@@ -193,6 +193,23 @@ if ($SIMULATE) {
 
 $healthy = empty($problems);
 
+// ---- record ------------------------------------------------------------------
+// Write this tick into the outage ledger (2026-08-24). BEFORE the alert
+// decision, and outside it: what gets RECORDED must not depend on what gets
+// SENT. The 2-consecutive-fails threshold and the hourly reminder exist to stop
+// the mail being noise, and they are right for mail - but they are wrong for
+// history. The 03:03 scheduler blips on 2026-08-21 and 2026-08-24 cleared
+// within one tick, never crossed the threshold, never emailed, and so existed
+// nowhere an admin would ever look. They are in the ledger now.
+//
+// --test is excluded because it forces the alert path without changing the
+// readings; a drill (--simulate-degraded) IS recorded, tagged 'drill', and left
+// out of every availability figure - a rehearsal should exercise this too.
+$ledgerChange = array('opened' => array(), 'closed' => array());
+if (!$TESTMODE) {
+    $ledgerChange = penumbra_outage_record($problems, time(), $config);
+}
+
 // ---- decide ------------------------------------------------------------------
 $prev = array('consecutive_fails' => 0, 'alerted' => false, 'last_alert' => 0, 'last_problems' => array());
 $raw = @file_get_contents($stateFile);
@@ -250,6 +267,10 @@ mon_log($verdict
     . (isset($sched['seconds_ago']) ? ' (' . $sched['seconds_ago'] . 's ago)' : '')
     . ' | smtp=' . (isset($smtp['status']) ? $smtp['status'] : '?')
     . ' | dbs=' . count($dbs)
+    // Transitions only. A tick that changed nothing says nothing extra, so the
+    // log stays scannable and the two lines that bracket an outage stand out.
+    . ($ledgerChange['opened'] ? ' | outage OPENED: ' . implode(',', $ledgerChange['opened']) : '')
+    . ($ledgerChange['closed'] ? ' | outage CLOSED: ' . implode(',', $ledgerChange['closed']) : '')
     . ($send ? ' | SENDING (' . $reason . ')' : ''));
 
 if (!$send) { exit($healthy ? 0 : 1); }
