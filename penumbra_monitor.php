@@ -63,6 +63,11 @@ $RECIPIENTS        = isset($MON['recipients'])   ? $MON['recipients']   : 'bplim
 $FROM              = isset($MON['from'])         ? $MON['from']         : 'penumbra-monitor@ncsu.edu';
 $FAILS_BEFORE_ALERT= isset($MON['fails_before']) ? (int)$MON['fails_before'] : 2;
 $REMIND_MINUTES    = isset($MON['remind_mins'])  ? (int)$MON['remind_mins']  : 60;
+// Flap detection (2026-08-28) - see the block further down for what these mean.
+// 3 bad checks in an hour is roughly "failing every twenty minutes", which is
+// well clear of the one-off blips the consecutive rule is designed to swallow.
+$FLAP_THRESHOLD    = isset($MON['flap_threshold'])   ? (int)$MON['flap_threshold']   : 3;
+$FLAP_WINDOW_MINS  = isset($MON['flap_window_mins']) ? (int)$MON['flap_window_mins'] : 60;
 
 $stateFile = 'D:\\Utilities\\PHP_8.2-p\\logs\\penumbra_monitor_state.json';
 $logFile   = 'D:\\Utilities\\PHP_8.2-p\\logs\\penumbra_monitor.log';
@@ -155,6 +160,74 @@ function mon_log($msg) {
     if ($VERBOSE) echo $line;
 }
 
+/**
+ * Fold one tick into the rolling flap window and report which components have
+ * crossed the threshold. See the long note at the flap-detection call site for
+ * WHY this rule exists; this is only the bookkeeping.
+ *
+ * DELIBERATELY PURE - no globals, no clock, no I/O - because the bug it exists
+ * to catch is a rule that behaves correctly on every tick in isolation and
+ * wrongly across a sequence. That is only provable by replaying a sequence, and
+ * only testable if the rule can be called without a database behind it.
+ *
+ * @param array $prevFlap    key => list of unix timestamps, from the last tick
+ * @param array $prevAlerted key => unix ts this key was last flap-alerted
+ * @param array $badKeys     component keys that looked bad THIS tick
+ * @param int   $now         this tick's timestamp
+ * @param int   $threshold   bad checks inside the window that constitute a flap
+ * @param int   $windowSecs  how far back the window reaches
+ * @param bool  $record      false on --test, so a drill cannot train the detector
+ * @param array $suppress    keys the CONSECUTIVE rule owns this tick - their marks
+ *                           are discarded, see the note on the unset() below
+ * @return array flap / flap_alerted / flapping (key => count that tripped it)
+ */
+function mon_flap_update($prevFlap, $prevAlerted, $badKeys, $now, $threshold, $windowSecs, $record = true, $suppress = array()) {
+    $hist    = is_array($prevFlap)    ? $prevFlap    : array();
+    $alerted = is_array($prevAlerted) ? $prevAlerted : array();
+    $cutoff  = $now - $windowSecs;
+
+    if ($record) {
+        foreach ($badKeys as $k) {
+            if (!isset($hist[$k]) || !is_array($hist[$k])) $hist[$k] = array();
+            $hist[$k][] = $now;
+        }
+    }
+
+    /* Prune EVERY key, not just the ones bad on this tick. A component that
+       stopped misbehaving has to age out on its own - otherwise marks left over
+       from this morning sit there forever, and one fresh blip tonight combines
+       with them to fire an alert about a system that is currently fine. */
+    foreach ($hist as $k => $stamps) {
+        $kept = array();
+        foreach ((array)$stamps as $ts) { if ((int)$ts > $cutoff) $kept[] = (int)$ts; }
+        if ($kept) { $hist[$k] = $kept; } else { unset($hist[$k]); }
+    }
+    // Expiring the alerted marker on the same window is what makes this remind
+    // rather than fire once: sustained flapping re-alerts, at most hourly.
+    foreach ($alerted as $k => $ts) { if ((int)$ts <= $cutoff) unset($alerted[$k]); }
+
+    /* A COMPONENT THE CONSECUTIVE RULE HAS REPORTED LEAVES NO MARKS BEHIND.
+       Caught in production on 2026-08-28, the first night this rule was live:
+       HR's nightly maintenance alerted correctly at 23:13 (2 consecutive) and
+       sent its RESOLVED note at 23:43 - and then a THIRD, wrong email at 23:48
+       announcing "intermittent failures", because seven marks from 23:08-23:38
+       were still inside the 60-minute window.
+       Guarding the send on $state['alerted'] is right DURING an episode and
+       useless after it: the recovery branch resets that flag to false, so the
+       marks outlive the thing that was suppressing them. Dropping the marks is
+       the durable form of the same intent - once an episode has been reported
+       through the primary channel, it is by definition not an UNreported flap.
+       Only the keys the alert actually names are dropped: a different
+       component's blip during the same window is still its own signal. */
+    foreach ($suppress as $k) { unset($hist[$k]); }
+
+    $flapping = array();
+    foreach ($hist as $k => $stamps) {
+        if (count($stamps) >= $threshold && !isset($alerted[$k])) $flapping[$k] = count($stamps);
+    }
+    return array('flap' => $hist, 'flap_alerted' => $alerted, 'flapping' => $flapping);
+}
+
 // ---- gather ------------------------------------------------------------------
 // probe_dbs + probe_smtp: this is the one caller that SHOULD pay for live checks.
 // Interactive pages must never probe (a dead listener blocks for 60-90s), which
@@ -211,7 +284,10 @@ if (!$TESTMODE) {
 }
 
 // ---- decide ------------------------------------------------------------------
-$prev = array('consecutive_fails' => 0, 'alerted' => false, 'last_alert' => 0, 'last_problems' => array());
+// flap / flap_alerted persist the rolling window the flap detector needs. They
+// are listed here so a state file written before 2026-08-28 still loads clean.
+$prev = array('consecutive_fails' => 0, 'alerted' => false, 'last_alert' => 0, 'last_problems' => array(),
+              'flap' => array(), 'flap_alerted' => array());
 $raw = @file_get_contents($stateFile);
 if ($raw) { $d = json_decode($raw, true); if (is_array($d)) { $prev = array_merge($prev, $d); } }
 
@@ -241,6 +317,97 @@ if ($healthy) {
 
 if ($TESTMODE) { $send = true; $reason = 'forced --test'; $subject = 'TEST: Penumbra monitor alert pipeline'; }
 
+// ---- flap detection ----------------------------------------------------------
+/* CONSECUTIVE IS NOT THE ONLY SHAPE A FAILURE HAS (2026-08-28).
+ *
+ * Everything above this line asks one question: is it STILL broken? That is the
+ * right question for the failure this watchdog was built for - a runner that
+ * dies and stays dead - and the 2-consecutive threshold is what keeps a single
+ * slow cycle from paging anyone at 3am.
+ *
+ * It is the wrong question for a link that is failing intermittently, and on
+ * 2026-08-28 that cost us. InfoEd was sick from roughly 11:53 to 13:19. The
+ * watchdog sampled it fourteen times and caught it red-handed twice - 11:54:58
+ * and 13:04:59 - but each catch recovered on the very next tick, so the counter
+ * reset to zero both times, never reached two, and nobody was told anything.
+ * Ninety minutes of a broken database, two ledger episodes reading
+ * "checks":1,"duration":0, one real user handed a 500, and total silence.
+ * Every alert rule here was working exactly as written.
+ *
+ * So this counts a second way: N bad checks within a rolling window, whether or
+ * not they touch. The window is per COMPONENT, keyed the same way the outage
+ * ledger keys episodes, so InfoEd flapping cannot be diluted by SMTP being fine.
+ *
+ * WHAT COUNTS AS BAD. Both the hard problems the snapshot reports AND the new
+ * 'degraded' state - a database that answered only after some of its connect
+ * attempts failed. Degraded is the signal that would have caught this on the
+ * first tick: it was true for most of that ninety minutes while 'down' was true
+ * for ten of it. A near-miss repeated is not a near-miss.
+ *
+ * WHY THE HISTORY OUTLIVES A GOOD TICK. The obvious implementation - keep the
+ * counter in $state and let the healthy branch reset it - is precisely the bug
+ * being fixed, one level up. Flap history is carried across BOTH branches on
+ * purpose and only ever expires by age.
+ *
+ * IT EMAILS BUT DOES NOT POST A BANNER. mon_sync_notice() is left keyed to the
+ * consecutive rule. Flapping is worth waking an admin; it is not worth telling
+ * every user the system is down, because between the blips it demonstrably is
+ * not - it is answering their reports. */
+
+// What looked wrong THIS tick, by stable component key.
+$badNow = array();
+foreach ($problems as $p) {
+    $c = penumbra_outage_classify($p);
+    if ($c['kind'] === 'drill') continue;   // a rehearsal must not train the detector
+    $badNow[$c['key']] = $p;
+}
+foreach ($dbs as $dbName => $d) {
+    if (isset($d['status']) && $d['status'] === 'degraded') {
+        $badNow['db:' . strtolower($dbName)] = 'database ' . $dbName . ' degraded ('
+            . (isset($d['failed_attempts']) ? $d['failed_attempts'] : '?')
+            . ' failed connect attempt(s) before one succeeded)';
+    }
+}
+
+$flapState = mon_flap_update(
+    isset($prev['flap'])         ? $prev['flap']         : array(),
+    isset($prev['flap_alerted']) ? $prev['flap_alerted'] : array(),
+    array_keys($badNow),
+    $now,
+    $FLAP_THRESHOLD,
+    $FLAP_WINDOW_MINS * 60,
+    !$TESTMODE,
+    // The consecutive rule has spoken for whatever is bad right now, so those
+    // marks must not also feed this one - see the unset() note in the function.
+    !empty($state['alerted']) ? array_keys($badNow) : array()
+);
+$flapHist    = $flapState['flap'];
+$flapAlerted = $flapState['flap_alerted'];
+$flapping    = $flapState['flapping'];
+
+/* Only when the consecutive rule has NOT already spoken. A sustained outage
+   trips both detectors - HR's nightly maintenance is 7 consecutive bad checks,
+   which is also 7 bad checks in an hour - and it must produce one email, not
+   two. The consecutive rule wins because it fires earlier and its subject line
+   is the more accurate description of what is happening. */
+$FLAPPING_ALERT = false;
+$flapLines = array();
+if (!$TESTMODE && !$send && empty($state['alerted']) && $flapping) {
+    foreach ($flapping as $k => $n) {
+        $flapLines[] = (isset($badNow[$k]) ? $badNow[$k] : $k)
+                     . ' - ' . $n . ' bad checks in the last ' . $FLAP_WINDOW_MINS . ' min';
+        $flapAlerted[$k] = $now;
+    }
+    $FLAPPING_ALERT = true;
+    $send    = true;
+    $reason  = 'flapping (' . count($flapping) . ' component(s), '
+             . $FLAP_THRESHOLD . '-in-' . $FLAP_WINDOW_MINS . 'min rule)';
+    $subject = 'ALERT: Penumbra - intermittent failures - ' . implode('; ', array_keys($flapping));
+}
+
+$state['flap']         = $flapHist;
+$state['flap_alerted'] = $flapAlerted;
+
 // PERSIST STATE HERE, before any early exit. Writing it only on the send path
 // (the first version of this file) meant consecutive_fails reset every quiet run
 // and the counter could never reach FAILS_BEFORE_ALERT - a watchdog that logs
@@ -262,11 +429,21 @@ if ($noticeOn && !$TESTMODE) {
 
 // ---- report ------------------------------------------------------------------
 $verdict = $healthy ? 'ok' : ('DEGRADED: ' . implode('; ', $problems));
+// Databases that answered only on a later fallback rung. Named in the log even
+// on an 'ok' tick, because before 2026-08-28 this was the state that left no
+// trace anywhere but php82_errors.log while a database quietly fell apart.
+$dbDegraded = array();
+foreach ($dbs as $dbName => $d) {
+    if (isset($d['status']) && $d['status'] === 'degraded') {
+        $dbDegraded[] = $dbName . '(' . (isset($d['failed_attempts']) ? $d['failed_attempts'] : '?') . ' failed)';
+    }
+}
 mon_log($verdict
     . ' | scheduler=' . (isset($sched['status']) ? $sched['status'] : '?')
     . (isset($sched['seconds_ago']) ? ' (' . $sched['seconds_ago'] . 's ago)' : '')
     . ' | smtp=' . (isset($smtp['status']) ? $smtp['status'] : '?')
     . ' | dbs=' . count($dbs)
+    . ($dbDegraded ? ' | DEGRADED: ' . implode(',', $dbDegraded) : '')
     // Transitions only. A tick that changed nothing says nothing extra, so the
     // log stays scannable and the two lines that bracket an outage stand out.
     . ($ledgerChange['opened'] ? ' | outage OPENED: ' . implode(',', $ledgerChange['opened']) : '')
@@ -280,7 +457,17 @@ if (!$send) { exit($healthy ? 0 : 1); }
 // notices use, so everything Penumbra sends unprompted looks like one system.
 // Recovery is green rather than alarm-red, and carries a tick instead of a
 // warning triangle: a RESOLVED note should be readable as good news at a glance.
-if ($healthy) {
+if ($FLAPPING_ALERT) {
+    /* Amber, not red, and deliberately not green even though this tick may well
+       be healthy: the whole point of a flap alert is that the instantaneous
+       reading is not the story. Whoever opens this needs to understand at a
+       glance that it is about a PATTERN over the last hour. */
+    $band = '#b26a00'; $glyph = '&#9888;';
+    $headline = 'Penumbra is failing intermittently';
+    $intro = 'A component has failed repeatedly over the last ' . $FLAP_WINDOW_MINS . ' minutes without '
+           . 'ever staying down long enough to trip the usual consecutive-failure alert. It may be '
+           . 'answering normally right now. The readings below are current; the pattern is the problem.';
+} elseif ($healthy) {
     $band = '#1a7f37'; $glyph = '&#10004;';
     $headline = 'Penumbra has recovered';
     $intro = 'Everything the watchdog checks is responding again. No action is needed - this note '
@@ -328,7 +515,9 @@ $rows .= penumbra_email_row('Checked', penumbra_email_h(date('Y-m-d H:i:s T')));
 
 $html  = penumbra_email_open($headline, $band, 'Penumbra Monitor', $glyph);
 $html .= penumbra_email_intro($intro);
-if (!$healthy && !empty($problems)) {
+if ($FLAPPING_ALERT && !empty($flapLines)) {
+    $html .= penumbra_email_callout('What keeps failing', nl2br(penumbra_email_h(implode("\n", $flapLines))));
+} elseif (!$healthy && !empty($problems)) {
     $html .= penumbra_email_callout('What is wrong', nl2br(penumbra_email_h(implode("\n", $problems))));
 }
 $html .= penumbra_email_section('System status', penumbra_email_kv_table($rows));
