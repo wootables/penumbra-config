@@ -255,6 +255,9 @@ if (is_array($snap)) {
 $sched = is_array($snap) && isset($snap['components']['scheduler']) ? $snap['components']['scheduler'] : array();
 $smtp  = is_array($snap) && isset($snap['components']['smtp'])      ? $snap['components']['smtp']      : array();
 $dbs   = is_array($snap) && isset($snap['components']['databases']) ? $snap['components']['databases'] : array();
+// www3 delivery (2026-09-12): are large responses reaching the reverse proxies?
+// Read from the IIS log inside the snapshot; 'down' arrives through $problems.
+$dlv   = is_array($snap) && isset($snap['components']['delivery'])  ? $snap['components']['delivery']  : array();
 
 // The synthetic fault goes in AFTER the real checks, so the readings in the email
 // stay truthful - the drill shows genuine scheduler/SMTP/database state and only
@@ -369,6 +372,13 @@ foreach ($dbs as $dbName => $d) {
     }
 }
 
+// www3 delivery (2026-09-12): intermittent stalls - some large responses
+// completing, some timing out - are exactly the shape the flap rule exists
+// for. A 'down' reading is already in $problems above and keyed the same way.
+if (isset($dlv['status']) && $dlv['status'] === 'degraded') {
+    $badNow['delivery'] = 'www3 delivery degraded (' . (isset($dlv['detail']) ? $dlv['detail'] : '?') . ')';
+}
+
 $flapState = mon_flap_update(
     isset($prev['flap'])         ? $prev['flap']         : array(),
     isset($prev['flap_alerted']) ? $prev['flap_alerted'] : array(),
@@ -443,6 +453,12 @@ mon_log($verdict
     . (isset($sched['seconds_ago']) ? ' (' . $sched['seconds_ago'] . 's ago)' : '')
     . ' | smtp=' . (isset($smtp['status']) ? $smtp['status'] : '?')
     . ' | dbs=' . count($dbs)
+    // Delivery every tick, like smtp=, so a quiet stretch and a broken path are
+    // told apart in the log itself. 'intermittent' rather than 'degraded' here:
+    // the log console paints the word DEGRADED red, and this state is amber.
+    . ' | delivery=' . (!isset($dlv['status']) ? '?' : ($dlv['status'] === 'degraded' ? 'intermittent' : $dlv['status']))
+    . ((isset($dlv['status']) && ($dlv['status'] === 'down' || $dlv['status'] === 'degraded'))
+        ? ' (' . (int)$dlv['stalled'] . ' stalled/' . (int)$dlv['ok'] . ' ok)' : '')
     . ($dbDegraded ? ' | DEGRADED: ' . implode(',', $dbDegraded) : '')
     // Transitions only. A tick that changed nothing says nothing extra, so the
     // log stays scannable and the two lines that bracket an outage stand out.
@@ -505,6 +521,9 @@ $rows .= penumbra_email_row('SMTP',
         '<strong>' . penumbra_email_h(isset($smtp['status']) ? strtoupper($smtp['status']) : '?') . '</strong>'
       . (isset($smtp['host']) ? ' &middot; ' . penumbra_email_h($smtp['host'] . ':' . $smtp['port']) : '')
       . (isset($smtp['detail']) ? '<br><span style="color:#888888;">' . penumbra_email_h($smtp['detail']) . '</span>' : ''));
+$rows .= penumbra_email_row('www3 delivery',
+        '<strong>' . penumbra_email_h(isset($dlv['status']) ? strtoupper($dlv['status']) : '?') . '</strong>'
+      . (isset($dlv['detail']) ? '<br><span style="color:#888888;">' . penumbra_email_h($dlv['detail']) . '</span>' : ''));
 foreach ($dbs as $dbName => $d) {
     $rows .= penumbra_email_row(strtoupper($dbName),
             '<strong>' . penumbra_email_h(isset($d['status']) ? strtoupper($d['status']) : '?') . '</strong>'
