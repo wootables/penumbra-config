@@ -68,6 +68,11 @@ $REMIND_MINUTES    = isset($MON['remind_mins'])  ? (int)$MON['remind_mins']  : 6
 // well clear of the one-off blips the consecutive rule is designed to swallow.
 $FLAP_THRESHOLD    = isset($MON['flap_threshold'])   ? (int)$MON['flap_threshold']   : 3;
 $FLAP_WINDOW_MINS  = isset($MON['flap_window_mins']) ? (int)$MON['flap_window_mins'] : 60;
+// Correlated blips (2026-09-12) - see mon_correlated_update(). This many
+// components going bad on the SAME check, having been fine on the previous one,
+// is alerted at once (amber), at most once per gap.
+$CORRELATED_MIN      = isset($MON['correlated_min'])      ? (int)$MON['correlated_min']      : 2;
+$CORRELATED_GAP_MINS = isset($MON['correlated_gap_mins']) ? (int)$MON['correlated_gap_mins'] : 60;
 
 $stateFile = 'D:\\Utilities\\PHP_8.2-p\\logs\\penumbra_monitor_state.json';
 $logFile   = 'D:\\Utilities\\PHP_8.2-p\\logs\\penumbra_monitor.log';
@@ -228,6 +233,70 @@ function mon_flap_update($prevFlap, $prevAlerted, $badKeys, $now, $threshold, $w
     return array('flap' => $hist, 'flap_alerted' => $alerted, 'flapping' => $flapping);
 }
 
+/**
+ * Correlated blips (2026-09-12): several components going bad on the SAME check.
+ *
+ * WHY. On 2026-09-12 at 06:48:58 SMTP was down AND InfoEd connected only on its
+ * third rung, on one tick; both were clean again at 06:53. The same pair at
+ * 07:53:43, clean at 07:58. Two independent systems failing at the same second
+ * is a network event, and it was the first sign of that day's proxy-path
+ * outage - but every rule above is per component, so it saw two isolated
+ * one-tick blips (below the 2-consecutive rule, and 65 minutes apart, so
+ * outside the 3-in-60 flap window) and said nothing.
+ *
+ * WHAT COUNTS. Components bad on THIS tick that were NOT bad on the previous
+ * one - fresh failures. A component already down (HR in its nightly window)
+ * plus one newcomer is not correlated; two newcomers beside it are. Degraded
+ * counts as bad, exactly as it does for the flap rule.
+ *
+ * PURE - no globals, clock or IO - so a sequence can be replayed in a test.
+ * Fires at most once per $minGapSecs. $suppress is true while a reported
+ * outage is in progress (those recipients are already engaged), when another
+ * rule has already sent this tick, and on --test.
+ *
+ * @return array newly (sorted keys), fire (bool), last_alert (unix)
+ */
+function mon_correlated_update($prevBadKeys, $badKeys, $now, $lastAlert, $minGapSecs, $minComponents = 2, $suppress = false) {
+    $prev  = is_array($prevBadKeys) ? array_values($prevBadKeys) : array();
+    $newly = array_values(array_diff(is_array($badKeys) ? $badKeys : array(), $prev));
+    sort($newly);
+    $last  = (int)$lastAlert;
+    $fire  = count($newly) >= max(1, (int)$minComponents)
+          && !$suppress
+          && ((int)$now - $last) >= (int)$minGapSecs;
+    return array('newly' => $newly, 'fire' => $fire, 'last_alert' => $fire ? (int)$now : $last);
+}
+
+/**
+ * Known windows (2026-09-12): a problem whose ledger episode STARTED inside a
+ * muted half hour is recorded and listed exactly as before, but withheld from
+ * the alert state machine, the user banner and the flap/correlated detectors.
+ * The mute list is written by health.php (the bell on a pattern pill) and
+ * matched by penumbra_mute_lookup(): component key + start within 25 minutes
+ * of the muted half hour's centre. PURE.
+ *
+ * @param array $problems     this tick's problem strings
+ * @param array $openEpisodes the ledger's open map (key => episode) AFTER this
+ *                            tick was recorded, so a first-tick problem has its
+ *                            start; with no episode the tick time stands in
+ * @param array $mutes        penumbra_mutes_read()
+ * @return array alert => problems to act on, muted => key => problem withheld
+ */
+function mon_apply_mutes($problems, $openEpisodes, $mutes, $now) {
+    $out = array('alert' => array(), 'muted' => array());
+    foreach ((array)$problems as $p) {
+        $c = penumbra_outage_classify($p);
+        $start = (is_array($openEpisodes) && isset($openEpisodes[$c['key']]['started_at']))
+               ? (int)$openEpisodes[$c['key']]['started_at'] : (int)$now;
+        if ($c['kind'] !== 'drill' && penumbra_mute_lookup($mutes, $c['key'], $start)) {
+            $out['muted'][$c['key']] = $p;
+        } else {
+            $out['alert'][] = $p;
+        }
+    }
+    return $out;
+}
+
 // ---- gather ------------------------------------------------------------------
 // probe_dbs + probe_smtp: this is the one caller that SHOULD pay for live checks.
 // Interactive pages must never probe (a dead listener blocks for 60-90s), which
@@ -259,6 +328,23 @@ $dbs   = is_array($snap) && isset($snap['components']['databases']) ? $snap['com
 // Read from the IIS log inside the snapshot; 'down' arrives through $problems.
 $dlv   = is_array($snap) && isset($snap['components']['delivery'])  ? $snap['components']['delivery']  : array();
 
+// Degraded readings this tick, by component key: a database that answered only
+// after some connect attempts failed, or delivery that is stalling
+// intermittently. Not outages - the app reached them - but recorded in the
+// ledger as NEAR MISSES (2026-09-12) and counted by the flap and correlated
+// rules below. Built once here so the ledger and the detectors cannot disagree.
+$degradedNow = array();
+foreach ($dbs as $dbName => $d) {
+    if (isset($d['status']) && $d['status'] === 'degraded') {
+        $degradedNow['db:' . strtolower($dbName)] = 'database ' . $dbName . ' degraded ('
+            . (isset($d['failed_attempts']) ? $d['failed_attempts'] : '?')
+            . ' failed connect attempt(s) before one succeeded)';
+    }
+}
+if (isset($dlv['status']) && $dlv['status'] === 'degraded') {
+    $degradedNow['delivery'] = 'www3 delivery degraded (' . (isset($dlv['detail']) ? $dlv['detail'] : '?') . ')';
+}
+
 // The synthetic fault goes in AFTER the real checks, so the readings in the email
 // stay truthful - the drill shows genuine scheduler/SMTP/database state and only
 // the fault itself is fabricated. Labelled loudly everywhere it surfaces so a
@@ -266,8 +352,6 @@ $dlv   = is_array($snap) && isset($snap['components']['delivery'])  ? $snap['com
 if ($SIMULATE) {
     $problems[] = 'SIMULATED FAULT - this is a drill, not a real failure';
 }
-
-$healthy = empty($problems);
 
 // ---- record ------------------------------------------------------------------
 // Write this tick into the outage ledger (2026-08-24). BEFORE the alert
@@ -281,16 +365,35 @@ $healthy = empty($problems);
 // --test is excluded because it forces the alert path without changing the
 // readings; a drill (--simulate-degraded) IS recorded, tagged 'drill', and left
 // out of every availability figure - a rehearsal should exercise this too.
-$ledgerChange = array('opened' => array(), 'closed' => array());
+$ledgerChange = array('opened' => array(), 'closed' => array(), 'near_opened' => array(), 'near_closed' => array());
 if (!$TESTMODE) {
-    $ledgerChange = penumbra_outage_record($problems, time(), $config);
+    // Degraded readings go in as near misses (2026-09-12): their own episodes,
+    // never downtime. Before this they existed nowhere but the log line above.
+    $ledgerChange = penumbra_outage_record($problems, time(), $config, array_values($degradedNow));
 }
+
+// ---- known windows ------------------------------------------------------------
+// AFTER recording, BEFORE deciding: a muted window is still history, it is just
+// not a page. The ledger's open map gives each problem its episode start, which
+// is what the mute is keyed on. $problems from here on is what may alert.
+$mutedNow = array();
+$pnbMutes = function_exists('penumbra_mutes_read') ? penumbra_mutes_read($config) : array();
+if ($pnbMutes) {
+    $pnbOpen = penumbra_outage_ledger_read($config);
+    $mm = mon_apply_mutes($problems, isset($pnbOpen['open']) ? $pnbOpen['open'] : array(), $pnbMutes, time());
+    $problems = $mm['alert'];
+    $mutedNow = $mm['muted'];
+}
+
+$healthy = empty($problems);
 
 // ---- decide ------------------------------------------------------------------
 // flap / flap_alerted persist the rolling window the flap detector needs. They
-// are listed here so a state file written before 2026-08-28 still loads clean.
+// are listed here so a state file written before 2026-08-28 still loads clean;
+// last_bad_keys / correlated_last_alert (2026-09-12) likewise.
 $prev = array('consecutive_fails' => 0, 'alerted' => false, 'last_alert' => 0, 'last_problems' => array(),
-              'flap' => array(), 'flap_alerted' => array());
+              'flap' => array(), 'flap_alerted' => array(),
+              'last_bad_keys' => array(), 'correlated_last_alert' => 0);
 $raw = @file_get_contents($stateFile);
 if ($raw) { $d = json_decode($raw, true); if (is_array($d)) { $prev = array_merge($prev, $d); } }
 
@@ -364,19 +467,11 @@ foreach ($problems as $p) {
     if ($c['kind'] === 'drill') continue;   // a rehearsal must not train the detector
     $badNow[$c['key']] = $p;
 }
-foreach ($dbs as $dbName => $d) {
-    if (isset($d['status']) && $d['status'] === 'degraded') {
-        $badNow['db:' . strtolower($dbName)] = 'database ' . $dbName . ' degraded ('
-            . (isset($d['failed_attempts']) ? $d['failed_attempts'] : '?')
-            . ' failed connect attempt(s) before one succeeded)';
-    }
-}
-
-// www3 delivery (2026-09-12): intermittent stalls - some large responses
-// completing, some timing out - are exactly the shape the flap rule exists
-// for. A 'down' reading is already in $problems above and keyed the same way.
-if (isset($dlv['status']) && $dlv['status'] === 'degraded') {
-    $badNow['delivery'] = 'www3 delivery degraded (' . (isset($dlv['detail']) ? $dlv['detail'] : '?') . ')';
+// Degraded readings - a database on a fallback rung, intermittent delivery -
+// are bad too: exactly the shape the flap rule exists for. Built once above
+// ($degradedNow) so the ledger's near misses and this detector see one list.
+foreach ($degradedNow as $k => $desc) {
+    if (!isset($badNow[$k])) $badNow[$k] = $desc;
 }
 
 $flapState = mon_flap_update(
@@ -414,6 +509,35 @@ if (!$TESTMODE && !$send && empty($state['alerted']) && $flapping) {
              . $FLAP_THRESHOLD . '-in-' . $FLAP_WINDOW_MINS . 'min rule)';
     $subject = 'ALERT: Penumbra - intermittent failures - ' . implode('; ', array_keys($flapping));
 }
+
+/* CORRELATED BLIPS (2026-09-12) - see mon_correlated_update(). Fresh failures
+   on this tick, counted across components. Fires only when nothing else has
+   spoken this tick and no reported outage is in progress; amber, like the flap
+   rule, and for the same reason: it may all be over by the next check. It does
+   NOT mark the state alerted, so no RESOLVED note follows it - if any of them
+   stays down, the consecutive rule sends its own alert five minutes later,
+   exactly as it always has. */
+$corr = mon_correlated_update(
+    isset($prev['last_bad_keys']) ? $prev['last_bad_keys'] : array(),
+    array_keys($badNow),
+    $now,
+    isset($prev['correlated_last_alert']) ? (int)$prev['correlated_last_alert'] : 0,
+    $CORRELATED_GAP_MINS * 60,
+    $CORRELATED_MIN,
+    $TESTMODE || $send || !empty($state['alerted'])
+);
+$CORRELATED_ALERT = false;
+$corrLines = array();
+if ($corr['fire']) {
+    foreach ($corr['newly'] as $k) { $corrLines[] = isset($badNow[$k]) ? $badNow[$k] : $k; }
+    $CORRELATED_ALERT = true;
+    $send    = true;
+    $reason  = 'correlated (' . count($corr['newly']) . ' components failed on the same check)';
+    $subject = 'ALERT: Penumbra - ' . count($corr['newly']) . ' components failed together - '
+             . implode(', ', $corr['newly']);
+}
+$state['last_bad_keys']         = array_keys($badNow);
+$state['correlated_last_alert'] = $corr['last_alert'];
 
 $state['flap']         = $flapHist;
 $state['flap_alerted'] = $flapAlerted;
@@ -464,6 +588,13 @@ mon_log($verdict
     // log stays scannable and the two lines that bracket an outage stand out.
     . ($ledgerChange['opened'] ? ' | outage OPENED: ' . implode(',', $ledgerChange['opened']) : '')
     . ($ledgerChange['closed'] ? ' | outage CLOSED: ' . implode(',', $ledgerChange['closed']) : '')
+    . (!empty($ledgerChange['near_opened']) ? ' | near-miss OPENED: ' . implode(',', $ledgerChange['near_opened']) : '')
+    . (!empty($ledgerChange['near_closed']) ? ' | near-miss CLOSED: ' . implode(',', $ledgerChange['near_closed']) : '')
+    // The pattern is named whether or not it was sent (rate-limited, or a
+    // reported outage already in progress), so the log can show what the rule saw.
+    . (count($corr['newly']) >= $CORRELATED_MIN ? ' | correlated: ' . implode(',', $corr['newly']) : '')
+    // A known window in progress: recorded above, withheld from the mail and banner.
+    . ($mutedNow ? ' | muted: ' . implode(',', array_keys($mutedNow)) : '')
     . ($send ? ' | SENDING (' . $reason . ')' : ''));
 
 if (!$send) { exit($healthy ? 0 : 1); }
@@ -483,6 +614,20 @@ if ($FLAPPING_ALERT) {
     $intro = 'A component has failed repeatedly over the last ' . $FLAP_WINDOW_MINS . ' minutes without '
            . 'ever staying down long enough to trip the usual consecutive-failure alert. It may be '
            . 'answering normally right now. The readings below are current; the pattern is the problem.';
+} elseif ($CORRELATED_ALERT) {
+    /* Amber: several things failed on one check. It may already be over - the
+       point is the coincidence. Independent systems rarely fail together by
+       chance; on 2026-09-12 this exact pair, twice in an hour, was the first
+       sign of a day-long outage on the path to the proxies. Checked BEFORE the
+       healthy branch on purpose: a tick whose fresh failures are all degraded
+       readings has no hard problem and would otherwise render as a recovery. */
+    $band = '#b26a00'; $glyph = '&#9888;';
+    $headline = 'Several things failed at once';
+    $intro = count($corr['newly']) . ' components went bad on the same check after being fine on the one '
+           . 'before: ' . implode(', ', $corr['newly']) . '. Independent systems rarely fail together by chance, '
+           . 'so this is usually the network rather than any one of them. The readings below are current. No '
+           . 'further note follows for this on its own; if any of them stays down, the usual alert arrives '
+           . 'after two consecutive checks.';
 } elseif ($healthy) {
     $band = '#1a7f37'; $glyph = '&#10004;';
     $headline = 'Penumbra has recovered';
@@ -536,6 +681,8 @@ $html  = penumbra_email_open($headline, $band, 'Penumbra Monitor', $glyph);
 $html .= penumbra_email_intro($intro);
 if ($FLAPPING_ALERT && !empty($flapLines)) {
     $html .= penumbra_email_callout('What keeps failing', nl2br(penumbra_email_h(implode("\n", $flapLines))));
+} elseif ($CORRELATED_ALERT && !empty($corrLines)) {
+    $html .= penumbra_email_callout('What failed together', nl2br(penumbra_email_h(implode("\n", $corrLines))));
 } elseif (!$healthy && !empty($problems)) {
     $html .= penumbra_email_callout('What is wrong', nl2br(penumbra_email_h(implode("\n", $problems))));
 }
@@ -546,7 +693,8 @@ $html .= penumbra_email_section('Where to look', penumbra_email_pre(
     . "Runbook:        " . $APP . "\\README.md  (section 4)"));
 $html .= penumbra_email_cta('https://www3.acs.ncsu.edu/sponsor_migration/penumbra/health.php', 'Open the health dashboard');
 $html .= penumbra_email_close('This is an automated message from the Penumbra watchdog (penumbra_monitor.php, reason: '
-    . penumbra_email_h($reason) . '). It alerts only after consecutive failed checks and reminds at most hourly. '
+    . penumbra_email_h($reason) . '). It alerts after consecutive failed checks, on intermittent failures, or when '
+    . 'several components fail on one check, and reminds at most hourly. '
     . 'Replies are not monitored.');
 
 $sent = penumbra_email_send($RECIPIENTS, $subject, $html, 'Penumbra Monitor', $FROM);
