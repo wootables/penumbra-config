@@ -57,7 +57,7 @@ return [
 				"COLLEGES", "PERSONNEL_DEPARTMENT_RELATION", "HS_EDITHIST"
 			],
 			'infoed' => [
-				"LOVROLESSYSTEM", "LOVROLES","LOVMODULES","FACULTY", "FACULTYEXTENDED", "DEPTPERSONNEL", "F_CERT", "UNIT", "PROP_STAT", "PROPOSAL", 
+				"LOVROLESSYSTEM", "LOVROLES","LOVMODULES","FACULTY", "FACULTYEXTENDED", "DEPTPERSONNEL", "F_CERT", "UNIT", "F_UNIT", "PROP_STAT", "PROPOSAL", 
 				"CODETAB", "SPONSPAS", "PROJMAIN", "COIMAIN", "PROP_U", "PROJMAINPERSONNEL", "PROJMAINXREF", "F_POSITION", "PROJOBJECT", 
 				"PROJOBJECTAWARD", "PROJOBJECT_U", "PT_UNIT", "PROPPDSBUDREF", "OBJECTTYPES", "TE", "TEMAIN", "TEMAININCREMENT", "TEPERIODINC", "TEPDS", 
 				"RPT_DYN_PM_ATTRIBUTES","RPT_PT_PR_PERSONNEL", "DEPTINFORMATION","SP_UDF","DEPT_DUNS_UEI","CLIENTATTRIBUTES",
@@ -186,6 +186,33 @@ return [
 	//   'log'     = don't block; only error_log what WOULD be blocked (dry run).
 	//   'off'     = disable the guard entirely.
 	'csrf_guard_mode' => 'enforce',
+
+	// -----------------------------------------------------------------------
+	// DROP_FILE delivery allow-lists (2026-09-04)
+	// -----------------------------------------------------------------------
+	// A scheduled DROP_FILE task may write ONLY under one of these roots (UNC
+	// \\server\share\folder or local X:\folder, matched as a case-insensitive
+	// path-segment prefix), and may connect ONLY to these hosts for sftp/scp/ftp
+	// or to S3 endpoints whose host is listed (the AWS default endpoint counts as
+	// s3.<region>.amazonaws.com). EMPTY = every DROP_FILE task is refused, at save
+	// time and again at run time - deny by default. Checked by
+	// penumbraDropDestinationError() (db_connection.php); the UNC transport then
+	// re-checks the RESOLVED directory so a junction cannot redirect the write.
+	// Single-quoted PHP: write each backslash twice ('\\\\server\\share').
+	'file_drop_allowed_roots' => [
+		// '\\\\fileserver.oit.ncsu.edu\\penumbra_drops',
+		// 'D:\\penumbra_drops',
+	],
+	'file_drop_allowed_hosts' => [
+		// 'gosparcs.oit.ncsu.edu',
+	],
+	// Optional SSH host-key pins for sftp/scp: host => 'SHA256:<base64>' as
+	// printed by `ssh-keygen -lf`, or copied from the scheduler log, which
+	// records "SSH host key for HOST is SHA256:..." on every UNPINNED connection.
+	// A pinned host that presents a different key is refused.
+	'file_drop_sftp_fingerprints' => [
+		// 'gosparcs.oit.ncsu.edu' => 'SHA256:AAAA...',
+	],
 
 	'scheduler_secret_key' => $dec('enc:v1:dwQoklPBtWcxAhFu8/VAE+f+2TS1uE7RyJkvJl21VqlafQJbBOX/vnNsGBkQ3Z+QMTju2jePy0Dj6UE2bUlGpAS2cVK1fl73nP4/Rw=='),
 	
