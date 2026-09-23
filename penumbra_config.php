@@ -202,6 +202,10 @@ return [
 	'file_drop_allowed_roots' => [
 		// '\\\\fileserver.oit.ncsu.edu\\penumbra_drops',
 		// 'D:\\penumbra_drops',
+		// 2026-09-18: test destination for scheduled File Drops (created by the app
+		// owner for the Custom Template E2E). Inside the webroot, so exports\web.config
+		// denies ALL HTTP access to it - keep that file if this root stays listed.
+		'C:\\inetpub\\wwwroot\\sponsor_migration\\penumbra\\exports',
 	],
 	'file_drop_allowed_hosts' => [
 		// 'gosparcs.oit.ncsu.edu',
