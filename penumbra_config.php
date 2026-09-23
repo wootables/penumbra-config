@@ -219,5 +219,10 @@ return [
 	],
 
 	'scheduler_secret_key' => $dec('enc:v1:dwQoklPBtWcxAhFu8/VAE+f+2TS1uE7RyJkvJl21VqlafQJbBOX/vnNsGBkQ3Z+QMTju2jePy0Dj6UE2bUlGpAS2cVK1fl73nP4/Rw=='),
+
+	// Employee directory refresh (people_sync.php, HR -> NC_REPORTING.PENUMBRA_PEOPLE).
+	// The scheduler runner launches it once a day after this time (HH:MM, America/New_York).
+	// Absent or '' = the runner never launches it.
+	'people_sync_time' => '05:30',
 	
 ];
