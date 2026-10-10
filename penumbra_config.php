@@ -220,9 +220,13 @@ return [
 
 	'scheduler_secret_key' => $dec('enc:v1:dwQoklPBtWcxAhFu8/VAE+f+2TS1uE7RyJkvJl21VqlafQJbBOX/vnNsGBkQ3Z+QMTju2jePy0Dj6UE2bUlGpAS2cVK1fl73nP4/Rw=='),
 
-	// Employee directory refresh (people_sync.php, HR -> NC_REPORTING.PENUMBRA_PEOPLE).
-	// The scheduler runner launches it once a day after this time (HH:MM, America/New_York).
-	// Absent or '' = the runner never launches it.
-	'people_sync_time' => '05:30',
+	// Penumbra self-maintenance jobs, run by the scheduler runner at the end of a
+	// cycle, once a day after the given time (HH:MM, America/New_York). The job
+	// names are the registry in penumbra_maintenance.php - config only schedules
+	// them, it can never name a script. Remove a line (or set '') to stop a job.
+	// Run one now without waiting: create an empty file log\maint_<job>.request (log\maint_<job>.paused holds one).
+	'maintenance' => [
+		'people_sync' => '05:30',   // HR -> NC_REPORTING.PENUMBRA_PEOPLE (people_sync.php)
+	],
 	
 ];
