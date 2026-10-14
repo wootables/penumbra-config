@@ -1,0 +1,2703 @@
+{
+ "nopaint": {
+  "file": "main",
+  "edits": [
+   [
+    "            var on = !hold && pivotNotesActive();\r\n            var toks = on ? pivotRowTokens() : [];",
+    "            var on = false;\r\n            var toks = [];"
+   ]
+  ],
+  "must": [
+   "V-nested-leaf",
+   "V-nested-group",
+   "V-nested-count",
+   "V-nested-notext",
+   "V-nested-faint",
+   "C-nested-open",
+   "C-nested-nofold",
+   "C-nested-place",
+   "C-nested-focus",
+   "C-nested-post",
+   "C-nested-again",
+   "C-nested-one",
+   "C-nested-band",
+   "C-nested-esc",
+   "C-nested-follow",
+   "C-nested-collapse",
+   "C-nested-away",
+   "V-static",
+   "V-flat",
+   "V-single",
+   "V-reorder",
+   "V-rank",
+   "V-collapsed-sum",
+   "V-collapsed-built",
+   "R-reveal",
+   "K-off-on",
+   "K-off-counts",
+   "V-exports-icons",
+   "J-chip-jump",
+   "P-wolf-hover",
+   "T-wolf-band",
+   "T-rr-race",
+   "T-rr-keep",
+   "T-rr-gone",
+   "T-rr-group",
+   "P-tip-shown",
+   "T-tip-gone",
+   "T-tip-again",
+   "T-tip-back",
+   "D-thread-ask",
+   "D-thread-post",
+   "D-reply-ask",
+   "D-panel-ask",
+   "D-panel-status",
+   "C-rc-post",
+   "C-rc-sort",
+   "C-rc-clip",
+   "C-rc-search",
+   "C-rc-page",
+   "C-rc-band",
+   "D-rc-ask",
+   "C-cw-post",
+   "C-cw-survive",
+   "C-cw-again"
+  ],
+  "scn": null
+ },
+ "noobserver": {
+  "file": "main",
+  "edits": [
+   [
+    "            _pvMo.observe(pc, { childList: true, subtree: true });",
+    "            void pc;"
+   ]
+  ],
+  "must": [
+   "V-nested-leaf",
+   "V-nested-group",
+   "V-nested-count",
+   "V-nested-notext",
+   "V-nested-faint",
+   "C-nested-open",
+   "C-nested-nofold",
+   "C-nested-place",
+   "C-nested-focus",
+   "C-nested-post",
+   "C-nested-again",
+   "C-nested-one",
+   "C-nested-band",
+   "C-nested-esc",
+   "C-nested-follow",
+   "C-nested-collapse",
+   "C-nested-away",
+   "V-static",
+   "V-flat",
+   "V-single",
+   "V-reorder",
+   "V-rank",
+   "V-collapsed-sum",
+   "V-collapsed-built",
+   "V-exports-icons",
+   "P-wolf-hover",
+   "T-wolf-band",
+   "T-rr-race",
+   "T-rr-keep",
+   "T-rr-gone",
+   "T-rr-group",
+   "P-tip-shown",
+   "T-tip-gone",
+   "T-tip-again",
+   "T-tip-back",
+   "D-thread-ask",
+   "D-thread-post",
+   "D-reply-ask",
+   "D-panel-ask",
+   "D-panel-status"
+  ],
+  "scn": null
+ },
+ "nosort": {
+  "file": "main",
+  "edits": [
+   [
+    "                pairs.sort(function (a, b) { return a[0] < b[0] ? -1 : (a[0] > b[0] ? 1 : 0); });",
+    "                void 0;"
+   ]
+  ],
+  "must": [
+   "V-reorder"
+  ],
+  "scn": [
+   "reorder",
+   "nested",
+   "single"
+  ]
+ },
+ "nosummary": {
+  "file": "main",
+  "edits": [
+   [
+    "                if (sumKey !== null) {\r\n                    parts = sumKey.split(PV_SEP);",
+    "                if (sumKey !== null) { continue;\r\n                    parts = sumKey.split(PV_SEP);"
+   ]
+  ],
+  "must": [
+   "V-collapsed-sum",
+   "C-nested-collapse"
+  ],
+  "scn": [
+   "collapsed",
+   "nested",
+   "reveal"
+  ]
+ },
+ "noother": {
+  "file": "main",
+  "edits": [
+   [
+    "                if (parts[i] === PV_OTHER) { pairs = null; break; }",
+    "                if (false) { pairs = null; break; }"
+   ]
+  ],
+  "must": [
+   "V-rank"
+  ],
+  "scn": [
+   "rank"
+  ]
+ },
+ "flatall": {
+  "file": "main",
+  "edits": [
+   [
+    "                    } else if (lvl === 0) {\r\n                        stampPivotCell(td, parts, toks, false, counts);",
+    "                    } else if (true) {\r\n                        stampPivotCell(td, parts, toks, false, counts);"
+   ]
+  ],
+  "must": [
+   "V-flat"
+  ],
+  "scn": [
+   "flat"
+  ]
+ },
+ "counttext": {
+  "file": "main",
+  "edits": [
+   [
+    "                + '<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"></path></svg>'\r\n                + '</button>';\r\n        }\r\n        // The icon goes FIRST",
+    "                + '<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"></path></svg>'\r\n                + (n ? n : '') + '</button>';\r\n        }\r\n        // The icon goes FIRST"
+   ]
+  ],
+  "must": [
+   "V-nested-notext"
+  ],
+  "scn": [
+   "nested",
+   "exports"
+  ]
+ },
+ "nostriphtml": {
+  "file": "main",
+  "edits": [
+   [
+    "                    $tdClone.find('.pivot-collapse-toggle, .journal-pvnote-btn').remove();",
+    "                    $tdClone.find('.pivot-collapse-toggle').remove();"
+   ]
+  ],
+  "must": [
+   "X-exports-html"
+  ],
+  "scn": [
+   "exports"
+  ]
+ },
+ "eq-nostriparray": {
+  "file": "main",
+  "edits": [
+   [
+    ".find('.sort-icon, .col-sort-icon, .pivot-collapse-toggle, .journal-pvnote-btn').remove()",
+    ".find('.sort-icon, .col-sort-icon, .pivot-collapse-toggle').remove()"
+   ]
+  ],
+  "must": [],
+  "scn": [
+   "exports"
+  ]
+ },
+ "noaway": {
+  "file": "main",
+  "edits": [
+   [
+    "                : ($('#pivot-output-container').is(':visible') && !!document.getElementById('pivotResultTable'));",
+    "                : (!!document.getElementById('pivotResultTable'));"
+   ]
+  ],
+  "must": [
+   "C-nested-away"
+  ],
+  "scn": [
+   "nested"
+  ]
+ },
+ "nofollow": {
+  "file": "main",
+  "edits": [
+   [
+    "            queuePlacePivotNoteCard();\r\n        }, true);",
+    "            void 0;\r\n        }, true);"
+   ]
+  ],
+  "must": [
+   "C-nested-follow"
+  ],
+  "scn": [
+   "nested"
+  ]
+ },
+ "noreanchor": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (refind || !cardAnchorBox(c.anchor, c.host)) {",
+    "            if (false) {"
+   ]
+  ],
+  "must": [
+   "C-nested-collapse"
+  ],
+  "scn": [
+   "nested",
+   "jpanel"
+  ]
+ },
+ "nokeyunlock": {
+  "file": "main",
+  "edits": [
+   [
+    "            $('#journalRowNotesEnable').prop('disabled', false);",
+    "            $('#journalRowNotesEnable').prop('disabled', !ok);"
+   ]
+  ],
+  "must": [
+   "K-off-panel",
+   "K-off-on",
+   "K-off-counts",
+   "K-off-status",
+   "K-off-saved"
+  ],
+  "scn": [
+   "off"
+  ]
+ },
+ "nosavenokey": {
+  "file": "main",
+  "edits": [
+   [
+    "        if (window._penumbraJournalRowNotes) {\r\n            viewOptions.journalRowNotes = true;",
+    "        if (window._penumbraJournalRowNotes && window._penumbraJournalKeyColumns && window._penumbraJournalKeyColumns.length) {\r\n            viewOptions.journalRowNotes = true;"
+   ]
+  ],
+  "must": [
+   "K-off-saved"
+  ],
+  "scn": [
+   "off"
+  ]
+ },
+ "nofetchnokey": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (!rid || window._penumbraJournalHidden || !window._penumbraJournalRowNotes) {\r\n                window._penumbraRowNotes = {}; window._penumbraRowNoteCounts = {};\r\n                window._penumbraPivotNotes",
+    "            if (!rid || window._penumbraJournalHidden || !window._penumbraJournalRowNotes || !keyCols()) {\r\n                window._penumbraRowNotes = {}; window._penumbraRowNoteCounts = {};\r\n                window._penumbraPivotNotes"
+   ]
+  ],
+  "must": [
+   "V-nested-count",
+   "V-nested-faint",
+   "C-nested-open",
+   "C-nested-post",
+   "V-flat",
+   "V-single",
+   "V-reorder",
+   "V-collapsed-sum",
+   "V-collapsed-built",
+   "K-off-counts",
+   "D-thread-ask",
+   "D-thread-post",
+   "D-reply-ask",
+   "V-bands-shared",
+   "V-bands-blank",
+   "C-bands-post",
+   "V-ch-pin",
+   "V-ch-pin-offset",
+   "V-ch-tip",
+   "C-ch-menu",
+   "C-ch-open",
+   "C-ch-post",
+   "C-ch-zero",
+   "C-ch-breakdown",
+   "V-chd-group",
+   "V-chd-drilled",
+   "C-chd-menu",
+   "C-chd-open",
+   "V-chp-pin",
+   "V-chp-tip",
+   "V-cho-nokey",
+   "V-chb-blank",
+   "V-ch2-retry",
+   "V-cv-nolabel",
+   "V-cv-nopin",
+   "V-cv-area",
+   "V-cv-inside",
+   "V-cv-past",
+   "V-cv-arc",
+   "V-cv-quiet",
+   "V-cv-hover",
+   "V-cv-open",
+   "V-cw-btn",
+   "V-cw-quiet",
+   "C-cw-open",
+   "C-cw-post"
+  ],
+  "scn": null
+ },
+ "pvscope": {
+  "file": "main",
+  "edits": [
+   [
+    "            var scope = (kind === 'chart') ? 'chart' : (isPivot ? 'pivot' : 'row');",
+    "            var scope = (kind === 'chart') ? 'chart' : 'row';"
+   ]
+  ],
+  "must": [
+   "C-nested-post"
+  ],
+  "scn": [
+   "nested"
+  ]
+ },
+ "nopvchip": {
+  "file": "journal",
+  "edits": [
+   [
+    "        if (String(n.SCOPE || '') === 'pivot') return renderPivotRef(n);\n",
+    ""
+   ]
+  ],
+  "must": [
+   "J-chip-pivot",
+   "J-chip-row",
+   "J-chip-tip",
+   "J-chip-jump"
+  ],
+  "scn": [
+   "jpanel"
+  ]
+ },
+ "nopvjump": {
+  "file": "journal",
+  "edits": [
+   [
+    "        $(document).on('click', '.journal-note-rowref-btn[data-pv-key]', function (e) {",
+    "        $(document).on('click', '.journal-note-rowref-btn[data-pv-key-off]', function (e) {"
+   ]
+  ],
+  "must": [
+   "J-chip-jump"
+  ],
+  "scn": [
+   "jpanel"
+  ]
+ },
+ "nokeyshape": {
+  "file": "manage",
+  "edits": [
+   [
+    "    if (!is_array($pairs) || count($pairs) < 1 || count($pairs) > 8) return false;",
+    "    if (!is_array($pairs)) return false;"
+   ]
+  ],
+  "must": [
+   "S-key-shape"
+  ],
+  "scn": [
+   "server"
+  ]
+ },
+ "wolfband": {
+  "file": "css",
+  "edits": [
+   [
+    ".journal-rownote-panel .journal-rownote-head.journal-rownote-close:hover {",
+    ".journal-rownote-panel .journal-rownote-head:hover {"
+   ]
+  ],
+  "must": [
+   "T-wolf-band"
+  ],
+  "scn": [
+   "wolfpack"
+  ]
+ },
+ "nogone": {
+  "file": "main",
+  "edits": [
+   [
+    "                } else if (!b && !(_pvScheduled || _applyScheduled) && !findPivotNoteBtn(c.key, false, c.host)) {",
+    "                } else if (false) {"
+   ]
+  ],
+  "must": [
+   "T-rr-gone"
+  ],
+  "scn": [
+   "rerender"
+  ]
+ },
+ "nopending": {
+  "file": "main",
+  "edits": [
+   [
+    "                } else if (!b && !(_pvScheduled || _applyScheduled) && !findPivotNoteBtn(c.key, false, c.host)) {",
+    "                } else if (!b && !findPivotNoteBtn(c.key, false, c.host)) {"
+   ]
+  ],
+  "must": [
+   "T-rr-race",
+   "T-rr-keep"
+  ],
+  "scn": [
+   "rerender"
+  ]
+ },
+ "notipremove": {
+  "file": "main",
+  "edits": [
+   [
+    "            $('.ui-tooltip').stop(true, true).remove(); // a tip already up (the pointer is still on the icon)",
+    "            void 0;"
+   ]
+  ],
+  "must": [
+   "T-tip-gone"
+  ],
+  "scn": [
+   "tooltip"
+  ]
+ },
+ "notiptitle": {
+  "file": "main",
+  "edits": [
+   [
+    "                b.removeAttribute('title');\r\n                $(b).removeData('ui-tooltip-title');",
+    "                void 0;"
+   ]
+  ],
+  "must": [
+   "T-tip-gone",
+   "T-tip-again"
+  ],
+  "scn": [
+   "tooltip"
+  ]
+ },
+ "norowline": {
+  "file": "manage",
+  "edits": [
+   [
+    "mentioned you in a journal note on the report <strong>' . $safeTitle . '</strong>:</p>'\n          . $rowLine // which row (journalRowRefLine), or ''\n",
+    "mentioned you in a journal note on the report <strong>' . $safeTitle . '</strong>:</p>'\n"
+   ]
+  ],
+  "must": [
+   "S-mail-wiring"
+  ],
+  "scn": [
+   "server3"
+  ]
+ },
+ "norefsnap": {
+  "file": "manage",
+  "edits": [
+   [
+    "            if ($ref_snap === null && $reply_root !== null) {",
+    "            if (false) {"
+   ]
+  ],
+  "must": [
+   "S-mail-wiring"
+  ],
+  "scn": [
+   "server3"
+  ]
+ },
+ "refkeyonly": {
+  "file": "manage",
+  "edits": [
+   [
+    "    if (is_array($snap) && $snap) {",
+    "    if (false) {"
+   ]
+  ],
+  "must": [
+   "S-row-ref"
+  ],
+  "scn": [
+   "server3"
+  ]
+ },
+ "nodelask": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (!replies) return 'Delete this note? A copy is kept in the audit log.';",
+    "            return 'Delete this note? A copy is kept in the audit log.';"
+   ]
+  ],
+  "must": [
+   "D-thread-ask",
+   "D-panel-ask"
+  ],
+  "scn": [
+   "delthread"
+  ]
+ },
+ "noothers": {
+  "file": "main",
+  "edits": [
+   [
+    "            var who = !byOthers ? '' : (byOthers === replies",
+    "            var who = '' && (byOthers === replies"
+   ]
+  ],
+  "must": [
+   "D-thread-ask",
+   "D-panel-ask"
+  ],
+  "scn": [
+   "delthread"
+  ]
+ },
+ "panelplain": {
+  "file": "journal",
+  "edits": [
+   [
+    "                ? P.journalDeleteQuestion(notesCache, noteId)\n",
+    "                ? 'Delete this journal note? This cannot be undone (a copy is kept in the audit log).'\n"
+   ]
+  ],
+  "must": [
+   "D-panel-ask"
+  ],
+  "scn": [
+   "delthread"
+  ]
+ },
+ "panelstatus": {
+  "file": "journal",
+  "edits": [
+   [
+    "            status(esc(resp.message || 'Note deleted.'), 'success');",
+    "            status('Note deleted.', 'success');"
+   ]
+  ],
+  "must": [
+   "D-panel-status"
+  ],
+  "scn": [
+   "delthread"
+  ]
+ },
+ "nocascade": {
+  "file": "manage",
+  "edits": [
+   [
+    "        foreach ($replies as $rp) { $del_ids[] = (int)$rp['ID']; }",
+    "        foreach ($replies as $rp) { }"
+   ]
+  ],
+  "must": [
+   "S-del-exact",
+   "S-del-order",
+   "S-del-chunks"
+  ],
+  "scn": [
+   "server6"
+  ]
+ },
+ "noauditreplies": {
+  "file": "manage",
+  "edits": [
+   [
+    "        if ($replies) $before['REPLIES'] = $replies;",
+    "        // (no replies in the audit)"
+   ]
+  ],
+  "must": [
+   "S-del-cascade"
+  ],
+  "scn": [
+   "server4"
+  ]
+ },
+ "nobandpaint": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (!pivotNotesActive() || $('body').hasClass('snapshot-comparison-active')) {\r\n                var olds = gc.querySelectorAll",
+    "            if (true) {\r\n                var olds = gc.querySelectorAll"
+   ]
+  ],
+  "must": [
+   "V-bands-icons",
+   "V-bands-shared",
+   "V-bands-blank",
+   "C-bands-nofold",
+   "C-bands-post",
+   "V-bands-rebuilt",
+   "R-bands-reveal",
+   "C-bands-away"
+  ],
+  "scn": [
+   "bands"
+  ]
+ },
+ "bandgate": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (!toggleActive() && !rowNotesActive() && !pivotNotesActive()) return; // band icons need no key",
+    "            if (!toggleActive() && !rowNotesActive()) return;"
+   ]
+  ],
+  "must": [
+   "V-bands-icons",
+   "V-bands-shared",
+   "V-bands-blank",
+   "C-bands-nofold",
+   "C-bands-post",
+   "V-bands-rebuilt",
+   "R-bands-reveal",
+   "C-bands-away"
+  ],
+  "scn": [
+   "bands"
+  ]
+ },
+ "bandblank": {
+  "file": "main",
+  "edits": [
+   [
+    "                parts.push(lab === '[Blank]' ? '' : lab);",
+    "                parts.push(lab);"
+   ]
+  ],
+  "must": [
+   "V-bands-icons",
+   "V-bands-blank"
+  ],
+  "scn": [
+   "bands"
+  ]
+ },
+ "bandfold": {
+  "file": "main",
+  "edits": [
+   [
+    "        if ($(e.target).closest('.group-hide, .journal-pvnote-btn').length) return;",
+    "        if ($(e.target).closest('.group-hide').length) return;"
+   ]
+  ],
+  "must": [
+   "C-bands-nofold"
+  ],
+  "scn": [
+   "bands"
+  ]
+ },
+ "bandhost": {
+  "file": "main",
+  "edits": [
+   [
+    "                : (c.host === 'group')",
+    "                : (false)"
+   ]
+  ],
+  "must": [
+   "C-bands-nofold",
+   "C-bands-post",
+   "R-bands-reveal"
+  ],
+  "scn": [
+   "bands"
+  ]
+ },
+ "bandreveal": {
+  "file": "main",
+  "edits": [
+   [
+    "                if ($('#groupedResultsContainer').is(':visible') && !$('body').hasClass('snapshot-comparison-active')) return revealBandNote(key, warn);",
+    "                void 0;"
+   ]
+  ],
+  "must": [
+   "R-bands-reveal"
+  ],
+  "scn": [
+   "bands"
+  ]
+ },
+ "noreplyscope": {
+  "file": "manage",
+  "edits": [
+   [
+    "                $scope        = ($prow['SCOPE'] === 'row' || $prow['SCOPE'] === 'pivot' || $prow['SCOPE'] === 'chart') ? $prow['SCOPE'] : 'report';",
+    "                $scope        = ($prow['SCOPE'] === 'row' || $prow['SCOPE'] === 'chart') ? $prow['SCOPE'] : 'report';"
+   ]
+  ],
+  "must": [
+   "S-reply-scope"
+  ],
+  "scn": [
+   "server"
+  ]
+ },
+ "rcwide": {
+  "file": "css",
+  "edits": [
+   [
+    "    width: min(820px, calc(100vw - 16px));",
+    "    width: min(620px, calc(100vw - 16px));"
+   ]
+  ],
+  "must": [
+   "C-rc-wide"
+  ],
+  "scn": [
+   "rowcard"
+  ]
+ },
+ "rcclip": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (!box || cardClipped(c, box)) {",
+    "            if (!box) {"
+   ]
+  ],
+  "must": [
+   "C-rc-sort",
+   "C-rc-clip"
+  ],
+  "scn": [
+   "rowcard"
+  ]
+ },
+ "rcundrawn": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (!box || cardClipped(c, box)) {\r\n                el.style.visibility = 'hidden';",
+    "            if (!box || cardClipped(c, box)) {\r\n                if (box) el.style.visibility = 'hidden';"
+   ]
+  ],
+  "must": [
+   "C-rc-search",
+   "C-rc-page",
+   "C-rg-fold"
+  ],
+  "scn": [
+   "rowcard",
+   "rowgrp"
+  ]
+ },
+ "rcnorowbox": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (host === 'row') {\r\n                var tr = b.closest('tr');",
+    "            if (false) {\r\n                var tr = b.closest('tr');"
+   ]
+  ],
+  "must": [
+   "C-rc-nocol"
+  ],
+  "scn": [
+   "rowcard"
+  ]
+ },
+ "rcnoopen": {
+  "file": "main",
+  "edits": [
+   [
+    "            openPivotNoteCard(this);\r\n        });\r\n        // A pivot row's note icon",
+    "            void this;\r\n        });\r\n        // A pivot row's note icon"
+   ]
+  ],
+  "must": [
+   "C-rc-open",
+   "C-rc-place",
+   "C-rc-wide",
+   "C-rc-post",
+   "C-rc-sort",
+   "C-rc-clip",
+   "C-rc-search",
+   "C-rc-page",
+   "C-rc-band",
+   "C-rc-nocol",
+   "R-rc-jump",
+   "D-rc-ask",
+   "C-rc-gone"
+  ],
+  "scn": [
+   "rowcard"
+  ]
+ },
+ "rcnoreveal": {
+  "file": "main",
+  "edits": [
+   [
+    "            else if ($btn.length && !(_pvCard && _pvCard.host === 'row' && _pvCard.key === rowKey)) openPivotNoteCard($btn[0]);",
+    "            else void $btn;"
+   ]
+  ],
+  "must": [
+   "C-rc-nocol",
+   "R-rc-jump",
+   "D-rc-ask"
+  ],
+  "scn": [
+   "rowcard"
+  ]
+ },
+ "rcgone": {
+  "file": "main",
+  "edits": [
+   [
+    "                } else if (!b && !(_pvScheduled || _applyScheduled) && !findPivotNoteBtn(c.key, false, c.host)) {",
+    "                } else if (false) {"
+   ]
+  ],
+  "must": [
+   "C-rc-gone"
+  ],
+  "scn": [
+   "rowcard"
+  ]
+ },
+ "delbyval": {
+  "file": "manage",
+  "edits": [
+   [
+    "        foreach (array_keys($del_ids) as $k) { oci_bind_by_name($stmt, ':d' . $k, $del_ids[$k]); }",
+    "        foreach ($del_ids as $k => $v) { oci_bind_by_name($stmt, ':d' . $k, $v); }"
+   ]
+  ],
+  "must": [
+   "S-del-exact",
+   "S-del-order",
+   "S-del-chunks"
+  ],
+  "scn": [
+   "server6"
+  ]
+ },
+ "delnochunk": {
+  "file": "manage",
+  "edits": [
+   [
+    "        foreach (array_chunk(array_keys($del_ids), 900) as $chunk) {",
+    "        foreach (array_chunk(array_keys($del_ids), 5000) as $chunk) {"
+   ]
+  ],
+  "must": [
+   "S-del-chunks"
+  ],
+  "scn": [
+   "server6"
+  ]
+ },
+ "delparent": {
+  "file": "manage",
+  "edits": [
+   [
+    "        $stmt = oci_parse($oci, \"DELETE FROM PENUMBRA_JOURNAL WHERE REPORT_ID = :rid AND (\" . implode(' OR ', $del_lists) . \")\");",
+    "        $stmt = oci_parse($oci, \"DELETE FROM PENUMBRA_JOURNAL WHERE REPORT_ID = :rid AND (PARENT_ID = :d0 OR \" . implode(' OR ', $del_lists) . \")\");"
+   ]
+  ],
+  "must": [
+   "S-del-exact",
+   "S-del-order",
+   "S-del-reply",
+   "S-del-chunks"
+  ],
+  "scn": [
+   "server6"
+  ]
+ },
+ "sweepback": {
+  "file": "main",
+  "edits": [
+   [
+    "            const rowSel = 'tbody tr:not(.search-hidden)';",
+    "            const rowSel = 'tbody tr:not(.search-hidden):not(.journal-note-child)';"
+   ]
+  ],
+  "must": [
+   "S-sweep-clean"
+  ],
+  "scn": [
+   "static7"
+  ]
+ },
+ "cnfooter": {
+  "file": "main",
+  "edits": [
+   [
+    "            try { n = _cnTooltipCount(items); } catch (e) { n = 0; }",
+    "            n = 0;"
+   ]
+  ],
+  "must": [
+   "V-ch-tip",
+   "V-chp-tip"
+  ],
+  "scn": [
+   "chbar",
+   "chpie"
+  ]
+ },
+ "cnmenu": {
+  "file": "main",
+  "edits": [
+   [
+    "        if (opts.note && opts.note.key) {",
+    "        if (false) {"
+   ]
+  ],
+  "must": [
+   "C-ch-menu",
+   "C-ch-open",
+   "C-ch-post",
+   "C-ch-zero",
+   "C-chd-menu",
+   "C-chd-open"
+  ],
+  "scn": [
+   "chbar",
+   "chdrill"
+  ]
+ },
+ "cnbreak": {
+  "file": "main",
+  "edits": [
+   [
+    "        if (_cnB && _cnB.key && window.Penumbra && window.Penumbra.chartNoteCount) {",
+    "        if (false) {"
+   ]
+  ],
+  "must": [
+   "C-ch-breakdown"
+  ],
+  "scn": [
+   "chbar"
+  ]
+ },
+ "cnz": {
+  "file": "css",
+  "edits": [
+   [
+    ".journal-pvnote-card.is-overlay { z-index: 100050; }",
+    ".journal-pvnote-card.is-overlay { }"
+   ]
+  ],
+  "must": [
+   "C-ch-breakdown",
+   "C-sw-overlay"
+  ],
+  "scn": [
+   "chbar",
+   "chsweep"
+  ]
+ },
+ "cnpath": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (!path[i] || path[i].val == null || !add(_cnTok(path[i].col), path[i].val)) return null;",
+    "            void 0;"
+   ]
+  ],
+  "must": [
+   "V-chd-drilled",
+   "C-chd-menu",
+   "C-chd-open"
+  ],
+  "scn": [
+   "chdrill"
+  ]
+ },
+ "cnseries": {
+  "file": "main",
+  "edits": [
+   [
+    "        if (g !== null && !seen[_cnTok(gbRaw)] && !add(_cnTok(gbRaw), g)) return null;",
+    "        void g;"
+   ]
+  ],
+  "must": [
+   "V-ch-keys",
+   "V-ch-pin",
+   "V-ch-pin-offset",
+   "V-ch-tip",
+   "C-ch-menu",
+   "C-ch-open",
+   "C-ch-post",
+   "C-ch-zero",
+   "C-ch-breakdown"
+  ],
+  "scn": [
+   "chbar"
+  ]
+ },
+ "cnunknown": {
+  "file": "main",
+  "edits": [
+   [
+    "        if (s !== 'Unknown') return s;",
+    "        return s;"
+   ]
+  ],
+  "must": [
+   "V-chb-blank",
+   "V-chb-ambiguous"
+  ],
+  "scn": [
+   "chblank"
+  ]
+ },
+ "cnambig": {
+  "file": "main",
+  "edits": [
+   [
+    "        if (blank && lit) return null;",
+    "        void 0;"
+   ]
+  ],
+  "must": [
+   "V-chb-ambiguous"
+  ],
+  "scn": [
+   "chblank"
+  ]
+ },
+ "cnother": {
+  "file": "main",
+  "edits": [
+   [
+    "        if (cfg.otherBucket && _chartDrillCleanLabel(x) === 'Other' && (cfg.type === 'treemap' || idx === (data.labels || []).length - 1)) return null;",
+    "        void 0;"
+   ]
+  ],
+  "must": [
+   "V-cho-nokey",
+   "C-cho-menu"
+  ],
+  "scn": [
+   "chother"
+  ]
+ },
+ "cnrefresh": {
+  "file": "main",
+  "edits": [
+   [
+    "                if (window._penumbraChartNotePinsRefresh) window._penumbraChartNotePinsRefresh(); // the charts' markers (2026-10-09)",
+    "                void 0;"
+   ]
+  ],
+  "must": [
+   "C-ch-post"
+  ],
+  "scn": [
+   "chbar"
+  ]
+ },
+ "cnclosepin": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (c.host === 'chart' && window._penumbraChartNotePinsRefresh) window._penumbraChartNotePinsRefresh(c.canvas || null);",
+    "            void c;"
+   ]
+  ],
+  "must": [
+   "C-ch-zero"
+  ],
+  "scn": [
+   "chbar"
+  ]
+ },
+ "cnactive": {
+  "file": "main",
+  "edits": [
+   [
+    "        return P.chartNotesActive() ? P : null;",
+    "        return P;"
+   ]
+  ],
+  "must": [
+   "V-chf-none",
+   "V-cw-off"
+  ],
+  "scn": [
+   "choff"
+  ]
+ },
+ "cnhost": {
+  "file": "main",
+  "edits": [
+   [
+    "                    ? (c.canvas ? ((c.canvas.isConnected && chartLive(c.canvas) && chartFound(c)) || chartCardRefind(c)) : !!(c.anchor && c.anchor.isConnected))",
+    "                    ? true"
+   ]
+  ],
+  "must": [
+   "C-ch-breakdown"
+  ],
+  "scn": [
+   "chbar"
+  ]
+ },
+ "cntokcase": {
+  "file": "main",
+  "edits": [
+   [
+    ": String(p.base).toUpperCase();",
+    ": String(p.base);"
+   ]
+  ],
+  "must": [
+   "V-chp-pin",
+   "V-chp-tip"
+  ],
+  "scn": [
+   "chpie"
+  ]
+ },
+ "cnlayerpos": {
+  "file": "main",
+  "edits": [
+   [
+    "        _cnSetPx(layer, 'left', (parseFloat(layer.style.left) || 0) + (cr.left - lr.left) / k);",
+    "        _cnSetPx(layer, 'left', 0);"
+   ]
+  ],
+  "must": [
+   "V-ch-pin-offset"
+  ],
+  "scn": [
+   "chbar"
+  ]
+ },
+ "cn2retry": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (P && (!cfg || !canvas.isConnected) && (chart.$pnbCnTry || 0) < 3) {",
+    "            if (false) {"
+   ]
+  ],
+  "must": [
+   "V-ch2-retry"
+  ],
+  "scn": [
+   "chhidden"
+  ]
+ },
+ "cn2refind": {
+  "file": "main",
+  "edits": [
+   [
+    "            var cv = window._penumbraChartNoteRefind ? window._penumbraChartNoteRefind(c.key, c.want) : null;",
+    "            var cv = null;"
+   ]
+  ],
+  "must": [
+   "C-ch2-survive",
+   "C-ch2-gone"
+  ],
+  "scn": [
+   "ch2keep"
+  ]
+ },
+ "cn2slot": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (want && want.slot && sl.root === want.slot.root && sl.i === want.slot.i) score += 1;",
+    "            void sl;"
+   ]
+  ],
+  "must": [
+   "C-ch2-survive"
+  ],
+  "scn": [
+   "ch2keep"
+  ]
+ },
+ "cn2onecanvas": {
+  "file": "main",
+  "edits": [
+   [
+    "        if (openKey && (!P.chartNoteOpenCanvas || P.chartNoteOpenCanvas() !== canvas)) openKey = null;",
+    "        void 0;"
+   ]
+  ],
+  "must": [
+   "V-ch2-onecanvas",
+   "C-ch2-survive"
+  ],
+  "scn": [
+   "ch2keep"
+  ]
+ },
+ "cv3labels": {
+  "file": "main",
+  "edits": [
+   [
+    "        var dl = chart && chart.$datalabels, list = (dl && Array.isArray(dl._labels)) ? dl._labels : [], out = [];",
+    "        var list = [], out = [];"
+   ]
+  ],
+  "must": [
+   "V-cv-nolabel",
+   "V-cv-past"
+  ],
+  "scn": [
+   "chvals"
+  ]
+ },
+ "cv3placed": {
+  "file": "main",
+  "edits": [
+   [
+    "        var spots = _cnSpots(it, w, h), all = labels.concat(placed), best = null, bestCost = Infinity;",
+    "        var spots = _cnSpots(it, w, h), all = labels, best = null, bestCost = Infinity;"
+   ],
+   [
+    "            var cost = _cnCover(r, labels) + _cnCover(r, placed) + (out > 0.5 ? out * (w + h) : 0);",
+    "            var cost = _cnCover(r, labels) + (out > 0.5 ? out * (w + h) : 0);"
+   ]
+  ],
+  "must": [
+   "V-cv-nopin"
+  ],
+  "scn": [
+   "chvals"
+  ]
+ },
+ "cv3corner": {
+  "file": "main",
+  "edits": [
+   [
+    "                if (fitW && fitH) s.push({ x: R - g - w, y: up ? T + g : B - g - h });",
+    "                void fitW;"
+   ]
+  ],
+  "must": [
+   "V-ch-pin",
+   "V-ch-pin-offset",
+   "V-cv-inside"
+  ],
+  "scn": [
+   "chbar",
+   "chvals"
+  ]
+ },
+ "cv3hz": {
+  "file": "main",
+  "edits": [
+   [
+    "            } else if (hz) {\r\n                var rt = b.x >= b.base;",
+    "            } else if (false) {\r\n                var rt = b.x >= b.base;"
+   ]
+  ],
+  "must": [
+   "V-cv-inside"
+  ],
+  "scn": [
+   "chvals"
+  ]
+ },
+ "cv3past": {
+  "file": "main",
+  "edits": [
+   [
+    "            for (var n = 0; dir && n < 8; n++) {",
+    "            for (var n = 0; false && n < 8; n++) {"
+   ]
+  ],
+  "must": [
+   "V-cv-nopin",
+   "V-cv-past"
+  ],
+  "scn": [
+   "chvals"
+  ]
+ },
+ "cv3area": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (area.right - area.left >= w) r.x = Math.min(Math.max(r.x, area.left), area.right - w);",
+    "            void 0;"
+   ]
+  ],
+  "must": [
+   "V-cv-area"
+  ],
+  "scn": [
+   "chvals"
+  ]
+ },
+ "cv3arc": {
+  "file": "main",
+  "edits": [
+   [
+    "            var fr = [0.72, 0.5, 0.88, 0.3];",
+    "            var fr = [0.5];"
+   ]
+  ],
+  "must": [
+   "V-chp-pin",
+   "V-cv-nolabel"
+  ],
+  "scn": [
+   "chpie",
+   "chvals"
+  ]
+ },
+ "cv3size": {
+  "file": "main",
+  "edits": [
+   [
+    "        for (var m = 0; m < pins.length; m++) sizes.push({ w: (pins[m].offsetWidth || 24) / (sx || 1), h: (pins[m].offsetHeight || 14) / (sy || 1) });",
+    "        for (var m = 0; m < pins.length; m++) sizes.push({ w: 0, h: 0 });"
+   ]
+  ],
+  "must": [
+   "V-ch-pin",
+   "V-ch-pin-offset",
+   "V-cv-nolabel",
+   "V-cv-nopin",
+   "V-cv-area",
+   "V-cv-inside",
+   "V-cv-past"
+  ],
+  "scn": [
+   "chbar",
+   "chvals"
+  ]
+ },
+ "cv3quiet": {
+  "file": "css",
+  "edits": [
+   [
+    "    opacity: 0.6;\r\n    transition: opacity 0.15s ease;",
+    "    transition: opacity 0.15s ease;"
+   ]
+  ],
+  "must": [
+   "V-cv-quiet",
+   "V-cv-hover",
+   "V-cv-open"
+  ],
+  "scn": [
+   "chvals"
+  ]
+ },
+ "cv3hover": {
+  "file": "css",
+  "edits": [
+   [
+    ":hover > .journal-chartnote-layer > .journal-chartnote-pin,\r\n.journal-chartnote-pin.is-open { opacity: 1; }",
+    ".journal-chartnote-pin.is-open { opacity: 1; }"
+   ]
+  ],
+  "must": [
+   "V-cv-hover"
+  ],
+  "scn": [
+   "chvals"
+  ]
+ },
+ "cv3open": {
+  "file": "css",
+  "edits": [
+   [
+    ":hover > .journal-chartnote-layer > .journal-chartnote-pin,\r\n.journal-chartnote-pin.is-open { opacity: 1; }",
+    ":hover > .journal-chartnote-layer > .journal-chartnote-pin { opacity: 1; }"
+   ]
+  ],
+  "must": [
+   "V-cv-open"
+  ],
+  "scn": [
+   "chvals"
+  ]
+ },
+ "cs5stk": {
+  "file": "main",
+  "edits": [
+   [
+    "stk: !!(meta && meta._stacked),",
+    "stk: false,"
+   ]
+  ],
+  "must": [
+   "V-cs-own"
+  ],
+  "scn": [
+   "chstack",
+   "chvals"
+  ]
+ },
+ "cs5hover": {
+  "file": "css",
+  "edits": [
+   [
+    "#reportSnippetOutput .journal-chartwhole-btn:hover,\r\n#reportSnippetOutput .journal-chartwhole-btn.is-open {\r\n    border-color",
+    ".journal-chartwhole-btn:hover,\r\n.journal-chartwhole-btn.is-open {\r\n    border-color"
+   ]
+  ],
+  "must": [
+   "V-ct-hover"
+  ],
+  "scn": [
+   "chtheme"
+  ]
+ },
+ "cs5dark": {
+  "file": "css",
+  "edits": [
+   [
+    "#reportSnippetOutput .journal-chartwhole-btn {\r\n    position: absolute;",
+    ".journal-chartwhole-btn {\r\n    position: absolute;"
+   ]
+  ],
+  "must": [
+   "V-ct-dark"
+  ],
+  "scn": [
+   "chtheme",
+   "chwhole"
+  ]
+ },
+ "cs5surface": {
+  "file": "css",
+  "edits": [
+   [
+    "    background: var(--bg-surface, #fff);   /* the theme's surface (--bg-main: only the newer themes set it; the six original ones fell back to #fff) */",
+    "    background: var(--bg-main, #fff);"
+   ]
+  ],
+  "must": [
+   "V-ct-surface"
+  ],
+  "scn": [
+   "chtheme"
+  ]
+ },
+ "dx1wipe": {
+  "file": "main",
+  "edits": [
+   [
+    "        if (st) { if (st.canvasRows) $c.data('sourceRowData', st.canvasRows); else $c.removeData('sourceRowData'); }",
+    "        void st;"
+   ]
+  ],
+  "must": [
+   "C-dx-rows",
+   "C-dx-menu",
+   "C-dx-preset"
+  ],
+  "scn": [
+   "chexit"
+  ]
+ },
+ "dx1capture": {
+  "file": "main",
+  "edits": [
+   [
+    "                canvasRows: $c.data('sourceRowData'),   // what the canvas held, for the drill's end (2026-10-10)",
+    "                canvasRows: undefined,"
+   ]
+  ],
+  "must": [
+   "V-dx-own",
+   "C-dx-preset"
+  ],
+  "scn": [
+   "chexit"
+  ]
+ },
+ "dx1restore": {
+  "file": "main",
+  "edits": [
+   [
+    "            // (its rows: _wipeDrillState put the canvas's own back above - this stored originalRows, which the chart's",
+    "            $c.data('sourceRowData', originalRows); // (mutant)"
+   ]
+  ],
+  "must": [
+   "C-dx-rows",
+   "C-dx-menu",
+   "C-dx-preset",
+   "V-dx-presetown"
+  ],
+  "scn": [
+   "chexit"
+  ]
+ },
+ "dx1presetwipe": {
+  "file": "main",
+  "edits": [
+   [
+    "        // restores its own below.)\r\n        _wipeDrillState(canvas);",
+    "        // restores its own below.)\r\n        void 0;"
+   ]
+  ],
+  "must": [
+   "C-dx-preset",
+   "C-dx-presetcrumb"
+  ],
+  "scn": [
+   "chexit"
+  ]
+ },
+ "dx1presetprobe": {
+  "file": "main",
+  "edits": [
+   [
+    "                        var rv = cleanCellVal(_chartDrillGet(probe[idx], col));",
+    "                        var rv = cleanCellVal(row && row.get ? row.get(col) : '');"
+   ]
+  ],
+  "must": [
+   "C-dx-presetfy"
+  ],
+  "scn": [
+   "chexit"
+  ]
+ },
+ "dx1presetcap": {
+  "file": "main",
+  "edits": [
+   [
+    "                canvasRows: $(canvas).data('sourceRowData'),   // for the drill's end to put back (2026-10-10)",
+    "                canvasRows: undefined,"
+   ]
+  ],
+  "must": [
+   "V-dx-presetown"
+  ],
+  "scn": [
+   "chexit"
+  ]
+ },
+ "dd1probe": {
+  "file": "main",
+  "edits": [
+   [
+    "            var probeRows = _chartDrillProbe(sourceRows, [vizConfig.xAxis, vizConfig.groupBy]);",
+    "            var probeRows = sourceRows;"
+   ]
+  ],
+  "must": [
+   "C-dt-rows",
+   "C-dt-drill",
+   "V-dt-crumb",
+   "C-dt-crumbswitch",
+   "C-dt-split",
+   "V-dt-cycle",
+   "C-dt-clickexcl",
+   "C-dt-clickdrill"
+  ],
+  "scn": [
+   "chdate"
+  ]
+ },
+ "dd1excl": {
+  "file": "main",
+  "edits": [
+   [
+    "                            var rv = _chartDrillCleanCellVal(_chartDrillGet(rowMap, col));",
+    "                            var rv = _chartDrillCleanCellVal(rowMap.get ? rowMap.get(col) : '');"
+   ]
+  ],
+  "must": [
+   "C-dt-clickexcl"
+  ],
+  "scn": [
+   "chdate"
+  ]
+ },
+ "dd1orig": {
+  "file": "main",
+  "edits": [
+   [
+    "                                var rv = _chartDrillCleanCellVal(_chartDrillGet(probeRows[ri], col));",
+    "                                var rv = _chartDrillCleanCellVal(sourceRows[ri].get(col));"
+   ]
+  ],
+  "must": [
+   "C-dt-clickdrill"
+  ],
+  "scn": [
+   "chdate"
+  ]
+ },
+ "dd1menuexcl": {
+  "file": "main",
+  "edits": [
+   [
+    "        var cfg = _getCanvasVizConfig(canvas) || {}, probe = _chartDrillProbe(rows, [cfg.xAxis, cfg.groupBy]);   // (a bucketed field: 2026-10-10)",
+    "        var cfg = _getCanvasVizConfig(canvas) || {}, probe = rows;"
+   ]
+  ],
+  "must": [
+   "C-dt-menuexcl"
+  ],
+  "scn": [
+   "chdate"
+  ]
+ },
+ "dd1path": {
+  "file": "main",
+  "edits": [
+   [
+    "        var probe = _chartDrillProbe(rows, path.slice(0, stop).map(function (s) { return s.col; }));",
+    "        var probe = rows;"
+   ]
+  ],
+  "must": [
+   "C-dt-drill",
+   "C-dt-crumbswitch",
+   "C-dt-menudrill"
+  ],
+  "scn": [
+   "chdate"
+  ]
+ },
+ "dd1crumb": {
+  "file": "main",
+  "edits": [
+   [
+    "        var baseRows = _chartDrillProbe(state.originalRows || [], path.map(function (s) { return s.col; }));",
+    "        var baseRows = state.originalRows || [];"
+   ]
+  ],
+  "must": [
+   "V-dt-crumb",
+   "C-dt-crumbswitch"
+  ],
+  "scn": [
+   "chdate"
+  ]
+ },
+ "dd1menurows": {
+  "file": "main",
+  "edits": [
+   [
+    "        var probe = _chartDrillProbe(sourceRows, [cfg.xAxis]);   // (a bucketed axis: 2026-10-10)",
+    "        var probe = sourceRows;"
+   ]
+  ],
+  "must": [
+   "C-dt-menurows"
+  ],
+  "scn": [
+   "chdate"
+  ]
+ },
+ "dd1panel": {
+  "file": "main",
+  "edits": [
+   [
+    "            var probe = _chartDrillProbe(sourceRows, [vizCfg.xAxis, vizCfg.groupBy]);",
+    "            var probe = sourceRows;"
+   ]
+  ],
+  "must": [
+   "C-dt-panel"
+  ],
+  "scn": [
+   "chdate"
+  ]
+ },
+ "dd1get": {
+  "file": "main",
+  "edits": [
+   [
+    "        return (v === undefined) ? row.get(String(col).toUpperCase()) : v;",
+    "        return v;"
+   ]
+  ],
+  "must": [
+   "C-dt-panel",
+   "C-dt-menurows",
+   "C-dt-menuexcl"
+  ],
+  "scn": [
+   "chdate"
+  ]
+ },
+ "dd1search": {
+  "file": "main",
+  "edits": [
+   [
+    "        if (!spec || !spec.split) return '{' + field + '} = //' + val + '//';",
+    "        if (true) return '{' + field + '} = //' + val + '//';"
+   ]
+  ],
+  "must": [
+   "V-dt-search",
+   "C-dt-split",
+   "V-dt-cycle",
+   "C-dt-menurows"
+  ],
+  "scn": [
+   "chdate"
+  ]
+ },
+ "dd1bucket": {
+  "file": "main",
+  "edits": [
+   [
+    "        else if (split === 'fy' && (m = /^FY(\\d{2})$/i.exec(s))) { y = 2000 + +m[1]; r = span(y - 1, 7, y, 6); }",
+    "        else if (false) { }"
+   ]
+  ],
+  "must": [
+   "V-dt-search",
+   "C-dt-split",
+   "C-dt-menurows",
+   "V-pd-search"
+  ],
+  "scn": [
+   "chdate",
+   "pvdate"
+  ]
+ },
+ "dd1nohand": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (ctx.searchParts && ctx.searchParts.some(function (p) { return !p; })) ctx.searchParts = [];",
+    "            void 0;"
+   ]
+  ],
+  "must": [
+   "V-dt-cycle"
+  ],
+  "scn": [
+   "chdate"
+  ]
+ },
+ "dd1fexpr": {
+  "file": "main",
+  "edits": [
+   [
+    "        if (_drillTopFexpr && _drillParts.length) _drillParts.unshift('(' + _drillTopFexpr + ')');",
+    "        if (_drillTopFexpr) _drillParts.unshift('(' + _drillTopFexpr + ')');"
+   ]
+  ],
+  "must": [
+   "V-dt-cycle"
+  ],
+  "scn": [
+   "chdate"
+  ]
+ },
+ "dd1pivot": {
+  "file": "main",
+  "edits": [
+   [
+    "            } else if (c.split) {",
+    "            } else if (false) {"
+   ]
+  ],
+  "must": [
+   "V-pd-search",
+   "V-pd-cycle"
+  ],
+  "scn": [
+   "pvdate",
+   "pvcycle"
+  ]
+ },
+ "dd1pivotagg": {
+  "file": "main",
+  "edits": [
+   [
+    "        if (noTableSearch) drillSearchString = '';   // (a bucket with no search: no hand-off, not the filter alone)",
+    "        void noTableSearch;"
+   ]
+  ],
+  "must": [
+   "V-pd-cycle"
+  ],
+  "scn": [
+   "pvcycle"
+  ]
+ },
+ "cs6split": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (gbRaw && (cfg.type === 'bar' || cfg.type === 'line')) {",
+    "            if (gbRaw && cfg.type !== 'combo' && sets.length > 1) {"
+   ]
+  ],
+  "must": [
+   "V-sw-split1",
+   "V-sw-scale",
+   "V-sw-tip",
+   "C-sw-focus",
+   "C-sw-regrace",
+   "C-sw-destroyed",
+   "V-sw-drillsplit",
+   "V-sw-zoom"
+  ],
+  "scn": [
+   "chsweep",
+   "chbar"
+  ]
+ },
+ "cs6seen": {
+  "file": "main",
+  "edits": [
+   [
+    "        if (g !== null && !seen[_cnTok(gbRaw)] && !add(_cnTok(gbRaw), g)) return null;",
+    "        if (g !== null && !add(_cnTok(gbRaw), g)) return null;"
+   ]
+  ],
+  "must": [
+   "V-sw-drillseen"
+  ],
+  "scn": [
+   "chsweep"
+  ]
+ },
+ "cs6other": {
+  "file": "main",
+  "edits": [
+   [
+    "        if (s === '(Other)') return null;",
+    "        if (s === 'Other' || s === '(Other)') return null;"
+   ]
+  ],
+  "must": [
+   "V-sw-other"
+  ],
+  "scn": [
+   "chsweep"
+  ]
+ },
+ "cs6tree": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (chart && chart.config && chart.config.type === 'treemap' && elements && elements.length > 1) picked = elements[elements.length - 1];",
+    "            void 0;"
+   ]
+  ],
+  "must": [
+   "C-sw-treemap"
+  ],
+  "scn": [
+   "chsweep"
+  ]
+ },
+ "cs6scale": {
+  "file": "main",
+  "edits": [
+   [
+    "        var k = (canvas.offsetWidth > 0 && cr.width > 0) ? cr.width / canvas.offsetWidth : (window.pnbZoomOf ? window.pnbZoomOf(layer) : 1);",
+    "        var k = (window.pnbZoomOf ? window.pnbZoomOf(layer) : 1);"
+   ]
+  ],
+  "must": [
+   "V-sw-still",
+   "V-sw-scale"
+  ],
+  "scn": [
+   "chsweep"
+  ]
+ },
+ "cs6zoom": {
+  "file": "main",
+  "edits": [
+   [
+    "        var k = (canvas.offsetWidth > 0 && cr.width > 0) ? cr.width / canvas.offsetWidth : (window.pnbZoomOf ? window.pnbZoomOf(layer) : 1);",
+    "        var k = 1;"
+   ]
+  ],
+  "must": [
+   "V-sw-still",
+   "V-sw-scale",
+   "V-sw-zoom"
+  ],
+  "scn": [
+   "chsweep"
+  ]
+ },
+ "cs6reset": {
+  "file": "main",
+  "edits": [
+   [
+    "        if (!layer.style.left) { layer.style.left = '0px'; layer.style.top = '0px'; }",
+    "        layer.style.left = '0px'; layer.style.top = '0px';"
+   ]
+  ],
+  "must": [
+   "V-sw-still"
+  ],
+  "scn": [
+   "chsweep"
+  ]
+ },
+ "cs6mail": {
+  "file": "main",
+  "edits": [
+   [
+    "        $c.find('.penumbra-web-only, .snippet-action, .sr-only, .chart-settings-cog, .chart-filter-panel, .journal-chartwhole-btn, .journal-chartnote-layer').remove();",
+    "        $c.find('.penumbra-web-only, .snippet-action, .sr-only').remove();"
+   ]
+  ],
+  "must": [
+   "V-sw-mail"
+  ],
+  "scn": [
+   "chsweep"
+  ]
+ },
+ "cs6tip": {
+  "file": "main",
+  "edits": [
+   [
+    "        for (var u = 0; u < pins.length; u++) pins[u].classList.toggle('is-under-tip', !!tb && _cnCover(placed[u], tb) > 0);",
+    "        void tb;"
+   ]
+  ],
+  "must": [
+   "V-sw-tip"
+  ],
+  "scn": [
+   "chsweep"
+  ]
+ },
+ "cs6tipcss": {
+  "file": "css",
+  "edits": [
+   [
+    ":hover > .journal-chartnote-layer > .journal-chartnote-pin.is-under-tip { opacity: 0.12; }",
+    ":hover > .journal-chartnote-layer > .journal-chartnote-pin.is-under-tip { }"
+   ]
+  ],
+  "must": [
+   "V-sw-tip"
+  ],
+  "scn": [
+   "chsweep"
+  ]
+ },
+ "cs6memo": {
+  "file": "main",
+  "edits": [
+   [
+    "        if (memo && memo[col]) { blank = memo[col][0]; lit = memo[col][1]; }",
+    "        if (false) { blank = memo[col][0]; lit = memo[col][1]; }"
+   ]
+  ],
+  "must": [
+   "V-sw-memo"
+  ],
+  "scn": [
+   "chsweep"
+  ]
+ },
+ "cs6shown": {
+  "file": "main",
+  "edits": [
+   [
+    "        if (!canvas.getClientRects().length) { layer.style.display = 'none'; _cnWatchShown(chart); return; }",
+    "        if (!canvas.getClientRects().length) { layer.style.display = 'none'; return; }"
+   ]
+  ],
+  "must": [
+   "V-sw-shown"
+  ],
+  "scn": [
+   "chsweep"
+  ]
+ },
+ "cs6cog": {
+  "file": "css",
+  "edits": [
+   [
+    "#reportSnippetOutput .chart-settings-cog--quiet:focus-visible + .journal-chartwhole-btn { left: 30px; }",
+    "#reportSnippetOutput .chart-settings-cog--quiet:focus-visible + .journal-chartwhole-btn { }"
+   ]
+  ],
+  "must": [
+   "V-sw-cogfocus"
+  ],
+  "scn": [
+   "chsweep"
+  ]
+ },
+ "cs6margin": {
+  "file": "css",
+  "edits": [
+   [
+    "    min-width: 22px;\r\n    padding: 0 4px;\r\n    border: 1px solid transparent;",
+    "    min-width: 22px;\r\n    margin: 0;\r\n    padding: 0 4px;\r\n    border: 1px solid transparent;"
+   ]
+  ],
+  "must": [
+   "V-sw-level"
+  ],
+  "scn": [
+   "chsweep"
+  ]
+ },
+ "cs6slide": {
+  "file": "main",
+  "edits": [
+   [
+    "            $(clone).find('.journal-chartnote-layer, .journal-chartwhole-btn').remove();",
+    "            void clone;"
+   ]
+  ],
+  "must": [
+   "V-sw-slide"
+  ],
+  "scn": [
+   "chsweep"
+  ]
+ },
+ "cs6name": {
+  "file": "main",
+  "edits": [
+   [
+    "        var tip = n ? (n + ' note' + (n === 1 ? '' : 's') + ' on the chart \"' + d.snap.Chart + '\" - click to view') : ('Add a note about the chart \"' + d.snap.Chart + '\"');",
+    "        var tip = n ? (n + ' note' + (n === 1 ? '' : 's') + ' on this chart - click to view') : 'Add a note about this chart';"
+   ]
+  ],
+  "must": [
+   "V-cw-btn"
+  ],
+  "scn": [
+   "chwhole"
+  ]
+ },
+ "cs6z": {
+  "file": "main",
+  "edits": [
+   [
+    "            el.className = 'journal-pvnote-card' + (isRow ? ' is-row' : '') + (chart ? ' is-chart' : '') + (inDlg ? ' is-overlay' : '') + (isWhole ? ' is-chartwhole' : '');",
+    "            el.className = 'journal-pvnote-card' + (isRow ? ' is-row' : '') + (chart ? ' is-chart' : '') + (isWhole ? ' is-chartwhole' : '');"
+   ]
+  ],
+  "must": [
+   "C-ch-breakdown",
+   "C-sw-overlay",
+   "C-sw-dialog"
+  ],
+  "scn": [
+   "chbar",
+   "chsweep"
+  ]
+ },
+ "cs6zchart": {
+  "file": "css",
+  "edits": [
+   [
+    ".journal-pvnote-card.is-overlay { z-index: 100050; }",
+    ".journal-pvnote-card.is-chart { z-index: 100050; }"
+   ]
+  ],
+  "must": [
+   "C-ch-open"
+  ],
+  "scn": [
+   "chbar",
+   "chsweep"
+  ]
+ },
+ "cs6mz": {
+  "file": "css",
+  "edits": [
+   [
+    "    z-index: 100060;   /* ...and over a note card on a dialog (100050; bug sweep, 2026-10-09) */",
+    "    z-index: 100001;"
+   ]
+  ],
+  "must": [
+   "V-sw-mentionz"
+  ],
+  "scn": [
+   "chsweep"
+  ]
+ },
+ "cs6rekey": {
+  "file": "main",
+  "edits": [
+   [
+    "        if (btn && btn.getAttribute('data-cw-key') && btn.getAttribute('data-cw-key') !== d.key) { btn.remove(); btn = null; }",
+    "        void 0;"
+   ]
+  ],
+  "must": [
+   "C-sw-rekey"
+  ],
+  "scn": [
+   "chsweep"
+  ]
+ },
+ "cs6host": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (!(_pvCard && _pvCard.key === key && _pvCard.host === 'pivot')) openPivotNoteCard(btn);   // (nor the pivot row's: bug sweep)",
+    "            if (!(_pvCard && _pvCard.key === key)) openPivotNoteCard(btn);"
+   ]
+  ],
+  "must": [
+   "C-ph-pivot"
+  ],
+  "scn": [
+   "pvhost"
+  ]
+ },
+ "cs6hostb": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (!(_pvCard && _pvCard.key === key && _pvCard.host === 'group')) openPivotNoteCard(b);",
+    "            if (!(_pvCard && _pvCard.key === key)) openPivotNoteCard(b);"
+   ]
+  ],
+  "must": [
+   "C-ph-band"
+  ],
+  "scn": [
+   "bdhost"
+  ]
+ },
+ "cs6again": {
+  "file": "main",
+  "edits": [
+   [
+    "            var again = !!(_pvCard && _pvCard.key === key && !!btn && _pvCard.anchor === btn",
+    "            var again = !!(_pvCard && _pvCard.key === key && !!btn"
+   ]
+  ],
+  "must": [
+   "C-cf-move",
+   "C-cf-snap"
+  ],
+  "scn": [
+   "chfilter"
+  ]
+ },
+ "cs6offnow": {
+  "file": "main",
+  "edits": [
+   [
+    "            // ...and the charts' markers and note buttons (bug sweep, 2026-10-09: they stayed until the next redraw)\r\n            if (window._penumbraChartNotePinsRefresh) window._penumbraChartNotePinsRefresh();",
+    "            // ...and the charts' markers and note buttons (bug sweep, 2026-10-09: they stayed until the next redraw)\r\n            void 0;"
+   ]
+  ],
+  "must": [
+   "V-cf-offnow",
+   "V-cw-switch"
+  ],
+  "scn": [
+   "chfilter"
+  ]
+ },
+ "cs6hidden": {
+  "file": "main",
+  "edits": [
+   [
+    "            var b = findChartWholeBtn(key, true);",
+    "            var b = findChartWholeBtn(key, true) || findChartWholeBtn(key, false);"
+   ]
+  ],
+  "must": [
+   "R-cf-hidden"
+  ],
+  "scn": [
+   "chfilter"
+  ]
+ },
+ "cs6grace": {
+  "file": "main",
+  "edits": [
+   [
+    "                if (c.lost && !document.hidden) c.ticks = (c.ticks || 0) + 1;   // a lost chart's grace counts these (bug sweep)",
+    "                if (c.lost) c.ticks = (c.ticks || 0) + 1;"
+   ]
+  ],
+  "must": [
+   "C-sw-grace"
+  ],
+  "scn": [
+   "chsweep"
+  ]
+ },
+ "cs6live": {
+  "file": "main",
+  "edits": [
+   [
+    "                    ? (c.canvas ? ((c.canvas.isConnected && chartLive(c.canvas) && chartFound(c)) || chartCardRefind(c)) : !!(c.anchor && c.anchor.isConnected))",
+    "                    ? (c.canvas ? ((c.canvas.isConnected && chartFound(c)) || chartCardRefind(c)) : !!(c.anchor && c.anchor.isConnected))"
+   ]
+  ],
+  "must": [
+   "C-sw-destroyed"
+  ],
+  "scn": [
+   "chsweep"
+  ]
+ },
+ "cs6live2": {
+  "file": "main",
+  "edits": [
+   [
+    "                    if (c.canvas && c.canvas.getClientRects().length && chartLive(c.canvas) && !findChartNotePin(c.key, c.canvas, false)) {",
+    "                    if (c.canvas && c.canvas.getClientRects().length && !findChartNotePin(c.key, c.canvas, false)) {"
+   ]
+  ],
+  "must": [
+   "C-sw-destroyed"
+  ],
+  "scn": [
+   "chsweep"
+  ]
+ },
+ "cs6found": {
+  "file": "main",
+  "edits": [
+   [
+    "        function chartFound(c) { c.lost = false; return true; }",
+    "        function chartFound(c) { return true; }"
+   ]
+  ],
+  "must": [
+   "C-sw-regrace",
+   "C-sw-destroyed"
+  ],
+  "scn": [
+   "chsweep"
+  ]
+ },
+ "cs6snap": {
+  "file": "main",
+  "edits": [
+   [
+    "                if (_wa && _wa.isConnected && _wa.getAttribute('data-cw-key') === rowKey) {",
+    "                if (false) {"
+   ]
+  ],
+  "must": [
+   "C-cf-snap"
+  ],
+  "scn": [
+   "chfilter"
+  ]
+ },
+ "cs6dlg": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (cv && c.inDlg && !(cv.closest && cv.closest('.infobox-overlay, .modal-prompt-overlay'))) cv = null;",
+    "            void 0;"
+   ]
+  ],
+  "must": [
+   "C-sw-dialog"
+  ],
+  "scn": [
+   "chsweep"
+  ]
+ },
+ "cs6focus": {
+  "file": "main",
+  "edits": [
+   [
+    "                        : shownEl(c.opener) ? c.opener : (shownEl(c.canvas) && c.canvas.tabIndex >= 0) ? c.canvas : null)",
+    "                        : null)"
+   ]
+  ],
+  "must": [
+   "C-sw-focus"
+  ],
+  "scn": [
+   "chsweep"
+  ]
+ },
+ "cs6aria": {
+  "file": "main",
+  "edits": [
+   [
+    "                + ' title=\"' + escapeHtml(_cnTip) + '\" data-pvn-tip=\"' + escapeHtml(_cnTip) + '\" aria-haspopup=\"dialog\" aria-expanded=\"false\"'",
+    "                + ' title=\"' + escapeHtml(_cnTip) + '\" data-pvn-tip=\"' + escapeHtml(_cnTip) + '\" aria-label=\"' + escapeHtml(_cnTip) + '\" aria-haspopup=\"dialog\" aria-expanded=\"false\"'"
+   ]
+  ],
+  "must": [
+   "V-sw-linkname"
+  ],
+  "scn": [
+   "chsweep"
+  ]
+ },
+ "cs6tipback": {
+  "file": "main",
+  "edits": [
+   [
+    "                b.setAttribute('title', b.getAttribute('aria-label') || b.getAttribute('data-pvn-tip') || '');",
+    "                b.setAttribute('title', b.getAttribute('aria-label') || '');"
+   ]
+  ],
+  "must": [
+   "V-sw-linkname"
+  ],
+  "scn": [
+   "chsweep"
+  ]
+ },
+ "cs5hash": {
+  "file": "main",
+  "edits": [
+   [
+    "        if (extra) parts.push(_cwHash(extra));",
+    "        void extra;"
+   ]
+  ],
+  "must": [
+   "V-cw-filter"
+  ],
+  "scn": [
+   "chfilter"
+  ]
+ },
+ "cs5family": {
+  "file": "main",
+  "edits": [
+   [
+    "        if (!_CW_AGG_TYPES[cfg.type]) extra += 't:' + String(cfg.type || '');",
+    "        void 0;"
+   ]
+  ],
+  "must": [
+   "V-cw-filter"
+  ],
+  "scn": [
+   "chfilter"
+  ]
+ },
+ "cs5switch": {
+  "file": "main",
+  "edits": [
+   [
+    "            window._penumbraChartNotes = {}; window._penumbraChartNoteCounts = {};   // (bug sweep: the original's chart notes stayed)",
+    "            void 0;"
+   ]
+  ],
+  "must": [
+   "V-cw-switch"
+  ],
+  "scn": [
+   "chfilter"
+  ]
+ },
+ "cs5warn": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (!pivotNotesActive()) return warn('Row notes are off for this report",
+    "            if (!pivotNotesActive()) return false && ('Row notes are off for this report"
+   ]
+  ],
+  "must": [
+   "V-cw-warn"
+  ],
+  "scn": [
+   "chfilter"
+  ]
+ },
+ "cs5srv5": {
+  "file": "manage",
+  "edits": [
+   [
+    "    if (count($p) === 5 && !preg_match('/^[0-9a-f]{1,64}$/', $p[4])) return false;",
+    "    if (false) return false;"
+   ]
+  ],
+  "must": [
+   "S-cw-key5"
+  ],
+  "scn": [
+   "server12"
+  ]
+ },
+ "cs5snap": {
+  "file": "manage",
+  "edits": [
+   [
+    "        if (mb_strlen($v, 'UTF-8') > 300) $v = mb_substr($v, 0, 299, 'UTF-8') . \"\\xE2\\x80\\xA6\";",
+    "        if (false) $v = '';"
+   ]
+  ],
+  "must": [
+   "S-cw-snap"
+  ],
+  "scn": [
+   "server12"
+  ]
+ },
+ "cw4paint": {
+  "file": "main",
+  "edits": [
+   [
+    "        try { _cwPaint(canvas, P); } catch (e) { }   // the chart's own note button (whole-chart notes)",
+    "        void 0;"
+   ]
+  ],
+  "must": [
+   "V-cw-btn",
+   "V-cw-quiet",
+   "C-cw-open",
+   "C-cw-post",
+   "C-cw-survive",
+   "C-cw-again",
+   "V-cw-drill",
+   "R-cw-jump",
+   "V-cw-gone"
+  ],
+  "scn": [
+   "chwhole",
+   "choff"
+  ]
+ },
+ "cw4origcfg": {
+  "file": "main",
+  "edits": [
+   [
+    "        var cfg = (st && st.originalCfg) || _cnVizConfig(canvas);",
+    "        var cfg = _cnVizConfig(canvas);"
+   ]
+  ],
+  "must": [
+   "V-cw-drill"
+  ],
+  "scn": [
+   "chwhole"
+  ]
+ },
+ "cw4store": {
+  "file": "main",
+  "edits": [
+   [
+    "(kind === 'pivot' ? window._penumbraPivotNotes : (kind === 'chart' ? window._penumbraChartNotes : window._penumbraRowNotes))",
+    "(kind === 'pivot' ? window._penumbraPivotNotes : window._penumbraRowNotes)"
+   ]
+  ],
+  "must": [
+   "C-cw-open",
+   "C-cw-post"
+  ],
+  "scn": [
+   "chwhole"
+  ]
+ },
+ "cw4scope": {
+  "file": "main",
+  "edits": [
+   [
+    "            var scope = (kind === 'chart') ? 'chart' : (isPivot ? 'pivot' : 'row');",
+    "            var scope = isPivot ? 'pivot' : 'row';"
+   ]
+  ],
+  "must": [
+   "C-cw-post"
+  ],
+  "scn": [
+   "chwhole"
+  ]
+ },
+ "cw4load": {
+  "file": "main",
+  "edits": [
+   [
+    "                    window._penumbraChartNoteCounts = resp.chart_counts || {};",
+    "                    void 0;"
+   ]
+  ],
+  "must": [
+   "V-cw-btn",
+   "V-cw-quiet",
+   "C-cw-post"
+  ],
+  "scn": [
+   "chwhole"
+  ]
+ },
+ "cw4refind": {
+  "file": "main",
+  "edits": [
+   [
+    "                    ? ((c.anchor && c.anchor.isConnected && chartFound(c)) || chartWholeRefind(c))",
+    "                    ? !!(c.anchor && c.anchor.isConnected)"
+   ]
+  ],
+  "must": [
+   "C-cw-survive",
+   "C-cw-again"
+  ],
+  "scn": [
+   "chwhole"
+  ]
+ },
+ "cw4again": {
+  "file": "main",
+  "edits": [
+   [
+    "                    : isWhole ? _pvCard.host === 'chartwhole'",
+    "                    : isWhole ? false"
+   ]
+  ],
+  "must": [
+   "C-cw-again"
+  ],
+  "scn": [
+   "chwhole"
+  ]
+ },
+ "cw4off": {
+  "file": "main",
+  "edits": [
+   [
+    "        if (!d) { if (btn) btn.remove(); return; }",
+    "        if (!d) { return; }"
+   ]
+  ],
+  "must": [
+   "V-cw-gone"
+  ],
+  "scn": [
+   "chwhole",
+   "choff"
+  ]
+ },
+ "cw4jump": {
+  "file": "journal",
+  "edits": [
+   [
+    "            if (window.Penumbra && window.Penumbra.revealChartNote) {",
+    "            if (false) {"
+   ]
+  ],
+  "must": [
+   "R-cw-jump"
+  ],
+  "scn": [
+   "chwhole"
+  ]
+ },
+ "cw4chip": {
+  "file": "journal",
+  "edits": [
+   [
+    "        if (String(n.SCOPE || '') === 'chart') return renderChartRef(n);",
+    "        void 0;"
+   ]
+  ],
+  "must": [
+   "R-cw-jump"
+  ],
+  "scn": [
+   "chwhole"
+  ]
+ },
+ "cw4quiet": {
+  "file": "css",
+  "edits": [
+   [
+    "    opacity: 0;\r\n    transition: opacity 0.15s ease;\r\n}\r\n#reportSnippetOutput .journal-chartwhole-btn svg",
+    "    transition: opacity 0.15s ease;\r\n}\r\n#reportSnippetOutput .journal-chartwhole-btn svg"
+   ]
+  ],
+  "must": [
+   "V-cw-quiet"
+  ],
+  "scn": [
+   "chwhole"
+  ]
+ },
+ "cw4srvkey": {
+  "file": "manage",
+  "edits": [
+   [
+    "    if (!is_array($p) || (count($p) !== 4 && count($p) !== 5)) return false;",
+    "    if (!is_array($p) || count($p) < 4) return false;"
+   ]
+  ],
+  "must": [
+   "S-cw-key5"
+  ],
+  "scn": [
+   "server11",
+   "server",
+   "server12"
+  ]
+ },
+ "cw4srvref": {
+  "file": "manage",
+  "edits": [
+   [
+    "    if ($scope === 'chart') return journalChartRefText($rowKey, $snapshot);",
+    "    if (false) return journalChartRefText($rowKey, $snapshot);"
+   ]
+  ],
+  "must": [
+   "S-cw-ref"
+  ],
+  "scn": [
+   "server11",
+   "server3"
+  ]
+ },
+ "cw4srvscope": {
+  "file": "manage",
+  "edits": [
+   [
+    "        $scope = ($scopeIn === 'row' || $scopeIn === 'pivot' || $scopeIn === 'chart') ? $scopeIn : 'report';",
+    "        $scope = ($scopeIn === 'row' || $scopeIn === 'pivot') ? $scopeIn : 'report';"
+   ]
+  ],
+  "must": [
+   "S-cw-add"
+  ],
+  "scn": [
+   "server11",
+   "server"
+  ]
+ }
+}

@@ -1,0 +1,227 @@
+<!doctype html><meta charset="utf-8"><title>running</title><pre id="out">running</pre>
+<script src="SRC.js"></script>
+<script>
+var LOG=[],PASS=0,FAIL=0;
+function ok(n,c,x){ if(c){PASS++;LOG.push('PASS  '+n);} else {FAIL++;LOG.push('FAIL  '+n+(x?'   >> '+x:''));} }
+function eq(n,g,w){ ok(n, JSON.stringify(g)===JSON.stringify(w), 'got='+JSON.stringify(g)+' want='+JSON.stringify(w)); }
+function close(n,g,w,tol){ ok(n, Math.abs(g-w) <= (tol||1e-6), 'got='+g+' want='+w); }
+
+try {
+  var code = String(window.__src).replace(/\r\n/g,'\n');
+  function grab(decl){
+    var start=code.indexOf(decl);
+    if(start===-1) throw new Error('anchor not found: '+decl);
+    var i=code.indexOf('{',start),depth=0,inStr=null,inLine=false,inBlk=false,inRe=false;
+    for(var j=i;j<code.length;j++){
+      var c=code[j],n=code[j+1];
+      if(inLine){ if(c==='\n') inLine=false; continue; }
+      if(inBlk){ if(c==='*'&&n==='/'){inBlk=false;j++;} continue; }
+      if(inStr){ if(c==='\\'){j++;continue;} if(c===inStr) inStr=null; continue; }
+      if(inRe){ if(c==='\\'){j++;continue;} if(c==='/') inRe=false; continue; }
+      if(c==='/'&&n==='/'){inLine=true;j++;continue;}
+      if(c==='/'&&n==='*'){inBlk=true;j++;continue;}
+      if(c==='"'||c==="'"||c==='`'){inStr=c;continue;}
+      if(c==='/'){ var k=j-1; while(k>=0&&/\s/.test(code[k]))k--;
+        if(k<0||/[=(,:;!&|?{}[\n+\-*%~^<>]/.test(code[k])){inRe=true;continue;} }
+      if(c==='{')depth++; else if(c==='}'){depth--; if(depth===0) return code.slice(start,j+1);}
+    }
+    throw new Error('unbalanced: '+decl);
+  }
+
+  // ---- helper primitives, real source ----
+  var hsrc = grab('function _vizParseUserNumber(')+'\n'+grab('function _vizParseBands(') + '\n' +
+             grab('function _vizParseUserNumber(')+'\n'+grab('function _vizParseRefMarker(')+'\n'+grab('function _vizParseTarget(') + '\n' +
+             grab('function _vizGaugeRange(') + '\n' +
+             grab('function _vizBandColor(');
+  var H = new Function(hsrc + '\nreturn {bands:_vizParseBands, target:_vizParseTarget, range:_vizGaugeRange, band:_vizBandColor};')();
+
+  eq('bands: empty', H.bands(''), []);
+  eq('bands: null', H.bands(null), []);
+  eq('bands: single', H.bands('50'), [50]);
+  eq('bands: two', H.bands('50|80'), [50,80]);
+  eq('bands: unsorted input is sorted', H.bands('80|50'), [50,80]);
+  eq('bands: dupes removed', H.bands('50|50|80'), [50,80]);
+  eq('bands: junk dropped', H.bands('50|abc|80'), [50,80]);
+  eq('bands: currency/commas tolerated', H.bands('$1,000|$2,000'), [1000,2000]);
+  eq('bands: capped at 3 cut points', H.bands('10|20|30|40|50'), [10,20,30]);
+  eq('bands: all junk -> empty', H.bands('a|b'), []);
+  eq('bands: negatives allowed', H.bands('-10|10'), [-10,10]);
+
+  eq('target: empty -> null', H.target(''), null);
+  eq('target: bare number', H.target('80'), {value:80,label:''});
+  eq('target: value|label', H.target('80|Goal'), {value:80,label:'Goal'});
+  eq('target: currency', H.target('$1,500|Budget'), {value:1500,label:'Budget'});
+  eq('target: non-numeric -> null', H.target('soon'), null);
+  eq('target: label may contain spaces', H.target('50|FY26 Goal'), {value:50,label:'FY26 Goal'});
+  eq('target: zero is a valid target', H.target('0'), {value:0,label:''});
+
+  // range: explicit yMin/yMax win
+  eq('range: explicit min+max honoured', H.range([50], null, [], '0', '100'), {min:0,max:100});
+  // Headroom is 5% of the SPAN above the floor, not 5% of the value:
+  // 10 + (50-10)*1.05 = 52. That is what keeps a non-zero floor honest.
+  eq('range: explicit min only', H.range([50], null, [], '10', ''), {min:10,max:52});
+  // auto: 0..value*1.05
+  var r1 = H.range([80], null, [], '', '');
+  close('range: auto max = value * 1.05', r1.max, 84);
+  eq('range: auto min is 0 for positive data', r1.min, 0);
+  // target beyond value must still fit inside the track
+  var r2 = H.range([80], {value:200,label:''}, [], '', '');
+  ok('range: target inside track', r2.max > 200, 'max='+r2.max);
+  // top band beyond both must fit
+  var r3 = H.range([10], null, [500], '', '');
+  ok('range: top band inside track', r3.max > 500, 'max='+r3.max);
+  // negatives pull min below zero
+  var r4 = H.range([-40, 20], null, [], '', '');
+  ok('range: negative data lowers min', r4.min <= -40, 'min='+r4.min);
+  // degenerate: all zeros must not produce min==max
+  var r5 = H.range([0], null, [], '', '');
+  ok('range: zero-only data still spans', r5.max > r5.min, JSON.stringify(r5));
+  // inverted explicit range is repaired, not rendered
+  var r6 = H.range([5], null, [], '100', '10');
+  ok('range: inverted explicit range repaired', r6.max > r6.min, JSON.stringify(r6));
+
+  ok('bandColor: light ramp darkens', H.band(0,3,false) !== H.band(2,3,false));
+  ok('bandColor: dark theme uses white', H.band(0,3,true).indexOf('255,255,255') !== -1);
+  ok('bandColor: light theme uses black', H.band(0,3,false).indexOf('0,0,0') !== -1);
+  ok('bandColor: single band does not divide by zero', /rgba\([\d,]+,0\.\d+\)/.test(H.band(0,1,false)));
+
+  // ---- generateChartDataFromMaps: gauge + bullet, real source ----
+  var stubs=[
+   'function parseAccountingNumber(v){ if(v==null) return NaN; var s=String(v).replace(/[$,\\s]/g,""); if(s==="") return NaN; var n=Number(s); return isNaN(n)?NaN:n; }',
+   'function getCustomSortComparator(){ return null; }',
+   'function vizExtraAggregate(){ return undefined; }',
+   'function getChartColor(i,a){ return "C"+i; }',
+   'function getChartBorderColor(i){ return "B"+i; }',
+   'function vizBucketRowsForAxis(r){ return r; }',
+   'function pivotWavgWeightCol(){ return null; }',
+   'function vizAggNeedsWeights(){ return false; }',
+   'function decodeHtmlEntities(s){ return String(s==null?"":s); }'
+  ].join('\n');
+  var gen = new Function(stubs+'\n'+hsrc+'\n'+grab('function _vizParseFunnelMode(')+'\n'+
+                         grab('function _vizParseVizOptions(')+'\n'+(/var PENUMBRA_PALETTE_NAMES = [^;]*;/.exec(code)||[''])[0]+'\n'+grab('function _vizParsePalette(')+'\n'+grab('function _vizParseFormat(')+'\n'+grab('function _vizParseUserNumber(')+'\n'+grab('function generateChartDataFromMaps(')+'\n'+grab('function _generateChartDataFromMaps(')+
+                         '\nreturn generateChartDataFromMaps;')();
+
+  function rows(pairs){ return pairs.map(function(p){ var m=new Map(); m.set('DEPT',p[0]); m.set('AMT',p[1]); return m; }); }
+  var R = rows([['A',10],['B',20],['C',30],['D',40]]);
+
+  // -- gauge: sum, target 120, bands 50|90 --
+  var g1 = gen(R,'','AMT',null,'sum',10,'gauge','value','desc','default',false,false,null,'',
+               {referenceLine:'120|Goal', bands:'50|90', yMin:'', yMax:''});
+  LOG.push('DEBUG g1 keys: ' + Object.keys(g1).join(',') + '  | genSrcHasGauge=' + (code.indexOf("chartType === 'gauge'") !== -1));
+  ok('gauge: _isGauge flag', g1._isGauge === true);
+  if (!g1._isGauge) { throw new Error('gauge branch did not fire; g1=' + JSON.stringify(g1).slice(0,300)); }
+  eq('gauge: value is the SUM of all rows', g1._gaugeValue, 100);
+  eq('gauge: bands parsed', g1._gaugeBands, [50,90]);
+  eq('gauge: target parsed', g1._gaugeTarget, {value:120,label:'Goal'});
+  ok('gauge: range covers the target', g1._gaugeRange.max >= 120, JSON.stringify(g1._gaugeRange));
+  eq('gauge: _chartType tag', g1._chartType, 'gauge');
+  ok('gauge: ignores xAxis entirely (no throw on empty)', true);
+
+  // gauge aggregations
+  eq('gauge: count', gen(R,'','AMT',null,'count',10,'gauge','value','desc','default',false,false,null,'',{})._gaugeValue, 4);
+  eq('gauge: avg',   gen(R,'','AMT',null,'avg',10,'gauge','value','desc','default',false,false,null,'',{})._gaugeValue, 25);
+  eq('gauge: min',   gen(R,'','AMT',null,'min',10,'gauge','value','desc','default',false,false,null,'',{})._gaugeValue, 10);
+  eq('gauge: max',   gen(R,'','AMT',null,'max',10,'gauge','value','desc','default',false,false,null,'',{})._gaugeValue, 40);
+
+  // gauge with no extras at all must not blow up
+  var g2 = gen(R,'','AMT',null,'sum',10,'gauge','value','desc','default',false,false,null,'', null);
+  eq('gauge: null extras -> no target', g2._gaugeTarget, null);
+  eq('gauge: null extras -> no bands', g2._gaugeBands, []);
+
+  // -- bullet: per-category rows against a shared target --
+  var b1 = gen(R,'DEPT','AMT',null,'sum',10,'bullet','value','desc','default',false,false,null,'',
+               {referenceLine:'25|Goal', bands:'15|35', yMin:'', yMax:''});
+  ok('bullet: _isBullet flag', b1._isBullet === true);
+  eq('bullet: labels sorted value desc', b1.labels, ['D','C','B','A']);
+  eq('bullet: values', b1._bulletValues, [40,30,20,10]);
+  eq('bullet: shared target', b1._gaugeTarget, {value:25,label:'Goal'});
+  eq('bullet: shared bands', b1._gaugeBands, [15,35]);
+  eq('bullet: thin measure bar', b1.datasets[0].barPercentage, 0.45);
+  ok('bullet: range covers the largest value', b1._gaugeRange.max >= 40, JSON.stringify(b1._gaugeRange));
+
+  // bullet honours explicit scale
+  var b2 = gen(R,'DEPT','AMT',null,'sum',10,'bullet','label','asc','default',false,false,null,'',
+               {referenceLine:'', bands:'', yMin:'0', yMax:'50'});
+  eq('bullet: explicit scale honoured', b2._gaugeRange, {min:0,max:50});
+  eq('bullet: label asc order', b2.labels, ['A','B','C','D']);
+
+  // bullet suppresses the Other bucket (a summed tail cannot meet a per-row target)
+  var b3 = gen(R,'DEPT','AMT',null,'sum',2,'bullet','value','desc','default',false,true,null,'',{});
+  eq('bullet: otherBucket suppressed', b3.labels, ['D','C']);
+
+  // empty rowset keeps the shared _noData contract for both
+  ok('gauge: empty rows -> _noData', !!gen([],'','AMT',null,'sum',10,'gauge','value','desc','default',false,false,null,'',{})._noData);
+  ok('bullet: empty rows -> _noData', !!gen([],'DEPT','AMT',null,'sum',10,'bullet','value','desc','default',false,false,null,'',{})._noData);
+
+  // ---- apply* config builders against those real payloads ----
+  var asrc = grab('function _vizBandColor(') + '\n' +
+             grab('function applyGaugeChartConfig(') + '\n' +
+             grab('function applyBulletChartConfig(');
+  var A = new Function('getChartColor','getChartBorderColor',
+            asrc + '\nreturn {gauge:applyGaugeChartConfig, bullet:applyBulletChartConfig};'
+          )(function(i){return 'C'+i;}, function(i){return 'B'+i;});
+
+  function cfg(){ return { options:{ scales:{ x:{type:'linear',grid:{}}, y:{grid:{},stacked:true} },
+                                     plugins:{ legend:{display:true}, tooltip:{}, datalabels:{} } } }; }
+
+  var gc = cfg();
+  A.gauge(gc, g1, {showValues:true, textColor:'#111', isDark:false, currencyPrefix:'$', fsBoost:0});
+  eq('gauge cfg: type becomes doughnut', gc.type, 'doughnut');
+  eq('gauge cfg: half circumference', gc.options.circumference, 180);
+  eq('gauge cfg: rotation', gc.options.rotation, 270);
+  ok('gauge cfg: scales removed', gc.options.scales === undefined);
+  ok('gauge cfg: legend off', gc.options.plugins.legend.display === false);
+  ok('gauge cfg: two slices', gc.data.datasets[0].data.length === 2);
+  close('gauge cfg: filled fraction = 100/range.max', gc.data.datasets[0].data[0], 100/g1._gaugeRange.max, 1e-9);
+  close('gauge cfg: slices sum to 1', gc.data.datasets[0].data[0]+gc.data.datasets[0].data[1], 1, 1e-9);
+  ok('gauge cfg: decor plugin registered', gc.plugins.some(function(p){return p.id==='penumbraGaugeDecor';}));
+  eq('gauge cfg: tooltip states value and target',
+     gc.options.plugins.tooltip.callbacks.label(),
+     '$100  -  target $120 (Goal), 83.3% of it');
+
+  // gauge where value exceeds the target (over-performance must not clamp weirdly)
+  var gOver = gen(rows([['A',300]]),'','AMT',null,'sum',10,'gauge','value','desc','default',false,false,null,'',
+                  {referenceLine:'100', bands:'', yMin:'', yMax:''});
+  var gc2 = cfg();
+  A.gauge(gc2, gOver, {showValues:true, textColor:'#111', isDark:false, currencyPrefix:'', fsBoost:0});
+  ok('gauge cfg: over-target fill stays within 0..1',
+     gc2.data.datasets[0].data[0] >= 0 && gc2.data.datasets[0].data[0] <= 1,
+     String(gc2.data.datasets[0].data[0]));
+  eq('gauge cfg: over-target tooltip', gc2.options.plugins.tooltip.callbacks.label(), '300  -  target 100, 300.0% of it');
+
+  // gauge with a ZERO target must not divide by zero
+  var gZero = gen(rows([['A',5]]),'','AMT',null,'sum',10,'gauge','value','desc','default',false,false,null,'',
+                  {referenceLine:'0', bands:'', yMin:'', yMax:''});
+  var gc3 = cfg();
+  A.gauge(gc3, gZero, {showValues:true, textColor:'#111', isDark:false, currencyPrefix:'', fsBoost:0});
+  ok('gauge cfg: zero target yields no NaN in tooltip',
+     gc3.options.plugins.tooltip.callbacks.label().indexOf('NaN') === -1,
+     gc3.options.plugins.tooltip.callbacks.label());
+
+  var bc = cfg();
+  A.bullet(bc, b1, {showValues:true, textColor:'#111', isDark:false, currencyPrefix:'$', fsBoost:0});
+  eq('bullet cfg: indexAxis y', bc.options.indexAxis, 'y');
+  eq('bullet cfg: x min from range', bc.options.scales.x.min, b1._gaugeRange.min);
+  eq('bullet cfg: x max from range', bc.options.scales.x.max, b1._gaugeRange.max);
+  ok('bullet cfg: value axis VISIBLE (unlike funnel)', bc.options.scales.x.display === true);
+  ok('bullet cfg: legend off', bc.options.plugins.legend.display === false);
+  ok('bullet cfg: decor plugin registered', bc.plugins.some(function(p){return p.id==='penumbraBulletDecor';}));
+  eq('bullet cfg: tooltip row 0 vs shared target',
+     bc.options.plugins.tooltip.callbacks.label({dataIndex:0}),
+     '$40  -  target $25 (Goal), 160.0% of it');
+  eq('bullet cfg: tooltip row 3', bc.options.plugins.tooltip.callbacks.label({dataIndex:3}),
+     '$10  -  target $25 (Goal), 40.0% of it');
+  eq('bullet cfg: datalabel ladders', bc.options.plugins.datalabels.formatter(2400000), '$2.4M');
+  ok('bullet cfg: showValues=false hides labels',
+     (function(){ var t=cfg(); A.bullet(t,b1,{showValues:false}); return t.options.plugins.datalabels.display===false; })());
+
+  // guards: wrong payload must be a no-op for both
+  var gnA=cfg(); A.gauge(gnA, {labels:[],datasets:[]}, {}); ok('gauge cfg: no-op on non-gauge data', gnA.type===undefined);
+  var gnB=cfg(); A.bullet(gnB, {labels:[],datasets:[]}, {}); ok('bullet cfg: no-op on non-bullet data', gnB.options.indexAxis===undefined);
+
+  document.getElementById('out').textContent =
+    'RESULT '+(FAIL===0?'ALL-PASS':'HAS-FAILURES')+'  pass='+PASS+' fail='+FAIL+'\n'+LOG.join('\n');
+} catch(e) {
+  document.getElementById('out').textContent='HARNESS-ERROR: '+e.name+': '+e.message+'\n'+(e.stack||'');
+}
+</script>

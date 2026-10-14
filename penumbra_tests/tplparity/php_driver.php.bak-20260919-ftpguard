@@ -1,0 +1,147 @@
+<?php
+/**
+ * tplparity - PHP side. Runs every corpus case through the code the SCHEDULER
+ * runs: generate_custom_template_string() (penumbra_template.php, required live
+ * from --app) on top of the runner's own functions, LIFTED out of
+ * schedule_runner.php by the tokenizer (runner_mirror.php). The runner itself is
+ * never required: its top level opens Oracle, claims tasks and sends email.
+ *
+ *   php php_driver.php <runner_mirror.php> <app_dir> <corpus.json> [--mutant=NAME]
+ *
+ * Output: RESULTS_JSON:{ cases:{id: base64(bytes)}, ops:{id: base64(text)}, warnings:[...], noise:"..." }
+ */
+error_reporting(E_ALL);
+ini_set('display_errors', '0');
+$GLOBALS['__warn'] = array();
+set_error_handler(function ($no, $str, $file, $line) {
+    if (!(error_reporting() & $no)) return true; // an @-suppressed call: the engine's own compile probes
+    $GLOBALS['__warn'][] = $str . ' @ ' . basename($file) . ':' . $line;
+    return true;
+});
+
+function fin($o) { echo 'RESULTS_JSON:' . json_encode($o, JSON_UNESCAPED_SLASHES); exit(0); }
+
+if ($argc < 4) fin(array('fatal' => 'usage: php_driver.php <mirror> <app> <corpus>'));
+$mirror = $argv[1]; $app = rtrim($argv[2], "/\\"); $corpusFile = $argv[3];
+$mutant = '';
+$live = $app; // --live=<dir>: where includes that are NOT staged come from (a stage dir holds only changed files)
+$dropDir = ''; // --drop=<dir>: also deliver a few cases through the real transport and read them back
+for ($i = 4; $i < $argc; $i++) {
+    if (strpos($argv[$i], '--mutant=') === 0) $mutant = substr($argv[$i], 9);
+    if (strpos($argv[$i], '--drop=') === 0) $dropDir = rtrim(str_replace('/', '\\', substr($argv[$i], 7)), '\\');
+    if (strpos($argv[$i], '--live=') === 0) $live = rtrim(substr($argv[$i], 7), "/\\");
+}
+$inc = function ($name) use ($app, $live) { return is_file("$app/$name") ? "$app/$name" : "$live/$name"; };
+
+ob_start(); // log_scheduler() echoes; keep stdout for the envelope
+try {
+    foreach (array($mirror, "$app/penumbra_template.php") as $f) {
+        if (!is_file($f)) { ob_end_clean(); fin(array('fatal' => "missing file: $f")); }
+    }
+    require $mirror;
+    // Live includes the runner gets from its own require block. Guarded on the
+    // FUNCTION, so if the runner ever declares its own copy the mirror's wins.
+    if (!function_exists('_search_get_virtual_columns')) require_once $inc('penumbra_search.php');
+    if (!function_exists('penumbra_build_theme_styles')) require_once $inc('themes_config.php');
+    require_once "$app/penumbra_template.php";
+    $theme_styles = penumbra_build_theme_styles(); // a `global` inside generate_pivot_html
+    $GLOBALS['theme_styles'] = $theme_styles;
+
+    $corpus = json_decode(file_get_contents($corpusFile), true);
+    if (!is_array($corpus)) { ob_end_clean(); fin(array('fatal' => 'corpus did not decode')); }
+
+    // ---- build the execute_scheduled_report() result shape ------------------
+    $cols = $corpus['columns'];
+    $hiddenIdx = array();
+    foreach ($corpus['hidden'] as $h) $hiddenIdx[array_search($h, $cols, true)] = true;
+    $visible = array('#');
+    $order = array();
+    foreach ($cols as $i => $c) { if (!isset($hiddenIdx[$i])) { $visible[] = $i; $order[] = $i; } }
+    $state = array('visibleColumns' => $visible, 'columnOrder' => $order, 'sortCriteria' => $corpus['sort']);
+
+    // rawData = QUERY order: the display-order rows, deterministically shuffled.
+    $raw = $corpus['rows'];
+    $perm = $corpus['perm'];
+    $shuffled = array();
+    foreach ($perm as $p) { if (isset($raw[$p])) $shuffled[] = $raw[$p]; }
+    $processed = apply_state_logic($shuffled, $state);
+    $flatResult = array_merge($state, $processed, array('rawData' => $shuffled, 'reportTitle' => 'Parity <b>Report</b> &amp; Co'));
+
+    $ctx = array(
+        'title' => 'Parity Report & Co', 'timestamp' => 'TS', 'url' => 'https://example.test/?id=x',
+        'themeName' => 'theme-default', 'promptValues' => array(),
+        'reportMeta' => array('noLimit' => false, 'searchFilter' => (string)$corpus['search'], 'reportSubtitle' => '')
+    );
+
+    if ($mutant === 'no_bom')        { /* applied below */ }
+    $out = array('cases' => array(), 'ops' => array(), 'meta' => array());
+    foreach ($corpus['cases'] as $c) {
+        $options = array('drop_format_custom' => true, 'drop_custom_header' => $c['header'],
+                         'drop_custom_template' => $c['body'], 'drop_custom_ext' => $c['ext'],
+                         'drop_custom_newline' => (bool)$c['newline']);
+        if ($c['mode'] === 'flat') {
+            $res = $flatResult;
+        } else {
+            $pv = $corpus['pivots'][$c['mode']];
+            $pr = $corpus['pivotData'][$pv['data']];
+            $res = array('data' => $pr, 'rawData' => $pr, 'viewMode' => 'pivot', 'pivot' => $pv);
+        }
+        try {
+            $bytes = generate_custom_template_string($res, $options, $ctx);
+            if ($mutant === 'no_bom' && substr($bytes, 0, 3) === "\xEF\xBB\xBF") $bytes = substr($bytes, 3);
+            $out['cases'][$c['id']] = base64_encode($bytes);
+        } catch (\Throwable $e) {
+            $out['cases'][$c['id']] = 'ERR:' . get_class($e) . ': ' . $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine();
+        }
+    }
+    foreach ($corpus['ops'] as $o) {
+        try {
+            $args = array_merge(array($o['op'], $o['subject']), $o['params']);
+            $out['ops'][$o['id']] = base64_encode((string)_snippet_string($args));
+        } catch (\Throwable $e) {
+            $out['ops'][$o['id']] = 'ERR:' . get_class($e) . ': ' . $e->getMessage();
+        }
+    }
+    // ---- delivery leg: --drop=<dir> ------------------------------------------
+    // The same bytes, handed to the app's REAL transport (plugins/file_transport.php,
+    // required live) the way the runner's DROP_FILE branch does it: filename from
+    // resolve_filename_pattern(), extension = the template's file type, the
+    // directory allow-listed via the runtime-only _allowed_roots key. Then the file
+    // is read back OFF DISK - that is what a consumer of the drop actually gets.
+    $out['dropped'] = array();
+    if ($dropDir !== '') {
+        require_once $inc('plugins/file_transport.php');
+        foreach ($corpus['cases'] as $c) {
+            if (!in_array($c['id'], array('plain_csv', 'sql_insert', 'json_ext_nobom', 'curly_class', 'nested_zip', 'pv2_rows'), true)) continue;
+            $bytes = base64_decode($out['cases'][$c['id']], true);
+            if ($bytes === false) { $out['dropped'][$c['id']] = 'ERR:no bytes'; continue; }
+            $name = resolve_filename_pattern('{TITLE}_' . $c['id'], 'Parity: "Report" <1>', 0) . '.' . $c['ext'];
+            $path = $dropDir . '\\' . $name;
+            $r = execute_file_drop($bytes, $path, 'unc', array('_allowed_roots' => array($dropDir)));
+            if (empty($r['success'])) { $out['dropped'][$c['id']] = 'ERR:' . $r['message']; continue; }
+            $back = @file_get_contents($path);
+            $out['dropped'][$c['id']] = ($back === false) ? 'ERR:not on disk' : base64_encode($back);
+            $out['meta']['dropname_' . $c['id']] = $name;
+        }
+        // The gate itself: the same call with a sibling directory must be refused,
+        // and must write nothing.
+        $sib = $dropDir . '_sibling';
+        $r2 = execute_file_drop('x', $sib . '\\refused.txt', 'unc', array('_allowed_roots' => array($dropDir)));
+        $out['meta']['refused_outside_root'] = (empty($r2['success']) && !is_file($sib . '\\refused.txt'));
+    }
+
+    // What the pivot source looked like - printed by run.ps1 when a pivot case fails.
+    foreach ($corpus['pivots'] as $pid => $pv) {
+        $src = penumbra_tpl_pivot_source(array('data' => $corpus['pivotData'][$pv['data']], 'viewMode' => 'pivot', 'pivot' => $pv), 'theme-default');
+        $out['meta'][$pid] = $src ? array('columns' => $src['columns'], 'rows' => $src['rows']) : null;
+    }
+    $out['meta']['mbstring'] = function_exists('mb_strtoupper');
+    $out['meta']['php'] = PHP_VERSION;
+    $out['warnings'] = $GLOBALS['__warn'];
+    $out['noise'] = substr((string)ob_get_clean(), 0, 2000);
+    fin($out);
+} catch (\Throwable $e) {
+    $noise = (string)ob_get_clean();
+    fin(array('fatal' => get_class($e) . ': ' . $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine(),
+              'noise' => substr($noise, 0, 2000), 'warnings' => $GLOBALS['__warn']));
+}

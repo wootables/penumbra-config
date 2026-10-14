@@ -1,0 +1,369 @@
+# =============================================================================
+# PENUMBRA CUSTOM-TEMPLATE PARITY  -  browser download  vs  scheduled File Drop
+#
+# ONE corpus (gen_corpus.php) through both engines, diffed BYTE FOR BYTE:
+#
+#   JS  side: the app's real path - formatCellContent() renders each cell,
+#             _buildCustomDownloadText() builds the text and _fireCustomDownload()
+#             produces the actual Blob - inside the real js/main.js ready closure
+#             (main.js + a one-line eval hook), in headless Edge.
+#   PHP side: generate_custom_template_string() (penumbra_template.php, required
+#             live) on top of the runner's own functions LIFTED out of
+#             schedule_runner.php by the tokenizer. The runner is never required:
+#             its top level opens Oracle, claims tasks and SENDS EMAIL.
+#
+# Also diffs every string() op directly: PenumbraTemplate.stringOp vs
+# _snippet_string - the twin scheduled EMAILS use too.
+#
+# Run it (UNC execution policy blocks -File, so pass the body as a scriptblock):
+#   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\tplparity'
+#   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1")))
+#   ... -App <dir>   files under test (a stage dir is fine; anything it lacks comes from -Live)
+#   ... -Control     plant one wrong byte on the PHP side: the run MUST report FAIL 1
+#   ... -Mutants     run every targeted mutant: each MUST make its named cases diverge
+#
+# Delivery leg: 6 cases through the REAL transport_unc() and read back off disk,
+# a sibling directory refused, and (2026-09-19) FTP + FTPS through transport_ftp()
+# on this PHP, which - like production - has NO ftp extension: each leg must be a
+# clean success=false that names the cause, never a throw (it used to be an
+# undefined-function Error -> "Runner Crash"). The plugin under test is
+# Pick('plugins\file_transport.php'), handed to the driver as --transport.
+#   FTP control: -App <dir> whose plugins\file_transport.php is the pre-fix plugin
+#   (live .bak-20260919-ftpguard) -> FAIL 2, both legs "THREW". -Mutants also
+#   rebuilds that pre-fix function (ftp_prefix_code) and must see it caught.
+#
+# Writes nothing to the webroot. Exit 1 on any divergence (or a mutant that survives).
+# =============================================================================
+param([string]$App = '', [string]$Live = '', [string]$Here = '', [switch]$Control, [switch]$Mutants, [switch]$KeepArtifacts, [switch]$Quiet)
+$ErrorActionPreference = 'Stop'
+if (-not $Here) { $Here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\tplparity' }
+if (-not $Live) { $Live = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
+if (-not $App)  { $App = $Live }
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+# Production loads mbstring; off-box the ini's D:\ extension_dir does not resolve,
+# so load it by UNC. FORWARD slashes: a backslash UNC loses its first slash on the
+# way through the ini scanner.
+$phpArgs = @('-n', '-d', 'extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/ext', '-d', 'extension=mbstring')
+$edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+$work = Join-Path $env:TEMP ('tplparity_' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+New-Item -ItemType Directory -Force $work | Out-Null
+
+function Pick($rel) { $a = Join-Path $App $rel; if (Test-Path -LiteralPath $a) { return $a }; return (Join-Path $Live $rel) }
+function Fwd($p) { return $p.Replace([char]92, [char]47) }
+# never 2>&1 on php.exe in PS 5.1 (stderr becomes ErrorRecords); stdout is clean on its own
+function Noise($lines) { $lines | Where-Object { $_ -notmatch 'dynamic library|Zend extension|php_opcache|Failed loading' } }
+function Say($m) { if (-not $Quiet) { Write-Host $m } }
+
+function Run-Php($mirror, $appDir, [string[]]$extra) {
+  $a = @($phpArgs) + @("$Here\php_driver.php", $mirror, (Fwd $appDir), "$work\corpus.json", ('--live=' + (Fwd $Live))) + $extra
+  $o = (Noise (& $php @a)) -join "`n"
+  $i = $o.IndexOf('RESULTS_JSON:')
+  if ($i -lt 0) { throw "PHP driver printed no envelope: $($o.Substring(0, [Math]::Min(600, $o.Length)))" }
+  $r = $o.Substring($i + 13) | ConvertFrom-Json
+  if ($r.fatal) { throw "PHP driver fatal: $($r.fatal)  noise: $($r.noise)" }
+  return $r
+}
+function Dec($b) {
+  if ($null -eq $b) { return '<missing>' }
+  if ($b -like 'ERR:*' -or $b -eq 'NOFIRE') { return $b }
+  return [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($b))
+}
+function Show($s) { return ($s -replace "`r", '\r' -replace "`n", '\n' -replace "`t", '\t' -replace ([string][char]0xFEFF), '<BOM>' -replace ([string][char]0xA0), '<NBSP>') }
+# FTP / FTPS with no ftp extension (production): each leg must come back
+# success=false with a message that names the cause. One line per leg that did not.
+function Ftp-Bad($meta) {
+  $out = @()
+  foreach ($leg in 'ftp', 'ftps') {
+    $f = $meta.("ftp_leg_$leg"); $want = $leg.ToUpper()
+    if ($meta.ftp_ext_loaded) { $out += "${leg}: this PHP HAS the ftp extension - the missing-extension path was not exercised" }
+    elseif (-not $f) { $out += "${leg}: no result recorded" }
+    elseif ($f.threw) { $out += "${leg}: the transport THREW ($($f.threw)) - the runner reports that as 'Runner Crash'" }
+    elseif ($f.success) { $out += "${leg}: reported SUCCESS without the ftp extension ('$($f.message)')" }
+    elseif ($f.message -cnotmatch ('^' + $want + ' is not available on this server')) { $out += "${leg}: failed without saying why: '$($f.message)'" }
+  }
+  return ,$out
+}
+
+# Compare one PHP result set to the JS one. Returns the list of diverging ids.
+function Diff-Sets($phpRes, $jsRes, $corpus) {
+  $bad = @()
+  foreach ($c in $corpus.cases) {
+    $p = $phpRes.cases.($c.id); $j = $jsRes.fired.($c.id)
+    if ($p -cne $j) { $bad += [pscustomobject]@{ id = $c.id; kind = 'case'; note = $c.note; js = $j; php = $p; known = [string]$c.known } }
+  }
+  foreach ($o in $corpus.ops) {
+    $p = $phpRes.ops.($o.id); $j = $jsRes.ops.($o.id)
+    if ($p -cne $j) { $bad += [pscustomobject]@{ id = $o.id; kind = 'op'; note = "$($o.op): $($o.note)"; js = $j; php = $p; known = '' } }
+  }
+  return ,$bad
+}
+
+try {
+  Say "[1/5] corpus ..."
+  $cj = (Noise (& $php -n "$Here\gen_corpus.php")) -join "`n"
+  [IO.File]::WriteAllText("$work\corpus.json", $cj, $utf8)
+  $corpus = $cj | ConvertFrom-Json
+  Say ("      {0} template cases, {1} string() op cases, {2} flat rows, {3} pivot layouts" -f $corpus.cases.Count, $corpus.ops.Count, $corpus.rows.Count, @($corpus.pivots.PSObject.Properties).Count)
+
+  Say "[2/5] lifting the runner mirror (no execution of the runner) ..."
+  $runner = Pick 'schedule_runner.php'
+  Noise (& $php -n "$Here\extract_mirror.php" $runner "$work\runner_mirror.php") | ForEach-Object { Say "      $_" }
+  $lint = (Noise (& $php -n -l "$work\runner_mirror.php")) -join ' '
+  if ($lint -notmatch 'No syntax errors') { throw "lifted mirror failed to lint: $lint" }
+
+  Say "[3/5] PHP side (scheduler engine) ..."
+  $tplDir = Split-Path (Pick 'penumbra_template.php') -Parent
+  New-Item -ItemType Directory -Force "$work\drop" | Out-Null
+  $transportUnderTest = Pick 'plugins\file_transport.php'
+  Say "      transport under test: $transportUnderTest"
+  $phpRes = Run-Php "$work\runner_mirror.php" $tplDir @("--drop=$work\drop", ('--transport=' + (Fwd $transportUnderTest)))
+  Say ("      php {0}, mbstring={1}, {2} warning(s)" -f $phpRes.meta.php, $phpRes.meta.mbstring, @($phpRes.warnings).Count)
+  if (-not $phpRes.meta.mbstring) { throw 'mbstring did not load - production has it, and case ops differ without it' }
+
+  Say "[4/5] JS side (real main.js in headless Edge) ..."
+  $jsDir = Join-Path $Live 'js'
+  foreach ($f in 'jquery-3.7.1.min.js','jquery-ui.min.js','moment.min.js','pako.min.js','codemirror.min.js','sql.min.js',
+                 'show-hint.js','foldcode.js','foldgutter.js','brace-fold.js','comment-fold.js','placeholder.js',
+                 'penumbra_snippet_help.js','purify.min.js') { Copy-Item -LiteralPath "$jsDir\$f" -Destination "$work\$f" -Force }
+  Copy-Item -LiteralPath (Pick 'js\penumbra_template.js') -Destination "$work\penumbra_template.js" -Force
+  Copy-Item -LiteralPath "$Here\js_driver.html" -Destination "$work\js_driver.html" -Force
+  [IO.File]::WriteAllText("$work\corpus_inline.js", 'window.__CORPUS = ' + $cj + ';', $utf8)
+  $src = [IO.File]::ReadAllText((Pick 'js\main.js'), $utf8)
+  $anchor = '$(document).ready(function () {'
+  $ai = $src.IndexOf($anchor)
+  if ($ai -lt 0) { throw 'main.js closure anchor not found' }
+  # A DIRECT eval inside the closure: the driver can reach (and assign) any
+  # closure-scope name at run time, so no export list has to track main.js.
+  $hook = 'try { window.__TPL = { ev: function (__c) { return eval(__c); } }; } catch (e) { window.__TPL_ERR = String(e); }'
+  [IO.File]::WriteAllText("$work\main_tpl.js", $src.Substring(0, $ai) + $anchor + "`r`n    $hook`r`n" + $src.Substring($ai + $anchor.Length), $utf8)
+
+  function Run-Edge($page, $tag) {
+    $dom = "$work\dom_$tag.txt"
+    $url = 'file:///' + (Fwd $work) + '/' + $page
+    $eargs = @('--headless=new', '--disable-gpu', '--no-sandbox', '--allow-file-access-from-files',
+               "--user-data-dir=$work\edgeprofile_$tag", '--virtual-time-budget=60000', '--dump-dom', $url)
+    $pp = Start-Process -FilePath $edge -PassThru -NoNewWindow -RedirectStandardOutput $dom -ArgumentList $eargs
+    # Edge can finish the dump and then never exit (2026-09-19, runs in parallel -
+    # a bare WaitForExit() hung 20 min; auditfixes hit the same). Wait for exit OR a
+    # complete dump (cap 120 s), then stop THIS profile's msedge - never anyone else's.
+    $udd = "$work\edgeprofile_$tag"
+    $deadline = [DateTime]::Now.AddSeconds(120)
+    while ([DateTime]::Now -lt $deadline) {
+      if ($pp.HasExited) { break }
+      $peek = ''
+      try { $fs = [IO.File]::Open($dom, 'Open', 'Read', 'ReadWrite'); $sr = New-Object IO.StreamReader($fs); $peek = $sr.ReadToEnd(); $sr.Close() } catch { }
+      if ($peek.Contains('</html>')) { break }
+      Start-Sleep -Milliseconds 500
+    }
+    if (-not $pp.HasExited) { try { $pp.Kill() } catch { } }
+    Get-CimInstance Win32_Process -Filter "Name = 'msedge.exe'" | Where-Object { $_.CommandLine -like "*$udd*" } |
+      ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } catch { } }
+    $d = $null
+    for ($z = 0; $z -lt 120; $z++) {
+      try { $d = [IO.File]::ReadAllText($dom); if ($d.Length -gt 0) { break } } catch { }
+      Start-Sleep -Milliseconds 500
+    }
+    if (-not $d) { throw "could not read the Edge dump ($tag)" }
+    $a = $d.LastIndexOf('<pre id="out">'); $b = $d.IndexOf('</pre>', $a)
+    if ($a -lt 0) { throw "no <pre id=out> in the dump ($tag, $($d.Length) bytes)" }
+    $txt = [System.Net.WebUtility]::HtmlDecode($d.Substring($a + 14, $b - $a - 14))
+    if (-not $txt.StartsWith('RESULTS_JSON:')) { throw "$tag driver did not finish: $($txt.Substring(0, [Math]::Min(600, $txt.Length)))" }
+    $o = $txt.Substring(13) | ConvertFrom-Json
+    if ($o.fatal) { throw "$tag driver fatal: $($o.fatal)" }
+    return $o
+  }
+  $jsRes = Run-Edge 'js_driver.html' 'parity'
+  foreach ($n in @($jsRes.notes)) { Say "      note: $n" }
+
+  # ---- the scheduler panel itself: markup SLICED from index.php + real main.js ----
+  Say "      scheduler File Drop panel (markup from index.php, real main.js + preset engine) ..."
+  $idx = [IO.File]::ReadAllText((Pick 'index.php'), $utf8)
+  $m0 = $idx.IndexOf('<!-- Drop File options (hidden by default'); $m1 = $idx.IndexOf('<!-- DB Dump options (hidden by default')
+  if ($m0 -lt 0 -or $m1 -le $m0) { throw 'could not slice the File Drop options markup out of index.php' }
+  $uiPage = [IO.File]::ReadAllText("$Here\ui_driver.html", $utf8).Replace('<!--@@SCHED_DROP_MARKUP@@-->', $idx.Substring($m0, $m1 - $m0))
+  [IO.File]::WriteAllText("$work\ui_driver.html", $uiPage, $utf8)
+  Copy-Item -LiteralPath (Pick 'js\penumbra_presets.js') -Destination "$work\penumbra_presets.js" -Force
+  $uiRes = Run-Edge 'ui_driver.html' 'ui'
+  $uiFail = @($uiRes.results | Where-Object { -not $_.ok })
+  Say ("      {0} UI assertion(s), {1} failed" -f @($uiRes.results).Count, $uiFail.Count)
+  foreach ($u in $uiFail) { Say ("        UI FAIL  {0}  {1}" -f $u.name, $u.detail) }
+
+  # The Blob is the ground truth. Where the app built text but fired nothing it
+  # REFUSED the download (no rows / empty template) - the PHP side must answer ''.
+  $selfBad = @()
+  foreach ($c in $corpus.cases) {
+    $built = $jsRes.cases.($c.id); $fired = $jsRes.fired.($c.id)
+    if ($fired -eq 'NOFIRE') { $jsRes.fired.($c.id) = ''; continue }
+    if ($fired -like 'ERR:*' -or $built -like 'ERR:*') { $selfBad += "$($c.id): built=$built fired=$fired"; continue }
+    $bom = if ($c.ext -eq 'json') { '' } else { [string][char]0xFEFF }
+    # -cne throughout: PowerShell's -ne is CASE-INSENSITIVE on strings, which
+    # would wave through exactly the uppercase/lowercase bugs this suite exists for.
+    if ((Dec $fired) -cne ($bom + (Dec $built))) { $selfBad += "$($c.id): Blob is not (BOM rule + built text)" }
+  }
+  if ($selfBad.Count) { Say "      JS SELF-CHECK FAILED (harness, not engine):"; $selfBad | ForEach-Object { Say "        $_" } }
+
+  Say "[5/5] diffing ..."
+  $pass = 0; $fail = 0
+  $bad = Diff-Sets $phpRes $jsRes $corpus
+  if ($Control) {
+    # Negative control: one planted wrong byte MUST be reported.
+    $first = $corpus.cases[0].id
+    $phpRes.cases.$first = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((Dec $phpRes.cases.$first) + 'X'))
+    $bad = Diff-Sets $phpRes $jsRes $corpus
+  }
+  # KNOWN divergences: cases flagged in the corpus for a difference that exists
+  # OUTSIDE the template layer. They must keep diverging - one that starts to
+  # match fails the run, so the flag cannot outlive the difference it names.
+  $knownCases = @($corpus.cases | Where-Object { $_.known })
+  $knownHit = @($bad | Where-Object { $_.known })
+  $bad = @($bad | Where-Object { -not $_.known })
+  $knownGone = @($knownCases | Where-Object { $id = $_.id; -not ($knownHit | Where-Object { $_.id -eq $id }) })
+  # ---- delivery leg: what landed ON DISK through the real transport_unc() ------
+  $dropBad = @(); $dropN = 0
+  foreach ($p in @($phpRes.dropped.PSObject.Properties)) {
+    $dropN++
+    $j = $jsRes.fired.($p.Name)
+    if ($p.Value -cne $j) { $dropBad += "$($p.Name): file on disk differs from the browser Blob ($((Show (Dec $p.Value)).Substring(0, [Math]::Min(120, (Show (Dec $p.Value)).Length))))" }
+    $fn = $phpRes.meta.("dropname_$($p.Name)")
+    if ($fn -and $fn -match '[\\/:*?"<>|]') { $dropBad += "$($p.Name): unsafe filename '$fn'" }
+  }
+  $dropN++; if (-not $phpRes.meta.refused_outside_root) { $dropBad += 'a destination OUTSIDE the permitted root was not refused' }
+  $dropN += 2; foreach ($x in (Ftp-Bad $phpRes.meta)) { $dropBad += "ftp $x" }
+  if ($dropN -lt 9) { $dropBad += "delivery leg ran $dropN checks, expected 9" }
+  Say ("      delivery leg: {0} check(s) through transport_unc() + transport_ftp(), {1} failed" -f $dropN, $dropBad.Count)
+  foreach ($d in $dropBad) { Say "        DROP FAIL  $d" }
+
+  $total = $corpus.cases.Count + $corpus.ops.Count - $knownCases.Count + @($uiRes.results).Count + $dropN
+  $fail = $bad.Count + $selfBad.Count + $knownGone.Count + $uiFail.Count + $dropBad.Count; $pass = $total - $bad.Count - $uiFail.Count - $dropBad.Count
+  foreach ($k in $knownHit) {
+    Say ""
+    Say ("  KNOWN ({0})  {1}  [{2}]" -f $k.known, $k.id, $k.note)
+    Say ("      JS  {0}" -f (Show (Dec $k.js)))
+    Say ("      PHP {0}" -f (Show (Dec $k.php)))
+  }
+  foreach ($k in $knownGone) { Say ""; Say ("  KNOWN DIVERGENCE NOW MATCHES - remove the flag from gen_corpus.php: {0}" -f $k.id) }
+  if (@($phpRes.warnings).Count) {
+    Say "      PHP WARNINGS (the runner logs these at E_ALL - each one is a finding):"
+    @($phpRes.warnings) | Select-Object -Unique -First 15 | ForEach-Object { Say "        $_" }
+    $fail += 1
+  }
+  foreach ($r in $bad) {
+    Say ""
+    Say ("  DIVERGES  {0}  [{1}]" -f $r.id, $r.note)
+    Say ("      JS  {0}" -f (Show (Dec $r.js)))
+    Say ("      PHP {0}" -f (Show (Dec $r.php)))
+  }
+
+  $mutFail = 0
+  if ($Mutants) {
+    Say ""
+    Say "MUTANTS - each one breaks ONE thing on the PHP side; its named cases MUST then diverge"
+    # file: M = runner mirror, T = penumbra_template.php
+    $muts = @(
+      @{ n = 'no_bom';          f = 'T'; s = '(($ext === ''json'') ? '''' : "\xEF\xBB\xBF") . $text'; r = '$text'; must = @('plain_csv', 'xml_ext'); mustNot = @('json_ext_nobom') },
+      @{ n = 'query_order';     f = 'T'; s = '$re = apply_state_logic($full, $st, $toggleCols);'; r = '$re = array(''data'' => $full, ''viewMode'' => ''standard'');'; must = @('plain_csv', 'rownum') },
+      @{ n = 'visible_only';    f = 'T'; s = 'if (isset($apiResult[''rawData'']) && is_array($apiResult[''rawData'']) && function_exists(''apply_state_logic'')) {'; r = 'if (false) {'; must = @('hidden_col') },
+      @{ n = 'php_trim';        f = 'T'; s = '$text = penumbra_tpl_js_trim($cell->textContent);'; r = '$text = trim($cell->textContent);'; must = @('pv4_nbsp_label') },
+      @{ n = 'cell_newlines';   f = 'T'; s = '$cell = str_replace("\r", "\n", str_replace("\n", '''', $cell));'; r = ''; must = @('multiline_cell') },
+      @{ n = 'nested_no_zip';   f = 'T'; s = 'if (empty($referenced)) { $lines[] = $renderWith($mk(null)); continue; }'; r = '$lines[] = $renderWith($mk(null)); continue;'; must = @('nested_zip') },
+      @{ n = 'legacy_titlecase'; f = 'M'; s = '$tc = @preg_replace_callback(''/\b\w/'', function ($m) { return strtoupper($m[0]); }, $lower);'; r = '$tc = ucwords($lower);'; must = @('titlecase') },
+      @{ n = 'byte_regex';      f = 'M'; s = '$attempts[] = array(_snippet_rx_ascii_classes($pattern), $rflags . ''Du'');'; r = ''; must = @('curly_class', 'regex_dot_unicode') },
+      @{ n = 'ucp_word';        f = 'M'; s = '$attempts[] = array(_snippet_rx_ascii_classes($pattern), $rflags . ''Du'');'; r = '$attempts[] = array($pattern, $rflags . ''Du'');'; must = @('regex_word_ascii') },
+      @{ n = 'preg_replacement'; f = 'M'; s = 'return _snippet_rx_expand($replacement, $m, $text);'; r = 'return $replacement;'; must = @('acct_negative', 'phone_fmt', 'comma_swap') },
+      @{ n = 'dollar_before_nl'; f = 'M'; s = '$attempts[] = array($pattern, $rflags . ''D'');'; r = '$attempts[] = array($pattern, $rflags);'; must = @('op:rx $ very end') },
+      @{ n = 'dot_matches_cr';  f = 'M'; s = '$rx = $delim . ''(*ANYCRLF)'' . $body . $delim . $a[1];'; r = '$rx = $delim . $body . $delim . $a[1];'; must = @('op:rx dot no CR') },
+      @{ n = 'byte_substr';     f = 'M'; s = 'return _snippet_js_substr($text, $start, $length);'; r = 'return ($length === null) ? substr($text, $start) : substr($text, $start, $length);'; must = @('op:substr utf8') },
+      @{ n = 'php_trim_op';     f = 'M'; s = 'if (function_exists(''penumbra_tpl_js_trim'')) return penumbra_tpl_js_trim($s, $side);'; r = ''; must = @('op:trim nbsp') },
+      @{ n = 'byte_length';     f = 'M'; s = 'return (string)_snippet_str_units($text);'; r = 'return (string)strlen($text);'; must = @('length_substr') },
+      @{ n = 'silent_bad_op';   f = 'M'; s = 'return ''[Error: Invalid string type: '' . $op . '']'';'; r = 'return $text;'; must = @('bad_op') },
+      # the pivot parity pair (2026-10-01): the runner follows the screen - trailing zeros trimmed, the [Blank] key first
+      @{ n = 'pivot_fmt_zeros';  f = 'M'; s = '$frac = rtrim($frac, ''0'');'; r = '$frac = $frac;'; must = @('pvk_display') },
+      @{ n = 'pivot_blank_last'; f = 'M'; s = 'if ($aBlank !== $bBlank) $cmp = $aBlank ? -1 : 1;'; r = 'if ($aBlank !== $bBlank) $cmp = $aBlank ? 1 : -1;'; must = @('pvb_blank_sort') }
+    )
+    $tplSrc = [IO.File]::ReadAllText((Pick 'penumbra_template.php'), $utf8)
+    $mirSrc = [IO.File]::ReadAllText("$work\runner_mirror.php", $utf8)
+    foreach ($m in $muts) {
+      $md = "$work\mut_$($m.n)"; New-Item -ItemType Directory -Force $md | Out-Null
+      $t = $tplSrc; $mi = $mirSrc
+      if ($m.f -eq 'T') { if ($t.IndexOf($m.s) -lt 0) { Say ("  {0,-18} ANCHOR NOT FOUND in penumbra_template.php" -f $m.n); $mutFail++; continue }; $t = $t.Replace($m.s, $m.r) }
+      else { if ($mi.IndexOf($m.s) -lt 0) { Say ("  {0,-18} ANCHOR NOT FOUND in the runner mirror" -f $m.n); $mutFail++; continue }; $mi = $mi.Replace($m.s, $m.r) }
+      [IO.File]::WriteAllText("$md\penumbra_template.php", $t, $utf8)
+      [IO.File]::WriteAllText("$md\runner_mirror.php", $mi, $utf8)
+      try { $mr = Run-Php "$md\runner_mirror.php" $md @() } catch { Say ("  {0,-18} KILLED (driver died: {1})" -f $m.n, $_.Exception.Message.Substring(0, [Math]::Min(90, $_.Exception.Message.Length))); continue }
+      $mb = Diff-Sets $mr $jsRes $corpus
+      $ids = @($mb | ForEach-Object { $_.id })
+      # 'op:<note>' names a string() op case by its note - op ids are positional.
+      $m.must = @($m.must | ForEach-Object {
+        if ($_ -like 'op:*') { $nn = $_.Substring(3); $hit = @($corpus.ops | Where-Object { $_.note -ceq $nn }); if ($hit.Count) { $hit[0].id } else { "UNRESOLVED($_)" } } else { $_ }
+      })
+      $baseIds = @(@($bad) + @($knownHit) | ForEach-Object { $_.id })
+      $newIds = @($ids | Where-Object { $baseIds -notcontains $_ })
+      $missed = @($m.must | Where-Object { $ids -notcontains $_ })
+      $leaked = @(@($m.mustNot) | Where-Object { $_ -and ($ids -contains $_) })
+      if ($m.must.Count -eq 0) {
+        Say ("  {0,-18} {1} new divergence(s) [{2}] - informational ({3})" -f $m.n, $newIds.Count, (($newIds | Select-Object -First 6) -join ','), $m.note)
+      } elseif ($missed.Count -or $leaked.Count) {
+        Say ("  {0,-18} SURVIVED - expected [{1}] to diverge; missing [{2}] wrongly-diverged [{3}]" -f $m.n, ($m.must -join ','), ($missed -join ','), ($leaked -join ',')); $mutFail++
+      } else {
+        Say ("  {0,-18} killed: {1} case(s) diverge, incl. {2}" -f $m.n, $newIds.Count, ($m.must -join ','))
+      }
+    }
+
+    # plugins/file_transport.php mutants (2026-09-19): break ONE thing in
+    # transport_ftp(); BOTH FTP legs must then fail, and for the NAMED reason.
+    # ftp_prefix_code rebuilds the pre-fix function: the check catches the real bug.
+    # A driver that dies here counts AGAINST the mutant - it never reached the check.
+    $trSrc = [IO.File]::ReadAllText($transportUnderTest, $utf8)
+    $trMuts = @(
+      @{ n = 'ftp_no_guard';    s = 'if (!function_exists($useFtps ? ''ftp_ssl_connect'' : ''ftp_connect'')) {'; r = 'if (false) {'; must = 'without saying why' },
+      @{ n = 'ftp_guard_ok';    s = 'Use SFTP instead.'''; r = 'Use SFTP instead.'', ''success'' => true'; must = 'reported SUCCESS' },
+      @{ n = 'ftp_prefix_code'; s = 'if (!function_exists($useFtps ? ''ftp_ssl_connect'' : ''ftp_connect'')) {'; r = 'if (false) {'; s2 = 'catch (\Throwable $e) {'; r2 = 'catch (Exception $e) {'; must = 'THREW' }
+    )
+    foreach ($m in $trMuts) {
+      $lost = @(@($m.s, $m.s2) | Where-Object { $_ -and $trSrc.IndexOf($_) -lt 0 })
+      if ($lost.Count) { Say ("  {0,-18} ANCHOR NOT FOUND in plugins/file_transport.php" -f $m.n); $mutFail++; continue }
+      $t = $trSrc.Replace($m.s, $m.r); if ($m.s2) { $t = $t.Replace($m.s2, $m.r2) }
+      $md = "$work\mut_$($m.n)"; New-Item -ItemType Directory -Force "$md\drop" | Out-Null
+      [IO.File]::WriteAllText("$md\file_transport.php", $t, $utf8)
+      try { $mr = Run-Php "$work\runner_mirror.php" $tplDir @("--drop=$md\drop", ('--transport=' + (Fwd "$md\file_transport.php"))) }
+      catch { Say ("  {0,-18} NOT EXERCISED - driver died: {1}" -f $m.n, $_.Exception.Message.Substring(0, [Math]::Min(90, $_.Exception.Message.Length))); $mutFail++; continue }
+      $fb = Ftp-Bad $mr.meta   # NOT @(...): that re-wraps the unary-comma result into ONE Object[]
+      $right = @($fb | Where-Object { $_ -clike "*$($m.must)*" })
+      if ($right.Count -eq 2) { Say ("  {0,-18} killed: both FTP legs fail - {1}" -f $m.n, $right[0]) }
+      else { Say ("  {0,-18} SURVIVED - expected both FTP legs to fail with '{1}', got [{2}]" -f $m.n, $m.must, ($fb -join ' | ')); $mutFail++ }
+    }
+  }
+
+  if ($Mutants) {
+    # UI mutants: break ONE thing in main.js; the named panel assertion MUST fail.
+    $mainTpl = [IO.File]::ReadAllText("$work\main_tpl.js", $utf8)
+    $uiMuts = @(
+      @{ n = 'ui_wrong_namespace'; rx = "(mountId: 'schedDropTplPresetMount',\s+ns: ')tpldownload(')"; to = '${1}tplcopy$2'; must = 'a preset saved under the DOWNLOAD namespace is listed here' },
+      @{ n = 'ui_no_header_prefill'; rx = [regex]::Escape("`$('#schedDropCustomHeader').val(_dlDefaultHeader());"); to = ''; must = 'header prefilled with the column names' },
+      @{ n = 'ui_panel_never_shows'; rx = [regex]::Escape("`$('#schedDropCustomOptions').toggle(on);"); to = ''; must = 'ticking Custom shows the panel' }
+    )
+    foreach ($um in $uiMuts) {
+      $mutated = [regex]::Replace($mainTpl, $um.rx, $um.to)
+      if ($mutated -ceq $mainTpl) { Say ("  {0,-18} ANCHOR NOT FOUND in main.js" -f $um.n); $mutFail++; continue }
+      [IO.File]::WriteAllText("$work\main_tpl.js", $mutated, $utf8)
+      try {
+        $ur = Run-Edge 'ui_driver.html' ('ui_' + $um.n)
+        $failedNames = @($ur.results | Where-Object { -not $_.ok } | ForEach-Object { $_.name })
+        if ($failedNames -contains $um.must) { Say ("  {0,-18} killed: {1} UI assertion(s) fail, incl. '{2}'" -f $um.n, $failedNames.Count, $um.must) }
+        else { Say ("  {0,-18} SURVIVED - '{1}' still passes" -f $um.n, $um.must); $mutFail++ }
+      } catch { Say ("  {0,-18} KILLED (page died: {1})" -f $um.n, $_.Exception.Message.Substring(0, [Math]::Min(80, $_.Exception.Message.Length))) }
+      finally { [IO.File]::WriteAllText("$work\main_tpl.js", $mainTpl, $utf8) }
+    }
+  }
+
+  Say ""
+  Say ("PASS {0} FAIL {1}   ({2} template cases + {3} string() ops byte-for-byte, {4} scheduler-panel UI checks, {5} delivery checks; {6} known divergence(s) tracked; mutants surviving: {7})" -f $pass, $fail, ($corpus.cases.Count - $knownCases.Count), $corpus.ops.Count, @($uiRes.results).Count, $dropN, $knownHit.Count, $mutFail)
+  if ($fail -gt 0 -or $mutFail -gt 0) { $script:tplExit = 1 } else { $script:tplExit = 0 }
+  $script:tplLast = @{ php = $phpRes; js = $jsRes; bad = $bad; corpus = $corpus }
+}
+finally {
+  if (-not $KeepArtifacts) { try { [IO.Directory]::Delete($work, $true) } catch { } } else { Say "artifacts kept: $work" }
+}
+if ($script:tplExit -ne 0) { exit 1 }

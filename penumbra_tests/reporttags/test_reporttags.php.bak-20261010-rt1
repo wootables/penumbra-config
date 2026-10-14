@@ -1,0 +1,760 @@
+<?php
+/**
+ * penumbra_tests/reporttags/test_reporttags.php - REPORT tags, step 1 (2026-10-08).
+ *
+ *   php.exe -n test_reporttags.php <penumbra_report_tags.php> <db_connection.php> <grants_admin.php>
+ *
+ * WHAT IS UNDER TEST. (1) The pure half of report tags: the pasted-id parser, the
+ * tag-list cleaner, the NARROW rule for who may change a report's tags, and the
+ * SQL text of every read and write (keyed by the NUMERIC report id, the idempotent
+ * MERGE, the rename that merges, the caps, the shared vocabulary). (2) The grant
+ * side lifted out of db_connection.php: penumbraNormalizeGrants() parsing the new
+ * ['tag' => NAME] shape, penumbraReportGrantMatches() and ...AllowsScheduler()
+ * answering tag grants through the injected tag map, fail-closed with no database,
+ * and penumbraIsConsoleAudience() counting a tag holder. (3) The Grants tool's
+ * validator and change-email wording lifted out of grants_admin.php, plus text
+ * pins on its picker. Offline, php -n. Tail must read "PASS: N   FAIL: 0" then
+ * "RESULT: GREEN".
+ */
+$lib = isset($argv[1]) ? $argv[1] : '';
+$dbc = isset($argv[2]) ? $argv[2] : '';
+$ga  = isset($argv[3]) ? $argv[3] : '';
+foreach (array('library' => $lib, 'db_connection.php' => $dbc, 'grants_admin.php' => $ga) as $what => $p) {
+    if (!is_file($p)) { echo "$what not found: $p\n"; echo "RESULT: RED\n"; return; }
+}
+$PASS = 0; $FAIL = 0;
+function ok($cond, $label) { global $PASS, $FAIL; if ($cond) { $PASS++; echo "  ok   $label\n"; } else { $FAIL++; echo "  FAIL $label\n"; } }
+function eq($got, $want, $label) {
+    global $PASS, $FAIL;
+    if ($got === $want) { $PASS++; echo "  ok   $label\n"; }
+    else { $FAIL++; echo "  FAIL $label\n       want: " . var_export($want, true) . "\n       got:  " . var_export($got, true) . "\n"; }
+}
+function fatal($msg) { echo "FATAL: $msg\nRESULT: RED\n"; exit(1); }
+/** The :names a statement binds, in order of first appearance (literals stripped first: HH24:MI is not a bind). */
+function bindsOf($sql) { $sql = preg_replace("/'[^']*'/", "''", $sql); preg_match_all('/:([a-z0-9_]+)/i', $sql, $m); return array_values(array_unique($m[1])); }
+/** The text between two unique anchors of a source file. */
+function cut($src, $a, $b, $what) {
+    $i = strpos($src, $a);
+    if ($i === false) fatal("$what: start anchor missing: $a");
+    if (strpos($src, $a, $i + 1) !== false) fatal("$what: start anchor is not unique: $a");
+    $j = strpos($src, $b, $i + strlen($a));
+    if ($j === false) fatal("$what: end anchor missing: $b");
+    return substr($src, $i, $j - $i);
+}
+
+// ------------------------------------------------------------ 0. include
+echo "0. the library declares only\n";
+$globalsBefore = array_keys($GLOBALS);
+ob_start(); require $lib; $out = ob_get_clean();
+eq($out, '', 'including it prints nothing');
+eq(array_values(array_diff(array_keys($GLOBALS), $globalsBefore, array('globalsBefore', 'out'))), array(), 'including it creates no globals');
+ok(function_exists('penumbraTagNormalize') && defined('PENUMBRA_TAG_SHAPE'), 'it pulls in the people half: ONE name rule for both kinds');
+eq(PENUMBRA_REPORT_TAG_MEMBERS_CAP, 1000, 'reports listed per tag are capped at 1,000');
+eq(PENUMBRA_REPORT_TAG_BULK_CAP, 2000, 'a pasted list is capped at 2,000');
+eq(PENUMBRA_REPORT_TAG_PER_REPORT, 20, 'a report carries at most 20 tags');
+
+// ------------------------------------------------------- 1. pasted ids
+echo "1. penumbraReportTagParseIds()\n";
+eq(penumbraReportTagParseIds("iacucred, w4b8\nORIED_budget; <fi-epa> (my.report) iacucred"),
+   array('iacucred', 'w4b8', 'ORIED_budget', 'fi-epa', 'my.report'), 'commas, newlines, semicolons, brackets, parentheses, duplicates; case kept');
+eq(penumbraReportTagParseIds('https://www3.acs.ncsu.edu/sponsor_migration/penumbra/index.php?id=iacucred&noconsole index.php?id=w4b8#top'),
+   array('iacucred', 'w4b8'), 'a pasted report link yields its id');
+eq(penumbraReportTagParseIds('a/b !! ' . str_repeat('a', 101) . ' ok_id'), array('ok_id'), 'a slash, junk and an over-long token are dropped');
+eq(penumbraReportTagParseIds('a b c d e', 3), array('a', 'b', 'c'), 'the cap keeps the first N');
+eq(penumbraReportTagParseIds(''), array(), 'nothing -> nothing');
+eq(penumbraReportTagParseIds(null), array(), 'null -> nothing');
+
+// --------------------------------------------------------- 2. the list
+echo "2. penumbraReportTagsClean()\n";
+eq(penumbraReportTagsClean(array('osp', ' Cals preaward ', 'OSP', '', 'bad name!', 'x-y')), array('OSP', 'CALS_PREAWARD', 'X_Y'), 'normalized through the name rule, junk dropped, duplicates folded, order kept');
+eq(penumbraReportTagsClean('osp, cals|preaward; z  q'), array('OSP', 'CALS', 'PREAWARD', 'Z', 'Q'), 'a string splits on commas, pipes, semicolons and whitespace');
+eq(penumbraReportTagsClean(array('a', 'b', 'c'), 2), array('A', 'B'), 'the cap keeps the first N');
+eq(penumbraReportTagsClean(array(array('nested'), null, 7, 'ok')), array('OK'), 'non-scalars are skipped');
+eq(penumbraReportTagsClean(null), array(), 'null -> nothing');
+eq(penumbraReportTagsClean(42), array(), 'a number -> nothing');
+
+// ----------------------------------------------------- 3. the narrow rule
+echo "3. penumbraReportTagsRefused() - who may change a report's tags\n";
+$G_OSP   = array('sql' => array(), 'reports' => array(), 'tags' => array(array('tag' => 'OSP', 'scheduler' => false)));
+$G_NONE  = array('sql' => array(), 'reports' => array(array('pattern' => 'ORIED_*', 'scheduler' => true)), 'tags' => array());
+eq(penumbraReportTagsRefused(true, $G_NONE, array(), array('OSP', 'CALS')), array(), 'an admin may add anything');
+eq(penumbraReportTagsRefused(true, null, array('OSP'), array()), array(), 'an admin may remove anything');
+eq(penumbraReportTagsRefused(false, $G_NONE, array('OSP'), array('osp')), array(), 'a change that changes nothing is never refused (case folded)');
+eq(penumbraReportTagsRefused(false, $G_OSP, array(), array('OSP')), array(), 'a holder may ADD the tag they hold');
+eq(penumbraReportTagsRefused(false, $G_OSP, array('OSP'), array()), array(), 'a holder may REMOVE the tag they hold (lock-out is theirs to risk)');
+eq(penumbraReportTagsRefused(false, $G_OSP, array(), array('CALS')), array('CALS'), 'a holder may not add a tag they do not hold');
+eq(penumbraReportTagsRefused(false, $G_OSP, array('CALS'), array()), array('CALS'), 'nor remove one');
+eq(penumbraReportTagsRefused(false, $G_OSP, array('CALS', 'OSP'), array('OSP', 'NIH', 'DOD')), array('CALS', 'NIH', 'DOD'), 'a mixed change names only the tags outside their grants');
+eq(penumbraReportTagsRefused(false, $G_NONE, array(), array('OSP')), array('OSP'), 'a pattern grant confers no tag rights');
+eq(penumbraReportTagsRefused(false, null, array(), array('OSP')), array('OSP'), 'no grants at all: refused');
+eq(penumbraReportTagsRefused(false, array('tags' => array(array('tag' => 'osp'))), array(), array('OSP')), array(), 'a lower-case grant name still matches (folded)');
+
+// --------------------------------------------------------------- 4. SQL
+echo "4. the SQL text\n";
+$s = penumbraReportTagsSqlList();
+ok(strpos($s, 'GROUP BY T.TAG') !== false && strpos($s, 'JOIN PENUMBRA_REPORTS R ON R.ID = T.REPORT_ID') !== false, 'list: one join on the numeric id, grouped by tag');
+ok(strpos($s, 'COUNT(*) AS REPORTS') !== false && strpos($s, 'MAX(T.ADDED_AT)') !== false, 'list: report counts and the last add');
+eq(bindsOf($s), array(), 'list: no binds');
+$s = penumbraReportTagsSqlMembers();
+ok(strpos($s, 'WHERE T.TAG = :tag') !== false && strpos($s, 'FETCH FIRST 1000 ROWS ONLY') !== false, 'members: by tag, capped at the constant');
+ok(strpos($s, 'TRIM(R.SHORT_ID) AS SHORT_ID, R.TITLE, R.OWNER_ID, R.AUTHORIZED') !== false, 'members: the report beside each row (SHORT_ID trimmed: it is CHAR)');
+ok(strpos($s, 'ORDER BY UPPER(R.TITLE), R.SHORT_ID') !== false, 'members: by title');
+eq(bindsOf($s), array('tag'), 'members: binds only :tag');
+eq(bindsOf(penumbraReportTagsSqlCount()), array('tag'), 'count: binds only :tag');
+eq(penumbraReportTagsSqlResolve(array(':s0', ':s1')), 'SELECT ID, TRIM(SHORT_ID) AS SHORT_ID, TITLE, OWNER_ID FROM PENUMBRA_REPORTS WHERE TRIM(SHORT_ID) IN (:s0,:s1)', 'resolve: the caller placeholders, verbatim, TRIM on the CHAR column');
+eq(penumbraReportTagsSqlOf(), 'SELECT TAG FROM PENUMBRA_REPORT_TAGS WHERE REPORT_ID = :report_id ORDER BY TAG', 'of: one report, by numeric id');
+eq(penumbraReportTagsSqlMap(), 'SELECT TRIM(R.SHORT_ID) AS SID, T.TAG FROM PENUMBRA_REPORT_TAGS T JOIN PENUMBRA_REPORTS R ON R.ID = T.REPORT_ID', 'map: every tagged report as SID + TAG (what the grant matcher loads)');
+eq(penumbraReportTagsSqlVocabulary(), 'SELECT TAG FROM PENUMBRA_PEOPLE_TAGS UNION SELECT TAG FROM PENUMBRA_REPORT_TAGS ORDER BY TAG', 'vocabulary: the UNION of both kinds (one vocabulary, two tables)');
+eq(penumbraReportTagsSqlCounts(), 'SELECT TAG, COUNT(*) AS N FROM PENUMBRA_REPORT_TAGS GROUP BY TAG', 'counts: reports per tag');
+$s = penumbraReportTagsSqlAdd();
+ok(strpos($s, 'MERGE INTO PENUMBRA_REPORT_TAGS T') === 0 && strpos($s, 'ON (T.REPORT_ID = S.REPORT_ID AND T.TAG = S.TAG)') !== false, 'add: a MERGE keyed on report + tag');
+ok(strpos($s, 'WHEN NOT MATCHED THEN INSERT') !== false && strpos($s, 'WHEN MATCHED') === false, 'add: inserts the missing row and NEVER touches an existing one (note, added-by survive)');
+ok(strpos($s, 'SYSDATE') !== false, 'add: stamped now');
+eq(bindsOf($s), array('report_id', 'tag', 'who', 'note'), 'add: exactly the four binds the page supplies');
+eq(penumbraReportTagsSqlRemove(), 'DELETE FROM PENUMBRA_REPORT_TAGS WHERE REPORT_ID = :report_id AND TAG = :tag', 'remove: one report, one tag');
+eq(penumbraReportTagsSqlUpdate(), 'UPDATE PENUMBRA_REPORT_TAGS SET NOTE = :note WHERE REPORT_ID = :report_id AND TAG = :tag', 'update: the note only');
+$r = penumbraReportTagsSqlRename();
+eq(count($r), 2, 'rename: two statements');
+ok(strpos($r[0], 'UPDATE PENUMBRA_REPORT_TAGS SET TAG = :newtag WHERE TAG = :oldtag') === 0, 'rename: first moves the rows');
+ok(strpos($r[0], 'AND REPORT_ID NOT IN (SELECT REPORT_ID FROM PENUMBRA_REPORT_TAGS WHERE TAG = :newtag)') !== false, 'rename: ...except reports that already carry the new name (no PK collision)');
+eq(substr_count($r[0], ':newtag'), 2, 'rename: :newtag appears twice (one bind, both places)');
+eq($r[1], 'DELETE FROM PENUMBRA_REPORT_TAGS WHERE TAG = :oldtag', 'rename: then the leftovers under the old name go (= merged)');
+eq(penumbraReportTagsSqlDeleteTag(), 'DELETE FROM PENUMBRA_REPORT_TAGS WHERE TAG = :tag', 'delete: the whole tag');
+$s = penumbraReportTagsSqlRecent();
+ok(strpos($s, "ACTION LIKE 'REPORT_TAG%'") !== false && strpos($s, 'FETCH FIRST 40 ROWS ONLY') !== false && strpos($s, 'ORDER BY ID DESC') !== false, 'recent: this side only, newest first, 40');
+ok(strpos($s, 'REPORT_ID') !== false && strpos($s, 'SOURCE_DATA') !== false && strpos($s, 'TO_CHAR("TIMESTAMP"') !== false, 'recent: carries REPORT_ID and the message; TIMESTAMP quoted');
+foreach (array('penumbraReportTagsSqlList', 'penumbraReportTagsSqlMembers', 'penumbraReportTagsSqlCount', 'penumbraReportTagsSqlOf', 'penumbraReportTagsSqlMap', 'penumbraReportTagsSqlCounts', 'penumbraReportTagsSqlAdd', 'penumbraReportTagsSqlRemove', 'penumbraReportTagsSqlUpdate', 'penumbraReportTagsSqlDeleteTag', 'penumbraReportTagsSqlRecent') as $fn) {
+    $sql = $fn();
+    ok(stripos($sql, 'PENUMBRA_PEOPLE') === false && stripos($sql, 'EMPLID') === false, "$fn: never the people tables (the two kinds share names, not rows)");
+}
+foreach (array('penumbraReportTagsSqlOf', 'penumbraReportTagsSqlAdd', 'penumbraReportTagsSqlRemove', 'penumbraReportTagsSqlUpdate') as $fn) {
+    ok(stripos($fn(), 'SHORT_ID') === false, "$fn: keyed by the NUMERIC id, never the short id (a rename keeps the tags)");
+}
+
+// ------------------------------------------ 5. db_connection.php: the grant side
+echo "5. db_connection.php - tag grants in the resolver and the matchers\n";
+$src = file_get_contents($dbc);
+$block = cut($src, "if (!function_exists('penumbraNormalizeGrants'))", "if (!function_exists('penumbraIsReportOwner'))", 'grant block');
+ok(strpos($block, "function penumbraReportTagMap(") !== false && strpos($block, "function penumbraReportTagsOf(") !== false, 'the map and its lookup sit in the grant block');
+eval('?>' . "<?php\n" . $block);
+foreach (array('penumbraNormalizeGrants', 'penumbraWildcardMatch', 'penumbraReportPatternTooBroad', 'penumbraReportTagMap', 'penumbraReportTagsOf', 'penumbraReportGrantMatches', 'penumbraReportGrantAllowsScheduler') as $fn) {
+    if (!function_exists($fn)) fatal("$fn not defined after the lift");
+}
+$cfg = array('user_grants' => array(
+    'tina'  => array(array('tag' => 'osp'), array('tag' => ' Cals_Preaward ', 'scheduler' => true), array('tag' => 'bad name!'), array('tag' => '1abc'), array('tag' => '')),
+    'pat'   => array(array('reports' => 'ORIED_*', 'scheduler' => 'false'), array('tag' => 'NIH', 'scheduler' => 'false')),
+    'sam'   => array(array('sql' => 'infoed')),
+    'mixed' => array(array('reports' => 'budget_summary'), array('tag' => 'DOD', 'scheduler' => 'true')),
+));
+$g = penumbraNormalizeGrants($cfg, 'TINA');
+eq(array_keys($g), array('sql', 'reports', 'tags'), 'the normalized shape has a tags list beside sql and reports');
+eq($g['tags'], array(array('tag' => 'OSP', 'scheduler' => false), array('tag' => 'CALS_PREAWARD', 'scheduler' => true)), 'tag names are upper-cased and trimmed; malformed names are skipped (fail-closed); the user lookup folds case');
+$g = penumbraNormalizeGrants($cfg, 'pat');
+eq($g['reports'], array(array('pattern' => 'ORIED_*', 'scheduler' => false)), 'pattern grants parse as before');
+eq($g['tags'], array(array('tag' => 'NIH', 'scheduler' => false)), "a string 'false' scheduler is FALSE on a tag grant too (filter_var)");
+eq(penumbraNormalizeGrants($cfg, 'sam'), array('sql' => array('infoed' => '*'), 'reports' => array(), 'tags' => array()), 'a sql-only user has empty reports and tags');
+eq(penumbraNormalizeGrants($cfg, 'nobody'), array('sql' => array(), 'reports' => array(), 'tags' => array()), 'an unknown user gets the empty structure');
+eq(penumbraNormalizeGrants($cfg, 'mixed'), array('sql' => array(), 'reports' => array(array('pattern' => 'budget_summary', 'scheduler' => false)), 'tags' => array(array('tag' => 'DOD', 'scheduler' => true))), 'a user may hold both kinds');
+
+// Fail closed FIRST, before any map is injected: the lifted loader finds no
+// queryViaOci8() here (a harness, like a request with no database) and must
+// answer "no tags" rather than fatal or guess.
+$tina = penumbraNormalizeGrants($cfg, 'tina');
+eq(penumbraReportGrantMatches($tina, 'some_report'), false, 'no database (no OCI8 helper): a tag grant matches nothing - fail closed');
+eq(penumbraReportTagMap(), array(), '...and the cached map is empty');
+// The seam: a map as the loader would build it (lower-cased short ids, upper tags).
+penumbraReportTagMap(array('osp_budget' => array('OSP'), 'cals_awards' => array('CALS_PREAWARD', 'NIH'), 'both' => array('OSP', 'DOD')));
+eq(penumbraReportTagsOf('OSP_Budget'), array('OSP'), 'the lookup folds the short id like penumbraWildcardMatch does');
+eq(penumbraReportTagsOf('  both  '), array('OSP', 'DOD'), 'and trims it (SHORT_ID is CHAR)');
+eq(penumbraReportTagsOf('untagged'), array(), 'an untagged report has none');
+eq(penumbraReportTagsOf(''), array(), 'an empty id has none');
+eq(penumbraReportGrantMatches($tina, 'osp_budget'), true, 'a tag grant matches a report carrying the tag');
+eq(penumbraReportGrantMatches($tina, 'CALS_AWARDS'), true, '...whatever the case of the id');
+eq(penumbraReportGrantMatches($tina, 'untagged'), false, '...and not an untagged report');
+eq(penumbraReportGrantMatches(penumbraNormalizeGrants($cfg, 'pat'), 'ORIED_x'), true, 'a pattern grant still matches as before');
+eq(penumbraReportGrantMatches(penumbraNormalizeGrants($cfg, 'pat'), 'cals_awards'), true, 'pat holds NIH: the tag side matches a report carrying NIH');
+eq(penumbraReportGrantMatches(penumbraNormalizeGrants($cfg, 'pat'), 'osp_budget'), false, 'pat does not hold OSP');
+eq(penumbraReportGrantMatches(penumbraNormalizeGrants($cfg, 'sam'), 'osp_budget'), false, 'a sql grant is not a report grant');
+eq(penumbraReportGrantMatches($tina, ''), false, 'an empty id matches nothing');
+eq(penumbraReportGrantMatches($tina, null), false, 'nor null');
+eq(penumbraReportGrantMatches(array('reports' => array(array('pattern' => 'both', 'scheduler' => false))), 'both'), true, 'a grants array with no tags key (older callers, harness stubs) still works');
+eq(penumbraReportGrantAllowsScheduler($tina, 'osp_budget'), false, 'a plain tag grant does NOT confer scheduling');
+eq(penumbraReportGrantAllowsScheduler($tina, 'cals_awards'), true, 'a tag grant with the verb does');
+eq(penumbraReportGrantAllowsScheduler(penumbraNormalizeGrants($cfg, 'mixed'), 'both'), true, 'mixed: DOD with scheduling covers a report tagged DOD');
+eq(penumbraReportGrantAllowsScheduler(penumbraNormalizeGrants($cfg, 'mixed'), 'budget_summary'), false, 'mixed: the pattern grant has no verb');
+eq(penumbraReportGrantAllowsScheduler(penumbraNormalizeGrants($cfg, 'pat'), 'cals_awards'), false, "pat's NIH grant says scheduler 'false': no");
+penumbraReportTagMap(array());
+eq(penumbraReportGrantMatches($tina, 'osp_budget'), false, 'an empty map (nothing tagged yet) matches nothing');
+
+// The console audience counts a tag holder (ai_assist / manage_table_info gate).
+$aud = cut($src, "if (!function_exists('penumbraIsConsoleAudience'))", '// -- end of the console audience predicate --', 'console audience');
+if (!function_exists('getConnectionForTable')) { function getConnectionForTable($t) { return false; } }   // no database here: the owner lookup fails closed
+eval('?>' . "<?php\n" . $aud);
+eq(penumbraIsConsoleAudience(false, $tina, 'tina'), true, 'console audience: a tag-only holder is in');
+eq(penumbraIsConsoleAudience(false, penumbraNormalizeGrants($cfg, 'pat'), 'pat'), true, 'console audience: a pattern holder is in');
+eq(penumbraIsConsoleAudience(false, penumbraNormalizeGrants($cfg, 'nobody'), 'nobody'), false, 'console audience: no grants and no database: out');
+eq(penumbraIsConsoleAudience(true, null, 'adm'), true, 'console audience: an admin is in');
+ok(strpos($block, "include_once \$lib") !== false && strpos($block, "function_exists('queryViaOci8')") !== false, 'the map loader pulls the pure half in lazily and guards on the OCI8 helper');
+ok(strpos($block, 'catch (Throwable $e)') !== false && strpos($block, '$map = array();') !== false, 'the map loader fails closed on any error');
+
+// ----------------------------------------- 6. grants_admin.php: the validator
+echo "6. grants_admin.php - the validator and the wording\n";
+$gsrc = file_get_contents($ga);
+$val = cut($gsrc, 'function pnb_validate_grants(', '/** One grant -> a short readable line', 'validator');
+$str = cut($gsrc, 'function pnb_grant_to_str(', 'function pnb_grants_list_strs(', 'to_str');
+eval('?>' . "<?php\n" . $val . "\n" . $str);
+$conns = array('ieprd', 'pins');
+$err = '';
+$v = pnb_validate_grants(array('tina' => array(array('tag' => ' osp '), array('tag' => 'cals', 'scheduler' => 'false'), array('tag' => 'NIH', 'scheduler' => true), array('reports' => 'ORIED_*'))), $conns, $err);
+eq($v, array('tina' => array(array('tag' => 'OSP'), array('tag' => 'CALS'), array('tag' => 'NIH', 'scheduler' => true), array('reports' => 'ORIED_*'))), 'a tag grant is written upper-cased and trimmed; scheduler only when truly true; patterns beside it');
+eq($err, '', '...with no error');
+eq(pnb_validate_grants(array('tina' => array(array('tag' => 'bad name!'))), $conns, $err), null, 'a malformed tag name is refused');
+ok(strpos($err, 'invalid tag name') !== false, '...and says so');
+eq(pnb_validate_grants(array('tina' => array(array('tag' => '1abc'))), $conns, $err), null, 'a name not starting with a letter is refused');
+eq(pnb_validate_grants(array('tina' => array(array('tag' => str_repeat('A', 61)))), $conns, $err), null, '61 characters are refused');
+eq(pnb_validate_grants(array('tina' => array(array('nothing' => 1))), $conns, $err), null, 'a grant of no known kind is refused');
+ok(strpos($err, "'tag'") !== false, "...and the message names 'tag' among the kinds");
+eq(pnb_validate_grants(array('tina' => array(array('reports' => 'A*'))), $conns, $err), null, 'the too-broad pattern rule is untouched');
+eq(pnb_grant_to_str(array('tag' => 'OSP')), 'Tag: OSP', 'wording: a tag grant');
+eq(pnb_grant_to_str(array('tag' => 'OSP', 'scheduler' => true)), 'Tag: OSP (+scheduler)', 'wording: with the verb');
+eq(pnb_grant_to_str(array('reports' => 'ORIED_*')), 'Report: ORIED_*', 'wording: a pattern grant, as before');
+
+// ------------------------------------------------ 7. the Grants tool's page
+echo "7. grants_admin.php - the picker\n";
+ok(strpos($gsrc, '<option value="tag">Tag scope</option>') !== false, 'the type picker offers Tag scope');
+ok(strpos($gsrc, "require_once 'penumbra_report_tags.php';") !== false && strpos($gsrc, 'penumbraTagsVocabularyRead($tagConn)') !== false && strpos($gsrc, 'penumbraReportTagsSqlCounts()') !== false, 'the page reads the shared vocabulary and the per-tag counts through the pure half');
+ok(strpos($gsrc, 'var TAG_OPTIONS = <?php echo json_encode($TAG_OPTIONS); ?>;') !== false, 'the options reach the script as JSON');
+ok(strpos($gsrc, 'class="fld fld-tag"') !== false && strpos($gsrc, 'class="gtag"') !== false, 'the add row has a tag select');
+ok(strpos($gsrc, 'class="sc fld-sched"') !== false && strpos($gsrc, "querySelectorAll('.fld-sched')") !== false, 'the scheduling checkbox follows report AND tag scope');
+ok(strpos($gsrc, "} else if (type === 'tag') {") !== false && strpos($gsrc, 'var g3 = { tag: tagName };') !== false, 'adding a tag grant builds {tag} (+scheduler)');
+ok(strpos($gsrc, "} else if (g.tag !== undefined) {") !== false && strpos($gsrc, 'class="chip tag"') !== false, 'a saved tag grant renders as its own chip');
+ok(strpos($gsrc, 'function tagCoverage(') !== false && strpos($gsrc, '(covers ') !== false, "the chip says how many reports the tag covers (breadth is visible at grant time)");
+ok(strpos($gsrc, '<div class="lg-item tag"><span class="lg-k">Tag scope</span>') !== false, 'the legend explains Tag scope');
+ok(strpos($gsrc, "tag: 'Tag access:") !== false, 'the hint for Tag scope');
+ok(strpos($gsrc, '(no tags exist yet)') !== false && strpos($gsrc, 'No tags exist yet. Start one in the Tags tool') !== false, 'with no tags the picker says where tags come from (closed vocabulary)');
+ok(strpos($gsrc, "catch (Throwable \$e) { /* the table is not created yet") !== false, 'the counts read survives a table that does not exist yet');
+
+// ---------------------------------------------- 8. step 2: the Tags tool's report side
+echo "8. the wording helpers and the Tags tool's report side (step 2)\n";
+eq(penumbraReportTagLabel('  Awards by  College ', 'awd_col'), 'Awards by College (awd_col)', 'label: the title with the id in parentheses after it (titles are not unique)');
+eq(penumbraReportTagLabel('<b>Bold</b> title', 'x'), 'Bold title (x)', 'label: markup in a title is stripped');
+eq(penumbraReportTagLabel('', 'only_id'), 'only_id', 'label: no title -> the id alone');
+eq(penumbraReportTagLabel('Title', ''), 'Title', 'label: no id -> the title alone');
+eq(penumbraReportTagsSummarize('OSP', array('A (a)', 'B (b)'), 1, array('zz')), 'OSP: tagged 2 reports (A (a), B (b)). 1 already carried it. no report has the id: zz.', 'summary: tagged, already carried, unknown ids');
+eq(penumbraReportTagsSummarize('OSP', array('A (a)'), 0, array()), 'OSP: tagged 1 report (A (a)).', 'summary: one report');
+eq(penumbraReportTagsSummarize('OSP', array(), 0, array()), 'OSP: nothing to do.', 'summary: nothing');
+eq(bindsOf(penumbraReportTagsSqlOne()), array('id'), 'one: a report by its numeric id, binds only :id');
+ok(strpos(penumbraReportTagsSqlOne(), 'TRIM(SHORT_ID) AS SHORT_ID, TITLE, OWNER_ID') !== false, 'one: carries what a label needs');
+$pt = isset($argv[4]) ? $argv[4] : '';
+if ($pt !== '' && is_file($pt)) {
+    $pg = php_strip_whitespace($pt);
+    ok(strpos($pg, "require_once 'penumbra_report_tags.php';") !== false, 'the page loads the report half beside the people half');
+    ok(strpos($pg, 'pnbTagsRead(penumbraReportTagsSqlCounts()); $rtagsReady = true;') !== false && strpos($pg, 'catch (Throwable $probe) { $rtagsReady = false; }') !== false, 'the report side is probed once per request and absent, never fatal, until the table exists');
+    foreach (array('radd', 'radd_bulk', 'rremove', 'rupdate') as $act) { ok(strpos($pg, "\$do === '$act'") !== false, "handles $act"); }
+    ok(strpos($pg, "@logPenumbraAudit(\$rep['id'], 'REPORT_TAG_ADD'") !== false && strpos($pg, "@logPenumbraAudit(\$rid, 'REPORT_TAG_REMOVE'") !== false && strpos($pg, "@logPenumbraAudit(\$rid, 'REPORT_TAG_UPDATE'") !== false, 'add / remove / update are audited WITH the report id (they show in the report\'s own log)');
+    ok(strpos($pg, "'REPORT_TAG_RENAME'") !== false && strpos($pg, "'REPORT_TAG_DELETE'") !== false, 'rename and delete are audited on the report side too');
+    ok(strpos($pg, '$rs = penumbraReportTagsSqlRename();') !== false && strpos($pg, 'penumbraReportTagsSqlDeleteTag()') !== false, 'rename and delete run the report twins...');
+    $i = strpos($pg, '$rs = penumbraReportTagsSqlRename();'); $j = ($i === false) ? false : strpos($pg, 'oci_commit($oci);', $i);
+    ok($i !== false && $j !== false && strpos(substr($pg, $i, $j - $i), 'pnbTagsWrite($oci, $rs[1]') !== false, '...on the same session, before the one commit (both kinds or neither)');
+    ok(strpos($pg, 'penumbraReportTagParseIds(') !== false && strpos($pg, 'pnbReportTagsResolve(') !== false && strpos($pg, 'penumbraReportTagsSummarize(') !== false, 'a pasted list goes through the parser, the resolver and the wording of the pure half');
+    ok(strpos($pg, 'penumbraReportTagsSqlOne()') !== false && strpos($pg, 'penumbraReportTagLabel(') !== false, 'labels come from the pure half');
+    ok(strpos($pg, 'id="panel-reports"') !== false && strpos($pg, 'name="do" value="radd"') !== false && strpos($pg, 'name="do" value="radd_bulk"') !== false && strpos($pg, 'name="do" value="rremove"') !== false, 'the Reports card: search, paste, remove');
+    ok(strpos($pg, "get_server_reports.php?mode=quicksearch&limit=50&search=") !== false && strpos($pg, 'name="short_id[]"') !== false, 'the search is the admin quicksearch; ticks post short ids');
+    ok(strpos($pg, "penumbra_admin_open('Tags',") !== false && strpos($pg, "penumbra_admin_head('Tags')") !== false, 'the page is now simply "Tags"');
+    ok(strpos($pg, "penumbra_tool_visit_beacon('tags')") !== false, 'the visit beacon key is unchanged');
+    ok(strpos($pg, 'pnbTagsRead(penumbraTagsSqlRecentBoth(400))') !== false && strpos($pg, "<a href=\"tags_admin.php?view=activity\" <?php echo \$tabAttr('activity'); ?> data-tab=\"activity\">Activity<?php echo pnbTagsBadge(count(\$recent)); ?></a>") !== false && strpos($pg, "<a href=\"tags_admin.php?view=untagged\" <?php echo \$tabAttr('untagged'); ?> data-tab=\"untagged\">Untagged<?php echo pnbTagsBadge(") !== false && strpos($pg, 'Recent activity') === false, 'recent changes of both kinds in one read: the Activity tab is the list (always a tab, like Untagged; no rail card)');
+    ok(strpos($pg, '[hidden] { display: none !important; }') !== false && strpos($pg, '.hist { display: grid') === false, 'hidden beats the page\'s own display rules, and no grid rule reaches the activity tables (2026-10-09)');
+    ok(strpos($pg, '{ overflow: visible; }') === false && strpos($pg, 'z-index: 40') === false && strpos($pg, '.dt-grip { position: absolute;') !== false, 'round 6 (2026-10-09): the heading tips are gone with their overflow rules; a grip sits on each heading instead');
+    ok(strpos($pg, '.pnb-adm-main a.mini, .pnb-adm-main .kv a, .pnb-adm-main .meta a, .pnb-adm-main h2 a.r') !== false && strpos($pg, 'color: var(--brand-text, var(--brand-primary)); text-decoration: underline; }') !== false, 'every link takes the theme link colour');
+    ok(strpos($pg, 'function dtSortBy(th, additive)') !== false && strpos($pg, "if (crit[at].dir === 'asc') crit[at] = { th: th, dir: 'desc' }; else crit.splice(at, 1);") !== false && strpos($pg, "if (!additive && crit.length && crit[0].th !== th) crit = [];") !== false && strpos($pg, '<span class="sort-rank" aria-hidden="true">') !== false && substr_count($pg, 'data-sortable>') >= 20 && strpos($pg, '<th>Value and note</th>') !== false, 'every list sorts like the app\'s tables: the dt engine, asc -> desc -> off, Shift+click chains, rank chips; the input columns stay unsortable');
+    ok(strpos($pg, 'id="tagTabs"') !== false && substr_count($pg, 'role="tabpanel"') === 4 && strpos($pg, 'function setTagTab(') !== false && strpos($pg, "else if (e.key === 'ArrowLeft') j = (i - 1 + tabBtns.length) % tabBtns.length;") !== false && strpos($pg, "setTagTab(OPEN_ADD || (window.location.hash || '#people').slice(1));") !== false, 'a tag page: People / Reports / Activity are sub-tabs (roving tabindex, arrow keys, the hash and ?add= pick the tab)');
+    ok(strpos($pg, "DT_KEY = 'penumbra_tags_colw'") !== false && strpos($pg, 'function dtResetAll(table)') !== false && strpos($pg, 'dtSetWidth(th, th.offsetWidth + DT_STEP)') !== false && strpos($pg, 'function dtOnEdge(th, e)') !== false, 'resizing like the app\'s tables: drag an edge, widths kept per table in the browser, double-click resets every column with Undo, + / - / 0 on a focused heading');
+    ok(strpos($pg, 'function syncSticky()') !== false && strpos($pg, "'--pnb-adm-offset'") !== false && strpos($pg, "'--pnb-cardhead-h'") !== false && strpos($pg, '.tags-banner { position: sticky;') !== false && strpos($pg, 'table.tags th, table.members th, table.hist th { position: sticky;') !== false && substr_count($pg, 'tags-banner"') >= 7, 'sticky: the admin bar, the banner above each table, then the header row, stacked by measurement');
+    ok(strpos($pg, '.tabs .tab-btn { display: inline-block; background: var(--bg-surface-alt); border: 1px solid var(--border-color); border-top: 3px solid var(--border-color);') !== false && strpos($pg, '.tabs .active { color: var(--brand-text, var(--brand-primary)); font-weight: 600; background: var(--bg-surface); border-top-color: var(--brand-primary); margin-bottom: -2px; padding-bottom: 11px; }') !== false && strpos($pg, "class=\"tab-btn active\" aria-current=\"page\"") !== false, 'the tab strip is Platform Metrics\' (the same rules, links and buttons alike)');
+    ok(strpos($pg, '.cols') === false && strpos($pg, 'overflow-x: auto') === false && substr_count($pg, 'class="pnb-log-tabs" role="group"') === 8 && strpos($pg, 'text-transform: uppercase; letter-spacing: 0.6px; padding: 6px 10px;') !== false, 'no side-by-side cards or sideways scrolling; the segments are the hub\'s pills; the tables wear Metrics\' typography');
+    ok(strpos($pg, '<th class="n" data-sortable>Reports<span class="sort-icon"') !== false && strpos($pg, "\$tags[\$byName[\$rt['TAG']]]['REPORTS']") !== false, 'the list shows a report count per name and the names only reports carry');
+    ok(strpos($pg, 'and <?php echo (int)$rcount; ?> report') !== false, 'the delete confirm names the report count too');
+} else {
+    echo "  (no people_tags.php given: the page pins were skipped)\n";
+}
+
+// ------------------------------------------- 9. step 3: Save As and the save endpoint
+echo "9. Save As, the save endpoint, delete / restore snapshots (step 3)\n";
+// The change summary names "tags" when they differ (lifted from db_connection.php).
+$cs = cut($src, 'function penumbraAuditChangeSummary(', 'function penumbraErrorActions()', 'change summary');
+eval('?>' . "<?php\n" . $cs);
+$csB = array('report' => array('query' => 'SELECT 1'), 'short_id' => 'x', 'title' => 'T', 'authorized' => 'public', 'owner_id' => 'o', 'tags' => array('OSP'));
+$csA = $csB; $csA['tags'] = array('OSP', 'NIH');
+$r = penumbraAuditChangeSummary($csB, $csA);
+eq($r['message'], 'Changed: tags', 'change summary: a tag added reads "Changed: tags"');
+eq($r['changed']['cats'], array('tags'), 'change summary: its own category');
+eq(in_array('tags', $r['changed']['keys'], true), true, 'change summary: and the key is named');
+eq(penumbraAuditChangeSummary($csB, $csB)['message'], 'No effective changes (identical state re-saved)', 'change summary: the same tags are no change');
+$csN = $csB; unset($csN['tags']);
+eq(penumbraAuditChangeSummary($csN, $csN)['message'], 'No effective changes (identical state re-saved)', 'change summary: snapshots without a tags key (restore, older rows) are untouched');
+$csT = $csA; $csT['title'] = 'T2';
+eq(penumbraAuditChangeSummary($csB, $csT)['message'], 'Changed: title, tags', 'change summary: tags sit after the access list in the order');
+$ss  = isset($argv[5]) ? $argv[5] : '';
+$del = isset($argv[6]) ? $argv[6] : '';
+$res = isset($argv[7]) ? $argv[7] : '';
+$idx = isset($argv[8]) ? $argv[8] : '';
+$mjs = isset($argv[9]) ? $argv[9] : '';
+if ($ss !== '' && is_file($ss)) {
+    $p = php_strip_whitespace($ss);
+    ok(strpos($p, "require_once 'penumbra_report_tags.php';") !== false && strpos($p, 'function pnbSaveApplyTags(') !== false, 'save: loads the pure half and has the one apply helper');
+    ok(strpos($p, '$tags_posted = is_array($data) && array_key_exists(\'tags\', $data);') !== false && strpos($p, 'if (!$tags_posted) { $tags = $tags_before; }') !== false, 'save: a payload without tags leaves the report\'s tags alone (an older client)');
+    ok(strpos($p, '$tags_refused = penumbraReportTagsRefused($isAdmin, $userGrants, $tags_before, $tags);') !== false, 'save: an overwrite runs the narrow rule over the before / after tags...');
+    ok(strpos($p, "'reason' => 'tags_not_held'") !== false && substr_count($p, 'tags_not_held') >= 2, '...and refuses with a DENIED_SCOPE row, on overwrite and on create');
+    ok(strpos($p, '$tagCreateOk = !$isAdmin && $tags_posted && !empty($tags) && !penumbraReportTagsRefused(false, $userGrants, array(), $tags);') !== false && strpos($p, '&& !$tagCreateOk) {') !== false, 'save: a tag-only holder may CREATE when every posted tag is held and there is at least one');
+    ok(strpos($p, 'pnbSaveApplyTags($oracleConn, $report_id_num, $tags_before, $tags, $owner_id, $short_id, penumbraReportTagLabel($title, $short_id));') !== false && strpos($p, 'pnbSaveApplyTags($oracleConn, $numeric_report_id, array(), $tags, $owner_id, $short_id, penumbraReportTagLabel($title, $short_id));') !== false, 'save: the tags are applied after the UPDATE and after the INSERT (the report is saved first)');
+    ok(strpos($p, "'tags' => \$tags_before") !== false && substr_count($p, "\$after_json_obj['tags'] = \$tags;") === 2, 'save: both audit snapshots carry the tags (the change summary reads them)');
+    ok(strpos($p, "logPenumbraAudit((int)\$reportId, 'REPORT_TAG_ADD'") !== false && strpos($p, "logPenumbraAudit((int)\$reportId, 'REPORT_TAG_REMOVE'") !== false, 'save: each tag change is its own audit row WITH the report id');
+}
+if ($del !== '' && is_file($del)) {
+    $p = php_strip_whitespace($del);
+    ok(strpos($p, "'tags' => \$before_tags,") !== false && strpos($p, 'penumbraReportTagsSqlOf()') !== false, 'delete: the snapshot carries the tags (the foreign key cascades them away)');
+}
+if ($res !== '' && is_file($res)) {
+    $p = php_strip_whitespace($res);
+    ok(strpos($p, "\$rtSnap = pnbRestoreDeleteSnapshot(\$oracleConn, \$short_id);") !== false && strpos($p, 'penumbraReportTagsSqlAdd()') !== false, 'restore: the snapshot\'s tags go back on the re-inserted row');
+}
+if ($idx !== '' && is_file($idx)) {
+    $p = file_get_contents($idx);
+    ok(strpos($p, 'reportTags: <?php echo json_encode($preloaded_report_tags); ?>,') !== false && strpos($p, 'tagVocabulary: <?php') !== false && strpos($p, 'tagGrants: <?php') !== false, 'index: the page hands the dialog the report\'s tags, the closed vocabulary and the held tags');
+    ok(strpos($p, 'penumbraReportTagsSqlOfShortId()') !== false, 'index: the preload reads the tags by short id through the pure half');
+    ok(strpos($p, 'class="form-row save-id-tags-row"') !== false && strpos($p, 'id="reportTagsContainer"') !== false && strpos($p, 'id="reportTagsInput"') !== false && strpos($p, 'id="serverSaveTags"') !== false, 'index: the ID card is Report ID and Tags side by side');
+    ok(strpos($p, 'id="reportTagsHint"') !== false && strpos($p, 'href="tags_admin.php"') !== false, 'index: the hint under the field links an admin to the Tags tool');
+}
+if ($mjs !== '' && is_file($mjs)) {
+    $p = file_get_contents($mjs);
+    ok(strpos($p, 'tags: collectReportTags(),') !== false, 'main.js: the save payload carries the pills');
+    ok(strpos($p, 'populateReportTags(penumbra_vars.reportTags || []);') !== false && strpos($p, 'initReportTagsAutocomplete();') !== false, 'main.js: the dialog opens with the report\'s tags as pills and the dropdown armed');
+    ok(strpos($p, 'penumbra_vars.reportTags = collectReportTags();') !== false, 'main.js: a save updates what the next open shows');
+    ok(strpos($p, "_tagVocab().indexOf(t) === -1") !== false && strpos($p, 'New tags start in the Tags tool.') !== false, 'main.js: a typed name outside the vocabulary is refused with the way to a new tag');
+    ok(strpos($p, 'if (have.indexOf(v) !== -1 || !_tagHeld(v)) continue;') !== false && strpos($p, "if (!_tagHeld(t)) { _tagHint(") !== false, 'main.js: the narrow rule client-side - a non-admin is offered and may commit only held tags');
+    ok(strpos($p, "var locked = !_tagHeld(t);") !== false && strpos($p, ".not('.locked')") !== false, 'main.js: an unheld tag already on the report renders locked and cannot be backspaced away');
+    ok(strpos($p, 'function _ensureHeldTagPill(') !== false && substr_count($p, '_ensureHeldTagPill();') >= 1, 'main.js: a copy by a tag-only editor is seeded with a held tag');
+}
+
+// --------------------------------- 10. step 4: repository, home search, Platform Metrics
+echo "10. the repository, the home search and Platform Metrics (step 4)\n";
+$gsr = isset($argv[10]) ? $argv[10] : '';
+$rep = isset($argv[11]) ? $argv[11] : '';
+$aa  = isset($argv[12]) ? $argv[12] : '';
+$pin = isset($argv[13]) ? $argv[13] : '';
+if ($gsr !== '' && is_file($gsr)) {
+    $p = php_strip_whitespace($gsr);
+    ok(strpos($p, "require_once 'penumbra_report_tags.php';") !== false && strpos($p, "LISTAGG(TAG, '|' ON OVERFLOW TRUNCATE)") !== false && substr_count($p, '. $tagsJoin') === 5 && substr_count($p, '. $tagsSel .') === 4, 'repository: every list query (and the tags lookup) joins one grouped pass over the tags (no extra query)');
+    ok(strpos($p, 'SELECT 1 FROM PENUMBRA_REPORT_TAGS WHERE ROWNUM = 1') !== false && strpos($p, "catch (Throwable \$tagProbeEx) { \$tagsSel = ''; \$tagsJoin = ''; }") !== false, 'repository: the join is built only while the table exists');
+    ok(strpos($p, "'TAGS' => (isset(\$row['TAGS'])") !== false && strpos($p, "? array_values(array_filter(explode('|', (string)\$row['TAGS']), 'strlen')) : array()") !== false, 'repository: TAGS reaches the client as a list (the whitelist names it and splits the join\'s string)');
+    ok(strpos($p, '$tagExact = \'\';') !== false && strpos($p, "preg_match('/^tag:") !== false && substr_count($p, 'rt.TAG = :stag') === 1 && substr_count($p, 'rt.TAG = :qtag') === 1, 'repository: tag:NAME is exact in the search and the quicksearch');
+    ok(strpos($p, 'rt.TAG LIKE UPPER(:sp5)') !== false && strpos($p, 'rt.TAG LIKE UPPER(:qp5)') !== false, 'repository: a plain term also matches tag names, in both');
+    ok(strpos($p, '$countSqlS = "SELECT COUNT(*) AS CNT FROM PENUMBRA_REPORTS r " . $whereS;') !== false, 'repository: the search count shares the where clause (the two cannot disagree)');
+    ok(strpos($p, "'via' => (\$viaPattern ? 'grant' : 'tag')") !== false, 'repository: an editor reached by a tag grant alone says "tag"');
+    ok(strpos($p, "\$mode === 'tags'") !== false && strpos($p, "buildAuthFilter(\$isAdmin, \$currentUserKey, 't')") !== false, 'repository: mode=tags answers the home screen for its pins, auth-filtered');
+}
+if ($rep !== '' && is_file($rep)) {
+    $p = file_get_contents($rep);
+    ok(strpos($p, "key: 'TAGS', label: 'Tags', sortKind: 'text', defaultVisible: true,") !== false, 'repository page: a Tags column, visible by default');
+    ok(strpos($p, 'function _repoTagPill(') !== false && strpos($p, "$('#reportFilterInput').val('tag:' + t).trigger('keyup');") !== false, 'repository page: a pill click searches exactly that tag');
+    ok(strpos($p, "['Tags',                '<span class=\"repo-tag-value\">' + _tagsStr + _tagsPencil + '</span>', _tagsLink],") !== false && strpos($p, 'Manage tags') !== false, 'repository page: a Tags row in the Meta section with the way to the tool (and, since 2026-10-10, the inline editor\'s pencil)');
+    ok(strpos($p, "if (via === 'tag+sched') { return 'tag, sched'; }") !== false, 'repository page: editors via a tag are labelled so');
+}
+if ($aa !== '' && is_file($aa)) {
+    $p = file_get_contents($aa);
+    ok(strpos($p, '$reportFilter  .= " AND REPORT_ID IN (SELECT REPORT_ID FROM PENUMBRA_REPORT_TAGS WHERE TAG = :rtag)";') !== false && strpos($p, '$reportFilterA .= " AND r.ID IN (SELECT REPORT_ID FROM PENUMBRA_REPORT_TAGS WHERE TAG = :rtag)";') !== false && strpos($p, "\$reportBinds[':rtag'] = \$tagSearch;") !== false, 'metrics: ?tag= is folded into both report-filter fragments with its bind');
+    ok(strpos($p, "if (isset(\$_GET['tag'])) \$tagSearch = penumbraTagNormalize(\$_GET['tag']);") !== false, 'metrics: the tag comes through the name rule, at Platform scope only');
+    ok(substr_count($p, "'tag'             => \$tagSearch,") === 2, 'metrics: the tag is carried into the report drill and back up');
+    ok(strpos($p, "\$chips[] = array('k' => 'tag', 'label' => 'Tag', 'value' => \$tagSearch, 'on' => true);") !== false, 'metrics: a Tag chip');
+    ok(substr_count($p, '$ftReport, $ftTag') >= 6, 'metrics: the table tags name the tag wherever they name the report');
+    ok(strpos($p, '<select id="fTag" name="tag"') !== false && strpos($p, 'penumbraReportTagsSqlCounts()') !== false, 'metrics: the sidebar offers every tag in use with its report count');
+    ok(strpos($p, "tags: <b><?php echo htmlspecialchars(implode(', ', \$anScopeTags)); ?></b>") !== false, 'metrics: the report scope strip shows the tags');
+    ok(strpos($p, "if (\$tagSearch !== '') \$taskReportFilter .= \" AND r.ID IN (SELECT REPORT_ID FROM PENUMBRA_REPORT_TAGS WHERE TAG = :rtag)\";") !== false, 'metrics: the scheduled-tasks query carries the tag clause too (it binds :rtag, and an unused bind is ORA-01036)');
+}
+if ($idx !== '' && is_file($idx)) {
+    $p = file_get_contents($idx);
+    ok(strpos($p, 'data-tags="<?php echo htmlspecialchars($pnlTags); ?>"') !== false && strpos($p, 'as IS_NEW{$pnlTagsSel}') !== false, 'home: recent rows carry their tags in the search haystack');
+    ok(strpos($p, 'by title, ID and tag.') !== false && strpos($p, 'tag:NAME means exactly one tag') !== false, 'home: the hint says so');
+}
+if ($pin !== '' && is_file($pin)) {
+    $p = file_get_contents($pin);
+    ok(strpos($p, 'function fillRowTags(') !== false && strpos($p, 'get_server_reports.php?mode=tags&ids=') !== false && strpos($p, 'fillRowTags(pinRows);') !== false, 'home: pins from localStorage ask for their tags once');
+}
+
+// ------------------------------------------- 11. step 5: the Grants tool's reach panel
+echo "11. the Grants tool's reach panel (step 5)\n";
+ok(strpos(penumbraReportTagsSqlIndex(), 'SELECT TRIM(R.SHORT_ID) AS SHORT_ID, R.TITLE, T.TAGS FROM PENUMBRA_REPORTS R') === 0 && strpos(penumbraReportTagsSqlIndex(), 'LEFT JOIN (SELECT REPORT_ID') !== false && strpos(penumbraReportTagsSqlIndex(), 'ORDER BY UPPER(R.TITLE), R.SHORT_ID') !== false, 'index: every report with its tags, by title');
+eq(bindsOf(penumbraReportTagsSqlIndex()), array(), 'index: no binds');
+eq(penumbraReportTagsSqlIndexPlain(), 'SELECT TRIM(SHORT_ID) AS SHORT_ID, TITLE, NULL AS TAGS FROM PENUMBRA_REPORTS ORDER BY UPPER(TITLE), SHORT_ID', 'index: the plain twin for an install without the table');
+$gsrc2 = file_get_contents($ga);
+ok(strpos($gsrc2, 'penumbraReportTagsSqlIndex()') !== false && strpos($gsrc2, 'penumbraReportTagsSqlIndexPlain()') !== false && strpos($gsrc2, 'array_flip(penumbraSystemShortIds())') !== false, 'the page builds the index through the pure half and drops the system placeholders');
+ok(strpos($gsrc2, 'var REPORT_INDEX = <?php echo json_encode($REPORT_INDEX); ?>;') !== false, 'the index reaches the script as JSON');
+ok(strpos($gsrc2, 'function reachOf(') !== false && strpos($gsrc2, 'function reachHtml(') !== false && strpos($gsrc2, "reachHtml(grants) +") !== false, 'each user card carries its reach, recomputed on every render');
+ok(strpos($gsrc2, "if (gr.reports !== undefined && patternMatches(gr.reports, rep.sid))") !== false && strpos($gsrc2, "(String(gr.reports).indexOf('*') === -1 ? 'id ' : 'pattern ')") !== false, 'reach: a pattern grant reaches by id or by pattern, named as such');
+ok(strpos($gsrc2, "if (gr.tag !== undefined && rep.tags.indexOf(String(gr.tag).toUpperCase()) !== -1) { via.push('tag ' + gr.tag);") !== false, 'reach: a tag grant reaches the reports carrying the tag');
+ok(strpos($gsrc2, "if (gr.scheduler) sched = true;") !== false && strpos($gsrc2, "x.sched ? ' <span class=\"sched\">+scheduler</span>'") !== false, 'reach: the scheduler verb rides only from a grant that says so');
+ok(strpos($gsrc2, "new RegExp('^' + rx + '$', 'i')") !== false, 'reach: the pattern mirror is anchored and case-insensitive like penumbraWildcardMatch');
+ok(strpos($gsrc2, "<summary>Reaches ' + reach.length + ' of ' + REPORT_INDEX.length + ' reports'") !== false && strpos($gsrc2, 'As the grants stand here, before saving.') !== false, 'reach: the summary counts and says it is the editor\'s view');
+
+// ---------------------------------------------- 12. the Tags tool redesign (tags_admin.php, 2026-10-08)
+echo "12. the catalog helpers and tags_admin.php (the redesign)\n";
+eq(penumbraTagAuditNames('CALS_PREAWARD: tagged Award geography (awardgeo) [Tags tool]'), array('CALS_PREAWARD'), 'audit names: the leading tag');
+eq(penumbraTagAuditNames('DODNSA renamed to DOD_NSA: 3 moved; 2 reports moved.'), array('DODNSA', 'DOD_NSA'), 'audit names: a rename names both');
+eq(penumbraTagAuditNames('Registered x <y> (group), tagged A.'), array(), 'audit names: a message that does not start with a tag names none');
+eq(penumbraTagAuditNames(''), array(), 'audit names: empty');
+$rows12 = array(array('ts' => '3', 'message' => 'B: removed x'), array('ts' => '2', 'message' => 'A renamed to B: 1 moved'), array('ts' => '1', 'message' => 'A: tagged y'));
+$lc12 = penumbraTagLastChanges($rows12);
+eq(array_keys($lc12), array('B', 'A'), 'last changes: one row per tag, newest first, a rename counting for both names');
+eq($lc12['A']['ts'], '2', 'last changes: the old name of a rename sees the rename, not the older add');
+eq(penumbraTagLookAlikes(array('CALS_PREAWARD', 'CALS_PRE_AWARD', 'PREAWARD', 'PRE_AWARD', 'NIH_PIS', 'IACUC', 'IACUX', 'ABC', 'ABD')),
+   array(array('CALS_PREAWARD', 'CALS_PRE_AWARD'), array('IACUC', 'IACUX'), array('PREAWARD', 'PRE_AWARD')), 'look-alikes: an underscore apart, or two edits on names of five or more, each pair once, in order');
+ok(count(penumbraTagLookAlikes(array('ABC', 'ABD'))) === 0, 'look-alikes: three-letter names one edit apart are NOT a pair (too short to mean anything)');
+eq(penumbraTagLookAlikes(array('NIH_PIS', 'NIH_PIS')), array(), 'look-alikes: a name is never paired with itself');
+eq(penumbraTagPairKey('b_x', 'A_Y'), 'A_Y|B_X', 'pair key: upper-cased, ordered, bar-joined');
+$gf12 = array('jdoe' => array(array('tag' => 'sparcs_it', 'scheduler' => true), array('reports' => 'x*')), 'rroe' => array(array('tag' => 'SPARCS_IT'), array('tag' => 'IACUC')), 'bad' => 'nope');
+eq(penumbraTagGrantHolders($gf12), array('IACUC' => array(array('uid' => 'rroe', 'scheduler' => false)), 'SPARCS_IT' => array(array('uid' => 'jdoe', 'scheduler' => true), array('uid' => 'rroe', 'scheduler' => false))), 'holders: tag => users, upper-cased, the scheduler add-on carried, other shapes and junk ignored');
+eq(penumbraTagGrantHolders(null), array(), 'holders: no file, nobody');
+$n12 = 0; $rp12 = penumbraTagGrantsRepoint($gf12, 'sparcs_it', 'SPARCS', $n12);
+eq($n12, 2, 'repoint: counts the grants it changed');
+eq($rp12['jdoe'][0]['tag'], 'SPARCS', 'repoint: the first holder follows the new name...');
+eq($rp12['rroe'][0]['tag'], 'SPARCS', '...and the second');
+eq($rp12['rroe'][1]['tag'], 'IACUC', 'repoint: other tags untouched');
+eq($rp12['jdoe'][1], array('reports' => 'x*'), 'repoint: other shapes untouched');
+$n12 = 9; eq(penumbraTagGrantsRepoint($gf12, 'SPARCS_IT', 'SPARCS_IT', $n12), $gf12, 'repoint: the same name changes nothing'); eq($n12, 0, 'repoint: ...and counts zero');
+ok(strpos(penumbraReportTagsSqlCoverage(array(':x0', ':x1')), 'NOT IN (:x0,:x1)') !== false && strpos(penumbraReportTagsSqlCoverage(array(':x0', ':x1')), 'EXISTS (SELECT 1 FROM PENUMBRA_REPORT_TAGS T WHERE T.REPORT_ID = R.ID)') !== false, 'coverage: counts reports with a tag, the system pages left out');
+ok(strpos(penumbraReportTagsSqlCoverage(array()), 'NOT IN') === false && preg_match('/FROM PENUMBRA_REPORTS R$/', penumbraReportTagsSqlCoverage(array())) === 1, 'coverage: no placeholders, no exclusion clause');
+eq(bindsOf(penumbraReportTagsSqlUntagged(array(':x0'), 300)), array('x0'), 'untagged: binds only the system ids');
+ok(strpos(penumbraReportTagsSqlUntagged(array(':x0'), 300), 'NOT EXISTS (SELECT 1 FROM PENUMBRA_REPORT_TAGS T WHERE T.REPORT_ID = R.ID)') !== false && strpos(penumbraReportTagsSqlUntagged(array(':x0'), 300), 'FETCH FIRST 300 ROWS ONLY') !== false && strpos(penumbraReportTagsSqlUntagged(array(':x0'), 300), 'ORDER BY R.UPDATED_AT DESC NULLS LAST') !== false, 'untagged: no tag at all, newest first, capped');
+ok(strpos(penumbraTagsSqlRecentBoth(400), "ACTION LIKE 'PEOPLE_TAG%' OR ACTION LIKE 'REPORT_TAG%'") !== false && strpos(penumbraTagsSqlRecentBoth(400), 'FETCH FIRST 400 ROWS ONLY') !== false && strpos(penumbraTagsSqlRecentBoth(400), 'ORDER BY ID DESC') !== false, 'recent (both kinds): one read, newest first, capped');
+ok(strpos(penumbraTagsSqlPeopleCoverage(), 'COUNT(DISTINCT T.EMPLID)') !== false && strpos(penumbraTagsSqlPeopleCoverage(), 'P.ACTIVE = 1') !== false, 'people coverage: distinct people, and the active ones');
+if ($pt !== '' && is_file($pt)) {
+    $pg = php_strip_whitespace($pt);
+    ok(strpos($pg, "'people_tags.php'") === false && strpos($pg, '"people_tags.php"') === false && strpos($pg, '[People tags tool]') === false && substr_count($pg, '[Tags tool]') >= 14, 'the page no longer says "people" for the tool: tags_admin.php, audited as [Tags tool]');
+    foreach (array("\$view === 'untagged'", "\$view === 'activity'", "\$view === 'accounts'", "\$view === 'tag'") as $v12) { ok(strpos($pg, $v12) !== false, "a view: $v12"); }
+    ok(strpos($pg, "in_array(\$view, array('', 'accounts', 'untagged', 'activity'), true)") !== false, 'an unknown view falls back to the catalog');
+    ok(substr_count($pg, 'pnbTagsInfo(') >= 20 && strpos($pg, 'How this works') === false && strpos($pg, 'class="pnb-i') !== false && strpos($pg, 'class="pnb-i-tip"') !== false, 'help lives in (i) marks (the hub\'s pnb-i / pnb-i-tip), not a How-this-works card');
+    ok(strpos($pg, "require_once 'penumbra_maintenance.php';") !== false && strpos($pg, 'penumbra_maintenance_state_dir()') !== false && strpos($pg, 'penumbra_tag_pairs.json') !== false, 'the dismissed look-alike pairs live in the web-writable state folder, never the webroot');
+    ok(strpos($pg, "\$do === 'dismiss_pair' || \$do === 'restore_pair'") !== false && strpos($pg, 'penumbraTagPairKey(') !== false && strpos($pg, 'pnbTagsPairsWrite(') !== false, 'a pair can be marked as different, and put back');
+    ok(strpos($pg, 'penumbraTagLookAlikes(array_keys($byName))') !== false && strpos($pg, 'pnbTagsPairsRead()') !== false, 'the rail lists the look-alike pairs minus the dismissed ones');
+    ok(strpos($pg, 'pnbTagsRead(penumbraReportTagsSqlUntagged($sysPh, 300), $sysBinds)') !== false && strpos($pg, 'pnbTagsRead(penumbraReportTagsSqlCoverage($sysPh), $sysBinds)') !== false && strpos($pg, 'penumbraSystemShortIds()') !== false, 'the untagged list and the coverage leave the system pages out');
+    ok(strpos($pg, 'pnbTagsRead(penumbraTagsSqlRecentBoth(400))') !== false && strpos($pg, '$lastChange = penumbraTagLastChanges($recent);') !== false, 'one read of both kinds feeds the Last change column, the activity view and the rail');
+    ok(strpos($pg, "penumbraTagGrantHolders(isset(\$config['user_grants']) ? \$config['user_grants'] : array())") !== false, 'the grant holders come from the grants db_connection.php already loaded');
+    ok(strpos($pg, "if (!empty(\$_POST['repoint'])) {") !== false && strpos($pg, 'penumbraTagGrantsRepoint($cur, $tag, $new, $repointed);') !== false && strpos($pg, "'GRANTS_UPDATED'") !== false && strpos($pg, "@rename(\$tmpf, \$gf)") !== false, 'rename re-points the grants that name the tag when asked: temp + rename like the Grants tool, audited');
+    $i12 = strpos($pg, '$rs = penumbraReportTagsSqlRename();'); $j12 = ($i12 === false) ? false : strpos($pg, "if (!empty(\$_POST['repoint'])) {", $i12); $k12 = ($i12 === false) ? false : strpos($pg, 'oci_commit($oci);', $i12);
+    ok($i12 !== false && $j12 !== false && $k12 !== false && $k12 < $j12, 'the re-point runs AFTER the commit (the rename stands even when the file is not writable)');
+    ok(strpos($pg, 'still name $tag and no longer match anything') !== false, 'a rename without the re-point, and a delete, warn that the grants stopped matching');
+    ok(strpos($pg, 'naming it will stop matching anything until changed in the Grants tool.') !== false, 'the delete confirm names the grants too');
+    ok(strpos($pg, "'analytics_all.php?filter_submitted=1&range=30d&tag=' . rawurlencode(\$tagView)") !== false && strpos($pg, "'repository.php?search=' . rawurlencode('tag:' . \$tagView)") !== false, 'a tag page deep-links into Platform Metrics and the repository');
+    ok(strpos($pg, 'id="newTagPanel"') !== false && strpos($pg, "function normalizeTag(raw)") !== false && strpos($pg, ".replace(/[\\s\\-.]+/g, '_').replace(/_+/g, '_').replace(/^_+|_+\$/g, '')") !== false && strpos($pg, "/^[A-Z][A-Z0-9_]{0,59}\$/.test(t)") !== false, 'New tag: the name rule is mirrored in the browser (penumbraTagNormalize\'s twin)');
+    ok(strpos($pg, 'function lookAlikeOf(name)') !== false && strpos($pg, 'levenshtein(t.t, name) <= 2') !== false, 'New tag: the look-alike rule is mirrored too');
+    ok(strpos($pg, "(existing ? n + ' exists: ' : 'Create ' + n + ' and ') + label") !== false && strpos($pg, "\$openAdd === 'people' ? '' : ' hidden'") !== false, 'New tag creates the tag in place through its first members (round 8); the tag page still opens with the chosen Add panel');
+    ok(strpos($pg, 'name="back" value="untagged"') !== false && strpos($pg, "\$_POST['back'] === 'untagged') ? 'tags_admin.php?view=untagged'") !== false, 'the untagged view tags ticked reports through the same radd handler and lands back on the list');
+    ok(strpos($pg, 'id="renamePop"') !== false && strpos($pg, 'function updateRename()') !== false && strpos($pg, "renameGo.textContent = 'Rename and merge';") !== false, 'Rename previews a merge before it happens');
+    ok(strpos($pg, 'data-toggle="addPeople"') !== false && strpos($pg, 'data-toggle="addReports"') !== false && strpos($pg, 'data-pane="pastePeople"') !== false && strpos($pg, 'data-pane="pasteReports"') !== false, 'the Add panels fold behind their buttons, search or paste');
+    ok(strpos($pg, '<th data-sortable>Tag<span class="sort-icon"') !== false && strpos($pg, 'id="kindSeg"') !== false && strpos($pg, 'id="tagsFind"') !== false, 'the catalog: a find box, a kind segment, sortable headings');
+}
+$idx12 = isset($argv[8]) ? $argv[8] : '';
+if ($idx12 !== '' && is_file($idx12)) { $ix12 = file_get_contents($idx12); ok(strpos($ix12, 'href="tags_admin.php"') !== false && strpos($ix12, 'href="people_tags.php"') === false, 'index: the Save As hint links tags_admin.php, not the old file'); }
+$rep12 = isset($argv[11]) ? $argv[11] : '';
+if ($rep12 !== '' && is_file($rep12)) { $rj12 = file_get_contents($rep12); ok(strpos($rj12, 'href="tags_admin.php"') !== false && strpos($rj12, 'people_tags.php') === false, 'repository: Manage tags links tags_admin.php'); ok(strpos($rj12, 'function runRepositoryDeepLink()') !== false && strpos($rj12, "/repository\\.php\$/i.test(") !== false && strpos($rj12, "get('search')") !== false && strpos($rj12, "window._pnbRepoDeepLinked = true;") !== false, 'repository: ?search= runs once, on the repository page only'); }
+$chr12 = isset($argv[14]) ? $argv[14] : '';
+if ($chr12 !== '' && is_file($chr12)) { $ch12 = file_get_contents($chr12); ok(strpos($ch12, "'href' => 'tags_admin.php'") !== false && strpos($ch12, 'people_tags.php') === false, 'the admin nav opens tags_admin.php'); }
+$dbc12 = file_get_contents($dbc);
+ok(strpos($dbc12, "'title' => 'Tags (Admin Tool)'") !== false && strpos($dbc12, 'People Tags (Admin Tool)') === false, 'the tool page registry calls it Tags (the __PEOPLE_TAGS__ placeholder stays)');
+
+
+// ---------------------------------------------- 13. tags on dashboards (2026-10-09, "direction one")
+echo "13. tags on dashboards\n";
+eq(bindsOf(penumbraDashboardTagsSqlAdd()), array('dashboard_id', 'tag', 'who', 'note'), 'dash add: the MERGE binds');
+ok(strpos(penumbraDashboardTagsSqlAdd(), 'MERGE INTO PENUMBRA_DASHBOARD_TAGS T') === 0 && strpos(penumbraDashboardTagsSqlAdd(), 'WHEN NOT MATCHED THEN INSERT') !== false, 'dash add: an idempotent MERGE');
+eq(bindsOf(penumbraDashboardTagsSqlRemove()), array('dashboard_id', 'tag'), 'dash remove binds');
+eq(bindsOf(penumbraDashboardTagsSqlRemoveAll()), array('dashboard_id'), 'dash remove-all binds (the delete path)');
+eq(bindsOf(penumbraDashboardTagsSqlUpdate()), array('note', 'dashboard_id', 'tag'), 'dash update binds');
+$drn13 = penumbraDashboardTagsSqlRename();
+ok(count($drn13) === 2 && strpos($drn13[0], 'AND DASHBOARD_ID NOT IN (SELECT DASHBOARD_ID FROM PENUMBRA_DASHBOARD_TAGS WHERE TAG = :newtag)') !== false && strpos($drn13[1], 'DELETE FROM PENUMBRA_DASHBOARD_TAGS WHERE TAG = :oldtag') === 0, 'dash rename = merge, the report twins\' shape');
+eq(bindsOf(penumbraDashboardTagsSqlMembers()), array('tag'), 'dash members: one bind');
+ok(strpos(penumbraDashboardTagsSqlMembers(), 'JOIN PENUMBRA_DASHBOARDS D ON D.ID = T.DASHBOARD_ID') !== false && strpos(penumbraDashboardTagsSqlMembers(), 'FETCH FIRST 1000 ROWS ONLY') !== false, 'dash members: the dashboard beside each row, capped');
+ok(strpos(penumbraDashboardTagsSqlMap(), 'TRIM(D.SHORT_ID) AS SID, T.TAG') !== false, 'dash map: short id -> tag');
+ok(strpos(penumbraDashboardTagsSqlIndex(), "LISTAGG(TAG, '|' ON OVERFLOW TRUNCATE)") !== false && strpos(penumbraDashboardTagsSqlIndex(), 'LEFT JOIN') !== false, 'dash index: every dashboard with its tags, the untagged ones too');
+ok(strpos(penumbraDashboardTagsSqlCoverage(), 'EXISTS (SELECT 1 FROM PENUMBRA_DASHBOARD_TAGS T WHERE T.DASHBOARD_ID = D.ID)') !== false, 'dash coverage: dashboards with a tag of all');
+eq(bindsOf(penumbraDashboardTagsSqlSearch()), array('q'), 'dash search: one bind, title or id');
+ok(strpos(penumbraTagsSqlVocabularyAll(), 'UNION SELECT TAG FROM PENUMBRA_DASHBOARD_TAGS') !== false && strpos(penumbraReportTagsSqlVocabulary(), 'DASHBOARD') === false, 'the vocabulary with dashboards is its own text; the two-table one is untouched');
+ok(strpos(penumbraTagsSqlRecentAll(400), "OR ACTION LIKE 'DASH_TAG%'") !== false && strpos(penumbraTagsSqlRecentAll(400), 'FETCH FIRST 400 ROWS ONLY') !== false, 'recent: all three kinds in one read');
+eq(penumbraDashboardTagsSummarize('OSP', array('A (a)', 'B (b)'), 1, array('zz')), 'OSP: tagged 2 dashboards (A (a), B (b)). 1 already carried it. no dashboard has the id: zz.', 'dash summary: the report wording with the noun swapped');
+eq(penumbraTagAuditNames('SPARCS_IT: tagged dashboard Pre-award at a glance (dash-7q2a) [Dashboard settings]'), array('SPARCS_IT'), 'a dashboard-side audit row names its tag');
+// The grant side, lifted from db_connection.php: the map is injected (the test seam), so the matchers answer offline.
+$dbcTxt13 = file_get_contents($dbc);
+$i13 = strpos($dbcTxt13, "if (!function_exists('penumbraDashboardTagMap')) {");
+$j13 = ($i13 === false) ? false : strpos($dbcTxt13, "if (!function_exists('penumbraReportGrantMatches')) {", $i13);
+ok($i13 !== false && $j13 !== false && $j13 > $i13, 'the dashboard grant side sits before penumbraReportGrantMatches');
+if ($i13 !== false && $j13 !== false) {
+    if (!function_exists('penumbraWildcardMatch')) { function penumbraWildcardMatch($pattern, $subject) { return (bool)preg_match('/^' . str_replace('\*', '.*', preg_quote((string)$pattern, '/')) . '$/i', (string)$subject); } }
+    eval('?>' . "<?php\n" . substr($dbcTxt13, $i13, $j13 - $i13));
+    eq(penumbraDashboardTagMap(array('dash-1' => array('SPARCS_IT'), 'dash-2' => array('IACUC'))), array('dash-1' => array('SPARCS_IT'), 'dash-2' => array('IACUC')), 'dash map: the injected seam replaces the cache');
+    $tagsOnly13 = array('sql' => array(), 'reports' => array(), 'tags' => array(array('tag' => 'SPARCS_IT', 'scheduler' => false)));
+    ok(penumbraDashboardTagGrantMatches($tagsOnly13, 'DASH-1') === true, 'a tag grant reaches a dashboard carrying the tag (case-folded id)');
+    ok(penumbraDashboardTagGrantMatches($tagsOnly13, 'dash-2') === false && penumbraDashboardTagGrantMatches($tagsOnly13, 'nope') === false && penumbraDashboardTagGrantMatches(array('tags' => array()), 'dash-1') === false, '...and no other dashboard, no unknown id, nothing without a tag grant');
+    ok(penumbraDashboardGrantMatches($tagsOnly13, 'dash-1') === true, 'the create rule: a held tag the dashboard carries...');
+    $patOnly13 = array('sql' => array(), 'reports' => array(array('pattern' => 'dash*', 'scheduler' => false)), 'tags' => array());
+    ok(penumbraDashboardGrantMatches($patOnly13, 'dash-9') === true && penumbraDashboardGrantMatches($patOnly13, 'other') === false, '...or a report pattern matching the id');
+    ok(penumbraDashboardTagGrantMatches($patOnly13, 'dash-1') === false, 'a pattern alone never EDITS a dashboard (create only, the 2026-07-29 rule)');
+}
+if ($pt !== '' && is_file($pt)) {
+    $pg = php_strip_whitespace($pt);
+    ok(strpos($pg, 'pnbTagsRead(penumbraDashboardTagsSqlCounts()); $dtagsReady = true;') !== false, 'the Tags tool probes the dashboard tags table once, never fatal');
+    foreach (array('dadd', 'dadd_bulk', 'dremove', 'dupdate') as $act13) { ok(strpos($pg, "\$do === '$act13'") !== false, "handles $act13"); }
+    ok(strpos($pg, "@logPenumbraAudit(null, 'DASH_TAG_ADD'") !== false && strpos($pg, "@logPenumbraAudit(null, 'DASH_TAG_REMOVE'") !== false && strpos($pg, "'DASH_TAG_RENAME'") !== false && strpos($pg, "'DASH_TAG_DELETE'") !== false, 'dashboard-side writes are audited with a null report id (a dashboard is not a report)');
+    $i = strpos($pg, '$ds = penumbraDashboardTagsSqlRename();'); $j = ($i === false) ? false : strpos($pg, 'oci_commit($oci);', $i);
+    ok($i !== false && $j !== false && strpos(substr($pg, $i, $j - $i), 'pnbTagsWrite($oci, $ds[1]') !== false, 'rename runs the dashboard twins on the same session before the one commit');
+    ok(strpos($pg, 'penumbraDashboardTagsSqlDeleteTag(), array') !== false && strpos($pg, 'penumbraTagsSqlRecentAll(400)') !== false, 'delete clears the third kind; the recent list reads all three');
+    ok(strpos($pg, 'id="panel-dashboards"') !== false && strpos($pg, 'id="tab-dashboards"') !== false && strpos($pg, 'name="do" value="dadd"') !== false && strpos($pg, "ajax=dashsearch") !== false && strpos($pg, "\$_GET['ajax'] === 'dashsearch'") !== false, 'a tag page has a Dashboards sub-tab with its own search');
+    ok(strpos($pg, 'data-kind="dashboards"') !== false && strpos($pg, 'data-sortable>Dashboards<span class="sort-icon"') !== false && strpos($pg, "'dashboard.php?search=' . rawurlencode('tag:' . \$tagView)") !== false, 'the catalog has a Dashboards kind and column; a tag page deep-links into the dashboard home');
+}
+$mdb13 = isset($argv[15]) ? $argv[15] : '';
+if ($mdb13 !== '' && is_file($mdb13)) {
+    $pm = php_strip_whitespace($mdb13);
+    ok(strpos($pm, 'function dashApplyTags(') !== false && strpos($pm, "'DASH_TAG_ADD'") !== false && strpos($pm, "'DASH_TAG_REMOVE'") !== false, 'manage_dashboard: one apply helper, audited adds and removes');
+    ok(strpos($pm, '$tagsRefused = penumbraReportTagsRefused($isAdmin, $userGrants, $tagsBefore, $tags);') !== false && strpos($pm, "'reason' => 'tags_not_held'") !== false, 'manage_dashboard: an update runs the narrow rule over the before / after tags and refuses with a DENIED_SCOPE row');
+    ok(strpos($pm, '$tagCreateOk = !$isAdmin && $tagsPosted && !empty($tags) && !penumbraReportTagsRefused(false, $userGrants, array(), $tags);') !== false && strpos($pm, '!penumbraDashboardGrantMatches($userGrants, $sid) && !$tagCreateOk) {') !== false, 'manage_dashboard: a tag-only holder may create when every posted tag is held');
+    ok(strpos($pm, '!penumbraDashboardTagGrantMatches($userGrants, $sid)) {') !== false, 'manage_dashboard: a tag-grant holder may update a dashboard carrying a held tag');
+    ok(strpos($pm, 'if (!$tagsPosted) { $tags = $tagsBefore; }') !== false, 'manage_dashboard: a payload without tags leaves them alone (an older client)');
+    ok(strpos($pm, 'penumbraDashboardTagsSqlRemoveAll()') !== false && strpos($pm, "'tags' => dashTagsOf(\$oracleConn, (int)\$row['ID'])") !== false, 'manage_dashboard: delete clears the tags and snapshots them');
+    ok(strpos($pm, "'tags' => isset(\$listTags[(int)\$row['ID']])") !== false && strpos($pm, "'tags' => dashTagsOf(\$oracleConn, (int)\$row['ID']),") !== false, 'manage_dashboard: list and get carry the tags');
+}
+$dsh13 = isset($argv[16]) ? $argv[16] : '';
+if ($dsh13 !== '' && is_file($dsh13)) {
+    $pd = file_get_contents($dsh13);
+    ok(strpos($pd, '$canCreate = $canCreate || !empty($heldTags);') !== false && strpos($pd, "tagGrants: <?php echo json_encode(\$heldTags); ?>") !== false && strpos($pd, 'tagVocabulary: <?php') !== false, 'dashboard.php: a tag-grant holder may create; the page carries the held tags and the vocabulary');
+    ok(strpos($pd, "penumbraDashboardTagGrantMatches(\$userGrants, \$dash['SHORT_ID'])") !== false && strpos($pd, "'tags'       => \$dashTags,") !== false, 'dashboard.php: a tag-grant holder edits a dashboard carrying a held tag; the meta carries its tags');
+}
+$djs13 = isset($argv[17]) ? $argv[17] : '';
+if ($djs13 !== '' && is_file($djs13)) {
+    $pj = file_get_contents($djs13);
+    ok(strpos($pj, 'function buildTagPillbox(') !== false && strpos($pj, 'id="dsTagBox"') !== false && strpos($pj, 'is not an existing tag. New tags start in Admin') !== false && strpos($pj, 'held.indexOf(t) !== -1') !== false, 'the module: a Tags pill box in the settings panel, the closed vocabulary, held tags only for a non-admin');
+    ok(substr_count($pj, 'tags: META.tags || [],') >= 1 && strpos($pj, 'var all = META.tags || []; if (V.isAdmin) { return all; }') !== false && strpos($pj, 'tags: createTags ? createTags.value() : [],') !== false, 'the module: every save, the duplicate and the create carry the tags');
+    ok(strpos($pj, 'function applyHomeFilter()') !== false && strpos($pj, "m = /^tag:\\s*([a-z0-9_]+)\$/i.exec(q)") !== false && strpos($pj, 'dash-home-tag') !== false && strpos($pj, "get('search')") !== false, 'the home: a filter by title / id / owner or tag:NAME, pills per card, ?search= from the address');
+}
+if ($ga !== '' && is_file($ga)) {
+    $pga = file_get_contents($ga);
+    ok(strpos($pga, 'var DASH_INDEX = <?php echo json_encode($DASH_INDEX); ?>;') !== false && strpos($pga, 'for (var d = 0; d < DASH_INDEX.length; d++)') !== false && strpos($pga, 'dashboard: true') !== false, 'the Grants tool: dashboards in the reach index, reached by tag');
+    ok(strpos($pga, "' and ' + DASH_INDEX.length + ' dashboards'") !== false && strpos($pga, "'dashboards' => isset(\$dnames[\$tn]) ? \$dnames[\$tn] : 0") !== false && strpos($pga, 'function tagCoverageDash(') !== false, 'the Grants tool: the summary and the picker count dashboards');
+}
+
+
+// ---------------------------------------------- 14. Tags tool round 6 (2026-10-09): plain sortable headings, the fit, grips, dark themes, the account edit
+echo "14. the Tags tool, round 6\n";
+if ($pt !== '' && is_file($pt)) {
+    $pg = php_strip_whitespace($pt);
+    ok(preg_match('/<th[^>]*>[^\n]*pnbTagsInfo\(/', $pg) === 0 && strpos($pg, "'About searching'") === false, 'no (i) mark inside a heading, and none beside the search box either (round 12)');
+    ok(strpos($pg, 'Open &rsaquo;') === false && strpos($pg, 'aria-label="Open"') === false && strpos($pg, 'a.open') === false && strpos($pg, '<a class="pill" href="<?php echo $h($href); ?>">') !== false, 'the Open column is gone; the name is the link');
+    ok(strpos($pg, 'table.tags td.when, table.tags td.when .of { white-space: normal; overflow-wrap: anywhere; }') !== false, 'the Last change column wraps, so the list fits its card instead of running under the rail');
+    ok(strpos($pg, '.untagged-form { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: flex-end;') !== false, 'the untagged tab\'s tag-the-ticked row bottom-aligns its button with the inputs');
+    ok(strpos($pg, 'table.tags th[data-sortable] .dt-sort-btn, table.members th[data-sortable] .dt-sort-btn, table.hist th[data-sortable] .dt-sort-btn { background: none; border: 0; box-shadow: none;') !== false && strpos($pg, "\n  .dt-sort-btn {") === false && strpos($pg, 'table.tags th[data-sortable].dt-edge .dt-sort-btn') !== false, 'the heading button resets the themes\' button dress at (0,3,2), Metrics\' selector shape (no pill look in the dark themes)');
+    ok(strpos($pg, '.dt-grip { position: absolute; top: 0; right: 0; bottom: 0; width: 7px; cursor: col-resize;') !== false && strpos($pg, "grip.className = 'dt-grip';") !== false && strpos($pg, 'th.appendChild(grip);') !== false && strpos($pg, 'var DT_GRIP = 7,') !== false && strpos($pg, 'Double-click to reset all column widths.') !== false, 'every sortable heading carries the repository\'s grip on its right edge (the hit zone is the grip)');
+    ok(strpos($pg, 'function pnbTagsOfPerson(') !== false && strpos($pg, 'id="tagVocab"') !== false && strpos($pg, "data-initial=\"<?php echo \$acctEdit ? \$h(implode(', ', \$acctTags)) : ''; ?>\"") !== false && strpos($pg, '<?php if (!$acctEdit): ?><label>Tags') === false, 'an account\'s Edit form carries its tags, with the vocabulary as a datalist');
+    ok(strpos($pg, '$toAdd = array_values(array_diff($want, $have)); $toDrop = array_values(array_diff($have, $want));') !== false && strpos($pg, "\"\$t: tagged \$name (\" . substr(\$id, 5) . \") [Account edit]\"") !== false && strpos($pg, "'PEOPLE_TAG_REMOVE', json_encode(array('tag' => \$t, 'emplid' => \$id)), null, \"\$t: removed \$name (\" . substr(\$id, 5) . \") [Account edit]\"") !== false && strpos($pg, 'if ($tagText !== null) {') !== false, 'an account edit applies the posted list as a whole, audited per tag; a form without the field leaves the tags alone');
+}
+
+
+// ---------------------------------------------- 15. untagged dashboards on the Untagged tab (2026-10-09)
+echo "15. untagged dashboards\n";
+eq(bindsOf(penumbraDashboardTagsSqlUntagged(300)), array(), 'untagged dashboards: no binds (no system pages to leave out)');
+ok(strpos(penumbraDashboardTagsSqlUntagged(300), ' FROM PENUMBRA_DASHBOARDS D WHERE NOT EXISTS (SELECT 1 FROM PENUMBRA_DASHBOARD_TAGS T WHERE T.DASHBOARD_ID = D.ID)') !== false && strpos(penumbraDashboardTagsSqlUntagged(300), 'ORDER BY D.UPDATED_AT DESC NULLS LAST, D.ID DESC FETCH FIRST 300 ROWS ONLY') !== false && strpos(penumbraDashboardTagsSqlUntagged(25), 'FETCH FIRST 25 ROWS ONLY') !== false, 'untagged dashboards: the ones with no tag at all, newest first, capped');
+if ($pt !== '' && is_file($pt)) {
+    $pg = php_strip_whitespace($pt);
+    ok(strpos($pg, '>Untagged<?php echo pnbTagsBadge($untaggedCount + $untaggedDashCount); ?></a>') !== false && strpos($pg, 'Untagged reports<?php') === false, 'the tab is Untagged, its badge counting reports and dashboards');
+    ok(strpos($pg, 'if ($dtagsReady) $untaggedDash = pnbTagsRead(penumbraDashboardTagsSqlUntagged(300));') !== false && strpos($pg, "\$untaggedDashCount = \$dtagsReady ? max(0, (int)\$coverage['DASHBOARDS'] - (int)\$coverage['DTAGGED']) : 0;") !== false, 'the view reads the list; the count comes from the coverage read on every view');
+    $iCov = strpos($pg, '$dcv = pnbTagsRead(penumbraDashboardTagsSqlCoverage());'); $iCat = strpos($pg, "} elseif (\$view === '') {");
+    ok($iCov !== false && $iCat !== false && $iCov < $iCat, 'the dashboards\' coverage is read before the view branches (every view carries the badge), no longer only on the catalog');
+    ok(strpos($pg, '<div class="pnb-adm-card" id="dashboards">') !== false && strpos($pg, 'id="untaggedDashForm"') !== false && strpos($pg, '<input type="hidden" name="do" value="dadd"><input type="hidden" name="back" value="untagged">') !== false && strpos($pg, 'Tag the ticked dashboards</button>') !== false && strpos($pg, "dashboard.php?id=<?php echo \$h(rawurlencode(\$u['SHORT_ID'])); ?>") !== false && strpos($pg, 'Every dashboard carries at least one tag.') !== false, 'a second card: Dashboards without a tag, the same tick / pick a tag / one write form, the empty state');
+    ok(strpos($pg, "\$_POST['back'] === 'untagged') ? 'tags_admin.php?view=untagged#dashboards' : \$back . '#dashboards'") !== false, 'tagging from that list lands back on it');
+    ok(strpos($pg, "each([['untaggedAll', 'untaggedTable', 'untaggedCount'], ['untaggedDashAll', 'untaggedDashTable', 'untaggedDashCount']], function (ids) {") !== false && strpos($pg, 'function applyFindToLists()') !== false, 'both lists tick all shown and count live; the strip\'s box filters them (round 9)');
+    ok(strpos($pg, '<span>Untagged dashboards</span><span class="v"><a href="tags_admin.php?view=untagged#dashboards"><?php echo (int)$untaggedDashCount; ?></a></span>') !== false, 'the coverage card\'s Untagged dashboards row links to the card');
+}
+
+
+// ---------------------------------------------- 16. Tags tool round 8 (2026-10-09): the strip's border, New tag as the app's lightbox, per-field account help, banner tips, activity shortcuts
+echo "16. the Tags tool, round 8\n";
+if ($pt !== '' && is_file($pt)) {
+    $pg = php_strip_whitespace($pt);
+    ok(strpos($pg, 'main > .toolbar.tags-banner { background: var(--pnb-page-bg, var(--bg-body, #fff)); margin: 0 -22px 14px; padding: 0 22px 8px; }') !== false, 'the catalog toolbar starts under the strip, which carries the gap in its own box (round 9)');
+    $iTb = strpos($pg, '<div class="toolbar tags-banner">'); $jTb = ($iTb === false) ? false : strpos($pg, '<div class="layout">', $iTb);
+    ok($iTb !== false && $jTb !== false && strpos(substr($pg, $iTb, $jTb - $iTb), 'id="newTagBtn"') === false && strpos(substr($pg, $iTb, $jTb - $iTb), 'id="newTagPanel"') === false, 'the toolbar no longer carries the New tag button or panel');
+    ok(strpos($pg, '<button type="button" class="primary small tab-new" id="newTagBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="newTagPanel">+ New tag</button>') !== false && strpos($pg, '.tabs .tab-new { margin-left: auto;') !== false, 'New tag sits at the end of the tab strip, right-aligned, on every list');
+    $iBox = strpos($pg, '<div class="help-lightbox" id="newTagLightbox" role="dialog" aria-modal="true" aria-labelledby="newTagTitle" hidden>'); $iCat = strpos($pg, "<?php if (\$view === ''): ?>");
+    ok($iBox !== false && $iCat !== false && $iBox < $iCat && strpos($pg, '<div class="lightbox-content pnb-dlg pop" id="newTagPanel"') !== false && strpos($pg, '<div class="pnb-dlg-head">') !== false && strpos($pg, '<span class="pnb-dlg-ico" aria-hidden="true">') !== false && strpos($pg, '<button type="button" class="close-lightbox" aria-label="Close" title="Close (Esc)">&times;</button>') !== false, 'New tag is the app\'s lightbox (.help-lightbox, .lightbox-content.pnb-dlg, the header band, the close button), rendered before the view branches');
+    ok(strpos($pg, 'function openNew()') !== false && strpos($pg, 'function closeNew()') !== false && strpos($pg, "newBox.hidden = false; newBox.style.display = 'flex';") !== false && strpos($pg, "newBox.addEventListener('click', function (e) { if (e.target === newBox) closeNew(); });") !== false && strpos($pg, "window.addEventListener('keydown', function (e) { if (e.key === 'Escape' && newBox && !newBox.hidden) { e.preventDefault(); e.stopPropagation(); closeNew(); } }, true);") !== false, 'Escape (caught on the window, at capture), the close button or the backdrop close it; focus returns to the button');
+    $iL = $iBox; $jL = strpos($pg, "<?php if (\$view === ''): ?>", $iBox); $lb = substr($pg, $iL, $jL - $iL);
+    ok(substr_count($lb, '<input type="hidden" name="tag" class="newTagTag" value="">') === 6 && substr_count($lb, 'name="back" value="<?php echo $h($backView); ?>"') === 6, 'the lightbox carries the tag page\'s six add forms (search and paste for people, reports, dashboards), each bound to the typed name and to this list');
+    foreach (array('add', 'add_bulk', 'radd', 'radd_bulk', 'dadd', 'dadd_bulk') as $do16) { ok(strpos($lb, '<input type="hidden" name="do" value="' . $do16 . '">') !== false, "the lightbox posts $do16"); }
+    ok(strpos($lb, 'id="peopleSearch"') !== false && strpos($lb, 'id="searchResults"') !== false && strpos($lb, 'id="reportSearch"') !== false && strpos($lb, 'id="reportResults"') !== false && strpos($lb, 'id="dashboardSearch"') !== false && strpos($lb, 'id="dashboardResults"') !== false && strpos($lb, 'id="newTagKind"') !== false, 'the three searches are the tag page\'s own (the same ids, so the same scripts serve them); a kind segment picks which panel shows');
+    ok(strpos($pg, "if (\$backView === 'catalog') \$back = 'tags_admin.php';") !== false && strpos($pg, "elseif (in_array(\$backView, array('accounts', 'untagged', 'activity'), true)) \$back = 'tags_admin.php?view=' . \$backView;") !== false, 'a write from the lightbox lands back on the list it was opened from');
+    ok(strpos($pg, "each(newBox.querySelectorAll('input.newTagTag'), function (i) { i.value = n; });") !== false && strpos($pg, "newPrev.textContent = !n ? 'Name the tag first.' : (ta ? 'Paste at least one id first.' : 'Tick at least one hit first.');") !== false && strpos($pg, "(existing ? n + ' exists: ' : 'Create ' + n + ' and ') + label") !== false, 'the typed name feeds every form; nothing posts without a name and something to carry it; an existing name adds to it');
+    ok(strpos($pg, "'About registering'") === false && substr_count($pg, '<span class="lbl">') === 7 && strpos($pg, "'About the units')") !== false && strpos($pg, "'About the address')") !== false && strpos($pg, '.valnote label .lbl { display: inline-flex;') !== false, 'the account form explains each of its seven fields with its own (i), the card-level tip gone');
+    ok(strpos($pg, '.tags-banner:hover, .tags-banner:focus-within { z-index: 6; }') !== false, 'a banner holding an open tip rises above the sticky row under it');
+    ok(substr_count($pg, '<a href="#" class="k flt" data-q="what:<?php echo $h($what); ?>"') === 2 && substr_count($pg, '<a href="#" class="flt" data-q="by:<?php echo $h($r[\'user\']); ?>"') === 2 && strpos($pg, "e.target.closest('table a.flt')") !== false && strpos($pg, "filt.dispatchEvent(new Event('input', { bubbles: true }));   // the list filters itself") !== false, 'What and By in both activity lists are shortcuts into the list\'s filter');
+    ok(strpos($pg, 'id="tagActivityFilter"') !== false && strpos($pg, "['tagActivityFilter', 'tagActivityTable']") !== false, 'the tag page\'s activity list has a filter of its own for the shortcuts to fill');
+}
+
+
+// ---------------------------------------------- 17. Tags tool round 9 (2026-10-09): one search box in the sticky strip
+echo "17. the Tags tool, round 9\n";
+if ($pt !== '' && is_file($pt)) {
+    $pg = php_strip_whitespace($pt);
+    $iStrip = strpos($pg, '<div class="tabs" role="navigation"'); $iFind = strpos($pg, 'id="tagsFind"'); $iNew = strpos($pg, 'id="newTagBtn"');
+    ok($iStrip !== false && $iFind !== false && $iNew !== false && $iStrip < $iFind && $iFind < $iNew && strpos($pg, '<label class="find tab-find">') !== false && strpos($pg, "'About searching'") === false, 'one search box sits in the strip, left of New tag, without a help mark (round 12)');
+    foreach (array('id="tagFind"', 'id="untaggedFilter"', 'id="untaggedDashFilter"', 'id="activityFilter"') as $gone17) { ok(strpos($pg, $gone17) === false, "gone: $gone17"); }
+    ok(strpos($pg, "var find = byId('tagsFind'), kindSeg = byId('kindSeg')") !== false && strpos($pg, "var findTables = ['accountTable', 'untaggedTable', 'untaggedDashTable', 'activityTable'];") !== false && strpos($pg, 'function applyFindToLists()') !== false && strpos($pg, "find.addEventListener('input', function () { findRemember(); applyFind(); });") !== false, 'the box drives the catalog filter (prefixes and kind pills kept) and filters the account, untagged and activity lists by any column');
+    ok(strpos($pg, "var FIND_KEY = 'penumbra_tags_find'") !== false && strpos($pg, 'sessionStorage.setItem(FIND_KEY, find.value)') !== false && strpos($pg, 'if (kept) find.value = kept;') !== false && strpos($pg, "if (kept.trim().toLowerCase() === 'untagged' && !table) { sessionStorage.removeItem(FIND_KEY); kept = ''; }") !== false, 'the text is kept while you switch tabs; the untagged keyword that opened the tab is dropped, never applied as a filter');
+    ok(strpos($pg, "filt = scope.querySelector('input[type=\"search\"]') || byId('tagsFind');") !== false && strpos($pg, "['memberFilter', 'memberTable'], ['reportFilter', 'reportTable'], ['dashboardFilter', 'dashboardTable'], ['tagActivityFilter', 'tagActivityTable']];") !== false, 'an activity shortcut fills the strip\'s box; the tag page keeps its own four filters');
+    ok(strpos($pg, '.tabs[role="navigation"] { position: sticky; top: var(--pnb-adm-offset, 0px); z-index: 8;') !== false && strpos($pg, '.tabs[role="navigation"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 14px; height: 2px;') !== false && strpos($pg, '.tabs[role="navigation"] .active { position: relative; z-index: 1; }') !== false, 'the strip sticks under the admin bar; its box carries the gap, the line is drawn into it and the active tab still covers the line');
+    ok(strpos($pg, 'top: calc(var(--pnb-adm-offset, 0px) + var(--pnb-tabs-h, 0px) + var(--pnb-banner-top, 0px))') !== false && strpos($pg, 'top: calc(var(--pnb-adm-offset, 0px) + var(--pnb-tabs-h, 0px) + var(--pnb-cardhead-h, 0px))') !== false && strpos($pg, "root.style.setProperty('--pnb-tabs-h', (strip && getComputedStyle(strip).position === 'sticky') ? strip.offsetHeight + 'px' : '0px');") !== false, 'the banners and the headings sit under the strip by its measured height');
+    ok(strpos($pg, '.tabs[role="navigation"], .tags-banner, table.tags th, table.members th, table.hist th { position: static; }') !== false && strpos($pg, ".tags-banner, .pnb-adm-stick, .tabs[role=\"navigation\"]'), function (el) { ro.observe(el); });") !== false, 'a short or narrow window unsticks the strip too; its size is watched');
+}
+
+
+// ---------------------------------------------- 18. Tags tool round 10 (2026-10-10): badges that follow the typing, the pill boxes, several tags per write
+echo "18. the Tags tool, round 10\n";
+if ($pt !== '' && is_file($pt)) {
+    $pg = php_strip_whitespace($pt);
+    ok(strpos($pg, "\$_GET['ajax'] === 'counts'") !== false && strpos($pg, "\$out = array('tags' => 0, 'accounts' => 0, 'untagged' => 0, 'activity' => 0);") !== false && strpos($pg, "if (preg_match('/^(people|reports|dashboards|both|values):\\s*(.*)\$/', \$tq, \$m)) { \$tk = \$m[1]; \$tq = \$m[2]; }") !== false && strpos($pg, '$hit = function ($parts) use ($q)') !== false, '?ajax=counts counts every tab\'s matches by the lists\' own rules (the catalog\'s prefixes, any column elsewhere)');
+    $iCounts = strpos($pg, "\$_GET['ajax'] === 'counts'"); $iIdx = strpos($pg, '$tagIndex[] = array(');
+    ok($iCounts !== false && $iIdx !== false && $iIdx < $iCounts, 'the counts endpoint runs after the catalog index and the lists are read');
+    ok(strpos($pg, ' data-tab="tags">Tags') !== false && strpos($pg, ' data-tab="accounts">Group accounts') !== false && strpos($pg, ' data-tab="untagged">Untagged') !== false && strpos($pg, ' data-tab="activity">Activity') !== false && strpos($pg, 'function updateBadges(q, mine)') !== false && strpos($pg, "if (!q) { each(['tags', 'accounts', 'untagged', 'activity'], function (k) { setBadge(k, null); });") !== false && strpos($pg, "getJSON('tags_admin.php?ajax=counts&q=' + encodeURIComponent(q)") !== false && strpos($pg, 'updateBadges(q, table ? a : b);') !== false, 'the badges follow the typing: the open tab counts its own rows, the others ask the endpoint, an empty box restores the totals');
+    ok(strpos($pg, 'placeholder="Search every tab: a tag, account, report, dashboard or change"') !== false, 'the placeholder says every tab');
+    ok(strpos($pg, 'function pillBox(box)') !== false && strpos($pg, "pill.className = 'access-capsule report-tag';") !== false && strpos($pg, "if (TAG_VOCAB.indexOf(t) === -1) { say('No tag called ' + t + ' exists yet. Start it with + New tag.'); return false; }") !== false && strpos($pg, '.pillbox { display: flex;') !== false, 'a pill box in the Save As dialog\'s dress, a closed vocabulary');
+    $iU = strpos($pg, "<?php elseif (\$view === 'untagged'): ?>"); $jU = strpos($pg, "<?php elseif (\$view === 'activity'): ?>", $iU); $ut = substr($pg, $iU, $jU - $iU);
+    ok(substr_count($ut, '<div class="pillbox" data-name="tags[]" data-required="1"') === 2 && strpos($ut, '<select name="tag"') === false && strpos($pg, 'id="tagVocab"') !== false, 'the Untagged tab\'s two forms take several tags as pills (no select left)');
+    ok(strpos($pg, '<div class="valnote-fld"><span class="lbl">Tags') !== false && strpos($pg, '<div class="pillbox" data-name="tags" data-initial=') !== false && strpos($pg, 'id="acctTagList"') === false, 'the account form\'s Tags field is a pill box, posting the comma-joined list the handlers already take');
+    ok(strpos($pg, "foreach ((isset(\$_POST['tags']) && is_array(\$_POST['tags'])) ? \$_POST['tags'] : array() as \$tx)") !== false && strpos($pg, 'if ($tag === \'\' && $tagsPosted) $tag = $tagsPosted[0];') !== false, 'tags[] from a pill box; the first stands as the single tag');
+    ok(substr_count($pg, '$tagsToApply = $tagsPosted ? $tagsPosted : array($tag);') === 2 && strpos($pg, "'REPORT_TAG_ADD', null, json_encode(array('tag' => \$tagX, 'short_id' => \$sid,") !== false, 'radd applies every posted tag to every ticked report, audited per tag and report');
+    ok(strpos($pg, '$msgs[] = penumbraDashboardTagsSummarize($tagX, $addedLabels, $already, $tagX === $tagsToApply[0] ? $unknown : array());') !== false && strpos($pg, "@logPenumbraAudit(null, 'DASH_TAG_ADD', null, json_encode(array('tag' => \$tagX,") !== false, 'dadd applies every posted tag to every ticked dashboard');
+}
+
+
+// ---------------------------------------------- 19. the repository's inline tag editor (2026-10-10)
+echo "19. the repository's inline tag editor\n";
+$mrt19 = isset($argv[18]) ? $argv[18] : '';
+if ($mrt19 !== '' && is_file($mrt19)) {
+    $pm = php_strip_whitespace($mrt19);
+    ok(strpos($pm, "require_once 'db_connection.php';") !== false && strpos($pm, "require_once 'penumbra_report_tags.php';") !== false && strpos($pm, 'penumbraCsrfGuard();') !== false, 'the endpoint loads the connection and the pure half, behind the CSRF guard');
+    ok(strpos($pm, "if (!\$isAdmin && !penumbraIsReportOwner(\$rep['OWNER_ID'], \$currentUserKey) && !penumbraReportGrantMatches(\$userGrants, \$rep['SHORT_ID'])) {") !== false && strpos($pm, "'reason' => 'not_an_editor'") !== false, 'the same gate as a save or a delete: an admin, the owner or a report-grant holder');
+    ok(strpos($pm, '$refused = penumbraReportTagsRefused($isAdmin, $userGrants, $have, $want);') !== false && strpos($pm, "'reason' => 'tags_not_held'") !== false && strpos($pm, 'http_response_code(403);') !== false, 'the narrow rule over the change, refused with a DENIED_SCOPE row and a 403');
+    ok(strpos($pm, 'function pnbRepoApplyTags(') !== false && strpos($pm, "'REPORT_TAG_ADD', null, json_encode(array('tag' => \$t, 'via' => 'repository', 'short_id' => \$sid)), \"\$t: tagged \$label [Repository]\"") !== false && strpos($pm, "'REPORT_TAG_REMOVE', json_encode(array('tag' => \$t, 'short_id' => \$sid)), null, \"\$t: removed from \$label [Repository]\"") !== false, 'adds MERGE and drops DELETE, each audited with the report id and this writer\'s name');
+    ok(strpos($pm, "'tags' => \$want, 'added' => \$done['added'], 'removed' => \$done['removed']") !== false, 'the answer carries the list as it is now and what changed');
+}
+if ($rep !== '' && is_file($rep)) {
+    $pr = file_get_contents($rep);
+    ok(strpos($pr, 'function openRepoTagEditor($cell, report)') !== false && strpos($pr, "class=\"repo-tag-edit\" data-tag-short-id=") !== false && strpos($pr, "['Tags',                '<span class=\"repo-tag-value\">' + _tagsStr + _tagsPencil + '</span>', _tagsLink],") !== false, 'the Tags row carries a pencil that opens the editor in place');
+    ok(strpos($pr, 'var _tagsPencil = _repoCanEditTags(report)') !== false && strpos($pr, 'function _repoCanEditTags(report)') !== false && strpos($pr, "(report.EDITORS || []).some(function (e) { return String(e.user || '').toLowerCase() === me; })") !== false, 'the pencil shows for whoever may edit the report: an admin, the owner, an editor');
+    ok(strpos($pr, "if (_repoTagVocab().indexOf(t) === -1) { \$hint.text('No tag called ' + t + ' exists yet. New tags start in the Tags tool.'); return false; }") !== false && strpos($pr, "if (!_repoTagHeld(t)) { \$hint.text('You hold no grant on ' + t + ', so you cannot put it on a report.'); return false; }") !== false && strpos($pr, "var locked = !_repoTagHeld(t);") !== false, 'a closed vocabulary; a non-admin adds or removes only the tags they hold, the others sit locked');
+    ok(strpos($pr, "url: 'manage_report_tags.php', type: 'POST', contentType: 'application/json',") !== false && strpos($pr, "data: JSON.stringify({ short_id: report.SHORT_ID, tags: want, tags_base: have }), dataType: 'json'") !== false && strpos($pr, "report.TAGS = Array.isArray(resp.tags) ? resp.tags : want;") !== false && strpos($pr, "var \$td = \$r.find('td[data-col=\"TAGS\"]');") !== false, 'Save posts the whole list; the pane and the list\'s Tags cell follow the answer');
+    ok(strpos($pr, "_srDetailReport = report;") !== false && strpos($pr, "else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); back(); }") !== false, 'the renderer remembers the report it shows; Escape puts the row back');
+}
+
+
+// ---------------------------------------------- 20. Tags tool round 12 (2026-10-10): three equal kind toggles, no search help, owner shortcuts
+echo "20. the Tags tool, round 12\n";
+if ($pt !== '' && is_file($pt)) {
+    $pg = php_strip_whitespace($pt);
+    ok(strpos($pg, 'data-kind="all"') === false && strpos($pg, 'data-kind="both"') === false && strpos($pg, '<button type="button" class="pnb-log-tab" data-kind="people" aria-pressed="false"') !== false && strpos($pg, '<button type="button" class="pnb-log-tab" data-kind="reports" aria-pressed="false"') !== false && strpos($pg, '<button type="button" class="pnb-log-tab" data-kind="dashboards" aria-pressed="false"') !== false, 'the catalog filters by three equal toggles: People, Reports, Dashboards; All and Both are gone');
+    ok(strpos($pg, 'var kinds = { people: false, reports: false, dashboards: false, values: false };') !== false && strpos($pg, 'kinds[kk] = !kinds[kk];') !== false && strpos($pg, 'if (k.people) ok = ok && p > 0;') !== false && strpos($pg, 'if (k.dashboards) ok = ok && d > 0;') !== false && strpos($pg, 'if (k.values) ok = ok && v > 0;') !== false && strpos($pg, "else if (k === 'both')") === false, 'each toggle narrows; several on = the tags carrying all of them');
+    ok(strpos($pg, "if (m) { q = m[2]; if (m[1] === 'both') { k.people = true; k.reports = true; } else { k[m[1]] = true; } }") !== false && strpos($pg, "if (pm) { if (pm[1] === 'both') { kinds.people = true; kinds.reports = true; } else { kinds[pm[1]] = true; }") !== false, 'a typed prefix sets the same toggles (both: = People + Reports) and a pill click absorbs it first');
+    ok(substr_count($pg, '<td><a href="#" class="flt" data-q="<?php echo $h(strtolower(trim((string)$u[\'OWNER_ID\']))); ?>"') === 2 && strpos($pg, 'table.hist a.flt, table.members a.flt {') !== false, 'the Owner column of both Untagged lists is a shortcut into the search box');
+}
+
+
+// ---------------------------------------------- 21. Tags tool round 13 (2026-10-10): the kind strip reads as a filter; the account form is a lightbox
+echo "21. the Tags tool, round 13\n";
+if ($pt !== '' && is_file($pt)) {
+    $pg = php_strip_whitespace($pt);
+    ok(strpos($pg, '<span class="seg-lbl" id="kindLbl">') !== false && strpos($pg, 'Carried by</span>') !== false && strpos($pg, '#kindSeg { display: inline-flex; gap: 0; flex-wrap: nowrap; border: 1px solid var(--border-color); border-radius: 999px;') !== false && strpos($pg, 'body.pnb-adm #kindSeg .pnb-log-tab.on::before { content: "\2713\00a0"; }') !== false, 'the kind strip reads as a filter: a funnel label, a segmented pill group, an on pill filled and ticked');
+    ok(strpos($pg, '<div class="help-lightbox" id="acctLightbox" role="dialog" aria-modal="true" aria-labelledby="acctTitle" hidden>') !== false && strpos($pg, '<h3 class="pnb-dlg-title" id="acctTitle"><?php echo $acctEdit ? \'Edit \' . $h($acctEdit[\'EMAIL\']) : \'Register an account\'; ?></h3>') !== false && strpos($pg, 'id="acctNewBtn"') !== false && strpos($pg, '<button type="button" class="secondary" id="acctCancel">Cancel</button>') !== false, 'Register / Edit an account is the app\'s lightbox, opened from the card\'s button');
+    ok(strpos($pg, 'function openAcct()') !== false && strpos($pg, 'function closeAcct()') !== false && strpos($pg, "if (ACCT_EDIT || window.location.hash === '#register') openAcct();") !== false && strpos($pg, "window.addEventListener('hashchange', function () { if (window.location.hash === '#register') openAcct(); });") !== false && strpos($pg, "if (ACCT_EDIT) { window.location.href = 'tags_admin.php?view=accounts'; return; }") !== false && strpos($pg, "if (e.key === 'Escape' && acctBox && !acctBox.hidden)") !== false, 'an Edit link opens it on load; closing an Edit returns to the plain list; Escape, Cancel, the x and the backdrop close it');
+    $iAcc = strpos($pg, "<?php elseif (\$view === 'accounts'): ?>"); $acc = $iAcc === false ? '' : substr($pg, $iAcc);
+    ok($iAcc !== false && strpos($acc, '<aside class="rail">') === false && strpos($acc, '<div class="layout">') === false && substr_count($pg, "', true); ?></span>") === 0, 'the accounts list spans its card (no rail); the field marks open rightward inside the lightbox');
+}
+
+
+// ---------------------------------------------- 22. the repository's tag pills and the inline editor, round 2 (2026-10-09)
+echo "22. the repository's tag pills, the editor keeps the held tags\n";
+$rep22 = isset($argv[11]) ? $argv[11] : '';
+$mcs22 = isset($argv[19]) ? $argv[19] : '';
+$rcs22 = isset($argv[20]) ? $argv[20] : '';
+if ($rep22 !== '' && is_file($rep22)) {
+    $pr22 = file_get_contents($rep22);
+    $iIn = strpos($pr22, '$ed.append($in);'); $iHave = strpos($pr22, 'have.forEach(addPill);');
+    ok($iIn !== false && $iHave !== false && $iIn < $iHave, 'the input joins the editor BEFORE the held tags are seated in front of it (detached, it swallowed them, and a Save then dropped them)');
+    ok(strpos($pr22, "\$cell.attr('colspan', 2).siblings('td.repo-kv-link').hide();") !== false, 'the open editor takes the link column too (the value column alone is ~90px in a 400px pane)');
+}
+if ($mcs22 !== '' && is_file($mcs22)) {
+    $mc22 = file_get_contents($mcs22);
+    ok(strpos($mc22, '.repo-tag-pill { display: inline-block; padding: 1px 5px; border-radius: 9px; font-family: inherit; font-size: 9px; font-weight: 600; letter-spacing: .02em; line-height: 1.35; white-space: nowrap; cursor: pointer;') !== false, 'the list pill: 9px on 1px 5px, a tick under its 10px, never broken mid-word');
+}
+if ($rcs22 !== '' && is_file($rcs22)) {
+    $rc22 = file_get_contents($rcs22);
+    ok(strpos($rc22, '#serverReportDetailsPane .repo-tag-pill { font-size: 9.5px; padding: 1px 6px; line-height: 1.3; white-space: nowrap; overflow-wrap: normal; }') !== false, 'the pane pill: a shade under the list pill, never broken mid-word by the cell');
+    ok(strpos($rc22, '#serverReportDetailsPane .repo-tag-editor .access-capsule.report-tag { gap: 3px; font-size: 10px; padding: 1px 7px; border-radius: 12px; }') !== false && strpos($rc22, '#serverReportDetailsPane .repo-tag-editor .access-capsule .remove-access { font-size: 11px; margin-left: 3px; }') !== false, 'the editor pills: 10px with an 11px x, a step under the Save As dialog');
+    ok(strpos($rc22, '#serverReportDetailsPane .repo-tag-actions button { font: inherit; font-size: 11px; padding: 2px 9px; border-radius: 4px; cursor: pointer; line-height: 1.4; white-space: nowrap; }') !== false && strpos($rc22, 'input.repo-tag-input { flex: 1 1 90px; min-width: 90px;') !== false, 'Save / Cancel never letter-wrap; the input asks for 90px');
+}
+
+
+// ---------------------------------------------- 23. the bug sweep (2026-10-09): the shared write rules, the gates, the clients
+echo "23. the bug sweep: merge, cap, vocabulary, the gates, the clients\n";
+if (!function_exists('penumbraReportTagsMerge')) { ok(false, 'the shared write rules exist (penumbraReportTagsMerge / OverCap / Unknown): a pre-sweep library'); }
+else {
+eq(penumbraReportTagsMerge(array('A', 'B', 'C'), array('A', 'B'), array('A', 'B', 'D')), array('A', 'B', 'C', 'D'), 'merge: an add from the base joins; a tag added elsewhere (C) stays');
+eq(penumbraReportTagsMerge(array('A', 'B', 'C'), array('A', 'B', 'C'), array('A', 'C')), array('A', 'C'), 'merge: a removal from the base removes');
+eq(penumbraReportTagsMerge(array('A', 'C'), array('A', 'B', 'C'), array('A', 'B', 'C')), array('A', 'C'), 'merge: a tag removed elsewhere stays removed when the client did not touch it');
+eq(penumbraReportTagsMerge(array('A'), null, array('B')), array('B'), 'merge: no base = the posted list is the whole list');
+eq(penumbraReportTagsOverCap(array_map(function ($i) { return 'T' . $i; }, range(1, 21))), true, 'over the cap: 21 distinct names');
+eq(penumbraReportTagsOverCap(array_merge(array_map(function ($i) { return 'T' . $i; }, range(1, 20)), array('t1'))), false, 'at the cap: 20 distinct names (a duplicate is not a 21st)');
+eq(penumbraReportTagsUnknown(array('A', 'B'), array('a')), array('B'), 'unknown names: judged case-blind against the vocabulary');
+$ch23 = 0;
+eq(penumbraTagGrantsRepoint(array('u' => array(array('tag' => 'A'), array('tag' => 'B', 'scheduler' => true), array('pattern' => 'X*'))), 'A', 'B', $ch23),
+   array('u' => array(array('tag' => 'B', 'scheduler' => true), array('pattern' => 'X*'))), 'repoint: one grant per name, the scheduler verb kept, other grants untouched');
+eq($ch23, 1, 'repoint: the count says one grant moved');
+}
+$ss23 = isset($argv[5]) ? $argv[5] : ''; $del23 = isset($argv[6]) ? $argv[6] : ''; $res23 = isset($argv[7]) ? $argv[7] : ''; $idx23 = isset($argv[8]) ? $argv[8] : '';
+$mjs23 = isset($argv[9]) ? $argv[9] : ''; $gsr23 = isset($argv[10]) ? $argv[10] : ''; $rep23 = isset($argv[11]) ? $argv[11] : ''; $mdb23 = isset($argv[15]) ? $argv[15] : '';
+$dsh23 = isset($argv[16]) ? $argv[16] : ''; $djs23 = isset($argv[17]) ? $argv[17] : ''; $mrt23 = isset($argv[18]) ? $argv[18] : ''; $lnd23 = isset($argv[21]) ? $argv[21] : '';
+$rd23 = function ($p) { return ($p !== '' && is_file($p)) ? file_get_contents($p) : ''; };
+$s = $rd23($ss23); if ($s !== '') {
+    ok(strpos($s, "\$tags_base = (\$tags_posted && isset(\$data['tags_base'])") !== false && strpos($s, 'penumbraReportTagsMerge($tags_before, $tags_base, $tags)') !== false, 'Save As: the dialog posts the list it started from and only its own changes move');
+    ok(strpos($s, "throw new Exception('A report carries at most ' . PENUMBRA_REPORT_TAG_PER_REPORT . ' tags.');") !== false && strpos($s, "' exists yet. New tags start in the Tags tool.');") !== false, 'Save As: the cap and an unknown name are refused out loud');
+    ok(strpos($s, "'via' => 'save', 'short_id' => \$shortId") !== false, 'Save As: the audit rows name the short id (the restore re-points them)');
+    ok(strpos($s, '"$t: tagged $label [Save As]"') !== false && strpos($s, '"$t: removed from $label [Save As]"') !== false && strpos($s, 'penumbraReportTagLabel($title, $short_id));') !== false, 'Save As: the audit rows name the report, like the Tags tool and the pane');
+}
+$s = $rd23($mrt23); if ($s !== '') {
+    ok(strpos($s, 'penumbraReportTagsMerge($have, $base, $want)') !== false && strpos($s, "(you hold no grant on them).', 'tags' => \$have));") !== false, 'the pane endpoint: a three-way merge, and a refusal returns the list as it is now');
+}
+$s = $rd23($res23); if ($s !== '') {
+    ok(strpos($s, "                if (is_array(\$rtSnap) && isset(\$rtSnap['tags']) && is_array(\$rtSnap['tags'])) {") !== false && strpos($s, "'via' => 'restore', 'short_id' => \$short_id") !== false, 'restore: the tags come from the DELETE snapshot and are audited');
+    ok(strpos($s, 'penumbraReportTagLabel($title, $short_id) . " [Restore]"') !== false, 'restore: the audit row names the report');
+    ok(strpos($s, 'array_intersect($heldNames, penumbraReportTagsClean($lnSnap[\'tags\'], PHP_INT_MAX))') !== false, 'restore: a held tag on the snapshot lets a tag-grant holder undo their delete');
+}
+$s = $rd23($del23); if ($s !== '') { ok(strpos($s, "            'tags'       => \$before_tags,") !== false, 'delete: the handback carries the tags (an Undelete posts it straight back)'); }
+$s = $rd23($gsr23); if ($s !== '') {
+    ok(strpos($s, '            $sql .= " OR EXISTS (SELECT 1 FROM PENUMBRA_REPORT_TAGS gt WHERE gt.REPORT_ID = r.ID AND gt.TAG IN (" . implode(\', \', $ph) . "))";') !== false && strpos($s, ':auth_gp') !== false, 'the feed: a grant is a reach the list shows (held tags, patterns)');
+    ok(strpos($s, '$whereS = "WHERE 1=0" . $auth2[\'sql\'];') !== false && strpos($s, '$tagNone = (') !== false, 'the feed: tag: with no usable name lists nothing');
+}
+$s = $rd23($mdb23); if ($s !== '') {
+    ok(strpos($s, '    return $grants !== null && dashCanEdit($row, $userKey, $isAdmin, $grants);') !== false && strpos($s, 'dashCanView($row, $currentUserKey, $isAdmin, $user_ouc, $userGrants)') !== false, 'dashboards: a tag-grant editor sees what they may edit');
+    ok(strpos($s, '&& !penumbraDashboardTagGrantMatches($userGrants, $sid)) {   // a tag-grant holder is owner-equivalent here too') !== false && strpos($s, "'tags_failed' => \$tagsFailed !== ''") !== false && strpos($s, 'penumbraReportTagsMerge($tagsBefore, $tagsBase, $tags)') !== false, 'dashboards: delete for a tag-grant holder, a merge, the tags-failed answer');
+}
+$s = $rd23($dsh23); if ($s !== '') { ok(strpos($s, 'penumbraDashboardTagGrantMatches($userGrants, $dash[\'SHORT_ID\']));   // a tag-grant editor sees what they may edit') !== false, 'dashboard page: the view gate takes a tag grant'); }
+$s = $rd23($mjs23); if ($s !== '') {
+    ok(strpos($s, "        if (e.target.id === 'reportTagsInput') {") !== false, 'Save As: Enter in the Tags box commits the tag, never the save');
+    ok(strpos($s, "$('#reportTagsContainer .access-capsule.report-tag.locked').remove(); syncReportTagsHidden();") !== false && strpos($s, 'tags_base: Array.isArray(penumbra_vars.reportTags)') !== false && strpos($s, "_commitTypedTag();   // a typed tag not yet a pill") !== false, 'Save As: a copy drops locked pills, the base is posted, a typed tag joins before the save');
+}
+$s = $rd23($djs23); if ($s !== '') { ok(strpos($s, 'tags: Array.isArray(r.tags) ? r.tags.slice() : []') !== false && strpos($s, 'tags_base: Array.isArray(META.tagsBase)') !== false && strpos($s, "say('A dashboard carries at most 20 tags.')") !== false, 'dashboard page: the hop keeps the tags, the base is posted, the pillbox stops at 20'); }
+$s = $rd23($rep23); if ($s !== '') {
+    ok(strpos($s, 'tags_base: have }') !== false && strpos($s, 'if (_srPreSearchRows) { _srPreSearchRows.each(patchRow); }') !== false && strpos($s, 'if (_srDetailReport === report) { renderServerReportDetails(report); }') !== false, 'the pane editor: the base is posted, the stashed rows follow a save, the pane never flips back');
+    ok(strpos($s, "if (!(Array.isArray(penumbra_vars.tagGrants) && penumbra_vars.tagGrants.length)) { return false; }") !== false && strpos($s, 'if ($tagEd.length) { var $tagCancel = $tagEd.closest(\'td\').find(\'.repo-tag-cancel\');') !== false, 'the pane editor: no pencil without a tag grant; Escape puts the row back');
+}
+$s = $rd23($lnd23); if ($s !== '') { ok(strpos($s, "var tm = (q || '').match(/^tag:") !== false && strpos($s, "rows[i].getAttribute('data-tags')") !== false, 'the home filter: tag:NAME is a whole tag'); }
+$s = $rd23($idx23); if ($s !== '') { ok(strpos($s, 'penumbraTagsVocabularyRead($pnbVocConn)') !== false && strpos($s, "fetchAll(PDO::FETCH_COLUMN), PHP_INT_MAX);   // uncapped, like the save") !== false, 'the report page: the three-kind vocabulary, the pills preloaded uncapped'); }
+
+
+echo "\nPASS: $PASS   FAIL: $FAIL\n";
+echo 'RESULT: ' . ($FAIL === 0 ? 'GREEN' : 'RED') . "\n";

@@ -1,0 +1,1820 @@
+// togglefix suite - browser half (2026-10-07). Runs ONE scenario (?scn=) against the
+// main.js / main.css / penumbra_journal.js the page loaded and publishes
+//   window.__JRRESULT = { scn, asserts: [{id, ok, detail}], errors: [...] }
+// and window.__JRDONE = true. run.py collects and prints the asserts.
+//   V-*  how a box is painted (dark themes, Wolfpack Red's hover)
+//   K-*  the saved key and toggle setup: journal-off save/restore, a key column the
+//        data lacks, a key too long to store
+//   J-*  a save under another id switches the journal to that report
+//   P-*  preconditions (they pass on every build: the fixture is sound)
+// Hovering needs a REAL pointer: the page asks (window.__hoverReq) and run.py moves
+// the mouse there over CDP.
+(function () {
+  var JR = window.__JR || {};
+  var SCN = window.__SCN;
+  var FX = window.__rowsFixture;
+  var SEP = window.__SEP;
+  var R = { scn: SCN, asserts: [] };
+  function rec(id, ok, detail) { R.asserts.push({ id: id, ok: !!ok, detail: String(detail == null ? '' : detail) }); }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function hides() { return window.__JR_HIDES || 0; }
+  async function until(fn, ms) { var t = Date.now(); while (!fn() && Date.now() - t < ms) await sleep(20); return fn(); }
+  function clickEl(el) { el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); }
+  function tb() { return document.getElementById('resultsTable'); }
+  function findBox(scope, k) {
+    var bs = (scope || document).querySelectorAll('.journal-toggle-box');
+    for (var i = 0; i < bs.length; i++) if (bs[i].getAttribute('data-row-key') === k) return bs[i];
+    return null;
+  }
+  function boxWhere(scope, isOn) {
+    var bs = scope.querySelectorAll('.journal-toggle-box');
+    for (var i = 0; i < bs.length; i++) if (bs[i].classList.contains('is-on') === isOn && !bs[i].disabled) return bs[i];
+    return null;
+  }
+  function clear(c) { return c === 'transparent' || /^rgba\(\s*0,\s*0,\s*0,\s*0\s*\)$/.test(c); }
+  function paint(b) {
+    var cs = getComputedStyle(b), sv = b.querySelector('svg');
+    return 'color ' + cs.color + ', stroke ' + (sv ? getComputedStyle(sv).stroke : '-') + ', background ' + cs.backgroundColor;
+  }
+  function uncheckedLooksEmpty(b) {
+    var cs = getComputedStyle(b), sv = b.querySelector('svg');
+    return clear(cs.color) && (!sv || clear(getComputedStyle(sv).stroke));
+  }
+  function toggleTh() { return document.querySelector('#tableHeader th[data-column="__JOURNAL_TOGGLE__toggle1"]'); }
+  function notesTh() { return document.querySelector('#tableHeader th[data-column="__JOURNAL_NOTES"]'); }
+  function noteCountOf(scope, k) {
+    var bs = scope.querySelectorAll('.journal-notes-btn');
+    for (var i = 0; i < bs.length; i++) {
+      if (bs[i].getAttribute('data-row-key') !== k) continue;
+      var c = bs[i].querySelector('.journal-notes-count');
+      return c ? c.textContent.trim() : '';
+    }
+    return null;
+  }
+  function log() { return window.__ajaxLog; }
+  function has(list, s) { for (var i = 0; i < list.length; i++) if (list[i].indexOf(s) >= 0) return true; return false; }
+  function count(list, s) { var n = 0; for (var i = 0; i < list.length; i++) if (list[i].indexOf(s) >= 0) n++; return n; }
+  function lockShown() { var el = document.getElementById('journalRowCfgLock'); return !!(el && el.style.display !== 'none' && el.textContent.trim()); }
+  function chip(col) {
+    var cbs = document.querySelectorAll('#journalKeyColumnsBox .journal-keycol-cb');
+    for (var i = 0; i < cbs.length; i++) if (cbs[i].value === col) return cbs[i];
+    return null;
+  }
+  function tick(col, on) {
+    var cb = chip(col);
+    if (!cb) return false;
+    if (cb.checked !== on) { cb.checked = on; $(cb).trigger('change'); }
+    return true;
+  }
+  function toast() {
+    return ((document.getElementById('action_overlay') || {}).textContent || '') + ' ' + ((document.getElementById('undo_text_container') || {}).textContent || '');
+  }
+  var _hn = 0;
+  async function hoverOver(el) {
+    if (!el) return false;
+    _hn++;
+    el.setAttribute('data-tf-hover', String(_hn));
+    el.scrollIntoView({ block: 'center' });
+    await sleep(60);
+    window.__hoverReq = { n: _hn, sel: '[data-tf-hover="' + _hn + '"]' };
+    var ok = await until(function () { return window.__hoverDone === _hn; }, 8000);
+    await sleep(200);
+    return ok;
+  }
+  async function boot() {
+    await until(function () { return window.__queryDone >= 1 && hides() >= 1; }, 60000);
+    await sleep(300);
+    await until(function () { return !window.__jPending; }, 15000);
+    await sleep(700);
+  }
+
+  var S = {};
+  // ---- F1: an UNCHECKED box shows no check on a dark theme (and the checked one stays green)
+  S.dark = async function () {
+    var dark = document.body.classList.contains('is-dark');
+    rec('P-dark-theme', dark && !!boxWhere(tb(), false) && !!boxWhere(tb(), true),
+        'body.is-dark ' + dark + ', theme ' + document.body.getAttribute('data-theme') + ', boxes ' + tb().querySelectorAll('.journal-toggle-box').length);
+    var off = boxWhere(tb(), false), on = boxWhere(tb(), true);
+    rec('V-dark-off', !!off && uncheckedLooksEmpty(off), off ? paint(off) : 'no unchecked box');
+    var co = on ? getComputedStyle(on) : null;
+    rec('V-dark-on', !!on && !clear(co.backgroundColor) && !clear(co.color) && (!off || co.backgroundColor !== getComputedStyle(off).backgroundColor),
+        on ? paint(on) : 'no checked box');
+  };
+  // Saved grouped, so the boxes are the grouped view's copies.
+  S.darkgrp = async function () {
+    var gc = document.getElementById('groupedResultsContainer');
+    var n = gc.querySelectorAll('.journal-toggle-box').length;
+    rec('P-darkgrp-grouped', $(gc).is(':visible') && n > 0 && document.body.classList.contains('is-dark'), 'grouped view shown ' + $(gc).is(':visible') + ', boxes in it ' + n);
+    var off = boxWhere(gc, false);
+    rec('V-darkgrp-off', !!off && uncheckedLooksEmpty(off), off ? paint(off) : 'no unchecked box in the grouped view');
+  };
+  // ---- F1: Wolfpack Red's blanket button hover must not fill a box red
+  S.wolf = async function () {
+    var off = boxWhere(tb(), false);
+    var ok1 = await hoverOver(off);
+    var hov = !!off && off.matches(':hover');
+    rec('P-wolf-hover', ok1 && hov && document.body.classList.contains('theme-wolfpack'),
+        'pointer moved ' + ok1 + ', :hover ' + hov + ', body ' + document.body.className);
+    rec('V-wolf-hover', hov && uncheckedLooksEmpty(off) && getComputedStyle(off).backgroundColor !== 'rgb(179, 0, 0)', off ? paint(off) : '-');
+    // A ticked box under the pointer still reads as ticked: its own fill (not the
+    // theme's red, not an unticked box's) with a visible check.
+    var on = boxWhere(tb(), true);
+    var ok2 = await hoverOver(on);
+    var co = on ? getComputedStyle(on) : null;
+    var ref = Array.prototype.filter.call(tb().querySelectorAll('.journal-toggle-box'), function (b) { return !b.classList.contains('is-on') && b !== off; })[0];
+    var refBg = ref ? getComputedStyle(ref).backgroundColor : '';
+    rec('V-wolf-onhover', ok2 && !!on && on.matches(':hover') && co.backgroundColor !== 'rgb(179, 0, 0)' && !clear(co.backgroundColor)
+        && co.backgroundColor !== refBg && !clear(co.color),
+        on ? (paint(on) + ' | an unticked box: ' + refBg) : 'no checked box');
+  };
+  // ---- F6: saved with the journal OFF, the key / toggle / row notes survive
+  S.offsave = async function () {
+    rec('P-off-hidden', window._penumbraJournalHidden === true && !toggleTh() && !notesTh(),
+        'hidden ' + window._penumbraJournalHidden + ', toggle column ' + !!toggleTh() + ', notes column ' + !!notesTh());
+    var t = window._penumbraJournalToggles || [], k = window._penumbraJournalKeyColumns || [];
+    rec('K-off-restored', t.length === 1 && t[0].key === 'toggle1' && t[0].label === 'Reviewed' && k.join('|') === 'PROTOCOL NO.|PROTOCOL TYPE'
+        && window._penumbraJournalRowNotes === true,
+        'toggles ' + JSON.stringify(t) + ', key ' + JSON.stringify(k) + ', row notes ' + window._penumbraJournalRowNotes);
+    // An administrator's peek at the journal-off report: notes only, no Toggle History tab.
+    var wrapShown = $('#journalBtnWrap').is(':visible');
+    clickEl(document.getElementById('journalBtn'));
+    var opened = await until(function () { return !!window.PenumbraJournal && $('#journalLightbox').is(':visible'); }, 8000);
+    await sleep(400);
+    var tabShown = $('#journalTabBtnHistory').length ? $('#journalTabBtnHistory').css('display') !== 'none' : null;
+    rec('K-off-tab', wrapShown && opened && tabShown === false, 'J button shown ' + wrapShown + ', panel opened ' + opened + ', Toggle History tab shown ' + tabShown);
+    $('#journalLightbox').hide();
+    // Switched on in View Options: the saved setup comes back, marks and notes with it.
+    var cb = document.getElementById('viewOptionJournal');
+    cb.checked = true; $(cb).trigger('change');
+    await until(function () { return !!toggleTh() && !!notesTh(); }, 8000);
+    await sleep(900);
+    var b3 = findBox(tb(), window.__MARKED[0]), b5 = findBox(tb(), window.__MARKED[1]);
+    var nc = noteCountOf(tb(), window.__MARKED[0]);
+    rec('K-off-turnon', !!toggleTh() && !!b3 && b3.classList.contains('is-on') && !!b5 && b5.classList.contains('is-on') && !!notesTh() && nc === '2',
+        'toggle column ' + !!toggleTh() + ', row 3 on ' + !!(b3 && b3.classList.contains('is-on')) + ', row 23 on ' + !!(b5 && b5.classList.contains('is-on'))
+        + ', notes column ' + !!notesTh() + ', row 3 note count ' + JSON.stringify(nc) + ', row notes ' + window._penumbraJournalRowNotes);
+    // Saved again with it OFF: the setup rides along, journalEnabled does not.
+    cb.checked = false; $(cb).trigger('change');
+    await sleep(300);
+    window._penumbraJournalKeyColumns = ['PROTOCOL NO.', 'PROTOCOL TYPE'];
+    window._penumbraJournalToggles = [{ key: 'toggle1', label: 'Reviewed' }];
+    window._penumbraJournalRowNotes = true;
+    var st = JR.buildStateObject ? JR.buildStateObject() : null;
+    var vo = (st && st.viewOptions) || {};
+    rec('K-off-save', !!st && !vo.journalEnabled && (vo.journalKeyColumns || []).join('|') === 'PROTOCOL NO.|PROTOCOL TYPE'
+        && (vo.journalToggles || []).length === 1 && vo.journalToggles[0].key === 'toggle1' && vo.journalRowNotes === true,
+        st ? 'viewOptions ' + JSON.stringify(vo) : 'buildStateObject gave nothing');
+  };
+  // ---- F7: a save under another id switches everything to that report
+  S['switch'] = async function () {
+    var b3 = findBox(tb(), window.__MARKED[0]), b5 = findBox(tb(), window.__MARKED[1]);
+    rec('P-sw-marks', !!b3 && b3.classList.contains('is-on') && !!b5 && b5.classList.contains('is-on') && window.Penumbra.journalReportId === 'jrfix',
+        'rows 3 / 23 on ' + !!(b3 && b3.classList.contains('is-on')) + ' / ' + !!(b5 && b5.classList.contains('is-on')) + ', report ' + window.Penumbra.journalReportId);
+    var api = !!(window.Penumbra && typeof window.Penumbra.journalSwitchReport === 'function');
+    rec('J-sw-api', api, api ? 'journalSwitchReport present' : 'no window.Penumbra.journalSwitchReport');
+    var later = ['J-sw-marks', 'J-sw-badge', 'J-sw-hist', 'J-sw-click', 'J-sw-gate', 'J-sw-stale'];
+    if (!api) { later.forEach(function (id) { rec(id, false, 'no journalSwitchReport'); }); return; }
+    // Row 3's hover history, cached under the original report.
+    $(b3).trigger('focus');
+    await sleep(700);
+    var h1 = count(log(), 'action=toggle_history&report_id=jrfix');
+    $(b3).trigger('blur');
+    await sleep(250);
+    var n0 = log().length;
+    window.Penumbra.journalSwitchReport('jrcopy');
+    await sleep(500);
+    var since = log().slice(n0), onNow = tb().querySelectorAll('.journal-toggle-box.is-on').length;
+    rec('J-sw-marks', window.Penumbra.journalReportId === 'jrcopy' && onNow === 0 && has(since, 'action=toggles&report_id=jrcopy')
+        && has(since, 'action=row_notes&report_id=jrcopy') && noteCountOf(tb(), window.__MARKED[0]) === '',
+        'report ' + window.Penumbra.journalReportId + ', boxes on ' + onNow + ', row 3 note count ' + JSON.stringify(noteCountOf(tb(), window.__MARKED[0]))
+        + ', requests ' + since.map(function (u) { return u.split('?')[1] || u; }).join(' ; ').slice(0, 300));
+    rec('J-sw-badge', has(since, 'action=summary&report_id=jrcopy') && !has(since, 'action=summary&report_id=jrfix'),
+        'summary requests after the switch: ' + since.filter(function (u) { return u.indexOf('action=summary') >= 0; }).join(' ; '));
+    // The same row's history is asked for again - for the copy.
+    var c3 = findBox(tb(), window.__MARKED[0]), n1 = log().length;
+    $(c3).trigger('focus');
+    await sleep(700);
+    $(c3).trigger('blur');
+    rec('J-sw-hist', h1 >= 1 && has(log().slice(n1), 'action=toggle_history&report_id=jrcopy'),
+        'original history fetches ' + h1 + '; after the switch: ' + log().slice(n1).join(' ; ').slice(0, 200));
+    // A tick writes to the copy.
+    var p1 = window.__J.posts.length, p2 = window.__J2.posts.length;
+    clickEl(findBox(tb(), window.__MARKED[0]));
+    await sleep(400);
+    var post = window.__J2.posts[window.__J2.posts.length - 1], d3 = findBox(tb(), window.__MARKED[0]);
+    rec('J-sw-click', window.__J.posts.length === p1 && window.__J2.posts.length === p2 + 1 && !!post && post.report_id === 'jrcopy'
+        && !!d3 && d3.classList.contains('is-on'),
+        'original posts +' + (window.__J.posts.length - p1) + ', copy posts +' + (window.__J2.posts.length - p2) + ', last ' + JSON.stringify(post));
+    // Switching the journal on would count (and offer to delete) the COPY's notes.
+    window._penumbraJournalWasOnAtLoad = false;
+    var n2 = log().length, done = null;
+    window.Penumbra.journalPublishGate(function () { done = 'proceed'; }, function () { done = 'cancel'; });
+    await sleep(300);
+    var g = log().slice(n2);
+    rec('J-sw-gate', done === 'proceed' && has(g, 'action=summary&report_id=jrcopy') && !has(g, 'report_id=jrfix'),
+        'gate ' + done + ', requests ' + g.join(' ; '));
+    // An answer for a report the page has already left does not land: jrfix answers
+    // 400 ms late, jrcopy2 at once. jrcopy2 shares the copies' store (row 3, ticked
+    // above); row 23 is marked on jrfix alone, and row 3's 2 notes are jrfix's.
+    var wantOn = Object.keys((window.__J2.toggles && window.__J2.toggles.toggle1) || {}).length;
+    window.Penumbra.journalSwitchReport('jrfix');
+    await sleep(20);
+    window.Penumbra.journalSwitchReport('jrcopy2');
+    await sleep(1100);
+    var onEnd = tb().querySelectorAll('.journal-toggle-box.is-on').length, ncEnd = noteCountOf(tb(), window.__MARKED[0]);
+    var e5 = findBox(tb(), window.__MARKED[1]);
+    rec('J-sw-stale', window.Penumbra.journalReportId === 'jrcopy2' && onEnd === wantOn && !!e5 && !e5.classList.contains('is-on') && ncEnd === '',
+        'report ' + window.Penumbra.journalReportId + ', boxes on ' + onEnd + ' (the copies\' store has ' + wantOn + '), row 23 on '
+        + !!(e5 && e5.classList.contains('is-on')) + ', row 3 note count ' + JSON.stringify(ncEnd));
+  };
+  // ---- F8: a saved key column the data no longer has
+  S.missing = async function () {
+    if (window.Penumbra && window.Penumbra.syncJournalRowConfigUI) window.Penumbra.syncJournalRowConfigUI();
+    await sleep(150);
+    rec('K-miss-off', !toggleTh() && !tb().querySelector('.journal-toggle-box'), 'toggle column ' + !!toggleTh());
+    var note = $('#journalKeyUniqueNote').text().replace(/\s+/g, ' ').trim();
+    rec('K-miss-note', /no GONE column/.test(note), note);
+    var cb = chip('GONE'), lab = cb ? cb.closest('.journal-keycol-chip') : null;
+    rec('K-miss-chip', !!cb && cb.checked && !!lab && lab.classList.contains('is-missing') && /not in this data/.test(lab.textContent),
+        cb ? ('checked ' + cb.checked + ', class ' + lab.className + ', text "' + lab.textContent + '"') : 'no GONE chip');
+    var lock = $('#journalRowCfgLock').text();
+    rec('K-miss-lock', lockShown() && /every key column in step 1 is in the data/.test(lock), 'lock shown ' + lockShown() + ' "' + lock + '"');
+    window.Penumbra.journalBulkAction('mark', {});
+    await sleep(150);
+    var tt = toast();
+    rec('K-miss-bulk', /GONE is not in this data/.test(tt), tt.replace(/\s+/g, ' ').slice(-220));
+    // Unticked on purpose: the two-column key works again, marks and all.
+    var unt = tick('GONE', false);
+    await until(function () { return !!toggleTh(); }, 6000);
+    await sleep(900);
+    var b3 = findBox(tb(), window.__MARKED[0]);
+    rec('K-miss-untick', unt && !!b3 && b3.classList.contains('is-on') && (window._penumbraJournalKeyColumns || []).join('|') === 'PROTOCOL NO.|PROTOCOL TYPE',
+        'unticked ' + unt + ', row 3 on ' + !!(b3 && b3.classList.contains('is-on')) + ', key ' + JSON.stringify(window._penumbraJournalKeyColumns));
+  };
+  // ---- C7: a key over the 1,000 bytes the journal stores
+  S.longkey = async function () {
+    if (window.Penumbra && window.Penumbra.syncJournalRowConfigUI) window.Penumbra.syncJournalRowConfigUI();
+    await sleep(150);
+    var all = tb().querySelectorAll('.journal-toggle-box');
+    rec('P-long-active', !!toggleTh() && all.length === 36, 'toggle column ' + !!toggleTh() + ', boxes ' + all.length);
+    var r = FX[window.__LONGIDX];
+    var lk = r['PROTOCOL NO.'] + SEP + r['PROTOCOL TYPE'] + SEP + r['TITLE'];
+    var lb = findBox(tb(), lk);
+    var others = Array.prototype.filter.call(all, function (b) { return b !== lb && b.disabled; }).length;
+    rec('K-long-box', !!lb && lb.disabled && /1,000 bytes/.test(lb.getAttribute('title') || '') && others === 0,
+        lb ? ('disabled ' + lb.disabled + ', title "' + (lb.getAttribute('title') || '') + '", other disabled boxes ' + others) : 'no box for the long row');
+    var p0 = window.__J.posts.length;
+    if (lb) clickEl(lb);
+    await sleep(300);
+    var lb2 = findBox(tb(), lk);
+    rec('K-long-click', !!lb2 && window.__J.posts.length === p0 && !lb2.classList.contains('is-on'),
+        'posts +' + (window.__J.posts.length - p0) + ', on ' + !!(lb2 && lb2.classList.contains('is-on')));
+    var note = $('#journalKeyUniqueNote').text().replace(/\s+/g, ' ').trim();
+    rec('K-long-note', /1 row has a key longer than the 1,000 bytes/.test(note), note);
+  };
+
+  // ======================= ROUND B (2026-10-07): the cheap wins ==========================
+  //   R-*  the shared state stays current: refresh on focus, its 30 s throttle, a refresh
+  //        that changed nothing / that failed, a tick still saving; "Already marked by"
+  //   W-*  who / when beside a ticked box, the box's accessible name, the popover date
+  //   P2-* "Reviewed: 2 of 36" in the status bar          B-* bulk Undo
+  //   A-*  Arrow Up / Down between boxes (REAL keys over CDP)   C-* clearing another's mark
+  //   G-*  "Reviewed: Checked" bands      H-* Toggle History: "Me", jump to the row
+  //   T-*  the touch-size rule
+  var _kn = 0;
+  async function pressKeys(keys) {
+    _kn++;
+    window.__keyReq = { n: _kn, keys: keys };
+    var ok = await until(function () { return window.__keyDone === _kn; }, 8000);
+    await sleep(200);
+    return ok;
+  }
+  function keyOf(i) { return window.__keyOf(FX[i]); }
+  function cellOf(b) { return b ? b.closest('td') : null; }
+  function toggleReads() { return count(log(), 'action=toggles&'); }
+
+  S.refresh = async function () {
+    var K10 = keyOf(9), K5 = window.__MARKED[1], K3 = window.__MARKED[0], K12 = keyOf(11);
+    // Meanwhile a colleague marks row 10 and clears row 23.
+    window.__J.toggles.toggle1[K10] = { by: 'kim', at: '2026-10-07 08:15:00' };
+    delete window.__J.toggles.toggle1[K5];
+    var n0 = toggleReads();
+    window.dispatchEvent(new Event('focus'));
+    await sleep(300);
+    rec('R-refresh-throttle', toggleReads() === n0, 'reads after a focus within 30 s of the last: +' + (toggleReads() - n0));
+    var realNow = Date.now, shift = 0;
+    Date.now = function () { return realNow.call(Date) + shift; };
+    try {
+      shift += 31000;
+      window.dispatchEvent(new Event('focus'));
+      await sleep(500);
+      var b10 = findBox(tb(), K10), b5 = findBox(tb(), K5);
+      rec('R-refresh-focus', toggleReads() === n0 + 1 && !!b10 && b10.classList.contains('is-on') && !!b5 && !b5.classList.contains('is-on'),
+          'reads +' + (toggleReads() - n0) + ', row 10 on ' + !!(b10 && b10.classList.contains('is-on')) + ', row 23 on ' + !!(b5 && b5.classList.contains('is-on')));
+      var st1 = window._penumbraToggleState;
+      shift += 31000;
+      window.dispatchEvent(new Event('focus'));
+      await sleep(500);
+      rec('R-refresh-same', toggleReads() === n0 + 2 && window._penumbraToggleState === st1,
+          'reads +' + (toggleReads() - n0) + ', state kept as it was ' + (window._penumbraToggleState === st1));
+      window.__failToggles = true;
+      shift += 31000;
+      window.dispatchEvent(new Event('focus'));
+      await sleep(500);
+      window.__failToggles = false;
+      var b3 = findBox(tb(), K3), c10 = findBox(tb(), K10);
+      rec('R-refresh-fail', toggleReads() === n0 + 3 && !!b3 && b3.classList.contains('is-on') && !!c10 && c10.classList.contains('is-on'),
+          'reads +' + (toggleReads() - n0) + ', rows 3 / 10 still on ' + !!(b3 && b3.classList.contains('is-on')) + ' / ' + !!(c10 && c10.classList.contains('is-on')));
+      // A tick whose write is still out (700 ms) when a refresh answers (30 ms).
+      window.__tslow = 700;
+      clickEl(findBox(tb(), K12));
+      await sleep(60);
+      shift += 31000;
+      window.dispatchEvent(new Event('focus'));
+      await sleep(250);
+      var mid = findBox(tb(), K12);
+      rec('R-refresh-pending', toggleReads() === n0 + 4 && !!mid && mid.classList.contains('is-on'),
+          'reads +' + (toggleReads() - n0) + ', row 12 on while its write is out ' + !!(mid && mid.classList.contains('is-on')));
+      await sleep(900);
+    } finally { Date.now = realNow; window.__tslow = 0; window.__failToggles = false; }
+  };
+  S.already = async function () {
+    var K7 = keyOf(6), K5 = window.__MARKED[1];
+    window.__J.toggles.toggle1[K7] = { by: 'kim', at: '2026-10-07 08:15:00' };   // not on this page yet
+    var b7 = findBox(tb(), K7), pre = !!b7 && !b7.classList.contains('is-on');
+    clickEl(b7);
+    await sleep(400);
+    var a7 = findBox(tb(), K7), tt = toast(), st = window.__J.toggles.toggle1[K7];
+    rec('R-already', pre && !!a7 && a7.classList.contains('is-on') && /Already marked by kim/.test(tt) && !!st && st.by === 'kim'
+        && /kim/.test(a7.getAttribute('aria-label') || ''),
+        'shown unmarked first ' + pre + ', now on ' + !!(a7 && a7.classList.contains('is-on')) + ', label "' + (a7 && a7.getAttribute('aria-label')) + '", stored by '
+        + (st && st.by) + ', toast "' + tt.replace(/\s+/g, ' ').slice(-90) + '"');
+    // Row 23 shows lee's mark, which lee has since cleared.
+    delete window.__J.toggles.toggle1[K5];
+    window.__ZERO['toggle1|' + K5] = { by: 'lee', at: '2026-10-07 08:20:00' };
+    clickEl(findBox(tb(), K5));
+    await sleep(400);
+    var a5 = findBox(tb(), K5), tt2 = toast();
+    rec('R-already-clear', !!a5 && !a5.classList.contains('is-on') && /Already cleared by lee/.test(tt2) && window.__ZERO['toggle1|' + K5].by === 'lee',
+        'row 23 on ' + !!(a5 && a5.classList.contains('is-on')) + ', toast "' + tt2.replace(/\s+/g, ' ').slice(-90) + '"');
+  };
+  S.who = async function () {
+    var K3 = window.__MARKED[0], K12 = keyOf(11);
+    var c3 = cellOf(findBox(tb(), K3));
+    // (2026-10-08, the user: "drop the visible text, keep it on hover for now") No who / when
+    // beside a ticked box: no data-who, no ::after content, no text in the cell.
+    var n = tb().querySelectorAll('td.journal-toggle-col[data-who]').length;
+    var after = c3 ? getComputedStyle(c3, '::after').content : '';
+    rec('W-who-cells', !!c3 && n === 0 && (after === 'none' || after === 'normal' || after === '') && c3.textContent.trim() === '',
+        'cells with a who ' + n + ', row 3 ::after ' + JSON.stringify(after) + ', cell text "' + (c3 && c3.textContent.trim()) + '"');
+    var lbl = findBox(tb(), K3).getAttribute('aria-label') || '';
+    rec('W-who-aria', lbl === 'Reviewed, row 25403 · Exempt: Marked by pat · 2026-10-01 09:00:00 - click to clear'
+        && /^Reviewed, row 25412 · Exempt: Click to mark$/.test(findBox(tb(), K12).getAttribute('aria-label') || ''), lbl);
+    $(findBox(tb(), K3)).trigger('focus');
+    await sleep(700);
+    var sum = ($('#pnbToggleHistPop .journal-hist-summary').text() || '').trim();
+    $(findBox(tb(), K3)).trigger('blur');
+    rec('W-who-pop', /^Currently marked by pat on Oct 1, 2026 9:00 AM$/.test(sum), sum);
+    clickEl(findBox(tb(), K12));
+    await sleep(400);
+    // A fresh tick takes the server's maker and time (its answer), as the name says.
+    var l12 = findBox(tb(), K12).getAttribute('aria-label') || '';
+    rec('W-who-mine', l12 === 'Reviewed, row 25412 · Exempt: Marked by harness · 2026-10-07 12:00:00 - click to clear', l12);
+  };
+  function progText() { var s = document.getElementById('sbJournalProgress'); return s ? s.textContent.replace(/\s+/g, ' ').trim() : null; }
+  S.progress = async function () {
+    await sleep(300);
+    var seg = document.getElementById('sbJournalProgress');
+    rec('P2-prog-text', progText() === 'Reviewed: 2 of 36' && !!seg && !!seg.previousElementSibling && seg.previousElementSibling.classList.contains('sb-lead'),
+        'text ' + JSON.stringify(progText()) + ', after ' + (seg && seg.previousElementSibling && seg.previousElementSibling.className));
+    clickEl(findBox(tb(), keyOf(11)));
+    await sleep(500);
+    rec('P2-prog-tick', progText() === 'Reviewed: 3 of 36', JSON.stringify(progText()));
+    $('#tableSearch').val("PROTOCOL TYPE = 'Exempt'");
+    JR.runTableSearch();
+    await sleep(900);
+    rec('P2-prog-search', progText() === 'Reviewed: 2 of 18', JSON.stringify(progText()));
+  };
+  S.bulkundo = async function () {
+    var K3 = window.__MARKED[0], K5 = window.__MARKED[1], c0 = window.__confirms.length;
+    window.Penumbra.journalBulkAction('mark', ['Reviewed']);
+    await sleep(700);
+    var conf = window.__confirms.slice(c0).join(' | '), tt = toast().replace(/\s+/g, ' ');
+    var undo = document.querySelector('.journal-bulk-undo');
+    var marked = Object.keys(window.__J.toggles.toggle1).length;
+    rec('B-undo-offer', /offers an Undo/.test(conf) && /34 rows marked\./.test(tt) && !!undo && marked === 36,
+        'confirm "' + conf.slice(-80) + '", toast "' + tt.slice(-80) + '", undo button ' + !!undo + ', marked on the server ' + marked);
+    if (undo) clickEl(undo);
+    await sleep(700);
+    var m = window.__J.toggles.toggle1, last = window.__J.posts[window.__J.posts.length - 1] || {};
+    rec('B-undo-exact', Object.keys(m).length === 2 && !!m[K3] && m[K3].by === 'pat' && !!m[K5] && m[K5].by === 'lee'
+        && last.action === 'set_toggles_bulk' && last.state === false && (last.row_keys || []).length === 34 && (last.row_keys || []).indexOf(K3) < 0,
+        'server marks ' + Object.keys(m).length + ' (row 3 by ' + (m[K3] && m[K3].by) + ', row 23 by ' + (m[K5] && m[K5].by) + '), the undo sent '
+        + (last.row_keys || []).length + ' keys, state ' + last.state);
+    rec('B-undo-page', tb().querySelectorAll('.journal-toggle-box.is-on').length === 2 && /UNDONE: 34 rows unmarked/.test(toast().replace(/\s+/g, ' ')),
+        'boxes on ' + tb().querySelectorAll('.journal-toggle-box.is-on').length + ', toast "' + toast().replace(/\s+/g, ' ').slice(-60) + '"');
+  };
+  S.arrows = async function () {
+    var b3 = findBox(tb(), window.__MARKED[0]);
+    b3.focus();
+    await pressKeys(['ArrowDown']);
+    var ae = document.activeElement;
+    rec('A-arrow-down', !!ae && ae.classList.contains('journal-toggle-box') && ae.getAttribute('data-row-key') === keyOf(3),
+        'focus on ' + (ae && (ae.getAttribute('data-row-key') || ae.tagName)));
+    await pressKeys(['ArrowUp', 'ArrowUp']);
+    ae = document.activeElement;
+    rec('A-arrow-up', !!ae && ae.getAttribute('data-row-key') === keyOf(1), 'focus on ' + (ae && (ae.getAttribute('data-row-key') || ae.tagName)));
+  };
+  S.confirmclear = async function () {
+    var K5 = window.__MARKED[1], K12 = keyOf(11);
+    window.__confirmAnswer = false;
+    var p0 = window.__J.posts.length, c0 = window.__confirms.length;
+    clickEl(findBox(tb(), K5));
+    await sleep(300);
+    var asked = window.__confirms.slice(c0).join(' | ');
+    rec('C-clear-ask', /^Clear lee's mark on this row \(made Oct 1, 2026 10:30 AM\)\?$/.test(asked) && window.__J.posts.length === p0
+        && findBox(tb(), K5).classList.contains('is-on'),
+        'asked "' + asked + '", posts +' + (window.__J.posts.length - p0) + ', row 23 on ' + findBox(tb(), K5).classList.contains('is-on'));
+    window.__confirmAnswer = true;
+    clickEl(findBox(tb(), K5));
+    await sleep(400);
+    rec('C-clear-yes', window.__J.posts.length === p0 + 1 && !findBox(tb(), K5).classList.contains('is-on'),
+        'posts +' + (window.__J.posts.length - p0) + ', row 23 on ' + findBox(tb(), K5).classList.contains('is-on'));
+    var c1 = window.__confirms.length;
+    clickEl(findBox(tb(), K12));
+    await sleep(400);
+    clickEl(findBox(tb(), K12));
+    await sleep(400);
+    rec('C-clear-mine', window.__confirms.length === c1 && !findBox(tb(), K12).classList.contains('is-on'),
+        'questions for my own mark ' + (window.__confirms.length - c1) + ', row 12 on ' + findBox(tb(), K12).classList.contains('is-on'));
+  };
+  S.bandlabel = async function () {
+    var names = Array.prototype.slice.call(document.querySelectorAll('#groupedResultsContainer .group-header .group-name'));
+    var chk = names.filter(function (n) { return n.textContent.trim() === 'Checked'; })[0];
+    var unc = names.filter(function (n) { return n.textContent.trim() === 'Unchecked'; })[0];
+    var bc = chk ? getComputedStyle(chk, '::before').content : null, bu = unc ? getComputedStyle(unc, '::before').content : null;
+    var shows = function (c) { return /attr\(data-tg-col\)/.test(c || '') || c === '"Reviewed: "'; };
+    rec('G-band-label', !!chk && !!unc && chk.getAttribute('data-tg-col') === 'Reviewed' && unc.getAttribute('data-tg-col') === 'Reviewed'
+        && shows(bc) && shows(bu) && chk.textContent.trim() === 'Checked',
+        'bands ' + names.map(function (n) { return n.textContent.trim(); }).join(', ') + ' | ::before ' + bc + ' / ' + bu);
+  };
+  S.histjump = async function () {
+    var K3 = window.__MARKED[0];
+    window.__histEvents = [
+      { state: 1, toggle: 'toggle1', by: 'pat', at: '2026-10-01 09:00:00', parts: ['25403', 'Exempt'], bulk: false },
+      { state: 1, toggle: 'toggle1', by: 'harness', at: '2026-10-02 09:00:00', parts: ['25405', 'Expedited'], bulk: false }
+    ];
+    clickEl(document.getElementById('journalBtn'));
+    await until(function () { return !!window.PenumbraJournal && $('#journalLightbox').is(':visible'); }, 8000);
+    await sleep(300);
+    clickEl(document.getElementById('journalTabBtnHistory'));
+    await until(function () { return document.querySelectorAll('#jHistResults .jhist-ev').length === 2; }, 5000);
+    var me = document.getElementById('jHistMe');
+    var pressed0 = me ? me.getAttribute('aria-pressed') : null;
+    if (me) clickEl(me);
+    await sleep(500);
+    var evs = document.querySelectorAll('#jHistResults .jhist-ev');
+    var lastUrl = log().filter(function (u) { return u.indexOf('toggle_history_search') >= 0; }).pop() || '';
+    rec('H-me-filter', !!me && pressed0 === 'false' && me.getAttribute('aria-pressed') === 'true' && $('#jHistUser').val() === 'harness'
+        && evs.length === 1 && /harness/.test(evs[0].textContent) && /user=harness/.test(lastUrl),
+        'Me ' + !!me + ' ' + pressed0 + ' -> ' + (me && me.getAttribute('aria-pressed')) + ', user box "' + $('#jHistUser').val() + '", events ' + evs.length);
+    if (me) clickEl(me);
+    await until(function () { return document.querySelectorAll('#jHistResults .jhist-ev').length === 2; }, 4000);
+    var btn = document.querySelector('#jHistResults .jhist-rowid-btn[data-row-key="25403' + SEP + 'Exempt"]');
+    if (btn) clickEl(btn);
+    await sleep(900);
+    var ae = document.activeElement, tr = ae && ae.closest ? ae.closest('tr') : null;
+    rec('H-jump', !!btn && !$('#journalLightbox').is(':visible') && !!ae && ae.classList.contains('journal-toggle-box')
+        && ae.getAttribute('data-row-key') === K3 && !!tr && tr.classList.contains('journal-row-flash'),
+        'row button ' + !!btn + ', panel shown ' + $('#journalLightbox').is(':visible') + ', focus ' + (ae && (ae.getAttribute('data-row-key') || ae.tagName))
+        + ', flashed ' + !!(tr && tr.classList.contains('journal-row-flash')));
+  };
+  // ======================= ROUND D (2026-10-08): Toggle History ===========================
+  //   H2-* the summary (counts, people - a person filters), the row's state now, Latest per
+  //        row, Marked / Unmarked, the quick ranges, Export CSV (the app's CSV cell guard)
+  function lastHistUrl() { return log().filter(function (u) { return u.indexOf('toggle_history_search') >= 0; }).pop() || ''; }
+  function histEvs() { return Array.prototype.slice.call(document.querySelectorAll('#jHistResults .jhist-ev')); }
+  async function histReload(fn, want) {
+    var n0 = count(log(), 'toggle_history_search');
+    fn();
+    await until(function () { return count(log(), 'toggle_history_search') > n0; }, 4000);
+    await sleep(250);
+    if (want != null) await until(function () { return histEvs().length === want; }, 3000);
+  }
+  function ymdAgo(n) { var d = new Date(); d.setDate(d.getDate() - n); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  S.histplus = async function () {
+    var K3 = window.__MARKED[0], K5 = window.__MARKED[1], K7 = keyOf(6), K12 = keyOf(11);
+    var ev = function (st, by, at, rk, bulk) { return { state: st, toggle: 'toggle1', by: by, at: at, rowKey: rk, parts: rk.split(SEP), bulk: !!bulk }; };
+    window.__histEvents = [ev(1, 'pat', '2026-10-07 09:00:00', K3), ev(0, 'lee', '2026-10-06 09:00:00', K7), ev(1, 'pat', '2026-10-05 09:00:00', K7),
+                           ev(1, 'kim', '2026-10-04 09:00:00', K12, true), ev(1, '=evil', '2026-10-03 09:00:00', K5)];
+    clickEl(document.getElementById('journalBtn'));
+    await until(function () { return !!window.PenumbraJournal && $('#journalLightbox').is(':visible'); }, 8000);
+    await sleep(300);
+    clickEl(document.getElementById('journalTabBtnHistory'));
+    await until(function () { return histEvs().length === 5; }, 5000);
+    var head = ($('#jHistResults .jhist-summary-head').text() || '').trim();
+    var chips = Array.prototype.map.call(document.querySelectorAll('#jHistResults .jhist-person'), function (b) { return b.textContent.replace(/\s+/g, ' ').trim(); });
+    rec('H2-summary', head === '5 changes on 4 rows: 4 marked, 1 unmarked.' && chips.join('|') === 'pat 2|=evil 1|kim 1|lee 1',
+        'head "' + head + '", people ' + JSON.stringify(chips));
+    var nowOf = histEvs().map(function (li) { var n = li.querySelector('.jhist-now'); return n ? n.textContent + (n.classList.contains('is-on') && /pat|lee/.test(n.title) ? '/' + (/pat/.test(n.title) ? 'pat' : 'lee') : '') : '-'; });
+    rec('H2-now', nowOf.join('|') === 'now marked/pat|now unmarked|now unmarked|now unmarked|now marked/lee', JSON.stringify(nowOf));
+    // A person in the summary: only theirs.
+    var lee = Array.prototype.filter.call(document.querySelectorAll('#jHistResults .jhist-person'), function (b) { return b.getAttribute('data-user') === 'lee'; })[0];
+    await histReload(function () { if (lee) clickEl(lee); }, 1);
+    rec('H2-person', !!lee && $('#jHistUser').val() === 'lee' && /user=lee/.test(lastHistUrl()) && histEvs().length === 1 && /lee/.test(histEvs()[0].textContent),
+        'user box "' + $('#jHistUser').val() + '", events ' + histEvs().length);
+    await histReload(function () { clickEl(document.getElementById('jHistClear')); }, 5);
+    // Latest per row: one line per row, its newest change.
+    await histReload(function () { $('#jHistMode').val('latest').trigger('change'); }, 4);
+    var lt = histEvs().map(function (li) { return (li.querySelector('.jhist-by') || {}).textContent; });
+    rec('H2-latest', /mode=latest/.test(lastHistUrl()) && lt.join('|') === 'pat|lee|kim|=evil', 'request ' + lastHistUrl().split('?')[1] + ' | by ' + JSON.stringify(lt));
+    await histReload(function () { $('#jHistMode').val('').trigger('change'); }, 5);
+    // Unmarked only.
+    await histReload(function () { $('#jHistState').val('0').trigger('change'); }, 1);
+    rec('H2-state', /state=0/.test(lastHistUrl()) && histEvs().length === 1 && /Unmarked/.test(histEvs()[0].textContent), 'events ' + histEvs().length);
+    await histReload(function () { $('#jHistState').val('').trigger('change'); }, 5);
+    // 7 days: the date boxes, the request, the pressed state; a hand-typed date lifts it.
+    var seven = document.querySelector('.jhist-preset[data-days="7"]');
+    await histReload(function () { if (seven) clickEl(seven); });
+    var pressed = seven && seven.getAttribute('aria-pressed') === 'true', f = $('#jHistFrom').val(), t = $('#jHistTo').val(), u7 = lastHistUrl();
+    $('#jHistFrom').val('2026-01-01').trigger('change');
+    await sleep(300);
+    rec('H2-preset', pressed && f === ymdAgo(6) && t === ymdAgo(0) && u7.indexOf('from=' + ymdAgo(6)) >= 0 && u7.indexOf('to=' + ymdAgo(0)) >= 0
+        && seven.getAttribute('aria-pressed') === 'false',
+        'from ' + f + ' to ' + t + ', pressed ' + pressed + ' then ' + (seven && seven.getAttribute('aria-pressed')) + ' | request ' + (u7.split('?')[1] || '-'));
+    await histReload(function () { clickEl(document.getElementById('jHistClear')); }, 5);
+    // Export CSV: what the list shows, through the app's CSV cell guard. The bytes are read
+    // with the BOM kept (Blob.text() would strip it).
+    var blob = null, name = null, rc = URL.createObjectURL, rr = URL.revokeObjectURL;
+    var hadClick = Object.prototype.hasOwnProperty.call(HTMLAnchorElement.prototype, 'click'), ck = HTMLAnchorElement.prototype.click;
+    URL.createObjectURL = function (b) { blob = b; return 'blob:tf-export'; };
+    URL.revokeObjectURL = function () {};
+    HTMLAnchorElement.prototype.click = function () { name = this.download; };
+    var exb = document.getElementById('jHistExport');
+    try { if (exb) clickEl(exb); await sleep(100); }
+    finally {
+      URL.createObjectURL = rc; URL.revokeObjectURL = rr;
+      if (hadClick) HTMLAnchorElement.prototype.click = ck; else delete HTMLAnchorElement.prototype.click;
+    }
+    var text = blob ? new TextDecoder('utf-8', { ignoreBOM: true }).decode(await blob.arrayBuffer()) : '';
+    var lines = text.replace(/^\uFEFF/, '').split('\r\n').filter(function (l) { return l !== ''; });
+    rec('H2-export', text.charAt(0) === '\uFEFF' && lines[0] === 'When,Who,Change,Column,PROTOCOL NO.,PROTOCOL TYPE,Bulk,Now,Now by,Now at'
+        && lines.length === 6 && lines[1] === '2026-10-07 09:00:00,pat,Marked,Reviewed,25403,Exempt,no,Marked,pat,2026-10-01 09:00:00'
+        && lines[5].indexOf(",'=evil,") > 0 && /^toggle-history-jrfix-\d{8}\.csv$/.test(name || ''),
+        'file ' + name + ' | ' + lines.slice(0, 2).join(' / ') + ' | evil line ' + (lines[5] || '-'));
+  };
+
+  // A row's note card HIDDEN because its row scrolled out of sight takes no file drop:
+  // a CSV dropped on the table where the hidden card still sits reaches the import.
+  function fileDrag(type, el, x, y, files) {
+    var dt = new DataTransfer();
+    for (var i = 0; i < files.length; i++) dt.items.add(files[i]);
+    var ev = new DragEvent(type, { bubbles: true, cancelable: true, composed: true, dataTransfer: dt, clientX: x, clientY: y });
+    el.dispatchEvent(ev);
+    return ev;
+  }
+  S.hiddendrop = async function () {
+    var K3 = window.__MARKED[0];
+    // The table on screen first: the card is position:fixed and keeps the spot it was
+    // last placed at when it hides - over whatever rows have scrolled under it.
+    document.getElementById('results-wrapper').scrollIntoView({ block: 'start' });
+    await sleep(200);
+    var nb = null, bs = tb().querySelectorAll('.journal-notes-btn');
+    for (var i = 0; i < bs.length; i++) if (bs[i].getAttribute('data-row-key') === K3) nb = bs[i];
+    if (nb) clickEl(nb);
+    await sleep(300);
+    var card = document.querySelector('.journal-pvnote-card'), panel = card ? card.querySelector('.journal-rownote-panel') : null;
+    var wrap = document.getElementById('results-wrapper');
+    // Row 3 scrolls up just past the table's own scroll box (a sticky header's height
+    // more), so the card hides while its spot is still over rows on screen.
+    var tr3 = nb ? nb.closest('tr') : null;
+    if (tr3) wrap.scrollTop += tr3.getBoundingClientRect().bottom - wrap.getBoundingClientRect().top + 60;
+    await sleep(700);                       // the card's 400 ms tick hides it
+    var r = panel ? panel.getBoundingClientRect() : null;
+    var x = r ? r.left + r.width / 2 : 0, y = r ? r.top + Math.min(40, r.height / 2) : 0;
+    var under = r ? document.elementFromPoint(x, y) : null;
+    var vis = card ? getComputedStyle(card).visibility : null;
+    rec('P-hd-hidden', !!panel && vis === 'hidden' && !!under && !!under.closest('#resultsTable') && r.width > 0,
+        'card ' + !!card + ', visibility ' + vis + ', under the hidden panel: ' + (under ? (under.closest('#resultsTable') ? 'the table' : under.tagName + '.' + under.className) : '-'));
+    window.__importSaw = 0;
+    $(document).on('drop.tfspy', function () { window.__importSaw++; });
+    var csv = new File(['ALPHA,BETA\n1,2\n'], 'data.csv', { type: 'text/csv' });
+    var tgt = under || tb();
+    fileDrag('dragenter', document.body, x, y, [csv]);
+    fileDrag('dragover', tgt, x, y, [csv]);
+    var armed = document.body.classList.contains('journal-drop-armed');
+    fileDrag('drop', tgt, x, y, [csv]);
+    await sleep(150);
+    $(document).off('drop.tfspy');
+    var inp = panel ? panel.querySelector('.journal-attach-input') : null;
+    rec('D-hd-import', window.__importSaw === 1 && !armed && !!inp && !(inp.files && inp.files.length),
+        'the import saw ' + window.__importSaw + ', armed over the hidden card ' + armed + ', files on the hidden note ' + (inp && inp.files ? inp.files.length : '?'));
+  };
+  // (2026-10-08) The TAP AREA grows on a touch-reporting browser, not the box: a remote-
+  // desktop Chrome reports exactly what a tablet does, and 28px boxes made a mouse user's
+  // tables chunkier. An absolutely positioned ::before 6px past the box; nothing in the
+  // block may resize the box itself.
+  S.touchcss = async function () {
+    var hit = false, resized = [], seen = [];
+    for (var i = 0; i < document.styleSheets.length; i++) {
+      var rules;
+      try { rules = document.styleSheets[i].cssRules; } catch (e) { continue; }
+      for (var j = 0; j < rules.length; j++) {
+        var r = rules[j];
+        if (r.type !== 4 || !/hover:\s*none/.test(r.conditionText || '') || !/pointer:\s*coarse/.test(r.conditionText || '')) continue;
+        for (var k = 0; k < r.cssRules.length; k++) {
+          var x = r.cssRules[k], sel = x.selectorText || '';
+          if (!/journal-toggle-box/.test(sel)) continue;
+          seen.push(sel + ' {' + x.style.cssText + '}');
+          if (/::before$/.test(sel) && x.style.position === 'absolute' && x.style.top === '-6px' && x.style.left === '-6px'
+              && x.style.right === '-6px' && x.style.bottom === '-6px') hit = true;
+          if (!/::before$/.test(sel) && (x.style.width || x.style.height)) resized.push(sel);
+        }
+      }
+    }
+    rec('T-touch-rule', hit && !resized.length, (seen.join(' | ') || 'no (hover: none) and (pointer: coarse) rule for the box')
+        + (resized.length ? ' | RESIZES the box: ' + resized.join(', ') : ''));
+  };
+
+  // ======================= ROUND E (2026-10-08): the sweep's remaining items 1-7 ================
+  //   E-fail-*     a failed save puts back what the row held (not "marked by me")
+  //   E-hist-*     the hover history after a flip, and after a bulk run
+  //   E-load-*     marks that could not be loaded: dimmed, refused, Try again
+  //   E-grp-foot   a toggle summary in each group footer
+  //   E-snap*-bulk no bulk write from a snapshot view or a comparison
+  //   E-warn-*     a toggle named Notes / with a "|"; the warning is a live region
+  //   E-genkey-used  a new column avoids a key with rows in any state
+  //   E-print-rule ticked boxes print
+  //   E-sort-stay  a saved sort on the toggle replays once (a note reload keeps the page)
+  //   E-cf-hidden  format() on a toggle with a key column hidden
+  //   E-regroup-place  a regroup with a search typed keeps the reader's place
+  //   E-snip-*     the snippet re-renders only when it names a journal column, once per burst
+  function stateMeta(k) { var m = (window._penumbraToggleState || {}).toggle1 || {}; return Object.prototype.hasOwnProperty.call(m, k) ? m[k] : null; }
+  function drawn(tr) { return tr.getClientRects().length > 0; }
+  S.failsave = async function () {
+    var K3 = window.__MARKED[0], K7 = keyOf(6);
+    // Pat's mark, cleared, the save fails: Pat's mark again.
+    var b3 = findBox(tb(), K3), c0 = window.__confirms.length;
+    window.__failWrites = 1;
+    clickEl(b3);
+    await sleep(400);
+    b3 = findBox(tb(), K3);
+    var m3 = stateMeta(K3);
+    rec('E-fail-prev', window.__confirms.length === c0 + 1 && !!b3 && b3.classList.contains('is-on') && !!m3 && m3.by === 'pat'
+        && /pat/.test(b3.getAttribute('aria-label') || ''),
+        'box on ' + (b3 && b3.classList.contains('is-on')) + ', state ' + JSON.stringify(m3) + ', label ' + (b3 && b3.getAttribute('aria-label')));
+    // The same when the request itself fails (an HTTP error) - on ANOTHER row (Lee's), so
+    // this step does not inherit what the first one left.
+    var K5 = window.__MARKED[1];
+    window.__rejectWrites = 1;
+    clickEl(findBox(tb(), K5));
+    await sleep(400);
+    var b5 = findBox(tb(), K5), m5 = stateMeta(K5);
+    rec('E-fail-prev-http', !!b5 && b5.classList.contains('is-on') && !!m5 && m5.by === 'lee',
+        'box on ' + (b5 && b5.classList.contains('is-on')) + ', state ' + JSON.stringify(m5));
+    // Two quick clicks on an unmarked row (the first one's save slow), both failing: unmarked.
+    window.__failWrites = 2; window.__tslow = 300;
+    clickEl(findBox(tb(), K7));
+    await sleep(60);
+    clickEl(findBox(tb(), K7));
+    await sleep(800);
+    var b7 = findBox(tb(), K7);
+    rec('E-fail-burst', !!b7 && !b7.classList.contains('is-on') && !stateMeta(K7),
+        'box on ' + (b7 && b7.classList.contains('is-on')) + ', state ' + JSON.stringify(stateMeta(K7)));
+  };
+  S.histflip = async function () {
+    var K12 = keyOf(11), K5 = window.__MARKED[1];
+    window.__rowHist = {};
+    window.__rowHist[K12] = [{ by: 'kim', at: '2026-10-01 09:00:00', state: 1, bulk: false }, { by: 'lee', at: '2026-09-30 09:00:00', state: 0, bulk: false }];
+    var b = findBox(tb(), K12);
+    b.scrollIntoView({ block: 'center' });
+    b.focus();
+    await sleep(600);
+    var pop = document.getElementById('pnbToggleHistPop');
+    var shown0 = !!pop && pop.style.display !== 'none' && /kim/.test(pop.textContent);
+    var n0 = count(log(), 'action=toggle_history&');
+    clickEl(b);                                  // focus stays on the box
+    await sleep(700);
+    pop = document.getElementById('pnbToggleHistPop');
+    var txt = pop ? pop.textContent : '';
+    rec('E-hist-flip', shown0 && pop.style.display !== 'none' && !/Loading history/.test(txt) && /kim/.test(txt) && count(log(), 'action=toggle_history&') > n0,
+        'open before ' + shown0 + ', after the flip: "' + txt.slice(0, 120) + '", history requests ' + n0 + ' -> ' + count(log(), 'action=toggle_history&'));
+    b.blur();
+    await sleep(300);
+    // Hovered once (cached), then a bulk mark: hovering again asks again.
+    var b5 = findBox(tb(), K5);
+    b5.focus(); await sleep(600); b5.blur(); await sleep(300);
+    var n1 = count(log(), 'action=toggle_history&');
+    window.Penumbra.journalBulkAction('mark', ['Reviewed']);
+    await sleep(900);
+    b5 = findBox(tb(), K5);
+    b5.focus(); await sleep(600);
+    rec('E-hist-bulk', count(log(), 'action=toggle_history&') > n1, 'history requests before the bulk ' + n1 + ', after hovering again ' + count(log(), 'action=toggle_history&'));
+    b5.blur();
+  };
+  S.loadfail = async function () {
+    var bs = tb().querySelectorAll('.journal-toggle-box');
+    var allDim = bs.length > 0 && Array.prototype.every.call(bs, function (b) { return b.getAttribute('aria-disabled') === 'true'; });
+    var op = bs.length ? getComputedStyle(bs[0]).opacity : '';
+    var t0 = toast();
+    rec('E-load-dim', allDim && document.body.classList.contains('pnb-jtoggles-unloaded') && parseFloat(op) < 0.6
+        && /Could not load the marks/.test(t0) && !!document.querySelector('.journal-toggle-retry'),
+        'boxes ' + bs.length + ', all aria-disabled ' + allDim + ', opacity ' + op + ', toast "' + t0.trim().slice(0, 140) + '"');
+    // A click writes nothing, a bulk mark refuses, a snapshot refuses.
+    var p0 = window.__J.posts.length;
+    if (bs.length) clickEl(bs[0]);
+    await sleep(200);
+    window.Penumbra.journalBulkAction('mark', ['Reviewed']);
+    await sleep(300);
+    var t1 = toast();
+    var snapErr = null;
+    try { window.Penumbra.journalSnapshotRowData(new Map([['PROTOCOL NO.', '25401'], ['PROTOCOL TYPE', 'Exempt'], ['TITLE', 'x']])); } catch (e) { snapErr = String(e && e.message); }
+    rec('E-load-refuse', window.__J.posts.length === p0 && /could not be loaded/i.test(t1) && /could not be loaded/i.test(snapErr || ''),
+        'writes ' + (window.__J.posts.length - p0) + ', toast "' + t1.trim().slice(0, 160) + '", snapshot ' + JSON.stringify(snapErr));
+    // Try again, now that the server answers: the marks show, the boxes work.
+    window.__failToggles = false;
+    var rb = document.querySelector('.journal-toggle-retry');
+    if (rb) clickEl(rb);
+    await sleep(700);
+    var b3 = findBox(tb(), window.__MARKED[0]);
+    var anyDis = Array.prototype.some.call(tb().querySelectorAll('.journal-toggle-box'), function (b) { return b.hasAttribute('aria-disabled'); });
+    rec('E-load-retry', !!rb && !document.body.classList.contains('pnb-jtoggles-unloaded') && !anyDis && !!b3 && b3.classList.contains('is-on'),
+        'retry button ' + !!rb + ', body class ' + document.body.classList.contains('pnb-jtoggles-unloaded') + ', any aria-disabled ' + anyDis + ', row 3 on ' + (b3 && b3.classList.contains('is-on')));
+  };
+  function footText(td) {
+    if (!td) return null;
+    var c = td.cloneNode(true), bd = c.querySelector('.pnb-sum-badge');
+    if (bd) bd.remove();
+    return c.textContent.replace(/\s+/g, ' ').trim();
+  }
+  S.grpfoot = async function () {
+    var gc = document.getElementById('groupedResultsContainer'), out = {};
+    var ws = gc.querySelectorAll('.group-wrapper.group-leaf');
+    for (var i = 0; i < ws.length; i++) {
+      out[ws[i].getAttribute('data-group-key') || ws[i].getAttribute('data-group-path')] = footText(ws[i].querySelector('tfoot td[data-column="__JOURNAL_TOGGLE__toggle1"]'));
+    }
+    rec('E-grp-foot', out['Exempt'] === '1' && out['Expedited'] === '1', 'group footers ' + JSON.stringify(out));
+  };
+  S.snapbulk = async function () {
+    var p0 = window.__J.posts.length;
+    window.__JR_set('snap', true);
+    window.Penumbra.journalBulkAction('mark', ['Reviewed']);
+    await sleep(300);
+    var t1 = toast();
+    rec('E-snap-bulk', window.__J.posts.length === p0 && /viewing a snapshot/i.test(t1), 'writes ' + (window.__J.posts.length - p0) + ', toast "' + t1.trim().slice(0, 160) + '"');
+    window.__JR_set('snap', false);
+    document.body.classList.add('snapshot-comparison-active');
+    var p1 = window.__J.posts.length;   // its own count: this step does not inherit the first one's
+    window.Penumbra.journalBulkAction('mark', ['Reviewed']);
+    await sleep(300);
+    var t2 = toast();
+    rec('E-snapcmp-bulk', window.__J.posts.length === p1 && /snapshot comparison/i.test(t2), 'writes ' + (window.__J.posts.length - p1) + ', toast "' + t2.trim().slice(0, 160) + '"');
+    document.body.classList.remove('snapshot-comparison-active');
+  };
+  S.notesname = async function () {
+    // Opening View Options rebuilds the panel from the rows (its tabsactivate handler).
+    if (window.Penumbra && window.Penumbra.syncJournalRowConfigUI) window.Penumbra.syncJournalRowConfigUI();
+    await sleep(150);
+    var inp = document.querySelector('#journalToggleList .journal-toggle-def-label');
+    var warn = document.getElementById('journalToggleWarn');
+    if (inp) { inp.value = 'Notes'; $(inp).trigger('change'); }
+    await sleep(200);
+    var w1 = warn ? warn.textContent : '';
+    rec('E-warn-notes', !!inp && /“Notes” is the name of the row notes column/.test(w1) && $(warn).is(':visible'), 'warning "' + w1.slice(0, 200) + '"');
+    if (inp) { inp.value = 'Done|Late'; $(inp).trigger('change'); }
+    await sleep(200);
+    var w2 = warn ? warn.textContent : '';
+    rec('E-warn-pipe', /cannot name a toggle with “\|”/.test(w2) && !/row notes column/.test(w2), 'warning "' + w2.slice(0, 200) + '"');
+    rec('E-warn-live', !!warn && warn.getAttribute('role') === 'status' && warn.getAttribute('aria-live') === 'polite',
+        'role ' + (warn && warn.getAttribute('role')) + ', aria-live ' + (warn && warn.getAttribute('aria-live')));
+    if (inp) { inp.value = 'Reviewed'; $(inp).trigger('change'); }
+  };
+  S.usedkeys = async function () {
+    if (window.Penumbra && window.Penumbra.syncJournalRowConfigUI) window.Penumbra.syncJournalRowConfigUI();
+    await sleep(150);
+    var before = (window._penumbraJournalToggles || []).length;
+    var addBtn = document.getElementById('journalAddToggleBtn');
+    var dis = addBtn ? addBtn.disabled : null;
+    if (addBtn) clickEl(addBtn);
+    await sleep(300);
+    var defs = window._penumbraJournalToggles || [];
+    var nd = defs[defs.length - 1] || {};
+    rec('E-genkey-used', !!addBtn && defs.length === before + 1 && nd.label === 'Toggle 2' && nd.key !== 'toggle2' && /^toggle2\d/.test(nd.key || ''),
+        'new column ' + JSON.stringify(nd) + ' (toggle2 has rows on the server, all cleared) | add button disabled ' + dis + ', columns ' + before + ' -> ' + defs.length);
+  };
+  S.printrule = async function () {
+    var hit = false, seen = [];
+    for (var s = 0; s < document.styleSheets.length; s++) {
+      var rules; try { rules = document.styleSheets[s].cssRules; } catch (e) { continue; }
+      for (var i = 0; i < rules.length; i++) {
+        var r = rules[i];
+        if (!r.media || !/print/.test(r.media.mediaText || '') || !r.cssRules) continue;
+        for (var k = 0; k < r.cssRules.length; k++) {
+          var x = r.cssRules[k], sel = x.selectorText || '';
+          if (!/journal-toggle-box\.is-on/.test(sel)) continue;
+          seen.push(sel + ' {' + x.style.cssText + '}');
+          if (x.style.getPropertyValue('print-color-adjust') === 'exact' || x.style.getPropertyValue('-webkit-print-color-adjust') === 'exact') hit = true;
+        }
+      }
+    }
+    rec('E-print-rule', hit, seen.join(' | ') || 'no print rule for a ticked box');
+  };
+  S.noteresort = async function () {
+    var K3 = window.__MARKED[0], K5 = window.__MARKED[1];
+    function shownKeys() {
+      return Array.prototype.filter.call(tb().querySelectorAll('tbody tr'), drawn).map(function (tr) {
+        var b = tr.querySelector('.journal-toggle-box'); return b ? b.getAttribute('data-row-key') : '?';
+      });
+    }
+    var first = shownKeys();
+    rec('E-sort-first', first.length === 25 && (first[0] === K3 || first[0] === K5) && (first[1] === K3 || first[1] === K5),
+        'page 1 starts ' + JSON.stringify(first.slice(0, 3)) + ' of ' + first.length);
+    window.__JR_set('page', 2);
+    await sleep(300);
+    var p2 = shownKeys();
+    window.Penumbra.loadJournalRowNotes();   // what posting a note runs: the note counts reload
+    await sleep(900);
+    var after = shownKeys();
+    rec('E-sort-stay', window.__JR_get('page') === 2 && p2.length === 11 && JSON.stringify(after) === JSON.stringify(p2),
+        'page ' + window.__JR_get('page') + ', page 2 before ' + JSON.stringify(p2.slice(0, 2)) + ' (' + p2.length + '), after ' + JSON.stringify(after.slice(0, 2)) + ' (' + after.length + ')');
+  };
+  S.cfhidden = async function () {
+    var K3 = window.__MARKED[0], K5 = window.__MARKED[1];
+    await sleep(800);
+    var on = [], off = 0, bad = [];
+    Array.prototype.forEach.call(tb().querySelectorAll('tbody tr'), function (tr) {
+      var b = tr.querySelector('.journal-toggle-box'); if (!b) return;
+      var k = b.getAttribute('data-row-key'), green = tr.style.backgroundColor === 'rgb(230, 255, 230)';
+      if (k === K3 || k === K5) { if (green) on.push(k); else bad.push(k + ':' + tr.style.backgroundColor); }
+      else if (green) bad.push(k + ':green');
+      else off++;
+    });
+    var th = document.querySelector('#tableHeader th[data-colname="PROTOCOL NO."]');
+    var hiddenKey = !th || th.style.display === 'none' || getComputedStyle(th).display === 'none';
+    rec('P-cf-hidden', hiddenKey, 'PROTOCOL NO. hidden ' + hiddenKey);
+    rec('E-cf-hidden', on.length === 2 && bad.length === 0, 'coloured ' + JSON.stringify(on) + ', wrong ' + JSON.stringify(bad.slice(0, 4)) + ', plain ' + off);
+  };
+  S.regroupsearch = async function () {
+    var gc = document.getElementById('groupedResultsContainer');
+    $('#tableSearch').val('STATUS = Approved');
+    JR.runTableSearch();
+    await sleep(1000);
+    function bandRows(path) {
+      var w = gc.querySelector('.group-wrapper[data-group-path="' + path + '"]');
+      return w ? Array.prototype.filter.call(w.querySelectorAll(':scope > .group-content > table > tbody > tr'), function (tr) { return !tr.classList.contains('search-hidden') && drawn(tr); }) : [];
+    }
+    var un = bandRows('Unchecked');
+    var pick = un[14], prev = un[13], next = un[15];
+    // The ticked row on screen (the band's box and the page both scroll to it), then the
+    // rows around it measured: the one before stays put, the one after takes its place.
+    if (pick) pick.scrollIntoView({ block: 'center' });
+    await sleep(200);
+    var prevIdx = prev ? prev.getAttribute('data-row-index') : null, nextIdx = next ? next.getAttribute('data-row-index') : null;
+    var top0 = prev ? Math.round(prev.getBoundingClientRect().top) : null;
+    var pickTop = pick ? Math.round(pick.getBoundingClientRect().top) : null;
+    var pb = pick ? pick.querySelector('.journal-toggle-box') : null;
+    if (pb) { pb.focus(); clickEl(pb); }
+    await sleep(2200);
+    var w2 = gc.querySelector('.group-wrapper[data-group-path="Unchecked"]');
+    var prev2 = w2 ? w2.querySelector('tr[data-row-index="' + prevIdx + '"]') : null;
+    var next2 = w2 ? w2.querySelector('tr[data-row-index="' + nextIdx + '"]') : null;
+    var top1 = prev2 ? Math.round(prev2.getBoundingClientRect().top) : null;
+    var nextTop1 = next2 ? Math.round(next2.getBoundingClientRect().top) : null;
+    var moved = pick ? gc.querySelector('.group-wrapper[data-group-path="Checked"] tr[data-row-index="' + pick.getAttribute('data-row-index') + '"]') : null;
+    rec('P-regroup-moved', !!moved && un.length > 20 && pickTop > 0 && pickTop < window.innerHeight,
+        'the ticked row is in Checked ' + !!moved + ', Unchecked rows shown before ' + un.length + ', the ticked row was at ' + pickTop + ' (viewport ' + window.innerHeight + ')');
+    rec('E-regroup-place', top0 !== null && top1 !== null && Math.abs(top1 - top0) <= 2 && nextTop1 !== null && Math.abs(nextTop1 - pickTop) <= 2,
+        'the row before the ticked one: ' + top0 + ' -> ' + top1 + '; the row after it: ' + nextTop1 + ' (the ticked row was at ' + pickTop + ')');
+  };
+  async function snipObserve(fn, ms) {
+    var out = document.getElementById('reportSnippetOutput'), texts = [], n = 0;
+    var mo = new MutationObserver(function () { n++; var t = out.textContent.replace(/\s+/g, ' ').trim(); if (texts[texts.length - 1] !== t) texts.push(t); });
+    mo.observe(out, { childList: true, subtree: true, characterData: true });
+    await fn();
+    await sleep(ms);
+    mo.disconnect();
+    return { n: n, texts: texts, now: out.textContent.replace(/\s+/g, ' ').trim() };
+  }
+  async function tickThree() {
+    clickEl(findBox(tb(), keyOf(6))); await sleep(60);
+    clickEl(findBox(tb(), keyOf(7))); await sleep(60);
+    clickEl(findBox(tb(), keyOf(8)));
+  }
+  S.snipguard = async function () {
+    var t0 = document.getElementById('reportSnippetOutput').textContent.replace(/\s+/g, ' ').trim();
+    var r = await snipObserve(tickThree, 900);
+    rec('P-snip-shown', /Rows in all: 36/.test(t0), 'snippet "' + t0.slice(0, 80) + '"');
+    rec('E-snip-skip', r.n === 0, 're-renders seen ' + r.n + ' | texts ' + JSON.stringify(r.texts.slice(0, 3)));
+  };
+  S.snipjournal = async function () {
+    var t0 = document.getElementById('reportSnippetOutput').textContent.replace(/\s+/g, ' ').trim();
+    var r = await snipObserve(tickThree, 1000);
+    rec('P-snipj-shown', /Reviewed so far: 2/.test(t0), 'snippet "' + t0.slice(0, 80) + '"');
+    rec('E-snip-once', /Reviewed so far: 5/.test(r.now) && !r.texts.some(function (t) { return /Reviewed so far: [34]\b/.test(t); }),
+        'now "' + r.now.slice(0, 60) + '" | texts seen ' + JSON.stringify(r.texts));
+  };
+
+  // ======================= ROUND G (2026-10-08): the smaller leftovers ===========================
+  //   G-state-*    a page with no saved report (a ?state= link): no row features; bulk says why
+  //   G-blank-*    a row with an EMPTY key: disabled box + notes button that say why, not a
+  //                duplicate, left out of a bulk mark, counted under step 1
+  //   G-grpsort    a GROUPED report sorted by a toggle: the bands sort once the marks land
+  //   G-dup-notice / G-miss-notice  the status bar says why the toggle columns are hidden
+  //   G-pop-*      the hover history beside the row's journal cells; a tap opens none
+  //   G-hist-*     Toggle History names a change as it was named then; an older answer is dropped
+  //   G-key-*      step 1's counts (the report's columns, a row once); a save resets the saved key
+  //   G-pub-cancel a cancelled turn-on closes the setup panel
+  //   G-band-*     a band summary on a toggle; bands ranked by it; a tick updates, moves nothing
+  //   G-cf-*       format(cell|header, <toggle label>, ...)
+  //   G-ctor-key   a key "constructor" is not a mark (search, snapshots)
+  //   G-tpl-real   a template {Name} keeps a real column of the toggle's name
+  function sbSeg() {
+    var seg = document.getElementById('sbJournalProgress');
+    var v = seg ? seg.querySelector('.sb-val') : null;
+    return { el: seg, shown: !!seg && seg.style.display !== 'none', warn: !!seg && seg.classList.contains('is-warn'), text: v ? v.textContent : '' };
+  }
+  async function csvOf(fn) {
+    var blob = null, name = null, rc = URL.createObjectURL, rr = URL.revokeObjectURL;
+    var hadClick = Object.prototype.hasOwnProperty.call(HTMLAnchorElement.prototype, 'click'), ck = HTMLAnchorElement.prototype.click;
+    URL.createObjectURL = function (b) { blob = b; return 'blob:tf-export'; };
+    URL.revokeObjectURL = function () {};
+    HTMLAnchorElement.prototype.click = function () { name = this.download; };
+    try { fn(); await sleep(100); }
+    finally {
+      URL.createObjectURL = rc; URL.revokeObjectURL = rr;
+      if (hadClick) HTMLAnchorElement.prototype.click = ck; else delete HTMLAnchorElement.prototype.click;
+    }
+    var text = blob ? new TextDecoder('utf-8', { ignoreBOM: true }).decode(await blob.arrayBuffer()) : '';
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    return { name: name, lines: text.split('\r\n').filter(function (l) { return l !== ''; }) };
+  }
+  function noteText() { return ((document.getElementById('journalKeyUniqueNote') || {}).textContent || '').replace(/\s+/g, ' '); }
+  S.stateonly = async function () {
+    var n = tb().querySelectorAll('tbody tr').length;
+    rec('P-state-noid', !window.Penumbra.journalReportId && n === 36, 'report id "' + window.Penumbra.journalReportId + '", rows ' + n);
+    rec('G-state-off', !toggleTh() && !notesTh() && !tb().querySelector('.journal-toggle-box, .journal-notes-btn'),
+        'toggle column ' + !!toggleTh() + ', notes column ' + !!notesTh() + ', boxes ' + tb().querySelectorAll('.journal-toggle-box').length);
+    var p0 = window.__J.posts.length;
+    window.Penumbra.journalBulkAction('mark', ['Reviewed']);
+    await sleep(500);
+    var t = toast();
+    rec('G-state-bulk', window.__J.posts.length === p0 && /Save the report first/.test(t), 'writes ' + (window.__J.posts.length - p0) + ', toast "' + t.trim().slice(0, 140) + '"');
+  };
+  S.blankkey = async function () {
+    var th = toggleTh();
+    rec('G-blank-shown', !!th, 'toggle column ' + !!th + ' (two rows have no TITLE, the key: they share the empty key)');
+    var all = Array.prototype.slice.call(tb().querySelectorAll('.journal-toggle-box'));
+    var blank = all.filter(function (b) { return b.getAttribute('data-row-key') === ''; });
+    var why = blank.filter(function (b) { return b.disabled && /key column is empty/.test(b.getAttribute('title') || ''); });
+    var live = all.filter(function (b) { return b.getAttribute('data-row-key') !== '' && !b.disabled; });
+    rec('G-blank-box', blank.length === 2 && why.length === 2 && live.length === 34,
+        'boxes ' + all.length + ': an empty key ' + blank.length + ' (disabled with the reason ' + why.length + '), live ' + live.length);
+    var nb = Array.prototype.filter.call(tb().querySelectorAll('.journal-notes-btn'), function (b) { return b.getAttribute('data-row-key') === ''; });
+    var nbWhy = nb.filter(function (b) { return b.disabled && /cannot take notes/.test(b.getAttribute('title') || '') && getComputedStyle(b).cursor === 'not-allowed'; });
+    rec('G-blank-notes', nb.length === 2 && nbWhy.length === 2, 'notes buttons with an empty key ' + nb.length + ', disabled with the reason (and a not-allowed cursor) '
+        + nbWhy.length + (nb[0] ? ', cursor ' + getComputedStyle(nb[0]).cursor : ''));
+    var p0 = window.__J.posts.length;
+    window.Penumbra.journalBulkAction('mark', ['Reviewed']);
+    await sleep(700);
+    var post = window.__J.posts.slice(p0).filter(function (b) { return b.action === 'set_toggles_bulk'; })[0];
+    rec('G-blank-bulk', !!post && post.row_keys.length === 34 && post.row_keys.indexOf('') < 0,
+        post ? ('keys ' + post.row_keys.length + ', an empty one among them ' + (post.row_keys.indexOf('') >= 0)) : ('no bulk write; toast "' + toast().trim().slice(0, 140) + '"'));
+    if (window.Penumbra.syncJournalRowConfigUI) window.Penumbra.syncJournalRowConfigUI();
+    await sleep(200);
+    var note = noteText();
+    rec('G-blank-note', /2 rows have an empty key/.test(note), 'step 1 "' + note.slice(0, 220) + '"');
+  };
+  S.grpsort = async function () {
+    var gc = document.getElementById('groupedResultsContainer'), K3 = window.__MARKED[0], K5 = window.__MARKED[1];
+    var first = {};
+    Array.prototype.forEach.call(gc.querySelectorAll('.group-wrapper.group-leaf'), function (w) {
+      var tr = w.querySelector('.group-content > table > tbody > tr');
+      var b = tr ? tr.querySelector('.journal-toggle-box') : null;
+      first[w.getAttribute('data-group-key')] = b ? b.getAttribute('data-row-key') : null;
+    });
+    var b3 = findBox(gc, K3), nBox = gc.querySelectorAll('.journal-toggle-box').length;
+    rec('P-grpsort-grouped', $(gc).is(':visible') && nBox === 36 && !!b3 && b3.classList.contains('is-on'),
+        'grouped ' + $(gc).is(':visible') + ', boxes ' + nBox + ', the marked row ticked ' + !!(b3 && b3.classList.contains('is-on')));
+    rec('G-grpsort', first['Exempt'] === K3 && first['Expedited'] === K5, 'each band starts with ' + JSON.stringify(first) + ' (marked: ' + K3 + ', ' + K5 + ')');
+  };
+  S.dupkey = async function () {
+    var s = sbSeg();
+    rec('P-dup-hidden', !toggleTh(), 'toggle column ' + !!toggleTh());
+    rec('G-dup-notice', s.shown && s.warn && s.text === 'Reviewed hidden: 18 rows share a key' && /cannot tell them apart/.test(s.el.title || ''),
+        'segment ' + s.shown + ', warn ' + s.warn + ', text "' + s.text + '", title "' + (s.el ? s.el.title : '') + '"');
+  };
+  S.missnotice = async function () {
+    var s = sbSeg();
+    rec('G-miss-notice', s.shown && s.warn && s.text === 'Reviewed hidden: no GONE column in these results',
+        'segment ' + s.shown + ', warn ' + s.warn + ', text "' + s.text + '"');
+  };
+  function popShown() { var p = document.getElementById('pnbToggleHistPop'); return !!p && p.style.display !== 'none'; }
+  S.poppos = async function () {
+    var b = findBox(tb(), keyOf(10));
+    b.scrollIntoView({ block: 'center' });
+    b.focus();
+    await sleep(700);
+    var pop = document.getElementById('pnbToggleHistPop'), shown = popShown();
+    var pr = pop ? pop.getBoundingClientRect() : null;
+    var td = b.closest('td'), runR = td.getBoundingClientRect().right;
+    for (var c = td.nextElementSibling; c && String(c.getAttribute('data-column') || '').indexOf('__JOURNAL') === 0; c = c.nextElementSibling) runR = Math.max(runR, c.getBoundingClientRect().right);
+    var nr = findBox(tb(), keyOf(11)).getBoundingClientRect();
+    var hit = !!pr && !(pr.right <= nr.left || pr.left >= nr.right || pr.bottom <= nr.top || pr.top >= nr.bottom);
+    rec('G-pop-beside', shown && pr.left >= runR && !hit,
+        'shown ' + shown + ', its left ' + (pr && Math.round(pr.left)) + ' / the row\'s journal cells end at ' + Math.round(runR) + ', covers the next row\'s box ' + hit);
+    b.blur();
+    await sleep(500);
+    // A tap: no history.
+    var b2 = findBox(tb(), keyOf(14));
+    b2.scrollIntoView({ block: 'center' });
+    b2.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'touch' }));
+    b2.focus();
+    await sleep(700);
+    var tapShown = popShown();
+    rec('G-pop-tap', !tapShown, 'a history open after a tap ' + tapShown);
+    b2.blur();
+    await sleep(500);
+    // A mouse press still opens it (the rule reads the pointer, not the screen).
+    var b3 = findBox(tb(), keyOf(16));
+    b3.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'mouse' }));
+    b3.focus();
+    await sleep(700);
+    rec('P-pop-mouse', popShown(), 'a history open after a mouse press ' + popShown());
+    b3.blur();
+  };
+  S.histlabels = async function () {
+    var K3 = window.__MARKED[0];
+    window.__histEvents = [
+      { state: 1, toggle: 'toggle7', label: 'Approved', by: 'pat', at: '2026-10-07 09:00:00', rowKey: K3, parts: K3.split(SEP), bulk: false, keyCols: ['Protocol No.', 'Protocol Type'] },
+      { state: 1, toggle: 'toggle1', label: 'Reviewed', by: 'lee', at: '2026-10-06 09:00:00', rowKey: 'P-77', parts: ['P-77'], bulk: false, keyCols: ['Proposal ID'] },
+      { state: 0, toggle: 'toggle1', by: 'kim', at: '2026-10-05 09:00:00', rowKey: K3, parts: K3.split(SEP), bulk: false }
+    ];
+    clickEl(document.getElementById('journalBtn'));
+    await until(function () { return !!window.PenumbraJournal && $('#journalLightbox').is(':visible'); }, 8000);
+    await sleep(300);
+    clickEl(document.getElementById('journalTabBtnHistory'));
+    await until(function () { return histEvs().length === 3; }, 5000);
+    var evs = histEvs();
+    var tg0 = evs[0] ? String((evs[0].querySelector('.jhist-toggle') || {}).textContent || '').replace(/\s+/g, ' ').trim() : '';
+    rec('G-hist-removed', tg0 === 'Approved (removed)', 'the removed column reads "' + tg0 + '"');
+    var kn = evs.map(function (li) { var k = li.querySelector('.jhist-k'); return k ? k.textContent : '-'; });
+    rec('G-hist-keycols', kn.join('|') === 'PROTOCOL NO.|PROPOSAL ID|PROTOCOL NO.', 'the first key name of each change ' + JSON.stringify(kn));
+    var csv = await csvOf(function () { var ex = document.getElementById('jHistExport'); if (ex) clickEl(ex); });
+    var L = csv.lines;
+    rec('G-hist-csv', L[0] === 'When,Who,Change,Column,Key 1,Key 2,Bulk,Now,Now by,Now at,Key columns'
+        && L[1] === '2026-10-07 09:00:00,pat,Marked,Approved,25403,Exempt,no,Unmarked,,,PROTOCOL NO. + PROTOCOL TYPE'
+        && L[2] === '2026-10-06 09:00:00,lee,Marked,Reviewed,P-77,,no,Unmarked,,,PROPOSAL ID'
+        && L[3] === '2026-10-05 09:00:00,kim,Unmarked,Reviewed,25403,Exempt,no,Marked,pat,2026-10-01 09:00:00,PROTOCOL NO. + PROTOCOL TYPE',
+        L.slice(0, 4).join(' / '));
+    // An answer to an earlier request is dropped: "pat" asked for (slowly), then the box cleared.
+    window.__histSlowNext = 700;
+    $('#jHistUser').val('pat').trigger('input');
+    await sleep(400);
+    $('#jHistUser').val('').trigger('input');
+    await sleep(1500);
+    rec('G-hist-stale', histEvs().length === 3, 'changes listed ' + histEvs().length + ' (the cleared box: 3; the slow answer for "pat": 1)');
+  };
+  S.keywarn = async function () {
+    if (window.Penumbra.syncJournalRowConfigUI) window.Penumbra.syncJournalRowConfigUI();
+    await sleep(200);
+    var ok1 = tick('PROTOCOL TYPE', false);
+    await sleep(300);
+    var note = noteText();
+    rec('G-key-count', ok1 && /Its 4 marks on 2 rows and 2 row notes are recorded under that key/.test(note), 'untick ' + ok1 + ' | step 1 "' + note.slice(0, 320) + '"');
+    // The key is saved: step 1 compares with the key just saved.
+    window.Penumbra.journalMarkLoadedKey();
+    await sleep(200);
+    var note2 = noteText();
+    rec('G-key-saved', /saved with the key/.test(note) && !/saved with the key/.test(note2), 'after the save: "' + note2.slice(0, 200) + '"');
+  };
+  S.pubcancel = async function () {
+    window.__confirmAnswer = false;
+    var c0 = window.__confirms.length, cb = document.getElementById('viewOptionJournal');
+    cb.checked = true;
+    $(cb).trigger('change');
+    var opened = $('#journalRowConfig').is(':visible');
+    await sleep(600);
+    rec('P-pub-asked', opened && window.__confirms.length === c0 + 1 && /switched off/.test(window.__confirms[c0] || ''),
+        'setup panel opened ' + opened + ', asked ' + (window.__confirms.length - c0) + ': "' + String(window.__confirms[c0] || '').slice(0, 90) + '"');
+    rec('G-pub-cancel', !cb.checked && window._penumbraJournalHidden === true && !$('#journalRowConfig').is(':visible'),
+        'box ticked ' + cb.checked + ', journal hidden ' + window._penumbraJournalHidden + ', setup panel shown ' + $('#journalRowConfig').is(':visible'));
+    window.__confirmAnswer = true;
+  };
+  S.bandsum = async function () {
+    var gc = document.getElementById('groupedResultsContainer');
+    function bands() {
+      return Array.prototype.map.call(gc.querySelectorAll('.group-wrapper[data-group-depth="0"]'), function (w) {
+        var h = w.querySelector(':scope > .group-header');
+        var v = h ? h.querySelector('.group-agg-value') : null, l = h ? h.querySelector('.group-agg-label') : null;
+        return { key: w.getAttribute('data-group-key'), label: l ? l.textContent : '', val: v ? v.textContent : null };
+      });
+    }
+    function byKey(bs) { var o = {}; bs.forEach(function (b) { o[b.key] = b.val; }); return o; }
+    function order(bs) { return bs.map(function (b) { return b.key; }).join('|'); }
+    await sleep(500);
+    var b0 = bands(), v0 = byKey(b0);
+    rec('G-band-sum', b0.length === 3 && b0.every(function (b) { return b.label === 'Sum of Reviewed: '; })
+        && v0['Amendment/Renewal'] === '2' && v0['Exempt'] === '1' && v0['Expedited'] === '1', JSON.stringify(b0));
+    rec('G-band-rank', order(b0) === 'Amendment/Renewal|Exempt|Expedited', 'the bands in order: ' + order(b0));
+    // A tick: its band's number follows; no band moves.
+    var bx = findBox(gc, keyOf(19));
+    if (bx) { bx.scrollIntoView({ block: 'center' }); clickEl(bx); }
+    await sleep(900);
+    var b1 = bands(), v1 = byKey(b1);
+    rec('G-band-tick', !!bx && v1['Expedited'] === '2' && order(b1) === order(b0), 'after ticking an Expedited row: ' + JSON.stringify(b1));
+  };
+  S.cfcell = async function () {
+    await sleep(600);
+    var K3 = window.__MARKED[0], K5 = window.__MARKED[1], on = [], bad = [];
+    Array.prototype.forEach.call(tb().querySelectorAll('tbody tr'), function (tr) {
+      var b = tr.querySelector('.journal-toggle-box'); if (!b) return;
+      var k = b.getAttribute('data-row-key'), bg = b.closest('td').style.backgroundColor, pink = bg === 'rgb(255, 230, 230)';
+      if (k === K3 || k === K5) { if (pink) on.push(k); else bad.push(k + ':' + bg); }
+      else if (pink) bad.push(k + ':pink');
+    });
+    rec('G-cf-cell', on.length === 2 && !bad.length, 'toggle cells coloured ' + JSON.stringify(on) + ', wrong ' + JSON.stringify(bad.slice(0, 4)));
+    var th = toggleTh();
+    rec('G-cf-header', !!th && th.style.color === 'rgb(200, 0, 0)', 'the toggle header colour "' + (th ? th.style.color : '-') + '"');
+  };
+  S.ctorkey = async function () {
+    var mkTitle = FX[2]['TITLE'], ctor = findBox(tb(), 'constructor'), mk = findBox(tb(), mkTitle);
+    rec('P-ctor-box', !!ctor && !ctor.classList.contains('is-on') && !!mk && mk.classList.contains('is-on'),
+        'the "constructor" row ' + (ctor ? (ctor.classList.contains('is-on') ? 'ticked' : 'unticked') : 'missing') + ', the marked row ' + (mk ? (mk.classList.contains('is-on') ? 'ticked' : 'unticked') : 'missing'));
+    $('#tableSearch').val('Reviewed = ☑');
+    JR.runTableSearch();
+    await sleep(700);
+    var shown = Array.prototype.filter.call(tb().querySelectorAll('tbody tr'), function (tr) { return !tr.classList.contains('search-hidden'); })
+      .map(function (tr) { var b = tr.querySelector('.journal-toggle-box'); return b ? b.getAttribute('data-row-key') : '?'; });
+    var extra = function (m) {
+      var t = window.Penumbra.journalSnapshotRowData(m);
+      return Object.keys(t).filter(function (k) { return !m.has(k); }).map(function (k) { return k + '=' + t[k]; }).join(',');
+    };
+    var snapC = null, snapM = null;
+    try {
+      snapC = extra(new Map([['PROTOCOL NO.', '25406'], ['PROTOCOL TYPE', 'Exempt'], ['TITLE', 'constructor']]));
+      snapM = extra(new Map([['PROTOCOL NO.', '25403'], ['PROTOCOL TYPE', 'Exempt'], ['TITLE', mkTitle]]));
+    } catch (e) { snapC = 'threw ' + (e && e.message); }
+    rec('G-ctor-key', shown.length === 1 && shown[0] === mkTitle && /=0$/.test(snapC || '') && !/=1/.test(snapC || '') && /=1$/.test(snapM || ''),
+        'the search "Reviewed = ☑" shows ' + JSON.stringify(shown) + ' | a snapshot row: "constructor" ' + snapC + ', the marked one ' + snapM);
+  };
+  S.tpl = async function () {
+    var out = (JR.generateTemplateOutput) ? JR.generateTemplateOutput('{TITLE}={Reviewed}') : null;
+    var lines = Array.isArray(out) ? out : [];
+    rec('G-tpl-real', lines.length === 36 && lines[0] === FX[0]['TITLE'] + '=R1' && lines.every(function (l) { return /=R\d+$/.test(l); }),
+        'lines ' + lines.length + ': ' + JSON.stringify(lines.slice(0, 3)));
+  };
+
+  // ======================= ROUND H (2026-10-08): bulk ticking for every viewer (item 8) ===========
+  //   H-hdr-*     the header's box: its state, marking the rest, clearing all (naming whose marks it
+  //               takes), no sort, only the rows the search shows, "on every page" past the page
+  //   H-grp-*     a group's own header box: that group's rows only
+  //   H-shift-*   Shift+click ranges: mark, clear, a range over someone else's mark asks first; a
+  //               Shift+mousedown selects no text
+  //   H-histname  a change's name in Toggle History filters the list to that person
+  function allBox(scope) { return scope ? scope.querySelector('th[data-column="__JOURNAL_TOGGLE__toggle1"] .journal-toggle-all') : null; }
+  function bulkPosts(from) { return window.__J.posts.slice(from).filter(function (b) { return b.action === 'set_toggles_bulk'; }); }
+  function sortState() {
+    var sc = ((JR.buildStateObject ? JR.buildStateObject() : null) || {}).sortCriteria || [];
+    return sc.length + (document.querySelector('th.sorted') ? ' sorted' : '');
+  }
+  function oneLine(t) { return String(t || '').replace(/\n+/g, ' / '); }
+  S.hdrall = async function () {
+    var b = allBox(tb().tHead);
+    var dash = b ? getComputedStyle(b.querySelector('.tg-dash')).display : '-', chk = b ? getComputedStyle(b.querySelector('.tg-check')).display : '-';
+    rec('H-hdr-state', !!b && b.getAttribute('aria-checked') === 'mixed' && b.title === 'Mark Reviewed on the other 34 rows the search shows'
+        && dash !== 'none' && chk === 'none',
+        'box ' + !!b + ', aria-checked ' + (b && b.getAttribute('aria-checked')) + ', title "' + (b && b.title) + '", dash ' + dash + ', check ' + chk);
+    var c0 = window.__confirms.length, p0 = window.__J.posts.length;
+    if (b) clickEl(b);
+    await sleep(900);
+    var post = bulkPosts(p0)[0], conf = window.__confirms[c0] || '';
+    b = allBox(tb().tHead);
+    var on1 = tb().querySelectorAll('.journal-toggle-box.is-on').length;
+    rec('H-hdr-mark', !!post && post.state === true && post.row_keys.length === 34 && post.row_keys.indexOf(window.__MARKED[0]) < 0
+        && /^Mark .Reviewed. on 34 rows the search shows\?/.test(conf) && /2 rows already marked keep their marks/.test(conf)
+        && on1 === 36 && !!b && b.getAttribute('aria-checked') === 'true' && /Undo/.test(toast()),
+        'confirm "' + oneLine(conf).slice(0, 170) + '" | post ' + (post ? post.row_keys.length + ' keys, state ' + post.state : 'none')
+        + ' | ticked ' + on1 + ', box ' + (b && b.getAttribute('aria-checked')));
+    rec('H-hdr-nosort', !!b && sortState() === '0', 'sort after the header box clicks: ' + sortState());
+    // All marked: a click clears them all, and says whose marks those were.
+    var c1 = window.__confirms.length, p1 = window.__J.posts.length;
+    if (b) clickEl(b);
+    await sleep(900);
+    var post2 = bulkPosts(p1)[0], conf2 = window.__confirms[c1] || '';
+    b = allBox(tb().tHead);
+    rec('H-hdr-clear', !!post2 && post2.state === false && post2.row_keys.length === 36 && /^Clear .Reviewed. on 36 rows the search shows\?/.test(conf2)
+        && /2 of them were marked by someone else \((pat, lee|lee, pat)\)/.test(conf2) && tb().querySelectorAll('.journal-toggle-box.is-on').length === 0
+        && !!b && b.getAttribute('aria-checked') === 'false',
+        'confirm "' + oneLine(conf2).slice(0, 200) + '" | post ' + (post2 ? post2.row_keys.length + ' keys, state ' + post2.state : 'none') + ' | box ' + (b && b.getAttribute('aria-checked')));
+    // Only the rows the search shows.
+    $('#tableSearch').val('STATUS = Closed');
+    JR.runTableSearch();
+    await sleep(800);
+    b = allBox(tb().tHead);
+    var t3 = b ? b.title : '', p2 = window.__J.posts.length;
+    if (b) clickEl(b);
+    await sleep(900);
+    var post3 = bulkPosts(p2)[0];
+    var closed = FX.filter(function (r) { return r['STATUS'] === 'Closed'; }).map(window.__keyOf);
+    rec('H-hdr-search', t3 === 'Mark Reviewed on all 9 rows the search shows' && !!post3 && post3.row_keys.length === 9
+        && post3.row_keys.every(function (k) { return closed.indexOf(k) >= 0; }),
+        'title "' + t3 + '" | post ' + (post3 ? post3.row_keys.length + ' keys' : 'none') + ' (Closed rows: ' + closed.length + ')');
+  };
+  S.hdrpage = async function () {
+    var b = allBox(tb().tHead), c0 = window.__confirms.length, p0 = window.__J.posts.length;
+    window.__confirmAnswer = false;
+    if (b) clickEl(b);
+    await sleep(400);
+    var conf = window.__confirms[c0] || '';
+    window.__confirmAnswer = true;
+    rec('H-hdr-pages', /^Mark .Reviewed. on 34 rows the search shows, on every page\?/.test(conf) && bulkPosts(p0).length === 0,
+        'confirm "' + oneLine(conf).slice(0, 160) + '", writes ' + bulkPosts(p0).length);
+  };
+  S.hdrfail = async function () {
+    var b = allBox(tb().tHead), c0 = window.__confirms.length, p0 = window.__J.posts.length;
+    if (b) clickEl(b);
+    await sleep(400);
+    var t = toast();
+    rec('H-hdr-unloaded', !!b && window.__confirms.length === c0 && bulkPosts(p0).length === 0 && /Could not load the marks/i.test(t),
+        'box ' + !!b + ', confirms ' + (window.__confirms.length - c0) + ', writes ' + bulkPosts(p0).length + ', toast "' + t.trim().slice(0, 120) + '"');
+  };
+  S.hdrgroup = async function () {
+    var gc = document.getElementById('groupedResultsContainer');
+    function band(key) {
+      var ws = gc.querySelectorAll('.group-wrapper.group-leaf');
+      for (var i = 0; i < ws.length; i++) if (ws[i].getAttribute('data-group-key') === key) return ws[i];
+      return null;
+    }
+    function boxOf(key) { var w = band(key), t = w ? w.querySelector('.group-content > table') : null; return t ? allBox(t.tHead) : null; }
+    var bx = boxOf('Exempt');
+    rec('H-grp-state', !!bx && bx.getAttribute('aria-checked') === 'mixed' && bx.title === 'Mark Reviewed on the other 17 rows in this group',
+        'box ' + !!bx + ', ' + (bx && bx.getAttribute('aria-checked')) + ', "' + (bx && bx.title) + '"');
+    var c0 = window.__confirms.length, p0 = window.__J.posts.length;
+    if (bx) clickEl(bx);
+    await sleep(1000);
+    var post = bulkPosts(p0)[0], conf = window.__confirms[c0] || '';
+    var exempt = FX.filter(function (r) { return r['PROTOCOL TYPE'] === 'Exempt'; }).map(window.__keyOf);
+    var ex = boxOf('Exempt'), ep = boxOf('Expedited');
+    rec('H-grp-mark', !!post && post.state === true && post.row_keys.length === 17 && post.row_keys.every(function (k) { return exempt.indexOf(k) >= 0; })
+        && /^Mark .Reviewed. on 17 rows in this group\?/.test(conf) && /1 row already marked keeps its mark\./.test(conf)
+        && !!ex && ex.getAttribute('aria-checked') === 'true'
+        && !!ep && ep.getAttribute('aria-checked') === 'mixed',
+        'confirm "' + oneLine(conf).slice(0, 140) + '" | post ' + (post ? post.row_keys.length + ' keys' : 'none')
+        + ' | Exempt box ' + (ex && ex.getAttribute('aria-checked')) + ', Expedited box ' + (ep && ep.getAttribute('aria-checked')));
+    rec('H-grp-nosort', !!bx && sortState() === '0', 'sort: ' + sortState());
+  };
+  S.shiftrange = async function () {
+    function boxAt(i) { return findBox(tb(), keyOf(i)); }
+    function onAt(list) { return list.map(function (i) { return boxAt(i).classList.contains('is-on') ? 1 : 0; }).join(''); }
+    function shiftClick(el) { el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window, shiftKey: true })); }
+    clickEl(boxAt(4));               // a plain click: marks row 5, and is where a range starts
+    await sleep(500);
+    var c0 = window.__confirms.length, p1 = window.__J.posts.length;
+    shiftClick(boxAt(8));            // rows 5-9 take row 9's new state: marked
+    await sleep(900);
+    var post = bulkPosts(p1)[0], want = [5, 6, 7, 8].map(keyOf);
+    rec('H-shift-mark', !!post && post.state === true && JSON.stringify(post.row_keys) === JSON.stringify(want) && window.__confirms.length === c0
+        && onAt([4, 5, 6, 7, 8]) === '11111',
+        'post ' + (post ? JSON.stringify(post.row_keys) : 'none') + ' (rows 6-9 wanted), confirms ' + (window.__confirms.length - c0) + ', rows 5-9 ticked ' + onAt([4, 5, 6, 7, 8]));
+    // From row 9 (the last box clicked) to row 7, now ticked: rows 7-9 are cleared.
+    var p2 = window.__J.posts.length;
+    shiftClick(boxAt(6));
+    await sleep(900);
+    var post2 = bulkPosts(p2)[0];
+    rec('H-shift-clear', !!post2 && post2.state === false && JSON.stringify(post2.row_keys.slice().sort()) === JSON.stringify([6, 7, 8].map(keyOf).sort())
+        && onAt([5, 6, 7, 8]) === '1000',
+        'post ' + (post2 ? JSON.stringify(post2.row_keys) : 'none') + ' | rows 6-9 ticked ' + onAt([5, 6, 7, 8]));
+    // A range over someone else's mark (Pat's, row 3) asks first - cancelled, nothing is written.
+    window.__confirmAnswer = false;
+    var c3 = window.__confirms.length, p3 = window.__J.posts.length;
+    shiftClick(boxAt(2));            // from row 7: rows 3-7 - Pat's row 3 and rows 5-6 would be cleared
+    await sleep(500);
+    var conf3 = window.__confirms[c3] || '';
+    window.__confirmAnswer = true;
+    rec('H-shift-theirs', window.__confirms.length === c3 + 1 && /^Clear .Reviewed. on 3 rows\?/.test(conf3) && /1 of them was marked by someone else \(pat\)/.test(conf3)
+        && window.__J.posts.length === p3 && boxAt(2).classList.contains('is-on'),
+        'confirm "' + oneLine(conf3).slice(0, 160) + '", writes ' + (window.__J.posts.length - p3));
+    var md = new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window, shiftKey: true });
+    boxAt(10).dispatchEvent(md);
+    rec('H-shift-noselect', md.defaultPrevented, 'a Shift+mousedown on a box: default prevented ' + md.defaultPrevented);
+  };
+  S.histname = async function () {
+    var K3 = window.__MARKED[0], K7 = keyOf(6);
+    var ev = function (st, by, at, rk) { return { state: st, toggle: 'toggle1', by: by, at: at, rowKey: rk, parts: rk.split(SEP), bulk: false }; };
+    window.__histEvents = [ev(1, 'pat', '2026-10-07 09:00:00', K3), ev(0, 'lee', '2026-10-06 09:00:00', K7), ev(1, 'pat', '2026-10-05 09:00:00', K7)];
+    clickEl(document.getElementById('journalBtn'));
+    await until(function () { return !!window.PenumbraJournal && $('#journalLightbox').is(':visible'); }, 8000);
+    await sleep(300);
+    clickEl(document.getElementById('journalTabBtnHistory'));
+    await until(function () { return histEvs().length === 3; }, 5000);
+    var nameBtn = histEvs()[1] ? histEvs()[1].querySelector('button.jhist-by[data-user]') : null;
+    // Read before the click: the list is drawn again, and a detached button has no computed style.
+    var cs = nameBtn ? getComputedStyle(nameBtn) : null, look = cs ? { border: cs.borderTopStyle, cursor: cs.cursor } : {};
+    await histReload(function () { if (nameBtn) clickEl(nameBtn); }, 1);
+    rec('H-histname', !!nameBtn && nameBtn.getAttribute('data-user') === 'lee' && $('#jHistUser').val() === 'lee' && /user=lee/.test(lastHistUrl())
+        && histEvs().length === 1 && /lee/.test(histEvs()[0].textContent) && look.border === 'none' && look.cursor === 'pointer',
+        'name button ' + !!nameBtn + ' (border ' + look.border + ', cursor ' + look.cursor + '), user box "' + $('#jHistUser').val()
+        + '", request ' + (lastHistUrl().split('?')[1] || '-').slice(0, 90) + ', changes listed ' + histEvs().length);
+  };
+
+  // ======================= ROUND I (2026-10-08): the who and when columns (item 9) ===================
+  //   I-who-cols     "Reviewed by" / "Reviewed on" beside the toggle, from the marks' own by / at
+  //   I-who-flip     a tick fills them (who at once, the day when the save answers); an untick empties them
+  //   I-who-search   search by them: a person, a day, TODAY-n, empty
+  //   I-who-sort     a header click sorts by them
+  //   I-who-tpl      a template reads them ({Reviewed by})
+  //   I-who-cmp      a snapshot comparison leaves them out
+  //   I-who-state    the switch is saved with the report
+  //   I-who-group    grouped by "Reviewed by": a band per person and [Blank], the band names its column
+  //   I-who-off      the switch off takes them out (and out of search); on brings them back
+  //   I-who-sortload a saved sort on one waits for the marks
+  function whoHeads() { return Array.prototype.map.call(tb().tHead.querySelectorAll('th[data-column^="__JOURNAL"]'), function (th) { return th.getAttribute('data-column'); }); }
+  function whoCell(scope, rk, kind) {
+    var b = findBox(scope, rk), tr = b ? b.closest('tr') : null;
+    var c = tr ? tr.querySelector(':scope > td[data-column="__JOURNAL_' + (kind === 'by' ? 'BY' : 'ON') + '__toggle1"]') : null;
+    return c ? c.textContent : null;
+  }
+  function shownRowKeys() {
+    return Array.prototype.filter.call(tb().querySelectorAll('tbody tr'), function (tr) { return !tr.classList.contains('search-hidden'); })
+      .map(function (tr) { var b = tr.querySelector('.journal-toggle-box'); return b ? b.getAttribute('data-row-key') : '?'; });
+  }
+  async function searchFor(q) { $('#tableSearch').val(q); JR.runTableSearch(); await sleep(500); return shownRowKeys(); }
+  S.whocols = async function () {
+    var K3 = window.__MARKED[0], K5 = window.__MARKED[1], K7 = keyOf(6);
+    var heads = whoHeads();
+    var thBy = tb().tHead.querySelector('th[data-column="__JOURNAL_BY__toggle1"]'), thOn = tb().tHead.querySelector('th[data-column="__JOURNAL_ON__toggle1"]');
+    rec('I-who-cols', heads.join(',') === '__JOURNAL_TOGGLE__toggle1,__JOURNAL_BY__toggle1,__JOURNAL_ON__toggle1,__JOURNAL_NOTES'
+        && !!thBy && /^Reviewed by/.test(thBy.textContent) && !!thOn && /^Reviewed on/.test(thOn.textContent)
+        && whoCell(tb(), K3, 'by') === 'pat' && whoCell(tb(), K3, 'on') === '2026-10-01' && whoCell(tb(), K5, 'by') === 'lee'
+        && whoCell(tb(), K7, 'by') === '' && whoCell(tb(), K7, 'on') === '',
+        'heads ' + heads.join(',') + ' | row 3 ' + whoCell(tb(), K3, 'by') + ' / ' + whoCell(tb(), K3, 'on') + ', row 23 ' + whoCell(tb(), K5, 'by')
+        + ', row 7 "' + whoCell(tb(), K7, 'by') + '" / "' + whoCell(tb(), K7, 'on') + '"');
+    var b7 = findBox(tb(), K7);
+    if (b7) clickEl(b7);
+    var byNow = whoCell(tb(), K7, 'by'), onNow = whoCell(tb(), K7, 'on');
+    await sleep(400);
+    var by1 = whoCell(tb(), K7, 'by'), on1 = whoCell(tb(), K7, 'on');
+    b7 = findBox(tb(), K7);
+    if (b7) clickEl(b7);
+    await sleep(400);
+    rec('I-who-flip', byNow === 'harness' && onNow === '' && by1 === 'harness' && on1 === '2026-10-07' && whoCell(tb(), K7, 'by') === '' && whoCell(tb(), K7, 'on') === '',
+        'at the click "' + byNow + '" / "' + onNow + '", once saved ' + by1 + ' / ' + on1 + ', unticked "' + whoCell(tb(), K7, 'by') + '" / "' + whoCell(tb(), K7, 'on') + '"');
+    var s1 = await searchFor('Reviewed by = pat');
+    var s2 = await searchFor('Reviewed on = 2026-10-01');
+    var s3 = await searchFor('Reviewed on >= TODAY-3650');
+    var s4 = await searchFor('Reviewed by = empty');
+    await searchFor('');
+    rec('I-who-search', s1.length === 1 && s1[0] === K3 && s2.length === 2 && s3.length === 2 && s4.length === 34,
+        '"Reviewed by = pat" ' + s1.length + ', "Reviewed on = 2026-10-01" ' + s2.length + ', ">= TODAY-3650" ' + s3.length + ', "Reviewed by = empty" ' + s4.length);
+    var lines = (JR.generateTemplateOutput ? JR.generateTemplateOutput('{TITLE}={Reviewed by}') : null) || [];
+    rec('I-who-tpl', lines.indexOf('Delta study 3=pat') >= 0 && lines.indexOf('Foxtrot study 23=lee') >= 0 && lines.indexOf('Alpha study 9=') >= 0,
+        'lines ' + lines.length + ': ' + JSON.stringify(lines.filter(function (l) { return /study (3|23|9)=/.test(l); })));
+    var thBy2 = tb().tHead.querySelector('th[data-column="__JOURNAL_BY__toggle1"]');
+    if (thBy2) clickEl(thBy2);
+    await sleep(600);
+    var order = shownRowKeys(), iLee = order.indexOf(K5), iPat = order.indexOf(K3);
+    rec('I-who-sort', !!thBy2 && iLee >= 0 && iPat === iLee + 1, 'after a click on the "Reviewed by" header: lee at ' + iLee + ', pat at ' + iPat);
+    var nc = window.Penumbra.journalNotComparedCol;
+    rec('I-who-cmp', !!nc && nc('__JOURNAL_BY__toggle1') && nc('__JOURNAL_ON__toggle1') && nc('__JOURNAL_NOTES') && !nc('__JOURNAL_TOGGLE__toggle1') && !nc('TITLE'),
+        'not compared: by ' + (nc && nc('__JOURNAL_BY__toggle1')) + ', on ' + (nc && nc('__JOURNAL_ON__toggle1')) + ', notes ' + (nc && nc('__JOURNAL_NOTES'))
+        + ', the toggle ' + (nc && nc('__JOURNAL_TOGGLE__toggle1')) + ', TITLE ' + (nc && nc('TITLE')));
+    var st = JR.buildStateObject ? JR.buildStateObject() : null;
+    rec('I-who-state', !!st && !!st.viewOptions && st.viewOptions.journalToggleWho === true, 'saved viewOptions.journalToggleWho ' + (st && st.viewOptions ? st.viewOptions.journalToggleWho : '-'));
+  };
+  S.whogroup = async function () {
+    var gc = document.getElementById('groupedResultsContainer');
+    var bands = Array.prototype.map.call(gc.querySelectorAll('.group-wrapper[data-group-depth="0"]'), function (w) {
+      var nm = w.querySelector(':scope > .group-header > .group-name');
+      return { key: w.getAttribute('data-group-key'), rows: w.querySelectorAll('.group-content > table > tbody > tr').length, col: nm ? nm.getAttribute('data-tg-col') : null };
+    });
+    var by = {};
+    bands.forEach(function (b) { by[b.key] = b; });
+    rec('I-who-group', bands.length === 3 && !!by['pat'] && by['pat'].rows === 1 && !!by['lee'] && by['lee'].rows === 1 && !!by['[Blank]'] && by['[Blank]'].rows === 34
+        && by['pat'].col === 'Reviewed by', JSON.stringify(bands));
+  };
+  S.whooff = async function () {
+    if (window.Penumbra.syncJournalRowConfigUI) window.Penumbra.syncJournalRowConfigUI();
+    await sleep(200);
+    var sw = document.getElementById('journalToggleWhoEnable');
+    var before = whoHeads().join(','), checked0 = sw ? sw.checked : null;
+    if (sw) { sw.checked = false; $(sw).trigger('change'); }
+    await sleep(600);
+    var off = whoHeads().join(','), offCells = tb().querySelectorAll('td[data-column^="__JOURNAL_BY__"], td[data-column^="__JOURNAL_ON__"]').length;
+    var names = (window.Penumbra.journalMergeCols ? window.Penumbra.journalMergeCols([]) : []).join('|');
+    var st = JR.buildStateObject ? JR.buildStateObject() : {};
+    var saved = !!(st && st.viewOptions && st.viewOptions.journalToggleWho);
+    if (sw) { sw.checked = true; $(sw).trigger('change'); }
+    await sleep(600);
+    var on = whoHeads().join(',');
+    rec('I-who-off', checked0 === true && /__JOURNAL_BY__toggle1/.test(before) && off === '__JOURNAL_TOGGLE__toggle1,__JOURNAL_NOTES' && offCells === 0
+        && !/Reviewed by/.test(names) && !saved && on === before,
+        'switch ' + checked0 + ' | before ' + before + ' | off ' + off + ' (cells ' + offCells + ', search names ' + names + ', saved ' + saved + ') | on again ' + on);
+  };
+  S.whosortload = async function () {
+    var keys = Array.prototype.map.call(tb().querySelectorAll('tbody tr'), function (tr) { var b = tr.querySelector('.journal-toggle-box'); return b ? b.getAttribute('data-row-key') : '?'; });
+    rec('I-who-sortload', keys[0] === window.__MARKED[0] && keys[1] === window.__MARKED[1],
+        'first rows ' + JSON.stringify(keys.slice(0, 3)) + ' (wanted pat\'s ' + window.__MARKED[0] + ', then lee\'s ' + window.__MARKED[1] + ')');
+  };
+
+  // ======================= ROUND M (2026-10-08): safe renames (item 10) ===========================
+  // The toggle was saved as "Reviewed" and is "Complete" now (viewOptions.journalToggles[].oldLabels):
+  //   M-old-search   a search on the old name: the toggle, braces, its who / when columns; the new name too
+  //   M-old-names    the pickers and the header say "Complete" alone; the old name resolves
+  //   M-old-snippet  count(Reviewed = ☑) in the snippet
+  //   M-old-format   format(row, Reviewed = ☑, ...)
+  //   M-old-tpl      {Reviewed} / {Reviewed by} in a template
+  //   M-old-button   mark|Reviewed finds it, and its question names "Complete"; an unknown name still fails
+  //   M-grp-old      a report saved grouped by "Reviewed": the bands, named "Complete"
+  //   M-grp-tick     ...and a tick moves its row (the regroup finds the level by its old name)
+  //   M-sum-old      a band summary saved on "Reviewed"
+  //   M-sb-multi     the Visual Search Builder reads "Reviewed = ☑ and Reviewed by = pat" back as Complete / Complete by
+  //   M-sb-brace     ...and "{Reviewed} = ☐" as Complete
+  //   M-live-*       a rename in the setup: the old name works at once and the status line says so, a name
+  //                  only typed is none, the save writes it, a later rename adds the name just saved, renaming
+  //                  back drops the name it has again
+  //   M-undo         a removed toggle comes back with its old names
+  //   M-cap          at most 10 old names, the newest
+  //   M-prec-*       a current name wins - the data's (Status), the notes column's, another toggle's (Sent);
+  //                  the setup warns when a name another toggle had is in use; the save keeps neither
+  async function cfgOpen() {
+    if (window.Penumbra.syncJournalRowConfigUI) window.Penumbra.syncJournalRowConfigUI();
+    await sleep(150);
+  }
+  function nameBox(i) { return document.querySelectorAll('#journalToggleList .journal-toggle-def-label')[i || 0] || null; }
+  // Typed a letter at a time (the box renames the column live on each), then Enter.
+  async function typeName(i, text) {
+    for (var n = 1; n <= text.length; n++) { var b = nameBox(i); if (!b) return false; b.value = text.slice(0, n); $(b).trigger('input'); }
+    var e = nameBox(i);
+    if (e) $(e).trigger($.Event('keydown', { key: 'Enter' }));
+    await sleep(250);
+    return !!e;
+  }
+  function savedToggles() { var st = JR.buildStateObject ? JR.buildStateObject() : null; return (st && st.viewOptions && st.viewOptions.journalToggles) || null; }
+  function rowsColoured(K3, K5) {
+    var on = [], bad = [];
+    Array.prototype.forEach.call(tb().querySelectorAll('tbody tr'), function (tr) {
+      var b = tr.querySelector('.journal-toggle-box'); if (!b) return;
+      var k = b.getAttribute('data-row-key'), green = tr.style.backgroundColor === 'rgb(230, 255, 230)';
+      if (k === K3 || k === K5) { if (green) on.push(k); else bad.push(k + ':' + tr.style.backgroundColor); }
+      else if (green) bad.push(k + ':green');
+    });
+    return { on: on, bad: bad };
+  }
+  S.renamed = async function () {
+    var K3 = window.__MARKED[0], K5 = window.__MARKED[1], P = window.Penumbra;
+    await sleep(800);
+    var cf = rowsColoured(K3, K5);
+    rec('M-old-format', cf.on.length === 2 && !cf.bad.length, 'coloured ' + JSON.stringify(cf.on) + ', wrong ' + JSON.stringify(cf.bad.slice(0, 4)));
+    var snip = document.getElementById('reportSnippetOutput').textContent.replace(/\s+/g, ' ').trim();
+    rec('M-old-snippet', /Marked so far: 2\b/.test(snip), 'snippet "' + snip.slice(0, 80) + '"');
+    var s1 = await searchFor('Reviewed = ☑');
+    var s2 = await searchFor('{Reviewed} = ☐');
+    var s3 = await searchFor('Reviewed by = pat');
+    var s4 = await searchFor('Reviewed on = 2026-10-01');
+    var s5 = await searchFor('Complete = ☑');
+    await searchFor('');
+    rec('M-old-search', s1.length === 2 && s1.indexOf(K3) >= 0 && s1.indexOf(K5) >= 0 && s2.length === 34 && s3.length === 1 && s3[0] === K3
+        && s4.length === 2 && s5.length === 2,
+        '"Reviewed = ☑" ' + s1.length + ', "{Reviewed} = ☐" ' + s2.length + ', "Reviewed by = pat" ' + s3.length + ', "Reviewed on = 2026-10-01" ' + s4.length
+        + ', "Complete = ☑" ' + s5.length);
+    var th = toggleTh();
+    var pick = (window._penumbraSearchAPI && window._penumbraSearchAPI.getColumns) ? window._penumbraSearchAPI.getColumns().map(function (c) { return c.name; }) : [];
+    var now = P.journalCurrentNameOf ? P.journalCurrentNameOf('Reviewed by') : '(none)';
+    rec('M-old-names', !!th && /^Complete/.test(th.textContent) && pick.indexOf('Complete') >= 0 && pick.indexOf('Complete by') >= 0
+        && pick.indexOf('Reviewed') < 0 && pick.indexOf('Reviewed by') < 0 && P.journalFriendlyCol('__JOURNAL_TOGGLE__toggle1') === 'Complete'
+        && P.journalSentinelFor('Reviewed') === '__JOURNAL_TOGGLE__toggle1' && P.journalSentinelFor('reviewed on') === '__JOURNAL_ON__toggle1' && now === 'Complete by',
+        'header "' + (th ? th.textContent : '-') + '" | picker ' + JSON.stringify(pick.filter(function (n) { return /Complete|Reviewed/.test(n); }))
+        + ' | friendly ' + P.journalFriendlyCol('__JOURNAL_TOGGLE__toggle1') + ', Reviewed -> ' + P.journalSentinelFor('Reviewed')
+        + ', "reviewed on" -> ' + P.journalSentinelFor('reviewed on') + ', "Reviewed by" stands for ' + now);
+    var lines = (JR.generateTemplateOutput ? JR.generateTemplateOutput('{TITLE}={Reviewed}/{Reviewed by}') : null) || [];
+    rec('M-old-tpl', lines.indexOf('Delta study 3=1/pat') >= 0 && lines.indexOf('Foxtrot study 23=1/lee') >= 0 && lines.indexOf('Alpha study 9=0/') >= 0,
+        'lines ' + lines.length + ': ' + JSON.stringify(lines.filter(function (l) { return /study (3|23|9)=/.test(l); })));
+    var c0 = window.__confirms.length, p0 = window.__J.posts.length;
+    window.__confirmAnswer = false;
+    window.Penumbra.journalBulkAction('mark', ['Reviewed']);
+    await sleep(200);
+    var q = window.__confirms.slice(c0).join(' | ');
+    window.Penumbra.journalBulkAction('mark', ['Nope']);
+    await sleep(200);
+    var t = toast();
+    window.__confirmAnswer = true;
+    rec('M-old-button', /Mark “Complete” on 34 rows\?/.test(q) && window.__J.posts.length === p0 && /No toggle column named “Nope”/.test(t),
+        'asked "' + oneLine(q).slice(0, 120) + '", posts ' + (window.__J.posts.length - p0) + ' | an unknown name: "' + t.trim().slice(0, 100) + '"');
+  };
+  function bandsOf(gc) {
+    return Array.prototype.map.call(gc.querySelectorAll('.group-wrapper[data-group-depth="0"]'), function (w) {
+      var nm = w.querySelector(':scope > .group-header > .group-name');
+      return { key: w.getAttribute('data-group-key'), rows: w.querySelectorAll('.group-content > table > tbody > tr[data-row-index]').length, col: nm ? nm.getAttribute('data-tg-col') : null };
+    });
+  }
+  S.renamegrp = async function () {
+    var gc = document.getElementById('groupedResultsContainer');
+    var b0 = bandsOf(gc), by0 = {};
+    b0.forEach(function (b) { by0[b.key] = b; });
+    rec('M-grp-old', $(gc).is(':visible') && b0.length === 2 && !!by0.Checked && by0.Checked.rows === 2 && !!by0.Unchecked && by0.Unchecked.rows === 34
+        && by0.Checked.col === 'Complete' && by0.Unchecked.col === 'Complete', 'grouped ' + $(gc).is(':visible') + ' ' + JSON.stringify(b0));
+    var bx = boxWhere(gc, false);
+    if (bx) { bx.scrollIntoView({ block: 'center' }); clickEl(bx); }
+    await sleep(1600);
+    var b1 = bandsOf(gc), by1 = {};
+    b1.forEach(function (b) { by1[b.key] = b; });
+    rec('M-grp-tick', !!bx && !!by1.Checked && by1.Checked.rows === 3 && !!by1.Unchecked && by1.Unchecked.rows === 33, 'after a tick: ' + JSON.stringify(b1));
+  };
+  S.renamesum = async function () {
+    var gc = document.getElementById('groupedResultsContainer');
+    await sleep(500);
+    var bs = Array.prototype.map.call(gc.querySelectorAll('.group-wrapper[data-group-depth="0"]'), function (w) {
+      var h = w.querySelector(':scope > .group-header');
+      var v = h ? h.querySelector('.group-agg-value') : null, l = h ? h.querySelector('.group-agg-label') : null;
+      return { key: w.getAttribute('data-group-key'), label: l ? l.textContent : '', val: v ? v.textContent : null };
+    });
+    var v = {};
+    bs.forEach(function (b) { v[b.key] = b.val; });
+    rec('M-sum-old', bs.length === 3 && v['Exempt'] === '1' && v['Expedited'] === '1' && bs.every(function (b) { return b.label === 'Sum of Reviewed: '; }),
+        JSON.stringify(bs));
+  };
+  S.renamesb = async function () {
+    // The Visual Search Builder (js/search_builder.js, loaded for this scenario alone - it changes the
+    // grouping picker's column source) with its markup (search_builder_content.php's, as sbc.html) and
+    // the preset chip stubbed.
+    if (!document.getElementById('searchBuilderContainer')) { var c = document.createElement('div'); c.id = 'searchBuilderContainer'; document.body.appendChild(c); }
+    window.PenumbraPresets = window.PenumbraPresets || { NS: { SEARCH: 'search' }, list: function () { return []; }, reportId: function () { return 'jrfix'; },
+      getPin: function () { return null; }, create: function () { return { setLoaded: function () {}, refresh: function () {} }; } };
+    var realGet = jQuery.get;
+    jQuery.get = function (u, cb) {
+      if (u === 'search_builder_content.php') {
+        var d = jQuery.Deferred();
+        fetch('sbc.html').then(function (r) { return r.text(); }).then(function (t) {
+          try { cb(t); } catch (e) { window.__errors.push('builder markup: ' + e); }
+          d.resolve(t);
+        });
+        return d.promise();
+      }
+      return realGet.apply(this, arguments);
+    };
+    await new Promise(function (res) { var s = document.createElement('script'); s.src = 'search_builder.js'; s.onload = res; s.onerror = res; document.head.appendChild(s); });
+    if (typeof window.openSearchBuilder === 'function') window.openSearchBuilder();
+    await until(function () { return $('#searchBuilderLightbox').is(':visible') && $('#sbConditionsContainer .sb-condition-row').length > 0; }, 6000);
+    function cols() { return $('#sbConditionsContainer .sb-condition-row').map(function () { return String($(this).find('.sb-col-select').val()); }).get(); }
+    var sb = window._penumbraSearchBuilder;
+    if (sb) sb.populateFromQuery('Reviewed = ☑ and Reviewed by = pat');
+    await sleep(500);
+    var c1 = cols();
+    if (sb) sb.populateFromQuery('{Reviewed} = ☐');
+    await sleep(500);
+    var c2 = cols();
+    rec('M-sb-multi', c1.length === 2 && c1[0] === 'Complete' && c1[1] === 'Complete by', 'builder ' + !!sb + ', rows read back as ' + JSON.stringify(c1));
+    rec('M-sb-brace', c2.length === 1 && c2[0] === 'Complete', 'rows read back as ' + JSON.stringify(c2));
+  };
+  S.renamelive = async function () {
+    var P = window.Penumbra;
+    await cfgOpen();
+    var b0 = nameBox(0);
+    if (b0) { b0.value = ''; $(b0).trigger('input'); }   // an emptied box keeps the name
+    var typed = await typeName(0, 'Complete');
+    var status = ($('#journalToggleStatus').text() || '').replace(/\s+/g, ' ');
+    var s1 = await searchFor('Reviewed = ☑'), s2 = await searchFor('Complete = ☑');
+    await searchFor('');
+    rec('M-live-search', typed && s1.length === 2 && s2.length === 2, 'renamed ' + typed + ' | "Reviewed = ☑" ' + s1.length + ', "Complete = ☑" ' + s2.length);
+    rec('M-live-status', /Named it Complete\. Searches, snippets, buttons and scheduled tasks that say Reviewed keep working\./.test(status), 'status "' + status.slice(0, 200) + '"');
+    var list = P.journalOldNameList ? P.journalOldNameList().map(function (o) { return o.name + '>' + o.current; }) : [];
+    var comp = P.journalCurrentNameOf ? P.journalCurrentNameOf('Comp') : 'x';
+    rec('M-live-typed', list.join('|') === 'Reviewed>Complete' && comp === null, 'old names ' + JSON.stringify(list) + ', "Comp" stands for ' + comp);
+    var t1 = savedToggles();
+    rec('M-live-save', !!t1 && t1.length === 1 && t1[0].key === 'toggle1' && t1[0].label === 'Complete' && JSON.stringify(t1[0].oldLabels) === '["Reviewed"]',
+        'saved ' + JSON.stringify(t1));
+    // The save went through (its success handler hands the saved toggles over): a later rename keeps the
+    // name just saved as an old name too.
+    if (t1) P.journalMarkLoadedKey(t1);
+    await typeName(0, 'Finished');
+    var t2 = savedToggles();
+    var s3 = await searchFor('Complete = ☑'), s4 = await searchFor('Reviewed = ☑');
+    await searchFor('');
+    rec('M-live-saved', !!t2 && t2[0].label === 'Finished' && JSON.stringify(t2[0].oldLabels) === '["Reviewed","Complete"]' && s3.length === 2 && s4.length === 2,
+        'saved ' + JSON.stringify(t2) + ' | "Complete = ☑" ' + s3.length + ', "Reviewed = ☑" ' + s4.length);
+    // Back to its first name: that one is its name again, the name saved since stays an old one.
+    await typeName(0, 'Reviewed');
+    var t3 = savedToggles();
+    rec('M-live-back', !!t3 && t3[0].label === 'Reviewed' && JSON.stringify(t3[0].oldLabels) === '["Complete"]', 'saved ' + JSON.stringify(t3));
+  };
+  S.renameundo = async function () {
+    var P = window.Penumbra;
+    await cfgOpen();
+    var rm = document.querySelector('#journalToggleList .journal-toggle-def-remove');
+    if (rm) clickEl(rm);
+    await sleep(300);
+    var gone = P.journalOldNameList ? P.journalOldNameList().length : -1;
+    var undo = document.querySelector('#journalToggleStatus .journal-toggle-undo');
+    if (undo) clickEl(undo);
+    await sleep(400);
+    var back = P.journalOldNameList ? P.journalOldNameList().map(function (o) { return o.name; }) : [];
+    var t = savedToggles();
+    var s = await searchFor('Reviewed = ☑');
+    await searchFor('');
+    rec('M-undo', !!rm && !!undo && gone === 0 && back.join('|') === 'Reviewed' && !!t && JSON.stringify(t[0].oldLabels) === '["Reviewed"]' && s.length === 2,
+        'removed: old names ' + gone + ' | undone: ' + JSON.stringify(back) + ', saved ' + JSON.stringify(t) + ', "Reviewed = ☑" ' + s.length);
+    var many = [];
+    for (var i = 1; i <= 12; i++) many.push('Name ' + i);
+    var cap = P.journalOldLabelsToSave ? P.journalOldLabelsToSave({ key: 'zz', label: 'Now', oldLabels: many }) : null;
+    rec('M-cap', !!cap && cap.length === 10 && cap[0] === 'Name 3' && cap[9] === 'Name 12', JSON.stringify(cap));
+  };
+  S.renameprec = async function () {
+    var K3 = window.__MARKED[0], K7 = keyOf(6), P = window.Penumbra;
+    var sStatus = await searchFor('Status = Closed');
+    var sNotes = await searchFor('Notes > 0');
+    var sSent = await searchFor('Sent = ☑');
+    await searchFor('');
+    rec('M-prec-real', sStatus.length === 9, '"Status = Closed" ' + sStatus.length + ' (the data column: 9 rows)');
+    var notesNow = P.journalCurrentNameOf ? P.journalCurrentNameOf('Notes') : 'x';
+    rec('M-prec-notes', sNotes.length === 1 && sNotes[0] === K3 && notesNow === null, '"Notes > 0" ' + JSON.stringify(sNotes) + ', "Notes" stands for ' + notesNow);
+    var sentNow = P.journalCurrentNameOf ? P.journalCurrentNameOf('Sent') : null;
+    rec('M-prec-current', sSent.length === 1 && sSent[0] === K7 && sentNow === null,
+        '"Sent = ☑" ' + JSON.stringify(sSent) + ' (Sent marks row 7), "Sent" listed as an old name of ' + sentNow);
+    await cfgOpen();
+    var warn = document.getElementById('journalToggleWarn'), w = warn ? warn.textContent : '';
+    rec('M-prec-warn', /“Sent” was the name of “Complete” before it was renamed\. Searches, snippets and scheduled tasks that say “Sent” now read this column/.test(w) && $(warn).is(':visible'),
+        'warning "' + w.slice(0, 240) + '"');
+    var t = savedToggles(), t1 = t ? t.filter(function (d) { return d.key === 'toggle1'; })[0] : null, t2 = t ? t.filter(function (d) { return d.key === 'toggle2'; })[0] : null;
+    rec('M-prec-save', !!t1 && JSON.stringify(t1.oldLabels) === '["Reviewed","Status"]' && !!t2 && !('oldLabels' in t2), 'saved ' + JSON.stringify(t));
+  };
+
+  // ======================= ROUND N (2026-10-08): key changes (item 11) ==============================
+  //   N-dirty-box   the key changed on screen, not saved: every box, the header's box and the notes buttons
+  //                 wait for the save and say so
+  //   N-dirty-note  step 1 says the save moves the marks and notes with their rows
+  //   N-dirty-bulk  a snippet button's mark|... refuses
+  //   N-dirty-back  the saved key ticked again: the boxes and their marks are back
+  //   N-save-plan   a save that changed the key asks the server to file under the old key (from_cols)...
+  //   N-save-pairs  ...and moves each filed old key to the new key of the row that has it
+  //   N-save-shown  the marks and notes show on their rows under the new key; the boxes are live
+  //   N-save-toast  what moved is said
+  //   N-parked-note step 1 lists what is filed under earlier keys - Move where the data has the key's
+  //                 columns, a reason where it does not
+  //   N-parked-move Move pairs the filed keys with this key's; a row holding its own mark keeps it; the
+  //                 list follows
+  //   N-write-keycols every row write names the page's key columns (a mark, a bulk mark and its Undo, bulk
+  //                 notes, a note)
+  //   N-shared-old  a save from a key two rows share (PROTOCOL NO. alone): such an old key moves nowhere, and
+  //                 the toast says nothing moved, and why
+  //   N-shared-new  a save to a key two rows share: nothing moves onto it
+  //   N-save-nokey  a report whose key the server cannot read (encrypted): the save says nothing; the boxes are live
+  function keyChips(cols) { var out = []; document.querySelectorAll('#journalKeyColumnsBox .journal-keycol-cb').forEach(function (c) { if (c.checked) out.push(c.value); }); return out.join('|'); }
+  function boxesDisabled() { var all = tb().querySelectorAll('.journal-toggle-box'), d = 0; all.forEach(function (b) { if (b.disabled) d++; }); return { all: all.length, disabled: d }; }
+  function boxOf(rk) { return findBox(tb(), rk); }
+  async function setKey(on, off) {
+    if (window.Penumbra.syncJournalRowConfigUI) window.Penumbra.syncJournalRowConfigUI();
+    await sleep(150);
+    on.forEach(function (c) { tick(c, true); });
+    off.forEach(function (c) { tick(c, false); });
+    await sleep(700);
+  }
+  function rekeyPosts(from) { return window.__J.posts.slice(from || 0).filter(function (b) { return b.action === 'rekey'; }); }
+  S.keydirty = async function () {
+    var K3 = window.__MARKED[0];
+    await setKey(['TITLE'], ['PROTOCOL NO.', 'PROTOCOL TYPE']);
+    var bd = boxesDisabled(), b1 = tb().querySelector('.journal-toggle-box'), all = document.querySelector('.journal-toggle-all');
+    var nbs = tb().querySelectorAll('.journal-notes-btn'), nd = 0;
+    nbs.forEach(function (n) { if (n.disabled) nd++; });
+    rec('N-dirty-box', keyChips() === 'TITLE' && bd.all === 36 && bd.disabled === 36 && !!b1 && /Save the report first/.test(b1.title || '')
+        && !!all && all.disabled && nbs.length === 36 && nd === 36,
+        'key ' + keyChips() + ' | boxes ' + bd.disabled + '/' + bd.all + ' disabled, title "' + (b1 ? b1.title : '-') + '" | header box disabled ' + (all && all.disabled)
+        + ' | notes ' + nd + '/' + nbs.length + ' disabled');
+    var note = ($('#journalKeyUniqueNote').text() || '').replace(/\s+/g, ' ');
+    rec('N-dirty-note', /When you save, the ones on rows in this data move to this key with their rows/.test(note) && /2 marked rows and 2 row notes/.test(note),
+        'note "' + note.slice(0, 400) + '"');
+    var p0 = window.__J.posts.length;
+    window.Penumbra.journalBulkAction('mark', ['Reviewed']);
+    await sleep(200);
+    rec('N-dirty-bulk', /Save the report first/.test(toast()) && window.__J.posts.length === p0, 'toast "' + toast().trim().slice(0, 140) + '", posts ' + (window.__J.posts.length - p0));
+    await setKey(['PROTOCOL NO.', 'PROTOCOL TYPE'], ['TITLE']);
+    var bd2 = boxesDisabled(), b3 = boxOf(K3);
+    rec('N-dirty-back', keyChips() === 'PROTOCOL NO.|PROTOCOL TYPE' && bd2.disabled === 0 && !!b3 && b3.classList.contains('is-on'),
+        'key ' + keyChips() + ' | boxes disabled ' + bd2.disabled + ' | row 3 marked ' + !!(b3 && b3.classList.contains('is-on')));
+  };
+  S.rekeysave = async function () {
+    var K3 = window.__MARKED[0], K5 = window.__MARKED[1], p0 = window.__J.posts.length;
+    await setKey(['TITLE'], ['PROTOCOL NO.', 'PROTOCOL TYPE']);
+    // The save went through: its success handler hands the toggles it saved over (Round M's wire).
+    var st = JR.buildStateObject ? JR.buildStateObject() : null;
+    window.Penumbra.journalMarkLoadedKey((st && st.viewOptions && st.viewOptions.journalToggles) || []);
+    await until(function () { return /DONE:/.test(toast()); }, 6000);
+    await sleep(900);
+    var rp = rekeyPosts(p0);
+    rec('N-save-plan', rp.length === 2 && JSON.stringify(rp[0].from_cols) === '["PROTOCOL NO.","PROTOCOL TYPE"]' && !('pairs' in rp[0]) && rp[0].report_id === 'jrfix',
+        'rekey posts ' + rp.length + ': ' + JSON.stringify(rp.map(function (b) { return { from: b.from_cols, pairs: b.pairs }; })).slice(0, 300));
+    var pairs = (rp[1] && rp[1].pairs) ? rp[1].pairs.slice().sort() : [];
+    rec('N-save-pairs', JSON.stringify(pairs) === JSON.stringify([[K3, 'Delta study 3'], [K5, 'Foxtrot study 23']].sort()), 'pairs ' + JSON.stringify(pairs));
+    var b3 = boxOf('Delta study 3'), b23 = boxOf('Foxtrot study 23'), b7 = boxOf(FX[6]['TITLE']);
+    var nOff = 0; tb().querySelectorAll('.journal-notes-btn').forEach(function (n) { if (n.disabled) nOff++; });
+    rec('N-save-shown', !!b3 && b3.classList.contains('is-on') && !!b23 && b23.classList.contains('is-on') && !!b7 && !b7.classList.contains('is-on')
+        && noteCountOf(tb(), 'Delta study 3') === '2' && boxesDisabled().disabled === 0 && nOff === 0,
+        'row 3 ' + !!(b3 && b3.classList.contains('is-on')) + ', row 23 ' + !!(b23 && b23.classList.contains('is-on')) + ', row 7 ' + !!(b7 && b7.classList.contains('is-on'))
+        + ' | notes on row 3 ' + noteCountOf(tb(), 'Delta study 3') + ' | boxes disabled ' + boxesDisabled().disabled + ', notes buttons disabled ' + nOff);
+    rec('N-save-toast', /The key changed, so the marks and notes moved with their rows: 2 marks and 2 notes\./.test(toast()), 'toast "' + toast().trim().slice(0, 240) + '"');
+  };
+  S.parked = async function () {
+    var K3 = window.__MARKED[0], K9 = keyOf(8);
+    if (window.Penumbra.syncJournalRowConfigUI) window.Penumbra.syncJournalRowConfigUI();
+    await sleep(300);
+    var parts = Array.prototype.map.call(document.querySelectorAll('#journalKeyUniqueNote .journal-rowcfg-parked'), function (d) { return d.textContent.replace(/\s+/g, ' ').trim(); });
+    var btns = document.querySelectorAll('#journalKeyUniqueNote .journal-rekey-btn');
+    rec('N-parked-note', parts.length === 2 && /^2 marks and 1 note are filed under the key TITLE, which this report used before, so they show on no row\. Move them to this key$/.test(parts[0])
+        && /^1 mark is filed under the key GONE, which this report used before, so it shows on no row\. This data does not have all of its columns, so it cannot be moved from here\.$/.test(parts[1]) && btns.length === 1,
+        JSON.stringify(parts) + ' | buttons ' + btns.length);
+    var p0 = window.__J.posts.length;
+    if (btns[0]) clickEl(btns[0]);
+    await until(function () { return /DONE:/.test(toast()); }, 6000);
+    await sleep(900);
+    var rp = rekeyPosts(p0), pairs = (rp[1] && rp[1].pairs) ? rp[1].pairs.slice().sort() : [];
+    var b9 = boxOf(K9), b3 = boxOf(K3);
+    var parts2 = Array.prototype.map.call(document.querySelectorAll('#journalKeyUniqueNote .journal-rowcfg-parked'), function (d) { return d.textContent.replace(/\s+/g, ' ').trim(); });
+    rec('N-parked-move', rp.length === 2 && JSON.stringify(rp[0].from_cols) === '["TITLE"]' && JSON.stringify(pairs) === JSON.stringify([['Alpha study 9', K9], ['Delta study 3', K3]].sort())
+        && !!b9 && b9.classList.contains('is-on') && !!b3 && b3.classList.contains('is-on') && (window._penumbraToggleState.toggle1[K3] || {}).by === 'pat'
+        && noteCountOf(tb(), K9) === '1' && /Moved to this key: 1 mark and 1 note\. 1 mark stays filed under TITLE: step 1 of the journal setup lists it\./.test(toast())
+        && parts2.length === 2 && /^1 mark is filed under the key TITLE/.test(parts2[0]),
+        'pairs ' + JSON.stringify(pairs) + ' | row 9 ' + !!(b9 && b9.classList.contains('is-on')) + ', row 3 by ' + ((window._penumbraToggleState.toggle1 || {})[K3] || {}).by
+        + ' | notes on row 9 ' + noteCountOf(tb(), K9) + ' | toast "' + toast().trim().slice(0, 200) + '" | then ' + JSON.stringify(parts2));
+  };
+  S.writekey = async function () {
+    var K7 = keyOf(6), want = JSON.stringify(['PROTOCOL NO.', 'PROTOCOL TYPE']), p0 = window.__J.posts.length;
+    var b7 = boxOf(K7);
+    if (b7) clickEl(b7);
+    await sleep(400);
+    window.Penumbra.journalBulkAction('mark', ['Reviewed']);
+    await sleep(500);
+    var undo = document.querySelector('.journal-bulk-undo');
+    if (undo) clickEl(undo);
+    await sleep(600);
+    window.Penumbra.journalBulkAction('addnote', ['', 'Checked in bulk.']);
+    await sleep(500);
+    document.getElementById('results-wrapper').scrollIntoView({ block: 'start' });
+    var nb = null; tb().querySelectorAll('.journal-notes-btn').forEach(function (b) { if (b.getAttribute('data-row-key') === K7) nb = b; });
+    if (nb) clickEl(nb);
+    await sleep(400);
+    var card = document.querySelector('.journal-pvnote-card'), inp = card ? card.querySelector('.journal-rownote-input') : null, post = card ? card.querySelector('.journal-rownote-post') : null;
+    if (inp) { inp.textContent = 'Row seven looked at.'; $(inp).trigger('input'); }
+    if (post) clickEl(post);
+    await sleep(600);
+    var by = {};
+    window.__J.posts.slice(p0).forEach(function (b) { if (!by[b.action]) by[b.action] = b; });
+    var ok = ['set_toggle', 'set_toggles_bulk', 'add_notes_bulk', 'add'].every(function (a) { return by[a] && JSON.stringify(by[a].key_cols) === want; });
+    var un = window.__J.posts.slice(p0).filter(function (b) { return b.action === 'set_toggles_bulk' && b.state === false; })[0];
+    rec('N-write-keycols', ok && by.add.scope === 'row' && !!un && JSON.stringify(un.key_cols) === want,
+        JSON.stringify(Object.keys(by).map(function (a) { return a + ':' + JSON.stringify(by[a].key_cols) + (a === 'add' ? '/' + by[a].scope : ''); }))
+        + ' | the Undo ' + (un ? JSON.stringify(un.key_cols) : 'not sent'));
+  };
+  async function saveNow() {
+    // The save went through: its success handler hands the toggles it saved over (Round M's wire).
+    var st = JR.buildStateObject ? JR.buildStateObject() : null;
+    window.Penumbra.journalMarkLoadedKey((st && st.viewOptions && st.viewOptions.journalToggles) || []);
+  }
+  S.rekeyshared = async function () {
+    var p0 = window.__J.posts.length;
+    await setKey(['TITLE'], ['PROTOCOL NO.']);
+    await saveNow();
+    await until(function () { return /Nothing was moved/.test(toast()); }, 6000);
+    await sleep(500);
+    var rp = rekeyPosts(p0), t = toast().replace(/\s+/g, ' ').trim();
+    rec('N-shared-old', keyChips() === 'TITLE' && rp.length === 1 && JSON.stringify(rp[0].from_cols) === '["PROTOCOL NO."]'
+        && /The key changed\. Nothing was moved: the rows filed under the key PROTOCOL NO\. are not in this data, or share their key with another row\./.test(t),
+        'key ' + keyChips() + ' | rekey posts ' + JSON.stringify(rp.map(function (b) { return { from: b.from_cols, pairs: b.pairs }; })).slice(0, 300) + ' | toast "' + t.slice(0, 220) + '"');
+  };
+  S.rekeydupnew = async function () {
+    var p0 = window.__J.posts.length;
+    await setKey([], ['PROTOCOL TYPE']);
+    await saveNow();
+    await until(function () { return /Nothing was moved/.test(toast()); }, 6000);
+    await sleep(500);
+    var rp = rekeyPosts(p0), t = toast().replace(/\s+/g, ' ').trim();
+    rec('N-shared-new', keyChips() === 'PROTOCOL NO.' && rp.length === 1 && JSON.stringify(rp[0].from_cols) === '["PROTOCOL NO.","PROTOCOL TYPE"]'
+        && /Nothing was moved: the rows filed under the key PROTOCOL NO\. \+ PROTOCOL TYPE are not in this data, or share their key with another row\./.test(t),
+        'key ' + keyChips() + ' | rekey posts ' + JSON.stringify(rp.map(function (b) { return { from: b.from_cols, pairs: b.pairs }; })).slice(0, 300) + ' | toast "' + t.slice(0, 220) + '"');
+  };
+  S.rekeynokey = async function () {
+    var p0 = window.__J.posts.length;
+    await setKey(['TITLE'], ['PROTOCOL NO.', 'PROTOCOL TYPE']);
+    var dis0 = boxesDisabled().disabled;
+    await saveNow();
+    await sleep(1500);
+    var rp = rekeyPosts(p0), t = toast().replace(/\s+/g, ' ').trim(), bd = boxesDisabled();
+    rec('N-save-nokey', dis0 === 36 && rp.length === 1 && !/ERROR/.test(t) && bd.disabled === 0 && bd.all === 36,
+        'boxes disabled before the save ' + dis0 + ', after ' + bd.disabled + '/' + bd.all + ' | rekey posts ' + rp.length + ' | toast "' + t.slice(0, 200) + '"');
+  };
+
+  (async function () {
+    try {
+      await boot();
+      if (!S[SCN]) throw new Error('unknown scenario ' + SCN);
+      await S[SCN]();
+      await sleep(50);
+    } catch (e) {
+      R.fatal = String((e && e.stack) || e);
+    }
+    R.errors = window.__errors.concat(window.__rejections).slice(0, 10);
+    R.hookErr = [window.__JR_ERR, window.__JR_ERR2].filter(Boolean).join('; ');
+    R.missing = window.__JR_MISSING || [];
+    window.__JRRESULT = R;
+    window.__JRDONE = true;
+    document.getElementById('out').textContent = 'DONE';
+  })();
+})();

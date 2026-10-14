@@ -1,0 +1,597 @@
+// sumfx suite - browser half (2026-10-02). Drives the REAL main.js (ready closure
+// unwrapped; window.__SF.ev evaluates inside it) through a footer summary badge's
+// Custom Formula box: picks are made the way a user makes them - menu options by
+// click, typing / Enter / Escape / End as REAL key presses and the mouse scenario
+// with REAL mouse clicks (both sent by run.py over CDP, asked for through act()).
+//
+//   M  the badge menu        X  the formula box opens     V  checking / refusing input
+//   A  applying a formula    P  nothing is saved          R  re-open, Cancel, Escape, switch away and back
+//   L  footer keyword        O  outside click             U  the mouse path         K  the keyboard path
+//   S  the settings panel (the box starts from a badge formula; Apply keeps it and clears the preview)
+//   H  another report        W  a report SAVED with a formula (the badge edits a preview, saves keep theirs)
+//   G  grouped view          D  breakdown table           C  snapshot comparison    T  contrast in 3 themes
+(function () {
+  var A = [], INFO = [];
+  function rec(id, ok, detail) { A.push({ id: id, ok: !!ok, detail: detail === undefined ? '' : String(detail).slice(0, 700) }); }
+  function info(s) { INFO.push(String(s).slice(0, 500)); }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function errs() { return window.__errors.concat(window.__rejections); }
+  function J(x) { return JSON.stringify(x); }
+  var SF = window.__SF || {};
+  function ev(s) { return SF.ev(s); }
+  function finish(fatal) {
+    var payload = { scn: window.__SCN, asserts: A, info: INFO, errors: errs().slice(0, 8),
+                    hookErr: window.__SF_ERR || '' };
+    if (fatal) payload.fatal = fatal;
+    window.__SFRESULT = payload;
+    window.__SFDONE = true;
+    document.getElementById('out').textContent = 'RESULTS_JSON:' + JSON.stringify(payload);
+  }
+  async function waitFor(fn, ms) {
+    var t0 = Date.now();
+    while (Date.now() - t0 < (ms || 20000)) { try { if (fn()) return true; } catch (e) { } await sleep(25); }
+    return false;
+  }
+
+  // ---- input ---------------------------------------------------------------
+  // REAL input, performed by run.py: key names ('Enter', 'Escape', 'End', ...),
+  // {text: '...'} typed into the focused field (Input.insertText), {click: [x, y]}.
+  var _seq = 0;
+  async function act(items) {
+    var my = ++_seq;
+    window.__req = { seq: my, items: items };
+    var ok = await waitFor(function () { return window.__ack === my; }, 30000);
+    if (!ok) throw new Error('run.py never performed input #' + my + ' ' + J(items));
+    await sleep(60);
+  }
+  // run.py --shots DIR: a screenshot of the viewport at this point.
+  async function shot(name) { if (/[?&]shots=1/.test(location.search)) await act([{ shot: name }]); }
+  function center(el) {
+    var r = el.getBoundingClientRect();
+    return [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)];
+  }
+  // A dispatched click: a throwing handler lands in window.onerror, as for a user.
+  function click(el) { el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); }
+  function mousedown(el) { el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window })); }
+
+  // ---- reading footers (cells found through the HEADER, never through what the
+  //      code under test stamps on the footer) -------------------------------
+  function colIdIn(table, name) {
+    var ths = table.querySelectorAll('thead th[data-colname]');
+    for (var i = 0; i < ths.length; i++) {
+      if (String(ths[i].getAttribute('data-colname')).toUpperCase() === name) return ths[i].getAttribute('data-column');
+    }
+    return null;
+  }
+  function footCellIn(table, name) {
+    var id = colIdIn(table, name), f = table && table.tFoot;
+    if (id === null || !f || !f.rows.length) return null;
+    var cells = f.rows[0].cells;
+    for (var i = 0; i < cells.length; i++) if (cells[i].getAttribute('data-column') === id) return cells[i];
+    return null;
+  }
+  function cellInfo(td) {
+    if (!td) return { text: 'NO CELL', badge: '', type: '', title: '' };
+    var b = td.querySelector('.pnb-sum-badge');
+    var c = td.cloneNode(true);
+    Array.prototype.forEach.call(c.querySelectorAll('.pnb-sum-badge'), function (n) { n.remove(); });
+    // A focused badge's title sits in jQuery UI's data while its tooltip is up.
+    return { text: c.textContent.trim(), badge: b ? b.textContent.trim() : '', type: td.getAttribute('data-sum-type') || '',
+             title: b ? (b.getAttribute('title') || jQuery(b).data('ui-tooltip-title') || '') : '' };
+  }
+  function mainTable() { return document.getElementById('resultsTable'); }
+  function mainCell(name) { return footCellIn(mainTable(), name); }
+  function main(name) { return cellInfo(mainCell(name)); }
+  function badgeOf(td) { return td ? td.querySelector('.pnb-sum-badge') : null; }
+  function label(table) {
+    var f = table && table.tFoot; if (!f || !f.rows.length) return 'NO FOOT';
+    var l = f.rows[0].querySelector('td.pnb-sum-label');
+    return l ? l.textContent.trim() : 'NO LABEL';
+  }
+  function menu() { return document.querySelector('.sp-sumtype-menu'); }
+  function box() { return document.querySelector('.sp-sumtype-menu .sp-sumfx-input'); }
+  function msg() { var m = document.querySelector('.sp-sumtype-menu .sp-sumfx-msg'); return m ? { text: m.textContent.trim(), role: m.getAttribute('role') || '' } : null; }
+  function opt(type) { return document.querySelector('.sp-sumtype-menu .sp-sumtype-opt[data-type="' + type + '"]'); }
+  function prefs() { try { return JSON.parse(localStorage.getItem('penumbra_column_prefs') || '{}'); } catch (e) { return { bad: String(e) }; } }
+
+  // Open `td`'s badge menu and pick Custom Formula -> the box. Returns '' or why not.
+  async function openBox(td) {
+    var b = badgeOf(td);
+    if (!b) return 'no badge';
+    if (!b.getClientRects().length) return 'the badge is not rendered (collapsed group?)';
+    b.scrollIntoView({ block: 'center' });
+    await sleep(30);
+    click(b);
+    await sleep(40);
+    var fx = opt('formula');
+    if (!fx) return 'the menu offers no Custom Formula (' + Array.prototype.map.call(document.querySelectorAll('.sp-sumtype-opt'), function (o) { return o.getAttribute('data-type'); }).join(',') + ')';
+    click(fx);
+    await sleep(40);
+    return box() ? '' : 'no formula box after picking Custom Formula';
+  }
+  async function typeFresh(text) {        // empty the box (script), then REAL typing
+    var b = box(); b.value = ''; b.dispatchEvent(new Event('input', { bubbles: true }));
+    b.focus();
+    await act([{ text: text }]);
+  }
+  async function pickType(td, type) {
+    var b = badgeOf(td); if (!b) return 'no badge';
+    click(b); await sleep(40);
+    var o = opt(type); if (!o) return 'menu lacks ' + type;
+    click(o); await sleep(80);
+    return menu() ? 'menu still open' : '';
+  }
+  async function waitBoot() {
+    await waitFor(function () { return window.__queryDone >= 1 && document.querySelectorAll('#resultsTable tbody tr').length === window.__LIVE.length && mainCell('AMOUNT'); }, 30000);
+    await sleep(400);
+  }
+  function bootCheck() {
+    var a = main('AMOUNT'), q = main('QTY');
+    rec('F-boot', a.text === '$2,100.00' && a.type === 'sum' && q.text === '21' && q.type === 'sum' && label(mainTable()) === 'TOTALS',
+      'AMOUNT=' + J(a) + ' QTY=' + J(q) + ' label=' + label(mainTable()));
+  }
+  function isAmountBadgeFocused() {
+    var b = badgeOf(mainCell('AMOUNT'));
+    return !!b && document.activeElement === b;
+  }
+
+  // ==========================================================================
+  async function scnFlat() {
+    await waitBoot();
+    bootCheck();
+
+    // M: every type, Custom Formula included, on a column that has NO formula.
+    badgeOf(mainCell('AMOUNT')).scrollIntoView({ block: 'center' });
+    await sleep(30);
+    click(badgeOf(mainCell('AMOUNT'))); await sleep(40);
+    var types = Array.prototype.map.call(document.querySelectorAll('.sp-sumtype-menu .sp-sumtype-opt'), function (o) { return o.getAttribute('data-type'); });
+    var want = ev('PENUMBRA_SUMMARY_ORDER').slice();
+    rec('M-all', J(types) === J(want) && types.indexOf('formula') === 13, 'menu=' + types.join(',') + ' | order=' + want.join(','));
+    var mm = menu();
+    if (mm) {
+      var fxr = opt('formula') ? opt('formula').getBoundingClientRect() : null, mr0 = mm.getBoundingClientRect();
+      rec('M-fits', mm.scrollHeight <= mm.clientHeight + 1 && !!fxr && fxr.top >= mr0.top && fxr.bottom <= mr0.bottom && mr0.top >= 0 && mr0.bottom <= window.innerHeight,
+        types.length + ' items, scrollHeight ' + mm.scrollHeight + ' / clientHeight ' + mm.clientHeight + ' (max-height ' + getComputedStyle(mm).maxHeight + ')' +
+        ' fx=' + (fxr ? J([fxr.top, fxr.bottom].map(Math.round)) : 'none') + ' menu=' + J([mr0.top, mr0.bottom].map(Math.round)));
+      await shot('menu');
+    }
+
+    // X: picking it opens the box in the same popover - nothing applied yet.
+    var fx = opt('formula');
+    if (fx) click(fx);
+    await sleep(40);
+    var m = menu(), b = box(), a0 = main('AMOUNT');
+    rec('X-open', !!m && m.classList.contains('sp-sumfx') && m.getAttribute('role') === 'dialog' && !!b && document.activeElement === b &&
+      b.value === '' && a0.text === '$2,100.00' && a0.type === 'sum' && !!document.querySelector('.pnb-sum-badge.is-open'),
+      'menu=' + (m ? m.className + ' role=' + m.getAttribute('role') : 'none') + ' box=' + (b ? J(b.value) : 'none') +
+      ' focused=' + (document.activeElement && document.activeElement.className) + ' AMOUNT=' + J(a0));
+    if (!b) return;
+    var mr = m.getBoundingClientRect(), br = badgeOf(mainCell('AMOUNT')).getBoundingClientRect();
+    var inView = mr.top >= 0 && mr.left >= 0 && mr.bottom <= window.innerHeight && mr.right <= window.innerWidth;
+    var clear = mr.bottom <= br.top || mr.top >= br.bottom;
+    rec('X-place', inView && clear && Math.abs((mr.bottom <= br.top ? br.top - mr.bottom : mr.top - br.bottom)) <= 8 && mr.width >= 280,
+      'box=' + J([mr.left, mr.top, mr.right, mr.bottom].map(Math.round)) + ' badge=' + J([br.left, br.top, br.right, br.bottom].map(Math.round)) + ' view=' + window.innerWidth + 'x' + window.innerHeight);
+    var lab = m.querySelector('label[for="' + b.id + '"]'), help = document.getElementById((b.getAttribute('aria-describedby') || '').split(' ')[1] || 'x');
+    rec('X-labels', !!lab && /AMOUNT/.test(lab.textContent) && !!help && /\{sum\}/.test(help.textContent) && /\{stddev\}/.test(help.textContent) &&
+      /Not saved/.test(m.textContent) && !!m.querySelector('.sp-sumfx-apply') && !!m.querySelector('.sp-sumfx-cancel'),
+      'label=' + (lab && lab.textContent) + ' help=' + (help && help.textContent.slice(0, 80)) + ' text=' + m.textContent.replace(/\s+/g, ' ').slice(0, 200));
+
+    // V: an unknown name. The message waits for a pause in typing.
+    await act([{ text: '{sum}/{cnt}' }]);
+    var quiet = msg();
+    rec('V-quiet', quiet && quiet.text === '' && b.getAttribute('aria-invalid') === 'true', 'right after typing: msg=' + J(quiet) + ' invalid=' + b.getAttribute('aria-invalid'));
+    await sleep(750);
+    var bad = msg();
+    rec('V-bad', bad && /Unknown value \{cnt\}/.test(bad.text) && !/Available/.test(bad.text) && main('AMOUNT').type === 'sum', 'after the pause: msg=' + J(bad) + ' AMOUNT=' + J(main('AMOUNT')));
+    await shot('box-error');
+    await act(['Enter']);
+    var be = msg();
+    rec('V-enter', !!menu() && be && be.role === 'alert' && /Unknown value/.test(be.text) && document.activeElement === box() && main('AMOUNT').text === '$2,100.00',
+      'menu=' + !!menu() + ' msg=' + J(be) + ' AMOUNT=' + J(main('AMOUNT')));
+    // an EMPTY box is refused by Enter (it is not an error while typing)
+    var bx = box(); bx.value = ''; bx.dispatchEvent(new Event('input', { bubbles: true })); bx.focus();
+    var calm = msg();
+    await act(['Enter']);
+    var em = msg();
+    rec('V-empty', calm && calm.text === '' && !!menu() && em && /Type a formula first/.test(em.text) && main('AMOUNT').type === 'sum',
+      'while empty: ' + J(calm) + ' | after Enter: ' + J(em) + ' menu=' + !!menu());
+
+    // A: a good formula + Enter.
+    await typeFresh('{max}+{min}');
+    await act(['Enter']);
+    var a1 = main('AMOUNT'), q1 = main('QTY');
+    rec('A-apply', !menu() && a1.text === '$700.00' && a1.type === 'formula' && a1.badge === 'FX' && /Custom Formula: \{max\}\+\{min\}/.test(a1.title) &&
+      q1.text === '21' && q1.type === 'sum' && label(mainTable()) === 'SUMMARY',
+      'menu=' + !!menu() + ' AMOUNT=' + J(a1) + ' QTY=' + J(q1) + ' label=' + label(mainTable()));
+    rec('A-focus', isAmountBadgeFocused(), 'active=' + (document.activeElement && (document.activeElement.className + ' in ' + (document.activeElement.closest('td') || {}).outerHTML)).slice(0, 200));
+    await sleep(700);   // the badge's tooltip (keyboard focus) is part of the picture
+    await shot('applied');
+
+    // P: a preview. Nothing stored, nothing in what a save or share would send.
+    var st = ev('buildStateObject()'), pr = prefs();
+    var tf = ev('transientColumnSummaryFormulas'), uf = ev('userColumnSummaryFormulas');
+    rec('P-nosave', !st.columnSummaryFormulas && !(st.columnSummaries && st.columnSummaries.AMOUNT) && !(pr.sumfx && (pr.sumfx.summaries || pr.sumfx.summaryFormulas)) &&
+      tf.AMOUNT === '{max}+{min}' && !Object.prototype.hasOwnProperty.call(uf, 'AMOUNT'),
+      'state.columnSummaries=' + J(st.columnSummaries) + ' state.columnSummaryFormulas=' + J(st.columnSummaryFormulas) + ' prefs=' + J(pr) + ' transient=' + J(tf) + ' user=' + J(uf));
+
+    // R: re-open -> FX is current and the box holds the formula in effect.
+    click(badgeOf(mainCell('AMOUNT'))); await sleep(40);
+    var cur = opt('formula');
+    var curOk = !!cur && cur.classList.contains('is-current');
+    if (cur) click(cur);
+    await sleep(40);
+    rec('R-prefill', curOk && box() && box().value === '{max}+{min}', 'current=' + curOk + ' box=' + (box() ? J(box().value) : 'none'));
+    // Cancel, by keyboard (Tab past Apply, Enter): nothing changes, focus goes back to the badge.
+    var tabbed = '';
+    if (box()) { box().focus(); await act(['Tab']); tabbed = document.activeElement && document.activeElement.className; await act(['Tab']); tabbed += ' > ' + (document.activeElement && document.activeElement.className); await act(['Enter']); }
+    await sleep(60);
+    var a2 = main('AMOUNT');
+    rec('R-cancel', !menu() && a2.text === '$700.00' && a2.type === 'formula' && isAmountBadgeFocused() && /sp-sumfx-apply.*>.*sp-sumfx-cancel/.test(tabbed),
+      'tab order=' + tabbed + ' menu=' + !!menu() + ' AMOUNT=' + J(a2) + ' badgeFocused=' + isAmountBadgeFocused());
+    // Escape: an edit typed but not applied is dropped; focus back on the badge.
+    var why = await openBox(mainCell('AMOUNT'));
+    if (!why) { box().focus(); await act([{ text: '*2' }]); await act(['Escape']); }
+    var a3 = main('AMOUNT');
+    rec('R-esc', !why && !menu() && a3.text === '$700.00' && isAmountBadgeFocused() && ev('transientColumnSummaryFormulas').AMOUNT === '{max}+{min}',
+      (why || '') + ' menu=' + !!menu() + ' AMOUNT=' + J(a3) + ' badgeFocused=' + isAmountBadgeFocused() + ' transient=' + J(ev('transientColumnSummaryFormulas')));
+    // Away to Average and back: the formula is still there to come back to.
+    var p1 = await pickType(mainCell('AMOUNT'), 'avg');
+    var avg = main('AMOUNT');
+    var why2 = await openBox(mainCell('AMOUNT'));
+    var back = box() ? box().value : 'none';
+    if (!why2) await act(['Enter']);
+    var a4 = main('AMOUNT');
+    rec('R-back', !p1 && avg.text === '$350.00' && avg.type === 'avg' && !why2 && back === '{max}+{min}' && a4.text === '$700.00' && a4.type === 'formula',
+      (p1 || '') + (why2 || '') + ' avg=' + J(avg) + ' box=' + J(back) + ' then=' + J(a4));
+
+    // L: every summarized column on a formula -> FORMULAS.
+    var why3 = await openBox(mainCell('QTY'));
+    if (!why3) { await typeFresh('{sum}*2'); await act(['Enter']); }
+    var q2 = main('QTY');
+    rec('L-formulas', !why3 && q2.text === '42.00' && q2.type === 'formula' && label(mainTable()) === 'FORMULAS',
+      (why3 || '') + ' QTY=' + J(q2) + ' label=' + label(mainTable()));
+
+    // O: a click outside closes the box and applies nothing.
+    var why4 = await openBox(mainCell('AMOUNT'));
+    if (!why4) { box().focus(); await act([{ text: '-1' }]); }
+    mousedown(document.getElementById('resultsHeader'));
+    await sleep(60);
+    var a5 = main('AMOUNT');
+    rec('O-outside', !why4 && !menu() && a5.text === '$700.00' && !document.querySelector('.pnb-sum-badge.is-open'),
+      (why4 || '') + ' menu=' + !!menu() + ' AMOUNT=' + J(a5));
+  }
+
+  // The same, with the MOUSE: real clicks on the badge, the menu item, Apply and Cancel.
+  function tooltipShown() {
+    return Array.prototype.some.call(document.querySelectorAll('.ui-tooltip'), function (t) { return t.getClientRects().length > 0 && getComputedStyle(t).display !== 'none'; });
+  }
+  async function mouseOpen() {
+    var b = badgeOf(mainCell('AMOUNT'));
+    b.scrollIntoView({ block: 'center' });
+    await sleep(60);
+    await act([{ click: center(b) }]);
+    var fx = opt('formula');
+    if (!menu() || !fx) return null;
+    fx.scrollIntoView({ block: 'nearest' });     // the last item: a user scrolls the menu to it if it has to
+    await sleep(30);
+    await act([{ click: center(fx) }]);
+    return fx;
+  }
+  async function scnMouse() {
+    await waitBoot();
+    var fx = await mouseOpen();
+    rec('U-menu', !!fx, 'menu=' + !!menu() + ' fx=' + !!fx);
+    if (!fx) return;
+    var bx = box();
+    rec('U-box', !!bx && document.activeElement === bx, 'box=' + !!bx + ' active=' + (document.activeElement && document.activeElement.className));
+    if (!bx) return;
+    await act([{ text: '{range}' }]);
+    await act([{ click: center(document.querySelector('.sp-sumfx-apply')) }]);
+    var a = main('AMOUNT');
+    rec('U-apply', !menu() && a.text === '$500.00' && a.type === 'formula' && a.badge === 'FX', 'menu=' + !!menu() + ' AMOUNT=' + J(a));
+    // A mouse pick leaves focus alone - a programmatic focus would pop the
+    // badge's tooltip 600 ms later.
+    await sleep(900);
+    rec('U-nofocus', !isAmountBadgeFocused() && !tooltipShown(), 'active=' + (document.activeElement && (document.activeElement.className || document.activeElement.tagName)) + ' tooltip=' + tooltipShown());
+    // Cancel by mouse: closes, changes nothing, leaves focus alone too.
+    var fx2 = await mouseOpen();
+    if (fx2 && box()) await act([{ text: '+1' }, { click: center(document.querySelector('.sp-sumfx-cancel')) }]);
+    await sleep(900);
+    var a2 = main('AMOUNT');
+    rec('U-cancel', !!fx2 && !menu() && a2.text === '$500.00' && !isAmountBadgeFocused() && !tooltipShown(),
+      'menu=' + !!menu() + ' AMOUNT=' + J(a2) + ' badgeFocused=' + isAmountBadgeFocused() + ' tooltip=' + tooltipShown());
+  }
+
+  // Keyboard only: Enter on the badge, End to the last item, Enter, type, Enter.
+  async function scnKbd() {
+    await waitBoot();
+    var b = badgeOf(mainCell('AMOUNT'));
+    b.focus();
+    await act(['Enter']);
+    await sleep(80);
+    var first = document.querySelector('.sp-sumtype-menu .sp-sumtype-opt');
+    rec('K-menu', !!menu() && document.activeElement === first, 'menu=' + !!menu() + ' active=' + (document.activeElement && document.activeElement.getAttribute('data-type')));
+    await act(['End']);
+    rec('K-end', document.activeElement === opt('formula'), 'active=' + (document.activeElement && document.activeElement.getAttribute('data-type')));
+    await act(['Enter']);
+    rec('K-box', !!box() && document.activeElement === box(), 'box=' + !!box() + ' active=' + (document.activeElement && document.activeElement.className));
+    if (!box()) return;
+    await act([{ text: '{range}' }, 'Enter']);
+    var a = main('AMOUNT'), nb = badgeOf(mainCell('AMOUNT'));
+    rec('K-apply', !menu() && a.text === '$500.00' && a.type === 'formula' && isAmountBadgeFocused() && !!nb && nb.matches(':focus-visible'),
+      'menu=' + !!menu() + ' AMOUNT=' + J(a) + ' badgeFocused=' + isAmountBadgeFocused() + ' focusVisible=' + (nb && nb.matches(':focus-visible')));
+    // Escape out of the box: back on the badge, nothing changed.
+    await act(['Enter']); await sleep(80);
+    await act(['End', 'Enter']);
+    var pre = box() ? box().value : 'none';
+    if (box()) await act([{ text: '+1' }, 'Escape']);
+    rec('K-esc', pre === '{range}' && !menu() && isAmountBadgeFocused() && main('AMOUNT').text === '$500.00',
+      'box was ' + J(pre) + ' menu=' + !!menu() + ' badgeFocused=' + isAmountBadgeFocused() + ' AMOUNT=' + J(main('AMOUNT')));
+    // Escape out of the plain type MENU returns focus to the badge as well.
+    await act(['Enter']); await sleep(80);
+    var opened = !!menu();
+    await act(['Escape']);
+    rec('K-escmenu', opened && !menu() && isAmountBadgeFocused(), 'opened=' + opened + ' menu=' + !!menu() + ' active=' + (document.activeElement && (document.activeElement.className || document.activeElement.tagName)));
+  }
+
+  // The settings panel: keeping a badge formula, and what Apply does to the preview.
+  function panelRow(name) { return document.querySelector('#spColumnList .sp-col-item[data-colname="' + name + '"]'); }
+  function rowState(name) {
+    var r = panelRow(name); if (!r) return { none: true };
+    var chip = r.querySelector('.sp-col-sumtype'), fx = r.querySelector('.sp-col-formula');
+    return { type: chip ? chip.getAttribute('data-type') : null, boxShown: !!fx && fx.style.display !== 'none', box: fx ? fx.value : null };
+  }
+  async function scnPanel() {
+    await waitBoot();
+    rec('P-report', ev('currentLoadedStateName') === 'sumfx', 'currentLoadedStateName=' + J(ev('currentLoadedStateName')));
+    var why = await openBox(mainCell('AMOUNT'));
+    if (!why) { await typeFresh('{max}+{min}'); await act(['Enter']); }
+    ev('populateSettingsColumns()');
+    var s1 = rowState('AMOUNT');
+    rec('S-chip', !why && s1.type === 'sum' && !s1.boxShown && s1.box === '{max}+{min}' && $('#spPendingCount').text() === '' && $('#spApply').prop('disabled') === true,
+      (why || '') + ' AMOUNT row=' + J(s1) + ' pending=' + J($('#spPendingCount').text()) + ' applyDisabled=' + $('#spApply').prop('disabled'));
+    // pick Custom Formula in the panel: the box shows the badge formula
+    var chip = panelRow('AMOUNT').querySelector('.sp-col-sumtype');
+    click(chip); await sleep(40);
+    var pf = opt('formula'); if (pf) click(pf);
+    await sleep(40);
+    var s2 = rowState('AMOUNT');
+    rec('S-pick', s2.type === 'formula' && s2.boxShown && s2.box === '{max}+{min}' && /1 change/.test($('#spPendingCount').text()),
+      'row=' + J(s2) + ' pending=' + J($('#spPendingCount').text()));
+    // ...edited to something else before keeping it, then Save Column Layout
+    var fxIn = panelRow('AMOUNT').querySelector('.sp-col-formula');
+    fxIn.value = '{max}*2'; fxIn.dispatchEvent(new Event('input', { bubbles: true }));
+    click(document.getElementById('spApply'));
+    await sleep(300);
+    var pr = prefs().sumfx || {}, a = main('AMOUNT');
+    rec('S-apply', pr.summaries && pr.summaries.AMOUNT === 'formula' && pr.summaryFormulas && pr.summaryFormulas.AMOUNT === '{max}*2' &&
+      J(ev('transientColumnSummaryFormulas')) === '{}' && J(ev('transientColumnSummaries')) === '{}' && a.text === '$1,200.00' && a.type === 'formula',
+      'prefs=' + J(pr) + ' transient=' + J(ev('transientColumnSummaryFormulas')) + '/' + J(ev('transientColumnSummaries')) + ' AMOUNT=' + J(a));
+    // the badge now edits a preview of the SAVED formula; the panel keeps showing the saved one
+    var why2 = await openBox(mainCell('AMOUNT'));
+    var pre = box() ? box().value : 'none';
+    if (!why2) { await typeFresh('{max}-{min}'); await act(['Enter']); }
+    var a2 = main('AMOUNT');
+    ev('populateSettingsColumns()');
+    var s3 = rowState('AMOUNT');
+    var st = ev('buildStateObject()');
+    rec('S-saved', !why2 && pre === '{max}*2' && a2.text === '$500.00' && s3.type === 'formula' && s3.boxShown && s3.box === '{max}*2' &&
+      $('#spPendingCount').text() === '' && st.columnSummaryFormulas && st.columnSummaryFormulas.AMOUNT === '{max}*2',
+      (why2 || '') + ' box was ' + J(pre) + ' AMOUNT=' + J(a2) + ' row=' + J(s3) + ' pending=' + J($('#spPendingCount').text()) + ' state=' + J(st.columnSummaryFormulas));
+    // Reset keeps a hidden box's badge formula (QTY has no saved formula)
+    var why3 = await openBox(mainCell('QTY'));
+    if (!why3) { await typeFresh('{sum}*2'); await act(['Enter']); }
+    ev('populateSettingsColumns()');
+    var q0 = rowState('QTY');
+    var nameRow = panelRow('NAME'); var vis = nameRow && nameRow.querySelector('.sp-col-check');
+    if (vis) { vis.checked = !vis.checked; $(vis).trigger('change'); }
+    ev('resetPanelState()');
+    var q1 = rowState('QTY');
+    rec('S-reset', !why3 && q0.type === 'sum' && !q0.boxShown && q0.box === '{sum}*2' && q1.type === 'sum' && !q1.boxShown && q1.box === '{sum}*2',
+      (why3 || '') + ' QTY before=' + J(q0) + ' after Reset=' + J(q1));
+  }
+
+  // Another report: the preview belongs to the report it was made on.
+  async function scnHydrate() {
+    await waitBoot();
+    var why = await openBox(mainCell('AMOUNT'));
+    if (!why) { await typeFresh('{max}+{min}'); await act(['Enter']); }
+    var before = main('AMOUNT');
+    ev('currentLoadedStateName = "sumfx_other"; hydrateUserColumnSummaries();');
+    ev('penumbraRefreshSummaryFooters()');
+    await sleep(60);
+    var after = main('AMOUNT');
+    var why2 = await openBox(mainCell('AMOUNT'));
+    var pre = box() ? box().value : 'none';
+    rec('H-cleared', !why && before.text === '$700.00' && after.text === '$2,100.00' && after.type === 'sum' &&
+      J(ev('transientColumnSummaryFormulas')) === '{}' && !why2 && pre === '',
+      (why || '') + (why2 || '') + ' before=' + J(before) + ' after=' + J(after) + ' transient=' + J(ev('transientColumnSummaryFormulas')) + ' box=' + J(pre));
+  }
+
+  // A report SAVED with AMOUNT = {sum}/{count}: the badge edits a preview of it.
+  async function scnSaved() {
+    await waitBoot();
+    var a0 = main('AMOUNT');
+    rec('W-boot', a0.text === '$350.00' && a0.type === 'formula' && /Custom Formula: \{sum\}\/\{count\}/.test(a0.title), 'AMOUNT=' + J(a0));
+    click(badgeOf(mainCell('AMOUNT'))); await sleep(40);
+    var cur = opt('formula');
+    var curOk = !!cur && cur.classList.contains('is-current');
+    if (cur) click(cur);
+    await sleep(40);
+    var pre = box() ? box().value : 'none';
+    rec('W-prefill', curOk && pre === '{sum}/{count}', 'current=' + curOk + ' box=' + J(pre));
+    if (box()) { await typeFresh('{max}'); await act(['Enter']); }
+    var a1 = main('AMOUNT');
+    var st = ev('buildStateObject()');
+    rec('W-edit', a1.text === '$600.00' && a1.type === 'formula' && /Custom Formula: \{max\}/.test(a1.title), 'AMOUNT=' + J(a1));
+    rec('W-state', st.columnSummaries && st.columnSummaries.AMOUNT === 'formula' && st.columnSummaryFormulas && st.columnSummaryFormulas.AMOUNT === '{sum}/{count}',
+      'columnSummaries=' + J(st.columnSummaries) + ' columnSummaryFormulas=' + J(st.columnSummaryFormulas));
+    ev('populateSettingsColumns()');
+    var r = rowState('AMOUNT');
+    rec('W-panel', r.type === 'formula' && r.boxShown && r.box === '{sum}/{count}' && $('#spPendingCount').text() === '',
+      'row=' + J(r) + ' pending=' + J($('#spPendingCount').text()));
+  }
+
+  // Grouped by DEPT: the pick reaches every group's footer.
+  function groupTables() {
+    var out = {};
+    document.querySelectorAll('#groupedResultsContainer .group-wrapper[data-group-key]').forEach(function (w) {
+      var t = w.querySelector('.group-content > table');
+      if (t) out[w.getAttribute('data-group-key')] = t;
+    });
+    return out;
+  }
+  async function scnGrouped() {
+    await waitFor(function () { var g = groupTables(); return g.A && g.B && footCellIn(g.A, 'AMOUNT'); }, 30000);
+    await sleep(400);
+    var g = groupTables();
+    var a0 = cellInfo(footCellIn(g.A, 'AMOUNT')), b0 = cellInfo(footCellIn(g.B, 'AMOUNT'));
+    rec('G-boot', a0.text === '$600.00' && b0.text === '$1,500.00', 'A=' + J(a0) + ' B=' + J(b0) + ' groups=' + Object.keys(g).join(','));
+    // the bands are built collapsed: open them, as a user does to reach a footer
+    if (!badgeOf(footCellIn(g.A, 'AMOUNT')).getClientRects().length) { click(document.getElementById('expandAllGroups')); await sleep(200); }
+    var why = await openBox(footCellIn(g.A, 'AMOUNT'));
+    if (!why) { await typeFresh('{max}+{min}'); await act(['Enter']); }
+    await sleep(100);
+    g = groupTables();
+    var a1 = cellInfo(g.A && footCellIn(g.A, 'AMOUNT')), b1 = cellInfo(g.B && footCellIn(g.B, 'AMOUNT'));
+    rec('G-apply', !why && !menu() && a1.text === '$400.00' && a1.type === 'formula' && a1.badge === 'FX' && b1.text === '$1,000.00' && b1.type === 'formula',
+      (why || '') + ' A=' + J(a1) + ' B=' + J(b1));
+    var act0 = document.activeElement;
+    rec('G-focus', g.A && act0 === badgeOf(footCellIn(g.A, 'AMOUNT')), 'active=' + (act0 && act0.classList && act0.classList.contains('pnb-sum-badge') ? 'a badge in group ' +
+      ((act0.closest('.group-wrapper') || {}).getAttribute ? act0.closest('.group-wrapper').getAttribute('data-group-key') : '?') : (act0 && act0.tagName)));
+  }
+
+  // A breakdown table (built by the real drill helpers) over DEPT A's 3 rows.
+  async function scnDrill() {
+    await waitBoot();
+    var cols = window.__COLS.slice(), rows = window.__LIVE.slice(0, 3);
+    var ds = ev('penumbraDrillSummaryInit')(cols);
+    rows.forEach(function (r) { cols.forEach(function (c) { if (ds.accs[c]) ds.accs[c].push(r[c]); }); });
+    var host = document.createElement('div');
+    host.className = 'infobox-overlay';
+    host.innerHTML = '<div class="infobox-content"><table class="infobox-drill-table"><thead><tr>' +
+      cols.map(function (c) { return '<th>' + c + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      rows.map(function (r) { return '<tr>' + cols.map(function (c) { return '<td>' + r[c] + '</td>'; }).join('') + '</tr>'; }).join('') +
+      '</tbody>' + ev('penumbraDrillFooterHtml')(cols, ds, '') + '</table></div>';
+    document.body.appendChild(host);
+    function dcell(name) { var t = host.querySelector('table'); return t.querySelector('tfoot td[data-sum-col="' + name + '"]'); }
+    var d0 = cellInfo(dcell('AMOUNT'));
+    rec('D-boot', d0.text === '$600.00' && d0.type === 'sum', 'drill AMOUNT=' + J(d0));
+    var why = await openBox(dcell('AMOUNT'));
+    if (!why) { await typeFresh('{max}+{min}'); await act(['Enter']); }
+    var d1 = cellInfo(dcell('AMOUNT')), m1 = main('AMOUNT');
+    rec('D-apply', !why && !menu() && d1.text === '$400.00' && d1.type === 'formula' && d1.badge === 'FX' && m1.text === '$700.00' && m1.type === 'formula',
+      (why || '') + ' drill=' + J(d1) + ' main=' + J(m1));
+    rec('D-focus', document.activeElement === badgeOf(dcell('AMOUNT')), 'active=' + (document.activeElement && document.activeElement.className));
+  }
+
+  // A snapshot comparison: the in-place recompute evaluates the preview formula.
+  function cmpWrappers() { return Array.prototype.slice.call(document.querySelectorAll('#snapshotComparisonContainer .group-wrapper')); }
+  function cmpTable(group) {
+    var w = cmpWrappers().filter(function (x) { return x.getAttribute('data-group-key') === group; })[0];
+    return w ? w.querySelector('table') : null;
+  }
+  async function scnCmp() {
+    await waitBoot();
+    var compress = ev('compressString'), runCmp = ev('runComparisonAndDisplayGrouped');
+    var snap = { name: 'Fixture snapshot', timestamp: Date.now() - 3 * 86400000, searchTerm: '', prompts: [], tables: '', notes: '',
+                 columnNames: window.__COLS.slice(),
+                 compressedData: compress(JSON.stringify(window.__SNAP.map(function (r) { return { rowData: r }; }))) };
+    var h0 = window.__SF_HIDES || 0;
+    runCmp(snap, ['ID']);
+    var ok = await waitFor(function () { return document.body.classList.contains('snapshot-comparison-active') && cmpWrappers().length === 4 && (window.__SF_HIDES || 0) > h0; }, 30000);
+    await sleep(300);
+    rec('C-boot', ok && cellInfo(footCellIn(cmpTable('New Rows'), 'AMOUNT')).text === '$1,100.00',
+      'wrappers=' + cmpWrappers().length + ' New AMOUNT=' + J(cellInfo(cmpTable('New Rows') && footCellIn(cmpTable('New Rows'), 'AMOUNT'))));
+    if (!ok) return;
+    // open the New Rows band if it was built collapsed
+    if (!badgeOf(footCellIn(cmpTable('New Rows'), 'AMOUNT')).getClientRects().length) {
+      var nw = cmpWrappers().filter(function (x) { return x.getAttribute('data-group-key') === 'New Rows'; })[0];
+      info('cmp: New Rows was collapsed - opened by its header');
+      click(nw.querySelector(':scope > .group-header'));
+      await sleep(200);
+    }
+    var why = await openBox(footCellIn(cmpTable('New Rows'), 'AMOUNT'));
+    if (!why) { await typeFresh('{max}+{min}'); await act(['Enter']); }
+    var want = { 'New Rows': '$1,100.00', 'Removed Rows': '$1,500.00', 'Modified Rows': '$700.00', 'Unchanged Rows': '$300.00' };
+    var bad = [];
+    Object.keys(want).forEach(function (gk) {
+      var c = cellInfo(cmpTable(gk) && footCellIn(cmpTable(gk), 'AMOUNT'));
+      if (c.text !== want[gk] || c.type !== 'formula' || c.badge !== 'FX') bad.push(gk + '=' + J(c));
+    });
+    rec('C-apply', !why && !menu() && !bad.length, (why || '') + (bad.join('; ') || 'every group: max+min, FX'));
+    rec('C-focus', document.activeElement === badgeOf(footCellIn(cmpTable('New Rows'), 'AMOUNT')), 'active=' + (document.activeElement && document.activeElement.className));
+  }
+
+  // ---- contrast of the box in a light and two dark themes --------------------
+  function parseColor(s) {
+    var m = /rgba?\(([^)]+)\)/.exec(s);
+    if (m) { var p = m[1].split(/[ ,\/]+/).filter(Boolean).map(parseFloat); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; }
+    m = /color\(srgb ([^)]+)\)/.exec(s);
+    if (m) { var q = m[1].split(/[ \/]+/).filter(Boolean).map(parseFloat); return { r: q[0] * 255, g: q[1] * 255, b: q[2] * 255, a: q.length > 3 ? q[3] : 1 }; }
+    return null;
+  }
+  function lum(c) {
+    function ch(v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+    return 0.2126 * ch(c.r) + 0.7152 * ch(c.g) + 0.0722 * ch(c.b);
+  }
+  function bgOf(el) {
+    for (var n = el; n && n.nodeType === 1; n = n.parentElement) {
+      var c = parseColor(getComputedStyle(n).backgroundColor);
+      if (c && c.a > 0.5) return c;
+    }
+    return { r: 255, g: 255, b: 255, a: 1 };
+  }
+  function contrast(el) {
+    var fg = parseColor(getComputedStyle(el).color), bg = bgOf(el);
+    if (!fg) return 0;
+    var l1 = lum(fg), l2 = lum(bg);
+    return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+  }
+  async function scnTheme() {
+    await waitBoot();
+    var themes = [['light', 'theme-default'], ['dark-blue', 'theme-dark-blue is-dark'], ['charcoal-gold', 'theme-charcoal-gold is-dark']];
+    for (var i = 0; i < themes.length; i++) {
+      document.body.className = themes[i][1];
+      var why = await openBox(mainCell('AMOUNT'));
+      if (why) { rec('T-' + themes[i][0], false, why); continue; }
+      await act([{ text: '{nope}' }]);
+      await act(['Enter']);
+      var m = menu();
+      var parts = {
+        title: m.querySelector('.sp-sumfx-title'), input: box(), msg: m.querySelector('.sp-sumfx-msg'),
+        help: m.querySelector('.sp-sumfx-help'), note: m.querySelector('.sp-sumfx-note'),
+        apply: m.querySelector('.sp-sumfx-apply'), cancel: m.querySelector('.sp-sumfx-cancel')
+      };
+      var low = [], all = {};
+      Object.keys(parts).forEach(function (k) {
+        var r = parts[k] ? contrast(parts[k]) : 0;
+        all[k] = Math.round(r * 100) / 100;
+        if (r < 4.5) low.push(k + ' ' + all[k]);
+      });
+      await shot('theme-' + themes[i][0]);
+      var shadow = getComputedStyle(box()).boxShadow;
+      rec('T-' + themes[i][0], !low.length && /rgb|color\(/.test(shadow) && shadow !== 'none',
+        (low.length ? 'BELOW 4.5: ' + low.join(', ') + ' | ' : '') + 'ratios=' + J(all) + ' invalid ring=' + shadow);
+      // the existing type menu's items, for the record (not this change's)
+      ev('_spCloseSummaryMenu()');
+      click(badgeOf(mainCell('AMOUNT'))); await sleep(40);
+      var o = document.querySelector('.sp-sumtype-menu .sp-sumtype-opt:not(.is-current) .sp-sumtype-label');
+      if (o) info(themes[i][0] + ': existing type-menu item contrast ' + (Math.round(contrast(o) * 100) / 100));
+      ev('_spCloseSummaryMenu()');
+    }
+    document.body.className = 'theme-default';
+  }
+
+  var SCN = { flat: scnFlat, mouse: scnMouse, kbd: scnKbd, panel: scnPanel, hydrate: scnHydrate, saved: scnSaved,
+              grouped: scnGrouped, drill: scnDrill, cmp: scnCmp, theme: scnTheme };
+  (async function () {
+    try {
+      if (!SF.ev) { finish('hook: window.__SF.ev missing'); return; }
+      var fn = SCN[window.__SCN];
+      if (!fn) { finish('unknown scenario ' + window.__SCN); return; }
+      await fn();
+      finish();
+    } catch (e) { finish('driver threw: ' + ((e && e.stack) || e)); }
+  })();
+})();

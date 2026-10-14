@@ -1,0 +1,175 @@
+# =============================================================================
+# SEARCH BAR SUITE (2026-09-25): the End-User UI option "Search Bar" (on by
+# default) and the empty control bar that gives its row back.
+#
+#   static    S1 the card (first in the grid, checked by default)  S2 saved as
+#             viewOptions.hideSearch and restored from it  S3 the admin marker +
+#             the live toggle  S4 "/" does not reach for a hidden box  S5 the CSS
+#             (restrict-search keeps an ACTIVE search's box; pnb-no-controlbar)
+#             S6 the help row
+#   browser   sb.html: #resultsHeader LIFTED from the index.php under test, under
+#             the css\main.css under test, driven by the REAL
+#             applyUserViewRestrictions / penumbraSyncControlBar /
+#             updateStickyHeaderOffset / markers sliced from the main.js under test:
+#             V1-V2 every bar option off = the bar goes and everything re-anchors;
+#             V3 only search on = bar + box; V4 search off alone = box gone,
+#             icons stay; V5 an active search brings box + bar back, clearing it
+#             takes them away; V6 a grouped report keeps the bar (Expand/Collapse);
+#             V7 any option on = never collapses, not even mid-reload; V8 admins
+#             keep the bar + the marker; V9 &noadm = the viewer's view; V10 the
+#             grouped view's sticky header re-anchors to the report header alone.
+#
+#   run.ps1                live files                 EXPECTED: GREEN 16 / 0
+#   run.ps1 -Control       each file's .bak-20260925-searchbar   EXPECTED: RED
+#   run.ps1 -MainCss <p> -MainJs <p> -IndexPhp <p> -HelpPhp <p>
+#   run.ps1 -Mutant <name> / -Mutants    anchors checked first (-CheckAnchors)
+#
+# UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\searchbar'
+#   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Mutants
+# Prints RESULT: GREEN/RED instead of exiting. Needs py -3 + websocket-client and
+# the PHP 8.2 CLI. Writes nothing to the webroot.
+# =============================================================================
+param([string]$MainCss = '', [string]$MainJs = '', [string]$IndexPhp = '', [string]$HelpPhp = '',
+      [string]$App = '', [string]$Here = '',
+      [string]$Mutant = '', [switch]$Mutants, [switch]$CheckAnchors, [switch]$Control, [switch]$Keep)
+$ErrorActionPreference = 'Stop'
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\searchbar' }
+$app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+if ($Control) {
+  $MainCss = "$app\css\main.css.bak-20260925-searchbar"; $MainJs = "$app\js\main.js.bak-20260925-searchbar"
+  $IndexPhp = "$app\index.php.bak-20260925-searchbar"; $HelpPhp = "$app\help_content.php.bak-20260925-searchbar"
+  foreach ($p in @($MainCss, $MainJs, $IndexPhp, $HelpPhp)) { if (-not (Test-Path $p)) { throw "-Control: no $p" } }
+}
+$paths = @{ css = $(if ($MainCss) { $MainCss } else { "$app\css\main.css" }); js = $(if ($MainJs) { $MainJs } else { "$app\js\main.js" })
+            idx = $(if ($IndexPhp) { $IndexPhp } else { "$app\index.php" }); help = $(if ($HelpPhp) { $HelpPhp } else { "$app\help_content.php" }) }
+$src0 = @{}; foreach ($k in @($paths.Keys)) { $src0[$k] = [IO.File]::ReadAllText($paths[$k], $utf8) }
+
+# --- mutants. main.css / main.js / help CRLF, index.php LF.
+$C = "`r`n"; $L = "`n"
+$mActive  = 'body.restrict-search #tableSearchContainer:not(.has-text) .search-wrapper {'
+$mActive0 = 'body.restrict-search #tableSearchContainer .search-wrapper {'
+$mBarCss  = 'body.pnb-no-controlbar #resultsHeader {' + $C + '    display: none !important;' + $C + '}' + $C
+$mFlags   = 'if ((!penumbra_vars.isAdmin || isNoAdmView) && _pnbBarAllOff) {'
+$mFlags0  = 'if (!penumbra_vars.isAdmin || isNoAdmView) {'
+$mAdmin0  = 'if (_pnbBarAllOff) {'
+$mObs     = "                _pnbBarObserver.observe(rh, { attributes: true, attributeFilter: ['style', 'class', 'hidden'], childList: true, subtree: true });" + $C
+$mRet     = "        if (!`$('#resultsHeader').is(':visible') && !barGone)"
+$mRet0    = "        if (!`$('#resultsHeader').is(':visible'))"
+$mHeight  = '(barGone ? 0 : $resultsHeader.outerHeight())'
+$mHeight0 = '$resultsHeader.outerHeight()'
+$mClass   = "            `$('body').addClass('restrict-search');" + $C
+$mReanchor = '        updateStickyHeaderOffset();' + $C + '        updateContainerHeight();' + $C + '    }' + $C + $C + '    /**'
+$mMarker  = "        viewOptionSearch:     '#tableSearchContainer .search-wrapper'," + $C
+$mSlash   = "            if (`$('body').hasClass('restrict-search') && !`$('#tableSearchContainer').hasClass('has-text')) return;" + $C
+$mSave    = "        if (!`$('#viewOptionSearch').is(':checked')) {" + $C + '            viewOptions.hideSearch = true;' + $C + '        }' + $C
+$mCard    = '                <div class="view-option-item"><label><input type="checkbox" id="viewOptionSearch" checked><div class="view-option-text"><strong>Search Bar</strong><small>Show the search box above the table.</small></div></label></div>' + $L
+$mutantDefs = [ordered]@{
+  'noactive'      = @{ t = 'css'; edits = @(,@($mActive, $mActive0)); red = @('S5', 'V5') }
+  'nobarcss'      = @{ t = 'css'; edits = @(,@($mBarCss, '')); red = @('S5', 'V1', 'V9') }
+  'noflags'       = @{ t = 'js';  edits = @(,@($mFlags, $mFlags0)); red = @('V7') }
+  'admincollapse' = @{ t = 'js';  edits = @(,@($mFlags, $mAdmin0)); red = @('V8') }
+  'noobserver'    = @{ t = 'js';  edits = @(,@($mObs, '')); red = @('V5', 'V6') }
+  'stickyreturn'  = @{ t = 'js';  edits = @(,@($mRet, $mRet0)); red = @('V10') }
+  'barheight'     = @{ t = 'js';  edits = @(,@($mHeight, $mHeight0)); red = @('V10') }
+  'nosearchclass' = @{ t = 'js';  edits = @(,@($mClass, '')); red = @('V1', 'V4') }
+  'noreanchor'    = @{ t = 'js';  edits = @(,@($mReanchor, ('    }' + $C + $C + '    /**'))); red = @('V2', 'V10') }
+  'nomarker'      = @{ t = 'js';  edits = @(,@($mMarker, '')); red = @('S3', 'V8') }
+  'noslash'       = @{ t = 'js';  edits = @(,@($mSlash, '')); red = @('S4') }
+  'nosave'        = @{ t = 'js';  edits = @(,@($mSave, '')); red = @('S2') }
+  'nocard'        = @{ t = 'idx'; edits = @(,@($mCard, '')); red = @('S1') }
+}
+function Apply-Mutant([string]$text, [string]$name) {
+  foreach ($e in $mutantDefs[$name].edits) {
+    $n = ([regex]::Matches($text, [regex]::Escape($e[0]))).Count
+    if ($n -ne 1) { throw "mutant '$name' anchor found $n times, expected 1 (needs the FEATURE build): $($e[0])" }
+    $text = $text.Replace($e[0], $e[1])
+  }
+  return $text
+}
+
+function Get-Static($s) {
+  $out = @()
+  $idx = $s.idx; $js = $s.js; $css = $s.css; $help = $s.help
+  $g = $idx.IndexOf('<div class="view-options-grid">', [Math]::Max(0, $idx.IndexOf('<div class="view-options-eu">')))
+  $first = if ($g -ge 0) { [regex]::Match($idx.Substring($g), 'id="viewOption(\w+)"( checked)?') } else { $null }
+  $out += [pscustomobject]@{ id = 'S1'; name = 'the Search Bar card is the End-User grid''s first, checked by default'; pass = ($null -ne $first) -and $first.Success -and ($first.Groups[1].Value -eq 'Search') -and ($first.Groups[2].Value -ne '') -and $idx.Contains('<strong>Search Bar</strong>'); detail = $(if ($first) { "first=$($first.Value)" } else { 'no grid' }) }
+  $sv = $js.Contains("if (!`$('#viewOptionSearch').is(':checked')) {" + $C + '            viewOptions.hideSearch = true;')
+  $ld = $js.Contains("`$('#viewOptionSearch').prop('checked', !vo.hideSearch);")
+  $out += [pscustomobject]@{ id = 'S2'; name = 'saved as viewOptions.hideSearch (absent = on) and restored from it'; pass = $sv -and $ld; detail = "save=$sv load=$ld" }
+  $mk = $js.Contains("viewOptionSearch:     '#tableSearchContainer .search-wrapper',")
+  $tg = $js.Contains("            case 'viewOptionSearch':" + $C + "            case 'viewOptionSnapshots':")
+  $out += [pscustomobject]@{ id = 'S3'; name = 'admins: the "hidden from users" marker covers the box, and the live toggle paints it'; pass = $mk -and $tg; detail = "marker=$mk toggle=$tg" }
+  $sl = $js.Contains("            if (`$('body').hasClass('restrict-search') && !`$('#tableSearchContainer').hasClass('has-text')) return;" + $C + "            const searchInput = `$('#tableSearch');")
+  $out += [pscustomobject]@{ id = 'S4'; name = '"/" does not reach for a hidden search box'; pass = $sl; detail = "guard=$sl" }
+  $c1 = $css.Contains('body.restrict-search #tableSearchContainer:not(.has-text) .search-wrapper {' + $C + '    display: none !important;')
+  $c2 = $css.Contains('body.pnb-no-controlbar #resultsHeader {' + $C + '    display: none !important;')
+  $c3 = $css.Contains('@container pnb-vo-eu (max-width: 1623px) {')
+  $out += [pscustomobject]@{ id = 'S5'; name = 'CSS: an active search keeps its box, the empty bar goes, the grid''s 12-card step (1623px)'; pass = $c1 -and $c2 -and $c3; detail = "restrict-search=$c1 no-controlbar=$c2 step1623=$c3" }
+  $hp = $help.Contains('<strong>Search Bar</strong></div>') -and $help.Contains('viewers get the table without the control bar at all')
+  $out += [pscustomobject]@{ id = 'S6'; name = 'the help documents the option and the reclaimed bar'; pass = $hp; detail = "help=$hp" }
+  return ,$out
+}
+
+function Invoke-Browser($s) {
+  $run = Join-Path $env:TEMP ('pnb_sb_' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+  New-Item -ItemType Directory -Force "$run\css", "$run\js" | Out-Null
+  foreach ($f in @('jquery-ui.css', 'penumbra_tiles.css', 'density.css', 'search_builder.css', 'penumbra_presets.css', 'penumbra_colwidths.css')) { Copy-Item "$app\css\$f" "$run\css\$f" -Force }
+  Copy-Item "$app\js\jquery-3.7.1.min.js" "$run\js\jquery-3.7.1.min.js" -Force
+  [IO.File]::WriteAllText("$run\main.css", $s.css, $utf8); [IO.File]::WriteAllText("$run\main.js", $s.js, $utf8); [IO.File]::WriteAllText("$run\index.php", $s.idx, $utf8)
+  foreach ($f in @('sb.html', 'cdp.py', 'gen.php')) { Copy-Item "$here\$f" "$run\$f" -Force }
+  $gen = & $php -n "$run\gen.php" $run $app 2>&1
+  if (-not (Test-Path "$run\themes.js")) { throw "gen.php wrote no themes.js: $gen" }
+  $cases = New-Object System.Collections.ArrayList
+  foreach ($cs in @(@('alloff', ''), @('searchon', ''), @('searchoff', ''), @('active', ''), @('grouped', ''), @('reload', ''), @('admin', '&admin=1'), @('noadm', '&admin=1&noadm=1'), @('offset', '&grouped=1'))) {
+    [void]$cases.Add(@{ name = $cs[0]; query = "case=$($cs[0])$($cs[1])" })
+  }
+  $base = 'file:///' + ($run -replace '\\', '/')
+  [IO.File]::WriteAllText("$run\jobs.json", (@{ base = "$base/sb.html"; viewport = @(1700, 900); cases = $cases } | ConvertTo-Json -Depth 5), $utf8)
+  $pyOut = & py -3 "$run\cdp.py" "$run\jobs.json" "$run\results.json" 2>&1
+  if (-not (Test-Path "$run\results.json")) { throw "cdp.py wrote no results: $pyOut" }
+  $out = @()
+  foreach ($rec in ([IO.File]::ReadAllText("$run\results.json", $utf8) | ConvertFrom-Json)) {
+    $as = @($rec.result.asserts)
+    if (-not $as.Count -or $null -eq $as[0]) { $out += [pscustomobject]@{ id = "Z-$($rec.name)"; name = "case $($rec.name) produced no asserts"; pass = $false; detail = [string]$rec.result.error }; continue }
+    foreach ($a in $as) { $out += [pscustomobject]@{ id = $a.id; name = $a.name; pass = [bool]$a.pass; detail = $a.detail } }
+  }
+  if (-not $Keep) { try { [IO.Directory]::Delete($run, $true) } catch { } } else { Write-Host "kept: $run" }
+  return ,$out
+}
+
+# Assign first: `@(fn)` wraps a `return ,$arr` as ONE element (the PS comma trap).
+function Get-All($s) { $a = Get-Static $s; $b = Invoke-Browser $s; return (@($a) + @($b)) }
+
+foreach ($k in @('css', 'js', 'idx', 'help')) { Write-Host ("{0,-5} {1}" -f $k, $paths[$k]) }
+if ($CheckAnchors -or $Mutants) {
+  $stale = @()
+  foreach ($nm in $mutantDefs.Keys) { try { [void](Apply-Mutant $src0[$mutantDefs[$nm].t] $nm) } catch { $stale += $_.Exception.Message } }
+  if ($stale.Count) { $stale | ForEach-Object { Write-Host "ANCHOR $_" }; Write-Host 'RESULT: RED'; return }
+  Write-Host "ANCHORS all $($mutantDefs.Count) mutants apply exactly once"
+  if ($CheckAnchors) { Write-Host 'RESULT: GREEN'; return }
+}
+if ($Mutant -or $Mutants) {
+  $names = if ($Mutants) { @($mutantDefs.Keys) } else { @($Mutant) }
+  $bite = 0
+  foreach ($nm in $names) {
+    if (-not $mutantDefs.Contains($nm)) { throw "unknown mutant '$nm'" }
+    $sx = @{}; foreach ($k in $src0.Keys) { $sx[$k] = $src0[$k] }
+    $tk = $mutantDefs[$nm].t; $sx[$tk] = Apply-Mutant $src0[$tk] $nm
+    $red = @(Get-All $sx | Where-Object { -not $_.pass } | ForEach-Object { $_.id })
+    $miss = @($mutantDefs[$nm].red | Where-Object { $red -notcontains $_ })
+    if ($miss.Count -eq 0) { $bite++; Write-Host ("MUTANT {0,-14} BITES   red: {1}" -f $nm, ($red -join ' ')) }
+    else { Write-Host ("MUTANT {0,-14} MISSED  {1} stayed green; red: {2}" -f $nm, ($miss -join ' '), ($red -join ' ')) }
+  }
+  Write-Host "MUTANTS $bite / $($names.Count) bite"
+  Write-Host $(if ($bite -eq $names.Count) { 'RESULT: GREEN' } else { 'RESULT: RED' })
+  return
+}
+$all = Get-All $src0
+foreach ($x in $all) { $d = [string]$x.detail; if ($d.Length -gt 300) { $d = $d.Substring(0, 300) + '...' }; Write-Host ('  {0}  {1} {2}  [{3}]' -f $(if ($x.pass) { 'PASS' } else { 'FAIL' }), $x.id, $x.name, $d) }
+$p = @($all | Where-Object { $_.pass }).Count; $f = @($all | Where-Object { -not $_.pass }).Count
+Write-Host "TOTAL pass=$p fail=$f"
+if ($f) { Write-Host ('FAILED: ' + (@($all | Where-Object { -not $_.pass } | ForEach-Object { $_.id }) -join ' ')) }
+Write-Host $(if ($f -eq 0) { 'RESULT: GREEN' } else { 'RESULT: RED' })

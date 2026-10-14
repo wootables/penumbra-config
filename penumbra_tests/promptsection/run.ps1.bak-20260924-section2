@@ -1,0 +1,291 @@
+# =============================================================================
+# promptsection - section= on query prompts (2026-09-24).
+#
+#   run.ps1                  against live
+#   run.ps1 -App <path>      against a stage (a file the stage lacks comes from
+#                            live - and it says so)
+#   run.ps1 -Control         one deliberately FALSE assertion in each half; each
+#                            must report FAIL 1
+#   run.ps1 -Mutant          eleven targeted mutants; each MUST go red with the exact
+#                            counts named below (-Only CE = just those letters)
+#
+# WHAT IS UNDER TEST. `[PROMPT;...;section=Dates]` is DISPLAY ONLY: it decides
+# which review button a prompt's chip sits under in the answered-prompts bar.
+# Two or more sections split the bar into boxes, each with its own review
+# button (reviews just that section, then re-runs); a section of one prompt has
+# no button; one section, or none, leaves the bar exactly as it was. No SQL
+# engine reads it (promptparity carries corpus cases that prove it).
+#
+#   1. promptsection_bar_tests.js      parsePrompt, the answer key, the section
+#                                      map, the bar (markup lifted from index.php,
+#                                      styled by css/main.css), the scoped review
+#                                      and the real click handlers - all cut out
+#                                      of js/main.js by name. With a stage, live's
+#                                      main.js is the REFERENCE for "the bar
+#                                      without sections is byte for byte what it
+#                                      was" (-Reference <main.js> to choose).
+#   2. promptsection_builder_tests.js  the TAG GENERATOR: the whole of main.js
+#                                      booted over the builder markup and its
+#                                      inline <style>, both lifted from index.php;
+#                                      Name / Section 50/50, preview, Generate,
+#                                      Overwrite, suggestions, Decision Tree,
+#                                      Reset, Test - real events on real controls.
+#   3. pins                            the help, the builder tip and the AI
+#                                      grammar still describe it.
+#
+# EXPECTED TAIL (match on the FAIL counts - the totals move as coverage lands):
+#   bar     | PASS: 75   FAIL: 0
+#   builder | PASS: 31   FAIL: 0
+#   pins    | PASS: 4   FAIL: 0
+#   RESULT: GREEN
+#
+# UNC .ps1 files are GPO-blocked here ("not digitally signed") - run the body as
+# a scriptblock rather than with -File:
+#   $dir = '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\promptsection'
+#   & ([scriptblock]::Create([IO.File]::ReadAllText("$dir\run.ps1").Replace('$here = $PSScriptRoot', "`$here = '$dir'")))
+# Never add a bare `exit` (it would kill the caller) and do not pipe the
+# invocation (a lingering headless-Edge child can hold stdout open).
+# =============================================================================
+param(
+    [string]$App = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra',
+    [string]$Reference = '',
+    [switch]$Control,
+    [switch]$Mutant,
+    [string]$Only = ''
+)
+
+$ErrorActionPreference = 'Stop'
+$here = $PSScriptRoot
+if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Path }
+$edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+$live = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+$work = Join-Path $env:TEMP ('pnb_promptsection_' + $PID)
+New-Item -ItemType Directory -Force -Path $work | Out-Null
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+
+$appFiles = 'index.php', 'js\main.js', 'css\main.css', 'help_content.php', 'ai_system_prompt.php'
+function Copy-AppInto([string]$dest) {
+    New-Item -ItemType Directory -Force -Path (Join-Path $dest 'js'), (Join-Path $dest 'css') | Out-Null
+    $fromLive = @()
+    foreach ($f in $appFiles) {
+        $src = Join-Path $App $f
+        if (-not (Test-Path -LiteralPath $src)) { $src = Join-Path $live $f; $fromLive += $f }
+        Copy-Item -LiteralPath $src -Destination (Join-Path $dest $f) -Force
+    }
+    return ,$fromLive
+}
+
+# One headless-Edge page -> its <pre id="out">. Start-Process + a redirected
+# stdout (never `>` or a pipe), a profile of its own per launch, one retry.
+function Invoke-EdgePage([string]$pageDir, [string]$pageFile, $lines, [string]$tag) {
+    $dom = Join-Path $pageDir ($pageFile + '.dom.txt')
+    $url = 'file:///' + ((Join-Path $pageDir $pageFile) -replace '\\', '/')
+    $text = ''; $errs = ''
+    for ($attempt = 1; $attempt -le 2; $attempt++) {
+        $ud = Join-Path $work ('ud_' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+        if (Test-Path $dom) { try { [IO.File]::Delete($dom) } catch { } }
+        $p = Start-Process -FilePath $edge -PassThru -NoNewWindow -RedirectStandardOutput $dom -RedirectStandardError (Join-Path $pageDir 'edge_err.txt') -ArgumentList '--headless=new', '--disable-gpu', '--no-sandbox', '--allow-file-access-from-files', '--no-first-run', '--disable-sync', '--disable-extensions', "--user-data-dir=$ud", '--window-size=1400,1000', '--virtual-time-budget=60000', '--dump-dom', $url
+        if (-not $p.WaitForExit(240000)) {
+            Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" | Where-Object { $_.CommandLine -like "*$ud*" } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch { } }
+            $lines.Add("$tag | launch $attempt TIMED OUT after 240s - headless Edge was stopped")
+        }
+        $domText = ''
+        if (Test-Path $dom) {
+            for ($try = 0; $try -lt 40; $try++) { try { $domText = [IO.File]::ReadAllText($dom); break } catch [System.IO.IOException] { Start-Sleep -Milliseconds 250 } }
+        }
+        $text = [System.Net.WebUtility]::HtmlDecode([regex]::Match($domText, '(?s)<pre id="out"[^>]*>(.*?)</pre>').Groups[1].Value)
+        $errs = [System.Net.WebUtility]::HtmlDecode([regex]::Match($domText, '(?s)<pre id="errs"[^>]*>(.*?)</pre>').Groups[1].Value)
+        if ($text -match 'DONE' -or $text -match 'STALLED in:' -or $text -match 'HARNESS') { break }
+        if ($attempt -eq 1) { $lines.Add("$tag | launch 1 produced no page dump - launching once more") }
+    }
+    ($errs -split "`n") | Where-Object { $_.Trim() -ne '' } | Select-Object -First 6 | ForEach-Object { $lines.Add("$tag | $_") }
+    ($text -split "`n") | Where-Object { $_ -match '^\s+FAIL |^\s+(got|want)[ :]|^\s+note |^HARNESS|^STALLED|^page errors' } | ForEach-Object { $lines.Add("$tag | $_") }
+    $fails = -1
+    $bt = [regex]::Match($text, 'PASS: \d+\s+FAIL: (\d+)')
+    if ($bt.Success -and $text -match 'DONE') { $fails = [int]$bt.Groups[1].Value; $lines.Add("$tag | " + $bt.Value) }
+    else { $lines.Add("$tag | NO RESULT - the page did not finish (see the STALLED / HARNESS line above, if any)") }
+    return $fails
+}
+
+# Runs the three halves against one app directory -> @{ bar; builder; pins; lines }.
+function Invoke-SectionSuite([string]$AppDir, [bool]$AsControl, [string]$RefMain) {
+    $lines = New-Object System.Collections.Generic.List[string]
+    $run = Join-Path $work ('run_' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+    New-Item -ItemType Directory -Force -Path $run | Out-Null
+    $ctl = if ($AsControl) { 'window.__control = true;' } else { '' }
+    $mainText = [IO.File]::ReadAllText((Join-Path $AppDir 'js\main.js'))
+    $idx = [IO.File]::ReadAllText((Join-Path $AppDir 'index.php'))
+
+    # ---- half 1: the bar and the review, functions lifted by name
+    $barFails = -1
+    $cm = [regex]::Match($idx, '(?s)<div id="promptInfoContainer">.*?<ul id="promptInfoList"></ul>\s*</div>')
+    if (-not $cm.Success) { $lines.Add('bar     | NO RESULT - #promptInfoContainer not found in index.php') }
+    else {
+        foreach ($lib in 'jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js') { Copy-Item (Join-Path $live "js\$lib") (Join-Path $run $lib) -Force }
+        Copy-Item (Join-Path $AppDir 'css\main.css') (Join-Path $run 'main.css') -Force
+        Copy-Item (Join-Path $here 'promptsection_bar_tests.js') (Join-Path $run 'tests.js') -Force
+        [IO.File]::WriteAllText((Join-Path $run 'SRC.js'), 'window.__src = ' + ($mainText | ConvertTo-Json -Compress) + ';')
+        $refText = ''
+        if ($RefMain -and (Test-Path -LiteralPath $RefMain)) { $refText = [IO.File]::ReadAllText($RefMain) }
+        [IO.File]::WriteAllText((Join-Path $run 'REF.js'), 'window.__srcRef = ' + ($refText | ConvertTo-Json -Compress) + ';')
+        [IO.File]::WriteAllText((Join-Path $run 'BAR.js'), 'window.__containerHtml = ' + ($cm.Value | ConvertTo-Json -Compress) + ';')
+        # rAF = null: jQuery's fx ticker prefers it and it never fires under --dump-dom.
+        $html = '<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="main.css">' +
+                '<style>*, *::before, *::after { transition: none !important; animation: none !important; }</style></head>' +
+                '<body><pre id="out">running</pre><pre id="errs"></pre>' +
+                '<button id="executeQuery" onclick="window.__execClicks=(window.__execClicks||0)+1">run</button>' +
+                '<script>window.onerror=function(m,s,l,c){document.getElementById("errs").textContent+="ONERROR: "+m+" @"+l+":"+c+"\n";};' +
+                'window.addEventListener("unhandledrejection",function(ev){document.getElementById("errs").textContent+="UNHANDLED: "+(ev.reason&&ev.reason.message||ev.reason)+"\n";});' +
+                'window.requestAnimationFrame=null;' + $ctl + '</script>' +
+                '<script src="jquery-3.7.1.min.js"></script><script src="jquery-ui.min.js"></script><script src="moment.min.js"></script>' +
+                '<script src="SRC.js"></script><script src="REF.js"></script><script src="BAR.js"></script><script src="tests.js"></script></body></html>'
+        [IO.File]::WriteAllText((Join-Path $run 'h.html'), $html)
+        $barFails = Invoke-EdgePage $run 'h.html' $lines 'bar    '
+    }
+
+    # ---- half 2: the Tag Generator, in the whole of main.js
+    $builderFails = -1
+    $i0 = $idx.IndexOf('<div id="promptGeneratorLightbox"')
+    $i1 = if ($i0 -ge 0) { $idx.IndexOf('<?php', $i0) } else { -1 }    # the lightbox is the last thing inside its `if`
+    $s1 = if ($i0 -ge 0) { $idx.LastIndexOf('</style>', $i0) } else { -1 }
+    $s0 = if ($s1 -ge 0) { $idx.LastIndexOf('<style>', $s1) } else { -1 }
+    $anchor = '$(document).ready(function () {'
+    if ($i0 -lt 0 -or $i1 -le $i0) { $lines.Add('builder | NO RESULT - could not find the Tag Generator markup in index.php') }
+    elseif ($s0 -lt 0 -or $s1 -le $s0 -or $idx.Substring($s0, $s1 - $s0).Contains('<?')) { $lines.Add('builder | NO RESULT - the Tag Generator <style> block is not where it was') }
+    elseif (-not $mainText.Substring(0, 200).Contains($anchor)) { $lines.Add('builder | NO RESULT - main.js closure anchor not found') }
+    else {
+        $markup = $idx.Substring($i0, $i1 - $i0).TrimEnd()
+        $style = $idx.Substring($s0, $s1 - $s0 + 8)
+        $opens = [regex]::Matches($markup, '<div[\s>]').Count
+        $closes = [regex]::Matches($markup, '</div>').Count
+        if ($opens -ne $closes) { $lines.Add("builder | NO RESULT - the lifted Tag Generator markup is not balanced ($opens <div> vs $closes </div>); index.php has moved") }
+        else {
+            $b = Join-Path $run 'builder'
+            New-Item -ItemType Directory -Force -Path $b | Out-Null
+            foreach ($lib in 'jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js', 'show-hint.js',
+                             'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js', 'penumbra_snippet_help.js',
+                             'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js') { Copy-Item (Join-Path $live "js\$lib") (Join-Path $b $lib) -Force }
+            Copy-Item (Join-Path $AppDir 'css\main.css') (Join-Path $b 'main.css') -Force
+            Copy-Item (Join-Path $here 'promptsection_builder_tests.js') (Join-Path $b 'builder_tests.js') -Force
+            $page = [IO.File]::ReadAllText((Join-Path $here 'builder_harness.html'), $utf8)
+            $page = [regex]::Replace($page, '<!-- BUILDER_MARKUP:.*?-->', [System.Text.RegularExpressions.MatchEvaluator]{ param($x) $markup })
+            $page = [regex]::Replace($page, '<!-- BUILDER_STYLE:.*?-->', [System.Text.RegularExpressions.MatchEvaluator]{ param($x) $style })
+            if ($AsControl) { $page = $page.Replace('<script src="main_pg.js"></script>', '<script>window.__control = true;</script><script src="main_pg.js"></script>') }
+            [IO.File]::WriteAllText((Join-Path $b 'h.html'), $page, $utf8)
+            # Unwrap the ready closure so it runs where it stands, and export a few
+            # closure names (looked up when CALLED - no temporal dead zone).
+            $hook = 'try { window.__PG = {' +
+                    ' getEditor: function () { return editor; },' +
+                    ' parsePrompt: function (s) { return parsePrompt(s); },' +
+                    ' prefill: function (c) { return prefillPromptGenerator(c); },' +
+                    ' populateParents: function () { return populateParentPromptSelectors(); },' +
+                    ' forcedKeys: function () { return Array.from(_forceDefaultApplied); }' +
+                    ' }; } catch (e) { window.__PG_ERR = String(e); }'
+            $k = $mainText.IndexOf($anchor)
+            $patched = $mainText.Substring(0, $k) + ';(function () {' + "`r`n" + $hook + "`r`n" + $mainText.Substring($k + $anchor.Length)
+            $j = $patched.LastIndexOf('});')
+            $patched = $patched.Substring(0, $j) + '})();' + $patched.Substring($j + 3)
+            [IO.File]::WriteAllText((Join-Path $b 'main_pg.js'), $patched, $utf8)
+            $builderFails = Invoke-EdgePage $b 'h.html' $lines 'builder'
+        }
+    }
+
+    # ---- half 3: pins - the words that describe it are still there
+    $pins = @(
+        @{ file = 'help_content.php';     what = 'the builder tip for the Section field';            needle = '<div data-tip="section">' },
+        @{ file = 'help_content.php';     what = 'the prompt reference row';                        needle = '<div style="flex: 0 0 120px; padding-left: 6px;"><code>section=</code></div>' },
+        @{ file = 'ai_system_prompt.php'; what = 'the AI grammar line';                             needle = '- section=NAME - display only' },
+        @{ file = 'index.php';            what = 'Name and Section share one .bld-row in the builder'; regex = '(?s)<div class="bld-row">\s*<div class="bld-field">\s*<label for="promptName">.{0,600}?<label for="promptSection">' }
+    )
+    if ($AsControl) { $pins += @{ file = 'index.php'; what = 'CONTROL: a pin that cannot be there (deliberately false)'; needle = 'NO-SUCH-PIN-' + [Guid]::NewGuid().ToString('N') } }
+    $pinPass = 0; $pinFail = 0
+    foreach ($pn in $pins) {
+        $txt = [IO.File]::ReadAllText((Join-Path $AppDir $pn.file))
+        $ok = if ($pn.ContainsKey('regex')) { [regex]::IsMatch($txt, $pn.regex) } else { $txt.Contains($pn.needle) }
+        if ($ok) { $pinPass++ } else { $pinFail++; $lines.Add("pins    |   FAIL $($pn.file): $($pn.what)") }
+    }
+    $lines.Add("pins    | PASS: $pinPass   FAIL: $pinFail")
+
+    return @{ bar = $barFails; builder = $builderFails; pins = $pinFail; lines = $lines }
+}
+
+function Remove-Work { try { [IO.Directory]::Delete($work, $true) } catch { } }   # not Remove-Item: the tool's pre-filter rejects it on a variable path
+
+$effApp = Join-Path $work 'app'
+$fromLive = Copy-AppInto $effApp
+if ($fromLive.Count -gt 0) { Write-Output ('note    | not in the app directory, taken from LIVE: ' + ($fromLive -join ', ')) }
+$refMain = $Reference
+if (-not $refMain) {
+    $liveMain = Join-Path $live 'js\main.js'
+    if ([IO.File]::ReadAllText($liveMain) -ne [IO.File]::ReadAllText((Join-Path $effApp 'js\main.js'))) { $refMain = $liveMain }
+}
+if ($refMain) { Write-Output "note    | reference build for the no-section bar: $refMain" }
+
+if (-not $Mutant) {
+    $r = Invoke-SectionSuite $effApp ([bool]$Control) $refMain
+    $r.lines | ForEach-Object { Write-Output $_ }
+    if ($Control) {
+        $ok = ($r.bar -eq 1 -and $r.builder -eq 1 -and $r.pins -eq 1)
+        Write-Output $(if ($ok) { 'CONTROL: all three halves reported exactly the one deliberate failure - the suite can see red' } else { "CONTROL BROKEN: expected FAIL 1 / 1 / 1, got $($r.bar) / $($r.builder) / $($r.pins)" })
+    } else {
+        Write-Output ('RESULT: ' + $(if ($r.bar -eq 0 -and $r.builder -eq 0 -and $r.pins -eq 0) { 'GREEN' } else { 'RED' }))
+    }
+    Remove-Work
+    return
+}
+
+# --- targeted mutants: each reverts ONE decision; the fail counts are exact -----
+$CRLF = "`r`n"
+$mutants = @(
+    @{ id = 'A'; name = 'A: section= is part of the answer key again'; file = 'js\main.js'; bar = 15; builder = 0; pins = 0
+       from = '? promptString.replace(/;\s*section=[^;\]]*?[ \t]*(?=\s*(?:;|\]|$))/gi, '''')'
+       to   = '? promptString' },
+    @{ id = 'B'; name = 'B: a section''s review asks every prompt'; file = 'js\main.js'; bar = 10; builder = 0; pins = 0
+       from = "prompts = prompts.filter(ps => (_sectionOf.get(getPromptStorageKey(ps)) || '') === _want);"
+       to   = 'prompts = prompts.filter(ps => true);' },
+    @{ id = 'C'; name = 'C: a resultif child keeps its OWN section'; file = 'js\main.js'; bar = 4; builder = 0; pins = 0
+       from = 'while (parentOf.has(at)) {'
+       to   = 'while (false) {' },
+    @{ id = 'D'; name = 'D: the box shows its section name as text (data(prompts) / exports would read it)'; file = 'js\main.js'; bar = 1; builder = 0; pins = 0
+       from = "'<li class=""prompt-section"" data-prompt-section=""' + escapeHtml(sec) + '"">'"
+       to   = "'<li class=""prompt-section"" data-prompt-section=""' + escapeHtml(sec) + '"">' + escapeHtml(sec)" },
+    @{ id = 'E'; name = 'E: a chip alone in its section loses its pencil'; file = 'js\main.js'; bar = 3; builder = 0; pins = 0
+       from = '${soloInSection ? '' is-solo'' : ''''}'
+       to   = '${''''}' },
+    @{ id = 'F'; name = 'F: ONE named section is drawn as a box'; file = 'js\main.js'; bar = 5; builder = 0; pins = 0
+       from = 'const sectioned = sectionOrder.length > 1;'
+       to   = "const sectioned = sectionOrder.length > 1 || sectionOrder[0] !== '';" },
+    @{ id = 'G'; name = 'G: the preview / Test twin drops section='; file = 'js\main.js'; bar = 0; builder = 4; pins = 0
+       from = 'if (section && /^[a-zA-Z0-9 _-]+$/.test(section)) {'
+       to   = 'if (false) {' },
+    @{ id = 'H'; name = 'H: re-opening a tag forgets its section'; file = 'js\main.js'; bar = 0; builder = 3; pins = 0
+       from = "`$('#promptSection').val(config.section || '');"
+       to   = "`$('#promptSection').val('');" },
+    @{ id = 'I'; name = 'I: the section button keeps the global button margin'; file = 'css\main.css'; bar = 2; builder = 0; pins = 0
+       from = '#promptInfoList .prompt-section-review {' + $CRLF + '    margin: 0;'
+       to   = '#promptInfoList .prompt-section-review {' + $CRLF + '    margin-left: 0;' },
+    @{ id = 'J'; name = 'J: a Decision Tree parent does not stand the Section field down'; file = 'js\main.js'; bar = 0; builder = 4; pins = 0
+       from = "const hasParent = String(`$('#promptResultIfName').val() || '').trim() !== '';"
+       to   = 'const hasParent = false;' },
+    @{ id = 'K'; name = 'K: the chip is content-box again (a capped chip runs past its slot)'; file = 'css\main.css'; bar = 2; builder = 0; pins = 0
+       from = 'Only a capped chip is affected. */' + $CRLF + '    box-sizing: border-box;'
+       to   = 'Only a capped chip is affected. */' + $CRLF + '    box-sizing: content-box;' }
+)
+$bad = 0
+foreach ($mu in $mutants) {
+    if ($Only -and ($Only.ToUpper().IndexOf($mu.id) -lt 0)) { continue }
+    $mApp = Join-Path $work ('mut_' + $mu.id)
+    Copy-AppInto $mApp | Out-Null
+    $target = Join-Path $mApp $mu.file
+    $text = [IO.File]::ReadAllText($target)
+    $count = ([regex]::Matches($text, [regex]::Escape($mu.from))).Count
+    if ($count -ne 1) { Write-Output ("ANCHOR {0}x - {1} (expected exactly one; fix the mutant)" -f $count, $mu.name); $bad++; continue }
+    [IO.File]::WriteAllText($target, $text.Replace($mu.from, $mu.to), $utf8)
+    $r = Invoke-SectionSuite $mApp $false $refMain
+    $verdict = if ($r.bar -eq $mu.bar -and $r.builder -eq $mu.builder -and $r.pins -eq $mu.pins) { 'BITES' } else { $bad++; 'WRONG' }
+    Write-Output ("{0,-6} {1}  (expected bar {2} / builder {3} / pins {4}, got {5} / {6} / {7})" -f $verdict, $mu.name, $mu.bar, $mu.builder, $mu.pins, $r.bar, $r.builder, $r.pins)
+    if ($verdict -eq 'WRONG') { $r.lines | Where-Object { $_ -match 'FAIL |NO RESULT' } | ForEach-Object { Write-Output "         $_" } }
+}
+Write-Output ''
+Write-Output $(if ($bad -eq 0) { "MUTANTS: all bite exactly as specified" } else { "MUTANTS: $bad problem(s) - the suite is not pinning what it claims" })
+Remove-Work

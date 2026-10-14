@@ -1,0 +1,223 @@
+# =============================================================================
+# ROLLBACK - column widths: round 1 (2026-09-25, the flat table), round 2
+# (2026-09-30, the grouped view + a pivot's row labels), round 3 (2026-10-01, a
+# pivot's value column while it has only one), round 4 (2026-10-01, a
+# one-row header's value columns, one width together) and round 5 (2026-10-01,
+# a two-row header's groups and leaves)
+#
+#   rollback.ps1 -Status             where things stand: both switches, the module files, and which
+#                                    hunks of each round every live file holds
+#   rollback.ps1 -Disable            SWITCH OFF everything: create an empty js\penumbra_colwidths.off.
+#                                    From the next page load index.php does not load the module; every
+#                                    column is content-sized again. Nothing deployed or restored, saved
+#                                    widths stay in the reports.  -Enable deletes it.
+#   rollback.ps1 -DisableViews       switch off ONLY the grouped-view and pivot parts (rounds 2-5): an
+#                                    empty js\penumbra_colwidths_views.off - the flat table keeps its
+#                                    widths.  -EnableViews deletes it.
+#   rollback.ps1 -Restore -Round 5 [-DryRun]
+#                                    take ROUND 5's two-row header back out (back to round 4):
+#                                    patch_colwidths5.py reverse on the CURRENT live main.js /
+#                                    help_content.php / README.md, and the module + stylesheet back from
+#                                    round 5's .bak (index.php untouched).
+#   rollback.ps1 -Restore -Round 4 [-DryRun]
+#                                    back to ROUND 3: round 5 out first if it is in, then round 4's widening (a pivot's value
+#                                    column only while it has just one): patch_colwidths4.py reverse on
+#                                    the CURRENT live help_content.php / README.md, and the module +
+#                                    stylesheet back from round 4's .bak (main.js, index.php untouched).
+#   rollback.ps1 -Restore -Round 3 [-DryRun]
+#                                    back to ROUND 2: round 4 out first if it is in, then round 3: patch_colwidths3.py
+#                                    reverse on the CURRENT live main.js / help_content.php / README.md
+#                                    (exactly those lines - anything deployed on top stays; it refuses,
+#                                    touching nothing, if someone edited them), and the module + stylesheet
+#                                    back from round 3's .bak - only while they are still what round 3
+#                                    deployed (its manifest).
+#   rollback.ps1 -Restore -Round 2 [-DryRun]
+#                                    back to ROUND 1: round 3 out first if it is in, then round 2
+#                                    (patch_colwidths2.py reverse; it also touches index.php), and the
+#                                    module + stylesheet back from round 2's .bak.
+#   rollback.ps1 -Restore [-DryRun]  take ALL of it out: every round newest first, then round 1
+#                                    (patch_colwidths.py reverse); the module and stylesheet are renamed
+#                                    *.removed-<stamp>, not deleted.
+#   A round comes out only after every later one (their hunks anchor on its text). Every swap is
+#   hash-guarded and atomic (MoveFileEx), index.php FIRST when it changes (from that moment no page
+#   loads what is being removed), with *.bak-<stamp>-colwidths-undo copies; a file a round never
+#   touched is left alone. -App <dir> rehearses on a copy.
+#
+# UNC NOTE: run the body as a scriptblock (-File on a UNC path is GPO-blocked here):
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\colwidths'
+#   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\rollback.ps1"))) -Disable
+# =============================================================================
+param([switch]$Status, [switch]$Disable, [switch]$Enable, [switch]$DisableViews, [switch]$EnableViews,
+      [switch]$Restore, [int]$Round = 0, [switch]$DryRun, [string]$App = '', [string]$Here = '')
+$ErrorActionPreference = 'Stop'
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\colwidths' }
+# -App: rehearse against a scratch copy of the app folder.
+$app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$off  = Join-Path $app 'js\penumbra_colwidths.off'
+$voff = Join-Path $app 'js\penumbra_colwidths_views.off'
+$mods = @('js\penumbra_colwidths.js', 'css\penumbra_colwidths.css')
+$code = @('js/main.js', 'index.php', 'help_content.php', 'README.md')
+$LATEST = 5
+
+if (-not ('PnbMove' -as [type])) {
+  Add-Type -Namespace '' -Name 'PnbMove' -MemberDefinition @'
+[System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true, CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+public static extern bool MoveFileEx(string existing, string replacement, int flags);
+'@
+}
+function Get-Sha([string]$p) { (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToLower() }
+function Move-Atomic([string]$from, [string]$to, [int]$flags) {
+  for ($i = 0; $i -lt 20; $i++) {
+    if ([PnbMove]::MoveFileEx($from, $to, $flags)) { return }
+    $err = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+    if ($err -ne 32 -and $err -ne 33 -and $err -ne 5) { throw "MoveFileEx($from -> $to) failed: Win32 $err" }
+    Start-Sleep -Milliseconds 250
+  }
+  throw "MoveFileEx($from -> $to) kept failing (sharing violation)"
+}
+function Copy-Code([string]$from, [string]$dest) {
+  foreach ($rel in $code) {
+    $d = Join-Path $dest ($rel -replace '/', '\')
+    New-Item -ItemType Directory -Force (Split-Path $d) | Out-Null
+    Copy-Item -LiteralPath (Join-Path $from ($rel -replace '/', '\')) -Destination $d -Force
+  }
+}
+function Patcher([int]$n) { Join-Path $here $(if ($n -eq 1) { 'patch_colwidths.py' } else { "patch_colwidths$n.py" }) }
+# Is round n in these files? (every one of its hunks applied)
+function Round-In([int]$n, [string]$dir) {
+  $out = & py -3 (Patcher $n) check $dir
+  return (@($out | Where-Object { $_ -notmatch 'APPLIED$' }).Count -eq 0)
+}
+# Round n's reverse from one copy of the code files into another: the files the
+# round never touched go through as they are, the patcher rewrites its own.
+function Reverse-Round([int]$n, [string]$from, [string]$to) {
+  Copy-Code $from $to
+  & py -3 (Patcher $n) reverse $from $to | Out-Host
+  return ($LASTEXITCODE -eq 0)
+}
+# The round-n deploy manifest whose DEPLOYED module + stylesheet have these
+# hashes (by content, never by name: PowerShell's culture-aware sort ignores
+# hyphens).
+function Find-Manifest([int]$n, [string]$js, [string]$css) {
+  $hit = $null
+  foreach ($d in @(Get-ChildItem (Join-Path $here 'deploy') -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "*-colwidths$n" })) {
+    $mj = Get-Content -Raw (Join-Path $d.FullName 'manifest.json') | ConvertFrom-Json
+    if ($mj.files.'js/penumbra_colwidths.js'.after -eq $js -and $mj.files.'css/penumbra_colwidths.css'.after -eq $css) { $hit = $mj }
+  }
+  return $hit
+}
+# Swap one live file for a staged copy: hash guard, .bak, atomic rename, verify.
+function Swap-Live([string]$live, [string]$new, [string]$takenSha, [string]$stamp) {
+  if ((Get-Sha $live) -ne $takenSha) { throw "$live changed while the rollback was being built - stopping here (files before it are already rolled back)" }
+  Copy-Item -LiteralPath $live -Destination "$live.bak-$stamp-colwidths-undo"
+  if ((Get-Sha "$live.bak-$stamp-colwidths-undo") -ne $takenSha) { throw "$live : backup hash mismatch" }
+  $want = Get-Sha $new
+  Copy-Item -LiteralPath $new -Destination "$live.rollback-tmp" -Force
+  if ((Get-Sha "$live.rollback-tmp") -ne $want) { throw "$live : temp copy hash mismatch" }
+  Move-Atomic "$live.rollback-tmp" $live 1
+  (Get-Item -LiteralPath $live).LastWriteTime = Get-Date
+  if ((Get-Sha $live) -ne $want) { throw "$live : live hash after the swap does not match" }
+  Write-Host ("  rolled back {0,-34} {1} -> {2}" -f (Split-Path $live -Leaf), $takenSha.Substring(0, 8), $want.Substring(0, 8)) -ForegroundColor Green
+}
+
+if (-not ($Status -or $Disable -or $Enable -or $DisableViews -or $EnableViews -or $Restore)) { $Status = $true }
+
+foreach ($sw in @(@($Disable, $Enable, $off, 'everything'), @($DisableViews, $EnableViews, $voff, 'the grouped-view + pivot parts'))) {
+  if ($sw[0]) {
+    if (Test-Path -LiteralPath $sw[2]) { Write-Host "already switched OFF ($($sw[2]) exists)" }
+    else { [IO.File]::WriteAllBytes($sw[2], [byte[]]@()); Write-Host "switched OFF $($sw[3]): created $($sw[2]) - takes effect on the next page load" -ForegroundColor Yellow }
+  }
+  if ($sw[1]) {
+    if (Test-Path -LiteralPath $sw[2]) { [IO.File]::Delete($sw[2]); Write-Host "switched ON $($sw[3]): deleted $($sw[2]) - takes effect on the next page load" -ForegroundColor Green }
+    else { Write-Host "already ON (no $($sw[2]))" }
+  }
+}
+
+if ($Status) {
+  Write-Host ("switch (all):    {0}" -f $(if (Test-Path -LiteralPath $off) { 'OFF (js\penumbra_colwidths.off exists)' } else { 'on' }))
+  Write-Host ("switch (views):  {0}" -f $(if (Test-Path -LiteralPath $voff) { 'OFF (js\penumbra_colwidths_views.off exists)' } else { 'on' }))
+  foreach ($m in $mods) { Write-Host ("module:  {0,-28} {1}" -f $m, $(if (Test-Path -LiteralPath (Join-Path $app $m)) { 'present' } else { 'absent' })) }
+  $tmp = Join-Path $env:TEMP ('pnb_cwst_' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+  Copy-Code $app $tmp
+  for ($n = $LATEST; $n -ge 1; $n--) {
+    Write-Host ("--- round {0} ({1}){2}:" -f $n, (Split-Path (Patcher $n) -Leaf), $(if ($n -lt $LATEST) { '; a hunk a later round rewrote reads UNEXPECTED / absent while that round is in' } else { '' }))
+    & py -3 (Patcher $n) check $tmp
+  }
+  try { [IO.Directory]::Delete($tmp, $true) } catch {}
+}
+
+if ($Restore) {
+  if ($Round -and @(2, 3, 4, 5) -notcontains $Round) { Write-Host 'ABORT - -Round takes 2 to 5 (no -Round = take ALL of it out); nothing was touched.' -ForegroundColor Red; return }
+  $stamp = (Get-Date).ToString('yyyyMMdd-HHmmss')
+  $tmp = Join-Path $env:TEMP ('pnb_cwrb_' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+  Copy-Code $app "$tmp\in"
+  $taken = @{}
+  foreach ($rel in $code) { $taken[$rel] = Get-Sha (Join-Path "$tmp\in" ($rel -replace '/', '\')) }
+  # Newest first: a round's hunks only read as applied once every later round is out.
+  $floor = if ($Round) { $Round } else { 1 }
+  $src = "$tmp\in"; $latestIn = 0
+  for ($n = $LATEST; $n -ge $floor; $n--) {
+    $in = Round-In $n $src
+    if ($in -and -not $latestIn) { $latestIn = $n }
+    if (-not $in) {
+      if ($n -eq $floor -and $Round) { Write-Host "ABORT - round $n is not (wholly) in the live files; nothing was touched." -ForegroundColor Red; return }
+      continue
+    }
+    if (-not (Reverse-Round $n $src "$tmp\r$n")) { Write-Host "ABORT - round $n's reverse patch refused (see above); nothing was touched. -DisableViews / -Disable still work." -ForegroundColor Red; return }
+    $src = "$tmp\r$n"
+  }
+  if (-not $latestIn) { Write-Host 'ABORT - no round of column widths is in the live files; nothing was touched.' -ForegroundColor Red; return }
+  $outDir = $src
+  foreach ($rel in @('index.php', 'help_content.php')) {
+    $l = (& $php -n -l (Join-Path $outDir $rel)) -join ' '
+    if ($l -notmatch 'No syntax errors') { Write-Host "ABORT - php -l on the rolled-back $rel : $l" -ForegroundColor Red; return }
+  }
+  # Back to round 2 or 1: the module + stylesheet come back from the .bak of the
+  # OLDEST round coming out, and only while they are still what the newest round
+  # in put there - each earlier round's manifest is the one whose deployed files
+  # the next round replaced.
+  $modBack = @()
+  if ($Round) {
+    $liveJs = Get-Sha (Join-Path $app 'js\penumbra_colwidths.js'); $liveCss = Get-Sha (Join-Path $app 'css\penumbra_colwidths.css')
+    $man = Find-Manifest $latestIn $liveJs $liveCss
+    if (-not $man) { Write-Host "ABORT - the live module / stylesheet are not what the round-$latestIn deploy put there (changed since, or never deployed); nothing was touched. -DisableViews still works." -ForegroundColor Red; return }
+    for ($k = $latestIn; $k -gt $Round; $k--) {
+      $man = Find-Manifest ($k - 1) $man.files.'js/penumbra_colwidths.js'.before $man.files.'css/penumbra_colwidths.css'.before
+      if (-not $man) { Write-Host "ABORT - no round-$($k - 1) deploy put the module round $k replaced; nothing was touched." -ForegroundColor Red; return }
+    }
+    $liveNow = @{ 'js/penumbra_colwidths.js' = $liveJs; 'css/penumbra_colwidths.css' = $liveCss }
+    foreach ($rel in @('js/penumbra_colwidths.js', 'css/penumbra_colwidths.css')) {
+      $f = $man.files.$rel
+      $live = Join-Path $app ($rel -replace '/', '\')
+      $bak = Join-Path $app ($f.bak -replace '/', '\')
+      if (-not $f.bak -or -not (Test-Path -LiteralPath $bak)) { Write-Host "ABORT - $bak is missing; nothing was touched." -ForegroundColor Red; return }
+      if ((Get-Sha $bak) -ne $f.before) { Write-Host "ABORT - $bak is not the file round $Round replaced; nothing was touched." -ForegroundColor Red; return }
+      $modBack += ,@($live, $bak, $liveNow[$rel])
+    }
+  }
+  if ($DryRun) { Write-Host "DRY RUN - the rolled-back files are in $outDir; nothing was touched."; return }
+  # index.php first - from that moment no page loads what is being removed. A
+  # file the rounds coming out never touched is left alone.
+  foreach ($rel in @('index.php', 'js/main.js', 'help_content.php', 'README.md')) {
+    $new = Join-Path $outDir ($rel -replace '/', '\')
+    if ((Get-Sha $new) -eq $taken[$rel]) { Write-Host ("  unchanged   {0}" -f (Split-Path $rel -Leaf)); continue }
+    Swap-Live (Join-Path $app ($rel -replace '/', '\')) $new $taken[$rel] $stamp
+  }
+  if ($Round) {
+    foreach ($mb in $modBack) { Swap-Live $mb[0] $mb[1] $mb[2] $stamp }
+  } else {
+    foreach ($m in $mods) {
+      $p = Join-Path $app $m
+      if (Test-Path -LiteralPath $p) { Move-Atomic $p "$p.removed-$stamp" 0; Write-Host "  renamed $m -> $m.removed-$stamp" }
+    }
+  }
+  try { [IO.Directory]::Delete($tmp, $true) } catch {}
+  foreach ($rel in @('index.php', 'help_content.php')) { Write-Host ('  live php -l: ' + ((& $php -n -l (Join-Path $app $rel)) -join ' ')) }
+  foreach ($f in @($off, $voff)) { if (Test-Path -LiteralPath $f) { Write-Host "note: $f still exists (harmless; delete it before a re-deploy)" } }
+  Write-Host $(if ($Round -eq 5) { 'ROUND 5 ROLLED BACK - back to round 4 (a two-row pivot header is content-sized again).' }
+               elseif ($Round -eq 4) { 'ROLLED BACK TO ROUND 3 (a pivot''s value column takes a width only while it is the only one).' }
+               elseif ($Round -eq 3) { 'ROLLED BACK TO ROUND 2 (a pivot''s value columns are content-sized again; everything else keeps its widths).' }
+               elseif ($Round -eq 2) { 'ROLLED BACK TO ROUND 1 (the flat table keeps column widths).' }
+               else { 'ROLLED BACK.' }) -ForegroundColor Green
+}

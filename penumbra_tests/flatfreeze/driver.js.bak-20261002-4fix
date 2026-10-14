@@ -1,0 +1,818 @@
+// Flat-table frozen columns - browser half (2026-09-18). Drives the REAL main.js
+// (ready closure unwrapped, window.__FF export hook) against the REAL main.css.
+//   U  the clamp and the generated rule text
+//   G  geometry: what actually sticks, layers, stays opaque - and what must not
+//   K  the '#'-rule case table, row for row the one test_flatfreeze.php runs
+//      against the runner's penumbra_flat_frozen_cols()
+//   P  persistence: the local pref, the carry-over, hydrate, the saved state
+//   S  the Settings panel control and the list markers
+//   X  the XLSX export count
+//   C  the status bar's custom-layout pill
+//   B  the status bar's frozen-columns chip and its card (2026-10-01)
+//   D  breakdown tables: the same frozen data columns behind their own '#', and the
+//      Settings panel's pivot notice above the Columns heading (2026-10-01)
+(function () {
+  var R = [];
+  function rec(name, pass, detail) { R.push({ name: name, pass: !!pass, detail: detail === undefined ? '' : String(detail).slice(0, 500) }); }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function errs() { return window.__errors.concat(window.__rejections); }
+  function finish(fatal) {
+    var payload = { results: R, pageErrors: errs().slice(0, 8), hookErr: [window.__FF_ERR, window.__FF_ERR2, (window.__FF_MISSING || []).join(',')].filter(Boolean).join('; ') };
+    if (fatal) payload.fatal = fatal;
+    document.getElementById('out').textContent = 'RESULTS_JSON:' + JSON.stringify(payload);
+  }
+  if (typeof window.stackHeaders !== 'function') window.stackHeaders = function () {};
+
+  var H = window.__FF || {};
+  var FF = (window.Penumbra && window.Penumbra.flatFreeze) || null;
+  var TRANSPARENT = /^(rgba\(0, 0, 0, 0\)|transparent)$/;
+
+  function wrap() { return document.getElementById('results-wrapper'); }
+  function headRow() { return document.getElementById('tableHeader'); }
+  function ths() { return Array.prototype.slice.call(headRow().children); }
+  function body() { return document.querySelector('#resultsTable > tbody'); }
+  function cell(r, idx) { return body().rows[r].children[idx - 1]; }
+  function left(el) { return el.getBoundingClientRect().left; }
+  function width(el) { return el.getBoundingClientRect().width; }
+  function near(a, b, tol) { return Math.abs(a - b) <= (tol === undefined ? 1.5 : tol); }
+  function pos(el) { return getComputedStyle(el).position; }
+  function styleText() { var s = document.getElementById('pnbFlatFreezeStyle'); return s ? s.textContent : ''; }
+  function ls(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return 'PARSE_ERR'; } }
+  function r1(n) { return Math.round(n * 10) / 10; }
+
+  // Show/hide one column the way applyColumnChanges() does: display on the <th>
+  // and on every body cell at that DOM index. The footer is REBUILT, because
+  // updateTotalRow() emits visible columns only.
+  function setHidden(idx, hidden) {
+    ths()[idx - 1].style.display = hidden ? 'none' : '';
+    var rows = body().rows;
+    for (var i = 0; i < rows.length; i++) {
+      var td = rows[i].children[idx - 1];
+      if (td && !td.hasAttribute('colspan')) td.style.display = hidden ? 'none' : '';
+    }
+    if (H.updateTotalRow) H.updateTotalRow();
+  }
+  function showAll() { for (var i = 1; i <= ths().length; i++) setHidden(i, false); }
+
+  var COLS = ['C01', 'C02', 'C03', 'C04', 'C05', 'C06', 'C07', 'C08', 'C09', 'C10', 'C11', 'AMOUNT'];
+  function makeRows(n) {
+    var out = [];
+    for (var i = 1; i <= n; i++) {
+      var row = {};
+      for (var c = 0; c < COLS.length; c++) row[COLS[c]] = (COLS[c] === 'AMOUNT') ? String(i * 100) : ('value ' + COLS[c] + ' row ' + i + ' xx');
+      out.push(row);
+    }
+    return out;
+  }
+  async function runQuery(rows) {
+    window.__queryResponse = { data: rows };
+    var ed = H.getEditor ? H.getEditor() : null;
+    if (ed) ed.setValue('SELECT 1 FROM DUAL');
+    var before = window.__ajaxLog.length;
+    $('#executeQuery').trigger('click');
+    for (var i = 0; i < 200; i++) {
+      await sleep(25);
+      if (window.__ajaxLog.length > before && (window.__rejections.length || !$('#loadingOverlay').is(':visible'))) break;
+    }
+    await sleep(400);
+  }
+
+  // ------------------------------------------------------------------------
+  function phaseU() {
+    if (!FF) { rec('U1 the clamp', false, 'window.Penumbra.flatFreeze is missing'); rec('U2 the generated rule text', false, 'missing'); return; }
+    var c = FF.clamp;
+    var got = [c(3, 10), c(9, 10), c(5, 3), c(-1, 10), c('abc', 10), c(2, 0), c('4', 9), c(2.7, 9), c(1, 1), c(null, 5), c(undefined, 5)];
+    rec('U1 the clamp: cap 5, never every column, junk is 0, unknown width caps only', got.join(',') === '3,5,2,0,0,2,4,2,0,0,0', got.join(','));
+    var css = FF.buildCss([{ idx: 1 }, { idx: 3 }], [0, 41], 187.4);
+    var want = [
+      '#results-wrapper{scroll-padding-left:188px}',
+      '@media screen{',
+      '#results-wrapper #resultsTable > thead > tr > th:nth-child(1)',
+      '#results-wrapper #resultsTable > tbody > tr > td:nth-child(3):not([colspan])',
+      // the footer holds VISIBLE columns only: second frozen column = 2nd cell
+      '#results-wrapper #resultsTable > tfoot > tr > td:nth-child(2):not([colspan])',
+      'left:41px', ':where(', 'background-color:inherit', 'box-shadow:'
+    ];
+    var missing = want.filter(function (w) { return css.indexOf(w) === -1; });
+    var imp = (css.match(/!important/g) || []).length;
+    rec('U2 rule text: DOM index up top, visible ordinal in the footer, :where backgrounds, screen only',
+      missing.length === 0 && css.indexOf('tfoot > tr > td:nth-child(3)') === -1 && imp === 2 && FF.buildCss([], []) === '',
+      'missing=' + JSON.stringify(missing) + ' important=' + imp);
+  }
+
+  // ------------------------------------------------------------------------
+  async function phaseG() {
+    await runQuery(makeRows(30));
+    var w = wrap();
+    var ok0 = ths().length === 13 && body().rows.length === 30 && (w.scrollWidth - w.clientWidth) > 300;
+    rec('G0 fixture: 13 columns, 30 rows, and the table overflows its wrapper sideways', ok0,
+      'ths=' + ths().length + ' rows=' + body().rows.length + ' scrollW=' + w.scrollWidth + ' clientW=' + w.clientWidth + ' errs=' + errs().slice(0, 2).join(' / '));
+    if (!ok0) return false;
+    // The real updateStickyHeaderOffset() writes an inline z-index on each <th>.
+    if (!ths()[0].style.zIndex && H.updateStickyHeaderOffset) H.updateStickyHeaderOffset();
+    rec('G0b fixture: the flat headers carry the INLINE z-index the real code writes', !!ths()[0].style.zIndex, 'z=' + ths()[0].style.zIndex + ' pos=' + ths()[0].style.position);
+
+    if (FF) FF.set(0, null);
+    w.scrollLeft = 300;
+    rec('G1 control: nothing frozen - the first column scrolls away and no rules exist',
+      left(ths()[0]) < left(w) - 200 && styleText() === '', 'thLeft=' + r1(left(ths()[0])) + ' wrapLeft=' + r1(left(w)) + ' css=' + styleText().length);
+    if (!FF) { rec('G2 two frozen columns hold the left edge', false, 'flatFreeze missing'); return false; }
+
+    w.scrollLeft = 0;
+    FF.set(0, 2);
+    var w0 = width(ths()[0]), w1 = width(ths()[1]);
+    w.scrollLeft = 300;
+    var wl = left(w) + w.clientLeft;
+    var g2 = near(left(ths()[0]), wl) && near(left(ths()[1]), wl + w0) && near(left(cell(0, 1)), wl) && near(left(cell(0, 2)), wl + w0) && left(cell(0, 3)) < wl + w0;
+    rec('G2 two frozen columns hold the left edge - header and body - while the third scrolls under them', g2,
+      'wrap=' + r1(wl) + ' th1=' + r1(left(ths()[0])) + ' th2=' + r1(left(ths()[1])) + ' (want ' + r1(wl + w0) + ') td1=' + r1(left(cell(0, 1))) + ' td2=' + r1(left(cell(0, 2))) + ' td3=' + r1(left(cell(0, 3))));
+
+    // elementFromPoint only answers inside the viewport, and the harness page
+    // puts editors above the table - bring the wrapper up first. The page
+    // scroll moves every rect, so the wrapper's left edge is read again.
+    w.scrollIntoView();
+    wl = left(w) + w.clientLeft;
+    var describe = function (el) { return el ? (el.tagName + (el.id ? '#' + el.id : '') + ' col=' + (el.getAttribute('data-colname') || el.getAttribute('data-column'))) : 'null'; };
+    var rb = cell(0, 2).getBoundingClientRect();
+    var rawB = document.elementFromPoint(wl + w0 + 6, rb.top + rb.height / 2);
+    var hitB = rawB && rawB.closest ? rawB.closest('td,th') : null;
+    rec('G3 a frozen body cell paints OVER the cells scrolling beneath it', hitB === cell(0, 2),
+      'hit=' + describe(hitB || rawB) + ' at ' + r1(wl + w0 + 6) + ',' + r1(rb.top + rb.height / 2) + ' viewport=' + window.innerWidth + 'x' + window.innerHeight);
+    var rh = ths()[1].getBoundingClientRect();
+    var rawH = document.elementFromPoint(wl + w0 + 6, rh.top + rh.height / 2);
+    var hitH = rawH && rawH.closest ? rawH.closest('td,th') : null;
+    rec('G4 a frozen header paints over the scrolling headers despite their inline z-index', hitH === ths()[1],
+      'hit=' + describe(hitH || rawH) + ' at ' + r1(wl + w0 + 6) + ',' + r1(rh.top + rh.height / 2));
+
+    var zr = [], zi;
+    for (zi = 0; zi < 4; zi++) {
+      var tr = body().rows[zi], bgTr = getComputedStyle(tr).backgroundColor, bgTd = getComputedStyle(cell(zi, 1)).backgroundColor;
+      zr.push((/zebra-/.test(tr.className) ? 'z' : '-') + ':' + bgTd + (bgTd === bgTr ? '=' : '!=') + 'tr');
+    }
+    var zebraOk = [0, 1, 2, 3].every(function (i) {
+      var tr = body().rows[i], a = getComputedStyle(tr).backgroundColor, b = getComputedStyle(cell(i, 1)).backgroundColor;
+      return /zebra-/.test(tr.className) && a === b && !TRANSPARENT.test(b);
+    });
+    rec('G5 frozen cells are opaque and take their ROW zebra colour, whatever the theme named it', zebraOk, zr.join(' | '));
+    rec('G5b an unfrozen cell in the same row is still transparent (the fill is only where it is needed)',
+      TRANSPARENT.test(getComputedStyle(cell(0, 5)).backgroundColor), getComputedStyle(cell(0, 5)).backgroundColor);
+
+    // Anything else that paints a cell has to keep winning: the fills sit at
+    // zero specificity. A plain (1,1,3) class rule stands in for a theme's.
+    var st = document.createElement('style');
+    st.textContent = '#resultsTable tbody tr.ff-paint td { background-color: rgb(1, 2, 3); }';
+    document.head.appendChild(st);
+    body().rows[1].classList.add('ff-paint');
+    var painted = getComputedStyle(cell(1, 1)).backgroundColor;
+    body().rows[1].classList.remove('ff-paint');
+    st.remove();
+    rec('G6 an ordinary cell rule still beats the frozen fill (it sits at zero specificity)', painted === 'rgb(1, 2, 3)', painted);
+
+    // Keyboard focus: a link in a cell that scrolled under the frozen block has
+    // to come out from behind it, not just reach the wrapper's edge.
+    var padWant = Math.ceil(width(ths()[0]) + width(ths()[1]));
+    var padGot = parseFloat(getComputedStyle(w).scrollPaddingLeft);
+    var probe = document.createElement('a');
+    probe.href = '#'; probe.textContent = 'probe';
+    cell(0, 4).appendChild(probe);
+    w.scrollLeft = 600;
+    probe.focus();
+    var probeLeft = left(probe), frozenRight = ths()[1].getBoundingClientRect().right;
+    probe.remove();
+    w.scrollLeft = 300;
+    rec('G6b the wrapper\'s scroll padding = the frozen width, so a focused link scrolls out from UNDER the frozen block (WCAG 2.4.11)',
+      padGot === padWant && probeLeft >= frozenRight - 1, 'padding=' + padGot + ' want ' + padWant + ' linkLeft=' + r1(probeLeft) + ' frozenRight=' + r1(frozenRight));
+
+    rec('G7 the edge shadow sits on the LAST frozen column only',
+      getComputedStyle(cell(0, 2)).boxShadow !== 'none' && getComputedStyle(cell(0, 1)).boxShadow === 'none' && getComputedStyle(ths()[1]).boxShadow !== 'none',
+      'col1=' + getComputedStyle(cell(0, 1)).boxShadow + ' col2=' + getComputedStyle(cell(0, 2)).boxShadow);
+
+    var note = document.createElement('tr');
+    note.className = 'journal-note-child';
+    note.innerHTML = '<td colspan="13">a journal note row</td>';
+    body().insertBefore(note, body().rows[1]);
+    var notePos = pos(note.firstElementChild);
+    note.remove();
+    rec('G8 a full-width (colspan) row is left alone', notePos === 'static', 'position=' + notePos);
+
+    // A hidden column between the frozen ones: the count covers VISIBLE columns.
+    w.scrollLeft = 0;
+    setHidden(2, true);
+    FF.apply();
+    var css9 = styleText();
+    w0 = width(ths()[0]);
+    w.scrollLeft = 300;
+    rec('G9 a hidden column is skipped: 2 frozen = # and the NEXT visible column (DOM index 3)',
+      css9.indexOf('th:nth-child(3)') !== -1 && css9.indexOf('th:nth-child(2)') === -1 && near(left(cell(0, 3)), wl + w0) && pos(cell(0, 3)) === 'sticky',
+      'td3Left=' + r1(left(cell(0, 3))) + ' want ' + r1(wl + w0) + ' pos=' + pos(cell(0, 3)));
+
+    var foot = document.querySelector('#resultsTable > tfoot > tr.total-row-data');
+    if (!foot) rec('G10 the footer is addressed by VISIBLE ordinal', false, 'no footer row was rendered');
+    else {
+      var f = foot.children;
+      rec('G10 the footer is addressed by VISIBLE ordinal: its 1st and 2nd cells stick, the 3rd does not',
+        pos(f[0]) === 'sticky' && pos(f[1]) === 'sticky' && pos(f[2]) === 'static' && near(left(f[0]), wl) && near(left(f[1]), wl + w0) && f[1].getAttribute('data-column') === cell(0, 3).getAttribute('data-column'),
+        'pos=' + pos(f[0]) + ',' + pos(f[1]) + ',' + pos(f[2]) + ' left=' + r1(left(f[0])) + ',' + r1(left(f[1])) + ' f2col=' + f[1].getAttribute('data-column') + ' td3col=' + cell(0, 3).getAttribute('data-column'));
+      rec('G10b frozen footer cells are opaque', !TRANSPARENT.test(getComputedStyle(f[0]).backgroundColor) || getComputedStyle(f[0]).backgroundImage !== 'none',
+        'color=' + getComputedStyle(f[0]).backgroundColor + ' image=' + getComputedStyle(f[0]).backgroundImage.slice(0, 40));
+      var link = document.querySelector('#resultsTable > tfoot > tr.total-row-link > td');
+      rec('G10c the footer link row (one colspan cell) is left alone', !link || pos(link) === 'static', link ? pos(link) : 'no link row');
+    }
+
+    // '#' hidden: the count simply starts at the first visible column.
+    w.scrollLeft = 0;
+    showAll();
+    setHidden(1, true);
+    FF.set(0, 1);
+    w.scrollLeft = 300;
+    rec('G11 with # hidden, 1 frozen = the first data column', pos(cell(0, 2)) === 'sticky' && near(left(cell(0, 2)), wl) && pos(cell(0, 3)) === 'static',
+      'td2=' + pos(cell(0, 2)) + '@' + r1(left(cell(0, 2))) + ' td3=' + pos(cell(0, 3)));
+
+    // Never every column.
+    w.scrollLeft = 0;
+    for (var i = 4; i <= 13; i++) setHidden(i, true);      // leaves DOM 2 and 3 visible
+    FF.set(0, 5);
+    var picked = FF.pick(5).map(function (c) { return c.idx; });
+    rec('G12 5 wanted but only 2 columns showing: one is frozen, one still scrolls', picked.join(',') === '2', 'picked=' + picked.join(','));
+    showAll();
+
+    // The width guard.
+    FF.set(0, 2);
+    w.style.width = '260px';
+    FF.apply();
+    var paused = FF.state().paused, cssP = styleText(), posP = pos(cell(0, 1));
+    w.style.width = '900px';
+    FF.apply();
+    rec('G13 frozen block wider than ~60% of the wrapper: paused, rules dropped - and back when it fits',
+      paused === true && cssP === '' && posP === 'static' && FF.state().paused === false && pos(cell(0, 1)) === 'sticky',
+      'paused=' + paused + ' cssWhilePaused=' + cssP.length + ' pos=' + posP + ' -> paused=' + FF.state().paused + ' pos=' + pos(cell(0, 1)));
+
+    // Outside #results-wrapper (the un-containerized states) the rules are inert.
+    var table = document.getElementById('resultsTable');
+    document.body.appendChild(table);
+    var outside = pos(cell(0, 1));
+    w.appendChild(table);
+    rec('G14 outside #results-wrapper the same rules are inert', outside === 'static' && pos(cell(0, 1)) === 'sticky', 'outside=' + outside + ' backInside=' + pos(cell(0, 1)));
+
+    // (__roObserved is shared by every ResizeObserver in main.js - the header
+    // stack has its own - so this looks for OUR elements, not at the length.)
+    var obs = window.__roObserved;
+    var held = function () { return [w, ths()[0], ths()[1], ths()[2]].map(function (el) { return obs.indexOf(el) !== -1 ? 1 : 0; }).join(''); };
+    var g15a = held();
+    FF.set(0, null);
+    rec('G15 the ResizeObserver holds exactly the frozen headers and the wrapper, and lets go of all of them at 0',
+      g15a === '1110' && held() === '0000', 'wrapper,th1,th2,th3 while 2 frozen=' + g15a + ' at 0=' + held());
+
+    // A re-render replaces every <th>. Nothing calls apply(): the header
+    // MutationObserver has to notice by itself.
+    FF.set(0, 2);
+    var oldTh = ths()[0];
+    await runQuery(makeRows(12));
+    await sleep(100);
+    var fresh = ths()[0] !== oldTh;
+    w.scrollLeft = 300;
+    wl = left(w) + w.clientLeft;
+    rec('G16 after a re-render the NEW headers are frozen and observed with no call from anywhere',
+      fresh && pos(ths()[1]) === 'sticky' && near(left(cell(0, 1)), wl) && window.__roObserved.indexOf(ths()[0]) !== -1 && window.__roObserved.indexOf(oldTh) === -1,
+      'fresh=' + fresh + ' pos=' + pos(ths()[1]) + ' td1=' + r1(left(cell(0, 1))) + ' wrap=' + r1(wl) + ' observedNew=' + (window.__roObserved.indexOf(ths()[0]) !== -1));
+    w.scrollLeft = 0;
+    FF.set(0, null);
+    return true;
+  }
+
+  // ------------------------------------------------------------------------
+  // K. The SAME rows as ff_cases() in test_flatfreeze.php. There the answer is
+  // the sheet's xSplit; here it is how many DATA columns end up frozen on
+  // screen. They have to be the same number, or a scheduled XLSX freezes
+  // different columns than the author saw.
+  function phaseK() {
+    if (!FF) { rec('K the shared case table', false, 'flatFreeze missing'); return; }
+    var ALL12 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+    var H5 = ['#', 0, 1, 2, 3, 4], N5 = [0, 1, 2, 3, 4];
+    var cases = [
+      ['K01 nothing saved', null, H5, 5, 0],
+      ['K02 count 0', 0, H5, 5, 0],
+      ['K03 count 1 with # shown: # WAS the one', 1, H5, 5, 0],
+      ['K04 count 2 with # shown', 2, H5, 5, 1],
+      ['K05 count 5 with # shown', 5, H5, 5, 4],
+      ['K06 count 9 is capped at 5', 9, H5, 5, 4],
+      ['K07 count 1 with # hidden', 1, N5, 5, 1],
+      ['K08 count 5 with # hidden: never ALL', 5, N5, 5, 4],
+      ['K09 count 5, # shown, two data columns', 5, ['#', 0, 1], 2, 1],
+      ['K10 count 3, # hidden, ONE data column', 3, [0], 1, 0],
+      ['K11 count 2, # shown, ONE data column', 2, ['#', 0], 1, 0],
+      ['K12 junk count', 'abc', H5, 5, 0],
+      ['K13 negative count', -3, H5, 5, 0],
+      ['K14 numeric string', '3', H5, 5, 2],
+      ['K15 float truncates like parseInt', 2.7, H5, 5, 1],
+      ['K16 no visibleColumns key = default layout, # shown', 2, null, 5, 1],
+      ['K17 EMPTY visibleColumns = default layout too', 2, [], 5, 1],
+      ['K18 column count unknown (0): cap only', 4, N5, 0, 4],
+      ['K19 count 9 over twelve columns: the cap by itself', 9, ALL12, 12, 5],
+      ['K20 count 5 over twelve columns, # shown: the # rule by itself', 5, ['#'].concat(ALL12), 12, 4]
+    ];
+    cases.forEach(function (c) {
+      var name = c[0], count = c[1], vis = c[2], nCols = c[3], want = c[4];
+      try {
+        if (nCols === 0) {
+          // "column count unknown" has no on-screen equivalent: it is the clamp
+          // with no visible count, which is how the saved value is resolved.
+          var g0 = FF.clamp(count, 0);
+          rec(name, g0 === want, 'got ' + g0 + ' want ' + want);
+          return;
+        }
+        // No saved visibleColumns (absent or empty) = the default layout the
+        // render builds: '#' shown. The columns the sheet has = the first nCols.
+        var numShown = (!vis || !vis.length) ? true : vis.indexOf('#') !== -1;
+        var all = ths();
+        for (var i = 0; i < all.length; i++) {
+          var isNum = all[i].getAttribute('data-column') === '#';
+          all[i].style.display = (isNum ? numShown : (i <= nCols)) ? '' : 'none';
+        }
+        FF.set(count === null ? 0 : count, null);
+        var got = FF.pick(FF.state().wanted).filter(function (p) { return p.th.getAttribute('data-column') !== '#'; }).length;
+        rec(name, got === want, 'got ' + got + ' want ' + want);
+      } catch (e) { rec(name, false, 'threw: ' + e.message); }
+    });
+    ths().forEach(function (th) { th.style.display = ''; });
+    FF.set(0, null);
+  }
+
+  // ------------------------------------------------------------------------
+  function phaseP() {
+    if (!FF || !H.setName) { rec('P persistence', false, 'flatFreeze or hook missing'); return; }
+    var KEY = 'penumbra_column_prefs';
+    localStorage.removeItem(KEY);
+    H.setName('rep1'); H.hydrate();
+    FF.set(0, null);
+    $('#spFreezeSelect').val('2').trigger('change');
+    var e1 = (ls(KEY) || {}).rep1;
+    rec('P1 picking 2 stores it beside the layout keys and freezes at once', e1 && e1.frozen === 2 && !('order' in e1) && FF.state().user === 2 && FF.state().wanted === 2,
+      JSON.stringify(e1) + ' state=' + JSON.stringify({ u: FF.state().user, w: FF.state().wanted }));
+
+    H.saveColPrefs();
+    var e3 = (ls(KEY) || {}).rep1;
+    // (order lists '#' too: 12 data columns + 1)
+    rec('P2 Save Column Layout replaces the entry but carries the count across', e3 && Array.isArray(e3.order) && e3.order.length === 13 && e3.frozen === 2,
+      'keys=' + (e3 ? Object.keys(e3).join(',') : 'none') + ' order=' + (e3 && e3.order ? e3.order.length : '-') + ' frozen=' + (e3 ? e3.frozen : '-'));
+
+    FF.set(3, 2);                       // the report itself now says 3
+    $('#spFreezeSelect').val('3').trigger('change');
+    var e2 = (ls(KEY) || {}).rep1;
+    rec('P3 picking what the report already says drops the key: the viewer follows the report again', e2 && !('frozen' in e2) && FF.state().user === null && FF.state().wanted === 3, JSON.stringify(e2).slice(0, 120));
+
+    localStorage.setItem(KEY, JSON.stringify({ rep2: { frozen: 4 } }));
+    H.setName('rep2'); H.hydrate();
+    var u2 = FF.state().user;
+    H.setName('rep3'); H.hydrate();
+    rec('P4 opening another report hydrates ITS pick - and none for a report without one', u2 === 4 && FF.state().user === null, 'rep2=' + u2 + ' rep3=' + FF.state().user);
+
+    localStorage.setItem(KEY, JSON.stringify({ rep4: { frozen: 1 } }));
+    H.setName('rep4'); H.hydrate();
+    FF.set(0, 1);
+    H.setName('rep5'); H.hydrate();
+    $('#spFreezeSelect').val('0').trigger('change');
+    var all = ls(KEY) || {};
+    rec('P5 a pick of None on a report with no entry leaves no empty entry behind', !('rep5' in all) && all.rep4 && all.rep4.frozen === 1, JSON.stringify(all));
+
+    FF.set(0, 2);
+    var s1 = H.buildState();
+    FF.set(0, null);
+    var s0 = H.buildState();
+    FF.set(4, null);
+    var s4 = H.buildState();
+    rec('P6 the saved report state carries the count in force, and no key at all when it is none',
+      s1 && s1.frozenCols === 2 && s0 && !('frozenCols' in s0) && s4 && s4.frozenCols === 4,
+      'pick2=' + (s1 && s1.frozenCols) + ' none=' + (s0 && ('frozenCols' in s0)) + ' report4=' + (s4 && s4.frozenCols));
+
+    // A viewer on a report with column customization switched off gets the
+    // AUTHOR's count; a stale pick of their own is ignored.
+    localStorage.setItem(KEY, JSON.stringify({ rep6: { frozen: 4 } }));
+    penumbra_vars.isAdmin = false; window._penumbraHideColumns = true;
+    FF.set(1, null);
+    H.setName('rep6'); H.hydrate();
+    var restricted = FF.state();
+    penumbra_vars.isAdmin = true; window._penumbraHideColumns = false;
+    rec('P7 column customization off: a non-admin gets the report count, not their old pick', restricted.user === null && restricted.wanted === 1, JSON.stringify({ u: restricted.user, w: restricted.wanted }));
+    localStorage.removeItem(KEY);
+    H.setName('rep1'); H.hydrate();
+    FF.set(0, null);
+  }
+
+  // ------------------------------------------------------------------------
+  function phaseS() {
+    if (!FF || !H.openSP) { rec('S settings panel', false, 'flatFreeze or hook missing'); return; }
+    var $sel = $('#spFreezeSelect');
+    rec('S0 the Freeze control exists: a select offering None and 1 to 5', $sel.length === 1 && $sel.find('option').map(function () { return this.value; }).get().join(',') === '0,1,2,3,4,5' && $('label[for="spFreezeSelect"]').length === 1,
+      'options=' + $sel.find('option').map(function () { return this.value; }).get().join(','));
+    FF.set(3, null);
+    H.openSP();
+    rec('S1 opening the panel shows the control at the count in force', $('#spFreezeWrap').is(':visible') && $sel.val() === '3', 'visible=' + $('#spFreezeWrap').is(':visible') + ' val=' + $sel.val());
+    var marks = function () { return $('#spColumnList .sp-col-item').map(function (i) { return $(this).hasClass('sp-col-frozen') ? (i + ($(this).hasClass('sp-col-frozen-last') ? 'L' : '')) : null; }).get().join(','); };
+    rec('S2 the first three rows of the list are marked, the third as the edge', marks() === '0,1,2L', marks());
+    $('#spColumnList .sp-col-item').eq(1).find('.sp-col-check').prop('checked', false).trigger('change');
+    rec('S3 unticking a row moves the marks to the first three CHECKED rows (the pending layout)', marks() === '0,2,3L', marks());
+    $sel.val('1').trigger('change');
+    rec('S4 changing the count re-marks the list straight away', marks() === '0L', marks());
+
+    penumbra_vars.isAdmin = false; window._penumbraHideColumns = true;
+    H.openSP();
+    var hid = !$('#spFreezeWrap').is(':visible'), m5 = marks();
+    penumbra_vars.isAdmin = true; window._penumbraHideColumns = false;
+    rec('S5 column customization off: no control and no marks for a non-admin', hid && m5 === '', 'hidden=' + hid + ' marks=' + m5);
+
+    H.openSP();
+    FF.set(0, 2);
+    wrap().style.width = '260px'; FF.apply();
+    var hintOn = $('#spFreezeHint').is(':visible');
+    wrap().style.width = '900px'; FF.apply();
+    rec('S6 the paused notice shows only while the width guard has the freeze paused', hintOn && !$('#spFreezeHint').is(':visible'), 'paused=' + hintOn + ' after=' + $('#spFreezeHint').is(':visible'));
+    $('#settingsPanel').removeClass('is-open');
+    FF.set(0, null);
+  }
+
+  // ------------------------------------------------------------------------
+  function phaseX() {
+    if (!FF) { rec('X export count', false, 'flatFreeze missing'); return; }
+    FF.set(0, 3);
+    var a = FF.exportCount();
+    ths()[2].classList.add('journal-notes-col');
+    var b = FF.exportCount();
+    ths()[2].classList.remove('journal-notes-col');
+    FF.set(0, null);
+    rec('X1 the XLSX split = the frozen columns the export keeps (the journal notes column is left out)', a === 3 && b === 2 && FF.exportCount() === 0, 'plain=' + a + ' withNotes=' + b + ' none=' + FF.exportCount());
+  }
+
+  // ------------------------------------------------------------------------
+  function phaseC() {
+    if (!FF || !H.setName) { rec('C custom-layout pill', false, 'flatFreeze or hook missing'); return; }
+    var fire = function () { document.dispatchEvent(new CustomEvent('penumbra:columns-changed')); };
+    localStorage.removeItem('penumbra_column_prefs');
+    H.setName('rep1'); H.hydrate();
+    FF.set(0, null); fire();
+    var off = $('#sbCustomCols').css('display');
+    FF.set(0, 2); fire();
+    var on = $('#sbCustomCols').css('display'), txt = $('#sbCustomColsDiff').text();
+    FF.set(3, 0); fire();
+    var txt2 = $('#sbCustomColsDiff').text();
+    FF.set(2, 2); fire();
+    var same = $('#sbCustomCols').css('display');
+    rec('C1 the pill lights for a count that departs from the report, and says both numbers',
+      off === 'none' && on !== 'none' && txt.indexOf('Frozen columns: 2 here, none in the report') !== -1 && txt2.indexOf('Frozen columns: none here, 3 in the report') !== -1 && same === 'none',
+      'off=' + off + ' on=' + on + ' [' + txt + '] [' + txt2 + '] same=' + same);
+    FF.set(0, null); fire();
+  }
+
+  // ------------------------------------------------------------------------
+  // B. The status bar's frozen-columns chip (#sbFrozen, 2026-10-01): a
+  // snowflake beside the column count while the flat table has frozen
+  // columns. Its card changes the count or restores the report's through the
+  // panel select's own writer. The whole Cols segment is LIFTED from the
+  // index.php under test (run.ps1), so placement and the sibling cards are
+  // the real ones.
+  async function phaseB() {
+    var $chip = $('#sbFrozen'), $pop = $('#sbFrozenPop'), $seg = $('#sbColsSeg');
+    if (!$chip.length || !$pop.length) { rec('B0 the chip and its card are in the status bar', false, 'no #sbFrozen / #sbFrozenPop in the index.php under test'); return; }
+    if (!FF || !H.setName || !H.openSP) { rec('B0 the chip and its card are in the status bar', false, 'flatFreeze or hook missing'); return; }
+    var KEY = 'penumbra_column_prefs';
+    var fire = function () { document.dispatchEvent(new CustomEvent('penumbra:columns-changed')); };
+    var shown = function () { return getComputedStyle($chip[0]).display !== 'none'; };
+    var isOpen = function () { return $seg.hasClass('sb-frz-open') && getComputedStyle($pop[0]).display === 'block'; };
+    var txt = function () { return $chip.find('.sb-frz-txt').text(); };
+    var lead = function () { return $('#sbFrozenDesc').text(); };
+    var btn = function (n) { return $('#sbFrozenCounts .sb-frz-n[data-n="' + n + '"]'); };
+    var pressed = function () {
+      return $('#sbFrozenCounts .sb-frz-n').filter(function () { return this.getAttribute('aria-pressed') === 'true'; })
+        .map(function () { return this.getAttribute('data-n'); }).get().join(',');
+    };
+    var restoreShown = function () { return $('#sbFrozenRestore').length === 1 && getComputedStyle($('#sbFrozenRestore')[0]).display !== 'none'; };
+    var panelOpen = function () { return $('#settingsPanel').hasClass('is-open'); };
+    var entry = function () { return (ls(KEY) || {}).repB; };
+    var key = function (el, k) {
+      var ev = new KeyboardEvent('keydown', { key: k, keyCode: k === 'Enter' ? 13 : 27, which: k === 'Enter' ? 13 : 27, bubbles: true, cancelable: true });
+      el.dispatchEvent(ev);
+      return ev;
+    };
+    var closeCard = function () { if ($seg.hasClass('sb-frz-open')) $(document.body).trigger('click'); };
+    // a view change reaches the bar the way it does in production: the count
+    // node changes, the observer schedules refreshAll() (60 ms debounce)
+    var nudge = async function () { $('#resultCount').text('nudge ' + Math.random()); await sleep(160); };
+
+    localStorage.removeItem(KEY);
+    H.setName('repB'); H.hydrate();
+    showAll();
+    wrap().style.width = '900px';
+    FF.set(0, null); fire();
+    var hidden0 = !shown();
+    FF.set(0, 2);      // nothing but the freeze itself: the chip must follow on its own
+    rec('B1 hidden while nothing is frozen; "2 frozen", active, naming the frozen columns, the moment 2 are frozen',
+      hidden0 && shown() && txt() === '2 frozen' && !$chip.hasClass('sb-off') && /#, C01\b/.test($chip.attr('title') || ''),
+      'hidden0=' + hidden0 + ' shown=' + shown() + ' txt=' + txt() + ' off=' + $chip.hasClass('sb-off') + ' title=' + $chip.attr('title'));
+
+    var ico = $chip.find('svg.sb-frz-ico');
+    rec('B2 it sits right after the Cols count, its card right after it, the snowflake decorative and the chip a labelled popup button',
+      $('#sbColsOpen').next()[0] === $chip[0] && $chip.next()[0] === $pop[0] && ico.length === 1 && ico.attr('aria-hidden') === 'true' &&
+      $chip.attr('role') === 'button' && $chip.attr('tabindex') === '0' && $chip.attr('aria-haspopup') === 'true' && $chip.attr('aria-expanded') === 'false',
+      'afterCols=' + ($('#sbColsOpen').next()[0] === $chip[0]) + ' cardNext=' + ($chip.next()[0] === $pop[0]) + ' ico=' + ico.length + '/' + ico.attr('aria-hidden') +
+      ' role=' + $chip.attr('role') + ' haspopup=' + $chip.attr('aria-haspopup') + ' expanded=' + $chip.attr('aria-expanded'));
+
+    $chip.trigger('click');
+    var pr = $pop[0].getBoundingClientRect(), br = document.getElementById('pnbStatusBar').getBoundingClientRect();
+    rec('B3 a click opens the card above the bar: 2 pressed (only 2), the columns named, "Restore default: none" (the report freezes nothing)',
+      isOpen() && $chip.attr('aria-expanded') === 'true' && $('#pnbStatusBar').hasClass('sb-pop-open') && pressed() === '2' &&
+      /#, C01 stay in view/.test(lead()) && restoreShown() && $('#sbFrozenRestoreTxt').text() === 'Restore default: none' &&
+      pr.bottom <= br.top && pr.left >= 0 && pr.right <= window.innerWidth && !panelOpen(),
+      'open=' + isOpen() + ' expanded=' + $chip.attr('aria-expanded') + ' pressed=' + pressed() + ' lead=[' + lead() + '] restore=' + restoreShown() + '/' + $('#sbFrozenRestoreTxt').text() +
+      ' card=' + r1(pr.left) + '..' + r1(pr.right) + ' bottom=' + r1(pr.bottom) + ' barTop=' + r1(br.top) + ' panel=' + panelOpen());
+
+    btn(3).trigger('click');
+    var e4 = entry();
+    rec('B4 picking 3 in the card freezes 3 at once, stores it like the panel does, and the card stays open on 3',
+      FF.state().user === 3 && FF.state().wanted === 3 && e4 && e4.frozen === 3 && styleText().indexOf('th:nth-child(3)') !== -1 &&
+      txt() === '3 frozen' && isOpen() && pressed() === '3' && !panelOpen(),
+      'state=' + JSON.stringify({ u: FF.state().user, w: FF.state().wanted }) + ' pref=' + JSON.stringify(e4) + ' txt=' + txt() + ' open=' + isOpen() + ' pressed=' + pressed() + ' panel=' + panelOpen());
+
+    // One writer: the card and the panel's select follow each other.
+    H.openSP();
+    if (!isOpen()) $chip.trigger('click');  // opening the panel closes nothing, but make sure
+    btn(1).trigger('click');
+    var selAfterCard = $('#spFreezeSelect').val();
+    var marks = $('#spColumnList .sp-col-item').map(function (i) { return $(this).hasClass('sp-col-frozen') ? (i + ($(this).hasClass('sp-col-frozen-last') ? 'L' : '')) : null; }).get().join(',');
+    $('#spFreezeSelect').val('4').trigger('change');
+    rec('B5 the card and the Settings panel follow each other: a pick in the card moves the select and the list marks, the select moves the chip',
+      selAfterCard === '1' && marks === '0L' && txt() === '4 frozen' && pressed() === '4',
+      'select=' + selAfterCard + ' marks=' + marks + ' -> chip=' + txt() + ' pressed=' + pressed());
+    $('#settingsPanel').removeClass('is-open'); $('#settingsPanelOverlay').removeClass('is-open');
+    closeCard();
+
+    // Restore = the report's own count, through the same writer.
+    FF.set(3, 1); fire();
+    $chip.trigger('click');
+    var rTxt = $('#sbFrozenRestoreTxt').text(), rOn = restoreShown();
+    localStorage.setItem(KEY, JSON.stringify({ repB: { frozen: 1 } }));
+    $('#sbFrozenRestore').trigger('focus').trigger('click');
+    var e6 = entry();
+    rec('B6 "Restore default: 3 columns" puts back the report\'s count, forgets the pick, hides itself and leaves focus on the 3',
+      rOn && rTxt === 'Restore default: 3 columns' && FF.state().user === null && FF.state().wanted === 3 && !(e6 && 'frozen' in e6) &&
+      !restoreShown() && txt() === '3 frozen' && pressed() === '3' && isOpen() && document.activeElement === btn(3)[0],
+      'before=' + rOn + '/' + rTxt + ' state=' + JSON.stringify({ u: FF.state().user, w: FF.state().wanted }) + ' pref=' + JSON.stringify(e6) +
+      ' after=' + restoreShown() + ' txt=' + txt() + ' pressed=' + pressed() + ' focus=' + (document.activeElement && (document.activeElement.getAttribute('data-n') || document.activeElement.id)));
+
+    // None on a report that freezes 3: the chip stays, muted, so the default
+    // is one click away.
+    btn(0).trigger('click');
+    rec('B7 None on a report that freezes 3: the chip stays, muted, "not frozen", with Restore and the report\'s count in the card',
+      shown() && $chip.hasClass('sb-off') && txt() === 'not frozen' && restoreShown() && pressed() === '0' && isOpen() &&
+      lead() === 'Nothing is frozen. This report freezes 3 columns by default.',
+      'shown=' + shown() + ' off=' + $chip.hasClass('sb-off') + ' txt=' + txt() + ' restore=' + restoreShown() + ' pressed=' + pressed() + ' lead=[' + lead() + ']');
+    closeCard();
+
+    // None on a report that freezes nothing: the chip goes, and takes the card
+    // and keyboard focus with it.
+    FF.set(0, 2); fire();
+    $chip.trigger('click');
+    btn(0).trigger('focus').trigger('click');
+    rec('B8 None on a report that freezes nothing: chip and card gone, aria-expanded back to false, focus handed to the Cols count',
+      !shown() && !$seg.hasClass('sb-frz-open') && $chip.attr('aria-expanded') === 'false' && !$('#pnbStatusBar').hasClass('sb-pop-open') &&
+      document.activeElement === document.getElementById('sbColsOpen'),
+      'shown=' + shown() + ' openClass=' + $seg.hasClass('sb-frz-open') + ' expanded=' + $chip.attr('aria-expanded') +
+      ' barLift=' + $('#pnbStatusBar').hasClass('sb-pop-open') + ' focus=' + (document.activeElement && document.activeElement.id));
+
+    // Only where Freeze applies - and the views reach it through refreshAll().
+    FF.set(0, 2); fire();
+    var views = [];
+    $('body').addClass('group-mode-active'); await nudge(); views.push('group:' + shown());
+    $('body').removeClass('group-mode-active'); await nudge(); views.push('flat:' + shown());
+    $('#pivot-output-container').show(); await nudge(); views.push('pivot:' + shown());
+    $('#pivot-output-container').hide(); await nudge(); views.push('flat:' + shown());
+    $('body').addClass('pnb-data-hidden'); await nudge(); views.push('rowsNone:' + shown());
+    $('body').removeClass('pnb-data-hidden'); await nudge(); views.push('flat:' + shown());
+    penumbra_vars.isAdmin = false; window._penumbraHideColumns = true; await nudge(); views.push('restricted:' + shown());
+    penumbra_vars.isAdmin = true; window._penumbraHideColumns = false; await nudge(); views.push('admin:' + shown());
+    rec('B9 only on the flat table, for a viewer who may change it: gone in a grouped view, a pivot, Rows = None and with Column Organization off',
+      views.join(' ') === 'group:false flat:true pivot:false flat:true rowsNone:false flat:true restricted:false admin:true', views.join(' '));
+
+    // The width guard.
+    wrap().style.width = '260px'; FF.apply();
+    var pTxt = txt(), pOff = $chip.hasClass('sb-off');
+    $chip.trigger('click');
+    var pLead = lead();
+    closeCard();
+    wrap().style.width = '900px'; FF.apply();
+    rec('B10 while the width guard has the freeze paused the chip says so, muted, and the card says why - and it comes back',
+      pTxt === '2 frozen · paused' && pOff && /^Freeze is paused: #, C01 would fill more than half/.test(pLead) && txt() === '2 frozen' && !$chip.hasClass('sb-off'),
+      'paused=' + pTxt + ' off=' + pOff + ' lead=[' + pLead + '] -> ' + txt());
+
+    // Keys. Enter on the chip opens the card without opening the panel; Enter
+    // on a count button inside it is left to the button (a synthetic keydown
+    // fires no native click, so what is checked is that the Cols segment's
+    // panel opener let it be).
+    var kChip = key($chip[0], 'Enter');
+    var kOpen = isOpen(), kPanel = panelOpen();
+    var kBtn = key(btn(1)[0], 'Enter');
+    rec('B11 Enter on the chip opens the card, not the panel; Enter on a count button is left to the button',
+      kChip.defaultPrevented && kOpen && !kPanel && !kBtn.defaultPrevented && !panelOpen() && isOpen(),
+      'chipPrevented=' + kChip.defaultPrevented + ' open=' + kOpen + ' panel=' + kPanel + ' btnPrevented=' + kBtn.defaultPrevented + ' panelAfter=' + panelOpen());
+
+    // Escape: main.js eats Escape at document capture, so the card listens on
+    // window. Nothing below it may hear the key (it would toggle the console):
+    // the harness counts what reaches the document's capture phase, from a
+    // listener registered ahead of main.js's own.
+    var esc0 = window.__docEsc;
+    btn(1).trigger('focus');
+    var kEsc = key(btn(1)[0], 'Escape');
+    var heard = window.__docEsc - esc0;
+    rec('B12 Escape closes the card, hands focus back to the chip, and goes no further',
+      !isOpen() && kEsc.defaultPrevented && heard === 0 && document.activeElement === $chip[0] && $chip.attr('aria-expanded') === 'false',
+      'open=' + isOpen() + ' prevented=' + kEsc.defaultPrevented + ' heardBelow=' + heard + ' focus=' + (document.activeElement && document.activeElement.id));
+
+    $chip.trigger('click');
+    $('#sbFrozenSettings').trigger('click');
+    var sOpen = panelOpen(), sCard = isOpen();
+    $('#settingsPanel').removeClass('is-open'); $('#settingsPanelOverlay').removeClass('is-open');
+    rec('B13 "Open the Column & Settings panel" opens the panel and closes the card', sOpen && !sCard, 'panel=' + sOpen + ' card=' + sCard);
+
+    // One card at a time in this segment, including the two cards that keep
+    // their own open classes (snapshot, as-of).
+    $seg.addClass('sb-grp-open sb-snap-open sb-asof-open');
+    $chip.trigger('click');
+    var cls = ['sb-grp-open', 'sb-snap-open', 'sb-asof-open', 'sb-frz-open'].filter(function (c) { return $seg.hasClass(c); }).join(',');
+    closeCard();
+    rec('B14 opening the card closes every other card in the segment', cls === 'sb-frz-open', 'open classes=' + cls);
+
+    // View Options > Column Organization off: the admin sees the chip marked
+    // "hidden from users", like the pivot and grouping chips.
+    $('#viewOptionColumns').prop('checked', false); fire();
+    var mOn = $chip.hasClass('pnb-user-hidden'), mTitle = $chip.attr('title') || '';
+    $('#viewOptionColumns').prop('checked', true); fire();
+    rec('B15 Column Organization off: the admin sees the chip marked as hidden from users (and the mark lifts with it)',
+      mOn && /ADMIN ONLY: View Options hide this from non-admin viewers\.$/.test(mTitle) && !$chip.hasClass('pnb-user-hidden') && !/ADMIN ONLY/.test($chip.attr('title') || ''),
+      'marked=' + mOn + ' title=[' + mTitle + '] after=' + $chip.hasClass('pnb-user-hidden'));
+
+    // Width changes call _frzApply() constantly; the chip hears only changes.
+    var ev = 0, cnt = function () { ev++; };
+    document.addEventListener('penumbra:freeze-changed', cnt);
+    FF.apply(); FF.apply(); FF.apply();
+    var still = ev;
+    $('#spFreezeSelect').val('1').trigger('change');
+    document.removeEventListener('penumbra:freeze-changed', cnt);
+    rec('B16 penumbra:freeze-changed fires on a change only, not on every re-measure', still === 0 && ev === 1, 'unchanged=' + still + ' afterChange=' + ev);
+
+    FF.set(0, null); fire();
+    localStorage.removeItem(KEY);
+    H.setName('rep1'); H.hydrate();
+  }
+
+  // ------------------------------------------------------------------------
+  // D. Breakdown tables (2026-10-01): the rows behind a pivot cell or a chart
+  // point, opened through the REAL chart-drill builder (_showChartDrillBreakdown
+  // via the hook). Freeze reaches them: the flat table's frozen DATA columns,
+  // with the breakdown's own '#' in front.
+  async function phaseD() {
+    if (!FF || !FF.breakdown || !H.chartDrill) { rec('D0 a breakdown opens through the real builder', false, 'breakdown freeze or the chart-drill hook missing'); return; }
+    var BD = FF.breakdown;
+    var TR = /^(rgba\(0, 0, 0, 0\)|transparent)$/;
+    var opaque = function (c) {
+      if (TR.test(c)) return false;
+      var m = /^rgba\([^)]*,\s*([\d.]+)\)$/.exec(c) || /\/\s*([\d.]+)\)$/.exec(c);
+      return !m || parseFloat(m[1]) >= 0.999;
+    };
+    var closeAll = function () { $('.infobox-overlay').remove(); $('#bdFakeInfo').remove(); };
+    var maps = function (rows) { return rows.map(function (o) { return new Map(Object.keys(o).map(function (k) { return [k, o[k]]; })); }); };
+    var open = async function () { closeAll(); H.chartDrill(maps(makeRows(40)), ['C11 = x'], [], null); await sleep(80); return document.querySelector('table.pnb-breakdown'); };
+    var boxOf = function (t) { return t.closest('.infobox-content'); };
+    var heads = function (t) { return t.tHead.rows[0].cells; };
+    var cellAt = function (t, r, i) { return t.tBodies[0].rows[r].cells[i]; };
+    var bl = function (t) { var b = boxOf(t); return left(b) + b.clientLeft; };
+    var sticky = function (el) { return pos(el) === 'sticky'; };
+
+    showAll();
+    FF.set(0, null);
+    var t = await open();
+    var ok0 = !!t && !!boxOf(t) && heads(t).length === 13 && heads(t)[0].textContent.indexOf('#') === 0 &&
+              boxOf(t).scrollWidth > boxOf(t).clientWidth + 300 && !sticky(cellAt(t, 3, 0)) && BD.state().css === '';
+    rec('D0 fixture: a breakdown opens through the real builder - # + the 12 visible columns, wider than its box, nothing frozen while the flat table freezes nothing',
+      ok0, t ? ('cols=' + heads(t).length + ' scrollW=' + boxOf(t).scrollWidth + ' clientW=' + boxOf(t).clientWidth + ' firstPos=' + pos(cellAt(t, 3, 0)) + ' css=' + BD.state().css.length) : 'no table; errs=' + errs().slice(0, 2).join(' / '));
+    if (!ok0) return;
+
+    // The freeze is set FIRST and the breakdown opened after: nothing but the
+    // builder's own call may freeze it.
+    FF.set(0, 2);
+    t = await open();
+    var b = boxOf(t), w0 = width(heads(t)[0]), w1 = width(heads(t)[1]);
+    b.scrollLeft = 400;
+    var L = bl(t);
+    var d1 = near(left(heads(t)[0]), L) && near(left(cellAt(t, 3, 0)), L) && near(left(heads(t)[1]), L + w0) && near(left(cellAt(t, 3, 1)), L + w0) &&
+             sticky(cellAt(t, 3, 1)) && !sticky(cellAt(t, 3, 2)) && left(cellAt(t, 3, 2)) < L + w0 + w1;
+    rec('D1 the flat table freezes # + C01, and a breakdown opened after freezes the same: its # and C01 hold the left edge while C02 scrolls under them',
+      d1, 'box=' + r1(L) + ' th1=' + r1(left(heads(t)[0])) + ' th2=' + r1(left(heads(t)[1])) + ' (want ' + r1(L + w0) + ') td3=' + r1(left(cellAt(t, 3, 2))) + ' pos=' + [0, 1, 2].map(function (i) { return pos(cellAt(t, 3, i)); }).join(','));
+
+    b.scrollIntoView();
+    L = bl(t);
+    var describe = function (el) { return el ? (el.tagName + ':' + String(el.textContent).trim().slice(0, 18)) : 'null'; };
+    var rc = cellAt(t, 5, 1).getBoundingClientRect(), hitB = document.elementFromPoint(L + w0 + 8, rc.top + rc.height / 2);
+    var rh = heads(t)[1].getBoundingClientRect(), hitH = document.elementFromPoint(L + w0 + 8, rh.top + rh.height / 2);
+    rec('D2 a frozen body cell and a frozen header cell each paint over the cells scrolling beneath them',
+      !!hitB && hitB.closest('td') === cellAt(t, 5, 1) && !!hitH && hitH.closest('th') === heads(t)[1],
+      'body hit=' + describe(hitB && hitB.closest('td,th')) + ' header hit=' + describe(hitH && hitH.closest('td,th')));
+
+    var rows = t.tBodies[0].rows, alt = null, plain = null;
+    for (var ri = 0; ri < rows.length && (!alt || !plain); ri++) { if (/drill-row-alt/.test(rows[ri].className)) alt = alt || rows[ri]; else plain = plain || rows[ri]; }
+    var altTd = getComputedStyle(alt.cells[1]).backgroundColor, altTr = getComputedStyle(alt).backgroundColor, plainTd = getComputedStyle(plain.cells[1]).backgroundColor;
+    var unf = getComputedStyle(plain.cells[5]).backgroundColor;
+    rec('D3 frozen cells are opaque - an alternate row\'s takes the row\'s own shade - while a cell that scrolls stays as it was',
+      opaque(plainTd) && opaque(altTd) && altTd === altTr && TR.test(unf), 'plain=' + plainTd + ' alt=' + altTd + ' (row ' + altTr + ') unfrozen=' + unf);
+    // Headers paint through the app-wide `th { background: ... !important }`
+    // theme fill - an image (a gradient) on most themes, a colour on some.
+    var headFill = function (th) { var cs = getComputedStyle(th); return { img: cs.backgroundImage, color: cs.backgroundColor }; };
+    var hf = headFill(heads(t)[1]);
+    heads(t)[1].classList.add('sorted');
+    var sf = headFill(heads(t)[1]);
+    heads(t)[1].classList.remove('sorted');
+    var filled = function (f) { return f.img !== 'none' || opaque(f.color); };
+    rec('D3b a frozen header cell is opaque, sorted or not (the theme\'s header fill)', filled(hf) && filled(sf),
+      'plain=' + hf.img.slice(0, 40) + '/' + hf.color + ' sorted=' + sf.img.slice(0, 40) + '/' + sf.color);
+
+    var last = getComputedStyle(cellAt(t, 3, 1)).boxShadow, first = getComputedStyle(cellAt(t, 3, 0)).boxShadow;
+    var pad = b.style.scrollPaddingLeft, wantPad = Math.ceil(w0 + w1) + 'px';
+    rec('D4 the edge shadow sits on the last frozen column only, and the box\'s scroll padding = the frozen width (keyboard focus comes out from under it)',
+      last !== 'none' && first === 'none' && pad === wantPad, 'first=' + first + ' last=' + last.slice(0, 40) + ' pad=' + pad + ' want ' + wantPad);
+    rec('D5 while frozen the breakdown draws separate borders (a collapsed border does not travel with a sticky cell)',
+      getComputedStyle(t).borderCollapse === 'separate', 'border-collapse=' + getComputedStyle(t).borderCollapse);
+
+    // '#' hidden in the flat table: it freezes C01 + C02; the breakdown still
+    // shows its '#', so it freezes three.
+    setHidden(1, true);
+    FF.set(0, 2);
+    t = await open();
+    var d6 = BD.wanted() === 3 && sticky(cellAt(t, 3, 2)) && !sticky(cellAt(t, 3, 3));
+    setHidden(1, false);
+    rec('D6 with # hidden in the flat table (it freezes C01 + C02) a breakdown freezes its # + C01 + C02 - the same DATA columns',
+      d6, 'wanted=' + BD.wanted() + ' pos=' + [0, 1, 2, 3].map(function (i) { return pos(cellAt(t, 3, i)); }).join(','));
+
+    // A change from the Settings panel reaches a breakdown that is open.
+    FF.set(0, 2);
+    t = await open();
+    $('#spFreezeSelect').val('3').trigger('change');
+    var d7 = sticky(cellAt(t, 3, 2)) && !sticky(cellAt(t, 3, 3));
+    var at3 = [0, 1, 2, 3].map(function (i) { return pos(cellAt(t, 3, i)); }).join(',');
+    $('#spFreezeSelect').val('0').trigger('change');
+    var d7b = !sticky(cellAt(t, 3, 0)) && BD.state().css === '' && boxOf(t).style.scrollPaddingLeft === '' && getComputedStyle(t).borderCollapse === 'collapse';
+    rec('D7 the Settings select moves an OPEN breakdown at once (3 -> # + C01 + C02), and None unfreezes it - rules, padding and borders all back',
+      d7 && d7b, 'at3=' + at3 + ' none: first=' + pos(cellAt(t, 3, 0)) + ' css=' + BD.state().css.length + ' collapse=' + getComputedStyle(t).borderCollapse);
+
+    // The width guard, per breakdown.
+    FF.set(0, 2);
+    t = await open();
+    boxOf(t).style.width = '150px'; BD.apply();
+    var paused = !sticky(cellAt(t, 3, 0)) && BD.state().paused.length === 1;
+    boxOf(t).style.width = ''; BD.apply();
+    rec('D8 a frozen block wider than ~60% of the box pauses the breakdown\'s freeze, and it comes back when it fits',
+      paused && sticky(cellAt(t, 3, 0)) && BD.state().paused.length === 0, 'paused=' + paused + ' back=' + pos(cellAt(t, 3, 0)) + ' pausedIds=' + BD.state().paused.join(','));
+
+    // The Table Info grid looks the same but is not a breakdown.
+    var fake = document.createElement('div');
+    fake.id = 'bdFakeInfo'; fake.className = 'infobox-content';
+    fake.style.cssText = 'width:300px;overflow:auto';
+    fake.innerHTML = '<table class="infobox-drill-table" style="width:100%;border-collapse:collapse"><thead><tr><th>A</th><th>B</th><th>C</th></tr></thead><tbody><tr><td>1</td><td>2</td><td>3</td></tr></tbody></table>';
+    document.body.appendChild(fake);
+    BD.apply();
+    var ft = fake.querySelector('table');
+    rec('D9 the Table Info grid (.infobox-drill-table without the breakdown mark) is never touched',
+      !ft.hasAttribute('data-pnb-bd') && pos(ft.rows[1].cells[0]) !== 'sticky', 'stamp=' + ft.getAttribute('data-pnb-bd') + ' pos=' + pos(ft.rows[1].cells[0]));
+    closeAll();
+
+    // The Settings panel in a pivot view: the notice above the Columns heading,
+    // naming Freeze, and the control still there to use.
+    $('#pivot-output-container').show();
+    H.openSP();
+    var msg = document.querySelector('.sp-columns-section .sp-columns-pivot-msg'), head = document.querySelector('.sp-columns-section .sp-columns-head');
+    var above = !!msg && !!head && !!(msg.compareDocumentPosition(head) & Node.DOCUMENT_POSITION_FOLLOWING);
+    var mtxt = msg ? msg.textContent : '';
+    var ctl = $('#spFreezeWrap').is(':visible') && !$('#spFreezeSelect').prop('disabled');
+    $('#settingsPanel').removeClass('is-open'); $('#settingsPanelOverlay').removeClass('is-open');
+    $('#pivot-output-container').hide();
+    rec('D10 in a pivot view the Settings panel\'s notice sits ABOVE the Columns heading, says Freeze is included for breakdown tables, and Freeze stays usable',
+      above && /Freeze included/.test(mtxt) && /breakdown tables/.test(mtxt) && ctl,
+      'above=' + above + ' text=[' + mtxt.slice(0, 140) + '] control=' + ctl);
+
+    FF.set(0, null);
+  }
+
+  // ?frames=1: frames_check.py drives the page itself over CDP. Hand it the
+  // fixture helpers and stand aside.
+  if (window.__FRAMES) {
+    window.__drv = { runQuery: runQuery, makeRows: makeRows, ths: ths, cell: cell, wrap: wrap, setHidden: setHidden };
+    document.getElementById('out').textContent = 'READY';
+    return;
+  }
+
+  (async function () {
+    try {
+      phaseU();
+      var ok = await phaseG();
+      if (ok) { phaseK(); phaseP(); phaseS(); phaseX(); phaseC(); await phaseB(); await phaseD(); }
+      finish();
+    } catch (e) { finish('driver threw: ' + ((e && e.stack) || e)); }
+  })();
+})();

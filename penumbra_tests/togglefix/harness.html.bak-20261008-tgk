@@ -1,0 +1,451 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>toggle fixes</title>
+<link rel="stylesheet" href="main.css">
+</head>
+<body class="theme-default">
+<!-- togglefix suite (2026-10-07): Round A of the journal toggle sweep, in the browser.
+     The REAL main.js booted through the REAL run path (stubbed query.php +
+     manage_journal.php) on the jrowfeat suite's 36-row fixture: key "PROTOCOL NO." +
+     "PROTOCOL TYPE", one toggle "Reviewed" (key toggle1), row notes on, rows 3 and
+     23 marked. ?scn=<name> picks the stored report state; driver.js runs it.
+     run.py splices in, from the index.php under test, the View Options journal panel
+     (TF_VIEW_OPTIONS) and the journal dialog (TF_JOURNAL_PANEL).
+     The fake journal server keeps one store per report: "jrfix" (the loaded report,
+     window.__J) and any other id (a copy, window.__J2 - nothing marked). -->
+
+<div id="reportHeaderContainer"><div id="defaultTitleView"></div><div id="reportInfoPanel" style="display:none"></div></div>
+<input id="reportTitle" value=""><input id="reportSubtitle" value=""><div id="admWrapper"></div><button id="toggleAdminViewBtn"></button>
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div><div id="mainReportTitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<button id="executeQuery">Run</button><button id="stopQueryBtn">Stop</button>
+<div id="loadingOverlay" style="display:none"><p id="execution-timer"></p><p id="loadingMessage"></p><div id="loadingTip"></div></div>
+<div id="importTimestamps"></div>
+<div id="resultsHeader" style="height:20px">controls
+  <span id="journalBtnWrap" class="journal-btn-wrap" style="display:none;"><svg class="export-icon" id="journalBtn" role="button" tabindex="0" aria-label="Open the report journal" viewBox="0 0 24 24" width="16" height="16"><rect x="2" y="2" width="20" height="20"></rect></svg><span id="journalBadge" class="journal-badge" aria-hidden="true" style="display:none;"></span></span>
+</div>
+<div id="tableSearchContainer"><input id="tableSearch" value=""></div>
+<div id="resultCount"></div>
+<div id="paginatorContainer" style="visibility:hidden">
+  <div id="paginationControls"><span id="pageInfo"></span><select id="rowsPerPageSelector"><option value="25">25</option><option value="50">50</option><option value="200">200</option><option value="all">All</option></select></div>
+  <div id="groupActionsContainer" style="display:none">
+    <a href="#" id="expandAllGroups">Expand All</a> <a href="#" id="collapseAllGroups">Collapse All</a>
+    <span id="removeGroupingSep">&bull;</span> <a href="#" id="configureGroupingBtn" role="button">Configure Grouping</a> <a href="#" id="removeGroupingLink">Remove Grouping</a>
+  </div>
+</div>
+<svg class="export-icon" id="groupTableBtn" role="button" tabindex="0" viewBox="0 0 24 24" width="16" height="16"><rect x="2" y="2" width="20" height="20"></rect></svg>
+<div id="table-view-container"><div id="container-parent"><div id="results-wrapper" style="width:1400px;height:700px;overflow:auto"><table id="resultsTable" class="data-grid-table"><caption class="sr-only">Report results table</caption><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table></div></div></div>
+<div id="errorBox"></div><div id="undo_text_container"></div>
+<div id="action_overlay"></div>
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="pnbNoSearchMatches" style="display:none"></div>
+<div id="settingsPanelOverlay"></div>
+<div id="settingsPanel">
+  <select id="spThemeSelector"><option value="report-default">Report Default</option><option value="theme-default">Default</option></select>
+  <select id="spDensitySelector"><option value="report-default">Report Default</option><option value="standard">Standard</option></select>
+  <input type="checkbox" id="spRowExpandToggle"><input type="checkbox" id="spResolverToggle">
+  <div class="sp-section sp-columns-section"><div class="sp-column-container"><div id="spColumnList" class="sp-column-list"></div></div></div>
+  <div class="sp-actions"><button id="spApply">Save Column Layout</button><button id="spReset">Reset</button><span id="spPendingCount"></span></div>
+</div>
+<div id="view-options-tab">
+  <div class="view-options-eu"><div class="view-options-grid">
+    <div class="view-option-item"><label><input type="checkbox" id="viewOptionJournal"><div class="view-option-text"><strong>Report Journal</strong><small>Opt-in shared notes.</small></div></label></div>
+  </div></div>
+<!--TF_VIEW_OPTIONS-->
+</div>
+<!-- The grouping dialog, as index.php ships it (the jsongroup suite's copy). -->
+<div id="groupingLightbox" class="help-lightbox">
+    <div class="lightbox-content pnb-dlg">
+        <div class="pnb-dlg-head">
+            <div class="pnb-dlg-tt"><h3 class="pnb-dlg-title">Group Table by Column</h3></div>
+            <span class="pnb-dlg-action" id="groupPresetMount"></span>
+            <button type="button" class="close-lightbox" aria-label="Close" title="Close (Esc)">&times;</button>
+        </div>
+        <p id="pivotWarningForGrouping" style="display: none;">Note, you are viewing a pivot table.</p>
+        <div class="grp-lb-body">
+          <div class="grp-lb-left">
+            <div id="groupingColumnSelector" class="penumbra-custom-select" style="width: 100%; margin-bottom: 15px;">
+                <div class="pcs-selected" data-value="" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-label="Column to group by">-- Select a Column to Group By --</div>
+                <div class="pcs-dropdown" role="listbox" aria-label="Columns to group by"></div>
+            </div>
+            <div id="groupLevel2Row" style="display: none; margin-bottom: 15px;">
+                <div id="groupingColumnSelector2" class="penumbra-custom-select" style="width: 100%;">
+                    <div class="pcs-selected" data-value="" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-label="Second grouping level">-- None --</div>
+                    <div class="pcs-dropdown" role="listbox" aria-label="Second grouping level"></div>
+                </div>
+            </div>
+            <div id="groupLevel3Row" style="display: none; margin-bottom: 15px;">
+                <div id="groupingColumnSelector3" class="penumbra-custom-select" style="width: 100%;">
+                    <div class="pcs-selected" data-value="" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-label="Third grouping level">-- None --</div>
+                    <div class="pcs-dropdown" role="listbox" aria-label="Third grouping level"></div>
+                </div>
+            </div>
+            <div id="groupBinOptions" style="display: none; margin-bottom: 15px;">
+                <span id="groupBinColName"></span>
+                <input type="number" id="groupBinWidth" min="1" step="1" autocomplete="off" aria-label="Fixed bin width">
+                <input type="text" id="groupBinEdges" autocomplete="off" aria-label="Custom range cut points">
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label><input type="checkbox" id="groupAggCheckbox"> Include additional summary in each group header</label>
+                <div id="groupAggOptions" style="display: none;">
+                    <div id="groupAggColumn" class="penumbra-custom-select" style="flex: 1;">
+                        <div class="pcs-selected" data-value="" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-label="Column to aggregate">-- Column --</div>
+                        <div class="pcs-dropdown" role="listbox" aria-label="Columns to aggregate"></div>
+                    </div>
+                    <select id="groupAggType">
+                        <option value="sum">Sum</option><option value="avg">Average</option><option value="median">Median</option>
+                        <option value="min">Min</option><option value="max">Max</option><option value="range">Range (max - min)</option>
+                        <option value="stddev">Std Deviation</option><option value="count">Count (non-blank)</option>
+                        <option value="count_blank">Count (blank)</option><option value="count_distinct">Count (distinct)</option>
+                        <option value="mode">Mode (most common)</option><option value="antimode">Antimode (least common)</option>
+                    </select>
+                    <div id="groupSummaryFilterHint"></div>
+                </div>
+            </div>
+          </div>
+          <div class="grp-lb-right">
+            <select id="groupSortSelect">
+                <option value="label|asc">Label A&ndash;Z</option><option value="label|desc">Label Z&ndash;A</option>
+                <option value="count|asc">Fewest items</option><option value="count|desc">Most items</option>
+            </select>
+            <div id="groupLimitRow"><select id="groupLimitDir"><option value="top">Top</option><option value="bottom">Bottom</option></select>
+                <input type="number" id="groupLimitN" min="0" step="1" placeholder="all"></div>
+            <label><input type="checkbox" id="groupLimitOther" checked> Roll the rest into &ldquo;(Other)&rdquo;</label>
+            <div id="groupLimitMinRow"><input type="number" id="groupLimitMinRows" min="0" step="1" placeholder="0"></div>
+            <div id="groupStartDepthRow"><select id="groupStartDepth">
+                <option value="0">Nothing (all collapsed)</option><option value="1">Level 1</option><option value="2">Level 2</option><option value="3">All levels</option>
+            </select></div>
+          </div>
+        </div>
+        <div>
+            <button id="resetGroupingBtn">Reset</button>
+            <button id="ungroupBtn" style="display: none;">Remove Grouping</button>
+            <button id="confirmGroupingBtn">Apply Grouping</button>
+        </div>
+    </div>
+</div>
+<!--TF_JOURNAL_PANEL-->
+<div id="pnbStatusBar">
+  <div class="sb-seg sb-lead"><span class="sb-val sb-b" id="sbRows">&nbsp;</span></div>
+  <div class="sb-seg" id="sbColsSeg"><span id="sbCols"></span>
+    <span class="sb-chip" id="sbCustomCols" style="display:none;">custom layout</span>
+    <div class="sb-pop" id="sbCustomColsPop"><div id="sbCustomColsDiff"></div><button id="sbCustomColsReset">Reset</button><button id="sbCustomColsSave" style="display:none;">Save</button></div>
+  </div>
+  <div class="sb-seg" id="sbUserSeg"></div>
+</div>
+<div id="importDragOverlay" style="display: none;"><div class="drag-overlay-content"><p>Drop file to import</p></div></div>
+<input type="file" id="importDataFileInput" style="display:none">
+<pre id="out">running</pre>
+
+<script>
+  (function () { try { localStorage.clear(); } catch (e) {} })();
+  // The registry rows the scenarios use: a dark theme (body.is-dark) and Wolfpack Red
+  // (its blanket `button:hover:not(:disabled)` fill lives in main.css).
+  window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' }, 'theme-dark-blue': { label: 'Dark Blue', isDark: true },
+                             'theme-wolfpack': { label: 'Wolfpack Red' } };
+  window.PENUMBRA_THEME_IDS = ['theme-default', 'theme-dark-blue', 'theme-wolfpack'];
+  window.PENUMBRA_THEME_ALIASES = {};
+  window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  window.PENUMBRA_JOURNAL_ASSETS = { js: 'penumbra_journal.js', css: 'penumbra_journal.css' };
+  (function () {
+    var P = new URLSearchParams(location.search);
+    window.__SCN = P.get('scn') || 'dark';
+    var S = window.__SCN;
+    var SEP = '␟';
+    window.__SEP = SEP;
+    var COLS = ['PROTOCOL NO.', 'PROTOCOL TYPE', 'TITLE', 'APPROVAL DATE', 'STATUS', 'AMOUNT'];
+    window.__COLS = COLS;
+    var W = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel', 'India'];
+    var rows = [];
+    for (var i = 1; i <= 36; i++) {
+      var r = {};
+      r['PROTOCOL NO.'] = String(25400 + (i % 18));
+      r['PROTOCOL TYPE'] = i <= 18 ? 'Exempt' : (i <= 30 ? 'Expedited' : 'Amendment/Renewal');
+      r['TITLE'] = W[i % W.length] + ' study ' + i;
+      r['APPROVAL DATE'] = (1 + (i % 12)) + '/' + (1 + (i % 27)) + '/2026';
+      r['STATUS'] = (i % 4 === 0) ? 'Closed' : 'Approved';
+      r['AMOUNT'] = '$' + (1000 + i * 37) + '.00';
+      rows.push(r);
+    }
+    // Round B: a toggle row stored with STATE 0 (someone cleared it): { rowKey: {by, at} }.
+    window.__ZERO = {};
+    // longkey: one row whose TITLE (a key column there) pushes its key past 1,000 bytes.
+    window.__LONGIDX = 5;
+    if (S === 'longkey') rows[5]['TITLE'] = 'Long title ' + new Array(1101).join('x');
+    window.__rowsFixture = rows;
+    window.__keyOf = function (r) { return r['PROTOCOL NO.'] + SEP + r['PROTOCOL TYPE']; };
+    var K3 = window.__keyOf(rows[2]), K5 = window.__keyOf(rows[22]);
+    window.__J = { toggles: { toggle1: {} }, counts: {}, notes: {}, posts: [] };
+    window.__J.toggles.toggle1[K3] = { by: 'pat', at: '2026-10-01 09:00:00' };
+    window.__J.toggles.toggle1[K5] = { by: 'lee', at: '2026-10-01 10:30:00' };
+    window.__J.counts[K3] = 2;
+    window.__J.notes[K3] = [
+      { ID: 901, REPORT_ID: 7, SCOPE: 'row', ROW_KEY: K3, NOTE_TEXT: 'First look done.', CREATED_BY: 'pat', CREATED_AT: '2026-10-01 09:05:00', PARENT_ID: null },
+      { ID: 902, REPORT_ID: 7, SCOPE: 'row', ROW_KEY: K3, NOTE_TEXT: 'Follow up next week.', CREATED_BY: 'lee', CREATED_AT: '2026-10-01 11:00:00', PARENT_ID: null }
+    ];
+    // Any other report id (a copy): nothing marked, no notes.
+    window.__J2 = { toggles: {}, counts: {}, notes: {}, posts: [] };
+    window.__MARKED = [K3, K5];
+    var order = []; for (var c = 0; c < COLS.length; c++) order.push(c);
+    var vo = { journalEnabled: true, journalKeyColumns: ['PROTOCOL NO.', 'PROTOCOL TYPE'],
+               journalToggles: [{ key: 'toggle1', label: 'Reviewed' }], journalRowNotes: true };
+    var st = {
+      name: 'jrfix', query: 'SELECT * FROM JR_FIXTURE', reportTitle: 'Toggle fixes fixture',
+      theme: 'theme-default', density: 'standard',
+      visibleColumns: ['#', 0, 1, 2, 3, 4], columnOrder: order,
+      sortCriteria: [], noLimit: true, rowExpandDefault: false, resolverLinksDefault: true,
+      rowsPerPage: '200', reportSnippet: '', viewOptions: vo
+    };
+    var journalOn = true;
+    if (S === 'dark' || S === 'darkgrp') st.theme = 'theme-dark-blue';
+    if (S === 'darkgrp') { st.groupBy = 'PROTOCOL TYPE'; st.visibleColumns = ['#', 1, 0, 2, 3, 4]; st.groupStartDepth = 3; }
+    if (S === 'wolf') st.theme = 'theme-wolfpack';
+    // Saved with the journal OFF but its key, toggle column and row notes kept.
+    if (S === 'offsave') { delete vo.journalEnabled; journalOn = false; }
+    // A saved key column the query no longer returns.
+    if (S === 'missing' || S === 'missnotice') vo.journalKeyColumns = ['PROTOCOL NO.', 'PROTOCOL TYPE', 'GONE'];
+    if (S === 'longkey') vo.journalKeyColumns = ['PROTOCOL NO.', 'PROTOCOL TYPE', 'TITLE'];
+    // Round B: saved grouped BY the toggle (its bands name the column).
+    if (S === 'bandlabel') { st.groupBy = 'Reviewed'; st.visibleColumns = ['#', 1, 0, 2, 3, 4]; st.groupStartDepth = 3; }
+    // Round E (2026-10-08).
+    // The marks cannot be loaded (until the scenario lets them).
+    if (S === 'loadfail') window.__failToggles = true;
+    // Grouped by type, the toggle column summed (the browser's key: the upper-cased
+    // internal column name).
+    if (S === 'grpfoot') { st.groupBy = 'PROTOCOL TYPE'; st.visibleColumns = ['#', 1, 0, 2, 3, 4]; st.groupStartDepth = 3; st.columnSummaries = { '__JOURNAL_TOGGLE__TOGGLE1': 'sum' }; }
+    // Sorted by the toggle, two pages.
+    // Sorted by the toggle, two pages; the marks land well after the note counts (the
+    // replay must wait for the marks, not run on the first journal data).
+    if (S === 'noteresort') { st.rowsPerPage = '25'; st.sortCriteria = [{ colIdentifier: '__JOURNAL_TOGGLE__toggle1', colIndex: '__JOURNAL_TOGGLE__toggle1', direction: 'desc' }]; window.__toggleDelay = 500; }
+    // The key's PROTOCOL NO. hidden, rows coloured by the toggle.
+    if (S === 'cfhidden') { st.visibleColumns = ['#', 1, 2, 3, 4]; st.reportSnippet = "format(row, Reviewed = ☑, 'background-color: rgb(230, 255, 230)')"; }
+    // Grouped BY the toggle, for a regroup with a search typed.
+    if (S === 'regroupsearch') { st.groupBy = 'Reviewed'; st.visibleColumns = ['#', 1, 0, 2, 3, 4]; st.groupStartDepth = 3; }
+    // Snippets that do / do not name the toggle.
+    if (S === 'snipguard') st.reportSnippet = 'Rows in all: count()';
+    if (S === 'snipjournal') st.reportSnippet = 'Reviewed so far: count(Reviewed = ☑)';
+    // The server lists toggle keys with rows in any state: toggle2's marks were all cleared.
+    if (S === 'usedkeys') window.__usedKeys = ['toggle1', 'toggle2'];
+    // Round G (2026-10-08, the smaller leftovers). (stateonly: run.py loads the page with no ?id=.)
+    // A one-column key (TITLE) that two rows lack.
+    if (S === 'blankkey') { vo.journalKeyColumns = ['TITLE']; rows[4]['TITLE'] = ''; rows[9]['TITLE'] = ''; }
+    // Grouped, sorted by the toggle, the marks landing after the bands are built.
+    if (S === 'grpsort') { st.groupBy = 'PROTOCOL TYPE'; st.visibleColumns = ['#', 1, 0, 2, 3, 4]; st.groupStartDepth = 3;
+      st.sortCriteria = [{ colIdentifier: '__JOURNAL_TOGGLE__toggle1', colIndex: '__JOURNAL_TOGGLE__toggle1', direction: 'desc' }]; window.__toggleDelay = 500; }
+    // A key that repeats: PROTOCOL NO. alone (18 rows share one).
+    if (S === 'dupkey') vo.journalKeyColumns = ['PROTOCOL NO.'];
+    // Two toggle columns ticked on the same two rows, and a removed column's mark.
+    if (S === 'keywarn') {
+      vo.journalToggles = [{ key: 'toggle1', label: 'Reviewed' }, { key: 'toggle2', label: 'Sent' }];
+      window.__J.toggles.toggle2 = {};
+      window.__J.toggles.toggle2[K3] = { by: 'pat', at: '2026-10-02 09:00:00' };
+      window.__J.toggles.toggle2[K5] = { by: 'lee', at: '2026-10-02 10:00:00' };
+      window.__J.toggles.toggle9 = {};
+      window.__J.toggles.toggle9[window.__keyOf(rows[6])] = { by: 'kim', at: '2026-09-01 09:00:00' };
+    }
+    // Saved with the journal off, three notes written while it was.
+    if (S === 'pubcancel') { delete vo.journalEnabled; journalOn = false; window.__summaryTotal = 3; }
+    // Grouped by type, a band summary on the toggle, the bands ranked by it; two more marks
+    // (Amendment/Renewal), all of them landing after the bands are built.
+    if (S === 'bandsum') { st.groupBy = 'PROTOCOL TYPE'; st.visibleColumns = ['#', 1, 0, 2, 3, 4]; st.groupStartDepth = 3;
+      st.groupAgg = { column: 'Reviewed', type: 'sum' }; st.groupSort = { key: 'summary', dir: 'desc' };
+      window.__J.toggles.toggle1[window.__keyOf(rows[30])] = { by: 'kim', at: '2026-10-02 09:00:00' };
+      window.__J.toggles.toggle1[window.__keyOf(rows[31])] = { by: 'kim', at: '2026-10-02 09:05:00' };
+      window.__toggleDelay = 500; }
+    // format() rules naming the toggle by its label.
+    if (S === 'cfcell') st.reportSnippet = "format(cell, Reviewed, Reviewed = ☑, 'background-color: rgb(255, 230, 230)')\nformat(header, Reviewed, 'color: rgb(200, 0, 0)')";
+    // A key (TITLE) whose value is "constructor"; the third row marked under its TITLE.
+    if (S === 'ctorkey') { vo.journalKeyColumns = ['TITLE']; rows[6]['TITLE'] = 'constructor';
+      window.__J.toggles.toggle1 = {}; window.__J.toggles.toggle1[rows[2]['TITLE']] = { by: 'pat', at: '2026-10-01 09:00:00' }; }
+    // A REAL column named like the toggle: REVIEWED = R1, R2, ...
+    if (S === 'tpl') { rows.forEach(function (r, i) { r['REVIEWED'] = 'R' + (i + 1); }); st.visibleColumns = ['#', 0, 1, 2, 3, 4, 6]; order.push(6); }
+    window.__STORED = st;
+    window.penumbra_vars = {
+      isAdmin: true, isGlobalAdmin: true, canEditReport: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+      tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+      imports: [], reports: [], themes: {}, prompts: {}, grants: [],
+      totalExemptions: [],
+      journal: { installed: true, enabled: journalOn, total: 0, unseen: 0 },
+      journalAccess: true,
+      preloadedState: st
+    };
+    window.__queryResponse = { data: rows };
+  })();
+  window.__T = {};
+  window.__queryDone = 0;
+  window.__ajaxLog = [];
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  // Fake server. query.php -> the fixture; manage_journal.php -> one store per report.
+  function __tfRid(url, body) {
+    var m = /[?&]report_id=([^&]*)/.exec(url);
+    if (m) return decodeURIComponent(m[1]);
+    return (body && body.report_id != null) ? String(body.report_id) : '';
+  }
+  function __tfJournal(url, opts) {
+    var m = /[?&]action=([a-z_]+)/.exec(url);
+    var action = m ? m[1] : null, body = null;
+    if (opts.data) { try { body = JSON.parse(opts.data); if (!action) action = body.action; } catch (e) { } }
+    var rid = __tfRid(url, body);
+    var J = (rid === 'jrfix' || rid === '') ? window.__J : window.__J2;
+    if (action === 'toggles') {
+      if (window.__failToggles) return { status: 'error', message: 'Simulated outage.' };
+      var tAns = { status: 'success', installed: true, toggles: JSON.parse(JSON.stringify(J.toggles)) };
+      if (window.__usedKeys) tAns.used_keys = window.__usedKeys.slice();
+      return tAns;
+    }
+    if (action === 'row_notes') return { status: 'success', counts: JSON.parse(JSON.stringify(J.counts)), notes: JSON.parse(JSON.stringify(J.notes)) };
+    if (action === 'summary') return { status: 'success', installed: true, total: window.__summaryTotal || 0, unseen: 0 };
+    // A row's own history when a scenario scripts one (window.__rowHist[rowKey]).
+    if (action === 'toggle_history') {
+      var hm = /[?&]row_key=([^&]*)/.exec(url), hrk = hm ? decodeURIComponent(hm[1]) : '';
+      return { status: 'success', events: (window.__rowHist && window.__rowHist[hrk]) ? JSON.parse(JSON.stringify(window.__rowHist[hrk])) : [] };
+    }
+    if (action === 'toggle_history_search') {
+      // The server's contract (Round D, 2026-10-08): user = case-insensitive CONTAINS,
+      // toggle_key / state / from / to filters, mode=latest (one per row), a summary over
+      // every change kept, and each event's row state NOW from the marks.
+      var qs = function (k) { var m = new RegExp('[?&]' + k + '=([^&]*)').exec(url); return m ? decodeURIComponent(m[1]) : ''; };
+      var u = qs('user').toLowerCase(), tkf = qs('toggle_key'), stf = qs('state'), latest = qs('mode') === 'latest', df = qs('from'), dt = qs('to');
+      var evs = (window.__histEvents || []).filter(function (e) {
+        var d = String(e.at || '').slice(0, 10);
+        return (!u || String(e.by).toLowerCase().indexOf(u) >= 0) && (!tkf || e.toggle === tkf)
+          && (stf === '' || String(e.state) === stf) && (!df || d >= df) && (!dt || d <= dt);
+      });
+      var sum = { changes: 0, marked: 0, unmarked: 0, rows: 0, people: [] }, rowsSeen = {}, ppl = {}, seen = {}, out = [];
+      evs.forEach(function (e) {
+        var rk = e.rowKey != null ? e.rowKey : (e.parts || []).join(window.__SEP);
+        sum.changes++; sum[e.state === 1 ? 'marked' : 'unmarked']++; rowsSeen[e.toggle + '|' + rk] = 1;
+        var p = ppl[e.by] || (ppl[e.by] = { user: e.by, marked: 0, unmarked: 0 });
+        p[e.state === 1 ? 'marked' : 'unmarked']++;
+        if (latest) { if (seen[e.toggle + '|' + rk]) return; seen[e.toggle + '|' + rk] = 1; }
+        var mk = (J.toggles[e.toggle] || {})[rk], o = JSON.parse(JSON.stringify(e));
+        o.rowKey = rk;
+        o.now = mk ? { on: true, by: mk.by, at: mk.at } : { on: false };
+        out.push(o);
+      });
+      sum.rows = Object.keys(rowsSeen).length;
+      sum.people = Object.keys(ppl).map(function (k) { return ppl[k]; }).sort(function (a, b) {
+        return ((b.marked + b.unmarked) - (a.marked + a.unmarked)) || (a.user < b.user ? -1 : (a.user > b.user ? 1 : 0));
+      });
+      return { status: 'success', truncated: false, events: out, summary: sum, partial: false, mode: latest ? 'latest' : 'all' };
+    }
+    if (action === 'list') return { status: 'success', installed: true, data: [], report: { title: 'Toggle fixes fixture' } };
+    // The writes follow the server's contract (Round B, 2026-10-07): a row already in
+    // the requested state is not written (no new maker, no new time) and the answer
+    // says what the row holds now; a bulk answers with the keys it changed. (The
+    // pre-Round-B server always wrote, and its answer had no unchanged / at - the
+    // control build ignores those fields, so it reads both answers alike.)
+    var NOW = '2026-10-07 12:00:00';
+    function rowNow(tk, rk) {
+      var m = J.toggles[tk] || {};
+      if (Object.prototype.hasOwnProperty.call(m, rk)) return { state: 1, by: m[rk].by, at: m[rk].at };
+      var z = window.__ZERO[tk + '|' + rk];
+      return z ? { state: 0, by: z.by, at: z.at } : null;
+    }
+    function writeRow(tk, rk, on) {
+      var cur = rowNow(tk, rk);
+      if ((cur ? cur.state : 0) === (on ? 1 : 0)) return false;
+      J.toggles[tk] = J.toggles[tk] || {};
+      if (on) { J.toggles[tk][rk] = { by: 'harness', at: NOW }; delete window.__ZERO[tk + '|' + rk]; }
+      else { delete J.toggles[tk][rk]; window.__ZERO[tk + '|' + rk] = { by: 'harness', at: NOW }; }
+      return true;
+    }
+    if (action === 'set_toggle' && body) {
+      J.posts.push(body);
+      // window.__failWrites = N: the next N single writes fail (status error, nothing written).
+      if (window.__failWrites > 0) { window.__failWrites--; return { status: 'error', message: 'Simulated save failure.' }; }
+      var changed = writeRow(body.toggle_key, body.row_key, !!body.state);
+      var now = rowNow(body.toggle_key, body.row_key) || { state: 0, by: 'harness', at: null };
+      return { status: 'success', state: now.state, unchanged: !changed, by: now.by, at: now.at };
+    }
+    if (action === 'set_toggles_bulk' && body) {
+      J.posts.push(body);
+      var ch = [];
+      (body.row_keys || []).forEach(function (rk) { if (writeRow(body.toggle_key, rk, !!body.state)) ch.push(rk); });
+      return { status: 'success', state: body.state ? 1 : 0, count: ch.length, skipped: (body.row_keys || []).length - ch.length, changed: ch, by: 'harness' };
+    }
+    if (body) J.posts.push(body);
+    return { status: 'success' };
+  }
+  // ?jslow=<rid>:<ms> - that report's journal STATE answers <ms> late (the others 30 ms).
+  var __tfSlow = (function () { var v = new URLSearchParams(location.search).get('jslow') || ''; var p = v.split(':'); return p.length === 2 ? { rid: p[0], ms: parseInt(p[1], 10) || 0 } : null; })();
+  jQuery.ajax = function (a, b) {
+    var opts = (typeof a === 'string') ? jQuery.extend({ url: a }, b || {}) : (a || {});
+    var url = String(opts.url || '');
+    window.__ajaxLog.push(url + (opts.data && typeof opts.data === 'string' ? ' ' + opts.data : ''));
+    var d = jQuery.Deferred();
+    var isQuery = /query\.php/.test(url);
+    var isJournal = /manage_journal\.php/.test(url);
+    var jState = isJournal && /[?&]action=(toggles|row_notes)/.test(url);
+    if (jState) window.__jPending = (window.__jPending || 0) + 1;
+    var delay = isJournal ? 30 : 0;
+    if (jState && __tfSlow && __tfRid(url, null) === __tfSlow.rid) delay = __tfSlow.ms;
+    // window.__toggleDelay = N: the marks (action=toggles) answer N ms late, the rest not.
+    if (jState && window.__toggleDelay && /[?&]action=toggles\b/.test(url)) delay = window.__toggleDelay;
+    // window.__histSlowNext = N: the next Toggle History search answers N ms late (Round G).
+    if (isJournal && /[?&]action=toggle_history_search/.test(url) && window.__histSlowNext) { delay = window.__histSlowNext; window.__histSlowNext = 0; }
+    // window.__tslow = N: the next toggle WRITE is applied and answered N ms later, as a
+    // slow server would (a read made meanwhile does not see it yet).
+    var isWrite = isJournal && opts.data && /"action":"set_toggle"/.test(String(opts.data));
+    if (isWrite && window.__tslow) { delay = window.__tslow; window.__tslow = 0; }
+    var resp = null;
+    // window.__rejectWrites = N: the next N single toggle writes never reach the server
+    // (an HTTP error: the request's fail path).
+    if (isWrite && window.__rejectWrites > 0) {
+      window.__rejectWrites--;
+      setTimeout(function () {
+        var xhr = { status: 500, responseText: '{"status":"error","message":"Simulated server error."}' };
+        try { if (opts.error) opts.error(xhr, 'error', 'Internal Server Error'); } catch (e) { window.__errors.push('ajax error threw: ' + String(e)); }
+        d.reject(xhr, 'error', 'Internal Server Error');
+      }, delay);
+      var rp = d.promise(); rp.abort = function () {}; return rp;
+    }
+    setTimeout(function () {
+      resp = isQuery ? window.__queryResponse : (isJournal ? __tfJournal(url, opts) : {});
+      try { if (opts.success) opts.success(resp, 'success', { status: 200 }); } catch (e) { window.__errors.push('ajax success threw: ' + String(e)); }
+      try { if (opts.complete) opts.complete({ status: 200 }, 'success'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }
+      d.resolve(resp, 'success', { status: 200 });
+      if (isQuery) window.__queryDone++;
+      if (jState) window.__jPending--;
+    }, delay);
+    var p = d.promise(); p.abort = function () {}; return p;
+  };
+  jQuery.getJSON = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.post = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.get = jQuery.post;
+  jQuery.fx.off = true;
+  window.__errors = [];
+  window.__rejections = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    window.__rejections.push(String((r && r.message) || r) + ' @' + String((r && r.stack) || '').split('\n').slice(1, 2).join('').trim());
+    e.preventDefault();
+  });
+  window.__confirms = [];
+  window.__confirmAnswer = true;
+  window.confirm = function (m) { window.__confirms.push(String(m)); return window.__confirmAnswer !== false; };
+  window.alert = function (m) { window.__errors.push('alert: ' + m); };
+  window.prompt = function () { return null; };
+  if (typeof window.stackHeaders !== 'function') window.stackHeaders = function () {};
+</script>
+<script src="penumbra_userseg.js"></script>
+<script src="main_tf.js"></script>
+<script src="driver.js"></script>
+</body></html>

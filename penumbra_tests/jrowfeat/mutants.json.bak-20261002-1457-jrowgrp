@@ -1,0 +1,308 @@
+{
+ "visgate": {
+  "edits": [
+   [
+    "            // never appears after enabling\" bug).\r\n            return !!computeValidity().ok;",
+    "            // never appears after enabling\" bug).\r\n            return !!computeValidity().ok && $('#resultsTable').is(':visible');"
+   ]
+  ],
+  "must": [
+   "G-grouped",
+   "G-flatbehind",
+   "G-hashshown",
+   "P-clickgrp-box",
+   "C-clickgrp-post",
+   "C-clickgrp-twin",
+   "C-clickgrp-label",
+   "C-clickgrp-off",
+   "R-regroup",
+   "R-regroup-all",
+   "G-cfggrp-add",
+   "G-cfggrp-notesoff"
+  ],
+  "scn": [
+   "flat",
+   "grouped",
+   "hashshown",
+   "ungroup",
+   "clickgrp",
+   "notegrp",
+   "regroup",
+   "cfggrp"
+  ]
+ },
+ "nogroupcontent": {
+  "edits": [
+   [
+    "                if (heads[k]) paintJournalTable(heads[k], tables[k], toggles, notesOn, false);",
+    "                if (false) paintJournalTable(heads[k], tables[k], toggles, notesOn, false);"
+   ]
+  ],
+  "must": [
+   "G-grouped",
+   "G-hashshown"
+  ],
+  "scn": [
+   "grouped",
+   "hashshown",
+   "clickgrp",
+   "notegrp",
+   "regroup",
+   "cfggrp"
+  ]
+ },
+ "norebuild": {
+  "edits": [
+   [
+    "                rebuildGroupedView(order);\r\n",
+    "                void order;\r\n"
+   ]
+  ],
+  "must": [
+   "G-cfggrp-add",
+   "G-cfggrp-notesoff"
+  ],
+  "scn": [
+   "grouped",
+   "hashshown",
+   "cfggrp"
+  ]
+ },
+ "eq-nohook": {
+  "edits": [
+   [
+    "        if (window.Penumbra && window.Penumbra.journalPaintFlat) {\r\n            try { window.Penumbra.journalPaintFlat(); } catch (e) { /* groups build without them */ }",
+    "        if (false) {\r\n            try { window.Penumbra.journalPaintFlat(); } catch (e) { /* groups build without them */ }"
+   ]
+  ],
+  "must": [],
+  "scn": [
+   "grouped",
+   "hashshown",
+   "ungroup",
+   "clickgrp",
+   "notegrp",
+   "cfggrp"
+  ]
+ },
+ "noreaim": {
+  "edits": [
+   [
+    "            if (_jMo && tb === _jMoTbody) return;",
+    "            if (_jMo) return;"
+   ]
+  ],
+  "must": [
+   "S-stale"
+  ],
+  "scn": [
+   "flat",
+   "stale"
+  ]
+ },
+ "nosync": {
+  "edits": [
+   [
+    "            function paintBtn($b, on) { syncToggleButtons(tk, rowKey); }",
+    "            function paintBtn($b, on) { $b.toggleClass('is-on', on).attr('aria-checked', on ? 'true' : 'false'); }"
+   ]
+  ],
+  "must": [
+   "C-clickgrp-twin",
+   "C-clickgrp-label"
+  ],
+  "scn": [
+   "clickgrp",
+   "regroup"
+  ]
+ },
+ "closeflat": {
+  "edits": [
+   [
+    "            $('#resultsTable tbody tr.journal-note-child, #groupedResultsContainer tr.journal-note-child').remove();",
+    "            $('#resultsTable tbody tr.journal-note-child').remove();"
+   ]
+  ],
+  "must": [
+   "N-notegrp-one",
+   "N-notegrp-mention",
+   "N-notegrp-esc",
+   "N-notegrp-band"
+  ],
+  "scn": [
+   "notegrp"
+  ]
+ },
+ "noescjournal": {
+  "edits": [
+   [
+    "                    && window.Penumbra.journalHandleEscape()) {",
+    "                    && false) {"
+   ]
+  ],
+  "must": [
+   "N-notegrp-mention"
+  ],
+  "scn": [
+   "notegrp"
+  ]
+ },
+ "nolock": {
+  "edits": [
+   [
+    "            if (ok) $lock.hide(); else $lock.show();",
+    "            $lock.hide();"
+   ]
+  ],
+  "must": [
+   "K-cfg-locked",
+   "K-cfg-dup"
+  ],
+  "scn": [
+   "cfg"
+  ]
+ },
+ "nostatusadd": {
+  "edits": [
+   [
+    "            setToggleStatus('Added a toggle column called <strong>' + escapeHtml(label) + '</strong>. Type its name, then press Enter. ' + whereText());",
+    "            void label;"
+   ]
+  ],
+  "must": [
+   "T-cfg-add"
+  ],
+  "scn": [
+   "cfg"
+  ]
+ },
+ "noundo": {
+  "edits": [
+   [
+    "            var u = _jUndo;\r\n            _jUndo = null;\r\n            if (!u || defByKey(u.def.key)) { setToggleStatus(''); return; }",
+    "            var u = null;\r\n            _jUndo = null;\r\n            if (!u || defByKey(u.def.key)) { setToggleStatus(''); return; }"
+   ]
+  ],
+  "must": [
+   "T-cfg-undo"
+  ],
+  "scn": [
+   "cfg"
+  ]
+ },
+ "emptylabel": {
+  "edits": [
+   [
+    "            if (!val || !defByKey(key)) return;\r\n            renameDef(key, val);",
+    "            if (!defByKey(key)) return;\r\n            renameDef(key, val);"
+   ]
+  ],
+  "must": [
+   "T-cfg-empty",
+   "T-cfg-undo"
+  ],
+  "scn": [
+   "cfg"
+  ]
+ },
+ "nokeywarn": {
+  "edits": [
+   [
+    "            if (_jKeyAtLoad && cur !== _jKeyAtLoad) {",
+    "            if (false) {"
+   ]
+  ],
+  "must": [
+   "K-keychg"
+  ],
+  "scn": [
+   "keychg"
+  ]
+ },
+ "nofreshkey": {
+  "edits": [
+   [
+    "            if (v.ok) window.Penumbra.loadJournalToggles();\r\n            else { stripToggleColumn(); }",
+    "            if (v.ok && hasToggles()) window.Penumbra.loadJournalToggles();\r\n            else { stripToggleColumn(); }"
+   ],
+   [
+    "            if (!_jToggleStateLoaded) base = base + 'x' + Date.now().toString(36);",
+    "            void base;"
+   ]
+  ],
+  "must": [
+   "T-cfg-fresh"
+  ],
+  "scn": [
+   "cfg"
+  ]
+ },
+ "eq-nostatefetch": {
+  "edits": [
+   [
+    "            if (v.ok) window.Penumbra.loadJournalToggles();\r\n            else { stripToggleColumn(); }",
+    "            if (v.ok && hasToggles()) window.Penumbra.loadJournalToggles();\r\n            else { stripToggleColumn(); }"
+   ]
+  ],
+  "must": [],
+  "scn": [
+   "cfg"
+  ]
+ },
+ "nodropstop": {
+  "edits": [
+   [
+    "            e.stopPropagation(); // the app-wide import never sees this drop",
+    "            void 0;"
+   ]
+  ],
+  "must": [
+   "D-drop-attach"
+  ],
+  "scn": [
+   "dropnote"
+  ]
+ },
+ "dropanywhere": {
+  "edits": [
+   [
+    "                if (r.width > 0 && r.height > 0 && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return zs[i];",
+    "                if (r.width > 0) return zs[i];"
+   ]
+  ],
+  "must": [
+   "D-drop-elsewhere"
+  ],
+  "scn": [
+   "dropnote"
+  ]
+ },
+ "footerhidden": {
+  "edits": [
+   [
+    "                if (hc[i].style.display === 'none') continue;\r\n                visCount++;",
+    "                visCount++;"
+   ]
+  ],
+  "must": [
+   "F-footer-hidden"
+  ],
+  "scn": [
+   "footer"
+  ]
+ },
+ "ccjournal": {
+  "edits": [
+   [
+    "        function _ccIsJournalCol(n) { return String(n).indexOf('__JOURNAL') === 0; }",
+    "        function _ccIsJournalCol(n) { return false; }"
+   ]
+  ],
+  "must": [
+   "C-ccpill"
+  ],
+  "scn": [
+   "ccpill"
+  ]
+ }
+}

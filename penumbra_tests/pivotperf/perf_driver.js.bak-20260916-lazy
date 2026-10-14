@@ -1,0 +1,211 @@
+// Pivot perf + summary-label driver (2026-09-16).
+// Synthetic data shaped like ?id=int-col-mat (3,242 rows over 1,793 records;
+// per-record vs per-row attribute cardinalities matched), fed through the REAL
+// processPivotData + generatePivotTable via the __PP closure export.
+//
+//   ?perf=<json matrix>  timing/hash matrix (diagnostics)
+//   ?suite=1             assertions for run.ps1
+(function () {
+  function rng(seed) { var s = seed >>> 0; return function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+  function pad(n, w) { var s = String(n); while (s.length < w) s = '0' + s; return s; }
+
+  window.__makeData = function (n, recs, seed, blanks) {
+    var r = rng(seed || 42);
+    var br = rng((seed || 42) + 7);
+    function b(v) { return (blanks && br() < blanks) ? '' : v; }
+    var recAttr = [];
+    for (var k = 0; k < recs; k++) {
+      recAttr.push({
+        date: '2025-' + pad(1 + Math.floor(r() * 12), 2) + '-' + pad(1 + Math.floor(r() * 21), 2),
+        ttype: 'TYPE_' + Math.floor(r() * 6),
+        form: 'FORM_' + Math.floor(r() * 16),
+        lead: 'LEAD_' + Math.floor(r() * 15),
+        collab: r() < 0.5 ? 'Single' : 'Interdisciplinary'
+      });
+    }
+    var rows = [];
+    for (var i = 0; i < n; i++) {
+      var rec = i < recs ? i : Math.floor(r() * recs);
+      var a = recAttr[rec];
+      var m = new Map();
+      m.set('RECORD_ID', 'R' + pad(rec, 6));
+      m.set('LOG_DATE', b(a.date));
+      m.set('AMOUNT_TOTAL', (Math.floor(r() * 5000000) / 100).toFixed(2));
+      m.set('AWARD_ID', 'A' + pad(rec, 6));
+      m.set('TRANSACTION_TYPE', b(a.ttype));
+      m.set('DEPARTMENT', b('DEPT_' + Math.floor(r() * 169)));
+      m.set('PI_NAME', b(blanks ? ('PI "' + Math.floor(r() * 1240) + '" & <co>') : ('PI_' + Math.floor(r() * 1240))));
+      m.set('FORM_OF_AWARD', a.form);
+      m.set('CONTRIB_COLLEGE', b('COL_' + Math.floor(r() * 17)));
+      m.set('LEAD_COLLEGE', a.lead);
+      m.set('COLLAB_TYPE', a.collab);
+      rows.push(m);
+    }
+    return rows;
+  };
+
+  var FIELDS = ['RECORD_ID', 'LOG_DATE', 'AWARD_ID', 'TRANSACTION_TYPE', 'DEPARTMENT', 'PI_NAME', 'FORM_OF_AWARD', 'CONTRIB_COLLEGE', 'LEAD_COLLEGE', 'COLLAB_TYPE'];
+
+  // cfg: { n, recs, fields | order, layout, expanded, rules: 'none'|'report', blanks, rankN, rankScope }
+  window.__runPivot = function (cfg) {
+    var P = window.__PP;
+    var n = cfg.n || 3242, recs = cfg.recs || Math.round(n * 1793 / 3242);
+    var data = window.__makeData(n, recs, cfg.seed || 42, cfg.blanks || 0);
+    var rows = cfg.order ? cfg.order.map(function (i) { return FIELDS[i]; }) : FIELDS.slice(0, cfg.fields);
+    var settings = {
+      v: 2, rows: rows, cols: [], vals: 'AMOUNT_TOTAL', agg: ['count'], aggLabels: null,
+      aggColOverrides: ['AMOUNT_TOTAL'], aggFilters: null, aggFormulas: null,
+      rowLayout: cfg.layout, colLayout: 'nested', sortOrder: 'asc', colSortOrder: 'asc',
+      stickyColCount: 3, totalColAggs: null, totalRowAggs: null, totalRowAggLabels: null,
+      totalRowAggBaseIdx: null, rankN: cfg.rankN || null, rankDir: cfg.rankN ? 'top' : null,
+      rankAgg: cfg.rankN ? 'count' : null, rankOther: true,
+      rankScope: cfg.rankScope || null, noBreakdown: false, startExpanded: !!cfg.expanded, hideEmpty: false
+    };
+    P.setSettings(settings);
+    P.setRules(cfg.rules === 'report' ? P.reportRules() : []);
+    var t0 = performance.now();
+    var pd = P.collect(data, rows, [], 'AMOUNT_TOTAL', ['count'], P.extraVals(settings.aggColOverrides, 'AMOUNT_TOTAL'), null);
+    var t1 = performance.now();
+    var res = P.gen(pd, rows, [], 'AMOUNT_TOTAL', cfg.layout, 'nested', ['count'], 'asc', null, [false], null, null, 'asc', 3, P.rankCfg(settings), null, settings.aggColOverrides, null, false);
+    var t2 = performance.now();
+    var out = {
+      n: n, fields: rows.length, layout: cfg.layout, rules: cfg.rules || 'none',
+      collectMs: Math.round(t1 - t0), genMs: Math.round(t2 - t1),
+      htmlKB: Math.round(res.html.length / 1024), rowCount: res.rowCount,
+      trs: (res.html.match(/<tr[ >]/g) || []).length,
+      items: (res.html.match(/\(\d+ items\)/g) || []).length,
+      itemsGt1: (res.html.match(/\((?:[2-9]|\d\d+) items\)/g) || []).length,
+      other: (res.html.match(/\(Other\)/g) || []).length
+    };
+    if (cfg.hash) {
+      var h = 0x811c9dc5;
+      for (var i = 0; i < res.html.length; i++) { h ^= res.html.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+      out.hash = h.toString(16);
+    }
+    if (cfg.keep) { out._html = res.html; out._rowKeys = Object.keys(pd.data); out._numRowFields = rows.length; }
+    return out;
+  };
+
+  // Independent expectation for every summary row's "(N items)" label: a group
+  // at level L shows its number of DISTINCT child groups at L+1, and the last
+  // group level (numRowFields-2) shows its number of leaf rows. Built from the
+  // collector's row keys with plain string prefixes - shares no code with the
+  // renderer's groupChildren / child-count bookkeeping.
+  function expectedItemCounts(rowKeys, numRowFields) {
+    var byGroup = Object.create(null);
+    rowKeys.forEach(function (rk) {
+      var parts = rk.split('|||');
+      for (var lvl = 0; lvl < numRowFields - 1; lvl++) {
+        var gk = parts.slice(0, lvl + 1).join('|||');
+        var child = parts.slice(0, lvl + 2).join('|||');
+        if (!byGroup[gk]) byGroup[gk] = { level: lvl, kids: Object.create(null), leaves: 0 };
+        byGroup[gk].kids[child] = true;
+        byGroup[gk].leaves++;
+      }
+    });
+    var exp = Object.create(null);
+    Object.keys(byGroup).forEach(function (gk) {
+      var g = byGroup[gk];
+      exp[gk] = (g.level === numRowFields - 2) ? g.leaves : Object.keys(g.kids).length;
+    });
+    return exp;
+  }
+
+  function summaryLabels(html) {
+    var re = /<tr class="pivot-group-summary-row pivot-group-summary-level-(\d+)" data-pivot-group-summary="([^"]*)"[\s\S]*?\((\d+) items\)/g;
+    var out = [], m;
+    while ((m = re.exec(html))) out.push({ level: +m[1], key: m[2].replace(/&quot;/g, '"'), n: +m[3] });
+    return out;
+  }
+
+  function report(txt) { var o = document.getElementById('out'); if (o) o.textContent = txt; }
+
+  function runSuite() {
+    var results = [];
+    function assert(name, cond, detail) { results.push({ name: name, pass: !!cond, detail: detail === undefined ? '' : String(detail) }); }
+
+    // 1. Label correctness: collapsed, blanks + quotes/&/< in keys + a
+    //    different field order, and start-expanded.
+    [
+      { name: '10 row fields, collapsed', cfg: { n: 800, fields: 10, layout: 'nested' } },
+      { name: '5 fields reordered, blanks + quote/&/< keys, report format rule', cfg: { n: 1200, order: [7, 8, 4, 5, 0], layout: 'nested', blanks: 0.1, rules: 'report' } },
+      { name: '5 row fields, start expanded', cfg: { n: 1500, fields: 5, layout: 'nested', expanded: true } }
+    ].forEach(function (t) {
+      var r = window.__runPivot(Object.assign({ keep: true }, t.cfg));
+      var exp = expectedItemCounts(r._rowKeys, r._numRowFields);
+      var labels = summaryLabels(r._html);
+      var bad = labels.filter(function (l) { return exp[l.key] !== l.n; });
+      var gt1 = labels.filter(function (l) { return l.n > 1; }).length;
+      var groups = Object.keys(exp).length;
+      assert('labels: ' + t.name + ' - one summary row per group', labels.length === groups, labels.length + ' rows vs ' + groups + ' groups');
+      assert('labels: ' + t.name + ' - every "(N items)" matches the independent count', labels.length > 0 && bad.length === 0,
+        bad.length + ' wrong of ' + labels.length + (bad.length ? '; first: ' + JSON.stringify({ key: bad[0].key, shown: bad[0].n, expected: exp[bad[0].key] }) : ''));
+      assert('labels: ' + t.name + ' - non-vacuous (some counts > 1)', gt1 > 0, gt1 + ' labels > 1');
+    });
+
+    // 2. Timing. Pre-fix, getChildGroupCount rescanned every group key per
+    //    summary row: this config took ~22 s there and ~0.2 s after. The ratio
+    //    against the same data in nested-static (no summary rows) keeps the
+    //    check meaningful on a slower box.
+    var big = { n: 1600, fields: 8 };
+    var tn = window.__runPivot(Object.assign({ layout: 'nested' }, big));
+    var ts = window.__runPivot(Object.assign({ layout: 'nested-static' }, big));
+    assert('timing: 8 fields x 1,600 rows collapsible nested builds in < 5,000 ms', tn.genMs < 5000, tn.genMs + ' ms (' + tn.trs + ' rows)');
+    assert('timing: nested / nested-static build ratio < 25', tn.genMs / Math.max(ts.genMs, 20) < 25,
+      tn.genMs + ' ms / ' + ts.genMs + ' ms = ' + (tn.genMs / Math.max(ts.genMs, 20)).toFixed(1));
+
+    // 3. The hidden flat table is not restyled while a pivot is on screen
+    //    (2026-09-16). applyConditionalFormatting() only ever reaches the flat
+    //    or grouped table; pivot generate/sort/search called it anyway and
+    //    restyled 3,242 x 28 HIDDEN cells (~3.3 s on ?id=int-col-mat). The
+    //    flat table must still format while it is showing, and again on return.
+    var P = window.__PP;
+    var $tb = $('#resultsTable tbody').empty();
+    $('#resultsTable thead th').each(function (i) { $(this).attr('data-column', i === 0 ? '#' : String(i - 1)); });
+    var body = '';
+    for (var ri = 0; ri < 40; ri++) {
+      body += '<tr><td>' + (ri + 1) + '</td><td>COL' + (ri % 3) + '</td><td>FY2' + (ri % 4) + '</td><td>' + (1000 + ri) +
+        '</td><td>' + (ri % 2 ? 'Active' : 'Closed') + '</td><td>R' + ri + '</td></tr>';
+    }
+    $tb.html(body);
+    var cond = "STATUS = 'Active'";
+    P.setRules([{ type: 'cell', targetColumn: 'AMOUNT', condition: cond, style: 'background-color: rgb(255, 0, 0)',
+      parsedCondition: P.parseQuery(cond, ['#', 'COLLEGE', 'FY', 'AMOUNT', 'STATUS', 'RECORD_ID']) }]);
+    function styledRows() { return $('#resultsTable tbody tr').filter(function () { return this.cells[3].style.backgroundColor !== ''; }).length; }
+    function clearStyles() { $('#resultsTable tbody td').css('background-color', ''); }
+    $('#groupedResultsContainer').hide();
+    $('#pivot-output-container').hide().empty();
+    clearStyles(); P.cf();
+    var flat1 = styledRows();
+    assert('hidden pass: flat table showing - format(cell) still applied', flat1 === 20, flat1 + ' of 40 rows styled (expected 20)');
+    clearStyles();
+    $('#pivot-output-container').html('<table id="pivotResultTable"><tbody><tr><td>pivot</td></tr></tbody></table>').show();
+    P.cf();
+    var hidden = styledRows();
+    assert('hidden pass: pivot on screen - hidden flat table NOT restyled', $('#pivot-output-container').is(':visible') && hidden === 0,
+      hidden + ' hidden rows restyled while the pivot was showing (expected 0)');
+    $('#pivot-output-container').hide().empty();
+    P.cf();
+    var flat2 = styledRows();
+    assert('hidden pass: back to the flat table - formatting catches up', flat2 === 20, flat2 + ' of 40 rows styled (expected 20)');
+    P.setRules([]);
+    return results;
+  }
+
+  var m = /[?&]perf=([^&]+)/.exec(location.search);
+  var s = /[?&]suite=1/.test(location.search);
+  if (m || s) {
+    var results = [];
+    try {
+      if (!window.__PP) throw new Error('hooks unavailable: ' + (window.__PP_ERR || 'n/a') + ' / ' + (window.__errors || []).slice(0, 3).join(' | '));
+      if (s) {
+        results = runSuite();
+      } else {
+        JSON.parse(decodeURIComponent(m[1])).forEach(function (cfg) { results.push(window.__runPivot(cfg)); });
+      }
+      report('RESULTS_JSON:' + JSON.stringify({ results: results, pageErrors: (window.__errors || []).slice(0, 6) }));
+    } catch (e) {
+      report('RESULTS_JSON:' + JSON.stringify({ fatal: String(e && e.stack || e), results: results, pageErrors: (window.__errors || []).slice(0, 6) }));
+    }
+  }
+})();

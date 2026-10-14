@@ -1,0 +1,102 @@
+# =============================================================================
+# Penumbra XLSX SUITE  -  the browser workbook writer, offline
+#
+# Lifts createXlsxWorkbook() + extractHeaderDataForExcel() (and the four small
+# helpers they call) out of the LIVE js/main.js by anchor, runs them against the
+# real ExcelJS 4.4.0 and the real theme registry (themes.js, regenerated from
+# themes_config.php each run), over DOM fixtures for every table type:
+#
+#   flat            table only / + header block / + header + Monochrome
+#   grouped         one sheet per group, name dedupe, header repeated per sheet,
+#                   chart media stored ONCE
+#   nested          single "Grouped Data" sheet with outline levels
+#   pivot           colspan/rowspan merges offset by the block, GT column
+#                   styling, frozen row-field columns
+#   one-column      the block must not reach past the table
+#
+# Assertions cover the 2026-09-04 redesign of the header block (full-width band,
+# by-line, timestamp+count, search filter, Report Parameters label|value rows,
+# Summary, Visualizations side by side, live link, computed row heights) AND the
+# defects it fixed: header-inflated column widths, per-sheet chart duplication,
+# the freeze that pinned most of the screen, <br> cells losing their lines,
+# inverted zebra, phantom columns on narrow tables.
+#
+#   powershell -File run.ps1
+#   powershell -File run.ps1 -MainJs <path>    (js\main.js.bak-20260904-xlsxhdr is
+#                                               the positive control: 80 pass / 35 FAIL)
+#
+# If the UNC execution policy refuses the script ("not digitally signed"), run
+# its body as a scriptblock from the workstation:
+#   $dir='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\xlsx'
+#   & ([scriptblock]::Create([IO.File]::ReadAllText("$dir\run.ps1").Replace('$here = $PSScriptRoot',"`$here = '$dir'")))
+# Do NOT pipe the invocation (a lingering headless child keeps stdout open).
+#
+# Writes the workbooks it built to files\ (flat_plain, flat_header, flat_header_mono,
+# grouped_header, nested_header, pivot_header .xlsx) so a human can open them.
+# Writes nothing to the webroot. Exit code 1 when any assertion fails.
+# =============================================================================
+param([string]$MainJs = '')
+$ErrorActionPreference = 'Stop'
+$here = $PSScriptRoot
+$app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+if (-not $MainJs) { $MainJs = "$app\js\main.js" }
+
+$browser = 'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe'
+if (-not (Test-Path $browser)) { $browser = 'C:\Program Files\Google\Chrome\Application\chrome.exe' }
+if (-not (Test-Path $browser)) { $browser = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe' }
+if (-not (Test-Path $browser)) { $browser = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }
+if (-not (Test-Path $browser)) { throw 'no Chrome or Edge found' }
+
+# Stage on LOCAL disk: file:// over UNC is flaky in headless Chrome, and the
+# run must never write into the suite dir on the share except its outputs.
+$work = Join-Path $env:TEMP ('pnb_xlsx_' + [guid]::NewGuid().ToString('n').Substring(0, 8))
+New-Item -ItemType Directory -Force -Path "$work\profile" | Out-Null
+Write-Host "[1/3] staging (main.js under test: $MainJs)"
+Copy-Item "$here\harness.html" $work -Force
+Copy-Item "$app\js\jquery-3.7.1.min.js" $work -Force
+Copy-Item "$app\js\exceljs-4.4.0.min.js" $work -Force
+# main.js is CRLF with two NUL bytes - copy bytes, never re-encode.
+[IO.File]::WriteAllBytes("$work\main_under_test.js", [IO.File]::ReadAllBytes($MainJs))
+# The theme registry exactly as index.php emits it.
+$themes = & $php -n -r "require '$app\themes_config.php'; penumbra_emit_themes_js();"
+[IO.File]::WriteAllText("$work\themes.js", ($themes -join "`n"), (New-Object System.Text.UTF8Encoding($false)))
+if ((Get-Item "$work\themes.js").Length -lt 5000) { throw 'themes.js looks empty - php failed?' }
+
+Write-Host "[2/3] running headless"
+$dom = "$work\dom.txt"
+$url = 'file:///' + ($work -replace '\\', '/') + '/harness.html?id=rj0qa05h'
+$edgeArgs = @('--headless=new', '--disable-gpu', '--no-sandbox', '--allow-file-access-from-files',
+              "--user-data-dir=$work\profile", '--virtual-time-budget=60000', '--dump-dom', $url)
+$pr = Start-Process -FilePath $browser -PassThru -NoNewWindow -RedirectStandardOutput $dom -ArgumentList $edgeArgs
+$pr.WaitForExit(180000) | Out-Null
+if (-not $pr.HasExited) { $pr.Kill(); Start-Sleep -Seconds 2 }
+
+Write-Host "[3/3] results"
+$html = [IO.File]::ReadAllText($dom)
+$m = [regex]::Match($html, '<pre id="out">(.*?)</pre>', 'Singleline')
+if (-not $m.Success) { Write-Host "NO <pre id=out> in the dump - harness never finished"; exit 1 }
+$text = [System.Net.WebUtility]::HtmlDecode($m.Groups[1].Value)
+$text -split "`n" | Where-Object { $_ -notmatch '^PASS ' } | ForEach-Object { Write-Host $_ }
+$passN = ([regex]::Matches($text, '(?m)^PASS ')).Count
+$failN = ([regex]::Matches($text, '(?m)^FAIL ')).Count
+$err   = ($text -match '(?m)^(ERROR|EXTRACT_ERROR|LOAD_ERROR)')
+
+# Sample workbooks
+$fm = [regex]::Match($html, '<div id="files">(.*?)</div>', 'Singleline')
+if ($fm.Success) {
+    New-Item -ItemType Directory -Force -Path "$here\files" | Out-Null
+    foreach ($line in ($fm.Groups[1].Value -split "`n")) {
+        $p = $line.Trim() -split ' '
+        if ($p.Length -eq 3 -and $p[0] -eq 'FILE') {
+            [IO.File]::WriteAllBytes("$here\files\$($p[1])", [Convert]::FromBase64String($p[2]))
+        }
+    }
+    Write-Host ("workbooks written to $here\files: " + ((Get-ChildItem "$here\files" -Filter *.xlsx | ForEach-Object { $_.Name }) -join ', '))
+}
+Copy-Item $dom "$here\dom.txt" -Force
+Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
+
+Write-Host "xlsx: pass=$passN fail=$failN error=$err"
+if ($failN -gt 0 -or $err) { exit 1 }
+exit 0

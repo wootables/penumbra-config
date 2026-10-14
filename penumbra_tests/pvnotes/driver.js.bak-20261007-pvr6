@@ -1,0 +1,649 @@
+// pvnotes suite - browser half (2026-10-06). Runs ONE scenario (?scn=) against
+// whichever main.js / penumbra_journal.js the page loaded and publishes
+//   window.__PVRESULT = { scn, asserts: [{id, ok, detail}], errors: [...] }
+// and window.__PVDONE = true. run.py collects and prints the asserts.
+//
+// GROUND TRUTH is the fixture (window.__rowsFixture), the key rule (window.__pk:
+// [row field, value] pairs sorted by field, as JSON) and the fake journal server
+// (window.__J). A pivot row is read from the page by its data-pivot-row (its raw
+// labels joined by |||) or, for a collapsed group, its summary row's key.
+(function () {
+  var JR = window.__PV || {};
+  var SCN = window.__SCN;
+  var pk = window.__pk;
+  var K = window.__K;
+  var DEPTS = window.__DEPTS, FYS = window.__FYS;
+  var R = { scn: SCN, asserts: [] };
+  function rec(id, ok, detail) { R.asserts.push({ id: id, ok: !!ok, detail: String(detail == null ? '' : detail) }); }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function hides() { return window.__PV_HIDES || 0; }
+  async function until(fn, ms) { var t = Date.now(); while (!fn() && Date.now() - t < ms) await sleep(20); return fn(); }
+  function clickEl(el) { el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); }
+  function fail(ids, why) { ids.forEach(function (id) { rec(id, false, why); }); }
+
+  // ---- reading the pivot -------------------------------------------------
+  function tbl() { return document.getElementById('pivotResultTable'); }
+  function drawn(el) { return !!el && el.getClientRects().length > 0; }
+  function arr(nl) { return Array.prototype.slice.call(nl || []); }
+  function btns() { return tbl() ? arr(tbl().querySelectorAll('.journal-pvnote-btn')) : []; }
+  function btnsFor(key) { return btns().filter(function (b) { return b.getAttribute('data-pvn-key') === key; }); }
+  function findBtn(key) { var d = btnsFor(key).filter(drawn); return d.length ? d[0] : null; }
+  function leafRows() { return tbl() ? arr(tbl().querySelectorAll(':scope > tbody > tr[data-pivot-row]')) : []; }
+  function partsOf(tr) { return tr.getAttribute('data-pivot-row').split('|||'); }
+  function cellOf(tr, lvl) { return tr.querySelector(':scope > td[data-row-field="' + lvl + '"]'); }
+  // Body rows that are not a collapsed group's summary row - readable on ANY build
+  // (data-pivot-row is new with the feature), for the P-* preconditions.
+  function bodyRows() { return tbl() ? arr(tbl().querySelectorAll(':scope > tbody > tr')).filter(function (tr) { return !tr.classList.contains('pivot-group-summary-row'); }) : []; }
+  function cards() { return arr(document.querySelectorAll('.journal-pvnote-card')); }
+  function after(b) { return getComputedStyle(b, '::after').content; }
+  function cnt(b) { return b ? b.getAttribute('data-count') : null; }
+  function drawnLeafCount(dept) { return leafRows().filter(function (tr) { return drawn(tr) && partsOf(tr)[0] === dept; }).length; }
+  function chevron(groupKey) {
+    var t = tbl() ? arr(tbl().querySelectorAll('.pivot-collapse-toggle-right')) : [];
+    for (var i = 0; i < t.length; i++) if (t[i].getAttribute('data-group-key') === groupKey && drawn(t[i])) return t[i];
+    return null;
+  }
+  function near(card, b) {
+    if (!card || !b) return false;
+    var br = b.getBoundingClientRect(), cr = card.getBoundingClientRect();
+    return Math.abs(cr.top - (br.bottom + 6)) <= 2 || Math.abs(cr.bottom - (br.top - 6)) <= 2;
+  }
+  function brief(b) { return b ? ('count "' + cnt(b) + '" open ' + b.classList.contains('is-open') + ' group ' + b.classList.contains('is-group')) : 'no icon'; }
+
+  // The leaf rows' icons in the leaf cell (nested layouts) or the first cell
+  // (side-by-side): exactly one, FIRST in the cell, keyed by the row's labels.
+  function checkLeafIcons(lvl, fields) {
+    var bad = [];
+    leafRows().forEach(function (tr) {
+      var parts = partsOf(tr), td = cellOf(tr, lvl);
+      var bs = td ? td.querySelectorAll('.journal-pvnote-btn') : [];
+      var want = pk(fields.map(function (f, i) { return [f, parts[i]]; }));
+      var tag = parts.join('/');
+      if (!td || bs.length !== 1) { bad.push(tag + ': ' + bs.length + ' icons'); return; }
+      if (td.firstChild !== bs[0]) bad.push(tag + ': icon not first in its cell');
+      if (bs[0].getAttribute('data-pvn-key') !== want) bad.push(tag + ': key ' + bs[0].getAttribute('data-pvn-key') + ' want ' + want);
+      if (bs[0].classList.contains('is-group')) bad.push(tag + ': marked as a group');
+    });
+    return bad;
+  }
+  // Each group: exactly one DRAWN icon, keyed by its label, first in the cell's
+  // sticky-text wrapper, in the level-0 cell, marked as a group.
+  function checkGroupIcons(field, values) {
+    var bad = [];
+    values.forEach(function (v) {
+      var k = pk([[field, v]]), shown = btnsFor(k).filter(drawn);
+      if (shown.length !== 1) { bad.push(v + ': drawn ' + shown.length); return; }
+      var b = shown[0], host = b.parentNode, td = b.closest('td');
+      if (!b.classList.contains('is-group')) bad.push(v + ': not is-group');
+      if (!host.classList.contains('pivot-row-sticky-text') || host.firstChild !== b) bad.push(v + ': not first in the sticky text');
+      if (!td || td.getAttribute('data-row-field') !== '0') bad.push(v + ': not in the level-0 cell');
+    });
+    return bad;
+  }
+
+  async function boot() {
+    await until(function () { return window.__queryDone >= 1 && hides() >= 1; }, 60000);
+    await until(function () { return !!tbl() && $('#pivot-output-container').is(':visible'); }, 15000);
+    await sleep(300);
+    await until(function () { return !window.__jPending; }, 15000);
+    await sleep(700);   // the coalesced paint (rAF / 120 ms) and the sticky re-measure
+    // The pivot on screen, as when a user clicks an icon (the page above it is long).
+    var w = document.getElementById('results-wrapper');
+    if (w) w.scrollIntoView({ block: 'start' });
+    await sleep(100);
+  }
+
+  var S = {};
+
+  // ---- nested (collapsible, expanded): icons, counts, text, the card ------
+  S.nested = async function () {
+    rec('P-nested-render', !!tbl() && bodyRows().length === 9 && bodyRows().every(drawn), 'pivot ' + !!tbl() + ', body rows ' + bodyRows().length);
+    var bl = checkLeafIcons(1, ['DEPT', 'FY']);
+    rec('V-nested-leaf', leafRows().length === 9 && !bl.length, bl.slice(0, 4).join(' | ') || 'all 9 leaf cells');
+    var bg = checkGroupIcons('DEPT', DEPTS);
+    rec('V-nested-group', !bg.length, bg.slice(0, 4).join(' | ') || 'all 3 group cells');
+    var bLeaf = findBtn(K.leaf), bGrp = findBtn(K.grp), bNone = findBtn(pk([['DEPT', 'Humanities'], ['FY', 'FY2024']]));
+    rec('V-nested-count', !!bLeaf && bLeaf.classList.contains('has-notes') && cnt(bLeaf) === '2' && after(bLeaf) === '"2"'
+        && !!bGrp && cnt(bGrp) === '1' && !!bNone && !bNone.classList.contains('has-notes') && cnt(bNone) === '' && after(bNone) === 'none',
+        'leaf ' + brief(bLeaf) + ' after ' + (bLeaf && after(bLeaf)) + ' | group ' + brief(bGrp) + ' | none ' + brief(bNone) + ' after ' + (bNone && after(bNone)));
+    // The icon adds no TEXT to its cell: the count is CSS content.
+    var badTxt = [];
+    btns().forEach(function (b) { if (b.textContent !== '') badTxt.push('icon text "' + b.textContent + '"'); });
+    leafRows().forEach(function (tr) { var p = partsOf(tr), td = cellOf(tr, 1); if (td && td.textContent.trim() !== p[1]) badTxt.push(p.join('/') + ' leaf text "' + td.textContent.trim() + '"'); });
+    rec('V-nested-notext', btns().length > 0 && !badTxt.length, badTxt.slice(0, 3).join(' | ') || (btns().length + ' icons, no text'));
+    rec('V-nested-faint', !!bNone && !!bLeaf && parseFloat(getComputedStyle(bNone).opacity) < 0.5 && getComputedStyle(bLeaf).opacity === '1',
+        'empty ' + (bNone && getComputedStyle(bNone).opacity) + ' noted ' + (bLeaf && getComputedStyle(bLeaf).opacity));
+    // The icons never shift the sticky columns: #pivotResultTable is table-layout:
+    // fixed (header cells set the widths), so the second sticky column's left
+    // still meets the first column's edge. A regression guard - it holds on the
+    // build before the feature too, and nothing in the feature re-measures.
+    var th1 = tbl() && tbl().querySelector('thead th.pivot-sticky-col'), td2 = tbl() && tbl().querySelector('tbody td.pivot-sticky-col-2');
+    var left = td2 ? parseFloat(td2.style.left) : NaN;
+    rec('V-nested-sticky', !!th1 && !!td2 && Math.abs(left - (th1.offsetWidth - 1)) <= 1,
+        'col-2 left ' + left + ', col-1 width ' + (th1 && th1.offsetWidth) + ', table-layout ' + (tbl() && getComputedStyle(tbl()).tableLayout));
+
+    var C = ['C-nested-open', 'C-nested-nofold', 'C-nested-place', 'C-nested-focus', 'C-nested-post', 'C-nested-again', 'C-nested-one',
+             'C-nested-band', 'C-nested-esc', 'C-nested-follow', 'C-nested-collapse', 'C-nested-away'];
+    if (!bLeaf || !bGrp) { fail(C, 'no icons to click'); return; }
+    var engBefore = drawnLeafCount('Engineering');
+    clickEl(bLeaf);
+    await until(function () { return cards().length === 1; }, 2000);
+    await sleep(150);
+    var c = cards()[0];
+    var ref = c ? (c.querySelector('.journal-rownote-ref') || {}).textContent : '';
+    var items = c ? c.querySelectorAll('.journal-rownote-item').length : -1;
+    rec('C-nested-open', cards().length === 1 && !!c && c.getAttribute('role') === 'dialog' && c.getAttribute('data-pvn-key') === K.leaf && drawn(c)
+        && items === 2 && ref === 'Engineering · FY2026' && bLeaf.classList.contains('is-open') && bLeaf.getAttribute('aria-expanded') === 'true',
+        'cards ' + cards().length + ' items ' + items + ' ref "' + ref + '" ' + brief(bLeaf));
+    rec('C-nested-nofold', engBefore === 3 && drawnLeafCount('Engineering') === 3, 'Engineering rows drawn ' + engBefore + ' -> ' + drawnLeafCount('Engineering'));
+    rec('C-nested-place', near(c, bLeaf), c ? ('card top ' + Math.round(c.getBoundingClientRect().top) + ' icon bottom ' + Math.round(bLeaf.getBoundingClientRect().bottom)) : 'no card');
+    rec('C-nested-focus', !!c && document.activeElement === c.querySelector('.journal-rownote-input'), 'active ' + (document.activeElement && document.activeElement.className));
+    if (!c) { fail(C.slice(4), 'no card'); return; }
+
+    // Post: scope 'pivot', the row's key, the labels as the snapshot; the count follows.
+    var inEl = c.querySelector('.journal-rownote-input');
+    inEl.focus();
+    inEl.textContent = 'Pivot check';
+    var nPosts = window.__J.posts.length;
+    clickEl(c.querySelector('.journal-rownote-post'));
+    await until(function () { return window.__J.posts.length > nPosts; }, 3000);
+    await until(function () { var b = findBtn(K.leaf); return !!b && cnt(b) === '3'; }, 3000);
+    var p = window.__J.posts[window.__J.posts.length - 1] || {};
+    var snap = p.row_snapshot || {};
+    var b3 = findBtn(K.leaf);
+    rec('C-nested-post', p.action === 'add' && p.scope === 'pivot' && p.row_key === K.leaf && p.note_text === 'Pivot check'
+        && snap.DEPT === 'Engineering' && snap.FY === 'FY2026' && cnt(b3) === '3' && c.querySelectorAll('.journal-rownote-item').length === 3
+        && !!b3 && b3.classList.contains('is-open'),
+        'post ' + JSON.stringify({ a: p.action, s: p.scope, k: p.row_key === K.leaf, t: p.note_text, snap: snap }) + ' | ' + brief(b3)
+        + ' items ' + c.querySelectorAll('.journal-rownote-item').length);
+
+    // The icon again closes it.
+    clickEl(findBtn(K.leaf));
+    await sleep(150);
+    rec('C-nested-again', cards().length === 0 && findBtn(K.leaf).getAttribute('aria-expanded') === 'false', 'cards ' + cards().length + ' ' + brief(findBtn(K.leaf)));
+
+    // One card at a time.
+    clickEl(findBtn(K.leaf)); await sleep(120);
+    clickEl(findBtn(K.grp)); await sleep(150);
+    rec('C-nested-one', cards().length === 1 && cards()[0].getAttribute('data-pvn-key') === K.grp
+        && !findBtn(K.leaf).classList.contains('is-open') && findBtn(K.grp).classList.contains('is-open'),
+        'cards ' + cards().length + ' key ' + (cards()[0] && cards()[0].getAttribute('data-pvn-key')));
+
+    // Its head band closes it and hands focus back to the icon.
+    var band = cards()[0] && cards()[0].querySelector('.journal-rownote-close');
+    if (band) clickEl(band);
+    await sleep(150);
+    rec('C-nested-band', cards().length === 0 && document.activeElement === findBtn(K.grp), 'cards ' + cards().length + ' focus on icon ' + (document.activeElement === findBtn(K.grp)));
+
+    // Escape is the editors' console key: it never closes a note (user, 2026-10-02).
+    clickEl(findBtn(K.leaf));
+    await until(function () { return cards().length === 1; }, 2000);
+    await sleep(150);
+    window.__wantKeys = ['Escape'];
+    await until(function () { return window.__keysSent; }, 5000);
+    await sleep(300);
+    rec('C-nested-esc', !!window.__keysSent && cards().length === 1, 'keys sent ' + !!window.__keysSent + ', cards ' + cards().length);
+
+    // It follows its icon when the page scrolls (main.js sizes #results-wrapper
+    // to its content here, so the page is what scrolls the pivot).
+    var c0 = cards()[0], i0 = findBtn(K.leaf);
+    var ct0 = c0 ? c0.getBoundingClientRect().top : NaN, it0 = i0 ? i0.getBoundingClientRect().top : NaN;
+    window.scrollBy(0, 40);
+    await sleep(300);
+    var c1 = cards()[0], i1 = findBtn(K.leaf);
+    var dc = (c1 ? c1.getBoundingClientRect().top : NaN) - ct0, di = (i1 ? i1.getBoundingClientRect().top : NaN) - it0;
+    rec('C-nested-follow', di <= -30 && Math.abs(dc - di) <= 2, 'icon moved ' + Math.round(di) + ', card moved ' + Math.round(dc));
+    window.scrollBy(0, -40);
+    await sleep(200);
+
+    // A group's card stays with the group when it collapses: the group's icon is
+    // on its summary row then.
+    clickEl(findBtn(K.grp));
+    await until(function () { return cards().length === 1 && cards()[0].getAttribute('data-pvn-key') === K.grp; }, 2000);
+    var chev = chevron('Sciences');
+    if (chev) clickEl(chev);
+    await sleep(700);
+    var gNow = findBtn(K.grp), gTr = gNow && gNow.closest('tr');
+    rec('C-nested-collapse', !!chev && drawnLeafCount('Sciences') === 0 && cards().length === 1 && !!gNow && !!gTr
+        && gTr.classList.contains('pivot-group-summary-row') && gNow.classList.contains('is-open') && near(cards()[0], gNow),
+        'chevron ' + !!chev + ' Sciences rows ' + drawnLeafCount('Sciences') + ' cards ' + cards().length + ' icon on summary row '
+        + !!(gTr && gTr.classList.contains('pivot-group-summary-row')) + ' ' + brief(gNow) + ' near ' + near(cards()[0], gNow));
+
+    // Put the pivot away: the card goes with it.
+    $('#pivot-output-container').hide();
+    await sleep(700);
+    rec('C-nested-away', cards().length === 0, 'cards ' + cards().length);
+    $('#pivot-output-container').show();
+  };
+
+  // ---- the other layouts and row-field shapes ------------------------------
+  S.static = async function () {
+    var bl = checkLeafIcons(1, ['DEPT', 'FY']), bg = checkGroupIcons('DEPT', DEPTS);
+    var sums = tbl() ? tbl().querySelectorAll('tr.pivot-group-summary-row').length : -1;
+    rec('V-static', !!tbl() && leafRows().length === 9 && !bl.length && !bg.length && sums === 0 && btns().length === 12,
+        'leaf: ' + (bl.slice(0, 2).join(' | ') || 'ok') + ' group: ' + (bg.slice(0, 2).join(' | ') || 'ok') + ' summary rows ' + sums + ' icons ' + btns().length);
+  };
+  S.flat = async function () {
+    var bl = checkLeafIcons(0, ['DEPT', 'FY']);
+    var second = leafRows().filter(function (tr) { var td = cellOf(tr, 1); return td && td.querySelector('.journal-pvnote-btn'); }).length;
+    var groups = btns().filter(function (b) { return b.classList.contains('is-group'); }).length;
+    rec('V-flat', !!tbl() && leafRows().length === 9 && !bl.length && second === 0 && groups === 0 && btns().length === 9 && cnt(findBtn(K.leaf)) === '2',
+        (bl.slice(0, 3).join(' | ') || 'first cells ok') + ' | icons in 2nd cells ' + second + ', group icons ' + groups + ', total ' + btns().length + ', leaf ' + brief(findBtn(K.leaf)));
+  };
+  // A DEPT-only pivot's row shares the thread of the DEPT group in a DEPT x FY pivot.
+  S.single = async function () {
+    var bl = checkLeafIcons(0, ['DEPT']);
+    rec('V-single', !!tbl() && leafRows().length === 3 && !bl.length && cnt(findBtn(K.grp)) === '1',
+        (bl.slice(0, 3).join(' | ') || 'rows ok') + ' | Sciences ' + brief(findBtn(K.grp)));
+  };
+  // The order of the row fields does not matter: FY x DEPT finds the DEPT x FY notes.
+  S.reorder = async function () {
+    var bl = checkLeafIcons(1, ['FY', 'DEPT']), bg = checkGroupIcons('FY', FYS);
+    var tr = findBtn(K.leaf) && findBtn(K.leaf).closest('tr');
+    rec('V-reorder', !!tbl() && !bl.length && !bg.length && cnt(findBtn(K.leaf)) === '2' && !!tr && tr.getAttribute('data-pivot-row') === 'FY2026|||Engineering',
+        (bl.concat(bg).slice(0, 3).join(' | ') || 'icons ok') + ' | leaf ' + brief(findBtn(K.leaf)) + ' on row ' + (tr && tr.getAttribute('data-pivot-row')));
+  };
+  // A Top-N "(Other)" row takes no note.
+  S.rank = async function () {
+    var isOther = function (tr) { var td = tr.querySelector(':scope > td'); return !!td && td.textContent.trim().indexOf('(Other)') === 0; };
+    var other = bodyRows().filter(isOther)[0] || null;
+    var named = bodyRows().filter(function (tr) { return !isOther(tr); });
+    var bad = named.filter(function (tr) { var td = cellOf(tr, 0); return !td || td.querySelectorAll('.journal-pvnote-btn').length !== 1; }).length;
+    rec('P-rank-other', !!other && named.length === 3, 'other row ' + !!other + ', named rows ' + named.length);
+    rec('V-rank', !!other && !other.querySelector('.journal-pvnote-btn') && named.length === 3 && bad === 0,
+        'other has icon ' + !!(other && other.querySelector('.journal-pvnote-btn')) + ', named without exactly one ' + bad);
+  };
+
+  // ---- collapsed groups, rows built on demand -----------------------------
+  S.collapsed = async function () {
+    var lazy = !!(tbl() && tbl().hasAttribute('data-pnb-lazy'));
+    rec('P-collapsed-lazy', lazy && drawnLeafCount('Engineering') === 0, 'lazy ' + lazy + ', leaf rows built ' + leafRows().length);
+    var bad = DEPTS.filter(function (d) {
+      var b = findBtn(pk([['DEPT', d]])), tr = b && b.closest('tr');
+      return !b || !tr.classList.contains('pivot-group-summary-row') || !b.classList.contains('is-group');
+    });
+    rec('V-collapsed-sum', !bad.length && cnt(findBtn(K.grp)) === '1', 'groups without a drawn summary-row icon: ' + (bad.join(', ') || 'none') + ' | Sciences ' + brief(findBtn(K.grp)));
+    var chev = chevron('Engineering');
+    if (chev) clickEl(chev);
+    await until(function () { return drawnLeafCount('Engineering') === 3; }, 3000);
+    await sleep(500);   // the observer's paint (rAF / 120 ms)
+    var eng = leafRows().filter(function (tr) { return drawn(tr) && partsOf(tr)[0] === 'Engineering'; });
+    var badLeaf = eng.filter(function (tr) {
+      var td = cellOf(tr, 1), b = td && td.querySelector('.journal-pvnote-btn');
+      return !b || b.getAttribute('data-pvn-key') !== pk([['DEPT', 'Engineering'], ['FY', partsOf(tr)[1]]]);
+    }).length;
+    rec('V-collapsed-built', !!chev && eng.length === 3 && badLeaf === 0 && cnt(findBtn(K.leaf)) === '2',
+        'chevron ' + !!chev + ', Engineering rows drawn ' + eng.length + ', without the right icon ' + badLeaf + ', leaf ' + brief(findBtn(K.leaf)));
+  };
+
+  // ---- the jump from the journal panel ------------------------------------
+  S.reveal = async function () {
+    rec('P-reveal-closed', drawnLeafCount('Engineering') === 0, 'Engineering rows drawn ' + drawnLeafCount('Engineering'));
+    var ok = window.Penumbra && window.Penumbra.revealPivotNote ? window.Penumbra.revealPivotNote(K.leaf) : 'none';
+    await sleep(400);
+    var b = findBtn(K.leaf), td = b && b.closest('td');
+    rec('R-reveal', ok === true && drawnLeafCount('Engineering') === 3 && cards().length === 1 && cards()[0].getAttribute('data-pvn-key') === K.leaf
+        && !!td && td.classList.contains('journal-pvnote-flash'),
+        'returned ' + ok + ', Engineering rows ' + drawnLeafCount('Engineering') + ', cards ' + cards().length + ', flash ' + !!(td && td.classList.contains('journal-pvnote-flash')));
+    var ok2 = window.Penumbra && window.Penumbra.revealPivotNote ? window.Penumbra.revealPivotNote(pk([['PI', 'Ada']])) : 'none';
+    await sleep(200);
+    var txt = document.body.textContent;
+    rec('R-reveal-other', ok2 === false && /Set this pivot/.test(txt) && /rows are PI/.test(txt), 'returned ' + ok2 + ', toast ' + /Set this pivot/.test(txt));
+  };
+
+  // ---- the switch: on without a key, saved without one --------------------
+  S.off = async function () {
+    rec('V-off-none', !!tbl() && btns().length === 0, 'icons ' + btns().length);
+    if (window.Penumbra && window.Penumbra.syncJournalRowConfigUI) window.Penumbra.syncJournalRowConfigUI();
+    await sleep(150);
+    var rn = document.getElementById('journalRowNotesEnable');
+    var lock = $('#journalRowCfgLock').text();
+    var notesBlk = document.querySelector('#journalRowCfgStep2 .journal-rowcfg-notes');
+    rec('K-off-panel', !!rn && !rn.disabled && /Toggle columns/.test(lock) && /step 1/i.test(lock) && $('#journalAddToggleBtn').prop('disabled')
+        && !!notesBlk && getComputedStyle(notesBlk).opacity === '1',
+        'switch disabled ' + (rn && rn.disabled) + ', lock "' + lock + '", notes block opacity ' + (notesBlk && getComputedStyle(notesBlk).opacity));
+    if (!rn) { fail(['K-off-on', 'K-off-counts', 'K-off-status', 'K-off-noflat', 'K-off-saved', 'K-off-off'], 'no switch'); return; }
+    rn.click();   // a real click: a disabled box ignores it
+    await until(function () { return btns().length > 0; }, 3000);
+    await sleep(500);
+    rec('K-off-on', rn.checked && btns().filter(drawn).length === 12, 'checked ' + rn.checked + ', icons drawn ' + btns().filter(drawn).length);
+    rec('K-off-counts', cnt(findBtn(K.leaf)) === '2' && cnt(findBtn(K.grp)) === '1', 'leaf ' + brief(findBtn(K.leaf)) + ' | group ' + brief(findBtn(K.grp)));
+    var st = ($('#journalToggleStatus').text() || '').replace(/\s+/g, ' ');
+    rec('K-off-status', /pivot/i.test(st) && /step 1/i.test(st), 'status "' + st + '"');
+    rec('K-off-noflat', !document.querySelector('#tableHeader th[data-column="__JOURNAL_NOTES"]'), 'flat Notes header ' + !!document.querySelector('#tableHeader th[data-column="__JOURNAL_NOTES"]'));
+    var vo = {};
+    try { vo = (JR.buildStateObject() || {}).viewOptions || {}; } catch (e) { vo = { err: String(e) }; }
+    rec('K-off-saved', vo.journalRowNotes === true && !vo.journalKeyColumns, 'viewOptions ' + JSON.stringify(vo));
+    rn.click();
+    await until(function () { return btns().length === 0; }, 3000);
+    var vo2 = {};
+    try { vo2 = (JR.buildStateObject() || {}).viewOptions || {}; } catch (e) { vo2 = { err: String(e) }; }
+    rec('K-off-off', !rn.checked && btns().length === 0 && vo2.journalRowNotes === undefined, 'checked ' + rn.checked + ', icons ' + btns().length + ', saved ' + JSON.stringify(vo2));
+  };
+
+  // ---- copies and exports carry no icon -----------------------------------
+  S.exports = async function () {
+    // 9 leaf + 3 group icons drawn (the 3 hidden summary rows carry the groups' too).
+    rec('V-exports-icons', btns().filter(drawn).length === 12, 'icons drawn ' + btns().filter(drawn).length + ' of ' + btns().length);
+    var html = '', a = null, csv = '';
+    try { html = String(JR.generateWysiwygHtml($('#pivotResultTable'), false, {})); } catch (e) { html = 'THREW ' + e; }
+    try { a = JR.getPivotDataAsArray(); } catch (e) { a = null; }
+    try { csv = String((JR.getPivotCsvForCopy('\t') || {}).content); } catch (e) { csv = 'THREW ' + e; }
+    rec('X-exports-html', html.indexOf('THREW') !== 0 && html.indexOf('Engineering') !== -1 && html.indexOf('journal-pvnote') === -1 && html.indexOf('data-pvn-key') === -1,
+        'length ' + html.length + ', has Engineering ' + (html.indexOf('Engineering') !== -1) + ', has icon ' + (html.indexOf('journal-pvnote') !== -1));
+    var flat = a ? [].concat.apply([], a.map(function (r) { return r.map(String); })) : [];
+    rec('X-exports-array', !!a && flat.indexOf('Engineering') !== -1 && flat.indexOf('FY2026') !== -1 && !flat.some(function (s) { return /journal|svg/.test(s); }),
+        a ? ('cells ' + flat.length + ', sample ' + JSON.stringify(a.slice(0, 3))) : 'no array');
+    rec('X-exports-csv', csv.indexOf('THREW') !== 0 && /(^|\t)Engineering(\t|$)/m.test(csv) && /(^|\t)FY2026(\t|$)/m.test(csv),
+        'csv head ' + JSON.stringify(csv.slice(0, 160)));
+  };
+
+  // ---- Wolfpack Red: a REAL hover on the card's band (round 2, 2026-10-07) ----
+  // The theme's blanket button hover (0,3,1) used to win over the band's own
+  // (0,3,0): solid #b30000 under the band's dark / muted text (user report).
+  // run.py moves the mouse over the band (window.__wantHover); the band's text
+  // must read at 4.5:1 or better, its close glyph at 3:1.
+  function rgbOf(s) {
+    var m = /^rgba?\(([^)]+)\)/.exec(s);
+    if (m) { var p = m[1].split(',').map(parseFloat); return [p[0], p[1], p[2]]; }
+    m = /^color\(srgb ([0-9.]+) ([0-9.]+) ([0-9.]+)/.exec(s);
+    if (m) return [parseFloat(m[1]) * 255, parseFloat(m[2]) * 255, parseFloat(m[3]) * 255];
+    return null;
+  }
+  function lum(c) {
+    return c.map(function (v) { v = v / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); })
+      .reduce(function (a, v, i) { return a + v * [0.2126, 0.7152, 0.0722][i]; }, 0);
+  }
+  function contrast(a, b) { if (!a || !b) return 0; var x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+  S.wolfpack = async function () {
+    var b = findBtn(K.leaf);
+    if (!b) { fail(['P-wolf-hover', 'T-wolf-band'], 'no icon'); return; }
+    clickEl(b);
+    await until(function () { return cards().length === 1; }, 2000);
+    await sleep(150);
+    var band = cards()[0] && cards()[0].querySelector('.journal-rownote-head');
+    if (!band) { fail(['P-wolf-hover', 'T-wolf-band'], 'no card'); return; }
+    var r = band.getBoundingClientRect();
+    window.__wantHover = { x: Math.round(r.left + r.width * 0.75), y: Math.round(r.top + r.height / 2) };
+    await until(function () { return window.__hoverSent; }, 5000);
+    await sleep(250);
+    var hovered = band.matches(':hover');
+    rec('P-wolf-hover', hovered && document.body.classList.contains('theme-wolfpack'), 'band hovered ' + hovered + ', body ' + document.body.className);
+    var bgS = getComputedStyle(band).backgroundColor, bg = rgbOf(bgS), worst = 99, det = [];
+    ['.journal-rownote-title', '.journal-rownote-ref', '.journal-rownote-hint'].forEach(function (sel) {
+      var cr = contrast(rgbOf(getComputedStyle(band.querySelector(sel)).color), bg);
+      det.push(sel.replace('.journal-rownote-', '') + ' ' + cr.toFixed(2)); worst = Math.min(worst, cr);
+    });
+    var crc = contrast(rgbOf(getComputedStyle(band.querySelector('.journal-rownote-chev')).stroke), bg);
+    rec('T-wolf-band', !!bg && worst >= 4.5 && crc >= 3, 'band ' + bgS + ' | ' + det.join(', ') + ', close glyph ' + crc.toFixed(2));
+  };
+
+  // ---- round 3 (2026-10-07): a re-render keeps or closes the card ------------
+  // run.py's hook setPivot(s) draws a pivot the way a report load does (the table
+  // is REPLACED; the observer then repaints). The card's 400 ms tick is captured
+  // (setInterval wrapped) and run IN the gap before that repaint: a card whose row
+  // still exists must survive it; a pivot without the row closes the card.
+  S.rerender = async function () {
+    var ids = ['T-rr-race', 'T-rr-keep', 'T-rr-gone', 'T-rr-group'];
+    var ticks = [], realSI = window.setInterval;
+    window.setInterval = function (fn, ms) { var id = realSI.apply(window, arguments); if (ms === 400) ticks.push(fn); return id; };
+    try {
+      var st = window.__STORED.pivot, b = findBtn(K.leaf);
+      if (!b || !JR.setPivot) { fail(ids, 'no icon or no setPivot hook'); return; }
+      clickEl(b);
+      await until(function () { return cards().length === 1; }, 2000);
+      var tick = ticks[ticks.length - 1];
+      JR.setPivot(JSON.parse(JSON.stringify(st)));
+      await Promise.resolve();               // the observer's microtask (a timer never runs before it)
+      var gapIcons = btns().length;          // 0: the new table is not stamped yet
+      if (tick) tick();
+      var openInGap = cards().length === 1;
+      await sleep(500);
+      var nb = findBtn(K.leaf);
+      rec('T-rr-race', !!tick && gapIcons === 0 && openInGap, 'tick captured ' + !!tick + ', icons in the gap ' + gapIcons + ', card open after the tick ' + openInGap);
+      rec('T-rr-keep', cards().length === 1 && !!nb && nb.classList.contains('is-open') && near(cards()[0], nb), 'cards ' + cards().length + ', ' + brief(nb) + ', near ' + near(cards()[0], nb));
+      var dept = JSON.parse(JSON.stringify(st)); dept.rows = ['DEPT'];
+      JR.setPivot(dept);
+      await sleep(700);
+      rec('T-rr-gone', cards().length === 0, 'cards ' + cards().length + ' after a pivot without the row');
+      // A group's thread is a DEPT-only pivot's row: its card survives the switch back.
+      for (var cc = cards(), i = 0; i < cc.length; i++) { var bb = cc[i].querySelector('.journal-rownote-close'); if (bb) clickEl(bb); }
+      await sleep(150);
+      var gb = findBtn(K.grp);
+      if (gb) clickEl(gb);
+      await until(function () { return cards().length === 1; }, 2000);
+      JR.setPivot(JSON.parse(JSON.stringify(st)));
+      await sleep(700);
+      var gNow = findBtn(K.grp);
+      rec('T-rr-group', !!gb && cards().length === 1 && !!gNow && gNow.classList.contains('is-group') && gNow.classList.contains('is-open') && near(cards()[0], gNow),
+          'row icon ' + !!gb + ', cards ' + cards().length + ', ' + brief(gNow) + ', near ' + near(cards()[0], gNow));
+    } finally {
+      window.setInterval = realSI;
+    }
+  };
+
+  // ---- round 3: the icon's tooltip never covers its open card ----------------
+  // jQuery UI's page-wide tooltip (z 200001) drew "Add a note about this row" over
+  // the card's header. REAL pointer moves (run.py) show it, then: open the card -
+  // tip gone, no title; away and back while open - still none (jQuery UI puts a
+  // parked title back on close); card closed - the title is back.
+  async function moveTo(x, y) {
+    window.__hoverSent = false;
+    window.__wantHover = { x: Math.round(x), y: Math.round(y) };
+    await until(function () { return window.__hoverSent; }, 5000);
+  }
+  S.tooltip = async function () {
+    var b = findBtn(K.leaf);
+    if (!b) { fail(['P-tip-shown', 'T-tip-gone', 'T-tip-again', 'T-tip-back'], 'no icon'); return; }
+    var r = b.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    await moveTo(cx, cy);
+    await sleep(1000);   // shown after 600 ms
+    var tip = $('.ui-tooltip:visible');
+    rec('P-tip-shown', tip.length === 1 && /note/i.test(tip.text()), 'tips ' + tip.length + ' "' + tip.text() + '"');
+    clickEl(b);
+    await until(function () { return cards().length === 1; }, 2000);
+    await sleep(1000);
+    var ob = findBtn(K.leaf), tips = $('.ui-tooltip:visible').length;
+    rec('T-tip-gone', cards().length === 1 && tips === 0 && !!ob && !ob.hasAttribute('title') && /note/i.test(ob.getAttribute('aria-label') || ''),
+        'cards ' + cards().length + ', tips shown ' + tips + ', icon title ' + JSON.stringify(ob && ob.getAttribute('title')));
+    await moveTo(5, 5);
+    await sleep(400);
+    ob = findBtn(K.leaf); r = ob.getBoundingClientRect();
+    await moveTo(r.left + r.width / 2, r.top + r.height / 2);
+    await sleep(1000);
+    ob = findBtn(K.leaf); tips = $('.ui-tooltip:visible').length;
+    rec('T-tip-again', cards().length === 1 && tips === 0 && !!ob && !ob.hasAttribute('title'),
+        'cards ' + cards().length + ', tips shown ' + tips + ', icon title ' + JSON.stringify(ob && ob.getAttribute('title')));
+    await moveTo(5, 5);
+    await sleep(400);
+    var band = cards()[0] && cards()[0].querySelector('.journal-rownote-close');
+    if (band) clickEl(band);
+    await sleep(300);
+    // The band hands focus back to the icon, and jQuery UI opens a FOCUS tooltip there:
+    // while it shows, jQuery UI parks the title in data('ui-tooltip-title').
+    var cb = findBtn(K.leaf), back = cb ? (cb.getAttribute('title') || $(cb).data('ui-tooltip-title') || '') : '';
+    rec('T-tip-back', cards().length === 0 && !!back && back === cb.getAttribute('aria-label'),
+        'cards ' + cards().length + ', title ' + JSON.stringify(cb && cb.getAttribute('title')) + ', parked ' + JSON.stringify(cb && $(cb).data('ui-tooltip-title')));
+  };
+
+  // ---- round 4 (2026-10-07): deleting a thread's first note deletes the thread ----
+  // The question must say how many replies go and who wrote them - on the pivot
+  // card (the table row's panel shares the handler) and in the journal panel; a
+  // reply alone asks as before; the panel's status line repeats the server's count.
+  S.delthread = async function () {
+    var ids = ['D-thread-ask', 'D-thread-post', 'D-reply-ask', 'D-panel-ask', 'D-panel-status'];
+    var b = findBtn(K.leaf);
+    if (!b) { fail(ids, 'no icon'); return; }
+    clickEl(b);
+    await until(function () { return cards().length === 1; }, 2000);
+    await sleep(150);
+    var c = cards()[0];
+    var del901 = c && c.querySelector('.journal-rownote-item[data-note-id="901"] .journal-rownote-del');
+    var n0 = window.__confirms.length, p0 = window.__J.posts.length;
+    if (del901) clickEl(del901);
+    await sleep(300);
+    var q = window.__confirms[n0] || '';
+    rec('D-thread-ask', /^Delete this note and its 1 reply \(written by someone else\)\? The whole thread is deleted\./.test(q), 'asked "' + q + '"');
+    var posts = window.__J.posts.slice(p0).filter(function (x) { return x.action === 'delete'; });
+    rec('D-thread-post', posts.length === 1 && String(posts[0].note_id) === '901', 'delete requests ' + JSON.stringify(posts));
+    await sleep(400);   // the reload after the delete (the fake server keeps the notes)
+    c = cards()[0];
+    var del904 = c && c.querySelector('.journal-rownote-item[data-note-id="904"] .journal-rownote-del');
+    n0 = window.__confirms.length;
+    if (del904) clickEl(del904);
+    await sleep(300);
+    var q2 = window.__confirms[n0] || '';
+    rec('D-reply-ask', !!del904 && q2 === 'Delete this note? A copy is kept in the audit log.', 'reply delete offered ' + !!del904 + ', asked "' + q2 + '"');
+    if (!window.PenumbraJournal || !window.PenumbraJournal.open) { fail(['D-panel-ask', 'D-panel-status'], 'no PenumbraJournal'); return; }
+    window.PenumbraJournal.open();
+    await until(function () { return !!document.querySelector('#journalNotesList .journal-note[data-note-id="901"] .journal-note-delete'); }, 4000);
+    var pd = document.querySelector('#journalNotesList .journal-note[data-note-id="901"] .journal-note-delete');
+    n0 = window.__confirms.length;
+    if (pd) clickEl(pd);
+    await sleep(500);
+    var q3 = window.__confirms[n0] || '';
+    rec('D-panel-ask', /^Delete this note and its 1 reply \(written by someone else\)\?/.test(q3), 'asked "' + q3 + '"');
+    var stx = ($('#journalStatusLine').text() || '').trim();
+    rec('D-panel-status', /Deleted the note and its 1 reply/.test(stx), 'status "' + stx + '"');
+  };
+
+  // ---- round 5 (2026-10-07): notes on the grouped view's band headers --------
+  // Each band's header carries the icon of the pivot group with exactly its
+  // fields - same key, same thread, same count - before its name; clicking it
+  // opens the card without folding the band; a regroup repaints; the journal
+  // panel's jump finds a band; copies carry no icon; leaving the view closes it.
+  S.bands = async function () {
+    var gc = document.getElementById('groupedResultsContainer');
+    function bandOf(path) {
+      var cur = gc, w = null;
+      for (var i = 0; i < path.length; i++) {
+        w = arr(cur.querySelectorAll(':scope > .group-wrapper, :scope > .group-content > .group-wrapper')).filter(function (x) { return x.getAttribute('data-group-key') === path[i]; })[0];
+        if (!w) return null;
+        cur = w;
+      }
+      return w;
+    }
+    function iconOf(w) { return w ? w.querySelector(':scope > .group-header > .journal-pvnote-btn') : null; }
+    function allBands() { return arr(gc.querySelectorAll('.group-wrapper')); }
+    var tops = arr(gc.querySelectorAll(':scope > .group-wrapper')), all = allBands();
+    rec('P-bands-built', $(gc).is(':visible') && tops.length === 4 && all.length === 14, 'top bands ' + tops.length + ', all bands ' + all.length);
+    var bad = [];
+    all.forEach(function (w) {
+      var chain = []; for (var x = w; x; x = x.parentElement ? x.parentElement.closest('.group-wrapper') : null) chain.unshift(x);
+      var pairs = chain.map(function (c) { var l = c.getAttribute('data-group-key'); return [c.getAttribute('data-group-col'), l === '[Blank]' ? '' : l]; });
+      var tag = chain.map(function (c) { return c.getAttribute('data-group-key'); }).join('/');
+      var icons = w.querySelectorAll(':scope > .group-header > .journal-pvnote-btn');
+      if (icons.length !== 1) { bad.push(tag + ': ' + icons.length + ' icons'); return; }
+      if (icons[0].getAttribute('data-pvn-key') !== pk(pairs)) bad.push(tag + ': key ' + icons[0].getAttribute('data-pvn-key'));
+      if (!icons[0].nextElementSibling || !icons[0].nextElementSibling.classList.contains('group-name')) bad.push(tag + ': not just before the name');
+      if (!icons[0].classList.contains('is-group') || icons[0].textContent !== '') bad.push(tag + ': not a text-less group icon');
+    });
+    rec('V-bands-icons', all.length === 14 && !bad.length, bad.slice(0, 4).join(' | ') || 'all 14 bands');
+    var sci = iconOf(bandOf(['Sciences'])), eng26 = iconOf(bandOf(['Engineering', 'FY2026'])), blank = iconOf(bandOf(['[Blank]']));
+    rec('V-bands-shared', !!sci && cnt(sci) === '1' && !!eng26 && cnt(eng26) === '2', 'Sciences ' + brief(sci) + ' | Engineering/FY2026 ' + brief(eng26));
+    rec('V-bands-blank', !!blank && blank.getAttribute('data-pvn-key') === K.blank && cnt(blank) === '1', '[Blank] ' + brief(blank) + ' key ' + (blank && blank.getAttribute('data-pvn-key')));
+    // Copy as HTML of the grouped view (its band names, no icon) - while it is grouped. It
+    // reads Sciences: a band this scenario never folds (a folded band's rows are not copied).
+    function copyCheck() {
+      var ex = document.getElementById('expandAllGroups');   // every band open: a folded band is not copied
+      if (ex) clickEl(ex);
+      var html = '';
+      try { html = String(JR.generateWysiwygHtml($('#groupedResultsContainer'), true, {})); } catch (e) { html = 'THREW ' + e; }
+      rec('X-bands-copy', html.indexOf('THREW') !== 0 && html.indexOf('Sciences') !== -1 && html.indexOf('journal-pvnote') === -1 && html.indexOf('data-pvn-key') === -1,
+          'length ' + html.length + ', has Sciences ' + (html.indexOf('Sciences') !== -1) + ', has icon ' + (html.indexOf('journal-pvnote') !== -1));
+    }
+    var C = ['C-bands-nofold', 'C-bands-post', 'V-bands-rebuilt', 'R-bands-reveal', 'C-bands-away'];
+    if (!sci) { fail(C, 'no band icon'); copyCheck(); }
+    else {
+      var sw = bandOf(['Sciences']), wasOpen = sw.classList.contains('open');
+      clickEl(sci);
+      await until(function () { return cards().length === 1; }, 2000);
+      await sleep(500);
+      var c = cards()[0];
+      rec('C-bands-nofold', cards().length === 1 && c.getAttribute('data-pvn-key') === K.grp && sw.classList.contains('open') === wasOpen && near(c, iconOf(bandOf(['Sciences']))),
+          'cards ' + cards().length + ', band open ' + wasOpen + ' -> ' + sw.classList.contains('open') + ', near ' + near(c, iconOf(bandOf(['Sciences']))));
+      if (c) {
+        var inEl = c.querySelector('.journal-rownote-input');
+        inEl.focus(); inEl.textContent = 'Band check';
+        var n0 = window.__J.posts.length;
+        clickEl(c.querySelector('.journal-rownote-post'));
+        await until(function () { return window.__J.posts.length > n0; }, 3000);
+        await until(function () { return cnt(iconOf(bandOf(['Sciences']))) === '2'; }, 3000);
+        var p = window.__J.posts[window.__J.posts.length - 1] || {}, snap = p.row_snapshot || {};
+        rec('C-bands-post', p.action === 'add' && p.scope === 'pivot' && p.row_key === K.grp && snap.DEPT === 'Sciences' && cnt(iconOf(bandOf(['Sciences']))) === '2',
+            'post ' + JSON.stringify({ s: p.scope, k: p.row_key === K.grp, snap: snap }) + ' | ' + brief(iconOf(bandOf(['Sciences']))));
+        var band = cards()[0] && cards()[0].querySelector('.journal-rownote-close');
+        if (band) clickEl(band);
+        await sleep(200);
+      } else { fail(['C-bands-post'], 'no card'); }
+      // A regroup builds new bands: the observer must paint them (no key column here).
+      if (JR.rebuildGroupedView) JR.rebuildGroupedView();
+      await sleep(900);
+      var icons = gc.querySelectorAll('.group-header > .journal-pvnote-btn').length;
+      rec('V-bands-rebuilt', !!JR.rebuildGroupedView && allBands().length === 14 && icons === 14, 'bands ' + allBands().length + ', icons ' + icons);
+      // The journal panel's jump: Engineering folded; the jump opens it, shows and
+      // flashes the FY2026 band, and opens its card.
+      var ew = bandOf(['Engineering']);
+      if (ew && ew.classList.contains('open')) clickEl(ew.querySelector(':scope > .group-header'));
+      await sleep(300);
+      var folded = !!ew && !ew.classList.contains('open');
+      var ok = window.Penumbra.revealPivotNote(K.leaf);
+      await sleep(500);
+      var fw = bandOf(['Engineering', 'FY2026']), fh = fw && fw.querySelector(':scope > .group-header');
+      rec('R-bands-reveal', folded && ok === true && ew.classList.contains('open') && cards().length === 1 && cards()[0].getAttribute('data-pvn-key') === K.leaf
+          && !!fh && fh.classList.contains('journal-band-flash') && drawn(fh),
+          'folded first ' + folded + ', returned ' + ok + ', Engineering open ' + (ew && ew.classList.contains('open')) + ', cards ' + cards().length + ', flash ' + !!(fh && fh.classList.contains('journal-band-flash')));
+      copyCheck();
+      // Leaving the grouped view takes a band's card with it.
+      if (JR.removeGrouping) JR.removeGrouping();
+      await sleep(900);
+      rec('C-bands-away', !!JR.removeGrouping && !$(gc).is(':visible') && cards().length === 0, 'grouped shown ' + $(gc).is(':visible') + ', cards ' + cards().length);
+      if (JR.rebuildGroupedView) JR.rebuildGroupedView();
+      await sleep(600);
+    }
+  };
+
+  // ---- the journal panel's tags --------------------------------------------
+  S.jpanel = async function () {
+    if (!window.PenumbraJournal || !window.PenumbraJournal.open) { fail(['J-chip-pivot', 'J-chip-row', 'J-chip-tip', 'J-chip-jump'], 'no PenumbraJournal'); return; }
+    window.PenumbraJournal.open();
+    await until(function () { return document.querySelectorAll('#journalNotesList .journal-note').length >= 2; }, 4000);
+    await sleep(200);
+    var pv = arr(document.querySelectorAll('#journalNotesList .journal-note-rowref-btn[data-pv-key]'));
+    var rw = arr(document.querySelectorAll('#journalNotesList .journal-note-rowref-btn[data-row-key]'));
+    var pvTxt = pv[0] ? pv[0].textContent : '';
+    rec('J-chip-pivot', pv.length === 1 && pv[0].getAttribute('data-pv-key') === K.leaf && !pv[0].hasAttribute('data-row-key')
+        && pvTxt.indexOf('DEPT: Engineering · FY: FY2026') !== -1 && /^Click to jump to this row in the pivot/.test(pv[0].getAttribute('title') || ''),
+        'pivot chips ' + pv.length + ' text "' + pvTxt + '" title "' + (pv[0] && (pv[0].getAttribute('title') || '').slice(0, 45)) + '"');
+    rec('J-chip-row', rw.length === 1 && rw[0].getAttribute('data-row-key') === '1001' && !rw[0].hasAttribute('data-pv-key'),
+        'row chips ' + rw.length + (rw[0] ? ' key ' + rw[0].getAttribute('data-row-key') : ''));
+    if (!pv.length) { fail(['J-chip-tip', 'J-chip-jump'], 'no pivot chip'); return; }
+    $(pv[0]).trigger('mouseenter');
+    await sleep(100);
+    var pop = document.getElementById('pnbRowRefPop');
+    rec('J-chip-tip', !!pop && /in the pivot/.test(pop.textContent) && /Engineering/.test(pop.textContent), 'tip "' + (pop ? pop.textContent.slice(0, 80) : '') + '"');
+    $(pv[0]).trigger('mouseleave');
+    clickEl(pv[0]);
+    await until(function () { return cards().length === 1; }, 3000);
+    await sleep(300);
+    rec('J-chip-jump', cards().length === 1 && cards()[0].getAttribute('data-pvn-key') === K.leaf && !$('#journalLightbox').is(':visible'),
+        'cards ' + cards().length + ', lightbox visible ' + $('#journalLightbox').is(':visible'));
+  };
+
+  (async function () {
+    try {
+      await boot();
+      if (!S[SCN]) throw new Error('unknown scenario ' + SCN);
+      await S[SCN]();
+      await sleep(50);
+    } catch (e) {
+      R.fatal = String((e && e.stack) || e);
+    }
+    R.errors = window.__errors.concat(window.__rejections).slice(0, 10);
+    R.hookErr = [window.__PV_ERR, window.__PV_ERR2, window.__PV_LAZY_ERR].filter(Boolean).join('; ');
+    R.missing = window.__PV_MISSING || [];
+    window.__PVRESULT = R;
+    window.__PVDONE = true;
+    document.getElementById('out').textContent = 'DONE';
+  })();
+})();

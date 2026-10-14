@@ -1,0 +1,560 @@
+# =============================================================================
+# promptparity - the same prompt tag, in the same place in the SQL, through all
+# THREE prompt engines.
+#
+#   powershell -File run.ps1
+#   powershell -File run.ps1 -App <path>   # run against a stage instead of live
+#                                          # (a file the stage lacks comes from live)
+#   powershell -File run.ps1 -Control      # one deliberately FALSE assertion in
+#                                          # each half; each must report FAIL 1
+#   powershell -File run.ps1 -Mutant       # 59 targeted mutants; each MUST go red
+#                                          # with the exact counts named below
+#   powershell -File run.ps1 -Mutant -Only AC   # just those ids (the first character
+#                                          # of each name: A-Z, 0-9, + and a-v;
+#                                          # case-sensitive)
+#
+# WHAT IS UNDER TEST. Three engines turn [PROMPT;...] tags into SQL: js/main.js
+# in the browser (binds), index.php for ?json=1 (dashboard tiles, API callers)
+# and schedule_runner.php for scheduled tasks (both splice quoted literals). A
+# report is written and proven in the browser; the other two run it later with
+# nobody watching. Found 2026-09-21, all of it older than the oldest backup:
+#   - c IN [PROMPT;type=multi-select] - the form the SQL help and the AI grounding
+#     show - lost its column in the BROWSER (WHERE IN (:p1, :p2)), and c NOT IN
+#     ran as c IN: the opposite filter, no error;
+#   - ?json=1 never stripped the quotes off template="...", so template="" was
+#     not a control prompt there and its quotes landed in the statement;
+#   - quotes written AROUND a tag - TO_DATE('[PROMPT;type=date]', ...) - were
+#     consumed by the browser only; both PHP engines sent ''01-JUL-22''.
+# And 2026-09-29, wrong in ALL THREE (so parity held while every engine was wrong):
+#   - c != / <> [multi-select] joined its values with OR - true for every row - and
+#     c NOT LIKE [multi-select] read NOT as the column (a syntax error). A negated
+#     operator now joins with AND; an explicit logic=or / logic=and still wins;
+#   - the operand in front of the operator had to be a plain column name: "My Col",
+#     [My Col], UPPER(c) and c=[tag] (no space) broke - the scheduler sent c='A,B',
+#     valid SQL that matched the wrong rows. One backward reader per language now
+#     (penumbraPromptOperatorBefore / readOperatorBefore inside processPrompts);
+#   - ([tag] IS NULL OR c IN ([tag])), the optional-filter idiom: the browser always
+#     bound ONE value in front of IS NULL, both PHP engines emitted the whole list.
+#     IS NOT NULL and a quoted tag in front of IS NULL get the same rule.
+# Second pass, the same day: a QUOTED multi-select after a comparison (c = '[tag]':
+# the scheduler sent c = 'A,B'), a function name a space from its parenthesis
+# (UPPER (c)), per-option templates in ?json=1 (it had none - the parser moved from
+# the runner into shared_logic.php, penumbraPromptOptionTemplates) and an UNANSWERED
+# control prompt (the scheduler emitted NULL). Third pass: several picked per-option
+# templates were invalid SQL in all three - the leading AND/OR came off the prompt-
+# template pieces and was never put back (fi-epa: `0 (and c.code_desc like '%' OR
+# ...)`); penumbraPromptJoinPieces / joinOptionPieces put ONE in front of the group.
+# corpus.txt is the contract: one expected line per case, for all three.
+#
+#   1. test_promptparity.php           the shared PHP helpers (shared_logic.php),
+#                                      then the corpus through the scheduler and
+#                                      the ?json=1 engine.
+#   2. promptparity_browser_tests.js   the corpus through the browser engine in
+#                                      headless Edge (binds written back in as
+#                                      literals), plus checks that it really
+#                                      sends binds.
+#   3. promptparity_builder_tests.js   the TAG GENERATOR's Join Logic menu (2026-
+#                                      09-29): the whole of main.js booted under
+#                                      the builder markup LIFTED from the index.php
+#                                      under test (builder_harness.html - the page
+#                                      the daterange suite uses), driven by real
+#                                      events: Automatic / OR / AND, and a tag
+#                                      re-edited with Overwrite Prompt keeping its
+#                                      logic= byte for byte.
+#
+# The halves lift the code under test out of the app files by name. Nothing is
+# require()d that could open a database or send mail; nothing is a pasted copy.
+#
+# EXPECTED TAIL:
+#   php     | PASS: 304   FAIL: 0
+#   browser | PASS: 119   FAIL: 0
+#   builder | PASS: 22   FAIL: 0
+#   RESULT: GREEN
+# (match on the FAIL counts - the totals move as the corpus grows.)
+# Positive controls for the 2026-09-29 cases: against the files from before the
+# first pass (the webroot's *.bak-20260929-promptneg copies) the run was RED with
+# php FAIL 50 / browser FAIL 26 / builder FAIL 9; before the second pass
+# (*.bak-20260929-promptneg2) RED 19 / 6 / 0; before the third
+# (*.bak-20260929-promptneg3) RED 8 / 4 / 0 - every failure one of the new cases.
+# Helpers a file does not have yet are not lifted, and their direct checks skipped.
+#
+# UNC .ps1 files are GPO-blocked here ("not digitally signed") - run the body as
+# a scriptblock rather than with -File:
+#   $dir = '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\promptparity'
+#   & ([scriptblock]::Create([IO.File]::ReadAllText("$dir\run.ps1").Replace('$here = $PSScriptRoot', "`$here = '$dir'")))
+# Never add a bare `exit` for the same reason: it would kill the caller. And do
+# not pipe the invocation: a lingering headless-Edge child can hold stdout open.
+# =============================================================================
+param(
+    [string]$App = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra',
+    [switch]$Control,
+    [switch]$Mutant,
+    [string]$Only = ''
+)
+
+$ErrorActionPreference = 'Stop'
+$here = $PSScriptRoot
+if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Path }
+$php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+$edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+$live = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+$work = Join-Path $env:TEMP ('pnb_promptparity_' + $PID)
+New-Item -ItemType Directory -Force -Path $work | Out-Null
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+
+# The app files the two halves read. A stage usually holds only what was edited,
+# so anything it lacks is taken from live - and said out loud, because "green
+# against the stage" must not quietly mean "green against live".
+$appFiles = 'shared_logic.php', 'schedule_runner.php', 'index.php', 'penumbra_search.php', 'js\main.js'
+function Copy-AppInto([string]$dest) {
+    New-Item -ItemType Directory -Force -Path (Join-Path $dest 'js') | Out-Null
+    $fromLive = @()
+    foreach ($f in $appFiles) {
+        $src = Join-Path $App $f
+        if (-not (Test-Path -LiteralPath $src)) { $src = Join-Path $live $f; $fromLive += $f }
+        Copy-Item -LiteralPath $src -Destination (Join-Path $dest $f) -Force
+    }
+    return ,$fromLive
+}
+
+# One headless-Edge page -> the text of its <pre id="out">. Start-Process +
+# -RedirectStandardOutput, never `>` or a pipe (PS 5.1 loses native stdout that
+# way); a profile dir of its OWN per launch (a shared one hung Edge when two
+# launches overlapped); up to two launches, because Edge now and then exits
+# without dumping the page - that is the browser, not the code under test. A
+# page that really stalls says so itself ("STALLED in: <section>") and is NOT
+# retried.
+function Invoke-EdgePage([string]$pageDir, [string]$pageFile, $lines, [string]$tag) {
+    $dom = Join-Path $pageDir ($pageFile + '.dom.txt')
+    $url = 'file:///' + (Join-Path $pageDir $pageFile).Replace([string][char]92, '/')
+    $text = ''; $errs = ''
+    for ($attempt = 1; $attempt -le 2; $attempt++) {
+        $ud = Join-Path $work ('ud_' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+        if (Test-Path $dom) { try { [IO.File]::Delete($dom) } catch { } }
+        # 60 s of virtual time: the builder page boots the WHOLE of main.js (the
+        # daterange suite's figures for the same page).
+        $p = Start-Process -FilePath $edge -PassThru -NoNewWindow -RedirectStandardOutput $dom -RedirectStandardError (Join-Path $pageDir 'edge_err.txt') -ArgumentList '--headless=new', '--disable-gpu', '--no-sandbox', '--allow-file-access-from-files', '--no-first-run', '--disable-sync', '--disable-extensions', "--user-data-dir=$ud", '--window-size=1400,1000', '--virtual-time-budget=60000', '--dump-dom', $url
+        if (-not $p.WaitForExit(240000)) {
+            Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" | Where-Object { $_.CommandLine -like "*$ud*" } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch { } }
+            $lines.Add("$tag | launch $attempt TIMED OUT after 240s - headless Edge was stopped")
+        }
+        $domText = ''
+        if (Test-Path $dom) {
+            # The redirected stdout file can stay locked for a moment after Edge exits.
+            for ($try = 0; $try -lt 40; $try++) {
+                try { $domText = [IO.File]::ReadAllText($dom); break } catch [System.IO.IOException] { Start-Sleep -Milliseconds 250 }
+            }
+        }
+        $text = [System.Net.WebUtility]::HtmlDecode([regex]::Match($domText, '(?s)<pre id="out"[^>]*>(.*?)</pre>').Groups[1].Value)
+        $errs = [System.Net.WebUtility]::HtmlDecode([regex]::Match($domText, '(?s)<pre id="errs"[^>]*>(.*?)</pre>').Groups[1].Value)
+        if ($text -match 'DONE' -or $text -match 'STALLED in:' -or $text -match 'HARNESS') { break }
+        if ($attempt -eq 1) { $lines.Add("$tag | launch 1 produced no page dump - launching once more") }
+    }
+    ($errs -split "`n") | Where-Object { $_.Trim() -ne '' } | Select-Object -First 6 | ForEach-Object { $lines.Add("$tag | $_") }
+    ($text -split "`n") | Where-Object { $_ -match '^\s+FAIL |^\s+(got|want)[ :]|^HARNESS|^STALLED|^page errors' } | ForEach-Object { $lines.Add("$tag | $_") }
+    $fails = -1
+    $bt = [regex]::Match($text, 'PASS: \d+\s+FAIL: (\d+)')
+    if ($bt.Success -and $text -match 'DONE') { $fails = [int]$bt.Groups[1].Value; $lines.Add("$tag | " + $bt.Value) }
+    else { $lines.Add("$tag | NO RESULT - the page did not finish (see the STALLED / HARNESS line above, if any)") }
+    return $fails
+}
+
+# Runs the three halves against one app directory.
+# Returns @{ php; browser; builder; lines } - a count of -1 means that half produced no result at all.
+# $MutatedFile (mutant runs only): a half that never reads that file cannot change,
+# so it is reported as 0 without being run - the browser half reads js\main.js
+# only, the builder half js\main.js and index.php.
+function Invoke-PromptParitySuite([string]$AppDir, [bool]$AsControl, [string]$MutatedFile = '') {
+    $runBrowser = (-not $MutatedFile) -or ($MutatedFile -eq 'js\main.js')
+    $runBuilder = (-not $MutatedFile) -or ($MutatedFile -eq 'js\main.js') -or ($MutatedFile -eq 'index.php')
+    $lines = New-Object System.Collections.Generic.List[string]
+    $run = Join-Path $work ('run_' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+    New-Item -ItemType Directory -Force -Path $run | Out-Null
+    $corpus = Join-Path $here 'corpus.txt'
+
+    # ---- half 1: PHP. -n because a workstation cannot load oci8/sqlsrv; the test
+    # sets its own timezone, which -n would otherwise drop to UTC.
+    $phpArgs = @('-n', (Join-Path $here 'test_promptparity.php'), $AppDir, $corpus)
+    if ($AsControl) { $phpArgs += '--control' }
+    # PS 5.1 wraps a native exe's stderr in ErrorRecords, and under 'Stop' the
+    # first one ends the script - which is what happens when the shared helpers
+    # are not in $AppDir yet and the test says so on stderr. Relax it for this
+    # call and keep the text, so that case reads as a clean RED below.
+    $eap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $phpOut = & $php @phpArgs 2>&1 | ForEach-Object { "$_" }
+    $ErrorActionPreference = $eap
+    $phpFails = -1
+    $tail = ($phpOut | Where-Object { $_ -match '^PASS: \d+\s+FAIL: \d+' } | Select-Object -Last 1)
+    if ($tail -and $tail -match 'FAIL:\s*(\d+)') { $phpFails = [int]$Matches[1] }
+    $phpOut | Where-Object { $_ -match '^\s+FAIL |^\s+(got|want)[ :]|^lift:|^could not|^cannot read|^corpus:' } | ForEach-Object { $lines.Add('php     | ' + $_) }
+    $lines.Add('php     | ' + $(if ($tail) { $tail } else { 'NO RESULT - the PHP half did not finish (are the shared prompt helpers in this app directory?)' }))
+
+    # ---- half 2: the browser engine. main.js and the corpus are baked into JS
+    # strings: `new Function` on text reports a real SyntaxError, where a file://
+    # <script src> would only say "Script error."
+    $mainText = [IO.File]::ReadAllText((Join-Path $AppDir 'js\main.js'))
+    foreach ($lib in 'jquery-3.7.1.min.js', 'moment.min.js') { Copy-Item (Join-Path $live "js\$lib") (Join-Path $run $lib) -Force }
+    Copy-Item (Join-Path $here 'promptparity_browser_tests.js') (Join-Path $run 'tests.js') -Force
+    [IO.File]::WriteAllText((Join-Path $run 'SRC.js'), 'window.__src = ' + ($mainText | ConvertTo-Json -Compress) + ';')
+    [IO.File]::WriteAllText((Join-Path $run 'CORPUS.js'), 'window.__corpus = ' + ([IO.File]::ReadAllText($corpus) | ConvertTo-Json -Compress) + ';')
+    $ctl = if ($AsControl) { 'window.__control = true;' } else { '' }
+    $html = '<!doctype html><html><head><meta charset="utf-8"></head><body><pre id="out">running</pre><pre id="errs"></pre>' +
+            '<script>window.onerror=function(m,s,l,c){document.getElementById("errs").textContent+="ONERROR: "+m+" @"+l+":"+c+"\n";};' +
+            'window.addEventListener("unhandledrejection",function(ev){document.getElementById("errs").textContent+="UNHANDLED: "+(ev.reason&&ev.reason.message||ev.reason)+"\n";});' +
+            $ctl + '</script>' +
+            '<script src="jquery-3.7.1.min.js"></script><script src="moment.min.js"></script>' +
+            '<script src="SRC.js"></script><script src="CORPUS.js"></script><script src="tests.js"></script></body></html>'
+    [IO.File]::WriteAllText((Join-Path $run 'h.html'), $html)
+    if ($runBrowser) { $browserFails = Invoke-EdgePage $run 'h.html' $lines 'browser' }
+    else { $browserFails = 0; $lines.Add("browser | not run: $MutatedFile is not read by this half") }
+
+    # ---- half 3: the Tag Generator, in the whole of main.js. Same page and same
+    # lift as the daterange suite's builder half (penumbra_tests\daterange\run.ps1).
+    $builderFails = -1
+    $idx = [IO.File]::ReadAllText((Join-Path $AppDir 'index.php'))
+    $i0 = $idx.IndexOf('<div id="promptGeneratorLightbox"')
+    $i1 = if ($i0 -ge 0) { $idx.IndexOf('<?php', $i0) } else { -1 }    # the lightbox is the last thing inside its `if`; the endif follows it
+    $anchor = '$(document).ready(function () {'
+    if (-not $runBuilder) { $builderFails = 0; $lines.Add("builder | not run: $MutatedFile is not read by this half") }
+    elseif ($i0 -lt 0 -or $i1 -le $i0) { $lines.Add('builder | NO RESULT - could not find the Tag Generator markup in index.php') }
+    elseif (-not $mainText.Substring(0, 200).Contains($anchor)) { $lines.Add('builder | NO RESULT - main.js closure anchor not found') }
+    else {
+        # The WHOLE lightbox, verbatim - both tabs, because opening the builder
+        # resets the Subquery form too. If the <div>s no longer balance, the cut
+        # landed somewhere else.
+        $markup = $idx.Substring($i0, $i1 - $i0).TrimEnd()
+        $opens  = [regex]::Matches($markup, '<div[\s>]').Count
+        $closes = [regex]::Matches($markup, '</div>').Count
+        if ($opens -ne $closes) { $lines.Add("builder | NO RESULT - the lifted Tag Generator markup is not balanced ($opens <div> vs $closes </div>); index.php has moved") }
+        else {
+            $b = Join-Path $run 'builder'
+            New-Item -ItemType Directory -Force -Path $b | Out-Null
+            foreach ($lib in 'jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js', 'show-hint.js',
+                             'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js', 'penumbra_snippet_help.js',
+                             'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js') { Copy-Item (Join-Path $live "js\$lib") (Join-Path $b $lib) -Force }
+            Copy-Item (Join-Path $here 'promptparity_builder_tests.js') (Join-Path $b 'builder_tests.js') -Force
+            $page = [IO.File]::ReadAllText((Join-Path $here 'builder_harness.html'), $utf8)
+            $page = [regex]::Replace($page, '<!-- BUILDER_MARKUP:.*?-->', [System.Text.RegularExpressions.MatchEvaluator]{ param($x) $markup })
+            if ($AsControl) { $page = $page.Replace('<script src="main_pg.js"></script>', '<script>window.__control = true;</script><script src="main_pg.js"></script>') }
+            [IO.File]::WriteAllText((Join-Path $b 'h.html'), $page, $utf8)
+            # Unwrap the ready closure so it runs where it stands, and export a few
+            # closure names (looked up when CALLED - no temporal dead zone).
+            $hook = 'try { window.__PG = {' +
+                    ' getEditor: function () { return editor; },' +
+                    ' parsePrompt: function (s) { return parsePrompt(s); },' +
+                    ' prefill: function (c) { return prefillPromptGenerator(c); }' +
+                    ' }; } catch (e) { window.__PG_ERR = String(e); }'
+            $k = $mainText.IndexOf($anchor)
+            $patched = $mainText.Substring(0, $k) + ';(function () {' + "`r`n" + $hook + "`r`n" + $mainText.Substring($k + $anchor.Length)
+            $j = $patched.LastIndexOf('});')
+            $patched = $patched.Substring(0, $j) + '})();' + $patched.Substring($j + 3)
+            [IO.File]::WriteAllText((Join-Path $b 'main_pg.js'), $patched, $utf8)
+            $builderFails = Invoke-EdgePage $b 'h.html' $lines 'builder'
+        }
+    }
+
+    return @{ php = $phpFails; browser = $browserFails; builder = $builderFails; lines = $lines }
+}
+
+function Remove-Work { try { [IO.Directory]::Delete($work, $true) } catch { } }   # not Remove-Item: the tool's pre-filter rejects it on a variable path
+
+if (-not $Mutant) {
+    $effApp = Join-Path $work 'app'
+    $fromLive = Copy-AppInto $effApp
+    if ("$App" -ne "$live" -and $fromLive.Count -gt 0) { Write-Output ('note    | not in the stage, taken from LIVE: ' + ($fromLive -join ', ')) }
+    $r = Invoke-PromptParitySuite $effApp ([bool]$Control)
+    $r.lines | ForEach-Object { Write-Output $_ }
+    if ($Control) {
+        $ok = ($r.php -eq 1 -and $r.browser -eq 1 -and $r.builder -eq 1)
+        Write-Output $(if ($ok) { 'CONTROL: all three halves reported exactly the one deliberate failure - the suite can see red' } else { "CONTROL BROKEN: expected FAIL 1 / 1 / 1, got $($r.php) / $($r.browser) / $($r.builder)" })
+    } else {
+        Write-Output ('RESULT: ' + $(if ($r.php -eq 0 -and $r.browser -eq 0 -and $r.builder -eq 0) { 'GREEN' } else { 'RED' }))
+    }
+    Remove-Work
+    return
+}
+
+# --- targeted mutants ---------------------------------------------------------
+# Each reverts ONE decision, in a scratch copy of the app. The expected fail
+# counts are exact, per half: a mutant that stays green, or goes red somewhere
+# it was not expected to, means the suite is not pinning what it claims. A
+# mutant with no `builder` count expects the builder half to stay green (0).
+# Ids are the first character of the name and case-sensitive (a-e: the builder).
+$mutApp = Join-Path $work 'mutapp'
+$mutants = @(
+    @{ name = 'A: the browser puts back only "IN (...)" - the column is lost again, and NOT IN runs as IN'
+       file = 'js\main.js'; php = 0; browser = 22
+       from = '                                replacement = `${fullColumn} ${operator} (${placeholders.join('', '')})`;'
+       to   = '                                replacement = `IN (${placeholders.join('', '')})`;' },
+    @{ name = 'B: the browser no longer parenthesises a list straight after IN when the operand cannot be read (c IN ''[tag]'')'
+       file = 'js\main.js'; php = 0; browser = 1
+       from = '                            } else if (!parsedPrompt.template && /\bIN\s*$/i.test(finalQuery)) {'
+       to   = '                            } else if (false) {' },
+    @{ name = "C: PHP - quotes written around a tag are left standing (''01-JUL-22'' again)"
+       file = 'shared_logic.php'; php = 20; browser = 0
+       from = "    if (!`$noQuote) {`n        `$before = (`$offset > 0)"
+       to   = "    if (false) {`n        `$before = (`$offset > 0)" },
+    @{ name = 'D: PHP - template="..." keeps its wrapping quotes'
+       file = 'shared_logic.php'; php = 49; browser = 0
+       from = '            return substr($v, 1, -1);'
+       to   = '            return $v;' },
+    @{ name = 'E: PHP - a list straight after IN is never given parentheses of its own'
+       file = 'shared_logic.php'; php = 11; browser = 0
+       from = "    return preg_match('/\bIN\s*`$/i', (string)`$sqlBefore) === 1;"
+       to   = '    return false;' },
+    @{ name = 'F: ?json=1 - no control-prompt exit: a multi-select with template="" emits its list again'
+       file = 'index.php'; php = 1; browser = 0
+       from = '                if ($isControlPrompt) {'
+       to   = '                if (false) {' },
+    @{ name = 'G: scheduler - the pair around a NOQUOTE tag is consumed too (c = a)'
+       file = 'schedule_runner.php'; php = 1; browser = 0
+       from = '            $noQuote || ($shouldSplit && $opMatch));'
+       to   = '            false);' },
+    @{ name = 'H: ?json=1 - the pair around a NOQUOTE tag is consumed too (c = a)'
+       file = 'index.php'; php = 1; browser = 0
+       from = '                    $noQuote || $tagGrew || $raw_value === '''');'
+       to   = '                    $tagGrew || $raw_value === '''');' },
+    @{ name = "M: ?json=1 - the quote rule reaches the NO ANSWER path (c = '''' becomes c = '')"
+       file = 'index.php'; php = 2; browser = 0
+       from = '                    $noQuote || $tagGrew || $raw_value === '''');'
+       to   = '                    $noQuote || $tagGrew);' },
+    @{ name = "N: scheduler - the quote rule reaches the NO ANSWER path (c = 'NULL' becomes c = NULL)"
+       file = 'schedule_runner.php'; php = 2; browser = 0
+       from = '            $sql = substr_replace($sql, $nullSql, $tagOffset, strlen($full_tag));'
+       to   = '            $sql = penumbraPromptSplice($sql, $tagOffset, strlen($full_tag), $nullSql, false);' },
+    @{ name = "I: PHP - what stands in front of a quoted tag is read WITH its quote: c IN ('[tag]') goes out as ONE value"
+       file = 'shared_logic.php'; php = 11; browser = 0
+       from = "    if (!`$noQuote && `$offset > 0 && `$sql[`$offset - 1] === `"'`""
+       to   = "    if (false && `$offset > 0 && `$sql[`$offset - 1] === `"'`"" },
+    @{ name = "J: scheduler - ONE value straight after IN goes out bare again (c IN 'A')"
+       file = 'schedule_runner.php'; php = 3; browser = 0
+       from = "            } else if (`$pType === 'multi-select' && penumbraPromptFollowsBareIn(penumbraPromptSqlBefore(`$sql, `$tagOffset, strlen(`$full_tag), false))) {"
+       to   = '            } else if (false) {' },
+    @{ name = 'K: scheduler - template="..." is not unquoted'
+       file = 'schedule_runner.php'; php = 22; browser = 0
+       from = '                $v = penumbraPromptUnquoteTemplate($v);'
+       to   = '                $v = $v;' },
+    @{ name = 'L: ?json=1 - template="..." is not unquoted (the state of things before 2026-09-21)'
+       file = 'index.php'; php = 22; browser = 0
+       from = "                    `$params['template'] = penumbraPromptUnquoteTemplate(`$params['template']);"
+       to   = "                    `$params['template'] = `$params['template'];" },
+    # --- 2026-09-29: negated operators, the operand reader, the IS NULL idiom ---
+    @{ name = 'O: PHP - a negated operator joins its list with OR again (true for every row)'
+       file = 'shared_logic.php'; php = 26; browser = 0
+       from = '    return in_array($operator, array(''!='', ''<>'', ''NOT LIKE''), true) ? '' AND '' : '' OR '';'
+       to   = '    return '' OR '';' },
+    @{ name = 'P: browser - a negated operator joins its list with OR again'
+       file = 'js\main.js'; php = 0; browser = 14
+       from = '                                : (parsedPrompt.logic === ''or'' ? '' OR '' : (negated ? '' AND '' : '' OR ''));'
+       to   = '                                : (parsedPrompt.logic === ''or'' ? '' OR '' : '' OR '');' },
+    @{ name = 'Q: PHP - logic=or no longer overrides the AND of a negated operator'
+       file = 'shared_logic.php'; php = 6; browser = 0
+       from = '    if ($l === ''or'') { return '' OR ''; }'
+       to   = '    if (false) { return '' OR ''; }' },
+    @{ name = 'R: browser - logic=or no longer overrides the AND of a negated operator'
+       file = 'js\main.js'; php = 0; browser = 2
+       from = '                                : (parsedPrompt.logic === ''or'' ? '' OR '' : (negated ? '' AND '' : '' OR ''));'
+       to   = '                                : (negated ? '' AND '' : '' OR '');' },
+    @{ name = 'S: PHP - NOT in front of LIKE is read as the operand again: c (NOT LIKE ''A'' OR NOT LIKE ''B'')'
+       file = 'shared_logic.php'; php = 19; browser = 0
+       from = '        if ($k < $i && $k >= 3 && strtoupper(substr($s, $k - 3, 3)) === ''NOT'' && !$isWord($k - 4)) {'
+       to   = '        if (false) {' },
+    @{ name = 'T: browser - NOT in front of LIKE is read as the operand again'
+       file = 'js\main.js'; php = 0; browser = 10
+       from = '                if (k < i && k >= 3 && s.substring(k - 3, k).toUpperCase() === ''NOT'' && !isWord(k - 4)) {'
+       to   = '                if (false) {' },
+    @{ name = 'U: PHP - an expression operand is not read (UPPER(c) = [tag])'
+       file = 'shared_logic.php'; php = 30; browser = 0
+       from = '    if ($j >= 1 && $s[$j - 1] === '')'') {'
+       to   = '    if (false) {' },
+    @{ name = 'V: browser - an expression operand is not read'
+       file = 'js\main.js'; php = 0; browser = 11
+       from = '            if (j >= 1 && s.charAt(j - 1) === '')'') {'
+       to   = '            if (false) {' },
+    @{ name = 'W: PHP - "quoted" and [bracketed] names are not read'
+       file = 'shared_logic.php'; php = 10; browser = 0
+       from = '        if ($ch === ''"'' || $ch === '']'') {'
+       to   = '        if (false) {' },
+    @{ name = 'X: browser - "quoted" and [bracketed] names are not read'
+       file = 'js\main.js'; php = 0; browser = 4
+       from = '                if (ch === ''"'' || ch === '']'') {'
+       to   = '                if (false) {' },
+    @{ name = 'Y: PHP - an operand holding a PROMPT tag is read after all'
+       file = 'shared_logic.php'; php = 2; browser = 0
+       from = '    if (preg_match(''/\[\s*PROMPT/i'', $operand)) { return null; }'
+       to   = '    if (false) { return null; }' },
+    @{ name = 'Z: browser - an operand holding a PROMPT tag is read after all'
+       file = 'js\main.js'; php = 0; browser = 1
+       from = '            if (/\[\s*PROMPT/i.test(operand)) return null;'
+       to   = '            if (false) return null;' },
+    @{ name = '1: ?json=1 - no IS NULL look-ahead: the whole list in front of IS NULL again'
+       file = 'index.php'; php = 6; browser = 0
+       from = '                            if (penumbraPromptFollowedByIsNull(penumbraPromptSqlAfter($sql, $offset, strlen($full_tag), $noQuote))) {'
+       to   = '                            if (false) {' },
+    @{ name = '2: scheduler - no IS NULL look-ahead'
+       file = 'schedule_runner.php'; php = 6; browser = 0
+       from = '                if (penumbraPromptFollowedByIsNull(penumbraPromptSqlAfter($sql, $tagOffset, strlen($full_tag), false))) {'
+       to   = '                if (false) {' },
+    @{ name = '3: PHP - IS NOT NULL is not read as the twin of IS NULL'
+       file = 'shared_logic.php'; php = 3; browser = 0
+       from = '    return preg_match(''/^\s*IS\s+(?:NOT\s+)?NULL\b/i'', (string)$sqlAfter) === 1;'
+       to   = '    return preg_match(''/^\s*IS\s+NULL\b/i'', (string)$sqlAfter) === 1;' },
+    @{ name = '4: browser - IS NOT NULL is not read'
+       file = 'js\main.js'; php = 0; browser = 1
+       from = '                        const isNullCheck = /^\s*IS\s+(?:NOT\s+)?NULL\b/i.test(afterPrompt);'
+       to   = '                        const isNullCheck = /^\s*IS\s+NULL\b/i.test(afterPrompt);' },
+    @{ name = '5: browser - the look-ahead does not step past the closing quote of a stripped pair'
+       file = 'js\main.js'; php = 0; browser = 1
+       from = '                        const afterPrompt = query.substring(prompt.index + prompt.fullMatch.length + (strippedTrailingQuote ? 1 : 0));'
+       to   = '                        const afterPrompt = query.substring(prompt.index + prompt.fullMatch.length);' },
+    @{ name = '6: browser - logic= read raw again (logic=AND joined with OR)'
+       file = 'js\main.js'; php = 0; browser = 1; builder = 1
+       from = '                    result.logic = value.trim().toLowerCase() || null;'
+       to   = '                    result.logic = value;' },
+    @{ name = '7: PHP - = needs a space in front of it again (c=[tag])'
+       file = 'shared_logic.php'; php = 3; browser = 0
+       from = "        `$operator = '=';`n        `$i -= 1;"
+       to   = "        `$operator = '=';`n        `$i -= 1;`n        if (!`$isWs(`$i - 1)) { return null; }" },
+    @{ name = '8: PHP - the SQL after a quoted tag keeps its closing quote'
+       file = 'shared_logic.php'; php = 3; browser = 0
+       from = '    if (!$noQuote && $after !== '''' && $after[0] === "''" && $offset > 0 && $sql[$offset - 1] === "''") {'
+       to   = '    if (false) {' },
+    @{ name = '9: ?json=1 - NOT IN is expanded per value like NOT LIKE'
+       file = 'index.php'; php = 3; browser = 0
+       from = '                            if ($operator === ''IN'' || $operator === ''NOT IN'') {'
+       to   = '                            if ($operator === ''IN'') {' },
+    @{ name = '0: browser - NOT IN is expanded per value like NOT LIKE'
+       file = 'js\main.js'; php = 0; browser = 5
+       from = '                            if (operator === ''IN'' || operator === ''NOT IN'') {'
+       to   = '                            if (operator === ''IN'') {' },
+    @{ name = '+: scheduler - a template on the tag in front of IS NULL is expanded per value'
+       file = 'schedule_runner.php'; php = 1; browser = 0
+       from = 'strpos($params[''template''], '':val'') !== false && !$isNullSubject) {'
+       to   = 'strpos($params[''template''], '':val'') !== false) {' },
+    # --- the Tag Generator's Join Logic menu (builder half) ---
+    @{ name = 'a: builder - Generate / Overwrite writes no logic= for OR again (a hand-written logic=or is lost)'
+       file = 'js\main.js'; php = 0; browser = 0; builder = 1
+       from = "        }`n`n        if (type === 'multi-select') {`n            if (`$('#promptLogic').val())   // '' = Automatic: nothing written"
+       to   = "        }`n`n        if (type === 'multi-select') {`n            if (`$('#promptLogic').val() && `$('#promptLogic').val() !== 'or')   // '' = Automatic: nothing written" },
+    @{ name = 'b: builder - the live preview / Test string writes no logic= for OR'
+       file = 'js\main.js'; php = 0; browser = 0; builder = 2
+       from = "            }`n        }`n        if (type === 'multi-select') {`n            if (`$('#promptLogic').val())   // '' = Automatic: nothing written"
+       to   = "            }`n        }`n        if (type === 'multi-select') {`n            if (`$('#promptLogic').val() && `$('#promptLogic').val() !== 'or')   // '' = Automatic: nothing written" },
+    @{ name = 'c: builder - re-editing a tag maps no logic= to OR again'
+       file = 'js\main.js'; php = 0; browser = 0; builder = 4
+       from = '            $(''#promptLogic'').val(config.logic === ''and'' || config.logic === ''or'' ? config.logic : '''');'
+       to   = '            $(''#promptLogic'').val(config.logic || ''or'');' },
+    @{ name = 'd: index.php - Join Logic has no Automatic choice (a reset form shows OR)'
+       file = 'index.php'; php = 0; browser = 0; builder = 6
+       from = '                            <option value="">Automatic</option>'
+       to   = '' },
+    @{ name = 'e: parsePrompt reads a missing logic= as or again (so a negated operator joins with OR)'
+       file = 'js\main.js'; php = 0; browser = 14; builder = 3
+       from = '            logic: null,'
+       to   = '            logic: ''or'',' },
+    # --- second pass, 2026-09-29: a quoted tag after a comparison, a name a space away,
+    #     per-option templates in ?json=1, an unanswered control prompt ---
+    @{ name = 'f: ?json=1 - the operator is read with the opening quote still there (c = ''[tag]'' unread)'
+       file = 'index.php'; php = 4; browser = 0
+       from = '                        $preceding_sql = penumbraPromptSqlBefore($sql, $offset, strlen($full_tag), $noQuote);'
+       to   = '                        $preceding_sql = substr($sql, 0, $offset);' },
+    @{ name = 'g: ?json=1 - the rewrite leaves the quote pair out of its span'
+       file = 'index.php'; php = 5; browser = 0
+       from = '                        $pair_quote = (strlen($preceding_sql) !== $offset) ? "''" : '''';'
+       to   = '                        $pair_quote = '''';' },
+    @{ name = 'h: scheduler - the operator is read with the opening quote still there'
+       file = 'schedule_runner.php'; php = 3; browser = 0
+       from = '        $precedingSql = penumbraPromptSqlBefore($sql, $tagOffset, strlen($full_tag), $noQuote);'
+       to   = '        $precedingSql = substr($sql, 0, $tagOffset);' },
+    @{ name = 'i: browser - the operator is read with the opening quote still there'
+       file = 'js\main.js'; php = 0; browser = 4
+       from = '                        const operatorMatch = readOperatorBefore(strippedTrailingQuote ? beforePrompt.slice(0, -1) : beforePrompt);'
+       to   = '                        const operatorMatch = readOperatorBefore(beforePrompt);' },
+    @{ name = 'j: PHP - a function name a space away from its parenthesis is not read (UPPER (c))'
+       file = 'shared_logic.php'; php = 6; browser = 0
+       from = "        `$q = `$p;`n        while (`$isWs(`$q - 1)) { `$q--; }"
+       to   = "        `$q = `$p;" },
+    @{ name = 'k: browser - a function name a space away is not read'
+       file = 'js\main.js'; php = 0; browser = 2
+       from = "                let q = p;`n                while (isWs(q - 1)) q--;"
+       to   = "                let q = p;" },
+    @{ name = 'l: ?json=1 - no per-option templates again'
+       file = 'index.php'; php = 9; browser = 0
+       from = '                if (!empty($perOptionTemplates)) {'
+       to   = '                if (false) {' },
+    @{ name = 'm: scheduler - an unanswered control prompt gets NULL again (WHERE 1=1 NULL AND ...)'
+       file = 'schedule_runner.php'; php = 2; browser = 0
+       from = '            if ($isControlPrompt) {'
+       to   = '            if (false) {' },
+    @{ name = 'n: PHP - a keyword in front of a parenthesis is read as a function name (AND (c))'
+       file = 'shared_logic.php'; php = 9; browser = 0
+       from = '        if ($nameStart >= 0 && !preg_match(''/^(AND|OR|NOT|WHERE|'
+       to   = '        if ($nameStart >= 0 && !preg_match(''/^(XAND|XOR|XNOT|XWHERE|' },
+    @{ name = 'o: browser - a keyword in front of a parenthesis is read as a function name'
+       file = 'js\main.js'; php = 0; browser = 3
+       from = '                if (nameStart >= 0 && !/^(AND|OR|NOT|WHERE'
+       to   = '                if (nameStart >= 0 && !/^(XAND|XOR|XNOT|XWHERE' },
+    # --- third pass, 2026-09-29: several per-option pieces, one connector in front ---
+    @{ name = 'q: PHP - several per-option pieces lose their connector (x = 0 (c like ... OR ...))'
+       file = 'shared_logic.php'; php = 8; browser = 0
+       from = '    return $prefix . ''('' . implode($joiner, $bodies) . '')'';'
+       to   = '    return ''('' . implode($joiner, $bodies) . '')'';' },
+    @{ name = 'r: PHP - the pieces keep their own AND inside the group ((and c like ... OR ...))'
+       file = 'shared_logic.php'; php = 9; browser = 0
+       from = '    foreach ($pieces as $p) { $bodies[] = preg_replace($lead, '''', $p); }'
+       to   = '    foreach ($pieces as $p) { $bodies[] = $p; }' },
+    @{ name = 'u: PHP - ONE per-option piece is grouped too'
+       file = 'shared_logic.php'; php = 11; browser = 0
+       from = '    if (count($pieces) === 1) { return $pieces[0]; }'
+       to   = '    if (false) { return $pieces[0]; }' },
+    @{ name = 's: browser - several per-option pieces lose their connector'
+       file = 'js\main.js'; php = 0; browser = 3
+       from = '            return prefix + ''('' + pieces.map(p => p.replace(lead, '''')).join(joiner) + '')'';'
+       to   = '            return ''('' + pieces.map(p => p.replace(lead, '''')).join(joiner) + '')'';' },
+    @{ name = 't: browser - the pieces keep their own AND inside the group'
+       file = 'js\main.js'; php = 0; browser = 3
+       from = '            return prefix + ''('' + pieces.map(p => p.replace(lead, '''')).join(joiner) + '')'';'
+       to   = '            return prefix + ''('' + pieces.join(joiner) + '')'';' },
+    @{ name = 'v: browser - ONE per-option piece is grouped too'
+       file = 'js\main.js'; php = 0; browser = 2
+       from = '            if (pieces.length === 1) return pieces[0];'
+       to   = '            if (false) return pieces[0];' },
+    @{ name = 'p: PHP - the shared per-option parser finds nothing (both PHP engines lose the templates)'
+       file = 'shared_logic.php'; php = 22; browser = 0
+       from = "            `$map[`$value] = `$template;"
+       to   = "            // `$map[`$value] = `$template;" }
+)
+
+$bad = 0
+if ($Only) { $mutants = @($mutants | Where-Object { $Only.Contains($_.name.Substring(0, 1)) }) }
+foreach ($m in $mutants) {
+    [void](Copy-AppInto $mutApp)
+    $target = Join-Path $mutApp $m.file
+    $text = [IO.File]::ReadAllText($target)
+    $eol  = if ($text.Contains("`r`n")) { "`r`n" } else { "`n" }
+    $from = $m.from.Replace("`r`n", "`n").Replace("`n", $eol)
+    $to   = $m.to.Replace("`r`n", "`n").Replace("`n", $eol)
+    $mut  = $text.Replace($from, $to)
+    if ($mut -ceq $text) {
+        Write-Output ("ANCHOR MISS - " + $m.name + " (the file has moved; fix the mutant)")
+        $bad++
+        continue
+    }
+    # .Replace() changes EVERY copy: an anchor found twice would mutate two places at once.
+    $hits = ([regex]::Matches($text, [regex]::Escape($from))).Count
+    if ($hits -ne 1) {
+        Write-Output ("ANCHOR NOT UNIQUE ($hits hits) - " + $m.name + " (lengthen the anchor)")
+        $bad++
+        continue
+    }
+    [IO.File]::WriteAllText($target, $mut)
+    $r = Invoke-PromptParitySuite $mutApp $false $m.file
+    $wantBuilder = if ($m.ContainsKey('builder')) { $m.builder } else { 0 }
+    if ($r.php -eq $m.php -and $r.browser -eq $m.browser -and $r.builder -eq $wantBuilder) { $verdict = 'BITES' } else { $verdict = 'WRONG'; $bad++ }
+    Write-Output ("{0,-6} {1}  (expected php {2} / browser {3} / builder {4}, got {5} / {6} / {7})" -f $verdict, $m.name, $m.php, $m.browser, $wantBuilder, $r.php, $r.browser, $r.builder)
+    if ($verdict -eq 'WRONG') { $r.lines | Where-Object { $_ -match 'FAIL |NO RESULT|HARNESS|STALLED|lift:' } | ForEach-Object { Write-Output "         $_" } }
+}
+Write-Output ''
+Write-Output $(if ($bad -eq 0) { "MUTANTS: all $($mutants.Count) bite exactly as specified" } else { "MUTANTS: $bad problem(s) - the suite is not pinning what it claims" })
+Remove-Work

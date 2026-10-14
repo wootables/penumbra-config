@@ -1,0 +1,502 @@
+/*
+ * promptsection_bar_tests.js - section= on query prompts (2026-09-24): the
+ * answered-prompts BAR and its REVIEW buttons.
+ *
+ * Drives the SHIPPED code: window.__src holds js/main.js as text (baked by
+ * run.ps1); the functions under test and the bar's two click handlers are cut
+ * out of it by name / exact first line and compiled with real jQuery, jQuery UI
+ * and moment. The bar's markup (#promptInfoContainer) is LIFTED from the
+ * index.php under test and styled by the css/main.css under test, so the CSS
+ * checks measure the rules that ship. window.__srcRef, when run.ps1 supplies a
+ * different build (live, while a stage is tested), is the reference for "the
+ * bar without sections is byte for byte what it was".
+ *
+ * What it pins - each one a decision, not an accident:
+ *   A. parsePrompt reads section=, and nothing else about a prompt changes.
+ *   B. getPromptStorageKey leaves section= out of the answer key: adding,
+ *      renaming or removing a section keeps the saved answer, and copies of a
+ *      tag that differ only in section= stay ONE prompt. A tag without
+ *      section= keeps the key it always had.
+ *   C. promptSectionMap: names compare without case or extra spaces; the first
+ *      copy that names a section decides; a resultif child sits in its PARENT's
+ *      section (followed up the chain).
+ *   D. updatePromptDisplay: one section or none = the bar as before; two or
+ *      more = a box with its own review button per section of 2+ chips, a plain
+ *      .is-solo chip for a section of one, the bar's own button hidden. The
+ *      wrappers add no text and the button is a <button>, so data(prompts)
+ *      (the list's text) and the exports (`#promptInfoList li a`) see only chips.
+ *   E. main.css: the <button> ignores the global and themed button rules and
+ *      looks like the bar's own button; a solo chip keeps its pencil; a long
+ *      answer in a box still ellipsizes at the container edge.
+ *   F. reconfigureAllPrompts(section): only that section is asked; every other
+ *      saved answer is untouched (its save loop clears every key it lists);
+ *      no argument = every prompt, as before; Cancel saves nothing; a resultif
+ *      child is reviewed with its parent and never loses its answer to another
+ *      section's review (a failed condition DELETES the child's answer).
+ *   G. The real click handlers: a box's button reviews its section; the bar's
+ *      own button reviews everything - or its one named section.
+ */
+(function () {
+    var out = [];
+    var pass = 0, fail = 0;
+    function show(v) { try { return JSON.stringify(v); } catch (e) { return String(v); } }
+    function check(label, got, want) {
+        if (show(got) === show(want)) { pass++; out.push('  ok   ' + label); }
+        else { fail++; out.push('  FAIL ' + label + '\n         got:  ' + show(got) + '\n         want: ' + show(want)); }
+    }
+    function note(t) { out.push('  note ' + t); }
+    function section(t) {
+        out.push('\n=== ' + t + ' ===');
+        document.getElementById('out').textContent = out.join('\n') + '\nSTALLED in: ' + t;
+    }
+    function finish() {
+        out.push('\nPASS: ' + pass + '   FAIL: ' + fail);
+        out.push('RESULT: ' + (fail === 0 ? 'GREEN' : 'RED'));
+        document.getElementById('out').textContent = out.join('\n') + '\nDONE';
+    }
+
+    // main.js is CRLF; every anchor below is written with \n.
+    var code = String(window.__src || '').replace(/\r\n/g, '\n');
+    var codeRef = String(window.__srcRef || '').replace(/\r\n/g, '\n');
+
+    function fnRe(name) { return new RegExp('\\n    (?:async )?function ' + name + '\\('); }
+    function grabFn(src, name) {
+        var m = fnRe(name).exec(src);
+        if (!m) throw new Error('grab: function ' + name + ' not found in main.js');
+        var start = m.index + 1;
+        var end = src.indexOf('\n    }\n', start);
+        if (end < 0) throw new Error('grab: end of ' + name + ' not found');
+        return src.substring(start, end + 7);
+    }
+    function grabLine(src, re, what) {
+        var m = re.exec(src);
+        if (!m) throw new Error('grab: ' + what + ' not found in main.js');
+        return m[0];
+    }
+    // A top-level statement: from its exact first line to the first "\n    });\n".
+    function grabStmt(src, firstLine) {
+        var at = src.indexOf('\n    ' + firstLine);
+        if (at < 0) return null;
+        var end = src.indexOf('\n    });\n', at + 1);
+        return end < 0 ? null : src.substring(at + 1, end + 9);
+    }
+
+    var NAMES = [
+        'escapeHtml', 'decodeHtmlEntities', 'stripWrappingQuotePair',
+        'resolveDynamicValues', 'resolveKeywordDate', 'resolveDynamicDate',
+        'penumbraIsDateRangeType', 'penumbraSplitDateRange', 'penumbraJoinDateRange', 'penumbraRangeHasKeywordEnd',
+        'penumbraParseRangeEnd', 'penumbraFormatRangeEnd', 'penumbraRangeKeywordDate', 'penumbraResolveRangeEnd',
+        'penumbraResolveDateRange', 'penumbraApplyDateRangeTemplate', 'penumbraDateRangePresets',
+        'penumbraDateRangePresetFor', 'penumbraDateRangeLabel', 'penumbraDateRangeResolvedText', 'penumbraDateRangeRawDefault',
+        'parsePrompt', 'parseMultiSelectDefault', 'splitValidateRules', 'validatePromptInput', 'sanitizeCssString',
+        'showPromptDialog', '_pnbDateRangeDialogHtml', '_pnbWireDateRangeDialog',
+        'generateResetLinkHtml', 'attachResetHandler', 'getPromptStorageKey', 'getPromptAnswerByName',
+        'autofillAuthFailed', 'autofillPayloadError', 'resolvePromptDateRange',
+        'promptTypeIconPaths', 'promptTypeIconSvg', '_pnbDatepickerBeforeShow',
+        'promptStateIconSvg', 'updatePromptDisplay',
+        'reconfigureSinglePrompt', 'reconfigureAllPrompts'
+    ];
+    // New with section=; a build without them still compiles (and goes red below).
+    var OPTIONAL = ['promptSectionKey', 'promptSectionMap'];
+    var HANDLER_BAR = "$(document).on('click', '#resetAllPromptsLink', function (e) {";
+    var HANDLER_SECTION = "$(document).on('click', '#promptInfoList .prompt-section-review', function (e) {";
+
+    var calls = { toasts: [] };
+    function buildEnv(src, withHandlers) {
+        var names = NAMES.concat(OPTIONAL.filter(function (n) { return fnRe(n).test(src); }));
+        var body = "var PNB_DATE_RANGE_SEP = '..';\n"
+            + grabLine(src, /\n    const _isRangeKeyword = [^\n]+\n/, '_isRangeKeyword')
+            + 'var _promptRangeCache = new Map();\n'
+            + 'var _forceDefaultApplied = new Set();\n'
+            + names.map(function (n) { return grabFn(src, n); }).join('\n');
+        var found = { bar: false, section: false };
+        if (withHandlers) {
+            var h1 = grabStmt(src, HANDLER_BAR), h2 = grabStmt(src, HANDLER_SECTION);
+            if (h1) { body += '\n' + h1; found.bar = true; }
+            if (h2) { body += '\n' + h2; found.section = true; }
+        }
+        body += '\nreturn {' + names.map(function (n) { return n + ':' + n; }).join(',')
+            + ', _forceDefaultApplied: _forceDefaultApplied };';
+        var e = new Function('getQuery', 'getSnippet', 'currentThemeId', 'penumbra_vars', 'editor', 'renderReportSnippet', 'handleSessionExpiredError',
+            'showLoading', 'hideLoading', 'show_text', body)(
+            function () { return window.__editorSql || ''; },
+            function () { return window.__snippetSql || ''; },
+            function () { return 'theme-default'; },
+            { shibboleth: {} },
+            { getValue: function () { return window.__editorSql || ''; } },
+            function () { }, function () { }, function () { }, function () { },
+            function (html) { calls.toasts.push(String(html)); });
+        e.handlersFound = found;
+        return e;
+    }
+
+    var env, ref = null;
+    try {
+        $.ajax = function () { return Promise.resolve([]); };
+        window._pnbModalHost = function () { return $(document.body); };
+        env = buildEnv(code, true);
+        if (codeRef && codeRef !== code) ref = buildEnv(codeRef, false);
+        if (!window.__containerHtml) throw new Error('run.ps1 did not supply the #promptInfoContainer markup');
+    } catch (e) {
+        out.push('HARNESS FAILED TO BUILD: ' + e.message);
+        fail++;
+        finish();
+        return;
+    }
+
+    function tick(ms) { return new Promise(function (r) { setTimeout(r, ms || 0); }); }
+    function mountBar() {
+        $('#hdr').remove();
+        $(document.body).prepend('<div id="hdr" style="width: 640px">' + window.__containerHtml + '</div>');
+    }
+    function clearAll() {
+        localStorage.clear(); env._forceDefaultApplied.clear();
+        $('.modal-prompt-overlay').remove(); window.__execClicks = 0; calls.toasts.length = 0;
+    }
+    function K(tag) { return env.getPromptStorageKey(tag); }
+    function store(tag, value, message) { localStorage.setItem(K(tag), JSON.stringify({ value: value, display: value, message: message })); }
+    function stored(tag) { var s = localStorage.getItem(K(tag)); return s ? JSON.parse(s) : null; }
+    function storedRaw(tag) { return localStorage.getItem(K(tag)); }
+    function lastDialog() {
+        var $d = $('.modal-prompt-overlay').last();
+        if (!$d.length) return null;
+        var id = $d.attr('id');
+        return { $d: $d, id: id, input: document.getElementById(id + '_input') };
+    }
+    function answerOne(seen) {
+        var d = lastDialog();
+        if (!d || d.$d.data('seenByTest')) return false;
+        d.$d.data('seenByTest', 1);
+        seen.push(d.$d.find('.modal-prompt-content span').first().text() + '=' + (d.input ? d.input.value : ''));
+        $('#' + d.id + '_ok').trigger('click');
+        return true;
+    }
+    // Presses OK in every dialog a flow opens; returns "message=shown value" per dialog.
+    async function okThrough(promise) {
+        var seen = [], done = false;
+        promise.then(function () { done = true; }, function () { done = true; });
+        for (var guard = 0; guard < 300 && !done; guard++) { await tick(20); answerOne(seen); }
+        await promise;
+        return seen;
+    }
+    // The same, for a flow started by a real click (the handler keeps its promise).
+    async function okThroughClick($el) {
+        var seen = [], exec0 = window.__execClicks || 0, toast0 = calls.toasts.length, quiet = 0;
+        $el.first().trigger('click');
+        for (var guard = 0; guard < 300; guard++) {
+            await tick(20);
+            if (answerOne(seen)) { quiet = 0; continue; }
+            if ((window.__execClicks || 0) > exec0 || calls.toasts.length > toast0) { if (++quiet > 3) break; }
+        }
+        return seen;
+    }
+    function sqlOf(list) { return 'SELECT 1 FROM DUAL WHERE 1=1\n' + list.join('\n') + '\n'; }
+    var norm = function (s) { return String(s).replace(/\s+/g, ' ').trim(); };
+    function textsOf($els) { return $els.map(function () { return $(this).text(); }).get(); }
+
+    var T = {
+        from: '[PROMPT;type=text;name=from;message=From date;section=Dates]',
+        to: '[PROMPT;type=text;name=to;message=To date;section= dates ]',     // same section, other spelling
+        dept: '[PROMPT;type=text;name=dept;message=Department]',
+        pi: '[PROMPT;type=text;name=pi;message=PI]',
+        stat: '[PROMPT;type=select;name=status;message=Status;options=Active,Closed;section=Status]'
+    };
+    function answerAll() {
+        store(T.from, '01-JUL-25', 'From date'); store(T.to, '30-JUN-26', 'To date');
+        store(T.dept, 'OSP', 'Department'); store(T.pi, 'Anderson', 'PI'); store(T.stat, 'Active', 'Status');
+    }
+    var MIX = [T.from, T.dept, T.to, T.stat, T.pi];    // Dates, -, Dates, Status, -
+    var NOSEC = ['[PROMPT;type=text;name=from;message=From date]', '[PROMPT;type=text;name=to;message=To date]', T.dept];
+
+    (async function () {
+        try {
+            // =================================================================
+            section('A. parsePrompt reads section=, nothing else changes');
+            check('section= is read', env.parsePrompt('[PROMPT;type=text;name=a;section=Dates;message=Pick one]').section, 'Dates');
+            check('no section= = null', env.parsePrompt('[PROMPT;type=text;name=a]').section, null);
+            check('an empty section= = null', env.parsePrompt('[PROMPT;type=text;name=a;section=]').section, null);
+            check('spaces around the name are trimmed', env.parsePrompt(T.to).section, 'dates');
+            check('SECTION= in capitals is the same key', env.parsePrompt('[PROMPT;type=text;SECTION=X]').section, 'X');
+            check('"section=" inside a message value is not a section', env.parsePrompt('[PROMPT;type=text;name=a;message=Use section=x]').section, null);
+            var withSec = env.parsePrompt('[PROMPT;type=select;name=s;message=Status;section=Filters;options=A:1,B:2;template="AND c = :val";nosave]');
+            var withoutSec = env.parsePrompt('[PROMPT;type=select;name=s;message=Status;options=A:1,B:2;template="AND c = :val";nosave]');
+            delete withSec.section; delete withoutSec.section;
+            check('every other field parses exactly as without it (options, template, flags)', withSec, withoutSec);
+            check('the value before it keeps its end', env.parsePrompt('[PROMPT;type=text;message=Pick one;section=S]').message, 'Pick one');
+
+            // =================================================================
+            section('B. the answer key leaves section= out');
+            var base = '[PROMPT;type=text;name=a;message=A]';
+            check('section= last', K('[PROMPT;type=text;name=a;message=A;section=Dates]'), K(base));
+            check('section= in the middle', K('[PROMPT;type=text;section=Dates;name=a;message=A]'), K(base));
+            check('section= first after PROMPT;', K('[PROMPT;section=Dates;type=text;name=a;message=A]'), K(base));
+            check('SECTION= in capitals, a two-word name, spaces before the ]', K('[PROMPT;type=text;name=a;message=A;SECTION= Report period ]'), K(base));
+            check('renaming a section keeps the key', K('[PROMPT;type=text;name=a;message=A;section=Dates]'), K('[PROMPT;type=text;name=a;message=A;section=Filters]'));
+            check('a tag written over several lines, with its section line deleted',
+                K('[PROMPT;\n  type=text;\n  section=Dates;\n  name=a\n]'), K('[PROMPT;\n  type=text;\n  name=a\n]'));
+            check('... and when the section line was the last one',
+                K('[PROMPT;\n  type=text;\n  name=a;\n  section=Dates\n]'), K('[PROMPT;\n  type=text;\n  name=a\n]'));
+            check('a shared prompt keeps its global key', K('[PROMPT;type=text;name=a;share;section=X]'), K('[PROMPT;type=text;name=a;share]'));
+            // A tag WITHOUT section= keeps the key it always had - the hash, written out here as the spec.
+            var legacyKey = function (tag) {
+                var h = 0;
+                for (var i = 0; i < tag.length; i++) { h = ((h << 5) - h) + tag.charCodeAt(i); h = h & h; }
+                return 'penumbra_prompt_' + (new URLSearchParams(window.location.search).get('id') || '__adhoc__') + '_' + Math.abs(h);
+            };
+            check('a tag without section= keeps its old key', K(base), legacyKey(base));
+            check('... also when its message says "section=" (only a ;section= key is dropped)', K('[PROMPT;type=text;name=a;message=Use section=x]'), legacyKey('[PROMPT;type=text;name=a;message=Use section=x]'));
+            check('a look-alike key (subsection=) is NOT dropped', K('[PROMPT;type=text;name=a;message=A;subsection=X]') === K(base), false);
+            check('two different prompts in one section keep two keys', K('[PROMPT;type=text;name=b;section=Dates]') === K('[PROMPT;type=text;name=a;section=Dates]'), false);
+
+            // =================================================================
+            section('C. promptSectionMap - which section a prompt is in');
+            var hasMap = typeof env.promptSectionMap === 'function' && typeof env.promptSectionKey === 'function';
+            check('main.js has promptSectionMap and promptSectionKey', hasMap, true);
+            var mapOf = function (tags) {
+                var m = hasMap ? env.promptSectionMap(tags.join('\n')) : new Map();
+                var o = {};
+                tags.forEach(function (t) { o[env.parsePrompt(t).name || '?'] = m.has(K(t)) ? m.get(K(t)) : '(none)'; });
+                return o;
+            };
+            check('names compare without case or extra spaces; no section = ""', mapOf([T.from, T.to, T.dept]), { from: 'dates', to: 'dates', dept: '' });
+            check('promptSectionKey("  Report   Period ") = "report period"', hasMap ? env.promptSectionKey('  Report   Period ') : null, 'report period');
+            var c1 = '[PROMPT;type=text;name=c;message=C]', c2 = '[PROMPT;type=text;name=c;message=C;section=Dates]', c3 = '[PROMPT;type=text;name=c;message=C;section=Other]';
+            check('an unsectioned copy, then a sectioned copy: the section counts', hasMap ? env.promptSectionMap([c1, c2].join('\n')).get(K(c1)) : null, 'dates');
+            check('two copies naming different sections: the first one decides', hasMap ? env.promptSectionMap([c2, c3].join('\n')).get(K(c1)) : null, 'dates');
+            var par = '[PROMPT;type=select;name=col;message=Search by;options=A,B;section=Filters]';
+            var kid = '[PROMPT;type=text;name=kid;resultif=col:A;message=Kid;section=Dates]';
+            var grand = '[PROMPT;type=text;name=grand;resultif=kid:x;message=Grandchild]';
+            var orphan = '[PROMPT;type=text;name=orph;resultif=nobody:x;message=Orphan;section=Dates]';
+            check('a child sits in its parent\'s section whatever its own says (even written first), a grandchild too; an orphan keeps its own',
+                mapOf([kid, par, grand, orphan]), { kid: 'filters', col: 'filters', grand: 'filters', orph: 'dates' });
+            var la = '[PROMPT;type=text;name=la;resultif=lb:x;message=LA;section=S1]', lb = '[PROMPT;type=text;name=lb;resultif=la:x;message=LB;section=S2]';
+            check('a parent loop (a <-> b) still ends', Object.keys(mapOf([la, lb])).length, 2);
+
+            // =================================================================
+            section('D. updatePromptDisplay - the bar');
+            mountBar();
+            var $list = $('#promptInfoList');
+            clearAll();
+            window.__editorSql = sqlOf(NOSEC);
+            store(NOSEC[0], '01-JUL-25', 'From date'); store(NOSEC[1], '30-JUN-26', 'To date'); store(T.dept, 'OSP', 'Department');
+            env.updatePromptDisplay();
+            check('no sections: three chips straight in the list, no boxes, no section buttons',
+                [$list.children('li').length, $list.find('.prompt-section').length, $list.find('.prompt-section-review').length], [3, 0, 0]);
+            check('no sections: the bar\'s own button shows and reviews everything (no section on it)',
+                [$('#resetAllPromptsLink').css('display') !== 'none', $('#resetAllPromptsLink').attr('data-prompt-section')], [true, undefined]);
+            check('no sections: no .is-solo, no has-sections', [$list.find('.is-solo').length, $list.hasClass('has-sections')], [0, false]);
+            var htmlNoSec = $list.html();
+            if (ref) {
+                ref.updatePromptDisplay();
+                check('no sections: the bar is BYTE-IDENTICAL to the reference build\'s', $list.html(), htmlNoSec);
+                env.updatePromptDisplay();
+            } else {
+                note('no separate reference build - the byte comparison with the pre-section bar is skipped');
+            }
+
+            var ONESEC = NOSEC.map(function (t) { return t.replace(']', ';section=Main]'); });
+            window.__editorSql = sqlOf(ONESEC);
+            env.updatePromptDisplay();
+            check('every chip in ONE named section: the same three plain chips - their answers found under the old keys',
+                [$list.children('li').length, $list.find('.prompt-section').length, textsOf($list.find('a.prompt-byline-link strong'))],
+                [3, 0, ['01-JUL-25', '30-JUN-26', 'OSP']]);
+            check('... and the bar\'s own button reviews that section',
+                [$('#resetAllPromptsLink').css('display') !== 'none', $('#resetAllPromptsLink').attr('data-prompt-section')], [true, 'main']);
+
+            window.__editorSql = sqlOf(MIX);
+            clearAll(); answerAll();
+            env.updatePromptDisplay();
+            var tops = $list.children('li').map(function () {
+                return $(this).hasClass('prompt-section') ? ('box:' + $(this).attr('data-prompt-section')) : ('chip:' + $(this).find('em').text());
+            }).get();
+            check('three sections: a box for Dates (seen first), a box for the two unsectioned, a plain chip for Status', tops, ['box:dates', 'box:', 'chip:Status:']);
+            check('each box holds its own chips, in SQL order', $list.find('li.prompt-section').map(function () { return textsOf($(this).find('em')).join('|'); }).get(),
+                ['From date:|To date:', 'Department:|PI:']);
+            var $btns = $list.find('.prompt-section-review');
+            check('one review button per box, a real <button type="button"> naming its section',
+                $btns.map(function () { return this.tagName + ':' + this.type + ':' + $(this).attr('data-prompt-section'); }).get(), ['BUTTON:button:dates', 'BUTTON:button:']);
+            check('each button says what it reviews (tooltip = accessible name)', $btns.map(function () { return $(this).attr('title') + ' | ' + $(this).attr('aria-label'); }).get(),
+                ['Review From date and To date, then re-run the report. | Review From date and To date, then re-run the report.',
+                 'Review Department and PI, then re-run the report. | Review Department and PI, then re-run the report.']);
+            check('the bar\'s own button stands down', $('#resetAllPromptsLink').css('display'), 'none');
+            check('the chip alone in its section keeps its pencil (.is-solo); no other chip does', textsOf($list.find('a.is-solo em')), ['Status:']);
+            check('has-sections on, has-solo-prompt off', [$list.hasClass('has-sections'), $list.hasClass('has-solo-prompt')], [true, false]);
+            check('the exports\' `#promptInfoList li a` finds exactly the five chips',
+                $('#promptInfoList li a').map(function () { return $(this).hasClass('prompt-byline-link') ? $(this).find('em').text() : 'NOT A CHIP: ' + this.outerHTML.slice(0, 60); }).get(),
+                ['From date:', 'To date:', 'Department:', 'PI:', 'Status:']);
+            check('data(prompts) = the list\'s text = exactly the chips\' text (no caption, no button text)',
+                norm($list.text()), norm(textsOf($list.find('a.prompt-byline-link')).join(' ')));
+
+            var THREE = [T.dept.replace(']', ';section=F]'), T.pi.replace(']', ';section=F]'), T.stat.replace('section=Status', 'section=f'), T.from];
+            window.__editorSql = sqlOf(THREE);
+            env.updatePromptDisplay();
+            check('three chips in a box: "A, B and C"', $list.find('.prompt-section-review').first().attr('title'), 'Review Department, PI and Status, then re-run the report.');
+
+            var OWN = [T.from.replace('section=Dates', 'section=s1'), T.dept.replace(']', ';section=s2]'), T.stat.replace('section=Status', 'section=s3')];
+            window.__editorSql = sqlOf(OWN);
+            env.updatePromptDisplay();
+            check('one section per prompt: no review button anywhere', [$list.find('.prompt-section-review').length, $('#resetAllPromptsLink').css('display')], [0, 'none']);
+            check('... and every chip keeps its pencil', $list.find('a.prompt-byline-link').map(function () { return $(this).hasClass('is-solo'); }).get(), [true, true, true]);
+
+            var PAR = '[PROMPT;type=select;name=col;message=Search by;options=A,B;template="";section=Filters]';
+            var KID = '[PROMPT;type=text;name=kid;resultif=col:A;message=Value;section=Dates;template="AND x = :val"]';
+            window.__editorSql = sqlOf([T.from, T.to, PAR, KID]);
+            store(PAR, 'A', 'Search by'); store(KID, 'foo', 'Value');
+            env.updatePromptDisplay();
+            check('a resultif child is drawn in its PARENT\'s box, not the one its own section= names',
+                $list.find('li.prompt-section').map(function () { return textsOf($(this).find('em')).join('|'); }).get(), ['From date:|To date:', 'Search by:|Value:']);
+
+            var HID = '[PROMPT;type=text;name=h;hidden;forcedefault=x;section=Secret]';
+            window.__editorSql = sqlOf(NOSEC.concat([HID]));
+            store(NOSEC[0], '01-JUL-25', 'From date'); store(NOSEC[1], '30-JUN-26', 'To date');
+            env.updatePromptDisplay();
+            check('a hidden prompt\'s section does not split the bar (it has no chip)', [$list.find('.prompt-section').length, $('#resetAllPromptsLink').css('display') !== 'none'], [0, true]);
+
+            var U1 = '[PROMPT;type=text;name=u;message=Unit]', U2 = '[PROMPT;type=text;name=u;message=Unit;section=Dates]';
+            window.__editorSql = 'SELECT 1 FROM A WHERE u = ' + U1 + '\nUNION ALL\nSELECT 1 FROM B WHERE u = ' + U2 + ' AND d = ' + T.from + '\n';
+            clearAll(); store(U1, 'X1', 'Unit'); store(T.from, '01-JUL-25', 'From date');
+            env.updatePromptDisplay();
+            check('a UNION report with ONE copy of a tag given a section: still one chip, and it is in that section',
+                [textsOf($list.find('a.prompt-byline-link em')), $('#resetAllPromptsLink').attr('data-prompt-section')], [['Unit:', 'From date:'], 'dates']);
+
+            // =================================================================
+            section('E. main.css - the box, its button, the pencil');
+            window.__editorSql = sqlOf(MIX);
+            clearAll(); answerAll();
+            env.updatePromptDisplay();
+            var btn = $list.find('.prompt-section-review').get(0);
+            var link = document.getElementById('resetAllPromptsLink');
+            if (!btn) {
+                check('a section button to measure', false, true);
+            } else {
+                var cs = getComputedStyle(btn), lk = getComputedStyle(link);
+                check('the button is the bar\'s 30 x 30 control - no global `button` margin or padding', [cs.width, cs.height, cs.marginTop, cs.paddingLeft], ['30px', '30px', '0px', '0px']);
+                check('... and looks exactly like the bar\'s own button', [cs.backgroundColor, cs.color, cs.borderTopColor, cs.borderTopLeftRadius], [lk.backgroundColor, lk.color, lk.borderTopColor, lk.borderTopLeftRadius]);
+                document.body.classList.add('theme-dark-blue');
+                cs = getComputedStyle(btn); lk = getComputedStyle(link);
+                var plain = document.createElement('button');
+                document.body.appendChild(plain);
+                var pcs = getComputedStyle(plain);
+                check('CONTROL: under theme-dark-blue a bare <button> IS restyled by the theme', pcs.backgroundColor !== lk.backgroundColor, true);
+                check('... but the section button still matches the bar\'s own button', [cs.backgroundColor, cs.color, cs.marginTop], [lk.backgroundColor, lk.color, '0px']);
+                plain.parentNode.removeChild(plain);
+                document.body.classList.remove('theme-dark-blue');
+            }
+            var soloA = $list.find('a.is-solo').get(0), boxA = $list.find('.prompt-section a.prompt-byline-link').get(0);
+            check('the pencil: always visible on the solo chip, hover-only on a boxed chip',
+                [soloA ? getComputedStyle(soloA, '::after').opacity : null, boxA ? getComputedStyle(boxA, '::after').opacity : null], ['1', '0']);
+            var box = $list.find('.prompt-section').get(0);
+            var bcs = box ? getComputedStyle(box) : {};
+            check('the box: a flex row, rounded, bordered', [bcs.display, bcs.borderTopLeftRadius, bcs.borderTopStyle], ['flex', '11px', 'solid']);
+            $('#hdr').css('width', '320px');
+            store(T.dept, new Array(61).join('W'), 'Department');
+            // The plain bar first. Before 2026-09-24 a capped chip ran its padding +
+            // border (31px) past its slot even here: max-width:100% on a content-box
+            // chip. Found while measuring the boxes; the chip is border-box now.
+            window.__editorSql = sqlOf(NOSEC);
+            env.updatePromptDisplay();
+            var plainChip = $list.find('a.prompt-byline-link').filter(function () { return $(this).find('em').text() === 'Department:'; }).get(0);
+            check('without sections, a long answer stays inside a narrow container too (the chip is border-box)',
+                plainChip ? plainChip.getBoundingClientRect().right <= document.getElementById('promptInfoContainer').getBoundingClientRect().right + 1 : null, true);
+            window.__editorSql = sqlOf(MIX);
+            env.updatePromptDisplay();
+            var cont = document.getElementById('promptInfoContainer').getBoundingClientRect();
+            var longChip = $list.find('a.prompt-byline-link').filter(function () { return $(this).find('em').text() === 'Department:'; }).get(0);
+            var st = longChip ? longChip.querySelector('strong') : null;
+            check('a long answer in a box stays inside a narrow container and ellipsizes',
+                longChip ? [longChip.getBoundingClientRect().right <= cont.right + 1, st.scrollWidth > st.clientWidth] : null, [true, true]);
+            if (longChip) {
+                var r = function (el) { var b = el.getBoundingClientRect(); return Math.round(b.left) + '-' + Math.round(b.right); };
+                note('x-extents: hdr ' + r(document.getElementById('hdr')) + ' | container ' + r(document.getElementById('promptInfoContainer'))
+                    + ' | list ' + r(document.getElementById('promptInfoList')) + ' | box ' + r($(longChip).closest('.prompt-section').get(0))
+                    + ' | inner list ' + r($(longChip).closest('.prompt-section-list').get(0)) + ' | li ' + r(longChip.parentNode)
+                    + ' | chip ' + r(longChip) + ' | value ' + r(st));
+            }
+            $('#hdr').css('width', '640px');
+
+            // =================================================================
+            section('F. reconfigureAllPrompts(section) - reviewing one section');
+            window.__editorSql = sqlOf(MIX);
+            clearAll(); answerAll();
+            var before = {};
+            MIX.forEach(function (t) { before[t] = storedRaw(t); });
+            var seen = await okThrough(env.reconfigureAllPrompts('dates'));
+            check('Dates: only its two prompts are asked, in order, each showing its answer', seen, ['From date=01-JUL-25', 'To date=30-JUN-26']);
+            check('... every other saved answer is untouched, byte for byte', [T.dept, T.pi, T.stat].map(function (t) { return storedRaw(t) === before[t]; }), [true, true, true]);
+            check('... its own answers are kept', [(stored(T.from) || {}).value, (stored(T.to) || {}).value], ['01-JUL-25', '30-JUN-26']);
+            check('... and the report re-ran once', window.__execClicks, 1);
+
+            clearAll(); answerAll();
+            seen = await okThrough(env.reconfigureAllPrompts(''));
+            check('"" = the unsectioned prompts, a section of their own', seen, ['Department=OSP', 'PI=Anderson']);
+            clearAll(); answerAll();
+            seen = await okThrough(env.reconfigureAllPrompts('  DATES '));
+            check('the section asked for is matched without case or extra spaces', seen, ['From date=01-JUL-25', 'To date=30-JUN-26']);
+            clearAll(); answerAll();
+            seen = await okThrough(env.reconfigureAllPrompts());
+            check('no section given: every prompt, as before', seen, ['From date=01-JUL-25', 'Department=OSP', 'To date=30-JUN-26', 'Status=Active', 'PI=Anderson']);
+            clearAll(); answerAll();
+            MIX.forEach(function (t) { before[t] = storedRaw(t); });
+            seen = await okThrough(env.reconfigureAllPrompts('nosuch'));
+            check('a section with no prompts: nothing asked, nothing changed, nothing re-run, a notice',
+                [seen.length, MIX.every(function (t) { return storedRaw(t) === before[t]; }), window.__execClicks, calls.toasts.join(' ').indexOf('No prompts found in this section') >= 0], [0, true, 0, true]);
+
+            clearAll(); answerAll();
+            MIX.forEach(function (t) { before[t] = storedRaw(t); });
+            var pc = env.reconfigureAllPrompts('dates');
+            await tick(40);
+            var dlg = lastDialog();
+            if (dlg) $('#' + dlg.id + '_cancel').trigger('click');
+            await pc;
+            check('Cancel: nothing saved, nothing re-run', [MIX.every(function (t) { return storedRaw(t) === before[t]; }), window.__execClicks], [true, 0]);
+
+            // The failure this design exists to prevent: a child reviewed apart from its
+            // parent is judged against NO answer, and a failed resultif DELETES its answer.
+            var RP = '[PROMPT;type=select;name=col;message=Search by;options=NAME,OUC;template="";section=Filters]';
+            var RK = '[PROMPT;type=text;name=kid;resultif=col:OUC;message=OUC value;section=Dates;template="AND x = :val"]';
+            var answerTree = function () { store(T.from, '01-JUL-25', 'From date'); store(T.to, '30-JUN-26', 'To date'); store(RP, 'OUC', 'Search by'); store(RK, '10', 'OUC value'); };
+            window.__editorSql = sqlOf([T.from, T.to, RP, RK]);
+            clearAll(); answerTree();
+            seen = await okThrough(env.reconfigureAllPrompts('dates'));
+            check('reviewing Dates does not ask a child whose own section= says Dates - it sits with its parent', seen, ['From date=01-JUL-25', 'To date=30-JUN-26']);
+            check('... and the child KEEPS its answer', (stored(RK) || {}).value, '10');
+            clearAll(); answerTree();
+            seen = await okThrough(env.reconfigureAllPrompts('filters'));
+            check('reviewing Filters asks the parent, then its child', seen, ['Search by=OUC', 'OUC value=10']);
+            check('... and both answers are kept', [(stored(RP) || {}).value, (stored(RK) || {}).value], ['OUC', '10']);
+
+            // =================================================================
+            section('G. the real click handlers');
+            check('both handlers were found in main.js', [env.handlersFound.bar, env.handlersFound.section], [true, true]);
+            window.__editorSql = sqlOf(MIX);
+            clearAll(); answerAll();
+            env.updatePromptDisplay();
+            seen = await okThroughClick($('#promptInfoList .prompt-section-review[data-prompt-section="dates"]'));
+            check('clicking the Dates box\'s button reviews Dates', seen, ['From date=01-JUL-25', 'To date=30-JUN-26']);
+            clearAll(); answerAll();
+            env.updatePromptDisplay();
+            seen = await okThroughClick($('#promptInfoList .prompt-section-review[data-prompt-section=""]'));
+            check('clicking the unsectioned box\'s button reviews those two', seen, ['Department=OSP', 'PI=Anderson']);
+
+            var ELSE = '[PROMPT;type=text;name=zz;message=Elsewhere;default=d;section=Else]';
+            window.__editorSql = sqlOf(ONESEC.concat([ELSE]));
+            clearAll(); store(ONESEC[0], '01-JUL-25', 'From date'); store(ONESEC[1], '30-JUN-26', 'To date'); store(ONESEC[2], 'OSP', 'Department');
+            env.updatePromptDisplay();
+            check('CONTROL: an unanswered prompt in another section has no chip, so the bar shows ONE section',
+                [$list.find('.prompt-section').length, $('#resetAllPromptsLink').attr('data-prompt-section')], [0, 'main']);
+            seen = await okThroughClick($('#resetAllPromptsLink'));
+            check('the bar\'s own button reviews its one named section - not the prompt elsewhere', seen, ['From date=01-JUL-25', 'To date=30-JUN-26', 'Department=OSP']);
+            window.__editorSql = sqlOf(NOSEC.concat(['[PROMPT;type=text;name=zz;message=Elsewhere;default=d]']));
+            clearAll(); store(NOSEC[0], '01-JUL-25', 'From date'); store(NOSEC[1], '30-JUN-26', 'To date'); store(T.dept, 'OSP', 'Department');
+            env.updatePromptDisplay();
+            seen = await okThroughClick($('#resetAllPromptsLink'));
+            check('no sections: the bar\'s own button reviews every prompt, as before', seen, ['From date=01-JUL-25', 'To date=30-JUN-26', 'Department=OSP', 'Elsewhere=d']);
+
+            if (window.__control) check('CONTROL: deliberate failure', 1, 2);
+        } catch (e) {
+            fail++;
+            out.push('  FAIL threw: ' + (e && e.stack ? e.stack : e));
+        }
+        finish();
+    })();
+})();

@@ -1,0 +1,107 @@
+# =============================================================================
+# Penumbra NOADM5 suite (2026-10-02) - the five &noadm / owner follow-ups of README
+# section 6 (after `ownerview`): (a) the metrics scope stays a plain viewer's under
+# &noadm (eng15); (b) the dashboard kiosk hop and home list clamp can_edit with noadm;
+# (c) a journal @mention / reply is not e-mailed to someone who could not open the
+# journal (off for viewers; they are not an admin, the owner or an editor) and the
+# toast says so; (d) a report grant views the journal - the API gate and index.php's
+# copy, term for term; (e) the pagination help. test.php lifts the API gate and its
+# helpers by their markers; the rest are text pins. No database, no web server.
+#
+#   powershell -File run.ps1                 (tests the LIVE files)
+#   powershell -File run.ps1 -App <dir>      (an app-shaped dir: the five PHP files flat,
+#                                             the two scripts under js\; missing ones
+#                                             come from live; the pre-fix files are the
+#                                             control: FATAL, no helpers to lift)
+#   powershell -File run.ps1 -Mutant <name>  (ONE single-point change; must turn
+#   powershell -File run.ps1 -Mutants         exactly its own assertions red)
+#       grantterm   the gate's grant term gone (manage_journal.php)      -> G3
+#       openviewer  journal ON no longer opens for a viewer (the flag is
+#                   never read then)                                     -> G7 G7b G13
+#       mailoff     the @mention guard gone                               -> M1
+#       replyoff    the reply fan-out guard gone                          -> M2
+#       idxgrant    index.php's copy loses the grant term                 -> I1
+#       dashnoadm   dashboard.php stops emitting noadm                    -> D1
+#       hopclamp    the kiosk hop no longer clamps can_edit               -> J1
+#       badgeclamp  the home badge no longer clamps                       -> J2
+#       helpbelow   the help says "below the table" again                 -> H1
+#       helpglyph   the help lists the old glyphs again                   -> H2
+#       toastoff    the toast never says why                              -> T1
+#       scopeoff    the metrics person-level tier ignores &noadm again    -> A1
+# Writes summary.txt. ONE run at a time. From a UNC path run it as a scriptblock
+# with `$here = $PSScriptRoot` replaced.
+# =============================================================================
+param([string]$App = '', [string]$Mutant = '', [switch]$Mutants)
+$ErrorActionPreference = 'Stop'
+$here = $PSScriptRoot
+$php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$live = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+function Src($rel) { if ($App -and (Test-Path -LiteralPath (Join-Path $App $rel))) { return (Join-Path $App $rel) }; return (Join-Path $live $rel) }
+$names = @{ dash = 'dashboard.php'; journal = 'manage_journal.php'; index = 'index.php'; help = 'help_content.php'; an = 'analytics_shared.php'; dashjs = 'js\penumbra_dashboard.js'; jrnjs = 'js\penumbra_journal.js' }
+
+$mutantDefs = @{
+  'grantterm'  = @('journal', '    if (journalCallerHoldsGrant($report, $currentUserKey)) return true;', '    if (false) return true;', @('G3'))
+  'openviewer' = @('journal', '    if (journalReportJournalEnabled($report)) return true;', '    if (false) return true;', @('G7', 'G7b', 'G13'))   # G13: the flag is never read then
+  'mailoff'    = @('journal', '                if (!journalTargetCanOpenJournal($report, $uid)) {', '                if (false) {', @('M1'))
+  'replyoff'   = @('journal', '                    if (!journalTargetCanOpenJournal($report, $u)) {', '                    if (false) {', @('M2'))
+  'idxgrant'   = @('index',   '                        || ($loadedShortId !== '''' && is_array($userGrants) && penumbraReportGrantMatches($userGrants, $loadedShortId))', '', @('I1'))
+  'dashnoadm'  = @('dash',    '    noadm: <?php echo json_encode((bool)$noadm); ?>,', '', @('D1'))
+  'hopclamp'   = @('dashjs',  'V.canEdit = !!r.can_edit && !penumbra_dash_vars.noadm;', 'V.canEdit = !!r.can_edit;', @('J1'))
+  'badgeclamp' = @('dashjs',  '((d.can_edit && !penumbra_dash_vars.noadm) ?', '(d.can_edit ?', @('J2'))
+  'helpbelow'  = @('help',    'appear in the bar above the table, beside the search box.', 'appear below the table.', @('H1'))
+  'helpglyph'  = @('help',    '<strong>First</strong> (&lt;&lt;)', '<strong>First</strong> (&laquo;)', @('H2'))
+  'toastoff'   = @('jrnjs',   '            if (offj) msg +=', '            if (false) msg +=', @('T1'))
+  'scopeoff'   = @('an',      '$editorRolesOn && ($out[''is_owner''] || $out[''is_editor''])', '($out[''is_owner''] || $out[''is_editor''])', @('A1'))
+}
+
+function Run-Once([string]$mut) {
+  $txt = @{}
+  foreach ($k in $names.Keys) { $txt[$k] = [IO.File]::ReadAllText((Src $names[$k])) }
+  $expect = @()
+  if ($mut) {
+    if (-not $mutantDefs.ContainsKey($mut)) { throw "unknown mutant '$mut' (known: $(($mutantDefs.Keys | Sort-Object) -join ', '))" }
+    $d = $mutantDefs[$mut]; $mk = $d[0]; $mOld = $d[1]; $mNew = $d[2]; $expect = @($d[3])
+    $mN = ([regex]::Matches($txt[$mk], [regex]::Escape($mOld))).Count
+    if ($mN -ne 1) { throw "mutant '$mut' anchor found $mN times in $mk, expected 1: $mOld" }
+    $txt[$mk] = $txt[$mk].Replace($mOld, $mNew)
+  }
+  $appDir = Join-Path $here 'app'
+  if (Test-Path -LiteralPath $appDir) { Remove-Item -LiteralPath $appDir -Recurse -Force }
+  New-Item -ItemType Directory -Path (Join-Path $appDir 'js') | Out-Null
+  $utf8 = New-Object System.Text.UTF8Encoding($false)
+  foreach ($k in $names.Keys) { [IO.File]::WriteAllText((Join-Path $appDir $names[$k]), $txt[$k], $utf8) }
+  # Through cmd so php.exe's stderr never reaches PowerShell (a terminating
+  # NativeCommandError under Stop); from a local directory because cmd warns on a UNC one.
+  $testPhp = Join-Path $here 'test.php'
+  Push-Location $env:TEMP
+  try { $out = cmd /c "`"$php`" `"$testPhp`" `"$appDir`" 2>nul" } finally { Pop-Location }
+  $lines = @($out | Where-Object { $_ -notmatch '^PHP (Warning|Notice|Deprecated)' })
+  $last = @($lines | Where-Object { $_ -match 'assertions, \d+ failed|^FATAL' }) | Select-Object -Last 1
+  if (-not $last) { $last = 'FATAL: test.php produced no summary' }
+  $red = @($lines | Where-Object { $_ -match '^FAIL ' } | ForEach-Object { ($_ -split ' ')[1] })
+  return @{ lines = $lines; last = $last; red = $red; expect = $expect }
+}
+
+$summary = New-Object System.Collections.Generic.List[string]
+$summary.Add("files: " + $(if ($App) { $App + ' (missing ones from LIVE)' } else { 'LIVE' }))
+$exit = 0
+if ($Mutants -or $Mutant) {
+  $todo = if ($Mutants) { @($mutantDefs.Keys | Sort-Object) } else { @($Mutant) }
+  foreach ($m in $todo) {
+    $r = Run-Once $m
+    $got = @($r.red | Sort-Object); $want = @($r.expect | Sort-Object)
+    $ok = (($got -join ',') -eq ($want -join ','))
+    $line = "mutant {0,-11} {1}  red=[{2}] expected=[{3}]  ({4})" -f $m, $(if ($ok) { 'BITES' } else { 'MISMATCH' }), ($got -join ' '), ($want -join ' '), $r.last
+    $summary.Add($line); Write-Host $line
+    if (-not $ok) { $exit = 1 }
+  }
+  $summary.Add($(if ($exit -eq 0) { 'RESULT: GREEN (every mutant bites exactly its own)' } else { 'RESULT: RED' }))
+} else {
+  $r = Run-Once ''
+  $r.lines | ForEach-Object { $summary.Add($_) }
+  $summary | ForEach-Object { Write-Host $_ }
+  if ($r.last -notmatch 'assertions, 0 failed') { $exit = 1 }
+}
+[IO.File]::WriteAllLines((Join-Path $here 'summary.txt'), $summary)
+if ($Mutants -or $Mutant) { Write-Host $summary[$summary.Count - 1] }
+exit $exit

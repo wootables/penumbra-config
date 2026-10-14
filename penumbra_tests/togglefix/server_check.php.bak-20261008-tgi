@@ -1,0 +1,728 @@
+<?php
+// togglefix suite - server half (2026-10-07). Round A of the toggle sweep, checked on
+// the PHP files under test WITHOUT running them as pages: manage_journal.php and
+// manage_snapshots.php connect to Oracle and answer HTTP, and schedule_runner.php
+// SENDS EMAIL (never require it). Functions and code blocks are lifted out by brace
+// matching and RUN against fakes; journal_export.php (functions only) is required.
+// Prints ONE JSON object: { asserts: [{id, ok, detail}] }.
+//   php -n server_check.php <dir with journal_export.php, manage_journal.php,
+//                            manage_snapshots.php, schedule_runner.php>
+//   S-case-*   toggle key columns matched by the row's own (any-case) names
+//   S-sid-* / S-snap-*  an all-digit SHORT_ID is a short id first
+//   S-gate-*   the six journal reads refuse a plain viewer while the journal is off
+//   S-tg-* / S-sched-* / S-dd-*  scheduled sends: grouped and pivot reports carry
+//              the toggles, one state read, Checked / Unchecked bands, DB dumps
+error_reporting(E_ALL & ~E_DEPRECATED);
+$dir = isset($argv[1]) ? rtrim($argv[1], '/\\') : '';
+// 'a' = Round A's checks, 'b' = Round B's (the no-op toggle writes), anything else = both.
+$mode = isset($argv[2]) ? $argv[2] : 'all';
+$RUN_A = ($mode === 'a' || $mode === 'all');
+$RUN_B = ($mode === 'b' || $mode === 'all');
+$RUN_D = ($mode === 'd' || $mode === 'all');   // Round D (2026-10-08): Toggle History
+$RUN_E = ($mode === 'e' || $mode === 'all');   // Round E (2026-10-08): the sweep's items 1-7
+$OUT = array();
+function rec($id, $ok, $detail) { global $OUT; $OUT[] = array('id' => $id, 'ok' => (bool)$ok, 'detail' => (string)$detail); }
+function src($name) {
+    global $dir;
+    $s = @file_get_contents($dir . DIRECTORY_SEPARATOR . $name);
+    return ($s === false) ? '' : str_replace("\r\n", "\n", $s);
+}
+// The text of the brace block that opens at the first '{' at/after $from.
+function braceBlock($s, $from) {
+    $b = strpos($s, '{', $from);
+    if ($b === false) return null;
+    $depth = 0;
+    for ($i = $b, $n = strlen($s); $i < $n; $i++) {
+        $c = $s[$i];
+        if ($c === '{') $depth++;
+        elseif ($c === '}') { $depth--; if ($depth === 0) return array($b, $i); }
+    }
+    return null;
+}
+// A column-0 function, optionally renamed (so a fake can take the real name).
+function liftFn($s, $name, $as = null) {
+    $a = strpos($s, "\nfunction " . $name . '(');
+    if ($a === false) return null;
+    $bb = braceBlock($s, $a);
+    if (!$bb) return null;
+    $code = substr($s, $a + 1, $bb[1] - $a);
+    if ($as !== null) $code = preg_replace('/^function ' . preg_quote($name, '/') . '\(/', 'function ' . $as . '(', $code);
+    return $code;
+}
+function defineLifted($s, $name, $as = null) {
+    $code = liftFn($s, $name, $as);
+    if ($code === null) return false;
+    try { eval($code); } catch (Throwable $e) { return false; }
+    return true;
+}
+
+$mj = src('manage_journal.php');
+$ms = src('manage_snapshots.php');
+$sr = src('schedule_runner.php');
+$jePath = $dir . DIRECTORY_SEPARATOR . 'journal_export.php';
+
+// ---------------------------------------------------------------- fakes
+$GLOBALS['QLOG'] = array();
+$GLOBALS['JX'] = array('cols' => 0, 'res' => 0);
+// Reports 7 (journal OFF), 8 (ON), 9 (ENCRYPTED); viewer1 is on each one's access
+// list but neither owner nor admin; owner1 owns them all.
+$GLOBALS['REPORTS'] = array(
+    7 => array('ID' => 7, 'SHORT_ID' => 'jroff', 'TITLE' => 'Off', 'OWNER_ID' => 'owner1', 'AUTHORIZED' => 'viewer1'),
+    8 => array('ID' => 8, 'SHORT_ID' => 'jron', 'TITLE' => 'On', 'OWNER_ID' => 'owner1', 'AUTHORIZED' => 'viewer1'),
+    9 => array('ID' => 9, 'SHORT_ID' => 'jrenc', 'TITLE' => 'Encrypted', 'OWNER_ID' => 'owner1', 'AUTHORIZED' => 'viewer1'),
+);
+$GLOBALS['RID_BY_SID'] = array('jroff' => 7, 'jron' => 8, 'jrenc' => 9);
+$GLOBALS['STATES'] = array(
+    7 => '{"query":"SELECT 1 FROM DUAL","viewOptions":{"journalKeyColumns":["ID"]}}',
+    8 => '{"query":"SELECT 1 FROM DUAL","viewOptions":{"journalEnabled":true,"journalKeyColumns":["ID"]}}',
+    9 => '{"encrypted":true,"content":"U2FsdGVkX19vcGFxdWU="}',
+);
+$allowedUsers = array('appadmin');
+$config = null;
+function journalGetReport($conn, $id) {
+    $R = $GLOBALS['REPORTS'];
+    if (is_int($id)) return isset($R[$id]) ? $R[$id] : null;
+    $m = $GLOBALS['RID_BY_SID']; $sid = trim((string)$id);
+    return isset($m[$sid]) ? $R[$m[$sid]] : null;
+}
+function journalCallerCanView() { return true; }
+function readClobViaOci8($t, $c, $k, $id) { return isset($GLOBALS['STATES'][(int)$id]) ? $GLOBALS['STATES'][(int)$id] : ''; }
+function queryViaOci8($sql, $binds = array()) {
+    // Round D: a scenario's own answer, when it has one (null = fall through).
+    if (isset($GLOBALS['QFAKE']) && is_callable($GLOBALS['QFAKE'])) {
+        $GLOBALS['QSEEN'][] = array('sql' => $sql, 'binds' => $binds);
+        $ans = call_user_func($GLOBALS['QFAKE'], $sql, $binds);
+        if ($ans !== null) return $ans;
+    }
+    // Round B's read-back of one toggle row (journalToggleCurrent): scripted.
+    if (strpos($sql, 'SELECT STATE, UPDATED_BY') !== false) return isset($GLOBALS['CUR_ROWS']) ? $GLOBALS['CUR_ROWS'] : array();
+    $GLOBALS['QLOG'][] = $sql;
+    if (strpos($sql, 'FROM PENUMBRA_JOURNAL WHERE ID = :nid') !== false && strpos($sql, 'ATTACH_NAME') !== false) {
+        return array(array('REPORT_ID' => $GLOBALS['ATTACH_RID'], 'ATTACH_NAME' => 'a.txt', 'ATTACH_MIME' => 'text/plain', 'ATTACH_SIZE' => 3));
+    }
+    return array();
+}
+function penumbraIsReportOwner($owner, $uid) { return strcasecmp(trim((string)$owner), trim((string)$uid)) === 0; }
+function journalHasAttachColumn() { return true; }
+function journalHasParentColumn() { return true; }
+function journalSanitizeToggleKey($k) { return preg_replace('/[^a-z0-9_\-]/', '', strtolower((string)$k)); }
+function utf8ize($x) { return $x; }
+function log_scheduler($m) { }
+// Scheduler: the two journal_export entry points the toggle block calls, counted.
+function sxResolver() {
+    return array('colNames' => array('DONE'), 'colMeta' => array(array('name' => 'DONE', 'key' => 'done')),
+                 'keyUpper' => array('ID'), 'stateMap' => array('done' => array()));
+}
+function journalExportToggleColumns($shortId, $state, &$rows) {
+    $GLOBALS['JX']['cols']++;
+    foreach ($rows as $i => $r) $rows[$i]['DONE'] = '0';
+    return array('colNames' => array('DONE'), 'rowsDecorated' => count($rows), 'resolver' => sxResolver());
+}
+function journalExportToggleResolver($shortId, $state, $existing = array()) { $GLOBALS['JX']['res']++; return sxResolver(); }
+// The level spec's helpers (only the plain, unsplit path is exercised).
+function pivot_parse_field_token($t) { return array('split' => null, 'base' => trim((string)$t), 'binWidth' => null, 'binEdges' => null); }
+function get_custom_sort_comparator($c, $k) { return function ($a, $b) { return 0; }; }
+function pivot_split_comparator($s, $k, $c) { return function ($a, $b) { return 0; }; }
+// PDO for the id lookups: report 2025 is "other"; report 99's SHORT_ID is "2025".
+$GLOBALS['PDO_REPORTS'] = array(
+    array('ID' => 2025, 'SHORT_ID' => 'other', 'TITLE' => 'Other', 'OWNER_ID' => 'x', 'AUTHORIZED' => ''),
+    array('ID' => 99, 'SHORT_ID' => '2025', 'TITLE' => 'Digits', 'OWNER_ID' => 'x', 'AUTHORIZED' => ''),
+    array('ID' => 7, 'SHORT_ID' => 'jrfix', 'TITLE' => 'Fixture', 'OWNER_ID' => 'x', 'AUTHORIZED' => ''),
+);
+class FakeStmt {
+    public $sql; public $b = array(); public $rows = array();
+    function __construct($sql) { $this->sql = $sql; }
+    function bindValue($k, $v, $t = null) { $this->b[$k] = $v; return true; }
+    function bindParam($k, &$v, $t = null) { $this->b[$k] = $v; return true; }
+    function execute($p = null) {
+        if (is_array($p)) foreach ($p as $k => $v) $this->b[(strpos($k, ':') === 0 ? $k : ':' . $k)] = $v;
+        $this->rows = array();
+        foreach ($GLOBALS['PDO_REPORTS'] as $r) {
+            if (strpos($this->sql, 'WHERE ID = :rid') !== false && isset($this->b[':rid']) && (int)$r['ID'] === (int)$this->b[':rid']) $this->rows[] = $r;
+            if (strpos($this->sql, 'TRIM(SHORT_ID) = :sid') !== false && isset($this->b[':sid']) && trim($r['SHORT_ID']) === (string)$this->b[':sid']) $this->rows[] = $r;
+        }
+        return true;
+    }
+    function fetch($m = null) { return $this->rows ? array_shift($this->rows) : false; }
+    function fetchColumn($i = 0) { $r = $this->fetch(); return $r ? array_values($r)[$i] : false; }
+}
+class FakePDO { function prepare($sql) { return new FakeStmt($sql); } }
+
+// ------------------------------------------- journal_export.php: key column case
+if ($RUN_A) {
+if (is_file($jePath)) {
+    require $jePath;
+    $res1 = array('keyUpper' => array('PROPOSAL ID'), 'colMeta' => array(array('name' => 'DONE', 'key' => 'done')),
+                  'stateMap' => array('done' => array('P-1' => array('by' => 'pat'))));
+    $sep = "\xE2\x90\x9F";
+    $res2 = array('keyUpper' => array('PROTOCOL NO.', 'PROTOCOL TYPE'), 'colMeta' => array(array('name' => 'DONE', 'key' => 'done')),
+                  'stateMap' => array('done' => array('25403' . $sep . 'Exempt' => array('by' => 'pat'))));
+    $v = function ($res, $row) { $o = journalExportToggleRowValues($res, $row); return isset($o['DONE']) ? $o['DONE'] : '(none)'; };
+    $c1 = $v($res1, array('Proposal ID' => 'P-1', 'Title' => 'x'));
+    $c2 = $v($res1, array('proposal id' => 'P-1'));
+    $c3 = $v($res2, array('Protocol No.' => '25403', 'Protocol Type' => 'Exempt'));
+    $c4 = $v($res1, array('Proposal ID' => 'P-2'));
+    rec('S-case-row', $c1 === '1' && $c2 === '1' && $c3 === '1' && $c4 === '0',
+        '"Proposal ID"=P-1 -> ' . $c1 . ', "proposal id"=P-1 -> ' . $c2 . ', "Protocol No."+"Protocol Type" -> ' . $c3 . ', unmarked P-2 -> ' . $c4);
+    $c5 = $v($res1, array('PROPOSAL ID' => 'P-1'));
+    rec('S-case-caps', $c5 === '1', 'all-caps alias -> ' . $c5);
+} else {
+    rec('S-case-row', false, 'no journal_export.php in ' . $dir);
+    rec('S-case-caps', false, 'no journal_export.php in ' . $dir);
+}
+
+// ------------------------------------------- the id lookups (journal + snapshots)
+$pdo = new FakePDO();
+$idOf = function ($r) { return is_array($r) ? (int)$r['ID'] : ($r === null ? 'null' : var_export($r, true)); };
+if (defineLifted($mj, 'journalGetReport', 'ut_journalGetReport')) {
+    $g = function ($x) use ($pdo, $idOf) { return $idOf(ut_journalGetReport($pdo, $x)); };
+    $d = $g('2025');
+    rec('S-sid-digits', $d === 99, 'short id "2025" -> report ' . $d . ' (99 has that short id; 2025 is another report\'s internal ID)');
+    $s = array('int 2025' => $g(2025), '"7"' => $g('7'), '"jrfix"' => $g('jrfix'), '""' => $g(''), '"nope"' => $g('nope'));
+    rec('S-sid-sane', $s['int 2025'] === 2025 && $s['"7"'] === 7 && $s['"jrfix"'] === 7 && $s['""'] === 'null' && $s['"nope"'] === 'null', json_encode($s));
+} else {
+    rec('S-sid-digits', false, 'journalGetReport not found'); rec('S-sid-sane', false, 'journalGetReport not found');
+}
+if (defineLifted($ms, 'resolveReportId', 'ut_resolveReportId')) {
+    $r = function ($x) use ($pdo) { $v = ut_resolveReportId($pdo, $x); return $v === null ? 'null' : $v; };
+    $d = $r('2025');
+    rec('S-snap-digits', $d === 99, 'short id "2025" -> report ' . var_export($d, true));
+    $s = array('"7"' => $r('7'), '"jrfix"' => $r('jrfix'), '""' => $r(''), 'int 7' => $r(7));
+    rec('S-snap-sane', $s['"7"'] === 7 && $s['"jrfix"'] === 7 && $s['""'] === 'null' && $s['int 7'] === 7, json_encode($s));
+} else {
+    rec('S-snap-digits', false, 'resolveReportId not found'); rec('S-snap-sane', false, 'resolveReportId not found');
+}
+
+// ------------------------------------------- the six journal reads, run for real
+foreach (array('journalReportStateFlags', 'journalReportJournalEnabled', 'journalTargetCanOpenJournal', 'journalCallerCanReadJournal') as $fn) {
+    defineLifted($mj, $fn);   // the build under test's own copies (the older builds lack some)
+}
+$READS = array('list', 'row_notes', 'toggles', 'toggle_history', 'toggle_history_search', 'attachment');
+$lifted = array();
+foreach ($READS as $act) {
+    $a = strpos($mj, "    if (\$action === '" . $act . "') {");
+    $bb = ($a === false) ? null : braceBlock($mj, $a);
+    if (!$bb) continue;
+    $body = substr($mj, $bb[0] + 1, $bb[1] - $bb[0] - 1);
+    $body = preg_replace('/\bexit\s*(\(\s*\))?\s*;/', 'return;', $body);
+    try {
+        eval('function ut_read_' . $act . '() { global $conn, $currentUserKey, $user_ouc, $isAdmin, $_JSON_BODY; ' . $body . "\n}");
+        $lifted[$act] = true;
+    } catch (Throwable $e) { $lifted[$act] = 'parse: ' . $e->getMessage(); }
+}
+function runRead($act, $sid, $uid, $admin) {
+    $GLOBALS['QLOG'] = array();
+    $_GET = array('action' => $act, 'report_id' => $sid, 'row_key' => 'k1', 'toggle_key' => 'done', 'note_id' => '55');
+    $GLOBALS['ATTACH_RID'] = $GLOBALS['RID_BY_SID'][$sid];
+    $GLOBALS['conn'] = 'pdo'; $GLOBALS['currentUserKey'] = $uid; $GLOBALS['user_ouc'] = ''; $GLOBALS['isAdmin'] = $admin;
+    ob_start(); $err = null;
+    try { call_user_func('ut_read_' . $act); } catch (Throwable $e) { $err = get_class($e) . ': ' . $e->getMessage(); }
+    $txt = ob_get_clean();
+    $q = array_values(array_filter($GLOBALS['QLOG'], function ($s) { return strpos($s, 'ATTACH_NAME') === false || strpos($s, 'WHERE ID = :nid') === false; }));
+    return array('refused' => strpos($txt, 'The Report Journal is off for this report.') !== false, 'queries' => count($q), 'err' => $err);
+}
+$gate = function ($sid, $uid, $admin, $wantRefused) use ($READS, $lifted) {
+    $bad = array();
+    foreach ($READS as $act) {
+        if ($lifted[$act] !== true) { $bad[] = $act . ' not lifted' . (is_string($lifted[$act]) ? ' (' . $lifted[$act] . ')' : ''); continue; }
+        $r = runRead($act, $sid, $uid, $admin);
+        if ($wantRefused && (!$r['refused'] || $r['queries'] > 0)) $bad[] = $act . ': refused ' . json_encode($r['refused']) . ', ' . $r['queries'] . ' quer' . ($r['queries'] === 1 ? 'y' : 'ies') . ($r['err'] ? ' (' . substr($r['err'], 0, 60) . ')' : '');
+        if (!$wantRefused && $r['refused']) $bad[] = $act . ': refused';
+    }
+    return $bad;
+};
+$b = $gate('jroff', 'viewer1', false, true);
+rec('S-gate-off', !$b, $b ? implode(' | ', $b) : 'a viewer of a journal-off report: all 6 reads refused before any query');
+$b = $gate('jron', 'viewer1', false, false);
+rec('S-gate-on', !$b, $b ? implode(' | ', $b) : 'journal on: all 6 reads go past the checks');
+$b = $gate('jroff', 'owner1', false, false);
+rec('S-gate-owner', !$b, $b ? implode(' | ', $b) : 'the owner\'s peek: all 6 reads go past the checks');
+$b = $gate('jroff', 'viewer1', true, false);
+rec('S-gate-admin', !$b, $b ? implode(' | ', $b) : 'an app admin: all 6 reads go past the checks');
+$b = $gate('jrenc', 'viewer1', false, false);
+rec('S-gate-enc', !$b, $b ? implode(' | ', $b) : 'an encrypted report (journal state unreadable here): all 6 reads stay open');
+
+// ------------------------------------------- scheduler: groupBy, band labels
+$okTg = defineLifted($sr, 'penumbra_sched_toggle_group_by');
+if ($okTg) {
+    $res = array('colMeta' => array(array('name' => 'DONE', 'key' => 'done'), array('name' => 'TAKEN_2', 'key' => 'taken')));
+    $t = array(
+        penumbra_sched_toggle_group_by('__JOURNAL_TOGGLE__done', $res),
+        penumbra_sched_toggle_group_by('PROTOCOL TYPE,__JOURNAL_TOGGLE__taken', $res),
+        penumbra_sched_toggle_group_by('Done', $res),
+        penumbra_sched_toggle_group_by('__JOURNAL_TOGGLE__gone', $res),
+        penumbra_sched_toggle_group_by('__JOURNAL_TOGGLE__done', null));
+    rec('S-tg-groupby', $t === array('DONE', 'PROTOCOL TYPE,TAKEN_2', 'Done', '__JOURNAL_TOGGLE__gone', '__JOURNAL_TOGGLE__done'), json_encode($t));
+} else {
+    rec('S-tg-groupby', false, 'penumbra_sched_toggle_group_by not found');
+}
+$okCols = defineLifted($sr, 'penumbra_sched_toggle_cols');
+$okSpec = defineLifted($sr, 'penumbra_group_level_spec');
+if ($okCols && $okSpec) {
+    $first = array('X' => 'a', 'DONE' => '1');
+    penumbra_sched_toggle_cols(array('DONE'));
+    $sp = penumbra_group_level_spec('Done', $first, array($first), array());
+    $sx = penumbra_group_level_spec('X', $first, array($first), array());
+    $l1 = $sp ? call_user_func($sp['label'], array('DONE' => '1')) : null;
+    $l0 = $sp ? call_user_func($sp['label'], array('DONE' => '0')) : null;
+    $lx = $sx ? call_user_func($sx['label'], array('X' => 'a')) : null;
+    penumbra_sched_toggle_cols(array());   // the next task has no toggles
+    $sp2 = penumbra_group_level_spec('Done', $first, array($first), array());
+    $lc = $sp2 ? call_user_func($sp2['label'], array('DONE' => '1')) : null;
+    rec('S-tg-label', $l1 === 'Checked' && $l0 === 'Unchecked' && $lx === 'a' && $lc === '1',
+        'toggle band 1 -> ' . json_encode($l1) . ', 0 -> ' . json_encode($l0) . ', a data column -> ' . json_encode($lx) . ', after the registry clears -> ' . json_encode($lc));
+} else {
+    rec('S-tg-label', false, 'penumbra_sched_toggle_cols ' . ($okCols ? 'ok' : 'missing') . ', penumbra_group_level_spec ' . ($okSpec ? 'ok' : 'missing'));
+}
+
+// ------------------------------------------- scheduler: the toggle block, run
+// (Round E, 2026-10-08: the block also re-keys the toggle summaries - a build that has the
+// helper calls it, one that does not, does not.)
+if (!function_exists('penumbra_sched_toggle_summaries')) defineLifted($sr, 'penumbra_sched_toggle_summaries');
+$a = strpos($sr, "    \$journal_toggle_cols = array();\n");
+$z = ($a === false) ? false : strpos($sr, "    // Engine C (snippets) toggle awareness.", $a);
+$blockOk = false;
+if ($a !== false && $z !== false && $z - $a < 6000) {
+    $blk = substr($sr, $a, $z - $a);
+    $blk = str_replace("require_once __DIR__ . '/journal_export.php';", '', $blk);
+    try {
+        eval('function ut_sched_block($apiData, $state, $report_id) { ' . $blk
+            . "\n return array('cols' => \$journal_toggle_cols, 'res' => \$journal_toggle_resolver, 'state' => \$state); }");
+        $blockOk = true;
+    } catch (Throwable $e) { $blockErr = $e->getMessage(); }
+}
+$runBlock = function ($state, $viewMode) {
+    $GLOBALS['JX'] = array('cols' => 0, 'res' => 0);
+    if (function_exists('penumbra_sched_toggle_cols')) penumbra_sched_toggle_cols(array('STALE'));
+    $r = ut_sched_block(array('data' => array(array('ID' => '1'), array('ID' => '2')), 'viewMode' => $viewMode), $state, 'jrfix');
+    $reg = function_exists('penumbra_sched_toggle_cols') ? array_keys(penumbra_sched_toggle_cols()) : null;
+    return array('colsCalls' => $GLOBALS['JX']['cols'], 'resCalls' => $GLOBALS['JX']['res'], 'cols' => $r['cols'],
+                 'resolver' => !empty($r['res']), 'groupBy' => isset($r['state']['groupBy']) ? $r['state']['groupBy'] : null, 'registry' => $reg);
+};
+if ($blockOk) {
+    $g = $runBlock(array('groupBy' => '__JOURNAL_TOGGLE__done'), 'grouped');
+    rec('S-sched-grouped', $g['colsCalls'] === 1 && $g['resCalls'] === 0 && $g['cols'] === array('DONE') && $g['resolver']
+        && $g['groupBy'] === 'DONE' && $g['registry'] === array('DONE'), json_encode($g));
+    $p = $runBlock(array('pivot' => array('rows' => array('X'))), 'pivot');
+    rec('S-sched-pivot', $p['colsCalls'] === 0 && $p['resCalls'] === 1 && $p['cols'] === array() && $p['resolver'] && $p['registry'] === array(), json_encode($p));
+    $f = $runBlock(array(), 'standard');
+    rec('S-sched-oneread', $f['colsCalls'] === 1 && $f['resCalls'] === 0 && $f['cols'] === array('DONE') && $f['resolver'], json_encode($f));
+} else {
+    foreach (array('S-sched-grouped', 'S-sched-pivot', 'S-sched-oneread') as $id) rec($id, false, 'toggle block not lifted' . (isset($blockErr) ? ': ' . $blockErr : ''));
+}
+
+// ------------------------------------------- DB dump: a grouped report's flatten
+$a = strpos($sr, "                if (\$dbdump_view_mode === 'grouped' && is_array(\$data)) {");
+$bb = ($a === false) ? null : braceBlock($sr, $a);
+if ($bb) {
+    $code = substr($sr, $a, $bb[1] - $a + 1);
+    try {
+        eval('function ut_dd_flatten($data, $apiResult, $dbdump_view_mode) { ' . $code . "\n return \$data; }");
+        $data = ut_dd_flatten(array('Exempt' => array(array('ID' => 1, 'DONE' => '1'), array('ID' => 2, 'DONE' => '0')),
+                                    'Expedited' => array(array('ID' => 3, 'DONE' => '0'))),
+                              array('journalToggleCols' => array('DONE')), 'grouped');
+        $left = 0; foreach ($data as $r) if (is_array($r) && array_key_exists('DONE', $r)) $left++;
+        rec('S-dd-strip', count($data) === 3 && $left === 0, count($data) . ' flat rows, ' . $left . ' still carrying the toggle column');
+    } catch (Throwable $e) { rec('S-dd-strip', false, 'flatten block threw: ' . $e->getMessage()); }
+} else {
+    rec('S-dd-strip', false, 'no grouped flatten block');
+}
+}   // $RUN_A
+
+// ======================= ROUND B (2026-10-07): a toggle write that changes nothing
+// writes nothing. set_toggle / set_toggles_bulk are lifted and RUN against a scripted
+// OCI layer: oci_num_rows says per execute whether the MERGE changed the row, a
+// scripted failure plays the concurrent first mark (ORA-00001), and the read-back
+// (journalToggleCurrent) answers from $GLOBALS['CUR_ROWS'].
+if ($RUN_B || $RUN_E) {
+if (!defined('OCI_NO_AUTO_COMMIT')) define('OCI_NO_AUTO_COMMIT', 0);
+if (!defined('JOURNAL_BULK_MAX_ROWS')) define('JOURNAL_BULK_MAX_ROWS', 5000);
+function getOci8Connection() { return 'oci'; }
+function oci_parse($c, $sql) { $GLOBALS['OCI']['sql'][] = $sql; return 'stmt'; }
+function oci_bind_by_name($st, $name, &$var, $len = -1) { $GLOBALS['OCI']['binds'][$name] = &$var; return true; }
+function oci_execute($st, $mode = 0) {
+    $i = $GLOBALS['OCI']['calls']++;
+    // OCI8 leaves every variable bound with the default type a STRING once it has run
+    // (2026-10-08: that is why the audit holds "state":"1"): so does this fake.
+    foreach (array_keys($GLOBALS['OCI']['binds']) as $k) {
+        $bv = $GLOBALS['OCI']['binds'][$k];
+        if (is_int($bv) || is_float($bv) || is_bool($bv)) $GLOBALS['OCI']['binds'][$k] = ($bv === false) ? '' : (string)$bv;
+    }
+    $vals = array();
+    foreach ($GLOBALS['OCI']['binds'] as $k => $v) $vals[$k] = $v;   // the values NOW, as OCI reads them
+    $GLOBALS['OCI']['exec'][] = $vals;
+    if (!empty($GLOBALS['OCI']['fail'][$i])) { $GLOBALS['OCI']['err'] = $GLOBALS['OCI']['fail'][$i]; $GLOBALS['OCI']['last'] = 0; return false; }
+    $GLOBALS['OCI']['last'] = isset($GLOBALS['OCI']['num'][$i]) ? $GLOBALS['OCI']['num'][$i] : 1;
+    return true;
+}
+function oci_num_rows($st) { return $GLOBALS['OCI']['last']; }
+function oci_error($x = null) { return array('message' => isset($GLOBALS['OCI']['err']) ? $GLOBALS['OCI']['err'] : 'fake'); }
+function oci_free_statement($st) { return true; }
+function oci_commit($c) { return true; }
+function oci_rollback($c) { return true; }
+function journalIsMissingTableError($m) { return false; }
+function logPenumbraAudit($rid, $action, $before, $after, $msg) { $GLOBALS['AUDIT'][] = array('action' => $action, 'after' => json_decode($after, true), 'msg' => $msg); }
+defineLifted($mj, 'journalToggleMergeSql');
+defineLifted($mj, 'journalToggleCurrent');
+$writeActs = array();
+foreach (array('set_toggle', 'set_toggles_bulk') as $act) {
+    $a = strpos($mj, "    if (\$action === '" . $act . "') {");
+    $bb = ($a === false) ? null : braceBlock($mj, $a);
+    if (!$bb) continue;
+    $body = substr($mj, $bb[0] + 1, $bb[1] - $bb[0] - 1);
+    $body = preg_replace('/\bexit\s*(\(\s*\))?\s*;/', 'return;', $body);
+    $body = str_replace("json_decode(file_get_contents('php://input'), true)", "\$GLOBALS['BULK_BODY']", $body);
+    try {
+        eval('function ut_write_' . $act . '() { global $conn, $currentUserKey, $user_ouc, $isAdmin, $_JSON_BODY; ' . $body . "\n}");
+        $writeActs[$act] = true;
+    } catch (Throwable $e) { $writeActs[$act] = 'parse: ' . $e->getMessage(); }
+}
+function runWrite($act, $body, $num, $fail, $cur) {
+    $GLOBALS['OCI'] = array('exec' => array(), 'num' => $num, 'fail' => $fail, 'calls' => 0, 'binds' => array(), 'sql' => array(), 'last' => 0);
+    $GLOBALS['AUDIT'] = array(); $GLOBALS['CUR_ROWS'] = $cur; $GLOBALS['QLOG'] = array();
+    $GLOBALS['_JSON_BODY'] = $body; $GLOBALS['BULK_BODY'] = $body;
+    $GLOBALS['conn'] = 'pdo'; $GLOBALS['currentUserKey'] = 'harness'; $GLOBALS['user_ouc'] = ''; $GLOBALS['isAdmin'] = false;
+    ob_start(); $err = null;
+    try { call_user_func('ut_write_' . $act); } catch (Throwable $e) { $err = get_class($e) . ': ' . $e->getMessage(); }
+    $raw = ob_get_clean();
+    return array('resp' => json_decode($raw, true), 'raw' => substr($raw, 0, 220), 'err' => $err, 'audit' => $GLOBALS['AUDIT'], 'oci' => $GLOBALS['OCI']);
+}
+function brief($r) {
+    return 'answer ' . ($r['resp'] ? json_encode($r['resp']) : $r['raw']) . ' | audit rows ' . count($r['audit']) . ($r['err'] ? ' | threw ' . $r['err'] : '');
+}
+// The read-back query: answered from CUR_ROWS (wrapping the Round A fake).
+function sbCurRowsFor($sql) { return (strpos($sql, 'SELECT STATE, UPDATED_BY') !== false) ? $GLOBALS['CUR_ROWS'] : null; }
+$okSet = isset($writeActs['set_toggle']) && $writeActs['set_toggle'] === true;
+$okBulk = isset($writeActs['set_toggles_bulk']) && $writeActs['set_toggles_bulk'] === true;
+$KIM = array(array('STATE' => '1', 'UPDATED_BY' => 'kim', 'UPDATED_AT' => '2026-10-07 09:00:00'));
+if ($RUN_B) {
+if ($okSet) {
+    $set = array('action' => 'set_toggle', 'report_id' => 'jron', 'row_key' => 'K1', 'toggle_key' => 'done', 'state' => true);
+    // The MERGE skips a row already in the state, and inserts no 0 row.
+    $r = runWrite('set_toggle', $set, array(1), array(), array(array('STATE' => '1', 'UPDATED_BY' => 'harness', 'UPDATED_AT' => '2026-10-07 12:00:00')));
+    $sql = $r['oci']['sql'] ? end($r['oci']['sql']) : '';
+    $ex = $r['oci']['exec'] ? $r['oci']['exec'][0] : array();
+    rec('SB-merge-sql', strpos($sql, 'WHERE t.STATE <> :st3') !== false && strpos($sql, 'WHERE :st4 = 1') !== false
+        && isset($ex[':st3']) && (int)$ex[':st3'] === 1 && isset($ex[':st4']) && (int)$ex[':st4'] === 1,
+        preg_replace('/\s+/', ' ', substr($sql, 0, 400)) . ' | binds ' . json_encode($ex));
+    rec('SB-set-changed', !$r['err'] && isset($r['resp']['unchanged']) && $r['resp']['unchanged'] === false && (int)$r['resp']['state'] === 1
+        && $r['resp']['by'] === 'harness' && $r['resp']['at'] === '2026-10-07 12:00:00' && count($r['audit']) === 1, brief($r));
+    // Already marked by kim: no write took place - no audit row, kim keeps the mark.
+    $r = runWrite('set_toggle', $set, array(0), array(), $KIM);
+    rec('SB-set-unchanged', !$r['err'] && !empty($r['resp']['unchanged']) && (int)$r['resp']['state'] === 1 && $r['resp']['by'] === 'kim'
+        && $r['resp']['at'] === '2026-10-07 09:00:00' && count($r['audit']) === 0, brief($r));
+    // Two first marks at once: the second INSERT hits the key, runs again as an update.
+    $r = runWrite('set_toggle', $set, array(1 => 0), array(0 => 'ORA-00001: unique constraint (PENUMBRA.PK_PENUMBRA_JRNL_TOGGLE) violated'), $KIM);
+    rec('SB-set-dup', !$r['err'] && $r['resp'] && $r['resp']['status'] === 'success' && $r['resp']['by'] === 'kim' && count($r['oci']['exec']) === 2,
+        brief($r) . ' | executes ' . count($r['oci']['exec']));
+} else {
+    foreach (array('SB-merge-sql', 'SB-set-changed', 'SB-set-unchanged', 'SB-set-dup') as $id) rec($id, false, 'set_toggle not lifted');
+}
+if ($okBulk) {
+    $bulk = array('action' => 'set_toggles_bulk', 'report_id' => 'jron', 'toggle_key' => 'done', 'state' => true, 'row_keys' => array('A', 'B', 'C'));
+    $r = runWrite('set_toggles_bulk', $bulk, array(1, 0, 1), array(), array());
+    $au = $r['audit'] ? $r['audit'][0]['after'] : null;
+    rec('SB-bulk-changed', !$r['err'] && $r['resp'] && (int)$r['resp']['count'] === 2 && isset($r['resp']['changed']) && $r['resp']['changed'] === array('A', 'C')
+        && isset($r['resp']['skipped']) && (int)$r['resp']['skipped'] === 1 && count($r['audit']) === 1 && $au && $au['row_keys'] === array('A', 'C') && (int)$au['row_count'] === 2,
+        brief($r) . ' | audit keys ' . json_encode($au ? $au['row_keys'] : null));
+    $r = runWrite('set_toggles_bulk', $bulk, array(0, 0, 0), array(), array());
+    rec('SB-bulk-none', !$r['err'] && $r['resp'] && (int)$r['resp']['count'] === 0 && isset($r['resp']['changed']) && $r['resp']['changed'] === array() && count($r['audit']) === 0,
+        brief($r));
+} else {
+    foreach (array('SB-bulk-changed', 'SB-bulk-none') as $id) rec($id, false, 'set_toggles_bulk not lifted');
+}
+}   // asserts: $RUN_B
+}   // $RUN_B || $RUN_E
+
+// ======================= ROUND D (2026-10-08): Toggle History. The per-row history and the
+// search are lifted and RUN against a scripted audit log (newest first, AFTER = the JSON the
+// writes store); the fake applies the SQL's own INSTR prefilters and FETCH FIRST cap, so a
+// query that does not narrow by the row sees only the newest rows - as Oracle would.
+if ($RUN_D || $RUN_E) {
+$dActs = array();
+foreach (array('toggle_history', 'toggle_history_search') as $act) {
+    $a = strpos($mj, "    if (\$action === '" . $act . "') {");
+    $bb = ($a === false) ? null : braceBlock($mj, $a);
+    if (!$bb) continue;
+    $body = preg_replace('/\bexit\s*(\(\s*\))?\s*;/', 'return;', substr($mj, $bb[0] + 1, $bb[1] - $bb[0] - 1));
+    try {
+        eval('function ut_d_' . $act . '() { global $conn, $currentUserKey, $user_ouc, $isAdmin, $_JSON_BODY; ' . $body . "\n}");
+        $dActs[$act] = true;
+    } catch (Throwable $e) { $dActs[$act] = 'parse: ' . $e->getMessage(); }
+}
+foreach (array('journalReportStateFlags', 'journalReportJournalEnabled', 'journalTargetCanOpenJournal', 'journalCallerCanReadJournal') as $fn) {
+    if (!function_exists($fn)) defineLifted($mj, $fn);
+}
+$SEPD = "\xE2\x90\x9F";
+function dRow($by, $ts, $aft) { return array('USER_ID' => $by, 'TS' => $ts, 'AFT' => json_encode($aft)); }
+// The audit query, answered from $GLOBALS['DAUDIT'] with the SQL's own INSTR needles and cap.
+function dAuditAnswer($sql, $binds) {
+    if (strpos($sql, 'PENUMBRA_AUDIT') !== false) {
+        $rows = $GLOBALS['DAUDIT'];
+        // The row needle and its int-form siblings (:n0..:n3, 2026-10-08) are ONE OR group.
+        if (isset($binds[':needle'])) {
+            $any = array($binds[':needle']);
+            for ($ni = 0; $ni < 4; $ni++) if (isset($binds[':n' . $ni])) $any[] = $binds[':n' . $ni];
+            $rows = array_values(array_filter($rows, function ($r) use ($any) {
+                foreach ($any as $n) if (strpos($r['AFT'], $n) !== false) return true;
+                return false;
+            }));
+        }
+        foreach (array(':tkn', ':stn') as $b) {
+            if (!isset($binds[$b])) continue;
+            $n = $binds[$b];
+            $legacyDone = ($b === ':tkn' && strpos($sql, 'INSTR("AFTER", \'"toggle_key"\') = 0') !== false);
+            $rows = array_values(array_filter($rows, function ($r) use ($n, $legacyDone) {
+                return strpos($r['AFT'], $n) !== false || ($legacyDone && strpos($r['AFT'], '"toggle_key"') === false);
+            }));
+        }
+        if (preg_match('/FETCH FIRST (\d+) ROWS ONLY/', $sql, $m)) $rows = array_slice($rows, 0, (int)$m[1]);
+        return $rows;
+    }
+    if (strpos($sql, 'FROM PENUMBRA_JOURNAL_TOGGLE') !== false && strpos($sql, 'STATE = 1') !== false) return $GLOBALS['DMARKS'];
+    return null;
+}
+function runD($act, $get) {
+    $GLOBALS['QSEEN'] = array();
+    $GLOBALS['QFAKE'] = 'dAuditAnswer';
+    $_GET = $get;
+    $GLOBALS['conn'] = 'pdo'; $GLOBALS['currentUserKey'] = 'viewer1'; $GLOBALS['user_ouc'] = ''; $GLOBALS['isAdmin'] = false;
+    ob_start(); $err = null;
+    try { call_user_func('ut_d_' . $act); } catch (Throwable $e) { $err = get_class($e) . ': ' . $e->getMessage(); }
+    $raw = ob_get_clean();
+    unset($GLOBALS['QFAKE']);
+    $audit = null;
+    foreach ($GLOBALS['QSEEN'] as $q) { if (strpos($q['sql'], 'PENUMBRA_AUDIT') !== false) $audit = $q; }
+    return array('resp' => json_decode($raw, true), 'raw' => substr($raw, 0, 200), 'err' => $err, 'audit' => $audit);
+}
+$okH = isset($dActs['toggle_history']) && $dActs['toggle_history'] === true;
+$okS = isset($dActs['toggle_history_search']) && $dActs['toggle_history_search'] === true;
+if ($RUN_D) {
+// ---- the per-row history: 2,500 newer changes on OTHER rows, then the target row's own two.
+$TGT = 'TGT' . $SEPD . '1';
+$GLOBALS['DAUDIT'] = array();
+for ($i = 0; $i < 2500; $i++) $GLOBALS['DAUDIT'][] = dRow('kim', '2026-10-0' . (8 - intdiv($i, 1000)) . ' 09:00:00', array('row_key' => 'OTHER' . $i, 'toggle_key' => 'done', 'state' => 1));
+$GLOBALS['DAUDIT'][] = dRow('lee', '2026-09-02 10:00:00', array('bulk' => true, 'toggle_key' => 'done', 'state' => 0, 'row_count' => 2, 'row_keys' => array('X', $TGT)));
+$GLOBALS['DAUDIT'][] = dRow('pat', '2026-09-01 09:00:00', array('row_key' => $TGT, 'toggle_key' => 'done', 'state' => 1));
+$GLOBALS['DMARKS'] = array();
+if ($okH) {
+    $r = runD('toggle_history', array('report_id' => 'jron', 'row_key' => $TGT, 'toggle_key' => 'done'));
+    $ev = ($r['resp'] && isset($r['resp']['events'])) ? $r['resp']['events'] : array();
+    $sql = $r['audit'] ? preg_replace('/\s+/', ' ', $r['audit']['sql']) : '';
+    $nb = ($r['audit'] && isset($r['audit']['binds'][':needle'])) ? $r['audit']['binds'][':needle'] : null;
+    rec('SD-row-sql', !$r['err'] && strpos($sql, 'INSTR("AFTER", :needle) > 0') !== false && $nb === json_encode($TGT)
+        && count($ev) === 2 && $ev[0]['by'] === 'lee' && $ev[0]['state'] === 0 && !empty($ev[0]['bulk']) && $ev[1]['by'] === 'pat' && $ev[1]['state'] === 1,
+        'events ' . json_encode($ev) . ' | needle ' . json_encode($nb) . ' | ' . substr($sql, 0, 160) . ($r['err'] ? ' | threw ' . $r['err'] : ''));
+} else {
+    rec('SD-row-sql', false, 'toggle_history not lifted');
+}
+// ---- the search: three people, single + bulk changes, a second column, the marks now.
+// The state is stored the way the writes REALLY store it (live-found 2026-10-08): a STRING -
+// set_toggle / set_toggles_bulk bind $state with oci_bind_by_name(), which turns the PHP int
+// into a string before the audit row is encoded ("state":"1"). The two oldest keep an int.
+$R = function ($n) use ($SEPD) { return 'R' . $n . $SEPD . 'A'; };
+$GLOBALS['DAUDIT'] = array(
+    dRow('pat', '2026-10-06 09:00:00', array('row_key' => $R(1), 'toggle_key' => 'done', 'state' => '1')),
+    dRow('lee', '2026-10-05 09:00:00', array('row_key' => $R(1), 'toggle_key' => 'done', 'state' => '0')),
+    dRow('pat', '2026-10-04 09:00:00', array('bulk' => true, 'toggle_key' => 'done', 'state' => '1', 'row_count' => 2, 'row_keys' => array($R(2), $R(3)))),
+    dRow('kim', '2026-10-03 09:00:00', array('row_key' => $R(1), 'toggle_key' => 'other', 'state' => '1')),
+    dRow('lee', '2026-10-02 09:00:00', array('row_key' => $R(4), 'toggle_key' => 'done', 'state' => 1)),
+    dRow('pat', '2026-10-01 09:00:00', array('row_key' => $R(2), 'toggle_key' => 'done', 'state' => 0)),
+);
+$GLOBALS['DMARKS'] = array(
+    array('TOGGLE_KEY' => 'done', 'ROW_KEY' => $R(1), 'UPDATED_BY' => 'pat', 'UPDATED_AT' => '2026-10-06 09:00:00'),
+    array('TOGGLE_KEY' => 'done', 'ROW_KEY' => $R(3), 'UPDATED_BY' => 'pat', 'UPDATED_AT' => '2026-10-04 09:00:00'),
+    array('TOGGLE_KEY' => 'done', 'ROW_KEY' => $R(4), 'UPDATED_BY' => 'lee', 'UPDATED_AT' => '2026-10-02 09:00:00'),
+);
+$base = array('report_id' => 'jron', 'user' => '', 'from' => '', 'to' => '', 'toggle_key' => 'done');
+if ($okS) {
+    $r = runD('toggle_history_search', $base);
+    $sm = ($r['resp'] && isset($r['resp']['summary'])) ? $r['resp']['summary'] : null;
+    $pp = $sm ? $sm['people'] : array();
+    rec('SD-search-summary', !$r['err'] && $sm && $sm['changes'] === 6 && $sm['marked'] === 4 && $sm['unmarked'] === 2 && $sm['rows'] === 4
+        && count($pp) === 2 && $pp[0]['user'] === 'pat' && $pp[0]['marked'] === 3 && $pp[0]['unmarked'] === 1 && $pp[1]['user'] === 'lee' && $pp[1]['marked'] === 1 && $pp[1]['unmarked'] === 1,
+        'summary ' . json_encode($sm) . ($r['err'] ? ' | threw ' . $r['err'] : ''));
+    $nows = array();
+    foreach (($r['resp'] && isset($r['resp']['events'])) ? $r['resp']['events'] : array() as $e) {
+        $nows[] = explode($SEPD, $e['rowKey'])[0] . ':' . (isset($e['now']) ? ($e['now']['on'] ? 'on/' . $e['now']['by'] : 'off') : '-');
+    }
+    rec('SD-search-now', $nows === array('R1:on/pat', 'R1:on/pat', 'R2:off', 'R3:on/pat', 'R4:on/lee', 'R2:off'), json_encode($nows));
+    $r = runD('toggle_history_search', $base + array('mode' => 'latest'));
+    $lt = array();
+    foreach (($r['resp'] && isset($r['resp']['events'])) ? $r['resp']['events'] : array() as $e) $lt[] = explode($SEPD, $e['rowKey'])[0] . ':' . $e['by'] . '/' . $e['state'];
+    rec('SD-search-latest', $lt === array('R1:pat/1', 'R2:pat/1', 'R3:pat/1', 'R4:lee/1') && $r['resp']['summary']['changes'] === 6, json_encode($lt));
+    // Unmarked only / Marked only: every stored form (string or int) - the fake applies any
+    // SQL needle on AFTER, so one that misses the string form drops those rows.
+    $r = runD('toggle_history_search', $base + array('state' => '0'));
+    $sql = $r['audit'] ? preg_replace('/\s+/', ' ', $r['audit']['sql']) : '';
+    $st = array();
+    foreach (($r['resp'] && isset($r['resp']['events'])) ? $r['resp']['events'] : array() as $e) $st[] = explode($SEPD, $e['rowKey'])[0] . ':' . $e['state'];
+    $r1 = runD('toggle_history_search', $base + array('state' => '1'));
+    $st1 = array();
+    foreach (($r1['resp'] && isset($r1['resp']['events'])) ? $r1['resp']['events'] : array() as $e) $st1[] = explode($SEPD, $e['rowKey'])[0] . ':' . $e['state'];
+    rec('SD-search-state', $st === array('R1:0', 'R2:0') && $r['resp']['summary']['marked'] === 0 && $r['resp']['summary']['unmarked'] === 2
+        && $st1 === array('R1:1', 'R2:1', 'R3:1', 'R4:1') && $r1['resp']['summary']['marked'] === 4 && $r1['resp']['summary']['unmarked'] === 0,
+        'unmarked ' . json_encode($st) . ', marked ' . json_encode($st1) . ' | ' . substr($sql, strpos($sql, 'WHERE'), 220));
+    $r = runD('toggle_history_search', array('toggle_key' => 'other') + $base);
+    $sql = $r['audit'] ? preg_replace('/\s+/', ' ', $r['audit']['sql']) : '';
+    $tk = array();
+    foreach (($r['resp'] && isset($r['resp']['events'])) ? $r['resp']['events'] : array() as $e) $tk[] = $e['toggle'] . ':' . $e['by'];
+    rec('SD-search-tkfilter', strpos($sql, 'INSTR("AFTER", :tkn) > 0') !== false && isset($r['audit']['binds'][':tkn']) && $r['audit']['binds'][':tkn'] === '"toggle_key":"other"'
+        && $tk === array('other:kim'), json_encode($tk) . ' | ' . substr($sql, strpos($sql, 'WHERE'), 220));
+    // Past the list's 1,500-event cap the summary keeps counting: a bulk flip of 1,600 rows,
+    // then two older single changes. A scan that hits its 5,000-row cap answers partial.
+    $bk = array();
+    for ($i = 0; $i < 1600; $i++) $bk[] = 'B' . $i . $SEPD . 'A';
+    $GLOBALS['DAUDIT'] = array(
+        dRow('kim', '2026-10-06 09:00:00', array('bulk' => true, 'toggle_key' => 'done', 'state' => 1, 'row_count' => 1600, 'row_keys' => $bk)),
+        dRow('lee', '2026-10-05 09:00:00', array('row_key' => $R(1), 'toggle_key' => 'done', 'state' => 0)),
+        dRow('pat', '2026-10-04 09:00:00', array('row_key' => $R(2), 'toggle_key' => 'done', 'state' => 1)),
+    );
+    $GLOBALS['DMARKS'] = array();
+    $r = runD('toggle_history_search', $base);
+    $sm = ($r['resp'] && isset($r['resp']['summary'])) ? $r['resp']['summary'] : null;
+    $ne = ($r['resp'] && isset($r['resp']['events'])) ? count($r['resp']['events']) : -1;
+    $c1 = $sm && $sm['changes'] === 1602 && $sm['marked'] === 1601 && $sm['unmarked'] === 1 && $sm['rows'] === 1602 && count($sm['people']) === 3
+        && $ne === 1500 && !empty($r['resp']['truncated']) && $r['resp']['partial'] === false;
+    $d1 = 'summary ' . ($sm ? $sm['changes'] . '/' . $sm['marked'] . '/' . $sm['unmarked'] . ' rows ' . $sm['rows'] . ' people ' . count($sm['people']) : 'none')
+        . ', events ' . $ne . ', truncated ' . json_encode($r['resp'] ? $r['resp']['truncated'] : null) . ', partial ' . json_encode($r['resp'] && isset($r['resp']['partial']) ? $r['resp']['partial'] : null);
+    $GLOBALS['DAUDIT'] = array();
+    for ($i = 0; $i < 5001; $i++) $GLOBALS['DAUDIT'][] = dRow('kim', '2026-10-06 09:00:00', array('row_key' => 'S' . $i, 'toggle_key' => 'done', 'state' => 1));
+    $r = runD('toggle_history_search', $base);
+    $c2 = $r['resp'] && isset($r['resp']['partial']) && $r['resp']['partial'] === true && $r['resp']['summary']['changes'] === 5000;
+    rec('SD-search-cap', $c1 && $c2, $d1 . ' | scan cap: partial ' . json_encode($r['resp'] && isset($r['resp']['partial']) ? $r['resp']['partial'] : null)
+        . ', changes ' . json_encode($r['resp'] && isset($r['resp']['summary']) ? $r['resp']['summary']['changes'] : null));
+} else {
+    foreach (array('SD-search-summary', 'SD-search-now', 'SD-search-latest', 'SD-search-state', 'SD-search-tkfilter', 'SD-search-cap') as $id) rec($id, false, 'toggle_history_search not lifted');
+}
+}   // asserts: $RUN_D
+}   // $RUN_D || $RUN_E
+
+// ======================= ROUND E (2026-10-08): the sweep's items 1-7, server half.
+//   SE-bulk-strval   a bulk write audits an all-digit key as a STRING
+//   SE-hist-int      the row's hover history finds a bulk row that holds the key as a number
+//   SE-used-keys     the toggles answer lists every key with rows in any state
+//   SE-sum-remap     a toggle summary re-keyed onto the output column's name
+//   SE-is-toggle     the task's toggle columns count as toggles for the summary rules
+//   SE-sched-sum     the scheduler's toggle block re-keys the summaries
+//   SE-eval-keep     a row that carries the toggle column keeps it (format() counts)
+if ($RUN_E) {
+// ---- 1: the bulk writer
+if ($okBulk) {
+    $bulk = array('action' => 'set_toggles_bulk', 'report_id' => 'jron', 'toggle_key' => 'done', 'state' => true, 'row_keys' => array('12345', 'A', '00123'));
+    $r = runWrite('set_toggles_bulk', $bulk, array(1, 1, 1), array(), array());
+    $au = $r['audit'] ? $r['audit'][0]['after'] : null;
+    $types = $au ? array_map('gettype', $au['row_keys']) : array();
+    $chg = ($r['resp'] && isset($r['resp']['changed'])) ? array_map('gettype', $r['resp']['changed']) : array();
+    rec('SE-bulk-strval', !$r['err'] && $au && $au['row_keys'] === array('12345', 'A', '00123') && $chg === array('string', 'string', 'string'),
+        'audit keys ' . json_encode($au ? $au['row_keys'] : null) . ' ' . json_encode($types) . ' | answer changed ' . json_encode($chg) . ($r['err'] ? ' | threw ' . $r['err'] : ''));
+} else {
+    rec('SE-bulk-strval', false, 'set_toggles_bulk not lifted');
+}
+// ---- 1: the reader
+if ($okH) {
+    $GLOBALS['DAUDIT'] = array(
+        // as written before 2026-10-08: the bulk key a NUMBER
+        array('USER_ID' => 'lee', 'TS' => '2026-10-05 09:00:00', 'AFT' => '{"bulk":true,"toggle_key":"done","state":"1","row_count":2,"row_keys":[12345,7]}'),
+        array('USER_ID' => 'kim', 'TS' => '2026-10-04 09:00:00', 'AFT' => '{"bulk":true,"toggle_key":"done","state":"1","row_count":1,"row_keys":[123456]}'),
+        array('USER_ID' => 'bo', 'TS' => '2026-10-03 09:00:00', 'AFT' => '{"bulk":true,"toggle_key":"done","state":"0","row_count":2,"row_keys":["A","12345"]}'),
+        array('USER_ID' => 'pat', 'TS' => '2026-10-02 09:00:00', 'AFT' => '{"row_key":"12345","toggle_key":"done","state":"1"}'),
+    );
+    $GLOBALS['DMARKS'] = array();
+    $r = runD('toggle_history', array('report_id' => 'jron', 'row_key' => '12345', 'toggle_key' => 'done'));
+    $by = array();
+    foreach (($r['resp'] && isset($r['resp']['events'])) ? $r['resp']['events'] : array() as $e) $by[] = $e['by'];
+    $sql = $r['audit'] ? preg_replace('/\s+/', ' ', $r['audit']['sql']) : '';
+    rec('SE-hist-int', !$r['err'] && $by === array('lee', 'bo', 'pat') && strpos($sql, 'INSTR("AFTER", :n0) > 0') !== false,
+        'events by ' . json_encode($by) . ' | ' . substr($sql, strpos($sql, 'WHERE'), 260) . ($r['err'] ? ' | threw ' . $r['err'] : ''));
+} else {
+    rec('SE-hist-int', false, 'toggle_history not lifted');
+}
+// ---- 7b: the toggles answer
+$a = strpos($mj, "    if (\$action === 'toggles') {");
+$bb = ($a === false) ? null : braceBlock($mj, $a);
+$okT = false;
+if ($bb) {
+    $body = preg_replace('/\bexit\s*(\(\s*\))?\s*;/', 'return;', substr($mj, $bb[0] + 1, $bb[1] - $bb[0] - 1));
+    try { eval('function ut_e_toggles() { global $conn, $currentUserKey, $user_ouc, $isAdmin; ' . $body . "\n}"); $okT = true; } catch (Throwable $e) { $okT = false; }
+}
+if ($okT) {
+    $GLOBALS['QSEEN'] = array();
+    $GLOBALS['QFAKE'] = function ($sql, $binds) {
+        if (strpos($sql, 'DISTINCT TOGGLE_KEY') !== false) return array(array('TOGGLE_KEY' => 'done'), array('TOGGLE_KEY' => 'old'));
+        if (strpos($sql, 'STATE = 1') !== false) return array(array('TOGGLE_KEY' => 'done', 'ROW_KEY' => 'R1', 'UPDATED_BY' => 'pat', 'UPDATED_AT' => '2026-10-01 09:00:00'));
+        return null;
+    };
+    $_GET = array('report_id' => 'jron');
+    $GLOBALS['conn'] = 'pdo'; $GLOBALS['currentUserKey'] = 'viewer1'; $GLOBALS['user_ouc'] = ''; $GLOBALS['isAdmin'] = false;
+    ob_start(); $terr = null;
+    try { ut_e_toggles(); } catch (Throwable $e) { $terr = $e->getMessage(); }
+    $tr = json_decode(ob_get_clean(), true);
+    unset($GLOBALS['QFAKE']);
+    rec('SE-used-keys', !$terr && $tr && isset($tr['used_keys']) && $tr['used_keys'] === array('done', 'old') && isset($tr['toggles']['done']['R1']),
+        json_encode($tr) . ($terr ? ' | threw ' . $terr : ''));
+} else {
+    rec('SE-used-keys', false, 'the toggles action not lifted');
+}
+// ---- 5: the summaries
+if (!function_exists('penumbra_sched_toggle_cols')) defineLifted($sr, 'penumbra_sched_toggle_cols');
+if (!function_exists('penumbra_sched_toggle_group_by')) defineLifted($sr, 'penumbra_sched_toggle_group_by');
+$okRemap = function_exists('penumbra_sched_toggle_summaries') || defineLifted($sr, 'penumbra_sched_toggle_summaries');
+if ($okRemap) {
+    $res = array('colMeta' => array(array('name' => 'DONE', 'key' => 'done'), array('name' => 'REVIEWED', 'key' => 'toggle1')));
+    $st = penumbra_sched_toggle_summaries(array(
+        'columnSummaries' => array('__JOURNAL_TOGGLE__DONE' => 'sum', '__JOURNAL_TOGGLE__TOGGLE1' => 'count_filled', 'REVIEWED' => 'avg', 'TITLE' => 'count'),
+        'columnSummaryFormulas' => array('__journal_toggle__done' => 'sum / count')), $res);
+    $cs = $st['columnSummaries']; $cf = $st['columnSummaryFormulas'];
+    rec('SE-sum-remap', isset($cs['DONE']) && $cs['DONE'] === 'sum' && $cs['REVIEWED'] === 'avg' && $cs['TITLE'] === 'count'
+        && isset($cf['DONE']) && $cf['DONE'] === 'sum / count',
+        'summaries ' . json_encode($cs) . ' | formulas ' . json_encode($cf));
+} else {
+    rec('SE-sum-remap', false, 'penumbra_sched_toggle_summaries not found');
+}
+$okIs = function_exists('penumbra_is_toggle_column') || defineLifted($sr, 'penumbra_is_toggle_column');
+if ($okIs && function_exists('penumbra_sched_toggle_cols')) {
+    penumbra_sched_toggle_cols(array('DONE'));
+    $i1 = penumbra_is_toggle_column('Done'); $i2 = penumbra_is_toggle_column('TITLE'); $i3 = penumbra_is_toggle_column('__JOURNAL_TOGGLE__x');
+    penumbra_sched_toggle_cols(array());
+    $i4 = penumbra_is_toggle_column('DONE');
+    rec('SE-is-toggle', $i1 === true && $i2 === false && $i3 === true && $i4 === false,
+        'DONE ' . json_encode($i1) . ', TITLE ' . json_encode($i2) . ', the internal name ' . json_encode($i3) . ', DONE after the registry clears ' . json_encode($i4));
+} else {
+    rec('SE-is-toggle', false, 'penumbra_is_toggle_column / penumbra_sched_toggle_cols not found');
+}
+// ---- 5: the scheduler's toggle block re-keys them (the block Round A lifts, run again)
+$a = strpos($sr, "    \$journal_toggle_cols = array();\n");
+$z = ($a === false) ? false : strpos($sr, "    // Engine C (snippets) toggle awareness.", $a);
+$okBlk = false;
+if ($a !== false && $z !== false && $z - $a < 6000) {
+    $blk = str_replace("require_once __DIR__ . '/journal_export.php';", '', substr($sr, $a, $z - $a));
+    try {
+        eval('function ut_sched_block_e($apiData, $state, $report_id) { ' . $blk . "\n return \$state; }");
+        $okBlk = true;
+    } catch (Throwable $e) { $okBlk = false; }
+}
+if ($okBlk) {
+    $st = ut_sched_block_e(array('data' => array(array('ID' => '1')), 'viewMode' => 'standard'),
+        array('columnSummaries' => array('__JOURNAL_TOGGLE__DONE' => 'sum')), 'jrfix');
+    rec('SE-sched-sum', isset($st['columnSummaries']['DONE']) && $st['columnSummaries']['DONE'] === 'sum', json_encode(isset($st['columnSummaries']) ? $st['columnSummaries'] : null));
+} else {
+    rec('SE-sched-sum', false, 'the scheduler toggle block not lifted');
+}
+// ---- 7e: a row that carries the toggle column keeps it
+if (!function_exists('journalExportToggleRowValues') && is_file($jePath)) require_once $jePath;
+$okEv = function_exists('_snippet_toggle_eval_row') || defineLifted($sr, '_snippet_toggle_eval_row');
+if ($okEv && function_exists('journalExportToggleRowValues')) {
+    $jt = array('keyUpper' => array('ID'), 'colMeta' => array(array('name' => 'DONE', 'key' => 'done')),
+                'stateMap' => array('done' => array('1' => array('by' => 'pat', 'at' => '2026-10-01 09:00:00'))));
+    $k1 = _snippet_toggle_eval_row(array('TITLE' => 'x', 'DONE' => '1'), $jt);   // the key column hidden: rendered without it
+    $k2 = _snippet_toggle_eval_row(array('ID' => '1'), $jt);
+    $k3 = _snippet_toggle_eval_row(array('ID' => '2'), $jt);
+    rec('SE-eval-keep', $k1['DONE'] === '1' && $k2['DONE'] === '1' && $k3['DONE'] === '0',
+        'rendered row (no key) ' . json_encode($k1) . ', full rows ' . json_encode($k2) . ' ' . json_encode($k3));
+} else {
+    rec('SE-eval-keep', false, '_snippet_toggle_eval_row / journalExportToggleRowValues not found');
+}
+}   // $RUN_E
+
+echo json_encode(array('asserts' => $OUT));

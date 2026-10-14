@@ -1,0 +1,275 @@
+# =============================================================================
+# promptparity - the same prompt tag, in the same place in the SQL, through all
+# THREE prompt engines.
+#
+#   powershell -File run.ps1
+#   powershell -File run.ps1 -App <path>   # run against a stage instead of live
+#                                          # (a file the stage lacks comes from live)
+#   powershell -File run.ps1 -Control      # one deliberately FALSE assertion in
+#                                          # each half; each must report FAIL 1
+#   powershell -File run.ps1 -Mutant       # 14 targeted mutants; each MUST go red
+#                                          # with the exact counts named below
+#   powershell -File run.ps1 -Mutant -Only AC   # just those letters
+#
+# WHAT IS UNDER TEST. Three engines turn [PROMPT;...] tags into SQL: js/main.js
+# in the browser (binds), index.php for ?json=1 (dashboard tiles, API callers)
+# and schedule_runner.php for scheduled tasks (both splice quoted literals). A
+# report is written and proven in the browser; the other two run it later with
+# nobody watching. Found 2026-09-21, all of it older than the oldest backup:
+#   - c IN [PROMPT;type=multi-select] - the form the SQL help and the AI grounding
+#     show - lost its column in the BROWSER (WHERE IN (:p1, :p2)), and c NOT IN
+#     ran as c IN: the opposite filter, no error;
+#   - ?json=1 never stripped the quotes off template="...", so template="" was
+#     not a control prompt there and its quotes landed in the statement;
+#   - quotes written AROUND a tag - TO_DATE('[PROMPT;type=date]', ...) - were
+#     consumed by the browser only; both PHP engines sent ''01-JUL-22''.
+# corpus.txt is the contract: one expected line per case, for all three.
+#
+#   1. test_promptparity.php           the shared PHP helpers (shared_logic.php),
+#                                      then the corpus through the scheduler and
+#                                      the ?json=1 engine.
+#   2. promptparity_browser_tests.js   the corpus through the browser engine in
+#                                      headless Edge (binds written back in as
+#                                      literals), plus checks that it really
+#                                      sends binds.
+#
+# Both halves lift the code under test out of the app files by name. Nothing is
+# require()d that could open a database or send mail; nothing is a pasted copy.
+#
+# EXPECTED TAIL:
+#   php     | PASS: 125   FAIL: 0
+#   browser | PASS: 55   FAIL: 0
+#   RESULT: GREEN
+# (match on the FAIL counts - the totals move as the corpus grows.)
+#
+# UNC .ps1 files are GPO-blocked here ("not digitally signed") - run the body as
+# a scriptblock rather than with -File:
+#   $dir = '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\promptparity'
+#   & ([scriptblock]::Create([IO.File]::ReadAllText("$dir\run.ps1").Replace('$here = $PSScriptRoot', "`$here = '$dir'")))
+# Never add a bare `exit` for the same reason: it would kill the caller. And do
+# not pipe the invocation: a lingering headless-Edge child can hold stdout open.
+# =============================================================================
+param(
+    [string]$App = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra',
+    [switch]$Control,
+    [switch]$Mutant,
+    [string]$Only = ''
+)
+
+$ErrorActionPreference = 'Stop'
+$here = $PSScriptRoot
+if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Path }
+$php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+$edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+$live = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+$work = Join-Path $env:TEMP ('pnb_promptparity_' + $PID)
+New-Item -ItemType Directory -Force -Path $work | Out-Null
+
+# The app files the two halves read. A stage usually holds only what was edited,
+# so anything it lacks is taken from live - and said out loud, because "green
+# against the stage" must not quietly mean "green against live".
+$appFiles = 'shared_logic.php', 'schedule_runner.php', 'index.php', 'penumbra_search.php', 'js\main.js'
+function Copy-AppInto([string]$dest) {
+    New-Item -ItemType Directory -Force -Path (Join-Path $dest 'js') | Out-Null
+    $fromLive = @()
+    foreach ($f in $appFiles) {
+        $src = Join-Path $App $f
+        if (-not (Test-Path -LiteralPath $src)) { $src = Join-Path $live $f; $fromLive += $f }
+        Copy-Item -LiteralPath $src -Destination (Join-Path $dest $f) -Force
+    }
+    return ,$fromLive
+}
+
+# One headless-Edge page -> the text of its <pre id="out">. Start-Process +
+# -RedirectStandardOutput, never `>` or a pipe (PS 5.1 loses native stdout that
+# way); a profile dir of its OWN per launch (a shared one hung Edge when two
+# launches overlapped); up to two launches, because Edge now and then exits
+# without dumping the page - that is the browser, not the code under test. A
+# page that really stalls says so itself ("STALLED in: <section>") and is NOT
+# retried.
+function Invoke-EdgePage([string]$pageDir, [string]$pageFile, $lines, [string]$tag) {
+    $dom = Join-Path $pageDir ($pageFile + '.dom.txt')
+    $url = 'file:///' + (Join-Path $pageDir $pageFile).Replace([string][char]92, '/')
+    $text = ''; $errs = ''
+    for ($attempt = 1; $attempt -le 2; $attempt++) {
+        $ud = Join-Path $work ('ud_' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+        if (Test-Path $dom) { try { [IO.File]::Delete($dom) } catch { } }
+        $p = Start-Process -FilePath $edge -PassThru -NoNewWindow -RedirectStandardOutput $dom -RedirectStandardError (Join-Path $pageDir 'edge_err.txt') -ArgumentList '--headless=new', '--disable-gpu', '--no-sandbox', '--allow-file-access-from-files', '--no-first-run', '--disable-sync', '--disable-extensions', "--user-data-dir=$ud", '--window-size=1200,900', '--virtual-time-budget=30000', '--dump-dom', $url
+        if (-not $p.WaitForExit(180000)) {
+            Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" | Where-Object { $_.CommandLine -like "*$ud*" } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch { } }
+            $lines.Add("$tag | launch $attempt TIMED OUT after 180s - headless Edge was stopped")
+        }
+        $domText = ''
+        if (Test-Path $dom) {
+            # The redirected stdout file can stay locked for a moment after Edge exits.
+            for ($try = 0; $try -lt 40; $try++) {
+                try { $domText = [IO.File]::ReadAllText($dom); break } catch [System.IO.IOException] { Start-Sleep -Milliseconds 250 }
+            }
+        }
+        $text = [System.Net.WebUtility]::HtmlDecode([regex]::Match($domText, '(?s)<pre id="out"[^>]*>(.*?)</pre>').Groups[1].Value)
+        $errs = [System.Net.WebUtility]::HtmlDecode([regex]::Match($domText, '(?s)<pre id="errs"[^>]*>(.*?)</pre>').Groups[1].Value)
+        if ($text -match 'DONE' -or $text -match 'STALLED in:' -or $text -match 'HARNESS') { break }
+        if ($attempt -eq 1) { $lines.Add("$tag | launch 1 produced no page dump - launching once more") }
+    }
+    ($errs -split "`n") | Where-Object { $_.Trim() -ne '' } | Select-Object -First 6 | ForEach-Object { $lines.Add("$tag | $_") }
+    ($text -split "`n") | Where-Object { $_ -match '^\s+FAIL |^\s+(got|want)[ :]|^HARNESS|^STALLED' } | ForEach-Object { $lines.Add("$tag | $_") }
+    $fails = -1
+    $bt = [regex]::Match($text, 'PASS: \d+\s+FAIL: (\d+)')
+    if ($bt.Success -and $text -match 'DONE') { $fails = [int]$bt.Groups[1].Value; $lines.Add("$tag | " + $bt.Value) }
+    else { $lines.Add("$tag | NO RESULT - the page did not finish (see the STALLED / HARNESS line above, if any)") }
+    return $fails
+}
+
+# Runs both halves against one app directory.
+# Returns @{ php; browser; lines } - a count of -1 means that half produced no result at all.
+function Invoke-PromptParitySuite([string]$AppDir, [bool]$AsControl) {
+    $lines = New-Object System.Collections.Generic.List[string]
+    $run = Join-Path $work ('run_' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+    New-Item -ItemType Directory -Force -Path $run | Out-Null
+    $corpus = Join-Path $here 'corpus.txt'
+
+    # ---- half 1: PHP. -n because a workstation cannot load oci8/sqlsrv; the test
+    # sets its own timezone, which -n would otherwise drop to UTC.
+    $phpArgs = @('-n', (Join-Path $here 'test_promptparity.php'), $AppDir, $corpus)
+    if ($AsControl) { $phpArgs += '--control' }
+    # PS 5.1 wraps a native exe's stderr in ErrorRecords, and under 'Stop' the
+    # first one ends the script - which is what happens when the shared helpers
+    # are not in $AppDir yet and the test says so on stderr. Relax it for this
+    # call and keep the text, so that case reads as a clean RED below.
+    $eap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $phpOut = & $php @phpArgs 2>&1 | ForEach-Object { "$_" }
+    $ErrorActionPreference = $eap
+    $phpFails = -1
+    $tail = ($phpOut | Where-Object { $_ -match '^PASS: \d+\s+FAIL: \d+' } | Select-Object -Last 1)
+    if ($tail -and $tail -match 'FAIL:\s*(\d+)') { $phpFails = [int]$Matches[1] }
+    $phpOut | Where-Object { $_ -match '^\s+FAIL |^\s+(got|want)[ :]|^lift:|^could not|^cannot read|^corpus:' } | ForEach-Object { $lines.Add('php     | ' + $_) }
+    $lines.Add('php     | ' + $(if ($tail) { $tail } else { 'NO RESULT - the PHP half did not finish (are the shared prompt helpers in this app directory?)' }))
+
+    # ---- half 2: the browser engine. main.js and the corpus are baked into JS
+    # strings: `new Function` on text reports a real SyntaxError, where a file://
+    # <script src> would only say "Script error."
+    $mainText = [IO.File]::ReadAllText((Join-Path $AppDir 'js\main.js'))
+    foreach ($lib in 'jquery-3.7.1.min.js', 'moment.min.js') { Copy-Item (Join-Path $live "js\$lib") (Join-Path $run $lib) -Force }
+    Copy-Item (Join-Path $here 'promptparity_browser_tests.js') (Join-Path $run 'tests.js') -Force
+    [IO.File]::WriteAllText((Join-Path $run 'SRC.js'), 'window.__src = ' + ($mainText | ConvertTo-Json -Compress) + ';')
+    [IO.File]::WriteAllText((Join-Path $run 'CORPUS.js'), 'window.__corpus = ' + ([IO.File]::ReadAllText($corpus) | ConvertTo-Json -Compress) + ';')
+    $ctl = if ($AsControl) { 'window.__control = true;' } else { '' }
+    $html = '<!doctype html><html><head><meta charset="utf-8"></head><body><pre id="out">running</pre><pre id="errs"></pre>' +
+            '<script>window.onerror=function(m,s,l,c){document.getElementById("errs").textContent+="ONERROR: "+m+" @"+l+":"+c+"\n";};' +
+            'window.addEventListener("unhandledrejection",function(ev){document.getElementById("errs").textContent+="UNHANDLED: "+(ev.reason&&ev.reason.message||ev.reason)+"\n";});' +
+            $ctl + '</script>' +
+            '<script src="jquery-3.7.1.min.js"></script><script src="moment.min.js"></script>' +
+            '<script src="SRC.js"></script><script src="CORPUS.js"></script><script src="tests.js"></script></body></html>'
+    [IO.File]::WriteAllText((Join-Path $run 'h.html'), $html)
+    $browserFails = Invoke-EdgePage $run 'h.html' $lines 'browser'
+
+    return @{ php = $phpFails; browser = $browserFails; lines = $lines }
+}
+
+function Remove-Work { try { [IO.Directory]::Delete($work, $true) } catch { } }   # not Remove-Item: the tool's pre-filter rejects it on a variable path
+
+if (-not $Mutant) {
+    $effApp = Join-Path $work 'app'
+    $fromLive = Copy-AppInto $effApp
+    if ("$App" -ne "$live" -and $fromLive.Count -gt 0) { Write-Output ('note    | not in the stage, taken from LIVE: ' + ($fromLive -join ', ')) }
+    $r = Invoke-PromptParitySuite $effApp ([bool]$Control)
+    $r.lines | ForEach-Object { Write-Output $_ }
+    if ($Control) {
+        $ok = ($r.php -eq 1 -and $r.browser -eq 1)
+        Write-Output $(if ($ok) { 'CONTROL: both halves reported exactly the one deliberate failure - the suite can see red' } else { "CONTROL BROKEN: expected FAIL 1 / 1, got $($r.php) / $($r.browser)" })
+    } else {
+        Write-Output ('RESULT: ' + $(if ($r.php -eq 0 -and $r.browser -eq 0) { 'GREEN' } else { 'RED' }))
+    }
+    Remove-Work
+    return
+}
+
+# --- targeted mutants ---------------------------------------------------------
+# Each reverts ONE decision, in a scratch copy of the app. The expected fail
+# counts are exact, per half: a mutant that stays green, or goes red somewhere
+# it was not expected to, means the suite is not pinning what it claims.
+$mutApp = Join-Path $work 'mutapp'
+$mutants = @(
+    @{ name = 'A: the browser puts back only "IN (...)" - the column is lost again, and NOT IN runs as IN'
+       file = 'js\main.js'; php = 0; browser = 16
+       from = '                                replacement = `${fullColumn} IN (${placeholders.join('', '')})`;'
+       to   = '                                replacement = `IN (${placeholders.join('', '')})`;' },
+    @{ name = 'B: the browser no longer parenthesises a list straight after IN when the pattern cannot read the operand'
+       file = 'js\main.js'; php = 0; browser = 4
+       from = '                            } else if (!parsedPrompt.template && /\bIN\s*$/i.test(finalQuery)) {'
+       to   = '                            } else if (false) {' },
+    @{ name = "C: PHP - quotes written around a tag are left standing (''01-JUL-22'' again)"
+       file = 'shared_logic.php'; php = 19; browser = 0
+       from = "    if (!`$noQuote) {`n        `$before = (`$offset > 0)"
+       to   = "    if (false) {`n        `$before = (`$offset > 0)" },
+    @{ name = 'D: PHP - template="..." keeps its wrapping quotes'
+       file = 'shared_logic.php'; php = 25; browser = 0
+       from = '            return substr($v, 1, -1);'
+       to   = '            return $v;' },
+    @{ name = 'E: PHP - a list straight after IN is never given parentheses of its own'
+       file = 'shared_logic.php'; php = 14; browser = 0
+       from = "    return preg_match('/\bIN\s*`$/i', (string)`$sqlBefore) === 1;"
+       to   = '    return false;' },
+    @{ name = 'F: ?json=1 - no control-prompt exit: a multi-select with template="" emits its list again'
+       file = 'index.php'; php = 1; browser = 0
+       from = '                if ($isControlPrompt) {'
+       to   = '                if (false) {' },
+    @{ name = 'G: scheduler - the pair around a NOQUOTE tag is consumed too (c = a)'
+       file = 'schedule_runner.php'; php = 1; browser = 0
+       from = '            $noQuote || ($shouldSplit && $opMatch));'
+       to   = '            false);' },
+    @{ name = 'H: ?json=1 - the pair around a NOQUOTE tag is consumed too (c = a)'
+       file = 'index.php'; php = 1; browser = 0
+       from = '                    $noQuote || $tagGrew || $raw_value === '''');'
+       to   = '                    $tagGrew || $raw_value === '''');' },
+    @{ name = "M: ?json=1 - the quote rule reaches the NO ANSWER path (c = '''' becomes c = '')"
+       file = 'index.php'; php = 1; browser = 0
+       from = '                    $noQuote || $tagGrew || $raw_value === '''');'
+       to   = '                    $noQuote || $tagGrew);' },
+    @{ name = "N: scheduler - the quote rule reaches the NO ANSWER path (c = 'NULL' becomes c = NULL)"
+       file = 'schedule_runner.php'; php = 1; browser = 0
+       from = '            $sql = substr_replace($sql, $nullSql, $tagOffset, strlen($full_tag));'
+       to   = '            $sql = penumbraPromptSplice($sql, $tagOffset, strlen($full_tag), $nullSql, false);' },
+    @{ name = "I: PHP - what stands in front of a quoted tag is read WITH its quote: c IN ('[tag]') goes out as ONE value"
+       file = 'shared_logic.php'; php = 4; browser = 0
+       from = "    if (!`$noQuote && `$offset > 0 && `$sql[`$offset - 1] === `"'`""
+       to   = "    if (false && `$offset > 0 && `$sql[`$offset - 1] === `"'`"" },
+    @{ name = "J: scheduler - ONE value straight after IN goes out bare again (c IN 'A')"
+       file = 'schedule_runner.php'; php = 3; browser = 0
+       from = "            } else if (`$pType === 'multi-select' && penumbraPromptFollowsBareIn(penumbraPromptSqlBefore(`$sql, `$tagOffset, strlen(`$full_tag), false))) {"
+       to   = '            } else if (false) {' },
+    @{ name = 'K: scheduler - template="..." is not unquoted'
+       file = 'schedule_runner.php'; php = 10; browser = 0
+       from = '                $v = penumbraPromptUnquoteTemplate($v);'
+       to   = '                $v = $v;' },
+    @{ name = 'L: ?json=1 - template="..." is not unquoted (the state of things before 2026-09-21)'
+       file = 'index.php'; php = 10; browser = 0
+       from = "                    `$params['template'] = penumbraPromptUnquoteTemplate(`$params['template']);"
+       to   = "                    `$params['template'] = `$params['template'];" }
+)
+
+$bad = 0
+if ($Only) { $mutants = @($mutants | Where-Object { $Only.ToUpper().Contains($_.name.Substring(0, 1)) }) }
+foreach ($m in $mutants) {
+    [void](Copy-AppInto $mutApp)
+    $target = Join-Path $mutApp $m.file
+    $text = [IO.File]::ReadAllText($target)
+    $eol  = if ($text.Contains("`r`n")) { "`r`n" } else { "`n" }
+    $from = $m.from.Replace("`r`n", "`n").Replace("`n", $eol)
+    $to   = $m.to.Replace("`r`n", "`n").Replace("`n", $eol)
+    $mut  = $text.Replace($from, $to)
+    if ($mut -ceq $text) {
+        Write-Output ("ANCHOR MISS - " + $m.name + " (the file has moved; fix the mutant)")
+        $bad++
+        continue
+    }
+    [IO.File]::WriteAllText($target, $mut)
+    $r = Invoke-PromptParitySuite $mutApp $false
+    if ($r.php -eq $m.php -and $r.browser -eq $m.browser) { $verdict = 'BITES' } else { $verdict = 'WRONG'; $bad++ }
+    Write-Output ("{0,-6} {1}  (expected php {2} / browser {3}, got {4} / {5})" -f $verdict, $m.name, $m.php, $m.browser, $r.php, $r.browser)
+    if ($verdict -eq 'WRONG') { $r.lines | Where-Object { $_ -match 'FAIL |NO RESULT|HARNESS|STALLED|lift:' } | ForEach-Object { Write-Output "         $_" } }
+}
+Write-Output ''
+Write-Output $(if ($bad -eq 0) { "MUTANTS: all $($mutants.Count) bite exactly as specified" } else { "MUTANTS: $bad problem(s) - the suite is not pinning what it claims" })
+Remove-Work

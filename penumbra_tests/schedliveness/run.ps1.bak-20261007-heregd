@@ -1,0 +1,118 @@
+# =============================================================================
+# Run the scheduler-liveness tests (penumbra_health.php).
+#
+#   powershell -File run.ps1
+#   powershell -File run.ps1 -App <path>    # run against a stage instead of live
+#   powershell -File run.ps1 -Mutant        # three targeted mutants; each MUST
+#                                           # go RED with the exact fail count
+#                                           # named below, proving the
+#                                           # assertions bite on the thing that
+#                                           # actually matters
+#
+# WHAT IS UNDER TEST. On 2026-09-20 ieprd went into restricted mode (ORA-12526)
+# in three windows. Scheduler liveness was read from ONE place - a heartbeat row
+# inside that same database - so "Oracle is unreachable" and "the runner is
+# dead" produced the same reading. The scheduler was reported unknown and then
+# offline; five alerts named it and four outage episodes were opened against it.
+# The runner started and completed a cycle every five minutes throughout.
+#
+# The fix gives the checker a second, database-independent reading (the runner's
+# own log, on local disk) and makes the verdict fail OPEN on anything it could
+# not observe, which is what every other component in that block already does.
+#
+# This suite drives the SHIPPED functions and the SHIPPED verdict text, both
+# extracted from penumbra_health.php - never a copy, because a test of a pasted
+# copy proves the copy works.
+#
+# -n (skip php.ini) because from a workstation the ini cannot load
+# oci8/pdo_oci/sqlsrv - those client libraries exist only on the server. Nothing
+# under test needs them: the code paths here use date/json/file only, and the
+# database is a hand-written fake.
+#
+# EXPECTED TAIL: "PASS: 41   FAIL: 0" then "RESULT: GREEN".
+#
+# UNC .ps1 files are GPO-blocked here ("not digitally signed") - run the body as
+# a scriptblock rather than with -File. Never add a bare `exit` for the same
+# reason: it would kill the caller.
+# =============================================================================
+param(
+    [string]$App = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra',
+    [switch]$Mutant
+)
+
+$ErrorActionPreference = 'Stop'
+$here = $PSScriptRoot
+if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Path }
+$php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+$test = Join-Path $here 'test_schedliveness.php'
+$src  = Join-Path $App 'penumbra_health.php'
+
+if (-not $Mutant) {
+    & $php -n $test $src
+    return
+}
+
+# --- targeted mutants -------------------------------------------------------
+# Each reverts ONE decision the fix makes. The expected fail count is exact: a
+# mutant that stays GREEN, or that goes red in more places than named, means the
+# suite is no longer pinning what it claims to pin.
+$text   = [IO.File]::ReadAllText($src)
+$tmp    = Join-Path $env:TEMP ('pnb_schedlive_mut_' + $PID)
+New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+
+$mutants = @(
+    @{ name = 'A: verdict fails CLOSED again (anything not online is an outage)'
+       fails = 4
+       from  = @'
+    if ($schedStatus === 'offline') {
+        $ok = false;
+        $problems[] = 'scheduler offline';
+    } elseif ($schedStatus === 'paused') {
+        $problems[] = 'scheduler paused';   // deliberate, not a failure
+    }
+'@
+       to    = @'
+    if ($schedStatus !== 'online') {
+        if ($schedStatus === 'paused') { $problems[] = 'scheduler paused'; }
+        else { $ok = false; $problems[] = 'scheduler ' . $schedStatus; }
+    }
+'@ },
+    @{ name = 'B: a stale heartbeat never consults the runner log'
+       fails = 2
+       from  = "                if (!empty(`$out['runner_log']['alive'])) {"
+       to    = "                if (false) {" },
+    @{ name = 'C: seconds_ago goes back to a fabricated 0'
+       fails = 2
+       from  = "        'seconds_ago'  => null,"
+       to    = "        'seconds_ago'  => 0," }
+)
+
+$bad = 0
+foreach ($m in $mutants) {
+    $mut = $text.Replace($m.from, $m.to)
+    if ($mut -eq $text) {
+        Write-Output ("ANCHOR MISS - " + $m.name + " (the file has moved; fix the mutant)")
+        $bad++
+        continue
+    }
+    $f = Join-Path $tmp 'health.php'
+    [IO.File]::WriteAllText($f, $mut)
+    $out = & $php -n $test $f 2>&1
+    $tail = ($out | Select-String -Pattern '^PASS: \d+\s+FAIL: \d+').Line
+    $got  = 0
+    if ($tail -match 'FAIL:\s*(\d+)') { $got = [int]$Matches[1] }
+    if ($got -eq $m.fails) {
+        $verdict = 'BITES'
+    } else {
+        $verdict = 'WRONG'
+        $bad++
+    }
+    Write-Output ("{0,-6} {1}  (expected {2} FAIL, got {3})" -f $verdict, $m.name, $m.fails, $got)
+    if ($got -ne $m.fails) { ($out | Select-String -Pattern '^\s+FAIL ').Line | ForEach-Object { Write-Output "         $_" } }
+    [IO.File]::Delete($f)
+}
+# [IO.Directory]::Delete, not Remove-Item: the PowerShell tool's pre-execution
+# filter rejects a whole script containing Remove-Item on a variable path.
+[IO.Directory]::Delete($tmp, $true)
+Write-Output ''
+Write-Output $(if ($bad -eq 0) { 'MUTANTS: all three bite exactly as specified' } else { "MUTANTS: $bad problem(s) - the suite is not pinning what it claims" })

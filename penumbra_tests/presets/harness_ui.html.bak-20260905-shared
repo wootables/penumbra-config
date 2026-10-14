@@ -1,0 +1,272 @@
+<html><body><pre id="out">running</pre><div id="stage"></div>
+<!--
+  DOM tests for the MOUNTED control - PenumbraPresets.create().
+  Companion to harness.html, which covers the store underneath it.
+
+  Live as of step 3: the two custom-template pickers (Copy Options and
+  Download) mount this with pin:false, so the "templates have no pin" and
+  "validate blocks the save" assertions below are load-bearing, not
+  hypothetical.
+
+  window.prompt / confirm are stubbed - headless Edge auto-dismisses both, so
+  every save/rename/delete path would otherwise silently no-op and read as a
+  pass.
+
+  CONTROL: __break=3 renders the preset NAME through innerHTML instead of
+  textContent. Only the XSS assertion catches it; every functional test still
+  passes, because a name without markup in it renders identically either way.
+-->
+<script src="SRC.js"></script>
+<script>
+(function () {
+  var out = document.getElementById('out');
+  var stage = document.getElementById('stage');
+  var log = [], pass = 0, fail = 0;
+
+  function sec(n) { log.push(''); log.push('-- ' + n); }
+  function eq(label, got, want) {
+    var g = JSON.stringify(got), wv = JSON.stringify(want);
+    if (g === wv) { pass++; log.push('  ok   ' + label); }
+    else { fail++; log.push('  FAIL ' + label + '\n         got:  ' + g + '\n         want: ' + wv); }
+  }
+
+  function makeStore() {
+    var mem = {};
+    return {
+      getItem: function (k) { return Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : null; },
+      setItem: function (k, v) { mem[k] = String(v); },
+      seed: function (k, o) { mem[k] = JSON.stringify(o); }
+    };
+  }
+
+  // ── dialog stubs ────────────────────────────────────────────────────────
+  var promptReply = null, confirmReply = true, promptSeen = [];
+  window.prompt = function (msg, dflt) { promptSeen.push([msg, dflt]); return promptReply; };
+  window.confirm = function () { return confirmReply; };
+
+  function click(node) {
+    node.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  }
+  function q(root, sel)  { return root.querySelector(sel); }
+  function qa(root, sel) { return Array.prototype.slice.call(root.querySelectorAll(sel)); }
+  function rowNames(el)  { return qa(el, '.pnb-preset-row .pnb-preset-rname').map(function (n) { return n.textContent; }); }
+  function chipText(el)  { return q(el, '.pnb-preset-name').textContent; }
+
+  var P;
+
+  try {
+    var code = String(window.__src).replace(/\r\n/g, '\n');
+
+    if (window.__break === 3) {
+      var before = code;
+      code = code.replace(
+        "pick.appendChild(el('span', 'pnb-preset-rname', entry.name));",
+        "pick.innerHTML += '<span class=\"pnb-preset-rname\">' + entry.name + '</span>';");
+      if (before === code) { throw new Error('break-3 anchor missed'); }
+    }
+
+    new Function(code)();
+    P = window.PenumbraPresets;
+    if (!P || typeof P.create !== 'function') { throw new Error('create() not exposed'); }
+
+    // Each control gets its own host so the two can coexist on the stage.
+    function host() { var h = document.createElement('div'); stage.appendChild(h); return h; }
+
+    var applied, stateNow;
+    function mk(opts) {
+      opts = opts || {};
+      var h = host();
+      var c = P.create({
+        ns: opts.ns || 'tplcopy',
+        anchor: h,
+        mount: opts.mount || 'inline',
+        label: opts.label || 'none',
+        pin: opts.pin,
+        reportId: function () { return 'r1'; },
+        getState: function () { return stateNow; },
+        applyState: function (dta, name) { applied = { data: dta, name: name }; },
+        validate: opts.validate,
+        onError: function (m) { errors.push(m); }
+      });
+      return { c: c, h: h };
+    }
+    var errors = [];
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('mounting');
+    P._setStorage(makeStore());
+    stateNow = { template: '{A}|{B}' };
+    var m = mk();
+    eq('control is in the anchor',   !!q(m.h, '.pnb-preset'), true);
+    eq('inline mount class',         q(m.h, '.pnb-preset').className.indexOf('pnb-preset-inline') !== -1, true);
+    eq('chip shows the empty label', chipText(m.h), 'none');
+    eq('popover starts hidden',      q(m.h, '.pnb-preset-pop').hidden, true);
+    eq('aria-expanded starts false', q(m.h, '.pnb-preset-chip').getAttribute('aria-expanded'), 'false');
+    eq('empty state message',        !!q(m.h, '.pnb-preset-empty'), true);
+    eq('save row is always offered', !!q(m.h, '.pnb-preset-save'), true);
+
+    var hdr = mk({ mount: 'header' });
+    eq('header mount class', q(hdr.h, '.pnb-preset').className.indexOf('pnb-preset-header') !== -1, true);
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('open / close');
+    click(q(m.h, '.pnb-preset-chip'));
+    eq('click opens',            q(m.h, '.pnb-preset-pop').hidden, false);
+    eq('aria-expanded flips',    q(m.h, '.pnb-preset-chip').getAttribute('aria-expanded'), 'true');
+    click(q(m.h, '.pnb-preset-chip'));
+    eq('click again closes',     q(m.h, '.pnb-preset-pop').hidden, true);
+
+    click(q(m.h, '.pnb-preset-chip'));
+    eq('handleEscape reports it consumed the key', P.handleEscape(), true);
+    eq('and it closed',          q(m.h, '.pnb-preset-pop').hidden, true);
+    eq('handleEscape is false with nothing open', P.handleEscape(), false);
+
+    // Only one panel open at a time, or two chips in one dialog would stack.
+    click(q(m.h, '.pnb-preset-chip'));
+    click(q(hdr.h, '.pnb-preset-chip'));
+    eq('opening the second closes the first', q(m.h, '.pnb-preset-pop').hidden, true);
+    eq('and the second is open',              q(hdr.h, '.pnb-preset-pop').hidden, false);
+    click(document.body);
+    eq('outside click dismisses',             q(hdr.h, '.pnb-preset-pop').hidden, true);
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('reading existing presets');
+    var S = makeStore();
+    S.seed('penumbra_template_presets', { r1: { Zeta: { template: 'z' }, alpha: { template: 'a' } } });
+    P._setStorage(S);
+    var r = mk();
+    click(q(r.h, '.pnb-preset-chip'));
+    eq('legacy presets render, name-sorted', rowNames(r.h), ['alpha', 'Zeta']);
+    eq('no empty-state now',                 !!q(r.h, '.pnb-preset-empty'), false);
+
+    applied = null;
+    click(qa(r.h, '.pnb-preset-pick')[0]);
+    eq('row click applies the data', applied.data, { template: 'a' });
+    eq('and passes the name',        applied.name, 'alpha');
+    eq('chip now names it',          chipText(r.h), 'alpha');
+    eq('picking closes the panel',   q(r.h, '.pnb-preset-pop').hidden, true);
+
+    click(q(r.h, '.pnb-preset-chip'));
+    eq('loaded row is ticked', qa(r.h, '.pnb-preset-row').filter(function (n) {
+      return n.className.indexOf('is-on') !== -1;
+    }).length, 1);
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('templates have no pin');   // the two live consumers pass pin:false
+    P._setStorage(makeStore());
+    stateNow = { template: 't' };
+    var np = mk({ ns: 'tplcopy', pin: false });
+    promptReply = 'One';
+    click(q(np.h, '.pnb-preset-save'));
+    click(q(np.h, '.pnb-preset-chip'));
+    eq('a row exists',            rowNames(np.h), ['One']);
+    eq('but carries no pin button',
+       qa(np.h, '.pnb-preset-row .pnb-preset-act').length, 2);   // rename + delete only
+
+    // The namespace default still grants a pin where one is meant to exist.
+    P._setStorage(makeStore());
+    var wp = mk({ ns: 'pivot' });
+    promptReply = 'One';
+    click(q(wp.h, '.pnb-preset-save'));
+    click(q(wp.h, '.pnb-preset-chip'));
+    eq('a view builder gets three actions',
+       qa(wp.h, '.pnb-preset-row .pnb-preset-act').length, 3);   // pin + rename + delete
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('save');
+    P._setStorage(makeStore());
+    stateNow = { template: '{PROJECT_ID}' };
+    var s = mk();
+    promptSeen = []; promptReply = 'My Template';
+    click(q(s.h, '.pnb-preset-save'));
+    eq('saved into the store',   P.get('tplcopy', 'r1', 'My Template'), { template: '{PROJECT_ID}' });
+    eq('chip names the new one', chipText(s.h), 'My Template');
+
+    // Cancelling the name prompt must not write anything.
+    promptReply = null;
+    click(q(s.h, '.pnb-preset-chip'));
+    click(q(s.h, '.pnb-preset-save'));
+    eq('cancelled save writes nothing', P.list('tplcopy', 'r1').length, 1);
+
+    // Re-saving defaults the prompt to the loaded name - "save my tweaks back".
+    promptSeen = []; promptReply = 'My Template';
+    stateNow = { template: 'edited' };
+    click(q(s.h, '.pnb-preset-chip'));
+    click(q(s.h, '.pnb-preset-save'));
+    eq('prompt defaults to the loaded name', promptSeen[0][1], 'My Template');
+    eq('overwrote in place',                 P.get('tplcopy', 'r1', 'My Template'), { template: 'edited' });
+    eq('still one preset',                   P.list('tplcopy', 'r1').length, 1);
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('validate blocks the save');   // "Enter a template before saving"
+    P._setStorage(makeStore());
+    errors = []; stateNow = { template: '   ' };
+    var v = mk({ validate: function () {
+      return String(stateNow.template || '').replace(/^\s+|\s+$/g, '')
+        ? null : 'Enter a template before saving a preset.';
+    } });
+    promptReply = 'Nope';
+    click(q(v.h, '.pnb-preset-save'));
+    eq('nothing was written', P.list('tplcopy', 'r1').length, 0);
+    eq('and it said why',     errors, ['Enter a template before saving a preset.']);
+
+    stateNow = { template: 'real' };
+    click(q(v.h, '.pnb-preset-chip'));
+    click(q(v.h, '.pnb-preset-save'));
+    eq('a valid template saves', P.list('tplcopy', 'r1').length, 1);
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('rename and delete');
+    P._setStorage(makeStore());
+    stateNow = { template: 'x' };
+    var rd = mk();
+    promptReply = 'First';
+    click(q(rd.h, '.pnb-preset-save'));
+
+    click(q(rd.h, '.pnb-preset-chip'));
+    promptReply = 'Renamed';
+    click(qa(rd.h, '.pnb-preset-row .pnb-preset-act')[0]);   // rename (no pin here)
+    eq('renamed in the store', P.list('tplcopy', 'r1').map(function (e) { return e.name; }), ['Renamed']);
+    eq('chip followed it',     chipText(rd.h), 'Renamed');
+
+    confirmReply = false;
+    click(qa(rd.h, '.pnb-preset-row .pnb-preset-act')[1]);   // delete, declined
+    eq('declining the confirm keeps it', P.list('tplcopy', 'r1').length, 1);
+
+    confirmReply = true;
+    click(qa(rd.h, '.pnb-preset-row .pnb-preset-act')[1]);   // delete, accepted
+    eq('deleted',              P.list('tplcopy', 'r1').length, 0);
+    eq('chip reset to label',  chipText(rd.h), 'none');
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('preset names are rendered as text');   // __break=3 lands here
+    P._setStorage(makeStore());
+    var nasty = '<img src=x onerror="window.__XSS=1">';
+    P.save('tplcopy', 'r1', nasty, { template: 'q' });
+    var x = mk();
+    click(q(x.h, '.pnb-preset-chip'));
+    eq('name survives verbatim as text', rowNames(x.h), [nasty]);
+    eq('no element was injected',        qa(x.h, '.pnb-preset-row img').length, 0);
+    eq('and no handler ran',             !!window.__XSS, false);
+
+    // Same guard on the chip, which shows the loaded name.
+    click(qa(x.h, '.pnb-preset-pick')[0]);
+    eq('chip renders it as text too', chipText(x.h), nasty);
+    eq('nothing injected into the chip', qa(x.h, '.pnb-preset-chip img').length, 0);
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('destroy');
+    var dz = mk();
+    dz.c.destroy();
+    eq('control removed from the DOM', !!q(dz.h, '.pnb-preset'), false);
+    eq('and no longer counted open',   P.handleEscape(), false);
+
+    out.textContent = log.join('\n') + '\n\n' + pass + ' passed, ' + fail + ' failed'
+      + (window.__break ? '   [BREAK=' + window.__break + ' CONTROL: failures are REQUIRED]' : '');
+  } catch (e) {
+    out.textContent = 'HARNESS-ERROR' + (window.__break ? ' [BREAK=' + window.__break + ']' : '')
+      + ': ' + e.name + ': ' + e.message + '\n\n' + log.join('\n');
+  }
+})();
+</script>
+</body></html>

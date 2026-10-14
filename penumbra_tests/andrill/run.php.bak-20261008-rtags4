@@ -1,0 +1,506 @@
+<?php
+/**
+ * penumbra_tests/andrill/run.php - the drill-down between Platform Metrics and
+ * one report's metrics (2026-10-01, step 1 of folding report metrics into
+ * Platform Metrics as a breadcrumb scope).
+ *
+ * Platform's report links (Most-Opened, Heaviest, Dead, the Home Visits card)
+ * open analytics.php in the SAME tab carrying the window and filters; the
+ * report page's sidebar crumb ("<- Platform Metrics", admins only) carries them
+ * back up. (The first deploy, 2026-10-01 14:12, put it in the report strip as
+ * "All reports"; the user missed the sidebar one, so it went back that day.) Both
+ * directions go through ONE helper, penumbra_an_carry_params() in
+ * analytics_shared.php; the crumb also read Platform's pref cookie through
+ * penumbra_an_platform_prefs() for the one Platform-only checkbox - until THE
+ * SWITCH (2026-10-02): analytics.php is now the engine's wrapper, a report's
+ * metrics page IS analytics_all.php at report scope, which has all three
+ * visibility toggles (Platform gained Hide my own views), so the drill-down and
+ * the crumb carry all three both ways and the report side below emulates the
+ * engine's report scope.
+ *
+ *   php.exe -n -d date.timezone=America/New_York run.php [--app=<dir>]
+ *           [--control] [--mutant=nofs|nocmp|nodow|formonly|falsy|bareup|newtab|ungated|
+ *                                 noplatform|famtheme|onecal|noexit|refreshdefault|
+ *                                 noautocarry|nomeup]
+ *
+ * --app     defaults to the LIVE webroot; point it at a staging copy before a deploy.
+ * --control adds one deliberately false assertion and MUST report FAIL 1.
+ * --mutant  breaks one guarantee in the target's source and MUST turn red:
+ *           nofs     the carry forgets filter_submitted (checkboxes fall back
+ *                    to the receiving page's defaults / saved prefs)
+ *           nocmp    the comparison is not carried
+ *           nodow    the weekday scope is not carried
+ *           formonly the remembered custom dates ride only while custom is on
+ *           falsy    false extras are sent as an empty value (isset() reads
+ *                    "excl_admins=" as ON on Platform)
+ *           bareup   the crumb carries even on a bare visit (would overwrite
+ *                    Platform's saved window with this page's defaults)
+ *           newtab   one report link opens a new tab again
+ *           ungated  the sidebar crumb shows to non-admins too
+ *           noplatform the drill-down forgets platform=1 (the theme would switch)
+ *           famtheme the report page never applies the family theme
+ *           onecal   the one-report jump also fires in calendar mode
+ *           noexit   the jump sends its header but renders the page anyway
+ *           refreshdefault auto-refresh is on unless switched off
+ *           noautocarry the drill-down forgets Hide automation (the way back
+ *                    up would switch Platform's off)
+ *           nomeup   the crumb forgets Hide my own views
+ *   (since the switch bareup / ungated / famtheme / refreshdefault break the
+ *   engine's report scope - analytics.php is its wrapper)
+ *
+ * Lifts the penumbra_an_* functions by the tokenizer (never require'd) and
+ * EMULATES each page's inline filter parsing, pinning every emulated line to
+ * the target source as a text anchor - if a page's parsing changes, the
+ * anchor goes red and the emulation must be re-checked.
+ *
+ *   1. carry_params itself
+ *   2. DOWN: every Platform state (address x saved prefs) -> the report page
+ *      resolves the same window and filters
+ *   3. UP: every chosen report-page state x ANY Platform cookie -> Platform
+ *      resolves the same window, filters and toggles, and keeps its own
+ *      Activity from the cookie
+ *   4. DOWN then UP lands exactly where Platform was
+ *   5. the cookie reader
+ *   6. escaping
+ *   7. page wiring (text anchors)
+ *   8. a Report filter that selects ONE report opens that report's page
+ *   9. the report page's theme: the family's when reached from Platform
+ *      (platform=1), the report's own otherwise
+ *  10. the report page's auto-refresh: off unless chosen, per browser
+ *
+ * EXPECTED TAIL: "PASS <n>   FAIL 0" (see the README entry for n). A smaller
+ * pass count is a failure too.
+ */
+$CONTROL = in_array('--control', $argv, true);
+$MUTANT = ''; $APP = null;
+foreach ($argv as $a) {
+    if (strpos($a, '--mutant=') === 0) $MUTANT = substr($a, 9);
+    if (strpos($a, '--app=')    === 0) $APP    = rtrim(substr($a, 6), '\\/');
+}
+if ($APP === null) $APP = '\\\\oitras.oit.ncsu.edu\\c$\\inetpub\\wwwroot\\sponsor_migration\\penumbra';
+echo "app:  $APP\n";
+echo 'timezone: ' . date_default_timezone_get() . "\n";
+if (date_default_timezone_get() !== 'America/New_York') { fwrite(STDERR, "run with -d date.timezone=America/New_York\n"); exit(2); }
+
+$pass = 0; $fail = 0; $failShown = 0;
+function t_ok($c, $l) { global $pass, $fail, $failShown; if ($c) { $pass++; return; } $fail++; if ($failShown++ < 40) echo "    FAIL  $l\n"; }
+function t_eq($g, $w, $l) { t_ok($g === $w, $l . '  (got ' . var_export($g, true) . ', want ' . var_export($w, true) . ')'); }
+function section($t) { echo "== $t\n"; }
+
+// ---- sources + mutants ------------------------------------------------------
+$shared = @file_get_contents($APP . '/analytics_shared.php');
+$allSrc = @file_get_contents($APP . '/analytics_all.php');
+$anSrc  = @file_get_contents($APP . '/analytics.php');
+if ($shared === false || $allSrc === false || $anSrc === false) { fwrite(STDERR, "cannot read sources\n"); exit(2); }
+
+$mutants = array(
+    'nofs'     => array('shared', "\$p = array('filter_submitted' => '1', 'range' => (string)\$w['rangeParam']);", "\$p = array('range' => (string)\$w['rangeParam']);"),
+    'nocmp'    => array('shared', "    if (\$w['cmpOn'] || \$w['cmpPaused']) \$p['cmp'] = '1';\n", ''),
+    'nodow'    => array('shared', "    if (\$w['dowParam']  !== '') \$p['dow']  = \$w['dowParam'];\n", ''),
+    'formonly' => array('shared', "    if (\$w['formFrom'] !== '') \$p['from'] = \$w['formFrom'];\n    if (\$w['formTo']   !== '') \$p['to']   = \$w['formTo'];\n",
+                                  "    if (\$w['customFrom'] !== '') \$p['from'] = \$w['customFrom'];\n    if (\$w['customTo']   !== '') \$p['to']   = \$w['customTo'];\n"),
+    'falsy'    => array('shared', "        if (\$val === null || \$val === false || \$val === '') continue;\n", "        if (\$val === null) continue;\n"),
+    'bareup'   => array('all',    "if (\$anReportScope && \$isAdmin && \$formSubmitted) {", "if (\$anReportScope && \$isAdmin) {"),
+    'newtab'   => array('all',    "<a class=\"rlink\" href=\"<?php echo \$anDrillHref(\$h['short']); ?>\"", "<a class=\"rlink\" href=\"<?php echo \$anDrillHref(\$h['short']); ?>\" target=\"_blank\" rel=\"noopener\""),
+    'ungated'  => array('all',    "        <?php if (\$anReportScope && \$isAdmin): ?>\n        <span class=\"crumb\">", "        <?php if (\$anReportScope): ?>\n        <span class=\"crumb\">"),
+    'noplatform' => array('all',  "    'platform'        => true,\n", ''),
+    'famtheme' => array('all',    "   if (\$anFamilyTheme) penumbra_admin_theme_script();\n   else penumbra_an_report_theme_script(\$anRptTheme);", "   penumbra_an_report_theme_script(\$anRptTheme);"),
+    'onecal'   => array('all',    "if (!\$anCalMode && !\$anReportScope && \$reportSearch !== '') {", "if (!\$anReportScope && \$reportSearch !== '') {"),
+    'noexit'   => array('all',    "true, 302);\n        exit;", "true, 302);"),
+    'refreshdefault' => array('all', "return localStorage.getItem(REFRESH_ON_KEY) === '1';", "return localStorage.getItem(REFRESH_ON_KEY) !== '0';"),
+    'noautocarry' => array('all', "\$anDrillCarry = penumbra_an_carry_params(\$anWin, array(\n    'excl_admins'     => \$excludeAdmins,\n    'excl_automation' => \$excludeAutomation,\n", "\$anDrillCarry = penumbra_an_carry_params(\$anWin, array(\n    'excl_admins'     => \$excludeAdmins,\n"),
+    'nomeup'   => array('all',    "        'excl_automation' => \$excludeAutomation,\n        'excl_me'         => \$excludeMe,\n", "        'excl_automation' => \$excludeAutomation,\n"),
+);
+if ($MUTANT !== '') {
+    if (!isset($mutants[$MUTANT])) { fwrite(STDERR, "unknown mutant\n"); exit(2); }
+    list($which, $from, $to) = $mutants[$MUTANT];
+    $ref = ($which === 'shared') ? 'shared' : (($which === 'an') ? 'anSrc' : 'allSrc');
+    $cnt = substr_count($$ref, $from);
+    if ($cnt !== 1) { fwrite(STDERR, "mutant anchor found $cnt times\n"); exit(2); }
+    $$ref = str_replace($from, $to, $$ref);
+    echo "MUTANT: $MUTANT applied\n";
+}
+
+// ---- lift -------------------------------------------------------------------
+function lift($src, $names, $prefix) {
+    $toks = token_get_all($src);
+    $out = '';
+    $n = count($toks);
+    for ($i = 0; $i < $n; $i++) {
+        if (!is_array($toks[$i]) || $toks[$i][0] !== T_FUNCTION) continue;
+        $j = $i + 1;
+        while ($j < $n && is_array($toks[$j]) && $toks[$j][0] === T_WHITESPACE) $j++;
+        if (!is_array($toks[$j]) || $toks[$j][0] !== T_STRING || !in_array($toks[$j][1], $names, true)) continue;
+        $buf = ''; $depth = 0; $started = false;
+        for ($k = $i; $k < $n; $k++) {
+            $tk = $toks[$k];
+            $txt = is_array($tk) ? $tk[1] : $tk;
+            $buf .= $txt;
+            if ($tk === '{' || (is_array($tk) && ($tk[0] === T_CURLY_OPEN || $tk[0] === T_DOLLAR_OPEN_CURLY_BRACES))) { $depth++; $started = true; }
+            elseif ($tk === '}') { $depth--; if ($started && $depth === 0) break; }
+        }
+        $out .= $buf . "\n";
+    }
+    foreach ($names as $nm) $out = str_replace($nm . '(', $prefix . $nm . '(', $out);
+    return $out;
+}
+$NAMES = array('penumbra_an_ymd_ok', 'penumbra_an_parse_window', 'penumbra_an_carry_params',
+               'penumbra_an_platform_pref_cookie', 'penumbra_an_platform_prefs');
+eval(lift($shared, $NAMES, 't_'));
+t_ok(function_exists('t_penumbra_an_parse_window'), 'lifted the window parser');
+t_ok(function_exists('t_penumbra_an_carry_params'), 'lifted penumbra_an_carry_params');
+t_ok(function_exists('t_penumbra_an_platform_prefs') && function_exists('t_penumbra_an_platform_pref_cookie'), 'lifted the cookie reader');
+if (!function_exists('t_penumbra_an_carry_params') || !function_exists('t_penumbra_an_platform_prefs')) {
+    echo "\nPASS $pass   FAIL $fail\n"; exit(1);
+}
+
+// ---- the two pages' inline parsing, emulated (pinned by section 7) ----------
+$OPT = array('last24h' => true);
+function plat_resolve($get, $cookie) {   // analytics_all.php
+    global $OPT;
+    $prefOr = function ($k, $d) use ($cookie) { return array_key_exists($k, $cookie) ? $cookie[$k] : $d; };
+    $w = t_penumbra_an_parse_window($get, $prefOr, $OPT);
+    $fs = $w['formSubmitted'];
+    $ouc = isset($get['ouc']) ? preg_replace('/\D/', '', (string)$get['ouc']) : '';
+    if ($ouc !== '' && !preg_match('/^(\d{2}|\d{6})$/', $ouc)) $ouc = '';
+    $ap = isset($get['actions_preset']) ? strtolower(trim($get['actions_preset'])) : (string)$prefOr('actions_preset', 'all');
+    if (!in_array($ap, array('all', 'view', 'change', 'deliver', 'errors'), true)) $ap = 'all';
+    return array('w' => $w,
+        'excl_admins'     => $fs ? isset($get['excl_admins'])     : (bool)$prefOr('excl_admins', false),
+        'excl_automation' => $fs ? isset($get['excl_automation']) : (bool)$prefOr('excl_automation', false),
+        'excl_me'         => $fs ? isset($get['excl_me'])         : (bool)$prefOr('excl_me', false),
+        'user'            => isset($get['user']) ? trim($get['user']) : '',
+        'ouc'             => $ouc,
+        'actions_preset'  => $ap);
+}
+// The report page - since the switch (2026-10-02) the engine at report scope,
+// as an admin ($anCanSeePeople): no cookie (the window parse gets the defaults),
+// the three toggles from the address alone (=1).
+function rep_resolve($get) {
+    global $OPT;
+    $w = t_penumbra_an_parse_window($get, function ($k, $d) { return $d; }, $OPT);
+    $ouc = isset($get['ouc']) ? preg_replace('/\D/', '', (string)$get['ouc']) : '';
+    if ($ouc !== '' && !preg_match('/^(\d{2}|\d{6})$/', $ouc)) $ouc = '';
+    return array('w' => $w,
+        'excl_admins'     => isset($get['excl_admins'])     && (string)$get['excl_admins'] === '1',
+        'excl_automation' => isset($get['excl_automation']) && (string)$get['excl_automation'] === '1',
+        'excl_me'         => isset($get['excl_me'])         && (string)$get['excl_me'] === '1',
+        'user'            => isset($get['user']) ? trim((string)$get['user']) : '',
+        'ouc'             => $ouc,
+        'family'          => isset($get['platform']) && (string)$get['platform'] === '1');
+}
+$TOGGLES = array('excl_admins', 'excl_automation', 'excl_me');
+// What the page SHOWS. The four date-box values only populate hidden inputs
+// ("remembered" dates) and are compared only when the source had them.
+$FORM_KEYS = array('formFrom', 'formTo', 'cmpFormFrom', 'cmpFormTo');
+function window_diff($src, $dst) {
+    global $FORM_KEYS;
+    foreach ($src as $k => $v) {
+        if ($k === 'formSubmitted') continue;
+        if (in_array($k, $FORM_KEYS, true)) { if ($v !== '' && $dst[$k] !== $v) return $k; continue; }
+        if (!array_key_exists($k, $dst) || $dst[$k] !== $v) return $k;
+    }
+    return '';
+}
+function carry_down($pl) {               // analytics_all.php's $anDrillCarry
+    return t_penumbra_an_carry_params($pl['w'], array('excl_admins' => $pl['excl_admins'], 'excl_automation' => $pl['excl_automation'],
+        'excl_me' => $pl['excl_me'], 'user' => $pl['user'], 'ouc' => $pl['ouc'], 'platform' => true));
+}
+function carry_up($rp) {                 // the report scope's $anUpHref (chosen state) - all three toggles as shown
+    return t_penumbra_an_carry_params($rp['w'], array('excl_admins' => $rp['excl_admins'], 'excl_automation' => $rp['excl_automation'],
+        'excl_me' => $rp['excl_me'], 'user' => $rp['user'], 'ouc' => $rp['ouc']));
+}
+// The address really goes through a URL: build it, then parse it back.
+function via_url($params) { parse_str(http_build_query($params), $out); return $out; }
+
+// ---- 1. carry_params itself ---------------------------------------------------
+section('1. penumbra_an_carry_params()');
+$none = function ($k, $d) { return $d; };
+$w30 = t_penumbra_an_parse_window(array(), $none, $OPT);
+$c = t_penumbra_an_carry_params($w30);
+t_eq($c, array('filter_submitted' => '1', 'range' => '30'), 'defaults: just the marker and the range');
+$c = t_penumbra_an_carry_params($w30, array('excl_admins' => true, 'user' => 'jdoe', 'ouc' => '06', 'x' => false, 'y' => '', 'z' => null, 'zero' => '0'));
+t_eq($c['excl_admins'] ?? null, '1', 'true is sent as 1');
+t_ok(!array_key_exists('x', $c) && !array_key_exists('y', $c) && !array_key_exists('z', $c), "false, '' and null drop the key");
+t_eq($c['zero'] ?? null, '0', "the string '0' is a value and is kept");
+$wc = t_penumbra_an_parse_window(array('range' => 'custom', 'from' => '2026-08-15', 'to' => '2026-08-01', 'filter_submitted' => '1', 'cmp' => '1',
+                                       'cfrom' => '2026-06-01', 'cto' => '2026-06-30', 'dow' => 'mon', 'hour' => '09'), $none, $OPT);
+$c = t_penumbra_an_carry_params($wc);
+t_eq($c, array('filter_submitted' => '1', 'range' => 'custom', 'from' => '2026-08-01', 'to' => '2026-08-15', 'cmp' => '1',
+               'cfrom' => '2026-06-01', 'cto' => '2026-06-30', 'dow' => 'MON', 'hour' => '9'),
+     'everything, normalised the way the parser resolved it (backwards pair swapped, dow upper-cased, hour unpadded)');
+$wp = t_penumbra_an_parse_window(array('range' => '24h', 'filter_submitted' => '1', 'cmp' => '1', 'cfrom' => '2026-06-01', 'cto' => '2026-06-30'), $none, $OPT);
+t_eq($wp['cmpPaused'], true, '(fixture: compare paused under 24h)');
+t_eq(t_penumbra_an_carry_params($wp)['cmp'] ?? null, '1', 'a paused comparison is carried, so it resumes on a day range');
+$wb = t_penumbra_an_parse_window(array('range' => 'custom', 'from' => 'nope', 'to' => '2026-08-15', 'dow' => 'XYZ', 'hour' => '24'), $none, $OPT);
+$c = t_penumbra_an_carry_params($wb);
+t_eq($c['range'], '30', 'an unusable custom range is carried as the 30 days it resolved to');
+t_ok(!isset($c['dow']) && !isset($c['hour']), 'an invalid weekday/hour is not carried');
+
+// ---- the matrices ---------------------------------------------------------------
+$ranges = array(null, '7', '30', '90', 'all', 'custom', '24h', 'bogus');
+$dates  = array(array(), array('from' => '2026-08-01', 'to' => '2026-08-15'), array('from' => '2026-08-15', 'to' => '2026-08-01'), array('from' => '2026-02-30', 'to' => '2026-03-01'));
+$cmps   = array(array(), array('cmp' => '1', 'cfrom' => '2026-06-01', 'cto' => '2026-06-30'), array('cfrom' => '2026-06-01', 'cto' => '2026-06-30'),
+                array('cmp' => '1', 'cfrom' => '2026-06-31', 'cto' => '2026-06-30'));
+$whens  = array(array(), array('dow' => 'TUE', 'hour' => '14'), array('dow' => 'XYZ', 'hour' => '99'));
+$cookies = array(
+    array(),
+    array('range' => '90', 'excl_admins' => 1, 'excl_automation' => 1, 'actions_preset' => 'errors'),
+    array('range' => 'custom', 'from' => '2026-07-01', 'to' => '2026-07-31', 'cmp' => 1, 'cfrom' => '2026-05-01', 'cto' => '2026-05-31', 'actions_preset' => 'view'),
+    array('range' => '24h', 'cmp' => 1, 'cfrom' => '2026-05-01', 'cto' => '2026-05-31', 'excl_automation' => 1, 'excl_me' => 1),
+    array('range' => '7', 'excl_admins' => 0, 'excl_automation' => 0, 'excl_me' => 0, 'actions_preset' => 'deliver'),
+);
+// The three visibility toggles as an address states them (the submitted ones).
+$togSets = array(array(), array('excl_admins' => '1'), array('excl_automation' => '1'), array('excl_me' => '1'),
+                 array('excl_admins' => '1', 'excl_automation' => '1', 'excl_me' => '1'),
+                 array('excl_admins' => '0', 'excl_automation' => '0', 'excl_me' => '0'));
+
+// ---- 2. DOWN ------------------------------------------------------------------------
+section('2. DOWN: Platform -> report keeps the window, filters and toggles');
+$n = 0; $bad = 0; $first = ''; $leak = 0; $notFamily = 0;
+foreach ($ranges as $rg) foreach ($dates as $dt) foreach ($cmps as $cp) foreach (array(false, true) as $sub)
+foreach ($whens as $wh) foreach ($togSets as $tg) foreach ($cookies as $ck) {
+    $get = $dt + $cp + $wh + $tg;
+    if ($rg !== null) $get['range'] = $rg;
+    if ($sub) $get['filter_submitted'] = '1';
+    $pl = plat_resolve($get, $ck);
+    $carry = carry_down($pl);
+    foreach (array('report', 'report_id', 'actions_preset', 'id') as $k) if (array_key_exists($k, $carry)) $leak++;
+    $rp = rep_resolve(via_url($carry));
+    $n++;
+    $d = window_diff($pl['w'], $rp['w']);
+    foreach ($TOGGLES as $k) if ($d === '' && $rp[$k] !== $pl[$k]) $d = $k;
+    if ($d !== '') { $bad++; if ($first === '') $first = "$d get=" . json_encode($get) . ' cookie=' . json_encode($ck); }
+    if (!$rp['family']) $notFamily++;
+}
+echo "    $n Platform states\n";
+t_eq($bad, 0, 'the report page resolves exactly what Platform showed, all three toggles included' . ($first ? " [first: $first]" : ''));
+t_eq($notFamily, 0, 'and every drill-down lands in the family theme (platform=1), so the look does not change');
+t_eq($leak, 0, 'nothing Platform-only or report-scoped rides down (report, report_id, actions_preset, id)');
+$filt = 0; $fBad = 0;
+foreach (array(' jdoe ', 'JDoe', "o'brien", '"><script>x</script>', '') as $u) foreach (array('06', '060401', '6', 'abc06', '0604011', ' 06-04-01 ') as $o) {
+    $pl = plat_resolve(array('user' => $u, 'ouc' => $o), array());
+    $rp = rep_resolve(via_url(carry_down($pl)));
+    $filt++;
+    if ($rp['user'] !== $pl['user'] || $rp['ouc'] !== $pl['ouc']) $fBad++;
+}
+t_eq($fBad, 0, "user + department filters arrive as Platform resolved them ($filt pairs, incl. an unusable OUC)");
+
+// ---- 3. UP --------------------------------------------------------------------------
+section('3. UP: report -> Platform, whatever Platform saved');
+$n = 0; $bad = 0; $first = ''; $leak = 0; $keep = 0;
+foreach ($ranges as $rg) foreach ($dates as $dt) foreach ($cmps as $cp)
+foreach ($whens as $wh) foreach ($togSets as $tg) foreach ($cookies as $ck) {
+    $get = $dt + $cp + $wh + $tg + array('filter_submitted' => '1', 'id' => 'iacucred', 'ip' => '10.0.0.1', 'feed' => '700', 'rows' => '50', 'expandall' => '1', 'platform' => '1');
+    if ($rg !== null) $get['range'] = $rg;
+    $rp = rep_resolve($get);
+    $carry = carry_up($rp);
+    foreach (array('id', 'ip', 'feed', 'rows', 'expandall', 'report', 'report_id', 'actions_preset', 'platform') as $k) if (array_key_exists($k, $carry)) $leak++;
+    $pl = plat_resolve(via_url($carry), $ck);
+    $n++;
+    $d = window_diff($rp['w'], $pl['w']);
+    foreach ($TOGGLES as $k) if ($d === '' && $pl[$k] !== $rp[$k]) $d = $k;
+    if ($d !== '') { $bad++; if ($first === '') $first = "$d get=" . json_encode($get) . ' cookie=' . json_encode($ck); }
+    $wantAp = isset($ck['actions_preset']) ? $ck['actions_preset'] : 'all';
+    if ($pl['actions_preset'] !== $wantAp) $keep++;
+}
+echo "    $n report states x saved cookies\n";
+t_eq($bad, 0, 'Platform resolves exactly what the report page showed, all three toggles included - the saved cookie cannot override it' . ($first ? " [first: $first]" : ''));
+t_eq($keep, 0, "Platform keeps its own Activity from the cookie");
+t_eq($leak, 0, 'nothing report-only rides up (id, ip, feed, rows, expandall, report, report_id, actions_preset, platform)');
+$filt = 0; $fBad = 0;
+foreach (array(' jdoe ', "o'brien", '') as $u) foreach (array('06', '060401', 'abc06') as $o) {
+    $rp = rep_resolve(array('filter_submitted' => '1', 'user' => $u, 'ouc' => $o));
+    $pl = plat_resolve(via_url(carry_up($rp)), array());
+    $filt++;
+    if ($pl['user'] !== $rp['user'] || $pl['ouc'] !== $rp['ouc']) $fBad++;
+}
+t_eq($fBad, 0, "user + department filters arrive as the report page resolved them ($filt pairs)");
+
+// ---- 4. DOWN then UP ----------------------------------------------------------------
+section('4. DOWN then UP lands where Platform was');
+$n = 0; $bad = 0; $first = '';
+foreach ($ranges as $rg) foreach ($dates as $dt) foreach ($cmps as $cp) foreach (array(false, true) as $sub)
+foreach ($whens as $wh) foreach ($togSets as $tg) foreach ($cookies as $ck) {
+    $get = $dt + $cp + $wh + $tg + array('user' => 'jdoe', 'ouc' => '060401', 'report' => 'iacuc');
+    if ($rg !== null) $get['range'] = $rg;
+    if ($sub) $get['filter_submitted'] = '1';
+    $p0 = plat_resolve($get, $ck);
+    // Platform rewrites its cookie on every render: what it reads back on the
+    // way up for anything the crumb does not carry (Activity).
+    $ck2 = array('range' => $p0['w']['rangeParam'], 'from' => $p0['w']['formFrom'], 'to' => $p0['w']['formTo'],
+                 'cmp' => ($p0['w']['cmpOn'] || $p0['w']['cmpPaused']) ? 1 : 0, 'cfrom' => $p0['w']['cmpFormFrom'], 'cto' => $p0['w']['cmpFormTo'],
+                 'actions_preset' => $p0['actions_preset'], 'excl_admins' => $p0['excl_admins'] ? 1 : 0, 'excl_automation' => $p0['excl_automation'] ? 1 : 0,
+                 'excl_me' => $p0['excl_me'] ? 1 : 0);
+    $rp = rep_resolve(via_url(carry_down($p0)));
+    $p1 = plat_resolve(via_url(carry_up($rp)), $ck2);
+    $n++;
+    $d = window_diff($p0['w'], $p1['w']);
+    foreach (array('excl_admins', 'excl_automation', 'excl_me', 'user', 'ouc', 'actions_preset') as $k) if ($d === '' && $p1[$k] !== $p0[$k]) $d = $k;
+    if ($d !== '') { $bad++; if ($first === '') $first = "$d get=" . json_encode($get) . ' cookie=' . json_encode($ck); }
+}
+echo "    $n round trips\n";
+t_eq($bad, 0, 'window, comparison, weekday/hour, all three toggles, Activity, user and department all come back' . ($first ? " [first: $first]" : ''));
+
+// ---- 5. the cookie reader -----------------------------------------------------------
+section('5. penumbra_an_platform_prefs()');
+$name = t_penumbra_an_platform_pref_cookie();
+t_eq($name, 'penumbra_an_all_prefs', 'the cookie name analytics_all.php has always written');
+$_COOKIE = array();
+t_eq(t_penumbra_an_platform_prefs(), array(), 'no cookie: no prefs');
+$_COOKIE = array($name => '{"range":"90","excl_automation":1}');
+t_eq(t_penumbra_an_platform_prefs(), array('range' => '90', 'excl_automation' => 1), 'the JSON object, decoded');
+foreach (array('not json', '"a string"', '42', 'null', '[') as $junk) {
+    $_COOKIE = array($name => $junk);
+    t_eq(t_penumbra_an_platform_prefs(), array(), 'junk cookie ' . $junk . ': no prefs, no warning');
+}
+$_COOKIE = array($name => array('x'));
+$warned = 0;
+set_error_handler(function () use (&$warned) { $warned++; return true; });
+try { $got = t_penumbra_an_platform_prefs(); } catch (Throwable $e) { $got = 'threw ' . get_class($e); }
+restore_error_handler();
+t_eq($got, array(), 'an array-shaped cookie (name[]=...) reads as no prefs');
+t_eq($warned, 0, 'and raises no warning');
+$_COOKIE = array();
+
+// ---- 6. escaping -----------------------------------------------------------------------
+section('6. escaping');
+$pl = plat_resolve(array('user' => '"><img src=x onerror=alert(1)>', 'ouc' => '06'), array());
+$href = htmlspecialchars('analytics.php?' . http_build_query(array('id' => trim(' abc   ')) + carry_down($pl)));
+t_ok(strpos($href, '"') === false && strpos($href, '<') === false && strpos($href, '>') === false, 'a hostile user value cannot leave the href attribute');
+t_ok(strpos($href, 'analytics.php?id=abc&amp;filter_submitted=1') === 0, 'the padded short id is trimmed and & is escaped for the attribute');
+parse_str(parse_url(html_entity_decode($href), PHP_URL_QUERY), $back);
+t_eq($back['user'] ?? null, '"><img src=x onerror=alert(1)>', 'and the value still arrives intact');
+
+// ---- 7. page wiring -----------------------------------------------------------------------
+section('7. wiring: analytics_all.php');
+$anchorsAll = array(
+    // Since the one engine (2026-10-01) the page also runs at REPORT scope
+    // ($anReportScope, the preview of analytics.php?engine=1), which reads and
+    // writes no cookie and gates the person filters on $anCanSeePeople. At
+    // Platform scope $anReportScope is false and $anCanSeePeople is true (the
+    // page is admin-only), so the emulation above is still Platform exactly;
+    // the pins below follow the new spellings.
+    "\$prefs = \$anReportScope ? array() : penumbra_an_platform_prefs();" => 'Platform reads its cookie through the shared reader (report scope reads none)',
+    "setcookie(\$PREF_COOKIE, json_encode(array(" => 'and still writes it under that name',
+    "    'excl_automation' => \$excludeAutomation ? 1 : 0," => 'the cookie keeps Hide automation',
+    "    'excl_me'         => \$excludeMe         ? 1 : 0," => '... and Hide my own views (since the switch)',
+    "\$anWin = penumbra_an_parse_window(\$_GET, \$prefOr, array('last24h' => true));" => 'emulated: window parse with the cookie',
+    "\$excludeAdmins     = \$formSubmitted ? isset(\$_GET['excl_admins'])     : (bool)\$prefOr('excl_admins',     false);" => 'emulated: Hide admins',
+    "\$excludeAutomation = \$formSubmitted ? isset(\$_GET['excl_automation']) : (bool)\$prefOr('excl_automation', false);" => 'emulated: Hide automation',
+    "\$excludeMe         = \$formSubmitted ? isset(\$_GET['excl_me'])         : (bool)\$prefOr('excl_me',         false);" => 'emulated: Hide my own views (Platform, since the switch)',
+    "\$userSearch = (\$anCanSeePeople && isset(\$_GET['user'])) ? trim(\$_GET['user']) : '';" => 'emulated: user',
+    "\$oucSearch = (\$anCanSeePeople && isset(\$_GET['ouc'])) ? preg_replace('/\\D/', '', (string)\$_GET['ouc']) : '';" => 'emulated: department',
+    "\nif (\$oucSearch !== '' && !preg_match('/^(\\d{2}|\\d{6})\$/', \$oucSearch)) \$oucSearch = '';" => 'emulated: department (shape)',
+    "\$actionPreset = isset(\$_GET['actions_preset']) ? strtolower(trim(\$_GET['actions_preset'])) : (string)\$prefOr('actions_preset', \$anReportScope ? 'view' : 'all');" => 'emulated: Activity (Platform scope starts on all)',
+    "\$anCanSeePeople = \$isAdmin;" => 'at Platform scope the person filters are the admin\'s (the page is admin-only)',
+    "\$anDrillCarry = penumbra_an_carry_params(\$anWin, array(\n    'excl_admins'     => \$excludeAdmins,\n    'excl_automation' => \$excludeAutomation,\n    'excl_me'         => \$excludeMe,\n    'user'            => \$userSearch,\n    'ouc'             => \$oucSearch,\n    'platform'        => true,\n));" => 'the drill-down carries exactly what section 2 tests',
+    "return htmlspecialchars('analytics.php?' . http_build_query(array('id' => trim((string)\$shortId)) + \$anDrillCarry));" => 'one href builder, escaped, id first',
+    "<div class=\"kpi\" data-go=\"url:<?php echo \$anDrillHref('__HOME__'); ?>\"" => 'Home Visits drills into __HOME__ the same way',
+);
+foreach ($anchorsAll as $a => $l) t_eq(substr_count($allSrc, $a), 1, $l);
+t_eq(substr_count($allSrc, '$_COOKIE'), 0, 'no second cookie decoder left in analytics_all.php');
+t_eq(substr_count($allSrc, '<a class="rlink" href="<?php echo $anDrillHref('), 3, 'all three report links (Most-Opened, Heaviest, Dead) use it');
+// Read each link's whole opening tag: [^>]* would stop at the PHP close tag
+// inside the href and never see a target after it (that blind spot let the
+// newtab mutant pass on the first draft of this check). Never spell that close
+// tag out in a comment here - it ends PHP mode even inside a // comment.
+preg_match_all('/<a class="rlink".*?<span class="rlink-t">/s', $allSrc, $rlinkTags);
+$newTabs = 0;
+foreach ($rlinkTags[0] as $tag) if (strpos($tag, 'target=') !== false) $newTabs++;
+t_eq(count($rlinkTags[0]), 3, 'three report-link tags read whole');
+t_eq($newTabs, 0, 'none opens a new tab');
+t_eq(substr_count($allSrc, 'href="analytics.php?id='), 0, 'no hand-built analytics.php link left');
+t_ok(strpos($allSrc, "\$oucSearch = (\$anCanSeePeople && isset(\$_GET['ouc']))") !== false
+     && strpos($allSrc, '$anDrillCarry = ') > strpos($allSrc, "\$oucSearch = (\$anCanSeePeople && isset(\$_GET['ouc']))"), 'built after the department filter is parsed');
+t_ok(strpos($allSrc, '$anDrillCarry = ') < strpos($allSrc, '<html'), 'and before any output');
+
+section('7b. wiring: the report page (since the switch, the engine at report scope)');
+// THE SWITCH (2026-10-02): analytics.php is the engine's wrapper, so the report
+// page's parsing and its crumb are analytics_all.php's report-scope lines.
+t_ok(strpos($anSrc, "define('PENUMBRA_AN_REPORT_SCOPE', true);\nrequire __DIR__ . '/analytics_all.php';") !== false && strlen($anSrc) < 4000, 'analytics.php is the engine\'s wrapper');
+$anchorsAn = array(
+    "    \$excludeAdmins     = isset(\$_GET['excl_admins'])     && (string)\$_GET['excl_admins'] === '1';" => 'emulated: Hide admins (the address alone)',
+    "    \$excludeAutomation = isset(\$_GET['excl_automation']) && (string)\$_GET['excl_automation'] === '1';" => 'emulated: Hide automation (the address alone)',
+    "    \$excludeMe         = isset(\$_GET['excl_me'])         && (string)\$_GET['excl_me'] === '1';" => 'emulated: Hide my own views (the address alone)',
+    "\$anUpHref = 'analytics_all.php';\nif (\$anReportScope && \$isAdmin && \$formSubmitted) {" => 'the crumb is bare unless a filter was chosen here (a bare visit never overwrites Platform\'s saved window)',
+    "    \$anUpHref .= '?' . http_build_query(penumbra_an_carry_params(\$anWin, array(\n        'excl_admins'     => \$excludeAdmins,\n        'excl_automation' => \$excludeAutomation,\n        'excl_me'         => \$excludeMe,\n        'user'            => \$userSearch,\n        'ouc'             => \$oucSearch,\n    )));" => 'emulated: the crumb carries the window, the three toggles and the person filters',
+    // 2026-10-03 (the user's call): the way up is the page title's breadcrumb -
+    // Analytics > All Reports > <report> - and the sidebar crumb is gone.
+    "<?php if (\$isAdmin): ?><a class=\"an-crumb\" href=\"<?php echo htmlspecialchars(\$anUpHref); ?>\"" => 'the way up is the title crumb "All Reports", admins only',
+);
+foreach ($anchorsAn as $a => $l) t_eq(substr_count($allSrc, $a), 1, $l);
+t_eq(substr_count($allSrc, 'class="crumb"'), 0, 'the sidebar crumb is gone (one way up)');
+t_eq(substr_count($allSrc, '&larr; Platform Metrics'), 0, '... with its old wording');
+t_eq(substr_count($allSrc, '>All Reports</a>'), 1, 'the title crumb names it "All Reports"');
+t_eq(substr_count($allSrc, 'ctx-crumb'), 0, 'no other crumb in the head');
+t_eq(substr_count($allSrc, 'href="analytics_all.php"'), 0, 'no bare hand-written link to Platform left');
+$upAt = strpos($allSrc, "\$anUpHref = 'analytics_all.php';");
+$sbAt = strpos($allSrc, '<h2 class="an-crumbs">');
+t_ok($upAt !== false && $sbAt !== false && $upAt < $sbAt, 'its href is built before the title renders (later = an undefined variable and an empty link)');
+t_eq(substr_count($shared, '.sidebar .crumb'), 0, 'the sidebar crumb\'s CSS went with it');
+// the emulated bare rule, end to end
+$isAdmin = true;
+foreach (array(array('id' => 'x'), array('id' => 'x', 'range' => '7'), array('id' => 'x', 'filter_submitted' => '1')) as $g) {
+    $w = t_penumbra_an_parse_window($g, function ($k, $d) { return $d; }, $OPT);
+    $bare = !($isAdmin && $w['formSubmitted']);
+    t_eq($bare, !isset($g['filter_submitted']), 'crumb bare exactly when nothing was chosen: ' . json_encode($g));
+}
+
+// ---- 8. one report selected = that report's page (2026-10-01) -----------------
+section('8. Platform: a Report filter that selects ONE report opens its page');
+$oneA = strpos($allSrc, "if (!\$anCalMode && !\$anReportScope && \$reportSearch !== '') {");   // never at report scope: it IS the one report
+$oneB = ($oneA === false) ? false : strpos($allSrc, '// ---- KPI mega-query', $oneA);
+$oneBlock = ($oneA !== false && $oneB !== false) ? substr($allSrc, $oneA, $oneB - $oneA) : '';
+t_ok($oneBlock !== '', 'found the one-report block (off the calendar, only when the Report filter is set)');
+$anchorsOne = array(
+    "FROM PENUMBRA_REPORTS WHERE TRIM(SHORT_ID) = :rsearch_id\",\n                     array(':rsearch_id' => \$reportSearch));" => 'an exact short id first (a typeahead pick or an ID pill), binding only what its SQL holds',
+    "} elseif (\$reportExactId === '') {" => 'a title search only for a typed search, never for an exact ?report_id=',
+    "WHERE UPPER(TITLE) LIKE UPPER(:rsearch_title) FETCH FIRST 2 ROWS ONLY\",\n                         array(':rsearch_title' => '%' . \$reportSearch . '%'));" => 'then a title match; two rows are enough to know it is not one',
+    "header('Location: analytics.php?' . http_build_query(array('id' => \$anOneSid) + \$anDrillCarry), true, 302);\n        exit;" => 'it goes there with the drill-down carry (platform=1 included) and stops',
+);
+foreach ($anchorsOne as $a => $l) t_eq(substr_count($oneBlock, $a), 1, $l);
+t_eq(substr_count($oneBlock, 'if (count($rows) === 1)'), 2, 'exactly one row, never "the first of several"');
+$ckAt = strpos($allSrc, 'setcookie($PREF_COOKIE');
+$dcAt = strpos($allSrc, '$anDrillCarry = penumbra_an_carry_params(');
+t_ok($ckAt !== false && $dcAt !== false && $oneA !== false && $ckAt < $dcAt && $dcAt < $oneA, 'after the cookie is written and the carry is built');
+t_ok($oneA !== false && $oneA < strpos($allSrc, '<html'), 'and before any output (a header must still be possible)');
+t_eq(substr_count($allSrc, 'Filter the whole page to this report'), 0, 'no ID pill still says it filters this page');
+t_eq(substr_count($allSrc, 'title="Open this report&rsquo;s metrics with this date range and filters"'), 4, 'all four ID pills say where they go ("date range", 2026-10-03)');
+t_ok(strpos($allSrc, "title=\"One report (a pick from the list, an exact short ID, or a title only one report has) opens that report's metrics") !== false, 'the Report box says what one report does');
+
+// ---- 9. the theme depends on how the report page was reached (2026-10-01) ------
+section('9. the report page: family theme when reached from Platform, the report\'s otherwise');
+// Since the switch (2026-10-02) the report page is the engine at report scope:
+// its theme lines are analytics_all.php's (E4b), Platform is always the family.
+$anchorsTheme = array(
+    "\$anFamilyTheme = !\$anReportScope || (isset(\$_GET['platform']) && (string)\$_GET['platform'] === '1');" => 'platform=1 (and nothing else) selects the family theme at report scope; Platform is always the family',
+    "if (!\$anFamilyTheme) {\n    try {\n        \$anStateJson = readClobViaOci8(" => 'the report\'s own theme is not even read then',
+    "<body>\n<?php /* Family theme, applied before anything paints" => 'the theme script sits right after <body>, like Platform\'s',
+    "   if (\$anFamilyTheme) penumbra_admin_theme_script();\n   else penumbra_an_report_theme_script(\$anRptTheme);" => 'the SAME family resolver Platform calls - otherwise the report\'s own resolution',
+);
+foreach ($anchorsTheme as $a => $l) t_eq(substr_count($allSrc, $a), 1, $l);
+$famAt = strpos($allSrc, 'penumbra_admin_theme_script();');
+$barAt = strpos($allSrc, "penumbra_admin_bar('Report Metrics'");
+t_ok($famAt !== false && $barAt !== false && $famAt < $barAt, 'applied before the admin bar paints');
+t_eq(substr_count($allSrc, "delete('platform')"), 0, 'no filter change or Clear all drops platform=1');
+t_eq(substr_count($allSrc, "<?php if (isset(\$_GET['platform']) && (string)\$_GET['platform'] === '1'): ?><input type=\"hidden\" name=\"platform\" value=\"1\"><?php endif; ?>"), 1, 'the filter form carries platform=1 through every change');
+
+// ---- 10. auto-refresh is OFF unless chosen (2026-10-01) -----------------------
+section('10. the report page: auto-refresh off by default, remembered per browser');
+$anchorsRefresh = array(
+    "aria-pressed=\"false\">Auto-refresh: off</button>" => 'the button renders off',
+    "<span class=\"dot<?php echo \$anReportScope ? ' is-off' : ''; ?>\"<?php if (\$anReportScope): ?> id=\"anLiveDot\"" => 'the live dot renders dimmed at report scope',
+    "title=\"Rendered <?php echo htmlspecialchars(\$anRenderedAt); ?> · auto-refresh is off\"" => 'and says so',
+    "const REFRESH_ON_KEY = 'pnbAnRefreshOn';" => 'one per-browser key (the report page\'s own)',
+    "function refreshOn() { try { return localStorage.getItem(REFRESH_ON_KEY) === '1'; } catch (e) { return false; } }" => 'on only when chosen; blocked storage reads as off',
+    "        if (!refreshOn()) return;\n" => 'the reload never runs while it is off',
+    ".sidebar h2 .dot.is-off {" => 'the dimmed dot is styled',
+);
+foreach ($anchorsRefresh as $a => $l) t_eq(substr_count($allSrc, $a), 1, $l);
+t_eq(substr_count($allSrc, 'Pause auto-refresh') + substr_count($allSrc, 'pnbAnRefreshPaused'), 0, 'the old on-by-default pause toggle is gone');
+
+if ($CONTROL) { section('control'); t_ok(false, 'CONTROL: deliberately false'); }
+
+echo "\nPASS $pass   FAIL $fail\n";
+exit($fail ? 1 : 0);

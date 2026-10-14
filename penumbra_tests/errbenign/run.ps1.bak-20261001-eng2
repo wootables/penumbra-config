@@ -1,0 +1,113 @@
+# =============================================================================
+# ERRBENIGN SUITE (2026-09-25 evening): the browser's harmless page-animation
+# aborts ("Transition was skipped" / "...aborted because of invalid state" /
+# "Skipped ViewTransition ...", CLIENT_ERROR rows written before 2026-09-25
+# 15:36) are NOT errors anywhere. ONE rule in db_connection.php
+# (penumbraBenignClientErrorPattern / penumbraClientErrorIsBenign + its SQL twin
+# penumbraBenignClientErrorSql / penumbraErrorCondSql), used by every count/list.
+# PHP only, offline: check.php lifts the real functions out of the files under
+# test (no database, nothing executed against Oracle - the SQL is checked by
+# shape; the deploy verifies it live).
+#
+#   R1 the rule (12 messages)            R2 the collector uses it (kind gate)
+#   S1 the SQL twin, exact (+ alias)     S2 the pattern stays dialect-safe
+#   C1 Auditor   C2 report metrics   C3 Platform Metrics   C4 health hub/page
+#   C5 no app file counts/lists errors with the bare set (a sweep)
+#   F1 report metrics feed chips         F2 the feed passes each row's message
+#
+#   run.ps1                live files                EXPECTED: GREEN 11 / 0
+#   run.ps1 -Control       each file's .bak-20260925-auditbenign  EXPECTED: RED
+#   run.ps1 -DbPhp <p> -AuditPhp <p> -AnPhp <p> -AllPhp <p> -HealthPhp <p> -LogPhp <p>
+#   run.ps1 -Mutant <name> / -Mutants    anchors checked first (-CheckAnchors)
+#
+# UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\errbenign'
+#   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Mutants
+# Prints RESULT: GREEN/RED instead of exiting. Writes nothing to the webroot.
+# =============================================================================
+param([string]$DbPhp = '', [string]$AuditPhp = '', [string]$AnPhp = '', [string]$AllPhp = '', [string]$HealthPhp = '', [string]$LogPhp = '',
+      [string]$App = '', [string]$Here = '',
+      [string]$Mutant = '', [switch]$Mutants, [switch]$CheckAnchors, [switch]$Control)
+$ErrorActionPreference = 'Stop'
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\errbenign' }
+$app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+
+$map = [ordered]@{ db = 'db_connection.php'; aud = 'get_audit_log.php'; an = 'analytics.php'; all = 'analytics_all.php'; hl = 'penumbra_health.php'; log = 'log_client_error.php' }
+$over = @{ db = $DbPhp; aud = $AuditPhp; an = $AnPhp; all = $AllPhp; hl = $HealthPhp; log = $LogPhp }
+if ($Control) {
+  foreach ($k in @($map.Keys)) {
+    $b = "$app\$($map[$k]).bak-20260925-auditbenign"
+    if (-not (Test-Path $b)) { throw "-Control: no $b (the build before the harmless-abort exclusion)" }
+    $over[$k] = $b
+  }
+}
+$paths = @{}; $src0 = @{}
+foreach ($k in @($map.Keys)) {
+  $paths[$k] = if ($over[$k]) { $over[$k] } else { "$app\$($map[$k])" }
+  $src0[$k] = [IO.File]::ReadAllText($paths[$k], $utf8)
+}
+
+# --- mutants: one rule each. All six files are LF.
+$L = "`n"
+$mutantDefs = [ordered]@{
+  'benignall'    = @{ t = 'db';  edits = @(,@(("return `"(CASE WHEN {`$p}ACTION <> 'CLIENT_ERROR' THEN 0`"" + $L + "         . `" WHEN REGEXP_LIKE("), ("return `"(CASE`"" + $L + "         . `" WHEN REGEXP_LIKE("))); red = @('S1') }
+  'condbare'     = @{ t = 'db';  edits = @(,@("return `"({`$p}ACTION IN (`" . penumbraErrorActionsSql() . `") AND NOT `" . penumbraBenignClientErrorSql(`$alias) . `")`";", "return `"({`$p}ACTION IN (`" . penumbraErrorActionsSql() . `"))`";")); red = @('S1') }
+  'ownregex'     = @{ t = 'db';  edits = @(,@("return (bool)preg_match('/' . penumbraBenignClientErrorPattern() . '/i', trim((string)`$message));", "return (bool)preg_match('/^(Transition was skipped|Skipped ViewTransition)/i', trim((string)`$message));")); red = @('R1', 'S1') }
+  'pcreonly'     = @{ t = 'db';  edits = @(,@("return '^(Transition was (skipped|aborted)|Skipped ViewTransition)';", "return '^(Transition\swas (skipped|aborted)|Skipped ViewTransition)';")); red = @('S2') }
+  'kpibare'      = @{ t = 'aud'; edits = @(,@('COUNT(CASE WHEN $errCond THEN 1 END) AS ERRORS,', 'COUNT(CASE WHEN ACTION IN ($badList) THEN 1 END) AS ERRORS,')); red = @('C1', 'C5') }
+  'badfambare'   = @{ t = 'aud'; edits = @(,@("'bad'     => `"(`" . penumbraErrorCondSql() . `" OR ACTION = 'AUDIT_ACK')`"", "'bad'     => `"(ACTION IN (`$badList) OR ACTION = 'AUDIT_ACK')`"")); red = @('C1', 'C5') }
+  'browserall'   = @{ t = 'aud'; edits = @(,@("COUNT(CASE WHEN ACTION = 'CLIENT_ERROR' AND NOT `$benign THEN 1 END) AS ERR_BROWSER,", "COUNT(CASE WHEN ACTION = 'CLIENT_ERROR' THEN 1 END) AS ERR_BROWSER,")); red = @('C1') }
+  'anbare'       = @{ t = 'an';  edits = @(,@("COUNT(CASE WHEN `" . penumbraErrorCondSql() . `" `$timeFilter THEN 1 END) AS ERR_TOTAL_COUNT,", "COUNT(CASE WHEN ACTION IN (`" . penumbraErrorActionsSql() . `") `$timeFilter THEN 1 END) AS ERR_TOTAL_COUNT,")); red = @('C2', 'C5') }
+  'feedbenign'   = @{ t = 'an';  edits = @(,@(("    if (`$a === 'CLIENT_ERROR' && `$msg !== null && penumbraClientErrorIsBenign(`$msg)) return 'other';" + $L), '')); red = @('F1') }
+  'feedmsg'      = @{ t = 'an';  edits = @(,@("'fam'    => `$famFor((string)`$r['ACTION'], `$famMsg),", "'fam'    => `$famFor((string)`$r['ACTION']),")); red = @('F2') }
+  'allbare'      = @{ t = 'all'; edits = @(,@('WHERE $errorCondSqlA $timeFilterA', 'WHERE a.ACTION IN ($errorActionsSql) $timeFilterA')); red = @('C3', 'C5') }
+  'healthbare'   = @{ t = 'hl';  edits = @(,@("WHERE `" . penumbraErrorCondSql() . `$tSql . `"", "WHERE ACTION IN (`" . penumbraErrorActionsSql() . `")`" . `$tSql . `"")); red = @('C4', 'C5') }
+  'collectorown' = @{ t = 'log'; edits = @(,@('return penumbraClientErrorIsBenign($message);   // the ONE rule (db_connection.php)', "return (bool)preg_match('/^(Transition was (skipped|aborted))/i', trim((string)`$message));")); red = @('R2') }
+}
+function Apply-Mutant([string]$text, [string]$name) {
+  foreach ($e in $mutantDefs[$name].edits) {
+    $n = ([regex]::Matches($text, [regex]::Escape($e[0]))).Count
+    if ($n -ne 1) { throw "mutant '$name' anchor found $n times, expected 1 (needs the FEATURE build): $($e[0])" }
+    $text = $text.Replace($e[0], $e[1])
+  }
+  return $text
+}
+
+function Invoke-Check($s) {
+  $run = Join-Path $env:TEMP ('pnb_eb_' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+  New-Item -ItemType Directory -Force $run | Out-Null
+  foreach ($k in @($map.Keys)) { [IO.File]::WriteAllText("$run\$($map[$k])", $s[$k], $utf8) }
+  Copy-Item "$here\check.php" "$run\check.php" -Force
+  $out = & $php -n "$run\check.php" $run $app 2>&1 | Out-String
+  try { [IO.Directory]::Delete($run, $true) } catch { }
+  return $out
+}
+function Get-Red([string]$out) { return @([regex]::Matches($out, '(?m)^FAIL\s+(\S+)') | ForEach-Object { $_.Groups[1].Value }) }
+
+foreach ($k in @($map.Keys)) { Write-Host ("{0,-22} {1}" -f $map[$k], $paths[$k]) }
+if ($CheckAnchors -or $Mutants) {
+  $stale = @()
+  foreach ($nm in $mutantDefs.Keys) { try { [void](Apply-Mutant $src0[$mutantDefs[$nm].t] $nm) } catch { $stale += $_.Exception.Message } }
+  if ($stale.Count) { $stale | ForEach-Object { Write-Host "ANCHOR $_" }; Write-Host 'RESULT: RED'; return }
+  Write-Host "ANCHORS all $($mutantDefs.Count) mutants apply exactly once"
+  if ($CheckAnchors) { Write-Host 'RESULT: GREEN'; return }
+}
+if ($Mutant -or $Mutants) {
+  $names = if ($Mutants) { @($mutantDefs.Keys) } else { @($Mutant) }
+  $bite = 0
+  foreach ($nm in $names) {
+    if (-not $mutantDefs.Contains($nm)) { throw "unknown mutant '$nm' (known: $(($mutantDefs.Keys) -join ', '))" }
+    $sx = @{}; foreach ($k in $src0.Keys) { $sx[$k] = $src0[$k] }
+    $tk = $mutantDefs[$nm].t; $sx[$tk] = Apply-Mutant $src0[$tk] $nm
+    $red = Get-Red (Invoke-Check $sx)
+    $miss = @($mutantDefs[$nm].red | Where-Object { $red -notcontains $_ })
+    if ($miss.Count -eq 0) { $bite++; Write-Host ("MUTANT {0,-13} BITES   red: {1}" -f $nm, ($red -join ' ')) }
+    else { Write-Host ("MUTANT {0,-13} MISSED  {1} stayed green; red: {2}" -f $nm, ($miss -join ' '), ($red -join ' ')) }
+  }
+  Write-Host "MUTANTS $bite / $($names.Count) bite"
+  Write-Host $(if ($bite -eq $names.Count) { 'RESULT: GREEN' } else { 'RESULT: RED' })
+  return
+}
+Write-Host (Invoke-Check $src0).TrimEnd()

@@ -1,0 +1,186 @@
+<?php
+/*
+ * errbenign - the browser's harmless page-animation aborts are NOT errors, anywhere.
+ * Offline (no database): lifts the real functions out of the files under test and
+ * checks the rule, its SQL twin, and that every consumer counts through it.
+ *   php -n check.php <dir> [<app dir>]
+ *       <dir>      holds the files under test: db_connection.php, get_audit_log.php,
+ *                  analytics.php, analytics_all.php, penumbra_health.php,
+ *                  log_client_error.php
+ *       <app dir>  every OTHER app PHP file (top level + plugins/includes/lib/api)
+ *                  is swept for bare error counts too; the files under test win
+ * Prints PASS/FAIL lines and RESULT: GREEN|RED.
+ */
+error_reporting(E_ALL);
+$dir = rtrim($argv[1], '\\/');
+$R = array();
+function T($id, $name, $pass, $detail = '') { global $R; $R[] = array($id, $name, (bool)$pass, (string)$detail); }
+function src($dir, $f) { $p = $dir . DIRECTORY_SEPARATOR . $f; return is_file($p) ? file_get_contents($p) : ''; }
+function lift_fn($src, $name) { return preg_match('/^function ' . preg_quote($name, '/') . '\(.*?^\}\n/ms', $src, $m) ? $m[0] : null; }
+
+$db  = src($dir, 'db_connection.php');
+$aud = src($dir, 'get_audit_log.php');
+$an  = src($dir, 'analytics.php');
+$all = src($dir, 'analytics_all.php');
+$hl  = src($dir, 'penumbra_health.php');
+$log = src($dir, 'log_client_error.php');
+
+// ---- the rule, lifted -------------------------------------------------------
+$fnNames = array('penumbraErrorActions', 'penumbraErrorActionsSql', 'penumbraBenignClientErrorPattern',
+                 'penumbraClientErrorIsBenign', 'penumbraBenignClientErrorSql', 'penumbraErrorCondSql');
+$missing = array(); $code = '';
+foreach ($fnNames as $n) { $f = lift_fn($db, $n); if ($f === null) $missing[] = $n; else $code .= $f; }
+$haveRule = !$missing;
+if ($haveRule) { eval($code); }
+
+$cases = array(
+    array('Transition was skipped', true),
+    array('Transition was aborted because of invalid state. ViewTransition opt-in disabled', true),
+    array('Skipped ViewTransition due to another transition starting.', true),
+    array('  transition was SKIPPED', true),
+    array('Uncaught SyntaxError: Missing initializer in const declaration', false),
+    array('Uncaught (in promise) AbortError: Transition was skipped', false),
+    array('The user aborted a request.', false),
+    array("Cannot read properties of undefined (reading 'transition')", false),
+    array('Failed to fetch', false),
+    array('ResizeObserver loop completed with undelivered notifications.', false),
+    array('', false),
+    array(null, false),
+);
+if ($haveRule) {
+    $bad = array();
+    foreach ($cases as $c) { $got = penumbraClientErrorIsBenign($c[0]); if ($got !== $c[1]) $bad[] = var_export($c[0], true) . '=>' . var_export($got, true); }
+    T('R1', 'the rule: the three abort forms are harmless (any case, trimmed), nothing else is (12 messages)', !$bad, $bad ? implode('; ', $bad) : '12/12');
+} else {
+    T('R1', 'the rule: the three abort forms are harmless (any case, trimmed), nothing else is (12 messages)', false, 'missing in db_connection.php: ' . implode(', ', $missing));
+}
+
+// ---- the collector uses the SAME rule, behind its kind gate --------------------
+$col = lift_fn($log, 'penumbra_client_error_is_benign');
+if ($col === null && preg_match('/function penumbra_client_error_is_benign\(.*?\n\}\n/s', $log, $mm)) $col = $mm[0];
+if ($col !== null && $haveRule) {
+    eval($col);
+    $kc = array(
+        array('unhandledrejection', 'Transition was skipped', true),
+        array('unhandledrejection', 'Skipped ViewTransition due to another transition starting.', true),
+        array('unhandledrejection', 'Transition was aborted because of invalid state.', true),
+        array('error', 'Transition was skipped', false),
+        array('resource', 'Transition was skipped', false),
+        array('unhandledrejection', 'Failed to fetch', false),
+    );
+    $bad = array();
+    foreach ($kc as $c) { $got = penumbra_client_error_is_benign($c[0], $c[1]); if ($got !== $c[2]) $bad[] = $c[0] . '/' . $c[1] . '=>' . var_export($got, true); }
+    $usesShared = (bool)preg_match('/return\s+penumbraClientErrorIsBenign\(\$message\)/', $col) && !preg_match('/preg_match\(/', $col);
+    T('R2', 'the collector drops exactly those (unhandled rejections only) through the SHARED rule, no regex of its own', !$bad && $usesShared, ($bad ? implode('; ', $bad) : '6/6') . ' shared=' . var_export($usesShared, true));
+} else {
+    T('R2', 'the collector drops exactly those (unhandled rejections only) through the SHARED rule, no regex of its own', false, $col === null ? 'collector function not found' : 'no shared rule to call');
+}
+
+// ---- the SQL twin -------------------------------------------------------------
+$pat = '^(Transition was (skipped|aborted)|Skipped ViewTransition)';
+if ($haveRule) {
+    $want  = "(CASE WHEN ACTION <> 'CLIENT_ERROR' THEN 0 WHEN REGEXP_LIKE(TRIM(JSON_VALUE(SOURCE_DATA, '$.message')), '" . $pat . "', 'i') THEN 1 ELSE 0 END) = 1";
+    $wantA = str_replace(array('ACTION <>', 'JSON_VALUE(SOURCE_DATA'), array('a.ACTION <>', 'JSON_VALUE(a.SOURCE_DATA'), $want);
+    $set   = "'BADPASS','DENIED','DENIED_SCOPE','DENIED_IMPORT','EMAIL_FAIL','SCHEDULE_RUN_FAIL','SCHEDULE_FAIL','SCHEDULE_NOAUTH','QUERY_TIMEOUT','QUERY_TOOBIG','CLIENT_ERROR'";
+    $okB  = penumbraBenignClientErrorSql() === $want;
+    $okBA = penumbraBenignClientErrorSql('a') === $wantA;
+    $okC  = penumbraErrorCondSql() === "(ACTION IN ($set) AND NOT $want)";
+    $okCA = penumbraErrorCondSql('a') === "(a.ACTION IN ($set) AND NOT $wantA)";
+    // ONE pattern for both engines: the PCRE test and the SQL twin both call it.
+    $isFn  = lift_fn($db, 'penumbraClientErrorIsBenign');
+    $sqlFn = lift_fn($db, 'penumbraBenignClientErrorSql');
+    $onePat = penumbraBenignClientErrorPattern() === $pat && strpos($isFn, 'penumbraBenignClientErrorPattern()') !== false && strpos($sqlFn, 'penumbraBenignClientErrorPattern()') !== false;
+    T('S1', 'the SQL twin: CLIENT_ERROR rows only (the JSON is read for nothing else), the same pattern as PHP, alias-qualified; the error condition = the set AND NOT a harmless abort', $okB && $okBA && $okC && $okCA && $onePat,
+      'benign=' . var_export($okB, true) . ' benign(a)=' . var_export($okBA, true) . ' cond=' . var_export($okC, true) . ' cond(a)=' . var_export($okCA, true) . ' onePattern=' . var_export($onePat, true));
+    $p = penumbraBenignClientErrorPattern();
+    T('S2', 'the pattern stays dialect-safe (letters, spaces, ^ ( ) | only - PCRE and Oracle read it alike)', (bool)preg_match('/^[A-Za-z ^()|]+$/', $p), $p);
+} else {
+    T('S1', 'the SQL twin: CLIENT_ERROR rows only (the JSON is read for nothing else), the same pattern as PHP, alias-qualified; the error condition = the set AND NOT a harmless abort', false, 'no rule');
+    T('S2', 'the pattern stays dialect-safe (letters, spaces, ^ ( ) | only - PCRE and Oracle read it alike)', false, 'no rule');
+}
+
+// ---- every consumer counts and lists through the condition ---------------------
+function has_all($s, $needles, &$miss) { $miss = array(); foreach ($needles as $k => $n) if (strpos($s, $n) === false) $miss[] = $k; return !$miss; }
+$m1 = array(); $ok1 = has_all($aud, array(
+    'bad family'   => "'bad'     => \"(\" . penumbraErrorCondSql() . \" OR ACTION = 'AUDIT_ACK')\"",
+    'chip counts'  => "\" WHEN \" . penumbraErrorCondSql() . \" OR ACTION = 'AUDIT_ACK' THEN 'bad'\"",
+    'cond var'     => '$errCond = penumbraErrorCondSql();',
+    'benign var'   => '$benign  = penumbraBenignClientErrorSql();',
+    'ERRORS'       => 'COUNT(CASE WHEN $errCond THEN 1 END) AS ERRORS,',
+    'ERRORS_TODAY' => 'COUNT(CASE WHEN $errCond AND TIMESTAMP >= TRUNC(SYSDATE) THEN 1 END) AS ERRORS_TODAY,',
+    'ERR_LAST'     => "TO_CHAR(MAX(CASE WHEN \$errCond THEN TIMESTAMP END), 'Mon FMDD') AS ERR_LAST,",
+    'ERR_BROWSER'  => "COUNT(CASE WHEN ACTION = 'CLIENT_ERROR' AND NOT \$benign THEN 1 END) AS ERR_BROWSER,",
+    'ERR_BLAST'    => "TO_CHAR(MAX(CASE WHEN ACTION = 'CLIENT_ERROR' AND NOT \$benign THEN TIMESTAMP END), 'Mon FMDD') AS ERR_BLAST,",
+), $m1);
+T('C1', 'Auditor (get_audit_log.php): Security & errors (list + chip), Errors / today / last, browser count + last - all without the aborts', $ok1, $ok1 ? 'all 9' : 'missing: ' . implode(', ', $m1));
+$m2 = array(); $ok2 = has_all($an, array(
+    'browser bucket' => "COUNT(CASE WHEN ACTION='CLIENT_ERROR' AND NOT \" . penumbraBenignClientErrorSql() . \" \$timeFilter THEN 1 END) AS CLIENT_ERR_COUNT,",
+    'error total'    => "COUNT(CASE WHEN \" . penumbraErrorCondSql() . \" \$timeFilter THEN 1 END) AS ERR_TOTAL_COUNT,",
+    'spark var'      => '$errCondSql = penumbraErrorCondSql();',
+    'spark ERRS'     => 'COUNT(CASE WHEN $errCondSql THEN 1 END) AS ERRS,',
+), $m2);
+T('C2', 'Report metrics (analytics.php): the browser bucket, the Errors total and the errors sparkline', $ok2, $ok2 ? 'all 4' : 'missing: ' . implode(', ', $m2));
+$m3 = array(); $ok3 = has_all($all, array(
+    'vars'           => '$errorCondSql    = penumbraErrorCondSql();',
+    'vars a'         => "\$errorCondSqlA   = penumbraErrorCondSql('a');",
+    'benign var'     => '$benignSql       = penumbraBenignClientErrorSql();',
+    'Errors preset'  => "'errors'  => array('label' => 'Errors',       'sql' => \"AND \$errorCondSql\"),",
+    'browser bucket' => "COUNT(CASE WHEN ACTION='CLIENT_ERROR' AND NOT \$benignSql \$timeFilter THEN 1 END) AS CLIENT_ERR_COUNT,",
+    'error total'    => 'COUNT(CASE WHEN $errorCondSql $timeFilter THEN 1 END) AS ERR_TOTAL_COUNT,',
+    'Errors list'    => 'WHERE $errorCondSqlA $timeFilterA $whenFilterA $userFilterA $reportFilterA',
+), $m3);
+T('C3', 'Platform Metrics (analytics_all.php): the Errors preset, browser bucket, Errors total and the Errors tab list', $ok3, $ok3 ? 'all 7' : 'missing: ' . implode(', ', $m3));
+$m4 = array(); $ok4 = has_all($hl, array(
+    'failure counts' => "WHERE \" . penumbraErrorCondSql() . \"\n                   AND TIMESTAMP >= SYSDATE - (:hrs/24)",
+    'recent list'    => "WHERE \" . penumbraErrorCondSql('a') . \"\n                   AND a.TIMESTAMP >= SYSDATE - (:hrs/24)",
+), $m4);
+T('C4', 'Health hub + health page (penumbra_health.php): the 24 h failure count and the recent-failures list', $ok4, $ok4 ? 'both' : 'missing: ' . implode(', ', $m4));
+
+// Sweep: NO file of the app counts or lists errors with the bare set any more.
+$bareRe = '/ACTION IN \(\s*(?:"\s*\.\s*penumbraErrorActionsSql\(\)\s*\.\s*"|\$errSet|\$errorActionsSql|\$errActionsSql|\$badList)\s*\)/';
+$hits = array();
+// db_connection.php minus penumbraErrorCondSql() itself: the condition's own body
+// IS "ACTION IN (the set) AND NOT ..." - S1 pins it exactly.
+$swept = array('get_audit_log.php' => $aud, 'analytics.php' => $an, 'analytics_all.php' => $all, 'penumbra_health.php' => $hl,
+               'db_connection.php' => str_replace((string)lift_fn($db, 'penumbraErrorCondSql'), '', $db), 'log_client_error.php' => $log);
+$appDir = isset($argv[2]) ? rtrim($argv[2], '\\/') : '';
+if ($appDir !== '') {
+    foreach (array('', 'plugins', 'includes', 'lib', 'api') as $sub) {
+        $g = glob($appDir . ($sub !== '' ? DIRECTORY_SEPARATOR . $sub : '') . DIRECTORY_SEPARATOR . '*.php');
+        foreach ($g ? $g : array() as $sf) { $bn = ($sub !== '' ? $sub . '/' : '') . basename($sf); if (!isset($swept[$bn])) $swept[$bn] = file_get_contents($sf); }
+    }
+}
+foreach ($swept as $bn => $s) { if (preg_match_all($bareRe, $s, $mm)) $hits[] = $bn . ' x' . count($mm[0]); }
+T('C5', 'no file of the app (' . count($swept) . ' swept) counts or lists errors with the bare error set', !$hits && count($swept) >= 4, $hits ? implode(', ', $hits) : 'clean');
+
+// ---- the report metrics feed's chips -------------------------------------------
+if ($haveRule && preg_match('/\$famFor = function \(.*?\n\};\n/s', $an, $fm)) {
+    eval($fm[0]);
+    $fc = array(
+        array('CLIENT_ERROR', 'Transition was skipped', 'other'),
+        array('CLIENT_ERROR', 'Skipped ViewTransition due to another transition starting.', 'other'),
+        array('CLIENT_ERROR', 'Uncaught SyntaxError: Missing initializer in const declaration', 'bad'),
+        array('CLIENT_ERROR', null, 'bad'),
+        array('BADPASS', null, 'bad'),
+        array('AUDIT_ACK', null, 'bad'),
+        array('OPEN', null, 'view'),
+    );
+    $bad = array();
+    foreach ($fc as $c) { $got = $famFor($c[0], $c[1]); if ($got !== $c[2]) $bad[] = $c[0] . '/' . var_export($c[1], true) . '=>' . $got; }
+    T('F1', 'Recent activity chips: a harmless abort is "other", a real browser error (or one with no message) stays under Errors', !$bad, $bad ? implode('; ', $bad) : '7/7');
+} else {
+    T('F1', 'Recent activity chips: a harmless abort is "other", a real browser error (or one with no message) stays under Errors', false, $haveRule ? '$famFor not found' : 'no rule');
+}
+$m6 = array(); $ok6 = has_all($an, array(
+    'init'     => '$famMsg = null;',
+    'decoded'  => "if (!empty(\$sd['message'])) { \$parts[] = \$clip(\$sd['message']); \$famMsg = (string)\$sd['message']; }",
+    'salvaged' => 'if (is_string($mv) && $mv !== \'\') { $parts[] = $clip($mv); $famMsg = $mv; }',
+    'call'     => "'fam'    => \$famFor((string)\$r['ACTION'], \$famMsg),",
+), $m6);
+T('F2', 'the feed hands each row\'s message (decoded, or salvaged from a truncated preview) to the chip classifier', $ok6, $ok6 ? 'all 4' : 'missing: ' . implode(', ', $m6));
+
+$fail = 0;
+foreach ($R as $r) { if (!$r[2]) $fail++; printf("%s  %s %s  [%s]\n", $r[2] ? 'PASS' : 'FAIL', $r[0], $r[1], $r[3]); }
+printf("TOTAL pass=%d fail=%d\n", count($R) - $fail, $fail);
+if ($fail) { $ids = array(); foreach ($R as $r) if (!$r[2]) $ids[] = $r[0]; echo 'FAILED: ' . implode(' ', $ids) . "\n"; }
+echo $fail ? "RESULT: RED\n" : "RESULT: GREEN\n";

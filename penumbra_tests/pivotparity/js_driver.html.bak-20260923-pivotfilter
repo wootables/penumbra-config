@@ -1,0 +1,217 @@
+<!doctype html><html><head><meta charset="utf-8"><title>pivot parity - JS side</title></head>
+<body>
+<div id="reportSnippetOutput"></div><div id="pivotResultTable"></div>
+<!--
+  CodeMirror mount points. NOT decorative: main.js creates `editor` from
+  #sqlQuery, and populateSelectorBox() -> updateSelectorHighlights() calls
+  editor.getValue() during init. With no textarea, `editor` stays null, that
+  call throws, and the ready closure dies ~4,600 lines before
+  `const _couldBeDate` - which surfaced as 54 date-split cases failing with a
+  TDZ that looked like engine divergence. Same three ids the pivot_trigger
+  harness stages, for the same reason.
+-->
+<textarea id="sqlQuery" style="display:none"></textarea>
+<textarea id="reportSnippet" style="display:none"></textarea>
+<textarea id="subquerySql" style="display:none"></textarea>
+<div id="selectorBox"></div>
+<pre id="out">RUNNING</pre>
+<script>window.__pageErrors=[];window.onerror=function(m){window.__pageErrors.push(String(m));return true;};</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  // Boot stubs, same recipe as ..\pivot_trigger\harness.html. These are NOT
+  // cosmetic: PENUMBRA_PIVOT_SPLITS is a `var` assigned ~22,600 lines into the
+  // ready closure, so if init throws before that line the name hoists but stays
+  // undefined and every split/token case fails as a harness artifact rather
+  // than a real divergence.
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () {
+    this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {};
+  };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+</script>
+<script src="fixtures_inline.js"></script>
+<script src="main_parity.js"></script>
+<script>
+(function () {
+  function fin(o){ document.getElementById('out').textContent = 'RESULTS_JSON:' + JSON.stringify(o); }
+  setTimeout(function () {
+    var P = window.__PARITY;
+    if (!P) { return fin({engine:'js', fatal:'hooks missing: ' + (window.__PARITY_ERR||''), pageErrors:window.__pageErrors}); }
+
+    // ---- sentinels: fixtures carry "+INF"/"-INF"; JS uses real Infinity ----
+    function mat(v){
+      if (typeof v === 'string'){ if(v==='+INF') return Infinity; if(v==='-INF') return -Infinity; return v; }
+      if (Array.isArray(v)) return v.map(mat);
+      if (v && typeof v === 'object'){ var o={}; for(var k in v){ if(Object.prototype.hasOwnProperty.call(v,k)) o[k]=mat(v[k]); } return o; }
+      return v;
+    }
+    // The collector stores `distinct` as a Set; fixtures carry a list. Rebuild
+    // the native shape so extractAggregationValue sees what it expects.
+    function bucketize(v){
+      if (Array.isArray(v)) return v.map(bucketize);
+      if (v && typeof v === 'object'){
+        var o = {};
+        for (var k in v){ if(!Object.prototype.hasOwnProperty.call(v,k)) continue;
+          o[k] = (k === 'distinct' && Array.isArray(v[k])) ? new Set(v[k]) : bucketize(v[k]);
+        }
+        return o;
+      }
+      return v;
+    }
+    function cellArg(v){ return (v === null || v === undefined) ? v : bucketize(mat(v)); }
+
+    // ---- canonical encoder (must match canon() in php_driver.php) ---------
+    function canon(v){
+      if (v === null || v === undefined) return 'null';
+      if (typeof v === 'boolean') return v ? 'b:true' : 'b:false';
+      if (typeof v === 'number'){
+        if (isNaN(v)) return 'NONNUMERIC';
+        if (v === Infinity || v >= 1e308) return 'n:+INF';
+        if (v === -Infinity || v <= -1e308) return 'n:-INF';
+        // 12 significant digits, matching sprintf('%.12G') on the PHP side - see
+        // the note there for why full precision breaks NESTED numbers.
+        var s = String(Number(v.toPrecision(12))); if (s === '-0') s = '0';
+        return 'n:' + s;
+      }
+      if (typeof v === 'string') return 's:' + v;
+      if (v instanceof Set) return canon(Array.from(v));
+      if (Array.isArray(v)) return 'a:[' + v.map(canon).join(',') + ']';
+      if (typeof v === 'object'){
+        var ks = Object.keys(v).sort(), p = [];
+        for (var i=0;i<ks.length;i++) p.push(ks[i] + '=' + canon(v[ks[i]]));
+        return 'o:{' + p.join(',') + '}';
+      }
+      return 's:' + String(v);
+    }
+
+    // Mirror of norm_collect()/norm_bucket() in php_driver.php - see the note
+    // there. `distinct` is a Set here and a keyed array in PHP; both become a
+    // SORTED list. `values` is deliberately left alone: its order is meaningful.
+    function normBucket(b){
+      if (!b || typeof b !== 'object') return b;
+      if (b.distinct instanceof Set) { b.distinct = Array.from(b.distinct).map(String).sort(); }
+      else if (Array.isArray(b.distinct)) { b.distinct = b.distinct.map(String).sort(); }
+      // Mirror of the PHP side: an EMPTY wpairs is dropped on both, because PHP
+      // cannot distinguish an empty map from an empty list.
+      if (!b.wpairs || Object.keys(b.wpairs).length === 0) { delete b.wpairs; }
+      if (b._colData) { for (var k in b._colData) { if (Object.prototype.hasOwnProperty.call(b._colData,k)) b._colData[k] = normBucket(b._colData[k]); } }
+      if (b._filteredBuckets) {
+        // Mirror the PHP side's 'k'+index keying so the container notation
+        // matches; PHP indexes these numerically and would canon as a list.
+        var fbOut = {};
+        for (var f in b._filteredBuckets) {
+          if (!Object.prototype.hasOwnProperty.call(b._filteredBuckets,f)) continue;
+          var fb = b._filteredBuckets[f];
+          if (fb && fb.main) fb.main = normBucket(fb.main);
+          if (fb && fb._colData) { for (var c2 in fb._colData) { if (Object.prototype.hasOwnProperty.call(fb._colData,c2)) fb._colData[c2] = normBucket(fb._colData[c2]); } }
+          fbOut['k' + f] = fb;
+        }
+        b._filteredBuckets = fbOut;
+      }
+      return b;
+    }
+    function normCollect(r){
+      if (!r || typeof r !== 'object') return r;
+      if (Array.isArray(r.rowValues)) r.rowValues = r.rowValues.map(String);
+      if (Array.isArray(r.colValues)) r.colValues = r.colValues.map(String);
+      if (r.data) {
+        for (var rk in r.data) {
+          if (!Object.prototype.hasOwnProperty.call(r.data, rk)) continue;
+          for (var ck in r.data[rk]) {
+            if (!Object.prototype.hasOwnProperty.call(r.data[rk], ck)) continue;
+            r.data[rk][ck] = normBucket(r.data[rk][ck]);
+          }
+        }
+      }
+      return r;
+    }
+
+    function call(fn, a){
+      switch (fn){
+        case 'extractAgg':         return P.extract(cellArg(a[0]), a[1], a[2], a[3]);
+        case 'stddev':             return P.stddev(a[0]);
+        case 'percentileOf':       return P.pctOf(a[0], a[1]);
+        case 'percentileP':        return P.pctP(a[0]);
+        case 'wavgCol':            return P.wavgCol(a[0]);
+        case 'wavgOf':             return P.wavgOf(a[0]);
+        case 'antimode':           return P.antimode(a[0]);
+        case 'parseNumericValues': return P.parseNums(a[0]);
+        case 'parseFieldToken':    return P.parseTok(a[0]);
+        case 'fieldDisplayLabel':  return P.dispLabel(a[0]);
+        case 'binBucket':          return P.binBucket(a[0], a[1], a[2]);
+        case 'binsBucket':         return P.binsBucket(a[0], a[1]);
+        case 'splitBucket':        return P.splitBucket(a[0], a[1]);
+        case 'autoBinWidth':       return P.autoW(a[0], a[1]);
+        case 'normalizeBinEdges':  return P.normEdges(a[0]);
+        case 'binsLabels':         return P.splits().bins.labels(a[0]);
+        case 'aggLabel':           return P.aggLabel(a[0]);
+        case 'parseValue':         return P.parseVal(a[0]);
+        // Straddles the apply-spread ceiling on purpose: with Math.min.apply
+        // these threw RangeError at 130k while PHP returned a number.
+        case 'emptyAggValue':      return P.emptyAgg(a[0]);
+        case 'filterRow': {
+          // Same path the collector uses: parse once, then evaluate the row.
+          var fr = new Map(); fr.set('AMT', a[0]); fr.set('OTHER', 'x');
+          var cols = ['AMT', 'OTHER'];
+          var parsed = P.parseQuery(a[1], cols);
+          return P.evalQuery(fr, parsed, cols);
+        }
+        case 'collect': {
+          // The JS collector wants Maps, not plain objects, and its parameter
+          // order differs from the PHP twin - map by name, never splat.
+          var src = a[0].map(function (r) {
+            var m = new Map();
+            for (var k in r) { if (Object.prototype.hasOwnProperty.call(r, k)) m.set(k, r[k]); }
+            return m;
+          });
+          var c = a[1];
+          return normCollect(P.collect(src, c.rows, c.cols, c.val, c.aggs, c.extra, c.filters));
+        }
+        case 'isDerivedAgg':       return P.isDerived(a[0]);
+        case 'isRoll':             return P.isRoll(a[0]);
+        case 'indexBaseLabel':     return P.indexBase(a[0]);
+        case 'minOfRange':         { var _mn=[]; for(var _i=0;_i<a[0];_i++) _mn.push(_i); return P.minOf(_mn); }
+        case 'maxOfRange':         { var _mx=[]; for(var _j=0;_j<a[0];_j++) _mx.push(_j); return P.maxOf(_mx); }
+      }
+      return '__NO_SUCH_FN__';
+    }
+
+    var res = {};
+    var cases = (window.__FIXTURES && window.__FIXTURES.cases) || [];
+    for (var i = 0; i < cases.length; i++){
+      var c = cases[i];
+      try { res[c.id] = canon(call(c.fn, c.args)); }
+      catch (e) { res[c.id] = 'ERR:' + (e && e.name ? e.name : 'Error') + ': ' + (e && e.message ? e.message : String(e)); }
+    }
+    var _probe = null;
+    try { _probe = P.probe ? P.probe() : null; } catch (e) { _probe = 'probe threw: ' + e; }
+    fin({engine:'js', results:res, pageErrors:window.__pageErrors, initProbe:_probe,
+         initErr: window.__INIT_ERR || null});
+  }, 60);
+})();
+</script>
+</body></html>

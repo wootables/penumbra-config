@@ -1,0 +1,2296 @@
+// pvnotes suite - browser half (2026-10-06). Runs ONE scenario (?scn=) against
+// whichever main.js / penumbra_journal.js the page loaded and publishes
+//   window.__PVRESULT = { scn, asserts: [{id, ok, detail}], errors: [...] }
+// and window.__PVDONE = true. run.py collects and prints the asserts.
+//
+// GROUND TRUTH is the fixture (window.__rowsFixture), the key rule (window.__pk:
+// [row field, value] pairs sorted by field, as JSON) and the fake journal server
+// (window.__J). A pivot row is read from the page by its data-pivot-row (its raw
+// labels joined by |||) or, for a collapsed group, its summary row's key.
+(function () {
+  var JR = window.__PV || {};
+  var SCN = window.__SCN;
+  var pk = window.__pk;
+  var K = window.__K;
+  var DEPTS = window.__DEPTS, FYS = window.__FYS;
+  var R = { scn: SCN, asserts: [] };
+  function rec(id, ok, detail) { R.asserts.push({ id: id, ok: !!ok, detail: String(detail == null ? '' : detail) }); }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function hides() { return window.__PV_HIDES || 0; }
+  async function until(fn, ms) { var t = Date.now(); while (!fn() && Date.now() - t < ms) await sleep(20); return fn(); }
+  function clickEl(el) { el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); }
+  function fail(ids, why) { ids.forEach(function (id) { rec(id, false, why); }); }
+
+  // ---- reading the pivot -------------------------------------------------
+  function tbl() { return document.getElementById('pivotResultTable'); }
+  function drawn(el) { return !!el && el.getClientRects().length > 0; }
+  function arr(nl) { return Array.prototype.slice.call(nl || []); }
+  function btns() { return tbl() ? arr(tbl().querySelectorAll('.journal-pvnote-btn')) : []; }
+  function btnsFor(key) { return btns().filter(function (b) { return b.getAttribute('data-pvn-key') === key; }); }
+  function findBtn(key) { var d = btnsFor(key).filter(drawn); return d.length ? d[0] : null; }
+  function leafRows() { return tbl() ? arr(tbl().querySelectorAll(':scope > tbody > tr[data-pivot-row]')) : []; }
+  function partsOf(tr) { return tr.getAttribute('data-pivot-row').split('|||'); }
+  function cellOf(tr, lvl) { return tr.querySelector(':scope > td[data-row-field="' + lvl + '"]'); }
+  // Body rows that are not a collapsed group's summary row - readable on ANY build
+  // (data-pivot-row is new with the feature), for the P-* preconditions.
+  function bodyRows() { return tbl() ? arr(tbl().querySelectorAll(':scope > tbody > tr')).filter(function (tr) { return !tr.classList.contains('pivot-group-summary-row'); }) : []; }
+  function cards() { return arr(document.querySelectorAll('.journal-pvnote-card')); }
+  function after(b) { return getComputedStyle(b, '::after').content; }
+  function cnt(b) { return b ? b.getAttribute('data-count') : null; }
+  function drawnLeafCount(dept) { return leafRows().filter(function (tr) { return drawn(tr) && partsOf(tr)[0] === dept; }).length; }
+  function chevron(groupKey) {
+    var t = tbl() ? arr(tbl().querySelectorAll('.pivot-collapse-toggle-right')) : [];
+    for (var i = 0; i < t.length; i++) if (t[i].getAttribute('data-group-key') === groupKey && drawn(t[i])) return t[i];
+    return null;
+  }
+  function near(card, b) {
+    if (!card || !b) return false;
+    var br = b.getBoundingClientRect(), cr = card.getBoundingClientRect();
+    return Math.abs(cr.top - (br.bottom + 6)) <= 2 || Math.abs(cr.bottom - (br.top - 6)) <= 2;
+  }
+  function brief(b) { return b ? ('count "' + cnt(b) + '" open ' + b.classList.contains('is-open') + ' group ' + b.classList.contains('is-group')) : 'no icon'; }
+
+  // The leaf rows' icons in the leaf cell (nested layouts) or the first cell
+  // (side-by-side): exactly one, FIRST in the cell, keyed by the row's labels.
+  function checkLeafIcons(lvl, fields) {
+    var bad = [];
+    leafRows().forEach(function (tr) {
+      var parts = partsOf(tr), td = cellOf(tr, lvl);
+      var bs = td ? td.querySelectorAll('.journal-pvnote-btn') : [];
+      var want = pk(fields.map(function (f, i) { return [f, parts[i]]; }));
+      var tag = parts.join('/');
+      if (!td || bs.length !== 1) { bad.push(tag + ': ' + bs.length + ' icons'); return; }
+      if (td.firstChild !== bs[0]) bad.push(tag + ': icon not first in its cell');
+      if (bs[0].getAttribute('data-pvn-key') !== want) bad.push(tag + ': key ' + bs[0].getAttribute('data-pvn-key') + ' want ' + want);
+      if (bs[0].classList.contains('is-group')) bad.push(tag + ': marked as a group');
+    });
+    return bad;
+  }
+  // Each group: exactly one DRAWN icon, keyed by its label, first in the cell's
+  // sticky-text wrapper, in the level-0 cell, marked as a group.
+  function checkGroupIcons(field, values) {
+    var bad = [];
+    values.forEach(function (v) {
+      var k = pk([[field, v]]), shown = btnsFor(k).filter(drawn);
+      if (shown.length !== 1) { bad.push(v + ': drawn ' + shown.length); return; }
+      var b = shown[0], host = b.parentNode, td = b.closest('td');
+      if (!b.classList.contains('is-group')) bad.push(v + ': not is-group');
+      if (!host.classList.contains('pivot-row-sticky-text') || host.firstChild !== b) bad.push(v + ': not first in the sticky text');
+      if (!td || td.getAttribute('data-row-field') !== '0') bad.push(v + ': not in the level-0 cell');
+    });
+    return bad;
+  }
+
+  async function boot() {
+    await until(function () { return window.__queryDone >= 1 && hides() >= 1; }, 60000);
+    if (window.__CHART_SCN) {   // round 8: a vis() chart in the snippet area, no pivot
+      await until(function () { return charts().length >= (window.__CHART_N || 1); }, 20000);
+    } else if (window.__TABLE_SCN) {   // round 6: a table scenario - its Notes column, no pivot
+      await until(function () { return !!document.querySelector('td[data-column="__JOURNAL_NOTES"] .journal-notes-btn'); }, 15000);
+    } else {
+      await until(function () { return !!tbl() && $('#pivot-output-container').is(':visible'); }, 15000);
+    }
+    await sleep(300);
+    await until(function () { return !window.__jPending; }, 15000);
+    await sleep(700);   // the coalesced paint (rAF / 120 ms) and the sticky re-measure
+    // The pivot on screen, as when a user clicks an icon (the page above it is long).
+    var w = document.getElementById(window.__CHART_SCN ? 'reportSnippetOutput' : 'results-wrapper');
+    if (w) w.scrollIntoView({ block: 'start' });
+    await sleep(100);
+  }
+
+  var S = {};
+
+  // ---- nested (collapsible, expanded): icons, counts, text, the card ------
+  S.nested = async function () {
+    rec('P-nested-render', !!tbl() && bodyRows().length === 9 && bodyRows().every(drawn), 'pivot ' + !!tbl() + ', body rows ' + bodyRows().length);
+    var bl = checkLeafIcons(1, ['DEPT', 'FY']);
+    rec('V-nested-leaf', leafRows().length === 9 && !bl.length, bl.slice(0, 4).join(' | ') || 'all 9 leaf cells');
+    var bg = checkGroupIcons('DEPT', DEPTS);
+    rec('V-nested-group', !bg.length, bg.slice(0, 4).join(' | ') || 'all 3 group cells');
+    var bLeaf = findBtn(K.leaf), bGrp = findBtn(K.grp), bNone = findBtn(pk([['DEPT', 'Humanities'], ['FY', 'FY2024']]));
+    rec('V-nested-count', !!bLeaf && bLeaf.classList.contains('has-notes') && cnt(bLeaf) === '2' && after(bLeaf) === '"2"'
+        && !!bGrp && cnt(bGrp) === '1' && !!bNone && !bNone.classList.contains('has-notes') && cnt(bNone) === '' && after(bNone) === 'none',
+        'leaf ' + brief(bLeaf) + ' after ' + (bLeaf && after(bLeaf)) + ' | group ' + brief(bGrp) + ' | none ' + brief(bNone) + ' after ' + (bNone && after(bNone)));
+    // The icon adds no TEXT to its cell: the count is CSS content.
+    var badTxt = [];
+    btns().forEach(function (b) { if (b.textContent !== '') badTxt.push('icon text "' + b.textContent + '"'); });
+    leafRows().forEach(function (tr) { var p = partsOf(tr), td = cellOf(tr, 1); if (td && td.textContent.trim() !== p[1]) badTxt.push(p.join('/') + ' leaf text "' + td.textContent.trim() + '"'); });
+    rec('V-nested-notext', btns().length > 0 && !badTxt.length, badTxt.slice(0, 3).join(' | ') || (btns().length + ' icons, no text'));
+    rec('V-nested-faint', !!bNone && !!bLeaf && parseFloat(getComputedStyle(bNone).opacity) < 0.5 && getComputedStyle(bLeaf).opacity === '1',
+        'empty ' + (bNone && getComputedStyle(bNone).opacity) + ' noted ' + (bLeaf && getComputedStyle(bLeaf).opacity));
+    // The icons never shift the sticky columns: #pivotResultTable is table-layout:
+    // fixed (header cells set the widths), so the second sticky column's left
+    // still meets the first column's edge. A regression guard - it holds on the
+    // build before the feature too, and nothing in the feature re-measures.
+    var th1 = tbl() && tbl().querySelector('thead th.pivot-sticky-col'), td2 = tbl() && tbl().querySelector('tbody td.pivot-sticky-col-2');
+    var left = td2 ? parseFloat(td2.style.left) : NaN;
+    rec('V-nested-sticky', !!th1 && !!td2 && Math.abs(left - (th1.offsetWidth - 1)) <= 1,
+        'col-2 left ' + left + ', col-1 width ' + (th1 && th1.offsetWidth) + ', table-layout ' + (tbl() && getComputedStyle(tbl()).tableLayout));
+
+    var C = ['C-nested-open', 'C-nested-nofold', 'C-nested-place', 'C-nested-focus', 'C-nested-post', 'C-nested-again', 'C-nested-one',
+             'C-nested-band', 'C-nested-esc', 'C-nested-follow', 'C-nested-collapse', 'C-nested-away'];
+    if (!bLeaf || !bGrp) { fail(C, 'no icons to click'); return; }
+    var engBefore = drawnLeafCount('Engineering');
+    clickEl(bLeaf);
+    await until(function () { return cards().length === 1; }, 2000);
+    await sleep(150);
+    var c = cards()[0];
+    var ref = c ? (c.querySelector('.journal-rownote-ref') || {}).textContent : '';
+    var items = c ? c.querySelectorAll('.journal-rownote-item').length : -1;
+    rec('C-nested-open', cards().length === 1 && !!c && c.getAttribute('role') === 'dialog' && c.getAttribute('data-pvn-key') === K.leaf && drawn(c)
+        && items === 2 && ref === 'Engineering · FY2026' && bLeaf.classList.contains('is-open') && bLeaf.getAttribute('aria-expanded') === 'true',
+        'cards ' + cards().length + ' items ' + items + ' ref "' + ref + '" ' + brief(bLeaf));
+    rec('C-nested-nofold', engBefore === 3 && drawnLeafCount('Engineering') === 3, 'Engineering rows drawn ' + engBefore + ' -> ' + drawnLeafCount('Engineering'));
+    rec('C-nested-place', near(c, bLeaf), c ? ('card top ' + Math.round(c.getBoundingClientRect().top) + ' icon bottom ' + Math.round(bLeaf.getBoundingClientRect().bottom)) : 'no card');
+    rec('C-nested-focus', !!c && document.activeElement === c.querySelector('.journal-rownote-input'), 'active ' + (document.activeElement && document.activeElement.className));
+    if (!c) { fail(C.slice(4), 'no card'); return; }
+
+    // Post: scope 'pivot', the row's key, the labels as the snapshot; the count follows.
+    var inEl = c.querySelector('.journal-rownote-input');
+    inEl.focus();
+    inEl.textContent = 'Pivot check';
+    var nPosts = window.__J.posts.length;
+    clickEl(c.querySelector('.journal-rownote-post'));
+    await until(function () { return window.__J.posts.length > nPosts; }, 3000);
+    await until(function () { var b = findBtn(K.leaf); return !!b && cnt(b) === '3'; }, 3000);
+    var p = window.__J.posts[window.__J.posts.length - 1] || {};
+    var snap = p.row_snapshot || {};
+    var b3 = findBtn(K.leaf);
+    rec('C-nested-post', p.action === 'add' && p.scope === 'pivot' && p.row_key === K.leaf && p.note_text === 'Pivot check'
+        && snap.DEPT === 'Engineering' && snap.FY === 'FY2026' && cnt(b3) === '3' && c.querySelectorAll('.journal-rownote-item').length === 3
+        && !!b3 && b3.classList.contains('is-open'),
+        'post ' + JSON.stringify({ a: p.action, s: p.scope, k: p.row_key === K.leaf, t: p.note_text, snap: snap }) + ' | ' + brief(b3)
+        + ' items ' + c.querySelectorAll('.journal-rownote-item').length);
+
+    // The icon again closes it.
+    clickEl(findBtn(K.leaf));
+    await sleep(150);
+    rec('C-nested-again', cards().length === 0 && findBtn(K.leaf).getAttribute('aria-expanded') === 'false', 'cards ' + cards().length + ' ' + brief(findBtn(K.leaf)));
+
+    // One card at a time.
+    clickEl(findBtn(K.leaf)); await sleep(120);
+    clickEl(findBtn(K.grp)); await sleep(150);
+    rec('C-nested-one', cards().length === 1 && cards()[0].getAttribute('data-pvn-key') === K.grp
+        && !findBtn(K.leaf).classList.contains('is-open') && findBtn(K.grp).classList.contains('is-open'),
+        'cards ' + cards().length + ' key ' + (cards()[0] && cards()[0].getAttribute('data-pvn-key')));
+
+    // Its head band closes it and hands focus back to the icon.
+    var band = cards()[0] && cards()[0].querySelector('.journal-rownote-close');
+    if (band) clickEl(band);
+    await sleep(150);
+    rec('C-nested-band', cards().length === 0 && document.activeElement === findBtn(K.grp), 'cards ' + cards().length + ' focus on icon ' + (document.activeElement === findBtn(K.grp)));
+
+    // Escape is the editors' console key: it never closes a note (user, 2026-10-02).
+    clickEl(findBtn(K.leaf));
+    await until(function () { return cards().length === 1; }, 2000);
+    await sleep(150);
+    window.__wantKeys = ['Escape'];
+    await until(function () { return window.__keysSent; }, 5000);
+    await sleep(300);
+    rec('C-nested-esc', !!window.__keysSent && cards().length === 1, 'keys sent ' + !!window.__keysSent + ', cards ' + cards().length);
+
+    // It follows its icon when the page scrolls. The focus handed back to the group's
+    // icon above scrolled #results-wrapper (it scrolls here: 412px of pivot in 250), so
+    // the leaf's icon is brought back into the box first - a card whose icon is out of
+    // the box hides (round 6, 2026-10-07).
+    var iv = findBtn(K.leaf);
+    if (iv) iv.scrollIntoView({ block: 'center' });
+    await sleep(300);
+    var c0 = cards()[0], i0 = findBtn(K.leaf);
+    var ct0 = c0 ? c0.getBoundingClientRect().top : NaN, it0 = i0 ? i0.getBoundingClientRect().top : NaN;
+    window.scrollBy(0, 40);
+    await sleep(300);
+    var c1 = cards()[0], i1 = findBtn(K.leaf);
+    var dc = (c1 ? c1.getBoundingClientRect().top : NaN) - ct0, di = (i1 ? i1.getBoundingClientRect().top : NaN) - it0;
+    rec('C-nested-follow', di <= -30 && Math.abs(dc - di) <= 2, 'icon moved ' + Math.round(di) + ', card moved ' + Math.round(dc));
+    window.scrollBy(0, -40);
+    await sleep(200);
+
+    // A group's card stays with the group when it collapses: the group's icon is
+    // on its summary row then. (In view first: a card whose icon is out of
+    // #results-wrapper's box hides - round 6, 2026-10-07.)
+    var gv = findBtn(K.grp);
+    if (gv) gv.scrollIntoView({ block: 'center' });
+    await sleep(300);
+    clickEl(findBtn(K.grp));
+    await until(function () { return cards().length === 1 && cards()[0].getAttribute('data-pvn-key') === K.grp; }, 2000);
+    var chev = chevron('Sciences');
+    if (chev) clickEl(chev);
+    await sleep(700);
+    var gNow = findBtn(K.grp), gTr = gNow && gNow.closest('tr');
+    rec('C-nested-collapse', !!chev && drawnLeafCount('Sciences') === 0 && cards().length === 1 && !!gNow && !!gTr
+        && gTr.classList.contains('pivot-group-summary-row') && gNow.classList.contains('is-open') && near(cards()[0], gNow),
+        'chevron ' + !!chev + ' Sciences rows ' + drawnLeafCount('Sciences') + ' cards ' + cards().length + ' icon on summary row '
+        + !!(gTr && gTr.classList.contains('pivot-group-summary-row')) + ' ' + brief(gNow) + ' near ' + near(cards()[0], gNow));
+
+    // Put the pivot away: the card goes with it.
+    $('#pivot-output-container').hide();
+    await sleep(700);
+    rec('C-nested-away', cards().length === 0, 'cards ' + cards().length);
+    $('#pivot-output-container').show();
+  };
+
+  // ---- the other layouts and row-field shapes ------------------------------
+  S.static = async function () {
+    var bl = checkLeafIcons(1, ['DEPT', 'FY']), bg = checkGroupIcons('DEPT', DEPTS);
+    var sums = tbl() ? tbl().querySelectorAll('tr.pivot-group-summary-row').length : -1;
+    rec('V-static', !!tbl() && leafRows().length === 9 && !bl.length && !bg.length && sums === 0 && btns().length === 12,
+        'leaf: ' + (bl.slice(0, 2).join(' | ') || 'ok') + ' group: ' + (bg.slice(0, 2).join(' | ') || 'ok') + ' summary rows ' + sums + ' icons ' + btns().length);
+  };
+  S.flat = async function () {
+    var bl = checkLeafIcons(0, ['DEPT', 'FY']);
+    var second = leafRows().filter(function (tr) { var td = cellOf(tr, 1); return td && td.querySelector('.journal-pvnote-btn'); }).length;
+    var groups = btns().filter(function (b) { return b.classList.contains('is-group'); }).length;
+    rec('V-flat', !!tbl() && leafRows().length === 9 && !bl.length && second === 0 && groups === 0 && btns().length === 9 && cnt(findBtn(K.leaf)) === '2',
+        (bl.slice(0, 3).join(' | ') || 'first cells ok') + ' | icons in 2nd cells ' + second + ', group icons ' + groups + ', total ' + btns().length + ', leaf ' + brief(findBtn(K.leaf)));
+  };
+  // A DEPT-only pivot's row shares the thread of the DEPT group in a DEPT x FY pivot.
+  S.single = async function () {
+    var bl = checkLeafIcons(0, ['DEPT']);
+    rec('V-single', !!tbl() && leafRows().length === 3 && !bl.length && cnt(findBtn(K.grp)) === '1',
+        (bl.slice(0, 3).join(' | ') || 'rows ok') + ' | Sciences ' + brief(findBtn(K.grp)));
+  };
+  // The order of the row fields does not matter: FY x DEPT finds the DEPT x FY notes.
+  S.reorder = async function () {
+    var bl = checkLeafIcons(1, ['FY', 'DEPT']), bg = checkGroupIcons('FY', FYS);
+    var tr = findBtn(K.leaf) && findBtn(K.leaf).closest('tr');
+    rec('V-reorder', !!tbl() && !bl.length && !bg.length && cnt(findBtn(K.leaf)) === '2' && !!tr && tr.getAttribute('data-pivot-row') === 'FY2026|||Engineering',
+        (bl.concat(bg).slice(0, 3).join(' | ') || 'icons ok') + ' | leaf ' + brief(findBtn(K.leaf)) + ' on row ' + (tr && tr.getAttribute('data-pivot-row')));
+  };
+  // A Top-N "(Other)" row takes no note.
+  S.rank = async function () {
+    var isOther = function (tr) { var td = tr.querySelector(':scope > td'); return !!td && td.textContent.trim().indexOf('(Other)') === 0; };
+    var other = bodyRows().filter(isOther)[0] || null;
+    var named = bodyRows().filter(function (tr) { return !isOther(tr); });
+    var bad = named.filter(function (tr) { var td = cellOf(tr, 0); return !td || td.querySelectorAll('.journal-pvnote-btn').length !== 1; }).length;
+    rec('P-rank-other', !!other && named.length === 3, 'other row ' + !!other + ', named rows ' + named.length);
+    rec('V-rank', !!other && !other.querySelector('.journal-pvnote-btn') && named.length === 3 && bad === 0,
+        'other has icon ' + !!(other && other.querySelector('.journal-pvnote-btn')) + ', named without exactly one ' + bad);
+  };
+
+  // ---- collapsed groups, rows built on demand -----------------------------
+  S.collapsed = async function () {
+    var lazy = !!(tbl() && tbl().hasAttribute('data-pnb-lazy'));
+    rec('P-collapsed-lazy', lazy && drawnLeafCount('Engineering') === 0, 'lazy ' + lazy + ', leaf rows built ' + leafRows().length);
+    var bad = DEPTS.filter(function (d) {
+      var b = findBtn(pk([['DEPT', d]])), tr = b && b.closest('tr');
+      return !b || !tr.classList.contains('pivot-group-summary-row') || !b.classList.contains('is-group');
+    });
+    rec('V-collapsed-sum', !bad.length && cnt(findBtn(K.grp)) === '1', 'groups without a drawn summary-row icon: ' + (bad.join(', ') || 'none') + ' | Sciences ' + brief(findBtn(K.grp)));
+    var chev = chevron('Engineering');
+    if (chev) clickEl(chev);
+    await until(function () { return drawnLeafCount('Engineering') === 3; }, 3000);
+    await sleep(500);   // the observer's paint (rAF / 120 ms)
+    var eng = leafRows().filter(function (tr) { return drawn(tr) && partsOf(tr)[0] === 'Engineering'; });
+    var badLeaf = eng.filter(function (tr) {
+      var td = cellOf(tr, 1), b = td && td.querySelector('.journal-pvnote-btn');
+      return !b || b.getAttribute('data-pvn-key') !== pk([['DEPT', 'Engineering'], ['FY', partsOf(tr)[1]]]);
+    }).length;
+    rec('V-collapsed-built', !!chev && eng.length === 3 && badLeaf === 0 && cnt(findBtn(K.leaf)) === '2',
+        'chevron ' + !!chev + ', Engineering rows drawn ' + eng.length + ', without the right icon ' + badLeaf + ', leaf ' + brief(findBtn(K.leaf)));
+  };
+
+  // ---- the jump from the journal panel ------------------------------------
+  S.reveal = async function () {
+    rec('P-reveal-closed', drawnLeafCount('Engineering') === 0, 'Engineering rows drawn ' + drawnLeafCount('Engineering'));
+    var ok = window.Penumbra && window.Penumbra.revealPivotNote ? window.Penumbra.revealPivotNote(K.leaf) : 'none';
+    await sleep(400);
+    var b = findBtn(K.leaf), td = b && b.closest('td');
+    rec('R-reveal', ok === true && drawnLeafCount('Engineering') === 3 && cards().length === 1 && cards()[0].getAttribute('data-pvn-key') === K.leaf
+        && !!td && td.classList.contains('journal-pvnote-flash'),
+        'returned ' + ok + ', Engineering rows ' + drawnLeafCount('Engineering') + ', cards ' + cards().length + ', flash ' + !!(td && td.classList.contains('journal-pvnote-flash')));
+    var ok2 = window.Penumbra && window.Penumbra.revealPivotNote ? window.Penumbra.revealPivotNote(pk([['PI', 'Ada']])) : 'none';
+    await sleep(200);
+    var txt = document.body.textContent;
+    rec('R-reveal-other', ok2 === false && /Set this pivot/.test(txt) && /rows are PI/.test(txt), 'returned ' + ok2 + ', toast ' + /Set this pivot/.test(txt));
+  };
+
+  // ---- the switch: on without a key, saved without one --------------------
+  S.off = async function () {
+    rec('V-off-none', !!tbl() && btns().length === 0, 'icons ' + btns().length);
+    if (window.Penumbra && window.Penumbra.syncJournalRowConfigUI) window.Penumbra.syncJournalRowConfigUI();
+    await sleep(150);
+    var rn = document.getElementById('journalRowNotesEnable');
+    var lock = $('#journalRowCfgLock').text();
+    var notesBlk = document.querySelector('#journalRowCfgStep2 .journal-rowcfg-notes');
+    rec('K-off-panel', !!rn && !rn.disabled && /Toggle columns/.test(lock) && /step 1/i.test(lock) && $('#journalAddToggleBtn').prop('disabled')
+        && !!notesBlk && getComputedStyle(notesBlk).opacity === '1',
+        'switch disabled ' + (rn && rn.disabled) + ', lock "' + lock + '", notes block opacity ' + (notesBlk && getComputedStyle(notesBlk).opacity));
+    if (!rn) { fail(['K-off-on', 'K-off-counts', 'K-off-status', 'K-off-noflat', 'K-off-saved', 'K-off-off'], 'no switch'); return; }
+    rn.click();   // a real click: a disabled box ignores it
+    await until(function () { return btns().length > 0; }, 3000);
+    await sleep(500);
+    rec('K-off-on', rn.checked && btns().filter(drawn).length === 12, 'checked ' + rn.checked + ', icons drawn ' + btns().filter(drawn).length);
+    rec('K-off-counts', cnt(findBtn(K.leaf)) === '2' && cnt(findBtn(K.grp)) === '1', 'leaf ' + brief(findBtn(K.leaf)) + ' | group ' + brief(findBtn(K.grp)));
+    var st = ($('#journalToggleStatus').text() || '').replace(/\s+/g, ' ');
+    rec('K-off-status', /pivot/i.test(st) && /step 1/i.test(st), 'status "' + st + '"');
+    rec('K-off-noflat', !document.querySelector('#tableHeader th[data-column="__JOURNAL_NOTES"]'), 'flat Notes header ' + !!document.querySelector('#tableHeader th[data-column="__JOURNAL_NOTES"]'));
+    var vo = {};
+    try { vo = (JR.buildStateObject() || {}).viewOptions || {}; } catch (e) { vo = { err: String(e) }; }
+    rec('K-off-saved', vo.journalRowNotes === true && !vo.journalKeyColumns, 'viewOptions ' + JSON.stringify(vo));
+    rn.click();
+    await until(function () { return btns().length === 0; }, 3000);
+    var vo2 = {};
+    try { vo2 = (JR.buildStateObject() || {}).viewOptions || {}; } catch (e) { vo2 = { err: String(e) }; }
+    rec('K-off-off', !rn.checked && btns().length === 0 && vo2.journalRowNotes === undefined, 'checked ' + rn.checked + ', icons ' + btns().length + ', saved ' + JSON.stringify(vo2));
+  };
+
+  // ---- copies and exports carry no icon -----------------------------------
+  S.exports = async function () {
+    // 9 leaf + 3 group icons drawn (the 3 hidden summary rows carry the groups' too).
+    rec('V-exports-icons', btns().filter(drawn).length === 12, 'icons drawn ' + btns().filter(drawn).length + ' of ' + btns().length);
+    var html = '', a = null, csv = '';
+    try { html = String(JR.generateWysiwygHtml($('#pivotResultTable'), false, {})); } catch (e) { html = 'THREW ' + e; }
+    try { a = JR.getPivotDataAsArray(); } catch (e) { a = null; }
+    try { csv = String((JR.getPivotCsvForCopy('\t') || {}).content); } catch (e) { csv = 'THREW ' + e; }
+    rec('X-exports-html', html.indexOf('THREW') !== 0 && html.indexOf('Engineering') !== -1 && html.indexOf('journal-pvnote') === -1 && html.indexOf('data-pvn-key') === -1,
+        'length ' + html.length + ', has Engineering ' + (html.indexOf('Engineering') !== -1) + ', has icon ' + (html.indexOf('journal-pvnote') !== -1));
+    var flat = a ? [].concat.apply([], a.map(function (r) { return r.map(String); })) : [];
+    rec('X-exports-array', !!a && flat.indexOf('Engineering') !== -1 && flat.indexOf('FY2026') !== -1 && !flat.some(function (s) { return /journal|svg/.test(s); }),
+        a ? ('cells ' + flat.length + ', sample ' + JSON.stringify(a.slice(0, 3))) : 'no array');
+    rec('X-exports-csv', csv.indexOf('THREW') !== 0 && /(^|\t)Engineering(\t|$)/m.test(csv) && /(^|\t)FY2026(\t|$)/m.test(csv),
+        'csv head ' + JSON.stringify(csv.slice(0, 160)));
+  };
+
+  // ---- Wolfpack Red: a REAL hover on the card's band (round 2, 2026-10-07) ----
+  // The theme's blanket button hover (0,3,1) used to win over the band's own
+  // (0,3,0): solid #b30000 under the band's dark / muted text (user report).
+  // run.py moves the mouse over the band (window.__wantHover); the band's text
+  // must read at 4.5:1 or better, its close glyph at 3:1.
+  function rgbOf(s) {
+    var m = /^rgba?\(([^)]+)\)/.exec(s);
+    if (m) { var p = m[1].split(',').map(parseFloat); return [p[0], p[1], p[2]]; }
+    m = /^color\(srgb ([0-9.]+) ([0-9.]+) ([0-9.]+)/.exec(s);
+    if (m) return [parseFloat(m[1]) * 255, parseFloat(m[2]) * 255, parseFloat(m[3]) * 255];
+    return null;
+  }
+  function lum(c) {
+    return c.map(function (v) { v = v / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); })
+      .reduce(function (a, v, i) { return a + v * [0.2126, 0.7152, 0.0722][i]; }, 0);
+  }
+  function contrast(a, b) { if (!a || !b) return 0; var x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+  S.wolfpack = async function () {
+    var b = findBtn(K.leaf);
+    if (!b) { fail(['P-wolf-hover', 'T-wolf-band'], 'no icon'); return; }
+    clickEl(b);
+    await until(function () { return cards().length === 1; }, 2000);
+    await sleep(150);
+    var band = cards()[0] && cards()[0].querySelector('.journal-rownote-head');
+    if (!band) { fail(['P-wolf-hover', 'T-wolf-band'], 'no card'); return; }
+    var r = band.getBoundingClientRect();
+    window.__wantHover = { x: Math.round(r.left + r.width * 0.75), y: Math.round(r.top + r.height / 2) };
+    await until(function () { return window.__hoverSent; }, 5000);
+    await sleep(250);
+    var hovered = band.matches(':hover');
+    rec('P-wolf-hover', hovered && document.body.classList.contains('theme-wolfpack'), 'band hovered ' + hovered + ', body ' + document.body.className);
+    var bgS = getComputedStyle(band).backgroundColor, bg = rgbOf(bgS), worst = 99, det = [];
+    ['.journal-rownote-title', '.journal-rownote-ref', '.journal-rownote-hint'].forEach(function (sel) {
+      var cr = contrast(rgbOf(getComputedStyle(band.querySelector(sel)).color), bg);
+      det.push(sel.replace('.journal-rownote-', '') + ' ' + cr.toFixed(2)); worst = Math.min(worst, cr);
+    });
+    var crc = contrast(rgbOf(getComputedStyle(band.querySelector('.journal-rownote-chev')).stroke), bg);
+    rec('T-wolf-band', !!bg && worst >= 4.5 && crc >= 3, 'band ' + bgS + ' | ' + det.join(', ') + ', close glyph ' + crc.toFixed(2));
+  };
+
+  // ---- round 3 (2026-10-07): a re-render keeps or closes the card ------------
+  // run.py's hook setPivot(s) draws a pivot the way a report load does (the table
+  // is REPLACED; the observer then repaints). The card's 400 ms tick is captured
+  // (setInterval wrapped) and run IN the gap before that repaint: a card whose row
+  // still exists must survive it; a pivot without the row closes the card.
+  S.rerender = async function () {
+    var ids = ['T-rr-race', 'T-rr-keep', 'T-rr-gone', 'T-rr-group'];
+    var ticks = [], realSI = window.setInterval;
+    window.setInterval = function (fn, ms) { var id = realSI.apply(window, arguments); if (ms === 400) ticks.push(fn); return id; };
+    try {
+      var st = window.__STORED.pivot, b = findBtn(K.leaf);
+      if (!b || !JR.setPivot) { fail(ids, 'no icon or no setPivot hook'); return; }
+      clickEl(b);
+      await until(function () { return cards().length === 1; }, 2000);
+      var tick = ticks[ticks.length - 1];
+      JR.setPivot(JSON.parse(JSON.stringify(st)));
+      await Promise.resolve();               // the observer's microtask (a timer never runs before it)
+      var gapIcons = btns().length;          // 0: the new table is not stamped yet
+      if (tick) tick();
+      var openInGap = cards().length === 1;
+      await sleep(500);
+      var nb = findBtn(K.leaf);
+      rec('T-rr-race', !!tick && gapIcons === 0 && openInGap, 'tick captured ' + !!tick + ', icons in the gap ' + gapIcons + ', card open after the tick ' + openInGap);
+      rec('T-rr-keep', cards().length === 1 && !!nb && nb.classList.contains('is-open') && near(cards()[0], nb), 'cards ' + cards().length + ', ' + brief(nb) + ', near ' + near(cards()[0], nb));
+      var dept = JSON.parse(JSON.stringify(st)); dept.rows = ['DEPT'];
+      JR.setPivot(dept);
+      await sleep(700);
+      rec('T-rr-gone', cards().length === 0, 'cards ' + cards().length + ' after a pivot without the row');
+      // A group's thread is a DEPT-only pivot's row: its card survives the switch back.
+      for (var cc = cards(), i = 0; i < cc.length; i++) { var bb = cc[i].querySelector('.journal-rownote-close'); if (bb) clickEl(bb); }
+      await sleep(150);
+      var gb = findBtn(K.grp);
+      if (gb) clickEl(gb);
+      await until(function () { return cards().length === 1; }, 2000);
+      JR.setPivot(JSON.parse(JSON.stringify(st)));
+      await sleep(700);
+      var gNow = findBtn(K.grp);
+      rec('T-rr-group', !!gb && cards().length === 1 && !!gNow && gNow.classList.contains('is-group') && gNow.classList.contains('is-open') && near(cards()[0], gNow),
+          'row icon ' + !!gb + ', cards ' + cards().length + ', ' + brief(gNow) + ', near ' + near(cards()[0], gNow));
+    } finally {
+      window.setInterval = realSI;
+    }
+  };
+
+  // ---- round 3: the icon's tooltip never covers its open card ----------------
+  // jQuery UI's page-wide tooltip (z 200001) drew "Add a note about this row" over
+  // the card's header. REAL pointer moves (run.py) show it, then: open the card -
+  // tip gone, no title; away and back while open - still none (jQuery UI puts a
+  // parked title back on close); card closed - the title is back.
+  async function moveTo(x, y) {
+    window.__hoverSent = false;
+    window.__wantHover = { x: Math.round(x), y: Math.round(y) };
+    await until(function () { return window.__hoverSent; }, 5000);
+  }
+  S.tooltip = async function () {
+    var b = findBtn(K.leaf);
+    if (!b) { fail(['P-tip-shown', 'T-tip-gone', 'T-tip-again', 'T-tip-back'], 'no icon'); return; }
+    var r = b.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    await moveTo(cx, cy);
+    await sleep(1000);   // shown after 600 ms
+    var tip = $('.ui-tooltip:visible');
+    rec('P-tip-shown', tip.length === 1 && /note/i.test(tip.text()), 'tips ' + tip.length + ' "' + tip.text() + '"');
+    clickEl(b);
+    await until(function () { return cards().length === 1; }, 2000);
+    await sleep(1000);
+    var ob = findBtn(K.leaf), tips = $('.ui-tooltip:visible').length;
+    rec('T-tip-gone', cards().length === 1 && tips === 0 && !!ob && !ob.hasAttribute('title') && /note/i.test(ob.getAttribute('aria-label') || ''),
+        'cards ' + cards().length + ', tips shown ' + tips + ', icon title ' + JSON.stringify(ob && ob.getAttribute('title')));
+    await moveTo(5, 5);
+    await sleep(400);
+    ob = findBtn(K.leaf); r = ob.getBoundingClientRect();
+    await moveTo(r.left + r.width / 2, r.top + r.height / 2);
+    await sleep(1000);
+    ob = findBtn(K.leaf); tips = $('.ui-tooltip:visible').length;
+    rec('T-tip-again', cards().length === 1 && tips === 0 && !!ob && !ob.hasAttribute('title'),
+        'cards ' + cards().length + ', tips shown ' + tips + ', icon title ' + JSON.stringify(ob && ob.getAttribute('title')));
+    await moveTo(5, 5);
+    await sleep(400);
+    var band = cards()[0] && cards()[0].querySelector('.journal-rownote-close');
+    if (band) clickEl(band);
+    await sleep(300);
+    // The band hands focus back to the icon, and jQuery UI opens a FOCUS tooltip there:
+    // while it shows, jQuery UI parks the title in data('ui-tooltip-title').
+    var cb = findBtn(K.leaf), back = cb ? (cb.getAttribute('title') || $(cb).data('ui-tooltip-title') || '') : '';
+    rec('T-tip-back', cards().length === 0 && !!back && back === cb.getAttribute('aria-label'),
+        'cards ' + cards().length + ', title ' + JSON.stringify(cb && cb.getAttribute('title')) + ', parked ' + JSON.stringify(cb && $(cb).data('ui-tooltip-title')));
+  };
+
+  // ---- round 4 (2026-10-07): deleting a thread's first note deletes the thread ----
+  // The question must say how many replies go and who wrote them - on the pivot
+  // card (the table row's panel shares the handler) and in the journal panel; a
+  // reply alone asks as before; the panel's status line repeats the server's count.
+  S.delthread = async function () {
+    var ids = ['D-thread-ask', 'D-thread-post', 'D-reply-ask', 'D-panel-ask', 'D-panel-status'];
+    var b = findBtn(K.leaf);
+    if (!b) { fail(ids, 'no icon'); return; }
+    clickEl(b);
+    await until(function () { return cards().length === 1; }, 2000);
+    await sleep(150);
+    var c = cards()[0];
+    var del901 = c && c.querySelector('.journal-rownote-item[data-note-id="901"] .journal-rownote-del');
+    var n0 = window.__confirms.length, p0 = window.__J.posts.length;
+    if (del901) clickEl(del901);
+    await sleep(300);
+    var q = window.__confirms[n0] || '';
+    rec('D-thread-ask', /^Delete this note and its 1 reply \(written by someone else\)\? The whole thread is deleted\./.test(q), 'asked "' + q + '"');
+    var posts = window.__J.posts.slice(p0).filter(function (x) { return x.action === 'delete'; });
+    rec('D-thread-post', posts.length === 1 && String(posts[0].note_id) === '901', 'delete requests ' + JSON.stringify(posts));
+    await sleep(400);   // the reload after the delete (the fake server keeps the notes)
+    c = cards()[0];
+    var del904 = c && c.querySelector('.journal-rownote-item[data-note-id="904"] .journal-rownote-del');
+    n0 = window.__confirms.length;
+    if (del904) clickEl(del904);
+    await sleep(300);
+    var q2 = window.__confirms[n0] || '';
+    rec('D-reply-ask', !!del904 && q2 === 'Delete this note? A copy is kept in the audit log.', 'reply delete offered ' + !!del904 + ', asked "' + q2 + '"');
+    if (!window.PenumbraJournal || !window.PenumbraJournal.open) { fail(['D-panel-ask', 'D-panel-status'], 'no PenumbraJournal'); return; }
+    window.PenumbraJournal.open();
+    await until(function () { return !!document.querySelector('#journalNotesList .journal-note[data-note-id="901"] .journal-note-delete'); }, 4000);
+    var pd = document.querySelector('#journalNotesList .journal-note[data-note-id="901"] .journal-note-delete');
+    n0 = window.__confirms.length;
+    if (pd) clickEl(pd);
+    await sleep(500);
+    var q3 = window.__confirms[n0] || '';
+    rec('D-panel-ask', /^Delete this note and its 1 reply \(written by someone else\)\?/.test(q3), 'asked "' + q3 + '"');
+    var stx = ($('#journalStatusLine').text() || '').trim();
+    rec('D-panel-status', /Deleted the note and its 1 reply/.test(stx), 'status "' + stx + '"');
+  };
+
+  // ---- round 5 (2026-10-07): notes on the grouped view's band headers --------
+  // Each band's header carries the icon of the pivot group with exactly its
+  // fields - same key, same thread, same count - before its name; clicking it
+  // opens the card without folding the band; a regroup repaints; the journal
+  // panel's jump finds a band; copies carry no icon; leaving the view closes it.
+  S.bands = async function () {
+    var gc = document.getElementById('groupedResultsContainer');
+    function bandOf(path) {
+      var cur = gc, w = null;
+      for (var i = 0; i < path.length; i++) {
+        w = arr(cur.querySelectorAll(':scope > .group-wrapper, :scope > .group-content > .group-wrapper')).filter(function (x) { return x.getAttribute('data-group-key') === path[i]; })[0];
+        if (!w) return null;
+        cur = w;
+      }
+      return w;
+    }
+    function iconOf(w) { return w ? w.querySelector(':scope > .group-header > .journal-pvnote-btn') : null; }
+    function allBands() { return arr(gc.querySelectorAll('.group-wrapper')); }
+    var tops = arr(gc.querySelectorAll(':scope > .group-wrapper')), all = allBands();
+    rec('P-bands-built', $(gc).is(':visible') && tops.length === 4 && all.length === 14, 'top bands ' + tops.length + ', all bands ' + all.length);
+    var bad = [];
+    all.forEach(function (w) {
+      var chain = []; for (var x = w; x; x = x.parentElement ? x.parentElement.closest('.group-wrapper') : null) chain.unshift(x);
+      var pairs = chain.map(function (c) { var l = c.getAttribute('data-group-key'); return [c.getAttribute('data-group-col'), l === '[Blank]' ? '' : l]; });
+      var tag = chain.map(function (c) { return c.getAttribute('data-group-key'); }).join('/');
+      var icons = w.querySelectorAll(':scope > .group-header > .journal-pvnote-btn');
+      if (icons.length !== 1) { bad.push(tag + ': ' + icons.length + ' icons'); return; }
+      if (icons[0].getAttribute('data-pvn-key') !== pk(pairs)) bad.push(tag + ': key ' + icons[0].getAttribute('data-pvn-key'));
+      if (!icons[0].nextElementSibling || !icons[0].nextElementSibling.classList.contains('group-name')) bad.push(tag + ': not just before the name');
+      if (!icons[0].classList.contains('is-group') || icons[0].textContent !== '') bad.push(tag + ': not a text-less group icon');
+    });
+    rec('V-bands-icons', all.length === 14 && !bad.length, bad.slice(0, 4).join(' | ') || 'all 14 bands');
+    var sci = iconOf(bandOf(['Sciences'])), eng26 = iconOf(bandOf(['Engineering', 'FY2026'])), blank = iconOf(bandOf(['[Blank]']));
+    rec('V-bands-shared', !!sci && cnt(sci) === '1' && !!eng26 && cnt(eng26) === '2', 'Sciences ' + brief(sci) + ' | Engineering/FY2026 ' + brief(eng26));
+    rec('V-bands-blank', !!blank && blank.getAttribute('data-pvn-key') === K.blank && cnt(blank) === '1', '[Blank] ' + brief(blank) + ' key ' + (blank && blank.getAttribute('data-pvn-key')));
+    // Copy as HTML of the grouped view (its band names, no icon) - while it is grouped. It
+    // reads Sciences: a band this scenario never folds (a folded band's rows are not copied).
+    function copyCheck() {
+      var ex = document.getElementById('expandAllGroups');   // every band open: a folded band is not copied
+      if (ex) clickEl(ex);
+      var html = '';
+      try { html = String(JR.generateWysiwygHtml($('#groupedResultsContainer'), true, {})); } catch (e) { html = 'THREW ' + e; }
+      rec('X-bands-copy', html.indexOf('THREW') !== 0 && html.indexOf('Sciences') !== -1 && html.indexOf('journal-pvnote') === -1 && html.indexOf('data-pvn-key') === -1,
+          'length ' + html.length + ', has Sciences ' + (html.indexOf('Sciences') !== -1) + ', has icon ' + (html.indexOf('journal-pvnote') !== -1));
+    }
+    var C = ['C-bands-nofold', 'C-bands-post', 'V-bands-rebuilt', 'R-bands-reveal', 'C-bands-away'];
+    if (!sci) { fail(C, 'no band icon'); copyCheck(); }
+    else {
+      var sw = bandOf(['Sciences']), wasOpen = sw.classList.contains('open');
+      clickEl(sci);
+      await until(function () { return cards().length === 1; }, 2000);
+      await sleep(500);
+      var c = cards()[0];
+      rec('C-bands-nofold', cards().length === 1 && c.getAttribute('data-pvn-key') === K.grp && sw.classList.contains('open') === wasOpen && near(c, iconOf(bandOf(['Sciences']))),
+          'cards ' + cards().length + ', band open ' + wasOpen + ' -> ' + sw.classList.contains('open') + ', near ' + near(c, iconOf(bandOf(['Sciences']))));
+      if (c) {
+        var inEl = c.querySelector('.journal-rownote-input');
+        inEl.focus(); inEl.textContent = 'Band check';
+        var n0 = window.__J.posts.length;
+        clickEl(c.querySelector('.journal-rownote-post'));
+        await until(function () { return window.__J.posts.length > n0; }, 3000);
+        await until(function () { return cnt(iconOf(bandOf(['Sciences']))) === '2'; }, 3000);
+        var p = window.__J.posts[window.__J.posts.length - 1] || {}, snap = p.row_snapshot || {};
+        rec('C-bands-post', p.action === 'add' && p.scope === 'pivot' && p.row_key === K.grp && snap.DEPT === 'Sciences' && cnt(iconOf(bandOf(['Sciences']))) === '2',
+            'post ' + JSON.stringify({ s: p.scope, k: p.row_key === K.grp, snap: snap }) + ' | ' + brief(iconOf(bandOf(['Sciences']))));
+        var band = cards()[0] && cards()[0].querySelector('.journal-rownote-close');
+        if (band) clickEl(band);
+        await sleep(200);
+      } else { fail(['C-bands-post'], 'no card'); }
+      // A regroup builds new bands: the observer must paint them (no key column here).
+      if (JR.rebuildGroupedView) JR.rebuildGroupedView();
+      await sleep(900);
+      var icons = gc.querySelectorAll('.group-header > .journal-pvnote-btn').length;
+      rec('V-bands-rebuilt', !!JR.rebuildGroupedView && allBands().length === 14 && icons === 14, 'bands ' + allBands().length + ', icons ' + icons);
+      // The journal panel's jump: Engineering folded; the jump opens it, shows and
+      // flashes the FY2026 band, and opens its card.
+      var ew = bandOf(['Engineering']);
+      if (ew && ew.classList.contains('open')) clickEl(ew.querySelector(':scope > .group-header'));
+      await sleep(300);
+      var folded = !!ew && !ew.classList.contains('open');
+      var ok = window.Penumbra.revealPivotNote(K.leaf);
+      await sleep(500);
+      var fw = bandOf(['Engineering', 'FY2026']), fh = fw && fw.querySelector(':scope > .group-header');
+      rec('R-bands-reveal', folded && ok === true && ew.classList.contains('open') && cards().length === 1 && cards()[0].getAttribute('data-pvn-key') === K.leaf
+          && !!fh && fh.classList.contains('journal-band-flash') && drawn(fh),
+          'folded first ' + folded + ', returned ' + ok + ', Engineering open ' + (ew && ew.classList.contains('open')) + ', cards ' + cards().length + ', flash ' + !!(fh && fh.classList.contains('journal-band-flash')));
+      copyCheck();
+      // Leaving the grouped view takes a band's card with it.
+      if (JR.removeGrouping) JR.removeGrouping();
+      await sleep(900);
+      rec('C-bands-away', !!JR.removeGrouping && !$(gc).is(':visible') && cards().length === 0, 'grouped shown ' + $(gc).is(':visible') + ', cards ' + cards().length);
+      if (JR.rebuildGroupedView) JR.rebuildGroupedView();
+      await sleep(600);
+    }
+  };
+
+  // ---- round 6 (2026-10-07): a TABLE row's notes open in the same card --------
+  // Key column ID, no pivot: the flat table (rowcard) and the grouped view (rowgrp).
+  // The card sits by the row's Notes button, wider than a pivot's; a post keeps it
+  // there; it follows a sort; it hides while its row is out of sight (out of the
+  // table's scroll box, searched out, on another page, in a folded band) and comes
+  // back; its band closes it (focus back); the journal panel's jump opens it; a
+  // hidden Notes column puts it by the row itself; it goes once the table has no
+  // such row; it moves with the row between the flat table and the grouped view.
+  // No panel row is ever added under a row.
+  function rootNow() { return document.getElementById($('#groupedResultsContainer').is(':visible') ? 'groupedResultsContainer' : 'resultsTable'); }
+  function rowBtn(k, root) {
+    var bs = arr((root || rootNow()).querySelectorAll('.journal-notes-btn')).filter(function (b) { return b.getAttribute('data-row-key') === k; });
+    var d = bs.filter(drawn);
+    return d.length ? d[0] : (bs[0] || null);
+  }
+  function rcount(b) { var s = b && b.querySelector('.journal-notes-count'); return s ? s.textContent.trim() : null; }
+  function shown(c) { return !!c && getComputedStyle(c).visibility !== 'hidden'; }
+  function card1() { var cs = cards(); return cs.length === 1 ? cs[0] : null; }
+  function headerTh(name) { return arr(document.querySelectorAll('#tableHeader th')).filter(function (th) { return $(th).data('colname') === name; })[0] || null; }
+  function flatOrder() { return arr(document.querySelectorAll('#resultsTable > tbody > tr')).map(function (tr) { var b = tr.querySelector('.journal-notes-btn'); return b ? b.getAttribute('data-row-key') : null; }); }
+  var _childAdds = 0;
+  function watchChildRows() {
+    var host = document.getElementById('table-view-container');
+    if (!host || !window.MutationObserver) return;
+    new MutationObserver(function (ms) {
+      ms.forEach(function (m) {
+        arr(m.addedNodes).forEach(function (n) {
+          if (n.nodeType === 1 && (n.classList.contains('journal-note-child') || (n.querySelector && n.querySelector('tr.journal-note-child')))) _childAdds++;
+        });
+      });
+    }).observe(host, { childList: true, subtree: true });
+  }
+  // Every id not recorded by the body (it stopped early, or threw) is a failure.
+  async function guarded(ids, body) {
+    var why = 'not reached';
+    try { await body(); } catch (e) { why = 'threw: ' + String((e && e.stack) || e).slice(0, 200); }
+    ids.forEach(function (id) { if (!R.asserts.some(function (a) { return a.id === id; })) rec(id, false, why); });
+  }
+
+  S.rowcard = async function () {
+    watchChildRows();
+    var wrap = document.getElementById('results-wrapper');
+    await guarded(['P-rc-col', 'C-rc-open', 'C-rc-place', 'C-rc-wide', 'C-rc-post', 'C-rc-sort', 'C-rc-clip', 'C-rc-search', 'C-rc-page',
+                   'C-rc-band', 'C-rc-nocol', 'R-rc-jump', 'D-rc-ask', 'C-rc-gone'], async function () {
+      var b1 = rowBtn('1001'), b2 = rowBtn('1002');
+      rec('P-rc-col', !!b1 && !!b2 && drawn(b1) && rcount(b1) === '1' && rcount(b2) === '2', '1001 count ' + rcount(b1) + ', 1002 count ' + rcount(b2));
+      if (!b1) return;
+      wrap.scrollTop = 0;
+      await sleep(50);
+      clickEl(b1);
+      await until(function () { return cards().length > 0; }, 2000);
+      await sleep(250);
+      var c = card1(), inEl = c ? c.querySelector('.journal-rownote-input') : null;
+      rec('C-rc-open', !!c && c.getAttribute('data-pvn-key') === '1001' && c.getAttribute('data-pvn-kind') === 'row' && c.classList.contains('is-row')
+          && /A table row note\./.test(c.textContent) && b1.classList.contains('is-open') && b1.getAttribute('aria-expanded') === 'true' && document.activeElement === inEl,
+          'cards ' + cards().length + (c ? ', key ' + c.getAttribute('data-pvn-key') + ', kind ' + c.getAttribute('data-pvn-kind') : '')
+          + ', panel rows ' + document.querySelectorAll('tr.journal-note-child').length + ', button open ' + b1.classList.contains('is-open')
+          + ', focus in its box ' + (!!inEl && document.activeElement === inEl));
+      if (!c) return;
+      rec('C-rc-place', shown(c) && near(c, rowBtn('1001')), 'shown ' + shown(c) + ', by its button ' + near(c, rowBtn('1001')));
+      var want = Math.min(820, document.documentElement.clientWidth - 16);
+      rec('C-rc-wide', Math.abs(c.offsetWidth - want) <= 2, 'width ' + c.offsetWidth + ' want ' + want + ' (a pivot row\'s card is 620)');
+      // A post: a ROW note with the row's snapshot; the count goes up, the re-painted
+      // button is open and the card stays by it.
+      inEl.focus(); inEl.textContent = 'Row card check';
+      var n0 = window.__J.posts.length;
+      clickEl(c.querySelector('.journal-rownote-post'));
+      await until(function () { return window.__J.posts.length > n0; }, 3000);
+      await until(function () { return rcount(rowBtn('1001')) === '2'; }, 3000);
+      await sleep(300);
+      var p = window.__J.posts[window.__J.posts.length - 1] || {}, snap = p.row_snapshot || {}, nb = rowBtn('1001');
+      rec('C-rc-post', p.action === 'add' && p.scope === 'row' && p.row_key === '1001' && snap.ID === '1001' && !!card1()
+          && /Row card check/.test(card1().textContent) && rcount(nb) === '2' && nb.classList.contains('is-open') && near(card1(), nb),
+          'post ' + JSON.stringify({ s: p.scope, k: p.row_key, id: snap.ID }) + ', count ' + rcount(nb) + ', open ' + (nb && nb.classList.contains('is-open')) + ', by it ' + near(card1(), nb));
+      // A sort moves the row (FY, newest first: 1001 goes from the top to row 19). The
+      // card follows: hidden while the row is out of the table's 200px box, by it once
+      // the row is scrolled to.
+      var th = headerTh('FY');
+      if (th) { clickEl(th); await sleep(300); clickEl(th); await sleep(600); }
+      var pos = flatOrder().indexOf('1001'), hidSort = !!card1() && !shown(card1());
+      var rb = rowBtn('1001');
+      if (rb) rb.scrollIntoView({ block: 'center' });
+      await sleep(400);
+      rec('C-rc-sort', !!th && pos >= 18 && hidSort && !!card1() && shown(card1()) && near(card1(), rowBtn('1001')),
+          'FY header ' + !!th + ', 1001 now row ' + (pos + 1) + ', hidden out of the box ' + hidSort + ', by it after the scroll ' + (!!card1() && shown(card1()) && near(card1(), rowBtn('1001'))));
+      if (th) { clickEl(th); await sleep(600); }      // a third click resets the sort
+      wrap.scrollTop = 0; window.scrollTo(0, 0);
+      await sleep(400);
+      // Scrolled out of the table's own scroll box: hidden; back: by its row.
+      wrap.scrollTop = 600;
+      await sleep(400);
+      var hidScroll = !!card1() && !shown(card1());
+      wrap.scrollTop = 0;
+      await sleep(400);
+      rec('C-rc-clip', flatOrder()[0] === '1001' && hidScroll && !!card1() && shown(card1()) && near(card1(), rowBtn('1001')),
+          'order reset ' + (flatOrder()[0] === '1001') + ', hidden scrolled away ' + hidScroll + ', back by its row ' + (!!card1() && shown(card1()) && near(card1(), rowBtn('1001'))));
+      // A search that leaves the row out: hidden, still open; cleared: back.
+      $('#tableSearch').val('Humanities');                  // the search runs on Enter (typing only clears)
+      if (JR.runTableSearch) await JR.runTableSearch();
+      await until(function () { var b = rowBtn('1001'); return !!b && !drawn(b); }, 4000);
+      await sleep(700);
+      var hidSearch = !!card1() && !shown(card1());
+      $('#tableSearch').val('');
+      if (JR.runTableSearch) await JR.runTableSearch();
+      await until(function () { var b = rowBtn('1001'); return !!b && drawn(b); }, 4000);
+      wrap.scrollTop = 0;
+      await sleep(700);
+      rec('C-rc-search', hidSearch && !!card1() && shown(card1()) && near(card1(), rowBtn('1001')),
+          'hidden while searched out ' + hidSearch + ', back by its row ' + (!!card1() && shown(card1()) && near(card1(), rowBtn('1001'))));
+      // Another page (AMOUNT, highest first: 1001 is the lowest - row 27, 25 a page):
+      // hidden, still open; the sort reset: back.
+      var ta = headerTh('AMOUNT');
+      if (ta) { clickEl(ta); await sleep(300); clickEl(ta); await sleep(700); }
+      var off = rowBtn('1001'), hidPage = !!card1() && !shown(card1()) && !!off && !drawn(off);
+      if (ta) { clickEl(ta); await sleep(600); }
+      wrap.scrollTop = 0;
+      await sleep(400);
+      rec('C-rc-page', !!ta && hidPage && !!card1() && shown(card1()) && near(card1(), rowBtn('1001')),
+          'AMOUNT header ' + !!ta + ', hidden on page 2 ' + hidPage + ', back by its row ' + (!!card1() && shown(card1()) && near(card1(), rowBtn('1001'))));
+      // Its band closes it and hands focus back to the row's button.
+      var band = card1() && card1().querySelector('.journal-rownote-close');
+      if (band) clickEl(band);
+      await sleep(250);
+      var fb = rowBtn('1001');
+      rec('C-rc-band', cards().length === 0 && document.activeElement === fb && !fb.classList.contains('is-open') && fb.getAttribute('aria-expanded') === 'false',
+          'cards ' + cards().length + ', focus on its button ' + (document.activeElement === fb) + ', open ' + (fb && fb.classList.contains('is-open')));
+      // A hidden Notes column: the journal panel's jump still opens the card, by the row itself.
+      var ncell = fb && fb.closest('td'), tr1 = fb && fb.closest('tr');
+      if (ncell) ncell.style.display = 'none';
+      var okNc = window.Penumbra.revealRowNote('1001');
+      await sleep(700);
+      var trR = tr1 ? tr1.getBoundingClientRect() : null, cc = card1(), ccR = cc ? cc.getBoundingClientRect() : null;
+      rec('C-rc-nocol', okNc === true && !!cc && shown(cc) && cc.getAttribute('data-pvn-key') === '1001' && !!trR
+          && (Math.abs(ccR.top - (trR.bottom + 6)) <= 2 || Math.abs(ccR.bottom - (trR.top - 6)) <= 2),
+          'returned ' + okNc + ', cards ' + cards().length + ', shown ' + shown(cc) + (trR && ccR ? ', card top ' + Math.round(ccR.top) + ' row bottom ' + Math.round(trR.bottom) : ''));
+      band = card1() && card1().querySelector('.journal-rownote-close');
+      if (band) clickEl(band);
+      if (ncell) ncell.style.display = '';
+      await sleep(250);
+      // The journal panel's jump to a table row opens that row's card and flashes the row.
+      var ok = window.Penumbra.revealRowNote('1002');
+      await sleep(700);
+      var b2n = rowBtn('1002'), tr2 = b2n && b2n.closest('tr');
+      rec('R-rc-jump', ok === true && !!card1() && card1().getAttribute('data-pvn-key') === '1002' && card1().getAttribute('data-pvn-kind') === 'row'
+          && !!tr2 && tr2.classList.contains('journal-row-flash') && near(card1(), b2n),
+          'returned ' + ok + ', cards ' + cards().length + ', key ' + (card1() && card1().getAttribute('data-pvn-key')) + ', flash ' + !!(tr2 && tr2.classList.contains('journal-row-flash')) + ', by its button ' + near(card1(), b2n));
+      // The thread's first note (ours; one reply by lee): the question counts the reply,
+      // and the card empties once both are gone.
+      var c2 = card1(), del = c2 && c2.querySelector('.journal-rownote-item[data-note-id="960"] .journal-rownote-del');
+      var q0 = window.__confirms.length;
+      if (del) clickEl(del);
+      await sleep(300);
+      var q = window.__confirms[q0] || '';
+      await until(function () { return !!card1() && !card1().querySelector('.journal-rownote-item'); }, 3000);
+      await sleep(300);
+      rec('D-rc-ask', /^Delete this note and its 1 reply \(written by someone else\)\? The whole thread is deleted\./.test(q)
+          && !!card1() && !card1().querySelector('.journal-rownote-item') && rcount(rowBtn('1002')) === '',
+          'asked "' + q + '", items left ' + (card1() ? card1().querySelectorAll('.journal-rownote-item').length : '?') + ', count "' + rcount(rowBtn('1002')) + '"');
+      // The table no longer has the row: the card goes.
+      var gtr = rowBtn('1002') && rowBtn('1002').closest('tr');
+      if (gtr) gtr.remove();
+      await sleep(1200);
+      rec('C-rc-gone', !!gtr && cards().length === 0, 'row taken out ' + !!gtr + ', cards ' + cards().length);
+    });
+    rec('C-rc-nochild', _childAdds === 0 && !document.querySelector('tr.journal-note-child'), 'panel rows added ' + _childAdds);
+  };
+
+  S.rowgrp = async function () {
+    watchChildRows();
+    var gc = document.getElementById('groupedResultsContainer');
+    await guarded(['P-rg-built', 'C-rg-open', 'C-rg-fold', 'C-rg-flat', 'C-rg-back'], async function () {
+      var ex = document.getElementById('expandAllGroups');
+      if (ex) clickEl(ex);
+      await sleep(300);
+      var tops = arr(gc.querySelectorAll(':scope > .group-wrapper')), gb = rowBtn('1001', gc);
+      rec('P-rg-built', $(gc).is(':visible') && tops.length === 3 && !!gb && drawn(gb) && rcount(gb) === '1',
+          'bands ' + tops.length + ', 1001 button drawn ' + drawn(gb) + ', count ' + rcount(gb));
+      if (!gb) return;
+      gb.scrollIntoView({ block: 'center' });
+      await sleep(200);
+      clickEl(gb);
+      await until(function () { return cards().length > 0; }, 2000);
+      await sleep(250);
+      var c = card1();
+      rec('C-rg-open', !!c && c.getAttribute('data-pvn-kind') === 'row' && c.getAttribute('data-pvn-key') === '1001' && shown(c) && near(c, rowBtn('1001', gc))
+          && !document.querySelector('tr.journal-note-child'),
+          'cards ' + cards().length + ', panel rows ' + document.querySelectorAll('tr.journal-note-child').length + (c ? ', shown ' + shown(c) + ', by its button ' + near(c, rowBtn('1001', gc)) : ''));
+      if (!c) return;
+      // Its band folded: hidden, still open; unfolded: back by its row.
+      var w = gb.closest('.group-wrapper'), hdr = w && w.querySelector(':scope > .group-header');
+      if (hdr) clickEl(hdr);
+      await sleep(700);
+      var hidFold = !!card1() && !shown(card1()) && !w.classList.contains('open');
+      if (hdr) clickEl(hdr);
+      await sleep(700);
+      rec('C-rg-fold', hidFold && !!card1() && shown(card1()) && near(card1(), rowBtn('1001', gc)),
+          'hidden while folded ' + hidFold + ', back by its row ' + (!!card1() && shown(card1()) && near(card1(), rowBtn('1001', gc))));
+      // Out of the grouped view: the same card stays with the row in the flat table...
+      if (JR.removeGrouping) JR.removeGrouping();
+      await sleep(900);
+      var fb = rowBtn('1001', document.getElementById('resultsTable'));
+      if (fb) fb.scrollIntoView({ block: 'center' });
+      await sleep(500);
+      rec('C-rg-flat', !!JR.removeGrouping && !$(gc).is(':visible') && !!card1() && shown(card1()) && near(card1(), fb) && !!fb && fb.classList.contains('is-open'),
+          'grouped shown ' + $(gc).is(':visible') + ', cards ' + cards().length + ', by the flat row ' + near(card1(), fb) + ', its button open ' + (fb && fb.classList.contains('is-open')));
+      // ...and back into the grouped view.
+      if (JR.rebuildGroupedView) JR.rebuildGroupedView();
+      await sleep(900);
+      var ex2 = document.getElementById('expandAllGroups');
+      if (ex2) clickEl(ex2);
+      await sleep(400);
+      var gb2 = rowBtn('1001', gc);
+      if (gb2) gb2.scrollIntoView({ block: 'center' });
+      await sleep(500);
+      rec('C-rg-back', !!JR.rebuildGroupedView && $(gc).is(':visible') && !!card1() && shown(card1()) && near(card1(), gb2),
+          'grouped shown ' + $(gc).is(':visible') + ', cards ' + cards().length + ', by the grouped row ' + near(card1(), gb2));
+    });
+    rec('C-rg-nochild', _childAdds === 0 && !document.querySelector('tr.journal-note-child'), 'panel rows added ' + _childAdds);
+  };
+
+  // ---- the journal panel's tags --------------------------------------------
+  S.jpanel = async function () {
+    if (!window.PenumbraJournal || !window.PenumbraJournal.open) { fail(['J-chip-pivot', 'J-chip-row', 'J-chip-tip', 'J-chip-jump'], 'no PenumbraJournal'); return; }
+    window.PenumbraJournal.open();
+    await until(function () { return document.querySelectorAll('#journalNotesList .journal-note').length >= 2; }, 4000);
+    await sleep(200);
+    var pv = arr(document.querySelectorAll('#journalNotesList .journal-note-rowref-btn[data-pv-key]'));
+    var rw = arr(document.querySelectorAll('#journalNotesList .journal-note-rowref-btn[data-row-key]'));
+    var pvTxt = pv[0] ? pv[0].textContent : '';
+    rec('J-chip-pivot', pv.length === 1 && pv[0].getAttribute('data-pv-key') === K.leaf && !pv[0].hasAttribute('data-row-key')
+        && pvTxt.indexOf('DEPT: Engineering · FY: FY2026') !== -1 && /^Click to jump to this row in the pivot/.test(pv[0].getAttribute('title') || ''),
+        'pivot chips ' + pv.length + ' text "' + pvTxt + '" title "' + (pv[0] && (pv[0].getAttribute('title') || '').slice(0, 45)) + '"');
+    rec('J-chip-row', rw.length === 1 && rw[0].getAttribute('data-row-key') === '1001' && !rw[0].hasAttribute('data-pv-key'),
+        'row chips ' + rw.length + (rw[0] ? ' key ' + rw[0].getAttribute('data-row-key') : ''));
+    if (!pv.length) { fail(['J-chip-tip', 'J-chip-jump'], 'no pivot chip'); return; }
+    $(pv[0]).trigger('mouseenter');
+    await sleep(100);
+    var pop = document.getElementById('pnbRowRefPop');
+    rec('J-chip-tip', !!pop && /in the pivot/.test(pop.textContent) && /Engineering/.test(pop.textContent), 'tip "' + (pop ? pop.textContent.slice(0, 80) : '') + '"');
+    $(pv[0]).trigger('mouseleave');
+    clickEl(pv[0]);
+    await until(function () { return cards().length === 1; }, 3000);
+    await sleep(300);
+    rec('J-chip-jump', cards().length === 1 && cards()[0].getAttribute('data-pvn-key') === K.leaf && !$('#journalLightbox').is(':visible'),
+        'cards ' + cards().length + ', lightbox visible ' + $('#journalLightbox').is(':visible'));
+  };
+
+  // ---- round 8 (2026-10-09): chart point notes ---------------------------------
+  // A chart's point is the pivot row with its labels. The chart is a real vis() in the
+  // report's snippet area; its keys are read from the chart ($pnbCn: point -> key), its
+  // markers from the layer over its canvas, its menu from the click (a dispatched click
+  // at the point: Chart.js hit-tests it as a user's).
+  function charts() {
+    return arr(document.querySelectorAll('#reportSnippetOutput canvas'))
+      .map(function (c) { return (window.Chart && Chart.getChart) ? Chart.getChart(c) : null; }).filter(Boolean);
+  }
+  function layerOf(ch) { return (ch && ch.canvas && window._penumbraChartNoteLayer) ? window._penumbraChartNoteLayer(ch.canvas) : null; }
+  function pinsOf(ch) { var l = layerOf(ch); return l ? arr(l.querySelectorAll('.journal-chartnote-pin')) : []; }
+  function pinFor(ch, key) { return pinsOf(ch).filter(function (p) { return p.getAttribute('data-pvn-key') === key; })[0] || null; }
+  function pt(ch, x, series) {
+    if (!ch) return null;
+    var i = (ch.data.labels || []).indexOf(x), d = 0;
+    if (series != null) { d = -1; ch.data.datasets.forEach(function (ds, k) { if (ds.label === series) d = k; }); }
+    return (i < 0 || d < 0) ? null : { d: d, i: i };
+  }
+  // A point in the viewport: where a click lands (a bar's middle - its tooltipPosition is its top edge, and
+  // Chart.js rounds an event's position; a slice's centroid) or its value end (where a marker sits).
+  function ptPos(ch, p, end) {
+    var el = ch.getDatasetMeta(p.d).data[p.i], r = ch.canvas.getBoundingClientRect(), q;
+    if (end) q = el.getProps(['x', 'y'], true);
+    else if (ch.config.type === 'bar') {
+      var g = el.getProps(['x', 'y', 'base', 'horizontal'], true);
+      q = g.horizontal ? { x: (g.x + g.base) / 2, y: g.y } : { x: g.x, y: (g.y + g.base) / 2 };
+    } else q = el.tooltipPosition(true);
+    return { x: r.left + q.x * r.width / ch.width, y: r.top + q.y * r.height / ch.height };
+  }
+  function clickPt(ch, p) {
+    var q = ptPos(ch, p, false);
+    ch.canvas.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window, clientX: q.x, clientY: q.y }));
+  }
+  function popup() { return document.querySelector('.chart-drill-popup'); }
+  function popItem(action) { var p = popup(); return p ? p.querySelector('[data-action="' + action + '"]') : null; }
+  function popActions() { var p = popup(); return p ? arr(p.querySelectorAll('[data-action]')).map(function (x) { return x.getAttribute('data-action'); }).join(',') : 'no menu'; }
+  function footer(ch, p) {
+    try {
+      var cb = ch.options.plugins.tooltip.callbacks.footer;
+      if (typeof cb !== 'function') return 'no footer callback';
+      var r = cb.call({}, [{ chart: ch, datasetIndex: p.d, dataIndex: p.i }]);
+      return (r === undefined) ? 'undefined' : JSON.stringify(r);
+    } catch (e) { return 'threw ' + e.message; }
+  }
+  function keyList(ch) { return (ch && ch.$pnbCn) ? ch.$pnbCn.map(function (e) { return e.d + ':' + e.i + '=' + e.key; }) : []; }
+  function cardKey() { var c = cards()[0]; return c ? c.getAttribute('data-pvn-key') : null; }
+  async function openFromMenu(ch, p) {
+    clickPt(ch, p);
+    await until(function () { return !!popup(); }, 2000);
+    var it = popItem('notes'), txt = it ? it.textContent : '';
+    if (it) clickEl(it);
+    await until(function () { return cards().length === 1; }, 2000);
+    await sleep(200);
+    return txt;
+  }
+  async function closeCard() {
+    var c = cards()[0], band = c && c.querySelector('.journal-rownote-close');
+    if (band) clickEl(band);
+    await sleep(250);
+  }
+  // Round 10 (2026-10-09): where a marker sits. Boxes in the chart's own px (the canvas's box over the chart's size).
+  function chartBox(ch, el) {
+    var r = el.getBoundingClientRect(), c = ch.canvas.getBoundingClientRect(), sx = ch.width / c.width, sy = ch.height / c.height;
+    return { x: (r.left - c.left) * sx, y: (r.top - c.top) * sy, w: r.width * sx, h: r.height * sy };
+  }
+  // The value labels as chartjs-plugin-datalabels drew them: its own boxes, with each label's point.
+  function labelBoxesOf(ch) {
+    var dl = ch.$datalabels, out = [];
+    ((dl && dl._labels) || []).forEach(function (l) {
+      var lay = l.$layout, r = (lay && lay._visible && lay._box) ? lay._box._rect : null;
+      if (r && r.w > 0 && r.h > 0) out.push({ x: r.x, y: r.y, w: r.w, h: r.h, d: l.$context ? l.$context.datasetIndex : -1, i: l.$context ? l.$context.dataIndex : -1 });
+    });
+    return out;
+  }
+  function overlap(a, b) {
+    return Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 1 && Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > 1;
+  }
+  // A bar's own box (final position): left, right, top, bottom, centre.
+  function barOf(ch, p) {
+    var el = ch.getDatasetMeta(p.d).data[p.i], b = el.getProps(['x', 'y', 'base', 'width', 'height'], true);
+    if (el.horizontal) return { L: Math.min(b.x, b.base), R: Math.max(b.x, b.base), T: b.y - b.height / 2, B: b.y + b.height / 2, cx: (b.x + b.base) / 2, cy: b.y };
+    return { L: b.x - b.width / 2, R: b.x + b.width / 2, T: Math.min(b.y, b.base), B: Math.max(b.y, b.base), cx: b.x, cy: (b.y + b.base) / 2 };
+  }
+  function f1(v) { return Math.round(v * 10) / 10; }
+  function bx(r) { return r ? '[' + f1(r.x) + ',' + f1(r.y) + ' ' + f1(r.w) + 'x' + f1(r.h) + ']' : 'none'; }
+  // In its bar's end corner: right edge 2px in from the bar's, top 2px under the bar's top.
+  function inCorner(ch, p, m) {
+    if (!ch || !p || !m) return false;
+    var b = chartBox(ch, m), bar = barOf(ch, p);
+    return Math.abs(b.x + b.w - (bar.R - 2)) <= 1.5 && Math.abs(b.y - (bar.T + 2)) <= 1.5;
+  }
+  function cornerTxt(ch, p, m) { return (ch && p && m) ? ('marker ' + bx(chartBox(ch, m)) + ' bar R ' + f1(barOf(ch, p).R) + ' T ' + f1(barOf(ch, p).T)) : 'marker none'; }
+
+  // DEPT x FY bars: every point's key, the marker, the tooltip, the menu, a post, an empty point, the breakdown.
+  S.chbar = async function () {
+    var ch = charts()[0];
+    rec('P-ch-chart', !!ch && (ch.data.labels || []).length === 3 && ch.data.datasets.length === 3,
+        ch ? ('labels ' + JSON.stringify(ch.data.labels) + ' series ' + ch.data.datasets.map(function (d) { return d.label; }).join(',')) : 'no chart');
+    var ALL = ['V-ch-keys', 'V-ch-pin', 'V-ch-tip', 'C-ch-menu', 'C-ch-open', 'C-ch-post', 'C-ch-zero', 'C-ch-breakdown'];
+    if (!ch) { fail(ALL, 'no chart'); return; }
+    var want = [], got = keyList(ch);
+    ch.data.datasets.forEach(function (ds, d) { ch.data.labels.forEach(function (x, i) { want.push(d + ':' + i + '=' + pk([['DEPT', x], ['FY', ds.label]])); }); });
+    rec('V-ch-keys', got.length === 9 && JSON.stringify(got.slice().sort()) === JSON.stringify(want.slice().sort()),
+        got.length + ' keys; e.g. ' + got.slice(0, 2).join(' | '));
+    var pL = pt(ch, 'Engineering', 'FY2026'), pZ = pt(ch, 'Humanities', 'FY2024');
+    var pin = pinFor(ch, K.leaf), lay = layerOf(ch);
+    // round 10: the marker sits in the segment's own end corner (off the spot above it, where its value goes)
+    var at = inCorner(ch, pL, pin);
+    rec('V-ch-pin', pinsOf(ch).length === 1 && !!pin && pin.getAttribute('data-count') === '2' && pin.classList.contains('has-notes') && at
+        && !!lay && lay.getAttribute('aria-hidden') === 'true' && getComputedStyle(lay).pointerEvents === 'none' && after(pin) === '"2"',
+        'pins ' + pinsOf(ch).length + (pin ? ' count ' + pin.getAttribute('data-count') : '') + ' ' + cornerTxt(ch, pL, pin) + ' layer ' + !!lay);
+    // The layer follows its canvas wherever the canvas sits in its box: shifted 23px inside its parent and
+    // redrawn, the marker is still in the segment's corner.
+    var par = ch.canvas.parentNode, padWas = par.style.paddingLeft;
+    var inBox = function () { return ch.canvas.getBoundingClientRect().left - par.getBoundingClientRect().left; };
+    var c0 = inBox();
+    par.style.paddingLeft = '23px';
+    ch.resize();
+    ch.update('none');
+    await sleep(250);
+    var moved = Math.round(inBox() - c0);
+    var pin2 = pinFor(ch, K.leaf), at2 = inCorner(ch, pL, pin2);
+    rec('V-ch-pin-offset', moved >= 10 && at2, 'canvas ' + moved + 'px further into its box; ' + cornerTxt(ch, pL, pin2));
+    par.style.paddingLeft = padWas;
+    ch.resize();
+    ch.update('none');
+    await sleep(250);
+    var f1 = pL ? footer(ch, pL) : 'no point', f0 = pZ ? footer(ch, pZ) : 'no point';
+    rec('V-ch-tip', f1 === JSON.stringify('2 notes (click, then Notes)') && f0 === 'undefined', 'noted ' + f1 + ' | none ' + f0);
+    // the click menu offers the thread, and opens it by the point's marker
+    var txt = await openFromMenu(ch, pL);
+    rec('C-ch-menu', txt === 'Notes (2)\u2026', 'menu item "' + txt + '"');
+    var c = cards()[0], pinO = pinFor(ch, K.leaf);
+    var ref = c ? (c.querySelector('.journal-rownote-ref') || {}).textContent : '';
+    rec('C-ch-open', !popup() && !!c && c.classList.contains('is-chart') && cardKey() === K.leaf && c.querySelectorAll('.journal-rownote-item').length === 2
+        && ref === 'Engineering · FY2026' && !!pinO && pinO.classList.contains('is-open') && near(c, pinO)
+        && getComputedStyle(c).zIndex === '10050' && !c.classList.contains('is-overlay'),   // (round 12: the dialog tier is is-overlay's, on a dialog)
+        'menu gone ' + !popup() + ', cards ' + cards().length + ' key ok ' + (cardKey() === K.leaf) + ' items ' + (c ? c.querySelectorAll('.journal-rownote-item').length : -1)
+        + ' ref "' + ref + '" marker open ' + !!(pinO && pinO.classList.contains('is-open')) + ' by it ' + near(c, pinO) + ' z ' + (c && getComputedStyle(c).zIndex));
+    if (c) {
+      var inEl = c.querySelector('.journal-rownote-input');
+      inEl.focus();
+      inEl.textContent = 'Chart check';
+      var nPosts = window.__J.posts.length;
+      clickEl(c.querySelector('.journal-rownote-post'));
+      await until(function () { return window.__J.posts.length > nPosts; }, 3000);
+      await until(function () { var q = pinFor(ch, K.leaf); return !!q && q.getAttribute('data-count') === '3'; }, 3000);
+      var p = window.__J.posts[window.__J.posts.length - 1] || {}, snap = p.row_snapshot || {}, p3 = pinFor(ch, K.leaf);
+      rec('C-ch-post', p.action === 'add' && p.scope === 'pivot' && p.row_key === K.leaf && p.note_text === 'Chart check'
+          && snap.DEPT === 'Engineering' && snap.FY === 'FY2026' && !!p3 && p3.getAttribute('data-count') === '3'
+          && c.querySelectorAll('.journal-rownote-item').length === 3,
+          'post ' + JSON.stringify({ a: p.action, s: p.scope, k: p.row_key === K.leaf, t: p.note_text, snap: snap }) + ' marker ' + (p3 && p3.getAttribute('data-count')));
+    } else rec('C-ch-post', false, 'no card');
+    await closeCard();
+    // a point with no notes: "Add a note...", a dashed marker while its card is open, none after
+    var kZ = pk([['DEPT', 'Humanities'], ['FY', 'FY2024']]);
+    var txtZ = await openFromMenu(ch, pZ);
+    var mz = pinFor(ch, kZ);
+    var openZ = cardKey() === kZ && !!mz && !mz.classList.contains('has-notes') && mz.classList.contains('is-open') && mz.getAttribute('data-count') === '';
+    await closeCard();
+    rec('C-ch-zero', txtZ === 'Add a note\u2026' && openZ && cards().length === 0 && !pinFor(ch, kZ) && !!pinFor(ch, K.leaf),
+        'menu "' + txtZ + '", open with a dashed marker ' + openZ + ', after close: cards ' + cards().length + ' its marker ' + !!pinFor(ch, kZ));
+    // the row breakdown: Notes beside "View in table"; the card over the dialog, gone with it
+    clickPt(ch, pL);
+    await until(function () { return !!popup(); }, 2000);
+    var rowsIt = popItem('rows');
+    if (rowsIt) clickEl(rowsIt);
+    await until(function () { return !!document.querySelector('.infobox-drill-notes'); }, 3000);
+    await sleep(200);
+    var nb = document.querySelector('.infobox-drill-notes'), nbTxt = nb ? nb.textContent : '';
+    if (nb) clickEl(nb);
+    await until(function () { return cards().length === 1; }, 2000);
+    await sleep(250);
+    var cb = cards()[0], k2 = cardKey(), over = false;
+    if (cb) {
+      var r2 = cb.getBoundingClientRect(), hit = document.elementFromPoint(r2.left + r2.width / 2, r2.top + 12);
+      over = !!hit && cb.contains(hit);
+    }
+    var byBtn = near(cb, nb), nbOpen = !!nb && nb.classList.contains('is-open');
+    var ov = document.querySelector('.infobox-overlay'), xb = ov ? ov.querySelector('.close-lightbox') : null;
+    if (xb) clickEl(xb);
+    await until(function () { return cards().length === 0; }, 2500);
+    var wantTxt = 'Notes (' + (window.__J.pcounts[K.leaf] || 0) + ')';
+    rec('C-ch-breakdown', nbTxt === wantTxt && k2 === K.leaf && over && byBtn && nbOpen && !!xb && cards().length === 0,
+        'button "' + nbTxt + '" (want "' + wantTxt + '"), card key ok ' + (k2 === K.leaf) + ', on top ' + over + ', by the button ' + byBtn
+        + ' open ' + nbOpen + ', after the dialog closes: cards ' + cards().length);
+  };
+
+  // A DEPT-only chart (Sciences = K.grp), drilled in place into FY: Engineering's FY2026 bar IS K.leaf.
+  S.chdrill = async function () {
+    var ch = charts()[0];
+    rec('P-chd-chart', !!ch && (ch.data.labels || []).length === 3 && ch.data.datasets.length === 1, ch ? 'labels ' + JSON.stringify(ch.data.labels) : 'no chart');
+    if (!ch) { fail(['V-chd-group', 'V-chd-drilled', 'C-chd-menu', 'C-chd-open'], 'no chart'); return; }
+    var pg = pinFor(ch, K.grp);
+    rec('V-chd-group', pinsOf(ch).length === 1 && !!pg && pg.getAttribute('data-count') === '1', 'pins ' + pinsOf(ch).length + ' Sciences ' + (pg && pg.getAttribute('data-count')));
+    clickPt(ch, pt(ch, 'Engineering'));
+    await until(function () { return !!popup(); }, 2000);
+    var fy = popup() ? popup().querySelector('.chart-drill-popup-item[data-col="FY"]') : null;
+    if (fy) clickEl(fy);
+    await until(function () { var c2 = charts()[0]; return !!c2 && (c2.data.labels || []).indexOf('FY2026') !== -1; }, 5000);
+    await sleep(600);
+    var ch2 = charts()[0], p26 = pt(ch2, 'FY2026'), keys = keyList(ch2), pl = ch2 ? pinFor(ch2, K.leaf) : null;
+    rec('V-chd-drilled', !!fy && !!ch2 && !!p26 && keys.length === 3 && keys.indexOf('0:' + p26.i + '=' + K.leaf) !== -1
+        && pinsOf(ch2).length === 1 && !!pl && pl.getAttribute('data-count') === '2',
+        'drill item ' + !!fy + ', labels ' + (ch2 ? JSON.stringify(ch2.data.labels) : '') + ', keys ' + keys.join(' | ') + ', markers ' + (ch2 ? pinsOf(ch2).length : 0));
+    if (!ch2 || !p26) { fail(['C-chd-menu', 'C-chd-open'], 'no drilled chart'); return; }
+    var txt = await openFromMenu(ch2, p26);
+    rec('C-chd-menu', txt === 'Notes (2)\u2026', 'menu item "' + txt + '"');
+    var c = cards()[0];
+    rec('C-chd-open', !!c && cardKey() === K.leaf && c.querySelectorAll('.journal-rownote-item').length === 2 && near(c, pinFor(ch2, K.leaf)),
+        'cards ' + cards().length + ' key ok ' + (cardKey() === K.leaf) + ' by the marker ' + near(c, pinFor(ch2, K.leaf)));
+  };
+
+  // A pie of dept (lower case in the vis() call): the Sciences slice's marker sits on the slice's middle line,
+  // 72% of the way to its rim (round 10: off the centroid, where a centred value goes).
+  S.chpie = async function () {
+    var ch = charts()[0];
+    rec('P-chp-chart', !!ch && ch.config.type === 'pie' && (ch.data.labels || []).length === 3, ch ? (ch.config.type + ' ' + JSON.stringify(ch.data.labels)) : 'no chart');
+    if (!ch) { fail(['V-chp-pin', 'V-chp-tip'], 'no chart'); return; }
+    var pS = pt(ch, 'Sciences'), pin = pinFor(ch, K.grp), want = null, got = null;
+    if (pS && pin) {
+      var a = ch.getDatasetMeta(pS.d).data[pS.i].getProps(['x', 'y', 'startAngle', 'endAngle', 'innerRadius', 'outerRadius'], true);
+      var mid = (a.startAngle + a.endAngle) / 2, rr = a.innerRadius + (a.outerRadius - a.innerRadius) * 0.72, b = chartBox(ch, pin);
+      want = { x: a.x + Math.cos(mid) * rr, y: a.y + Math.sin(mid) * rr };
+      got = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+    }
+    rec('V-chp-pin', pinsOf(ch).length === 1 && !!want && Math.abs(got.x - want.x) <= 1.5 && Math.abs(got.y - want.y) <= 1.5,
+        'markers ' + pinsOf(ch).length + (got ? ' centre ' + f1(got.x) + ',' + f1(got.y) + ' want ' + f1(want.x) + ',' + f1(want.y) : ''));
+    var f = pS ? footer(ch, pS) : 'no point';
+    rec('V-chp-tip', f === JSON.stringify('1 note (click, then Notes)'), 'footer ' + f);
+  };
+
+  // Top 3 PIs + Other: the Other bar takes no note (its members move with the rank); Cy2 has one.
+  S.chother = async function () {
+    var ch = charts()[0], labels = ch ? (ch.data.labels || []) : [];
+    var iO = labels.indexOf('Other'); if (iO === -1) iO = labels.indexOf('(Other)');
+    rec('P-cho-chart', !!ch && labels.length === 4 && iO !== -1, 'labels ' + JSON.stringify(labels));
+    if (!ch || iO === -1) { fail(['V-cho-nokey', 'C-cho-menu'], 'no Other bar'); return; }
+    var keys = keyList(ch);
+    rec('V-cho-nokey', keys.length === 3 && keys.every(function (k) { return k.indexOf('Other') === -1; }) && pinsOf(ch).length === 1 && !!pinFor(ch, K.cy2),
+        keys.length + ' keys: ' + keys.join(' | ') + '; markers ' + pinsOf(ch).length);
+    clickPt(ch, { d: 0, i: iO });
+    await until(function () { return !!popup() || !!document.querySelector('.infobox-overlay'); }, 2500);
+    await sleep(200);
+    var shown = !!popup() || !!document.querySelector('.infobox-overlay');
+    var notes = !!popItem('notes') || !!document.querySelector('.infobox-drill-notes');
+    rec('C-cho-menu', shown && !notes, 'menu or breakdown ' + shown + ', Notes offered ' + notes);
+  };
+
+  // A blank department is the pivot's '' (K.blank); a PI bar holding a blank and a literal "Unknown" takes none.
+  S.chblank = async function () {
+    var cs = charts();
+    rec('P-chb-charts', cs.length === 2 && cs[0].data.labels.indexOf('Unknown') !== -1 && cs[1].data.labels.indexOf('Unknown') !== -1,
+        cs.map(function (c) { return JSON.stringify(c.data.labels); }).join(' / '));
+    if (cs.length !== 2) { fail(['V-chb-blank', 'V-chb-ambiguous'], 'charts ' + cs.length); return; }
+    var p1 = pt(cs[0], 'Unknown'), k1 = keyList(cs[0]);
+    rec('V-chb-blank', !!p1 && k1.indexOf('0:' + p1.i + '=' + K.blank) !== -1 && k1.length === 4 && !!pinFor(cs[0], K.blank),
+        'keys ' + k1.join(' | ') + '; marker ' + !!pinFor(cs[0], K.blank));
+    var p2 = pt(cs[1], 'Unknown'), k2 = keyList(cs[1]);
+    rec('V-chb-ambiguous', !!p2 && k2.length === cs[1].data.labels.length - 1 && !k2.some(function (k) { return k.indexOf('0:' + p2.i + '=') === 0; }),
+        k2.length + ' keys of ' + cs[1].data.labels.length + ' bars; the Unknown bar keyed ' + k2.some(function (k) { return k.indexOf('0:' + p2.i + '=') === 0; }));
+  };
+
+  // Row notes off: no markers, no tooltip line, no Notes in the menu.
+  S.choff = async function () {
+    var ch = charts()[0];
+    rec('P-chf-chart', !!ch && (ch.data.labels || []).length === 3, ch ? 'labels ' + JSON.stringify(ch.data.labels) : 'no chart');
+    if (!ch) { fail(['V-chf-none', 'V-cw-off'], 'no chart'); return; }
+    var pL = pt(ch, 'Engineering', 'FY2026'), lay = !!layerOf(ch), f = pL ? footer(ch, pL) : 'no point';
+    clickPt(ch, pL);
+    await until(function () { return !!popup(); }, 2000);
+    rec('V-chf-none', !lay && f === 'undefined' && !!popup() && !popItem('notes'), 'layer ' + lay + ', footer ' + f + ', menu ' + popActions());
+    // round 11: no whole-chart note button either (the chart's cog is there)
+    var nW = document.querySelectorAll('.journal-chartwhole-btn').length, cog = !!document.querySelector('#reportSnippetOutput .chart-settings-cog');
+    rec('V-cw-off', nW === 0 && cog, 'note buttons ' + nW + ', a cog ' + cog);
+  };
+
+  // ---- round 9 (2026-10-09): chart notes round 2 ----------------------------------
+  // Two identical DEPT x FY charts. Opened from the SECOND chart's Humanities / FY2024 (no notes): its dashed
+  // marker on that chart alone; the snippet drawn again (new canvases): the card stays, by the new second
+  // chart's marker; the charts gone: it closes after its wait.
+  S.ch2keep = async function () {
+    var cs = charts();
+    rec('P-ch2-charts', cs.length === 2 && cs.every(function (c) { return (c.data.labels || []).length === 3 && c.data.datasets.length === 3; }) && typeof JR.renderReportSnippet === 'function',
+        'charts ' + cs.length + ', renderReportSnippet ' + typeof JR.renderReportSnippet);
+    var ALL = ['V-ch2-onecanvas', 'C-ch2-survive', 'C-ch2-gone'];
+    if (cs.length !== 2 || typeof JR.renderReportSnippet !== 'function') { fail(ALL, 'no fixture'); return; }
+    var kZ = pk([['DEPT', 'Humanities'], ['FY', 'FY2024']]);
+    var txt = await openFromMenu(cs[1], pt(cs[1], 'Humanities', 'FY2024'));
+    if (window._penumbraChartNotePinsRefresh) window._penumbraChartNotePinsRefresh();   // every chart, as a counts reload does
+    var m2 = pinFor(cs[1], kZ), m1 = pinFor(cs[0], kZ);
+    rec('V-ch2-onecanvas', txt === 'Add a note\u2026' && cardKey() === kZ && !!m2 && m2.classList.contains('is-open') && !m1,
+        'menu "' + txt + '", card ' + (cardKey() === kZ) + ', chart 2 marker ' + !!m2 + ', chart 1 marker ' + !!m1);
+    var old = cs.map(function (c) { return c.canvas; });
+    try { JR.renderReportSnippet(); } catch (e) { }
+    await until(function () { var n = charts(); return n.length === 2 && n.every(function (c) { return old.indexOf(c.canvas) === -1; }); }, 8000);
+    await until(function () { var n = charts(); return n.length === 2 && !!pinFor(n[1], kZ); }, 4000);
+    await sleep(600);   // the card's tick
+    var ns = charts(), c1 = cards()[0], p2 = ns[1] ? pinFor(ns[1], kZ) : null, p1 = ns[0] ? pinFor(ns[0], kZ) : null;
+    var newCanvases = ns.length === 2 && ns.every(function (c) { return old.indexOf(c.canvas) === -1; });
+    rec('C-ch2-survive', newCanvases && cards().length === 1 && cardKey() === kZ && !!c1 && c1.style.visibility !== 'hidden'
+        && !!p2 && p2.classList.contains('is-open') && near(c1, p2) && !p1,
+        'new canvases ' + newCanvases + ', cards ' + cards().length + ' key ok ' + (cardKey() === kZ) + ' shown ' + (c1 && c1.style.visibility !== 'hidden')
+        + ', by the new chart 2 marker ' + near(c1, p2) + ', chart 1 marker ' + !!p1);
+    // the charts gone for good: the card waits, then goes
+    charts().forEach(function (c) { var cv = c.canvas; c.destroy(); if (cv && cv.parentNode) cv.parentNode.removeChild(cv); });
+    var t0 = Date.now();
+    await sleep(1500);
+    var still = cards().length;
+    await until(function () { return cards().length === 0; }, 6000);
+    rec('C-ch2-gone', still === 1 && cards().length === 0 && (Date.now() - t0) >= 2500,
+        'after 1.5 s cards ' + still + ', closed after ' + Math.round((Date.now() - t0) / 100) / 10 + ' s');
+  };
+
+  // The redraw a chart's creation asks of the next animation frame never comes (window.__PV_NORAF: a background
+  // tab runs none): its markers come anyway - the paint retries on a timer.
+  S.chhidden = async function () {
+    var ch = charts()[0];
+    rec('P-chh-chart', !!ch && window.__PV_NORAF === true && (ch.data.labels || []).length === 3, ch ? 'labels ' + JSON.stringify(ch.data.labels) + ' noraf ' + window.__PV_NORAF : 'no chart');
+    var pin = ch ? pinFor(ch, K.leaf) : null;
+    rec('V-ch2-retry', !!pin && pin.getAttribute('data-count') === '2' && keyList(ch).length === 9,
+        'marker ' + (pin ? pin.getAttribute('data-count') : 'none') + ', keys ' + keyList(ch).length);
+  };
+
+  // ---- round 12 (2026-10-09): the chart notes bug sweep ------------------------------------
+  // Stacked bars: each segment's marker stays on its own segment (past a segment's end lies the next one: a lower
+  // segment's marker slid past the whole stack), off the values.
+  S.chstack = async function () {
+    var cs = charts();
+    rec('P-cs-charts', cs.length === 2 && cs.every(function (c) { return c.data.datasets.length === 3; }) && cs[0].options.indexAxis === 'y' && cs[1].options.indexAxis !== 'y',
+        'charts ' + cs.length + ', axes ' + cs.map(function (c) { return c.options.indexAxis; }).join(','));
+    if (cs.length !== 2) { fail(['V-cs-own'], 'no fixture'); return; }
+    var bad = [], n = 0;
+    cs.forEach(function (ch, ci) {
+      var labs = labelBoxesOf(ch), hz = ch.options.indexAxis === 'y';
+      [[K.e24, 'FY2024'], [K.leaf, 'FY2026']].forEach(function (kv) {
+        var p = pt(ch, 'Engineering', kv[1]), m = pinFor(ch, kv[0]);
+        if (!p || !m) { bad.push(ci + ':' + kv[1] + ' no marker'); return; }
+        n++;
+        var b = chartBox(ch, m), bar = barOf(ch, p), cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+        // across its own segment: on the bar or right by it (above / below a horizontal one, beside a vertical one)
+        var own = hz ? (cx >= bar.L && cx <= bar.R && cy >= bar.T - b.h - 4 && cy <= bar.B + b.h + 4)
+                     : (cy >= bar.T && cy <= bar.B && cx >= bar.L - b.w - 4 && cx <= bar.R + b.w + 4);
+        var onLab = labs.filter(function (l) { return overlap(b, l); }).length;
+        if (!own || onLab) bad.push(ci + ':' + kv[1] + ' ' + bx(b) + ' segment ' + f1(bar.L) + '..' + f1(bar.R) + ' x ' + f1(bar.T) + '..' + f1(bar.B) + (onLab ? ' on ' + onLab + ' values' : ''));
+      });
+    });
+    rec('V-cs-own', n === 4 && !bad.length, n + ' markers; ' + (bad.join(' | ') || 'each on its own segment, off the values'));
+  };
+  // The key's 5th part: two charts that differ only by their own filter (or a type that does not aggregate) keep their own
+  // threads; a bar and a line of the same fields share theirs. With Row notes off the journal's jump says why; a Save As
+  // switch drops the original's chart notes at once.
+  S.chfilter = async function () {
+    var cs = charts(), ALL = ['V-cw-filter', 'V-cw-warn', 'C-cf-move', 'C-cf-snap', 'R-cf-hidden', 'V-cf-offnow', 'V-cw-switch'];
+    rec('P-cf-charts', cs.length === 4, 'charts ' + cs.length + ': ' + cs.map(function (c) { return c.config.type; }).join(','));
+    if (cs.length !== 4) { fail(ALL, 'no fixture'); return; }
+    var bs = cs.map(function (c) { return wbtn(c)[0] || null; }), ks = bs.map(function (b) { var k = b ? b.getAttribute('data-cw-key') : null; try { return JSON.parse(k); } catch (e) { return null; } });
+    var cn = bs.map(function (b) { return b ? b.getAttribute('data-count') : 'none'; });
+    var four = JSON.stringify(ks[0]) === K.plain, hex = function (k) { return Array.isArray(k) && k.length === 5 && /^[0-9a-f]{1,64}$/.test(k[4]); };
+    var ok = four && hex(ks[1]) && JSON.stringify(ks[1].slice(0, 4)) === K.plain && JSON.stringify(ks[2]) === K.plain && hex(ks[3]) && ks[3][4] !== ks[1][4]
+          && cn.join('|') === '1||1|';
+    rec('V-cw-filter', ok, 'keys ' + ks.map(function (k) { return JSON.stringify(k); }).join(' | ') + '; counts "' + cn.join('" "') + '"');
+    // Row notes off: the journal's jump to a chart says why
+    window._penumbraJournalRowNotes = false;
+    var ov = document.getElementById('action_overlay'), before = ov ? ov.textContent : '';
+    var said = false;
+    try { window.Penumbra.revealChartNote(K.plain); } catch (e) { }
+    await sleep(300);
+    var after2 = ov ? ov.textContent : '';
+    said = after2.length > before.length && /Row notes are off/.test(after2);
+    window._penumbraJournalRowNotes = true;
+    rec('V-cw-warn', said, 'the notice ' + (said ? 'says why' : 'says nothing: "' + after2.slice(-90) + '"'));
+    // (round 12 part 3) an identical chart's button moves the card there (it closed it)
+    clickEl(bs[0]);
+    await until(function () { return cards().length === 1; }, 2000);
+    await sleep(200);
+    var open0 = cardKey() === K.plain && bs[0].classList.contains('is-open');
+    clickEl(bs[2]);
+    await sleep(400);
+    var moved = cards().length === 1 && cardKey() === K.plain && bs[2].classList.contains('is-open') && !bs[0].classList.contains('is-open') && near(cards()[0], bs[2]);
+    rec('C-cf-move', open0 && moved, 'open on the bar\'s button ' + open0 + ', then on the line\'s ' + moved + ' (cards ' + cards().length + ')');
+    // a whole chart's note goes out with the title its chart has when it is posted (it took the one the card opened with)
+    var cv2 = cs[2].canvas, cfg2 = $(cv2).data('vizConfig'), snapOk = false, snapTxt = 'no card';
+    if (cards().length === 1) {
+      $(cv2).data('vizConfig', Object.assign({}, cfg2, { title: 'All years, renamed' }));
+      cs[2].update('none');
+      await sleep(200);
+      var c5 = cards()[0], in5 = c5.querySelector('.journal-rownote-input'), n5 = window.__J.posts.length;
+      in5.focus();
+      in5.textContent = 'Snapshot check';
+      clickEl(c5.querySelector('.journal-rownote-post'));
+      await until(function () { return window.__J.posts.length > n5; }, 3000);
+      var p5 = window.__J.posts[window.__J.posts.length - 1] || {}, s5 = p5.row_snapshot || {};
+      if (typeof s5 === 'string') { try { s5 = JSON.parse(s5); } catch (e) { s5 = {}; } }
+      snapOk = window.__J.posts.length > n5 && p5.scope === 'chart' && p5.row_key === K.plain && s5.Chart === 'All years, renamed';
+      snapTxt = 'post ' + JSON.stringify({ s: p5.scope, k: p5.row_key === K.plain, snap: s5 });
+      $(cv2).data('vizConfig', cfg2);
+      cs[2].update('none');
+    }
+    rec('C-cf-snap', snapOk, snapTxt);
+    await closeCard();
+    // the J panel's jump to a chart that is hidden says so, and opens no card nobody could see
+    var wr0 = cs[0].canvas.parentNode, wr2 = cs[2].canvas.parentNode;
+    wr0.style.display = 'none'; wr2.style.display = 'none';
+    var beforeH = ov ? ov.textContent : '', rj = null;
+    try { rj = window.Penumbra.revealChartNote(K.plain); } catch (e) { rj = 'threw ' + e.message; }
+    await sleep(300);
+    var afterH = ov ? ov.textContent : '', saidH = afterH.length > beforeH.length && /hidden right now/.test(afterH);
+    rec('R-cf-hidden', rj === false && saidH && cards().length === 0, 'jump ' + rj + ', the notice ' + (saidH ? 'says it is hidden' : '"' + afterH.slice(-90) + '"') + ', cards ' + cards().length);
+    wr0.style.display = ''; wr2.style.display = '';
+    // Row notes off in View Options: the charts' buttons go at once (they waited for a redraw)
+    window._penumbraJournalRowNotes = false;
+    window.Penumbra.refreshJournalRowFeatures();
+    var offN = document.querySelectorAll('#reportSnippetOutput .journal-chartwhole-btn').length;
+    window._penumbraJournalRowNotes = true;
+    window.Penumbra.refreshJournalRowFeatures();
+    var onN = document.querySelectorAll('#reportSnippetOutput .journal-chartwhole-btn').length;
+    rec('V-cf-offnow', offN === 0 && onN === 4, 'buttons with Row notes off ' + offN + ', back on ' + onN);
+    bs = cs.map(function (c) { return wbtn(c)[0] || null; });
+    await sleep(300);
+    // a Save As switch: the original's chart notes go at once (the copy's own come with its fetch)
+    var had = Object.keys(window._penumbraChartNoteCounts || {}).length, now = -1, btnNow = null;
+    try {
+      if (window.Penumbra.journalSwitchReport) window.Penumbra.journalSwitchReport('pvfix-copy');
+      now = Object.keys(window._penumbraChartNoteCounts || {}).length;
+      btnNow = bs[0] ? bs[0].getAttribute('data-count') : null;
+    } catch (e) { now = 'threw ' + e.message; }
+    rec('V-cw-switch', had >= 1 && now === 0 && btnNow === '', 'chart counts before ' + had + ', right after the switch ' + now + ', the button "' + btnNow + '"');
+  };
+  // ---- round 12 part 3 (2026-10-09): the bug sweep's chart-side and card-side fixes ---------------------------
+  // c0 a DEPT bar split by FY but narrowed to FY2026 by its own filter, c1 / c2 the same DEPT bar twice (a department
+  // really called "Other", and a blank one), c3 a treemap of PIs grouped by department.
+  async function mainSrc() {
+    if (typeof window.__mainSrc === 'string') return window.__mainSrc;
+    var t = '';
+    try { t = await (await fetch('main_pv.js', { cache: 'no-store' })).text(); } catch (e) { t = ''; }
+    window.__mainSrc = t;
+    return t;
+  }
+  S.chsweep = async function () {
+    var cs = charts();
+    var ALL = ['V-sw-split1', 'V-sw-other', 'V-sw-memo', 'V-sw-still', 'V-sw-scale', 'V-sw-tip', 'V-sw-shown', 'V-sw-level', 'V-sw-cogfocus',
+               'V-sw-mentionz', 'V-sw-mail', 'V-sw-slide', 'C-sw-treemap', 'C-sw-overlay', 'V-sw-linkname', 'C-sw-focus', 'C-sw-dialog',
+               'C-sw-regrace', 'C-sw-grace', 'C-sw-rekey', 'C-sw-destroyed', 'V-sw-drillsplit', 'V-sw-drillseen', 'V-sw-zoom'];
+    rec('P-sw-charts', cs.length === 5 && cs[3].config.type === 'treemap' && cs[4].data.datasets.length > 1, 'charts ' + cs.map(function (c) { return c.config.type; }).join(','));
+    if (cs.length !== 5) { fail(ALL, 'no fixture'); return; }
+    var c0 = cs[0], c1 = cs[1], c2 = cs[2], c3 = cs[3];
+    // A1: a split chart narrowed to one series keeps the split in its keys (it filed Engineering's note on Engineering alone)
+    var k0 = keyList(c0), fyAll = k0.length > 0 && k0.every(function (s) { return s.indexOf('["FY","FY2026"]') !== -1; });
+    var pL = pt(c0, 'Engineering', 'FY2026'), pinL = pinFor(c0, K.leaf);
+    rec('V-sw-split1', c0.data.datasets.length === 1 && fyAll && !!pinL && pinL.getAttribute('data-count') === '2' && !pinFor(c0, K.grp),
+        'series ' + c0.data.datasets.length + ', ' + k0.length + ' keys, all with FY2026 ' + fyAll + ' (' + (k0[0] || 'none') + '), Engineering\'s marker '
+        + (pinL ? pinL.getAttribute('data-count') : 'none') + ', a Sciences-alone marker ' + !!pinFor(c0, K.grp));
+    // A7: a department really called Other takes notes (this chart folds no Top-N roll-up)
+    var pinO = pinFor(c1, K.oth);
+    rec('V-sw-other', (c1.data.labels || []).indexOf('Other') !== -1 && !!pinO && pinO.getAttribute('data-count') === '1',
+        'labels ' + JSON.stringify(c1.data.labels) + ', the Other department\'s marker ' + (pinO ? pinO.getAttribute('data-count') : 'none'));
+    // A9: the "Unknown" bar's scan of the rows runs once, not on every update
+    var rows1 = $(c1.canvas).data('sourceRowData') || $(c1.canvas).closest('.penumbra-chart-filter-wrapper').data('sourceRowData') || [];
+    var nGet = 0, hasUnk = (c1.data.labels || []).indexOf('Unknown') !== -1;
+    rows1.forEach(function (m) { if (m && typeof m.get === 'function') { var og = m.get; m.get = function (k) { nGet++; return og.call(this, k); }; } });
+    try { c1.update('none'); } finally { rows1.forEach(function (m) { if (m && Object.prototype.hasOwnProperty.call(m, 'get')) delete m.get; }); }
+    rec('V-sw-memo', hasUnk && rows1.length > 20 && nGet < rows1.length, 'an "Unknown" bar ' + hasUnk + ', row reads in one update ' + nGet + ' (rows ' + rows1.length + ')');
+    // A3: in a scaled box (a fullscreen slide's scale()), 23px into it, the marker is still in its segment's corner
+    var w0 = c0.canvas.parentNode, was0 = [w0.style.paddingLeft, w0.style.transform, w0.style.transformOrigin];
+    w0.style.paddingLeft = '23px'; w0.style.transformOrigin = '0 0'; w0.style.transform = 'scale(0.5)';
+    c0.update('none');
+    await sleep(250);
+    var pinS = pinFor(c0, K.leaf);
+    rec('V-sw-scale', !!pinS && inCorner(c0, pL, pinS), 'at half size: ' + cornerTxt(c0, pL, pinS));
+    // A11: a redraw writes nothing on the marker layer that has not changed (here, 23px into its box: a layer put back
+    // to 0,0 before each placement changes its left twice a draw)
+    c0.draw();
+    var l0 = layerOf(c0), muts = 0, mo = new MutationObserver(function (rs) { muts += rs.length; });
+    if (l0) mo.observe(l0, { attributes: true, attributeFilter: ['style'], subtree: true });
+    c0.draw(); c0.draw();
+    muts += mo.takeRecords().length;
+    mo.disconnect();
+    rec('V-sw-still', !!l0 && muts === 0, 'style writes on the marker layer over two redraws, 23px into its box: ' + muts + ' (left ' + (l0 ? l0.style.left : '-') + ')');
+    w0.style.paddingLeft = was0[0]; w0.style.transform = was0[1]; w0.style.transformOrigin = was0[2];
+    c0.update('none');
+    await sleep(250);
+    // the density zoom: at CSS zoom 125%, 23px into its box, the marker is still in its segment's corner (the canvas's
+    // screen box over its layout size IS the zoom; dzdialogs only read the source line before round 12)
+    w0.style.paddingLeft = '23px'; w0.style.zoom = '1.25';
+    c0.update('none');
+    await sleep(250);
+    var pinZ = pinFor(c0, K.leaf), zEff = (window.pnbZoomOf && pinZ) ? window.pnbZoomOf(pinZ) : null;
+    rec('V-sw-zoom', !!pinZ && zEff > 1.2 && inCorner(c0, pL, pinZ), 'at zoom ' + zEff + ': ' + cornerTxt(c0, pL, pinZ));
+    w0.style.paddingLeft = was0[0]; w0.style.zoom = '';
+    c0.update('none');
+    await sleep(250);
+    // A6: the chart's own tooltip over a marker: the marker fades while it shows
+    var pinT = pinFor(c0, K.leaf), tipOk = false, tipTxt = 'no marker';
+    var POS = (window.Chart && Chart.Tooltip && Chart.Tooltip.positioners) || null;
+    if (pinT && pL && POS) {
+      var pb = chartBox(c0, pinT), tto = c0.options.plugins.tooltip;
+      POS.pnbTest = function () { return { x: pb.x + pb.w / 2, y: pb.y + pb.h / 2 }; };
+      tto.position = 'pnbTest'; tto.xAlign = 'center'; tto.yAlign = 'center';
+      c0.update('none');
+      c0.tooltip.setActiveElements([{ datasetIndex: pL.d, index: pL.i }], { x: pb.x, y: pb.y });
+      c0.draw();
+      await sleep(600);
+      c0.draw();
+      var tt = c0.tooltip, under = pinT.classList.contains('is-under-tip'), opU = parseFloat(getComputedStyle(pinT).opacity);
+      var tbox = { x: f1(tt.x), y: f1(tt.y), w: f1(tt.width), h: f1(tt.height), o: tt.opacity };
+      c0.tooltip.setActiveElements([], { x: 0, y: 0 });
+      c0.draw();
+      await sleep(600);
+      c0.draw();
+      var gone = !pinT.classList.contains('is-under-tip');
+      delete tto.position; delete tto.xAlign; delete tto.yAlign;
+      c0.update('none');
+      tipOk = under && opU < 0.2 && gone;
+      tipTxt = 'tooltip ' + JSON.stringify(tbox) + ' over the marker ' + bx(pb) + ': faded ' + under + ' (opacity ' + opU + '), back after it ' + gone;
+    }
+    rec('V-sw-tip', tipOk, tipTxt);
+    // A10: a chart drawn while hidden shows its markers once it is shown (a snippet chart is not drawn again)
+    var w1 = c1.canvas.parentNode;
+    w1.style.display = 'none';
+    c1.update('none');
+    await sleep(100);
+    var l1a = layerOf(c1), hid1 = !!l1a && l1a.style.display === 'none';
+    w1.style.display = '';
+    await sleep(400);
+    var l1b = layerOf(c1), pG = pt(c1, 'Sciences'), pinG = pinFor(c1, K.grp);
+    rec('V-sw-shown', hid1 && !!l1b && l1b.style.display !== 'none' && !!pinG && drawn(pinG) && inCorner(c1, pG, pinG),
+        'its layer hidden with it ' + hid1 + '; shown again: layer ' + (l1b ? '"' + l1b.style.display + '"' : 'none') + ', ' + cornerTxt(c1, pG, pinG));
+    // D6: the note button level with the cog (it had zeroed the global button margin the cog keeps)
+    var cog1 = c1.canvas.parentNode.querySelector(':scope > .chart-settings-cog'), wb1 = wbtn(c1)[0];
+    var cgR = cog1 ? cog1.getBoundingClientRect() : null, wbR = wb1 ? wb1.getBoundingClientRect() : null;
+    rec('V-sw-level', !!cgR && !!wbR && Math.abs(cgR.top - wbR.top) <= 1, (cgR && wbR) ? ('cog top ' + f1(cgR.top) + ', note button top ' + f1(wbR.top)) : 'no cog / button');
+    // A12: beside a quiet cog that has the keyboard's focus (it shows then, in that spot), the button steps aside
+    var lq = '', lfv = '', fv = false;
+    if (cog1 && wb1) {
+      cog1.classList.add('chart-settings-cog--quiet');
+      lq = getComputedStyle(wb1).left;
+      cog1.focus();
+      fv = cog1.matches(':focus-visible');
+      lfv = getComputedStyle(wb1).left;
+      cog1.blur();
+      cog1.classList.remove('chart-settings-cog--quiet');
+    }
+    rec('V-sw-cogfocus', lq === '4px' && fv && lfv === '30px', 'beside a quiet cog ' + lq + ', the cog keyboard-focused (focus-visible ' + fv + ') ' + lfv);
+    // B1 / D2: the @-mention list and its pop over a card on a dialog, under the drill menu
+    var dd = document.createElement('ul'); dd.className = 'journal-mention-dropdown'; document.body.appendChild(dd);
+    var mp = document.createElement('div'); mp.className = 'journal-mention-pop'; document.body.appendChild(mp);
+    var zd = +getComputedStyle(dd).zIndex, zp = +getComputedStyle(mp).zIndex;
+    dd.remove(); mp.remove();
+    rec('V-sw-mentionz', zd > 100050 && zp > 100050 && zd < 100100 && zp < 100100, 'the @-mention list ' + zd + ', its pop ' + zp + ' (a card on a dialog 100050, the drill menu 100100)');
+    // A4: a manual e-mail's copy drops the charts' controls and note markers; D12: the carousel's clone drops the
+    // markers before its charts are drawn again (source checks: neither runs in this harness)
+    var src = await mainSrc(), mi = src.indexOf('function penumbraCloneForExport($el) {'), seg = mi >= 0 ? src.slice(mi, mi + 1200) : '';
+    var mm = /\$c\.find\('([^']*)'\)\.remove\(\);/.exec(seg), sel = mm ? mm[1] : '';
+    rec('V-sw-mail', ['.chart-settings-cog', '.chart-filter-panel', '.journal-chartwhole-btn', '.journal-chartnote-layer'].every(function (k) { return sel.indexOf(k) !== -1; }),
+        'the e-mail copy drops "' + sel + '"');
+    var ci = src.indexOf('var clone = entry.bodyEl.cloneNode(true);');
+    var ri = ci >= 0 ? src.indexOf("$(clone).find('.journal-chartnote-layer, .journal-chartwhole-btn').remove();", ci) : -1;
+    var oi = ci >= 0 ? src.indexOf("var origCanvases = entry.bodyEl.querySelectorAll('canvas');", ci) : -1;
+    rec('V-sw-slide', ci >= 0 && ri > ci && oi > ri && ri - ci < 600, 'the clone at ' + ci + ', its markers dropped at ' + ri + ', its charts drawn again from ' + oi);
+    // A2: a grouped treemap's leaf offers its own thread (the click took the group under it)
+    var tmI = -1, tmD = c3.data.datasets[0] || { data: [] }, kAda = pk([['DEPT', 'Engineering'], ['PI', 'Ada']]), tmTxt = '', tmKey = null, tmActs = '';
+    (tmD.data || []).forEach(function (raw, i) { var lf = raw && (raw._data || raw); if (lf && lf._label === 'Ada' && lf._group === 'Engineering') tmI = i; });
+    if (tmI >= 0) {
+      var tel = c3.getDatasetMeta(0).data[tmI], tg = tel.getProps(['x', 'y', 'width', 'height'], true), tr = c3.canvas.getBoundingClientRect();
+      var tcx = tr.left + (tg.x + tg.width / 2) * tr.width / c3.width, tcy = tr.top + (tg.y + tg.height / 2) * tr.height / c3.height;
+      c3.canvas.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window, clientX: tcx, clientY: tcy }));
+      await until(function () { return !!popup(); }, 2000);
+      tmActs = popActions();
+      var tit = popItem('notes');
+      tmTxt = tit ? tit.textContent : '';
+      if (tit) { clickEl(tit); await until(function () { return cards().length === 1; }, 2000); await sleep(200); tmKey = cardKey(); }
+      else if (popup()) popup().remove();
+    }
+    rec('C-sw-treemap', tmI >= 0 && tmTxt === 'Add a note\u2026' && tmKey === kAda, 'leaf ' + tmI + ', menu "' + tmTxt + '" (' + tmActs + '), card ' + tmKey);
+    await closeCard();
+    // B1: the row breakdown's card on the dialog's tier; D7: its Notes link is named by its text, the long line its title
+    clickPt(c1, pG);
+    await until(function () { return !!popup(); }, 2000);
+    var rIt = popItem('rows');
+    if (rIt) clickEl(rIt);
+    await until(function () { return !!document.querySelector('.infobox-drill-notes'); }, 3000);
+    await sleep(200);
+    var nb = document.querySelector('.infobox-drill-notes'), tip0 = nb ? nb.getAttribute('title') : null;
+    var named = !!nb && !nb.hasAttribute('aria-label') && !!tip0 && nb.getAttribute('data-pvn-tip') === tip0 && (nb.textContent || '').trim() === 'Notes (1)';
+    if (nb) clickEl(nb);
+    await until(function () { return cards().length === 1; }, 2000);
+    await sleep(250);
+    var cb = cards()[0], zb = cb ? getComputedStyle(cb).zIndex : '', clb = cb ? cb.className : '';
+    var ovOk = !!cb && cb.classList.contains('is-overlay') && zb === '100050';
+    if (nb) clickEl(nb);   // again: it closes, and the link's title comes back
+    await until(function () { return cards().length === 0; }, 2000);
+    var tipBack = !!nb && !!tip0 && nb.getAttribute('title') === tip0;
+    rec('C-sw-overlay', ovOk, 'the card: z ' + zb + ', class "' + clb + '"');
+    rec('V-sw-linkname', named && tipBack, 'aria-label ' + (nb ? nb.hasAttribute('aria-label') : 'no link') + ', text "' + (nb ? (nb.textContent || '').trim() : '')
+        + '", data-pvn-tip = title ' + (!!nb && nb.getAttribute('data-pvn-tip') === tip0) + ', the title back after the card ' + tipBack);
+    var ovD = document.querySelector('.infobox-overlay'), xbD = ovD ? ovD.querySelector('.close-lightbox') : null;
+    if (xbD) clickEl(xbD);
+    await sleep(500);
+    // B12: closing a point's card puts the focus back where it was
+    var fbtn = document.createElement('button');
+    fbtn.type = 'button'; fbtn.textContent = 'opener';
+    document.body.insertBefore(fbtn, document.body.firstChild);
+    fbtn.focus();
+    var f0 = document.activeElement === fbtn;
+    window.Penumbra.openChartNote(K.leaf, ['DEPT', 'FY'], null, c0.canvas);
+    await until(function () { return cards().length === 1; }, 2000);
+    await sleep(250);
+    var fIn = !!cards()[0] && cards()[0].contains(document.activeElement);
+    await closeCard();
+    var fBack = document.activeElement === fbtn;
+    fbtn.remove();
+    rec('C-sw-focus', f0 && fIn && fBack, 'the opener focused ' + f0 + ', the card took it ' + fIn + ', back on close ' + fBack + ' (now ' + (document.activeElement ? document.activeElement.tagName : 'none') + ')');
+    // B11: a card on a chart in a dialog goes with the dialog (it jumped to a report chart with the same point)
+    var w2 = c2.canvas.parentNode, home2 = w2.parentNode, next2 = w2.nextSibling;
+    var fake = document.createElement('div');
+    fake.className = 'infobox-overlay';
+    fake.style.cssText = 'display:block;position:fixed;left:0;top:0;width:700px;height:420px;background:#fff;z-index:100000;';
+    document.body.appendChild(fake);
+    fake.appendChild(w2);
+    c2.update('none');
+    await sleep(250);
+    var tD = await openFromMenu(c2, pt(c2, 'Sciences'));
+    var cdD = cards()[0], inD = !!cdD && cdD.classList.contains('is-overlay');
+    fake.remove();
+    await sleep(1300);
+    var p1o = pinFor(c1, K.grp), jumped = !!p1o && p1o.classList.contains('is-open'), visD = cards().length === 1 && shown(cards()[0]);
+    await until(function () { return cards().length === 0; }, 5000);
+    rec('C-sw-dialog', tD === 'Notes (1)\u2026' && inD && !jumped && !visD && cards().length === 0,
+        'menu "' + tD + '", on the dialog\'s tier ' + inD + '; the dialog closed: jumped to the report chart ' + jumped + ', shown ' + visD + ', cards after ' + cards().length);
+    if (next2 && next2.parentNode === home2) home2.insertBefore(w2, next2); else home2.appendChild(w2);
+    c2.update('none');
+    await sleep(250);
+    // its chart back by itself (put back in place), a later loss waits anew
+    var tR = await openFromMenu(c0, pL);
+    var home0 = w0.parentNode, next0 = w0.nextSibling;
+    home0.removeChild(w0);
+    await sleep(1000);
+    var held1 = cards().length === 1;
+    home0.insertBefore(w0, next0);
+    await sleep(2800);
+    var back1 = cards().length === 1 && shown(cards()[0]);
+    home0.removeChild(w0);
+    await sleep(900);
+    var held2 = cards().length === 1;
+    home0.insertBefore(w0, next0);
+    await sleep(600);
+    rec('C-sw-regrace', tR === 'Notes (2)\u2026' && held1 && back1 && held2, 'menu "' + tR + '", held while away ' + held1 + ', back with its chart ' + back1 + ', held again on a second loss ' + held2);
+    await closeCard();
+    // B8: a lost chart's grace counts the card's checks while the page shows (three seconds of clock ran out in a
+    // background tab, whose timers are slowed, before the chart was drawn again)
+    var bG = wbtn(c0)[0], kG = bG ? bG.getAttribute('data-cw-key') : null, heldH = false, waitedG = -1;
+    if (bG) {
+      clickEl(bG);
+      await until(function () { return cards().length === 1; }, 2000);
+      await sleep(200);
+      var openG = cardKey() === kG;
+      Object.defineProperty(document, 'hidden', { configurable: true, get: function () { return true; } });
+      bG.remove();
+      await sleep(4200);
+      heldH = openG && cards().length === 1;
+      delete document.hidden;
+      var tG = Date.now();
+      await until(function () { return cards().length === 0; }, 6000);
+      waitedG = cards().length === 0 ? Date.now() - tG : -1;
+    }
+    rec('C-sw-grace', heldH && waitedG >= 2500, 'held for 4.2 s while the page was hidden ' + heldH + ', closed ' + waitedG + ' ms after it showed');
+    c0.update('none');
+    await sleep(250);
+    // B2: the chart's cog changes what it shows (re-keyed in place): its open card goes, the button is a new one
+    var bK = wbtn(c0)[0], kOld = bK ? bK.getAttribute('data-cw-key') : null, kNew = null, bN = null, cfg0 = $(c0.canvas).data('vizConfig');
+    if (bK) {
+      clickEl(bK);
+      await until(function () { return cards().length === 1; }, 2000);
+      await sleep(200);
+      $(c0.canvas).data('vizConfig', Object.assign({}, cfg0, { agg: 'avg' }));
+      c0.update('none');
+      await sleep(300);
+      bN = wbtn(c0)[0]; kNew = bN ? bN.getAttribute('data-cw-key') : null;
+      await until(function () { return cards().length === 0; }, 5000);
+    }
+    rec('C-sw-rekey', !!kOld && !!kNew && kNew !== kOld && !!bN && bN !== bK && cards().length === 0 && !bN.classList.contains('is-open'),
+        'keys ' + kOld + ' -> ' + kNew + ', a new button ' + (!!bN && bN !== bK) + ', cards ' + cards().length);
+    if (cards().length) await closeCard();
+    $(c0.canvas).data('vizConfig', cfg0);
+    c0.update('none');
+    await sleep(250);
+    // B9: its chart destroyed and drawn again a moment later on the same canvas: the card waits for it (it closed at
+    // once); destroyed for good, the card goes once the wait is over
+    var tB = await openFromMenu(c0, pL);
+    var cv0 = c0.canvas, raw0 = c0.config._config || c0.config;
+    c0.destroy();
+    await sleep(900);
+    var midN = cards().length, midShown = midN === 1 && shown(cards()[0]);
+    try { new Chart(cv0, raw0); } catch (e) { }
+    await sleep(1000);
+    c0 = Chart.getChart(cv0) || c0;
+    var pinB = pinFor(c0, K.leaf), cB = cards()[0];
+    var backB = !!cB && cardKey() === K.leaf && shown(cB) && !!pinB && pinB.classList.contains('is-open') && near(cB, pinB);
+    c0.destroy();
+    var t9 = Date.now();
+    await until(function () { return cards().length === 0; }, 6000);
+    var gone9 = cards().length === 0 ? Date.now() - t9 : -1;
+    try { new Chart(cv0, raw0); } catch (e) { }
+    await sleep(500);
+    c0 = Chart.getChart(cv0) || c0;
+    rec('C-sw-destroyed', tB === 'Notes (2)\u2026' && midN === 1 && !midShown && backB && gone9 >= 2500,
+        'menu "' + tB + '", while gone: cards ' + midN + ' shown ' + midShown + '; drawn again: back by its marker ' + backB + '; destroyed for good: closed after ' + gone9 + ' ms');
+    if (cards().length) await closeCard();
+    // A1 (2): a split chart drilled in place keeps its series once (the drill's path holds it already: it took no note)
+    clickPt(c0, pt(c0, 'Engineering', 'FY2026'));
+    await until(function () { return !!popup(); }, 2000);
+    var piIt = popup() ? popup().querySelector('.chart-drill-popup-item[data-col="PI"]') : null;
+    if (piIt) clickEl(piIt);
+    await until(function () { var d = charts()[0]; return !!d && (d.data.labels || []).indexOf('Ada') !== -1; }, 5000);
+    await sleep(600);
+    var cD = charts()[0], kd = keyList(cD);
+    var dOk = kd.length === 3 && kd.every(function (s) { return s.indexOf('["DEPT","Engineering"]') !== -1 && s.indexOf('["FY","FY2026"]') !== -1 && /\["PI","(Ada|Bo|Cy)"\]/.test(s); });
+    rec('V-sw-drillsplit', !!piIt && dOk, 'drill item ' + !!piIt + ', labels ' + (cD ? JSON.stringify(cD.data.labels) : '') + ', keys ' + kd.join(' | '));
+    // A1 (3): a split chart of many series drilled from a segment: the drill's path holds the series' field (PI), and the
+    // drilled chart's series is in its key once (a second time refused the point: none of its points took a note)
+    var c4 = charts()[4], pAda = c4 ? pt(c4, 'FY2026', 'Ada') : null, deIt = null;
+    if (c4 && pAda) {
+      clickPt(c4, pAda);
+      await until(function () { return !!popup(); }, 2000);
+      deIt = popup() ? popup().querySelector('.chart-drill-popup-item[data-col="DEPT"]') : null;
+      if (deIt) clickEl(deIt);
+      await until(function () { var d = charts()[4]; return !!d && (d.data.labels || []).indexOf('Engineering') !== -1; }, 5000);
+      await sleep(600);
+    }
+    var c4d = charts()[4], k4 = keyList(c4d), kWant = pk([['DEPT', 'Engineering'], ['FY', 'FY2026'], ['PI', 'Ada']]);
+    rec('V-sw-drillseen', !!deIt && k4.length === 1 && k4[0].slice(k4[0].indexOf('=') + 1) === kWant,
+        'drill item ' + !!deIt + ', labels ' + (c4d ? JSON.stringify(c4d.data.labels) : '') + ', keys ' + (k4.join(' | ') || 'none'));
+  };
+  // The J panel's jump opens its own host's card: a chart point's card open on the same key (Engineering / FY2026)
+  // counted as the pivot row's or the band's, and the jump opened nothing (round 12 part 3).
+  async function chartCardOn(key) {
+    var a = document.createElement('a');
+    a.href = '#'; a.textContent = 'a chart point';
+    document.body.insertBefore(a, document.body.firstChild);
+    var ok = window.Penumbra.openChartNote(key, ['DEPT', 'FY'], a, null);
+    await sleep(250);
+    var c = cards()[0];
+    return { a: a, ok: !!ok && !!c && c.classList.contains('is-chart') && cardKey() === key };
+  }
+  S.pvhost = async function () {
+    var h = await chartCardOn(K.leaf);
+    var r = window.Penumbra.revealPivotNote(K.leaf);
+    await sleep(900);
+    var c = cards()[0], ib = findBtn(K.leaf);
+    rec('C-ph-pivot', h.ok && r === true && cards().length === 1 && !!c && !c.classList.contains('is-chart') && cardKey() === K.leaf && !!ib && ib.classList.contains('is-open'),
+        'a chart card first ' + h.ok + ', jump ' + r + ', cards ' + cards().length + ', still the chart\'s ' + !!(c && c.classList.contains('is-chart')) + ', the pivot icon open ' + !!(ib && ib.classList.contains('is-open')));
+    await closeCard();
+    h.a.remove();
+  };
+  S.bdhost = async function () {
+    var h = await chartCardOn(K.leaf);
+    var r = window.Penumbra.revealPivotNote(K.leaf);   // no pivot: the grouped view's band
+    await sleep(900);
+    var c = cards()[0], bb = arr(document.querySelectorAll('#groupedResultsContainer .group-header > .journal-pvnote-btn')).filter(function (b) { return b.getAttribute('data-pvn-key') === K.leaf && b.classList.contains('is-open'); });
+    rec('C-ph-band', h.ok && r === true && cards().length === 1 && !!c && !c.classList.contains('is-chart') && cardKey() === K.leaf && bb.length === 1,
+        'a chart card first ' + h.ok + ', jump ' + r + ', cards ' + cards().length + ', still the chart\'s ' + !!(c && c.classList.contains('is-chart')) + ', the band icon open ' + bb.length);
+    await closeCard();
+    h.a.remove();
+  };
+  // ---- round 13 (2026-10-10): the date-split drill ----------------------------------------------------------
+  // The user: "fix the date split drill bug". A chart of a bucketed field (AWARD_DATE:fy) is drawn from a COPY of its
+  // rows carrying the bucket; the click, the drill in place and its breadcrumb, the filter panel and the right-click menu
+  // read the bucket from the report's own rows, which have none, and "View in table" searched a column that is not
+  // there. Sums: AMOUNT = 100*(dept+1) + 10*(fy+1) + pi, so a department's FY26 = 300*(d+1) + 93, its FY24 = 300*(d+1) + 33.
+  function lastDlg() { var o = document.querySelectorAll('.infobox-overlay'); return o.length ? o[o.length - 1] : null; }
+  function dlgRows(o) {
+    var t = o ? o.querySelector('.infobox-drill-table') : null;
+    return t ? arr(t.querySelectorAll('tbody tr')).filter(function (tr) { return !/No matching/.test(tr.textContent); }).length : -1;
+  }
+  async function closeDlgs() {
+    arr(document.querySelectorAll('.infobox-overlay .close-lightbox')).forEach(function (x) { clickEl(x); });
+    await sleep(400);
+  }
+  async function rowsFromMenu(ch, p) {
+    clickPt(ch, p);
+    await until(function () { return !!popup(); }, 2000);
+    var it = popItem('rows');
+    if (it) clickEl(it); else if (popup()) popup().remove();
+    await until(function () { var o = lastDlg(); return !!o && !!o.querySelector('.infobox-drill-table'); }, 3000);
+    await sleep(200);
+    return lastDlg();
+  }
+  async function ctxMenuOn(ch) {
+    var r = ch.canvas.getBoundingClientRect();
+    ch.canvas.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, view: window, button: 2, clientX: r.left + 20, clientY: r.top + 20 }));
+    await sleep(300);
+  }
+  function sumsOf(c) { var o = {}; if (c && c.data.datasets[0]) c.data.labels.forEach(function (l, i) { o[l] = c.data.datasets[0].data[i]; }); return o; }
+  function lbls(c) { return (c && c.data.labels || []).slice().sort().join(','); }
+  function panelBox(c, v) {
+    var w = c ? c.canvas.closest('.penumbra-chart-filter-wrapper') : null;
+    var it = w ? arr(w.querySelectorAll('.chart-filter-item')).filter(function (x) { return String($(x).data('value')) === v; })[0] : null;
+    return it ? it.querySelector('input[type="checkbox"]') : null;
+  }
+  var FY25 = '{AWARD_DATE} >= 2024-07-01 AND {AWARD_DATE} <= 2025-06-30';
+  S.chdate = async function () {
+    var cs = charts();
+    var ALL = ['C-dt-rows', 'V-dt-search', 'C-dt-drill', 'V-dt-crumb', 'C-dt-crumbswitch', 'C-dt-split', 'V-dt-cycle', 'C-dt-panel', 'C-dt-menurows',
+               'C-dt-menudrill', 'C-dt-clickexcl', 'C-dt-clickdrill', 'C-dt-menuexcl'];
+    rec('P-dt-charts', cs.length === 3 && lbls(cs[0]) === 'FY24,FY25,FY26' && cs[1].data.datasets.map(function (d) { return d.label; }).sort().join(',') === 'FY24,FY25,FY26'
+        && lbls(cs[2]) === 'Aug,Feb,Jun', 'charts ' + cs.length + ': ' + cs.map(lbls).join(' | ') + '; series ' + (cs[1] ? cs[1].data.datasets.map(function (d) { return d.label; }).join(',') : ''));
+    if (cs.length !== 3) { fail(ALL, 'no fixture'); return; }
+    var c0 = cs[0], c1 = cs[1], c2 = cs[2];
+    // a click on FY25: its 9 rows; "View in table" hands the table FY25's date range
+    var o1 = await rowsFromMenu(c0, pt(c0, 'FY25'));
+    var n1 = dlgRows(o1), s1 = o1 ? $(o1).data('drill-search') : null, link1 = !!(o1 && o1.querySelector('.infobox-drill-to-table'));
+    rec('C-dt-rows', n1 === 9, 'the FY25 bar\'s breakdown: ' + n1 + ' rows (want 9)');
+    rec('V-dt-search', s1 === FY25 && link1, 'its table search "' + s1 + '", the link ' + link1);
+    await closeDlgs();
+    // a drill in place from FY26 into DEPT: the drilled chart draws FY26's sums
+    clickPt(c0, pt(c0, 'FY26'));
+    await until(function () { return !!popup(); }, 2000);
+    var dIt = popup() ? popup().querySelector('.chart-drill-popup-item[data-col="DEPT"]') : null;
+    if (dIt) clickEl(dIt); else if (popup()) popup().remove();
+    await until(function () { var d = charts()[0]; return !!d && (d.data.labels || []).indexOf('Engineering') !== -1; }, 4000);
+    await sleep(500);
+    var s26 = sumsOf(charts()[0]);
+    rec('C-dt-drill', !!dIt && s26.Engineering === 393 && s26.Sciences === 693 && s26.Humanities === 993, 'drill item ' + !!dIt + ', the drilled chart ' + JSON.stringify(s26));
+    // its breadcrumb lists the fiscal years, FY26 chosen; choosing FY24 draws FY24's sums
+    var sel = document.querySelector('.chart-drill-bc-val[data-step-idx="0"]');
+    var opts = sel ? arr(sel.options).map(function (o) { return o.value; }) : [];
+    rec('V-dt-crumb', !!sel && opts.slice().sort().join(',') === 'FY24,FY25,FY26' && sel.value === 'FY26', 'breadcrumb options ' + JSON.stringify(opts) + ', chosen ' + (sel && sel.value));
+    var s24 = {};
+    if (sel) {
+      sel.value = 'FY24';
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      await until(function () { var d = charts()[0]; return !!d && d.data.datasets[0] && d.data.datasets[0].data.indexOf(333) !== -1; }, 4000);
+      await sleep(300);
+      s24 = sumsOf(charts()[0]);
+    }
+    rec('C-dt-crumbswitch', s24.Engineering === 333 && s24.Sciences === 633 && s24.Humanities === 933, 'after choosing FY24: ' + JSON.stringify(s24));
+    var ex = document.querySelector('.chart-drill-exit');
+    if (ex) clickEl(ex);
+    await until(function () { return lbls(charts()[0]) === 'FY24,FY25,FY26'; }, 4000);
+    await sleep(300);
+    c0 = charts()[0];
+    // the series: Engineering's FY25 segment - its 3 rows, a search with both
+    var pS = pt(c1, 'Engineering', 'FY25');
+    var o2 = pS ? await rowsFromMenu(c1, pS) : null;
+    var n2 = dlgRows(o2), s2 = o2 ? $(o2).data('drill-search') : null;
+    rec('C-dt-split', n2 === 3 && s2 === '{DEPT} = //Engineering// AND ' + FY25, 'Engineering / FY25: ' + n2 + ' rows (want 3), search "' + s2 + '"');
+    await closeDlgs();
+    // a cycle (every February) on a filtered chart: its 9 rows and no "View in table" - no date range is February of
+    // every year, and the chart's filter alone is not the click's rows
+    var o3 = await rowsFromMenu(c2, pt(c2, 'Feb'));
+    var n3 = dlgRows(o3), s3 = o3 ? $(o3).data('drill-search') : null, link3 = !!(o3 && o3.querySelector('.infobox-drill-to-table'));
+    rec('V-dt-cycle', n3 === 9 && !link3 && !s3, 'February: ' + n3 + ' rows (want 9), link ' + link3 + ', search ' + JSON.stringify(s3));
+    await closeDlgs();
+    // the X filter panel: FY24 unchecked - the chart keeps FY25 and FY26
+    var cb = panelBox(c0, 'FY24'), after = '';
+    if (cb) {
+      $(cb).prop('checked', false).trigger('change');
+      await until(function () { return lbls(charts()[0]) === 'FY25,FY26'; }, 3000);
+      await sleep(300);
+      after = lbls(charts()[0]);
+      $(cb).prop('checked', true).trigger('change');
+      await until(function () { return lbls(charts()[0]) === 'FY24,FY25,FY26'; }, 3000);
+      await sleep(300);
+    }
+    rec('C-dt-panel', !!cb && after === 'FY25,FY26', 'the panel\'s FY24 ' + (cb ? 'unchecked: the chart shows ' + after : 'item missing'));
+    c0 = charts()[0];
+    // the right-click menu: "Show source rows" for FY25, then a drill from FY26 into DEPT
+    await ctxMenuOn(c0);
+    var sr = document.querySelector('.ctx-drill-show-rows[data-x-val="FY25"]');
+    if (sr) $(sr).trigger('click');
+    await until(function () { var o = lastDlg(); return !!o && !!o.querySelector('.infobox-drill-table'); }, 3000);
+    await sleep(200);
+    var o4 = lastDlg(), n4 = sr ? dlgRows(o4) : -1, s4 = (sr && o4) ? $(o4).data('drill-search') : null;
+    rec('C-dt-menurows', !!sr && n4 === 9 && s4 === FY25, 'right-click Show source rows ' + !!sr + ': ' + n4 + ' rows (want 9), search "' + s4 + '"');
+    await closeDlgs();
+    await ctxMenuOn(c0);
+    var dl = document.querySelector('.ctx-drill-leaf[data-x-val="FY26"][data-col="DEPT"]');
+    if (dl) $(dl).trigger('click');
+    await until(function () { var d = charts()[0]; return !!d && (d.data.labels || []).indexOf('Engineering') !== -1; }, 4000);
+    await sleep(400);
+    var sm = sumsOf(charts()[0]);
+    rec('C-dt-menudrill', !!dl && sm.Engineering === 393 && sm.Sciences === 693 && sm.Humanities === 993, 'right-click drill ' + !!dl + ': ' + JSON.stringify(sm));
+    var ex2 = document.querySelector('.chart-drill-exit');
+    if (ex2) clickEl(ex2);
+    await until(function () { return lbls(charts()[0]) === 'FY24,FY25,FY26'; }, 4000);
+    await sleep(300);
+    // c1's series panel: FY24 and FY25 unchecked - one series left, so a click carries the department alone and the
+    // panel's exclusions decide the rows (they read the bucket too)
+    var g24 = panelBox(c1, 'FY24'), g25 = panelBox(c1, 'FY25');
+    if (g24) $(g24).prop('checked', false).trigger('change');
+    if (g25) $(g25).prop('checked', false).trigger('change');
+    await until(function () { var d = charts()[1]; return !!d && d.data.datasets.length === 1; }, 3000);
+    await sleep(300);
+    var c1b = charts()[1], pE = pt(c1b, 'Engineering', 'FY26');
+    var o5 = pE ? await rowsFromMenu(c1b, pE) : null, n5 = dlgRows(o5);
+    rec('C-dt-clickexcl', !!g24 && !!g25 && n5 === 3, 'FY24 + FY25 unchecked (series ' + (c1b ? c1b.data.datasets.length : '?') + '): Engineering ' + n5 + ' rows (want 3)');
+    await closeDlgs();
+    // ...and the right-click "Show source rows" for Engineering: 3 rows (FY24 / FY25 excluded through the bucket)
+    // (before the drill: a drill's exit leaves the canvas holding the drill's filtered rows)
+    await ctxMenuOn(charts()[1]);
+    var sr2 = document.querySelector('.ctx-drill-show-rows[data-x-val="Engineering"]');
+    if (sr2) $(sr2).trigger('click');
+    await until(function () { var o = lastDlg(); return !!o && !!o.querySelector('.infobox-drill-table'); }, 3000);
+    await sleep(200);
+    var n6 = sr2 ? dlgRows(lastDlg()) : -1;
+    rec('C-dt-menuexcl', !!sr2 && n6 === 3, 'right-click Show source rows for Engineering ' + !!sr2 + ': ' + n6 + ' rows (want 3)');
+    await closeDlgs();
+    // ...and a drill from it into PI keeps the exclusions: FY26 alone - Ada 130, Bo 131, Cy 132
+    var pIt = null;
+    if (pE) {
+      clickPt(c1b, pE);
+      await until(function () { return !!popup(); }, 2000);
+      pIt = popup() ? popup().querySelector('.chart-drill-popup-item[data-col="PI"]') : null;
+      if (pIt) clickEl(pIt); else if (popup()) popup().remove();
+      await until(function () { var d = charts()[1]; return !!d && (d.data.labels || []).indexOf('Ada') !== -1; }, 4000);
+      await sleep(400);
+    }
+    var dd = charts()[1], sp = sumsOf(dd);
+    rec('C-dt-clickdrill', !!pIt && !!dd && dd.data.datasets.length === 1 && sp.Ada === 130 && sp.Bo === 131 && sp.Cy === 132,
+        'drill item ' + !!pIt + ', series ' + (dd ? dd.data.datasets.length : '?') + ', ' + JSON.stringify(sp));
+    var ex3 = dd ? dd.canvas.parentNode.querySelector('.chart-drill-exit') || document.querySelector('.chart-drill-exit') : null;
+    if (ex3) clickEl(ex3);
+    await until(function () { var d = charts()[1]; return !!d && (d.data.labels || []).indexOf('Engineering') !== -1; }, 4000);
+    await sleep(300);
+  };
+  // A pivot of a bucketed date: a cell's breakdown, and its "View in table" (it searched {AWARD_DATE} = //FY25//).
+  async function pivotCellDlg(rowKey) {
+    var t = tbl(), td = t ? arr(t.querySelectorAll('td[data-row-key]')).filter(function (c) { return c.getAttribute('data-row-key') === rowKey; })[0] : null;
+    if (!td) return null;
+    clickEl(td);
+    await until(function () { var o = lastDlg(); return !!o && !!o.querySelector('.infobox-drill-table'); }, 3000);
+    await sleep(200);
+    return lastDlg();
+  }
+  S.pvdate = async function () {
+    var o = await pivotCellDlg('FY25'), n = dlgRows(o), s = o ? $(o).data('drill-search') : null, link = !!(o && o.querySelector('.infobox-drill-to-table'));
+    rec('V-pd-search', n === 9 && s === FY25 && link, 'the FY25 cell: ' + n + ' rows (want 9), search "' + s + '", link ' + link);
+    await closeDlgs();
+  };
+  S.pvcycle = async function () {
+    var o = await pivotCellDlg('Feb'), n = dlgRows(o), s = o ? $(o).data('drill-search') : null, link = !!(o && o.querySelector('.infobox-drill-to-table'));
+    rec('V-pd-cycle', n === 9 && !link && !s, 'the February cell (a per-agg filter on): ' + n + ' rows (want 9), link ' + link + ', search ' + JSON.stringify(s));
+    await closeDlgs();
+  };
+  // ---- round 14 (2026-10-10): a drill's rows outlived the drill ------------------------------------------------
+  // The user: "fix the drill exit quirk too". A drill in place writes its own rows on the canvas, and its exit stored the
+  // drill's starting rows there - already narrowed by the chart's filter panel. The panel's live redraw draws from the
+  // wrapper's rows, so a value re-checked after the exit came back on the chart while every later click, breakdown and
+  // drill read the narrowed rows. A preset loaded onto a drilled chart was drawn from the drill's last rows and kept the
+  // old breadcrumb; a preset's restored drill skipped its saved exclusions on a bucketed series. Each canvas's OWN rows
+  // here are its wrapper's minus Humanities, so "the canvas's own rows put back" differs from "none put back".
+  function crumbOn(c) { var w = c ? c.canvas.parentNode : null; return !!(w && w.querySelector('.chart-drill-breadcrumb-container')); }
+  function ownRows(c) {
+    var all = $(c.canvas).data('sourceRowData') || [];
+    $(c.canvas).data('sourceRowData', all.filter(function (m) { return m.get('DEPT') !== 'Humanities'; }));
+    return all.length;
+  }
+  async function menuRows(c, xv) {
+    await ctxMenuOn(c);
+    var it = document.querySelector('.ctx-drill-show-rows[data-x-val="' + xv + '"]');
+    if (it) $(it).trigger('click');
+    await until(function () { var o = lastDlg(); return !!o && !!o.querySelector('.infobox-drill-table'); }, 3000);
+    await sleep(200);
+    var n = it ? dlgRows(lastDlg()) : -2;
+    await closeDlgs();
+    return n;
+  }
+  // The right-click menu's preset Load, its store answering with this preset.
+  async function presetOn(c, preset) {
+    var api = window._penumbraVizAutoRun, g = api.get, sl = api.setLoaded;
+    api.get = function () { return JSON.parse(JSON.stringify(preset)); };
+    api.setLoaded = function () { };
+    try {
+      await ctxMenuOn(c);
+      var li = document.createElement('li');
+      li.className = 'ctx-presets-load';
+      li.setAttribute('data-preset-name', 'dx14');
+      document.getElementById('chartContextMenu').appendChild(li);
+      $(li).trigger('click');
+      li.remove();
+    } finally { api.get = g; api.setLoaded = sl; }
+    await sleep(800);
+  }
+  async function drillInto(ci, x, series, col, seen) {
+    var c = charts()[ci], p = pt(c, x, series), it = null;
+    if (!p) return false;
+    clickPt(c, p);
+    await until(function () { return !!popup(); }, 2000);
+    it = popup() ? popup().querySelector('.chart-drill-popup-item[data-col="' + col + '"]') : null;
+    if (it) clickEl(it); else if (popup()) popup().remove();
+    await until(function () { var d = charts()[ci]; return !!d && (d.data.labels || []).indexOf(seen) !== -1; }, 4000);
+    await sleep(400);
+    return !!it;
+  }
+  S.chexit = async function () {
+    var cs = charts();
+    var ALL = ['C-dx-rows', 'C-dx-menu', 'V-dx-own', 'C-dx-preset', 'C-dx-presetcrumb', 'C-dx-presetfy', 'V-dx-presetown'];
+    rec('P-dx-charts', cs.length === 2 && lbls(cs[0]) === 'Engineering,Humanities,Sciences' && cs[0].data.datasets.length === 3 && cs[1].data.datasets.length === 3,
+        'charts ' + cs.length + ': ' + cs.map(lbls).join(' | ') + '; series ' + cs.map(function (c) { return c.data.datasets.length; }).join(','));
+    if (cs.length !== 2) { fail(ALL, 'no fixture'); return; }
+    ownRows(cs[0]);
+    // c0: FY2024 and FY2025 unchecked (one series left), a drill from Engineering into PI, its exit, then both checked again
+    var b24 = panelBox(cs[0], 'FY2024'), b25 = panelBox(cs[0], 'FY2025');
+    if (b24) $(b24).prop('checked', false).trigger('change');
+    if (b25) $(b25).prop('checked', false).trigger('change');
+    await until(function () { var d = charts()[0]; return !!d && d.data.datasets.length === 1; }, 3000);
+    await sleep(300);
+    var d1 = await drillInto(0, 'Engineering', 'FY2026', 'PI', 'Ada'), sp = sumsOf(charts()[0]);
+    var ex = document.querySelector('.chart-drill-exit');
+    if (ex) clickEl(ex);
+    await until(function () { var d = charts()[0]; return !!d && (d.data.labels || []).indexOf('Engineering') !== -1; }, 4000);
+    await sleep(300);
+    b24 = panelBox(charts()[0], 'FY2024'); b25 = panelBox(charts()[0], 'FY2025');
+    if (b24) $(b24).prop('checked', true).trigger('change');
+    if (b25) $(b25).prop('checked', true).trigger('change');
+    await until(function () { var d = charts()[0]; return !!d && d.data.datasets.length === 3 && lbls(d) === 'Engineering,Humanities,Sciences'; }, 3000);
+    await sleep(300);
+    var c0 = charts()[0], pre = 'the drill ' + d1 + ' ' + JSON.stringify(sp) + ', its exit ' + !!ex + ', FY2024 + FY2025 back: ' + lbls(c0) + ' x ' + c0.data.datasets.length;
+    // a click on Engineering's FY2024 segment: its 3 rows (the exit left FY2026's alone on the canvas: none)
+    var p24 = pt(c0, 'Engineering', 'FY2024');
+    var o1 = p24 ? await rowsFromMenu(c0, p24) : null, n1 = dlgRows(o1);
+    rec('C-dx-rows', d1 && sp.Ada === 130 && !!ex && n1 === 3, pre + '; Engineering / FY2024: ' + n1 + ' rows (want 3)');
+    await closeDlgs();
+    // the right-click "Show source rows" for Engineering: its 9 rows (the exit's: 3)
+    var n2 = await menuRows(charts()[0], 'Engineering');
+    rec('C-dx-menu', n2 === 9, 'right-click Show source rows for Engineering: ' + n2 + ' rows (want 9)');
+    // ...and for Humanities: none - the canvas's OWN rows are back, not the wrapper's
+    var n3 = await menuRows(charts()[0], 'Humanities');
+    rec('V-dx-own', n3 === 0, 'right-click Show source rows for Humanities: ' + n3 + ' rows (want 0: the canvas\'s own rows)');
+    // a preset (the chart's own config) loaded onto the drilled chart: drawn from the chart's rows, and the drill gone
+    var d2 = await drillInto(0, 'Engineering', 'FY2026', 'PI', 'Ada');
+    var st0 = $(charts()[0].canvas).data('drillState'), drilled = d2 && crumbOn(charts()[0]) && !!st0;
+    if (st0 && st0.originalCfg) await presetOn(charts()[0], st0.originalCfg);
+    await until(function () { var d = charts()[0]; return !!d && (d.data.labels || []).indexOf('Engineering') !== -1; }, 3000);
+    await sleep(300);
+    var cp = charts()[0];
+    rec('C-dx-preset', drilled && !!cp && lbls(cp) === 'Engineering,Sciences' && cp.data.datasets.length === 3,
+        'drilled ' + drilled + '; the preset: ' + lbls(cp) + ' x ' + (cp ? cp.data.datasets.length : '?') + ' (want Engineering,Sciences x 3: the chart\'s own rows)');
+    rec('C-dx-presetcrumb', drilled && !!cp && !crumbOn(cp) && !$(cp.canvas).data('drillState'),
+        'after the preset: breadcrumb ' + (cp && crumbOn(cp)) + ', drill state ' + !!(cp && $(cp.canvas).data('drillState')));
+    // c1: a preset that restores a drill (Engineering into PI) with FY24 + FY25 unchecked on its AWARD_DATE:fy series:
+    // Engineering's FY26 alone - Ada 130, Bo 131, Cy 132
+    var c1 = charts()[1];
+    ownRows(c1);
+    var g24 = panelBox(c1, 'FY24'), col = g24 ? String($(g24.closest('.chart-filter-item')).data('column')) : 'AWARD_DATE:fy';
+    var cfg1 = JSON.parse(JSON.stringify($(c1.canvas).data('vizConfig') || {})), pre1 = JSON.parse(JSON.stringify(cfg1));
+    pre1.runtimeState = { unchecked: [col + '::FY24', col + '::FY25'],
+                          drill: { originalCfg: cfg1, path: [{ col: 'DEPT', val: 'Engineering' }], displayedCol: 'PI' } };
+    await presetOn(c1, pre1);
+    await until(function () { var d = charts()[1]; return !!d && (d.data.labels || []).indexOf('Ada') !== -1; }, 4000);
+    await sleep(400);
+    var dr = charts()[1], s1 = sumsOf(dr);
+    rec('C-dx-presetfy', !!g24 && !!dr && crumbOn(dr) && dr.data.datasets.length === 1 && s1.Ada === 130 && s1.Bo === 131 && s1.Cy === 132,
+        'the series column ' + col + '; the restored drill: breadcrumb ' + (dr && crumbOn(dr)) + ', series ' + (dr ? dr.data.datasets.length : '?') + ', ' + JSON.stringify(s1) + ' (want FY26 alone: 130 / 131 / 132)');
+    // ...its exit puts the canvas's own rows back too: Humanities has none
+    var exb = dr ? dr.canvas.parentNode.querySelector('.chart-drill-exit') : null;
+    if (exb) clickEl(exb);
+    await until(function () { var d = charts()[1]; return !!d && (d.data.labels || []).indexOf('Engineering') !== -1; }, 4000);
+    await sleep(300);
+    var n4 = await menuRows(charts()[1], 'Humanities');
+    rec('V-dx-presetown', !!exb && n4 === 0, 'the restored drill\'s exit ' + !!exb + ', then right-click Show source rows for Humanities: ' + n4 + ' rows (want 0: the canvas\'s own rows)');
+  };
+  // ---- round 15 (2026-10-10): the filter panel during a drill ------------------------------------------------
+  // The user: "fix the filter panel during a drill". A drilled chart keeps its filter panel - the values of the chart the
+  // drill started from - and the panel's live redraw ignored the drill: it drew the DRILLED config from every row of the
+  // report (the drill's scope gone, its breadcrumb still naming it), pinned that axis to labels it took then (after the
+  // exit the panel did nothing), and grew the panel with the drilled axis's values. The exit drew the drill's starting
+  // rows, not the panel as it stood. c0's OWN rows lack Humanities, so the drill's starting rows tell from the wrapper's.
+  function dsLabels(c) { return (c && c.data.datasets || []).map(function (d) { return d.label; }).sort().join(','); }
+  function seriesSums(c, label) {
+    var o = {}, d = c ? c.data.datasets.filter(function (x) { return x.label === label; })[0] : null;
+    if (d) c.data.labels.forEach(function (l, i) { o[l] = d.data[i]; });
+    return o;
+  }
+  function shape(c) { return c ? lbls(c) + ' x ' + dsLabels(c) : 'no chart'; }
+  function bcOpts() {
+    var s = document.querySelector('.chart-drill-bc-val[data-step-idx="0"]');
+    return s ? arr(s.options).map(function (o) { return o.value; }).sort().join(',') : null;
+  }
+  async function menuDrill(ci, xv, col, seen) {
+    await ctxMenuOn(charts()[ci]);
+    var it = document.querySelector('.ctx-drill-leaf[data-x-val="' + xv + '"][data-col="' + col + '"]');
+    if (it) $(it).trigger('click');
+    await until(function () { var d = charts()[ci]; return !!d && (d.data.labels || []).indexOf(seen) !== -1; }, 4000);
+    await sleep(400);
+    return !!it;
+  }
+  async function setBox(ci, v, on, ok) {
+    var b = panelBox(charts()[ci], v);
+    if (b) $(b).prop('checked', on).trigger('change');
+    await until(function () { return ok(charts()[ci]); }, 3000);
+    await sleep(300);
+    return !!b;
+  }
+  S.chpanel = async function () {
+    var cs = charts();
+    var ALL = ['C-dp-drill', 'V-dp-panel', 'V-dp-base', 'V-dp-self', 'C-dp-exit', 'C-dp-after', 'C-dp-fy'];
+    rec('P-dp-charts', cs.length === 2 && shape(cs[0]) === 'Engineering,Humanities,Sciences x FY2024,FY2025,FY2026' && lbls(cs[1]) === 'FY24,FY25,FY26',
+        'charts ' + cs.length + ': ' + shape(cs[0]) + ' | ' + lbls(cs[1]));
+    if (cs.length !== 2) { fail(ALL, 'no fixture'); return; }
+    ownRows(cs[0]);
+    var w0 = cs[0].canvas.closest('.penumbra-chart-filter-wrapper'), items0 = w0 ? w0.querySelectorAll('.chart-filter-item').length : -1;
+    // c0: a drill from Engineering into PI (the right-click menu: Engineering alone, every year), then FY2024 unchecked:
+    // still Engineering's PIs, FY2025 + FY2026
+    var d1 = await menuDrill(0, 'Engineering', 'PI', 'Ada'), was = shape(charts()[0]);
+    var b1 = await setBox(0, 'FY2024', false, function (d) { return !!d && d.data.datasets.length !== 3; });
+    var d2 = charts()[0], s25 = seriesSums(d2, 'FY2025');
+    rec('C-dp-drill', d1 && b1 && shape(d2) === 'Ada,Bo,Cy x FY2025,FY2026' && s25.Ada === 120 && s25.Bo === 121 && s25.Cy === 122 && crumbOn(d2),
+        'drilled ' + d1 + ' (' + was + '); FY2024 unchecked: ' + shape(d2) + ', FY2025 ' + JSON.stringify(s25) + ', breadcrumb ' + crumbOn(d2) + ' (want Ada,Bo,Cy x FY2025,FY2026: 120 / 121 / 122)');
+    var items1 = w0 ? w0.querySelectorAll('.chart-filter-item').length : -1, pis = w0 ? w0.querySelectorAll('.chart-filter-item[data-column="PI"]').length : -1;
+    rec('V-dp-panel', items0 > 0 && items1 === items0 && pis === 0, 'the panel: ' + items0 + ' items before, ' + items1 + ' after, PI items ' + pis);
+    // the breadcrumb's departments come from the chart's OWN rows (no Humanities)
+    rec('V-dp-base', bcOpts() === 'Engineering,Sciences', 'the breadcrumb\'s departments: ' + bcOpts() + ' (want Engineering,Sciences: the chart\'s own rows)');
+    // Engineering itself unchecked: nothing left to drill - the drill stays as drawn
+    var b2 = await setBox(0, 'Engineering', false, function () { return true; });
+    var d3 = charts()[0];
+    rec('V-dp-self', b2 && shape(d3) === 'Ada,Bo,Cy x FY2025,FY2026' && crumbOn(d3),
+        'Engineering unchecked during its own drill: ' + shape(d3) + ', breadcrumb ' + crumbOn(d3) + ' (want it as drawn)');
+    // the exit: the chart the drill started from, as the panel stands - no Engineering, no FY2024
+    var ex = document.querySelector('.chart-drill-exit');
+    if (ex) clickEl(ex);
+    await until(function () { var d = charts()[0]; return !!d && !crumbOn(d) && (d.data.labels || []).indexOf('Sciences') !== -1; }, 4000);
+    await sleep(400);
+    var e1 = charts()[0];
+    rec('C-dp-exit', !!ex && shape(e1) === 'Humanities,Sciences x FY2025,FY2026', 'the exit ' + !!ex + ': ' + shape(e1) + ' (want Humanities,Sciences x FY2025,FY2026)');
+    // ...and the panel still drives the chart: Engineering checked again comes back, FY2024 stays out
+    var b3 = await setBox(0, 'Engineering', true, function (d) { return !!d && (d.data.labels || []).indexOf('Engineering') !== -1; });
+    var e2 = charts()[0];
+    rec('C-dp-after', b3 && shape(e2) === 'Engineering,Humanities,Sciences x FY2025,FY2026',
+        'Engineering checked again after the exit: ' + shape(e2) + ' (want the three departments x FY2025,FY2026)');
+    // c1: AWARD_DATE:fy with its axis panel - a drill from FY26 into DEPT, then FY25 unchecked: FY26's sums stay
+    var d4 = await menuDrill(1, 'FY26', 'DEPT', 'Engineering');
+    var b4 = await setBox(1, 'FY25', false, function () { return true; });
+    var f1 = charts()[1], sf = sumsOf(f1);
+    rec('C-dp-fy', d4 && b4 && crumbOn(f1) && lbls(f1) === 'Engineering,Humanities,Sciences' && sf.Engineering === 393 && sf.Sciences === 693 && sf.Humanities === 993,
+        'drilled ' + d4 + '; FY25 unchecked: ' + JSON.stringify(sf) + ', breadcrumb ' + crumbOn(f1) + ' (want FY26 alone: 393 / 693 / 993)');
+  };
+  // Themes: the whole-chart button keeps its own look (on Wolfpack a hover went solid #b30000 with a light glyph; on
+  // a dark theme it wore the theme's button box at rest); the markers take the theme's surface.
+  S.chtheme = async function () {
+    var ch = charts()[0], b = ch ? wbtn(ch)[0] : null;
+    rec('P-ct-theme', !!b && document.body.classList.contains('theme-wolfpack') && b.classList.contains('has-notes'), 'button ' + !!b + ', body ' + document.body.className);
+    if (!b) { fail(['V-ct-hover', 'V-ct-dark', 'V-ct-surface'], 'no button'); return; }
+    var alpha = function (s) { var m = /^rgba\([^)]*,\s*([0-9.]+)\)$/.exec(s); return m ? parseFloat(m[1]) : 1; };
+    // the page at its top: the harness's sticky header covers a chart's top edge (where the button sits) once scrolled
+    window.scrollTo(0, 0);
+    await sleep(200);
+    var r = b.getBoundingClientRect(), hx = r.left + r.width / 2, hy = r.top + r.height / 2, under = document.elementFromPoint(hx, hy);
+    await moveTo(hx, hy);
+    await sleep(400);
+    if (!b.matches(':hover')) { rec('V-ct-hover', false, 'the pointer is over ' + (under ? under.tagName + '.' + String(under.className && under.className.baseVal !== undefined ? under.className.baseVal : under.className) : 'nothing') + ', not the button'); }
+    // the designed hover (the pivot icon's): a faint wash, the icon in the notes' red - not the theme's solid fill
+    var s = getComputedStyle(b), red = hexRgb(getComputedStyle(document.body).getPropertyValue('--accent-danger').trim()) || [204, 0, 0];
+    var wash = alpha(s.backgroundColor) > 0 && alpha(s.backgroundColor) < 0.5;   // the faint wash, not transparent (its own hover rule lost) nor a theme's fill
+    if (b.matches(':hover')) rec('V-ct-hover', wash && JSON.stringify(rgbOf(s.color)) === JSON.stringify(red),
+        'hovered ' + b.matches(':hover') + ': background ' + s.backgroundColor + ', icon ' + s.color + ' (the notes red ' + JSON.stringify(red) + ')');
+    // a dark theme, the pointer away: no theme box at rest; a marker on the theme's surface
+    var cls = Array.prototype.slice.call(document.body.classList).filter(function (c) { return /^theme-/.test(c); });
+    cls.forEach(function (c) { document.body.classList.remove(c); });
+    document.body.classList.add('theme-dark-blue');
+    var pars = [ch.canvas.parentNode], aw = null;
+    [[3, 3], [window.innerWidth - 4, 3], [3, window.innerHeight - 4], [window.innerWidth - 4, window.innerHeight - 4]].forEach(function (q) {
+      if (aw) return;
+      for (var nd = document.elementFromPoint(q[0], q[1]); nd; nd = nd.parentNode) if (pars.indexOf(nd) !== -1) return;
+      aw = { x: q[0], y: q[1] };
+    });
+    aw = aw || { x: 3, y: 3 };
+    await moveTo(aw.x, aw.y);
+    await sleep(400);
+    var s2 = getComputedStyle(b);
+    rec('V-ct-dark', alpha(s2.backgroundColor) < 0.1 && /0px|transparent|rgba\(0, 0, 0, 0\)/.test(s2.borderTopColor + ' ' + s2.borderTopWidth),
+        'dark theme at rest: background ' + s2.backgroundColor + ', border ' + s2.borderTopColor + ' ' + s2.borderTopWidth);
+    var pin = pinFor(ch, K.leaf), surf = getComputedStyle(document.body).getPropertyValue('--bg-surface').trim();
+    var pb = pin ? getComputedStyle(pin).backgroundColor : 'no marker';
+    rec('V-ct-surface', !!pin && !!surf && JSON.stringify(rgbOf(pb)) === JSON.stringify(hexRgb(surf)), 'marker background ' + pb + ', the theme surface ' + surf);
+    document.body.classList.remove('theme-dark-blue');
+    cls.forEach(function (c) { document.body.classList.add(c); });
+  };
+  function hexRgb(h) { var m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(h || ''); return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : null; }
+
+  // ---- round 11 (2026-10-09): whole-chart notes ------------------------------------------
+  // The user: "are notes for entire charts possible", then "yes". A DEPT x FY bar chart (one note on the whole chart)
+  // and a DEPT pie (none): the button after each chart's cog and its key (what the chart shows), quiet at rest, the
+  // card (kind 'chart', the chart's title), a post (scope 'chart', the chart's snapshot), the card through a snippet
+  // re-render, a second click closes it, a drill keeps the key, the J panel's chip jumps to the chart, notes off: gone.
+  function wbtn(ch) {
+    var w = (ch && ch.canvas) ? ch.canvas.parentNode : null;
+    return w ? arr(w.querySelectorAll(':scope > .journal-chartwhole-btn')) : [];
+  }
+  S.chwhole = async function () {
+    var cs = charts();
+    var ALL = ['V-cw-btn', 'V-cw-quiet', 'C-cw-open', 'C-cw-post', 'C-cw-survive', 'C-cw-again', 'V-cw-drill', 'R-cw-jump', 'V-cw-gone'];
+    rec('P-cw-charts', cs.length === 2 && cs[0].config.type === 'bar' && cs[1].config.type === 'pie', 'charts ' + cs.map(function (c) { return c.config.type; }).join(','));
+    if (cs.length !== 2) { fail(ALL, 'no fixture'); return; }
+    var b0 = wbtn(cs[0]), b1 = wbtn(cs[1]), cog0 = cs[0].canvas.parentNode.querySelector(':scope > .chart-settings-cog');
+    var aft = !!cog0 && !!b0[0] && cog0.nextElementSibling === b0[0];
+    rec('V-cw-btn', b0.length === 1 && b1.length === 1 && aft && b0[0].getAttribute('data-cw-key') === K.whole && b1[0].getAttribute('data-cw-key') === K.wholePie
+        && b0[0].getAttribute('data-count') === '1' && b0[0].classList.contains('has-notes') && after(b0[0]) === '"1"'
+        && b1[0].getAttribute('data-count') === '' && !b1[0].classList.contains('has-notes')
+        && b0[0].getAttribute('aria-label') === '1 note on the chart "By department and year" - click to view'
+        && b1[0].getAttribute('aria-label') === 'Add a note about the chart "Share by department"',   // (round 12: the chart's title in its name)
+        'buttons ' + b0.length + '/' + b1.length + ', after the cog ' + aft + ', keys ' + (b0[0] && b0[0].getAttribute('data-cw-key')) + ' / ' + (b1[0] && b1[0].getAttribute('data-cw-key'))
+        + ', counts "' + (b0[0] && b0[0].getAttribute('data-count')) + '" / "' + (b1[0] && b1[0].getAttribute('data-count')) + '", labels "'
+        + (b0[0] && b0[0].getAttribute('aria-label')) + '" / "' + (b1[0] && b1[0].getAttribute('aria-label')) + '"');
+    if (!b0.length || !b1.length) { fail(ALL.slice(1), 'no buttons'); return; }
+    // quiet: the pointer away - the noted chart's at 60%, the other's hidden; the pie pointed at - its own shows
+    var op = function (m) { return m ? parseFloat(getComputedStyle(m).opacity) : -1; };
+    var pars = cs.map(function (c) { return c.canvas.parentNode; }), aw = null;
+    [[3, 3], [window.innerWidth - 4, 3], [3, window.innerHeight - 4], [window.innerWidth - 4, window.innerHeight - 4]].forEach(function (q) {
+      if (aw) return;
+      for (var n = document.elementFromPoint(q[0], q[1]); n; n = n.parentNode) if (pars.indexOf(n) !== -1) return;
+      aw = { x: q[0], y: q[1] };
+    });
+    aw = aw || { x: 3, y: 3 };
+    await moveTo(aw.x, aw.y);
+    await sleep(400);
+    var r0 = op(b0[0]), r1 = op(b1[0]);
+    var cr = cs[1].canvas.getBoundingClientRect(), hx = Math.round(cr.left + cr.width / 2), hy = Math.round(cr.top + cr.height / 2);
+    for (var gy = 0.5, found = false; gy < 0.96 && !found; gy += 0.05) {
+      for (var gx = 0.1; gx < 0.95 && !found; gx += 0.1) {
+        var qx = Math.round(cr.left + cr.width * gx), qy = Math.round(cr.top + cr.height * gy);
+        if (document.elementFromPoint(qx, qy) === cs[1].canvas) { hx = qx; hy = qy; found = true; }
+      }
+    }
+    await moveTo(hx, hy);
+    await sleep(400);
+    var h0 = op(b0[0]), h1 = op(b1[0]);
+    await moveTo(aw.x, aw.y);
+    await sleep(300);
+    rec('V-cw-quiet', Math.abs(r0 - 0.6) < 0.01 && r1 === 0 && Math.abs(h1 - 0.55) < 0.01 && Math.abs(h0 - 0.6) < 0.01,
+        'at rest: noted ' + r0 + ', none ' + r1 + '; the pie pointed at (' + hx + ',' + hy + '): noted ' + h0 + ', the pie\'s ' + h1);
+    // the card: by the button, kind 'chart', the chart's title, its one note, a composer "about this chart"
+    clickEl(b0[0]);
+    await until(function () { return cards().length === 1; }, 2000);
+    await sleep(250);
+    var c = cards()[0], refEl = c ? c.querySelector('.journal-rownote-ref') : null, ref = refEl ? refEl.textContent : '';
+    var inp = c ? c.querySelector('.journal-rownote-input') : null, ph = inp ? (inp.getAttribute('data-placeholder') || '') : '';
+    rec('C-cw-open', !!c && c.classList.contains('is-chartwhole') && c.getAttribute('data-pvn-kind') === 'chart' && cardKey() === K.whole
+        && c.querySelectorAll('.journal-rownote-item').length === 1 && ref === 'By department and year' && near(c, b0[0])
+        && b0[0].classList.contains('is-open') && b0[0].getAttribute('aria-expanded') === 'true' && /^Add a note about this chart/.test(ph),
+        'card ' + !!c + (c ? ' class "' + c.className + '" kind ' + c.getAttribute('data-pvn-kind') + ' items ' + c.querySelectorAll('.journal-rownote-item').length : '')
+        + ' ref "' + ref + '" by the button ' + near(c, b0[0]) + ' open ' + b0[0].classList.contains('is-open') + ' placeholder "' + ph.slice(0, 30) + '"');
+    // a post: scope 'chart', the chart's key and snapshot; the button's count and the list follow
+    if (c && inp) {
+      inp.focus();
+      inp.textContent = 'Whole chart check';
+      var nPosts = window.__J.posts.length;
+      clickEl(c.querySelector('.journal-rownote-post'));
+      await until(function () { return window.__J.posts.length > nPosts; }, 3000);
+      await until(function () { var q = wbtn(charts()[0])[0]; return !!q && q.getAttribute('data-count') === '2'; }, 3000);
+      await sleep(300);
+      var p = window.__J.posts[window.__J.posts.length - 1] || {}, snap = p.row_snapshot || {}, c2 = cards()[0], bb = wbtn(charts()[0])[0];
+      rec('C-cw-post', p.action === 'add' && p.scope === 'chart' && p.row_key === K.whole && p.note_text === 'Whole chart check'
+          && snap.Chart === 'By department and year' && snap.Category === 'DEPT' && snap.Split === 'FY' && snap.Measure === 'AMOUNT (sum)'
+          && !!bb && bb.getAttribute('data-count') === '2' && !!c2 && c2.querySelectorAll('.journal-rownote-item').length === 2,
+          'post ' + JSON.stringify({ a: p.action, s: p.scope, k: p.row_key === K.whole, t: p.note_text, snap: snap }) + ' button ' + (bb && bb.getAttribute('data-count'))
+          + ' items ' + (c2 ? c2.querySelectorAll('.journal-rownote-item').length : -1));
+    } else rec('C-cw-post', false, 'no card');
+    // the snippet drawn again (new canvases, new buttons): the card stays, by the bar chart's new button
+    var oldBtn = wbtn(charts()[0])[0];
+    try { JR.renderReportSnippet(); } catch (e) { }
+    await until(function () { var n = charts(); return n.length === 2 && !!wbtn(n[0])[0] && wbtn(n[0])[0] !== oldBtn; }, 8000);
+    await sleep(700);   // the card's tick
+    var nb = wbtn(charts()[0])[0], c3 = cards()[0];
+    rec('C-cw-survive', !!nb && nb !== oldBtn && !!oldBtn && !oldBtn.isConnected && cards().length === 1 && cardKey() === K.whole && !!c3 && c3.style.visibility !== 'hidden'
+        && nb.classList.contains('is-open') && near(c3, nb),
+        'new button ' + (!!nb && nb !== oldBtn) + ', cards ' + cards().length + ', key ok ' + (cardKey() === K.whole) + ', shown ' + (c3 && c3.style.visibility !== 'hidden')
+        + ', by the new button ' + near(c3, nb) + ', open ' + (nb && nb.classList.contains('is-open')));
+    // its button again: the card closes
+    if (nb) clickEl(nb);
+    await sleep(300);
+    rec('C-cw-again', cards().length === 0 && !!nb && !nb.classList.contains('is-open') && nb.getAttribute('aria-expanded') === 'false',
+        'cards ' + cards().length + ', open ' + (nb && nb.classList.contains('is-open')));
+    // a drill keeps the chart's key: the pie drilled into Engineering's years
+    var pie = charts()[1];
+    clickPt(pie, pt(pie, 'Engineering'));
+    await until(function () { return !!popup(); }, 2000);
+    var fy = popup() ? popup().querySelector('.chart-drill-popup-item[data-col="FY"]') : null;
+    if (fy) clickEl(fy);
+    await until(function () { var c4 = charts()[1]; return !!c4 && (c4.data.labels || []).indexOf('FY2026') !== -1; }, 5000);
+    await sleep(600);
+    var pd = charts()[1], pb = pd ? wbtn(pd)[0] : null;
+    rec('V-cw-drill', !!fy && !!pd && (pd.data.labels || []).indexOf('FY2026') !== -1 && !!pb && wbtn(pd).length === 1 && pb.getAttribute('data-cw-key') === K.wholePie,
+        'drill item ' + !!fy + ', labels ' + (pd ? JSON.stringify(pd.data.labels) : '') + ', key ' + (pb && pb.getAttribute('data-cw-key')));
+    // the J panel's chip: the chart's title; a click jumps to the chart and opens its card
+    if (!window.PenumbraJournal || !window.PenumbraJournal.open) { fail(['R-cw-jump', 'V-cw-gone'], 'no PenumbraJournal'); return; }
+    window.PenumbraJournal.open();
+    await until(function () { return !!document.querySelector('#journalNotesList .journal-note-rowref-btn[data-chart-key]'); }, 4000);
+    await sleep(200);
+    var chip = document.querySelector('#journalNotesList .journal-note-rowref-btn[data-chart-key]'), chipTxt = chip ? chip.textContent : '';
+    if (chip) clickEl(chip);
+    await until(function () { return cards().length === 1; }, 3000);
+    await sleep(500);
+    var c5 = cards()[0], b5 = wbtn(charts()[0])[0];
+    rec('R-cw-jump', !!chip && chip.getAttribute('data-chart-key') === K.whole && chipTxt.indexOf('Chart: By department and year') !== -1
+        && !!c5 && cardKey() === K.whole && c5.classList.contains('is-chartwhole') && !$('#journalLightbox').is(':visible') && near(c5, b5),
+        'chip "' + chipTxt.trim() + '", cards ' + cards().length + ' key ok ' + (cardKey() === K.whole) + ', lightbox visible ' + $('#journalLightbox').is(':visible')
+        + ', by the button ' + near(c5, b5));
+    // the Row notes switch off: the buttons go, and the card
+    window._penumbraJournalRowNotes = false;
+    if (window.Penumbra && window.Penumbra.loadJournalRowNotes) window.Penumbra.loadJournalRowNotes();
+    await sleep(500);
+    var left = document.querySelectorAll('.journal-chartwhole-btn').length;
+    rec('V-cw-gone', left === 0 && cards().length === 0, 'buttons left ' + left + ', cards ' + cards().length);
+  };
+
+  // ---- round 10 (2026-10-09): chart notes round 3 ----------------------------------------
+  // The user: "The note icon covers up the label though it seems, it could also be slightly muted or transparent".
+  // Six charts with their values on (chartjs-plugin-datalabels): 0 DEPT x FY, values above the bars; 1 the same,
+  // short (120px tall) with the values centred in the bars; 2 horizontal; 3 by ID (27 narrow bars; notes on 1001,
+  // 1002, 1003 and the tallest, 1027); 4 a pie, values centred; 5 stacked, values centred. No marker on a value
+  // label or on another marker, each in its chart area and by its own point; quiet (60%) until its chart is
+  // pointed at (a REAL pointer: CSS :hover), and at full strength on an open card's point.
+  S.chvals = async function () {
+    var cs = charts(), labs = cs.map(labelBoxesOf);
+    var ALL = ['V-cv-nolabel', 'V-cv-nopin', 'V-cv-area', 'V-cv-inside', 'V-cv-past', 'V-cv-arc', 'V-cv-quiet', 'V-cv-hover', 'V-cv-open'];
+    // the read-out is not the bug: chart 0's nine values sit right above their bars, centred
+    var sane = cs.length === 6 && labs.every(function (l) { return l.length > 0; }), off0 = [];
+    if (sane) labs[0].forEach(function (lb) {
+      var bar = barOf(cs[0], { d: lb.d, i: lb.i });
+      if (!(lb.y + lb.h <= bar.T + 1 && Math.abs(lb.x + lb.w / 2 - bar.cx) <= 1)) off0.push(lb.d + ':' + lb.i + ' ' + bx(lb) + ' bar T ' + f1(bar.T));
+    });
+    rec('P-cv-charts', sane && labs[0].length === 9 && !off0.length,
+        'charts ' + cs.length + ', labels ' + labs.map(function (l) { return l.length; }).join('/') + (off0.length ? '; off ' + off0.slice(0, 3).join(' | ') : ''));
+    if (!sane) { fail(ALL, 'no fixture'); return; }
+    var onLab = [], onPin = [], outArea = [];
+    cs.forEach(function (ch, ci) {
+      var ms = pinsOf(ch).map(function (m) { return { m: m, b: chartBox(ch, m) }; }), A = ch.chartArea;
+      ms.forEach(function (o, k) {
+        var tag = ci + ':' + o.m.getAttribute('data-pvn-key');
+        labs[ci].forEach(function (lb) { if (overlap(o.b, lb)) onLab.push(tag + ' ' + bx(o.b) + ' on ' + lb.d + ':' + lb.i + ' ' + bx(lb)); });
+        for (var j = k + 1; j < ms.length; j++) if (overlap(o.b, ms[j].b)) onPin.push(tag + ' ' + bx(o.b) + ' on ' + ms[j].m.getAttribute('data-pvn-key') + ' ' + bx(ms[j].b));
+        if (o.b.x < A.left - 1 || o.b.y < A.top - 1 || o.b.x + o.b.w > A.right + 1 || o.b.y + o.b.h > A.bottom + 1)
+          outArea.push(tag + ' ' + bx(o.b) + ' area ' + f1(A.left) + ',' + f1(A.top) + '..' + f1(A.right) + ',' + f1(A.bottom));
+      });
+    });
+    var counts = cs.map(function (ch) { return pinsOf(ch).length; }).join('/'), cntOk = counts === '1/1/1/4/1/1';
+    rec('V-cv-nolabel', cntOk && !onLab.length, 'markers ' + counts + '; on a value: ' + (onLab.slice(0, 3).join(' | ') || 'none'));
+    rec('V-cv-nopin', cntOk && !onPin.length, 'markers ' + counts + '; on each other: ' + (onPin.slice(0, 3).join(' | ') || 'none'));
+    rec('V-cv-area', cntOk && !outArea.length, 'out of the chart area: ' + (outArea.slice(0, 3).join(' | ') || 'none'));
+    // in its bar's end corner: values above (0), horizontal (2: the right end), a stacked segment (5)
+    var p0 = pt(cs[0], 'Engineering', 'FY2026'), p2 = pt(cs[2], 'Engineering', 'FY2026'), p5 = pt(cs[5], 'Engineering', 'FY2026');
+    var m0 = pinFor(cs[0], K.leaf), m2 = pinFor(cs[2], K.leaf), m5 = pinFor(cs[5], K.leaf);
+    rec('V-cv-inside', inCorner(cs[0], p0, m0) && inCorner(cs[2], p2, m2) && inCorner(cs[5], p5, m5),
+        'values above: ' + cornerTxt(cs[0], p0, m0) + ' | horizontal: ' + cornerTxt(cs[2], p2, m2) + ' | stacked: ' + cornerTxt(cs[5], p5, m5));
+    // past the end: chart 1's corner holds its centred value, so the marker goes over the bar, centred; chart 3's
+    // bars are too narrow for a corner, so each marker goes over its own value (1001-1003), centred on its bar
+    var past = [], p1 = pt(cs[1], 'Engineering', 'FY2026'), m1 = pinFor(cs[1], K.leaf);
+    if (p1 && m1) {
+      var b1 = chartBox(cs[1], m1), bar1 = barOf(cs[1], p1);
+      if (!(b1.y + b1.h <= bar1.T + 0.5 && Math.abs(b1.x + b1.w / 2 - bar1.cx) <= 1.5)) past.push('short ' + bx(b1) + ' bar T ' + f1(bar1.T) + ' cx ' + f1(bar1.cx));
+    } else past.push('short: no marker');
+    ['1001', '1002', '1003', '1027'].forEach(function (id) {
+      var p = pt(cs[3], id), m = pinFor(cs[3], pk([['ID', id]]));
+      if (!p || !m) { past.push(id + ': no marker'); return; }
+      var b = chartBox(cs[3], m), bar = barOf(cs[3], p), lb = labs[3].filter(function (l) { return l.d === p.d && l.i === p.i; })[0];
+      // over its own bar (its centre within the bar: one at the chart's edge moves in a little), and over its value
+      var mine = b.x + b.w / 2 >= bar.L && b.x + b.w / 2 <= bar.R, over = !!lb && b.y + b.h <= lb.y + 0.5;
+      if (!mine || (id !== '1027' && !over)) past.push(id + ' ' + bx(b) + ' bar ' + f1(bar.L) + '..' + f1(bar.R) + ' T ' + f1(bar.T) + ' value ' + bx(lb));
+    });
+    rec('V-cv-past', !past.length, past.length ? past.slice(0, 4).join(' | ') : 'over the short bar, centred, and over each narrow bar\'s value');
+    // the pie's marker centre is inside its own slice
+    var p4 = pt(cs[4], 'Sciences'), m4 = pinFor(cs[4], K.grp), arcOk = false, arcTxt = 'no marker';
+    if (p4 && m4) {
+      var a = cs[4].getDatasetMeta(p4.d).data[p4.i].getProps(['x', 'y', 'startAngle', 'endAngle', 'innerRadius', 'outerRadius'], true), b4 = chartBox(cs[4], m4);
+      var dx = b4.x + b4.w / 2 - a.x, dy = b4.y + b4.h / 2 - a.y, rad = Math.sqrt(dx * dx + dy * dy), ang = Math.atan2(dy, dx);
+      while (ang < a.startAngle) ang += 2 * Math.PI;
+      while (ang > a.startAngle + 2 * Math.PI) ang -= 2 * Math.PI;
+      arcOk = ang <= a.endAngle && rad >= a.innerRadius && rad <= a.outerRadius;
+      arcTxt = 'centre at r ' + f1(rad) + ', ' + f1(ang * 180 / Math.PI) + 'deg; slice ' + f1(a.startAngle * 180 / Math.PI) + '..' + f1(a.endAngle * 180 / Math.PI) + 'deg, r ' + f1(a.innerRadius) + '..' + f1(a.outerRadius);
+    }
+    rec('V-cv-arc', arcOk, arcTxt);
+    // quiet at rest; full strength while its own chart is pointed at, the others staying quiet
+    var op = function (m) { return m ? parseFloat(getComputedStyle(m).opacity) : -1; }, m3 = pinsOf(cs[3])[0];
+    // the pointer parked where no chart is (a corner of the viewport that is not over one)
+    var pars = cs.map(function (c) { return c.canvas.parentNode; }), aw = null;
+    [[3, 3], [window.innerWidth - 4, 3], [3, window.innerHeight - 4], [window.innerWidth - 4, window.innerHeight - 4]].forEach(function (q) {
+      if (aw) return;
+      for (var n = document.elementFromPoint(q[0], q[1]); n; n = n.parentNode) if (pars.indexOf(n) !== -1) return;
+      aw = { x: q[0], y: q[1] };
+    });
+    aw = aw || { x: 3, y: 3 };
+    await moveTo(aw.x, aw.y);
+    await sleep(400);
+    var r0 = op(m0), r3 = op(m3);
+    rec('V-cv-quiet', Math.abs(r0 - 0.6) < 0.01 && Math.abs(r3 - 0.6) < 0.01, 'at rest: chart 0 ' + r0 + ', chart 3 ' + r3);
+    // a point the canvas itself is hit at (the page's sticky top covers a chart scrolled to the top)
+    var cr = cs[0].canvas.getBoundingClientRect(), hx = Math.round(cr.left + cr.width / 2), hy = Math.round(cr.top + 8);
+    for (var gy = 0.5, found = false; gy < 0.96 && !found; gy += 0.05) {
+      for (var gx = 0.1; gx < 0.95 && !found; gx += 0.1) {
+        var qx = Math.round(cr.left + cr.width * gx), qy = Math.round(cr.top + cr.height * gy);
+        if (document.elementFromPoint(qx, qy) === cs[0].canvas) { hx = qx; hy = qy; found = true; }
+      }
+    }
+    await moveTo(hx, hy);
+    await sleep(400);
+    var h0 = op(m0), h3 = op(m3), under = document.elementFromPoint(hx, hy), wr = cs[0].canvas.parentNode;
+    rec('V-cv-hover', Math.abs(h0 - 1) < 0.01 && Math.abs(h3 - 0.6) < 0.01, 'chart 0 pointed at (' + hx + ',' + hy + ' over '
+        + (under ? under.tagName + '.' + (typeof under.className === 'string' ? under.className : '') : 'nothing') + ', its box hovered ' + wr.matches(':hover')
+        + ', viewport ' + window.innerWidth + 'x' + window.innerHeight + '): its marker ' + h0 + ', chart 3\'s ' + h3);
+    await moveTo(aw.x, aw.y);
+    await sleep(300);
+    // an open card's point: full strength, the pointer elsewhere
+    var txt = await openFromMenu(cs[4], p4);
+    await sleep(400);
+    var mS = pinFor(cs[4], K.grp), o4 = op(mS), o0 = op(pinFor(cs[0], K.leaf));
+    rec('V-cv-open', txt === 'Notes (1)\u2026' && cardKey() === K.grp && !!mS && mS.classList.contains('is-open') && Math.abs(o4 - 1) < 0.01 && Math.abs(o0 - 0.6) < 0.01,
+        'menu "' + txt + '", card ' + (cardKey() === K.grp) + ', its marker ' + o4 + ', chart 0\'s ' + o0);
+    await closeCard();
+  };
+
+  (async function () {
+    try {
+      await boot();
+      if (!S[SCN]) throw new Error('unknown scenario ' + SCN);
+      await S[SCN]();
+      await sleep(50);
+    } catch (e) {
+      R.fatal = String((e && e.stack) || e);
+    }
+    R.errors = window.__errors.concat(window.__rejections).slice(0, 10);
+    R.hookErr = [window.__PV_ERR, window.__PV_ERR2, window.__PV_LAZY_ERR].filter(Boolean).join('; ');
+    R.missing = window.__PV_MISSING || [];
+    window.__PVRESULT = R;
+    window.__PVDONE = true;
+    document.getElementById('out').textContent = 'DONE';
+  })();
+})();

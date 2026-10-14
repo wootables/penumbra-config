@@ -1,0 +1,382 @@
+<!doctype html><meta charset="utf-8"><title>running</title><pre id="out">running</pre>
+<script>
+// Installed in its OWN tag so a SYNTAX error in the main script below - which no
+// try/catch inside that tag can ever see - still reports itself instead of
+// leaving the page showing the initial "running" text.
+window.onerror = function (msg, src, line, col) {
+  var el = document.getElementById('out');
+  if (el && el.textContent === 'running') {
+    el.textContent = 'SCRIPT-ERROR: ' + msg + '  (line ' + line + ':' + col + ')';
+  }
+  return false;
+};
+</script>
+<script src="SRC.js"></script>
+<script>
+var LOG=[],PASS=0,FAIL=0;
+function ok(n,c,x){ if(c){PASS++;LOG.push('PASS  '+n);} else {FAIL++;LOG.push('FAIL  '+n+(x?'   >> '+x:''));} }
+function eq(n,g,w){ ok(n, JSON.stringify(g)===JSON.stringify(w), 'got='+JSON.stringify(g)+' want='+JSON.stringify(w)); }
+
+try {
+  var code = String(window.__src).replace(/\r\n/g,'\n');
+  function grab(decl){
+    var start=code.indexOf(decl);
+    if(start===-1) throw new Error('anchor not found: '+decl);
+    var i=code.indexOf('{',start),depth=0,inStr=null,inLine=false,inBlk=false,inRe=false;
+    for(var j=i;j<code.length;j++){
+      var c=code[j],n=code[j+1];
+      if(inLine){ if(c==='\n') inLine=false; continue; }
+      if(inBlk){ if(c==='*'&&n==='/'){inBlk=false;j++;} continue; }
+      if(inStr){ if(c==='\\'){j++;continue;} if(c===inStr) inStr=null; continue; }
+      if(inRe){ if(c==='\\'){j++;continue;} if(c==='/') inRe=false; continue; }
+      if(c==='/'&&n==='/'){inLine=true;j++;continue;}
+      if(c==='/'&&n==='*'){inBlk=true;j++;continue;}
+      if(c==='"'||c==="'"||c==='`'){inStr=c;continue;}
+      if(c==='/'){ var k=j-1; while(k>=0&&/\s/.test(code[k]))k--;
+        if(k<0||/[=(,:;!&|?{}[\n+\-*%~^<>]/.test(code[k])){inRe=true;continue;} }
+      if(c==='{')depth++; else if(c==='}'){depth--; if(depth===0) return code.slice(start,j+1);}
+    }
+    throw new Error('unbalanced: '+decl);
+  }
+  function grabVar(name){
+    var i = code.indexOf('var ' + name);
+    if (i === -1) throw new Error('var not found: ' + name);
+    var depth=0,inStr=null,inLine=false,inBlk=false;
+    for (var j=i;j<code.length;j++){
+      var c=code[j], n=code[j+1];
+      if(inLine){ if(c==='\n') inLine=false; continue; }
+      if(inBlk){ if(c==='*'&&n==='/'){inBlk=false;j++;} continue; }
+      if(inStr){ if(c==='\\'){j++;continue;} if(c===inStr) inStr=null; continue; }
+      if(c==='/'&&n==='/'){inLine=true;j++;continue;}
+      if(c==='/'&&n==='*'){inBlk=true;j++;continue;}
+      if(c==='/'){ var k=j-1; while(k>=0&&/\s/.test(code[k]))k--;
+        if(k<0||/[=(,:;!&|?{}[\n+\-*%~^<>]/.test(code[k])){
+          for(var r=j+1;r<code.length;r++){ if(code[r]==='\\'){r++;continue;} if(code[r]==='/'){j=r;break;} if(code[r]==='\n')break; }
+          continue; } }
+      if(c==='"'||c==="'"||c==='`'){inStr=c;continue;}
+      if(c==='['||c==='{'||c==='(')depth++;
+      else if(c===']'||c==='}'||c===')')depth--;
+      else if(c===';'&&depth===0) return code.slice(i,j+1);
+    }
+    throw new Error('unterminated var: '+name);
+  }
+
+  var mapDeps = grabVar('PENUMBRA_US_GRID = {') + '\n' +
+                grabVar('PENUMBRA_US_GRID_COLS') + '\n' +
+                grabVar('_PENUMBRA_STATE_BY_NAME') + '\n' +
+                grabVar('_PENUMBRA_STATE_BY_FIPS') + '\n' +
+                grab('function _vizResolveState(') + '\n' +
+                grab('function _vizParseVizOptions(');
+  var M = new Function(mapDeps +
+    '\nreturn {grid:PENUMBRA_US_GRID, cols:PENUMBRA_US_GRID_COLS, rows:PENUMBRA_US_GRID_ROWS,' +
+    ' resolve:_vizResolveState, opts:_vizParseVizOptions};')();
+
+  // ---- grid integrity: this is the part a wrong map would hide ----
+  var keys = Object.keys(M.grid);
+  eq('grid: 55 tiles (50 states + DC + 4 territories)', keys.length, 55);
+  ok('grid: DC present', !!M.grid.DC);
+  ok('grid: PR/VI/GU/AS all present', !!(M.grid.PR && M.grid.VI && M.grid.GU && M.grid.AS));
+  ok('grid: Caribbean pair sits SE of Florida',
+     M.grid.PR.r === M.grid.FL.r && M.grid.PR.c > M.grid.FL.c && M.grid.VI.c > M.grid.PR.c);
+  ok('grid: Pacific territories sit with Hawaii',
+     M.grid.GU.c === M.grid.HI.c && M.grid.GU.r < M.grid.HI.r && M.grid.AS.r === M.grid.HI.r);
+  var seen = {}, dupes = [];
+  keys.forEach(function(k){
+    var g = M.grid[k], cell = g.r + ',' + g.c;
+    if (seen[cell]) dupes.push(cell + ' = ' + seen[cell] + ' & ' + k);
+    seen[cell] = k;
+  });
+  eq('grid: NO two states share a cell', dupes, []);
+  ok('grid: every tile inside 11x8', keys.every(function(k){
+    var g=M.grid[k]; return g.r>=0 && g.r<M.rows && g.c>=0 && g.c<M.cols;
+  }));
+  ok('grid: every tile has a name', keys.every(function(k){ return !!M.grid[k].name; }));
+  ok('grid: all postal keys are 2 uppercase letters', keys.every(function(k){ return /^[A-Z]{2}$/.test(k); }));
+
+  // anchors a reader would notice instantly if wrong
+  eq('grid: WA top-left of the mainland', [M.grid.WA.r, M.grid.WA.c], [2,0]);
+  eq('grid: ME top-right', [M.grid.ME.r, M.grid.ME.c], [0,10]);
+  eq('grid: AK detached top-left', [M.grid.AK.r, M.grid.AK.c], [0,0]);
+  eq('grid: HI detached bottom-left', [M.grid.HI.r, M.grid.HI.c], [7,0]);
+  eq('grid: FL bottom-right', [M.grid.FL.r, M.grid.FL.c], [7,8]);
+  ok('grid: CA below OR below WA (same column)',
+     M.grid.WA.c===M.grid.OR.c && M.grid.OR.c===M.grid.CA.c &&
+     M.grid.WA.r < M.grid.OR.r && M.grid.OR.r < M.grid.CA.r);
+  ok('grid: TX below OK', M.grid.TX.r > M.grid.OK.r);
+  ok('grid: TN directly below KY', M.grid.TN.c===M.grid.KY.c && M.grid.TN.r===M.grid.KY.r+1);
+  ok('grid: AR directly below MO', M.grid.AR.c===M.grid.MO.c && M.grid.AR.r===M.grid.MO.r+1);
+  ok('grid: KS directly below NE', M.grid.KS.c===M.grid.NE.c && M.grid.KS.r===M.grid.NE.r+1);
+  ok('grid: NC east of TN', M.grid.NC.c > M.grid.TN.c);
+  ok('grid: NC is home turf and present', M.grid.NC.name === 'North Carolina');
+
+  // ---- state resolution ----
+  eq('resolve: postal', M.resolve('NC'), 'NC');
+  eq('resolve: postal lowercase', M.resolve('nc'), 'NC');
+  eq('resolve: postal padded', M.resolve('  NC  '), 'NC');
+  eq('resolve: full name', M.resolve('North Carolina'), 'NC');
+  eq('resolve: full name case-insensitive', M.resolve('nORTH cAROLINA'), 'NC');
+  eq('resolve: DC variants', [M.resolve('DC'), M.resolve('District of Columbia'), M.resolve('Washington DC')], ['DC','DC','DC']);
+  eq('resolve: FIPS 37 -> NC', M.resolve('37'), 'NC');
+  eq('resolve: FIPS 6 -> CA (single digit padded)', M.resolve('6'), 'CA');
+  eq('resolve: FIPS 06 -> CA', M.resolve('06'), 'CA');
+  eq('resolve: blank -> null', M.resolve(''), null);
+  eq('resolve: null -> null', M.resolve(null), null);
+  eq('resolve: junk -> null', M.resolve('Ontario'), null);
+  // Real NC_Reporting values, from LOCATIONS_PT_PAM (verified 2026-08-27)
+  eq('resolve: REAL DATA "Georgia (State)"', M.resolve('Georgia (State)'), 'GA');
+  eq('resolve: REAL DATA "District Of Columbia"', M.resolve('District Of Columbia'), 'DC');
+  eq('resolve: REAL DATA "North Carolina"', M.resolve('North Carolina'), 'NC');
+  eq('resolve: parenthetical strip is not greedy', M.resolve('Washington (State)'), 'WA');
+  eq('resolve: a bare parenthetical is still junk', M.resolve('(State)'), null);
+  // Territories got their own tiles 2026-08-27 - they are REAL rows in
+  // LOCATIONS_PT_PAM (PR 63, VI 11, GU 4, AS 1) and were being discarded.
+  eq('resolve: Puerto Rico', M.resolve('Puerto Rico'), 'PR');
+  eq('resolve: Guam', M.resolve('Guam'), 'GU');
+  eq('resolve: Virgin Islands', M.resolve('Virgin Islands'), 'VI');
+  eq('resolve: American Samoa', M.resolve('American Samoa'), 'AS');
+  eq('resolve: PR postal code', M.resolve('PR'), 'PR');
+  eq('resolve: qualified US Virgin Islands', M.resolve('U.S. Virgin Islands'), 'VI');
+  eq('resolve: territory FIPS 72 -> PR', M.resolve('72'), 'PR');
+  eq('resolve: territory FIPS 78 -> VI', M.resolve('78'), 'VI');
+  // Northern Marianas has NO tile, so it must stay unmatched rather than be
+  // quietly binned into a neighbour.
+  eq('resolve: FIPS 69 (N. Marianas, no tile) stays null', M.resolve('69'), null);
+  eq('resolve: unassigned FIPS 03 -> null', M.resolve('03'), null);
+  // the truncation trap: a long numeric id must NOT become a state
+  eq('resolve: 5-digit zip is NOT a state', M.resolve('27695'), null);
+  eq('resolve: county FIPS 37183 is NOT a state', M.resolve('37183'), null);
+  // explicit modes
+  eq('resolve: mode postal rejects a name', M.resolve('North Carolina', 'postal'), null);
+  eq('resolve: mode name rejects a postal', M.resolve('NC', 'name'), null);
+  eq('resolve: mode fips rejects a postal', M.resolve('NC', 'fips'), null);
+  eq('resolve: mode fips accepts 37', M.resolve('37', 'fips'), 'NC');
+  // auto ordering: postal wins over FIPS for a 2-char value
+  eq('resolve: auto prefers postal over name', M.resolve('IN'), 'IN');
+
+  // ---- named options object (arg 41) ----
+  eq('opts: empty -> {}', M.opts(''), {});
+  eq('opts: null -> {}', M.opts(null), {});
+  eq('opts: valid JSON', M.opts('{"map":"us-grid","match":"postal"}'), {map:'us-grid',match:'postal'});
+  eq('opts: malformed JSON degrades to {}', M.opts('{not json'), {});
+  eq('opts: an ARRAY is not an options object', M.opts('[1,2,3]'), {});
+  eq('opts: a bare string is not an options object', M.opts('"hello"'), {});
+  eq('opts: escaped quotes (infobox raw| wrapper)', M.opts('{\\"map\\":\\"us-grid\\"}'), {map:'us-grid'});
+  eq('opts: already an object passes through', M.opts({map:'x'}), {map:'x'});
+  eq('opts: showLabels false survives', M.opts('{"showLabels":false}'), {showLabels:false});
+
+  // ---- generateChartDataFromMaps map branch ----
+  var stubs=[
+   'function parseAccountingNumber(v){ if(v==null) return NaN; var s=String(v).replace(/[$,\\s]/g,""); if(s==="") return NaN; var n=Number(s); return isNaN(n)?NaN:n; }',
+   'function getCustomSortComparator(){ return null; }',
+   'function vizExtraAggregate(){ return undefined; }',
+   'function getChartColor(i,a){ return "#336699"; }',
+   'function getChartBorderColor(i){ return "B"+i; }',
+   'function vizBucketRowsForAxis(r){ return r; }',
+   'function pivotWavgWeightCol(){ return null; }',
+   'function vizAggNeedsWeights(){ return false; }',
+   'function decodeHtmlEntities(s){ return String(s==null?"":s); }',
+   'function hexToRgba(c,a){ return "rgba(51,102,153,"+a+")"; }',
+   'function darkenRgba(c){ return c; }',
+   'function penumbraPercentileOf(s,p){ var n=s.length; if(!n) return 0; if(n===1) return s[0]; var r=(p/100)*(n-1),lo=Math.floor(r),hi=Math.ceil(r); return lo===hi?s[lo]:s[lo]+(s[hi]-s[lo])*(r-lo); }',
+   'function parseDate(){ return null; }',
+   'function moment(){ return {isValid:function(){return false;},valueOf:function(){return 0;},format:function(){return "";}}; }'
+  ].join('\n');
+  var gen = new Function(stubs+'\n'+mapDeps+'\n'+
+                         grab('function _vizParseFunnelMode(')+'\n'+
+                         grab('function _vizParseWhiskerMode(')+'\n'+
+                         grab('function _vizBoxStats(')+'\n'+
+                         grab('function _vizParseUserNumber(')+'\n'+grab('function _vizParseBands(')+'\n'+
+                         grab('function _vizParseUserNumber(')+'\n'+grab('function _vizParseRefMarker(')+'\n'+grab('function _vizParseTarget(')+'\n'+
+                         grab('function _vizGaugeRange(')+'\n'+
+                         grab('function _vizDateMs(')+'\n'+
+                         grab('function _vizGanttMarker(')+'\n'+
+                         grab('function penumbraFormatChartNumber(')+'\n'+(/var PENUMBRA_PALETTE_NAMES = [^;]*;/.exec(code)||[''])[0]+'\n'+grab('function _vizParsePalette(')+'\n'+grab('function _vizParseFormat(')+'\n'+grab('function _vizParseUserNumber(')+'\n'+grab('function generateChartDataFromMaps(')+'\n'+grab('function _generateChartDataFromMaps(')+'\n'+(code.indexOf('function penumbraComboAutoSlots(')!==-1?grab('function penumbraComboAutoSlots(')+'\n'+grab('function penumbraButterflyAutoColor(')+'\nfunction _penumbraPaletteHex(i){ return "#00000"+i; }\nvar _penumbraActivePalette = "auto";':'')+
+                         '\nreturn generateChartDataFromMaps;')();
+
+  function rows(list){ return list.map(function(r){ var m=new Map(); m.set('ST',r[0]); m.set('AMT',r[1]); return m; }); }
+
+  var R = rows([['NC',100],['NC',50],['CA',400],['TX',200],['NY',10],['Ontario',999]]);
+  var mp = gen(R,'ST','AMT',null,'sum',10,'map','value','desc','default',false,false,null,'',{});
+  ok('map: _isMap flag', mp._isMap === true);
+  eq('map: ALWAYS 55 tiles, absent states included', mp._mapTiles.length, 55);
+  eq('map: matched state count', mp._mapMatched, 4);
+  eq('map: unmatched counted', mp._mapUnmatched, 1);
+  eq('map: unmatched sample surfaced', mp._mapUnmatchedSample, 'Ontario');
+  function tile(st){ return mp._mapTiles.filter(function(t){return t.st===st;})[0]; }
+  eq('map: NC sums both rows', tile('NC').value, 150);
+  eq('map: NC row count', tile('NC').n, 2);
+  eq('map: CA', tile('CA').value, 400);
+  eq('map: a state with no rows is null, not 0', tile('WY').value, null);
+  eq('map: absent state has n=0', tile('WY').n, 0);
+  eq('map: min over PRESENT states only', mp._mapMin, 10);
+  eq('map: max', mp._mapMax, 400);
+  eq('map: _chartType tag', mp._chartType, 'map');
+  eq('map: also exposes a single-chart shape', mp.labels.length, 55);
+
+  // Territories carry data through the whole pipeline now, and must NOT be
+  // counted as unmatched. Mirrors the real LOCATIONS_PT_PAM values.
+  var terr = gen(rows([['Puerto Rico',63],['Virgin Islands',11],['Guam',4],['American Samoa',1],['NC',32155]]),
+                 'ST','AMT',null,'sum',10,'map','value','desc','default',false,false,null,'',{});
+  eq('territories: none unmatched', terr._mapUnmatched, 0);
+  eq('territories: 5 matched', terr._mapMatched, 5);
+  // NOT named tt - a `var tt` for the tooltip callbacks already exists later in
+  // this same scope, and shadowing it made the failure much harder to read.
+  function terrVal(st){ return terr._mapTiles.filter(function(t){return t.st===st;})[0].value; }
+  eq('territories: PR value', terrVal('PR'), 63);
+  eq('territories: VI value', terrVal('VI'), 11);
+  eq('territories: GU value', terrVal('GU'), 4);
+  eq('territories: AS value', terrVal('AS'), 1);
+  eq('territories: min spans down to AS', terr._mapMin, 1);
+
+  // aggregations
+  eq('map: count', gen(R,'ST','AMT',null,'count',10,'map','value','desc','default',false,false,null,'',{})._mapTiles.filter(function(t){return t.st==='NC';})[0].value, 2);
+  eq('map: avg', gen(R,'ST','AMT',null,'avg',10,'map','value','desc','default',false,false,null,'',{})._mapTiles.filter(function(t){return t.st==='NC';})[0].value, 75);
+  eq('map: max agg', gen(R,'ST','AMT',null,'max',10,'map','value','desc','default',false,false,null,'',{})._mapTiles.filter(function(t){return t.st==='NC';})[0].value, 100);
+
+  // full names and FIPS resolve through the same branch
+  var byName = gen(rows([['North Carolina',5],['California',7]]),'ST','AMT',null,'sum',10,'map','value','desc','default',false,false,null,'',{});
+  eq('map: full names resolve', [byName._mapTiles.filter(function(t){return t.st==='NC';})[0].value,
+                                  byName._mapTiles.filter(function(t){return t.st==='CA';})[0].value], [5,7]);
+  var byFips = gen(rows([['37',5],['06',7]]),'ST','AMT',null,'sum',10,'map','value','desc','default',false,false,null,'',
+                   {vizOptions:'{"match":"fips"}'});
+  eq('map: FIPS mode resolves', byFips._mapTiles.filter(function(t){return t.st==='NC';})[0].value, 5);
+
+  // match mode is respected - postal mode must REJECT full names
+  var strict = gen(rows([['North Carolina',5]]),'ST','AMT',null,'sum',10,'map','value','desc','default',false,false,null,'',
+                   {vizOptions:'{"match":"postal"}'});
+  ok('map: match=postal rejects full names -> _noData', !!strict._noData, JSON.stringify(strict).slice(0,120));
+
+  // nothing matches at all -> an actionable message, not a blank grid
+  var none = gen(rows([['Ontario',1],['Quebec',2]]),'ST','AMT',null,'sum',10,'map','value','desc','default',false,false,null,'',{});
+  ok('map: no matches -> _noData', !!none._noData);
+  ok('map: _noData names the column', none._noData.indexOf('ST') !== -1, none._noData);
+  ok('map: _noData shows an example of what failed', none._noData.indexOf('Ontario') !== -1, none._noData);
+
+  // explicit scale pins the ramp
+  var pinned = gen(R,'ST','AMT',null,'sum',10,'map','value','desc','default',false,false,null,'',{yMin:'0',yMax:'1000'});
+  eq('map: yMin/yMax pin the colour scale', [pinned._mapMin, pinned._mapMax], [0,1000]);
+  var inverted = gen(R,'ST','AMT',null,'sum',10,'map','value','desc','default',false,false,null,'',{yMin:'900',yMax:'100'});
+  ok('map: inverted explicit scale repaired', inverted._mapMin < inverted._mapMax);
+
+  // showLabels flows from the options object
+  eq('map: showLabels default true', mp._mapShowLabels, true);
+  eq('map: showLabels false honoured',
+     gen(R,'ST','AMT',null,'sum',10,'map','value','desc','default',false,false,null,'',{vizOptions:'{"showLabels":false}'})._mapShowLabels, false);
+
+  // ---- applyMapChartConfig ----
+  // The REAL penumbraPercentileOf goes in, not a stub - quantile band edges
+  // are supposed to agree with the pivot's pNN, and a stub would test my
+  // reimplementation of that promise rather than the promise itself.
+  // _vizGeoLayer is stubbed to null so this exercises the TILE path; the
+  // outline path has its own harness section further down.
+  var A = new Function('getChartColor','getChartBorderColor','hexToRgba','_vizGeoLayer','applyOutlineMapConfig',
+    grabVar('PENUMBRA_US_GRID_COLS') + '\n' +
+    grab('function penumbraPercentileOf(') + '\n' +
+    grab('function penumbraFormatChartNumber(') + '\n' +
+    grab('function applyMapChartConfig(') + '\nreturn applyMapChartConfig;'
+  )(function(){return '#336699';}, function(i){return 'B'+i;}, function(c,a){return 'rgba(51,102,153,'+a+')';},
+    function(){ return null; }, function(){ throw new Error('outline path must not run in the tile tests'); });
+
+  function cfg(){ return { options:{ indexAxis:'y', scales:{ x:{}, y:{} },
+                                     plugins:{ legend:{display:true}, tooltip:{}, datalabels:{} } } }; }
+  var c1 = cfg();
+  A(c1, mp, {showValues:false, textColor:'#111', isDark:false, currencyPrefix:'$', fsBoost:0});
+  eq('mapCfg: type becomes scatter', c1.type, 'scatter');
+  ok('mapCfg: indexAxis removed', c1.options.indexAxis === undefined);
+  ok('mapCfg: legend off', c1.options.plugins.legend.display === false);
+  eq('mapCfg: one point per tile', c1.data.datasets[0].data.length, 55);
+  eq('mapCfg: square points', c1.data.datasets[0].pointStyle, 'rect');
+  ok('mapCfg: both axes hidden',
+     c1.options.scales.x.display === false && c1.options.scales.y.display === false);
+  ok('mapCfg: legend plugin registered', c1.plugins.some(function(p){return p.id==='penumbraMapLegend';}));
+  // y is negated so row 0 is at the TOP
+  var ncIdx = mp._mapTiles.findIndex(function(t){return t.st==='NC';});
+  eq('mapCfg: NC point matches its grid cell',
+     [c1.data.datasets[0].data[ncIdx].x, c1.data.datasets[0].data[ncIdx].y],
+     [M.grid.NC.c, -M.grid.NC.r]);
+
+  var fmt = c1.options.plugins.datalabels.formatter;
+  eq('mapCfg: label is the postal code when values are off', fmt(null,{dataIndex:ncIdx}), 'NC');
+  var c2 = cfg();
+  A(c2, mp, {showValues:true, textColor:'#111', isDark:false, currencyPrefix:'$', fsBoost:0});
+  eq('mapCfg: with values, label is code + number',
+     c2.options.plugins.datalabels.formatter(null,{dataIndex:ncIdx}), ['NC','$150']);
+  var wyIdx = mp._mapTiles.findIndex(function(t){return t.st==='WY';});
+  eq('mapCfg: a no-data tile still shows its code',
+     c2.options.plugins.datalabels.formatter(null,{dataIndex:wyIdx}), 'WY');
+
+  var tt = c1.options.plugins.tooltip.callbacks;
+  eq('mapCfg: tooltip title names the state', tt.title([{dataIndex:ncIdx}]), 'North Carolina (NC)');
+  // Quantile is the default, so the band is part of the tooltip contract.
+  eq('mapCfg: tooltip value + row count + band', tt.label({dataIndex:ncIdx}), '$150   (2 rows)   -  20-40th pct');
+  eq('mapCfg: tooltip says No data for an absent state', tt.label({dataIndex:wyIdx}), 'No data');
+
+  // labels can be switched off entirely
+  var c3 = cfg();
+  A(c3, gen(R,'ST','AMT',null,'sum',10,'map','value','desc','default',false,false,null,'',{vizOptions:'{"showLabels":false}'}),
+    {showValues:false, textColor:'#111', isDark:false, currencyPrefix:'', fsBoost:0});
+  ok('mapCfg: showLabels false hides datalabels', c3.options.plugins.datalabels.display === false);
+
+  // ---- SHADE BANDS: quantile (default) vs equal-interval ----
+  // The real distribution: one dominant unit plus a long tail. This is the
+  // shape equal-interval binning renders as a single visible feature.
+  var skewSpec = [['NC',32155]];
+  var tail = ['CA','FL','VA','DC','GA','TN','MD','SC','TX','NY','PA','OH','MI','WA','MA','IL','AZ','NM','CO','OR'];
+  tail.forEach(function(st,i){ skewSpec.push([st, 240 - i*10]); });
+  var skew = gen(rows(skewSpec),'ST','AMT',null,'sum',10,'map','value','desc','default',false,false,null,'',{});
+  eq('bins: quantile is the DEFAULT', skew._mapBins, 'quantile');
+  eq('bins: equal is opt-in',
+     gen(rows(skewSpec),'ST','AMT',null,'sum',10,'map','value','desc','default',false,false,null,'',
+         {vizOptions:'{"bins":"equal"}'})._mapBins, 'equal');
+
+  function bandSpread(payload){
+    var cf = cfg();
+    A(cf, payload, {showValues:false, textColor:'#111', isDark:false, currencyPrefix:'', fsBoost:0});
+    // Recover each populated tile's band from its fill colour.
+    var fills = cf.data.datasets[0].backgroundColor;
+    var seen = {};
+    payload._mapTiles.forEach(function(t,i){ if (t.value != null) seen[fills[i]] = (seen[fills[i]]||0)+1; });
+    return Object.keys(seen).length;
+  }
+  var equalPayload = gen(rows(skewSpec),'ST','AMT',null,'sum',10,'map','value','desc','default',false,false,null,'',
+                         {vizOptions:'{"bins":"equal"}'});
+  var qBands = bandSpread(skew), eBands = bandSpread(equalPayload);
+  eq('bins: equal-interval collapses the skew to 2 shades', eBands, 2);
+  ok('bins: quantile uses MORE shades than equal on skewed data',
+     qBands > eBands, 'quantile=' + qBands + ' equal=' + eBands);
+  eq('bins: quantile spreads across all 5', qBands, 5);
+
+  // quantile edges must come from the SHARED percentile helper
+  var qc = cfg();
+  A(qc, skew, {showValues:false, textColor:'#111', isDark:false, currencyPrefix:'', fsBoost:0});
+  var qTip = qc.options.plugins.tooltip.callbacks.label;
+  var ncIdx2 = skew._mapTiles.findIndex(function(t){return t.st==='NC';});
+  ok('bins: quantile tooltip names the percentile band',
+     /80-100th pct$/.test(qTip({dataIndex:ncIdx2})), qTip({dataIndex:ncIdx2}));
+  var lowIdx = skew._mapTiles.findIndex(function(t){return t.st==='OR';});
+  ok('bins: lowest value lands in the bottom band',
+     /^0-20th pct$|0-20th pct$/.test(qTip({dataIndex:lowIdx})), qTip({dataIndex:lowIdx}));
+  // equal-interval must NOT claim a percentile
+  var ec = cfg();
+  A(ec, equalPayload, {showValues:false, textColor:'#111', isDark:false, currencyPrefix:'', fsBoost:0});
+  ok('bins: equal mode omits the percentile note',
+     ec.options.plugins.tooltip.callbacks.label({dataIndex:ncIdx2}).indexOf('pct') === -1);
+
+  // degenerate: every value identical must not divide by zero
+  var flat = gen(rows([['NC',5],['CA',5],['TX',5]]),'ST','AMT',null,'sum',10,'map','value','desc','default',false,false,null,'',{});
+  var fc = cfg();
+  A(fc, flat, {showValues:false, textColor:'#111', isDark:false, currencyPrefix:'', fsBoost:0});
+  ok('bins: identical values do not produce NaN fills',
+     fc.data.datasets[0].backgroundColor.every(function(c){ return c.indexOf('NaN') === -1; }));
+
+  // guard
+  var c4 = cfg();
+  A(c4, {labels:[],datasets:[]}, {});
+  ok('mapCfg: no-op on non-map data', c4.type === undefined);
+
+  document.getElementById('out').textContent =
+    'RESULT '+(FAIL===0?'ALL-PASS':'HAS-FAILURES')+'  pass='+PASS+' fail='+FAIL+'\n'+LOG.join('\n');
+} catch(e) {
+  document.getElementById('out').textContent='HARNESS-ERROR: '+e.name+': '+e.message+'\n'+(e.stack||'');
+}
+</script>

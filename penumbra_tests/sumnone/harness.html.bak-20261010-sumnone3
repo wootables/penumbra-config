@@ -1,0 +1,184 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>summary none</title>
+<link rel="stylesheet" href="main.css">
+</head>
+<body class="theme-default">
+<!-- sumfx suite (2026-10-02): Custom Formula typed into a footer summary badge.
+     The REAL main.js (+ penumbra_a11y.js, as index.php loads it) booted through
+     the real run path (stubbed query.php) on a 6-row fixture. ?scn=<name> picks
+     the stored report state; driver.js runs the scenario and records asserts.
+     The snapshot comparison clones the REAL analysis <template> - run.py lifts it
+     out of index.php into SNAP_TEMPLATE. -->
+<div id="reportHeaderContainer"><div id="defaultTitleView"></div><div id="reportInfoPanel" style="display:none"></div></div>
+<div id="headerToggleHandle"></div>
+<input id="reportTitle" value=""><input id="reportSubtitle" value=""><div id="admWrapper"></div><button id="toggleAdminViewBtn"></button>
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div><div id="mainReportTitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<button id="executeQuery">Run</button><button id="stopQueryBtn">Stop</button>
+<div id="loadingOverlay" style="display:none"><p id="execution-timer"></p><p id="loadingMessage"></p><div id="loadingTip"></div></div>
+<div id="importTimestamps"></div><span id="dataLoadedTimestamp">Data loaded: 2026-10-02 09:00</span>
+<div id="snapAnalysisDock"></div>
+<div id="resultsHeader" style="height:20px">controls</div>
+<div id="tableSearchContainer"><input id="tableSearch" value=""></div>
+<div id="resultCount"></div>
+<div id="paginatorContainer">
+  <div id="paginationControls"><span id="pageInfo"></span><select id="rowsPerPageSelector"><option value="25">25</option><option value="200">200</option><option value="all">All</option></select></div>
+  <div id="groupActionsContainer" style="display:none">
+    <a href="#" id="expandAllGroups">Expand All</a> <a href="#" id="collapseAllGroups">Collapse All</a>
+    <span id="removeGroupingSep">&bull;</span> <a href="#" id="configureGroupingBtn" role="button">Configure Grouping</a> <a href="#" id="removeGroupingLink">Remove Grouping</a>
+  </div>
+</div>
+<div id="table-view-container"><div id="container-parent"><div id="results-wrapper" style="width:1100px;height:420px;overflow:auto"><table id="resultsTable" class="data-grid-table"><caption class="sr-only">Report results table</caption><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table></div></div></div>
+<div id="errorBox"></div><div id="undo_text_container"></div>
+<div id="action_overlay"></div>
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="pnbNoSearchMatches" style="display:none"></div>
+<div id="manageSnapshotsLightbox" style="display:none"><input type="checkbox" id="snapIncludeToggles"></div>
+<div id="settingsPanelOverlay"></div>
+<div id="settingsPanel">
+  <select id="spThemeSelector"><option value="report-default">Report Default</option><option value="theme-default">Default</option></select>
+  <select id="spDensitySelector"><option value="report-default">Report Default</option><option value="standard">Standard</option></select>
+  <input type="checkbox" id="spRowExpandToggle"><input type="checkbox" id="spResolverToggle">
+  <div class="sp-section sp-columns-section"><div class="sp-column-container"><div id="spColumnList" class="sp-column-list"></div></div></div>
+  <div class="sp-actions"><button id="spApply">Save Column Layout</button><button id="spReset">Reset</button><span id="spPendingCount"></span></div>
+</div>
+<!-- The grouping dialog's controls the grouped boot reads (the jrowfeat suite's copy, trimmed). -->
+<div id="groupingLightbox" class="help-lightbox">
+  <div class="lightbox-content pnb-dlg">
+    <div id="groupingColumnSelector" class="penumbra-custom-select"><div class="pcs-selected" data-value="" role="combobox" tabindex="0">-- Select --</div><div class="pcs-dropdown" role="listbox"></div></div>
+    <div id="groupLevel2Row" style="display: none;"><div id="groupingColumnSelector2" class="penumbra-custom-select"><div class="pcs-selected" data-value="" role="combobox" tabindex="0">-- None --</div><div class="pcs-dropdown" role="listbox"></div></div></div>
+    <div id="groupLevel3Row" style="display: none;"><div id="groupingColumnSelector3" class="penumbra-custom-select"><div class="pcs-selected" data-value="" role="combobox" tabindex="0">-- None --</div><div class="pcs-dropdown" role="listbox"></div></div></div>
+    <div id="groupBinOptions" style="display: none;"><span id="groupBinColName"></span><input type="number" id="groupBinWidth"><input type="text" id="groupBinEdges"></div>
+    <label><input type="checkbox" id="groupAggCheckbox"> summary</label>
+    <div id="groupAggOptions" style="display: none;">
+      <div id="groupAggColumn" class="penumbra-custom-select"><div class="pcs-selected" data-value="" role="combobox" tabindex="0">-- Column --</div><div class="pcs-dropdown" role="listbox"></div></div>
+      <select id="groupAggType"><option value="sum">Sum</option></select><div id="groupSummaryFilterHint"></div>
+    </div>
+    <select id="groupSortSelect"><option value="label|asc">Label A-Z</option><option value="label|desc">Label Z-A</option></select>
+    <div id="groupLimitRow"><select id="groupLimitDir"><option value="top">Top</option></select><input type="number" id="groupLimitN"></div>
+    <label><input type="checkbox" id="groupLimitOther" checked> other</label>
+    <div id="groupLimitMinRow"><input type="number" id="groupLimitMinRows"></div>
+    <div id="groupStartDepthRow"><select id="groupStartDepth"><option value="0">Nothing</option><option value="1">Level 1</option><option value="3" selected>All levels</option></select></div>
+    <button id="resetGroupingBtn">Reset</button><button id="ungroupBtn" style="display: none;">Remove Grouping</button><button id="confirmGroupingBtn">Apply Grouping</button>
+  </div>
+</div>
+<div id="pnbStatusBar">
+  <div class="sb-seg" id="sbColsSeg"><span id="sbCols"></span>
+    <span class="sb-chip" id="sbCustomCols" style="display:none;">custom layout</span>
+    <div class="sb-pop" id="sbCustomColsPop"><div id="sbCustomColsDiff"></div><button id="sbCustomColsReset">Reset</button><button id="sbCustomColsSave" style="display:none;">Save</button></div>
+  </div>
+  <div class="sb-seg" id="sbUserSeg"></div>
+</div>
+<!--SNAP_TEMPLATE-->
+<pre id="out">running</pre>
+
+<script>
+  (function () { try { localStorage.clear(); } catch (e) {} })();
+  window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' } };
+  window.PENUMBRA_THEME_IDS = ['theme-default'];
+  window.PENUMBRA_THEME_ALIASES = {};
+  window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  (function () {
+    var P = new URLSearchParams(location.search);
+    var S = window.__SCN = P.get('scn') || 'flat';
+    // ID is the comparison key; DEPT groups the rows 3 + 3. AMOUNT (currency) and
+    // QTY are totalled by default through the name whitelist below.
+    window.__COLS = ['ID', 'DEPT', 'NAME', 'AMOUNT', 'QTY', 'NOTE'];
+    window.__LIVE = [
+      { ID: '1', DEPT: 'A', NAME: 'Alpha',   AMOUNT: '$100.00', QTY: '1', NOTE: 'x' },
+      { ID: '2', DEPT: 'A', NAME: 'Bravo',   AMOUNT: '$200.00', QTY: '2', NOTE: 'y' },
+      { ID: '3', DEPT: 'A', NAME: 'Charlie', AMOUNT: '$300.00', QTY: '3', NOTE: 'z' },
+      { ID: '4', DEPT: 'B', NAME: 'Delta',   AMOUNT: '$400.00', QTY: '4', NOTE: 'w' },
+      { ID: '5', DEPT: 'B', NAME: 'Echo',    AMOUNT: '$500.00', QTY: '5', NOTE: 'v' },
+      { ID: '6', DEPT: 'B', NAME: 'Foxtrot', AMOUNT: '$600.00', QTY: '6', NOTE: 'u' }
+    ];
+    // cmp: 1-2 Unchanged, 3 (AMOUNT) and 4 (QTY) Modified, 5-6 New, 7-8 Removed.
+    window.__SNAP = [
+      { ID: '1', DEPT: 'A', NAME: 'Alpha',   AMOUNT: '$100.00', QTY: '1',  NOTE: 'x' },
+      { ID: '2', DEPT: 'A', NAME: 'Bravo',   AMOUNT: '$200.00', QTY: '2',  NOTE: 'y' },
+      { ID: '3', DEPT: 'A', NAME: 'Charlie', AMOUNT: '$150.00', QTY: '3',  NOTE: 'z' },
+      { ID: '4', DEPT: 'B', NAME: 'Delta',   AMOUNT: '$400.00', QTY: '40', NOTE: 'w' },
+      { ID: '7', DEPT: 'C', NAME: 'Golf',    AMOUNT: '$700.00', QTY: '7',  NOTE: 't' },
+      { ID: '8', DEPT: 'C', NAME: 'Hotel',   AMOUNT: '$800.00', QTY: '8',  NOTE: 's' }
+    ];
+    var st = {
+      name: 'sumfx', query: 'SELECT ID, DEPT, NAME, AMOUNT, QTY, NOTE FROM SUMFX_FIXTURE', reportTitle: 'Badge formula fixture',
+      theme: 'theme-default', density: 'standard', sortCriteria: [], noLimit: true,
+      rowExpandDefault: false, resolverLinksDefault: false, rowsPerPage: '200', reportSnippet: ''
+    };
+    // Saved by its author with AMOUNT summarized by a Custom Formula.
+    if (S === 'saved') {
+      st.columnSummaries = { AMOUNT: 'formula' };
+      st.columnSummaryFormulas = { AMOUNT: '{sum}/{count}' };
+    }
+    if (S === 'grouped') st.groupBy = 'DEPT';
+    window.__STORED = st;
+    window.penumbra_vars = {
+      isAdmin: true, isGlobalAdmin: true, canEditReport: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+      tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+      imports: [], reports: [], themes: {}, prompts: {}, grants: [],
+      totalExemptions: ['AMOUNT', 'QTY'],
+      preloadedState: st
+    };
+  })();
+  window.__queryDone = 0;
+  window.__ajaxLog = [];
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  // query.php answers with the live rows; nothing else is expected to be asked.
+  jQuery.ajax = function (a, b) {
+    var opts = (typeof a === 'string') ? jQuery.extend({ url: a }, b || {}) : (a || {});
+    var url = String(opts.url || '');
+    window.__ajaxLog.push(url);
+    var d = jQuery.Deferred();
+    var isQuery = /query\.php/.test(url);
+    var resp = isQuery ? { data: JSON.parse(JSON.stringify(window.__LIVE)) } : {};
+    setTimeout(function () {
+      try { if (opts.success) opts.success(resp, 'success', { status: 200 }); } catch (e) { window.__errors.push('ajax success threw: ' + String(e)); }
+      try { if (opts.complete) opts.complete({ status: 200 }, 'success'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }
+      d.resolve(resp, 'success', { status: 200 });
+      if (isQuery) window.__queryDone++;
+    }, 0);
+    var p = d.promise(); p.abort = function () {}; return p;
+  };
+  jQuery.getJSON = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.post = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.get = jQuery.post;
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.IntersectionObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.__errors = [];
+  window.__rejections = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    window.__rejections.push(String((r && r.message) || r) + ' @' + String((r && r.stack) || '').split('\n').slice(1, 2).join('').trim());
+    e.preventDefault();
+  });
+  window.confirm = function () { return true; };
+  window.alert = function (m) { window.__errors.push('alert: ' + m); };
+  window.prompt = function () { return null; };
+  if (typeof window.stackHeaders !== 'function') window.stackHeaders = function () {};
+</script>
+<script src="penumbra_userseg.js"></script>
+<script src="penumbra_a11y.js"></script>
+<script src="main_sf.js"></script>
+<script src="penumbra_calc.js"></script>
+<script src="driver.js"></script>
+</body></html>

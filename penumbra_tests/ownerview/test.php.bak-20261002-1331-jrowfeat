@@ -1,0 +1,326 @@
+<?php
+// =============================================================================
+// ownerview/test.php - the PHP half of the ownerview suite (2026-10-01).
+//
+// Lifts the editor-role decisions out of the files under test by stable text
+// anchors (anchors that exist in the pre-change build too, so the control shows
+// real RED rows rather than a FATAL) and evals them over a role matrix with the
+// grant / owner / authorization helpers stubbed. Nothing is included, no
+// database is opened.
+//
+//   index.php      the role block ($canEditLoadedReport, $canScheduleLoadedReport,
+//                  $admin_class), the owner promotion + the view gate, the
+//                  journal block ($pnbJrnAccess = manage_journal.php's own gate,
+//                  $pnbJrnWanted), the status bar's role badges ($sb_is_owner)
+//                  and the role-pill markup itself
+//   dashboard.php  $mayView / $canEdit
+//   query.php      $penumbraCanAuthorReport (guardrail copy) and the view check
+//   static         the console + penumbra_vars still key on the editor flag, the
+//                  ?asof= gate follows the promotion, journalAccess reaches
+//                  penumbra_vars, the copy and the help text
+//   help render    help_content.php rendered for a non-admin and an admin: the
+//                  View Options and Report Journal topics reach both
+//
+// usage: php -n test.php <dir holding index.php dashboard.php query.php
+//                          help_content.php main.js>
+// Prints one line per assertion:  A|<id>|<1 pass, 0 fail>|<name>|<detail>
+// then "<n> assertions, <m> failed", or FATAL|<why> when an anchor is gone.
+// =============================================================================
+error_reporting(E_ALL);
+ini_set('display_errors', '1');
+$dir = isset($argv[1]) ? rtrim($argv[1], "\\/") : '';
+$A = array();
+function T($id, $name, $pass, $detail = '') { global $A; $A[] = array($id, $name, (bool)$pass, (string)$detail); }
+function fatal($m) { echo 'FATAL|' . str_replace(array("\r", "\n"), ' ', $m) . "\n"; exit(2); }
+function rd($dir, $f) {
+    $p = $dir . DIRECTORY_SEPARATOR . $f;
+    if (!is_file($p)) fatal("missing $p");
+    return str_replace("\r\n", "\n", file_get_contents($p));
+}
+set_error_handler(function ($no, $str, $file, $line) {
+    // An undefined variable inside a lifted block means the block reads state
+    // this harness does not model: that is a harness gap, never a pass.
+    fatal("PHP error $no: $str (line $line of an eval'd block)");
+});
+
+$idx  = rd($dir, 'index.php');
+$dash = rd($dir, 'dashboard.php');
+$qry  = rd($dir, 'query.php');
+$help = rd($dir, 'help_content.php');
+$mjs  = rd($dir, 'main.js');
+
+// ---- stubs: the same semantics as db_connection.php / report_auth.php -------
+function penumbraWildcardMatch($pattern, $sid) { return fnmatch(strtoupper(trim($pattern)), strtoupper(trim($sid))); }
+function penumbraReportGrantMatches($grants, $shortId) {
+    if (empty($grants['reports']) || $shortId === '' || $shortId === null) return false;
+    foreach ($grants['reports'] as $rg) { if (penumbraWildcardMatch($rg['pattern'], (string)$shortId)) return true; }
+    return false;
+}
+function penumbraReportGrantAllowsScheduler($grants, $shortId) {
+    if (empty($grants['reports']) || $shortId === '' || $shortId === null) return false;
+    foreach ($grants['reports'] as $rg) { if (!empty($rg['scheduler']) && penumbraWildcardMatch($rg['pattern'], (string)$shortId)) return true; }
+    return false;
+}
+function penumbraIsReportOwner($ownerId, $userKey) {
+    $u = strtoupper(trim((string)$userKey));
+    if ($u === '') return false;
+    return strtoupper(trim((string)$ownerId)) === $u;
+}
+// report_auth.php's: the admin bypass reads the GLOBAL $isAdmin (cleared by &noadm).
+function checkAuthorization($authorized_list, $user_id, $user_ouc) {
+    global $isAdmin;
+    $authorized_list = trim((string)$authorized_list);
+    if ($isAdmin) return true;
+    if (strtolower($authorized_list) === 'public') return true;
+    foreach (explode(',', $authorized_list) as $it) { if (strcasecmp(trim($it), $user_id) === 0) return true; }
+    return false;
+}
+
+// ---- lifts ------------------------------------------------------------------
+function cut($src, $a, $b, $what) {
+    $i = strpos($src, $a);
+    if ($i === false) fatal("$what: start anchor missing: $a");
+    $j = strpos($src, $b, $i + strlen($a));
+    if ($j === false) fatal("$what: end anchor missing: $b");
+    if (strpos($src, $a, $i + 1) !== false) fatal("$what: start anchor is not unique: $a");
+    return substr($src, $i, $j - $i);
+}
+function once($src, $re, $what) {
+    $n = preg_match_all($re, $src, $m);
+    if ($n !== 1) fatal("$what: expected exactly one match of $re, found $n");
+    return $m[0][0];
+}
+
+$code = array();
+// index.php: the per-report role block, up to the repo-mode override.
+$code['role'] = cut($idx, '// --- PER-REPORT POWER-USER ROLE ---', '// Repo page never shows the console', 'index role block');
+// index.php: the owner promotion, then the view gate's condition. The gate is the
+// last `if (` line before the first statement of the authorized branch.
+$p0 = strpos($idx, '// OWNER == report-grant-equivalent');
+if ($p0 === false) fatal('index owner promotion: anchor missing');
+$clob = strpos($idx, "// Read CLOB via OCI8 to avoid PDO's 4000-byte buffer corruption", $p0);
+if ($clob === false) fatal('index view gate: CLOB anchor missing');
+$gate = strrpos(substr($idx, 0, $clob), "\n                if (");
+if ($gate === false || $gate < $p0) fatal('index view gate: no if ( line between the promotion and the CLOB read');
+$code['promo'] = substr($idx, $p0, $gate - $p0);
+if (strlen($code['promo']) > 3000) fatal('index owner promotion: lifted block is ' . strlen($code['promo']) . ' chars (anchors drifted?)');
+if (!preg_match('/^\s*if \((.*)\) \{\s*$/s', substr($idx, $gate, $clob - $gate), $gm)) fatal('index view gate: unparseable');
+$code['cond'] = $gm[1];
+// index.php: the journal block from the "enabled?" sniff to the preload's if
+// (both builds have both ends; the newer one holds $pnbJrnAccess in between).
+$code['jrn'] = cut($idx, '$pnbJrnEnabled = strpos(', 'if ($pnbJrnWanted && !empty($currentUserKey))', 'index journal badge preload');
+$code['sb'] = cut($idx, '$sb_is_admin = false;', "\n?>", 'index role badges');
+$code['pills'] = cut($idx, '<div class="sb-uroles">', '</div>', 'index role pills') . '</div>';
+// dashboard.php
+$code['dview'] = once($dash, '/\$mayView = [^;]+;/', 'dashboard view gate');
+$code['dedit'] = once($dash, '/\$canEdit = \(\$isAdmin[^;]+;/', 'dashboard editor flag');
+// query.php
+$code['qsid'] = once($qry, '/\$penumbraAuthShortId = [^;]+;/', 'query author short id');
+$code['qauth'] = once($qry, '/\$penumbraCanAuthorReport = [^;]+;/', 'query author flag');
+$code['qview'] = once($qry, '/\$can_view = \$is_owner[^;]+;/', 'query view check');
+
+// ---- the index.php matrix -------------------------------------------------------
+function idx_run($code, $sc) {
+    global $isAdmin;
+    // What index.php holds at those points. $isAdmin is db_connection.php's, which
+    // &noadm has already cleared; the global copy is checkAuthorization's.
+    $isAdmin = $sc['adm'] && !$sc['noadm'];
+    $GLOBALS['isAdmin'] = $isAdmin;
+    $noadm = $sc['noadm'] ? 1 : 0;
+    $userGrants = array('reports' => array(), 'sql' => array());
+    if ($sc['grant'] > 0) $userGrants['reports'][] = array('pattern' => 'R*', 'scheduler' => $sc['grant'] > 1);
+    $currentUserKey = 'ada';
+    $user_ouc = '140101';
+    $_GET = array('id' => 'R1');
+    $owner_id = $sc['owner'] ? 'ADA ' : 'zed';
+    $authorized_list = $sc['auth'] ? 'bob, ada' : 'adminonly';
+    $preloaded_state_json = $sc['jrn'] ? '{"viewOptions":{"journalEnabled":true}}' : '{"viewOptions":{}}';
+    eval($code['role']);
+    eval($code['promo']);
+    $view = (bool)eval('return (' . $code['cond'] . ');');
+    eval($code['jrn']);
+    eval($code['sb']);
+    ob_start();
+    eval('?>' . $code['pills']);
+    $html = ob_get_clean();
+    preg_match_all('/<span class="sb-urole [^"]*">([^<]+)<\/span>/', $html, $pm);
+    return array('edit' => (bool)$canEditLoadedReport, 'sched' => (bool)$canScheduleLoadedReport, 'view' => $view,
+                 'cls' => trim($admin_class), 'jrn' => (bool)$pnbJrnWanted, 'owner' => (bool)$sb_is_owner,
+                 'pills' => implode('+', $pm[1]),
+                 // null = the build has no such flag (before 2026-10-01's fix)
+                 'acc' => isset($pnbJrnAccess) ? (bool)$pnbJrnAccess : null);
+}
+
+$n = 0;
+foreach (array(0, 1) as $adm) foreach (array(0, 1) as $own) foreach (array(0, 1, 2) as $gr)
+foreach (array(0, 1) as $na) foreach (array(0, 1) as $au) foreach (array(false, true) as $jr) {
+    $sc = array('adm' => $adm, 'owner' => $own, 'grant' => $gr, 'noadm' => $na, 'auth' => $au, 'jrn' => $jr);
+    $lab = ($adm ? 'admin' : 'user') . ($own ? '+owner' : '') . ($gr === 2 ? '+grant(sched)' : ($gr ? '+grant' : ''))
+         . ($na ? ' &noadm' : '') . ($au ? ' authorized' : '') . ($jr ? ' journal-on' : '');
+    $r = idx_run($code, $sc);
+    $isAdm = $adm && !$na;
+    $edit = $isAdm || (!$na && ($gr > 0 || $own));
+    $sched = $isAdm || (!$na && $gr === 2);
+    $view = $isAdm || $own || $gr > 0 || $au;
+    $cls = $edit ? ($isAdm ? 'admin-view' : 'admin-view scoped-editor') : '';
+    // manage_journal.php's journalCallerCanView: admin, owner or the access list
+    // (no grant term). The peek, and so the preload, needs it on top of edit.
+    $acc = $isAdm || $own || $au;
+    $jrn = ($edit && $acc) || $jr;
+    $ownerPill = $own && !$na;
+    $pills = ($isAdm ? 'Administrator' : ($edit ? 'Report Editor' : 'Explorer')) . ($ownerPill ? '+Owner' : '');
+    T('P1', "editor flag: $lab", $r['edit'] === $edit, 'got ' . var_export($r['edit'], true) . ' want ' . var_export($edit, true));
+    T('P2', "scheduler flag: $lab", $r['sched'] === $sched, 'got ' . var_export($r['sched'], true) . ' want ' . var_export($sched, true));
+    T('P3', "the report opens: $lab", $r['view'] === $view, 'got ' . var_export($r['view'], true) . ' want ' . var_export($view, true));
+    T('P4', "body class: $lab", $r['cls'] === $cls, "got '{$r['cls']}' want '$cls'");
+    T('P5', "journal badge preloaded: $lab", $r['jrn'] === $jrn, 'got ' . var_export($r['jrn'], true) . ' want ' . var_export($jrn, true));
+    T('P6', "Owner pill: $lab", $r['owner'] === $ownerPill, 'got ' . var_export($r['owner'], true) . ' want ' . var_export($ownerPill, true));
+    T('P7', "role pills rendered: $lab", $r['pills'] === $pills, "got '{$r['pills']}' want '$pills'");
+    T('P8', "journal API access (penumbra_vars.journalAccess): $lab", $r['acc'] === $acc, 'got ' . var_export($r['acc'], true) . ' want ' . var_export($acc, true));
+    $n++;
+}
+
+// ---- dashboard.php ----------------------------------------------------------------
+function dash_run($code, $sc) {
+    global $isAdmin;
+    $isAdmin = $sc['adm'] && !$sc['noadm'];
+    $GLOBALS['isAdmin'] = $isAdmin;
+    $noadm = $sc['noadm'] ? 1 : 0;
+    $currentUserKey = 'ada';
+    $user_ouc = '140101';
+    $dash = array('OWNER_ID' => $sc['owner'] ? 'ada' : 'zed', 'AUTHORIZED' => $sc['auth'] ? 'ada' : 'adminonly');
+    eval($code['dview']);
+    eval($code['dedit']);
+    return array('view' => (bool)$mayView, 'edit' => (bool)$canEdit);
+}
+foreach (array(0, 1) as $adm) foreach (array(0, 1) as $own) foreach (array(0, 1) as $na) foreach (array(0, 1) as $au) {
+    $lab = ($adm ? 'admin' : 'user') . ($own ? '+owner' : '') . ($na ? ' &noadm' : '') . ($au ? ' authorized' : '');
+    $r = dash_run($code, array('adm' => $adm, 'owner' => $own, 'noadm' => $na, 'auth' => $au));
+    $isAdm = $adm && !$na;
+    $edit = $isAdm || (!$na && $own);
+    $view = $isAdm || $own || $au;
+    T('D1', "dashboard builder: $lab", $r['edit'] === $edit, 'got ' . var_export($r['edit'], true) . ' want ' . var_export($edit, true));
+    T('D2', "dashboard opens: $lab", $r['view'] === $view, 'got ' . var_export($r['view'], true) . ' want ' . var_export($view, true));
+}
+
+// ---- query.php --------------------------------------------------------------------
+function q_run($code, $sc) {
+    global $isAdmin;
+    $isAdmin = $sc['adm'] && !$sc['noadm'];
+    $GLOBALS['isAdmin'] = $isAdmin;
+    $noadm = $sc['noadm'] ? 1 : 0;
+    $currentUserKey = 'ada';
+    $user_ouc = '140101';
+    $userGrants = array('reports' => array(), 'sql' => array());
+    if ($sc['grant']) $userGrants['reports'][] = array('pattern' => 'R1');
+    if ($sc['sql']) $userGrants['sql'][] = array('table' => 'T1');
+    $_POST = $sc['sid'] ? array('short_id' => 'R1') : array();
+    $view = null;
+    // query.php sets $is_owner on its non-admin path only, after finding the row.
+    if (!$isAdmin && $sc['sid']) {
+        $is_owner = (bool)$sc['owner'];
+        $authorized_str = $sc['auth'] ? 'ada' : 'adminonly';
+        $check_short_id = 'R1';
+        eval($code['qview']);
+        $view = (bool)$can_view;
+    }
+    eval($code['qsid']);
+    eval($code['qauth']);
+    return array('author' => (bool)$penumbraCanAuthorReport, 'view' => $view);
+}
+foreach (array(0, 1) as $adm) foreach (array(0, 1) as $own) foreach (array(0, 1) as $gr) foreach (array(0, 1) as $na)
+foreach (array(0, 1) as $sid) foreach (array(0, 1) as $sql) foreach (array(0, 1) as $au) {
+    $lab = ($adm ? 'admin' : 'user') . ($own ? '+owner' : '') . ($gr ? '+grant' : '') . ($sql ? '+sql' : '')
+         . ($na ? ' &noadm' : '') . ($sid ? ' report' : ' ad-hoc') . ($au ? ' authorized' : '');
+    $r = q_run($code, array('adm' => $adm, 'owner' => $own, 'grant' => $gr, 'noadm' => $na, 'sid' => $sid, 'sql' => $sql, 'auth' => $au));
+    $isAdm = $adm && !$na;
+    $author = $isAdm || (!$na && ((!$isAdm && $sid && $own) || ($sid && $gr) || (!$sid && $sql)));
+    T('Q1', "query.php author copy: $lab", $r['author'] === $author, 'got ' . var_export($r['author'], true) . ' want ' . var_export($author, true));
+    if (!$isAdm && $sid) {
+        $view = $own || $gr || $au;   // unchanged by &noadm: ownership and a grant still VIEW
+        T('Q2', "query.php view check: $lab", $r['view'] === $view, 'got ' . var_export($r['view'], true) . ' want ' . var_export($view, true));
+    }
+}
+
+// ---- static pins --------------------------------------------------------------------
+$flagN = substr_count($idx, '$pnbEditorRolesOn = !$noadm;');
+$flagAt = strpos($idx, '$pnbEditorRolesOn = !$noadm;');
+$editAt = strpos($idx, '$canEditLoadedReport = $isAdmin');
+T('S1', 'index.php sets the &noadm role flag once, before the editor flag, from $noadm', $flagN === 1 && $flagAt !== false && $editAt !== false && $flagAt < $editAt,
+  "defined=$flagN at=" . var_export($flagAt, true) . ' editFlagAt=' . var_export($editAt, true));
+$pv1 = strpos($idx, 'isAdmin: <?php echo json_encode($canEditLoadedReport); ?>,') !== false;
+$pv2 = strpos($idx, 'canEditReport: <?php echo json_encode($canEditLoadedReport); ?>,') !== false;
+$pv3 = strpos($idx, 'noadm: <?php echo json_encode((bool)$noadm); ?>,') !== false;
+$con = strpos($idx, "<?php if (\$canEditLoadedReport): ?>\n  <div id=\"admWrapper\"") !== false;
+$asof = strpos($idx, 'if ($pnbAsOfId > 0 && !$canEditLoadedReport) {');
+T('S2', 'the console, penumbra_vars.isAdmin / canEditReport and ?asof= all key on the editor flag, after the promotion',
+  $pv1 && $pv2 && $pv3 && $con && $asof !== false && $asof > $gate,
+  "isAdmin=$pv1 canEditReport=$pv2 noadm=$pv3 console=$con asofAfterGate=" . var_export($asof !== false && $asof > $gate, true));
+$note = cut($idx, '<div id="spColumnsAdminNote"', '</div>', 'Columns note');
+$intro = cut($idx, '>End-User UI Options</h4>', '</p>', 'View Options intro');
+T('S3', 'the Columns note and the View Options intro name viewers who cannot edit the report, not non-admins',
+  strpos($note, 'viewers who cannot edit this report') !== false && strpos($intro, 'viewers who cannot edit this report') !== false
+  && stripos($note . $intro, 'non-admin') === false, strip_tags($note) . ' | ' . strip_tags($intro));
+if (!preg_match("/var PNB_USER_HIDDEN_NOTE = '((?:[^'\\\\]|\\\\.)*)';/", $mjs, $nm)) fatal('main.js: PNB_USER_HIDDEN_NOTE not found');
+$noteText = stripcslashes($nm[1]);
+T('S4', 'the marker note is the editors\' wording, and the help quotes it verbatim',
+  $noteText === "EDITORS ONLY: View Options hide this from this report's viewers." && strpos($help, '&ldquo;' . $noteText . '&rdquo;') !== false
+  && strpos($help, 'ADMIN ONLY: View Options hide') === false, "note=[$noteText]");
+$s6 = strpos($help, 'viewers get the table without the control bar at all') !== false;
+$old = strpos($help, 'toggles there take effect at once') !== false;
+$inc = stripos($help, 'admins included') !== false;
+$pre = strpos($help, 'To see what a viewer sees, save the report and reopen it with <code>&amp;noadm</code>.') !== false;
+T('S5', 'View Options help: no live &noadm preview, no "admins included" journal claim, the searchbar S6 phrase kept',
+  $s6 && !$old && !$inc && $pre, "s6=$s6 oldPreview=$old adminsIncluded=$inc newPreview=$pre");
+$urow = cut($help, '<code>noadm</code></td>', '</tr>', 'help URL-parameter row');
+$jav = cut($help, '<strong>Availability</strong></div>', '</div></div>', 'help journal availability');
+T('S6', 'help: &noadm drops owner/editor status (Owner pill, outlines, console) and the journal topic names the editors\' peek',
+  strpos($urow, 'Owner pill') !== false && strpos($urow, 'report-owner and report-editor status') !== false && strpos($urow, 'still opens, as a viewer') !== false
+  && strpos($jav, 'editors (administrators, its owner, and report-grant holders who are also on its access list) still get the J icon, marked amber') !== false,
+  'urow=' . substr(strip_tags($urow), 0, 160));
+$accInit = strpos($idx, '$pnbJrnAccess = false;');
+$accSet  = strpos($idx, '$pnbJrnAccess = $isAdmin');
+$accVar  = strpos($idx, 'journalAccess: <?php echo json_encode((bool)$pnbJrnAccess); ?>,') !== false;
+T('S7', 'penumbra_vars.journalAccess carries $pnbJrnAccess, defaulted to false before the ?id= branch sets it',
+  $accInit !== false && $accSet !== false && $accInit < $accSet && $accVar,
+  'init=' . var_export($accInit, true) . ' set=' . var_export($accSet, true) . " emitted=$accVar");
+
+// ---- help_content.php rendered, as the lazy help fetch gets it ------------------------
+// Its only PHP is the db_connection.php include (dropped here), $isAdmin gates and
+// date() examples. A topic outside every $isAdmin block reaches every viewer.
+function help_render($help, $admin) {
+    $isAdmin = $admin;
+    ob_start();
+    eval('?>' . $help);
+    return ob_get_clean();
+}
+if (substr_count($help, "require_once 'db_connection.php';") !== 1) fatal('help_content.php: the db_connection.php include is not there exactly once');
+$helpSrc = str_replace("require_once 'db_connection.php';", '', $help);
+$hUser = help_render($helpSrc, false);
+$hAdm  = help_render($helpSrc, true);
+$has = function ($html, $id) { return strpos($html, '<div id="' . $id . '" class="help-topic">') !== false; };
+$hv = array();
+foreach (array('viewoptionsHelpLightbox', 'journalHelpLightbox', 'schedulerHelpLightbox', 'schedulerPromptHelpLightbox', 'schedOnCompletionHelpLightbox') as $tid) {
+    $hv[] = $tid . '=' . ($has($hUser, $tid) ? 'U' : '-') . ($has($hAdm, $tid) ? 'A' : '-');
+}
+T('S8', 'help: the View Options and Report Journal topics reach a non-admin too (owners, grant holders, journal viewers); their admin-only neighbours stay admin-only',
+  $has($hUser, 'viewoptionsHelpLightbox') && $has($hUser, 'journalHelpLightbox') && $has($hAdm, 'viewoptionsHelpLightbox') && $has($hAdm, 'journalHelpLightbox')
+  && !$has($hUser, 'schedulerHelpLightbox') && !$has($hUser, 'schedulerPromptHelpLightbox') && !$has($hUser, 'schedOnCompletionHelpLightbox')
+  && $has($hAdm, 'schedulerHelpLightbox') && $has($hAdm, 'schedulerPromptHelpLightbox') && $has($hAdm, 'schedOnCompletionHelpLightbox'),
+  implode(' ', $hv));
+$s9 = array(
+    'persist' => strpos($help, 'Viewers who cannot edit the report see the restricted UI automatically.') !== false && strpos($help, 'Non-admin viewers see the restricted UI') === false,
+    'share'   => strpos($help, 'the same View Options the report\'s editor configured.') !== false && strpos($help, 'View Options the admin configured') === false,
+    'badges'  => strpos($help, 'Badges are also hidden automatically for viewers who cannot edit the report when') !== false && strpos($help, 'hidden automatically for non-admin viewers') === false,
+    'asuser'  => strpos($help, 'A report you own still opens there; whether a viewer can open it at all is up to its access list.') !== false,
+);
+T('S9', 'help: persistence, share-link and summary-badge copy name the report\'s editors, and Open as User says an owned report still opens',
+  !in_array(false, $s9, true), json_encode($s9));
+
+// ---- report -------------------------------------------------------------------------
+$fail = 0;
+foreach ($A as $a) {
+    if (!$a[2]) $fail++;
+    echo 'A|' . $a[0] . '|' . ($a[2] ? 1 : 0) . '|' . str_replace(array('|', "\n"), array('/', ' '), $a[1]) . '|' . str_replace(array('|', "\n"), array('/', ' '), $a[3]) . "\n";
+}
+echo count($A) . " assertions, $fail failed\n";

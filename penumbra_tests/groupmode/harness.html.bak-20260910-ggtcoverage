@@ -1,0 +1,1321 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>group mode</title></head>
+<body>
+<!-- Minimal report DOM. rebuildGroupedView() reads the group column off
+     #resultsTable > thead > tr#tableHeader th[data-colname] and the cell values
+     off each row's td[data-column], so those two attributes must agree. The
+     grouping picker is deliberately EMPTY: getCustomSelectValue() then returns
+     '' and the rebuild falls back to currentGroupingColumn, which is what
+     __GM.setLevels() drives. -->
+<table id="resultsTable"><thead><tr id="tableHeader">
+  <th data-colname="#" data-column="c0">#</th>
+  <th data-colname="COLLEGE" data-column="c1">COLLEGE</th>
+  <th data-colname="DEPT" data-column="c2">DEPT</th>
+  <th data-colname="AWARD_DATE" data-column="c3">AWARD_DATE</th>
+  <th data-colname="AMOUNT" data-column="c4">AMOUNT</th>
+  <th data-colname="ACTIVE" data-column="c5">ACTIVE</th>
+</tr></thead><tbody></tbody></table>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="pnbNoSearchMatches" style="display:none"></div>
+<input id="tableSearch" value="">
+<div id="pivot-output-container" style="display:none"></div>
+<div id="snapshotComparisonContainer" style="display:none"></div>
+<div id="errorBox"></div>
+<div id="undo_text_container"></div>
+<!-- main.js initialises the CodeMirror editors during ready, unconditionally,
+     so these must exist even though group mode never uses them. Without them
+     init throws and the closure never assigns PENUMBRA_PIVOT_SPLITS. -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<select id="rowsPerPageSelector"><option value="100">100</option></select>
+<a href="#" id="expandAllGroups">Expand all</a><a href="#" id="collapseAllGroups">Collapse all</a>
+<!-- Copy Snippet writer surface. main.js binds #copyGroupSnippetBtn directly at
+     ready time, so it and the fields it reads must exist BEFORE main.js loads. -->
+<div id="groupingLightbox" style="display:none"></div>
+<input type="checkbox" id="groupAggCheckbox">
+<div id="groupAggOptions" style="display:none"></div>
+<select id="groupAggType"><option value="sum">sum</option><option value="avg">avg</option></select>
+<select id="groupSortSelect">
+  <option value="label|asc">label asc</option><option value="label|desc">label desc</option>
+  <option value="count|asc">count asc</option><option value="count|desc">count desc</option>
+</select>
+<button id="copyGroupSnippetBtn" type="button">Snippet</button>
+<div id="groupingColumnSelector" class="penumbra-custom-select">
+  <div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div>
+</div>
+<div id="groupLevel2Row" style="display:none">
+  <div id="groupingColumnSelector2" class="penumbra-custom-select">
+    <div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div>
+  </div>
+</div>
+<div id="groupLevel3Row" style="display:none">
+  <div id="groupingColumnSelector3" class="penumbra-custom-select">
+    <div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div>
+  </div>
+</div>
+<div id="groupAggColumn" class="penumbra-custom-select">
+  <div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div>
+</div>
+<!-- The rest of the grouping dialog's controls, and the Reset button that
+     clears them. main.js binds #resetGroupingBtn at ready time, so the button
+     has to exist BEFORE main.js loads or the handler is never wired and the
+     reset phase would silently assert against an inert click. -->
+<select id="groupStartDepth">
+  <option value="0">Collapsed</option><option value="1">Level 1</option>
+  <option value="2">Level 2</option><option value="3">All levels</option>
+</select>
+<select id="groupLimitDir"><option value="top">top</option><option value="bottom">bottom</option></select>
+<input type="text" id="groupLimitN"><input type="text" id="groupLimitMinRows">
+<input type="checkbox" id="groupLimitOther" checked>
+<div id="groupSummaryFilterHint" style="display:none"></div>
+<button id="resetGroupingBtn" type="button">Reset</button>
+<!-- The shared preset engine mounts its chip here. Must exist before main.js
+     runs _groupMountPresetChip() at ready, or the control is never created,
+     _groupPresetCtl stays null, and the reset handler's guarded call to
+     setLoaded(null) becomes a no-op that asserts nothing. -->
+<div id="groupPresetMount"></div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<!-- Before main.js, matching index.php's own order: main.js's ready handler
+     calls _groupMountPresetChip(), which needs window.PenumbraPresets to exist. -->
+<script src="penumbra_presets.js"></script>
+<script>
+  // Same boot stubs as the pivot_trigger / parity harnesses.
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  // Synchronous show/hide AND slide: the fx ticker's rAF never fires under
+  // --dump-dom, so an animated slideDown would leave .group-content at
+  // display:none and every :visible assertion below would read wrong.
+  // (Do NOT null requestAnimationFrame instead - main.js calls it during init
+  // and the ready closure would die before binding anything.)
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () {
+    this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {};
+  };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  // Clipboard capture for the Copy Snippet handler (same stub the pivot_trigger
+  // harness uses) - the writer's only observable output is what it writes here.
+  window.__clip = null;
+  if (!navigator.clipboard) { try { Object.defineProperty(navigator, 'clipboard', { value: {}, configurable: true }); } catch (e) {} }
+  try { navigator.clipboard.writeText = function (s) { window.__clip = s; return Promise.resolve(); }; } catch (e) {}
+  window.__errors = [];
+  window.onerror = function (m, src, line) {
+    window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line);
+    try { var o = document.getElementById('out'); if (o && o.textContent === 'running') o.textContent = 'PAGE_ERROR: ' + window.__errors[0]; } catch (x) {}
+    return true;
+  };
+</script>
+<script src="main_patched.js"></script>
+<script>
+(function () {
+  function report(txt) { document.getElementById('out').textContent = txt; }
+  var results = [];
+  function assert(name, cond, detail) { results.push({ name: name, pass: !!cond, detail: detail === undefined ? '' : String(detail) }); }
+  function eq(name, got, want) { assert(name, got === want, 'got ' + JSON.stringify(got) + ' want ' + JSON.stringify(want)); }
+
+  // --- Fixture -----------------------------------------------------------
+  // Chosen so every level has an uneven fan-out (2/1 and 2/1), which is what
+  // catches an off-by-one that a symmetric tree would hide. Fiscal years run
+  // Jul-Jun named by the ENDING year, so the AWARD_DATE column spans FY24-FY26.
+  var COLS = ['#', 'COLLEGE', 'DEPT', 'AWARD_DATE', 'AMOUNT', 'ACTIVE'];
+  var DATA = [
+    ['1', 'Eng', 'ECE',  '2024-03-15', '100000', '1'],
+    ['2', 'Eng', 'ECE',  '2024-08-20', '250000', '0'],
+    ['3', 'Eng', 'ME',   '2024-03-01', '50000',  '1'],
+    ['4', 'Sci', 'BIO',  '2025-01-10', '75000',  '0'],
+    ['5', 'Sci', 'BIO',  '2025-09-05', '300000', '1'],
+    ['6', 'Sci', 'CHEM', '2024-11-11', '125000', '1']
+  ];
+  // FY per row (Jul 1 - Jun 30, named by ending year):
+  //   r1 2024-03 -> FY24   r2 2024-08 -> FY25   r3 2024-03 -> FY24
+  //   r4 2025-01 -> FY25   r5 2025-09 -> FY26   r6 2024-11 -> FY25
+
+  function buildTable(rows) {
+    rows = rows || DATA;
+    var tb = document.querySelector('#resultsTable tbody');
+    tb.innerHTML = '';
+    for (var i = 0; i < rows.length; i++) {
+      var tr = document.createElement('tr');
+      for (var c = 0; c < COLS.length; c++) {
+        var td = document.createElement('td');
+        td.setAttribute('data-column', 'c' + c);
+        td.textContent = rows[i][c];
+        tr.appendChild(td);
+      }
+      tb.appendChild(tr);
+    }
+    var maps = rows.map(function (row) {
+      var m = new Map();
+      for (var c = 0; c < COLS.length; c++) m.set(COLS[c], row[c]);
+      return m;
+    });
+    window.__GM.setRows(maps);
+  }
+
+  // Group values that collide with Object.prototype. The app reports over
+  // arbitrary SQL, so a column holding the literal text "constructor" is not
+  // exotic - and on a plain {} it CRASHES the grouping walk outright
+  // (`if (!groups[v]) groups[v] = []` never fires, so the next .push runs
+  // against the Object constructor). A plain-value fixture passes either way,
+  // so only these names discriminate.
+  var PROTO_DATA = [
+    ['1', 'constructor',    'ECE', '2024-03-15', '100000', '1'],
+    ['2', 'constructor',    'ME',  '2024-08-20', '250000', '0'],
+    ['3', 'toString',       'ECE', '2024-03-01', '50000',  '1'],
+    ['4', '__proto__',      'BIO', '2025-01-10', '75000',  '0'],
+    ['5', '__proto__',      'BIO', '2025-09-05', '300000', '1'],
+    ['6', 'hasOwnProperty', 'CHEM','2024-11-11', '125000', '1'],
+    ['7', 'Eng',            'ECE', '2024-04-04', '10000',  '1']
+  ];
+
+  // Read the rendered tree back as plain nested objects, so assertions talk
+  // about shape rather than about jQuery.
+  function readTree($parent) {
+    return $parent.children('.group-wrapper').map(function () {
+      var $w = $(this);
+      var $content = $w.children('.group-content');
+      var kids = readTree($content);
+      return {
+        key: $w.attr('data-group-key'),
+        path: $w.attr('data-group-path'),
+        depth: $w.attr('data-group-depth'),
+        col: $w.attr('data-group-col'),
+        leaf: $w.hasClass('group-leaf'),
+        branch: $w.hasClass('group-branch'),
+        count: $w.children('.group-header').children('.group-count').text(),
+        rows: $content.children('table').children('tbody').children('tr').length,
+        kids: kids
+      };
+    }).get();
+  }
+  function tree() { return readTree($('#groupedResultsContainer')); }
+  // Every data row must appear exactly once across the LEAVES - the single
+  // cheapest guard against a recursion that duplicates or drops rows.
+  function leafRowTotal(nodes) {
+    var t = 0;
+    for (var i = 0; i < nodes.length; i++) {
+      t += nodes[i].leaf ? nodes[i].rows : leafRowTotal(nodes[i].kids);
+    }
+    return t;
+  }
+  // A miss returns a SENTINEL, never null: on a positive-control run half these
+  // nodes legitimately do not exist, and a null here would throw on the first
+  // .rows/.kids and abort the whole run as one opaque fatal instead of letting
+  // each assertion fail on its own with a readable value.
+  var MISSING = { key: null, path: null, depth: null, col: null,
+                  leaf: false, branch: false, count: null, rows: -1, kids: [] };
+  function group(nodes, key) {
+    for (var i = 0; i < (nodes || []).length; i++) if (String(nodes[i].key) === key) return nodes[i];
+    return MISSING;
+  }
+
+  // __GM2 is the nested-grouping API. When it is absent (a pre-nesting main.js -
+  // the positive control) the harness still drives level 0 through the scalar,
+  // so the single-level and bucket phases run and only the nesting assertions
+  // fail. NESTED is the gate the nesting phases check.
+  //
+  // Assigned inside run(), NEVER here: main.js's body sits in $(document).ready,
+  // which jQuery defers, so at the time THIS script executes neither hook set
+  // exists yet. Reading it eagerly latched false on a perfectly good build and
+  // produced 31 phantom failures.
+  var NESTED = false;
+  function regroup(levels) {
+    if (NESTED) { window.__GM2.setLevels(levels); }
+    else { window.__GM.setLevel0(levels[0] || null); }
+    // CLEAR THE DIALOG PICKER FIRST. rebuildGroupedView() opens with
+    //   getCustomSelectValue('groupingColumnSelector') || currentGroupingColumn
+    // so the DIALOG wins over the level stack this helper just set. Phase I
+    // drives that picker and leaves it on COLLEGE, and every phase after it
+    // happened to use COLLEGE as level 0 - so a stale picker went unnoticed
+    // until a phase asked for a different level 0 and silently got COLLEGE
+    // back, complete with plausible-looking assertions failing for the wrong
+    // reason. Blanking it makes the level stack authoritative, which is what
+    // every caller here means.
+    $('#groupingColumnSelector .pcs-selected').attr('data-value', '').text('-- None --');
+    window.__GM.rebuild();
+  }
+
+  function run() {
+    if (!window.__GM) {
+      report('RESULTS_JSON:' + JSON.stringify({
+        fatal: 'window.__GM missing - hook injection failed. __GM_ERR=' + String(window.__GM_ERR),
+        pageErrors: window.__errors.slice(0, 6), results: []
+      }));
+      return;
+    }
+    NESTED = !!window.__GM2;
+    try {
+      buildTable();
+      window.__GM.setAgg(null);
+      window.__GM.setSort({ key: 'label', dir: 'asc' });
+      window.__GM.setCustomSort({});
+
+      // ================= A. SINGLE LEVEL = the invariant =================
+      // Nesting must be strictly opt-in: with one level the renderer has to
+      // produce exactly the flat shape it produced before the tree existed.
+      regroup(['COLLEGE']);
+      var t1 = tree();
+      eq('1 level: two top-level groups', t1.length, 2);
+      eq('1 level: every wrapper is a leaf', t1.filter(function (n) { return n.leaf; }).length, 2);
+      eq('1 level: no branch wrappers', $('#groupedResultsContainer .group-branch').length, 0);
+      eq('1 level: no nested wrappers at all', $('#groupedResultsContainer .group-wrapper .group-wrapper').length, 0);
+      eq('1 level: Eng holds 3 rows', group(t1, 'Eng').rows, 3);
+      eq('1 level: Sci holds 3 rows', group(t1, 'Sci').rows, 3);
+      eq('1 level: every source row appears exactly once', leafRowTotal(t1), DATA.length);
+      eq('1 level: depth is 0', group(t1, 'Eng').depth, '0');
+      eq('1 level: path is the bare label', group(t1, 'Eng').path, 'Eng');
+      eq('1 level: count pill is the row count', group(t1, 'Eng').count, '3');
+      eq('1 level: data-group-col names the level column', group(t1, 'Eng').col, 'COLLEGE');
+      eq('1 level: label sort puts Eng before Sci', t1[0].key, 'Eng');
+
+      // ================= B. TWO LEVELS =================
+      regroup(['COLLEGE', 'DEPT']);
+      var t2 = tree();
+      eq('2 levels: still two top-level groups', t2.length, 2);
+      eq('2 levels: top level is a BRANCH', group(t2, 'Eng').branch, true);
+      eq('2 levels: a branch owns no table of its own', group(t2, 'Eng').rows, 0);
+      eq('2 levels: Eng splits into 2 departments', group(t2, 'Eng').kids.length, 2);
+      eq('2 levels: Sci splits into 2 departments', group(t2, 'Sci').kids.length, 2);
+      eq('2 levels: ECE holds 2 rows', group(group(t2, 'Eng').kids, 'ECE').rows, 2);
+      eq('2 levels: ME holds 1 row', group(group(t2, 'Eng').kids, 'ME').rows, 1);
+      eq('2 levels: CHEM holds 1 row', group(group(t2, 'Sci').kids, 'CHEM').rows, 1);
+      eq('2 levels: no row duplicated or dropped', leafRowTotal(t2), DATA.length);
+      eq('2 levels: child is a leaf', group(group(t2, 'Eng').kids, 'ECE').leaf, true);
+      eq('2 levels: child depth is 1', group(group(t2, 'Eng').kids, 'ECE').depth, '1');
+      eq('2 levels: child path carries its ancestor', group(group(t2, 'Eng').kids, 'ECE').path, 'Eng|||ECE');
+      eq('2 levels: child data-group-col is the CHILD column', group(group(t2, 'Eng').kids, 'ECE').col, 'DEPT');
+      eq('2 levels: branch count pill totals its children', group(t2, 'Eng').count, '3');
+      eq('2 levels: sub-groups sort by label', (group(t2, 'Sci').kids[0] || MISSING).key, 'BIO');
+      // A repeated label under two different parents must stay two distinct
+      // nodes with distinct paths - this is what collapse state keys on.
+      assert('2 levels: same label under different parents gets distinct paths',
+        group(group(t2, 'Eng').kids, 'ECE').path !== group(group(t2, 'Sci').kids, 'BIO').path,
+        'Eng|||ECE vs Sci|||BIO');
+
+      // ================= C. THREE LEVELS, MIDDLE ONE BUCKETED =============
+      regroup(['COLLEGE', 'AWARD_DATE:fy', 'DEPT']);
+      var t3 = tree();
+      eq('3 levels: two top-level groups', t3.length, 2);
+      var eng = group(t3, 'Eng');
+      eq('3 levels: Eng spans FY24 and FY25', eng.kids.length, 2);
+      eq('3 levels: fiscal years are chronological', (eng.kids[0] || MISSING).key, 'FY24');
+      eq('3 levels: FY24 under Eng holds 2 rows across its leaves', leafRowTotal([eng.kids[0] || MISSING]), 2);
+      eq('3 levels: FY25 under Eng holds 1 row', leafRowTotal([eng.kids[1] || MISSING]), 1);
+      var sci = group(t3, 'Sci');
+      var engFy0 = eng.kids[0] || MISSING, engFy1 = eng.kids[1] || MISSING;
+      var sciFy0 = sci.kids[0] || MISSING, sciFy1 = sci.kids[1] || MISSING;
+      var deepest = (engFy0.kids && engFy0.kids[0]) || MISSING;
+      eq('3 levels: Sci spans FY25 and FY26', sci.kids.length, 2);
+      eq('3 levels: Sci fiscal years are chronological', sciFy0.key + '/' + sciFy1.key, 'FY25/FY26');
+      eq('3 levels: bucketed level names its TOKEN as the column', engFy0.col, 'AWARD_DATE:fy');
+      eq('3 levels: deepest node is a leaf', deepest.leaf, true);
+      eq('3 levels: deepest depth is 2', deepest.depth, '2');
+      eq('3 levels: deepest path has three segments', String(deepest.path).split('|||').length, 3);
+      eq('3 levels: no row duplicated or dropped', leafRowTotal(t3), DATA.length);
+      // FY24 under Eng is ECE(3/15) + ME(3/1) -> two separate departments.
+      eq('3 levels: FY24 under Eng splits into 2 departments', engFy0.kids.length, 2);
+
+      // ================= D. LEVEL CAP + MIRROR =================
+      assert('nesting API is present (__GM2)', NESTED, 'GM2_ERR=' + String(window.__GM2_ERR));
+      if (NESTED) {
+        eq('cap: the ceiling is 3', window.__GM2.maxLevels(), 3);
+        window.__GM2.setLevels(['COLLEGE', 'DEPT', 'AWARD_DATE', 'AMOUNT']);
+        eq('cap: a fourth level is clamped away', window.__GM2.getLevels().length, 3);
+        window.__GM2.setLevels(['COLLEGE', 'DEPT']);
+        eq('mirror: currentGroupingColumn is level 0', window.__GM2.getLevel0(), 'COLLEGE');
+        window.__GM2.setLevels([]);
+        eq('mirror: an empty stack nulls the mirror', window.__GM2.getLevel0(), null);
+        window.__GM2.setLevels('COLLEGE');
+        eq('setter: a bare string is accepted as one level', window.__GM2.getLevels().length, 1);
+        window.__GM2.setLevels(['COLLEGE', '', null]);
+        eq('setter: blank levels are dropped', window.__GM2.getLevels().length, 1);
+      }
+
+      // ================= E. A MISSING LEVEL DEGRADES, NEVER THROWS ========
+      regroup(['COLLEGE', 'NO_SUCH_COLUMN']);
+      var tMissing = tree();
+      eq('missing level: falls back to one level rather than failing', tMissing.length, 2);
+      eq('missing level: outer level still renders leaves', tMissing.filter(function (n) { return n.leaf; }).length, 2);
+      eq('missing level: rows are intact', leafRowTotal(tMissing), DATA.length);
+
+      // ================= F. BUCKET HELPERS (reused by later work) =========
+      var spec = window.__GM.bucketSpec('AWARD_DATE:fy');
+      assert('bucketSpec: a token resolves', !!spec, String(spec));
+      eq('bucketSpec: base is the column', spec ? spec.base : null, 'AWARD_DATE');
+      eq('bucketSpec: fiscal year of a March date', spec ? spec.label('2024-03-15') : null, 'FY24');
+      eq('bucketSpec: fiscal year of an August date', spec ? spec.label('2024-08-20') : null, 'FY25');
+      eq('bucketSpec: blank in, blank out', spec ? spec.label('') : null, '');
+      assert('bucketSpec: a plain column is not a bucket', window.__GM.bucketSpec('COLLEGE') === null, '');
+
+      var lab = NESTED ? window.__GM2.labeler('AWARD_DATE:fy') : null;
+      assert('labeler: resolves for a real column', typeof lab === 'function', typeof lab);
+      var firstRow = document.querySelector('#resultsTable tbody tr');
+      eq('labeler: reads the row and buckets it', lab ? lab(firstRow) : null, 'FY24');
+      assert('labeler: a missing column returns null', NESTED && window.__GM2.labeler('NOPE') === null, '');
+
+      // ACTIVE is 0/1 - it parses as numeric but has nothing to bin.
+      eq('binWorthwhile: a 0/1 flag is not worth binning', window.__GM.binWorth('ACTIVE'), false);
+      eq('variants: a boolean-ish numeric offers no buckets', window.__GM.variants('ACTIVE').length, 0);
+      eq('variants: a text column offers no buckets', window.__GM.variants('COLLEGE').length, 0);
+      assert('variants: a date column offers period buckets', window.__GM.variants('AWARD_DATE').length > 0,
+        window.__GM.variants('AWARD_DATE').length);
+      assert('variants: fiscal year is among them',
+        window.__GM.variants('AWARD_DATE').some(function (v) { return v.token === 'AWARD_DATE:fy'; }), '');
+      eq('variants: bucket tokens display as a friendly label',
+        window.__GM.dispLabel('AWARD_DATE:fy'), 'AWARD_DATE (Fiscal Year)');
+
+      // ================= G. CUSTOM SORT ORDER vs VARIANT ORDER ============
+      // The variant's own calendar order applies when nothing overrides it...
+      window.__GM.setCustomSort({});
+      var cmpPlain = window.__GM.sortCmp('AWARD_DATE:fy');
+      assert('sort: with no custom order, FY24 precedes FY25', cmpPlain('FY24', 'FY25') < 0, cmpPlain('FY24', 'FY25'));
+      // ...and a custom order covering the labels outranks it.
+      window.__GM.setCustomSort({ AWARD_DATE: { values: ['FY26', 'FY25', 'FY24'] } });
+      var cmpCustom = window.__GM.sortCmp('AWARD_DATE:fy');
+      assert('sort: a custom order flips the variant order', cmpCustom('FY24', 'FY25') > 0, cmpCustom('FY24', 'FY25'));
+      assert('sort: and orders the whole list by it', cmpCustom('FY26', 'FY24') < 0, cmpCustom('FY26', 'FY24'));
+      // A custom order for the column's RAW values matches no bucket label, so
+      // it must degrade to the variant order rather than scrambling it.
+      window.__GM.setCustomSort({ AWARD_DATE: { values: ['2025-09-05', '2024-03-15'] } });
+      var cmpIrrel = window.__GM.sortCmp('AWARD_DATE:fy');
+      assert('sort: an unrelated custom order degrades to the calendar',
+        cmpIrrel('FY24', 'FY25') < 0, cmpIrrel('FY24', 'FY25'));
+      // ...and the rendered tree agrees with the comparator.
+      window.__GM.setCustomSort({ AWARD_DATE: { values: ['FY26', 'FY25', 'FY24'] } });
+      regroup(['COLLEGE', 'AWARD_DATE:fy']);
+      var tCustom = tree();
+      eq('sort: the rendered fiscal bands follow the custom order',
+        (group(tCustom, 'Eng').kids[0] || MISSING).key, 'FY25');
+      window.__GM.setCustomSort({});
+
+      // ================= H. COLLAPSE STILL WORKS AT DEPTH =================
+      regroup(['COLLEGE', 'DEPT']);
+      var $engHeader = $('#groupedResultsContainer .group-wrapper[data-group-path="Eng"]').children('.group-header');
+      eq('collapse: the branch header exists', $engHeader.length, 1);
+      $engHeader.trigger('click');
+      assert('collapse: clicking a branch header opens it',
+        $('#groupedResultsContainer .group-wrapper[data-group-path="Eng"]').hasClass('open'), '');
+      var $eceHeader = $('#groupedResultsContainer .group-wrapper[data-group-path="Eng|||ECE"]').children('.group-header');
+      eq('collapse: the nested leaf header exists', $eceHeader.length, 1);
+      $eceHeader.trigger('click');
+      assert('collapse: a nested leaf toggles independently of its parent',
+        $('#groupedResultsContainer .group-wrapper[data-group-path="Eng|||ECE"]').hasClass('open'), '');
+      assert('collapse: toggling the child left the parent open',
+        $('#groupedResultsContainer .group-wrapper[data-group-path="Eng"]').hasClass('open'), '');
+
+      // ================= H2. BULK EXPAND / COLLAPSE AT DEPTH ==============
+      // The freeze this guards against is a PERF failure the harness cannot
+      // see (jQuery.fx.off makes the slides synchronous here), but the end
+      // state is exactly what broke when the bulk path was rewritten to skip
+      // the animation - so lock the state at every depth.
+      regroup(['COLLEGE', 'AWARD_DATE:fy', 'DEPT']);
+      var $allW = $('#groupedResultsContainer .group-wrapper');
+      var $allC = $('#groupedResultsContainer .group-content');
+      assert('expand all: the tree has wrappers at more than one depth',
+        $('#groupedResultsContainer .group-wrapper[data-group-depth="2"]').length > 0,
+        $allW.length + ' wrappers');
+      $('#expandAllGroups').trigger('click');
+      eq('expand all: every wrapper is open', $allW.not('.open').length, 0);
+      eq('expand all: no content left hidden', $allC.filter(function () {
+        return $(this).css('display') === 'none';
+      }).length, 0);
+      eq('expand all: the deepest level opened too',
+        $('#groupedResultsContainer .group-wrapper[data-group-depth="2"]').not('.open').length, 0);
+      $('#collapseAllGroups').trigger('click');
+      eq('collapse all: no wrapper left open', $allW.filter('.open').length, 0);
+      eq('collapse all: every content is hidden', $allC.filter(function () {
+        return $(this).css('display') !== 'none';
+      }).length, 0);
+      eq('collapse all: the deepest level closed too',
+        $('#groupedResultsContainer .group-wrapper[data-group-depth="2"]').filter('.open').length, 0);
+      // And a single header still toggles on its own afterwards.
+      $('#groupedResultsContainer .group-wrapper[data-group-path="Eng"]').children('.group-header').trigger('click');
+      assert('collapse all: a single header still toggles afterwards',
+        $('#groupedResultsContainer .group-wrapper[data-group-path="Eng"]').hasClass('open'), '');
+
+      // ================= H3. PER-LEVEL AGGREGATES + GRAND TOTAL ===========
+      // AMOUNT over the fixture: Eng = 100000+250000+50000 = 400,000
+      //                          Sci =  75000+300000+125000 = 500,000
+      //                          all = 900,000
+      // ECE = 350,000, ME = 50,000, BIO = 375,000, CHEM = 125,000
+      function aggOf(node) {
+        var el = node && node.el ? node.el : node;
+        if (!el) return null;
+        var v = el.querySelector(':scope > .group-header > .group-agg-summary > .group-agg-value');
+        return v ? v.textContent.trim() : null;
+      }
+      function wrapperByPath(p) {
+        return document.querySelector('#groupedResultsContainer .group-wrapper[data-group-path="' + p + '"]');
+      }
+      window.__GM.setAgg({ column: 'AMOUNT', type: 'sum' });
+
+      regroup(['COLLEGE']);
+      eq('agg 1 level: Eng totals its rows', aggOf(wrapperByPath('Eng')), '400,000');
+      eq('agg 1 level: Sci totals its rows', aggOf(wrapperByPath('Sci')), '500,000');
+      var gt1 = document.querySelector('#groupedResultsContainer > .group-grand-total');
+      assert('grand total: the bar is rendered', !!gt1, '');
+      eq('grand total: it totals every row', aggOf(gt1), '900,000');
+      eq('grand total: it counts every row',
+        gt1 ? gt1.querySelector('.group-count').textContent.trim() : null, '6');
+      eq('grand total: it is the LAST child of the container',
+        document.getElementById('groupedResultsContainer').lastElementChild, gt1);
+      assert('grand total: it is not a group wrapper',
+        gt1 && !gt1.classList.contains('group-wrapper'), gt1 && gt1.className);
+
+      regroup(['COLLEGE', 'DEPT']);
+      // The point of per-level aggregates: a BRANCH totals its whole subtree.
+      eq('agg 2 levels: the branch totals its subtree', aggOf(wrapperByPath('Eng')), '400,000');
+      eq('agg 2 levels: a leaf totals only its own rows', aggOf(wrapperByPath('Eng|||ECE')), '350,000');
+      eq('agg 2 levels: the other leaf too', aggOf(wrapperByPath('Eng|||ME')), '50,000');
+      eq('agg 2 levels: second branch', aggOf(wrapperByPath('Sci')), '500,000');
+      eq('agg 2 levels: and its leaves', aggOf(wrapperByPath('Sci|||BIO')), '375,000');
+      // The children must add up to the parent, and the parents to the grand
+      // total - the cheapest guard against a branch double-counting its own
+      // subtree. Read back the RENDERED numbers: comparing two literals here
+      // would only be testing the harness's own arithmetic, and would pass
+      // against a build that renders no aggregates at all.
+      function aggNum(node) {
+        var t = aggOf(node);
+        return t === null ? null : parseFloat(t.replace(/[^0-9.\-]/g, ''));
+      }
+      function kidsSum(path) {
+        var p = wrapperByPath(path);
+        if (!p) return null;
+        var kids = p.querySelectorAll(':scope > .group-content > .group-wrapper');
+        if (!kids.length) return null;
+        var t = 0;
+        for (var i = 0; i < kids.length; i++) {
+          var v = aggNum(kids[i]);
+          if (v === null) return null;
+          t += v;
+        }
+        return t;
+      }
+      // BOTH sides must be real numbers, not just equal: on a build that
+      // renders no aggregates at all every reading is null, and a null === null
+      // comparison would sail through while proving nothing.
+      function sumsTo(name, got, want) {
+        assert(name, got !== null && want !== null && Math.abs(got - want) < 0.005,
+          'children=' + got + ' parent=' + want);
+      }
+      sumsTo('agg 2 levels: Eng children sum to the Eng band',
+        kidsSum('Eng'), aggNum(wrapperByPath('Eng')));
+      sumsTo('agg 2 levels: Sci children sum to the Sci band',
+        kidsSum('Sci'), aggNum(wrapperByPath('Sci')));
+      var engN = aggNum(wrapperByPath('Eng')), sciN = aggNum(wrapperByPath('Sci'));
+      sumsTo('agg 2 levels: the two branches sum to the grand total',
+        (engN === null || sciN === null) ? null : engN + sciN,
+        aggNum(document.querySelector('#groupedResultsContainer > .group-grand-total')));
+      eq('agg 2 levels: grand total still 900,000',
+        aggOf(document.querySelector('#groupedResultsContainer > .group-grand-total')), '900,000');
+      // A branch must carry its OWN total, not a clone of a descendant's.
+      assert('agg 2 levels: exactly one summary per band',
+        Array.prototype.every.call(
+          document.querySelectorAll('#groupedResultsContainer .group-wrapper'),
+          function (w) { return w.querySelectorAll(':scope > .group-header > .group-agg-summary').length <= 1; }),
+        'a band carries more than one summary');
+
+      regroup(['COLLEGE', 'AWARD_DATE:fy', 'DEPT']);
+      eq('agg 3 levels: depth-0 branch still totals everything below it',
+        aggOf(wrapperByPath('Eng')), '400,000');
+      // Eng FY24 = ECE 3/15 (100,000) + ME 3/1 (50,000) = 150,000
+      eq('agg 3 levels: a bucketed middle level totals its own band',
+        aggOf(wrapperByPath('Eng|||FY24')), '150,000');
+      eq('agg 3 levels: and the deepest leaf', aggOf(wrapperByPath('Eng|||FY24|||ECE')), '100,000');
+      eq('agg 3 levels: grand total unchanged by depth',
+        aggOf(document.querySelector('#groupedResultsContainer > .group-grand-total')), '900,000');
+
+      // ---- % of total / % of parent ------------------------------------
+      function shareOf(node) {
+        var el = node && node.el ? node.el : node;
+        if (!el) return null;
+        var s = el.querySelector(':scope > .group-header > .group-agg-summary > .group-agg-share');
+        return s ? s.textContent.trim() : null;
+      }
+      regroup(['COLLEGE', 'DEPT']);
+      // Eng 400,000 of 900,000 = 44.4%; Sci 500,000 = 55.6%
+      eq('share: a depth-0 band shows only its share of the total',
+        shareOf(wrapperByPath('Eng')), '44.4% of total');
+      eq('share: the other one too', shareOf(wrapperByPath('Sci')), '55.6% of total');
+      // ECE 350,000 of Eng 400,000 = 87.5%; of 900,000 = 38.9%
+      eq('share: a nested band shows parent AND total',
+        shareOf(wrapperByPath('Eng|||ECE')), '87.5% of parent · 38.9% of total');
+      eq('share: and its sibling', shareOf(wrapperByPath('Eng|||ME')),
+        '12.5% of parent · 5.6% of total');
+      // The children's shares of their parent must add to 100.
+      var ece = parseFloat(shareOf(wrapperByPath('Eng|||ECE')));
+      var me = parseFloat(shareOf(wrapperByPath('Eng|||ME')));
+      assert('share: sibling shares of the parent total 100%', Math.abs(ece + me - 100) < 0.05,
+        ece + ' + ' + me);
+      assert('share: depth 0 does not repeat the same number twice',
+        (shareOf(wrapperByPath('Eng')) || '').indexOf('of parent') === -1,
+        shareOf(wrapperByPath('Eng')));
+
+      // A share is only honest for ADDITIVE measures.
+      window.__GM.setAgg({ column: 'AMOUNT', type: 'avg' });
+      regroup(['COLLEGE', 'DEPT']);
+      assert('share: avg gets no share (a percentage of an average is meaningless)',
+        shareOf(wrapperByPath('Eng')) === null, shareOf(wrapperByPath('Eng')));
+      assert('share: but avg still renders its own value',
+        aggOf(wrapperByPath('Eng')) !== null, '');
+      window.__GM.setAgg({ column: 'NAME', type: 'count_distinct' });
+      regroup(['COLLEGE', 'DEPT']);
+      assert('share: count_distinct gets no share (children do not total 100%)',
+        shareOf(wrapperByPath('Eng')) === null, shareOf(wrapperByPath('Eng')));
+      window.__GM.setAgg({ column: 'AMOUNT', type: 'count' });
+      regroup(['COLLEGE', 'DEPT']);
+      assert('share: count DOES get one (its parts add up)',
+        (shareOf(wrapperByPath('Eng')) || '').indexOf('of total') !== -1,
+        shareOf(wrapperByPath('Eng')));
+      window.__GM.setAgg({ column: 'AMOUNT', type: 'sum' });
+
+      // Turning the summary off must take the bar with it.
+      window.__GM.setAgg(null);
+      regroup(['COLLEGE']);
+      assert('grand total: no summary configured means no bar',
+        !document.querySelector('#groupedResultsContainer > .group-grand-total'), '');
+      eq('grand total: and no band carries a summary either',
+        document.querySelectorAll('#groupedResultsContainer .group-agg-summary').length, 0);
+      window.__GM.setAgg(null);
+
+      // ================= H4. COLLAPSE STATE SURVIVES A RE-RENDER ==========
+      // rebuildGroupedView() renders from scratch and groups render CLOSED, so
+      // before this every search / sort / column change silently collapsed the
+      // whole outline.
+      var PERSIST = !!window.__GM4;
+      assert('collapse-state API is present (__GM4)', PERSIST, 'GM4_ERR=' + String(window.__GM4_ERR));
+      if (PERSIST && NESTED) {
+        function isOpen(p) {
+          var w = wrapperByPath(p);
+          return !!(w && w.classList.contains('open'));
+        }
+        regroup(['COLLEGE', 'DEPT']);
+        // Explicitly collapse first: persistence now carries open state across
+        // re-renders, so an earlier phase's leftovers would otherwise decide
+        // what this one starts from. A phase that depends on its predecessor is
+        // a phase that fails for the wrong reason.
+        $('#collapseAllGroups').trigger('click');
+        eq('persist: everything starts collapsed',
+          document.querySelectorAll('#groupedResultsContainer .group-wrapper.open').length, 0);
+        // Open one branch and one of its leaves, leaving the siblings shut.
+        $(wrapperByPath('Eng')).children('.group-header').trigger('click');
+        $(wrapperByPath('Eng|||ECE')).children('.group-header').trigger('click');
+        assert('persist: the branch is open', isOpen('Eng'), '');
+        assert('persist: the nested leaf is open', isOpen('Eng|||ECE'), '');
+        assert('persist: a sibling stayed shut', !isOpen('Eng|||ME'), '');
+        assert('persist: the other branch stayed shut', !isOpen('Sci'), '');
+
+        // A re-render with the SAME grouping must put the reader back.
+        window.__GM.rebuild();
+        assert('persist: the branch is still open after a re-render', isOpen('Eng'), '');
+        assert('persist: so is the nested leaf', isOpen('Eng|||ECE'), '');
+        assert('persist: and the shut sibling is still shut', !isOpen('Eng|||ME'), '');
+        assert('persist: the other branch is still shut', !isOpen('Sci'), '');
+        // Re-opened content must be genuinely visible, not just class-marked.
+        eq('persist: a restored group is actually shown',
+          $(wrapperByPath('Eng')).children('.group-content').css('display'), 'block');
+
+        // Same LABEL under a different parent must NOT be dragged open with it.
+        // BIO sits under Sci; opening Eng|||ECE says nothing about it.
+        assert('persist: an identically-named band elsewhere is unaffected',
+          !isOpen('Sci|||BIO'), '');
+
+        // Capture/restore in isolation.
+        var snap = window.__GM4.captureOpen();
+        assert('persist: capture records the open paths', !!snap['Eng'] && !!snap['Eng|||ECE'],
+          Object.keys(snap).join(','));
+        assert('persist: capture does NOT record the shut ones', !snap['Eng|||ME'] && !snap['Sci'],
+          Object.keys(snap).join(','));
+        // A path that no longer exists must be ignored, not throw.
+        var restored = window.__GM4.restoreOpen({ 'No Such Group|||Nope': true });
+        eq('persist: an unknown path restores nothing', restored, 0);
+
+        // Changing the GROUPING must not inherit the old outline. DEPT is a real
+        // fixture column, so this actually re-renders - grouping by a column
+        // that does not exist would return early and leave the previous DOM in
+        // place, which would have "passed" for entirely the wrong reason.
+        regroup(['DEPT']);
+        assert('persist: the new grouping actually rendered',
+          document.querySelectorAll('#groupedResultsContainer .group-wrapper').length === 4,
+          document.querySelectorAll('#groupedResultsContainer .group-wrapper').length + ' wrappers');
+        eq('persist: a different grouping starts collapsed',
+          document.querySelectorAll('#groupedResultsContainer .group-wrapper.open').length, 0);
+      }
+
+      // ================= I. PICKER + COMMA GRAMMAR =======================
+      var GRAMMAR = !!window.__GM3;
+      assert('picker/grammar API is present (__GM3)', GRAMMAR, 'GM3_ERR=' + String(window.__GM3_ERR));
+      if (GRAMMAR && NESTED) {
+        // The setter is what makes a comma-joined string round-trip through
+        // every place a grouping already travels as ONE string.
+        window.__GM2.setLevels('COLLEGE,DEPT');
+        eq('grammar: a comma string becomes two levels', window.__GM2.getLevels().length, 2);
+        eq('grammar: level 0 is the first', window.__GM2.getLevel0(), 'COLLEGE');
+        window.__GM2.setLevels('COLLEGE , DEPT , AWARD_DATE:fy');
+        eq('grammar: surrounding spaces are trimmed', window.__GM2.getLevels()[2], 'AWARD_DATE:fy');
+        window.__GM2.setLevels('COLLEGE,,DEPT');
+        eq('grammar: an empty segment is dropped', window.__GM2.getLevels().length, 2);
+        window.__GM2.setLevels('COLLEGE,DEPT,AWARD_DATE,AMOUNT');
+        eq('grammar: the comma form still respects the cap', window.__GM2.getLevels().length, 3);
+        eq('level0Of: reads the outermost level', window.__GM3.level0Of('COLLEGE,DEPT'), 'COLLEGE');
+        eq('level0Of: a single column is its own level 0', window.__GM3.level0Of('COLLEGE'), 'COLLEGE');
+        eq('level0Of: empty in, empty out', window.__GM3.level0Of(''), '');
+        // A bucket token must survive level0Of untouched - it splits on ':',
+        // never on ','.
+        eq('level0Of: leaves a bucket token intact', window.__GM3.level0Of('AWARD_DATE:fy,DEPT'), 'AWARD_DATE:fy');
+
+        // The dialog itself.
+        var cols = window.__GM.colsForGrouping() || {};
+        window.__GM3.populateLevels(cols, ['COLLEGE', 'DEPT']);
+        eq('picker: level 1 holds the outer column', window.__GM3.getValue('groupingColumnSelector'), 'COLLEGE');
+        eq('picker: level 2 holds the inner column', window.__GM3.getValue('groupingColumnSelector2'), 'DEPT');
+        eq('picker: the dialog reports both levels', window.__GM3.dialogLevels().length, 2);
+        eq('picker: level 2 row is visible', $('#groupLevel2Row').is(':visible'), true);
+        eq('picker: level 3 row is visible once level 2 is set', $('#groupLevel3Row').is(':visible'), true);
+        // A column already used by an outer level must not be offered again.
+        var lvl2Values = $('#groupingColumnSelector2 .pcs-dropdown .pcs-item').map(function () {
+          return $(this).attr('data-value');
+        }).get();
+        assert('picker: an outer level’s column is excluded from level 2',
+          lvl2Values.indexOf('COLLEGE') === -1, lvl2Values.join('|'));
+        assert('picker: level 2 still offers other columns',
+          lvl2Values.indexOf('DEPT') !== -1, lvl2Values.join('|'));
+        assert('picker: level 2 offers a None row', lvl2Values.indexOf('') !== -1, lvl2Values.join('|'));
+        // Bucket children belong to the deeper levels too.
+        assert('picker: level 2 offers bucket variants',
+          lvl2Values.indexOf('AWARD_DATE:fy') !== -1, lvl2Values.join('|'));
+
+        window.__GM3.populateLevels(cols, ['COLLEGE']);
+        eq('picker: one level reports one level', window.__GM3.dialogLevels().length, 1);
+        eq('picker: level 3 row hides when level 2 is empty', $('#groupLevel3Row').is(':visible'), false);
+        // A gap must END the stack - a stale deeper value cannot survive it.
+        $('#groupingColumnSelector2 .pcs-selected').attr('data-value', '');
+        $('#groupingColumnSelector3 .pcs-selected').attr('data-value', 'AMOUNT');
+        eq('picker: a gap truncates rather than skipping a level',
+          window.__GM3.dialogLevels().length, 1);
+
+        window.__GM3.populateLevels(cols, []);
+        eq('picker: an empty stack reports nothing', window.__GM3.dialogLevels().length, 0);
+        eq('picker: level 2 row hides with no level 1', $('#groupLevel2Row').is(':visible'), false);
+
+        // ---- Copy Snippet, driven through the REAL button handler ----------
+        // The writer's whole job is to turn what the dialog shows into an
+        // action(trigger, ...) call, so drive the dialog and read the clipboard.
+        function snippetFor(levels) {
+          window.__GM3.populateLevels(cols, levels);
+          $('#groupAggCheckbox').prop('checked', false);
+          $('#groupSortSelect').val('label|asc');
+          window.__clip = null;
+          $('#copyGroupSnippetBtn').trigger('click');
+          return window.__clip;
+        }
+        var s1 = snippetFor(['COLLEGE']);
+        assert('snippet: one level emits the plain column',
+          typeof s1 === 'string' && s1.indexOf('group_by|COLLEGE') !== -1, s1);
+        assert('snippet: one level adds no comma',
+          typeof s1 === 'string' && s1.indexOf('group_by|COLLEGE,') === -1, s1);
+        var s2 = snippetFor(['COLLEGE', 'DEPT']);
+        assert('snippet: two levels are comma-joined',
+          typeof s2 === 'string' && s2.indexOf('group_by|COLLEGE,DEPT') !== -1, s2);
+        var s3 = snippetFor(['COLLEGE', 'AWARD_DATE:fy', 'DEPT']);
+        assert('snippet: three levels including a bucket token round-trip',
+          typeof s3 === 'string' && s3.indexOf('group_by|COLLEGE,AWARD_DATE:fy,DEPT') !== -1, s3);
+        assert('snippet: the caption names every level in order',
+          typeof s3 === 'string' && s3.indexOf('COLLEGE > AWARD_DATE (Fiscal Year) > DEPT') !== -1, s3);
+        assert('snippet: it is an action(trigger, ...) call',
+          typeof s3 === 'string' && s3.indexOf('action(trigger,') === 0, s3);
+        // And the emitted trigger feeds straight back into the setter.
+        var m = /group_by\|([^'"]+)/.exec(String(s3));
+        window.__GM2.setLevels(m ? m[1] : '');
+        eq('snippet: the emitted trigger re-applies as three levels',
+          window.__GM2.getLevels().length, 3);
+        eq('snippet: and its bucket level survives the round trip',
+          window.__GM2.getLevels()[1], 'AWARD_DATE:fy');
+      }
+
+      // ================= J. "X of Y" DENOMINATORS AT EVERY DEPTH ==========
+      // The search path does not recount from source data - it re-labels each
+      // pill from `data-total-rows` stamped on the header at RENDER time. So
+      // the denominator is a render-time contract, and it is testable without
+      // driving the search engine at all (which this fixture cannot do anyway:
+      // the grouped-search branch keys rows off a `td[data-column="#"]` the
+      // harness table does not use).
+      //
+      // Two real bugs lived here. Only renderLeafGroup stamped the attribute,
+      // so the moment nesting turned depth 0 into a BRANCH the outermost band
+      // lost its ratio entirely. And the nested denominator map was built only
+      // while a search was already active - but grouping is applied FIRST and
+      // searched afterwards, so it was null exactly when it was needed, and the
+      // -1 "unknown" sentinel got stamped and printed as "171 of -1".
+      if (NESTED) {
+        function totalOf(p) {
+          var w = wrapperByPath(p);
+          if (!w) return 'NO_WRAPPER';
+          var h = w.querySelector(':scope > .group-header');
+          if (!h) return 'NO_HEADER';
+          var v = $(h).data('total-rows');
+          return v === undefined ? 'UNSTAMPED' : v;
+        }
+        regroup(['COLLEGE', 'DEPT']);
+        eq('denominator: depth 0 is stamped with its unfiltered count', totalOf('Eng'), 3);
+        eq('denominator: the other depth-0 band too', totalOf('Sci'), 3);
+        eq('denominator: a nested leaf carries its own total', totalOf('Eng|||ECE'), 2);
+        eq('denominator: an only-child leaf too', totalOf('Eng|||ME'), 1);
+        eq('denominator: under the other parent as well', totalOf('Sci|||BIO'), 2);
+        eq('denominator: and its single-row sibling', totalOf('Sci|||CHEM'), 1);
+
+        // Every wrapper, not just the ones named above - an unstamped band is
+        // one that silently drops back to a plain count under search.
+        var _unstamped = [];
+        var _wraps = document.querySelectorAll('#groupedResultsContainer .group-wrapper');
+        for (var _wi = 0; _wi < _wraps.length; _wi++) {
+          var _h = _wraps[_wi].querySelector(':scope > .group-header');
+          var _tv = _h ? $(_h).data('total-rows') : undefined;
+          if (typeof _tv !== 'number' || _tv < 0) {
+            _unstamped.push(_wraps[_wi].getAttribute('data-group-path') + '=' + String(_tv));
+          }
+        }
+        assert('denominator: no band is left unstamped or negative',
+          _wraps.length === 6 && _unstamped.length === 0,
+          _wraps.length + ' wrappers; bad: ' + (_unstamped.join(', ') || 'none'));
+
+        // The -1 sentinel must never reach the rendered pill. NOTE: this is a
+        // RENDER-time guard only, and it passes on the mutant build too - the
+        // leak that actually shipped ("171 of -1") came from the SEARCH path
+        // re-labelling from a stamped -1, and this fixture cannot drive that
+        // path. The stamping precondition is what the assertions above cover;
+        // the visible leak is covered by the live pass on ?id=grantprofiles.
+        var _pillText = $('#groupedResultsContainer .group-count').map(function () {
+          return $(this).text();
+        }).get().join('|');
+        assert('denominator: the -1 sentinel never reaches a count pill (render-time)',
+          _pillText.length > 0 && _pillText.indexOf('-1') === -1, _pillText);
+
+        // Three levels with a bucket in the middle: the walk that builds the
+        // per-path totals has to label rows through the SAME bucket labeler the
+        // renderer used, or the deepest denominators land on paths nothing
+        // matches and every leaf falls back to the sentinel.
+        regroup(['COLLEGE', 'AWARD_DATE:fy', 'DEPT']);
+        var _deep = [], _deepBad = 0, _deepSum = 0;
+        var _dw = document.querySelectorAll('#groupedResultsContainer .group-wrapper');
+        for (var _di2 = 0; _di2 < _dw.length; _di2++) {
+          var _dh = _dw[_di2].querySelector(':scope > .group-header');
+          var _dv = _dh ? $(_dh).data('total-rows') : undefined;
+          if (typeof _dv !== 'number' || _dv < 0) { _deepBad++; continue; }
+          if (_dw[_di2].classList.contains('group-leaf')) { _deep.push(_dv); _deepSum += _dv; }
+        }
+        assert('denominator: a bucketed middle level still stamps every band',
+          _dw.length > 0 && _deepBad === 0, _dw.length + ' wrappers, ' + _deepBad + ' bad');
+        assert('denominator: the leaf totals account for all six rows',
+          _deep.length > 0 && _deepSum === DATA.length,
+          _deep.join('+') + ' = ' + _deepSum + ' want ' + DATA.length);
+      }
+
+      // ============ P. "ROWS THAT WILL APPEAR" COUNT, NESTED ==============
+      // The email dialog warns how many rows reach the embedded table. It used
+      // to count from `.group-wrapper.open`, which with one level was always a
+      // leaf and so was right - but a nested OPEN BRANCH says nothing about
+      // whether its children are open, so it credited itself with rows sitting
+      // inside its own CLOSED leaves. "Start expanded to Level 1" is exactly
+      // that shape. Rows live only in leaves, so count there.
+      if (NESTED) {
+        function emailRowCounts() {
+          var sel = 'tbody tr:not(.search-hidden):not(.journal-note-child)';
+          var vis = 0, seen = 0;
+          $('#groupedResultsContainer .group-leaf:not(.search-hidden)').each(function () {
+            var n = $(this).find(sel).length;
+            seen += n;
+            if (this.classList.contains('open') && this.offsetParent !== null) vis += n;
+          });
+          return { visible: vis, collapsed: seen - vis };
+        }
+        function setOpen(matchLeaf, open) {
+          $('#groupedResultsContainer .group-wrapper').each(function () {
+            if (this.classList.contains('group-leaf') !== matchLeaf) return;
+            var c = this.querySelector(':scope > .group-content');
+            if (open) { this.classList.add('open'); if (c) c.style.display = 'block'; }
+            else { this.classList.remove('open'); if (c) c.style.display = 'none'; }
+          });
+        }
+        regroup(['COLLEGE', 'DEPT']);
+        $('#collapseAllGroups').trigger('click');
+        eq('emailrows: everything collapsed embeds nothing', emailRowCounts().visible, 0);
+        eq('emailrows: and attributes every row to collapsed groups',
+          emailRowCounts().collapsed, DATA.length);
+
+        // THE regression: branches open, leaves shut.
+        setOpen(false, true);    // branches open
+        setOpen(true, false);    // leaves shut
+        eq('emailrows: an open BRANCH does not embed its closed leaves rows',
+          emailRowCounts().visible, 0);
+        eq('emailrows: those rows are still counted as collapsed',
+          emailRowCounts().collapsed, DATA.length);
+
+        // And the normal case still totals correctly.
+        $('#expandAllGroups').trigger('click');
+        eq('emailrows: fully expanded embeds every row',
+          emailRowCounts().visible, DATA.length);
+        eq('emailrows: with nothing left collapsed', emailRowCounts().collapsed, 0);
+
+        // A single-level grouping is the case that always worked - it must not
+        // have moved, since every wrapper is a leaf there.
+        regroup(['COLLEGE']);
+        $('#expandAllGroups').trigger('click');
+        eq('emailrows: one level still counts every row', emailRowCounts().visible, DATA.length);
+        $('#collapseAllGroups').trigger('click');
+        eq('emailrows: and still zero when collapsed', emailRowCounts().visible, 0);
+      }
+
+      // ================= O. GROUP-LEVEL FILTERING (gap #6) ================
+      // Top/bottom N, a minimum group size, and the "(Other)" rollup. The
+      // fixture has COLLEGE Eng=3 rows, Sci=3 rows and DEPT ECE=2, ME=1, BIO=2,
+      // CHEM=1 - uneven on purpose, so a min-size cut is observable.
+      var LIMITS = !!window.__GM7;
+      assert('limit: group-limit API is present (__GM7)', LIMITS,
+        'GM7_ERR=' + String(window.__GM7_ERR));
+      if (LIMITS) {
+        function topKeys() {
+          return $('#groupedResultsContainer').children('.group-wrapper')
+            .map(function () { return $(this).attr('data-group-key'); }).get();
+        }
+        function otherNode() { return wrapperByPath('(Other)'); }
+
+        window.__GM7.setLimit(null);
+        regroup(['DEPT']);
+        // Guards the regroup() fix above: this phase is the first to use a level
+        // 0 other than COLLEGE, so a stale dialog picker would render the wrong
+        // grouping and every assertion below would fail for the wrong reason.
+        eq('limit: the level stack beats a stale dialog picker',
+          $('#groupedResultsContainer').children('.group-wrapper')
+            .map(function () { return $(this).attr('data-group-col'); }).get().join(','),
+          'DEPT,DEPT,DEPT,DEPT');
+        eq('limit: with no limit every group renders', topKeys().length, 4);
+
+        // --- top N + rollup ---
+        window.__GM7.setLimit({ n: 2, dir: 'top', other: true, minRows: 0 });
+        regroup(['DEPT']);
+        eq('limit top 2: two real groups plus the rollup', topKeys().length, 3);
+        eq('limit top 2: the rollup is LAST', topKeys()[2], '(Other)');
+        assert('limit top 2: the kept groups are the first two in sort order',
+          topKeys()[0] === 'BIO' && topKeys()[1] === 'CHEM', topKeys().join(','));
+        // The rollup holds REAL rows, so its count is the sum of what it replaced.
+        eq('limit: the rollup carries the excluded rows', group(tree(), '(Other)').rows, 3);
+        eq('limit: and every row is still present exactly once',
+          leafRowTotal(tree()), DATA.length);
+        eq('limit: it records how many groups it replaced',
+          otherNode() ? otherNode().getAttribute('data-group-other') : null, '2');
+        assert('limit: the rollup has no hide-group button',
+          otherNode() && !otherNode().querySelector('.group-hide'), '');
+
+        // --- rollup off = the excluded groups are simply gone ---
+        window.__GM7.setLimit({ n: 2, dir: 'top', other: false, minRows: 0 });
+        regroup(['DEPT']);
+        eq('limit: with the rollup off only the kept groups render', topKeys().length, 2);
+        assert('limit: and no (Other) band exists', !otherNode(), '');
+        eq('limit: so rows ARE dropped from the view', leafRowTotal(tree()), 3);
+
+        // --- bottom N takes from the other end ---
+        window.__GM7.setLimit({ n: 1, dir: 'bottom', other: false, minRows: 0 });
+        regroup(['DEPT']);
+        eq('limit bottom 1: keeps the last group in sort order', topKeys()[0], 'ME');
+
+        // --- minimum size ---
+        window.__GM7.setLimit({ n: 0, dir: 'top', other: false, minRows: 2 });
+        regroup(['DEPT']);
+        assert('limit minRows: single-row groups are dropped',
+          topKeys().indexOf('ME') === -1 && topKeys().indexOf('CHEM') === -1, topKeys().join(','));
+        assert('limit minRows: larger ones stay',
+          topKeys().indexOf('ECE') !== -1 && topKeys().indexOf('BIO') !== -1, topKeys().join(','));
+
+        // --- the two interact: the floor applies FIRST, so a tiny group can
+        //     never spend one of the top-N slots ---
+        window.__GM7.setLimit({ n: 2, dir: 'top', other: true, minRows: 2 });
+        regroup(['DEPT']);
+        eq('limit: min-size runs before top-N, so both survivors are the big ones',
+          topKeys().filter(function (k) { return k !== '(Other)'; }).sort().join(','), 'BIO,ECE');
+        eq('limit: everything filtered out lands in the rollup',
+          group(tree(), '(Other)').rows, 2);
+
+        // --- normalizer: "no limit" has ONE spelling ---
+        assert('limit: an all-zero limit normalizes to null',
+          window.__GM7.normalize({ n: 0, minRows: 0 }) === null, '');
+        assert('limit: a blank limit normalizes to null',
+          window.__GM7.normalize({ n: '', minRows: '' }) === null, '');
+        eq('limit: a negative n is clamped away',
+          window.__GM7.normalize({ n: -5, minRows: 3 }).n, 0);
+        eq('limit: an unknown dir falls back to top',
+          window.__GM7.normalize({ n: 2, dir: 'sideways' }).dir, 'top');
+        eq('limit: other defaults ON', window.__GM7.normalize({ n: 2 }).other, true);
+
+        window.__GM7.setLimit(null);
+        regroup(['COLLEGE']);
+      }
+
+      // ================= N. GROUPED -> CHART BUILDER (gap #9) =============
+      // #vizAutoBuildBtn reads whichever layout is on screen. Its grouped
+      // reader used to take currentGroupingColumn (level 0) and hardcode
+      // groupBy:'none', so a two-level grouping charted as though it were flat.
+      // Config object only - the builder itself needs Chart.js, which this
+      // harness deliberately does not stage.
+      var VIZR = !!window.__GM6;
+      assert('viz: grouped-reader API is present (__GM6)', VIZR,
+        'GM6_ERR=' + String(window.__GM6_ERR));
+      if (VIZR && NESTED) {
+        window.__GM.setAgg({ column: 'AMOUNT', type: 'sum' });
+        regroup(['COLLEGE']);
+        var v1 = window.__GM6.groupsToViz();
+        eq('viz 1 level: the group column is the X axis', v1.config.xAxis, 'COLLEGE');
+        eq('viz 1 level: no series', v1.config.groupBy, 'none');
+        eq('viz 1 level: the summary column is the Y axis', v1.config.yAxis, 'AMOUNT');
+        eq('viz 1 level: and its aggregation carries over', v1.config.agg, 'sum');
+
+        regroup(['COLLEGE', 'DEPT']);
+        var v2 = window.__GM6.groupsToViz();
+        eq('viz 2 levels: level 1 is still the X axis', v2.config.xAxis, 'COLLEGE');
+        eq('viz 2 levels: level 2 becomes the SERIES', v2.config.groupBy, 'DEPT');
+        eq('viz 2 levels: no warning is needed', v2.warnings.length, 0);
+
+        regroup(['COLLEGE', 'DEPT', 'AWARD_DATE:fy']);
+        var v3 = window.__GM6.groupsToViz();
+        eq('viz 3 levels: X axis unchanged', v3.config.xAxis, 'COLLEGE');
+        eq('viz 3 levels: series is still level 2', v3.config.groupBy, 'DEPT');
+        assert('viz 3 levels: the unplottable level is called out, not dropped silently',
+          v3.warnings.some(function (w) { return /not plotted/.test(w); }),
+          v3.warnings.join(' | '));
+
+        // A bucket token must survive into the series slot untouched.
+        regroup(['COLLEGE', 'AWARD_DATE:fy']);
+        eq('viz: a bucket token passes through to the series',
+          window.__GM6.groupsToViz().config.groupBy, 'AWARD_DATE:fy');
+
+        // Vocabulary reconciliation with gap #8: three of the new types are
+        // already chartable, and the text ones are correctly refused.
+        eq('viz: median is chartable', window.__GM6.canAgg('median'), true);
+        eq('viz: stddev is chartable', window.__GM6.canAgg('stddev'), true);
+        eq('viz: range is chartable', window.__GM6.canAgg('range'), true);
+        eq('viz: mode is NOT (it returns text, which cannot be a Y axis)',
+          window.__GM6.canAgg('mode'), false);
+        regroup(['COLLEGE', 'DEPT']);
+        window.__GM.setAgg({ column: 'DEPT', type: 'mode' });
+        var vm = window.__GM6.groupsToViz();
+        eq('viz: a text aggregate falls back to counting rows', vm.config.agg, 'count');
+        assert('viz: and says so', vm.warnings.some(function (w) { return /counts rows/.test(w); }),
+          vm.warnings.join(' | '));
+        window.__GM.setAgg(null);
+        regroup(['COLLEGE']);
+      }
+
+      // ================= M. START-EXPANDED DEPTH (gap #10) ================
+      // A saved default for how many levels open on a fresh grouping. The whole
+      // point is that it is a STARTING state: rebuildGroupedView() runs on every
+      // search keystroke, so a default re-applied there would fight the reader.
+      var DEPTHCTL = !!window.__GM5;
+      assert('depth: start-depth API is present (__GM5)', DEPTHCTL,
+        'GM5_ERR=' + String(window.__GM5_ERR));
+      if (DEPTHCTL && NESTED) {
+        function openCount(d) {
+          return document.querySelectorAll(
+            '#groupedResultsContainer .group-wrapper.open[data-group-depth="' + d + '"]').length;
+        }
+        window.__GM5.setStartDepth(0);
+        regroup(['COLLEGE', 'DEPT']);
+        eq('depth 0: nothing opens (the historical default)',
+          document.querySelectorAll('#groupedResultsContainer .group-wrapper.open').length, 0);
+
+        window.__GM5.setStartDepth(1);
+        regroup(['COLLEGE', 'DEPT']);
+        eq('depth 1: the outer bands open', openCount(0), 2);
+        eq('depth 1: but their children stay shut', openCount(1), 0);
+        assert('depth 1: an opened band is genuinely shown',
+          $(wrapperByPath('Eng')).children('.group-content').css('display') === 'block',
+          $(wrapperByPath('Eng')).children('.group-content').css('display'));
+
+        window.__GM5.setStartDepth(2);
+        regroup(['COLLEGE', 'DEPT']);
+        eq('depth 2: outer bands open', openCount(0), 2);
+        eq('depth 2: and so do their children', openCount(1), 4);
+
+        // THE trap this design exists to avoid: the default must apply ONCE per
+        // grouping, not on every render. A reader who collapses everything and
+        // then types in the search box must stay collapsed.
+        window.__GM5.setStartDepth(1);
+        regroup(['COLLEGE', 'DEPT']);
+        eq('depth: applied on the first render', openCount(0), 2);
+        $('#collapseAllGroups').trigger('click');
+        eq('depth: reader collapses everything',
+          document.querySelectorAll('#groupedResultsContainer .group-wrapper.open').length, 0);
+        window.__GM.rebuild();            // what a search keystroke does
+        eq('depth: a re-render does NOT re-apply the default over the reader',
+          document.querySelectorAll('#groupedResultsContainer .group-wrapper.open').length, 0);
+
+        // But a NEW grouping is a fresh outline, so it applies again.
+        regroup(['COLLEGE']);
+        eq('depth: a new grouping re-applies it', openCount(0), 2);
+
+        // Saved state carries it, and only when non-default.
+        window.__GM5.setStartDepth(0);
+        assert('depth: 0 is omitted from saved state',
+          window.__GM5.stateDepth() === undefined, String(window.__GM5.stateDepth()));
+        window.__GM5.setStartDepth(2);
+        eq('depth: a non-default value is saved', window.__GM5.stateDepth(), 2);
+        window.__GM5.setStartDepth(0);
+        regroup(['COLLEGE']);
+      }
+
+      // ================= L. AGGREGATE VOCABULARY (gap #8) =================
+      // Group headers offered six types while the shared summary registry
+      // already implemented median/range/stddev/mode/antimode and the counting
+      // family. _rcaApply() now feeds that registry instead of its own switch,
+      // so this asserts the NEW types and that the original six did not move.
+      // setAgg only stores the choice - the value is produced during a render,
+      // so each type needs a regroup before the band can be read.
+      function aggAt(path, col, type) {
+        window.__GM.setAgg({ column: col, type: type });
+        regroup(['COLLEGE']);
+        return aggOf(wrapperByPath(path));
+      }
+      // Eng = AMOUNT 100000 / 250000 / 50000, DEPT ECE / ECE / ME
+      eq('vocab: sum unchanged',   aggAt('Eng', 'AMOUNT', 'sum'),   '400,000');
+      eq('vocab: min unchanged',   aggAt('Eng', 'AMOUNT', 'min'),   '50,000');
+      eq('vocab: max unchanged',   aggAt('Eng', 'AMOUNT', 'max'),   '250,000');
+      eq('vocab: count still means NON-BLANK', aggAt('Eng', 'AMOUNT', 'count'), '3');
+      eq('vocab: count_distinct still means UNIQUE',
+        aggAt('Eng', 'DEPT', 'count_distinct'), '2');
+
+      eq('vocab: median', aggAt('Eng', 'AMOUNT', 'median'), '100,000');
+      eq('vocab: range = max - min', aggAt('Eng', 'AMOUNT', 'range'), '200,000');
+      assert('vocab: stddev renders a spread',
+        /^10[0-9,.]*$/.test(String(aggAt('Eng', 'AMOUNT', 'stddev'))),
+        aggAt('Eng', 'AMOUNT', 'stddev'));
+      eq('vocab: mode is the most common value', aggAt('Eng', 'DEPT', 'mode'), 'ECE');
+      eq('vocab: antimode is the least common', aggAt('Eng', 'DEPT', 'antimode'), 'ME');
+
+      // A text winner must not be coerced to a number in data-agg-value, which
+      // is what the group-summary search filter compares against.
+      // The share is an ALLOW-list, so none of the new non-additive types get one.
+      aggAt('Eng', 'AMOUNT', 'median');
+      eq('vocab: median gets no % share (parts do not sum to the whole)',
+        document.querySelectorAll('#groupedResultsContainer .group-agg-share').length, 0);
+      aggAt('Eng', 'AMOUNT', 'sum');
+      assert('vocab: but sum still does',
+        document.querySelectorAll('#groupedResultsContainer .group-agg-share').length > 0, '');
+      window.__GM.setAgg(null);
+      regroup(['COLLEGE']);
+
+      // ================= K. PROTOTYPE-NAMED GROUP VALUES ==================
+      // Runs LAST and rebuilds the fixture, so a throw here cannot strand the
+      // earlier phases. Restores DATA before returning.
+      try {
+        buildTable(PROTO_DATA);
+        var _protoThrew = null;
+        try { regroup(['COLLEGE']); } catch (e) { _protoThrew = String(e && e.message ? e.message : e); }
+        assert('proto: grouping on prototype-named values does not throw',
+          _protoThrew === null, _protoThrew);
+
+        var _pt = tree();
+        eq('proto: one band per distinct value, none lost', _pt.length, 5);
+        var _names = _pt.map(function (n) { return n.key; }).sort().join(',');
+        eq('proto: every prototype name survives as its own band', _names,
+          'Eng,__proto__,constructor,hasOwnProperty,toString');
+        eq('proto: every row is placed exactly once', leafRowTotal(_pt), PROTO_DATA.length);
+        eq('proto: constructor holds its 2 rows', group(_pt, 'constructor').rows, 2);
+        eq('proto: __proto__ holds its 2 rows', group(_pt, '__proto__').rows, 2);
+        eq('proto: toString holds its 1 row', group(_pt, 'toString').rows, 1);
+        // The count pill is the denominator the search path re-labels from - it
+        // must be a NUMBER, not "function Object() { [native code] }1".
+        eq('proto: the count pill is a real number, not a stringified function',
+          group(_pt, 'constructor').count, '2');
+        // Scoped to THIS phase's own bands, and required to find some. A build
+        // where the walk throws leaves the PREVIOUS phase's render standing, so
+        // an unscoped "no pill says 'native code'" passes against stale DOM and
+        // discriminates nothing.
+        var _protoPills = [];
+        ['constructor', 'toString', '__proto__', 'hasOwnProperty'].forEach(function (nm) {
+          var w = wrapperByPath(nm);
+          if (w) _protoPills.push($(w).children('.group-header').children('.group-count').text());
+        });
+        assert('proto: no pill leaked a function body',
+          _protoPills.length === 4 && _protoPills.every(function (t) {
+            return /^\d+$/.test(t.trim());
+          }), JSON.stringify(_protoPills));
+
+        // Nested, so the level-0 map AND the per-path denominators both see them.
+        if (NESTED) {
+          var _n2threw = null;
+          try { regroup(['COLLEGE', 'DEPT']); } catch (e) { _n2threw = String(e && e.message ? e.message : e); }
+          assert('proto: nesting under a prototype-named parent does not throw',
+            _n2threw === null, _n2threw);
+          var _nt = tree();
+          eq('proto: still 5 top-level bands when nested', _nt.length, 5);
+          eq('proto: no row duplicated or dropped when nested',
+            leafRowTotal(_nt), PROTO_DATA.length);
+          eq('proto: constructor splits into its 2 departments',
+            group(_nt, 'constructor').kids.length, 2);
+          var _ancStamp = $(wrapperByPath('constructor')).children('.group-header').data('total-rows');
+          eq('proto: and its band is stamped with a numeric denominator', _ancStamp, 2);
+        }
+      } finally {
+        buildTable(DATA);   // never leave the fixture swapped for a later run
+        regroup(['COLLEGE']);
+      }
+
+      // ================= L. THE DIALOG'S RESET BUTTON =====================
+      // Cancel became Reset on 2026-08-30 (the X and Escape already cancel), so
+      // the button has to clear every control the dialog owns AND leave the
+      // grouping that is currently applied alone - nothing changes on screen
+      // until Apply Grouping is pressed. Runs last: it deliberately empties the
+      // pickers, which no later phase should inherit.
+      var RESETBTN = !!(window.__GM3 && document.getElementById('resetGroupingBtn'));
+      assert('reset: the button is wired', RESETBTN, 'GM3_ERR=' + String(window.__GM3_ERR));
+      if (RESETBTN) {
+        regroup(['COLLEGE', 'DEPT']);
+        var _bandsBefore = tree().length;
+
+        // Dirty every single control the reset handler claims to clear. If any
+        // of this seeding silently fails, the guard below catches it - without
+        // it the post-click assertions would pass against a form that was
+        // already clean, which is the classic vacuous assert.
+        var _rcols = window.__GM.colsForGrouping() || {};
+        window.__GM3.populateLevels(_rcols, ['COLLEGE', 'DEPT', 'AWARD_DATE:fy']);
+        $('#groupAggColumn .pcs-selected').attr('data-value', 'AMOUNT').text('AMOUNT');
+        $('#groupAggCheckbox').prop('checked', true);
+        $('#groupAggOptions').show();
+        $('#groupAggType').val('avg');
+        $('#groupSortSelect').append('<option value="summary|desc">Summary high-low</option>');
+        $('#groupSortSelect').val('summary|desc');
+        $('#groupStartDepth').val('2');
+        $('#groupLimitDir').val('bottom');
+        $('#groupLimitN').val('5');
+        $('#groupLimitMinRows').val('3');
+        $('#groupLimitOther').prop('checked', false);
+        $('#groupSummaryFilterHint').show();
+        eq('reset: the form really was dirty first',
+          window.__GM3.dialogLevels().join(',') + '/' + $('#groupSortSelect').val() +
+          '/' + $('#groupLimitN').val(),
+          'COLLEGE,DEPT,AWARD_DATE:fy/summary|desc/5');
+
+        $('#resetGroupingBtn').click();
+
+        eq('reset: every grouping level is cleared', window.__GM3.dialogLevels().length, 0);
+        eq('reset: level 2 row is hidden again', $('#groupLevel2Row').is(':visible'), false);
+        eq('reset: level 3 row is hidden again', $('#groupLevel3Row').is(':visible'), false);
+        eq('reset: the summary checkbox is off', $('#groupAggCheckbox').prop('checked'), false);
+        eq('reset: the summary panel is hidden', $('#groupAggOptions').is(':visible'), false);
+        eq('reset: the summary column is cleared', window.__GM3.getValue('groupAggColumn'), '');
+        eq('reset: the aggregate falls back to sum', $('#groupAggType').val(), 'sum');
+        // These two are appended on open and only mean anything while a summary
+        // exists, so clearing the summary has to take them with it.
+        eq('reset: the summary sort options are removed',
+          $('#groupSortSelect').find('option[value^="summary"]').length, 0);
+        eq('reset: sort falls back to label ascending', $('#groupSortSelect').val(), 'label|asc');
+        eq('reset: start depth falls back to collapsed', $('#groupStartDepth').val(), '0');
+        eq('reset: the limit direction falls back to top', $('#groupLimitDir').val(), 'top');
+        eq('reset: the top-N box is emptied', $('#groupLimitN').val(), '');
+        eq('reset: the minimum-size box is emptied', $('#groupLimitMinRows').val(), '');
+        eq('reset: the rollup checkbox is back on', $('#groupLimitOther').prop('checked'), true);
+        eq('reset: the summary filter tip is hidden', $('#groupSummaryFilterHint').is(':visible'), false);
+
+        // The whole point of Reset over Cancel: the REPORT is untouched. A
+        // handler that called setGroupingColumns([]) would blank the view the
+        // moment the button was pressed, which is not what the button says.
+        eq('reset: the applied grouping still renders its bands', tree().length, _bandsBefore);
+        eq('reset: and is still the nested stack', window.__GM2.getLevels().join(','), 'COLLEGE,DEPT');
+
+        // The preset chip reads this same form through _groupBuildSnapshotFromDialog,
+        // so Reset has to drop its "loaded" name as well - while leaving the saved
+        // preset and its on-load pin alone. Requires penumbra_presets.js to be
+        // staged: without it _groupPresetCtl stays null and the handler's guarded
+        // setLoaded(null) is a no-op that would assert nothing.
+        var PRESETS = !!(window.PenumbraPresets &&
+          document.querySelector('#groupPresetMount .pnb-preset-save'));
+        assert('reset/preset: the chip is mounted', PRESETS,
+          'PenumbraPresets=' + (typeof window.PenumbraPresets));
+        if (PRESETS) {
+          var P = window.PenumbraPresets;
+          // Hermetic backend, so the run never depends on (or writes to) whatever
+          // the browser profile happens to hold.
+          var _mem = {};
+          P._setStorage({
+            getItem: function (k) {
+              return Object.prototype.hasOwnProperty.call(_mem, k) ? _mem[k] : null;
+            },
+            setItem: function (k, v) { _mem[k] = String(v); },
+            removeItem: function (k) { delete _mem[k]; }
+          });
+          var chipName = function () {
+            var n = document.querySelector('#groupPresetMount .pnb-preset-name');
+            return n ? n.textContent.trim() : null;
+          };
+          // Something valid to save (the control refuses an empty stack).
+          window.__GM3.populateLevels(window.__GM.colsForGrouping() || {}, ['COLLEGE', 'DEPT']);
+          var _oldPrompt = window.prompt;
+          window.prompt = function () { return 'Suite Preset'; };
+          try { document.querySelector('#groupPresetMount .pnb-preset-save').click(); }
+          finally { window.prompt = _oldPrompt; }
+          // Guard: if the save silently failed, every claim below would be
+          // asserting against a chip that was never loaded in the first place.
+          eq('reset/preset: saving puts the name on the chip', chipName(), 'Suite Preset');
+
+          // Pin through the row's own control, so "the pin survives" is not
+          // comparing null to null.
+          var pinBtn = document.querySelector(
+            '#groupPresetMount .pnb-preset-row .pnb-preset-act[title*="loads"]');
+          if (pinBtn) { pinBtn.click(); }
+          var pinBefore = P.getPin('layout');
+          assert('reset/preset: the pin really was set first',
+            !!(pinBefore && pinBefore.builder === P.NS.GROUP), JSON.stringify(pinBefore));
+
+          $('#resetGroupingBtn').click();
+
+          eq('reset/preset: the chip drops the loaded name', chipName(), 'Presets');
+          eq('reset/preset: but the preset itself is NOT deleted',
+            P.list(P.NS.GROUP, null).map(function (p) { return p.name; }).join(','),
+            'Suite Preset');
+          eq('reset/preset: and its on-load pin survives',
+            JSON.stringify(P.getPin('layout')), JSON.stringify(pinBefore));
+        }
+
+        regroup(['COLLEGE']);
+      }
+
+      report('RESULTS_JSON:' + JSON.stringify({ pageErrors: window.__errors.slice(0, 6), results: results }));
+    } catch (e) {
+      report('RESULTS_JSON:' + JSON.stringify({
+        fatal: String(e && e.stack ? e.stack : e),
+        pageErrors: window.__errors.slice(0, 6), results: results
+      }));
+    }
+  }
+
+  var tries = 0;
+  (function wait() {
+    tries++;
+    if (window.__GM || tries > 40) { setTimeout(run, 300); }
+    else { setTimeout(wait, 100); }
+  })();
+})();
+</script>
+</body></html>

@@ -1,0 +1,138 @@
+# =============================================================================
+# Run the people-directory resolver tests (penumbra_directory.php).
+#
+#   powershell -File run.ps1
+#   powershell -File run.ps1 -App <path>    # run against a stage instead of live
+#   powershell -File run.ps1 -Mutant        # three targeted mutants; each MUST
+#                                           # go RED with the exact fail count
+#                                           # named below
+#   powershell -File run.ps1 -UiMutant      # a control plus six mutants of the
+#                                           # scheduler form's "?" icons, the chart
+#                                           # they open and the pill hover (section 9)
+#
+# WHAT IS UNDER TEST. On 2026-09-23 the six places Penumbra looks a person up
+# (scheduler recipient variables and OUC authorization, the recipient picker,
+# owner-by-name search, OUC info, journal mentions and access lists, analytics
+# departments) moved from scraping COI_CHECK_COMPLIANCE to one resolver family
+# over NC_REPORTING.PENUMBRA_PEOPLE. This suite drives those resolvers against a
+# hand-written fake connection: the SQL each one sends, the binds, the row
+# shaping, the batching, and the rule that SUPERVISOR_EMAIL (HR's EMAIL_ADDR,
+# which is the supervisor's address) is never matched as the person's own.
+#
+# -n (skip php.ini): nothing here needs an extension or a database.
+#
+# EXPECTED TAIL: "PASS: 98   FAIL: 0" then "RESULT: GREEN"  (count as of 2026-09-23 evening; section 9 needs the app folder, run.ps1 passes it)
+#
+# UNC .ps1 files are GPO-blocked here ("not digitally signed") - run the body as
+# a scriptblock rather than with -File. Never add a bare `exit` for the same
+# reason: it would kill the caller.
+# =============================================================================
+param(
+    [string]$App = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra',
+    [switch]$Mutant,
+    [switch]$UiMutant
+)
+
+$ErrorActionPreference = 'Stop'
+$here = $PSScriptRoot
+if (-not $here -and $MyInvocation.MyCommand.Path) { $here = Split-Path -Parent $MyInvocation.MyCommand.Path }
+# Invoked as a scriptblock (the UNC workaround) neither of the above exists.
+if (-not $here) { $here = '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\peopledir' }
+$php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+$test = Join-Path $here 'test_peopledir.php'
+$src  = Join-Path $App 'penumbra_directory.php'
+
+if (-not $Mutant -and -not $UiMutant) {
+    & $php -n $test $src $App
+    return
+}
+
+if ($UiMutant) {
+    # --- UI-wiring mutants (2026-09-23 evening) --------------------------------
+    # Section 9 also pins the scheduler form's "?" icons (they replaced the token
+    # lists under Subject Line / Body Preamble), the Recipient Variables chart they
+    # open, and the recipient pill hover the Recipients placeholder advertises. The
+    # files the suite reads are copied once to a temp app folder; each mutant breaks
+    # ONE thing there (bytes swapped as Latin-1, so nothing else changes), runs, and
+    # restores. The unmutated copy runs first as the control and must be GREEN.
+    $files = @('penumbra_directory.php', 'schedule_runner.php', 'penumbra_search.php', 'manage_schedule.php',
+               'get_email_recipients.php', 'index.php', 'help_content.php', 'js\main.js', 'js\search_builder.js')
+    $uiMutants = @(
+        @{ Name = 'a per-type relabel writes the whole label again (wipes the "?")'; File = 'js\main.js';
+           From = "`$('#schedSubjectLabelText').text('Label:');";   To = "`$('#schedSubjectLabel').text('Label:');";   Expect = 1 },
+        @{ Name = 'the subject "?" never comes back after a Snapshot / File Drop visit'; File = 'js\main.js';
+           From = "`$('#schedSubjectVarsHelp').show();";   To = '';   Expect = 1 },
+        @{ Name = 'the pill hover drops {OUC6D}'; File = 'js\main.js';
+           From = "['{OUC6D}', vars.ouc],";   To = '';   Expect = 1 },
+        @{ Name = 'the Body Preamble "?" loses its jump to the chart'; File = 'index.php';
+           From = 'Body Preamble:</span> <span class="tab-help-icon" data-target="#schedulerPromptHelpLightbox" data-jump-to="schedDyn-recipientVars"';
+           To   = 'Body Preamble:</span> <span class="tab-help-icon" data-target="#schedulerPromptHelpLightbox"';   Expect = 1 },
+        @{ Name = 'the chart loses the anchor the "?" icons jump to'; File = 'help_content.php';
+           From = '<h4 id="schedDyn-recipientVars">';   To = '<h4>';   Expect = 2 },
+        @{ Name = 'a chart row loses its example ({JOBCODE_PREFIX})'; File = 'help_content.php';
+           From = '(the job family)</td><td style="padding:5px; border-bottom:1px solid #eee;">UP</td>';
+           To   = '(the job family)</td><td style="padding:5px; border-bottom:1px solid #eee;"></td>';   Expect = 1 }
+    )
+    $latin1 = [Text.Encoding]::GetEncoding(28591)
+    $tmp = Join-Path $env:TEMP ('pnb_peopledir_uimut_' + $PID)
+    foreach ($f in $files) {
+        $dst = Join-Path $tmp $f
+        New-Item -ItemType Directory -Force (Split-Path -Parent $dst) | Out-Null
+        Copy-Item -LiteralPath (Join-Path $App $f) -Destination $dst -Force
+    }
+    $lib = Join-Path $tmp 'penumbra_directory.php'
+    $out = & $php -n $test $lib $tmp 2>&1 | Out-String
+    $allGood = ($out -match 'PASS:\s+\d+\s+FAIL:\s+0\b')
+    Write-Host ('CONTROL (unmutated copy) -> ' + $(if ($allGood) { 'GREEN' } else { 'NOT GREEN - fix the suite or the app before trusting the mutants' }))
+    foreach ($m in $uiMutants) {
+        $target = Join-Path $tmp $m.File
+        $orig = [IO.File]::ReadAllBytes($target)
+        $text = $latin1.GetString($orig)
+        $hits = ($text.Length - $text.Replace($m.From, '').Length) / $m.From.Length
+        if ($hits -ne 1) { Write-Host ("MUTANT NOT APPLICABLE (anchor found {0}x, need 1): {1}" -f $hits, $m.Name); $allGood = $false; continue }
+        [IO.File]::WriteAllBytes($target, $latin1.GetBytes($text.Replace($m.From, $m.To)))
+        $out  = & $php -n $test $lib $tmp 2>&1 | Out-String
+        [IO.File]::WriteAllBytes($target, $orig)
+        $fail = 0
+        if ($out -match 'FAIL:\s+(\d+)') { $fail = [int]$Matches[1] }
+        $verdict = if ($fail -eq $m.Expect) { 'OK  ' } else { 'BAD ' }
+        if ($fail -ne $m.Expect) { $allGood = $false }
+        Write-Host ("{0} ui mutant '{1}' -> FAIL: {2} (expected {3})" -f $verdict, $m.Name, $fail, $m.Expect)
+    }
+    Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+    Write-Host ('UI MUTANTS: ' + $(if ($allGood) { 'ALL BITE' } else { 'PROBLEM' }))
+    return
+}
+
+# --- targeted mutants -------------------------------------------------------
+# Each reverts ONE decision the resolvers make. The expected fail count is
+# exact: a mutant that stays GREEN, or that goes red in more places than named,
+# means the suite is no longer pinning what it claims to pin.
+$text = [IO.File]::ReadAllText($src)
+$tmp  = Join-Path $env:TEMP ('pnb_peopledir_mut_' + $PID)
+New-Item -ItemType Directory -Force $tmp | Out-Null
+
+$mutants = @(
+    @{ Name = 'email lookup loses the Unity-ID fallback (COI-era addresses whose HR EMAILID differs stop resolving)';
+       From = "' WHERE EMAIL = :e1 OR UNITY_ID = :u'";   To = "' WHERE EMAIL = :e1'";   Expect = 1 },
+    @{ Name = 'OUC people list no longer restricted to active people';
+       From = "' WHERE ACTIVE = 1 AND UNITY_ID IS NOT NULL AND ('";   To = "' WHERE UNITY_ID IS NOT NULL AND ('";   Expect = 1 },
+    @{ Name = 'unity batches lose the unity@ncsu.edu EMAIL fallback (people HR gives no Unity ID vanish)';
+       From = "') OR EMAIL IN (' . implode(',', `$phE) . ')'";   To = "')'";   Expect = 1 }
+)
+
+$allGood = $true
+foreach ($m in $mutants) {
+    if ($text.IndexOf($m.From) -lt 0) { Write-Host ("MUTANT NOT APPLICABLE (anchor missing): " + $m.Name); $allGood = $false; continue }
+    $mutated = $text.Replace($m.From, $m.To)
+    $file = Join-Path $tmp 'penumbra_directory.php'
+    [IO.File]::WriteAllText($file, $mutated)
+    $out  = & $php -n $test $file $App 2>&1 | Out-String
+    $fail = 0
+    if ($out -match 'FAIL:\s+(\d+)') { $fail = [int]$Matches[1] }
+    $verdict = if ($fail -eq $m.Expect) { 'OK  ' } else { 'BAD ' }
+    if ($fail -ne $m.Expect) { $allGood = $false }
+    Write-Host ("{0} mutant '{1}' -> FAIL: {2} (expected {3})" -f $verdict, $m.Name, $fail, $m.Expect)
+}
+Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+Write-Host ('MUTANTS: ' + $(if ($allGood) { 'ALL BITE' } else { 'PROBLEM' }))

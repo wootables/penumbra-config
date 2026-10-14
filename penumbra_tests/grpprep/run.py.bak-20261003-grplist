@@ -1,0 +1,243 @@
+# =============================================================================
+# GRPPREP SUITE (2026-10-03) - step 1 of the grouped view's List layout
+#
+# The grouped PDF export and the "in X of Y groups" count used to ask jQuery
+# :visible - where a group is ON SCREEN. A layout that hides group wrappers
+# (List) would then have emptied the PDF's columns, closed open groups during a
+# PDF, and miscounted. Step 1 makes all three read the group's own state. This
+# suite loads each scenario against the BASELINE (the build before) and the
+# CANDIDATE and requires
+#   D-*  identical output where nothing may change: a single-level grouping's
+#        PDF (whole) and the open/closed state it leaves, a nested grouping's
+#        innermost tables under an OPEN branch, the count text, the email embed
+#        and the CSV/TSV/JSON exports
+#   E-*  no page errors on either build
+#   L-*  on the candidate: a group wrapper hidden by a class of its own (the
+#        List stand-in in harness.html) changes neither the PDF nor the count;
+#        a PDF leaves every group open or closed as it found it; and a nested
+#        grouping's PDF gives EVERY innermost table its columns. The last two
+#        were broken in the build before for groups inside a CLOSED branch (it
+#        printed them blank and closed the open ones) - so they are L-, not D-.
+#   I-*  observations printed for both builds, never asserted
+#
+#   py -3 run.py                               candidate = live js\main.js, baseline = newest js\main.js.bak-*-grpprep
+#   py -3 run.py --candidate F --baseline B    any two builds (the stage vs live before the deploy)
+#   py -3 run.py --control                     candidate := baseline: exactly the L-*list asserts go RED
+#   py -3 run.py --mutant NAME / --mutants     one line of the candidate put back or broken
+#   --scn a,b                                  a subset of scenarios
+# Headless Edge over CDP; stages into %TEMP%; writes nothing to the webroot.
+# =============================================================================
+import glob, json, os, shutil, socket, subprocess, sys, tempfile, time, urllib.request
+import websocket
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js',
+        'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
+        'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js']
+JS_LIBS = ['jspdf-2.5.1.umd.min.js', 'jspdf-autotable-3.5.23.min.js']   # loadScript('js/...')
+SCN = ['pdf', 'pdfopen', 'pdflist', 'count', 'countlist', 'ncount', 'npdf', 'nlist', 'email', 'exports']
+# the candidate-only checks each scenario publishes (window.__HCRESULT.chk)
+CHK = {'pdf': ['stateKept'], 'pdfopen': ['stateKept'], 'pdflist': ['headsEqual', 'keepOpen'],
+       'countlist': ['countEqual'], 'npdf': ['leafCols', 'stateKept'],
+       'nlist': ['stackedLeafCols', 'headsEqual', 'keepOpen']}
+NEW_OWN = "const $groupContent = $groupWrapper.children('.group-content');"
+NEW_COLLAPSED = "const wasHidden = $groupContent.css('display') === 'none';"
+NEW_HEADINGS = "$thisTable.children('thead').children('tr').children('th').filter(function () { return this.style.display !== 'none'; }).each(function () {"
+TH = "$thisTable.children('thead').children('tr').children('th')."
+NEW_COUNT = "? _grcTop.not('.search-hidden').length"
+
+MUTANTS = {
+    # "collapsed?" asks :visible again: an OPEN group under a closed branch, or
+    # hidden the List way, is closed by the PDF
+    'collapsedrevert': ([(NEW_COLLAPSED, "const wasHidden = !$groupContent.is(':visible');")],
+                        ['L-pdflist-keepOpen', 'L-nlist-keepOpen', 'L-npdf-stateKept'], ['pdflist', 'nlist', 'npdf']),
+    # a branch shows and re-hides EVERY nested content again: it closes the open
+    # groups inside a closed branch
+    'findrevert': ([(NEW_OWN, "const $groupContent = $groupWrapper.find('.group-content');")],
+                   ['L-npdf-stateKept'], ['npdf']),
+    # the headings ask :visible again: a group under a closed branch, or hidden
+    # the List way, gets no columns
+    'headingsrevert': ([(NEW_HEADINGS, TH + "filter(':visible').each(function () {")],
+                       ['L-pdflist-headsEqual', 'L-nlist-headsEqual', 'L-npdf-leafCols', 'L-nlist-stackedLeafCols'], ['pdflist', 'nlist', 'npdf']),
+    # every heading taken, hidden columns too: the PDF changes everywhere
+    'headingsall': ([(NEW_HEADINGS, TH + "filter(function () { return true; }).each(function () {")],
+                    ['D-pdf', 'D-pdfopen', 'D-npdf'], ['pdf', 'pdfopen', 'npdf']),
+    # the count asks :visible again: bands hidden the List way drop out of "X"
+    'countrevert': ([(NEW_COUNT, "? _grcTop.filter(':visible').length")],
+                    ['L-countlist-countEqual'], ['countlist']),
+    # the count ignores the search: "6 of 6" where the search kept 5
+    'countall': ([(NEW_COUNT, "? _grcTop.length")],
+                 ['D-count', 'D-ncount'], ['count', 'ncount']),
+}
+
+args = sys.argv[1:]
+def opt(name, default=None):
+    if name in args:
+        i = args.index(name); v = args[i + 1]; del args[i:i + 2]; return v
+    return default
+def flag(name):
+    if name in args: args.remove(name); return True
+    return False
+cand_path = opt('--candidate', os.path.join(APP, 'js', 'main.js'))
+base_path = opt('--baseline', None)
+scn_arg = opt('--scn', None)
+one_mutant = opt('--mutant', None)
+all_mutants = flag('--mutants')
+control = flag('--control')
+verbose = flag('--verbose')
+if not base_path:
+    baks = sorted(glob.glob(os.path.join(APP, 'js', 'main.js.bak-*-grpprep')))
+    if not baks: raise SystemExit('needs --baseline <main.js before the change> (the deploy leaves js\\main.js.bak-<stamp>-grpprep)')
+    base_path = baks[-1]
+if control:
+    cand_path = base_path
+
+def read_b(p): return open(p, 'rb').read().decode('utf-8', 'surrogateescape')
+def hook(src):
+    anchor = '$(document).ready(function () {'
+    i = src.find(anchor)
+    if i < 0 or i > 400: raise SystemExit('closure anchor not found')
+    names = ['runTableSearch', 'getExportData', 'generatePdfContent', 'loadScript', 'updateGroupedResultCount']
+    h = ('\r\n;try { window.__HC = {}; } catch (e) { window.__HC_ERR = String(e); }\r\n'
+         'try { [' + ','.join('"%s"' % n for n in names) + '].forEach(function (k) { try { window.__HC[k] = eval(k); } catch (e) { (window.__HC_MISSING = window.__HC_MISSING || []).push(k); } }); } catch (e) { window.__HC_ERR2 = String(e); }\r\n')
+    out = src[:i] + ';(function () {' + h + src[i + len(anchor):]
+    j = out.rfind('});')
+    out = out[:j] + '})();' + out[j + 3:]
+    hl = '    function hideLoading() {\r\n'
+    if out.count(hl) != 1: raise SystemExit('hideLoading anchor count %d' % out.count(hl))
+    return out.replace(hl, hl + '        window.__HC_HIDES = (window.__HC_HIDES || 0) + 1;\r\n')
+def mutate(src, name):
+    for old, new in MUTANTS[name][0]:
+        if src.count(old) != 1: raise SystemExit("mutant '%s': anchor found %d times (needs the FIXED build): %r" % (name, src.count(old), old[:90]))
+        src = src.replace(old, new)
+    return src
+
+stage = tempfile.mkdtemp(prefix='pnb_gp_')
+os.makedirs(os.path.join(stage, 'js'))
+for f in LIBS: shutil.copyfile(os.path.join(APP, 'js', f), os.path.join(stage, f))
+for f in JS_LIBS: shutil.copyfile(os.path.join(APP, 'js', f), os.path.join(stage, 'js', f))
+shutil.copyfile(os.path.join(APP, 'css', 'main.css'), os.path.join(stage, 'main.css'))
+for f in ('harness.html', 'driver.js'): shutil.copyfile(os.path.join(HERE, f), os.path.join(stage, f))
+def free_port():
+    s = socket.socket(); s.bind(('127.0.0.1', 0)); p = s.getsockname()[1]; s.close(); return p
+hp, dp = free_port(), free_port()
+srv = subprocess.Popen([sys.executable, '-m', 'http.server', str(hp), '--bind', '127.0.0.1', '--directory', stage], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+edge = subprocess.Popen([EDGE, '--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check', '--disable-sync',
+                         '--disable-extensions', '--user-data-dir=' + os.path.join(stage, 'profile'), '--window-size=1500,900',
+                         '--remote-debugging-port=%d' % dp, '--remote-allow-origins=*', 'about:blank'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+def jget(p, m='GET'):
+    return json.loads(urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:%d%s' % (dp, p), method=m), timeout=15).read().decode())
+for _ in range(150):
+    try: jget('/json/version'); break
+    except Exception: time.sleep(0.2)
+
+def run_page(scn):
+    t = jget('/json/new?about:blank', 'PUT')
+    ws = websocket.create_connection(t['webSocketDebuggerUrl'], timeout=300, suppress_origin=True)
+    n = [0]
+    def call(m, p=None):
+        n[0] += 1; mid = n[0]
+        ws.send(json.dumps({'id': mid, 'method': m, 'params': p or {}}))
+        while True:
+            r = json.loads(ws.recv())
+            if r.get('id') == mid: return r.get('result', {})
+    try:
+        # Every build is written to the same main_hc.js: never let the browser
+        # serve a cached copy (heuristic freshness once handed a mutant the
+        # previous build - the lazyrows trap, 2026-09-30).
+        call('Network.enable')
+        call('Network.setCacheDisabled', {'cacheDisabled': True})
+        call('Page.navigate', {'url': 'http://127.0.0.1:%d/harness.html?scn=%s' % (hp, scn)})
+        t0 = time.time()
+        while time.time() - t0 < 300:
+            time.sleep(0.25)
+            v = call('Runtime.evaluate', {'expression': 'window.__HCDONE ? JSON.stringify(window.__HCRESULT) : null', 'returnByValue': True}).get('result', {}).get('value')
+            if v: return json.loads(v)
+        return {'fatal': 'timeout (300 s)'}
+    finally:
+        try: ws.close()
+        except Exception: pass
+        try: urllib.request.urlopen('http://127.0.0.1:%d/json/close/%s' % (dp, t['id']), timeout=10).read()
+        except Exception: pass
+
+def run_build(text, scns):
+    open(os.path.join(stage, 'main_hc.js'), 'wb').write(hook(text).encode('utf-8', 'surrogateescape'))
+    out = {}
+    for s in scns:
+        r = run_page(s)
+        if r.get('fatal') and 'never finished loading' in r['fatal']:
+            r = run_page(s); r['retried'] = True
+        out[s] = r
+    return out
+
+def first_diff(a, b):
+    a = json.dumps(a, sort_keys=True); b = json.dumps(b, sort_keys=True)
+    n = min(len(a), len(b)); i = 0
+    while i < n and a[i] == b[i]: i += 1
+    return 'at %d: base %r / cand %r' % (i, a[max(0, i - 60):i + 120], b[max(0, i - 60):i + 120])
+
+def evaluate(base, cand, scns):
+    out = []
+    add = lambda aid, ok, d: out.append((aid, bool(ok), d))
+    for s in scns:
+        r, b = cand.get(s, {}), base.get(s, {})
+        if r.get('fatal') or b.get('fatal'):
+            add('F-' + s, False, 'cand: %s | base: %s' % ((r.get('fatal') or '')[:300], (b.get('fatal') or '')[:300])); continue
+        fr, fb = r.get('same', {}), b.get('same', {})
+        bad = [k for k in sorted(set(fr) | set(fb)) if fr.get(k) != fb.get(k)]
+        add('D-' + s, bool(fr) and not bad, ('identical (%s)' % ','.join(sorted(fr))) if not bad else ('DIFFER in %s: %s' % (','.join(bad), first_diff(fb.get(bad[0]), fr.get(bad[0])))))
+        add('E-' + s, not r.get('errors') and not b.get('errors') and not r.get('hookErr') and not r.get('missing'),
+            'cand %s %s %s | base %s' % (r.get('errors'), r.get('hookErr'), r.get('missing'), b.get('errors')))
+        for c in CHK.get(s, []):
+            v = (r.get('chk') or {}).get(c)
+            add('L-%s-%s' % (s, c), v is True, 'cand %s (base %s)%s' % (v, (b.get('chk') or {}).get(c),
+                ('; info cand %s | base %s' % (json.dumps(r.get('info'))[:300], json.dumps(b.get('info'))[:300])) if v is not True else ''))
+        info = r.get('info') or {}
+        if s in ('npdf', 'pdflist', 'nlist', 'countlist'):
+            add('I-' + s, True, 'cand %s | base %s' % (json.dumps(info)[:260], json.dumps(b.get('info') or {})[:260]))
+    return out
+
+try:
+    base_text, cand_text = read_b(base_path), read_b(cand_path)
+    print('candidate: %s%s' % (cand_path, '   (CONTROL: the baseline itself)' if control else ''))
+    print('baseline:  %s' % base_path)
+    names = list(SCN)
+    if scn_arg: names = [s for s in names if s in scn_arg.split(',')]
+    if all_mutants or one_mutant:
+        ok = bad = 0
+        todo = [one_mutant] if one_mutant else list(MUTANTS)
+        need = sorted(set(s for m in todo for s in MUTANTS[m][2]))
+        base = run_build(base_text, need)
+        for m in todo:
+            edits, must, scns = MUTANTS[m]
+            res = evaluate(base, run_build(mutate(cand_text, m), scns), scns)
+            red = [a for a, p, _ in res if not p]
+            good = (not [x for x in must if x not in red]) if must else (not red)
+            ok += good; bad += (not good)
+            print('  %s  mutant %-16s turns %s red   [red: %s]' % ('PASS' if good else 'FAIL', m, ' '.join(must), ' '.join(red)))
+            if verbose:
+                for a, p, d in res:
+                    if not p: print('        %-24s %s' % (a, d[:300]))
+        print('SUMMARY mutants ok=%d bad=%d' % (ok, bad))
+        print('RESULT: GREEN' if bad == 0 else 'RESULT: RED')
+    else:
+        base = run_build(base_text, names)
+        cand = run_build(cand_text, names)
+        res = evaluate(base, cand, names)
+        p = f = 0; failed = []
+        for a, passed, d in res:
+            print('  %s  %-24s %s' % ('PASS' if passed else ('FAIL' if not a.startswith('I-') else 'INFO'), a, d[:420]))
+            if a.startswith('I-'): continue
+            if passed: p += 1
+            else: f += 1; failed.append(a)
+        print('TOTAL pass=%d fail=%d   failed: %s' % (p, f, ' '.join(failed)))
+        print('RESULT: GREEN' if f == 0 and p > 0 else 'RESULT: RED')
+finally:
+    try: edge.kill()
+    except Exception: pass
+    try: srv.kill()
+    except Exception: pass
+    time.sleep(1)
+    shutil.rmtree(stage, ignore_errors=True)

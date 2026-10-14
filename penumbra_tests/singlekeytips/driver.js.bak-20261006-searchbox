@@ -1,0 +1,304 @@
+// Single-key hints - report page (2026-09-25). Drives the REAL main.js (ready
+// closure unwrapped, window.__SKT export hook), the REAL penumbra_a11y.js and
+// the REAL main.css, with the toolbar markup LIFTED from the index.php under
+// test. Tooltips are opened the way a pointer opens them: a mouseover that
+// reaches the page's ONE global jQuery UI tooltip.
+//   T  tooltips: the 13 keyed controls, exact wording, the attribute never
+//      written, the live region, switch off / live back on, the admin-only
+//      key, a rebuilt journal title and the admin-hidden marker, titles that
+//      must come through untouched (no key, markup, no id)
+//   K  keys: p, P (Caps Lock), J, typing, switched off, Ctrl+Shift+P once, ?, Z
+//   S  the cheat sheet: its intro, the dashboards row, its own switch
+//   B  the "/" badges: shown while on, gone when off (both switches), the home
+//      filter's clear button kept, the repository badge beats its inline style
+//   O  ?keys=off (a page load of its own): the class is there from the start
+(function () {
+  var R = [];
+  function rec(name, pass, detail) { R.push({ name: name, pass: !!pass, detail: detail === undefined ? '' : String(detail).slice(0, 700) }); }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function errs() { return window.__errors.concat(window.__rejections); }
+  function finish(fatal) {
+    var payload = { results: R, pageErrors: errs().slice(0, 8),
+      hookErr: [window.__SKT_ERR, window.__SKT_ERR2, (window.__SKT_MISSING || []).join(',')].filter(Boolean).join('; ') };
+    if (fatal) payload.fatal = fatal;
+    document.getElementById('out').textContent = 'RESULTS_JSON:' + JSON.stringify(payload);
+  }
+  if (typeof window.stackHeaders !== 'function') window.stackHeaders = function () {};
+  var H = window.__SKT || {};
+  var OFFLOAD = /[?&]keys=off/.test(location.search);
+
+  // The contract, written out independently of the implementation: control -> key.
+  var KEYED = [
+    ['pivotBtn', 'P'], ['visualizeBtn', 'V'], ['groupTableBtn', 'G'], ['downloadBtn', 'D'],
+    ['copyActionsBtn', 'C'], ['emailTableBtn', 'E'], ['journalBtn', 'N'], ['nextPageBtn', 'J'],
+    ['prevPageBtn', 'K'], ['headerToggleHandle', 'H'], ['settingsPanelHandle', 'S'],
+    ['clearTableSearch', 'X'], ['toggleAiPanel', 'A']
+  ];
+  var ORIG = {};
+  function byId(id) { return document.getElementById(id); }
+  function setSwitch(on) { try { localStorage.setItem('pnb_single_keys', on ? 'on' : 'off'); } catch (e) {} }
+  // What the tooltip must read: the key inside the title's own "(HOTKEY) " prefix, else in front.
+  function want(title, k) { return /^\([^()]+\) /.test(title) ? '(' + k + ' or ' + title.slice(1) : '(' + k + ') ' + title; }
+
+  function tipInst() { try { return $(document).tooltip('instance'); } catch (e) { return null; } }
+  // Open the global tooltip on el the way a pointer does, read it, close it.
+  function openTip(el) {
+    var $el = $(el);
+    $el.trigger('mouseover');
+    var id = $el.data('ui-tooltip-id');
+    var $t = id ? $('#' + id) : $();
+    var ins = tipInst();
+    var out = {
+      opened: !!id,
+      text: $t.length ? $t.find('.ui-tooltip-content').text() : null,
+      html: $t.length ? $t.find('.ui-tooltip-content').html() : null,
+      markup: $t.find('.ui-tooltip-content b').length,
+      live: (ins && ins.liveRegion) ? ins.liveRegion.children().last().text() : null,
+      describedBy: String($el.attr('aria-describedby') || '')
+    };
+    $el.trigger('mouseleave');
+    out.titleAfter = $el.attr('title');
+    return out;
+  }
+
+  async function runQuery(n) {
+    var rows = [];
+    for (var i = 1; i <= n; i++) rows.push({ ID: String(1000 + i), NAME: 'Person ' + i, AMOUNT: String(i * 10) });
+    window.__queryResponse = { data: rows };
+    var ed = H.getEditor ? H.getEditor() : null;
+    if (ed) ed.setValue('SELECT 1 FROM DUAL');
+    var before = window.__ajaxLog.length;
+    $('#executeQuery').trigger('click');
+    for (var k = 0; k < 200; k++) {
+      await sleep(25);
+      if (window.__ajaxLog.length > before && (window.__rejections.length || !$('#loadingOverlay').is(':visible'))) break;
+    }
+    await sleep(400);
+  }
+
+  // ------------------------------------------------------------------ T
+  function phaseT() {
+    var missing = KEYED.filter(function (p) { return !byId(p[0]); }).map(function (p) { return p[0]; });
+    rec('T0 the 13 keyed controls are in the lifted markup, each with a title', missing.length === 0 &&
+        KEYED.every(function (p) { return !!(byId(p[0]) && byId(p[0]).getAttribute('title')); }), missing.join(',') || 'all present');
+    KEYED.forEach(function (p) { var el = byId(p[0]); ORIG[p[0]] = el ? el.getAttribute('title') : null; });
+
+    setSwitch(true);
+    // Exact wording for the patterns the page uses (index.php titles of 2026-09-25).
+    var ex = [
+      ['pivotBtn', '(P or CTRL+SHIFT+P) Create a Pivot Table'],
+      ['nextPageBtn', '(J or Alt+Page Down) Next Page'],
+      ['headerToggleHandle', '(H or F2) Toggle Header Visibility'],
+      ['settingsPanelHandle', '(S or CTRL+,) Column & Settings Panel'],
+      ['clearTableSearch', '(X) Clear search'],
+      ['toggleAiPanel', '(A or Ctrl+Shift+A) Ask AI Assistant']
+    ];
+    var bad = [];
+    ex.forEach(function (p) { var t = openTip(byId(p[0])); if (t.text !== p[1]) bad.push(p[0] + '=' + JSON.stringify(t.text)); });
+    rec('T1 switch on: the tooltip names the key inside the title\'s own prefix - "(P or CTRL+SHIFT+P) Create a Pivot Table", "(X) Clear search"', bad.length === 0, bad.join(' | ') || 'all 6 exact');
+
+    var bad2 = [], written = [];
+    KEYED.forEach(function (p) {
+      var el = byId(p[0]); if (!el) { bad2.push(p[0] + ' missing'); return; }
+      var t = openTip(el), w = want(ORIG[p[0]], p[1]);
+      if (t.text !== w) bad2.push(p[0] + '=' + JSON.stringify(t.text) + ' want ' + JSON.stringify(w));
+      if (t.titleAfter !== ORIG[p[0]]) written.push(p[0] + '=' + JSON.stringify(t.titleAfter));
+    });
+    rec('T2 all 13 keyed controls carry their key (p v g d c e n j k h s x a)', bad2.length === 0, bad2.join(' | ') || '13/13');
+    rec('T3 the title attribute itself is never written (read back after each tooltip closes)', written.length === 0, written.join(' | ') || '13/13 unchanged');
+
+    var tp = openTip(byId('pivotBtn'));
+    rec('T4 the screen-reader live region gets the same words (jQuery UI copies the content)', tp.live === '(P or CTRL+SHIFT+P) Create a Pivot Table' && tp.describedBy.length > 0,
+        'live=' + JSON.stringify(tp.live) + ' describedBy=' + tp.describedBy);
+
+    setSwitch(false);
+    var bad5 = [];
+    KEYED.forEach(function (p) { var el = byId(p[0]); if (!el) return; var t = openTip(el); if (t.text !== ORIG[p[0]]) bad5.push(p[0] + '=' + JSON.stringify(t.text)); });
+    rec('T5 switch off: every tooltip is exactly its title again - no key named', bad5.length === 0, bad5.join(' | ') || '13/13 plain');
+
+    setSwitch(true);
+    var t6 = openTip(byId('downloadBtn'));
+    rec('T6 switch back on, no reload: the key is back at the next tooltip', t6.text === want(ORIG.downloadBtn, 'D'), JSON.stringify(t6.text));
+
+    window.penumbra_vars.isAdmin = false;
+    var ai = openTip(byId('toggleAiPanel')), pv = openTip(byId('pivotBtn'));
+    window.penumbra_vars.isAdmin = true;
+    rec('T7 the admin-only key (a, the AI panel) is not named to a viewer; the others still are',
+        ai.text === ORIG.toggleAiPanel && pv.text === want(ORIG.pivotBtn, 'P'), 'ai=' + JSON.stringify(ai.text) + ' pivot=' + JSON.stringify(pv.text));
+
+    // A title rebuilt at runtime keeps the hint: journalBtnTitle() rewrites it on
+    // every badge refresh; penumbraMarkUserHidden appends its note.
+    var $j = $('#journalBtn');
+    var rebuilt = '(CTRL+SHIFT+J) Report Journal — Shared Notes & Mentions • 3 notes, 1 new';
+    $j.attr('title', rebuilt);
+    var tj = openTip($j[0]);
+    rec('T8 a title rebuilt at runtime (the journal badge count) still gets the key', tj.text === '(N or ' + rebuilt.slice(1), JSON.stringify(tj.text));
+    if (typeof H.markHidden === 'function') {
+      H.markHidden($j, true);
+      var marked = $j.attr('title');
+      var tm = openTip($j[0]);
+      H.markHidden($j, false);
+      rec('T9 the admin-hidden marker\'s note and the key live side by side', tm.text === '(N or ' + marked.slice(1) && / -- /.test(marked) && $j.attr('title') === rebuilt,
+          'tip=' + JSON.stringify(tm.text) + ' after unmark=' + JSON.stringify($j.attr('title')));
+    } else { rec('T9 the admin-hidden marker\'s note and the key live side by side', false, 'penumbraMarkUserHidden not exported: ' + (window.__SKT_MISSING || []).join(',')); }
+    $j.attr('title', ORIG.journalBtn);
+
+    var plain = openTip(byId('sktPlain'));
+    var noid = openTip(document.querySelector('.sktNoId'));
+    var snap = openTip(byId('snapshotBtn'));
+    var keysHelp = openTip(byId('spKeysHelp'));
+    var sbi = openTip(byId('searchBuilderIcon'));
+    rec('T10 unkeyed titles come through exactly - markup stays TEXT (escaped), no id, Ctrl+Shift-only, the ? button, the builder icon',
+        plain.text === 'a <b>bold</b> & c' && plain.markup === 0 && /&lt;b&gt;/.test(plain.html || '') &&
+        noid.text === '(Z) no id here' && snap.text === $('#snapshotBtn').attr('title') &&
+        keysHelp.text === $('#spKeysHelp').attr('title') && sbi.text === $('#searchBuilderIcon').attr('title'),
+        JSON.stringify([plain.text, plain.markup, noid.text, snap.text, keysHelp.text, sbi.text]));
+
+    if (typeof H.tip === 'function') {
+      var noIdEl = document.createElement('span');
+      var t11 = [H.tip(noIdEl, 'abc'), H.tip(byId('pivotBtn'), ''), H.tip(null, 'x'), H.tip(byId('sktPlain'), 'plain')];
+      rec('T11 _pnbSingleKeyTip: no id, an empty title, no element, an unkeyed id - all returned as given', t11[0] === 'abc' && t11[1] === '' && t11[2] === 'x' && t11[3] === 'plain', JSON.stringify(t11));
+    } else { rec('T11 _pnbSingleKeyTip: no id, an empty title, no element, an unkeyed id - all returned as given', false, '_pnbSingleKeyTip not exported: ' + (window.__SKT_MISSING || []).join(',')); }
+  }
+
+  // ------------------------------------------------------------------ K
+  function key(target, k, mods) {
+    var init = { key: k, bubbles: true, cancelable: true };
+    if (mods) Object.keys(mods).forEach(function (m) { init[m] = mods[m]; });
+    var ev = new KeyboardEvent('keydown', init);
+    target.dispatchEvent(ev);
+    return ev.defaultPrevented;
+  }
+  var COUNT = {};
+  // Count activations of a control and keep its real handler out of the way.
+  function counter(id) {
+    COUNT[id] = 0;
+    $('#' + id).off('click').on('click.skt', function (e) { COUNT[id]++; e.stopPropagation(); e.preventDefault(); return false; });
+  }
+  async function phaseK() {
+    await runQuery(60);
+    $('#rowsPerPageSelector').val('25').trigger('change');
+    await sleep(300);
+    var vis = { pivot: $('#pivotBtn').is(':visible'), next: $('#nextPageBtn').is(':visible') && !$('#nextPageBtn').prop('disabled'),
+                pager: $('#paginatorContainer').css('visibility') };
+    rec('K0 fixture: after a 60-row run the pivot icon is visible and the next-page button live', vis.pivot && vis.next && vis.pager !== 'hidden', JSON.stringify(vis));
+    counter('pivotBtn'); counter('nextPageBtn');
+    setSwitch(true);
+    document.activeElement && document.activeElement.blur && document.activeElement.blur();
+
+    var pv1 = key(document.body, 'p');
+    rec('K1 p opens the pivot builder (unchanged)', COUNT.pivotBtn === 1 && pv1, 'count=' + COUNT.pivotBtn + ' prevented=' + pv1);
+    var pv2 = key(document.body, 'P');
+    rec('K2 P - Caps Lock on - opens it too (the fix)', COUNT.pivotBtn === 2 && pv2, 'count=' + COUNT.pivotBtn + ' prevented=' + pv2);
+    key(document.body, 'J');
+    rec('K3 J pages forward like j', COUNT.nextPageBtn === 1, 'count=' + COUNT.nextPageBtn);
+
+    var inp = byId('tableSearch');
+    $('#tableSearchContainer').show();
+    inp.focus();
+    var c0 = COUNT.pivotBtn;
+    var pv4 = key(inp, 'P');
+    inp.blur();
+    rec('K4 P typed into a field stays a letter (the caret owns it)', COUNT.pivotBtn === c0 && !pv4, 'count ' + c0 + '->' + COUNT.pivotBtn + ' prevented=' + pv4);
+
+    setSwitch(false);
+    var c1 = COUNT.pivotBtn;
+    var pv5 = key(document.body, 'P'); key(document.body, 'p');
+    setSwitch(true);
+    rec('K5 switched off: neither p nor P does anything', COUNT.pivotBtn === c1 && !pv5, 'count ' + c1 + '->' + COUNT.pivotBtn);
+
+    var c2 = COUNT.pivotBtn;
+    key(document.body, 'P', { ctrlKey: true, shiftKey: true });
+    rec('K6 Ctrl+Shift+P still opens it exactly ONCE (the single-key branch keeps out of modified keys)', COUNT.pivotBtn === c2 + 1, 'count ' + c2 + '->' + COUNT.pivotBtn);
+
+    key(document.body, '?');
+    var open1 = $('#pnbShortcutsLightbox').is(':visible');
+    key(document.body, '?');
+    var open2 = $('#pnbShortcutsLightbox').is(':visible');
+    rec('K7 ? opens the cheat sheet and ? closes it (unchanged)', open1 && !open2, 'after1=' + open1 + ' after2=' + open2);
+
+    var c3 = COUNT.pivotBtn, c4 = COUNT.nextPageBtn;
+    var pz = key(document.body, 'Z');
+    rec('K8 an unmapped capital (Z) does nothing and is not swallowed', !pz && COUNT.pivotBtn === c3 && COUNT.nextPageBtn === c4, 'prevented=' + pz);
+  }
+
+  // ------------------------------------------------------------------ S
+  async function phaseS() {
+    setSwitch(true);
+    if (typeof window.penumbraToggleShortcutSheet !== 'function') { rec('S1 the cheat sheet', false, 'penumbraToggleShortcutSheet missing'); return; }
+    window.penumbraToggleShortcutSheet(true);
+    await sleep(50);
+    var $lb = $('#pnbShortcutsLightbox');
+    var intro = $lb.find('.pnb-keys-intro').text();
+    rec('S1 the cheat sheet says tooltips name the single keys and Caps Lock makes no difference', /names its single key in its tooltip/.test(intro) && /Caps Lock makes no difference/.test(intro), intro);
+    var dashRow = $lb.find('tr').filter(function () { return /Dashboards:/.test($(this).text()); }).text();
+    rec('S2 its dashboards row names what the keys do: help (H) and add a tile (A), not home / access', /refresh, help, kiosk, edit, add a tile, settings, pause/.test(dashRow) && !/home|access/.test(dashRow), dashRow);
+    var $cb = $lb.find('#pnbKeysSheetToggle');
+    $cb.prop('checked', false).trigger('change');
+    await sleep(30);
+    var st = { ls: localStorage.getItem('pnb_single_keys'), cls: document.documentElement.classList.contains('pnb-keys-off'), sp: $('#spSingleKeysToggle').prop('checked'),
+               badge: getComputedStyle(byId('tableSearchKey')).display };
+    $lb.find('#pnbKeysSheetToggle').prop('checked', true).trigger('change');
+    await sleep(30);
+    var st2 = { ls: localStorage.getItem('pnb_single_keys'), cls: document.documentElement.classList.contains('pnb-keys-off') };
+    window.penumbraToggleShortcutSheet(false);
+    rec('S3 the sheet\'s own switch turns the keys off and on - the Settings twin and the "/" badges follow at once',
+        st.ls === 'off' && st.cls && st.sp === false && st.badge === 'none' && st2.ls === 'on' && !st2.cls, JSON.stringify([st, st2]));
+  }
+
+  // ------------------------------------------------------------------ B
+  function badges() {
+    var h = byId('pnlFilterKey');
+    return { cls: document.documentElement.classList.contains('pnb-keys-off'),
+             table: getComputedStyle(byId('tableSearchKey')).display,
+             home: h ? getComputedStyle(h).display : 'missing',
+             repo: getComputedStyle(byId('repoSearchKey')).display };
+  }
+  async function phaseB() {
+    setSwitch(true);
+    if (window.penumbraSingleKeysSync) window.penumbraSingleKeysSync();
+    $('#tableSearchContainer').removeClass('has-text');
+    var on = badges();
+    rec('B1 switch on: the three "/" badges show (search bar, home filter, repository)', !on.cls && on.table !== 'none' && on.home !== 'none' && on.repo !== 'none', JSON.stringify(on));
+    $('#spSingleKeysToggle').prop('checked', false).trigger('change');
+    await sleep(30);
+    var off = badges();
+    rec('B2 the Settings switch off: html.pnb-keys-off, and all three badges are gone - the repository\'s despite its inline display',
+        off.cls && off.table === 'none' && off.home === 'none' && off.repo === 'none' && localStorage.getItem('pnb_single_keys') === 'off', JSON.stringify(off));
+    var h = byId('pnlFilterKey');
+    if (h) { h.classList.add('is-clear'); }
+    var clr = h ? getComputedStyle(h).display : 'missing';
+    if (h) { h.classList.remove('is-clear'); }
+    rec('B3 ...but the home filter\'s badge stays while it is the clear button (.is-clear)', clr !== 'none', 'display=' + clr);
+    $('#spSingleKeysToggle').prop('checked', true).trigger('change');
+    await sleep(30);
+    var back = badges();
+    rec('B4 switched back on: the class goes and the badges return', !back.cls && back.table !== 'none' && back.home !== 'none' && back.repo !== 'none', JSON.stringify(back));
+  }
+
+  // ------------------------------------------------------------------ O
+  async function phaseO() {
+    var b = badges();
+    rec('O1 a page loaded with the switch already off: html.pnb-keys-off from the start, the badges hidden', b.cls && b.table === 'none' && b.home === 'none' && b.repo === 'none', JSON.stringify(b));
+    var t = openTip(byId('pivotBtn'));
+    rec('O2 ...and the tooltips name no keys', t.text === byId('pivotBtn').getAttribute('title'), JSON.stringify(t.text));
+    var off = typeof window.penumbraSingleKeysOff === 'function' && window.penumbraSingleKeysOff();
+    rec('O3 ...and penumbraSingleKeysOff() agrees', off === true, String(off));
+  }
+
+  async function main() {
+    for (var i = 0; i < 200 && !(window.jQuery && $(document).data('ui-tooltip')); i++) await sleep(25);
+    await sleep(300);
+    if (window.__SKT_ERR) { finish('hook: ' + window.__SKT_ERR); return; }
+    if (OFFLOAD) { await phaseO(); finish(); return; }
+    phaseT();
+    await phaseK();
+    await phaseS();
+    await phaseB();
+    rec('Z1 no page errors', errs().length === 0, errs().slice(0, 5).join(' | ') || 'none');
+    finish();
+  }
+  window.__drv = { openTip: openTip, key: key, runQuery: runQuery, badges: badges, KEYED: KEYED, want: want };
+  if (window.__REAL) { document.getElementById('out').textContent = 'READY'; return; }
+  main().catch(function (e) { finish('driver threw: ' + (e && e.stack || e)); });
+})();

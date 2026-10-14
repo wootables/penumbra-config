@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>View Options layout harness</title>
+<script src="themes.js"></script>
+<style>
+  /* harness chrome only - never styles the lifted tab */
+  #out { white-space: pre-wrap; word-break: break-all; font: 11px/1.3 Consolas, monospace; margin: 12px 0 0; }
+  /* The stylesheets load AFTER the markup is in, so a `transition: all` (the
+     Custom Sort "+ Add" button has one) animates its padding in from the UA
+     default and a measurement taken in the first 150ms reads a column up to
+     10px short. The page measures settled layout: no transitions. */
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+</style>
+</head>
+<body class="admin-view">
+<div id="admWrapper" class="admin-view">
+  <div id="admin-flex-container" style="display: flex; align-items: stretch; height: auto;">
+    <div id="editorTabs" class="ui-tabs ui-corner-all ui-widget ui-widget-content" style="flex-grow: 1;">
+      <div id="voSlot"></div>
+    </div>
+  </div>
+</div>
+<pre id="out"></pre>
+<script>
+/*
+ * View Options layout suite (2026-09-25) - the page half. run.ps1 copies this
+ * next to the index.php and css/main.css UNDER TEST and cdp.py loads it once
+ * per case. #view-options-tab is lifted VERBATIM from that index.php (PHP
+ * comments stripped; any other PHP = error) and rendered under index.php's
+ * <link> set, in its order, with <body> stamped the way applyTheme() stamps it.
+ *   ?phase=wide|compact|dark|width|input|fixture   &w=<End-User grid width>
+ *   &theme=theme-...   &compact=1   &rows=6,5 (phase=width: the expected rows)
+ * Result: window.__vo = { asserts: [{id, name, pass, detail}], ... }.
+ */
+(function () {
+  var q = new URLSearchParams(location.search);
+  var phase = q.get('phase') || 'wide';
+  var theme = q.get('theme') || 'theme-hello-kitty';
+  var W = parseFloat(q.get('w') || '1677');
+  var compact = q.get('compact') === '1';
+  var out = document.getElementById('out');
+  var A = [];
+  function T(id, name, pass, detail) { A.push({ id: id, name: name, pass: !!pass, detail: detail === undefined ? '' : String(detail) }); }
+  function finish(extra) {
+    var res = extra || {};
+    res.asserts = A; res.phase = phase; res.w = W; res.theme = theme; res.compact = compact;
+    window.__vo = res; out.textContent = JSON.stringify(res); window.__voDone = true;
+  }
+
+  try {
+    var x = new XMLHttpRequest();
+    x.open('GET', q.get('idx') || 'index.php', false);
+    x.send(null);
+    var idx = x.responseText;
+    if (!idx || idx.length < 1000) throw new Error('index.php not read');
+    var a = idx.indexOf('<div id="view-options-tab">');
+    if (a < 0) throw new Error('no #view-options-tab open');
+    // First match AFTER the open: the tab strip <li> above repeats this anchor.
+    var b = idx.indexOf('<?php if ($canScheduleLoadedReport): ?>', a);
+    if (b < 0) throw new Error('no close anchor after the tab');
+    var html = idx.slice(a, b).replace(/<\?php\s*\/\*[\s\S]*?\*\/\s*\?>/g, '');
+    if (html.indexOf('<?') >= 0) throw new Error('lifted block still contains PHP');
+    if (html.indexOf('id="viewOptionSnapshots"') < 0 || html.indexOf('id="viewOptionBareHeader"') < 0) throw new Error('lift guard: option ids missing');
+    document.getElementById('voSlot').outerHTML = html;
+    document.getElementById('view-options-tab').className += ' ui-tabs-panel ui-corner-bottom ui-widget-content';
+    // What renderCustomSortOrderCards() paints at boot for a report with no
+    // custom sort orders, so the Custom Sort column is as tall as it really is.
+    var csl = document.getElementById('customSortOrdersList');
+    if (csl) {
+      var pe = document.createElement('p');
+      pe.className = 'cs-cards-empty';
+      pe.textContent = 'No custom sort orders yet. Every column sorts alphabetically (or numerically) until you add one.';
+      csl.appendChild(pe);
+    }
+  } catch (e) { T('Z0', 'the tab lifts from the index.php under test', false, e.message); finish(); return; }
+
+  var row = (window.PNB_THEMES || []).filter(function (t) { return t.id === theme; })[0] || { id: theme, isDark: false, modern: false };
+  if (theme !== 'theme-default') document.body.classList.add(theme);
+  document.body.setAttribute('data-theme', theme);
+  document.body.classList.toggle('is-dark', !!row.isDark);
+  document.body.classList.toggle('registry-theme', !!row.modern);
+  if (compact) document.getElementById('admWrapper').classList.add('compact-admin-mode');
+
+  function euGrid() { var s = document.getElementById('viewOptionSnapshots'); return s && s.closest('.view-options-grid'); }
+
+  if (phase === 'fixture') {
+    // A card whose title is one 44-character word: only overflow-wrap can keep
+    // it inside a 128px card (no space, no <wbr>).
+    var g0 = euGrid();
+    var fx = document.createElement('div');
+    fx.className = 'view-option-item';
+    fx.id = 'voFixtureCard';
+    fx.innerHTML = '<label><input type="checkbox" id="voFixtureBox"><div class="view-option-text"><strong>Supercalifragilisticexpialidociousnessesxyz</strong><small>Fixture.</small></div></label>';
+    g0.appendChild(fx);
+  }
+
+  var sheets = ['css/jquery-ui.css', q.get('css') || 'main.css', 'css/penumbra_tiles.css', 'css/density.css', 'css/search_builder.css', 'css/penumbra_presets.css', 'css/penumbra_colwidths.css', 'themevars.css'];
+  var pending = sheets.length;
+  sheets.forEach(function (href) {
+    var l = document.createElement('link');
+    l.rel = 'stylesheet'; l.href = href;
+    l.onload = l.onerror = function () { if (--pending === 0) settle(); };
+    document.head.appendChild(l);
+  });
+
+  function r(el) { var bb = el.getBoundingClientRect(); return { x: +bb.left.toFixed(2), y: +(bb.top + scrollY).toFixed(2), w: +bb.width.toFixed(2), h: +bb.height.toFixed(2), r: +bb.right.toFixed(2), b: +(bb.bottom + scrollY).toFixed(2) }; }
+
+  function settle() {
+    var wrap = document.getElementById('admWrapper');
+    wrap.style.width = (W + 80) + 'px';
+    var g = euGrid();
+    var off = wrap.getBoundingClientRect().width - g.getBoundingClientRect().width;
+    wrap.style.width = (W + off) + 'px';
+    (document.fonts ? document.fonts.ready : Promise.resolve()).then(function () {
+      requestAnimationFrame(function () { requestAnimationFrame(run); });
+    });
+  }
+
+  // Line boxes of the characters [from, to) of el's text, across text nodes.
+  function lineRects(el, from, to) {
+    var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), n, pos = 0, rects = [];
+    while ((n = walker.nextNode())) {
+      var len = n.data.length, s = Math.max(from - pos, 0), e = Math.min(to - pos, len);
+      if (s < e) { var rg = document.createRange(); rg.setStart(n, s); rg.setEnd(n, e); Array.prototype.push.apply(rects, Array.prototype.slice.call(rg.getClientRects())); }
+      pos += len;
+    }
+    var tops = {};
+    rects.forEach(function (x) { if (x.width > 0.5) tops[Math.round(x.top)] = 1; });
+    return { lines: Object.keys(tops).length, left: rects.length ? Math.min.apply(null, rects.map(function (x) { return x.left; })) : null, top: rects.length ? Math.min.apply(null, rects.map(function (x) { return x.top; })) : null };
+  }
+
+  function cardInfo(it) {
+    // A card that lost its <label> (the nolabel mutant) is still measured, so
+    // R1 / R3 / R5 - not a harness error - are what report it.
+    var cb = it.querySelector('input[type="checkbox"]'), st = it.querySelector('strong'), sm = it.querySelector('small'), lab = it.querySelector('label') || cb.parentElement;
+    var cs = getComputedStyle(it), sst = getComputedStyle(st);
+    var lh = parseFloat(sst.lineHeight) || parseFloat(sst.fontSize) * 1.2;
+    // The description is measured from the LABEL's left edge, where the
+    // checkbox's layout box starts: compact mode draws every checkbox at
+    // transform: scale(0.75), so its painted edge sits 1.6px inside that box.
+    var c = r(it), cbr = r(cb), str = r(st), smr = r(sm), labr = r(lab);
+    var padL = parseFloat(cs.paddingLeft) + parseFloat(cs.borderLeftWidth), padR = parseFloat(cs.paddingRight) + parseFloat(cs.borderRightWidth);
+    return {
+      id: cb.id, title: st.textContent, checked: cb.checked, card: c, cb: cbr, strong: str, small: smr,
+      titleLines: Math.round(str.h / lh),
+      cbDy: +((cbr.y + cbr.h / 2) - (str.y + lh / 2)).toFixed(2),
+      cbBeforeTitle: cbr.r <= str.x + 0.5 && Math.abs((cbr.y + cbr.h / 2) - (str.y + lh / 2)) < lh / 2,
+      smallLeftDx: +(smr.x - labr.x).toFixed(2),
+      smallFull: smr.w >= (c.w - padL - padR) - 1,
+      smallBelow: smr.y >= str.b - 0.5,
+      inside: str.x >= c.x - 0.5 && str.r <= c.r + 0.5 && smr.r <= c.r + 0.5 && smr.b <= c.b + 0.5 && cbr.x >= c.x,
+      overflowX: lab.scrollWidth > lab.clientWidth + 1 || it.scrollWidth > it.clientWidth + 1 || st.scrollWidth > st.clientWidth + 1,
+      bg: cs.backgroundColor, smallColor: getComputedStyle(sm).color
+    };
+  }
+
+  // A Layout radio card: the LABEL is the card (and the grid), so the content
+  // edge is its own padding box, not a child's.
+  function radioInfo(lab) {
+    var rd = lab.querySelector('input[type="radio"]'), st = lab.querySelector('strong'), sm = lab.querySelector('small');
+    var cs = getComputedStyle(lab), sst = getComputedStyle(st);
+    var lh = parseFloat(sst.lineHeight) || parseFloat(sst.fontSize) * 1.2;
+    var c = r(lab), rr = r(rd), str = r(st), smr = r(sm);
+    var padL = parseFloat(cs.paddingLeft) + parseFloat(cs.borderLeftWidth), padR = parseFloat(cs.paddingRight) + parseFloat(cs.borderRightWidth);
+    return {
+      v: rd.value, card: c, titleLines: Math.round(str.h / lh),
+      dy: +((rr.y + rr.h / 2) - (str.y + lh / 2)).toFixed(2),
+      before: rr.r <= str.x + 0.5,
+      sdx: +(smr.x - (c.x + padL)).toFixed(2),
+      full: smr.w >= (c.w - padL - padR) - 1,
+      gap: +(smr.y - str.b).toFixed(2),
+      ovf: lab.scrollWidth > lab.clientWidth + 1 || st.scrollWidth > st.clientWidth + 1,
+      bg: cs.backgroundColor, smallColor: getComputedStyle(sm).color
+    };
+  }
+  function radioRows(rs) { var t = {}; rs.forEach(function (x) { t[Math.round(x.card.y)] = 1; }); return Object.keys(t).length; }
+
+  function rowsOf(cards) {
+    var tops = {};
+    cards.forEach(function (c) { var t = Math.round(c.card.y); tops[t] = (tops[t] || 0) + 1; });
+    return Object.keys(tops).sort(function (p, q2) { return p - q2; }).map(function (t) { return tops[t]; });
+  }
+
+  function run() {
+    var res = {};
+    try {
+      var tab = document.getElementById('view-options-tab');
+      var g = euGrid();
+      var items = Array.prototype.slice.call(g.querySelectorAll(':scope > .view-option-item'));
+      var cards = items.map(cardInfo);
+      var rows = rowsOf(cards.filter(function (c) { return c.id !== 'voFixtureBox'; }));
+      res.tabH = r(tab).h; res.gridH = r(g).h; res.gridW = r(g).w; res.rows = rows;
+      res.cards = cards.map(function (c) { return { id: c.id, t: c.title, w: c.card.w, h: c.card.h, tl: c.titleLines, dy: c.cbDy, sdx: c.smallLeftDx }; });
+      var bad = function (pred) { return cards.filter(function (c) { return !pred(c); }).map(function (c) { return c.id; }); };
+      var one = function (id) { return cards.filter(function (c) { return c.id === id; })[0]; };
+
+      if (phase === 'wide' || phase === 'compact' || phase === 'dark') {
+        var P = phase === 'wide' ? 'W' : phase === 'compact' ? 'C' : 'D';
+        T(P + '1', 'the ' + cards.length + ' End-User cards share ONE row at ' + W + 'px' + (compact ? ' (compact)' : ''), cards.length === 11 && rows.length === 1, 'rows=' + rows.join('+') + ' cards=' + cards.length);
+        T(P + '2', 'every checkbox sits IN LINE with its title (left of it, centred on its first line within 1px)', bad(function (c) { return c.cbBeforeTitle && Math.abs(c.cbDy) <= 1; }).length === 0, 'off: ' + bad(function (c) { return c.cbBeforeTitle && Math.abs(c.cbDy) <= 1; }).join(',') + ' dy=' + cards.map(function (c) { return c.cbDy; }).join('/'));
+        T(P + '3', 'every description runs UNDER both, from the edge the checkbox starts at, at the card\'s full width', bad(function (c) { return Math.abs(c.smallLeftDx) <= 1 && c.smallFull && c.smallBelow; }).length === 0, 'off: ' + bad(function (c) { return Math.abs(c.smallLeftDx) <= 1 && c.smallFull && c.smallBelow; }).join(',') + ' dx=' + cards.map(function (c) { return c.smallLeftDx; }).join('/'));
+        T(P + '4', 'nothing overflows or leaves its card', bad(function (c) { return !c.overflowX && c.inside; }).length === 0, 'off: ' + bad(function (c) { return !c.overflowX && c.inside; }).join(','));
+        var hs = cards.map(function (c) { return c.card.h; });
+        T(P + '5', 'the cards share one height', Math.max.apply(null, hs) - Math.min.apply(null, hs) <= 0.5, 'h=' + Math.min.apply(null, hs) + '..' + Math.max.apply(null, hs));
+        // The three Layout radios (2026-09-25 pm): the same in-line card, one row.
+        var rs = Array.prototype.slice.call(document.querySelectorAll('.header-layout-radios > .header-layout-option')).map(radioInfo);
+        var rh = rs.map(function (x) { return x.card.h; });
+        res.radios = rs.map(function (x) { return { v: x.v, w: x.card.w, h: x.card.h, dy: x.dy, sdx: x.sdx, gap: x.gap }; });
+        T(P + 'L1', 'the three Layout radio cards share ONE row at one height', rs.length === 3 && radioRows(rs) === 1 && Math.max.apply(null, rh) - Math.min.apply(null, rh) <= 0.5, 'radios=' + rs.length + ' rows=' + radioRows(rs) + ' h=' + rh.join('/'));
+        var rok = function (x) { return x.before && Math.abs(x.dy) <= 1 && Math.abs(x.sdx) <= 1 && x.full && x.gap >= 0 && x.gap <= 3 && x.titleLines === 1; };
+        T(P + 'L2', 'every radio sits in line with its title (centred on it within 1px), the description RIGHT under the title (<= 3px) from the card\'s content edge at full width', rs.length === 3 && rs.filter(rok).length === 3, rs.map(function (x) { return x.v + ' dy=' + x.dy + ' dx=' + x.sdx + ' gap=' + x.gap + ' full=' + x.full; }).join(' | '));
+        T(P + 'L3', 'no Layout radio card overflows', rs.length === 3 && rs.filter(function (x) { return !x.ovf; }).length === 3, rs.map(function (x) { return x.v + '=' + x.ovf; }).join(' '));
+        if (phase === 'dark') {
+          T('DL4', 'the dark radio card colours still win (.is-dark: #161b22 card, #8b949e text)', rs.length && rs[0].bg === 'rgb(22, 27, 34)' && rs[0].smallColor === 'rgb(139, 148, 158)', rs.length ? ('bg=' + rs[0].bg + ' small=' + rs[0].smallColor) : 'none');
+        }
+      }
+      if (phase === 'wide') {
+        var ex = one('viewOptionExport');
+        T('W6', 'every title fits in two lines, and Export/Download in ONE', bad(function (c) { return c.titleLines <= 2; }).length === 0 && ex && ex.titleLines === 1, 'lines=' + cards.map(function (c) { return c.titleLines; }).join('/'));
+        var bare = document.getElementById('viewOptionBareHeader');
+        var bareCard = bare && bare.closest('.view-option-item');
+        var layoutCol = document.querySelector('input[name="headerLayout"]').closest('.view-options-split-col');
+        T('W7', 'Bare Header is the grid\'s LAST card, unchecked, and says it applies to everyone', !!bareCard && items[items.length - 1] === bareCard && !bare.checked && /applies to everyone/i.test(bareCard.textContent), bareCard ? ('last=' + (items[items.length - 1] === bareCard) + ' text=' + bareCard.textContent.trim()) : 'no card');
+        var h4 = layoutCol.querySelector('h4');
+        T('W8', 'the layout column is headed "Layout" and holds the three radios and nothing else', h4.textContent.trim() === 'Layout' && layoutCol.querySelectorAll('input[type="radio"]').length === 3 && layoutCol.querySelectorAll('input[type="checkbox"]').length === 0, 'head="' + h4.textContent.trim() + '" checkboxes=' + layoutCol.querySelectorAll('input[type="checkbox"]').length);
+        var cols = Array.prototype.slice.call(document.querySelectorAll('.view-options-split-row > .view-options-split-col')).map(function (c) { return r(c).h; });
+        res.splitCols = cols;
+        T('W9', 'the tab is short: the Layout column <= 170px, the grid <= 90px, the whole tab <= 430px (231 / 173 / 591 before any of this)', r(layoutCol).h <= 170 && r(g).h <= 90 && r(tab).h <= 430, 'layout=' + r(layoutCol).h + ' grid=' + r(g).h + ' tab=' + r(tab).h);
+        var ctf = document.getElementById('viewOptionClickFilter').closest('.view-option-item');
+        var ci = cardInfo(ctf);
+        T('W10', 'Table Behavior\'s Click-to-Filter card has the same in-line layout', ci.cbBeforeTitle && Math.abs(ci.cbDy) <= 1 && Math.abs(ci.smallLeftDx) <= 1 && ci.smallFull && !ci.overflowX, 'dy=' + ci.cbDy + ' dx=' + ci.smallLeftDx + ' full=' + ci.smallFull);
+      }
+      if (phase === 'compact') {
+        T('C6', 'compact mode: the tab <= 345px (417 before any of this; the Custom Sort column is the tallest here now)', r(tab).h <= 345, 'tab=' + r(tab).h);
+      }
+      if (phase === 'dark') {
+        var c0 = cards[0];
+        T('D6', 'the dark card colours still win over the restyle (.is-dark: #161b22 card, #8b949e text)', c0.bg === 'rgb(22, 27, 34)' && c0.smallColor === 'rgb(139, 148, 158)', 'bg=' + c0.bg + ' small=' + c0.smallColor);
+      }
+      if (phase === 'width') {
+        var want = (q.get('rows') || '').split(',').map(Number).join('+');
+        T('N' + W, W + 'px: ' + want + ' (balanced, never one card alone on a row), nothing overflowing', rows.join('+') === want && bad(function (c) { return !c.overflowX && c.inside; }).length === 0, 'rows=' + rows.join('+') + ' overflow: ' + bad(function (c) { return !c.overflowX && c.inside; }).join(','));
+        if (q.get('lrows')) {
+          // One row from 376px of Layout column (a 1168px tab), Split under the
+          // other two from 248px, one per row below that; no card overflowing.
+          var lr = Array.prototype.slice.call(document.querySelectorAll('.header-layout-radios > .header-layout-option')).map(radioInfo);
+          T('NL' + W, W + 'px: the Layout radios sit in ' + q.get('lrows') + ' row(s), none overflowing', radioRows(lr) === +q.get('lrows') && lr.filter(function (x) { return !x.ovf; }).length === 3, 'rows=' + radioRows(lr) + ' w=' + lr.map(function (x) { return x.card.w; }).join('/'));
+        }
+        if (q.get('sub1') === '1') {
+          var sl = document.querySelector('label[for="reportSubtitle"]');
+          var slh = parseFloat(getComputedStyle(sl).lineHeight) || parseFloat(getComputedStyle(sl).fontSize) * 1.2;
+          T('NS' + W, W + 'px: the subtitle label fits on ONE line (its "see Custom Code help" moved into the placeholder)', Math.round(r(sl).h / slh) === 1, 'h=' + r(sl).h + ' lineHeight=' + slh);
+        }
+        if (q.get('wbr') === '1') {
+          var exs = document.getElementById('viewOptionExport').closest('label').querySelector('strong');
+          var full = exs.textContent, k = full.indexOf('Download');
+          var l1 = lineRects(exs, 0, k), l2 = lineRects(exs, k, full.length);
+          res.wbr = { l1: l1, l2: l2, strongX: r(exs).x };
+          T('NW', W + 'px: Export/Download wraps AT the slash ("Download" whole on line 2, from the title\'s left edge)', l1.lines === 1 && l2.lines === 1 && l2.top > l1.top + 2 && Math.abs(l2.left - exs.getBoundingClientRect().left) <= 1, JSON.stringify(res.wbr));
+        }
+      }
+      if (phase === 'fixture') {
+        var fc = cardInfo(document.getElementById('voFixtureCard'));
+        T('F1', 'an unbreakable 44-character title stays inside its card (the overflow-wrap safety net)', !fc.overflowX && fc.inside, 'strong ' + fc.strong.x + '..' + fc.strong.r + ' card ' + fc.card.x + '..' + fc.card.r + ' ovf=' + fc.overflowX);
+      }
+      if (phase === 'input') {
+        var bb = document.getElementById('viewOptionBareHeader');
+        var bc = bb.closest('.view-option-item');
+        res.targets = { small: r(bc.querySelector('small')), strong: r(bc.querySelector('strong')), pagTitle2: (function () { var s = document.getElementById('viewOptionPagination').closest('label').querySelector('strong'); var rr = r(s); return { x: rr.x + 4, y: rr.b - 5 }; })() };
+        window.__voChanges = 0;
+        bb.addEventListener('change', function () { window.__voChanges++; });
+        var name = (bb.labels && bb.labels[0]) ? bb.labels[0].textContent.replace(/\s+/g, ' ').trim() : '';
+        T('R3', 'the Bare Header box is still labelled by its whole card (title + description)', /^Bare Header/.test(name) && /Applies to everyone/.test(name), name);
+      }
+      res.sheetOk = getComputedStyle(document.documentElement).getPropertyValue('--accent-info').trim() !== '';
+      if (!res.sheetOk) T('Z1', 'the stylesheet under test parsed to its end', false, '--accent-info unresolved');
+    } catch (e) { T('Z2', 'the ' + phase + ' phase ran', false, e.message); }
+    finish(res);
+  }
+})();
+</script>
+</body>
+</html>

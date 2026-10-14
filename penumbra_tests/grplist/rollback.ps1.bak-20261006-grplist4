@@ -1,0 +1,169 @@
+# =============================================================================
+# ROLLBACK - the grouped view's List layout (2026-10-03, "grplist")
+#
+#   rollback.ps1 -Status            the switch, the module files, and whether every live file holds
+#                                   the feature's lines (grplist_patch.py check)
+#   rollback.ps1 -Disable           SWITCH OFF: create an empty js\penumbra_grouplist.off. From the next
+#                                   page load index.php loads neither the module nor its stylesheet:
+#                                   every grouped report is Stacked, the dialog's Layout row stays
+#                                   hidden, a report saved as List keeps the choice, unused. Nothing is
+#                                   deployed or restored.   -Enable deletes the file.
+#   rollback.ps1 -Restore [-DryRun] take the feature OUT: grplist3_patch.py reverse (round 3), then
+#                                   grplist2_patch.py reverse (round 2) - each when it is in; each
+#                                   edits lines the round before added, so newest goes first - then
+#                                   grplist_patch.py reverse on the CURRENT live js\main.js / index.php /
+#                                   help_content.php / README.md (+ ai_system_prompt.php and
+#                                   js\penumbra_snippet_help.js, round 2's) - exactly those lines, so
+#                                   anything deployed on top stays; it REFUSES, touching nothing, if any
+#                                   of them were edited or are only partly in - then
+#                                   the same hash-guarded atomic swap the deploy used, index.php FIRST
+#                                   (from that moment no page loads the module), with
+#                                   *.bak-<stamp>-grplist-undo copies; the module and stylesheet are
+#                                   renamed *.removed-<stamp>, never deleted.
+#   -App <dir> rehearses on a copy of the app folder (do: -Restore -DryRun -App <copy>, then
+#   -Restore -App <copy>, and diff the copy against the pre-feature .baks).
+#   ROUND 2 ONLY (2026-10-03, "grplist2"): deploy2.ps1 -Rollback -Stamp <its stamp> puts round 2's
+#   .bak files back while the live files are still exactly that deploy; later, the full -Restore.
+#
+# UNC NOTE: run the body as a scriptblock (the share is RemoteSigned):
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\grplist'
+#   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\rollback.ps1"))) -Disable
+# =============================================================================
+param([switch]$Status, [switch]$Disable, [switch]$Enable, [switch]$Restore, [switch]$DryRun,
+      [string]$App = '', [string]$Here = '')
+$ErrorActionPreference = 'Stop'
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\grplist' }
+$app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
+$off     = Join-Path $app 'js\penumbra_grouplist.off'
+$modules = @('js\penumbra_grouplist.js', 'css\penumbra_grouplist.css')
+$patched1 = @('index.php', 'js\main.js', 'help_content.php', 'README.md')   # index.php FIRST
+$patched2 = @('ai_system_prompt.php', 'js\penumbra_snippet_help.js')      # round 2 only
+$patcher  = Join-Path $here 'deploy\grplist_patch.py'
+$patcher2 = Join-Path $here 'deploy\grplist2_patch.py'
+$patcher3 = Join-Path $here 'deploy\grplist3_patch.py'
+$stamp    = (Get-Date).ToString('yyyyMMdd-HHmmss') + '-grplist-undo'
+
+function Get-Sha([string]$p) { (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToLower() }
+function Check-State([string]$p, [string]$dir) {
+  $o = & py -3 $p check $dir 2>&1
+  return @{ code = $LASTEXITCODE; text = ($o -join "`n") }
+}
+
+if ($Status) {
+  "app:      $app"
+  "switch:   " + $(if (Test-Path -LiteralPath $off) { 'OFF (js\penumbra_grouplist.off exists)' } else { 'on' })
+  foreach ($m in $modules) { "module:   $m " + $(if (Test-Path -LiteralPath (Join-Path $app $m)) { 'present' } else { 'ABSENT' }) }
+  $s3 = Check-State $patcher3 $app
+  "round 3:  exit $($s3.code) (0 = APPLIED, 1 = NOT APPLIED, 2 = DRIFT)"
+  $s3.text
+  if ($s3.code -eq 0) { "rounds 2 and 1: (read under round 3's lines - -Restore -DryRun reverses the chain and checks each)" ; return }
+  $s2 = Check-State $patcher2 $app
+  "round 2:  exit $($s2.code) (0 = APPLIED, 1 = NOT APPLIED, 2 = DRIFT)"
+  $s2.text
+  if ($s2.code -eq 0) { "round 1:  (read under round 2's lines - check it after a round-2 reverse; -Restore -DryRun does)" ; return }
+  $s = Check-State $patcher $app
+  "round 1:  exit $($s.code) (0 = APPLIED, 1 = NOT APPLIED, 2 = DRIFT)"
+  $s.text
+  return
+}
+if ($Disable) {
+  if (Test-Path -LiteralPath $off) { "already off: $off"; return }
+  [IO.File]::WriteAllBytes($off, [byte[]]@())
+  "SWITCHED OFF: $off created. Every grouped report is Stacked from the next page load."
+  return
+}
+if ($Enable) {
+  if (-not (Test-Path -LiteralPath $off)) { "already on (no $off)"; return }
+  [IO.File]::Delete($off)
+  "SWITCHED ON: $off deleted."
+  return
+}
+if (-not $Restore) { throw 'pick one: -Status, -Disable, -Enable or -Restore [-DryRun]' }
+
+# ---- -Restore -------------------------------------------------------------------
+if (-not ('PnbMove' -as [type])) {
+  Add-Type -Namespace '' -Name 'PnbMove' -MemberDefinition @'
+[System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true, CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+public static extern bool MoveFileEx(string existing, string replacement, int flags);
+'@
+}
+function Move-Atomic([string]$from, [string]$to) {
+  for ($i = 0; $i -lt 20; $i++) {
+    if ([PnbMove]::MoveFileEx($from, $to, 1)) { return }
+    $err = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+    if ($err -ne 32 -and $err -ne 33 -and $err -ne 5) { throw "MoveFileEx($from -> $to) failed: Win32 $err" }
+    Start-Sleep -Milliseconds 250
+  }
+  throw "MoveFileEx($from -> $to) kept failing (sharing violation)"
+}
+
+# 1. Reverse into scratch folders, NEWEST round first (each round's lines sit on the earlier
+#    ones'): every patcher refuses (writes nothing) unless EVERY file of its round is APPLIED.
+#    A round that is not in at all is skipped - but only while no later round was in, and
+#    round 1 must be in (else there is nothing to restore). Each scratch folder carries every
+#    file forward, so the next patcher reads the previous one's output.
+function New-Scratch {
+  $w = Join-Path $env:TEMP ('pnb_grplist_restore_' + [guid]::NewGuid().ToString('N').Substring(0, 8))
+  if ($w -notmatch '\\pnb_grplist_restore_[0-9a-f]{8}$') { throw "refusing an unexpected scratch dir: $w" }
+  New-Item -ItemType Directory -Force -Path (Join-Path $w 'js') | Out-Null
+  return $w
+}
+$rounds = @(
+  @{ name = 'round 3 (grplist3)'; patcher = $patcher3; files = $patched1 },
+  @{ name = 'round 2 (grplist2)'; patcher = $patcher2; files = $patched1 + $patched2 },
+  @{ name = 'round 1 (grplist)';  patcher = $patcher;  files = $patched1 }
+)
+$allFiles = $patched1 + $patched2
+$before = @{}
+foreach ($rel in $allFiles) { $before[$rel] = Get-Sha (Join-Path $app $rel) }
+$cur = $app; $patched = @(); $done = @()
+foreach ($rd in $rounds) {
+  $s = Check-State $rd.patcher $cur
+  if ($s.code -eq 1) {
+    if ($done.Count) { Write-Host "ABORT - $($rd.name) is NOT in although a later round was: an inconsistent tree. Nothing was touched." -ForegroundColor Red; return }
+    if ($rd.name -like 'round 1*') { Write-Host 'ABORT - round 1 is not in: the List layout is already out. Nothing was touched.' -ForegroundColor Red; return }
+    "  skip: $($rd.name) is not in"
+    continue
+  }
+  if ($s.code -ne 0) {
+    Write-Host "ABORT - $($rd.name) is only partly in, or its lines were edited. Nothing was touched." -ForegroundColor Red
+    $s.text
+    return
+  }
+  $next = New-Scratch
+  $o = & py -3 $rd.patcher reverse $cur $next 2>&1
+  $o | ForEach-Object { "  $_" }
+  if ($LASTEXITCODE -ne 0) { Write-Host "ABORT - the $($rd.name) patcher refused. Nothing was touched." -ForegroundColor Red; return }
+  foreach ($rel in $allFiles) {
+    if (-not (Test-Path -LiteralPath (Join-Path $next $rel))) { Copy-Item -LiteralPath (Join-Path $cur $rel) -Destination (Join-Path $next $rel) }
+  }
+  foreach ($rel in $rd.files) { if ($patched -notcontains $rel) { $patched += $rel } }
+  $done += $rd.name
+  $cur = $next
+}
+$work = $cur
+# index.php FIRST: from that moment no page loads the module
+$patched = @($patched | Where-Object { $_ -eq 'index.php' }) + @($patched | Where-Object { $_ -ne 'index.php' })
+foreach ($rel in $patched) { if (-not (Test-Path -LiteralPath (Join-Path $work $rel))) { throw "patcher wrote no $rel" } }
+Write-Host ('reverse OK - every file is wholly APPLIED and reverses cleanly (' + ($done -join ', then ') + ').') -ForegroundColor Green
+if ($DryRun) { Write-Host "DRY RUN - stopping before the swap (reversed copies in $work)."; return }
+
+# 2. Swap, index.php first; each live file must still be what we reversed from.
+foreach ($rel in $patched) {
+  $live = Join-Path $app $rel
+  if ((Get-Sha $live) -ne $before[$rel]) { throw "$rel : LIVE CHANGED during the restore - stopped (earlier files are already restored; re-run -Status)" }
+  Copy-Item -LiteralPath $live -Destination "$live.bak-$stamp"
+  if ((Get-Sha "$live.bak-$stamp") -ne $before[$rel]) { throw "$rel : backup hash mismatch" }
+  $src = Join-Path $work $rel
+  $tmp = "$live.deploy-tmp"
+  Copy-Item -LiteralPath $src -Destination $tmp -Force
+  if ((Get-Sha $tmp) -ne (Get-Sha $src)) { throw "$rel : temp copy hash mismatch" }
+  Move-Atomic $tmp $live
+  (Get-Item -LiteralPath $live).LastWriteTime = Get-Date
+  Write-Host ("  restored {0,-17} {1} -> {2}" -f $rel, $before[$rel].Substring(0, 8), (Get-Sha $live).Substring(0, 8)) -ForegroundColor Green
+}
+foreach ($m in $modules) {
+  $p = Join-Path $app $m
+  if (Test-Path -LiteralPath $p) { Move-Atomic $p "$p.removed-$stamp"; "  renamed  $m -> $(Split-Path $p -Leaf).removed-$stamp" }
+}
+'RESTORED - the List layout is out. Commit: git add -- js/main.js index.php help_content.php README.md ai_system_prompt.php js/penumbra_snippet_help.js (and the module renames).'

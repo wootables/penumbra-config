@@ -1,0 +1,459 @@
+<?php
+/**
+ * penumbra_tests/anwindow/run.php - the analytics window parser (analytics_shared.php)
+ * and the Platform Metrics / Report Metrics wiring that depends on it. Written
+ * 2026-09-23 for "Last 24 hours" (range=24h) and the Reports-tab windowing
+ * fixes (Heaviest Reports windowed; Dead Reports drops reports created after a
+ * past window); extended the same day (round 2) for 24h on analytics.php, the
+ * User/Department filters on Heaviest + Dead, the sticky page head and the
+ * per-table "filtered" tags.
+ *
+ *   php.exe -n -d date.timezone=America/New_York run.php [--app=<dir>]
+ *           [--orig=<file>] [--control]
+ *           [--mutant=dedupe|gate|priornull|cmppause|tagsescape|tagsoff]
+ *
+ * --app     defaults to the LIVE webroot; point it at a staging copy before a deploy.
+ * --orig    the parser to hold the target against. Defaults to the frozen
+ *           fixture_analytics_shared_pre24h.php beside this file: the live
+ *           analytics_shared.php as it was BEFORE range=24h existed.
+ * --control adds one deliberately false assertion and MUST report FAIL 1.
+ * --mutant  breaks one guarantee in the target's source and MUST turn red:
+ *           dedupe (DST hour folding), gate (the 24h opt-in), priornull (the
+ *           nonexistent spring hour), cmppause (compare applied under 24h),
+ *           tagsescape (tag text unescaped), tagsoff (the "not applied" half
+ *           of a tag dropped).
+ * The timezone flag is REQUIRED (-n drops php.ini's, and every label is local
+ * time); the suite refuses to run without it.
+ *
+ * Lifts the penumbra_an_* functions from both copies by the tokenizer (never
+ * require'd), renames them orig_* / stg_*, and checks:
+ *   1. regression: every non-24h input gives byte-identical parser output to
+ *      the fixture, with and without the opt-in (17,280 combinations)
+ *   2. the 24h window itself (SQL fragments, labels, flags, compare pause, gate)
+ *   3. the hourly axis on fixed clocks, incl. both DST nights, and a synthetic
+ *      "bars sum to the window" simulation
+ *   4. analytics_all.php wiring (text anchors), 4b the Heaviest/Dead filter
+ *      fixes, 4c which tags each table gets
+ *   5. penumbra_an_filter_tags() itself, escaping included
+ *   6. analytics.php wiring (24h opt-in, hourly sparks + trend, tags)
+ *   7. the sticky page head on both pages
+ * IF SECTION 1 GOES RED after a DELIBERATE change to how an existing range
+ * parses, re-freeze the fixture from the new live file - it exists to catch
+ * the accidental kind.
+ *
+ * EXPECTED TAIL: "PASS 169   FAIL 0". A smaller pass count is a failure too.
+ */
+$CONTROL = in_array('--control', $argv, true);
+$MUTANT = ''; $ORIG = null; $STAGE = null;
+foreach ($argv as $a) {
+    if (strpos($a, '--mutant=') === 0) $MUTANT = substr($a, 9);
+    if (strpos($a, '--orig=')   === 0) $ORIG   = substr($a, 7);
+    if (strpos($a, '--app=')    === 0) $STAGE  = rtrim(substr($a, 6), '\\/');
+}
+if ($ORIG === null)  $ORIG  = __DIR__ . DIRECTORY_SEPARATOR . 'fixture_analytics_shared_pre24h.php';
+if ($STAGE === null) $STAGE = '\\\\oitras.oit.ncsu.edu\\c$\\inetpub\\wwwroot\\sponsor_migration\\penumbra';
+echo "app:  $STAGE\norig: $ORIG\n";
+
+$pass = 0; $fail = 0;
+function t_ok($c, $l) { global $pass, $fail; if ($c) $pass++; else { $fail++; echo "    FAIL  $l\n"; } }
+function t_eq($g, $w, $l) { t_ok($g === $w, $l . '  (got ' . var_export($g, true) . ', want ' . var_export($w, true) . ')'); }
+function section($t) { echo "== $t\n"; }
+
+echo 'timezone: ' . date_default_timezone_get() . "\n";
+if (date_default_timezone_get() !== 'America/New_York') { fwrite(STDERR, "run with -d date.timezone=America/New_York\n"); exit(2); }
+
+// ---- lift ------------------------------------------------------------------
+function lift($src, $names, $prefix) {
+    $toks = token_get_all($src);
+    $out = '';
+    $n = count($toks);
+    for ($i = 0; $i < $n; $i++) {
+        if (!is_array($toks[$i]) || $toks[$i][0] !== T_FUNCTION) continue;
+        $j = $i + 1;
+        while ($j < $n && is_array($toks[$j]) && $toks[$j][0] === T_WHITESPACE) $j++;
+        if (!is_array($toks[$j]) || $toks[$j][0] !== T_STRING || !in_array($toks[$j][1], $names, true)) continue;
+        $buf = ''; $depth = 0; $started = false;
+        for ($k = $i; $k < $n; $k++) {
+            $tk = $toks[$k];
+            $txt = is_array($tk) ? $tk[1] : $tk;
+            $buf .= $txt;
+            if ($tk === '{' || (is_array($tk) && ($tk[0] === T_CURLY_OPEN || $tk[0] === T_DOLLAR_OPEN_CURLY_BRACES))) { $depth++; $started = true; }
+            elseif ($tk === '}') { $depth--; if ($started && $depth === 0) break; }
+        }
+        $out .= $buf . "\n";
+    }
+    foreach ($names as $nm) $out = str_replace($nm . '(', $prefix . $nm . '(', $out);
+    return $out;
+}
+$NAMES = array('penumbra_an_ymd_ok', 'penumbra_an_parse_window', 'penumbra_an_overlay_series', 'penumbra_an_hour_axis', 'penumbra_an_filter_tags');
+$origSrc  = @file_get_contents($ORIG);
+$stageSrc = @file_get_contents($STAGE . '/analytics_shared.php');
+$allSrc   = @file_get_contents($STAGE . '/analytics_all.php');
+$anSrc    = @file_get_contents($STAGE . '/analytics.php');
+if ($origSrc === false || $stageSrc === false || $allSrc === false || $anSrc === false) { fwrite(STDERR, "cannot read sources\n"); exit(2); }
+
+$mutants = array(
+    'dedupe'    => array("        if (isset(\$seen[\$key])) continue;\n", ''),
+    'gate'      => array("if (!empty(\$opts['last24h'])) \$rangeAllowed[] = '24h';", "\$rangeAllowed[] = '24h';"),
+    'priornull' => array("(date('H', \$p) === date('H', \$t)) ? date('Y-m-d H', \$p) : null", "date('Y-m-d H', \$p)"),
+    'cmppause'  => array("    } elseif (\$cmpRequested && \$cmpFormFrom !== '' && \$cmpFormTo !== '') {", "    }\n    if (\$cmpRequested && \$cmpFormFrom !== '' && \$cmpFormTo !== '') {"),
+    // Filter tags (2026-09-23): the visible text unescaped; the "not applied" half dropped.
+    'tagsescape' => array("'<span class=\"sr-only\">Filtered by </span><span class=\"an-ftag-t\">' . htmlspecialchars(\$txt) . '</span></span>';",
+                          "'<span class=\"sr-only\">Filtered by </span><span class=\"an-ftag-t\">' . \$txt . '</span></span>';"),
+    'tagsoff'    => array("    if (!empty(\$off)) {", "    if (false && !empty(\$off)) {"),
+);
+if ($MUTANT !== '') {
+    if (!isset($mutants[$MUTANT])) { fwrite(STDERR, "unknown mutant\n"); exit(2); }
+    list($from, $to) = $mutants[$MUTANT];
+    $cnt = substr_count($stageSrc, $from);
+    if ($cnt !== 1) { fwrite(STDERR, "mutant anchor found $cnt times\n"); exit(2); }
+    $stageSrc = str_replace($from, $to, $stageSrc);
+    echo "MUTANT: $MUTANT applied\n";
+}
+$origCode  = lift($origSrc,  $NAMES, 'orig_');
+$stageCode = lift($stageSrc, $NAMES, 'stg_');
+eval($origCode);
+eval($stageCode);
+t_ok(function_exists('orig_penumbra_an_parse_window'), 'lifted orig parser');
+t_ok(function_exists('stg_penumbra_an_parse_window'),  'lifted staged parser');
+t_ok(function_exists('stg_penumbra_an_hour_axis'),     'lifted staged hour axis');
+t_ok(!function_exists('orig_penumbra_an_hour_axis'),   'orig has no hour axis (sanity: lifted the right files)');
+
+// ---- 1. regression ---------------------------------------------------------
+section('1. every non-24h input: target parser output === the pre-24h fixture');
+$ranges = array(null, '7', '30', '90', 'all', 'All', 'custom', 'CUSTOM', '', 'bogus', ' 30 ', '24h', '24H', '1', '-7', '7d');
+$dates  = array(
+    array(),
+    array('from' => '2026-08-01', 'to' => '2026-08-15'),
+    array('from' => '2026-08-15', 'to' => '2026-08-01'),
+    array('from' => '2026-02-30', 'to' => '2026-03-01'),
+    array('from' => "2026-08-01' OR 1=1--", 'to' => '2026-08-15'),
+    array('from' => '2026-08-01'),
+);
+$cmps = array(
+    array(),
+    array('cmp' => '1', 'cfrom' => '2026-06-01', 'cto' => '2026-06-30'),
+    array('cmp' => '1', 'cfrom' => '2026-06-31', 'cto' => '2026-06-30'),
+    array('cmp' => '1', 'cfrom' => '2026-06-30', 'cto' => '2026-06-01'),
+    array('cfrom' => '2026-06-01', 'cto' => '2026-06-30'),
+);
+$prefSets = array(
+    array(),
+    array('range' => '7'),
+    array('range' => 'custom', 'from' => '2026-07-01', 'to' => '2026-07-31'),
+    array('range' => '24h'),
+    array('cmp' => 1, 'cfrom' => '2026-05-01', 'cto' => '2026-05-31'),
+    array('range' => '24h', 'cmp' => 1, 'cfrom' => '2026-05-01', 'cto' => '2026-05-31'),
+);
+$whens = array(array(), array('dow' => 'MON', 'hour' => '9'), array('dow' => 'XYZ', 'hour' => '99'));
+$combos = 0; $regDiff = 0; $regDiffOpt = 0; $newKeyBad = 0; $saw24 = 0; $firstDiff = '';
+foreach ($ranges as $rg) foreach ($dates as $dt) foreach ($cmps as $cp) foreach (array(false, true) as $sub)
+foreach ($prefSets as $ps) foreach ($whens as $wh) {
+    $get = $dt + $cp + $wh;
+    if ($rg !== null) $get['range'] = $rg;
+    if ($sub) $get['filter_submitted'] = '1';
+    $prefOr = function ($k, $d) use ($ps) { return array_key_exists($k, $ps) ? $ps[$k] : $d; };
+    $o  = orig_penumbra_an_parse_window($get, $prefOr);
+    $s  = stg_penumbra_an_parse_window($get, $prefOr);
+    $s2 = stg_penumbra_an_parse_window($get, $prefOr, array('last24h' => true));
+    $combos++;
+    foreach ($o as $key => $val) {
+        if (!array_key_exists($key, $s) || $s[$key] !== $val) {
+            $regDiff++;
+            if ($firstDiff === '') $firstDiff = "no-opt key=$key get=" . json_encode($get) . ' prefs=' . json_encode($ps);
+            break;
+        }
+    }
+    $wantEnd = ($o['rangeParam'] === 'custom') ? "TO_DATE('" . $o['customTo'] . "','YYYY-MM-DD')+1" : '';
+    if (($s['trendHourly'] ?? 'MISSING') !== false || ($s['cmpPaused'] ?? 'MISSING') !== false || ($s['windowEndLit'] ?? 'MISSING') !== $wantEnd) $newKeyBad++;
+    if ($s2['rangeParam'] === '24h') { $saw24++; continue; }
+    foreach ($o as $key => $val) {
+        if (!array_key_exists($key, $s2) || $s2[$key] !== $val) {
+            $regDiffOpt++;
+            if ($firstDiff === '') $firstDiff = "opt key=$key get=" . json_encode($get) . ' prefs=' . json_encode($ps);
+            break;
+        }
+    }
+}
+echo "    $combos combinations, $saw24 resolved to 24h with the opt-in\n";
+t_eq($regDiff, 0, 'without the opt-in: every key identical to the live parser' . ($firstDiff ? " [first: $firstDiff]" : ''));
+t_eq($regDiffOpt, 0, 'with the opt-in: every non-24h input identical to the live parser');
+t_eq($newKeyBad, 0, 'new keys without the opt-in: trendHourly=false, cmpPaused=false, windowEndLit=custom end or empty');
+t_ok($saw24 > 0, 'the matrix did reach 24h with the opt-in');
+
+// ---- 2. the 24h window -----------------------------------------------------
+section('2. range=24h');
+$none = function ($k, $d) { return $d; };
+$w = stg_penumbra_an_parse_window(array('range' => '24h'), $none, array('last24h' => true));
+t_eq($w['rangeParam'], '24h', 'rangeParam');
+t_eq($w['windowDays'], 1, 'windowDays = 1 (not null: has a prior + deltas)');
+t_eq($w['rangeLabelLong'], 'Last 24 hours', 'long label');
+t_eq($w['rangeLabelShort'], '24h', 'short label');
+t_eq($w['priorLabel'], '24h', 'prior label ("vs the prior 24h")');
+t_eq($w['timeFilter'],  'AND TIMESTAMP >= SYSDATE-1', 'timeFilter is the exact rolling day on the DB clock');
+t_eq($w['timeFilterA'], 'AND a.TIMESTAMP >= SYSDATE-1', 'timeFilterA');
+t_eq($w['priorFilter'], 'AND TIMESTAMP < SYSDATE-1 AND TIMESTAMP >= SYSDATE-2', 'priorFilter = the 24 hours before');
+t_eq($w['trendHourly'], true, 'trendHourly');
+t_eq($w['trendDaily'], false, 'trendDaily off (flags exclusive)');
+t_eq($w['windowStartTs'], null, 'no day-based window start');
+t_eq($w['cmpPresets'], array(), 'no day-based compare presets');
+t_eq($w['windowEndLit'], '', 'window runs to now: no end literal');
+t_eq($w['cmpOn'], false, 'compare off');
+t_eq($w['cmpPaused'], false, 'nothing to pause');
+$wU = stg_penumbra_an_parse_window(array('range' => ' 24H '), $none, array('last24h' => true));
+t_eq($wU['rangeParam'], '24h', 'GET value is trimmed + lowercased like the others');
+$wP = stg_penumbra_an_parse_window(array(), function ($k, $d) { return $k === 'range' ? '24h' : $d; }, array('last24h' => true));
+t_eq($wP['rangeParam'], '24h', 'saved cookie pref 24h is honoured with the opt-in');
+$wN = stg_penumbra_an_parse_window(array('range' => '24h'), $none);
+t_eq($wN['rangeParam'], '30', 'WITHOUT the opt-in 24h falls back to 30 (the gate a daily-only page relies on)');
+t_eq($wN['trendHourly'], false, 'and never goes hourly');
+$wNP = stg_penumbra_an_parse_window(array(), function ($k, $d) { return $k === 'range' ? '24h' : $d; });
+t_eq($wNP['rangeParam'], '30', 'without the opt-in a 24h pref falls back too');
+$wF = stg_penumbra_an_parse_window(array('range' => '24h', 'from' => '2026-08-01', 'to' => '2026-08-15'), $none, array('last24h' => true));
+t_eq($wF['timeFilter'], 'AND TIMESTAMP >= SYSDATE-1', 'stray from/to do not turn 24h into a date window');
+t_eq($wF['formFrom'], '2026-08-01', 'but the date boxes keep their remembered values');
+t_eq($wF['windowEndLit'], '', 'and no end literal');
+$wW = stg_penumbra_an_parse_window(array('range' => '24h', 'dow' => 'MON', 'hour' => '9'), $none, array('last24h' => true));
+t_eq($wW['whenFilter'], " AND UPPER(TRIM(TO_CHAR(TIMESTAMP, 'DY'))) = 'MON' AND TO_CHAR(TIMESTAMP, 'HH24') = '09'", 'weekday/hour scope unchanged under 24h');
+
+section('2b. compare under 24h: paused, not applied, not dropped');
+$cmpGet = array('range' => '24h', 'filter_submitted' => '1', 'cmp' => '1', 'cfrom' => '2026-06-01', 'cto' => '2026-06-30');
+$wc = stg_penumbra_an_parse_window($cmpGet, $none, array('last24h' => true));
+t_eq($wc['cmpOn'], false, 'cmpOn false');
+t_eq($wc['cmpPaused'], true, 'cmpPaused true');
+t_eq($wc['priorFilter'], 'AND TIMESTAMP < SYSDATE-1 AND TIMESTAMP >= SYSDATE-2', 'priorFilter stays the prior 24h, NOT the comparison dates');
+t_eq($wc['priorLabel'], '24h', 'priorLabel stays 24h');
+t_eq($wc['cmpFormFrom'] . '|' . $wc['cmpFormTo'], '2026-06-01|2026-06-30', 'comparison dates still carried to the form');
+$wc2 = stg_penumbra_an_parse_window(array('range' => '24h', 'filter_submitted' => '1', 'cfrom' => '2026-06-01', 'cto' => '2026-06-30'), $none, array('last24h' => true));
+t_eq($wc2['cmpPaused'], false, 'unticked compare: nothing paused');
+$wc3 = stg_penumbra_an_parse_window(array('range' => '24h', 'filter_submitted' => '1', 'cmp' => '1', 'cfrom' => 'bad', 'cto' => '2026-06-30'), $none, array('last24h' => true));
+t_eq($wc3['cmpPaused'], false, 'compare with an invalid date: nothing paused (same rule as cmpOn)');
+$wc4 = stg_penumbra_an_parse_window(array('range' => '24h'), function ($k, $d) { $p = array('cmp' => 1, 'cfrom' => '2026-05-01', 'cto' => '2026-05-31'); return array_key_exists($k, $p) ? $p[$k] : $d; }, array('last24h' => true));
+t_eq($wc4['cmpPaused'], true, 'first load with a saved compare pref: paused');
+$w7 = stg_penumbra_an_parse_window(array('range' => '7', 'filter_submitted' => '1', 'cmp' => '1', 'cfrom' => '2026-06-01', 'cto' => '2026-06-30'), $none, array('last24h' => true));
+t_eq($w7['cmpOn'], true, 'switching back to 7d with the carried checkbox: compare resumes');
+t_eq($w7['cmpPaused'], false, 'and is not reported paused');
+t_eq($w7['priorFilter'], "AND TIMESTAMP >= TO_DATE('2026-06-01','YYYY-MM-DD') AND TIMESTAMP < TO_DATE('2026-06-30','YYYY-MM-DD')+1", '7d + compare priorFilter = the comparison dates');
+
+section('2c. custom window end literal (drives the Dead Reports existed-by guard)');
+$wcu = stg_penumbra_an_parse_window(array('range' => 'custom', 'from' => '2026-08-01', 'to' => '2026-08-15'), $none, array('last24h' => true));
+t_eq($wcu['windowEndLit'], "TO_DATE('2026-08-15','YYYY-MM-DD')+1", 'custom: exclusive end = to + 1 day');
+$wcb = stg_penumbra_an_parse_window(array('range' => 'custom', 'from' => '2026-08-15', 'to' => '2026-08-01'), $none, array('last24h' => true));
+t_eq($wcb['windowEndLit'], "TO_DATE('2026-08-15','YYYY-MM-DD')+1", 'backwards pair: end is the LATER date');
+$wci = stg_penumbra_an_parse_window(array('range' => 'custom', 'from' => "2026-08-01' OR 1=1--", 'to' => '2026-08-15'), $none, array('last24h' => true));
+t_eq($wci['windowEndLit'], '', 'injection attempt falls back to 30d: no literal at all');
+t_eq($wci['rangeParam'], '30', 'and the range is 30');
+foreach (array('7', '30', '90', 'all') as $r) {
+    $x = stg_penumbra_an_parse_window(array('range' => $r), $none, array('last24h' => true));
+    t_eq($x['windowEndLit'], '', "preset $r runs to now: no end literal");
+}
+
+// ---- 3. the hourly axis ----------------------------------------------------
+section('3. hour axis on fixed clocks');
+$mk = function ($s) { return strtotime($s); };
+function axis_keys($ax) { return array_map(function ($b) { return $b['key']; }, $ax); }
+function strictly_increasing($keys) { for ($i = 1; $i < count($keys); $i++) if (strcmp($keys[$i - 1], $keys[$i]) >= 0) return false; return true; }
+
+$ax = stg_penumbra_an_hour_axis($mk('2026-09-23 14:37:12'));
+t_eq(count($ax), 25, 'normal day: 25 buckets (partial first + 23 whole + partial current)');
+t_eq($ax[0]['key'], '2026-09-22 14', 'first key = the hour the window opens in');
+t_eq($ax[0]['label'], 'Sep 22 14:37', 'first label carries the opening minute');
+t_eq($ax[1]['label'], 'Sep 22 15:00', 'later labels are hour starts');
+t_eq($ax[24]['key'], '2026-09-23 14', 'last key = the current hour');
+t_eq($ax[24]['label'], 'Sep 23 14:00', 'last label');
+t_eq($ax[0]['prior'], '2026-09-21 14', 'prior of the first bucket = same hour a day back');
+t_eq($ax[24]['prior'], '2026-09-22 14', 'prior of the last bucket');
+t_ok(strictly_increasing(axis_keys($ax)), 'keys strictly increasing (so unique)');
+
+$ax0 = stg_penumbra_an_hour_axis($mk('2026-09-23 14:00:00'));
+t_eq(count($ax0), 25, 'exactly on the hour: still 25');
+t_eq($ax0[0]['label'], 'Sep 22 14:00', 'on-the-hour first label');
+
+$axM = stg_penumbra_an_hour_axis($mk('2026-09-23 00:05:00'));
+t_eq($axM[0]['key'] . ' .. ' . $axM[count($axM) - 1]['key'], '2026-09-22 00 .. 2026-09-23 00', 'just after midnight spans two dates');
+
+// DST 2026: fall back Sun Nov 1 02:00 EDT -> 01:00 EST. Spring 2027: Sun Mar 14 02:00 EST -> 03:00 EDT.
+$axFB = stg_penumbra_an_hour_axis($mk('2026-11-01 14:30:00'));
+$kFB = axis_keys($axFB);
+t_eq(count($axFB), 25, 'fall-back day: 26 real hour-starts fold to 25 buckets');
+t_eq(count(array_keys($kFB, '2026-11-01 01')), 1, 'the doubled 01:00 hour is ONE bucket');
+t_ok(strictly_increasing($kFB), 'fall-back keys strictly increasing');
+t_eq($axFB[0]['key'], '2026-10-31 14', 'fall-back: opens at the same wall-clock hour yesterday (SYSDATE-1 is wall-clock)');
+
+$axSF = stg_penumbra_an_hour_axis($mk('2027-03-14 14:30:00'));
+$kSF = axis_keys($axSF);
+t_eq(count($axSF), 24, 'spring-forward day: 24 buckets (no 02:00)');
+t_ok(!in_array('2027-03-14 02', $kSF, true), 'no 02 bucket that day');
+t_ok(strictly_increasing($kSF), 'spring keys strictly increasing');
+
+$axAS = stg_penumbra_an_hour_axis($mk('2027-03-15 14:30:00'));
+$nullAt = array();
+foreach ($axAS as $b) if ($b['prior'] === null) $nullAt[] = $b['key'];
+t_eq($nullAt, array('2027-03-15 02'), 'day after spring-forward: only 02:00 has no prior hour (a gap, not the 03 bucket twice)');
+$priors = array_values(array_filter(array_map(function ($b) { return $b['prior']; }, $axAS), function ($p) { return $p !== null; }));
+t_eq(count($priors), count(array_unique($priors)), 'day after spring-forward: no prior bucket drawn twice');
+
+$axAF = stg_penumbra_an_hour_axis($mk('2026-11-02 14:30:00'));
+$pAF = array_map(function ($b) { return $b['prior']; }, $axAF);
+t_eq(count(array_keys($pAF, '2026-11-01 01')), 1, 'day after fall-back: the folded prior 01 bucket is drawn once');
+t_ok(!in_array(null, $pAF, true), 'day after fall-back: every hour has a prior');
+
+section('3b. bars sum to the window (synthetic rows every 7 min over 3 days)');
+// Emulates the SQL exactly: window = TIMESTAMP >= (now - 1 day, wall clock);
+// prior = [now - 2 days, now - 1 day); bucket = the row's local 'Y-m-d H'.
+$simulate = function ($nowStr) use ($mk) {
+    $now = $mk($nowStr);
+    $lo = strtotime('-1 day', $now); $plo = strtotime('-2 days', $now);
+    $by = array(); $byP = array(); $nWin = 0; $nPrior = 0;
+    for ($ts = strtotime('-3 days', $now); $ts <= $now; $ts += 420) {
+        $k = date('Y-m-d H', $ts);
+        if ($ts >= $lo) { $nWin++; $by[$k] = ($by[$k] ?? 0) + 1; }
+        elseif ($ts >= $plo) { $nPrior++; $byP[$k] = ($byP[$k] ?? 0) + 1; }
+    }
+    $ax = stg_penumbra_an_hour_axis($now);
+    $sum = 0; $sumP = 0;
+    foreach ($ax as $b) {
+        $sum += $by[$b['key']] ?? 0;
+        if ($b['prior'] !== null) $sumP += $byP[$b['prior']] ?? 0;
+    }
+    return array($nWin, $sum, $nPrior, $sumP, $byP);
+};
+foreach (array('2026-09-23 14:37:12', '2026-09-23 00:05:00', '2026-11-01 14:30:00', '2026-11-02 14:30:00', '2027-03-15 14:30:00') as $clock) {
+    list($nWin, $sum, $nPrior, $sumP) = $simulate($clock);
+    t_eq($sum, $nWin, "$clock: bars sum to the window count ($nWin)");
+    t_eq($sumP, $nPrior, "$clock: dashed line sums to the prior count ($nPrior)");
+}
+list($nWin, $sum, $nPrior, $sumP, $byP) = $simulate('2027-03-14 14:30:00');
+t_eq($sum, $nWin, '2027-03-14 (spring day): bars still sum to the window');
+t_eq($nPrior - $sumP, $byP['2027-03-13 02'] ?? -1, 'spring day: the dashed line misses exactly the prior 02 bucket (documented edge)');
+
+// ---- 4. page wiring ---------------------------------------------------------
+section('4. analytics_all.php wiring');
+t_ok(strpos($allSrc, "penumbra_an_parse_window(\$_GET, \$prefOr, array('last24h' => true))") !== false, 'opts into 24h');
+t_ok(strpos($allSrc, '<option value="24h"') !== false, 'range select offers Last 24 hours');
+t_ok(strpos($allSrc, '>Last 24 hours</option>') !== false, 'option text');
+// (the pause-scheduler dialog has its own unrelated <option value="24h">, hence the tail)
+t_eq(substr_count($allSrc, '<option value="24h"    <?php echo $rangeParam === \'24h\''), 1, 'exactly one 24h RANGE option');
+t_ok(strpos($allSrc, "WHERE a.ACTION='OPEN' AND a.ROW_COUNT IS NOT NULL \$sysSqlA \$timeFilterA \$whenFilterA \$userFilterA \$reportFilterA") !== false, 'Heaviest query is windowed + scoped, incl. user/department (round 2)');
+t_ok(strpos($allSrc, 'window not applied') === false, 'no "window not applied" text left');
+$hvA = strpos($allSrc, '<h3>Heaviest Reports');
+$hvB = ($hvA === false) ? false : strpos($allSrc, '</h3>', $hvA);
+t_ok($hvA !== false && $hvB !== false, 'found the Heaviest header');
+t_ok($hvA !== false && strpos(substr($allSrc, $hvA, $hvB - $hvA), 'not applied') === false, 'Heaviest header no longer says anything is "not applied"');
+t_ok($hvA !== false && strpos(substr($allSrc, $hvA, $hvB - $hvA), "echo 'by median cells · ' . htmlspecialchars(\$rangeLabelShort);") !== false, 'Heaviest header names the window');
+t_eq(substr_count($allSrc, '$deadOwnerFilter $deadOucSql $deadExistedSql $reportFilterA'), 2, 'Dead list AND its total carry the owner-department + existed-by guards');
+t_eq(substr_count($allSrc, 'NOT IN ($sysShortIdSql)'), 2, 'toolvisit anchor: exactly two NOT IN ($sysShortIdSql)');
+t_ok(strpos($allSrc, "\$deadExistedSql = (\$windowEndLit !== '') ? 'AND (r.CREATED_AT IS NULL OR r.CREATED_AT < ' . \$windowEndLit . ')' : '';") !== false, 'existed-by guard keeps NULL CREATED_AT');
+t_ok(strpos($allSrc, "'cmp'             => (\$cmpOn || \$cmpPaused) ? 1 : 0,") !== false, 'cookie keeps a paused compare');
+t_ok(strpos($allSrc, "<?php echo (\$cmpOn || \$cmpPaused) ? 'checked' : ''; ?>") !== false, 'checkbox stays checked while paused');
+t_ok(strpos($allSrc, "<div class=\"check-list\"<?php echo \$rangeParam === '24h' ? ' hidden' : ''; ?>>") !== false, 'compare checkbox hidden (not removed) under 24h');
+t_ok(strpos($stageSrc, '.check-list[hidden] { display: none; }') !== false, 'shared CSS lets [hidden] beat .check-list display:flex');
+// Since 2026-10-01 (step 2, increment 1) BOTH pages build the trend through
+// penumbra_an_trend_series() in analytics_shared.php; the anengine suite proves
+// it equals the inline code it replaced. These read the builder, not the pages.
+$tsHourly = strpos($stageSrc, "        if (\$w['trendHourly']) {");
+$tsDaily  = strpos($stageSrc, "        } elseif (\$w['trendDaily']) {");
+t_ok($tsHourly !== false && $tsDaily !== false && $tsHourly < $tsDaily, 'hourly trend branch ahead of daily (shared builder)');
+t_eq(substr_count($stageSrc, "\$count(\"TRUNC(TIMESTAMP, 'HH24'), 'YYYY-MM-DD HH24'\", \"TRUNC(TIMESTAMP, 'HH24')\""), 2, 'hourly main + prior queries (shared builder)');
+t_ok(strpos($allSrc, "\$hourAxis = \$trendHourly ? penumbra_an_hour_axis(time()) : array();") !== false, 'axis from the shared helper, read once');
+t_ok(strpos($allSrc, "echo ' (hourly) + prior 24 hours';") !== false, 'trend header names the hourly view');
+t_ok(strpos($stageSrc, "\$prior[]  = (\$hb['prior'] === null) ? null") !== false, 'a missing DST hour is a gap in the dashed line (shared builder)');
+t_eq(substr_count($allSrc, '= penumbra_an_trend_series('), 1, 'Platform takes its trend from the shared builder');
+
+// ---- 4b. the two filter fixes (round 2, 2026-09-23) ---------------------------
+section('4b. Heaviest honours user/department; Dead honours department');
+$hq    = strpos($allSrc, "\$sysSqlA \$timeFilterA \$whenFilterA \$userFilterA \$reportFilterA");
+$hqEnd = ($hq === false) ? false : strpos($allSrc, 'analytics_all heaviest query failed', $hq);
+t_ok($hq !== false && $hqEnd !== false && strpos(substr($allSrc, $hq, $hqEnd - $hq), "\n            \$commonBindsA\n") !== false, 'Heaviest binds $commonBindsA (user + ouc + report) - exactly the names it now holds');
+t_eq(substr_count($allSrc, 'array_merge($exclBinds, $userBinds, $reportBinds, $deadOucBinds)'), 2, 'both dead queries bind the owner-department list');
+t_ok(strpos($allSrc, "SELECT DISTINCT LOWER(TRIM(OWNER_ID)) AS OWNER_ID FROM PENUMBRA_REPORTS WHERE OWNER_ID IS NOT NULL") !== false, 'owners resolved directly, not from the window-active user list');
+t_ok(strpos($allSrc, "\$deadOucSql = 'AND 1=0';") !== false, 'nobody in the unit = an honest empty list');
+t_ok(strpos($allSrc, "'LOWER(TRIM(r.OWNER_ID)) IN ('") !== false, 'owner match is case- and padding-insensitive');
+
+section('4c. Platform Metrics table tags');
+foreach (array('<h3>Top Departments<?php echo $ftTagsUsers; ?>', '<h3>Top Colleges<?php echo $ftTagsUsers; ?>',
+               '<h3><?php echo $usersHeading; ?><?php echo $ftTagsUsers; ?>', '<h3>Most-Opened Reports<?php echo $ftTagsOpened; ?>',
+               '<h3>Heaviest Reports<?php echo $ftTagsHeavy; ?>', '<h3>Errors &amp; Failures<?php echo $ftTagsErrors; ?>') as $anchor) {
+    t_eq(substr_count($allSrc, $anchor), 1, 'tag in header: ' . $anchor);
+}
+t_ok(strpos($allSrc, "                    echo \$ftTagsDead;\n") !== false, 'Dead header carries its tags');
+t_ok(strpos($allSrc, "\$ftTagsHeavy  = penumbra_an_filter_tags(\$ftList(array(\$ftByUser('run by'), \$ftDept, \$ftReport, \$ftWhen)), \$ftExcl);") !== false, 'Heaviest: the visibility toggles listed as NOT applied');
+t_ok(strpos($allSrc, "    \$ftList(array(\$ftWhen))\n);") !== false, 'Dead: weekday/hour listed as NOT applied');
+t_ok(strpos($allSrc, "\$ftTagsErrors = penumbra_an_filter_tags(\$ftList(array(\$ftByUser('user'), \$ftDept, \$ftReport, \$ftWhen)), \$ftExcl);") !== false, 'Errors: the visibility toggles listed as NOT applied');
+t_ok(strpos($allSrc, "' · owned by '") === false && strpos($allSrc, 'scope not applied</em>') === false, 'the old inline Dead notes are gone (they are tags now)');
+
+// ---- 5. the tag helper --------------------------------------------------------
+section('5. penumbra_an_filter_tags()');
+t_ok(function_exists('stg_penumbra_an_filter_tags'), 'lifted the tag helper');
+t_eq(stg_penumbra_an_filter_tags(array(), array()), '', 'nothing active: no markup at all');
+t_eq(stg_penumbra_an_filter_tags(array(null, ''), array('')), '', 'empty items dropped, never rendered as blank tags');
+$tg = stg_penumbra_an_filter_tags(array(array('user', 'bplimon'), array('dept', '060401'), 'Mon 09:00'));
+t_ok(strpos($tg, '<span class="an-ftags">') === 0, 'one wrapper');
+t_eq(substr_count($tg, 'class="an-ftag"'), 1, 'one applied tag');
+t_ok(strpos($tg, 'user bplimon · dept 060401 · Mon 09:00') !== false, 'label/value pairs joined by a space, items by a middot');
+t_ok(strpos($tg, '<span class="sr-only">Filtered by </span>') !== false, 'screen readers hear what the funnel means');
+t_ok(strpos($tg, 'title="This table is filtered by: user bplimon') !== false, 'tooltip spells it out');
+t_ok(strpos($tg, 'an-ftag off') === false, 'no dashed tag when nothing is ignored');
+$tg2 = stg_penumbra_an_filter_tags(array(), array('Mon 09:00', 'no admins'));
+t_eq(substr_count($tg2, 'an-ftag off'), 1, 'ignored only: one dashed tag');
+t_ok(strpos($tg2, 'not applied: Mon 09:00 · no admins') !== false, 'the dashed tag names what is NOT applied');
+t_ok(strpos($tg2, 'class="an-ftag"') === false, 'no applied tag when nothing applies');
+$tg3 = stg_penumbra_an_filter_tags(array('user x'), array('no admins'));
+t_ok(strpos($tg3, 'class="an-ftag"') !== false && strpos($tg3, 'an-ftag off') > strpos($tg3, 'class="an-ftag"'), 'both: applied first, then not applied');
+$evil = stg_penumbra_an_filter_tags(array(array('report', '<script>alert(1)</script>"x\'')), array('<b>y</b>'));
+t_ok(strpos($evil, '<script>') === false && strpos($evil, '<b>') === false, 'values escaped in the visible text');
+t_ok(strpos($evil, '&lt;script&gt;alert(1)&lt;/script&gt;&quot;x&#039;') !== false, 'the escaped form is what renders');
+t_ok(preg_match('/title="[^"]*</', $evil) === 0, 'and inside the title attribute');
+
+// ---- 6. report metrics (analytics.php) ------------------------------------------
+section('6. analytics.php wiring');
+t_ok(strpos($anSrc, "penumbra_an_parse_window(\$_GET, function (\$k, \$d) { return \$d; }, array('last24h' => true))") !== false, 'report metrics opts into 24h');
+t_eq(substr_count($anSrc, '<option value="24h"    <?php echo $rangeParam === \'24h\''), 1, 'its range picker offers Last 24 hours');
+t_ok(strpos($anSrc, "\$hourAxis = \$trendHourly ? penumbra_an_hour_axis(time()) : array();") !== false, 'one axis read, shared by sparks + trend');
+// Since 2026-10-01 (the one engine, E2a) the report page's card sparks and its
+// new-viewers window start are built in analytics_shared.php
+// (penumbra_an_report_sparks() / penumbra_an_window_start_lit()), so these five
+// pins read the shared source; the page hands them its one $hourAxis.
+t_ok(strpos($stageSrc, "\$sparkHourly = \$w['trendHourly'];") !== false, 'sparks go hourly with the trend');
+t_ok(strpos($stageSrc, "foreach (\$hourAxis as \$hb) \$sparkKeys[] = \$hb['key'];") !== false, 'spark keys = the axis keys');
+t_ok(strpos($stageSrc, "\$sparkTimeCut    = (\$sparkHourly || \$sparkDaily) ? substr(\$timeFilter, 4)") !== false, 'hourly sparks cut on the same predicate as the cards');
+t_ok(strpos($stageSrc, "if (\$sparkDaily || \$sparkHourly) {") !== false, 'Total Views keeps its own monthly spark under 24h');
+t_ok(strpos($stageSrc, "(\$w['trendHourly'] ? 'SYSDATE-1'") !== false, 'new-viewers MINUS starts at SYSDATE-1 under 24h');
+t_ok(strpos($anSrc, "\$anSparks = penumbra_an_report_sparks(\$run, \$report_id_num, \$anWin, \$hourAxis,") !== false, 'the report page hands the card sparks its one hour axis');
+t_eq(substr_count($anSrc, '= penumbra_an_trend_series('), 1, 'report trend comes from the same shared builder (hourly queries + DST gap checked above)');
+t_ok(strpos($anSrc, "\$anWin, \$hourAxis, 'analytics.php');") !== false, 'and is handed the one axis the sparks use');
+t_ok(strpos($anSrc, "<div class=\"check-list\"<?php echo \$rangeParam === '24h' ? ' hidden' : ''; ?>>") !== false, 'compare hidden (not removed) under 24h');
+t_ok(strpos($anSrc, "<input type=\"checkbox\" id=\"fCmp\" <?php echo (\$cmpOn || \$cmpPaused) ? 'checked' : ''; ?>>") !== false, 'a paused compare stays checked (currentParams reads it)');
+t_ok(strpos($anSrc, "echo ' (hourly) + prior 24 hours';") !== false, 'trend header names the hourly view');
+t_eq(substr_count($anSrc, '$ftTagsSide'), 5, 'side-table tags: defined once, used by the four side tables');
+t_ok(strpos($anSrc, "<h3>Recent activity</h3>\n        <?php echo \$ftTagsFeed; ?>") !== false, 'the feed carries its own tags');
+t_ok(strpos($anSrc, "\$ftTagsFeed = penumbra_an_filter_tags(\$ftScope, array_merge((\$rangeParam !== '30') ? array(\$rangeLabelLong) : array(), \$ftWhen, \$ftExcl));") !== false, 'feed: scope applied; window/when/toggles listed as NOT applied');
+
+// ---- 7. sticky page head ---------------------------------------------------------
+section('7. sticky page head');
+$blockOf = function ($src) {
+    $a = strpos($src, '<div class="an-sticky">');
+    $b = strpos($src, '</div><?php /* /.an-sticky */ ?>');
+    return ($a !== false && $b !== false && $b > $a) ? substr($src, $a, $b - $a) : '';
+};
+t_eq(substr_count($allSrc, '<div class="an-sticky">'), 1, 'Platform Metrics: one sticky head');
+t_eq(substr_count($anSrc,  '<div class="an-sticky">'), 1, 'report metrics: one sticky head');
+$blk = $blockOf($allSrc);
+t_ok(strpos($blk, '<div class="main-head">') !== false && strpos($blk, 'class="filter-bar') !== false && strpos($blk, 'class="tabs" role="tablist"') !== false, 'Platform: title + filter bar + tab strip inside it');
+t_ok($blk !== '' && strpos($blk, 'role="tabpanel"') === false, 'Platform: no tab panel inside it');
+$blk = $blockOf($anSrc);
+t_ok(strpos($blk, '<div class="main-head">') !== false && strpos($blk, 'penumbra_filter_bar($chips);') !== false && strpos($blk, '<div class="ctx">') !== false, 'report metrics: title + filter bar + report strip inside it');
+t_ok($blk !== '' && strpos($blk, 'class="kpi-strip"') === false, 'report metrics: the KPI strip stays out');
+t_ok(strpos($stageSrc, ".an-sticky {\n        position: sticky; top: var(--pnb-adm-offset, 0px); z-index: 20;") !== false, 'pinned under the admin stack, below its z-index 30');
+t_ok(strpos($stageSrc, 'table.dt th { position: sticky; top: calc(var(--pnb-adm-offset, 0px) + var(--an-sticky-h, 0px)); z-index: 2; }') !== false, 'table headers pin below bar + head (was top:0, under the bar)');
+t_ok(strpos($stageSrc, "root.style.setProperty('--an-sticky-h', (isSticky() ? Math.round(head.getBoundingClientRect().height) : 0) + 'px');") !== false, 'height published, 0 while static');
+t_ok(strpos($stageSrc, '@media (max-width: 900px), (max-height: 560px) { .an-sticky { position: static; } }') !== false, 'static on narrow / short windows');
+foreach (array('analytics_all.php' => $allSrc, 'analytics.php' => $anSrc) as $fn => $src) {
+    t_ok(strpos($src, "document.querySelector('.pnb-adm-stick') || document.querySelector('.pnb-adm-bar')") !== false, "$fn: offset measured on the whole sticky stack (notice banner included)");
+    t_ok(strpos($src, 'var(--pnb-adm-offset, 0px) + var(--an-sticky-h, 0px) + 12px') !== false, "$fn: scroll targets clear the sticky head");
+}
+
+if ($CONTROL) { section('control'); t_ok(false, 'CONTROL: deliberately false'); }
+
+echo "\nPASS $pass   FAIL $fail\n";
+exit($fail ? 1 : 0);

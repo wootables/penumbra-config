@@ -1,0 +1,259 @@
+# =============================================================================
+# @@JSON GROUPING SUITE (2026-09-30)
+#
+# Grouping by a NESTED sub-column (a key inside an @@JSON cell, e.g. SUB_NAME)
+# used to map each flat <tr> to its data by DOM POSITION (masterRowData[pos]).
+# A flat sort moves the <tr>s in place, and an open journal note row pushes every
+# row below it down one - so after either, rows landed in bands computed from
+# OTHER rows' nested data, and "Sort groups by Summary" ranked bands on other
+# rows' nested values. The fix resolves each row by its own '#' cell, like every
+# other masterRowData reader.
+#
+# Each scenario boots the REAL main.js through the real run path (stubbed
+# query.php) on a 240-row fixture, reorders the flat table the way a user does,
+# groups through the REAL dialog, and checks every band against ground truth
+# computed from the fixture alone (driver.js):
+#   P-*  preconditions (the '#' premise, the sort/note row really happened, ...)
+#   M-*  membership: a row sits only under names its own nested table holds
+#   C-*  completeness: every eligible row under each of its names, exactly once
+#   T-*  band totals ("of N") = whole-result counts
+#   V-*  summary values; S-* band order under "Sort groups by Summary"
+#
+#   py -3 run.py                        candidate = live js\main.js
+#   py -3 run.py --candidate F          any build (e.g. the stage copy before deploy)
+#   py -3 run.py --control              candidate := the pre-fix baseline: EXACTLY the
+#                                       CONTROL_RED asserts must fail, all others pass
+#   py -3 run.py --mutant NAME          one fix site reverted in the candidate
+#   py -3 run.py --mutants              every mutant, each against the asserts it MUST turn red
+#   --baseline F   the pre-fix build for --control (default: newest js\main.js.bak-*-jsongroup)
+#   --app DIR      where the libs + main.css come from (default: the live webroot)
+#   --scn a,b      a subset of scenarios;  --keep keeps the staging dir
+#
+# Headless Edge over CDP; stages into %TEMP%; writes nothing to the webroot.
+# Needs Python 3 + websocket-client (py -3 -m pip install websocket-client).
+# =============================================================================
+import json, os, shutil, socket, subprocess, sys, tempfile, time, urllib.request, glob
+import websocket
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js',
+        'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
+        'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js']
+ALL_SCN = ['plain', 'sortload', 'clicksort', 'sortsearch', 'noteopen', 'sumsort', 'sumsortboth']
+
+# What the pre-fix build gets wrong - and ONLY that. Everything else must pass on it
+# too, which is what proves the truth model and the read-out are not the bug.
+# (V-sumsortboth: each band's Sum of its OWN name's SUB_AMT was right per row, but
+# summed over the wrong rows.)
+CONTROL_RED = ['M-sortload', 'C-sortload', 'M-clicksort', 'C-clicksort', 'M-sortsearch', 'C-sortsearch',
+               'M-noteopen', 'C-noteopen', 'M-sumsortboth', 'C-sumsortboth', 'V-sumsortboth', 'S-sumsort', 'S-sumsortboth']
+
+# --- mutants: name -> (edits on the CANDIDATE, assert ids that MUST go red) ------------------------
+# An edit's anchor must occur exactly once (i.e. the candidate must be the FIXED build).
+MUTANTS = {
+    # The band walk back on DOM position (the bug itself, at its main site).
+    'posgroups': ([("                var rowIndex = _pnbLazyRowIndex(this);",
+                    "                var rowIndex = $row.index();")],
+                  ['M-sortload', 'C-sortload', 'M-clicksort', 'C-clicksort', 'M-sortsearch', 'C-sortsearch',
+                   'M-noteopen', 'C-noteopen', 'M-sumsortboth', 'C-sumsortboth', 'V-sumsortboth']),
+    # The summary pre-sort back on DOM position.
+    'possumsort': ([("                        var _prIdx = _pnbLazyRowIndex(_$pr[0]);",
+                     "                        var _prIdx = _$pr.data('rowIndex') !== undefined ? _$pr.data('rowIndex') : _$pr.index();")],
+                   ['S-sumsort']),
+    # The band pre-sort back to summing EVERY nested row of a member row: the bands
+    # are ranked on another number than they show (fixed 2026-10-01).
+    'uncorrsumsort': ([("                            if (isVirtualGrouping) {\r\n                                // Both columns nested (2026-10-01)",
+                        "                            if (false) {\r\n                                // Both columns nested (2026-10-01)")],
+                      ['S-sumsortboth']),
+    # The totals pass back on DOM position. EQUIVALENT by design: a walk over every
+    # data row is a permutation of masterRowData, so its counts never depended on the
+    # order - it is keyed by '#' only so the two passes read alike. Must stay GREEN.
+    'eq-postotals': ([("            allDomRows.each(function () {\r\n                var _vgTotIdx = _pnbLazyRowIndex(this);",
+                       "            allDomRows.each(function (index) {\r\n                var _vgTotIdx = index;")], []),
+}
+MUTANT_SCN = {'posgroups': ['sortload', 'clicksort', 'sortsearch', 'noteopen', 'sumsortboth'],
+              'possumsort': ['sumsort'], 'uncorrsumsort': ['sumsortboth'], 'eq-postotals': ALL_SCN}
+
+# --- args -------------------------------------------------------------------------------------
+args = sys.argv[1:]
+def opt(name, default=None):
+    if name in args:
+        i = args.index(name); v = args[i + 1]; del args[i:i + 2]; return v
+    return default
+def flag(name):
+    if name in args: args.remove(name); return True
+    return False
+cand_path = opt('--candidate', os.path.join(APP, 'js', 'main.js'))
+base_path = opt('--baseline', None)
+app_dir = opt('--app', APP)
+scn_arg = opt('--scn', None)
+one_mutant = opt('--mutant', None)
+all_mutants = flag('--mutants')
+control = flag('--control')
+keep = flag('--keep')
+if args: raise SystemExit('unknown arguments: %s' % ' '.join(args))
+if control:
+    if not base_path:
+        baks = sorted(glob.glob(os.path.join(APP, 'js', 'main.js.bak-*-jsongroup')))
+        if not baks:
+            raise SystemExit('no baseline: pass --baseline <main.js before the fix> (the deploy leaves js\\main.js.bak-<stamp>-jsongroup)')
+        base_path = baks[-1]
+    cand_path = base_path
+
+def read_b(p): return open(p, 'rb').read().decode('utf-8', 'surrogateescape')
+
+def hook(src):
+    """The ready closure becomes an IIFE with a name-by-name export hook, and
+    hideLoading counts its calls (the end of a run / search / apply)."""
+    anchor = '$(document).ready(function () {'
+    i = src.find(anchor)
+    if i < 0 or i > 400: raise SystemExit('closure anchor not found')
+    names = ['runTableSearch']
+    h = ('\r\n;try { window.__JG = { master: function () { try { return eval("masterRowData"); } catch (e) { return null; } } }; } catch (e) { window.__JG_ERR = String(e); }\r\n'
+         'try { [' + ','.join('"%s"' % n for n in names) + '].forEach(function (k) { try { window.__JG[k] = eval(k); } catch (e) { (window.__JG_MISSING = window.__JG_MISSING || []).push(k); } }); } catch (e) { window.__JG_ERR2 = String(e); }\r\n')
+    out = src[:i] + ';(function () {' + h + src[i + len(anchor):]
+    j = out.rfind('});')
+    out = out[:j] + '})();' + out[j + 3:]
+    hl = '    function hideLoading() {\r\n'
+    if out.count(hl) != 1: raise SystemExit('hideLoading anchor count %d' % out.count(hl))
+    return out.replace(hl, hl + '        window.__JG_HIDES = (window.__JG_HIDES || 0) + 1;\r\n')
+
+def mutate(src, name):
+    edits, _ = MUTANTS[name]
+    for old, new in edits:
+        n = src.count(old)
+        if n != 1: raise SystemExit("mutant '%s': anchor found %d times (needs the FIXED build): %s" % (name, n, old[:100]))
+        src = src.replace(old, new)
+    return src
+
+# --- staging + browser ------------------------------------------------------------------------
+stage = tempfile.mkdtemp(prefix='pnb_jg_')
+os.makedirs(os.path.join(stage, 'c'))
+for f in LIBS: shutil.copyfile(os.path.join(app_dir, 'js', f), os.path.join(stage, 'c', f))
+shutil.copyfile(os.path.join(app_dir, 'css', 'main.css'), os.path.join(stage, 'c', 'main.css'))
+shutil.copyfile(os.path.join(HERE, 'harness.html'), os.path.join(stage, 'c', 'harness.html'))
+shutil.copyfile(os.path.join(HERE, 'driver.js'), os.path.join(stage, 'c', 'driver.js'))
+
+def write_build(text):
+    open(os.path.join(stage, 'c', 'main_jg.js'), 'wb').write(text.encode('utf-8', 'surrogateescape'))
+
+def free_port():
+    s = socket.socket(); s.bind(('127.0.0.1', 0)); p = s.getsockname()[1]; s.close(); return p
+hp, dp = free_port(), free_port()
+srv = subprocess.Popen([sys.executable, '-m', 'http.server', str(hp), '--bind', '127.0.0.1', '--directory', stage],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+prof = os.path.join(stage, 'profile')
+edge = subprocess.Popen([EDGE, '--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check',
+                         '--disable-sync', '--disable-extensions', '--user-data-dir=' + prof, '--window-size=1500,900',
+                         '--remote-debugging-port=%d' % dp, '--remote-allow-origins=*', 'about:blank'],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+def jget(p, m='GET'):
+    return json.loads(urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:%d%s' % (dp, p), method=m), timeout=15).read().decode())
+for _ in range(150):
+    try: jget('/json/version'); break
+    except Exception: time.sleep(0.2)
+for _ in range(100):
+    try: urllib.request.urlopen('http://127.0.0.1:%d/c/harness.html' % hp, timeout=5).read(); break
+    except Exception: time.sleep(0.2)
+
+def run_page(scn):
+    t = jget('/json/new?about:blank', 'PUT')
+    ws = websocket.create_connection(t['webSocketDebuggerUrl'], timeout=300, suppress_origin=True)
+    n = [0]
+    def call(method, params=None):
+        n[0] += 1; mid = n[0]
+        ws.send(json.dumps({'id': mid, 'method': method, 'params': params or {}}))
+        while True:
+            m = json.loads(ws.recv())
+            if m.get('id') == mid: return m.get('result', {})
+    try:
+        call('Page.enable')
+        # Every build is written to the same c/main_jg.js: never let the browser serve a
+        # cached copy (heuristic freshness once handed a mutant the previous build).
+        call('Network.enable')
+        call('Network.setCacheDisabled', {'cacheDisabled': True})
+        call('Page.navigate', {'url': 'http://127.0.0.1:%d/c/harness.html?scn=%s' % (hp, scn)})
+        t0 = time.time()
+        while time.time() - t0 < 180:
+            time.sleep(0.25)
+            try:
+                r = call('Runtime.evaluate', {'expression': 'window.__JGDONE ? JSON.stringify(window.__JGRESULT) : null', 'returnByValue': True})
+                v = r.get('result', {}).get('value')
+                if v: return json.loads(v)
+            except Exception:
+                pass
+        return {'fatal': 'timeout waiting for the scenario (180 s)'}
+    finally:
+        try: ws.close()
+        except Exception: pass
+        try: urllib.request.urlopen('http://127.0.0.1:%d/json/close/%s' % (dp, t['id']), timeout=10).read()
+        except Exception: pass
+
+def run_suite(text, scns):
+    write_build(text)
+    res, obs = [], {}
+    for s in scns:
+        r = run_page(s)
+        if r.get('fatal'):
+            res.append(('F-' + s, False, 'fatal: ' + str(r['fatal'])[:400])); continue
+        if r.get('missing') or r.get('hookErr'):
+            res.append(('H-' + s, False, 'hook: missing %s %s' % (r.get('missing'), r.get('hookErr'))))
+        for a in r.get('asserts', []):
+            res.append((a['id'], a['ok'], a['detail']))
+        res.append(('E-' + s, not r.get('errors'), 'page errors: %s' % (r.get('errors') or 'none')))
+        obs[s] = r.get('obs', {})
+    return res, obs
+
+try:
+    scns = scn_arg.split(',') if scn_arg else ALL_SCN
+    cand_src = read_b(cand_path)
+    print('candidate: %s%s' % (cand_path, '   (CONTROL: the pre-fix baseline)' if control else ''), flush=True)
+    if all_mutants or one_mutant:
+        names = [one_mutant] if one_mutant else list(MUTANTS.keys())
+        ok_n = bad_n = 0
+        for name in names:
+            _, must = MUTANTS[name]
+            res, _ = run_suite(hook(mutate(cand_src, name)), MUTANT_SCN[name])
+            red = [a for a, ok, _ in res if not ok]
+            if must:
+                missing = [m for m in must if m not in red]
+                stray = [a for a in red if a not in must]
+                good = not missing and not stray
+                msg = ('turns exactly %s red' % ' '.join(must)) if good else \
+                      ('stayed GREEN on %s; also red: %s' % (' '.join(missing) or '-', ' '.join(stray) or '-'))
+            else:
+                good = not red
+                msg = 'equivalent layer: all GREEN, as documented' if good else 'NOT equivalent - red: %s' % ' '.join(red)
+            ok_n += good; bad_n += (not good)
+            print('  %s  mutant %-13s %s' % ('PASS' if good else 'FAIL', name, msg), flush=True)
+        print('SUMMARY mutants ok=%d bad=%d' % (ok_n, bad_n))
+        print('RESULT: GREEN' if bad_n == 0 else 'RESULT: RED')
+    else:
+        res, obs = run_suite(hook(cand_src), scns)
+        p = f = 0; failed = []
+        for aid, ok, detail in res:
+            print('  %s  %-24s %s' % ('PASS' if ok else 'FAIL', aid, detail[:300]), flush=True)
+            if ok: p += 1
+            else: f += 1; failed.append(aid)
+        for s in scns:
+            o = obs.get(s) or {}
+            keep_keys = [k for k in ('flatHead', 'groups', 'orderShown', 'orderMonotonic', 'orderByLoose', 'looseTotals') if k in o]
+            if keep_keys: print('  obs %-11s %s' % (s, '; '.join('%s=%s' % (k, o[k]) for k in keep_keys))[:600])
+        print('TOTAL pass=%d fail=%d   failed: %s' % (p, f, ' '.join(failed)))
+        if control:
+            want = [a for a in CONTROL_RED if a.split('-', 1)[1] in scns]
+            exact = sorted(failed) == sorted(want)
+            print('CONTROL: %s (expected red: %s)' % ('red set is EXACTLY the documented bug' if exact else 'red set DIFFERS from CONTROL_RED', ' '.join(want)))
+            print('RESULT: GREEN' if exact else 'RESULT: RED')
+        else:
+            print('RESULT: GREEN' if f == 0 and p > 0 else 'RESULT: RED')
+finally:
+    try: edge.kill()
+    except Exception: pass
+    try: srv.kill()
+    except Exception: pass
+    time.sleep(1)
+    if keep: print('kept: ' + stage)
+    else: shutil.rmtree(stage, ignore_errors=True)

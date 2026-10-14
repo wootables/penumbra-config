@@ -1,0 +1,1693 @@
+// Flat-table column widths - browser half (2026-09-24). Drives the REAL
+// main.js (ready closure unwrapped, window.__CWH export hook), the REAL module
+// (js/penumbra_colwidths.js) and the REAL main.css + the module's CSS.
+//   U  pure pieces: the rule text, the clean map, the two-layer resolution
+//   G  geometry: narrow AND widen, neighbours untouched, a hidden column, the
+//      footer's visible ordinal, colspan rows, a reorder, outside the wrapper,
+//      full-height rows, the '#' column, frozen offsets following a resize
+//   D  the drag: only the edge strip, the guide moves and the table does not,
+//      one width on release, the click after it is no sort, twice = fit,
+//      Escape, the clamp
+//   K  keys on a focused header: + - 0, modifiers left to the browser
+//   P  persistence: only differences stored, the carry-over, hydrate, the
+//      WYSIWYG save, carry-forward with no header / module off, after a save
+//   R  the restricted viewer (Column Organization off, not an admin)
+//   C  the custom-layout pill
+//   S  the Settings panel note and Reset widths
+//   O  ?colwidths=off (a page load of its own): inert, and saves still carry
+//   V  the grouped view (2026-09-30)          Q  a pivot's row labels (2026-09-30)
+//   Y  a pivot's ONE value column (2026-10-01)  Z  a one-row header's value columns, one width (round 4)
+//   M  a TWO-row header: groups and leaves, a flat table at two levels (round 5)
+//   W  ?colwidths=flat (a page load of its own): the flat table only
+//   L  the custom-layout pill beyond the flat table: grouped, pivot row labels, value columns,
+//      Grand Total, a two-row heading named by its headings (2026-10-01)
+//   E  breakdown tables: the same drag / double press / keys, widths for the page session
+//      only (nothing stored), never the Table Info grid (2026-10-01); W5 their views switch
+(function () {
+  var R = [];
+  function rec(name, pass, detail) { R.push({ name: name, pass: !!pass, detail: detail === undefined ? '' : String(detail).slice(0, 600) }); }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function errs() { return window.__errors.concat(window.__rejections); }
+  function finish(fatal) {
+    var payload = { results: R, pageErrors: errs().slice(0, 8),
+      hookErr: [window.__CWH_ERR, window.__CWH_ERR2, (window.__CWH_MISSING || []).join(',')].filter(Boolean).join('; ') };
+    if (fatal) payload.fatal = fatal;
+    document.getElementById('out').textContent = 'RESULTS_JSON:' + JSON.stringify(payload);
+  }
+  if (typeof window.stackHeaders !== 'function') window.stackHeaders = function () {};
+
+  var H = window.__CWH || {};
+  var KEY = 'penumbra_column_prefs';
+  var OFF = /[?&]colwidths=off/.test(location.search);
+  function CW() { return (window.Penumbra && window.Penumbra.colWidths) || null; }
+  function HOST() { return (window.Penumbra && window.Penumbra.colWidthsHost) || null; }
+  function FF() { return (window.Penumbra && window.Penumbra.flatFreeze) || null; }
+
+  function wrap() { return document.getElementById('results-wrapper'); }
+  function headRow() { return document.getElementById('tableHeader'); }
+  function ths() { return Array.prototype.slice.call(headRow().children); }
+  function body() { return document.querySelector('#resultsTable > tbody'); }
+  function thOf(n) { return headRow().querySelector('th[data-colname="' + n + '"]'); }
+  function idxOf(n) { return ths().indexOf(thOf(n)) + 1; }
+  function tdOf(r, n) { return body().rows[r].children[idxOf(n) - 1]; }
+  function footRow() { return document.querySelector('#resultsTable > tfoot > tr.total-row-data'); }
+  // The footer cell under column n: the footer holds VISIBLE columns only.
+  function footOf(n) {
+    var f = footRow(); if (!f) return null;
+    var vis = ths().filter(function (t) { return t.style.display !== 'none'; });
+    return f.children[vis.indexOf(thOf(n))] || null;
+  }
+  function width(el) { return el ? el.getBoundingClientRect().width : -1; }
+  function near(a, b, tol) { return Math.abs(a - b) <= (tol === undefined ? 1.5 : tol); }
+  function r1(n) { return Math.round(n * 10) / 10; }
+  function ls(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return 'PARSE_ERR'; } }
+  function entry(name) { var all = ls(KEY) || {}; return all[name] || null; }
+  function styleText() { var s = document.getElementById('pnbColWidthStyle'); return s ? s.textContent : ''; }
+  function shield() { return document.querySelector('.pnb-colw-shield'); }
+  function sortState(n) { var t = thOf(n); return t ? (t.getAttribute('aria-sort') || 'none') : 'missing'; }
+  function liveText() { var l = document.getElementById('pnbColwLive'); return l ? l.textContent : ''; }
+  function fire() { document.dispatchEvent(new CustomEvent('penumbra:columns-changed')); }
+
+  // Report widths straight into main.js's layer, then one synchronous pass.
+  function setReport(m) { H.setReportWidths(m); if (CW()) CW().apply(); }
+  function apply() { if (CW()) CW().apply(); }
+
+  function ptr(type, target, x, y) {
+    return target.dispatchEvent(new PointerEvent(type, {
+      bubbles: true, cancelable: true, composed: true, view: window, clientX: x, clientY: y,
+      button: type === 'pointermove' ? -1 : 0, buttons: type === 'pointerup' ? 0 : 1,
+      pointerId: 1, pointerType: 'mouse', isPrimary: true }));
+  }
+  function key(el, k, mods) {
+    var init = { key: k, bubbles: true, cancelable: true };
+    if (mods) Object.keys(mods).forEach(function (m) { init[m] = mods[m]; });
+    return el.dispatchEvent(new KeyboardEvent('keydown', init));
+  }
+  function edge(th) { var r = th.getBoundingClientRect(); return { x: r.right - 3, y: r.top + r.height / 2, r: r }; }
+
+  // Show/hide one column the way applyColumnChanges() does: display on the <th>
+  // and every body cell at that DOM index; the footer is REBUILT because
+  // updateTotalRow() emits visible columns only.
+  function setHidden(n, hidden) {
+    var i = idxOf(n);
+    thOf(n).style.display = hidden ? 'none' : '';
+    var rows = body().rows;
+    for (var r = 0; r < rows.length; r++) {
+      var td = rows[r].children[i - 1];
+      if (td && !td.hasAttribute('colspan')) td.style.display = hidden ? 'none' : '';
+    }
+    if (H.updateTotalRow) H.updateTotalRow();
+  }
+
+  var COLS = ['ID', 'TITLE', 'NAME', 'C04', 'C05', 'C06', 'C07', 'C08', 'C09', 'C10', 'C11', 'AMOUNT'];
+  var LOREM = 'lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua';
+  function makeRows(n) {
+    var out = [];
+    for (var i = 1; i <= n; i++) {
+      var row = {};
+      for (var c = 0; c < COLS.length; c++) {
+        var k = COLS[c];
+        // C10 / C11 have few distinct values (2026-09-30): the grouped view
+        // groups on C11 and the pivot crosses C11 > NAME with C10.
+        row[k] = k === 'ID' ? String(100000 + i)
+               : k === 'TITLE' ? ('Title ' + i + ' ' + LOREM.slice(0, 50 + (i * 7) % 60))
+               : k === 'NAME' ? ('Person ' + i)
+               : k === 'AMOUNT' ? String(i * 100)
+               : k === 'C10' ? ('FY ' + (2023 + (i % 4)))
+               : k === 'C11' ? ('Dept ' + 'ABC'.charAt(i % 3))
+               : ('value ' + k + ' row ' + i);
+      }
+      out.push(row);
+    }
+    return out;
+  }
+  async function runQuery(rows) {
+    window.__queryResponse = { data: rows };
+    var ed = H.getEditor ? H.getEditor() : null;
+    if (ed) ed.setValue('SELECT 1 FROM DUAL');
+    var before = window.__ajaxLog.length;
+    $('#executeQuery').trigger('click');
+    for (var i = 0; i < 200; i++) {
+      await sleep(25);
+      if (window.__ajaxLog.length > before && (window.__rejections.length || !$('#loadingOverlay').is(':visible'))) break;
+    }
+    await sleep(400);
+  }
+  function naturalWidths() {
+    var m = {};
+    ths().forEach(function (t) { if (t.style.display !== 'none') m[t.getAttribute('data-colname')] = width(t); });
+    return m;
+  }
+  // Click a header until its sort is off again (asc -> desc -> none).
+  function unsort(n) { for (var i = 0; i < 3 && sortState(n) !== 'none'; i++) thOf(n).click(); }
+
+  // ------------------------------------------------------------------------
+  function phaseU() {
+    var cw = CW();
+    if (!cw) { rec('U1 the rule text', false, 'window.Penumbra.colWidths is missing'); }
+    else {
+      var css = cw.buildCss([{ name: 'TITLE', idx: 3, vis: 2, w: 120 }]);
+      var want = ['@media screen{',
+        '#results-wrapper #resultsTable > thead > tr > th:nth-child(3),',
+        '#results-wrapper #resultsTable > tbody > tr > td:nth-child(3):not([colspan]),',
+        // the footer holds VISIBLE columns only: DOM column 3 is its 2nd cell
+        '#results-wrapper #resultsTable > tfoot > tr > td:nth-child(2):not([colspan])',
+        'width:120px!important', 'min-width:120px!important', 'max-width:120px!important', 'box-sizing:border-box!important'];
+      var missing = want.filter(function (w) { return css.indexOf(w) === -1; });
+      rec('U1 rule text: DOM index for header and body, visible ordinal for the footer, colspan rows out, screen only',
+        missing.length === 0 && css.indexOf('tfoot > tr > td:nth-child(3)') === -1 && cw.buildCss([]) === '' && cw.buildCss(null) === '',
+        'missing=' + JSON.stringify(missing) + ' css=' + css.slice(0, 160));
+    }
+    try {
+      var c1 = H.clean({ title: 240, B: 'auto', C: 10, D: 5000, E: '300', F: 'x', G: true, ' ': 50, H: 39.4, I: 40.4, J: [1], K: 2000 }, false);
+      var c2 = H.clean({ B: 'auto', title: 240 }, true);
+      var junk = [H.clean(null, true), H.clean([1, 2], true), H.clean('x', true)].map(function (o) { return Object.keys(o).length; }).join(',');
+      rec('U2 clean map: names upper-cased, whole px in 40..2000, numeric strings ok, junk dropped, auto only for the viewer layer',
+        JSON.stringify(c1) === '{"TITLE":240,"E":300,"I":40,"K":2000}' && JSON.stringify(c2) === '{"B":"auto","TITLE":240}' && junk === '0,0,0',
+        'report=' + JSON.stringify(c1) + ' viewer=' + JSON.stringify(c2) + ' junk=' + junk);
+    } catch (e) { rec('U2 clean map', false, 'threw: ' + e.message); }
+    var host = HOST();
+    if (!host) { rec('U3 the two layers', false, 'colWidthsHost is missing'); return; }
+    try {
+      H.setName(null); H.hydrate();
+      H.setReportWidths({ A: 200 });
+      host.clearUser();
+      var a = host.widthFor('a');
+      host.setUser('A', 300); var b = host.widthFor('A');
+      host.setUser('A', 'auto'); var c = host.widthFor('A');
+      host.setUser('A', null); var d = host.widthFor('A');
+      var e = host.widthFor('NOPE');
+      H.setReportWidths({}); host.clearUser();
+      rec('U3 the viewer wins, auto means content-sized even over a report width, null follows the report again',
+        a === 200 && b === 300 && c === null && d === 200 && e === null, [a, b, c, d, e].join(','));
+    } catch (e2) { rec('U3 the two layers', false, 'threw: ' + e2.message); }
+    try {
+      var vf = cw.viewsFor, off = document.createElement('script'), plain = document.createElement('script');
+      off.setAttribute('data-views', 'off');
+      var got = [vf(plain, ''), vf(null, '?id=x'), vf(off, ''), vf(plain, '?id=x&colwidths=flat'), vf(plain, '?colwidths=flatten')].join(',');
+      rec('U4 the views switch: on by default, off for a script marked data-views="off" (index.php) or &colwidths=flat',
+        got === 'true,true,false,false,true', got);
+    } catch (e3) { rec('U4 the views switch', false, 'threw: ' + e3.message); }
+  }
+
+  // ------------------------------------------------------------------------
+  var NAT = null;
+  async function phaseG() {
+    await runQuery(makeRows(20));
+    var w = wrap(), cw = CW(), host = HOST();
+    var ok0 = ths().length === 13 && body().rows.length === 20 && (w.scrollWidth - w.clientWidth) > 200 && !!footRow();
+    rec('G0 fixture: 13 columns, 20 rows, a footer row, and the table overflows its wrapper sideways', ok0,
+      'ths=' + ths().length + ' rows=' + body().rows.length + ' scroll=' + w.scrollWidth + '/' + w.clientWidth + ' foot=' + !!footRow() + ' errs=' + errs().slice(0, 2).join(' / '));
+    if (!ok0) return false;
+    if (!ths()[0].style.zIndex && H.updateStickyHeaderOffset) H.updateStickyHeaderOffset();
+    rec('G0b the module is running: host bound, html.pnb-colw-on set, no width rules while nothing has a width',
+      !!(cw && host && cw.state().host) && document.documentElement.classList.contains('pnb-colw-on') && styleText() === '',
+      'module=' + !!cw + ' host=' + !!host + ' class=' + document.documentElement.classList.contains('pnb-colw-on') + ' css=' + styleText().length);
+    if (!cw || !host) return false;
+
+    NAT = naturalWidths();
+    var t0 = thOf('TITLE'), tdT = tdOf(0, 'TITLE');
+    rec('G1 control: TITLE sizes to its content, capped by the 350px rule, and its long values are cut short',
+      NAT.TITLE > 340 && NAT.TITLE < 400 && tdT.scrollWidth > tdT.clientWidth && NAT.ID < 120,
+      'TITLE=' + r1(NAT.TITLE) + ' ID=' + r1(NAT.ID) + ' tdScroll=' + tdT.scrollWidth + '/' + tdT.clientWidth);
+
+    setReport({ TITLE: 120 });
+    var nT = [width(thOf('TITLE')), width(tdOf(0, 'TITLE')), width(tdOf(19, 'TITLE')), width(footOf('TITLE'))];
+    rec('G2 narrowing works: header, body and footer cells of TITLE all 120px (a header-only width cannot do this)',
+      nT.every(function (x) { return near(x, 120); }), nT.map(r1).join(','));
+    var moved = Object.keys(NAT).filter(function (n) { return n !== 'TITLE' && !near(width(thOf(n)), NAT[n], 1); });
+    rec('G3 every other column keeps its content width', moved.length === 0, moved.length ? moved.map(function (n) { return n + ':' + r1(NAT[n]) + '->' + r1(width(thOf(n))); }).join(' ') : 'all ' + (Object.keys(NAT).length - 1) + ' unchanged');
+
+    setReport({ TITLE: 600, ID: 200 });
+    var wT = [width(thOf('TITLE')), width(tdOf(0, 'TITLE')), width(footOf('TITLE'))], wI = [width(thOf('ID')), width(tdOf(3, 'ID')), width(footOf('ID'))];
+    rec('G4 widening past the 350px cap works too: TITLE 600, ID 200, header body and footer',
+      wT.every(function (x) { return near(x, 600); }) && wI.every(function (x) { return near(x, 200); }), 'TITLE=' + wT.map(r1).join(',') + ' ID=' + wI.map(r1).join(','));
+
+    // A hidden column BEFORE the target: thead/tbody keep their DOM index,
+    // the footer's ordinal shifts left by one.
+    setHidden('ID', true);
+    apply();
+    var css5 = styleText(), di = idxOf('TITLE');
+    var vis5 = ths().filter(function (t) { return t.style.display !== 'none'; }).indexOf(thOf('TITLE')) + 1;
+    var g5 = [width(thOf('TITLE')), width(tdOf(0, 'TITLE')), width(footOf('TITLE'))];
+    rec('G5 a hidden column before it: header/body rule by DOM index ' + di + ', footer by visible ordinal ' + vis5 + ', all 600px',
+      css5.indexOf('th:nth-child(' + di + ')') !== -1 && css5.indexOf('tfoot > tr > td:nth-child(' + vis5 + ')') !== -1 &&
+      css5.indexOf('tfoot > tr > td:nth-child(' + di + ')') === -1 && g5.every(function (x) { return near(x, 600); }),
+      'widths=' + g5.map(r1).join(',') + ' css=' + css5.replace(/#results-wrapper #resultsTable/g, 'S').slice(0, 300));
+    setHidden('ID', false);
+    apply();
+
+    // A one-cell (colspan) row's cell is the FIRST child, so give the first
+    // column a width too - that is the rule it must not pick up.
+    setReport({ '#': 90, TITLE: 600, ID: 200 });
+    var note = document.createElement('tr');
+    note.className = 'journal-note-child';
+    note.innerHTML = '<td colspan="13">a journal note row</td>';
+    body().insertBefore(note, body().rows[1]);
+    var noteW = width(note.firstElementChild), tableW = width(document.getElementById('resultsTable')), numW = width(thOf('#'));
+    note.remove();
+    setReport({ TITLE: 600, ID: 200 });
+    rec('G6 a full-width (colspan) row is left alone - it spans the table even with a width on the first column',
+      noteW > 1000 && near(noteW, tableW, 4) && near(numW, 90), 'note=' + r1(noteW) + ' table=' + r1(tableW) + ' #=' + r1(numW));
+
+    // A reorder (what Save Column Layout does): TITLE's cells move to the end.
+    // Nothing calls apply() - the header observer has to notice.
+    var from = idxOf('TITLE') - 1, rows = body().rows;
+    headRow().appendChild(thOf('TITLE'));
+    for (var r = 0; r < rows.length; r++) rows[r].appendChild(rows[r].children[from]);
+    if (H.updateTotalRow) H.updateTotalRow();
+    await sleep(60);
+    var css7 = styleText();
+    rec('G7 after a reorder the width follows the column NAME to its new place (the observer re-ran by itself)',
+      idxOf('TITLE') === 13 && css7.indexOf('th:nth-child(13)') !== -1 && near(width(thOf('TITLE')), 600) && near(width(tdOf(0, 'TITLE')), 600) && near(width(thOf('ID')), 200),
+      'idx=' + idxOf('TITLE') + ' TITLE=' + r1(width(thOf('TITLE'))) + '/' + r1(width(tdOf(0, 'TITLE'))) + ' ID=' + r1(width(thOf('ID'))));
+    // ...and back, for the later phases.
+    var back = idxOf('TITLE') - 1;
+    headRow().insertBefore(thOf('TITLE'), ths()[2]);
+    for (r = 0; r < rows.length; r++) rows[r].insertBefore(rows[r].children[back], rows[r].children[2]);
+    if (H.updateTotalRow) H.updateTotalRow();
+    await sleep(60);
+
+    var table = document.getElementById('resultsTable');
+    document.body.appendChild(table);
+    var outside = width(thOf('TITLE'));
+    w.appendChild(table);
+    rec('G8 outside #results-wrapper the rules are inert (grouped and un-containerized states)', near(outside, NAT.TITLE, 2) && near(width(thOf('TITLE')), 600),
+      'outside=' + r1(outside) + ' natural=' + r1(NAT.TITLE) + ' back=' + r1(width(thOf('TITLE'))));
+
+    // Full-height rows pin cell max-width/min-width with !important of their own.
+    document.body.classList.add('disable-auto-expand');
+    setReport({ TITLE: 130 });
+    var g9 = [width(thOf('TITLE')), width(tdOf(0, 'TITLE')), width(footOf('TITLE'))];
+    var g9h = tdOf(0, 'TITLE').getBoundingClientRect().height;
+    document.body.classList.remove('disable-auto-expand');
+    rec('G9 full-height rows: the width still holds (130px) and the text wraps inside it instead',
+      g9.every(function (x) { return near(x, 130); }) && g9h > 40, 'widths=' + g9.map(r1).join(',') + ' rowHeight=' + r1(g9h));
+
+    setReport({ '#': 90 });
+    rec('G10 the # row-number column can be sized too', near(width(thOf('#')), 90) && near(width(body().rows[0].children[0]), 90), '#=' + r1(width(thOf('#'))));
+
+    var ff = FF();
+    if (!ff) rec('G11 frozen offsets follow a resize', false, 'flatFreeze missing');
+    else {
+      setReport({});
+      ff.set(0, 2);
+      var before = (document.getElementById('pnbFlatFreezeStyle') || {}).textContent || '';
+      setReport({ '#': 90 });
+      var after = (document.getElementById('pnbFlatFreezeStyle') || {}).textContent || '';
+      ff.set(0, null);
+      rec('G11 frozen columns: the second frozen column\'s offset moves to the new width of the first in the same pass',
+        /left:90px/.test(after) && !/left:90px/.test(before), 'before=' + (before.match(/left:\d+px/g) || []).join(',') + ' after=' + (after.match(/left:\d+px/g) || []).join(','));
+    }
+    setReport({});
+    rec('G12 with no widths left the stylesheet empties and every column is back to its content width',
+      styleText() === '' && Object.keys(NAT).every(function (n) { return near(width(thOf(n)), NAT[n], 1); }), 'css=' + styleText().length);
+
+    // A saved report's widths arrive through the REAL render path (the state
+    // it decodes on a report run), and an ad-hoc run afterwards resets them.
+    if (!H.setStateLoading) { rec('G13 a saved report\'s widths through the render path', false, 'hook missing'); return true; }
+    penumbra_vars.preloadedState = { name: 'rstate', query: 'SELECT 1 FROM DUAL', columnWidths: { title: 150, NAME: 'wide', ID: 5 } };
+    H.setStateLoading(true);
+    await runQuery(makeRows(20));
+    var g13a = width(thOf('TITLE')), g13n = width(thOf('NAME')), g13i = width(thOf('ID')), rep = HOST() ? HOST().state().report : null;
+    penumbra_vars.preloadedState = null;
+    H.setStateLoading(false);
+    await runQuery(makeRows(20));
+    var g13b = width(thOf('TITLE'));
+    rec('G13 a saved report\'s widths arrive through the real render path (junk dropped), and an ad-hoc run after it clears them',
+      near(g13a, 150) && near(g13n, NAT.NAME, 1) && near(g13i, NAT.ID, 1) && rep && JSON.stringify(rep) === '{"TITLE":150}' && near(g13b, NAT.TITLE, 1.5),
+      'report run: TITLE=' + r1(g13a) + ' NAME=' + r1(g13n) + ' ID=' + r1(g13i) + ' map=' + JSON.stringify(rep) + ' | ad-hoc run: TITLE=' + r1(g13b));
+    return true;
+  }
+
+  // ------------------------------------------------------------------------
+  async function phaseD() {
+    var host = HOST(), cw = CW();
+    if (!host || !cw) { rec('D the drag', false, 'module or host missing'); return; }
+    localStorage.removeItem(KEY);
+    H.setName('rdrag'); H.hydrate();
+    setReport({});
+    var th = thOf('TITLE'), w0 = width(th), e = edge(th);
+
+    var midOk = ptr('pointerdown', th, e.r.left + e.r.width / 2, e.y);
+    var noShield = !shield();
+    th.click();
+    var sorted = sortState('TITLE');
+    unsort('TITLE');
+    rec('D1 control: a press in the MIDDLE of a header is no resize, and its click still sorts',
+      midOk && noShield && sorted === 'ascending' && sortState('TITLE') === 'none', 'notPrevented=' + midOk + ' noShield=' + noShield + ' sort=' + sorted);
+
+    th = thOf('TITLE'); e = edge(th);
+    var downOk = ptr('pointerdown', th, e.x, e.y);
+    var sh = shield(), guide = sh && sh.querySelector('.pnb-colw-guide'), label = sh && sh.querySelector('.pnb-colw-label');
+    rec('D2 a press on the right-edge strip starts a drag: the event is taken, a shield + guide + width label appear',
+      !downOk && !!sh && !!guide && !!label && label.textContent === Math.round(w0) + ' px' && getComputedStyle(sh).cursor === 'col-resize',
+      'prevented=' + !downOk + ' shield=' + !!sh + ' label=' + (label ? label.textContent : '-') + ' cursor=' + (sh ? getComputedStyle(sh).cursor : '-'));
+    if (!sh) return;
+
+    ptr('pointermove', sh, e.x + 40, e.y);
+    ptr('pointermove', sh, e.x + 80, e.y);
+    await sleep(30);
+    var gx = new DOMMatrixReadOnly(getComputedStyle(guide).transform).m41;
+    rec('D3 while dragging only the guide moves: it sits at the new edge, the table has NOT been laid out again',
+      near(gx, e.r.left + w0 + 80, 2) && near(width(thOf('TITLE')), w0, 0.5) && styleText() === '' && label.textContent === Math.round(w0 + 80) + ' px',
+      'guideX=' + r1(gx) + ' want ' + r1(e.r.left + w0 + 80) + ' th=' + r1(width(thOf('TITLE'))) + ' css=' + styleText().length + ' label=' + label.textContent);
+
+    var evs = 0, onChange = function () { evs++; };
+    document.addEventListener('penumbra:columns-changed', onChange);
+    ptr('pointerup', sh, e.x + 80, e.y);
+    document.removeEventListener('penumbra:columns-changed', onChange);
+    var want = Math.round(w0 + 80), en = entry('rdrag');
+    rec('D4 on release the width lands once: TITLE is ' + want + 'px, stored for this report, and the change is announced',
+      !shield() && near(width(thOf('TITLE')), want, 1) && en && en.widths && en.widths.TITLE === want && evs >= 1 && liveText() === 'TITLE column width ' + want + ' pixels',
+      'shieldGone=' + !shield() + ' th=' + r1(width(thOf('TITLE'))) + ' stored=' + JSON.stringify(en) + ' events=' + evs + ' live="' + liveText() + '"');
+
+    // The browser's click after the release: it normally lands on the shield's
+    // parent (body); if a browser delivers it to the header it must still not sort.
+    thOf('TITLE').click();
+    var afterDrag = sortState('TITLE');
+    await sleep(700);
+    thOf('TITLE').click();
+    var later = sortState('TITLE');
+    unsort('TITLE');
+    rec('D5 the click that ends a drag is not a sort - and a real click a moment later sorts as usual',
+      afterDrag === 'none' && later === 'ascending', 'rightAfter=' + afterDrag + ' later=' + later);
+
+    // Press twice (no movement) = fit to content. No report width, so the
+    // viewer's entry simply goes.
+    th = thOf('TITLE'); e = edge(th);
+    ptr('pointerdown', th, e.x, e.y);
+    if (shield()) ptr('pointerup', shield(), e.x, e.y);
+    var afterOne = width(thOf('TITLE'));
+    ptr('pointerdown', thOf('TITLE'), e.x, e.y);
+    var fitted = width(thOf('TITLE')), en6 = entry('rdrag');
+    rec('D6 a single press changes nothing; a second press on the same edge fits the column to its content again',
+      near(afterOne, want, 1) && near(fitted, NAT.TITLE, 1.5) && !shield() && (!en6 || !en6.widths) && liveText() === 'TITLE column fits its content',
+      'afterOne=' + r1(afterOne) + ' fitted=' + r1(fitted) + ' natural=' + r1(NAT.TITLE) + ' stored=' + JSON.stringify(en6) + ' live="' + liveText() + '"');
+    await sleep(700);
+
+    // main.js's global hotkey handler sits on document's CAPTURE phase and eats
+    // every Escape (its fallback toggles the admin console), so the drag has to
+    // hear it first - and nothing else may.
+    th = thOf('TITLE'); e = edge(th);
+    ptr('pointerdown', th, e.x, e.y);
+    var hadShield = !!shield(), bodyCls = document.body.className, adm = $('#admWrapper').css('display');
+    var escFree = true;
+    if (hadShield) {
+      ptr('pointermove', shield(), e.x + 50, e.y);
+      escFree = key(document.body, 'Escape');
+    }
+    var cancelled = !shield();
+    var esc = hadShield && cancelled && !escFree && near(width(thOf('TITLE')), NAT.TITLE, 1.5) && !entry('rdrag') &&
+              document.body.className === bodyCls && $('#admWrapper').css('display') === adm;
+    if (shield()) ptr('pointerup', shield(), e.x, e.y);
+    rec('D7 Escape during a drag cancels it and does nothing else: no shield, no width, nothing stored, the app\'s own Escape untouched', esc,
+      'cancelled=' + cancelled + ' taken=' + !escFree + ' th=' + r1(width(thOf('TITLE'))) + ' stored=' + JSON.stringify(entry('rdrag')) +
+      ' bodyClass=' + (document.body.className === bodyCls ? 'same' : bodyCls + '->' + document.body.className) + ' adm=' + adm + '->' + $('#admWrapper').css('display'));
+    await sleep(700);
+
+    th = thOf('NAME'); e = edge(th);
+    ptr('pointerdown', th, e.x, e.y);
+    if (shield()) { ptr('pointermove', shield(), e.x - 1000, e.y); ptr('pointerup', shield(), e.x - 1000, e.y); }
+    rec('D8 dragging far past the left edge stops at the 40px minimum', near(width(thOf('NAME')), host.min, 1) && host.min === 40,
+      'NAME=' + r1(width(thOf('NAME'))) + ' min=' + host.min);
+    await sleep(700);
+    host.clearUser(); apply();
+  }
+
+  // ------------------------------------------------------------------------
+  async function phaseK() {
+    var host = HOST();
+    if (!host || !CW()) { rec('K keyboard', false, 'module or host missing'); return; }
+    H.setName('rkeys'); H.hydrate();
+    setReport({});
+    var th = thOf('TITLE'), w0 = Math.round(width(th));
+    th.focus();
+    var p1 = key(th, '+'), a = width(thOf('TITLE')), liveA = liveText();
+    key(thOf('TITLE'), '-'); var b = width(thOf('TITLE'));
+    key(thOf('TITLE'), '_'); var c = width(thOf('TITLE'));
+    key(thOf('TITLE'), '='); var d = width(thOf('TITLE'));
+    key(thOf('TITLE'), '0'); var z = width(thOf('TITLE'));
+    rec('K1 on a focused header + and = widen by 20, - and _ narrow by 20, 0 fits the column to its content again',
+      !p1 && near(a, w0 + 20, 1) && near(b, w0, 1) && near(c, w0 - 20, 1) && near(d, w0, 1) && near(z, NAT.TITLE, 1.5) && liveA === 'TITLE column width ' + (w0 + 20) + ' pixels',
+      [w0, a, b, c, d, z].map(r1).join(' -> ') + ' live="' + liveA + '"');
+    var ctrl = key(thOf('TITLE'), '+', { ctrlKey: true }), meta = key(thOf('TITLE'), '-', { metaKey: true }), alt = key(thOf('TITLE'), '0', { altKey: true });
+    rec('K2 with Ctrl / Cmd / Alt the key is left to the browser (Ctrl+plus is zoom): not taken, no change',
+      ctrl && meta && alt && near(width(thOf('TITLE')), NAT.TITLE, 1.5), 'notPrevented=' + [ctrl, meta, alt].join(',') + ' th=' + r1(width(thOf('TITLE'))));
+    var ent = key(thOf('TITLE'), 'Enter'), spc = key(thOf('TITLE'), ' '), arr = key(thOf('TITLE'), 'ArrowRight');
+    rec('K3 Enter, Space and the arrow keys are not taken (they sort and scroll as before)', ent && spc && arr, [ent, spc, arr].join(','));
+    var n = thOf('NAME'), wn = Math.round(width(n)), notFocusedTarget = key(n.querySelector('.sort-icon') || n, '+');
+    rec('K4 only a key pressed ON the header counts (not one bubbling up from inside it)',
+      n.querySelector('.sort-icon') ? (notFocusedTarget && near(width(thOf('NAME')), wn, 1)) : true, 'fromIcon notPrevented=' + notFocusedTarget);
+    host.clearUser(); apply();
+  }
+
+  // ------------------------------------------------------------------------
+  function phaseP() {
+    var host = HOST();
+    if (!host || !H.setName) { rec('P persistence', false, 'host or hook missing'); return; }
+    localStorage.removeItem(KEY);
+    H.setName('rp1'); H.hydrate();
+    H.setReportWidths({ TITLE: 200 });
+    host.setUser('TITLE', 200); var e1 = entry('rp1');
+    host.setUser('TITLE', 260); var e2 = entry('rp1');
+    host.setUser('ID', 'auto'); var e3 = entry('rp1');
+    host.setUser('TITLE', 'auto'); var e4 = entry('rp1'), w4 = host.widthFor('TITLE');
+    rec('P1 only what DIFFERS from the report is stored: same width = nothing, 260 = stored, fit on a column the report leaves alone = nothing, fit over a report width = auto',
+      !e1 && e2 && e2.widths && e2.widths.TITLE === 260 && e3 && !('ID' in e3.widths) && e4 && e4.widths.TITLE === 'auto' && w4 === null,
+      [JSON.stringify(e1), JSON.stringify(e2), JSON.stringify(e3), JSON.stringify(e4), w4].join(' | '));
+
+    host.setUser('TITLE', 260);
+    H.saveColPrefs();
+    var e5 = entry('rp1');
+    rec('P2 Save Column Layout replaces the entry but carries the widths across', e5 && Array.isArray(e5.order) && e5.order.length === 13 && e5.widths && e5.widths.TITLE === 260,
+      'keys=' + (e5 ? Object.keys(e5).join(',') : 'none') + ' widths=' + JSON.stringify(e5 && e5.widths));
+
+    var saved = localStorage.getItem(KEY);
+    localStorage.setItem(KEY, JSON.stringify({ rp2: { widths: { name: 150, JUNK: 'x', TINY: 5 } } }));
+    H.setName('rp2'); H.hydrate();
+    var a = [host.widthFor('NAME'), host.widthFor('JUNK'), host.widthFor('TINY')];
+    H.setName('rp3'); H.hydrate();
+    var b = host.widthFor('NAME');
+    localStorage.setItem(KEY, saved);
+    rec('P3 opening a report hydrates ITS widths (junk dropped) - and none for a report without any',
+      a[0] === 150 && a[1] === null && a[2] === null && b === null, 'rp2=' + a.join(',') + ' rp3=' + b);
+
+    H.setName('rp1'); H.hydrate();
+    H.setReportWidths({ TITLE: 200, AMOUNT: 150, GONE: 300 });
+    var s1 = H.buildState();
+    rec('P4 the saved state carries the widths AS SEEN (the viewer\'s 260 over the report\'s 200) for the columns the table has',
+      s1 && JSON.stringify(s1.columnWidths) === '{"TITLE":260,"AMOUNT":150}', JSON.stringify(s1 && s1.columnWidths));
+
+    // No header to read (a failed / empty / in-flight run): the report's map goes through.
+    var parked = document.createDocumentFragment();
+    ths().forEach(function (t) { parked.appendChild(t); });
+    var s2 = H.buildState();
+    headRow().appendChild(parked);
+    // Module off: the report's own map, not the viewer's picks (they apply nowhere).
+    var cw = window.Penumbra.colWidths;
+    delete window.Penumbra.colWidths;
+    var s3 = H.buildState();
+    window.Penumbra.colWidths = cw;
+    rec('P5 with no header, or with the module switched off, a save carries the report\'s own widths through untouched',
+      s2 && JSON.stringify(s2.columnWidths) === '{"TITLE":200,"AMOUNT":150,"GONE":300}' && s3 && JSON.stringify(s3.columnWidths) === '{"TITLE":200,"AMOUNT":150,"GONE":300}',
+      'noHeader=' + JSON.stringify(s2 && s2.columnWidths) + ' moduleOff=' + JSON.stringify(s3 && s3.columnWidths));
+
+    // The widths read runs inside EVERY save: a surprise in it must never
+    // cost the save - it falls back to the report's own map.
+    var s9 = null, threw = '';
+    Object.defineProperty(window.Penumbra, 'colWidths', { configurable: true, get: function () { throw new Error('boom'); } });
+    try { s9 = H.buildState(); } catch (x) { threw = x.message; }
+    delete window.Penumbra.colWidths;
+    window.Penumbra.colWidths = cw;
+    rec('P9 a failure inside the widths read never breaks a save: the state is built with the report\'s own widths',
+      !threw && s9 && JSON.stringify(s9.columnWidths) === '{"TITLE":200,"AMOUNT":150,"GONE":300}', 'threw=' + threw + ' saved=' + JSON.stringify(s9 && s9.columnWidths));
+
+    H.setReportWidths({});
+    host.clearUser();
+    var s4 = H.buildState();
+    rec('P6 no widths anywhere = no columnWidths key at all', s4 && !('columnWidths' in s4), JSON.stringify(s4 && s4.columnWidths));
+
+    // After a save the widths it wrote are the report's; matching picks go.
+    host.setUser('TITLE', 260);
+    H.saved({ TITLE: 260, AMOUNT: 150 });
+    var st = host.state(), e7 = entry('rp1');
+    rec('P7 after a save the report holds what was saved and the viewer\'s now-identical pick is dropped from storage',
+      JSON.stringify(st.report) === '{"TITLE":260,"AMOUNT":150}' && JSON.stringify(st.user) === '{}' && (!e7 || !e7.widths) && host.widthFor('TITLE') === 260,
+      'report=' + JSON.stringify(st.report) + ' user=' + JSON.stringify(st.user) + ' stored=' + JSON.stringify(e7));
+
+    // An ad-hoc query: kept for the session, never written anywhere.
+    var before = localStorage.getItem(KEY);
+    H.setName(null); H.hydrate();
+    H.setReportWidths({});
+    host.setUser('TITLE', 310);
+    rec('P8 no report (ad-hoc query): the width applies for the session and nothing is written to storage',
+      host.widthFor('TITLE') === 310 && localStorage.getItem(KEY) === before, 'width=' + host.widthFor('TITLE') + ' storageChanged=' + (localStorage.getItem(KEY) !== before));
+    host.clearUser();
+    H.setName('rp1'); H.hydrate();
+    H.setReportWidths({}); apply();
+  }
+
+  // ------------------------------------------------------------------------
+  function phaseR() {
+    var host = HOST();
+    if (!host || !CW()) { rec('R restricted viewer', false, 'module or host missing'); return; }
+    localStorage.setItem(KEY, JSON.stringify({ rr2: { widths: { TITLE: 500 } } }));
+    penumbra_vars.isAdmin = false; window._penumbraHideColumns = true;
+    try {
+      H.setName('rr2'); H.hydrate();
+      setReport({ TITLE: 150 });
+      var cls = document.documentElement.classList.contains('pnb-colw-on');
+      var w1 = width(thOf('TITLE'));
+      host.setUser('TITLE', 300);
+      var after = host.widthFor('TITLE');
+      var th = thOf('TITLE'), e = edge(th);
+      var taken = !ptr('pointerdown', th, e.x, e.y), sh = !!shield();
+      th.focus();
+      var k = key(th, '+');
+      rec('R1 Column Organization off for a non-admin: the author\'s widths still apply, the viewer\'s stale pick is ignored',
+        near(w1, 150) && host.widthFor('TITLE') === 150, 'th=' + r1(w1) + ' widthFor=' + host.widthFor('TITLE'));
+      rec('R2 ...and nothing offers or takes a resize: no grip class, press not taken, no shield, keys left alone, the API refuses',
+        !cls && !taken && !sh && k && after === 150 && near(width(thOf('TITLE')), 150), 'class=' + cls + ' taken=' + taken + ' shield=' + sh + ' keyNotTaken=' + k + ' afterSet=' + after);
+      if (sh) ptr('pointerup', shield(), e.x, e.y);
+    } finally {
+      penumbra_vars.isAdmin = true; window._penumbraHideColumns = false;
+    }
+    localStorage.removeItem(KEY);
+    H.setName('rp1'); H.hydrate();
+    setReport({});
+    rec('R3 back to an admin: the grip class returns', document.documentElement.classList.contains('pnb-colw-on'), '');
+  }
+
+  // ------------------------------------------------------------------------
+  function phaseC() {
+    var host = HOST();
+    if (!host || !CW()) { rec('C custom-layout pill', false, 'module or host missing'); return; }
+    localStorage.removeItem(KEY);
+    H.setName('rc'); H.hydrate();
+    setReport({}); fire();
+    var off = $('#sbCustomCols').css('display');
+    host.setUser('TITLE', 222);
+    var on = $('#sbCustomCols').css('display'), txt = $('#sbCustomColsDiff').text();
+    setReport({ TITLE: 222 }); fire();
+    var same = $('#sbCustomCols').css('display');
+    rec('C1 the pill lights for a width that departs from the report, names the column, and goes out when they agree',
+      off === 'none' && on !== 'none' && txt.indexOf('Column widths set here: TITLE') !== -1 && same === 'none',
+      'off=' + off + ' on=' + on + ' [' + txt + '] same=' + same);
+    setReport({}); fire();
+    var cw = window.Penumbra.colWidths;
+    delete window.Penumbra.colWidths;
+    fire();
+    var modOff = $('#sbCustomCols').css('display');
+    window.Penumbra.colWidths = cw;
+    fire();
+    rec('C2 with the module switched off the pill does not report widths (they apply nowhere)', modOff === 'none' && $('#sbCustomCols').css('display') !== 'none',
+      'moduleOff=' + modOff + ' back=' + $('#sbCustomCols').css('display'));
+    host.clearUser(); fire();
+  }
+
+  // ------------------------------------------------------------------------
+  function phaseS() {
+    var host = HOST();
+    if (!host || !CW()) { rec('S settings panel', false, 'module or host missing'); return; }
+    localStorage.removeItem(KEY);
+    H.setName('rs'); H.hydrate();
+    setReport({}); host.clearUser(); apply();
+    var note = document.getElementById('spColwNote'), hint = document.getElementById('spFreezeHint');
+    rec('S0 the note sits right after the Freeze hint, hidden while this browser has no widths of its own',
+      !!note && !!hint && hint.nextElementSibling === note && note.style.display === 'none' && !!document.getElementById('spColwReset'),
+      'note=' + !!note + ' afterHint=' + (hint && hint.nextElementSibling === note) + ' display=' + (note ? note.style.display : '-'));
+    if (!note) return;
+    host.setUser('TITLE', 240); apply();
+    var shown = note.style.display !== 'none';
+    document.getElementById('spColwReset').click();
+    var en = entry('rs');
+    rec('S1 a width shows the note; Reset widths drops every pick, hides the note, restores the column and says so',
+      shown && note.style.display === 'none' && host.widthFor('TITLE') === null && near(width(thOf('TITLE')), NAT.TITLE, 1.5) && (!en || !en.widths) && liveText() === 'Column widths reset to the report',
+      'shown=' + shown + ' after=' + note.style.display + ' widthFor=' + host.widthFor('TITLE') + ' stored=' + JSON.stringify(en) + ' live="' + liveText() + '"');
+    setReport({ TITLE: 180 }); apply();
+    rec('S2 the report\'s own widths are not "yours": no note for them', note.style.display === 'none' && near(width(thOf('TITLE')), 180), 'display=' + note.style.display);
+    setReport({});
+  }
+
+  // ------------------------------------------------------------------------
+  async function phaseO() {
+    await runQuery(makeRows(20));
+    var host = HOST();
+    rec('O1 &colwidths=off: the module stands down - no API, no grip class, no stylesheet - while main.js keeps its state layer',
+      !CW() && !!host && !document.documentElement.classList.contains('pnb-colw-on') && !document.getElementById('pnbColWidthStyle') && ths().length === 13,
+      'module=' + !!CW() + ' host=' + !!host + ' class=' + document.documentElement.classList.contains('pnb-colw-on'));
+    if (!host) return;
+    var nat = width(thOf('TITLE'));
+    H.setName('ro'); H.hydrate();
+    H.setReportWidths({ TITLE: 120 });
+    host.setUser('TITLE', 300);
+    var s = H.buildState();
+    rec('O2 a report\'s widths apply nowhere, yet a save still carries them (and not a viewer pick that could not be seen)',
+      near(width(thOf('TITLE')), nat, 1) && s && JSON.stringify(s.columnWidths) === '{"TITLE":120}', 'th=' + r1(width(thOf('TITLE'))) + ' saved=' + JSON.stringify(s && s.columnWidths));
+    var th = thOf('TITLE'), e = edge(th);
+    var notTaken = ptr('pointerdown', th, e.x, e.y);
+    th.click();
+    var sorted = sortState('TITLE');
+    unsort('TITLE');
+    fire();
+    rec('O3 the header edge is an ordinary header again: the press is not taken and the click sorts; the pill says nothing about widths',
+      notTaken && !shield() && sorted === 'ascending' && $('#sbCustomColsDiff').text().indexOf('Column widths') === -1, 'notTaken=' + notTaken + ' sort=' + sorted);
+  }
+
+  // ------------------------------------------------------------------------
+  // 2026-09-30: the grouped view and a pivot's row labels.
+  function gbox() { return document.getElementById('groupedResultsContainer'); }
+  function groupTables() { return Array.prototype.slice.call(document.querySelectorAll('#groupedResultsContainer .group-content > table')); }
+  function gth(t, n) { return t.querySelector('thead > tr > th[data-colname="' + n + '"]'); }
+  function gVisible(t) { return Array.prototype.slice.call(t.querySelectorAll('thead > tr > th')).filter(function (x) { return x.style.display !== 'none'; }); }
+  // Through the REAL path: the level stack, the dialog picker blanked (it would
+  // win over the stack - the groupmode suite's trap), rebuildGroupedView().
+  // The app opens a group on click; here every group is opened by hand.
+  // No apply() here on purpose: the module's own observer on the container has
+  // to notice the rebuild (mutant `noviewsobs`).
+  async function buildGroups(levels) {
+    H.setLevels(levels);
+    $('#groupingColumnSelector .pcs-selected').attr('data-value', '').text('-- None --');
+    H.rebuild();
+    gbox().style.display = 'block';
+    $('#groupedResultsContainer .group-wrapper').addClass('open');
+    $('#groupedResultsContainer .group-content').css('display', 'block');
+    await sleep(60);
+  }
+  function pivT() { return document.getElementById('pivotResultTable'); }
+  function plv(L) { return pivT().querySelector('thead th[data-row-field="' + L + '"]'); }
+  function pcells(L) { return Array.prototype.slice.call(pivT().querySelectorAll('tbody td[data-row-field="' + L + '"]')); }
+  // The REAL processPivotData + generatePivotTable (the pivotperf recipe),
+  // mounted the way the pivot view mounts it, with currentPivotSettings set
+  // first - the module reads the row fields from there.
+  // The pivot's HTML through the real generator, with its settings in force.
+  // opt (2026-10-01): aggs (default ['sum']), totalRowAggs ([] = no Grand Total
+  // column), aggColOverrides (the aggregations' own columns), keep (a filter
+  // on the fixture rows), colLayout ('nested' default, or 'flat').
+  function pivotHtml(rows, cols, opt) {
+    opt = opt || {};
+    var aggs = opt.aggs || ['sum'], tra = (opt.totalRowAggs === undefined) ? null : opt.totalRowAggs, aco = opt.aggColOverrides || null;
+    var cl = opt.colLayout || 'nested';
+    var settings = { v: 2, rows: rows, cols: cols, vals: 'AMOUNT', agg: aggs, rowLayout: 'nested', colLayout: cl,
+      sortOrder: 'asc', colSortOrder: 'asc', stickyColCount: 2, totalColAggs: null, totalRowAggs: tra, totalRowAggLabels: null,
+      totalRowAggBaseIdx: null, rankN: null, rankDir: null, rankAgg: null, rankOther: true, rankScope: null, noBreakdown: false,
+      startExpanded: true, hideEmpty: false, aggColOverrides: aco };
+    H.setPivotSettings(settings);
+    H.resetSort();
+    var src = makeRows(20).filter(opt.keep || function () { return true; })
+      .map(function (o) { var m = new Map(); Object.keys(o).forEach(function (k) { m.set(k, o[k]); }); return m; });
+    var pd = H.pcollect(src, rows, cols, 'AMOUNT', aggs, H.pextra(aco, 'AMOUNT'), null);
+    return H.pgen(pd, rows, cols, 'AMOUNT', 'nested', cl, aggs, 'asc', null, aggs.map(function () { return false; }), null, tra, 'asc', 2, H.prank(settings), null, aco, null, false);
+  }
+  async function mountPivot(rows, cols, opt) {
+    var res = pivotHtml(rows, cols, opt);
+    // A scroll box narrower than the pivot, as in the app (the pivot view's
+    // own #results-wrapper). In a box WIDER than the pivot the base
+    // table { min-width: 100% } stretches every column, and widening one
+    // rightly takes that stretch back from the others.
+    var $c = $('#pivot-output-container');
+    $c.empty().html(res.html).css({ width: '520px', overflow: 'auto' }).show();
+    var $t = $('#pivotResultTable');
+    if (res.isNested || $t.find('tbody td[rowspan]').length > 0) $t.addClass('is-nested-pivot');
+    H.pzebra(); H.pcollapse(); H.psticky();
+    await sleep(60);    // the module's observer on #pivot-output-container, not a call from here
+    return res;
+  }
+
+  async function phaseV() {
+    var host = HOST(), cw = CW();
+    if (!host || !cw || !H.rebuild || !H.setLevels) { rec('V the grouped view', false, 'module, host or grouping hooks missing'); return; }
+    localStorage.removeItem(KEY);
+    H.setName('rgrp'); H.hydrate();
+    setReport({}); host.clearUser();
+    gbox().style.width = '1000px';
+    $('#table-view-container').hide();
+    await buildGroups(['C11']);
+    var ts = groupTables(), t0 = ts[0];
+    var ok0 = ts.length === 3 && !!t0 && !!gth(t0, 'TITLE') && /%$/.test(gth(t0, 'TITLE').style.width) &&
+              getComputedStyle(t0).tableLayout === 'fixed' && !document.getElementById('pnbColWidthGroupStyle');
+    rec('V0 fixture: grouped on C11 through the real rebuild - 3 fixed-layout tables, cloned headers with inline % widths, no rules while nothing has a width', ok0,
+      'tables=' + ts.length + ' width=' + (t0 && gth(t0, 'TITLE') ? gth(t0, 'TITLE').style.width : '-') + ' style=' + !!document.getElementById('pnbColWidthGroupStyle') + ' errs=' + errs().slice(0, 2).join(' / '));
+    if (!ok0) return;
+    function fills(t) { var b = t.parentNode; return near(width(t), b.clientWidth, 2) && b.scrollWidth <= b.clientWidth + 1; }
+
+    setReport({ TITLE: 120 });
+    var v1 = ts.map(function (t) { return r1(width(gth(t, 'TITLE'))); });
+    rec('V1 a width the flat table uses holds in EVERY group table, and the other columns still fill the width exactly (no scrollbar)',
+      v1.every(function (w) { return near(w, 120); }) && ts.every(fills), 'TITLE=' + v1.join(',') + ' table=' + r1(width(t0)) + ' box=' + t0.parentNode.clientWidth);
+
+    gbox().style.width = '760px'; cw.apply();
+    var narrow = width(gth(t0, 'TITLE')), fitN = fills(t0);
+    gbox().style.width = '1400px'; cw.apply();
+    var wide = width(gth(t0, 'TITLE')), fitW = fills(t0);
+    gbox().style.width = '1000px'; cw.apply();
+    rec('V2 ...at any width of the view: 760px and 1400px both keep TITLE at exactly 120 and still fill', near(narrow, 120) && near(wide, 120) && fitN && fitW,
+      '760:' + r1(narrow) + '/' + fitN + ' 1400:' + r1(wide) + '/' + fitW);
+
+    // Compact density (density.css: grouped cells 4px 5px) is where the
+    // remainder rule matters: with every column given a width, Edge spreads
+    // what the set widths leave over ALL of them - set widths included - unless
+    // the others' shares add up to exactly what is left (84 came out 100). At
+    // the default 9px padding Edge happens to hand the room to the % columns
+    // only, so both densities are checked.
+    setReport({});
+    document.body.classList.add('density-compact');
+    apply();
+    var names3 = ['TITLE', 'NAME', 'C04', 'C05'], set3 = {}, want3 = [];
+    names3.forEach(function (n) { var w = Math.round(width(gth(t0, n)) * 0.6); set3[n] = w; want3.push(w); });
+    setReport(set3);
+    var fourC = names3.map(function (n) { return Math.round(width(gth(t0, n))); }), fitC = fills(t0);
+    document.body.classList.remove('density-compact');
+    apply();
+    var fourD = names3.map(function (n) { return Math.round(width(gth(t0, n))); }), fitD = fills(t0);
+    rec('V3 several widths at once (each 60% of its natural width) are each exact at Compact and default density - without the remainder rule Compact drifted (84 came out 100)',
+      fourC.join(',') === want3.join(',') && fitC && fourD.join(',') === want3.join(',') && fitD,
+      'want ' + want3.join(',') + ' compact ' + fourC.join(',') + '/' + fitC + ' default ' + fourD.join(',') + '/' + fitD);
+
+    setReport({ TITLE: 1600 });
+    var others = gVisible(t0).filter(function (x) { return x.getAttribute('data-colname') !== 'TITLE'; }).map(function (x) { return width(x); });
+    var minO = Math.min.apply(null, others), tW = width(gth(t0, 'TITLE'));
+    rec('V4 a width the view cannot hold gives way: TITLE takes what is left, every other column keeps at least 40px, nothing overflows',
+      minO >= 39 && tW < 1600 && tW > 400 && fills(t0), 'TITLE=' + r1(tW) + ' narrowest other=' + r1(minO) + ' of ' + others.length);
+
+    setReport({}); host.clearUser();
+    var th = gth(t0, 'TITLE'), e = edge(th);
+    ptr('pointerdown', th, e.x, e.y);
+    var sh = shield(), lbl = -1, cap = -1;
+    if (sh) {
+      ptr('pointermove', sh, e.x + 5000, e.y);
+      await sleep(30);
+      lbl = parseInt((sh.querySelector('.pnb-colw-label') || {}).textContent, 10);
+      ptr('pointerup', sh, e.x + 5000, e.y);
+    }
+    var stored = host.widthFor('TITLE');
+    var minO2 = Math.min.apply(null, gVisible(t0).filter(function (x) { return x.getAttribute('data-colname') !== 'TITLE'; }).map(width));
+    rec('V5 a drag in the grouped view stops where the others would go under 40px: the guide says so and the width lands there',
+      !!sh && lbl > 400 && lbl === stored && near(width(gth(t0, 'TITLE')), stored, 1) && minO2 >= 39 && fills(t0),
+      'shield=' + !!sh + ' label=' + lbl + ' stored=' + stored + ' th=' + r1(width(gth(t0, 'TITLE'))) + ' narrowest other=' + r1(minO2));
+    var en = entry('rgrp');
+    var flatCss = CW().state().css;
+    rec('V6 it is the SAME width as the flat table\'s: stored under the column name, and the flat table\'s own rule carries it for when that view comes back',
+      en && en.widths && en.widths.TITLE === stored && host.widthFor('TITLE') === stored && flatCss.indexOf('width:' + stored + 'px') !== -1,
+      'stored=' + JSON.stringify(en) + ' flat rule has it=' + (flatCss.indexOf('width:' + stored + 'px') !== -1));
+    gth(t0, 'TITLE').click();
+    var sortAfter = H.getSort().length;
+    await sleep(700);
+    rec('V7 the click that ends a grouped-view drag is not a sort', sortAfter === 0, 'sort criteria after the click: ' + sortAfter);
+
+    setReport({}); host.clearUser(); apply();
+    var g = gth(t0, 'NAME'), w0 = Math.round(width(g));
+    g.focus();
+    var kp = key(g, '+'), a = Math.round(width(gth(t0, 'NAME')));
+    key(gth(t0, 'NAME'), '0');
+    var z = Math.round(width(gth(t0, 'NAME')));
+    rec('V8 keys on a focused grouped-view header: + widens by 20, 0 fits it again', !kp && near(a, w0 + 20, 1) && near(z, w0, 1.5),
+      w0 + ' -> ' + a + ' -> ' + z);
+
+    // A regroup rebuilds every table: the widths follow the NAMES, and the
+    // other columns' shares come from the new clones.
+    setReport({ TITLE: 150 });
+    await sleep(60);
+    await buildGroups(['C10']);
+    var ts2 = groupTables();
+    var v9 = ts2.map(function (t) { return Math.round(width(gth(t, 'TITLE'))); });
+    rec('V9 after a regroup (now 4 groups on C10) every new table carries the width', ts2.length === 4 && v9.every(function (w) { return w === 150; }) && ts2.every(fills),
+      'tables=' + ts2.length + ' TITLE=' + v9.join(','));
+
+    // A column hidden in the flat table is hidden in every clone: no rule, no share.
+    setHidden('C05', true);
+    setReport({ TITLE: 150, C05: 300 });
+    await buildGroups(['C11']);
+    var t3 = groupTables()[0], gcss = (document.getElementById('pnbColWidthGroupStyle') || {}).textContent || '';
+    var hiddenOut = gth(t3, 'C05').style.display === 'none' && gcss.indexOf('"C05"') === -1 && fills(t3) && near(width(gth(t3, 'TITLE')), 150);
+    setHidden('C05', false);
+    rec('V10 a column hidden in the flat table gets no rule and no share in the grouped view (its width waits for it)', hiddenOut,
+      'hidden=' + (gth(t3, 'C05') ? gth(t3, 'C05').style.display : '-') + ' inCss=' + (gcss.indexOf('"C05"') !== -1));
+
+    // A re-render the flat table never sees: the container's tables are
+    // replaced by ones with other shares (other rows, other content widths) and
+    // the flat header is not touched - only the grouped view's own observer can
+    // notice (V9 cannot: a regroup keeps the shares, and the rules follow the
+    // names, so a stale rule set still LOOKS right there).
+    var V11 = 'V11 a re-render only the grouped view sees (its tables replaced, new shares) is laid out again by the module\'s own observer';
+    if (!cw.pickGroup || !cw.groupLayout || !cw.buildGroupCss) {
+      rec(V11, false, 'this build has no grouped-view layout');
+    } else {
+      setReport({ TITLE: 150 });
+      await buildGroups(['C11']);
+      await sleep(60);
+      var was11 = cw.state().group, inSync = was11 === cw.buildGroupCss(cw.groupLayout(cw.pickGroup(), width(groupTables()[0])));
+      var re = gbox().querySelector('.group-wrapper').cloneNode(true);
+      var hrow = re.querySelector('.group-content > table > thead > tr');
+      var sa = hrow.querySelector('th[data-colname="ID"]'), sb = hrow.querySelector('th[data-colname="C06"]'), sw = sa.style.width;
+      sa.style.width = sb.style.width; sb.style.width = sw;
+      Array.prototype.slice.call(gbox().children).forEach(function (k) { gbox().removeChild(k); });
+      gbox().appendChild(re);
+      await sleep(60);
+      var fresh11 = cw.buildGroupCss(cw.groupLayout(cw.pickGroup(), width(groupTables()[0])));
+      rec(V11, inSync && fresh11 !== was11 && cw.state().group === fresh11 && near(width(gth(groupTables()[0], 'TITLE')), 150) && fills(groupTables()[0]),
+        'in sync before=' + inSync + ' layout changed=' + (fresh11 !== was11) + ' applied the new one=' + (cw.state().group === fresh11) + ' TITLE=' + r1(width(gth(groupTables()[0], 'TITLE'))));
+    }
+    setReport({}); host.clearUser();
+    gbox().style.display = 'none';
+    $('#table-view-container').show();
+  }
+
+  async function phaseQ() {
+    var host = HOST(), cw = CW();
+    if (!host || !cw || !H.pgen || !host.pivotRelayout) { rec('Q the pivot row labels', false, 'module, host accessors or pivot hooks missing'); return; }
+    localStorage.removeItem(KEY);
+    H.setName('rpiv'); H.hydrate();
+    setReport({}); host.clearUser();
+    await mountPivot(['C11', 'NAME'], ['C10']);
+    var t = pivT();
+    var ok0 = !!t && !!plv(0) && !!plv(1) && pcells(0).some(function (c) { return c.hasAttribute('rowspan'); }) &&
+              JSON.stringify(host.pivotRowFields()) === '["C11","NAME"]' && plv(1).getAttribute('tabindex') === '0';
+    rec('Q0 fixture: a real nested pivot (C11 > NAME by C10), rowspan row-label cells, the fields read from the pivot settings, row-label headers focusable',
+      ok0, 'table=' + !!t + ' fields=' + JSON.stringify(host.pivotRowFields()) + ' tabindex=' + (plv(1) ? plv(1).getAttribute('tabindex') : '-') + ' errs=' + errs().slice(0, 2).join(' / '));
+    if (!ok0) return;
+    var nat0 = width(plv(0)), nat1 = width(plv(1));
+
+    setReport({ 'PIVOT:NAME': 300 });
+    var c1 = pcells(1).filter(function (c) { return c.offsetParent; }).map(width);
+    rec('Q1 PIVOT:NAME sizes the NAME column - its header and every body cell - and leaves C11 alone',
+      near(width(plv(1)), 300) && c1.length > 0 && c1.every(function (w) { return near(w, 300); }) && near(width(plv(0)), nat0, 1),
+      'header=' + r1(width(plv(1))) + ' cells=' + c1.length + ' C11=' + r1(width(plv(0))) + '/' + r1(nat0));
+
+    setReport({ 'PIVOT:NAME': 50, 'PIVOT:C11': 420 });
+    rec('Q2 narrowing under the content and widening past the 350px cap both work (auto layout: body cells included)',
+      near(width(plv(1)), 50) && near(width(plv(0)), 420) && pcells(0).filter(function (c) { return c.offsetParent; }).every(function (c) { return near(width(c), 420); }),
+      'NAME=' + r1(width(plv(1))) + ' C11=' + r1(width(plv(0))));
+
+    setReport({ 'PIVOT:NAME': 300 });
+    var mins = [plv(1)].concat(pcells(1));
+    mins.forEach(function (c) { c.classList.add('pivot-row-field-minimized'); });
+    var minW = width(plv(1));
+    mins.forEach(function (c) { c.classList.remove('pivot-row-field-minimized'); });
+    rec('Q3 a column the pivot has collapsed stays collapsed - the width never beats .pivot-row-field-minimized', minW < 3 && near(width(plv(1)), 300),
+      'collapsed=' + r1(minW) + ' back=' + r1(width(plv(1))));
+
+    setReport({ 'PIVOT:C11': 250 });
+    var s2 = t.querySelector('thead th.pivot-sticky-col-2');
+    rec('Q4 the sticky row labels follow: the second frozen column now starts at the first one\'s new width',
+      !!s2 && s2.style.left === (Math.round(width(plv(0))) - 1) + 'px' && near(width(plv(0)), 250), 'left=' + (s2 ? s2.style.left : 'no sticky col 2') + ' C11=' + r1(width(plv(0))));
+
+    setReport({}); host.clearUser(); apply();
+    var th = plv(1), w1 = width(th), e = edge(th);
+    ptr('pointerdown', th, e.x, e.y);
+    var sh = shield();
+    if (sh) { ptr('pointermove', sh, e.x + 60, e.y); await sleep(30); ptr('pointerup', sh, e.x + 60, e.y); }
+    plv(1).click();
+    var sortN = H.getSort().length, en = entry('rpiv');
+    rec('Q5 a drag on a row-label header lands as PIVOT:NAME, and the click after it is no sort',
+      !!sh && en && en.widths && en.widths['PIVOT:NAME'] === Math.round(w1 + 60) && near(width(plv(1)), Math.round(w1 + 60), 1) && sortN === 0,
+      'shield=' + !!sh + ' stored=' + JSON.stringify(en) + ' sorts=' + sortN);
+    await sleep(700);
+
+    host.clearUser(); cw.apply();
+    plv(1).focus();
+    var w2 = Math.round(width(plv(1)));
+    var kp = key(plv(1), '+'), a = Math.round(width(plv(1)));
+    key(plv(1), '0');
+    var z = Math.round(width(plv(1)));
+    rec('Q6 keys on a focused row-label header: + widens by 20, 0 fits it again', !kp && near(a, w2 + 20, 1) && near(z, w2, 1.5), w2 + ' -> ' + a + ' -> ' + z);
+
+    // (Since round 4 a ONE-row header's value columns resize - phase Z - and
+    // since round 5 a TWO-row header's - phase M. Three rows: not.)
+    await mountPivot(['NAME'], ['C10', 'C11'], { aggs: ['sum', 'count'] });
+    var valTh = pivT().querySelector('thead th.pivot-sub-header:not(.pivot-grand-total)'), ve = valTh ? edge(valTh) : null;
+    var valTaken = ve ? !ptr('pointerdown', valTh, ve.x, ve.y) : null, valShield = !!shield();
+    if (valShield) ptr('pointerup', shield(), ve.x, ve.y);
+    rec('Q7 a THREE-row header (sum + count under FY > C11) keeps its value columns as they were: the press at an edge is not taken',
+      valTh && pivT().tHead.rows.length === 3 && valTaken === false && !valShield,
+      'rows=' + pivT().tHead.rows.length + ' value header=' + (valTh ? valTh.textContent.trim().slice(0, 20) : 'none') + ' taken=' + valTaken);
+
+    H.setReportWidths({ 'PIVOT:C11': 200 });
+    host.setUser('PIVOT:NAME', 310);
+    var s1 = H.buildState();
+    $('#pivot-output-container').empty();
+    var s0 = H.buildState();
+    var want = { 'PIVOT:C11': 200, 'PIVOT:NAME': 310 };
+    var has = function (s) { return s && s.columnWidths && s.columnWidths['PIVOT:C11'] === 200 && s.columnWidths['PIVOT:NAME'] === 310; };
+    rec('Q8 a save carries the pivot\'s row-label widths as seen (the viewer\'s 310 included), with or without a pivot on screen',
+      has(s1) && has(s0), 'with=' + JSON.stringify(s1 && s1.columnWidths) + ' without=' + JSON.stringify(s0 && s0.columnWidths) + ' want ' + JSON.stringify(want));
+
+    // Reordered row fields: each width follows its FIELD, not its level.
+    await sleep(60);
+    await mountPivot(['NAME', 'C11'], ['C10']);
+    rec('Q9 reordering the pivot\'s rows keeps each width with its field (NAME now level 0 at 310, C11 level 1 at 200)',
+      near(width(plv(0)), 310) && near(width(plv(1)), 200), 'level0(NAME)=' + r1(width(plv(0))) + ' level1(C11)=' + r1(width(plv(1))));
+    setReport({}); host.clearUser();
+    $('#pivot-output-container').empty().hide();
+  }
+
+  // 2026-10-01: a pivot's ONE value column - addressed by what it is NOT (a
+  // row label, a spanning cell) while the module has the table marked.
+  var VSEL = ':not([data-row-field]):not([colspan])';
+  function pval() { return pivT() ? pivT().querySelector(':scope > thead > tr > th' + VSEL) : null; }
+  function vcells() { return Array.prototype.slice.call(pivT().querySelectorAll(':scope > tbody > tr > td' + VSEL)); }
+  function vfoot() { return Array.prototype.slice.call(pivT().querySelectorAll(':scope > tfoot > tr > td' + VSEL)); }
+  function vall() { return vcells().concat(vfoot()).filter(function (c) { return c.offsetParent; }); }
+  function marked() { return !!pivT() && pivT().hasAttribute('data-pnb-colw-value'); }
+  function clipped() { return vall().filter(function (c) { return c.scrollWidth > c.clientWidth + 1; }); }
+  function labelsW() { return width(plv(0)) + (plv(1) ? width(plv(1)) : 0); }
+
+  async function phaseY() {
+    var host = HOST(), cw = CW();
+    if (!host || !cw || !H.pgen || !host.pivotValueField || !cw.pivotValueHeads) { rec('Y a pivot\'s one value column', false, 'module, host accessor or pivot hooks missing'); return; }
+    localStorage.removeItem(KEY);
+    H.setName('rval'); H.hydrate();
+    setReport({}); host.clearUser();
+    await mountPivot(['C11', 'NAME'], []);
+    var th = pval(), subs = vcells().filter(function (c) { return c.parentNode.classList.contains('pivot-group-summary-row'); });
+    var hd = cw.pivotValueHeads(pivT());
+    var ok0 = !!th && marked() && !!hd && hd.cols.length === 1 && hd.cols[0] === th && hd.total === null && th.getAttribute('tabindex') === '0' &&
+              host.pivotValueField() === 'AMOUNT' && subs.length > 0 && vfoot().length === 1;
+    rec('Y0 fixture: rows C11 > NAME, one sum, no column field - ONE value header, the table marked, the header focusable, the field AMOUNT, subtotal rows and a footer total',
+      ok0, 'header=' + (th ? th.textContent.trim().slice(0, 20) : 'none') + ' marked=' + marked() + ' tabindex=' + (th ? th.getAttribute('tabindex') : '-') +
+      ' field=' + host.pivotValueField() + ' subtotals=' + subs.length + ' foot=' + vfoot().length + ' errs=' + errs().slice(0, 2).join(' / '));
+    if (!ok0) return;
+
+    setReport({ 'PIVOT:=AMOUNT': 220 });
+    var ws1 = vall().map(width), lab = pivT().querySelector(':scope > tfoot > tr > td[colspan]');
+    rec('Y1 PIVOT:=AMOUNT sizes the value column - its header, every body cell, every subtotal and the footer total - and the footer\'s label still spans the label columns',
+      near(width(pval()), 220) && ws1.length > 20 && ws1.every(function (w) { return near(w, 220); }) && !!lab && near(width(lab), labelsW(), 2),
+      'header=' + r1(width(pval())) + ' cells=' + ws1.length + ' widths=' + Array.from(new Set(ws1.map(Math.round))).join(',') + ' footLabel=' + (lab ? r1(width(lab)) : '-') + '/' + r1(labelsW()));
+
+    setReport({ 'PIVOT:=AMOUNT': 420 });
+    var ws2 = vall().map(width);
+    rec('Y2 past the 350px cap (420) - and the footer\'s spanning label takes no part: the label columns stay at their content, not pushed apart',
+      near(width(pval()), 420) && ws2.every(function (w) { return near(w, 420); }) && labelsW() < 300,
+      'header=' + r1(width(pval())) + ' labels=' + r1(labelsW()));
+
+    setReport({ 'PIVOT:=AMOUNT': 45 });
+    var floor = cw.valueFloor(pivT()), w45 = width(pval()), clip45 = clipped().length;
+    var ft = vfoot()[0], oldFoot = ft.innerHTML;
+    ft.innerHTML = '<strong>9,876,543,210.00</strong>';   // the totals have grown since the width was stored
+    var floorBig = cw.valueFloor(pivT()), wBig = width(pval()), clipBig = clipped().length;
+    ft.innerHTML = oldFoot;
+    rec('Y3 a number is never cut: a stored 45px shows at the widest number (the footer total), and a bigger total widens it again - not one value cell clipped',
+      floor > 45 && near(w45, floor, 1) && clip45 === 0 && floorBig > floor + 30 && near(wBig, floorBig, 1) && clipBig === 0,
+      '45 -> ' + r1(w45) + ' (floor ' + floor + ', clipped ' + clip45 + '); bigger total -> ' + r1(wBig) + ' (floor ' + floorBig + ', clipped ' + clipBig + ')');
+
+    setReport({}); host.clearUser(); apply();
+    th = pval();
+    var nat = width(th), e = edge(th), to = e.x - (nat - 10);
+    ptr('pointerdown', th, e.x, e.y);
+    var sh = shield(), lbl = '';
+    if (sh) {
+      ptr('pointermove', sh, to, e.y); await sleep(40);
+      lbl = (sh.querySelector('.pnb-colw-label') || {}).textContent || '';
+      ptr('pointerup', sh, to, e.y);
+    }
+    pval().click();
+    var sortN = H.getSort().length, en = entry('rval'), stored = en && en.widths ? en.widths['PIVOT:=AMOUNT'] : null;
+    rec('Y4 a drag far below the numbers stops at the widest one - the guide says so - lands as PIVOT:=AMOUNT, and the click after it is no sort',
+      !!sh && stored === floor && near(width(pval()), floor, 1) && lbl === floor + ' px (widest number)' && sortN === 0 && clipped().length === 0,
+      'shield=' + !!sh + ' label="' + lbl + '" stored=' + stored + ' floor=' + floor + ' width=' + r1(width(pval())) + ' sorts=' + sortN);
+    await sleep(700);
+
+    host.clearUser(); host.setUser('PIVOT:=AMOUNT', floor + 10); apply();
+    pval().focus();
+    key(pval(), '-');
+    var k1 = host.widthFor('PIVOT:=AMOUNT');
+    key(pval(), '-');
+    var k2 = host.widthFor('PIVOT:=AMOUNT');
+    host.clearUser(); setReport({ 'PIVOT:=AMOUNT': 45 });      // the report's width is under the numbers now
+    pval().focus();
+    var shows = Math.round(width(pval()));
+    key(pval(), '+');
+    var k3 = host.widthFor('PIVOT:=AMOUNT'), w3 = Math.round(width(pval()));
+    key(pval(), '0');
+    var w0 = Math.round(width(pval()));
+    rec('Y5 keys: - stops at the widest number (and stays), + steps from what SHOWS when a number holds the column open, 0 fits it',
+      k1 === floor && k2 === floor && k3 === shows + 20 && near(w3, shows + 20, 1) && near(w0, nat, 1.5),
+      'floor+10 -> ' + k1 + ' -> ' + k2 + '; shows ' + shows + ' (stored 45) + -> ' + k3 + '/' + w3 + '; 0 -> ' + w0 + ' (natural ' + r1(nat) + ')');
+
+    // A header of TWO rows (sum + count): none of it.
+    host.clearUser(); setReport({ 'PIVOT:=AMOUNT': 220 });
+    await mountPivot(['C11', 'NAME'], [], { aggs: ['sum', 'count'] });
+    var vths = Array.prototype.slice.call(pivT().querySelectorAll(':scope > thead > tr > th.pivot-sub-header'));
+    rec('Y6 a two-row header (sum + count) with the ONE-row width stored: no one-row mark, no one-row rule, no column at 220 (its own widths are phase M\'s)',
+      vths.length === 2 && !marked() && cw.pivotValueHeads(pivT()) === null && cw.state().pivot.indexOf('data-pnb-colw-value') === -1 &&
+      vths.every(function (x) { return !near(width(x), 220, 2); }),
+      'sub-headers=' + vths.length + ' marked=' + marked() + ' widths=' + vths.map(function (x) { return Math.round(width(x)); }).join(','));
+
+    // A re-render INTO a two-row header never flashes the width: the new
+    // table is unmarked until apply() runs, so the rule still in force misses it.
+    await mountPivot(['C11', 'NAME'], []);
+    var before7 = near(width(pval()), 220) && marked();
+    $('#pivot-output-container').html(pivotHtml(['C11', 'NAME'], [], { aggs: ['sum', 'count'] }).html);
+    var first = pivT().querySelector(':scope > thead > tr > th.pivot-sub-header'), flash = width(first), m7 = marked();
+    await sleep(60);
+    rec('Y7 a re-render into a two-row header never shows the width, not even for the frame before the module runs',
+      before7 && !m7 && !near(flash, 220, 2) && !marked(),
+      'before=' + before7 + ' first sub-header right after the swap=' + r1(flash) + ' marked=' + m7 + ' after a frame=' + marked());
+
+    await mountPivot(['C11', 'NAME'], [], { aggs: ['sum', 'count'] });
+    var two = marked() || cw.pivotValueHeads(pivT()) !== null;
+    await mountPivot(['C11', 'NAME'], ['C10'], { totalRowAggs: [], keep: function (o) { return o.C10 === 'FY 2023'; } });
+    var oneFy = marked() && pval() && near(width(pval()), 220) && pivT().querySelectorAll(':scope > thead > tr > th:not([data-row-field])').length === 1;
+    rec('Y8 two aggregations (sum + count) take no one-row width; a column field with ONE value and no Grand Total column is one value column, and takes the width',
+      !two && oneFy, 'sum+count marked=' + two + ' one FY, no Grand Total: marked=' + marked() + ' width=' + (pval() ? r1(width(pval())) : '-'));
+
+    host.clearUser(); setReport({});
+    await mountPivot(['C11', 'NAME'], []);
+    host.setUser('PIVOT:=AMOUNT', 250);
+    var s1 = H.buildState();
+    await mountPivot(['C11', 'NAME'], [], { aggs: ['sum', 'count'] });
+    var s2 = H.buildState();
+    var keep = function (s) { return !!(s && s.columnWidths && s.columnWidths['PIVOT:=AMOUNT'] === 250); };
+    rec('Y9 a save carries PIVOT:=AMOUNT - and still does while the pivot has a two-row header (kept, unused)',
+      keep(s1) && keep(s2), 'one=' + JSON.stringify(s1 && s1.columnWidths) + ' two=' + JSON.stringify(s2 && s2.columnWidths));
+
+    host.clearUser(); setReport({ 'PIVOT:=TITLE': 200, 'PIVOT:=AMOUNT': 300 });
+    await mountPivot(['C11', 'NAME'], [], { aggs: ['count'], aggColOverrides: ['TITLE'] });
+    rec('Y10 an aggregation reading its OWN column (count of TITLE) files the width under that column: PIVOT:=TITLE, not the pivot\'s value field',
+      host.pivotValueField() === 'TITLE' && marked() && near(width(pval()), 200), 'field=' + host.pivotValueField() + ' width=' + (pval() ? r1(width(pval())) : '-'));
+
+    var css = cw.buildPivotCss([{ value: 'cols', field: 'AMOUNT', w: 200 }]);
+    var M = '#pivotResultTable[data-pnb-colw-value]', VC = VSEL + ':not(.pivot-grand-total)';
+    var wantH = M + ' > thead > tr > th' + VC + '{box-sizing:border-box!important;width:200px!important;min-width:200px!important;max-width:200px!important}';
+    var wantB = M + ' > tbody > tr > td' + VC + ',' + M + ' > tfoot > tr > td' + VC + '{box-sizing:border-box!important;width:200px!important;min-width:200px!important;max-width:none!important}';
+    rec('Y11 rule text: the marked table only, the header exact, the body and footer cells with no max-width, spanning cells out, screen only',
+      css.indexOf('@media screen{') === 0 && css.indexOf(wantH) !== -1 && css.indexOf(wantB) !== -1, css.slice(0, 400));
+
+    setReport({}); host.clearUser();
+    $('#pivot-output-container').empty().hide();
+  }
+
+  // Round 4 (2026-10-01): a ONE-row header's value columns - one width
+  // together (PIVOT:=<field>), the Grand Total its own (PIVOT:TOTAL=<field>).
+  function zheads() { return CW().pivotValueHeads(pivT()); }
+  function zcells(gt) {
+    var v = gt ? '.pivot-grand-total' : VSEL + ':not(.pivot-grand-total)';
+    return Array.prototype.slice.call(pivT().querySelectorAll(':scope > tbody > tr > td' + v + ',:scope > tfoot > tr > td' + v))
+      .filter(function (c) { return c.offsetParent; });
+  }
+  function zclipped(gt) { return zcells(gt).filter(function (c) { return c.scrollWidth > c.clientWidth + 1; }).length; }
+  function allNear(list, w, tol) { return list.length > 0 && list.every(function (x) { return near(width(x), w, tol); }); }
+
+  async function phaseZ() {
+    var host = HOST(), cw = CW();
+    if (!host || !cw || !cw.pivotValueHeads) { rec('Z a one-row header\'s value columns', false, 'this build has no round-4 value columns'); return; }
+    localStorage.removeItem(KEY);
+    H.setName('rvz'); H.hydrate();
+    setReport({}); host.clearUser();
+    await mountPivot(['C11', 'NAME'], ['C10']);
+    var hd = zheads();
+    var ok0 = !!hd && hd.cols.length === 4 && !!hd.total && marked() && hd.cols.concat([hd.total]).every(function (x) { return x.getAttribute('tabindex') === '0'; });
+    rec('Z0 fixture: FY across (C11 > NAME by C10) - a one-row header, 4 FY value columns + the Grand Total, the table marked, every value header focusable',
+      ok0, 'cols=' + (hd ? hd.cols.length : '-') + ' total=' + !!(hd && hd.total) + ' marked=' + marked() + ' errs=' + errs().slice(0, 2).join(' / '));
+    if (!ok0) return;
+    var gtNat = width(hd.total);
+
+    setReport({ 'PIVOT:=AMOUNT': 150 });
+    hd = zheads();
+    var c1 = zcells(false);
+    rec('Z1 PIVOT:=AMOUNT sizes EVERY FY column - headers, body, subtotals and footer - to 150, and leaves the Grand Total as it was',
+      allNear(hd.cols, 150) && c1.length > 80 && allNear(c1, 150) && near(width(hd.total), gtNat, 2),
+      'headers=' + hd.cols.map(function (x) { return r1(width(x)); }).join(',') + ' cells=' + c1.length + ' total=' + r1(width(hd.total)) + '/' + r1(gtNat));
+
+    setReport({ 'PIVOT:=AMOUNT': 150, 'PIVOT:TOTAL=AMOUNT': 200 });
+    hd = zheads();
+    var g2 = zcells(true);
+    rec('Z2 PIVOT:TOTAL=AMOUNT sizes the Grand Total column on its own - header, body, subtotals, the footer corner - and the FY columns stay at 150',
+      near(width(hd.total), 200) && g2.length > 20 && allNear(g2, 200) && allNear(hd.cols, 150),
+      'total=' + r1(width(hd.total)) + ' cells=' + g2.length + ' fy=' + hd.cols.map(function (x) { return r1(width(x)); }).join(','));
+
+    setReport({ 'PIVOT:=AMOUNT': 45, 'PIVOT:TOTAL=AMOUNT': 45 });
+    hd = zheads();
+    var floorC = cw.valueFloor(pivT(), 'cols'), floorG = cw.valueFloor(pivT(), 'total');
+    var wsC = hd.cols.map(width), maxC = Math.max.apply(null, wsC);
+    rec('Z3 a number is never cut: at 45px every FY column holds at its own widest number (the widest of them = the floor), the Grand Total at its own - not one cell clipped',
+      floorC > 45 && near(maxC, floorC, 1) && zclipped(false) === 0 && near(width(hd.total), floorG, 1) && zclipped(true) === 0 && floorG > floorC,
+      'fy=' + wsC.map(r1).join(',') + ' floor ' + floorC + '; total=' + r1(width(hd.total)) + ' floor ' + floorG + '; clipped ' + zclipped(false) + '/' + zclipped(true));
+
+    // A drag on ANY FY header (the third) far left: all of them stop together.
+    setReport({}); host.clearUser(); apply();
+    hd = zheads();
+    var th3 = hd.cols[2], nat3 = width(th3), e = edge(th3), to = e.x - (nat3 - 10);
+    ptr('pointerdown', th3, e.x, e.y);
+    var sh = shield(), lbl = '';
+    if (sh) {
+      ptr('pointermove', sh, to, e.y); await sleep(40);
+      lbl = (sh.querySelector('.pnb-colw-label') || {}).textContent || '';
+      ptr('pointerup', sh, to, e.y);
+    }
+    zheads().cols[2].click();
+    var en = entry('rvz'), stored = en && en.widths ? en.widths['PIVOT:=AMOUNT'] : null, sorts = H.getSort().length;
+    hd = zheads();
+    rec('Z4 a drag on the third FY header far below the numbers stops at the widest of ALL the FY columns (the guide says so), lands as PIVOT:=AMOUNT, every FY column at that one width, no sort',
+      // ...and that floor is what the BROWSER holds the widest FY column at
+      // (Z3's 45px run), not just what the module's own measure says.
+      !!sh && stored === floorC && near(stored, maxC, 1) && allNear(hd.cols, floorC, 1) && lbl === floorC + ' px (widest number)' && zclipped(false) === 0 && sorts === 0,
+      'shield=' + !!sh + ' label="' + lbl + '" stored=' + stored + ' floor=' + floorC + ' browser widest=' + r1(maxC) + ' fy=' + hd.cols.map(function (x) { return r1(width(x)); }).join(',') + ' sorts=' + sorts);
+    await sleep(700);
+
+    host.clearUser(); apply();
+    hd = zheads();
+    var th1 = hd.cols[0], w1 = Math.round(width(th1)), e1 = edge(th1), gtBefore = width(hd.total);
+    ptr('pointerdown', th1, e1.x, e1.y);
+    var sh5 = shield(), lbl5 = '';
+    if (sh5) {
+      ptr('pointermove', sh5, e1.x + 40, e1.y); await sleep(40);
+      lbl5 = (sh5.querySelector('.pnb-colw-label') || {}).textContent || '';
+      ptr('pointerup', sh5, e1.x + 40, e1.y);
+    }
+    hd = zheads();
+    rec('Z5 a drag on the first FY header widens them ALL to one width - the guide says "all 4 columns" - and the Grand Total does not move',
+      !!sh5 && lbl5 === (w1 + 40) + ' px (all 4 columns)' && host.widthFor('PIVOT:=AMOUNT') === w1 + 40 && allNear(hd.cols, w1 + 40, 1) && near(width(hd.total), gtBefore, 2),
+      'label="' + lbl5 + '" stored=' + host.widthFor('PIVOT:=AMOUNT') + ' fy=' + hd.cols.map(function (x) { return r1(width(x)); }).join(',') + ' total=' + r1(width(hd.total)) + '/' + r1(gtBefore));
+    await sleep(700);
+
+    hd = zheads();
+    var tg = hd.total, wg = Math.round(width(tg)), eg = edge(tg), fyBefore = hd.cols.map(width);
+    ptr('pointerdown', tg, eg.x, eg.y);
+    var sh6 = shield(), lbl6 = '';
+    if (sh6) {
+      ptr('pointermove', sh6, eg.x + 30, eg.y); await sleep(40);
+      lbl6 = (sh6.querySelector('.pnb-colw-label') || {}).textContent || '';
+      ptr('pointerup', sh6, eg.x + 30, eg.y);
+    }
+    hd = zheads();
+    rec('Z6 a drag on the Grand Total header sizes it alone (PIVOT:TOTAL=AMOUNT); the FY columns stay put',
+      !!sh6 && lbl6 === (wg + 30) + ' px' && host.widthFor('PIVOT:TOTAL=AMOUNT') === wg + 30 && near(width(hd.total), wg + 30, 1) &&
+      hd.cols.every(function (x, i) { return near(width(x), fyBefore[i], 1); }),
+      'label="' + lbl6 + '" stored=' + host.widthFor('PIVOT:TOTAL=AMOUNT') + ' total=' + r1(width(hd.total)));
+    await sleep(700);
+
+    // The first FY header is wider by nature (it carries the column-sort
+    // arrow): + on the SECOND steps from the widest, so none of them narrows.
+    host.clearUser(); apply();
+    hd = zheads();
+    var natZ = hd.cols.map(function (x) { return Math.round(width(x)); }), widest = Math.max.apply(null, natZ);
+    var k = hd.cols[1];
+    k.focus();
+    key(k, '+');
+    hd = zheads();
+    var plus = hd.cols.map(function (x) { return Math.round(width(x)); }), said = liveText();
+    key(zheads().cols[1], '0');
+    hd = zheads();
+    var back = hd.cols.map(function (x) { return Math.round(width(x)); });
+    rec('Z7 keys on any FY header: + widens them ALL to the widest of them + 20 (none narrows; the live region says "columns"), 0 fits each again',
+      natZ[0] > natZ[1] && plus.every(function (w) { return near(w, widest + 20, 1); }) && /AMOUNT columns width \d+ pixels/.test(said) &&
+      host.widthFor('PIVOT:=AMOUNT') === null && back.every(function (w, i) { return near(w, natZ[i], 1); }),
+      'natural ' + natZ.join(',') + ' + -> ' + plus.join(',') + ' said "' + said + '"; 0 -> ' + back.join(','));
+
+    setReport({ 'PIVOT:=AMOUNT': 150 });
+    await mountPivot(['C11', 'NAME'], ['C10'], { aggs: ['sum', 'count'] });
+    var twoAgg = marked() || zheads() !== null;
+    await mountPivot(['C11', 'NAME'], ['C10', 'C04'], { keep: function (o, i) { return true; } });
+    var nested = marked() || zheads() !== null, nestedRows = pivT().tHead.rows.length;
+    await mountPivot(['C11'], ['C10', 'C11'], { colLayout: 'flat' });
+    var flatRows = pivT().tHead.rows.length, flatHd = zheads();
+    rec('Z8 a two-row header takes no one-row width (sum + count by FY; two nested column fields); two column fields laid out FLAT are one row, and take the width',
+      !twoAgg && !nested && nestedRows > 1 && flatRows === 1 && marked() && !!flatHd && allNear(flatHd.cols, 150),
+      'sum+count marked=' + twoAgg + ' nested rows=' + nestedRows + ' marked=' + nested + ' flat rows=' + flatRows + ' cols=' + (flatHd ? flatHd.cols.length : '-') + ' marked=' + marked());
+
+    var cssZ = cw.buildPivotCss([{ value: 'total', field: 'AMOUNT', w: 210 }]);
+    var MZ = '#pivotResultTable[data-pnb-colw-value]';
+    var wantGH = MZ + ' > thead > tr > th.pivot-grand-total{box-sizing:border-box!important;width:210px!important;min-width:210px!important;max-width:210px!important}';
+    var wantGB = MZ + ' > tbody > tr > td.pivot-grand-total,' + MZ + ' > tfoot > tr > td.pivot-grand-total{box-sizing:border-box!important;width:210px!important;min-width:210px!important;max-width:none!important}';
+    rec('Z9 rule text: the Grand Total by its class on the marked table, the header exact, its cells with no max-width',
+      cssZ.indexOf(wantGH) !== -1 && cssZ.indexOf(wantGB) !== -1, cssZ.slice(0, 400));
+
+    host.clearUser(); setReport({});
+    await mountPivot(['C11', 'NAME'], ['C10']);
+    host.setUser('PIVOT:=AMOUNT', 160); host.setUser('PIVOT:TOTAL=AMOUNT', 190);
+    var sz = H.buildState(), cwz = sz && sz.columnWidths;
+    rec('Z10 a save carries both: PIVOT:=AMOUNT and PIVOT:TOTAL=AMOUNT', !!cwz && cwz['PIVOT:=AMOUNT'] === 160 && cwz['PIVOT:TOTAL=AMOUNT'] === 190, JSON.stringify(cwz));
+
+    setReport({}); host.clearUser();
+    $('#pivot-output-container').empty().hide();
+  }
+
+  // Round 5 (2026-10-01): a TWO-row header - groups (the top row) and their
+  // leaves, sized like a flat table at two levels, filed by position.
+  function mgrid() { return CW().pivotGrid(pivT()); }
+  function gmarked() { return !!pivT() && pivT().hasAttribute('data-pnb-colw-grid'); }
+  function mcells(L) {
+    var at = ':nth-last-child(' + L.p + '):not([data-row-field]):not([colspan])';
+    return Array.prototype.slice.call(pivT().querySelectorAll(':scope > tbody > tr > td' + at + ',:scope > tfoot > tr > td' + at))
+      .filter(function (c) { return c.offsetParent; });
+  }
+  function mclipped(L) { return mcells(L).filter(function (c) { return c.scrollWidth > c.clientWidth + 1; }).length; }
+  function lwidths(g) { return g.leaves.map(function (L) { return Math.round(width(L.th)); }); }
+  async function edgeDrag(th, dx) {
+    var e = edge(th), lbl = '';
+    ptr('pointerdown', th, e.x, e.y);
+    var sh = shield();
+    if (sh) {
+      ptr('pointermove', sh, e.x + dx, e.y); await sleep(40);
+      lbl = (sh.querySelector('.pnb-colw-label') || {}).textContent || '';
+      ptr('pointerup', sh, e.x + dx, e.y);
+    }
+    return { shield: !!sh, label: lbl };
+  }
+
+  async function phaseM() {
+    var host = HOST(), cw = CW();
+    if (!host || !cw || !cw.pivotGrid || !host.minValue) { rec('M a two-row header', false, 'this build has no round-5 grid'); return; }
+    localStorage.removeItem(KEY);
+    H.setName('rvm'); H.hydrate();
+    setReport({}); host.clearUser();
+    await mountPivot(['C11', 'NAME'], ['C10'], { aggs: ['sum', 'count'] });
+    var g = mgrid();
+    var tail = g ? Array.prototype.slice.call(pivT().tBodies[0].rows).every(function (r) {
+      return Array.prototype.slice.call(r.cells).slice(-g.n).every(function (c) { return !c.hasAttribute('data-row-field') && !c.hasAttribute('colspan'); });
+    }) : false;
+    var ok0 = !!g && gmarked() && !marked() && g.groups.length === 5 && g.leaves.length === 10 &&
+              g.groups.every(function (G) { return G.th.getAttribute('tabindex') === '0'; }) && g.leaves.every(function (L) { return L.th.getAttribute('tabindex') === '0'; }) && tail;
+    rec('M0 fixture: sum + count by FY - a two-row header read as 4 FY groups + the Grand Total (T), 2 leaves each, marked as a grid (not one-row), every group and leaf header focusable, every row ending with its 10 value cells',
+      ok0, 'groups=' + (g ? g.groups.map(function (G) { return G.id + ':' + G.leaves.length; }).join(' ') : 'none') + ' grid=' + gmarked() + ' one-row=' + marked() + ' rows end with values=' + tail + ' errs=' + errs().slice(0, 2).join(' / '));
+    if (!ok0) return;
+    var nat = g.leaves.map(function (L) { return width(L.th); });
+
+    setReport({ 'PIVOT:=AMOUNT@1.1': 90 });
+    g = mgrid();
+    var L11 = g.leaves[3], c1 = mcells(L11);
+    rec('M1 a leaf alone (FY 2024 Count, 1.1): its header and every body, subtotal and footer cell at 90; its sibling and the next year untouched; the year header = its two leaves',
+      near(width(L11.th), 90) && c1.length > 20 && c1.every(function (c) { return near(width(c), 90); }) &&
+      near(width(g.leaves[2].th), nat[2], 1) && near(width(g.leaves[4].th), nat[4], 1) && near(width(g.groups[1].th), width(g.leaves[2].th) + width(g.leaves[3].th), 1.5),
+      'leaf=' + r1(width(L11.th)) + ' cells=' + c1.length + ' sibling=' + r1(width(g.leaves[2].th)) + '/' + r1(nat[2]) + ' FY 2024=' + r1(width(g.groups[1].th)));
+
+    setReport({}); host.clearUser(); apply();
+    g = mgrid();
+    var G0 = g.groups[0], w0 = Math.round(width(G0.th)), others = [1, 2, 3, 4].map(function (i) { return Math.round(width(g.groups[i].th)); });
+    var d2 = await edgeDrag(G0.th, -20);
+    g = mgrid();
+    var a0 = host.widthFor('PIVOT:=AMOUNT@0.0'), a1 = host.widthFor('PIVOT:=AMOUNT@0.1'), lw2 = lwidths(g.groups[0]);
+    rec('M2 a drag on a year header (FY 2023, -20) sizes the YEAR like a flat column: its 2 leaves share the new width evenly (as their numbers allow), the other years stay put, the guide says "2 columns"',
+      d2.shield && a0 + a1 === w0 - 20 && Math.abs(a0 - a1) <= 1 && near(width(g.groups[0].th), w0 - 20, 1.5) && near(lw2[0], a0, 1) && near(lw2[1], a1, 1) &&
+      [1, 2, 3, 4].every(function (i, j) { return near(width(g.groups[i].th), others[j], 1.5); }) && d2.label === (w0 - 20) + ' px (2 columns)',
+      'label="' + d2.label + '" stored ' + a0 + '+' + a1 + ' want ' + (w0 - 20) + ' year=' + r1(width(g.groups[0].th)) + ' leaves=' + lw2.join(','));
+    await sleep(700);
+
+    // A column of nothing but '-' (a baseline year's % change) goes far
+    // narrower than 40px - and still no further than its '-'.
+    g = mgrid();
+    var L01 = g.leaves[1];
+    mcells(L01).forEach(function (c) { c.textContent = '-'; });
+    var d3 = await edgeDrag(L01.th, -200);
+    var s3 = host.widthFor('PIVOT:=AMOUNT@0.1');
+    g = mgrid();
+    rec('M3 a column of "-" alone drags down past 40px to its widest "-" (stored, as main.js now keeps a value column under 40), the guide says so, nothing clipped',
+      d3.shield && s3 !== null && s3 < 40 && s3 >= host.minValue && near(width(g.leaves[1].th), s3, 1) && /^\d+ px \(widest number\)$/.test(d3.label) && mclipped(g.leaves[1]) === 0,
+      'label="' + d3.label + '" stored=' + s3 + ' shows=' + r1(width(g.leaves[1].th)) + ' clipped=' + mclipped(g.leaves[1]));
+    await sleep(700);
+
+    // By POSITION: drop FY 2023 - the first group is now FY 2024 and carries
+    // the first group's widths; the Grand Total's stay with T.
+    host.clearUser(); setReport({ 'PIVOT:=AMOUNT@0.0': 130, 'PIVOT:=AMOUNT@T.1': 95 });
+    await mountPivot(['C11', 'NAME'], ['C10'], { aggs: ['sum', 'count'], keep: function (o) { return o.C10 !== 'FY 2023'; } });
+    g = mgrid();
+    rec('M4 widths go by POSITION: with FY 2023 gone the first group is FY 2024 - still group 0 - and takes 0.0 (130); the Grand Total is always T and its leaf T.1 (95) stays with it',
+      !!g && g.groups.length === 4 && /FY 2024/.test(g.groups[0].th.textContent) && g.groups[0].id === '0' && near(width(g.leaves[0].th), 130) &&
+      g.groups[3].id === 'T' && near(width(g.groups[3].leaves[1].th), 95),
+      'first=' + (g ? g.groups[0].th.textContent.trim().slice(0, 12) : '-') + ' 0.0=' + (g ? r1(width(g.leaves[0].th)) : '-') + ' T.1=' + (g ? r1(width(g.groups[3].leaves[1].th)) : '-'));
+
+    setReport({}); host.clearUser();
+    await mountPivot(['C11', 'NAME'], ['C10'], { aggs: ['sum', 'count'] });
+    g = mgrid();
+    var G1 = g.groups[1], w1 = Math.round(width(G1.th));
+    G1.th.focus(); key(G1.th, '+');
+    g = mgrid();
+    var plusOk = near(width(g.groups[1].th), w1 + 20, 1.5) && host.widthFor('PIVOT:=AMOUNT@1.0') + host.widthFor('PIVOT:=AMOUNT@1.1') === w1 + 20;
+    var L20 = g.leaves[4], w20 = Math.round(width(L20.th));
+    L20.th.focus(); key(L20.th, '-');
+    var minus = host.widthFor('PIVOT:=AMOUNT@2.0');
+    key(mgrid().groups[1].th, '0');
+    g = mgrid();
+    rec('M5 keys: + on a year header widens the year by 20 (shared evenly), - on a leaf narrows that leaf alone, 0 on the year fits its leaves again',
+      plusOk && minus !== null && minus < w20 && host.widthFor('PIVOT:=AMOUNT@1.0') === null && host.widthFor('PIVOT:=AMOUNT@1.1') === null && near(width(g.groups[1].th), w1, 1.5),
+      'year ' + w1 + ' + -> ' + (plusOk ? 'ok' : 'NO') + '; leaf ' + w20 + ' - -> ' + minus + '; 0 -> ' + r1(width(g.groups[1].th)));
+
+    // Double press on a year's edge = fit its leaves.
+    host.clearUser(); setReport({ 'PIVOT:=AMOUNT@2.0': 150, 'PIVOT:=AMOUNT@2.1': 150 });
+    g = mgrid();
+    var e6 = edge(g.groups[2].th);
+    ptr('pointerdown', g.groups[2].th, e6.x, e6.y); if (shield()) ptr('pointerup', shield(), e6.x, e6.y);
+    ptr('pointerdown', g.groups[2].th, e6.x, e6.y); if (shield()) ptr('pointerup', shield(), e6.x, e6.y);
+    g = mgrid();
+    rec('M6 a double press on a year\'s edge fits its leaves to their content again (over the report\'s 150s)',
+      host.widthFor('PIVOT:=AMOUNT@2.0') === null && host.widthFor('PIVOT:=AMOUNT@2.1') === null && !near(width(g.leaves[4].th), 150, 2),
+      '2.0=' + host.widthFor('PIVOT:=AMOUNT@2.0') + ' shows ' + r1(width(g.leaves[4].th)));
+    await sleep(700);
+
+    // No crossing over: a two-row header's widths never reach a one-row
+    // pivot, and the one-row width never reaches the two-row one.
+    host.clearUser(); setReport({ 'PIVOT:=AMOUNT@0.0': 150, 'PIVOT:=AMOUNT': 170 });
+    await mountPivot(['C11', 'NAME'], ['C10']);
+    var one = zheads(), oneW = one ? one.cols.map(function (x) { return Math.round(width(x)); }) : [];
+    await mountPivot(['C11', 'NAME'], ['C10'], { aggs: ['sum', 'count'] });
+    g = mgrid();
+    rec('M7 no crossing over: the one-row pivot shows its own 170 (not the grid\'s 150), the two-row one its 0.0 at 150 and nothing at 170',
+      oneW.length === 4 && oneW.every(function (w) { return near(w, 170, 1); }) && near(width(g.leaves[0].th), 150) && g.leaves.slice(1).every(function (L) { return !near(width(L.th), 170, 1); }),
+      'one-row=' + oneW.join(',') + ' grid 0.0=' + r1(width(g.leaves[0].th)));
+
+    // Two nested column fields (FY > C11), one aggregation: groups of 3, and
+    // the Grand Total spanning both rows is a leaf of its own (T.0).
+    host.clearUser(); setReport({ 'PIVOT:=AMOUNT@1.2': 120, 'PIVOT:=AMOUNT@T.0': 110 });
+    await mountPivot(['NAME'], ['C10', 'C11']);
+    g = mgrid();
+    rec('M8 two nested column fields: 4 groups of 3 (FY over C11) + the Grand Total as a leaf of its own; 1.2 and T.0 take their widths',
+      !!g && gmarked() && g.groups.length === 5 && g.groups[0].leaves.length === 3 && g.groups[4].leaves.length === 1 && g.groups[4].leaves[0].th === g.groups[4].th &&
+      near(width(g.groups[1].leaves[2].th), 120) && near(width(g.groups[4].th), 110),
+      g ? ('groups=' + g.groups.map(function (G) { return G.id + ':' + G.leaves.length; }).join(' ') + ' 1.2=' + r1(width(g.groups[1].leaves[2].th)) + ' T=' + r1(width(g.groups[4].th))) : 'no grid');
+
+    // One aggregation, the Grand Total split by two of its own: the years span
+    // both rows (leaves of their own), the Grand Total is a group of 2.
+    host.clearUser(); setReport({ 'PIVOT:=AMOUNT@1.0': 140, 'PIVOT:=AMOUNT@T.1': 100 });
+    await mountPivot(['C11', 'NAME'], ['C10'], { totalRowAggs: ['sum', 'count'] });
+    g = mgrid();
+    rec('M9 one aggregation with the Grand Total split in two: each year a leaf of its own (1.0), the Grand Total a group of 2 (T.1) - both take their widths',
+      !!g && gmarked() && g.groups.length === 5 && g.groups[1].leaves[0].th === g.groups[1].th && g.groups[4].leaves.length === 2 &&
+      near(width(g.groups[1].th), 140) && near(width(g.groups[4].leaves[1].th), 100),
+      g ? ('groups=' + g.groups.map(function (G) { return G.id + ':' + G.leaves.length; }).join(' ') + ' 1.0=' + r1(width(g.groups[1].th)) + ' T.1=' + r1(width(g.groups[4].leaves[1].th))) : 'no grid');
+
+    setReport({ 'PIVOT:=AMOUNT@0.0': 150 });
+    await mountPivot(['NAME'], ['C10', 'C11'], { aggs: ['sum', 'count'] });
+    rec('M10 a THREE-row header (FY > C11, sum + count) is no grid and no one-row header: nothing marked, nothing sized',
+      pivT().tHead.rows.length === 3 && !gmarked() && !marked() && cw.pivotGrid(pivT()) === null,
+      'rows=' + pivT().tHead.rows.length + ' grid=' + gmarked() + ' one-row=' + marked());
+
+    var cssM = cw.buildPivotCss([{ grid: { p: 3, q: 4, row: 1 }, w: 77 }]);
+    var MM = '#pivotResultTable[data-pnb-colw-grid]', AT = ':nth-last-child(3):not([data-row-field]):not([colspan])';
+    var wantMH = MM + ' > thead > tr:nth-child(2) > th:nth-last-child(4){box-sizing:border-box!important;width:77px!important;min-width:77px!important;max-width:77px!important}';
+    var wantMB = MM + ' > tbody > tr > td' + AT + ',' + MM + ' > tfoot > tr > td' + AT + '{box-sizing:border-box!important;width:77px!important;min-width:77px!important;max-width:none!important}';
+    rec('M11 rule text: the grid-marked table only; the header by its row and its place from the right, exact; its cells by their place from the right, no max-width',
+      cssM.indexOf(wantMH) !== -1 && cssM.indexOf(wantMB) !== -1, cssM.slice(0, 400));
+
+    // A re-render INTO a one-row pivot never flashes a grid width: the new
+    // table is unmarked until apply() runs, so the rules still in force miss it.
+    host.clearUser(); setReport({ 'PIVOT:=AMOUNT@T.0': 150 });
+    await mountPivot(['C11', 'NAME'], ['C10'], { aggs: ['sum', 'count'] });
+    g = mgrid();
+    var before13 = !!g && near(width(g.groups[4].leaves[0].th), 150);
+    $('#pivot-output-container').html(pivotHtml(['C11', 'NAME'], ['C10'], { aggs: ['sum'] }).html);
+    var cells13 = Array.prototype.slice.call(pivT().querySelectorAll(':scope > tbody > tr > td:not([data-row-field])')), flash13 = cells13.filter(function (c) { return near(width(c), 150, 1); }).length;
+    var m13 = gmarked();
+    await sleep(60);
+    rec('M13 a re-render into a one-row pivot never shows a grid width, not even for the frame before the module runs',
+      before13 && !m13 && flash13 === 0 && !gmarked(), 'before=' + before13 + ' cells at 150 right after the swap=' + flash13 + ' grid mark=' + m13);
+
+    // Dragged far left, a year stops at the sum of its leaves' widest numbers,
+    // and the split holds EACH leaf at its own (they differ: sums vs counts).
+    host.clearUser(); setReport({});
+    await mountPivot(['C11', 'NAME'], ['C10'], { aggs: ['sum', 'count'] });
+    g = mgrid();
+    var d14 = await edgeDrag(g.groups[3].th, -400);
+    g = mgrid();
+    var s30 = host.widthFor('PIVOT:=AMOUNT@3.0'), s31 = host.widthFor('PIVOT:=AMOUNT@3.1'), lw14 = lwidths(g.groups[3]);
+    rec('M14 a year dragged far left stops where its leaves\' widest numbers allow: each leaf stored at what it shows (a sum wider than a count), nothing clipped, the guide says "widest numbers"',
+      d14.shield && s30 !== null && s31 !== null && s30 > s31 && near(lw14[0], s30, 1) && near(lw14[1], s31, 1) && mclipped(g.groups[3].leaves[0]) === 0 &&
+      mclipped(g.groups[3].leaves[1]) === 0 && /\(widest numbers\)$/.test(d14.label),
+      'label="' + d14.label + '" stored ' + s30 + '/' + s31 + ' shows ' + lw14.join('/'));
+    await sleep(700);
+
+    // A body row that does not END with one value cell per leaf is no grid.
+    var bad = pivT().tBodies[0].rows[0], extra = document.createElement('td');
+    extra.setAttribute('data-row-field', '9');
+    bad.appendChild(extra);
+    var refused = cw.pivotGrid(pivT()) === null;
+    bad.removeChild(extra);
+    rec('M15 a body row that does not end with one value cell per leaf: no grid (nothing could be addressed by its place)', refused && cw.pivotGrid(pivT()) !== null,
+      'refused=' + refused);
+
+    // A stored leaf width under its numbers (an author's 20px on a sum
+    // column, or totals that have grown since) still shows every digit.
+    host.clearUser(); setReport({ 'PIVOT:=AMOUNT@2.0': 20 });
+    await mountPivot(['C11', 'NAME'], ['C10'], { aggs: ['sum', 'count'] });
+    g = mgrid();
+    var L16 = g.groups[2].leaves[0];
+    rec('M16 a leaf stored at 20px under its numbers shows at its widest number - not one cell clipped',
+      width(L16.th) > 30 && mclipped(L16) === 0, 'shows ' + r1(width(L16.th)) + ' clipped ' + mclipped(L16));
+
+    host.clearUser(); setReport({});
+    await mountPivot(['C11', 'NAME'], ['C10'], { aggs: ['sum', 'count'] });
+    host.setUser('PIVOT:=AMOUNT@0.1', 24); host.setUser('PIVOT:=AMOUNT@T.0', 133);
+    var sm = H.buildState(), cwm = sm && sm.columnWidths;
+    rec('M12 a save carries the leaves\' widths - a 24px one included (a value column may now be under 40)',
+      !!cwm && cwm['PIVOT:=AMOUNT@0.1'] === 24 && cwm['PIVOT:=AMOUNT@T.0'] === 133, JSON.stringify(cwm));
+
+    setReport({}); host.clearUser();
+    $('#pivot-output-container').empty().hide();
+  }
+
+  async function phaseW() {
+    await runQuery(makeRows(20));
+    var host = HOST(), cw = CW();
+    var ok = !!cw && !!host && cw.VIEWS === false && document.documentElement.classList.contains('pnb-colw-on') &&
+             !document.documentElement.classList.contains('pnb-colw-views');
+    rec('W1 &colwidths=flat: the module runs for the flat table only - views off, the views class absent', ok,
+      'module=' + !!cw + ' views=' + (cw ? cw.VIEWS : '-') + ' class=' + document.documentElement.className);
+    if (!cw || !host) return;
+    H.setName('rflat'); H.hydrate();
+    setReport({ TITLE: 120, 'PIVOT:NAME': 300 });
+    var flatOk = near(width(thOf('TITLE')), 120);
+    gbox().style.width = '1000px';
+    await buildGroups(['C11']);
+    var t0 = groupTables()[0];
+    var gW = t0 ? width(gth(t0, 'TITLE')) : -1, e = t0 ? edge(gth(t0, 'TITLE')) : null;
+    var gTaken = e ? !ptr('pointerdown', gth(t0, 'TITLE'), e.x, e.y) : null, gShield = !!shield();
+    if (gShield) ptr('pointerup', shield(), e.x, e.y);
+    gbox().style.display = 'none';
+    await mountPivot(['C11', 'NAME'], ['C10']);
+    var pW = width(plv(1)), pTab = plv(1).getAttribute('tabindex');
+    rec('W2 the flat table keeps its width; the grouped view and the pivot take none, and their headers offer no grip or tab stop',
+      flatOk && !near(gW, 120, 2) && !document.getElementById('pnbColWidthGroupStyle') && gTaken === false && !gShield &&
+      !near(pW, 300, 2) && !document.getElementById('pnbColWidthPivotStyle') && pTab === null,
+      'flat=' + r1(width(thOf('TITLE'))) + ' group=' + r1(gW) + ' taken=' + gTaken + ' pivot=' + r1(pW) + ' tabindex=' + pTab);
+
+    // 2026-10-01: a pivot's one value column is one of the "views" parts too.
+    setReport({ 'PIVOT:=AMOUNT': 220 });
+    await mountPivot(['C11', 'NAME'], []);
+    var v = pval(), ve = v ? edge(v) : null;
+    var vTaken = ve ? !ptr('pointerdown', v, ve.x, ve.y) : null, vShield = !!shield();
+    if (vShield) ptr('pointerup', shield(), ve.x, ve.y);
+    rec('W3 a pivot with one value column takes no width either: no mark, no rule, no grip, no tab stop',
+      !!v && !marked() && !near(width(v), 220, 2) && vTaken === false && !vShield && !v.hasAttribute('tabindex') && !document.getElementById('pnbColWidthPivotStyle'),
+      'marked=' + marked() + ' width=' + (v ? r1(width(v)) : '-') + ' taken=' + vTaken + ' tabindex=' + (v ? v.getAttribute('tabindex') : '-'));
+
+    // 2026-10-01: the custom-layout pill reports pivot widths - but not here,
+    // where they apply nowhere (a stored one from a views-on visit, say).
+    host.setUser('PIVOT:NAME', 250); fire();
+    var w4 = $('#sbCustomCols').css('display'), w4d = $('#sbCustomColsDiff').text();
+    host.clearUser(); fire();
+    rec('W4 a pivot width of this browser\'s own does not light the custom-layout pill while the views part is off',
+      w4 === 'none' && w4d.indexOf('Pivot column widths') === -1, 'pill=' + w4 + ' [' + w4d + ']');
+
+    // 2026-10-01: a breakdown table is one of the "views" parts too.
+    if (H.chartDrill) {
+      $('#pivot-output-container').empty().hide();
+      H.chartDrill(makeRows(20).map(function (o) { return new Map(Object.keys(o).map(function (k) { return [k, o[k]]; })); }), ['C11 = x'], [], null);
+      await sleep(80);
+      var bt = document.querySelector('table.pnb-breakdown'), bth = bt ? bt.tHead.rows[0].cells[1] : null;
+      var be = bth ? edge(bth) : null, bFree = be ? ptr('pointerdown', bth, be.x, be.y) : null, bSh = !!shield();
+      if (bSh) ptr('pointerup', shield(), be.x, be.y);
+      rec('W5 a breakdown takes no width either: no grip, no tab stop, a press on its edge is left alone',
+        !!bth && getComputedStyle(bth, '::after').content === 'none' && !bth.hasAttribute('tabindex') && bFree === true && !bSh,
+        bth ? ('grip=' + getComputedStyle(bth, '::after').content + ' tabindex=' + bth.getAttribute('tabindex') + ' shield=' + bSh) : 'no breakdown');
+      $('.infobox-overlay').remove();
+    } else {
+      rec('W5 a breakdown takes no width either', false, 'chart-drill hook missing');
+    }
+  }
+
+  // ------------------------------------------------------------------------
+  // L. The custom-layout pill beyond the flat table (2026-10-01). It counted
+  // only the names the FLAT header holds, so a pivot's widths (PIVOT:...)
+  // never lit it. The grouped view's widths ARE flat names (L1 says so).
+  async function phaseL() {
+    var host = HOST(), cw = CW();
+    if (!host || !cw || !cw.pivotGrid || !cw.pivotValueHeads) { rec('L the pill beyond the flat table', false, 'this build has no round-5 grid'); return; }
+    var pill = function () { return $('#sbCustomCols').css('display') !== 'none'; };
+    var diff = function () { return $('#sbCustomColsDiff').text(); };
+    var head = function (th) { return String(th.textContent || '').replace(/[▲▼▶◀]/g, '').replace(/\s+/g, ' ').trim(); };
+    localStorage.removeItem(KEY);
+    H.setName('rpill'); H.hydrate();
+    setReport({}); host.clearUser(); fire();
+
+    gbox().style.width = '1000px'; gbox().style.display = '';
+    $('#table-view-container').hide();
+    await buildGroups(['C11']);
+    var g0 = pill();
+    host.setUser('NAME', 150);
+    var g1 = pill(), gd = diff();
+    host.clearUser();
+    rec('L1 a width set in the grouped view lights the pill under its column name - the grouped view files it under the flat column\'s - and goes out when cleared',
+      !g0 && g1 && gd.indexOf('Column widths set here: NAME') !== -1 && !pill(), 'before=' + g0 + ' set=' + g1 + ' [' + gd + '] cleared=' + pill());
+    gbox().style.display = 'none';
+
+    await mountPivot(['C11', 'NAME'], []);
+    var p0 = pill();
+    host.setUser('PIVOT:C11', 180);
+    var p1 = pill(), pd = diff(), st1 = entry('rpill');
+    rec('L2 a pivot row label\'s width lights the pill, named by its field (and it is what this browser stores)',
+      !p0 && p1 && pd.indexOf('Pivot column widths set here: C11') !== -1 && !!st1 && !!st1.widths && st1.widths['PIVOT:C11'] === 180,
+      'before=' + p0 + ' set=' + p1 + ' [' + pd + '] stored=' + JSON.stringify(st1));
+    host.clearUser();
+
+    await mountPivot(['C11', 'NAME'], ['C10']);           // one-row heading: 4 FY value columns + the Grand Total
+    host.setUser('PIVOT:=AMOUNT', 120);
+    host.setUser('PIVOT:TOTAL=AMOUNT', 140);
+    var vd = diff();
+    rec('L3 the value columns (one width together) and the Grand Total light it too, in words: "the value columns, Grand Total"',
+      pill() && vd.indexOf('Pivot column widths set here: ') !== -1 && vd.indexOf('the value columns') !== -1 && vd.indexOf('Grand Total') !== -1 && vd.indexOf('PIVOT:') === -1,
+      'pill=' + pill() + ' [' + vd + ']');
+    host.clearUser();
+
+    await mountPivot(['C11', 'NAME'], ['C10'], { aggs: ['sum', 'count'] });   // two-row heading
+    var g = mgrid();
+    var want = g ? head(g.groups[1].th) + ' ' + head(g.leaves[3].th) : '?';
+    host.setUser('PIVOT:=AMOUNT@1.1', 90);
+    host.setUser('PIVOT:=AMOUNT@T.0', 95);
+    var md = diff();
+    rec('L4 a two-row heading\'s column is named by its two headings ("' + want + '"), its Grand Total as such - never by its stored place',
+      !!g && pill() && md.indexOf(want) !== -1 && md.indexOf('Grand Total') !== -1 && md.indexOf('@') === -1 && md.indexOf('1.1') === -1,
+      'pill=' + pill() + ' [' + md + ']');
+
+    // Back on the flat table (no pivot on screen): still reported - a save
+    // carries every PIVOT: width in force - named by place count, not text.
+    $('#pivot-output-container').empty().hide();
+    $('#table-view-container').show();
+    fire();
+    var fd = diff();
+    rec('L5 with no pivot on screen the pivot widths are still reported (a save would carry them), the heading column by count',
+      pill() && fd.indexOf('Pivot column widths set here: ') !== -1 && fd.indexOf('Grand Total') !== -1 && fd.indexOf('1 value column') !== -1,
+      'pill=' + pill() + ' [' + fd + ']');
+
+    // The grouped-view + pivot part switched off: they apply nowhere.
+    cw.VIEWS = false; fire();
+    var vOff = pill();
+    cw.VIEWS = true; fire();
+    // Column Organization off for a non-admin: no widths of their own at all.
+    penumbra_vars.isAdmin = false; window._penumbraHideColumns = true; fire();
+    var rOff = pill();
+    penumbra_vars.isAdmin = true; window._penumbraHideColumns = false; fire();
+    rec('L6 nothing is reported while the views part is off (VIEWS false) or for a viewer without Column Organization - and it comes back',
+      !vOff && !rOff && pill(), 'viewsOff=' + vOff + ' restricted=' + rOff + ' back=' + pill());
+
+    host.clearUser(); fire();
+    rec('L7 cleared: the pill goes out again', !pill(), 'pill=' + pill());
+    localStorage.removeItem(KEY);
+  }
+
+  // ------------------------------------------------------------------------
+  // E. Breakdown tables (2026-10-01): the rows behind a pivot cell or a chart
+  // point, opened through the REAL chart-drill builder (hook chartDrill). The
+  // same drag, double press and keys - but the widths last the page session
+  // only: nothing stored, nothing saved, gone with another report.
+  async function phaseE() {
+    var host = HOST(), cw = CW();
+    if (!host || !cw || !cw.pickDrill || !H.chartDrill) { rec('E0 a breakdown takes widths', false, 'no breakdown support in this build, or the chart-drill hook is missing'); return; }
+    var maps = function (rows) { return rows.map(function (o) { return new Map(Object.keys(o).map(function (k) { return [k, o[k]]; })); }); };
+    var closeAll = function () { $('.infobox-overlay').remove(); $('#cwFakeInfo').remove(); };
+    var open = async function () { closeAll(); H.chartDrill(maps(makeRows(20)), ['C11 = x'], [], null); await sleep(80); return document.querySelector('table.pnb-breakdown'); };
+    // By the header's visible text (not the module's own drillName, which is
+    // under test): the column name, then the sort icon.
+    var hth = function (t, n) { var c = t.tHead.rows[0].cells; for (var i = 0; i < c.length; i++) if (c[i].textContent.replace(/\s+/g, ' ').trim().split(' ')[0] === n) return c[i]; return null; };
+    var colCells = function (t, n) {
+      var th = hth(t, n), i = Array.prototype.indexOf.call(th.parentNode.cells, th), out = [th];
+      Array.prototype.forEach.call(t.tBodies[0].rows, function (r) { if (r.cells[i] && !r.cells[i].hasAttribute('colspan')) out.push(r.cells[i]); });
+      if (t.tFoot && t.tFoot.rows[0] && t.tFoot.rows[0].cells[i]) out.push(t.tFoot.rows[0].cells[i]);
+      return out;
+    };
+    var grip = function (th) { return getComputedStyle(th, '::after').content; };
+    localStorage.removeItem(KEY);
+    H.setName('rbd'); H.hydrate();
+    setReport({}); host.clearUser();
+    $('#table-view-container').show();
+    gbox().style.display = 'none';
+    $('#pivot-output-container').empty().hide();
+
+    var t = await open();
+    var th0 = t ? hth(t, 'TITLE') : null;
+    var ok0 = !!t && !!th0 && grip(th0) !== 'none' && th0.getAttribute('tabindex') === '0' && t.tHead.rows[0].cells[0].textContent.indexOf('#') === 0;
+    rec('E0 fixture: a breakdown through the real builder, its headers carrying the grip and a tab stop', ok0,
+      t ? ('grip=' + (th0 ? grip(th0) : '-') + ' tabindex=' + (th0 ? th0.getAttribute('tabindex') : '-')) : 'no table; errs=' + errs().slice(0, 2).join(' / '));
+    if (!ok0) return;
+
+    var natTitle = Math.round(width(th0)), natName = Math.round(width(hth(t, 'NAME')));
+    var stored0 = JSON.stringify(ls(KEY)), user0 = JSON.stringify(host.state().user);
+    var d1 = await edgeDrag(th0, -60);
+    t = document.querySelector('table.pnb-breakdown');
+    var want = natTitle - 60, cells = colCells(t, 'TITLE');
+    var e1 = d1.shield && cells.length > 20 && cells.every(function (c) { return near(width(c), want); }) && near(width(hth(t, 'NAME')), natName, 1) &&
+             cw.drillWidths().TITLE === want && JSON.stringify(ls(KEY)) === stored0 && JSON.stringify(host.state().user) === user0;
+    rec('E1 a drag on a breakdown header (TITLE -60) sizes its header, body and footer cells; the next column keeps its width; NOTHING is stored or set for the report',
+      e1, 'shield=' + d1.shield + ' want ' + want + ' got ' + cells.slice(0, 3).map(function (c) { return r1(width(c)); }).join(',') + '..(' + cells.length + ') NAME=' + r1(width(hth(t, 'NAME'))) + '/' + natName +
+      ' session=' + JSON.stringify(cw.drillWidths()) + ' storedSame=' + (JSON.stringify(ls(KEY)) === stored0) + ' userSame=' + (JSON.stringify(host.state().user) === user0));
+    hth(t, 'TITLE').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    rec('E2 the click that ends the drag does not sort the breakdown', !hth(t, 'TITLE').classList.contains('sorted'), 'sorted=' + hth(t, 'TITLE').classList.contains('sorted'));
+    await sleep(700);   // the double-press window, so E3's reopen is not one
+
+    t = await open();
+    rec('E3 the next breakdown of the same report opens with that width - for the page session', near(width(hth(t, 'TITLE')), want),
+      'TITLE=' + r1(width(hth(t, 'TITLE'))) + ' want ' + want);
+    // Sorting rewrites the header's icon (arrows, a rank): the width belongs to
+    // the column's NAME, so it stays.
+    var mid = hth(t, 'TITLE').getBoundingClientRect();
+    hth(t, 'TITLE').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: mid.left + 10, clientY: mid.top + mid.height / 2 }));
+    await sleep(30);
+    apply();
+    rec('E3b sorting the breakdown by that column keeps its width (filed by the column name, not the header\'s text)',
+      hth(t, 'TITLE').classList.contains('sorted') && near(width(hth(t, 'TITLE')), want), 'sorted=' + hth(t, 'TITLE').classList.contains('sorted') + ' TITLE=' + r1(width(hth(t, 'TITLE'))) + ' header="' + hth(t, 'TITLE').textContent.trim() + '"');
+
+    var e = edge(hth(t, 'TITLE'));
+    ptr('pointerdown', hth(t, 'TITLE'), e.x, e.y); if (shield()) ptr('pointerup', shield(), e.x, e.y);
+    ptr('pointerdown', hth(t, 'TITLE'), e.x, e.y); if (shield()) ptr('pointerup', shield(), e.x, e.y);
+    await sleep(30);
+    rec('E4 a double press on the edge fits the column to its content again', !('TITLE' in cw.drillWidths()) && near(width(hth(t, 'TITLE')), natTitle, 2),
+      'session=' + JSON.stringify(cw.drillWidths()) + ' TITLE=' + r1(width(hth(t, 'TITLE'))) + ' natural ' + natTitle);
+    await sleep(700);
+
+    var thN = hth(t, 'NAME');
+    thN.focus();
+    key(thN, '+');
+    var plus = Math.round(width(hth(t, 'NAME')));
+    key(hth(t, 'NAME'), '-'); key(hth(t, 'NAME'), '-');
+    var minus = Math.round(width(hth(t, 'NAME')));
+    key(hth(t, 'NAME'), '0');
+    var zero = Math.round(width(hth(t, 'NAME')));
+    rec('E5 on a focused breakdown header + widens 20px, - narrows 20px, 0 fits it again',
+      near(plus, natName + 20, 1) && near(minus, natName - 20, 1) && near(zero, natName, 2) && !('NAME' in cw.drillWidths()),
+      'natural ' + natName + ' +=' + plus + ' --=' + minus + ' 0=' + zero);
+
+    var fake = document.createElement('div');
+    fake.id = 'cwFakeInfo'; fake.className = 'infobox-content';
+    fake.innerHTML = '<table class="infobox-drill-table" style="width:100%;border-collapse:collapse"><thead><tr><th>AAA</th><th>BBB</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table>';
+    document.body.appendChild(fake);
+    var fth = fake.querySelector('th'), fe = edge(fth), fw = width(fth);
+    var notTaken = ptr('pointerdown', fth, fe.x, fe.y), fsh = !!shield();
+    if (fsh) ptr('pointerup', shield(), fe.x, fe.y);
+    rec('E6 the Table Info grid (.infobox-drill-table without the breakdown mark) takes no grip and no width',
+      grip(fth) === 'none' && notTaken && !fsh && near(width(fth), fw), 'grip=' + grip(fth) + ' taken=' + !notTaken + ' shield=' + fsh);
+    fake.remove();
+
+    await edgeDrag(hth(t, 'TITLE'), -40);
+    var before = cw.drillWidths().TITLE;
+    H.setName('rbd-other'); H.hydrate();
+    await sleep(700);
+    t = await open();
+    rec('E7 another report\'s breakdowns start from their natural widths (a session width belongs to its report)',
+      !!before && !('TITLE' in cw.drillWidths()) && near(width(hth(t, 'TITLE')), natTitle, 2), 'had=' + before + ' after=' + JSON.stringify(cw.drillWidths()) + ' TITLE=' + r1(width(hth(t, 'TITLE'))));
+
+    penumbra_vars.isAdmin = false; window._penumbraHideColumns = true;
+    apply();
+    var rGrip = grip(hth(t, 'TITLE')), re = edge(hth(t, 'TITLE')), rFree = ptr('pointerdown', hth(t, 'TITLE'), re.x, re.y), rSh = !!shield();
+    if (rSh) ptr('pointerup', shield(), re.x, re.y);
+    penumbra_vars.isAdmin = true; window._penumbraHideColumns = false;
+    apply();
+    rec('E8 a viewer without Column Organization gets no grip on a breakdown either', rGrip === 'none' && rFree && !rSh, 'grip=' + rGrip + ' shield=' + rSh);
+    closeAll();
+    H.setName('rbd'); H.hydrate();
+  }
+
+  // ?real=1: real_input.py drives the page over CDP with real input. Hand it
+  // the fixture and stand aside.
+  if (window.__REAL) {
+    window.__drv = { runQuery: runQuery, makeRows: makeRows, thOf: thOf, tdOf: tdOf, width: width, edge: edge, sortState: sortState, entry: entry,
+                     buildGroups: buildGroups, groupTables: groupTables, gth: gth, mountPivot: mountPivot, plv: plv, pval: pval,
+                     zheads: function () { return CW().pivotValueHeads(pivT()); },
+                     mgrid: function () { return CW().pivotGrid(pivT()); } };
+    document.getElementById('out').textContent = 'READY';
+    return;
+  }
+
+  var FLATONLY = /[?&]colwidths=flat/.test(location.search);
+  (async function () {
+    try {
+      // The module binds on jQuery's ready, after this script has started.
+      for (var i = 0; i < 40 && !OFF && !(CW() && CW().state().host); i++) await sleep(25);
+      if (OFF) { await phaseO(); finish(); return; }
+      if (FLATONLY) { await phaseW(); finish(); return; }
+      phaseU();
+      var ok = await phaseG();
+      if (ok) { await phaseD(); await phaseK(); phaseP(); phaseR(); phaseC(); phaseS(); await phaseV(); await phaseQ(); await phaseY(); await phaseZ(); await phaseM(); await phaseL(); await phaseE(); }
+      finish();
+    } catch (e) { finish('driver threw: ' + ((e && e.stack) || e)); }
+  })();
+})();

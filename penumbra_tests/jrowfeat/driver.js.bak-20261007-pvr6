@@ -1,0 +1,1000 @@
+// jrowfeat suite - browser half (2026-10-02). Runs ONE scenario (?scn=) against
+// whichever main.js the page loaded and publishes
+//   window.__JRRESULT = { scn, asserts: [{id, ok, detail}], obs: {...}, errors: [...] }
+// and window.__JRDONE = true. run.py collects and prints the asserts.
+//
+// GROUND TRUTH comes from the fixture and the fake journal server (window.__J)
+// alone: a rendered row is identified by its '#' cell (= fixture index + 1, or
+// the grouped clone's data-row-index), its key by the fixture's two key values.
+(function () {
+  var JR = window.__JR || {};
+  var SCN = window.__SCN;
+  var FX = window.__rowsFixture;
+  var SEP = window.__SEP;
+  var R = { scn: SCN, asserts: [], obs: {}, notes: [] };
+  function rec(id, ok, detail) { R.asserts.push({ id: id, ok: !!ok, detail: String(detail == null ? '' : detail) }); }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function hides() { return window.__JR_HIDES || 0; }
+  async function until(fn, ms) { var t = Date.now(); while (!fn() && Date.now() - t < ms) await sleep(20); return fn(); }
+  function clickEl(el) { el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); }
+  function keyEl(el, key) {
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: key, keyCode: key === 'Enter' ? 13 : (key === 'Escape' ? 27 : 0), bubbles: true, cancelable: true }));
+  }
+  function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+
+  // ---- ground truth ------------------------------------------------------
+  function keyOfIndex(i) { return window.__keyOf(FX[i]); }
+  function isMarked(k) { var m = window.__J.toggles.toggle1 || {}; return own(m, k); }
+  function noteCount(k) { return own(window.__J.counts, k) ? window.__J.counts[k] : 0; }
+
+  // ---- reading the page --------------------------------------------------
+  function rowIndexOf(tr) {
+    var a = tr.getAttribute('data-row-index');
+    if (a !== null && a !== '') return parseInt(a, 10);
+    var h = tr.querySelector(":scope > td[data-column='#']");
+    return h ? parseInt(h.textContent, 10) - 1 : NaN;
+  }
+  function headerCols(headRow) {
+    return Array.prototype.map.call(headRow.children, function (th) { return th.getAttribute('data-column'); });
+  }
+  // A table's journal picture: header order around '#', every data row's cells.
+  function readTable(headRow, bodyRows) {
+    var out = { head: headRow ? headerCols(headRow) : [], headText: {}, rows: [], problems: [] };
+    if (headRow) {
+      Array.prototype.forEach.call(headRow.children, function (th) {
+        var dc = th.getAttribute('data-column') || '';
+        if (dc.indexOf('__JOURNAL') === 0) out.headText[dc] = th.textContent.replace(/[▲▼]/g, '').trim();
+      });
+    }
+    bodyRows.forEach(function (tr) {
+      if (tr.classList.contains('journal-note-child')) return;
+      var idx = rowIndexOf(tr);
+      if (isNaN(idx)) return;
+      var cells = Array.prototype.slice.call(tr.children);
+      var cols = cells.map(function (td) { return td.getAttribute('data-column'); });
+      var tgl = tr.querySelectorAll(":scope > td[data-column='__JOURNAL_TOGGLE__toggle1']");
+      var nts = tr.querySelectorAll(":scope > td[data-column='__JOURNAL_NOTES']");
+      var box = tgl.length ? tgl[0].querySelector('.journal-toggle-box') : null;
+      var nb = nts.length ? nts[0].querySelector('.journal-notes-btn') : null;
+      out.rows.push({
+        idx: idx, cols: cols, nToggle: tgl.length, nNotes: nts.length,
+        on: box ? box.getAttribute('aria-checked') === 'true' : null,
+        rk: box ? box.getAttribute('data-row-key') : (nb ? nb.getAttribute('data-row-key') : null),
+        count: nb ? (nb.querySelector('.journal-notes-count') || {}).textContent || '' : null,
+        label: box ? box.getAttribute('aria-label') : null
+      });
+    });
+    return out;
+  }
+  function flatPicture() {
+    var hdr = document.getElementById('tableHeader');
+    var rows = Array.prototype.slice.call(document.querySelectorAll('#resultsTable > tbody > tr'));
+    return readTable(hdr, rows);
+  }
+  function leafTables() {
+    return Array.prototype.slice.call(document.querySelectorAll('#groupedResultsContainer .group-content > table'));
+  }
+  function groupedPictures() {
+    return leafTables().map(function (t) {
+      var head = t.tHead ? t.tHead.rows[t.tHead.rows.length - 1] : null;
+      var rows = [];
+      Array.prototype.forEach.call(t.tBodies, function (tb) { rows = rows.concat(Array.prototype.slice.call(tb.rows)); });
+      return readTable(head, rows);
+    });
+  }
+  // Checks one table picture against the truth: the two journal columns right
+  // after '#', every data row carrying exactly one of each with the right state.
+  function checkPicture(p, label) {
+    var bad = [];
+    var h = p.head, hi = h.indexOf('#');
+    if (hi < 0) bad.push(label + ': no # header');
+    else if (h[hi + 1] !== '__JOURNAL_TOGGLE__toggle1' || h[hi + 2] !== '__JOURNAL_NOTES') bad.push(label + ': header after # = ' + h.slice(hi + 1, hi + 3).join(','));
+    if (p.headText['__JOURNAL_TOGGLE__toggle1'] !== 'Reviewed') bad.push(label + ': toggle header text "' + p.headText['__JOURNAL_TOGGLE__toggle1'] + '"');
+    if (!p.rows.length) bad.push(label + ': no data rows');
+    p.rows.forEach(function (r) {
+      var k = keyOfIndex(r.idx);
+      var ci = r.cols.indexOf('#');
+      if (r.nToggle !== 1 || r.nNotes !== 1) { bad.push(label + ' row ' + (r.idx + 1) + ': cells toggle=' + r.nToggle + ' notes=' + r.nNotes); return; }
+      if (r.cols[ci + 1] !== '__JOURNAL_TOGGLE__toggle1' || r.cols[ci + 2] !== '__JOURNAL_NOTES') bad.push(label + ' row ' + (r.idx + 1) + ': cell order ' + r.cols.slice(ci, ci + 3).join(','));
+      if (r.rk !== k) bad.push(label + ' row ' + (r.idx + 1) + ': key "' + r.rk + '" want "' + k + '"');
+      if (r.on !== isMarked(k)) bad.push(label + ' row ' + (r.idx + 1) + ': on=' + r.on + ' want ' + isMarked(k));
+      var want = noteCount(k) ? String(noteCount(k)) : '';
+      if (String(r.count).trim() !== want) bad.push(label + ' row ' + (r.idx + 1) + ': note count "' + r.count + '" want "' + want + '"');
+    });
+    return bad;
+  }
+
+  // ---- driving the page the way a user does ------------------------------
+  async function boot() {
+    await until(function () { return window.__queryDone >= 1 && hides() >= 1; }, 60000);
+    // the journal state fetches (late on purpose with ?jdelay) + the coalesced apply (rAF / 120 ms)
+    await sleep(300);
+    await until(function () { return !window.__jPending; }, 15000);
+    await sleep(700);
+  }
+  function pickCustom(id, value) {
+    var items = document.querySelectorAll('#' + id + ' .pcs-dropdown .pcs-item'), hit = null, seen = [];
+    for (var i = 0; i < items.length; i++) {
+      seen.push(items[i].getAttribute('data-value'));
+      if (items[i].getAttribute('data-value') === value) hit = items[i];
+    }
+    if (!hit) throw new Error('#' + id + ' offers no "' + value + '" (offers: ' + seen.join(', ') + ')');
+    clickEl(document.querySelector('#' + id + ' .pcs-selected'));
+    clickEl(hit);
+  }
+  async function groupVia(level0) {
+    clickEl(document.getElementById('groupTableBtn'));
+    await sleep(50);
+    pickCustom('groupingColumnSelector', level0);
+    var before = hides();
+    clickEl(document.getElementById('confirmGroupingBtn'));
+    await until(function () { return hides() > before && document.querySelectorAll('#groupedResultsContainer .group-wrapper').length > 0; }, 30000);
+    await sleep(600);
+  }
+  async function ungroup() {
+    var before = hides();
+    clickEl(document.getElementById('removeGroupingLink'));
+    await until(function () { return hides() > before && !$('#groupedResultsContainer').is(':visible'); }, 30000);
+    await sleep(600);
+  }
+  function findBox(scope, k) {
+    var bs = (scope || document).querySelectorAll('.journal-toggle-box');
+    for (var i = 0; i < bs.length; i++) if (bs[i].getAttribute('data-row-key') === k) return bs[i];
+    return null;
+  }
+  function findNotesBtn(scope, k) {
+    var bs = (scope || document).querySelectorAll('.journal-notes-btn');
+    for (var i = 0; i < bs.length; i++) if (bs[i].getAttribute('data-row-key') === k) return bs[i];
+    return null;
+  }
+  function panelText() { var el = document.getElementById('journalRowConfig'); return el ? el.textContent : ''; }
+  function statusText() { return ($('#journalToggleStatus').text() || '').replace(/\s+/g, ' ').trim(); }
+  function lockShown() { var el = document.getElementById('journalRowCfgLock'); return !!(el && el.style.display !== 'none' && el.textContent.trim()); }
+  function tick(colName, on) {
+    var cbs = document.querySelectorAll('#journalKeyColumnsBox .journal-keycol-cb');
+    for (var i = 0; i < cbs.length; i++) {
+      if (cbs[i].value === colName) { if (cbs[i].checked !== on) { cbs[i].checked = on; $(cbs[i]).trigger('change'); } return true; }
+    }
+    return false;
+  }
+  function flatToggleHeaderText() {
+    var th = document.querySelector('#tableHeader th[data-column^="__JOURNAL_TOGGLE__"]');
+    return th ? th.textContent.replace(/[▲▼]/g, '').trim() : null;
+  }
+
+  var S = {
+    // A report saved FLAT: the columns after '#', the server's state on them.
+    flat: async function () {
+      var p = flatPicture();
+      var bad = checkPicture(p, 'flat');
+      rec('F-flat', !bad.length, bad.slice(0, 6).join(' | ') || (p.rows.length + ' rows ok'));
+    },
+    // Saved GROUPED (eirbprotsum): every group's rows carry the columns, and so
+    // does the (hidden) flat table they are cloned from.
+    grouped: async function () {
+      var gp = groupedPictures();
+      var bad = [];
+      if (!gp.length) bad.push('no group tables');
+      gp.forEach(function (p, i) { bad = bad.concat(checkPicture(p, 'group ' + (i + 1))); });
+      var n = gp.reduce(function (s, p) { return s + p.rows.length; }, 0);
+      if (n !== FX.length) bad.push('grouped rows ' + n + ' of ' + FX.length);
+      rec('G-grouped', !bad.length, bad.slice(0, 6).join(' | ') || (gp.length + ' groups, ' + n + ' rows ok'));
+      var fb = checkPicture(flatPicture(), 'flat(hidden)');
+      rec('G-flatbehind', !fb.length, fb.slice(0, 4).join(' | ') || 'flat table carries the columns too');
+    },
+    // Remove Grouping only un-hides the flat table: its columns must be there.
+    ungroup: async function () {
+      await ungroup();
+      var bad = checkPicture(flatPicture(), 'flat');
+      rec('U-ungroup', !bad.length, bad.slice(0, 6).join(' | ') || 'flat table has the columns after Remove Grouping');
+    },
+    // '#' shown while grouped: header order is # | Reviewed | Notes | ...
+    hashshown: async function () {
+      var gp = groupedPictures(), bad = [];
+      gp.forEach(function (p, i) { bad = bad.concat(checkPicture(p, 'group ' + (i + 1))); });
+      rec('G-hashshown', gp.length && !bad.length, bad.slice(0, 6).join(' | ') || (gp.length + ' groups ok'));
+    },
+    // A header sort REPLACES the tbody; a later rebuild of the rows must still
+    // get the columns (the observer used to stay on the detached tbody).
+    stale: async function () {
+      var tb0 = document.querySelector('#resultsTable > tbody');
+      var th = document.querySelector('#tableHeader th[data-colname="TITLE"]');
+      if (!th) throw new Error('no TITLE header');
+      clickEl(th);
+      await sleep(400);
+      var tb1 = document.querySelector('#resultsTable > tbody');
+      rec('P-stale-swap', tb0 !== tb1, 'the header sort replaced the tbody: ' + (tb0 !== tb1));
+      var before = flatPicture();
+      rec('P-stale-before', !checkPicture(before, 'flat').length, 'columns present right after the sort');
+      JR.rebuildTableFromMasterData();
+      await sleep(900);
+      var bad = checkPicture(flatPicture(), 'flat');
+      rec('S-stale', !bad.length, bad.slice(0, 6).join(' | ') || 'columns re-injected after the rows were rebuilt');
+    },
+    // A click on a GROUPED row's box: the right key posts, and every copy of that
+    // row's box (the flat twin included) shows the new state.
+    clickgrp: async function () {
+      clickEl(document.getElementById('expandAllGroups'));
+      await sleep(150);
+      var k = keyOfIndex(25);                       // 25407 Expedited, not marked
+      var box = findBox(document.getElementById('groupedResultsContainer'), k);
+      rec('P-clickgrp-box', !!box, 'grouped box for ' + k + ': ' + !!box);
+      if (!box) return;
+      clickEl(box);
+      await sleep(400);
+      var post = window.__J.posts.filter(function (b) { return b.action === 'set_toggle'; }).pop() || {};
+      rec('C-clickgrp-post', post.row_key === k && post.toggle_key === 'toggle1' && post.state === true,
+          'posted ' + JSON.stringify(post));
+      var flatBox = findBox(document.getElementById('resultsTable'), k);
+      var gOn = box.isConnected ? box.getAttribute('aria-checked') : (findBox(document.getElementById('groupedResultsContainer'), k) || {}).getAttribute && findBox(document.getElementById('groupedResultsContainer'), k).getAttribute('aria-checked');
+      rec('C-clickgrp-twin', gOn === 'true' && flatBox && flatBox.getAttribute('aria-checked') === 'true',
+          'grouped=' + gOn + ' flat=' + (flatBox && flatBox.getAttribute('aria-checked')));
+      var lbl = (findBox(document.getElementById('groupedResultsContainer'), k) || box).getAttribute('aria-label') || '';
+      rec('C-clickgrp-label', /^Marked/.test(lbl), 'aria-label after marking: "' + lbl + '"');
+      // and back off
+      clickEl(findBox(document.getElementById('groupedResultsContainer'), k));
+      await sleep(400);
+      var flatBox2 = findBox(document.getElementById('resultsTable'), k);
+      rec('C-clickgrp-off', flatBox2 && flatBox2.getAttribute('aria-checked') === 'false' && !isMarked(k),
+          'flat after unmark=' + (flatBox2 && flatBox2.getAttribute('aria-checked')) + ' server marked=' + isMarked(k));
+    },
+    // Notes inside a group: the child row opens under its row, spans that row,
+    // and opening another (in another group) closes the first.
+    notegrp: async function () {
+      // Groups render collapsed; a reader opens one before using its rows.
+      clickEl(document.getElementById('expandAllGroups'));
+      await sleep(150);
+      var g = document.getElementById('groupedResultsContainer');
+      var kA = window.__NOTED, kB = keyOfIndex(30);   // 25412 Expedited
+      var a = findNotesBtn(g, kA), b = findNotesBtn(g, kB);
+      rec('P-notegrp-btns', !!a && !!b, 'grouped note buttons: A=' + !!a + ' B=' + !!b);
+      if (!a || !b) return;
+      clickEl(a);
+      await sleep(200);
+      var trA = a.closest('tr'), childA = trA.nextElementSibling;
+      var okA = !!childA && childA.classList.contains('journal-note-child');
+      var span = okA ? parseInt(childA.firstElementChild.getAttribute('colspan'), 10) : -1;
+      rec('N-notegrp-open', okA && span === trA.children.length && /First look done/.test(childA.textContent),
+          'child after its row: ' + okA + ', colspan ' + span + ' of ' + trA.children.length + ' cells, shows the notes: ' + (okA && /First look done/.test(childA.textContent)));
+      clickEl(b);
+      await sleep(200);
+      var open = g.querySelectorAll('tr.journal-note-child');
+      var trB = b.closest('tr');
+      rec('N-notegrp-one', open.length === 1 && trB.nextElementSibling === open[0] && !a.classList.contains('is-open'),
+          'open children ' + open.length + ', under B: ' + (open.length && trB.nextElementSibling === open[0]));
+      // The panel's band says "Click to collapse" - and no longer "Esc".
+      var hint = open.length ? (open[0].querySelector('.journal-rownote-hint') || {}).textContent || '' : '';
+      rec('N-notegrp-hint', open.length && /collapse/i.test(hint) && !/esc/i.test(hint), 'band hint "' + hint + '"');
+      // An open @mention list: Escape closes the LIST only (the note stays open).
+      var inp = open.length ? open[0].querySelector('.journal-rownote-input') : null;
+      var listShown = false, listAfter = null, noteAfterList = 0, noteAfterEsc = 0;
+      if (inp) {
+        inp.focus();
+        inp.textContent = 'cc @pa';
+        var rng = document.createRange(); rng.setStart(inp.firstChild, inp.firstChild.length); rng.collapse(true);
+        var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rng);
+        inp.dispatchEvent(new Event('input', { bubbles: true }));
+        await until(function () { var d = document.querySelector('ul.journal-mention-dropdown'); return d && d.style.display !== 'none' && d.childElementCount > 0; }, 3000);
+        var dd = document.querySelector('ul.journal-mention-dropdown');
+        listShown = !!(dd && dd.style.display !== 'none' && dd.childElementCount > 0);
+        keyEl(inp, 'Escape');
+        await sleep(150);
+        listAfter = !!(dd && dd.style.display !== 'none' && dd.childElementCount > 0);
+        noteAfterList = g.querySelectorAll('tr.journal-note-child').length;
+        // A second Escape with no list open belongs to the admin console (the
+        // user's call): the note panel stays open.
+        keyEl(inp, 'Escape');
+        await sleep(150);
+        noteAfterEsc = g.querySelectorAll('tr.journal-note-child').length;
+      }
+      rec('N-notegrp-mention', listShown && listAfter === false && noteAfterList === 1,
+          'list shown ' + listShown + ', after Escape shown ' + listAfter + ', note panels open ' + noteAfterList);
+      rec('N-notegrp-esc', noteAfterEsc === 1, 'note panels open after an Escape with no list: ' + noteAfterEsc + ' (Escape stays the console toggle)');
+      // The band collapses it, focus back on the row's note button.
+      var band = g.querySelector('tr.journal-note-child .journal-rownote-close');
+      if (band) clickEl(band);
+      await sleep(150);
+      rec('N-notegrp-band', g.querySelectorAll('tr.journal-note-child').length === 0 && document.activeElement === b,
+          'after the band click: open ' + g.querySelectorAll('tr.journal-note-child').length + ', focus on its button ' + (document.activeElement === b));
+    },
+    // A mark made in the FLAT table shows in the group rows built from it, and
+    // stays after Remove Grouping.
+    regroup: async function () {
+      var k = keyOfIndex(10);                       // 25411 Exempt
+      clickEl(findBox(document.getElementById('resultsTable'), k));
+      await sleep(400);
+      await groupVia('PROTOCOL TYPE');
+      var gb = findBox(document.getElementById('groupedResultsContainer'), k);
+      rec('R-regroup', gb && gb.getAttribute('aria-checked') === 'true', 'grouped box after a flat mark: ' + (gb && gb.getAttribute('aria-checked')));
+      var gp = groupedPictures(), bad = [];
+      gp.forEach(function (p, i) { bad = bad.concat(checkPicture(p, 'group ' + (i + 1))); });
+      rec('R-regroup-all', gp.length && !bad.length, bad.slice(0, 5).join(' | ') || 'every group row right');
+      await ungroup();
+      var fbad = checkPicture(flatPicture(), 'flat');
+      rec('R-regroup-back', !fbad.length, fbad.slice(0, 5).join(' | ') || 'flat right after Remove Grouping');
+    },
+    // The setup panel, driven from scratch the way an owner does it.
+    cfg: async function () {
+      // Opening the View Options tab is what (re)builds the panel from the rows
+      // (the tabsactivate handler); the restore ran before the rows existed.
+      if (window.Penumbra && window.Penumbra.syncJournalRowConfigUI) window.Penumbra.syncJournalRowConfigUI();
+      await sleep(100);
+      var hasPanel = !!document.getElementById('journalRowConfig');
+      rec('P-cfg-panel', hasPanel && $('#journalRowConfig').is(':visible'), 'panel present and shown: ' + hasPanel);
+      // 1) nothing picked yet: step 2's toggle columns say why they are locked, and
+      // are. The Row notes switch is NOT locked since 2026-10-06 (pivot rows need no
+      // key - suite pvnotes K-off-panel holds that), so it is no longer asserted here.
+      rec('K-cfg-locked', lockShown() && /step 1/i.test($('#journalRowCfgLock').text()) && $('#journalAddToggleBtn').prop('disabled'),
+          'lock "' + $('#journalRowCfgLock').text() + '" add disabled=' + $('#journalAddToggleBtn').prop('disabled'));
+      // 2) a key that is not unique: still locked, and says so.
+      tick('PROTOCOL NO.', true);
+      await sleep(150);
+      rec('K-cfg-dup', lockShown() && /unique/i.test($('#journalRowCfgLock').text()) && /share|duplicate/i.test($('#journalKeyUniqueNote').text()),
+          'lock "' + $('#journalRowCfgLock').text() + '" note "' + $('#journalKeyUniqueNote').text() + '"');
+      // 3) a unique key: unlocked, step 1 marked done.
+      tick('PROTOCOL TYPE', true);
+      await sleep(150);
+      rec('K-cfg-open', !lockShown() && !$('#journalAddToggleBtn').prop('disabled') && $('#journalRowCfgStep1').hasClass('is-done') && /Unique across all 36 rows/.test($('#journalKeyUniqueNote').text()),
+          'lock shown=' + lockShown() + ' add disabled=' + $('#journalAddToggleBtn').prop('disabled') + ' note "' + $('#journalKeyUniqueNote').text() + '"');
+      // 4) add a toggle column: confirmed in words, the new name box focused, column in the table.
+      clickEl(document.getElementById('journalAddToggleBtn'));
+      await sleep(700);
+      var inp = document.querySelector('#journalToggleList .journal-toggle-def:last-child .journal-toggle-def-label');
+      rec('T-cfg-add', /Added/.test(statusText()) && inp && document.activeElement === inp && flatToggleHeaderText() === 'Toggle 1',
+          'status "' + statusText() + '" focused=' + (inp && document.activeElement === inp) + ' header "' + flatToggleHeaderText() + '"');
+      // The fake server holds marks under toggle1 (a column this report had
+      // before): the new column must start EMPTY, never inherit them.
+      var markedNew = document.querySelectorAll('#resultsTable .journal-toggle-box[aria-checked="true"]').length;
+      rec('T-cfg-fresh', markedNew === 0 && (window._penumbraJournalToggles[0] || {}).key !== 'toggle1',
+          'marked boxes in the new column ' + markedNew + ', its key ' + (window._penumbraJournalToggles[0] || {}).key);
+      // 5) name it + Enter: confirmed, header follows.
+      inp.value = 'Reviewed'; $(inp).trigger('input');
+      keyEl(inp, 'Enter');
+      await sleep(400);
+      rec('T-cfg-name', /Reviewed/.test(statusText()) && /Named|set/i.test(statusText()) && flatToggleHeaderText() === 'Reviewed' && document.activeElement === inp,
+          'status "' + statusText() + '" header "' + flatToggleHeaderText() + '" focus kept ' + (document.activeElement === inp));
+      // 6) an emptied name is refused and the old one kept.
+      inp.value = ''; $(inp).trigger('input');
+      keyEl(inp, 'Enter');
+      await sleep(300);
+      rec('T-cfg-empty', inp.value === 'Reviewed' && /name/i.test(statusText()) && flatToggleHeaderText() === 'Reviewed',
+          'box "' + inp.value + '" status "' + statusText() + '" header "' + flatToggleHeaderText() + '"');
+      var keyBefore = (window._penumbraJournalToggles[0] || {}).key;
+      // 7) remove: confirmed with an Undo that brings back the SAME column.
+      clickEl(document.querySelector('#journalToggleList .journal-toggle-def-remove'));
+      await sleep(400);
+      var undo = document.querySelector('#journalToggleStatus .journal-toggle-undo');
+      rec('T-cfg-remove', /Removed/.test(statusText()) && !!undo && !document.querySelector('#tableHeader th[data-column^="__JOURNAL_TOGGLE__"]') && window._penumbraJournalToggles.length === 0,
+          'status "' + statusText() + '" undo=' + !!undo + ' header gone=' + !document.querySelector('#tableHeader th[data-column^="__JOURNAL_TOGGLE__"]'));
+      if (undo) { clickEl(undo); await sleep(600); }
+      var back = window._penumbraJournalToggles[0] || {};
+      rec('T-cfg-undo', back.key === keyBefore && back.label === 'Reviewed' && flatToggleHeaderText() === 'Reviewed' && /Restored/.test(statusText()),
+          'restored ' + JSON.stringify(back) + ' (key before ' + keyBefore + ') header "' + flatToggleHeaderText() + '" status "' + statusText() + '"');
+      // 8) notes on: confirmed.
+      var rn = document.getElementById('journalRowNotesEnable');
+      rn.checked = true; $(rn).trigger('change');
+      await sleep(700);
+      rec('T-cfg-notes', /notes/i.test(statusText()) && !!document.querySelector('#tableHeader th[data-column="__JOURNAL_NOTES"]'),
+          'status "' + statusText() + '" notes header ' + !!document.querySelector('#tableHeader th[data-column="__JOURNAL_NOTES"]'));
+      // 9) the panel's copy: numbered steps, no em-dashes (the user's rule for UI text).
+      var txt = panelText();
+      rec('T-cfg-copy', txt.indexOf('—') === -1 && document.querySelectorAll('#journalRowConfig .journal-rowcfg-step').length === 2,
+          'em-dashes ' + (txt.split('—').length - 1) + ', step badges ' + document.querySelectorAll('#journalRowConfig .journal-rowcfg-step').length);
+    },
+    // Changing the key of a report that already has marks / notes warns that
+    // they detach (they stay saved and return if the key is switched back).
+    keychg: async function () {
+      if (window.Penumbra && window.Penumbra.syncJournalRowConfigUI) window.Penumbra.syncJournalRowConfigUI();
+      await sleep(100);
+      var before = $('#journalKeyUniqueNote').text();
+      tick('PROTOCOL TYPE', false);
+      tick('TITLE', true);          // PROTOCOL NO. + TITLE: unique, but a different key
+      await sleep(200);
+      var t = $('#journalKeyUniqueNote').text();
+      rec('K-keychg', /Unique/.test(t) && /2 marked/.test(t) && /2 row notes?/.test(t),
+          'note before "' + before + '" after "' + t + '"');
+      tick('TITLE', false);
+      tick('PROTOCOL TYPE', true);
+      await sleep(200);
+      var t2 = $('#journalKeyUniqueNote').text();
+      rec('K-keyback', /Unique/.test(t2) && !/marked/.test(t2), 'back on the saved key: "' + t2 + '"');
+    }
+  };
+
+  // ---- the two nits of 2026-10-02 -----------------------------------------
+  async function openFlatNote(idx) {
+    var k = keyOfIndex(idx);
+    var b = findNotesBtn(document.getElementById('resultsTable'), k);
+    if (!b) return null;
+    clickEl(b);
+    await sleep(200);
+    var tr = b.closest('tr'), child = tr.nextElementSibling;
+    return (child && child.classList.contains('journal-note-child')) ? child : null;
+  }
+  // The row-note Post button against the journal panel's, on a DARK theme
+  // (body.is-dark), with the panel's lazy stylesheet loaded as it is once the
+  // panel has been opened: same colours, and the row button keeps its size.
+  S.postbtn = async function () {
+    var child = await openFlatNote(4);
+    rec('P-postbtn-open', !!child, 'a row note opened: ' + !!child);
+    if (!child) return;
+    var link = document.createElement('link');
+    link.rel = 'stylesheet'; link.href = 'penumbra_journal.css';
+    var loaded = new Promise(function (r) { link.onload = r; link.onerror = r; });
+    document.head.appendChild(link);
+    await loaded;
+    var box = document.createElement('div');
+    box.innerHTML = '<div class="journal-composer-buttons"><button type="button" class="journal-post-btn">Post</button></div>';
+    document.body.appendChild(box);
+    var row = child.querySelector('.journal-rownote-post'), panel = box.querySelector('.journal-post-btn');
+    document.body.classList.add('is-dark');
+    await sleep(50);
+    var cr = getComputedStyle(row), cp = getComputedStyle(panel);
+    rec('B-postbtn-dark', cr.color === cp.color && cr.backgroundColor === cp.backgroundColor,
+        'row ' + cr.color + ' on ' + cr.backgroundColor + ' | panel ' + cp.color + ' on ' + cp.backgroundColor);
+    rec('B-postbtn-size', cr.fontSize === '12px', 'row Post font-size after the panel stylesheet loaded: ' + cr.fontSize);
+    document.body.classList.remove('is-dark');
+    box.remove();
+  };
+  function fileDrag(type, el, x, y, files) {
+    var dt = new DataTransfer();
+    for (var i = 0; i < files.length; i++) dt.items.add(files[i]);
+    var ev = new DragEvent(type, { bubbles: true, cancelable: true, composed: true, dataTransfer: dt, clientX: x, clientY: y });
+    el.dispatchEvent(ev);
+    return ev;
+  }
+  // A file dropped on an open row-note card is attached to that note (and the
+  // app-wide import never sees it); a data file dropped on the table still
+  // imports, exactly as before.
+  S.dropnote = async function () {
+    var child = await openFlatNote(4);
+    rec('P-drop-open', !!child, 'a row note opened: ' + !!child);
+    if (!child) return;
+    var panel = child.querySelector('.journal-rownote-panel');
+    panel.scrollIntoView({ block: 'center' });
+    await sleep(50);
+    var r = panel.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+    var file = new File(['hello note'], 'notes.txt', { type: 'text/plain' });
+    // Stands where the app-wide import listens (a document-level drop handler,
+    // bound like it): counts the drops that reach it.
+    window.__importSaw = 0;
+    $(document).on('drop.jrspy', function () { window.__importSaw++; });
+    fileDrag('dragenter', document.body, x, y, [file]);
+    var under = document.elementFromPoint(x, y) || panel;
+    fileDrag('dragover', under, x, y, [file]);
+    await sleep(30);
+    rec('D-drop-armed', panel.classList.contains('journal-drop-target') && document.body.classList.contains('journal-drop-armed')
+        && getComputedStyle(document.getElementById('importDragOverlay')).display === 'none',
+        'card lit ' + panel.classList.contains('journal-drop-target') + ', overlay display ' + getComputedStyle(document.getElementById('importDragOverlay')).display);
+    var rowsBefore = document.querySelectorAll('#resultsTable > tbody > tr').length;
+    under = document.elementFromPoint(x, y) || panel;
+    fileDrag('drop', under, x, y, [file]);
+    await sleep(600);
+    var pill = child.querySelector('.journal-attach-selected');
+    var inp = child.querySelector('.journal-attach-input');
+    rec('D-drop-attach', /notes\.txt/.test(pill ? pill.textContent : '') && inp && inp.files && inp.files.length === 1
+        && document.querySelectorAll('#resultsTable > tbody > tr').length === rowsBefore && !panel.classList.contains('journal-drop-target')
+        && window.__importSaw === 0,
+        'pill "' + (pill ? pill.textContent.trim() : '') + '", input files ' + (inp && inp.files ? inp.files.length : '?')
+        + ', rows ' + rowsBefore + ' -> ' + document.querySelectorAll('#resultsTable > tbody > tr').length + ', drops the import saw ' + window.__importSaw);
+    // A CSV dropped on the table (outside any note) is still imported.
+    var cell = document.querySelector('#resultsTable > tbody > tr:last-child > td:last-child');
+    cell.scrollIntoView({ block: 'center' });
+    await sleep(50);
+    var cr = cell.getBoundingClientRect(), cx = cr.left + 3, cy = cr.top + 3;
+    var csv = new File(['ALPHA,BETA\n1,2\n3,4\n'], 'data.csv', { type: 'text/csv' });
+    fileDrag('dragenter', document.body, cx, cy, [csv]);
+    fileDrag('dragover', document.elementFromPoint(cx, cy) || cell, cx, cy, [csv]);
+    var lit = document.body.classList.contains('journal-drop-armed');
+    var sawBefore = window.__importSaw;
+    fileDrag('drop', document.elementFromPoint(cx, cy) || cell, cx, cy, [csv]);
+    await sleep(100);
+    $(document).off('drop.jrspy');
+    rec('D-drop-elsewhere', window.__importSaw === sawBefore + 1 && !lit,
+        'a CSV dropped on the table reached the import: ' + (window.__importSaw - sawBefore) + ' (drop target armed over the table: ' + lit + ')');
+  };
+
+  // The setup changed WHILE the report is grouped: the group tables follow
+  // (rebuilt from the flat table - their widths and footers are positional).
+  function groupJournalHeads() {
+    return leafTables().map(function (t) {
+      var head = t.tHead ? t.tHead.rows[t.tHead.rows.length - 1] : null;
+      if (!head) return '';
+      return Array.prototype.map.call(head.querySelectorAll(':scope > [data-column^="__JOURNAL"]'), function (th) { return th.getAttribute('data-column'); }).join(',');
+    });
+  }
+  function groupRowsJournalCount() {
+    var n = [];
+    leafTables().forEach(function (t) {
+      Array.prototype.forEach.call(t.tBodies[0] ? t.tBodies[0].rows : [], function (tr) {
+        if (tr.classList.contains('journal-note-child')) return;
+        n.push(tr.querySelectorAll(':scope > [data-column^="__JOURNAL"]').length);
+      });
+    });
+    return n;
+  }
+  S.cfggrp = async function () {
+    if (window.Penumbra && window.Penumbra.syncJournalRowConfigUI) window.Penumbra.syncJournalRowConfigUI();
+    await sleep(100);
+    clickEl(document.getElementById('journalAddToggleBtn'));
+    await sleep(900);
+    var defs = (window._penumbraJournalToggles || []).map(function (d) { return '__JOURNAL_TOGGLE__' + d.key; });
+    var want = defs.concat(['__JOURNAL_NOTES']).join(',');
+    var heads = groupJournalHeads(), counts = groupRowsJournalCount();
+    rec('G-cfggrp-add', defs.length === 2 && heads.length > 0 && heads.every(function (h) { return h === want; })
+        && counts.length === FX.length && counts.every(function (c) { return c === 3; }),
+        'want ' + want + ' | group heads ' + JSON.stringify(heads.slice(0, 3)) + ' | rows with 3 cells ' + counts.filter(function (c) { return c === 3; }).length + '/' + counts.length);
+    var rn = document.getElementById('journalRowNotesEnable');
+    rn.checked = false; $(rn).trigger('change');
+    await sleep(900);
+    heads = groupJournalHeads(); counts = groupRowsJournalCount();
+    var flatNotes = document.querySelectorAll('#resultsTable [data-column="__JOURNAL_NOTES"]').length;
+    rec('G-cfggrp-notesoff', heads.length > 0 && heads.every(function (h) { return h.indexOf('__JOURNAL_NOTES') === -1 && h.split(',').length === 2; })
+        && counts.every(function (c) { return c === 2; }) && flatNotes === 0,
+        'group heads ' + JSON.stringify(heads.slice(0, 3)) + ' | flat notes cells ' + flatNotes);
+  };
+  // The summary footer lines up with the header column for column - with '#'
+  // hidden (the footer holds VISIBLE columns only), and after a journal column
+  // is hidden by the viewer.
+  function footerAligned() {
+    var hdr = document.getElementById('tableHeader');
+    var tf = document.querySelector('#resultsTable > tfoot > tr.total-row-data');
+    if (!hdr || !tf) return { ok: false, why: 'no footer' };
+    var vis = Array.prototype.filter.call(hdr.children, function (th) { return th.style.display !== 'none'; })
+      .map(function (th) { return th.getAttribute('data-column'); });
+    var cells = Array.prototype.map.call(tf.children, function (td) { return td.getAttribute('data-column'); });
+    return { ok: vis.join('|') === cells.join('|'), why: 'header ' + vis.join(',') + ' | footer ' + cells.join(',') };
+  }
+  S.footer = async function () {
+    await sleep(300);
+    var tf = document.querySelector('#resultsTable > tfoot > tr.total-row-data');
+    rec('P-footer', !!tf && /\$/.test(tf.textContent), 'summary footer present: ' + !!tf + ' "' + (tf ? tf.textContent.replace(/\s+/g, ' ').trim().slice(0, 60) : '') + '"');
+    var a = footerAligned();
+    rec('F-footer-align', a.ok, a.why);
+    // The viewer hides the Reviewed column (as the column chooser does: every
+    // cell display:none), the footer is rebuilt, the journal pass runs again.
+    $('#resultsTable [data-column="__JOURNAL_TOGGLE__toggle1"]').css('display', 'none');
+    JR.updateTotalRow();
+    if (window.Penumbra.applyJournalToggles) window.Penumbra.applyJournalToggles();
+    await sleep(500);
+    var b = footerAligned();
+    rec('F-footer-hidden', b.ok, b.why);
+  };
+
+  // The status bar's "custom layout" pill compares the on-screen columns with
+  // the report's saved layout: the journal columns are in neither on purpose.
+  S.ccpill = async function () {
+    // Nudge the status bar's #resultCount observer for a fresh refresh (the
+    // ungroup path does the same), now that the journal columns are in.
+    var rc = document.getElementById('resultCount');
+    if (rc) { var c = document.createComment(''); rc.appendChild(c); rc.removeChild(c); }
+    await sleep(400);
+    var pill = document.getElementById('sbCustomCols');
+    var shown = pill ? getComputedStyle(pill).display !== 'none' : null;
+    var jth = document.querySelectorAll('#tableHeader th[data-column^="__JOURNAL"]').length;
+    rec('C-ccpill', jth === 2 && shown === false, 'journal headers ' + jth + ', custom-layout pill shown ' + shown + ' "' + ($('#sbCustomColsDiff').text() || '').replace(/\s+/g, ' ').slice(0, 120) + '"');
+  };
+
+  // ---- round 2 (2026-10-02): grouped BY the toggle ---------------------------
+  // A band = a group wrapper, named by its data-group-path ('Checked',
+  // 'Exempt|||Unchecked'); its rows = the data rows of every leaf table under it.
+  function wrapperByPath(path) {
+    var ws = document.querySelectorAll('#groupedResultsContainer .group-wrapper[data-group-path]');
+    for (var i = 0; i < ws.length; i++) if (ws[i].getAttribute('data-group-path') === path) return ws[i];
+    return null;
+  }
+  function bandTrs(w) {
+    return Array.prototype.filter.call(w ? w.querySelectorAll('.group-content > table > tbody > tr') : [], function (tr) {
+      return !tr.classList.contains('journal-note-child') && !isNaN(rowIndexOf(tr));
+    });
+  }
+  function bands(depth) {
+    var out = {};
+    document.querySelectorAll('#groupedResultsContainer .group-wrapper[data-group-depth="' + (depth || 0) + '"]').forEach(function (w) {
+      out[w.getAttribute('data-group-path')] = bandTrs(w).map(rowIndexOf).sort(function (a, b) { return a - b; });
+    });
+    return out;
+  }
+  function canon(b) {
+    return Object.keys(b).sort().map(function (k) { return k + '=' + b[k].length + '[' + b[k].join(',') + ']'; }).join(' ');
+  }
+  function brief(b) { return Object.keys(b).sort().map(function (k) { return k + '=' + b[k].length; }).join(' '); }
+  // The truth: the fake server's marks, per fixture row (nested: under its type).
+  function wantBands(nested) {
+    var out = {};
+    FX.forEach(function (r, i) {
+      var p = (nested ? r['PROTOCOL TYPE'] + '|||' : '') + (isMarked(keyOfIndex(i)) ? 'Checked' : 'Unchecked');
+      (out[p] = out[p] || []).push(i);
+    });
+    return out;
+  }
+  function rowIn(path, idx) {
+    var trs = bandTrs(wrapperByPath(path));
+    for (var i = 0; i < trs.length; i++) if (rowIndexOf(trs[i]) === idx) return trs[i];
+    return null;
+  }
+  function shown(tr) { return !!(tr && tr.getClientRects().length); }
+  function shownIn(path) { return bandTrs(wrapperByPath(path)).filter(shown); }
+  // The shown rows of a band a scenario drives - or a clear failure when the
+  // report is not grouped that way at all (the pre-fix build opens it flat).
+  function rowsOf(path, n) {
+    var rows = shownIn(path);
+    if (rows.length < n) throw new Error('no band "' + path + '" with ' + n + ' shown rows (grouped ' + $('#groupedResultsContainer').is(':visible')
+        + ', bands ' + (brief(bands(0)) || 'none') + ', dropped notice ' + droppedNotice() + ')');
+    return rows;
+  }
+  function pillOf(path) {
+    var w = wrapperByPath(path), p = w && w.querySelector(':scope > .group-header .group-count');
+    return p ? p.textContent.trim() : null;
+  }
+  function boxOf(tr) { return tr ? tr.querySelector('.journal-toggle-box') : null; }
+  function droppedNotice() { return /grouping dropped/i.test(document.body.textContent || ''); }
+  async function expandAll() { clickEl(document.getElementById('expandAllGroups')); await sleep(200); }
+  // The grouping dialog's value for the toggle: its label where the picker lists
+  // it so (search_builder.js loaded), its sentinel in the fallback list.
+  function toggleValueIn(id) {
+    var items = document.querySelectorAll('#' + id + ' .pcs-dropdown .pcs-item');
+    for (var i = 0; i < items.length; i++) {
+      var v = items[i].getAttribute('data-value') || '';
+      if (v === 'Reviewed' || v.indexOf('__JOURNAL_TOGGLE__') === 0) return v;
+    }
+    return null;
+  }
+
+  // Saved grouped BY the toggle - by its label, by its sentinel: the report opens
+  // grouped (it used to come back flat: "Previous grouping dropped because the
+  // column was removed from the query"), its bands the server's marks.
+  async function savedByToggle(id) {
+    var got = bands(0), want = wantBands(false);
+    rec(id, $('#groupedResultsContainer').is(':visible') && !droppedNotice() && canon(got) === canon(want),
+        'grouped ' + $('#groupedResultsContainer').is(':visible') + ', dropped notice ' + droppedNotice() + ' | bands ' + canon(got).slice(0, 160) + ' | want ' + brief(want));
+  }
+  S.bytoggle = function () { return savedByToggle('Y-bytoggle-load'); };
+  S.bysentinel = function () { return savedByToggle('Y-bysentinel-load'); };
+  // The journal state lands AFTER the group build (?jdelay): the first build put
+  // every row in Unchecked; the bands are put right once the marks arrive.
+  function probeFirstBuild() {
+    var t = setInterval(function () {
+      if (!document.querySelector('#groupedResultsContainer .group-wrapper')) return;
+      clearInterval(t);
+      var open = {};
+      document.querySelectorAll('#groupedResultsContainer .group-wrapper[data-group-depth="0"]').forEach(function (w) { open[w.getAttribute('data-group-path')] = w.classList.contains('open'); });
+      window.__firstBuild = { bands: bands(0), open: open, pending: window.__jPending || 0 };
+    }, 5);
+  }
+  S.bylate = async function () {
+    var fb = window.__firstBuild;
+    rec('P-bylate-early', !!fb && fb.pending > 0 && !fb.bands.Checked && (fb.bands.Unchecked || []).length === FX.length,
+        fb ? ('first build: ' + brief(fb.bands) + ', journal fetches still out ' + fb.pending) : 'never grouped');
+    var got = bands(0), want = wantBands(false);
+    rec('Y-bylate-bands', canon(got) === canon(want), 'bands ' + brief(got) + ' want ' + brief(want) + ' | ' + canon(got).slice(0, 120));
+  };
+  // Tick a row in Unchecked while the bands are sorted by TITLE: it stays put
+  // while the clicks settle, then moves to Checked (pills follow); the row after
+  // it takes its place on screen; the sort holds; the moved row is flashed.
+  S.flipgrp = async function () {
+    await expandAll();
+    var th = document.querySelector('#groupedResultsContainer .group-content > table th[data-colname="TITLE"]');
+    if (th) { clickEl(th); await sleep(600); }
+    var rows = rowsOf('Unchecked', 20);
+    var order0 = rows.map(rowIndexOf);
+    var pos = Math.floor(rows.length / 2), pick = rows[pos], nextTr = rows[pos + 1];
+    var idx = rowIndexOf(pick), nextIdx = rowIndexOf(nextTr), k = keyOfIndex(idx);
+    pick.scrollIntoView({ block: 'center' });
+    await sleep(100);
+    var top0 = pick.getBoundingClientRect().top;
+    // (the band scrolls inside its own box: scrollIntoView scrolled the box AND the page)
+    var prevTop0 = rows[pos - 1].getBoundingClientRect().top;
+    var uScroll0 = pick.closest('.group-content').scrollTop;
+    var box = boxOf(pick);
+    clickEl(box);
+    await sleep(250);
+    rec('Y-flipgrp-stay', !!rowIn('Unchecked', idx) && !rowIn('Checked', idx) && box.getAttribute('aria-checked') === 'true',
+        'right after the tick: in Unchecked ' + !!rowIn('Unchecked', idx) + ', in Checked ' + !!rowIn('Checked', idx) + ', box ' + box.getAttribute('aria-checked'));
+    await sleep(1300);
+    var got = bands(0), want = wantBands(false);
+    var flatBox = findBox(document.getElementById('resultsTable'), k);
+    rec('Y-flipgrp-moved', isMarked(k) && canon(got) === canon(want) && pillOf('Checked') === '3' && pillOf('Unchecked') === '33'
+        && flatBox && flatBox.getAttribute('aria-checked') === 'true',
+        'row ' + (idx + 1) + ' marked ' + isMarked(k) + ' | bands ' + brief(got) + ' want ' + brief(want) + ' | pills ' + pillOf('Checked') + '/' + pillOf('Unchecked'));
+    var nr = rowIn('Unchecked', nextIdx);
+    var top1 = nr ? nr.getBoundingClientRect().top : NaN;
+    var prevIdx = rowIndexOf(rows[pos - 1]), pr = rowIn('Unchecked', prevIdx);
+    var prevTop1 = pr ? pr.getBoundingClientRect().top : NaN;
+    var ubox = wrapperByPath('Unchecked') && wrapperByPath('Unchecked').querySelector(':scope > .group-content');
+    // The band's box went back to its place on the PAGE (the Checked band above it
+    // grew), so the box's own scroll is untouched.
+    rec('Y-flipgrp-place', Math.abs(top1 - top0) <= 2 && Math.abs(prevTop1 - prevTop0) <= 2 && !!ubox && ubox.scrollTop === uScroll0,
+        'the next row (' + (nextIdx + 1) + ') sits at ' + Math.round(top1) + ', the ticked row was at ' + Math.round(top0)
+        + '; the row before it ' + Math.round(prevTop0) + ' -> ' + Math.round(prevTop1) + ' (band box scrolled ' + uScroll0 + ' -> ' + (ubox ? ubox.scrollTop : '?') + ')');
+    var order1 = shownIn('Unchecked').map(rowIndexOf);
+    var want1 = order0.filter(function (i) { return i !== idx; });
+    rec('Y-flipgrp-sort', order1.join(',') === want1.join(','), 'Unchecked order ' + order1.slice(0, 8).join(',') + '... want ' + want1.slice(0, 8).join(',') + '...');
+    var moved = rowIn('Checked', idx);
+    rec('Y-flipgrp-flash', !!moved && moved.classList.contains('journal-row-flash'), 'the moved row flashed in Checked: ' + !!(moved && moved.classList.contains('journal-row-flash')));
+  };
+  // From the keyboard (focus on the box, Space): once the row moves, focus is on
+  // the box of the row that took its place.
+  S.flipkbd = async function () {
+    await expandAll();
+    var rows = rowsOf('Unchecked', 5);
+    var pick = rows[3], nextIdx = rowIndexOf(rows[4]);
+    var box = boxOf(pick);
+    box.focus();
+    window.__wantKeys = [' '];          // run.py presses a real Space on the focused box
+    await until(function () { return window.__keysSent; }, 8000);
+    await sleep(100);
+    var fv = false; try { fv = box.matches(':focus-visible'); } catch (e) { }
+    rec('P-flipkbd-fv', document.activeElement === box && fv && box.getAttribute('aria-checked') === 'true',
+        'box focused ' + (document.activeElement === box) + ', :focus-visible ' + fv + ', marked by the Space ' + box.getAttribute('aria-checked'));
+    await sleep(1300);
+    var nb = boxOf(rowIn('Unchecked', nextIdx));
+    rec('Y-flipkbd-focus', !!nb && document.activeElement === nb && !rowIn('Unchecked', rowIndexOf(pick)),
+        'focus on the next row\'s box ' + (!!nb && document.activeElement === nb) + ' (active: ' + (document.activeElement && (document.activeElement.className || document.activeElement.tagName)) + ')');
+  };
+  // An open row note holds the table still (its draft survives); closing it
+  // lets the ticked row move.
+  S.notewait = async function () {
+    await expandAll();
+    var rows = rowsOf('Unchecked', 7);
+    var A = rows[2], B = rows[6], bIdx = rowIndexOf(B);
+    var nbtn = findNotesBtn(A, keyOfIndex(rowIndexOf(A)));
+    clickEl(nbtn);
+    await sleep(250);
+    var inp = document.querySelector('#groupedResultsContainer tr.journal-note-child .journal-rownote-input');
+    if (inp) { inp.textContent = 'draft text'; inp.dispatchEvent(new Event('input', { bubbles: true })); }
+    clickEl(boxOf(B));
+    await sleep(1300);
+    var inp2 = document.querySelector('#groupedResultsContainer tr.journal-note-child .journal-rownote-input');
+    rec('Y-notewait-held', !!inp && inp2 === inp && /draft text/.test(inp2.textContent) && !!rowIn('Unchecked', bIdx) && !rowIn('Checked', bIdx),
+        'note still open with its draft ' + (inp2 === inp && !!inp2 && /draft text/.test(inp2.textContent)) + ', ticked row in Unchecked ' + !!rowIn('Unchecked', bIdx));
+    var band = document.querySelector('#groupedResultsContainer tr.journal-note-child .journal-rownote-close');
+    if (band) clickEl(band);
+    await sleep(800);
+    rec('Y-notewait-after', !!rowIn('Checked', bIdx) && !rowIn('Unchecked', bIdx) && !document.querySelector('#groupedResultsContainer tr.journal-note-child'),
+        'after the note closed: in Checked ' + !!rowIn('Checked', bIdx) + ', in Unchecked ' + !!rowIn('Unchecked', bIdx));
+  };
+  // Ticked and unticked again before the clicks settle: nothing is rebuilt.
+  S.dblflip = async function () {
+    await expandAll();
+    var pick = rowsOf('Unchecked', 6)[5], idx = rowIndexOf(pick), k = keyOfIndex(idx);
+    var w0 = document.querySelector('#groupedResultsContainer .group-wrapper');
+    clickEl(boxOf(pick));
+    await sleep(150);
+    clickEl(boxOf(rowIn('Unchecked', idx) || pick));
+    await sleep(1400);
+    var w1 = document.querySelector('#groupedResultsContainer .group-wrapper');
+    rec('Y-dblflip', w0 === w1 && w0.isConnected && !!rowIn('Unchecked', idx) && !isMarked(k),
+        'same group build ' + (w0 === w1 && w0.isConnected) + ', row in Unchecked ' + !!rowIn('Unchecked', idx) + ', marked ' + isMarked(k));
+  };
+  // The toggle as the SECOND level (by label, by sentinel): sub-bands under each
+  // type; a tick moves the row between them.
+  async function nestedCheck(id, flipId) {
+    var got = bands(1), want = wantBands(true);
+    var cols = Array.prototype.map.call(document.querySelectorAll('#groupedResultsContainer .group-wrapper[data-group-depth="1"]'), function (w) { return w.getAttribute('data-group-col'); });
+    rec(id, canon(got) === canon(want) && cols.length > 0, 'sub-bands ' + brief(got) + ' want ' + brief(want) + ' | level cols ' + cols.slice(0, 2).join(','));
+    if (!flipId) return;
+    await expandAll();
+    var pick = rowsOf('Exempt|||Unchecked', 5)[4], idx = rowIndexOf(pick);
+    // ANOTHER band, scrolled inside its own box (a leaf band is a 425px scroller):
+    // the regroup builds every box anew, and must give this one its scroll back.
+    function boxOfBand(p) { var w = wrapperByPath(p); return w ? w.querySelector(':scope > .group-content') : null; }
+    var obox = boxOfBand('Expedited|||Unchecked');
+    if (obox) obox.scrollTop = 60;
+    var oScroll0 = obox ? obox.scrollTop : -1;
+    clickEl(boxOf(pick));
+    await sleep(1400);
+    rec(flipId, idx >= 0 && !!rowIn('Exempt|||Checked', idx) && !rowIn('Exempt|||Unchecked', idx),
+        'row ' + (idx + 1) + ' in Exempt|||Checked ' + !!rowIn('Exempt|||Checked', idx) + ', in Exempt|||Unchecked ' + !!rowIn('Exempt|||Unchecked', idx));
+    var obox1 = boxOfBand('Expedited|||Unchecked');
+    rec('Y-nested-boxscroll', oScroll0 > 0 && !!obox1 && obox1 !== obox && obox1.scrollTop === oScroll0,
+        'the Expedited|||Unchecked box was scrolled ' + oScroll0 + ', after the regroup ' + (obox1 ? obox1.scrollTop : '?') + ' (a new box: ' + (!!obox1 && obox1 !== obox) + ')');
+  }
+  S.nested = function () { return nestedCheck('Y-nested-bands', 'Y-nested-flip'); };
+  S.nestedsent = function () { return nestedCheck('Y-nestedsent-bands', null); };
+  // Grouping BY the toggle from the dialog: as level 1, then under PROTOCOL TYPE.
+  S.pickgrp = async function () {
+    clickEl(document.getElementById('groupTableBtn'));
+    await sleep(80);
+    var tv = toggleValueIn('groupingColumnSelector');
+    rec('P-pickgrp-offered', !!tv, 'the dialog offers the toggle as "' + tv + '"');
+    if (!tv) return;
+    pickCustom('groupingColumnSelector', tv);
+    var before = hides();
+    clickEl(document.getElementById('confirmGroupingBtn'));
+    await until(function () { return hides() > before && document.querySelectorAll('#groupedResultsContainer .group-wrapper').length > 0; }, 30000);
+    await sleep(600);
+    var got = bands(0), want = wantBands(false);
+    rec('Y-pickgrp', canon(got) === canon(want), 'bands ' + brief(got) + ' want ' + brief(want));
+    clickEl(document.getElementById('configureGroupingBtn'));
+    await sleep(120);
+    pickCustom('groupingColumnSelector', 'PROTOCOL TYPE');
+    await sleep(60);
+    var tv2 = toggleValueIn('groupingColumnSelector2');
+    if (tv2) pickCustom('groupingColumnSelector2', tv2);
+    before = hides();
+    clickEl(document.getElementById('confirmGroupingBtn'));
+    await until(function () { return hides() > before; }, 30000);
+    await sleep(600);
+    var got2 = bands(1), want2 = wantBands(true);
+    rec('Y-pickgrp-nested', !!tv2 && canon(got2) === canon(want2), 'level 2 offered as "' + tv2 + '" | sub-bands ' + brief(got2) + ' want ' + brief(want2));
+  };
+  // A toggle labelled like a real column (STATUS): grouping by STATUS means the
+  // real column, as a search on it does.
+  S.shadow = async function () {
+    var got = bands(0);
+    var want = {}; FX.forEach(function (r, i) { (want[r.STATUS] = want[r.STATUS] || []).push(i); });
+    rec('Y-shadow', canon(got) === canon(want), 'bands ' + brief(got) + ' want ' + brief(want));
+  };
+  // A search still on: after the tick moves the row, the search still holds.
+  function hiddenBySearch(tr) { return tr.classList.contains('search-hidden') || tr.style.display === 'none'; }
+  S.flipsearch = async function () {
+    $('#tableSearch').val('STATUS = Approved');
+    JR.runTableSearch();
+    await sleep(900);
+    await expandAll();
+    var all = bandTrs(document.getElementById('groupedResultsContainer'));
+    var live = all.filter(function (tr) { return !hiddenBySearch(tr); });
+    var closedLive = live.filter(function (tr) { return FX[rowIndexOf(tr)].STATUS === 'Closed'; }).length;
+    rec('P-flipsearch-on', live.length === 27 && closedLive === 0, 'rows left by the search ' + live.length + ', Closed among them ' + closedLive);
+    var pick = rowsOf('Unchecked', 10).filter(function (tr) { return FX[rowIndexOf(tr)].STATUS === 'Approved'; })[3];
+    var idx = pick ? rowIndexOf(pick) : -1;
+    if (pick) clickEl(boxOf(pick));
+    await sleep(1500);
+    all = bandTrs(document.getElementById('groupedResultsContainer'));
+    live = all.filter(function (tr) { return !hiddenBySearch(tr); });
+    closedLive = live.filter(function (tr) { return FX[rowIndexOf(tr)].STATUS === 'Closed'; }).length;
+    var mv = idx >= 0 ? rowIn('Checked', idx) : null;
+    rec('Y-flipsearch', !!mv && !hiddenBySearch(mv) && live.length === 27 && closedLive === 0 && !rowIn('Unchecked', idx),
+        'moved to Checked ' + !!mv + ', rows left by the search ' + live.length + ', Closed among them ' + closedLive);
+  };
+
+  // Leaving a snapshot comparison puts back the grouping stashed on entering it -
+  // here the toggle, by the label (this harness's picker lists its sentinel).
+  // ---- round 3 (2026-10-02): a tick that creates or empties a band ----------------
+  // Shown = rendered, inside the viewport below the band headers parked above it,
+  // and inside its band box's visible part (below the box's sticky header row).
+  function seenWhere(tr) {
+    if (!tr || !tr.getClientRects().length) return { ok: false, why: 'not shown (its band is closed)' };
+    var r = tr.getBoundingClientRect(), cover = 0;
+    for (var w = tr.closest('.group-wrapper'); w; w = w.parentElement ? w.parentElement.closest('.group-wrapper') : null) {
+      var hd = w.querySelector(':scope > .group-header'); if (hd) cover += hd.getBoundingClientRect().height;
+    }
+    var box = tr.closest('.group-content'), br = box ? box.getBoundingClientRect() : null;
+    var th = box ? box.querySelector(':scope > table > thead') : null, hh = th ? th.getBoundingClientRect().height : 0;
+    var inPage = r.top >= cover - 1 && r.bottom <= window.innerHeight + 1;
+    var inBox = !br || (r.top >= br.top + hh - 1 && r.bottom <= br.bottom + 1);
+    return { ok: inPage && inBox, why: 'row at ' + Math.round(r.top) + '..' + Math.round(r.bottom) + ' (page shows ' + Math.round(cover) + '..' + window.innerHeight
+      + (br ? ', its box ' + Math.round(br.top + hh) + '..' + Math.round(br.bottom) : '') + ')' };
+  }
+  function bandState(path) {
+    var w = wrapperByPath(path);
+    return w ? (path + (w.classList.contains('open') ? ' open' : ' CLOSED') + ' with ' + bandTrs(w).length + ' row(s)') : (path + ' absent');
+  }
+  // The first row ticked into a grouping with no Checked band yet, working at the
+  // top of Unchecked: the new band opens and is shown, the row in it, its header lit.
+  S.firsttick = async function () {
+    await expandAll();
+    wrapperByPath('Unchecked').scrollIntoView({ block: 'start' });
+    await sleep(100);
+    var pick = rowsOf('Unchecked', 5)[2], idx = rowIndexOf(pick);
+    clickEl(boxOf(pick));
+    await sleep(1300);
+    var cw = wrapperByPath('Checked'), inC = rowIn('Checked', idx);
+    rec('Z-first-band', !!cw && cw.classList.contains('open') && !!inC && bandTrs(cw).length === 1 && !rowIn('Unchecked', idx),
+        bandState('Checked') + ', the ticked row in it ' + !!inC);
+    var sw = seenWhere(inC);
+    rec('Z-first-seen', sw.ok, sw.why);
+    var hdr = cw ? cw.querySelector(':scope > .group-header') : null;
+    rec('Z-first-flash', !!hdr && hdr.classList.contains('journal-band-flash'), 'the Checked header lit ' + !!(hdr && hdr.classList.contains('journal-band-flash')));
+  };
+  // The only checked row unticked while Unchecked's own box is scrolled down: the
+  // Checked band goes, and the row is shown where it joined Unchecked.
+  S.lasttick = async function () {
+    await expandAll();
+    var k = keyOfIndex(2);
+    wrapperByPath('Unchecked').querySelector(':scope > .group-content').scrollTop = 250;
+    wrapperByPath('Checked').scrollIntoView({ block: 'start' });
+    await sleep(100);
+    var tr = rowIn('Checked', 2);
+    if (!tr) throw new Error('no row 3 in Checked: ' + bandState('Checked'));
+    clickEl(boxOf(tr));
+    await sleep(1300);
+    var inU = rowIn('Unchecked', 2);
+    rec('Z-last-gone', !wrapperByPath('Checked') && !!inU && !isMarked(k), bandState('Checked') + ', the row in Unchecked ' + !!inU + ', marked ' + isMarked(k));
+    var sw = seenWhere(inU);
+    rec('Z-last-seen', sw.ok, sw.why);
+  };
+  // Bands sorted Z-A (Unchecked above Checked), the only mark unticked while
+  // Unchecked has scrolled off the top: the row is shown in Unchecked BELOW its
+  // band header, which is parked at the top of the page.
+  S.lastdesc = async function () {
+    await expandAll();
+    var paths = Array.prototype.map.call(document.querySelectorAll('#groupedResultsContainer .group-wrapper[data-group-depth="0"]'), function (w) { return w.getAttribute('data-group-path'); });
+    rec('P-desc-order', paths.join(',') === 'Unchecked,Checked', 'bands top to bottom: ' + paths.join(','));
+    var cw = wrapperByPath('Checked');
+    cw.scrollIntoView({ block: 'start' });
+    await sleep(100);
+    var tr = rowIn('Checked', 2);
+    if (!tr) throw new Error('no row 3 in Checked: ' + bandState('Checked'));
+    clickEl(boxOf(tr));
+    await sleep(1300);
+    var inU = rowIn('Unchecked', 2);
+    var sw = seenWhere(inU);
+    rec('Z-desc-seen', !wrapperByPath('Checked') && !!inU && sw.ok, bandState('Checked') + ', ' + sw.why);
+  };
+  // Every row checked, one unticked near the foot of the Checked box: the new
+  // Unchecked band opens below and is shown.
+  S.alltick = async function () {
+    await expandAll();
+    var cw = wrapperByPath('Checked');
+    cw.scrollIntoView({ block: 'end' });
+    await sleep(100);
+    var bb = cw.querySelector(':scope > .group-content').getBoundingClientRect();
+    var pick = shownIn('Checked').filter(function (tr) { var r = tr.getBoundingClientRect(); return r.top >= bb.top + 40 && r.bottom <= bb.bottom; }).pop();
+    if (!pick) throw new Error('no row in view at the foot of the Checked box');
+    var idx = rowIndexOf(pick);
+    clickEl(boxOf(pick));
+    await sleep(1300);
+    var uw = wrapperByPath('Unchecked'), inU = rowIn('Unchecked', idx);
+    rec('Z-all-band', !!uw && uw.classList.contains('open') && !!inU && bandTrs(uw).length === 1, bandState('Unchecked') + ', the row in it ' + !!inU);
+    var sw = seenWhere(inU);
+    rec('Z-all-seen', sw.ok, sw.why);
+  };
+  // The toggle as level 2, nothing marked: the first tick under Exempt opens the
+  // new Exempt|||Checked band and shows it.
+  S.nestfirst = async function () {
+    await expandAll();
+    wrapperByPath('Exempt|||Unchecked').scrollIntoView({ block: 'start' });
+    await sleep(100);
+    var pick = rowsOf('Exempt|||Unchecked', 5)[2], idx = rowIndexOf(pick);
+    clickEl(boxOf(pick));
+    await sleep(1300);
+    var cw = wrapperByPath('Exempt|||Checked'), inC = rowIn('Exempt|||Checked', idx);
+    rec('Z-nest-band', !!cw && cw.classList.contains('open') && !!inC && wrapperByPath('Exempt').classList.contains('open'),
+        bandState('Exempt|||Checked') + ', the row in it ' + !!inC);
+    var sw = seenWhere(inC);
+    rec('Z-nest-seen', sw.ok, sw.why);
+  };
+  // Saved "start expanded to: all levels", the marks landing after the build: the
+  // Checked band the marks create opens like every band of the first build did.
+  S.latebands = async function () {
+    var fb = window.__firstBuild;
+    rec('P-late-first', !!fb && fb.pending > 0 && !fb.bands.Checked && fb.open.Unchecked === true,
+        fb ? ('first build: ' + brief(fb.bands) + ', Unchecked open ' + fb.open.Unchecked + ', journal fetches still out ' + fb.pending) : 'never grouped');
+    var cw = wrapperByPath('Checked');
+    rec('Z-late-open', !!cw && cw.classList.contains('open') && bandTrs(cw).length === 2, bandState('Checked'));
+  };
+
+  S.cmpexit = async function () {
+    if (!JR.setPreCompare || !JR._restorePreCompareGrouping) throw new Error('hook: no compare-exit access');
+    JR.setPreCompare({ column: 'Reviewed', agg: null, sort: null });
+    var before = hides();
+    var ok = JR._restorePreCompareGrouping();
+    await until(function () { return hides() > before && document.querySelectorAll('#groupedResultsContainer .group-wrapper').length > 0; }, 8000);
+    await sleep(500);
+    var got = bands(0), want = wantBands(false);
+    rec('Y-cmpexit', ok === true && canon(got) === canon(want), 'regrouped ' + ok + ' | bands ' + brief(got) + ' want ' + brief(want));
+  };
+
+  (async function () {
+    try {
+      if (SCN === 'bylate' || SCN === 'latebands') probeFirstBuild();
+      await boot();
+      if (!S[SCN]) throw new Error('unknown scenario ' + SCN);
+      await S[SCN]();
+      await sleep(50);
+    } catch (e) {
+      R.fatal = String((e && e.stack) || e);
+      R.bootState = { flatRows: document.querySelectorAll('#resultsTable > tbody > tr').length, hides: hides(), queryDone: window.__queryDone,
+                      grouped: $('#groupedResultsContainer').is(':visible'), errors: (window.__errors || []).slice(0, 5) };
+    }
+    R.errors = window.__errors.concat(window.__rejections).slice(0, 10);
+    R.hookErr = [window.__JR_ERR, window.__JR_ERR2].filter(Boolean).join('; ');
+    R.missing = window.__JR_MISSING || [];
+    R.confirms = window.__confirms.slice(0, 5);
+    window.__JRRESULT = R;
+    window.__JRDONE = true;
+    document.getElementById('out').textContent = 'DONE';
+  })();
+})();

@@ -1,0 +1,613 @@
+{
+ "nopaint": {
+  "file": "main",
+  "edits": [
+   [
+    "            var on = !hold && pivotNotesActive();\r\n            var toks = on ? pivotRowTokens() : [];",
+    "            var on = false;\r\n            var toks = [];"
+   ]
+  ],
+  "must": [
+   "V-nested-leaf",
+   "V-nested-group",
+   "V-nested-count",
+   "V-nested-notext",
+   "V-nested-faint",
+   "C-nested-open",
+   "C-nested-nofold",
+   "C-nested-place",
+   "C-nested-focus",
+   "C-nested-post",
+   "C-nested-again",
+   "C-nested-one",
+   "C-nested-band",
+   "C-nested-esc",
+   "C-nested-follow",
+   "C-nested-collapse",
+   "C-nested-away",
+   "V-static",
+   "V-flat",
+   "V-single",
+   "V-reorder",
+   "V-rank",
+   "V-collapsed-sum",
+   "V-collapsed-built",
+   "R-reveal",
+   "K-off-on",
+   "K-off-counts",
+   "V-exports-icons",
+   "J-chip-jump",
+   "P-wolf-hover",
+   "T-wolf-band",
+   "T-rr-race",
+   "T-rr-keep",
+   "T-rr-gone",
+   "T-rr-group",
+   "P-tip-shown",
+   "T-tip-gone",
+   "T-tip-again",
+   "T-tip-back",
+   "D-thread-ask",
+   "D-thread-post",
+   "D-reply-ask",
+   "D-panel-ask",
+   "D-panel-status"
+  ],
+  "scn": null
+ },
+ "noobserver": {
+  "file": "main",
+  "edits": [
+   [
+    "            _pvMo.observe(pc, { childList: true, subtree: true });",
+    "            void pc;"
+   ]
+  ],
+  "must": [
+   "V-nested-leaf",
+   "V-nested-group",
+   "V-nested-count",
+   "V-nested-notext",
+   "V-nested-faint",
+   "C-nested-open",
+   "C-nested-nofold",
+   "C-nested-place",
+   "C-nested-focus",
+   "C-nested-post",
+   "C-nested-again",
+   "C-nested-one",
+   "C-nested-band",
+   "C-nested-esc",
+   "C-nested-follow",
+   "C-nested-collapse",
+   "C-nested-away",
+   "V-static",
+   "V-flat",
+   "V-single",
+   "V-reorder",
+   "V-rank",
+   "V-collapsed-sum",
+   "V-collapsed-built",
+   "V-exports-icons",
+   "P-wolf-hover",
+   "T-wolf-band",
+   "T-rr-race",
+   "T-rr-keep",
+   "T-rr-gone",
+   "T-rr-group",
+   "P-tip-shown",
+   "T-tip-gone",
+   "T-tip-again",
+   "T-tip-back",
+   "D-thread-ask",
+   "D-thread-post",
+   "D-reply-ask",
+   "D-panel-ask",
+   "D-panel-status"
+  ],
+  "scn": null
+ },
+ "nosort": {
+  "file": "main",
+  "edits": [
+   [
+    "                pairs.sort(function (a, b) { return a[0] < b[0] ? -1 : (a[0] > b[0] ? 1 : 0); });",
+    "                void 0;"
+   ]
+  ],
+  "must": [
+   "V-reorder"
+  ],
+  "scn": [
+   "reorder",
+   "nested",
+   "single"
+  ]
+ },
+ "nosummary": {
+  "file": "main",
+  "edits": [
+   [
+    "                if (sumKey !== null) {\r\n                    parts = sumKey.split(PV_SEP);",
+    "                if (sumKey !== null) { continue;\r\n                    parts = sumKey.split(PV_SEP);"
+   ]
+  ],
+  "must": [
+   "V-collapsed-sum",
+   "C-nested-collapse"
+  ],
+  "scn": [
+   "collapsed",
+   "nested",
+   "reveal"
+  ]
+ },
+ "noother": {
+  "file": "main",
+  "edits": [
+   [
+    "                if (parts[i] === PV_OTHER) { pairs = null; break; }",
+    "                if (false) { pairs = null; break; }"
+   ]
+  ],
+  "must": [
+   "V-rank"
+  ],
+  "scn": [
+   "rank"
+  ]
+ },
+ "flatall": {
+  "file": "main",
+  "edits": [
+   [
+    "                    } else if (lvl === 0) {\r\n                        stampPivotCell(td, parts, toks, false, counts);",
+    "                    } else if (true) {\r\n                        stampPivotCell(td, parts, toks, false, counts);"
+   ]
+  ],
+  "must": [
+   "V-flat"
+  ],
+  "scn": [
+   "flat"
+  ]
+ },
+ "counttext": {
+  "file": "main",
+  "edits": [
+   [
+    "                + '<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"></path></svg>'\r\n                + '</button>';\r\n        }\r\n        // The icon goes FIRST",
+    "                + '<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"></path></svg>'\r\n                + (n ? n : '') + '</button>';\r\n        }\r\n        // The icon goes FIRST"
+   ]
+  ],
+  "must": [
+   "V-nested-notext"
+  ],
+  "scn": [
+   "nested",
+   "exports"
+  ]
+ },
+ "nostriphtml": {
+  "file": "main",
+  "edits": [
+   [
+    "                    $tdClone.find('.pivot-collapse-toggle, .journal-pvnote-btn').remove();",
+    "                    $tdClone.find('.pivot-collapse-toggle').remove();"
+   ]
+  ],
+  "must": [
+   "X-exports-html"
+  ],
+  "scn": [
+   "exports"
+  ]
+ },
+ "eq-nostriparray": {
+  "file": "main",
+  "edits": [
+   [
+    ".find('.sort-icon, .col-sort-icon, .pivot-collapse-toggle, .journal-pvnote-btn').remove()",
+    ".find('.sort-icon, .col-sort-icon, .pivot-collapse-toggle').remove()"
+   ]
+  ],
+  "must": [],
+  "scn": [
+   "exports"
+  ]
+ },
+ "noaway": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (!$('#pivot-output-container').is(':visible') || !document.getElementById('pivotResultTable') || !pivotNotesActive()) {",
+    "            if (!document.getElementById('pivotResultTable') || !pivotNotesActive()) {"
+   ]
+  ],
+  "must": [
+   "C-nested-away"
+  ],
+  "scn": [
+   "nested"
+  ]
+ },
+ "nofollow": {
+  "file": "main",
+  "edits": [
+   [
+    "            queuePlacePivotNoteCard();\r\n        }, true);",
+    "            void 0;\r\n        }, true);"
+   ]
+  ],
+  "must": [
+   "C-nested-follow"
+  ],
+  "scn": [
+   "nested"
+  ]
+ },
+ "noreanchor": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (refind || !c.anchor || !c.anchor.isConnected || !c.anchor.getClientRects().length) {",
+    "            if (false) {"
+   ]
+  ],
+  "must": [
+   "C-nested-collapse"
+  ],
+  "scn": [
+   "nested",
+   "jpanel"
+  ]
+ },
+ "nokeyunlock": {
+  "file": "main",
+  "edits": [
+   [
+    "            $('#journalRowNotesEnable').prop('disabled', false);",
+    "            $('#journalRowNotesEnable').prop('disabled', !ok);"
+   ]
+  ],
+  "must": [
+   "K-off-panel",
+   "K-off-on",
+   "K-off-counts",
+   "K-off-status",
+   "K-off-saved"
+  ],
+  "scn": [
+   "off"
+  ]
+ },
+ "nosavenokey": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (window._penumbraJournalRowNotes) {\r\n                viewOptions.journalRowNotes = true;",
+    "            if (window._penumbraJournalRowNotes && window._penumbraJournalKeyColumns && window._penumbraJournalKeyColumns.length) {\r\n                viewOptions.journalRowNotes = true;"
+   ]
+  ],
+  "must": [
+   "K-off-saved"
+  ],
+  "scn": [
+   "off"
+  ]
+ },
+ "nofetchnokey": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (!rid || window._penumbraJournalHidden || !window._penumbraJournalRowNotes) {\r\n                window._penumbraRowNotes = {}; window._penumbraRowNoteCounts = {};\r\n                window._penumbraPivotNotes",
+    "            if (!rid || window._penumbraJournalHidden || !window._penumbraJournalRowNotes || !keyCols()) {\r\n                window._penumbraRowNotes = {}; window._penumbraRowNoteCounts = {};\r\n                window._penumbraPivotNotes"
+   ]
+  ],
+  "must": [
+   "V-nested-count",
+   "V-nested-faint",
+   "C-nested-open",
+   "C-nested-post",
+   "V-flat",
+   "V-single",
+   "V-reorder",
+   "V-collapsed-sum",
+   "V-collapsed-built",
+   "K-off-counts"
+  ],
+  "scn": null
+ },
+ "pvscope": {
+  "file": "main",
+  "edits": [
+   [
+    "            var scope = isPivot ? 'pivot' : 'row';",
+    "            var scope = 'row';"
+   ]
+  ],
+  "must": [
+   "C-nested-post"
+  ],
+  "scn": [
+   "nested"
+  ]
+ },
+ "nopvchip": {
+  "file": "journal",
+  "edits": [
+   [
+    "        if (String(n.SCOPE || '') === 'pivot') return renderPivotRef(n);\n",
+    ""
+   ]
+  ],
+  "must": [
+   "J-chip-pivot",
+   "J-chip-row",
+   "J-chip-tip",
+   "J-chip-jump"
+  ],
+  "scn": [
+   "jpanel"
+  ]
+ },
+ "nopvjump": {
+  "file": "journal",
+  "edits": [
+   [
+    "        $(document).on('click', '.journal-note-rowref-btn[data-pv-key]', function (e) {",
+    "        $(document).on('click', '.journal-note-rowref-btn[data-pv-key-off]', function (e) {"
+   ]
+  ],
+  "must": [
+   "J-chip-jump"
+  ],
+  "scn": [
+   "jpanel"
+  ]
+ },
+ "nokeyshape": {
+  "file": "manage",
+  "edits": [
+   [
+    "    if (!is_array($pairs) || count($pairs) < 1 || count($pairs) > 8) return false;",
+    "    if (!is_array($pairs)) return false;"
+   ]
+  ],
+  "must": [
+   "S-key-shape"
+  ],
+  "scn": [
+   "server"
+  ]
+ },
+ "wolfband": {
+  "file": "css",
+  "edits": [
+   [
+    ".journal-rownote-panel .journal-rownote-head.journal-rownote-close:hover {",
+    ".journal-rownote-panel .journal-rownote-head:hover {"
+   ]
+  ],
+  "must": [
+   "T-wolf-band"
+  ],
+  "scn": [
+   "wolfpack"
+  ]
+ },
+ "nogone": {
+  "file": "main",
+  "edits": [
+   [
+    "                } else if (!b && !_pvScheduled && !findPivotNoteBtn(c.key, false)) {",
+    "                } else if (false) {"
+   ]
+  ],
+  "must": [
+   "T-rr-gone"
+  ],
+  "scn": [
+   "rerender"
+  ]
+ },
+ "nopending": {
+  "file": "main",
+  "edits": [
+   [
+    "                } else if (!b && !_pvScheduled && !findPivotNoteBtn(c.key, false)) {",
+    "                } else if (!b && !findPivotNoteBtn(c.key, false)) {"
+   ]
+  ],
+  "must": [
+   "T-rr-race",
+   "T-rr-keep"
+  ],
+  "scn": [
+   "rerender"
+  ]
+ },
+ "notipremove": {
+  "file": "main",
+  "edits": [
+   [
+    "            $('.ui-tooltip').stop(true, true).remove(); // a tip already up (the pointer is still on the icon)",
+    "            void 0;"
+   ]
+  ],
+  "must": [
+   "T-tip-gone"
+  ],
+  "scn": [
+   "tooltip"
+  ]
+ },
+ "notiptitle": {
+  "file": "main",
+  "edits": [
+   [
+    "                b.removeAttribute('title');\r\n                $(b).removeData('ui-tooltip-title');",
+    "                void 0;"
+   ]
+  ],
+  "must": [
+   "T-tip-gone",
+   "T-tip-again"
+  ],
+  "scn": [
+   "tooltip"
+  ]
+ },
+ "norowline": {
+  "file": "manage",
+  "edits": [
+   [
+    "mentioned you in a journal note on the report <strong>' . $safeTitle . '</strong>:</p>'\n          . $rowLine // which row (journalRowRefLine), or ''\n",
+    "mentioned you in a journal note on the report <strong>' . $safeTitle . '</strong>:</p>'\n"
+   ]
+  ],
+  "must": [
+   "S-mail-wiring"
+  ],
+  "scn": [
+   "server3"
+  ]
+ },
+ "norefsnap": {
+  "file": "manage",
+  "edits": [
+   [
+    "            if ($ref_snap === null && $reply_root !== null) {",
+    "            if (false) {"
+   ]
+  ],
+  "must": [
+   "S-mail-wiring"
+  ],
+  "scn": [
+   "server3"
+  ]
+ },
+ "refkeyonly": {
+  "file": "manage",
+  "edits": [
+   [
+    "    if (is_array($snap) && $snap) {",
+    "    if (false) {"
+   ]
+  ],
+  "must": [
+   "S-row-ref"
+  ],
+  "scn": [
+   "server3"
+  ]
+ },
+ "nodelask": {
+  "file": "main",
+  "edits": [
+   [
+    "            if (!replies) return 'Delete this note? A copy is kept in the audit log.';",
+    "            return 'Delete this note? A copy is kept in the audit log.';"
+   ]
+  ],
+  "must": [
+   "D-thread-ask",
+   "D-panel-ask"
+  ],
+  "scn": [
+   "delthread"
+  ]
+ },
+ "noothers": {
+  "file": "main",
+  "edits": [
+   [
+    "            var who = !byOthers ? '' : (byOthers === replies",
+    "            var who = '' && (byOthers === replies"
+   ]
+  ],
+  "must": [
+   "D-thread-ask",
+   "D-panel-ask"
+  ],
+  "scn": [
+   "delthread"
+  ]
+ },
+ "panelplain": {
+  "file": "journal",
+  "edits": [
+   [
+    "                ? P.journalDeleteQuestion(notesCache, noteId)\n",
+    "                ? 'Delete this journal note? This cannot be undone (a copy is kept in the audit log).'\n"
+   ]
+  ],
+  "must": [
+   "D-panel-ask"
+  ],
+  "scn": [
+   "delthread"
+  ]
+ },
+ "panelstatus": {
+  "file": "journal",
+  "edits": [
+   [
+    "            status(esc(resp.message || 'Note deleted.'), 'success');",
+    "            status('Note deleted.', 'success');"
+   ]
+  ],
+  "must": [
+   "D-panel-status"
+  ],
+  "scn": [
+   "delthread"
+  ]
+ },
+ "nocascade": {
+  "file": "manage",
+  "edits": [
+   [
+    "            $stmt = oci_parse($oci, \"DELETE FROM PENUMBRA_JOURNAL WHERE REPORT_ID = :rid AND (ID = :nid OR (PARENT_ID = :pid AND ID <= :maxid))\");",
+    "            $stmt = oci_parse($oci, \"DELETE FROM PENUMBRA_JOURNAL WHERE ID = :nid\");"
+   ]
+  ],
+  "must": [
+   "S-del-cascade"
+  ],
+  "scn": [
+   "server4"
+  ]
+ },
+ "noauditreplies": {
+  "file": "manage",
+  "edits": [
+   [
+    "        if ($replies) $before['REPLIES'] = $replies;",
+    "        // (no replies in the audit)"
+   ]
+  ],
+  "must": [
+   "S-del-cascade"
+  ],
+  "scn": [
+   "server4"
+  ]
+ },
+ "noreplyscope": {
+  "file": "manage",
+  "edits": [
+   [
+    "                $scope        = ($prow['SCOPE'] === 'row' || $prow['SCOPE'] === 'pivot') ? $prow['SCOPE'] : 'report';",
+    "                $scope        = ($prow['SCOPE'] === 'row') ? 'row' : 'report';"
+   ]
+  ],
+  "must": [
+   "S-reply-scope"
+  ],
+  "scn": [
+   "server"
+  ]
+ }
+}

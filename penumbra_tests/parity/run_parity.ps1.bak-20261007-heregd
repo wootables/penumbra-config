@@ -1,0 +1,173 @@
+# =============================================================================
+# Penumbra snippet-engine PARITY HARNESS  -  one-command rebuild + run
+#
+# Compares engine B (browser: report subtitle + infobox, resolveInfoboxSnippet)
+# against engine C (scheduler: scheduled email, execute_email_snippet) over a
+# shared corpus, and prints every case where the two disagree.
+#
+#   powershell -File run_parity.ps1
+#
+# It rebuilds everything from the LIVE app files each run, so it always tests
+# what is deployed. Nothing is written to the webroot.
+# =============================================================================
+$ErrorActionPreference = 'Stop'
+$here = $PSScriptRoot
+$app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+$js   = "$app\js"
+$php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+$edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }
+
+Write-Host "[1/6] extracting engine C functions from schedule_runner.php ..."
+& $php -n "$here\extract_engine_c.php" "$app\schedule_runner.php" "$here\engineC_functions.php" | Out-Host
+# A native exit code does not trip $ErrorActionPreference, so check it: a failed
+# step would otherwise leave the PREVIOUS run's result_c.json for step 6 to compare.
+if ($LASTEXITCODE -ne 0) { throw "engine C extraction failed (exit $LASTEXITCODE)" }
+
+Write-Host "[2/6] running engine C corpus ..."
+# $app is passed so run_engine_c.php requires penumbra_search.php and (since
+# 2026-09-29) penumbra_render_charts.php from the SAME tree the functions were
+# extracted from - schedule_runner.php require_once's both, the extract cannot (see
+# run_engine_c.php). It exits 1 with a FATAL line if it cannot.
+& $php -n "$here\run_engine_c.php" "$app" | Out-Host
+if ($LASTEXITCODE -ne 0) { throw "engine C runner failed (exit $LASTEXITCODE) - see its FATAL line above; result_c.json is STALE" }
+
+Write-Host "[3/6] staging JS + patching main.js ..."
+# Vendor libs main.js's init needs. Without them the ready-closure throws early
+# and every `const` after that point stays in the temporal dead zone, which makes
+# engine B silently return snippets UNRESOLVED (false divergences).
+$libs = @('jquery-3.7.1.min.js','jquery-ui.min.js','moment.min.js','pako.min.js',
+          'codemirror.min.js','sql.min.js','show-hint.js','foldcode.js','foldgutter.js',
+          'brace-fold.js','comment-fold.js','placeholder.js','penumbra_snippet_help.js',
+          'purify.min.js','penumbra_template.js')
+foreach ($f in $libs) { Copy-Item "$js\$f" "$here\$f" -Force }
+# NOTE: chart-4.5.1.min.js is deliberately NOT loaded - it spins animation frames
+# under --virtual-time-budget and hangs the run. vis() is therefore not covered.
+
+$src = [IO.File]::ReadAllText("$js\main.js")
+$anchor = '$(document).ready(function () {'
+if (-not $src.Substring(0, 200).Contains($anchor)) { throw "main.js closure anchor not found - update run_parity.ps1" }
+# Export engine B as the closure's FIRST statement: function declarations hoist,
+# so this captures it (with all its real dependencies) even if later init throws.
+$inject = ''
+$inject += "`r`n    try {"
+$inject += "`r`n      window.__ENGINE_B = function (text, maps, cols) {"
+$inject += "`r`n        allResolvedPrompts = (window.__CORPUS && window.__CORPUS.promptValues) || [];"
+$inject += "`r`n        return resolveInfoboxSnippet(text, maps, cols);"
+$inject += "`r`n      };"
+$inject += "`r`n    } catch (e) { window.__ENGINE_B_ERR = String(e); }"
+$inject += "`r`n"
+$inject = $anchor + $inject
+# Engine A has NO function to export - it is inline in the async
+# renderReportSnippet, which reads its text from snippetEditor and writes into
+# #reportSnippetOutput. So inject a SHIM instead: swap in a real CodeMirror
+# instance (renderReportSnippet and its callees touch 14 different editor
+# methods, so a getValue() stub dies on getWrapperElement), pass rows through
+# the real sourceDataMaps parameter - visibleColumns is derived from the first
+# map keys, main.js ~34244 - and read the sink back. This is an ASSIGNMENT at
+# the top of the closure, so the body only touches the module-level `let`s when
+# CALLED, long past their temporal dead zone.
+$injectA = ''
+$injectA += "`r`n    try {"
+$injectA += "`r`n      window.__ENGINE_A = async function (text, maps) {"
+$injectA += "`r`n        if (!snippetEditor || typeof snippetEditor.getWrapperElement !== 'function') {"
+$injectA += "`r`n          snippetEditor = CodeMirror.fromTextArea(document.getElementById('reportSnippet'), { lineNumbers: false });"
+$injectA += "`r`n        }"
+$injectA += "`r`n        snippetEditor.setValue(text);"
+$injectA += "`r`n        allResolvedPrompts = (window.__CORPUS && window.__CORPUS.promptValues) || [];"
+$injectA += "`r`n        pendingPivotSettings = null;"
+$injectA += "`r`n        pendingGroupByColumn = null;"
+$injectA += "`r`n        window._penumbraAutoloadFired = true;"
+$injectA += "`r`n        var el = document.getElementById('reportSnippetOutput');"
+$injectA += "`r`n        el.innerHTML = '';"
+$injectA += "`r`n        await renderReportSnippet(maps, false, { ignorePendingViewState: true });"
+$injectA += "`r`n        return el.innerHTML;"
+$injectA += "`r`n      };"
+$injectA += "`r`n    } catch (e) { window.__ENGINE_A_ERR = String(e); }"
+$injectA += "`r`n"
+$inject += $injectA
+$patched = $src.Substring(0, $src.IndexOf($anchor)) + $inject + $src.Substring($src.IndexOf($anchor) + $anchor.Length)
+# Surface what engine B's internal `catch (e) { return m; }` swallows, so a broken
+# harness can never masquerade as a divergence.
+$patched = [regex]::Replace($patched, "\} catch \(e\) \{\r?\n\s*return m;\r?\n\s*\}",
+  "} catch (e) {`r`n (window.__B_ERRS = window.__B_ERRS || []).push(String(fn) + ' :: ' + (e && e.message ? e.message : e));`r`n return m;`r`n }", 1)
+[IO.File]::WriteAllText("$here\main_patched.js", $patched, (New-Object System.Text.UTF8Encoding($false)))
+[IO.File]::WriteAllText("$here\corpus_inline.js", "window.__CORPUS = " + [IO.File]::ReadAllText("$here\corpus.json") + ";", (New-Object System.Text.UTF8Encoding($false)))
+
+# One headless-Edge harness run. Factored out when engine A joined (2026-08-29):
+# A and B differ only in page, dump file, profile dir, output file and time budget.
+function Invoke-EdgeHarness {
+    param(
+        [string]$Label,          # 'A' / 'B' - messages only
+        [string]$Page,
+        [string]$DomFile,
+        [string]$ProfileDir,     # separate user-data-dir per harness, so the two never collide
+        [string]$OutFile,
+        [int]$BudgetMs = 8000
+    )
+    $dom = Join-Path $here $DomFile
+    if (Test-Path $dom) { Remove-Item $dom -Force }
+    # ?unit=Engineering is load-bearing, not decoration: engine B answers
+    # data(unit) from the URL query (main.js ~51739) before it looks anywhere
+    # else, and engine C answers it from a string key in promptValues. The two
+    # only agree if the page is actually loaded carrying the parameter. Keep it
+    # in step with corpus.json's promptNamed.
+    $url = 'file:///' + $here.Replace([char]92, [char]47) + '/' + $Page + '?unit=Engineering'
+    # -Wait can hang forever here: a lingering Edge child keeps the redirected
+    # stdout handle open, so the parent never sees EOF. -PassThru lets us poll the
+    # dump file and kill the process ourselves (see the wait loop below).
+    $proc = Start-Process -FilePath $edge -PassThru -NoNewWindow -RedirectStandardOutput $dom -ArgumentList `
+      '--headless=new','--disable-gpu','--no-sandbox','--allow-file-access-from-files', `
+      "--user-data-dir=$(Join-Path $here $ProfileDir)","--virtual-time-budget=$BudgetMs",'--dump-dom',$url
+    # Edge's --dump-dom output is COMPLETE long before the process exits - a lingering
+    # child can hold the redirected stdout handle open indefinitely (reproduced at 107
+    # corpus cases: the dump had all results and </html>, yet the process was still
+    # alive at 120s). So wait for the marker IN THE DUMP, not for process exit, and
+    # kill Edge ourselves once the output is there.
+    $readShared = {
+      param($p)
+      $fs = [IO.File]::Open($p, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+      try { $sr = New-Object IO.StreamReader($fs); return $sr.ReadToEnd() } finally { $fs.Dispose() }
+    }
+    $dumpWait = [Diagnostics.Stopwatch]::StartNew()
+    $ready = $false
+    while ($dumpWait.Elapsed.TotalSeconds -lt 180) {
+      try {
+        $peek = & $readShared $dom
+        if ($peek.Contains('RESULTS_JSON:') -and $peek.TrimEnd().EndsWith('</html>')) { $ready = $true; break }
+      } catch { }
+      if ($proc.HasExited -and $dumpWait.Elapsed.TotalSeconds -gt 5) { $ready = $true; break }
+      Start-Sleep -Milliseconds 500
+    }
+    if (-not $proc.HasExited) { try { $proc.Kill() } catch { } }
+    if (-not $ready) { throw "engine $Label harness: no complete RESULTS_JSON dump within 180s" }
+    # The launched process has exited, but a lingering Edge child can still hold
+    # the redirected stdout handle for a moment - retry rather than fail the run.
+    $d = $null
+    for ($try = 0; $try -lt 40; $try++) {
+      try { $d = [IO.File]::ReadAllText($dom); break } catch { Start-Sleep -Milliseconds 250 }
+    }
+    if ($null -eq $d) { throw "engine $Label harness: $dom stayed locked" }
+    $i = $d.IndexOf('<pre id="out">'); $j = $d.IndexOf('</pre>', $i)
+    $txt = [System.Net.WebUtility]::HtmlDecode($d.Substring($i + 14, $j - $i - 14))
+    if (-not $txt.StartsWith('RESULTS_JSON:')) { throw "engine $Label harness failed: $($txt.Substring(0,[Math]::Min(300,$txt.Length)))" }
+    $parsed = $txt.Substring(13) | ConvertFrom-Json
+    if ($parsed.pageErrors) { Write-Warning "engine ${Label}: main.js init errors (may invalidate results): $($parsed.pageErrors -join '; ')" }
+    $swallowed = @($parsed.cases | Where-Object { $_.swallowed })
+    if ($swallowed.Count) { Write-Warning "engine $Label swallowed errors (HARNESS PROBLEM, not divergence): $(($swallowed | ForEach-Object { $_.id }) -join ', ')" }
+    $failed = @($parsed.cases | Where-Object { $_.error })
+    if ($failed.Count) { Write-Warning "engine $Label threw on $($failed.Count) case(s): $(($failed | Select-Object -First 5 | ForEach-Object { $_.id }) -join ', ')" }
+    [IO.File]::WriteAllText("$here\$OutFile", ($parsed.cases | ConvertTo-Json -Depth 6))
+}
+
+Write-Host "[4/6] running engine B corpus in headless Edge ..."
+Invoke-EdgeHarness -Label 'B' -Page 'harness_b.html' -DomFile 'b.dom.txt' -ProfileDir 'edgeprofile' -OutFile 'result_b.json'
+
+Write-Host "[5/6] running engine A corpus in headless Edge ..."
+# Engine A runs the REAL renderReportSnippet for every case (CodeMirror setValue
+# plus a full async render), which is far heavier than B's straight-line
+# resolver - hence the bigger virtual-time budget.
+Invoke-EdgeHarness -Label 'A' -Page 'harness_a.html' -DomFile 'a.dom.txt' -ProfileDir 'edgeprofile_a' -OutFile 'result_a.json' -BudgetMs 20000
+
+Write-Host "[6/6] comparing ..."
+& "$here\compare.ps1"

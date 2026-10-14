@@ -1,0 +1,295 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="main.css"><link rel="stylesheet" href="penumbra_tiles.css"><link rel="stylesheet" href="penumbra_dashboard.css">
+</head><body class="pnb-dash theme-wolfpack-dark is-dark">
+<!-- Dashboard search harness (2026-09-29): penumbra_dashboard.js + penumbra_tiles.js
+     under test, index.php = the framed-report test double in this folder. The real
+     main.css is loaded on a dark theme so the filter box's computed styles are
+     checked against the blanket per-theme button rules. -->
+<div id="dashApp" class="dash-app"><header class="dash-head" id="dashHead">
+  <div class="dash-head-title" id="dashHeadTitle"></div>
+  <div class="dash-head-actions" id="dashHeadActions"></div>
+</header><main id="dashMain"></main></div>
+<pre id="out">running</pre>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="chart-4.5.1.min.js"></script>
+<script>
+var CALLS = [], ERRORS = [], REPLACED = [];
+window.onerror = function (m, src, line) { ERRORS.push('onerror: ' + m + ' @' + String(src).split('/').pop() + ':' + line); };
+// The dashboard rewrites its own address; a file:// page may not, so record it.
+history.replaceState = function (s, t, u) { REPLACED.push(String(u)); };
+
+var REP = {
+  repA: [ { COLLEGE: 'Eng', AMOUNT: '10', STATUS: 'Open' }, { COLLEGE: 'Sci', AMOUNT: '20', STATUS: 'Open' },
+          { COLLEGE: 'Eng', AMOUNT: '3', STATUS: 'Closed' }, { COLLEGE: 'Ag', AMOUNT: '200', STATUS: 'Closed' } ],
+  repB: [ { NAME: 'Ada', AMOUNT: '7' }, { NAME: 'Bob', AMOUNT: '2' }, { NAME: 'Cy', AMOUNT: '150' } ]
+};
+// A small emulation of the server: the literal rule (a condition on a column the
+// rows lack matches nothing), AND-precedence, and index.php's &dsearch= routing.
+function cond(row, part) {
+  var m = part.match(/^\s*(\w+)\s*(=|>|<)\s*(.+?)\s*$/);
+  if (!m) {
+    var needle = part.trim().toLowerCase();
+    return Object.keys(row).some(function (k) { return String(row[k]).toLowerCase().indexOf(needle) > -1; });
+  }
+  var v = row[m[1].toUpperCase()];
+  if (v === undefined) { return false; }
+  if (m[2] === '=') { return String(v).toLowerCase() === m[3].toLowerCase(); }
+  var a = parseFloat(v), b = parseFloat(m[3]);
+  return m[2] === '>' ? a > b : a < b;
+}
+function filt(rows, text) {
+  if (!text) { return rows; }
+  var ors = text.split(/\s+or\s+/i).map(function (s) { return s.split(/\s+and\s+/i); });
+  return rows.filter(function (r) { return ors.some(function (ands) { return ands.every(function (p) { return cond(r, p); }); }); });
+}
+function routeStub(ds, cols) {
+  var spec = JSON.parse(ds), keep = [], skipped = [];
+  spec.f.forEach(function (fr) {
+    var c = String(fr[0] || '').toUpperCase();
+    if (!c || cols.indexOf(c) > -1) { keep.push(fr[1]); } else if (skipped.indexOf(c) < 0) { skipped.push(c); }
+  });
+  return { text: keep.length ? (spec.p || '') + keep.join(' and ') : '', skipped: skipped };
+}
+var SNAPS = [ { ID: 7, CREATED_AT: '2026-06-01 10:00:00', ROW_COUNT: 5 }, { ID: 8, CREATED_AT: '2026-06-15 10:00:00', ROW_COUNT: 8 },
+              { ID: 9, CREATED_AT: '2026-07-01 10:00:00', ROW_COUNT: 2 } ];
+$.getJSON = function (url, params) {
+  params = params || {};
+  CALLS.push({ url: url, p: $.extend({}, params) });
+  var d = $.Deferred();
+  var delay = 10;
+  if (url === 'index.php' && params.dsearch && params.dsearch.indexOf('"AMOUNT > 1"') > -1) { delay = 700; }   // the race phase's slow filter
+  setTimeout(function () {
+    if (url === 'index.php') {
+      var rows = REP[params.id];
+      if (!rows) { d.resolve({ data: [{ ERROR: 'Report Not Found (ID: ' + params.id + ')' }] }); return; }
+      var resp = {};
+      if (params.search) { rows = filt(rows, params.search); }
+      if (params.dsearch) {
+        var r = routeStub(params.dsearch, Object.keys(REP[params.id][0]));
+        rows = filt(rows, r.text);
+        resp.search_skipped = r.skipped;
+      }
+      if (params.limit && rows.length > params.limit) { resp.total_rows = rows.length; rows = rows.slice(0, params.limit); }
+      resp.data = rows;
+      d.resolve(resp);
+    } else if (url === 'manage_snapshots.php') {
+      if (params.action === 'list') { d.resolve({ status: 'success', data: SNAPS.slice().reverse() }); }
+      else { d.resolve({ status: 'success', data: { SNAP_DATA: JSON.stringify([{ X: 1 }, { X: 2 }]), CREATED_AT: '2026-07-01 10:00:00' } }); }
+    } else if (url === 'manage_dashboard.php') {
+      d.resolve({ status: 'success', data: [] });
+    } else { d.reject({ status: 404 }); }
+  }, delay);
+  return d.promise();
+};
+$.ajax = function () { var d = $.Deferred(); d.resolve({ status: 'success' }); return d.promise(); };
+
+const penumbra_dash_vars = {
+  currentUserKey: 'tester', isAdmin: true, canCreate: true, reportGrantPatterns: [],
+  shortId: 'demo', found: true, canEdit: true,
+  urlSearchOverride: '?fy=2026',
+  shibboleth: { name: 'Ada', fname: 'Ada' },
+  meta: { short_id: 'demo', title: 'Filter demo', owner_id: 'tester', authorized: 'tester', updated_at: '' },
+  state: { version: 1, theme: 'theme-default', refreshSeconds: 0, tiles: [
+    { id: 'd1', type: 'stat',  report: 'repA', label: 'A total', agg: 'sum', column: 'AMOUNT', format: 'number', w: 4, h: 1, source: 'live' },
+    { id: 'd2', type: 'table', report: 'repB', label: 'People', columns: ['NAME', 'AMOUNT'], rows: 5, w: 4, h: 2, source: 'live' },
+    { id: 'd3', type: 'stat',  report: 'repA', label: 'Open count', agg: 'count', search: 'STATUS = Open', format: 'number', w: 4, h: 1, source: 'live' },
+    { id: 'd4', type: 'stat',  report: 'repA', label: 'Or count', agg: 'count', search: 'STATUS = Open or STATUS = Closed', format: 'number', w: 4, h: 1, source: 'live' },
+    { id: 'd5', type: 'stat',  report: 'repC', label: 'Snap count', agg: 'count', format: 'number', w: 4, h: 1, source: 'snapshot' },
+    { id: 'd6', type: 'trend', report: 'repC', label: 'Trend', agg: 'count', points: 3, w: 4, h: 1 },
+    { id: 'd7', type: 'note',  label: '', text: 'a note', w: 12, h: 1 },
+    { id: 'e1', type: 'embed', report: 'repA', label: 'A table', show: 'table', w: 4, h: 3, autoHeight: false },
+    { id: 'e2', type: 'embed', report: 'repB', label: 'B full', show: 'both', w: 4, h: 3, autoHeight: false },
+    { id: 'e3', type: 'embed', report: 'repA', label: 'A header', show: 'header', w: 4, h: 3, autoHeight: false },
+    { id: 'e4', type: 'embed', report: 'repA', label: 'A chart', show: 'chart', chartN: 1, w: 4, h: 3 },
+    { id: 'e5', type: 'embed', report: 'legacy', label: 'Legacy', show: 'both', w: 4, h: 3, autoHeight: false }
+  ] },
+  themes: [{ id: 'theme-default', label: 'Default Light', isDark: false }]
+};
+</script>
+<script src="purify.min.js"></script><script src="penumbra_tiles.js"></script>
+<script>
+// A local .php file does not render as a page in this browser, so the framed-report
+// double is stub.html: the ONE change to what the engine builds (every other part
+// of the embed address is asserted as produced).
+(function () {
+  var real = PenumbraTiles.embedUrl;
+  PenumbraTiles.embedUrl = function (spec, opts) { return String(real.call(PenumbraTiles, spec, opts)).replace(/^index\.php\?/, 'stub.html?'); };
+})();
+</script>
+<script src="dash.js"></script>
+<script>
+var L = [];
+function ok(n, c, x) { L.push((c ? 'PASS ' : 'FAIL ') + n + (x !== undefined && !c ? '  [' + x + ']' : '')); }
+function eq(n, got, want) { ok(n, JSON.stringify(got) === JSON.stringify(want), 'got ' + JSON.stringify(got) + ' want ' + JSON.stringify(want)); }
+function tile(id) { return $('.dash-tile[data-tile-id="' + id + '"]'); }
+function frame(id) { return tile(id).find('iframe.dash-embed')[0] || null; }
+function fwin(id) { var f = frame(id); try { return f ? f.contentWindow : null; } catch (e) { return null; } }
+function booted(id) { var w = fwin(id); try { return !!(w && w.__boot); } catch (e) { return false; } }
+function stat(id) { return tile(id).find('.dash-stat-value').text(); }
+function lastCall(id) { for (var i = CALLS.length - 1; i >= 0; i--) { if (CALLS[i].url === 'index.php' && CALLS[i].p.id === id) { return CALLS[i].p; } } return null; }
+function note() { return $('#dashFilterNote').text(); }
+function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+function until(fn, ms) {
+  var t0 = Date.now();
+  return new Promise(function (res) {
+    (function poll() { var v = false; try { v = fn(); } catch (e) { } if (v || Date.now() - t0 > ms) { res(!!v); } else { setTimeout(poll, 100); } })();
+  });
+}
+function enter(text) {
+  $('#dashSearchInput').val(text).trigger('input');
+  $('#dashSearchInput').trigger($.Event('keydown', { key: 'Enter' }));
+}
+function publish() {
+  var A = 'RES' + 'ULT>>', B = '<' + '<FIN';
+  document.getElementById('out').textContent = A + L.join(' ;; ') + B;
+}
+var DS1 = '{"p":"","f":[["COLLEGE","COLLEGE = Eng"],["AMOUNT","AMOUNT > 5"]]}';
+var DS3 = '{"p":"","f":[["","STATUS = Open"],["COLLEGE","COLLEGE = Eng"],["AMOUNT","AMOUNT > 5"]]}';
+var DSOR = '{"p":"","f":[["","COLLEGE = Eng or COLLEGE = Sci"]]}';
+var NBEFORE = 0;
+
+// ══════ S. the shared splitter (PenumbraTiles.splitSearch) ══════
+function splitChecks() {
+  var T = window.PenumbraTiles;
+  if (!T || typeof T.splitSearch !== 'function') { ok('splitSearch is exported', false, typeof (T && T.splitSearch)); return; }
+  var sp = T.splitSearch;
+  function frags(s) { return sp(s).fragments.map(function (f) { return [f.col, f.text]; }); }
+  eq('split: two conditions', frags('COLLEGE = Eng and AMOUNT > 5'), [['COLLEGE', 'COLLEGE = Eng'], ['AMOUNT', 'AMOUNT > 5']]);
+  var r2 = sp('__ROW  A=1');
+  ok('split: a leading modifier is the prefix', r2.prefix === '__ROW  ' && r2.fragments.length === 1 && r2.fragments[0].col === 'A' && r2.fragments[0].text === 'A=1', JSON.stringify(r2));
+  var r3 = sp('A = 1 or B = 2');
+  ok('split: or is reported', r3.or === true && r3.fragments.length === 2, JSON.stringify(r3));
+  eq('split: and inside quotes is text', frags('TITLE = "Arts and Sciences" and X > 1'), [['TITLE', 'TITLE = "Arts and Sciences"'], ['X', 'X > 1']]);
+  eq('split: and inside a regex is text', frags('COL = /a and b/'), [['COL', 'COL = /a and b/']]);
+  eq('split: and inside //exact// is text', frags('X != //exact and more//'), [['X', 'X != //exact and more//']]);
+  eq('split: a quoted column name', frags("'Total Amount' > 5"), [['TOTAL AMOUNT', "'Total Amount' > 5"]]);
+  eq('split: a braced column name', frags('{Dept} = Ops'), [['DEPT', '{Dept} = Ops']]);
+  eq('split: a global term has no column', frags('grant'), [['', 'grant']]);
+  eq('split: a literal has no column', frags('1 = 1'), [['', '1 = 1']]);
+  eq('split: a word operator', frags('TITLE contains grant'), [['TITLE', 'TITLE contains grant']]);
+  eq('split: the row-number column', frags('# > 2'), [['#', '# > 2']]);
+  eq('split: fragments are sliced byte for byte; AND in capitals joins', frags('A   >   5 AND b<3'), [['A', 'A   >   5'], ['B', 'b<3']]);
+  eq('split: a trailing joiner is dropped', frags('COLLEGE = Eng and'), [['COLLEGE', 'COLLEGE = Eng']]);
+  eq('split: empty text', frags('   '), []);
+  eq('split: a column followed by no operator is not a condition', frags('Name Eng'), [['', 'Name Eng']]);
+  eq('split: a column name containing "and" is not a joiner', frags('BRAND = x and ANDY > 2'), [['BRAND', 'BRAND = x'], ['ANDY', 'ANDY > 2']]);
+}
+
+splitChecks();
+setTimeout(function () { window.scrollTo(0, document.body.scrollHeight); }, 250);
+setTimeout(function () { window.scrollTo(0, 0); }, 600);
+
+until(function () { return ['e1', 'e2', 'e3', 'e4', 'e5'].every(booted) && stat('d1') !== ''; }, 9000).then(function (ready) {
+  ok('every frame and data tile loaded', ready, ['e1', 'e2', 'e3', 'e4', 'e5'].map(function (id) { return id + ':' + booted(id); }).join(' ') + ' d1=' + stat('d1'));
+  // ══════ A. no dashboard filter ══════
+  ok('the filter box is in the header, between the title and the buttons',
+     $('#dashHead > #dashFilter').length === 1 && $('#dashFilter').next().is('#dashHeadActions'), $('#dashHead').children().map(function () { return this.id || this.className; }).get().join(','));
+  ok('the box starts empty with its clear button hidden', $('#dashSearchInput').val() === '' && getComputedStyle($('#dashSearchClear')[0]).display === 'none',
+     $('#dashSearchInput').val() + '/' + getComputedStyle($('#dashSearchClear')[0]).display);
+  ok('the note is empty and takes no space', note() === '' && getComputedStyle($('#dashFilterNote')[0]).display === 'none', note());
+  var go = getComputedStyle($('#dashSearchGo')[0]);
+  ok('the apply button stays transparent under the dark theme button rules', go.backgroundColor === 'rgba(0, 0, 0, 0)', go.backgroundColor);
+  ok('the input is transparent inside its box', getComputedStyle($('#dashSearchInput')[0]).backgroundColor === 'rgba(0, 0, 0, 0)', getComputedStyle($('#dashSearchInput')[0]).backgroundColor);
+  var p0 = lastCall('repA');
+  ok('without a filter no fetch carries dsearch', CALLS.every(function (c) { return !c.p.dsearch; }), JSON.stringify(p0));
+  var d3first = CALLS.filter(function (c) { return c.url === 'index.php' && c.p.search === 'STATUS = Open'; }).length;
+  ok("a tile's own search still goes as plain search", d3first >= 1, JSON.stringify(CALLS.map(function (c) { return c.p; })));
+  eq('stat before filtering', [stat('d1'), stat('d3'), stat('d4')], ['233', '2', '4']);
+  ok('embed addresses carry no dsearch yet', ['e1', 'e2', 'e3', 'e4', 'e5'].every(function (id) { return (frame(id).getAttribute('src') || '').indexOf('dsearch') === -1; }));
+  var boots = {}, els = {};
+  ['e1', 'e2', 'e3', 'e4', 'e5'].forEach(function (id) { boots[id] = fwin(id).__boot; els[id] = frame(id); });
+
+  // ══════ B. apply COLLEGE = Eng and AMOUNT > 5 ══════
+  enter('COLLEGE = Eng and AMOUNT > 5');
+  return until(function () { return booted('e4') && frame('e4') !== els.e4 && booted('e5') && frame('e5') !== els.e5 && stat('d1') === '10'; }, 6000).then(function () {
+    return wait(300);
+  }).then(function () {
+    var last = REPLACED[REPLACED.length - 1] || '';
+    ok('the address carries the filter', last.indexOf('dashboard.php?id=demo') === 0 && last.indexOf('search=COLLEGE%20%3D%20Eng%20and%20AMOUNT%20%3E%205') > -1 && last.indexOf('fy=2026') > -1, last);
+    var d1calls = CALLS.filter(function (c) { return c.url === 'index.php' && c.p.dsearch === DS1 && !c.p.search; }).length;
+    ok('data tiles send the fragment list, not plain search', d1calls >= 1, JSON.stringify(CALLS.slice(-6).map(function (c) { return c.p; })));
+    var p3 = CALLS.filter(function (c) { return c.url === 'index.php' && c.p.dsearch === DS3; }).length;
+    ok("a tile's own filter is ANDed in as a fragment with no column", p3 >= 1, JSON.stringify(CALLS.slice(-8).map(function (c) { return c.p; })));
+    var OWNOR = 'STATUS = Open or STATUS = Closed';
+    ok('a tile whose own filter uses "or" keeps it, plain, and gets no fragment list',
+       CALLS.some(function (c) { return c.p.search === OWNOR; }) && CALLS.every(function (c) { return !(c.p.search === OWNOR && c.p.dsearch); }));
+    eq('stats follow the routed filter', [stat('d1'), stat('d3'), stat('d4')], ['10', '1', '4']);
+    ok('the table tile of a report WITHOUT the column is filtered by the rest, not emptied',
+       tile('d2').find('tbody tr').length === 2, tile('d2').find('tbody').text());
+    var n = note();
+    ok('the note names the tile whose report lacks the column', n.indexOf('People (its report has no COLLEGE column)') > -1, n);
+    ok('the note names a framed report that lacks it (from its message)', n.indexOf('B full (its report has no COLLEGE column)') > -1, n);
+    ok('the note names the "or" tile', n.indexOf('Or count (its own filter uses "or"') > -1, n);
+    ok('the note names the snapshot and trend tiles', n.indexOf('Snap count (it reads a snapshot)') > -1 && n.indexOf('Trend (it plots snapshot history)') > -1, n);
+    ok('the note leaves out tiles the filter reaches, and notes', n.indexOf('A total') === -1 && n.indexOf('Open count') === -1 && n.indexOf('A table') === -1 && n.indexOf('note') === -1, n);
+    ok('badges on the unreached tiles that have a head', tile('d2').find('.dash-nofilter-badge').length === 1 && tile('e2').find('.dash-nofilter-badge').length === 1 &&
+       tile('d1').find('.dash-nofilter-badge').length === 0, [tile('d2').find('.dash-nofilter-badge').length, tile('e2').find('.dash-nofilter-badge').length, tile('d1').find('.dash-nofilter-badge').length].join(','));
+    ok('the badge is drawn', tile('d2').find('.dash-nofilter-badge').length && getComputedStyle(tile('d2').find('.dash-nofilter-badge')[0]).display !== 'none');
+    // Embeds in place: same element, same document, the payload received.
+    ['e1', 'e2', 'e3'].forEach(function (id) {
+      var w = fwin(id), p = (w && w.__applied || [])[0] || null;
+      ok(id + ' filtered IN PLACE (same frame, same document)', frame(id) === els[id] && w.__boot === boots[id], id);
+      ok(id + ' received the fragment list', !!p && p.dsearch === DS1 && p.search === '', JSON.stringify(p));
+      var loc = ''; try { loc = w.location.search; } catch (e) { }
+      ok(id + " frame address now carries the filter (a reload keeps it)", loc.indexOf('dsearch=') > -1, loc);
+    });
+    ok('the framed repA table routed the whole filter', fwin('e1').document.getElementById('tableSearch').value === 'COLLEGE = Eng and AMOUNT > 5', fwin('e1').document.getElementById('tableSearch').value);
+    ok('the framed repB page kept only AMOUNT', fwin('e2').document.getElementById('tableSearch').value === 'AMOUNT > 5', fwin('e2').document.getElementById('tableSearch').value);
+    ok('a chart tile reloads with the filter in its address', frame('e4') !== els.e4 && (frame('e4').getAttribute('src') || '').indexOf('dsearch=' + encodeURIComponent(DS1)) > -1, frame('e4').getAttribute('src'));
+    ok('a page without the hook reloads with the filter in its address', frame('e5') !== els.e5 && (frame('e5').getAttribute('src') || '').indexOf('dsearch=') > -1, frame('e5').getAttribute('src'));
+    ok("a data tile's open link carries the fragment list", (tile('d1').find('.dash-tile-open').attr('href') || '').indexOf('dsearch=' + encodeURIComponent(DS1)) > -1, tile('d1').find('.dash-tile-open').attr('href'));
+    ok('the clear button shows and the box is marked active', getComputedStyle($('#dashSearchClear')[0]).display !== 'none' && $('#dashFilter').hasClass('dash-filter-active'));
+
+    // ══════ C. keyboard ══════
+    $('#dashSearchInput').trigger('blur');
+    $(document).trigger($.Event('keydown', { key: '/' }));
+    ok('/ focuses the filter box', document.activeElement && document.activeElement.id === 'dashSearchInput', document.activeElement && document.activeElement.id);
+    $('#dashSearchInput').val('junk').trigger('input');
+    ok('typing without applying marks the box', $('#dashFilter').hasClass('dash-filter-dirty'));
+    $('#dashSearchInput').trigger($.Event('keydown', { key: 'Escape' }));
+    ok('Escape drops what was typed and shows the filter in force', $('#dashSearchInput').val() === 'COLLEGE = Eng and AMOUNT > 5' && !$('#dashFilter').hasClass('dash-filter-dirty'), $('#dashSearchInput').val());
+
+    // ══════ D. a dashboard filter with "or" ══════
+    els.e4 = frame('e4'); els.e5 = frame('e5');
+    enter('COLLEGE = Eng or COLLEGE = Sci');
+    return until(function () { return stat('d1') === '33'; }, 4000);
+  }).then(function () {
+    return wait(300);
+  }).then(function () {
+    var pa = lastCall('repA');
+    ok('an "or" filter goes as ONE fragment with no column', pa && pa.dsearch === DSOR, JSON.stringify(pa));
+    eq('an "or" filter replaces a tile\'s own filter', [stat('d1'), stat('d4')], ['33', '3']);
+    ok('the note warns about "or"', note().indexOf('A filter with "or" goes to every tile as typed') > -1, note());
+    ok('a report without the column shows no rows under an "or" filter (as documented)', tile('d2').find('tbody tr').length === 0, tile('d2').find('tbody').text());
+
+    // ══════ E. a slow response for an older filter never overwrites a newer one ══════
+    enter('AMOUNT > 1');
+    enter('AMOUNT > 100');
+    return wait(1400);
+  }).then(function () {
+    eq('the newest filter wins over a slower, older fetch', stat('d1'), '200');
+
+    // ══════ F. clear ══════
+    NBEFORE = CALLS.length;
+    $('#dashSearchClear').trigger('click');
+    return until(function () { return stat('d1') === '233'; }, 4000);
+  }).then(function () {
+    return wait(300);
+  }).then(function () {
+    var last = REPLACED[REPLACED.length - 1] || '';
+    ok('clearing takes search out of the address and keeps the prompts', last.indexOf('search=') === -1 && last.indexOf('fy=2026') > -1, last);
+    ok('after clearing, no fetch carries a fragment list', CALLS.slice(NBEFORE).every(function (c) { return !c.p.dsearch; }), JSON.stringify(CALLS.slice(NBEFORE).map(function (c) { return c.p; })));
+    eq('stats are back', [stat('d1'), stat('d3'), stat('d4')], ['233', '2', '4']);
+    ok('the note is empty again', note() === '', note());
+    ok('every badge is gone', $('.dash-nofilter-badge').length === 0, String($('.dash-nofilter-badge').length));
+    var pe = (fwin('e1').__applied || []).slice(-1)[0] || null;
+    ok('embeds are cleared in place', !!pe && pe.dsearch === '' && pe.search === '', JSON.stringify(pe));
+    ok('the box is empty and focused for the next filter', $('#dashSearchInput').val() === '' && document.activeElement && document.activeElement.id === 'dashSearchInput');
+    ok('no exception escaped', ERRORS.length === 0, ERRORS.join(' | '));
+    publish();
+  });
+}).catch(function (e) {
+  L.push('HARNESS_ERROR: ' + (e && e.message ? e.message : e) + ' @ ' + String(e && e.stack || '').split('\n')[1]);
+  publish();
+});
+</script></body></html>

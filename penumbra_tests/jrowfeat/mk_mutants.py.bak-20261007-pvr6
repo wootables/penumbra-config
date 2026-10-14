@@ -1,0 +1,48 @@
+# Builds the MUTANTS table of run.py from anchors checked against the staged main.js.
+import sys, json
+src = open(sys.argv[1], 'rb').read().decode('utf-8', 'surrogateescape')
+N = '\r\n'
+def L(*lines): return N.join(lines)
+M = [
+ # name, [(old, new)], must-red, scenarios (None = all)
+ ('visgate', [(L('            // never appears after enabling" bug).', '            return !!computeValidity().ok;'),
+               L('            // never appears after enabling" bug).', "            return !!computeValidity().ok && $('#resultsTable').is(':visible');"))],
+  None, None),
+ ('nogroupcontent', [("                if (heads[k]) paintJournalTable(heads[k], tables[k], toggles, notesOn, false);",
+                      "                if (false) paintJournalTable(heads[k], tables[k], toggles, notesOn, false);")], None, None),
+ ('norebuild', [("                rebuildGroupedView(order);" + N, "                void order;" + N)], None, None),
+ ('eq-nohook', [("        if (window.Penumbra && window.Penumbra.journalPaintFlat) {" + N + "            try { window.Penumbra.journalPaintFlat(); } catch (e) { /* groups build without them */ }",
+                 "        if (false) {" + N + "            try { window.Penumbra.journalPaintFlat(); } catch (e) { /* groups build without them */ }")], [], None),
+ ('noreaim', [("            if (_jMo && tb === _jMoTbody) return;", "            if (_jMo) return;")], None, None),
+ ('nosync', [("            function paintBtn($b, on) { syncToggleButtons(tk, rowKey); }",
+              "            function paintBtn($b, on) { $b.toggleClass('is-on', on).attr('aria-checked', on ? 'true' : 'false'); }")], None, None),
+ ('closeflat', [("            $('#resultsTable tbody tr.journal-note-child, #groupedResultsContainer tr.journal-note-child').remove();",
+                 "            $('#resultsTable tbody tr.journal-note-child').remove();")], None, None),
+ ('noescjournal', [("                    && window.Penumbra.journalHandleEscape()) {", "                    && false) {")], None, None),
+ ('nolock', [("            if (ok) $lock.hide(); else $lock.show();", "            $lock.hide();")], None, ['cfg']),
+ ('nostatusadd', [("            setToggleStatus('Added a toggle column called <strong>' + escapeHtml(label) + '</strong>. Type its name, then press Enter. ' + whereText());",
+                   "            void label;")], None, ['cfg']),
+ ('noundo', [("            var u = _jUndo;" + N + "            _jUndo = null;" + N + "            if (!u || defByKey(u.def.key)) { setToggleStatus(''); return; }",
+              "            var u = null;" + N + "            _jUndo = null;" + N + "            if (!u || defByKey(u.def.key)) { setToggleStatus(''); return; }")], None, ['cfg']),
+ ('emptylabel', [("            if (!val || !defByKey(key)) return;" + N + "            renameDef(key, val);",
+                  "            if (!defByKey(key)) return;" + N + "            renameDef(key, val);")], None, ['cfg']),
+ ('nokeywarn', [("            if (_jKeyAtLoad && cur !== _jKeyAtLoad) {", "            if (false) {")], None, ['keychg']),
+ ('nofreshkey', [("            if (v.ok) window.Penumbra.loadJournalToggles();" + N + "            else { stripToggleColumn(); }",
+                  "            if (v.ok && hasToggles()) window.Penumbra.loadJournalToggles();" + N + "            else { stripToggleColumn(); }"),
+                 ("            if (!_jToggleStateLoaded) base = base + 'x' + Date.now().toString(36);", "            void base;")], None, ['cfg']),
+ ('eq-nostatefetch', [("            if (v.ok) window.Penumbra.loadJournalToggles();" + N + "            else { stripToggleColumn(); }",
+                       "            if (v.ok && hasToggles()) window.Penumbra.loadJournalToggles();" + N + "            else { stripToggleColumn(); }")], [], ['cfg']),
+ ('nodropstop', [("            e.stopPropagation(); // the app-wide import never sees this drop", "            void 0;")], None, ['dropnote']),
+ ('dropanywhere', [("                if (r.width > 0 && r.height > 0 && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return zs[i];",
+                    "                if (r.width > 0) return zs[i];")], None, ['dropnote']),
+ ('footerhidden', [("                if (hc[i].style.display === 'none') continue;" + N + "                visCount++;",
+                    "                visCount++;")], None, ['footer']),
+]
+out = {}
+for name, edits, must, scn in M:
+    for old, new in edits:
+        n = src.count(old)
+        if n != 1: raise SystemExit('%s: anchor found %d times: %r' % (name, n, old[:80]))
+    out[name] = {'edits': edits, 'must': must, 'scn': scn}
+json.dump(out, open(sys.argv[2], 'w', encoding='utf-8'), indent=1)
+print('anchors ok:', len(out))

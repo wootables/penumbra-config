@@ -1,0 +1,70 @@
+<?php
+// pvnotes suite - server half (2026-10-06). Reads the manage_journal.php under
+// test WITHOUT running it (it connects to Oracle and answers HTTP): lifts
+// journalValidPivotKey() out by brace matching and runs it on good and bad
+// keys, and checks the add / reply / row_notes code for the 'pivot' scope.
+// Prints one JSON object: { asserts: [{id, ok, detail}] }.
+//   php server_check.php <path to manage_journal.php>
+$path = isset($argv[1]) ? $argv[1] : '';
+$src = @file_get_contents($path);
+$out = array();
+function rec(&$out, $id, $ok, $detail) { $out[] = array('id' => $id, 'ok' => (bool)$ok, 'detail' => (string)$detail); }
+if ($src === false || $src === '') {
+    echo json_encode(array('fatal' => 'cannot read ' . $path));
+    exit(1);
+}
+
+// --- journalValidPivotKey(): lifted and run ------------------------------
+$fn = null;
+$a = strpos($src, 'function journalValidPivotKey(');
+if ($a !== false) {
+    $b = strpos($src, '{', $a);
+    $depth = 0;
+    for ($i = $b, $n = strlen($src); $i < $n; $i++) {
+        if ($src[$i] === '{') $depth++;
+        elseif ($src[$i] === '}') { $depth--; if ($depth === 0) { $fn = substr($src, $a, $i - $a + 1); break; } }
+    }
+}
+$cases = array(
+    array('[["DEPT","Engineering"]]', true),
+    array('[["DEPT","Engineering"],["FY","FY2026"]]', true),
+    array('[["AWARD_DATE:fy","2026"],["DEPT",""]]', true),
+    array('[]', false),
+    array('{"0":["DEPT","x"]}', false),
+    array('[["DEPT"]]', false),
+    array('[["DEPT","x","y"]]', false),
+    array('[["","x"]]', false),
+    array('[[1,"x"]]', false),
+    array('[["DEPT",2026]]', false),
+    array('"DEPT"', false),
+    array('not json', false),
+    array('[' . implode(',', array_fill(0, 9, '["F","v"]')) . ']', false),
+    array('[["' . str_repeat('F', 201) . '","v"]]', false),
+);
+if ($fn === null) {
+    rec($out, 'S-key-valid', false, 'no journalValidPivotKey() in ' . basename($path));
+    rec($out, 'S-key-shape', false, 'no journalValidPivotKey()');
+} else {
+    eval($fn);
+    $goodOk = true; $badOk = true; $wrong = array();
+    foreach ($cases as $c) {
+        $got = journalValidPivotKey($c[0]);
+        if ($got !== $c[1]) { $wrong[] = substr($c[0], 0, 40) . ' -> ' . var_export($got, true); if ($c[1]) $goodOk = false; else $badOk = false; }
+    }
+    rec($out, 'S-key-valid', $goodOk, $goodOk ? 'the 3 well-formed keys pass' : implode(' | ', $wrong));
+    rec($out, 'S-key-shape', $badOk, $badOk ? 'the 11 malformed keys are refused' : implode(' | ', $wrong));
+}
+
+// --- the add / reply / row_notes code paths -------------------------------
+$addOk = strpos($src, "\$scope = (\$scopeIn === 'row' || \$scopeIn === 'pivot') ? \$scopeIn : 'report';") !== false
+      && strpos($src, "if (\$scope === 'pivot' && !journalValidPivotKey(\$row_key)) {") !== false
+      && strpos($src, "'ROW_KEY'     => (\$scope !== 'report' ? \$row_key : null),") !== false;
+rec($out, 'S-add-scope', $addOk, $addOk ? 'add takes scope pivot, validates its key, stores ROW_KEY' : 'add does not take a pivot scope');
+$replyOk = strpos($src, "\$scope        = (\$prow['SCOPE'] === 'row' || \$prow['SCOPE'] === 'pivot') ? \$prow['SCOPE'] : 'report';") !== false;
+rec($out, 'S-reply-scope', $replyOk, $replyOk ? 'a reply inherits a pivot scope' : 'a reply to a pivot note would land as a report note');
+$rnOk = strpos($src, "SCOPE IN ('row', 'pivot') AND ROW_KEY IS NOT NULL") !== false
+     && strpos($src, "'pivot_counts' => utf8ize(\$pcounts), 'pivot_notes' => utf8ize(\$pnotes)") !== false
+     && strpos($src, "if (\$r['SCOPE'] === 'pivot') {") !== false
+     && strpos($src, "\$pnotes[\$rk][] = \$r;\n                continue;") !== false;
+rec($out, 'S-rownotes-pivot', $rnOk, $rnOk ? 'row_notes answers pivot notes apart from table-row notes' : 'row_notes has no pivot_counts / pivot_notes');
+echo json_encode(array('asserts' => $out));

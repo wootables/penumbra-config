@@ -1,0 +1,1117 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>pivot trigger round-trip</title></head>
+<body>
+<!-- Minimal DOM. main.js binds #copyPivotSnippetBtn DIRECTLY at ready time, so
+     the pivot-builder elements must exist BEFORE main.js loads. The trigger
+     handler is delegated off #reportSnippetOutput. The parser resolves the
+     Value column against #tableHeader th[data-colname]. -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<table id="resultsTable"><thead id="tableHeader"><tr>
+  <th data-colname="#">#</th><th data-colname="COLLEGE">COLLEGE</th><th data-colname="FY">FY</th>
+  <th data-colname="AMOUNT">AMOUNT</th><th data-colname="STATUS">STATUS</th><th data-colname="RECORD_ID">RECORD_ID</th>
+</tr></thead><tbody></tbody></table>
+<div id="errorBox"></div>
+<!-- Phase 3 (2026-08-21): layout_switch / toggle_switch. The toggle reads its
+     own state off the LIVE report, so the three things it reads must exist:
+     the search box, and the two view containers (hidden = the flat table, which
+     is the baseline state every toggle assertion starts from). -->
+<input id="tableSearch" value="">
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="pivotLightbox" style="display:none">
+  <div id="pivot-source-columns"></div>
+  <div id="pivot-rows"></div><div id="pivot-cols"></div><div id="pivot-vals"></div>
+  <select id="pivot-aggregation-selector"><option value="">-</option><option value="sum">sum</option></select>
+  <table><tbody id="pivot-agg-table-body"></tbody></table>
+  <select id="pivot-rows-layout-select"><option value="nested">nested</option><option value="nested-static">nested-static</option><option value="flat">flat</option></select>
+  <select id="pivot-cols-layout-select"><option value="nested">nested</option><option value="flat">flat</option></select>
+  <select id="pivot-sort-order"><option value="asc">asc</option><option value="desc">desc</option></select>
+  <input id="pivot-sticky-cols" value="3">
+  <input type="checkbox" id="pivot-row-total-override-toggle">
+  <div id="pivot-row-total-override-container" style="display:none"><div id="pivot-row-total-slots"></div><div id="pivot-row-total-tokens"></div></div>
+  <select id="pivot-rank-dir"><option value="none">none</option><option value="top">top</option><option value="bottom">bottom</option></select>
+  <input id="pivot-rank-n" value="10"><select id="pivot-rank-agg"><option value="sum">sum</option><option value="count">count</option></select>
+  <select id="pivot-rank-scope"><option value="">Overall</option></select>
+  <input type="checkbox" id="pivot-rank-other" checked><label id="pivot-rank-other-label"></label>
+  <input type="checkbox" id="pivot-no-breakdown"><input type="checkbox" id="pivot-start-expanded">
+  <select id="pivotPresetSelect"><option value=""></option></select><button id="pivotDeletePresetBtn"></button><input type="checkbox" id="pivotAutoRunPreset">
+  <button id="generatePivotBtn">Generate</button>
+  <select id="pivotSnippetTargetSelect" style="display: none;"></select>
+  <button id="updatePivotSnippetBtn" type="button" style="display: none;">&#x27F3; Update Snippet</button>
+  <button id="copyPivotSnippetBtn">Snippet</button>
+  <button id="pivotSavePresetBtn"></button>
+</div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  // Same boot stubs as the parity harness (see ..\parity\harness_b.html for why).
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  // Synchronous show/hide: the fx ticker's rAF never fires under --dump-dom,
+  // so animated fadeIn would otherwise leave display:none and break :visible.
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () {
+    this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {};
+  };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  // NOTE: do NOT null window.requestAnimationFrame here - main.js calls it during
+  // init and the ready-closure then dies before any handler is bound. Instead,
+  // jQuery.fx.off (set after jQuery loads, below the vendor scripts) makes
+  // fadeIn/fadeOut synchronous so :visible assertions work headless.
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); try { var o = document.getElementById('out'); if (o && o.textContent === 'running') o.textContent = 'PAGE_ERROR: ' + window.__errors[0]; } catch (x) {} return true; };
+  // Clipboard capture for the Copy Snippet handler.
+  window.__clip = null;
+  if (!navigator.clipboard) { try { Object.defineProperty(navigator, 'clipboard', { value: {}, configurable: true }); } catch (e) {} }
+  try { navigator.clipboard.writeText = function (s) { window.__clip = s; return Promise.resolve(); }; } catch (e) {}
+</script>
+<script src="main_patched.js"></script>
+<script>
+(function () {
+  function report(txt) { document.getElementById('out').textContent = txt; }
+  var results = [];
+  function assert(name, cond, detail) { results.push({ name: name, pass: !!cond, detail: detail === undefined ? '' : String(detail) }); }
+
+  function rowsSnapshot() {
+    return $('#pivot-agg-table-body tr').map(function () {
+      var $tr = $(this);
+      return {
+        type: $tr.attr('data-agg-type'),
+        col: $tr.attr('data-agg-col') || null,
+        label: $tr.data('custom-label') || null,
+        filter: $tr.attr('data-agg-filter') || null,
+        formula: ($tr.attr('data-agg-type') === 'formula') ? ($tr.attr('data-agg-formula') || '') : null,
+        shownLabel: $tr.find('.pat-cell-lbl .pat-cell-text').text()
+      };
+    }).get();
+  }
+  // Fire a trigger exactly the way executeChainStep / the infobox path do: a
+  // temp .snippet-action link inside #reportSnippetOutput. The parser's
+  // runSilent() setup runs SYNCHRONOUSLY in the click; only the Generate click
+  // is deferred 10ms (and Generate is unbound below - no data in the harness).
+  function fireTrigger(cmd) {
+    var a = $('<a class="snippet-action" data-action-name="trigger"></a>').attr('data-action-value', cmd);
+    $('#reportSnippetOutput').append(a);
+    a.trigger('click');
+    a.remove();
+    return rowsSnapshot();
+  }
+
+  function run() {
+    var T = window.__PT;
+    if (!T || typeof T.addAggregationRow !== 'function') {
+      report('RESULTS_JSON:' + JSON.stringify({ fatal: 'hooks unavailable: ' + (window.__PT_ERR || 'n/a'), pageErrors: window.__errors.slice(0, 6) }));
+      return;
+    }
+    $('#generatePivotBtn').off('click');   // no data in the harness; keep the run deterministic
+
+    // ---- 1. Parser: full snippet with filters, formula AND custom labels (position 17)
+    var full = "pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT,sum:AMOUNT,formula|nested|nested|asc|3|none|none|none|none|none|none|STATUS=Active;;STATUS=Closed;;|;;;;{Active Sum} - {Closed Sum}|Active Sum;;Closed Sum;;Variance";
+    var r1 = fireTrigger(full);
+    assert('parser: 3 rows (two filtered Sums survive the dedupe + formula)', r1.length === 3, JSON.stringify(r1));
+    assert('parser: row1 = sum/AMOUNT/"Active Sum"/STATUS=Active', r1[0] && r1[0].type === 'sum' && r1[0].col === 'AMOUNT' && r1[0].label === 'Active Sum' && r1[0].filter === 'STATUS=Active', JSON.stringify(r1[0]));
+    assert('parser: row2 = sum/AMOUNT/"Closed Sum"/STATUS=Closed', r1[1] && r1[1].type === 'sum' && r1[1].col === 'AMOUNT' && r1[1].label === 'Closed Sum' && r1[1].filter === 'STATUS=Closed', JSON.stringify(r1[1]));
+    assert('parser: row3 = formula "Variance" {Active Sum} - {Closed Sum}', r1[2] && r1[2].type === 'formula' && r1[2].label === 'Variance' && r1[2].formula === '{Active Sum} - {Closed Sum}', JSON.stringify(r1[2]));
+    assert('parser: label cells SHOW the custom labels', r1.length === 3 && r1[0].shownLabel === 'Active Sum' && r1[1].shownLabel === 'Closed Sum' && r1[2].shownLabel === 'Variance', JSON.stringify(r1.map(function (r) { return r.shownLabel; })));
+    var v1 = T.validatePivotFormulas();
+    assert('parser: formula validates against the restored labels (no "unknown/ambiguous label")', v1 && v1.error === null, JSON.stringify(v1 && v1.error));
+    assert('parser: row/col chips keep their case', $('#pivot-rows .pivot-column-item').attr('data-field') === 'COLLEGE' && $('#pivot-cols .pivot-column-item').attr('data-field') === 'FY', $('#pivot-rows').text() + '/' + $('#pivot-cols').text());
+
+    // ---- 2. Writer: Copy Snippet must reproduce the SAME trigger (round trip)
+    window.__clip = null;
+    $('#copyPivotSnippetBtn').trigger('click');
+    var expected = "action(trigger, 'View Pivot', '" + full + "')";
+    assert('writer: Copy Snippet emits the labels and round-trips byte-for-byte', window.__clip === expected, 'got: ' + window.__clip);
+
+    // ---- 3. Legacy snippets (no label position) still work, labels default
+    var r3 = fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum,count');
+    assert('legacy: sum,count -> 2 rows, default labels', r3.length === 2 && r3[0].type === 'sum' && r3[1].type === 'count' && r3[0].label === null && r3[1].label === null, JSON.stringify(r3));
+    // Writer on a default-label pivot must NOT emit the labels field (trailing default trimmed)
+    window.__clip = null; $('#copyPivotSnippetBtn').trigger('click');
+    assert('writer: no custom labels -> AggLabels field omitted', window.__clip === "action(trigger, 'View Pivot', 'pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT,count:AMOUNT')", 'got: ' + window.__clip);
+
+    // ---- 4. Dedupe: exact duplicates still collapse; differentiated ones survive
+    var r4a = fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum,sum');
+    assert('dedupe: sum,sum (identical) -> 1 row', r4a.length === 1, JSON.stringify(r4a));
+    var r4b = fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum,sum:AMOUNT');
+    assert('dedupe: sum,sum:AMOUNT with Value=AMOUNT -> still 1 row', r4b.length === 1, JSON.stringify(r4b));
+    var r4c = fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT,sum:AMOUNT|nested|nested|asc|3|none|none|none|none|none|none|none|none|Gross;;Net');
+    assert('dedupe: same type+col, different LABELS -> 2 rows', r4c.length === 2 && r4c[0].label === 'Gross' && r4c[1].label === 'Net', JSON.stringify(r4c));
+    var r4d = fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT,sum:AMOUNT|nested|nested|asc|3|none|none|none|none|none|none|STATUS=Active;;STATUS=Closed');
+    assert('dedupe: same type+col, different FILTERS (the help example shape) -> 2 rows', r4d.length === 2 && r4d[0].filter === 'STATUS=Active' && r4d[1].filter === 'STATUS=Closed', JSON.stringify(r4d));
+    var r4e = fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT,distinct:RECORD_ID,sum:AMOUNT');
+    assert('dedupe: sum:AMOUNT,distinct:RECORD_ID,sum:AMOUNT -> 2 rows', r4e.length === 2 && r4e[0].type === 'sum' && r4e[1].type === 'distinct' && r4e[1].col === 'RECORD_ID', JSON.stringify(r4e));
+
+    // ---- 5. sum_count alias: labels can't name two columns -> both default
+    var r5 = fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum_count|nested|nested|asc|3|none|none|none|none|none|none|none|none|Both');
+    assert('sum_count: expands to sum+count, label ignored', r5.length === 2 && r5[0].type === 'sum' && r5[1].type === 'count' && r5[0].label === null && r5[1].label === null, JSON.stringify(r5));
+
+    // ---- 5b. Expand arg (2026-08-25): the "Start groups expanded" inversion.
+    // Position 13 is now Expand: only the 'expanded' keyword checks the box;
+    // legacy 'collapsed', 'none' and absent all mean the collapsed default.
+    var fullExp = 'pivot|COLLEGE,DEPT|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|expanded';
+    fireTrigger(fullExp);
+    assert("expand: parser checks the box on 'expanded'", $('#pivot-start-expanded').is(':checked'), 'box unchecked after |expanded');
+    window.__clip = null; $('#copyPivotSnippetBtn').trigger('click');
+    assert('expand: writer round-trips |expanded byte-for-byte', window.__clip === "action(trigger, 'View Pivot', '" + fullExp + "')", 'got: ' + window.__clip);
+    fireTrigger('pivot|COLLEGE,DEPT|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|collapsed');
+    assert("expand: legacy 'collapsed' keyword leaves the box unchecked (= the default)", !$('#pivot-start-expanded').is(':checked'), 'box checked after |collapsed');
+    window.__clip = null; $('#copyPivotSnippetBtn').trigger('click');
+    assert('expand: unchecked box emits no Expand arg (trailing default trimmed)', window.__clip === "action(trigger, 'View Pivot', 'pivot|COLLEGE,DEPT|FY|AMOUNT|sum:AMOUNT')", 'got: ' + window.__clip);
+
+    // ---- 5c. New aggregate types (2026-08-25): stddev/range/count_filled/count_blank/antimode
+    var r5c = fireTrigger('pivot|COLLEGE|FY|AMOUNT|stddev:AMOUNT,range:AMOUNT,count_filled:AMOUNT,count_blank:AMOUNT,antimode:AMOUNT');
+    assert('newaggs: parser accepts all five types', r5c.length === 5 && r5c[0].type === 'stddev' && r5c[1].type === 'range' && r5c[2].type === 'count_filled' && r5c[3].type === 'count_blank' && r5c[4].type === 'antimode', JSON.stringify(r5c));
+    window.__clip = null; $('#copyPivotSnippetBtn').trigger('click');
+    assert('newaggs: writer round-trips all five byte-for-byte', window.__clip === "action(trigger, 'View Pivot', 'pivot|COLLEGE|FY|AMOUNT|stddev:AMOUNT,range:AMOUNT,count_filled:AMOUNT,count_blank:AMOUNT,antimode:AMOUNT')", 'got: ' + window.__clip);
+    var r5d = fireTrigger('pivot|COLLEGE|FY|AMOUNT|stdev');
+    assert("newaggs: 'stdev' alias normalizes to stddev", r5d.length === 1 && r5d[0].type === 'stddev', JSON.stringify(r5d));
+    // ---- 5d. Derived additions (2026-08-25 pt2): diff + the :down twins of
+    // pct_change / diff / index. All are colon-suffix VARIANTS, not column
+    // overrides - the parser's _knownColonSuffixes list must keep them whole.
+    var r5e = fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT,diff,pct_change:down,diff:down,index:down');
+    assert('derived: parser accepts diff + the three :down twins', r5e.length === 5 && r5e[1].type === 'diff' && r5e[2].type === 'pct_change:down' && r5e[3].type === 'diff:down' && r5e[4].type === 'index:down', JSON.stringify(r5e));
+    // ---- % of Parent + Cumulative % (2026-08-26): pct_cum:down is a colon
+    // VARIANT (must survive _knownColonSuffixes), the other three plain tokens.
+    window.__clip = null; $('#copyPivotSnippetBtn').trigger('click');
+    assert('derived: writer round-trips them byte-for-byte', window.__clip === "action(trigger, 'View Pivot', 'pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT,diff,pct_change:down,diff:down,index:down')", 'got: ' + window.__clip);
+    var r5p = fireTrigger('pivot|COLLEGE,DEPT|FY|AMOUNT|sum:AMOUNT,pct_parent_row,pct_parent_col,pct_cum,pct_cum:down');
+    assert('pctparent: parser accepts all four new derived types', r5p.length === 5 && r5p[1].type === 'pct_parent_row' && r5p[2].type === 'pct_parent_col' && r5p[3].type === 'pct_cum' && r5p[4].type === 'pct_cum:down', JSON.stringify(r5p));
+    window.__clip = null; $('#copyPivotSnippetBtn').trigger('click');
+    assert('pctparent: writer round-trips them byte-for-byte',
+      String(window.__clip || '').indexOf('sum:AMOUNT,pct_parent_row,pct_parent_col,pct_cum,pct_cum:down') !== -1, 'got: ' + window.__clip);
+
+    var M5 = window.__PT5;
+    if (M5) {
+        assert('newaggs math: sample stddev of [10,20,30] = 10', Math.abs(M5.stddev([10, 20, 30]) - 10) < 1e-9, String(M5.stddev([10, 20, 30])));
+        assert('newaggs math: stddev of a single value = 0', M5.stddev([5]) === 0, String(M5.stddev([5])));
+        assert('newaggs math: antimode least-common', M5.antimode(['a', 'a', 'b']) === 'b', M5.antimode(['a', 'a', 'b']));
+        assert('newaggs math: antimode tie keeps first seen', M5.antimode(['x', 'y']) === 'x', M5.antimode(['x', 'y']));
+        var cell5 = { count: 3, sum: 30, numericCount: 2, min: 10, max: 20, distinct: new Set(['10', '20']), values: ['10', '20'] };
+        assert('newaggs extract: stddev ~7.0710678', Math.abs(M5.extract(cell5, 'stddev') - 7.0710678) < 1e-6, String(M5.extract(cell5, 'stddev')));
+        assert('newaggs extract: range 10', M5.extract(cell5, 'range') === 10, String(M5.extract(cell5, 'range')));
+        assert('newaggs extract: count_filled 2 / count_blank 1', M5.extract(cell5, 'count_filled') === 2 && M5.extract(cell5, 'count_blank') === 1, M5.extract(cell5, 'count_filled') + '/' + M5.extract(cell5, 'count_blank'));
+        assert('newaggs extract: antimode tie -> first seen', M5.extract(cell5, 'antimode') === '10', String(M5.extract(cell5, 'antimode')));
+    } else {
+        assert('newaggs: __PT5 hooks available', false, window.__PT5_ERR || 'n/a');
+    }
+
+    // ---- 5e. Date splits (2026-08-25): FIELD:variant[:fill] tokens ----
+    var M6 = window.__PT6;
+    if (M6) {
+        var tk = M6.parseTok('AWARD_DATE:fy');
+        assert('datesplit parse: base/split', tk.base === 'AWARD_DATE' && tk.split === 'fy' && tk.fill === false, JSON.stringify(tk));
+        tk = M6.parseTok('AWARD_DATE:YM:FILL');
+        assert('datesplit parse: case-insensitive + fill', tk.split === 'ym' && tk.fill === true, JSON.stringify(tk));
+        tk = M6.parseTok('WEIRD:COLUMN');
+        assert('datesplit parse: unknown suffix stays plain', tk.base === 'WEIRD:COLUMN' && tk.split === null, JSON.stringify(tk));
+        assert('datesplit compose: canonical form', M6.composeTok('award_date', 'fy', true) === 'AWARD_DATE:fy:fill', M6.composeTok('award_date', 'fy', true));
+        assert('datesplit compose: cycle drops fill', M6.composeTok('X', 'month', true) === 'X:month', M6.composeTok('X', 'month', true));
+        assert('datesplit display label', M6.dispLabel('AWARD_DATE:fy') === 'AWARD_DATE (Fiscal Year)', M6.dispLabel('AWARD_DATE:fy'));
+        // Pill round-trip: token -> DOM pill (base + data-split/-fill) -> token
+        var $pill = M6.buildPill('award_date:FY:FILL');
+        assert('datesplit pill: data-field is base', $pill.attr('data-field') === 'award_date' && $pill.attr('data-split') === 'fy' && $pill.attr('data-fill') === '1', $pill.attr('data-field') + '/' + $pill.attr('data-split'));
+        assert('datesplit pill round-trip canonical', M6.tokFromPill($pill[0]) === 'AWARD_DATE:fy:fill', M6.tokFromPill($pill[0]));
+        // Bucket labels (2025-03-14 is a Friday; FY named by ENDING year, Jul-Jun)
+        assert('datesplit bucket fy Mar', M6.bucket('fy', '2025-03-14') === 'FY25', M6.bucket('fy', '2025-03-14'));
+        assert('datesplit bucket fy Jul', M6.bucket('fy', '2025-07-01') === 'FY26', M6.bucket('fy', '2025-07-01'));
+        assert('datesplit bucket fyq Mar=FQ3', M6.bucket('fyq', '2025-03-14') === 'FY25 Q3', M6.bucket('fyq', '2025-03-14'));
+        assert('datesplit bucket ym', M6.bucket('ym', '2025-03-14') === 'Mar 2025', M6.bucket('ym', '2025-03-14'));
+        assert('datesplit bucket monthnum', M6.bucket('monthnum', '2025-03-14') === '03', M6.bucket('monthnum', '2025-03-14'));
+        assert('datesplit bucket dow', M6.bucket('dow', '2025-03-14') === 'Fri', M6.bucket('dow', '2025-03-14'));
+        assert('datesplit bucket hour date-only', M6.bucket('hour', '2025-03-14') === '00:00', M6.bucket('hour', '2025-03-14'));
+        assert('datesplit bucket hour timestamp', M6.bucket('hour', '2025-03-14 15:42:07') === '15:00', M6.bucket('hour', '2025-03-14 15:42:07'));
+        assert('datesplit bucket unparsable keeps raw', M6.bucket('fy', 'not a date') === 'not a date', M6.bucket('fy', 'not a date'));
+        assert('datesplit bucket blank stays blank', M6.bucket('fy', '') === '', JSON.stringify(M6.bucket('fy', '')));
+        assert('datesplit bucket strips markers', M6.bucket('year', '@@HTML<b>2025-03-14</b>') === '2025', M6.bucket('year', '@@HTML<b>2025-03-14</b>'));
+        // Ordering + fill walking
+        assert('datesplit vcmp Jan<Feb', M6.vcmp('month', 'Jan', 'Feb') < 0 && M6.vcmp('month', 'Dec', 'Jan') > 0, M6.vcmp('month', 'Jan', 'Feb') + '/' + M6.vcmp('month', 'Dec', 'Jan'));
+        assert('datesplit vcmp raw after real buckets', M6.vcmp('month', 'zzz', 'Dec') > 0, String(M6.vcmp('month', 'zzz', 'Dec')));
+        var SPL = M6.splitsGet();
+        assert('datesplit next fy century wrap', SPL.fy.next('FY99') === 'FY00', SPL.fy.next('FY99'));
+        assert('datesplit next ym wraps', SPL.ym.next('Dec 2025') === 'Jan 2026', SPL.ym.next('Dec 2025'));
+        var fillSpec = M6.fillSpec(['AWARD_DATE:ym:fill']);
+        assert('datesplit fillSpec accepts single period', !!fillSpec && fillSpec.split === 'ym', JSON.stringify(fillSpec));
+        assert('datesplit fillSpec rejects cycle', M6.fillSpec(['AWARD_DATE:month:fill']) === null, 'expected null');
+        var gapKeys = ['Jan 2025', 'Apr 2025'];
+        M6.expand(gapKeys, 'ym');
+        assert('datesplit expand inserts Feb+Mar', gapKeys.join('|') === 'Jan 2025|Feb 2025|Mar 2025|Apr 2025', gapKeys.join('|'));
+    } else {
+        assert('datesplit: __PT6 hooks available', false, window.__PT6_ERR || 'n/a');
+    }
+
+    // ---- 5f. Numeric binning (2026-08-26): tokens, buckets, widths, pills ----
+    var M7 = window.__PT7;
+    if (M7 && M6) {
+        var bt = M6.parseTok('AMOUNT:bin50000');
+        assert('bin parse: base/split/width', bt.base === 'AMOUNT' && bt.split === 'bin' && bt.binWidth === 50000, JSON.stringify(bt));
+        assert('bin parse: auto has null width', M6.parseTok('AMOUNT:bin').split === 'bin' && M6.parseTok('AMOUNT:bin').binWidth == null, JSON.stringify(M6.parseTok('AMOUNT:bin')));
+        assert('bin parse: bin0 is a plain field', M6.parseTok('AMOUNT:bin0').split === null && M6.parseTok('AMOUNT:bin0').base === 'AMOUNT:bin0', JSON.stringify(M6.parseTok('AMOUNT:bin0')));
+        assert('bin parse: binlog + fill', (function () { var x = M6.parseTok('AMT:binlog:fill'); return x.split === 'binlog' && x.fill === true; })(), JSON.stringify(M6.parseTok('AMT:binlog:fill')));
+        assert('bin compose w width + fill', M6.composeTok('AMT', 'bin', true, 1000) === 'AMT:bin1000:fill', M6.composeTok('AMT', 'bin', true, 1000));
+        assert('bin compose auto', M6.composeTok('AMT', 'bin', false, null) === 'AMT:bin', M6.composeTok('AMT', 'bin', false, null));
+        assert('bin dispLabel fixed', M6.dispLabel('AMOUNT:bin50000') === 'AMOUNT (Bins of 50,000)', M6.dispLabel('AMOUNT:bin50000'));
+        assert('bin dispLabel auto', M6.dispLabel('AMOUNT:bin') === 'AMOUNT (Bins)', M6.dispLabel('AMOUNT:bin'));
+        assert('bin bucket 50000 w50000', M7.binBucket('bin', '50000', 50000) === '50,000 – 99,999', M7.binBucket('bin', '50000', 50000));
+        assert('bin bucket negative', M7.binBucket('bin', '-1500', 1000) === '-2,000 – -1,001', M7.binBucket('bin', '-1500', 1000));
+        assert('bin bucket currency', M7.binBucket('bin', '$1,234.56', 1000) === '1,000 – 1,999', M7.binBucket('bin', '$1,234.56', 1000));
+        assert('bin bucket raw fallback', M7.binBucket('bin', 'N/A', 1000) === 'N/A', M7.binBucket('bin', 'N/A', 1000));
+        assert('binlog exact power 1000', M7.binBucket('binlog', '1000', null) === '1,000 – 9,999', M7.binBucket('binlog', '1000', null));
+        assert('binlog < 1', M7.binBucket('binlog', '0.25', null) === '< 1', M7.binBucket('binlog', '0.25', null));
+        assert('autoW 0..45000 = 5000', M7.autoW(0, 45000) === 5000, String(M7.autoW(0, 45000)));
+        assert('autoW degenerate = 1', M7.autoW(7, 7) === 1, String(M7.autoW(7, 7)));
+        assert('bin vcmp numeric order', M6.vcmp('bin', '5,000 – 9,999', '10,000 – 14,999') < 0, String(M6.vcmp('bin', '5,000 – 9,999', '10,000 – 14,999')));
+        assert('binlog vcmp: < 1 first', M6.vcmp('binlog', '< 1', '1 – 9') < 0, String(M6.vcmp('binlog', '< 1', '1 – 9')));
+        var SPL2 = M6.splitsGet();
+        assert('bin next label', SPL2.bin.next('0 – 4,999') === '5,000 – 9,999', SPL2.bin.next('0 – 4,999'));
+        assert('binlog next label', SPL2.binlog.next('10 – 99') === '100 – 999', SPL2.binlog.next('10 – 99'));
+        var binFill = M6.fillSpec(['AMT:bin1000:fill']);
+        assert('bin fillSpec accepted', !!binFill && binFill.split === 'bin' && binFill.binWidth === 1000, JSON.stringify(binFill));
+        var binGaps = ['0 – 999', '3,000 – 3,999'];
+        M6.expand(binGaps, 'bin');
+        assert('bin expand inserts middle buckets', binGaps.join('|') === '0 – 999|1,000 – 1,999|2,000 – 2,999|3,000 – 3,999', binGaps.join('|'));
+        var $bp = M6.buildPill('AMOUNT:bin50000');
+        assert('bin pill carries data-bin-width', $bp.attr('data-split') === 'bin' && $bp.attr('data-bin-width') === '50000', ($bp.attr('data-split') || '') + '/' + ($bp.attr('data-bin-width') || ''));
+        assert('bin pill token round-trip', M6.tokFromPill($bp[0]) === 'AMOUNT:bin50000', M6.tokFromPill($bp[0]));
+        assert('bin chip auto', M7.chip(null) === 'Bins', M7.chip(null));
+        assert('bin chip 50K', M7.chip(50000) === 'Bin 50K', M7.chip(50000));
+        assert('bin chip 2M', M7.chip(2000000) === 'Bin 2M', M7.chip(2000000));
+        assert('bin chip 750', M7.chip(750) === 'Bin 750', M7.chip(750));
+    } else {
+        assert('binning: __PT7 hooks available', false, window.__PT7_ERR || 'n/a');
+    }
+
+    // ---- 5g. Custom-edge bins (2026-08-27) ----
+    var M8 = window.__PT8;
+    if (M8 && M6) {
+        var E = [100000, 250000, 500000, 750000, 1000000, 5000000];
+        var ETOK = 'AMOUNT:bins100000_250000_500000_750000_1000000_5000000';
+        var et = M6.parseTok(ETOK);
+        assert('bins parse: split + edges', et.split === 'bins' && et.binEdges.join(',') === E.join(','), JSON.stringify(et.binEdges));
+        assert('bins parse: sorted + de-duplicated', M6.parseTok('AMOUNT:bins500000_100000_500000').binEdges.join(',') === '100000,500000', JSON.stringify(M6.parseTok('AMOUNT:bins500000_100000_500000').binEdges));
+        assert('bins parse: bare :bins is a plain field', M6.parseTok('AMOUNT:bins').split === null && M6.parseTok('AMOUNT:bins').base === 'AMOUNT:bins', JSON.stringify(M6.parseTok('AMOUNT:bins')));
+        assert('bins parse: fill', M6.parseTok('AMT:bins1000_2000:fill').fill === true);
+        assert('bins compose round-trip', M6.composeTok('AMOUNT', 'bins', false, null, E) === ETOK, M6.composeTok('AMOUNT', 'bins', false, null, E));
+        assert('bins compose w/ fill', M6.composeTok('AMT', 'bins', true, null, [1000, 2000]) === 'AMT:bins1000_2000:fill', M6.composeTok('AMT', 'bins', true, null, [1000, 2000]));
+        assert('bins compose: no edges = plain column', M6.composeTok('AMOUNT', 'bins', false, null, null) === 'AMOUNT', M6.composeTok('AMOUNT', 'bins', false, null, null));
+        assert('bins display label', M6.dispLabel(ETOK) === 'AMOUNT (Custom Ranges)', M6.dispLabel(ETOK));
+        var SPL3 = M6.splitsGet();
+        assert('compact 100K', SPL3.bins.fmt(100000) === '100K', SPL3.bins.fmt(100000));
+        assert('compact 1.5M', SPL3.bins.fmt(1500000) === '1.5M', SPL3.bins.fmt(1500000));
+        assert('compact 1,234,567 not faked', SPL3.bins.fmt(1234567) === '1,234,567', SPL3.bins.fmt(1234567));
+        assert('compact parse $1.5M', SPL3.bins.parse('$1.5M') === 1500000, String(SPL3.bins.parse('$1.5M')));
+        assert('compact parse junk', SPL3.bins.parse('abc') === null);
+        assert('bins bucket below', M8.binsBucket('50000', E) === 'below 100K', M8.binsBucket('50000', E));
+        assert('bins bucket lower edge inclusive', M8.binsBucket('100000', E) === '100K – 250K', M8.binsBucket('100000', E));
+        assert('bins bucket upper edge goes above', M8.binsBucket('250000', E) === '250K – 500K', M8.binsBucket('250000', E));
+        assert('bins bucket 999,999.99', M8.binsBucket('$999,999.99', E) === '750K – 1M', M8.binsBucket('$999,999.99', E));
+        assert('bins bucket last edge open', M8.binsBucket('5000000', E) === 'above 5M', M8.binsBucket('5000000', E));
+        assert('bins bucket raw fallback', M8.binsBucket('N/A', E) === 'N/A');
+        assert('bins bucket blank', M8.binsBucket('', E) === '');
+        assert('bins labels match the chart', SPL3.bins.labels(E).join('|') === 'below 100K|100K – 250K|250K – 500K|500K – 750K|750K – 1M|1M – 5M|above 5M', SPL3.bins.labels(E).join('|'));
+        assert('bins vcmp orders below < range < above', M6.vcmp('bins', 'below 100K', '250K – 500K') < 0 && M6.vcmp('bins', '1M – 5M', 'above 5M') < 0, 'ordering');
+        assert('bins vcmp raw sorts last', M6.vcmp('bins', 'N/A', 'above 5M') > 0, String(M6.vcmp('bins', 'N/A', 'above 5M')));
+        var binsFill = M6.fillSpec([ETOK + ':fill']);
+        assert('bins fillSpec accepted', !!binsFill && binsFill.split === 'bins', JSON.stringify(binsFill && binsFill.split));
+        var sparse = ['below 1K', '2K – 3K', 'N/A'];
+        M6.expand(sparse, 'bins', { binEdges: [1000, 2000, 3000] });
+        assert('bins fill rebuilds every bucket, raw last', sparse.join('|') === 'below 1K|1K – 2K|2K – 3K|above 3K|N/A', sparse.join('|'));
+        assert('bins normEdges rejects too many', M8.normEdges(new Array(50).join('1').split('').map(function (x, i) { return i + 1; })) === null, 'expected null');
+        assert('bins normEdges rejects negatives', M8.normEdges([-5, 10]) === null, 'expected null');
+        // Free-typed cut points. The comma is BOTH a list separator and a
+        // thousands separator - "$50,000" must not become 50 and 0 (live bug,
+        // caught 2026-08-27).
+        assert('edge list: comma-separated compact', (M8.edgeList('100K, 250K, 500K, 1M').nums || []).join(',') === '100000,250000,500000,1000000', JSON.stringify(M8.edgeList('100K, 250K, 500K, 1M')));
+        assert('edge list: grouped number stays whole', (M8.edgeList('$50,000').nums || []).join(',') === '50000', JSON.stringify(M8.edgeList('$50,000')));
+        assert('edge list: mixed formats + spaces', (M8.edgeList('2.5M  $50,000 1M').nums || []).join(',') === '2500000,50000,1000000', JSON.stringify(M8.edgeList('2.5M  $50,000 1M')));
+        assert('edge list: grouped numbers in a comma list', (M8.edgeList('100,000, 250,000').nums || []).join(',') === '100000,250000', JSON.stringify(M8.edgeList('100,000, 250,000')));
+        assert('edge list: ungrouped comma list still splits', (M8.edgeList('100000,250000').nums || []).join(',') === '100000,250000', JSON.stringify(M8.edgeList('100000,250000')));
+        assert('edge list: junk names the offender', M8.edgeList('100K, abc').bad === 'abc', JSON.stringify(M8.edgeList('100K, abc')));
+        assert('edge list: empty input', (M8.edgeList('   ').nums || []).length === 0);
+        var $ep = M6.buildPill(ETOK);
+        assert('bins pill carries data-bin-edges', $ep.attr('data-split') === 'bins' && $ep.attr('data-bin-edges') === E.join('_'), ($ep.attr('data-bin-edges') || ''));
+        assert('bins pill token round-trip', M6.tokFromPill($ep[0]) === ETOK, M6.tokFromPill($ep[0]));
+    } else {
+        assert('custom bins: __PT8 hooks available', false, window.__PT8_ERR || 'n/a');
+    }
+
+    // ---- 5h. Percentile aggregations (2026-08-27) ----
+    var M9 = window.__PT9, M5 = window.__PT5;
+    if (M9 && M5) {
+        assert('pctile token p90', M9.pctP('p90') === 90, String(M9.pctP('p90')));
+        assert('pctile bounds p1/p99', M9.pctP('p1') === 1 && M9.pctP('p99') === 99);
+        assert('pctile rejects p0/p100', M9.pctP('p0') === null && M9.pctP('p100') === null);
+        assert('pctile never matches pct_ types', M9.pctP('pct_row_total') === null && M9.pctP('pct_cum:down') === null && M9.pctP('pct_grand_total') === null);
+        assert('pctile rejects base types', M9.pctP('sum') === null && M9.pctP('') === null);
+        assert('pctile label is P90', M9.aggLabel('p90') === 'P90', M9.aggLabel('p90'));
+        var TEN = [1,2,3,4,5,6,7,8,9,10];
+        assert('p50 of 1..10 = 5.5', M9.pctOf(TEN, 50) === 5.5, String(M9.pctOf(TEN, 50)));
+        assert('p90 of 1..10 = 9.1', Math.abs(M9.pctOf(TEN, 90) - 9.1) < 1e-9, String(M9.pctOf(TEN, 90)));
+        assert('p25 of 1..10 = 3.25', M9.pctOf(TEN, 25) === 3.25, String(M9.pctOf(TEN, 25)));
+        assert('pctile sorts unsorted input', M9.pctOf([10, 1, 5], 50) === 5, String(M9.pctOf([10, 1, 5], 50)));
+        assert('pctile single value', M9.pctOf([7], 90) === 7);
+        assert('pctile empty = 0', M9.pctOf([], 90) === 0);
+        // Must be the SAME math as the snippet percentile(), or percentile(50,COL)
+        // and a P50 pivot column would disagree on the same data.
+        assert('pctile defers to the snippet engine helper',
+            M9.pctOf(TEN, 37) === M9.snippetPctOf(TEN.slice(), 37), String(M9.pctOf(TEN, 37)) + ' vs ' + String(M9.snippetPctOf(TEN.slice(), 37)));
+        // Through the real cell extractor: P50 must equal median exactly.
+        var _mkCell = function (vals) {
+            var nums = vals.map(Number);
+            return { count: vals.length, sum: nums.reduce(function (a, b) { return a + b; }, 0),
+                numericCount: vals.length, min: Math.min.apply(null, nums), max: Math.max.apply(null, nums),
+                distinct: new Set(vals.map(String)), values: vals.map(String) };
+        };
+        var _c4 = _mkCell([10, 20, 30, 40]);
+        assert('extract p50 = 25', M5.extract(_c4, 'p50') === 25, String(M5.extract(_c4, 'p50')));
+        assert('extract p50 === extract median', M5.extract(_c4, 'p50') === M5.extract(_c4, 'median'), String(M5.extract(_c4, 'p50')) + ' vs ' + String(M5.extract(_c4, 'median')));
+        assert('extract p90 = 37', M5.extract(_c4, 'p90') === 37, String(M5.extract(_c4, 'p90')));
+        assert('extract p25 = 17.5', M5.extract(_c4, 'p25') === 17.5, String(M5.extract(_c4, 'p25')));
+        var _c5 = _mkCell([2, 4, 6, 8, 10]);
+        assert('extract p50 odd count = 6', M5.extract(_c5, 'p50') === 6, String(M5.extract(_c5, 'p50')));
+        assert('extract ignores non-numeric junk', M5.extract({ count: 3, sum: 3, numericCount: 2, min: 1, max: 2, distinct: new Set(['1','2','x']), values: ['1', 'x', '2'] }, 'p50') === 1.5);
+        // ---- Weighted average ----
+        assert('wavg token', M9.wavgCol('wavg@AMOUNT') === 'AMOUNT', String(M9.wavgCol('wavg@AMOUNT')));
+        assert('wavg token uppercases', M9.wavgCol('wavg@amount') === 'AMOUNT');
+        assert('wavg rejects bare wavg', M9.wavgCol('wavg') === null);
+        assert('wavg rejects other types', M9.wavgCol('avg') === null && M9.wavgCol('p90') === null && M9.wavgCol('') === null);
+        assert('wavg label names the weight', M9.aggLabel('wavg@AMOUNT') === 'Wtd Avg by AMOUNT', M9.aggLabel('wavg@AMOUNT'));
+        assert('bare wavg label', M9.aggLabel('wavg') === 'Weighted Avg', M9.aggLabel('wavg'));
+        assert('wavg of a pair', M9.wavgOf({ w: 400, wv: 7000 }) === 17.5, String(M9.wavgOf({ w: 400, wv: 7000 })));
+        assert('wavg of zero weight = 0', M9.wavgOf({ w: 0, wv: 0 }) === 0 && M9.wavgOf(null) === 0);
+        var _acc = { w: 0, wv: 0 };
+        M9.wavgAdd(_acc, { w: 400, wv: 7000 });
+        M9.wavgAdd(_acc, { w: 100, wv: 4000 });
+        assert('wavg merge is Sw / S(v*w), not an avg of avgs',
+            _acc.w === 500 && _acc.wv === 11000 && M9.wavgOf(_acc) === 22, JSON.stringify(_acc) + ' -> ' + String(M9.wavgOf(_acc)));
+        M9.wavgAdd(_acc, null);
+        assert('wavg merge ignores a missing pair', _acc.w === 500);
+        assert('wavgPair reads the bucket by weight column',
+            M9.wavgPair({ wpairs: { AMOUNT: { w: 2, wv: 8 } } }, 'AMOUNT').wv === 8 && M9.wavgPair({ wpairs: {} }, 'AMOUNT') === null);
+        // Extraction straight from a bucket
+        var _wCell = { count: 2, sum: 30, numericCount: 2, min: 10, max: 20, distinct: new Set(['10','20']),
+            values: ['10','20'], wpairs: { AMOUNT: { w: 400, wv: 7000 } } };
+        assert('extract wavg@AMOUNT = 17.5', M5.extract(_wCell, 'wavg@AMOUNT') === 17.5, String(M5.extract(_wCell, 'wavg@AMOUNT')));
+        assert('extract plain avg is still 15', M5.extract(_wCell, 'avg') === 15, String(M5.extract(_wCell, 'avg')));
+        assert('extract wavg with an unknown weight column = 0', M5.extract(_wCell, 'wavg@NOPE') === 0);
+        // The Aggregate cell renders the weight as its own click target
+        var _cellHtml = M9.aggCellHtml('wavg@AMOUNT');
+        assert('wavg cell shows Weighted Avg + a weight target',
+            _cellHtml.indexOf('Weighted Avg') !== -1 && _cellHtml.indexOf('pat-wavg-w') !== -1 && _cellHtml.indexOf('AMOUNT') !== -1, _cellHtml);
+        assert('bare wavg cell prompts for the weight',
+            M9.aggCellHtml('wavg').indexOf('pick weight') !== -1, M9.aggCellHtml('wavg'));
+        assert('a normal agg cell has no weight target',
+            M9.aggCellHtml('sum').indexOf('pat-wavg-w') === -1, M9.aggCellHtml('sum'));
+    } else {
+        assert('percentile: __PT9 hooks available', false, window.__PT9_ERR || 'n/a');
+    }
+
+    // ---- 5i. Chart this pivot (2026-08-27) ----
+    // The button does not draw anything: it maps the pivot's SHAPE onto a
+    // Visualization Builder config. That mapping is a pure function of the
+    // stashed shape, so it is driven here with a synthetic stash.
+    var MC = window.__PT10;
+    if (MC) {
+        assert('chart map: no pivot = null', (MC.setStash(null), MC.toViz() === null));
+        assert('chart map: the builder agg list holds the static types (patterns are tested via canAgg)',
+            MC.vizAggsGet().indexOf('sum') !== -1 && MC.vizAggsGet().indexOf('stddev') !== -1 && MC.vizAggsGet().indexOf('range') !== -1 && MC.vizAggsGet().indexOf('antimode') === -1, MC.vizAggsGet().join(','));
+
+        // Clean case: one row field, one column field, one supported agg.
+        MC.setStash({ aggTypes: ['sum'], aggLabels: ['Sum'], rowFields: ['COLLEGE'], colFields: ['FY'], valField: 'AMOUNT' });
+        var m = MC.toViz();
+        assert('chart map: rows -> xAxis', m.config.xAxis === 'COLLEGE', m.config.xAxis);
+        assert('chart map: cols -> groupBy', m.config.groupBy === 'FY', m.config.groupBy);
+        assert('chart map: value -> yAxis', m.config.yAxis === 'AMOUNT', m.config.yAxis);
+        assert('chart map: agg carries', m.config.agg === 'sum', m.config.agg);
+        assert('chart map: a clean pivot warns about nothing', m.warnings.length === 0, JSON.stringify(m.warnings));
+
+        // No column field -> no series.
+        MC.setStash({ aggTypes: ['count'], aggLabels: ['Count'], rowFields: ['COLLEGE'], colFields: [], valField: 'AMOUNT' });
+        assert('chart map: no column field = groupBy none', MC.toViz().config.groupBy === 'none', MC.toViz().config.groupBy);
+
+        // Nested rows: one axis only.
+        MC.setStash({ aggTypes: ['sum'], aggLabels: ['Sum'], rowFields: ['COLLEGE', 'DEPT'], colFields: [], valField: 'AMOUNT' });
+        var mn = MC.toViz();
+        assert('chart map: nested rows keep the first and warn', mn.config.xAxis === 'COLLEGE' && mn.warnings.length === 1 && mn.warnings[0].indexOf('one X axis') !== -1, JSON.stringify(mn.warnings));
+
+        // An aggregation the builder cannot do (count_blank is pivot-only).
+        MC.setStash({ aggTypes: ['count_blank'], aggLabels: ['Blank'], rowFields: ['COLLEGE'], colFields: [], valField: 'AMOUNT' });
+        var mw = MC.toViz();
+        assert('chart map: an unsupported agg falls back to Sum and says so',
+            mw.config.agg === 'sum' && mw.warnings[0].indexOf('Blank') !== -1, JSON.stringify(mw.warnings));
+
+        // Several aggregations: the first SUPPORTED one wins, the rest are named.
+        MC.setStash({ aggTypes: ['antimode', 'avg', 'sum'], aggLabels: ['Antimode', 'Avg', 'Sum'], rowFields: ['COLLEGE'], colFields: [], valField: 'AMOUNT' });
+        var mm = MC.toViz();
+        assert('chart map: picks the first agg the builder supports', mm.config.agg === 'avg', mm.config.agg);
+        assert('chart map: names the aggregations left behind', mm.warnings.length === 1 && mm.warnings[0].indexOf('Not charted') !== -1, JSON.stringify(mm.warnings));
+        // A bucketed row field now carries over whole - the chart X axis
+        // understands the same tokens - so it must NOT warn any more.
+        MC.setStash({ aggTypes: ['sum'], aggLabels: ['Sum'], rowFields: ['AMOUNT:bins100000_250000'], colFields: [], valField: 'AMOUNT' });
+        var mbk = MC.toViz();
+        assert('chart map: a bucketed row field is passed through as a token', mbk.config.xAxis === 'AMOUNT:bins100000_250000', mbk.config.xAxis);
+        assert('chart map: bucketed rows no longer warn', mbk.warnings.length === 0, JSON.stringify(mbk.warnings));
+        // Series still come from a plain column, so a bucketed COLUMN field warns.
+        MC.setStash({ aggTypes: ['sum'], aggLabels: ['Sum'], rowFields: ['COLLEGE'], colFields: ['AWARD_DATE:fy'], valField: 'AMOUNT' });
+        var mbc = MC.toViz();
+        assert('chart map: a bucketed column field falls back and warns', mbc.config.groupBy === 'AWARD_DATE' && mbc.warnings.length === 1, JSON.stringify(mbc));
+        MC.setStash(null);
+
+        // ---- Axis bucketing in the chart module itself ----
+        assert('axis bucket: the comparator for a token is the variant order',
+            MC.sortCmp('AMOUNT:bin')('5,000 – 9,999', '10,000 – 14,999') < 0, 'expected ascending by bucket');
+        assert('axis bucket: a plain column keeps its normal comparator path',
+            MC.sortCmp('COLLEGE') === null || typeof MC.sortCmp('COLLEGE') === 'function');
+        assert('axis bucket: bins order below < range < above',
+            MC.sortCmp('AMOUNT:bins100000_250000')('below 100K', '100K – 250K') < 0 &&
+            MC.sortCmp('AMOUNT:bins100000_250000')('100K – 250K', 'above 250K') < 0, 'expected sequence order');
+
+        // The row rewrite that feeds the data builder. (The builder itself is
+        // not exercisable here - it needs the report DOM - so the LIVE E2E
+        // covers the end-to-end draw; this covers the bucketing logic.)
+        function _m(o) { var m = new Map(); Object.keys(o).forEach(function (k) { m.set(k, o[k]); }); return m; }
+        var rows = [_m({ AMOUNT: '50000' }), _m({ AMOUNT: '150000' }), _m({ AMOUNT: '260000' }), _m({ AMOUNT: '9000000' })];
+        var bucketed = MC.bucketRows(rows, 'AMOUNT:bins100000_250000_500000');
+        assert('axis bucket: rows gain the bucket under the token key',
+            bucketed.map(function (m) { return m.get('AMOUNT:BINS100000_250000_500000'); }).join('|')
+                === 'below 100K|100K – 250K|250K – 500K|above 500K',
+            bucketed.map(function (m) { return m.get('AMOUNT:BINS100000_250000_500000'); }).join('|'));
+        assert('axis bucket: auto width resolves from the data',
+            MC.bucketRows(rows, 'AMOUNT:bin')[0].get('AMOUNT:BIN') === '0 – 999,999',
+            String(MC.bucketRows(rows, 'AMOUNT:bin')[0].get('AMOUNT:BIN')));
+        assert('axis bucket: a plain column returns the rows untouched',
+            MC.bucketRows(rows, 'AMOUNT') === rows);
+        assert('axis bucket: source rows are cloned, never mutated',
+            rows[0].get('AMOUNT:BINS100000_250000_500000') === undefined && rows[0].size === 1, String(rows[0].size));
+        // ---- Chart aggregations (percentile / stddev / range / wavg) ----
+        var TEN = [1,2,3,4,5,6,7,8,9,10];
+        assert('chart agg: p90 matches the pivot percentile', MC.extraAgg(TEN, 'p90') === M9.pctOf(TEN, 90), String(MC.extraAgg(TEN, 'p90')));
+        assert('chart agg: p25', MC.extraAgg(TEN, 'p25') === 3.25, String(MC.extraAgg(TEN, 'p25')));
+        assert('chart agg: stddev of [10,20,30] = 10', MC.extraAgg([10,20,30], 'stddev') === 10, String(MC.extraAgg([10,20,30], 'stddev')));
+        assert('chart agg: range', MC.extraAgg([5, 40, 12], 'range') === 35, String(MC.extraAgg([5, 40, 12], 'range')));
+        assert('chart agg: an unrelated type returns undefined (site keeps its own default)',
+            MC.extraAgg(TEN, 'sum') === undefined && MC.extraAgg(TEN, 'count') === undefined && MC.extraAgg(TEN, 'median') === undefined);
+        assert('chart agg: empty values return undefined', MC.extraAgg([], 'p90') === undefined);
+        // Weighted average: (10*100 + 20*300) / 400 = 17.5
+        assert('chart agg: wavg pairs value with weight',
+            MC.extraAgg([10, 20], 'wavg@AMOUNT', [100, 300]) === 17.5, String(MC.extraAgg([10, 20], 'wavg@AMOUNT', [100, 300])));
+        assert('chart agg: wavg skips rows with an unusable weight (NaN)',
+            MC.extraAgg([10, 20, 40], 'wavg@AMOUNT', [NaN, 300, 100]) === 25, String(MC.extraAgg([10, 20, 40], 'wavg@AMOUNT', [NaN, 300, 100])));
+        assert('chart agg: wavg with zero total weight = 0',
+            MC.extraAgg([10, 20], 'wavg@AMOUNT', [0, 0]) === 0);
+        assert('chart agg: wavg without weights returns undefined (unsupported chart types fall back)',
+            MC.extraAgg([10, 20], 'wavg@AMOUNT') === undefined && MC.extraAgg([10, 20], 'wavg@AMOUNT', [1]) === undefined);
+        // What the builder can now do - drives the Chart This Pivot mapping.
+        assert('chart agg: builder can do percentiles and wavg now',
+            MC.canAgg('p90') && MC.canAgg('wavg@COUNT') && MC.canAgg('stddev') && MC.canAgg('range') && MC.canAgg('sum'));
+        assert('chart agg: builder still cannot do the pivot-only types',
+            !MC.canAgg('antimode') && !MC.canAgg('mode') && !MC.canAgg('pct_parent_row') && !MC.canAgg('count_blank'));
+        // ...so a percentile pivot no longer degrades to Sum.
+        MC.setStash({ aggTypes: ['p90'], aggLabels: ['P90'], rowFields: ['COLLEGE'], colFields: [], valField: 'AMOUNT' });
+        var mp = MC.toViz();
+        assert('chart map: a percentile pivot keeps its aggregation', mp.config.agg === 'p90' && mp.warnings.length === 0, JSON.stringify(mp));
+        MC.setStash({ aggTypes: ['wavg@COUNT'], aggLabels: ['Wtd Avg by COUNT'], rowFields: ['COLLEGE'], colFields: [], valField: 'AMOUNT' });
+        var mwv = MC.toViz();
+        assert('chart map: a weighted-average pivot keeps its weight', mwv.config.agg === 'wavg@COUNT' && mwv.warnings.length === 0, JSON.stringify(mwv));
+        MC.setStash({ aggTypes: ['antimode'], aggLabels: ['Antimode'], rowFields: ['COLLEGE'], colFields: [], valField: 'AMOUNT' });
+        assert('chart map: a text-only aggregation still falls back to Sum and says so',
+            MC.toViz().config.agg === 'sum' && MC.toViz().warnings.length === 1, JSON.stringify(MC.toViz()));
+        MC.setStash(null);
+
+        // Offered variants respect the column's type and granularity.
+        assert('axis bucket: a text column offers no buckets', MC.bucketVariants('COLLEGE').length === 0, JSON.stringify(MC.bucketVariants('COLLEGE')));
+        var numV = MC.bucketVariants('AMOUNT');
+        assert('axis bucket: a numeric column offers bin + binlog',
+            numV.length === 2 && numV[0].token === 'AMOUNT:bin' && numV[1].token === 'AMOUNT:binlog', JSON.stringify(numV));
+    } else {
+        assert('chart: __PT10 hooks available', false, window.__PT10_ERR || 'n/a');
+    }
+
+    // ---- 6. Engine B (resolveInfoboxSnippet): pivot| keeps its case + un-escapes \'
+    var B = window.__ENGINE_B;
+    if (typeof B === 'function') {
+      var html = B("action(trigger, 'Go', 'pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|none|none|Status = Active|none|Sponsor\\'s Total')", [], ['COLLEGE', 'FY', 'AMOUNT', 'STATUS']);
+      var out = (html && typeof html === 'object' && 'html' in html) ? html.html : String(html);
+      var $a = $('<div>').html(out).find('a.snippet-action');
+      var val = $a.attr('data-action-value') || '';
+      assert('engine B: pivot| trigger keeps case (COLLEGE / Status = Active / Sponsor\'s Total) and un-escapes the apostrophe',
+        val.indexOf('pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT|') === 0 && val.indexOf('|Status = Active|') !== -1 && val.indexOf("|Sponsor's Total") !== -1, val || out.substring(0, 200));
+      var html2 = B("action(trigger, 'Go', 'sort|AMOUNT|DESC')", [], ['AMOUNT']);
+      var out2 = (html2 && typeof html2 === 'object' && 'html' in html2) ? html2.html : String(html2);
+      assert('engine B: other triggers still lowercased (sort|AMOUNT|DESC -> sort|amount|desc)', ($('<div>').html(out2).find('a.snippet-action').attr('data-action-value') || '') === 'sort|amount|desc', out2.substring(0, 200));
+      // Click the engine-B-rendered pivot link: the parser must receive mixed case
+      $('#reportSnippetOutput').html(out);
+      $('#reportSnippetOutput a.snippet-action').trigger('click');
+      var r6 = rowsSnapshot(); $('#reportSnippetOutput').empty();
+      assert('engine B link -> parser: filter + label arrive with case intact', r6.length === 1 && r6[0].filter === 'Status = Active' && r6[0].label === "Sponsor's Total", JSON.stringify(r6));
+      // Writer must escape the apostrophe so the snippet re-parses
+      window.__clip = null; $('#copyPivotSnippetBtn').trigger('click');
+      assert("writer: apostrophe in a label is emitted as \\' inside the single-quoted arg", typeof window.__clip === 'string' && window.__clip.indexOf("Sponsor\\'s Total')") !== -1, 'got: ' + window.__clip);
+    } else {
+      assert('engine B available', false, window.__ENGINE_B_ERR || 'n/a');
+    }
+
+    // ---- 7. Engine A (renderReportSnippet): same case-preservation, through the real render
+    var A = window.__RENDER_A, ed = (window.Penumbra && window.Penumbra.getSnippetEditor) ? window.Penumbra.getSnippetEditor() : null;
+    if (typeof A === 'function' && ed) {
+      ed.setValue("action(trigger, 'Go', 'pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|none|none|Status = Active|none|Mixed Case Label')");
+      Promise.resolve().then(function () { return A(null, true); }).then(function () {
+        var valA = $('#reportSnippetOutput a.snippet-action[data-action-name="trigger"]').attr('data-action-value') || '';
+        assert('engine A: rendered pivot| link keeps case (COLLEGE / Status = Active / Mixed Case Label)',
+          valA.indexOf('pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT|') === 0 && valA.indexOf('|Status = Active|') !== -1 && valA.indexOf('|Mixed Case Label') !== -1, valA || $('#reportSnippetOutput').html().substring(0, 300));
+        ed.setValue("action(trigger, 'Go', 'sort|AMOUNT|DESC')");
+        return A(null, true);
+      }).then(function () {
+        var valA2 = $('#reportSnippetOutput a.snippet-action[data-action-name="trigger"]').attr('data-action-value') || '';
+        assert('engine A: other triggers still lowercased (sort|amount|desc)', valA2 === 'sort|amount|desc', valA2);
+      }).catch(function (e) {
+        assert('engine A render ran', false, String(e && e.message ? e.message : e));
+      }).then(function () { return runPhase2(ed); }).then(function () { return runPhase3(ed); }).then(function () { return runPerf(ed); }).then(finish, function (e) {
+        assert('phase2/3/perf crashed', false, String(e && e.message ? e.message : e));
+        finish();
+      });
+    } else {
+      assert('engine A render hook available (renderReportSnippet + Penumbra.getSnippetEditor)', false, 'A=' + typeof A + ' ed=' + !!ed);
+      finish();
+    }
+  }
+
+  // ══════ Phase 2: double-click edit-in-place feature (2026-08-19) ══════
+  function runPhase2(ed) {
+    var T2 = window.__PT2 || {};
+    if (typeof T2.locate !== 'function') {
+      assert('phase2: __PT2 hooks available', false, window.__PT2_ERR || 'n/a');
+      return Promise.resolve();
+    }
+    var openLb = function () { $('#pivotLightbox').css('display', 'flex'); };
+
+    // -- Locator unit tests
+    var callTxt = "action(trigger, case(1=1,'A','B'), 'pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|none|none|Status = Active|none|Sponsor\\'s Total', 1=1)";
+    var doc = "Intro prose action(trigger, 'Sort it', 'sort|AMOUNT|DESC') mid prose\n" + callTxt + "\ntail prose";
+    var pivotIdx = doc.indexOf('pivot|');
+    var loc = T2.locate(doc, pivotIdx + 3);
+    assert('locate: click inside pivot trigger finds the call', !!loc && doc.substring(loc.callFrom, loc.callTo) === callTxt, loc ? doc.substring(loc.callFrom, loc.callTo) : 'null');
+    assert('locate: arg span covers the quoted trigger and label decodes', !!loc && doc.charAt(loc.argFrom) === "'" && doc.charAt(loc.argTo - 1) === "'" && loc.trigger.indexOf("Sponsor's Total") !== -1 && loc.trigger.indexOf('\\') === -1, loc ? JSON.stringify({ arg: doc.substring(loc.argFrom, loc.argTo), trig: loc.trigger }) : 'null');
+    assert('locate: click inside a sort call returns null', T2.locate(doc, doc.indexOf('sort|') + 2) === null, '');
+    assert('locate: click in prose returns null', T2.locate(doc, 3) === null, '');
+    var callB1 = "action(trigger, 'View C1', 'pivot|COLLEGE|none|AMOUNT|sum')";
+    var callB2 = "action(trigger, 'View C2', 'pivot|FY|none|AMOUNT|count')";
+    var lst = T2.list(callB1 + '\n' + callB2);
+    assert('list: two pivot calls found with labels', lst.length === 2 && lst[0].label === 'View C1' && lst[1].label === 'View C2', JSON.stringify(lst.map(function (c) { return c.label; })));
+
+    // -- Double-click end to end, through the REAL registered CM handler chain
+    ed.setValue(doc); // also clears any armed target via the setValue hook
+    ed.setCursor(ed.posFromIndex(pivotIdx + 3));
+    CodeMirror.signal(ed, 'dblclick', ed, { preventDefault: function () { } });
+    assert('dblclick: whole action(...) call selected', ed.getSelection() === callTxt, ed.getSelection().substring(0, 120));
+    var r27 = rowsSnapshot();
+    assert('dblclick: builder loaded with label/filter case intact', r27.length === 1 && r27[0].label === "Sponsor's Total" && r27[0].filter === 'Status = Active' && r27[0].col === 'AMOUNT', JSON.stringify(r27));
+    assert('dblclick: edit target armed + lightbox open + Update visible, picker hidden',
+      !!T2.getTarget() && $('#pivotLightbox').is(':visible') && $('#updatePivotSnippetBtn').is(':visible') && !$('#pivotSnippetTargetSelect').is(':visible'),
+      JSON.stringify({ tgt: !!T2.getTarget(), lb: $('#pivotLightbox').is(':visible'), btn: $('#updatePivotSnippetBtn').is(':visible'), dd: $('#pivotSnippetTargetSelect').is(':visible') }));
+
+    // -- Update in place (marker path): label + condition survive byte-for-byte
+    $('#pivot-agg-table-body tr').first().data('custom-label', "Renamed & Co's");
+    window.__PT.refreshAggTokenLabels();
+    openLb();
+    $('#updatePivotSnippetBtn').trigger('click');
+    var expArg = "'pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|none|none|Status = Active|none|Renamed & Co\\'s'";
+    var expDoc = "Intro prose action(trigger, 'Sort it', 'sort|AMOUNT|DESC') mid prose\n" +
+      "action(trigger, case(1=1,'A','B'), " + expArg + ", 1=1)" + "\ntail prose";
+    assert('update: only the trigger arg replaced; label + condition preserved', ed.getValue() === expDoc, ed.getValue());
+    openLb();
+    $('#updatePivotSnippetBtn').trigger('click');
+    assert('update: repeat click is idempotent', ed.getValue() === expDoc, ed.getValue());
+    ed.replaceRange('PREFIX! ', { line: 0, ch: 0 });
+    openLb();
+    $('#updatePivotSnippetBtn').trigger('click');
+    assert('update: marker tracks an upstream edit', ed.getValue() === 'PREFIX! ' + expDoc, ed.getValue());
+
+    // -- Sole-call path (no double-click, exactly one pivot command)
+    ed.setValue('Solo header\n' + callB1 + '\nfooter');
+    assert('setValue cleared the armed target', !T2.getTarget(), '');
+    openLb(); // in the app the refresh runs while #pivotBtn is opening the lightbox
+    T2.refreshTargetUI();
+    assert('sole: Update visible, picker hidden', $('#updatePivotSnippetBtn').is(':visible') && !$('#pivotSnippetTargetSelect').is(':visible'), JSON.stringify({ btn: $('#updatePivotSnippetBtn').is(':visible'), dd: $('#pivotSnippetTargetSelect').is(':visible') }));
+    $('#updatePivotSnippetBtn').trigger('click');
+    var built = T2.build();
+    assert('sole: the only pivot call was updated from the builder', !built.error && ed.getValue().indexOf("'" + built.trigger.replace(/'/g, "\\'") + "'") !== -1 && ed.getValue().indexOf('sum:AMOUNT') !== -1, ed.getValue());
+
+    // -- Multi-call path: the picker loads the selection into the builder,
+    //    arms it as the write target, and STAYS visible (v1 hid it once a
+    //    target was armed - read as "the dropdown disappeared").
+    ed.setValue(callB1 + '\n' + callB2);
+    openLb(); // previous update fadeOut'd the lightbox; visibility needs the parent shown
+    T2.refreshTargetUI();
+    var $dd = $('#pivotSnippetTargetSelect');
+    assert('multi: picker shown with one option per pivot call', $dd.is(':visible') && $dd.find('option').length === 2 && /View C1/.test($dd.find('option').eq(0).text()) && /View C2/.test($dd.find('option').eq(1).text()), $dd.find('option').map(function () { return $(this).text(); }).get().join(' | '));
+    $dd.val('1').trigger('change');
+    var r32 = rowsSnapshot();
+    assert('multi: selecting from the picker LOADS that command into the builder', r32.length === 1 && r32[0].type === 'count' && r32[0].col === 'AMOUNT' && $('#pivot-rows .pivot-column-item').attr('data-field') === 'FY', JSON.stringify(r32) + ' rows=' + $('#pivot-rows').text());
+    assert('multi: selection arms the target and the picker stays visible, preselected', !!T2.getTarget() && $dd.is(':visible') && $dd.val() === '1', JSON.stringify({ tgt: !!T2.getTarget(), vis: $dd.is(':visible'), val: $dd.val() }));
+    openLb();
+    $('#updatePivotSnippetBtn').trigger('click');
+    var lines = ed.getValue().split('\n');
+    var built2 = T2.build();
+    assert('multi: picked call (2nd) updated, 1st untouched', lines[0] === callB1 && lines[1].indexOf("'View C2'") !== -1 && lines[1].indexOf(built2.trigger.split('|').slice(0, 4).join('|')) !== -1, ed.getValue());
+    openLb();
+    T2.refreshTargetUI();
+    assert('multi: picker still offered on the next builder open (regression)', $dd.is(':visible') && $dd.find('option').length === 2 && $dd.val() === '1', JSON.stringify({ vis: $dd.is(':visible'), n: $dd.find('option').length, val: $dd.val() }));
+
+    // -- Fields sidebar on dropdown load: '#' offered (it lives in the row
+    //    maps once search/snippet passes stamp it - repopulate shows it, so
+    //    the loader must too), used columns excluded. User report 2026-08-19.
+    var srcMap = new Map();
+    srcMap.set('#', '1'); srcMap.set('COLLEGE', 'x'); srcMap.set('FY', '2024');
+    srcMap.set('AMOUNT', '5'); srcMap.set('EXTRA_COL', 'y');
+    T2.setRows([srcMap]);
+    $dd.val('0').trigger('change'); // reload call 1: rows=COLLEGE, value=AMOUNT
+    var srcTxts = $('#pivot-source-columns .pivot-column-item').map(function () { return $(this).attr('data-field'); }).get();
+    assert("source list: '#' offered on dropdown load, used columns excluded",
+      srcTxts.indexOf('#') !== -1 && srcTxts.indexOf('EXTRA_COL') !== -1 && srcTxts.indexOf('FY') !== -1 && srcTxts.indexOf('COLLEGE') === -1 && srcTxts.indexOf('AMOUNT') === -1,
+      JSON.stringify(srcTxts));
+    T2.setRows([]); // restore the empty-data baseline for the remaining tests
+
+    // -- No pivot calls: both controls hidden, update is a safe no-op
+    ed.setValue("nothing here action(trigger, 'X', 'sort|AMOUNT|asc')");
+    T2.refreshTargetUI();
+    var before33 = ed.getValue();
+    assert('none: Update + picker hidden', !$('#updatePivotSnippetBtn').is(':visible') && !$('#pivotSnippetTargetSelect').is(':visible'), '');
+    openLb();
+    $('#updatePivotSnippetBtn').trigger('click');
+    assert('none: forced update click leaves the snippet untouched', ed.getValue() === before33, ed.getValue());
+
+    // -- Admin gate: non-admins get neither the button nor the picker, even
+    //    with several pivot calls present (matches #copyPivotSnippetBtn's gate;
+    //    non-admins also have no snippet editor at all in the real app).
+    ed.setValue(callB1 + '\n' + callB2);
+    openLb();
+    var _wasAdmin = window.penumbra_vars.isAdmin;
+    window.penumbra_vars.isAdmin = false;
+    T2.refreshTargetUI();
+    assert('admin gate: refresh hides Update + picker for non-admins', !$('#updatePivotSnippetBtn').is(':visible') && !$('#pivotSnippetTargetSelect').is(':visible') && $('#pivotSnippetTargetSelect').find('option').length === 0, JSON.stringify({ btn: $('#updatePivotSnippetBtn').is(':visible'), dd: $('#pivotSnippetTargetSelect').is(':visible') }));
+    var handledNonAdmin = T2.open(ed, ed.posFromIndex(ed.getValue().indexOf('pivot|') + 2), { preventDefault: function () { } });
+    assert('admin gate: double-click opener refuses for non-admins', handledNonAdmin === false && !T2.getTarget(), String(handledNonAdmin));
+    window.penumbra_vars.isAdmin = _wasAdmin;
+
+    // -- Executor state resets (found while wiring load-only mode)
+    fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum|nested|nested|asc|3|none|sum:Total@0');
+    var rtOn = $('#pivot-row-total-override-toggle').is(':checked');
+    var tokOn = $('#pivot-row-total-slots .pivot-row-total-token').length;
+    fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum');
+    var rtOff = $('#pivot-row-total-override-toggle').is(':checked');
+    var tokOff = $('#pivot-row-total-slots .pivot-row-total-token').length;
+    assert('row totals: trigger applies them, next trigger without them CLEARS them', rtOn && tokOn >= 1 && !rtOff && tokOff === 0, JSON.stringify({ rtOn: rtOn, tokOn: tokOn, rtOff: rtOff, tokOff: tokOff }));
+    fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum|nested|nested|asc|7');
+    var sticky7 = $('#pivot-sticky-cols').val();
+    fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum');
+    var sticky3 = $('#pivot-sticky-cols').val();
+    assert('sticky cols: explicit 7 applies, trimmed trigger resets to default 3', sticky7 === '7' && sticky3 === '3', sticky7 + '/' + sticky3);
+
+    // -- Rank scope (2026-08-25): @FIELD suffix, parser + writer round-trip
+    fireTrigger('pivot|COLLEGE,DEPT|FY|AMOUNT|sum|nested|nested|asc|3|none|none|top3_sum_other@college');
+    assert('rank scope: parser applies @FIELD case-insensitively via the options rebuild',
+      $('#pivot-rank-scope').val() === 'COLLEGE', String($('#pivot-rank-scope').val()) + ' opts=' + $('#pivot-rank-scope option').length);
+    window.__clip = null;
+    $('#copyPivotSnippetBtn').trigger('click');
+    var clipScope = String(window.__clip || '');
+    assert('rank scope: writer emits @COLLEGE', clipScope.indexOf('top3_sum_other@COLLEGE') !== -1, clipScope.substring(0, 200));
+    fireTrigger('pivot|COLLEGE,DEPT|FY|AMOUNT|sum|nested|nested|asc|3|none|none|top3_sum_other');
+    assert('rank scope: trigger without @ resets to Overall', $('#pivot-rank-scope').val() === '', String($('#pivot-rank-scope').val()));
+    window.__clip = null;
+    $('#copyPivotSnippetBtn').trigger('click');
+    assert('rank scope: Overall emits no @ suffix', String(window.__clip || '').indexOf('top3_sum_other@') === -1, String(window.__clip || '').substring(0, 200));
+    fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum|nested|nested|asc|3|none|none|top3_sum_other@COLLEGE');
+    assert('rank scope: single row field locks to Overall (disabled)',
+      $('#pivot-rank-scope').val() === '' && $('#pivot-rank-scope').prop('disabled') === true,
+      String($('#pivot-rank-scope').val()) + '/' + String($('#pivot-rank-scope').prop('disabled')));
+
+    // Binning round-trip (2026-08-26): the parser seeds the pill (split +
+    // width survive decorate, which needs AMOUNT to look numeric), and the
+    // writer re-emits the token byte-for-byte.
+    var _binSeed = new Map();
+    _binSeed.set('COLLEGE', 'Eng'); _binSeed.set('FY', '2024'); _binSeed.set('AMOUNT', '12000');
+    if (window.__PT2 && window.__PT2.setRows) window.__PT2.setRows([_binSeed]);
+    fireTrigger('pivot|AMOUNT:bin20000|FY|AMOUNT|count|nested|nested|asc|3');
+    var $binPill = $('#pivot-rows .pivot-column-item[data-field="AMOUNT"]');
+    assert('bin round-trip: pill carries split + width after decorate',
+      $binPill.attr('data-split') === 'bin' && $binPill.attr('data-bin-width') === '20000',
+      ($binPill.attr('data-split') || '') + '/' + ($binPill.attr('data-bin-width') || ''));
+    window.__clip = null; $('#copyPivotSnippetBtn').trigger('click');
+    assert('bin round-trip: writer re-emits AMOUNT:bin20000',
+      typeof window.__clip === 'string' && window.__clip.indexOf('AMOUNT:bin20000') !== -1,
+      String(window.__clip).substring(0, 160));
+
+    // Custom-edge round-trip (2026-08-27): the edge list must survive the
+    // parser, the pill's decorate pass and the writer, byte for byte.
+    fireTrigger('pivot|AMOUNT:bins100000_250000_500000_750000_1000000_5000000|FY|AMOUNT|sum|nested|nested|asc|3');
+    var $edgePill = $('#pivot-rows .pivot-column-item[data-field="AMOUNT"]');
+    assert('bins round-trip: pill keeps split + edges after decorate',
+      $edgePill.attr('data-split') === 'bins' && $edgePill.attr('data-bin-edges') === '100000_250000_500000_750000_1000000_5000000',
+      ($edgePill.attr('data-split') || '') + '/' + ($edgePill.attr('data-bin-edges') || ''));
+    assert('bins round-trip: chip reads Ranges',
+      ($edgePill.find('.pivot-split-chip').text() || '') === 'Ranges', $edgePill.find('.pivot-split-chip').text());
+    window.__clip = null; $('#copyPivotSnippetBtn').trigger('click');
+    assert('bins round-trip: writer re-emits the full edge list',
+      typeof window.__clip === 'string' && window.__clip.indexOf('AMOUNT:bins100000_250000_500000_750000_1000000_5000000') !== -1,
+      String(window.__clip).substring(0, 200));
+
+    // Percentile round-trip: pNN must survive the trigger parser's agg
+    // whitelist (it is a PATTERN, not a listed type) and come back out.
+    fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum,p90,p25');
+    var _pctRows = rowsSnapshot();
+    assert('pctile round-trip: parser kept all three aggs',
+      _pctRows.length === 3 && _pctRows[1].type === 'p90' && _pctRows[2].type === 'p25', JSON.stringify(_pctRows));
+    assert('pctile round-trip: label cells SHOW P90 / P25 (no custom label needed)',
+      _pctRows[1].shownLabel === 'P90' && _pctRows[2].shownLabel === 'P25', JSON.stringify([_pctRows[1].shownLabel, _pctRows[2].shownLabel]));
+    window.__clip = null; $('#copyPivotSnippetBtn').trigger('click');
+    assert('pctile round-trip: writer re-emits p90/p25 with their columns',
+      typeof window.__clip === 'string' && window.__clip.indexOf('sum:AMOUNT,p90:AMOUNT,p25:AMOUNT') !== -1,
+      String(window.__clip).substring(0, 200));
+
+    // Weighted average round-trip: wavg@WEIGHT must clear the agg whitelist,
+    // render its weight target, and come back out of the writer intact.
+    fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum,wavg@AMOUNT');
+    var _wRows = rowsSnapshot();
+    assert('wavg round-trip: parser kept wavg@AMOUNT',
+      _wRows.length === 2 && _wRows[1].type === 'wavg@AMOUNT', JSON.stringify(_wRows));
+    assert('wavg round-trip: label reads Wtd Avg by AMOUNT',
+      _wRows[1].shownLabel === 'Wtd Avg by AMOUNT', String(_wRows[1].shownLabel));
+    assert('wavg round-trip: the cell carries a clickable weight target',
+      $('#pivot-agg-table-body tr').eq(1).find('.pat-wavg-w').length === 1,
+      $('#pivot-agg-table-body tr').eq(1).find('.pat-cell-agg').html() || '');
+    window.__clip = null; $('#copyPivotSnippetBtn').trigger('click');
+    assert('wavg round-trip: writer re-emits wavg@AMOUNT',
+      typeof window.__clip === 'string' && window.__clip.indexOf('wavg@AMOUNT') !== -1,
+      String(window.__clip).substring(0, 200));
+    return Promise.resolve();
+  }
+
+  // ══════ Phase 3: layout_switch + toggle_switch controls (2026-08-21) ══════
+  // These two are snippet FUNCTIONS, so everything below goes through the real
+  // engine-A render and the real locator - no re-implemented parsing here.
+  function runPhase3(ed) {
+    var T2 = window.__PT2 || {}, T3 = window.__PT3 || {}, A = window.__RENDER_A;
+    if (typeof T3.cmdActive !== 'function' || typeof A !== 'function') {
+      assert('phase3: __PT3 hooks available', false, window.__PT3_ERR || 'n/a');
+      return Promise.resolve();
+    }
+    var draw = function (src) { ed.setValue(src); return Promise.resolve().then(function () { return A(null, true); }); };
+    var outText = function () { return $('#reportSnippetOutput').text().trim(); };
+    var SW = '#reportSnippetOutput .pnb-layout-switch';
+    var P3 = "'By College|pivot|COLLEGE|FY|AMOUNT|sum'";
+    var P4 = "'By Year|pivot|FY|none|AMOUNT|count'";
+
+    return draw("layout_switch('Table|flat', " + P3 + ", " + P4 + ")").then(function () {
+      assert('ls: renders 3 positions, horizontal by default',
+        $(SW).length === 1 && $(SW + ' .pnb-ls-opt').length === 3 && $(SW).attr('data-ls-orient') === 'horizontal',
+        JSON.stringify({ n: $(SW + ' .pnb-ls-opt').length, o: $(SW).attr('data-ls-orient'), txt: outText().substring(0, 90) }));
+      assert('ls: every position carries a title for the ellipsed label',
+        $(SW + ' .pnb-ls-opt').filter(function () { return !!$(this).attr('title'); }).length === 3, '');
+      // 6 positions must STAY horizontal - orientation is never inferred from
+      // the count (an earlier build flipped to vertical past 5; user rejected it).
+      var six = ["'Table|flat'", P3, P4,
+        "'A|pivot|COLLEGE|none|AMOUNT|sum'", "'B|pivot|FY|none|AMOUNT|sum'", "'C|pivot|STATUS|none|AMOUNT|sum'"].join(', ');
+      return draw('layout_switch(' + six + ')');
+    }).then(function () {
+      assert('ls: 6 positions stay HORIZONTAL (orientation is never inferred)',
+        $(SW + ' .pnb-ls-opt').length === 6 && $(SW).attr('data-ls-orient') === 'horizontal',
+        JSON.stringify({ n: $(SW + ' .pnb-ls-opt').length, o: $(SW).attr('data-ls-orient') }));
+      return draw("layout_switch('vertical', 'wide', 'small', 'Table|flat', " + P3 + ")");
+    }).then(function () {
+      assert('ls: vertical keyword honoured; wide/small become classes',
+        $(SW).attr('data-ls-orient') === 'vertical' && $(SW).hasClass('wide') && $(SW).hasClass('small'),
+        JSON.stringify({ o: $(SW).attr('data-ls-orient'), c: $(SW).attr('class') }));
+      return draw("layout_switch('sideways', 'Table|flat', " + P3 + ")");
+    }).then(function () {
+      assert('ls: unknown keyword errors and names itself', outText().indexOf('unknown keyword sideways') !== -1, outText().substring(0, 110));
+      return draw("layout_switch('Table|flat')");
+    }).then(function () {
+      assert('ls: a single position is refused', outText().indexOf('at least 2 positions') !== -1, outText().substring(0, 110));
+
+      // ---- Locator: a switch POSITION is an editable target like an action() call
+      var doc = "prose\nlayout_switch('vertical', 'Table|flat', " + P3 + ", " + P4 + ")\ntail";
+      var lst = T2.list(doc);
+      assert('ls locate: both pivot positions listed, keyword + flat ignored',
+        lst.length === 2 && lst[0].label === 'By College' && lst[1].label === 'By Year',
+        JSON.stringify(lst.map(function (c) { return c.label; })));
+      var p0 = lst[0];
+      assert('ls locate: arg span is the TRIGGER only - no quotes, no Label| prefix',
+        p0.argQuoted === false && doc.substring(p0.argFrom, p0.argTo) === 'pivot|COLLEGE|FY|AMOUNT|sum',
+        JSON.stringify({ q: p0.argQuoted, span: doc.substring(p0.argFrom, p0.argTo) }));
+      assert('ls locate: call span is ONE position, not the whole layout_switch call',
+        doc.substring(p0.callFrom, p0.callTo) === P3, doc.substring(p0.callFrom, p0.callTo));
+      var hit = T2.locate(doc, doc.indexOf('COLLEGE|FY'));
+      assert('ls locate: a click inside a position resolves to that position',
+        !!hit && hit.label === 'By College', hit ? hit.label : 'null');
+      assert('ls locate: a click on the vertical keyword is not a target',
+        T2.locate(doc, doc.indexOf("'vertical'") + 3) === null, '');
+
+      // ---- Update Snippet writes back INTO the position, keeping `Label|`
+      ed.setValue(doc);
+      T2.refreshTargetUI();
+      $('#pivotLightbox').css('display', 'flex');
+      var $dd = $('#pivotSnippetTargetSelect');
+      assert('ls update: picker offers both positions', $dd.is(':visible') && $dd.find('option').length === 2, String($dd.find('option').length));
+      $dd.val('1').trigger('change');                 // load "By Year"
+      $('#pivot-sticky-cols').val('1');               // change one field
+      $('#updatePivotSnippetBtn').trigger('click');
+      var after = ed.getValue();
+      assert('ls update: position 2 rewritten with its Label| and quotes intact',
+        after.indexOf("'By Year|pivot|FY|") !== -1 && after.indexOf("'By College|pivot|COLLEGE|FY|AMOUNT|sum'") !== -1,
+        after);
+      assert('ls update: still one layout_switch call, position 1 untouched',
+        (after.match(/layout_switch\s*\(/g) || []).length === 1 && after.indexOf("'vertical'") !== -1, after);
+      $('#pivotLightbox').hide();
+
+      // ---- toggle_switch: rendering + refusals
+      return draw("toggle_switch('Active only', 'on|search|STATUS = Active', 'off|search|')");
+    }).then(function () {
+      var $t = $('#reportSnippetOutput .pnb-toggle');
+      assert('ts: renders with the settings pill, label and OFF baseline',
+        $t.length === 1 && $t.find('.sp-switch').length === 1 && $t.find('.pnb-toggle-label').text() === 'Active only'
+        && $t.attr('data-ts-on') === '0' && $t.find('.pnb-toggle-btn').attr('aria-checked') === 'false',
+        JSON.stringify({ n: $t.length, on: $t.attr('data-ts-on'), lbl: $t.find('.pnb-toggle-label').text() }));
+      assert('ts: label position defaults to left', $t.attr('data-ts-label') === 'left', String($t.attr('data-ts-label')));
+      return draw("toggle_switch('Active only', 'bottom', 'on|search|X', 'off|search|')");
+    }).then(function () {
+      assert('ts: label position keyword applied', $('#reportSnippetOutput .pnb-toggle').attr('data-ts-label') === 'bottom',
+        String($('#reportSnippetOutput .pnb-toggle').attr('data-ts-label')));
+      return draw("toggle_switch('X', 'on|toast|hi', 'off|toast|bye')");
+    }).then(function () {
+      assert('ts: an ON side with no observable command REFUSES to render',
+        $('#reportSnippetOutput .pnb-toggle').length === 0 && outText().indexOf('cannot tell whether it is on') !== -1,
+        outText().substring(0, 130));
+      return draw("toggle_switch('X', 'on|search|A')");
+    }).then(function () {
+      assert('ts: a missing off| side is refused', outText().indexOf('at least one off|COMMAND') !== -1, outText().substring(0, 120));
+      return draw("toggle_switch('Bad|Label', 'on|search|A', 'off|search|')");
+    }).then(function () {
+      assert('ts: a label containing a pipe is refused', outText().indexOf('FIRST argument is the label') !== -1, outText().substring(0, 120));
+
+      // ---- The contract that matters: state is READ, never remembered
+      assert('ts state: search is detectable, toast is not',
+        T3.cmdDetectable('search|A') === true && T3.cmdDetectable('theme|x') === true && T3.cmdDetectable('toast|hi') === false, '');
+      $('#tableSearch').val('');
+      assert('ts state: search|TERM is inactive with an empty box', T3.cmdActive('search|STATUS = Active') === false, '');
+      assert('ts state: search| (clear) IS active with an empty box', T3.cmdActive('search|') === true, '');
+      $('#tableSearch').val('STATUS = Active');
+      assert('ts state: search|TERM becomes active when the box matches', T3.cmdActive('search|STATUS = Active') === true, '');
+      assert('ts state: a different term does not match', T3.cmdActive('search|SOMETHING ELSE') === false, '');
+      return draw("toggle_switch('Active only', 'on|search|STATUS = Active', 'off|search|')");
+    }).then(function () {
+      // The box still holds the ON term from above, so the freshly rendered
+      // switch must come up ON without anything having been clicked.
+      T3.syncToggles();
+      var onNow = $('#reportSnippetOutput .pnb-toggle').attr('data-ts-on');
+      assert('ts state: a rendered switch reads ON from the live report, unclicked', onNow === '1', String(onNow));
+      // ...and clearing the box BY HAND must move it back, with no click at all.
+      $('#tableSearch').val('');
+      T3.syncToggles();
+      var offNow = $('#reportSnippetOutput .pnb-toggle').attr('data-ts-on');
+      assert('ts state: clearing the search BY HAND turns the switch off',
+        offNow === '0' && $('#reportSnippetOutput .pnb-toggle .pnb-toggle-btn').attr('aria-checked') === 'false', String(offNow));
+      $('#reportSnippetOutput').empty();
+      return Promise.resolve();
+    });
+  }
+
+  // ══════ Phase 4: perf measurements for the reported dblclick stall ══════
+  // (id=dr-huron2, "3-4s on a 2-bar snippet"). Numbers land in the detail
+  // column; only the row-scan control is a real assertion.
+  function runPerf(ed) {
+    var T2 = window.__PT2 || {};
+    if (typeof T2.setRows !== 'function' || typeof T2.render !== 'function') {
+      assert('perf: hooks available', false, window.__PT2_ERR || 'n/a');
+      return Promise.resolve();
+    }
+    var N = 20000;
+    var rows = new Array(N);
+    var trHtml = new Array(N);
+    for (var i = 0; i < N; i++) {
+      var m = new Map();
+      m.set('COLLEGE', 'College ' + (i % 12));
+      m.set('FY', String(2020 + (i % 6)));
+      m.set('AMOUNT', String((i % 997) * 13));
+      m.set('STATUS', (i % 2) ? 'Active' : 'Closed');
+      m.set('RECORD_ID', 'R' + i);
+      rows[i] = m;
+      trHtml[i] = '<tr><td>' + (i + 1) + '</td></tr>';
+    }
+    T2.setRows(rows);
+    $('#resultsTable tbody').html(trHtml.join(''));
+
+    function mkBar(tag) {
+      var b = '<div class="penumbra-btn-bar joined">';
+      for (var k = 1; k <= 5; k++) {
+        b += "<span class=\"penumbra-snippet-btn\">action(search, '" + tag + k + " (' count(STATUS = 'Active') ')', 'STATUS = //Active//')</span>";
+      }
+      return b + '</div>';
+    }
+    function timeRender(label, snippet) {
+      ed.setValue(snippet);
+      var t0 = performance.now();
+      return Promise.resolve(T2.render(null, true)).then(function () {
+        return { label: label, ms: Math.round(performance.now() - t0) };
+      }, function (e) {
+        return { label: label, ms: -1, err: String(e && e.message ? e.message : e) };
+      });
+    }
+
+    var out = [];
+    return timeRender('control count()', 'Total: count()').then(function (r0) {
+      var txt = $('#reportSnippetOutput').text();
+      assert('perf control: count() sees the 20,000 synthetic rows', txt.indexOf('20,000') !== -1, txt.substring(0, 80) + ' [' + r0.ms + 'ms]');
+      return timeRender('1 bar (5 buttons)', mkBar('A'));
+    }).then(function (r1) {
+      out.push(r1);
+      return timeRender('2 bars (10 buttons)', mkBar('A') + '\n' + mkBar('B'));
+    }).then(function (r2) {
+      out.push(r2);
+      // Skip the 4-bar case if 2 bars is already pathological (keeps the run bounded)
+      if (r2.ms >= 0 && r2.ms < 8000) {
+        return timeRender('4 bars (20 buttons)', mkBar('A') + '\n' + mkBar('B') + '\n' + mkBar('C') + '\n' + mkBar('D')).then(function (r4) { out.push(r4); });
+      }
+      out.push({ label: '4 bars (20 buttons)', ms: -2, err: 'skipped - 2 bars already >= 8s' });
+    }).then(function () {
+      out.forEach(function (r) {
+        assert('perf render: ' + r.label, true, (r.ms >= 0 ? r.ms + 'ms' : (r.err || 'n/a')));
+      });
+      var r1 = out[0], r2 = out[1], r4 = out[2];
+      var scale = 'r2/r1=' + (r1 && r2 && r1.ms > 0 ? (r2.ms / r1.ms).toFixed(2) : '?') +
+        ' r4/r2=' + (r2 && r4 && r2.ms > 0 && r4.ms >= 0 ? (r4.ms / r2.ms).toFixed(2) : '?');
+      assert('perf scaling (2x content: ~2x = linear, ~4x = quadratic)', true, scale);
+      // Editor-side dblclick path on the 2-bar doc (word-select + our locator + token scan)
+      var twoBars = mkBar('A') + '\n' + mkBar('B');
+      ed.setValue(twoBars);
+      ed.setCursor(ed.posFromIndex(twoBars.indexOf('count(') + 2));
+      var t0 = performance.now();
+      CodeMirror.signal(ed, 'dblclick', ed, { preventDefault: function () { } });
+      var dblMs = Math.round(performance.now() - t0);
+      assert('perf dblclick handler on 2-bar doc', true, dblMs + 'ms');
+      var t1 = performance.now();
+      var hint = CodeMirror.hint['snippet-helper'] ? CodeMirror.hint['snippet-helper'](ed, {}) : null;
+      return Promise.resolve(hint).then(function () {
+        assert('perf snippet-helper hint build', true, Math.round(performance.now() - t1) + 'ms');
+      }, function () {
+        assert('perf snippet-helper hint build', true, 'threw after ' + Math.round(performance.now() - t1) + 'ms');
+      });
+    });
+  }
+
+  function finish() {
+    report('RESULTS_JSON:' + JSON.stringify({ pageErrors: window.__errors.slice(0, 6), results: results }));
+  }
+
+  // ══════ Perf mode (?perf=1): REAL-clock measurements ══════
+  // --virtual-time-budget virtualizes performance.now(), so CPU-bound work
+  // reads as 0ms in the normal run. Perf mode instead runs WITHOUT virtual
+  // time and takes every measurement SYNCHRONOUSLY during initial script
+  // execution (blocking the load event, which is when --dump-dom snapshots):
+  // jQuery's ready is fired synthetically first so main.js's closure has
+  // installed the hooks. renderReportSnippet is async, but everything up to
+  // its first await - including the whole function-resolution loop - runs
+  // synchronously before it returns, which is exactly the cost under test.
+  function runPerfSync() {
+    var T2 = window.__PT2 || {};
+    var ed = (window.Penumbra && window.Penumbra.getSnippetEditor) ? window.Penumbra.getSnippetEditor() : null;
+    if (!ed || typeof T2.setRows !== 'function') {
+      report('RESULTS_JSON:' + JSON.stringify({ fatal: 'perf hooks unavailable: ' + (window.__PT2_ERR || window.__PT_ERR || 'n/a'), pageErrors: window.__errors.slice(0, 6) }));
+      return;
+    }
+    var N = 20000;
+    var rows = new Array(N), trHtml = new Array(N);
+    for (var i = 0; i < N; i++) {
+      var m = new Map();
+      m.set('COLLEGE', 'College ' + (i % 12));
+      m.set('FY', String(2020 + (i % 6)));
+      m.set('AMOUNT', String((i % 997) * 13));
+      m.set('STATUS', (i % 2) ? 'Active' : 'Closed');
+      m.set('RECORD_ID', 'R' + i);
+      rows[i] = m;
+      trHtml[i] = '<tr><td>' + (i + 1) + '</td></tr>';
+    }
+    T2.setRows(rows);
+    $('#resultsTable tbody').html(trHtml.join(''));
+    function mkBar(tag) {
+      var b = '<div class="penumbra-btn-bar joined">';
+      for (var k = 1; k <= 5; k++) {
+        b += "<span class=\"penumbra-snippet-btn\">action(search, '" + tag + k + " (' count(STATUS = 'Active') ')', 'STATUS = //Active//')</span>";
+      }
+      return b + '</div>';
+    }
+    function timeSync(label, snippet) {
+      ed.setValue(snippet);
+      var t0 = performance.now();
+      try { T2.render(null, true); } catch (e) { return { label: label, ms: -1, err: String(e && e.message ? e.message : e) }; }
+      return { label: label, ms: Math.round(performance.now() - t0) };
+    }
+    var out = [];
+    out.push(timeSync('control count()', 'Total: count()'));
+    out[0].outText = $('#reportSnippetOutput').text().substring(0, 40);
+    out.push(timeSync('1 bar (5 buttons)', mkBar('A')));
+    out.push(timeSync('2 bars (10 buttons)', mkBar('A') + '\n' + mkBar('B')));
+    if (out[2].ms >= 0 && out[2].ms < 8000) {
+      out.push(timeSync('4 bars (20 buttons)', mkBar('A') + '\n' + mkBar('B') + '\n' + mkBar('C') + '\n' + mkBar('D')));
+    } else {
+      out.push({ label: '4 bars (20 buttons)', ms: -2, err: 'skipped - 2 bars already >= 8s' });
+    }
+    var twoBars = mkBar('A') + '\n' + mkBar('B');
+    ed.setValue(twoBars);
+    ed.setCursor(ed.posFromIndex(twoBars.indexOf('count(') + 2));
+    var t0 = performance.now();
+    CodeMirror.signal(ed, 'dblclick', ed, { preventDefault: function () { } });
+    out.push({ label: 'dblclick handler on 2-bar doc', ms: Math.round(performance.now() - t0) });
+    var t1 = performance.now();
+    try { if (CodeMirror.hint['snippet-helper']) CodeMirror.hint['snippet-helper'](ed, {}); } catch (e) { }
+    out.push({ label: 'snippet-helper hint (sync part)', ms: Math.round(performance.now() - t1) });
+    var results = out.map(function (r) {
+      return { name: 'PERF ' + r.label, pass: true, detail: (r.ms >= 0 ? r.ms + 'ms' : (r.err || 'n/a')) + (r.outText ? ' out="' + r.outText + '"' : '') };
+    });
+    var r1 = out[1], r2 = out[2], r4 = out[3];
+    results.push({
+      name: 'PERF scaling (2x content: ~2x = linear, ~4x = quadratic)', pass: true,
+      detail: 'r2/r1=' + (r1.ms > 0 ? (r2.ms / r1.ms).toFixed(2) : '?') + ' r4/r2=' + (r2.ms > 0 && r4.ms >= 0 ? (r4.ms / r2.ms).toFixed(2) : '?')
+    });
+    report('RESULTS_JSON:' + JSON.stringify({ pageErrors: window.__errors.slice(0, 6), results: results }));
+  }
+
+  if (/[?&]perf=1/.test(location.search)) {
+    // run.ps1 -PerfMode unwrapped main.js's ready closure into an IIFE, so the
+    // hooks already exist - measure synchronously, before the load event.
+    runPerfSync();
+  } else {
+    var tries = 0;
+    (function wait() {
+      tries++;
+      if (window.__PT || tries > 40) { setTimeout(run, 300); }
+      else { setTimeout(wait, 100); }
+    })();
+  }
+})();
+</script>
+</body></html>

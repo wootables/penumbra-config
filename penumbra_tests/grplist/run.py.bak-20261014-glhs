@@ -1,0 +1,585 @@
+# =============================================================================
+# GRPLIST SUITE (2026-10-03) - the grouped view's List layout (step 2)
+#
+# Configure Grouping > Layout: List puts the group names in a column on the
+# left and shows the selected group on the right, its own box fitted to the
+# window and its table given the width its text needs (it scrolls sideways).
+# js/penumbra_grouplist.js + css/penumbra_grouplist.css + the state and hooks in
+# main.js. Each scenario loads the REAL main.js and the REAL module (harness.html,
+# the hiddencols fixture grouped by H_GROUP, nested for n*) and publishes named
+# checks:
+#   L-<scn>-<check>  must hold on the candidate
+#   E-<scn>          no page errors
+#
+#   py -3 run.py                        candidate = LIVE js\main.js + module + stylesheet
+#   py -3 run.py --stage DIR            a stage in the app layout (DIR\js\main.js, DIR\js\penumbra_grouplist.js,
+#                                       DIR\css\penumbra_grouplist.css)
+#   py -3 run.py --control [--baseline F]
+#                                       the build before (newest js\main.js.bak-*-grplist, or F) and NO module:
+#                                       the List checks go RED, the Stacked ones stay green
+#   py -3 run.py --mutant NAME / --mutants
+#   --scn a,b                           a subset of scenarios
+# Headless Edge over CDP; stages into %TEMP%; writes nothing to the webroot.
+#
+# ROUND 2 ("grplist2", 2026-10-03): the harness also loads density.css and the
+# column-width tool (js/penumbra_colwidths.js + css, LIVE copies) as index.php does.
+# New scenarios: longtext (fits first, like Stacked), pinnarrow (narrowing columns
+# in the width tool shrinks the scroll), density, listwidth, trigger
+# (group_by|...|layout=list|stacked through executeChainStep), switch
+# (layout_switch / toggle_switch that name a layout); boot + exit gained checks.
+# The CONTROL for round 2 is the build before it: run with no --stage while the
+# LIVE app is still round 1 - the new checks must go red there.
+# =============================================================================
+import glob, json, os, shutil, socket, subprocess, sys, tempfile, time, urllib.request
+import websocket
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js',
+        'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
+        'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js']
+JS_LIBS = ['jspdf-2.5.1.umd.min.js', 'jspdf-autotable-3.5.23.min.js']
+SCN = [('boot', ''), ('many', ''), ('click', ''), ('keys', ''), ('search', ''), ('band', ''), ('email', ''), ('pdf', ''),
+       ('exports', ''), ('save', ''), ('layoutonly', ''), ('wide', ''), ('widestacked', ''), ('nested', ''),
+       ('nstick', ''), ('narrow', ''), ('kill', '&grouplist=off'), ('tallabove', ''), ('broken', ''), ('exit', ''),
+       ('longtext', ''), ('pinnarrow', ''), ('pinhash', ''), ('density', ''), ('listwidth', ''), ('trigger', ''), ('switch', ''),
+       ('copysnip', ''), ('pinflat', '&colwidths=flat'), ('radio', ''), ('tip', ''), ('compare', ''), ('fitstacked', ''), ('wideresize', ''), ('widecmp', ''), ('n3crumb', ''), ('nmerge', ''), ('nmergejs', ''), ('nmergeexp', '')]
+# every check a scenario must publish (a missing one fails)
+CHK = {
+    'boot': ['on', 'items', 'oneGroup', 'open', 'fit', 'listFit', 'row', 'linksHidden', 'grid', 'count', 'selectedAria',
+             'fieldSynced', 'listAuto', 'stableRows', 'barUnderList', 'barListWidth',
+             'frame', 'barFlush', 'bandClean',    # round 4: one frame
+             'rowFlush', 'bandTint', 'oneInset', 'ringOff',   # round 5: the row joins its pane
+             'onePill', 'noSep',   # round 6: one vocabulary, no floating bullet
+             'noEdgeWhileFits'],   # glfit: no second rule beside a list that fits
+    'many': ['longList', 'listScrolls', 'barUnderList', 'capped', 'edgeWhileScrolls', 'listKeep', 'rowStays'],   # gltot
+    'click': ['shown', 'aria', 'keepOpen', 'fitMoved'],
+    'keys': ['down', 'end', 'home', 'upStays', 'shownFollows'],
+    'search': ['searchEvent', 'listFollows', 'moved', 'items4', 'count', 'oneShown'],
+    'band': ['noToggle', 'hasHide', 'hideWorks'],
+    'email': ['stackedNow', 'same'],
+    'pdf': ['same'],
+    'exports': ['allRows', 'same'],
+    'save': ['listSaved', 'stackedOmits'],
+    'layoutonly': ['startsStacked', 'noRegroup', 'listOn', 'closed', 'regroup', 'stackedAgain'],
+    'wide': ['minWidth', 'scrolls', 'headerSticky', 'headsFit'],   # round 7: no heading cut short
+    # stackfit (2026-10-13): Stacked scrolls sideways too (was noMinWidth + noScroll)
+    'widestacked': ['stackRule', 'screenOnly', 'scrolls', 'headerSticky', 'aligned', 'followsDensity', 'keptClosed',
+                    'dropsStale', 'reopens', 'listOwns', 'headsFit', 'syncCheap'],   # stackfit2: no heading cut short
+    # stackfit3: a short group and a tall one, a heading held - neither scrolls
+    'fitstacked': ['measured', 'fits', 'tableFills', 'headsFit', 'heldRule', 'mixedHeights', 'mixedHeads'],
+    # stackfit2: a set width is drawn as asked and a drag is not capped at the box
+    'wideresize': ['toolExact', 'drawnExact', 'grows', 'scrollsMore', 'dragUncapped', 'headsFitPinned'],
+    # stackfit2: a comparison's groups in Stacked get their own rule
+    # crumbclick (2026-10-14): each name in the crumb goes to that group in the list
+    'n3crumb': ['twoNames', 'pointer', 'rootGoes', 'rootOpen', 'rootShown', 'midGoes', 'nameNot', 'clipped', 'bandDom'],
+    # glmerge (2026-10-14): a selected branch is one table
+    'nmerge': ['clickSelects', 'allLeaves', 'oneHead', 'aligned', 'noFoot', 'oneScroll', 'rowsAll', 'headStays',
+               'stripes', 'foldArrow', 'keysPass', 'enterSelects', 'backToLeaf', 'stripesBack', 'exitClean',
+               'ptotal', 'ptAligned', 'ptPinned', 'ptNotTable', 'ptGone', 'boxKeep'],   # gltot
+    'nmergejs': ['clickSelects', 'headStays'],
+    # glmerge: with a branch selected the email, the PDF and the exports are Stacked's with that branch open
+    'nmergeexp': ['email', 'pdf', 'exports'],
+    'widecmp': ['cmpStacked', 'cmpRule', 'cmpScrolls', 'cmpHeadsFit', 'gridUntouched'],
+    # round 4: h0 is 0 in List (the outer bands are hidden) - the drawn band's top is the base instead
+    'nested': ['items9', 'path', 'folds', 'pathMoved', 'oneBand', 'crumb', 'bandTop', 'leftToBranch', 'footer', 'fills'],
+    'nstick': ['h0', 'footer', 'fills'],
+    'narrow': ['stackedNarrow', 'listWide'],
+    'kill': ['off', 'rowHidden'],
+    # glfit (2026-10-14): sized for the group scrolled into place, not the 425px cap
+    'tallabove': ['boxFits', 'listFits', 'inPlace', 'tinyCap'],
+    'broken': ['fellBack', 'staysStacked'],
+    'exit': ['onBefore', 'cssGuard', 'gone', 'reset', 'fieldReset'],
+    # round 2
+    'longtext': ['minByHeadings', 'fits', 'tableFills', 'wraps'],
+    'pinnarrow': ['headsFitPinned', 'scrollsFirst', 'pinDrawn', 'shrinks', 'noScroll', 'noRuleYet', 'restores'],
+    'pinhash': ['toolRule', 'pinDrawn', 'headsFit', 'important', 'toolClears', 'headsFitAfter'],   # round 9: only '#' pinned
+    'pinflat': ['viewsOff', 'ignoresPins', 'fits'],
+    'density': ['standard', 'compact', 'easy', 'rowsFollow'],
+    'listwidth': ['capped', 'shortFull', 'longClipped', 'groupBeside'],
+    'trigger': ['startsStacked', 'listOn', 'layoutOnlyStep', 'aggKept', 'keepsList', 'cancelIgnored', 'junkIgnored', 'toStacked'],
+    'switch': ['listSel', 'bestMatch', 'toggleOn', 'stackedNow', 'noRegroup', 'stepDone', 'stackedSel', 'plainSel', 'toggleOff', 'toggleBack'],
+    'copysnip': ['writesList', 'stackedPlain'],
+    # round 3
+    'radio': ['opened', 'openShowsList', 'clickSets', 'appliedStacked', 'reopenShowsStacked', 'resetRepaints'],
+    'tip': ['tipShows', 'tipDescribes'],
+    # grplistcmp (2026-10-13): a snapshot comparison is listed too
+    'compare': ['cmpOn', 'cmpItems', 'cmpOne', 'cmpPane', 'cmpFit', 'cmpDivider', 'cmpVisible', 'cmpCount', 'cmpClick',
+                'cmpApplyStacked', 'cmpApplyList', 'cmpNotice', 'cmpRerun', 'cmpClear'],
+}
+
+# (file, old, new): file is 'main' (main.js), 'mod' (the module) or 'css' (its stylesheet)
+MUTANTS = {
+    # gltot: main.js offers no branch total
+    'ptmain': ([('main', "        totalFor: function (tables) { return penumbraGroupTotalFor(tables); }\r\n", "        totalFor: null\r\n")],
+               ['L-nmerge-ptotal'], ['nmerge']),
+    # gltot: the module never draws it
+    'ptnone': ([('mod', "        parentTotal(merge ? sel : null, c, tbl);\n", "        parentTotal(null, c, tbl);\n")],
+               ['L-nmerge-ptotal'], ['nmerge']),
+    # gltot: equal columns instead of the header's widths
+    'ptgrid': ([('mod', "row.style.gridTemplateColumns = ws.map(function (w) { return w + 'px'; }).join(' ');", "row.style.gridTemplateColumns = ws.map(function () { return '1fr'; }).join(' ');")],
+               ['L-nmerge-ptAligned'], ['nmerge']),
+    # gltot: not pinned to the box's foot
+    'ptsticky': ([('css', "    position: sticky;\n    bottom: 0;\n    z-index: 4;\n    box-sizing: border-box;\n", "    z-index: 4;\n    box-sizing: border-box;\n")],
+                 ['L-nmerge-ptPinned'], ['nmerge']),
+    # gltot: the scroll positions are not put back after the re-measure
+    'keepscroll': ([('mod', "            if (ke[0].scrollTop !== ke[1]) { ke[0].scrollTop = ke[1]; }\n", "")],
+                   ['L-many-listKeep', 'L-nmerge-boxKeep'], ['many', 'nmerge']),
+    # glmerge: a click on a branch's row only unfolds it again
+    'mgnosel': ([('mod', "        else if (fromClick) { selPath = path; expanded[path] = true; }\n", "        else if (fromClick) { expanded[path] = true; }\n")],
+                ['L-nmerge-clickSelects'], ['nmerge']),
+    # glmerge: every group's header drawn
+    'mghead': ([('css', "    visibility: collapse;\n", "")],
+               ['L-nmerge-oneHead'], ['nmerge']),
+    # glmerge: the other tables keep their own widths
+    'mgwidth': ([('mod', "            if (merge) { shareWidths(tbl, sel.querySelectorAll('.group-wrapper.group-leaf > .group-content > table')); }\n", "")],
+                ['L-nmerge-aligned'], ['nmerge']),
+    # glmerge: the per-group totals drawn between the groups
+    'mgfoot': ([('css', "> table > tfoot {\n    display: none;\n}", "> table > tfoot {\n}")],
+               ['L-nmerge-noFoot'], ['nmerge']),
+    # glmerge: the header is not moved by the scroll-driven animation
+    'mganim': ([('css', "        animation-timeline: --pnb-gl-merge;\n", "")],
+               ['L-nmerge-headStays'], ['nmerge']),
+    # glmerge: no scroll listener where there is no scroll-driven animation
+    'mglisten': ([('mod', "        if (box && box !== mBox && !SCROLL_ANIM) { box.addEventListener('scroll', placeHead, { passive: true }); }\n", "")],
+                 ['L-nmergejs-headStays'], ['nmergejs']),
+    # glmerge: the stripes restart in every group
+    'mgstripe': ([('mod', "        restripe(r, merge ? sel : null);\n", "")],
+                 ['L-nmerge-stripes'], ['nmerge']),
+    # glmerge: what a branch opened stays open after it
+    'mgclose': ([('mod', "            if (o.isConnected && o.classList.contains('open')) {\n                o.classList.remove('open');\n", "            if (false) {\n")],
+                ['L-nmerge-backToLeaf'], ['nmerge']),
+    # crumbclick: a click on the crumb is swallowed like any band click
+    'crumbclick': ([('mod', "        if (cp != null) { crumbGo(cp); }\n", "")],
+                ['L-n3crumb-rootGoes', 'L-n3crumb-midGoes'], ['n3crumb']),
+    # crumbclick: the names measured without the separators - the second name lands on the first
+    'crumbsep': ([('mod', "            at += w + sep;\n", "            at += w;\n")],
+                 ['L-n3crumb-midGoes'], ['n3crumb']),
+    # crumbclick: the crumb reaches the name - a click on the group's own name jumps too
+    'crumbwide': ([('mod', "            else if (ord > -1) { right = Math.min(right, cr.left - gap); }\n", "")],
+                  ['L-n3crumb-clipped'], ['n3crumb']),
+    # glfit: the box is read from the PAGE position again - under a tall header it keeps 425px
+    'glpage': ([('mod', "            var room = Math.floor(want - base - (cr.top - rTop)", "            var room = Math.floor(want - (cr.top + window.pageYOffset)")],
+               ['L-tallabove-boxFits', 'L-tallabove-inPlace'], ['tallabove']),
+    # glfit: the list is read from the page position again
+    'glpagelist': ([('mod', "            var lroom = want - base - (l.getBoundingClientRect().top - rTop)", "            var lroom = want - (l.getBoundingClientRect().top + window.pageYOffset)")],
+                   ['L-tallabove-listFits'], ['tallabove']),
+    # glfit: no left rule while the list scrolls
+    'gledge': ([('mod', "            r.classList.toggle('pnb-gl-lscroll', l.scrollHeight > l.clientHeight + 1);\n", "")],
+               ['L-many-edgeWhileScrolls'], ['many']),
+    # glfit: the rule always - doubled beside a list that fits
+    'gledgeall': ([('mod', "l.scrollHeight > l.clientHeight + 1);", "true);")],
+                  ['L-boot-noEdgeWhileFits'], ['boot']),
+    # stackfit3: measured on a short group, the box keeps its bar's width - tall groups scroll
+    'nobarw': ([('mod', "        return c.clientWidth - (own > 0 ? 0 : scrollbarW());\n", "        return c.clientWidth;\n")],
+               ['L-fitstacked-mixedHeights'], ['fitstacked']),
+    # stackfit2: the module never tells the tool the view scrolls - set widths scale to the box, drags cap
+    'nogrpscroll': ([('mod', "    document.documentElement.classList.add('pnb-grp-scroll');\n", "")],
+                    ['L-wideresize-toolExact', 'L-wideresize-dragUncapped'], ['wideresize']),
+    # the tool scales set widths down to the box again
+    'cwscale': ([('cw', "groupScrolls() ? 0 : groupWidth(groupRefRow())", "groupWidth(groupRefRow())")],
+                ['L-wideresize-toolExact'], ['wideresize']),
+    # a drag is capped at the box again
+    'cwcap': ([('cw', "        if (groupScrolls()) { return host.max; }\n", "")],
+              ['L-wideresize-dragUncapped'], ['wideresize']),
+    # comparison groups are left squeezed
+    'nocmpscope': ([('mod', "        if (!cmp) { return out; }\n", "        return out;\n")],
+                   ['L-widecmp-cmpRule', 'L-widecmp-cmpScrolls'], ['widecmp']),
+    # no heading held at its need: '#' is cut short again
+    'nohold': ([('mod', "        if (!short || !named) { return { w: w, cols: [] }; }\n", "        return { w: w, cols: [] };\n")],
+               ['L-widestacked-headsFit'], ['widestacked']),
+    # stackfit (2026-10-13): Stacked never measured - squeezed to fit again
+    'nostack': ([('mod', "if (!wanted()) { if (on) { teardown(); } stackFit(); return; }", "if (!wanted()) { if (on) { teardown(); } return; }")],
+                ['L-widestacked-stackRule', 'L-widestacked-scrolls', 'L-fitstacked-measured'], ['widestacked', 'fitstacked']),
+    # the rule stays up under List
+    'stackinlist': ([('mod', "            clearStack();   // List sizes its one table itself\n", "")],
+                    ['L-widestacked-listOwns'], ['widestacked']),
+    # the rule reaches print too
+    'stackprint': ([('mod', "el.textContent = text ? '@media screen { ' + text + ' }' : '';", "el.textContent = text;")],
+                   ['L-widestacked-screenOnly'], ['widestacked']),
+    # a CLOSED group is measured (its icons read 0 wide) - nothing is ever dropped
+    'stackclosed': ([('mod', "if (sc.tbls[i].getClientRects().length) { drawnT = sc.tbls[i]; break; }", "{ drawnT = sc.tbls[i]; break; }")],
+                    ['L-widestacked-dropsStale'], ['widestacked']),
+    # every collapse drops the rule (the next open squeezes for a frame)
+    'stacknosig': ([('mod', "} else if (prev && sc.tbls.length && colSig(sc.tbls[0]) === prev.sig) {", "} else if (false) {")],
+                   ['L-widestacked-keptClosed'], ['widestacked']),
+    # asks more than the headings need: a narrow table scrolls
+    'stackeager': ([('mod', "        var w = Math.ceil(pinSum + needSum), left", "        var w = Math.ceil(pinSum + needSum) + 5000, left")],
+                   ['L-fitstacked-fits', 'L-fitstacked-measured'], ['fitstacked']),
+    # grplistcmp: the module stands down in a comparison again
+    'cmpexcl': ([('mod', "        if (window.innerWidth < NARROW) { return false; }", "        if (document.body.classList.contains('snapshot-comparison-active')) { return false; }\n        if (window.innerWidth < NARROW) { return false; }")],
+                ['F-compare'], ['compare']),   # the list never appears: the scenario stops
+    # the list walks the container only: a comparison's groups are one level down
+    'cmphost': ([('mod', "    function groupsHost(r) { return (r && r.querySelector(':scope > #snapshotComparisonContainer')) || r; }", "    function groupsHost(r) { return r; }")],
+                ['F-compare'], ['compare']),
+    # the comparison's box is not the right-hand pane (the group sits in row 1 beside the list only)
+    'cmppane': ([('css', "body.pnb-gl-on #groupedResultsContainer > #snapshotComparisonContainer {\n    grid-row: 1 / 4;\n    align-self: stretch;\n}", "")],
+                ['L-compare-cmpDivider'], ['compare']),
+    # display: contents for the comparison's box - jQuery's :visible goes false
+    'cmpcontents': ([('css', "    grid-row: 1 / 4;\n    align-self: stretch;\n}\nbody.pnb-gl-on #groupedResultsContainer > .group-wrapper,", "    display: contents;\n}\nbody.pnb-gl-on #groupedResultsContainer > .group-wrapper,")],
+                ['L-compare-cmpVisible'], ['compare']),
+    # the comparison count reads :visible again
+    'cmpcount': ([('main', "$('#snapshotComparisonContainer .group-wrapper:not(.search-hidden)').length;", "$('#snapshotComparisonContainer .group-wrapper:visible').length;")],
+                 ['L-compare-cmpCount'], ['compare']),
+    # Apply in a comparison ignores the layout (the 10-13 snapgrp guard)
+    'cmpnolayout': ([('main', "                if (_cmpLayout !== currentGroupLayout) {", "                if (false) {")],
+                    ['L-compare-cmpApplyStacked'], ['compare']),   # (List was on already: that Apply changes nothing)
+    # Apply in a comparison regroups the live rows by __SNAP_TYPE (the bug before snapgrp)
+    'cmpregroup': ([('main', "        if (selectedColumn === '__SNAP_TYPE') {", "        if (false) {")],
+                   ['L-compare-cmpApplyStacked'], ['compare']),
+    # nothing hidden: every group stays on screen
+    'noclass': ([('mod', "if (w.classList.contains('pnb-gl-off') === k) { w.classList.toggle('pnb-gl-off', !k); changed = true; }", "")],
+                ['L-boot-oneGroup', 'L-click-shown'], ['boot', 'click']),
+    # hidden with .search-hidden: every export then drops the hidden groups
+    'searchclass': ([('mod', "w.classList.toggle('pnb-gl-off', !k)", "w.classList.toggle('search-hidden', !k)")],
+                    ['L-exports-allRows'], ['exports']),
+    # no min-width: the selected table is squeezed like today, no sideways scroll
+    'nominwidth': ([('mod', "if (w > 0) { tbl.style.minWidth = w + 'px'; fitted.push([tbl, 'minWidth']); }", "")],
+                   ['L-wide-minWidth', 'L-wide-scrolls'], ['wide']),
+    # no fit: the box keeps the stacked 425px cap
+    'nofit': ([('mod', "if (room >= MIN_FIT) {", "if (false) {")],
+              ['L-boot-fit'], ['boot']),
+    # the grid rule without its guard beats .hide(): the container stays up after Remove Grouping
+    'noguard': ([('css', 'body.pnb-gl-on #groupedResultsContainer:not([style*="display: none"]) {\n    display: grid !important;',
+                  'body.pnb-gl-on #groupedResultsContainer {\n    display: grid !important;')],
+                ['L-exit-cssGuard'], ['exit']),
+    # no click guard: a click on the selected group's band collapses it (the re-sync re-opens it a frame later)
+    'noblock': ([('mod', "if (!on || !e.target || !e.target.closest) { return; }\n        if (!e.target.closest('#groupedResultsContainer .group-wrapper > .group-header')) { return; }",
+                  "return;")],
+                ['L-band-noToggle'], ['band']),
+    # every Apply regroups
+    'layoutonly': ([('main', "        if (want === currentGroupLayout) return false;\r\n", "        return false;\r\n")],
+                   ['L-layoutonly-noRegroup'], ['layoutonly']),
+    # the normal Apply forgets the layout
+    'noread': ([('main', "        // The layout (2026-10-03, grplist), read with the rest of the form.\r\n        currentGroupLayout = ($('#groupLayout').val() === 'list') ? 'list' : 'stacked';\r\n", "")],
+               ['L-layoutonly-stackedAgain'], ['layoutonly']),
+    # the first DRAWN band is not looked for: a hidden first band measures 0
+    'stickyrevert': ([('main', "            var measured = 0;\r\n            for (var bi = 0; bi < bands.length && bi < 60 && !measured; bi++) {\r\n                measured = Math.round(bands[bi].getBoundingClientRect().height);\r\n            }\r\n",
+                       "            var measured = Math.round(bands[0].getBoundingClientRect().height);\r\n")],
+                     ['L-nstick-h0'], ['nstick']),
+    # the footer's columns read from the first band again: a nested footer gets a cell per column per inner group
+    'footerrevert': ([('main', "$(\"#groupedResultsContainer .group-wrapper.group-leaf:first > .group-content > table > thead > tr > th[data-colname]:not([style*='display: none'])\")",
+                       "$(\"#groupedResultsContainer .group-wrapper:first th[data-colname]:not([style*='display: none'])\")")],
+                     ['L-nested-footer', 'L-nested-fills', 'L-nstick-footer', 'L-nstick-fills'], ['nested', 'nstick']),
+    # List is not saved
+    'nosave': ([('main', "                state.groupLayout = 'list';\r\n", "")],
+               ['L-save-listSaved'], ['save']),
+    # no narrow-window fallback
+    'nonarrow': ([('mod', "        if (window.innerWidth < NARROW) { return false; }", "")],
+                 ['L-narrow-stackedNarrow'], ['narrow']),
+    # the list's fallback is a cramped 150px again (beside a 425px box)
+    'listfloor150': ([('mod', "(lroom >= MIN_FIT ? Math.floor(lroom) : STACKED_CAP)", "Math.max(MIN_FIT, Math.floor(lroom))")],
+                     ['L-tallabove-listFloor'], ['tallabove']),
+    # a fault is retried on the next event instead of staying Stacked
+    'nobroken': ([('mod', "            broken = true;\n", "")],
+                 ['L-broken-staysStacked'], ['broken']),
+    # the search does not reach the list: the selected group disappears with nothing in its place
+    'nosearchfollow': ([('main', "                _groupLayoutNotify('groupedSearched');", "")],
+                       ['L-search-searchEvent'], ['search']),
+    # ---- round 2 (grplist2) ----
+    # widths set in the column-width tool are not read: narrowing columns cannot shrink the table
+    'nopins': ([('mod', "            if (pinned > 0) {", "            if (false) {")],
+               ['L-pinnarrow-shrinks', 'L-pinnarrow-noScroll'], ['pinnarrow']),
+    # a column asks for its TEXT, not its heading: a long text column scrolls sideways again
+    'textwidth': ([('mod', "var label = String(th.textContent || '')", "var label = String(tbl.textContent || '')")],
+                  ['L-longtext-fits', 'L-longtext-minByHeadings'], ['longtext']),
+    # the list keeps its own font size, whatever the density
+    'nodensity': ([('mod', "        if (fs && l.style.fontSize !== fs) { l.style.fontSize = fs; }\n", "")],
+                  ['L-density-compact', 'L-density-easy'], ['density']),
+    # the list column is a fixed 260px again
+    'fixedlist': ([('css', "    grid-template-columns: fit-content(min(420px, 40%)) minmax(0, 1fr);", "    grid-template-columns: 260px minmax(0, 1fr);")],
+                  ['L-listwidth-capped'], ['listwidth']),
+    # every sync re-draws the rows
+    'listredraw': ([('mod', "        if (sig === lastSig && l.firstChild) { return; }\n", "")],
+                   ['L-boot-stableRows'], ['boot']),
+    # the grid sees no layout= option: it is read as a summary column / sort
+    'nooption': ([('main', "                        const _gbOpts = _groupTriggerOptions(args);", "                        const _gbOpts = { pos: args, layout: null };")],
+                 ['L-trigger-listOn'], ['trigger']),
+    # a trigger without a layout reads the dialog's field as it stands (a cancelled choice)
+    'nokeep': ([('main', "$('#groupLayout').val(_gbOpts.layout || currentGroupLayout);", "if (_gbOpts.layout) $('#groupLayout').val(_gbOpts.layout);")],
+               ['L-trigger-cancelIgnored'], ['trigger']),
+    # the dialog's field is not set from a loaded report
+    'nofieldsync': ([('main', "                    $('#groupLayout').val(currentGroupLayout);\r\n", "")],
+                    ['L-boot-fieldSynced'], ['boot']),
+    # the layout-only shortcut does not end its step: a switch's step never completes
+    'nostepdone': ([('main', "            penumbraSyncActiveLayout();\r\n            $(document).trigger('penumbra:stepComplete');\r\n            return;\r\n", "            return;\r\n")],
+                   ['L-switch-stepDone'], ['switch']),
+    # a layout_switch takes the FIRST match again: a plain position beats one naming the layout on screen
+    'firstmatch': ([('main', "                if (s > best) { best = s; hit = i; }", "                if (s > 0 && hit < 0) { hit = i; }")],
+                   ['L-switch-bestMatch'], ['switch']),
+    # a layout_switch position that names a layout matches in either layout
+    'anylayout': ([('main', "            if (_tl && _tl !== currentGroupLayout) return false;\r\n", "")],
+                  ['L-switch-listSel'], ['switch']),
+    # a toggle_switch command that names a layout is on in either layout
+    'toggleany': ([('main', "            if (_cl && _cl !== currentGroupLayout) return false;", "")],
+                  ['L-switch-toggleOff'], ['switch']),
+    # grplist2b: a set width counts even where the tool does not draw the grouped view
+    'pinanyview': ([('mod', "        var tool = document.documentElement.classList.contains('pnb-colw-views');", "        var tool = true;")],
+                   ['L-pinflat-ignoresPins', 'L-pinflat-fits'], ['pinflat']),
+    # grplist2b: the drawn width is trusted even when it is only the generic 350px cap
+    'pinmaxwidth': ([('mod', "                sum += (drawn > 0 && drawn < pinned) ? drawn : pinned;", "                sum += drawn > 0 ? drawn : pinned;")],
+                    ['L-pinnarrow-noRuleYet'], ['pinnarrow']),
+    # Copy Snippet leaves the layout out: a List grouping pastes back as Stacked
+    'nocopy': ([('main', "        if (_csList) triggerValue += '|layout=list';", "")],
+               ['L-copysnip-writesList'], ['copysnip']),
+    # ---- round 3 (grplist3) ----
+    # the total bar goes back under the group
+    'barcol2': ([('css', "    grid-column: 1;\n    grid-row: 2;\n    align-self: start;", "    grid-column: 2;\n    grid-row: 4;\n    align-self: start;")],
+                ['L-boot-barUnderList', 'L-many-barUnderList'], ['boot', 'many']),
+    # the total's one-line width widens the list's column (the table loses that width)
+    'barwide': ([('css', "    contain: inline-size;\n", "")],
+                ['L-boot-barListWidth'], ['boot']),
+    # the box still gives up the total's height (glfit: one pass, so one edit)
+    'barfit': ([('mod', "            var room = Math.floor(want - base - (cr.top - rTop) - under);", "            var room = Math.floor(want - base - (cr.top - rTop) - under - gtH);")],   # glfit: one pass now
+               ['L-boot-fit'], ['boot']),
+    # the list does not leave room for the total under it
+    'barlist': ([('mod', "            var lroom = want - base - (l.getBoundingClientRect().top - rTop) - gtH - frameB;", "            var lroom = want - base - (l.getBoundingClientRect().top - rTop) - frameB;")],
+                ['L-boot-listFit'], ['boot']),
+    # ---- round 4 (grplist4): one frame ----
+    # the container is not the frame: three cards with gaps again
+    'noframe': ([('css', "    border: 1px solid var(--border-color, #d9dce1);\n    border-radius: 8px;\n    overflow: clip;\n    background: var(--bg-surface, #ffffff);\n}", "}")],
+                ['L-boot-frame'], ['boot']),
+    # the total floats 8px under the list again
+    'gaptotal': ([('css', "    margin-top: 0;\n    top: calc(var(--pnb-grp-base, 0px) + var(--pnb-gl-list-h, 0px));", "    margin-top: 8px;\n    top: calc(var(--pnb-grp-base, 0px) + var(--pnb-gl-list-h, 0px) + 8px);")],
+                 ['L-boot-barFlush'], ['boot']),
+    # the hidden chevron keeps its 20px blank at the head of the band
+    'chevronback': ([('css', "    display: none;   /* was visibility:hidden - a 20px blank at the head of the band (grplist4) */", "    visibility: hidden;")],
+                    ['L-boot-bandClean'], ['boot']),
+    # the bands above the selected group are drawn again: two headings, the summary twice
+    'bandsback': ([('css', "body.pnb-gl-on #groupedResultsContainer .group-wrapper:not(.pnb-gl-sel) > .group-header {\n    display: none;\n}", "")],
+                  ['L-nested-oneBand'], ['nested']),
+    # the band shows no path to a nested group
+    'nocrumb': ([('mod', "        if (sel) { sel.classList.toggle('pnb-gl-deep', names.length > 0); }", "")],
+                ['L-nested-crumb'], ['nested']),
+    # ---- round 5 (grplist5): the selected row joins its pane ----
+    # the reserved scrollbar gutter is back: the row stops 11px short of the divider
+    'gutterback': ([('css', "    scrollbar-width: thin;\n    /* No reserved gutter (grplist5):", "    scrollbar-width: thin;\n    scrollbar-gutter: stable;\n    /* No reserved gutter (grplist5):")],
+                   ['L-boot-rowFlush'], ['boot']),
+    # the band keeps the theme's own grey and its 14px padding: not the row's colour or height
+    'bandgrey': ([('css', "    padding: 0 1em;\n    min-height: 3em;\n    background: var(--bg-surface-alt, #eef1f6);\n}", "}")],
+                 ['L-boot-bandTint'], ['boot']),
+    # a flat list keeps the blank twisty slot: names 18px off the inset
+    'twistyback': ([('css', "#pnbGroupList:not(:has(.pnb-gl-item[aria-expanded])) .pnb-gl-twisty {\n    display: none;\n}", "")],
+                   ['L-boot-oneInset'], ['boot']),
+    # the keyboard ring is drawn all the time again
+    'ringon': ([('css', "#pnbGroupList:focus-visible .pnb-gl-item.is-active {", "#pnbGroupList .pnb-gl-item.is-active {")],
+               ['L-boot-ringOff'], ['boot']),
+    # ---- round 6 (grplist6): one vocabulary ----
+    # the three pills are three sizes and styles again
+    'pillsplit': ([('css', "#pnbGroupList .pnb-gl-count,\nbody.pnb-gl-on #groupedResultsContainer .group-wrapper.pnb-gl-sel > .group-header .group-count,\nbody.pnb-gl-on #groupedResultsContainer > .group-grand-total > .group-header.ggt-header .group-count {\n    font-size: 0.9em;", "#pnbGroupList .pnb-gl-count {\n    font-size: 0.9em;")],
+                  ['L-boot-onePill'], ['boot']),
+    # the bullet floats at the head of the controls bar again
+    'sepback': ([('css', "body.pnb-gl-on #collapseAllGroups,\nbody.pnb-gl-on #removeGroupingSep {", "body.pnb-gl-on #collapseAllGroups {")],
+                ['L-boot-noSep'], ['boot']),
+    # ---- round 7 (grplist7): no heading cut short ----
+    # the percentages' sliver stands: the '#' heading is clipped again
+    'nowiden': ([('mod', "            widenHeads(tbl);", "")],
+                ['L-wide-headsFit'], ['wide']),
+    # ---- round 9 (grplist9): the widths beat the tool's % !important ----
+    # a plain inline width: the tool's percentages win and the free headings are cut
+    'noimportant': ([('mod', "            plan[j][0].style.setProperty('width', plan[j][1] + 'px', 'important');", "            plan[j][0].style.width = plan[j][1] + 'px';")],
+                    ['L-pinhash-headsFit', 'L-pinhash-important'], ['pinhash']),
+    # the grouping dialog never wires the ? popover: the Layout tip shows nothing
+    'notipinit': ([('main', "        if (typeof initHelpPopover === 'function') initHelpPopover();\r\n        $('#groupingLightbox').css('display', 'flex').hide().fadeIn();", "        $('#groupingLightbox').css('display', 'flex').hide().fadeIn();")],
+                  ['L-tip-tipShows'], ['tip']),
+    # opening the dialog does not repaint the radios: they keep the HTML default (Stacked)
+    'nopaint': ([('main', "        _groupLayoutPaint();   // grplist3: the radios show it\r\n", "")],
+                ['L-radio-openShowsList'], ['radio']),
+    # a radio click does not reach the hidden field
+    'noradioset': ([('main', "        if (this.checked) $('#groupLayout').val(this.value === 'list' ? 'list' : 'stacked');", "")],
+                   ['L-radio-clickSets'], ['radio']),
+    # Reset clears the field but leaves the radio on List
+    'noresetpaint': ([('main', "        $('#groupLayout').val('stacked');\r\n        _groupLayoutPaint();   // grplist3\r\n", "        $('#groupLayout').val('stacked');\r\n")],
+                     ['L-radio-resetRepaints'], ['radio']),
+}
+
+args = sys.argv[1:]
+def opt(name, default=None):
+    if name in args:
+        i = args.index(name); v = args[i + 1]; del args[i:i + 2]; return v
+    return default
+def flag(name):
+    if name in args: args.remove(name); return True
+    return False
+stage_dir = opt('--stage', None)
+base_path = opt('--baseline', None)
+scn_arg = opt('--scn', None)
+one_mutant = opt('--mutant', None)
+all_mutants = flag('--mutants')
+control = flag('--control')
+verbose = flag('--verbose')
+src_root = stage_dir or APP
+cand = {'main': os.path.join(src_root, 'js', 'main.js'),
+        'mod': os.path.join(src_root, 'js', 'penumbra_grouplist.js'),
+        'css': os.path.join(src_root, 'css', 'penumbra_grouplist.css'),
+        'cw': os.path.join(src_root, 'js', 'penumbra_colwidths.js')}
+if not os.path.exists(cand['cw']): cand['cw'] = os.path.join(APP, 'js', 'penumbra_colwidths.js')
+if control:
+    if not base_path:
+        baks = sorted(glob.glob(os.path.join(APP, 'js', 'main.js.bak-*-grplist')))
+        if not baks: raise SystemExit('--control needs --baseline <main.js before the change> (the deploy leaves js\\main.js.bak-<stamp>-grplist)')
+        base_path = baks[-1]
+
+def read_b(p): return open(p, 'rb').read().decode('utf-8', 'surrogateescape')
+def hook(src):
+    anchor = '$(document).ready(function () {'
+    i = src.find(anchor)
+    if i < 0 or i > 400: raise SystemExit('closure anchor not found')
+    names = ['runTableSearch', 'getExportData', 'generatePdfContent', 'loadScript', 'updateGroupedResultCount',
+             'buildStateObject', 'removeGrouping', 'applyDensity', 'executeChainStep', 'penumbraSyncActiveLayout',
+             'runComparisonAndDisplayGrouped', 'compressString', 'updateComparisonResultCount']   # grplistcmp
+    h = ('\r\n;try { window.__HC = {'
+         ' setLayout: function (v) { try { currentGroupLayout = v; } catch (e) { } },'
+         ' getLayout: function () { try { return currentGroupLayout; } catch (e) { return null; } },'
+         ' getMaster: function () { try { return masterRowData; } catch (e) { return null; } } }; } catch (e) { window.__HC_ERR = String(e); }\r\n'
+         'try { [' + ','.join('"%s"' % n for n in names) + '].forEach(function (k) { try { window.__HC[k] = eval(k); } catch (e) { (window.__HC_MISSING = window.__HC_MISSING || []).push(k); } }); } catch (e) { window.__HC_ERR2 = String(e); }\r\n'
+         'try { var __pnbRGV = rebuildGroupedView; rebuildGroupedView = function () { window.__REBUILDS = (window.__REBUILDS || 0) + 1; return __pnbRGV.apply(this, arguments); }; } catch (e) { window.__HC_ERR3 = String(e); }\r\n')
+    out = src[:i] + ';(function () {' + h + src[i + len(anchor):]
+    j = out.rfind('});')
+    out = out[:j] + '})();' + out[j + 3:]
+    hl = '    function hideLoading() {\r\n'
+    if out.count(hl) != 1: raise SystemExit('hideLoading anchor count %d' % out.count(hl))
+    return out.replace(hl, hl + '        window.__HC_HIDES = (window.__HC_HIDES || 0) + 1;\r\n')
+def mutate(texts, name):
+    t = dict(texts)
+    for f, old, new in MUTANTS[name][0]:
+        if t[f].count(old) != 1: raise SystemExit("mutant '%s': %s anchor found %d times: %r" % (name, f, t[f].count(old), old[:90]))
+        t[f] = t[f].replace(old, new)
+    return t
+
+stage = tempfile.mkdtemp(prefix='pnb_gl_')
+os.makedirs(os.path.join(stage, 'js'))
+for f in LIBS: shutil.copyfile(os.path.join(APP, 'js', f), os.path.join(stage, f))
+for f in JS_LIBS: shutil.copyfile(os.path.join(APP, 'js', f), os.path.join(stage, 'js', f))
+shutil.copyfile(os.path.join(APP, 'css', 'main.css'), os.path.join(stage, 'main.css'))
+# round 2: density.css and the column-width tool, as index.php loads them (live copies)
+shutil.copyfile(os.path.join(APP, 'css', 'density.css'), os.path.join(stage, 'density.css'))
+shutil.copyfile(os.path.join(APP, 'css', 'penumbra_colwidths.css'), os.path.join(stage, 'penumbra_colwidths.css'))
+# stackfit2: the column-width tool is a candidate file too ('cw': the stage's when it has
+# one, else live), written by run_build so a mutant can reach it
+for f in ('harness.html', 'driver.js'): shutil.copyfile(os.path.join(HERE, f), os.path.join(stage, f))
+def free_port():
+    s = socket.socket(); s.bind(('127.0.0.1', 0)); p = s.getsockname()[1]; s.close(); return p
+hp, dp = free_port(), free_port()
+srv = subprocess.Popen([sys.executable, '-m', 'http.server', str(hp), '--bind', '127.0.0.1', '--directory', stage], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+edge = subprocess.Popen([EDGE, '--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check', '--disable-sync',
+                         '--disable-extensions', '--user-data-dir=' + os.path.join(stage, 'profile'), '--window-size=1500,900',
+                         '--remote-debugging-port=%d' % dp, '--remote-allow-origins=*', 'about:blank'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+def jget(p, m='GET'):
+    return json.loads(urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:%d%s' % (dp, p), method=m), timeout=15).read().decode())
+for _ in range(150):
+    try: jget('/json/version'); break
+    except Exception: time.sleep(0.2)
+
+def run_page(scn, extra):
+    t = jget('/json/new?about:blank', 'PUT')
+    ws = websocket.create_connection(t['webSocketDebuggerUrl'], timeout=300, suppress_origin=True)
+    n = [0]
+    def call(m, p=None):
+        n[0] += 1; mid = n[0]
+        ws.send(json.dumps({'id': mid, 'method': m, 'params': p or {}}))
+        while True:
+            r = json.loads(ws.recv())
+            if r.get('id') == mid: return r.get('result', {})
+    try:
+        call('Network.enable')
+        call('Network.setCacheDisabled', {'cacheDisabled': True})
+        call('Page.navigate', {'url': 'http://127.0.0.1:%d/harness.html?scn=%s%s' % (hp, scn, extra)})
+        t0 = time.time()
+        while time.time() - t0 < 300:
+            time.sleep(0.25)
+            v = call('Runtime.evaluate', {'expression': 'window.__HCDONE ? JSON.stringify(window.__HCRESULT) : null', 'returnByValue': True}).get('result', {}).get('value')
+            if v: return json.loads(v)
+        return {'fatal': 'timeout (300 s)'}
+    finally:
+        try: ws.close()
+        except Exception: pass
+        try: urllib.request.urlopen('http://127.0.0.1:%d/json/close/%s' % (dp, t['id']), timeout=10).read()
+        except Exception: pass
+
+# grplist3: the tip scenario's help_content.php = the candidate's group-layout tip block
+# behind the marker ensureHelpLoaded() checks for (the harness cannot run the PHP).
+help_src = os.path.join(src_root, 'help_content.php')
+if control or not os.path.exists(help_src): help_src = os.path.join(APP, 'help_content.php')
+def help_stub():
+    h = read_b(help_src)
+    i = h.find('<div data-tip="group-layout">')
+    block = h[i:h.find('</div>', i) + 6] if i >= 0 else ''
+    # grplistcmp: the compare engine clones index.php's analysis-card template
+    ix = read_b(os.path.join(APP, 'index.php'))
+    k = ix.find('<template id="snapshotAnalysisTemplate">')
+    tpl = ix[k:ix.find('</template>', k) + 11] if k >= 0 else ''
+    return ('window.__HELP_STUB = ' + json.dumps('<div id="searchHelpLightbox"></div>' + block) + ';\n'
+            + 'window.__SNAPTPL = ' + json.dumps(tpl) + ';\n')
+
+def run_build(texts, scns):
+    open(os.path.join(stage, 'help_stub.js'), 'wb').write(help_stub().encode('utf-8', 'surrogateescape'))
+    open(os.path.join(stage, 'main_hc.js'), 'wb').write(hook(texts['main']).encode('utf-8', 'surrogateescape'))
+    open(os.path.join(stage, 'penumbra_grouplist.js'), 'wb').write(texts['mod'].encode('utf-8', 'surrogateescape'))
+    open(os.path.join(stage, 'penumbra_grouplist.css'), 'wb').write(texts['css'].encode('utf-8', 'surrogateescape'))
+    open(os.path.join(stage, 'penumbra_colwidths.js'), 'wb').write(texts['cw'].encode('utf-8', 'surrogateescape'))
+    out = {}
+    for s, x in SCN:
+        if s not in scns: continue
+        r = run_page(s, x)
+        if r.get('fatal') and 'never finished loading' in r['fatal']:
+            r = run_page(s, x); r['retried'] = True
+        out[s] = r
+    return out
+
+def evaluate(res, scns):
+    out = []
+    add = lambda aid, ok, d: out.append((aid, bool(ok), d))
+    for s in scns:
+        r = res.get(s, {})
+        if r.get('fatal'):
+            add('F-' + s, False, (r.get('fatal') or '')[:400]); continue
+        add('E-' + s, not r.get('errors') and not r.get('hookErr') and not r.get('missing'),
+            'errors %s %s %s' % (r.get('errors'), r.get('hookErr'), r.get('missing')))
+        chk = r.get('chk') or {}
+        for c in CHK[s]:
+            v = chk.get(c)
+            add('L-%s-%s' % (s, c), v is True, '%s%s' % (v, ('   info %s' % json.dumps(r.get('info'))[:330]) if v is not True else ''))
+    return out
+
+try:
+    names = [s for s, _ in SCN]
+    if scn_arg: names = [s for s in names if s in scn_arg.split(',')]
+    if control:
+        texts = {'main': read_b(base_path), 'mod': '/* --control: no module */\n', 'css': '/* --control: no module */\n',
+                 'cw': read_b(os.path.join(APP, 'js', 'penumbra_colwidths.js'))}
+        print('CONTROL: %s and NO module' % base_path)
+    else:
+        texts = {k: read_b(v) for k, v in cand.items()}
+        print('candidate: %s' % src_root)
+    if all_mutants or one_mutant:
+        ok = bad = 0
+        for m in ([one_mutant] if one_mutant else list(MUTANTS)):
+            edits, must, scns = MUTANTS[m]
+            res = evaluate(run_build(mutate(texts, m), scns), scns)
+            red = [a for a, p, _ in res if not p]
+            good = not [x for x in must if x not in red]
+            ok += good; bad += (not good)
+            print('  %s  mutant %-15s turns %s red   [red: %s]' % ('PASS' if good else 'FAIL', m, ' '.join(must), ' '.join(red)))
+            if verbose:
+                for a, p, d in res:
+                    if not p: print('        %-30s %s' % (a, d[:300]))
+        print('SUMMARY mutants ok=%d bad=%d' % (ok, bad))
+        print('RESULT: GREEN' if bad == 0 else 'RESULT: RED')
+    else:
+        res = evaluate(run_build(texts, names), names)
+        p = f = 0; failed = []
+        for a, passed, d in res:
+            print('  %s  %-30s %s' % ('PASS' if passed else 'FAIL', a, d[:420]))
+            if passed: p += 1
+            else: f += 1; failed.append(a)
+        print('TOTAL pass=%d fail=%d   failed: %s' % (p, f, ' '.join(failed)))
+        print('RESULT: GREEN' if f == 0 and p > 0 else 'RESULT: RED')
+finally:
+    try: edge.kill()
+    except Exception: pass
+    try: srv.kill()
+    except Exception: pass
+    time.sleep(1)
+    shutil.rmtree(stage, ignore_errors=True)

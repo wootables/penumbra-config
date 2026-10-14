@@ -1,0 +1,63 @@
+# Compare engine B (browser: infobox/subtitle) vs engine C (scheduler: email)
+# for every corpus case, and print a divergence report.
+$sp = $PSScriptRoot
+$b = Get-Content "$sp\result_b.json" -Raw | ConvertFrom-Json
+$c = Get-Content "$sp\result_c.json" -Raw | ConvertFrom-Json
+
+# Engine C wraps its output in the email's styled container; engine B returns the
+# bare fragment. Strip that wrapper so we compare like with like.
+function Strip-CWrapper([string]$s) {
+    if ($null -eq $s) { return $null }
+    $t = $s.Trim()
+    $t = [regex]::Replace($t, '^<div style="font-size:\s*12px;[^"]*">', '')
+    if ($t.EndsWith('</div>')) { $t = $t.Substring(0, $t.Length - 6) }
+    return $t.Trim()
+}
+function Norm([string]$s) {
+    if ($null -eq $s) { return '' }
+    return ([regex]::Replace($s, '\s+', ' ')).Trim()
+}
+
+# Cases that differ for a KNOWN, accepted reason. Listing them here keeps the
+# report actionable: anything printed under DIVERGENCES is a genuine finding.
+$expected = @{
+  'progress_bar_2arg' = 'BY DESIGN: email needs <table> + inline CSS; the browser uses <div class=...>.'
+  'sum_scope_all'     = 'NOT HARNESS-VERIFIABLE: B''s `all` scope reads module-level masterRowData, empty with no report loaded. LIVE-VERIFIED OK 2026-08-18 on ?id=epa-perm (subtitle count(, all) = 778 = full row count, matching C''s full-rowset value).'
+  'string_upper'      = 'KNOWN (low): malformed input only - B returns an error string, C passes the input through. Valid ops agree.'
+  'progress_bar'      = 'KNOWN (low): malformed input only (missing 2nd arg) - B errors, C emits nothing.'
+}
+
+$cMap = @{}; foreach ($r in $c) { $cMap[$r.id] = $r }
+
+$same = 0; $diff = @(); $errs = @(); $known = @()
+foreach ($rb in $b) {
+    $rc = $cMap[$rb.id]
+    if ($null -eq $rc) { continue }
+    if ($rb.error -or $rc.error) {
+        $errs += [pscustomobject]@{ id=$rb.id; snippet=$rb.snippet; b_err=$rb.error; c_err=$rc.error }
+        continue
+    }
+    $bo = Norm $rb.out
+    $co = Norm (Strip-CWrapper $rc.out)
+    if ($bo -eq $co) { $same++ }
+    elseif ($expected.ContainsKey($rb.id)) { $known += [pscustomobject]@{ id=$rb.id; why=$expected[$rb.id] } }
+    else { $diff += [pscustomobject]@{ id=$rb.id; snippet=$rb.snippet; B=$bo; C=$co } }
+}
+
+"==== PARITY: engine B (browser subtitle/infobox) vs engine C (scheduled email) ===="
+"cases compared : {0}" -f ($same + $diff.Count + $known.Count)
+"identical      : {0}" -f $same
+"known/expected : {0}" -f $known.Count
+"DIVERGENT      : {0}   <-- real findings" -f $diff.Count
+"errors         : {0}" -f $errs.Count
+""
+if ($known.Count) { "---- known / accepted (not findings) ----"; $known | ForEach-Object { "  [{0}] {1}" -f $_.id, $_.why }; "" }
+if ($errs.Count) { "---- ERRORS ----"; $errs | ForEach-Object { "[{0}] {1}`n   B: {2}`n   C: {3}" -f $_.id, $_.snippet, $_.b_err, $_.c_err }; "" }
+if ($diff.Count) {
+  "---- DIVERGENCES ----"
+  $diff | ForEach-Object {
+    "[{0}]  {1}" -f $_.id, $_.snippet
+    "    B (browser): {0}" -f $(if ($_.B.Length -gt 150) { $_.B.Substring(0,150)+'...' } else { $_.B })
+    "    C (email)  : {0}" -f $(if ($_.C.Length -gt 150) { $_.C.Substring(0,150)+'...' } else { $_.C })
+  }
+}

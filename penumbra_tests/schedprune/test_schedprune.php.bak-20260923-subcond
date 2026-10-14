@@ -1,0 +1,705 @@
+<?php
+/**
+ * test_schedprune.php - email-only scheduler options stay off non-EMAIL tasks.
+ *
+ * WHY THIS SUITE EXISTS (2026-09-18). The scheduler form posts ONE options object
+ * for every task type (main.js: "include both email and snapshot options ...
+ * unused fields are harmless"), and a new draft's hidden Recipients field starts
+ * out holding its creator. manage_schedule.php stored both wholesale, so every
+ * DB_DUMP task carried attach_csv, body_preamble, theme_override ... plus
+ * RECIPIENTS = its creator and OPTIONS.recipient_vars = the creator's name, OUC,
+ * department and employee id - and every SCHEDULE_* audit snapshot copied it
+ * (live 2026-09-18: all 4 DB_DUMP tasks, 42 lifecycle audit rows). Two earlier
+ * fixes had patched READERS of the leak (main.js + penumbra_repository.js both
+ * guard subscriptions_enabled with "non-EMAIL tasks can carry a stale true").
+ * penumbra_sched_prune_email_only() now fixes the WRITER, on both write paths:
+ * action=save and action=restore_from_audit.
+ *
+ * WHAT IS UNDER TEST - three parts, all against the real files:
+ *   A. A DRIFT GUARD over schedule_runner.php. Dropping a key is only safe while
+ *      no non-EMAIL path reads it. Every string literal naming a pruned key must
+ *      sit inside the EMAIL branch, or inside a function whose every call chain
+ *      starts there. The one allowed exception is theme_override in the DROP_FILE
+ *      branch (it styles the dropped PDF), which is why DROP_FILE keeps it. The
+ *      reverse check reads main.js's optionsObj literal: a key the form writes
+ *      for EVERY type must be read by some non-EMAIL path, or be pruned. A
+ *      synthetic reader injected into the DB_DUMP branch proves the scan can fail.
+ *   B. The helper, lifted from manage_schedule.php by the tokenizer.
+ *   C. The SHIPPED endpoint. manage_schedule.php is read and five lines are
+ *      rewritten (four requires, the CSRF guard, the Content-Type header) plus
+ *      every `exit;` -> a throw; each rewrite is COUNTED and asserted. Each
+ *      scenario runs in its own php.exe (schedprune_child.php) against a fake
+ *      database that records every statement; a statement the fake does not
+ *      recognise fails the scenario instead of quietly answering "no rows".
+ *
+ * TARGETED MUTANTS always run: six edits to the file under test, each of which
+ * must be killed by the assertion that names it.
+ *
+ *   php.exe -n -d memory_limit=1024M test_schedprune.php --app=<webroot> [--manage=<file>] [--template=<file>] [--control]
+ *
+ * --manage overrides the manage_schedule.php under test (a staged copy); the
+ * runner and main.js still come from --app. --control adds one deliberately
+ * false assertion, which MUST report FAIL.
+ *
+ * EXPECTED TAIL: "PASS 214   FAIL 0" (--control: FAIL 1; the pre-fix
+ * manage_schedule.php: FAIL 27). Any other tail is a failure, a smaller pass
+ * count included - a harness error scores zero, it does not report FAIL.
+ * --dump prints Part A's per-key classification table.
+ */
+
+$APP = null; $MANAGE = null; $CONTROL = false; $DUMP = false; $TEMPLATE = null;
+foreach ($argv as $a) {
+    if (strpos($a, '--app=') === 0)    { $APP = rtrim(substr($a, 6), "\\/"); }
+    if (strpos($a, '--manage=') === 0) { $MANAGE = substr($a, 9); }
+    // penumbra_template.php (2026-09-18): manage_schedule.php requires it for the
+    // File Drop custom-template rule. The child loads the REAL file - it is pure
+    // declarations - so the df_custom_* scenarios exercise the shipped rule.
+    if (strpos($a, '--template=') === 0) { $TEMPLATE = substr($a, 11); }
+    if ($a === '--control')            { $CONTROL = true; }
+    if ($a === '--dump')               { $DUMP = true; }   // print Part A's classification table
+}
+if ($APP === null) { fwrite(STDERR, "test_schedprune.php: --app=<webroot> is required\n"); exit(2); }
+if ($MANAGE === null) { $MANAGE = $APP . '/manage_schedule.php'; }
+if ($TEMPLATE === null) { $TEMPLATE = $APP . '/penumbra_template.php'; }
+$RUNNER = $APP . '/schedule_runner.php';
+$MAINJS = $APP . '/js/main.js';
+$CHILD  = __DIR__ . '/schedprune_child.php';
+foreach (array($MANAGE, $RUNNER, $MAINJS, $CHILD, $TEMPLATE) as $f) {
+    if (!is_file($f)) { fwrite(STDERR, "test_schedprune.php: cannot read $f\n"); exit(2); }
+}
+
+// The keys the fix drops from every non-EMAIL task (theme_override: all but DROP_FILE).
+$EMAIL_ONLY = array('attach_csv', 'attach_xlsx', 'attach_pdf', 'no_body', 'include_link', 'no_links',
+                    'include_snippet', 'body_preamble', 'recipient_vars', 'subscriptions_enabled',
+                    'subscriptions_notify', 'changes_only', 'theme_override');
+sort($EMAIL_ONLY);
+
+// ------------------------------------------------------------ assertion core
+$PASS = 0; $FAIL = 0; $FAILED = array(); $QUIET = false;
+function ok($cond, $label, $detail = '') {
+    global $PASS, $FAIL, $FAILED, $QUIET;
+    if ($cond) { $PASS++; return true; }
+    $FAIL++; $FAILED[] = $label;
+    if (!$QUIET) { echo "    FAIL  $label\n"; if ($detail !== '') echo "            $detail\n"; }
+    return false;
+}
+function eq($actual, $expected, $label) {
+    return ok($actual === $expected, $label,
+        'expected ' . json_encode($expected) . '  actual ' . json_encode($actual));
+}
+function section($t) { global $QUIET; if (!$QUIET) echo "$t\n"; }
+
+// ============================================================== PART A
+// Drift guard over schedule_runner.php (+ the form literal in main.js).
+// ======================================================================
+
+/** Token list with byte offsets; T_* ids for array tokens, null for 1-char ones. */
+function pnb_tokens($src) {
+    $out = array(); $off = 0;
+    foreach (token_get_all($src) as $t) {
+        $txt = is_array($t) ? $t[1] : $t;
+        $out[] = array(is_array($t) ? $t[0] : null, $txt, $off);
+        $off += strlen($txt);
+    }
+    return $out;
+}
+function pnb_is_open($tok)  { return $tok[1] === '{' || $tok[0] === T_CURLY_OPEN || $tok[0] === T_DOLLAR_OPEN_CURLY_BRACES; }
+function pnb_match_brace($toks, $i) {
+    $depth = 0; $n = count($toks);
+    for ($k = $i; $k < $n; $k++) {
+        if (pnb_is_open($toks[$k])) { $depth++; }
+        elseif ($toks[$k][1] === '}') { $depth--; if ($depth === 0) return $k; }
+    }
+    return -1;
+}
+function pnb_next_sig($toks, $i, $dir) {
+    $n = count($toks);
+    for ($k = $i + $dir; $k >= 0 && $k < $n; $k += $dir) {
+        if (!in_array($toks[$k][0], array(T_WHITESPACE, T_COMMENT, T_DOC_COMMENT), true)) return $k;
+    }
+    return -1;
+}
+function pnb_line($src, $off) { return substr_count($src, "\n", 0, $off) + 1; }
+
+/**
+ * Scan $src for string literals naming any of $keys and classify each one.
+ * Returns array('anchors' => [name => count], 'occ' => [ [key, line, class] ... ]).
+ * class: 'EMAIL' | 'EMAIL via f>g' | 'NON_EMAIL:<region>[ via f>g]'
+ */
+function pnb_scan_runner($src, array $keys) {
+    $toks = pnb_tokens($src);
+    $n = count($toks);
+    $offToIdx = array();
+    for ($i = 0; $i < $n; $i++) { if ($toks[$i][1] === '{') $offToIdx[$toks[$i][2]] = $i; }
+
+    $anchors = array(
+        'EMAIL'     => "if (\$task['TASK_TYPE'] === 'EMAIL') {",
+        'SNAPSHOT'  => "} else if (\$task['TASK_TYPE'] === 'SNAPSHOT') {",
+        'DROP_FILE' => "} else if (\$task['TASK_TYPE'] === 'DROP_FILE') {",
+        'DB_DUMP'   => "} else if (\$task['TASK_TYPE'] === 'DB_DUMP') {",
+    );
+    $spans = array(); $counts = array();
+    foreach ($anchors as $name => $a) {
+        $counts[$name] = substr_count($src, $a);
+        if ($counts[$name] !== 1) continue;
+        $bo = strpos($src, $a) + strlen($a) - 1;
+        if (!isset($offToIdx[$bo])) { $counts[$name] = -1; continue; }
+        $oi = $offToIdx[$bo]; $ci = pnb_match_brace($toks, $oi);
+        $spans[$name] = array($toks[$oi][2], $ci >= 0 ? $toks[$ci][2] : PHP_INT_MAX);
+    }
+
+    // Named functions: [name, bodyStartOff, bodyEndOff]
+    $funcs = array();
+    for ($i = 0; $i < $n; $i++) {
+        if ($toks[$i][0] !== T_FUNCTION) continue;
+        $j = pnb_next_sig($toks, $i, 1);
+        if ($j >= 0 && $toks[$j][1] === '&') $j = pnb_next_sig($toks, $j, 1);
+        if ($j < 0 || $toks[$j][0] !== T_STRING) continue;
+        $name = $toks[$j][1];
+        $k = $j; while ($k < $n && $toks[$k][1] !== '(') $k++;
+        $pd = 0;
+        for (; $k < $n; $k++) { if ($toks[$k][1] === '(') $pd++; elseif ($toks[$k][1] === ')') { $pd--; if ($pd === 0) break; } }
+        while ($k < $n && !pnb_is_open($toks[$k]) && $toks[$k][1] !== ';') $k++;
+        if ($k >= $n || $toks[$k][1] === ';') continue;
+        $e = pnb_match_brace($toks, $k);
+        $funcs[] = array($name, $toks[$k][2], $e >= 0 ? $toks[$e][2] : PHP_INT_MAX);
+    }
+    // Call sites by name (name( not preceded by function/->/::/new), plus 'name' string callbacks.
+    $sites = array();
+    $skipPrev = array(T_FUNCTION, T_OBJECT_OPERATOR, T_DOUBLE_COLON, T_NEW);
+    if (defined('T_NULLSAFE_OBJECT_OPERATOR')) $skipPrev[] = T_NULLSAFE_OBJECT_OPERATOR;
+    $fnNames = array();
+    foreach ($funcs as $f) $fnNames[$f[0]] = true;
+    for ($i = 0; $i < $n; $i++) {
+        $id = $toks[$i][0];
+        if ($id === T_STRING || (defined('T_NAME_FULLY_QUALIFIED') && $id === T_NAME_FULLY_QUALIFIED)) {
+            $nm = ltrim($toks[$i][1], '\\');
+            if (!isset($fnNames[$nm])) continue;
+            $nx = pnb_next_sig($toks, $i, 1); $pv = pnb_next_sig($toks, $i, -1);
+            if ($nx < 0 || $toks[$nx][1] !== '(') continue;
+            if ($pv >= 0 && in_array($toks[$pv][0], $skipPrev, true)) continue;
+            $sites[$nm][] = $toks[$i][2];
+        } elseif ($id === T_CONSTANT_ENCAPSED_STRING) {
+            $nm = substr($toks[$i][1], 1, -1);
+            if (isset($fnNames[$nm])) $sites[$nm][] = $toks[$i][2];
+        }
+    }
+
+    $inSpan = function ($off, $name) use ($spans) {
+        return isset($spans[$name]) && $off > $spans[$name][0] && $off < $spans[$name][1];
+    };
+    $fnAt = function ($off) use ($funcs) {
+        $best = null;
+        foreach ($funcs as $f) {
+            if ($off > $f[1] && $off < $f[2] && ($best === null || $f[1] > $best[1])) $best = $f;
+        }
+        return $best;
+    };
+    $classify = function ($off, $seen) use (&$classify, $inSpan, $fnAt, &$sites) {
+        // Branch spans first: the task loop may itself sit inside a function,
+        // and a read in a type branch belongs to that TYPE, not to the loop's caller.
+        if ($inSpan($off, 'EMAIL')) return 'EMAIL';
+        foreach (array('SNAPSHOT', 'DROP_FILE', 'DB_DUMP') as $b) { if ($inSpan($off, $b)) return "NON_EMAIL:$b"; }
+        $f = $fnAt($off);
+        if ($f === null) return 'NON_EMAIL:SHARED';
+        $nm = $f[0];
+        if (isset($seen[$nm])) return 'EMAIL';           // a cycle adds no new entry point
+        if (empty($sites[$nm])) return "NON_EMAIL:uncalled $nm";
+        $seen[$nm] = true;
+        foreach ($sites[$nm] as $so) {
+            $c = $classify($so, $seen);
+            if (strpos($c, 'NON_EMAIL') === 0) return $c . " via $nm";
+        }
+        return "EMAIL via $nm";
+    };
+
+    $want = array_flip($keys);
+    $occ = array();
+    for ($i = 0; $i < $n; $i++) {
+        if ($toks[$i][0] !== T_CONSTANT_ENCAPSED_STRING) continue;
+        $v = substr($toks[$i][1], 1, -1);
+        if (!isset($want[$v])) continue;
+        $occ[] = array($v, pnb_line($src, $toks[$i][2]), $classify($toks[$i][2], array()));
+    }
+    return array('anchors' => $counts, 'occ' => $occ);
+}
+
+/** Keys of main.js's `var optionsObj = { ... };` - what the form writes for EVERY type. */
+function pnb_form_literal_keys($js, &$err) {
+    $a = 'var optionsObj = {';
+    if (substr_count($js, $a) !== 1) { $err = 'optionsObj literal anchor found ' . substr_count($js, $a) . 'x'; return array(); }
+    $p = strpos($js, $a) + strlen($a) - 1; $depth = 0; $q = null; $n = strlen($js);
+    for ($i = $p; $i < $n; $i++) {
+        $c = $js[$i];
+        if ($q !== null) { if ($c === '\\') { $i++; continue; } if ($c === $q) $q = null; continue; }
+        if ($c === "'" || $c === '"' || $c === '`') { $q = $c; continue; }
+        if ($c === '/' && $i + 1 < $n && $js[$i + 1] === '/') { $e = strpos($js, "\n", $i); $i = ($e === false) ? $n : $e; continue; }
+        if ($c === '{') $depth++;
+        elseif ($c === '}') { $depth--; if ($depth === 0) break; }
+    }
+    $body = preg_replace('~//[^\n]*~', '', substr($js, $p + 1, $i - $p - 1));
+    preg_match_all('/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:/m', $body, $m);
+    $err = null;
+    return array_values(array_unique($m[1]));
+}
+
+function pnb_part_a($RUNNER, $MAINJS, $EMAIL_ONLY) {
+    section('PART A - schedule_runner.php reads the pruned keys on EMAIL paths only');
+    $src = file_get_contents($RUNNER);
+    $js  = file_get_contents($MAINJS);
+    $jsErr = null;
+    $formKeys = pnb_form_literal_keys($js, $jsErr);
+    ok($jsErr === null, 'main.js: the optionsObj literal is found exactly once', (string)$jsErr);
+    ok(count($formKeys) >= 15 && in_array('attach_csv', $formKeys, true) && in_array('prompt_answers', $formKeys, true),
+        'main.js: optionsObj literal keys extracted (' . count($formKeys) . ')', implode(',', $formKeys));
+    // changes_only is assigned outside the literal but unconditionally (every type).
+    $formAll = $formKeys;
+    if (strpos($js, 'optionsObj.changes_only = ') !== false) $formAll[] = 'changes_only';
+    ok(in_array('changes_only', $formAll, true), 'main.js: the unconditional optionsObj.changes_only assignment is found');
+
+    $scanKeys = array_values(array_unique(array_merge($EMAIL_ONLY, $formAll)));
+    $r = pnb_scan_runner($src, $scanKeys);
+    foreach ($r['anchors'] as $nm => $c) eq($c, 1, "runner: the $nm branch anchor is found exactly once");
+
+    $byKey = array();
+    foreach ($r['occ'] as $o) $byKey[$o[0]][] = $o;
+    global $DUMP;
+    if ($DUMP) {
+        foreach ($r['occ'] as $o) printf("      %-24s line %-6d %s\n", $o[0], $o[1], $o[2]);
+        echo '      form literal keys: ' . implode(', ', $formAll) . "\n";
+    }
+
+    // 1. Every pruned key: no non-EMAIL reader (theme_override may sit in DROP_FILE).
+    foreach ($EMAIL_ONLY as $k) {
+        $bad = array();
+        foreach (isset($byKey[$k]) ? $byKey[$k] : array() as $o) {
+            if (strpos($o[2], 'NON_EMAIL') !== 0) continue;
+            if ($k === 'theme_override' && strpos($o[2], 'NON_EMAIL:DROP_FILE') === 0) continue;
+            $bad[] = 'line ' . $o[1] . ' ' . $o[2];
+        }
+        ok(empty($bad), "runner: '$k' is read on EMAIL paths only" . ($k === 'theme_override' ? ' (+ DROP_FILE)' : ''),
+            'non-EMAIL reader(s): ' . implode('; ', $bad) . ' - keep the key for that type in penumbra_sched_prune_email_only()');
+    }
+    // 2. The scan actually sees things (a scanner that finds nothing passes vacuously).
+    foreach (array('attach_csv', 'include_link', 'body_preamble', 'theme_override', 'subscriptions_enabled') as $k) {
+        $hit = false;
+        foreach (isset($byKey[$k]) ? $byKey[$k] : array() as $o) if ($o[2] === 'EMAIL') $hit = true;
+        ok($hit, "scanner sanity: the EMAIL branch reads '$k'");
+    }
+    $dropTheme = false;
+    foreach (isset($byKey['theme_override']) ? $byKey['theme_override'] : array() as $o) {
+        if ($o[2] === 'NON_EMAIL:DROP_FILE') $dropTheme = true;
+    }
+    ok($dropTheme, "runner: the DROP_FILE branch reads 'theme_override' (the reason DROP_FILE keeps it)");
+    $via = false;
+    foreach (isset($byKey['changes_only']) ? $byKey['changes_only'] : array() as $o) {
+        if (strpos($o[2], 'EMAIL via ') === 0) $via = true;
+    }
+    ok($via, "scanner sanity: 'changes_only' is resolved through a helper's call sites to EMAIL");
+
+    // 3. Reverse check: a key the form writes for EVERY type is read off-EMAIL, or pruned.
+    foreach ($formAll as $k) {
+        if (in_array($k, $EMAIL_ONLY, true)) continue;
+        $shared = false;
+        foreach (isset($byKey[$k]) ? $byKey[$k] : array() as $o) if (strpos($o[2], 'NON_EMAIL') === 0) $shared = true;
+        ok($shared, "form key '$k' (written for every type) is read by a non-EMAIL path",
+            'only EMAIL reads it - add it to penumbra_sched_prune_email_only(), or it leaks onto every other type');
+    }
+
+    // 4. The guard can fail: a reader injected into the DB_DUMP branch must be caught.
+    $a = "} else if (\$task['TASK_TYPE'] === 'DB_DUMP') {";
+    $inj = str_replace($a, $a . "\n\$__pnb_probe = \$options['attach_csv'];", $src);
+    unset($src);
+    $r2 = pnb_scan_runner($inj, array('attach_csv'));
+    $caught = false;
+    foreach ($r2['occ'] as $o) if ($o[2] === 'NON_EMAIL:DB_DUMP') $caught = true;
+    ok($caught, 'negative control: an attach_csv reader injected into the DB_DUMP branch is flagged');
+}
+
+// ============================================================== PART B
+// The helper, lifted from the manage_schedule.php under test.
+// ======================================================================
+function pnb_lift_function($src, $name) {
+    $toks = pnb_tokens($src); $n = count($toks);
+    for ($i = 0; $i < $n; $i++) {
+        if ($toks[$i][0] !== T_FUNCTION) continue;
+        $j = pnb_next_sig($toks, $i, 1);
+        if ($j < 0 || $toks[$j][0] !== T_STRING || $toks[$j][1] !== $name) continue;
+        $k = $j; while ($k < $n && $toks[$k][1] !== '{') $k++;
+        $e = pnb_match_brace($toks, $k);
+        if ($e < 0) return null;
+        return substr($src, $toks[$i][2], $toks[$e][2] + 1 - $toks[$i][2]);
+    }
+    return null;
+}
+function pnb_full_options() {
+    return array(
+        // email-only
+        'attach_csv' => true, 'attach_xlsx' => false, 'attach_pdf' => false, 'no_body' => false,
+        'include_link' => true, 'no_links' => false, 'include_snippet' => false, 'body_preamble' => 'Hi {FNAME}',
+        'recipient_vars' => array('powner@ncsu.edu' => array('fname' => 'Pat', 'empl_id' => '000123456', 'ouc' => '123456')),
+        'subscriptions_enabled' => false, 'subscriptions_notify' => true, 'changes_only' => false,
+        'theme_override' => 'theme-wolfpack',
+        // shared
+        'skip_empty' => true, 'skip_no_change' => false, 'skip_custom_condition' => false, 'custom_condition_expr' => '',
+        'skip_if_missed_min' => 60, 'prompt_answers' => array('fy' => '2026'), 'me_map' => array('ouc' => '123456'),
+        'search_filter' => 'STATUS:Active', 'change_mode' => 'all', 'change_columns' => null,
+        'notify_success' => true, 'notify_success_recipients' => 'powner@ncsu.edu',
+        'notify_failure' => true, 'notify_failure_recipients' => 'powner@ncsu.edu',
+        // type-specific + server-owned
+        'destination_table' => 'PNB_DUMP_T', 'dbdump_row_mode' => 'all', 'snap_max_keep' => 50, 'drop_path' => '\\\\srv\\share',
+        'subscribers' => array(array('uid' => 'x', 'email' => 'x@ncsu.edu')), 'suppressed' => array('y@ncsu.edu'),
+        '_test_run_transient' => true,
+    );
+}
+function pnb_part_b($MANAGE, $EMAIL_ONLY) {
+    section('PART B - penumbra_sched_prune_email_only()');
+    static $seq = 0;
+    $code = pnb_lift_function(file_get_contents($MANAGE), 'penumbra_sched_prune_email_only');
+    if (!ok($code !== null, 'helper: penumbra_sched_prune_email_only() is defined in manage_schedule.php')) return;
+    $fn = 'pnb_prune_under_test_' . (++$seq);
+    eval(preg_replace('/function\s+penumbra_sched_prune_email_only\s*\(/', "function $fn(", $code, 1));
+    $full = pnb_full_options();
+    $removed = function ($type) use ($fn, $full) { $o = $fn($type, $full); $d = array_keys(array_diff_key($full, $o)); sort($d); return $d; };
+
+    eq($fn('EMAIL', $full), $full, 'helper: EMAIL options come back unchanged');
+    eq($removed('DB_DUMP'), $EMAIL_ONLY, 'helper: DB_DUMP drops exactly the 13 email-only keys');
+    eq($removed('SNAPSHOT'), $EMAIL_ONLY, 'helper: SNAPSHOT drops exactly the 13 email-only keys');
+    $noTheme = array_values(array_diff($EMAIL_ONLY, array('theme_override')));
+    eq($removed('DROP_FILE'), $noTheme, 'helper: DROP_FILE drops the 12 and KEEPS theme_override');
+    eq($removed('WEBHOOK'), $EMAIL_ONLY, 'helper: any other type is treated like DB_DUMP');
+    $kept = $fn('DB_DUMP', $full);
+    $keptShould = array_diff_key($full, array_flip($EMAIL_ONLY));
+    eq($kept, $keptShould, 'helper: every other key (shared, type-specific, subscribers/suppressed, _test_run_*) survives untouched');
+    eq($fn('DB_DUMP', $kept), $kept, 'helper: idempotent');
+    eq($fn('DB_DUMP', null), null, 'helper: a non-array (undecodable options) passes through');
+    eq($fn('DB_DUMP', array()), array(), 'helper: an empty options array stays empty');
+}
+
+// ============================================================== PART C
+// The shipped endpoint under a fake database, one process per request.
+// ======================================================================
+function pnb_build_core($srcFile, $destFile) {
+    $out = array(); $hit = array('require' => 0, 'csrf' => 0, 'header' => 0, 'exit' => 0);
+    foreach (file($srcFile) as $ln) {
+        $t = trim($ln);
+        if (preg_match("/^require_once '(db_connection|penumbra_health|cron_describe|penumbra_template)\\.php';/", $t)) { $hit['require']++; $out[] = "// [harness] require stripped\n"; continue; }
+        if (strpos($t, 'penumbraCsrfGuard(') === 0) { $hit['csrf']++; $out[] = "// [harness] csrf guard stripped\n"; continue; }
+        if ($t === "header('Content-Type: application/json');") { $hit['header']++; $out[] = "// [harness] header stripped\n"; continue; }
+        if ($t === 'exit;') {
+            $hit['exit']++;
+            $out[] = substr($ln, 0, strlen($ln) - strlen(ltrim($ln))) . "throw new PnbHarnessExit();\n";
+            continue;
+        }
+        $out[] = $ln;
+    }
+    file_put_contents($destFile, implode('', $out));
+    return $hit;
+}
+function pnb_proc(array $cmd) {
+    $p = proc_open($cmd, array(1 => array('pipe', 'w'), 2 => array('pipe', 'w')), $pipes, sys_get_temp_dir());
+    if (!is_resource($p)) return array(-1, '', 'proc_open failed');
+    $so = stream_get_contents($pipes[1]); $se = stream_get_contents($pipes[2]);
+    fclose($pipes[1]); fclose($pipes[2]);
+    return array(proc_close($p), $so, $se);
+}
+function pnb_run($core, array $scn) {
+    global $CHILD, $TEMPLATE;
+    $sf = tempnam(sys_get_temp_dir(), 'pnbs'); $of = tempnam(sys_get_temp_dir(), 'pnbo');
+    file_put_contents($sf, json_encode($scn));
+    list($rc, $so, $se) = pnb_proc(array(PHP_BINARY, '-n', '-d', 'date.timezone=America/New_York', $CHILD, $core, $sf, $of, $TEMPLATE));
+    $res = json_decode((string)@file_get_contents($of), true);
+    @unlink($sf); @unlink($of);
+    if (!is_array($res)) {
+        $res = array('response' => '', 'error' => "child wrote no result (rc=$rc) " . trim($so . ' ' . $se),
+                     'rec' => array('stmts' => array(), 'audits' => array(), 'unknown' => array(), 'warnings' => array()));
+    }
+    $res['stderr'] = trim($se);
+    return $res;
+}
+function pnb_stmts($res, $kind) { $o = array(); foreach ($res['rec']['stmts'] as $s) if ($s['kind'] === $kind) $o[] = $s; return $o; }
+function pnb_audits($res, $action) { $o = array(); foreach ($res['rec']['audits'] as $a) if ($a['action'] === $action) $o[] = $a; return $o; }
+function pnb_has_any(array $opts, array $keys) { return array_values(array_intersect($keys, array_keys($opts))); }
+
+/** What main.js's save handler posts - creator capsule, recipient_vars and all. */
+function pnb_client_options($type) {
+    $o = array(
+        'attach_csv' => true, 'attach_xlsx' => false, 'attach_pdf' => false, 'no_body' => false,
+        'include_link' => true, 'no_links' => false, 'skip_empty' => false, 'skip_no_change' => false,
+        'skip_custom_condition' => false, 'custom_condition_expr' => '', 'skip_if_missed_min' => 60,
+        'include_snippet' => false, 'theme_override' => 'theme-wolfpack', 'body_preamble' => '',
+        'prompt_answers' => array('fy' => '2026'), 'me_map' => array('ouc' => '123456'),
+        'search_filter' => 'STATUS:Active',
+        'recipient_vars' => array('powner@ncsu.edu' => array('fname' => 'Pat', 'lname' => 'Owner', 'username' => 'powner',
+            'email' => 'powner@ncsu.edu', 'empl_id' => '000123456', 'ouc' => '123456', 'ouc2d' => '12', 'ouc4d' => '1234', 'dept' => 'Research Admin')),
+        'subscriptions_enabled' => false, 'subscriptions_notify' => true,
+        'change_mode' => 'all', 'change_columns' => null, 'changes_only' => false,
+        'notify_success' => true, 'notify_success_recipients' => 'powner@ncsu.edu',
+        'notify_failure' => true, 'notify_failure_recipients' => 'powner@ncsu.edu',
+    );
+    if ($type === 'DB_DUMP') {
+        $o += array('destination_schema' => '', 'destination_table' => 'PNB_DUMP_T', 'collision_override' => false,
+                    'override_reason' => '', 'dbdump_columns_mode' => 'custom', 'dbdump_columns_custom' => array('A', 'B'),
+                    'dbdump_strip_html' => true, 'dbdump_row_mode' => 'all', 'dbdump_row_limit' => null, 'dbdump_reload_mode' => 'recreate');
+    }
+    if ($type === 'SNAPSHOT') { $o['snap_max_keep'] = 50; }
+    if ($type === 'DROP_FILE') {
+        $o += array('drop_protocol' => 'unc', 'drop_host' => '', 'drop_port' => null, 'drop_path' => '\\\\srv\\share\\drops',
+                    'drop_username' => '', 'drop_filename_pattern' => '{TITLE}_{DATE}', 'drop_format_csv' => true,
+                    'drop_format_xlsx' => false, 'drop_format_pdf' => true, 'drop_format_json' => false,
+                    'drop_passive_mode' => true, 'drop_use_ftps' => false, 'drop_sftp_key' => '',
+                    'drop_s3_bucket' => '', 'drop_s3_region' => 'us-east-1', 'drop_s3_endpoint' => '');
+    }
+    return $o;
+}
+function pnb_save_post($type, $taskId, array $extra = array()) {
+    return array_merge(array(
+        'action' => 'save', 'task_id' => ($taskId === null ? '' : (string)$taskId), 'report_id' => 'ddrep',
+        'task_type' => $type, 'subject' => ($type === 'DB_DUMP' ? 'DB Dump -> PNB_DUMP_T' : 'Weekly ({ROW_COUNT})'),
+        'cron_expression' => '0 8 * * 1',
+        // main.js blanks SNAPSHOT / DROP_FILE only - DB_DUMP ships the hidden creator capsule.
+        'recipients' => (($type === 'SNAPSHOT' || $type === 'DROP_FILE') ? '' : 'Pat Owner <powner@ncsu.edu>;'),
+        'is_active' => '1', 'test_once' => '0', 'report_password' => '', 'preserve_password' => 'false',
+        'options' => json_encode(pnb_client_options($type)),
+        'drop_password' => '', 'drop_s3_access_key' => '', 'drop_s3_secret_key' => '', 'preserve_drop_secrets' => 'false',
+    ), $extra);
+}
+/** A task row as Oracle hands it back: legacy OPTIONS still carrying the email keys. */
+function pnb_row($id, $type, $recip) {
+    $opts = pnb_client_options($type);
+    if ($type === 'DB_DUMP') { $opts['destination_schema'] = 'PENUMBRA_RW'; $opts['reader_role'] = 'ORIED_RO'; }
+    return array('ID' => (string)$id, 'REPORT_ID' => 'ddrep', 'TASK_TYPE' => $type, 'RECIPIENTS' => $recip,
+                 'SUBJECT' => 'row ' . $id, 'CRON_EXPRESSION' => '0 8 * * 1', 'OPTIONS' => json_encode($opts),
+                 'OWNER_ID' => 'powner', 'IS_ACTIVE' => '1', 'NEXT_RUN' => '2026-09-21 08:00:00',
+                 'LAST_RUN' => '2026-09-14 08:00:00', 'CREATED_AT' => '2026-08-01 10:00:00');
+}
+function pnb_fixture(array $post) {
+    $dd  = pnb_row(501, 'DB_DUMP', 'Pat Owner <powner@ncsu.edu>;');
+    $em  = pnb_row(502, 'EMAIL', 'Pat Owner <powner@ncsu.edu>;Sam Two <stwo@ncsu.edu>;');
+    $ddSnap = $dd; $ddSnap['OPTIONS'] = json_decode($dd['OPTIONS'], true);
+    $emSnap = $em; $emSnap['OPTIONS'] = json_decode($em['OPTIONS'], true);
+    $gone = $ddSnap; $gone['ID'] = '599';
+    return array(
+        'post' => $post,
+        'reports' => array('ddrep' => 4242),
+        'tasks' => array($dd, $em),
+        'audits' => array(
+            9001 => array('ACTION' => 'SCHEDULE_UPDATE', 'REPORT_ID' => 4242, 'BEFORE' => json_encode($ddSnap), 'AFTER' => json_encode($ddSnap)),
+            9002 => array('ACTION' => 'SCHEDULE_DELETE', 'REPORT_ID' => 4242, 'BEFORE' => json_encode($gone), 'AFTER' => null),
+            9003 => array('ACTION' => 'SCHEDULE_UPDATE', 'REPORT_ID' => 4242, 'BEFORE' => json_encode($emSnap), 'AFTER' => json_encode($emSnap)),
+        ),
+    );
+}
+function pnb_scenarios() {
+    return array(
+        'dd_update'  => pnb_fixture(pnb_save_post('DB_DUMP', 501)),
+        'dd_insert'  => pnb_fixture(pnb_save_post('DB_DUMP', null)),
+        'em_update'  => pnb_fixture(pnb_save_post('EMAIL', 502)),
+        'df_insert'  => pnb_fixture(pnb_save_post('DROP_FILE', null)),
+        // File Drop custom template (2026-09-18): one good save, and the two
+        // refusals penumbra_tpl_drop_options_error() exists for.
+        'df_custom_ok'    => pnb_fixture(pnb_save_post('DROP_FILE', null, array('options' => json_encode(pnb_client_options('DROP_FILE') + array(
+            'drop_format_custom' => true, 'drop_custom_header' => ' {ID},{NAME} ', 'drop_custom_ext' => 'TSV', 'drop_custom_newline' => false,
+            'drop_custom_template' => " {ID}\\tstring(regex_replace, {NAME}, '[()]', '') "))))),
+        'df_custom_empty' => pnb_fixture(pnb_save_post('DROP_FILE', null, array('options' => json_encode(pnb_client_options('DROP_FILE') + array(
+            'drop_format_custom' => true, 'drop_custom_header' => '{ID}', 'drop_custom_ext' => 'txt', 'drop_custom_template' => "  \n "))))),
+        'df_custom_clash' => pnb_fixture(pnb_save_post('DROP_FILE', null, array('options' => json_encode(pnb_client_options('DROP_FILE') + array(
+            'drop_format_custom' => true, 'drop_custom_ext' => 'csv', 'drop_custom_template' => '{ID}'))))),
+        'df_custom_badext' => pnb_fixture(pnb_save_post('DROP_FILE', null, array('options' => json_encode(pnb_client_options('DROP_FILE') + array(
+            'drop_format_custom' => true, 'drop_custom_ext' => 'php', 'drop_custom_template' => '{ID}'))))),
+        'sn_insert'  => pnb_fixture(pnb_save_post('SNAPSHOT', null)),
+        'dd_test'    => pnb_fixture(pnb_save_post('DB_DUMP', null, array('test_once' => '1'))),
+        'rs_update'  => pnb_fixture(array('action' => 'restore_from_audit', 'audit_id' => '9001', 'report_id' => 'ddrep')),
+        'rs_recreate'=> pnb_fixture(array('action' => 'restore_from_audit', 'audit_id' => '9002', 'report_id' => 'ddrep')),
+        'rs_email'   => pnb_fixture(array('action' => 'restore_from_audit', 'audit_id' => '9003', 'report_id' => 'ddrep')),
+    );
+}
+
+/** Common per-request health: success, no crash, nothing unrecognised, no PHP warnings. */
+function pnb_healthy($tag, $res) {
+    $resp = json_decode(trim($res['response']), true);
+    ok($res['error'] === null, "$tag: request ran to its exit", (string)$res['error']);
+    ok(is_array($resp) && isset($resp['status']) && $resp['status'] === 'success', "$tag: status success", substr($res['response'], 0, 300));
+    ok(empty($res['rec']['unknown']), "$tag: every statement recognised by the fake", implode(' | ', $res['rec']['unknown']));
+    ok(empty($res['rec']['warnings']), "$tag: no PHP warnings/notices", implode(' | ', $res['rec']['warnings']));
+    return $resp;
+}
+/** The single task write + the matching lifecycle audit, decoded. */
+function pnb_write($tag, $res, $kind, $action) {
+    $w = pnb_stmts($res, $kind);
+    ok(count($w) === 1, "$tag: exactly one $kind", 'got ' . count($w));
+    $a = pnb_audits($res, $action);
+    ok(count($a) === 1, "$tag: exactly one $action audit", 'got ' . count($a));
+    $opts = $w ? json_decode((string)$w[0]['binds'][':opts'], true) : null;
+    $rec  = $w ? $w[0]['binds'][':rec'] : null;
+    $after = $a ? json_decode((string)$a[0]['after'], true) : null;
+    return array(is_array($opts) ? $opts : array(), $rec, is_array($after) ? $after : array(), $a ? $a[0] : null);
+}
+
+function pnb_part_c($MANAGE, $EMAIL_ONLY, $only = null) {
+    section('PART C - the shipped endpoint (save + restore_from_audit)');
+    $core = sys_get_temp_dir() . '/pnb_schedprune_core_' . getmypid() . '_' . mt_rand() . '.php';
+    $hit = pnb_build_core($MANAGE, $core);
+    eq($hit['require'], 4, 'harness: four requires stripped (db_connection, penumbra_health, cron_describe, penumbra_template)');
+    eq($hit['csrf'], 1, 'harness: penumbraCsrfGuard() stripped exactly once');
+    eq($hit['header'], 1, 'harness: Content-Type header stripped exactly once');
+    ok($hit['exit'] >= 40, 'harness: every bare exit; became a throw (>= 40)', 'got ' . $hit['exit']);
+    list($lrc, $lso, $lse) = pnb_proc(array(PHP_BINARY, '-n', '-l', $core));
+    eq($lrc, 0, 'harness: patched core parses (' . trim($lso . $lse) . ')');
+
+    $noTheme = array_values(array_diff($EMAIL_ONLY, array('theme_override')));
+    foreach (pnb_scenarios() as $tag => $scn) {
+        if ($only !== null && !in_array($tag, $only, true)) continue;
+        $res = pnb_run($core, $scn);
+        // A REFUSED save: an error envelope, and nothing written or audited.
+        if (in_array($tag, array('df_custom_empty', 'df_custom_clash', 'df_custom_badext'), true)) {
+            $r = json_decode(trim($res['response']), true);
+            $want = array('df_custom_empty' => 'row template is empty', 'df_custom_clash' => 'collides with the CSV format',
+                          'df_custom_badext' => 'file type must be one of');
+            ok($res['error'] === null, "$tag: request ran to its exit", (string)$res['error']);
+            ok(is_array($r) && isset($r['status']) && $r['status'] === 'error' && strpos((string)$r['message'], $want[$tag]) !== false,
+               "$tag: refused with the reason", substr($res['response'], 0, 300));
+            eq(count(pnb_stmts($res, 'INSERT_TASK')) + count(pnb_stmts($res, 'UPDATE_TASK')), 0, "$tag: nothing written");
+            eq(count($res['rec']['audits']), 0, "$tag: nothing audited");
+            ok(empty($res['rec']['warnings']), "$tag: no PHP warnings/notices", implode(' | ', $res['rec']['warnings']));
+            continue;
+        }
+        $resp = pnb_healthy($tag, $res);
+        $sent = json_decode($scn['post']['options'] ?? 'null', true);
+        if ($tag === 'df_custom_ok') {
+            list($opts, $rec, $after) = pnb_write($tag, $res, 'INSERT_TASK', 'SCHEDULE_NEW');
+            foreach (array('drop_format_custom', 'drop_custom_header', 'drop_custom_template', 'drop_custom_newline') as $k) {
+                ok(array_key_exists($k, $opts) && $opts[$k] === $sent[$k], "df_custom_ok: '$k' stored VERBATIM (leading/trailing spaces are content)");
+            }
+            eq(isset($opts['drop_custom_ext']) ? $opts['drop_custom_ext'] : null, 'tsv', 'df_custom_ok: the file type is normalised to lower case');
+            ok(isset($after['OPTIONS']) && $after['OPTIONS'] == $opts, 'df_custom_ok: the audit AFTER records exactly what was stored');
+        }
+
+        if ($tag === 'dd_update' || $tag === 'dd_insert') {
+            list($opts, $rec, $after, $arow) = pnb_write($tag, $res, $tag === 'dd_update' ? 'UPDATE_TASK' : 'INSERT_TASK',
+                                                         $tag === 'dd_update' ? 'SCHEDULE_UPDATE' : 'SCHEDULE_NEW');
+            eq(pnb_has_any($opts, $EMAIL_ONLY), array(), "$tag: stored OPTIONS carry no email-only key");
+            eq($rec, '', "$tag: stored RECIPIENTS blank (not the hidden creator capsule)");
+            eq(pnb_has_any(isset($after['OPTIONS']) ? $after['OPTIONS'] : array(), $EMAIL_ONLY), array(), "$tag: audit AFTER.OPTIONS carry no email-only key");
+            eq(isset($after['RECIPIENTS']) ? $after['RECIPIENTS'] : null, '', "$tag: audit AFTER.RECIPIENTS blank");
+            ok(isset($after['OPTIONS']) && $after['OPTIONS'] == $opts, "$tag: the audit AFTER records exactly what was stored");
+            foreach (array('prompt_answers', 'me_map', 'search_filter', 'skip_if_missed_min', 'skip_empty', 'change_mode',
+                           'notify_success', 'notify_success_recipients', 'notify_failure', 'notify_failure_recipients',
+                           'dbdump_columns_custom', 'dbdump_row_mode', 'dbdump_reload_mode', 'dbdump_strip_html') as $k) {
+                ok(array_key_exists($k, $opts) && $opts[$k] === $sent[$k], "$tag: '$k' stored as sent");
+            }
+            eq(isset($opts['destination_schema']) ? $opts['destination_schema'] : null, 'PENUMBRA_RW', "$tag: destination_schema still server-resolved");
+            eq(isset($opts['reader_role']) ? $opts['reader_role'] : null, 'ORIED_RO', "$tag: reader_role default still applied");
+            if ($tag === 'dd_update') {
+                $before = json_decode((string)$arow['before'], true);
+                ok(isset($before['OPTIONS']['recipient_vars']) && $before['RECIPIENTS'] === 'Pat Owner <powner@ncsu.edu>;',
+                   'dd_update: audit BEFORE is the row as it was (evidence untouched)');
+            }
+        }
+        if ($tag === 'em_update') {
+            list($opts, $rec, $after) = pnb_write($tag, $res, 'UPDATE_TASK', 'SCHEDULE_UPDATE');
+            $miss = array_values(array_diff($EMAIL_ONLY, array_keys($opts)));
+            eq($miss, array(), 'em_update: EMAIL keeps every email-only key');
+            ok(isset($opts['recipient_vars']) && $opts['recipient_vars'] === $sent['recipient_vars'], 'em_update: recipient_vars stored as sent');
+            eq($rec, 'Pat Owner <powner@ncsu.edu>;', 'em_update: RECIPIENTS stored as sent');
+            eq(pnb_has_any(isset($after['OPTIONS']) ? $after['OPTIONS'] : array(), $EMAIL_ONLY), $EMAIL_ONLY, 'em_update: audit AFTER keeps them too');
+        }
+        if ($tag === 'df_insert') {
+            list($opts, $rec, $after) = pnb_write($tag, $res, 'INSERT_TASK', 'SCHEDULE_NEW');
+            eq(isset($opts['theme_override']) ? $opts['theme_override'] : null, 'theme-wolfpack', 'df_insert: DROP_FILE keeps theme_override (its PDF theme)');
+            eq(pnb_has_any($opts, $noTheme), array(), 'df_insert: DROP_FILE drops the other 12');
+            eq($rec, '', 'df_insert: RECIPIENTS blank');
+            ok(isset($opts['drop_path']) && $opts['drop_format_pdf'] === true, 'df_insert: drop_* keys stored as sent');
+        }
+        if ($tag === 'sn_insert') {
+            list($opts, $rec) = pnb_write($tag, $res, 'INSERT_TASK', 'SCHEDULE_NEW');
+            eq(pnb_has_any($opts, $EMAIL_ONLY), array(), 'sn_insert: SNAPSHOT drops all 13 (theme_override included)');
+            eq(isset($opts['snap_max_keep']) ? $opts['snap_max_keep'] : null, 50, 'sn_insert: snap_max_keep stored as sent');
+            eq($rec, '', 'sn_insert: RECIPIENTS blank');
+        }
+        if ($tag === 'dd_test') {
+            $w = pnb_stmts($res, 'INSERT_TASK');
+            ok(count($w) === 1, 'dd_test: exactly one INSERT_TASK (the transient row)');
+            $opts = $w ? json_decode((string)$w[0]['binds'][':opts'], true) : array();
+            eq(pnb_has_any((array)$opts, $EMAIL_ONLY), array(), 'dd_test: the transient row carries no email-only key');
+            eq(isset($opts['_test_run_transient']) ? $opts['_test_run_transient'] : null, true, 'dd_test: _test_run_transient still set');
+            eq($w ? $w[0]['binds'][':rec'] : null, '', 'dd_test: transient RECIPIENTS blank');
+            $a = pnb_audits($res, 'SCHEDULE_TEST_RUN');
+            $ad = $a ? json_decode((string)$a[0]['after'], true) : array();
+            ok(count($a) === 1, 'dd_test: exactly one SCHEDULE_TEST_RUN audit');
+            eq(pnb_has_any(isset($ad['options']) ? $ad['options'] : array(), $EMAIL_ONLY), array(), 'dd_test: the test-run audit options carry no email-only key');
+            eq(isset($ad['recipients']) ? $ad['recipients'] : null, '', 'dd_test: the test-run audit recipients blank');
+            ok(is_array($resp) && !empty($resp['test_once']), 'dd_test: answered as a one-time test');
+        }
+        if ($tag === 'rs_update' || $tag === 'rs_recreate') {
+            list($opts, $rec, $after) = pnb_write($tag, $res, $tag === 'rs_update' ? 'UPDATE_TASK' : 'INSERT_TASK', 'SCHEDULE_RESTORE');
+            eq(pnb_has_any($opts, $EMAIL_ONLY), array(), "$tag: restored OPTIONS carry no email-only key");
+            eq($rec, '', "$tag: restored RECIPIENTS blank");
+            eq(pnb_has_any(isset($after['OPTIONS']) ? $after['OPTIONS'] : array(), $EMAIL_ONLY), array(), "$tag: SCHEDULE_RESTORE AFTER carries no email-only key");
+            ok(isset($opts['destination_table']) && $opts['destination_table'] === 'PNB_DUMP_T' && isset($opts['prompt_answers']),
+               "$tag: the snapshot's own settings come back");
+        }
+        if ($tag === 'rs_email') {
+            list($opts, $rec) = pnb_write($tag, $res, 'UPDATE_TASK', 'SCHEDULE_RESTORE');
+            eq(array_values(array_diff($EMAIL_ONLY, array_keys($opts))), array(), 'rs_email: an EMAIL restore keeps every email-only key');
+            eq($rec, 'Pat Owner <powner@ncsu.edu>;Sam Two <stwo@ncsu.edu>;', 'rs_email: an EMAIL restore keeps its RECIPIENTS');
+        }
+    }
+    @unlink($core);
+}
+
+// ================================================================= main
+echo "test_schedprune.php  (PHP " . PHP_VERSION . ", tz " . date_default_timezone_get() . ")\n";
+echo "  manage : $MANAGE\n  runner : $RUNNER\n  main.js: $MAINJS\n";
+pnb_part_a($RUNNER, $MAINJS, $EMAIL_ONLY);
+pnb_part_b($MANAGE, $EMAIL_ONLY);
+pnb_part_c($MANAGE, $EMAIL_ONLY);
+
+// ---------------------------------------------------------- targeted mutants
+section('MUTANTS - each edit must be killed by the assertion that names it');
+$src = file_get_contents($MANAGE);
+$mutants = array(
+    'save prune removed' => array(
+        "            \$options = penumbra_sched_prune_email_only(\$task_type, \$options);\n", '',
+        array('dd_update', 'dd_insert'), 'dd_update: stored OPTIONS carry no email-only key'),
+    'save RECIPIENTS kept' => array(
+        "            \$options = penumbra_sched_prune_email_only(\$task_type, \$options);\n            \$recipients = '';\n",
+        "            \$options = penumbra_sched_prune_email_only(\$task_type, \$options);\n",
+        array('dd_update'), 'dd_update: stored RECIPIENTS blank (not the hidden creator capsule)'),
+    'DROP_FILE theme exception dropped' => array(
+        "    if (\$task_type !== 'DROP_FILE') \$email_only[] = 'theme_override';\n", "    \$email_only[] = 'theme_override';\n",
+        array('df_insert'), 'df_insert: DROP_FILE keeps theme_override (its PDF theme)'),
+    'restore prune removed' => array(
+        "            \$s_opts = penumbra_sched_prune_email_only(\$s_type, \$s_opts);\n", '',
+        array('rs_update'), 'rs_update: restored OPTIONS carry no email-only key'),
+    'restore RECIPIENTS kept' => array(
+        "            \$s_opts = penumbra_sched_prune_email_only(\$s_type, \$s_opts);\n            \$s_rec  = '';\n",
+        "            \$s_opts = penumbra_sched_prune_email_only(\$s_type, \$s_opts);\n",
+        array('rs_update'), 'rs_update: restored RECIPIENTS blank'),
+    // Both callers already skip EMAIL, so only the helper's own contract can see this one.
+    'EMAIL pruned too' => array(
+        "    if (\$task_type === 'EMAIL' || !is_array(\$options)) return \$options;\n", "    if (!is_array(\$options)) return \$options;\n",
+        array(), 'helper: EMAIL options come back unchanged'),
+);
+foreach ($mutants as $mname => $m) {
+    list($find, $repl, $scns, $expectLabel) = $m;
+    $cnt = substr_count($src, $find);
+    if (!eq($cnt, 1, "mutant '$mname': its target text occurs exactly once in the file under test")) continue;
+    $mf = sys_get_temp_dir() . '/pnb_schedprune_mut_' . getmypid() . '_' . md5($mname) . '.php';
+    file_put_contents($mf, str_replace($find, $repl, $src));
+    // Run quietly, remember the outer tally, then restore it.
+    $saveP = $PASS; $saveF = $FAIL; $saveL = $FAILED;
+    $QUIET = true; $PASS = 0; $FAIL = 0; $FAILED = array();
+    pnb_part_b($mf, $EMAIL_ONLY);
+    pnb_part_c($mf, $EMAIL_ONLY, $scns);
+    $mFail = $FAIL; $mLabels = $FAILED;
+    $QUIET = false; $PASS = $saveP; $FAIL = $saveF; $FAILED = $saveL;
+    @unlink($mf);
+    ok($mFail > 0 && in_array($expectLabel, $mLabels, true), "mutant '$mname' is killed by: $expectLabel",
+       'mutant failures: ' . ($mLabels ? implode(' | ', $mLabels) : '(none - the suite cannot see this edit)'));
+}
+
+if ($CONTROL) { ok(false, 'CONTROL: this deliberately false assertion must FAIL'); }
+
+echo "\nPASS $PASS   FAIL $FAIL\n";
+exit($FAIL === 0 ? 0 : 1);

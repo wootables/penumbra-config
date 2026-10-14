@@ -1,0 +1,183 @@
+<?php
+/**
+ * penumbra_tests/peopletags/test_peopletags.php - the People tags admin tool (2026-09-23).
+ *
+ *   php.exe -n test_peopletags.php <penumbra_people_tags.php> [<people_tags.php>]
+ *
+ * WHAT IS UNDER TEST. The pure half of the tool: the tag-name rule (what an
+ * admin types -> what CK_PEOPLE_TAG_SHAPE will accept), the pasted-list parser,
+ * the SQL text of every read and write (the idempotent MERGE that never
+ * overwrites, the rename that merges, the caps), the usage snippets and the
+ * flash wording. With the page path given, a few text pins on people_tags.php:
+ * CSRF check, POST-redirect-GET, commit + rollback, the five audit actions.
+ * Offline, php -n. Tail must read "PASS: N   FAIL: 0" then "RESULT: GREEN".
+ */
+$lib  = isset($argv[1]) ? $argv[1] : '';
+$page = isset($argv[2]) ? $argv[2] : '';
+if (!is_file($lib)) { echo "library not found: $lib\n"; echo "RESULT: RED\n"; return; }
+$PASS = 0; $FAIL = 0;
+function ok($cond, $label) { global $PASS, $FAIL; if ($cond) { $PASS++; echo "  ok   $label\n"; } else { $FAIL++; echo "  FAIL $label\n"; } }
+function eq($got, $want, $label) {
+    global $PASS, $FAIL;
+    if ($got === $want) { $PASS++; echo "  ok   $label\n"; }
+    else { $FAIL++; echo "  FAIL $label\n       want: " . var_export($want, true) . "\n       got:  " . var_export($got, true) . "\n"; }
+}
+/** The :names a statement binds, in order of first appearance. */
+function bindsOf($sql) { $sql = preg_replace("/'[^']*'/", "''", $sql); preg_match_all('/:([a-z0-9_]+)/i', $sql, $m); return array_values(array_unique($m[1])); }   // literals first: HH24:MI is not a bind
+
+// ------------------------------------------------------------ 0. include
+echo "0. the library declares only\n";
+$globalsBefore = array_keys($GLOBALS);
+ob_start(); require $lib; $out = ob_get_clean();
+eq($out, '', 'including it prints nothing');
+eq(array_values(array_diff(array_keys($GLOBALS), $globalsBefore, array('globalsBefore', 'out'))), array(), 'including it creates no globals');
+eq(PENUMBRA_TAG_SHAPE, '/^[A-Z][A-Z0-9_]{0,59}$/', 'the name rule is the CHECK constraint (CK_PEOPLE_TAG_SHAPE), verbatim');
+eq(PENUMBRA_TAG_MEMBERS_CAP, 1000, 'members shown per tag are capped at 1,000');
+eq(PENUMBRA_TAG_BULK_CAP, 2000, 'a pasted list is capped at 2,000');
+
+// ---------------------------------------------------------- 1. the name
+echo "1. penumbraTagNormalize()\n";
+eq(penumbraTagNormalize('cals preaward'), 'CALS_PREAWARD', 'lower case with a space -> upper case, underscore');
+eq(penumbraTagNormalize('  Osp-Contact.x  '), 'OSP_CONTACT_X', 'hyphens and dots become underscores, ends trimmed');
+eq(penumbraTagNormalize('a   b---c'), 'A_B_C', 'runs of separators collapse to one underscore');
+eq(penumbraTagNormalize('__A__'), 'A', 'leading and trailing underscores go');
+eq(penumbraTagNormalize('CALS_PREAWARD'), 'CALS_PREAWARD', 'a stored name comes back unchanged');
+eq(penumbraTagNormalize('1abc'), '', 'must start with a letter');
+eq(penumbraTagNormalize('ab$c'), '', 'other characters are refused, never dropped');
+eq(penumbraTagNormalize('a/b'), '', 'a slash is refused');
+eq(penumbraTagNormalize(''), '', 'empty -> empty');
+eq(penumbraTagNormalize(null), '', 'null -> empty');
+eq(penumbraTagNormalize(str_repeat('A', 60)), str_repeat('A', 60), '60 characters fit');
+eq(penumbraTagNormalize(str_repeat('A', 61)), '', '61 do not');
+eq(penumbraTagNormalize("x\ty"), 'X_Y', 'a tab is a separator too');
+eq(penumbraTagNormalize('_'), '', 'only separators -> empty');
+
+// ------------------------------------------------------- 2. pasted lists
+echo "2. penumbraTagParseIds()\n";
+eq(penumbraTagParseIds("jdoe, ASmith\nbwhite@ncsu.edu; <cjones@ncsu.edu> mailto:dlee@ncsu.edu jdoe"),
+   array('jdoe', 'asmith', 'bwhite', 'cjones', 'dlee'), 'commas, newlines, semicolons, emails, angle brackets, mailto:, duplicates');
+eq(penumbraTagParseIds("\"efox\" ('ggreen') [hhall]"), array('efox', 'ggreen', 'hhall'), 'quotes, parentheses and brackets are trimmed');
+eq(penumbraTagParseIds('!! ?? ' . str_repeat('a', 65) . ' ok_id'), array('ok_id'), 'junk and over-long tokens are dropped');
+eq(penumbraTagParseIds('a b c d e', 3), array('a', 'b', 'c'), 'the cap keeps the first N');
+eq(penumbraTagParseIds(''), array(), 'nothing -> nothing');
+eq(penumbraTagParseIds('john.doe@gmail.com'), array('john.doe'), 'any email keeps its local part (the lookup adds @ncsu.edu itself)');
+
+// ------------------------------------------------------------- 3. usage
+echo "3. penumbraTagSqlUsage()\n";
+$u = penumbraTagSqlUsage('cals preaward');
+eq($u['like'], "SELECT * FROM PENUMBRA_PEOPLE_V WHERE TAGS LIKE '%|CALS_PREAWARD|%'", 'the LIKE on the view, normalized name, pipe-wrapped');
+eq($u['value'], "JSON_VALUE(ATTRS, '$.CALS_PREAWARD')", 'the value through ATTRS');
+ok(strpos($u['exists'], "t.TAG = 'CALS_PREAWARD'") !== false && strpos($u['exists'], 'EXISTS (SELECT 1 FROM PENUMBRA_PEOPLE_TAGS t') !== false, 'the EXISTS form on the table');
+eq(penumbraTagSqlUsage('bad name!'), array('like' => '', 'exists' => '', 'value' => ''), 'an impossible name gives no SQL at all');
+
+// --------------------------------------------------------------- 4. SQL
+echo "4. the SQL text\n";
+$s = penumbraTagsSqlList();
+ok(strpos($s, 'GROUP BY T.TAG') !== false && strpos($s, 'JOIN PENUMBRA_PEOPLE P ON P.EMPLID = T.EMPLID') !== false, 'list: one join, grouped by tag');
+ok(strpos($s, 'LISTAGG(DISTINCT T.SOURCE') !== false && strpos($s, 'NVL(SUM(P.ACTIVE), 0) AS ACTIVE_MEMBERS') !== false, 'list: sources and active counts');
+eq(bindsOf($s), array(), 'list: no binds');
+$s = penumbraTagsSqlMembers();
+ok(strpos($s, 'WHERE T.TAG = :tag') !== false && strpos($s, 'FETCH FIRST 1000 ROWS ONLY') !== false, 'members: by tag, capped at the constant');
+ok(strpos($s, 'ORDER BY P.ACTIVE DESC, UPPER(P.LAST_NAME), UPPER(P.FIRST_NAME)') !== false, 'members: active people first, then by name');
+ok(strpos($s, 'P.JOB_TITLE, P.KIND') !== false, 'members: carries KIND, so an account is labelled as one (2026-09-25)');
+eq(bindsOf($s), array('tag'), 'members: binds only :tag');
+eq(bindsOf(penumbraTagsSqlCount()), array('tag'), 'count: binds only :tag');
+eq(penumbraTagsSqlPeople(array(':e0', ':e1')), 'SELECT EMPLID, UNITY_ID, FIRST_NAME, LAST_NAME FROM PENUMBRA_PEOPLE WHERE EMPLID IN (:e0,:e1)', 'people: the caller placeholders, verbatim');
+$s = penumbraTagsSqlAdd();
+ok(strpos($s, 'MERGE INTO PENUMBRA_PEOPLE_TAGS T') === 0 && strpos($s, 'ON (T.EMPLID = S.EMPLID AND T.TAG = S.TAG)') !== false, 'add: a MERGE keyed on person + tag');
+ok(strpos($s, 'WHEN NOT MATCHED THEN INSERT') !== false && strpos($s, 'WHEN MATCHED') === false, 'add: inserts the missing row and NEVER touches an existing one (value, note, added-by survive)');
+ok(strpos($s, "'MANUAL'") !== false && strpos($s, 'SYSDATE') !== false, 'add: SOURCE = MANUAL, stamped now');
+eq(bindsOf($s), array('emplid', 'tag', 'val', 'who', 'note'), 'add: exactly the five binds the page supplies');
+eq(penumbraTagsSqlRemove(), 'DELETE FROM PENUMBRA_PEOPLE_TAGS WHERE EMPLID = :emplid AND TAG = :tag', 'remove: one person, one tag');
+eq(penumbraTagsSqlUpdate(), 'UPDATE PENUMBRA_PEOPLE_TAGS SET VAL = :val, NOTE = :note WHERE EMPLID = :emplid AND TAG = :tag', 'update: value and note only');
+$r = penumbraTagsSqlRename();
+eq(count($r), 2, 'rename: two statements');
+ok(strpos($r[0], 'UPDATE PENUMBRA_PEOPLE_TAGS SET TAG = :newtag WHERE TAG = :oldtag') === 0, 'rename: first moves the rows');
+ok(strpos($r[0], 'AND EMPLID NOT IN (SELECT EMPLID FROM PENUMBRA_PEOPLE_TAGS WHERE TAG = :newtag)') !== false, 'rename: ...except people who already carry the new name (no PK collision)');
+eq(substr_count($r[0], ':newtag'), 2, 'rename: :newtag appears twice (one bind, both places)');
+eq($r[1], 'DELETE FROM PENUMBRA_PEOPLE_TAGS WHERE TAG = :oldtag', 'rename: then the leftovers under the old name go (= merged)');
+eq(penumbraTagsSqlDeleteTag(), 'DELETE FROM PENUMBRA_PEOPLE_TAGS WHERE TAG = :tag', 'delete: the whole tag');
+$s = penumbraTagsSqlRecent();
+ok(strpos($s, "ACTION LIKE 'PEOPLE_TAG%'") !== false && strpos($s, 'FETCH FIRST 40 ROWS ONLY') !== false && strpos($s, 'ORDER BY ID DESC') !== false, 'recent: this tool only, newest first, 40');
+ok(strpos($s, 'SOURCE_DATA') !== false && strpos($s, 'TO_CHAR("TIMESTAMP"') !== false, 'recent: the message rides in SOURCE_DATA; TIMESTAMP is a reserved word, quoted');
+foreach (array('penumbraTagsSqlList', 'penumbraTagsSqlMembers', 'penumbraTagsSqlCount', 'penumbraTagsSqlAdd', 'penumbraTagsSqlRemove', 'penumbraTagsSqlUpdate', 'penumbraTagsSqlDeleteTag', 'penumbraTagsSqlRecent') as $fn) {
+    $sql = $fn();
+    ok(stripos($sql, 'PENUMBRA_PEOPLE_STG') === false && stripos($sql, 'COI_CHECK') === false, "$fn: never the staging table, never the old COI table");
+}
+
+// ------------------------------------------------- 4b. hand-registered accounts
+echo "4b. hand-registered accounts (2026-09-25)\n";
+eq(array(penumbraAccountEmailNormalize(' <CALS_Preaward@NCSU.edu> '), penumbraAccountEmailNormalize('mailto:x@y.org'), penumbraAccountEmailNormalize('not an address'), penumbraAccountEmailNormalize('a@b')),
+   array('cals_preaward@ncsu.edu', 'x@y.org', '', ''), 'email: lower-cased, decorations and mailto: stripped, any domain, junk refused');
+eq(penumbraAccountId('CALS_Preaward@ncsu.edu'), 'ACCT:cals_preaward@ncsu.edu', 'id: ACCT: + the address');
+eq(penumbraAccountId(str_repeat('a', 45) . '@ncsu.edu'), '', 'id: an address that cannot fit the 44-character key is refused');
+eq(array(penumbraAccountKind(' Group '), penumbraAccountKind('mailbox'), penumbraAccountKind('person'), penumbraAccountKind('')), array('group', 'mailbox', '', ''), 'kind: group or mailbox only (a person comes from HR)');
+$u = penumbraAccountUnitsNormalize(' 11, 1502 ;150201 11 ');
+eq(array($u['ok'], $u['list'], $u['first'], $u['error']), array(true, '11|1502|150201', '11', ''), 'units: 2/4/6-digit prefixes, any separator, deduplicated, first kept');
+$u = penumbraAccountUnitsNormalize('11, *, 15');
+eq(array($u['ok'], $u['list'], $u['first']), array(true, '*', ''), 'units: a star anywhere means campus-wide and stands alone, with no own OUC');
+$u = penumbraAccountUnitsNormalize('');
+eq(array($u['ok'], $u['list'], $u['first']), array(true, '', ''), 'units: empty is allowed');
+$u = penumbraAccountUnitsNormalize('11, 150');
+eq(array($u['ok'], $u['list']), array(false, ''), 'units: three digits are refused (2, 4 or 6 only)');
+ok(strpos($u['error'], "'150'") !== false && strpos($u['error'], '2, 4 or 6') !== false, 'units: the error names the token and the rule');
+$s = penumbraAccountsSqlList();
+ok(strpos($s, "WHERE P.SOURCE = 'MANUAL'") !== false && strpos($s, 'LISTAGG(T.TAG') !== false && strpos($s, 'ORDER BY P.ACTIVE DESC') !== false, 'list: manual rows only, with their tags, active first');
+eq(bindsOf($s), array(), 'list: no binds');
+$s = penumbraAccountsSqlInsert();
+ok(strpos($s, 'INSERT INTO NC_REPORTING.PENUMBRA_PEOPLE (') === 0 && strpos($s, "'MANUAL'") !== false && substr_count($s, 'SYSDATE') === 3, 'insert: the writer names the schema, SOURCE = MANUAL, stamped now');
+eq(bindsOf($s), array('emplid', 'email', 'name', 'kind', 'ouc', 'units', 'dept', 'descr'), 'insert: the eight binds the page supplies (:name fills three columns)');
+eq(substr_count($s, ':name'), 3, 'insert: NAME, FIRST_NAME and PREFERRED_NAME from one bind');
+ok(strpos($s, ' 1, \'A\', \'Hand-registered account\', 0, 0, ') !== false, 'insert: active, status A, no jobs, not PI-eligible');
+$s = penumbraAccountsSqlUpdate();
+ok(strpos($s, 'UPDATE NC_REPORTING.PENUMBRA_PEOPLE SET') === 0 && strpos($s, "WHERE EMPLID = :emplid AND SOURCE = 'MANUAL'") !== false && strpos($s, 'EMAIL') === false, 'update: only a hand-registered row, never the address');
+eq(bindsOf($s), array('name', 'kind', 'ouc', 'units', 'dept', 'descr', 'emplid'), 'update: the same fields plus the id');
+$s = penumbraAccountsSqlSetActive();
+ok(strpos($s, "WHERE EMPLID = :emplid AND SOURCE = 'MANUAL'") !== false && strpos($s, 'SET ACTIVE = :active') !== false && strpos($s, 'DELETE') === false, 'retire/restore: flips ACTIVE on a hand-registered row, never deletes');
+eq(bindsOf($s), array('active', 'emplid'), 'retire/restore: two binds');
+foreach (array('penumbraAccountsSqlList', 'penumbraAccountsSqlInsert', 'penumbraAccountsSqlUpdate', 'penumbraAccountsSqlSetActive') as $fn) {
+    ok(stripos($fn(), 'PENUMBRA_PEOPLE_STG') === false, "$fn: never the staging table");
+}
+
+// ------------------------------------------------------------ 5. wording
+echo "5. penumbraTagsSummarize()\n";
+eq(penumbraTagsSummarize('T1', array('Ann A (anna)', 'Bob B (bobb)'), 1, array('zzz')),
+   'T1: added 2 people (Ann A (anna), Bob B (bobb)). 1 already had it. not in the directory: zzz.', 'added, already, unknown - in that order');
+eq(penumbraTagsSummarize('T1', array('Ann A (anna)'), 0, array()), 'T1: added 1 person (Ann A (anna)).', 'one person, singular');
+eq(penumbraTagsSummarize('T1', array(), 0, array()), 'T1: nothing to do.', 'nothing happened');
+$many = array(); for ($i = 1; $i <= 10; $i++) $many[] = "P$i";
+ok(strpos(penumbraTagsSummarize('T1', $many, 0, array()), 'added 10 people (P1, P2, P3, P4, P5, P6, P7, P8, ...)') !== false, 'more than eight names are elided');
+$unk = array(); for ($i = 1; $i <= 15; $i++) $unk[] = "u$i";
+ok(strpos(penumbraTagsSummarize('T1', array(), 0, $unk), 'u12 and 3 more') !== false, 'more than twelve unknowns are counted');
+
+// ------------------------------------------------------------ 6. the page
+if ($page !== '' && is_file($page)) {
+    echo "6. people_tags.php text pins\n";
+    $pg = php_strip_whitespace($page);
+    ok(strpos($pg, 'hash_equals($CSRF') !== false, 'every write checks the session CSRF token');
+    ok(strpos($pg, "header('Location: '") !== false && substr_count($pg, '$say(') >= 12, 'writes end in a redirect (POST-redirect-GET), on every path');
+    ok(substr_count($pg, 'oci_commit($oci)') >= 5 && strpos($pg, 'oci_rollback($oci)') !== false, 'each write path commits; a failure rolls back');
+    foreach (array('PEOPLE_TAG_ADD', 'PEOPLE_TAG_REMOVE', 'PEOPLE_TAG_UPDATE', 'PEOPLE_TAG_RENAME', 'PEOPLE_TAG_DELETE') as $act) {
+        ok(strpos($pg, "'$act'") !== false, "audits $act");
+    }
+    ok(strpos($pg, "penumbra_tool_visit_beacon('tags')") !== false, 'logs the visit as the tags tool');
+    ok(strpos($pg, '$isAdmin') !== false && strpos($pg, 'http_response_code(403)') !== false, 'admin-only');
+    ok(strpos($pg, 'penumbraSessionStart();') !== false || strpos($pg, 'session_start();') !== false, 'starts the session itself (db_connection.php does not): the CSRF token and the flash live there (penumbraSessionStart() since 2026-10-01)');
+    ok(strpos($pg, 'OCI_NO_AUTO_COMMIT') !== false, 'statements run without auto-commit (one commit per request)');
+    ok(strpos($pg, 'penumbraPeopleLookupByUnity(') !== false, 'a pasted list resolves through the directory resolver, not its own SQL');
+    ok(preg_match('/\b(exec|shell_exec|system|passthru|popen|proc_open)\s*\(/', $pg) === 0, 'no process spawning');
+    // Hand-registered accounts (2026-09-25): written on the writer, audited, offered on the index view.
+    ok(strpos($pg, "strpos(\$do, 'acct_') === 0") !== false && strpos($pg, 'connectOracleWriter()') !== false && strpos($pg, 'pnbOciHandle()') !== false, 'accounts: the handlers run on the WRITER connection (the app session only reads the directory)');
+    foreach (array('PEOPLE_ACCOUNT_ADD', 'PEOPLE_ACCOUNT_UPDATE', 'PEOPLE_ACCOUNT_RETIRE', 'PEOPLE_ACCOUNT_RESTORE') as $a) { ok(strpos($pg, "'$a'") !== false, "accounts: audited as $a"); }
+    ok(strpos($pg, "if (!empty(\$existing['found']))") !== false && strpos($pg, 'belongs to a person in HR') !== false, 'accounts: an address HR already knows cannot be registered');
+    ok(strpos($pg, 'id="accounts"') !== false && strpos($pg, 'name="do" value="acct_active"') !== false && strpos($pg, "\$acctEdit ? 'acct_update' : 'acct_add'") !== false, 'accounts: the card, the retire/restore form and the add-or-edit form');
+    ok(strpos($pg, 'penumbraAccountsSqlList()') !== false && strpos($pg, 'penumbraAccountUnitsNormalize(') !== false && strpos($pg, 'penumbraAccountEmailNormalize(') !== false, 'accounts: the page uses the library helpers, never its own rules');
+    // Seen 2026-09-25 in the Wolfpack theme: a muted header colour of the page's own sat on the theme's red th.
+    ok(strpos($pg, 'table.hist th { color: var(--text-muted)') === false && preg_match('/table\.tags th, table\.members th, table\.hist th \{[^}]*\}/', $pg, $thm) === 1 && strpos($thm[0], 'color:') === false, 'table headers take the THEME\'s header colour (never a muted colour of their own on a coloured header)');
+    ok(strpos($pg, "(\$last !== '' ? \$last . ', ' . \$first : \$first)") !== false && strpos($pg, "if (\$kind !== '' && \$kind !== 'person') \$name .= ' (' . \$kind . ')';") !== false, 'members: a hand-registered account reads "Name (group)", never ", Name"');
+} else {
+    echo "6. people_tags.php text pins - skipped (no page path given)\n";
+}
+
+echo "\nPASS: $PASS   FAIL: $FAIL\n";
+echo 'RESULT: ' . ($FAIL === 0 ? 'GREEN' : 'RED') . "\n";

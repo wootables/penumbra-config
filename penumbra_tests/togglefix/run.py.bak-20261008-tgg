@@ -1,0 +1,424 @@
+# =============================================================================
+# TOGGLE FIXES SUITE "togglefix" (2026-10-07)
+#
+# Round A of the journal ROW TOGGLES sweep (user, 10-07: "Build the fix-first items
+# plus the cheap wins"):
+#   F1 dark themes drew a check in every UNCHECKED box; Wolfpack Red's hover filled
+#      a box solid red                                         (css/main.css)
+#   F2 scheduled sends of GROUPED / PIVOT reports dropped the toggles; the state was
+#      read twice per run; DB dumps of a grouped send          (schedule_runner.php)
+#   F3 a key column aliased in mixed case read every toggle 0 on the server
+#                                                              (journal_export.php)
+#   F4 an all-digit SHORT_ID was taken as another report's internal ID
+#                                                    (manage_journal / manage_snapshots)
+#   F5 the journal's reads let a plain viewer of a journal-OFF report read it
+#   F6 saving with the journal OFF dropped the key / toggle / row-notes setup
+#   F7 a save under another id (Save as Copy ...) kept the original's marks on screen
+#   F8 a key column missing from the data was read as blank
+#   C7 a key over the 1,000 bytes the journal stores
+#
+# Browser scenarios boot the REAL main.js through the real run path (stubbed
+# query.php + manage_journal.php, jrowfeat's 36-row fixture), with the View Options
+# journal panel and the journal dialog lifted from the index.php under test; the
+# 'srv' scenario runs server_check.php (php -n) on the build's PHP files; 'wire'
+# reads the save handler. driver.js / server_check.php record the asserts.
+#
+#   py -3 run.py                        candidate = the live webroot
+#   py -3 run.py --dir D                any build laid out like the webroot (js\main.js,
+#                                       css\main.css, js\penumbra_journal.js, index.php,
+#                                       the four PHP files); a file D lacks comes from --app
+#   py -3 run.py --control --dir D      the PRE-FIX build on Round A's scenarios: EXACTLY
+#                                       CONTROL_RED must fail (default D: the newest
+#                                       *.bak-*-tga files on live)
+#   py -3 run.py --control-c --dir D    the build before the who / when label came out
+#                                       (2026-10-08; default: *.bak-*-tgd): EXACTLY W-who-cells
+#   py -3 run.py --control-b --dir D    the Round A build on EVERY scenario: EXACTLY
+#                                       CONTROL_RED_B (Round B's asserts) must fail
+#                                       (default D: the newest *.bak-*-tgb files on live)
+#
+# Round B (2026-10-07, the cheap wins): the shared state refreshes on focus / every 3 min
+# (R-*), "Already marked by", who / when beside a box and its accessible name (W-*), the
+# status bar's "Reviewed: 2 of 36" (P2-*), bulk Undo (B-*), Arrow Up / Down (A-*, real
+# keys), a confirm before clearing another's mark (C-*), "Reviewed: Checked" bands (G-*),
+# Toggle History "Me" + jump (H-*), the touch-size rule (T-*); srvb = the server's no-op
+# toggle writes (server_check.php mode b).
+#   py -3 run.py --mutant NAME / --mutants   single-point reverts of the candidate; each
+#                                       must turn exactly its own asserts red
+#   --scn a,b    a subset;   --keep keeps the staging dir;   --verbose
+#
+# Round D (2026-10-08, user: "build 1 through 5" - Toggle History): a summary (changes / rows /
+# marked / unmarked, people who filter), each change's row state NOW, Latest per row, Marked /
+# Unmarked, Today / 7 days / 30 days, Export CSV (H2-*, scenario histplus); srvd = the server
+# half (server_check.php mode d): the per-row hover history found BY ROW in SQL, the search's
+# summary past the list cap, the marks now, latest, the state + column prefilters (SD-*).
+#   py -3 run.py --control-d --dir D    the build before Round D (default: *.bak-*-tge) on
+#                                       EVERY scenario: EXACTLY CONTROL_RED_D must fail
+#
+# Headless Edge over CDP; stages into %TEMP%; writes nothing to the webroot.
+# =============================================================================
+import glob, json, os, shutil, socket, subprocess, sys, tempfile, time, urllib.request
+import websocket
+try: sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+except Exception: pass
+
+HERE = os.path.dirname(os.path.abspath(__file__)) or os.getcwd()
+APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js',
+        'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
+        'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js']
+FILES = ['js/main.js', 'css/main.css', 'js/penumbra_journal.js', 'index.php',
+         'journal_export.php', 'manage_journal.php', 'manage_snapshots.php', 'schedule_runner.php',
+         'css/penumbra_journal.css']
+PHP_FILES = ['journal_export.php', 'manage_journal.php', 'manage_snapshots.php', 'schedule_runner.php']
+ROUND_A_BROWSER = ['dark', 'darkgrp', 'wolf', 'offsave', 'switch', 'missing', 'longkey']
+# Round B (2026-10-07, the cheap wins): refresh / "Already marked by" / who + when / the
+# status bar's "Reviewed: 2 of 36" / bulk Undo / Arrow keys / clearing another's mark /
+# "Reviewed: Checked" bands / Toggle History "Me" + jump / the touch-size rule; srvb = the
+# server's no-op toggle writes.
+ROUND_B_BROWSER = ['refresh', 'already', 'who', 'progress', 'bulkundo', 'arrows', 'confirmclear', 'bandlabel', 'histjump', 'touchcss',
+                   'hiddendrop']
+# Round D (2026-10-08): Toggle History's summary / now / latest / filters / Export CSV; srvd =
+# the server half.
+ROUND_D_BROWSER = ['histplus']
+BROWSER_SCN = ROUND_A_BROWSER + ROUND_B_BROWSER + ROUND_D_BROWSER
+ROUND_A_SCN = ROUND_A_BROWSER + ['srv', 'wire']
+ROUND_B_SCN = ROUND_B_BROWSER + ['srvb']
+ROUND_D_SCN = ROUND_D_BROWSER + ['srvd']
+ALL_SCN = ROUND_A_SCN + ROUND_B_SCN + ROUND_D_SCN
+EXTRA = {'switch': '&jslow=jrfix:400'}
+EXPECT = {
+    'dark': ['P-dark-theme', 'V-dark-off', 'V-dark-on'],
+    'darkgrp': ['P-darkgrp-grouped', 'V-darkgrp-off'],
+    'wolf': ['P-wolf-hover', 'V-wolf-hover', 'V-wolf-onhover'],
+    'offsave': ['P-off-hidden', 'K-off-restored', 'K-off-tab', 'K-off-turnon', 'K-off-save'],
+    'switch': ['P-sw-marks', 'J-sw-api', 'J-sw-marks', 'J-sw-badge', 'J-sw-hist', 'J-sw-click', 'J-sw-gate', 'J-sw-stale'],
+    'missing': ['K-miss-off', 'K-miss-note', 'K-miss-chip', 'K-miss-lock', 'K-miss-bulk', 'K-miss-untick'],
+    'longkey': ['P-long-active', 'K-long-box', 'K-long-click', 'K-long-note'],
+    'srv': ['S-case-row', 'S-case-caps', 'S-sid-digits', 'S-sid-sane', 'S-snap-digits', 'S-snap-sane', 'S-gate-off', 'S-gate-on',
+            'S-gate-owner', 'S-gate-admin', 'S-gate-enc', 'S-tg-groupby', 'S-tg-label', 'S-sched-grouped', 'S-sched-pivot',
+            'S-sched-oneread', 'S-dd-strip'],
+    'wire': ['W-save-switch'],
+    'refresh': ['R-refresh-throttle', 'R-refresh-focus', 'R-refresh-same', 'R-refresh-fail', 'R-refresh-pending'],
+    'already': ['R-already', 'R-already-clear'],
+    'who': ['W-who-cells', 'W-who-aria', 'W-who-pop', 'W-who-mine'],
+    'progress': ['P2-prog-text', 'P2-prog-tick', 'P2-prog-search'],
+    'bulkundo': ['B-undo-offer', 'B-undo-exact', 'B-undo-page'],
+    'arrows': ['A-arrow-down', 'A-arrow-up'],
+    'confirmclear': ['C-clear-ask', 'C-clear-yes', 'C-clear-mine'],
+    'bandlabel': ['G-band-label'],
+    'histjump': ['H-me-filter', 'H-jump'],
+    'touchcss': ['T-touch-rule'],
+    'hiddendrop': ['P-hd-hidden', 'D-hd-import'],
+    'srvb': ['SB-merge-sql', 'SB-set-changed', 'SB-set-unchanged', 'SB-set-dup', 'SB-bulk-changed', 'SB-bulk-none'],
+    'histplus': ['H2-summary', 'H2-now', 'H2-person', 'H2-latest', 'H2-state', 'H2-preset', 'H2-export'],
+    'srvd': ['SD-row-sql', 'SD-search-summary', 'SD-search-now', 'SD-search-latest', 'SD-search-state', 'SD-search-tkfilter',
+             'SD-search-cap'],
+}
+# What the pre-fix build gets wrong (frozen from its first control run). Everything else
+# must PASS on it too: that is what proves the fixture and the read-out are not the bug.
+# Frozen 2026-10-07 from the control run on the pre-fix build (tga/orig = live at 18:36).
+CONTROL_RED = ['V-dark-off', 'V-darkgrp-off', 'V-wolf-hover', 'V-wolf-onhover', 'K-off-restored',
+               'K-off-turnon', 'K-off-save', 'J-sw-api', 'J-sw-marks', 'J-sw-badge', 'J-sw-hist',
+               'J-sw-click', 'J-sw-gate', 'J-sw-stale', 'K-miss-off', 'K-miss-note', 'K-miss-chip',
+               'K-miss-lock', 'K-miss-bulk', 'K-miss-untick', 'K-long-box', 'K-long-click', 'K-long-note',
+               'S-case-row', 'S-sid-digits', 'S-snap-digits', 'S-gate-off', 'S-tg-groupby', 'S-tg-label',
+               'S-sched-grouped', 'S-sched-pivot', 'S-sched-oneread', 'S-dd-strip', 'W-save-switch']
+# --control-b: the Round A build (the newest *.bak-*-tgb files after Round B's deploy, or
+# --dir) on EVERY scenario: exactly these fail, Round A's all pass. Frozen from its first run.
+CONTROL_RED_B = ['R-refresh-focus', 'R-refresh-same', 'R-refresh-fail', 'R-refresh-pending', 'R-already',
+                 'R-already-clear', 'W-who-aria', 'W-who-pop', 'W-who-mine', 'P2-prog-text',
+                 'P2-prog-tick', 'P2-prog-search', 'B-undo-offer', 'B-undo-exact', 'B-undo-page',
+                 'A-arrow-down', 'A-arrow-up', 'C-clear-ask', 'C-clear-yes', 'G-band-label', 'H-me-filter',
+                 'H-jump', 'T-touch-rule', 'D-hd-import', 'SB-merge-sql', 'SB-set-changed', 'SB-set-unchanged',
+                 'SB-set-dup', 'SB-bulk-changed', 'SB-bulk-none']
+# --control-c: the build before the who / when label came out (2026-10-08; the newest *.bak-*-tgd files,
+# or --dir) on EVERY scenario: exactly the label check fails.
+CONTROL_RED_C = ['W-who-cells']
+# (R-refresh-throttle and C-clear-mine pass on the Round A build too - no refresh, no question at
+# all; their mutants, eq-free, make them bite.)
+# (--control, --control-b and --control-c run the scenarios of their own round and the ones
+# before it; Round D's came later.)
+# --control-d: the build before Round D (2026-10-08; the newest *.bak-*-tge files, or --dir) on
+# EVERY scenario: exactly Round D's asserts fail. Frozen 2026-10-08 from its first run (tge/orig =
+# live at 00:23, the 40b3afc build): 101 others pass on it.
+CONTROL_RED_D = ['H2-summary', 'H2-now', 'H2-person', 'H2-latest', 'H2-state', 'H2-preset', 'H2-export',
+                 'SD-row-sql', 'SD-search-summary', 'SD-search-now', 'SD-search-latest', 'SD-search-state',
+                 'SD-search-tkfilter', 'SD-search-cap']
+
+MUTANTS = {}
+_mp = os.path.join(HERE, 'mutants.json')
+if os.path.exists(_mp):
+    for _k, _v in json.load(open(_mp, encoding='utf-8')).items():
+        MUTANTS[_k] = ([tuple(e) for e in _v['edits']], _v['must'], _v['scn'])
+
+args = sys.argv[1:]
+def opt(name, default=None):
+    if name in args:
+        i = args.index(name); v = args[i + 1]; del args[i:i + 2]; return v
+    return default
+def flag(name):
+    if name in args: args.remove(name); return True
+    return False
+cand_dir = opt('--dir', None)
+app_dir = opt('--app', APP)
+scn_arg = opt('--scn', None)
+one_mutant = opt('--mutant', None)
+all_mutants = flag('--mutants')
+control = flag('--control')
+control_b = flag('--control-b')
+control_c = flag('--control-c')
+control_d = flag('--control-d')
+keep = flag('--keep')
+verbose = flag('--verbose')
+if args: raise SystemExit('unknown arguments: %s' % ' '.join(args))
+
+def read_b(p): return open(p, 'rb').read().decode('utf-8', 'surrogateescape')
+
+def build_files():
+    """rel path -> text of the build under test."""
+    out = {}
+    for rel in FILES:
+        p = None
+        if cand_dir:
+            q = os.path.join(cand_dir, *rel.split('/'))
+            if os.path.exists(q): p = q
+        elif control or control_b or control_c or control_d:
+            suf = '.bak-*-tge' if control_d else ('.bak-*-tgd' if control_c else ('.bak-*-tgb' if control_b else '.bak-*-tga'))
+            baks = sorted(glob.glob(os.path.join(app_dir, *rel.split('/')) + suf))
+            if baks: p = baks[-1]
+        if p is None: p = os.path.join(app_dir, *rel.split('/'))
+        out[rel] = (p, read_b(p))
+    return out
+
+def lift_div(index_text, opener, what):
+    a = index_text.find(opener)
+    if a < 0: raise SystemExit('index.php: no ' + what)
+    depth, i = 0, a
+    while True:
+        o = index_text.find('<div', i); c = index_text.find('</div>', i)
+        if c < 0: raise SystemExit('index.php: ' + what + ' never closes')
+        if o != -1 and o < c: depth += 1; i = o + 4
+        else:
+            depth -= 1; i = c + 6
+            if depth == 0: break
+    block = index_text[a:i]
+    if '<?' in block: raise SystemExit('index.php: PHP inside ' + what + ' - the lift needs updating')
+    return block
+
+def hook(src):
+    """The ready closure becomes an IIFE with a name-by-name export hook, and
+    hideLoading counts its calls (the end of a run / grouping)."""
+    anchor = '$(document).ready(function () {'
+    i = src.find(anchor)
+    if i < 0 or i > 400: raise SystemExit('closure anchor not found')
+    names = ['buildStateObject', 'runTableSearch']
+    h = ('\r\n;try { window.__JR = {}; } catch (e) { window.__JR_ERR = String(e); }\r\n'
+         'try { [' + ','.join('"%s"' % n for n in names) + '].forEach(function (k) { try { window.__JR[k] = eval(k); } catch (e) { (window.__JR_MISSING = window.__JR_MISSING || []).push(k); } }); } catch (e) { window.__JR_ERR2 = String(e); }\r\n')
+    out = src[:i] + ';(function () {' + h + src[i + len(anchor):]
+    j = out.rfind('});')
+    out = out[:j] + '})();' + out[j + 3:]
+    hl = '    function hideLoading() {\r\n'
+    if out.count(hl) != 1: raise SystemExit('hideLoading anchor count %d' % out.count(hl))
+    return out.replace(hl, hl + '        window.__JR_HIDES = (window.__JR_HIDES || 0) + 1;\r\n')
+
+def mutate(files, name):
+    files = dict(files)
+    for rel, old, new in MUTANTS[name][0]:
+        p, t = files[rel]
+        if '\r\n' in t: old, new = old.replace('\n', '\r\n'), new.replace('\n', '\r\n')
+        if t.count(old) != 1: raise SystemExit("mutant '%s': %s anchor found %d times (needs the FIXED build): %r" % (name, rel, t.count(old), old[:90]))
+        files[rel] = (p, t.replace(old, new))
+    return files
+
+stage = tempfile.mkdtemp(prefix='pnb_tf_')
+for f in LIBS: shutil.copyfile(os.path.join(app_dir, 'js', f), os.path.join(stage, f))
+shutil.copyfile(os.path.join(app_dir, 'css', 'penumbra_journal.css'), os.path.join(stage, 'penumbra_journal.css'))
+shutil.copyfile(os.path.join(HERE, 'driver.js'), os.path.join(stage, 'driver.js'))
+harness = open(os.path.join(HERE, 'harness.html'), encoding='utf-8').read()
+for m in ('<!--TF_VIEW_OPTIONS-->', '<!--TF_JOURNAL_PANEL-->'):
+    if harness.count(m) != 1: raise SystemExit('harness: splice marker missing: ' + m)
+
+def free_port():
+    s = socket.socket(); s.bind(('127.0.0.1', 0)); p = s.getsockname()[1]; s.close(); return p
+hp, dp = free_port(), free_port()
+srv = subprocess.Popen([sys.executable, '-m', 'http.server', str(hp), '--bind', '127.0.0.1', '--directory', stage], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+# This machine's headless Edge reports (hover: none) / (pointer: coarse) since 10-07: force a mouse.
+edge = subprocess.Popen([EDGE, '--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check', '--disable-sync',
+                         '--disable-extensions', '--user-data-dir=' + os.path.join(stage, 'profile'), '--window-size=1500,900',
+                         '--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4',
+                         '--remote-debugging-port=%d' % dp, '--remote-allow-origins=*', 'about:blank'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+def jget(p, m='GET'):
+    return json.loads(urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:%d%s' % (dp, p), method=m), timeout=15).read().decode())
+for _ in range(150):
+    try: jget('/json/version'); break
+    except Exception: time.sleep(0.2)
+
+HOVER_PT = ('(function(){var e=document.querySelector(%s); if(!e) return null; var r=e.getBoundingClientRect();'
+            ' return JSON.stringify({x:r.left+r.width/2,y:r.top+r.height/2});})()')
+# TRUSTED key presses, asked for by the page (window.__keyReq = {n, keys}): a dispatched
+# KeyboardEvent is not what a keyboard user sends.
+KEYS = {'ArrowDown': ('ArrowDown', 40), 'ArrowUp': ('ArrowUp', 38), 'Tab': ('Tab', 9), ' ': ('Space', 32)}
+def press(call, key):
+    code, vk = KEYS[key]
+    down = {'type': 'keyDown', 'key': key, 'code': code, 'windowsVirtualKeyCode': vk, 'nativeVirtualKeyCode': vk}
+    if key == ' ': down['text'] = ' '
+    call('Input.dispatchKeyEvent', down)
+    call('Input.dispatchKeyEvent', {'type': 'keyUp', 'key': key, 'code': code, 'windowsVirtualKeyCode': vk, 'nativeVirtualKeyCode': vk})
+
+def run_page(scn):
+    t = jget('/json/new?about:blank', 'PUT')
+    ws = websocket.create_connection(t['webSocketDebuggerUrl'], timeout=300, suppress_origin=True)
+    n = [0]
+    def call(m, p=None):
+        n[0] += 1; mid = n[0]
+        ws.send(json.dumps({'id': mid, 'method': m, 'params': p or {}}))
+        while True:
+            r = json.loads(ws.recv())
+            if r.get('id') == mid: return r.get('result', {})
+    def ev(expr):
+        return call('Runtime.evaluate', {'expression': expr, 'returnByValue': True}).get('result', {}).get('value')
+    try:
+        call('Network.enable')
+        call('Network.setCacheDisabled', {'cacheDisabled': True})   # every build is written to the same main_tf.js
+        call('Emulation.setFocusEmulationEnabled', {'enabled': True})
+        call('Page.navigate', {'url': 'http://127.0.0.1:%d/harness.html?id=jrfix&scn=%s%s' % (hp, scn, EXTRA.get(scn, ''))})
+        t0 = time.time()
+        while time.time() - t0 < 180:
+            time.sleep(0.2)
+            h = ev('(window.__hoverReq && window.__hoverReq.n !== window.__hoverDone) ? JSON.stringify(window.__hoverReq) : null')
+            if h:
+                req = json.loads(h)
+                pt = ev(HOVER_PT % json.dumps(req['sel']))
+                if pt:
+                    xy = json.loads(pt)
+                    call('Input.dispatchMouseEvent', {'type': 'mouseMoved', 'x': xy['x'], 'y': xy['y'], 'pointerType': 'mouse'})
+                ev('window.__hoverDone = %d' % req['n'])
+            k = ev('(window.__keyReq && window.__keyReq.n !== window.__keyDone) ? JSON.stringify(window.__keyReq) : null')
+            if k:
+                kr = json.loads(k)
+                for key in kr['keys']: press(call, key)
+                ev('window.__keyDone = %d' % kr['n'])
+            v = ev('window.__JRDONE ? JSON.stringify(window.__JRRESULT) : null')
+            if v: return json.loads(v)
+        return {'fatal': 'timeout (180 s)'}
+    finally:
+        try: ws.close()
+        except Exception: pass
+        try: urllib.request.urlopen('http://127.0.0.1:%d/json/close/%s' % (dp, t['id']), timeout=10).read()
+        except Exception: pass
+
+def run_srv(files, mode):
+    d = os.path.join(stage, 'srv')
+    os.makedirs(d, exist_ok=True)
+    for rel in PHP_FILES:
+        open(os.path.join(d, rel), 'wb').write(files[rel][1].encode('utf-8', 'surrogateescape'))
+    r = subprocess.run([PHP, '-n', os.path.join(HERE, 'server_check.php'), d, mode], capture_output=True, timeout=120)
+    try: return json.loads(r.stdout.decode('utf-8', 'replace'))
+    except Exception: return {'fatal': 'server_check.php: ' + (r.stdout + r.stderr).decode('utf-8', 'replace')[:600]}
+
+def run_wire(files):
+    t = files['js/main.js'][1].replace('\r\n', '\n')
+    a = t.find("            newUrl.searchParams.set('id', response.new_id);")
+    z = t.find("            $('#saveStateLightbox').fadeOut();", a) if a >= 0 else -1
+    region = t[a:z] if (a >= 0 and z > a) else ''
+    call_ok = 'window.Penumbra.journalSwitchReport(response.new_id || shortId)' in region
+    old_gone = 'window.Penumbra.journalReportId = shortId;' not in region
+    return {'asserts': [{'id': 'W-save-switch', 'ok': bool(region) and call_ok and old_gone,
+                         'detail': ('save success region %d chars; switch call %s; copy-only re-point gone %s' % (len(region), call_ok, old_gone))}]}
+
+def run_build(files, scns):
+    res = {}
+    if any(s in BROWSER_SCN for s in scns):
+        idx = files['index.php'][1]
+        page = harness.replace('<!--TF_VIEW_OPTIONS-->', lift_div(idx, '<div id="journalRowConfig"', '#journalRowConfig'))
+        page = page.replace('<!--TF_JOURNAL_PANEL-->', lift_div(idx, '<div id="journalLightbox"', '#journalLightbox'))
+        open(os.path.join(stage, 'harness.html'), 'w', encoding='utf-8').write(page)
+        open(os.path.join(stage, 'main_tf.js'), 'wb').write(hook(files['js/main.js'][1]).encode('utf-8', 'surrogateescape'))
+        open(os.path.join(stage, 'main.css'), 'wb').write(files['css/main.css'][1].encode('utf-8', 'surrogateescape'))
+        open(os.path.join(stage, 'penumbra_journal.js'), 'wb').write(files['js/penumbra_journal.js'][1].encode('utf-8', 'surrogateescape'))
+        open(os.path.join(stage, 'penumbra_journal.css'), 'wb').write(files['css/penumbra_journal.css'][1].encode('utf-8', 'surrogateescape'))
+    for s in scns:
+        if s == 'srv': res[s] = run_srv(files, 'a')
+        elif s == 'srvb': res[s] = run_srv(files, 'b')
+        elif s == 'srvd': res[s] = run_srv(files, 'd')
+        elif s == 'wire': res[s] = run_wire(files)
+        else: res[s] = run_page(s)
+    return res
+
+def evaluate(res, scns):
+    out = []
+    for s in scns:
+        r = res.get(s, {})
+        got = {a['id']: a for a in (r.get('asserts') or [])}
+        for aid in EXPECT[s]:
+            if aid in got: out.append((aid, got[aid]['ok'], got[aid]['detail']))
+            else: out.append((aid, False, 'NOT RECORDED' + (' | fatal: ' + (r.get('fatal') or '')[:300] if r.get('fatal') else '')))
+        for aid, a in got.items():
+            if aid not in EXPECT[s]: out.append((aid, a['ok'], 'UNEXPECTED ID ' + a['detail']))
+        if s in BROWSER_SCN:
+            out.append(('E-' + s, not r.get('errors') and not r.get('hookErr') and not r.get('missing') and not r.get('fatal'),
+                        'errors %s hook %s missing %s fatal %s' % (r.get('errors'), r.get('hookErr'), r.get('missing'), (r.get('fatal') or '')[:200])))
+        elif r.get('fatal'):
+            out.append(('E-' + s, False, r['fatal'][:400]))
+    return out
+
+try:
+    files = build_files()
+    print('build under test:')
+    for rel in FILES: print('  %-24s %s' % (rel, files[rel][0]))
+    if control: print('  (CONTROL: the pre-fix build)')
+    if control_b: print('  (CONTROL-B: the Round A build)')
+    if control_c: print('  (CONTROL-C: the build with the visible who / when label)')
+    if control_d: print('  (CONTROL-D: the build before Round D)')
+    pool = ROUND_A_SCN if control else ((ROUND_A_SCN + ROUND_B_SCN) if (control_b or control_c) else ALL_SCN)
+    names = [s for s in pool if not scn_arg or s in scn_arg.split(',')]
+    if all_mutants or one_mutant:
+        ok = bad = 0
+        for m in (one_mutant.split(',') if one_mutant else list(MUTANTS)):
+            edits, must, mscn = MUTANTS[m]
+            sc = [s for s in (mscn or names) if s in names]
+            res = evaluate(run_build(mutate(files, m), sc), sc)
+            red = [a for a, p, _ in res if not p]
+            if must is None:
+                print('  EXPLORE mutant %-18s red: %s' % (m, ' '.join(red) or '(nothing)'))
+                for a, p, d in res:
+                    if not p: print('        %-18s %s' % (a, d[:300]))
+                bad += 1
+                continue
+            good = sorted(red) == sorted(must)
+            ok += good; bad += (not good)
+            print('  %s  mutant %-18s turns %s red   [red: %s]' % ('PASS' if good else 'FAIL', m, ' '.join(must) or '(nothing)', ' '.join(red)))
+            if verbose or not good:
+                for a, p, d in res:
+                    if not p: print('        %-18s %s' % (a, d[:300]))
+        print('SUMMARY mutants ok=%d bad=%d' % (ok, bad))
+        print('RESULT: GREEN' if bad == 0 and ok > 0 else 'RESULT: RED')
+    else:
+        res = evaluate(run_build(files, names), names)
+        p = f = 0; failed = []
+        for a, passed, d in res:
+            print('  %s  %-18s %s' % ('PASS' if passed else 'FAIL', a, d[:420]))
+            if passed: p += 1
+            else: f += 1; failed.append(a)
+        print('TOTAL pass=%d fail=%d   failed: %s' % (p, f, ' '.join(failed)))
+        if control or control_b or control_c or control_d:
+            reds = CONTROL_RED if control else (CONTROL_RED_B if control_b else (CONTROL_RED_C if control_c else CONTROL_RED_D))
+            if reds is None:
+                print('CONTROL: not frozen yet - red set: %s' % ' '.join(failed))
+                print('RESULT: RED')
+            else:
+                want = [a for a in reds if any(a in EXPECT[s] or a == 'E-' + s for s in names)]
+                print('CONTROL: %s (expected red: %s)' % ('as expected' if sorted(failed) == sorted(want) else 'NOT as expected', ' '.join(want)))
+                print('RESULT: GREEN' if sorted(failed) == sorted(want) else 'RESULT: RED')
+        else:
+            print('RESULT: GREEN' if f == 0 and p > 0 else 'RESULT: RED')
+finally:
+    try: edge.kill()
+    except Exception: pass
+    try: srv.kill()
+    except Exception: pass
+    time.sleep(1)
+    if keep: print('kept: ' + stage)
+    else: shutil.rmtree(stage, ignore_errors=True)

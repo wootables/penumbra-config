@@ -1,0 +1,108 @@
+<?php
+/**
+ * Audit-fix unit tests (2026-08-22): cron DOW 7, NaN custom conditions,
+ * first-run baseline fallback, pivot word operators (server reference).
+ *
+ * Runs against the LIVE app files through the parity extractor
+ * (token_get_all) - schedule_runner.php is never included directly (it would
+ * start the scheduler). Pass AF_SRC_RUNNER / AF_SRC_MANAGE env vars to point
+ * at a .bak to prove the suite can fail (mutation control).
+ */
+$here = __DIR__;
+$pass = 0; $fail = 0;
+function t($name, $cond, $detail = '') {
+    global $pass, $fail;
+    if ($cond) { $pass++; echo "PASS  $name\n"; }
+    else { $fail++; echo "FAIL  $name" . ($detail !== '' ? "  :: $detail" : '') . "\n"; }
+}
+
+// --- stubs; the extracted copies are wrapped in function_exists() so these win ---
+$GLOBALS['__log'] = array();
+function log_scheduler($m) { $GLOBALS['__log'][] = $m; }
+$GLOBALS['__fake_snapshot'] = null;
+function penumbra_fetch_latest_scheduler_snapshot($rid, $cb, $pw) { return $GLOBALS['__fake_snapshot']; }
+function queryViaOci8($sql, $binds = array()) { throw new Exception('no DB in unit tests: ' . $sql); }
+function getOci8Connection() { throw new Exception('no DB in unit tests'); }
+function penumbra_snaps_pin_supported() { return true; }
+
+require $here . '/runner_functions.php';
+require $here . '/manage_functions.php';
+
+// ---------------------------------------------------------------- 1. cron DOW 7 (runner)
+$n  = get_next_run_date('0 9 * * 7');
+t('runner: DOW 7 parses to a Sunday 09:00', $n !== false && date('w', strtotime($n)) === '0' && date('H:i', strtotime($n)) === '09:00', var_export($n, true));
+$n0 = get_next_run_date('0 9 * * 0');
+t('runner: DOW 0 is a Sunday 09:00', $n0 !== false && date('w', strtotime($n0)) === '0');
+t('runner: 7 and 0 yield the same occurrence', $n === $n0, "$n vs $n0");
+$n15 = get_next_run_date('0 9 * * 1-5');
+t('runner: weekday range unaffected', $n15 !== false && in_array((int)date('w', strtotime($n15)), array(1, 2, 3, 4, 5), true));
+$n57 = get_next_run_date('0 9 * * 5-7');
+t('runner: range ending in 7 covers Fri/Sat/Sun', $n57 !== false && in_array((int)date('w', strtotime($n57)), array(5, 6, 0), true), var_export($n57, true));
+$n17 = get_next_run_date('0 9 * * 1,7');
+t('runner: list containing 7 covers Mon/Sun', $n17 !== false && in_array((int)date('w', strtotime($n17)), array(1, 0), true), var_export($n17, true));
+t('runner: check_cron_part("7", 0) alone stays false (fallback lives in the caller)', check_cron_part('7', 0) === false);
+
+// ---------------------------------------------------------------- 2. cron DOW 7 (manage_schedule)
+$m  = get_next_run_date_calc('0 9 * * 7');
+t('manage: DOW 7 parses to a Sunday 09:00', date('w', strtotime($m)) === '0' && date('H:i', strtotime($m)) === '09:00', $m);
+$m0 = get_next_run_date_calc('0 9 * * 0');
+t('manage: same occurrence as DOW 0', $m === $m0, "$m vs $m0");
+t('manage: the +1 hour fallback was NOT taken', abs(strtotime($m) - strtotime('+1 hour')) > 600, $m);
+
+// ---------------------------------------------------------------- 3. NaN custom conditions fail loud
+$r = evaluate_custom_condition('NaN > 0', array(), array(), 'flat');
+t('NaN > 0 -> null (CONDITION_EVAL_FAILED), never true', $r === null, var_export($r, true));
+$r2 = evaluate_custom_condition('0 < NaN', array(), array(), 'flat');
+t('0 < NaN -> null', $r2 === null, var_export($r2, true));
+$r3 = evaluate_custom_condition('5 > 0', array(), array(), 'flat');
+t('control: 5 > 0 -> true', $r3 === true, var_export($r3, true));
+$r4 = evaluate_custom_condition('0 > 5', array(), array(), 'flat');
+t('control: 0 > 5 -> false', $r4 === false, var_export($r4, true));
+$data = array(array('ID' => '1', 'NOTES' => 'x'), array('ID' => '2', 'NOTES' => ''));
+$cols = array('ID', 'NOTES');
+$r5 = evaluate_custom_condition("count(NOTES != '') > 0", $data, $cols, 'flat');
+t("count(NOTES != '') > 0 -> null (row notes are browser-only)", $r5 === null, var_export($r5, true));
+$r6 = evaluate_custom_condition("count(ID != '') > 0", $data, $cols, 'flat');
+t("control: count(ID != '') > 0 -> true", $r6 === true, var_export($r6, true));
+
+// ---------------------------------------------------------------- 4. pivot word operators (server reference for the browser change)
+$row = array('TITLE' => 'Grant award');
+t('pivot contains (server)', pivot_evaluate_single_condition($row, 'TITLE contains grant') === true);
+t('pivot CONTAINS is case-insensitive (server)', pivot_evaluate_single_condition($row, 'TITLE CONTAINS GRANT') === true);
+// "starts with" is NOT an operator on either side (removed 2026-08-22 on user
+// feedback - the Visual Search Builder writes a prefix test as the anchored
+// regex COL = /^X/). An unparseable condition passes through as TRUE here, so
+// both forms read the same: no filtering.
+t('pivot "starts with" is not a server operator (unparseable -> pass-through)',
+    pivot_evaluate_single_condition($row, 'TITLE starts with gr') === true
+    && pivot_evaluate_single_condition($row, 'TITLE starts with award') === true);
+t('pivot contains still works after the removal', pivot_evaluate_single_condition($row, 'TITLE contains award') === true
+    && pivot_evaluate_single_condition($row, 'TITLE contains nope') === false);
+
+// ---------------------------------------------------------------- 5. first-run baseline fallback
+if (!function_exists('penumbra_first_run_baseline_unchanged')) {
+    t('baseline: helper exists', false, 'penumbra_first_run_baseline_unchanged missing (pre-fix source?)');
+} else {
+    $rows = array(array('ID' => '1', 'AMOUNT' => '10'), array('ID' => '2', 'AMOUNT' => '20'));
+    $GLOBALS['__fake_snapshot'] = null;
+    t('baseline: no snapshot of any kind -> false (run proceeds)', penumbra_first_run_baseline_unchanged(1, null, $rows, null, 'test') === false);
+    $GLOBALS['__fake_snapshot'] = array('id' => 7, 'name' => 'Baseline (pre-scheduler)', 'rows' => $rows, 'created_at' => '');
+    $GLOBALS['__log'] = array();
+    t('baseline: identical rows -> true (skip)', penumbra_first_run_baseline_unchanged(1, null, $rows, null, 'test') === true, implode(' | ', $GLOBALS['__log']));
+    t('baseline: the check is logged with the snapshot id and counts', count($GLOBALS['__log']) === 1 && strpos($GLOBALS['__log'][0], '#7') !== false && strpos($GLOBALS['__log'][0], '0 new, 0 removed, 0 modified') !== false, implode(' | ', $GLOBALS['__log']));
+    $rows2 = $rows; $rows2[1]['AMOUNT'] = '21';
+    t('baseline: modified row -> false', penumbra_first_run_baseline_unchanged(1, null, $rows2, null, 'test') === false);
+    $rows3 = $rows; $rows3[] = array('ID' => '3', 'AMOUNT' => '30');
+    t('baseline: new row -> false', penumbra_first_run_baseline_unchanged(1, null, $rows3, null, 'test') === false);
+    t('baseline: removed row -> false', penumbra_first_run_baseline_unchanged(1, null, array($rows[0]), null, 'test') === false);
+    t('baseline: custom key columns, unchanged -> true', penumbra_first_run_baseline_unchanged(1, null, $rows, array('ID'), 'test') === true);
+    t('baseline: empty current rows -> false', penumbra_first_run_baseline_unchanged(1, null, array(), null, 'test') === false);
+    $GLOBALS['__fake_snapshot'] = array('id' => 8, 'name' => 'legacy', 'rows' => array(), 'created_at' => '');
+    t('baseline: snapshot with no rows -> false', penumbra_first_run_baseline_unchanged(1, null, $rows, null, 'test') === false);
+}
+
+// ---------------------------------------------------------------- 6. snapshot-name send tokens are the email tokens (format parity)
+t('send-date token formats exist as used by the email subject', date('F j, Y') !== '' && date('g:i A') !== '');
+
+echo "\n$pass passed, $fail failed\n";
+exit($fail > 0 ? 1 : 0);

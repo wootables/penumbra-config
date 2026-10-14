@@ -1,0 +1,264 @@
+<!doctype html><meta charset="utf-8"><title>running</title><pre id="out">running</pre>
+<script src="SRC.js"></script>
+<script>
+var LOG=[],PASS=0,FAIL=0;
+function ok(n,c,x){ if(c){PASS++;LOG.push('PASS  '+n);} else {FAIL++;LOG.push('FAIL  '+n+(x?'   >> '+x:''));} }
+function eq(n,g,w){ ok(n, JSON.stringify(g)===JSON.stringify(w), 'got='+JSON.stringify(g)+' want='+JSON.stringify(w)); }
+function close(n,g,w,tol){ ok(n, Math.abs(g-w) <= (tol||1e-9), 'got='+g+' want='+w); }
+
+try {
+  var code = String(window.__src).replace(/\r\n/g,'\n');
+  function grab(decl){
+    var start=code.indexOf(decl);
+    if(start===-1) throw new Error('anchor not found: '+decl);
+    var i=code.indexOf('{',start),depth=0,inStr=null,inLine=false,inBlk=false,inRe=false;
+    for(var j=i;j<code.length;j++){
+      var c=code[j],n=code[j+1];
+      if(inLine){ if(c==='\n') inLine=false; continue; }
+      if(inBlk){ if(c==='*'&&n==='/'){inBlk=false;j++;} continue; }
+      if(inStr){ if(c==='\\'){j++;continue;} if(c===inStr) inStr=null; continue; }
+      if(inRe){ if(c==='\\'){j++;continue;} if(c==='/') inRe=false; continue; }
+      if(c==='/'&&n==='/'){inLine=true;j++;continue;}
+      if(c==='/'&&n==='*'){inBlk=true;j++;continue;}
+      if(c==='"'||c==="'"||c==='`'){inStr=c;continue;}
+      if(c==='/'){ var k=j-1; while(k>=0&&/\s/.test(code[k]))k--;
+        if(k<0||/[=(,:;!&|?{}[\n+\-*%~^<>]/.test(code[k])){inRe=true;continue;} }
+      if(c==='{')depth++; else if(c==='}'){depth--; if(depth===0) return code.slice(start,j+1);}
+    }
+    throw new Error('unbalanced: '+decl);
+  }
+
+  // ---- box maths, real source (incl. the SHARED percentile) ----
+  var bsrc = grab('function penumbraPercentileOf(') + '\n' +
+             grab('function _vizParseWhiskerMode(') + '\n' +
+             grab('function _vizBoxStats(');
+  var B = new Function(bsrc + '\nreturn {pct:penumbraPercentileOf, mode:_vizParseWhiskerMode, stats:_vizBoxStats};')();
+
+  eq('whiskerMode: default tukey', B.mode(''), 'tukey');
+  eq('whiskerMode: minmax', B.mode('minmax'), 'minmax');
+  eq('whiskerMode: case-insensitive', B.mode('MinMax'), 'minmax');
+  eq('whiskerMode: junk -> tukey', B.mode('banana'), 'tukey');
+  eq('whiskerMode: null -> tukey', B.mode(null), 'tukey');
+
+  eq('boxStats: empty -> null', B.stats([], 'tukey'), null);
+  eq('boxStats: null -> null', B.stats(null, 'tukey'), null);
+
+  // 1..9 : Q1=3, median=5, Q3=7 under the linear (interpolating) rule
+  var s9 = B.stats([1,2,3,4,5,6,7,8,9], 'tukey');
+  eq('boxStats: Q1 of 1..9', s9.q1, 3);
+  eq('boxStats: median of 1..9', s9.q2, 5);
+  eq('boxStats: Q3 of 1..9', s9.q3, 7);
+  eq('boxStats: IQR', s9.iqr, 4);
+  eq('boxStats: n', s9.n, 9);
+  eq('boxStats: no outliers in a clean run', s9.outliers, []);
+  eq('boxStats: whiskers reach the extremes when nothing is out', [s9.lo,s9.hi], [1,9]);
+
+  // MUST agree with the shared percentile helper (the whole point of reusing it)
+  eq('boxStats: Q1 === penumbraPercentileOf(25)', s9.q1, B.pct([1,2,3,4,5,6,7,8,9],25));
+  eq('boxStats: median === penumbraPercentileOf(50)', s9.q2, B.pct([1,2,3,4,5,6,7,8,9],50));
+  eq('boxStats: Q3 === penumbraPercentileOf(75)', s9.q3, B.pct([1,2,3,4,5,6,7,8,9],75));
+
+  // input order must not matter (the helper sorts a COPY)
+  var shuffled = [9,1,5,3,7,2,8,4,6];
+  var sShuf = B.stats(shuffled, 'tukey');
+  eq('boxStats: order-independent', [sShuf.q1,sShuf.q2,sShuf.q3], [s9.q1,s9.q2,s9.q3]);
+  eq('boxStats: caller array not mutated', shuffled, [9,1,5,3,7,2,8,4,6]);
+
+  // an obvious outlier
+  var sOut = B.stats([1,2,3,4,5,6,7,8,9,100], 'tukey');
+  ok('boxStats: 100 flagged as an outlier', sOut.outliers.indexOf(100) !== -1, JSON.stringify(sOut.outliers));
+  ok('boxStats: upper whisker stops at a REAL data point, not the fence',
+     [1,2,3,4,5,6,7,8,9,100].indexOf(sOut.hi) !== -1, 'hi='+sOut.hi);
+  ok('boxStats: whisker is below the outlier', sOut.hi < 100, 'hi='+sOut.hi);
+  eq('boxStats: max still records the outlier', sOut.max, 100);
+
+  // minmax mode never produces outliers
+  var sMM = B.stats([1,2,3,4,5,6,7,8,9,100], 'minmax');
+  eq('minmax: no outliers ever', sMM.outliers, []);
+  eq('minmax: whiskers are the true extremes', [sMM.lo,sMM.hi], [1,100]);
+  eq('minmax: quartiles identical to tukey', [sMM.q1,sMM.q2,sMM.q3], [sOut.q1,sOut.q2,sOut.q3]);
+
+  // degenerate inputs
+  var sOne = B.stats([42], 'tukey');
+  eq('boxStats: single value collapses to a point', [sOne.q1,sOne.q2,sOne.q3,sOne.lo,sOne.hi], [42,42,42,42,42]);
+  eq('boxStats: single value has no outliers', sOne.outliers, []);
+  var sSame = B.stats([5,5,5,5], 'tukey');
+  eq('boxStats: identical values -> zero IQR', sSame.iqr, 0);
+  eq('boxStats: identical values -> no outliers', sSame.outliers, []);
+  var sNeg = B.stats([-10,-5,0,5,10], 'tukey');
+  eq('boxStats: negatives handled', sNeg.q2, 0);
+  ok('boxStats: negative min preserved', sNeg.min === -10);
+
+  // ---- generateChartDataFromMaps: box + pareto, real source ----
+  var stubs=[
+   'function parseAccountingNumber(v){ if(v==null) return NaN; var s=String(v).replace(/[$,\\s]/g,""); if(s==="") return NaN; var n=Number(s); return isNaN(n)?NaN:n; }',
+   'function getCustomSortComparator(){ return null; }',
+   'function vizExtraAggregate(){ return undefined; }',
+   'function getChartColor(i,a){ return "C"+i; }',
+   'function getChartBorderColor(i){ return "B"+i; }',
+   'function vizBucketRowsForAxis(r){ return r; }',
+   'function pivotWavgWeightCol(){ return null; }',
+   'function vizAggNeedsWeights(){ return false; }',
+   'function decodeHtmlEntities(s){ return String(s==null?"":s); }',
+   'function hexToRgba(c){ return c; }',
+   'function darkenRgba(c){ return c; }',
+   'function lightenRgba(c){ return c; }'
+  ].join('\n');
+  var gen = new Function(stubs+'\n'+bsrc+'\n'+
+                         grab('function _vizParseFunnelMode(')+'\n'+
+                         grab('function _vizParseUserNumber(')+'\n'+grab('function _vizParseBands(')+'\n'+
+                         grab('function _vizParseUserNumber(')+'\n'+grab('function _vizParseRefMarker(')+'\n'+grab('function _vizParseTarget(')+'\n'+
+                         grab('function _vizGaugeRange(')+'\n'+
+                         grab('function _vizParseVizOptions(')+'\n'+(/var PENUMBRA_PALETTE_NAMES = [^;]*;/.exec(code)||[''])[0]+'\n'+grab('function _vizParsePalette(')+'\n'+grab('function _vizParseFormat(')+'\n'+grab('function _vizParseUserNumber(')+'\n'+grab('function generateChartDataFromMaps(')+'\n'+grab('function _generateChartDataFromMaps(')+'\n'+(code.indexOf('function penumbraComboAutoSlots(')!==-1?grab('function penumbraComboAutoSlots(')+'\n'+grab('function penumbraButterflyAutoColor(')+'\nfunction _penumbraPaletteHex(i){ return "#00000"+i; }\nvar _penumbraActivePalette = "auto";':'')+
+                         '\nreturn generateChartDataFromMaps;')();
+
+  function rows(pairs){ return pairs.map(function(p){ var m=new Map(); m.set('DEPT',p[0]); m.set('AMT',p[1]); return m; }); }
+
+  var R = rows([
+    ['A',1],['A',2],['A',3],['A',4],['A',5],
+    ['B',10],['B',20],['B',30],['B',40],['B',500],
+    ['C',7],['C',7],['C',7]
+  ]);
+  var bx = gen(R,'DEPT','AMT',null,'sum',10,'box','value','desc','default',false,false,null,'',{boxWhiskers:'tukey'});
+  ok('box: _isBox flag', bx._isBox === true);
+  eq('box: whisker mode recorded', bx._boxWhiskers, 'tukey');
+  eq('box: one box per category', bx.labels.length, 3);
+  eq('box: sorted by MEDIAN desc', bx.labels, ['B','C','A']);
+  eq('box: dataset carries [Q1,Q3] pairs', bx.datasets[0].data[0], [bx._boxStats[0].q1, bx._boxStats[0].q3]);
+  eq('box: B median', bx._boxStats[0].q2, 30);
+  eq('box: C is a degenerate box', bx._boxStats[1].iqr, 0);
+  ok('box: B flags 500 as an outlier', bx._boxStats[0].outliers.indexOf(500) !== -1);
+  eq('box: _chartType tag', bx._chartType, 'box');
+
+  // sort by label asc
+  var bxL = gen(R,'DEPT','AMT',null,'sum',10,'box','label','asc','default',false,false,null,'',{});
+  eq('box: label asc order', bxL.labels, ['A','B','C']);
+  eq('box: default whisker mode when arg absent', bxL._boxWhiskers, 'tukey');
+
+  // minmax through the data path
+  var bxM = gen(R,'DEPT','AMT',null,'sum',10,'box','label','asc','default',false,false,null,'',{boxWhiskers:'minmax'});
+  eq('box: minmax mode reaches the stats', bxM._boxWhiskers, 'minmax');
+  eq('box: minmax B has no outliers', bxM._boxStats[1].outliers, []);
+  eq('box: minmax B whisker reaches 500', bxM._boxStats[1].hi, 500);
+
+  // non-numeric rows are excluded, not zero-filled
+  var bxN = gen(rows([['A',1],['A','n/a'],['A',3]]),'DEPT','AMT',null,'sum',10,'box','label','asc','default',false,false,null,'',{});
+  eq('box: blanks excluded from n (not counted as 0)', bxN._boxStats[0].n, 2);
+  eq('box: blanks do not drag the median to 0', bxN._boxStats[0].q2, 2);
+
+  // a category with NO numeric values is dropped entirely
+  var bxD = gen(rows([['A',1],['A',3],['Z','x'],['Z','y']]),'DEPT','AMT',null,'sum',10,'box','label','asc','default',false,false,null,'',{});
+  eq('box: all-blank category dropped', bxD.labels, ['A']);
+
+  // no numeric values anywhere -> its own _noData message
+  var bxE = gen(rows([['A','x']]),'DEPT','AMT',null,'sum',10,'box','label','asc','default',false,false,null,'',{});
+  ok('box: no numerics -> _noData', !!bxE._noData, JSON.stringify(bxE).slice(0,120));
+
+  // Other bucket POOLS the tail's raw values (meaningful here, unlike bullet)
+  var many = rows([['A',1],['A',2],['B',10],['B',20],['C',100],['C',200],['D',1000],['D',2000]]);
+  var bxO = gen(many,'DEPT','AMT',null,'sum',2,'box','value','desc','default',false,true,null,'',{});
+  eq('box: Other appended', bxO.labels, ['D','C','Other']);
+  eq('box: Other pools A+B raw values (n=4)', bxO._boxStats[2].n, 4);
+  eq('box: Other median of [1,2,10,20]', bxO._boxStats[2].q2, 6);
+
+  // ---- PARETO ----
+  var CS = [
+    {col:'AMT', agg:'sum',           type:'bar',  label:'Spend'},
+    {col:'AMT', agg:'running_total', type:'line', label:'Cumulative'}
+  ];
+  var P = rows([['A',50],['B',30],['C',15],['D',5]]);
+
+  var noP = gen(P,'DEPT','AMT',null,'sum',10,'combo','value','desc','default',false,false,CS,'',{});
+  ok('pareto OFF: flag absent', noP._isPareto === false);
+  var lineOff = noP.datasets.filter(function(d){return d.type==='line';})[0];
+  eq('pareto OFF: line is cumulative ABSOLUTE', lineOff.data, [50,80,95,100]);
+
+  var yesP = gen(P,'DEPT','AMT',null,'sum',10,'combo','value','desc','default',false,false,CS,'',{pareto:true});
+  ok('pareto ON: flag set', yesP._isPareto === true);
+  var lineOn = yesP.datasets.filter(function(d){return d.type==='line';})[0];
+  eq('pareto ON: line rescaled to % of grand total', lineOn.data, [50,80,95,100]);
+  var barOn = yesP.datasets.filter(function(d){return d.type!=='line';})[0];
+  eq('pareto ON: BARS keep absolute units', barOn.data, [50,30,15,5]);
+
+  // a case where % and absolute genuinely differ
+  var P2 = rows([['A',200],['B',200],['C',100]]);
+  var yesP2 = gen(P2,'DEPT','AMT',null,'sum',10,'combo','value','desc','default',false,false,CS,'',{pareto:true});
+  var l2 = yesP2.datasets.filter(function(d){return d.type==='line';})[0];
+  eq('pareto ON: 200/200/100 -> 40/80/100 %', l2.data, [40,80,100]);
+  ok('pareto ON: last point is exactly 100', l2.data[l2.data.length-1] === 100);
+
+  // pareto ticked but NO cumulative series -> must NOT claim pareto
+  var CSflat = [
+    {col:'AMT', agg:'sum', type:'bar',  label:'Spend'},
+    {col:'AMT', agg:'avg', type:'line', label:'Average'}
+  ];
+  var noCum = gen(P,'DEPT','AMT',null,'sum',10,'combo','value','desc','default',false,false,CSflat,'',{pareto:true});
+  ok('pareto ON w/o a cumulative line: flag stays FALSE', noCum._isPareto === false);
+  var lFlat = noCum.datasets.filter(function(d){return d.type==='line';})[0];
+  ok('pareto ON w/o cumulative: that line is untouched', lFlat.data[0] === 50, JSON.stringify(lFlat.data));
+
+  // running_count also qualifies
+  var CScount = [
+    {col:'AMT', agg:'sum',           type:'bar',  label:'Spend'},
+    {col:'AMT', agg:'running_count', type:'line', label:'Cum count'}
+  ];
+  var pc = gen(P,'DEPT','AMT',null,'sum',10,'combo','value','desc','default',false,false,CScount,'',{pareto:true});
+  ok('pareto: running_count also rescales', pc._isPareto === true);
+  var lc = pc.datasets.filter(function(d){return d.type==='line';})[0];
+  eq('pareto: running_count -> 25/50/75/100 %', lc.data, [25,50,75,100]);
+
+  // ---- applyParetoChartConfig ----
+  var A = new Function(grab('function applyParetoChartConfig(') + '\nreturn applyParetoChartConfig;')();
+  function cfgDual(){ return { options:{ scales:{ x:{}, y:{}, y2:{position:'right',ticks:{},grid:{}} },
+                                         plugins:{ legend:{display:true}, tooltip:{}, datalabels:{} } } }; }
+  var pc1 = cfgDual();
+  A(pc1, yesP, {isDark:false, textColor:'#111'});
+  eq('paretoCfg: y2 pinned to 0', pc1.options.scales.y2.min, 0);
+  eq('paretoCfg: y2 pinned to 100', pc1.options.scales.y2.max, 100);
+  eq('paretoCfg: y2 ticks render as %', pc1.options.scales.y2.ticks.callback(60), '60%');
+  ok('paretoCfg: 80% marker plugin registered',
+     pc1.plugins.some(function(p){return p.id==='penumbraParetoMarker';}));
+
+  // no dual axis configured -> the helper must CREATE y2, not silently plot % on dollars
+  var pc2 = { options:{ scales:{ x:{}, y:{} }, plugins:{ legend:{}, tooltip:{}, datalabels:{} } } };
+  A(pc2, yesP, {isDark:true, textColor:'#eee'});
+  ok('paretoCfg: y2 created when Dual Y-Axis was off', !!pc2.options.scales.y2);
+  eq('paretoCfg: created y2 also pinned', [pc2.options.scales.y2.min, pc2.options.scales.y2.max], [0,100]);
+  ok('paretoCfg: line dataset reassigned to y2',
+     yesP.datasets.filter(function(d){return d.type==='line';})[0].yAxisID === 'y2');
+
+  // guard: non-pareto data is a no-op
+  var pc3 = cfgDual();
+  A(pc3, noP, {isDark:false, textColor:'#111'});
+  ok('paretoCfg: no-op when _isPareto is false', pc3.options.scales.y2.min === undefined);
+
+  // ---- applyBoxChartConfig ----
+  var Abox = new Function('return (' + grab('function applyBoxChartConfig(') + ');')();
+  function cfgBox(){ return { options:{ scales:{ x:{grid:{}}, y:{grid:{}} },
+                                        plugins:{ legend:{display:true}, tooltip:{}, datalabels:{display:true} } } }; }
+  var bc = cfgBox();
+  Abox(bc, bx, {showValues:true, textColor:'#111', isDark:false, currencyPrefix:'$', fsBoost:0, horizontal:false});
+  eq('boxCfg: vertical indexAxis', bc.options.indexAxis, 'x');
+  ok('boxCfg: legend off', bc.options.plugins.legend.display === false);
+  ok('boxCfg: datalabels off (box IS the summary)', bc.options.plugins.datalabels.display === false);
+  ok('boxCfg: decor plugin registered', bc.plugins.some(function(p){return p.id==='penumbraBoxDecor';}));
+  var tl = bc.options.plugins.tooltip.callbacks.label({dataIndex:0});
+  ok('boxCfg: tooltip is a multi-line five-number summary', Array.isArray(tl) && tl.length >= 8, JSON.stringify(tl));
+  ok('boxCfg: tooltip names the median', tl.join('|').indexOf('median') !== -1);
+  ok('boxCfg: tooltip reports n', tl.join('|').indexOf('n = ') !== -1);
+  ok('boxCfg: tooltip counts outliers for B', tl.join('|').indexOf('outliers: 1') !== -1, tl.join('|'));
+
+  var bch = cfgBox();
+  Abox(bch, bx, {showValues:true, textColor:'#111', isDark:true, currencyPrefix:'', fsBoost:0, horizontal:true});
+  eq('boxCfg: horizontal indexAxis', bch.options.indexAxis, 'y');
+
+  var bcn = cfgBox();
+  Abox(bcn, {labels:[],datasets:[]}, {});
+  ok('boxCfg: no-op on non-box data', bcn.options.indexAxis === undefined);
+
+  document.getElementById('out').textContent =
+    'RESULT '+(FAIL===0?'ALL-PASS':'HAS-FAILURES')+'  pass='+PASS+' fail='+FAIL+'\n'+LOG.join('\n');
+} catch(e) {
+  document.getElementById('out').textContent='HARNESS-ERROR: '+e.name+': '+e.message+'\n'+(e.stack||'');
+}
+</script>

@@ -1,0 +1,131 @@
+<?php
+/**
+ * METRICS ACTIVITY SUITE (2026-10-03): Platform Metrics' Activity tab, the
+ * toggles reaching the feed at both scopes, and the breadcrumb title.
+ *
+ *   A. penumbra_an_report_feed($run, null, ...) - every report: the SQL ranks
+ *      ROWIDs alone (no CLOB read per table row), the caller's seam sits INSIDE
+ *      that ranking, the previews are read for those rows only, and each row
+ *      carries its report's short id and title.
+ *   B. the report-scope query is BYTE-IDENTICAL to the shipped one before the
+ *      change (--orig=<dir>): its rows and SQL are unchanged.
+ *   C. analytics_all.php: both feeds wired on the right seams, the toggles
+ *      tagged (incl. "not mine"), the Activity tab at both scopes, the
+ *      breadcrumb (Analytics > All Reports [> report]; All Reports links up for
+ *      admins only).
+ *
+ *   php -n test_anactivity.php --app=<dir> --orig=<dir> [--control] [--mutant=1|2|3]
+ *     --mutant=1  the seam is dropped from the ranking subquery -> A scope RED
+ *     --mutant=2  the report column never fills -> A report/title RED
+ *     --mutant=3  the report-scope SQL loses a space -> B RED
+ */
+error_reporting(E_ALL);
+set_error_handler(function ($no, $str, $file, $line) { throw new ErrorException($str, 0, $no, $file, $line); });
+$opt = array('app' => '', 'orig' => '', 'control' => false, 'mutant' => 0);
+foreach (array_slice($argv, 1) as $a) {
+    if (strpos($a, '--app=') === 0) $opt['app'] = rtrim(substr($a, 6), '/\\');
+    elseif (strpos($a, '--orig=') === 0) $opt['orig'] = rtrim(substr($a, 7), '/\\');
+    elseif ($a === '--control') $opt['control'] = true;
+    elseif (strpos($a, '--mutant=') === 0) $opt['mutant'] = (int)substr($a, 9);
+}
+if ($opt['app'] === '' || $opt['orig'] === '') { fwrite(STDERR, "--app=<dir> and --orig=<dir> are required\n"); exit(2); }
+$APP = $opt['app'];
+$PASS = 0; $FAIL = 0;
+function ok($c, $l, $g = null) { global $PASS, $FAIL; if ($c) { $PASS++; echo "  ok   $l\n"; } else { $FAIL++; echo "  FAIL $l" . ($g !== null ? ' (got: ' . (is_string($g) ? $g : json_encode($g)) . ')' : '') . "\n"; } }
+function section($s) { echo "\n== $s\n"; }
+function lift($src, $names) {
+    $t = token_get_all($src); $n = count($t); $out = ''; $found = array();
+    for ($i = 0; $i < $n; $i++) {
+        if (!is_array($t[$i]) || $t[$i][0] !== T_FUNCTION) continue;
+        $j = $i + 1;
+        while ($j < $n && ((is_array($t[$j]) && $t[$j][0] === T_WHITESPACE) || (!is_array($t[$j]) && $t[$j] === '&'))) $j++;
+        if ($j >= $n || !is_array($t[$j]) || $t[$j][0] !== T_STRING) continue;
+        $fname = $t[$j][1];
+        if (!in_array($fname, $names, true) || in_array($fname, $found, true)) continue;
+        $depth = 0; $started = false; $buf = '';
+        for ($k = $i; $k < $n; $k++) {
+            $tok = $t[$k];
+            if (is_array($tok)) { if ($tok[0] === T_CURLY_OPEN || $tok[0] === T_DOLLAR_OPEN_CURLY_BRACES) { $depth++; $started = true; } $buf .= $tok[1]; }
+            else { if ($tok === '{') { $depth++; $started = true; } elseif ($tok === '}') { $depth--; } $buf .= $tok; }
+            if ($started && $depth === 0) break;
+        }
+        $out .= "if (!function_exists('$fname')) {\n$buf\n}\n"; $found[] = $fname;
+    }
+    $missing = array_diff($names, $found);
+    if ($missing) { fwrite(STDERR, "MISSING from source: " . implode(', ', $missing) . "\n"); exit(2); }
+    return $out;
+}
+function patch_once($hay, $from, $to, $label) { $c = substr_count($hay, $from); if ($c !== 1) { fwrite(STDERR, "patch '$label' anchor matched $c times\n"); exit(2); } return str_replace($from, $to, $hay); }
+if (!function_exists('mb_strlen')) { function mb_strlen($s) { return (int)preg_match_all('/./us', (string)$s); } }
+if (!function_exists('mb_substr')) { function mb_substr($s, $a, $n = null) { preg_match_all('/./us', $s, $m); return implode('', array_slice($m[0], $a, $n)); } }
+
+$dbHelpers = lift(file_get_contents($APP . '/db_connection.php'), array('penumbraErrorActions', 'penumbraClientErrorIsBenign', 'penumbraBenignClientErrorPattern'));
+eval("?><?php\n" . $dbHelpers);
+$health = lift(file_get_contents($APP . '/penumbra_health.php'), array('penumbra_failure_notice_cols', 'penumbra_failure_notice_text', 'penumbra_failure_notice'));
+eval("?><?php\n" . $health);
+
+$shSrc = file_get_contents($APP . '/analytics_shared.php');
+$feedSrc = lift($shSrc, array('penumbra_an_report_feed', 'penumbra_an_feed_family'));
+if ($opt['mutant'] === 1) { $feedSrc = patch_once($feedSrc, 'WHERE 1=1 $scopeSql', 'WHERE 1=1', 'mutant1'); }
+if ($opt['mutant'] === 2) { $feedSrc = patch_once($feedSrc, "\$row['report'] = (isset(\$r['RSHORT'])", "\$row['report'] = (false && isset(\$r['RSHORT'])", 'mutant2'); }
+if ($opt['mutant'] === 3) { $feedSrc = patch_once($feedSrc, 'FROM PENUMBRA_AUDIT WHERE REPORT_ID = :rid $scopeSql', 'FROM PENUMBRA_AUDIT WHERE REPORT_ID = :rid  $scopeSql', 'mutant3'); }
+eval("?><?php\n" . $feedSrc);
+// The shipped builder from before the change, renamed, for B.
+$origFeed = lift(file_get_contents($opt['orig'] . '/analytics_shared.php'), array('penumbra_an_report_feed'));
+$origFeed = patch_once($origFeed, 'function penumbra_an_report_feed(', 'function orig_an_report_feed(', 'rename');
+$origFeed = str_replace("function_exists('penumbra_an_report_feed')", "function_exists('orig_an_report_feed')", $origFeed);
+eval("?><?php\n" . $origFeed);
+
+$cap = array('sql' => '', 'binds' => null);
+$rowsFor = function ($all) {
+    $base = array('TS' => '2026-10-03 14:00:00', 'USER_ID' => 'jdoe', 'ACTION' => 'OPEN', 'SD' => '{"ip_address":"10.0.0.1"}', 'AF' => null, 'BF' => null, 'BLEN' => null, 'ALEN' => null,
+                  'N_STATE' => null, 'N_TO' => null, 'N_BCC' => null, 'N_ON' => null, 'N_SPEC' => null, 'N_OWNER' => null);
+    $r1 = $base; $r2 = $base; $r2['USER_ID'] = 'SCHEDULER'; $r2['ACTION'] = 'SCHEDULE_FAIL'; $r2['SD'] = '{"message":"ORA-00942"}'; $r2['N_STATE'] = 'sent'; $r2['N_TO'] = 'jdoe@ncsu.edu';
+    if ($all) { $r1['RSHORT'] = 'awdunit'; $r1['RTITLE'] = 'Awards by Unit'; $r2['RSHORT'] = null; $r2['RTITLE'] = null; }
+    return array($r1, $r2);
+};
+$mkRun = function ($all) use (&$cap, $rowsFor) { return function ($sql, $binds) use (&$cap, $rowsFor, $all) { $cap = array('sql' => $sql, 'binds' => $binds); return $rowsFor($all); }; };
+
+// ---------------------------------------------------------------------------
+section('A. every report (rid = null)');
+$seam = ' AND (USER_ID IS NULL OR USER_ID NOT IN (:ex0)) AND UPPER(USER_ID) = UPPER(:usearch)';
+$binds = array(':ex0' => 'ME', ':usearch' => 'jdoe');
+$fa = penumbra_an_report_feed($mkRun(true), null, $seam, $binds, 200, 'test', true);
+$sql = preg_replace('/\s+/', ' ', $cap['sql']);
+ok(strpos($sql, 'WHERE a.ROWID IN (SELECT rid FROM (SELECT ROWID AS rid FROM PENUMBRA_AUDIT WHERE 1=1 AND (USER_ID IS NULL OR USER_ID NOT IN (:ex0)) AND UPPER(USER_ID) = UPPER(:usearch) ORDER BY TIMESTAMP DESC FETCH FIRST 200 ROWS ONLY))') !== false,
+   'the seam (toggles, user...) sits INSIDE the ranking, which picks ROWIDs only', $sql);
+ok(strpos($sql, 'LEFT JOIN PENUMBRA_REPORTS r ON r.ID = a.REPORT_ID') !== false && strpos($sql, 'TRIM(r.SHORT_ID) AS RSHORT, r.TITLE AS RTITLE') !== false, 'each row is joined to its report (left: a row with no report survives)');
+ok(strpos($sql, 'ORDER BY a.TIMESTAMP DESC') !== false, 'newest first');
+ok(preg_match('/SUBSTR\(a\.SOURCE_DATA, 1, 2000\)/', $sql) === 1 && strpos($sql, "JSON_VALUE(a.SOURCE_DATA, '\$.notice.state') AS N_STATE") !== false, 'the outer read is aliased (previews and the notice columns)');
+ok(preg_match('/SELECT ROWID AS rid FROM PENUMBRA_AUDIT WHERE[^)]*SUBSTR/', $sql) === 0, 'no CLOB function in the ranking');
+ok(strpos($sql, ':rid') === false && $cap['binds'] === $binds, 'no :rid, and exactly the seam\'s binds (an unused bind is ORA-01036)', $cap['binds']);
+ok(isset($fa[0]['report']) && $fa[0]['report'] === 'awdunit' && $fa[0]['title'] === 'Awards by Unit', 'a row carries its report short id and title', $fa[0]);
+ok(isset($fa[1]['report']) && $fa[1]['report'] === '' && $fa[1]['title'] === '', 'a row with no report: empty, not null');
+ok(isset($fa[1]['meta']) && strpos($fa[1]['meta'], 'Notice emailed to jdoe@ncsu.edu') !== false, 'the failure notice still rides along', $fa[1]['meta'] ?? null);
+
+section('B. the report scope is unchanged');
+$fs = penumbra_an_report_feed($mkRun(false), 42, $seam, $binds, 200, 'test', true); $sNew = $cap;
+$fo = orig_an_report_feed($mkRun(false), 42, $seam, $binds, 200, 'test', true);   $sOld = $cap;
+ok($sNew['sql'] === $sOld['sql'], 'the report-scope SQL is byte-identical to the shipped one', substr($sNew['sql'], 0, 200));
+ok($sNew['binds'] === $sOld['binds'], 'with the same binds');
+ok($fs === $fo, 'and the same rows out (no report/title keys added at report scope)');
+
+section('C. analytics_all.php wiring');
+$all = file_get_contents($APP . '/analytics_all.php');
+ok(strpos($all, "\$anFeed = penumbra_an_report_feed(\$run, \$anRid, (\$anRepSeam === '' ? '' : ' ' . \$anRepSeam), \$anRepBinds,") !== false, 'report scope: the cards\' seam - the toggles reach the feed (Hide my own views)');
+ok(strpos($all, "\$anRepSeam  = trim(\$exclSql . ' ' . \$userFilter);") !== false, '... and that seam carries $exclSql, which carries the current user under Hide my own views');
+ok(strpos($all, "if (\$excludeMe && (string)\$currentUserKey !== '') { \$exclNames[] = \$currentUserKey; }") !== false, '... (the toggle puts the current user on the list)');
+ok(strpos($all, "penumbra_an_report_feed(\$run, null, \" \$sysSql \$exclSql \$userFilter \$reportFilter\",\n            array_merge(\$exclBinds, \$userBinds, \$oucBinds, \$reportBinds),") !== false, 'Platform: every report on its seam with exactly its binds');
+ok(strpos($all, 'if (!$anCalMode && $anCanSeePeople) {') !== false, 'never in calendar mode, people tier only');
+ok(substr_count($all, '<?php if (!$anCalMode): /* Recent activity (E3b-2)') === 2, 'the tab button and its panel at both scopes, not in calendar mode');
+ok(strpos($all, "<?php if (!\$anReportScope): ?>\n                        <th scope=\"col\" style=\"width:120px;\" data-sortable>Report") !== false, 'Platform\'s feed has a Report column');
+ok(strpos($all, "if (\$excludeMe)         \$ftExcl[] = 'not mine';") !== false, 'Hide my own views is tagged');
+ok(strpos($all, '<h2 class="an-crumbs"><span class="an-crumb">Analytics</span><span class="an-crumb-sep" aria-hidden="true">&rsaquo;</span><span class="an-crumb-here" aria-current="page">All Reports</span></h2>') !== false, 'Platform title: Analytics > All Reports');
+ok(strpos($all, 'Analytics - all reports') === false, 'the old dash title is gone');
+ok(preg_match('/<\?php if \(\$isAdmin\): \?><a class="an-crumb" href="<\?php echo htmlspecialchars\(\$anUpHref\); \?>" title="Back up to Platform Metrics[^\n]*?>All Reports<\/a>/', $all) === 1, 'report title: All Reports links up to Platform (with its filters), admins only');
+ok(strpos($all, 'title="Open this report" aria-current="page">') !== false, 'the report itself is the current crumb and still opens the report');
+ok(strpos($all, "\xE2\x80\x94") === false || substr_count($all, "\xE2\x80\x94") === substr_count(file_get_contents($opt['orig'] . '/analytics_all.php'), "\xE2\x80\x94"), 'no new em-dashes');
+
+if ($opt['control']) { section('control'); ok(false, 'control: a deliberately false assertion (must FAIL)'); }
+echo "\nSUMMARY  pass=$PASS  fail=$FAIL\n";
+exit($FAIL ? 1 : 0);

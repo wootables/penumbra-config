@@ -1,0 +1,107 @@
+# =============================================================================
+# recipalerts - the scheduler's Recipients alert icon + card (2026-09-23).
+#
+#   powershell -File run.ps1                 # scenarios against live
+#   powershell -File run.ps1 -App <path>     # against a stage (needs index.php + js\main.js)
+#   powershell -File run.ps1 -Control        # one deliberately false assertion: must be FAIL 1
+#   powershell -File run.ps1 -Mutant         # four targeted mutants, exact fail counts
+#
+# WHAT IS UNDER TEST. The warnings that used to sit in a box under the Subscriptions card
+# (one message at a time) became an icon after the "Recipients:" label that summarizes EVERY
+# alert, with a card listing them. The logic lives in js/main.js (_schedRecipientAlerts,
+# checkSchedulerExternalWarning, the card controller); this suite LIFTS those functions - plus
+# the two save-side helpers they call and escapeHtml - out of the real file by exact anchors
+# (never a pasted copy), lifts the real Recipients label from index.php, and drives them in
+# headless Edge with real jQuery. A missing anchor throws: the code moved, re-anchor.
+#
+# EXPECTED TAIL: "PASS: 19   FAIL: 0"  (count as of 2026-09-23 night)
+#
+# UNC .ps1 files are GPO-blocked here ("not digitally signed") - run the body as a scriptblock:
+#   $dir = '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\recipalerts'
+#   & ([scriptblock]::Create([IO.File]::ReadAllText("$dir\run.ps1").Replace('$here = $PSScriptRoot', "`$here = '$dir'")))
+# Never add a bare `exit` (it would kill the caller), and do not pipe the invocation.
+# =============================================================================
+param(
+    [string]$App = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra',
+    [switch]$Control,
+    [switch]$Mutant
+)
+
+$ErrorActionPreference = 'Stop'
+$here = $PSScriptRoot
+if (-not $here) { $here = '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\recipalerts' }
+$edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+$jq   = '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\auditfixes\jquery-3.7.1.min.js'
+
+function Get-Lift([string]$src, [string]$start, [string]$end, [string]$what) {
+    $s = $src.IndexOf($start)
+    if ($s -lt 0) { throw "lift: start anchor missing ($what)" }
+    if ($src.IndexOf($start, $s + 1) -ge 0) { throw "lift: start anchor not unique ($what)" }
+    $e = $src.IndexOf($end, $s)
+    if ($e -lt 0) { throw "lift: end anchor missing ($what)" }
+    return $src.Substring($s, $e + $end.Length - $s)
+}
+
+$main  = [IO.File]::ReadAllText((Join-Path $App 'js\main.js'))
+$index = [IO.File]::ReadAllText((Join-Path $App 'index.php'))
+$nl = "`r`n"
+$liftOk = Get-Lift $main '    function penumbraSchedulerRecipientOk(addr) {' `
+    ('        return /^[^\s@<>,;]+@[^\s@<>,;.]+(\.[^\s@<>,;.]+)+$/.test(String(addr == null ? '''' : addr).trim());' + $nl + '    }') 'save-side address rule'
+$liftEsc = Get-Lift $main '    function escapeHtml(text) {' `
+    ('        return div.innerHTML.replace(/"/g, ''&quot;'').replace(/''/g, ''&#39;'');' + $nl + '    }') 'escapeHtml'
+$liftAlerts = Get-Lift $main '    function _schedRecipListHtml(items) {' `
+    '    $(''.scheduler-config-panel'').on(''scroll'', function () { if ($_schedRecipCard) _schedRecipCardClose(); });' 'recipient alerts block'
+$label = Get-Lift $index '<label>Recipients: <span id="schedRecipAlert"' '</span></label>' 'Recipients label'
+
+function Invoke-Harness([string]$alertsJs, [string]$query) {
+    $tmp = Join-Path $env:TEMP ('pnb_recipalerts_' + $PID + '_' + [guid]::NewGuid().ToString('N').Substring(0, 6))
+    New-Item -ItemType Directory -Force $tmp | Out-Null
+    Copy-Item -LiteralPath (Join-Path $here 'harness.html') -Destination (Join-Path $tmp 'harness.html')
+    Copy-Item -LiteralPath (Join-Path $here 'tests.js') -Destination (Join-Path $tmp 'tests.js')
+    Copy-Item -LiteralPath $jq -Destination (Join-Path $tmp 'jquery.js')
+    $enc = New-Object System.Text.UTF8Encoding($false)
+    [IO.File]::WriteAllText((Join-Path $tmp 'fixture.js'), "document.getElementById('labelHost').innerHTML = " + ($label | ConvertTo-Json) + ";", $enc)
+    $lifted = "window.__pnbLift = (function (`$) {`r`n" + $liftOk + "`r`n" + $liftEsc + "`r`n" + $alertsJs + "`r`nreturn { recipAlerts: _schedRecipientAlerts };`r`n})(jQuery);`r`n"
+    [IO.File]::WriteAllText((Join-Path $tmp 'lifted.js'), $lifted, $enc)
+    $ud  = Join-Path $env:TEMP ('pnbedge_recipalerts_' + [guid]::NewGuid().ToString('N').Substring(0, 8))
+    $dom = Join-Path $tmp 'dom.txt'
+    $url = 'file:///' + ($tmp -replace '\\', '/') + '/harness.html' + $query
+    Start-Process -FilePath $edge -Wait -NoNewWindow -RedirectStandardOutput $dom -ArgumentList '--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check', '--disable-sync', '--disable-extensions', '--allow-file-access-from-files', "--user-data-dir=$ud", '--virtual-time-budget=10000', '--dump-dom', $url
+    $text = [IO.File]::ReadAllText($dom)
+    Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+    if ($text -match '<pre id="out">([\s\S]*?)</pre>') { return [System.Net.WebUtility]::HtmlDecode($Matches[1]) }
+    return 'FAIL harness produced no report (dump length ' + $text.Length + ')' + "`nPASS: 0   FAIL: 1"
+}
+function Get-FailCount([string]$report) { if ($report -match 'FAIL:\s+(\d+)') { return [int]$Matches[1] } return -1 }
+
+if (-not $Control -and -not $Mutant) {
+    Write-Output (Invoke-Harness $liftAlerts '')
+    return
+}
+if ($Control) {
+    $r = Invoke-Harness $liftAlerts '?control=1'
+    $f = Get-FailCount $r
+    Write-Output $(if ($f -eq 1) { 'CONTROL: exactly the one deliberate failure - the suite can see red' } else { "CONTROL BROKEN: expected FAIL 1, got $f`n$r" })
+    return
+}
+
+# --- targeted mutants: each reverts ONE decision in the lifted alerts block ---
+$mutants = @(
+    @{ Name = "'outside ncsu.edu' drifts from the runner's rule (endsWith @ncsu.edu)";
+       From = "if (raw.toLowerCase().indexOf('ncsu.edu') === -1) {";   To = "if (!/@ncsu\.edu`$/i.test(raw)) {";   Expect = 1 },
+    @{ Name = 'capsule text reaches the card unescaped';
+       From = "return '<code>' + escapeHtml(s) + '</code>';";   To = "return '<code>' + s + '</code>';";   Expect = 1 },
+    @{ Name = 'focus handed back by Escape reopens the card';
+       From = "if (!_schedRecipQuietFocus) _schedRecipCardOpen(false);";   To = "_schedRecipCardOpen(false);";   Expect = 1 },
+    @{ Name = 'the external note ignores Include Live Link';
+       From = "if (external.length && `$('#schedIncludeLink').is(':checked')) {";   To = "if (external.length) {";   Expect = 1 }
+)
+$allGood = $true
+foreach ($m in $mutants) {
+    $hits = ($liftAlerts.Length - $liftAlerts.Replace($m.From, '').Length) / $m.From.Length
+    if ($hits -ne 1) { Write-Output ("MUTANT NOT APPLICABLE (anchor found {0}x): {1}" -f $hits, $m.Name); $allGood = $false; continue }
+    $f = Get-FailCount (Invoke-Harness $liftAlerts.Replace($m.From, $m.To) '')
+    if ($f -ne $m.Expect) { $allGood = $false }
+    Write-Output ("{0} mutant '{1}' -> FAIL: {2} (expected {3})" -f $(if ($f -eq $m.Expect) { 'OK  ' } else { 'BAD ' }), $m.Name, $f, $m.Expect)
+}
+Write-Output ('MUTANTS: ' + $(if ($allGood) { 'ALL BITE' } else { 'PROBLEM' }))

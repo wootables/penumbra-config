@@ -1,0 +1,167 @@
+<?php
+/**
+ * peopledir - pins the people-directory resolvers in penumbra_directory.php
+ * (the six readers that moved from COI_CHECK_COMPLIANCE to PENUMBRA_PEOPLE on
+ * 2026-09-23): what SQL each one sends, what it binds, how it shapes a row, how
+ * it batches, and the one rule that must never regress - SUPERVISOR_EMAIL is
+ * another person's address and is never matched as the person's own.
+ *
+ *   php -n test_peopledir.php <path-to-penumbra_directory.php>
+ *
+ * The database is a hand-written fake (FakeConn/FakeStmt below) that records
+ * every prepared statement and its binds and hands back canned rows. Requires
+ * the SHIPPED file straight from the app (or a stage) folder - never a copy.
+ * Tail must read "PASS: N   FAIL: 0" then "RESULT: GREEN".
+ */
+$lib = isset($argv[1]) ? $argv[1] : '';
+if (!is_file($lib)) { echo "library not found: $lib\n"; echo "RESULT: RED\n"; return; }
+$_SERVER['SCRIPT_FILENAME'] = __FILE__;   // the library refuses direct web access by comparing basenames
+// The resolvers error_log() a database failure; under php -n that is stderr, which
+// PowerShell 5.1 turns into a terminating error. Park it in a temp file instead.
+ini_set('error_log', sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'penumbra_peopledir_errlog_' . getmypid() . '.txt');
+require $lib;
+
+$PASS = 0; $FAIL = 0;
+function ok($cond, $label) { global $PASS, $FAIL; if ($cond) { $PASS++; echo "  ok   $label\n"; } else { $FAIL++; echo "  FAIL $label\n"; } }
+function eq($got, $want, $label) {
+    global $PASS, $FAIL;
+    if ($got === $want) { $PASS++; echo "  ok   $label\n"; }
+    else { $FAIL++; echo "  FAIL $label\n       want: " . var_export($want, true) . "\n       got:  " . var_export($got, true) . "\n"; }
+}
+
+/* ------------------------------------------------------------ the fake DB */
+class FakeStmt {
+    public $sql; public $binds = array(); private $rows; private $i = 0; private $conn;
+    public function __construct($conn, $sql, $rows) { $this->conn = $conn; $this->sql = $sql; $this->rows = $rows; }
+    public function bindValue($k, $v, $t = null) { $this->binds[$k] = $v; return true; }
+    public function execute($p = null) { if ($this->conn->throwOnExecute) throw new Exception('ORA-00000 fake'); return true; }
+    public function fetch($mode = null) { return isset($this->rows[$this->i]) ? $this->rows[$this->i++] : false; }
+}
+class FakeConn {
+    public $statements = array(); public $queue = array(); public $throwOnExecute = false;
+    public function prepare($sql) { $rows = count($this->queue) ? array_shift($this->queue) : array(); $st = new FakeStmt($this, $sql, $rows); $this->statements[] = $st; return $st; }
+    public function last() { return end($this->statements); }
+}
+function person($over = array()) {
+    return array_merge(array(
+        'EMPLID' => '000123456', 'UNITY_ID' => 'jdoe', 'FIRST_NAME' => 'Jane', 'LAST_NAME' => 'Doe', 'PREFERRED_NAME' => 'Jane Doe',
+        'EMAIL' => 'jdoe@ncsu.edu', 'SUPERVISOR_EMAIL' => 'boss@ncsu.edu', 'OUC' => '140201', 'DEPT_NAME' => 'Chemical & Biomolecular Engr',
+        'ACTIVE' => '1', 'JOB_TITLE' => 'Professor', 'EMPL_CLASS' => 'EFX', 'PI_ELIGIBLE' => '1',
+    ), $over);
+}
+function sqlOneLine($s) { return preg_replace('/\s+/', ' ', $s); }
+
+// ------------------------------------------------------------- 1. shaping
+echo "1. penumbraPeopleRowToDetails\n";
+$d = penumbraPeopleRowToDetails(person());
+eq(array($d['found'], $d['empl_id'], $d['ouc'], $d['ouc2d'], $d['ouc4d'], $d['ouc6d'], $d['dept'], $d['fname'], $d['lname']),
+   array(true, '000123456', '140201', '14', '1402', '140201', 'Chemical & Biomolecular Engr', 'Jane', 'Doe'), 'the eight legacy keys keep their meaning');
+eq(array($d['unity'], $d['email'], $d['supervisor_email'], $d['active'], $d['title'], $d['empl_class'], $d['pi_eligible'], $d['pname']),
+   array('jdoe', 'jdoe@ncsu.edu', 'boss@ncsu.edu', 1, 'Professor', 'EFX', 1, 'Jane Doe'), 'the new keys');
+ok(!array_key_exists('email_alias', $d), "no 'email_alias' key: HR EMAIL_ADDR is the supervisor's address, not an alias");
+$d = penumbraPeopleRowToDetails(person(array('UNITY_ID' => 'JDOE', 'EMAIL' => 'JDoe@NCSU.EDU', 'ACTIVE' => '0', 'PI_ELIGIBLE' => '0', 'OUC' => '06')));
+eq(array($d['unity'], $d['email'], $d['active'], $d['pi_eligible'], $d['ouc2d'], $d['ouc4d']), array('jdoe', 'jdoe@ncsu.edu', 0, 0, '06', '06'), 'ids lower-cased, flags numeric, a short OUC does not overflow its slices');
+$d = penumbraPeopleRowToDetails(null);
+eq(array($d['found'], $d['ouc'], $d['dept'], $d['fname'], $d['empl_id']), array(false, '', '', '', ''), 'no row = found false and empty strings (what the runner substitutes into {OUC}/{DEPT})');
+eq(penumbraPeopleUnityKey(penumbraPeopleRowToDetails(person(array('UNITY_ID' => '')))), 'jdoe', 'a person without a Unity ID is keyed by the email local part');
+eq(penumbraPeopleUnityKey(penumbraPeopleRowToDetails(person(array('UNITY_ID' => '', 'EMAIL' => '')))), '', 'no id at all: empty key (the caller skips it)');
+
+// ------------------------------------------------------- 2. lookup by email
+echo "2. penumbraPeopleLookupByEmail\n";
+$c = new FakeConn(); $c->queue[] = array(person());
+$d = penumbraPeopleLookupByEmail($c, '  JDoe@NCSU.edu ');
+$st = $c->last();
+eq($d['found'], true, 'found');
+eq($st->binds, array(':e1' => 'jdoe@ncsu.edu', ':u' => 'jdoe'), 'binds the lower-cased address AND its local part as a Unity ID');
+ok(strpos($st->sql, 'WHERE EMAIL = :e1 OR UNITY_ID = :u') !== false, 'matches EMAIL or UNITY_ID');
+ok(strpos($st->sql, 'SUPERVISOR_EMAIL =') === false && strpos($st->sql, 'SUPERVISOR_EMAIL LIKE') === false, 'NEVER matches the supervisor address as the person');
+ok(strpos($st->sql, 'ORDER BY ACTIVE DESC, LAST_SEEN DESC FETCH FIRST 1 ROWS ONLY') !== false, 'one row: active first, then freshest');
+ok(strpos($st->sql, 'LOWER(') === false && strpos($st->sql, 'SUBSTR(') === false, 'no function wraps a column in the WHERE (the indexes stay usable)');
+$c = new FakeConn(); $c->queue[] = array();
+eq(penumbraPeopleLookupByEmail($c, 'nobody@example.org')['found'], false, 'unknown address: found false, no exception');
+$c = new FakeConn();
+eq(count($c->statements) + (penumbraPeopleLookupByEmail($c, 'not-an-email')['found'] ? 1 : 0), 0, 'a value without @ never reaches the database');
+eq(penumbraPeopleLookupByEmail(null, 'x@y')['found'], false, 'no connection: found false');
+$c = new FakeConn(); $c->throwOnExecute = true; $c->queue[] = array(person());
+eq(penumbraPeopleLookupByEmail($c, 'jdoe@ncsu.edu')['found'], false, 'a database error reads as not found (never throws into the runner)');
+
+// ------------------------------------------------------- 3. lookup by unity
+echo "3. penumbraPeopleLookupByUnity\n";
+$c = new FakeConn();
+$c->queue[] = array(person(array('UNITY_ID' => 'jdoe', 'ACTIVE' => '1')), person(array('UNITY_ID' => 'jdoe', 'ACTIVE' => '0', 'OUC' => '999999')), person(array('UNITY_ID' => '', 'EMAIL' => 'nouid@ncsu.edu', 'EMPLID' => '2')));
+$m = penumbraPeopleLookupByUnity($c, array(' JDoe ', 'nouid', 'jdoe', '', 'bad id!'));
+$st = $c->last();
+eq(array_keys($m), array('jdoe', 'nouid'), 'keyed by lower-cased Unity ID; a row without one is keyed by its email local part');
+eq($m['jdoe']['ouc'], '140201', 'when two rows share an id the first (active) one wins');
+eq($st->binds[':u0'], 'jdoe', 'ids trimmed, lower-cased and de-duplicated before binding');
+eq($st->binds[':m0'], 'jdoe@ncsu.edu', 'each id is also tried as unity@ncsu.edu on EMAIL');
+ok(!isset($st->binds[':u2']), "an unsafe id ('bad id!') and an empty one are dropped");
+ok(strpos($st->sql, 'UNITY_ID IN (:u0,:u1) OR EMAIL IN (:m0,:m1)') !== false, 'one IN list per side');
+ok(preg_match('/SUPERVISOR_EMAIL\s*(=|LIKE|IN)\b/', $st->sql) === 0, 'the supervisor address is selected but never a match key');
+$c = new FakeConn(); $ids = array(); for ($i = 0; $i < 450; $i++) $ids[] = 'u' . $i;
+penumbraPeopleLookupByUnity($c, $ids);
+eq(count($c->statements), 2, '450 ids -> two statements (400 per chunk; two binds per id stay under the 1000 cap)');
+eq(penumbraPeopleLookupByUnity($c, array()), array(), 'no ids: no query');
+
+// ------------------------------------------------------ 4. search (picker)
+echo "4. penumbraPeopleSearch\n";
+$c = new FakeConn(); $c->queue[] = array(person());
+$r = penumbraPeopleSearch($c, ' jane   Doe ', 15);
+$st = $c->last();
+eq(count($r), 1, 'rows come back as details');
+eq($st->binds, array(':k0' => '%JANE%', ':p0' => 'jane%', ':k1' => '%DOE%', ':p1' => 'doe%'), 'per keyword: a contains bind for names (upper) and a prefix bind for ids (lower)');
+ok(substr_count($st->sql, ') AND (') === 1, 'keywords are AND-ed (both must match)');
+ok(strpos($st->sql, 'UPPER(FIRST_NAME) LIKE :k0 OR UPPER(LAST_NAME) LIKE :k0 OR UPPER(PREFERRED_NAME) LIKE :k0 OR EMAIL LIKE :p0 OR UNITY_ID LIKE :p0') !== false, 'names by contains, email and Unity ID by prefix');
+ok(preg_match('/SUPERVISOR_EMAIL\s*(=|LIKE|IN)\b/', $st->sql) === 0, 'the picker never matches on the supervisor address');
+ok(strpos($st->sql, 'ORDER BY ACTIVE DESC, LAST_NAME, FIRST_NAME FETCH FIRST 15 ROWS ONLY') !== false, 'active people first, then by name, capped');
+$c = new FakeConn();
+eq(penumbraPeopleSearch($c, '   ', 15), array(), 'blank term: nothing, no query');
+eq(count($c->statements), 0, '...really no query');
+$c = new FakeConn(); $c->queue[] = array();
+penumbraPeopleSearch($c, 'x', 9999);
+ok(strpos($c->last()->sql, 'FETCH FIRST 200 ROWS ONLY') !== false, 'the limit is clamped to 200');
+
+// ------------------------------------------------------- 5. owner by name
+echo "5. penumbraPeopleUnityByName\n";
+$c = new FakeConn(); $c->queue[] = array(array('UNITY_ID' => 'JDOE'), array('UNITY_ID' => 'jdoe'), array('UNITY_ID' => ' '));
+eq(penumbraPeopleUnityByName($c, 'Doe', 50), array('jdoe'), 'lower-cased, de-duplicated, blanks dropped');
+$st = $c->last();
+eq($st->binds, array(':n1' => '%Doe%', ':n2' => '%Doe%'), 'contains match on the term');
+ok(strpos($st->sql, "UPPER(FIRST_NAME || ' ' || LAST_NAME) LIKE UPPER(:n1)") !== false && strpos($st->sql, "UPPER(PREFERRED_NAME || ' ' || LAST_NAME) LIKE UPPER(:n2)") !== false, 'matches "First Last" and "Preferred Last"');
+ok(strpos($st->sql, 'UNITY_ID IS NOT NULL') !== false, 'only people with a Unity ID (OWNER_ID is a Unity ID)');
+eq(penumbraPeopleUnityByName($c, '', 50), array(), 'empty term: nothing');
+
+// ------------------------------------------------- 6. departments under OUC
+echo "6. penumbraPeopleDepartmentsUnder\n";
+$c = new FakeConn(); $c->queue[] = array(array('OUC' => '140201', 'DEPT_NAME' => 'Chem Engr', 'CNT' => '119'), array('OUC' => '140101', 'DEPT_NAME' => 'Engr Dean', 'CNT' => '40'));
+$r = penumbraPeopleDepartmentsUnder($c, '14', 50);
+eq($r, array(array('ouc' => '140201', 'dept' => 'Chem Engr', 'people' => 119), array('ouc' => '140101', 'dept' => 'Engr Dean', 'people' => 40)), 'rows shaped as ouc/dept/people, in the order Oracle gave (most people first)');
+$st = $c->last();
+eq($st->binds, array(':pfx' => '14%'), 'prefix bind');
+ok(strpos($st->sql, 'WHERE OUC LIKE :pfx AND ACTIVE = 1 GROUP BY OUC, DEPT_NAME') !== false, 'active people only, grouped by department');
+foreach (array('1', '1234567', '14x', '') as $badP) { eq(penumbraPeopleDepartmentsUnder($c, $badP, 50), array(), "'$badP' is not a 2/4/6-digit prefix: nothing"); }
+
+// ---------------------------------------------------- 7. people in OUCs
+echo "7. penumbraPeopleInOucs\n";
+$c = new FakeConn(); $c->queue[] = array(array('UNITY_ID' => 'ADOE', 'FIRST_NAME' => 'Al', 'LAST_NAME' => 'Doe'), array('UNITY_ID' => 'adoe', 'FIRST_NAME' => 'Al', 'LAST_NAME' => 'Doe'), array('UNITY_ID' => 'bdoe', 'FIRST_NAME' => ' Bo ', 'LAST_NAME' => 'Doe'));
+$m = penumbraPeopleInOucs($c, array('14', '1402', 'xx', '14'), 500);
+eq($m, array('adoe' => 'Al Doe', 'bdoe' => 'Bo Doe'), 'unity => "First Last", lower-cased, de-duplicated, trimmed');
+$st = $c->last();
+eq($st->binds, array(':o0' => '14%', ':o1' => '1402%'), 'one prefix bind per valid OUC, invalid ones dropped');
+ok(strpos($st->sql, 'WHERE ACTIVE = 1 AND UNITY_ID IS NOT NULL AND (OUC LIKE :o0 OR OUC LIKE :o1)') !== false, 'active people with a Unity ID in any of the OUCs');
+ok(strpos($st->sql, 'FETCH FIRST 500 ROWS ONLY') !== false, 'capped');
+$c = new FakeConn();
+eq(penumbraPeopleInOucs($c, array('xx'), 500), array(), 'no valid prefix: nothing, no query');
+eq(count($c->statements), 0, '...really no query');
+
+// ------------------------------------------- 8. analytics department map
+echo "8. penumbraLookupDepartments (analytics map shape)\n";
+$c = new FakeConn(); $c->queue[] = array(person(), person(array('UNITY_ID' => 'noouc', 'OUC' => '', 'DEPT_NAME' => '')), person(array('UNITY_ID' => 'onlyname', 'OUC' => '', 'DEPT_NAME' => 'Somewhere')));
+$m = penumbraLookupDepartments($c, array('jdoe', 'noouc', 'onlyname'));
+eq($m['jdoe'], array('raw' => '140201-Chemical & Biomolecular Engr', 'ouc' => '140201', 'dept' => 'Chemical & Biomolecular Engr'), "the map keeps its raw/ouc/dept shape; raw is rebuilt as 'OUC-Name'");
+ok(!isset($m['noouc']), 'a person with neither OUC nor department is left out, as before');
+eq($m['onlyname'], array('raw' => 'Somewhere', 'ouc' => '', 'dept' => 'Somewhere'), 'a department without a code keeps just the name');
+eq(penumbraDepartmentLabel($m['jdoe']), 'Chemical & Biomolecular Engr', 'the legacy label helper still yields the bare name from the new map');
+
+echo "\nPASS: $PASS   FAIL: $FAIL\n";
+echo 'RESULT: ' . ($FAIL === 0 ? 'GREEN' : 'RED') . "\n";

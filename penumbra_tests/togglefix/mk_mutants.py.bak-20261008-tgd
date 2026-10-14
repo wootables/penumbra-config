@@ -1,0 +1,212 @@
+# Builds mutants.json for the togglefix suite: single-point reverts of Round A, each
+# with the asserts it must turn red. Every anchor is checked against the FIXED build
+# (pass its directory: py -3 mk_mutants.py <dir laid out like the webroot>).
+# Anchors are written with LF; run.py matches them CRLF on a CRLF file.
+import json, os, sys
+HERE = os.path.dirname(os.path.abspath(__file__)) or os.getcwd()
+D = sys.argv[1] if len(sys.argv) > 1 else r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+GATE = ("        // The journal is off: only its peek reads it (journalCallerCanReadJournal).\n"
+        "        if (!journalCallerCanReadJournal($report, $currentUserKey, $isAdmin)) {\n"
+        "            echo json_encode(array('status' => 'error', 'message' => 'The Report Journal is off for this report.'));\n"
+        "            exit;\n"
+        "        }\n")
+# The list action's own head up to its gate (the gate text itself repeats in 5 reads).
+LIST_HEAD = ("    if ($action === 'list') {\n"
+             "        $report_identifier = isset($_GET['report_id']) ? $_GET['report_id'] : '';\n"
+             "        if (empty($report_identifier)) throw new Exception(\"report_id is required.\");\n\n"
+             "        $report = journalGetReport($conn, $report_identifier);\n"
+             "        if (!$report) throw new Exception(\"Report not found.\");\n"
+             "        if (!journalCallerCanView($report, $currentUserKey, $user_ouc, $isAdmin)) {\n"
+             "            echo json_encode(array('status' => 'error', 'message' => 'You do not have access to this report.'));\n"
+             "            exit;\n"
+             "        }\n")
+M = {
+    # ---- F1 (main.css)
+    'css-scope': ([('css/main.css', ":is(#resultsTable, #groupedResultsContainer) .journal-toggle-box {\n    display: inline-flex;\n",
+                    ".journal-toggle-box {\n    display: inline-flex;\n")],
+                  ['V-dark-off', 'V-darkgrp-off', 'V-wolf-hover'], ['dark', 'darkgrp', 'wolf']),
+    'css-on': ([('css/main.css', ":is(#resultsTable, #groupedResultsContainer) .journal-toggle-box.is-on {\n",
+                 ".journal-toggle-box.is-on {\n")],
+               ['V-dark-on', 'V-wolf-onhover'], ['dark', 'wolf']),
+    # ---- F6 (main.js + penumbra_journal.js)
+    'save-gate': ([('js/main.js', "            viewOptions.journalEnabled = true;\n        }\n        // Phase 2: row identity + toggle config. Saved whether or not the journal\n",
+                    "            viewOptions.journalEnabled = true;\n        }\n        if ($('#viewOptionJournal').is(':checked')) // MUTANT: key columns saved only while on\n        // Phase 2: row identity + toggle config. Saved whether or not the journal\n")],
+                  ['K-off-save'], ['offsave']),
+    'restore-gate': ([('js/main.js', "                window._penumbraJournalKeyColumns = Array.isArray(_jvo.journalKeyColumns)\n",
+                       "                window._penumbraJournalKeyColumns = (_jrnEnabled && Array.isArray(_jvo.journalKeyColumns))\n")],
+                     ['K-off-restored', 'K-off-turnon'], ['offsave']),
+    'reenable-notes': ([('js/main.js', "                $('#journalRowNotesEnable').prop('checked', !!window._penumbraJournalRowNotes);\n                populateKeyPicker(); renderToggleDefs(); syncConfigFromUI();\n",
+                         "                populateKeyPicker(); renderToggleDefs(); syncConfigFromUI();\n")],
+                       ['K-off-turnon'], ['offsave']),
+    'tab-gate': ([('js/penumbra_journal.js', "        return !window._penumbraJournalHidden\n            && !!(window._penumbraJournalToggles && window._penumbraJournalToggles.length);\n",
+                   "        return !!(window._penumbraJournalToggles && window._penumbraJournalToggles.length);\n")],
+                 ['K-off-tab'], ['offsave']),
+    # ---- F7 (main.js)
+    'sw-guard-tg': ([('js/main.js', "                if (rid !== jReportId()) return; // asked for the report the page has left (journalSwitchReport)\n", "")],
+                    ['J-sw-stale'], ['switch']),
+    'sw-guard-notes': ([('js/main.js', "                if (rid !== jReportId()) { if (cb) cb(); return; } // asked for the report the page has left\n", "")],
+                       ['J-sw-stale'], ['switch']),
+    'sw-hist': ([('js/main.js', "            hideHistPop();\n            _histCache = {};\n            _toggleSeq = {};\n",
+                  "            hideHistPop();\n            _toggleSeq = {};\n")],
+                ['J-sw-hist'], ['switch']),
+    'sw-bootvar': ([('js/main.js', "            journalReportId = String(id || '');\n            window.Penumbra.journalReportId = journalReportId;\n",
+                     "            window.Penumbra.journalReportId = String(id || '');\n")],
+                   ['J-sw-badge', 'J-sw-gate'], ['switch']),
+    'wire': ([('js/main.js', "                window.Penumbra.journalSwitchReport(response.new_id || shortId);\n", "                void 0;\n")],
+             ['W-save-switch'], ['wire']),
+    # ---- F8 (main.js)
+    'miss-validate': ([('js/main.js', "            if (missing.length) return { ok: false, reason: 'missing', missing: missing, dup: 0, total: masterRowData.length };\n", "")],
+                      ['K-miss-off', 'K-miss-note', 'K-miss-lock', 'K-miss-bulk'], ['missing']),
+    'miss-chip': ([('js/main.js', "            if (cols.length) {\n                var inData = {};\n", "            if (false) {\n                var inData = {};\n")],
+                  ['K-miss-chip', 'K-miss-untick'], ['missing']),
+    'miss-note-msg': ([('js/main.js', "                + v.missing.map(function (c) { return '<strong>' + escapeHtml(c) + '</strong>'; }).join(' or ')\n",
+                        "                + 'a key'\n")],
+                      ['K-miss-note'], ['missing']),
+    'miss-lock-msg': ([('js/main.js', "                else if (v && v.reason === 'missing') msg = 'Toggle columns open once every key column in step 1 is in the data.';\n", "")],
+                      ['K-miss-lock'], ['missing']),
+    'miss-bulk-msg': ([('js/main.js', "                    ? 'The journal key column ' + _kv.missing.join(', ') + ' is not in this data, so rows cannot be identified.'\n",
+                        "                    ? 'The journal key column is not unique for this data, so rows cannot be identified.'\n")],
+                      ['K-miss-bulk'], ['missing']),
+    # ---- C7 (main.js)
+    'long-box': ([('js/main.js', "            var blocked = rowKeyTooLong(rowKey);\n", "            var blocked = false;\n")],
+                 ['K-long-box', 'K-long-click'], ['longkey']),
+    # EQUIVALENT by design: the box's `disabled` attribute already keeps the click
+    # from reaching the handler; the guard backs it up. Must stay green.
+    'eq-long-guard': ([('js/main.js', "            if (this.disabled) return; // a key too long to store (toggleBtnHtml)\n", "")],
+                      [], ['longkey']),
+    'long-note': ([('js/main.js', "            if (v && v.nLong) {\n", "            if (false) {\n")],
+                  ['K-long-note'], ['longkey']),
+    # ---- server
+    'srv-case': ([('journal_export.php', "            $parts[] = journalCleanKeyValueExport(isset($vals[$col]) ? $vals[$col] : null);\n",
+                   "            $parts[] = journalCleanKeyValueExport(isset($row[$col]) ? $row[$col] : null);\n")],
+                 ['S-case-row'], ['srv']),
+    'srv-sid': ([('manage_journal.php', "    if (is_int($identifier)) return $byId($identifier);\n",
+                  "    if (is_int($identifier) || ctype_digit(trim((string)$identifier))) return $byId($identifier);\n")],
+                ['S-sid-digits'], ['srv']),
+    'srv-snap': ([('manage_snapshots.php', "    if (is_int($identifier)) return $identifier;\n",
+                   "    if (is_int($identifier) || ctype_digit(trim((string)$identifier))) return (int)$identifier;\n")],
+                 ['S-snap-digits'], ['srv']),
+    'srv-gate-list': ([('manage_journal.php', LIST_HEAD + GATE, LIST_HEAD)],
+                      ['S-gate-off'], ['srv']),
+    'srv-gate-attach': ([('manage_journal.php', "        // The journal is off: only its peek reads it (journalCallerCanReadJournal).\n"
+                          "        if (!journalCallerCanReadJournal($report, $currentUserKey, $isAdmin)) {\n            http_response_code(403);\n",
+                          "        if (false) {\n            http_response_code(403);\n")],
+                        ['S-gate-off'], ['srv']),
+    'srv-enc': ([('manage_journal.php', "    $f = journalReportStateFlags($report);\n    return $f['enc'];\n", "    return false;\n")],
+                ['S-gate-enc'], ['srv']),
+    'srv-tgby': ([('schedule_runner.php', "        if (isset($byKey[$k])) { $levels[$i] = $byKey[$k]; $changed = true; }\n",
+                   "        if (false) { $levels[$i] = $byKey[$k]; $changed = true; }\n")],
+                 ['S-tg-groupby', 'S-sched-grouped'], ['srv']),
+    'srv-label': ([('schedule_runner.php', "        if ($isToggle) return ((string)$val === '1') ? 'Checked' : 'Unchecked';\n", "")],
+                  ['S-tg-label'], ['srv']),
+    'srv-flat': ([('schedule_runner.php', "    if (is_array($flat_rows) && !empty($flat_rows)) {\n        require_once __DIR__ . '/journal_export.php';\n        if ($sched_is_pivot) {\n",
+                   "    if (empty($state['groupBy']) && !$sched_is_pivot && is_array($flat_rows) && !empty($flat_rows)) {\n        require_once __DIR__ . '/journal_export.php';\n        if ($sched_is_pivot) {\n")],
+                 ['S-sched-grouped', 'S-sched-pivot'], ['srv']),
+    'srv-oneread': ([('schedule_runner.php', "            $journal_toggle_resolver = $jt['resolver'];\n",
+                      "            $journal_toggle_resolver = journalExportToggleResolver($report_id, $state, array_keys(reset($flat_rows)));\n")],
+                    ['S-sched-grouped', 'S-sched-oneread'], ['srv']),
+    'srv-reg': ([('schedule_runner.php', "    penumbra_sched_toggle_cols($journal_toggle_cols);\n", "")],
+                ['S-sched-grouped', 'S-sched-pivot'], ['srv']),
+    'srv-dd': ([('schedule_runner.php', "                    foreach ($_ddTg as $_ddCol) {\n", "                    foreach (array() as $_ddCol) {\n")],
+               ['S-dd-strip'], ['srv']),
+
+    # ======================= ROUND B (2026-10-07): the cheap wins
+    # ---- B1 refresh (main.js)
+    # Without the throttle every focus re-reads: the first assert sees the extra read and
+    # every later one's exact read count is off by one.
+    'b-throttle': ([('js/main.js', "            if (Date.now() - _jLastToggleLoad < minAgeMs) return;\n", "")],
+                   ['R-refresh-throttle', 'R-refresh-focus', 'R-refresh-same', 'R-refresh-fail', 'R-refresh-pending'], ['refresh']),
+    'b-focus': ([('js/main.js', "        $(window).on('focus', function () { refreshTogglesIfStale(30000); });\n", "")],
+                ['R-refresh-focus', 'R-refresh-same', 'R-refresh-fail', 'R-refresh-pending'], ['refresh']),
+    'b-same': ([('js/main.js', "                if (quiet && sameToggleState(window._penumbraToggleState, next)) return;\n", "")],
+               ['R-refresh-same'], ['refresh']),
+    'b-failkeep': ([('js/main.js', "                if (quiet && !ok) return; // a failed refresh keeps what is shown\n", "")],
+                   ['R-refresh-fail'], ['refresh']),
+    'b-overlay': ([('js/main.js', "                overlayPendingFlips(next);\n", "")],
+                  ['R-refresh-pending'], ['refresh']),
+    'b-answer': ([('js/main.js', "                    if (_on) stateMap[rowKey] = { by: resp.by || me, at: resp.at || null };\n",
+                   "                    if (_on) stateMap[rowKey] = { by: me, at: null };\n")],
+                 ['R-already', 'W-who-mine'], ['already', 'who']),
+    'b-toast': ([('js/main.js', "                    if (resp.unchanged && _on && _other) {\n", "                    if (false) {\n")],
+                ['R-already'], ['already']),
+    # ---- B2 who / when (main.js)
+    'b-who': ([('js/main.js', "            var w = whoText(meta);\n", "            var w = '';\n")],
+              ['W-who-cells', 'W-who-mine'], ['who']),
+    'b-aria': ([('js/main.js', "            return (lbl ? lbl + ', ' : '') + 'row ' + String(rowKey == null ? '' : rowKey).split(KEY_SEP).join(' · ') + ': ' + toggleTip(on, meta);\n",
+                 "            return toggleTip(on, meta);\n")],
+               ['W-who-aria'], ['who']),
+    'b-popdate': ([('js/main.js', "                    + (meta.at ? ' on ' + escapeHtml(fmtHistWhen(meta.at)) : '') + '</div>'\n", "                    + '</div>'\n")],
+                  ['W-who-pop'], ['who']),
+    # ---- B3 progress (main.js)
+    'b-prog': ([('js/main.js', "            var defs = toggleActive() ? activeToggles() : [];\n            if (!defs.length) { if (seg) seg.style.display = 'none'; return; }\n",
+                 "            var defs = [];\n            if (!defs.length) { if (seg) seg.style.display = 'none'; return; }\n")],
+               ['P2-prog-text', 'P2-prog-tick', 'P2-prog-search'], ['progress']),
+    'b-progsearch': ([('js/main.js', "                if (tr.classList.contains('search-hidden')) continue;\n                var idx = rowIndexOf(tr, hashCellOf(tr));\n",
+                       "                var idx = rowIndexOf(tr, hashCellOf(tr));\n")],
+                     ['P2-prog-search'], ['progress']),
+    # ---- B4 bulk Undo, arrows, confirm (main.js)
+    'b-undo': ([('js/main.js', "                _bulkUndo = changed.length ? { rid: jReportId(), tk: toggleKey, state: !targetState, keys: changed } : null;\n",
+                 "                _bulkUndo = null;\n")],
+               ['B-undo-offer', 'B-undo-exact', 'B-undo-page'], ['bulkundo']),
+    'b-undokeys': ([('js/main.js', "                var changed = Array.isArray(resp.changed) ? resp.changed : keys;\n", "                var changed = visibleRowKeysInOrder(0);\n")],
+                   ['B-undo-exact', 'B-undo-page'], ['bulkundo']),
+    'b-arrows': ([('js/main.js', "            if (next) {\n                next.focus();\n", "            if (next) {\n")],
+                 ['A-arrow-down', 'A-arrow-up'], ['arrows']),
+    'b-confirm': ([('js/main.js', "                        && !window.confirm('Clear ' + _cur.by + '\\'s mark on this row' + (_cur.at ? ' (made ' + fmtHistWhen(_cur.at) + ')' : '') + '?')) return;\n",
+                    "                        && false) return;\n")],
+                  ['C-clear-ask', 'C-clear-yes'], ['confirmclear']),
+    'b-confirm-mine': ([('js/main.js', "                if (_cur && _cur.by && me && String(_cur.by).toLowerCase() !== String(me).toLowerCase()\n",
+                         "                if (_cur && _cur.by && me\n")],
+                       ['C-clear-mine'], ['confirmclear']),
+    # ---- B5 bands, history, touch (main.js / penumbra_journal.js / main.css)
+    'b-band': ([('js/main.js', "                if (lbl) { if (nm.getAttribute('data-tg-col') !== lbl) nm.setAttribute('data-tg-col', lbl); }\n",
+                 "                if (false) { if (nm.getAttribute('data-tg-col') !== lbl) nm.setAttribute('data-tg-col', lbl); }\n")],
+               ['G-band-label'], ['bandlabel']),
+    'b-me': ([('js/penumbra_journal.js', "        if (!$('#jHistMe').length && $('#jHistUser').length) {\n", "        if (false) {\n")],
+             ['H-me-filter'], ['histjump']),
+    'b-jumpbtn': ([('js/penumbra_journal.js', "            +   (ev.parts && ev.parts.length\n", "            +   (false\n")],
+                  ['H-jump'], ['histjump']),
+    'b-jumpfocus': ([('js/main.js', "            var $tbox = (opts && opts.toggleKey)\n", "            var $tbox = false\n")],
+                    ['H-jump'], ['histjump']),
+    'b-touch': ([('css/main.css', "    :is(#resultsTable, #groupedResultsContainer) .journal-toggle-box::before { content: ''; position: absolute; inset: -6px; }\n", "")],
+                ['T-touch-rule'], ['touchcss']),
+    # (2026-10-08) back to growing the BOX on a touch-reporting browser.
+    'b-touch-box': ([('css/main.css', "    :is(#resultsTable, #groupedResultsContainer) .journal-toggle-box { position: relative; }\n",
+                      "    :is(#resultsTable, #groupedResultsContainer) .journal-toggle-box { position: relative; width: 28px; height: 28px; }\n")],
+                    ['T-touch-rule'], ['touchcss']),
+    # ---- B, found by the Round B sweep: a hidden row card takes no file drop (main.js)
+    'b-dropvis': ([('js/main.js', "                if (card && getComputedStyle(card).visibility === 'hidden') continue;\n", "")],
+                  ['D-hd-import'], ['hiddendrop']),
+    # ---- B server (manage_journal.php)
+    'b-srv-where': ([('manage_journal.php', "                   WHERE t.STATE <> :st3\n", "")],
+                    ['SB-merge-sql'], ['srvb']),
+    'b-srv-audit': ([('manage_journal.php', "        if ($changed) {\n            logPenumbraAudit($report_id, 'JOURNAL_TOGGLE', null,\n",
+                      "        if (true) {\n            logPenumbraAudit($report_id, 'JOURNAL_TOGGLE', null,\n")],
+                    ['SB-set-unchanged'], ['srvb']),
+    'b-srv-answer': ([('manage_journal.php', "            'by' => $cur['by'], 'at' => $cur['at'])));\n",
+                       "            'by' => $currentUserKey, 'at' => $cur['at'])));\n")],
+                     ['SB-set-unchanged', 'SB-set-dup'], ['srvb']),
+    'b-srv-dup': ([('manage_journal.php', "            if (strpos((string)$e['message'], 'ORA-00001') !== false) $ok = oci_execute($stmt);\n", "")],
+                  ['SB-set-dup'], ['srvb']),
+    'b-srv-bulk': ([('manage_journal.php', "            if ((int)oci_num_rows($stmt) > 0) $changed_keys[] = $rk;\n", "            $changed_keys[] = $rk;\n")],
+                   ['SB-bulk-changed', 'SB-bulk-none'], ['srvb']),
+}
+APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+cache = {}
+def text(rel):
+    # A file the build directory does not carry is the live one (run.py does the same).
+    if rel not in cache:
+        p = os.path.join(D, *rel.split('/'))
+        if not os.path.exists(p): p = os.path.join(APP, *rel.split('/'))
+        cache[rel] = open(p, 'rb').read().decode('utf-8', 'surrogateescape').replace('\r\n', '\n')
+    return cache[rel]
+bad = 0
+for name, (edits, must, scn) in M.items():
+    for rel, old, new in edits:
+        n = text(rel).count(old)
+        if n != 1:
+            print('ANCHOR %-16s %s: found %d times: %r' % (name, rel, n, old[:80])); bad += 1
+if bad: raise SystemExit('%d anchor(s) wrong - mutants.json NOT written' % bad)
+out = {k: {'edits': [list(e) for e in v[0]], 'must': v[1], 'scn': v[2]} for k, v in M.items()}
+open(os.path.join(HERE, 'mutants.json'), 'w', encoding='utf-8', newline='\n').write(json.dumps(out, indent=1, ensure_ascii=False))
+print('%d mutants, every anchor found once in %s' % (len(M), D))

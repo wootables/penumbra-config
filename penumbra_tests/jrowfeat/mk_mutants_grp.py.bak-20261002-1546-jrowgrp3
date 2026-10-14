@@ -1,0 +1,64 @@
+# Round 2 (2026-10-02, grouped BY the toggle): adds the grp-* mutants to mutants.json,
+# every anchor checked against the build they were made for (the staged main.js).
+#   py -3 mk_mutants_grp.py <main.js> <mutants.json>
+# must = None until frozen from an EXPLORE run (run.py prints the red set).
+import sys, json
+src = open(sys.argv[1], 'rb').read().decode('utf-8', 'surrogateescape')
+N = '\r\n'
+SAVED = ['bytoggle', 'bysentinel', 'bylate', 'flipgrp', 'flipkbd', 'notewait', 'dblflip', 'flipsearch']
+M = [
+ # name, [(old, new)], must-red, scenarios
+ # fix A: the load-time "is the grouping's column still there" guard asks the journal
+ ('grp-noload', [("                                || groupIsJournalToggle(groupLevel0Of(pendingGroupByColumn));",
+                  "                                || false;")], None, SAVED + ['nested']),
+ # the compare-exit restore asks it too
+ ('grp-nocmp', [("        }) || groupIsJournalToggle(groupLevel0Of(saved.column));   // a toggle: listed by label OR sentinel, saved by either",
+                 "        });")], None, ['cmpexit']),
+ # fix C: a toggle as a NESTED level
+ ('grp-nonested', [("        if (_jLab) {" + N + "            return function (rowEl) {",
+                    "        if (false) {" + N + "            return function (rowEl) {")], None, ['nested', 'nestedsent', 'pickgrp']),
+ # a real column of the same name wins
+ ('grp-noshadow', [("                if (!bySentinel && masterRowData && masterRowData.length && masterRowData[0]",
+                    "                if (false && masterRowData && masterRowData.length && masterRowData[0]")], None, ['shadow', 'bytoggle']),
+ # fix B: state landing after the build is checked against the bands
+ ('grp-nocheck', [("            if (toggles.length) checkToggleBands();", "            void 0;")], None, ['bytoggle', 'bysentinel', 'bylate']),
+ # fix B: a click schedules the regroup
+ ('grp-noflip', [("            noteToggleFlip(this); // grouped BY this toggle: the row changes band once the clicks settle",
+                  "            void 0;")], None, ['flipgrp', 'flipkbd', 'notewait', 'dblflip', 'nested', 'flipsearch']),
+ # the clicks settle first
+ ('grp-nodebounce', [("        var REGROUP_DELAY = 800;", "        var REGROUP_DELAY = 0;")], None, ['flipgrp', 'dblflip']),
+ # an open row note holds the table still ...
+ ('grp-nowait', [("            if (gc.querySelector('tr.journal-note-child')) { _jRegroupWaiting = true; return; }", "            void 0;")], None, ['notewait']),
+ # ... and closing it lets the regroup run
+ ('grp-noresume', [("            if (_jRegroupWaiting) scheduleToggleRegroup(150);", "            void 0;")], None, ['notewait']),
+ # the reader's place
+ ('grp-noanchor', [("                if (keep) {" + N + "                    // The band's box back where it was on the page (a band",
+                    "                if (false) {" + N + "                    // The band's box back where it was on the page (a band")], None, ['flipgrp']),
+ # ... the band's box back on the page (else the box's own scroll takes the shift)
+ ('grp-nodybox', [("                        if (Math.abs(dyBox) >= 1) sc.scrollTop = sc.scrollTop + dyBox;", "                        void dyBox;")], None, ['flipgrp']),
+ # every band's own scroll, put back after the rebuild
+ ('grp-noboxscroll', [("                if (bs0) { nboxes[nb].scrollTop = bs0.t; nboxes[nb].scrollLeft = bs0.l; }", "                void bs0;")], None, ['nested', 'flipgrp']),
+ # a keyboard user's focus
+ ('grp-nofocus', [("                    if (box) { try { box.focus({ preventScroll: true }); } catch (e) { box.focus(); } }", "                    void box;")], None, ['flipkbd']),
+ # the grouped view's sort
+ ('grp-nosort', [("            if (Array.isArray(sortCriteria) && sortCriteria.length && typeof penumbraSortTbodyInPlace === 'function') {" + N
+                  + "                $('#groupedResultsContainer .group-content > table > tbody').each(",
+                  "            if (false) {" + N
+                  + "                $('#groupedResultsContainer .group-content > table > tbody').each(")], None, ['flipgrp']),
+ # the search still on
+ ('grp-nosearch', [(N + "            if ($.trim($('#tableSearch').val() || '') && typeof runTableSearch === 'function') {" + N
+                    + "                try { runTableSearch(); } catch (e) { /* the groups stand unfiltered */ }",
+                    N + "            if (false) {" + N
+                    + "                try { runTableSearch(); } catch (e) { /* the groups stand unfiltered */ }")], None, ['flipsearch']),
+ # the moved row shows where it went
+ ('grp-noflash', [("                for (var c = 0; c < cs.length; c++) flashRowCopy(cs[c]);", "                void cs;")], None, ['flipgrp']),
+]
+out = json.load(open(sys.argv[2], encoding='utf-8'))
+for name, edits, must, scn in M:
+    for old, new in edits:
+        n = src.count(old)
+        if n != 1: raise SystemExit('%s: anchor found %d times: %r' % (name, n, old[:80]))
+    keep = out.get(name, {}).get('must') if name in out else None
+    out[name] = {'edits': edits, 'must': must if must is not None else keep, 'scn': scn}
+json.dump(out, open(sys.argv[2], 'w', encoding='utf-8'), indent=1)
+print('anchors ok:', len(M), 'grp mutants;', len(out), 'in all')

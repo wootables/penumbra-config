@@ -1,0 +1,217 @@
+# =============================================================================
+# Run the REPORT tags tests (2026-10-08): the pure half (penumbra_report_tags.php),
+# the grant side of db_connection.php (penumbraNormalizeGrants /
+# penumbraReportTagMap / penumbraReportGrantMatches / ...AllowsScheduler /
+# penumbraIsConsoleAudience, and the audit change summary), the Grants tool's
+# validator + picker (grants_admin.php), the Tags tool page (tags_admin.php,
+# step 2), and step 3: Save As (index.php + js/main.js), the save endpoint
+# (save_server_state.php) and the delete / restore snapshots.
+#   powershell -File run.ps1                 # normal run, against the LIVE app
+#   powershell -File run.ps1 -App <dir>      # against a staged copy (flat, or
+#                                            # app-shaped with js\ beside; a file it
+#                                            # lacks comes from live)
+#   powershell -File run.ps1 -Mutant         # targeted mutants; each MUST go RED
+#                                            # with the exact fail count named below
+#
+# WHAT IS UNDER TEST. The pasted-id parser, the tag-list cleaner, the NARROW rule
+# for who may change a report's tags (admin: any; a non-admin: only tags they hold
+# a grant on), the SQL text of every read and write (numeric report id, idempotent
+# MERGE, rename = merge, the caps, the shared vocabulary = the UNION of both tag
+# tables); the resolver parsing ['tag' => NAME (, 'scheduler')], both matchers
+# answering tag grants through the injected tag map and FAILING CLOSED with no
+# database; the console audience; the validator writing upper-cased names and
+# refusing malformed ones; text pins on the picker; the Tags tool page's report
+# side; the change summary naming "tags"; pins on Save As, the save endpoint's
+# narrow rule and create gate, and the delete / restore snapshots. Offline, php -n.
+#
+# EXPECTED TAIL: "PASS: N   FAIL: 0" then "RESULT: GREEN" (N = 284 as of 2026-10-09: round 5 of the Tags tool redesign, section 12; twenty-one mutants).
+#
+# UNC .ps1 files are GPO-blocked here ("not digitally signed") - run the body as
+# a scriptblock rather than with -File. Never add a bare `exit` for the same
+# reason: it would kill the caller.
+# =============================================================================
+param(
+    [string]$App = '\' + '\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra',
+    [switch]$Mutant
+)
+$ErrorActionPreference = 'Stop'
+$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\reporttags' }   # empty when run as a scriptblock: never fall back to the caller's cwd
+$live = '\' + '\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+$php  = '\' + '\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+$test = Join-Path $here 'test_reporttags.php'
+# A staged file by its app-relative name: flat (main.js beside) or app-shaped (js\main.js); live otherwise.
+function Pick($name) {
+    $p = Join-Path $App $name; if (Test-Path $p) { return $p }
+    $flat = Join-Path $App (Split-Path -Leaf $name); if (Test-Path $flat) { return $flat }
+    return (Join-Path $live $name)
+}
+$files = [ordered]@{
+    lib = Pick 'penumbra_report_tags.php'
+    dbc = Pick 'db_connection.php'
+    ga  = Pick 'grants_admin.php'
+    pt  = Pick 'tags_admin.php'
+    ss  = Pick 'save_server_state.php'
+    del = Pick 'delete_server_report.php'
+    res = Pick 'restore_server_report.php'
+    idx = Pick 'index.php'
+    mjs = Pick 'js\main.js'
+    gsr = Pick 'get_server_reports.php'
+    rep = Pick 'js\penumbra_repository.js'
+    aa  = Pick 'analytics_all.php'
+    pin = Pick 'js\pinned_reports.js'
+    chr = Pick 'penumbra_admin_chrome.php'
+    mdb = Pick 'manage_dashboard.php'
+    dsh = Pick 'dashboard.php'
+    djs = Pick 'js\penumbra_dashboard.js'
+    mrt = Pick 'manage_report_tags.php'
+}
+$ppl = Pick 'penumbra_people_tags.php'   # the pure half requires it from ITS OWN folder
+if (-not $Mutant) {
+    & $php -n $test @($files.Values)
+    return
+}
+# --- targeted mutants -------------------------------------------------------
+# Each reverts ONE rule. The expected fail count is exact: a mutant that stays
+# GREEN, or that goes red in more places than named, means the suite no longer
+# pins what it claims to pin. 'File' names which source it edits.
+$tmp = Join-Path $env:TEMP ('pnb_reporttags_mut_' + $PID)
+New-Item -ItemType Directory -Force $tmp | Out-Null
+Copy-Item $ppl (Join-Path $tmp 'penumbra_people_tags.php') -Force   # beside a mutated pure half, its require_once resolves
+$mutants = @(
+    @{ File = 'dbc'; Name = 'the resolver no longer upper-cases a tag name (a lower-case grant is silently skipped)';
+       From = "`$tag = strtoupper(trim((string)`$grant['tag']));";   To = "`$tag = trim((string)`$grant['tag']);";   Expect = 5 },
+    @{ File = 'dbc'; Name = 'the matcher ignores tag grants';
+       From = "if (isset(`$tg['tag']) && in_array(`$tg['tag'], `$have, true)) return true;";   To = 'if (false) return true;';   Expect = 3 },
+    @{ File = 'dbc'; Name = 'a plain tag grant leaks the scheduler verb';
+       From = "if (!empty(`$tg['scheduler']) && isset(`$tg['tag']) && in_array(`$tg['tag'], `$have, true)) return true;";
+       To   = "if (isset(`$tg['tag']) && in_array(`$tg['tag'], `$have, true)) return true;";   Expect = 2 },
+    @{ File = 'dbc'; Name = 'the lookup stops folding the short id (an upper-case id finds no tags)';
+       From = "`$sid = strtolower(trim((string)`$shortId));`n        if (`$sid === '') return array();";
+       To   = "`$sid = trim((string)`$shortId);`n        if (`$sid === '') return array();";   Expect = 2 },
+    @{ File = 'dbc'; Name = 'the console audience forgets tag holders';
+       From = "|| !empty(`$grants['reports']) || !empty(`$grants['tags'])))";   To = "|| !empty(`$grants['reports'])))";   Expect = 1 },
+    @{ File = 'dbc'; Name = 'the change summary files a tag change under "other settings"';
+       From = "elseif (`$k === 'tags') `$cats['tags'] = 1;";   To = "elseif (`$k === 'tags') `$stateN++;";   Expect = 3 },
+    @{ File = 'ga';  Name = 'the validator accepts any tag name';
+       From = "if (!preg_match('/^[A-Z][A-Z0-9_]{0,59}$/', `$tag)) { `$err = `"invalid tag name";   To = "if (false) { `$err = `"invalid tag name";   Expect = 4 },
+    @{ File = 'lib'; Name = 'the narrow rule lets a non-admin change any tag';
+       From = 'if (!$changed || $isAdmin) return array();';   To = 'return array();';   Expect = 5 },
+    @{ File = 'pt';  Name = 'the Tags tool audits an add without the report id (the report''s own log would not show it)';
+       From = "@logPenumbraAudit(`$rep['id'], 'REPORT_TAG_ADD'";   To = "@logPenumbraAudit(null, 'REPORT_TAG_ADD'";   Expect = 1 },
+    @{ File = 'pt';  Name = 'the Tags tool renames people but leaves the reports behind (the two kinds drift apart)';
+       From = '$rs = penumbraReportTagsSqlRename();';   To = '$rs = array("SELECT 1 FROM DUAL", "SELECT 1 FROM DUAL");';   Expect = 3 },
+    @{ File = 'ss';  Name = 'the save endpoint stops refusing tags the saver does not hold';
+       From = '$tags_refused = penumbraReportTagsRefused($isAdmin, $userGrants, $tags_before, $tags);';   To = '$tags_refused = array();';   Expect = 1 },
+    @{ File = 'ss';  Name = 'the create gate ignores a tag-only holder''s tags';
+       From = '&& !$tagCreateOk) {';   To = ') {';   Expect = 1 },
+    @{ File = 'aa';  Name = 'Platform Metrics drops the tag from the aliased report filter (half the queries ignore it)';
+       From = '$reportFilterA .= " AND r.ID IN (SELECT REPORT_ID FROM PENUMBRA_REPORT_TAGS WHERE TAG = :rtag)";';   To = '$reportFilterA .= "";';   Expect = 1 },
+    @{ File = 'gsr'; Name = 'the repository list drops TAGS from its whitelist (the column would show nothing)';
+       From = "? array_values(array_filter(explode('|', (string)`$row['TAGS']), 'strlen')) : array(),";   To = '? array() : array(),';   Expect = 1 },
+    @{ File = 'ga';  Name = 'the Grants tool''s reach ignores tag grants (a tag holder would read as reaching nothing)';
+       From = "rep.tags.indexOf(String(gr.tag).toUpperCase()) !== -1) { via.push('tag ' + gr.tag);";   To = "rep.tags.indexOf(String(gr.tag).toUpperCase()) !== -2) { via.push('tag ' + gr.tag);";   Expect = 1 },
+    @{ File = 'lib'; Name = 'look-alikes pair up three-letter names (every short tag would read as a duplicate)';
+       From = 'max(strlen($a), strlen($b)) >= 5';   To = 'max(strlen($a), strlen($b)) >= 1';   Expect = 2 },
+    @{ File = 'lib'; Name = 'the grant holders lose the scheduler add-on';
+       From = "'scheduler' => !empty(`$g['scheduler'])";   To = "'scheduler' => false";   Expect = 1 },
+    @{ File = 'lib'; Name = 'a re-point counts the grants but changes none of them';
+       From = '{ $grantsByUser[$uid][$k][''tag''] = $new; $changed++; }';   To = '{ $changed++; }';   Expect = 2 },
+    @{ File = 'pt';  Name = 'the untagged list forgets to leave the system pages out';
+       From = 'pnbTagsRead(penumbraReportTagsSqlUntagged($sysPh, 300), $sysBinds)';   To = 'pnbTagsRead(penumbraReportTagsSqlUntagged(array(), 300), array())';   Expect = 1 },
+    @{ File = 'pt';  Name = 'a rename never re-points the grants that name the tag (its holders silently stranded)';
+       From = "if (!empty(`$_POST['repoint'])) {";   To = 'if (false) {';   Expect = 2 },
+    @{ File = 'pt';  Name = 'the three-way sort loses its third state (a column can never be un-sorted)';
+       From = 'else crit.splice(at, 1); }';   To = 'else crit[at] = { th: th, dir: ''asc'' }; }';   Expect = 1 },
+    @{ File = 'lib'; Name = 'the dashboard summary says reports (the flash would lie about what was tagged)';
+       From = "(`$n === 1 ? 'dashboard' : 'dashboards')";   To = "(`$n === 1 ? 'report' : 'reports')";   Expect = 1 },
+    @{ File = 'dbc'; Name = 'the dashboard tag matcher ignores held tags (a tag grant reaches no dashboard)';
+       From = "if (isset(`$tg['tag']) && in_array(`$tg['tag'], `$have, true)) { return true; }   // a held tag the dashboard carries";   To = "if (false) { return true; }   // a held tag the dashboard carries";   Expect = 2 },
+    @{ File = 'mdb'; Name = 'the dashboard save stops refusing tags the saver does not hold';
+       From = '$tagsRefused = penumbraReportTagsRefused($isAdmin, $userGrants, $tagsBefore, $tags);';   To = '$tagsRefused = array();';   Expect = 1 },
+    @{ File = 'djs'; Name = 'the dashboard home loses tag:NAME (a tag pill would filter by text, not by tag)';
+       From = 'm = /^tag:\s*([a-z0-9_]+)$/i.exec(q)';   To = 'm = null';   Expect = 1 },
+    @{ File = 'pt'; Name = 'the heading button loses the specificity that beats the themes'' button rule (dark headings turn into pills again)';
+       From = 'table.tags th[data-sortable] .dt-sort-btn, table.members th[data-sortable] .dt-sort-btn, table.hist th[data-sortable] .dt-sort-btn { background: none; border: 0; box-shadow: none;';   To = '.dt-sort-btn { background: none; border: 0; box-shadow: none;';   Expect = 1 },
+    @{ File = 'pt'; Name = 'the untagged tab''s tag-the-ticked row centres again (the button floats above the inputs)';
+       From = '.untagged-form { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: flex-end;';   To = '.untagged-form { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center;';   Expect = 1 },
+    @{ File = 'pt'; Name = 'the headings lose their grip (resizing is back to an invisible edge)';
+       From = 'th.appendChild(grip);';   To = 'void grip;';   Expect = 1 },
+    @{ File = 'pt'; Name = 'an account edit drops the tags it should add (the field only ever removes)';
+       From = '$toAdd = array_values(array_diff($want, $have)); $toDrop = array_values(array_diff($have, $want));';   To = '$toAdd = array(); $toDrop = array_values(array_diff($have, $want));';   Expect = 1 },
+    @{ File = 'lib'; Name = 'the untagged-dashboards list forgets the NOT EXISTS (every dashboard would be listed as untagged)';
+       From = '" FROM PENUMBRA_DASHBOARDS D WHERE NOT EXISTS (SELECT 1 FROM PENUMBRA_DASHBOARD_TAGS T WHERE T.DASHBOARD_ID = D.ID)"';   To = '" FROM PENUMBRA_DASHBOARDS D"';   Expect = 1 },
+    @{ File = 'pt'; Name = 'the Untagged tab''s badge counts reports only (an untagged dashboard would hide behind a zero)';
+       From = 'pnbTagsBadge($untaggedCount + $untaggedDashCount)';   To = 'pnbTagsBadge($untaggedCount)';   Expect = 1 },
+    @{ File = 'pt'; Name = 'tagging from the untagged dashboards list lands on the tag page instead of the list';
+       From = '''tags_admin.php?view=untagged#dashboards'' : $back . ''#dashboards''';   To = '$back . ''#dashboards'' : $back . ''#dashboards''';   Expect = 1 },
+    @{ File = 'pt'; Name = 'the toolbar paints over the tab strip again (its bottom border vanishes on the Tags tab)';
+       From = 'margin: 0 -22px 14px; padding: 0 22px 8px; }';   To = 'margin: -22px -22px 14px; padding: 22px 22px 8px; }';   Expect = 1 },
+    @{ File = 'pt'; Name = 'Escape no longer closes the New tag lightbox';
+       From = "if (e.key === 'Escape' && newBox && !newBox.hidden) { e.preventDefault(); e.stopPropagation(); closeNew(); }";   To = "if (false) { closeNew(); }";   Expect = 1 },
+    @{ File = 'pt'; Name = 'a write from the lightbox lands on the new tag''s page instead of the list it came from';
+       From = "if (`$backView === 'catalog') `$back = 'tags_admin.php';";   To = "if (false) `$back = 'tags_admin.php';";   Expect = 1 },
+    @{ File = 'pt'; Name = 'a banner with an open tip stays under the sticky row below it';
+       From = '.tags-banner:hover, .tags-banner:focus-within { z-index: 6; }';   To = '.tags-banner:hover, .tags-banner:focus-within { z-index: 3; }';   Expect = 1 },
+    @{ File = 'pt'; Name = 'an activity shortcut fills the box but never filters the list';
+       From = "filt.dispatchEvent(new Event('input', { bubbles: true }));   // the list filters itself";   To = "/* no filter */";   Expect = 1 },
+    @{ File = 'pt'; Name = 'the strip stops sticking (the tabs, the search and New tag scroll away)';
+       From = '.tabs[role="navigation"] { position: sticky; top: var(--pnb-adm-offset, 0px); z-index: 8;';   To = '.tabs[role="navigation"] { position: static; top: var(--pnb-adm-offset, 0px); z-index: 8;';   Expect = 1 },
+    @{ File = 'pt'; Name = 'the search box forgets its text between tabs';
+       From = 'sessionStorage.setItem(FIND_KEY, find.value)';   To = 'void 0';   Expect = 1 },
+    @{ File = 'pt'; Name = 'the search box filters the catalog only (the other tabs ignore it)';
+       From = "var findTables = ['accountTable', 'untaggedTable', 'untaggedDashTable', 'activityTable'];";   To = "var findTables = [];";   Expect = 1 },
+    @{ File = 'pt'; Name = 'the banners forget the strip''s height (they would stick under it, hidden)';
+       From = 'top: calc(var(--pnb-adm-offset, 0px) + var(--pnb-tabs-h, 0px) + var(--pnb-banner-top, 0px))';   To = 'top: calc(var(--pnb-adm-offset, 0px) + var(--pnb-banner-top, 0px))';   Expect = 1 },
+    @{ File = 'pt'; Name = 'the counts endpoint ignores the catalog''s kind prefixes (people: would count every tag)';
+       From = "if (preg_match('/^(people|reports|dashboards|both|values):\s*(.*)$/', `$tq, `$m)) { `$tk = `$m[1]; `$tq = `$m[2]; }";   To = "if (false) { `$tk = `$m[1]; `$tq = `$m[2]; }";   Expect = 1 },
+    @{ File = 'pt'; Name = 'an emptied search box never puts the badge totals back';
+       From = "if (!q) { each(['tags', 'accounts', 'untagged', 'activity'], function (k) { setBadge(k, null); });";   To = "if (!q) { each([], function (k) { setBadge(k, null); });";   Expect = 1 },
+    @{ File = 'pt'; Name = 'the pill box takes any word (the closed vocabulary leaks)';
+       From = "if (TAG_VOCAB.indexOf(t) === -1) { say('No tag called ' + t + ' exists yet. Start it with + New tag.'); return false; }";   To = "if (false) { return false; }";   Expect = 1 },
+    @{ File = 'pt'; Name = 'radd applies only the first of several tags';
+       From = '$tagsToApply = $tagsPosted ? $tagsPosted : array($tag);   // every posted tag, reports (2026-10-10)';   To = '$tagsToApply = array($tag);   // every posted tag, reports (2026-10-10)';   Expect = 1 },
+    @{ File = 'mrt'; Name = 'the tags endpoint skips the narrow rule (a non-admin could change any tag from the pane)';
+       From = '$refused = penumbraReportTagsRefused($isAdmin, $userGrants, $have, $want);';   To = '$refused = array();';   Expect = 1 },
+    @{ File = 'mrt'; Name = 'the tags endpoint lets anyone edit (the editor gate is gone)';
+       From = "if (!`$isAdmin && !penumbraIsReportOwner(`$rep['OWNER_ID'], `$currentUserKey) && !penumbraReportGrantMatches(`$userGrants, `$rep['SHORT_ID'])) {";   To = "if (false) {";   Expect = 1 },
+    @{ File = 'rep'; Name = 'the pane editor takes any word (the closed vocabulary leaks)';
+       From = "if (_repoTagVocab().indexOf(t) === -1) { `$hint.text('No tag called ' + t + ' exists yet. New tags start in the Tags tool.'); return; }";   To = "if (false) { return; }";   Expect = 1 },
+    @{ File = 'rep'; Name = 'the pencil shows for everyone (a viewer would get an editor the server then refuses)';
+       From = 'var _tagsPencil = _repoCanEditTags(report)';   To = 'var _tagsPencil = true';   Expect = 1 },
+    @{ File = 'pt'; Name = 'a kind pill stops toggling (once on, People could never be switched off)';
+       From = 'kinds[kk] = !kinds[kk];';   To = 'kinds[kk] = true;';   Expect = 1 },
+    @{ File = 'pt'; Name = 'both: stops meaning People and Reports';
+       From = "if (m) { q = m[2]; if (m[1] === 'both') { k.people = true; k.reports = true; } else { k[m[1]] = true; } }";   To = "if (m) { q = m[2]; if (false) { k.people = true; k.reports = true; } else { k[m[1]] = true; } }";   Expect = 1 },
+    @{ File = 'pt'; Name = 'the shortcut handler ignores the Untagged owner links (only the activity lists would answer a click)';
+       From = "e.target.closest('table a.flt')";   To = "e.target.closest('table.hist a.flt')";   Expect = 1 },
+    @{ File = 'pt'; Name = 'the kind strip loses its segmented border (three loose buttons again)';
+       From = '#kindSeg { display: inline-flex; gap: 0; flex-wrap: nowrap; border: 1px solid var(--border-color); border-radius: 999px;';   To = '#kindSeg { display: inline-flex; gap: 0; flex-wrap: nowrap; border: 0; border-radius: 999px;';   Expect = 1 },
+    @{ File = 'pt'; Name = 'an Edit link no longer opens the account lightbox on load (the edit form would sit hidden)';
+       From = "if (ACCT_EDIT || window.location.hash === '#register') openAcct();";   To = "if (false) openAcct();";   Expect = 1 },
+    @{ File = 'pt'; Name = 'Escape no longer closes the account lightbox';
+       From = "if (e.key === 'Escape' && acctBox && !acctBox.hidden)";   To = "if (false)";   Expect = 1 }
+)
+$leaves = @{ lib = 'penumbra_report_tags.php'; dbc = 'db_connection.php'; ga = 'grants_admin.php'; pt = 'tags_admin.php'; ss = 'save_server_state.php'; del = 'delete_server_report.php'; res = 'restore_server_report.php'; idx = 'index.php'; mjs = 'main.js'; gsr = 'get_server_reports.php'; rep = 'penumbra_repository.js'; aa = 'analytics_all.php'; pin = 'pinned_reports.js'; chr = 'penumbra_admin_chrome.php'; mdb = 'manage_dashboard.php'; dsh = 'dashboard.php'; djs = 'penumbra_dashboard.js'; mrt = 'manage_report_tags.php' }
+$allGood = $true
+foreach ($m in $mutants) {
+    $srcPath = $files[$m.File]
+    $text = [IO.File]::ReadAllText($srcPath)
+    if ($text.IndexOf($m.From) -lt 0) { Write-Host ("MUTANT NOT APPLICABLE (anchor missing): " + $m.Name); $allGood = $false; continue }
+    $mutated = $text.Replace($m.From, $m.To)
+    $file = Join-Path $tmp $leaves[$m.File]
+    [IO.File]::WriteAllText($file, $mutated)
+    # NOT $args: that is PowerShell's automatic variable, and assigning to it inside
+    # this scriptblock handed php.exe nothing (every mutant read as FATAL, 2026-10-08).
+    $phpArgs = @($files.Values)
+    $i = 0; foreach ($k in $files.Keys) { if ($k -eq $m.File) { $phpArgs[$i] = $file }; $i++ }
+    $out  = & $php -n $test @phpArgs 2>&1 | Out-String
+    $fail = 0
+    if ($out -match 'FAIL:\s+(\d+)') { $fail = [int]$Matches[1] }
+    # -cmatch: case-SENSITIVE, because a pin label says "never fatal" and -match would read it as the harness's FATAL.
+    if ($out -cmatch 'FATAL') { $fail = -1; Write-Host ('     ' + (($out -split "`n") | Where-Object { $_ -cmatch 'FATAL' } | Select-Object -First 1)) }
+    $verdict = if ($fail -eq $m.Expect) { 'OK  ' } else { 'BAD ' }
+    if ($fail -ne $m.Expect) { $allGood = $false }
+    Write-Host ("{0} mutant '{1}' -> FAIL: {2} (expected {3})" -f $verdict, $m.Name, $fail, $m.Expect)
+}
+Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+Write-Host ('MUTANTS: ' + $(if ($allGood) { 'ALL BITE' } else { 'PROBLEM' }))

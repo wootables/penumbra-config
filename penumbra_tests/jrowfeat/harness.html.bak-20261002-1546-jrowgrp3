@@ -1,0 +1,319 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>journal row features</title>
+<link rel="stylesheet" href="main.css">
+</head>
+<body class="theme-default">
+<!-- jrowfeat suite (2026-10-02): journal row features (toggle columns + row notes)
+     in the flat table AND the grouped view. The REAL main.js booted through the
+     REAL run path (stubbed query.php + manage_journal.php) on a 36-row fixture
+     shaped like eirbprotsum: key = "PROTOCOL NO." + "PROTOCOL TYPE" (a column
+     name with a dot and a space; PROTOCOL NO. alone is NOT unique), one toggle
+     "Reviewed" (key toggle1), row notes on. ?scn=<name> picks the stored report
+     state; driver.js runs the scenario and records its asserts.
+     The View Options journal panel (#journalRowConfig) is NOT in this file: run.py
+     lifts it from the index.php under test and splices it in at JR_VIEW_OPTIONS.
+     Round 2 (2026-10-02): reports saved GROUPED BY the toggle (BYTOGGLE below). -->
+
+<div id="reportHeaderContainer"><div id="defaultTitleView"></div><div id="reportInfoPanel" style="display:none"></div></div>
+<input id="reportTitle" value=""><input id="reportSubtitle" value=""><div id="admWrapper"></div><button id="toggleAdminViewBtn"></button>
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div><div id="mainReportTitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<button id="executeQuery">Run</button><button id="stopQueryBtn">Stop</button>
+<div id="loadingOverlay" style="display:none"><p id="execution-timer"></p><p id="loadingMessage"></p><div id="loadingTip"></div></div>
+<div id="importTimestamps"></div>
+<div id="resultsHeader" style="height:20px">controls</div>
+<div id="tableSearchContainer"><input id="tableSearch" value=""></div>
+<div id="resultCount"></div>
+<div id="paginatorContainer" style="visibility:hidden">
+  <div id="paginationControls"><span id="pageInfo"></span><select id="rowsPerPageSelector"><option value="25">25</option><option value="50">50</option><option value="200">200</option><option value="all">All</option></select></div>
+  <div id="groupActionsContainer" style="display:none">
+    <a href="#" id="expandAllGroups">Expand All</a> <a href="#" id="collapseAllGroups">Collapse All</a>
+    <span id="removeGroupingSep">&bull;</span> <a href="#" id="configureGroupingBtn" role="button">Configure Grouping</a> <a href="#" id="removeGroupingLink">Remove Grouping</a>
+  </div>
+</div>
+<svg class="export-icon" id="groupTableBtn" role="button" tabindex="0" viewBox="0 0 24 24" width="16" height="16"><rect x="2" y="2" width="20" height="20"></rect></svg>
+<div id="table-view-container"><div id="container-parent"><div id="results-wrapper" style="width:1400px;height:700px;overflow:auto"><table id="resultsTable" class="data-grid-table"><caption class="sr-only">Report results table</caption><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table></div></div></div>
+<div id="errorBox"></div><div id="undo_text_container"></div>
+<!-- show_text()'s toast dock: the notices land here (round 2 reads "Previous grouping dropped"). -->
+<div id="action_overlay"></div>
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="pnbNoSearchMatches" style="display:none"></div>
+<div id="settingsPanelOverlay"></div>
+<div id="settingsPanel">
+  <select id="spThemeSelector"><option value="report-default">Report Default</option><option value="theme-default">Default</option></select>
+  <select id="spDensitySelector"><option value="report-default">Report Default</option><option value="standard">Standard</option></select>
+  <input type="checkbox" id="spRowExpandToggle"><input type="checkbox" id="spResolverToggle">
+  <div class="sp-section sp-columns-section"><div class="sp-column-container"><div id="spColumnList" class="sp-column-list"></div></div></div>
+  <div class="sp-actions"><button id="spApply">Save Column Layout</button><button id="spReset">Reset</button><span id="spPendingCount"></span></div>
+</div>
+<!-- View Options: the journal card (the live-toggle handler binds to the grid's
+     checkboxes at ready time) + the row-feature panel lifted from index.php. -->
+<div id="view-options-tab">
+  <div class="view-options-eu"><div class="view-options-grid">
+    <div class="view-option-item"><label><input type="checkbox" id="viewOptionJournal"><div class="view-option-text"><strong>Report Journal</strong><small>Opt-in shared notes.</small></div></label></div>
+  </div></div>
+<!--JR_VIEW_OPTIONS-->
+</div>
+<!-- The grouping dialog, as index.php ships it (the jsongroup suite's copy). -->
+<div id="groupingLightbox" class="help-lightbox">
+    <div class="lightbox-content pnb-dlg">
+        <div class="pnb-dlg-head">
+            <div class="pnb-dlg-tt"><h3 class="pnb-dlg-title">Group Table by Column</h3></div>
+            <span class="pnb-dlg-action" id="groupPresetMount"></span>
+            <button type="button" class="close-lightbox" aria-label="Close" title="Close (Esc)">&times;</button>
+        </div>
+        <p id="pivotWarningForGrouping" style="display: none;">Note, you are viewing a pivot table.</p>
+        <div class="grp-lb-body">
+          <div class="grp-lb-left">
+            <div id="groupingColumnSelector" class="penumbra-custom-select" style="width: 100%; margin-bottom: 15px;">
+                <div class="pcs-selected" data-value="" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-label="Column to group by">-- Select a Column to Group By --</div>
+                <div class="pcs-dropdown" role="listbox" aria-label="Columns to group by"></div>
+            </div>
+            <div id="groupLevel2Row" style="display: none; margin-bottom: 15px;">
+                <div id="groupingColumnSelector2" class="penumbra-custom-select" style="width: 100%;">
+                    <div class="pcs-selected" data-value="" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-label="Second grouping level">-- None --</div>
+                    <div class="pcs-dropdown" role="listbox" aria-label="Second grouping level"></div>
+                </div>
+            </div>
+            <div id="groupLevel3Row" style="display: none; margin-bottom: 15px;">
+                <div id="groupingColumnSelector3" class="penumbra-custom-select" style="width: 100%;">
+                    <div class="pcs-selected" data-value="" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-label="Third grouping level">-- None --</div>
+                    <div class="pcs-dropdown" role="listbox" aria-label="Third grouping level"></div>
+                </div>
+            </div>
+            <div id="groupBinOptions" style="display: none; margin-bottom: 15px;">
+                <span id="groupBinColName"></span>
+                <input type="number" id="groupBinWidth" min="1" step="1" autocomplete="off" aria-label="Fixed bin width">
+                <input type="text" id="groupBinEdges" autocomplete="off" aria-label="Custom range cut points">
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label><input type="checkbox" id="groupAggCheckbox"> Include additional summary in each group header</label>
+                <div id="groupAggOptions" style="display: none;">
+                    <div id="groupAggColumn" class="penumbra-custom-select" style="flex: 1;">
+                        <div class="pcs-selected" data-value="" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-label="Column to aggregate">-- Column --</div>
+                        <div class="pcs-dropdown" role="listbox" aria-label="Columns to aggregate"></div>
+                    </div>
+                    <select id="groupAggType">
+                        <option value="sum">Sum</option><option value="avg">Average</option><option value="median">Median</option>
+                        <option value="min">Min</option><option value="max">Max</option><option value="range">Range (max - min)</option>
+                        <option value="stddev">Std Deviation</option><option value="count">Count (non-blank)</option>
+                        <option value="count_blank">Count (blank)</option><option value="count_distinct">Count (distinct)</option>
+                        <option value="mode">Mode (most common)</option><option value="antimode">Antimode (least common)</option>
+                    </select>
+                    <div id="groupSummaryFilterHint"></div>
+                </div>
+            </div>
+          </div>
+          <div class="grp-lb-right">
+            <select id="groupSortSelect">
+                <option value="label|asc">Label A&ndash;Z</option><option value="label|desc">Label Z&ndash;A</option>
+                <option value="count|asc">Fewest items</option><option value="count|desc">Most items</option>
+            </select>
+            <div id="groupLimitRow"><select id="groupLimitDir"><option value="top">Top</option><option value="bottom">Bottom</option></select>
+                <input type="number" id="groupLimitN" min="0" step="1" placeholder="all"></div>
+            <label><input type="checkbox" id="groupLimitOther" checked> Roll the rest into &ldquo;(Other)&rdquo;</label>
+            <div id="groupLimitMinRow"><input type="number" id="groupLimitMinRows" min="0" step="1" placeholder="0"></div>
+            <div id="groupStartDepthRow"><select id="groupStartDepth">
+                <option value="0">Nothing (all collapsed)</option><option value="1">Level 1</option><option value="2">Level 2</option><option value="3">All levels</option>
+            </select></div>
+          </div>
+        </div>
+        <div>
+            <button id="resetGroupingBtn">Reset</button>
+            <button id="ungroupBtn" style="display: none;">Remove Grouping</button>
+            <button id="confirmGroupingBtn">Apply Grouping</button>
+        </div>
+    </div>
+</div>
+<div id="pnbStatusBar">
+  <div class="sb-seg" id="sbColsSeg"><span id="sbCols"></span>
+    <span class="sb-chip" id="sbCustomCols" style="display:none;">custom layout</span>
+    <div class="sb-pop" id="sbCustomColsPop"><div id="sbCustomColsDiff"></div><button id="sbCustomColsReset">Reset</button><button id="sbCustomColsSave" style="display:none;">Save</button></div>
+  </div>
+  <div class="sb-seg" id="sbUserSeg"></div>
+</div>
+<div id="importDragOverlay" style="display: none;"><div class="drag-overlay-content"><p>Drop file to import</p></div></div>
+<input type="file" id="importDataFileInput" style="display:none">
+<pre id="out">running</pre>
+
+<script>
+  (function () { try { localStorage.clear(); } catch (e) {} })();
+  // ccpill: this browser holds a column layout of its own for the report that is
+  // IDENTICAL to the report's saved one - the "custom layout" pill must stay off.
+  (function () {
+    if (new URLSearchParams(location.search).get('scn') !== 'ccpill') return;
+    var names = ['PROTOCOL NO.', 'PROTOCOL TYPE', 'TITLE', 'APPROVAL DATE', 'STATUS', 'AMOUNT'];
+    try { localStorage.setItem('penumbra_column_prefs', JSON.stringify({ jrfix: { order: names, visible: names.slice(0, 5), isNumVisible: true } })); } catch (e) {}
+  })();
+  window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' } };
+  window.PENUMBRA_THEME_IDS = ['theme-default'];
+  window.PENUMBRA_THEME_ALIASES = {};
+  window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  (function () {
+    var P = new URLSearchParams(location.search);
+    window.__SCN = P.get('scn') || 'flat';
+    var S = window.__SCN;
+    var SEP = '␟';
+    window.__SEP = SEP;
+    // --- the fixture: 36 IRB-protocol-like rows ---------------------------
+    // PROTOCOL NO. repeats across types (25401 is both Exempt and Expedited), so
+    // the key needs PROTOCOL TYPE too - exactly eirbprotsum's composite key.
+    var COLS = ['PROTOCOL NO.', 'PROTOCOL TYPE', 'TITLE', 'APPROVAL DATE', 'STATUS', 'AMOUNT'];
+    window.__COLS = COLS;
+    var W = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel', 'India'];
+    var rows = [];
+    for (var i = 1; i <= 36; i++) {
+      var r = {};
+      r['PROTOCOL NO.'] = String(25400 + (i % 18));
+      r['PROTOCOL TYPE'] = i <= 18 ? 'Exempt' : (i <= 30 ? 'Expedited' : 'Amendment/Renewal');
+      r['TITLE'] = W[i % W.length] + ' study ' + i;
+      r['APPROVAL DATE'] = (1 + (i % 12)) + '/' + (1 + (i % 27)) + '/2026';
+      r['STATUS'] = (i % 4 === 0) ? 'Closed' : 'Approved';
+      r['AMOUNT'] = '$' + (1000 + i * 37) + '.00';   // currency: the footer sums it when shown
+      rows.push(r);
+    }
+    window.__rowsFixture = rows;
+    window.__keyOf = function (r) { return r['PROTOCOL NO.'] + SEP + r['PROTOCOL TYPE']; };
+    // --- the journal "server" -------------------------------------------
+    // Two rows already marked Reviewed, one row with two notes.
+    var K3 = window.__keyOf(rows[2]), K5 = window.__keyOf(rows[22]);   // 25403 Exempt, 25405 Expedited
+    window.__J = {
+      toggles: { toggle1: {} },
+      counts: {}, notes: {},
+      posts: []
+    };
+    window.__J.toggles.toggle1[K3] = { by: 'pat', at: '2026-10-01 09:00:00' };
+    window.__J.toggles.toggle1[K5] = { by: 'lee', at: '2026-10-01 10:30:00' };
+    window.__J.counts[K3] = 2;
+    window.__J.notes[K3] = [
+      { ID: 901, REPORT_ID: 7, SCOPE: 'row', ROW_KEY: K3, NOTE_TEXT: 'First look done.', CREATED_BY: 'pat', CREATED_AT: '2026-10-01 09:05:00', PARENT_ID: null },
+      { ID: 902, REPORT_ID: 7, SCOPE: 'row', ROW_KEY: K3, NOTE_TEXT: 'Follow up next week.', CREATED_BY: 'lee', CREATED_AT: '2026-10-01 11:00:00', PARENT_ID: null }
+    ];
+    window.__MARKED = [K3, K5];
+    window.__NOTED = K3;
+    // --- the scenario's stored report ------------------------------------
+    var order = []; for (var c = 0; c < COLS.length; c++) order.push(c);
+    var vo = { journalEnabled: true, journalKeyColumns: ['PROTOCOL NO.', 'PROTOCOL TYPE'],
+               journalToggles: [{ key: 'toggle1', label: 'Reviewed' }], journalRowNotes: true };
+    var st = {
+      name: 'jrfix', query: 'SELECT * FROM JR_FIXTURE', reportTitle: 'Journal row features fixture',
+      theme: 'theme-default', density: 'standard',
+      visibleColumns: ['#', 0, 1, 2, 3, 4], columnOrder: order,
+      sortCriteria: [], noLimit: true, rowExpandDefault: false, resolverLinksDefault: true,
+      rowsPerPage: '200', reportSnippet: '', viewOptions: vo
+    };
+    // eirbprotsum's shape: saved GROUPED by PROTOCOL TYPE, '#' not among the shown columns.
+    if (S === 'grouped' || S === 'ungroup' || S === 'clickgrp' || S === 'notegrp' || S === 'hashshown' || S === 'cfggrp') {
+      st.groupBy = 'PROTOCOL TYPE';
+      st.visibleColumns = (S === 'hashshown') ? ['#', 1, 0, 2, 3, 4] : [1, 0, 2, 3, 4];
+    }
+    // Saved GROUPED BY the toggle column (round 2, 2026-10-02), '#' hidden as on
+    // eirbprotsum: by its label (what the picker offers), by its sentinel, nested
+    // under PROTOCOL TYPE both ways; and a toggle LABELLED like a real column.
+    var BYTOGGLE = { bytoggle: 'Reviewed', bylate: 'Reviewed', flipgrp: 'Reviewed', flipkbd: 'Reviewed', notewait: 'Reviewed',
+                     dblflip: 'Reviewed', flipsearch: 'Reviewed', bysentinel: '__JOURNAL_TOGGLE__toggle1',
+                     nested: 'PROTOCOL TYPE,Reviewed', nestedsent: 'PROTOCOL TYPE,__JOURNAL_TOGGLE__toggle1', shadow: 'STATUS' };
+    if (BYTOGGLE[S]) { st.groupBy = BYTOGGLE[S]; st.visibleColumns = [1, 0, 2, 3, 4]; }
+    if (S === 'shadow') vo.journalToggles = [{ key: 'toggle1', label: 'STATUS' }];
+    // A summary footer (AMOUNT sums) with '#' hidden - the footer holds visible columns only.
+    if (S === 'footer') st.visibleColumns = [0, 1, 2, 3, 4, 5];
+    // The setup panel from scratch: journal on, nothing configured yet.
+    if (S === 'cfg') { st.viewOptions = { journalEnabled: true }; }
+    window.__STORED = st;
+    window.penumbra_vars = {
+      isAdmin: true, isGlobalAdmin: true, canEditReport: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+      tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+      imports: [], reports: [], themes: {}, prompts: {}, grants: [],
+      totalExemptions: [],
+      journal: { installed: true, enabled: true, total: 0, unseen: 0 },
+      journalAccess: true,
+      preloadedState: st
+    };
+    window.__queryResponse = { data: rows };
+  })();
+  window.__T = {};
+  window.__queryDone = 0;
+  window.__ajaxLog = [];
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  // Fake server. query.php -> the fixture; manage_journal.php -> window.__J.
+  function __jrJournal(url, opts) {
+    var m = /[?&]action=([a-z_]+)/.exec(url);
+    var action = m ? m[1] : null, body = null;
+    if (!action && opts.data) { try { body = JSON.parse(opts.data); action = body.action; } catch (e) { } }
+    var J = window.__J;
+    if (action === 'toggles') return { status: 'success', installed: true, toggles: JSON.parse(JSON.stringify(J.toggles)) };
+    if (action === 'row_notes') return { status: 'success', counts: JSON.parse(JSON.stringify(J.counts)), notes: JSON.parse(JSON.stringify(J.notes)) };
+    if (action === 'summary') return { status: 'success', installed: true, total: 0, unseen: 0 };
+    if (action === 'toggle_history') return { status: 'success', events: [] };
+    if (action === 'set_toggle' && body) {
+      J.posts.push(body);
+      var tk = body.toggle_key;
+      J.toggles[tk] = J.toggles[tk] || {};
+      if (body.state) J.toggles[tk][body.row_key] = { by: 'harness', at: '2026-10-02 12:00:00' };
+      else delete J.toggles[tk][body.row_key];
+      return { status: 'success', state: body.state ? 1 : 0, by: 'harness' };
+    }
+    if (body) J.posts.push(body);
+    return { status: 'success' };
+  }
+  jQuery.ajax = function (a, b) {
+    var opts = (typeof a === 'string') ? jQuery.extend({ url: a }, b || {}) : (a || {});
+    var url = String(opts.url || '');
+    window.__ajaxLog.push(url);
+    var d = jQuery.Deferred();
+    var isQuery = /query\.php/.test(url);
+    var isJournal = /manage_journal\.php/.test(url);
+    // ?jdelay=N: the journal STATE (toggles / row notes) answers N ms late - after the
+    // report has rendered and grouped, as a slow journal fetch does on a fast query.
+    var jState = isJournal && /[?&]action=(toggles|row_notes)/.test(url);
+    if (jState) window.__jPending = (window.__jPending || 0) + 1;
+    var isPeople = /get_email_recipients\.php/.test(url);
+    var resp = isQuery ? window.__queryResponse : (isJournal ? __jrJournal(url, opts) : (isPeople ? [{ username: 'pat', name: 'Pat Doe' }, { username: 'paul', name: 'Paul Roe' }] : {}));
+    setTimeout(function () {
+      try { if (opts.success) opts.success(resp, 'success', { status: 200 }); } catch (e) { window.__errors.push('ajax success threw: ' + String(e)); }
+      try { if (opts.complete) opts.complete({ status: 200 }, 'success'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }
+      d.resolve(resp, 'success', { status: 200 });
+      if (isQuery) window.__queryDone++;
+      if (jState) window.__jPending--;
+    }, jState ? (parseInt(new URLSearchParams(location.search).get('jdelay'), 10) || 30) : (isJournal ? 30 : 0));
+    var p = d.promise(); p.abort = function () {}; return p;
+  };
+  jQuery.getJSON = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.post = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.get = jQuery.post;
+  jQuery.fx.off = true;
+  window.__errors = [];
+  window.__rejections = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    window.__rejections.push(String((r && r.message) || r) + ' @' + String((r && r.stack) || '').split('\n').slice(1, 2).join('').trim());
+    e.preventDefault();
+  });
+  window.__confirms = [];
+  window.confirm = function (m) { window.__confirms.push(String(m)); return true; };
+  window.alert = function (m) { window.__errors.push('alert: ' + m); };
+  window.prompt = function () { return null; };
+  if (typeof window.stackHeaders !== 'function') window.stackHeaders = function () {};
+</script>
+<script src="penumbra_userseg.js"></script>
+<script src="main_jr.js"></script>
+<script src="driver.js"></script>
+</body></html>

@@ -1,0 +1,38 @@
+# =============================================================================
+# Email-only scheduler options stay off non-EMAIL tasks (added 2026-09-18).
+#
+# Run the BODY as a scriptblock (UNC scripts are GPO-blocked):
+#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\schedprune\run.ps1'))
+#   & $sb                     # EXPECTED TAIL: "PASS 215   FAIL 0"
+#   & $sb -Control            # must report FAIL 1 - proves the harness can fail
+#   & $sb -Manage <file>      # test a staged manage_schedule.php (runner + main.js stay live)
+#   & $sb -Template <file>    # ...with a staged penumbra_template.php (the File Drop custom-template rule)
+#   & $sb -Dump               # also print Part A's per-key classification table
+#
+# WHAT IS UNDER TEST: penumbra_sched_prune_email_only() in manage_schedule.php,
+# on both write paths (action=save, action=restore_from_audit), plus a drift
+# guard proving schedule_runner.php reads the dropped keys on EMAIL paths only.
+# Details in the header of test_schedprune.php. Six targeted mutants always run.
+#
+# Any tail other than "PASS 215   FAIL 0" is a failure, a smaller pass count
+# included. The pre-fix manage_schedule.php reports FAIL 27.
+# =============================================================================
+param([switch]$Control, [switch]$Dump, [string]$Manage = '', [string]$Template = '')
+
+$ErrorActionPreference = 'Stop'
+# Hard-coded, not $PSScriptRoot: that is empty when the body runs as a scriptblock.
+$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\schedprune'
+$app  = '//oitras.oit.ncsu.edu/c$/inetpub/wwwroot/sponsor_migration/penumbra'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+
+# NOT $args - that is an automatic variable in PowerShell.
+$phpArgs = @('-n', '-d', 'memory_limit=1024M', '-d', 'date.timezone=America/New_York',
+             (Join-Path $here 'test_schedprune.php'), "--app=$app")
+if ($Manage)  { $phpArgs += "--manage=$Manage" }
+if ($Template) { $phpArgs += "--template=$Template" }
+if ($Control) { $phpArgs += '--control' }
+if ($Dump)    { $phpArgs += '--dump' }
+
+# No `exit` here: inside a scriptblock it would close the caller's session.
+# The php exit code is left in $LASTEXITCODE (0 = all pass).
+& $php @phpArgs

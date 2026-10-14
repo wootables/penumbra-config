@@ -1,0 +1,593 @@
+# =============================================================================
+# FSEXIT SUITE (2026-10-01) - a mouse way out of a dashboard chart tile's fullscreen
+#
+# A dashboard chart tile is the report's chart carousel in a same-origin frame
+# (index.php?embed=1&fullscreen=true&fspages=N), opened PERSISTENT: the overlay
+# IS the tile, so every close path no-ops and main.css hides the x. The tile's
+# fullscreen button (U+26F6, shown on hover) puts it in native fullscreen, and
+# until 2026-10-01 the only way back was the keyboard (Esc). Now, in native
+# fullscreen, the x shows in its usual corner (main.css:
+# #chartCarouselOverlay.cc-persistent:fullscreen .cc-close) named "Exit
+# fullscreen (Esc)", and close() LEAVES fullscreen for a persistent overlay:
+# the tile stays and the fullscreen button is offered again. A report's own
+# fullscreen x still closes the carousel.
+#
+# FSFIT (2026-10-01, same day): report charts RE-FIT. Both carousel mounts size
+# the page from the viewport at that moment, and only tiles (persistent) and
+# slides followed later changes - so a click-launched carousel, mounted before
+# the browser granted fullscreen, kept the WINDOW's size: empty bands above and
+# below in the fullscreen stage. Now the first mount of a click-launched
+# carousel waits for the fullscreen request to settle (granted or refused, 1 s
+# at most) and mounts ONCE at the final size, and every overlay re-mounts its
+# chart page when the viewport settles at a new size (resize.ccFit, 200 ms; a
+# report's slides keep their own re-scale), without restarting the countdown.
+#
+# Real fullscreen needs a user gesture, so this drives headless Edge over CDP
+# with TRUSTED mouse/key events (Input.dispatch*), the REAL main.js + main.css,
+# and a dashboard stand-in (host.html) framing the report page (tile.html).
+# Scenarios (each a fresh tab):
+#   tile    the fullscreen button, then the x, back to the tile - twice
+#   kiosk   host.html fullscreen first (the dashboard's kiosk view): the tile's
+#           x unwinds ONLY the tile; the kiosk stays fullscreen
+#   esc     the tile fullscreen, then Escape (the keyboard way, unchanged)
+#   report  report.html, not an embed: a click-launched carousel in true
+#           fullscreen; its x closes the carousel (unchanged) and unbinds
+#   fit     report.html: a click-launched carousel lands in fullscreen at the
+#           fullscreen size, mounted once
+#   win     report.html?charts=2: a carousel opened with NO gesture (refused,
+#           windowed - the autoload path) re-fits when the viewport shrinks and
+#           grows back (CDP device-metrics override) and after its fullscreen
+#           button; the 4 s slideshow keeps its schedule through a re-fit
+# Asserts:
+#   T-mount  the tile's overlay is up, persistent, its chart drawn
+#   T-nox    no x in the tile (nothing to close to)
+#   T-offer  the fullscreen button is offered (cc-fs-denied) and shows on hover
+#   T-fs     a click on it: the tile's overlay is the fullscreen element
+#   T-x      in fullscreen the x is displayed, opaque, on screen, on top
+#   T-name   ...and named "Exit fullscreen" / "Exit fullscreen (Esc)"
+#   T-exit   a click on the x leaves fullscreen (tile AND host)
+#   T-stay   ...and the tile stays: overlay + chart up, the button re-offered, the x hidden
+#   T-again  a second round behaves the same
+#   K-kiosk  the host's own fullscreen is granted (kiosk stand-in)
+#   K-fs     the tile goes fullscreen inside it
+#   K-x      the x is displayed there too
+#   K-exit   a click on it leaves the TILE's fullscreen only: the host stays fullscreen, the tile stays
+#   E-win    a windowed Escape that reaches the tile (the frame has focus) leaves the overlay up
+#   E-fs     (precondition) the tile is fullscreen
+#   E-exit   Escape leaves fullscreen and the tile stays (the browser keeps that Esc from the page)
+#   R-fs     report page: a click-launched carousel (not persistent) is in true fullscreen
+#   R-x      its x is displayed and named "Close" / "Close (Esc)"
+#   R-close  a click on it closes the carousel and leaves fullscreen
+#   R-unbind ...and no carousel resize handler is left on the window
+#   T-fit    the tile's chart fills its stage in fullscreen and again back in the tile
+#   F-fs     fit: the click-launched carousel is in true fullscreen
+#   F-size   its chart fills the FULLSCREEN stage (chart vs the stage's content box)
+#   F-once   ...mounted once (one entry animation, no re-mount after the resize)
+#   W-open   win: refused + windowed, the chart fills the stage, one mount
+#   W-shrink the viewport shrinks: the chart re-fits the smaller stage
+#   C-keep   the re-fit did not restart the countdown: page 2 at ~4 s after the open
+#   W-grow   the viewport grows back: the chart re-fits again
+#   W-fs     its fullscreen button: the chart re-fits the fullscreen stage
+#   *-err    no page errors (tile + host / report)
+#
+#   py -3 run.py                    candidate = the LIVE js\main.js + css\main.css
+#   py -3 run.py --app <dir>        candidate = <dir>\js\main.js + <dir>\css\main.css (a stage)
+#   py -3 run.py --control          the build before FSFIT (live main.js while it lacks the fix, else the
+#                                   newest js\main.js.bak-*-fsfit; live main.css): RED on exactly CONTROL_RED
+#   py -3 run.py --control-fsexit   the build before FSEXIT (js\main.js.bak-*-fsexit + css\main.css.bak-*-fsexit):
+#                                   RED on exactly CONTROL_RED_FSEXIT
+#   py -3 run.py --mutants          every mutant of the candidate against the asserts it must turn red
+#   py -3 run.py --mutant NAME      one of them;  --explore prints the raw observations
+# Headless Edge over CDP; stages into %TEMP%; writes nothing to the webroot.
+# cd into this folder first (Git Bash mangles a \\server\d$ argument to py -3).
+# =============================================================================
+import glob, json, os, shutil, socket, subprocess, sys, tempfile, time, urllib.request
+import websocket
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js',
+        'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
+        'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'chart-4.5.1.min.js',
+        'chartjs-plugin-datalabels-2.0.0.min.js', 'penumbra_a11y.js']
+PAGES = ['host.html', 'tile.html', 'report.html']
+# A maximized window on a 1600x1000 screen: fullscreen GROWS the viewport, as on
+# a real monitor. (Headless defaults to an 800x600 screen; a window LARGER than
+# its screen shrinks the viewport on entry. Before fsfit a report's chart,
+# mounted at the pre-fullscreen size, then overflowed its stage over the header
+# and - single-page canvases take the pointer for hover values - covered the x.)
+SCREEN = (1600, 1000)
+WINDOW = (1600, 880)
+CRLF = '\r\n'
+OVERLAY = 'chartCarouselOverlay'
+
+# The fix's own lines - each must be found exactly once in a FIXED build.
+JS_EXIT = '                        var _pxp = document.exitFullscreen();' + CRLF
+JS_RETURN = '                return;' + CRLF + '            }' + CRLF + '            stopProgress();' + CRLF
+JS_NAME = "? '<button type=\"button\" class=\"cc-close\" aria-label=\"Exit fullscreen\" title=\"Exit fullscreen (Esc)\">&times;</button>'"
+CSS_RULE = '#chartCarouselOverlay.cc-persistent:fullscreen .cc-close {' + CRLF + '    display: inline-flex !important;' + CRLF + '}' + CRLF
+MUTANTS = {
+    # the x stays hidden in a tile's fullscreen: no mouse way out (the old behaviour, CSS half)
+    'nocss': ([('css', CSS_RULE, '')], ['T-x', 'T-exit', 'T-stay', 'T-again', 'K-x', 'K-exit']),
+    # the x shows but close() leaves fullscreen alone (the old behaviour, JS half)
+    'noexit': ([('js', JS_EXIT, '                        var _pxp = null;' + CRLF)], ['T-exit', 'T-stay', 'T-again', 'K-exit']),
+    # the x CLOSES a persistent overlay: the viewer lands on the report page behind the tile.
+    # (E-exit stays green: in native fullscreen the browser keeps Esc, so it never reaches close();
+    # a WINDOWED Esc does - E-win.)
+    'closeall': ([('js', JS_RETURN, '            }' + CRLF + '            stopProgress();' + CRLF)], ['T-stay', 'T-again', 'K-exit', 'E-win']),
+    # the tile's x keeps the report's name ("Close") for what is an exit from fullscreen
+    'noname': ([('js', JS_NAME, "? '<button type=\"button\" class=\"cc-close\" aria-label=\"Close\" title=\"Close (Esc)\">&times;</button>'")], ['T-name']),
+}
+# FSFIT's own lines.
+JS_DEFER = '        if (_ccFsGesture && _ccFsAsk) {' + CRLF
+JS_SLIDESKIP = "                if (!persistentOpt && _fitEntry && _fitEntry.kind === 'slide') { return; }" + CRLF
+JS_KEEP = '                try { renderCurrent(true); } catch (eRf) { /* keep the current mount */ }' + CRLF
+JS_UNBIND = "            $(window).off('resize.chartCarouselSlide resize.ccFit');" + CRLF
+JS_BASELINE = '            _ccFitW = window.innerWidth; _ccFitH = window.innerHeight;' + CRLF
+MUTANTS.update({
+    # the first mount does not wait for the fullscreen: mounted for the window, then re-fit (two entry animations)
+    'nodefer': ([('js', JS_DEFER, '        if (false) {' + CRLF)], ['F-once']),
+    # the re-fit is tiles-only again: a report's chart page keeps the size it was mounted at
+    'norefit': ([('js', JS_SLIDESKIP, '                if (!persistentOpt) { return; }' + CRLF)], ['W-shrink', 'W-grow', 'W-fs']),
+    # a re-fit restarts the page's countdown
+    'resetprog': ([('js', JS_KEEP, '                try { renderCurrent(); } catch (eRf) { /* keep the current mount */ }' + CRLF)], ['C-keep']),
+    # close() leaves the re-fit bound to the window
+    'nounbind': ([('js', JS_UNBIND, "            $(window).off('resize.chartCarouselSlide');" + CRLF)], ['R-unbind']),
+    # no baseline: every settled resize re-mounts, even when the page already has that size
+    'nobaseline': ([('js', JS_BASELINE, '')], ['F-once']),
+})
+# The build before FSFIT: a click-launched chart keeps the window's size in fullscreen, and a report's
+# chart page never re-fits.
+CONTROL_RED = ['F-size', 'W-shrink', 'W-grow', 'W-fs']
+# The build before FSEXIT (which also lacks FSFIT): no x in a tile's fullscreen, so no mouse way out.
+CONTROL_RED_FSEXIT = sorted(['T-x', 'T-name', 'T-exit', 'T-stay', 'T-again', 'K-x', 'K-exit'] + CONTROL_RED)
+
+args = sys.argv[1:]
+def opt(name, default=None):
+    if name in args:
+        i = args.index(name); v = args[i + 1]; del args[i:i + 2]; return v
+    return default
+def flag(name):
+    if name in args: args.remove(name); return True
+    return False
+app_dir = opt('--app', APP)
+control_fsexit = flag('--control-fsexit')
+control = flag('--control') or control_fsexit
+mutants = flag('--mutants')
+one_mutant = opt('--mutant', None)
+explore = flag('--explore')
+verbose = flag('--verbose')
+if args: raise SystemExit('unknown arguments: %s' % ' '.join(args))
+
+def read_b(p): return open(p, 'rb').read().decode('utf-8', 'surrogateescape')
+js_path = os.path.join(app_dir, 'js', 'main.js')
+css_path = os.path.join(app_dir, 'css', 'main.css')
+if control_fsexit:
+    bj = sorted(glob.glob(os.path.join(APP, 'js', 'main.js.bak-*-fsexit')))
+    bc = sorted(glob.glob(os.path.join(APP, 'css', 'main.css.bak-*-fsexit')))
+    if not bj or not bc: raise SystemExit('--control-fsexit: no js\\main.js / css\\main.css .bak-*-fsexit in the webroot')
+    js_path, css_path = bj[-1], bc[-1]
+elif control:
+    js_path, css_path = os.path.join(APP, 'js', 'main.js'), os.path.join(APP, 'css', 'main.css')
+    if read_b(js_path).count(JS_DEFER):
+        bj = sorted(glob.glob(os.path.join(APP, 'js', 'main.js.bak-*-fsfit')))
+        if not bj: raise SystemExit('--control: live has the fix and there is no js\\main.js.bak-*-fsfit to stand for the build before it')
+        js_path = bj[-1]
+JS0, CSS0 = read_b(js_path), read_b(css_path)
+
+def mutate(js, css, name):
+    for which, old, new in MUTANTS[name][0]:
+        src = js if which == 'js' else css
+        if src.count(old) != 1: raise SystemExit("mutant '%s': anchor found %d times (needs the FIXED build)" % (name, src.count(old)))
+        if which == 'js': js = js.replace(old, new)
+        else: css = css.replace(old, new)
+    return js, css
+
+stage = tempfile.mkdtemp(prefix='pnb_fsx_')
+for f in LIBS: shutil.copyfile(os.path.join(APP, 'js', f), os.path.join(stage, f))
+for f in PAGES: shutil.copyfile(os.path.join(HERE, f), os.path.join(stage, f))
+def free_port():
+    s = socket.socket(); s.bind(('127.0.0.1', 0)); p = s.getsockname()[1]; s.close(); return p
+hp, dp = free_port(), free_port()
+srv = subprocess.Popen([sys.executable, '-m', 'http.server', str(hp), '--bind', '127.0.0.1', '--directory', stage], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+edge = subprocess.Popen([EDGE, '--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check', '--disable-sync',
+                         '--disable-extensions', '--user-data-dir=' + os.path.join(stage, 'profile'),
+                         '--window-size=%d,%d' % WINDOW, '--screen-info={%dx%d}' % SCREEN,
+                         '--remote-debugging-port=%d' % dp, '--remote-allow-origins=*', 'about:blank'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+def jget(p, m='GET'):
+    return json.loads(urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:%d%s' % (dp, p), method=m), timeout=15).read().decode())
+for _ in range(150):
+    try: jget('/json/version'); break
+    except Exception: time.sleep(0.2)
+
+class Tab(object):
+    def __init__(self, page):
+        self.t = jget('/json/new?about:blank', 'PUT')
+        self.ws = websocket.create_connection(self.t['webSocketDebuggerUrl'], timeout=60, suppress_origin=True)
+        self.n = 0
+        # Every build is written to the same main.js / main.css: never let the
+        # browser hand a page the previous one (heuristic freshness).
+        self.call('Network.enable')
+        self.call('Network.setCacheDisabled', {'cacheDisabled': True})
+        self.call('Page.enable')
+        self.call('Page.bringToFront')
+        self.call('Page.navigate', {'url': 'http://127.0.0.1:%d/%s' % (hp, page)})
+    def call(self, m, p=None):
+        self.n += 1; mid = self.n
+        self.ws.send(json.dumps({'id': mid, 'method': m, 'params': p or {}}))
+        while True:
+            r = json.loads(self.ws.recv())
+            if r.get('id') == mid:
+                if 'error' in r: raise RuntimeError('%s: %s' % (m, r['error']))
+                return r.get('result', {})
+    def ev(self, expr):
+        r = self.call('Runtime.evaluate', {'expression': expr, 'returnByValue': True})
+        if r.get('exceptionDetails'): return None
+        return r.get('result', {}).get('value')
+    def state(self):
+        v = self.ev('window.__state ? JSON.stringify(window.__state()) : null')
+        return json.loads(v) if v else {}
+    def probe(self, sel, top=False):
+        v = self.ev('window.__probe ? JSON.stringify(window.__probe(%s, %s)) : null' % (json.dumps(sel), 'true' if top else 'false'))
+        return json.loads(v) if v else {'exists': False}
+    def fit(self, fn='__fit'):
+        v = self.ev('window.%s ? JSON.stringify(window.%s()) : null' % (fn, fn))
+        return json.loads(v) if v else {}
+    def viewport(self, w=None, h=None):
+        # A device-metrics override resizes the viewport (and fires resize) the way a
+        # window resize does; None clears it, back to the window's own size.
+        if w is None: self.call('Emulation.clearDeviceMetricsOverride')
+        else: self.call('Emulation.setDeviceMetricsOverride', {'width': w, 'height': h, 'deviceScaleFactor': 1, 'mobile': False})
+    def until(self, pred, timeout):
+        t0 = time.time(); s = self.state()
+        while time.time() - t0 < timeout:
+            if pred(s): return s
+            time.sleep(0.1); s = self.state()
+        return s
+    def move(self, x, y):
+        self.call('Input.dispatchMouseEvent', {'type': 'mouseMoved', 'x': x, 'y': y, 'button': 'none', 'buttons': 0})
+    def click(self, x, y):
+        self.move(x, y); time.sleep(0.05)
+        self.call('Input.dispatchMouseEvent', {'type': 'mousePressed', 'x': x, 'y': y, 'button': 'left', 'buttons': 1, 'clickCount': 1})
+        time.sleep(0.05)
+        self.call('Input.dispatchMouseEvent', {'type': 'mouseReleased', 'x': x, 'y': y, 'button': 'left', 'buttons': 0, 'clickCount': 1})
+    def key_escape(self):
+        k = {'key': 'Escape', 'code': 'Escape', 'windowsVirtualKeyCode': 27, 'nativeVirtualKeyCode': 27}
+        self.call('Input.dispatchKeyEvent', dict(k, type='rawKeyDown'))
+        self.call('Input.dispatchKeyEvent', dict(k, type='keyUp'))
+    def close(self):
+        try: self.ws.close()
+        except Exception: pass
+        try: urllib.request.urlopen('http://127.0.0.1:%d/json/close/%s' % (dp, self.t['id']), timeout=10).read()
+        except Exception: pass
+
+def tile_ready(tab):
+    return tab.until(lambda s: s.get('ready') and s.get('overlay') and s.get('denied'), 20)
+
+def press_fs_button(tab, obs, tag):
+    # Hover first (the button is hover-gated in a tile), then a trusted click.
+    b = tab.probe('#%s .cc-fsbtn' % OVERLAY)
+    obs[tag + 'btn0'] = b
+    if not b.get('w'): return None
+    tab.move(b['x'], b['y']); time.sleep(0.35)
+    b = tab.probe('#%s .cc-fsbtn' % OVERLAY)
+    obs[tag + 'btn'] = b
+    tab.click(b['x'], b['y'])
+    s = tab.until(lambda s: s.get('tileFs') == OVERLAY, 4)
+    time.sleep(0.6)   # the persistent refit re-mounts the chart at the new size (200 ms debounce)
+    return tab.state()
+
+def press_x(tab, obs, tag, want):
+    x = tab.probe('#%s .cc-close' % OVERLAY)
+    obs[tag + 'x'] = x
+    if not (x.get('w') and x.get('display') != 'none'):
+        obs[tag + 'clicked'] = False
+        return tab.state()
+    obs[tag + 'clicked'] = True
+    tab.click(x['x'], x['y'])
+    tab.until(want, 4)
+    time.sleep(0.6)
+    return tab.state()
+
+def scn_tile():
+    tab = Tab('host.html'); obs = {}
+    try:
+        obs['s0'] = tile_ready(tab)
+        obs['x0'] = tab.probe('#%s .cc-close' % OVERLAY)
+        for rnd in ('r1', 'r2'):
+            obs[rnd + 'fs'] = press_fs_button(tab, obs, rnd)
+            obs[rnd + 'fit'] = tab.fit('__tileFit')
+            obs[rnd + 'after'] = press_x(tab, obs, rnd, lambda s: s.get('tileFs') is None and s.get('hostFs') is None)
+            obs[rnd + 'x2'] = tab.probe('#%s .cc-close' % OVERLAY)
+            obs[rnd + 'fit2'] = tab.fit('__tileFit')
+            if rnd == 'r1' and (obs['r1after'] or {}).get('tileFs'):
+                break   # never left fullscreen: there is no second round
+        obs['end'] = tab.state()
+    finally:
+        tab.close()
+    return obs
+
+def scn_kiosk():
+    tab = Tab('host.html'); obs = {}
+    try:
+        obs['s0'] = tile_ready(tab)
+        k = tab.probe('#kiosk', True)
+        tab.click(k['x'], k['y'])
+        obs['k'] = tab.until(lambda s: s.get('hostFs') == 'HTML', 4)
+        time.sleep(0.6)
+        obs['fs'] = press_fs_button(tab, obs, 'k')
+        obs['after'] = press_x(tab, obs, 'k', lambda s: s.get('tileFs') is None)
+        obs['end'] = tab.state()
+    finally:
+        tab.close()
+    return obs
+
+def scn_esc():
+    tab = Tab('host.html'); obs = {}
+    try:
+        obs['s0'] = tile_ready(tab)
+        # Windowed first: a click on the tile's chart gives the frame focus, so
+        # this Escape DOES reach the page (main.js's capture handler routes it
+        # to the x -> close()) - and a persistent overlay must survive it.
+        c = tab.probe('#%s .cc-canvas' % OVERLAY)
+        tab.click(c['x'], c['y'])
+        time.sleep(0.2)
+        tab.key_escape()
+        time.sleep(0.6)
+        obs['win'] = tab.state()
+        obs['fs'] = press_fs_button(tab, obs, 'e')
+        tab.key_escape()
+        tab.until(lambda s: s.get('tileFs') is None and s.get('hostFs') is None, 4)
+        time.sleep(0.6)
+        obs['after'] = tab.state()
+    finally:
+        tab.close()
+    return obs
+
+def scn_report():
+    tab = Tab('report.html'); obs = {}
+    try:
+        obs['s0'] = tab.until(lambda s: s.get('ready'), 20)
+        b = tab.probe('#launch')
+        tab.click(b['x'], b['y'])
+        obs['fs'] = tab.until(lambda s: s.get('overlay') and s.get('hostFs') == OVERLAY, 4)
+        time.sleep(0.6)
+        obs['fs'] = tab.state()
+        obs['after'] = press_x(tab, obs, 'r', lambda s: not s.get('overlay') and s.get('hostFs') is None)
+        # The carousel's resize handlers on the window after the close (namespaces).
+        v = tab.ev("JSON.stringify(((jQuery._data(window, 'events') || {}).resize || []).map(function (h) { return h.namespace; }))")
+        obs['resizeNs'] = json.loads(v) if v else None
+    finally:
+        tab.close()
+    return obs
+
+def scn_fit():
+    tab = Tab('report.html'); obs = {}
+    try:
+        obs['s0'] = tab.until(lambda s: s.get('ready'), 20)
+        b = tab.probe('#launch')
+        tab.click(b['x'], b['y'])
+        tab.until(lambda s: s.get('overlay') and s.get('hostFs') == OVERLAY, 4)
+        time.sleep(1.2)   # the deferred mount, then past any re-fit's 200 ms debounce
+        obs['fit'] = tab.fit()
+        obs['end'] = tab.state()
+    finally:
+        tab.close()
+    return obs
+
+def scn_win():
+    tab = Tab('report.html?charts=2'); obs = {}
+    try:
+        obs['s0'] = tab.until(lambda s: s.get('ready'), 20)
+        t0 = time.time()
+        tab.ev('window.__openNoGesture({ interval: 4 })')   # CDP evaluate = no user activation: refused, windowed
+        time.sleep(0.8)
+        obs['open'] = tab.fit()
+        tab.viewport(1100, 640)
+        time.sleep(0.9)
+        obs['shrink'] = tab.fit()
+        time.sleep(max(0, 4.9 - (time.time() - t0)))   # past the first advance (4 s after the open)
+        v = tab.ev('JSON.stringify(window.__counterLog)')
+        obs['log'] = json.loads(v) if v else []
+        tab.viewport(None)
+        time.sleep(0.9)
+        obs['grow'] = tab.fit()
+        b = tab.probe('#%s .cc-fsbtn' % OVERLAY)
+        obs['btn'] = b
+        if b.get('w'):
+            tab.click(b['x'], b['y'])
+            tab.until(lambda s: s.get('hostFs') == OVERLAY, 4)
+            time.sleep(0.9)
+        obs['fs'] = tab.fit()
+        obs['end'] = tab.state()
+    finally:
+        tab.close()
+    return obs
+
+SCENARIOS = [('tile', scn_tile), ('kiosk', scn_kiosk), ('esc', scn_esc), ('report', scn_report), ('fit', scn_fit), ('win', scn_win)]
+
+def run_build(js, css):
+    open(os.path.join(stage, 'main.js'), 'wb').write(js.encode('utf-8', 'surrogateescape'))
+    open(os.path.join(stage, 'main.css'), 'wb').write(css.encode('utf-8', 'surrogateescape'))
+    out = {}
+    for name, fn in SCENARIOS:
+        try: out[name] = fn()
+        except Exception as e: out[name] = {'fatal': '%s: %s' % (type(e).__name__, e)}
+    return out
+
+def g(d, *ks):
+    for k in ks:
+        if not isinstance(d, dict): return None
+        d = d.get(k)
+    return d
+
+def shown(p):
+    return bool(p and p.get('exists') and p.get('display') != 'none' and p.get('w') and p.get('opacity') == '1'
+                and p.get('visibility') == 'visible' and p.get('inView') and p.get('onTop'))
+
+def brief(p):
+    if not p or not p.get('exists'): return 'absent'
+    return '%s op=%s pe=%s %dx%d %s%s' % (p.get('display'), p.get('opacity'), p.get('pe'), p.get('w') or 0, p.get('h') or 0,
+                                         'on-screen' if p.get('inView') else 'OFF-screen',
+                                         ' on-top' if p.get('onTop') else (' covered by %s' % p.get('hitDesc') if p.get('hitDesc') else ' no box'))
+
+def fsbrief(s):
+    return 'tile fs=%s host fs=%s overlay=%s denied=%s chart=%s' % (g(s, 'tileFs'), g(s, 'hostFs'), g(s, 'overlay'), g(s, 'denied'), g(s, 'chart'))
+
+# "Fills its stage": the chart's own size (Chart.js width/height, CSS px) within
+# this many px of the stage's content box - the wrap padding plus the mount's
+# chrome estimates. Measured 2026-10-01 on the fixed build: +16..+32 wide,
+# -31..+24 tall (a two-page carousel's chart runs 31 px into the stage padding:
+# its nav-bar estimate, as before). The bug it guards: +212 tall in fullscreen,
+# -454 wide after a window shrink.
+TOL_W, TOL_H = 60, 40
+def fills(f):
+    return bool(f and f.get('overlay') and f.get('cw') and abs(f['sw'] - f['cw']) <= TOL_W and abs(f['sh'] - f['ch']) <= TOL_H)
+
+def fitbrief(f):
+    if not f or not f.get('overlay'): return 'no overlay'
+    s = 'viewport %sx%s%s: chart %sx%s in a %sx%s stage (off by %+d x %+d)' % (
+        f.get('vw'), f.get('vh'), ' fullscreen' if f.get('fs') else '', f.get('cw'), f.get('ch'), f.get('sw'), f.get('sh'),
+        (f.get('sw') or 0) - (f.get('cw') or 0), (f.get('sh') or 0) - (f.get('ch') or 0))
+    if 'mounts' in f: s += ', %s mount(s)' % f.get('mounts')
+    return s
+
+def evaluate(R):
+    out = []
+    add = lambda aid, ok, detail: out.append((aid, bool(ok), detail))
+    t = R.get('tile', {})
+    if t.get('fatal'):
+        add('T-fatal', False, t['fatal'])
+    else:
+        s0 = t.get('s0', {})
+        add('T-mount', s0.get('overlay') and s0.get('persistent') and s0.get('chart'), 'overlay %s, persistent %s, chart %s' % (s0.get('overlay'), s0.get('persistent'), s0.get('chart')))
+        add('T-nox', g(t, 'x0', 'exists') and g(t, 'x0', 'display') == 'none', 'x in the tile: %s' % brief(t.get('x0')))
+        add('T-offer', s0.get('denied') and g(t, 'r1btn', 'opacity') == '1' and g(t, 'r1btn', 'pe') == 'auto' and g(t, 'r1btn', 'onTop'),
+            'offered %s; before hover %s; on hover %s' % (s0.get('denied'), brief(t.get('r1btn0')), brief(t.get('r1btn'))))
+        f1 = t.get('r1fs') or {}
+        add('T-fs', f1.get('tileFs') == OVERLAY and f1.get('hostFs') == 'tile', fsbrief(f1) + ' (screen %sx%s)' % (f1.get('vw'), f1.get('vh')))
+        add('T-x', shown(t.get('r1x')), 'x in fullscreen: %s' % brief(t.get('r1x')))
+        add('T-name', g(t, 'r1x', 'aria') == 'Exit fullscreen' and g(t, 'r1x', 'title') == 'Exit fullscreen (Esc)',
+            'aria-label %r, title %r' % (g(t, 'r1x', 'aria'), g(t, 'r1x', 'title')))
+        a1 = t.get('r1after') or {}
+        add('T-exit', t.get('r1clicked') and a1.get('tileFs') is None and a1.get('hostFs') is None,
+            ('clicked the x: ' if t.get('r1clicked') else 'NO x to click: ') + fsbrief(a1))
+        add('T-stay', a1.get('overlay') and a1.get('persistent') and a1.get('chart') and a1.get('denied') and g(t, 'r1x2', 'display') == 'none',
+            fsbrief(a1) + '; x after: %s' % brief(t.get('r1x2')))
+        f2, a2 = t.get('r2fs') or {}, t.get('r2after') or {}
+        add('T-again', f2.get('tileFs') == OVERLAY and shown(t.get('r2x')) and t.get('r2clicked') and a2.get('tileFs') is None
+            and a2.get('hostFs') is None and a2.get('overlay') and a2.get('chart') and a2.get('denied'),
+            'round 2: in %s / x %s / out %s' % (fsbrief(f2), brief(t.get('r2x')), fsbrief(a2)) if f2 else 'no round 2')
+        add('T-fit', fills(t.get('r1fit')) and g(t, 'r1fit', 'fs') and fills(t.get('r1fit2')),
+            'fullscreen: %s; back: %s' % (fitbrief(t.get('r1fit')), fitbrief(t.get('r1fit2'))))
+        add('T-err', not g(t, 'end', 'errors') and g(t, 'end', 'ready'), 'errors %s' % g(t, 'end', 'errors'))
+    k = R.get('kiosk', {})
+    if k.get('fatal'):
+        add('K-fatal', False, k['fatal'])
+    else:
+        add('K-kiosk', g(k, 'k', 'hostFs') == 'HTML', 'host fs=%s (%s)' % (g(k, 'k', 'hostFs'), g(k, 'k', 'kiosk')))
+        add('K-fs', g(k, 'fs', 'tileFs') == OVERLAY and g(k, 'fs', 'hostFs') == 'tile', fsbrief(k.get('fs')))
+        add('K-x', shown(k.get('kx')), 'x: %s' % brief(k.get('kx')))
+        ka = k.get('after') or {}
+        add('K-exit', k.get('kclicked') and ka.get('tileFs') is None and ka.get('hostFs') == 'HTML' and ka.get('overlay') and ka.get('chart'),
+            ('clicked the x: ' if k.get('kclicked') else 'NO x to click: ') + fsbrief(ka))
+        add('K-err', not g(k, 'end', 'errors'), 'errors %s' % g(k, 'end', 'errors'))
+    e = R.get('esc', {})
+    if e.get('fatal'):
+        add('E-fatal', False, e['fatal'])
+    else:
+        ew = e.get('win') or {}
+        add('E-win', ew.get('escSeen', 0) >= 1 and ew.get('overlay') and ew.get('persistent') and ew.get('chart') and ew.get('tileFs') is None,
+            'windowed: the page saw %s Escape keydown(s); %s' % (ew.get('escSeen'), fsbrief(ew)))
+        add('E-fs', g(e, 'fs', 'tileFs') == OVERLAY, fsbrief(e.get('fs')))
+        ea = e.get('after') or {}
+        add('E-exit', ea.get('tileFs') is None and ea.get('hostFs') is None and ea.get('overlay') and ea.get('chart') and ea.get('denied'),
+            fsbrief(ea) + '; the page saw %s Escape keydown(s) in all (the browser keeps the one that leaves fullscreen)' % ea.get('escSeen'))
+        add('E-err', not ea.get('errors'), 'errors %s' % ea.get('errors'))
+    r = R.get('report', {})
+    if r.get('fatal'):
+        add('R-fatal', False, r['fatal'])
+    else:
+        rf = r.get('fs') or {}
+        add('R-fs', rf.get('overlay') and not rf.get('persistent') and rf.get('hostFs') == OVERLAY, fsbrief(rf).replace('tile fs=None ', ''))
+        add('R-x', shown(r.get('rx')) and g(r, 'rx', 'aria') == 'Close' and g(r, 'rx', 'title') == 'Close (Esc)',
+            'x: %s, aria-label %r, title %r' % (brief(r.get('rx')), g(r, 'rx', 'aria'), g(r, 'rx', 'title')))
+        ra = r.get('after') or {}
+        add('R-close', r.get('rclicked') and not ra.get('overlay') and ra.get('hostFs') is None,
+            ('clicked the x: ' if r.get('rclicked') else 'NO x to click: ') + 'overlay %s, fs=%s' % (ra.get('overlay'), ra.get('hostFs')))
+        add('R-err', not ra.get('errors'), 'errors %s' % ra.get('errors'))
+        ns = r.get('resizeNs')
+        left = [n for n in (ns or []) if any(k in n for k in ('ccFit', 'ccPersistentFit', 'chartCarouselSlide'))]
+        add('R-unbind', r.get('rclicked') and ns is not None and not left,
+            'carousel resize handlers left after the close: %s (window resize namespaces: %s)' % (left or 'none', ns))
+    f = R.get('fit', {})
+    if f.get('fatal'):
+        add('F-fatal', False, f['fatal'])
+    else:
+        ff = f.get('fit') or {}
+        add('F-fs', ff.get('fs'), fitbrief(ff))
+        add('F-size', ff.get('fs') and fills(ff), fitbrief(ff))
+        add('F-once', ff.get('mounts') == 1, '%s mount(s) of the stage chart' % ff.get('mounts'))
+        add('F-err', not g(f, 'end', 'errors'), 'errors %s' % g(f, 'end', 'errors'))
+    w = R.get('win', {})
+    if w.get('fatal'):
+        add('W-fatal', False, w['fatal'])
+    else:
+        wo, ws, wg, wf = w.get('open') or {}, w.get('shrink') or {}, w.get('grow') or {}, w.get('fs') or {}
+        add('W-open', not wo.get('fs') and wo.get('denied') and fills(wo) and wo.get('mounts') == 1, fitbrief(wo))
+        add('W-shrink', ws.get('vw') == 1100 and fills(ws), fitbrief(ws))
+        adv = [e for e in (w.get('log') or []) if e.get('text') == '2 / 2']
+        add('C-keep', bool(adv) and 3600 <= adv[0]['ms'] <= 4600,
+            'page 2 at %s ms after the open (interval 4 s; a re-fit ~1.0 s in); counter log %s' % (adv[0]['ms'] if adv else None, w.get('log')))
+        add('W-grow', wg.get('vw', 0) > 1100 and fills(wg), fitbrief(wg))
+        add('W-fs', wf.get('fs') and fills(wf), fitbrief(wf) if g(w, 'btn', 'w') else 'no fullscreen button: %s' % brief(w.get('btn')))
+        add('W-err', not g(w, 'end', 'errors'), 'errors %s' % g(w, 'end', 'errors'))
+    return out
+
+def report(res):
+    p = f = 0; failed = []
+    for aid, passed, detail in res:
+        print('  %s  %-8s %s' % ('PASS' if passed else 'FAIL', aid, detail))
+        if passed: p += 1
+        else: f += 1; failed.append(aid)
+    return p, f, failed
+
+try:
+    print('candidate: %s' % js_path)
+    print('           %s%s' % (css_path, ('   (CONTROL: the build before %s)' % ('FSEXIT' if control_fsexit else 'FSFIT')) if control else ''))
+    if mutants or one_mutant:
+        ok = bad = 0
+        for name in ([one_mutant] if one_mutant else list(MUTANTS)):
+            must = MUTANTS[name][1]
+            mj, mc = mutate(JS0, CSS0, name)
+            res = evaluate(run_build(mj, mc))
+            red = [a for a, passed, _ in res if not passed]
+            good = not [m for m in must if m not in red]
+            ok += good; bad += (not good)
+            print('  %s  mutant %-9s turns %s red   [red: %s]' % ('PASS' if good else 'FAIL', name, ' '.join(must), ' '.join(red)))
+            if verbose:
+                for aid, passed, detail in res:
+                    if not passed: print('        %-8s %s' % (aid, detail[:400]))
+        print('SUMMARY mutants ok=%d bad=%d' % (ok, bad))
+        print('RESULT: GREEN' if bad == 0 else 'RESULT: RED')
+    else:
+        R = run_build(JS0, CSS0)
+        if explore:
+            print(json.dumps(R, indent=1, sort_keys=True))
+        res = evaluate(R)
+        p, f, failed = report(res)
+        print('TOTAL pass=%d fail=%d   failed: %s' % (p, f, ' '.join(failed)))
+        if control:
+            want = sorted(CONTROL_RED_FSEXIT if control_fsexit else CONTROL_RED)
+            print('CONTROL: red %s, expected %s' % (' '.join(sorted(failed)), ' '.join(want)))
+            print('RESULT: GREEN (the control is red on exactly the expected asserts)' if sorted(failed) == want else 'RESULT: RED (the control is not red where expected)')
+        else:
+            print('RESULT: GREEN' if f == 0 and p > 0 else 'RESULT: RED')
+finally:
+    try: edge.kill()
+    except Exception: pass
+    try: srv.kill()
+    except Exception: pass
+    time.sleep(1)
+    shutil.rmtree(stage, ignore_errors=True)

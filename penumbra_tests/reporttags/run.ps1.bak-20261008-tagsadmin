@@ -1,0 +1,132 @@
+# =============================================================================
+# Run the REPORT tags tests (2026-10-08): the pure half (penumbra_report_tags.php),
+# the grant side of db_connection.php (penumbraNormalizeGrants /
+# penumbraReportTagMap / penumbraReportGrantMatches / ...AllowsScheduler /
+# penumbraIsConsoleAudience, and the audit change summary), the Grants tool's
+# validator + picker (grants_admin.php), the Tags tool page (people_tags.php,
+# step 2), and step 3: Save As (index.php + js/main.js), the save endpoint
+# (save_server_state.php) and the delete / restore snapshots.
+#   powershell -File run.ps1                 # normal run, against the LIVE app
+#   powershell -File run.ps1 -App <dir>      # against a staged copy (flat, or
+#                                            # app-shaped with js\ beside; a file it
+#                                            # lacks comes from live)
+#   powershell -File run.ps1 -Mutant         # targeted mutants; each MUST go RED
+#                                            # with the exact fail count named below
+#
+# WHAT IS UNDER TEST. The pasted-id parser, the tag-list cleaner, the NARROW rule
+# for who may change a report's tags (admin: any; a non-admin: only tags they hold
+# a grant on), the SQL text of every read and write (numeric report id, idempotent
+# MERGE, rename = merge, the caps, the shared vocabulary = the UNION of both tag
+# tables); the resolver parsing ['tag' => NAME (, 'scheduler')], both matchers
+# answering tag grants through the injected tag map and FAILING CLOSED with no
+# database; the console audience; the validator writing upper-cased names and
+# refusing malformed ones; text pins on the picker; the Tags tool page's report
+# side; the change summary naming "tags"; pins on Save As, the save endpoint's
+# narrow rule and create gate, and the delete / restore snapshots. Offline, php -n.
+#
+# EXPECTED TAIL: "PASS: N   FAIL: 0" then "RESULT: GREEN" (N = 220 as of 2026-10-08 step 5 + the tasks-query fix; fifteen mutants).
+#
+# UNC .ps1 files are GPO-blocked here ("not digitally signed") - run the body as
+# a scriptblock rather than with -File. Never add a bare `exit` for the same
+# reason: it would kill the caller.
+# =============================================================================
+param(
+    [string]$App = '\' + '\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra',
+    [switch]$Mutant
+)
+$ErrorActionPreference = 'Stop'
+$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\reporttags' }   # empty when run as a scriptblock: never fall back to the caller's cwd
+$live = '\' + '\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+$php  = '\' + '\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+$test = Join-Path $here 'test_reporttags.php'
+# A staged file by its app-relative name: flat (main.js beside) or app-shaped (js\main.js); live otherwise.
+function Pick($name) {
+    $p = Join-Path $App $name; if (Test-Path $p) { return $p }
+    $flat = Join-Path $App (Split-Path -Leaf $name); if (Test-Path $flat) { return $flat }
+    return (Join-Path $live $name)
+}
+$files = [ordered]@{
+    lib = Pick 'penumbra_report_tags.php'
+    dbc = Pick 'db_connection.php'
+    ga  = Pick 'grants_admin.php'
+    pt  = Pick 'people_tags.php'
+    ss  = Pick 'save_server_state.php'
+    del = Pick 'delete_server_report.php'
+    res = Pick 'restore_server_report.php'
+    idx = Pick 'index.php'
+    mjs = Pick 'js\main.js'
+    gsr = Pick 'get_server_reports.php'
+    rep = Pick 'js\penumbra_repository.js'
+    aa  = Pick 'analytics_all.php'
+    pin = Pick 'js\pinned_reports.js'
+}
+$ppl = Pick 'penumbra_people_tags.php'   # the pure half requires it from ITS OWN folder
+if (-not $Mutant) {
+    & $php -n $test @($files.Values)
+    return
+}
+# --- targeted mutants -------------------------------------------------------
+# Each reverts ONE rule. The expected fail count is exact: a mutant that stays
+# GREEN, or that goes red in more places than named, means the suite no longer
+# pins what it claims to pin. 'File' names which source it edits.
+$tmp = Join-Path $env:TEMP ('pnb_reporttags_mut_' + $PID)
+New-Item -ItemType Directory -Force $tmp | Out-Null
+Copy-Item $ppl (Join-Path $tmp 'penumbra_people_tags.php') -Force   # beside a mutated pure half, its require_once resolves
+$mutants = @(
+    @{ File = 'dbc'; Name = 'the resolver no longer upper-cases a tag name (a lower-case grant is silently skipped)';
+       From = "`$tag = strtoupper(trim((string)`$grant['tag']));";   To = "`$tag = trim((string)`$grant['tag']);";   Expect = 5 },
+    @{ File = 'dbc'; Name = 'the matcher ignores tag grants';
+       From = "if (isset(`$tg['tag']) && in_array(`$tg['tag'], `$have, true)) return true;";   To = 'if (false) return true;';   Expect = 3 },
+    @{ File = 'dbc'; Name = 'a plain tag grant leaks the scheduler verb';
+       From = "if (!empty(`$tg['scheduler']) && isset(`$tg['tag']) && in_array(`$tg['tag'], `$have, true)) return true;";
+       To   = "if (isset(`$tg['tag']) && in_array(`$tg['tag'], `$have, true)) return true;";   Expect = 2 },
+    @{ File = 'dbc'; Name = 'the lookup stops folding the short id (an upper-case id finds no tags)';
+       From = "`$sid = strtolower(trim((string)`$shortId));`n        if (`$sid === '') return array();";
+       To   = "`$sid = trim((string)`$shortId);`n        if (`$sid === '') return array();";   Expect = 2 },
+    @{ File = 'dbc'; Name = 'the console audience forgets tag holders';
+       From = "|| !empty(`$grants['reports']) || !empty(`$grants['tags'])))";   To = "|| !empty(`$grants['reports'])))";   Expect = 1 },
+    @{ File = 'dbc'; Name = 'the change summary files a tag change under "other settings"';
+       From = "elseif (`$k === 'tags') `$cats['tags'] = 1;";   To = "elseif (`$k === 'tags') `$stateN++;";   Expect = 3 },
+    @{ File = 'ga';  Name = 'the validator accepts any tag name';
+       From = "if (!preg_match('/^[A-Z][A-Z0-9_]{0,59}$/', `$tag)) { `$err = `"invalid tag name";   To = "if (false) { `$err = `"invalid tag name";   Expect = 4 },
+    @{ File = 'lib'; Name = 'the narrow rule lets a non-admin change any tag';
+       From = 'if (!$changed || $isAdmin) return array();';   To = 'return array();';   Expect = 5 },
+    @{ File = 'pt';  Name = 'the Tags tool audits an add without the report id (the report''s own log would not show it)';
+       From = "@logPenumbraAudit(`$rep['id'], 'REPORT_TAG_ADD'";   To = "@logPenumbraAudit(null, 'REPORT_TAG_ADD'";   Expect = 1 },
+    @{ File = 'pt';  Name = 'the Tags tool renames people but leaves the reports behind (the two kinds drift apart)';
+       From = '$rs = penumbraReportTagsSqlRename();';   To = '$rs = array("SELECT 1 FROM DUAL", "SELECT 1 FROM DUAL");';   Expect = 2 },
+    @{ File = 'ss';  Name = 'the save endpoint stops refusing tags the saver does not hold';
+       From = '$tags_refused = penumbraReportTagsRefused($isAdmin, $userGrants, $tags_before, $tags);';   To = '$tags_refused = array();';   Expect = 1 },
+    @{ File = 'ss';  Name = 'the create gate ignores a tag-only holder''s tags';
+       From = '&& !$tagCreateOk) {';   To = ') {';   Expect = 1 },
+    @{ File = 'aa';  Name = 'Platform Metrics drops the tag from the aliased report filter (half the queries ignore it)';
+       From = '$reportFilterA .= " AND r.ID IN (SELECT REPORT_ID FROM PENUMBRA_REPORT_TAGS WHERE TAG = :rtag)";';   To = '$reportFilterA .= "";';   Expect = 1 },
+    @{ File = 'gsr'; Name = 'the repository list drops TAGS from its whitelist (the column would show nothing)';
+       From = "? array_values(array_filter(explode('|', (string)`$row['TAGS']), 'strlen')) : array(),";   To = '? array() : array(),';   Expect = 1 },
+    @{ File = 'ga';  Name = 'the Grants tool''s reach ignores tag grants (a tag holder would read as reaching nothing)';
+       From = "rep.tags.indexOf(String(gr.tag).toUpperCase()) !== -1) { via.push('tag ' + gr.tag);";   To = "rep.tags.indexOf(String(gr.tag).toUpperCase()) !== -2) { via.push('tag ' + gr.tag);";   Expect = 1 }
+)
+$leaves = @{ lib = 'penumbra_report_tags.php'; dbc = 'db_connection.php'; ga = 'grants_admin.php'; pt = 'people_tags.php'; ss = 'save_server_state.php'; del = 'delete_server_report.php'; res = 'restore_server_report.php'; idx = 'index.php'; mjs = 'main.js'; gsr = 'get_server_reports.php'; rep = 'penumbra_repository.js'; aa = 'analytics_all.php'; pin = 'pinned_reports.js' }
+$allGood = $true
+foreach ($m in $mutants) {
+    $srcPath = $files[$m.File]
+    $text = [IO.File]::ReadAllText($srcPath)
+    if ($text.IndexOf($m.From) -lt 0) { Write-Host ("MUTANT NOT APPLICABLE (anchor missing): " + $m.Name); $allGood = $false; continue }
+    $mutated = $text.Replace($m.From, $m.To)
+    $file = Join-Path $tmp $leaves[$m.File]
+    [IO.File]::WriteAllText($file, $mutated)
+    # NOT $args: that is PowerShell's automatic variable, and assigning to it inside
+    # this scriptblock handed php.exe nothing (every mutant read as FATAL, 2026-10-08).
+    $phpArgs = @($files.Values)
+    $i = 0; foreach ($k in $files.Keys) { if ($k -eq $m.File) { $phpArgs[$i] = $file }; $i++ }
+    $out  = & $php -n $test @phpArgs 2>&1 | Out-String
+    $fail = 0
+    if ($out -match 'FAIL:\s+(\d+)') { $fail = [int]$Matches[1] }
+    # -cmatch: case-SENSITIVE, because a pin label says "never fatal" and -match would read it as the harness's FATAL.
+    if ($out -cmatch 'FATAL') { $fail = -1; Write-Host ('     ' + (($out -split "`n") | Where-Object { $_ -cmatch 'FATAL' } | Select-Object -First 1)) }
+    $verdict = if ($fail -eq $m.Expect) { 'OK  ' } else { 'BAD ' }
+    if ($fail -ne $m.Expect) { $allGood = $false }
+    Write-Host ("{0} mutant '{1}' -> FAIL: {2} (expected {3})" -f $verdict, $m.Name, $fail, $m.Expect)
+}
+Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+Write-Host ('MUTANTS: ' + $(if ($allGood) { 'ALL BITE' } else { 'PROBLEM' }))

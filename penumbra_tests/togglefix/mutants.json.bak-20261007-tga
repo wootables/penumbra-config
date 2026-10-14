@@ -1,0 +1,482 @@
+{
+ "css-scope": {
+  "edits": [
+   [
+    "css/main.css",
+    ":is(#resultsTable, #groupedResultsContainer) .journal-toggle-box {\n    display: inline-flex;\n",
+    ".journal-toggle-box {\n    display: inline-flex;\n"
+   ]
+  ],
+  "must": [
+   "V-dark-off",
+   "V-darkgrp-off",
+   "V-wolf-hover"
+  ],
+  "scn": [
+   "dark",
+   "darkgrp",
+   "wolf"
+  ]
+ },
+ "css-on": {
+  "edits": [
+   [
+    "css/main.css",
+    ":is(#resultsTable, #groupedResultsContainer) .journal-toggle-box.is-on {\n",
+    ".journal-toggle-box.is-on {\n"
+   ]
+  ],
+  "must": [
+   "V-dark-on",
+   "V-wolf-onhover"
+  ],
+  "scn": [
+   "dark",
+   "wolf"
+  ]
+ },
+ "save-gate": {
+  "edits": [
+   [
+    "js/main.js",
+    "            viewOptions.journalEnabled = true;\n        }\n        // Phase 2: row identity + toggle config. Saved whether or not the journal\n",
+    "            viewOptions.journalEnabled = true;\n        }\n        if ($('#viewOptionJournal').is(':checked')) // MUTANT: key columns saved only while on\n        // Phase 2: row identity + toggle config. Saved whether or not the journal\n"
+   ]
+  ],
+  "must": [
+   "K-off-save"
+  ],
+  "scn": [
+   "offsave"
+  ]
+ },
+ "restore-gate": {
+  "edits": [
+   [
+    "js/main.js",
+    "                window._penumbraJournalKeyColumns = Array.isArray(_jvo.journalKeyColumns)\n",
+    "                window._penumbraJournalKeyColumns = (_jrnEnabled && Array.isArray(_jvo.journalKeyColumns))\n"
+   ]
+  ],
+  "must": [
+   "K-off-restored",
+   "K-off-turnon"
+  ],
+  "scn": [
+   "offsave"
+  ]
+ },
+ "reenable-notes": {
+  "edits": [
+   [
+    "js/main.js",
+    "                $('#journalRowNotesEnable').prop('checked', !!window._penumbraJournalRowNotes);\n                populateKeyPicker(); renderToggleDefs(); syncConfigFromUI();\n",
+    "                populateKeyPicker(); renderToggleDefs(); syncConfigFromUI();\n"
+   ]
+  ],
+  "must": [
+   "K-off-turnon"
+  ],
+  "scn": [
+   "offsave"
+  ]
+ },
+ "tab-gate": {
+  "edits": [
+   [
+    "js/penumbra_journal.js",
+    "        return !window._penumbraJournalHidden\n            && !!(window._penumbraJournalToggles && window._penumbraJournalToggles.length);\n",
+    "        return !!(window._penumbraJournalToggles && window._penumbraJournalToggles.length);\n"
+   ]
+  ],
+  "must": [
+   "K-off-tab"
+  ],
+  "scn": [
+   "offsave"
+  ]
+ },
+ "sw-guard-tg": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (rid !== jReportId()) return; // asked for the report the page has left (journalSwitchReport)\n",
+    ""
+   ]
+  ],
+  "must": [
+   "J-sw-stale"
+  ],
+  "scn": [
+   "switch"
+  ]
+ },
+ "sw-guard-notes": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (rid !== jReportId()) { if (cb) cb(); return; } // asked for the report the page has left\n",
+    ""
+   ]
+  ],
+  "must": [
+   "J-sw-stale"
+  ],
+  "scn": [
+   "switch"
+  ]
+ },
+ "sw-hist": {
+  "edits": [
+   [
+    "js/main.js",
+    "            hideHistPop();\n            _histCache = {};\n            _toggleSeq = {};\n",
+    "            hideHistPop();\n            _toggleSeq = {};\n"
+   ]
+  ],
+  "must": [
+   "J-sw-hist"
+  ],
+  "scn": [
+   "switch"
+  ]
+ },
+ "sw-bootvar": {
+  "edits": [
+   [
+    "js/main.js",
+    "            journalReportId = String(id || '');\n            window.Penumbra.journalReportId = journalReportId;\n",
+    "            window.Penumbra.journalReportId = String(id || '');\n"
+   ]
+  ],
+  "must": [
+   "J-sw-badge",
+   "J-sw-gate"
+  ],
+  "scn": [
+   "switch"
+  ]
+ },
+ "wire": {
+  "edits": [
+   [
+    "js/main.js",
+    "                window.Penumbra.journalSwitchReport(response.new_id || shortId);\n",
+    "                void 0;\n"
+   ]
+  ],
+  "must": [
+   "W-save-switch"
+  ],
+  "scn": [
+   "wire"
+  ]
+ },
+ "miss-validate": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (missing.length) return { ok: false, reason: 'missing', missing: missing, dup: 0, total: masterRowData.length };\n",
+    ""
+   ]
+  ],
+  "must": [
+   "K-miss-off",
+   "K-miss-note",
+   "K-miss-lock",
+   "K-miss-bulk"
+  ],
+  "scn": [
+   "missing"
+  ]
+ },
+ "miss-chip": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (cols.length) {\n                var inData = {};\n",
+    "            if (false) {\n                var inData = {};\n"
+   ]
+  ],
+  "must": [
+   "K-miss-chip",
+   "K-miss-untick"
+  ],
+  "scn": [
+   "missing"
+  ]
+ },
+ "miss-note-msg": {
+  "edits": [
+   [
+    "js/main.js",
+    "                + v.missing.map(function (c) { return '<strong>' + escapeHtml(c) + '</strong>'; }).join(' or ')\n",
+    "                + 'a key'\n"
+   ]
+  ],
+  "must": [
+   "K-miss-note"
+  ],
+  "scn": [
+   "missing"
+  ]
+ },
+ "miss-lock-msg": {
+  "edits": [
+   [
+    "js/main.js",
+    "                else if (v && v.reason === 'missing') msg = 'Toggle columns open once every key column in step 1 is in the data.';\n",
+    ""
+   ]
+  ],
+  "must": [
+   "K-miss-lock"
+  ],
+  "scn": [
+   "missing"
+  ]
+ },
+ "miss-bulk-msg": {
+  "edits": [
+   [
+    "js/main.js",
+    "                    ? 'The journal key column ' + _kv.missing.join(', ') + ' is not in this data, so rows cannot be identified.'\n",
+    "                    ? 'The journal key column is not unique for this data, so rows cannot be identified.'\n"
+   ]
+  ],
+  "must": [
+   "K-miss-bulk"
+  ],
+  "scn": [
+   "missing"
+  ]
+ },
+ "long-box": {
+  "edits": [
+   [
+    "js/main.js",
+    "            var blocked = rowKeyTooLong(rowKey);\n",
+    "            var blocked = false;\n"
+   ]
+  ],
+  "must": [
+   "K-long-box",
+   "K-long-click"
+  ],
+  "scn": [
+   "longkey"
+  ]
+ },
+ "eq-long-guard": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (this.disabled) return; // a key too long to store (toggleBtnHtml)\n",
+    ""
+   ]
+  ],
+  "must": [],
+  "scn": [
+   "longkey"
+  ]
+ },
+ "long-note": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (v && v.nLong) {\n",
+    "            if (false) {\n"
+   ]
+  ],
+  "must": [
+   "K-long-note"
+  ],
+  "scn": [
+   "longkey"
+  ]
+ },
+ "srv-case": {
+  "edits": [
+   [
+    "journal_export.php",
+    "            $parts[] = journalCleanKeyValueExport(isset($vals[$col]) ? $vals[$col] : null);\n",
+    "            $parts[] = journalCleanKeyValueExport(isset($row[$col]) ? $row[$col] : null);\n"
+   ]
+  ],
+  "must": [
+   "S-case-row"
+  ],
+  "scn": [
+   "srv"
+  ]
+ },
+ "srv-sid": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "    if (is_int($identifier)) return $byId($identifier);\n",
+    "    if (is_int($identifier) || ctype_digit(trim((string)$identifier))) return $byId($identifier);\n"
+   ]
+  ],
+  "must": [
+   "S-sid-digits"
+  ],
+  "scn": [
+   "srv"
+  ]
+ },
+ "srv-snap": {
+  "edits": [
+   [
+    "manage_snapshots.php",
+    "    if (is_int($identifier)) return $identifier;\n",
+    "    if (is_int($identifier) || ctype_digit(trim((string)$identifier))) return (int)$identifier;\n"
+   ]
+  ],
+  "must": [
+   "S-snap-digits"
+  ],
+  "scn": [
+   "srv"
+  ]
+ },
+ "srv-gate-list": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "    if ($action === 'list') {\n        $report_identifier = isset($_GET['report_id']) ? $_GET['report_id'] : '';\n        if (empty($report_identifier)) throw new Exception(\"report_id is required.\");\n\n        $report = journalGetReport($conn, $report_identifier);\n        if (!$report) throw new Exception(\"Report not found.\");\n        if (!journalCallerCanView($report, $currentUserKey, $user_ouc, $isAdmin)) {\n            echo json_encode(array('status' => 'error', 'message' => 'You do not have access to this report.'));\n            exit;\n        }\n        // The journal is off: only its peek reads it (journalCallerCanReadJournal).\n        if (!journalCallerCanReadJournal($report, $currentUserKey, $isAdmin)) {\n            echo json_encode(array('status' => 'error', 'message' => 'The Report Journal is off for this report.'));\n            exit;\n        }\n",
+    "    if ($action === 'list') {\n        $report_identifier = isset($_GET['report_id']) ? $_GET['report_id'] : '';\n        if (empty($report_identifier)) throw new Exception(\"report_id is required.\");\n\n        $report = journalGetReport($conn, $report_identifier);\n        if (!$report) throw new Exception(\"Report not found.\");\n        if (!journalCallerCanView($report, $currentUserKey, $user_ouc, $isAdmin)) {\n            echo json_encode(array('status' => 'error', 'message' => 'You do not have access to this report.'));\n            exit;\n        }\n"
+   ]
+  ],
+  "must": [
+   "S-gate-off"
+  ],
+  "scn": [
+   "srv"
+  ]
+ },
+ "srv-gate-attach": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "        // The journal is off: only its peek reads it (journalCallerCanReadJournal).\n        if (!journalCallerCanReadJournal($report, $currentUserKey, $isAdmin)) {\n            http_response_code(403);\n",
+    "        if (false) {\n            http_response_code(403);\n"
+   ]
+  ],
+  "must": [
+   "S-gate-off"
+  ],
+  "scn": [
+   "srv"
+  ]
+ },
+ "srv-enc": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "    $f = journalReportStateFlags($report);\n    return $f['enc'];\n",
+    "    return false;\n"
+   ]
+  ],
+  "must": [
+   "S-gate-enc"
+  ],
+  "scn": [
+   "srv"
+  ]
+ },
+ "srv-tgby": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "        if (isset($byKey[$k])) { $levels[$i] = $byKey[$k]; $changed = true; }\n",
+    "        if (false) { $levels[$i] = $byKey[$k]; $changed = true; }\n"
+   ]
+  ],
+  "must": [
+   "S-tg-groupby",
+   "S-sched-grouped"
+  ],
+  "scn": [
+   "srv"
+  ]
+ },
+ "srv-label": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "        if ($isToggle) return ((string)$val === '1') ? 'Checked' : 'Unchecked';\n",
+    ""
+   ]
+  ],
+  "must": [
+   "S-tg-label"
+  ],
+  "scn": [
+   "srv"
+  ]
+ },
+ "srv-flat": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "    if (is_array($flat_rows) && !empty($flat_rows)) {\n        require_once __DIR__ . '/journal_export.php';\n        if ($sched_is_pivot) {\n",
+    "    if (empty($state['groupBy']) && !$sched_is_pivot && is_array($flat_rows) && !empty($flat_rows)) {\n        require_once __DIR__ . '/journal_export.php';\n        if ($sched_is_pivot) {\n"
+   ]
+  ],
+  "must": [
+   "S-sched-grouped",
+   "S-sched-pivot"
+  ],
+  "scn": [
+   "srv"
+  ]
+ },
+ "srv-oneread": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "            $journal_toggle_resolver = $jt['resolver'];\n",
+    "            $journal_toggle_resolver = journalExportToggleResolver($report_id, $state, array_keys(reset($flat_rows)));\n"
+   ]
+  ],
+  "must": [
+   "S-sched-grouped",
+   "S-sched-oneread"
+  ],
+  "scn": [
+   "srv"
+  ]
+ },
+ "srv-reg": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "    penumbra_sched_toggle_cols($journal_toggle_cols);\n",
+    ""
+   ]
+  ],
+  "must": [
+   "S-sched-grouped",
+   "S-sched-pivot"
+  ],
+  "scn": [
+   "srv"
+  ]
+ },
+ "srv-dd": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "                    foreach ($_ddTg as $_ddCol) {\n",
+    "                    foreach (array() as $_ddCol) {\n"
+   ]
+  ],
+  "must": [
+   "S-dd-strip"
+  ],
+  "scn": [
+   "srv"
+  ]
+ }
+}

@@ -1,0 +1,159 @@
+<?php
+/**
+ * Engine C (scheduler / email) corpus runner.
+ * Loads the extracted schedule_runner.php functions and renders every corpus case
+ * through execute_email_snippet(), writing results as JSON for comparison with
+ * engine B. No database, no scheduler main loop.
+ *
+ *   php -n run_engine_c.php [appDir]     (run_parity.ps1 passes its $app)
+ */
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_NOTICE & ~E_WARNING);
+ini_set('display_errors', '0');
+date_default_timezone_set('America/New_York');
+
+$dir = __DIR__;
+// The app tree engineC_functions.php was extracted from. run_parity.ps1 passes its
+// $app, so the runner functions and the include below always come from ONE tree.
+$appDir = (isset($argv[1]) && $argv[1] !== '') ? rtrim($argv[1], '/\\')
+        : '\\\\oitras.oit.ncsu.edu\\c$\\inetpub\\wwwroot\\sponsor_migration\\penumbra';
+
+// --- penumbra_search.php, required LIVE (2026-09-19). ------------------------
+// extract_engine_c.php lifts only the functions schedule_runner.php itself
+// DECLARES - it does not follow the runner's require_once lines (following them
+// would drag in db_connection.php). But schedule_runner.php:48 loads
+// penumbra_search.php unconditionally, and since that file was split out on
+// 2026-09-05, _cf_test_condition() calls its _sr_resolve_keyword_date() for any
+// condition value that is neither numeric nor a date, unless the op is
+// 'contains'. Without the file, every text-valued condition (NAME=Alpha,
+// ID != '') threw "Call to undefined function", _snippet_dispatch's silent catch
+// turned that into '', and lookup_first_match read as an engine divergence
+// (B 1200.50 / C empty) until 2026-09-19. The REAL runner was never affected:
+// with this file loaded C returns 1200.50 like both browser engines.
+// Same fix as groupmode\test_nested_php.php. Pre-flighted with the tokenizer:
+// 18 pure declarations, no top-level code, no requires of its own, no name
+// collisions with the extract. It replaces the old zero-argument
+// _search_get_virtual_columns() stub - the real one returns array() for a row
+// with no @@JSON cell, which is every corpus row (verified: swapping the stub for
+// the live file moved ONLY lookup_first_match). Loaded BEFORE the
+// function_exists-guarded extract, so a name the runner might ever re-declare
+// cannot fatal here.
+$searchFile = $appDir . DIRECTORY_SEPARATOR . 'penumbra_search.php';
+if (!function_exists('_sr_resolve_keyword_date') && is_file($searchFile)) {
+    require $searchFile;
+}
+if (!function_exists('_sr_resolve_keyword_date') || !function_exists('_search_get_virtual_columns')) {
+    // Loud and named. Without it the text-condition paths die INSIDE the
+    // dispatcher's catch and come out as bogus divergences, not as an error.
+    echo "FATAL: penumbra_search.php not loaded ($searchFile) - engine C needs _sr_resolve_keyword_date() and _search_get_virtual_columns()\n";
+    exit(1);
+}
+
+// --- penumbra_render_charts.php, required LIVE (2026-09-29). -----------------
+// execute_email_snippet() now ends with penumbra_vis_apply_tokens() and, when a
+// caller asks for charts, calls penumbra_vis_render_snippet(); both live in
+// penumbra_render_charts.php (pure functions over the render queue, no database,
+// no process spawn), which the extract does not lift. Without it every corpus
+// case fatals on the tail call. Nothing here asks for charts, so the apply is a
+// no-op on an empty store - engine C stays deterministic and offline.
+$chartsFile = $appDir . DIRECTORY_SEPARATOR . 'penumbra_render_charts.php';
+if (!function_exists('penumbra_vis_apply_tokens') && is_file($chartsFile)) {
+    require $chartsFile;
+}
+if (!function_exists('penumbra_vis_apply_tokens')) {
+    echo "FATAL: penumbra_render_charts.php not loaded ($chartsFile) - engine C needs penumbra_vis_apply_tokens()\n";
+    exit(1);
+}
+
+// --- Stubs that must exist BEFORE the extract (it is function_exists-guarded, so
+//     anything defined here wins over the real implementation). --------------
+// Theme CSS var resolution lives in themes_config.php (not extracted); progress_bar
+// calls it. Return the fallback colour unchanged so output stays deterministic.
+function penumbra_resolve_css_vars($css) { return $css; }
+
+// --- Record what _snippet_dispatch's catch swallows (2026-09-19). ------------
+// The runner wraps each _snippet_dispatch() call in
+// `catch (\Throwable $e) { $result = ''; }` and logs nothing, so a Throwable -
+// a helper this extract lacks, or a genuine engine exception - reaches the
+// comparison as an innocent-looking ''. That is how the missing-include failure
+// above passed for a divergence. Engine B has had the equivalent from the start
+// (run_parity.ps1 patches B's catch; harness_b.html records `swallowed`). Patch
+// a COPY of the extract - never the runner - so each swallowed Throwable is
+// recorded per case, and refuse to run if any call site escaped the hook: a
+// silent zero is indistinguishable from a check that never ran.
+$extract = file_get_contents($dir . '/engineC_functions.php');
+$dispatchCalls = 0;
+$toks = token_get_all($extract);
+$nt = count($toks);
+for ($ti = 0; $ti < $nt; $ti++) {
+    if (!is_array($toks[$ti]) || $toks[$ti][0] !== T_STRING || $toks[$ti][1] !== '_snippet_dispatch') continue;
+    $tp = $ti - 1;
+    while ($tp >= 0 && is_array($toks[$tp]) && $toks[$tp][0] === T_WHITESPACE) $tp--;
+    if ($tp >= 0 && is_array($toks[$tp]) && $toks[$tp][0] === T_FUNCTION) continue; // the declaration
+    $dispatchCalls++;
+}
+unset($toks);
+$hooked = 0;
+$extract = preg_replace_callback(
+    '/(\$\w+\s*=\s*_snippet_dispatch\((\$\w+)[^;]*;\s*\}\s*catch\s*\(\s*\\\\Throwable\s+(\$\w+)\s*\)\s*\{)/',
+    function ($m) {
+        return $m[1] . ' $GLOBALS[\'__C_SWALLOWED\'][] = ' . $m[2] . ' . \' :: \' . get_class(' . $m[3] . ') . \': \' . ' . $m[3] . '->getMessage();';
+    },
+    $extract, -1, $hooked);
+if ($hooked < 1 || $hooked !== $dispatchCalls) {
+    echo "FATAL: hooked $hooked of $dispatchCalls _snippet_dispatch() call sites - the runner's catch changed shape; update run_engine_c.php so a swallowed Throwable cannot hide\n";
+    exit(1);
+}
+file_put_contents($dir . '/engineC_instrumented.php', $extract);
+unset($extract);
+
+require_once $dir . '/engineC_instrumented.php';
+
+// Globals engine C reads.
+$GLOBALS['total_exemptions'] = array('TOTAL','AMOUNT','COUNT','AMT','CNT','COST');
+$GLOBALS['config'] = array();
+$GLOBALS['strip_links'] = false;
+
+$corpus = json_decode(file_get_contents($dir . '/corpus.json'), true);
+$columns = $corpus['columns'];
+$rows    = $corpus['rows'];
+
+// data() context. _snippet_data() takes ONE merged array: integer keys are the
+// ordered resolved answers behind data(promptN) (it indexes N-1, exactly as
+// engine B indexes allResolvedPrompts), and string keys are raw answers by name
+// behind data(customName). Merging them here keeps the corpus file readable as
+// two separate lists. reportMeta carries data(subtitle)/data(byline),
+// data(search) and data(rowlimit).
+$promptValues = isset($corpus['promptValues']) ? $corpus['promptValues'] : array();
+if (isset($corpus['promptNamed']) && is_array($corpus['promptNamed'])) {
+    foreach ($corpus['promptNamed'] as $k => $v) { $promptValues[$k] = $v; }
+}
+$reportMeta = isset($corpus['reportMeta']) ? $corpus['reportMeta'] : array();
+
+$out = array();
+foreach ($corpus['cases'] as $c) {
+    $res = array('id' => $c['id'], 'snippet' => $c['snippet']);
+    $GLOBALS['__C_SWALLOWED'] = array();   // filled by the hooked dispatcher catches
+    try {
+        $html = execute_email_snippet($c['snippet'], $rows, $columns, 'flat', $promptValues, $reportMeta, false);
+        $res['out'] = $html;
+        // PLAIN mode (report subtitle / by-line). Until 2026-08-29 this path
+        // returned early and skipped the whole number pass; it now runs the
+        // same pass and differs from HTML mode ONLY by the styled wrapper.
+        // Capturing it here lets compare.ps1 assert exactly that, which is
+        // the guardrail the change was missing - engine B has one mode, so a
+        // plain-mode drift would otherwise be invisible to this harness.
+        $res['out_plain'] = execute_email_snippet($c['snippet'], $rows, $columns, 'flat', $promptValues, $reportMeta, true);
+    } catch (Throwable $e) {
+        $res['error'] = get_class($e) . ': ' . $e->getMessage();
+    }
+    // Same field name and 3-entry cap as harness_b.html, so compare.ps1 reads both alike.
+    if ($GLOBALS['__C_SWALLOWED']) {
+        $res['swallowed'] = array_slice(array_values(array_unique($GLOBALS['__C_SWALLOWED'])), 0, 3);
+    }
+    $out[] = $res;
+}
+
+file_put_contents($dir . '/result_c.json', json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+echo "engine C: " . count($out) . " cases (penumbra_search.php from $searchFile; $hooked dispatcher catch(es) hooked)\n";
+foreach ($out as $r) { if (isset($r['error'])) echo "  ERROR {$r['id']}: {$r['error']}\n"; }
+foreach ($out as $r) { if (isset($r['swallowed'])) echo "  SWALLOWED {$r['id']}: " . implode(' | ', $r['swallowed']) . "\n"; }

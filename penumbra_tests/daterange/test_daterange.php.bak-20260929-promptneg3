@@ -1,0 +1,606 @@
+<?php
+/**
+ * test_daterange.php - [PROMPT;type=date-range], the two PHP engines.
+ *
+ * WHAT IS UNDER TEST. One prompt, two dates. The answer is a single raw string
+ * "<from>..<to>"; the author writes the SQL operator and the engine supplies the
+ * two values:
+ *
+ *     col BETWEEN [PROMPT;type=date-range;...]    ->  col BETWEEN 'A' AND 'B'
+ *     template="AND col >= :from AND col <= :to"  ->  explicit placement
+ *
+ * Three engines resolve prompts in this app (js/main.js in the browser, index.php
+ * for ?json=1, schedule_runner.php for scheduled tasks) and their history is one
+ * of drifting apart. The two PHP engines therefore share ONE set of helpers in
+ * shared_logic.php, and this suite pins three things:
+ *
+ *   1. the helpers themselves (split / parse / format / resolve / emit / splice);
+ *   2. each PHP engine's own wiring around them;
+ *   3. PARITY - the same tag and the same answer must leave both engines as the
+ *      same SQL text, byte for byte.
+ *
+ * Runs against the SHIPPED code, never a copy:
+ *   - shared_logic.php opens the database on include (require_once
+ *     'db_connection.php'), and schedule_runner.php claims tasks and SENDS EMAIL
+ *     on include. Neither may be require()d. Named functions are lifted out of
+ *     both with PHP's own tokenizer instead.
+ *   - index.php's prompt pass is top-level code, not a function. Its date-range
+ *     branch is cut out by its literal first and last lines and compiled into a
+ *     small loop that mirrors the pass's own loop. ONE textual change is made to
+ *     that fragment: `exit;` becomes a throw, so a refusal can be asserted on
+ *     instead of ending the test run. Nothing else is touched.
+ *
+ *   php.exe -n test_daterange.php [<app dir> [<fixture.js> [--control]]]
+ *
+ * <fixture.js>: where to write the parity cases for the browser suite (run.ps1
+ * passes it). --control adds one deliberately false assertion: the run must
+ * then end "FAIL: 1".
+ *
+ * -n (skip php.ini) because a workstation cannot load oci8/sqlsrv. -n also drops
+ * date.timezone, so this file sets it: the relative-date grammar calls date().
+ */
+
+date_default_timezone_set('America/New_York');
+
+// index.php's refusals call header(). On the CLI any output at all counts as
+// "headers already sent", and the resulting warning would land inside the JSON
+// body this suite captures. Hold the suite's own output back until the end so
+// header() stays the silent no-op it is in a real request. (PHP flushes this
+// buffer on shutdown, so a fatal still shows everything printed before it.)
+ob_start();
+
+$APP = isset($argv[1]) ? rtrim($argv[1], "\\/") : 'C:\\inetpub\\wwwroot\\sponsor_migration\\penumbra';
+$F_SHARED = $APP . DIRECTORY_SEPARATOR . 'shared_logic.php';
+$F_RUNNER = $APP . DIRECTORY_SEPARATOR . 'schedule_runner.php';
+$F_INDEX  = $APP . DIRECTORY_SEPARATOR . 'index.php';
+$F_SEARCH = $APP . DIRECTORY_SEPARATOR . 'penumbra_search.php';
+
+$pass = 0; $fail = 0;
+function check($label, $got, $want) {
+    global $pass, $fail;
+    if ($got === $want) { $pass++; echo "  ok   $label\n"; }
+    else {
+        $fail++;
+        echo "  FAIL $label\n         got:  " . var_export($got, true) . "\n         want: " . var_export($want, true) . "\n";
+    }
+}
+function check_contains($label, $haystack, $needle) {
+    global $pass, $fail;
+    if (is_string($haystack) && strpos($haystack, $needle) !== false) { $pass++; echo "  ok   $label\n"; }
+    else {
+        $fail++;
+        echo "  FAIL $label\n         got:  " . var_export($haystack, true) . "\n         want it to contain: " . var_export($needle, true) . "\n";
+    }
+}
+
+// ---------------------------------------------------------------------------
+// lift: pull named top-level functions out of a file WITHOUT executing it.
+// Brace matching runs on real tokens, and counts the two interpolation openers
+// ("{$x}" and "${x}") because a plain "}" is what closes them.
+// ---------------------------------------------------------------------------
+function lift($file, array $names) {
+    $code = file_get_contents($file);
+    if ($code === false) { fwrite(STDERR, "cannot read $file\n"); exit(2); }
+    $want = array_flip($names);
+    $tokens = token_get_all($code);
+    $n = count($tokens);
+    $out = ''; $found = array(); $depth = 0;
+    for ($i = 0; $i < $n; $i++) {
+        $t = $tokens[$i];
+        if ($depth === 0 && is_array($t) && $t[0] === T_FUNCTION) {
+            $k = $i + 1;
+            while ($k < $n && is_array($tokens[$k]) && in_array($tokens[$k][0], array(T_WHITESPACE, T_COMMENT, T_DOC_COMMENT), true)) { $k++; }
+            if ($k < $n && is_array($tokens[$k]) && $tokens[$k][0] === T_STRING) {
+                $fname = $tokens[$k][1];
+                $buf = ''; $d = 0; $opened = false;
+                for ($j = $i; $j < $n; $j++) {
+                    $tt = $tokens[$j];
+                    $txt = is_array($tt) ? $tt[1] : $tt;
+                    $buf .= $txt;
+                    if (is_array($tt) && ($tt[0] === T_CURLY_OPEN || $tt[0] === T_DOLLAR_OPEN_CURLY_BRACES)) { $d++; }
+                    elseif ($txt === '{') { $d++; $opened = true; }
+                    elseif ($txt === '}') { $d--; if ($opened && $d === 0) { break; } }
+                }
+                if (isset($want[$fname])) {
+                    $out .= "if (!function_exists('$fname')) {\n$buf\n}\n";
+                    $found[$fname] = true;
+                }
+                $i = $j;
+                continue;
+            }
+        }
+        if (is_array($t)) {
+            if ($t[0] === T_CURLY_OPEN || $t[0] === T_DOLLAR_OPEN_CURLY_BRACES) { $depth++; }
+        } elseif ($t === '{') { $depth++; }
+        elseif ($t === '}') { $depth--; }
+    }
+    foreach ($names as $nm) {
+        if (!isset($found[$nm])) { fwrite(STDERR, "lift: function $nm not found in $file\n"); exit(2); }
+    }
+    return $out;
+}
+
+// ---------------------------------------------------------------------------
+// stubs - defined BEFORE the lift so the function_exists guards keep them.
+// ---------------------------------------------------------------------------
+$GLOBALS['DR_LOG'] = array();
+function log_scheduler($m) { $GLOBALS['DR_LOG'][] = $m; }
+
+// The MIN/MAX lookup is a database query. The fake records what it was asked
+// and answers from a fixture (null = "the lookup could not run").
+$GLOBALS['DR_LOOKUP'] = array('answer' => null, 'calls' => array());
+function penumbraPromptDateRange($table, $column, $condition = '') {
+    $GLOBALS['DR_LOOKUP']['calls'][] = array($table, $column, $condition);
+    return $GLOBALS['DR_LOOKUP']['answer'];
+}
+
+class DrExit extends Exception {}
+
+eval(lift($F_SHARED, array(
+    'extractPromptTags', 'resolveParamDateExpression', 'penumbraApplyDateRangeKeyword',
+    'penumbraDateRangeIsType', 'penumbraDateRangeSplit', 'penumbraDateRangeParseEnd',
+    'penumbraDateRangeFormatEnd', 'penumbraDateRangeResolve', 'penumbraDateRangeEmit',
+    'penumbraDateRangeDisplay', 'penumbraDateRangeUrlValue', 'penumbraDateRangeSplice',
+    'penumbraNoQuoteTypeIsAllowed', 'penumbraNoQuoteTypeError',
+    'penumbraNoQuoteValueIsAllowed', 'penumbraNoQuoteValueError',
+)));
+// The prompt emission rules both PHP engines share since 2026-09-21
+// (penumbraDateRangeSplice() is now a one-line call into penumbraPromptSplice(),
+// and the engines call the rest for every type), plus the multi-select operator
+// reader, join rule and IS NULL look-ahead of 2026-09-29, and the per-option
+// template parser that moved here from the runner the same day. Lifted only when
+// present, so this file still runs against an app directory from before either.
+$sharedText = (string)file_get_contents($F_SHARED);
+$promptHelpers = array();
+foreach (array('penumbraPromptUnquoteTemplate', 'penumbraPromptSplice', 'penumbraPromptSqlBefore', 'penumbraPromptFollowsBareIn',
+               'penumbraPromptOperatorBefore', 'penumbraPromptJoin', 'penumbraPromptSqlAfter', 'penumbraPromptFollowedByIsNull',
+               'penumbraPromptOptionTemplates', 'penumbraPromptOptionSplit', 'penumbraPromptUnquotedDoubleColon', 'penumbraPromptUnquotedColon') as $ph) {
+    if (strpos($sharedText, 'function ' . $ph . '(') !== false) { $promptHelpers[] = $ph; }
+}
+if ($promptHelpers) { eval(lift($F_SHARED, $promptHelpers)); }
+require_once $F_SEARCH;   // pure declarations: _sr_resolve_relative_date()
+// The runner's own copy of the per-option parser exists only before 2026-09-29.
+$runnerText = (string)file_get_contents($F_RUNNER);
+$runnerNames = array('process_scheduler_prompts');
+foreach (array('penumbra_parse_per_option_templates', 'penumbra_split_options_value',
+               'penumbra_find_unquoted_double_colon', 'penumbra_find_unquoted_colon') as $rn) {
+    if (strpos($runnerText, 'function ' . $rn . '(') !== false) { $runnerNames[] = $rn; }
+}
+eval(lift($F_RUNNER, $runnerNames));
+
+// ---------------------------------------------------------------------------
+// the ?json=1 engine: index.php's date-range branch, as shipped.
+// ---------------------------------------------------------------------------
+$idx = str_replace("\r\n", "\n", (string)file_get_contents($F_INDEX));
+$fragStartMark = "                if (penumbraDateRangeIsType(isset(\$params['type']) ? \$params['type'] : '')) {\n                    \$drLabel =";
+$fragEndMark   = "                        penumbraDateRangeEmit(\$drTemplate, \"'\" . \$drRange['from'] . \"'\", \"'\" . \$drRange['to'] . \"'\"));\n                    continue;\n                }\n";
+$fs = strpos($idx, $fragStartMark);
+$fe = ($fs === false) ? false : strpos($idx, $fragEndMark, $fs);
+if ($fs === false || $fe === false) { fwrite(STDERR, "could not locate index.php's date-range branch in $F_INDEX\n"); exit(2); }
+$jsonFrag = substr($idx, $fs, $fe + strlen($fragEndMark) - $fs);
+$exitCount = substr_count($jsonFrag, 'exit;');
+// The ONE change: a refusal throws instead of ending the process.
+$jsonFrag = str_replace('exit;', "throw new DrExit(ob_get_clean());", $jsonFrag);
+
+// The pass's own parameter parsing, lifted verbatim - from its "Re-parse params"
+// comment to the RESULTIF banner - so the harness reads a tag exactly the way
+// index.php does. Since 2026-09-21 that includes the template= unquote step; a
+// hand-made copy of the loop here missed it the day it was added.
+$pm0 = strrpos(substr($idx, 0, $fs), '// Re-parse params for this specific tag');
+$pm1 = ($pm0 === false) ? false : strpos($idx, '// --- RESULTIF LOGIC ---', $pm0);
+if ($pm0 === false || $pm1 === false || $pm1 > $fs) {
+    fwrite(STDERR, "could not locate index.php's Pass 2 parameter parsing\n"); exit(2);
+}
+$jsonParamBlock = substr($idx, $pm0, $pm1 - $pm0);
+
+eval('
+function dr_json_engine($sql, $get = array()) {
+    $prompt_answers = array();
+    $tags = extractPromptTags($sql);
+    for ($i = count($tags) - 1; $i >= 0; $i--) {
+        $full_tag = $tags[$i]["full_tag"];
+        $offset = $tags[$i]["offset"];
+        $inner_content = $tags[$i]["inner_content"];
+' . $jsonParamBlock . '
+        $raw_value = "";
+        if (isset($params["name"]) && isset($get[$params["name"]])) { $raw_value = $get[$params["name"]]; }
+        elseif (isset($params["forcedefault"])) { $raw_value = $params["forcedefault"]; }
+        elseif (isset($params["default"])) { $raw_value = $params["default"]; }
+        ob_start();
+' . $jsonFrag . '
+        ob_end_clean();
+        // Anything that gets here was not a date-range prompt.
+        $sql = substr_replace($sql, "<<not-a-date-range>>", $offset, strlen($full_tag));
+    }
+    return $sql;
+}');
+
+/** Runs the ?json=1 branch; returns the SQL, or "REFUSED: <json error text>". */
+function json_run($sql, $get = array()) {
+    $level = ob_get_level();
+    try {
+        $out = dr_json_engine($sql, $get);
+        while (ob_get_level() > $level) { ob_end_clean(); }
+        return $out;
+    } catch (DrExit $e) {
+        while (ob_get_level() > $level) { ob_end_clean(); }
+        $j = json_decode($e->getMessage(), true);
+        return 'REFUSED: ' . (is_array($j) && isset($j['error']) ? $j['error'] : $e->getMessage());
+    }
+}
+/** Runs the scheduler engine; returns the SQL, or "REFUSED: <exception text>". */
+function runner_run($sql, $answers = array(), &$shown = null, &$byName = null, &$list = null) {
+    $shown = array(); $byName = array(); $list = array();
+    // 6th argument (2026-09-24): the positional data(promptN) list. An older
+    // engine without the parameter simply ignores the extra argument.
+    try { return process_scheduler_prompts($sql, $answers, $shown, $byName, array(), $list); }
+    catch (Exception $e) { return 'REFUSED: ' . $e->getMessage(); }
+}
+
+function lit($ts) { return strtoupper(date('d-M-y', $ts)); }
+
+echo "app under test: $APP\n";
+echo "timezone: " . date_default_timezone_get() . "   today: " . lit(time()) . "\n";
+
+// ===========================================================================
+echo "\n=== 1. helpers: type, split ===\n";
+check("type 'date-range'",             penumbraDateRangeIsType('date-range'), true);
+check("type ' Date-Range ' (tolerant)", penumbraDateRangeIsType(' Date-Range '), true);
+check("type 'date' is NOT a range",    penumbraDateRangeIsType('date'), false);
+check("type '' is NOT a range",        penumbraDateRangeIsType(''), false);
+
+check('split a..b',                 penumbraDateRangeSplit('01-JUL-25..30-JUN-26'), array('01-JUL-25', '30-JUN-26'));
+check('split trims each half',      penumbraDateRangeSplit('  TODAY-30 ..  TODAY '), array('TODAY-30', 'TODAY'));
+check('split keeps phrases whole',  penumbraDateRangeSplit('first day of last month..last day of last month'),
+      array('first day of last month', 'last day of last month'));
+check('split: no separator',        penumbraDateRangeSplit('01-JUL-25'), null);
+check('split: missing To',          penumbraDateRangeSplit('01-JUL-25..'), null);
+check('split: missing From',        penumbraDateRangeSplit('..30-JUN-26'), null);
+check('split: three halves',        penumbraDateRangeSplit('a..b..c'), null);
+check('split: null',                penumbraDateRangeSplit(null), null);
+check('split: array answer',        penumbraDateRangeSplit(array('a', 'b')), null);
+
+// ===========================================================================
+echo "\n=== 2. helpers: parse one end (formats, real dates only, RR window) ===\n";
+check('DD-MON-YY',            penumbraDateRangeParseEnd('01-AUG-26'), array(2026, 8, 1));
+check('D-mon-YY, any case',   penumbraDateRangeParseEnd('1-aug-26'),  array(2026, 8, 1));
+check('DD-MON-YYYY',          penumbraDateRangeParseEnd('01-JAN-1965'), array(1965, 1, 1));
+check('ISO',                  penumbraDateRangeParseEnd('2026-08-01'), array(2026, 8, 1));
+check('US slash, 4-digit',    penumbraDateRangeParseEnd('8/1/2026'),   array(2026, 8, 1));
+check('US slash, 2-digit',    penumbraDateRangeParseEnd('08/01/26'),   array(2026, 8, 1));
+// The database re-reads a DD-MON-YY literal with Oracle's RR rule. PHP's own
+// two-digit pivot is 70, which would put 60 in 2060 and reject a 1960-2026 range
+// as "From after To" while the database would have run it happily.
+check('RR window: 60 is 1960 (PHP alone says 2060)', penumbraDateRangeParseEnd('01-JAN-60'), array(1960, 1, 1));
+check('RR window: 50 is 1950',                       penumbraDateRangeParseEnd('01-JAN-50'), array(1950, 1, 1));
+check('RR window: 49 is 2049',                       penumbraDateRangeParseEnd('01-JAN-49'), array(2049, 1, 1));
+check('RR window applies to slash dates too',        penumbraDateRangeParseEnd('1/1/60'),    array(1960, 1, 1));
+check('31-FEB is not a date',      penumbraDateRangeParseEnd('31-FEB-26'), null);
+check('29-FEB in a non-leap year', penumbraDateRangeParseEnd('29-FEB-26'), null);
+check('29-FEB in a leap year',     penumbraDateRangeParseEnd('29-FEB-28'), array(2028, 2, 29));
+check('32-JAN is not a date',      penumbraDateRangeParseEnd('32-JAN-26'), null);
+check('unknown month',             penumbraDateRangeParseEnd('01-XXX-26'), null);
+check('an unresolved phrase is not a date', penumbraDateRangeParseEnd('yesterday'), null);
+check('a date with a TIME is not accepted', penumbraDateRangeParseEnd('01-AUG-26 14:30'), null);
+check('empty',                     penumbraDateRangeParseEnd(''), null);
+
+// ===========================================================================
+echo "\n=== 3. helpers: format one end ===\n";
+check('in the RR window -> 2-digit year', penumbraDateRangeFormatEnd(array(2026, 8, 1)),   '01-AUG-26');
+check('1950 is the window floor',         penumbraDateRangeFormatEnd(array(1950, 1, 1)),   '01-JAN-50');
+check('2049 is the window ceiling',       penumbraDateRangeFormatEnd(array(2049, 12, 31)), '31-DEC-49');
+check('1949 keeps 4 digits',              penumbraDateRangeFormatEnd(array(1949, 12, 31)), '31-DEC-1949');
+check('2050 keeps 4 digits',              penumbraDateRangeFormatEnd(array(2050, 1, 1)),   '01-JAN-2050');
+foreach (array(array(1949, 12, 31), array(1950, 1, 1), array(1999, 12, 31), array(2000, 2, 29), array(2049, 12, 31), array(2050, 1, 1)) as $ymd) {
+    check('round trip ' . implode('-', $ymd), penumbraDateRangeParseEnd(penumbraDateRangeFormatEnd($ymd)), $ymd);
+}
+
+// ===========================================================================
+echo "\n=== 4. helpers: resolve a whole answer ===\n";
+$P = array('type' => 'date-range', 'name' => 'r');
+$r = penumbraDateRangeResolve($P, '01-JUL-25..30-JUN-26');
+check('literal pair: from', isset($r['from']) ? $r['from'] : $r, '01-JUL-25');
+check('literal pair: to',   isset($r['to']) ? $r['to'] : $r,     '30-JUN-26');
+check('raw halves are kept', array($r['from_raw'], $r['to_raw']), array('01-JUL-25', '30-JUN-26'));
+
+$r = penumbraDateRangeResolve($P, 'TODAY-30..TODAY');
+check('TODAY-30..TODAY', array($r['from'], $r['to']), array(lit(strtotime('-30 days')), lit(time())));
+
+$r = penumbraDateRangeResolve($P, 'first day of last month..last day of last month');
+check('last month, as phrases', array($r['from'], $r['to']),
+      array(lit(strtotime('first day of last month')), lit(strtotime('last day of last month'))));
+
+$fyStart = ((int)date('n') >= 7) ? (int)date('Y') : (int)date('Y') - 1;
+$r = penumbraDateRangeResolve($P, 'first day of this fiscal year..last day of this fiscal year');
+check('this fiscal year (Jul 1 - Jun 30)', array($r['from'], $r['to']),
+      array(lit(mktime(0, 0, 0, 7, 1, $fyStart)), lit(mktime(0, 0, 0, 6, 30, $fyStart + 1))));
+$r = penumbraDateRangeResolve($P, 'first day of this fiscal year..TODAY');
+check('fiscal year to date', array($r['from'], $r['to']), array(lit(mktime(0, 0, 0, 7, 1, $fyStart)), lit(time())));
+
+$r = penumbraDateRangeResolve($P, '2025-07-01..6/30/2026');
+check('mixed ISO + slash normalise to DD-MON-YY', array($r['from'], $r['to']), array('01-JUL-25', '30-JUN-26'));
+$r = penumbraDateRangeResolve($P, '15-AUG-26..15-AUG-26');
+check('a one-day range is allowed', array($r['from'], $r['to']), array('15-AUG-26', '15-AUG-26'));
+$r = penumbraDateRangeResolve($P, '01-JAN-60..01-JAN-26');
+check('1960..2026 is in order under the RR window', isset($r['error']) ? $r['error'] : array($r['from'], $r['to']), array('01-JAN-60', '01-JAN-26'));
+
+$r = penumbraDateRangeResolve($P, '30-JUN-26..01-JUL-25');
+check('REVERSED range is refused', isset($r['error']) ? $r['error'] : 'no error', 'The From date must be on or before the To date.');
+$r = penumbraDateRangeResolve($P, 'TODAY..TODAY-30');
+check('REVERSED rolling range is refused', isset($r['error']) ? $r['error'] : 'no error', 'The From date must be on or before the To date.');
+$r = penumbraDateRangeResolve($P, '01-JUL-25');
+check_contains('one date is not a range', isset($r['error']) ? $r['error'] : 'no error', 'needs both a From and a To date');
+$r = penumbraDateRangeResolve($P, '01-JUL-25..');
+check_contains('missing To is refused', isset($r['error']) ? $r['error'] : 'no error', 'needs both a From and a To date');
+$r = penumbraDateRangeResolve($P, '');
+check_contains('empty answer is refused', isset($r['error']) ? $r['error'] : 'no error', 'needs both a From and a To date');
+$r = penumbraDateRangeResolve($P, '01-JUL-25..someday');
+check_contains('the bad half is NAMED in the error', isset($r['error']) ? $r['error'] : 'no error', "'someday' is not a date");
+$r = penumbraDateRangeResolve($P, 'Smith..Jones');
+check_contains('text is never coerced into a date', isset($r['error']) ? $r['error'] : 'no error', "'Smith' is not a date");
+
+echo "\n--- min / max keywords ---\n";
+$r = penumbraDateRangeResolve($P, 'min..max');
+check('no autofill= : widen to 01-JAN-70..today', array($r['from'], $r['to']), array('01-JAN-70', lit(time())));
+check('...and no lookup was attempted', count($GLOBALS['DR_LOOKUP']['calls']), 0);
+
+$PA = array('type' => 'date-range', 'name' => 'r', 'autofill' => "STATS_V2.LOG_DATE|PI_NAME = '{pi_name}'");
+$GLOBALS['DR_LOOKUP'] = array('answer' => array('min' => '1998-01-03', 'max' => '2026-09-14'), 'calls' => array());
+$r = penumbraDateRangeResolve($PA, 'min..max', function ($n) { return $n === 'pi_name' ? "O'Brien, Pat" : null; });
+check('autofill= : min..max is the data span', array($r['from'], $r['to']), array('03-JAN-98', '14-SEP-26'));
+check('the {name} token reached the lookup, quote doubled',
+      isset($GLOBALS['DR_LOOKUP']['calls'][0]) ? $GLOBALS['DR_LOOKUP']['calls'][0] : null,
+      array('STATS_V2', 'LOG_DATE', "PI_NAME = 'O''Brien, Pat'"));
+$r = penumbraDateRangeResolve($PA, '01-JAN-20..max', function ($n) { return 'x'; });
+check('a keyword may be just ONE end', array($r['from'], $r['to']), array('01-JAN-20', '14-SEP-26'));
+$r = penumbraDateRangeResolve($PA, 'MIN..Max', function ($n) { return 'x'; });
+check('keywords are case-insensitive', array($r['from'], $r['to']), array('03-JAN-98', '14-SEP-26'));
+
+$GLOBALS['DR_LOOKUP'] = array('answer' => null, 'calls' => array());
+$r = penumbraDateRangeResolve($PA, 'min..max', function ($n) { return 'x'; });
+check('a failed lookup WIDENS, never breaks', array($r['from'], $r['to']), array('01-JAN-70', lit(time())));
+$r = penumbraDateRangeResolve($PA, 'min..max', function ($n) { return null; });
+check('an unresolvable {name} token widens too', array($r['from'], $r['to']), array('01-JAN-70', lit(time())));
+
+// ===========================================================================
+echo "\n=== 5. helpers: emit + splice ===\n";
+check('no template: the bare pair',  penumbraDateRangeEmit(null, "'A'", "'B'"), "'A' AND 'B'");
+check('template :from / :to',        penumbraDateRangeEmit('AND d >= :from AND d <= :to', "'A'", "'B'"), "AND d >= 'A' AND d <= 'B'");
+check('template :val = the bare pair', penumbraDateRangeEmit('AND d BETWEEN :val', "'A'", "'B'"), "AND d BETWEEN 'A' AND 'B'");
+check('a token may repeat',          penumbraDateRangeEmit(':from :from :to', 'A', 'B'), 'A A B');
+check('word boundary: :total / :tomorrow / :from_date / :value are NOT tokens',
+      penumbraDateRangeEmit(':total :tomorrow :from_date :value', 'A', 'B'), ':total :tomorrow :from_date :value');
+check('values are data: $1 and \\1 survive', penumbraDateRangeEmit(':from|:to', '$1', '\\1'), '$1|\\1');
+check('TO_DATE wrapping is the author\'s business',
+      penumbraDateRangeEmit("AND d BETWEEN TO_DATE(:from,'DD-MON-RR') AND TO_DATE(:to,'DD-MON-RR')", "'A'", "'B'"),
+      "AND d BETWEEN TO_DATE('A','DD-MON-RR') AND TO_DATE('B','DD-MON-RR')");
+
+check('splice: plain',              penumbraDateRangeSplice('x BETWEEN [T] y', 10, 3, "'A' AND 'B'"), "x BETWEEN 'A' AND 'B' y");
+check("splice: '[T]' loses BOTH author quotes", penumbraDateRangeSplice("x BETWEEN '[T]' y", 11, 3, "'A' AND 'B'"), "x BETWEEN 'A' AND 'B' y");
+check('splice: a quote on ONE side only is left alone', penumbraDateRangeSplice("x = 'a' AND d BETWEEN [T]", 22, 3, 'P'), "x = 'a' AND d BETWEEN P");
+check('splice: tag at offset 0',    penumbraDateRangeSplice('[T] z', 0, 3, 'P'), 'P z');
+
+$rng = array('from' => '01-JUL-25', 'to' => '30-JUN-26');
+check('display form',   penumbraDateRangeDisplay($rng),  '01-JUL-25 to 30-JUN-26');
+check('URL-value form', penumbraDateRangeUrlValue($rng), '01-JUL-25..30-JUN-26');
+check('the URL-value form resolves back to itself',
+      penumbraDateRangeUrlValue(penumbraDateRangeResolve($P, penumbraDateRangeUrlValue($rng))), '01-JUL-25..30-JUN-26');
+
+// ===========================================================================
+echo "\n=== 6. scheduler engine (process_scheduler_prompts, as shipped) ===\n";
+$T = '[PROMPT;type=date-range;name=awd;message=Award date]';
+check('bare BETWEEN',
+      runner_run("SELECT * FROM t WHERE d BETWEEN $T", array('awd' => '01-JUL-25..30-JUN-26'), $shown, $byName),
+      "SELECT * FROM t WHERE d BETWEEN '01-JUL-25' AND '30-JUN-26'");
+check('what is SHOWN reads "A to B", keyed by message', $shown, array('Award date' => '01-JUL-25 to 30-JUN-26'));
+check('the deep link carries "A..B", keyed by name',    $byName, array('awd' => '01-JUL-25..30-JUN-26'));
+
+check("the author's quotes around the tag are consumed",
+      runner_run("WHERE d BETWEEN '$T' AND x = 1", array('awd' => '01-JUL-25..30-JUN-26')),
+      "WHERE d BETWEEN '01-JUL-25' AND '30-JUN-26' AND x = 1");
+
+check('a saved ROLLING answer resolves at run time',
+      runner_run("WHERE d BETWEEN $T", array('awd' => 'first day of last month..last day of last month')),
+      "WHERE d BETWEEN '" . lit(strtotime('first day of last month')) . "' AND '" . lit(strtotime('last day of last month')) . "'");
+
+check('template :from / :to',
+      runner_run('WHERE 1=1 [PROMPT;type=date-range;name=awd;template="AND d >= :from AND d < :to"]', array('awd' => '01-JUL-25..30-JUN-26')),
+      "WHERE 1=1 AND d >= '01-JUL-25' AND d < '30-JUN-26'");
+check('template :val',
+      runner_run('WHERE 1=1 [PROMPT;type=date-range;name=awd;template="AND TRUNC(d) BETWEEN :val"]', array('awd' => '01-JUL-25..30-JUN-26')),
+      "WHERE 1=1 AND TRUNC(d) BETWEEN '01-JUL-25' AND '30-JUN-26'");
+
+check('priority: forcedefault beats the saved answer',
+      runner_run('WHERE d BETWEEN [PROMPT;type=date-range;name=awd;forcedefault=01-JAN-24..31-DEC-24]', array('awd' => '01-JUL-25..30-JUN-26')),
+      "WHERE d BETWEEN '01-JAN-24' AND '31-DEC-24'");
+check('priority: the saved answer beats default',
+      runner_run('WHERE d BETWEEN [PROMPT;type=date-range;name=awd;default=01-JAN-24..31-DEC-24]', array('awd' => '01-JUL-25..30-JUN-26')),
+      "WHERE d BETWEEN '01-JUL-25' AND '30-JUN-26'");
+check('priority: default when there is no answer',
+      runner_run('WHERE d BETWEEN [PROMPT;type=date-range;name=awd;default=01-JAN-24..31-DEC-24]', array()),
+      "WHERE d BETWEEN '01-JAN-24' AND '31-DEC-24'");
+check('label= wins the display key',
+      (function () { runner_run('WHERE d BETWEEN [PROMPT;type=date-range;name=awd;label=Period;message=Award date]', array('awd' => '01-JUL-25..30-JUN-26'), $s, $b); return $s; })(),
+      array('Period' => '01-JUL-25 to 30-JUN-26'));
+
+check_contains('REVERSED range stops the task, naming the prompt',
+      runner_run("WHERE d BETWEEN $T", array('awd' => '30-JUN-26..01-JUL-25')), "REFUSED: Prompt 'Award date': The From date must be on or before the To date.");
+check_contains('ONE date stops the task',
+      runner_run("WHERE d BETWEEN $T", array('awd' => '01-JUL-25')), "REFUSED: Prompt 'Award date': A date range needs both");
+// Every other type substitutes SQL NULL for a missing answer and carries on.
+// Here that would be `BETWEEN NULL` - a syntax error from the database, naming
+// nothing. Both ends are required, so say so.
+check_contains('NO answer stops the task (it is not quietly turned into NULL)',
+      runner_run("WHERE d BETWEEN $T", array()), "REFUSED: Prompt 'Award date': A date range needs both");
+check_contains('noquote is refused for this type',
+      runner_run('WHERE d BETWEEN [PROMPT;type=date-range;name=awd;noquote]', array('awd' => '01-JUL-25..30-JUN-26')), 'REFUSED: ');
+
+check('control prompt (template="") emits nothing...',
+      runner_run('WHERE 1=1 [PROMPT;type=date-range;name=awd;message=Award date;template=""]', array('awd' => '01-JUL-25..30-JUN-26'), $shown, $byName),
+      'WHERE 1=1 ');
+check('...but its answer is still shown', $shown, array('Award date' => '01-JUL-25 to 30-JUN-26'));
+check('an UNANSWERED control prompt is not an error',
+      runner_run('WHERE 1=1 [PROMPT;type=date-range;name=awd;template=""]', array()), 'WHERE 1=1 ');
+
+check('resultif not met: "AND col BETWEEN" goes with the tag',
+      runner_run('SELECT 1 FROM t WHERE x = 1 AND d BETWEEN [PROMPT;type=date-range;name=awd;resultif=mode:Y]', array('mode' => 'N', 'awd' => '01-JUL-25..30-JUN-26')),
+      'SELECT 1 FROM t WHERE x = 1');
+
+check('two range prompts + a text prompt in one statement (offsets survive the quote-eating splice)',
+      runner_run("WHERE a BETWEEN '[PROMPT;type=date-range;name=r1]' AND p = [PROMPT;type=text;name=t1] AND b BETWEEN '[PROMPT;type=date-range;name=r2]'",
+                 array('r1' => '01-JAN-24..31-DEC-24', 't1' => "O'Neil", 'r2' => '01-JUL-25..30-JUN-26')),
+      "WHERE a BETWEEN '01-JAN-24' AND '31-DEC-24' AND p = 'O''Neil' AND b BETWEEN '01-JUL-25' AND '30-JUN-26'");
+
+$GLOBALS['DR_LOOKUP'] = array('answer' => array('min' => '1998-01-03', 'max' => '2026-09-14'), 'calls' => array());
+check('min..max with autofill=, the {name} token filled from the task answers',
+      runner_run("WHERE d BETWEEN [PROMPT;type=date-range;name=awd;forcedefault=min..max;autofill=STATS_V2.LOG_DATE|PI_NAME = '{pi}']", array('pi' => 'Lee, Sam')),
+      "WHERE d BETWEEN '03-JAN-98' AND '14-SEP-26'");
+check('...the lookup saw the substituted condition',
+      isset($GLOBALS['DR_LOOKUP']['calls'][0]) ? $GLOBALS['DR_LOOKUP']['calls'][0][2] : null, "PI_NAME = 'Lee, Sam'");
+
+echo "\n--- CONTROLS: the types that were already here are untouched ---\n";
+check('type=date still emits one quoted literal',
+      runner_run('WHERE d > [PROMPT;type=date;name=x;default=01-JUL-22]', array()), "WHERE d > '01-JUL-22'");
+check('type=date rolling default still resolves',
+      runner_run('WHERE d > [PROMPT;type=date;name=x;forcedefault=TODAY-30]', array()), "WHERE d > '" . lit(strtotime('-30 days')) . "'");
+$GLOBALS['DR_LOOKUP'] = array('answer' => array('min' => '1998-01-03', 'max' => '2026-09-14'), 'calls' => array());
+check('type=date min keyword still works through the HOISTED lookup',
+      runner_run("WHERE d >= [PROMPT;type=date;name=x;forcedefault=min;autofill=STATS_V2.LOG_DATE|PI_NAME = '{pi}']", array('pi' => 'Lee, Sam')),
+      "WHERE d >= '03-JAN-98'");
+check('...and its {name} token still resolves',
+      isset($GLOBALS['DR_LOOKUP']['calls'][0]) ? $GLOBALS['DR_LOOKUP']['calls'][0][2] : null, "PI_NAME = 'Lee, Sam'");
+check('type=multi-select IN list is untouched',
+      runner_run('WHERE c IN [PROMPT;type=multi-select;name=m]', array('m' => 'A,B')), "WHERE c IN ('A', 'B')");
+check('a ".." inside a TEXT answer is just text',
+      runner_run('WHERE c = [PROMPT;type=text;name=t]', array('t' => 'a..b')), "WHERE c = 'a..b'");
+check('an unanswered TEXT prompt still becomes NULL (the old rule, unchanged)',
+      runner_run('WHERE c = [PROMPT;type=text;name=t]', array()), 'WHERE c = NULL');
+
+// ===========================================================================
+echo "\n=== 7. ?json=1 engine (index.php's branch, as shipped) ===\n";
+check('the fragment carries the refusals we expect to have redirected', $exitCount, 2);
+check('bare BETWEEN, answer from the URL',
+      json_run("SELECT * FROM t WHERE d BETWEEN $T", array('awd' => '01-JUL-25..30-JUN-26')),
+      "SELECT * FROM t WHERE d BETWEEN '01-JUL-25' AND '30-JUN-26'");
+check('a non-range prompt falls through to the generic path',
+      json_run('WHERE d > [PROMPT;type=date;name=x;default=01-JUL-22]', array()), 'WHERE d > <<not-a-date-range>>');
+// index.php never strips the quotes off template="..." for the other types; the
+// browser and the runner do. For this type all three must agree.
+check('template quotes are stripped here too',
+      json_run('WHERE 1=1 [PROMPT;type=date-range;name=awd;template="AND d >= :from AND d < :to"]', array('awd' => '01-JUL-25..30-JUN-26')),
+      "WHERE 1=1 AND d >= '01-JUL-25' AND d < '30-JUN-26'");
+check_contains('a refusal is a JSON error that names the prompt and how to fix the URL',
+      json_run("WHERE d BETWEEN $T", array('awd' => '30-JUN-26..01-JUL-25')),
+      "REFUSED: Prompt 'Award date': The From date must be on or before the To date. Supply it in the URL as &awd=<from>..<to>.");
+check_contains('no value at all is a refusal, not an empty literal',
+      json_run("WHERE d BETWEEN $T", array()), "REFUSED: Prompt 'Award date': A date range needs both");
+check_contains('noquote is refused',
+      json_run('WHERE d BETWEEN [PROMPT;type=date-range;name=awd;noquote]', array('awd' => '01-JUL-25..30-JUN-26')), 'REFUSED: ');
+
+// ===========================================================================
+echo "\n=== 8. PARITY: same tag + same answer => the same SQL from both engines ===\n";
+$parity = array(
+    array('bare',               "WHERE d BETWEEN $T", '01-JUL-25..30-JUN-26'),
+    array('quoted tag',         "WHERE d BETWEEN '$T' AND x = 1", '01-JUL-25..30-JUN-26'),
+    array('rolling phrases',    "WHERE d BETWEEN $T", 'first day of last month..last day of last month'),
+    array('keyword dates',      "WHERE d BETWEEN $T", 'TODAY-30..TODAY'),
+    array('fiscal year',        "WHERE d BETWEEN $T", 'first day of last fiscal year..last day of last fiscal year'),
+    array('quarter',            "WHERE d BETWEEN $T", 'first day of last quarter..last day of last quarter'),
+    array('calendar year',      "WHERE d BETWEEN $T", 'first day of this year..last day of this year'),
+    array('ISO + slash input',  "WHERE d BETWEEN $T", '2025-07-01..6/30/2026'),
+    array('out-of-window year', "WHERE d BETWEEN $T", '01-JAN-1940..01-JAN-2055'),
+    array('template from/to',   'WHERE 1=1 [PROMPT;type=date-range;name=awd;message=Award date;template="AND d >= :from AND d <= :to"]', '01-JUL-25..30-JUN-26'),
+    array('template val',       'WHERE 1=1 [PROMPT;type=date-range;name=awd;message=Award date;template="AND d BETWEEN :val"]', '01-JUL-25..30-JUN-26'),
+    array('control prompt',     'WHERE 1=1 [PROMPT;type=date-range;name=awd;message=Award date;template=""]', '01-JUL-25..30-JUN-26'),
+    array('REFUSED: reversed',  "WHERE d BETWEEN $T", '30-JUN-26..01-JUL-25'),
+    array('REFUSED: one date',  "WHERE d BETWEEN $T", '01-JUL-25'),
+    array('REFUSED: not a date', "WHERE d BETWEEN $T", '01-JUL-25..whenever'),
+);
+// The grounds a refusal is made on. Each engine words a refusal its own way (an
+// exception, a JSON body, a browser error); this substring is in all of them.
+$refusalReason = array(
+    'REFUSED: reversed'   => 'The From date must be on or before the To date.',
+    'REFUSED: one date'   => 'A date range needs both a From and a To date',
+    'REFUSED: not a date' => "'whenever' is not a date",
+);
+$fixture = array('today' => lit(time()), 'cases' => array());
+foreach ($parity as $c) {
+    $a = runner_run($c[1], array('awd' => $c[2]));
+    $b = json_run($c[1], array('awd' => $c[2]));
+    $isRefusal = isset($refusalReason[$c[0]]);
+    // What the BROWSER engine must reproduce (daterange_browser_tests.js, part 4).
+    $fixture['cases'][] = array(
+        'label'   => $c[0],
+        'sql'     => $c[1],
+        'answer'  => $c[2],
+        'refused' => $isRefusal,
+        'reason'  => $isRefusal ? $refusalReason[$c[0]] : null,
+        'php_sql' => $isRefusal ? null : $a,
+    );
+    if ($isRefusal) {
+        check_contains('the scheduler refuses on the stated grounds: ' . $c[0], $a, $refusalReason[$c[0]]);
+    }
+    // A refusal is worded per engine (one is an exception, one a JSON body with a
+    // URL hint); what must agree is THAT both refused, and on what grounds.
+    if (strpos($a, 'REFUSED: ') === 0 || strpos($b, 'REFUSED: ') === 0) {
+        $norm = function ($s) { return preg_replace('/ Supply it in the URL as .*$/', '', $s); };
+        check('parity (refusal): ' . $c[0], $norm($b), $norm($a));
+    } else {
+        check('parity: ' . $c[0], $b, $a);
+    }
+}
+check('parity: the out-of-window case really did keep 4-digit years',
+      runner_run("WHERE d BETWEEN $T", array('awd' => '01-JAN-1940..01-JAN-2055')), "WHERE d BETWEEN '01-JAN-1940' AND '01-JAN-2055'");
+
+// ===========================================================================
+echo "\n=== 12. data(promptN) is positional: a range takes TWO slots, From then To (2026-09-24) ===\n";
+$T12 = '[PROMPT;type=date-range;name=awd;message=Award dates;forcedefault=01-JUL-25..30-JUN-26]';
+runner_run('SELECT 1 FROM t WHERE d BETWEEN ' . $T12, array(), $s12, $b12, $l12);
+check('list: a range is two slots', $l12, array('01-JUL-25', '30-JUN-26'));
+check('map: still ONE pill, "A to B"', $s12, array('Award dates' => '01-JUL-25 to 30-JUN-26'));
+runner_run('SELECT 1 FROM t WHERE d BETWEEN ' . $T12 . ' UNION SELECT 1 FROM u WHERE e BETWEEN ' . $T12, array(), $s12, $b12, $l12);
+check('list: the same tag written twice is ONE prompt - two slots, not four', $l12, array('01-JUL-25', '30-JUN-26'));
+runner_run('SELECT 1 FROM t WHERE c = [PROMPT;type=text;name=x] AND d BETWEEN ' . $T12 . ' AND e = [PROMPT;type=text;name=y]', array('x' => 'A', 'y' => 'B'), $s12, $b12, $l12);
+check('list: SQL order with the range in the middle', $l12, array('A', '01-JUL-25', '30-JUN-26', 'B'));
+runner_run('SELECT 1 FROM t WHERE c = [PROMPT;type=text;name=x] AND e = [PROMPT;type=text;name=x]', array('x' => 'A'), $s12, $b12, $l12);
+check('list: a repeated text tag is one slot', $l12, array('A'));
+runner_run('SELECT 1 FROM t WHERE c = [PROMPT;type=text;name=x;message=First] AND e = [PROMPT;type=text;name=y;message=First]', array('x' => 'A', 'y' => 'B'), $s12, $b12, $l12);
+check('list: two DIFFERENT tags with one label are two slots (the map folds them)', $l12, array('A', 'B'));
+// section= is display only, and the browser's answer key leaves it out: copies
+// that differ ONLY in section= are one prompt there, so one slot here too
+// (2026-09-24 - they were two here, shifting every later data(promptN)).
+runner_run('SELECT 1 FROM t WHERE c = [PROMPT;type=text;name=x] AND e = [PROMPT;type=text;name=x;section=Dates] AND f = [PROMPT;type=text;name=y]', array('x' => 'A', 'y' => 'B'), $s12, $b12, $l12);
+check('list: copies differing ONLY in section= are one slot (the later copy names it)', $l12, array('A', 'B'));
+runner_run('SELECT 1 FROM t WHERE c = [PROMPT;type=text;section=Dates;name=x] AND e = [PROMPT;type=text;name=x] AND f = [PROMPT;type=text;name=y]', array('x' => 'A', 'y' => 'B'), $s12, $b12, $l12);
+check('list: ...and when the FIRST copy names it', $l12, array('A', 'B'));
+runner_run('SELECT 1 FROM t WHERE c = [PROMPT;type=text;name=x;section=A] AND e = [PROMPT;type=text;name=x;subsection=B] AND f = [PROMPT;type=text;name=y]', array('x' => 'A', 'y' => 'B'), $s12, $b12, $l12);
+check('list: CONTROL - a look-alike key (subsection=) is a different tag, two slots', $l12, array('A', 'A', 'B'));
+runner_run('SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=p;options=y,n;template=""] AND c = [PROMPT;type=text;name=x;resultif=p:y]', array('p' => 'n', 'x' => 'v'), $s12, $b12, $l12);
+check('list: a resultif-dropped prompt has no slot', $l12, array('n'));
+runner_run('SELECT 1 FROM t WHERE c = [PROMPT;type=text;name=x]', array(), $s12, $b12, $l12);
+check('list: an unanswered prompt keeps its slot', $l12, array(null));
+
+// --control: ONE deliberately false assertion. The run must end "FAIL: 1" / RED;
+// if it ends green, this file has stopped being able to report a failure.
+if (in_array('--control', $argv, true)) {
+    echo "\n=== CONTROL (must FAIL) ===\n";
+    check('CONTROL: a reversed range is accepted (deliberately false)',
+          isset(penumbraDateRangeResolve($P, '30-JUN-26..01-JUL-25')['error']), false);
+}
+
+// Hand the browser suite the cases above, as the two PHP engines answered them.
+// Written only when asked for (run.ps1 passes a path) and only from a GREEN run:
+// a fixture from a red PHP run would teach the browser suite the wrong answers.
+if (isset($argv[2]) && $argv[2] !== '' && $argv[2] !== '--control') {
+    if ($fail === 0 || in_array('--control', $argv, true)) {
+        file_put_contents($argv[2], 'window.__fixture = ' . json_encode($fixture, JSON_UNESCAPED_SLASHES) . ';');
+        echo "\nfixture: " . count($fixture['cases']) . " cases written for the browser suite\n";
+    } else {
+        @unlink($argv[2]);
+        echo "\nfixture: NOT written (this run is red)\n";
+    }
+}
+
+echo "\nPASS: $pass   FAIL: $fail\n";
+echo 'RESULT: ' . ($fail === 0 ? 'GREEN' : 'RED') . "\n";
+exit($fail === 0 ? 0 : 1);

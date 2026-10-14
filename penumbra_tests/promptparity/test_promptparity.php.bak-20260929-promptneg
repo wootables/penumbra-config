@@ -1,0 +1,248 @@
+<?php
+/**
+ * test_promptparity.php <app dir> <corpus.txt> [--control]
+ *
+ * The two PHP prompt engines, as shipped, against the shared corpus:
+ *   - process_scheduler_prompts() is lifted out of schedule_runner.php BY NAME
+ *     (never require that file: it opens Oracle and sends mail);
+ *   - index.php's ?json=1 prompt passes are top-level code, so they are CUT OUT
+ *     by their first and last comment lines and compiled into a function. One
+ *     textual change: `exit;` becomes a throw, so a refusal can be reported
+ *     instead of ending the run;
+ *   - the shared helpers are lifted out of shared_logic.php by name (never
+ *     require it either: it opens the database on include).
+ * Nothing here is a pasted copy of the code under test.
+ *
+ * <app dir> must hold shared_logic.php, schedule_runner.php, index.php and
+ * penumbra_search.php - run.ps1 assembles it (stage files, live for the rest).
+ */
+date_default_timezone_set('America/New_York');   // php -n drops date.timezone
+ob_start();                                      // a CLI header() after output warns INTO captured text
+
+$APP     = rtrim($argv[1], '/' . chr(92));
+$CORPUS  = $argv[2];
+$CONTROL = in_array('--control', $argv, true);
+
+$pass = 0; $fail = 0; $lines = array();
+function check($label, $got, $want) {
+    global $pass, $fail, $lines;
+    if ($got === $want) { $pass++; $lines[] = '  ok   ' . $label; return; }
+    $fail++;
+    $lines[] = '  FAIL ' . $label;
+    $lines[] = '     got : ' . var_export($got, true);
+    $lines[] = '     want: ' . var_export($want, true);
+}
+function section($t) { global $lines; $lines[] = ''; $lines[] = '--- ' . $t; }
+function finish() {
+    global $pass, $fail, $lines;
+    while (ob_get_level() > 0) { ob_end_clean(); }
+    echo implode("\n", $lines), "\n\nPASS: $pass   FAIL: $fail\n";
+    exit($fail === 0 ? 0 : 1);
+}
+
+function lift($file, array $names) {
+    $code = file_get_contents($file);
+    if ($code === false) { fwrite(STDERR, "cannot read $file\n"); exit(2); }
+    $want = array_flip($names);
+    $tokens = token_get_all($code);
+    $n = count($tokens); $out = ''; $found = array(); $depth = 0;
+    for ($i = 0; $i < $n; $i++) {
+        $t = $tokens[$i];
+        if ($depth === 0 && is_array($t) && $t[0] === T_FUNCTION) {
+            $k = $i + 1;
+            while ($k < $n && is_array($tokens[$k]) && in_array($tokens[$k][0], array(T_WHITESPACE, T_COMMENT, T_DOC_COMMENT), true)) { $k++; }
+            if ($k < $n && is_array($tokens[$k]) && $tokens[$k][0] === T_STRING) {
+                $fname = $tokens[$k][1]; $buf = ''; $d = 0; $opened = false;
+                for ($j = $i; $j < $n; $j++) {
+                    $tt = $tokens[$j]; $txt = is_array($tt) ? $tt[1] : $tt; $buf .= $txt;
+                    if (is_array($tt) && ($tt[0] === T_CURLY_OPEN || $tt[0] === T_DOLLAR_OPEN_CURLY_BRACES)) { $d++; }
+                    elseif ($txt === '{') { $d++; $opened = true; }
+                    elseif ($txt === '}') { $d--; if ($opened && $d === 0) { break; } }
+                }
+                if (isset($want[$fname])) { $out .= "if (!function_exists('$fname')) {\n$buf\n}\n"; $found[$fname] = true; }
+                $i = $j; continue;
+            }
+        }
+        if (is_array($t)) { if ($t[0] === T_CURLY_OPEN || $t[0] === T_DOLLAR_OPEN_CURLY_BRACES) { $depth++; } }
+        elseif ($t === '{') { $depth++; } elseif ($t === '}') { $depth--; }
+    }
+    foreach ($names as $nm) { if (!isset($found[$nm])) { fwrite(STDERR, "lift: function $nm not found in $file\n"); exit(2); } }
+    return $out;
+}
+
+// ---- stubs for what the lifted code calls but this test has no business running
+function log_scheduler($m) {}
+function penumbraPromptDateRange($t, $c, $cond = '') { return null; }   // the MIN/MAX lookup: a database call
+class EngineExit extends Exception {}
+
+// ---- the code under test
+$F_SHARED = $APP . '/shared_logic.php';
+$F_RUNNER = $APP . '/schedule_runner.php';
+$F_INDEX  = $APP . '/index.php';
+eval(lift($F_SHARED, array(
+    'extractPromptTags', 'resolveParamDateExpression', 'penumbraApplyDateRangeKeyword',
+    'penumbraDateRangeIsType', 'penumbraDateRangeSplit', 'penumbraDateRangeParseEnd', 'penumbraDateRangeFormatEnd',
+    'penumbraDateRangeResolve', 'penumbraDateRangeEmit', 'penumbraDateRangeDisplay', 'penumbraDateRangeUrlValue',
+    'penumbraDateRangeSplice',
+    'penumbraPromptUnquoteTemplate', 'penumbraPromptSplice', 'penumbraPromptSqlBefore', 'penumbraPromptFollowsBareIn',
+    'penumbraNoQuoteTypeIsAllowed', 'penumbraNoQuoteTypeError', 'penumbraNoQuoteValueIsAllowed', 'penumbraNoQuoteValueError',
+    'penumbraResolveMeInPromptValue', 'penumbraUnknownMeVarsMessage',
+)));
+require_once $APP . '/penumbra_search.php';     // _sr_resolve_relative_date(): pure, no I/O
+eval(lift($F_RUNNER, array('process_scheduler_prompts', 'penumbra_parse_per_option_templates',
+    'penumbra_split_options_value', 'penumbra_find_unquoted_double_colon', 'penumbra_find_unquoted_colon')));
+
+$idx = str_replace("\r\n", "\n", (string)file_get_contents($F_INDEX));
+$s = strpos($idx, "        // Pass 1: Build an 'Answer Map'");
+$e = strpos($idx, "        // --- 1.5 SQL-CONTEXT me() SUBSTITUTION");
+if ($s === false || $e === false || $e <= $s) { fwrite(STDERR, "could not locate index.php's prompt passes\n"); exit(2); }
+$passes = str_replace('exit;', 'throw new EngineExit(ob_get_clean());', substr($idx, $s, $e - $s));
+$GLOBALS['__meRe'] = '/\bme\(\s*[A-Za-z0-9_]*\s*\)/i';
+eval('function json_engine($sql, $get) {
+    $_GET = $get;
+    $jsonMeMap = null;
+    $jsonMeTokenRe = $GLOBALS["__meRe"];
+    ob_start();
+' . $passes . '
+    ob_end_clean();
+    return $sql;
+}');
+
+function run_json($sql, $get) {
+    $level = ob_get_level();
+    try { $o = json_engine($sql, $get); }
+    catch (EngineExit $x) { $j = json_decode($x->getMessage(), true); $o = 'REFUSED: ' . (is_array($j) && isset($j['error']) ? $j['error'] : $x->getMessage()); }
+    catch (Throwable $x) { $o = 'THREW: ' . $x->getMessage(); }
+    while (ob_get_level() > $level) { ob_end_clean(); }
+    return $o;
+}
+function run_runner($sql, $answers) {
+    $a = array(); $b = array();
+    try { return process_scheduler_prompts($sql, $answers, $a, $b, array()); }
+    catch (Throwable $x) { return 'REFUSED: ' . $x->getMessage(); }
+}
+
+// ---- the corpus (format: see its own header)
+function load_corpus($file) {
+    $text = file_get_contents($file);
+    if ($text === false) { fwrite(STDERR, "cannot read $file\n"); exit(2); }
+    $cases = array(); $group = ''; $cur = null;
+    foreach (preg_split('/\r?\n/', $text) as $line) {
+        if (trim($line) === '' || $line[0] === '#') { continue; }
+        if (!preg_match('/^([a-z]+):(.*)$/', $line, $m)) { fwrite(STDERR, "corpus: cannot read this line: $line\n"); exit(2); }
+        $k = $m[1]; $v = trim($m[2]);
+        if ($k === 'group') { $group = $v; continue; }
+        if ($k === 'case') {
+            if ($cur !== null) { $cases[] = $cur; }
+            $cur = array('group' => $group, 'label' => $v, 'sql' => null, 'answers' => array(), 'mode' => '', 'expect' => array());
+            continue;
+        }
+        if ($cur === null) { fwrite(STDERR, "corpus: '$k:' before any case:\n"); exit(2); }
+        if ($k === 'sql') { $cur['sql'] = str_replace('\n', "\n", $v); }
+        elseif ($k === 'ans') {
+            foreach (($v === '' ? array() : explode('&', $v)) as $pair) {
+                $eq = strpos($pair, '=');
+                $cur['answers'][substr($pair, 0, $eq)] = substr($pair, $eq + 1);
+            }
+        }
+        elseif ($k === 'mode') { $cur['mode'] = $v; }
+        elseif ($k === 'all') { $cur['expect'] = array('browser' => $v, 'runner' => $v, 'json' => $v); }
+        elseif ($k === 'browser' || $k === 'runner' || $k === 'json') { $cur['expect'][$k] = $v; }
+        else { fwrite(STDERR, "corpus: unknown key '$k:'\n"); exit(2); }
+    }
+    if ($cur !== null) { $cases[] = $cur; }
+    foreach ($cases as $c) {
+        if ($c['sql'] === null || count($c['expect']) !== 3) { fwrite(STDERR, "corpus: case '" . $c['label'] . "' needs sql: and an expectation for all three engines\n"); exit(2); }
+    }
+    return $cases;
+}
+
+// =============================================================================
+section('shared helpers (shared_logic.php)');
+
+check('unquote: "x"',                       penumbraPromptUnquoteTemplate('"AND c = :val"'), 'AND c = :val');
+check("unquote: 'x'",                       penumbraPromptUnquoteTemplate("'AND c = :val'"), 'AND c = :val');
+check('unquote: "" is the EMPTY template',  penumbraPromptUnquoteTemplate('""'), '');
+check("unquote: '' is the EMPTY template",  penumbraPromptUnquoteTemplate("''"), '');
+check('unquote: bare text is left alone',   penumbraPromptUnquoteTemplate('AND c = :val'), 'AND c = :val');
+check('unquote: a MISMATCHED pair is left alone', penumbraPromptUnquoteTemplate('"AND c = :val' . "'"), '"AND c = :val' . "'");
+check('unquote: one pair only',             penumbraPromptUnquoteTemplate("\"'x'\""), "'x'");
+check('unquote: a lone quote is not a pair', penumbraPromptUnquoteTemplate('"'), '"');
+check('unquote: quotes INSIDE stay',        penumbraPromptUnquoteTemplate("AND c LIKE '%' || :val"), "AND c LIKE '%' || :val");
+
+check('splice: plain',                          penumbraPromptSplice('c = [T] AND z', 4, 3, "'v'"), "c = 'v' AND z");
+check("splice: '[T]' loses BOTH author quotes", penumbraPromptSplice("c = '[T]' AND z", 5, 3, "'v'"), "c = 'v' AND z");
+check('splice: a quote on ONE side only is left alone', penumbraPromptSplice("c = 'x' AND e = [T]", 16, 3, "'v'"), "c = 'x' AND e = 'v'");
+check('splice: tag at offset 0',                penumbraPromptSplice('[T] z', 0, 3, 'P'), 'P z');
+check('splice: tag at the very end',            penumbraPromptSplice("c = '[T]'", 5, 3, "'v'"), "c = 'v'");
+check('splice: noquote KEEPS the pair',         penumbraPromptSplice("c = '[T]' AND z", 5, 3, 'a', true), "c = 'a' AND z");
+check('splice: the date-range twin still consumes the pair', penumbraDateRangeSplice("d BETWEEN '[T]' y", 11, 3, "'A' AND 'B'"), "d BETWEEN 'A' AND 'B' y");
+
+check("sqlBefore: a pair around the tag - its opening quote is gone", penumbraPromptSqlBefore("c IN ('[T]')", 7, 3), 'c IN (');
+check('sqlBefore: no pair',                     penumbraPromptSqlBefore('c IN ([T])', 6, 3), 'c IN (');
+check('sqlBefore: a quote in front only',       penumbraPromptSqlBefore("c = 'x' || '[T] z", 12, 3), "c = 'x' || '");
+check('sqlBefore: noquote - the pair stays, so it is still in front', penumbraPromptSqlBefore("c = '[T]'", 5, 3, true), "c = '");
+check('sqlBefore: offset 0',                    penumbraPromptSqlBefore('[T] z', 0, 3), '');
+
+check('bareIn: c IN',                 penumbraPromptFollowsBareIn('WHERE c IN '), true);
+check('bareIn: c NOT IN, no space',   penumbraPromptFollowsBareIn('WHERE c NOT IN'), true);
+check('bareIn: lower case + newline', penumbraPromptFollowsBareIn("WHERE c in\n"), true);
+check('bareIn: UPPER(c) IN',          penumbraPromptFollowsBareIn('WHERE UPPER(c) IN '), true);
+check('bareIn: IN ( - already open',  penumbraPromptFollowsBareIn('WHERE c IN ('), false);
+check('bareIn: a word ENDING in "in"', penumbraPromptFollowsBareIn('FROM a JOIN '), false);
+check('bareIn: =',                    penumbraPromptFollowsBareIn('WHERE c = '), false);
+check('bareIn: nothing in front',     penumbraPromptFollowsBareIn(''), false);
+
+// =============================================================================
+$cases = load_corpus($CORPUS);
+$group = null;
+foreach ($cases as $c) {
+    if ($c['group'] !== $group) { $group = $c['group']; section('corpus: ' . $group); }
+    check('scheduler | ' . $c['label'], run_runner($c['sql'], $c['answers']), $c['expect']['runner']);
+    check('?json=1   | ' . $c['label'], run_json($c['sql'], $c['answers']),   $c['expect']['json']);
+}
+
+// =============================================================================
+section('engine wiring the corpus format cannot say');
+
+// A task stores a multi-select answer as an ARRAY; the scheduler joins it itself.
+check('scheduler | an ARRAY answer straight after IN',
+    run_runner('SELECT 1 FROM t WHERE c IN [PROMPT;type=multi-select;name=m;options=A,B,C]', array('m' => array('A', 'B'))),
+    "SELECT 1 FROM t WHERE c IN ('A', 'B')");
+check('scheduler | an ARRAY of ONE straight after IN',
+    run_runner('SELECT 1 FROM t WHERE c IN [PROMPT;type=multi-select;name=m;options=A,B,C]', array('m' => array('A'))),
+    "SELECT 1 FROM t WHERE c IN ('A')");
+// "Wilson, Alyson" in a TEXT prompt is one value - the quote rule must not turn it into a list.
+check('scheduler | a comma in a TEXT answer stays one value, quoted tag or not',
+    run_runner("SELECT 1 FROM t WHERE c = '[PROMPT;type=text;name=x]'", array('x' => 'Wilson, Alyson')),
+    "SELECT 1 FROM t WHERE c = 'Wilson, Alyson'");
+check('?json=1   | a comma in a TEXT answer stays one value, quoted tag or not',
+    run_json("SELECT 1 FROM t WHERE c = '[PROMPT;type=text;name=x]'", array('x' => 'Wilson, Alyson')),
+    "SELECT 1 FROM t WHERE c = 'Wilson, Alyson'");
+// noquote on a type that may not use it is still refused - quotes around the tag change nothing.
+check('scheduler | noquote on type=text is still refused',
+    substr(run_runner("SELECT 1 FROM t WHERE c = '[PROMPT;type=text;name=x;noquote]'", array('x' => 'v')), 0, 8), 'REFUSED:');
+check('?json=1   | noquote on type=text is still refused',
+    substr(run_json("SELECT 1 FROM t WHERE c = '[PROMPT;type=text;name=x;noquote]'", array('x' => 'v')), 0, 8), 'REFUSED:');
+
+// NO ANSWER + quotes around the tag: DELIBERATELY left byte for byte as it was before
+// 2026-09-21. The browser strips the pair and binds a real NULL; the PHP engines keep
+// the pair around their "no answer" literal. That is wrong, but it is VALID SQL that a
+// scheduled task or a tile may be living on (task #50 walks this path every morning),
+// so it changes only after the saved reports have been read. These pins are here so
+// the quote rule cannot reach this path by accident.
+check("scheduler | no answer, quoted tag: still the string 'NULL' (pinned as-is, README 6)",
+    run_runner("SELECT 1 FROM t WHERE c = '[PROMPT;type=text;name=x]' AND z = 1", array()),
+    "SELECT 1 FROM t WHERE c = 'NULL' AND z = 1");
+check("?json=1   | no answer, quoted tag: still '''' (pinned as-is, README 6)",
+    run_json("SELECT 1 FROM t WHERE c = '[PROMPT;type=text;name=x]' AND z = 1", array()),
+    "SELECT 1 FROM t WHERE c = '''' AND z = 1");
+check('scheduler | no answer, bare tag: NULL',
+    run_runner('SELECT 1 FROM t WHERE c = [PROMPT;type=text;name=x] AND z = 1', array()),
+    'SELECT 1 FROM t WHERE c = NULL AND z = 1');
+check("?json=1   | no answer, bare tag: ''",
+    run_json('SELECT 1 FROM t WHERE c = [PROMPT;type=text;name=x] AND z = 1', array()),
+    "SELECT 1 FROM t WHERE c = '' AND z = 1");
+
+if ($CONTROL) { section('control'); check('CONTROL (deliberately false - must FAIL)', 'a', 'b'); }
+finish();

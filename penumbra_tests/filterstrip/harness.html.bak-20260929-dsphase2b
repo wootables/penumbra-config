@@ -1,0 +1,436 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>filter strip harness</title>
+<!-- The real stylesheet (copied by run.ps1), so the fold, the label default and
+     the pressed glyph are asserted on COMPUTED styles, not on class names. -->
+<link rel="stylesheet" href="main.css"></head>
+<body>
+<!-- Minimal DOM, the pivot_trigger scaffold: main.js binds several builder
+     elements DIRECTLY at ready time, so they must exist before it loads. The
+     strip reads its state off #tableSearch and the two view containers, and
+     its columns off #resultsTable's columnNameToOriginalIndex data. -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<table id="resultsTable"><thead id="tableHeader"><tr>
+  <th data-colname="#">#</th><th data-colname="COLLEGE">COLLEGE</th><th data-colname="FY">FY</th>
+  <th data-colname="AMOUNT">AMOUNT</th><th data-colname="STATUS">STATUS</th><th data-colname="% CHANGE">% CHANGE</th>
+</tr></thead><tbody></tbody></table>
+<!-- The real #loadingOverlay markup (as in ..\switchmotion): _pnbMotionBusy()
+     reads its visibility, and the chip flow's "second click is dropped"
+     contract depends on it. Hidden by default because this page loads no CSS
+     (main.css hides it); showLoading() shows it, hideLoading() hides it. -->
+<div id="loadingOverlay" style="display:none">
+  <div class="loader"></div>
+  <p>Executing Query, Please Wait...</p>
+  <div style="display: flex; align-items: center; gap: 20px;">
+    <p id="execution-timer" style="font-size: 1.5em; margin: 0; font-weight: bold;"></p>
+    <button id="stopQueryBtn">Stop</button>
+  </div>
+  <div id="loadingTip" aria-live="polite"></div>
+</div>
+<div id="errorBox"></div>
+<input id="tableSearch" value="">
+<span id="resultCount"></span>
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="snapshotComparisonContainer" style="display:none"></div>
+<div id="pivotLightbox" style="display:none">
+  <div id="pivot-source-columns"></div>
+  <div id="pivot-rows"></div><div id="pivot-cols"></div><div id="pivot-vals"></div>
+  <select id="pivot-aggregation-selector"><option value="">-</option><option value="sum">sum</option></select>
+  <table><tbody id="pivot-agg-table-body"></tbody></table>
+  <select id="pivot-rows-layout-select"><option value="nested">nested</option><option value="nested-static">nested-static</option><option value="flat">flat</option></select>
+  <select id="pivot-cols-layout-select"><option value="nested">nested</option><option value="flat">flat</option></select>
+  <select id="pivot-sort-order"><option value="asc">asc</option><option value="desc">desc</option></select>
+  <input id="pivot-sticky-cols" value="3">
+  <input type="checkbox" id="pivot-row-total-override-toggle">
+  <div id="pivot-row-total-override-container" style="display:none"><div id="pivot-row-total-slots"></div><div id="pivot-row-total-tokens"></div></div>
+  <select id="pivot-rank-dir"><option value="none">none</option><option value="top">top</option><option value="bottom">bottom</option></select>
+  <input id="pivot-rank-n" value="10"><select id="pivot-rank-agg"><option value="sum">sum</option><option value="count">count</option></select>
+  <select id="pivot-rank-scope"><option value="">Overall</option></select>
+  <input type="checkbox" id="pivot-rank-other" checked><label id="pivot-rank-other-label"></label>
+  <input type="checkbox" id="pivot-no-breakdown"><input type="checkbox" id="pivot-start-expanded">
+  <select id="pivotPresetSelect"><option value=""></option></select><button id="pivotDeletePresetBtn"></button><input type="checkbox" id="pivotAutoRunPreset">
+  <button id="generatePivotBtn">Generate</button>
+  <select id="pivotSnippetTargetSelect" style="display: none;"></select>
+  <button id="updatePivotSnippetBtn" type="button" style="display: none;">&#x27F3; Update Snippet</button>
+  <button id="copyPivotSnippetBtn">Snippet</button>
+  <button id="pivotSavePresetBtn"></button>
+</div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  // Same boot stubs as the pivot_trigger / parity harnesses.
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); };
+  window.__clip = null;
+  if (!navigator.clipboard) { try { Object.defineProperty(navigator, 'clipboard', { value: {}, configurable: true }); } catch (e) {} }
+  try { navigator.clipboard.writeText = function (s) { window.__clip = s; return Promise.resolve(); }; } catch (e) {}
+</script>
+<script src="main_patched.js"></script>
+<script>
+(function () {
+  function report(txt) { document.getElementById('out').textContent = txt; }
+  var results = [];
+  function assert(name, cond, detail) { results.push({ name: name, pass: !!cond, detail: detail === undefined ? '' : String(detail) }); }
+  function eq(name, got, want) { assert(name, JSON.stringify(got) === JSON.stringify(want), 'got ' + JSON.stringify(got) + ' want ' + JSON.stringify(want)); }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function finish() { report('RESULTS_JSON:' + JSON.stringify({ pageErrors: window.__errors.slice(0, 6), results: results })); }
+
+  var COLS = ['#', 'COLLEGE', 'FY', 'AMOUNT', 'STATUS', '% CHANGE'];
+  function row(n, college, fy, amount, status, pct) {
+    var m = new Map();
+    m.set('#', String(n)); m.set('COLLEGE', college); m.set('FY', fy); m.set('AMOUNT', amount); m.set('STATUS', status); m.set('% CHANGE', pct);
+    return m;
+  }
+  // 13 rows. COLLEGE: Eng 6 (one 'ENG', one @@HTML-wrapped), Sci 3, Ag 2, CHASS 1,
+  // one blank. FY: 2025 x7, 2024 x4, 2023 x2. STATUS: Active 8, Closed 3, Pending 2.
+  function fixture() {
+    return [
+      row(1, 'Eng', '2025', '100', 'Active', '5'),
+      row(2, 'Eng', '2025', '250', 'Closed', '5'),
+      row(3, 'Eng', '2024', '50', 'Active', '-2'),
+      row(4, 'Eng', '2023', '500', 'Pending', '10'),
+      row(5, 'ENG', '2024', '20', 'Active', '5'),
+      row(6, '@@HTML<a href="#">Eng</a>', '2025', '900', 'Active', '7'),
+      row(7, 'Sci', '2025', '300', 'Active', '5'),
+      row(8, 'Sci', '2024', '75', 'Closed', '1'),
+      row(9, 'Sci', '2023', '10', 'Active', '0'),
+      row(10, 'Ag', '2025', '40', 'Active', '5'),
+      row(11, 'Ag', '2024', '60', 'Closed', '3'),
+      row(12, 'CHASS', '2025', '5', 'Pending', '5'),
+      row(13, '', '2025', '1', 'Active', '9')
+    ];
+  }
+  function vals(g, col) {
+    var grp = null;
+    g.groups.forEach(function (x) { if (x.field.col === col) grp = x; });
+    return grp ? grp.values.map(function (e) { return [e.v, e.n, e.on]; }) : null;
+  }
+  function chipText(sel) { return $(sel).map(function () { return $(this).find('.pnb-fs-v').text(); }).get(); }
+  function matchCount(F, text, rows) {
+    var parsed = F.parseQ(text, COLS), n = 0;
+    rows.forEach(function (r) { if (F.evalQ(r, parsed, COLS)) n++; });
+    return n;
+  }
+
+  function run() {
+    var F = window.__FS;
+    if (!F || typeof F.state !== 'function' || typeof F.compose !== 'function') {
+      report('RESULTS_JSON:' + JSON.stringify({ fatal: 'hooks unavailable: ' + (window.__FS_ERR || 'n/a'), pageErrors: window.__errors.slice(0, 6) }));
+      return;
+    }
+    var FIELDS = [{ label: 'College', col: 'COLLEGE', mode: 'in', top: 12, az: false }, { label: 'Fiscal Year', col: 'FY', mode: 'in', top: 12, az: true }];
+    var FIELDS3 = FIELDS.concat([{ label: 'Status', col: 'STATUS', mode: 'in', top: 12, az: false }]);
+
+    // ══════ A. argument parsing ══════
+    var a1 = F.parseArgs(['College|COLLEGE', 'Fiscal Year|FY|az']);
+    assert('args: two fields parse with defaults', !a1.error && a1.fields.length === 2 && a1.fields[0].label === 'College' && a1.fields[0].col === 'COLLEGE'
+      && a1.fields[0].mode === 'in' && a1.fields[0].top === 12 && a1.fields[0].az === false && a1.fields[1].az === true, JSON.stringify(a1));
+    var a2 = F.parseArgs(['wide', 'College|COLLEGE', 'Small']);
+    eq('args: bare words are keywords, case-forgiven, deduped', !a2.error && a2.mods, ['wide', 'small']);
+    var a3 = F.parseArgs(['sideways', 'College|COLLEGE']);
+    assert('args: an unknown keyword is a loud error naming itself', a3.error && a3.error.indexOf('unknown keyword sideways') !== -1, a3.error);
+    assert('args: a field with no column is refused', /needs a column/.test(F.parseArgs(['College|']).error || ''), F.parseArgs(['College|']).error);
+    assert('args: a field with no label is refused', /needs a label/.test(F.parseArgs(['|COLLEGE']).error || ''), F.parseArgs(['|COLLEGE']).error);
+    assert('args: a column listed twice is refused', /listed twice/.test(F.parseArgs(['A|COLLEGE', 'B|college']).error || ''), '');
+    assert('args: keywords alone are refused (at least one field)', /at least one field/.test(F.parseArgs(['wide']).error || ''), '');
+    var a8 = F.parseArgs(['Status|STATUS|exclude|top=3', 'X|Y|top=0']);
+    assert('args: exclude and top=N options', !a8.error && a8.fields[0].mode === 'ex' && a8.fields[0].top === 3 && a8.fields[1].top === 0, JSON.stringify(a8));
+    assert('args: an unknown option is a loud error', /unknown option foo/.test(F.parseArgs(['Status|STATUS|foo']).error || ''), F.parseArgs(['Status|STATUS|foo']).error);
+    eq('args: the column is upper-cased', F.parseArgs(['College|college']).fields[0].col, 'COLLEGE');
+    eq('args: look, label and alignment keywords become classes', F.parseArgs(['segmented', 'ghost', 'bare', 'labels=top', 'labels=left', 'right', 'center', 'College|COLLEGE']).mods,
+      ['segmented', 'ghost', 'bare', 'labels-top', 'labels-left', 'align-right', 'align-center']);
+    eq('args: columns=N becomes a cols class; labels=none is the default (no class)', F.parseArgs(['columns=3', 'labels=none', 'College|COLLEGE']).mods, ['cols-3']);
+    assert('args: nolabels is not a keyword any more (labels are hidden by default)', /unknown keyword nolabels/.test(F.parseArgs(['nolabels', 'College|COLLEGE']).error || ''), '');
+    assert('args: columns out of range is a loud error', /columns=9 is out of range/.test(F.parseArgs(['columns=9', 'College|COLLEGE']).error || ''), F.parseArgs(['columns=9', 'College|COLLEGE']).error);
+    assert('args: a prototype name is not a keyword', /unknown keyword constructor/.test(F.parseArgs(['constructor', 'College|COLLEGE']).error || ''), F.parseArgs(['constructor', 'College|COLLEGE']).error);
+    assert('args: the unknown-keyword error lists the looks', /segmented/.test(F.parseArgs(['sideways', 'College|COLLEGE']).error || ''), '');
+
+    // ══════ B. encoder / decoder ══════
+    eq('enc: plain value untouched', F.enc('Eng'), 'Eng');
+    var meta = 'a.b*c+d?e^f$g(h)i|j[k]l{m}n\\o';
+    assert('enc: metacharacters are escaped', F.enc(meta).indexOf('a\\.b\\*c\\+d\\?e\\^f\\$g\\(h\\)i\\|j\\[k\\]l\\{m\\}n\\\\o') === 0, F.enc(meta));
+    eq('enc: decode reverses the metacharacter escape', F.dec(F.enc(meta)), meta);
+    eq('enc: a slash becomes \\x2F (the tokenizer ends a regex at any slash)', F.enc('a/b'), 'a\\x2Fb');
+    eq('enc: \\x2F decodes back to a slash', F.dec('a\\x2Fb'), 'a/b');
+    eq('enc: literal text \\x2F in a value survives the round trip', F.dec(F.enc('has\\x2Fliteral')), 'has\\x2Fliteral');
+    var stP = F.state(F.compose({ prefix: '', sel: { COLLEGE: ['a|b', 'c'] }, rest: [] }, FIELDS), FIELDS);
+    eq('enc: a value containing a pipe is one value, not two', stP.sel.COLLEGE, ['a|b', 'c']);
+
+    // ══════ C. state from the search text ══════
+    var c1 = F.state('', FIELDS);
+    assert('state: empty text', Object.keys(c1.sel).length === 0 && c1.rest.length === 0 && c1.or === false && c1.prefix === '', JSON.stringify(c1));
+    eq('state: one strip condition is claimed', F.state('COLLEGE = /^(?:Eng|Sci)$/', FIELDS).sel.COLLEGE, ['Eng', 'Sci']);
+    var c3 = F.state('COLLEGE = /^(?:Eng)$/ and AMOUNT > 100 and FY = /^(?:2025)$/', FIELDS);
+    assert('state: two strip conditions plus a typed one (kept verbatim as rest)',
+      JSON.stringify(c3.sel.COLLEGE) === '["Eng"]' && JSON.stringify(c3.sel.FY) === '["2025"]' && JSON.stringify(c3.rest) === '["AMOUNT > 100"]' && !c3.or, JSON.stringify(c3));
+    var EXF = [{ label: 'Status', col: 'STATUS', mode: 'ex', top: 12, az: false }];
+    eq('state: an exclude field claims its != condition', F.state('STATUS != /^(?:Closed)$/', EXF).sel.STATUS, ['Closed']);
+    eq('state: the wrong operator for the field goes to rest, not the strip', F.state('STATUS = /^(?:Closed)$/', EXF).rest, ['STATUS = /^(?:Closed)$/']);
+    eq('state: no spaces around the operator still reads (operator padding)', F.state('COLLEGE=/^(?:Eng)$/', FIELDS).sel.COLLEGE, ['Eng']);
+    assert('state: a top-level or is detected', F.state('COLLEGE = /^(?:Eng)$/ or FY = 2025', FIELDS).or === true, '');
+    assert('state: AND with an upper-case joiner is not or', F.state('COLLEGE = /^(?:Eng)$/ AND FY = 2025', FIELDS).or === false, '');
+    var c7 = F.state('__ROW COLLEGE = /^(?:Eng)$/', FIELDS);
+    assert('state: a leading __ROW modifier is kept as the prefix', c7.prefix === '__ROW ' && JSON.stringify(c7.sel.COLLEGE) === '["Eng"]', JSON.stringify(c7));
+    var c8 = F.state('COLLEGE = /^(?:Arts and Sciences|Eng)$/', FIELDS);
+    assert('state: "and" inside the regex literal is a value, not a joiner', JSON.stringify(c8.sel.COLLEGE) === '["Arts and Sciences","Eng"]' && c8.rest.length === 0, JSON.stringify(c8));
+    var PCT = [{ label: 'Change', col: '% CHANGE', mode: 'in', top: 12, az: false }];
+    eq('state: a quoted column name is claimed', F.state("'% CHANGE' = /^(?:5)$/", PCT).sel['% CHANGE'], ['5']);
+    eq('state: the {COLUMN} form is claimed', F.state('{COLLEGE} = /^(?:Eng)$/', FIELDS).sel.COLLEGE, ['Eng']);
+    eq('state: the column name is matched case-insensitively', F.state('college = /^(?:Eng)$/', FIELDS).sel.COLLEGE, ['Eng']);
+    eq('state: a plain condition on a strip column is typed rest, not a selection', F.state('COLLEGE = Eng', FIELDS).rest, ['COLLEGE = Eng']);
+    eq('state: a quoted value with and inside stays one fragment', F.state('COLLEGE = /^(?:Eng)$/ and TITLE = "Arts and Sciences"', FIELDS).rest, ['TITLE = "Arts and Sciences"']);
+
+    // ══════ D. compose ══════
+    eq('compose: nothing selected, nothing typed = empty text', F.compose(F.state('', FIELDS), FIELDS), '');
+    eq('compose: a selection', F.compose({ prefix: '', sel: { COLLEGE: ['Eng', 'Sci'] }, rest: [] }, FIELDS), 'COLLEGE = /^(?:Eng|Sci)$/');
+    var d3 = F.state('AMOUNT > 100', FIELDS); d3.sel.COLLEGE = ['Eng'];
+    eq('compose: strip conditions first, then the typed rest', F.compose(d3, FIELDS), 'COLLEGE = /^(?:Eng)$/ and AMOUNT > 100');
+    eq('compose: an exclude field writes !=', F.compose({ prefix: '', sel: { STATUS: ['Closed'] }, rest: [] }, EXF), 'STATUS != /^(?:Closed)$/');
+    var hard = F.compose({ prefix: '', sel: { COLLEGE: ['A.B', 'c/d', 'e|f', 'g\\h'], FY: ['2025'] }, rest: ['AMOUNT > 100'] }, FIELDS);
+    eq('compose: state(compose(x)) is a fixed point on awkward values', F.compose(F.state(hard, FIELDS), FIELDS), hard);
+    eq('compose: awkward values decode back exactly', F.state(hard, FIELDS).sel.COLLEGE, ['A.B', 'c/d', 'e|f', 'g\\h']);
+    eq('compose: a column with a space is quoted', F.compose({ prefix: '', sel: { '% CHANGE': ['5'] }, rest: [] }, PCT), "'% CHANGE' = /^(?:5)$/");
+    var d7 = F.state('__ROW AMOUNT > 1', FIELDS); d7.sel.FY = ['2025'];
+    eq('compose: the __ROW prefix is kept in front', F.compose(d7, FIELDS), '__ROW FY = /^(?:2025)$/ and AMOUNT > 1');
+    eq('compose: rest only when nothing is selected', F.compose(F.state('AMOUNT > 100', FIELDS), FIELDS), 'AMOUNT > 100');
+    var rows = fixture();
+    var agree = F.compose({ prefix: '', sel: { COLLEGE: ['Eng', 'Sci'], FY: ['2025'] }, rest: [] }, FIELDS);
+    eq('engine agreement: the composed text filters the REAL evaluator to the expected rows', matchCount(F, agree, rows), 4);
+    eq('engine agreement: html-wrapped and differently-cased cells match the chip value', matchCount(F, F.compose({ prefix: '', sel: { COLLEGE: ['Eng'] }, rest: [] }, FIELDS), rows), 6);
+    var metaRows = [row(1, 'A.B', '2025', '1', 'x', '0'), row(2, 'AXB', '2025', '1', 'x', '0')];
+    eq('engine agreement: a value with a regex metacharacter matches only itself', matchCount(F, F.compose({ prefix: '', sel: { COLLEGE: ['A.B'] }, rest: [] }, FIELDS), metaRows), 1);
+    eq('engine agreement: a value with a slash matches through \\x2F', matchCount(F, F.compose({ prefix: '', sel: { COLLEGE: ['c/d'] }, rest: [] }, FIELDS), [row(1, 'c/d', '', '', '', ''), row(2, 'cXd', '', '', '', '')]), 1);
+    eq('engine agreement: an exclude selection removes exactly those rows', matchCount(F, F.compose({ prefix: '', sel: { STATUS: ['Closed'] }, rest: [] }, EXF), rows), 10);
+
+    // ══════ E. chip sets + counts ══════
+    F.setRows(rows);
+    $('#resultsTable').data('columnNameToOriginalIndex', { 'COLLEGE': 1, 'FY': 2, 'AMOUNT': 3, 'STATUS': 4, '% CHANGE': 5 });
+    var SPEC = { fields: FIELDS3, mods: [] };
+    var e1 = F.groups(SPEC, '');
+    eq('counts: full counts, blanks skipped, case and @@HTML merged, sorted by count', vals(e1, 'COLLEGE'), [['Eng', 6, false], ['Sci', 3, false], ['Ag', 2, false], ['CHASS', 1, false]]);
+    eq('counts: az sorts by value (numeric-aware)', vals(e1, 'FY'), [['2023', 2, false], ['2024', 4, false], ['2025', 7, false]]);
+    assert('counts: no off reason on a plain table', e1.off === null, String(e1.off));
+    var e3 = F.groups(SPEC, 'COLLEGE = /^(?:Eng)$/');
+    eq('counts: another column is cross-filtered by the selection', vals(e3, 'FY'), [['2023', 1, false], ['2024', 2, false], ['2025', 3, false]]);
+    eq('counts: a column is NOT narrowed by its own selection, and its chip is on', vals(e3, 'COLLEGE'), [['Eng', 6, true], ['Sci', 3, false], ['Ag', 2, false], ['CHASS', 1, false]]);
+    var e4 = F.groups(SPEC, 'COLLEGE = /^(?:Eng)$/ and FY = /^(?:2025)$/');
+    eq('counts: two selections narrow a third column', vals(e4, 'STATUS'), [['Active', 2, false], ['Closed', 1, false], ['Pending', 0, false]]);
+    eq('counts: each selected column sees the OTHER selection', vals(e4, 'COLLEGE'), [['Eng', 3, true], ['Sci', 1, false], ['Ag', 1, false], ['CHASS', 1, false]]);
+    var e5 = F.groups(SPEC, 'AMOUNT > 100');
+    eq('counts: a typed condition narrows every column', vals(e5, 'COLLEGE'), [['Eng', 3, false], ['Sci', 1, false], ['Ag', 0, false], ['CHASS', 0, false]]);
+    var e6 = vals(F.groups(SPEC, 'COLLEGE = /^(?:Zzz)$/'), 'COLLEGE');
+    assert('counts: a pressed value the data lacks still gets a chip (so it can be released)', JSON.stringify(e6[e6.length - 1]) === '["Zzz",0,true]', JSON.stringify(e6));
+    $('#pivot-output-container').show();
+    var e7 = F.groups(SPEC, 'COLLEGE = /^(?:Eng)$/');
+    $('#pivot-output-container').hide();
+    assert('counts: a visible pivot pauses the strip (off=pivot, nothing pressed, full counts)', e7.off === 'pivot' && JSON.stringify(vals(e7, 'COLLEGE')) === JSON.stringify([['Eng', 6, false], ['Sci', 3, false], ['Ag', 2, false], ['CHASS', 1, false]]), JSON.stringify({ off: e7.off, c: vals(e7, 'COLLEGE') }));
+    var e8 = F.groups(SPEC, 'COLLEGE = /^(?:Eng)$/ or FY = 2025');
+    assert('counts: a top-level or pauses the strip (off=or)', e8.off === 'or' && JSON.stringify(vals(e8, 'COLLEGE')[0]) === '["Eng",6,false]', JSON.stringify({ off: e8.off }));
+    assert('counts: the same text and rows come back memoized', F.groups(SPEC, 'AMOUNT > 100') === F.groups(SPEC, 'AMOUNT > 100'), '');
+
+    // ══════ F. engine A rendering ══════
+    var A = F.renderA, ed = (window.Penumbra && window.Penumbra.getSnippetEditor) ? window.Penumbra.getSnippetEditor() : null;
+    if (typeof A !== 'function' || !ed) {
+      assert('engine A render hook available (renderReportSnippet + Penumbra.getSnippetEditor)', false, 'A=' + typeof A + ' ed=' + !!ed);
+      finish(); return;
+    }
+    var draw = function (src) { ed.setValue(src); return Promise.resolve().then(function () { return A(null, true); }); };
+    var outText = function () { return $('#reportSnippetOutput').text().trim(); };
+    var S = '#reportSnippetOutput .pnb-fstrip';
+    $('#tableSearch').val('');
+    draw("filter_strip('College|COLLEGE', 'Fiscal Year|FY|az')").then(function () {
+      assert('render: two groups with names and chips', $(S).length === 1 && $(S + ' .pnb-fs-group').length === 2
+        && $(S + ' .pnb-fs-group').eq(0).find('.pnb-fs-name').text() === 'College' && $(S + ' .pnb-fs-group').eq(0).find('.pnb-fs-chip').length === 4
+        && $(S + ' .pnb-fs-group').eq(1).find('.pnb-fs-chip').length === 3, $('#reportSnippetOutput').html().substring(0, 300));
+      eq('render: FY chips in az order', chipText(S + ' .pnb-fs-group:eq(1) .pnb-fs-chip'), ['2023', '2024', '2025']);
+      eq('render: counts are shown', $(S + ' .pnb-fs-group:eq(0) .pnb-fs-chip:eq(0) .pnb-fs-n').text(), '6');
+      assert('render: DOMPurify kept the control attributes', $(S + ' .pnb-fs-chip').first().attr('data-fs-val') === 'Eng' && $(S + ' .pnb-fs-chip').first().attr('aria-pressed') === 'false'
+        && $(S + ' .pnb-fs-group').first().attr('data-fs-col') === 'COLLEGE' && $(S).attr('role') === 'group', $(S + ' .pnb-fs-chip').first().prop('outerHTML'));
+      assert('render: nothing pressed = no clear buttons', $(S + ' .pnb-fs-clear').length === 0 && $(S + ' .pnb-fs-clearall').length === 0, '');
+      $('#tableSearch').val('COLLEGE = /^(?:Eng)$/');
+      return draw("filter_strip('College|COLLEGE', 'Fiscal Year|FY|az')");
+    }).then(function () {
+      assert('render: the pressed chip is read from the box, unclicked', $(S + ' .pnb-fs-chip[data-fs-val="Eng"]').attr('aria-pressed') === 'true'
+        && $(S + ' .pnb-fs-chip[data-fs-val="Sci"]').attr('aria-pressed') === 'false', $(S).html().substring(0, 200));
+      assert('render: a selected group gets a clear button and the strip a Clear all', $(S + ' .pnb-fs-group:eq(0) .pnb-fs-clear').length === 1 && $(S + ' .pnb-fs-clearall').length === 1, '');
+      eq('render: the cross-filtered FY counts are shown', $(S + ' .pnb-fs-group:eq(1) .pnb-fs-chip .pnb-fs-n').map(function () { return $(this).text(); }).get(), ['1', '2', '3']);
+      $('#tableSearch').val('');
+      return draw("filter_strip('sideways', 'College|COLLEGE')");
+    }).then(function () {
+      assert('render: unknown keyword errors and names itself', $(S).length === 0 && outText().indexOf('unknown keyword sideways') !== -1, outText().substring(0, 120));
+      return draw("filter_strip('College|NOPE')");
+    }).then(function () {
+      assert('render: a column the report lacks is refused by name', outText().indexOf('column NOPE is not in this report') !== -1, outText().substring(0, 120));
+      return draw("filter_strip('wide', 'small', 'nocounts', 'College|COLLEGE')");
+    }).then(function () {
+      assert('render: keywords become classes; nocounts hides the counts', $(S).hasClass('wide') && $(S).hasClass('small') && $(S + ' .pnb-fs-n').length === 0, $(S).attr('class'));
+      return draw("filter_strip('segmented', 'labels=top', 'columns=2', 'right', 'College|COLLEGE', 'Fiscal Year|FY')");
+    }).then(function () {
+      assert('render: look, label, column and alignment keywords reach the rendered strip', $(S).hasClass('segmented') && $(S).hasClass('labels-top') && $(S).hasClass('cols-2') && $(S).hasClass('align-right') && $(S + ' .pnb-fs-group').length === 2, $(S).attr('class'));
+      return draw("filter_strip('bare', 'College|COLLEGE', 'Status|STATUS|exclude')");
+    }).then(function () {
+      assert('render: by default the label is in the DOM for screen readers and no label class is set',
+        $(S).hasClass('bare') && !$(S).hasClass('labels-left') && !$(S).hasClass('labels-top') && $(S + ' .pnb-fs-name').first().text() === 'College', $(S).html().substring(0, 160));
+      assert('render: an exclude group carries both marker forms and a screen-reader suffix',
+        $(S + ' .pnb-fs-group:eq(1) .pnb-fs-not-short').text() === 'not' && $(S + ' .pnb-fs-group:eq(1) .pnb-fs-not-long').text() === 'is not'
+        && $(S + ' .pnb-fs-group:eq(1) .pnb-fs-name').text() === 'Status is not', $(S + ' .pnb-fs-group:eq(1)').html().substring(0, 200));
+      return draw("filter_strip('columns=7', 'College|COLLEGE')");
+    }).then(function () {
+      assert('render: columns out of range errors loudly', $(S).length === 0 && outText().indexOf('columns=7 is out of range') !== -1, outText().substring(0, 120));
+      return draw("filter_strip('College|COLLEGE|top=2', 'Status|STATUS|exclude')");
+    }).then(function () {
+      var shown = function () { return $(S + ' .pnb-fs-group:eq(0) .pnb-fs-chip').filter(function () { return getComputedStyle(this).display !== 'none'; }).length; };
+      assert('render: top=2 folds the rest behind +n more (COMPUTED display, the real stylesheet)', shown() === 2
+        && $(S + ' .pnb-fs-group:eq(0) .pnb-fs-more').text() === '+2 more', JSON.stringify({ shown: shown(), more: $(S + ' .pnb-fs-group:eq(0) .pnb-fs-more').text() }));
+      assert('render: an exclude field says so', $(S + ' .pnb-fs-group:eq(1) .pnb-fs-not-short').text() === 'not', $(S + ' .pnb-fs-group:eq(1) .pnb-fs-not').text());
+      var nameCs = getComputedStyle($(S + ' .pnb-fs-group:eq(0) .pnb-fs-name')[0]);
+      assert('render: the label is screen-reader-only by default (computed: absolute, 1px)', nameCs.position === 'absolute' && nameCs.width === '1px', nameCs.position + ' ' + nameCs.width);
+      $(S + ' .pnb-fs-group:eq(0) .pnb-fs-more').trigger('click');
+      assert('render: +n more opens the fold in place', shown() === 4 && $(S + ' .pnb-fs-group:eq(0) .pnb-fs-more').text() === 'less', String(shown()));
+      $(S + ' .pnb-fs-group:eq(0) .pnb-fs-more').trigger('click');
+      assert('render: less folds it again', shown() === 2, String(shown()));
+      return draw("filter_strip('labels=left', 'College|COLLEGE')");
+    }).then(function () {
+      var nameCs2 = getComputedStyle($(S + ' .pnb-fs-group:eq(0) .pnb-fs-name')[0]);
+      assert('render: labels=left shows the label in flow, as written (computed: static, no uppercase)', nameCs2.position === 'static' && nameCs2.textTransform === 'none' && $(S + ' .pnb-fs-name').text() === 'College', nameCs2.position + ' ' + nameCs2.textTransform);
+      $('#tableSearch').val('COLLEGE = /^(?:Eng)$/');
+      return draw("filter_strip('College|COLLEGE')");
+    }).then(function () {
+      var glyph = getComputedStyle($(S + ' .pnb-fs-chip[data-fs-val="Eng"]')[0], '::before').content;
+      assert('render: a pressed chip carries the check glyph (computed ::before content)', /2713|✓/.test(glyph), glyph);
+      $('#tableSearch').val('');
+
+      // ══════ G. the click flow (through the executor's own search action) ══════
+      return draw("filter_strip('College|COLLEGE', 'Fiscal Year|FY|az')");
+    }).then(function () {
+      $(S + ' .pnb-fs-chip[data-fs-val="Sci"]').trigger('click');
+      // The switches' rule: the control moves AT ONCE under a data-only veil.
+      assert('click: the chip paints its pending state at once', $(S + ' .pnb-fs-chip[data-fs-val="Sci"]').attr('aria-pressed') === 'true' && $(S).attr('aria-busy') === 'true',
+        JSON.stringify({ pressed: $(S + ' .pnb-fs-chip[data-fs-val="Sci"]').attr('aria-pressed'), busy: $(S).attr('aria-busy') }));
+      var mo = F.motion();
+      assert('click: a strip motion is live and scoped (the data-only veil)', !!mo && mo.kind === 'fs' && mo.scoped === true && mo.dispatched === true,
+        JSON.stringify(mo && { kind: mo.kind, scoped: mo.scoped, dispatched: mo.dispatched }));
+      assert('click: the controls read busy while the rows change', F.busy() === true, '');
+      $(S + ' .pnb-fs-chip[data-fs-val="Eng"]').trigger('click');   // must be dropped
+      return wait(300);
+    }).then(function () {
+      eq('click: a chip writes its condition into the box', $('#tableSearch').val(), 'COLLEGE = /^(?:Sci)$/');
+      assert('click: a second click while the change is in flight is dropped, then the motion settles', $('#tableSearch').val() === 'COLLEGE = /^(?:Sci)$/' && !F.motion() && $(S).attr('aria-busy') === undefined,
+        JSON.stringify({ box: $('#tableSearch').val(), motion: !!F.motion(), busy: $(S).attr('aria-busy') }));
+      assert('click: the re-rendered chip reads as pressed', $(S + ' .pnb-fs-chip[data-fs-val="Sci"]').attr('aria-pressed') === 'true', $(S).html().substring(0, 200));
+      $(S + ' .pnb-fs-chip[data-fs-val="Eng"]').trigger('click');
+      return wait(300);
+    }).then(function () {
+      eq('click: a second chip in the group joins the alternation', $('#tableSearch').val(), 'COLLEGE = /^(?:Sci|Eng)$/');
+      $(S + ' .pnb-fs-chip[data-fs-val="Sci"]').trigger('click');
+      return wait(300);
+    }).then(function () {
+      eq('click: clicking a pressed chip releases it', $('#tableSearch').val(), 'COLLEGE = /^(?:Eng)$/');
+      $(S + ' .pnb-fs-chip[data-fs-val="2025"]').trigger('click');
+      return wait(300);
+    }).then(function () {
+      eq('click: a chip in another group joins with and', $('#tableSearch').val(), 'COLLEGE = /^(?:Eng)$/ and FY = /^(?:2025)$/');
+      eq('click: the counts follow the selection', $(S + ' .pnb-fs-group:eq(0) .pnb-fs-chip .pnb-fs-n').map(function () { return $(this).text(); }).get(), ['3', '1', '1', '1']);
+      $(S + ' .pnb-fs-group:eq(1) .pnb-fs-clear').trigger('click');
+      return wait(300);
+    }).then(function () {
+      eq('click: a group clear removes only that group', $('#tableSearch').val(), 'COLLEGE = /^(?:Eng)$/');
+      $('#tableSearch').val('AMOUNT > 100');
+      return draw("filter_strip('College|COLLEGE', 'Fiscal Year|FY|az')");
+    }).then(function () {
+      $(S + ' .pnb-fs-chip[data-fs-val="Eng"]').trigger('click');
+      return wait(300);
+    }).then(function () {
+      eq('click: a typed condition survives a chip click', $('#tableSearch').val(), 'COLLEGE = /^(?:Eng)$/ and AMOUNT > 100');
+      $(S + ' .pnb-fs-clearall').trigger('click');
+      return wait(300);
+    }).then(function () {
+      eq('click: Clear all releases the chips and keeps the typed condition', $('#tableSearch').val(), 'AMOUNT > 100');
+      $('#tableSearch').val('COLLEGE = Eng or FY = 2025');
+      F.sync();
+      assert('sync: an or query pauses the rendered strip (chips disabled, note shown)', $(S).attr('data-fs-off') === 'or' && $(S + ' .pnb-fs-chip:disabled').length === 7 && $(S + ' .pnb-fs-note').length === 1, $(S).attr('data-fs-off') + ' ' + $(S + ' .pnb-fs-chip:disabled').length);
+      $(S + ' .pnb-fs-chip[data-fs-val="Sci"]').trigger('click');
+      return wait(200);
+    }).then(function () {
+      eq('sync: a click on a paused strip changes nothing', $('#tableSearch').val(), 'COLLEGE = Eng or FY = 2025');
+      $('#tableSearch').val('FY = /^(?:2024)$/');
+      F.sync();
+      assert('sync: a hand-typed condition presses its chip and lifts the pause', $(S).attr('data-fs-off') === undefined && $(S + ' .pnb-fs-chip[data-fs-val="2024"]').attr('aria-pressed') === 'true'
+        && $(S + ' .pnb-fs-chip[data-fs-val="2025"]').attr('aria-pressed') === 'false' && $(S + ' .pnb-fs-note').length === 0 && $(S + ' .pnb-fs-chip:disabled').length === 0, $(S).html().substring(0, 200));
+      $('#tableSearch').val('');
+      F.sync();
+      assert('sync: clearing the box by hand releases every chip', $(S + ' .pnb-fs-chip[aria-pressed="true"]').length === 0, '');
+
+      // ---- view changes go through penumbraSyncActiveLayout (a trigger-built
+      // pivot never re-renders the snippet, so the render-time pause alone
+      // left the chips live over a pivot - found on the live drive 2026-09-28)
+      $('#tableSearch').val('COLLEGE = /^(?:Eng)$/');
+      F.sync();
+      $('#pivot-output-container').show();
+      F.syncLayout();
+      assert('view sync: a pivot on screen pauses the rendered strip (off=pivot, chips disabled, note)',
+        $(S).attr('data-fs-off') === 'pivot' && $(S + ' .pnb-fs-chip:disabled').length === 7 && $(S + ' .pnb-fs-note').text().indexOf('Exit the pivot') !== -1,
+        JSON.stringify({ off: $(S).attr('data-fs-off'), dis: $(S + ' .pnb-fs-chip:disabled').length, note: $(S + ' .pnb-fs-note').text() }));
+      $(S + ' .pnb-fs-chip[data-fs-val="Sci"]').trigger('click');
+      return wait(200);
+    }).then(function () {
+      eq('view sync: a click while paused over a pivot changes nothing', $('#tableSearch').val(), 'COLLEGE = /^(?:Eng)$/');
+      $('#pivot-output-container').hide();
+      F.syncLayout();
+      assert('view sync: back in the table view the strip resumes and re-reads the box',
+        $(S).attr('data-fs-off') === undefined && $(S + ' .pnb-fs-chip:disabled').length === 0 && $(S + ' .pnb-fs-note').length === 0
+        && $(S + ' .pnb-fs-chip[data-fs-val="Eng"]').attr('aria-pressed') === 'true',
+        JSON.stringify({ off: $(S).attr('data-fs-off'), dis: $(S + ' .pnb-fs-chip:disabled').length, eng: $(S + ' .pnb-fs-chip[data-fs-val="Eng"]').attr('aria-pressed') }));
+      $('#snapshotComparisonContainer').show();
+      F.syncLayout();
+      assert('view sync: a comparison on screen pauses it too', $(S).attr('data-fs-off') === 'compare' && $(S + ' .pnb-fs-note').text().indexOf('comparison') !== -1, String($(S).attr('data-fs-off')));
+      $('#snapshotComparisonContainer').hide();
+      F.syncLayout();
+      $('#tableSearch').val('');
+      F.sync();
+
+      // ══════ H. the other engines + the registry ══════
+      var b = F.engineB("before filter_strip('College|COLLEGE') after", rows, COLS);
+      var bh = (b && b.html !== undefined) ? String(b.html) : String(b);
+      assert('engine B: renders nothing for filter_strip (no control, no raw source)', bh.indexOf('filter_strip') === -1 && bh.indexOf('pnb-fstrip') === -1 && bh.indexOf('before') !== -1 && bh.indexOf('after') !== -1, bh.substring(0, 160));
+      assert('registry: filter_strip is a known snippet function', F.names().indexOf('filter_strip') !== -1, JSON.stringify(F.names().slice(-4)));
+      return draw("filter_strip('College|COLLEGE')");
+    }).then(function () {
+      assert('render: a fresh render with an empty box shows nothing pressed', $(S + ' .pnb-fs-chip[aria-pressed="true"]').length === 0 && $(S + ' .pnb-fs-chip').length === 4, '');
+    }).catch(function (e) {
+      assert('render/click phases crashed', false, String(e && e.stack ? e.stack : e));
+    }).then(finish);
+  }
+  $(function () { setTimeout(run, 30); });
+})();
+</script>
+</body></html>

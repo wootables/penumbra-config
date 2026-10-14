@@ -1,0 +1,531 @@
+<?php
+/**
+ * dbbackup - pins the nightly table backup (2026-10-12):
+ *   db_backup_lib.php   every decision, as pure functions (section 1)
+ *   db_backup_job.php   the whole job, run offline over a FAKE database and a
+ *                       fake clock in a scratch folder (section 2): one-go sets,
+ *                       sets spread over cycles, pause, retention, the disk guard,
+ *                       the lock, abandoned sets, failing tables, a table whose
+ *                       columns change between cycles, the runner's cycle cap
+ *   penumbra_maintenance.php  the registry entry (section 3)
+ *
+ *   php -n test_dbbackup.php <app folder>
+ *
+ * Tail must read "PASS: N   FAIL: 0" then "RESULT: GREEN".
+ */
+date_default_timezone_set('America/New_York');
+$app = isset($argv[1]) ? rtrim($argv[1], '/\\') : '';
+if (!is_file($app . '/db_backup_job.php')) { echo "db_backup_job.php not found in '$app'\nRESULT: RED\n"; return; }
+require $app . '/penumbra_maintenance.php';
+require $app . '/db_backup_job.php';
+
+$PASS = 0; $FAIL = 0;
+function ok($cond, $label) {
+    global $PASS, $FAIL;
+    if ($cond) { $PASS++; echo "  ok   $label\n"; }
+    else       { $FAIL++; echo "  FAIL $label\n"; }
+}
+function eq($got, $want, $label) {
+    global $PASS, $FAIL;
+    if ($got === $want) { $PASS++; echo "  ok   $label\n"; }
+    else { $FAIL++; echo "  FAIL $label\n       want: " . var_export($want, true) . "\n       got:  " . var_export($got, true) . "\n"; }
+}
+
+// ---------------------------------------------------------------- 1. pure
+echo "1. settings\n";
+$s = db_backup_settings(null);
+eq($s['dir'], 'D:\\Utilities\\PHP_8.2-p\\penumbra_backups', 'default folder is in the PHP folder, outside the webroot');
+eq(array($s['keep_days'], $s['budget_secs'], $s['exclude']), array(14, 150, array('PENUMBRA_PEOPLE_STG')), 'defaults: 14 sets, 150 s a cycle, staging excluded');
+$s = db_backup_settings(array('keep_days' => 500, 'budget_secs' => 9999, 'exclude' => array(' penumbra_x ', ''), 'dir' => 'E:\\bk\\'));
+eq(array($s['keep_days'], $s['budget_secs'], $s['exclude'], $s['dir']), array(90, 240, array('PENUMBRA_X'), 'E:\\bk'), 'clamped to 90 / 240, exclude upper-cased, trailing slash dropped');
+eq(db_backup_settings(array('budget_secs' => 1))['budget_secs'], 30, 'budget floor 30 s');
+
+echo "1b. table selection\n";
+$sel = db_backup_select_tables(array(
+    array('TABLE_NAME' => 'PENUMBRA_AUDIT', 'NUM_ROWS' => 90000, 'AVG_ROW_LEN' => 900, 'TEMPORARY' => 'N', 'COMMENTS' => null),
+    array('TABLE_NAME' => 'PENUMBRA_REPORTS', 'NUM_ROWS' => 1800, 'AVG_ROW_LEN' => 3000, 'TEMPORARY' => 'N', 'COMMENTS' => null),
+    array('TABLE_NAME' => 'PENUMBRA_THEMES', 'NUM_ROWS' => null, 'AVG_ROW_LEN' => null, 'TEMPORARY' => 'N', 'COMMENTS' => null),
+    array('TABLE_NAME' => 'PENUMBRA_PEOPLE_STG', 'NUM_ROWS' => 1, 'AVG_ROW_LEN' => 1, 'TEMPORARY' => 'N', 'COMMENTS' => null),
+    array('TABLE_NAME' => 'PENUMBRA_SALES_DUMP', 'NUM_ROWS' => 1, 'AVG_ROW_LEN' => 1, 'TEMPORARY' => 'N', 'COMMENTS' => 'PENUMBRA_DBDUMP task_id=4 owner=x'),
+    array('TABLE_NAME' => 'PENUMBRA_GTT', 'NUM_ROWS' => 1, 'AVG_ROW_LEN' => 1, 'TEMPORARY' => 'Y', 'COMMENTS' => null),
+    array('TABLE_NAME' => 'PENUMBRA_"X', 'NUM_ROWS' => 1, 'AVG_ROW_LEN' => 1, 'TEMPORARY' => 'N', 'COMMENTS' => null),
+), array('PENUMBRA_PEOPLE_STG'));
+eq($sel['take'], array('PENUMBRA_THEMES', 'PENUMBRA_REPORTS', 'PENUMBRA_AUDIT'), 'smallest first (never-analysed = 0); the big audit table last');
+eq(array_keys($sel['skip']), array('PENUMBRA_PEOPLE_STG', 'PENUMBRA_SALES_DUMP', 'PENUMBRA_GTT', 'PENUMBRA_"X'), 'skipped: excluded, a DB_DUMP output, a temp table, an unsafe name');
+
+echo "1c. columns\n";
+$cp = db_backup_column_plan(array(
+    array('COLUMN_NAME' => 'ID', 'DATA_TYPE' => 'NUMBER', 'DATA_LENGTH' => 22, 'DATA_PRECISION' => null, 'DATA_SCALE' => null, 'NULLABLE' => 'N'),
+    array('COLUMN_NAME' => 'TS', 'DATA_TYPE' => 'TIMESTAMP(6)', 'DATA_LENGTH' => 11, 'NULLABLE' => 'Y'),
+    array('COLUMN_NAME' => 'BODY', 'DATA_TYPE' => 'CLOB', 'DATA_LENGTH' => 4000, 'NULLABLE' => 'Y'),
+    array('COLUMN_NAME' => 'PIC', 'DATA_TYPE' => 'BLOB', 'NULLABLE' => 'Y'),
+    array('COLUMN_NAME' => 'H', 'DATA_TYPE' => 'RAW', 'DATA_LENGTH' => 16, 'NULLABLE' => 'Y'),
+    array('COLUMN_NAME' => 'X', 'DATA_TYPE' => 'XMLTYPE', 'NULLABLE' => 'Y'),
+    array('COLUMN_NAME' => 'V', 'DATA_TYPE' => 'NUMBER', 'NULLABLE' => 'Y', 'VIRTUAL_COLUMN' => 'YES'),
+));
+eq(array_map(function ($c) { return $c['name'] . ':' . $c['enc']; }, $cp['columns']), array('ID:s', 'TS:s', 'BODY:s', 'PIC:b64', 'H:hex', 'V:s'), 'text/number/timestamp/CLOB as strings, BLOB base64, RAW hex');
+eq($cp['columns'][4]['expr'], 'RAWTOHEX("H")', 'RAW is selected through RAWTOHEX');
+eq($cp['skipped'], array('X' => 'XMLTYPE'), 'an unsupported type is left out and named');
+ok($cp['columns'][5]['virtual'] && !$cp['columns'][0]['virtual'], 'a virtual column is marked (a restore must not insert it)');
+eq($cp['columns'][0]['nullable'], false, 'NOT NULL carried');
+eq(db_backup_key_column(array('ID'), $cp['columns']), array('name' => 'ID', 'kind' => 'n'), 'single NUMBER primary key = the resume key');
+eq(db_backup_key_column(array('ID', 'TS'), $cp['columns']), null, 'composite key -> read in one go');
+eq(db_backup_key_column(array('TS'), $cp['columns']), null, 'a TIMESTAMP key is not used');
+eq(db_backup_key_column(array(), $cp['columns']), null, 'no key -> null');
+$sp = db_backup_column_plan(array(array('COLUMN_NAME' => 'CODE', 'DATA_TYPE' => 'VARCHAR2')));
+eq(db_backup_key_column(array('CODE'), $sp['columns']), array('name' => 'CODE', 'kind' => 's'), 'a VARCHAR2 key is used (binary sort)');
+eq(db_backup_column_plan(array(array('COLUMN_NAME' => 'A"B', 'DATA_TYPE' => 'NUMBER')))['columns'], array(), 'a column name with a quote is never put in SQL');
+ok(db_backup_columns_sig($cp['columns']) !== db_backup_columns_sig(array_slice($cp['columns'], 1)), 'the column fingerprint changes when a column goes');
+
+echo "1d. SQL\n";
+$k = array('name' => 'ID', 'kind' => 'n');
+eq(db_backup_select_sql('NC_REPORTING', 'PENUMBRA_T', $cp['columns'], null, null), 'SELECT "ID", "TS", "BODY", "PIC", RAWTOHEX("H"), "V" FROM "NC_REPORTING"."PENUMBRA_T"', 'no key: whole table, no ORDER BY');
+eq(db_backup_select_sql('NC_REPORTING', 'PENUMBRA_T', array($cp['columns'][0]), $k, null), 'SELECT "ID" FROM "NC_REPORTING"."PENUMBRA_T" ORDER BY "ID"', 'keyed first part: key order');
+eq(db_backup_select_sql('NC_REPORTING', 'PENUMBRA_T', array($cp['columns'][0]), $k, '41'), 'SELECT "ID" FROM "NC_REPORTING"."PENUMBRA_T" WHERE "ID" > TO_NUMBER(:k) ORDER BY "ID"', 'resume: after the last key, numerically');
+eq(db_backup_select_sql('S', 'PENUMBRA_T', $sp['columns'], array('name' => 'CODE', 'kind' => 's'), 'ab'), 'SELECT "CODE" FROM "S"."PENUMBRA_T" WHERE "CODE" > :k ORDER BY "CODE"', 'text key resume binds as text');
+
+echo "1e. row encoding\n";
+class FakeLob { private $v; function __construct($v) { $this->v = $v; } function load() { return $this->v; } }
+list($line, $lossy) = db_backup_encode_row(array('0012.50', null, new FakeLob("a\nb \"q\" /x/"), "\x00\xff\x01", 'ABCD', '7'), $cp['columns']);
+eq(json_decode($line, true), array('0012.50', null, "a\nb \"q\" /x/", base64_encode("\x00\xff\x01"), 'ABCD', '7'), 'NUMBER text kept exactly, NULL null, CLOB loaded, BLOB base64');
+eq($lossy, false, 'valid UTF-8 is not lossy');
+eq(strpos($line, "\n"), false, 'one row = one line (newlines escaped)');
+list($line, $lossy) = db_backup_encode_row(array('1', "caf\xe9", null, null, null, null), $cp['columns']);
+ok($lossy && json_decode($line, true)[1] === "caf\u{FFFD}", 'invalid UTF-8: the row is kept with U+FFFD and reported lossy');
+list($line) = db_backup_encode_row(array('1', "Ünïcödé ✓", null, null, null, null), $cp['columns']);
+eq(json_decode($line, true)[1], "Ünïcödé ✓", 'unicode round-trips');
+
+echo "1e2. CLOBs as text slices\n";
+$fp = db_backup_fetch_plan($cp['columns'], array('name' => 'ID', 'kind' => 'n'), 2);
+eq(array_map(function ($s) { return $s['expr']; }, $fp['select']),
+   array('"ID"', '"TS"', 'DBMS_LOB.SUBSTR("BODY", 1330, 1)', 'DBMS_LOB.SUBSTR("BODY", 1330, 1331)', 'DBMS_LOB.GETLENGTH("BODY")', 'LENGTHC("BODY")', '"PIC"', 'RAWTOHEX("H")', '"V"'),
+   'keyed: the CLOB becomes slices + GETLENGTH + LENGTHC; the BLOB and the rest stay as they were');
+eq(array($fp['sliced'], $fp['max_chars']), array(true, 2660), 'sliced, 2 x 1330 characters inline');
+$fp0 = db_backup_fetch_plan($cp['columns'], null);
+eq(array($fp0['sliced'], count($fp0['select'])), array(false, 6), 'no key: never sliced (a long value could not be fetched back)');
+$dec = function ($body, $len, $lenc, $s1 = null, $s2 = null) use ($fp) { return db_backup_decode_row(array('1', 'ts', $s1, $s2, $len, $lenc, 'P', 'H', 'V'), $fp); };
+eq($dec('', '5', '5', 'ab', 'cde'), array(array('1', 'ts', 'abcde', 'P', 'H', 'V'), array()), 'slices joined, other columns in plan order');
+eq($dec('', null, null), array(array('1', 'ts', null, 'P', 'H', 'V'), array()), 'GETLENGTH NULL = a NULL CLOB');
+eq($dec('', '0', '0'), array(array('1', 'ts', '', 'P', 'H', 'V'), array()), 'GETLENGTH 0 = an empty CLOB');
+eq($dec('', '2661', '2661', 'x', 'y')[1], array('BODY'), 'longer than the slices: fetched whole');
+eq($dec('', '1332', '1331', 'a', 'b')[1], array('BODY'), 'GETLENGTH != LENGTHC (a character past U+FFFF): fetched whole');
+eq($dec('', '4', '4', "\u{e9}\u{e9}", "\u{e9}\u{e9}")[0][2], "\u{e9}\u{e9}\u{e9}\u{e9}", 'multibyte text: counted in characters, not bytes');
+eq($dec('', '6', '6', 'ab', 'cd')[1], array('BODY'), 'joined text shorter than GETLENGTH says: fetched whole, never written short');
+eq(db_backup_prefetch_rows(array_fill(0, 3, 1)), 500, 'a narrow statement prefetches 500 rows');
+eq(db_backup_prefetch_rows(array_fill(0, 40, 1)), 104, 'a wide sliced one fewer (client buffer ~16 MB)');
+eq(db_backup_prefetch_rows(array_fill(0, 4000, 1)), 20, 'never under 20');
+
+echo "1f. names, deadline, next action\n";
+eq(db_backup_set_name(mktime(1, 30, 0, 10, 13, 2026)), '2026-10-13_0130', 'set folder name');
+ok(db_backup_set_name_ok('2026-10-13_0130') && !db_backup_set_name_ok('..') && !db_backup_set_name_ok('2026-10-13_0130x') && !db_backup_set_name_ok('C:\\Windows'), 'only YYYY-MM-DD_HHMM is a set folder');
+eq(db_backup_part_file('PENUMBRA_AUDIT', 3), 'PENUMBRA_AUDIT.0003.jsonl.gz', 'part file name');
+ok(db_backup_file_ok('PENUMBRA_AUDIT.0003.jsonl.gz') && db_backup_file_ok('manifest.json') && db_backup_file_ok('PENUMBRA_A.0001.jsonl.gz.tmp'), 'the job\'s own files are recognised');
+ok(!db_backup_file_ok('notes.txt') && !db_backup_file_ok('..\\PENUMBRA_A.0001.jsonl.gz') && !db_backup_file_ok('PENUMBRA_A.0001.jsonl.gz.bak') && !db_backup_file_ok('x/manifest.json'), 'anything else is never deleted');
+eq(db_backup_deadline(1000.0, 150, null), 1150.0, 'CLI: the budget alone');
+eq(db_backup_deadline(1000.0, 150, 900.0), 1150.0, 'early in the cycle: the budget');
+eq(db_backup_deadline(1000.0, 150, 800.0), 1055.0, 'late in the cycle: never past 255 s into it');
+eq(db_backup_next_action(null, 100)['action'], 'new', 'no set -> new');
+eq(db_backup_next_action(array('status' => 'complete', 'set' => 'a'), 100)['action'], 'new', 'newest complete -> new');
+$na = db_backup_next_action(array('status' => 'in_progress', 'set' => 'a', 'started_ts' => 100), 100 + 19 * 3600);
+eq(array($na['action'], $na['abandon']), array('resume', false), 'in progress, 19 h old -> resume');
+$na = db_backup_next_action(array('status' => 'in_progress', 'set' => 'a', 'started_ts' => 100), 100 + 21 * 3600);
+eq(array($na['action'], $na['abandon']), array('new', true), 'in progress, 21 h old -> abandon + new');
+eq(db_backup_pending(array('tables' => array('A' => array('status' => 'done'), 'B' => array('status' => 'partial'), 'C' => array('status' => 'error'), 'D' => array('status' => 'failed'), 'E' => array('status' => 'pending')))), array('B', 'C', 'E'), 'pending = pending, partial, error (failed is final)');
+
+echo "1g. retention\n";
+$D = 86400; $now = 100 * $D;
+$sets = array(
+    array('name' => '2026-10-01_0130', 'status' => 'complete', 'started_ts' => $now - 4 * $D),
+    array('name' => '2026-10-02_0130', 'status' => 'complete', 'started_ts' => $now - 3 * $D),
+    array('name' => '2026-10-03_0130', 'status' => 'abandoned', 'started_ts' => $now - 2.5 * $D),
+    array('name' => '2026-10-04_0130', 'status' => 'complete', 'started_ts' => $now - 1 * $D),
+    array('name' => '2026-10-05_0130', 'status' => 'failed', 'started_ts' => $now - 0.5 * $D),
+    array('name' => '2026-10-05_0135', 'status' => 'in_progress', 'started_ts' => $now - 3600),
+    array('name' => 'my-copy', 'status' => 'complete', 'started_ts' => 0),
+);
+eq(db_backup_retention($sets, $now, 2), array('2026-10-01_0130' => 'beyond the 2 newest complete sets', '2026-10-03_0130' => 'abandoned set older than 2 days'),
+   'keep 2: the oldest complete goes, an old abandoned set goes, a young failed / in-progress set stays, a foreign folder is never named');
+$r0 = array_keys(db_backup_retention($sets, $now, 0)); sort($r0);
+eq($r0, array('2026-10-01_0130', '2026-10-02_0130', '2026-10-03_0130'), 'keep 0 still keeps the newest complete set');
+eq(db_backup_retention(array(array('name' => '2026-10-01_0130', 'status' => 'in_progress', 'started_ts' => $now - 3 * $D)), $now, 5), array('2026-10-01_0130' => 'in_progress set older than 2 days'), 'a stuck in-progress set older than 2 days goes');
+
+echo "1h. freshness + checks\n";
+$now = 2000000000;
+eq(db_backup_freshness(null, $now, true)['status'], 'never', 'scheduled, no set yet -> never');
+eq(db_backup_freshness(null, $now, false)['status'], 'off', 'not scheduled -> off (no warning)');
+$lt = array('finished_ts' => $now - 3 * 3600, 'set' => 'S', 'tables' => 21, 'rows' => 1234567, 'bytes' => 3 * 1048576);
+$f = db_backup_freshness($lt, $now, true);
+eq(array($f['status'], $f['detail']), array('ok', 'last complete 3h ago - set S: 21 tables, 1,234,567 rows, 3.0 MB'), 'fresh set -> ok with the numbers');
+eq(db_backup_freshness(array('finished_ts' => $now - 37 * 3600) + $lt, $now, true)['status'], 'stale', 'over 36 h -> stale');
+eq(db_backup_freshness(array('finished_ts' => $now - 37 * 3600) + $lt, $now, false)['status'], 'ok', 'a manual-only job is never stale');
+$w = db_backup_checks(array('tables' => array('PENUMBRA_X' => array('skipped_columns' => array('X' => 'XMLTYPE'), 'lossy' => 2))), 4 * 1048576, 1048576);
+eq(count($w), 3, 'checks: unsupported column, lossy rows, low disk');
+eq(db_backup_checks(array('tables' => array('PENUMBRA_X' => array('skipped_columns' => array(), 'lossy' => 0))), 100 * 1048576, 1048576), array(), 'nothing to say -> empty list (clears last night\'s)');
+
+// ------------------------------------------------------- 2. the job, offline
+echo "2. the job over a fake database\n";
+
+/** A stand-in for DbBackupOci: dictionary + data from arrays, the fake clock moves per row. */
+class FakeDb {
+    public $t; public $clock; public $perRow; public $fail = array(); public $began = 0; public $ended = 0; public $queries = array();
+    function __construct(array $tables, &$clock, $perRow) { $this->t = $tables; $this->clock =& $clock; $this->perRow = $perRow; }
+    function begin() { $this->began++; }
+    function end() { $this->ended++; }
+    function close() {}
+    function all($sql, array $b = array()) {
+        if (strpos($sql, 'FROM ALL_TABLES') !== false) {
+            $out = array();
+            foreach ($this->t as $n => $d) $out[] = array('TABLE_NAME' => $n, 'NUM_ROWS' => count($d['rows']), 'AVG_ROW_LEN' => isset($d['len']) ? $d['len'] : 10,
+                                                          'TEMPORARY' => 'N', 'COMMENTS' => isset($d['comment']) ? $d['comment'] : null);
+            return $out;
+        }
+        if (strpos($sql, 'FROM ALL_TAB_COLS') !== false) { return isset($this->t[$b[':t']]) ? $this->t[$b[':t']]['cols'] : array(); }
+        if (strpos($sql, 'FROM ALL_CONSTRAINTS') !== false) { return array_map(function ($c) { return array('COLUMN_NAME' => $c); }, $this->t[$b[':t']]['pk']); }
+        throw new Exception('fake: unexpected dictionary SQL ' . $sql);
+    }
+    public $refuseSlices = false; public $prefetches = array(); public $values = 0;
+    /** A CLOB as Oracle counts it: UTF-16 units; a character past U+FFFF is two (a surrogate pair). */
+    static function units($s) {
+        $u = array();
+        foreach (preg_split('//u', (string)$s, -1, PREG_SPLIT_NO_EMPTY) as $ch) {
+            $cp = (strlen($ch) === 4) ? 0x10000 : 0;
+            if ($cp) { $u[] = array($ch, 'hi'); $u[] = array($ch, 'lo'); } else { $u[] = array($ch, 'bmp'); }
+        }
+        return $u;
+    }
+    /** DBMS_LOB.SUBSTR(c, amount, offset) in UTF-16 units; half a surrogate pair comes out as U+FFFD (what a split does to the text). */
+    static function lobSubstr($s, $amount, $offset) {
+        $u = self::units($s);
+        $part = array_slice($u, $offset - 1, $amount);
+        if (!$part) return null;   // past the end: NULL, like Oracle
+        $out = '';
+        for ($i = 0; $i < count($part); $i++) {
+            if ($part[$i][1] === 'bmp') { $out .= $part[$i][0]; continue; }
+            if ($part[$i][1] === 'hi' && isset($part[$i + 1]) && $part[$i + 1][1] === 'lo') { $out .= $part[$i][0]; $i++; continue; }
+            $out .= "\u{FFFD}";
+        }
+        return $out;
+    }
+    function cell($tn, array $r, $e) {
+        list($kind, $c) = $e;
+        $v = array_key_exists($c, $r) ? $r[$c] : null;
+        if ($kind === 'substr') return $v === null ? null : self::lobSubstr($v, $e[2], $e[3]);
+        if ($kind === 'getlength') return $v === null ? null : (string)count(self::units($v));
+        if ($kind === 'lengthc') return ($v === null || $v === '') ? ($v === null ? null : '0') : (string)count(preg_split('//u', $v, -1, PREG_SPLIT_NO_EMPTY));
+        if ($kind === 'raw') return $v === null ? null : strtoupper(bin2hex($v));
+        return $v;
+    }
+    function rows($sql, array $b = array(), $prefetch = 500) {
+        $this->queries[] = $sql;
+        $this->prefetches[] = $prefetch;
+        if (!preg_match('/^SELECT (.*) FROM "NC_REPORTING"\."([A-Z0-9_]+)"( WHERE "(\w+)" > (TO_NUMBER\(:k\)|:k))?( ORDER BY "(\w+)")?$/', $sql, $m)) throw new Exception('fake: unexpected SQL ' . $sql);
+        $tn = $m[2];
+        if (isset($this->fail[$tn])) throw new Exception('ORA-00942: table or view does not exist (fake)');
+        if ($this->refuseSlices && strpos($m[1], 'DBMS_LOB') !== false) throw new Exception('ORA-00904: "LENGTHC": invalid identifier (fake)');
+        preg_match_all('/DBMS_LOB\.SUBSTR\("([^"]+)", (\d+), (\d+)\)|DBMS_LOB\.GETLENGTH\("([^"]+)"\)|LENGTHC\("([^"]+)"\)|RAWTOHEX\("([^"]+)"\)|"([^"]+)"/', $m[1], $em, PREG_SET_ORDER);
+        $exprs = array();
+        foreach ($em as $x) {
+            if (!empty($x[1]))      $exprs[] = array('substr', $x[1], (int)$x[2], (int)$x[3]);
+            elseif (!empty($x[4]))  $exprs[] = array('getlength', $x[4]);
+            elseif (!empty($x[5]))  $exprs[] = array('lengthc', $x[5]);
+            elseif (!empty($x[6]))  $exprs[] = array('raw', $x[6]);
+            else                    $exprs[] = array('col', $x[7]);
+        }
+        $rows = $this->t[$tn]['rows'];
+        $order = isset($m[7]) ? $m[7] : null;
+        if ($order) usort($rows, function ($x, $y) use ($order) { return is_numeric($x[$order]) ? $x[$order] <=> $y[$order] : strcmp($x[$order], $y[$order]); });
+        foreach ($rows as $r) {
+            if (!empty($m[3])) {
+                $kv = $r[$m[4]];
+                if ($m[5] === ':k' ? strcmp((string)$kv, $b[':k']) <= 0 : (float)$kv <= (float)$b[':k']) continue;
+            }
+            $this->clock += $this->perRow;
+            $out = array();
+            foreach ($exprs as $e) $out[] = $this->cell($tn, $r, $e);
+            yield $out;
+        }
+    }
+    function value($sql, array $b = array()) {
+        if (!preg_match('/^SELECT "(\w+)" FROM "NC_REPORTING"\."([A-Z0-9_]+)" WHERE "(\w+)" = (TO_NUMBER\(:w\)|:w)$/', $sql, $m)) throw new Exception('fake: unexpected value SQL ' . $sql);
+        $this->values++;
+        $this->clock += $this->perRow;
+        foreach ($this->t[$m[2]]['rows'] as $r) { if ((string)$r[$m[3]] === (string)$b[':w']) return array_key_exists($m[1], $r) ? $r[$m[1]] : null; }
+        return null;
+    }
+}
+function col($n, $t, $null = 'Y') { return array('COLUMN_NAME' => $n, 'DATA_TYPE' => $t, 'DATA_LENGTH' => 10, 'DATA_PRECISION' => null, 'DATA_SCALE' => null, 'NULLABLE' => $null, 'VIRTUAL_COLUMN' => 'NO'); }
+function fixture($auditRows = 30) {
+    $audit = array();
+    for ($i = 1; $i <= $auditRows; $i++) $audit[] = array('ID' => (string)$i, 'ACTION' => $i % 2 ? 'OPEN' : 'UPDATE', 'AFTER' => str_repeat('x', $i % 7) . "\n\u{2713}", 'TS' => '2026-10-12 01:0' . ($i % 10) . ':00');
+    return array(
+        'PENUMBRA_REPORTS' => array('pk' => array('ID'), 'len' => 100,
+            'cols' => array(col('ID', 'NUMBER', 'N'), col('SHORT_ID', 'VARCHAR2'), col('DEF', 'CLOB'), col('ICON', 'BLOB'), col('H', 'RAW'), col('X', 'XMLTYPE')),
+            'rows' => array(array('ID' => '7', 'SHORT_ID' => 'awdspon', 'DEF' => '{"q":"SELECT 1"}', 'ICON' => "\x89PNG\x00\x01", 'H' => "\xde\xad", 'X' => '<x/>'),
+                            array('ID' => '12', 'SHORT_ID' => 'dodnsa', 'DEF' => null, 'ICON' => null, 'H' => null, 'X' => null),
+                            array('ID' => '3', 'SHORT_ID' => 'Ünï', 'DEF' => "multi\nline", 'ICON' => null, 'H' => null, 'X' => null))),
+        'PENUMBRA_THEMES' => array('pk' => array(), 'len' => 1,
+            'cols' => array(col('NAME', 'VARCHAR2'), col('CSS', 'CLOB')),
+            'rows' => array(array('NAME' => 'dark', 'CSS' => ':root{}'), array('NAME' => 'light', 'CSS' => null))),
+        'PENUMBRA_TAGS' => array('pk' => array('CODE'), 'len' => 5,
+            'cols' => array(col('CODE', 'VARCHAR2', 'N'), col('N', 'NUMBER')),
+            'rows' => array(array('CODE' => 'b', 'N' => '2'), array('CODE' => 'a', 'N' => '1'), array('CODE' => 'C', 'N' => '3'))),
+        'PENUMBRA_AUDIT' => array('pk' => array('ID'), 'len' => 1000,
+            'cols' => array(col('ID', 'NUMBER', 'N'), col('ACTION', 'VARCHAR2'), col('AFTER', 'CLOB'), col('TS', 'TIMESTAMP(6)')),
+            'rows' => $audit),
+        'PENUMBRA_PEOPLE_STG' => array('pk' => array(), 'cols' => array(col('A', 'VARCHAR2')), 'rows' => array(array('A' => 'x'))),
+        'PENUMBRA_X_DUMP' => array('pk' => array(), 'comment' => 'PENUMBRA_DBDUMP task_id=9', 'cols' => array(col('A', 'VARCHAR2')), 'rows' => array(array('A' => 'x'))),
+    );
+}
+function scratch($tag) {
+    $d = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'pnb_dbbak_' . getmypid() . '_' . $tag;
+    @mkdir($d . DIRECTORY_SEPARATOR . 'bk', 0777, true); @mkdir($d . DIRECTORY_SEPARATOR . 'state'); @mkdir($d . DIRECTORY_SEPARATOR . 'log');
+    return $d;
+}
+function rmtree($d) {
+    if (!is_dir($d) || strpos(basename($d), 'pnb_dbbak_') !== 0 && strpos($d, 'pnb_dbbak_') === false) return;   // leaf-pattern guard
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($d, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST) as $f) {
+        $f->isDir() ? @rmdir($f->getPathname()) : @unlink($f->getPathname());
+    }
+    @rmdir($d);
+}
+$AUDITED = array();
+function logPenumbraAudit($rid, $action, $before, $after, $message = null, $extra = null) { global $AUDITED; $AUDITED[] = array($action, json_decode($after, true), $message); }
+
+/** One job run; the log is swallowed (kept in $LASTLOG). */
+function runjob($dir, $db, &$clock, array $over = array(), array $opts = array()) {
+    global $LASTLOG;
+    $GLOBALS['db_backup_log_dir'] = $dir . DIRECTORY_SEPARATOR . 'log';
+    $settings = array_merge(db_backup_settings(array('dir' => $dir . DIRECTORY_SEPARATOR . 'bk', 'min_free_gb' => 0)), $over);
+    ob_start();
+    $code = db_backup_run(array_merge(array('db' => $db, 'clock' => function () use (&$clock) { return $clock; },
+                                            'settings' => $settings, 'state_dir' => $dir . DIRECTORY_SEPARATOR . 'state', 'cycle_start' => null), $opts));
+    $LASTLOG = ob_get_clean();
+    return $code;
+}
+function sets($dir) { return db_backup_list_sets($dir . DIRECTORY_SEPARATOR . 'bk'); }
+function read_table($setDir, $m, $tn) {
+    $rows = array();
+    foreach ($m['tables'][$tn]['parts'] as $p) {
+        db_backup_read_part($setDir . DIRECTORY_SEPARATOR . $p['file'], function ($r, $h) use (&$rows) { $rows[] = array_combine(array_map(function ($c) { return $c['name']; }, $h['columns']), $r); });
+    }
+    return $rows;
+}
+function flag($dir, $kind) { return penumbra_maintenance_flag_on(penumbra_maintenance_control_path('db_backup', $kind, $dir . DIRECTORY_SEPARATOR . 'state')); }
+
+// 2a. a whole set in one go
+echo "2a. one-go set\n";
+$d = scratch('a'); $clock = (float)mktime(1, 30, 0, 10, 13, 2026); $db = new FakeDb(fixture(), $clock, 0.01);
+$AUDITED = array();
+$code = runjob($d, $db, $clock, array(), array('unlimited' => true));
+eq($code, 0, 'exit 0');
+$ss = sets($d); $m = $ss ? $ss[0]['manifest'] : array();
+eq(array(count($ss), $ss ? $ss[0]['name'] : '', isset($m['status']) ? $m['status'] : ''), array(1, '2026-10-13_0130', 'complete'), 'one set, named by its start, complete');
+eq(array_keys($m['tables']), array('PENUMBRA_THEMES', 'PENUMBRA_TAGS', 'PENUMBRA_REPORTS', 'PENUMBRA_AUDIT'), 'smallest first; staging and the DB_DUMP output not taken');
+eq(db_backup_verify_set($ss[0]['dir']), array(), 'verify: every part whole, hashes and counts match');
+$rep = read_table($ss[0]['dir'], $m, 'PENUMBRA_REPORTS');
+eq(array_column($rep, 'ID'), array('3', '7', '12'), 'keyed table read in NUMERIC key order (3 < 7 < 12)');
+eq(array($rep[1]['DEF'], base64_decode($rep[1]['ICON']), $rep[1]['H'], $rep[0]['SHORT_ID'], $rep[0]['DEF'], $rep[2]['ICON']),
+   array('{"q":"SELECT 1"}', "\x89PNG\x00\x01", 'DEAD', 'Ünï', "multi\nline", null), 'CLOB, BLOB (base64), RAW (hex), unicode, newlines and NULL round-trip');
+ok(!array_key_exists('X', $rep[0]), 'the XMLTYPE column is left out');
+eq(array_column(read_table($ss[0]['dir'], $m, 'PENUMBRA_TAGS'), 'CODE'), array('C', 'a', 'b'), 'text key in BINARY order');
+eq(count(read_table($ss[0]['dir'], $m, 'PENUMBRA_AUDIT')), 30, 'all 30 audit rows');
+eq($db->began . '/' . $db->ended, '1/1', 'one READ ONLY transaction, ended');
+$lt = json_decode((string)@file_get_contents($d . '/state/db_backup_latest.json'), true);
+eq(array($lt['set'], $lt['tables'], $lt['rows'], $lt['failed']), array('2026-10-13_0130', 4, 38, 0), 'the Health hub summary is written (4 tables, 38 rows)');
+$ck = penumbra_maintenance_checks_read('db_backup', $d . '/state');
+ok($ck && count($ck['warnings']) === 1 && strpos($ck['warnings'][0], 'X (XMLTYPE)') !== false, 'checks: the unsupported column is reported');
+eq(count($AUDITED) ? $AUDITED[0][0] : '', 'DB_BACKUP', 'one DB_BACKUP audit row');
+eq(count($AUDITED) ? array($AUDITED[0][1]['tables'], $AUDITED[0][1]['rows']) : null, array(4, 38), 'its stats lead with tables and rows (the hub shows the first two)');
+ok(!is_file($d . '/bk/db_backup.lock'), 'lock removed');
+ok(!flag($d, 'request'), 'a finished set requests nothing');
+$hdr = null; db_backup_read_part($ss[0]['dir'] . '/PENUMBRA_REPORTS.0001.jsonl.gz', function ($r, $h) use (&$hdr) { $hdr = $h; return false; });
+eq(array($hdr['format'], $hdr['table'], $hdr['key'], count($hdr['columns'])), array('penumbra-backup-1', 'PENUMBRA_REPORTS', 'ID', 5), 'the part header describes itself');
+rmtree($d);
+
+// 2b. a set spread over cycles
+echo "2b. spread over cycles\n";
+$d = scratch('b'); $clock = (float)mktime(1, 30, 0, 10, 13, 2026); $db = new FakeDb(fixture(5000), $clock, 0.02);   // audit = 100 s of reading
+$AUDITED = array(); $codes = array(); $cycles = 0;
+do {
+    @file_put_contents(penumbra_maintenance_control_path('db_backup', 'request', $d . '/state'), "off\n");   // the tick consumes the request
+    $codes[] = runjob($d, $db, $clock, array('budget_secs' => 30));
+    $clock += 300; $cycles++;
+    $ss = sets($d); $m = $ss[0]['manifest'];
+    if ($cycles === 1) {
+        eq($m['status'], 'in_progress', 'after cycle 1: in progress');
+        eq(array($m['tables']['PENUMBRA_REPORTS']['status'], $m['tables']['PENUMBRA_AUDIT']['status']), array('done', 'partial'), 'small tables done in cycle 1, the audit table partial');
+        ok(flag($d, 'request'), 'the job requested its own next run');
+        eq(count($AUDITED), 0, 'no audit row for a cycle in the middle of a set');
+    }
+} while ($m['status'] === 'in_progress' && $cycles < 10);
+eq(array($m['status'], $cycles), array('complete', 4), 'complete after 4 cycles of 30 s');
+eq(array_unique($codes), array(0), 'every cycle exit 0');
+$ids = array_map('intval', array_column(read_table($ss[0]['dir'], $m, 'PENUMBRA_AUDIT'), 'ID'));
+eq(array(count($ids), $ids === range(1, 5000)), array(5000, true), 'all 5000 audit rows across the parts, each once, in order');
+ok(count($m['tables']['PENUMBRA_AUDIT']['parts']) >= 4, 'the audit table is in ' . count($m['tables']['PENUMBRA_AUDIT']['parts']) . ' parts');
+eq($m['tables']['PENUMBRA_AUDIT']['parts'][1]['after'], $m['tables']['PENUMBRA_AUDIT']['parts'][0]['last_key'], 'part 2 starts after part 1\'s last key');
+ok(strpos(implode("\n", $db->queries), 'WHERE "ID" > TO_NUMBER(:k)') !== false, 'resumes with WHERE key > :k');
+eq(db_backup_verify_set($ss[0]['dir']), array(), 'verify passes');
+ok(!flag($d, 'request'), 'no request after the last cycle');
+eq(count($m['cycles']), 4, 'the manifest records each cycle');
+rmtree($d);
+
+// 2c. the runner's cycle cap: started 200 s into a cycle -> only 55 s
+echo "2c. cycle cap\n";
+$d = scratch('c'); $clock = (float)mktime(1, 30, 0, 10, 13, 2026); $db = new FakeDb(fixture(5000), $clock, 0.02);
+runjob($d, $db, $clock, array('budget_secs' => 240), array('cycle_start' => $clock - 200));
+$m = sets($d)[0]['manifest'];
+$secs = $m['cycles'][0]['secs'];
+ok($secs <= 60 && $secs >= 54, "stopped at 255 s into the runner's cycle, give or take one 200-row check ({$secs}s of work, not 240)");
+rmtree($d);
+
+// 2d. paused mid-set
+echo "2d. pause\n";
+$d = scratch('d'); $clock = (float)mktime(1, 30, 0, 10, 13, 2026); $db = new FakeDb(fixture(5000), $clock, 0.02);
+penumbra_maintenance_flag_set('db_backup', 'paused', true, $d . '/state');
+runjob($d, $db, $clock, array('budget_secs' => 30));
+ok(!flag($d, 'request'), 'a paused job does not request its next cycle');
+ok(strpos($LASTLOG, 'PAUSED') !== false, 'the log says it waits for Resume');
+rmtree($d);
+
+// 2e. a big table without a key never fits
+echo "2e. keyless overrun\n";
+$d = scratch('e'); $clock = (float)mktime(1, 30, 0, 10, 13, 2026);
+$fx = fixture(5); for ($i = 0; $i < 5000; $i++) $fx['PENUMBRA_THEMES']['rows'][] = array('NAME' => "t$i", 'CSS' => 'x');
+$fx['PENUMBRA_THEMES']['len'] = 999999;   // sorted last so it gets a whole cycle
+$db = new FakeDb($fx, $clock, 0.02); $AUDITED = array(); $codes = array();
+for ($i = 0; $i < 4; $i++) { $codes[] = runjob($d, $db, $clock, array('budget_secs' => 30)); $clock += 300; }
+$m = sets($d)[0]['manifest'];
+eq($m['tables']['PENUMBRA_THEMES']['status'], 'failed', 'a keyless table that cannot fit a whole cycle is failed, not retried forever');
+ok(strpos($m['tables']['PENUMBRA_THEMES']['error'], 'no single-column primary key') !== false, 'with the reason');
+eq($m['status'], 'complete', 'the rest of the set still completes');
+ok(in_array(1, $codes, true), 'that run exits 1 (the hub shows FAILED)');
+eq(count($AUDITED) ? $AUDITED[count($AUDITED) - 1][0] : '', 'DB_BACKUP_FAIL', 'audited as DB_BACKUP_FAIL');
+eq(glob(sets($d)[0]['dir'] . '/PENUMBRA_THEMES*'), array(), 'no partial file left for it');
+$ck = penumbra_maintenance_checks_read('db_backup', $d . '/state');
+ok($ck && strpos(implode(' ', $ck['warnings']), 'not backed up: PENUMBRA_THEMES') !== false, 'checks name it');
+rmtree($d);
+
+// 2f. a table that errors
+echo "2f. failing table\n";
+$d = scratch('f'); $clock = (float)mktime(1, 30, 0, 10, 13, 2026); $db = new FakeDb(fixture(), $clock, 0.01);
+$db->fail['PENUMBRA_TAGS'] = true;
+$code = runjob($d, $db, $clock, array(), array('unlimited' => true));
+$m = sets($d)[0]['manifest'];
+eq(array($m['status'], $m['tables']['PENUMBRA_TAGS']['status'], $m['tables']['PENUMBRA_REPORTS']['status']), array('in_progress', 'error', 'done'), 'one table errors; the others are taken; the set stays open');
+for ($i = 0; $i < 2; $i++) { $clock += 300; $code = runjob($d, $db, $clock, array(), array('unlimited' => true)); }
+$m = sets($d)[0]['manifest'];
+eq(array($m['tables']['PENUMBRA_TAGS']['status'], $m['tables']['PENUMBRA_TAGS']['attempts'], $m['status'], $code), array('failed', 3, 'complete', 1), 'three attempts, then failed; the set completes with exit 1');
+ok(strpos($m['tables']['PENUMBRA_TAGS']['error'], 'ORA-00942') !== false, 'the Oracle error is kept');
+rmtree($d);
+
+// 2g. columns change between cycles
+echo "2g. column change mid-set\n";
+$d = scratch('g'); $clock = (float)mktime(1, 30, 0, 10, 13, 2026); $fx = fixture(5000); $db = new FakeDb($fx, $clock, 0.02);
+runjob($d, $db, $clock, array('budget_secs' => 30)); $clock += 300;
+$db->t['PENUMBRA_AUDIT']['cols'][] = col('NEWCOL', 'VARCHAR2');
+for ($i = 0; $i < 6; $i++) { $ss = sets($d); if ($ss[0]['manifest']['status'] !== 'in_progress') break; runjob($d, $db, $clock, array('budget_secs' => 30)); $clock += 300; }
+$m = sets($d)[0]['manifest'];
+$rows = read_table(sets($d)[0]['dir'], $m, 'PENUMBRA_AUDIT');
+eq(array($m['status'], count($rows), array_key_exists('NEWCOL', $rows[0])), array('complete', 5000, true), 'the table started over with the new column: 5000 rows, no duplicates, every part has NEWCOL');
+eq(db_backup_verify_set(sets($d)[0]['dir']), array(), 'verify passes');
+rmtree($d);
+
+// 2h. retention through a run
+echo "2h. retention\n";
+$d = scratch('h'); $clock = (float)mktime(1, 30, 0, 10, 13, 2026); $db = new FakeDb(fixture(), $clock, 0.01);
+foreach (array('2026-10-09_0130' => 5, '2026-10-10_0130' => 4, '2026-10-11_0130' => 3, '2026-10-12_0130' => 2) as $n => $daysAgo) {
+    @mkdir("$d/bk/$n");
+    file_put_contents("$d/bk/$n/manifest.json", json_encode(array('format' => 'penumbra-backup-1', 'set' => $n, 'status' => 'complete', 'started_ts' => (int)$clock - $daysAgo * 86400, 'tables' => array())));
+    file_put_contents("$d/bk/$n/PENUMBRA_A.0001.jsonl.gz", 'x');
+}
+file_put_contents("$d/bk/2026-10-09_0130/notes.txt", 'mine');
+@mkdir("$d/bk/keep-me"); file_put_contents("$d/bk/keep-me/PENUMBRA_A.0001.jsonl.gz", 'x');
+runjob($d, $db, $clock, array('keep_days' => 2), array('unlimited' => true));
+$left = array_values(array_filter(scandir("$d/bk"), function ($n) { return $n[0] !== '.'; }));
+eq($left, array('2026-10-09_0130', '2026-10-12_0130', '2026-10-13_0130', 'keep-me'), 'keep 2: the new set + the newest old one; 10-10 and 10-11 removed; a foreign folder untouched');
+eq(array_values(array_filter((array)@scandir("$d/bk/2026-10-09_0130"), function ($n) { return $n[0] !== '.'; })), array('notes.txt'), 'a set holding a file the job did not write: its own files removed, the folder and the foreign file kept');
+rmtree($d);
+
+// 2i. guards: disk, lock, abandoned set
+echo "2i. guards\n";
+$d = scratch('i'); $clock = (float)mktime(1, 30, 0, 10, 13, 2026); $db = new FakeDb(fixture(), $clock, 0.01); $AUDITED = array();
+$code = runjob($d, $db, $clock, array('min_free' => PHP_INT_MAX));
+eq(array($code, count(sets($d)), $db->began), array(2, 0, 0), 'not enough disk: exit 2, no set started, no database touched');
+$ck = penumbra_maintenance_checks_read('db_backup', $d . '/state');
+ok($ck && strpos($ck['warnings'][0], 'free on the backup disk') !== false, 'the hub is told why');
+eq(count($AUDITED) ? $AUDITED[0][0] : '', 'DB_BACKUP_FAIL', 'audited');
+file_put_contents($d . '/bk/db_backup.lock', '1');
+eq(runjob($d, $db, $clock), 3, 'a fresh lock: exit 3 (already running)');
+ok(is_file($d . '/bk/db_backup.lock'), 'and the other run\'s lock is left alone');
+touch($d . '/bk/db_backup.lock', time() - 7200);
+eq(runjob($d, $db, $clock, array(), array('unlimited' => true)), 0, 'a lock 2 h old is stale: removed, the run goes ahead');
+rmtree($d);
+$d = scratch('i2'); $clock = (float)mktime(1, 30, 0, 10, 13, 2026); $db = new FakeDb(fixture(), $clock, 0.01);
+@mkdir("$d/bk/2026-10-12_0100");
+file_put_contents("$d/bk/2026-10-12_0100/manifest.json", json_encode(array('format' => 'penumbra-backup-1', 'set' => '2026-10-12_0100', 'status' => 'in_progress', 'started_ts' => (int)$clock - 21 * 3600, 'tables' => array('PENUMBRA_A' => array('status' => 'pending')), 'cycles' => array())));
+runjob($d, $db, $clock, array(), array('unlimited' => true));
+$ss = sets($d);
+eq(array($ss[0]['status'], $ss[1]['status']), array('abandoned', 'complete'), 'a set unfinished after 21 h is marked abandoned and a new set is taken');
+rmtree($d);
+
+// 2k. CLOBs read as slices, byte-exact
+echo "2k. sliced CLOBs\n";
+$hard = array(
+    '1' => null,
+    '2' => '',
+    '3' => 'short',
+    '4' => str_repeat("\u{e9}", 2000),                               // 2 slices, multibyte across the edge
+    '5' => str_repeat('a', 1329) . "\u{1F600}" . str_repeat('b', 10),  // an emoji split by the 1330 edge
+    '6' => str_repeat('L', 12000),                                   // longer than 8 slices
+    '7' => "\u{1F600} smile",                                        // an emoji, no edge
+    '8' => str_repeat('z', 10640),                                   // exactly 8 slices
+    '9' => "{\"a\":\"line1\\nline2\"}\n\t \u{2713}",
+);
+foreach (array(false, true) as $refuse) {
+    $d = scratch('k' . (int)$refuse); $clock = (float)mktime(1, 30, 0, 10, 13, 2026);
+    $fx = array('PENUMBRA_AUDIT' => array('pk' => array('ID'), 'len' => 1,
+        'cols' => array(col('ID', 'NUMBER', 'N'), col('AFTER', 'CLOB'), col('SOURCE_DATA', 'CLOB')), 'rows' => array()));
+    foreach ($hard as $id => $v) $fx['PENUMBRA_AUDIT']['rows'][] = array('ID' => (string)$id, 'AFTER' => $v, 'SOURCE_DATA' => $v === null ? 'x' : 'S' . $v);
+    $db = new FakeDb($fx, $clock, 0.001); $db->refuseSlices = $refuse;
+    $code = runjob($d, $db, $clock, array(), array('unlimited' => true));
+    $ss = sets($d); $m = $ss[0]['manifest'];
+    $got = array(); foreach (read_table($ss[0]['dir'], $m, 'PENUMBRA_AUDIT') as $r) $got[$r['ID']] = $r['AFTER'];
+    $want = $hard; ksort($want);
+    if (!$refuse) {
+        eq($code, 0, 'exit 0');
+        ok($got === $want, 'every CLOB value byte-exact: NULL, empty, multibyte across an edge, an emoji ON an edge, longer than the slices, exactly 8 slices');
+        ok(strpos($db->queries[0], 'DBMS_LOB.SUBSTR("AFTER", 1330, 9311)') !== false && strpos($db->queries[0], 'LENGTHC("SOURCE_DATA")') !== false, 'read as 8 slices + GETLENGTH + LENGTHC per CLOB');
+        ok($db->prefetches[0] < 500 && $db->prefetches[0] >= 20, 'with a smaller prefetch (' . $db->prefetches[0] . ' rows)');
+        eq($db->values, 7, 'only the 7 values that need it are fetched whole: #5 (split emoji / emoji), #6 (too long), #7 (emoji) in both columns, and #8 SOURCE_DATA (10,641 characters, one past 8 slices)');
+        eq($m['tables']['PENUMBRA_AUDIT']['refetched'], 7, 'the manifest counts them');
+        eq(db_backup_verify_set($ss[0]['dir']), array(), 'verify passes');
+    } else {
+        ok($got === $want, 'the database refuses the sliced statement: the same rows, byte-exact, read the plain way');
+        ok(!empty($m['tables']['PENUMBRA_AUDIT']['slice_fallback']) && strpos($LASTLOG, 'reading its CLOBs whole') !== false, 'the fallback is logged and recorded');
+        eq($db->values, 0, 'no per-value fetches on the plain path');
+    }
+    rmtree($d);
+}
+
+// 2j. the job file only declares
+echo "2j. job contract\n";
+$code = php_strip_whitespace($app . '/db_backup_job.php') . php_strip_whitespace($app . '/db_backup_lib.php');
+ok(preg_match('/(?<![\$\w])(exit|die)\s*[;(]/', $code) === 0, 'never exit()/die() (it runs inside the runner)');
+ok(preg_match('/\b(define|ini_set|register_shutdown_function|set_time_limit|popen|proc_open|exec|shell_exec|system|passthru)\s*\(/', $code) === 0, 'no define/ini_set/shutdown handler/time limit, no process spawning (disabled on the server)');
+ok(preg_match('/\b(oci_connect|oci_pconnect)\s*\(/', $code) === 0 && strpos($code, 'oci_new_connect') !== false, 'its own session (oci_new_connect), never the runner\'s cached one');
+eq(preg_match_all('/->(all|rows)\(\s*\'(?!SELECT)/', $code), 0, 'every query the job sends starts with SELECT');
+ok(strpos($code, 'SET TRANSACTION READ ONLY') !== false, 'reads inside SET TRANSACTION READ ONLY');
+
+// ---------------------------------------------------------- 3. registry
+echo "3. registry\n";
+$jobs = penumbra_maintenance_jobs();
+ok(isset($jobs['db_backup']), 'db_backup is a registered maintenance job');
+eq(array($jobs['db_backup']['file'], $jobs['db_backup']['function'], $jobs['db_backup']['log_prefix'], $jobs['db_backup']['audit_action']),
+   array('db_backup_job.php', 'db_backup_run', 'db_backup_', 'DB_BACKUP'), 'file, entry point, log prefix, audit action');
+ok(function_exists($jobs['db_backup']['function']), 'its entry point is defined by its file');
+$st = penumbra_maintenance_status(array('db_backup' => '01:30'), '2026-10-13 01:35', array('last' => array(), 'requested' => array(), 'paused' => array()));
+eq($st['jobs']['db_backup']['will_run'], true, 'scheduled at 01:30 -> due on the 01:35 cycle');
+
+echo "\nPASS: $PASS   FAIL: $FAIL\n";
+echo $FAIL === 0 ? "RESULT: GREEN\n" : "RESULT: RED\n";

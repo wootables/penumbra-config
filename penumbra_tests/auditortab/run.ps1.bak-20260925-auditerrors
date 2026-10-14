@@ -1,0 +1,213 @@
+# =============================================================================
+# AUDITOR TAB SUITE (2026-09-25): the "Audit trail" banner + the view heights
+#
+# The segment bar is a titled banner (owner-picked mockup D): a brand-tinted band
+# with a brand accent edge, an aria-hidden "Audit trail" label, an icon on each
+# tab, count badges, and the metrics link as a solid button. Health shares
+# Pulse's 290px floor (an admin's Health scrolled 14px at the old 260).
+#
+#   ah.html renders the REAL renderAuditSegBar, _auditPaintHealth and
+#   renderAuditSegPulse (+ helpers, sliced out of the main.js under test) into the
+#   REAL #auditor-tab lifted from the index.php under test, under index.php's
+#   stylesheet set with the css\main.css under test, in headless Edge over CDP.
+#
+#   A1 A2  admin Health: no scrollbar at 1708px / 900px
+#   A3     Health is exactly as tall as Pulse          A4  non-admin Health: none
+#   A5     an Unresolved card scrolls, but sits wholly visible on top
+#   A6     compact: content-sized, no scrollbar       A7  Events keeps 325px
+#   A8     a busy Pulse (8 action-mix rows) has no scrollbar at 1708px
+#   B1     the banner: an aria-hidden "Audit trail" title, 4 role=tab pills each with
+#          an aria-hidden icon, exactly one selected, "Report metrics" with an icon
+#   B2     it IS a band: a background gradient and a 4px accent edge
+#   B3     the pills read: >= 12px, >= 600 weight
+#   B4     the metrics link is a solid brand button
+#   B5     one line at 1708 (hint shown) and at 900 (hint dropped, title word kept)
+#   B6     one line at 720 (title word dropped too)   B7  compact bar <= 30px
+#   B8     every banner text pair >= 4.5:1 on all 18 themes, Health AND Events
+#          selected (title, pill, selected pill + its count, badge, button, hint)
+#
+#   run.ps1                     live files        EXPECTED: GREEN 16 / 0
+#   run.ps1 -Control            the .bak-20260925-auditortab main.css + main.js
+#                                                 EXPECTED: RED (see CONTROL)
+#   CONTROL (measured 2026-09-25 against the build before): RED 6 / 10 - A1 A2 A3 and
+#     B1-B6 B8 fail; A4-A8 hold either way, and B7 too (the old compact bar was also
+#     under 30px). 13 mutants, all bite.
+#   run.ps1 -MainCss <p> -MainJs <p> [-IndexPhp <p>]   any other copies
+#   run.ps1 -Mutant <name> / -Mutants     each checked against the asserts it MUST
+#                               turn red; anchors are checked first (-CheckAnchors)
+#   -Keep keeps the staging dir.  -Here <dir> runs a copy.
+#
+# UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\auditortab'
+#   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Mutants
+# Prints RESULT: GREEN/RED instead of exiting (an exit kills the caller).
+# Needs py -3 with websocket-client and the PHP 8.2 CLI. Writes nothing to the webroot.
+# =============================================================================
+param([string]$MainCss = '', [string]$MainJs = '', [string]$IndexPhp = '', [string]$App = '', [string]$Here = '',
+      [string]$Mutant = '', [switch]$Mutants, [switch]$CheckAnchors, [switch]$Control, [switch]$Keep)
+$ErrorActionPreference = 'Stop'
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\auditortab' }
+$app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+
+if ($Control) {
+  $MainCss = "$app\css\main.css.bak-20260925-auditortab"; $MainJs = "$app\js\main.js.bak-20260925-auditortab"
+  if (-not (Test-Path $MainCss) -or -not (Test-Path $MainJs)) { throw '-Control needs the .bak-20260925-auditortab files; before the deploy pass -MainCss / -MainJs instead' }
+}
+$cssPath = if ($MainCss) { $MainCss } else { "$app\css\main.css" }
+$jsPath  = if ($MainJs) { $MainJs } else { "$app\js\main.js" }
+$idxPath = if ($IndexPhp) { $IndexPhp } else { "$app\index.php" }
+$css0 = [IO.File]::ReadAllText($cssPath, $utf8)
+$js0  = [IO.File]::ReadAllText($jsPath, $utf8)
+
+# --- mutants. main.css + main.js are CRLF. Strings built first: in PowerShell
+# `'a' + 'b', 'c'` is 'a' + ('b','c').
+$C = "`r`n"
+$mPulse  = '#admWrapper:not(.compact-admin-mode) #auditMainRow:has(#auditSegPulse.on)'
+$mHealth = '#admWrapper:not(.compact-admin-mode) #auditMainRow:has(#auditSegHealth.on) {'
+$mShared = $mPulse + ',' + $C + $mHealth
+$mAlone  = $mPulse + ' {'
+$mFloor  = $mHealth + $C + '    min-height: 290px;'
+$mFloor270 = $mHealth + $C + '    min-height: 270px;'
+$mBandBg = '    background: linear-gradient(90deg, color-mix(in srgb, var(--brand-primary, #336699) 13%, var(--bg-surface, #fff)), color-mix(in srgb, var(--brand-primary, #336699) 3%, var(--bg-surface, #fff)) 60%);' + $C
+$mAccent = '    border-left: 4px solid var(--brand-primary, #336699);' + $C + '    border-radius: 6px;' + $C + '    background: linear-gradient'
+$mAccent0 = '    border-radius: 6px;' + $C + '    background: linear-gradient'
+$mPillFont = '#auditSegBar .audit-seg { font-size: 12px; }'
+$mPillFont11 = '#auditSegBar .audit-seg { font-size: 11px; }'
+$mLinkBg = '    border-radius: 999px;' + $C + '    background: var(--brand-primary, #336699);' + $C + '    color: var(--on-brand, #fff);' + $C + '    font-size: 12px;'
+$mLinkBg0 = '    border-radius: 999px;' + $C + '    background: transparent;' + $C + '    color: var(--on-brand, #fff);' + $C + '    font-size: 12px;'
+$mHintRule = '@container pnb-audit-bar (max-width: 1119px) {' + $C + '    .audit-seg-hint { display: none; }' + $C + '}' + $C
+$mTitleRule = '@container pnb-audit-bar (max-width: 799px) {' + $C + '    .audit-seg-title-t { display: none; }' + $C
+$mTitleRule0 = '@container pnb-audit-bar (max-width: 799px) {' + $C
+$mTitleColor = '(all 18 themes measured). */' + $C + '    color: color-mix(in srgb, var(--brand-text, var(--brand-primary, #336699)) 65%, var(--text-main, #222));'
+$mTitleColor0 = '(all 18 themes measured). */' + $C + '    color: var(--brand-text, var(--brand-primary, #336699));'
+$mBadgeSel = '.audit-seg[aria-selected="true"] .seg-n:not(:empty) {' + $C + '    background: var(--on-brand, #fff);' + $C + '    color: var(--brand-primary, #336699);'
+$mBadgeSel0 = '.audit-seg[aria-selected="true"] .seg-n:not(:empty) {' + $C + '    background: color-mix(in srgb, var(--on-brand, #fff) 24%, transparent);' + $C + '    color: var(--on-brand, #fff);'
+$mCompactBar = '.compact-admin-mode #auditSegBar { padding: 3px 8px 3px 10px; gap: 4px; }' + $C
+$mIcons  = '                     _auditSegIco(s.ico) + s.label +'
+$mIcons0 = '                     s.label +'
+$mTitleAria  = "var h = '<span class=`"audit-seg-title`" aria-hidden=`"true`">' +"
+$mTitleAria0 = "var h = '<span class=`"audit-seg-title`">' +"
+$mutantDefs = [ordered]@{
+  'nohealth'    = @{ t = 'css'; edits = @(,@($mShared, $mAlone)); red = @('A1', 'A2', 'A3') }
+  'floor270'    = @{ t = 'css'; edits = @(,@($mFloor, $mFloor270)); red = @('A1', 'A2') }
+  'nobandbg'    = @{ t = 'css'; edits = @(,@($mBandBg, '')); red = @('B2') }
+  'noaccent'    = @{ t = 'css'; edits = @(,@($mAccent, $mAccent0)); red = @('B2') }
+  'smallpills'  = @{ t = 'css'; edits = @(,@($mPillFont, $mPillFont11)); red = @('B3') }
+  'linkplain'   = @{ t = 'css'; edits = @(,@($mLinkBg, $mLinkBg0)); red = @('B4', 'B8') }
+  'nohintrule'  = @{ t = 'css'; edits = @(,@($mHintRule, '')); red = @('B5') }
+  'notitlerule' = @{ t = 'css'; edits = @(,@($mTitleRule, $mTitleRule0)); red = @('B6') }
+  'brandtitle'  = @{ t = 'css'; edits = @(,@($mTitleColor, $mTitleColor0)); red = @('B8') }
+  'washbadge'   = @{ t = 'css'; edits = @(,@($mBadgeSel, $mBadgeSel0)); red = @('B8') }
+  'compactbar'  = @{ t = 'css'; edits = @(,@($mCompactBar, '')); red = @('B7') }
+  'noicons'     = @{ t = 'js';  edits = @(,@($mIcons, $mIcons0)); red = @('B1') }
+  'titlespoken' = @{ t = 'js';  edits = @(,@($mTitleAria, $mTitleAria0)); red = @('B1') }
+}
+function Apply-Mutant([string]$text, [string]$name) {
+  foreach ($e in $mutantDefs[$name].edits) {
+    $n = ([regex]::Matches($text, [regex]::Escape($e[0]))).Count
+    if ($n -ne 1) { throw "mutant '$name' anchor found $n times, expected 1 (needs the FEATURE build): $($e[0])" }
+    $text = $text.Replace($e[0], $e[1])
+  }
+  return $text
+}
+
+function Invoke-Cases([string]$cssText, [string]$jsText) {
+  $run = Join-Path $env:TEMP ('pnb_at_' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+  New-Item -ItemType Directory -Force "$run\css", "$run\js" | Out-Null
+  foreach ($f in @('jquery-ui.css', 'penumbra_tiles.css', 'density.css', 'search_builder.css', 'penumbra_presets.css', 'penumbra_colwidths.css')) { Copy-Item "$app\css\$f" "$run\css\$f" -Force }
+  foreach ($f in @('jquery-3.7.1.min.js', 'moment.min.js')) { Copy-Item "$app\js\$f" "$run\js\$f" -Force }
+  [IO.File]::WriteAllText("$run\main.css", $cssText, $utf8)
+  [IO.File]::WriteAllText("$run\main.js", $jsText, $utf8)
+  Copy-Item $idxPath "$run\index.php" -Force
+  foreach ($f in @('ah.html', 'cdp.py', 'gen.php')) { Copy-Item "$here\$f" "$run\$f" -Force }
+  $gen = & $php -n "$run\gen.php" $run $app 2>&1
+  if (-not (Test-Path "$run\themes.js")) { throw "gen.php wrote no themes.js: $gen" }
+  $tj = [IO.File]::ReadAllText("$run\themes.js")
+  $themes = @([regex]::Matches($tj, '"id"\s*:\s*"([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
+  $p = 'idx=index.php&js=main.js&css=main.css&realbar=1'
+  $cases = New-Object System.Collections.ArrayList
+  foreach ($cs0 in @(
+    @('h1708', 'seg=health&admin=1&w=1708'), @('h900', 'seg=health&admin=1&w=900'), @('h720', 'seg=health&admin=1&w=720'),
+    @('p1708', 'seg=pulse&w=1708'), @('u1708', 'seg=health&admin=0&w=1708'), @('e1708', 'seg=health&admin=1&errors=1&w=1708'),
+    @('c1708', 'seg=health&admin=1&w=1708&compact=1'), @('v1708', 'seg=events&w=1708'))) {
+    [void]$cases.Add(@{ name = $cs0[0]; query = "$p&$($cs0[1])&theme=theme-hello-kitty" })
+  }
+  foreach ($th in $themes) { foreach ($sg in @('health', 'events')) { [void]$cases.Add(@{ name = "k|$th|$sg"; query = "$p&seg=$sg&admin=1&w=1708&theme=$th" }) } }
+  $jobs = @{ base = ('file:///' + ($run -replace '\\', '/') + '/ah.html'); viewport = @(2400, 1000); cases = $cases }
+  [IO.File]::WriteAllText("$run\jobs.json", ($jobs | ConvertTo-Json -Depth 5), $utf8)
+  $pyOut = & py -3 "$run\cdp.py" "$run\jobs.json" "$run\results.json" 2>&1
+  if (-not (Test-Path "$run\results.json")) { throw "cdp.py wrote no results: $pyOut" }
+  $res = @{}
+  foreach ($rec in ([IO.File]::ReadAllText("$run\results.json", $utf8) | ConvertFrom-Json)) { $res[$rec.name] = $rec.result }
+  $res['__themes'] = $themes
+  if (-not $Keep) { try { [IO.Directory]::Delete($run, $true) } catch { } } else { Write-Host "kept: $run" }
+  return $res
+}
+
+function Get-Asserts($m) {
+  $out = @()
+  foreach ($k in @('h1708', 'h900', 'h720', 'p1708', 'u1708', 'e1708', 'c1708', 'v1708')) {
+    if ($null -eq $m[$k] -or $m[$k].error) { $out += [pscustomobject]@{ id = 'Z0'; name = "case $k rendered"; pass = $false; detail = $(if ($m[$k]) { $m[$k].error } else { 'no result' }) } }
+  }
+  if ($out.Count) { return ,$out }
+  $h = $m['h1708']; $n = $m['h900']; $s = $m['h720']; $pu = $m['p1708']; $u = $m['u1708']; $e = $m['e1708']; $cp = $m['c1708']; $v = $m['v1708']
+  $out += [pscustomobject]@{ id = 'A1'; name = 'admin Health at 1708px has no scrollbar'; pass = ($h.overflow -le 0); detail = "panel=$($h.panelClient) content=$($h.panelScroll) floor=$($h.rowMinH)" }
+  $out += [pscustomobject]@{ id = 'A2'; name = 'admin Health at 900px has no scrollbar'; pass = ($n.overflow -le 0); detail = "panel=$($n.panelClient) content=$($n.panelScroll)" }
+  $out += [pscustomobject]@{ id = 'A3'; name = 'Health is exactly as tall as Pulse'; pass = ([Math]::Abs($h.row.h - $pu.row.h) -le 0.5); detail = "health row=$($h.row.h) pulse row=$($pu.row.h)" }
+  $out += [pscustomobject]@{ id = 'A4'; name = 'a non-admin owner''s Health has no scrollbar'; pass = ($u.overflow -le 0); detail = "overflow=$($u.overflow)" }
+  $out += [pscustomobject]@{ id = 'A5'; name = 'an Unresolved card scrolls the view but sits wholly visible on top'; pass = ($e.overflow -gt 0) -and ($e.firstKidRoom -ge 0) -and ($e.kids[0] -like 'audit-hcard sev-bad*'); detail = "overflow=$($e.overflow) room=$($e.firstKidRoom)" }
+  $out += [pscustomobject]@{ id = 'A6'; name = 'compact is content-sized (120px floor), no scrollbar'; pass = ($cp.rowMinH -eq '120px') -and ($cp.overflow -le 0); detail = "floor=$($cp.rowMinH) overflow=$($cp.overflow)" }
+  $out += [pscustomobject]@{ id = 'A7'; name = 'Events keeps its own 325px floor'; pass = ($v.rowMinH -eq '325px'); detail = "floor=$($v.rowMinH)" }
+  $out += [pscustomobject]@{ id = 'A8'; name = 'a busy Pulse (8 action-mix rows) has no scrollbar at 1708px'; pass = ($pu.overflow -le 0); detail = "panel=$($pu.panelClient) content=$($pu.panelScroll)" }
+  $bi = $h.barInfo
+  $out += [pscustomobject]@{ id = 'B1'; name = 'the banner: aria-hidden "Audit trail" title, 4 tabs each with an aria-hidden icon, one selected, "Report metrics" with an icon'; pass = $bi.titleHidden -and ($bi.titleText -eq 'Audit trail') -and ($bi.tabs -eq 4) -and ($bi.tabIcons -eq 4) -and ($bi.selected -eq 1) -and ($bi.linkText -like 'Report metrics*') -and $bi.linkIcon; detail = "title=[$($bi.titleText)] hidden=$($bi.titleHidden) tabs=$($bi.tabs) icons=$($bi.tabIcons) selected=$($bi.selected) link=[$($bi.linkText)] linkIcon=$($bi.linkIcon)" }
+  $out += [pscustomobject]@{ id = 'B2'; name = 'it IS a band: a background gradient and a 4px accent edge'; pass = ($bi.bgImage -like 'linear-gradient*') -and ($bi.borderLeft -eq '4px'); detail = "bg=$($bi.bgImage) edge=$($bi.borderLeft)" }
+  $out += [pscustomobject]@{ id = 'B3'; name = 'the pills read: >= 12px and >= 600 weight'; pass = ($bi.pillFont -ge 12) -and ($bi.pillWeight -ge 600); detail = "font=$($bi.pillFont) weight=$($bi.pillWeight)" }
+  $out += [pscustomobject]@{ id = 'B4'; name = 'the metrics link is a solid brand button'; pass = [bool]$bi.linkIsBrand; detail = "brandFill=$($bi.linkIsBrand)" }
+  $out += [pscustomobject]@{ id = 'B5'; name = 'one line at 1708 (hint shown) and at 900 (hint dropped, title word kept)'; pass = ($h.barLines -eq 1) -and $h.hintShown -and ($n.barLines -eq 1) -and (-not $n.hintShown) -and $n.titleWordShown; detail = "1708 lines=$($h.barLines) hint=$($h.hintShown) | 900 lines=$($n.barLines) hint=$($n.hintShown) word=$($n.titleWordShown)" }
+  $out += [pscustomobject]@{ id = 'B6'; name = 'one line at 720 (title word dropped, shield kept)'; pass = ($s.barLines -eq 1) -and (-not $s.titleWordShown); detail = "lines=$($s.barLines) word=$($s.titleWordShown)" }
+  $out += [pscustomobject]@{ id = 'B7'; name = 'the compact bar is slim: <= 30px (41 docked)'; pass = ($cp.bar.h -le 30) -and ($cp.bar.h -lt $h.bar.h); detail = "compact=$($cp.bar.h) docked=$($h.bar.h)" }
+  $fails = @(); $cnt = 0
+  foreach ($th in $m['__themes']) { foreach ($sg in @('health', 'events')) {
+    $r = $m["k|$th|$sg"]
+    if ($null -eq $r -or $null -eq $r.contrast) { $fails += "$th/$sg=missing"; continue }
+    foreach ($pr in $r.contrast.PSObject.Properties) { $cnt++; if ([double]$pr.Value -lt 4.5) { $fails += "$th/$sg/$($pr.Name)=$($pr.Value)" } }
+  } }
+  $out += [pscustomobject]@{ id = 'B8'; name = "every banner text pair >= 4.5:1 on all $(@($m['__themes']).Count) themes, Health and Events selected"; pass = ($fails.Count -eq 0) -and ($cnt -gt 100); detail = "pairs=$cnt fails: $($fails -join ' ')" }
+  return ,$out
+}
+
+Write-Host "main.css: $cssPath"
+Write-Host "main.js:  $jsPath"
+if ($CheckAnchors -or $Mutants) {
+  $stale = @()
+  foreach ($nm in $mutantDefs.Keys) { $src = if ($mutantDefs[$nm].t -eq 'js') { $js0 } else { $css0 }; try { [void](Apply-Mutant $src $nm) } catch { $stale += $_.Exception.Message } }
+  if ($stale.Count) { $stale | ForEach-Object { Write-Host "ANCHOR $_" }; Write-Host 'RESULT: RED'; return }
+  Write-Host "ANCHORS all $($mutantDefs.Count) mutants apply exactly once"
+  if ($CheckAnchors) { Write-Host 'RESULT: GREEN'; return }
+}
+if ($Mutant -or $Mutants) {
+  $names = if ($Mutants) { @($mutantDefs.Keys) } else { @($Mutant) }
+  $bite = 0
+  foreach ($nm in $names) {
+    if (-not $mutantDefs.Contains($nm)) { throw "unknown mutant '$nm' (known: $(($mutantDefs.Keys) -join ', '))" }
+    $mc = if ($mutantDefs[$nm].t -eq 'css') { Apply-Mutant $css0 $nm } else { $css0 }
+    $mj = if ($mutantDefs[$nm].t -eq 'js') { Apply-Mutant $js0 $nm } else { $js0 }
+    $all = Get-Asserts (Invoke-Cases $mc $mj)
+    $red = @($all | Where-Object { -not $_.pass } | ForEach-Object { $_.id })
+    $miss = @($mutantDefs[$nm].red | Where-Object { $red -notcontains $_ })
+    if ($miss.Count -eq 0) { $bite++; Write-Host ("MUTANT {0,-12} BITES   red: {1}" -f $nm, ($red -join ' ')) }
+    else { Write-Host ("MUTANT {0,-12} MISSED  {1} stayed green; red: {2}" -f $nm, ($miss -join ' '), ($red -join ' ')) }
+  }
+  Write-Host "MUTANTS $bite / $($names.Count) bite"
+  Write-Host $(if ($bite -eq $names.Count) { 'RESULT: GREEN' } else { 'RESULT: RED' })
+  return
+}
+$all = Get-Asserts (Invoke-Cases $css0 $js0)
+foreach ($x in $all) { $d = [string]$x.detail; if ($d.Length -gt 300) { $d = $d.Substring(0, 300) + '...' }; Write-Host ('  {0}  {1} {2}  [{3}]' -f $(if ($x.pass) { 'PASS' } else { 'FAIL' }), $x.id, $x.name, $d) }
+$p = @($all | Where-Object { $_.pass }).Count; $f = @($all | Where-Object { -not $_.pass }).Count
+Write-Host "TOTAL pass=$p fail=$f"
+if ($f) { Write-Host ('FAILED: ' + (@($all | Where-Object { -not $_.pass } | ForEach-Object { $_.id }) -join ' ')) }
+Write-Host $(if ($f -eq 0) { 'RESULT: GREEN' } else { 'RESULT: RED' })

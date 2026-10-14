@@ -1,0 +1,112 @@
+# Builds mutants.json for the pvnotes suite and checks every anchor against the
+# FEATURE build it was made for (each must occur exactly once in its file).
+#   py -3 mk_mutants.py <stage or app dir>
+# A mutant keeps its frozen "must" list across rebuilds (read back from the old
+# mutants.json); a new one starts at null = EXPLORE (run.py prints its red set).
+import json, os, sys
+HERE = os.path.dirname(os.path.abspath(__file__))
+base = sys.argv[1] if len(sys.argv) > 1 else r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+FILES = {'main': 'js\\main.js', 'journal': 'js\\penumbra_journal.js', 'manage': 'manage_journal.php', 'css': 'css\\main.css'}
+CR = '\r\n'   # main.js is CRLF; penumbra_journal.js and manage_journal.php are LF
+
+M = {
+    # the paint pass never runs: no icon anywhere
+    'nopaint': ('main', [('            var on = !hold && pivotNotesActive();' + CR + '            var toks = on ? pivotRowTokens() : [];',
+                          '            var on = false;' + CR + '            var toks = [];')], None),
+    # no observer: a pivot rendered (or rows built) after the notes landed stays bare
+    'noobserver': ('main', [('            _pvMo.observe(pc, { childList: true, subtree: true });', '            void pc;')], None),
+    # keys follow the pivot's field ORDER: FY x DEPT misses the DEPT x FY notes
+    'nosort': ('main', [('                pairs.sort(function (a, b) { return a[0] < b[0] ? -1 : (a[0] > b[0] ? 1 : 0); });', '                void 0;')], None),
+    # a collapsed group's summary row gets no icon
+    'nosummary': ('main', [('                if (sumKey !== null) {' + CR + '                    parts = sumKey.split(PV_SEP);',
+                            '                if (sumKey !== null) { continue;' + CR + '                    parts = sumKey.split(PV_SEP);')], None),
+    # a Top-N (Other) row takes a note
+    'noother': ('main', [('                if (parts[i] === PV_OTHER) { pairs = null; break; }', '                if (false) { pairs = null; break; }')], None),
+    # side-by-side: every label cell gets an icon, not just the row's first
+    'flatall': ('main', [('                    } else if (lvl === 0) {' + CR + '                        stampPivotCell(td, parts, toks, false, counts);',
+                          '                    } else if (true) {' + CR + '                        stampPivotCell(td, parts, toks, false, counts);')], None),
+    # the count as TEXT in the button: it lands in the label cell's text
+    'counttext': ('main', [("                + '<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"></path></svg>'" + CR + "                + '</button>';" + CR + "        }" + CR + "        // The icon goes FIRST",
+                            "                + '<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"></path></svg>'" + CR + "                + (n ? n : '') + '</button>';" + CR + "        }" + CR + "        // The icon goes FIRST")], None),
+    # Copy as HTML / the email embed / print keep the icon
+    'nostriphtml': ('main', [("                    $tdClone.find('.pivot-collapse-toggle, .journal-pvnote-btn').remove();", "                    $tdClone.find('.pivot-collapse-toggle').remove();")], None),
+    # EQUIVALENT by design: the count is CSS content and the svg has no text, so the
+    # XLSX/array text reader would read the same without its strip
+    'eq-nostriparray': ('main', [(".find('.sort-icon, .col-sort-icon, .pivot-collapse-toggle, .journal-pvnote-btn').remove()", ".find('.sort-icon, .col-sort-icon, .pivot-collapse-toggle').remove()")], []),
+    # the card stays up when the pivot is put away
+    'noaway': ('main', [("            if (!$('#pivot-output-container').is(':visible') || !document.getElementById('pivotResultTable') || !pivotNotesActive()) {",
+                         "            if (!document.getElementById('pivotResultTable') || !pivotNotesActive()) {")], None),
+    # the card stays put when the page scrolls
+    'nofollow': ('main', [('            queuePlacePivotNoteCard();' + CR + '        }, true);', '            void 0;' + CR + '        }, true);')], None),
+    # the card never re-finds its icon (a collapse moves a group's icon to its summary row)
+    'noreanchor': ('main', [('            if (refind || !c.anchor || !c.anchor.isConnected || !c.anchor.getClientRects().length) {', '            if (false) {')], None),
+    # the Row notes switch still waits for a key
+    'nokeyunlock': ('main', [("            $('#journalRowNotesEnable').prop('disabled', false);", "            $('#journalRowNotesEnable').prop('disabled', !ok);")], None),
+    # saved only with a key
+    'nosavenokey': ('main', [('            if (window._penumbraJournalRowNotes) {' + CR + '                viewOptions.journalRowNotes = true;',
+                              '            if (window._penumbraJournalRowNotes && window._penumbraJournalKeyColumns && window._penumbraJournalKeyColumns.length) {' + CR + '                viewOptions.journalRowNotes = true;')], None),
+    # fetched only with a key: the pivot's counts never land
+    'nofetchnokey': ('main', [('            if (!rid || window._penumbraJournalHidden || !window._penumbraJournalRowNotes) {' + CR + '                window._penumbraRowNotes = {}; window._penumbraRowNoteCounts = {};' + CR + '                window._penumbraPivotNotes',
+                               '            if (!rid || window._penumbraJournalHidden || !window._penumbraJournalRowNotes || !keyCols()) {' + CR + '                window._penumbraRowNotes = {}; window._penumbraRowNoteCounts = {};' + CR + '                window._penumbraPivotNotes')], None),
+    # a pivot row's note is posted as a TABLE row's
+    'pvscope': ('main', [("            var scope = isPivot ? 'pivot' : 'row';", "            var scope = 'row';")], None),
+    # the journal panel gives a pivot note a TABLE row's tag (it jumps to the table)
+    'nopvchip': ('journal', [("        if (String(n.SCOPE || '') === 'pivot') return renderPivotRef(n);\n", '')], None),
+    # the pivot tag does nothing when clicked
+    'nopvjump': ('journal', [("        $(document).on('click', '.journal-note-rowref-btn[data-pv-key]', function (e) {", "        $(document).on('click', '.journal-note-rowref-btn[data-pv-key-off]', function (e) {")], None),
+    # the server takes any JSON array as a pivot key
+    'nokeyshape': ('manage', [('    if (!is_array($pairs) || count($pairs) < 1 || count($pairs) > 8) return false;', '    if (!is_array($pairs)) return false;')], None),
+    # round 2: the band's hover back at (0,3,0) - the Wolfpack Red blanket (0,3,1) paints it red
+    'wolfband': ('css', [('.journal-rownote-panel .journal-rownote-head.journal-rownote-close:hover {', '.journal-rownote-panel .journal-rownote-head:hover {')], ['T-wolf-band']),
+    # round 3: a re-render that drops the card's row leaves the card floating
+    'nogone': ('main', [('                } else if (!b && !_pvScheduled && !findPivotNoteBtn(c.key, false)) {', '                } else if (false) {')], None),
+    # round 3: no wait for a pending repaint - the tick closes a card whose row is about to be stamped
+    'nopending': ('main', [('                } else if (!b && !_pvScheduled && !findPivotNoteBtn(c.key, false)) {', '                } else if (!b && !findPivotNoteBtn(c.key, false)) {')], None),
+    # round 3: a tip already up stays over the card
+    'notipremove': ('main', [("            $('.ui-tooltip').stop(true, true).remove(); // a tip already up (the pointer is still on the icon)", '            void 0;')], None),
+    # round 3: the open icon keeps its title (and jQuery UI's parked copy): the tip returns
+    'notiptitle': ('main', [('                b.removeAttribute(\'title\');' + CR + "                $(b).removeData('ui-tooltip-title');", '                void 0;')], None),
+    # round 3: the mention e-mail drops the row line
+    'norowline': ('manage', [("mentioned you in a journal note on the report <strong>' . $safeTitle . '</strong>:</p>'\n          . $rowLine // which row (journalRowRefLine), or ''\n",
+                              "mentioned you in a journal note on the report <strong>' . $safeTitle . '</strong>:</p>'\n")], None),
+    # round 3: a reply's e-mail never reads its root's snapshot
+    'norefsnap': ('manage', [('            if ($ref_snap === null && $reply_root !== null) {', '            if (false) {')], None),
+    # round 3: the snapshot is ignored - the key's bare values only
+    'refkeyonly': ('manage', [('    if (is_array($snap) && $snap) {', '    if (false) {')], None),
+    # round 4: the question never mentions the replies
+    'nodelask': ('main', [("            if (!replies) return 'Delete this note? A copy is kept in the audit log.';", "            return 'Delete this note? A copy is kept in the audit log.';")], None),
+    # round 4: the question never says other people wrote some of them
+    'noothers': ('main', [('            var who = !byOthers ? \'\' : (byOthers === replies', "            var who = '' && (byOthers === replies")], None),
+    # round 4: the journal panel keeps its old question
+    'panelplain': ('journal', [('                ? P.journalDeleteQuestion(notesCache, noteId)\n', "                ? 'Delete this journal note? This cannot be undone (a copy is kept in the audit log).'\n")], None),
+    # round 4: the panel's status ignores the server's count
+    'panelstatus': ('journal', [("            status(esc(resp.message || 'Note deleted.'), 'success');", "            status('Note deleted.', 'success');")], None),
+    # round 4: the server deletes the root alone again
+    'nocascade': ('manage', [('            $stmt = oci_parse($oci, "DELETE FROM PENUMBRA_JOURNAL WHERE REPORT_ID = :rid AND (ID = :nid OR (PARENT_ID = :pid AND ID <= :maxid))");', '            $stmt = oci_parse($oci, "DELETE FROM PENUMBRA_JOURNAL WHERE ID = :nid");')], None),
+    # round 4: the replies deleted with a thread leave no copy in the audit row
+    'noauditreplies': ('manage', [("        if ($replies) $before['REPLIES'] = $replies;", '        // (no replies in the audit)')], None),
+    # a reply to a pivot note lands as a report note
+    'noreplyscope': ('manage', [("                $scope        = ($prow['SCOPE'] === 'row' || $prow['SCOPE'] === 'pivot') ? $prow['SCOPE'] : 'report';",
+                                 "                $scope        = ($prow['SCOPE'] === 'row') ? 'row' : 'report';")], None),
+}
+SCN = {'nodelask': ['delthread'], 'noothers': ['delthread'], 'panelplain': ['delthread'], 'panelstatus': ['delthread'],
+       'nocascade': ['server4'], 'noauditreplies': ['server4'], 'nogone': ['rerender'], 'nopending': ['rerender'], 'notipremove': ['tooltip'], 'notiptitle': ['tooltip'],
+       'norowline': ['server3'], 'norefsnap': ['server3'], 'refkeyonly': ['server3'], 'wolfband': ['wolfpack'], 'nostriphtml': ['exports'], 'eq-nostriparray': ['exports'], 'nokeyshape': ['server'], 'noreplyscope': ['server'],
+       'nopvchip': ['jpanel'], 'nopvjump': ['jpanel'], 'nokeyunlock': ['off'], 'nosavenokey': ['off'], 'counttext': ['nested', 'exports'],
+       'noaway': ['nested'], 'nofollow': ['nested'], 'noreanchor': ['nested', 'jpanel'], 'pvscope': ['nested'],
+       'nosort': ['reorder', 'nested', 'single'], 'noother': ['rank'], 'flatall': ['flat'], 'nosummary': ['collapsed', 'nested', 'reveal']}
+
+old = {}
+p = os.path.join(HERE, 'mutants.json')
+if os.path.exists(p): old = json.load(open(p, encoding='utf-8'))
+texts = {k: open(os.path.join(base, rel), 'rb').read().decode('utf-8', 'surrogateescape') for k, rel in FILES.items()}
+out, bad = {}, 0
+for name, (f, edits, must) in M.items():
+    for a, b in edits:
+        n = texts[f].count(a)
+        if n != 1: print('ANCHOR %s: found %d times in %s: %r' % (name, n, f, a[:80])); bad += 1
+    keep = old.get(name, {}).get('must') if name in old else None
+    out[name] = {'file': f, 'edits': [list(e) for e in edits], 'must': must if must is not None else keep, 'scn': SCN.get(name)}
+json.dump(out, open(p, 'w', encoding='utf-8', newline='\n'), indent=1, ensure_ascii=False)
+print('%d mutants, %d bad anchors' % (len(out), bad))
+sys.exit(1 if bad else 0)

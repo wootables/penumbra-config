@@ -1,0 +1,214 @@
+<?php
+/**
+ * Audit-fix unit tests (2026-08-22): cron DOW 7, NaN custom conditions,
+ * first-run baseline fallback, pivot word operators (server reference).
+ *
+ * Runs against the LIVE app files through the parity extractor
+ * (token_get_all) - schedule_runner.php is never included directly (it would
+ * start the scheduler). Pass AF_SRC_RUNNER / AF_SRC_MANAGE env vars to point
+ * at a .bak to prove the suite can fail (mutation control).
+ *
+ * Ends "<N> passed, <M> failed". run.ps1 reads that line rather than trusting
+ * the exit code: a run that dies part-way never prints it, and a run that
+ * tests nothing prints "0 passed". Run it through run.ps1 - step [1/4] lifts
+ * the files required below.
+ */
+$here = __DIR__;
+$pass = 0; $fail = 0;
+function t($name, $cond, $detail = '') {
+    global $pass, $fail;
+    if ($cond) { $pass++; echo "PASS  $name\n"; }
+    else { $fail++; echo "FAIL  $name" . ($detail !== '' ? "  :: $detail" : '') . "\n"; }
+}
+
+// --- stubs; the extracted copies are wrapped in function_exists() so these win ---
+$GLOBALS['__log'] = array();
+function log_scheduler($m) { $GLOBALS['__log'][] = $m; }
+$GLOBALS['__fake_snapshot'] = null;
+function penumbra_fetch_latest_scheduler_snapshot($rid, $cb, $pw) { return $GLOBALS['__fake_snapshot']; }
+function queryViaOci8($sql, $binds = array()) { throw new Exception('no DB in unit tests: ' . $sql); }
+function getOci8Connection() { throw new Exception('no DB in unit tests'); }
+function penumbra_snaps_pin_supported() { return true; }
+
+// --- the runner mirror, with the snippet dispatcher's silent catch HOOKED ---------------
+// evaluate_custom_condition() wraps every snippet call in
+// `catch (\Throwable $e) { $result = ''; }`, and an unquoted '' side then evaluates to
+// null - the same null the NaN / browser-only assertions in section 3 expect. So a
+// Throwable in there (a helper this mirror lacks, or a real engine error) passes those
+// assertions for the wrong reason, and it turned the count(ID) control from true into
+// null while penumbra_search.php was missing (2026-09-19). Patch a COPY of the extract -
+// never the runner - so every swallowed Throwable is recorded, and refuse to run if a
+// call site escaped the hook. Same hook as parity\run_engine_c.php.
+$GLOBALS['__AF_SWALLOWED'] = array();
+$extract = @file_get_contents($here . '/runner_functions.php');
+if ($extract === false) { echo "FATAL  runner_functions.php missing - run the suite through run.ps1 (step [1/4] extracts it)\n"; exit(2); }
+$dispatchCalls = 0;
+$toks = token_get_all($extract);
+$nt = count($toks);
+for ($ti = 0; $ti < $nt; $ti++) {
+    if (!is_array($toks[$ti]) || $toks[$ti][0] !== T_STRING || $toks[$ti][1] !== '_snippet_dispatch') continue;
+    $tp = $ti - 1;
+    while ($tp >= 0 && is_array($toks[$tp]) && $toks[$tp][0] === T_WHITESPACE) $tp--;
+    if ($tp >= 0 && is_array($toks[$tp]) && $toks[$tp][0] === T_FUNCTION) continue; // the declaration
+    $dispatchCalls++;
+}
+unset($toks);
+$hooked = 0;
+$extract = preg_replace_callback(
+    '/(\$\w+\s*=\s*_snippet_dispatch\((\$\w+)[^;]*;\s*\}\s*catch\s*\(\s*\\\\Throwable\s+(\$\w+)\s*\)\s*\{)/',
+    function ($m) {
+        return $m[1] . ' $GLOBALS[\'__AF_SWALLOWED\'][] = ' . $m[2] . ' . \' :: \' . get_class(' . $m[3] . ') . \': \' . ' . $m[3] . '->getMessage();';
+    },
+    $extract, -1, $hooked);
+if ($hooked < 1 || $hooked !== $dispatchCalls) {
+    echo "FATAL  hooked $hooked of $dispatchCalls _snippet_dispatch() call sites - the runner's catch changed shape; update tests.php so a swallowed Throwable cannot hide\n";
+    exit(2);
+}
+file_put_contents($here . '/runner_instrumented.php', $extract);
+unset($extract);
+require $here . '/runner_instrumented.php';
+require $here . '/manage_functions.php';
+
+// --- the runner's includes ---------------------------------------------------------------
+// The extractor lifts only what schedule_runner.php itself DECLARES and never follows its
+// require_once lines, so every helper the runner gets from an include is absent unless
+// run.ps1 lifts that include too (as dep_<file>.php). evaluate_custom_condition() reaches
+// the helpers below through the snippet engine (static probe, 2026-09-19). Without
+// penumbra_search.php the count() conditions in section 3 died on "Call to undefined
+// function _search_get_virtual_columns()", so the last 16 of these 30 assertions never ran
+// and the suite reported only php_exit=255. A missing dependency is a NAMED failure now.
+foreach (glob($here . '/dep_*.php') as $depFile) require $depFile;
+$needed = array(
+    'penumbra_search.php'   => array('_search_get_virtual_columns', '_search_get_structured_virtual_data', '_sr_resolve_keyword_date'),
+    'journal_export.php'    => array('journalExportToggleRowValues', 'journalToggleWantExport'),
+    'penumbra_template.php' => array('penumbra_tpl_js_trim'),
+    'themes_config.php'     => array('penumbra_get_themes'),
+);
+$notLifted = array();
+foreach ($needed as $depName => $fns) {
+    $gone = array();
+    foreach ($fns as $fn) if (!function_exists($fn)) $gone[] = $fn . '()';
+    if ($gone) $notLifted[] = $depName . ' (' . implode(', ', $gone) . ')';
+}
+if ($notLifted) {
+    echo "FATAL  dependency not lifted: " . implode('; ', $notLifted) . " - run.ps1 step [1/4] lifts the runner's includes; run the suite through run.ps1\n";
+    exit(2);
+}
+
+// evaluate_custom_condition(), plus whatever the dispatcher's catch swallowed on the way.
+function af_cond($expr, $data = array(), $cols = array()) {
+    $before = count($GLOBALS['__AF_SWALLOWED']);
+    $r = evaluate_custom_condition($expr, $data, $cols, 'flat');
+    return array($r, array_slice($GLOBALS['__AF_SWALLOWED'], $before));
+}
+function af_shown($r, $swallowed) {
+    return var_export($r, true) . ($swallowed ? '  swallowed: ' . implode(' | ', $swallowed) : '');
+}
+
+// ---------------------------------------------------------------- 1. cron DOW 7 (runner)
+$n  = get_next_run_date('0 9 * * 7');
+t('runner: DOW 7 parses to a Sunday 09:00', $n !== false && date('w', strtotime($n)) === '0' && date('H:i', strtotime($n)) === '09:00', var_export($n, true));
+$n0 = get_next_run_date('0 9 * * 0');
+t('runner: DOW 0 is a Sunday 09:00', $n0 !== false && date('w', strtotime($n0)) === '0');
+t('runner: 7 and 0 yield the same occurrence', $n === $n0, "$n vs $n0");
+$n15 = get_next_run_date('0 9 * * 1-5');
+t('runner: weekday range unaffected', $n15 !== false && in_array((int)date('w', strtotime($n15)), array(1, 2, 3, 4, 5), true));
+$n57 = get_next_run_date('0 9 * * 5-7');
+t('runner: range ending in 7 covers Fri/Sat/Sun', $n57 !== false && in_array((int)date('w', strtotime($n57)), array(5, 6, 0), true), var_export($n57, true));
+$n17 = get_next_run_date('0 9 * * 1,7');
+t('runner: list containing 7 covers Mon/Sun', $n17 !== false && in_array((int)date('w', strtotime($n17)), array(1, 0), true), var_export($n17, true));
+t('runner: check_cron_part("7", 0) alone stays false (fallback lives in the caller)', check_cron_part('7', 0) === false);
+
+// ---------------------------------------------------------------- 2. cron DOW 7 (manage_schedule)
+$m  = get_next_run_date_calc('0 9 * * 7');
+t('manage: DOW 7 parses to a Sunday 09:00', date('w', strtotime($m)) === '0' && date('H:i', strtotime($m)) === '09:00', $m);
+$m0 = get_next_run_date_calc('0 9 * * 0');
+t('manage: same occurrence as DOW 0', $m === $m0, "$m vs $m0");
+t('manage: the +1 hour fallback was NOT taken', abs(strtotime($m) - strtotime('+1 hour')) > 600, $m);
+
+// ---------------------------------------------------------------- 3. NaN custom conditions fail loud
+// Each assertion also requires that the dispatcher swallowed NOTHING: a null that came
+// out of a caught Throwable is not the null these assertions are about.
+list($r, $sw) = af_cond('NaN > 0');
+t('NaN > 0 -> null (CONDITION_EVAL_FAILED), never true', $r === null && !$sw, af_shown($r, $sw));
+list($r2, $sw) = af_cond('0 < NaN');
+t('0 < NaN -> null', $r2 === null && !$sw, af_shown($r2, $sw));
+list($r3, $sw) = af_cond('5 > 0');
+t('control: 5 > 0 -> true', $r3 === true && !$sw, af_shown($r3, $sw));
+list($r4, $sw) = af_cond('0 > 5');
+t('control: 0 > 5 -> false', $r4 === false && !$sw, af_shown($r4, $sw));
+$data = array(array('ID' => '1', 'NOTES' => 'x'), array('ID' => '2', 'NOTES' => ''));
+$cols = array('ID', 'NOTES');
+list($r5, $sw) = af_cond("count(NOTES != '') > 0", $data, $cols);
+t("count(NOTES != '') > 0 -> null (row notes are browser-only)", $r5 === null && !$sw, af_shown($r5, $sw));
+list($r6, $sw) = af_cond("count(ID != '') > 0", $data, $cols);
+t("control: count(ID != '') > 0 -> true", $r6 === true && !$sw, af_shown($r6, $sw));
+
+// ---------------------------------------------------------------- 4. pivot word operators (server reference for the browser change)
+$row = array('TITLE' => 'Grant award');
+t('pivot contains (server)', pivot_evaluate_single_condition($row, 'TITLE contains grant') === true);
+t('pivot CONTAINS is case-insensitive (server)', pivot_evaluate_single_condition($row, 'TITLE CONTAINS GRANT') === true);
+// "starts with" is NOT an operator on either side (removed 2026-08-22 on user
+// feedback - the Visual Search Builder writes a prefix test as the anchored
+// regex COL = /^X/). Since 2026-09-23 night the pivot filter reads a condition
+// exactly like the browser (engine C, the twin of parseAdvancedQuery +
+// evaluateParsedQuery): "TITLE starts with gr" is TITLE contains "starts" AND the
+// search terms "with", "gr" - false here, as on screen. The old hand-rolled
+// evaluator let an unparseable condition through as TRUE (no filtering at all),
+// which the browser never did; pivotparity's filterRow2 pins this against it.
+t('pivot "starts with" is not a server operator (words, read like the browser)',
+    pivot_evaluate_single_condition($row, 'TITLE starts with gr') === false
+    && pivot_evaluate_single_condition($row, 'TITLE = /^gr/') === true
+    && pivot_evaluate_single_condition($row, 'TITLE = /^award/') === false);
+t('pivot contains still works after the removal', pivot_evaluate_single_condition($row, 'TITLE contains award') === true
+    && pivot_evaluate_single_condition($row, 'TITLE contains nope') === false);
+
+// ---------------------------------------------------------------- 5. first-run baseline fallback
+if (!function_exists('penumbra_first_run_baseline_unchanged')) {
+    t('baseline: helper exists', false, 'penumbra_first_run_baseline_unchanged missing (pre-fix source?)');
+} else {
+    $rows = array(array('ID' => '1', 'AMOUNT' => '10'), array('ID' => '2', 'AMOUNT' => '20'));
+    $GLOBALS['__fake_snapshot'] = null;
+    t('baseline: no snapshot of any kind -> false (run proceeds)', penumbra_first_run_baseline_unchanged(1, null, $rows, null, 'test') === false);
+    $GLOBALS['__fake_snapshot'] = array('id' => 7, 'name' => 'Baseline (pre-scheduler)', 'rows' => $rows, 'created_at' => '');
+    $GLOBALS['__log'] = array();
+    t('baseline: identical rows -> true (skip)', penumbra_first_run_baseline_unchanged(1, null, $rows, null, 'test') === true, implode(' | ', $GLOBALS['__log']));
+    t('baseline: the check is logged with the snapshot id and counts', count($GLOBALS['__log']) === 1 && strpos($GLOBALS['__log'][0], '#7') !== false && strpos($GLOBALS['__log'][0], '0 new, 0 removed, 0 modified') !== false, implode(' | ', $GLOBALS['__log']));
+    $rows2 = $rows; $rows2[1]['AMOUNT'] = '21';
+    t('baseline: modified row -> false', penumbra_first_run_baseline_unchanged(1, null, $rows2, null, 'test') === false);
+    $rows3 = $rows; $rows3[] = array('ID' => '3', 'AMOUNT' => '30');
+    t('baseline: new row -> false', penumbra_first_run_baseline_unchanged(1, null, $rows3, null, 'test') === false);
+    t('baseline: removed row -> false', penumbra_first_run_baseline_unchanged(1, null, array($rows[0]), null, 'test') === false);
+    t('baseline: custom key columns, unchanged -> true', penumbra_first_run_baseline_unchanged(1, null, $rows, array('ID'), 'test') === true);
+    t('baseline: empty current rows -> false', penumbra_first_run_baseline_unchanged(1, null, array(), null, 'test') === false);
+    $GLOBALS['__fake_snapshot'] = array('id' => 8, 'name' => 'legacy', 'rows' => array(), 'created_at' => '');
+    t('baseline: snapshot with no rows -> false', penumbra_first_run_baseline_unchanged(1, null, $rows, null, 'test') === false);
+}
+
+// ---------------------------------------------------------------- 6. snapshot-name send tokens are the email tokens (format parity)
+t('send-date token formats exist as used by the email subject', date('F j, Y') !== '' && date('g:i A') !== '');
+
+// ---------------------------------------------------------------- 8. recipient variables resolved into a condition (2026-09-23)
+// The runner resolves {PI_ELIGIBLE} / {EMPL_STATUS} / ... with the SQL engine before evaluating,
+// so the evaluator receives a QUOTED literal on that side. Pin how it compares those.
+list($r, $sw) = af_cond("'1' = 0");
+t("cond: '1' = 0 is FALSE (a PI-eligible recipient is not skipped by {PI_ELIGIBLE} = 0)", $r === false && !$sw, af_shown($r, $sw));
+list($r, $sw) = af_cond("'0' = 0");
+t("cond: '0' = 0 is TRUE (a non-eligible recipient is skipped)", $r === true && !$sw, af_shown($r, $sw));
+list($r, $sw) = af_cond("'A' != 'A'");
+t("cond: 'A' != 'A' is FALSE ({EMPL_STATUS} != 'A' keeps an active person)", $r === false && !$sw, af_shown($r, $sw));
+list($r, $sw) = af_cond("'T' != 'A'");
+t("cond: 'T' != 'A' is TRUE (a terminated person is skipped)", $r === true && !$sw, af_shown($r, $sw));
+list($r, $sw) = af_cond("'' = 'A'");
+t("cond: '' = 'A' is FALSE, not an evaluation failure (a recipient the directory does not know resolves to '')", $r === false && !$sw, af_shown($r, $sw));
+list($r, $sw) = af_cond("'C4' = 'C4'");
+t("cond: 'C4' = 'C4' is TRUE ({JOBCODE_PREFIX} = 'C4' skips the C4 family)", $r === true && !$sw, af_shown($r, $sw));
+
+// ---------------------------------------------------------------- 7. nothing hid behind the dispatcher's catch
+// Section 3 checks per call; this also covers any later test that reaches the snippet
+// engine without going through af_cond().
+t('no Throwable was swallowed by the snippet dispatcher anywhere in this run', !$GLOBALS['__AF_SWALLOWED'],
+    implode(' | ', array_slice($GLOBALS['__AF_SWALLOWED'], 0, 3)));
+
+echo "\n$pass passed, $fail failed\n";
+exit($fail > 0 ? 1 : 0);

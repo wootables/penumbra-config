@@ -1,0 +1,228 @@
+# =============================================================================
+# Run the date-range prompt tests ([PROMPT;type=date-range]).
+#
+#   powershell -File run.ps1
+#   powershell -File run.ps1 -App <path>   # run against a stage instead of live
+#   powershell -File run.ps1 -Control      # one deliberately FALSE assertion in
+#                                          # each half; both must report FAIL 1
+#   powershell -File run.ps1 -Mutant       # six targeted mutants; each MUST go
+#                                          # red with the exact counts named below
+#
+# WHAT IS UNDER TEST. One prompt, two dates. The answer is a single raw string
+# "<from>..<to>"; the author writes the SQL operator and the engine supplies the
+# two values (`col BETWEEN [PROMPT;type=date-range;...]`, or template= with
+# :from / :to). Three engines resolve prompts in this app - js/main.js in the
+# browser, index.php for ?json=1, schedule_runner.php for scheduled tasks - and
+# their history is one of drifting apart, so this suite has two halves that are
+# tied together:
+#
+#   1. test_daterange.php          the shared PHP helpers (shared_logic.php),
+#                                  each PHP engine's wiring around them, and
+#                                  PHP-to-PHP parity. It then WRITES A FIXTURE:
+#                                  every parity case, as the PHP engines answered it.
+#   2. daterange_browser_tests.js  the browser engine in headless Edge, with real
+#                                  jQuery / jQuery UI / moment: the helpers,
+#                                  processPrompts, the dialog (real clicks on real
+#                                  day cells) - and that fixture, which the browser
+#                                  engine must reproduce byte for byte once its
+#                                  binds are written back in as literals.
+#
+# Everything runs against the SHIPPED code, lifted out of the app files by name.
+# Nothing is require()d that could open a database or send mail, and nothing is
+# a pasted copy.
+#
+# EXPECTED TAIL:
+#   php     | PASS: 136   FAIL: 0
+#   browser | PASS: 143   FAIL: 0
+#   RESULT: GREEN
+# (match on the FAIL counts - the totals move as coverage lands.)
+#
+# The rolling-date cases compare against "today", computed on both sides at run
+# time. A run that straddles midnight can therefore go red once; run it again.
+#
+# UNC .ps1 files are GPO-blocked here ("not digitally signed") - run the body as
+# a scriptblock rather than with -File:
+#   $dir = '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\daterange'
+#   & ([scriptblock]::Create([IO.File]::ReadAllText("$dir\run.ps1").Replace('$here = $PSScriptRoot', "`$here = '$dir'")))
+# Never add a bare `exit` for the same reason: it would kill the caller. And do
+# not pipe the invocation: a lingering headless-Edge child can hold stdout open.
+# =============================================================================
+param(
+    [string]$App = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra',
+    [switch]$Control,
+    [switch]$Mutant
+)
+
+$ErrorActionPreference = 'Stop'
+$here = $PSScriptRoot
+if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Path }
+$php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+$edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+$live = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+$work = Join-Path $env:TEMP ('pnb_daterange_' + $PID)
+New-Item -ItemType Directory -Force -Path $work | Out-Null
+
+# Runs both halves against one app directory. Returns @{ php = <fails>; browser = <fails>; lines = <report> }
+# (-1 = that half did not produce a result at all).
+function Invoke-DateRangeSuite([string]$AppDir, [bool]$AsControl) {
+    $lines = New-Object System.Collections.Generic.List[string]
+    $run = Join-Path $work ('run_' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+    New-Item -ItemType Directory -Force -Path $run | Out-Null
+
+    # ---- half 1: PHP. -n because a workstation cannot load oci8/sqlsrv; the
+    # test sets its own timezone, which -n would otherwise drop to UTC.
+    $fx = Join-Path $run 'FIXTURE.js'
+    $phpArgs = @('-n', (Join-Path $here 'test_daterange.php'), $AppDir, $fx)
+    if ($AsControl) { $phpArgs += '--control' }
+    # PS 5.1 wraps a native exe's stderr in ErrorRecords, and under 'Stop' the
+    # first one ends the script - which is exactly what happens when the feature
+    # is not in $AppDir and the test says so on stderr. Relax it for this call
+    # and keep the text, so that case reads as a clean RED below.
+    $eap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $phpOut = & $php @phpArgs 2>&1 | ForEach-Object { "$_" }
+    $ErrorActionPreference = $eap
+    $phpFails = -1
+    $tail = ($phpOut | Where-Object { $_ -match '^PASS: \d+\s+FAIL: \d+' } | Select-Object -Last 1)
+    if ($tail -and $tail -match 'FAIL:\s*(\d+)') { $phpFails = [int]$Matches[1] }
+    $phpOut | Where-Object { $_ -match '^\s+FAIL |^\s+(got|want)[ :]|^lift:|^could not|^cannot read' } | ForEach-Object { $lines.Add('php     | ' + $_) }
+    $lines.Add('php     | ' + $(if ($tail) { $tail } else { 'NO RESULT - the PHP half did not finish (is the feature in this app directory?)' }))
+    if (-not (Test-Path $fx)) { [IO.File]::WriteAllText($fx, 'window.__fixture = null;') }
+
+    # ---- half 2: the browser engine, headless
+    $mainJs = Join-Path $AppDir 'js\main.js'
+    foreach ($lib in 'jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js') {
+        $src = Join-Path $AppDir "js\$lib"
+        if (-not (Test-Path $src)) { $src = Join-Path $live "js\$lib" }   # a stage usually holds only the edited files
+        Copy-Item $src (Join-Path $run $lib) -Force
+    }
+    Copy-Item (Join-Path $here 'daterange_browser_tests.js') (Join-Path $run 'tests.js') -Force
+    # main.js is baked into a JS string: `new Function` on text reports a real
+    # SyntaxError, where a file:// <script src> would only ever say "Script error."
+    [IO.File]::WriteAllText((Join-Path $run 'SRC.js'), 'window.__src = ' + ([IO.File]::ReadAllText($mainJs) | ConvertTo-Json -Compress) + ';')
+    $ctl = if ($AsControl) { 'window.__control = true;' } else { '' }
+    # requestAnimationFrame = null: jQuery's fx ticker prefers rAF, which never
+    # fires under --dump-dom; without this an animation callback would stall the run.
+    $html = '<!doctype html><html><head><meta charset="utf-8"></head><body><pre id="out">running</pre><pre id="errs"></pre>' +
+            '<script>window.onerror=function(m,s,l,c){document.getElementById("errs").textContent+="ONERROR: "+m+" @"+l+":"+c+"\n";};' +
+            'window.addEventListener("unhandledrejection",function(ev){document.getElementById("errs").textContent+="UNHANDLED: "+(ev.reason&&ev.reason.message||ev.reason)+"\n";});' +
+            'window.requestAnimationFrame=null;' + $ctl + '</script>' +
+            '<script src="jquery-3.7.1.min.js"></script><script src="jquery-ui.min.js"></script><script src="moment.min.js"></script>' +
+            '<script src="SRC.js"></script><script src="FIXTURE.js"></script><script src="tests.js"></script></body></html>'
+    [IO.File]::WriteAllText((Join-Path $run 'h.html'), $html)
+
+    # Start-Process + -RedirectStandardOutput, never `>` or a pipe: PS 5.1 loses
+    # native stdout that way. A profile dir of its OWN per launch: a shared one
+    # hung Edge when two launches overlapped (2026-09-21).
+    $dom = Join-Path $run 'dom.txt'
+    $url = 'file:///' + ((Join-Path $run 'h.html') -replace '\\', '/')
+    $browserFails = -1
+    $text = ''
+    $errs = ''
+    # Up to two launches. Headless Edge now and then exits without dumping the
+    # page (seen on the first launch of a batch); that is the browser, not the
+    # code under test, and a second launch settles it. A page that really stalls
+    # says so itself ("STALLED in: <section>") and is NOT retried.
+    for ($attempt = 1; $attempt -le 2; $attempt++) {
+        $ud = Join-Path $work ('ud_' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+        if (Test-Path $dom) { try { [IO.File]::Delete($dom) } catch { } }
+        $p = Start-Process -FilePath $edge -PassThru -NoNewWindow -RedirectStandardOutput $dom -RedirectStandardError (Join-Path $run 'edge_err.txt') -ArgumentList '--headless=new', '--disable-gpu', '--no-sandbox', '--allow-file-access-from-files', "--user-data-dir=$ud", '--window-size=1400,1000', '--virtual-time-budget=60000', '--dump-dom', $url
+        if (-not $p.WaitForExit(180000)) {
+            Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" | Where-Object { $_.CommandLine -like "*$ud*" } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch { } }
+            $lines.Add("browser | launch $attempt TIMED OUT after 180s - headless Edge was stopped")
+        }
+        $domText = ''
+        if (Test-Path $dom) {
+            # The redirected stdout file can stay locked for a moment after Edge
+            # exits (its child processes inherit the handle). Wait it out.
+            for ($try = 0; $try -lt 40; $try++) {
+                try { $domText = [IO.File]::ReadAllText($dom); break } catch [System.IO.IOException] { Start-Sleep -Milliseconds 250 }
+            }
+        }
+        $text = [System.Net.WebUtility]::HtmlDecode([regex]::Match($domText, '(?s)<pre id="out">(.*?)</pre>').Groups[1].Value)
+        $errs = [System.Net.WebUtility]::HtmlDecode([regex]::Match($domText, '(?s)<pre id="errs">(.*?)</pre>').Groups[1].Value)
+        if ($text -match 'DONE' -or $text -match 'STALLED in:' -or $text -match 'HARNESS') { break }
+        if ($attempt -eq 1) { $lines.Add('browser | launch 1 produced no page dump - launching once more') }
+    }
+    ($errs -split "`n") | Where-Object { $_.Trim() -ne '' } | Select-Object -First 6 | ForEach-Object { $lines.Add("browser | $_") }
+    ($text -split "`n") | Where-Object { $_ -match '^\s+FAIL |^\s+(got|want)[ :]|^HARNESS|^STALLED' } | ForEach-Object { $lines.Add("browser | $_") }
+    $bt = [regex]::Match($text, 'PASS: \d+\s+FAIL: (\d+)')
+    if ($bt.Success -and $text -match 'DONE') { $browserFails = [int]$bt.Groups[1].Value; $lines.Add('browser | ' + $bt.Value) }
+    else { $lines.Add('browser | NO RESULT - the page did not finish (see the STALLED / HARNESS line above, if any)') }
+
+    return @{ php = $phpFails; browser = $browserFails; lines = $lines }
+}
+
+function Remove-Work { try { [IO.Directory]::Delete($work, $true) } catch { } }   # not Remove-Item: the tool's pre-filter rejects it on a variable path
+
+if (-not $Mutant) {
+    $r = Invoke-DateRangeSuite $App ([bool]$Control)
+    $r.lines | ForEach-Object { Write-Output $_ }
+    if ($Control) {
+        $ok = ($r.php -eq 1 -and $r.browser -eq 1)
+        Write-Output $(if ($ok) { 'CONTROL: both halves reported exactly the one deliberate failure - the suite can see red' } else { "CONTROL BROKEN: expected FAIL 1 / FAIL 1, got $($r.php) / $($r.browser)" })
+    } else {
+        Write-Output ('RESULT: ' + $(if ($r.php -eq 0 -and $r.browser -eq 0) { 'GREEN' } else { 'RED' }))
+    }
+    Remove-Work
+    return
+}
+
+# --- targeted mutants ---------------------------------------------------------
+# Each reverts ONE decision the feature makes, in a scratch copy of the app. The
+# expected fail counts are exact, per half: a mutant that stays green, or goes red
+# somewhere it was not expected to, means the suite is not pinning what it claims.
+$mutApp = Join-Path $work 'mutapp'
+New-Item -ItemType Directory -Force -Path (Join-Path $mutApp 'js') | Out-Null
+$files = 'shared_logic.php', 'schedule_runner.php', 'index.php', 'penumbra_search.php', 'js\main.js'
+
+$mutants = @(
+    @{ name = 'A: two-digit years read with the LANGUAGE pivot, not the database (Oracle RR) window'
+       file = 'shared_logic.php'; php = 4; browser = 1
+       from = "        `$d = (int)`$m[1]; `$mo = `$MON[`$monKey]; `$y = (int)`$m[3];`n        if (strlen(`$m[3]) === 2) `$y += (`$y >= 50) ? 1900 : 2000;"
+       to   = "        `$d = (int)`$m[1]; `$mo = `$MON[`$monKey]; `$y = (int)`$m[3];`n        if (strlen(`$m[3]) === 2) `$y += (`$y >= 70) ? 1900 : 2000;" },
+    @{ name = 'B: a reversed range is let through (BETWEEN would return zero rows, silently)'
+       file = 'shared_logic.php'; php = 5; browser = 1
+       from = '    if ($a > $b) {'
+       to   = '    if (false) {' },
+    @{ name = "C: the author's quotes around the tag are left in place"
+       file = 'shared_logic.php'; php = 3; browser = 1
+       from = "    if (`$before === `"'`" && `$after === `"'`") {"
+       to   = '    if (false) {' },
+    @{ name = 'D: the browser sends ONE bind (the generic path) instead of two'
+       file = 'js\main.js'; php = 0; browser = 21
+       from = "                } else if (_isDrPrompt) {`n                    // TWO binds from one prompt."
+       to   = "                } else if (false) {`n                    // TWO binds from one prompt." },
+    @{ name = 'E: a forced default is STORED RESOLVED - the frozen-default bug of 2026-08-31, again'
+       file = 'js\main.js'; php = 0; browser = 2
+       from = "                            value: drForcedRaw,"
+       to   = "                            value: drForced.from + '..' + drForced.to," },
+    @{ name = "F: jQuery UI's own selected-day / today fills are left on the range calendar"
+       file = 'js\main.js'; php = 0; browser = 2
+       from = "            obs.observe(`$cal[0], { childList: true, subtree: true });"
+       to   = "            /* mutant: never observes */" }
+)
+
+$bad = 0
+foreach ($m in $mutants) {
+    foreach ($f in $files) { Copy-Item (Join-Path $App $f) (Join-Path $mutApp $f) -Force }
+    $target = Join-Path $mutApp $m.file
+    $text = [IO.File]::ReadAllText($target)
+    $eol  = if ($text.Contains("`r`n")) { "`r`n" } else { "`n" }
+    $from = $m.from.Replace("`r`n", "`n").Replace("`n", $eol)
+    $to   = $m.to.Replace("`r`n", "`n").Replace("`n", $eol)
+    $mut  = $text.Replace($from, $to)
+    if ($mut -ceq $text) {
+        Write-Output ("ANCHOR MISS - " + $m.name + " (the file has moved; fix the mutant)")
+        $bad++
+        continue
+    }
+    [IO.File]::WriteAllText($target, $mut)
+    $r = Invoke-DateRangeSuite $mutApp $false
+    if ($r.php -eq $m.php -and $r.browser -eq $m.browser) { $verdict = 'BITES' } else { $verdict = 'WRONG'; $bad++ }
+    Write-Output ("{0,-6} {1}  (expected php {2} / browser {3}, got {4} / {5})" -f $verdict, $m.name, $m.php, $m.browser, $r.php, $r.browser)
+    if ($verdict -eq 'WRONG') { $r.lines | Where-Object { $_ -match 'FAIL |NO RESULT|HARNESS|STALLED|lift:' } | ForEach-Object { Write-Output "         $_" } }
+}
+Write-Output ''
+Write-Output $(if ($bad -eq 0) { 'MUTANTS: all six bite exactly as specified' } else { "MUTANTS: $bad problem(s) - the suite is not pinning what it claims" })
+Remove-Work

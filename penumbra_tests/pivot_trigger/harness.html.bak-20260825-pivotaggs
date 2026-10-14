@@ -1,0 +1,671 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>pivot trigger round-trip</title></head>
+<body>
+<!-- Minimal DOM. main.js binds #copyPivotSnippetBtn DIRECTLY at ready time, so
+     the pivot-builder elements must exist BEFORE main.js loads. The trigger
+     handler is delegated off #reportSnippetOutput. The parser resolves the
+     Value column against #tableHeader th[data-colname]. -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<table id="resultsTable"><thead id="tableHeader"><tr>
+  <th data-colname="#">#</th><th data-colname="COLLEGE">COLLEGE</th><th data-colname="FY">FY</th>
+  <th data-colname="AMOUNT">AMOUNT</th><th data-colname="STATUS">STATUS</th><th data-colname="RECORD_ID">RECORD_ID</th>
+</tr></thead><tbody></tbody></table>
+<div id="errorBox"></div>
+<!-- Phase 3 (2026-08-21): layout_switch / toggle_switch. The toggle reads its
+     own state off the LIVE report, so the three things it reads must exist:
+     the search box, and the two view containers (hidden = the flat table, which
+     is the baseline state every toggle assertion starts from). -->
+<input id="tableSearch" value="">
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="pivotLightbox" style="display:none">
+  <div id="pivot-source-columns"></div>
+  <div id="pivot-rows"></div><div id="pivot-cols"></div><div id="pivot-vals"></div>
+  <select id="pivot-aggregation-selector"><option value="">-</option><option value="sum">sum</option></select>
+  <table><tbody id="pivot-agg-table-body"></tbody></table>
+  <select id="pivot-rows-layout-select"><option value="nested">nested</option><option value="nested-static">nested-static</option><option value="flat">flat</option></select>
+  <select id="pivot-cols-layout-select"><option value="nested">nested</option><option value="flat">flat</option></select>
+  <select id="pivot-sort-order"><option value="asc">asc</option><option value="desc">desc</option></select>
+  <input id="pivot-sticky-cols" value="3">
+  <input type="checkbox" id="pivot-row-total-override-toggle">
+  <div id="pivot-row-total-override-container" style="display:none"><div id="pivot-row-total-slots"></div><div id="pivot-row-total-tokens"></div></div>
+  <select id="pivot-rank-dir"><option value="none">none</option><option value="top">top</option><option value="bottom">bottom</option></select>
+  <input id="pivot-rank-n" value="10"><select id="pivot-rank-agg"><option value="sum">sum</option><option value="count">count</option></select>
+  <input type="checkbox" id="pivot-rank-other" checked><label id="pivot-rank-other-label"></label>
+  <input type="checkbox" id="pivot-no-breakdown"><input type="checkbox" id="pivot-start-expanded">
+  <select id="pivotPresetSelect"><option value=""></option></select><button id="pivotDeletePresetBtn"></button><input type="checkbox" id="pivotAutoRunPreset">
+  <button id="generatePivotBtn">Generate</button>
+  <select id="pivotSnippetTargetSelect" style="display: none;"></select>
+  <button id="updatePivotSnippetBtn" type="button" style="display: none;">&#x27F3; Update Snippet</button>
+  <button id="copyPivotSnippetBtn">Snippet</button>
+  <button id="pivotSavePresetBtn"></button>
+</div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  // Same boot stubs as the parity harness (see ..\parity\harness_b.html for why).
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  // Synchronous show/hide: the fx ticker's rAF never fires under --dump-dom,
+  // so animated fadeIn would otherwise leave display:none and break :visible.
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () {
+    this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {};
+  };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  // NOTE: do NOT null window.requestAnimationFrame here - main.js calls it during
+  // init and the ready-closure then dies before any handler is bound. Instead,
+  // jQuery.fx.off (set after jQuery loads, below the vendor scripts) makes
+  // fadeIn/fadeOut synchronous so :visible assertions work headless.
+  window.__errors = [];
+  window.onerror = function (m) { window.__errors.push(String(m)); return true; };
+  // Clipboard capture for the Copy Snippet handler.
+  window.__clip = null;
+  if (!navigator.clipboard) { try { Object.defineProperty(navigator, 'clipboard', { value: {}, configurable: true }); } catch (e) {} }
+  try { navigator.clipboard.writeText = function (s) { window.__clip = s; return Promise.resolve(); }; } catch (e) {}
+</script>
+<script src="main_patched.js"></script>
+<script>
+(function () {
+  function report(txt) { document.getElementById('out').textContent = txt; }
+  var results = [];
+  function assert(name, cond, detail) { results.push({ name: name, pass: !!cond, detail: detail === undefined ? '' : String(detail) }); }
+
+  function rowsSnapshot() {
+    return $('#pivot-agg-table-body tr').map(function () {
+      var $tr = $(this);
+      return {
+        type: $tr.attr('data-agg-type'),
+        col: $tr.attr('data-agg-col') || null,
+        label: $tr.data('custom-label') || null,
+        filter: $tr.attr('data-agg-filter') || null,
+        formula: ($tr.attr('data-agg-type') === 'formula') ? ($tr.attr('data-agg-formula') || '') : null,
+        shownLabel: $tr.find('.pat-cell-lbl .pat-cell-text').text()
+      };
+    }).get();
+  }
+  // Fire a trigger exactly the way executeChainStep / the infobox path do: a
+  // temp .snippet-action link inside #reportSnippetOutput. The parser's
+  // runSilent() setup runs SYNCHRONOUSLY in the click; only the Generate click
+  // is deferred 10ms (and Generate is unbound below - no data in the harness).
+  function fireTrigger(cmd) {
+    var a = $('<a class="snippet-action" data-action-name="trigger"></a>').attr('data-action-value', cmd);
+    $('#reportSnippetOutput').append(a);
+    a.trigger('click');
+    a.remove();
+    return rowsSnapshot();
+  }
+
+  function run() {
+    var T = window.__PT;
+    if (!T || typeof T.addAggregationRow !== 'function') {
+      report('RESULTS_JSON:' + JSON.stringify({ fatal: 'hooks unavailable: ' + (window.__PT_ERR || 'n/a'), pageErrors: window.__errors.slice(0, 6) }));
+      return;
+    }
+    $('#generatePivotBtn').off('click');   // no data in the harness; keep the run deterministic
+
+    // ---- 1. Parser: full snippet with filters, formula AND custom labels (position 17)
+    var full = "pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT,sum:AMOUNT,formula|nested|nested|asc|3|none|none|none|none|none|none|STATUS=Active;;STATUS=Closed;;|;;;;{Active Sum} - {Closed Sum}|Active Sum;;Closed Sum;;Variance";
+    var r1 = fireTrigger(full);
+    assert('parser: 3 rows (two filtered Sums survive the dedupe + formula)', r1.length === 3, JSON.stringify(r1));
+    assert('parser: row1 = sum/AMOUNT/"Active Sum"/STATUS=Active', r1[0] && r1[0].type === 'sum' && r1[0].col === 'AMOUNT' && r1[0].label === 'Active Sum' && r1[0].filter === 'STATUS=Active', JSON.stringify(r1[0]));
+    assert('parser: row2 = sum/AMOUNT/"Closed Sum"/STATUS=Closed', r1[1] && r1[1].type === 'sum' && r1[1].col === 'AMOUNT' && r1[1].label === 'Closed Sum' && r1[1].filter === 'STATUS=Closed', JSON.stringify(r1[1]));
+    assert('parser: row3 = formula "Variance" {Active Sum} - {Closed Sum}', r1[2] && r1[2].type === 'formula' && r1[2].label === 'Variance' && r1[2].formula === '{Active Sum} - {Closed Sum}', JSON.stringify(r1[2]));
+    assert('parser: label cells SHOW the custom labels', r1.length === 3 && r1[0].shownLabel === 'Active Sum' && r1[1].shownLabel === 'Closed Sum' && r1[2].shownLabel === 'Variance', JSON.stringify(r1.map(function (r) { return r.shownLabel; })));
+    var v1 = T.validatePivotFormulas();
+    assert('parser: formula validates against the restored labels (no "unknown/ambiguous label")', v1 && v1.error === null, JSON.stringify(v1 && v1.error));
+    assert('parser: row/col chips keep their case', $('#pivot-rows .pivot-column-item').attr('data-field') === 'COLLEGE' && $('#pivot-cols .pivot-column-item').attr('data-field') === 'FY', $('#pivot-rows').text() + '/' + $('#pivot-cols').text());
+
+    // ---- 2. Writer: Copy Snippet must reproduce the SAME trigger (round trip)
+    window.__clip = null;
+    $('#copyPivotSnippetBtn').trigger('click');
+    var expected = "action(trigger, 'View Pivot', '" + full + "')";
+    assert('writer: Copy Snippet emits the labels and round-trips byte-for-byte', window.__clip === expected, 'got: ' + window.__clip);
+
+    // ---- 3. Legacy snippets (no label position) still work, labels default
+    var r3 = fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum,count');
+    assert('legacy: sum,count -> 2 rows, default labels', r3.length === 2 && r3[0].type === 'sum' && r3[1].type === 'count' && r3[0].label === null && r3[1].label === null, JSON.stringify(r3));
+    // Writer on a default-label pivot must NOT emit the labels field (trailing default trimmed)
+    window.__clip = null; $('#copyPivotSnippetBtn').trigger('click');
+    assert('writer: no custom labels -> AggLabels field omitted', window.__clip === "action(trigger, 'View Pivot', 'pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT,count:AMOUNT')", 'got: ' + window.__clip);
+
+    // ---- 4. Dedupe: exact duplicates still collapse; differentiated ones survive
+    var r4a = fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum,sum');
+    assert('dedupe: sum,sum (identical) -> 1 row', r4a.length === 1, JSON.stringify(r4a));
+    var r4b = fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum,sum:AMOUNT');
+    assert('dedupe: sum,sum:AMOUNT with Value=AMOUNT -> still 1 row', r4b.length === 1, JSON.stringify(r4b));
+    var r4c = fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT,sum:AMOUNT|nested|nested|asc|3|none|none|none|none|none|none|none|none|Gross;;Net');
+    assert('dedupe: same type+col, different LABELS -> 2 rows', r4c.length === 2 && r4c[0].label === 'Gross' && r4c[1].label === 'Net', JSON.stringify(r4c));
+    var r4d = fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT,sum:AMOUNT|nested|nested|asc|3|none|none|none|none|none|none|STATUS=Active;;STATUS=Closed');
+    assert('dedupe: same type+col, different FILTERS (the help example shape) -> 2 rows', r4d.length === 2 && r4d[0].filter === 'STATUS=Active' && r4d[1].filter === 'STATUS=Closed', JSON.stringify(r4d));
+    var r4e = fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT,distinct:RECORD_ID,sum:AMOUNT');
+    assert('dedupe: sum:AMOUNT,distinct:RECORD_ID,sum:AMOUNT -> 2 rows', r4e.length === 2 && r4e[0].type === 'sum' && r4e[1].type === 'distinct' && r4e[1].col === 'RECORD_ID', JSON.stringify(r4e));
+
+    // ---- 5. sum_count alias: labels can't name two columns -> both default
+    var r5 = fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum_count|nested|nested|asc|3|none|none|none|none|none|none|none|none|Both');
+    assert('sum_count: expands to sum+count, label ignored', r5.length === 2 && r5[0].type === 'sum' && r5[1].type === 'count' && r5[0].label === null && r5[1].label === null, JSON.stringify(r5));
+
+    // ---- 5b. Expand arg (2026-08-25): the "Start groups expanded" inversion.
+    // Position 13 is now Expand: only the 'expanded' keyword checks the box;
+    // legacy 'collapsed', 'none' and absent all mean the collapsed default.
+    var fullExp = 'pivot|COLLEGE,DEPT|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|expanded';
+    fireTrigger(fullExp);
+    assert("expand: parser checks the box on 'expanded'", $('#pivot-start-expanded').is(':checked'), 'box unchecked after |expanded');
+    window.__clip = null; $('#copyPivotSnippetBtn').trigger('click');
+    assert('expand: writer round-trips |expanded byte-for-byte', window.__clip === "action(trigger, 'View Pivot', '" + fullExp + "')", 'got: ' + window.__clip);
+    fireTrigger('pivot|COLLEGE,DEPT|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|collapsed');
+    assert("expand: legacy 'collapsed' keyword leaves the box unchecked (= the default)", !$('#pivot-start-expanded').is(':checked'), 'box checked after |collapsed');
+    window.__clip = null; $('#copyPivotSnippetBtn').trigger('click');
+    assert('expand: unchecked box emits no Expand arg (trailing default trimmed)', window.__clip === "action(trigger, 'View Pivot', 'pivot|COLLEGE,DEPT|FY|AMOUNT|sum:AMOUNT')", 'got: ' + window.__clip);
+
+    // ---- 6. Engine B (resolveInfoboxSnippet): pivot| keeps its case + un-escapes \'
+    var B = window.__ENGINE_B;
+    if (typeof B === 'function') {
+      var html = B("action(trigger, 'Go', 'pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|none|none|Status = Active|none|Sponsor\\'s Total')", [], ['COLLEGE', 'FY', 'AMOUNT', 'STATUS']);
+      var out = (html && typeof html === 'object' && 'html' in html) ? html.html : String(html);
+      var $a = $('<div>').html(out).find('a.snippet-action');
+      var val = $a.attr('data-action-value') || '';
+      assert('engine B: pivot| trigger keeps case (COLLEGE / Status = Active / Sponsor\'s Total) and un-escapes the apostrophe',
+        val.indexOf('pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT|') === 0 && val.indexOf('|Status = Active|') !== -1 && val.indexOf("|Sponsor's Total") !== -1, val || out.substring(0, 200));
+      var html2 = B("action(trigger, 'Go', 'sort|AMOUNT|DESC')", [], ['AMOUNT']);
+      var out2 = (html2 && typeof html2 === 'object' && 'html' in html2) ? html2.html : String(html2);
+      assert('engine B: other triggers still lowercased (sort|AMOUNT|DESC -> sort|amount|desc)', ($('<div>').html(out2).find('a.snippet-action').attr('data-action-value') || '') === 'sort|amount|desc', out2.substring(0, 200));
+      // Click the engine-B-rendered pivot link: the parser must receive mixed case
+      $('#reportSnippetOutput').html(out);
+      $('#reportSnippetOutput a.snippet-action').trigger('click');
+      var r6 = rowsSnapshot(); $('#reportSnippetOutput').empty();
+      assert('engine B link -> parser: filter + label arrive with case intact', r6.length === 1 && r6[0].filter === 'Status = Active' && r6[0].label === "Sponsor's Total", JSON.stringify(r6));
+      // Writer must escape the apostrophe so the snippet re-parses
+      window.__clip = null; $('#copyPivotSnippetBtn').trigger('click');
+      assert("writer: apostrophe in a label is emitted as \\' inside the single-quoted arg", typeof window.__clip === 'string' && window.__clip.indexOf("Sponsor\\'s Total')") !== -1, 'got: ' + window.__clip);
+    } else {
+      assert('engine B available', false, window.__ENGINE_B_ERR || 'n/a');
+    }
+
+    // ---- 7. Engine A (renderReportSnippet): same case-preservation, through the real render
+    var A = window.__RENDER_A, ed = (window.Penumbra && window.Penumbra.getSnippetEditor) ? window.Penumbra.getSnippetEditor() : null;
+    if (typeof A === 'function' && ed) {
+      ed.setValue("action(trigger, 'Go', 'pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|none|none|Status = Active|none|Mixed Case Label')");
+      Promise.resolve().then(function () { return A(null, true); }).then(function () {
+        var valA = $('#reportSnippetOutput a.snippet-action[data-action-name="trigger"]').attr('data-action-value') || '';
+        assert('engine A: rendered pivot| link keeps case (COLLEGE / Status = Active / Mixed Case Label)',
+          valA.indexOf('pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT|') === 0 && valA.indexOf('|Status = Active|') !== -1 && valA.indexOf('|Mixed Case Label') !== -1, valA || $('#reportSnippetOutput').html().substring(0, 300));
+        ed.setValue("action(trigger, 'Go', 'sort|AMOUNT|DESC')");
+        return A(null, true);
+      }).then(function () {
+        var valA2 = $('#reportSnippetOutput a.snippet-action[data-action-name="trigger"]').attr('data-action-value') || '';
+        assert('engine A: other triggers still lowercased (sort|amount|desc)', valA2 === 'sort|amount|desc', valA2);
+      }).catch(function (e) {
+        assert('engine A render ran', false, String(e && e.message ? e.message : e));
+      }).then(function () { return runPhase2(ed); }).then(function () { return runPhase3(ed); }).then(function () { return runPerf(ed); }).then(finish, function (e) {
+        assert('phase2/3/perf crashed', false, String(e && e.message ? e.message : e));
+        finish();
+      });
+    } else {
+      assert('engine A render hook available (renderReportSnippet + Penumbra.getSnippetEditor)', false, 'A=' + typeof A + ' ed=' + !!ed);
+      finish();
+    }
+  }
+
+  // ══════ Phase 2: double-click edit-in-place feature (2026-08-19) ══════
+  function runPhase2(ed) {
+    var T2 = window.__PT2 || {};
+    if (typeof T2.locate !== 'function') {
+      assert('phase2: __PT2 hooks available', false, window.__PT2_ERR || 'n/a');
+      return Promise.resolve();
+    }
+    var openLb = function () { $('#pivotLightbox').css('display', 'flex'); };
+
+    // -- Locator unit tests
+    var callTxt = "action(trigger, case(1=1,'A','B'), 'pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|none|none|Status = Active|none|Sponsor\\'s Total', 1=1)";
+    var doc = "Intro prose action(trigger, 'Sort it', 'sort|AMOUNT|DESC') mid prose\n" + callTxt + "\ntail prose";
+    var pivotIdx = doc.indexOf('pivot|');
+    var loc = T2.locate(doc, pivotIdx + 3);
+    assert('locate: click inside pivot trigger finds the call', !!loc && doc.substring(loc.callFrom, loc.callTo) === callTxt, loc ? doc.substring(loc.callFrom, loc.callTo) : 'null');
+    assert('locate: arg span covers the quoted trigger and label decodes', !!loc && doc.charAt(loc.argFrom) === "'" && doc.charAt(loc.argTo - 1) === "'" && loc.trigger.indexOf("Sponsor's Total") !== -1 && loc.trigger.indexOf('\\') === -1, loc ? JSON.stringify({ arg: doc.substring(loc.argFrom, loc.argTo), trig: loc.trigger }) : 'null');
+    assert('locate: click inside a sort call returns null', T2.locate(doc, doc.indexOf('sort|') + 2) === null, '');
+    assert('locate: click in prose returns null', T2.locate(doc, 3) === null, '');
+    var callB1 = "action(trigger, 'View C1', 'pivot|COLLEGE|none|AMOUNT|sum')";
+    var callB2 = "action(trigger, 'View C2', 'pivot|FY|none|AMOUNT|count')";
+    var lst = T2.list(callB1 + '\n' + callB2);
+    assert('list: two pivot calls found with labels', lst.length === 2 && lst[0].label === 'View C1' && lst[1].label === 'View C2', JSON.stringify(lst.map(function (c) { return c.label; })));
+
+    // -- Double-click end to end, through the REAL registered CM handler chain
+    ed.setValue(doc); // also clears any armed target via the setValue hook
+    ed.setCursor(ed.posFromIndex(pivotIdx + 3));
+    CodeMirror.signal(ed, 'dblclick', ed, { preventDefault: function () { } });
+    assert('dblclick: whole action(...) call selected', ed.getSelection() === callTxt, ed.getSelection().substring(0, 120));
+    var r27 = rowsSnapshot();
+    assert('dblclick: builder loaded with label/filter case intact', r27.length === 1 && r27[0].label === "Sponsor's Total" && r27[0].filter === 'Status = Active' && r27[0].col === 'AMOUNT', JSON.stringify(r27));
+    assert('dblclick: edit target armed + lightbox open + Update visible, picker hidden',
+      !!T2.getTarget() && $('#pivotLightbox').is(':visible') && $('#updatePivotSnippetBtn').is(':visible') && !$('#pivotSnippetTargetSelect').is(':visible'),
+      JSON.stringify({ tgt: !!T2.getTarget(), lb: $('#pivotLightbox').is(':visible'), btn: $('#updatePivotSnippetBtn').is(':visible'), dd: $('#pivotSnippetTargetSelect').is(':visible') }));
+
+    // -- Update in place (marker path): label + condition survive byte-for-byte
+    $('#pivot-agg-table-body tr').first().data('custom-label', "Renamed & Co's");
+    window.__PT.refreshAggTokenLabels();
+    openLb();
+    $('#updatePivotSnippetBtn').trigger('click');
+    var expArg = "'pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|none|none|Status = Active|none|Renamed & Co\\'s'";
+    var expDoc = "Intro prose action(trigger, 'Sort it', 'sort|AMOUNT|DESC') mid prose\n" +
+      "action(trigger, case(1=1,'A','B'), " + expArg + ", 1=1)" + "\ntail prose";
+    assert('update: only the trigger arg replaced; label + condition preserved', ed.getValue() === expDoc, ed.getValue());
+    openLb();
+    $('#updatePivotSnippetBtn').trigger('click');
+    assert('update: repeat click is idempotent', ed.getValue() === expDoc, ed.getValue());
+    ed.replaceRange('PREFIX! ', { line: 0, ch: 0 });
+    openLb();
+    $('#updatePivotSnippetBtn').trigger('click');
+    assert('update: marker tracks an upstream edit', ed.getValue() === 'PREFIX! ' + expDoc, ed.getValue());
+
+    // -- Sole-call path (no double-click, exactly one pivot command)
+    ed.setValue('Solo header\n' + callB1 + '\nfooter');
+    assert('setValue cleared the armed target', !T2.getTarget(), '');
+    openLb(); // in the app the refresh runs while #pivotBtn is opening the lightbox
+    T2.refreshTargetUI();
+    assert('sole: Update visible, picker hidden', $('#updatePivotSnippetBtn').is(':visible') && !$('#pivotSnippetTargetSelect').is(':visible'), JSON.stringify({ btn: $('#updatePivotSnippetBtn').is(':visible'), dd: $('#pivotSnippetTargetSelect').is(':visible') }));
+    $('#updatePivotSnippetBtn').trigger('click');
+    var built = T2.build();
+    assert('sole: the only pivot call was updated from the builder', !built.error && ed.getValue().indexOf("'" + built.trigger.replace(/'/g, "\\'") + "'") !== -1 && ed.getValue().indexOf('sum:AMOUNT') !== -1, ed.getValue());
+
+    // -- Multi-call path: the picker loads the selection into the builder,
+    //    arms it as the write target, and STAYS visible (v1 hid it once a
+    //    target was armed - read as "the dropdown disappeared").
+    ed.setValue(callB1 + '\n' + callB2);
+    openLb(); // previous update fadeOut'd the lightbox; visibility needs the parent shown
+    T2.refreshTargetUI();
+    var $dd = $('#pivotSnippetTargetSelect');
+    assert('multi: picker shown with one option per pivot call', $dd.is(':visible') && $dd.find('option').length === 2 && /View C1/.test($dd.find('option').eq(0).text()) && /View C2/.test($dd.find('option').eq(1).text()), $dd.find('option').map(function () { return $(this).text(); }).get().join(' | '));
+    $dd.val('1').trigger('change');
+    var r32 = rowsSnapshot();
+    assert('multi: selecting from the picker LOADS that command into the builder', r32.length === 1 && r32[0].type === 'count' && r32[0].col === 'AMOUNT' && $('#pivot-rows .pivot-column-item').attr('data-field') === 'FY', JSON.stringify(r32) + ' rows=' + $('#pivot-rows').text());
+    assert('multi: selection arms the target and the picker stays visible, preselected', !!T2.getTarget() && $dd.is(':visible') && $dd.val() === '1', JSON.stringify({ tgt: !!T2.getTarget(), vis: $dd.is(':visible'), val: $dd.val() }));
+    openLb();
+    $('#updatePivotSnippetBtn').trigger('click');
+    var lines = ed.getValue().split('\n');
+    var built2 = T2.build();
+    assert('multi: picked call (2nd) updated, 1st untouched', lines[0] === callB1 && lines[1].indexOf("'View C2'") !== -1 && lines[1].indexOf(built2.trigger.split('|').slice(0, 4).join('|')) !== -1, ed.getValue());
+    openLb();
+    T2.refreshTargetUI();
+    assert('multi: picker still offered on the next builder open (regression)', $dd.is(':visible') && $dd.find('option').length === 2 && $dd.val() === '1', JSON.stringify({ vis: $dd.is(':visible'), n: $dd.find('option').length, val: $dd.val() }));
+
+    // -- Fields sidebar on dropdown load: '#' offered (it lives in the row
+    //    maps once search/snippet passes stamp it - repopulate shows it, so
+    //    the loader must too), used columns excluded. User report 2026-08-19.
+    var srcMap = new Map();
+    srcMap.set('#', '1'); srcMap.set('COLLEGE', 'x'); srcMap.set('FY', '2024');
+    srcMap.set('AMOUNT', '5'); srcMap.set('EXTRA_COL', 'y');
+    T2.setRows([srcMap]);
+    $dd.val('0').trigger('change'); // reload call 1: rows=COLLEGE, value=AMOUNT
+    var srcTxts = $('#pivot-source-columns .pivot-column-item').map(function () { return $(this).attr('data-field'); }).get();
+    assert("source list: '#' offered on dropdown load, used columns excluded",
+      srcTxts.indexOf('#') !== -1 && srcTxts.indexOf('EXTRA_COL') !== -1 && srcTxts.indexOf('FY') !== -1 && srcTxts.indexOf('COLLEGE') === -1 && srcTxts.indexOf('AMOUNT') === -1,
+      JSON.stringify(srcTxts));
+    T2.setRows([]); // restore the empty-data baseline for the remaining tests
+
+    // -- No pivot calls: both controls hidden, update is a safe no-op
+    ed.setValue("nothing here action(trigger, 'X', 'sort|AMOUNT|asc')");
+    T2.refreshTargetUI();
+    var before33 = ed.getValue();
+    assert('none: Update + picker hidden', !$('#updatePivotSnippetBtn').is(':visible') && !$('#pivotSnippetTargetSelect').is(':visible'), '');
+    openLb();
+    $('#updatePivotSnippetBtn').trigger('click');
+    assert('none: forced update click leaves the snippet untouched', ed.getValue() === before33, ed.getValue());
+
+    // -- Admin gate: non-admins get neither the button nor the picker, even
+    //    with several pivot calls present (matches #copyPivotSnippetBtn's gate;
+    //    non-admins also have no snippet editor at all in the real app).
+    ed.setValue(callB1 + '\n' + callB2);
+    openLb();
+    var _wasAdmin = window.penumbra_vars.isAdmin;
+    window.penumbra_vars.isAdmin = false;
+    T2.refreshTargetUI();
+    assert('admin gate: refresh hides Update + picker for non-admins', !$('#updatePivotSnippetBtn').is(':visible') && !$('#pivotSnippetTargetSelect').is(':visible') && $('#pivotSnippetTargetSelect').find('option').length === 0, JSON.stringify({ btn: $('#updatePivotSnippetBtn').is(':visible'), dd: $('#pivotSnippetTargetSelect').is(':visible') }));
+    var handledNonAdmin = T2.open(ed, ed.posFromIndex(ed.getValue().indexOf('pivot|') + 2), { preventDefault: function () { } });
+    assert('admin gate: double-click opener refuses for non-admins', handledNonAdmin === false && !T2.getTarget(), String(handledNonAdmin));
+    window.penumbra_vars.isAdmin = _wasAdmin;
+
+    // -- Executor state resets (found while wiring load-only mode)
+    fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum|nested|nested|asc|3|none|sum:Total@0');
+    var rtOn = $('#pivot-row-total-override-toggle').is(':checked');
+    var tokOn = $('#pivot-row-total-slots .pivot-row-total-token').length;
+    fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum');
+    var rtOff = $('#pivot-row-total-override-toggle').is(':checked');
+    var tokOff = $('#pivot-row-total-slots .pivot-row-total-token').length;
+    assert('row totals: trigger applies them, next trigger without them CLEARS them', rtOn && tokOn >= 1 && !rtOff && tokOff === 0, JSON.stringify({ rtOn: rtOn, tokOn: tokOn, rtOff: rtOff, tokOff: tokOff }));
+    fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum|nested|nested|asc|7');
+    var sticky7 = $('#pivot-sticky-cols').val();
+    fireTrigger('pivot|COLLEGE|FY|AMOUNT|sum');
+    var sticky3 = $('#pivot-sticky-cols').val();
+    assert('sticky cols: explicit 7 applies, trimmed trigger resets to default 3', sticky7 === '7' && sticky3 === '3', sticky7 + '/' + sticky3);
+    return Promise.resolve();
+  }
+
+  // ══════ Phase 3: layout_switch + toggle_switch controls (2026-08-21) ══════
+  // These two are snippet FUNCTIONS, so everything below goes through the real
+  // engine-A render and the real locator - no re-implemented parsing here.
+  function runPhase3(ed) {
+    var T2 = window.__PT2 || {}, T3 = window.__PT3 || {}, A = window.__RENDER_A;
+    if (typeof T3.cmdActive !== 'function' || typeof A !== 'function') {
+      assert('phase3: __PT3 hooks available', false, window.__PT3_ERR || 'n/a');
+      return Promise.resolve();
+    }
+    var draw = function (src) { ed.setValue(src); return Promise.resolve().then(function () { return A(null, true); }); };
+    var outText = function () { return $('#reportSnippetOutput').text().trim(); };
+    var SW = '#reportSnippetOutput .pnb-layout-switch';
+    var P3 = "'By College|pivot|COLLEGE|FY|AMOUNT|sum'";
+    var P4 = "'By Year|pivot|FY|none|AMOUNT|count'";
+
+    return draw("layout_switch('Table|flat', " + P3 + ", " + P4 + ")").then(function () {
+      assert('ls: renders 3 positions, horizontal by default',
+        $(SW).length === 1 && $(SW + ' .pnb-ls-opt').length === 3 && $(SW).attr('data-ls-orient') === 'horizontal',
+        JSON.stringify({ n: $(SW + ' .pnb-ls-opt').length, o: $(SW).attr('data-ls-orient'), txt: outText().substring(0, 90) }));
+      assert('ls: every position carries a title for the ellipsed label',
+        $(SW + ' .pnb-ls-opt').filter(function () { return !!$(this).attr('title'); }).length === 3, '');
+      // 6 positions must STAY horizontal - orientation is never inferred from
+      // the count (an earlier build flipped to vertical past 5; user rejected it).
+      var six = ["'Table|flat'", P3, P4,
+        "'A|pivot|COLLEGE|none|AMOUNT|sum'", "'B|pivot|FY|none|AMOUNT|sum'", "'C|pivot|STATUS|none|AMOUNT|sum'"].join(', ');
+      return draw('layout_switch(' + six + ')');
+    }).then(function () {
+      assert('ls: 6 positions stay HORIZONTAL (orientation is never inferred)',
+        $(SW + ' .pnb-ls-opt').length === 6 && $(SW).attr('data-ls-orient') === 'horizontal',
+        JSON.stringify({ n: $(SW + ' .pnb-ls-opt').length, o: $(SW).attr('data-ls-orient') }));
+      return draw("layout_switch('vertical', 'wide', 'small', 'Table|flat', " + P3 + ")");
+    }).then(function () {
+      assert('ls: vertical keyword honoured; wide/small become classes',
+        $(SW).attr('data-ls-orient') === 'vertical' && $(SW).hasClass('wide') && $(SW).hasClass('small'),
+        JSON.stringify({ o: $(SW).attr('data-ls-orient'), c: $(SW).attr('class') }));
+      return draw("layout_switch('sideways', 'Table|flat', " + P3 + ")");
+    }).then(function () {
+      assert('ls: unknown keyword errors and names itself', outText().indexOf('unknown keyword sideways') !== -1, outText().substring(0, 110));
+      return draw("layout_switch('Table|flat')");
+    }).then(function () {
+      assert('ls: a single position is refused', outText().indexOf('at least 2 positions') !== -1, outText().substring(0, 110));
+
+      // ---- Locator: a switch POSITION is an editable target like an action() call
+      var doc = "prose\nlayout_switch('vertical', 'Table|flat', " + P3 + ", " + P4 + ")\ntail";
+      var lst = T2.list(doc);
+      assert('ls locate: both pivot positions listed, keyword + flat ignored',
+        lst.length === 2 && lst[0].label === 'By College' && lst[1].label === 'By Year',
+        JSON.stringify(lst.map(function (c) { return c.label; })));
+      var p0 = lst[0];
+      assert('ls locate: arg span is the TRIGGER only - no quotes, no Label| prefix',
+        p0.argQuoted === false && doc.substring(p0.argFrom, p0.argTo) === 'pivot|COLLEGE|FY|AMOUNT|sum',
+        JSON.stringify({ q: p0.argQuoted, span: doc.substring(p0.argFrom, p0.argTo) }));
+      assert('ls locate: call span is ONE position, not the whole layout_switch call',
+        doc.substring(p0.callFrom, p0.callTo) === P3, doc.substring(p0.callFrom, p0.callTo));
+      var hit = T2.locate(doc, doc.indexOf('COLLEGE|FY'));
+      assert('ls locate: a click inside a position resolves to that position',
+        !!hit && hit.label === 'By College', hit ? hit.label : 'null');
+      assert('ls locate: a click on the vertical keyword is not a target',
+        T2.locate(doc, doc.indexOf("'vertical'") + 3) === null, '');
+
+      // ---- Update Snippet writes back INTO the position, keeping `Label|`
+      ed.setValue(doc);
+      T2.refreshTargetUI();
+      $('#pivotLightbox').css('display', 'flex');
+      var $dd = $('#pivotSnippetTargetSelect');
+      assert('ls update: picker offers both positions', $dd.is(':visible') && $dd.find('option').length === 2, String($dd.find('option').length));
+      $dd.val('1').trigger('change');                 // load "By Year"
+      $('#pivot-sticky-cols').val('1');               // change one field
+      $('#updatePivotSnippetBtn').trigger('click');
+      var after = ed.getValue();
+      assert('ls update: position 2 rewritten with its Label| and quotes intact',
+        after.indexOf("'By Year|pivot|FY|") !== -1 && after.indexOf("'By College|pivot|COLLEGE|FY|AMOUNT|sum'") !== -1,
+        after);
+      assert('ls update: still one layout_switch call, position 1 untouched',
+        (after.match(/layout_switch\s*\(/g) || []).length === 1 && after.indexOf("'vertical'") !== -1, after);
+      $('#pivotLightbox').hide();
+
+      // ---- toggle_switch: rendering + refusals
+      return draw("toggle_switch('Active only', 'on|search|STATUS = Active', 'off|search|')");
+    }).then(function () {
+      var $t = $('#reportSnippetOutput .pnb-toggle');
+      assert('ts: renders with the settings pill, label and OFF baseline',
+        $t.length === 1 && $t.find('.sp-switch').length === 1 && $t.find('.pnb-toggle-label').text() === 'Active only'
+        && $t.attr('data-ts-on') === '0' && $t.find('.pnb-toggle-btn').attr('aria-checked') === 'false',
+        JSON.stringify({ n: $t.length, on: $t.attr('data-ts-on'), lbl: $t.find('.pnb-toggle-label').text() }));
+      assert('ts: label position defaults to left', $t.attr('data-ts-label') === 'left', String($t.attr('data-ts-label')));
+      return draw("toggle_switch('Active only', 'bottom', 'on|search|X', 'off|search|')");
+    }).then(function () {
+      assert('ts: label position keyword applied', $('#reportSnippetOutput .pnb-toggle').attr('data-ts-label') === 'bottom',
+        String($('#reportSnippetOutput .pnb-toggle').attr('data-ts-label')));
+      return draw("toggle_switch('X', 'on|toast|hi', 'off|toast|bye')");
+    }).then(function () {
+      assert('ts: an ON side with no observable command REFUSES to render',
+        $('#reportSnippetOutput .pnb-toggle').length === 0 && outText().indexOf('cannot tell whether it is on') !== -1,
+        outText().substring(0, 130));
+      return draw("toggle_switch('X', 'on|search|A')");
+    }).then(function () {
+      assert('ts: a missing off| side is refused', outText().indexOf('at least one off|COMMAND') !== -1, outText().substring(0, 120));
+      return draw("toggle_switch('Bad|Label', 'on|search|A', 'off|search|')");
+    }).then(function () {
+      assert('ts: a label containing a pipe is refused', outText().indexOf('FIRST argument is the label') !== -1, outText().substring(0, 120));
+
+      // ---- The contract that matters: state is READ, never remembered
+      assert('ts state: search is detectable, toast is not',
+        T3.cmdDetectable('search|A') === true && T3.cmdDetectable('theme|x') === true && T3.cmdDetectable('toast|hi') === false, '');
+      $('#tableSearch').val('');
+      assert('ts state: search|TERM is inactive with an empty box', T3.cmdActive('search|STATUS = Active') === false, '');
+      assert('ts state: search| (clear) IS active with an empty box', T3.cmdActive('search|') === true, '');
+      $('#tableSearch').val('STATUS = Active');
+      assert('ts state: search|TERM becomes active when the box matches', T3.cmdActive('search|STATUS = Active') === true, '');
+      assert('ts state: a different term does not match', T3.cmdActive('search|SOMETHING ELSE') === false, '');
+      return draw("toggle_switch('Active only', 'on|search|STATUS = Active', 'off|search|')");
+    }).then(function () {
+      // The box still holds the ON term from above, so the freshly rendered
+      // switch must come up ON without anything having been clicked.
+      T3.syncToggles();
+      var onNow = $('#reportSnippetOutput .pnb-toggle').attr('data-ts-on');
+      assert('ts state: a rendered switch reads ON from the live report, unclicked', onNow === '1', String(onNow));
+      // ...and clearing the box BY HAND must move it back, with no click at all.
+      $('#tableSearch').val('');
+      T3.syncToggles();
+      var offNow = $('#reportSnippetOutput .pnb-toggle').attr('data-ts-on');
+      assert('ts state: clearing the search BY HAND turns the switch off',
+        offNow === '0' && $('#reportSnippetOutput .pnb-toggle .pnb-toggle-btn').attr('aria-checked') === 'false', String(offNow));
+      $('#reportSnippetOutput').empty();
+      return Promise.resolve();
+    });
+  }
+
+  // ══════ Phase 4: perf measurements for the reported dblclick stall ══════
+  // (id=dr-huron2, "3-4s on a 2-bar snippet"). Numbers land in the detail
+  // column; only the row-scan control is a real assertion.
+  function runPerf(ed) {
+    var T2 = window.__PT2 || {};
+    if (typeof T2.setRows !== 'function' || typeof T2.render !== 'function') {
+      assert('perf: hooks available', false, window.__PT2_ERR || 'n/a');
+      return Promise.resolve();
+    }
+    var N = 20000;
+    var rows = new Array(N);
+    var trHtml = new Array(N);
+    for (var i = 0; i < N; i++) {
+      var m = new Map();
+      m.set('COLLEGE', 'College ' + (i % 12));
+      m.set('FY', String(2020 + (i % 6)));
+      m.set('AMOUNT', String((i % 997) * 13));
+      m.set('STATUS', (i % 2) ? 'Active' : 'Closed');
+      m.set('RECORD_ID', 'R' + i);
+      rows[i] = m;
+      trHtml[i] = '<tr><td>' + (i + 1) + '</td></tr>';
+    }
+    T2.setRows(rows);
+    $('#resultsTable tbody').html(trHtml.join(''));
+
+    function mkBar(tag) {
+      var b = '<div class="penumbra-btn-bar joined">';
+      for (var k = 1; k <= 5; k++) {
+        b += "<span class=\"penumbra-snippet-btn\">action(search, '" + tag + k + " (' count(STATUS = 'Active') ')', 'STATUS = //Active//')</span>";
+      }
+      return b + '</div>';
+    }
+    function timeRender(label, snippet) {
+      ed.setValue(snippet);
+      var t0 = performance.now();
+      return Promise.resolve(T2.render(null, true)).then(function () {
+        return { label: label, ms: Math.round(performance.now() - t0) };
+      }, function (e) {
+        return { label: label, ms: -1, err: String(e && e.message ? e.message : e) };
+      });
+    }
+
+    var out = [];
+    return timeRender('control count()', 'Total: count()').then(function (r0) {
+      var txt = $('#reportSnippetOutput').text();
+      assert('perf control: count() sees the 20,000 synthetic rows', txt.indexOf('20,000') !== -1, txt.substring(0, 80) + ' [' + r0.ms + 'ms]');
+      return timeRender('1 bar (5 buttons)', mkBar('A'));
+    }).then(function (r1) {
+      out.push(r1);
+      return timeRender('2 bars (10 buttons)', mkBar('A') + '\n' + mkBar('B'));
+    }).then(function (r2) {
+      out.push(r2);
+      // Skip the 4-bar case if 2 bars is already pathological (keeps the run bounded)
+      if (r2.ms >= 0 && r2.ms < 8000) {
+        return timeRender('4 bars (20 buttons)', mkBar('A') + '\n' + mkBar('B') + '\n' + mkBar('C') + '\n' + mkBar('D')).then(function (r4) { out.push(r4); });
+      }
+      out.push({ label: '4 bars (20 buttons)', ms: -2, err: 'skipped - 2 bars already >= 8s' });
+    }).then(function () {
+      out.forEach(function (r) {
+        assert('perf render: ' + r.label, true, (r.ms >= 0 ? r.ms + 'ms' : (r.err || 'n/a')));
+      });
+      var r1 = out[0], r2 = out[1], r4 = out[2];
+      var scale = 'r2/r1=' + (r1 && r2 && r1.ms > 0 ? (r2.ms / r1.ms).toFixed(2) : '?') +
+        ' r4/r2=' + (r2 && r4 && r2.ms > 0 && r4.ms >= 0 ? (r4.ms / r2.ms).toFixed(2) : '?');
+      assert('perf scaling (2x content: ~2x = linear, ~4x = quadratic)', true, scale);
+      // Editor-side dblclick path on the 2-bar doc (word-select + our locator + token scan)
+      var twoBars = mkBar('A') + '\n' + mkBar('B');
+      ed.setValue(twoBars);
+      ed.setCursor(ed.posFromIndex(twoBars.indexOf('count(') + 2));
+      var t0 = performance.now();
+      CodeMirror.signal(ed, 'dblclick', ed, { preventDefault: function () { } });
+      var dblMs = Math.round(performance.now() - t0);
+      assert('perf dblclick handler on 2-bar doc', true, dblMs + 'ms');
+      var t1 = performance.now();
+      var hint = CodeMirror.hint['snippet-helper'] ? CodeMirror.hint['snippet-helper'](ed, {}) : null;
+      return Promise.resolve(hint).then(function () {
+        assert('perf snippet-helper hint build', true, Math.round(performance.now() - t1) + 'ms');
+      }, function () {
+        assert('perf snippet-helper hint build', true, 'threw after ' + Math.round(performance.now() - t1) + 'ms');
+      });
+    });
+  }
+
+  function finish() {
+    report('RESULTS_JSON:' + JSON.stringify({ pageErrors: window.__errors.slice(0, 6), results: results }));
+  }
+
+  // ══════ Perf mode (?perf=1): REAL-clock measurements ══════
+  // --virtual-time-budget virtualizes performance.now(), so CPU-bound work
+  // reads as 0ms in the normal run. Perf mode instead runs WITHOUT virtual
+  // time and takes every measurement SYNCHRONOUSLY during initial script
+  // execution (blocking the load event, which is when --dump-dom snapshots):
+  // jQuery's ready is fired synthetically first so main.js's closure has
+  // installed the hooks. renderReportSnippet is async, but everything up to
+  // its first await - including the whole function-resolution loop - runs
+  // synchronously before it returns, which is exactly the cost under test.
+  function runPerfSync() {
+    var T2 = window.__PT2 || {};
+    var ed = (window.Penumbra && window.Penumbra.getSnippetEditor) ? window.Penumbra.getSnippetEditor() : null;
+    if (!ed || typeof T2.setRows !== 'function') {
+      report('RESULTS_JSON:' + JSON.stringify({ fatal: 'perf hooks unavailable: ' + (window.__PT2_ERR || window.__PT_ERR || 'n/a'), pageErrors: window.__errors.slice(0, 6) }));
+      return;
+    }
+    var N = 20000;
+    var rows = new Array(N), trHtml = new Array(N);
+    for (var i = 0; i < N; i++) {
+      var m = new Map();
+      m.set('COLLEGE', 'College ' + (i % 12));
+      m.set('FY', String(2020 + (i % 6)));
+      m.set('AMOUNT', String((i % 997) * 13));
+      m.set('STATUS', (i % 2) ? 'Active' : 'Closed');
+      m.set('RECORD_ID', 'R' + i);
+      rows[i] = m;
+      trHtml[i] = '<tr><td>' + (i + 1) + '</td></tr>';
+    }
+    T2.setRows(rows);
+    $('#resultsTable tbody').html(trHtml.join(''));
+    function mkBar(tag) {
+      var b = '<div class="penumbra-btn-bar joined">';
+      for (var k = 1; k <= 5; k++) {
+        b += "<span class=\"penumbra-snippet-btn\">action(search, '" + tag + k + " (' count(STATUS = 'Active') ')', 'STATUS = //Active//')</span>";
+      }
+      return b + '</div>';
+    }
+    function timeSync(label, snippet) {
+      ed.setValue(snippet);
+      var t0 = performance.now();
+      try { T2.render(null, true); } catch (e) { return { label: label, ms: -1, err: String(e && e.message ? e.message : e) }; }
+      return { label: label, ms: Math.round(performance.now() - t0) };
+    }
+    var out = [];
+    out.push(timeSync('control count()', 'Total: count()'));
+    out[0].outText = $('#reportSnippetOutput').text().substring(0, 40);
+    out.push(timeSync('1 bar (5 buttons)', mkBar('A')));
+    out.push(timeSync('2 bars (10 buttons)', mkBar('A') + '\n' + mkBar('B')));
+    if (out[2].ms >= 0 && out[2].ms < 8000) {
+      out.push(timeSync('4 bars (20 buttons)', mkBar('A') + '\n' + mkBar('B') + '\n' + mkBar('C') + '\n' + mkBar('D')));
+    } else {
+      out.push({ label: '4 bars (20 buttons)', ms: -2, err: 'skipped - 2 bars already >= 8s' });
+    }
+    var twoBars = mkBar('A') + '\n' + mkBar('B');
+    ed.setValue(twoBars);
+    ed.setCursor(ed.posFromIndex(twoBars.indexOf('count(') + 2));
+    var t0 = performance.now();
+    CodeMirror.signal(ed, 'dblclick', ed, { preventDefault: function () { } });
+    out.push({ label: 'dblclick handler on 2-bar doc', ms: Math.round(performance.now() - t0) });
+    var t1 = performance.now();
+    try { if (CodeMirror.hint['snippet-helper']) CodeMirror.hint['snippet-helper'](ed, {}); } catch (e) { }
+    out.push({ label: 'snippet-helper hint (sync part)', ms: Math.round(performance.now() - t1) });
+    var results = out.map(function (r) {
+      return { name: 'PERF ' + r.label, pass: true, detail: (r.ms >= 0 ? r.ms + 'ms' : (r.err || 'n/a')) + (r.outText ? ' out="' + r.outText + '"' : '') };
+    });
+    var r1 = out[1], r2 = out[2], r4 = out[3];
+    results.push({
+      name: 'PERF scaling (2x content: ~2x = linear, ~4x = quadratic)', pass: true,
+      detail: 'r2/r1=' + (r1.ms > 0 ? (r2.ms / r1.ms).toFixed(2) : '?') + ' r4/r2=' + (r2.ms > 0 && r4.ms >= 0 ? (r4.ms / r2.ms).toFixed(2) : '?')
+    });
+    report('RESULTS_JSON:' + JSON.stringify({ pageErrors: window.__errors.slice(0, 6), results: results }));
+  }
+
+  if (/[?&]perf=1/.test(location.search)) {
+    // run.ps1 -PerfMode unwrapped main.js's ready closure into an IIFE, so the
+    // hooks already exist - measure synchronously, before the load event.
+    runPerfSync();
+  } else {
+    var tries = 0;
+    (function wait() {
+      tries++;
+      if (window.__PT || tries > 40) { setTimeout(run, 300); }
+      else { setTimeout(wait, 100); }
+    })();
+  }
+})();
+</script>
+</body></html>

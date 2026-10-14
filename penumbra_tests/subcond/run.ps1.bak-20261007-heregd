@@ -1,0 +1,114 @@
+# =============================================================================
+# subcond - "Allow only on custom condition" for report subscriptions (2026-09-23).
+#
+#   powershell -File run.ps1                 # against live
+#   powershell -File run.ps1 -App <path>     # against a stage (a stage needs the library,
+#                                            # penumbra_search.php, penumbra_directory.php
+#                                            # and the six consumer files)
+#   powershell -File run.ps1 -Mutant         # eight library mutants + two wiring mutants + two
+#                                            # form mutants; each MUST go red by exactly its count
+#
+# WHAT IS UNDER TEST. penumbra_subscribe_condition.php is the ONE evaluator behind the
+# header Subscribe chip (index.php), the subscribe endpoint (manage_subscription.php), the
+# save gate + preview (manage_schedule.php) and the send-time auto-unsubscribe
+# (schedule_runner.php). The suite drives it against a hand-written fake connection - the
+# parser gate, tag membership, matching, the error-REPORTING lookup, the fail-closed join
+# gate, the fail-SAFE send-time filter, the directory scan - then pins the four consumers.
+#
+# -n (skip php.ini): nothing here needs an extension or a database.
+#
+# EXPECTED TAIL: "PASS: 78   FAIL: 0" then "RESULT: GREEN"  (count as of 2026-09-23 late night:
+# + braces as the documented spelling, the Subscriptions "?" and the option's tooltip)
+#
+# UNC .ps1 files are GPO-blocked here ("not digitally signed") - run the body as a
+# scriptblock: & ([scriptblock]::Create((Get-Content -Raw '<this file>'))) [-App ..] [-Mutant]
+# Never add a bare `exit` for the same reason: it would kill the caller.
+# =============================================================================
+param(
+    [string]$App = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra',
+    [switch]$Mutant
+)
+
+$ErrorActionPreference = 'Stop'
+$here = $PSScriptRoot
+if (-not $here -and $MyInvocation.MyCommand.Path) { $here = Split-Path -Parent $MyInvocation.MyCommand.Path }
+if (-not $here) { $here = '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\subcond' }
+$php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+$test = Join-Path $here 'test_subcond.php'
+$lib  = Join-Path $App 'penumbra_subscribe_condition.php'
+
+if (-not $Mutant) {
+    & $php -n $test $lib $App
+    return
+}
+
+function Get-FailCount([string]$out) { if ($out -match 'FAIL:\s+(\d+)') { return [int]$Matches[1] } return -1 }
+$latin1 = [Text.Encoding]::GetEncoding(28591)
+$tmp = Join-Path $env:TEMP ('pnb_subcond_mut_' + $PID)
+$files = @('penumbra_subscribe_condition.php', 'penumbra_search.php', 'penumbra_directory.php', 'index.php',
+           'manage_subscription.php', 'manage_schedule.php', 'schedule_runner.php', 'help_content.php', 'js\main.js')
+foreach ($f in $files) {
+    $dst = Join-Path $tmp $f
+    New-Item -ItemType Directory -Force (Split-Path -Parent $dst) | Out-Null
+    Copy-Item -LiteralPath (Join-Path $App $f) -Destination $dst -Force
+}
+$tlib = Join-Path $tmp 'penumbra_subscribe_condition.php'
+$out = & $php -n $test $tlib $tmp 2>&1 | Out-String
+$allGood = ($out -match 'PASS:\s+\d+\s+FAIL:\s+0\b')
+Write-Host ('CONTROL (unmutated copy) -> ' + $(if ($allGood) { 'GREEN' } else { 'NOT GREEN - fix before trusting the mutants' }))
+
+$mutants = @(
+    @{ Name = 'the validator lets an unknown (braced / row-number) column through'; File = 'penumbra_subscribe_condition.php';
+       From = 'if (!isset($known[$col])) {';   To = 'if (false) {';   Expect = 2 },
+    @{ Name = 'TAGS keeps plain string comparison (no membership rewrite)'; File = 'penumbra_subscribe_condition.php';
+       From = "if (`$col !== 'TAGS') continue;";   To = 'continue;';   Expect = 6 },
+    # RETIRED 2026-09-23 late: 'the parse keeps the raw column (no canonical write-back)' (was 3).
+    # Since the bracespace fix the SEARCH PARSER itself drops the spaces inside "{ OUC2D }", so
+    # the library's write-back is defense in depth that no public call can reach any more - the
+    # mutant went GREEN (0), which is a finding, not a pass. penumbraSubCondColumnName is still
+    # pinned directly (1b), and the bracespace suite owns the parser's brace strip.
+    # Expect 1 since 2026-09-23 night: "{OUC2D} 14" is an implicit contains now (the browser's
+    # reading), so only the bare "OUC2D" still reaches the hint.
+    @{ Name = 'a real variable with no operator is called unknown (no hint)'; File = 'penumbra_subscribe_condition.php';
+       From = 'if (isset($known[$bare])) {';   To = 'if (false) {';   Expect = 1 },
+    @{ Name = 'the send-time filter ignores a failed directory lookup'; File = 'penumbra_subscribe_condition.php';
+       From = "if (!`$load['ok']) { `$out['reason'] = 'the employee directory could not be read'; return `$out; }";   To = '';   Expect = 1 },
+    @{ Name = 'the lookup swallows a failed query (reports ok)'; File = 'penumbra_subscribe_condition.php';
+       From = "error_log('penumbraSubCondLoadPeople failed: ' . `$e->getMessage());`n                `$out['ok'] = false;";
+       To   = "error_log('penumbraSubCondLoadPeople failed: ' . `$e->getMessage());";   Expect = 2 },
+    @{ Name = 'an empty directory for 2+ subscribers is trusted (everyone removed)'; File = 'penumbra_subscribe_condition.php';
+       From = 'if (count($keys) >= 2 && empty($load[''people''])) {';   To = 'if (false) {';   Expect = 1 },
+    @{ Name = 'the join gate fails OPEN for someone with no directory record'; File = 'penumbra_subscribe_condition.php';
+       From = 'return $rec !== null && penumbraSubCondMatchRow($chk[''parsed''], $rec);';
+       To   = 'return $rec === null || penumbraSubCondMatchRow($chk[''parsed''], $rec);';   Expect = 2 },
+    @{ Name = 'the preview counts inactive people too'; File = 'penumbra_subscribe_condition.php';
+       From = "' WHERE ACTIVE = 1 ORDER BY LAST_NAME, FIRST_NAME'";   To = "' ORDER BY LAST_NAME, FIRST_NAME'";   Expect = 1 },
+    @{ Name = 'the runner no longer prunes on the condition'; File = 'schedule_runner.php';
+       From = '$subCondRes = penumbraSubCondFilterEntries($conn, $subCondExpr, $subEntriesToMerge);';
+       To   = '$subCondRes = array(''checked'' => false, ''reason'' => ''mutant'', ''allowed'' => $subEntriesToMerge, ''dropped'' => array());';   Expect = 1 },
+    @{ Name = 'the subscribe endpoint stops gating'; File = 'manage_subscription.php';
+       From = 'if ($subCond !== '''' && $action === ''subscribe'' && !$staleSuppressed && !$isTyped) {';
+       To   = 'if (false) {';   Expect = 1 },
+    @{ Name = 'the card''s "?" jumps back to the narrow condition item'; File = 'index.php';
+       From = 'data-jump-to="schedHelp-subscriptions" title=';   To = 'data-jump-to="schedHelp-subsCondition" title=';   Expect = 2 },
+    @{ Name = 'the option''s tooltip says "can subscribe" again'; File = 'index.php';
+       From = 'matches the condition see the Subscribe option for this schedule.';   To = 'matches a condition can subscribe.';   Expect = 1 }
+)
+foreach ($m in $mutants) {
+    $target = Join-Path $tmp $m.File
+    $orig = [IO.File]::ReadAllBytes($target)
+    $text = $latin1.GetString($orig)
+    $from = $m.From
+    # The library is LF, the runner CRLF: a multi-line anchor is written with `n and adapted here.
+    if ($text.IndexOf("`r`n") -ge 0) { $from = $from.Replace("`n", "`r`n") }
+    $hits = ($text.Length - $text.Replace($from, '').Length) / $from.Length
+    if ($hits -ne 1) { Write-Host ("MUTANT NOT APPLICABLE (anchor found {0}x, need 1): {1}" -f $hits, $m.Name); $allGood = $false; continue }
+    [IO.File]::WriteAllBytes($target, $latin1.GetBytes($text.Replace($from, $m.To)))
+    $mout = & $php -n $test $tlib $tmp 2>&1 | Out-String
+    [IO.File]::WriteAllBytes($target, $orig)
+    $fail = Get-FailCount $mout
+    if ($fail -ne $m.Expect) { $allGood = $false }
+    Write-Host ("{0} mutant '{1}' -> FAIL: {2} (expected {3})" -f $(if ($fail -eq $m.Expect) { 'OK  ' } else { 'BAD ' }), $m.Name, $fail, $m.Expect)
+}
+Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+Write-Host ('MUTANTS: ' + $(if ($allGood) { 'ALL BITE' } else { 'PROBLEM' }))

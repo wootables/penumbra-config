@@ -1,0 +1,485 @@
+<?php
+/**
+ * penumbra_tests\hubcard - the health hub's cards render over fixtures.
+ *
+ *   php.exe -n -d date.timezone=America/New_York test_hubcard.php
+ *       --health=<penumbra_health.php> --page=<health.php>
+ *       [--html=<out.html>] [--control] [--mutant]
+ *
+ * WHAT IS UNDER TEST. The 2026-09-12 redesign of health.php. Seven regions of
+ * the LIVE page - the status band, scheduler + database tiles, delivery,
+ * failures, outage history, runtime, and the log viewer with its scripts - are
+ * cut out of the shipped file by their anchors and rendered with PHP over
+ * fixtures: an open outage with its escalation packet, an open near miss, a
+ * muted recurring window, a closed near miss, a 24-hour strip with red and
+ * amber cells, a degraded database tile, four delivery stalls, a folded and an
+ * unfolded failures card, an unreadable log source. The mute POST handler runs
+ * for real against a scratch mute file. Every diagnostic is promoted to fatal,
+ * so a notice inside a template is a FAIL, not a line in a log nobody reads.
+ *
+ * Everything runs the shipped code: the OUTAGE HISTORY block and
+ * penumbra_outage_packet() are lifted from penumbra_health.php, the page
+ * helpers (pnb_h ... pnb_info) from health.php, both by the tokenizer.
+ *
+ * --control  one deliberately false assertion, which MUST report FAIL.
+ * --mutant   the bell loses its data-slot before the outage card renders: a
+ *            bell without a slot cannot mute anything (the handler refuses
+ *            it), and the suite must go RED on exactly that.
+ * --html     also writes the rendered regions into a page shell that links
+ *            css/main.css + css/density.css beside it, for a headless look.
+ */
+error_reporting(E_ALL);
+set_error_handler(function ($no, $str, $file, $line) {
+    if (!(error_reporting() & $no)) return false;   // a deliberate @ stays silent
+    throw new ErrorException($str, 0, $no, $file, $line);
+});
+
+// Under -n no php.ini loads, so mbstring (a shared DLL here) is absent; the
+// page truncates messages with mb_substr. ASCII fixtures make substr exact.
+if (!function_exists('mb_substr')) {
+    function mb_substr($s, $a, $b = null, $e = null) { return $b === null ? substr($s, $a) : substr($s, $a, $b); }
+    function mb_strlen($s, $e = null) { return strlen($s); }
+}
+
+$HEALTH = ''; $PAGE = ''; $HTML = ''; $CONTROL = false; $MUTANT = false;
+foreach ($argv as $a) {
+    if (strpos($a, '--health=') === 0)     $HEALTH = substr($a, 9);
+    elseif (strpos($a, '--page=') === 0)   $PAGE = substr($a, 7);
+    elseif (strpos($a, '--html=') === 0)   $HTML = substr($a, 7);
+    elseif ($a === '--control')            $CONTROL = true;
+    elseif ($a === '--mutant')             $MUTANT = true;
+}
+if ($HEALTH === '' || $PAGE === '') { fwrite(STDERR, "usage: --health=<penumbra_health.php> --page=<health.php> [--html=<out>] [--control] [--mutant]\n"); exit(2); }
+
+$TMP = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'pnb_hubcard_' . getmypid();
+if (!@mkdir($TMP, 0777, true) && !is_dir($TMP)) { fwrite(STDERR, "cannot create $TMP\n"); exit(2); }
+register_shutdown_function(function () use ($TMP) {
+    foreach ((array)glob($TMP . DIRECTORY_SEPARATOR . '*') as $f) @unlink($f);
+    @rmdir($TMP);
+});
+
+$PASS = 0; $FAIL = 0;
+function ok($c, $label, $got = null) {
+    global $PASS, $FAIL;
+    if ($c) { $PASS++; echo "  ok   $label\n"; }
+    else    { $FAIL++; echo "  FAIL $label" . ($got === null ? '' : ' (got: ' . substr(json_encode($got), 0, 300) . ')') . "\n"; }
+}
+function section($t) { echo "\n$t\n" . str_repeat('-', strlen($t)) . "\n"; }
+
+/** Lift named functions by the tokenizer, so a one-line helper cannot swallow
+ *  the function after it (the monfix suite's approach). */
+function lift($src, $names) {
+    $t = token_get_all($src); $n = count($t); $out = ''; $found = array();
+    for ($i = 0; $i < $n; $i++) {
+        if (!is_array($t[$i]) || $t[$i][0] !== T_FUNCTION) continue;
+        $j = $i + 1;
+        while ($j < $n && ((is_array($t[$j]) && $t[$j][0] === T_WHITESPACE) || (!is_array($t[$j]) && $t[$j] === '&'))) $j++;
+        if ($j >= $n || !is_array($t[$j]) || $t[$j][0] !== T_STRING) continue;
+        $fname = $t[$j][1];
+        if (!in_array($fname, $names, true)) continue;
+        $depth = 0; $started = false; $buf = '';
+        for ($k = $i; $k < $n; $k++) {
+            $tok = $t[$k];
+            if (is_array($tok)) {
+                if ($tok[0] === T_CURLY_OPEN || $tok[0] === T_DOLLAR_OPEN_CURLY_BRACES) { $depth++; $started = true; }
+                $buf .= $tok[1];
+            } else {
+                if ($tok === '{') { $depth++; $started = true; } elseif ($tok === '}') { $depth--; }
+                $buf .= $tok;
+            }
+            if ($started && $depth === 0) break;
+        }
+        $out .= "if (!function_exists('$fname')) {\n$buf\n}\n";
+        $found[] = $fname;
+    }
+    $missing = array_diff($names, $found);
+    if ($missing) { fwrite(STDERR, "MISSING from source: " . implode(', ', $missing) . "\n"); exit(2); }
+    return $out;
+}
+/** The text between two anchors of the live page; every anchor must be unique. */
+function cut($hay, $from, $to, $label) {
+    if (substr_count($hay, $from) !== 1) { fwrite(STDERR, "anchor '$label' start matched " . substr_count($hay, $from) . " times\n"); exit(2); }
+    $a = strpos($hay, $from);
+    $b = strpos($hay, $to, $a);
+    if ($b === false) { fwrite(STDERR, "anchor '$label' end not found\n"); exit(2); }
+    return substr($hay, $a, $b - $a);
+}
+function render($file) {
+    extract($GLOBALS, EXTR_SKIP);
+    ob_start();
+    try { include $file; return ob_get_clean(); }
+    catch (Throwable $e) { ob_end_clean(); return "TEMPLATE ERROR: " . $e->getMessage() . " at " . basename($e->getFile()) . ":" . $e->getLine(); }
+}
+/** No template exception, and no PHP diagnostic text (case-sensitive: the log
+ *  script legitimately says `undefined` and the (i) copy says `warning`). */
+function clean($html) {
+    return strpos($html, 'TEMPLATE ERROR') === false
+        && !preg_match('/\b(Warning|Notice|Deprecated|Fatal error|Parse error): /', $html)
+        && !preg_match('/Undefined (variable|index|array key|offset|property)/', $html);
+}
+
+// ---------------------------------------------------------------------------
+// The code under test.
+// ---------------------------------------------------------------------------
+$src  = file_get_contents($HEALTH);
+$page = file_get_contents($PAGE);
+if ($src === false || $page === false) { fwrite(STDERR, "cannot read the sources\n"); exit(2); }
+
+$start = strpos($src, "/* =====================================================================\n * OUTAGE HISTORY");
+$end   = strpos($src, "/**\n * Compose the whole picture.");
+if ($start === false || $end === false) { fwrite(STDERR, "OUTAGE HISTORY block not found\n"); exit(2); }
+$config = array();
+$stub = '<?php function penumbra_health_cache_file($c) { return ' . var_export($TMP . DIRECTORY_SEPARATOR . 'penumbra_health_cache.json', true) . '; }'
+      . ' function penumbra_log_web_account() { return "IIS APPPOOL\\\\penumbra"; }'
+      . ' function penumbra_log_web_account_note() { return "the application pool identity"; } ?>';
+file_put_contents($TMP . DIRECTORY_SEPARATOR . 'block.php', $stub . "\n<?php\n" . substr($src, $start, $end - $start) . "\n");
+require $TMP . DIRECTORY_SEPARATOR . 'block.php';
+file_put_contents($TMP . DIRECTORY_SEPARATOR . 'packet.php', "<?php\n" . lift($src, array('penumbra_outage_packet')));
+require $TMP . DIRECTORY_SEPARATOR . 'packet.php';
+file_put_contents($TMP . DIRECTORY_SEPARATOR . 'helpers.php', "<?php\n" . lift($page, array('pnb_h', 'pnb_dot', 'pnb_ago', 'pnb_bytes', 'pnb_chip', 'pnb_dur', 'pnb_info')));
+require $TMP . DIRECTORY_SEPARATOR . 'helpers.php';
+
+// ---------------------------------------------------------------------------
+// Fixtures. A week of ledger: a 03:03 scheduler window on three days (one of
+// them today, so it sits inside the 24-hour strip), HR down for two checks
+// last night, a closed INFOED near miss, and right now an open www3 delivery
+// outage plus an open INFOED near miss.
+// ---------------------------------------------------------------------------
+$T = time(); $DAY = 86400;
+$ev = array();
+$ev[] = array($T - 7 * $DAY, array(), array());
+$schedStarts = array();
+for ($d = 2; $d >= 0; $d--) {
+    $t0 = strtotime(date('Y-m-d', $T - $d * $DAY) . ' 03:03:10');
+    if ($t0 > $T - 900) $t0 -= $DAY;           // a run before 03:18 keeps the window in the past
+    $schedStarts[] = $t0;
+    $ev[] = array($t0,       array('scheduler heartbeat is 412s old'), array());
+    $ev[] = array($t0 + 300, array('scheduler heartbeat is 712s old'), array());
+    $ev[] = array($t0 + 600, array(), array());
+}
+$hr0 = $T - 20 * 3600;
+$ev[] = array($hr0,       array('database hr down'), array());
+$ev[] = array($hr0 + 300, array('database hr down'), array());
+$ev[] = array($hr0 + 600, array(), array());
+$NM = 'database infoed degraded (2 failed connect attempt(s) before one succeeded)';
+$ev[] = array($T - 3000, array(), array($NM));
+$ev[] = array($T - 2700, array(), array());
+for ($t = $T - 1500; $t <= $T - 300; $t += 300) {
+    $ev[] = array($t, array('www3 delivery down'), ($t >= $T - 600) ? array($NM) : array());
+}
+usort($ev, function ($a, $b) { return $a[0] - $b[0]; });
+foreach ($ev as $e) { penumbra_outage_record($e[1], $e[0], $config, $e[2]); }
+$slot = penumbra_mute_slot($schedStarts[2]);
+penumbra_mute_set('scheduler', $slot, true, 'bplimon', 'Scheduler ~03:03 daily', $config);
+
+$outg = penumbra_outage_history(array('hours' => 168, 'limit' => 25), $config);
+
+$dlvFailures = array();
+foreach (array(1380, 1020, 660, 300) as $ago) {
+    $dlvFailures[] = array('at' => date('c', $T - $ago), 'ts' => $T - $ago, 'kind' => 'stall', 'proxy' => '10.48.12.91',
+                           'uri' => '/sponsor_migration/penumbra/css/main.css', 'status' => 200, 'win32' => 121, 'bytes' => 206671, 'ms' => 19051);
+}
+$dlvFailures[] = array('at' => date('c', $T - 200), 'ts' => $T - 200, 'kind' => 'drop', 'proxy' => '10.48.12.98',
+                       'uri' => '/sponsor_migration/penumbra/index.php', 'status' => 200, 'win32' => 64, 'bytes' => 92264, 'ms' => 8102);
+$snap = array(
+    'ok' => false, 'problems' => array('www3 delivery down'),
+    'warnings' => array('www3 delivery: 4 stalled (win32 121) against 1 delivered in the last 15 min', 'INFOED near miss in progress: 2 failed connect attempt(s) before one succeeded'),
+    'checked_at' => date('Y-m-d H:i:s', $T),
+    'components' => array(
+        'scheduler' => array('status' => 'online', 'last_run' => date('Y-m-d H:i:s', $T - 42), 'seconds_ago' => 42, 'detail' => ''),
+        'errors'    => array('total' => 0, 'window_hours' => 24, 'by_action' => array()),
+        'databases' => array(
+            'hr'       => array('status' => 'ok', 'ms' => 38),
+            'fin'      => array('status' => 'ok', 'ms' => 41),
+            'infoed'   => array('status' => 'degraded', 'ms' => 1210, 'detail' => '2 failed connect attempt(s) before one succeeded'),
+            'srar'     => array('status' => 'ok', 'ms' => 27),
+            'wolfware' => array('status' => 'ok', 'ms' => 63),
+        ),
+        'databases_probed_at' => date('H:i:s', $T - 200), 'databases_from_cache' => true,
+        'smtp' => array('status' => 'ok', 'ms' => 12, 'host' => 'mta.example.edu', 'port' => 25, 'seconds_ago' => 200, 'from_cache' => true),
+        'delivery' => array('status' => 'down', 'window_mins' => 15, 'min_bytes' => 25000, 'proxies' => array('10.48.12.91', '10.48.12.98'),
+                            'samples' => 6, 'ok' => 1, 'stalled' => 4, 'dropped' => 1, 'last_ok_at' => date('c', $T - 800), 'last_fail_at' => date('c', $T - 200),
+                            'largest_ok_bytes' => 26262, 'failures' => $dlvFailures, 'files' => array('u_ex' . gmdate('ymd', $T) . '.log'),
+                            'log_lag_secs' => 40, 'window_truncated' => false, 'checked_at' => date('c', $T),
+                            'detail' => '4 stalled (win32 121) against 1 delivered in the last 15 min', 'ms' => 3),
+        'recent_failures' => array('rows' => array(), 'detail' => ''),
+        'tasks' => array('active' => 41, 'inactive' => 7, 'overdue' => 0, 'next_due' => date('Y-m-d H:i:s', $T + 240), 'next_in_secs' => 240),
+        'runtime' => array('php_version' => '8.2.29', 'sapi' => 'cgi-fcgi', 'opcache' => 'on', 'php_eol' => '2026-12-31', 'host' => 'OITRAS',
+                           'timezone' => 'America/New_York', 'memory_limit' => '512M', 'max_execution' => 300,
+                           'extensions' => array('oci8' => true, 'sqlsrv' => true, 'pdo_sqlsrv' => true, 'gd' => true, 'mbstring' => true),
+                           'pdo_oci_present' => false, 'inflight' => array('active' => 0, 'stale' => 0, 'limit' => 3),
+                           'disks' => array('logs' => array('root' => 'D:\\', 'free_gb' => 120.4, 'pct_free' => 61),
+                                            'web'  => array('root' => 'C:\\', 'free_gb' => 30.1, 'pct_free' => 25))),
+        'outages' => $outg,
+    ),
+);
+$sched = $snap['components']['scheduler']; $errs = $snap['components']['errors']; $dbs = $snap['components']['databases'];
+$tasks = $snap['components']['tasks']; $rt = $snap['components']['runtime']; $fails = array();
+$plog = array('count' => 3, 'last_at' => date('H:i:s', $T - 1400));
+$dbOk = 0; $dbBad = 0;
+foreach ($dbs as $d) { if ($d['status'] === 'ok') $dbOk++; elseif ($d['status'] === 'down') $dbBad++; }
+$logSources = array(
+    'php'       => array('label' => 'PHP errors', 'path' => 'D:\\Utilities\\PHP_8.2-p\\logs\\php82_errors.log', 'kind' => 'php', 'hint' => 'Fatals, warnings and every PENUMBRA-prefixed line.'),
+    'scheduler' => array('label' => 'Scheduler',  'path' => 'C:\\inetpub\\wwwroot\\sponsor_migration\\penumbra\\log\\scheduler_' . date('Y-m-d') . '.log', 'kind' => 'scheduler', 'hint' => 'One line per task start and finish.'),
+    'monitor'   => array('label' => 'Watchdog',   'path' => 'D:\\Utilities\\PHP_8.2-p\\logs\\penumbra_monitor.log', 'kind' => 'monitor', 'hint' => 'One line per 5-minute check.'),
+    'iis'       => array('label' => 'IIS access', 'path' => 'C:\\inetpub\\logs\\LogFiles\\W3SVC1\\u_ex' . gmdate('ymd') . '.log', 'kind' => 'w3c', 'hint' => 'Every request, UTC.'),
+    'httperr'   => array('label' => 'HTTP errors', 'path' => '', 'kind' => 'w3c', 'hint' => 'HTTP.sys rejects.', 'why' => 'C:\\Windows\\System32\\LogFiles\\HTTPERR is not readable by the pool identity'),
+);
+
+// ---------------------------------------------------------------------------
+// The regions, cut from the live page by their anchors.
+// ---------------------------------------------------------------------------
+$R = array(
+    'top' => cut($page, '<div id="pnbHubTop">', '</div><!-- /pnbHubTop -->', 'status band') . '</div><!-- /pnbHubTop -->',
+    'r1'  => cut($page, '  <div class="pnb-adm-card" id="pnbCardSched">', '  <?php /* Delivery through www3', 'R1 scheduler + tiles'),
+    'r2'  => cut($page, '  <?php /* Delivery through www3', '  <?php /* SAYING WHAT THIS CARD IS NOT', 'R2 delivery'),
+    'r3'  => cut($page, '  <?php /* SAYING WHAT THIS CARD IS NOT', '  <?php /* =========================== OUTAGE HISTORY', 'R3 failures'),
+    'r4'  => cut($page, '  <?php /* =========================== OUTAGE HISTORY', '  <?php if ($rt) { ?>', 'R4 outages'),
+    'r5'  => cut($page, '  <?php if ($rt) { ?>', '</div><!-- /left -->', 'R5 runtime'),
+    'r6'  => cut($page, '  <div class="pnb-adm-card pnb-log" id="pnbLog">', '<?php penumbra_admin_close(); ?>', 'R6 logs + scripts'),
+);
+if ($MUTANT) {
+    $needle = 'data-slot="<?php echo (int)$p[\'slot\']; ?>"';
+    if (substr_count($R['r4'], $needle) !== 1) { fwrite(STDERR, "mutant: bell slot markup not found\n"); exit(2); }
+    $R['r4'] = str_replace($needle, 'data-slot=""', $R['r4']);
+    echo "MUTANT: the bell renders without its data-slot\n";
+}
+$H = array();
+foreach ($R as $k => $tpl) {
+    $f = $TMP . DIRECTORY_SEPARATOR . $k . '.php';
+    file_put_contents($f, $tpl);
+    $H[$k] = render($f);
+}
+// the failures card a second time, with rows
+$errs = array('total' => 2, 'window_hours' => 24, 'by_action' => array('SCHEDULED_SEND' => 1, 'EXPORT' => 1));
+$fails = array(
+    array('ts' => date('Y-m-d H:i', $T - 5000), 'action' => 'SCHEDULED_SEND', 'report' => 'awdspon', 'title' => 'Awards by Selected Funders', 'user' => 'scheduler', 'message' => 'ip_address=127.0.0.1 SMTP connect to mta:25 timed out after 30s'),
+    array('ts' => date('Y-m-d H:i', $T - 9000), 'action' => 'EXPORT', 'report' => '', 'title' => '', 'user' => 'jdoe', 'message' => ''),
+);
+$H['r3b'] = render($TMP . DIRECTORY_SEPARATOR . 'r3.php');
+$errs = $snap['components']['errors']; $fails = array();
+
+// ---------------------------------------------------------------------------
+section('0. Every region renders without a diagnostic');
+foreach ($H as $k => $html) { ok(clean($html), "$k renders clean", substr($html, 0, 200)); }
+
+section('1. Status band');
+$h = $H['top'];
+ok(strpos($h, 'pnb-adm-status bad') !== false && strpos($h, 'Degraded: www3 delivery down') !== false, 'band is red and names the problem');
+ok(preg_match('/<a class="pnb-hub-status-link"[^>]*>[^<]*<\/a>\s*<span class="pnb-i"/', $h) === 1, 'the (i) sits right after the headline link');
+ok(strpos($h, 'aria-label="About the status"') !== false && strpos($h, 'warnings never page anyone') !== false, 'with its explanatory tip');
+ok(preg_match('/<div class="pnb-chip bad"[^>]*>\s*<span class="pnb-chip-v">DOWN<\/span><span class="pnb-chip-l">delivery \(www3\)<\/span>/', $h) === 1, 'delivery chip DOWN in red');
+$outNexp = (int)$outg['total'] + count($outg['open']);   // 4 closed + 1 open
+ok($outNexp === 5 && preg_match('/<div class="pnb-chip bad"[^>]*>\s*<span class="pnb-chip-v">5<\/span><span class="pnb-chip-l">outages 7d<\/span>/', $h) === 1, 'outages chip counts 4 closed + 1 open, in red because one is open', $outNexp);
+ok(strpos($h, 'ONE IS STILL OPEN') !== false, 'and its tip says one is still open');
+ok(strpos($h, '2 near miss(es) recorded as well') !== false, 'and its tip counts the near misses separately');
+ok(strpos($h, '<li>INFOED near miss in progress') !== false, 'warnings list carries the near miss in progress');
+
+section('2. Scheduler card and the tiles');
+$h = $H['r1'];
+ok(strpos($h, 'id="pnbCardSched"') !== false && strpos($h, '<span class="k">Last heartbeat</span>') !== false, 'scheduler as a key/value list');
+ok(preg_match('/<h2>Scheduler <span class="pnb-i"/', $h) === 1, 'its footnote became an (i) in the heading');
+ok(strpos($h, 'class="pnb-h2-r"') !== false && strpos($h, 'ONLINE') !== false, 'status pinned at the heading\'s right');
+ok(substr_count($h, '<div class="pnb-tile ') === 6, 'six tiles: five databases and the mail relay', substr_count($h, '<div class="pnb-tile '));
+ok(preg_match('/<div class="pnb-tile degraded">.*?<b>INFOED<\/b>/s', $h) === 1, 'INFOED tile carries the degraded tone');
+ok(preg_match('/<div class="pnb-tile degraded">.*?<span class="pnb-tile-s">degraded &middot; 1210 ms <span class="pnb-i"/s', $h) === 1, 'its detail is an (i) inside the tile');
+ok(preg_match('/<div class="pnb-tile ok">.*?<b>MAIL \(MTA\)<\/b>\s*<span class="pnb-tile-s">up &middot; 12 ms/s', $h) === 1, 'mail relay is the sixth tile, up');
+ok(strpos($h, 'never sends mail') !== false, 'with the handshake note in its (i)');
+ok(strpos($h, '(cached) &middot; <a href="?full=1"') !== false, 're-probe link rides the heading');
+ok(strpos($h, '<table') === false, 'no table left in the databases card');
+
+section('3. Delivery card');
+$h = $H['r2'];
+ok(strpos($h, 'id="pnbDelivery"') !== false && strpos($h, 'pnb-rows pnb-rows-dl') !== false, 'delivery failures as a one-line row list');
+ok(substr_count($h, '<div class="pnb-row">') === 5, 'five rows: four stalls and a drop', substr_count($h, '<div class="pnb-row">'));
+ok(substr_count($h, '<span class="c bad">STALL</span>') === 4 && substr_count($h, '<span class="c warn">CUT OFF</span>') === 1, 'stalls red, the drop amber');
+$allJump = true;
+foreach ($dlvFailures as $f) {
+    $q = gmdate('H:i', $f['ts']);
+    if (strpos($h, 'class="pnb-log-jump" data-log="iis" data-q="' . $q . '"') === false) $allJump = false;
+}
+ok($allJump, 'every row links to the IIS tab filtered to its UTC minute');
+ok(strpos($h, 'title="/sponsor_migration/penumbra/css/main.css"') !== false, 'the uri survives whole in the title');
+ok(preg_match('/<span class="pnb-h2-r"><span class="pnb-adm-dot bad"><\/span>DOWN<\/span>/', $h) === 1, 'verdict pinned at the heading\'s right');
+ok(strpos($h, '4 delivered') === false && strpos($h, '1 delivered &middot; 4 stalled &middot; 1 cut off') !== false, 'the counts line');
+
+section('4. Failures card folds when empty');
+$h = $H['r3'];
+ok(strpos($h, 'pnb-adm-card pnb-card-fold') !== false && strpos($h, '<span class="pnb-h2-val">none</span>') !== false, 'empty: one folded line saying none');
+ok(strpos($h, 'pnb-fail-list') === false && strpos($h, 'pnb-fail-counts') === false, 'and nothing else');
+ok(strpos($h, 'is <a href="#pnbOutages">outage history</a>') !== false, 'its (i) points at outage history');
+$h = $H['r3b'];
+ok(strpos($h, 'pnb-card-fold') === false && substr_count($h, 'pnb-fail-pill') === 2 && substr_count($h, '<div class="pnb-fail-row">') === 2, 'with rows: unfolded, pills and rows', substr($h, 0, 400));
+ok(strpos($h, 'SMTP connect to mta:25 timed out') !== false, 'the message wraps whole', substr($h, 0, 400));
+
+section('5. Outage history');
+$h = $H['r4'];
+ok(strpos($h, 'id="pnbOutages"') !== false, 'card present');
+$ledgerN = array('total' => (int)$outg['total'], 'open' => count($outg['open']), 'near_total' => (int)$outg['near_total'], 'near_open' => count($outg['near_open']));
+echo "  info ledger: " . json_encode($ledgerN) . "\n";
+ok($ledgerN['total'] === 4 && $ledgerN['open'] === 1 && $ledgerN['near_open'] === 1 && $ledgerN['near_total'] === 1, 'ledger: 4 closed outages, one open, one open and one closed near miss', $ledgerN);
+preg_match('/<span class="pnb-h2-r">([^<]*)<\/span>/', $h, $hm);
+$outN = $ledgerN['total'] + $ledgerN['open']; $nearN = $ledgerN['near_total'] + $ledgerN['near_open'];
+ok(isset($hm[1]) && $hm[1] === "$outN outage" . ($outN == 1 ? '' : 's') . " &middot; $nearN near miss" . ($nearN == 1 ? '' : 'es') . " &middot; coverage " . $outg['coverage_pct'] . '%', 'heading summary counts outages, near misses and coverage', isset($hm[1]) ? $hm[1] : null);
+ok(preg_match('/<div class="pnb-out-openrow">\s*<span class="pnb-adm-dot bad"><\/span>\s*<strong>www3 delivery<\/strong> has been down for/', $h) === 1, 'open outage row');
+ok(preg_match('/<button type="button" class="pnb-out-copy" data-packet="([^"]+)"/', $h, $m) === 1, 'with a Copy escalation packet button');
+$packet = isset($m[1]) ? html_entity_decode($m[1], ENT_QUOTES, 'UTF-8') : '';
+ok(strpos($packet, 'Penumbra outage: www3 delivery') === 0, 'packet starts with the component');
+ok(strpos($packet, 'Problem: www3 delivery down') !== false, 'packet names the problem');
+ok(strpos($packet, 'Evidence (IIS access log, last 15 min): 4 stalled (win32 121)') !== false, 'packet carries the delivery evidence line');
+ok(substr_count($packet, ' STALL win32 121 - 206,671 bytes sent - 19.1s - via 10.48.12.91 - /sponsor_migration/penumbra/css/main.css') === 4, 'and the four stalled requests');
+ok(strpos($packet, 'Peers: proxies 10.48.12.91, 10.48.12.98 -> this server') !== false, 'and the peers');
+ok(strpos($packet, 'Health page: https://www3.acs.ncsu.edu/sponsor_migration/penumbra/health.php') !== false && strpos($packet, 'Watchdog log:') !== false, 'and where to look next');
+ok(strpos($packet, "\n") !== false && strpos($m[1], '&') !== false, 'packet is multi-line and attribute-escaped');
+ok(preg_match('/<div class="pnb-out-openrow near">\s*<span class="pnb-adm-dot warn"><\/span>\s*<strong>INFOED<\/strong> near miss for/', $h) === 1, 'open near miss row, amber');
+ok(substr_count($h, 'pnb-out-copy') === 1, 'only the outage gets a Copy button (a near miss is not a ticket)');
+
+// the strip
+ok(preg_match('/<div class="pnb-strip"/', $h) === 1, '24-hour strip present');
+preg_match_all('/<div class="pnb-strip-r"><span class="pnb-strip-n">([^<]+)<\/span><div class="pnb-strip-bar">(.*?)<\/div><\/div>/s', $h, $sm, PREG_SET_ORDER);
+$strip = array();
+foreach ($sm as $row) { $strip[$row[1]] = array('cells' => substr_count($row[2], '<i'), 'b' => substr_count($row[2], 'class="b"'), 'a' => substr_count($row[2], 'class="a"')); }
+ok(isset($strip['www3 delivery'], $strip['INFOED'], $strip['HR'], $strip['Scheduler']), 'one strip row per component seen in 24h', array_keys($strip));
+ok(!empty($strip['www3 delivery']) && $strip['www3 delivery']['cells'] === 96 && $strip['www3 delivery']['b'] >= 1 && $strip['www3 delivery']['b'] <= 3, '96 cells; the open outage paints red cells', isset($strip['www3 delivery']) ? $strip['www3 delivery'] : null);
+ok(!empty($strip['INFOED']) && $strip['INFOED']['a'] >= 1 && $strip['INFOED']['b'] === 0, 'a near miss paints amber, never red', isset($strip['INFOED']) ? $strip['INFOED'] : null);
+ok(!empty($strip['HR']) && $strip['HR']['b'] >= 1 && $strip['HR']['b'] <= 2, 'last night\'s HR outage is one or two red cells', isset($strip['HR']) ? $strip['HR'] : null);
+ok(strpos($h, '<div class="pnb-strip-ax">') !== false && strpos($h, '<span>now</span>') !== false, 'with a time axis ending at now');
+
+// availability + the pattern pill with its bell
+preg_match_all('/pnb-out-name">([^<]+)</', $h, $mm);
+ok(in_array('HR', $mm[1], true) && in_array('Scheduler', $mm[1], true) && !in_array('INFOED', $mm[1], true), 'availability tiles for HR and Scheduler, none for a near miss', $mm[1]);
+ok(preg_match('/<span class="pnb-out-patpill"[^>]*>\s*<b>Scheduler<\/b> ~03:03/', $h) === 1, 'the recurring 03:03 scheduler window is a pattern pill');
+ok(preg_match('/<button type="button" class="pnb-bell muted" aria-pressed="true"\s+data-key="scheduler" data-slot="' . (int)$slot . '"/', $h) === 1, 'its bell is muted and carries key + slot for the handler', $slot);
+ok(strpos($h, '&#128277; Muted</button>') !== false && strpos($h, 'Click to alert again.') !== false, 'muted bell reads Muted and offers to alert again');
+ok(strpos($h, 'data-label="Scheduler ~03:03 daily"') !== false, 'and a label for the mute file');
+
+// the merged one-line list
+ok(strpos($h, '<div class="pnb-rows pnb-rows-out">') !== false, 'closed episodes and near misses share one list');
+// 1 near / 2 when / 3 component / 4 length / 5 to / 6 cause text / 7 tags / 8 checks
+preg_match_all('/<div class="pnb-row( near)?">\s*<span class="t">([^<]+)<\/span>\s*<span class="c">([^<]+)<\/span>\s*<span class="d">([^<]+)<\/span>\s*<span class="to">([^<]+)<\/span>\s*<span class="p" title="([^"]*)"><span class="pt">([^<]*)<\/span>(.*?)<\/span>\s*<span class="k">([^<]+)<\/span>/s', $h, $rows, PREG_SET_ORDER);
+ok(count($rows) === 5, 'five one-line rows: 3 scheduler, 1 HR, 1 near miss', count($rows));
+ok(!empty($rows) && $rows[0][1] === ' near' && $rows[0][3] === 'INFOED' && strpos($rows[0][8], 'near miss</span>') !== false, 'newest first: the closed INFOED near miss, tagged');
+ok(!empty($rows) && $rows[0][2] === date('D d M H:i', $T - 3000) && $rows[0][5] === 'to ' . date('H:i', $T - 2700), 'with its start and end times');
+ok(!empty($rows) && $rows[0][6] === $rows[0][7] && $rows[0][7] === pnb_h($NM), 'the cause text is clippable on its own, whole in the title');
+$schedRows = array_filter($rows, function ($r) { return $r[3] === 'Scheduler'; });
+$allTagged = count($schedRows) === 3;
+foreach ($schedRows as $r) { if (strpos($r[8], '>recurring</span>') === false || strpos($r[8], '>muted</span>') === false) $allTagged = false; }
+ok($allTagged, 'every scheduler row carries recurring + muted tags (listed, never hidden)');
+$hrRows = array_filter($rows, function ($r) { return $r[3] === 'HR'; });
+ok(count($hrRows) === 1 && trim(reset($hrRows)[8]) === '' && reset($hrRows)[9] === '2 checks', 'the HR row has no tag and 2 checks');
+ok(strpos($h, '<strong>Near misses</strong>') === false && strpos($h, 'pnb-fail-list') === false, 'the old two-line lists are gone');
+
+section('6. Runtime card');
+$h = $H['r5'];
+ok(strpos($h, 'id="pnbRuntime"') !== false && strpos($h, 'pnb-kv pnb-kv-2') !== false, 'runtime as a two-column key/value list');
+ok(strpos($h, '<span class="pnb-warn">security support ends 2026-12-31</span>') !== false, 'PHP end of support inline');
+ok(substr_count($h, '<span class="k">Disk ') === 2, 'both disks');
+ok(preg_match('/<h2>Runtime <span class="pnb-i"[^>]*><span class="pnb-i-tip">.*?IIS APPPOOL\\\\penumbra.*?<\/span><\/span><\/h2>/s', $h) === 1, 'the (i) names the web account');
+ok(strpos($h, '<span class="pnb-ext ok">oci8</span>') !== false && strpos($h, 'pdo_oci</span>') === false, 'extensions as pills, no pdo_oci');
+
+section('7. Log viewer');
+$h = $H['r6'];
+ok(preg_match_all('/<button type="button" class="pnb-log-tab[^"]*"\s+data-log="/', $h) === 5 && strpos($h, 'role="tablist"') !== false, 'five file tabs', preg_match_all('/<button type="button" class="pnb-log-tab[^"]*"\s+data-log="/', $h));
+ok(preg_match('/<button type="button" class="pnb-log-tab on"\s+data-log="php"[^>]*aria-selected="true"/', $h) === 1, 'the first is selected');
+ok(preg_match('/class="pnb-log-tab off"\s+data-log="httperr"[^>]*aria-disabled="true"[^>]*title="C:\\\\Windows\\\\System32\\\\LogFiles\\\\HTTPERR is not readable[^"]*">HTTP errors<span class="sr-only"> \(unreadable\)<\/span>/', $h) === 1, 'an unreadable source is dimmed, disabled, and says why');
+ok(strpos($h, '<div class="pnb-log-pane">') !== false, 'the tabs attach to a pane');
+ok(substr_count($h, '<label class="pnb-tg"') === 3 && substr_count($h, '<i class="sw" aria-hidden="true"></i>') === 3, 'three switches: problems only, newest first, wrap');
+ok(strpos($h, 'id="logCtxWrap" hidden') !== false, 'context control hidden until a filter is typed');
+ok(strpos($h, 'id="logAuto"') === false && strpos($h, 'function schedule(') === false && strpos($h, 'penumbra_health_auto') === false, 'the per-log auto-refresh is gone');
+ok(preg_match('/<select id="logLines" hidden aria-hidden="true" tabindex="-1">/', $h) === 1, 'line count select kept hidden as the state holder');
+ok(preg_match('/<span class="pnb-log-lines" id="logLinesLinks">show <a href="#" data-lines="300">300<\/a> &middot; <a href="#" data-lines="1000">1000<\/a> &middot; <a href="#" data-lines="5000">5000<\/a><\/span>/', $h) === 1, 'the count is three links in the status line');
+ok(preg_match('/<select id="logDay" aria-label="Day to show" hidden><\/select>/', $h) === 1, 'day picker sits inline in the status line');
+ok(preg_match('/<button type="button" class="pnb-link-btn" id="logKeys" aria-pressed="true"/', $h) === 1, 'keys switch is a link-button');
+ok(strpos($h, '<h2>Logs <span class="pnb-i"') !== false && strpos($h, '<b>5</b> pick a tab') !== false, 'the viewer (i) counts the tabs');
+// the scripts
+ok(strpos($h, 'window.pnbLog = {') !== false && strpos($h, 'jump: function (key, q)') !== false, 'log console exposes load + jump');
+ok(strpos($h, "getElementById('hubRefreshSel')") !== false && strpos($h, "'penumbra_health_refresh'") !== false && strpos($h, "['pnbHubTop', 'pnbHubLeft']") !== false, 'page refresher swaps the two live regions');
+ok(strpos($h, "qs.delete('full')") !== false, 'and never turns a timer into a live probe');
+ok(strpos($h, "closest('.pnb-out-copy')") !== false && strpos($h, "closest('.pnb-bell')") !== false && strpos($h, "closest('.pnb-log-jump')") !== false, 'card actions are delegated on document');
+ok(strpos($h, "fd.set('action', 'mute')") !== false && strpos($h, "method: 'POST'") !== false, 'the bell POSTs the mute');
+ok(strpos($h, "setProperty('--pnb-stick-h'") !== false && strpos($h, "getElementById('pnbNoticeBar')") !== false, 'the sticky offset follows the header stack and the notice bar');
+ok(strpos($h, "window.penumbraSingleKeysOff") !== false, 'single-key shortcuts still honour the app-wide off switch');
+
+section('8. The page as a whole');
+ok(strpos($page, 'function pnb_info(') !== false, 'pnb_info helper present');
+ok(preg_match('/penumbra_admin_open\(\'System Health\', \'checked \' \. \$snap\[\'checked_at\'\], \'health\', true, \'wide\', \$pnbRefreshCtl\);/', $page) === 1, 'the refresh control rides into the chrome as the 6th argument');
+ok(strpos($page, 'id="pnbHubTop"') !== false && strpos($page, 'id="pnbHubLeft"') !== false, 'both live regions have ids');
+ok(strpos($page, "\$_POST['action'] === 'mute'") !== false && strpos($page, 'penumbra_mute_set(') !== false, 'mute POST action present');
+ok(substr_count($page, 'pnb_info(') >= 10, 'ten or more footnotes became (i) tips', substr_count($page, 'pnb_info('));
+ok(strpos($page, 'id="logAuto"') === false, 'no per-log auto-refresh anywhere');
+ok(strpos($page, "\r\n") === false, 'line endings stayed LF');
+
+section('9. The mute handler, for real');
+$mute = cut($page, '// --- known-window mute toggle (admin only, POST)', '// --- one-time metrics column provisioning', 'mute handler');
+ok(substr_count($mute, 'exit;') === 3, 'handler exits on refusal, bad input and success');
+// exit -> return so the handler can be included repeatedly; header() and
+// http_response_code() -> shims, because this process has already written
+// its results to stdout and PHP would refuse the real ones.
+$muteHarness = str_replace(array('exit;', 'header(', 'http_response_code('), array('return;', 'pnb_test_header(', 'pnb_test_code('), $mute);
+ok(substr_count($muteHarness, 'pnb_test_code(') === 2 && substr_count($muteHarness, 'pnb_test_header(') === 1, 'handler sets a status code on both refusals');
+file_put_contents($TMP . DIRECTORY_SEPARATOR . 'mute.php', "<?php\n" . $muteHarness);
+$TEST_CODE = 200;
+function pnb_test_header($h) { }
+function pnb_test_code($c = null) { global $TEST_CODE; if ($c !== null) $TEST_CODE = (int)$c; return $TEST_CODE; }
+function run_mute($post, $admin) {
+    global $config, $TMP, $TEST_CODE;
+    $_POST = $post; $isAdmin = $admin; $currentUserKey = 'tester'; $TEST_CODE = 200;
+    ob_start(); include $TMP . DIRECTORY_SEPARATOR . 'mute.php'; $out = ob_get_clean();
+    return array($TEST_CODE, json_decode($out, true), $out);
+}
+list($code, $j) = run_mute(array('action' => 'mute', 'key' => 'db:hr', 'slot' => '10', 'on' => '1', 'label' => 'HR ~05:00 daily'), true);
+ok($code === 200 && !empty($j['ok']) && $j['muted'] === true, 'admin mutes db:hr slot 10', array($code, $j));
+ok(penumbra_mute_has(penumbra_mutes_read($config), 'db:hr', 10), 'and the mute file has it');
+ok(penumbra_mute_has(penumbra_mutes_read($config), 'scheduler', $slot), 'without losing the scheduler mute');
+list($code, $j) = run_mute(array('action' => 'mute', 'key' => 'db:hr', 'slot' => '10', 'on' => '0'), true);
+ok($code === 200 && !empty($j['ok']) && $j['muted'] === false && !penumbra_mute_has(penumbra_mutes_read($config), 'db:hr', 10), 'unmute removes it');
+list($code, $j) = run_mute(array('action' => 'mute', 'key' => 'db:hr', 'slot' => '99', 'on' => '1'), true);
+ok($code === 400 && isset($j['error']), 'slot 99 is refused', array($code, $j));
+list($code, $j) = run_mute(array('action' => 'mute', 'key' => '', 'slot' => '3', 'on' => '1'), true);
+ok($code === 400 && isset($j['error']), 'an empty key is refused');
+list($code, $j) = run_mute(array('action' => 'mute', 'key' => 'db:hr', 'slot' => '10', 'on' => '1'), false);
+ok($code === 403 && isset($j['error']) && !penumbra_mute_has(penumbra_mutes_read($config), 'db:hr', 10), 'a non-admin is refused and nothing is written');
+list($code, $j) = run_mute(array('action' => 'mute', 'key' => 'db:hr<script>', 'slot' => '11', 'on' => '1'), true);
+ok($code === 200 && penumbra_mute_has(penumbra_mutes_read($config), 'db:hrscript', 11) && !penumbra_mute_has(penumbra_mutes_read($config), 'db:hr<script>', 11), 'key is reduced to its safe characters');
+
+if ($CONTROL) { section('CONTROL'); ok(false, 'control: a deliberately false assertion (must FAIL)'); }
+
+// ---------------------------------------------------------------------------
+// Optional: a page for a headless look. Not a test, but it is what the eye
+// checks, so the regions above are the ones on it.
+// ---------------------------------------------------------------------------
+if ($HTML !== '') {
+    $refresh = '<div class="pnb-hub-refresh" id="pnbHubRefresh" role="group" aria-label="Page auto-refresh"><span>&#8635; auto-refresh</span>'
+             . '<select id="hubRefreshSel" aria-label="Auto-refresh interval"><option value="0">off</option><option value="30">30s</option><option value="60" selected>60s</option><option value="120">2 min</option><option value="300">5 min</option></select>'
+             . '<span id="hubRefreshNext">next in <b>1:00</b></span><button type="button" id="hubRefreshPause" class="pnb-hub-refresh-p" aria-pressed="false" title="Pause auto-refresh">&#10074;&#10074;</button>'
+             . '<span class="pnb-hub-refresh-bar" aria-hidden="true"><i id="hubRefreshBar"></i></span></div>';
+    $mockRows = array(
+        array('t' => date('Y-m-d H:i:s', $T - 60) . ' DEGRADED: www3 delivery down | delivery=down | near-miss OPEN infoed | correlated: none | SENDING (alert, 2nd consecutive)', 's' => 'err'),
+        array('t' => date('Y-m-d H:i:s', $T - 360) . ' DEGRADED: www3 delivery down | delivery=down | near-miss OPENED infoed', 's' => 'err'),
+        array('t' => date('Y-m-d H:i:s', $T - 660) . ' OK | delivery=intermittent | hr 38ms fin 41ms infoed 1210ms srar 27ms wolfware 63ms | smtp 12ms', 's' => 'warn'),
+        array('t' => date('Y-m-d H:i:s', $T - 960) . ' OK | delivery=ok | hr 36ms fin 40ms infoed 44ms srar 29ms wolfware 61ms | smtp 11ms', 's' => 'ok'),
+        array('t' => date('Y-m-d H:i:s', $T - 1260) . ' OK | delivery=ok | hr 37ms fin 39ms infoed 45ms srar 28ms wolfware 60ms | smtp 12ms', 's' => 'ok'),
+        array('t' => date('Y-m-d H:i:s', $T - 1560) . ' OK | delivery=quiet | hr 36ms fin 41ms infoed 43ms srar 27ms wolfware 62ms | smtp 11ms', 's' => 'ok'),
+    );
+    $mock = json_encode(array('file' => 'penumbra_monitor.log', 'size' => 1834211, 'mtime_h' => date('Y-m-d H:i:s', $T - 61), 'age_secs' => 61,
+                              'shown' => count($mockRows), 'truncated' => true, 'days_all' => array(), 'span' => 0, 'day' => '', 'ctx' => 0,
+                              'hint' => 'One line per 5-minute check. DEGRADED lines bracket an outage.', 'rows' => $mockRows));
+    $mockJs = '<script>window.fetch = function (u) { return Promise.resolve({ ok: true, status: 200, json: function () { return Promise.resolve(' . $mock . '); }, text: function () { return Promise.resolve("<html></html>"); } }); };</script>' . "\n";
+    $r6 = preg_replace('/<script>/', $mockJs . '<script>', $H['r6'], 1);
+    $shell = '<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">'
+           . '<title>Penumbra &middot; Health (fixture render)</title><link rel="stylesheet" href="css/main.css"><link rel="stylesheet" href="css/density.css"></head>' . "\n"
+           . '<body class="pnb-adm theme-wolfpack">' . "\n"
+           . '<div class="pnb-adm-stick"><div id="pnbNoticeBar" class="pnb-notice pnb-notice-critical" role="alert"><span class="pnb-notice-msg"><span class="sr-only">Critical: </span><strong>Penumbra outage:</strong> www3 delivery has been down for ' . pnb_h(pnb_dur($outg['open'][0]['duration'])) . ' (since ' . date('H:i', $outg['open'][0]['started_at']) . '). Large pages may not load through www3.</span><a class="pnb-notice-manage" href="#">Manage &rarr;</a></div>'
+           . '<header class="pnb-adm-bar"><span class="pnb-crumb"><span class="pnb-crumb-home">Penumbra</span><span class="pnb-crumb-sep">&rsaquo;</span><span class="pnb-crumb-step">Admin</span></span><div class="pnb-adm-titles"><h1>System Health</h1><p>checked ' . pnb_h($snap['checked_at']) . '</p></div>' . $refresh
+           . '<nav class="pnb-adm-nav"><a href="#">&#9776; Repository</a><a href="#" class="on" aria-current="page">&#10084; Health</a><a href="#">&#9993; Notice</a><a href="#">&#128273; Grants</a></nav></header></div>' . "\n"
+           . '<main class="pnb-adm-main wide">' . "\n" . $H['top'] . "\n"
+           . '<div class="pnb-hub-grid">' . "\n" . '<div class="pnb-hub-col" id="pnbHubLeft">' . "\n" . $H['r1'] . $H['r2'] . $H['r3'] . $H['r4'] . $H['r5'] . '</div><!-- /left -->' . "\n"
+           . '<div class="pnb-hub-col">' . "\n" . $r6 . "\n"
+           . '<script>setTimeout(function () { var i = document.querySelector("#pnbCardDbs .pnb-tile.degraded .pnb-i"); if (i) i.focus(); }, 300);</script>' . "\n"
+           . '</main></body></html>';
+    file_put_contents($HTML, $shell);
+    echo "\nHTML: " . strlen($shell) . " bytes -> $HTML\n";
+}
+
+echo "\nSUMMARY  pass=$PASS  fail=$FAIL\n";
+exit($FAIL === 0 ? 0 : 1);

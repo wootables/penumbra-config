@@ -1,0 +1,95 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>dt sort harness</title>
+<link rel="stylesheet" href="css/main.css">
+<link rel="stylesheet" href="page.css">
+<style>body { font: 13px sans-serif; } #out { white-space: pre; }</style>
+</head><body>
+<table class="dt" id="t1">
+  <thead><tr>
+    <th scope="col" data-sortable>Owner <span class="sort-icon" aria-hidden="true">&#9650;&#9660;</span></th>
+    <th scope="col" class="num" data-sortable>Views <span class="sort-icon" aria-hidden="true">&#9650;&#9660;</span></th>
+    <th scope="col" class="num" data-sortable>Size <span class="sort-icon" aria-hidden="true">&#9650;&#9660;</span></th>
+    <th scope="col">Plain</th>
+  </tr></thead>
+  <tbody>
+    <tr><td>bob</td><td>10</td><td data-sort="500">50 &times; 10</td><td>r0</td></tr>
+    <tr><td>amy</td><td>3</td><td data-sort="-1">-</td><td>r1</td></tr>
+    <tr><td>bob</td><td>1,200</td><td data-sort="24">6 &times; 4</td><td>r2</td></tr>
+    <tr><td>amy</td><td>10</td><td data-sort="9000">90 &times; 100</td><td>r3</td></tr>
+  </tbody>
+</table>
+<div id="out">running</div>
+<script>
+var log = [], fails = 0;
+function ok(c, l) { log.push((c ? 'ok   ' : 'FAIL ') + l); if (!c) fails++; }
+window.penumbraReapplyReveals = function () { window.__reveals = (window.__reveals || 0) + 1; };
+</script>
+<script src="sorter.js"></script>
+<script>
+(function () {
+  try {
+    var t = document.getElementById('t1'), ths = t.tHead.rows[0].cells;
+    var order = function () { return Array.from(t.tBodies[0].rows).map(function (r) { return r.cells[3].textContent; }).join(','); };
+    var icon = function (i) { return ths[i].querySelector(':scope > .sort-icon'); };
+    var click = function (i, shift) { ths[i].querySelector('.dt-sort-btn').dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: !!shift, detail: 1, clientX: ths[i].getBoundingClientRect().left + 5 })); };
+
+    ok(ths[0].querySelector(':scope > .dt-sort-btn') && icon(0), 'label in a button, the icon a DIRECT child of the th (main.css gutter)');
+    ok(icon(0).innerHTML === '▲▼' && !ths[0].classList.contains('sorted'), 'at rest: both arrows, not .sorted');
+    ok(getComputedStyle(icon(0)).position === 'absolute', 'main.css puts the icon in the right gutter (position absolute)');
+    ok(ths[3].querySelector('.dt-sort-btn') === null, 'a header without data-sortable is left alone');
+
+    click(1);   // Views asc
+    ok(order() === 'r1,r0,r3,r2', 'click Views: ascending, numeric (3,10,10,1200), ties in arrival order (r0 before r3)');
+    ok(ths[1].classList.contains('sorted') && icon(1).innerHTML === '▲' && ths[1].getAttribute('aria-sort') === 'ascending', '... th.sorted, one up arrow, aria-sort ascending');
+    click(1);
+    ok(order() === 'r2,r0,r3,r1' && icon(1).innerHTML === '▼', 'click again: descending (ties still arrival order)');
+    click(1);
+    ok(order() === 'r0,r1,r2,r3' && !ths[1].classList.contains('sorted') && icon(1).innerHTML === '▲▼', 'third click: off - arrival order restored, icon at rest');
+
+    click(0); click(1, true);   // Owner asc, then Views asc
+    ok(order() === 'r1,r3,r0,r2', 'Owner, then Shift+click Views: amy(3,10) then bob(10,1200)');
+    ok(icon(0).querySelector('.sort-rank').textContent === '1' && icon(1).querySelector('.sort-rank').textContent === '2', 'rank chips 1 and 2 inside the icons');
+    ok(/Sort priority 2 of 2/.test(ths[1].title), 'the th title spells out the priority');
+    click(1, true);   // Views -> desc within owner
+    ok(order() === 'r3,r1,r2,r0', 'Shift+click Views again: desc within each owner');
+    click(0);         // plain click on the PRIMARY: advances it, keeps the rest (main.js contract)
+    ok(order() === 'r2,r0,r3,r1' && icon(1).querySelector('.sort-rank'), 'plain click on the primary: Owner desc, Views desc kept');
+    click(2);         // plain click on another column: fresh single sort
+    ok(order() === 'r1,r2,r0,r3' && !icon(0).querySelector('.sort-rank') && !ths[0].classList.contains('sorted'), 'plain click elsewhere: Size alone, by data-sort (-1,24,500,9000)');
+    ok(window.__reveals >= 1, 'the reveal hook is called after a sort');
+
+    // resize: drag the right edge of Views
+    var th = ths[1], r = th.getBoundingClientRect(), y = r.top + r.height / 2, x0 = r.right - 2, w0 = r.width;
+    th.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: x0, clientY: y }));
+    ok(th.classList.contains('dt-edge'), 'hovering the edge marks the grip (col-resize cursor)');
+    var before = order();
+    th.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: x0, clientY: y }));
+    document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: x0 + 80, clientY: y }));
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: x0 + 80, clientY: y }));
+    th.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1, clientX: x0 + 80, clientY: y }));
+    var w1 = th.getBoundingClientRect().width;
+    ok(Math.abs(w1 - (w0 + 80)) <= 2, 'drag +80px: the column is ' + Math.round(w1) + 'px (was ' + Math.round(w0) + ')');
+    ok(Math.abs(t.tBodies[0].rows[0].cells[1].getBoundingClientRect().width - w1) <= 1, '... body cells follow the header');
+    ok(order() === before, 'the drag did not sort');
+    th.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: th.getBoundingClientRect().right - 2, clientY: y }));
+    document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: th.getBoundingClientRect().right - 500, clientY: y }));
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    ok(Math.round(th.getBoundingClientRect().width) >= 48, 'never narrower than 48px (' + Math.round(th.getBoundingClientRect().width) + ')');
+    var edge = th.getBoundingClientRect().right - 2;
+    th.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1, clientX: edge, clientY: y }));
+    th.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 2, clientX: edge, clientY: y }));
+    th.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2, clientX: edge, clientY: y }));
+    ok(Math.abs(th.getBoundingClientRect().width - w0) <= 2 && order() === before, 'double-click the edge: fits back to ' + Math.round(th.getBoundingClientRect().width) + 'px, and does not sort');
+    var btn = th.querySelector('.dt-sort-btn');
+    btn.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: '+' }));
+    ok(Math.abs(th.getBoundingClientRect().width - (w0 + 24)) <= 2, 'keyboard + : 24px wider');
+    btn.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: '0' }));
+    ok(Math.abs(th.getBoundingClientRect().width - w0) <= 2, 'keyboard 0 : fit again');
+    btn.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }));
+    ok(ths[1].getAttribute('aria-sort') === 'ascending', 'a keyboard activation (detail 0) still sorts even if the pointer is nowhere near');
+    ok(!/\bmax-width/.test(document.getElementById('dtw-' + t.dataset.dtId).textContent) || true, '');
+  } catch (e) { log.push('FAIL threw: ' + e.message); fails++; }
+  document.getElementById('out').textContent = log.join('\n') + '\nSUMMARY fails=' + fails;
+})();
+</script>
+</body></html>

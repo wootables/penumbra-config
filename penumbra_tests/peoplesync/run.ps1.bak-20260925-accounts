@@ -1,0 +1,91 @@
+# =============================================================================
+# Run the people-sync tests (people_sync_lib.php - the employee directory sync).
+#
+#   powershell -File run.ps1
+#   powershell -File run.ps1 -App <path>    # run against a stage instead of live
+#   powershell -File run.ps1 -Mutant        # six targeted mutants; each MUST
+#                                           # go RED with the exact fail count
+#                                           # named below
+#
+# WHAT IS UNDER TEST. people_sync.php refreshes NC_REPORTING.PENUMBRA_PEOPLE
+# from HR every night; scheduled tasks will use that table to decide who gets
+# mail. Every decision the sync makes - which HR row is "the" row per person,
+# how values are normalized, whether a night's extract is trusted at all, what
+# the MERGE / DDL say - lives in people_sync_lib.php as pure functions, and this
+# suite pins them. The driver's I/O (connections, the fetch loop) is not here;
+# it is exercised by running the sync with --dry-run.
+#
+# -n (skip php.ini) because from a workstation the ini cannot load
+# oci8/pdo_oci/sqlsrv - those client libraries exist only on the server. Nothing
+# under test needs them.
+#
+# EXPECTED TAIL: "PASS: 190   FAIL: 0" then "RESULT: GREEN"  (count as of 2026-09-24, dictionary comments added)
+#
+# UNC .ps1 files are GPO-blocked here ("not digitally signed") - run the body as
+# a scriptblock rather than with -File. Never add a bare `exit` for the same
+# reason: it would kill the caller.
+# =============================================================================
+param(
+    [string]$App = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra',
+    [switch]$Mutant
+)
+
+$ErrorActionPreference = 'Stop'
+$here = $PSScriptRoot
+if (-not $here -and $MyInvocation.MyCommand.Path) { $here = Split-Path -Parent $MyInvocation.MyCommand.Path }
+# Invoked as a scriptblock (the UNC workaround) neither of the above exists.
+if (-not $here) { $here = '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\peoplesync' }
+$phpDir = '\\oitras\d$\Utilities\PHP_8.2-p'
+$php  = Join-Path $phpDir 'php.exe'
+$test = Join-Path $here 'test_peoplesync.php'
+$src  = Join-Path $App 'people_sync_lib.php'
+# mbstring is loaded explicitly (relative extension_dir, so run from the PHP
+# folder): the width clamp uses mb_strcut and the suite proves it never splits
+# a UTF-8 sequence, which a substr() fallback could not prove.
+$phpArgs = @('-n', '-d', 'extension_dir=ext', '-d', 'extension=php_mbstring.dll')
+
+if (-not $Mutant) {
+    Push-Location $phpDir
+    try { & $php @phpArgs $test $src } finally { Pop-Location }
+    return
+}
+
+# --- targeted mutants -------------------------------------------------------
+# Each reverts ONE decision the library makes. The expected fail count is exact:
+# a mutant that stays GREEN, or that goes red in more places than named, means
+# the suite is no longer pinning what it claims to pin.
+$text = [IO.File]::ReadAllText($src)
+$tmp  = Join-Path $env:TEMP ('pnb_peoplesync_mut_' + $PID)
+New-Item -ItemType Directory -Force $tmp | Out-Null
+
+$mutants = @(
+    @{ Name = 'first-run guard skip no longer reported (operator is not told the ratio rules had no baseline)';
+       From = 'if ($cRows > 0) {';   To = 'if (true) {';   Expect = 1 },
+    @{ Name = 'VARCHAR2 width clamp disabled';
+       From = 'if (strlen($v) > $spec[1]) {';   To = 'if (false) {';   Expect = 4 },
+    @{ Name = 'future-dated HR rows no longer excluded';
+       From = 'WHERE EFFDT < TRUNC(SYSDATE) + 1';   To = 'WHERE 1 = 1';   Expect = 1 },
+    @{ Name = 'PI rule loses the ES2 class (the 12/2025 addition silently dropped)';
+       From = '''classes''  => array(''EFX'', ''ENF'', ''ES1'', ''ES2'', ''ECX'')';   To = '''classes''  => array(''EFX'', ''ENF'', ''ES1'', ''ECX'')';   Expect = 3 },
+    @{ Name = 'PI rule loses the OUC 10 exclusion';
+       From = '''ouc_not_prefix'' => ''10''';   To = '''ouc_not_prefix'' => ''ZZ''';   Expect = 3 },
+    @{ Name = 'a column loses its dictionary comment (EMPL_RCD renamed in the comment map)';
+       From = '''EMPL_RCD''          => ''PeopleSoft employee record number';   To = '''EMPL_RCDX''         => ''PeopleSoft employee record number';   Expect = 3 }
+)
+
+$allGood = $true
+foreach ($m in $mutants) {
+    if ($text.IndexOf($m.From) -lt 0) { Write-Host ("MUTANT NOT APPLICABLE (anchor missing): " + $m.Name); $allGood = $false; continue }
+    $mutated = $text.Replace($m.From, $m.To)
+    $file = Join-Path $tmp 'people_sync_lib.php'
+    [IO.File]::WriteAllText($file, $mutated)
+    Push-Location $phpDir
+    try { $out = & $php @phpArgs $test $file 2>&1 | Out-String } finally { Pop-Location }
+    $fail = 0
+    if ($out -match 'FAIL:\s+(\d+)') { $fail = [int]$Matches[1] }
+    $verdict = if ($fail -eq $m.Expect) { 'OK  ' } else { 'BAD ' }
+    if ($fail -ne $m.Expect) { $allGood = $false }
+    Write-Host ("{0} mutant '{1}' -> FAIL: {2} (expected {3})" -f $verdict, $m.Name, $fail, $m.Expect)
+}
+Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+Write-Host ('MUTANTS: ' + $(if ($allGood) { 'ALL BITE' } else { 'PROBLEM' }))

@@ -1,0 +1,137 @@
+# =============================================================================
+# Penumbra RENDER WORKER suite (2026-09-29): penumbra_render_worker.ps1 + the
+# runner's client penumbra_render_client.php, end to end on THIS workstation
+# (the worker runs here as the current user with the local Edge; the box is
+# proven separately - the 2026-09-29 spike). Everything happens in .\queue.
+#
+#   run.ps1                      tests the LIVE files on the box
+#   run.ps1 -Worker <p> -Client <p>   staged copies
+#   run.ps1 -Mutant nokill       the worker no longer kills a hung Edge: the
+#                                "no leftover Edge after a timeout" assertion
+#                                must go red (and only what follows from it)
+# Run the body as a scriptblock from the workstation (UNC .ps1 policy):
+#   $dir='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\renderworker'
+#   & ([scriptblock]::Create([IO.File]::ReadAllText("$dir\run.ps1").Replace('$here = $PSScriptRoot',"`$here = '$dir'")))
+# Writes summary.txt. Exit code 1 when any assertion fails.
+# =============================================================================
+param([string]$Worker = '', [string]$Client = '', [string]$Mutant = '')
+$ErrorActionPreference = 'Continue'
+$here = $PSScriptRoot
+$phpDir = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p'
+$app = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+if (-not $Worker) { $Worker = "$phpDir\penumbra_render_worker.ps1" }
+if (-not $Client) { $Client = "$app\penumbra_render_client.php" }
+$php = "$phpDir\php.exe"
+# The queue lives on the WORKSTATION (local disk): the worker and Edge run here,
+# and PHP's is_writable() says no to a UNC path (on the box the queue is D:\...).
+$q = Join-Path $env:LOCALAPPDATA 'Temp\penumbra_renderworker\queue'
+$results = New-Object System.Collections.Generic.List[object]
+function Assert([string]$name, [bool]$cond, [string]$detail = '') { $results.Add(@{ name = $name; pass = $cond; detail = $detail }) | Out-Null; if ($cond) { Write-Host "  PASS  $name" -ForegroundColor Green } else { Write-Host "  FAIL  $name" -ForegroundColor Red; if ($detail) { Write-Host "        $detail" -ForegroundColor DarkYellow } } }
+function Del([string]$p) { try { if (Test-Path -LiteralPath $p) { [IO.File]::Delete($p) } } catch {} }
+function KillQueueEdge { Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" | Where-Object { $_.CommandLine -like "*penumbra_renderworker\queue*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } }
+function LeftoverEdge { (Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" | Where-Object { $_.CommandLine -like "*penumbra_renderworker\queue*" } | Measure-Object).Count }
+function PngSize([string]$p) { Add-Type -AssemblyName System.Drawing; $i = [System.Drawing.Image]::FromFile($p); $s = "$($i.Width)x$($i.Height)"; $i.Dispose(); $s }
+function Wait-Until([scriptblock]$cond, [int]$ms) { $sw = [Diagnostics.Stopwatch]::StartNew(); while ($sw.ElapsedMilliseconds -lt $ms) { if (& $cond) { return $true }; Start-Sleep -Milliseconds 150 }; return (& $cond) }
+function StartWorker([string]$script, [string]$outFile, [string[]]$extra) {
+  $a = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $script, '-Queue', $q, '-MaxHours', '1', '-PollMs', '200', '-RenderTimeoutSec', '8', '-StaleMinutes', '1', '-StaleEveryMinutes', '0') + $extra
+  Start-Process -FilePath 'powershell.exe' -ArgumentList $a -PassThru -WindowStyle Hidden -RedirectStandardOutput $outFile -RedirectStandardError ($outFile + '.err')
+}
+function ClientRender([string]$page, [string]$out, [int]$dpr = 1, [int]$timeout = 40) {
+  $a = @('-n', '-d', 'display_errors=stderr', $Client, '--selftest', $q, $page, $out, "$dpr", "$timeout")
+  $raw = & $php $a 2>$null | Select-Object -Last 1
+  try { return ($raw | ConvertFrom-Json) } catch { return @{ ok = $false; error = "unparseable client output: $raw" } }
+}
+
+Write-Host "[1/4] fixtures"
+if (Test-Path $q) { Get-ChildItem $q -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object { Del $_.FullName } } else { New-Item -ItemType Directory -Path $q -Force | Out-Null }
+Write-Host "      queue: $q"
+KillQueueEdge
+$chartJs = [IO.File]::ReadAllText("$app\js\chart-4.5.1.min.js")
+$chart = '<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#fff}</style></head><body><canvas id="c" width="880" height="420"></canvas><script>' + $chartJs + '</script><script>new Chart(document.getElementById("c").getContext("2d"),{type:"bar",data:{labels:["Eng","Sci","Ag"],datasets:[{label:"Render worker test",data:[3,2,1],backgroundColor:"#336699"}]},options:{animation:false,responsive:false}});</script></body></html>'
+[IO.File]::WriteAllText("$here\chart.html", $chart)
+[IO.File]::WriteAllText("$here\hang.html", '<!doctype html><html><body><script>while(true){}</script></body></html>')
+[IO.File]::WriteAllText("$here\blank.html", '<!doctype html><html><body style="margin:0"><div style="width:200px;height:80px;background:#369"></div></body></html>')
+# The copy under test must be LOCAL too: a .ps1 on the UNC share is refused
+# ("not digitally signed") even with -ExecutionPolicy Bypass.
+$wut = Join-Path (Split-Path $q -Parent) 'worker_under_test.ps1'
+$src = [IO.File]::ReadAllText($Worker)
+$mutants = @{ 'nokill' = @('try { & taskkill /PID $p.Id /T /F 2>&1 | Out-Null } catch {}', '# MUTANT: hung Edge left alive') }
+if ($Mutant) {
+  if (-not $mutants.ContainsKey($Mutant)) { throw "unknown mutant '$Mutant'" }
+  $n = ([regex]::Matches($src, [regex]::Escape($mutants[$Mutant][0]))).Count
+  if ($n -ne 1) { throw "mutant anchor found $n times" }
+  $src = $src.Replace($mutants[$Mutant][0], $mutants[$Mutant][1]); Write-Host "      + MUTANT $Mutant"
+}
+[IO.File]::WriteAllText($wut, $src)
+Write-Host "      worker: $Worker"; Write-Host "      client: $Client"
+
+Write-Host "[2/4] worker up"
+$w1 = StartWorker $wut "$here\worker1.out" @()
+$hb = Join-Path $q 'worker.heartbeat'
+Assert 'worker: heartbeat appears within 10s' (Wait-Until { Test-Path $hb } 10000) ''
+Assert 'worker: lock file holds its PID' ((Test-Path (Join-Path $q 'worker.lock')) -and ((Get-Content (Join-Path $q 'worker.lock') -Raw).Trim() -eq "$($w1.Id)")) (Get-Content (Join-Path $q 'worker.lock') -Raw -ErrorAction SilentlyContinue)
+
+Write-Host "[3/4] renders"
+$r1 = ClientRender "$here\chart.html" "$here\out_chart.png" 1 40
+Assert 'render: the client gets a PNG of the chart page' ($r1.ok -eq $true -and $r1.png -gt 5000) (ConvertTo-Json $r1 -Compress)
+if ($r1.ok) { Assert 'render: 900x450 at dpr 1' ((PngSize "$here\out_chart.png") -eq '900x450') (PngSize "$here\out_chart.png") }
+Assert 'render: the request files are cleaned up by the client' (((Get-ChildItem $q -File | Where-Object { $_.Name -like 'r2*' }) | Measure-Object).Count -eq 0) ((Get-ChildItem $q -File | Select-Object -ExpandProperty Name) -join ',')
+$r2 = ClientRender "$here\chart.html" "$here\out_chart2.png" 2 40
+Assert 'render: dpr 2 doubles the pixels (1800x900)' ($r2.ok -eq $true -and (PngSize "$here\out_chart2.png") -eq '1800x900') (ConvertTo-Json $r2 -Compress)
+$r3 = ClientRender "$here\hang.html" "$here\out_hang.png" 1 25
+Assert 'timeout: a page that never finishes comes back as a timeout error, not a hang' ($r3.ok -eq $false -and $r3.error -match 'timeout') (ConvertTo-Json $r3 -Compress)
+Start-Sleep -Seconds 2
+Assert 'timeout: no Edge is left holding the queue after a timeout' ((LeftoverEdge) -eq 0) "leftover=$(LeftoverEdge)"
+$r4 = ClientRender "$here\blank.html" "$here\out_blank.png" 1 40
+Assert 'timeout: the worker still renders after a timeout (profile not wedged)' ($r4.ok -eq $true) (ConvertTo-Json $r4 -Compress)
+# half-written request: a .tmp must be ignored until it is renamed
+[IO.File]::WriteAllText("$q\half.html.tmp", $chart)
+Start-Sleep -Seconds 2
+Assert 'protocol: a half-written page (.html.tmp) is not picked up' (-not (Test-Path "$q\half.done")) ''
+[IO.File]::Move("$q\half.html.tmp", "$q\half.html")
+Assert 'protocol: once renamed it renders and publishes .done' (Wait-Until { Test-Path "$q\half.done" } 20000) ''
+$doneJson = if (Test-Path "$q\half.done") { Get-Content "$q\half.done" -Raw | ConvertFrom-Json } else { $null }
+Assert 'protocol: .done carries ok, ms, bytes, width, height, dpr' ($doneJson -and $doneJson.ok -eq $true -and $doneJson.ms -gt 0 -and $doneJson.bytes -gt 0 -and $doneJson.width -eq 900 -and $doneJson.dpr -eq 1) (Get-Content "$q\half.done" -Raw -ErrorAction SilentlyContinue)
+foreach ($f in @('half.html', 'half.done', 'half.png', 'half.lock')) { Del "$q\$f" }
+# unreadable options -> defaults
+[IO.File]::WriteAllText("$q\badopt.json", '{not json')
+[IO.File]::WriteAllText("$q\badopt.html.tmp", $chart); [IO.File]::Move("$q\badopt.html.tmp", "$q\badopt.html")
+Assert 'protocol: unreadable options fall back to defaults and still render' ((Wait-Until { Test-Path "$q\badopt.done" } 20000) -and ((Get-Content "$q\badopt.done" -Raw | ConvertFrom-Json).ok -eq $true)) (Get-Content "$q\badopt.done" -Raw -ErrorAction SilentlyContinue)
+foreach ($f in @('badopt.html', 'badopt.json', 'badopt.done', 'badopt.png')) { Del "$q\$f" }
+# stale sweep (StaleMinutes 1, every loop): old leftovers vanish, worker.* stays
+[IO.File]::WriteAllText("$q\old.done", '{}'); [IO.File]::WriteAllText("$q\old.png", 'x')
+(Get-Item "$q\old.done").LastWriteTime = (Get-Date).AddHours(-2); (Get-Item "$q\old.png").LastWriteTime = (Get-Date).AddHours(-2)
+Assert 'sweep: files older than the stale window are removed' (Wait-Until { -not (Test-Path "$q\old.done") -and -not (Test-Path "$q\old.png") } 5000) ''
+Assert 'sweep: worker.* files survive the sweep' ((Test-Path "$q\worker.log") -and (Test-Path $hb)) ''
+# single instance
+$w2 = StartWorker $wut "$here\worker2.out" @()
+$w2.WaitForExit(15000) | Out-Null
+$w2out = Get-Content "$here\worker2.out" -Raw -ErrorAction SilentlyContinue
+Assert 'single instance: a second worker sees the lock and exits' ($w2.HasExited -and $w2out -match 'holds the lock') ($w2out)
+Assert 'single instance: the first worker is still alive' (-not $w1.HasExited) ''
+# heartbeat keeps moving
+$hb1 = Get-Content $hb -Raw; Start-Sleep -Seconds 1; $hb2 = Get-Content $hb -Raw
+Assert 'worker: the heartbeat keeps advancing' ($hb1 -ne $hb2) "$hb1 / $hb2"
+
+Write-Host "[4/4] stop + recovery"
+Stop-Process -Id $w1.Id -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1
+Assert 'recovery: a killed worker leaves a stale lock' (Test-Path (Join-Path $q 'worker.lock')) ''
+$w3 = StartWorker $wut "$here\worker3.out" @('-Once')
+$w3.WaitForExit(20000) | Out-Null
+$w3out = Get-Content "$here\worker3.out" -Raw -ErrorAction SilentlyContinue
+Assert 'recovery: the next worker takes over a stale lock and runs' ($w3out -match 'stale lock' -and $w3out -match 'worker stop') ($w3out)
+Assert 'recovery: -Once removes its lock on exit' (-not (Test-Path (Join-Path $q 'worker.lock'))) ''
+[IO.File]::WriteAllText($hb, (Get-Date).AddMinutes(-10).ToString('o'))
+$r5 = ClientRender "$here\blank.html" "$here\out_noworker.png" 1 3
+Assert 'client: with no worker it fails fast and names the stale heartbeat' ($r5.ok -eq $false -and $r5.error -match 'did not answer' -and $r5.error -match 'heartbeat is stale') (ConvertTo-Json $r5 -Compress)
+Assert 'client: a failed request leaves nothing in the queue' (((Get-ChildItem $q -File | Where-Object { $_.Name -like 'r2*' }) | Measure-Object).Count -eq 0) ((Get-ChildItem $q -File | Select-Object -ExpandProperty Name) -join ',')
+KillQueueEdge
+
+$fail = ($results | Where-Object { -not $_.pass } | Measure-Object).Count
+$lines = $results | ForEach-Object { if ($_.pass) { "  PASS  $($_.name)" } else { "  FAIL  $($_.name)`r`n        $($_.detail)" } }
+$lines += ("{0} assertions, {1} failed" -f $results.Count, $fail)
+if ($Mutant) { $lines += "mutant: $Mutant" }
+$lines += "worker: $Worker"; $lines += "client: $Client"
+[IO.File]::WriteAllLines("$here\summary.txt", $lines)
+Write-Host ("{0} assertions, {1} failed" -f $results.Count, $fail)
+if ($fail -gt 0) { exit 1 }

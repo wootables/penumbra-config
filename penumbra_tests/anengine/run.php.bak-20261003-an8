@@ -1,0 +1,1563 @@
+<?php
+/**
+ * penumbra_tests/anengine/run.php - step 2 of folding report metrics into
+ * Platform Metrics (2026-10-01): each panel the two metrics pages used to build
+ * in their own inline code moves into ONE shared builder in analytics_shared.php.
+ * This suite proves each move changes nothing, OFFLINE:
+ *
+ *   the OLD block is cut out of the page BEFORE the increment (by its own first
+ *   and last lines) and run as written; the NEW code is cut out of the page
+ *   AFTER (the call line, or the same block when the page kept part of it
+ *   inline) and run the same way; both get the same variables, the same fake
+ *   database and the same fixed clock, and must issue the same queries (same
+ *   select items and predicates in any order, same binds, same grouping/order)
+ *   and produce identical results - the DB-down path included.
+ *
+ *   php.exe -n -d date.timezone=America/New_York -d memory_limit=1G run.php
+ *       (with increment 6 also -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/ext
+ *        -d extension=mbstring - forward slashes; the feed clips with mb_*)
+ *       [--app=<dir>]                       the pages AFTER (default: live webroot)
+ *       [--orig1=<dir> | --bak1=<stamp>]    the pages before increment 1
+ *       [--orig2=<dir> | --bak2=<stamp>]    the pages before increment 2
+ *       [--orig3=<dir> | --bak3=<stamp>]    the pages before increment 3
+ *       [--orig4=<dir> | --bak4=<stamp>]    the pages before increment 4
+ *       [--orig5=<dir> | --bak5=<stamp>]    the pages before increment 5 (E2a)
+ *       [--orig6=<dir> | --bak6=<stamp>]    the pages before increment 6 (E3a)
+ *       [--orig7=<dir> | --bak7=<stamp>]    the pages before increment 7 (E4b)
+ *       [--orig8=<dir> | --bak8=<stamp>]    the pages before the SWITCH (20261002-eng14):
+ *                                           since it, analytics.php is the engine's wrapper,
+ *                                           and the increments read the report page's call
+ *                                           lines from its last page (required then)
+ *       [--db=<db_connection.php>]          default: <live webroot>/db_connection.php
+ *       [--control] [--mutant=<name>]
+ *
+ * An increment's section runs only when its BEFORE pages are given; at least
+ * one is required. --bakN=<stamp> reads "<app>/<file>.bak-<stamp>" - the copy
+ * the deploy left beside each live file (increment 1: 20261001-eng1, increment
+ * 2: 20261001-eng2, increment 3: 20261001-eng3, increment 4: 20261001-eng4,
+ * increment 5: 20261001-eng6 - eng5 was the preview switch, E1, which no
+ * section here covers), so the proof can be re-run after the swaps. (--orig=
+ * is the old name of --orig1=.)
+ *
+ * Increment 1: penumbra_an_trend_series() + penumbra_an_heatmap(), both pages.
+ * Increment 2: the counter catalog - penumbra_an_counter_sql() /
+ *   penumbra_an_counts() / penumbra_an_dash_like() - for the report page's
+ *   usage + system counters and Platform's usage, home-visit and system ones.
+ * Increment 3: Top departments + Top colleges - penumbra_an_departments() /
+ *   penumbra_an_dept_decorate() - on both pages, with a fake PENUMBRA_PEOPLE
+ *   connection behind the real penumbra_directory.php resolvers (lifted from
+ *   the app), a per-user aggregate large enough to hit Platform's 1000-row
+ *   cap and the 250-row ranking, mixed-case ids, and the directory down.
+ * Increment 4: the Consumption mix (penumbra_an_mix()) and the panel bodies
+ *   both pages rendered identically - penumbra_an_mix_body(),
+ *   penumbra_an_heat_sr_table(), penumbra_an_dept_rows(),
+ *   penumbra_an_college_rows(): each OLD template block is rendered as written
+ *   and compared, whitespace-normalised, with the NEW call's output, over
+ *   hostile labels (& < > " '), empty and full data.
+ * Increment 5 (the one engine, E2a): the report page's own cards -
+ *   penumbra_an_report_counters() / _system() / _sparks() / _kpis() - old
+ *   inline blocks vs the page's calls, over three clocks, every window and
+ *   scope, metrics on/off and the database failing at each of 8 points.
+ *   Increment 5 MOVED two of increment 2's report-page blocks (the usage and
+ *   system counters) into those builders: on such a page increment 2's AFTER
+ *   side for them is the page before increment 5, so give --orig5/--bak5 with
+ *   --orig2/--bak2 (the chain: before 2 == before 5, proven here; before 5 ==
+ *   now, proven by section 5).
+ * Increment 6 (the one engine, E3a): the person-level builders -
+ *   penumbra_an_report_top_viewers() / _top_ips() / _feed() with
+ *   penumbra_an_feed_family() and penumbra_an_feed_fetch_size() - old inline
+ *   blocks vs the page's calls: viewers + IPs over 3 clocks x 12 windows x 3
+ *   scopes x the people tier on/off x the database failing at each point;
+ *   the feed over every kind of row its detail and family rules branch on,
+ *   3 scopes x the tier x six ?feed= values x the database down.
+ *
+ * --mutant (each MUST turn red):
+ *   increment 1: order (monthly loses ORDER BY), prior (daily overlay reads the
+ *     main window), dst (a missing hour drawn as 0), heatday (Sunday dropped),
+ *     walkback (daily axis walks back from now), scope (report trend loses its
+ *     exclusion seam)
+ *   increment 2: cntprior ('views_prior' reads the main window), cnterr
+ *     ('errors' counts the bare action set), cntsched ('sched_runs_all'
+ *     windowed), cntdash (dashboard pulls lose their detector), cntscope
+ *     (Platform's system counters lose the weekday/hour scope), cntalias (the
+ *     report page asks for EMAIL_FAIL_COUNT where it reads EMAILFAIL_COUNT)
+ *   increment 3: deptcap (the report page caps its viewers), deptalso
+ *     (Platform stops looking up its users table's names), deptlooked (Top
+ *     viewers decorated when nobody viewed), deptscope (the report page's
+ *     departments lose the exclusion seam), deptrank (colleges ranked 10
+ *     deep), deptcase (the Department column stops lower-casing the id)
+ *   increment 4: mixneg (Views loses its floor at 0), mixorder (two channels
+ *     swap places - the donut's palette is index-matched), mixempty (an
+ *     all-zero mix draws a donut), heatcap (the heatmap caption unescaped),
+ *     deptesc (a department label unescaped), collpill (an unknown college
+ *     loses its code pill), rowcut (the report page renders 10 departments)
+ *   increment 5 (the one engine, E2a - the report's own cards): e5start (the
+ *     24h new-viewers start drops the "-1"), e5ipkey (a BADPASS row's old 'ip'
+ *     key is no longer read), e5sparkcut (the spark time cut keeps its "AND"),
+ *     e5people ("last by <user>" shown to everyone), e5monthly (Total Views'
+ *     monthly spark loses the exclusion seam)
+ *   E2b (section 6 - the report's cards inside the engine; the numbers are
+ *     proven live by anparity_cards.js): e2bkeep (a feed-chip target the
+ *     engine lacks is kept), e2bseam (the engine's cards lose the user /
+ *     department filter), e2bpeople (the engine's cards name people to
+ *     everyone)
+ *   increment 6 (E3a - Top viewers, Top IPs, the activity feed): e6famack
+ *     (AUDIT_ACK leaves the Errors chip), e6clip (the detail clip counts
+ *     bytes), e6flag (a BADPASS address is no longer flagged), e6vspark (a
+ *     viewer's spark looks up a lower-cased id), e6feedscope (the page's feed
+ *     loses its user / department / IP scope), e6gate (the feed is queried for
+ *     a viewer who may not see people), e6size (?feed= clamps at 10, not 50)
+ *   E3b-1 (section 8 - the Users tab at report scope): e3bspark (a person's
+ *     spark looks up a lower-cased id), e3bchunk (IN-lists of 2000 - past
+ *     Oracle's 1000), e3bgate (the people panels queried for every viewer),
+ *     e3bseam (Top IPs lose the cards' seam)
+ *   E3b-2 (section 9 - the Activity tab): e3b2gate (the feed queried for a
+ *     viewer who may not see people), e3b2scope (the feed loses the user /
+ *     department filter), e3b2target (Total Views stops picking its chip)
+ *   E4a (section 10 - the IP filter): e4ipgate (a viewer who may not see
+ *     people can filter by address), e4ipvalid (the address is not validated -
+ *     a LIKE wildcard gets through), e4ipbind (the report cards lose the bind)
+ *   increment 7 / E4b (sections 11-12 - the subscriber count moved; the theme
+ *     by route, auto-refresh, the info strip): e4bsid (the short id is not
+ *     trimmed), e4btransient (a transient test run counts as a subscription
+ *     schedule), e4broute (any platform= value means "from Platform"),
+ *     e4border (the report's saved default outranks the reader's prefs)
+ *   E4c (section 13 - the Errors list at report scope): e4chead (the Report
+ *     heading comes back at report scope), e4ccell (the Report cell does)
+ *   the switch (section 14): swwrapper (the wrapper gains a line), swbeacon
+ *     (report scope logs its views as Platform's), swexclme (Platform's Hide
+ *     my own views ignores the cookie), swcookie (Platform stops saving it)
+ *   the report scope's gate (section 15, 2026-10-02): nascope (owner and
+ *     editor keep the person tier under ?noadm), nacall (the engine stops
+ *     passing empty($noadm))
+ * EXPECTED TAIL: "PASS <n>   FAIL 0".
+ */
+error_reporting(E_ALL);
+$CONTROL = in_array('--control', $argv, true);
+$MUTANT = ''; $APP = null; $DB = null; $BEFORE = array(1 => null, 2 => null, 3 => null, 4 => null, 5 => null, 6 => null, 7 => null, 8 => null); $BAK = array(1 => null, 2 => null, 3 => null, 4 => null, 5 => null, 6 => null, 7 => null, 8 => null);
+foreach ($argv as $a) {
+    if (strpos($a, '--mutant=') === 0) $MUTANT = substr($a, 9);
+    if (strpos($a, '--app=')    === 0) $APP    = rtrim(substr($a, 6), '\\/');
+    if (strpos($a, '--db=')     === 0) $DB     = substr($a, 5);
+    if (strpos($a, '--orig=')   === 0) $BEFORE[1] = rtrim(substr($a, 7), '\\/');
+    foreach (array(1, 2, 3, 4, 5, 6, 7, 8) as $n) {
+        if (strpos($a, "--orig$n=") === 0) $BEFORE[$n] = rtrim(substr($a, strlen("--orig$n=")), '\\/');
+        if (strpos($a, "--bak$n=")  === 0) $BAK[$n]    = substr($a, strlen("--bak$n="));
+    }
+}
+$LIVE = '\\\\oitras.oit.ncsu.edu\\c$\\inetpub\\wwwroot\\sponsor_migration\\penumbra';
+if ($APP === null) $APP = $LIVE;
+if ($DB === null)  $DB  = $LIVE . '\\db_connection.php';
+if (count(array_filter($BEFORE)) + count(array_filter($BAK)) === 0) {
+    fwrite(STDERR, "give the BEFORE pages of at least one increment: --orig1=/--bak1=, --orig2=/--bak2=, --orig3=/--bak3=, --orig4=/--bak4=, --orig5=/--bak5=, --orig6=/--bak6=, --orig7=/--bak7=, --orig8=/--bak8=\n"); exit(2);
+}
+echo "app:  $APP\ndb:   $DB\n";
+echo 'timezone: ' . date_default_timezone_get() . "\n";
+if (date_default_timezone_get() !== 'America/New_York') { fwrite(STDERR, "run with -d date.timezone=America/New_York\n"); exit(2); }
+
+$pass = 0; $fail = 0; $shown = 0;
+function t_ok($c, $l) { global $pass, $fail, $shown; if ($c) { $pass++; return; } $fail++; if ($shown++ < 30) echo "    FAIL  $l\n"; }
+function t_eq($g, $w, $l) { t_ok($g === $w, $l . '  (got ' . substr(var_export($g, true), 0, 300) . ', want ' . substr(var_export($w, true), 0, 300) . ')'); }
+function section($t) { echo "== $t\n"; }
+function readf($p) { $s = @file_get_contents($p); if ($s === false) { fwrite(STDERR, "cannot read $p\n"); exit(2); } return $s; }
+
+$src = array('s_an' => readf("$APP/analytics.php"), 's_all' => readf("$APP/analytics_all.php"), 's_sh' => readf("$APP/analytics_shared.php"), 'db' => readf($DB));
+foreach (array(1, 2, 3, 4, 5, 6, 7, 8) as $n) {
+    if ($BEFORE[$n] === null && $BAK[$n] === null) continue;
+    foreach (array('an' => 'analytics.php', 'all' => 'analytics_all.php', 'sh' => 'analytics_shared.php') as $k => $f) {
+        $p = ($BEFORE[$n] !== null) ? $BEFORE[$n] . "/$f" : "$APP/$f.bak-" . $BAK[$n];
+        // A deploy backs up only the files it swapped (increment 5 left
+        // analytics_all.php alone): no .bak = the page did not change, so the
+        // current one stands in. A section that cuts a block from it would
+        // still catch a wrong stand-in ("the block did change").
+        if ($BEFORE[$n] === null && !is_file($p)) { echo "before increment $n: no $f.bak-{$BAK[$n]} - unchanged by it, the current file stands in\n"; $p = "$APP/$f"; }
+        $src["b{$n}_$k"] = readf($p);
+    }
+    echo "before increment $n: " . ($BEFORE[$n] !== null ? $BEFORE[$n] : "$APP/*.bak-" . $BAK[$n]) . "\n";
+}
+// THE SWITCH (2026-10-02, "increment 8"): analytics.php became the engine's
+// wrapper - a report's metrics page IS analytics_all.php at report scope. The
+// increments' NEW side for the report page (its call lines) lived in that page
+// until then, so it is read from the last page before the switch and run with
+// the CURRENT shared builders, as always. The wrapper itself is section 14's.
+$src['wrapper_an'] = null;
+if (strpos($src['s_an'], "define('PENUMBRA_AN_REPORT_SCOPE', true);") !== false && strlen($src['s_an']) < 4000) {
+    $src['wrapper_an'] = $src['s_an'];
+    if (!isset($src['b8_an']) || strlen($src['b8_an']) < 4000) {
+        fwrite(STDERR, "analytics.php is the engine's wrapper (the switch): give the pages before it, --orig8=<dir> or --bak8=20261002-eng14\n"); exit(2);
+    }
+    $src['s_an'] = $src['b8_an'];
+    echo "report page: the engine's wrapper since the switch - the increments read its last page (before increment 8)\n";
+}
+// FOLLOW-UP 2 (2026-10-02): penumbra_an_report_top_viewers() left analytics_shared.php with the old
+// report page, its only caller. The frozen copy beside this file stands in wherever the suite still
+// needs it: increment 6's proof, and section 8's reference for the engine's penumbra_an_user_sparks().
+$src['fx_tv'] = readf(__DIR__ . DIRECTORY_SEPARATOR . 'fixture_top_viewers.php');
+$tvKey = (strpos($src['s_sh'], 'function penumbra_an_report_top_viewers(') !== false) ? 's_sh' : 'fx_tv';
+if ($tvKey === 'fx_tv') echo "Top viewers builder: gone from analytics_shared.php - the frozen fixture_top_viewers.php stands in\n";
+
+$mutants = array(
+    'order'    => array('s_sh', "\$count(\"TRUNC(TIMESTAMP, 'MM'), 'YYYY-MM'\", \"TRUNC(TIMESTAMP, 'MM')\", \$w['timeFilter'], true)", "\$count(\"TRUNC(TIMESTAMP, 'MM'), 'YYYY-MM'\", \"TRUNC(TIMESTAMP, 'MM')\", \$w['timeFilter'], false)"),
+    'prior'    => array('s_sh', "\$count(\"TRUNC(TIMESTAMP), 'YYYY-MM-DD'\", 'TRUNC(TIMESTAMP)', \$w['priorFilter'], false), \$wd, \$w);", "\$count(\"TRUNC(TIMESTAMP), 'YYYY-MM-DD'\", 'TRUNC(TIMESTAMP)', \$w['timeFilter'], false), \$wd, \$w);"),
+    'dst'      => array('s_sh', "\$prior[]  = (\$hb['prior'] === null) ? null", "\$prior[]  = (\$hb['prior'] === null) ? 0"),
+    'heatday'  => array('s_sh', ", 'SUN' => 6);", ");"),
+    'walkback' => array('s_sh', "\$ts = strtotime(\"-\$i days\", \$w['trendEndTs']);", "\$ts = strtotime(\"-\$i days\", strtotime(date('Y-m-d') . ' 12:00:00'));"),
+    'scope'    => array('s_an', "\$run, \"REPORT_ID = :rid AND ACTION='OPEN' \$whenFilter \$exclSql\",", "\$run, \"REPORT_ID = :rid AND ACTION='OPEN' \$whenFilter\","),
+    'cntprior' => array('s_sh', "case 'views_prior':          return \"COUNT(CASE WHEN ACTION='OPEN' \$p THEN 1 END)\";", "case 'views_prior':          return \"COUNT(CASE WHEN ACTION='OPEN' \$t THEN 1 END)\";"),
+    'cnterr'   => array('s_sh', "case 'errors':               return \"COUNT(CASE WHEN \" . penumbraErrorCondSql() . \" \$t THEN 1 END)\";", "case 'errors':               return \"COUNT(CASE WHEN ACTION IN (\" . penumbraErrorActionsSql() . \") \$t THEN 1 END)\";"),
+    'cntsched' => array('s_sh', "case 'sched_runs_all':       return \"COUNT(CASE WHEN ACTION IN (\$schedRun) THEN 1 END)\";", "case 'sched_runs_all':       return \"COUNT(CASE WHEN ACTION IN (\$schedRun) \$t THEN 1 END)\";"),
+    'cntdash'  => array('s_sh', "case 'dash_views':           return \"COUNT(CASE WHEN ACTION='OPEN' \$t AND \" . penumbra_an_dash_like() . \" THEN 1 END)\";", "case 'dash_views':           return \"COUNT(CASE WHEN ACTION='OPEN' \$t THEN 1 END)\";"),
+    'cntscope' => array('s_all', "penumbra_an_counts(\$run, \"1=1 \$whenFilter \$userFilter \$reportFilter\", \$commonBinds", "penumbra_an_counts(\$run, \"1=1 \$userFilter \$reportFilter\", \$commonBinds"),
+    // (the alias map lives in penumbra_an_report_system() once increment 5 moved it)
+    'cntalias' => array(strpos($src['s_an'], 'penumbra_an_report_system(') !== false ? 's_sh' : 's_an', "'EMAILFAIL_COUNT'  => 'email_fails',", "'EMAIL_FAIL_COUNT' => 'email_fails',"),
+    'deptcap'    => array('s_an',  'array_merge($ridBinds, $exclBinds));' . "\n" . '    $top_depts    = $deptRes[', 'array_merge($ridBinds, $exclBinds), array(), 1000);' . "\n" . '    $top_depts    = $deptRes['),
+    'deptalso'   => array('s_all', 'array_merge($exclBinds, $commonBinds), $usersNames, $DEPT_USER_CAP, $DEPT_RANK_MAX);', 'array_merge($exclBinds, $commonBinds), array(), $DEPT_USER_CAP, $DEPT_RANK_MAX);'),
+    'deptlooked' => array('s_an',  'if ($deptRes[\'looked\']) $top_viewers = penumbra_an_dept_decorate(', '$top_viewers = penumbra_an_dept_decorate('),
+    'deptscope'  => array('s_an',  'penumbra_an_departments($run, $oracleConn, "REPORT_ID = :rid $timeFilter $whenFilter $exclSql",', 'penumbra_an_departments($run, $oracleConn, "REPORT_ID = :rid $timeFilter $whenFilter",'),
+    'deptrank'   => array('s_sh',  '$out[\'colleges\'] = penumbraRankColleges($viewsByUser, $out[\'map\'], $rankMax);', '$out[\'colleges\'] = penumbraRankColleges($viewsByUser, $out[\'map\'], 10);'),
+    'deptcase'   => array('s_sh',  '$key = strtolower(trim((string)$row[\'user\']));', '$key = trim((string)$row[\'user\']);'),
+    'mixneg'     => array('s_sh',  "'Views'      => max(0, (int)\$views - (int)\$dash),", "'Views'      => (int)\$views - (int)\$dash,"),
+    'mixorder'   => array('s_sh',  "'Exports'    => (int)\$exports,\n        'Emails'     => (int)\$emails,", "'Emails'     => (int)\$emails,\n        'Exports'    => (int)\$exports,"),
+    'mixempty'   => array('s_sh',  'if (array_sum($mix) === 0): ?>', 'if (empty($mix)): ?>'),
+    'heatcap'    => array('s_sh',  '<caption><?php echo htmlspecialchars($caption); ?></caption>', '<caption><?php echo $caption; ?></caption>'),
+    'deptesc'    => array('s_sh',  '<?php echo htmlspecialchars($d[\'label\']); ?></button>', '<?php echo $d[\'label\']; ?></button>'),
+    'collpill'   => array('s_sh',  '<?php if ($c[\'code\'] !== \'\'): ?><span class="pill">', '<?php if (false): ?><span class="pill">'),
+    'rowcut'     => array('s_an',  'penumbra_an_dept_rows($top_depts);', 'penumbra_an_dept_rows(array_slice($top_depts, 0, 10));'),
+    'e5start'    => array('s_sh',  "(\$w['trendHourly'] ? 'SYSDATE-1'", "(\$w['trendHourly'] ? 'SYSDATE'"),
+    'e5ipkey'    => array('s_sh',  ": (isset(\$sd['ip']) ? \$sd['ip'] : null);", ": null;"),
+    'e5sparkcut' => array('s_sh',  "\$sparkTimeCut    = (\$sparkHourly || \$sparkDaily) ? substr(\$timeFilter, 4)", "\$sparkTimeCut    = (\$sparkHourly || \$sparkDaily) ? substr(\$timeFilter, 0)"),
+    'e5people'   => array('s_sh',  "\$lastUpdSub = \$can_see_people", "\$lastUpdSub = true"),
+    'e5monthly'  => array('s_sh',  "AND TIMESTAMP >= ADD_MONTHS(TRUNC(SYSDATE,'MM'), -23) \$exclSql", "AND TIMESTAMP >= ADD_MONTHS(TRUNC(SYSDATE,'MM'), -23)"),
+    'e2bkeep'    => array('s_sh',  "            unset(\$kpis[\$i]['go'], \$kpis[\$i]['goLabel'], \$kpis[\$i]['goTitle']);", "            continue;"),
+    'e2bseam'    => array('s_all', "\$anRepSeam  = trim(\$exclSql . ' ' . \$userFilter);", "\$anRepSeam  = trim(\$exclSql);"),
+    'e2bpeople'  => array('s_all', '$anWin, $anCanSeePeople, $anRepSched)', '$anWin, true, $anRepSched)'),
+    'e6famack'   => array('s_sh',  "    if (in_array(\$a, \$bad, true) || \$a === 'AUDIT_ACK') return 'bad';", "    if (in_array(\$a, \$bad, true)) return 'bad';"),
+    'e6clip'     => array('s_sh',  "            return (mb_strlen(\$s) > \$max) ? mb_substr(\$s, 0, \$max) . '\u{2026}' : \$s;", "            return (strlen(\$s) > \$max) ? substr(\$s, 0, \$max) . '\u{2026}' : \$s;"),
+    'e6flag'     => array('s_sh',  "            if (isset(\$bpIps[\$ip])) {", "            if (false) {"),
+    'e6vspark'   => array($tvKey,  "\$tv['spark'][\$idx] = isset(\$byUser[\$tv['user']][\$kk]) ? \$byUser[\$tv['user']][\$kk] : 0;", "\$tv['spark'][\$idx] = isset(\$byUser[strtolower(\$tv['user'])][\$kk]) ? \$byUser[strtolower(\$tv['user'])][\$kk] : 0;"),
+    'e6feedscope'=> array('s_an',  "penumbra_an_report_feed(\$run, \$report_id_num, \$scopeSql, \$scopeBinds,", "penumbra_an_report_feed(\$run, \$report_id_num, '', array(),"),
+    'e6gate'     => array('s_an',  "\$feed = \$can_see_people\n", "\$feed = true\n"),
+    'e6size'     => array('s_sh',  "        if (\$FEED_FETCH < 50)        \$FEED_FETCH = 50;", "        if (\$FEED_FETCH < 10)        \$FEED_FETCH = 10;"),
+    'e3bspark'   => array('s_sh',  "                if (isset(\$byUser[\$u][\$kk])) \$out[\$u][\$idx] = \$byUser[\$u][\$kk];", "                if (isset(\$byUser[strtolower(\$u)][\$kk])) \$out[\$u][\$idx] = \$byUser[strtolower(\$u)][\$kk];"),
+    'e3bchunk'   => array('s_sh',  "array_chunk(array_keys(\$out), 900)", "array_chunk(array_keys(\$out), 2000)"),
+    'e3bgate'    => array('s_all', "if (\$anReportScope && \$anCanSeePeople) {\n    \$anUserIds", "if (\$anReportScope) {\n    \$anUserIds"),
+    'e3bseam'    => array('s_all', "penumbra_an_report_top_ips(\$run, \$anRid, \$anWin, \$anRepSeam, \$anRepBinds,", "penumbra_an_report_top_ips(\$run, \$anRid, \$anWin, '', array(),"),
+    'e3b2gate'   => array('s_all', "if (\$anReportScope && \$anCanSeePeople) {\n    \$anFeed     =", "if (\$anReportScope) {\n    \$anFeed     ="),
+    'e3b2scope'  => array('s_all', "penumbra_an_report_feed(\$run, \$anRid, (\$userFilter === '' ? '' : ' ' . \$userFilter), array_merge(\$userBinds, \$oucBinds", "penumbra_an_report_feed(\$run, \$anRid, '', array(\$oucBinds"),
+    'e3b2target' => array('s_all', "'feed:view'      => array('feed:view',", "'feed:view'      => array('#card-feed',"),
+    'e4ipgate'   => array('s_all', "\$ipSearch = (\$anReportScope && \$anCanSeePeople && isset(\$_GET['ip']))", "\$ipSearch = (\$anReportScope && isset(\$_GET['ip']))"),
+    'e4ipvalid'  => array('s_all', "if (\$ipSearch !== '' && filter_var(\$ipSearch, FILTER_VALIDATE_IP) === false) \$ipSearch = '';", "if (false) \$ipSearch = '';"),
+    'e4ipbind'   => array('s_all', "\$anRepBinds = array_merge(\$exclBinds, \$userBinds, \$oucBinds, \$ipBinds);", "\$anRepBinds = array_merge(\$exclBinds, \$userBinds, \$oucBinds);"),
+    'e4bsid'     => array('s_sh',  "\$subStmt->bindValue(':sid', trim((string)\$shortId));", "\$subStmt->bindValue(':sid', (string)\$shortId);"),
+    'e4btransient' => array('s_sh', "if (!is_array(\$subOpts) || empty(\$subOpts['subscriptions_enabled']) || !empty(\$subOpts['_test_run_transient'])) continue;", "if (!is_array(\$subOpts) || empty(\$subOpts['subscriptions_enabled'])) continue;"),
+    'e4broute'   => array('s_all', "\$anFamilyTheme = !\$anReportScope || (isset(\$_GET['platform']) && (string)\$_GET['platform'] === '1');", "\$anFamilyTheme = !\$anReportScope || isset(\$_GET['platform']);"),
+    'e4border'   => array('s_sh',  "        if (hasPref && pref !== 'report-default') return pref;\n        if (!hasPref) {\n            try { var g = localStorage.getItem('penumbra_user_theme'); if (g) return g; } catch (e) { }\n        }\n        if (window.PNB_REPORT_DEFAULT_THEME) return window.PNB_REPORT_DEFAULT_THEME;\n",
+                                    "        if (window.PNB_REPORT_DEFAULT_THEME) return window.PNB_REPORT_DEFAULT_THEME;\n        if (hasPref && pref !== 'report-default') return pref;\n        if (!hasPref) {\n            try { var g = localStorage.getItem('penumbra_user_theme'); if (g) return g; } catch (e) { }\n        }\n"),
+    'e4chead'    => array('s_all', "<?php if (!\$anReportScope): /* one report: every row is this report (and there is no Report filter to fill) */ ?>", "<?php if (true): /* one report: every row is this report (and there is no Report filter to fill) */ ?>"),
+    'e4ccell'    => array('s_all', "                            <?php if (!\$anReportScope): ?>\n                            <td><?php echo \$e['short'] !== '-'", "                            <?php if (true): ?>\n                            <td><?php echo \$e['short'] !== '-'"),
+    'swwrapper'  => array('wrapper_an', "define('PENUMBRA_AN_REPORT_SCOPE', true);\n", "define('PENUMBRA_AN_REPORT_SCOPE', true);\n\$anWrapperExtra = 1;\n"),
+    'swbeacon'   => array('s_all', "if (\$anReportScope) penumbra_tool_visit_beacon('report_metrics', trim((string)\$anScope['row']['SHORT_ID']));", "if (\$anReportScope) penumbra_tool_visit_beacon('metrics');"),
+    'swexclme'   => array('s_all', "\$excludeMe         = \$formSubmitted ? isset(\$_GET['excl_me'])         : (bool)\$prefOr('excl_me',         false);", "\$excludeMe         = \$formSubmitted ? isset(\$_GET['excl_me'])         : false;"),
+    'swcookie'   => array('s_all', "    'excl_me'         => \$excludeMe         ? 1 : 0,\n", ''),
+    'nascope'    => array('s_sh',  "\$out['can_see_people'] = \$isAdmin || (\$editorRolesOn && (\$out['is_owner'] || \$out['is_editor']));", "\$out['can_see_people'] = \$isAdmin || \$out['is_owner'] || \$out['is_editor'];"),
+    'nacall'     => array('s_all', "\$isAdmin, \$currentUserKey, \$user_ouc, \$config, empty(\$noadm));", "\$isAdmin, \$currentUserKey, \$user_ouc, \$config, true);"),
+);
+if ($MUTANT !== '') {
+    if (!isset($mutants[$MUTANT])) { fwrite(STDERR, "unknown mutant\n"); exit(2); }
+    list($k, $from, $to) = $mutants[$MUTANT];
+    $n = substr_count($src[$k], $from);
+    if ($n !== 1) { fwrite(STDERR, "mutant anchor found $n times\n"); exit(2); }
+    $src[$k] = str_replace($from, $to, $src[$k]);
+    echo "MUTANT: $MUTANT applied\n";
+}
+
+// ---- lift functions under their REAL names --------------------------------------
+function lift($code, $names) {
+    $toks = token_get_all($code); $out = ''; $n = count($toks);
+    for ($i = 0; $i < $n; $i++) {
+        if (!is_array($toks[$i]) || $toks[$i][0] !== T_FUNCTION) continue;
+        $j = $i + 1; while ($j < $n && is_array($toks[$j]) && $toks[$j][0] === T_WHITESPACE) $j++;
+        if (!is_array($toks[$j]) || $toks[$j][0] !== T_STRING || !in_array($toks[$j][1], $names, true)) continue;
+        $buf = ''; $depth = 0; $started = false;
+        for ($k = $i; $k < $n; $k++) {
+            $tk = $toks[$k]; $buf .= is_array($tk) ? $tk[1] : $tk;
+            if ($tk === '{' || (is_array($tk) && ($tk[0] === T_CURLY_OPEN || $tk[0] === T_DOLLAR_OPEN_CURLY_BRACES))) { $depth++; $started = true; }
+            elseif ($tk === '}') { $depth--; if ($started && $depth === 0) break; }
+        }
+        $out .= $buf . "\n";
+    }
+    return $out;
+}
+section('0. setup');
+$helpers = array('penumbra_an_ymd_ok', 'penumbra_an_parse_window', 'penumbra_an_hour_axis', 'penumbra_an_overlay_series');
+foreach (array(1, 2, 3, 4, 5, 6, 7, 8) as $n) if (isset($src["b{$n}_sh"])) {
+    foreach ($helpers as $h) t_eq(lift($src['s_sh'], array($h)), lift($src["b{$n}_sh"], array($h)), "helper $h unchanged since increment $n");
+}
+eval(lift($src['s_sh'], $helpers));
+$newFns = array('penumbra_an_trend_series', 'penumbra_an_heatmap', 'penumbra_an_dash_like', 'penumbra_an_counter_sql', 'penumbra_an_counts');
+eval(lift($src['s_sh'], $newFns));
+foreach ($newFns as $f) t_ok(function_exists($f), "lifted $f");
+$dbFns = array('penumbraErrorActions', 'penumbraErrorActionsSql', 'penumbraBenignClientErrorPattern', 'penumbraBenignClientErrorSql', 'penumbraErrorCondSql');
+eval(lift($src['db'], $dbFns));
+foreach ($dbFns as $f) t_ok(function_exists($f), "lifted $f from db_connection.php");
+$GLOBALS['__hasMetrics'] = true;
+function penumbraAuditHasMetrics() { return $GLOBALS['__hasMetrics']; }
+if (isset($src['b5_an'])) {
+    // Increment 5 (the one engine, E2a): the report page's own card builders.
+    $inc5Fns = array('penumbra_an_window_start_lit', 'penumbra_an_report_counters', 'penumbra_an_report_system',
+                     'penumbra_an_report_sparks', 'penumbra_an_report_kpis');
+    eval(lift($src['s_sh'], $inc5Fns));
+    foreach ($inc5Fns as $f) t_ok(function_exists($f), "lifted $f");
+}
+if (isset($src['b6_an']) && !function_exists('mb_strlen')) {
+    // The feed clips its detail with mb_strlen()/mb_substr(); php.exe -n loads no extension.
+    fwrite(STDERR, "increment 6 needs mbstring: add -d extension_dir=//oitras.oit.ncsu.edu/d\$/Utilities/PHP_8.2-p/ext -d extension=mbstring (forward slashes)\n"); exit(2);
+}
+if (isset($src['b6_an'])) {
+    // Increment 6 (the one engine, E3a): the person-level builders - Top
+    // viewers, Top IPs, the activity feed (+ its family rule and fetch size).
+    // The feed's family rule asks db_connection.php's benign-abort predicate.
+    $inc6Fns = array('penumbra_an_report_top_viewers', 'penumbra_an_report_top_ips', 'penumbra_an_feed_fetch_size',
+                     'penumbra_an_feed_family', 'penumbra_an_report_feed');
+    eval(lift($src['s_sh'], array_values(array_diff($inc6Fns, array('penumbra_an_report_top_viewers')))));
+    eval(lift($src[$tvKey], array('penumbra_an_report_top_viewers')));
+    foreach ($inc6Fns as $f) t_ok(function_exists($f), "lifted $f");
+    eval(lift($src['db'], array('penumbraClientErrorIsBenign')));
+    t_ok(function_exists('penumbraClientErrorIsBenign'), 'lifted penumbraClientErrorIsBenign from db_connection.php');
+    // penumbra_an_report_sparks() gives the viewer sparks their axis
+    if (!function_exists('penumbra_an_report_sparks')) eval(lift($src['s_sh'], array('penumbra_an_window_start_lit', 'penumbra_an_report_sparks')));
+}
+if (isset($src['b4_an'])) {
+    // Increment 4's mix builder and panel-body renderers (the renderers carry
+    // inline HTML - lift() keeps the close/open-tag tokens, eval() runs them as
+    // written).
+    $inc4Fns = array('penumbra_an_mix', 'penumbra_an_mix_body', 'penumbra_an_heat_sr_table', 'penumbra_an_dept_rows', 'penumbra_an_college_rows');
+    eval(lift($src['s_sh'], $inc4Fns));
+    foreach ($inc4Fns as $f) t_ok(function_exists($f), "lifted $f");
+}
+if (isset($src['b3_an'])) {
+    // Increment 3's builders, and the REAL directory resolvers both the old
+    // inline blocks and the builders call - lifted from the app's
+    // penumbra_directory.php (which this increment does not change) and run
+    // against a fake PENUMBRA_PEOPLE connection (FakeDirConn below).
+    $inc3Fns = array('penumbra_an_departments', 'penumbra_an_dept_decorate');
+    eval(lift($src['s_sh'], $inc3Fns));
+    foreach ($inc3Fns as $f) t_ok(function_exists($f), "lifted $f");
+    $dirPath = is_file("$APP/penumbra_directory.php") ? "$APP/penumbra_directory.php" : "$LIVE/penumbra_directory.php";
+    $dirFns = array('penumbraDepartmentLabel', 'penumbraOucIsReal', 'penumbraPeopleColumns', 'penumbraPeopleRowToDetails',
+                    'penumbraPeopleUnityKey', 'penumbraPeopleLookupByUnity', 'penumbraLookupDepartments',
+                    'penumbraRankDepartments', 'penumbraCollegeNames', 'penumbraRankColleges');
+    eval(lift(readf($dirPath), $dirFns));
+    foreach ($dirFns as $f) t_ok(function_exists($f), "lifted $f from penumbra_directory.php");
+}
+
+// ---- cutting blocks ----------------------------------------------------------------
+function cut($text, $start, $end, $label) {
+    if (substr_count($text, $start) !== 1) { fwrite(STDERR, "block $label: start found " . substr_count($text, $start) . " times\n"); exit(2); }
+    $a = strpos($text, $start); $b = strpos($text, $end, $a);
+    if ($b === false) { fwrite(STDERR, "block $label: no end\n"); exit(2); }
+    return substr($text, $a, $b + strlen($end) - $a);
+}
+function callOf($text, $fn, $label) {
+    if (!preg_match('/^list\(([^)]*)\) = ' . $fn . '\(\n.*?\);\n/ms', $text, $m)) { fwrite(STDERR, "new call $label not found\n"); exit(2); }
+    if (preg_match_all('/= ' . $fn . '\(/', $text) !== 1) { fwrite(STDERR, "new call $label found more than once\n"); exit(2); }
+    return $m[0];
+}
+
+// ---- runners: a FIXED clock behind time() ---------------------------------------------
+$GLOBALS['__clock'] = 0;
+eval('namespace PnbOld; use Exception;
+function time() { return $GLOBALS["__clock"]; }
+function run_block($__code, $__env, $__out) { extract($__env); eval("namespace PnbOld; use Exception; use PDO; " . $__code); $r = array(); foreach ($__out as $__v) $r[] = isset($$__v) ? $$__v : "(unset)"; return $r; }');
+// (eval()d code always compiles in the GLOBAL namespace, whatever function it
+// runs in - hence the namespace line prepended above, so the blocks reach
+// PnbOld\time(), the fixed clock, and their catch (Exception) still matches.
+// Class names do NOT fall back to the global namespace the way functions do,
+// so PDO::FETCH_ASSOC in a block needs its own `use PDO;` - since increment 7.)
+function run_new($__code, $__env, $__out) { extract($__env); eval($__code); $r = array(); foreach ($__out as $__v) $r[] = isset($$__v) ? $$__v : '(unset)'; return $r; }
+
+// ---- the fake database ----------------------------------------------------------------
+function split_depth0($s, $sepRe) {   // split at depth 0, outside quotes
+    $parts = array(); $depth = 0; $cur = ''; $n = strlen($s); $inq = false;
+    for ($i = 0; $i < $n; $i++) {
+        $c = $s[$i];
+        if ($c === "'") $inq = !$inq;
+        if (!$inq) { if ($c === '(') $depth++; elseif ($c === ')') $depth--; }
+        if (!$inq && $depth === 0 && preg_match($sepRe, substr($s, $i, 6), $mm)) { $parts[] = $cur; $cur = ''; $i += strlen($mm[0]) - 1; continue; }
+        $cur .= $c;
+    }
+    $parts[] = $cur;
+    return $parts;
+}
+function preds($where) {
+    $out = array();
+    foreach (split_depth0(' AND ' . $where, '/^ AND /i') as $p) {
+        $p = trim($p); if (strtoupper(substr($p, 0, 4)) === 'AND ') $p = trim(substr($p, 4));
+        if ($p !== '' && $p !== '1=1') $out[] = $p;
+    }
+    sort($out);
+    return $out;
+}
+function norm_sql($sql) { return trim(preg_replace('/\s+/', ' ', preg_replace('#/\*.*?\*/#s', ' ', $sql))); }
+
+// ---- the fake directory (increment 3): PENUMBRA_PEOPLE behind the PDO-shaped shim ----
+// Who is known hangs off the id alone: ~20% nobody, then a name with no unit
+// number, a unit number with no name, a name that carries its number, or a
+// plain unit - 20 college prefixes (three unknown: 99, 45, 77) x 60 units, so
+// a big crowd fills more than the 250 ranked department rows AND more than 10
+// college rows (the deptrank mutant stayed green with 8 prefixes).
+function fake_person($u) {
+    $c = crc32('dir|' . $u);
+    if ($c % 10 < 2) return null;
+    $pfxs = array('06', '14', '17', '11', '99', '51', '20', '45', '01', '02', '04', '12', '13', '15', '16', '18', '19', '24', '77', '41');
+    $pfx = $pfxs[($c >> 2) % 20]; $unit = ($c >> 4) % 60;
+    $ouc = $pfx . str_pad((string)$unit, 4, '0', STR_PAD_LEFT);
+    switch (($c >> 10) % 5) {
+        case 0:  $o = '';   $d = 'Research Comms'; break;
+        case 1:  $o = $ouc; $d = ''; break;
+        case 2:  $o = $ouc; $d = $ouc . '-Unit ' . $unit; break;
+        default: $o = $ouc; $d = 'Unit ' . $unit . ' of ' . $pfx; break;
+    }
+    return array('EMPLID' => (string)(100000 + $c % 900000), 'UNITY_ID' => $u, 'FIRST_NAME' => 'F', 'LAST_NAME' => 'L', 'PREFERRED_NAME' => '',
+                 'EMAIL' => $u . '@ncsu.edu', 'SUPERVISOR_EMAIL' => '', 'OUC' => $o, 'DEPT_NAME' => $d, 'ACTIVE' => '1', 'JOB_TITLE' => '',
+                 'EMPL_CLASS' => '', 'PI_ELIGIBLE' => '0', 'JOBCODE' => '', 'EMPL_STATUS' => 'A', 'OUCS_ALL' => $o, 'SOURCE' => 'HR', 'KIND' => 'person');
+}
+class FakeDirStmt {
+    private $c; private $sql; private $b = array(); private $rows = array();
+    function __construct($c, $sql) { $this->c = $c; $this->sql = $sql; }
+    function bindValue($k, $v, $t = null) { $this->b[$k] = $v; return true; }
+    function execute() {
+        $this->c->log[] = norm_sql($this->sql) . ' | ' . json_encode($this->b);
+        if ($this->c->down) throw new Exception('fake directory down');
+        $this->rows = array();
+        foreach ($this->b as $k => $u) if (strpos($k, ':u') === 0) { $p = fake_person($u); if ($p) $this->rows[] = $p; }
+        return true;
+    }
+    function fetch($mode = null) { return $this->rows ? array_shift($this->rows) : false; }
+}
+class FakeDirConn {
+    public $log = array(); public $down;
+    function __construct($down) { $this->down = $down; }
+    function prepare($sql) { return new FakeDirStmt($this, $sql); }
+}
+function canon($sql, $binds) {
+    $s = norm_sql($sql);
+    ksort($binds);
+    if (stripos($s, ' MINUS ') !== false || stripos($s, 'ROWNUM') !== false) return 'RAW ' . $s . ' | ' . json_encode($binds);
+    if (!preg_match('/^SELECT (.*) FROM PENUMBRA_AUDIT WHERE (.*?)(?: GROUP BY (.*?))?( ORDER BY 1)?$/', $s, $m)) return 'UNPARSED ' . $s;
+    $items = array_map('trim', split_depth0($m[1], '/^,/')); sort($items);
+    return implode(' ; ', $items) . ' | ' . implode(' & ', preds($m[2])) . ' | GROUP ' . (isset($m[3]) ? $m[3] : '') . ' | ' . (!empty($m[4]) ? 'ORDERED' : 'unordered') . ' | ' . json_encode($binds);
+}
+// Increment 6: the activity feed's rows - one of every kind the feed's detail
+// and family rules branch on (browsers, a benign and a real client error, the
+// error set + AUDIT_ACK, the change family with every size-delta shape, the
+// scheduler's lower- and upper-case AFTER keys, a BEFORE-only delete, AFTER and
+// SOURCE_DATA cut mid-JSON, a multibyte message across the 200-char clip, an
+// anonymous row, not-JSON). The SQL's scope does not change them: the feed is
+// judged on its query text (canon) and on what it makes of the rows.
+function fake_feed_rows() {
+    $long = str_repeat("\xC3\xA9", 150) . str_repeat('x', 100);
+    $rows = array(
+        array('ACTION' => 'OPEN', 'USER_ID' => 'jdoe', 'SD' => '{"ip_address":"10.0.0.9","browser":"Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 Chrome/120.0 Safari/537.36 Edg/120.0.1"}'),
+        array('ACTION' => 'OPEN', 'USER_ID' => 'Jdoe', 'SD' => '{"ip_address":"152.1.1.1","browser":"Mozilla/5.0 Chrome/119.0 Safari/537.36"}'),
+        array('ACTION' => 'OPEN', 'USER_ID' => 'amy', 'SD' => '{"browser":"Mozilla/5.0 Firefox/118.0"}'),
+        array('ACTION' => 'OPEN', 'USER_ID' => null, 'SD' => '{"browser":"Mozilla/5.0 Version/17.0 Safari/605.1.15"}'),
+        array('ACTION' => 'OPEN', 'USER_ID' => 'bob', 'SD' => '{"browser":"curl/8.0"}'),
+        array('ACTION' => 'CLIENT_ERROR', 'USER_ID' => 'amy', 'SD' => '{"message":"Transition was skipped because the document was hidden"}'),
+        array('ACTION' => 'CLIENT_ERROR', 'USER_ID' => 'amy', 'SD' => '{"message":"TypeError: x is undefined"}'),
+        array('ACTION' => 'CLIENT_ERROR', 'USER_ID' => 'amy', 'SD' => '{"message":"  skipped viewtransition: hidden"}'),
+        array('ACTION' => 'BADPASS', 'USER_ID' => 'eve', 'SD' => '{"ip_address":"8.8.8.8"}'),
+        array('ACTION' => 'DENIED', 'USER_ID' => 'eve', 'SD' => null),
+        array('ACTION' => 'AUDIT_ACK', 'USER_ID' => 'adm1', 'SD' => '{}'),
+        array('ACTION' => 'QUERY_TIMEOUT', 'USER_ID' => 'jdoe', 'SD' => '{"message":"' . $long . '"}'),
+        array('ACTION' => 'CREATE', 'USER_ID' => 'jdoe', 'ALEN' => '500'),
+        array('ACTION' => 'UPDATE', 'USER_ID' => 'jdoe', 'BLEN' => '120000', 'ALEN' => '121550'),
+        array('ACTION' => 'UPDATE', 'USER_ID' => 'jdoe', 'BLEN' => '2000', 'ALEN' => '1200'),
+        array('ACTION' => 'UPDATE', 'USER_ID' => 'jdoe', 'ALEN' => '900'),
+        array('ACTION' => 'UPDATE', 'USER_ID' => 'jdoe', 'BLEN' => '999', 'ALEN' => '999'),
+        array('ACTION' => 'DELETE', 'USER_ID' => 'jdoe'),
+        array('ACTION' => 'ROLLBACK', 'USER_ID' => 'jdoe'),
+        array('ACTION' => 'SNAPSHOT_CREATE', 'USER_ID' => 'jdoe'),
+        array('ACTION' => 'EXPORT', 'USER_ID' => 'amy', 'SD' => '{"ip_address":"10.1.1.1"}'),
+        array('ACTION' => 'EMAIL', 'USER_ID' => 'amy'),
+        array('ACTION' => 'SCHEDULE_RUN_OK', 'USER_ID' => 'SCHEDULER', 'SD' => '{"message":"Run ok"}',
+              'AF' => '{"task_type":"email","task_id":42,"subject":"' . str_repeat('S', 90) . '","cron":"0 6 * * 1-5","one_time_new_task":true}'),
+        array('ACTION' => 'SCHEDULE_NEW', 'USER_ID' => 'jdoe', 'AF' => '{"TASK_TYPE":"drop","ID":"7","SUBJECT":"Weekly","CRON_EXPRESSION":"' . str_repeat('5 ', 30) . '"}'),
+        array('ACTION' => 'SCHEDULE_DELETE', 'USER_ID' => 'jdoe', 'BF' => '{"TASK_TYPE":"email","ID":"9"}'),
+        array('ACTION' => 'SCHEDULE_UPDATE', 'USER_ID' => 'jdoe', 'AF' => '{"one_time_new_task":true,"task_type":"email","task_id":"11","subject":"Trunc \"q\" here","cron":"*/5'),
+        array('ACTION' => 'SCHEDULE_RUN_FAIL', 'USER_ID' => 'SCHEDULER', 'SD' => '{"message":"Run failed: \"db\" timeout","context":{"sql":"SELECT', 'AF' => ''),
+        array('ACTION' => 'SCHEDULE_SKIPPED', 'USER_ID' => 'SCHEDULER', 'AF' => '{"task_id":-3}'),
+        array('ACTION' => 'IMPORT_RUN', 'USER_ID' => 'jdoe'),
+        array('ACTION' => 'JOURNAL_ENTRY', 'USER_ID' => 'jdoe', 'SD' => 'not json at all'),
+        array('ACTION' => 'LOGIN', 'USER_ID' => 'jdoe', 'SD' => '{"message":""}'),
+    );
+    foreach ($rows as $i => $r) {
+        $rows[$i] = array('TS' => date('Y-m-d H:i:s', $GLOBALS['__clock'] - $i * 600)) + $r + array('SD' => null, 'AF' => null, 'BF' => null, 'BLEN' => null, 'ALEN' => null);
+    }
+    return $rows;
+}
+function fake_rows($sql, $env, $binds = array()) {
+    $s = norm_sql($sql);
+    // ---- increment 6: Top viewers, their sparks, Top IPs, the feed ----
+    if (strpos($s, 'AS LAST_SEEN') !== false) {
+        // A crowd sized off the query (scope + window), mixed-case ids; FETCH
+        // FIRST keeps the heaviest, ties by id, as Oracle would order them.
+        $h = crc32($s); $out = array(); $sizes = array(0, 1, 3, 12, 40);
+        for ($i = 0, $n = $sizes[$h % 5]; $i < $n; $i++) {
+            $name = ($i % 4 === 1) ? 'V' . $i : 'v' . $i;
+            $out[] = array('USER_ID' => $name, 'VIEWS' => (string)(1 + crc32($name . '|' . $h) % 40), 'LAST_SEEN' => date('Y-m-d H:i', $GLOBALS['__clock'] - crc32('ls' . $name) % 86400));
+        }
+        usort($out, function ($a, $b) { return ((int)$b['VIEWS'] - (int)$a['VIEWS']) ?: strcmp($a['USER_ID'], $b['USER_ID']); });
+        if (preg_match('/FETCH FIRST (\d+) ROWS ONLY/', $s, $fm)) $out = array_slice($out, 0, (int)$fm[1]);
+        return $out;
+    }
+    if (preg_match('/^SELECT USER_ID, .* AS BUCKET, COUNT\(\*\) AS CNT FROM/', $s)) {
+        // One viewer's opens per bucket - only for the ids the IN list names.
+        $clock = $GLOBALS['__clock']; $out = array(); $keys = array();
+        if (strpos($s, "'YYYY-MM-DD HH24'") !== false)  { for ($t = $clock - 80 * 3600; $t <= $clock; $t += 3600) $keys[] = date('Y-m-d H', $t); }
+        elseif (strpos($s, "'YYYY-MM-DD'") !== false)   { for ($d = 0; $d < 800; $d++) $keys[] = date('Y-m-d', strtotime("-$d days", $clock)); }
+        else                                            { for ($mo = 30; $mo >= 0; $mo--) $keys[] = date('Y-m', strtotime("-$mo months", strtotime(date('Y-m-01', $clock)))); }
+        foreach ($binds as $bk => $u) {
+            if (strpos($bk, ':u') !== 0) continue;
+            foreach ($keys as $k) { $c = crc32($u . '|' . $k) % 9; if ($c > 5) $out[] = array('USER_ID' => $u, 'BUCKET' => $k, 'CNT' => (string)($c - 5)); }
+        }
+        return $out;
+    }
+    if (strpos($s, 'AS HITS') !== false) {
+        // Every tag branch: a BADPASS address (flagged outranks campus), campus,
+        // RFC1918 incl. both 172.16/172.31 edges, 172.32 (public), loopbacks,
+        // link-local, ULA in both cases, public v4 / v6.
+        $ips = array('10.0.0.1', '10.20.30.40', '152.1.2.3', '192.168.4.5', '172.16.0.9', '172.31.255.1', '172.32.0.1', '::1', '127.0.0.1',
+                     'fe80::1', 'fd12::7', 'FC00::1', '8.8.8.8', '2001:db8::1', '10.0.0.2');
+        $h = crc32($s); $out = array();
+        foreach ($ips as $i => $ip) { if ((($h >> $i) & 3) === 0) continue; $out[] = array('IP' => $ip, 'HITS' => (string)(1 + crc32($ip . $h) % 50), 'USERS' => (string)(1 + crc32('u' . $ip) % 9)); }
+        usort($out, function ($a, $b) { return ((int)$b['HITS'] - (int)$a['HITS']) ?: strcmp($a['IP'], $b['IP']); });
+        if (preg_match('/FETCH FIRST (\d+) ROWS ONLY/', $s, $fm)) $out = array_slice($out, 0, (int)$fm[1]);
+        return $out;
+    }
+    if (strpos($s, 'AS BLEN') !== false) return fake_feed_rows();
+    if (stripos($s, ' MINUS ') !== false) return array(array('CNT' => '7'));
+    if (stripos($s, 'ROWNUM') !== false) {
+        return (strpos($s, "ACTION='UPDATE'") !== false) ? array(array('USER_ID' => 'jdoe', 'TS' => '2026-09-30 10:00'))
+                                                         : array(array('ACTION' => 'SCHEDULE_RUN_OK', 'TS' => '2026-09-30 11:00'));
+    }
+    $salt = ($env['priorFilter'] !== '' && strpos($sql, $env['priorFilter']) !== false) ? 'P' : 'M';
+    $clock = $GLOBALS['__clock']; $rows = array();
+    // Increment 3's per-user aggregate: a crowd whose size hangs off the scope
+    // (nobody, a few, hundreds, past Platform's 1000-row cap), mixed-case and
+    // padded ids, views from the name. FETCH FIRST n keeps the n heaviest, as
+    // Oracle would (ties by id, so both runs agree).
+    if (preg_match('/^SELECT USER_ID, COUNT\(\*\) AS VIEWS FROM PENUMBRA_AUDIT WHERE (.*?) GROUP BY USER_ID(?: ORDER BY VIEWS DESC FETCH FIRST (\d+) ROWS ONLY)?$/', norm_sql($sql), $m)) {
+        $h = crc32(implode(' & ', preds($m[1])) . '|' . $salt);
+        $sizes = array(0, 2, 9, 60, 400, 1300);
+        for ($i = 0, $n = $sizes[$h % 6]; $i < $n; $i++) {
+            $name = ($i % 7 === 3) ? 'U' . $i : (($i % 13 === 5) ? ' u' . $i . ' ' : 'u' . $i);
+            $rows[] = array('USER_ID' => $name, 'VIEWS' => (string)(1 + crc32($name . '|' . $h) % 60));
+        }
+        if (!empty($m[2])) {
+            usort($rows, function ($a, $b) { return ((int)$b['VIEWS'] - (int)$a['VIEWS']) ?: strcmp($a['USER_ID'], $b['USER_ID']); });
+            $rows = array_slice($rows, 0, (int)$m[2]);
+        }
+        return $rows;
+    }
+    // The row SHAPE comes from the SELECT list only: a custom window's
+    // TO_DATE('...','YYYY-MM-DD') sits in the WHERE clause of every query.
+    $sel = substr($sql, 0, (int)strpos($sql, 'FROM PENUMBRA_AUDIT'));
+    // Bucket rows carry EVERY alias the select names (since increment 5: the
+    // card sparks read OPENS/UNIQ/EXPS/DASHN and ERRS/UPDS/SRUNS off one row),
+    // each from its own name, so a series read off the wrong column cannot match.
+    $extra = array();
+    if (preg_match_all('/\bAS ([A-Z_][A-Z_0-9]*)/', $sel, $am)) foreach ($am[1] as $al) if (!in_array($al, array('BUCKET', 'CNT', 'DY', 'HR'), true)) $extra[] = $al;
+    $more = function ($k) use ($extra, $salt) { $o = array(); foreach ($extra as $al) $o[$al] = (string)(crc32($salt . $k . '|' . $al) % 7); return $o; };
+    if (strpos($sel, "'YYYY-MM-DD HH24'") !== false) {
+        for ($t = $clock - 3 * 86400; $t <= $clock; $t += 3600) { $k = date('Y-m-d H', $t); $c = crc32($salt . $k) % 5; if ($c) $rows[] = array('BUCKET' => $k, 'CNT' => (string)$c) + $more($k); }
+    } elseif (strpos($sel, "'YYYY-MM-DD'") !== false) {
+        for ($d = 0; $d < 800; $d++) { $k = date('Y-m-d', strtotime("-$d days", $clock)); $c = crc32($salt . $k) % 4; if ($c) $rows[] = array('BUCKET' => $k, 'CNT' => (string)$c) + $more($k); }
+    } elseif (strpos($sel, "'YYYY-MM'") !== false) {
+        for ($mo = 30; $mo >= 0; $mo--) { $k = date('Y-m', strtotime("-$mo months", strtotime(date('Y-m-01', $clock)))); $c = crc32($salt . $k) % 9; if ($c) $rows[] = array('BUCKET' => $k, 'CNT' => (string)$c) + $more($k); }
+    } elseif (strpos($sel, 'AS SD') !== false && strpos($s, "ACTION='BADPASS'") !== false) {
+        // Increment 5: the BADPASS addresses - repeats, the old 'ip' key, junk.
+        foreach (array('{"ip_address":"10.0.0.1"}', '{"ip":"10.0.0.2"}', '{"ip_address":"10.0.0.1"}', 'not json', null, '{"message":"x"}') as $sdv) $rows[] = array('SD' => $sdv);
+    } elseif (strpos($sel, "'DY'") !== false) {
+        foreach (array('MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN', ' sun', 'XYZ') as $dy) for ($h = 0; $h <= 24; $h++) {
+            $hr = str_pad((string)$h, 2, '0', STR_PAD_LEFT); $c = crc32($salt . $dy . $hr) % 6; if ($c) $rows[] = array('DY' => $dy, 'HR' => $hr, 'CNT' => (string)$c);
+        }
+    } elseif (preg_match('/^SELECT (.*) FROM PENUMBRA_AUDIT WHERE (.*)$/', $s, $m)) {
+        // A counter row: every column's value hangs off ITS OWN expression text
+        // (and the scope), so an alias asked with a different expression - or a
+        // different alias - can never come back with the same number.
+        $row = array(); $scope = implode(' & ', preds($m[2]));
+        foreach (split_depth0($m[1], '/^,/') as $item) {
+            if (!preg_match('/^(.*) AS ([A-Z_0-9]+)$/s', trim($item), $im)) continue;
+            $row[$im[2]] = (string)(crc32(trim($im[1]) . '|' . $scope) % 997);
+        }
+        $rows[] = $row;
+    }
+    return $rows;
+}
+function make_run(&$calls, $env, $failAt) {
+    return function ($sql, $binds) use (&$calls, $env, $failAt) {
+        $calls[] = canon($sql, $binds);
+        if ($failAt !== null && count($calls) === $failAt) throw new Exception('fake DB down');
+        return fake_rows($sql, $env, $binds);
+    };
+}
+$tmpLog = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'anengine_' . getmypid() . '.log';
+ini_set('log_errors', '1');
+ini_set('error_log', $tmpLog);
+function read_log($p) { $l = @file_get_contents($p); @unlink($p); return $l === false ? '' : preg_replace('/^\[[^\]]*\] /m', '', $l); }
+
+// ---- shared matrices --------------------------------------------------------------------
+$windows = array(
+    array('range' => '24h'), array('range' => '7'), array('range' => '30'), array('range' => '90'), array('range' => 'all'),
+    array('range' => 'custom', 'from' => '2026-08-01', 'to' => '2026-08-15'),
+    array('range' => 'custom', 'from' => '2026-06-04', 'to' => '2026-10-01'),
+    array('range' => 'custom', 'from' => '2025-01-01', 'to' => '2026-09-30'),
+    array('range' => '30', 'filter_submitted' => '1', 'cmp' => '1', 'cfrom' => '2026-07-01', 'cto' => '2026-07-10'),
+    array('range' => '7', 'filter_submitted' => '1', 'cmp' => '1', 'cfrom' => '2026-05-01', 'cto' => '2026-06-30'),
+    array('range' => 'custom', 'from' => '2026-09-01', 'to' => '2026-09-30', 'dow' => 'TUE', 'hour' => '10'),
+    array('range' => '24h', 'filter_submitted' => '1', 'cmp' => '1', 'cfrom' => '2026-07-01', 'cto' => '2026-07-31'),
+);
+$anScopes = array(
+    array('exclSql' => '', 'exclBinds' => array()),
+    array('exclSql' => 'AND (USER_ID IS NULL OR USER_ID NOT IN (:ex0,:ex1)) AND UPPER(USER_ID) = UPPER(:uflt)', 'exclBinds' => array(':ex0' => 'adm1', ':ex1' => 'adm2', ':uflt' => 'jdoe')),
+    array('exclSql' => " AND (LOWER(USER_ID) IN (:oc0,:oc1)) AND SOURCE_DATA LIKE :ipflt", 'exclBinds' => array(':oc0' => 'a', ':oc1' => 'b', ':ipflt' => '%"ip_address":"10.0.0.1"%')),
+);
+$allScopes = array(
+    array('actionFilter' => '', 'trendExclSql' => '', 'trendExclBinds' => array(), 'exclSql' => '', 'exclBinds' => array(), 'userFilter' => '', 'reportFilter' => '',
+          'commonBinds' => array(), 'userBinds' => array(), 'oucBinds' => array(), 'reportSearch' => ''),
+    array('actionFilter' => "AND ACTION = 'OPEN'", 'trendExclSql' => 'AND (USER_ID IS NULL OR USER_ID NOT IN (:ex0))', 'trendExclBinds' => array(':ex0' => 'DEV_API'),
+          'exclSql' => 'AND (USER_ID IS NULL OR USER_ID NOT IN (:ex0))', 'exclBinds' => array(':ex0' => 'DEV_API'),
+          'userFilter' => 'AND UPPER(USER_ID) = UPPER(:usearch) AND (LOWER(USER_ID) IN (:oc0))', 'reportFilter' => '',
+          'commonBinds' => array(':usearch' => 'jdoe', ':oc0' => 'jdoe'), 'userBinds' => array(':usearch' => 'jdoe'), 'oucBinds' => array(':oc0' => 'jdoe'), 'reportSearch' => ''),
+    array('actionFilter' => "AND (ACTION IN ('BADPASS','DENIED') AND NOT (ACTION = 'CLIENT_ERROR' AND SOURCE_DATA LIKE '%skipped%'))", 'trendExclSql' => '', 'trendExclBinds' => array(),
+          'exclSql' => '', 'exclBinds' => array(), 'userFilter' => '',
+          'reportFilter' => 'AND REPORT_ID IN (SELECT ID FROM PENUMBRA_REPORTS WHERE TRIM(SHORT_ID) = :rsearch_id OR UPPER(TITLE) LIKE UPPER(:rsearch_title))',
+          'commonBinds' => array(':rsearch_id' => 'abc', ':rsearch_title' => '%abc%'), 'userBinds' => array(), 'oucBinds' => array(), 'reportSearch' => 'abc'),
+);
+$sysSql = 'AND REPORT_ID NOT IN (1,2,3)';
+function window_env($get, $clock) {
+    $GLOBALS['__clock'] = $clock;
+    $w = penumbra_an_parse_window($get, function ($k, $d) { return $d; }, array('last24h' => true));
+    // parse_window anchors "today" at the real clock; re-anchor the daily axis on the fixed one
+    if ($w['rangeParam'] !== 'custom') $w['trendEndTs'] = strtotime(date('Y-m-d', $clock) . ' 12:00:00');
+    return $w;
+}
+
+// =========================================================================================
+// INCREMENT 1 - the trend and the heatmap
+// =========================================================================================
+if (isset($src['b1_an'])) {
+    $old = array(
+        'an_trend'  => cut($src['b1_an'],  "// 3) Trend chart series - hourly for 24h, daily for 7/30/90 (plus the\n", "    error_log(\"analytics.php trend query failed: \" . \$e->getMessage());\n}\n", 'an trend'),
+        'an_heat'   => cut($src['b1_an'],  "// 4b) Activity heatmap - OPENs by day-of-week \xC3\x97 hour (server-local time),\n", "    error_log(\"analytics.php heatmap query failed: \" . \$e->getMessage());\n}\n", 'an heat'),
+        'all_trend' => cut($src['b1_all'], "// ---- Trend series - hourly for 24h, daily for short windows, monthly for long/all\n", "} catch (Exception \$e) { error_log(\"analytics_all trend query failed: \" . \$e->getMessage()); }\n", 'all trend'),
+        'all_heat'  => cut($src['b1_all'], "// ---- Activity heatmap: weekday \xC3\x97 hour ----", "} catch (Exception \$e) { error_log(\"analytics_all heatmap query failed: \" . \$e->getMessage()); }\n", 'all heat'),
+    );
+    $new = array(
+        'an_trend'  => callOf($src['s_an'],  'penumbra_an_trend_series', 'an trend'),
+        'an_heat'   => callOf($src['s_an'],  'penumbra_an_heatmap', 'an heat'),
+        'all_trend' => callOf($src['s_all'], 'penumbra_an_trend_series', 'all trend'),
+        'all_heat'  => callOf($src['s_all'], 'penumbra_an_heatmap', 'all heat'),
+    );
+    t_ok(strpos($src['s_all'], "\$hourAxis = \$trendHourly ? penumbra_an_hour_axis(time()) : array();\nlist(\$trend, \$trendPrior, \$trendLabels) = penumbra_an_trend_series(") !== false,
+         'Platform reads its hour axis once, right before its trend');
+    foreach ($old as $k => $blk) t_ok(strpos($src[strpos($k, 'an_') === 0 ? 's_an' : 's_all'], $blk) === false, "increment 1: old $k block is gone from the page");
+    $clocks = array(strtotime('2026-10-01 14:37:12'), strtotime('2026-11-01 14:30:00'), strtotime('2027-03-15 09:05:00'), strtotime('2026-12-31 23:59:30'));
+    $panels = array(
+        'an_trend'  => array('an',  array('daily', 'dailyPrior', 'dailyLabels')),
+        'an_heat'   => array('an',  array('heatRows', 'heatTotal')),
+        'all_trend' => array('all', array('trend', 'trendPrior', 'trendLabels')),
+        'all_heat'  => array('all', array('heatRows', 'heatTotal')),
+    );
+    foreach ($panels as $pk => $pd) {
+        section("1. increment 1, $pk: old inline block vs the new shared call");
+        $cases = 0; $outBad = 0; $sqlBad = 0; $logBad = 0; $firstOut = ''; $firstSql = '';
+        foreach ($clocks as $clock) foreach ($windows as $get) foreach (($pd[0] === 'an' ? $anScopes : $allScopes) as $sc) foreach (array(null, 1, 2) as $failAt) {
+            $w = window_env($get, $clock);
+            $env = $w + array('sysSql' => $sysSql, 'ridBinds' => array(':rid' => 42), 'hourAxis' => $w['trendHourly'] ? penumbra_an_hour_axis($clock) : array()) + $sc;
+            $env['anWin'] = $w;
+            $callsO = array(); $callsN = array();
+            $envO = $env; $envO['run'] = make_run($callsO, $env, $failAt);
+            $envN = $env; $envN['run'] = make_run($callsN, $env, $failAt);
+            read_log($tmpLog);
+            $o = \PnbOld\run_block($old[$pk], $envO, $pd[1]); $logO = read_log($tmpLog);
+            $n = run_new($new[$pk], $envN, $pd[1]);           $logN = read_log($tmpLog);
+            $cases++;
+            if ($o !== $n) { $outBad++; if ($firstOut === '') $firstOut = date('Y-m-d H:i', $clock) . ' ' . json_encode($get) . ' fail@' . var_export($failAt, true) . ' old=' . substr(json_encode($o), 0, 200) . ' new=' . substr(json_encode($n), 0, 200); }
+            if ($callsO !== $callsN) { $sqlBad++; if ($firstSql === '') $firstSql = json_encode($get) . ' old=' . substr(json_encode($callsO), 0, 300) . ' new=' . substr(json_encode($callsN), 0, 300); }
+            if ($logO !== $logN) $logBad++;
+        }
+        echo "    $cases cases\n";
+        t_eq($outBad, 0, "$pk: identical series" . ($firstOut ? " [first: $firstOut]" : ''));
+        t_eq($sqlBad, 0, "$pk: the same queries (predicates in any order, binds, grouping, order)" . ($firstSql ? " [first: $firstSql]" : ''));
+        t_eq($logBad, 0, "$pk: the same error-log line when the database fails mid-panel");
+    }
+}
+
+// =========================================================================================
+// INCREMENT 2 - the counter catalog
+// =========================================================================================
+if (isset($src['b2_an'])) {
+    $blocks = array(
+        'an_kpi'   => array('an',  "// 1) KPI mega-query (USAGE) - TOTAL_VIEWS is always all-time; everything else\n", "    error_log(\"analytics.php KPI query failed: \" . \$e->getMessage());\n}\n", array('k')),
+        'an_sys'   => array('an',  "\$sys = ['BADPASS_COUNT'=>0,", "    error_log(\"analytics.php system KPI query failed: \" . \$e->getMessage());\n}\n", array('sys')),
+        'all_kpi'  => array('all', "\$k = array('DASH_COUNT'=>0,'DASH_PRIOR'=>0,", "} catch (Exception \$e) { error_log(\"analytics_all human-KPI query failed: \" . \$e->getMessage()); }\n", array('k')),
+        'all_home' => array('all', "\$homeApplies = (\$homeReportId !== null && \$reportSearch === '');\n", "    } catch (Exception \$e) { error_log(\"analytics_all home-visits query failed: \" . \$e->getMessage()); }\n}\n", array('k', 'homeApplies')),
+        'all_sys'  => array('all', "// ---- System + edit + error counters (NOT filtered by the exclusion toggles)\n", "} catch (Exception \$e) { error_log(\"analytics_all system-KPI query failed: \" . \$e->getMessage()); }\n", array('k')),
+    );
+    section('2. increment 2: the dashboard detector is the same text');
+    foreach (array('b2_an' => 'report page', 'b2_all' => 'Platform') as $sk => $lbl) {
+        t_ok(preg_match('/^\$dashLike = "(.*)";$/m', $src[$sk], $dm) === 1 && stripcslashes($dm[1]) === penumbra_an_dash_like(), "the $lbl's old \$dashLike literal == penumbra_an_dash_like()");
+    }
+    // Since increment 5 the report page has no $dashLike reader left (its counters
+    // and spark ask penumbra_an_dash_like() inside the shared builders).
+    $an5 = strpos($src['s_an'], 'penumbra_an_report_counters(') !== false;
+    t_eq(substr_count($src['s_all'], '$dashLike = penumbra_an_dash_like();'), 1, "s_all takes \$dashLike from the shared detector");
+    t_eq(substr_count($src['s_an'], '$dashLike = penumbra_an_dash_like();'), $an5 ? 0 : 1, $an5 ? 's_an (after increment 5) keeps no dead $dashLike' : "s_an takes \$dashLike from the shared detector");
+    if ($an5) t_eq(substr_count($src['s_an'], 'dashLike'), 0, 's_an (after increment 5) reads no $dashLike');
+    t_eq(substr_count($src['s_an'] . $src['s_all'], 'SOURCE_DATA LIKE \'%\\"message'), 0, 'no page spells the detector out any more');
+    foreach ($blocks as $bk => $bd) {
+        section("2. increment 2, $bk: old block vs new block");
+        $oldB = cut($src['b2_' . $bd[0]], $bd[1], $bd[2], "old $bk");
+        $afterSrc = $src['s_' . $bd[0]];
+        $movedBy5 = array('an_kpi' => 'penumbra_an_report_counters(', 'an_sys' => 'penumbra_an_report_system(');
+        if (isset($movedBy5[$bk]) && strpos($afterSrc, $bd[1]) === false && strpos($afterSrc, $movedBy5[$bk]) !== false) {
+            // Increment 5 moved this block into a shared builder (section 5 proves
+            // that move): judge increment 2 on the page just before increment 5.
+            if (!isset($src['b5_an'])) { fwrite(STDERR, "increment 2's $bk block moved into analytics_shared.php in increment 5: give --orig5=/--bak5= too\n"); exit(2); }
+            $afterSrc = $src['b5_an'];
+            echo "    (moved by increment 5 into " . rtrim($movedBy5[$bk], '(') . "(): the AFTER side is the page before increment 5)\n";
+        }
+        $newB = cut($afterSrc, $bd[1], $bd[2], "new $bk");
+        t_ok($oldB !== $newB, "$bk: the block did change (the test compares two different codes)");
+        $cases = 0; $outBad = 0; $sqlBad = 0; $logBad = 0; $firstOut = ''; $firstSql = '';
+        foreach ($windows as $get) foreach (($bd[0] === 'an' ? $anScopes : $allScopes) as $sc) foreach (array(true, false) as $hasM) foreach (array(null, 1, 2, 3) as $failAt) {
+            $GLOBALS['__hasMetrics'] = $hasM;
+            $w = window_env($get, strtotime('2026-10-01 14:37:12'));
+            $env = $w + array('sysSql' => $sysSql, 'ridBinds' => array(':rid' => 42), 'dashLike' => penumbra_an_dash_like(),
+                              'windowStartLit' => 'TRUNC(SYSDATE)-29', 'benignSql' => penumbraBenignClientErrorSql(), 'errorCondSql' => penumbraErrorCondSql(),
+                              'homeReportId' => 7, 'k' => array('DASH_COUNT' => 0, 'PAGE_VIEWS' => 5, 'HOME_VISITS' => 0)) + $sc;
+            $env['anWin'] = $w;
+            $callsO = array(); $callsN = array();
+            $envO = $env; $envO['run'] = make_run($callsO, $env, $failAt);
+            $envN = $env; $envN['run'] = make_run($callsN, $env, $failAt);
+            read_log($tmpLog);
+            $o = \PnbOld\run_block($oldB, $envO, $bd[3]); $logO = read_log($tmpLog);
+            $n = \PnbOld\run_block($newB, $envN, $bd[3]); $logN = read_log($tmpLog);
+            $cases++;
+            if ($o !== $n) { $outBad++; if ($firstOut === '') $firstOut = json_encode($get) . ' metrics=' . var_export($hasM, true) . ' fail@' . var_export($failAt, true) . ' old=' . substr(json_encode($o), 0, 260) . ' new=' . substr(json_encode($n), 0, 260); }
+            if ($callsO !== $callsN) { $sqlBad++; if ($firstSql === '') $firstSql = json_encode($get) . ' old=' . substr(json_encode($callsO), 0, 400) . ' new=' . substr(json_encode($callsN), 0, 400); }
+            if ($logO !== $logN) $logBad++;
+        }
+        echo "    $cases cases\n";
+        t_eq($outBad, 0, "$bk: identical counters" . ($firstOut ? " [first: $firstOut]" : ''));
+        t_eq($sqlBad, 0, "$bk: the same queries (select items + predicates in any order, binds)" . ($firstSql ? " [first: $firstSql]" : ''));
+        t_eq($logBad, 0, "$bk: the same error-log line when the database fails mid-block");
+    }
+    $GLOBALS['__hasMetrics'] = true;
+}
+
+// =========================================================================================
+// INCREMENT 3 - Top departments + Top colleges
+// =========================================================================================
+if (isset($src['b3_an'])) {
+    $blocks3 = array(
+        'an_dept'  => array('an',  "// 5b) Departments - roll every viewer in the window up to the department the\n",
+                            "    error_log(\"analytics.php departments query failed: \" . \$e->getMessage());\n}\n",
+                            array('top_depts', 'top_colleges', 'dept_map', 'dept_users_matched', 'dept_users_total', 'top_viewers')),
+        'all_dept' => array('all', "// ---- Departments (Users tab) ---------------------------------------------\n",
+                            "} catch (Exception \$e) { error_log(\"analytics_all departments query failed: \" . \$e->getMessage()); }\n",
+                            array('depts', 'colleges', 'dept_map', 'dept_users_matched', 'dept_users_total', 'dept_users_capped', 'DEPT_USER_CAP', 'DEPT_RANK_MAX', 'users')),
+    );
+    // The page's people table the block decorates: mixed case, padded, someone
+    // who is not a viewer (Platform's update-only user), someone unknown.
+    $people3 = array(
+        'an'  => array('top_viewers' => array(array('user' => 'U3', 'views' => 9), array('user' => 'u0', 'views' => 7), array('user' => ' u5 ', 'views' => 4),
+                                              array('user' => 'nobody', 'views' => 1), array('user' => 'U10', 'views' => 1))),
+        'all' => array('users' => array(array('user' => 'u1', 'actions' => 40), array('user' => 'U17', 'actions' => 12),
+                                        array('user' => 'updater9', 'actions' => 5), array('user' => 'u2', 'actions' => 2))),
+    );
+    foreach ($blocks3 as $bk => $bd) {
+        section("3. increment 3, $bk: old block vs new block");
+        $oldB = cut($src['b3_' . $bd[0]], $bd[1], $bd[2], "old $bk");
+        $newB = cut($src['s_' . $bd[0]], $bd[1], $bd[2], "new $bk");
+        t_ok($oldB !== $newB, "$bk: the block did change (the test compares two different codes)");
+        t_eq(substr_count($newB, '$deptRes = penumbra_an_departments($run, $oracleConn,'), 1, "$bk: the new block runs the shared builder");
+        $cases = 0; $outBad = 0; $sqlBad = 0; $dirBad = 0; $logBad = 0; $firstOut = ''; $firstSql = '';
+        $cov = array('nobody' => 0, 'capped' => 0, 'ranked 250' => 0, 'directory down' => 0, 'DB down' => 0);
+        foreach ($windows as $get) foreach (($bd[0] === 'an' ? $anScopes : $allScopes) as $sc) foreach (array(null, 1) as $failAt) foreach (array(false, true) as $dirDown) {
+            $w = window_env($get, strtotime('2026-10-01 14:37:12'));
+            $env = $w + array('sysSql' => $sysSql, 'ridBinds' => array(':rid' => 42)) + $sc + $people3[$bd[0]];
+            $env['anWin'] = $w;
+            $callsO = array(); $callsN = array(); $dirO = new FakeDirConn($dirDown); $dirN = new FakeDirConn($dirDown);
+            $envO = $env; $envO['run'] = make_run($callsO, $env, $failAt); $envO['oracleConn'] = $dirO;
+            $envN = $env; $envN['run'] = make_run($callsN, $env, $failAt); $envN['oracleConn'] = $dirN;
+            read_log($tmpLog);
+            $o = \PnbOld\run_block($oldB, $envO, $bd[3]); $logO = read_log($tmpLog);
+            $n = \PnbOld\run_block($newB, $envN, $bd[3]); $logN = read_log($tmpLog);
+            $cases++;
+            if ($o !== $n) { $outBad++; if ($firstOut === '') $firstOut = json_encode($get) . ' fail@' . var_export($failAt, true) . ' dirDown=' . var_export($dirDown, true) . ' old=' . substr(json_encode($o), 0, 260) . ' new=' . substr(json_encode($n), 0, 260); }
+            if ($callsO !== $callsN) { $sqlBad++; if ($firstSql === '') $firstSql = json_encode($get) . ' old=' . substr(json_encode($callsO), 0, 400) . ' new=' . substr(json_encode($callsN), 0, 400); }
+            if ($dirO->log !== $dirN->log) $dirBad++;
+            if ($logO !== $logN) $logBad++;
+            if ($failAt === null && $o[4] === 0) $cov['nobody']++;
+            if ($bd[0] === 'all' && $o[5] === true) $cov['capped']++;
+            if (count($o[0]) === 250) $cov['ranked 250']++;
+            if ($dirDown && $failAt === null && $o[4] > 0) $cov['directory down']++;
+            if ($failAt === 1) $cov['DB down']++;
+        }
+        $covTxt = array(); foreach ($cov as $ck => $cv) $covTxt[] = "$ck $cv";
+        echo "    $cases cases (" . implode(', ', $covTxt) . ")\n";
+        t_eq($outBad, 0, "$bk: identical panels, map, coverage counts and people rows" . ($firstOut ? " [first: $firstOut]" : ''));
+        t_eq($sqlBad, 0, "$bk: the same aggregate query (predicates in any order, binds, grouping, cap)" . ($firstSql ? " [first: $firstSql]" : ''));
+        t_eq($dirBad, 0, "$bk: the same directory lookups (names, chunks, order)");
+        t_eq($logBad, 0, "$bk: the same error-log lines when the database or the directory fails");
+        t_ok($cov['nobody'] > 0 && $cov['ranked 250'] > 0 && $cov['directory down'] > 0 && $cov['DB down'] > 0 && ($bd[0] === 'an' || $cov['capped'] > 0),
+             "$bk: the cases reach nobody in scope, a full 250-row ranking, the directory down, the DB down" . ($bd[0] === 'all' ? ' and the 1000-viewer cap' : ''));
+    }
+}
+
+// =========================================================================================
+// INCREMENT 4 - the Consumption mix, and the panel bodies both pages render alike
+// =========================================================================================
+function norm_html($h) { return trim(preg_replace('/>\s+</', '><', preg_replace('/\s+/', ' ', $h))); }
+function render_tpl($__code, $__env) { extract($__env); ob_start(); try { eval('?>' . $__code); } finally { $__html = ob_get_clean(); } return $__html; }
+// The one template line that CALLS $fn (an open-tag line naming it, whatever
+// its arguments - so a mutated call is rendered and judged, not just "not
+// found").
+function one_line($text, $fn, $label) {
+    $hits = array();
+    foreach (explode("\n", $text) as $ln) if (strpos($ln, $fn) !== false && strpos($ln, '<' . '?php') !== false) $hits[] = $ln . "\n";
+    if (count($hits) !== 1) { fwrite(STDERR, "new line $label found " . count($hits) . " times\n"); exit(2); }
+    return $hits[0];
+}
+if (isset($src['b4_an'])) {
+    section('4. increment 4, the mix: old block vs new');
+    $mixBlocks = array(
+        'an'  => array("// 4) Consumption mix - how the report's data reaches people in the window:\n",
+                       "    'Automation' => \$schedRunsWindow,\n);\n",
+                       "\$mix = penumbra_an_mix(\$k['VIEWS_WINDOW'], \$k['DASH_WINDOW'], \$k['EXPORT_COUNT'], \$sys['EMAIL_COUNT'], \$schedRunsWindow);\n",
+                       array('mix', 'schedRunsWindow')),
+        'all' => array("// ---- Consumption mix (Overview) -------------------------------------------\n",
+                       "    'Automation' => (int)\$k['SCHED_RUN_COUNT'],\n);\n",
+                       "\$mix = penumbra_an_mix(\$k['PAGE_VIEWS'], \$k['DASH_COUNT'], \$k['EXPORT_COUNT'], \$k['EMAIL_COUNT'], \$k['SCHED_RUN_COUNT']);\n",
+                       array('mix')),
+    );
+    mt_srand(20261001);
+    $pool = array(0, '0', 1, '7', 12, '45', 300, '2685', 17229, null);
+    foreach ($mixBlocks as $pg => $mb) {
+        $oldB = cut($src["b4_$pg"], $mb[0], $mb[1], "old $pg mix");
+        $newB = cut($src["s_$pg"],  $mb[0], $mb[2], "new $pg mix");
+        t_ok(strpos($src["s_$pg"], $mb[1]) === false, "$pg: the inline mix array is gone from the page");
+        $bad = 0; $first = ''; $neg = 0;
+        for ($i = 0; $i < 400; $i++) {
+            $p = function () use ($pool) { return $pool[mt_rand(0, count($pool) - 1)]; };
+            $env = array('k' => array('VIEWS_WINDOW' => $p(), 'DASH_WINDOW' => $p(), 'EXPORT_COUNT' => $p(), 'PAGE_VIEWS' => $p(), 'DASH_COUNT' => $p(), 'EMAIL_COUNT' => $p(), 'SCHED_RUN_COUNT' => $p()),
+                         'sys' => array('EMAIL_COUNT' => $p(), 'SCHED_OK_COUNT' => $p(), 'SCHED_FAIL_COUNT' => $p(), 'SCHED_SKIP_COUNT' => $p()));
+            $o = \PnbOld\run_block($oldB, $env, $mb[3]);
+            $n = \PnbOld\run_block($newB, $env, $mb[3]);
+            if ((int)$env['k'][$pg === 'an' ? 'DASH_WINDOW' : 'DASH_COUNT'] > (int)$env['k'][$pg === 'an' ? 'VIEWS_WINDOW' : 'PAGE_VIEWS']) $neg++;
+            if ($o !== $n) { $bad++; if ($first === '') $first = json_encode($env) . ' old=' . json_encode($o) . ' new=' . json_encode($n); }
+        }
+        echo "    $pg: 400 counter sets ($neg with more dashboard pulls than views)\n";
+        t_eq($bad, 0, "$pg: identical mix (keys, order, values)" . ($first ? " [first: $first]" : ''));
+    }
+
+    section('4. increment 4, the panel bodies: old template vs new call');
+    $hostile = 'Aug 1 - Aug 31 <b>&amp; "R&D" \'x\'';
+    $deptSets = array(
+        array(),
+        array(array('dept' => 'ORI-Ofc of Sponsored Programs', 'label' => 'ORI-Ofc of Sponsored Programs', 'ouc' => '060401', 'views' => 1234567, 'users' => 1201, 'known' => true),
+              array('dept' => 'R&D <Lab> "x"', 'label' => 'R&D <Lab> "x" \'y\'', 'ouc' => '140201', 'views' => 9, 'users' => 2, 'known' => true),
+              array('dept' => 'Research Comms', 'label' => 'Research Comms', 'ouc' => '', 'views' => 5, 'users' => 1, 'known' => true),
+              array('dept' => '(not in directory)', 'label' => '(not in directory)', 'ouc' => '', 'views' => 3, 'users' => 3, 'known' => false),
+              array('dept' => 'Unit <7> & "co"', 'label' => 'Unit <7> & "co"', 'ouc' => '', 'views' => 0, 'users' => 0, 'known' => false)),
+    );
+    $collSets = array(
+        array(),
+        array(array('code' => '06', 'label' => 'Research & Innovation (ORI)', 'known' => true, 'views' => 40213, 'users' => 77),
+              array('code' => '99', 'label' => 'OUC 99xxxx', 'known' => false, 'views' => 12, 'users' => 4),
+              array('code' => '', 'label' => '(not in directory)', 'known' => false, 'views' => 3, 'users' => 3),
+              array('code' => '1"4', 'label' => '<i>Eng</i> & "co"', 'known' => true, 'views' => 1, 'users' => 1),
+              array('code' => '<b>', 'label' => 'x\'y', 'known' => false, 'views' => 2, 'users' => 1)),
+    );
+    $heatSets = array(array_fill(0, 7, array_fill(0, 24, 0)));
+    $hs = array(); for ($dd = 0; $dd < 7; $dd++) for ($hh = 0; $hh < 24; $hh++) $hs[$dd][$hh] = ($dd * 31 + $hh * 7) % 13 === 0 ? (string)($dd + $hh) : ($dd * 24 + $hh) % 5;
+    $heatSets[] = $hs;
+    $mixSets = array(array('Views' => 0, 'Dashboards' => 0, 'Exports' => 0, 'Emails' => 0, 'Automation' => 0),
+                     array('Views' => 310, 'Dashboards' => 3, 'Exports' => 3, 'Emails' => 0, 'Automation' => 18),
+                     array('Views' => 0, 'Dashboards' => 0, 'Exports' => 0, 'Emails' => 0, 'Automation' => 1));
+    $tpl = array(
+        // label => array(page, old start, old end, new start, new end) - a NEW start of null means the new code is that one line
+        'an mix body'   => array('an',  "            <?php if (\$mixEmpty): ?>\n", "            <?php endif; ?>\n", 'penumbra_an_mix_body(', null),
+        'an heat body'  => array('an',  "            <?php if (\$heatEmpty): ?>\n", "            <?php endif; ?>\n", "            <?php if (\$heatEmpty): ?>\n", "            <?php endif; ?>\n"),
+        'an dept rows'  => array('an',  "            <?php foreach (\$top_depts as \$d): ?>\n", "            <?php endforeach; ?>\n", 'penumbra_an_dept_rows(', null),
+        'an coll rows'  => array('an',  "            <?php foreach (\$top_colleges as \$c): ?>\n", "            <?php endforeach; ?>\n", 'penumbra_an_college_rows(', null),
+        'all mix body'  => array('all', "                    <?php if (\$mixEmpty): ?>\n", "                    <?php endif; ?>\n", 'penumbra_an_mix_body(', null),
+        'all heat body' => array('all', "                    <?php if (\$heatEmpty): ?>\n", "                    <?php endif; ?>\n", "                    <?php if (\$heatEmpty): ?>\n", "                    <?php endif; ?>\n"),
+        'all dept rows' => array('all', "                    <?php foreach (\$depts as \$d): ?>\n", "                    <?php endforeach; ?>\n", 'penumbra_an_dept_rows(', null),
+        'all coll rows' => array('all', "                    <?php foreach (\$colleges as \$c): ?>\n", "                    <?php endforeach; ?>\n", 'penumbra_an_college_rows(', null),
+    );
+    // A list longer than any display step (10), so a renderer that cuts rows is caught.
+    $long = array(); for ($ri = 0; $ri < 13; $ri++) $long[] = array('dept' => "Unit $ri", 'label' => "Unit $ri & co", 'ouc' => ($ri % 3) ? '06' . str_pad((string)$ri, 4, '0', STR_PAD_LEFT) : '', 'views' => 1000 - $ri, 'users' => 13 - $ri, 'known' => ($ri % 4) !== 0);
+    $deptSets[] = $long;
+    $longC = array(); for ($ri = 0; $ri < 13; $ri++) $longC[] = array('code' => str_pad((string)(10 + $ri), 2, '0', STR_PAD_LEFT), 'label' => "College $ri", 'known' => ($ri % 2) === 0, 'views' => 500 - $ri, 'users' => 2);
+    $collSets[] = $longC;
+    foreach ($tpl as $tk => $td) {
+        $oldT = cut($src['b4_' . $td[0]], $td[1], $td[2], "old $tk");
+        $newT = ($td[4] === null) ? one_line($src['s_' . $td[0]], $td[3], "new $tk") : cut($src['s_' . $td[0]], $td[3], $td[4], "new $tk");
+        t_ok($oldT !== $newT, "$tk: the template did change");
+        if ($td[4] === null) t_ok(strpos($src['s_' . $td[0]], $oldT) === false, "$tk: the inline template is gone from the page");
+        $cases = 0; $bad = 0; $first = ''; $nonEmpty = 0;
+        foreach (array('Last 30 days', $hostile) as $rl) foreach ($mixSets as $mx) foreach ($heatSets as $hr) foreach ($deptSets as $ds) foreach ($collSets as $cs) {
+            $env = array('rangeLabelShort' => $rl, 'mix' => $mx, 'mixEmpty' => (array_sum($mx) === 0), 'heatRows' => $hr, 'heatEmpty' => (array_sum(array_map('array_sum', $hr)) === 0),
+                         'top_depts' => $ds, 'top_colleges' => $cs, 'depts' => $ds, 'colleges' => $cs);
+            $o = norm_html(render_tpl($oldT, $env));
+            $n = norm_html(render_tpl($newT, $env));
+            $cases++;
+            if ($o !== '') $nonEmpty++;
+            if ($o !== $n) { $bad++; if ($first === '') $first = 'old=' . substr($o, 0, 220) . ' new=' . substr($n, 0, 220); }
+        }
+        t_eq($bad, 0, "$tk: the same HTML ($cases renders, $nonEmpty non-empty; whitespace-normalised)" . ($first ? " [first: $first]" : ''));
+    }
+}
+
+// =========================================================================================
+// INCREMENT 5 - the one engine, E2a: the report page's own cards
+// =========================================================================================
+if (isset($src['b5_an'])) {
+    section('5. increment 5, the report cards: counters + system + BADPASS addresses + sparks, old blocks vs the builders');
+    // OLD: the page's window-start assignment + every block from the counters to the
+    // monthly spark, run as written. NEW: the page's calls.
+    $wsOld = cut($src['b5_an'], "\$windowStartLit = (\$rangeParam === 'custom')\n", "'TRUNC(SYSDATE)-' . (\$windowDays - 1)));\n", 'old window start');
+    $oldA  = $wsOld . cut($src['b5_an'], "// 1) KPI mega-query (USAGE) - TOTAL_VIEWS is always all-time; everything else\n",
+                                         "        error_log(\"analytics.php monthly spark query failed: \" . \$e->getMessage());\n    }\n}\n", 'old cards blocks');
+    $newA  = cut($src['s_an'], "// 1) KPI counters (usage + the last UPDATE), 1b) the security / delivery / edit\n", "extract(\$anSparks);\n", 'new cards calls');
+    t_ok(strpos($src['s_an'], "// 1) KPI mega-query (USAGE)") === false, 'the inline card blocks are gone from the page');
+    $outA = array('k', 'sys', 'bpIps', 'sparkLen', 'sparkTitle', 'sparkKeys', 'sparkBucketExpr', 'sparkTimeCut', 'sparkOpens', 'sparkUnique',
+                  'sparkExports', 'sparkDash', 'sparkErrors', 'sparkUpdates', 'sparkRuns', 'sparkOpensMonthly', 'sparkTitleMonthly');
+    $clocks5 = array(strtotime('2026-10-01 14:37:12'), strtotime('2026-11-01 14:30:00'), strtotime('2027-03-15 09:05:00'));
+    $cases = 0; $outBad = 0; $sqlBad = 0; $logBad = 0; $firstOut = ''; $firstSql = '';
+    foreach ($clocks5 as $clock) foreach ($windows as $get) foreach ($anScopes as $sc) foreach (array(true, false) as $hasM) foreach (array(null, 1, 2, 3, 4, 5, 6, 7, 8) as $failAt) {
+        $GLOBALS['__hasMetrics'] = $hasM;
+        $w = window_env($get, $clock);
+        $env = $w + array('ridBinds' => array(':rid' => 42), 'report_id_num' => 42, 'dashLike' => penumbra_an_dash_like(),
+                          'hourAxis' => $w['trendHourly'] ? penumbra_an_hour_axis($clock) : array()) + $sc;
+        $env['anWin'] = $w;
+        $callsO = array(); $callsN = array();
+        $envO = $env; $envO['run'] = make_run($callsO, $env, $failAt);
+        $envN = $env; $envN['run'] = make_run($callsN, $env, $failAt);
+        read_log($tmpLog);
+        $o = \PnbOld\run_block($oldA, $envO, $outA); $logO = read_log($tmpLog);
+        $n = \PnbOld\run_block($newA, $envN, $outA); $logN = read_log($tmpLog);
+        $cases++;
+        if ($o !== $n) { $outBad++; if ($firstOut === '') { foreach ($outA as $ix => $nm) if ($o[$ix] !== $n[$ix]) { $firstOut = json_encode($get) . " fail@" . var_export($failAt, true) . " $nm old=" . substr(json_encode($o[$ix]), 0, 200) . ' new=' . substr(json_encode($n[$ix]), 0, 200); break; } } }
+        if ($callsO !== $callsN) { $sqlBad++; if ($firstSql === '') $firstSql = json_encode($get) . ' old=' . substr(json_encode($callsO), 0, 300) . ' new=' . substr(json_encode($callsN), 0, 300); }
+        if ($logO !== $logN) $logBad++;
+    }
+    $GLOBALS['__hasMetrics'] = true;
+    echo "    $cases cases\n";
+    t_eq($outBad, 0, 'cards data: identical counters, system counters, BADPASS addresses and every spark series + axis' . ($firstOut ? " [first: $firstOut]" : ''));
+    t_eq($sqlBad, 0, 'cards data: the same queries in the same order' . ($firstSql ? " [first: $firstSql]" : ''));
+    t_eq($logBad, 0, 'cards data: the same error-log lines when the database fails at any of the eight points');
+
+    section('5. increment 5, the card list: old block vs penumbra_an_report_kpis()');
+    $oldB = cut($src['b5_an'], "// ---- Build \$kpis array consumed by the existing HTML below ----\n", "                         . (\$sizedN === 1 ? '' : 's')];\n}\n", 'old kpis block');
+    $oldB .= cut($src['b5_an'], "// Scheduler card - only for reports that have ever had scheduler activity\n", "               'go'=>'feed:sched', 'goLabel'=>'scheduler rows', 'goTitle'=>'Show the SCHEDULE_* rows in Recent activity'];\n}\n", 'old sched card');
+    $kHits = array();
+    foreach (explode("\n", $src['s_an']) as $ln) if (strpos($ln, '$kpis = penumbra_an_report_kpis(') !== false) $kHits[] = $ln . "\n";
+    if (count($kHits) !== 1) { fwrite(STDERR, "new kpis call found " . count($kHits) . " times\n"); exit(2); }
+    $newB = $kHits[0];
+    // Synthetic inputs over every branch: all-time vs windowed, zero / nonzero
+    // priors, dashboards, run size (incl. the 250k / 500k cell warnings), the
+    // scheduler card with each last-run outcome, every error bucket, the
+    // people tier on and off, a weekday/hour scope.
+    $kSets = array(
+        array('TOTAL_VIEWS' => '1234', 'VIEWS_WINDOW' => '50', 'VIEWS_PRIOR' => '40', 'UNIQUE_VIEWERS' => '7', 'NEW_VIEWERS_WINDOW' => 3, 'EXPORT_COUNT' => '5', 'EXPORT_PRIOR' => '0',
+              'DASH_WINDOW' => '4', 'DASH_PRIOR' => '2', 'LAST_UPDATE_USER' => 'jdoe', 'LAST_UPDATE_AT' => '2026-09-30 10:00'),
+        array('TOTAL_VIEWS' => '0', 'VIEWS_WINDOW' => '0', 'VIEWS_PRIOR' => '0', 'UNIQUE_VIEWERS' => '0', 'NEW_VIEWERS_WINDOW' => 0, 'EXPORT_COUNT' => '0', 'EXPORT_PRIOR' => '3',
+              'DASH_WINDOW' => '0', 'DASH_PRIOR' => '0', 'LAST_UPDATE_USER' => null, 'LAST_UPDATE_AT' => null),
+        array('TOTAL_VIEWS' => '9', 'VIEWS_WINDOW' => '3', 'VIEWS_PRIOR' => '9', 'UNIQUE_VIEWERS' => '1', 'NEW_VIEWERS_WINDOW' => 1, 'EXPORT_COUNT' => '2', 'EXPORT_PRIOR' => '4',
+              'DASH_WINDOW' => '0', 'DASH_PRIOR' => '6', 'LAST_UPDATE_USER' => 'x<y>', 'LAST_UPDATE_AT' => '2026-01-01 00:00'),
+    );
+    $sysBase = array('BADPASS_COUNT'=>0,'BADPASS_IP_COUNT'=>0,'DENIED_COUNT'=>0,'EMAIL_COUNT'=>0,'EMAILFAIL_COUNT'=>0,'UPDATE_COUNT'=>0,
+                     'SCHED_OK_COUNT'=>0,'SCHED_FAIL_COUNT'=>0,'SCHED_SKIP_COUNT'=>0,'SCHED_ALLTIME'=>0,'TIMEOUT_COUNT'=>0,'CLIENT_ERR_COUNT'=>0,'ERR_TOTAL_COUNT'=>0,
+                     'LAST_RUN_ACTION'=>null,'LAST_RUN_AT'=>null,'SIZED_RUNS'=>0,'MED_ROWS'=>0,'MED_COLS'=>0,'MAX_ROWS'=>0,'MAX_CELLS'=>0,'MED_MS'=>0,'MAX_MS'=>0);
+    $sysSets = array(
+        $sysBase,
+        array_merge($sysBase, array('BADPASS_COUNT'=>'3','BADPASS_IP_COUNT'=>2,'DENIED_COUNT'=>'1','EMAIL_COUNT'=>'4','EMAILFAIL_COUNT'=>'1','UPDATE_COUNT'=>'6',
+            'SCHED_OK_COUNT'=>'10','SCHED_FAIL_COUNT'=>'2','SCHED_SKIP_COUNT'=>'1','SCHED_ALLTIME'=>'40','TIMEOUT_COUNT'=>'1','CLIENT_ERR_COUNT'=>'2','ERR_TOTAL_COUNT'=>'12',
+            'LAST_RUN_ACTION'=>'SCHEDULE_RUN_FAIL','LAST_RUN_AT'=>'2026-09-30 06:00','SIZED_RUNS'=>'5','MED_ROWS'=>'4569','MED_COLS'=>'9','MAX_ROWS'=>'60000','MAX_CELLS'=>'540000','MED_MS'=>'850','MAX_MS'=>'2500')),
+        array_merge($sysBase, array('SCHED_OK_COUNT'=>'3','SCHED_ALLTIME'=>'3','LAST_RUN_ACTION'=>'SCHEDULE_SKIPPED','LAST_RUN_AT'=>'2026-09-29 06:00',
+            'SIZED_RUNS'=>'1','MED_ROWS'=>'10','MED_COLS'=>'1','MAX_ROWS'=>'10','MAX_CELLS'=>'260000','MED_MS'=>'1200','MAX_MS'=>'1200','ERR_TOTAL_COUNT'=>'1')),
+        array_merge($sysBase, array('SCHED_ALLTIME'=>'2','LAST_RUN_ACTION'=>'SCHEDULE_RUN_OK','LAST_RUN_AT'=>'2026-09-28 06:00','UPDATE_COUNT'=>'1')),
+    );
+    $cases = 0; $bad = 0; $first = '';
+    foreach (array(array('range' => '30'), array('range' => 'all'), array('range' => '24h'),
+                   array('range' => 'custom', 'from' => '2026-09-01', 'to' => '2026-09-30', 'dow' => 'TUE', 'hour' => '10')) as $get)
+    foreach ($kSets as $kk) foreach ($sysSets as $ss) foreach (array(true, false) as $people) {
+        $w = window_env($get, strtotime('2026-10-01 14:37:12'));
+        $sp = penumbra_an_report_sparks(function ($sql, $b) { return array(); }, 42, $w, $w['trendHourly'] ? penumbra_an_hour_axis(strtotime('2026-10-01 14:37:12')) : array(), '', array(), 't');
+        $sp['sparkOpens'][0] = 5; $sp['sparkErrors'][0] = 1;   // a non-empty series or two
+        $env = $w + $sp + array('k' => $kk, 'sys' => $ss, 'anSparks' => $sp, 'anWin' => $w, 'can_see_people' => $people,
+                                'schedRunsWindow' => (int)$ss['SCHED_OK_COUNT'] + (int)$ss['SCHED_FAIL_COUNT'] + (int)$ss['SCHED_SKIP_COUNT']);
+        $o = \PnbOld\run_block($oldB, $env, array('kpis'));
+        $n = \PnbOld\run_block($newB, $env, array('kpis'));
+        $cases++;
+        if ($o !== $n) { $bad++; if ($first === '') $first = json_encode($get) . ' people=' . var_export($people, true) . ' old=' . substr(json_encode($o), 0, 300) . ' new=' . substr(json_encode($n), 0, 300); }
+    }
+    echo "    $cases card lists\n";
+    t_eq($bad, 0, 'the card list: identical labels, values, sub-lines, sparks, warnings and click targets' . ($first ? " [first: $first]" : ''));
+}
+
+// =========================================================================================
+section('5. the shared builders themselves');
+$GLOBALS['__clock'] = strtotime('2027-03-15 14:30:00');
+$w = penumbra_an_parse_window(array('range' => '24h'), function ($k, $d) { return $d; }, array('last24h' => true));
+$calls = array();
+list($s, $p, $l) = penumbra_an_trend_series(make_run($calls, $w, null), 'X = 1', array(), $w, penumbra_an_hour_axis($GLOBALS['__clock']), 't');
+t_ok(in_array(null, $p, true), 'the day after spring-forward: the missing hour stays a NULL gap');
+t_eq(count($s), count($l), 'one label per bar');
+list($s, $p, $l) = penumbra_an_trend_series(function ($sql, $b) { throw new Exception('down'); }, 'X = 1', array(), $w, penumbra_an_hour_axis($GLOBALS['__clock']), 't');
+t_eq(array($s, $p, $l), array(array(), array(), array()), 'a dead database draws an empty chart, never a half-built one');
+list($h, $tot) = penumbra_an_heatmap(function ($sql, $b) { return array(array('DY' => ' sun ', 'HR' => '23', 'CNT' => '4'), array('DY' => 'XYZ', 'HR' => '01', 'CNT' => '9'), array('DY' => 'MON', 'HR' => '24', 'CNT' => '9')); }, 'X = 1', array(), 't');
+t_eq(array($h[6][23], $tot), array(4, 4), 'heatmap: day names trimmed and upper-cased, unknown days and hour 24 ignored');
+$w30 = penumbra_an_parse_window(array('range' => '30'), function ($k, $d) { return $d; }, array('last24h' => true));
+$threw = false; try { penumbra_an_counter_sql('nope', $w30); } catch (InvalidArgumentException $e) { $threw = true; }
+t_ok($threw, 'an unknown counter name throws instead of counting something else');
+t_ok(strpos(penumbra_an_counter_sql('views', $w30), $w30['timeFilter']) !== false && strpos(penumbra_an_counter_sql('views_prior', $w30), $w30['priorFilter']) !== false, 'window counters read the window, *_prior counters the prior window');
+t_ok(strpos(penumbra_an_counter_sql('views_all', $w30), 'TIMESTAMP') === false && strpos(penumbra_an_counter_sql('sched_runs_all', $w30), 'TIMESTAMP') === false, 'the all-time counters carry no window');
+t_ok(strpos(penumbra_an_counter_sql('errors', $w30), penumbraErrorCondSql()) !== false, "'errors' is the canonical error set");
+t_ok(strpos(penumbra_an_counter_sql('sched_runs', $w30), "'EMAIL'") === false, "'sched_runs' never counts the manual EMAIL rows");
+$got = penumbra_an_counts(function ($sql, $b) { return array(); }, 'X = 1', array(), $w30, array('A' => 'views'));
+t_eq($got, array(), 'no row back = an empty array (the page keeps its defaults)');
+$threw = false; try { penumbra_an_counts(function ($sql, $b) { throw new Exception('down'); }, 'X = 1', array(), $w30, array('A' => 'views')); } catch (Exception $e) { $threw = true; }
+t_ok($threw, 'penumbra_an_counts() lets a DB error through to the page\'s own catch');
+if (function_exists('penumbra_an_departments')) {
+    $rowsRun = function ($rows) { return function ($sql, $b) use ($rows) { return $rows; }; };
+    $r = penumbra_an_departments($rowsRun(array()), new FakeDirConn(false), 'X = 1', array());
+    t_eq(array($r['looked'], $r['total'], $r['capped'], $r['map']), array(false, 0, false, array()), 'departments: nobody in scope = nothing looked up');
+    $dir = new FakeDirConn(false);
+    $r = penumbra_an_departments($rowsRun(array()), $dir, 'X = 1', array(), array('updater9'));
+    t_ok($r['looked'] && count($dir->log) === 1 && $r['total'] === 0, 'departments: a name from the people table is looked up even with no viewers');
+    $r = penumbra_an_departments($rowsRun(array(array('USER_ID' => 'a', 'VIEWS' => '2'), array('USER_ID' => 'b', 'VIEWS' => '1'))), new FakeDirConn(false), 'X = 1', array(), array(), 2);
+    t_ok($r['capped'] && $r['total'] === 2, 'departments: reaching the cap exactly says capped');
+    $dec = penumbra_an_dept_decorate(array(array('user' => 'Nobody-Known')), array());
+    t_eq(array($dec[0]['dept'], $dec[0]['ouc']), array('', ''), 'decorate: an unknown person gets an empty Department, not a missing one');
+    $threw = false; try { penumbra_an_departments(function ($s, $b) { throw new Exception('down'); }, new FakeDirConn(false), 'X = 1', array()); } catch (Exception $e) { $threw = true; }
+    t_ok($threw, 'penumbra_an_departments() lets the aggregate\'s DB error through to the page\'s own catch');
+}
+if (function_exists('penumbra_an_mix')) {
+    t_eq(penumbra_an_mix(3, 5, 0, 0, 0)['Views'], 0, 'mix: more dashboard pulls than views = 0 Views, never negative');
+    t_eq(array_keys(penumbra_an_mix(1, 0, 1, 1, 1)), array('Views', 'Dashboards', 'Exports', 'Emails', 'Automation'), 'mix: the five channels in the donut palette order');
+    ob_start(); penumbra_an_mix_body(penumbra_an_mix(0, 0, 0, 0, 0), 'x'); $h = ob_get_clean();
+    t_ok(strpos($h, 'chart-empty') !== false && strpos($h, 'mixChart') === false, 'mix body: every channel 0 = the empty state, no canvas');
+    ob_start(); penumbra_an_heat_sr_table(array_fill(0, 7, array_fill(0, 24, 1)), 'a <b> & "c"'); $h = ob_get_clean();
+    t_ok(substr_count($h, '<tr>') === 8 && strpos($h, 'a &lt;b&gt; &amp; &quot;c&quot;') !== false, 'heat table: 7 day rows + the header, caption escaped');
+}
+
+// =========================================================================================
+// THE ONE ENGINE, E2b - the report's cards inside the engine (analytics_all.php at
+// report scope). Not a move, so no old-vs-new run: the numbers are proven LIVE
+// (anparity_cards.js: the engine's cards == the report page's, case by case). Here:
+// the target re-pointer, and the engine's wiring of the builders as text.
+// =========================================================================================
+if (strpos($src['s_sh'], 'function penumbra_an_kpis_retarget(') !== false) {
+    section('6. the one engine, E2b: the report cards inside the engine');
+    eval(lift($src['s_sh'], array('penumbra_an_kpis_retarget')));
+    $cards6 = array(
+        array('label' => 'A', 'value' => '1', 'go' => '#panel-trend', 'goLabel' => 'x', 'goTitle' => 'y'),
+        array('label' => 'B', 'value' => '2', 'go' => 'feed:view', 'goLabel' => 'x', 'goTitle' => 'y', 'spark' => array(1, 2)),
+        array('label' => 'C', 'value' => '3', 'spark' => array()),
+        array('label' => 'D', 'value' => '4', 'go' => ''),
+    );
+    $got6 = penumbra_an_kpis_retarget($cards6, array('#panel-trend' => array('#card-trend', 'views over time', 'Jump')));
+    t_eq($got6[0], array('label' => 'A', 'value' => '1', 'go' => '#card-trend', 'goLabel' => 'views over time', 'goTitle' => 'Jump'), 'a mapped target is re-pointed, its footer label and title with it');
+    t_eq($got6[1], array('label' => 'B', 'value' => '2', 'spark' => array(1, 2)), 'a target the engine lacks (a feed chip) is dropped with its footer; the rest of the card stays');
+    t_eq(array($got6[2], $got6[3]), array($cards6[2], $cards6[3]), 'cards without a target are untouched');
+    t_eq(array_keys($got6), array(0, 1, 2, 3), 'every card kept, in order');
+    $e6 = $src['s_all'];
+    t_eq(substr_count($e6, "\$anRepSeam  = trim(\$exclSql . ' ' . \$userFilter);"), 1, "the engine hands the builders its exclusion list plus its user / department filter (the report page's one \$exclSql)");
+    // (since E4a also the IP filter's bind - the IP predicate rides in $userFilter)
+    t_eq(preg_match('/\$anRepBinds = array_merge\(\$exclBinds, \$userBinds, \$oucBinds(, \$ipBinds)?\);/', $e6), 1, '... with exactly those binds');
+    foreach (array('penumbra_an_report_counters($run, $anRid, $anWin, $anRepSeam, $anRepBinds, $anRepLog)',
+                   'penumbra_an_report_system($run, $anRid, $anWin, $anRepLog)',
+                   'penumbra_an_report_sparks($run, $anRid, $anWin, $hourAxis, $anRepSeam, $anRepBinds, $anRepLog)',
+                   'penumbra_an_report_kpis($anRepK, $anRepSys, $anRepSp, $anWin, $anCanSeePeople, $anRepSched)') as $call6)
+        t_eq(substr_count($e6, $call6), 1, "the engine calls $call6");
+    t_ok(preg_match_all("/'(#panel-[a-z]+|feed:[a-z]+)'\s*=>\s*array\('#(card-[a-z]+)'/", $e6, $m6) >= 4, 'the engine maps the report targets it can honour');
+    foreach ($m6[2] as $id6) t_eq(substr_count($e6, 'id="' . $id6 . '"') >= 1, true, "the mapped target #$id6 exists on the engine page");
+    t_eq(substr_count($e6, "<?php if (\$anReportScope): /* the report's own cards (E2b)"), 1, "at report scope the card row is the report's (Platform's cards render only at Platform scope)");
+    t_ok(strpos($e6, "document.querySelectorAll('.an-rep-cards canvas[data-spark]')") !== false && strpos($e6, 'sparks.forEach(c => c.destroy()); sparks = [];') !== false,
+         'the cards\' sparks are drawn in rebuild() and destroyed on a redraw (theme change)');
+}
+
+// =========================================================================================
+// INCREMENT 6 - the one engine, E3a: Top viewers, Top IPs, the activity feed
+// =========================================================================================
+if (isset($src['b6_an'])) {
+    section('7. increment 6 (E3a), Top viewers + Top IPs: old blocks vs the builders');
+    $oldV = cut($src['b6_an'], "// 5) Top viewers (person-level - only queried when the caller may see them)\n",
+                "        error_log(\"analytics.php top viewers query failed: \" . \$e->getMessage());\n    }\n}\n", 'old top viewers');
+    $oldI = cut($src['b6_an'], "// 6) Top IPs (person-level - gated like Top viewers). Aggregated IN SQL:\n",
+                "        error_log(\"analytics.php top IPs query failed: \" . \$e->getMessage());\n    }\n}\n", 'old top ips');
+    $oldF = cut($src['b6_an'], "// 7) Activity feed (person-level - gated). 50 rows render visible at first;\n",
+                "    error_log(\"analytics.php feed query failed: \" . \$e->getMessage());\n}\n}\n", 'old feed');
+    // The new calls - located by what they call, so a mutated call is judged, not "not found".
+    $newCall = function ($fn) use ($src) {
+        if (!preg_match('/^\$[a-z_]+ = \$can_see_people\n    \? ' . $fn . '\(.*\n    : \[\];\n/m', $src['s_an'], $m)
+            && !preg_match('/^\$[a-z_]+ = [^\n]*\n    \? ' . $fn . '\(.*\n    : \[\];\n/m', $src['s_an'], $m)) { fwrite(STDERR, "new call $fn not found\n"); exit(2); }
+        return $m[0];
+    };
+    $newV = $newCall('penumbra_an_report_top_viewers');
+    $newI = $newCall('penumbra_an_report_top_ips');
+    if (!preg_match('/^list\(\$FEED_FETCH, \$FEED_MAX\) = penumbra_an_feed_fetch_size\(\$_GET\);\n/m', $src['s_an'], $fs)) { fwrite(STDERR, "new feed size call not found\n"); exit(2); }
+    $newF = $fs[0] . $newCall('penumbra_an_report_feed');
+    foreach (array('top viewers' => "// 5) Top viewers (person-level - only queried when the caller may see them)\n\$top_viewers = [];",
+                   'top IPs' => "\$ipRe   = '\"ip_address\"", 'feed' => '$famFor = function') as $lbl => $gone)
+        t_ok(strpos($src['s_an'], $gone) === false, "the inline $lbl block is gone from the page");
+    $bp6 = array('10.0.0.1' => true, '10.0.0.2' => true);
+    $cases = 0; $outBad = 0; $sqlBad = 0; $logBad = 0; $firstOut = ''; $firstSql = ''; $cov = array('viewers' => 0, 'no viewers' => 0, 'viewer sparks' => 0, 'ips' => 0, 'flagged' => 0, 'DB down' => 0);
+    foreach (array(strtotime('2026-10-01 14:37:12'), strtotime('2026-11-01 14:30:00'), strtotime('2027-03-15 09:05:00')) as $clock)
+    foreach ($windows as $get) foreach ($anScopes as $sc) foreach (array(true, false) as $people) foreach (array(null, 1, 2, 3) as $failAt) {
+        $w = window_env($get, $clock);
+        $hourAxis6 = $w['trendHourly'] ? penumbra_an_hour_axis($clock) : array();
+        $sp6 = penumbra_an_report_sparks(function ($sql, $b) { return array(); }, 42, $w, $hourAxis6, '', array(), 't');
+        $env = $w + $sp6 + $sc + array('report_id_num' => 42, 'ridBinds' => array(':rid' => 42), 'anWin' => $w, 'anSparks' => $sp6, 'can_see_people' => $people,
+                                         'VIEWER_FETCH' => 200, 'IP_FETCH' => 100, 'bpIps' => $bp6);
+        $callsO = array(); $callsN = array();
+        $envO = $env; $envO['run'] = make_run($callsO, $env, $failAt);
+        $envN = $env; $envN['run'] = make_run($callsN, $env, $failAt);
+        read_log($tmpLog);
+        $o = \PnbOld\run_block($oldV . $oldI, $envO, array('top_viewers', 'top_ips')); $logO = read_log($tmpLog);
+        $n = \PnbOld\run_block($newV . $newI, $envN, array('top_viewers', 'top_ips')); $logN = read_log($tmpLog);
+        $cases++;
+        if ($o !== $n) { $outBad++; if ($firstOut === '') $firstOut = json_encode($get) . ' people=' . var_export($people, true) . ' fail@' . var_export($failAt, true) . ' old=' . substr(json_encode($o), 0, 240) . ' new=' . substr(json_encode($n), 0, 240); }
+        if ($callsO !== $callsN) { $sqlBad++; if ($firstSql === '') $firstSql = json_encode($get) . ' old=' . substr(json_encode($callsO), 0, 300) . ' new=' . substr(json_encode($callsN), 0, 300); }
+        if ($logO !== $logN) $logBad++;
+        if ($failAt === null && $people) {
+            if (count($o[0]) > 0) $cov['viewers']++; else $cov['no viewers']++;
+            foreach ($o[0] as $tv6) if (array_sum($tv6['spark']) > 0) { $cov['viewer sparks']++; break; }
+            if (count($o[1]) > 0) $cov['ips']++;
+            foreach ($o[1] as $ip6) if ($ip6['tag'] === 'flagged') { $cov['flagged']++; break; }
+        }
+        if ($failAt !== null && $people) $cov['DB down']++;
+    }
+    $covTxt = array(); foreach ($cov as $ck => $cv) $covTxt[] = "$ck $cv";
+    echo "    $cases cases (" . implode(', ', $covTxt) . ")\n";
+    t_eq($outBad, 0, 'viewers + IPs: identical rows, sparks and tags' . ($firstOut ? " [first: $firstOut]" : ''));
+    t_eq($sqlBad, 0, 'viewers + IPs: the same queries in the same order (none for a viewer who may not see people)' . ($firstSql ? " [first: $firstSql]" : ''));
+    t_eq($logBad, 0, 'viewers + IPs: the same error-log lines when the database fails at each point');
+    t_ok($cov['viewers'] > 0 && $cov['no viewers'] > 0 && $cov['viewer sparks'] > 0 && $cov['ips'] > 0 && $cov['flagged'] > 0,
+         'the cases reach viewers with live sparks, nobody, and addresses incl. a flagged one');
+
+    section('7. increment 6 (E3a), the activity feed: old block vs the builder');
+    $scopes6 = array(array('scopeSql' => '', 'scopeBinds' => array()),
+                     array('scopeSql' => ' AND UPPER(USER_ID) = UPPER(:uflt)', 'scopeBinds' => array(':uflt' => 'jdoe')),
+                     array('scopeSql' => ' AND (LOWER(USER_ID) IN (:oc0,:oc1)) AND SOURCE_DATA LIKE :ipflt', 'scopeBinds' => array(':oc0' => 'a', ':oc1' => 'b', ':ipflt' => '%"ip_address":"10.0.0.1"%')));
+    $cases = 0; $outBad = 0; $sqlBad = 0; $logBad = 0; $firstOut = ''; $firstSql = ''; $fams = array();
+    $getSave = $_GET;
+    foreach ($scopes6 as $sc) foreach (array(true, false) as $people) foreach (array(null, '30', '500', '99999', 'abc', '-5') as $feedParam) foreach (array(null, 1) as $failAt) {
+        $_GET = ($feedParam === null) ? array() : array('feed' => $feedParam);
+        $w = window_env(array('range' => '30'), strtotime('2026-10-01 14:37:12'));
+        $env = $w + $sc + array('report_id_num' => 42, 'ridBinds' => array(':rid' => 42), 'anWin' => $w, 'can_see_people' => $people);
+        $callsO = array(); $callsN = array();
+        $envO = $env; $envO['run'] = make_run($callsO, $env, $failAt);
+        $envN = $env; $envN['run'] = make_run($callsN, $env, $failAt);
+        read_log($tmpLog);
+        $o = \PnbOld\run_block($oldF, $envO, array('feed', 'FEED_FETCH', 'FEED_MAX')); $logO = read_log($tmpLog);
+        $n = \PnbOld\run_block($newF, $envN, array('feed', 'FEED_FETCH', 'FEED_MAX')); $logN = read_log($tmpLog);
+        $cases++;
+        if ($o !== $n) { $outBad++; if ($firstOut === '') { foreach ((array)$o[0] as $ix => $row) if (!isset($n[0][$ix]) || $n[0][$ix] !== $row) { $firstOut = "row $ix old=" . json_encode($row, JSON_UNESCAPED_UNICODE) . ' new=' . json_encode(isset($n[0][$ix]) ? $n[0][$ix] : null, JSON_UNESCAPED_UNICODE); break; } if ($firstOut === '') $firstOut = 'sizes old=' . json_encode(array_slice($o, 1)) . ' new=' . json_encode(array_slice($n, 1)); } }
+        if ($callsO !== $callsN) { $sqlBad++; if ($firstSql === '') $firstSql = 'old=' . substr(json_encode($callsO), 0, 300) . ' new=' . substr(json_encode($callsN), 0, 300); }
+        if ($logO !== $logN) $logBad++;
+        if ($failAt === null && $people) foreach ($o[0] as $row) $fams[$row['fam']] = true;
+    }
+    $_GET = $getSave;
+    ksort($fams);
+    echo "    $cases cases (families seen: " . implode(', ', array_keys($fams)) . ")\n";
+    t_eq($outBad, 0, 'feed: identical rows (time, user, action, family, detail) and fetch sizes' . ($firstOut ? " [first: $firstOut]" : ''));
+    t_eq($sqlBad, 0, 'feed: the same query (scope, binds, fetch size)' . ($firstSql ? " [first: $firstSql]" : ''));
+    t_eq($logBad, 0, 'feed: the same error-log line when the database fails');
+    t_eq(array_keys($fams), array('bad', 'change', 'journal', 'other', 'sched', 'share', 'view'), 'the fake feed reaches every family');
+    t_eq(array(penumbra_an_feed_fetch_size(array()), penumbra_an_feed_fetch_size(array('feed' => '30')), penumbra_an_feed_fetch_size(array('feed' => '99999'))),
+         array(array(200, 2000), array(50, 2000), array(2000, 2000)), 'fetch size: 200 by default, clamped to 50..2000');
+}
+
+// =========================================================================================
+// THE ONE ENGINE, E3b-1 - the Users tab at report scope (the user's call, 2026-10-01):
+// Platform's Top Users + a per-viewer trend spark (no Reports Touched), Top IPs under it.
+// penumbra_an_user_sparks() must give EXACTLY the report page's Top viewers sparks.
+// =========================================================================================
+if (strpos($src['s_sh'], 'function penumbra_an_user_sparks(') !== false) {
+    section('8. the one engine, E3b-1: per-person sparks = the report page\'s Top viewers sparks; the Users tab wiring');
+    eval(lift($src['s_sh'], array('penumbra_an_user_sparks')));
+    foreach (array('penumbra_an_report_top_viewers', 'penumbra_an_report_sparks') as $f8) if (!function_exists($f8)) eval(lift($f8 === 'penumbra_an_report_top_viewers' ? $src[$tvKey] : $src['s_sh'], array($f8, 'penumbra_an_window_start_lit')));
+    $cases = 0; $bad = 0; $first = ''; $withData = 0;
+    foreach (array(strtotime('2026-10-01 14:37:12'), strtotime('2027-03-15 09:05:00')) as $clock) foreach ($windows as $get) foreach ($anScopes as $sc) {
+        $w = window_env($get, $clock);
+        $sp8 = penumbra_an_report_sparks(function ($sql, $b) { return array(); }, 42, $w, $w['trendHourly'] ? penumbra_an_hour_axis($clock) : array(), '', array(), 't');
+        $c1 = array(); $c2 = array();
+        $tv = penumbra_an_report_top_viewers(make_run($c1, $w, null), 42, $w, $sc['exclSql'], $sc['exclBinds'], $sp8, 200, 't');
+        $ids = array(); foreach ($tv as $row) $ids[] = $row['user'];
+        $us = penumbra_an_user_sparks(make_run($c2, $w, null), 42, $ids, $sp8, 't');
+        $cases++;
+        $want = array(); foreach ($tv as $row) $want[(string)$row['user']] = $row['spark'];
+        if ($us !== $want) { $bad++; if ($first === '') $first = json_encode($get) . ' want=' . substr(json_encode($want), 0, 200) . ' got=' . substr(json_encode($us), 0, 200); }
+        foreach ($want as $series) if (array_sum($series) > 0) { $withData++; break; }
+    }
+    echo "    $cases cases ($withData with live sparks)\n";
+    t_eq($bad, 0, 'per-person sparks: the same series as the report page\'s Top viewers, id for id' . ($first ? " [first: $first]" : ''));
+    t_ok($withData > 0, 'the cases reach viewers with live sparks');
+    // the IN-lists: 900 ids each, OR'd; every id still gets its series
+    $w = window_env(array('range' => '30'), strtotime('2026-10-01 14:37:12'));
+    $sp8 = penumbra_an_report_sparks(function ($sql, $b) { return array(); }, 42, $w, array(), '', array(), 't');
+    $many = array(); for ($i = 0; $i < 1901; $i++) $many[] = 'p' . $i;
+    $c3 = array(); $seen = array();
+    $us = penumbra_an_user_sparks(function ($sql, $b) use (&$seen, $w) { $seen[] = array(substr_count($sql, 'USER_ID IN ('), count($b)); return fake_rows($sql, $w, $b); }, 42, $many, $sp8, 't');
+    t_eq($seen, array(array(3, 1902)), '1,901 ids: one query, three IN-lists (900 + 900 + 101), every id bound once plus :rid');
+    t_eq(count($us), 1901, '... and every id comes back with a series');
+    t_eq(penumbra_an_user_sparks(function ($sql, $b) { throw new Exception('no query expected'); }, 42, array(), $sp8, 't'), array(), 'nobody listed: no query, nothing back');
+    read_log($tmpLog);
+    $us = penumbra_an_user_sparks(function ($sql, $b) { throw new Exception('fake DB down'); }, 42, array('a', 'B'), $sp8, 't');
+    t_eq(array(array_keys($us), array_sum(array_map('array_sum', $us)), trim(read_log($tmpLog))), array(array('a', 'B'), 0, 't user sparks query failed: fake DB down'),
+         'database down: zeros for everyone, one error-log line');
+    // the engine's wiring (text pins - the live people check proves the numbers)
+    $e8 = $src['s_all'];
+    foreach (array("if (\$anReportScope && \$anCanSeePeople) {\n    \$anUserIds = array();"            => 'the people panels are queried at report scope for the people tier only',
+                   '$anUserSparks = penumbra_an_user_sparks($run, $anRid, $anUserIds, $anRepSp, $anRepLog);' => 'the users list gets its sparks on the cards\' axis',
+                   '$anTopIps    = penumbra_an_report_top_ips($run, $anRid, $anWin, $anRepSeam, $anRepBinds, $anRepBpIps, $anIpFetch, $anRepLog);' => 'Top IPs: the report page\'s builder on the cards\' seam, with its BADPASS addresses',
+                   "<?php if (!\$anReportScope): /* one report: always 1 */ ?>\n                        <th scope=\"col\" class=\"num\" data-sortable>Reports Touched" => 'Reports Touched only at Platform scope',
+                   "<td><canvas class=\"row-spark\" aria-hidden=\"true\""                              => 'a Trend cell per user at report scope',
+                   "<?php if (\$anReportScope): /* the report's Top IPs (E3b), under its people */ ?>"   => 'the Top IPs card at report scope only',
+                   "document.querySelectorAll('canvas.row-spark').forEach(canvas => {"                 => 'the row sparks are drawn in rebuild()') as $pin8 => $what8)
+        t_eq(substr_count($e8, $pin8), 1, "engine: $what8");
+}
+
+// =========================================================================================
+// THE ONE ENGINE, E3b-2 - the Activity tab at report scope (the user's call): the report
+// page's feed (penumbra_an_report_feed(), proven in increment 6) on the engine's user /
+// department filter, its chips and two-mode Load older; the four cards that open a chip.
+// The rows are proven LIVE (anparity_cards.js FEED); here the wiring.
+// =========================================================================================
+if (strpos($src['s_all'], 'id="panel-activity"') !== false) {
+    section('9. the one engine, E3b-2: the Activity tab wiring');
+    $e9 = $src['s_all'];
+    // (since E4a the user / department filter carries the IP filter too, with its bind)
+    // 2026-10-03: the feed rides the report cards' seam ($anRepSeam = the toggles + user /
+    // department / IP, with $anRepBinds) - "Hide my own views" was silently ignored by the
+    // old user-filter-only call - and Platform has its own feed over every report.
+    t_eq(preg_match('/if \(!\$anCalMode && \$anCanSeePeople\) \{\n    if \(\$anReportScope\) \{\n        \$anFeed = penumbra_an_report_feed\(\$run, \$anRid, \(\$anRepSeam === \'\' \? \'\' : \' \' \. \$anRepSeam\) \. " \$timeFilter \$whenFilter", \$anRepBinds, \$anFeedFetch, \$anRepLog, \$errNoticeAddrs\);/', $e9), 1,
+         'engine: the feed: the people tier only, the report page\'s builder on the report cards\' seam (toggles + user / department / IP) + the date range and weekday/hour scope, with exactly its binds');
+    t_eq(preg_match('/    \} else \{\n        \$anFeed = penumbra_an_report_feed\(\$run, null, " \$sysSql \$exclSql \$userFilter \$reportFilter \$timeFilter \$whenFilter",\n            array_merge\(\$exclBinds, \$userBinds, \$oucBinds, \$reportBinds\), \$anFeedFetch, \'analytics_all.php \(platform\)\', \$errNoticeAddrs\);/', $e9), 1,
+         'engine: Platform\'s feed: every report (null id) on Platform\'s seam - system placeholders out, the toggles, user / department, the Report search - with exactly those binds');
+    foreach (array('list($anFeedFetch, $anFeedMax) = penumbra_an_feed_fetch_size($_GET);' => 'the feed depth: the page\'s ?feed= rule',
+                   "\$anFeedMore = (count(\$anFeed) === \$anFeedFetch && \$anFeedFetch < \$anFeedMax);" => 'Load older reloads only when the fetch came back full',
+                   "\$anReportScope ? \"['overview','users','errors','activity']\" : \"['overview','users','reports','errors','activity','calendar']\"" => 'the Activity tab at both scopes (Platform since 2026-10-03)',
+                   'data-tab="activity" role="tab" id="tab-activity"' => 'its tab button',
+                   '<div class="panel" id="panel-activity" role="tabpanel"' => 'its panel',
+                   "u.hash = 'activity';" => 'Fetch older lands back on the Activity tab',
+                   "if (window.applyFeedView && th.closest('#feedTable')) window.applyFeedView();" => 'a sort of the feed re-applies its chip and reveal',
+                   "if (go.indexOf('feed:') === 0) {" => 'a card\'s feed: target is honoured (chip, else All, then the feed)') as $pin9 => $what9)
+        t_eq(substr_count($e9, $pin9), 1, "engine: $what9");
+    foreach (array('view', 'share', 'change', 'sched') as $fam9)
+        t_eq(preg_match("/'feed:$fam9'\s*=>\s*array\('feed:$fam9',/", $e9), 1, "the $fam9 card keeps its chip target (the feed is here now)");
+    // every feed: target the engine keeps is a chip family the feed can show
+    t_ok(preg_match('/\$anFamChips  = array\((.*?)\);/s', $e9, $fc9) === 1, 'the chip list is declared');
+    foreach (array('view', 'share', 'change', 'sched', 'bad') as $fam9) t_ok(strpos($fc9[1], "'$fam9' =>") !== false, "the $fam9 chip exists");
+}
+
+// =========================================================================================
+// THE ONE ENGINE, E4a - the report page's IP filter at report scope (?ip=, people tier).
+// The parse lines are cut from the engine and run as written over every edge; the
+// rest is wiring. The panels' numbers under an IP are proven LIVE (cards, people,
+// feed checks with ?ip= cases).
+// =========================================================================================
+if (strpos($src['s_all'], '$ipSearch = (') !== false) {
+    section('10. the one engine, E4a: the IP filter');
+    $e10 = $src['s_all'];
+    $parse10 = cut($e10, "\$ipSearch = (", "\$ipSearch = '';\n", 'ip parse');
+    $ip10 = function ($get, $reportScope, $people) use ($parse10) {
+        $_GET = $get; $anReportScope = $reportScope; $anCanSeePeople = $people;
+        eval($parse10);
+        return $ipSearch;
+    };
+    $getSave10 = $_GET;
+    foreach (array(array(array('ip' => '10.50.52.60'), true, true, '10.50.52.60', 'an IPv4 address applies'),
+                   array(array('ip' => ' 2001:db8::1 '), true, true, '2001:db8::1', 'an IPv6 address applies, trimmed'),
+                   array(array('ip' => '10.50.52.%'), true, true, '', 'a LIKE wildcard is refused (not an IP)'),
+                   array(array('ip' => "10.0.0.1' OR '1'='1"), true, true, '', 'an injection attempt is refused'),
+                   array(array('ip' => '10.0.0.1_'), true, true, '', 'a single-character wildcard is refused'),
+                   array(array('ip' => ''), true, true, '', 'empty = no filter'),
+                   array(array(), true, true, '', 'absent = no filter'),
+                   array(array('ip' => '10.50.52.60'), true, false, '', 'a viewer who may not see people cannot filter by address'),
+                   array(array('ip' => '10.50.52.60'), false, true, '', 'Platform scope ignores ?ip=')) as $c10)
+        t_eq($ip10($c10[0], $c10[1], $c10[2]), $c10[3], "ip parse: {$c10[4]}");
+    $_GET = $getSave10;
+    foreach (array("\$userFilter  .= ' AND SOURCE_DATA LIKE :ipflt';"             => 'the predicate joins the user / department filter',
+                   "\$userFilterA .= ' AND a.SOURCE_DATA LIKE :ipflt';"          => '... and its aliased twin',
+                   "\$ipBinds[':ipflt'] = '%\"ip_address\":\"' . \$ipSearch . '\"%';" => 'the bind is the exact JSON key/value pair',
+                   "\$commonBinds  = array_merge(\$commonBinds, \$ipBinds);"       => 'it binds wherever the user / department filter binds',
+                   "\$anRepBinds = array_merge(\$exclBinds, \$userBinds, \$oucBinds, \$ipBinds);" => 'the report cards and Top IPs bind it',
+                   "\$anRepBinds, \$anFeedFetch, \$anRepLog, \$errNoticeAddrs);" => 'the feed binds it (through the report cards\' binds, 2026-10-03)',
+                   "<input type=\"text\" id=\"fIp\" name=\"ip\""                  => 'the sidebar box submits it',
+                   "ip: 'fIp' })[btn.dataset.filter]"                            => 'a Top IPs address fills the box',
+                   "data-filter=\"ip\" data-value=\"<?php echo htmlspecialchars(\$ip['ip']); ?>\"" => 'Top IPs addresses are filter buttons',
+                   "\$chips[] = array('k' => 'ip', 'label' => 'IP', 'value' => \$ipSearch, 'on' => true);" => 'an active filter shows a chip',
+                   "ip: \\'\\'' : ''; ?> };"                                     => 'Clear all clears it') as $pin10 => $what10)
+        t_eq(substr_count($e10, $pin10), 1, "engine: $what10");
+    t_eq(substr_count($e10, '$ftIp'), 4, 'the IP is named in the Users, Errors and Activity tags (and defined once)');
+}
+
+// =========================================================================================
+// INCREMENT 7 - the one engine, E4b: the report's subscriber count, moved into the shared
+// file (the engine's info strip shows it too). Old page block vs the new call, over a fake
+// PDO connection: schedules with subscriptions on / off, a transient test run, broken
+// JSON, OPTIONS as a CLOB stream, subscribers that are not a list, none at all, and the
+// database failing at prepare or execute.
+// =========================================================================================
+class FakeSubStmt {
+    private $c; public $binds = array();
+    function __construct($c) { $this->c = $c; }
+    function bindValue($k, $v, $t = null) { $this->c->log[] = 'bind ' . $k . '=' . json_encode($v); return true; }
+    function execute() { $this->c->log[] = 'execute'; if ($this->c->down === 'execute') throw new Exception('fake DB down at execute'); return true; }
+    function fetch($mode = null) { return $this->c->rows ? array_shift($this->c->rows) : false; }
+}
+class FakeSubConn {
+    public $log = array(); public $rows; public $down;
+    function __construct($rows, $down) { $this->rows = $rows; $this->down = $down; }
+    function prepare($sql) { $this->log[] = norm_sql($sql); if ($this->down === 'prepare') throw new Exception('fake DB down at prepare'); return new FakeSubStmt($this); }
+}
+if (isset($src['b7_an'])) {
+    section('11. increment 7 (E4b), the subscriber count: old page block vs penumbra_an_report_subscribers()');
+    eval(lift($src['s_sh'], array('penumbra_an_report_subscribers')));
+    $oldS = cut($src['b7_an'], "\$sub_ctx = null;\ntry {\n    \$subStmt = \$oracleConn->prepare(", "} catch (Exception \$subCtxEx) { /* meta line simply not shown */ }\n", 'old subscribers');
+    $sHits = array();
+    foreach (explode("\n", $src['s_an']) as $ln) if (strpos($ln, 'penumbra_an_report_subscribers(') !== false && strpos($ln, '$sub_ctx') !== false) $sHits[] = $ln . "\n";
+    if (count($sHits) !== 1) { fwrite(STDERR, "new subscribers call found " . count($sHits) . " times\n"); exit(2); }
+    $newS = $sHits[0];
+    t_ok(strpos($src['s_an'], '$subStmt = $oracleConn->prepare(') === false, 'the inline subscriber block is gone from the page');
+    $mkRows = function ($set) {
+        $o = function ($a) { return json_encode($a); };
+        $clob = function ($s) { $h = fopen('php://memory', 'r+'); fwrite($h, $s); rewind($h); return $h; };
+        switch ($set) {
+            case 'none':   return array();
+            case 'mixed':  return array(array('OPTIONS' => $o(array('subscriptions_enabled' => true, 'subscribers' => array('a', 'b', 'c')))),
+                                         array('OPTIONS' => $o(array('subscriptions_enabled' => true))),
+                                         array('OPTIONS' => $o(array('subscriptions_enabled' => false, 'subscribers' => array('x')))),
+                                         array('OPTIONS' => $o(array('subscriptions_enabled' => true, '_test_run_transient' => true, 'subscribers' => array('y')))),
+                                         array('OPTIONS' => '{not json'),
+                                         array('OPTIONS' => $clob($o(array('subscriptions_enabled' => 1, 'subscribers' => array('p', 'q'))))),
+                                         array('OPTIONS' => $o(array('subscriptions_enabled' => true, 'subscribers' => 'not-a-list'))),
+                                         array('OPTIONS' => null));
+            case 'off':    return array(array('OPTIONS' => $o(array('subscriptions_enabled' => false))), array('OPTIONS' => $o(array())));
+            case 'one':    return array(array('OPTIONS' => $clob($o(array('subscriptions_enabled' => true, 'subscribers' => array())))));
+        }
+    };
+    $cases = 0; $bad = 0; $first = '';
+    foreach (array('none', 'mixed', 'off', 'one') as $set) foreach (array(null, 'prepare', 'execute') as $down) foreach (array('rpt', ' rpt  ', 'int-col-mat') as $sid) {
+        $cO = new FakeSubConn($mkRows($set), $down); $cN = new FakeSubConn($mkRows($set), $down);
+        $o = \PnbOld\run_block($oldS, array('oracleConn' => $cO, 'row' => array('SHORT_ID' => $sid)), array('sub_ctx'));
+        $n = \PnbOld\run_block($newS, array('oracleConn' => $cN, 'row' => array('SHORT_ID' => $sid)), array('sub_ctx'));
+        $cases++;
+        if ($o !== $n || $cO->log !== $cN->log) { $bad++; if ($first === '') $first = "$set/" . var_export($down, true) . "/'$sid' old=" . json_encode($o) . json_encode($cO->log) . ' new=' . json_encode($n) . json_encode($cN->log); }
+    }
+    echo "    $cases cases\n";
+    t_eq($bad, 0, 'subscribers: the same count (tasks, subscribers), the same query and binds, null alike when nothing offers subscriptions or the database fails' . ($first ? " [first: $first]" : ''));
+    $cM = new FakeSubConn($mkRows('mixed'), null);
+    t_eq(penumbra_an_report_subscribers($cM, 'rpt'), array('tasks' => 4, 'subs' => 5), 'the mixed set: 4 subscription schedules (on, on-without-list, the CLOB one, the not-a-list one), 5 subscribers');
+}
+
+// =========================================================================================
+// THE ONE ENGINE, E4b - the report page's chrome at report scope: the theme by route, the
+// opt-in auto-refresh, the info strip. The flag line is cut from the engine and run as
+// written; the theme script is rendered; the rest is wiring (the strip's texts and the
+// saved default theme are proven LIVE against the report page).
+// =========================================================================================
+if (strpos($src['s_all'], '$anFamilyTheme = ') !== false) {
+    section('12. the one engine, E4b: theme by route, auto-refresh, the info strip');
+    $e12 = $src['s_all'];
+    $flag12 = cut($e12, "\$anFamilyTheme = ", ";\n", 'family flag');
+    $fam12 = function ($reportScope, $get) use ($flag12) { $_GET = $get; $anReportScope = $reportScope; eval($flag12); return $anFamilyTheme; };
+    $getSave12 = $_GET;
+    foreach (array(array(false, array(), true, 'Platform scope: always the family theme'),
+                   array(false, array('platform' => '1'), true, 'Platform scope with platform=1: the family theme'),
+                   array(true, array(), false, 'report scope opened from the report: the REPORT\'s theme'),
+                   array(true, array('platform' => '1'), true, 'report scope reached from Platform (platform=1): the family theme'),
+                   array(true, array('platform' => '0'), false, 'platform=0 is not "from Platform"'),
+                   array(true, array('platform' => 'yes'), false, 'only platform=1 counts')) as $c12)
+        t_eq($fam12($c12[0], $c12[1]), $c12[2], "theme route: {$c12[3]}");
+    $_GET = $getSave12;
+    if (!function_exists('penumbra_emit_themes_js')) { function penumbra_emit_themes_js() { echo "window.PENUMBRA_THEMES = {};\n"; } }
+    eval(lift($src['s_sh'], array('penumbra_an_report_theme_script')));
+    ob_start(); penumbra_an_report_theme_script('theme-wolfpack'); $ts12 = ob_get_clean();
+    t_ok(strpos($ts12, 'window.PNB_REPORT_DEFAULT_THEME = "theme-wolfpack";') !== false, 'the report theme script carries the report\'s saved default');
+    $order12 = array("if (qp.get('theme')) return qp.get('theme');", "if (hasPref && pref !== 'report-default') return pref;",
+                     "localStorage.getItem('penumbra_user_theme')", 'if (window.PNB_REPORT_DEFAULT_THEME) return window.PNB_REPORT_DEFAULT_THEME;', "return 'theme-default';");
+    $pos12 = array(); foreach ($order12 as $o12) $pos12[] = strpos($ts12, $o12);
+    t_ok(!in_array(false, $pos12, true) && $pos12 === array_values(array_unique($pos12)) && $pos12 == array_values(call_user_func(function ($a) { sort($a); return $a; }, $pos12)),
+         'the resolution order is the report page\'s: ?theme > per-report pref (report-default skips the global) > global pref > saved default > theme-default');
+    ob_start(); penumbra_an_report_theme_script('x"</script><b>'); $ts12b = ob_get_clean();
+    t_ok(strpos($ts12b, '</script><b>') === false, 'a hostile saved theme cannot close the script (JSON-encoded)');
+    foreach (array("if (\$anFamilyTheme) penumbra_admin_theme_script();" => 'the family chain only on the family route',
+                   "else penumbra_an_report_theme_script(\$anRptTheme);" => 'otherwise the report\'s own resolution, right after <body>',
+                   "readClobViaOci8('PENUMBRA_REPORTS', 'STATE_DATA', 'SHORT_ID', \$anScope['row']['SHORT_ID'])" => 'the saved default is the report\'s STATE_DATA theme',
+                   "\$anSubCtx     = \$anReportScope ? penumbra_an_report_subscribers(\$oracleConn, \$anScope['row']['SHORT_ID']) : null;" => 'the strip\'s subscriber count is the page\'s builder',
+                   "<button type=\"button\" id=\"anRefreshToggle\" class=\"an-refresh-toggle\" aria-pressed=\"false\">Auto-refresh: off</button>" => 'the auto-refresh toggle starts off',
+                   "const REFRESH_ON_KEY = 'pnbAnRefreshOn';" => 'the auto-refresh choice is the report page\'s own browser key',
+                   "function feedEngaged() { return feedFam !== 'all' || feedShown > 50; }" => 'auto-refresh stands down while the Activity feed is being read',
+                   "id=\"anLiveDot\"" => 'the sidebar dot is the live indicator',
+                   "<a class=\"an-ctx-title\" href=\"index.php?id=" => 'the title is the way back to the report') as $pin12 => $what12)
+        t_eq(substr_count($e12, $pin12), 1, "engine: $what12");
+    foreach (array('owner: <b>', 'created: <b>', 'last modified: <b>', 'authorized: <b>', '>subscribers: <b>', '>editors:') as $m12)
+        t_eq(substr_count($e12, $m12), 1, "the info strip shows $m12");
+}
+
+// =========================================================================================
+// 13. the one engine, E4c: the Errors list at report scope has no Report column - every
+// row is the report, and there is no Report filter there for its button to fill. The
+// list's table is cut out of the engine and RENDERED at both scopes. Runs on every engine
+// with a report scope, so a build from before E4c is red here.
+// =========================================================================================
+if (strpos($src['s_all'], "defined('PENUMBRA_AN_REPORT_SCOPE')") !== false) {
+    section('13. the one engine, E4c: the Errors list at report scope');
+    $card13 = cut($src['s_all'], "<div class=\"card scroll\" id=\"card-errors\" data-pnb-table>", "</table>\n", 'errors list');
+    if (strpos($card13, '<table class="dt">') === false) { fwrite(STDERR, "errors list: no table\n"); exit(2); }
+    $tbl13 = substr($card13, strpos($card13, '<table class="dt">'));
+    $render13 = function ($reportScope) use ($tbl13) {
+        $anReportScope = $reportScope;
+        $errors = array(array('ts' => '2026-10-01 09:00', 'user' => 'abc', 'ip' => '10.0.0.1', 'short' => 'rpt', 'action' => 'ERROR', 'msg' => 'boom'),
+                        array('ts' => '2026-10-01 08:00', 'user' => '(unknown)', 'ip' => '-', 'short' => '-', 'action' => 'BADPASS', 'msg' => 'denied'));
+        ob_start(); eval('?>' . $tbl13); return ob_get_clean();
+    };
+    $cols13 = function ($html) {
+        $thead = preg_match('#<thead>(.*?)</thead>#s', $html, $m) ? $m[1] : '';
+        preg_match_all('#<th\b[^>]*>(.*?)</th>#s', $thead, $th);
+        $heads = array(); foreach ($th[1] as $h) $heads[] = strtok(trim(strip_tags($h)), ' ');
+        $body = preg_match('#<tbody>(.*?)</tbody>#s', $html, $b) ? $b[1] : '';
+        preg_match_all('#<tr>(.*?)</tr>#s', $body, $rows);
+        $cells = array(); foreach ($rows[1] as $r) $cells[] = preg_match_all('#<td\b#', $r);
+        return array($heads, $cells, substr_count($html, 'data-filter="report"'));
+    };
+    list($hR, $cR, $fR) = $cols13($render13(true));
+    list($hP, $cP, $fP) = $cols13($render13(false));
+    t_eq($hR, array('Time', 'User', 'IP', 'Action', 'Detail'), 'report scope: no Report column');
+    t_eq($cR, array(5, 5), 'report scope: every row has one cell per heading');
+    t_eq($fR, 0, 'report scope: no report filter buttons (there is no Report filter to fill)');
+    t_eq($hP, array('Time', 'User', 'IP', 'Report', 'Action', 'Detail'), 'Platform scope: the Report column stays');
+    t_eq($cP, array(6, 6), 'Platform scope: every row has one cell per heading');
+    t_eq($fP, 1, 'Platform scope: a report id is a filter button, a missing one is not');
+}
+
+// =========================================================================================
+// 14. THE SWITCH (2026-10-02): analytics.php is the engine's wrapper - the scope constant
+// and the include, nothing else (logic added there would be a second, diverging engine);
+// the preview's pieces are gone; the report scope logs its page views the way the report
+// page always did (report_metrics + the report's id - never 'metrics'); Platform has
+// "Hide my own views", remembered in its cookie like the other two toggles, and the
+// drill-down and the way back up carry all three. Runs on every engine with a report
+// scope, so a build from before the switch is red here.
+// =========================================================================================
+if (strpos($src['s_all'], "defined('PENUMBRA_AN_REPORT_SCOPE')") !== false) {
+    section('14. the switch: analytics.php is the engine\'s wrapper');
+    $w14 = $src['wrapper_an'];
+    t_ok($w14 !== null, 'analytics.php is the engine\'s wrapper');
+    $code14 = '';
+    if ($w14 !== null) foreach (token_get_all($w14) as $tk) {
+        if (is_array($tk) && in_array($tk[0], array(T_OPEN_TAG, T_WHITESPACE, T_COMMENT, T_DOC_COMMENT), true)) continue;
+        $code14 .= is_array($tk) ? $tk[1] : $tk;
+    }
+    t_eq($code14, "define('PENUMBRA_AN_REPORT_SCOPE',true);require__DIR__.'/analytics_all.php';", 'the wrapper\'s code, token for token: the scope constant and the include');
+    foreach (array('name="engine"' => 'no engine=1 hidden field rides the filters',
+                   'an-preview-pill' => 'no preview label (nor its style)',
+                   "\$_GET['engine']" => 'nothing reads engine=') as $gone14 => $what14)
+        t_eq(substr_count($src['s_all'], $gone14), 0, "the preview is gone: $what14");
+    t_eq(substr_count($src['s_all'], "if (\$anReportScope) penumbra_tool_visit_beacon('report_metrics', trim((string)\$anScope['row']['SHORT_ID']));"), 1,
+         'report scope logs the report metrics page view with the report\'s id (the page\'s own log)');
+    t_eq(substr_count($src['s_all'], "else penumbra_tool_visit_beacon(\$anCalMode ? 'calendar' : 'metrics');"), 1, 'Platform and the calendar keep theirs');
+    t_eq(substr_count($src['s_all'], 'penumbra_tool_visit_beacon('), 2, 'and nothing else logs a view');
+    // the visibility toggles, run as written: scope x submitted x address x cookie
+    $tog14 = cut($src['s_all'], "\$excludeAdmins     = \$formSubmitted ? ", "    \$excludeMe         = isset(\$_GET['excl_me'])         && (string)\$_GET['excl_me'] === '1';\n}\n", 'visibility toggles');
+    $me14 = function ($reportScope, $submitted, $get, $cookie) use ($tog14) {
+        $_GET = $get; $anReportScope = $reportScope; $formSubmitted = $submitted;
+        $prefs = $reportScope ? array() : $cookie;
+        $prefOr = function ($k, $d) use ($prefs) { return array_key_exists($k, $prefs) ? $prefs[$k] : $d; };
+        eval($tog14);
+        return array($excludeAdmins, $excludeAutomation, $excludeMe);
+    };
+    $getSave14 = $_GET;
+    foreach (array(array(false, true,  array('excl_me' => '1'), array(),               true,  'Platform: checked and submitted = on'),
+                   array(false, true,  array(),                 array('excl_me' => 1), false, 'Platform: submitted unchecked = off, whatever the cookie says'),
+                   array(false, false, array(),                 array('excl_me' => 1), true,  'Platform: a fresh visit takes it from the cookie'),
+                   array(false, false, array(),                 array('excl_me' => 0), false, 'Platform: ... off when the cookie says off'),
+                   array(false, false, array(),                 array(),               false, 'Platform: no cookie = off'),
+                   array(true,  false, array('excl_me' => '1'), array(),               true,  'report scope: the address says on'),
+                   array(true,  true,  array('excl_me' => '0'), array(),               false, 'report scope: only =1 is on'),
+                   array(true,  false, array(),                 array('excl_me' => 1), false, 'report scope: no cookie is read')) as $c14) {
+        $got14 = $me14($c14[0], $c14[1], $c14[2], $c14[3]);
+        t_eq($got14[2], $c14[4], "Hide my own views: {$c14[5]}");
+    }
+    $_GET = $getSave14;
+    t_eq(substr_count($src['s_all'], "    'excl_me'         => \$excludeMe         ? 1 : 0,\n)), array("), 1, 'Platform remembers it in its cookie with the other two');
+    t_eq(substr_count($src['s_all'], 'name="excl_me"'), 1, 'one Hide my own views box');
+    t_eq(substr_count($src['s_all'], "<?php if (\$anReportScope): ?>\n                <label title=\"Leave out your own visits"), 0, '... shown at both scopes (no report-scope gate)');
+    t_eq(substr_count($src['s_all'], "excl_automation: false, excl_me: false<?php echo \$anReportScope ? ', ip: \\'\\'' : ''; ?> };"), 1, 'Clear all clears it at both scopes');
+    t_eq(substr_count($src['s_all'], "    'excl_automation' => \$excludeAutomation,\n    'excl_me'         => \$excludeMe,\n"), 1, 'the drill-down carries Hide automation and Hide my own views (a round trip keeps them)');
+    t_eq(substr_count($src['s_all'], "        'excl_automation' => \$excludeAutomation,\n        'excl_me'         => \$excludeMe,\n"), 1, '... and so does the way back up');
+}
+
+// =========================================================================================
+// 15. the report scope's gate, penumbra_an_report_scope() (2026-10-02): run over a fake
+// connection and fake ownership / sharing / grant helpers. Who may VIEW a report's metrics
+// (admin, owner, anyone it is shared with) and who gets the person-level tier (admin, owner,
+// report editor) - and under ?noadm (the caller passes empty($noadm) as $editorRolesOn) a
+// PLAIN viewer: ownership and grants still let the owner view, but open no person-level
+// tier any more (the app-wide &noadm rule since that day). db_connection.php has already
+// cleared $isAdmin under ?noadm, so the cases below pass it false there.
+// =========================================================================================
+if (strpos($src['s_sh'], 'function penumbra_an_report_scope(') !== false) {
+    section('15. the report scope\'s gate (penumbra_an_report_scope) and ?noadm');
+    eval(lift($src['s_sh'], array('penumbra_an_report_scope')));
+    if (!function_exists('penumbraIsReportOwner'))   { function penumbraIsReportOwner($owner, $user) { return trim((string)$user) !== '' && strcasecmp(trim((string)$owner), trim((string)$user)) === 0; } }
+    if (!function_exists('checkAuthorization'))      { function checkAuthorization($auth, $user, $ouc) { $a = array_map('trim', explode(',', strtolower((string)$auth))); return in_array('public', $a, true) || in_array(strtolower((string)$user), $a, true); } }
+    if (!function_exists('penumbraNormalizeGrants')) { function penumbraNormalizeGrants($config, $u) { return $config['user_grants'][$u]; } }
+    if (!function_exists('penumbraReportGrantMatches')) { function penumbraReportGrantMatches($g, $sid) { return in_array($sid, $g['reports'], true); } }
+    if (!function_exists('penumbraReportGrantAllowsScheduler')) { function penumbraReportGrantAllowsScheduler($g, $sid) { return !empty($g['sched']); } }
+    $scopeConn15 = function ($row) {
+        return new class($row) {
+            private $row; function __construct($r) { $this->row = $r; }
+            function prepare($sql) { $r = $this->row; return new class($r) {
+                private $r; function __construct($r) { $this->r = $r; }
+                function bindValue($k, $v, $t = null) { return true; } function execute() { return true; }
+                function fetch($m = null) { return $this->r; } }; }
+        };
+    };
+    $cfg15 = array('user_grants' => array('ed1' => array('reports' => array('rpt'), 'sched' => true), 'own1' => array('reports' => array('rpt'))));
+    $rowPriv = array('ID' => 1, 'SHORT_ID' => 'rpt ', 'TITLE' => 'T', 'OWNER_ID' => 'own1', 'AUTHORIZED' => 'viewer1', 'CREATED' => 'c', 'MODIFIED' => 'm');
+    $rowPub  = array('AUTHORIZED' => 'public') + $rowPriv;
+    // (row, isAdmin, user, editorRolesOn) => (status, can_view, can_see_people)
+    foreach (array(array($rowPriv, true,  'adm',     true,  200, true,  true,  'an admin sees everything'),
+                   array($rowPriv, false, 'adm',     false, 403, false, false, 'an admin under ?noadm is a stranger to a report not shared with them'),
+                   array($rowPriv, false, 'own1',    true,  200, true,  true,  'the owner sees the people'),
+                   array($rowPriv, false, 'own1',    false, 200, true,  false, 'the owner under ?noadm still views, but sees no people'),
+                   array($rowPub,  false, 'ed1',     true,  200, true,  true,  'a report editor sees the people'),
+                   array($rowPub,  false, 'ed1',     false, 200, true,  false, 'a report editor under ?noadm sees no people'),
+                   array($rowPriv, false, 'ed1',     true,  403, false, false, 'a grant does not share the report (an editor it is not shared with cannot view)'),
+                   array($rowPriv, false, 'viewer1', true,  200, true,  false, 'a viewer it is shared with sees the counts, not the people'),
+                   array($rowPriv, false, 'viewer1', false, 200, true,  false, '... under ?noadm too'),
+                   array($rowPriv, false, 'nobody',  true,  403, false, false, 'a stranger is refused')) as $c15) {
+        $o15 = penumbra_an_report_scope($scopeConn15($c15[0]), 'rpt', $c15[1], $c15[2], '', $cfg15, $c15[3]);
+        t_eq(array($o15['status'], $o15['can_view'], $o15['can_see_people']), array($c15[4], $c15[5], $c15[6]), "scope gate: {$c15[7]}");
+    }
+    $d15 = penumbra_an_report_scope($scopeConn15($rowPriv), 'rpt', false, 'own1', '', $cfg15);
+    t_eq($d15['can_see_people'], true, 'scope gate: called without the flag, the owner keeps the people (the default is roles on)');
+    t_eq(penumbra_an_report_scope($scopeConn15($rowPriv), '  ', false, 'own1', '', $cfg15)['status'], 400, 'scope gate: no id = 400');
+    t_eq(penumbra_an_report_scope($scopeConn15(false), 'zz', false, 'own1', '', $cfg15)['status'], 404, 'scope gate: no such report = 404');
+    t_eq(substr_count($src['s_all'], "\$isAdmin, \$currentUserKey, \$user_ouc, \$config, empty(\$noadm));"), 1, 'the engine passes empty($noadm) as the roles flag');
+}
+@unlink($tmpLog);
+
+if ($CONTROL) { section('control'); t_ok(false, 'CONTROL: deliberately false'); }
+echo "\nPASS $pass   FAIL $fail\n";
+exit($fail ? 1 : 0);

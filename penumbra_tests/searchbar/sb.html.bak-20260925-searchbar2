@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Search Bar harness</title>
+<script src="themes.js"></script>
+<script src="js/jquery-3.7.1.min.js"></script>
+<style>
+  #out { white-space: pre-wrap; word-break: break-all; font: 11px/1.3 Consolas, monospace; margin: 12px 0 0; }
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+  body { margin: 0; }
+  #reportHeaderContainer { height: 120px; }
+  #hiddenOpts { position: absolute; left: -9999px; }
+</style>
+</head>
+<body>
+<div id="reportHeaderContainer">report header stand-in</div>
+<div id="barSlot"></div>
+<div id="tableSlot"></div>
+<div id="hiddenOpts"><input type="checkbox" id="viewOptionSearch"></div>
+<pre id="out"></pre>
+<script>
+/*
+ * The control bar (#resultsHeader, LIFTED from the index.php under test) under the
+ * css\main.css under test, driven by the REAL applyUserViewRestrictions /
+ * penumbraSyncControlBar / updateStickyHeaderOffset / the admin markers, sliced
+ * out of the main.js under test. ?case=<name> (see CASES), &idx= &js= &css=.
+ * Result: window.__vo = { asserts: [...] } (async cases finish a few frames later).
+ */
+(function () {
+  var q = new URLSearchParams(location.search), A = [];
+  function T(id, name, pass, detail) { A.push({ id: id, name: name, pass: !!pass, detail: String(detail === undefined ? '' : detail) }); }
+  function done() { window.__vo = { asserts: A }; document.getElementById('out').textContent = JSON.stringify(A, null, 1); window.__voDone = true; }
+  function fail(m) { T('Z0', 'the harness set up', false, m); done(); }
+  function get(u) { var x = new XMLHttpRequest(); x.open('GET', u, false); x.send(null); return x.responseText; }
+  function slice(code, a, b, max) {
+    var i = code.indexOf(a); if (i < 0) throw new Error('anchor missing: ' + a.slice(0, 60));
+    var j = code.indexOf(b, i + a.length); if (j < 0) throw new Error('end anchor missing after: ' + a.slice(0, 60));
+    if (max && j - i > max) throw new Error('slice too long (' + (j - i) + ') for: ' + a.slice(0, 60));
+    return code.slice(i, j);
+  }
+  var fns, rec = { uch: 0, stack: 0 }, pv = { isAdmin: q.get('admin') === '1' }, noadm = q.get('noadm') === '1';
+  try {
+    var idx = get(q.get('idx') || 'index.php');
+    var a = idx.indexOf('<div id="resultsHeader">');
+    if (a < 0) throw new Error('no #resultsHeader');
+    var re = /<\/?div\b[^>]*>/g, depth = 0, end = -1, m;
+    re.lastIndex = a;
+    while ((m = re.exec(idx))) { depth += (m[0][1] === '/') ? -1 : 1; if (depth === 0) { end = m.index + m[0].length; break; } }
+    if (end < 0) throw new Error('unbalanced #resultsHeader');
+    var html = idx.slice(a, end);
+    if (html.indexOf('<?') >= 0) throw new Error('lifted bar contains PHP');
+    document.getElementById('barSlot').outerHTML = html;
+    // The table below the bar: inside #results-wrapper (flat), or bare (grouped - its
+    // header then sticks to the WINDOW below the chrome, the offset under test).
+    var rows = ''; for (var i = 0; i < 60; i++) rows += '<tr><td>row ' + i + '</td><td>' + (i * 7) + '</td></tr>';
+    var table = '<table id="resultsTable"><thead><tr><th>A</th><th>B</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    document.getElementById('tableSlot').outerHTML = q.get('grouped') === '1' ? table : '<div id="results-wrapper">' + table + '</div>';
+
+    var js = get(q.get('js') || 'main.js').replace(/\r\n/g, '\n');
+    var code = slice(js, '    var PNB_USER_HIDDEN_TARGETS = {', '    function applyUserViewRestrictions(viewOptions) {', 20000) +
+               slice(js, '    function applyUserViewRestrictions(viewOptions) {', '    /**\n * Checks for visible columns', 20000) +
+               slice(js, '    function updateStickyHeaderOffset() {', "_groupSyncStickyOffsets();\n    }\n", 8000) + "_groupSyncStickyOffsets();\n    }\n";
+    fns = new Function('$', 'penumbra_vars', 'isNoAdmView', 'rec',
+      'function applyHeaderLayout() {}\nfunction updateContainerHeight() { rec.uch++; }\nwindow.stackHeaders = function () { rec.stack++; };\n' + code +
+      '\nreturn { apply: applyUserViewRestrictions, sync: (typeof penumbraSyncControlBar === "function" ? penumbraSyncControlBar : function () {}), markers: penumbraRefreshUserHiddenMarkers, sticky: updateStickyHeaderOffset };')($, pv, noadm, rec);
+  } catch (e) { fail(e.message); return; }
+
+  var theme = q.get('theme') || 'theme-hello-kitty';
+  document.body.classList.add(theme); document.body.setAttribute('data-theme', theme);
+  var sheets = ['css/jquery-ui.css', q.get('css') || 'main.css', 'css/penumbra_tiles.css', 'css/density.css', 'css/search_builder.css', 'css/penumbra_presets.css', 'css/penumbra_colwidths.css', 'themevars.css'];
+  var pending = sheets.length;
+  sheets.forEach(function (href) {
+    var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = href;
+    l.onload = l.onerror = function () { if (--pending === 0) go(); };
+    document.head.appendChild(l);
+  });
+
+  var ALL_OFF = { hideSearch: true, hideSnapshots: true, hideEmail: true, hideGrouping: true, hideClipboard: true, hideExport: true, hidePivot: true, hideViz: true, hidePagination: true };
+  function vo(over) { var o = {}; for (var k in ALL_OFF) o[k] = ALL_OFF[k]; for (var k2 in (over || {})) o[k2] = over[k2]; return o; }
+  function frames(n, cb) { if (n <= 0) { cb(); return; } requestAnimationFrame(function () { frames(n - 1, cb); }); }
+  function st() {
+    var rh = document.getElementById('resultsHeader'), sw = document.querySelector('#tableSearchContainer .search-wrapper');
+    var rc = document.getElementById('resultCount'), tbl = document.getElementById('results-wrapper') || document.getElementById('resultsTable');
+    var hdr = document.getElementById('reportHeaderContainer').getBoundingClientRect();
+    var th = document.querySelector('#resultsTable thead th');
+    return {
+      collapsed: document.body.classList.contains('pnb-no-controlbar'),
+      rhDisplay: getComputedStyle(rh).display, rhH: rh.offsetHeight,
+      search: !!(sw && sw.getClientRects().length && getComputedStyle(sw).display !== 'none'),
+      count: !!(rc && getComputedStyle(rc).display !== 'none' && rc.closest('#tableSearchContainer') && getComputedStyle(rc.closest('#tableSearchContainer')).display !== 'none'),
+      icons: Array.prototype.slice.call(document.querySelectorAll('#resultsHeader .header-right [role="button"]')).filter(function (e) { return e.getClientRects().length > 0; }).length,
+      tableGap: Math.round(tbl.getBoundingClientRect().top - hdr.bottom),
+      thTop: th ? th.style.top : '', marker: !!(sw && sw.classList.contains('pnb-user-hidden'))
+    };
+  }
+  function J(o) { return JSON.stringify(o); }
+
+  function go() {
+    try {
+      // The loaded-report state the app leaves before restrictions apply.
+      $('#tableSearchContainer').show(); $('.export-container').show(); $('#paginatorContainer').css('visibility', 'visible');
+      document.getElementById('resultCount').textContent = '60 rows';
+      var c = q.get('case') || 'alloff';
+      var s0 = st();   // before any option applies: the bar's own height
+      if (c === 'alloff') {
+        fns.apply(vo()); fns.sticky();
+        frames(2, function () {
+          var s = st();
+          T('V1', 'every control-bar option off: a viewer\'s bar is gone and the table moves up into its row', s.collapsed && s.rhDisplay === 'none' && s.rhH === 0 && s.tableGap <= s0.tableGap - s0.rhH + 1 && s0.rhH > 20, 'before=' + J(s0) + ' after=' + J(s) + ' containerHeight/stack re-run=' + rec.uch + '/' + rec.stack);
+          T('V2', '...and everything stacked on it re-anchors (container height + header stack re-run)', rec.uch > 0 && rec.stack > 0, 'updateContainerHeight=' + rec.uch + ' stackHeaders=' + rec.stack);
+          done();
+        });
+      } else if (c === 'searchon') {
+        fns.apply(vo({ hideSearch: false }));
+        frames(2, function () { var s = st(); T('V3', 'only the search box left: the bar stays, with the box', !s.collapsed && s.rhH > 20 && s.search, J(s)); done(); });
+      } else if (c === 'searchoff') {
+        fns.apply({ hideSearch: true });
+        frames(2, function () { var s = st(); T('V4', 'Search Bar off alone: the box goes, the icons stay, and so does the bar', !s.collapsed && !s.search && s.icons >= 6, J(s)); done(); });
+      } else if (c === 'active') {
+        fns.apply(vo());
+        frames(2, function () {
+          var s1 = st();
+          $('#tableSearchContainer').addClass('has-text'); $('#tableSearch').val('BIO');
+          frames(3, function () {
+            var s2 = st();
+            $('#tableSearchContainer').removeClass('has-text'); $('#tableSearch').val('');
+            frames(3, function () {
+              var s3 = st();
+              T('V5', 'an ACTIVE search (Click-to-Filter, a link) brings the box back - and the bar with it - so it can be seen and cleared; cleared, the bar goes again', s1.collapsed && !s2.collapsed && s2.search && s2.rhH > 20 && s3.collapsed && !s3.search, 'off=' + J(s1) + ' | active=' + J(s2) + ' | cleared=' + J(s3));
+              done();
+            });
+          });
+        });
+      } else if (c === 'grouped') {
+        fns.apply(vo());
+        frames(2, function () {
+          var s1 = st();
+          $('#groupActionsContainer').show();   // a report the author saved grouped: Expand / Collapse All
+          frames(3, function () {
+            var s2 = st();
+            T('V6', 'a grouped report keeps the bar for Expand / Collapse All (Remove Grouping stays hidden)', s1.collapsed && !s2.collapsed && s2.rhH > 20 && $('#expandAllGroups').is(':visible') && !$('#removeGroupingLink').is(':visible'), 'plain=' + J(s1) + ' | grouped=' + J(s2));
+            done();
+          });
+        });
+      } else if (c === 'reload') {
+        fns.apply(vo({ hideEmail: false }));   // one option still on
+        frames(2, function () {
+          var s1 = st();
+          // A data reload hides the containers for a moment (as the app does).
+          $('.export-container').hide(); $('#tableSearchContainer').hide();
+          frames(3, function () {
+            var s2 = st();
+            T('V7', 'with ANY bar option still on the bar never goes - not even while a reload hides its icons (no flicker)', !s1.collapsed && !s2.collapsed, 'loaded=' + J(s1) + ' | reloading=' + J(s2));
+            done();
+          });
+        });
+      } else if (c === 'admin') {
+        document.getElementById('viewOptionSearch').checked = false;
+        fns.apply(vo()); fns.markers();
+        frames(2, function () {
+          var s = st();
+          T('V8', 'an admin keeps the bar whatever the options, and the search box wears the "hidden from users" marker', !s.collapsed && s.rhH > 20 && s.marker, J(s));
+          done();
+        });
+      } else if (c === 'noadm') {
+        fns.apply(vo());
+        frames(2, function () { var s = st(); T('V9', 'an admin previewing with &noadm sees what a viewer sees: no bar', s.collapsed && s.rhH === 0, J(s)); done(); });
+      } else if (c === 'offset') {
+        // Grouped view (no wrapper): the header sticks to the WINDOW, below the chrome.
+        fns.sticky(); var before = document.querySelector('#resultsTable thead th').style.top;
+        var barH = $('#resultsHeader').outerHeight(), hdrH = $('#reportHeaderContainer').outerHeight();
+        fns.apply(vo());
+        frames(2, function () {
+          var s = st();
+          T('V10', 'the grouped view\'s sticky header re-anchors to the report header alone once the bar is gone', Math.abs(parseFloat(before) - (hdrH + barH)) < 0.6 && barH > 20 && Math.abs(parseFloat(s.thTop) - hdrH) < 0.6, 'with bar=' + before + ' (header ' + hdrH + ' + bar ' + barH + ') -> without=' + s.thTop);
+          done();
+        });
+      } else { fail('unknown case ' + c); }
+    } catch (e) { fail('run: ' + e.message); }
+  }
+})();
+</script>
+</body>
+</html>

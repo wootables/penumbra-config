@@ -1,0 +1,155 @@
+# =============================================================================
+# PIVOT SUMMARY-ROW PERF + "(N items)" LABEL SUITE (2026-09-16)
+#
+# A collapsible nested pivot with 10 row fields over ?id=int-col-mat's 3,242
+# rows took over 10 minutes to render. generatePivotTable's summary rows called
+# getChildGroupCount(), which scanned EVERY group key (split() per key) for
+# EVERY summary row: O(groups^2), ~26k groups there. The fix counts distinct
+# child groups while groupChildren is built. Measured in this harness on the
+# same shape: 201,327 ms -> 682 ms, byte-identical HTML across 14 configs.
+#
+# Drives the REAL generatePivotTable + processPivotData (closure export, main.js
+# initialised synchronously as an IIFE) in headless Edge on synthetic data.
+#
+# Added the same day:
+#  - applyConditionalFormatting() returns early while a pivot is on screen (pivot
+#    generate/sort/search used to restyle the HIDDEN flat table, ~3.3 s a call);
+#  - build caches: DOMPurify once per distinct label value, one Intl.NumberFormat
+#    per digit range (link-valued labels were 2.5 s of a 3.3 s nested build);
+#  - large Collapsible pivots build hidden rows on demand (_pivotLazy): the
+#    reported 10-field pivot builds 1,793 rows instead of 22,587. Checked by
+#    decomposition identity and by one fixed click script run eager vs on demand.
+#
+#   run.ps1              live js/main.js                 EXPECTED: PASS 32  FAIL 0
+#   run.ps1 -Control     pre-fix backup (none of it)     EXPECTED: PASS 17  FAIL 12 (~1 min)
+#   run.ps1 -Mutant      counts child ROWS, not GROUPS   EXPECTED: PASS 29  FAIL 3 (the 3 label asserts)
+#   run.ps1 -Mutant2     pivot guard always returns      EXPECTED: PASS 30  FAIL 2 (the 2 flat-table asserts)
+#   run.ps1 -Mutant3     late rows skip toggle states    EXPECTED: interaction asserts fail
+#   run.ps1 -Mutant4     no DOMPurify label cache        EXPECTED: PASS 31  FAIL 1 (the sanitize-count assert)
+#   run.ps1 -MainJs <p>  any other copy (e.g. a stage file before deploy)
+#
+# UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivotperf'
+#   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Control
+# Prints RESULT: GREEN/RED instead of exiting (an exit kills the caller).
+# Writes nothing to the webroot.
+# =============================================================================
+param([string]$MainJs = '', [switch]$Control, [switch]$Mutant, [switch]$Mutant2, [switch]$Mutant3, [switch]$Mutant4, [string]$Matrix = '')
+$ErrorActionPreference = 'Stop'
+$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivotperf'
+$app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+$js   = "$app\js"
+$controlBak = "$js\main.js.bak-20260916-pivotgroups"
+$edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+
+if ($Control) { $MainJs = $controlBak }
+if (-not $MainJs) { $MainJs = "$js\main.js" }
+if (-not (Test-Path $MainJs)) { throw "main.js under test not found: $MainJs" }
+Write-Host "[1/3] staging (main.js under test: $MainJs$(if ($Mutant) { ' + MUTANT' })$(if ($Mutant2) { ' + MUTANT2' })$(if ($Mutant3) { ' + MUTANT3' })$(if ($Mutant4) { ' + MUTANT4' }))"
+
+# Stage into a LOCAL temp dir: Edge reads a 6 MB script over SMB slowly, and a
+# per-run dir + profile keeps concurrent runs from colliding.
+$run = Join-Path $env:TEMP ('pnb_pivotperf_' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+New-Item -ItemType Directory -Force $run | Out-Null
+$libs = @('jquery-3.7.1.min.js','jquery-ui.min.js','moment.min.js','pako.min.js',
+          'codemirror.min.js','sql.min.js','show-hint.js','foldcode.js','foldgutter.js',
+          'brace-fold.js','comment-fold.js','placeholder.js','penumbra_snippet_help.js',
+          'purify.min.js','penumbra_template.js')
+foreach ($f in $libs) { Copy-Item "$js\$f" "$run\$f" -Force }
+Copy-Item "$here\harness.html" "$run\harness.html" -Force
+Copy-Item "$here\perf_driver.js" "$run\perf_driver.js" -Force
+
+$src = [IO.File]::ReadAllText($MainJs, $utf8)
+$anchor = '$(document).ready(function () {'
+if (-not $src.Substring(0, 200).Contains($anchor)) { throw 'main.js closure anchor not found' }
+if ($Mutant) {
+  # Count a child ROW on every push after the first, instead of a new child GROUP.
+  $old = "                    groupChildren[groupKey].push(rowKey);`r`n                }`r`n            });"
+  $new = "                    groupChildren[groupKey].push(rowKey);`r`n                    if (level > 0 && groupChildren[groupKey].length > 1) { const pk2 = parts.slice(0, level).join('|||'); childGroupCounts[pk2] = (childGroupCounts[pk2] || 0) + 1; }`r`n                }`r`n            });"
+  if (([regex]::Matches($src, [regex]::Escape($old))).Count -ne 1) { throw 'mutant anchor not found exactly once - update run.ps1' }
+  if (-not $src.Contains('childGroupCounts')) { throw 'mutant needs the fixed main.js (childGroupCounts absent)' }
+  $src = $src.Replace($old, $new)
+}
+if ($Mutant2) {
+  # The pivot guard fires unconditionally, so the flat table never formats.
+  $old2 = "        if (`$('#pivot-output-container').is(':visible')) {`r`n            return;`r`n        }`r`n`r`n        // Scope to the ACTIVE container's live rows"
+  $new2 = "        if (true) {`r`n            return;`r`n        }`r`n`r`n        // Scope to the ACTIVE container's live rows"
+  if (([regex]::Matches($src, [regex]::Escape($old2))).Count -ne 1) { throw 'mutant2 anchor not found exactly once (needs the guarded main.js) - update run.ps1' }
+  $src = $src.Replace($old2, $new2)
+}
+if ($Mutant3) {
+  # Rows built late keep their render-time toggle state instead of their group's current one.
+  $old3 = '            if (key === null || !(key in states)) continue;'
+  $new3 = '            if (true) continue;'
+  if (([regex]::Matches($src, [regex]::Escape($old3))).Count -ne 1) { throw 'mutant3 anchor not found exactly once (needs on-demand rows) - update run.ps1' }
+  $src = $src.Replace($old3, $new3)
+}
+if ($Mutant4) {
+  # Label cache off: every label cell runs formatCellContent (DOMPurify) again.
+  $old4 = '            let out = _pivotCellContentCache.get(k);'
+  $new4 = '            let out = undefined;'
+  if (([regex]::Matches($src, [regex]::Escape($old4))).Count -ne 1) { throw 'mutant4 anchor not found exactly once (needs the build caches) - update run.ps1' }
+  $src = $src.Replace($old4, $new4)
+}
+$hook = @(
+  'try { window.__PP = { gen: generatePivotTable, collect: processPivotData, extraVals: getExtraValFields, rankCfg: buildRankConfig,',
+  '  cf: applyConditionalFormatting, parseQuery: parseAdvancedQuery, collapseBar: injectPivotCollapseBar,',
+  '  zebra: applyZebraStriping, sticky: updateStickyColumnLayout, pivotArray: getPivotDataAsArray, csvCopy: getPivotCsvForCopy,',
+  '  setSettings: function (s) { currentPivotSettings = s; }, setRules: function (r) { conditionalFormattingRules = r; },',
+  '  reportRules: function () { var c = "CONTRIB_COLLEGE = ''{LEAD_COLLEGE}'' and CONTRIB_COLLEGE != ''''";',
+  '    return [{ type: "cell", targetColumn: "AMOUNT_CROSS", condition: c, style: "background-color: var(--brand-primary) !important; color: var(--brand-primary)",',
+  '      parsedCondition: parseAdvancedQuery(c, ["RECORD_ID","CONTRIB_COLLEGE","LEAD_COLLEGE","AMOUNT_CROSS"]) }]; } };',
+  '} catch (e) { window.__PP_ERR = String(e); }',
+  'try { window.__PP.lazy = { get: function () { return _pivotLazy; }, bind: penumbraPivotLazyBind, ensureAll: penumbraPivotEnsureAllRows,',
+  '  count: penumbraPivotBodyRowCount }; window.__PP.setLazyMin = function (v) { _pivotLazyMinRows = (v === null ? _PIVOT_LAZY_MIN_ROWS_DEFAULT : v); };',
+  '} catch (e) { window.__PP_LAZY_ERR = String(e); }'
+) -join ' '
+# Synchronous init: unwrap the ready closure into an IIFE so the driver (a later
+# <script>) runs against an initialised closure before the load event.
+$i = $src.IndexOf($anchor)
+$patched = $src.Substring(0, $i) + ';(function () {' + "`r`n    $hook`r`n" + $src.Substring($i + $anchor.Length)
+$j = $patched.LastIndexOf('});')
+if ($j -lt 0) { throw 'closure tail not found' }
+$patched = $patched.Substring(0, $j) + '})();' + $patched.Substring($j + 3)
+[IO.File]::WriteAllText("$run\main_perf.js", $patched, $utf8)
+
+Write-Host "[2/3] running headless Edge ..."
+$prof = Join-Path $run 'profile'
+$dom  = Join-Path $run 'dom.txt'
+$query = if ($Matrix) { '?perf=' + [Uri]::EscapeDataString($Matrix) } else { '?suite=1' }
+$url = 'file:///' + $run.Replace([char]92, [char]47) + '/harness.html' + $query
+$edgeArgs = @('--headless=new','--disable-gpu','--no-sandbox','--allow-file-access-from-files',"--user-data-dir=$prof",'--dump-dom', $url)
+$pr = Start-Process -FilePath $edge -PassThru -NoNewWindow -RedirectStandardOutput $dom -RedirectStandardError (Join-Path $run 'err.txt') -ArgumentList $edgeArgs
+$pr.WaitForExit(900000) | Out-Null
+if (-not $pr.HasExited) { $pr.Kill() }
+# A lingering child on the throw-away profile keeps the dump handle open: stop
+# ONLY processes on that profile (the user runs Edge), then read share-everything.
+Get-CimInstance Win32_Process -Filter "Name = 'msedge.exe'" | Where-Object { $_.CommandLine -like "*$prof*" } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {} }
+$d = ''
+for ($k = 0; $k -lt 40; $k++) {
+  try {
+    $fs = New-Object IO.FileStream($dom, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+    $sr = New-Object IO.StreamReader($fs); $d = $sr.ReadToEnd(); $sr.Close()
+    if ($d.Contains('</pre>')) { break }
+  } catch {}
+  Start-Sleep -Milliseconds 500
+}
+$a = $d.IndexOf('<pre id="out">'); $b = $d.IndexOf('</pre>', $a)
+if ($a -lt 0) { throw "no <pre id=out> in dump ($($d.Length) bytes) - see $run" }
+$txt = [System.Net.WebUtility]::HtmlDecode($d.Substring($a + 14, $b - $a - 14))
+if (-not $txt.StartsWith('RESULTS_JSON:')) { throw "harness did not finish: $($txt.Substring(0, [Math]::Min(400, $txt.Length)))" }
+$parsed = $txt.Substring(13) | ConvertFrom-Json
+
+Write-Host "[3/3] results"
+if ($parsed.fatal) { Write-Host "FATAL: $($parsed.fatal)" -ForegroundColor Red; Write-Host 'RESULT: RED'; return }
+if ($parsed.pageErrors -and $parsed.pageErrors.Count) { Write-Warning "main.js init errors (may invalidate results): $($parsed.pageErrors -join '; ')" }
+if ($Matrix) { $parsed.results | ForEach-Object { $_ | ConvertTo-Json -Compress }; return }
+$pass = 0; $fail = 0
+foreach ($r in $parsed.results) {
+  if ($r.pass) { $pass++; Write-Host ("  PASS  " + $r.name + "  [" + $r.detail + "]") -ForegroundColor Green }
+  else { $fail++; Write-Host ("  FAIL  " + $r.name) -ForegroundColor Red; Write-Host ("        " + $r.detail) -ForegroundColor DarkYellow }
+}
+Write-Host ("PASS {0}   FAIL {1}" -f $pass, $fail)
+Write-Host $(if ($fail -eq 0) { 'RESULT: GREEN' } else { 'RESULT: RED' })
+try { [IO.Directory]::Delete($run, $true) } catch {}

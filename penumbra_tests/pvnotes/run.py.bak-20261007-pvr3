@@ -1,0 +1,341 @@
+# =============================================================================
+# PIVOT ROW NOTES SUITE "pvnotes" (2026-10-06)
+#
+# Journal notes on PIVOT rows. A note icon at the start of each pivot row's OWN
+# label cell (the leaf cell in the nested layouts, a group's own spanning cell
+# for a note on the whole group, the row's first cell side-by-side) opens a
+# floating card with that row's thread - the table row's list + composer. The
+# key is the row's labels: [row field, value] pairs sorted by field, as JSON, so
+# it needs no key column, and the Row notes switch no longer waits for one (the
+# user's "Option 1"). Stored as SCOPE='pivot'; row_notes answers them apart.
+#
+# Each browser scenario boots the REAL main.js + penumbra_journal.js through the
+# real run path (stubbed query.php + manage_journal.php) on a 27-row DEPT x FY x
+# PI fixture saved as a PIVOT, with the View Options journal panel and the
+# journal dialog LIFTED from the index.php under test. driver.js records:
+#   V-*  the icons (where, how many, keys, counts, no text, faint, sticky offsets)
+#   C-*  the card (open, no fold, placed, focus, post, close by icon / band, one
+#        at a time, Escape keeps it, follows a scroll, re-anchors on a collapse,
+#        closes when the pivot is put away)
+#   K-*  the switch with no key (panel, on, counts, status, no table column,
+#        saved, off)      X-* copies / exports carry no icon
+#   R-*  the jump from the journal panel     J-* the panel's pivot-row tag
+#   P-*  preconditions    E-* no page errors
+#   T-*  round 2 (2026-10-07): the card's band on Wolfpack Red under a REAL hover
+# plus the server half (server_check.php on the manage_journal.php under test):
+#   S-*  the pivot key validator, add / reply scope, row_notes' pivot maps
+#
+#   py -3 run.py                        candidate = the app's live files
+#   py -3 run.py --stage DIR            candidate = a staged copy (DIR\js\main.js, DIR\index.php,
+#                                       DIR\css\main.css, DIR\js\penumbra_journal.js,
+#                                       DIR\css\penumbra_journal.css, DIR\manage_journal.php)
+#   py -3 run.py --control [--stage DIR] the PRE-FEATURE build: the newest *.bak-*-pvnotes of each
+#                                       file in the app (the deploy leaves them), or a staged copy
+#                                       with --stage: EXACTLY CONTROL_RED must fail
+#   py -3 run.py --mutant NAME / --mutants   single-point reverts of the candidate (mutants.json,
+#                                       anchor-checked by mk_mutants.py); each must turn exactly
+#                                       its own asserts red ("eq-" ones stay green by design)
+#   py -3 run.py --control-wolf         the build round 2 replaced (main.css = the newest
+#                                       css\main.css.bak-*-pvwolf, or --css F) on EVERY scenario:
+#                                       EXACTLY CONTROL_RED_WOLF must fail
+#   --css F     the main.css under test (any mode)
+#   --scn a,b   a subset;   --keep keeps the staging dir;   --app DIR libs source
+#
+# Headless Edge over CDP; stages into %TEMP%; writes nothing to the webroot.
+# Needs Python 3 + websocket-client (py -3 -m pip install websocket-client).
+# =============================================================================
+import glob, json, os, shutil, socket, subprocess, sys, tempfile, time, urllib.request
+import websocket
+try: sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+except Exception: pass
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js',
+        'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
+        'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js']
+# The files under test: name -> path relative to the app (or the stage).
+FILES = {'main': 'js\\main.js', 'index': 'index.php', 'css': 'css\\main.css', 'journal': 'js\\penumbra_journal.js',
+         'jcss': 'css\\penumbra_journal.css', 'manage': 'manage_journal.php'}
+BROWSER_SCN = ['nested', 'static', 'flat', 'single', 'reorder', 'rank', 'collapsed', 'reveal', 'off', 'exports', 'jpanel']
+ROUND1_SCN = BROWSER_SCN + ['server']
+# Round 2 (2026-10-07, user): on Wolfpack Red the card's band went solid red on hover
+# with its dark / muted text on top.
+ROUND2_SCN = ['wolfpack']
+ALL_SCN = ROUND1_SCN + ROUND2_SCN
+EXPECT = {
+    'nested': ['P-nested-render', 'V-nested-leaf', 'V-nested-group', 'V-nested-count', 'V-nested-notext', 'V-nested-faint',
+               'V-nested-sticky', 'C-nested-open', 'C-nested-nofold', 'C-nested-place', 'C-nested-focus', 'C-nested-post',
+               'C-nested-again', 'C-nested-one', 'C-nested-band', 'C-nested-esc', 'C-nested-follow', 'C-nested-collapse',
+               'C-nested-away'],
+    'static': ['V-static'],
+    'flat': ['V-flat'],
+    'single': ['V-single'],
+    'reorder': ['V-reorder'],
+    'rank': ['P-rank-other', 'V-rank'],
+    'collapsed': ['P-collapsed-lazy', 'V-collapsed-sum', 'V-collapsed-built'],
+    'reveal': ['P-reveal-closed', 'R-reveal', 'R-reveal-other'],
+    'off': ['V-off-none', 'K-off-panel', 'K-off-on', 'K-off-counts', 'K-off-status', 'K-off-noflat', 'K-off-saved', 'K-off-off'],
+    'exports': ['V-exports-icons', 'X-exports-html', 'X-exports-array', 'X-exports-csv'],
+    'jpanel': ['J-chip-pivot', 'J-chip-row', 'J-chip-tip', 'J-chip-jump'],
+    'wolfpack': ['P-wolf-hover', 'T-wolf-band'],
+    'server': ['S-key-valid', 'S-key-shape', 'S-add-scope', 'S-reply-scope', 'S-rownotes-pivot'],
+}
+# What the pre-feature build gets wrong. Frozen from its first control run:
+# every other assert must PASS on the old build too, which is what proves the
+# fixture and the read-out are not the bug. None = not frozen yet.
+# (frozen 2026-10-06 from that day's live build, main.js 0606a8f7)
+CONTROL_RED = ['V-nested-leaf', 'V-nested-group', 'V-nested-count', 'V-nested-notext', 'V-nested-faint',
+               'C-nested-open', 'C-nested-nofold', 'C-nested-place', 'C-nested-focus', 'C-nested-post',
+               'C-nested-again', 'C-nested-one', 'C-nested-band', 'C-nested-esc', 'C-nested-follow',
+               'C-nested-collapse', 'C-nested-away', 'V-static', 'V-flat', 'V-single', 'V-reorder', 'V-rank',
+               'V-collapsed-sum', 'V-collapsed-built', 'R-reveal', 'R-reveal-other', 'K-off-panel',
+               'K-off-on', 'K-off-counts', 'K-off-status', 'K-off-saved', 'V-exports-icons', 'J-chip-pivot',
+               'J-chip-tip', 'J-chip-jump', 'S-key-valid', 'S-key-shape', 'S-add-scope', 'S-reply-scope',
+               'S-rownotes-pivot']
+
+# --control-wolf: the build round 2 replaced (live 2026-10-06 19:14, main.css 2de301ed) on
+# EVERY scenario - round 1 all green, only the band fails.
+CONTROL_RED_WOLF = ['T-wolf-band']
+
+# --- mutants: name -> {file, edits, must, scn} (mutants.json, built by mk_mutants.py) --------
+MUTANTS = json.load(open(os.path.join(HERE, 'mutants.json'), encoding='utf-8')) if os.path.exists(os.path.join(HERE, 'mutants.json')) else {}
+
+args = sys.argv[1:]
+def opt(name, default=None):
+    if name in args:
+        i = args.index(name); v = args[i + 1]; del args[i:i + 2]; return v
+    return default
+def flag(name):
+    if name in args: args.remove(name); return True
+    return False
+stage_dir = opt('--stage', None)
+app_dir = opt('--app', APP)
+scn_arg = opt('--scn', None)
+one_mutant = opt('--mutant', None)
+all_mutants = flag('--mutants')
+control = flag('--control')
+control_wolf = flag('--control-wolf')
+css_over = opt('--css', None)
+keep = flag('--keep')
+verbose = flag('--verbose')
+if args: raise SystemExit('unknown arguments: %s' % ' '.join(args))
+
+paths = {}
+for k, rel in FILES.items():
+    if control and not stage_dir:
+        baks = sorted(glob.glob(os.path.join(APP, rel + '.bak-*-pvnotes')))
+        # a file the deploy did not touch has no .bak: the live one IS the old one
+        paths[k] = baks[-1] if baks else os.path.join(APP, rel)
+    else:
+        paths[k] = os.path.join(stage_dir or APP, rel)
+if control_wolf and not css_over:
+    baks = sorted(glob.glob(os.path.join(APP, FILES['css'] + '.bak-*-pvwolf')))
+    if not baks: raise SystemExit('no css\\main.css.bak-*-pvwolf: pass --css <the main.css before round 2>')
+    paths['css'] = baks[-1]
+if css_over: paths['css'] = css_over
+
+def read_b(p): return open(p, 'rb').read().decode('utf-8', 'surrogateescape')
+
+def lift(index_text, marker):
+    """A <div id="..."> block from index.php, verbatim, to its close."""
+    a = index_text.find('<div id="%s"' % marker)
+    if a < 0: raise SystemExit('index.php: no #' + marker)
+    depth, i = 0, a
+    while True:
+        o = index_text.find('<div', i); c = index_text.find('</div>', i)
+        if c < 0: raise SystemExit('index.php: #%s never closes' % marker)
+        if o != -1 and o < c: depth += 1; i = o + 4
+        else:
+            depth -= 1; i = c + 6
+            if depth == 0: break
+    block = index_text[a:i]
+    if '<?' in block: raise SystemExit('index.php: PHP inside #%s - the lift needs updating' % marker)
+    return block
+
+def hook(src):
+    """The ready closure becomes an IIFE with a name-by-name export hook; hideLoading
+    counts its calls; the end of init applies the harness's on-demand row threshold."""
+    anchor = '$(document).ready(function () {'
+    i = src.find(anchor)
+    if i < 0 or i > 400: raise SystemExit('closure anchor not found')
+    names = ['buildStateObject', 'getPivotDataAsArray', 'getPivotCsvForCopy', 'generateWysiwygHtml', 'togglePivotGroup']
+    h = ('\r\n;try { window.__PV = {}; } catch (e) { window.__PV_ERR = String(e); }\r\n'
+         'try { [' + ','.join('"%s"' % n for n in names) + '].forEach(function (k) { try { window.__PV[k] = eval(k); } catch (e) { (window.__PV_MISSING = window.__PV_MISSING || []).push(k); } }); } catch (e) { window.__PV_ERR2 = String(e); }\r\n')
+    out = src[:i] + ';(function () {' + h + src[i + len(anchor):]
+    j = out.rfind('});')
+    tail = '\r\n;try { if (window.__PV_LAZY_MIN) _pivotLazyMinRows = window.__PV_LAZY_MIN; } catch (e) { window.__PV_LAZY_ERR = String(e); }\r\n'
+    out = out[:j] + tail + '})();' + out[j + 3:]
+    hl = '    function hideLoading() {\r\n'
+    if out.count(hl) != 1: raise SystemExit('hideLoading anchor count %d' % out.count(hl))
+    return out.replace(hl, hl + '        window.__PV_HIDES = (window.__PV_HIDES || 0) + 1;\r\n')
+
+def mutate(texts, name):
+    m = MUTANTS[name]
+    f = m.get('file', 'main')
+    src = texts[f]
+    for old, new in m['edits']:
+        if src.count(old) != 1: raise SystemExit("mutant '%s': anchor found %d times in %s (needs the FEATURE build): %r" % (name, src.count(old), f, old[:90]))
+        src = src.replace(old, new)
+    out = dict(texts); out[f] = src
+    return out
+
+stage = tempfile.mkdtemp(prefix='pnb_pv_')
+for f in LIBS: shutil.copyfile(os.path.join(app_dir, 'js', f), os.path.join(stage, f))
+shutil.copyfile(os.path.join(HERE, 'driver.js'), os.path.join(stage, 'driver.js'))
+harness = open(os.path.join(HERE, 'harness.html'), encoding='utf-8').read()
+for mk in ('<!--PV_VIEW_OPTIONS-->', '<!--PV_JOURNAL_LIGHTBOX-->'):
+    if harness.count(mk) != 1: raise SystemExit('harness: splice marker missing: ' + mk)
+
+def free_port():
+    s = socket.socket(); s.bind(('127.0.0.1', 0)); p = s.getsockname()[1]; s.close(); return p
+hp, dp = free_port(), free_port()
+srv = subprocess.Popen([sys.executable, '-m', 'http.server', str(hp), '--bind', '127.0.0.1', '--directory', stage], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+edge = subprocess.Popen([EDGE, '--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check', '--disable-sync',
+                         '--disable-extensions', '--user-data-dir=' + os.path.join(stage, 'profile'), '--window-size=1500,900',
+                         '--remote-debugging-port=%d' % dp, '--remote-allow-origins=*', 'about:blank'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+def jget(p, m='GET'):
+    return json.loads(urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:%d%s' % (dp, p), method=m), timeout=15).read().decode())
+for _ in range(150):
+    try: jget('/json/version'); break
+    except Exception: time.sleep(0.2)
+
+# A TRUSTED key press, asked for by the page (window.__wantKeys = ['Escape']).
+KEYS = {' ': ('Space', 32, ' '), 'Tab': ('Tab', 9, None), 'Enter': ('Enter', 13, '\r'), 'Escape': ('Escape', 27, None)}
+def press(call, key):
+    code, vk, text = KEYS[key]
+    down = {'type': 'keyDown', 'key': key, 'code': code, 'windowsVirtualKeyCode': vk, 'nativeVirtualKeyCode': vk}
+    if text: down['text'] = text
+    call('Input.dispatchKeyEvent', down)
+    call('Input.dispatchKeyEvent', {'type': 'keyUp', 'key': key, 'code': code, 'windowsVirtualKeyCode': vk, 'nativeVirtualKeyCode': vk})
+
+def run_page(scn):
+    t = jget('/json/new?about:blank', 'PUT')
+    ws = websocket.create_connection(t['webSocketDebuggerUrl'], timeout=300, suppress_origin=True)
+    n = [0]
+    def call(m, p=None):
+        n[0] += 1; mid = n[0]
+        ws.send(json.dumps({'id': mid, 'method': m, 'params': p or {}}))
+        while True:
+            r = json.loads(ws.recv())
+            if r.get('id') == mid: return r.get('result', {})
+    try:
+        call('Network.enable')
+        call('Network.setCacheDisabled', {'cacheDisabled': True})   # every build is written to the same file names
+        call('Emulation.setFocusEmulationEnabled', {'enabled': True})
+        call('Page.navigate', {'url': 'http://127.0.0.1:%d/harness.html?id=pvfix&scn=%s' % (hp, scn)})
+        t0 = time.time()
+        while time.time() - t0 < 180:
+            time.sleep(0.25)
+            k = call('Runtime.evaluate', {'expression': '(window.__wantKeys && !window.__keysSent) ? JSON.stringify(window.__wantKeys) : null', 'returnByValue': True}).get('result', {}).get('value')
+            if k:
+                for key in json.loads(k): press(call, key)
+                call('Runtime.evaluate', {'expression': 'window.__keysSent = true'})
+            hv = call('Runtime.evaluate', {'expression': '(window.__wantHover && !window.__hoverSent) ? JSON.stringify(window.__wantHover) : null', 'returnByValue': True}).get('result', {}).get('value')
+            if hv:   # a REAL pointer move: CSS :hover follows it (a dispatched mouseover does not)
+                pt = json.loads(hv)
+                call('Input.dispatchMouseEvent', {'type': 'mouseMoved', 'x': pt['x'], 'y': pt['y'], 'button': 'none'})
+                call('Runtime.evaluate', {'expression': 'window.__hoverSent = true'})
+            v = call('Runtime.evaluate', {'expression': 'window.__PVDONE ? JSON.stringify(window.__PVRESULT) : null', 'returnByValue': True}).get('result', {}).get('value')
+            if v: return json.loads(v)
+        return {'fatal': 'timeout (180 s)'}
+    finally:
+        try: ws.close()
+        except Exception: pass
+        try: urllib.request.urlopen('http://127.0.0.1:%d/json/close/%s' % (dp, t['id']), timeout=10).read()
+        except Exception: pass
+
+def run_server(manage_text):
+    p = os.path.join(stage, 'manage_journal_under_test.php')
+    open(p, 'wb').write(manage_text.encode('utf-8', 'surrogateescape'))
+    r = subprocess.run([PHP, '-n', os.path.join(HERE, 'server_check.php'), p], capture_output=True, timeout=60)
+    try: return json.loads(r.stdout.decode('utf-8', 'replace'))
+    except Exception: return {'fatal': 'server_check: ' + (r.stdout + r.stderr).decode('utf-8', 'replace')[:400]}
+
+def run_build(texts, scns):
+    open(os.path.join(stage, 'main_pv.js'), 'wb').write(hook(texts['main']).encode('utf-8', 'surrogateescape'))
+    open(os.path.join(stage, 'penumbra_journal_pv.js'), 'wb').write(texts['journal'].encode('utf-8', 'surrogateescape'))
+    open(os.path.join(stage, 'main.css'), 'wb').write(texts['css'].encode('utf-8', 'surrogateescape'))
+    open(os.path.join(stage, 'penumbra_journal.css'), 'wb').write(texts['jcss'].encode('utf-8', 'surrogateescape'))
+    page = harness.replace('<!--PV_VIEW_OPTIONS-->', lift(texts['index'], 'journalRowConfig')) \
+                  .replace('<!--PV_JOURNAL_LIGHTBOX-->', lift(texts['index'], 'journalLightbox'))
+    open(os.path.join(stage, 'harness.html'), 'w', encoding='utf-8').write(page)
+    out = {}
+    for s in scns:
+        out[s] = run_server(texts['manage']) if s == 'server' else run_page(s)
+    return out
+
+def evaluate(res, scns):
+    out = []
+    for s in scns:
+        r = res.get(s, {})
+        got = {a['id']: a for a in (r.get('asserts') or [])}
+        for aid in EXPECT[s]:
+            if aid in got: out.append((aid, got[aid]['ok'], got[aid]['detail']))
+            else: out.append((aid, False, 'NOT RECORDED' + (' | fatal: ' + (r.get('fatal') or '')[:300] if r.get('fatal') else '')))
+        for aid, a in got.items():
+            if aid not in EXPECT[s]: out.append((aid, a['ok'], 'UNEXPECTED ID ' + a['detail']))
+        if s != 'server':
+            out.append(('E-' + s, not r.get('errors') and not r.get('hookErr') and not r.get('missing') and not r.get('fatal'),
+                        'errors %s hook %s missing %s fatal %s' % (r.get('errors'), r.get('hookErr'), r.get('missing'), (r.get('fatal') or '')[:200])))
+    return out
+
+try:
+    texts = {k: read_b(p) for k, p in paths.items()}
+    for k in FILES: print('%-8s %s' % (k, paths[k]))
+    if control: print('(CONTROL: the pre-feature build)')
+    if control_wolf: print('(CONTROL-WOLF: the build before round 2)')
+    pool = ROUND1_SCN if control else ALL_SCN
+    names = [s for s in pool if not scn_arg or s in scn_arg.split(',')]
+    if all_mutants or one_mutant:
+        ok = bad = 0
+        for m in (one_mutant.split(',') if one_mutant else list(MUTANTS)):
+            mm = MUTANTS[m]
+            sc = [s for s in (mm.get('scn') or names) if s in names]
+            res = evaluate(run_build(mutate(texts, m), sc), sc)
+            red = [a for a, p, _ in res if not p]
+            must = mm.get('must')
+            if must is None:
+                print('  EXPLORE mutant %-16s red: %s' % (m, ' '.join(red) or '(nothing)'))
+                for a, p, d in res:
+                    if not p: print('        %-20s %s' % (a, d[:300]))
+                bad += 1
+                continue
+            good = sorted(red) == sorted(must)
+            ok += good; bad += (not good)
+            print('  %s  mutant %-16s turns %s red   [red: %s]' % ('PASS' if good else 'FAIL', m, ' '.join(must) or '(nothing)', ' '.join(red)))
+            if verbose or not good:
+                for a, p, d in res:
+                    if not p: print('        %-20s %s' % (a, d[:300]))
+        print('SUMMARY mutants ok=%d bad=%d' % (ok, bad))
+        print('RESULT: GREEN' if bad == 0 and ok > 0 else 'RESULT: RED')
+    else:
+        res = evaluate(run_build(texts, names), names)
+        p = f = 0; failed = []
+        for a, passed, d in res:
+            print('  %s  %-20s %s' % ('PASS' if passed else 'FAIL', a, d[:420]))
+            if passed: p += 1
+            else: f += 1; failed.append(a)
+        print('TOTAL pass=%d fail=%d   failed: %s' % (p, f, ' '.join(failed)))
+        if control or control_wolf:
+            reds = CONTROL_RED if control else CONTROL_RED_WOLF
+            if reds is None:
+                print('CONTROL: not frozen yet - red set: %s' % ' '.join(failed))
+                print('RESULT: RED')
+            else:
+                want = [a for a in reds if any(a in EXPECT[s] or a == 'E-' + s for s in names)]
+                same = sorted(failed) == sorted(want)
+                print('CONTROL: %s (expected red: %s)' % ('as expected' if same else 'NOT as expected', ' '.join(want)))
+                print('RESULT: GREEN' if same else 'RESULT: RED')
+        else:
+            print('RESULT: GREEN' if f == 0 and p > 0 else 'RESULT: RED')
+finally:
+    try: edge.kill()
+    except Exception: pass
+    try: srv.kill()
+    except Exception: pass
+    time.sleep(1)
+    if keep: print('kept: ' + stage)
+    else: shutil.rmtree(stage, ignore_errors=True)

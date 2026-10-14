@@ -1,0 +1,310 @@
+# =============================================================================
+# Run the date-range prompt tests ([PROMPT;type=date-range]).
+#
+#   powershell -File run.ps1
+#   powershell -File run.ps1 -App <path>   # run against a stage instead of live
+#                                          # (a file the stage lacks comes from live)
+#   powershell -File run.ps1 -Control      # one deliberately FALSE assertion in
+#                                          # each of the three halves; each must
+#                                          # report FAIL 1
+#   powershell -File run.ps1 -Mutant       # eight targeted mutants; each MUST go
+#                                          # red with the exact counts named below
+#
+# WHAT IS UNDER TEST. One prompt, two dates. The answer is a single raw string
+# "<from>..<to>"; the author writes the SQL operator and the engine supplies the
+# two values (`col BETWEEN [PROMPT;type=date-range;...]`, or template= with
+# :from / :to). Three engines resolve prompts in this app - js/main.js in the
+# browser, index.php for ?json=1, schedule_runner.php for scheduled tasks - and
+# their history is one of drifting apart. Three halves, tied together:
+#
+#   1. test_daterange.php           the shared PHP helpers (shared_logic.php), each
+#                                   PHP engine's wiring around them, and PHP-to-PHP
+#                                   parity. It then WRITES A FIXTURE: every parity
+#                                   case, as the PHP engines answered it.
+#   2. daterange_browser_tests.js   the browser ENGINE and the DIALOG, in headless
+#                                   Edge with real jQuery / jQuery UI / moment:
+#                                   the helpers, processPrompts, the two-calendar
+#                                   dialog (real clicks on real day cells) - and
+#                                   that fixture, which the browser engine must
+#                                   reproduce byte for byte once its binds are
+#                                   written back in as literals.
+#   3. daterange_builder_tests.js   the TAG GENERATOR. The whole of main.js is
+#                                   booted (its ready closure unwrapped) over the
+#                                   builder markup LIFTED from the index.php under
+#                                   test, and the builder is driven by real events:
+#                                   Type, typing, the quick-range menu, Test,
+#                                   Generate, Edit Existing. Added 2026-09-21 after
+#                                   the first build shipped with halves 1 and 2
+#                                   green and the builder barely touched - the
+#                                   owner found that by hand within the hour.
+#
+# Halves 1 and 2 lift the functions under test out of the app files by name;
+# half 3 runs the real file whole. Nothing is require()d that could open a
+# database or send mail, and nothing is a pasted copy.
+#
+# EXPECTED TAIL:
+#   php     | PASS: 136   FAIL: 0
+#   browser | PASS: 153   FAIL: 0
+#   builder | PASS: 53   FAIL: 0
+#   RESULT: GREEN
+# (match on the FAIL counts - the totals move as coverage lands.)
+#
+# The rolling-date cases compare against "today", computed on both sides at run
+# time. A run that straddles midnight can therefore go red once; run it again.
+#
+# UNC .ps1 files are GPO-blocked here ("not digitally signed") - run the body as
+# a scriptblock rather than with -File:
+#   $dir = '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\daterange'
+#   & ([scriptblock]::Create([IO.File]::ReadAllText("$dir\run.ps1").Replace('$here = $PSScriptRoot', "`$here = '$dir'")))
+# Never add a bare `exit` for the same reason: it would kill the caller. And do
+# not pipe the invocation: a lingering headless-Edge child can hold stdout open.
+# =============================================================================
+param(
+    [string]$App = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra',
+    [switch]$Control,
+    [switch]$Mutant,
+    [string]$Only = ''          # with -Mutant: just these letters, e.g. -Only GH (for re-measuring after an edit)
+)
+
+$ErrorActionPreference = 'Stop'
+$here = $PSScriptRoot
+if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Path }
+$php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+$edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+$live = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+$work = Join-Path $env:TEMP ('pnb_daterange_' + $PID)
+New-Item -ItemType Directory -Force -Path $work | Out-Null
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+
+# The app files the three halves read. A stage usually holds only what was
+# edited, so anything it lacks is taken from live - and said out loud, because
+# "green against the stage" must not quietly mean "green against live".
+$appFiles = 'shared_logic.php', 'schedule_runner.php', 'index.php', 'penumbra_search.php', 'js\main.js'
+function Copy-AppInto([string]$dest) {
+    New-Item -ItemType Directory -Force -Path (Join-Path $dest 'js') | Out-Null
+    $fromLive = @()
+    foreach ($f in $appFiles) {
+        $src = Join-Path $App $f
+        if (-not (Test-Path -LiteralPath $src)) { $src = Join-Path $live $f; $fromLive += $f }
+        Copy-Item -LiteralPath $src -Destination (Join-Path $dest $f) -Force
+    }
+    return ,$fromLive
+}
+
+# One headless-Edge page -> the text of its <pre id="out">. Start-Process +
+# -RedirectStandardOutput, never `>` or a pipe (PS 5.1 loses native stdout that
+# way); a profile dir of its OWN per launch (a shared one hung Edge when two
+# launches overlapped); up to two launches, because Edge now and then exits
+# without dumping the page - that is the browser, not the code under test. A
+# page that really stalls says so itself ("STALLED in: <section>") and is NOT
+# retried.
+function Invoke-EdgePage([string]$pageDir, [string]$pageFile, $lines, [string]$tag) {
+    $dom = Join-Path $pageDir ($pageFile + '.dom.txt')
+    $url = 'file:///' + ((Join-Path $pageDir $pageFile) -replace '\\', '/')
+    $text = ''; $errs = ''
+    for ($attempt = 1; $attempt -le 2; $attempt++) {
+        $ud = Join-Path $work ('ud_' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+        if (Test-Path $dom) { try { [IO.File]::Delete($dom) } catch { } }
+        $p = Start-Process -FilePath $edge -PassThru -NoNewWindow -RedirectStandardOutput $dom -RedirectStandardError (Join-Path $pageDir 'edge_err.txt') -ArgumentList '--headless=new', '--disable-gpu', '--no-sandbox', '--allow-file-access-from-files', '--no-first-run', '--disable-sync', '--disable-extensions', "--user-data-dir=$ud", '--window-size=1400,1000', '--virtual-time-budget=60000', '--dump-dom', $url
+        if (-not $p.WaitForExit(240000)) {
+            Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" | Where-Object { $_.CommandLine -like "*$ud*" } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch { } }
+            $lines.Add("$tag | launch $attempt TIMED OUT after 240s - headless Edge was stopped")
+        }
+        $domText = ''
+        if (Test-Path $dom) {
+            # The redirected stdout file can stay locked for a moment after Edge exits.
+            for ($try = 0; $try -lt 40; $try++) {
+                try { $domText = [IO.File]::ReadAllText($dom); break } catch [System.IO.IOException] { Start-Sleep -Milliseconds 250 }
+            }
+        }
+        $text = [System.Net.WebUtility]::HtmlDecode([regex]::Match($domText, '(?s)<pre id="out"[^>]*>(.*?)</pre>').Groups[1].Value)
+        $errs = [System.Net.WebUtility]::HtmlDecode([regex]::Match($domText, '(?s)<pre id="errs"[^>]*>(.*?)</pre>').Groups[1].Value)
+        if ($text -match 'DONE' -or $text -match 'STALLED in:' -or $text -match 'HARNESS') { break }
+        if ($attempt -eq 1) { $lines.Add("$tag | launch 1 produced no page dump - launching once more") }
+    }
+    ($errs -split "`n") | Where-Object { $_.Trim() -ne '' } | Select-Object -First 6 | ForEach-Object { $lines.Add("$tag | $_") }
+    ($text -split "`n") | Where-Object { $_ -match '^\s+FAIL |^\s+(got|want)[ :]|^HARNESS|^STALLED|^page errors' } | ForEach-Object { $lines.Add("$tag | $_") }
+    $fails = -1
+    $bt = [regex]::Match($text, 'PASS: \d+\s+FAIL: (\d+)')
+    if ($bt.Success -and $text -match 'DONE') { $fails = [int]$bt.Groups[1].Value; $lines.Add("$tag | " + $bt.Value) }
+    else { $lines.Add("$tag | NO RESULT - the page did not finish (see the STALLED / HARNESS line above, if any)") }
+    return $fails
+}
+
+# Runs all three halves against one app directory.
+# Returns @{ php; browser; builder; lines } - a count of -1 means that half produced no result at all.
+function Invoke-DateRangeSuite([string]$AppDir, [bool]$AsControl) {
+    $lines = New-Object System.Collections.Generic.List[string]
+    $run = Join-Path $work ('run_' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+    New-Item -ItemType Directory -Force -Path $run | Out-Null
+    $ctl = if ($AsControl) { 'window.__control = true;' } else { '' }
+
+    # ---- half 1: PHP. -n because a workstation cannot load oci8/sqlsrv; the test
+    # sets its own timezone, which -n would otherwise drop to UTC.
+    $fx = Join-Path $run 'FIXTURE.js'
+    $phpArgs = @('-n', (Join-Path $here 'test_daterange.php'), $AppDir, $fx)
+    if ($AsControl) { $phpArgs += '--control' }
+    # PS 5.1 wraps a native exe's stderr in ErrorRecords, and under 'Stop' the
+    # first one ends the script - which is exactly what happens when the feature
+    # is not in $AppDir and the test says so on stderr. Relax it for this call
+    # and keep the text, so that case reads as a clean RED below.
+    $eap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $phpOut = & $php @phpArgs 2>&1 | ForEach-Object { "$_" }
+    $ErrorActionPreference = $eap
+    $phpFails = -1
+    $tail = ($phpOut | Where-Object { $_ -match '^PASS: \d+\s+FAIL: \d+' } | Select-Object -Last 1)
+    if ($tail -and $tail -match 'FAIL:\s*(\d+)') { $phpFails = [int]$Matches[1] }
+    $phpOut | Where-Object { $_ -match '^\s+FAIL |^\s+(got|want)[ :]|^lift:|^could not|^cannot read' } | ForEach-Object { $lines.Add('php     | ' + $_) }
+    $lines.Add('php     | ' + $(if ($tail) { $tail } else { 'NO RESULT - the PHP half did not finish (is the feature in this app directory?)' }))
+    if (-not (Test-Path $fx)) { [IO.File]::WriteAllText($fx, 'window.__fixture = null;') }
+
+    # ---- half 2: the browser engine + the dialog. Functions are lifted by name
+    # from main.js, which is baked into a JS string: `new Function` on text reports
+    # a real SyntaxError, where a file:// <script src> would only say "Script error."
+    $mainText = [IO.File]::ReadAllText((Join-Path $AppDir 'js\main.js'))
+    foreach ($lib in 'jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js') { Copy-Item (Join-Path $live "js\$lib") (Join-Path $run $lib) -Force }
+    Copy-Item (Join-Path $here 'daterange_browser_tests.js') (Join-Path $run 'tests.js') -Force
+    [IO.File]::WriteAllText((Join-Path $run 'SRC.js'), 'window.__src = ' + ($mainText | ConvertTo-Json -Compress) + ';')
+    # requestAnimationFrame = null: jQuery's fx ticker prefers rAF, which never
+    # fires under --dump-dom; without this an animation callback would stall the run.
+    $html = '<!doctype html><html><head><meta charset="utf-8"></head><body><pre id="out">running</pre><pre id="errs"></pre>' +
+            '<script>window.onerror=function(m,s,l,c){document.getElementById("errs").textContent+="ONERROR: "+m+" @"+l+":"+c+"\n";};' +
+            'window.addEventListener("unhandledrejection",function(ev){document.getElementById("errs").textContent+="UNHANDLED: "+(ev.reason&&ev.reason.message||ev.reason)+"\n";});' +
+            'window.requestAnimationFrame=null;' + $ctl + '</script>' +
+            '<script src="jquery-3.7.1.min.js"></script><script src="jquery-ui.min.js"></script><script src="moment.min.js"></script>' +
+            '<script src="SRC.js"></script><script src="FIXTURE.js"></script><script src="tests.js"></script></body></html>'
+    [IO.File]::WriteAllText((Join-Path $run 'h.html'), $html)
+    $browserFails = Invoke-EdgePage $run 'h.html' $lines 'browser'
+
+    # ---- half 3: the Tag Generator, in the whole of main.js
+    $builderFails = -1
+    $idx = [IO.File]::ReadAllText((Join-Path $AppDir 'index.php'))
+    $i0 = $idx.IndexOf('<div id="promptGeneratorLightbox"')
+    $i1 = if ($i0 -ge 0) { $idx.IndexOf('<?php', $i0) } else { -1 }    # the lightbox is the last thing inside its `if`; the endif follows it
+    $anchor = '$(document).ready(function () {'
+    if ($i0 -lt 0 -or $i1 -le $i0) { $lines.Add('builder | NO RESULT - could not find the Tag Generator markup in index.php') }
+    elseif (-not $mainText.Substring(0, 200).Contains($anchor)) { $lines.Add('builder | NO RESULT - main.js closure anchor not found') }
+    else {
+        # The WHOLE lightbox, verbatim - both tabs, because opening the builder
+        # resets the Subquery form too. It is PHP-free up to the endif after it;
+        # if the <div>s no longer balance, the cut landed somewhere else.
+        $markup = $idx.Substring($i0, $i1 - $i0).TrimEnd()
+        $opens  = [regex]::Matches($markup, '<div[\s>]').Count
+        $closes = [regex]::Matches($markup, '</div>').Count
+        if ($opens -ne $closes) { $lines.Add("builder | NO RESULT - the lifted Tag Generator markup is not balanced ($opens <div> vs $closes </div>); index.php has moved") }
+        else {
+            $b = Join-Path $run 'builder'
+            New-Item -ItemType Directory -Force -Path $b | Out-Null
+            foreach ($lib in 'jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js', 'show-hint.js',
+                             'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js', 'penumbra_snippet_help.js',
+                             'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js') { Copy-Item (Join-Path $live "js\$lib") (Join-Path $b $lib) -Force }
+            Copy-Item (Join-Path $here 'daterange_builder_tests.js') (Join-Path $b 'builder_tests.js') -Force
+            $page = [IO.File]::ReadAllText((Join-Path $here 'builder_harness.html'), $utf8)
+            $page = [regex]::Replace($page, '<!-- BUILDER_MARKUP:.*?-->', [System.Text.RegularExpressions.MatchEvaluator]{ param($x) $markup })
+            if ($AsControl) { $page = $page.Replace('<script src="main_pg.js"></script>', '<script>window.__control = true;</script><script src="main_pg.js"></script>') }
+            [IO.File]::WriteAllText((Join-Path $b 'h.html'), $page, $utf8)
+            # Unwrap the ready closure so it runs where it stands, and export a few
+            # closure names. The wrappers look the names up when CALLED, long after
+            # the closure's `let` / `const` lines have run - no temporal dead zone.
+            $hook = 'try { window.__PG = {' +
+                    ' getEditor: function () { return editor; },' +
+                    ' parsePrompt: function (s) { return parsePrompt(s); },' +
+                    ' prefill: function (c) { return prefillPromptGenerator(c); },' +
+                    ' populateParents: function () { return populateParentPromptSelectors(); },' +
+                    ' forcedKeys: function () { return Array.from(_forceDefaultApplied); }' +
+                    ' }; } catch (e) { window.__PG_ERR = String(e); }'
+            $k = $mainText.IndexOf($anchor)
+            $patched = $mainText.Substring(0, $k) + ';(function () {' + "`r`n" + $hook + "`r`n" + $mainText.Substring($k + $anchor.Length)
+            $j = $patched.LastIndexOf('});')
+            $patched = $patched.Substring(0, $j) + '})();' + $patched.Substring($j + 3)
+            [IO.File]::WriteAllText((Join-Path $b 'main_pg.js'), $patched, $utf8)
+            $builderFails = Invoke-EdgePage $b 'h.html' $lines 'builder'
+        }
+    }
+
+    return @{ php = $phpFails; browser = $browserFails; builder = $builderFails; lines = $lines }
+}
+
+function Remove-Work { try { [IO.Directory]::Delete($work, $true) } catch { } }   # not Remove-Item: the tool's pre-filter rejects it on a variable path
+
+if (-not $Mutant) {
+    $effApp = Join-Path $work 'app'
+    $fromLive = Copy-AppInto $effApp
+    if ("$App" -ne "$live" -and $fromLive.Count -gt 0) { Write-Output ('note    | not in the stage, taken from LIVE: ' + ($fromLive -join ', ')) }
+    $r = Invoke-DateRangeSuite $effApp ([bool]$Control)
+    $r.lines | ForEach-Object { Write-Output $_ }
+    if ($Control) {
+        $ok = ($r.php -eq 1 -and $r.browser -eq 1 -and $r.builder -eq 1)
+        Write-Output $(if ($ok) { 'CONTROL: all three halves reported exactly the one deliberate failure - the suite can see red' } else { "CONTROL BROKEN: expected FAIL 1 / 1 / 1, got $($r.php) / $($r.browser) / $($r.builder)" })
+    } else {
+        Write-Output ('RESULT: ' + $(if ($r.php -eq 0 -and $r.browser -eq 0 -and $r.builder -eq 0) { 'GREEN' } else { 'RED' }))
+    }
+    Remove-Work
+    return
+}
+
+# --- targeted mutants ---------------------------------------------------------
+# Each reverts ONE decision the feature makes, in a scratch copy of the app. The
+# expected fail counts are exact, per half: a mutant that stays green, or goes red
+# somewhere it was not expected to, means the suite is not pinning what it claims.
+$mutApp = Join-Path $work 'mutapp'
+$mutants = @(
+    @{ name = 'A: two-digit years read with the LANGUAGE pivot, not the database (Oracle RR) window'
+       file = 'shared_logic.php'; php = 4; browser = 1; builder = 0
+       from = "        `$d = (int)`$m[1]; `$mo = `$MON[`$monKey]; `$y = (int)`$m[3];`n        if (strlen(`$m[3]) === 2) `$y += (`$y >= 50) ? 1900 : 2000;"
+       to   = "        `$d = (int)`$m[1]; `$mo = `$MON[`$monKey]; `$y = (int)`$m[3];`n        if (strlen(`$m[3]) === 2) `$y += (`$y >= 70) ? 1900 : 2000;" },
+    @{ name = 'B: a reversed range is let through (BETWEEN would return zero rows, silently)'
+       file = 'shared_logic.php'; php = 5; browser = 1; builder = 0
+       from = '    if ($a > $b) {'
+       to   = '    if (false) {' },
+    @{ name = "C: the author's quotes around the tag are left in place"
+       file = 'shared_logic.php'; php = 3; browser = 1; builder = 0
+       from = "    if (`$before === `"'`" && `$after === `"'`") {"
+       to   = '    if (false) {' },
+    @{ name = 'D: the browser sends ONE bind (the generic path) instead of two'
+       file = 'js\main.js'; php = 0; browser = 21; builder = 3
+       from = "                } else if (_isDrPrompt) {`n                    // TWO binds from one prompt."
+       to   = "                } else if (false) {`n                    // TWO binds from one prompt." },
+    @{ name = 'E: a forced default is STORED RESOLVED - the frozen-default bug of 2026-08-31, again'
+       file = 'js\main.js'; php = 0; browser = 2; builder = 0
+       from = "                            value: drForcedRaw,"
+       to   = "                            value: drForced.from + '..' + drForced.to," },
+    @{ name = "F: jQuery UI's own selected-day / today fills are left on the range calendars"
+       file = 'js\main.js'; php = 0; browser = 2; builder = 0
+       from = "            obs.observe(`$root.find('.pnb-dr-main')[0], { childList: true, subtree: true });"
+       to   = "            /* mutant: never observes */" },
+    @{ name = 'G: each calendar shows TWO months again - a month pane with no month / year menus is back'
+       file = 'js\main.js'; php = 0; browser = 4; builder = 0
+       from = "                numberOfMonths: 1,"
+       to   = "                numberOfMonths: 2," },
+    @{ name = 'H: the Test button runs a forced default the old way (the answer just given is ignored)'
+       file = 'js\main.js'; php = 0; browser = 0; builder = 4
+       from = "                _forceDefaultApplied.add(storageKey);`n                let resultObj;"
+       to   = "                let resultObj;" }
+)
+
+$bad = 0
+if ($Only) { $mutants = @($mutants | Where-Object { $Only.ToUpper().Contains($_.name.Substring(0, 1)) }) }
+foreach ($m in $mutants) {
+    [void](Copy-AppInto $mutApp)
+    $target = Join-Path $mutApp $m.file
+    $text = [IO.File]::ReadAllText($target)
+    $eol  = if ($text.Contains("`r`n")) { "`r`n" } else { "`n" }
+    $from = $m.from.Replace("`r`n", "`n").Replace("`n", $eol)
+    $to   = $m.to.Replace("`r`n", "`n").Replace("`n", $eol)
+    $mut  = $text.Replace($from, $to)
+    if ($mut -ceq $text) {
+        Write-Output ("ANCHOR MISS - " + $m.name + " (the file has moved; fix the mutant)")
+        $bad++
+        continue
+    }
+    [IO.File]::WriteAllText($target, $mut)
+    $r = Invoke-DateRangeSuite $mutApp $false
+    if ($r.php -eq $m.php -and $r.browser -eq $m.browser -and $r.builder -eq $m.builder) { $verdict = 'BITES' } else { $verdict = 'WRONG'; $bad++ }
+    Write-Output ("{0,-6} {1}  (expected php {2} / browser {3} / builder {4}, got {5} / {6} / {7})" -f $verdict, $m.name, $m.php, $m.browser, $m.builder, $r.php, $r.browser, $r.builder)
+    if ($verdict -eq 'WRONG') { $r.lines | Where-Object { $_ -match 'FAIL |NO RESULT|HARNESS|STALLED|lift:' } | ForEach-Object { Write-Output "         $_" } }
+}
+Write-Output ''
+Write-Output $(if ($bad -eq 0) { "MUTANTS: all $($mutants.Count) bite exactly as specified" } else { "MUTANTS: $bad problem(s) - the suite is not pinning what it claims" })
+Remove-Work

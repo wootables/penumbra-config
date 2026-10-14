@@ -1,0 +1,164 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>flat freeze</title>
+<!-- The REAL stylesheet: the frozen cells' backgrounds, the zebra rows they
+     inherit from and the sticky header they have to layer under all live there. -->
+<link rel="stylesheet" href="main.css">
+</head>
+<body>
+<!-- Minimal DOM for the flat-table frozen-columns suite (2026-09-18). Built from
+     the namekeys harness (known to boot main.js and run a query through the real
+     render path) plus the Freeze control, a status bar for the custom-layout
+     pill, and #resultsHeader so updateStickyHeaderOffset() really runs - it is
+     what writes the INLINE z-index the frozen headers have to beat. -->
+<div id="reportHeaderContainer"><div id="defaultTitleView"></div><div id="reportInfoPanel" style="display:none"></div></div>
+<input id="reportTitle" value=""><div id="admWrapper"></div><button id="toggleAdminViewBtn"></button>
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<button id="executeQuery">Run</button><button id="stopQueryBtn">Stop</button>
+<div id="loadingOverlay" style="display:none"><p id="execution-timer"></p><p id="loadingMessage"></p></div>
+<div id="importTimestamps"></div>
+<div id="resultsHeader" style="height:20px">controls</div>
+<!-- Same shape as index.php after applyContainerization(): the wrapper is the
+     scroll box. 900px wide so a 12-column table overflows it sideways. -->
+<div id="table-view-container"><div id="container-parent"><div id="results-wrapper" style="width:900px;height:420px"><table id="resultsTable"><caption class="sr-only">Report results table</caption><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table></div></div></div>
+<div id="paginationControls"><select id="rowsPerPageSelector"><option value="25">25</option><option value="50">50</option><option value="100">100</option><option value="all">All</option></select></div>
+<div id="errorBox"></div><div id="undo_text_container"></div>
+<input id="tableSearch" value="">
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="pivotLightbox" style="display:none">
+  <div id="pivot-source-columns"></div>
+  <div id="pivot-rows"></div><div id="pivot-cols"></div><div id="pivot-vals"></div>
+  <select id="pivot-aggregation-selector"><option value="">-</option><option value="sum">sum</option></select>
+  <table><tbody id="pivot-agg-table-body"></tbody></table>
+  <button id="generatePivotBtn">Generate</button>
+  <button id="copyPivotSnippetBtn">Snippet</button>
+</div>
+<div id="settingsPanelOverlay"></div>
+<div id="settingsPanel">
+  <select id="spThemeSelector">
+    <option value="report-default">Report Default</option>
+    <option value="theme-default">Default</option>
+    <option value="theme-dark">Dark</option>
+  </select>
+  <select id="spDensitySelector">
+    <option value="report-default">Report Default</option>
+    <option value="standard">Standard</option>
+    <option value="compact">Compact</option>
+  </select>
+  <input type="checkbox" id="spRowExpandToggle"><input type="checkbox" id="spResolverToggle">
+  <div class="sp-section sp-columns-section">
+    <!-- FREEZE_MARKUP: run.ps1 replaces this line with the block lifted from the index.php under test -->
+    <div class="sp-column-container"><div id="spColumnList" class="sp-column-list"></div></div>
+  </div>
+  <div class="sp-actions"><button id="spApply">Save Column Layout</button><button id="spReset">Reset</button><span id="spPendingCount"></span></div>
+</div>
+<!-- status bar: just what the custom-layout pill touches -->
+<div id="pnbStatusBar">
+  <div class="sb-seg" id="sbColsSeg">
+    <span id="sbCols"></span>
+    <span class="sb-chip" id="sbCustomCols" style="display:none;">custom layout</span>
+    <div class="sb-pop" id="sbCustomColsPop"><div id="sbCustomColsDiff"></div>
+      <button id="sbCustomColsReset">Reset</button><button id="sbCustomColsSave" style="display:none;">Save</button></div>
+  </div>
+  <div class="sb-seg" id="sbUserSeg"></div>
+</div>
+<button id="saveQuery">Save</button>
+<input id="serverSaveTitleInput"><input id="serverSaveSubtitleInput">
+<select id="serverSaveTheme"><option value="theme-default">Default</option></select>
+<select id="serverSaveDensity"><option value="standard">Standard</option></select>
+<pre id="out">running</pre>
+
+<script>
+  (function () {
+    try { localStorage.clear(); } catch (e) {}
+  })();
+  window.PENUMBRA_THEMES = {
+    'theme-default':  { label: 'Default' },
+    'theme-dark':     { label: 'Dark', dark: true }
+  };
+  window.PENUMBRA_THEME_IDS = ['theme-default', 'theme-dark'];
+  window.PENUMBRA_THEME_ALIASES = {};
+  window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: [],
+    totalExemptions: ['AMOUNT']
+  };
+  window.__ajaxLog = [];
+  jQuery.ajax = function (a, b) {
+    var opts = (typeof a === 'string') ? jQuery.extend({ url: a }, b || {}) : (a || {});
+    var url = String(opts.url || '');
+    window.__ajaxLog.push(url);
+    var d = jQuery.Deferred();
+    var resp = {};
+    if (/query\.php/.test(url)) resp = window.__queryResponse || { data: [] };
+    setTimeout(function () {
+      try { if (opts.success) opts.success(resp, 'success', { status: 200 }); } catch (e) { window.__errors.push('ajax success threw: ' + String(e)); }
+      try { if (opts.complete) opts.complete({ status: 200 }, 'success'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }
+      d.resolve(resp, 'success', { status: 200 });
+    }, 0);
+    var p = d.promise(); p.abort = function () {}; return p;
+  };
+  jQuery.getJSON = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.post = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.get = jQuery.post;
+  jQuery.fx.off = true;
+  // --dump-dom renders no frames, so a real ResizeObserver would never call
+  // back anyway: the driver calls flatFreeze.apply() where one would have. The
+  // observers' own wiring is proved separately, with real frames (run.ps1 -Frames).
+  // ?frames=1 (frames_check.py, driven over CDP with real rendering) keeps the
+  // browser's own ResizeObserver and rAF - proving those is its whole point.
+  window.__FRAMES = /[?&]frames=1/.test(location.search);
+  window.__roObserved = [];
+  if (!window.__FRAMES) {
+    window.ResizeObserver = function () {
+      this.observe = function (el) { window.__roObserved.push(el); };
+      this.unobserve = function (el) { var i = window.__roObserved.indexOf(el); if (i !== -1) window.__roObserved.splice(i, 1); };
+      this.disconnect = function () {};
+    };
+    window.IntersectionObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+    // ...and no frames means no rAF either. Run the callback on a timer instead,
+    // so penumbraFlatFreezeSync() still lands (the header MutationObserver's path).
+    window.requestAnimationFrame = function (cb) { return setTimeout(function () { cb(Date.now()); }, 0); };
+    window.cancelAnimationFrame = function (id) { clearTimeout(id); };
+  }
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  window.__errors = [];
+  window.__rejections = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    window.__rejections.push(String((r && r.message) || r) + ' @' + String((r && r.stack) || '').split('\n').slice(1, 2).join('').trim());
+    e.preventDefault();
+  });
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  window.prompt = function () { return null; };
+</script>
+<!-- The status bar's init stands down without this module (it says so itself),
+     and the custom-layout pill lives inside that init. -->
+<script src="penumbra_userseg.js"></script>
+<script src="main_ff.js"></script>
+<script src="driver.js"></script>
+</body></html>

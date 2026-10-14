@@ -1,0 +1,509 @@
+<?php
+/**
+ * penumbra_tests/toolvisit/run.php - admin tool page-view logging (2026-09-16).
+ *
+ * Opening Health, Grants, Notice, Metrics, Calendar, the Repository or a
+ * report's Metrics page now writes ACTION='OPEN' against a placeholder report
+ * per tool (__HEALTH__, __GRANTS__, ...), the way the landing page always logged
+ * __HOME__. The page embeds an HMAC token; penumbra_tool_visit_beacon() posts it
+ * from the browser to log_tool_visit.php, whose body is
+ * penumbraHandleToolVisitBeacon(). This suite drives that machinery:
+ *
+ *   - every db_connection.php function involved, LIFTED from the target app by
+ *     the tokenizer (never require'd - its top level resolves identity and
+ *     opens connections),
+ *   - penumbra_tool_visit_beacon() and penumbra_admin_tools() from
+ *     penumbra_admin_chrome.php, buildAuthFilter() from get_server_reports.php,
+ *   - the wiring on each page and every exclusion site, read as TEXT from the
+ *     target files (those are not functions, so they cannot be lifted).
+ *
+ * Only the database is faked (queryViaOci8 / execClobInsert / logPenumbraAudit),
+ * with just enough SQL matching that a changed query changes the answer.
+ *
+ *   php.exe -n run.php [--app=<app dir>] [--control] [--mutant]
+ *
+ * --app     defaults to the LIVE webroot; point it at a staging copy before a deploy.
+ * --control adds one deliberately false assertion and MUST report FAIL 1.
+ * --mutant  removes the token's signature check from the lifted verifier and
+ *           MUST turn the forgery assertions red.
+ *
+ * EXPECTED TAIL: "PASS <n>   FAIL 0". A smaller pass count is a failure too.
+ */
+$CONTROL = in_array('--control', $argv, true);
+$MUTANT  = in_array('--mutant',  $argv, true);
+$APP = null;
+foreach ($argv as $a) { if (strpos($a, '--app=') === 0) $APP = substr($a, 6); }
+if ($APP === null) $APP = '\\\\oitras.oit.ncsu.edu\\c$\\inetpub\\wwwroot\\sponsor_migration\\penumbra';
+$APP = rtrim($APP, '\\/');
+
+$pass = 0; $fail = 0;
+function t_ok($cond, $label) {
+    global $pass, $fail;
+    if ($cond) { $pass++; } else { $fail++; echo "    FAIL  $label\n"; }
+}
+function t_eq($got, $want, $label) {
+    t_ok($got === $want, $label . '  (got ' . var_export($got, true) . ', want ' . var_export($want, true) . ')');
+}
+function section($title) { echo "== $title\n"; }
+
+$ERRLOG = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'penumbra_toolvisit_errlog_' . getmypid() . '.txt';
+@unlink($ERRLOG);
+ini_set('log_errors', '1');
+ini_set('error_log', $ERRLOG);
+function errlog_text() { global $ERRLOG; return is_file($ERRLOG) ? (string)file_get_contents($ERRLOG) : ''; }
+
+// ---------------------------------------------------------------------------
+// 0. Sources
+// ---------------------------------------------------------------------------
+$read = function ($f) use ($APP) {
+    $s = @file_get_contents($APP . '/' . $f);
+    if ($s === false) { fwrite(STDERR, "FATAL: cannot read $f under $APP\n"); exit(2); }
+    return $s;
+};
+$srcDb      = $read('db_connection.php');
+$srcChrome  = $read('penumbra_admin_chrome.php');
+$srcRepo    = $read('get_server_reports.php');
+$srcHealth  = $read('health.php');
+$srcGrants  = $read('grants_admin.php');
+$srcNotice  = $read('system_notice.php');
+$srcAll     = $read('analytics_all.php');
+$srcAn      = $read('analytics.php');
+$srcIndex   = $read('index.php');
+$srcSuggest = $read('analytics_suggest.php');
+$srcRename  = $read('rename_report_short_id.php');
+$srcBeacon  = $read('log_tool_visit.php');
+echo "app: $APP\n";
+
+// ---------------------------------------------------------------------------
+// 1. Fake database
+// ---------------------------------------------------------------------------
+class FakeDb {
+    static $reports = array();   // id => row (SHORT_ID space-padded, like the CHAR column)
+    static $audit = array();
+    static $inserts = array();
+    static $queries = array();
+    static $nextReportId = 500;
+    static $nextAuditId = 9000;
+    static $failSelect = false;
+    static $failInsert = false;
+    static $raceOnInsert = false;
+    static $failAudit = false;
+    static function reset() {
+        self::$reports = array(10 => array('SHORT_ID' => str_pad('budget_summary', 20), 'TITLE' => 'Budget'));
+        self::$audit = array(); self::$inserts = array(); self::$queries = array();
+        self::$nextReportId = 500; self::$nextAuditId = 9000;
+        self::$failSelect = self::$failInsert = self::$raceOnInsert = self::$failAudit = false;
+    }
+    static function idsFor($sid) {
+        $out = array();
+        foreach (self::$reports as $id => $r) { if (trim($r['SHORT_ID']) === $sid) $out[] = $id; }
+        return $out;
+    }
+}
+function queryViaOci8($sql, $binds = array(), $callTimeoutMs = 0, $memBudgetBytes = 0) {
+    FakeDb::$queries[] = $sql;
+    if (FakeDb::$failSelect) throw new Exception('fake: ORA-03113 end-of-file on communication channel');
+    if (preg_match('/^SELECT MIN\(ID\) AS ID FROM PENUMBRA_REPORTS WHERE TRIM\(SHORT_ID\) = :sid$/', $sql)) {
+        $ids = FakeDb::idsFor($binds[':sid']);
+        return array(array('ID' => empty($ids) ? null : (string)min($ids)));
+    }
+    if (preg_match('/^SELECT ID FROM PENUMBRA_REPORTS WHERE TRIM\(SHORT_ID\) IN \((.*)\)$/', $sql, $m)) {
+        preg_match_all("/'([^']*)'/", $m[1], $mm);
+        $out = array();
+        foreach (FakeDb::$reports as $id => $r) { if (in_array(trim($r['SHORT_ID']), $mm[1], true)) $out[] = array('ID' => (string)$id); }
+        return $out;
+    }
+    throw new Exception('FakeDb: unexpected SQL: ' . $sql);
+}
+function execClobInsert($pdoConn, $table, $cols, $clobCols, $rawCols = array(), $returnIdCol = null) {
+    FakeDb::$inserts[] = array('table' => $table, 'cols' => $cols, 'clob' => $clobCols, 'raw' => $rawCols, 'ret' => $returnIdCol);
+    if ($table !== 'PENUMBRA_REPORTS') throw new Exception('FakeDb: unexpected insert into ' . $table);
+    if (FakeDb::$raceOnInsert) {
+        // Another first visitor committed the row between our lookup and our insert.
+        FakeDb::$reports[FakeDb::$nextReportId++] = array('SHORT_ID' => str_pad($cols['SHORT_ID'], 20), 'TITLE' => $cols['TITLE']);
+        throw new Exception('fake: ORA-00001 unique constraint violated');
+    }
+    if (FakeDb::$failInsert) throw new Exception('fake: ORA-01031 insufficient privileges');
+    $id = FakeDb::$nextReportId++;
+    FakeDb::$reports[$id] = array('SHORT_ID' => str_pad($cols['SHORT_ID'], 20), 'TITLE' => $cols['TITLE']);
+    return $returnIdCol !== null ? $id : null;
+}
+function logPenumbraAudit($report_id, $action, $before_json, $after_json, $message = null, $extra_source = null) {
+    if (FakeDb::$failAudit) throw new Exception('fake: audit insert failed');
+    $id = FakeDb::$nextAuditId++;
+    FakeDb::$audit[] = array('id' => $id, 'report_id' => $report_id, 'action' => $action, 'before' => $before_json,
+                             'after' => $after_json, 'message' => $message, 'user' => $GLOBALS['currentUserKey']);
+    return $id;
+}
+
+// ---------------------------------------------------------------------------
+// 2. Lift the shipped functions (tokenizer - strings/comments cannot fool it)
+// ---------------------------------------------------------------------------
+function lift_function($src, $name) {
+    $tokens = token_get_all($src); $n = count($tokens);
+    for ($i = 0; $i < $n; $i++) {
+        $t = $tokens[$i];
+        if (!is_array($t) || $t[0] !== T_FUNCTION) continue;
+        $k = $i + 1;
+        while ($k < $n && is_array($tokens[$k]) && $tokens[$k][0] === T_WHITESPACE) $k++;
+        if (!($k < $n && is_array($tokens[$k]) && $tokens[$k][0] === T_STRING && $tokens[$k][1] === $name)) continue;
+        $buf = ''; $depth = 0; $started = false;
+        for ($j = $i; $j < $n; $j++) {
+            $tt = $tokens[$j]; $txt = is_array($tt) ? $tt[1] : $tt;
+            $buf .= $txt;
+            if ($txt === '{' || (is_array($tt) && ($tt[0] === T_CURLY_OPEN || $tt[0] === T_DOLLAR_OPEN_CURLY_BRACES))) { $depth++; $started = true; }
+            elseif ($txt === '}') { $depth--; if ($started && $depth === 0) return $buf; }
+        }
+        return null;
+    }
+    return null;
+}
+function lift_or_die($src, $name, $file) {
+    $code = lift_function($src, $name);
+    if ($code === null) { fwrite(STDERR, "FATAL: $name not found in $file - is the change deployed there?\n"); exit(2); }
+    return $code;
+}
+
+if (!preg_match("/define\\('PENUMBRA_HOME_SHORT_ID',\\s*'([^']+)'\\);/", $srcDb, $hm)) { fwrite(STDERR, "FATAL: PENUMBRA_HOME_SHORT_ID define not found\n"); exit(2); }
+define('PENUMBRA_HOME_SHORT_ID', $hm[1]);
+
+$dbFns = array('penumbraLogHomeVisit', 'penumbraToolPages', 'penumbraToolShortIds', 'penumbraSystemShortIds',
+               'penumbraShortIdSqlList', 'penumbraToolReportIds', 'penumbraExcludeReportIdsSql',
+               'penumbraEnsurePlaceholderReport', 'penumbraLogPlaceholderVisit', 'penumbraLogToolVisit',
+               'penumbraToolVisitKey', 'penumbraToolVisitShortIdOk', 'penumbraToolVisitToken',
+               'penumbraToolVisitVerify', 'penumbraHandleToolVisitBeacon');
+foreach ($dbFns as $fn) {
+    $code = lift_or_die($srcDb, $fn, 'db_connection.php');
+    if ($MUTANT && $fn === 'penumbraToolVisitVerify') {
+        // The mutant: no signature check. Anything well-formed is believed.
+        $code = str_replace("!hash_equals(hash_hmac('sha256', \$payload, \$key), \$parts[1])", "false /* MUTANT */", $code, $c);
+        if ($c !== 1) { fwrite(STDERR, "FATAL: mutant rewrite applied $c times (need 1)\n"); exit(2); }
+        echo "mutant: signature check removed from penumbraToolVisitVerify\n";
+    }
+    eval($code);
+}
+// A second, never-called copy of the id resolver, so its failure path can be
+// exercised without fighting the first copy's per-request static cache.
+eval(str_replace('function penumbraToolReportIds(', 'function penumbraToolReportIds_fresh(', lift_or_die($srcDb, 'penumbraToolReportIds', 'db_connection.php')));
+eval(lift_or_die($srcChrome, 'penumbra_tool_visit_beacon', 'penumbra_admin_chrome.php'));
+eval(lift_or_die($srcChrome, 'penumbra_admin_tools', 'penumbra_admin_chrome.php'));
+eval(lift_or_die($srcRepo, 'buildAuthFilter', 'get_server_reports.php'));
+
+$config = array('scheduler_secret_key' => 'toolvisit-suite-secret-0123456789');
+$currentUserKey = 'bplimon';
+$oracleTableNames = array('PS_NC_LEDGER');
+$NOW = 1789560000;   // a fixed instant; every token call passes it explicitly
+
+// ---------------------------------------------------------------------------
+section('1. registry');
+// ---------------------------------------------------------------------------
+$pages = penumbraToolPages();
+t_eq(array_keys($pages), array('repo', 'metrics', 'calendar', 'health', 'grants', 'notice', 'report_metrics'), 'tool keys');
+$seen = array();
+foreach ($pages as $k => $p) {
+    t_ok(isset($p['short_id']) && preg_match('/^__[A-Z_]+__$/D', $p['short_id']) === 1, "$k: short id has the __NAME__ shape");
+    t_ok(isset($p['title']) && $p['title'] !== '' && strpbrk($p['title'], '<>&"\'') === false, "$k: title is plain text");
+    t_ok(!isset($seen[$p['short_id']]), "$k: short id is unique");
+    $seen[$p['short_id']] = true;
+}
+t_eq($pages['health']['short_id'], '__HEALTH__', 'health placeholder id');
+t_eq($pages['report_metrics']['short_id'], '__REPORT_METRICS__', 'report metrics placeholder id');
+foreach (array_keys(penumbra_admin_tools()) as $navKey) {
+    t_ok(isset($pages[$navKey]), "admin nav tool '$navKey' has a visit placeholder");
+}
+t_eq(PENUMBRA_HOME_SHORT_ID, '__HOME__', 'home constant unchanged');
+$sys = penumbraSystemShortIds();
+t_eq($sys[0], '__HOME__', 'system ids start with __HOME__');
+t_eq(count($sys), 8, 'system ids = home + 7 tools');
+t_ok(!in_array('__HOME__', penumbraToolShortIds(), true), 'tool ids exclude __HOME__');
+t_eq(count(array_unique($sys)), 8, 'system ids unique');
+foreach ($sys as $sid) { t_ok(preg_match('/^__.*__$/', $sid) === 1, "$sid is refused by rename's __NAME__ rule"); }
+
+// ---------------------------------------------------------------------------
+section('2. SQL fragments');
+// ---------------------------------------------------------------------------
+t_eq(penumbraShortIdSqlList(array('__HOME__', 'penumbra_log')), "'__HOME__','penumbra_log'", 'literal list');
+t_eq(penumbraShortIdSqlList(array("a'b", 'x) OR 1=1 --', '', str_repeat('a', 101), 42, null, 'ok_id', 'ok_id')), "'ok_id'", 'unsafe ids dropped, duplicates collapsed');
+t_eq(penumbraShortIdSqlList(array("a'b")), "'__NONE__'", 'never an empty list (NOT IN (NULL) hides everything)');
+t_eq(penumbraShortIdSqlList(array()), "'__NONE__'", 'empty input -> harmless literal');
+t_eq(substr_count(penumbraShortIdSqlList($sys), "'") / 2, 8, 'all 8 system ids survive the filter');
+t_eq(penumbraExcludeReportIdsSql(array()), '', 'no ids -> no fragment');
+t_eq(penumbraExcludeReportIdsSql(array(5, '6', 6, 0, -1, 'x')), ' AND (REPORT_ID IS NULL OR REPORT_ID NOT IN (5,6))', 'ids -> NULL-safe NOT IN of ints');
+t_eq(penumbraExcludeReportIdsSql(array(7), 'a.REPORT_ID'), ' AND (a.REPORT_ID IS NULL OR a.REPORT_ID NOT IN (7))', 'aliased column');
+t_eq(penumbraExcludeReportIdsSql(array(7), 'REPORT_ID) OR (1=1'), '', 'a non-identifier column is refused');
+$af = buildAuthFilter(true, 'bplimon');
+foreach ($sys as $sid) { t_ok(strpos($af['sql'], "'" . $sid . "'") !== false, "repository filter (admin) hides $sid"); }
+t_ok(strpos($af['sql'], 'NOT IN (') !== false && strpos($af['sql'], "<> '__HOME__'") === false, 'repository filter is one NOT IN list');
+$afu = buildAuthFilter(false, 'someone');
+t_ok(strpos($afu['sql'], "'__HEALTH__'") !== false && strpos($afu['sql'], ':auth_user') !== false, 'repository filter (non-admin) hides placeholders AND keeps the auth clause');
+
+// ---------------------------------------------------------------------------
+section('3. tokens');
+// ---------------------------------------------------------------------------
+foreach (array('repo', 'metrics', 'calendar', 'health', 'grants', 'notice') as $tool) {
+    $tok = penumbraToolVisitToken($tool, '', 'BPLimon', $NOW);
+    t_ok($tok !== '' && preg_match('/^[A-Za-z0-9_-]+\.[0-9a-f]{64}$/D', $tok) === 1, "$tool: token minted in base64url.hex form");
+    t_eq(penumbraToolVisitVerify($tok, 'bplimon', $NOW + 2), array('tool' => $tool, 'short_id' => ''), "$tool: round trip");
+}
+$tokRm = penumbraToolVisitToken('report_metrics', '  budget_summary  ', 'bplimon', $NOW);
+t_eq(penumbraToolVisitVerify($tokRm, 'bplimon', $NOW), array('tool' => 'report_metrics', 'short_id' => 'budget_summary'), 'report_metrics carries the trimmed report id');
+t_eq(penumbraToolVisitToken('report_metrics', '', 'bplimon', $NOW), '', 'report_metrics without a report id -> no token');
+t_eq(penumbraToolVisitToken('report_metrics', "bad\nid", 'bplimon', $NOW), '', 'control character in report id -> no token');
+t_eq(penumbraToolVisitToken('report_metrics', str_repeat('r', 129), 'bplimon', $NOW), '', '129-byte report id -> no token');
+t_ok(penumbraToolVisitToken('report_metrics', str_repeat('r', 128), 'bplimon', $NOW) !== '', '128-byte report id -> token');
+$tokH = penumbraToolVisitToken('health', 'ignored_id', 'bplimon', $NOW);
+t_eq(penumbraToolVisitVerify($tokH, 'bplimon', $NOW), array('tool' => 'health', 'short_id' => ''), 'a non-metrics tool drops the report id');
+t_eq(penumbraToolVisitToken('health', '', '', $NOW), '', 'no identity -> no token');
+t_eq(penumbraToolVisitToken('health', '', 'DEV_API', $NOW), '', 'DEV_API -> no token');
+t_eq(penumbraToolVisitToken('health', '', 'dev_api', $NOW), '', 'dev_api (any case) -> no token');
+t_eq(penumbraToolVisitToken('home', '', 'bplimon', $NOW), '', 'unknown tool -> no token');
+t_eq(penumbraToolVisitToken(123, '', 'bplimon', $NOW), '', 'non-string tool -> no token');
+$tokGlobal = penumbraToolVisitToken('grants');
+t_eq(penumbraToolVisitVerify($tokGlobal), array('tool' => 'grants', 'short_id' => ''), 'page-style call uses $currentUserKey and the clock');
+
+$tok = penumbraToolVisitToken('health', '', 'bplimon', $NOW);
+t_eq(penumbraToolVisitVerify($tok, 'BPLIMON', $NOW), array('tool' => 'health', 'short_id' => ''), 'user match is case-insensitive');
+t_eq(penumbraToolVisitVerify($tok, 'someoneelse', $NOW), null, "another user's token logs nothing");
+t_eq(penumbraToolVisitVerify($tok, '', $NOW), null, 'no identity on the beacon -> null');
+t_eq(penumbraToolVisitVerify($tok, 'bplimon', $NOW + 900), array('tool' => 'health', 'short_id' => ''), 'age 900s still valid');
+t_eq(penumbraToolVisitVerify($tok, 'bplimon', $NOW + 901), null, 'age 901s expired');
+t_eq(penumbraToolVisitVerify($tok, 'bplimon', $NOW - 60), array('tool' => 'health', 'short_id' => ''), '60s of clock slack accepted');
+t_eq(penumbraToolVisitVerify($tok, 'bplimon', $NOW - 61), null, 'a token from the future is refused');
+
+list($b64, $sig) = explode('.', $tok);
+$payload = base64_decode(strtr($b64, '-_', '+/'));
+$forged = str_replace('"t":"health"', '"t":"grants"', $payload);
+t_ok($forged !== $payload, 'forgery fixture rewrote the tool');
+$forgedTok = rtrim(strtr(base64_encode($forged), '+/', '-_'), '=') . '.' . $sig;
+t_eq(penumbraToolVisitVerify($forgedTok, 'bplimon', $NOW), null, 'FORGERY: edited payload with the old signature');
+$otherUser = rtrim(strtr(base64_encode(str_replace('"u":"bplimon"', '"u":"mallory"', $payload)), '+/', '-_'), '=') . '.' . $sig;
+t_eq(penumbraToolVisitVerify($otherUser, 'mallory', $NOW), null, 'FORGERY: payload re-addressed to another user');
+$flip = $b64 . '.' . substr($sig, 0, 63) . ($sig[63] === 'a' ? 'b' : 'a');
+t_eq(penumbraToolVisitVerify($flip, 'bplimon', $NOW), null, 'FORGERY: one flipped signature digit');
+$wrongKey = rtrim(strtr(base64_encode($payload), '+/', '-_'), '=') . '.' . hash_hmac('sha256', $payload, 'not-the-secret');
+t_eq(penumbraToolVisitVerify($wrongKey, 'bplimon', $NOW), null, 'FORGERY: signed with another key');
+$selfSigned = function ($arr) { $p = json_encode($arr); return rtrim(strtr(base64_encode($p), '+/', '-_'), '=') . '.' . hash_hmac('sha256', $p, penumbraToolVisitKey()); };
+t_ok($selfSigned(array('v' => 1, 't' => 'health', 's' => '', 'u' => 'bplimon', 'ts' => $NOW)) !== '' &&
+     penumbraToolVisitVerify($selfSigned(array('v' => 1, 't' => 'health', 's' => '', 'u' => 'bplimon', 'ts' => $NOW)), 'bplimon', $NOW) !== null, 'signed-fixture helper is a working control');
+t_eq(penumbraToolVisitVerify($selfSigned(array('v' => 1, 't' => '__HOME__', 's' => '', 'u' => 'bplimon', 'ts' => $NOW)), 'bplimon', $NOW), null, 'signed but unknown tool');
+t_eq(penumbraToolVisitVerify($selfSigned(array('v' => 2, 't' => 'health', 's' => '', 'u' => 'bplimon', 'ts' => $NOW)), 'bplimon', $NOW), null, 'signed but wrong version');
+t_eq(penumbraToolVisitVerify($selfSigned(array('v' => 1, 't' => 'health', 's' => 'x', 'u' => 'bplimon', 'ts' => $NOW)), 'bplimon', $NOW), null, 'signed health token carrying a report id');
+t_eq(penumbraToolVisitVerify($selfSigned(array('v' => 1, 't' => 'report_metrics', 's' => '', 'u' => 'bplimon', 'ts' => $NOW)), 'bplimon', $NOW), null, 'signed report_metrics token without a report id');
+t_eq(penumbraToolVisitVerify($selfSigned(array('v' => 1, 't' => 'health', 's' => '', 'u' => 'bplimon')), 'bplimon', $NOW), null, 'signed but no timestamp');
+foreach (array('' => 'empty', 'abc' => 'no dot', 'a.b.c' => 'two dots', $tok . '.' => 'trailing dot', ('!!!.' . $sig) => 'bad base64 charset',
+               str_repeat('A', 1030) => 'oversize') as $bad => $why) {
+    t_eq(penumbraToolVisitVerify($bad, 'bplimon', $NOW), null, "garbage token ($why)");
+}
+t_eq(penumbraToolVisitVerify(array($tok), 'bplimon', $NOW), null, 'non-string token');
+$saved = $config; $config = array();
+t_eq(penumbraToolVisitToken('health', '', 'bplimon', $NOW), '', 'no scheduler secret -> no token');
+t_eq(penumbraToolVisitVerify($tok, 'bplimon', $NOW), null, 'no scheduler secret -> nothing verifies');
+$config = $saved;
+
+// ---------------------------------------------------------------------------
+section('4. placeholder creation + OPEN rows');
+// ---------------------------------------------------------------------------
+FakeDb::reset();
+$aid = penumbraLogToolVisit('health');
+t_ok(is_int($aid), 'first health visit returns an audit id');
+t_eq(count(FakeDb::$inserts), 1, 'first visit creates the placeholder once');
+t_eq(FakeDb::$inserts[0]['table'], 'PENUMBRA_REPORTS', 'insert target');
+t_eq(FakeDb::$inserts[0]['cols'], array('SHORT_ID' => '__HEALTH__', 'TITLE' => 'Health (Admin Tool)', 'OWNER_ID' => '__SYSTEM__', 'STATE_DATA' => '{}', 'AUTHORIZED' => 'adminonly'), 'placeholder row columns (hidden, system-owned, adminonly)');
+t_eq(FakeDb::$inserts[0]['clob'], array('STATE_DATA'), 'STATE_DATA bound as a CLOB');
+t_eq(FakeDb::$inserts[0]['ret'], 'ID', 'new id taken from RETURNING');
+$healthId = FakeDb::idsFor('__HEALTH__');
+t_eq(count($healthId), 1, 'one placeholder row');
+t_eq(count(FakeDb::$audit), 1, 'one audit row');
+t_eq(FakeDb::$audit[0]['report_id'], $healthId[0], 'OPEN filed against the placeholder id');
+t_eq(FakeDb::$audit[0]['action'], 'OPEN', 'action is OPEN (so analytics.php?id=__HEALTH__ works)');
+t_eq(array(FakeDb::$audit[0]['before'], FakeDb::$audit[0]['after'], FakeDb::$audit[0]['message']), array(null, null, null), 'no before/after/message for a plain tool view');
+penumbraLogToolVisit('health');
+t_eq(count(FakeDb::$inserts), 1, 'second visit does not insert again');
+t_eq(FakeDb::$audit[1]['report_id'], $healthId[0], 'second visit filed against the same id');
+penumbraLogToolVisit('report_metrics', 'budget_summary');
+$last = end(FakeDb::$audit);
+t_eq($last['message'], 'report budget_summary', 'report metrics view names the report');
+t_eq($last['report_id'], FakeDb::idsFor('__REPORT_METRICS__')[0], 'report metrics view goes to __REPORT_METRICS__, never the report itself');
+t_ok($last['report_id'] !== 10, 'the real report (id 10) got no row');
+$before = count(FakeDb::$audit);
+t_eq(penumbraLogToolVisit('home'), null, 'unknown tool logs nothing');
+t_eq(penumbraLogToolVisit(array('health')), null, 'non-string tool logs nothing');
+t_eq(count(FakeDb::$audit), $before, 'no row for unknown tools');
+
+FakeDb::reset();
+FakeDb::$raceOnInsert = true;
+$aid = penumbraLogToolVisit('grants');
+t_ok(is_int($aid), 'lost the create race -> still logged');
+t_eq(end(FakeDb::$audit)['report_id'], FakeDb::idsFor('__GRANTS__')[0], 'race: row filed against the winner');
+
+FakeDb::reset();
+FakeDb::$reports[700] = array('SHORT_ID' => str_pad('__NOTICE__', 20), 'TITLE' => 'dup');
+FakeDb::$reports[650] = array('SHORT_ID' => str_pad('__NOTICE__', 20), 'TITLE' => 'dup');
+penumbraLogToolVisit('notice');
+t_eq(end(FakeDb::$audit)['report_id'], 650, 'duplicate placeholders -> lowest id, deterministically');
+t_eq(count(FakeDb::$inserts), 0, 'existing (padded) placeholder is found, not re-created');
+
+FakeDb::reset();
+FakeDb::$failSelect = true;
+$threw = false;
+try { $r = penumbraLogToolVisit('health'); } catch (Throwable $e) { $threw = true; }
+t_ok(!$threw && $r === null, 'database down -> null, never an exception');
+t_ok(strpos(errlog_text(), 'PENUMBRA VISIT LOG FAILED (__HEALTH__)') !== false, 'database down -> greppable error_log line');
+FakeDb::reset();
+FakeDb::$failInsert = true;
+t_eq(penumbraLogToolVisit('calendar'), null, 'cannot create the placeholder -> null');
+t_eq(count(FakeDb::$audit), 0, 'cannot create the placeholder -> no orphan OPEN row');
+FakeDb::reset();
+FakeDb::$failAudit = true;
+$threw = false;
+try { $r = penumbraLogToolVisit('metrics'); } catch (Throwable $e) { $threw = true; }
+t_ok(!$threw && $r === null, 'audit write throws -> swallowed');
+
+FakeDb::reset();
+$oracleTableNames = array('PS_NC_LEDGER');
+penumbraLogHomeVisit();
+t_eq(end(FakeDb::$audit)['report_id'], FakeDb::idsFor('__HOME__')[0], 'home visit still logs OPEN on __HOME__');
+t_eq(FakeDb::$inserts[0]['cols']['TITLE'], 'Home Page (Landing)', 'home placeholder keeps its title');
+t_eq(FakeDb::$inserts[0]['cols']['AUTHORIZED'], 'adminonly', 'home placeholder stays adminonly');
+t_eq($oracleTableNames, array('PS_NC_LEDGER', 'DUAL'), 'home visit keeps its DUAL side effect');
+penumbraLogHomeVisit();
+t_eq($oracleTableNames, array('PS_NC_LEDGER', 'DUAL'), 'DUAL is not added twice');
+t_eq(count(FakeDb::$inserts), 1, 'home placeholder created once');
+$oracleTableNames = null;
+penumbraLogHomeVisit();
+t_eq($oracleTableNames, array('DUAL'), 'a missing whitelist becomes array(DUAL)');
+
+// ---------------------------------------------------------------------------
+section('5. placeholder ids for the pulse exclusion');
+// ---------------------------------------------------------------------------
+FakeDb::reset();
+FakeDb::$reports[400] = array('SHORT_ID' => str_pad('__HOME__', 20), 'TITLE' => 'Home');
+FakeDb::$reports[501] = array('SHORT_ID' => str_pad('__HEALTH__', 20), 'TITLE' => 'Health');
+FakeDb::$reports[502] = array('SHORT_ID' => str_pad('__METRICS__', 20), 'TITLE' => 'Metrics');
+$ids = penumbraToolReportIds();
+sort($ids);
+t_eq($ids, array(501, 502), 'tool placeholder ids only - never __HOME__ (400) or a real report (10)');
+$q = count(FakeDb::$queries);
+penumbraToolReportIds();
+t_eq(count(FakeDb::$queries), $q, 'one lookup per request (static cache)');
+t_eq(penumbraExcludeReportIdsSql($ids), ' AND (REPORT_ID IS NULL OR REPORT_ID NOT IN (501,502))', 'pulse fragment from the resolved ids');
+FakeDb::$failSelect = true;
+t_eq(penumbraToolReportIds_fresh(), array(), 'lookup failure -> array() (exclusion off, page fine)');
+t_ok(strpos(errlog_text(), 'tool placeholder id lookup failed') !== false, 'lookup failure is logged');
+
+// ---------------------------------------------------------------------------
+section('6. beacon endpoint body');
+// ---------------------------------------------------------------------------
+FakeDb::reset();
+$currentUserKey = 'bplimon';
+$good = penumbraToolVisitToken('notice');
+t_eq(penumbraHandleToolVisitBeacon('GET', 't=' . rawurlencode($good)), 'method', 'GET refused');
+t_eq(penumbraHandleToolVisitBeacon('POST', ''), 'body', 'empty body refused');
+t_eq(penumbraHandleToolVisitBeacon('POST', 't=' . str_repeat('A', 2100)), 'body', 'oversize body refused');
+t_eq(penumbraHandleToolVisitBeacon('POST', null), 'body', 'unreadable body refused');
+t_eq(penumbraHandleToolVisitBeacon('POST', 't=garbage'), 'token', 'garbage token refused');
+t_eq(penumbraHandleToolVisitBeacon('POST', 't[]=' . rawurlencode($good)), 'token', 'array-shaped parameter refused');
+t_eq(count(FakeDb::$audit), 0, 'no rows from refused beacons');
+t_eq(penumbraHandleToolVisitBeacon('POST', 'x=1&t=' . rawurlencode($good)), 'logged', 'valid beacon logged');
+t_eq(end(FakeDb::$audit)['report_id'], FakeDb::idsFor('__NOTICE__')[0], 'beacon row lands on __NOTICE__');
+t_eq(end(FakeDb::$audit)['user'], 'bplimon', 'beacon row belongs to the posting user');
+$currentUserKey = 'mallory';
+t_eq(penumbraHandleToolVisitBeacon('POST', 't=' . rawurlencode($good)), 'token', "someone else posting bplimon's token -> refused");
+$currentUserKey = 'bplimon';
+$rm = penumbraToolVisitToken('report_metrics', 'budget_summary');
+t_eq(penumbraHandleToolVisitBeacon('POST', 't=' . rawurlencode($rm)), 'logged', 'report metrics beacon logged');
+t_eq(end(FakeDb::$audit)['message'], 'report budget_summary', 'report metrics beacon names the report');
+FakeDb::$failAudit = true;
+t_eq(penumbraHandleToolVisitBeacon('POST', 't=' . rawurlencode($good)), 'failed', 'audit failure -> failed, no exception');
+FakeDb::$failAudit = false;
+
+// ---------------------------------------------------------------------------
+section('7. page emitter');
+// ---------------------------------------------------------------------------
+$emit = function ($method, $tool, $sid = '') {
+    if ($method === null) { unset($_SERVER['REQUEST_METHOD']); } else { $_SERVER['REQUEST_METHOD'] = $method; }
+    ob_start(); penumbra_tool_visit_beacon($tool, $sid); return ob_get_clean();
+};
+$html = $emit('GET', 'health');
+t_ok(strpos($html, '<script>') === 0 && substr_count($html, '</script>') === 1, 'GET render emits one script block');
+t_ok(strpos($html, "navigator.sendBeacon('log_tool_visit.php'") !== false, 'posts with sendBeacon to log_tool_visit.php');
+t_ok(strpos($html, "x.open('POST', 'log_tool_visit.php', true)") !== false, 'XHR fallback posts to the same endpoint');
+t_ok(strpos($html, 'window.__pnbToolVisitSent') !== false, 'once-per-page guard present');
+t_ok(preg_match('/encodeURIComponent\("([A-Za-z0-9_\-]+\.[0-9a-f]{64})"\)/', $html, $em) === 1, 'token embedded as a JSON string');
+t_eq(isset($em[1]) ? penumbraToolVisitVerify($em[1]) : null, array('tool' => 'health', 'short_id' => ''), 'embedded token verifies for this user');
+t_ok(preg_match('/=>|`|\blet\s|\bconst\s/', $html) === 0, 'emitted JS is ES5 (no arrows, template literals, let, const)');
+t_eq($emit('POST', 'health'), '', 'POST re-render emits nothing');
+t_eq($emit('HEAD', 'health'), '', 'HEAD emits nothing');
+t_eq($emit(null, 'health'), '', 'no request method (CLI) emits nothing');
+t_eq($emit('GET', 'nope'), '', 'unknown tool emits nothing');
+t_eq($emit('GET', 'report_metrics', ''), '', 'report metrics without a report id emits nothing');
+$currentUserKey = '';
+t_eq($emit('GET', 'health'), '', 'no identity (health-key monitor) emits nothing');
+$currentUserKey = 'bplimon';
+$htmlRm = $emit('GET', 'report_metrics', 'budget_summary');
+t_ok(preg_match('/encodeURIComponent\("([^"]+)"\)/', $htmlRm, $em2) === 1 && penumbraToolVisitVerify($em2[1]) === array('tool' => 'report_metrics', 'short_id' => 'budget_summary'), 'report metrics page embeds its report id');
+
+// ---------------------------------------------------------------------------
+section('8. wiring in the target files (text)');
+// ---------------------------------------------------------------------------
+$tail = function ($src, $n) { return substr($src, -$n); };
+// health.php: the call sits right after penumbra_admin_open() and AHEAD of every
+// region - the page refresh swaps #pnbHubTop / #pnbHubLeft, and the hubcard suite
+// renders the text between its own anchors, so the call may live in none of them.
+$hBeacon = strpos($srcHealth, "penumbra_tool_visit_beacon('health');");
+$hOpen   = strpos($srcHealth, "penumbra_admin_open('System Health'");
+$hTop    = strpos($srcHealth, '<div id="pnbHubTop">');
+$hMute   = strpos($srcHealth, '// --- one-time metrics column provisioning');
+t_ok($hBeacon !== false && $hOpen !== false && $hOpen < $hBeacon, 'health.php: beacon after the page header opens');
+t_ok($hTop !== false && $hBeacon < $hTop, 'health.php: beacon ahead of #pnbHubTop (outside the refresh-swapped regions and the hubcard cuts)');
+t_ok($hMute !== false && $hBeacon > $hMute, "health.php: beacon clear of hubcard's mute-handler cut");
+t_eq(substr_count($srcHealth, '<?php penumbra_admin_close(); ?>'), 1, "health.php: hubcard's R6 end anchor is intact");
+t_eq(substr_count($srcHealth, 'penumbra_tool_visit_beacon('), 1, 'health.php: exactly one beacon');
+t_ok(strpos($tail($srcGrants, 400), "penumbra_tool_visit_beacon('grants');") !== false, 'grants_admin.php: beacon at the foot of the GET render');
+t_eq(substr_count($srcGrants, 'penumbra_tool_visit_beacon('), 1, 'grants_admin.php: exactly one beacon');
+t_ok(strpos($tail($srcNotice, 600), "penumbra_tool_visit_beacon('notice');") !== false, 'system_notice.php: beacon at the foot of the page');
+t_eq(substr_count($srcNotice, 'penumbra_tool_visit_beacon('), 1, 'system_notice.php: exactly one beacon');
+t_ok(strpos($tail($srcAll, 900), "penumbra_tool_visit_beacon(\$anCalMode ? 'calendar' : 'metrics');") !== false, 'analytics_all.php: calendar/metrics beacon at the foot');
+t_eq(substr_count($srcAll, 'penumbra_tool_visit_beacon('), 1, 'analytics_all.php: exactly one beacon');
+t_ok(strpos($tail($srcAn, 900), "penumbra_tool_visit_beacon('report_metrics', trim((string)\$report_ctx['short_id']));") !== false, 'analytics.php: report metrics beacon at the foot');
+t_eq(substr_count($srcAn, 'penumbra_tool_visit_beacon('), 1, 'analytics.php: exactly one beacon');
+$repoStart = strpos($srcIndex, '<?php if ($isRepoMode):');
+$repoEnd = ($repoStart === false) ? false : strpos($srcIndex, 'endif; ?>', $repoStart);
+$repoBlock = ($repoEnd === false) ? '' : substr($srcIndex, $repoStart, $repoEnd - $repoStart);
+t_ok(strpos($repoBlock, "penumbra_tool_visit_beacon('repo');") !== false, 'index.php: repo beacon inside the repo-mode header block');
+t_eq(substr_count($srcIndex, 'penumbra_tool_visit_beacon('), 1, 'index.php: exactly one beacon');
+t_ok(strpos($srcBeacon, '<?php') === 0, 'log_tool_visit.php: nothing before <?php');
+t_ok(strpos($srcBeacon, "require_once 'db_connection.php';") !== false && strpos($srcBeacon, 'http_response_code(204)') !== false
+     && strpos($srcBeacon, 'penumbraHandleToolVisitBeacon(') !== false, 'log_tool_visit.php: 204 + the shared handler');
+t_ok(strpos($srcBeacon, '?>') === false, 'log_tool_visit.php: no closing tag (no stray output)');
+
+t_ok(strpos($srcRepo, "<> '__HOME__'") === false, "get_server_reports.php: the old single-id guard is gone");
+t_ok(strpos($srcIndex, "<> '__HOME__'") === false, "index.php: no single-id __HOME__ guard left");
+$p2c = strpos($srcIndex, '$pnlSysIdSql = penumbraShortIdSqlList(penumbraSystemShortIds());');
+$p2d = strpos($srcIndex, '$pnlToolExcl = penumbraExcludeReportIdsSql(penumbraToolReportIds());');
+$pRecent = strpos($srcIndex, 'AND TRIM(r.SHORT_ID) NOT IN ($pnlSysIdSql)');
+t_ok($p2c !== false && $p2d !== false && $pRecent !== false && $p2c < $pRecent && $p2d < $pRecent, 'index.php: placeholder lists defined before the recents query uses them');
+$kStart = strpos($srcIndex, '$kpi_sql = "');
+$kEnd = ($kStart === false) ? false : strpos($srcIndex, '";', $kStart);
+$kpi = ($kEnd === false) ? '' : substr($srcIndex, $kStart, $kEnd - $kStart);
+t_eq(substr_count($kpi, 'FROM PENUMBRA_AUDIT'), 5, 'index.php: pulse KPI block has 5 audit subqueries');
+t_eq(substr_count($kpi, '$pnlToolExcl'), 5, 'index.php: every audit subquery in the pulse excludes the tool placeholders');
+t_ok(strpos($kpi, 'NOT IN ($pnlSysIdSql)) AS NEW_REPORTS_7D') !== false, 'index.php: NEW_REPORTS_7D skips placeholders');
+t_ok(preg_match('/\$hr_sql = "[^"]*ACTION = \'OPEN\' AND TIMESTAMP > SYSDATE - 30 \$pnlToolExcl/', $srcIndex) === 1, 'index.php: busiest-hours pulse excludes tool views');
+t_ok(preg_match('/\$day_sql = "[^"]*ACTION = \'OPEN\' AND TIMESTAMP > SYSDATE - 30 \$pnlToolExcl/', $srcIndex) === 1, 'index.php: views-per-day pulse excludes tool views');
+t_ok(preg_match('/WHERE CREATED_AT > SYSDATE - 7\s+AND TRIM\(SHORT_ID\) NOT IN \(\$pnlSysIdSql\)\s+ORDER BY CREATED_AT DESC/', $srcIndex) === 1, 'index.php: "new in the repository" rail skips placeholders');
+t_ok(strpos($srcAll, "'__HOME__','penumbra_log'") === false, 'analytics_all.php: no hard-coded two-id list left');
+t_ok(strpos($srcAll, "\$sysShortIds   = array_merge(penumbraSystemShortIds(), array('penumbra_log'));") !== false, 'analytics_all.php: system ids from the registry');
+t_eq(substr_count($srcAll, 'NOT IN ($sysShortIdSql)'), 2, 'analytics_all.php: dead-report list AND its total skip every placeholder');
+t_ok(strpos($srcAll, 'WHERE TRIM(SHORT_ID) IN ($sysShortIdSql)') !== false, 'analytics_all.php: the id lookup behind $sysSql resolves every placeholder');
+t_ok(strpos($srcSuggest, "'__HOME__','penumbra_log'") === false && strpos($srcSuggest, 'NOT IN ($sysIdSql)') !== false, 'analytics_suggest.php: report suggestions skip every placeholder');
+t_ok(preg_match("/\\\$RESERVED = array_merge\\(array\\('penumbra_report_list', 'penumbra_log'\\),\\s+array_map\\('strtolower', penumbraSystemShortIds\\(\\)\\)\\);/", $srcRename) === 1, 'rename_report_short_id.php: every placeholder is reserved in both directions');
+
+if ($CONTROL) {
+    section('CONTROL');
+    t_ok(false, 'CONTROL: deliberate failure (this run must report FAIL 1)');
+}
+
+@unlink($ERRLOG);
+echo "\nPASS $pass   FAIL $fail\n";
+exit($fail === 0 ? 0 : 1);

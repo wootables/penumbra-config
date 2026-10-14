@@ -1,0 +1,263 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>nested group sticky offsets</title>
+<link rel="stylesheet" href="main.css">
+<link rel="stylesheet" href="density.css">
+</head>
+<body>
+<!-- #groupedResultsContainer is display:none in main.css; the app show()s it. -->
+<div id="groupedResultsContainer" style="display:block"></div>
+<pre id="out">running</pre>
+<script>
+(function () {
+  var results = [];
+  function assert(name, cond, detail) { results.push({ name: name, pass: !!cond, detail: detail === undefined ? '' : String(detail) }); }
+  function eq(name, got, want) { assert(name, got === want, 'got ' + JSON.stringify(got) + ' want ' + JSON.stringify(want)); }
+
+  // Build the same wrapper shape renderGroupNode() produces, by hand, so this
+  // page tests the STYLESHEET rather than main.js.
+  function band(depth, label, isLeaf) {
+    var w = document.createElement('div');
+    w.className = 'group-wrapper open ' + (isLeaf ? 'group-leaf' : 'group-branch');
+    w.setAttribute('data-group-depth', String(depth));
+    var h = document.createElement('div');
+    h.className = 'group-header';
+    h.innerHTML = '<span class="group-chevron">v</span><span class="group-name">' + label +
+                  '</span><span class="group-count">5</span>';
+    var c = document.createElement('div');
+    c.className = 'group-content';
+    c.style.display = 'block';           // the app slideDown()s this
+    w.appendChild(h); w.appendChild(c);
+    return { wrapper: w, header: h, content: c };
+  }
+  function leafTable() {
+    var t = document.createElement('table');
+    var rows = '';
+    for (var i = 0; i < 40; i++) rows += '<tr><td>row ' + i + '</td><td>b</td></tr>';
+    t.innerHTML = '<thead><tr><th>Name</th><th>Dept</th></tr></thead><tbody>' + rows + '</tbody>';
+    return t;
+  }
+
+  // Mirrors _groupSyncStickyOffsets() in main.js.
+  function syncOffsets() {
+    var root = document.getElementById('groupedResultsContainer');
+    var h = [0, 0, 0];
+    for (var d = 0; d < 3; d++) {
+      var el = root.querySelector('.group-wrapper[data-group-depth="' + d + '"] > .group-header');
+      h[d] = el ? Math.round(el.getBoundingClientRect().height) : 0;
+    }
+    root.style.setProperty('--pnb-grp-h0', h[0] + 'px');
+    root.style.setProperty('--pnb-grp-h01', (h[0] + h[1]) + 'px');
+    root.style.setProperty('--pnb-grp-h012', (h[0] + h[1] + h[2]) + 'px');
+    return h;
+  }
+  function topOf(el) {
+    var v = getComputedStyle(el).top;
+    return v === 'auto' ? null : Math.round(parseFloat(v));
+  }
+  function scrolls(el) {
+    var cs = getComputedStyle(el);
+    return (cs.overflowY === 'auto' || cs.overflowY === 'scroll' ||
+            cs.overflowX === 'auto' || cs.overflowX === 'scroll');
+  }
+
+  function build(depths) {
+    var root = document.getElementById('groupedResultsContainer');
+    root.innerHTML = '';
+    root.removeAttribute('style');
+    root.style.display = 'block';
+    var made = [], parent = root;
+    for (var i = 0; i < depths; i++) {
+      var b = band(i, 'Level ' + i + ' label', i === depths - 1);
+      parent.appendChild(b.wrapper);
+      made.push(b);
+      parent = b.content;
+    }
+    parent.appendChild(leafTable());
+    return { bands: made, thead: parent.querySelector('thead th') };
+  }
+
+  function run(densityClass, label) {
+    document.body.className = densityClass || '';
+    var b3 = build(3);
+    var h = syncOffsets();
+    var t0 = topOf(b3.bands[0].header), t1 = topOf(b3.bands[1].header), t2 = topOf(b3.bands[2].header);
+    assert(label + ' 3 levels: all bands measured a real height', h[0] > 0 && h[1] > 0 && h[2] > 0, h.join('/'));
+    eq(label + ' 3 levels: depth 0 parks at the top', t0, 0);
+    eq(label + ' 3 levels: depth 1 parks below depth 0', t1, h[0]);
+    eq(label + ' 3 levels: depth 2 parks below both', t2, h[0] + h[1]);
+    assert(label + ' 3 levels: band offsets strictly increase (no overlap)',
+      t0 < t1 && t1 < t2, [t0, t1, t2].join(' < '));
+    // THE FIX: a branch must not scroll, or its children stick inside IT
+    // instead of against the page and the offsets above become nonsense.
+    assert(label + ' 3 levels: depth-0 branch does not scroll', !scrolls(b3.bands[0].content), getComputedStyle(b3.bands[0].content).overflowY);
+    assert(label + ' 3 levels: depth-1 branch does not scroll', !scrolls(b3.bands[1].content), getComputedStyle(b3.bands[1].content).overflowY);
+    assert(label + ' 3 levels: the LEAF still scrolls its table', scrolls(b3.bands[2].content), getComputedStyle(b3.bands[2].content).overflowY);
+    eq(label + ' 3 levels: leaf keeps its own max-height',
+      getComputedStyle(b3.bands[2].content).maxHeight, '425px');
+    eq(label + ' 3 levels: a branch has no max-height',
+      getComputedStyle(b3.bands[0].content).maxHeight, 'none');
+    // The leaf's column header sticks inside the leaf's own scroller, so 0.
+    eq(label + ' 3 levels: the column header sticks at the top of its own box', topOf(b3.thead), 0);
+    // z-index DESCENDS with depth. This assertion used to demand the opposite -
+    // that all three SHARE one value - on the reasoning that different pin
+    // offsets meant they could never overlap. They can: a child band is pinned
+    // only while its own wrapper is in view, and once that wrapper scrolls past,
+    // sticky releases the child and it travels up THROUGH the parent's pinned
+    // band. With equal z-index the later-in-DOM child won and painted over its
+    // own parent (measured live: parent 149-198, child 163-212). The test was
+    // encoding the bug, which is why it never caught it.
+    var z = [b3.bands[0].header, b3.bands[1].header, b3.bands[2].header]
+      .map(function (e) { return parseInt(getComputedStyle(e).zIndex, 10) || 0; });
+    var thZ = parseInt(getComputedStyle(b3.thead).zIndex, 10) || 0;
+    assert(label + ' 3 levels: an outer band outranks its inner ones',
+      z[0] > z[1] && z[1] > z[2], z.join(','));
+    assert(label + ' 3 levels: bands sit above the leaf thead', z[2] > thZ, z[2] + ' > ' + thZ);
+    assert(label + ' 3 levels: bands sit below the controls bar (1004)', z[0] < 1004, z[0]);
+
+    // The app parks ~250px of its own sticky chrome at the viewport top, so the
+    // bands offset from --pnb-grp-base rather than from 0. Prove the whole stack
+    // shifts with it (the page itself has no chrome, hence the 0 default).
+    var root3 = document.getElementById('groupedResultsContainer');
+    root3.style.setProperty('--pnb-grp-base', '250px');
+    eq(label + ' base: depth 0 clears the chrome', topOf(b3.bands[0].header), 250);
+    eq(label + ' base: depth 1 clears chrome + one band', topOf(b3.bands[1].header), 250 + h[0]);
+    eq(label + ' base: depth 2 clears chrome + two bands', topOf(b3.bands[2].header), 250 + h[0] + h[1]);
+    root3.style.setProperty('--pnb-grp-base', '0px');
+    eq(label + ' base: resets cleanly to 0', topOf(b3.bands[0].header), 0);
+
+    var b2 = build(2);
+    var h2 = syncOffsets();
+    eq(label + ' 2 levels: depth 1 parks below depth 0', topOf(b2.bands[1].header), h2[0]);
+    assert(label + ' 2 levels: depth-0 branch does not scroll', !scrolls(b2.bands[0].content), '');
+    assert(label + ' 2 levels: the leaf scrolls', scrolls(b2.bands[1].content), '');
+
+    // ONE level: the pre-nesting shape, which must be untouched.
+    var b1 = build(1);
+    var h1 = syncOffsets();
+    eq(label + ' 1 level: the band parks at the top', topOf(b1.bands[0].header), 0);
+    eq(label + ' 1 level: the column header still sticks at 0', topOf(b1.thead), 0);
+    assert(label + ' 1 level: the single wrapper is a leaf and scrolls', scrolls(b1.bands[0].content), '');
+    eq(label + ' 1 level: and keeps the 425px box', getComputedStyle(b1.bands[0].content).maxHeight, '425px');
+    assert(label + ' 1 level: band height is plausible for this density', h1[0] > 10 && h1[0] < 90, h1[0]);
+    return h1[0];
+  }
+
+  try {
+    var standard = run('', 'standard:');
+    var compact = run('density-compact', 'compact:');
+    var easy = run('density-easy-read', 'easy-read:');
+    // NOT monotonic: standard's band is driven by the count PILL rather than by
+    // padding, so it lands within a pixel of easy-read. The claim that matters
+    // is only that the densities differ, which is what rules out a constant.
+    assert('density actually changes band height (so a constant could not work)',
+      !(compact === standard && standard === easy) && Math.abs(compact - standard) > 4,
+      'compact=' + compact + ' standard=' + standard + ' easy-read=' + easy);
+
+    // --- The bucket sub-items in the grouping picker (2026-08-30) ------------
+    // `.pcs-item-bucket` was authored as a BARE class, so it lost to the base
+    // `.pcs-dropdown .pcs-item` (two classes) and the entire block - indent,
+    // type size, muted colour - was silently dead: sub-items rendered exactly
+    // like their parent column. Invisible to harness.html, which loads no CSS,
+    // which is the whole reason this stylesheet pass exists. Asserted as a
+    // RELATIONSHIP (bucket is indented further than its parent) rather than
+    // against the literal 38px, so re-spacing the picker does not fail this.
+    (function () {
+      var dd = document.createElement('div');
+      dd.className = 'pcs-dropdown';
+      // Off-screen but LAID OUT: display:none would report empty strings for
+      // every computed value and the comparisons below would all be 0 === 0.
+      dd.style.cssText = 'position:absolute; left:-9999px; top:0; width:320px;';
+      var plain = document.createElement('div');
+      plain.className = 'pcs-item pcs-item-visible';
+      plain.textContent = 'AWARD_DATE';
+      var bucket = document.createElement('div');
+      bucket.className = 'pcs-item pcs-item-visible pcs-item-bucket';
+      bucket.textContent = '↳ AWARD_DATE by Fiscal Year';
+      var ex = document.createElement('span');
+      ex.className = 'pcs-item-ex';
+      ex.textContent = 'FY26';
+      bucket.appendChild(ex);
+      dd.appendChild(plain); dd.appendChild(bucket);
+      document.body.appendChild(dd);
+
+      var cp = getComputedStyle(plain), cb = getComputedStyle(bucket), ce = getComputedStyle(ex);
+      var pl = parseFloat(cp.paddingLeft), bl = parseFloat(cb.paddingLeft);
+      // Guard first: if the base rule stopped applying, everything below would
+      // compare 0 against 0 and pass while testing nothing.
+      assert('picker css: the base item rule applies at all', pl > 0, cp.paddingLeft);
+      assert('picker css: a bucket sub-item is indented past its parent column',
+        bl > pl, 'plain=' + cp.paddingLeft + ' bucket=' + cb.paddingLeft);
+      assert('picker css: the indent is visible, not sub-pixel',
+        (bl - pl) >= 8, 'indent=' + (bl - pl) + 'px');
+      assert('picker css: a bucket sub-item is set smaller than its parent',
+        parseFloat(cb.fontSize) < parseFloat(cp.fontSize),
+        'plain=' + cp.fontSize + ' bucket=' + cb.fontSize);
+      assert('picker css: and muted, so the parent column still leads',
+        cb.color !== cp.color, 'both ' + cb.color);
+      // The example chip rides along; it was the only part of the block that
+      // ever worked (its selector had a descendant combinator).
+      assert('picker css: the example chip keeps its own smaller size',
+        parseFloat(ce.fontSize) < parseFloat(cb.fontSize),
+        'bucket=' + cb.fontSize + ' ex=' + ce.fontSize);
+      dd.remove();
+    })();
+
+    // --- "Configure Grouping" and its two gates (2026-08-31) -----------------
+    // A second door into the grouping builder, sitting beside "Remove Grouping"
+    // on the grouped view. Both of its gates are CSS, so this pass is the only
+    // one that can see them:
+    //   restrict-grouping         - a viewer whose View Options hide Grouping.
+    //     applyUserViewRestrictions() only .hide()s the TOOLBAR icon and then
+    //     leans on this body class for every other entry point, so a control
+    //     left out of that rule stays clickable on an already-grouped report.
+    //   snapshot-comparison-active - a comparison groups by the synthetic
+    //     __SNAP_TYPE column; reconfiguring that makes no sense, and the sibling
+    //     Remove link is reworded to "Clear Snapshot Comparison" instead.
+    (function () {
+      var savedBodyClass = document.body.className;
+      var bar = document.createElement('div');
+      bar.innerHTML =
+        '<a href="#" class="themed-link-button" id="configureGroupingBtn">Configure Grouping</a>' +
+        '<a href="#" class="themed-link-button" id="removeGroupingLink">Remove Grouping</a>' +
+        '<span class="btn-group-sep" id="removeGroupingSep">&bull;</span>';
+      document.body.appendChild(bar);
+      var cfg = document.getElementById('configureGroupingBtn');
+      var rem = document.getElementById('removeGroupingLink');
+      var shown = function (el) { return getComputedStyle(el).display !== 'none'; };
+
+      document.body.className = '';
+      // Guard: if it were hidden by default every claim below would pass for
+      // the wrong reason.
+      assert('configure: the link shows on a normal grouped view', shown(cfg),
+        getComputedStyle(cfg).display);
+      assert('configure: so does Remove Grouping', shown(rem), '');
+
+      document.body.className = 'restrict-grouping';
+      assert('configure: restrict-grouping hides it (no side door into the builder)',
+        !shown(cfg), getComputedStyle(cfg).display);
+      assert('configure: restrict-grouping still hides Remove Grouping too',
+        !shown(rem), getComputedStyle(rem).display);
+
+      document.body.className = 'snapshot-comparison-active';
+      assert('configure: a snapshot comparison hides it', !shown(cfg),
+        getComputedStyle(cfg).display);
+      // Deliberately NOT hidden - compare mode renames this one rather than
+      // removing it, so a user can always leave the comparison.
+      assert('configure: but a comparison KEEPS the Remove link (it is the exit)',
+        shown(rem), getComputedStyle(rem).display);
+
+      document.body.className = '';
+      assert('configure: it comes back once neither class applies', shown(cfg), '');
+
+      bar.remove();
+      document.body.className = savedBodyClass;
+    })();
+
+    document.getElementById('out').textContent = 'RESULTS_JSON:' + JSON.stringify({ results: results });
+  } catch (e) {
+    document.getElementById('out').textContent = 'RESULTS_JSON:' + JSON.stringify({
+      fatal: String(e && e.stack ? e.stack : e), results: results });
+  }
+})();
+</script>
+</body></html>

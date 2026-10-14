@@ -1,0 +1,54 @@
+<?php
+/**
+ * Engine C (scheduler / email) corpus runner.
+ * Loads the extracted schedule_runner.php functions and renders every corpus case
+ * through execute_email_snippet(), writing results as JSON for comparison with
+ * engine B. No database, no scheduler main loop.
+ */
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_NOTICE & ~E_WARNING);
+ini_set('display_errors', '0');
+date_default_timezone_set('America/New_York');
+
+$dir = __DIR__;
+
+// --- Stubs that must exist BEFORE the extract (it is function_exists-guarded, so
+//     anything defined here wins over the real implementation). --------------
+// Virtual/search columns need the live search machinery; the corpus does not use them.
+function _search_get_virtual_columns() { return array(); }
+// Theme CSS var resolution lives in themes_config.php (not extracted); progress_bar
+// calls it. Return the fallback colour unchanged so output stays deterministic.
+function penumbra_resolve_css_vars($css) { return $css; }
+
+require_once $dir . '/engineC_functions.php';
+
+// Globals engine C reads.
+$GLOBALS['total_exemptions'] = array('TOTAL','AMOUNT','COUNT','AMT','CNT','COST');
+$GLOBALS['config'] = array();
+$GLOBALS['strip_links'] = false;
+
+$corpus = json_decode(file_get_contents($dir . '/corpus.json'), true);
+$columns = $corpus['columns'];
+$rows    = $corpus['rows'];
+
+$out = array();
+foreach ($corpus['cases'] as $c) {
+    $res = array('id' => $c['id'], 'snippet' => $c['snippet']);
+    try {
+        $html = execute_email_snippet($c['snippet'], $rows, $columns, 'flat', array(), array(), false);
+        $res['out'] = $html;
+        // PLAIN mode (report subtitle / by-line). Until 2026-08-29 this path
+        // returned early and skipped the whole number pass; it now runs the
+        // same pass and differs from HTML mode ONLY by the styled wrapper.
+        // Capturing it here lets compare.ps1 assert exactly that, which is
+        // the guardrail the change was missing - engine B has one mode, so a
+        // plain-mode drift would otherwise be invisible to this harness.
+        $res['out_plain'] = execute_email_snippet($c['snippet'], $rows, $columns, 'flat', array(), array(), true);
+    } catch (Throwable $e) {
+        $res['error'] = get_class($e) . ': ' . $e->getMessage();
+    }
+    $out[] = $res;
+}
+
+file_put_contents($dir . '/result_c.json', json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+echo "engine C: " . count($out) . " cases\n";
+foreach ($out as $r) { if (isset($r['error'])) echo "  ERROR {$r['id']}: {$r['error']}\n"; }

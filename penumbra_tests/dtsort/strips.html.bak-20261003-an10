@@ -1,0 +1,55 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>sticky strips harness</title>
+<style>
+  :root { --pnb-adm-offset: 40px; --an-sticky-h: 30px; --bg-surface: #fff; }
+  body { margin: 0; font: 13px sans-serif; }
+  .card { border: 1px solid #ccc; margin: 20px; }
+  .card > h3 { margin: 0; padding: 10px 14px 8px; border-bottom: 1px solid #ccc; }
+  .bulk-bar { padding: 8px 14px; background: #eef; }
+  .bulk-bar[hidden] { display: none; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { padding: 6px 10px; }
+  th { background: #336; color: #fff; }
+</style>
+<link rel="stylesheet" href="strips.css">
+</head><body>
+<div style="height: 300px">spacer</div>
+<div class="card scroll" id="c1">
+  <h3>Unviewed Reports <small>45 reports</small></h3>
+  <div class="bulk-bar" id="bar">2 reports selected</div>
+  <table class="dt"><thead><tr><th>Report</th><th>Views</th></tr></thead>
+  <tbody id="tb"></tbody></table>
+</div>
+<div style="height: 2000px">after</div>
+<div id="out">running</div>
+<script>
+  var tb = document.getElementById('tb');
+  for (var i = 0; i < 200; i++) { var tr = document.createElement('tr'); tr.innerHTML = '<td>r' + i + '</td><td>' + i + '</td>'; tb.appendChild(tr); }
+</script>
+<script src="strips.js"></script>
+<script>
+var log = [], fails = 0;
+function ok(c, l) { log.push((c ? 'ok   ' : 'FAIL ') + l); if (!c) fails++; }
+var card = document.getElementById('c1'), h3 = card.querySelector('h3'), bar = document.getElementById('bar'), th = card.querySelector('th');
+var T = 70;   // 40 admin bar + 30 page head
+window.scrollTo(0, card.offsetTop + 1500);
+setTimeout(function () {
+  var hb = h3.getBoundingClientRect(), bb = bar.getBoundingClientRect(), tb2 = th.getBoundingClientRect();
+  ok(h3.classList.contains('an-cardhead') && bar.classList.contains('an-cardhead'), 'the title strip and the selection strip are marked as card strips');
+  ok(Math.abs(hb.top - T) < 1, 'scrolled deep into the card: the title strip pins under the page head (top ' + Math.round(hb.top) + ', want ' + T + ')');
+  ok(Math.abs(bb.top - hb.bottom) < 1, 'the selection strip pins right under it (' + Math.round(bb.top) + ' vs ' + Math.round(hb.bottom) + ')');
+  ok(Math.abs(tb2.top - bb.bottom) < 1, 'the table header row pins right under both (' + Math.round(tb2.top) + ' vs ' + Math.round(bb.bottom) + ')');
+  ok(getComputedStyle(h3).backgroundColor !== 'rgba(0, 0, 0, 0)', 'the title strip is opaque');
+  bar.hidden = true;
+  setTimeout(function () {
+    var hb2 = h3.getBoundingClientRect(), tb3 = th.getBoundingClientRect();
+    ok(Math.abs(tb3.top - hb2.bottom) < 1, 'selection strip hidden: the header row closes the gap (' + Math.round(tb3.top) + ' vs ' + Math.round(hb2.bottom) + ')');
+    window.scrollTo(0, card.offsetTop + card.offsetHeight + 400);
+    setTimeout(function () {
+      ok(h3.getBoundingClientRect().bottom <= card.getBoundingClientRect().bottom + 1, 'scrolled past the card: its strip leaves with it');
+      document.getElementById('out').textContent = log.join('\n') + '\nSUMMARY fails=' + fails;
+    }, 100);
+  }, 200);
+}, 200);
+</script>
+</body></html>

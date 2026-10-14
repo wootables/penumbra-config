@@ -1,0 +1,296 @@
+<?php
+/**
+ * tplparity corpus - ONE fixture for both engines.
+ *
+ * Rows are written here as the RAW database values and emitted in SERVER form:
+ * plain cells pass through htmlspecialchars(ENT_QUOTES) exactly as
+ * penumbraProcessOutputRow() (shared_logic.php) hands them to the browser and to
+ * the runner; @@HTML / @@JSON cells pass through untouched. The browser side
+ * renders each cell with the app's real formatCellContent(); the PHP side feeds
+ * the same strings to generate_custom_template_string().
+ *
+ * 'rows' is in DISPLAY order (sorted by NAME asc) - the order the browser table
+ * is built in. The PHP side is handed the SAME rows shuffled, as rawData in
+ * query order, plus the saved sort: putting them back in display order with the
+ * hidden column still attached is part of what is under test.
+ */
+function enc($v) { return ($v === null) ? null : htmlspecialchars($v, ENT_QUOTES, 'UTF-8'); }
+
+$NBSP = "\xC2\xA0";
+$columns = array('ID', 'NAME', 'TITLE', 'AMOUNT', 'PHONE', 'NOTES', 'LINK', 'TAGS', 'HIDDEN_CODE');
+$hidden  = array('HIDDEN_CODE');
+
+// raw rows, in display order (NAME ascending, natural / case-insensitive)
+$raw = array(
+    array('001', "A\$1B\$&C\\1", 'Dollar $1 and $& and \\1 tokens IN DATA', '$5.00', '9195550001',
+          'string(uppercase, {NAME}) data(count) {ID}', '@@HTML<a href="https://x.test/?a=1&amp;b=2" target="_blank">Award &amp; Co</a>',
+          '@@JSON[{"Tag":"alpha","Owner":"Ann"},{"Tag":"beta, gamma","Owner":"O\'Neil (PI)"}]', 'H-(001)'),
+    array('002', 'de la Cruz, Maria', 'Plain title', '1234.5', '919.555.0002',
+          'a, b; c', "@@HTML<b>Bold</b> <i>text</i><br>b\r\n<br/>c</br>d", null, 'H-(002)'),
+    array('000123', "N\xC3\xBA\xC3\xB1ez, Jos\xC3\xA9", "\xE2\x80\x9CCurly\xE2\x80\x9D \xE2\x80\x98quotes\xE2\x80\x99 \xE2\x80\x93 dash",
+          '(500.00)', '(919) 555-0003', 'C:\\temp\\new, "quoted", it\'s', '@@HTML<span>caf&eacute; &lt;tag&gt;</span>',
+          '@@JSON[{"Tag":"solo","Owner":"@@HTML<a href=\"#\">Linked <b>Owner</b></a>"}]', 'H-[003]'),
+    array('004', "O'BRIEN-SMITH, JOHN", 'The "Big" Award (Phase I), part 2', '$1,234,567.89', '919-555-0004',
+          "line1\nline2", '', '@@JSON[]', ''),
+    array('005', "  padded name {$NBSP}", '<b>not html</b> & "amp"', '0', '',
+          "tab\there", null, '@@JSON[{"Tag":"x","Owner":null},{"Tag":"y"},{"Tag":"z","Owner":"Zed","Extra":7}]', '((nested)) (parens)'),
+    array('006', 'zeta', '', '', '+1 (919) 555-0006 x12', "crlf\r\nline\r\n\r\n  last", '@@HTML', null, null),
+);
+
+$rows = array();
+foreach ($raw as $r) {
+    $row = array();
+    foreach ($columns as $i => $c) {
+        $v = $r[$i];
+        $row[$c] = (is_string($v) && (strpos($v, '@@HTML') === 0 || strpos($v, '@@JSON') === 0)) ? $v : enc($v);
+    }
+    $rows[] = $row;
+}
+
+// ---- pivot fixtures ------------------------------------------------------------
+// 'exact': whole numbers and a FULL grid, so the two pivot renderers print the
+// same text and the template layer on top of them is compared byte for byte.
+// 'known': cents, and one hole in the grid (Arts has no 2025). The renderers
+// print the DECIMALS differently today, independent of templates:
+//   browser formatPivotValue(): Intl min 0 / max N decimals  -> 175.5   5     '' (empty cell)
+//   runner  pivot_format_value(): number_format(N)           -> 175.50  5.00  '' (empty cell)
+// (The empty cell matched from 2026-09-25, stamp fycomp: the browser used to
+// print 0 there. The hole stays in the fixture; the decimals keep this case
+// divergent.)
+// Cases on it are flagged known=pivot_display: they MUST diverge, and the run
+// fails if one starts matching so the flag cannot outlive the difference.
+$mkPivot = function ($list) {
+    $o = array();
+    foreach ($list as $p) $o[] = array('COLLEGE' => enc($p[0]), 'DEPT' => enc($p[1]), 'FY' => enc($p[2]), 'AMOUNT' => enc($p[3]));
+    return $o;
+};
+$pivotData = array(
+    'exact' => $mkPivot(array(
+        array('Arts', 'Music', '2024', '100'), array('Arts', 'Music', '2024', '50'), array('Arts', 'Music', '2025', '40'),
+        array('Arts', 'Dance', '2024', '25'), array('Arts', 'Dance', '2025', '30'),
+        array('Science', 'Physics', '2024', '1000'), array('Science', 'Physics', '2025', '2500'),
+        array('Science', 'Bio & Chem', '2024', '200'), array('Science', 'Bio & Chem', '2025', '300'),
+        array("O'Neil Center", 'Policy (Public)', '2024', '75'), array("O'Neil Center", 'Policy (Public)', '2025', '125'),
+    )),
+    // A row label ending in a NO-BREAK SPACE: the browser reads pivot cells with
+    // .text().trim(), which strips it; PHP's trim() would not.
+    'nbsp' => $mkPivot(array(
+        array("Arts{$NBSP}", 'x', '2024', '5'), array('Science', 'x', '2024', '7'), array('Science', 'x', '2025', '9'),
+        array("Arts{$NBSP}", 'x', '2025', '11'),
+    )),
+    // A BLANK row key, whole numbers, full grid - so the ONLY thing under test is
+    // where the two pivot renderers sort the "[Blank]" row (found live 2026-09-18 on
+    // ?id=awdunit: first on screen, last in the scheduled drop).
+    'blankkey' => $mkPivot(array(
+        array('Arts', 'x', '2024', '5'), array('', 'x', '2024', '7'), array('Science', 'x', '2024', '9'),
+        array('Arts', 'x', '2025', '6'), array('', 'x', '2025', '8'), array('Science', 'x', '2025', '10'),
+    )),
+    'known' => $mkPivot(array(
+        array('Arts', 'Music', '2024', '100'), array('Arts', 'Music', '2024', '50.5'), array('Arts', 'Dance', '2024', '25'),
+        array('Science', 'Physics', '2024', '1000'), array('Science', 'Physics', '2025', '2500.75'),
+        array('Science', 'Bio & Chem', '2025', '300'),
+    )),
+);
+$pivots = array(
+    'pv1' => array('data' => 'exact', 'rows' => array('COLLEGE'), 'cols' => array('FY'), 'vals' => 'AMOUNT', 'agg' => array('sum'),
+                   'rowLayout' => 'nested', 'colLayout' => 'nested', 'sortOrder' => 'asc'),
+    'pv2' => array('data' => 'exact', 'rows' => array('COLLEGE', 'DEPT'), 'cols' => array('FY'), 'vals' => 'AMOUNT', 'agg' => array('sum', 'count'),
+                   'rowLayout' => 'nested', 'colLayout' => 'nested', 'sortOrder' => 'asc'),
+    'pv3' => array('data' => 'exact', 'rows' => array('COLLEGE', 'DEPT'), 'cols' => array('FY'), 'vals' => 'AMOUNT', 'agg' => array('sum'),
+                   'rowLayout' => 'flat', 'colLayout' => 'flat', 'sortOrder' => 'desc'),
+    'pv4' => array('data' => 'nbsp', 'rows' => array('COLLEGE'), 'cols' => array('FY'), 'vals' => 'AMOUNT', 'agg' => array('sum'),
+                   'rowLayout' => 'nested', 'colLayout' => 'nested', 'sortOrder' => 'asc'),
+    'pvb' => array('data' => 'blankkey', 'rows' => array('COLLEGE'), 'cols' => array('FY'), 'vals' => 'AMOUNT', 'agg' => array('sum'),
+                   'rowLayout' => 'nested', 'colLayout' => 'nested', 'sortOrder' => 'asc'),
+    'pvk' => array('data' => 'known', 'rows' => array('COLLEGE'), 'cols' => array('FY'), 'vals' => 'AMOUNT', 'agg' => array('sum', 'count'),
+                   'rowLayout' => 'nested', 'colLayout' => 'nested', 'sortOrder' => 'asc'),
+);
+
+// ---- template cases ----------------------------------------------------------
+$LQ = "\xE2\x80\x9C"; $RQ = "\xE2\x80\x9D"; $LS = "\xE2\x80\x98"; $RS = "\xE2\x80\x99";
+$cases = array();
+$add = function ($id, $note, $body, $header = '', $ext = 'txt', $newline = true, $mode = 'flat', $known = '') use (&$cases) {
+    $cases[] = array('id' => $id, 'note' => $note, 'mode' => $mode, 'header' => $header, 'body' => $body,
+                     'ext' => $ext, 'newline' => $newline, 'known' => $known);
+};
+// plain placeholders / headers / extensions
+$add('plain_csv',      'bare placeholders, default-style header, .csv',     '{ID},{NAME},{AMOUNT}', '{ID},{NAME},{AMOUNT}', 'csv');
+$add('case_insens',    'placeholder names are case-insensitive',            '{id}|{Name}|{aMoUnT}', '{id}|{Name}');
+$add('unknown_ph',     'unknown placeholder stays literal',                 '{ID}:{NOPE}:{}', '{NOPE}');
+$add('hidden_col',     'a HIDDEN column is addressable, like the browser',  '{ID}={HIDDEN_CODE}', '{HIDDEN_CODE}');
+$add('rownum',         '{#} is the row number',                             '{#}.{ID}');
+$add('tabs_nonewline', '\\t escapes; no line break between rows',           '{ID}\\t{PHONE};', 'id\\tphone', 'tsv', false);
+$add('json_ext_nobom', '.json gets NO byte-order mark',                     '["{ID}"]', '', 'json');
+$add('xml_ext',        '.xml',                                              '<r id="{ID}"/>', '<?xml version="1.0"?>', 'xml');
+$add('empty_header',   'empty header = no header line',                     '{ID}', '');
+$add('header_renders_empty', 'a header that RENDERS empty is dropped too',  '{ID}', 'data(search)');
+$add('data_in_cells',  'string(/data(/{X} text INSIDE A CELL is never evaluated', '{ID}>{NOTES}<');
+$add('multiline_cell', 'newline / tab / CRLF inside a cell',                '[{NOTES}]');
+// 2026-10-10 (the user: a multi-line cell keeps its lines - "as shown, with a real newline" - and a template undoes it per
+// field by regex): the field folded onto one line, and its lines run together as every template had them before
+$add('multiline_fold', 'a field folded onto one line by regex_replace',     '[string(regex_replace, {NOTES}, \'\s*\n\s*\', \' \')]');
+$add('multiline_glue', 'its lines run together by regex_replace (as before)', '[string(regex_replace, {NOTES}, \'\n\', \'\')]');
+// 2026-10-10 (the user: "in addition to \t, also allow \n" in every custom template): \n is a line break in the body and the
+// header (a row double-spaced), a cell's own backslashes are never touched, and a doubled backslash stays as typed
+$add('newline_escape', '\\n escapes in the body and the header',              '{ID}:{NOTES}\n', 'h1\nh2');
+$add('backslash_pair', 'a doubled backslash before n / t is left as typed',   '[\\\\n|\\\\t]');
+$add('regex_add_nl',   'regex_replace ADDS a line break inside a cell (\n in the replacement)', '[string(regex_replace, {NOTES}, \'; \', \'\n\')]');
+$add('html_cell',      '@@HTML cell = visible text, entities decoded',      '{ID}:{LINK}:');
+$add('entities',       '& < > " \' survive as themselves',                  '{TITLE}');
+// quotes
+$add('csv_quote',      'CSV quoting: wrap in ", double the inner "',        '"string(replace, {TITLE}, \'"\', \'""\')"', '', 'csv');
+$add('sql_insert',     'SQL literal: double the single quotes',             'INSERT INTO T (ID, NAME) VALUES (\'{ID}\', \'string(replace, {NAME}, "\'", "\'\'")\');');
+$add('strip_quotes',   'remove every quote character, straight and curly',  'string(regex_replace, {TITLE}, \'["\\\'' . $LQ . $RQ . $LS . $RS . ']\', \'\')');
+$add('curly_class',    'curly -> straight through a CHARACTER CLASS',       'string(regex_replace, string(regex_replace, {TITLE}, \'[' . $LQ . $RQ . ']\', \'"\'), "[' . $LS . $RS . ']", "\'")');
+$add('curly_literal',  'curly -> straight through literal replace',         'string(replace, string(replace, {TITLE}, \'' . $LQ . '\', \'"\'), \'' . $RQ . '\', \'"\')');
+$add('quote_wrap',     'add quotes around a value',                         'string(concat, \'"\', {NAME}, \'"\')|string(concat, "\'", {ID}, "\'")');
+$add('json_escape',    'JSON string escaping chain',                        '"string(replace, string(replace, {NOTES}, \'\\\', \'\\\\\'), \'"\', \'\\"\')"');
+// parentheses
+$add('strip_parens',   'remove parentheses (class)',                        'string(regex_replace, {TITLE}, \'[()]\', \'\')');
+$add('strip_parens_lit', 'remove parentheses (two literal replaces)',       'string(replace, string(replace, {HIDDEN_CODE}, \'(\', \'\'), \')\', \'\')');
+$add('paren_content',  'drop a parenthesised clause',                       'string(regex_replace, {TITLE}, \'\\s*\\([^)]*\\)\', \'\')');
+$add('acct_negative',  '(500.00) -> -500.00',                               'string(regex_replace, {AMOUNT}, \'^\\((.*)\\)$\', \'-$1\')');
+$add('add_parens',     'wrap in parentheses',                               '(string(trim, {NAME}))|string(regex_replace, {ID}, \'^(.*)$\', \'($1)\')');
+$add('phone_fmt',      'digits only, then (919) 555-1234',                  'string(regex_replace, string(regex_replace, {PHONE}, \'\\D\', \'\'), \'^1?(\\d{3})(\\d{3})(\\d{4}).*$\', \'($1) $2-$3\')');
+$add('brackets',       'square -> round brackets',                          'string(replace, string(replace, {HIDDEN_CODE}, \'[\', \'(\'), \']\', \')\')');
+$add('unquoted_paren_arg', 'a paren in an UNQUOTED arg is depth-tracked',   'string(concat, {ID}, (x))');
+// commas
+$add('comma_swap',     'LAST, FIRST -> FIRST LAST',                         'string(regex_replace, {NAME}, \'^\\s*([^,]+),\\s*(.+?)\\s*$\', \'$2 $1\')');
+$add('comma_to_pipe',  'comma -> pipe',                                     'string(replace, {NOTES}, \',\', \' |\')');
+$add('strip_money',    'strip $ and thousands commas',                      'string(regex_replace, {AMOUNT}, \'[$,]\', \'\')');
+$add('comma_split',    'split on comma: first / last / range / rest',       'string(split, {NAME}, \',\', 1)~string(split, {NAME}, \',\', -1)~string(split, {NOTES}, \',\', 2-3)~string(split, {NOTES}, \',\', 2-)');
+$add('comma_in_quotes', 'a comma inside a quoted arg does not split args',  'string(concat, {ID}, \', \', {PHONE})');
+// $ replacement grammar
+$add('repl_dollar_lit',  '"$5.00" with no fifth group is literal text',     'string(regex_replace, {ID}, \'^\', \'$5.00 \')');
+$add('repl_groups',      '$1$1, $0, $&',                                    'string(regex_replace, {ID}, \'(\\d)\', \'$1$1\')|string(regex_replace, {ID}, \'\\d+\', \'<$0>\')|string(regex_replace, {ID}, \'\\d+\', \'[$&]\')');
+$add('repl_dollardollar', '$$ is one literal dollar',                       'string(regex_replace, {ID}, \'^0+\', \'$$\')');
+$add('repl_prefix_suffix', '$` and $\' are the text before / after',       'string(regex_replace, {ID}, \'1\', "<$`|$\'>")');
+$add('repl_backslash',   'a backslash-digit in the replacement is literal', 'string(regex_replace, {ID}, \'(\\d)$\', \'\\1\')');
+$add('repl_two_digit',   '$10 with one group = group 1 then a zero',        'string(regex_replace, {ID}, \'(\\d)$\', \'$10\')');
+$add('repl_literal_dollar', 'literal replace never reads $ sequences',      'string(replace, {ID}, \'0\', \'$&$$\')');
+$add('replace_empty_find', 'an empty find text changes nothing',            'string(replace, {ID}, \'\', \'X\')');
+// case / trim / length / substr / pad
+$add('titlecase',      'capitalize after EVERY word boundary',              'string(titlecase, {NAME})');
+$add('upper_lower',    'non-ASCII letters change case too',                 'string(uppercase, {NAME})|string(lowercase, {NAME})');
+$add('trims',          'trim strips a no-break space too',                  '[string(trim, {NAME})][string(ltrim, {NAME})][string(rtrim, {NAME})]');
+$add('trim_chars',     'ltrim / rtrim with a character set',                'string(ltrim, {ID}, \'0\')|string(rtrim, {HIDDEN_CODE}, \')]\')|string(ltrim, {AMOUNT}, \'$(\')');
+$add('length_substr',  'length and substr count CHARACTERS',                'string(length, {NAME})|string(substr, {NAME}, 0, 5)|string(substr, {NAME}, -4)|string(substr, {NAME}, 2, \'\')');
+$add('pad',            'padstart / padend, ASCII and not',                  'string(padstart, {ID}, 8, \'0\')|string(padend, {NAME}, 22, \'.\')|string(padstart, {AMOUNT}, 3, \'' . $LQ . '\')');
+$add('nested_calls',   'calls nest',                                        'string(padstart, string(length, string(trim, {NAME})), 3, \'0\')');
+// grammar edges
+$add('bare_ref',       'a bare word is a column ref with literal fallback', 'string(uppercase, NAME)|string(concat, ID, -, suffix)');
+$add('op_not_column',  'the op name is never resolved as a column',         'string(UPPERCASE, {ID})|string( lowercase , {NAME})');
+$add('unbalanced',     'an unbalanced call is left verbatim',               'string(uppercase, {NAME}');
+$add('not_a_call',     'substring( / metadata( are not calls',              'substring({ID}) metadata({ID}) mystring(x) $data(y)');
+$add('one_arg',        'string() needs a type and a subject',               'string(uppercase)');
+$add('bad_op',         'unknown op names the mistake',                      'string(upper, {ID})');
+$add('bad_regex',      'invalid pattern / flags / missing pattern',         'string(regex_replace, {ID}, \'(\', \'x\')|string(regex_replace, {ID}, \'a\', \'b\', \'g\')|string(regex_replace, {ID}, \'\', \'b\')');
+$add('regex_flags',    'i / m / s flags',                                   'string(regex_replace, {NAME}, \'JOHN\', \'Jack\', \'i\')|string(regex_replace, {NOTES}, \'^l\', \'L\', \'m\')|string(regex_replace, {NOTES}, \'1.l\', \'_\', \'s\')');
+$add('regex_dollar_end', '$ is the very end, not "before a final newline"', 'string(regex_replace, {NOTES}, \'e$\', \'E\')');
+$add('regex_word_ascii', '\\w \\d \\b stay ASCII, as in a JS RegExp',        'string(regex_replace, {NAME}, \'\\W+\', \'_\')|string(regex_replace, {NAME}, \'\\b\', \'|\')');
+$add('regex_dot_unicode', '. is one CHARACTER, not one byte',               'string(regex_replace, {NAME}, \'.\', \'x\')');
+$add('braces_in_template', 'a JSON-ish template: { directly before a placeholder', '{"id":"{ID}","n":"x"} { "id": "{ID}" }');
+$add('data_count',     'data(count) / data(search) repeat on every row',    '{ID}/data(count)/[data(search)]/data()', 'rows=data(count)');
+$add('data_title',     'data(title), bare and inside string()',             '{ID}:data(title):string(uppercase, data(title))', '# data(title) - data(count) rows');
+// nested @@JSON
+$add('nested_zip',     '{Parent-Sub} expands one line per nested entry',    '{ID}|{TAGS-Tag}|{TAGS-Owner}', '{ID}|{TAGS-Tag}|{TAGS-Owner}');
+$add('nested_in_call', 'a nested ref inside string() expands too',          '{ID}|string(uppercase, {TAGS-Tag})|string(regex_replace, {TAGS-Owner}, \'\\s*\\(.*\\)\', \'\')');
+$add('nested_bare_parent', 'a bare {Parent} is the raw JSON text',          '{ID}:{TAGS}');
+$add('nested_extra_key', 'a sub-key only some entries have',                '{ID}|{TAGS-Extra}|');
+// pivot
+$add('pv1_rows',  'pivot: one row field, one col field, sum, Grand Total row + column', '{COLLEGE};{2024};{2025};{Grand Total}', '{COLLEGE};{2024};{2025};{Grand Total}', 'csv', true, 'pv1');
+$add('pv1_calls', 'pivot: string() over pivot cells',               'string(uppercase, {COLLEGE})=string(regex_replace, {2024}, \'[$,]\', \'\')+string(padstart, {2025}, 7, \'.\')', '', 'txt', true, 'pv1');
+$add('pv2_rows',  'pivot: two row fields (rowspan labels repeat), multi-agg headers', '{COLLEGE}/{DEPT}: {2024-Sum} {2024-Count} | {2025-Sum} {2025-Count} | {Grand Total-Sum} {Grand Total-Count}', '{COLLEGE}/{DEPT}|{2024-Sum}|{Grand Total-Count}', 'txt', true, 'pv2');
+$add('pv3_flat',  'pivot: flat row layout, descending',             '{COLLEGE}~{DEPT}~{2024}~{2025}', '', 'txt', true, 'pv3');
+$add('pv_unknown', 'pivot: unknown placeholder stays literal, names are case-insensitive', '{college}:{NOPE}:{grand total}', '', 'txt', true, 'pv1');
+$add('pv4_nbsp_label', 'pivot: a label ending in a no-break space is trimmed like the browser trims it', '[{COLLEGE}]={2024}+{2025}', '', 'txt', true, 'pv4');
+$add('pvb_blank_sort', 'pivot: the [Blank] row key lands FIRST on both sides (the runner followed the screen, 2026-10-01; a KNOWN divergence 2026-09-18..10-01)', '{COLLEGE}={2024}+{2025}', '', 'txt', true, 'pvb');
+$add('pvk_display', 'pivot: decimals, counts and empty cells print as on the screen (the runner trims trailing zeros, 2026-10-01; a KNOWN divergence 2026-09-18..10-01)', '{COLLEGE};{2024-Sum};{2024-Count};{2025-Sum};{2025-Count}', '', 'txt', true, 'pvk');
+
+// ---- string() op unit cases (direct stringOp vs _snippet_string) -------------
+$ops = array();
+$op = function ($note, $type, $subject, $params = array()) use (&$ops) {
+    $ops[] = array('id' => 'op' . str_pad((string)(count($ops) + 1), 3, '0', STR_PAD_LEFT), 'note' => $note,
+                   'op' => $type, 'subject' => $subject, 'params' => $params);
+};
+$op('upper ascii', 'uppercase', 'abc Xyz');               $op('upper accents', 'uppercase', "jos\xC3\xA9 stra\xC3\x9Fe");
+$op('lower accents', 'lowercase', "JOS\xC3\x89 \xC3\x9CBER"); $op('title apostrophe', 'titlecase', "o'brien-smith jr.");
+$op('title digits', 'titlecase', '3rd floor_b wing');     $op('title accents', 'titlecase', "\xC3\x89LAN vital");
+$op('trim nbsp', 'trim', "{$NBSP} x {$NBSP}");            $op('trim nul kept', 'trim', "\0x\0");
+$op('ltrim ws', 'ltrim', " \t x ");                       $op('rtrim ws', 'rtrim', " x \n");
+$op('ltrim chars', 'ltrim', '000120', array('0'));        $op('rtrim chars', 'rtrim', 'abc]])', array(')]'));
+$op('ltrim class specials', 'ltrim', '^-\\]x', array('^-\\]'));
+$op('rtrim before newline', 'rtrim', "abcxx\n", array('x'));
+$op('replace all', 'replace', 'a,b,,c', array(',', ';')); $op('replace regex chars', 'replace', 'a.b*c(d)', array('(d)', '[D]'));
+$op('replace to empty', 'replace', '(a)(b)', array('('));  $op('replace $&', 'replace', 'abc', array('b', '$&$&'));
+$op('replace $$', 'replace', 'abc', array('b', '$$'));    $op('replace empty find', 'replace', 'abc', array('', '-'));
+$op("replace \$'", 'replace', 'abc', array('b', "\$'"));
+$op('rx groups', 'regex_replace', 'John Smith', array('(\\w+) (\\w+)', '$2, $1'));
+$op('rx $0', 'regex_replace', 'abc', array('b', '[$0]')); $op('rx no group literal', 'regex_replace', 'FREE', array('^FREE$', '$5.00'));
+$op('rx $10', 'regex_replace', 'ab', array('(a)', '$10')); $op('rx $01', 'regex_replace', 'ab', array('(a)', '$01'));
+$op('rx unmatched group', 'regex_replace', 'ac', array('(a)(b)?c', '[$2]'));
+$op('rx named group', 'regex_replace', '2026-09', array('(?<y>\\d{4})-(?<m>\\d{2})', '$<m>/$<y>'));
+$op('rx $< no names', 'regex_replace', 'ab', array('a', '$<x>'));
+$op('rx backslash', 'regex_replace', 'ab', array('(a)', '\\1\\\\'));
+$op('rx tilde', 'regex_replace', 'a~b', array('~', '-'));  $op('rx escaped tilde', 'regex_replace', 'a~b#c', array('\\~|#', '-'));
+$op('rx slash', 'regex_replace', 'a/b', array('/', '|'));  $op('rx empty match', 'regex_replace', 'abc', array('x*', '-'));
+$op('rx empty match utf8', 'regex_replace', "\xC3\xA9a", array('x*', '-'));
+$op('rx class curly', 'regex_replace', "{$LQ}a{$RQ}", array("[{$LQ}{$RQ}]", '"'));
+$op('rx dot utf8', 'regex_replace', "\xC3\xA9\xC3\xA9", array('.', 'x'));
+$op('rx \\w accents', 'regex_replace', "Jos\xC3\xA9 N\xC3\xBA\xC3\xB1ez", array('\\w+', 'W'));
+$op('rx \\d', 'regex_replace', "a1\xC3\xA92", array('\\d', '#')); $op('rx \\b accents', 'regex_replace', "\xC3\xA9lan x", array('\\b', '|'));
+$op('rx [\\w-] class', 'regex_replace', "a-b \xC3\xA9", array('[\\w-]+', 'X'));
+$op('rx \\s nbsp', 'regex_replace', "a{$NBSP}b c", array('\\s', '_'));
+$op('rx i flag', 'regex_replace', 'AbC', array('b', 'x', 'i')); $op('rx m flag', 'regex_replace', "a\nb", array('^', '>', 'm'));
+$op('rx s flag', 'regex_replace', "a\nb", array('a.b', 'X', 's')); $op('rx dot no newline', 'regex_replace', "a\nb", array('a.b', 'X'));
+$op('rx dot no CR', 'regex_replace', "a\rb", array('a.b', 'X')); $op('rx $ very end', 'regex_replace', "ab\n", array('b$', 'X'));
+$op('rx bad flag', 'regex_replace', 'a', array('a', 'b', 'x')); $op('rx bad pattern', 'regex_replace', 'a', array('(', 'b'));
+$op('rx no pattern', 'regex_replace', 'a', array('', 'b')); $op('rx quotes', 'regex_replace', "it's \"q\"", array('[\'"]', ''));
+$op('rx parens', 'regex_replace', 'f(x) (y)', array('\\(([^)]*)\\)', '[$1]'));
+$op('split first', 'split', 'a, b ,c', array(',', '1'));   $op('split zero', 'split', 'a,b', array(',', '0'));
+$op('split last', 'split', 'a,b,c', array(',', '-1'));     $op('split oob', 'split', 'a,b', array(',', '9'));
+$op('split range', 'split', 'a, b, c, d', array(',', '2-3')); $op('split rest', 'split', 'a,b,c', array(',', '2-'));
+$op('split default delim', 'split', 'a,b', array('', '2')); $op('split multi-char', 'split', 'a::b::c', array('::', '2'));
+$op('split trims nbsp', 'split', "a,{$NBSP}b{$NBSP}", array(',', '2'));
+$op('substr basic', 'substr', 'abcdef', array('1', '3'));  $op('substr to end', 'substr', 'abcdef', array('2'));
+$op('substr negative', 'substr', 'abcdef', array('-2'));   $op('substr neg len', 'substr', 'abcdef', array('1', '-1'));
+$op('substr utf8', 'substr', "\xC3\xA9\xC3\xA8\xC3\xA0bc", array('1', '2')); $op('substr empty len', 'substr', 'abcdef', array('2', ''));
+$op('substr zero len', 'substr', 'abcdef', array('2', '0')); $op('substr past end', 'substr', 'abc', array('9'));
+$op('length ascii', 'length', 'abc');                      $op('length utf8', 'length', "\xC3\xA9\xC3\xA8");
+$op('length astral', 'length', "a\xF0\x9F\x98\x80");       $op('length empty', 'length', '');
+$op('concat', 'concat', 'a', array('b', '', 'c'));         $op('padstart', 'padstart', '7', array('3', '0'));
+$op('padend', 'padend', '7', array('3', '0'));             $op('pad multi', 'padstart', 'x', array('6', 'ab'));
+$op('pad no-op', 'padstart', 'abcdef', array('3', '0'));   $op('pad empty char', 'padend', 'x', array('3', ''));
+$op('pad utf8 subject', 'padstart', "\xC3\xA9", array('3', '.')); $op('pad utf8 char', 'padend', 'x', array('3', "\xE2\x80\xA2"));
+$op('unknown op', 'upper', 'abc');                         $op('op spacing/case', '  UPPERCASE ', 'abc');
+$op('guard bytes stripped', 'length', "\x021,234\x02");
+
+// QUERY order = the display rows shuffled. perm[q] = display index of the q-th
+// query row; masterIndex[d] = the 1-based query position of display row d, which
+// is what the app prints in the '#' column (it indexes masterRowData, so it does
+// NOT renumber when the table is sorted).
+$perm = array(3, 0, 5, 2, 4, 1);
+$masterIndex = array();
+foreach ($perm as $q => $d) $masterIndex[$d] = $q + 1;
+ksort($masterIndex);
+
+// WANTS (2026-10-10): text a case's output must hold in BOTH engines, beyond their agreeing - a multi-line cell's lines as
+// the table shows them (the CR of a CRLF gone, a blank line kept, an @@HTML cell's <br> / <br/> / </br> a line each) and
+// the regex_replace undo. The parity alone passed on the glued build too.
+$wants = array(
+    'multiline_cell' => array("[line1\nline2]", "[tab\there]", "[crlf\nline\n\n  last]"),
+    'html_cell'      => array("002:Bold text\nb\nc\nd:"),
+    'multiline_fold' => array("[line1 line2]", "[tab\there]", "[crlf line last]"),
+    'multiline_glue' => array("[line1line2]", "[crlfline  last]"),
+    'newline_escape' => array("h1\nh2\n", "002:a, b; c\n\n", "C:\\temp\\new"),
+    'backslash_pair' => array('[\\\\n|\\\\t]'),
+    'regex_add_nl'   => array("[a, b\nc]"),
+);
+
+echo json_encode(array(
+    'columns' => $columns, 'hidden' => $hidden, 'rows' => $rows,
+    'perm' => $perm, 'masterIndex' => array_values($masterIndex),
+    'sort' => array(array('colIdentifier' => 'NAME', 'direction' => 'asc')),
+    'search' => '', 'pivotData' => $pivotData, 'pivots' => $pivots,
+    'cases' => $cases, 'ops' => $ops, 'wants' => $wants
+), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);

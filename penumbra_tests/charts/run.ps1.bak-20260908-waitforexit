@@ -1,0 +1,142 @@
+# =============================================================================
+# Penumbra CHART SUITE  -  one-command rebuild + run  (12 harnesses)
+#
+# Covers the per-type chart builders and the lazy-load bridge between
+# js/main.js and js/penumbra_charts.js:
+#
+#   funnel_test           conversion + duration funnels, stage maths, labels
+#   gauge_test            gauge + bullet: bands, targets, range resolution
+#   box_pareto_test       box plot quartiles/whiskers/outliers + the pareto flag
+#   gantt_test            timeline bars, date parsing, tick formatting, markers
+#   map_test              US tile-grid cartogram: state resolution, binning,
+#                         territories, legend placement, unmatched rows
+#   dough_roundtrip_test  doughnut survives the vis() emit -> parse round trip
+#   module_test           penumbra_charts.js standing ALONE with no main.js:
+#                         exports present, init() refuses partial deps loudly
+#   bridge_test           the excision itself: nothing was left behind in
+#                         main.js, every module export has exactly one shim,
+#                         shims delegate argument-for-argument when armed and
+#                         return documented neutrals (never undefined) when
+#                         not, the module is fetched ONCE with the versioned
+#                         URL, and all five Chart.js load sites await it
+#
+#   powershell -File run.ps1
+#   powershell -File run.ps1 -MainJs <path>   (e.g. a .bak - positive control:
+#                                              the PRE-extraction main.js must
+#                                              FAIL bridge_test, because it
+#                                              still owns the builders itself)
+#
+# If the UNC execution policy refuses the script ("not digitally signed"), run
+# its body as a scriptblock from the workstation:
+#   $dir='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\charts'
+#   & ([scriptblock]::Create([IO.File]::ReadAllText("$dir\run.ps1").Replace('$here = $PSScriptRoot',"`$here = '$dir'")))
+# and do NOT pipe the invocation (a lingering headless child keeps stdout open
+# and the pipeline never sees EOF); the script prints its own summary.
+#
+# Rebuilds SRC.js from the LIVE app files each run, so it always tests what is
+# deployed. Writes nothing to the webroot. Exit code 1 when any assertion fails.
+# =============================================================================
+param([string]$MainJs = '')
+$ErrorActionPreference = 'Stop'
+$here = $PSScriptRoot
+$app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+$js   = "$app\js"
+if (-not $MainJs) { $MainJs = "$js\main.js" }
+
+# Chrome first: on this box headless EDGE emits nothing for these pages, and
+# cscript's JScript engine is ES3 so it cannot parse main.js at all.
+$browser = 'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe'
+if (-not (Test-Path $browser)) { $browser = 'C:\Program Files\Google\Chrome\Application\chrome.exe' }
+if (-not (Test-Path $browser)) { $browser = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe' }
+if (-not (Test-Path $browser)) { $browser = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }
+if (-not (Test-Path $browser)) { throw 'no Chrome or Edge found' }
+
+Write-Host "[1/3] staging JS from the live app ..."
+Copy-Item "$js\moment.min.js"       "$here\moment.min.js"       -Force
+Copy-Item "$js\penumbra_charts.js"  "$here\penumbra_charts.js"  -Force
+# The geo asset is a LIVE APP FILE too, and outline_map_test asserts directly
+# against it (feature counts, projection landmarks, centroid arming). Without
+# this copy the suite happily tested whatever build_geo.pl last left here while
+# the app served something else - which is how a world layer shipped to the app
+# on 2026-08-28 with no harness covering it.
+Copy-Item "$js\penumbra_geo_us.js"  "$here\penumbra_geo_us.js"  -Force
+
+# SRC.js = penumbra_charts.js + main.js, MODULE FIRST on purpose: main.js now
+# carries one-line shims with the same names as the real builders, and the
+# harnesses' grab() takes the FIRST match. Module-first makes every
+# grab('function applyXChartConfig(') land on the real implementation; every
+# other anchor is unique, so the order cannot affect it.
+#
+# Read as raw BYTES and decode explicitly. js/main.js is pure CRLF and holds two
+# NUL bytes; a re-encoding read (or sed, which silently rewrites CRLF to LF)
+# corrupts it. The harnesses normalise CRLF themselves.
+Write-Host "      main.js under test: $MainJs"
+$u8   = New-Object System.Text.UTF8Encoding($false)
+$mod  = $u8.GetString([IO.File]::ReadAllBytes("$js\penumbra_charts.js"))
+$main = $u8.GetString([IO.File]::ReadAllBytes($MainJs))
+$text = $mod + "`n" + $main
+
+$sb = New-Object System.Text.StringBuilder ($text.Length + 200000)
+[void]$sb.Append('window.__src = "')
+foreach ($ch in $text.ToCharArray()) {
+    $o = [int]$ch
+    if     ($ch -eq [char]92)  { [void]$sb.Append('\\') }        # backslash
+    elseif ($ch -eq [char]34)  { [void]$sb.Append('\"') }        # double quote
+    elseif ($o  -eq 10)        { [void]$sb.Append('\n')  }
+    elseif ($o  -eq 13)        { [void]$sb.Append('\r')  }
+    elseif ($o  -eq 9)         { [void]$sb.Append('\t')  }
+    elseif ($o -lt 32 -or $o -gt 126) { [void]$sb.Append(('\u{0:x4}' -f $o)) }
+    else   { [void]$sb.Append($ch) }
+}
+[void]$sb.Append('";')
+[IO.File]::WriteAllText("$here\SRC.js", $sb.ToString(), $u8)
+Write-Host ("      SRC.js rebuilt: {0} source chars -> {1} bytes" -f $text.Length, (Get-Item "$here\SRC.js").Length)
+
+Write-Host "[2/3] running 12 harnesses headlessly ..."
+$suites = @('funnel_test','gauge_test','box_pareto_test','gantt_test','map_test',
+            'dough_roundtrip_test','module_test','bridge_test','format_bands_test','outline_map_test','palette_test','autobuild_test')
+$rows = @()
+foreach ($s in $suites) {
+    # Its own profile per run: a stale disk cache will happily serve the
+    # PREVIOUS version of SRC.js and quietly "pass" against old code.
+    $udd = Join-Path $here ("profile_" + $s)
+    if (Test-Path $udd) { Remove-Item $udd -Recurse -Force }
+    $dom = Join-Path $here ($s + "_dom.txt")
+    if (Test-Path $dom) { Remove-Item $dom -Force }
+    $url = 'file:///' + $here.Replace([char]92, [char]47) + '/' + $s + '.html'
+    $args = @('--headless=new','--disable-gpu','--no-sandbox','--allow-file-access-from-files',
+              "--user-data-dir=$udd",'--virtual-time-budget=40000','--dump-dom',$url)
+    # -RedirectStandardOutput, never a pipe: a lingering headless child keeps
+    # stdout open and a PowerShell pipeline never sees EOF.
+    Start-Process -FilePath $browser -Wait -NoNewWindow -RedirectStandardOutput $dom -ArgumentList $args
+    $d = [IO.File]::ReadAllText($dom)
+    $i = $d.IndexOf('<pre id="out">')
+    if ($i -lt 0) { throw "$s : no <pre id=out> in dump ($($d.Length) bytes)" }
+    $j = $d.IndexOf('</pre>', $i)
+    $txt = [System.Net.WebUtility]::HtmlDecode($d.Substring($i + 14, $j - $i - 14))
+    $first = ($txt -split "`n")[0].Trim()
+    $pass = 0; $fail = 0
+    if ($first -match 'pass=(\d+)\s+fail=(\d+)') { $pass = [int]$Matches[1]; $fail = [int]$Matches[2] }
+    else { $fail = -1 }
+    $rows += [pscustomobject]@{ suite = $s; pass = $pass; fail = $fail; line = $first; text = $txt }
+}
+
+Write-Host "[3/3] results"
+$totalPass = 0; $totalFail = 0
+foreach ($r in $rows) {
+    if ($r.fail -eq 0) {
+        $totalPass += $r.pass
+        Write-Host ("  PASS  {0,-22} {1,4} assertions" -f $r.suite, $r.pass) -ForegroundColor Green
+    } elseif ($r.fail -lt 0) {
+        $totalFail++
+        Write-Host ("  ERROR {0,-22} {1}" -f $r.suite, $r.line) -ForegroundColor Red
+    } else {
+        $totalPass += $r.pass; $totalFail += $r.fail
+        Write-Host ("  FAIL  {0,-22} {1} failed of {2}" -f $r.suite, $r.fail, ($r.pass + $r.fail)) -ForegroundColor Red
+        foreach ($l in ($r.text -split "`n")) {
+            if ($l.StartsWith('FAIL')) { Write-Host ("        " + $l.Trim()) -ForegroundColor DarkYellow }
+        }
+    }
+}
+Write-Host ("SUMMARY pass={0} fail={1}" -f $totalPass, $totalFail)
+if ($totalFail -gt 0) { exit 1 }

@@ -1,0 +1,133 @@
+# =============================================================================
+# Penumbra FILTER STRIP HARNESS  -  filter_strip() snippet control (2026-09-28)
+#
+# Boots js/main.js headlessly (same recipe as ..\pivot_trigger) and drives the
+# real code paths of the filter_strip() snippet function:
+#   - argument parsing (fields, options, keywords, refusals)
+#   - the value encoder/decoder and the search-text round trip
+#     (_pnbFsState / _pnbFsCompose), including the engine agreement check
+#     through the REAL parseAdvancedQuery + evaluateParsedQuery
+#   - chip sets with cross-filtered counts (_pnbFsGroups)
+#   - engine A rendering, DOMPurify survival, the "+n more" fold
+#   - the click flow through the executor's own `search` action
+#   - engine B returning nothing, the function registry
+#
+#   powershell -File run.ps1                 (tests the LIVE js/main.js)
+#   powershell -File run.ps1 -MainJs <path>  (a staged copy, or a .bak as the
+#                                             positive control: a pre-feature
+#                                             main.js must FAIL with
+#                                             "hooks unavailable")
+#   powershell -File run.ps1 -Mutant <name>  (ONE single-point change, to SHOW
+#                                             a named assertion bites)
+#       fsorblind    a top-level `or` no longer pauses the strip
+#       fsnoescape   values are no longer regex-escaped
+#       fsrestdrop   typed conditions are dropped from the composed text
+#       fsselfcount  a column's own selection narrows its own counts
+#
+# If the UNC execution policy refuses the script, run its body as a scriptblock:
+#   $dir='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\filterstrip'
+#   & ([scriptblock]::Create([IO.File]::ReadAllText("$dir\run.ps1").Replace('$here = $PSScriptRoot',"`$here = '$dir'"))) -MainJs <path>
+# Output also lands in summary.txt (the console truncates long runs).
+# Rebuilds from the LIVE app files each run; writes nothing to the webroot.
+# Exit code 1 when any assertion fails.
+# =============================================================================
+param([string]$MainJs = '', [string]$MainCss = '', [string]$Mutant = '')
+$ErrorActionPreference = 'Stop'
+$here = $PSScriptRoot
+$app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+$js   = "$app\js"
+if (-not $MainJs) { $MainJs = "$js\main.js" }
+# The harness loads the real main.css (like ..\switchmotion) so it can assert
+# COMPUTED styles: the top=N fold was green on a class check while the chips
+# stayed visible (a lighter hide rule lost to the chip's layout rule).
+if (-not $MainCss) { $MainCss = "$app\css\main.css" }
+Copy-Item $MainCss "$here\main.css" -Force
+$edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }
+$summary = New-Object System.Collections.Generic.List[string]
+
+Write-Host "[1/3] staging JS + patching main.js ..."
+$libs = @('jquery-3.7.1.min.js','jquery-ui.min.js','moment.min.js','pako.min.js',
+          'codemirror.min.js','sql.min.js','show-hint.js','foldcode.js','foldgutter.js',
+          'brace-fold.js','comment-fold.js','placeholder.js','penumbra_snippet_help.js',
+          'purify.min.js','penumbra_template.js')
+foreach ($f in $libs) { Copy-Item "$js\$f" "$here\$f" -Force }
+
+Write-Host "      main.js under test: $MainJs"
+$src = [IO.File]::ReadAllText($MainJs, (New-Object System.Text.UTF8Encoding($false)))
+$anchor = '$(document).ready(function () {'
+if (-not $src.Substring(0, 200).Contains($anchor)) { throw "main.js closure anchor not found - update run.ps1" }
+
+# Targeted mutants: ONE single-point change each. The anchor must occur exactly
+# once or the run throws - a mutant that quietly stopped applying would read as
+# a vacuous pass.
+$mutants = @{
+  'fsorblind'   = @('if (lower === ''or'') st.or = true;', 'if (lower === ''or'') st.or = false;')
+  'fsnoescape'  = @('function _pnbFsEncode(v) { return escapeRegex(String(v)).replace(/\//g, ''\\x2F''); }', 'function _pnbFsEncode(v) { return String(v).replace(/\//g, ''\\x2F''); }')
+  'fsrestdrop'  = @('(st.rest || []).forEach(function (r) { if (r) parts.push(r); });', '/* mutant: rest dropped */')
+  'fsselfcount' = @('if (gc !== col && st.sel[gc] && st.sel[gc].length) { others.sel[gc] = st.sel[gc]; anyOther = true; }', 'if (st.sel[gc] && st.sel[gc].length) { others.sel[gc] = st.sel[gc]; anyOther = true; }')
+}
+if ($Mutant) {
+  if (-not $mutants.ContainsKey($Mutant)) { throw "unknown mutant '$Mutant' (known: $(($mutants.Keys | Sort-Object) -join ', '))" }
+  $mOld = $mutants[$Mutant][0]; $mNew = $mutants[$Mutant][1]
+  $mN = ([regex]::Matches($src, [regex]::Escape($mOld))).Count
+  if ($mN -ne 1) { throw "mutant '$Mutant' anchor found $mN times, expected 1: $mOld" }
+  $src = $src.Replace($mOld, $mNew)
+  Write-Host "      + MUTANT $Mutant"
+}
+
+# Export the closure-internal functions as the closure's FIRST statement.
+# Function declarations hoist, so this works even if later init throws; the
+# registry is a var assigned later, hence the getter; masterRowData is a `let`
+# read only when setRows() is called, long after the closure body has run.
+$hooks = @(
+  'try { window.__FS = { parseArgs: _pnbFsParseArgs, state: _pnbFsState, compose: _pnbFsCompose,',
+  '  enc: _pnbFsEncode, dec: _pnbFsDecode, groups: _pnbFsGroups, render: _pnbFsRender,',
+  '  sync: _pnbSyncFilterStrips, syncLayout: penumbraSyncActiveLayout, cellText: _pnbFsCellText, colRef: _pnbFsColRef,',
+  '  setRows: function (r) { masterRowData = r; }, renderA: renderReportSnippet,',
+  '  engineB: resolveInfoboxSnippet, parseQ: parseAdvancedQuery, evalQ: evaluateParsedQuery,',
+  '  names: function () { return PENUMBRA_SNIPPET_FN_NAMES; },',
+  '  motion: function () { return _pnbMotion; }, busy: _pnbMotionBusy };',
+  '} catch (e) { window.__FS_ERR = String(e); }'
+) -join ' '
+$inject  = $anchor + "`r`n    $hooks`r`n"
+$patched = $src.Substring(0, $src.IndexOf($anchor)) + $inject + $src.Substring($src.IndexOf($anchor) + $anchor.Length)
+[IO.File]::WriteAllText("$here\main_patched.js", $patched, (New-Object System.Text.UTF8Encoding($false)))
+
+Write-Host "[2/3] running harness in headless Edge ..."
+$udd = Join-Path $here 'edgeprofile'
+$dom = Join-Path $here 'dom.txt'
+if (Test-Path $dom) { [IO.File]::Delete($dom) }
+$url = 'file:///' + $here.Replace([char]92, [char]47) + '/harness.html'
+$edgeArgs = @('--headless=new','--disable-gpu','--no-sandbox','--allow-file-access-from-files',"--user-data-dir=$udd",'--virtual-time-budget=30000','--dump-dom',$url)
+Start-Process -FilePath $edge -Wait -NoNewWindow -RedirectStandardOutput $dom -ArgumentList $edgeArgs
+$d = [IO.File]::ReadAllText($dom)
+$i = $d.IndexOf('<pre id="out">'); $j = $d.IndexOf('</pre>', $i)
+if ($i -lt 0) { throw "no <pre id=out> in dump (Edge produced $($d.Length) bytes)" }
+$txt = [System.Net.WebUtility]::HtmlDecode($d.Substring($i + 14, $j - $i - 14))
+if (-not $txt.StartsWith('RESULTS_JSON:')) { throw "harness did not finish: $($txt.Substring(0,[Math]::Min(400,$txt.Length)))" }
+$parsed = $txt.Substring(13) | ConvertFrom-Json
+[IO.File]::WriteAllText("$here\result.json", ($parsed | ConvertTo-Json -Depth 6))
+
+Write-Host "[3/3] results"
+if ($parsed.fatal) {
+  $summary.Add("FATAL: $($parsed.fatal)")
+  [IO.File]::WriteAllLines("$here\summary.txt", $summary)
+  throw "FATAL: $($parsed.fatal)"
+}
+if ($parsed.pageErrors -and $parsed.pageErrors.Count) {
+  $summary.Add("WARNING main.js init errors: $($parsed.pageErrors -join '; ')")
+  Write-Warning "main.js init errors (may invalidate results): $($parsed.pageErrors -join '; ')"
+}
+$fail = 0
+foreach ($r in $parsed.results) {
+  if ($r.pass) { $summary.Add("  PASS  " + $r.name); Write-Host ("  PASS  " + $r.name) -ForegroundColor Green }
+  else { $fail++; $summary.Add("  FAIL  " + $r.name); $summary.Add("        " + $r.detail); Write-Host ("  FAIL  " + $r.name) -ForegroundColor Red; Write-Host ("        " + $r.detail) -ForegroundColor DarkYellow }
+}
+$line = ("{0} assertions, {1} failed" -f $parsed.results.Count, $fail)
+$summary.Add($line)
+if ($Mutant) { $summary.Add("mutant: $Mutant") }
+$summary.Add("main.js: $MainJs")
+[IO.File]::WriteAllLines("$here\summary.txt", $summary)
+Write-Host $line
+if ($fail -gt 0) { exit 1 }

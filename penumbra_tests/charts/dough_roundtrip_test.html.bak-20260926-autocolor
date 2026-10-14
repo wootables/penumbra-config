@@ -1,0 +1,185 @@
+<!doctype html><meta charset="utf-8"><title>running</title><pre id="out">running</pre>
+<script src="SRC.js"></script>
+<script>
+var LOG=[],PASS=0,FAIL=0;
+function ok(n,c,x){ if(c){PASS++;LOG.push('PASS  '+n);} else {FAIL++;LOG.push('FAIL  '+n+(x?'   >> '+x:''));} }
+function eq(n,g,w){ ok(n, JSON.stringify(g)===JSON.stringify(w), 'got='+JSON.stringify(g)+' want='+JSON.stringify(w)); }
+
+try {
+  var code = String(window.__src).replace(/\r\n/g,'\n');
+
+  function grab(decl){
+    var start=code.indexOf(decl);
+    if(start===-1) throw new Error('anchor not found: '+decl);
+    var i=code.indexOf('{',start),depth=0,inStr=null,inLine=false,inBlk=false,inRe=false;
+    for(var j=i;j<code.length;j++){
+      var c=code[j],n=code[j+1];
+      if(inLine){ if(c==='\n') inLine=false; continue; }
+      if(inBlk){ if(c==='*'&&n==='/'){inBlk=false;j++;} continue; }
+      if(inStr){ if(c==='\\'){j++;continue;} if(c===inStr) inStr=null; continue; }
+      if(inRe){ if(c==='\\'){j++;continue;} if(c==='/') inRe=false; continue; }
+      if(c==='/'&&n==='/'){inLine=true;j++;continue;}
+      if(c==='/'&&n==='*'){inBlk=true;j++;continue;}
+      if(c==='"'||c==="'"||c==='`'){inStr=c;continue;}
+      if(c==='/'){ var k=j-1; while(k>=0&&/\s/.test(code[k]))k--;
+        if(k<0||/[=(,:;!&|?{}[\n+\-*%~^<>]/.test(code[k])){inRe=true;continue;} }
+      if(c==='{')depth++; else if(c==='}'){depth--; if(depth===0) return code.slice(start,j+1);}
+    }
+    throw new Error('unbalanced: '+decl);
+  }
+
+  var stubs=[
+   'function parseAccountingNumber(v){ if(v==null) return NaN; var s=String(v).replace(/[$,\\s]/g,""); if(s==="") return NaN; var n=Number(s); return isNaN(n)?NaN:n; }',
+   'function getCustomSortComparator(){ return null; }',
+   'function vizExtraAggregate(){ return undefined; }',
+   'function getChartColor(i,a){ return "C"+i+"@"+a; }',
+   'function getChartBorderColor(i){ return "B"+i; }',
+   'function vizBucketRowsForAxis(r){ return r; }',
+   'function pivotWavgWeightCol(){ return null; }',
+   'function vizAggNeedsWeights(){ return false; }',
+   'function decodeHtmlEntities(s){ return String(s==null?"":s); }',
+   'function injectTrendDataset(){}'
+  ].join('\n');
+
+  var gen=new Function(stubs+'\n'+grab('function _vizParseFunnelMode(')+'\n'+
+                       grab('function _vizParseVizOptions(')+'\n'+(/var PENUMBRA_PALETTE_NAMES = [^;]*;/.exec(code)||[''])[0]+'\n'+grab('function _vizParsePalette(')+'\n'+grab('function _vizParseFormat(')+'\n'+grab('function _vizParseUserNumber(')+'\n'+grab('function generateChartDataFromMaps(')+'\n'+grab('function _generateChartDataFromMaps(')+
+                       '\nreturn generateChartDataFromMaps;')();
+
+  function rows(pairs){ return pairs.map(function(p){ var m=new Map(); m.set('DEPT',p[0]); m.set('AMT',p[1]); return m; }); }
+  var R = rows([['Chem',400],['Physics',300],['Bio',200],['Math',100]]);
+
+  // ---- 1. doughnut must build IDENTICAL data to pie (it shares the default path) ----
+  var pie  = gen(R,'DEPT','AMT',null,'sum',10,'pie','value','desc','default',false,false,null,'');
+  var dough= gen(R,'DEPT','AMT',null,'sum',10,'doughnut','value','desc','default',false,false,null,'');
+  eq('doughnut labels == pie labels', dough.labels, pie.labels);
+  eq('doughnut data == pie data', dough.datasets[0].data, pie.datasets[0].data);
+  eq('doughnut gets per-slice colour ARRAY', dough.datasets[0].backgroundColor,
+     ['C0@0.75','C1@0.75','C2@0.75','C3@0.75']);
+  eq('doughnut _chartType tag', dough._chartType, 'doughnut');
+  ok('doughnut is NOT flagged as funnel', !dough._isFunnel);
+
+  // doughnut + Other bucket (pie supports it, so doughnut must too)
+  var dOther = gen(R,'DEPT','AMT',null,'sum',2,'doughnut','value','desc','default',false,true,null,'');
+  eq('doughnut otherBucket labels', dOther.labels, ['Chem','Physics','Other']);
+  eq('doughnut otherBucket value = 200+100', dOther.datasets[0].data[2], 300);
+  eq('doughnut Other gets the grey', dOther.datasets[0].backgroundColor[2], 'rgba(189, 195, 199, 0.75)');
+
+  // ---- 2. vis() parser must read arg[36] as funnelMode ----
+  // Use the REAL arg splitter and quote stripper, not stubs - the parser
+  // swallows their exceptions and returns null, which would look like a
+  // parsing failure in the code under test rather than a harness gap.
+  var parserSrc = grab('function stripWrappingQuotePair(') + '\n' +
+                  grab('function parseFunctionArgs(') + '\n' +
+                  grab('function _parseVisCallFromSnippet(');
+
+  // cfg.isCurrency is NOT a vis() argument - the parser derives it from the
+  // report table's columnProperties, so it reaches for jQuery. That is the
+  // ONLY DOM touch in the three grabbed functions, and it is why this page
+  // spent a while throwing "ReferenceError: $ is not defined" before its first
+  // assertion (a HARNESS-ERROR row scores zero, so the whole suite's exit code
+  // stayed 1 while nothing was actually broken in the app). Inject $ as a
+  // parameter - the format_bands_test idiom - rather than narrowing the grab,
+  // so the parser stays under test whole. TABLE is the fake #resultsTable
+  // payload; {} means "no report loaded", which is what every round-trip
+  // assertion below assumes.
+  var TABLE = {};
+  function $stub(sel) {
+    return { data: function (k) { return sel === '#resultsTable' ? TABLE[k] : undefined; } };
+  }
+  var parser = new Function('$', parserSrc + '\nreturn _parseVisCallFromSnippet;')($stub);
+
+  var full = "vis('funnel', 'STAGE', 'DAYS', 'none', 'sum', 10, 'Cycle Time', true, true, 800, 300, " +
+             "'top', 'auto', true, false, false, 'top', 'label', 'asc', 'default', false, '', '', '', " +
+             "false, true, true, false, '', '', '', 'none', false, true, '', '', 'duration|hours')";
+  var cfg = parser(full);
+  ok('parser returns a config', !!cfg);
+  eq('parser: type', cfg.type, 'funnel');
+  eq('parser: funnelMode read from arg[36]', cfg.funnelMode, 'duration|hours');
+  eq('parser: referenceLine still arg[35]', cfg.referenceLine, '');
+  eq('parser: sortBy still arg[17]', cfg.sortBy, 'label');
+  eq('parser: xAxis', cfg.xAxis, 'STAGE');
+
+  // A legacy vis() with NO tail args must not gain a funnelMode
+  var legacy = parser("vis('bar', 'DEPT', 'AMT', 'none', 'sum', 10, 'T', true, true, 800, 180)");
+  ok('parser: legacy call still parses', !!legacy);
+  eq('parser: legacy funnelMode is empty', legacy.funnelMode, '');
+  eq('parser: legacy type', legacy.type, 'bar');
+
+  // conversion mode round-trips too
+  var convCall = full.replace("'duration|hours'", "'conversion'");
+  eq('parser: conversion token', parser(convCall).funnelMode, 'conversion');
+
+  // ---- 2b. the isCurrency derivation (the reason $ is injected above) ----
+  // Every OTHER field is read straight out of the argument list; this one is
+  // computed from the report table, so it is the only part of the parser a
+  // stub could silently neuter. Cover it here: if the derivation is rewritten
+  // to reach for something else, these fail loudly instead of the page going
+  // back to a zero-assertion HARNESS-ERROR.
+  function visCall(over) {
+    var a = [];
+    for (var i = 0; i < 41; i++) a.push("''");
+    a[0] = "'bar'"; a[1] = "'DEPT'"; a[2] = "'AMT'"; a[3] = "'none'"; a[4] = "'sum'"; a[5] = '10';
+    for (var k in (over || {})) a[k] = over[k];
+    return 'vis(' + a.join(', ') + ')';
+  }
+  var comboArg = function (series) {
+    return "'" + JSON.stringify(series).replace(/"/g, '\\"') + "'";
+  };
+
+  eq('currency: no report table loaded -> false', parser(full).isCurrency, false);
+
+  // AMT is a currency column, QTY is not. columnProperties is keyed by the
+  // ORIGINAL index, which columnNameToOriginalIndex resolves from an
+  // UPPERCASED column name.
+  TABLE = { columnNameToOriginalIndex: { AMT: 3, QTY: 4 },
+            columnProperties: { 3: { isCurrency: true }, 4: { isCurrency: false } } };
+
+  eq('currency: sum over a currency column', parser(visCall()).isCurrency, true);
+  eq('currency: the lookup is case-insensitive',
+     parser(visCall({ 2: "'amt'" })).isCurrency, true);
+  eq('currency: sum over a non-currency column',
+     parser(visCall({ 2: "'QTY'" })).isCurrency, false);
+  eq('currency: a column the table does not have',
+     parser(visCall({ 2: "'NOPE'" })).isCurrency, false);
+  eq('currency: no y-axis at all', parser(visCall({ 2: "'none'" })).isCurrency, false);
+  // A count is a row tally, never money - even over a currency column.
+  eq('currency: count is never currency', parser(visCall({ 4: "'count'" })).isCurrency, false);
+  eq('currency: distinct is never currency', parser(visCall({ 4: "'distinct'" })).isCurrency, false);
+  eq('currency: running_count is never currency',
+     parser(visCall({ 4: "'running_count'" })).isCurrency, false);
+
+  // combo/butterfly ignore the y-axis argument entirely and read arg[30]
+  // instead, so they need their own branch of the derivation.
+  var comboMoney = { 0: "'combo'", 2: "'none'", 4: "'count'",
+                     30: comboArg([{ col: 'QTY', agg: 'sum' }, { col: 'AMT', agg: 'avg' }]) };
+  eq('currency: combo finds money in a LATER series', parser(visCall(comboMoney)).isCurrency, true);
+  eq('currency: butterfly uses the same branch',
+     parser(visCall({ 0: "'butterfly'", 2: "'none'", 4: "'count'",
+                      30: comboArg([{ col: 'AMT', agg: 'sum' }]) })).isCurrency, true);
+  eq('currency: combo whose only money series is a count',
+     parser(visCall({ 0: "'combo'", 2: "'none'", 4: "'count'",
+                      30: comboArg([{ col: 'AMT', agg: 'count' }]) })).isCurrency, false);
+  eq('currency: combo with no series at all',
+     parser(visCall({ 0: "'combo'", 2: "'none'", 4: "'count'" })).isCurrency, false);
+  // The comboSeries payload must survive the escaping round trip too, or the
+  // branch above would be passing for the wrong reason.
+  eq('currency: comboSeries parsed back out of arg[30]',
+     parser(visCall(comboMoney)).comboSeries,
+     [{ col: 'QTY', agg: 'sum' }, { col: 'AMT', agg: 'avg' }]);
+
+  TABLE = {};
+
+  // ---- 3. parser output feeds generateChartDataFromMaps unchanged ----
+  var sr = rows([['Intake',5],['Review',30],['Award',12]]);
+  var viaCfg = gen(sr, 'DEPT','AMT', null, 'sum', 10, cfg.type,
+                   cfg.sortBy, cfg.sortDir, 'default', false, false, null, cfg.funnelMode);
+  eq('end-to-end: mode survived parse->generate', viaCfg._funnelMode, 'duration');
+  eq('end-to-end: unit survived parse->generate', viaCfg._funnelUnit, 'hours');
+  eq('end-to-end: stage order (label asc)', viaCfg.labels, ['Award','Intake','Review']);
+
+  document.getElementById('out').textContent =
+    'RESULT '+(FAIL===0?'ALL-PASS':'HAS-FAILURES')+'  pass='+PASS+' fail='+FAIL+'\n'+LOG.join('\n');
+} catch(e) {
+  document.getElementById('out').textContent='HARNESS-ERROR: '+e.name+': '+e.message+'\n'+(e.stack||'');
+}
+</script>

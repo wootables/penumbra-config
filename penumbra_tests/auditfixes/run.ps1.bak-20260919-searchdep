@@ -1,0 +1,56 @@
+# =============================================================================
+# Audit-fix test suite (2026-08-22)  -  PHP unit tests + JS harness
+#
+# Run the BODY as a scriptblock (UNC scripts are GPO-blocked):
+#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\auditfixes\run.ps1')); & $sb
+# Never pipe the invocation (a lingering Edge child keeps stdout open).
+#
+# Mutation control: set $env:AF_SRC_RUNNER / $env:AF_SRC_MANAGE / $env:AF_SRC_MAINJS
+# to a .bak before running and the suite MUST go red.
+# =============================================================================
+$ErrorActionPreference = 'Stop'
+$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\auditfixes'
+$app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+$php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+$extract = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\parity\extract_engine_c.php'
+$edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }
+
+$srcRunner = if ($env:AF_SRC_RUNNER) { $env:AF_SRC_RUNNER } else { "$app\schedule_runner.php" }
+$srcManage = if ($env:AF_SRC_MANAGE) { $env:AF_SRC_MANAGE } else { "$app\manage_schedule.php" }
+$srcMain   = if ($env:AF_SRC_MAINJS) { $env:AF_SRC_MAINJS } else { "$app\js\main.js" }
+
+Write-Host "[1/4] extracting functions ($srcRunner, $srcManage) ..."
+& $php -n $extract $srcRunner "$here\runner_functions.php" | Out-Host
+& $php -n $extract $srcManage "$here\manage_functions.php" | Out-Host
+
+Write-Host "[2/4] PHP unit tests ..."
+& $php -n -d memory_limit=512M "$here\tests.php" | Out-Host
+$phpExit = $LASTEXITCODE
+
+Write-Host "[3/4] staging JS + patching main.js ($srcMain) ..."
+$libs = @('jquery-3.7.1.min.js','jquery-ui.min.js','moment.min.js','pako.min.js',
+          'codemirror.min.js','sql.min.js','show-hint.js','foldcode.js','foldgutter.js',
+          'brace-fold.js','comment-fold.js','placeholder.js','penumbra_snippet_help.js',
+          'purify.min.js','penumbra_template.js')
+foreach ($f in $libs) { Copy-Item "$app\js\$f" "$here\$f" -Force }
+$src = [IO.File]::ReadAllText($srcMain)
+$anchor = '$(document).ready(function () {'
+if (-not $src.Substring(0, 200).Contains($anchor)) { throw "main.js closure anchor not found" }
+$inject  = $anchor + "`r`n    try { window.__AF = { parseAdvancedQuery: parseAdvancedQuery, evaluateParsedQuery: evaluateParsedQuery, validatePromptInput: validatePromptInput, splitValidateRules: (typeof splitValidateRules === 'function' ? splitValidateRules : null), validateCronExpression: validateCronExpression, calculateNextCronRun: (typeof calculateNextCronRun === 'function' ? calculateNextCronRun : null) }; } catch (e) { window.__AF_ERR = String(e); }`r`n"
+$patched = $src.Substring(0, $src.IndexOf($anchor)) + $inject + $src.Substring($src.IndexOf($anchor) + $anchor.Length)
+[IO.File]::WriteAllText("$here\main_patched.js", $patched, (New-Object System.Text.UTF8Encoding($false)))
+
+Write-Host "[4/4] JS harness in headless Edge ..."
+$udd = Join-Path $here 'edgeprofile'
+$dom = Join-Path $here 'js.dom.txt'
+$url = 'file:///' + $here.Replace([char]92, [char]47) + '/harness_js.html'
+Start-Process -FilePath $edge -Wait -NoNewWindow -RedirectStandardOutput $dom -ArgumentList `
+  '--headless=new','--disable-gpu','--no-sandbox','--allow-file-access-from-files', `
+  "--user-data-dir=$udd",'--virtual-time-budget=8000','--dump-dom',$url
+$d = [IO.File]::ReadAllText($dom)
+$i = $d.IndexOf('<pre id="out">'); $j = $d.IndexOf('</pre>', $i)
+$txt = [System.Net.WebUtility]::HtmlDecode($d.Substring($i + 14, $j - $i - 14))
+Write-Host $txt
+$jsFail = ($txt -match 'JS_FAIL=(\d+)') | Out-Null; $jsFail = [int]$Matches[1]
+Write-Host ("SUMMARY php_exit={0} js_fail={1}" -f $phpExit, $jsFail)

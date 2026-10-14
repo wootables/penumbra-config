@@ -1,0 +1,96 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>engine A corpus</title></head>
+<body>
+<!-- Engine A is the MAIN snippet area: inline in the async renderReportSnippet,
+     which reads its text from snippetEditor and writes into #reportSnippetOutput.
+     Unlike engine B there is no function to export, so run_parity.ps1 injects an
+     __ENGINE_A shim that swaps in a stub editor, passes rows via the real
+     sourceDataMaps parameter (visibleColumns is derived from the first map's
+     keys, main.js ~34244) and reads the sink back. Same minimal DOM as
+     harness_b.html plus the containers this path touches. -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<div id="reportHeaderContainer"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<div id="resultsTable"></div><div id="errorBox"></div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  // Same bootstrapping stubs harness_b.html documents - without them main.js's
+  // ready-closure dies early and every later `const` stays in the temporal dead
+  // zone, which makes the engines silently return snippets UNRESOLVED.
+  window.penumbra_vars = {
+    isAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  window.ResizeObserver = function () {
+    this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {};
+  };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  window.__errors = [];
+  window.onerror = function (m) { window.__errors.push(String(m)); return true; };
+</script>
+<script src="main_patched.js"></script>
+<script src="corpus_inline.js"></script>
+<script>
+(function () {
+  function report(txt) { document.getElementById('out').textContent = txt; }
+
+  async function run() {
+    var A = window.__ENGINE_A;
+    if (typeof A !== 'function') {
+      report('ENGINE_A_UNAVAILABLE err=' + (window.__ENGINE_A_ERR || 'n/a') +
+             ' pageErrors=' + JSON.stringify(window.__errors.slice(0, 3)));
+      return;
+    }
+    var corpus = window.__CORPUS;
+    // main.js uppercases row-map keys at ingestion; mirror that exactly.
+    var maps = corpus.rows.map(function (r) {
+      var m = new Map();
+      Object.keys(r).forEach(function (k) { m.set(k.toUpperCase(), r[k]); });
+      return m;
+    });
+
+    var results = [];
+    for (var i = 0; i < corpus.cases.length; i++) {
+      var c = corpus.cases[i];
+      var entry = { id: c.id, snippet: c.snippet };
+      try {
+        entry.out = await A(c.snippet, maps);
+      } catch (e) {
+        entry.error = String(e && e.message ? e.message : e);
+      }
+      results.push(entry);
+    }
+    report('RESULTS_JSON:' + JSON.stringify({ pageErrors: window.__errors.slice(0, 6), cases: results }));
+  }
+
+  var tries = 0;
+  (function wait() {
+    tries++;
+    if (typeof window.__ENGINE_A === 'function' || tries > 40) { setTimeout(run, 250); }
+    else { setTimeout(wait, 100); }
+  })();
+})();
+</script>
+</body></html>

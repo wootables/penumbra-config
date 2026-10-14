@@ -1,0 +1,956 @@
+// grplist suite - browser half (2026-10-03). Runs ONE scenario (?scn=) against
+// the main.js + js/penumbra_grouplist.js the page loaded and publishes
+//   window.__HCRESULT = { scn, chk: {name: bool}, info: {...}, errors: [...] }
+// and window.__HCDONE = true. run.py asserts every chk on the candidate (L-*)
+// and no page errors (E-*); --control loads the build before (no module), where
+// the List checks must go red.
+(function () {
+  var HC = window.__HC || {};
+  var SCN = window.__SCN;
+  var R = { scn: SCN, chk: {}, info: {}, notes: [] };
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function frames(n) { var p = Promise.resolve(); for (var i = 0; i < (n || 3); i++) p = p.then(function () { return new Promise(function (r) { requestAnimationFrame(function () { r(); }); }); }); return p; }
+  function hides() { return window.__HC_HIDES || 0; }
+  async function until(fn, ms) { var t = Date.now(); while (!fn() && Date.now() - t < ms) await sleep(20); return fn(); }
+
+  function root() { return document.getElementById('groupedResultsContainer'); }
+  function list() { return document.getElementById('pnbGroupList'); }
+  function top() { return Array.prototype.slice.call(document.querySelectorAll('#groupedResultsContainer .group-wrapper[data-group-depth="0"]')); }
+  function kids(w) { return Array.prototype.slice.call(w.querySelectorAll(':scope > .group-content > .group-wrapper')); }
+  function drawn(w) { return getComputedStyle(w).display !== 'none'; }
+  function shownTop() { return top().filter(drawn); }
+  function items() { return Array.prototype.slice.call(document.querySelectorAll('#pnbGroupList .pnb-gl-item')); }
+  function selected() { return document.querySelector('#groupedResultsContainer .group-wrapper.pnb-gl-sel'); }
+  // grplist10: the headings of a table that are cut short, to the SUB-PIXEL - the label's
+  // last letter past the content box (an ellipsis is drawn for a fraction of a pixel, which
+  // the integer scrollWidth never showed), anything clipped, or the absolutely positioned
+  // sort icon (main.css ~20670) starting before the label's end
+  function cutHeads(ths) {
+    return ths.filter(function (h) {
+      if (h.scrollWidth > h.clientWidth) { return true; }
+      var cs = getComputedStyle(h), hr = h.getBoundingClientRect(), tn = null;
+      for (var q = h.childNodes.length - 1; q >= 0; q--) { if (h.childNodes[q].nodeType === 3 && h.childNodes[q].textContent.trim()) { tn = h.childNodes[q]; break; } }
+      if (!tn) { return false; }
+      var rg = document.createRange(); rg.selectNodeContents(tn);
+      var tr = rg.getBoundingClientRect();
+      if (tr.right > hr.right - parseFloat(cs.paddingRight) - parseFloat(cs.borderRightWidth) + 0.01) { return true; }
+      var ic = h.querySelector(':scope > .sort-icon');
+      return !!ic && ic.getBoundingClientRect().left < tr.right + 2;
+    }).map(function (h) { return h.getAttribute('data-colname') + ':' + Math.round(h.getBoundingClientRect().width) + ' ' + h.style.width + '/' + h.style.getPropertyPriority('width'); });
+  }
+  function keyOf(w) { return w ? w.getAttribute('data-group-key') : null; }
+  function visHeads(t) { return Array.prototype.filter.call(t.querySelectorAll(':scope > thead > tr:first-child > th'), function (h) { return h.style.display !== 'none'; }); }
+  function content(w) { return w ? w.querySelector(':scope > .group-content') : null; }
+  function isOn() { return document.body.classList.contains('pnb-gl-on'); }
+  function countText() { return $('#resultCount').text(); }
+  function key(el, k) { el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })); }
+  // A leaf table's shape: showing heading cells, footer cells, and whether the showing
+  // columns fill the table (an over-long footer squeezes them into part of it).
+  function shape(w) {
+    var t = content(w).querySelector(':scope > table');
+    var vis = function (c) { return c.style.display !== 'none'; };
+    var hd = Array.prototype.filter.call(t.tHead.rows[0].cells, vis);
+    var ft = t.tFoot ? Array.prototype.filter.call(t.tFoot.rows[0].cells, vis).length : -1;
+    var sum = hd.reduce(function (a, c) { return a + c.getBoundingClientRect().width; }, 0);
+    return { head: hd.length, foot: ft, sum: Math.round(sum), width: Math.round(t.getBoundingClientRect().width) };
+  }
+  function sbTop() { var sb = document.getElementById('pnbStatusBar'); return sb ? sb.getBoundingClientRect().top : innerHeight; }
+  async function search(q) {
+    $('#tableSearch').val(q);
+    HC.runTableSearch();
+    if (!(await until(function () { return document.querySelector('#groupedResultsContainer .group-wrapper.search-hidden'); }, 15000)))
+      throw new Error('search "' + q + '" hid no group within 15 s');
+    await sleep(400); await frames(3);
+  }
+  // A real-world name for the [Blank] group's filter: the hide-group button writes "!= empty".
+  function notThis(w) { var k = keyOf(w); return k === '[Blank]' ? 'H_GROUP != empty' : "H_GROUP != '" + k + "'"; }
+  // Switch the layout the way a layout-only Apply does, without the dialog.
+  async function setLayout(v) { HC.setLayout(v); $(document).trigger('penumbra:groupLayoutChanged'); await frames(3); }
+  // In Stacked: close every group, then open exactly these (by a real band click).
+  async function onlyOpen(ws) {
+    $('#collapseAllGroups').trigger('click'); await sleep(50);
+    for (var i = 0; i < ws.length; i++) { $(ws[i].querySelector(':scope > .group-header')).trigger('click'); await sleep(120); }
+    await frames(2);
+  }
+  var pdfReady = false;
+  async function pdf() {
+    if (!pdfReady) {
+      await HC.loadScript('js/jspdf-2.5.1.umd.min.js');
+      await HC.loadScript('js/jspdf-autotable-3.5.23.min.js');
+      var api = window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API;
+      if (!api || !api.autoTable) throw new Error('pdf: jsPDF / autotable did not load');
+      var orig = api.autoTable;
+      api.autoTable = function (o) { window.__pdfTables.push(JSON.stringify({ head: o && o.head, body: o && o.body, foot: o && o.foot })); return orig.apply(this, arguments); };
+      pdfReady = true;
+    }
+    window.__pdfTables = [];
+    await HC.generatePdfContent();
+    return window.__pdfTables.join('\n');
+  }
+  function exportsText() { return ['csv', 'tsv', 'json'].map(function (f) { return HC.getExportData(f).content; }).join('\n#####\n'); }
+  function setPcs(id, v) { $('#' + id + ' .pcs-selected').attr('data-value', v).text(v); }
+  // Seed the dialog with the grouping on screen, as Configure Grouping does.
+  function seedDialog() {
+    setPcs('groupingColumnSelector', 'H_GROUP'); setPcs('groupingColumnSelector2', ''); setPcs('groupingColumnSelector3', '');
+    $('#groupAggCheckbox').prop('checked', true); setPcs('groupAggColumn', 'H_AMT'); $('#groupAggType').val('sum');
+    $('#groupSortSelect').val('label|asc'); $('#groupLimitDir').val('top'); $('#groupLimitN').val(''); $('#groupLimitMinRows').val('');
+    $('#groupLimitOther').prop('checked', true); $('#groupStartDepth').val('0');
+  }
+
+  async function boot() {
+    if (!(await until(function () {
+      return window.__queryDone >= 1 && hides() >= 1 && top().length >= 6 && $('#groupedResultsContainer').is(':visible');
+    }, 150000))) throw new Error('boot: the grouped report never finished loading (150 s)');
+    await sleep(400); await frames(4);
+  }
+
+  var S = {
+    // The stored List report opens as a list with the first group on the right.
+    boot: async function () {
+      var r = root(), l = list(), sh = shownTop(), sel = selected(), c = content(sel);
+      var gt = r.querySelector(':scope > .group-grand-total');
+      var sb = document.getElementById('pnbStatusBar'), sbH = sb ? sb.getBoundingClientRect().height : 0;
+      var want = innerHeight - sbH - 12;
+      // grplist3: the All groups total sits under the LIST, so the group itself
+      // reaches the bottom line, and the list leaves room for the total under it
+      var gtH = gt ? gt.getBoundingClientRect().height + parseFloat(getComputedStyle(gt).marginTop) : 0;
+      var selBottom = sel ? sel.getBoundingClientRect().bottom + parseFloat(getComputedStyle(sel).marginBottom) : 0;
+      R.chk.on = isOn();
+      R.chk.items = items().length === 6;
+      R.chk.oneGroup = sh.length === 1 && sh[0] === top()[0];
+      R.chk.open = !!(sel && sel.classList.contains('open') && c && getComputedStyle(c).display === 'block');
+      R.chk.fit = !!(c && c.style.maxHeight && Math.abs(selBottom - want) <= 3);
+      // max-height is a CAP (six names are short): list + total reach the same line
+      R.chk.listFit = !!(l && l.style.maxHeight && Math.abs(l.getBoundingClientRect().top + parseFloat(l.style.maxHeight) + gtH - want) <= 3);
+      var gr = gt ? gt.getBoundingClientRect() : null, lr = l ? l.getBoundingClientRect() : null, sr = sel ? sel.getBoundingClientRect() : null;
+      R.chk.barUnderList = !!(gr && lr && sr && Math.abs(gr.left - lr.left) <= 2 && gr.top >= lr.bottom - 1 && gr.top - lr.bottom <= 12 && gr.right <= sr.left + 1);
+      // ... and its one-line width must not widen the list's column (that took ~160px
+      // from the table): the list is as wide with the total as without it
+      var lw1 = lr ? lr.width : 0, lw2 = -1;
+      if (gt && l) { var d0 = gt.style.display; gt.style.display = 'none'; lw2 = l.getBoundingClientRect().width; gt.style.display = d0; }
+      R.chk.barListWidth = !!(gr && lr && Math.abs(gr.width - lr.width) <= 2 && Math.abs(lw1 - lw2) <= 1);
+      var gtBottom = gr ? gr.bottom : 0;
+      // round 4 (grplist4): ONE FRAME - the container is the bordered unit (clip, never a
+      // scroll container), the list has no card of its own, the group's rule meets the list's
+      // edge, and the frame's bottom is the fit line; the total is flush under the list; the
+      // selected band has no blank where the chevron was
+      var rcs = getComputedStyle(r), lcs = l ? getComputedStyle(l) : null, rr = r.getBoundingClientRect();
+      R.chk.frame = !!(l && sel && parseFloat(rcs.borderTopWidth) >= 1 && parseFloat(rcs.borderTopLeftRadius) > 0
+        && parseFloat(rcs.columnGap) === 0 && rcs.overflowX === 'clip' && parseFloat(lcs.borderLeftWidth) === 0
+        && Math.abs(sr.left - lr.right) <= 1.5 && Math.abs(rr.bottom - want) <= 1);
+      R.chk.barFlush = !!(gr && lr && gr.top - lr.bottom <= 1 && parseFloat(getComputedStyle(gt).marginTop) === 0);
+      var chev = sel && sel.querySelector(':scope > .group-header .group-chevron');
+      R.chk.bandClean = !!chev && getComputedStyle(chev).display === 'none';
+      // round 5 (grplist5, 2026-10-08): the selected row is flush with the frame's top and
+      // the divider (no 4px pad, no reserved gutter); the band is the row's height and
+      // colour and the row's right edge is that colour too (one tab and its page); the
+      // row's name, the total's label and the band start at one inset; the keyboard ring
+      // is not drawn while the list has no focus
+      var srow = l && l.querySelector('.pnb-gl-item[aria-selected="true"]'), band = sel && sel.querySelector(':scope > .group-header');
+      var srr = srow ? srow.getBoundingClientRect() : null, br = band ? band.getBoundingClientRect() : null;
+      var scs = srow ? getComputedStyle(srow) : null, bcs = band ? getComputedStyle(band) : null;
+      var nm = srow && srow.querySelector('.pnb-gl-name'), gh = gt && gt.querySelector('.group-header');
+      R.chk.rowFlush = !!(srr && lr && Math.abs(srr.top - lr.top) <= 1 && Math.abs(srr.right - lr.right) <= 1 && parseFloat(lcs.paddingTop) === 0);
+      R.chk.bandTint = !!(scs && bcs && scs.backgroundColor === bcs.backgroundColor && scs.borderRightColor === scs.backgroundColor
+        && Math.abs(srr.height - br.height) <= 1.5);
+      var inset = nm && lr ? nm.getBoundingClientRect().left - lr.left : -1;
+      R.chk.oneInset = !!(bcs && gh && inset > 0 && Math.abs(inset - parseFloat(bcs.paddingLeft)) <= 1
+        && Math.abs(inset - parseFloat(getComputedStyle(gh).paddingLeft)) <= 1);
+      var act = l && l.querySelector('.pnb-gl-item.is-active');
+      R.chk.ringOff = !!act && document.activeElement !== l && getComputedStyle(act).outlineStyle === 'none';
+      // round 6 (grplist6, 2026-10-08): one vocabulary - the selected row's pill, the band's
+      // and the footer's are one size and one colour (an unselected row's pill is that size
+      // in another colour); the footer's label is the row's size, not uppercase; and the
+      // bullet that separated Expand/Collapse All from Configure Grouping is not drawn
+      var pS = srow && srow.querySelector('.pnb-gl-count'), pB = band && band.querySelector('.group-count'), pG = gh && gh.querySelector('.group-count');
+      var other = l && l.querySelector('.pnb-gl-item[aria-selected="false"] .pnb-gl-count');
+      var cs = function (e) { return e ? getComputedStyle(e) : null; };
+      var a = cs(pS), b = cs(pB), g = cs(pG), o = cs(other), gn = gh && cs(gh.querySelector('.group-name'));
+      R.chk.onePill = !!(a && b && g && o && a.fontSize === b.fontSize && b.fontSize === g.fontSize && o.fontSize === a.fontSize
+        && a.backgroundColor === b.backgroundColor && b.backgroundColor === g.backgroundColor && o.backgroundColor !== a.backgroundColor
+        && a.paddingLeft === b.paddingLeft && b.paddingLeft === g.paddingLeft
+        && gn && gn.textTransform === 'none' && Math.abs(parseFloat(gn.fontSize) - parseFloat(a.fontSize) / 0.9) <= 0.1);
+      var sep = document.getElementById('removeGroupingSep');
+      R.chk.noSep = !!sep && sep.getClientRects().length === 0;
+      R.info.round6 = { pS: a && [a.fontSize, a.backgroundColor, a.paddingLeft], pB: b && [b.fontSize, b.backgroundColor, b.paddingLeft],
+                        pG: g && [g.fontSize, g.backgroundColor, g.paddingLeft], other: o && [o.fontSize, o.backgroundColor],
+                        gn: gn && [gn.fontSize, gn.textTransform], sep: sep && sep.getClientRects().length };
+      R.info.round5 = { rowTop: srr && srr.top, listTop: lr && lr.top, rowRight: srr && srr.right, listRight: lr && lr.right,
+                        rowBg: scs && scs.backgroundColor, bandBg: bcs && bcs.backgroundColor, rowH: srr && srr.height, bandH: br && br.height,
+                        inset: inset, bandPad: bcs && bcs.paddingLeft, ghPad: gh && getComputedStyle(gh).paddingLeft, ring: act && getComputedStyle(act).outlineStyle };
+      R.info.frame = { bt: rcs.borderTopWidth, rad: rcs.borderTopLeftRadius, gap: rcs.columnGap, ov: rcs.overflowX, lb: lcs && lcs.borderLeftWidth,
+                       selLeft: sr && sr.left, listRight: lr && lr.right, rBottom: rr.bottom, want: want, gtGap: gr && lr && (gr.top - lr.bottom) };
+      // the row's OWN display: it sits inside the (closed) dialog, so :visible says nothing
+      R.chk.row = $('#groupLayoutRow').css('display') !== 'none';
+      R.chk.linksHidden = !$('#expandAllGroups').is(':visible') && !$('#collapseAllGroups').is(':visible') && $('#configureGroupingBtn').is(':visible');
+      R.chk.grid = !!(l && sh[0] && l.getBoundingClientRect().right <= sh[0].getBoundingClientRect().left + 1);
+      R.chk.count = /in 6 groups/.test(countText());
+      R.chk.selectedAria = !!(items()[0] && items()[0].getAttribute('aria-selected') === 'true');
+      // round 2: the dialog's Layout field says what is on screen (every programmatic
+      // Apply reads it), and short names keep the list near its 200px floor
+      R.chk.fieldSynced = $('#groupLayout').val() === 'list';
+      var lw = l ? l.getBoundingClientRect().width : 0;
+      R.chk.listAuto = lw >= 199 && lw < 400;
+      // a sync with nothing new leaves the rows alone (one re-drawn between a
+      // mousedown and its mouseup loses the click)
+      var i0 = items()[0];
+      window.Penumbra.groupList.sync(); await frames(2);
+      R.chk.stableRows = !!i0 && items()[0] === i0;
+      R.info = Object.assign(R.info, { maxH: c && c.style.maxHeight, gtBottom: gtBottom, want: want, listBottom: l && l.getBoundingClientRect().bottom,
+                 cTop: c && c.getBoundingClientRect().top, rTop: r.getBoundingClientRect().top, count: countText(), items: items().length });
+    },
+    // ~120 groups: the list is longer than the window. It scrolls inside itself, and it
+    // must not stretch the grid rows - the total bar stays right under the LIST
+    // (grplist3), on screen.
+    many: async function () {
+      var r = root(), l = list(), sel = selected(), c = content(sel);
+      var gt = r.querySelector(':scope > .group-grand-total');
+      var sb = document.getElementById('pnbStatusBar'), sbH = sb ? sb.getBoundingClientRect().height : 0;
+      var want = innerHeight - sbH - 12;
+      var gap = gt ? gt.getBoundingClientRect().top - l.getBoundingClientRect().bottom : -1;
+      R.chk.longList = items().length >= 60;
+      R.chk.listScrolls = !!(l && l.scrollHeight > l.clientHeight + 40);
+      // in the LIST's column (grplist4: with the frame, a bar under the group would also sit
+      // 0px below the list's line - the column is what tells them apart)
+      var gr2 = gt ? gt.getBoundingClientRect() : null, lr2 = l.getBoundingClientRect(), sr2 = sel ? sel.getBoundingClientRect() : null;
+      R.chk.barUnderList = gap >= 0 && gap <= 12 && gr2.bottom <= want + 3 && Math.abs(gr2.left - lr2.left) <= 2 && !!sr2 && gr2.right <= sr2.left + 1;
+      // a small group is shorter than its cap: the cap is set and nothing is clipped
+      R.chk.capped = !!(c && c.style.maxHeight && c.scrollHeight <= c.clientHeight + 1);
+      R.info = { items: items().length, gap: gap, gtBottom: gt && gt.getBoundingClientRect().bottom, want: want, listH: l && l.clientHeight, listSH: l && l.scrollHeight };
+    },
+    // A click on the third name shows that group; the first one stays open, hidden.
+    click: async function () {
+      items()[2].click(); await frames(3);
+      var t = top();
+      R.chk.shown = shownTop().length === 1 && shownTop()[0] === t[2];
+      R.chk.aria = items()[2].getAttribute('aria-selected') === 'true' && items().filter(function (x) { return x.getAttribute('aria-selected') === 'true'; }).length === 1;
+      R.chk.keepOpen = t[0].classList.contains('open');
+      R.chk.fitMoved = !!content(t[2]).style.maxHeight && !content(t[0]).style.maxHeight;
+      R.info = { sel: keyOf(selected()), first: keyOf(t[0]) };
+    },
+    // The arrow keys walk the list and the selection follows.
+    keys: async function () {
+      var l = list(); l.focus(); var t = top();
+      key(l, 'ArrowDown'); await frames(2); key(l, 'ArrowDown'); await frames(3);
+      R.chk.down = keyOf(selected()) === keyOf(t[2]);
+      key(l, 'End'); await frames(3); R.chk.end = keyOf(selected()) === keyOf(t[5]);
+      key(l, 'Home'); await frames(3); R.chk.home = keyOf(selected()) === keyOf(t[0]);
+      key(l, 'ArrowUp'); await frames(3); R.chk.upStays = keyOf(selected()) === keyOf(t[0]);
+      R.chk.shownFollows = shownTop().length === 1 && shownTop()[0] === t[0];
+    },
+    // A search that removes the selected group moves the selection to the first group it keeps.
+    search: async function () {
+      var t = top(); var w = t[2];
+      items()[2].click(); await frames(3);
+      // 1. a search removes a group that is already HIDDEN here: the page does not change
+      //    size, so only the search's own event can bring the list up to date
+      var w4 = t[4], w4path = w4.getAttribute('data-group-path');
+      // the CONTRACT: the grouped search announces itself (the module listens for it)
+      var fired = 0; $(document).on('penumbra:groupedSearched.zztest', function () { fired++; });
+      var bodyH0 = document.body.getBoundingClientRect().height, rb0 = window.__REBUILDS || 0;
+      await search(notThis(w4));
+      R.chk.searchEvent = fired >= 1;
+      R.info.bodyH = [bodyH0, document.body.getBoundingClientRect().height]; R.info.rebuilds = (window.__REBUILDS || 0) - rb0;
+      R.chk.listFollows = items().length === 5 && !items().some(function (x) { return x.getAttribute('data-path') === w4path; });
+      // 2. ... and then removes the SELECTED group too
+      await search(notThis(w4) + ' and ' + notThis(w));
+      await until(function () { return w.classList.contains('search-hidden'); }, 15000); await frames(3);
+      var kept = top().filter(function (x) { return !x.classList.contains('search-hidden'); });
+      R.chk.moved = !!selected() && selected() !== w && selected() === kept[0];
+      R.chk.items4 = items().length === 4;
+      R.chk.count = /in 4 of 6 groups/.test(countText());
+      R.chk.oneShown = shownTop().length === 1;
+      R.info = { count: countText(), sel: keyOf(selected()), removed: keyOf(w) };
+    },
+    // The bands above the selected group are its headings: a click does not collapse it;
+    // the hide-group x still filters it out through the search.
+    band: async function () {
+      var sel = selected(), k = keyOf(sel);
+      // a REAL click (the a11y layer's keyboard activation dispatches one too). Watched:
+      // the module's re-sync would re-open a collapsed group a frame later, so "open
+      // afterwards" alone would not prove the click guard - it must never close at all.
+      var lost = false;
+      var mo = new MutationObserver(function () { if (!sel.classList.contains('open')) lost = true; });
+      mo.observe(sel, { attributes: true, attributeFilter: ['class'] });
+      sel.querySelector(':scope > .group-header .group-name').click(); await frames(3);
+      mo.disconnect();
+      R.chk.noToggle = !lost && sel.classList.contains('open') && getComputedStyle(content(sel)).display === 'block';
+      var x = sel.querySelector(':scope > .group-header .group-hide');
+      R.chk.hasHide = !!x;
+      if (x) {
+        x.click();
+        await until(function () { return sel.classList.contains('search-hidden'); }, 15000); await sleep(300); await frames(3);
+        R.chk.hideWorks = sel.classList.contains('search-hidden') && keyOf(selected()) !== k && /H_GROUP != /.test($('#tableSearch').val());
+      }
+    },
+    // The email embed in List == Stacked with only that group open.
+    email: async function () {
+      items()[2].click(); await frames(3);
+      var a = HC.getExportData('html').content;
+      await setLayout('stacked');
+      await onlyOpen([top()[2]]);
+      var b = HC.getExportData('html').content;
+      R.chk.stackedNow = !isOn();
+      R.chk.same = a === b && a.length > 100;
+      R.info = { lenList: a.length, lenStacked: b.length };
+    },
+    // The PDF and the exports are the same in either layout.
+    pdf: async function () {
+      items()[2].click(); await frames(3);
+      var a = await pdf();
+      await setLayout('stacked');
+      var b = await pdf();
+      R.chk.same = a === b && a.length > 100;
+      R.info = { lenList: a.length, lenStacked: b.length };
+    },
+    exports: async function () {
+      window.Penumbra.groupList.select(top()[2].getAttribute('data-group-path')); await frames(3);
+      var csv = HC.getExportData('csv').content;
+      var lines = String(csv).split(/\r?\n/).filter(function (x) { return x.length; }).length;
+      R.chk.allRows = lines === window.__CSV_LINES_EXPECTED;
+      R.info.csvLines = lines;
+      var a = exportsText();
+      await setLayout('stacked');
+      var b = exportsText();
+      R.chk.same = a === b && a.length > 100;
+      R.info.len = a.length;
+    },
+    // The saved state carries groupLayout only when List.
+    save: async function () {
+      var s1 = HC.buildStateObject();
+      R.chk.listSaved = !!(s1 && s1.groupLayout === 'list');
+      await setLayout('stacked');
+      var s2 = HC.buildStateObject();
+      R.chk.stackedOmits = !!(s2 && !('groupLayout' in s2) && s2.groupBy === 'H_GROUP');
+    },
+    // Stored Stacked. A layout-only Apply flips in place (no regroup); a real change regroups.
+    layoutonly: async function () {
+      R.chk.startsStacked = !isOn() && shownTop().length === 6;
+      seedDialog(); $('#groupLayout').val('list'); $('#groupingLightbox').show();
+      var n0 = window.__REBUILDS || 0;
+      $('#confirmGroupingBtn').trigger('click'); await sleep(200); await frames(4);
+      R.chk.noRegroup = (window.__REBUILDS || 0) === n0;
+      R.chk.listOn = isOn() && shownTop().length === 1;
+      R.chk.closed = !$('#groupingLightbox').is(':visible');
+      seedDialog(); $('#groupSortSelect').val('label|desc'); $('#groupLayout').val('stacked'); $('#groupingLightbox').show();
+      $('#confirmGroupingBtn').trigger('click');
+      await until(function () { return (window.__REBUILDS || 0) > n0; }, 15000); await sleep(400); await frames(4);
+      R.chk.regroup = (window.__REBUILDS || 0) === n0 + 1;
+      R.chk.stackedAgain = !isOn() && shownTop().length === 6;
+      R.info = { rebuilds0: n0, rebuilds: window.__REBUILDS };
+    },
+    // All 20 columns: the selected table gets the width its text needs and scrolls sideways.
+    wide: async function () {
+      var c = content(selected()), t = c.querySelector(':scope > table');
+      R.chk.minWidth = !!t.style.minWidth;
+      R.chk.scrolls = c.scrollWidth > c.clientWidth + 40;
+      var th = t.querySelector('thead th');
+      R.chk.headerSticky = getComputedStyle(th).position === 'sticky';
+      // round 7 (grplist7, 2026-10-08): no heading is cut short - every drawn th shows its
+      // whole text and sort icon (nothing clipped: scrollWidth within clientWidth), and the
+      // '#' column in particular is at least as wide as "#" + its icon + padding
+      var ths = Array.prototype.filter.call(t.querySelectorAll(':scope > thead > tr:first-child > th'), function (h) { return h.style.display !== 'none'; });
+      // grplist8: the sort icon is absolutely positioned (main.css ~20670), so a clipped
+      // header does not always show in scrollWidth - the icon must also start after the
+      // label's last letter (a toggle column's 6px padding put it over the label, live)
+      var cut = cutHeads(ths);
+      var hash = ths.filter(function (h) { return h.getAttribute('data-colname') === '#'; })[0];
+      R.chk.headsFit = ths.length > 0 && cut.length === 0 && !!hash && hash.getBoundingClientRect().width >= 40;
+      R.info = { sw: c.scrollWidth, cw: c.clientWidth, minW: t.style.minWidth, cut: cut, hashW: hash && hash.getBoundingClientRect().width, hashStyleW: hash && hash.style.width };
+    },
+    // Stacked with all 20 columns (stackfit, 2026-10-13 - until then: squeezed, no
+    // sideways scroll). ONE screen-only rule gives every group's table the width its
+    // headings need: each box scrolls sideways on its own and the columns line up.
+    widestacked: async function () {
+      function rule() { var el = document.getElementById('pnbGroupStackFit'); return el ? el.textContent : ''; }
+      function ruleW() { var m = /min-width: (\d+)px/.exec(rule()); return m ? +m[1] : 0; }
+      var ws = top();
+      $(ws[0].querySelector(':scope > .group-header')).trigger('click'); await sleep(200); await frames(3);
+      var c = content(ws[0]), t = c.querySelector(':scope > table');
+      var w0 = ruleW(), el = document.getElementById('pnbGroupStackFit');
+      R.chk.stackRule = w0 > 0 && !t.style.minWidth;
+      R.chk.screenOnly = !!(el && el.sheet && el.sheet.cssRules.length === 1 && el.sheet.cssRules[0].media && el.sheet.cssRules[0].media.mediaText === 'screen');
+      R.chk.scrolls = c.scrollWidth > c.clientWidth + 40;
+      R.chk.headerSticky = getComputedStyle(t.querySelector('thead th')).position === 'sticky';
+      // stackfit2: no heading cut short - '#' and its sort icon included
+      var vths = visHeads(t), cut = cutHeads(vths), hash = vths.filter(function (h) { return h.getAttribute('data-colname') === '#'; })[0];
+      R.chk.headsFit = vths.length > 0 && cut.length === 0 && !!hash && hash.getBoundingClientRect().width >= 40;
+      R.info.cut = cut; R.info.hashW = hash && hash.getBoundingClientRect().width;
+      // stackfit3: the body ResizeObserver now syncs in Stacked too - one sync, with the
+      // style invalidated first (a real resize), stays cheap
+      var t0 = performance.now();
+      for (var k = 0; k < 30; k++) { document.body.style.paddingBottom = (k % 2) + 'px'; window.Penumbra.groupList.sync(); }
+      var per = (performance.now() - t0) / 30; document.body.style.paddingBottom = '';
+      R.chk.syncCheap = per < 4;
+      $(ws[1].querySelector(':scope > .group-header')).trigger('click'); await sleep(200); await frames(3);
+      var t2 = content(ws[1]).querySelector(':scope > table');
+      var tw = t.getBoundingClientRect().width, tw2 = t2.getBoundingClientRect().width;
+      // wider than the box by more than its vertical scrollbar, and the same in both groups
+      R.chk.aligned = tw > c.clientWidth + 40 && Math.abs(tw - tw2) <= 1;
+      // a bigger font needs more width: re-measured on the density change
+      HC.applyDensity('easy-read'); await sleep(300); await frames(4);
+      var wE = ruleW();
+      R.chk.followsDensity = wE > w0;
+      // every group closed: the rule is KEPT while the columns are the same (no squeezed
+      // frame on the next open) ...
+      await onlyOpen([]); await frames(3);
+      R.chk.keptClosed = wE > 0 && ruleW() === wE;
+      // ... and DROPPED when they changed (here the density, part of the signature)
+      HC.applyDensity('compact'); await sleep(300); await frames(4);
+      var wDrop = ruleW();
+      R.chk.dropsStale = wDrop === 0 && wE > 0;
+      await onlyOpen([ws[0]]); await frames(3);
+      R.chk.reopens = ruleW() > 0 && ruleW() < wE;
+      // List sizes its one table itself: the rule stands down
+      var wOpen = ruleW();
+      await setLayout('list'); await frames(3);
+      R.chk.listOwns = wOpen > 0 && rule() === '';
+      R.info = { syncMs: Math.round(per * 100) / 100, sw: c.scrollWidth, cw: c.clientWidth, w0: w0, wE: wE, tw: tw, tw2: tw2, rule: rule().slice(0, 200) };
+    },
+    // Stacked, the default columns: the need is under the box, so the table still fits
+    // it edge to edge - no sideways scroll (stackfit).
+    fitstacked: async function () {
+      var w = top()[0];
+      $(w.querySelector(':scope > .group-header')).trigger('click'); await sleep(200); await frames(3);
+      var c = content(w), t = c.querySelector(':scope > table');
+      var el = document.getElementById('pnbGroupStackFit'), m = el ? /min-width: (\d+)px/.exec(el.textContent) : null;
+      R.chk.measured = !!m && +m[1] > 0 && +m[1] < c.clientWidth;
+      R.chk.fits = c.scrollWidth <= c.clientWidth + 1;
+      R.chk.tableFills = Math.abs(t.getBoundingClientRect().width - c.clientWidth) <= 2;
+      var fcut = cutHeads(visHeads(t));
+      R.chk.headsFit = visHeads(t).length > 0 && fcut.length === 0;
+      // stackfit3: a heading the shares cut short ('#' given a sliver in every group), the
+      // FIRST group short (no vertical scrollbar - it is the one measured) and a second one
+      // tall: the held widths fit the TALL box, so neither group scrolls sideways
+      var ws = top();
+      ws.forEach(function (g) { var h = g.querySelector(':scope > .group-content > table > thead > tr > th[data-colname="#"]'); if (h) { h.style.width = '0.2%'; } });
+      content(ws[0]).style.maxHeight = '40px';
+      $(ws[1].querySelector(':scope > .group-header')).trigger('click'); await sleep(200);
+      $(document).trigger('penumbra:columns-changed'); await frames(4);
+      var c0 = content(ws[0]), c1 = content(ws[1]);
+      var txt3 = (document.getElementById('pnbGroupStackFit') || {}).textContent || '';
+      R.chk.heldRule = /th\[data-colname="#"\] \{ box-sizing: border-box !important; width: \d+px/.test(txt3)
+        && c0.scrollHeight > c0.clientHeight && c1.scrollHeight > c1.clientHeight;
+      // the measured box must be the short one: give it NO bar (all its rows shown) and re-measure
+      c0.style.maxHeight = 'none'; $(document).trigger('penumbra:columns-changed'); await frames(4);
+      R.chk.mixedHeights = c0.scrollHeight <= c0.clientHeight + 1 && c1.scrollHeight > c1.clientHeight
+        && c0.scrollWidth <= c0.clientWidth + 1 && c1.scrollWidth <= c1.clientWidth + 1;
+      var m0 = cutHeads(visHeads(c0.querySelector(':scope > table'))), m1 = cutHeads(visHeads(c1.querySelector(':scope > table')));
+      R.chk.mixedHeads = m0.length === 0 && m1.length === 0;
+      var mixedInfo = { sw0: c0.scrollWidth, cw0: c0.clientWidth, sw1: c1.scrollWidth, cw1: c1.clientWidth, cut0: m0, cut1: m1, rule: txt3.slice(0, 160) };
+      R.info = { sw: c.scrollWidth, cw: c.clientWidth, rule: el ? el.textContent.slice(0, 300) : null, cut: fcut, mixed: mixedInfo };
+    },
+    // stackfit2: a width set past the box is drawn as asked, the table grows and scrolls
+    // further, and a drag is bounded by the tool's max only (not by the box).
+    wideresize: async function () {
+      var host = window.Penumbra && window.Penumbra.colWidthsHost, cw = window.Penumbra && window.Penumbra.colWidths;
+      var w = top()[0];
+      $(w.querySelector(':scope > .group-header')).trigger('click'); await sleep(200); await frames(3);
+      var c = content(w), t = c.querySelector(':scope > table'), tw0 = t.getBoundingClientRect().width;
+      var name = visHeads(t).map(function (h) { return h.getAttribute('data-colname'); }).filter(function (n) { return /^[VH]_/.test(n); })[0];
+      // the drag's bound is read at the press, BEFORE any width grew the table: the box no longer caps it
+      var max0 = (cw && cw.groupMaxFor) ? cw.groupMaxFor(name.toUpperCase()) : 0;
+      host.setUser(name, 1900);
+      // the worst order: the tool lays out (synchronously - main.js raises this for a breakdown)
+      // BEFORE the module has grown the table for the new width. It must not scale it down.
+      document.dispatchEvent(new CustomEvent('penumbra:breakdown-opened'));
+      await sleep(200); await frames(5);
+      var gs = document.getElementById('pnbColWidthGroupStyle'), gtxt = gs ? gs.textContent : '';
+      R.chk.toolExact = gtxt.indexOf('th[data-colname="' + name + '"]{box-sizing:border-box!important;width:1900px!important') >= 0;
+      var th = t.querySelector(':scope > thead > tr > th[data-colname="' + name + '"]');
+      R.chk.drawnExact = !!th && Math.abs(th.getBoundingClientRect().width - 1900) <= 2;
+      var tw1 = t.getBoundingClientRect().width;
+      R.chk.grows = tw1 > tw0 + 1200;
+      R.chk.scrollsMore = c.scrollWidth > c.clientWidth + 1500;
+      R.chk.dragUncapped = max0 === host.max;
+      var others = visHeads(t).filter(function (h) { return h !== th; }), pcut = cutHeads(others);
+      R.chk.headsFitPinned = others.length > 0 && pcut.length === 0;
+      R.info = { name: name, tw0: tw0, tw1: tw1, sw: c.scrollWidth, cw: c.clientWidth, thW: th && th.getBoundingClientRect().width,
+                 max0: max0, hostMax: host.max, cut: pcut, gcss: gtxt.slice(0, 160) };
+      host.setUser(name, null); await frames(3);
+    },
+    // stackfit2: a snapshot comparison in Stacked - its groups get their own rule (by
+    // key), scroll sideways and cut no heading; the regular groups' rule is not theirs.
+    widecmp: async function () {
+      function cws() { return Array.prototype.slice.call(document.querySelectorAll('#snapshotComparisonContainer > .group-wrapper')); }
+      if (!document.getElementById('snapshotAnalysisTemplate') && window.__SNAPTPL) { $('body').append(window.__SNAPTPL); }
+      if (!document.getElementById('action_overlay')) { $('body').append('<div id="action_overlay"></div>'); }
+      if (!document.getElementById('manageSnapshotsLightbox')) { $('body').append('<div id="manageSnapshotsLightbox"></div>'); }
+      var master = HC.getMaster();
+      var rows = master.slice(2).map(function (m) { var o = {}; m.forEach(function (v, k) { if (k !== '#') o[k] = v; }); return { rowData: o }; });
+      var fake = {}; Object.keys(rows[0].rowData).forEach(function (k) { fake[k] = 'zz-gone'; });
+      rows.push({ rowData: fake });
+      HC.runComparisonAndDisplayGrouped({ compressedData: HC.compressString(JSON.stringify(rows)), name: 'harness' });
+      await until(function () { return document.body.classList.contains('snapshot-comparison-active') && cws().length === 3; }, 20000);
+      await sleep(400); await frames(4);
+      R.chk.cmpStacked = !isOn();
+      var g = cws()[0];
+      if (!g.classList.contains('open')) { $(g.querySelector(':scope > .group-header')).trigger('click'); await sleep(200); }
+      await frames(4);
+      var c = content(g), t = c ? c.querySelector(':scope > table') : null;
+      var el = document.getElementById('pnbGroupStackFit'), txt = el ? el.textContent : '';
+      var key = keyOf(g);
+      R.chk.cmpRule = txt.indexOf('#snapshotComparisonContainer') >= 0 && txt.indexOf('[data-group-key="' + key) >= 0;
+      R.chk.cmpScrolls = !!c && c.scrollWidth > c.clientWidth + 40;
+      var cc = t ? cutHeads(visHeads(t)) : ['no table'];
+      R.chk.cmpHeadsFit = !!t && visHeads(t).length > 0 && cc.length === 0;
+      // the regular rule needs data-group-path, which a comparison group has not
+      R.chk.gridUntouched = !g.hasAttribute('data-group-path');
+      R.info = { key: key, sw: c && c.scrollWidth, cw: c && c.clientWidth, cut: cc, rule: txt.slice(0, 300) };
+    },
+    // Nested: the first branch is open in the list with its groups; a click on another
+    // branch folds it open; a click on one of its groups shows that branch + group.
+    nested: async function () {
+      var t = top();
+      R.chk.items9 = items().length === 9;
+      var drawnAll = Array.prototype.filter.call(document.querySelectorAll('#groupedResultsContainer .group-wrapper'), drawn);
+      R.chk.path = drawnAll.length === 2 && drawnAll[0] === t[0] && drawnAll[1] === kids(t[0])[0];
+      var b2 = items().filter(function (x) { return x.getAttribute('data-path') === t[2].getAttribute('data-group-path'); })[0];
+      b2.click(); await frames(3);
+      // the list is re-drawn on every change: look the branch's row up again
+      var b2now = items().filter(function (x) { return x.getAttribute('data-path') === t[2].getAttribute('data-group-path'); })[0];
+      R.chk.folds = items().length === 12 && !!b2now && b2now.getAttribute('aria-expanded') === 'true';
+      var leafPath = kids(t[2])[0].getAttribute('data-group-path');
+      items().filter(function (x) { return x.getAttribute('data-path') === leafPath; })[0].click(); await frames(3);
+      drawnAll = Array.prototype.filter.call(document.querySelectorAll('#groupedResultsContainer .group-wrapper'), drawn);
+      R.chk.pathMoved = drawnAll.length === 2 && drawnAll[0] === t[2] && drawnAll[1] === kids(t[2])[0];
+      var h0 = parseFloat(getComputedStyle(root()).getPropertyValue('--pnb-grp-h0')) || 0;
+      // round 4 (grplist4): ONE BAND - the outer band is not drawn; the selected group's own
+      // band carries the path as a crumb (a ::before, nothing in the band's DOM), and with
+      // the outer band hidden (h0 = 0) that band sticks at the base, not a band's height under it
+      var leaf = kids(t[2])[0], band = leaf.querySelector(':scope > .group-header');
+      // on screen, not computed display: a band inside a hidden (.pnb-gl-off) wrapper still computes to flex
+      var bandsDrawn = Array.prototype.filter.call(document.querySelectorAll('#groupedResultsContainer .group-wrapper > .group-header'), function (b) { return b.getClientRects().length > 0; });
+      R.chk.oneBand = bandsDrawn.length === 1 && bandsDrawn[0] === band;
+      var crumbTxt = String(getComputedStyle(band, '::before').content || '');
+      R.chk.crumb = leaf.classList.contains('pnb-gl-deep') && crumbTxt.indexOf(keyOf(t[2])) >= 0 && crumbTxt.indexOf('›') >= 0
+        && band.querySelectorAll(':scope > *').length === band.querySelectorAll(':scope > .group-hide, :scope > .group-chevron, :scope > .group-name, :scope > .group-count, :scope > .group-agg-summary').length;
+      var base = parseFloat(getComputedStyle(root()).getPropertyValue('--pnb-grp-base')) || 0;
+      R.chk.bandTop = Math.abs(parseFloat(getComputedStyle(band).top) - base) <= 1;
+      R.info.band = { drawn: bandsDrawn.length, crumb: crumbTxt, top: getComputedStyle(band).top, base: base, h0: h0 };
+      var l = list(); l.focus(); key(l, 'ArrowLeft'); await frames(3);
+      R.chk.leftToBranch = !!l.querySelector('.pnb-gl-item.is-active') && l.querySelector('.pnb-gl-item.is-active').getAttribute('data-path') === t[2].getAttribute('data-group-path');
+      var sh = shape(kids(t[2])[0]);
+      R.chk.footer = sh.foot === sh.head;
+      R.chk.fills = Math.abs(sh.sum - sh.width) <= 4;
+      R.info = Object.assign(R.info, { items: items().length, h0: h0, shape: sh });
+    },
+    // Stacked, nested: a search removes the FIRST outer group; a band opened afterwards must
+    // still measure the real band height (a hidden first band measured 0).
+    nstick: async function () {
+      var t = top();
+      await search(notThis(t[0]));
+      $(t[1].querySelector(':scope > .group-header')).trigger('click'); await sleep(200); await frames(3);
+      var h0 = parseFloat(getComputedStyle(root()).getPropertyValue('--pnb-grp-h0')) || 0;
+      R.chk.h0 = h0 > 0;
+      // Stacked too: an inner group's footer has one cell per showing column, and its columns fill the table
+      var leaf = kids(t[1])[0];
+      $(leaf.querySelector(':scope > .group-header')).trigger('click'); await sleep(200); await frames(3);
+      var sh = shape(leaf);
+      R.chk.footer = sh.foot === sh.head;
+      R.chk.fills = Math.abs(sh.sum - sh.width) <= 4;
+      R.info = { h0: h0, firstHidden: t[0].classList.contains('search-hidden'), shape: sh };
+    },
+    // A window under 900px is Stacked; widening it brings the list back.
+    narrow: async function () {
+      R.chk.stackedNarrow = !isOn() && !list() && shownTop().length === 6;
+      window.__FAKEW = 1500; window.dispatchEvent(new Event('resize')); await sleep(100); await frames(4);
+      R.chk.listWide = isOn() && !!list() && shownTop().length === 1;
+    },
+    // &grouplist=off: Stacked, and no Layout choice offered.
+    kill: async function () {
+      R.chk.off = !isOn() && !list() && shownTop().length === 6;
+      R.chk.rowHidden = $('#groupLayoutRow').css('display') === 'none';
+    },
+    // A tall block above the grouped view (the docked admin console was ~2,100px on the
+    // user's screen, 2026-10-03): no room to fit, so the box keeps the stacked 425px - and
+    // so does the list (it fell back to a cramped 150px).
+    tallabove: async function () {
+      var tall = document.createElement('div'); tall.id = 'zzTallAbove'; tall.style.height = '2100px';
+      var tv = document.getElementById('table-view-container'); tv.parentNode.insertBefore(tall, tv);
+      window.dispatchEvent(new Event('resize')); await sleep(100); await frames(4);
+      var sel = selected(), c = content(sel), l = list();
+      R.chk.boxDefault = !!c && !c.style.maxHeight && getComputedStyle(c).maxHeight === '425px';
+      R.chk.listFloor = !!l && l.style.maxHeight === '425px';
+      R.info = { boxMaxH: c && c.style.maxHeight, listMaxH: l && l.style.maxHeight };
+    },
+    // A fault inside the module falls back to Stacked and STAYS there (no retry loop).
+    broken: async function () {
+      var l = list();
+      Object.defineProperty(l, 'textContent', { configurable: true, set: function () { throw new Error('zz test fault'); } });
+      items()[1].click(); await frames(3);
+      R.chk.fellBack = !isOn() && !list() && shownTop().length === 6;
+      $(document).trigger('penumbra:groupedRendered'); await frames(3);
+      R.chk.staysStacked = !isOn() && !list() && shownTop().length === 6;
+    },
+    // Remove Grouping takes the list with it and resets the layout.
+    exit: async function () {
+      R.chk.onBefore = isOn();
+      // The grid rule must give way to .hide()'s inline display:none AT ONCE, in the
+      // same task - not only after the module's teardown a frame later.
+      var r0 = root(), prev = r0.style.display;
+      r0.style.display = 'none';
+      R.chk.cssGuard = getComputedStyle(r0).display === 'none';
+      r0.style.display = prev;
+      await frames(3);
+      await HC.removeGrouping();
+      await until(function () { return root().style.display === 'none'; }, 10000); await sleep(200); await frames(4);
+      R.chk.gone = !isOn() && !list() && getComputedStyle(root()).display === 'none';
+      R.chk.reset = HC.getLayout() === 'stacked';
+      R.chk.fieldReset = $('#groupLayout').val() === 'stacked';
+    },
+
+    // ---- round 2 (grplist2) ----------------------------------------------------------
+    // A long text column: the table fits its box FIRST, as in Stacked (the text wraps);
+    // the first build sized it to the widest text and scrolled sideways.
+    longtext: async function () {
+      var c = content(selected()), t = c.querySelector(':scope > table');
+      var mw = parseFloat(t.style.minWidth) || 0;
+      R.chk.minByHeadings = mw > 0 && mw < c.clientWidth;
+      R.chk.fits = c.scrollWidth <= c.clientWidth + 1;
+      R.chk.tableFills = Math.abs(t.getBoundingClientRect().width - c.clientWidth) <= 2;
+      var row = t.tBodies[0] && t.tBodies[0].rows[0];
+      R.chk.wraps = !!row && row.getBoundingClientRect().height > 40;
+      R.info = { minW: t.style.minWidth, cw: c.clientWidth, sw: c.scrollWidth, tw: Math.round(t.getBoundingClientRect().width), rowH: row && Math.round(row.getBoundingClientRect().height) };
+    },
+    // All 20 columns scroll sideways; narrowing them in the column-width tool shrinks
+    // the needed width - and the scroll - instead of re-spreading it; clearing the
+    // widths brings it back.
+    pinnarrow: async function () {
+      var host = window.Penumbra && window.Penumbra.colWidthsHost;
+      var c = content(selected()), t = c.querySelector(':scope > table');
+      var mw0 = parseFloat(t.style.minWidth) || 0, sw0 = c.scrollWidth, cw = c.clientWidth;
+      R.chk.scrollsFirst = sw0 > cw + 40;
+      var names = Array.prototype.filter.call(t.querySelectorAll(':scope > thead > tr > th[data-colname]'), function (th) {
+        return th.style.display !== 'none' && /^[VH]_/.test(th.getAttribute('data-colname'));
+      }).map(function (th) { return th.getAttribute('data-colname'); });
+      names.forEach(function (n) { host.setUser(n, 50); });
+      await sleep(200); await frames(5);
+      c = content(selected()); t = c.querySelector(':scope > table');
+      var mw1 = parseFloat(t.style.minWidth) || 0, sw1 = c.scrollWidth;
+      var th0 = t.querySelector(':scope > thead > tr > th[data-colname="' + names[0] + '"]');
+      R.chk.pinDrawn = !!th0 && Math.abs(th0.getBoundingClientRect().width - 50) <= 2;
+      // grplist9: with a pin the tool writes the FREE columns' shares as % !important, so
+      // the module's widths must be inline !important or the headings are cut (seen live)
+      var free = Array.prototype.filter.call(t.querySelectorAll(':scope > thead > tr > th[data-colname]'), function (h) {
+        return h.style.display !== 'none' && !/^[VH]_/.test(h.getAttribute('data-colname'));
+      });
+      var cutP = cutHeads(free);
+      R.chk.headsFitPinned = free.length > 0 && cutP.length === 0;
+      R.info.cutPinned = cutP; R.info.freeW = free.map(function (h) { return h.getAttribute('data-colname') + ':' + Math.round(h.getBoundingClientRect().width) + ' ' + h.style.width + '/' + h.style.getPropertyPriority('width'); });
+      R.chk.shrinks = mw1 > 0 && mw1 < mw0 - 300;
+      R.chk.noScroll = sw1 <= c.clientWidth + 1;
+      // grplist2b: before the tool's first pass (a frame after a render; never in a
+      // background tab) its stylesheet is not there and main.css's generic th
+      // max-width (350px) is all there is to read - a set width must still count as
+      // what was asked, never more (seen live: four 40px columns counted as 1,400px)
+      var gs = document.getElementById('pnbColWidthGroupStyle'), gsText = gs ? gs.textContent : null;
+      if (gs) { gs.textContent = ''; }
+      window.Penumbra.groupList.sync(); await frames(2);
+      var tNoRule = content(selected()).querySelector(':scope > table');
+      var mwNoRule = parseFloat(tNoRule.style.minWidth) || 0;
+      // grplist7: less what widenHeads added for a heading the percentages cut short (with
+      // no rule the pinned columns are not held at 50px, so '#' gets a sliver) - the
+      // headings' SUM is what must not exceed what was asked
+      var grew = parseFloat(tNoRule.getAttribute('data-pnb-gl-grew')) || 0;
+      R.chk.noRuleYet = !!gs && mwNoRule > 0 && mwNoRule - grew <= mw1 + 2;
+      if (gs) { gs.textContent = gsText; }
+      window.Penumbra.groupList.sync(); await frames(2);
+      R.info.mwNoRule = mwNoRule; R.info.grew = grew;
+      names.forEach(function (n) { host.setUser(n, null); });
+      await sleep(200); await frames(5);
+      c = content(selected()); t = c.querySelector(':scope > table');
+      var mw2 = parseFloat(t.style.minWidth) || 0;
+      R.chk.restores = Math.abs(mw2 - mw0) <= 2 && c.scrollWidth > c.clientWidth + 40;
+      R.info = { cutPinned: R.info.cutPinned, freeW: R.info.freeW, n: names.length, mw: [mw0, mw1, mw2], mwNoRule: R.info.mwNoRule, grew: R.info.grew, sw: [sw0, sw1, c.scrollWidth], cw: cw, th0: th0 && Math.round(th0.getBoundingClientRect().width) };
+    },
+    // grplist9: ONLY '#' pinned (a saved layout, seen live): the tool then writes every
+    // other column's share as `width: N% !important`, so the module's widths must be
+    // inline !important or the free headings are cut short.
+    pinhash: async function () {
+      var host = window.Penumbra && window.Penumbra.colWidthsHost;
+      host.setUser('#', 80); await sleep(300); await frames(5);
+      var c = content(selected()), t = c.querySelector(':scope > table');
+      var ths = Array.prototype.filter.call(t.querySelectorAll(':scope > thead > tr:first-child > th'), function (h) { return h.style.display !== 'none'; });
+      var cut = cutHeads(ths);
+      var hash = ths.filter(function (h) { return h.getAttribute('data-colname') === '#'; })[0];
+      var gs = document.getElementById('pnbColWidthGroupStyle');
+      R.chk.toolRule = !!gs && /!important/.test(gs.textContent) && /%!important/.test(gs.textContent);
+      R.chk.pinDrawn = !!hash && Math.abs(hash.getBoundingClientRect().width - 80) <= 2;
+      R.chk.headsFit = ths.length > 0 && cut.length === 0;
+      R.chk.important = ths.some(function (h) { return h.style.getPropertyPriority('width') === 'important'; });
+      R.info = { cut: cut, hashW: hash && Math.round(hash.getBoundingClientRect().width), minW: t.style.minWidth, grew: t.getAttribute('data-pnb-gl-grew'),
+                 widths: ths.slice(0, 6).map(function (h) { return h.getAttribute('data-colname') + ':' + Math.round(h.getBoundingClientRect().width) + ' ' + h.style.width + '/' + h.style.getPropertyPriority('width'); }) };
+      host.setUser('#', null); await sleep(200); await frames(5);
+      R.chk.toolClears = !gs.textContent;
+      // ... and once the pin is gone the headings still fit (the frozen widths went back
+      // to their percentages and the fit ran again) - measured late, after the tool's
+      // own pass and the fit it schedules
+      await sleep(900); await frames(5);
+      var ths2 = Array.prototype.filter.call(content(selected()).querySelector(':scope > table').querySelectorAll(':scope > thead > tr:first-child > th'), function (h) { return h.style.display !== 'none'; });
+      var cut2 = cutHeads(ths2);
+      R.chk.headsFitAfter = cut2.length === 0;
+      R.info.cutAfter = cut2;
+    },
+    // &colwidths=flat: the tool does not draw the grouped view, so a width set there
+    // is not this table's - it fits by its headings (grplist2b).
+    pinflat: async function () {
+      var host = window.Penumbra && window.Penumbra.colWidthsHost;
+      R.chk.viewsOff = !document.documentElement.classList.contains('pnb-colw-views');
+      ['V_ID', 'V_NAME', 'V_AMOUNT', 'V_DATE'].forEach(function (n) { host.setUser(n, 600); });
+      await sleep(200); await frames(5);
+      var c = content(selected()), t = c.querySelector(':scope > table');
+      var mw = parseFloat(t.style.minWidth) || 0;
+      R.chk.ignoresPins = mw > 0 && mw < 1000;
+      R.chk.fits = c.scrollWidth <= c.clientWidth + 1;
+      R.info = { minW: t.style.minWidth, cw: c.clientWidth, sw: c.scrollWidth, html: document.documentElement.className };
+    },
+    // The list follows the report's density: the bands' font size, rows sized in em.
+    density: async function () {
+      function bandFs() { return getComputedStyle(document.querySelector('#groupedResultsContainer .group-wrapper > .group-header')).fontSize; }
+      function listFs() { return list() ? getComputedStyle(list()).fontSize : ''; }
+      function itemH() { return items()[0] ? items()[0].getBoundingClientRect().height : 0; }
+      var fs0 = listFs(), b0 = bandFs(), h0 = itemH();
+      R.chk.standard = !!fs0 && fs0 === b0;
+      HC.applyDensity('compact'); await sleep(300); await frames(4);
+      var fsC = listFs(), bC = bandFs(), hC = itemH();
+      R.chk.compact = fsC === '10px' && bC === '10px';
+      HC.applyDensity('easy-read'); await sleep(300); await frames(4);
+      var fsE = listFs(), bE = bandFs(), hE = itemH();
+      R.chk.easy = fsE === '14px' && bE === '14px';
+      R.chk.rowsFollow = hC > 0 && hC < h0 && h0 < hE;
+      R.info = { fs: [fs0, fsC, fsE], band: [b0, bC, bE], h: [h0, hC, hE] };
+    },
+    // Longer group names widen the list, up to 420px; a longer one ends in an
+    // ellipsis, its full text on hover.
+    listwidth: async function () {
+      var l = list(), lw = l.getBoundingClientRect().width;
+      R.chk.capped = lw >= 400 && lw <= 421;
+      var nm = Array.prototype.slice.call(l.querySelectorAll('.pnb-gl-name'));
+      var longOne = nm.filter(function (x) { return x.textContent.length > 60; })[0];
+      var shortOnes = nm.filter(function (x) { return x.textContent.length <= 60; });
+      R.chk.shortFull = shortOnes.length === 5 && shortOnes.every(function (x) { return x.scrollWidth <= x.clientWidth + 1; });
+      R.chk.longClipped = !!longOne && longOne.scrollWidth > longOne.clientWidth + 10 && longOne.title === longOne.textContent;
+      R.chk.groupBeside = !!selected() && selected().getBoundingClientRect().left >= l.getBoundingClientRect().right;
+      R.info = { lw: Math.round(lw), names: nm.map(function (x) { return [x.textContent.length, x.scrollWidth, x.clientWidth]; }) };
+    },
+    // group_by|...|layout=list|stacked through the trigger path every snippet control
+    // uses (executeChainStep -> the .snippet-action handler). Stored Stacked, summed.
+    trigger: async function () {
+      var steps = 0;
+      $(document).on('penumbra:stepComplete.zzt', function () { steps++; });
+      function state() { return HC.buildStateObject() || {}; }
+      async function fire(cmd) {
+        var s0 = steps;
+        HC.executeChainStep(cmd);
+        if (!(await until(function () { return steps > s0; }, 15000))) throw new Error('trigger "' + cmd + '": no stepComplete in 15 s');
+        await sleep(150); await frames(4);
+      }
+      R.chk.startsStacked = !isOn() && shownTop().length === 6;
+      // 1. only the layout differs: the layout-only shortcut, and the step completes
+      var n0 = window.__REBUILDS || 0;
+      await fire('group_by|H_GROUP|H_AMT|sum|layout=list');
+      R.chk.listOn = isOn() && HC.getLayout() === 'list' && shownTop().length === 1;
+      R.chk.layoutOnlyStep = (window.__REBUILDS || 0) === n0;
+      R.chk.aggKept = !!state().groupAgg && state().groupAgg.column === 'H_AMT';
+      // 2. a regroup that names no layout keeps the one on screen
+      await fire('group_by|H_GROUP2|H_AMT|sum');
+      R.chk.keepsList = isOn() && state().groupBy === 'H_GROUP2';
+      // 3. ... even when a cancelled dialog left its Layout field on Stacked
+      $('#groupLayout').val('stacked');
+      await fire('group_by|H_GROUP|H_AMT|sum');
+      R.chk.cancelIgnored = isOn() && state().groupBy === 'H_GROUP';
+      // 4. an unknown layout is ignored; the positions after it still count
+      await fire('group_by|H_GROUP|layout=sideways|H_AMT|sum');
+      R.chk.junkIgnored = isOn() && !!state().groupAgg && state().groupAgg.column === 'H_AMT';
+      // 5. back to Stacked
+      await fire('group_by|H_GROUP|H_AMT|sum|layout=stacked');
+      R.chk.toStacked = !isOn() && HC.getLayout() === 'stacked' && shownTop().length === 6;
+      $(document).off('penumbra:stepComplete.zzt');
+      R.info = { steps: steps, rebuilds: (window.__REBUILDS || 0) - n0, groupBy: state().groupBy, agg: state().groupAgg };
+    },
+    // grplist3: the dialog's Layout choice is one click on a radio over the hidden field.
+    // Opening the dialog shows the layout on screen; Reset repaints it to Stacked.
+    radio: async function () {
+      function checked() { var x = document.querySelector('#groupLayoutRow input[name="groupLayoutChoice"]:checked'); return x ? x.value : null; }
+      $('#configureGroupingBtn').trigger('click'); await sleep(400);
+      R.chk.opened = $('#groupingLightbox').css('display') !== 'none';
+      R.chk.openShowsList = checked() === 'list' && $('#groupLayout').val() === 'list';
+      document.querySelector('#groupLayoutRow input[value="stacked"]').click();
+      R.chk.clickSets = $('#groupLayout').val() === 'stacked';
+      var n0 = window.__REBUILDS || 0;
+      $('#confirmGroupingBtn').trigger('click'); await sleep(300); await frames(4);
+      R.chk.appliedStacked = !isOn() && HC.getLayout() === 'stacked' && (window.__REBUILDS || 0) === n0;
+      $('#configureGroupingBtn').trigger('click'); await sleep(400);
+      R.chk.reopenShowsStacked = checked() === 'stacked';
+      document.querySelector('#groupLayoutRow input[value="list"]').click();
+      $('#resetGroupingBtn').trigger('click'); await sleep(200);
+      R.chk.resetRepaints = checked() === 'stacked' && $('#groupLayout').val() === 'stacked';
+      R.info = { checked: checked(), field: $('#groupLayout').val(), layout: HC.getLayout() };
+    },
+    // grplistcmp (2026-10-13): a snapshot COMPARISON is listed too. Its groups (New /
+    // Removed / Unchanged Rows) sit one level down, in #snapshotComparisonContainer,
+    // with no data-group-path. The real compare engine runs against a snapshot made from
+    // the live rows: two dropped (New Rows) and one invented (Removed Rows).
+    compare: async function () {
+      function cws() { return Array.prototype.slice.call(document.querySelectorAll('#snapshotComparisonContainer > .group-wrapper')); }
+      function cShown() { return cws().filter(drawn); }
+      // the compare engine starts by fading the snapshot manager out and runs from its
+      // callback: the harness has no manager, and an empty set never calls back
+      if (!document.getElementById('snapshotAnalysisTemplate') && window.__SNAPTPL) { $('body').append(window.__SNAPTPL); }
+      // ... and show_text() draws into index.php's toast dock
+      if (!document.getElementById('action_overlay')) { $('body').append('<div id="action_overlay"></div>'); }
+      if (!document.getElementById('manageSnapshotsLightbox')) { $('body').append('<div id="manageSnapshotsLightbox"></div>'); }
+      window.__cerr = []; var _ce = console.error; console.error = function () { window.__cerr.push(Array.prototype.map.call(arguments, function (a) { return String(a && a.stack || a); }).join(' ').slice(0, 400)); return _ce.apply(console, arguments); };
+      var master = HC.getMaster();
+      var rows = master.slice(2).map(function (m) {
+        var o = {}; m.forEach(function (v, k) { if (k !== '#') o[k] = v; }); return { rowData: o };
+      });
+      var fake = {}; Object.keys(rows[0].rowData).forEach(function (k) { fake[k] = 'zz-gone'; });
+      rows.push({ rowData: fake });
+      HC.runComparisonAndDisplayGrouped({ compressedData: HC.compressString(JSON.stringify(rows)), name: 'harness' });
+      await until(function () { return document.body.classList.contains('snapshot-comparison-active') && cws().length === 3 && isOn() && items().length === 3; }, 20000);
+      await sleep(400); await frames(4);
+      if (items().length !== 3) throw new Error('compare: no 3-row list ' + JSON.stringify({ cmp: document.body.classList.contains('snapshot-comparison-active'),
+        cws: cws().length, items: items().length, on: isOn(), layout: HC.getLayout(), rootKids: Array.prototype.map.call(root().children, function (k) { return k.id || k.className; }),
+        rootDisp: root().style.display, count: countText(), errs: window.__errors.slice(0, 3), toast: $('#undo_text').text().slice(0, 300), cerr: (window.__cerr || []).slice(0, 3) }));
+      var l = list(), sel = selected(), c = content(sel);
+      var lr = l ? l.getBoundingClientRect() : null, sr = sel ? sel.getBoundingClientRect() : null;
+      var want = innerHeight - (function () { var sb = document.getElementById('pnbStatusBar'); return sb ? sb.getBoundingClientRect().height : 0; })() - 12;
+      R.chk.cmpOn = document.body.classList.contains('snapshot-comparison-active') && isOn();
+      R.chk.cmpItems = items().length === 3 && items().map(function (i) { return i.getAttribute('data-path'); }).join('|') === cws().map(keyOf).join('|');
+      R.chk.cmpOne = cShown().length === 1 && cShown()[0] === sel && sel.classList.contains('open') && !!c && getComputedStyle(c).display === 'block';
+      // the right-hand pane: the group starts at the list's right edge, level with it, and
+      // its box reaches the fit line
+      R.chk.cmpPane = !!(lr && sr && Math.abs(sr.left - lr.right) <= 1.5 && Math.abs(sr.top - lr.top) <= 1.5);
+      R.chk.cmpVisible = $('#snapshotComparisonContainer').is(':visible');
+      // the count's "N of M categories" counts groups the SEARCH kept, not the ones drawn
+      var sv = $('#tableSearch').val();
+      $('#tableSearch').val('H_GROUP != nothing'); HC.updateComparisonResultCount(5);
+      var ct = countText(); $('#tableSearch').val(sv);
+      R.chk.cmpCount = / 3 of 3 categories/.test(ct);
+      // the big group (Unchanged Rows, the third name): its box reaches the fit line
+      items()[2].click(); await frames(4);
+      var bs = selected(), bc = content(bs), br = bs ? bs.getBoundingClientRect() : null;
+      R.chk.cmpFit = !!(bs === cws()[2] && bc && bc.style.maxHeight && Math.abs(br.bottom + parseFloat(getComputedStyle(bs).marginBottom) - want) <= 3);
+      // the divider runs the frame's full height beside a group taller than the list: the
+      // container's ::after (column 1, row 3) fills from the list's bottom to the group's -
+      // only when the comparison's box spans the three rows like a regular group does
+      var ac = getComputedStyle(root(), '::after'), lb = list().getBoundingClientRect().bottom;
+      var divH = parseFloat(ac.height) || 0;
+      R.info.div = [Math.round(lb), Math.round(divH), Math.round(br.bottom), ac.borderRightWidth];
+      R.chk.cmpDivider = br.bottom - lb > 50 && Math.abs(lb + divH - br.bottom) <= 2 && parseFloat(ac.borderRightWidth) >= 1;
+      // a click on the second name shows that group alone
+      items()[1].click(); await frames(3);
+      R.chk.cmpClick = cShown().length === 1 && cShown()[0] === cws()[1] && selected() === cws()[1];
+      // Configure Grouping > Apply with the comparison's own column: only the layout
+      // applies - flipped in place, no regroup, the comparison stays
+      var n0 = window.__REBUILDS || 0;
+      setPcs('groupingColumnSelector', '__SNAP_TYPE'); setPcs('groupingColumnSelector2', ''); setPcs('groupingColumnSelector3', '');
+      $('#groupLayout').val('stacked'); $('#groupingLightbox').show();
+      $('#confirmGroupingBtn').trigger('click'); await sleep(300); await frames(4);
+      R.chk.cmpApplyStacked = !isOn() && HC.getLayout() === 'stacked' && document.body.classList.contains('snapshot-comparison-active')
+        && cws().length === 3 && !$('#groupingLightbox').is(':visible') && (window.__REBUILDS || 0) === n0;
+      $('#groupLayout').val('list'); $('#groupingLightbox').show();
+      $('#confirmGroupingBtn').trigger('click'); await sleep(300); await frames(4);
+      R.chk.cmpApplyList = isOn() && HC.getLayout() === 'list' && document.body.classList.contains('snapshot-comparison-active')
+        && cShown().length === 1 && (window.__REBUILDS || 0) === n0;
+      $('#groupLayout').val('list'); $('#groupingLightbox').show();
+      $('#confirmGroupingBtn').trigger('click'); await sleep(300);
+      var toasts = document.body.innerText;
+      R.chk.cmpNotice = /only the Layout choice/.test(toasts) && isOn();
+      // the search re-runs the comparison from scratch (a NEW container): still a list
+      var box0 = document.getElementById('snapshotComparisonContainer');
+      $('#tableSearch').val(''); HC.runTableSearch();
+      await until(function () { var b = document.getElementById('snapshotComparisonContainer'); return b && b !== box0 && cws().length === 3; }, 20000);
+      await sleep(400); await frames(4);
+      R.chk.cmpRerun = document.getElementById('snapshotComparisonContainer') !== box0 && isOn() && items().length === 3 && cShown().length === 1;
+      // Clear: back to the report's own List grouping
+      $('#removeGroupingLink').trigger('click');
+      await until(function () { return !document.body.classList.contains('snapshot-comparison-active') && top().length === 6 && isOn(); }, 20000);
+      await sleep(400); await frames(4);
+      R.chk.cmpClear = !document.body.classList.contains('snapshot-comparison-active') && isOn() && items().length === 6 && shownTop().length === 1;
+      R.info = { div: R.info.div, items: items().map(function (i) { return i.getAttribute('data-path'); }), keys: cws().map(keyOf), count: ct, layout: HC.getLayout(),
+                 pane: lr && sr ? [Math.round(lr.right), Math.round(sr.left), Math.round(lr.top), Math.round(sr.top), Math.round(sr.bottom), Math.round(want)] : null,
+                 rebuilds: (window.__REBUILDS || 0) - n0, fitB: br ? [Math.round(br.bottom), Math.round(want), bc && bc.style.maxHeight] : null,
+                 toast: (toasts.match(/NOTICE[^\n]{0,120}/g) || []).slice(0, 3), cmpAfter: document.body.classList.contains('snapshot-comparison-active') };
+    },
+    // grplist3: the Layout ? tip shows its text. The shared popover was wired only by
+    // the pivot / viz / snapshot / Tag Generator dialogs - this one showed nothing.
+    tip: async function () {
+      $('#configureGroupingBtn').trigger('click'); await sleep(400);
+      var ic = document.querySelector('#groupLayoutRow .bld-help-icon[data-tip="group-layout"]');
+      if (ic) { ic.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true, relatedTarget: document.body })); }
+      await until(function () { var p = document.querySelector('.bld-help-pop.open'); return !!p && /Stacked/.test(p.textContent); }, 5000);
+      var p = document.querySelector('.bld-help-pop.open');
+      var t = p ? p.textContent.replace(/\s+/g, ' ') : '';
+      R.chk.tipShows = /Stacked/.test(t) && /\bList\b/.test(t);
+      R.chk.tipDescribes = /All groups total/.test(t) && /fills the rest of the window/.test(t);
+      R.info = { icon: !!ic, text: t.slice(0, 220) };
+    },
+    // The grouping dialog's Copy Snippet writes the layout option for List (only), and
+    // the caption says so.
+    copysnip: async function () {
+      function last() { return window.__clip[window.__clip.length - 1] || ''; }
+      seedDialog(); $('#groupLayout').val('list'); $('#groupingLightbox').show();
+      window.__clip = [];
+      $('#copyGroupSnippetBtn').trigger('click'); await sleep(150);
+      var a = last();
+      R.chk.writesList = a.indexOf('group_by|H_GROUP|H_AMT|sum|layout=list') !== -1 && a.indexOf('Group by H_GROUP (list)') !== -1;
+      seedDialog(); $('#groupLayout').val('stacked'); $('#groupingLightbox').show();
+      $('#copyGroupSnippetBtn').trigger('click'); await sleep(150);
+      var b = last();
+      R.chk.stackedPlain = b.indexOf('group_by|H_GROUP|H_AMT|sum') !== -1 && b.indexOf('layout=') === -1 && b.indexOf('(list)') === -1;
+      R.info = { a: a, b: b, clipErr: window.__clipErr || null };
+    },
+    // layout_switch / toggle_switch positions that name a layout: selected / on only in
+    // that layout, the best match wins, and a click that changes only the layout ends
+    // its step (the shortcut used to leave chains waiting 15 s).
+    'switch': async function () {
+      if (!(await until(function () {
+        return document.querySelectorAll('#reportSnippetOutput .pnb-layout-switch').length === 2 && document.querySelector('#reportSnippetOutput .pnb-toggle');
+      }, 15000))) throw new Error('switch: the snippet controls never rendered');
+      HC.penumbraSyncActiveLayout(); await frames(2);
+      function sws() { return document.querySelectorAll('#reportSnippetOutput .pnb-layout-switch'); }
+      function selOf(sw) { var o = sw.querySelectorAll('.pnb-ls-opt'); for (var i = 0; i < o.length; i++) { if (o[i].classList.contains('is-selected')) return i; } return -1; }
+      function tsOn() { var t = document.querySelector('#reportSnippetOutput .pnb-toggle'); return !!t && t.getAttribute('data-ts-on') === '1'; }
+      R.chk.listSel = selOf(sws()[0]) === 1;
+      R.chk.bestMatch = selOf(sws()[1]) === 1;
+      R.chk.toggleOn = tsOn();
+      var steps = 0, n0 = window.__REBUILDS || 0;
+      $(document).on('penumbra:stepComplete.zzt', function () { steps++; });
+      sws()[0].querySelectorAll('.pnb-ls-opt')[0].click();
+      await until(function () { return !isOn() && steps > 0; }, 8000); await sleep(1100); await frames(3);
+      R.chk.stackedNow = !isOn() && HC.getLayout() === 'stacked';
+      R.chk.noRegroup = (window.__REBUILDS || 0) === n0;
+      R.chk.stepDone = steps >= 1;
+      R.chk.stackedSel = selOf(sws()[0]) === 0;
+      R.chk.plainSel = selOf(sws()[1]) === 0;
+      R.chk.toggleOff = !tsOn();
+      // the toggle's ON side: one command, group_by|H_GROUP|H_AMT|sum|layout=list
+      document.querySelector('#reportSnippetOutput .pnb-toggle-btn').click();
+      await until(function () { return isOn(); }, 8000); await sleep(1100); await frames(3);
+      R.chk.toggleBack = isOn() && tsOn() && selOf(sws()[0]) === 1;
+      $(document).off('penumbra:stepComplete.zzt');
+      R.info = { steps: steps, rebuilds: (window.__REBUILDS || 0) - n0, sel: [selOf(sws()[0]), selOf(sws()[1])], ts: tsOn(), out: $('#reportSnippetOutput').text().slice(0, 120) };
+    }
+  };
+
+  (async function () {
+    try {
+      await boot();
+      if (!S[SCN]) throw new Error('unknown scenario ' + SCN);
+      R.info0 = { groups: top().length, on: isOn() };
+      await S[SCN]();
+      await sleep(50);
+    } catch (e) {
+      R.fatal = String((e && e.stack) || e);
+    }
+    R.errors = window.__errors.concat(window.__rejections).slice(0, 10);
+    R.hookErr = [window.__HC_ERR, window.__HC_ERR2].filter(Boolean).join('; ');
+    R.missing = window.__HC_MISSING || [];
+    window.__HCRESULT = R;
+    window.__HCDONE = true;
+    document.getElementById('out').textContent = 'DONE';
+  })();
+})();

@@ -1,0 +1,540 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>xlsx harness</title>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="exceljs-4.4.0.min.js"></script>
+<script src="themes.js"></script>
+<style>
+  .hid { display: none; }
+  body { font-family: Verdana, sans-serif; font-size: 12px; }
+  #reportSnippetOutput canvas { display: block; }
+  .penumbra-export-only { display: none; }
+</style>
+<body>
+<pre id="out">running</pre>
+<div id="files"></div>
+
+<!-- ===================== report header fixtures ===================== -->
+<h2 id="mainReportTitle">Sponsored Awards by Department FY2026</h2>
+<div id="mainReportSubtitle">Prepared by the <b>Office of Research</b> weekly<span class="penumbra-web-only"> (web only)</span><span class="penumbra-export-only"> for export</span></div>
+<p id="dataLoadedTimestamp"><svg viewBox="0 0 24 24" width="12" height="12" class="timestamp-icon"><polyline points="15 10 20 15 15 20"></polyline></svg> Data retrieved on: September 4, 2026, 3:12 PM</p>
+<div id="importTimestamps"><div class="import-ts-line"><svg viewBox="0 0 24 24" width="12" height="12"></svg> Imported: awards.csv (120 rows): Sep 1, 2026, 8:00 AM</div></div>
+<ul id="promptInfoList">
+  <li><a href="#" title="2026"><em>Fiscal Year:</em> <strong>2026</strong></a></li>
+  <li><a href="#" title="College of Engineering, College of Sciences, College of Humanities and Social Sciences, College of Natural Resources, College of Veterinary Medicine, College of Design, Poole College of Management"><em>College:</em> <strong>College of Engineering, College of Sciences, Colle...</strong></a></li>
+</ul>
+<div id="reportSnippetOutput">Total awarded: <b>$1,234,567</b><br>Departments: 12<div class="penumbra-web-only">web only line</div><div class="snippet-action">Run again</div><canvas id="c1" width="400" height="300"></canvas></div>
+<span id="resultCount">42 rows</span>
+<input id="tableSearch" value="Engineering">
+
+<!-- ===================== flat table ===================== -->
+<div id="flatWrap">
+<table id="resultsTable">
+  <thead><tr id="tableHeader">
+    <th data-column="0">PROJECT_ID</th>
+    <th data-column="1">EMPLID</th>
+    <th data-column="2">DEPT</th>
+    <th data-column="3">AMOUNT</th>
+    <th data-column="4">PCT</th>
+    <th data-column="5">NOTES</th>
+    <th data-column="6">AWARD_DATE</th>
+  </tr></thead>
+  <tbody>
+    <tr><td data-column="0">P26-000123</td><td data-column="1">000937888</td><td data-column="2">Engineering</td><td data-column="3">$12,345.67</td><td data-column="4">45%</td><td data-column="5">line one<br>line two is longer here<br>x</td><td data-column="6">9/4/2026</td></tr>
+    <tr><td data-column="0">P26-000124</td><td data-column="1">123456</td><td data-column="2">Engineering</td><td data-column="3">$1,000.00</td><td data-column="4">10%</td><td data-column="5">short</td><td data-column="6">9/5/2026</td></tr>
+    <tr><td data-column="0">P26-000125</td><td data-column="1">7</td><td data-column="2">Sciences</td><td data-column="3">$36,654.33</td><td data-column="4">100%</td><td data-column="5"></td><td data-column="6">9/6/2026</td></tr>
+    <tr class="search-hidden"><td data-column="0">HIDDEN</td><td data-column="1">0</td><td data-column="2">Hidden</td><td data-column="3">$9.99</td><td data-column="4">1%</td><td data-column="5">hidden</td><td data-column="6">1/1/2000</td></tr>
+  </tbody>
+  <tfoot><tr><td data-column="0">Total</td><td data-column="1"></td><td data-column="2"></td><td data-column="3">$50,000.00</td><td data-column="4"></td><td data-column="5"></td><td data-column="6"></td></tr></tfoot>
+</table>
+</div>
+
+<!-- ===================== grouped (single level) ===================== -->
+<div id="groupedResultsContainer" class="hid"></div>
+
+<!-- ===================== pivot ===================== -->
+<div id="pivot-output-container" class="hid">
+<table id="pivotResultTable">
+  <thead>
+    <tr><th rowspan="2" class="pivot-sticky-col"><div class="pivot-header-flex-wrapper"><span class="pivot-header-text">DEPT</span><span class="sort-icon">&#9650;&#9660;</span></div></th><th colspan="2"><div class="pivot-header-flex-wrapper"><span class="pivot-header-text">2024</span></div></th><th colspan="2"><div class="pivot-header-flex-wrapper"><span class="pivot-header-text">2025</span></div></th><th rowspan="2" class="pivot-grand-total"><div class="pivot-header-flex-wrapper"><span class="pivot-header-text"><strong>Grand Total</strong></span></div></th></tr>
+    <tr><th class="pivot-sub-header">Sum</th><th class="pivot-sub-header">Count</th><th class="pivot-sub-header">Sum</th><th class="pivot-sub-header">Count</th></tr>
+  </thead>
+  <tbody>
+    <tr><td class="pivot-sticky-col">Engineering</td><td>$1,000</td><td>3</td><td>$2,500</td><td>4</td><td>$3,500</td></tr>
+    <tr><td class="pivot-sticky-col">Sciences</td><td>$700</td><td>2</td><td>$800</td><td>1</td><td>$1,500</td></tr>
+  </tbody>
+  <tfoot><tr><td colspan="1" class="pivot-sticky-col pivot-last-sticky"><strong>Grand Total</strong></td><td>$1,700</td><td>5</td><td>$3,300</td><td>5</td><td>$5,000</td></tr></tfoot>
+</table>
+</div>
+
+<script>
+(function () {
+  var out = [];
+  var pass = 0, fail = 0;
+  function ok(cond, name, detail) {
+    if (cond) { pass++; out.push('PASS ' + name); }
+    else { fail++; out.push('FAIL ' + name + (detail !== undefined ? ' :: ' + String(detail) : '')); }
+  }
+  function flush(extra) {
+    if (extra) out.push(extra);
+    out.push('SUMMARY pass=' + pass + ' fail=' + fail);
+    document.getElementById('out').textContent = out.join('\n');
+    document.title = 'DONE pass=' + pass + ' fail=' + fail;
+  }
+  var qs = new URLSearchParams(location.search);
+  var srcFile = qs.get('src') || 'main_under_test.js';
+
+  // ---- draw something on the chart canvas so toDataURL has real pixels ----
+  (function () {
+    var c = document.getElementById('c1'), ctx = c.getContext('2d');
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 400, 300);
+    ctx.fillStyle = '#cc3300'; ctx.fillRect(40, 60, 80, 200);
+    ctx.fillStyle = '#3366cc'; ctx.fillRect(160, 120, 80, 140);
+    ctx.fillStyle = '#33aa33'; ctx.fillRect(280, 30, 80, 230);
+  })();
+
+  // ---- source extraction ----
+  var code;
+  try {
+    var x = new XMLHttpRequest(); x.open('GET', srcFile, false); x.send();
+    code = x.responseText.replace(/\r\n/g, '\n');
+  } catch (e) { flush('LOAD_ERROR ' + e.message); return; }
+  if (!code || code.length < 1000) { flush('LOAD_ERROR empty source ' + srcFile); return; }
+
+  function grab(startAnchor, endAnchor) {
+    var s = code.indexOf(startAnchor);
+    if (s < 0) throw new Error('start anchor not found: ' + startAnchor);
+    var e = code.indexOf(endAnchor, s);
+    if (e < 0) throw new Error('end anchor not found: ' + endAnchor);
+    return code.substring(s, e);
+  }
+  var lifted;
+  try {
+    lifted = [
+      grab('    function penumbraSummaryCellText($td) {', '    // ----- Breakdown (infobox drill-down) table summaries'),
+      grab('    function getPivotDataAsArray() {', '    // ===== END: ADD THIS NEW HELPER FUNCTION ====='),
+      grab('    function getExpandedResultCount() {', '    // Renders the prompt list (#promptInfoList) as themed pills.'),
+      grab('    function penumbraCloneForExport($el) {', '    // True when the subtitle contains a snippet function'),
+      grab('    function extractHeaderDataForExcel(', '    // --- UPDATE THE DOWNLOAD FUNCTION ---')
+    ].join('\n');
+  } catch (e) { flush('EXTRACT_ERROR ' + e.message); return; }
+  out.push('extracted ' + lifted.length + ' chars from ' + srcFile + ' (' + code.length + ')');
+
+  // The theme helpers are tiny; replicate them from the registry emitted by
+  // themes_config.php (themes.js) exactly as main.js does.
+  var PENUMBRA_THEMES = window.PENUMBRA_THEMES || {};
+  function penumbraTheme(id) { return PENUMBRA_THEMES[id] || PENUMBRA_THEMES['theme-default'] || {}; }
+  function getThemeExcel(id) { var x = penumbraTheme(id || 'theme-default').excel; return x || {}; }
+
+  function build(ctx) {
+    var names = Object.keys(ctx), vals = names.map(function (k) { return ctx[k]; });
+    var f = new Function(names.join(','), lifted + '\nreturn { createXlsxWorkbook: createXlsxWorkbook, extractHeaderDataForExcel: extractHeaderDataForExcel };');
+    return f.apply(null, vals);
+  }
+  function ctxFor(opts) {
+    opts = opts || {};
+    return {
+      $: window.jQuery,
+      ExcelJS: window.ExcelJS,
+      loadScript: function () { return Promise.resolve(); },
+      getThemeExcel: getThemeExcel,
+      currentThemeId: function () { return opts.theme || 'theme-default'; },
+      bodyIsDark: function () { return false; },
+      formatJsonForTextExport: function (v) { return v; },
+      currentPivotSettings: opts.pivot || null,
+      currentGroupingColumns: opts.grouping || null,
+      console: window.console
+    };
+  }
+
+  // ---- fixtures for the modes ----
+  function setMode(mode) {
+    $('#flatWrap').toggleClass('hid', mode !== 'flat');
+    $('#groupedResultsContainer').toggleClass('hid', mode !== 'grouped' && mode !== 'nested');
+    $('#pivot-output-container').toggleClass('hid', mode !== 'pivot');
+    var $g = $('#groupedResultsContainer').empty();
+    if (mode === 'grouped') {
+      $g.append(leaf('Engineering', 'Engineering', [
+        ['P26-000123', '000937888', 'Engineering', '$12,345.67', '45%', 'line one<br>line two is longer here<br>x', '9/4/2026'],
+        ['P26-000124', '123456', 'Engineering', '$1,000.00', '10%', 'short', '9/5/2026']
+      ], ['Sum', '', '', '$13,345.67', '', '', '']));
+      $g.append(leaf('Sciences', 'Sciences', [
+        ['P26-000125', '7', 'Sciences', '$36,654.33', '100%', '', '9/6/2026']
+      ], ['Sum', '', '', '$36,654.33', '', '', '']));
+      // A third group with the same name as the first (case-insensitive) exercises sheet dedupe
+      $g.append(leaf('ENGINEERING', 'ENGINEERING', [
+        ['P26-000199', '55', 'ENGINEERING', '$5.00', '0%', '', '9/9/2026']
+      ], null));
+    } else if (mode === 'nested') {
+      var $b = $('<div class="group-wrapper group-branch" data-group-key="Engineering"></div>');
+      $b.append('<div class="group-header"><span class="group-name">Engineering</span><span class="group-count">3</span><span class="group-agg-summary">Sum of AMOUNT: $50,000.00 across three departments in the college of engineering</span></div>');
+      var $bc = $('<div class="group-content"></div>');
+      $bc.append(leaf('Engineering␟CSC', 'CSC', [
+        ['P26-000123', '000937888', 'Engineering', '$12,345.67', '45%', 'line one<br>line two is longer here<br>x', '9/4/2026'],
+        ['P26-000124', '123456', 'Engineering', '$1,000.00', '10%', 'short', '9/5/2026']
+      ], ['Sum', '', '', '$13,345.67', '', '', '']));
+      $bc.append(leaf('Engineering␟ECE', 'ECE', [
+        ['P26-000125', '7', 'Sciences', '$36,654.33', '100%', '', '9/6/2026']
+      ], null));
+      $b.append($bc);
+      $g.append($b);
+      $g.append('<div class="group-grand-total">Grand Total   3 rows   Sum of AMOUNT: $50,000.00</div>');
+    }
+  }
+  function leaf(key, name, rows, foot) {
+    var $w = $('<div class="group-wrapper group-leaf"></div>').attr('data-group-key', key);
+    var $h = $('<div class="group-header"></div>');
+    $h.append('<span class="group-hide" title="Hide"><svg></svg></span>');
+    $h.append($('<span class="group-name"></span>').text(name));
+    $h.append($('<span class="group-count"></span>').text(rows.length));
+    $w.append($h);
+    var $c = $('<div class="group-content"></div>');
+    var $t = $('<table></table>');
+    $t.append($('#resultsTable thead').clone().find('tr').removeAttr('id').end());
+    var $tb = $('<tbody></tbody>');
+    rows.forEach(function (r) {
+      var $tr = $('<tr></tr>');
+      r.forEach(function (v, i) { $tr.append($('<td></td>').attr('data-column', String(i)).html(v)); });
+      $tb.append($tr);
+    });
+    $t.append($tb);
+    if (foot) {
+      var $tf = $('<tfoot></tfoot>'), $fr = $('<tr></tr>');
+      foot.forEach(function (v, i) { $fr.append($('<td></td>').attr('data-column', String(i)).text(v)); });
+      $tf.append($fr); $t.append($tf);
+    }
+    $c.append($t); $w.append($c);
+    return $w;
+  }
+
+  // ---- inspection helpers ----
+  function widths(ws) { return (ws.columns || []).map(function (c) { return c.width; }); }
+  function mergesOf(ws) { return (ws.model && ws.model.merges) ? ws.model.merges.slice() : []; }
+  function fillOf(cell) { return cell && cell.fill && cell.fill.fgColor ? cell.fill.fgColor.argb : null; }
+  function heightsTo(ws, n) { var t = 0; for (var r = 1; r <= n; r++) { var h = ws.getRow(r).height; t += (typeof h === 'number' ? h : 15); } return t; }
+  function findRow(ws, needle) {
+    var hit = 0;
+    ws.eachRow(function (row, n) {
+      if (hit) return;
+      row.eachCell(function (c) {
+        if (hit) return;
+        var v = c.value;
+        if (v && typeof v === 'object' && v.text != null) v = v.text;
+        if (v != null && String(v).indexOf(needle) !== -1) hit = n;
+      });
+    });
+    return hit;
+  }
+  function rowText(ws, n) {
+    var parts = [];
+    ws.getRow(n).eachCell({ includeEmpty: true }, function (c) {
+      var v = c.value; if (v && typeof v === 'object' && v.text != null) v = v.text;
+      parts.push(v == null ? '' : String(v));
+    });
+    return parts;
+  }
+  function b64(buf) {
+    var u = new Uint8Array(buf), s = '';
+    for (var i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
+    return btoa(s);
+  }
+  var filesOut = [];
+  function keep(name, wb) {
+    return wb.xlsx.writeBuffer().then(function (buf) { filesOut.push('FILE ' + name + ' ' + b64(buf)); return buf.byteLength; });
+  }
+
+  // ---- the run ----
+  (async function main() {
+    try {
+      var api, wb, ws, w, m, hdrEnd, thead;
+
+      // ================= 1. FLAT, table only =================
+      setMode('flat');
+      api = build(ctxFor({}));
+      wb = await api.createXlsxWorkbook(false);
+      ok(!!wb, 'flat/plain: workbook built');
+      ws = wb.getWorksheet('Report Data');
+      ok(!!ws, 'flat/plain: sheet "Report Data"');
+      ok(ws.rowCount === 1 + 3 + 1, 'flat/plain: 1 header + 3 visible rows + footer (search-hidden row skipped)', ws.rowCount);
+      ok(ws.views[0] && ws.views[0].ySplit === 1, 'flat/plain: freeze at row 1', JSON.stringify(ws.views));
+      ok(ws.getCell('B2').type === ExcelJS.ValueType.String && ws.getCell('B2').value === '000937888', 'flat/plain: leading-zero EMPLID stays text', ws.getCell('B2').value);
+      ok(ws.getCell('D2').type === ExcelJS.ValueType.Number && Math.abs(ws.getCell('D2').value - 12345.67) < 1e-9, 'flat/plain: currency is numeric', ws.getCell('D2').value);
+      ok(/\$/.test(ws.getCell('D2').numFmt || ''), 'flat/plain: currency numFmt carries $', ws.getCell('D2').numFmt);
+      ok(ws.getCell('E2').type === ExcelJS.ValueType.String, 'flat/plain: percent stays text', ws.getCell('E2').value);
+      ok(String(ws.getCell('F2').value).split('\n').length === 3, 'flat/plain: <br> cell becomes 3 lines', JSON.stringify(ws.getCell('F2').value));
+      ok(fillOf(ws.getCell('A1')) === getThemeExcel('theme-default').headerBg, 'flat/plain: header fill = theme headerBg', fillOf(ws.getCell('A1')));
+      ok(fillOf(ws.getCell('A2')) === getThemeExcel('theme-default').oddBg, 'flat/plain: row 1 fill = oddBg', fillOf(ws.getCell('A2')));
+      w = widths(ws);
+      ok(w.length === 7 && w.every(function (x) { return x >= 15 && x <= 70; }), 'flat/plain: 7 column widths in [15,70]', JSON.stringify(w));
+      // Width algorithm: NOTES column - longest LINE is 23 chars; whole cell is 36 with newlines.
+      // 23*1.2+2 = 29.6 ; 36*1.2+2 = 45.2
+      ok(w[5] < 40, 'flat/plain: multi-line cell width sized by longest LINE (not whole text)', w[5]);
+      ok(w[0] < 30, 'flat/plain: PROJECT_ID width is modest', w[0]);
+      var plainWidths = w.slice();
+      await keep('flat_plain.xlsx', wb);
+
+      // ================= 2. FLAT + header =================
+      api = build(ctxFor({}));
+      wb = await api.createXlsxWorkbook(true);
+      ws = wb.getWorksheet('Report Data');
+      thead = findRow(ws, 'PROJECT_ID');
+      ok(thead > 1, 'flat/header: column header row pushed below a header block', thead);
+      hdrEnd = thead - 1;
+      ok(findRow(ws, 'Sponsored Awards by Department FY2026') === 1, 'flat/header: title in row 1');
+      m = mergesOf(ws);
+      ok(m.indexOf('A1:G1') !== -1, 'flat/header: title merged across the table width', JSON.stringify(m));
+      ok(findRow(ws, 'Office of Research') > 0 && findRow(ws, 'Office of Research') < thead, 'flat/header: subtitle/by-line present in the block', findRow(ws, 'Office of Research'));
+      ok(findRow(ws, 'web only') === 0, 'flat/header: web-only content stripped');
+      ok(findRow(ws, 'for export') > 0, 'flat/header: noweb() export-only content kept');
+      var tsRow = findRow(ws, 'Data retrieved on');
+      ok(tsRow > 0 && tsRow < thead, 'flat/header: timestamp row present', tsRow);
+      ok(tsRow > 0 && rowText(ws, tsRow).join(' ').indexOf('42 rows') !== -1, 'flat/header: row count sits with the timestamp', rowText(ws, tsRow).join(' | '));
+      ok(tsRow > 0 && !/^[^A-Za-z0-9]/.test(String(rowText(ws, tsRow)[0])), 'flat/header: timestamp has no leading icon glyph', JSON.stringify(rowText(ws, tsRow)[0]));
+      ok(findRow(ws, 'Engineering') > 0 && findRow(ws, 'Search filter') > 0 && findRow(ws, 'Search filter') < thead, 'flat/header: active search filter recorded', findRow(ws, 'Search filter'));
+      ok(findRow(ws, 'awards.csv') > 0 && findRow(ws, 'awards.csv') < thead, 'flat/header: import timestamp line present');
+      var fy = findRow(ws, 'Fiscal Year');
+      ok(fy > 0 && fy < thead, 'flat/header: prompt present', fy);
+      ok(findRow(ws, 'College of Natural Resources') > 0, 'flat/header: prompt exports FULL value from title attr (not the truncated chip)');
+      var sn = findRow(ws, 'Total awarded');
+      ok(sn > 0 && sn < thead, 'flat/header: snippet text present', sn);
+      ok(findRow(ws, 'Run again') === 0, 'flat/header: action() link text stripped from snippet');
+      ok(findRow(ws, 'web only line') === 0, 'flat/header: web-only snippet line stripped');
+      ok(ws.getImages().length === 1, 'flat/header: one chart image placed', ws.getImages().length);
+      ok(wb.model.media.length === 1, 'flat/header: one media entry in the workbook', wb.model.media.length);
+      ok(findRow(ws, 'View this report') === 0, 'flat/header: NO link back to the report (access concern)');
+      // widths must not be inflated by the header block
+      w = widths(ws);
+      ok(JSON.stringify(w) === JSON.stringify(plainWidths), 'flat/header: column widths IDENTICAL to table-only export (header block excluded from autosize)', JSON.stringify(w) + ' vs ' + JSON.stringify(plainWidths));
+      // every header-block row spans the table (continuous block), rows 1..hdrEnd
+      var unmergedHdr = [];
+      for (var r = 1; r <= hdrEnd; r++) {
+        var spans = m.filter(function (s) { return new RegExp('^A' + r + ':').test(s); });
+        if (!spans.length) unmergedHdr.push(r);
+      }
+      // prompt rows are label|value (A + B:G), so they legitimately have no A-anchored full merge
+      var promptRows = [];
+      ws.eachRow(function (row, n) { if (n < thead && /:$/.test(String(row.getCell(1).value || '')) && row.getCell(2).value) promptRows.push(n); });
+      var stray = unmergedHdr.filter(function (r) { return promptRows.indexOf(r) === -1; });
+      ok(stray.length === 0, 'flat/header: every block row is merged across the table (except prompt label|value rows)', 'unmerged rows ' + JSON.stringify(stray) + ' prompts ' + JSON.stringify(promptRows));
+      // no merge escapes the table width
+      ok(m.every(function (s) { return !/:[H-Z]/.test(s) && !/:A[A-Z]/.test(s); }), 'flat/header: no merge reaches past column G', JSON.stringify(m));
+      // freeze: a block over ~half a screen (300pt) is NOT frozen
+      var blockPt = heightsTo(ws, hdrEnd);
+      ok(blockPt > 300, 'flat/header: block with a 300px chart exceeds the half-screen rule (' + Math.round(blockPt) + 'pt)');
+      ok(!ws.views.length || !ws.views[0].ySplit, 'flat/header: no row freeze when the block exceeds 300pt', JSON.stringify(ws.views));
+      // data rows still styled from the table header downward
+      ok(fillOf(ws.getCell('A' + thead)) === getThemeExcel('theme-default').headerBg, 'flat/header: column header row keeps theme headerBg');
+      ok(ws.getCell('B' + (thead + 1)).value === '000937888', 'flat/header: first data row directly under the column header', ws.getCell('B' + (thead + 1)).value);
+      await keep('flat_header.xlsx', wb);
+
+      // ================= 2b. FLAT + header, NO chart, freeze applies =================
+      var $canvasKeep = $('#c1').detach();
+      api = build(ctxFor({}));
+      wb = await api.createXlsxWorkbook(true);
+      ws = wb.getWorksheet('Report Data');
+      thead = findRow(ws, 'PROJECT_ID');
+      ok(ws.getImages().length === 0, 'flat/header/nochart: no images');
+      ok(ws.views[0] && ws.views[0].ySplit === thead && ws.views[0].topLeftCell === 'A' + (thead + 1), 'flat/header/nochart: block within 300pt -> frozen through the column header row', JSON.stringify(ws.views) + ' thead=' + thead);
+      ok(heightsTo(ws, thead - 1) <= 300, 'flat/header/nochart: block height within the rule', heightsTo(ws, thead - 1));
+      $('#reportSnippetOutput').append($canvasKeep);
+
+      // ================= 3. FLAT + header + MONOCHROME =================
+      api = build(ctxFor({ theme: 'theme-forest' }));
+      wb = await api.createXlsxWorkbook(true, { monochrome: true });
+      ws = wb.getWorksheet('Report Data');
+      thead = findRow(ws, 'PROJECT_ID');
+      var mono = getThemeExcel('theme-monochrome');
+      ok(mono && mono.headerBg === 'FF2B2B2B', 'mono: registry has the Monochrome excel palette', JSON.stringify(mono));
+      ok(fillOf(ws.getCell('A' + thead)) === mono.headerBg, 'mono: column header fill = monochrome headerBg (active theme ignored)', fillOf(ws.getCell('A' + thead)));
+      ok(fillOf(ws.getCell('A1')) === mono.headerBg, 'mono: title fill = monochrome headerBg', fillOf(ws.getCell('A1')));
+      ok(fillOf(ws.getCell('A' + (thead + 2))) === mono.evenBg, 'mono: zebra evenBg = monochrome', fillOf(ws.getCell('A' + (thead + 2))));
+      // chart pixels must be grey
+      var media = wb.model.media[0];
+      ok(!!media, 'mono: chart media present');
+      if (media) {
+        var greyOk = await (function () {
+          return new Promise(function (res) {
+            var img = new Image();
+            img.onload = function () {
+              var c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+              var cx = c.getContext('2d'); cx.drawImage(img, 0, 0);
+              var d = cx.getImageData(0, 0, c.width, c.height).data, bad = 0;
+              for (var i = 0; i < d.length; i += 4) { if (Math.abs(d[i] - d[i + 1]) > 2 || Math.abs(d[i + 1] - d[i + 2]) > 2) bad++; }
+              res(bad === 0);
+            };
+            img.onerror = function () { res(false); };
+            if (media.base64) { img.src = "data:image/png;base64," + media.base64; }
+            else { var u = new Uint8Array(media.buffer), s = ""; for (var i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); img.src = "data:image/png;base64," + btoa(s); }
+          });
+        })();
+        ok(greyOk, 'mono: chart image is greyscale (r==g==b on every pixel)');
+      }
+      // and a NON-mono export keeps the colour
+      api = build(ctxFor({ theme: 'theme-forest' }));
+      wb = await api.createXlsxWorkbook(true, { monochrome: false });
+      ws = wb.getWorksheet('Report Data');
+      thead = findRow(ws, 'PROJECT_ID');
+      ok(fillOf(ws.getCell('A' + thead)) === getThemeExcel('theme-forest').headerBg, 'theme: active theme palette used when mono is off', fillOf(ws.getCell('A' + thead)));
+      await keep('flat_header_mono.xlsx', wb);
+
+      // ================= 4. GROUPED single level + header =================
+      setMode('grouped');
+      api = build(ctxFor({ grouping: ['DEPT'] }));
+      wb = await api.createXlsxWorkbook(true);
+      ok(!!wb, 'grouped/header: workbook built');
+      var names = wb.worksheets.map(function (s) { return s.name; });
+      ok(names.length === 3, 'grouped/header: one sheet per group', JSON.stringify(names));
+      ok(names[0] === 'Engineering' && names[1] === 'Sciences' && /^ENGINEERING \(1\)$/.test(names[2]), 'grouped/header: sheet names + case-insensitive dedupe', JSON.stringify(names));
+      ws = wb.worksheets[0];
+      thead = findRow(ws, 'PROJECT_ID');
+      ok(thead > 1, 'grouped/header: header block above the table on sheet 1', thead);
+      ok(findRow(wb.worksheets[1], 'PROJECT_ID') > 1, 'grouped/header: header block repeated on sheet 2');
+      ok(wb.model.media.length === 1, 'grouped/header: chart image bytes stored ONCE for all sheets', wb.model.media.length);
+      ok(wb.worksheets.every(function (s) { return s.getImages().length === 1; }), 'grouped/header: every sheet shows the chart');
+      ok(ws.rowCount === thead + 2 + 1, 'grouped/header: 2 rows + footer under the header', ws.rowCount + ' thead=' + thead);
+      ok(ws.getCell('B' + (thead + 1)).value === '000937888', 'grouped/header: leading-zero id kept in grouped sheet');
+      var wsE = wb.worksheets[2];
+      ok(wsE.rowCount === findRow(wsE, 'PROJECT_ID') + 1, 'grouped/header: group without footer has no footer row');
+      w = widths(ws);
+      ok(w.every(function (x) { return x <= 70 && x >= 15; }) && w[0] < 30, 'grouped/header: widths not inflated by the header block', JSON.stringify(w));
+      await keep('grouped_header.xlsx', wb);
+
+      // ================= 5. NESTED grouping + header =================
+      setMode('nested');
+      api = build(ctxFor({ grouping: ['COLLEGE', 'DEPT'] }));
+      wb = await api.createXlsxWorkbook(true);
+      ok(!!wb, 'nested/header: workbook built (hasData set)');
+      ws = wb.getWorksheet('Grouped Data');
+      ok(!!ws, 'nested/header: single "Grouped Data" sheet');
+      thead = findRow(ws, 'PROJECT_ID');
+      var band = findRow(ws, 'Sum of AMOUNT: $50,000.00 across');
+      ok(band === thead + 1, 'nested/header: branch band directly under the column header', band + ' vs ' + thead);
+      ok(ws.getRow(band).outlineLevel === 0, 'nested/header: branch band at outline level 0');
+      var leafBand = findRow(ws, 'CSC');
+      ok(ws.getRow(leafBand).outlineLevel === 1, 'nested/header: leaf band at level 1', ws.getRow(leafBand).outlineLevel);
+      ok(ws.getRow(leafBand + 1).outlineLevel === 2, 'nested/header: leaf data at level 2', ws.getRow(leafBand + 1).outlineLevel);
+      ok(findRow(ws, 'Grand Total') === ws.rowCount, 'nested/header: grand total is the last row');
+      w = widths(ws);
+      ok(w[0] < 30 && w[1] < 30, 'nested/header: band merges do not inflate column widths', JSON.stringify(w));
+      ok(!ws.views[0] || !ws.views[0].ySplit, 'nested/header: chart makes the block exceed 300pt -> no row freeze', JSON.stringify(ws.views));
+      await keep('nested_header.xlsx', wb);
+
+      // ================= 6. PIVOT + header =================
+      setMode('pivot');
+      api = build(ctxFor({ pivot: { rows: ['DEPT'], stickyColCount: 1 } }));
+      wb = await api.createXlsxWorkbook(true);
+      ws = wb.getWorksheet('Pivot Analysis');
+      ok(!!ws, 'pivot/header: sheet built');
+      thead = findRow(ws, 'DEPT');
+      ok(thead > 1, 'pivot/header: header block above the pivot', thead);
+      m = mergesOf(ws);
+      ok(m.indexOf('B' + thead + ':C' + thead) !== -1 && m.indexOf('D' + thead + ':E' + thead) !== -1, 'pivot/header: colspan header merges offset by the block', JSON.stringify(m));
+      ok(m.indexOf('A' + thead + ':A' + (thead + 1)) !== -1, 'pivot/header: rowspan row-field header merged vertically', JSON.stringify(m));
+      ok(m.indexOf('F' + thead + ':F' + (thead + 1)) !== -1 || m.indexOf('F' + thead + ':F' + (thead + 1)) === -1, 'pivot/header: (info) GT header merge ' + JSON.stringify(m));
+      ok(ws.getCell('B' + (thead + 2)).type === ExcelJS.ValueType.Number && ws.getCell('B' + (thead + 2)).value === 1000, 'pivot/header: data cell numeric', ws.getCell('B' + (thead + 2)).value);
+      ok(fillOf(ws.getCell('F' + (thead + 2))) === getThemeExcel('theme-default').groupHeaderBg, 'pivot/header: GT column uses groupHeaderBg', fillOf(ws.getCell('F' + (thead + 2))));
+      var foot = ws.rowCount;
+      ok(String(ws.getCell('A' + foot).value).indexOf('Grand Total') === 0, 'pivot/header: footer row last', ws.getCell('A' + foot).value);
+      ok(ws.getCell('F' + foot).value === 5000, 'pivot/header: footer GT numeric', ws.getCell('F' + foot).value);
+      w = widths(ws);
+      ok(w[1] < 30 && w[2] < 30, 'pivot/header: widths not inflated by the block', JSON.stringify(w));
+      ok(ws.views[0] && ws.views[0].xSplit === 1 && !ws.views[0].ySplit, 'pivot/header: tall block -> column freeze kept, no row freeze', JSON.stringify(ws.views));
+      await keep('pivot_header.xlsx', wb);
+
+      // ================= 7. PIVOT table only: frozen columns =================
+      api = build(ctxFor({ pivot: { rows: ['DEPT'], stickyColCount: 1 } }));
+      wb = await api.createXlsxWorkbook(false);
+      ws = wb.getWorksheet('Pivot Analysis');
+      ok(ws.views[0] && ws.views[0].xSplit === 1 && ws.views[0].ySplit === 2, 'pivot/plain: freeze 1 column + 2 header rows', JSON.stringify(ws.views));
+      ok(mergesOf(ws).indexOf('A1:A2') !== -1, 'pivot/plain: rowspan merge at A1:A2', JSON.stringify(mergesOf(ws)));
+
+      // ================= 8. ONE-COLUMN table + header (narrow merges) =================
+      setMode('flat');
+      $('#tableHeader th').not('[data-column="0"]').hide();
+      $('#resultsTable td').not('[data-column="0"]').hide();
+      api = build(ctxFor({}));
+      wb = await api.createXlsxWorkbook(true);
+      ws = wb.getWorksheet('Report Data');
+      m = mergesOf(ws);
+      ok(m.length === 0, 'onecol/header: no merges at all on a one-column table', JSON.stringify(m));
+      thead = findRow(ws, 'PROJECT_ID');
+      ok(thead > 1 && findRow(ws, 'Fiscal Year') > 0, 'onecol/header: block still written (prompts collapse into one cell)');
+      ok(ws.columnCount === 1 || widths(ws).length === 1, 'onecol/header: sheet stays one column wide', ws.columnCount);
+      $('#tableHeader th, #resultsTable td').show();
+
+      // ================= 8b. Prompt label|value rows + wrap heights =================
+      setMode('flat');
+      api = build(ctxFor({}));
+      wb = await api.createXlsxWorkbook(true);
+      ws = wb.getWorksheet('Report Data');
+      thead = findRow(ws, 'PROJECT_ID');
+      var fyRow = findRow(ws, 'Fiscal Year');
+      ok(fyRow > 0 && ws.getRow(fyRow).getCell(1).font && ws.getRow(fyRow).getCell(1).font.bold === true, 'prompts: label cell is bold');
+      ok(fyRow > 0 && ws.getRow(fyRow).getCell(1).alignment && ws.getRow(fyRow).getCell(1).alignment.horizontal === 'right', 'prompts: label right-aligned');
+      ok(fyRow > 0 && ws.getRow(fyRow).getCell(2).value === '2026', 'prompts: value in column B', ws.getRow(fyRow).getCell(2).value);
+      ok(mergesOf(ws).indexOf('B' + fyRow + ':G' + fyRow) !== -1, 'prompts: value merged B:G', JSON.stringify(mergesOf(ws)));
+      var collegeRow = findRow(ws, 'College of Natural Resources');
+      ok(collegeRow === fyRow + 1, 'prompts: one row per prompt', collegeRow + ' vs ' + fyRow);
+      ok(ws.getRow(collegeRow).height > ws.getRow(fyRow).height, 'prompts: long value gets a taller (wrapped) row', ws.getRow(collegeRow).height + ' vs ' + ws.getRow(fyRow).height);
+      var paramLbl = findRow(ws, 'Report Parameters');
+      ok(paramLbl === fyRow - 1, 'prompts: "Report Parameters" label row directly above');
+      var sumLbl = findRow(ws, 'Summary');
+      var sumRow = findRow(ws, 'Total awarded');
+      ok(sumLbl > 0 && sumRow === sumLbl + 1, 'summary: label then text', sumLbl + '/' + sumRow);
+      ok(String(ws.getRow(sumRow).getCell(1).value).split('\n').length === 2, 'summary: snippet keeps its 2 hard lines', JSON.stringify(ws.getRow(sumRow).getCell(1).value));
+      ok(ws.getRow(sumRow).height >= 2 * 9 * 1.35 + 5, 'summary: row height covers 2 lines', ws.getRow(sumRow).height);
+      ok(ws.getRow(1).height >= 34, 'title: band height >= 34pt', ws.getRow(1).height);
+      ok(ws.getRow(1).getCell(1).border && ws.getRow(1).getCell(1).border.left && ws.getRow(1).getCell(1).border.left.color.argb === getThemeExcel('theme-default').headerBg, 'block: accent stripe on column A');
+      ok(ws.getRow(thead - 1).height === 8, 'block: 8pt spacer right above the column header', ws.getRow(thead - 1).height);
+      var vizLbl = findRow(ws, 'Visualizations');
+      var img0 = ws.getImages()[0];
+      ok(vizLbl > 0 && img0 && img0.range && img0.range.tl && Math.floor(img0.range.tl.nativeRow) === vizLbl, 'charts: image anchored on the row under "Visualizations"', img0 && JSON.stringify({c: img0.range.tl.nativeCol, r: img0.range.tl.nativeRow}) + ' viz=' + vizLbl);
+      ok(vizLbl > 0 && ws.getRow(vizLbl + 1).height >= 300 * 0.75, 'charts: chart row tall enough for a 300px chart', ws.getRow(vizLbl + 1).height);
+      ok(img0 && img0.range.ext && img0.range.ext.width === 400 && img0.range.ext.height === 300, 'charts: placed at the canvas ON-SCREEN size (400x300, no downscale)', img0 && JSON.stringify(img0.range.ext));
+
+      // ================= 8c. Two charts: side by side when the table is wide enough =================
+      var $c2 = $('<canvas id="c2" width="300" height="200"></canvas>');
+      $('#reportSnippetOutput').append($c2);
+      (function () { var c = $c2[0], cx = c.getContext('2d'); cx.fillStyle = '#eeeeee'; cx.fillRect(0, 0, 300, 200); cx.fillStyle = '#990099'; cx.fillRect(20, 20, 100, 100); })();
+      api = build(ctxFor({}));
+      wb = await api.createXlsxWorkbook(true);
+      ws = wb.getWorksheet('Report Data');
+      var imgs = ws.getImages();
+      ok(imgs.length === 2 && wb.model.media.length === 2, 'charts2: two images, two media', imgs.length + '/' + wb.model.media.length);
+      if (imgs.length === 2) {
+        var r0 = Math.floor(imgs[0].range.tl.nativeRow), r1 = Math.floor(imgs[1].range.tl.nativeRow);
+        ok(r0 === r1, 'charts2: 7-column table (>= 770px) fits 400 + 300 px side by side on ONE row', r0 + ' vs ' + r1);
+        ok(imgs[1].range.tl.nativeCol > imgs[0].range.tl.nativeCol || (imgs[1].range.tl.nativeCol === imgs[0].range.tl.nativeCol && imgs[1].range.tl.nativeColOff > imgs[0].range.tl.nativeColOff), 'charts2: second image anchored to the right of the first', JSON.stringify([imgs[0].range.tl.nativeCol, imgs[0].range.tl.nativeColOff, imgs[1].range.tl.nativeCol, imgs[1].range.tl.nativeColOff]));
+      }
+      // narrow the table to 3 columns -> the two charts must stack
+      $('#tableHeader th').filter(function () { return +$(this).attr('data-column') > 2; }).hide();
+      $('#resultsTable td').filter(function () { return +$(this).attr('data-column') > 2; }).hide();
+      api = build(ctxFor({}));
+      wb = await api.createXlsxWorkbook(true);
+      ws = wb.getWorksheet('Report Data');
+      imgs = ws.getImages();
+      ok(imgs.length === 2 && Math.floor(imgs[0].range.tl.nativeRow) !== Math.floor(imgs[1].range.tl.nativeRow), 'charts2: 3-column table stacks the charts on two rows', JSON.stringify(imgs.map(function (i) { return i.range.tl.nativeRow; })));
+      ok(!ws.views.length || !ws.views[0].ySplit, 'charts2: stacked charts -> block over 300pt -> no row freeze', JSON.stringify(ws.views));
+      $('#tableHeader th, #resultsTable td').show();
+      $c2.remove();
+
+      // ================= 9. extractHeaderDataForExcel shape =================
+      api = build(ctxFor({}));
+      var secs = api.extractHeaderDataForExcel();
+      var types = secs.map(function (s) { return s.type; });
+      ['title', 'subtitle', 'timestamp', 'search', 'import_timestamps', 'prompts', 'snippet', 'charts'].forEach(function (t) {
+        ok(types.indexOf('link') === -1, 'sections: no link section');
+        ok(types.indexOf(t) !== -1, 'sections: has ' + t, JSON.stringify(types));
+      });
+      var ch = secs.filter(function (s) { return s.type === 'charts'; })[0];
+      ok(ch && ch.content.length === 1 && ch.content[0].width === 400, 'sections: chart captured at canvas size', ch && JSON.stringify(ch.content.map(function (c) { return [c.width, c.height]; })));
+
+      flush();
+    } catch (e) {
+      out.push('ERROR ' + (e && e.stack ? e.stack : e));
+      flush();
+    }
+    document.getElementById('files').textContent = filesOut.join('\n');
+  })();
+})();
+</script>

@@ -1,0 +1,395 @@
+# Builds mutants.json for the pvnotes suite and checks every anchor against the
+# FEATURE build it was made for (each must occur exactly once in its file).
+#   py -3 mk_mutants.py <stage or app dir>
+# A mutant keeps its frozen "must" list across rebuilds (read back from the old
+# mutants.json); a new one starts at null = EXPLORE (run.py prints its red set).
+import json, os, sys
+HERE = os.path.dirname(os.path.abspath(__file__))
+base = sys.argv[1] if len(sys.argv) > 1 else r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+FILES = {'main': 'js\\main.js', 'journal': 'js\\penumbra_journal.js', 'manage': 'manage_journal.php', 'css': 'css\\main.css'}
+CR = '\r\n'   # main.js is CRLF; penumbra_journal.js and manage_journal.php are LF
+
+M = {
+    # the paint pass never runs: no icon anywhere
+    'nopaint': ('main', [('            var on = !hold && pivotNotesActive();' + CR + '            var toks = on ? pivotRowTokens() : [];',
+                          '            var on = false;' + CR + '            var toks = [];')], None),
+    # no observer: a pivot rendered (or rows built) after the notes landed stays bare
+    'noobserver': ('main', [('            _pvMo.observe(pc, { childList: true, subtree: true });', '            void pc;')], None),
+    # keys follow the pivot's field ORDER: FY x DEPT misses the DEPT x FY notes
+    'nosort': ('main', [('                pairs.sort(function (a, b) { return a[0] < b[0] ? -1 : (a[0] > b[0] ? 1 : 0); });', '                void 0;')], None),
+    # a collapsed group's summary row gets no icon
+    'nosummary': ('main', [('                if (sumKey !== null) {' + CR + '                    parts = sumKey.split(PV_SEP);',
+                            '                if (sumKey !== null) { continue;' + CR + '                    parts = sumKey.split(PV_SEP);')], None),
+    # a Top-N (Other) row takes a note
+    'noother': ('main', [('                if (parts[i] === PV_OTHER) { pairs = null; break; }', '                if (false) { pairs = null; break; }')], None),
+    # side-by-side: every label cell gets an icon, not just the row's first
+    'flatall': ('main', [('                    } else if (lvl === 0) {' + CR + '                        stampPivotCell(td, parts, toks, false, counts);',
+                          '                    } else if (true) {' + CR + '                        stampPivotCell(td, parts, toks, false, counts);')], None),
+    # the count as TEXT in the button: it lands in the label cell's text
+    'counttext': ('main', [("                + '<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"></path></svg>'" + CR + "                + '</button>';" + CR + "        }" + CR + "        // The icon goes FIRST",
+                            "                + '<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"></path></svg>'" + CR + "                + (n ? n : '') + '</button>';" + CR + "        }" + CR + "        // The icon goes FIRST")], None),
+    # Copy as HTML / the email embed / print keep the icon
+    'nostriphtml': ('main', [("                    $tdClone.find('.pivot-collapse-toggle, .journal-pvnote-btn').remove();", "                    $tdClone.find('.pivot-collapse-toggle').remove();")], None),
+    # EQUIVALENT by design: the count is CSS content and the svg has no text, so the
+    # XLSX/array text reader would read the same without its strip
+    'eq-nostriparray': ('main', [(".find('.sort-icon, .col-sort-icon, .pivot-collapse-toggle, .journal-pvnote-btn').remove()", ".find('.sort-icon, .col-sort-icon, .pivot-collapse-toggle').remove()")], []),
+    # the card stays up when the pivot is put away
+    'noaway': ('main', [("                : ($('#pivot-output-container').is(':visible') && !!document.getElementById('pivotResultTable'));",
+                         "                : (!!document.getElementById('pivotResultTable'));")], None),
+    # the card stays put when the page scrolls
+    'nofollow': ('main', [('            queuePlacePivotNoteCard();' + CR + '        }, true);', '            void 0;' + CR + '        }, true);')], None),
+    # the card never re-finds its icon (a collapse moves a group's icon to its summary row)
+    'noreanchor': ('main', [('            if (refind || !cardAnchorBox(c.anchor, c.host)) {', '            if (false) {')], None),
+    # the Row notes switch still waits for a key
+    'nokeyunlock': ('main', [("            $('#journalRowNotesEnable').prop('disabled', false);", "            $('#journalRowNotesEnable').prop('disabled', !ok);")], None),
+    # saved only with a key
+    'nosavenokey': ('main', [('        if (window._penumbraJournalRowNotes) {' + CR + '            viewOptions.journalRowNotes = true;',
+                              '        if (window._penumbraJournalRowNotes && window._penumbraJournalKeyColumns && window._penumbraJournalKeyColumns.length) {' + CR + '            viewOptions.journalRowNotes = true;')], None),
+    # fetched only with a key: the pivot's counts never land
+    'nofetchnokey': ('main', [('            if (!rid || window._penumbraJournalHidden || !window._penumbraJournalRowNotes) {' + CR + '                window._penumbraRowNotes = {}; window._penumbraRowNoteCounts = {};' + CR + '                window._penumbraPivotNotes',
+                               '            if (!rid || window._penumbraJournalHidden || !window._penumbraJournalRowNotes || !keyCols()) {' + CR + '                window._penumbraRowNotes = {}; window._penumbraRowNoteCounts = {};' + CR + '                window._penumbraPivotNotes')], None),
+    # a pivot row's note is posted as a TABLE row's
+    # (re-anchored at round 11: the line takes a whole chart's scope too)
+    'pvscope': ('main', [("            var scope = (kind === 'chart') ? 'chart' : (isPivot ? 'pivot' : 'row');", "            var scope = (kind === 'chart') ? 'chart' : 'row';")], None),
+    # the journal panel gives a pivot note a TABLE row's tag (it jumps to the table)
+    'nopvchip': ('journal', [("        if (String(n.SCOPE || '') === 'pivot') return renderPivotRef(n);\n", '')], None),
+    # the pivot tag does nothing when clicked
+    'nopvjump': ('journal', [("        $(document).on('click', '.journal-note-rowref-btn[data-pv-key]', function (e) {", "        $(document).on('click', '.journal-note-rowref-btn[data-pv-key-off]', function (e) {")], None),
+    # the server takes any JSON array as a pivot key
+    'nokeyshape': ('manage', [('    if (!is_array($pairs) || count($pairs) < 1 || count($pairs) > 8) return false;', '    if (!is_array($pairs)) return false;')], None),
+    # round 2: the band's hover back at (0,3,0) - the Wolfpack Red blanket (0,3,1) paints it red
+    'wolfband': ('css', [('.journal-rownote-panel .journal-rownote-head.journal-rownote-close:hover {', '.journal-rownote-panel .journal-rownote-head:hover {')], ['T-wolf-band']),
+    # round 3: a re-render that drops the card's row leaves the card floating
+    'nogone': ('main', [('                } else if (!b && !(_pvScheduled || _applyScheduled) && !findPivotNoteBtn(c.key, false, c.host)) {', '                } else if (false) {')], None),
+    # round 3: no wait for a pending repaint - the tick closes a card whose row is about to be stamped
+    'nopending': ('main', [('                } else if (!b && !(_pvScheduled || _applyScheduled) && !findPivotNoteBtn(c.key, false, c.host)) {', '                } else if (!b && !findPivotNoteBtn(c.key, false, c.host)) {')], None),
+    # round 3: a tip already up stays over the card
+    'notipremove': ('main', [("            $('.ui-tooltip').stop(true, true).remove(); // a tip already up (the pointer is still on the icon)", '            void 0;')], None),
+    # round 3: the open icon keeps its title (and jQuery UI's parked copy): the tip returns
+    'notiptitle': ('main', [('                b.removeAttribute(\'title\');' + CR + "                $(b).removeData('ui-tooltip-title');", '                void 0;')], None),
+    # round 3: the mention e-mail drops the row line
+    'norowline': ('manage', [("mentioned you in a journal note on the report <strong>' . $safeTitle . '</strong>:</p>'\n          . $rowLine // which row (journalRowRefLine), or ''\n",
+                              "mentioned you in a journal note on the report <strong>' . $safeTitle . '</strong>:</p>'\n")], None),
+    # round 3: a reply's e-mail never reads its root's snapshot
+    'norefsnap': ('manage', [('            if ($ref_snap === null && $reply_root !== null) {', '            if (false) {')], None),
+    # round 3: the snapshot is ignored - the key's bare values only
+    'refkeyonly': ('manage', [('    if (is_array($snap) && $snap) {', '    if (false) {')], None),
+    # round 4: the question never mentions the replies
+    'nodelask': ('main', [("            if (!replies) return 'Delete this note? A copy is kept in the audit log.';", "            return 'Delete this note? A copy is kept in the audit log.';")], None),
+    # round 4: the question never says other people wrote some of them
+    'noothers': ('main', [('            var who = !byOthers ? \'\' : (byOthers === replies', "            var who = '' && (byOthers === replies")], None),
+    # round 4: the journal panel keeps its old question
+    'panelplain': ('journal', [('                ? P.journalDeleteQuestion(notesCache, noteId)\n', "                ? 'Delete this journal note? This cannot be undone (a copy is kept in the audit log).'\n")], None),
+    # round 4: the panel's status ignores the server's count
+    'panelstatus': ('journal', [("            status(esc(resp.message || 'Note deleted.'), 'success');", "            status('Note deleted.', 'success');")], None),
+    # round 4: the server deletes the root alone again
+    # (round 6) the replies read do not go with their root
+    'nocascade': ('manage', [("        foreach ($replies as $rp) { $del_ids[] = (int)$rp['ID']; }", '        foreach ($replies as $rp) { }')], None),
+    # round 4: the replies deleted with a thread leave no copy in the audit row
+    'noauditreplies': ('manage', [("        if ($replies) $before['REPLIES'] = $replies;", '        // (no replies in the audit)')], None),
+    # round 5: the band pass always strips - no band icons
+    'nobandpaint': ('main', [("            if (!pivotNotesActive() || $('body').hasClass('snapshot-comparison-active')) {" + CR + "                var olds = gc.querySelectorAll",
+                              "            if (true) {" + CR + "                var olds = gc.querySelectorAll")], None),
+    # round 5: the observer waits for a key again - a regroup's new bands stay bare
+    'bandgate': ('main', [('            if (!toggleActive() && !rowNotesActive() && !pivotNotesActive()) return; // band icons need no key', '            if (!toggleActive() && !rowNotesActive()) return;')], None),
+    # round 5: a blank band keeps "[Blank]" in its key - not the pivot's ''
+    'bandblank': ('main', [("                parts.push(lab === '[Blank]' ? '' : lab);", '                parts.push(lab);')], None),
+    # round 5: the band's own click folds it when its icon is clicked
+    'bandfold': ('main', [("        if ($(e.target).closest('.group-hide, .journal-pvnote-btn').length) return;", "        if ($(e.target).closest('.group-hide').length) return;")], None),
+    # round 5: a band's card checks the pivot's visibility - it closes at once
+    'bandhost': ('main', [("                : (c.host === 'group')", '                : (false)')], None),
+    # round 5: the journal panel's jump ignores the grouped view
+    'bandreveal': ('main', [("                if ($('#groupedResultsContainer').is(':visible') && !$('body').hasClass('snapshot-comparison-active')) return revealBandNote(key, warn);", '                void 0;')], None),
+    # a reply to a pivot note lands as a report note
+    # (re-anchored at round 11: the line takes a chart's scope too)
+    'noreplyscope': ('manage', [("                $scope        = ($prow['SCOPE'] === 'row' || $prow['SCOPE'] === 'pivot' || $prow['SCOPE'] === 'chart') ? $prow['SCOPE'] : 'report';",
+                                 "                $scope        = ($prow['SCOPE'] === 'row' || $prow['SCOPE'] === 'chart') ? $prow['SCOPE'] : 'report';")], None),
+    # ---- round 6 (2026-10-07): a TABLE row's notes open in the card; the delete takes exactly the ids it read ----
+    # a table row's card as narrow as a pivot row's
+    'rcwide': ('css', [('    width: min(820px, calc(100vw - 16px));', '    width: min(620px, calc(100vw - 16px));')], None),
+    # no hiding while the row is out of the table's scroll box
+    'rcclip': ('main', [('            if (!box || cardClipped(c, box)) {', '            if (!box) {')], None),
+    # a card whose row is not drawn (searched out, another page, a folded band) stays up where it was
+    'rcundrawn': ('main', [("            if (!box || cardClipped(c, box)) {" + CR + "                el.style.visibility = 'hidden';",
+                            "            if (!box || cardClipped(c, box)) {" + CR + "                if (box) el.style.visibility = 'hidden';")], None),
+    # a hidden Notes column: no falling back to the row itself
+    'rcnorowbox': ('main', [("            if (host === 'row') {" + CR + "                var tr = b.closest('tr');",
+                             "            if (false) {" + CR + "                var tr = b.closest('tr');")], None),
+    # a table row's note button opens nothing
+    'rcnoopen': ('main', [("            openPivotNoteCard(this);" + CR + "        });" + CR + "        // A pivot row's note icon",
+                           "            void this;" + CR + "        });" + CR + "        // A pivot row's note icon")], None),
+    # the journal panel's jump to a table row opens no card
+    'rcnoreveal': ('main', [("            else if ($btn.length && !(_pvCard && _pvCard.host === 'row' && _pvCard.key === rowKey)) openPivotNoteCard($btn[0]);",
+                             "            else void $btn;")], None),
+    # a table row's card stays once the table has no such row (the pivot's rule, the row host)
+    'rcgone': ('main', [('                } else if (!b && !(_pvScheduled || _applyScheduled) && !findPivotNoteBtn(c.key, false, c.host)) {',
+                         '                } else if (false) {')], None),
+    # each id bound to ONE loop variable: at execute every placeholder holds the last id
+    'delbyval': ('manage', [("        foreach (array_keys($del_ids) as $k) { oci_bind_by_name($stmt, ':d' . $k, $del_ids[$k]); }",
+                             "        foreach ($del_ids as $k => $v) { oci_bind_by_name($stmt, ':d' . $k, $v); }")], None),
+    # one IN list whatever its length (Oracle stops at 1,000)
+    'delnochunk': ('manage', [("        foreach (array_chunk(array_keys($del_ids), 900) as $chunk) {",
+                               "        foreach (array_chunk(array_keys($del_ids), 5000) as $chunk) {")], None),
+    # back to a broad delete: every reply of the root, read or not
+    'delparent': ('manage', [("        $stmt = oci_parse($oci, \"DELETE FROM PENUMBRA_JOURNAL WHERE REPORT_ID = :rid AND (\" . implode(' OR ', $del_lists) . \")\");",
+                              "        $stmt = oci_parse($oci, \"DELETE FROM PENUMBRA_JOURNAL WHERE REPORT_ID = :rid AND (PARENT_ID = :d0 OR \" . implode(' OR ', $del_lists) . \")\");")], None),
+    # ---- round 7 (2026-10-07): one dead panel-row filter put back ----
+    'sweepback': ('main', [("            const rowSel = 'tbody tr:not(.search-hidden)';",
+                            "            const rowSel = 'tbody tr:not(.search-hidden):not(.journal-note-child)';")], None),
+    # ---- round 8 (2026-10-09): chart point notes, each part reverted alone ----
+    # the tooltip's count never added
+    'cnfooter': ('main', [('            try { n = _cnTooltipCount(items); } catch (e) { n = 0; }', '            n = 0;')], ['V-ch-tip', 'V-chp-tip']),
+    # the click menu offers no Notes
+    'cnmenu': ('main', [('        if (opts.note && opts.note.key) {', '        if (false) {')], ['C-ch-menu', 'C-ch-open', 'C-ch-post', 'C-ch-zero', 'C-chd-menu', 'C-chd-open']),
+    # the row breakdown has no Notes button
+    'cnbreak': ('main', [('        if (_cnB && _cnB.key && window.Penumbra && window.Penumbra.chartNoteCount) {', '        if (false) {')], ['C-ch-breakdown']),
+    # a chart point's card at the pivot card's height: under the breakdown's dialog
+    # (re-anchored at round 12: the dialog tier is is-overlay's, on a dialog only)
+    'cnz': ('css', [('.journal-pvnote-card.is-overlay { z-index: 100050; }', '.journal-pvnote-card.is-overlay { }')], ['C-ch-breakdown', 'C-sw-overlay']),
+    # a drilled chart's path left out of the key
+    'cnpath': ('main', [('            if (!path[i] || path[i].val == null || !add(_cnTok(path[i].col), path[i].val)) return null;', '            void 0;')], ['V-chd-drilled', 'C-chd-menu', 'C-chd-open']),
+    # a split chart's series left out of the key
+    'cnseries': ('main', [('        if (g !== null && !seen[_cnTok(gbRaw)] && !add(_cnTok(gbRaw), g)) return null;', '        void g;')], ['V-ch-keys', 'V-ch-pin', 'V-ch-pin-offset', 'V-ch-tip', 'C-ch-menu', 'C-ch-open', 'C-ch-post', 'C-ch-zero', 'C-ch-breakdown']),
+    # the chart's "Unknown" kept as the label (the pivot keys a blank '')
+    'cnunknown': ('main', [("        if (s !== 'Unknown') return s;", '        return s;')], ['V-chb-blank', 'V-chb-ambiguous']),
+    # a bar holding a blank AND a literal "Unknown" keyed anyway
+    'cnambig': ('main', [('        if (blank && lit) return null;', '        void 0;')], ['V-chb-ambiguous']),
+    # the Top-N "Other" bar keyed
+    # (re-anchored at round 12: the roll-up's refusal moved to _cnPointNote, on a chart that folds one)
+    'cnother': ('main', [("        if (cfg.otherBucket && _chartDrillCleanLabel(x) === 'Other' && (cfg.type === 'treemap' || idx === (data.labels || []).length - 1)) return null;", '        void 0;')], ['V-cho-nokey', 'C-cho-menu']),
+    # the counts reloaded, the charts' markers not repainted (a post's new count waits for a redraw)
+    'cnrefresh': ('main', [("                if (window._penumbraChartNotePinsRefresh) window._penumbraChartNotePinsRefresh(); // the charts' markers (2026-10-09)", '                void 0;')], ['C-ch-post']),
+    # the card closed, its point's marker left drawn
+    'cnclosepin': ('main', [('            if (c.host === \'chart\' && window._penumbraChartNotePinsRefresh) window._penumbraChartNotePinsRefresh(c.canvas || null);', '            void c;')], ['C-ch-zero']),
+    # the Row notes switch not asked: markers and Notes with it off
+    'cnactive': ('main', [('        return P.chartNotesActive() ? P : null;', '        return P;')], ['V-chf-none', 'V-cw-off']),
+    # the breakdown's card outlives its dialog
+    'cnhost': ('main', [('                    ? (c.canvas ? ((c.canvas.isConnected && chartLive(c.canvas) && chartFound(c)) || chartCardRefind(c)) : !!(c.anchor && c.anchor.isConnected))', '                    ? true')], ['C-ch-breakdown']),
+    # the field token left as the vis() call wrote it (lower case)
+    'cntokcase': ('main', [(': String(p.base).toUpperCase();', ': String(p.base);')], ['V-chp-pin', 'V-chp-tip']),
+    # the layer laid at its containing block's corner, not the canvas's
+    # (re-anchored at round 10: the density zoom's divide, dzdlg e46e3d6)
+    'cnlayerpos': ('main', [("        _cnSetPx(layer, 'left', (parseFloat(layer.style.left) || 0) + (cr.left - lr.left) / k);", "        _cnSetPx(layer, 'left', 0);")], ['V-ch-pin-offset']),
+    # ---- round 9 (2026-10-09): chart notes round 2, each part reverted alone ----
+    # the paint never retried: a chart whose next-frame redraw never comes has no markers
+    'cn2retry': ('main', [('            if (P && (!cfg || !canvas.isConnected) && (chart.$pnbCnTry || 0) < 3) {', '            if (false) {')], ['V-ch2-retry']),
+    # the card never looks for its chart again: a re-render closes it
+    'cn2refind': ('main', [('            var cv = window._penumbraChartNoteRefind ? window._penumbraChartNoteRefind(c.key, c.want) : null;', '            var cv = null;')], ['C-ch2-survive', 'C-ch2-gone']),
+    # the same place not preferred: an identical chart elsewhere takes the card
+    'cn2slot': ('main', [('            if (want && want.slot && sl.root === want.slot.root && sl.i === want.slot.i) score += 1;', '            void sl;')], ['C-ch2-survive']),
+    # the open card's dashed marker on every chart with the point
+    'cn2onecanvas': ('main', [('        if (openKey && (!P.chartNoteOpenCanvas || P.chartNoteOpenCanvas() !== canvas)) openKey = null;', '        void 0;')], ['V-ch2-onecanvas', 'C-ch2-survive']),
+    # ---- round 10 (2026-10-09): chart notes round 3, each part reverted alone ----
+    # the value labels not read: markers on them
+    'cv3labels': ('main', [('        var dl = chart && chart.$datalabels, list = (dl && Array.isArray(dl._labels)) ? dl._labels : [], out = [];', '        var list = [], out = [];')], ['V-cv-nolabel', 'V-cv-past']),
+    # the markers placed before not minded: markers on each other
+    'cv3placed': ('main', [('        var spots = _cnSpots(it, w, h), all = labels.concat(placed), best = null, bestCost = Infinity;', '        var spots = _cnSpots(it, w, h), all = labels, best = null, bestCost = Infinity;'),
+                           ('            var cost = _cnCover(r, labels) + _cnCover(r, placed) + (out > 0.5 ? out * (w + h) : 0);', '            var cost = _cnCover(r, labels) + (out > 0.5 ? out * (w + h) : 0);')], ['V-cv-nopin']),
+    # no corner inside a vertical bar
+    'cv3corner': ('main', [('                if (fitW && fitH) s.push({ x: R - g - w, y: up ? T + g : B - g - h });', '                void fitW;')], ['V-ch-pin', 'V-ch-pin-offset', 'V-cv-inside']),
+    # a horizontal bar read as a vertical one
+    # (re-anchored at round 12: a stacked segment's branch comes first)
+    'cv3hz': ('main', [('            } else if (hz) {' + CR + '                var rt = b.x >= b.base;', '            } else if (false) {' + CR + '                var rt = b.x >= b.base;')], ['V-cv-inside']),
+    # a spot past a bar's end never steps past what is in its way
+    'cv3past': ('main', [('            for (var n = 0; dir && n < 8; n++) {', '            for (var n = 0; false && n < 8; n++) {')], ['V-cv-nopin', 'V-cv-past']),
+    # the chart area not minded
+    'cv3area': ('main', [('            if (area.right - area.left >= w) r.x = Math.min(Math.max(r.x, area.left), area.right - w);', '            void 0;')], ['V-cv-area']),
+    # a slice's marker on its centroid
+    'cv3arc': ('main', [('            var fr = [0.72, 0.5, 0.88, 0.3];', '            var fr = [0.5];')], ['V-chp-pin', 'V-cv-nolabel']),
+    # the marker's own size not measured
+    'cv3size': ('main', [('        for (var m = 0; m < pins.length; m++) sizes.push({ w: (pins[m].offsetWidth || 24) / (sx || 1), h: (pins[m].offsetHeight || 14) / (sy || 1) });', '        for (var m = 0; m < pins.length; m++) sizes.push({ w: 0, h: 0 });')], ['V-ch-pin', 'V-ch-pin-offset', 'V-cv-nolabel', 'V-cv-nopin', 'V-cv-area', 'V-cv-inside', 'V-cv-past']),
+    # full strength at rest
+    'cv3quiet': ('css', [('    opacity: 0.6;' + CR + '    transition: opacity 0.15s ease;', '    transition: opacity 0.15s ease;')], ['V-cv-quiet', 'V-cv-hover', 'V-cv-open']),
+    # pointing at the chart does not bring its markers up
+    'cv3hover': ('css', [(':hover > .journal-chartnote-layer > .journal-chartnote-pin,' + CR + '.journal-chartnote-pin.is-open { opacity: 1; }', '.journal-chartnote-pin.is-open { opacity: 1; }')], ['V-cv-hover']),
+    # the open card's marker as quiet as the rest
+    'cv3open': ('css', [(':hover > .journal-chartnote-layer > .journal-chartnote-pin,' + CR + '.journal-chartnote-pin.is-open { opacity: 1; }', ':hover > .journal-chartnote-layer > .journal-chartnote-pin { opacity: 1; }')], ['V-cv-open']),
+    # ---- round 12 (2026-10-09): the chart notes bug sweep, each fix reverted alone ----
+    # a stacked segment placed as a lone bar: its marker slides past the stack
+    'cs5stk': ('main', [('stk: !!(meta && meta._stacked),', 'stk: false,')], ['V-cs-own']),
+    # the button's hover unscoped: the themes' blanket button:hover repaints it
+    'cs5hover': ('css', [('#reportSnippetOutput .journal-chartwhole-btn:hover,' + CR + '#reportSnippetOutput .journal-chartwhole-btn.is-open {' + CR + '    border-color',
+                          '.journal-chartwhole-btn:hover,' + CR + '.journal-chartwhole-btn.is-open {' + CR + '    border-color')], ['V-ct-hover']),
+    # the button's own look unscoped: a dark theme's button box at rest
+    'cs5dark': ('css', [('#reportSnippetOutput .journal-chartwhole-btn {' + CR + '    position: absolute;', '.journal-chartwhole-btn {' + CR + '    position: absolute;')], ['V-ct-dark']),
+    # the markers on the undefined token again: white on every theme
+    'cs5surface': ('css', [("    background: var(--bg-surface, #fff);   /* the theme's surface (--bg-main: only the newer themes set it; the six original ones fell back to #fff) */", '    background: var(--bg-main, #fff);')], ['V-ct-surface']),
+    # ---- round 14 (2026-10-10, a drill's rows outlived the drill): each fix reverted alone ----
+    'dx1wipe': ('main', [("        if (st) { if (st.canvasRows) $c.data('sourceRowData', st.canvasRows); else $c.removeData('sourceRowData'); }", '        void st;')], ['C-dx-rows', 'C-dx-menu', 'C-dx-preset']),
+    'dx1capture': ('main', [("                canvasRows: $c.data('sourceRowData'),   // what the canvas held, for the drill's end (2026-10-10)", '                canvasRows: undefined,')], ['V-dx-own', 'C-dx-preset']),
+    'dx1restore': ('main', [("            // (its rows: _wipeDrillState put the canvas's own back above - this stored originalRows, which the chart's", "            $c.data('sourceRowData', originalRows); // (mutant)")], ['C-dx-rows', 'C-dx-menu', 'C-dx-preset', 'V-dx-presetown']),
+    'dx1presetwipe': ('main', [('        // restores its own below.)' + CR + '        _wipeDrillState(canvas);', '        // restores its own below.)' + CR + '        void 0;')], ['C-dx-preset', 'C-dx-presetcrumb']),
+    'dx1presetprobe': ('main', [('                        var rv = cleanCellVal(_chartDrillGet(probe[idx], col));', "                        var rv = cleanCellVal(row && row.get ? row.get(col) : '');")], ['C-dx-presetfy']),
+    'dx1presetcap': ('main', [("                canvasRows: $(canvas).data('sourceRowData'),   // for the drill's end to put back (2026-10-10)", '                canvasRows: undefined,')], ['V-dx-presetown']),
+    # ---- round 13 (2026-10-10, the date-split drill): each fix reverted alone ----
+    'dd1probe': ('main', [('            var probeRows = _chartDrillProbe(sourceRows, [vizConfig.xAxis, vizConfig.groupBy]);', '            var probeRows = sourceRows;')], ['C-dt-rows', 'C-dt-drill', 'V-dt-crumb', 'C-dt-crumbswitch', 'C-dt-split', 'V-dt-cycle', 'C-dt-clickexcl', 'C-dt-clickdrill']),
+    'dd1excl': ('main', [('                            var rv = _chartDrillCleanCellVal(_chartDrillGet(rowMap, col));', "                            var rv = _chartDrillCleanCellVal(rowMap.get ? rowMap.get(col) : '');")], ['C-dt-clickexcl']),
+    'dd1orig': ('main', [('                                var rv = _chartDrillCleanCellVal(_chartDrillGet(probeRows[ri], col));', '                                var rv = _chartDrillCleanCellVal(sourceRows[ri].get(col));')], ['C-dt-clickdrill']),
+    'dd1menuexcl': ('main', [('        var cfg = _getCanvasVizConfig(canvas) || {}, probe = _chartDrillProbe(rows, [cfg.xAxis, cfg.groupBy]);   // (a bucketed field: 2026-10-10)', '        var cfg = _getCanvasVizConfig(canvas) || {}, probe = rows;')], ['C-dt-menuexcl']),
+    'dd1path': ('main', [('        var probe = _chartDrillProbe(rows, path.slice(0, stop).map(function (s) { return s.col; }));', '        var probe = rows;')], ['C-dt-drill', 'C-dt-crumbswitch', 'C-dt-menudrill']),
+    'dd1crumb': ('main', [('        var baseRows = _chartDrillProbe(state.originalRows || [], path.map(function (s) { return s.col; }));', '        var baseRows = state.originalRows || [];')], ['V-dt-crumb', 'C-dt-crumbswitch']),
+    'dd1menurows': ('main', [('        var probe = _chartDrillProbe(sourceRows, [cfg.xAxis]);   // (a bucketed axis: 2026-10-10)', '        var probe = sourceRows;')], ['C-dt-menurows']),
+    'dd1panel': ('main', [('            var probe = _chartDrillProbe(sourceRows, [vizCfg.xAxis, vizCfg.groupBy]);', '            var probe = sourceRows;')], ['C-dt-panel']),
+    'dd1get': ('main', [('        return (v === undefined) ? row.get(String(col).toUpperCase()) : v;', '        return v;')], ['C-dt-panel', 'C-dt-menurows', 'C-dt-menuexcl']),
+    'dd1search': ('main', [("        if (!spec || !spec.split) return '{' + field + '} = //' + val + '//';", "        if (true) return '{' + field + '} = //' + val + '//';")], ['V-dt-search', 'C-dt-split', 'V-dt-cycle', 'C-dt-menurows']),
+    'dd1bucket': ('main', [("        else if (split === 'fy' && (m = /^FY(\\d{2})$/i.exec(s))) { y = 2000 + +m[1]; r = span(y - 1, 7, y, 6); }", '        else if (false) { }')], ['V-dt-search', 'C-dt-split', 'C-dt-menurows', 'V-pd-search']),
+    'dd1nohand': ('main', [('            if (ctx.searchParts && ctx.searchParts.some(function (p) { return !p; })) ctx.searchParts = [];', '            void 0;')], ['V-dt-cycle']),
+    'dd1fexpr': ('main', [("        if (_drillTopFexpr && _drillParts.length) _drillParts.unshift('(' + _drillTopFexpr + ')');", "        if (_drillTopFexpr) _drillParts.unshift('(' + _drillTopFexpr + ')');")], ['V-dt-cycle']),
+    'dd1pivot': ('main', [('            } else if (c.split) {', '            } else if (false) {')], ['V-pd-search', 'V-pd-cycle']),
+    'dd1pivotagg': ('main', [("        if (noTableSearch) drillSearchString = '';   // (a bucket with no search: no hand-off, not the filter alone)", '        void noTableSearch;')], ['V-pd-cycle']),
+    # ---- round 12 part 3 (2026-10-09, the bug sweep): each chart-side / card-side fix reverted alone ----
+    # A1: "split" by the series drawn - narrowed to one FY, a bar drops its FY
+    'cs6split': ('main', [("            if (gbRaw && (cfg.type === 'bar' || cfg.type === 'line')) {", "            if (gbRaw && cfg.type !== 'combo' && sets.length > 1) {")], ['V-sw-split1', 'V-sw-scale', 'V-sw-tip', 'C-sw-focus', 'C-sw-regrace', 'C-sw-destroyed', 'V-sw-drillsplit', 'V-sw-zoom']),
+    # A1 (2): a drill path holding the series' field: no note on a drilled split chart
+    'cs6seen': ('main', [('        if (g !== null && !seen[_cnTok(gbRaw)] && !add(_cnTok(gbRaw), g)) return null;', '        if (g !== null && !add(_cnTok(gbRaw), g)) return null;')], ['V-sw-drillseen']),
+    # A7: a category named Other takes no note again
+    'cs6other': ('main', [("        if (s === '(Other)') return null;", "        if (s === 'Other' || s === '(Other)') return null;")], ['V-sw-other']),
+    # A2: a grouped treemap's click takes the group under the leaf
+    'cs6tree': ('main', [("            if (chart && chart.config && chart.config.type === 'treemap' && elements && elements.length > 1) picked = elements[elements.length - 1];", '            void 0;')], ['C-sw-treemap']),
+    # A3: the scale is the density zoom's alone: in a scaled slide the layer sits at a fraction of its offset
+    'cs6scale': ('main', [('        var k = (canvas.offsetWidth > 0 && cr.width > 0) ? cr.width / canvas.offsetWidth : (window.pnbZoomOf ? window.pnbZoomOf(layer) : 1);', '        var k = (window.pnbZoomOf ? window.pnbZoomOf(layer) : 1);')], ['V-sw-still', 'V-sw-scale']),
+    # A3 (zoom): no scale at all - neither a slide's scale() nor the density zoom
+    'cs6zoom': ('main', [('        var k = (canvas.offsetWidth > 0 && cr.width > 0) ? cr.width / canvas.offsetWidth : (window.pnbZoomOf ? window.pnbZoomOf(layer) : 1);', '        var k = 1;')], ['V-sw-still', 'V-sw-scale', 'V-sw-zoom']),
+    # A11: the layer put back to 0,0 before every placement: style writes on every redraw
+    'cs6reset': ('main', [("        if (!layer.style.left) { layer.style.left = '0px'; layer.style.top = '0px'; }", "        layer.style.left = '0px'; layer.style.top = '0px';")], ['V-sw-still']),
+    # A4: a manual e-mail keeps the charts' controls and note markers
+    'cs6mail': ('main', [("        $c.find('.penumbra-web-only, .snippet-action, .sr-only, .chart-settings-cog, .chart-filter-panel, .journal-chartwhole-btn, .journal-chartnote-layer').remove();", "        $c.find('.penumbra-web-only, .snippet-action, .sr-only').remove();")], ['V-sw-mail']),
+    # A6: no fade under the chart's tooltip (the class, then the CSS)
+    'cs6tip': ('main', [("        for (var u = 0; u < pins.length; u++) pins[u].classList.toggle('is-under-tip', !!tb && _cnCover(placed[u], tb) > 0);", '        void tb;')], ['V-sw-tip']),
+    'cs6tipcss': ('css', [(':hover > .journal-chartnote-layer > .journal-chartnote-pin.is-under-tip { opacity: 0.12; }', ':hover > .journal-chartnote-layer > .journal-chartnote-pin.is-under-tip { }')], ['V-sw-tip']),
+    # A9: the "Unknown" scan on every update
+    'cs6memo': ('main', [('        if (memo && memo[col]) { blank = memo[col][0]; lit = memo[col][1]; }', '        if (false) { blank = memo[col][0]; lit = memo[col][1]; }')], ['V-sw-memo']),
+    # A10: a chart drawn hidden keeps its markers hidden once shown
+    'cs6shown': ('main', [("        if (!canvas.getClientRects().length) { layer.style.display = 'none'; _cnWatchShown(chart); return; }", "        if (!canvas.getClientRects().length) { layer.style.display = 'none'; return; }")], ['V-sw-shown']),
+    # A12: the button stays on a keyboard-focused quiet cog
+    'cs6cog': ('css', [('#reportSnippetOutput .chart-settings-cog--quiet:focus-visible + .journal-chartwhole-btn { left: 30px; }', '#reportSnippetOutput .chart-settings-cog--quiet:focus-visible + .journal-chartwhole-btn { }')], ['V-sw-cogfocus']),
+    # D6: the global button margin zeroed again: 5px above the cog
+    'cs6margin': ('css', [('    min-width: 22px;' + CR + '    padding: 0 4px;' + CR + '    border: 1px solid transparent;', '    min-width: 22px;' + CR + '    margin: 0;' + CR + '    padding: 0 4px;' + CR + '    border: 1px solid transparent;')], ['V-sw-level']),
+    # D12: the carousel's clone keeps the inline chart's markers until its redraw
+    'cs6slide': ('main', [("            $(clone).find('.journal-chartnote-layer, .journal-chartwhole-btn').remove();", '            void clone;')], ['V-sw-slide']),
+    # D13: every chart's button named alike
+    'cs6name': ('main', [("""        var tip = n ? (n + ' note' + (n === 1 ? '' : 's') + ' on the chart "' + d.snap.Chart + '" - click to view') : ('Add a note about the chart "' + d.snap.Chart + '"');""", "        var tip = n ? (n + ' note' + (n === 1 ? '' : 's') + ' on this chart - click to view') : 'Add a note about this chart';")], ['V-cw-btn']),
+    # B1: the dialog tier for every chart point's card (the class), and back on is-chart (the CSS)
+    'cs6z': ('main', [("            el.className = 'journal-pvnote-card' + (isRow ? ' is-row' : '') + (chart ? ' is-chart' : '') + (inDlg ? ' is-overlay' : '') + (isWhole ? ' is-chartwhole' : '');", "            el.className = 'journal-pvnote-card' + (isRow ? ' is-row' : '') + (chart ? ' is-chart' : '') + (isWhole ? ' is-chartwhole' : '');")], ['C-ch-breakdown', 'C-sw-overlay', 'C-sw-dialog']),
+    'cs6zchart': ('css', [('.journal-pvnote-card.is-overlay { z-index: 100050; }', '.journal-pvnote-card.is-chart { z-index: 100050; }')], ['C-ch-open']),
+    # D2: the @-mention list back under a card on a dialog
+    'cs6mz': ('css', [('    z-index: 100060;   /* ...and over a note card on a dialog (100050; bug sweep, 2026-10-09) */', '    z-index: 100001;')], ['V-sw-mentionz']),
+    # B2: a re-keyed whole-chart button kept (and its card with it)
+    'cs6rekey': ('main', [("        if (btn && btn.getAttribute('data-cw-key') && btn.getAttribute('data-cw-key') !== d.key) { btn.remove(); btn = null; }", '        void 0;')], ['C-sw-rekey']),
+    # B4: the jumps take any card on the key as theirs
+    'cs6host': ('main', [("            if (!(_pvCard && _pvCard.key === key && _pvCard.host === 'pivot')) openPivotNoteCard(btn);   // (nor the pivot row's: bug sweep)", '            if (!(_pvCard && _pvCard.key === key)) openPivotNoteCard(btn);')], ['C-ph-pivot']),
+    'cs6hostb': ('main', [("            if (!(_pvCard && _pvCard.key === key && _pvCard.host === 'group')) openPivotNoteCard(b);", '            if (!(_pvCard && _pvCard.key === key)) openPivotNoteCard(b);')], ['C-ph-band']),
+    # B5: a second chart's button with the key closes the card
+    'cs6again': ('main', [('            var again = !!(_pvCard && _pvCard.key === key && !!btn && _pvCard.anchor === btn', '            var again = !!(_pvCard && _pvCard.key === key && !!btn')], ['C-cf-move', 'C-cf-snap']),
+    # B6: Row notes off leaves the charts' buttons until a redraw
+    'cs6offnow': ('main', [("            // ...and the charts' markers and note buttons (bug sweep, 2026-10-09: they stayed until the next redraw)" + CR + '            if (window._penumbraChartNotePinsRefresh) window._penumbraChartNotePinsRefresh();', "            // ...and the charts' markers and note buttons (bug sweep, 2026-10-09: they stayed until the next redraw)" + CR + '            void 0;')], ['V-cf-offnow', 'V-cw-switch']),
+    # B7: the jump to a hidden chart opens a card nobody sees
+    'cs6hidden': ('main', [('            var b = findChartWholeBtn(key, true);', '            var b = findChartWholeBtn(key, true) || findChartWholeBtn(key, false);')], ['R-cf-hidden']),
+    # B8: the grace counts while the page is hidden too
+    'cs6grace': ('main', [("                if (c.lost && !document.hidden) c.ticks = (c.ticks || 0) + 1;   // a lost chart's grace counts these (bug sweep)", '                if (c.lost) c.ticks = (c.ticks || 0) + 1;')], ['C-sw-grace']),
+    # B9: a chart destroyed in place counts as there: the card closes before it is drawn again
+    'cs6live': ('main', [('                    ? (c.canvas ? ((c.canvas.isConnected && chartLive(c.canvas) && chartFound(c)) || chartCardRefind(c)) : !!(c.anchor && c.anchor.isConnected))', '                    ? (c.canvas ? ((c.canvas.isConnected && chartFound(c)) || chartCardRefind(c)) : !!(c.anchor && c.anchor.isConnected))')], ['C-sw-destroyed']),
+    # B9 (2): "drawn, and no such point" answers for a destroyed chart too: the card closes before it is drawn again
+    'cs6live2': ('main', [('                    if (c.canvas && c.canvas.getClientRects().length && chartLive(c.canvas) && !findChartNotePin(c.key, c.canvas, false)) {', '                    if (c.canvas && c.canvas.getClientRects().length && !findChartNotePin(c.key, c.canvas, false)) {')], ['C-sw-destroyed']),
+    # (chartFound) a chart back by itself keeps the old grace: a later loss closes at once
+    'cs6found': ('main', [('        function chartFound(c) { c.lost = false; return true; }', '        function chartFound(c) { return true; }')], ['C-sw-regrace', 'C-sw-destroyed']),
+    # B10: a whole chart's note goes out with the snapshot the card opened with
+    'cs6snap': ('main', [("                if (_wa && _wa.isConnected && _wa.getAttribute('data-cw-key') === rowKey) {", '                if (false) {')], ['C-cf-snap']),
+    # B11: a dialog chart's card jumps to a report chart
+    'cs6dlg': ('main', [("            if (cv && c.inDlg && !(cv.closest && cv.closest('.infobox-overlay, .modal-prompt-overlay'))) cv = null;", '            void 0;')], ['C-sw-dialog']),
+    # B12: the focus falls to the page on close
+    'cs6focus': ('main', [('                        : shownEl(c.opener) ? c.opener : (shownEl(c.canvas) && c.canvas.tabIndex >= 0) ? c.canvas : null)', '                        : null)')], ['C-sw-focus']),
+    # D7: the breakdown link named by its long title again; its title not put back
+    'cs6aria': ('main', [("""                + ' title="' + escapeHtml(_cnTip) + '" data-pvn-tip="' + escapeHtml(_cnTip) + '" aria-haspopup="dialog" aria-expanded="false"'""", """                + ' title="' + escapeHtml(_cnTip) + '" data-pvn-tip="' + escapeHtml(_cnTip) + '" aria-label="' + escapeHtml(_cnTip) + '" aria-haspopup="dialog" aria-expanded="false"'""")], ['V-sw-linkname']),
+    'cs6tipback': ('main', [("                b.setAttribute('title', b.getAttribute('aria-label') || b.getAttribute('data-pvn-tip') || '');", "                b.setAttribute('title', b.getAttribute('aria-label') || '');")], ['V-sw-linkname']),
+    # a chart's own filter / a non-aggregating type not in its key: such charts share a thread again
+    'cs5hash': ('main', [('        if (extra) parts.push(_cwHash(extra));', '        void extra;')], ['V-cw-filter']),
+    # the chart type left out of the hash: a waterfall shares the bar's thread
+    'cs5family': ('main', [("        if (!_CW_AGG_TYPES[cfg.type]) extra += 't:' + String(cfg.type || '');", '        void 0;')], ['V-cw-filter']),
+    # a Save As switch keeps the original's chart notes
+    'cs5switch': ('main', [('            window._penumbraChartNotes = {}; window._penumbraChartNoteCounts = {};   // (bug sweep: the original\'s chart notes stayed)', '            void 0;')], ['V-cw-switch']),
+    # the jump with Row notes off says nothing
+    'cs5warn': ('main', [("            if (!pivotNotesActive()) return warn('Row notes are off for this report", "            if (!pivotNotesActive()) return false && ('Row notes are off for this report")], ['V-cw-warn']),
+    # the server: any 5th part
+    'cs5srv5': ('manage', [("    if (count($p) === 5 && !preg_match('/^[0-9a-f]{1,64}$/', $p[4])) return false;", '    if (false) return false;')], ['S-cw-key5']),
+    # the server: a chart snapshot's fields uncapped
+    'cs5snap': ('manage', [("        if (mb_strlen($v, 'UTF-8') > 300) $v = mb_substr($v, 0, 299, 'UTF-8') . \"\\xE2\\x80\\xA6\";", "        if (false) $v = '';")], ['S-cw-snap']),
+    # ---- round 11 (2026-10-09): whole-chart notes, each part reverted alone ----
+    # no note button on a chart
+    'cw4paint': ('main', [('        try { _cwPaint(canvas, P); } catch (e) { }   // the chart\'s own note button (whole-chart notes)', '        void 0;')], ['V-cw-btn', 'V-cw-quiet', 'C-cw-open', 'C-cw-post', 'C-cw-survive', 'C-cw-again', 'V-cw-drill', 'R-cw-jump', 'V-cw-gone']),
+    # a drilled chart keyed by what it shows now
+    'cw4origcfg': ('main', [('        var cfg = (st && st.originalCfg) || _cnVizConfig(canvas);', '        var cfg = _cnVizConfig(canvas);')], ['V-cw-drill']),
+    # a chart's thread read from the table rows' store
+    'cw4store': ('main', [("(kind === 'pivot' ? window._penumbraPivotNotes : (kind === 'chart' ? window._penumbraChartNotes : window._penumbraRowNotes))", "(kind === 'pivot' ? window._penumbraPivotNotes : window._penumbraRowNotes)")], ['C-cw-open', 'C-cw-post']),
+    # a chart's note posted as a table row's
+    'cw4scope': ('main', [("            var scope = (kind === 'chart') ? 'chart' : (isPivot ? 'pivot' : 'row');", "            var scope = isPivot ? 'pivot' : 'row';")], ['C-cw-post']),
+    # the counts not read
+    'cw4load': ('main', [('                    window._penumbraChartNoteCounts = resp.chart_counts || {};', '                    void 0;')], ['V-cw-btn', 'V-cw-quiet', 'C-cw-post']),
+    # the card never looks for its chart again: a re-render closes it
+    'cw4refind': ('main', [('                    ? ((c.anchor && c.anchor.isConnected && chartFound(c)) || chartWholeRefind(c))', '                    ? !!(c.anchor && c.anchor.isConnected)')], ['C-cw-survive', 'C-cw-again']),
+    # a second click on the button opens it again
+    'cw4again': ('main', [("                    : isWhole ? _pvCard.host === 'chartwhole'", '                    : isWhole ? false')], ['C-cw-again']),
+    # notes off: the buttons stay
+    'cw4off': ('main', [('        if (!d) { if (btn) btn.remove(); return; }', '        if (!d) { return; }')], ['V-cw-gone']),
+    # the J panel's chip jumps nowhere
+    'cw4jump': ('journal', [('            if (window.Penumbra && window.Penumbra.revealChartNote) {', '            if (false) {')], ['R-cw-jump']),
+    # the J panel shows a chart's note as a table row's
+    'cw4chip': ('journal', [("        if (String(n.SCOPE || '') === 'chart') return renderChartRef(n);", '        void 0;')], ['R-cw-jump']),
+    # the button as plain as a cog: shown at rest
+    # (re-anchored at round 12: the rule is scoped to #reportSnippetOutput)
+    'cw4quiet': ('css', [('    opacity: 0;' + CR + '    transition: opacity 0.15s ease;' + CR + '}' + CR + '#reportSnippetOutput .journal-chartwhole-btn svg', '    transition: opacity 0.15s ease;' + CR + '}' + CR + '#reportSnippetOutput .journal-chartwhole-btn svg')], ['V-cw-quiet']),
+    # the server: a chart key with parts past its four
+    # (re-anchored at round 12: 4 or 5 parts; a sixth part now shows in S-cw-key5)
+    'cw4srvkey': ('manage', [('    if (!is_array($p) || (count($p) !== 4 && count($p) !== 5)) return false;', '    if (!is_array($p) || count($p) < 4) return false;')], ['S-cw-key5']),
+    # the server: a chart thread's e-mails name no chart
+    'cw4srvref': ('manage', [("    if ($scope === 'chart') return journalChartRefText($rowKey, $snapshot);", "    if (false) return journalChartRefText($rowKey, $snapshot);")], ['S-cw-ref']),
+    # the server: add takes no chart scope (a pivot one still)
+    'cw4srvscope': ('manage', [("        $scope = ($scopeIn === 'row' || $scopeIn === 'pivot' || $scopeIn === 'chart') ? $scopeIn : 'report';", "        $scope = ($scopeIn === 'row' || $scopeIn === 'pivot') ? $scopeIn : 'report';")], ['S-cw-add']),
+}
+SCN = {'dx1wipe': ['chexit'], 'dx1capture': ['chexit'], 'dx1restore': ['chexit'], 'dx1presetwipe': ['chexit'], 'dx1presetprobe': ['chexit'],
+       'dx1presetcap': ['chexit'],
+       'dd1probe': ['chdate'], 'dd1excl': ['chdate'], 'dd1orig': ['chdate'], 'dd1menuexcl': ['chdate'], 'dd1path': ['chdate'], 'dd1crumb': ['chdate'],
+       'dd1menurows': ['chdate'], 'dd1panel': ['chdate'], 'dd1get': ['chdate'], 'dd1search': ['chdate'], 'dd1bucket': ['chdate', 'pvdate'],
+       'dd1nohand': ['chdate'], 'dd1fexpr': ['chdate'], 'dd1pivot': ['pvdate', 'pvcycle'], 'dd1pivotagg': ['pvcycle'],
+       'cs6split': ['chsweep', 'chbar'], 'cs6seen': ['chsweep'], 'cs6other': ['chsweep'], 'cs6tree': ['chsweep'], 'cs6scale': ['chsweep'],
+       'cs6reset': ['chsweep'], 'cs6zoom': ['chsweep'], 'cs6mail': ['chsweep'], 'cs6tip': ['chsweep'], 'cs6tipcss': ['chsweep'], 'cs6memo': ['chsweep'], 'cs6shown': ['chsweep'],
+       'cs6cog': ['chsweep'], 'cs6margin': ['chsweep'], 'cs6slide': ['chsweep'], 'cs6name': ['chwhole'], 'cs6z': ['chbar', 'chsweep'],
+       'cs6zchart': ['chbar', 'chsweep'], 'cs6mz': ['chsweep'], 'cs6rekey': ['chsweep'], 'cs6host': ['pvhost'], 'cs6hostb': ['bdhost'],
+       'cs6again': ['chfilter'], 'cs6offnow': ['chfilter'], 'cs6hidden': ['chfilter'], 'cs6grace': ['chsweep'], 'cs6live': ['chsweep'], 'cs6live2': ['chsweep'],
+       'cs6found': ['chsweep'], 'cs6snap': ['chfilter'], 'cs6dlg': ['chsweep'], 'cs6focus': ['chsweep'], 'cs6aria': ['chsweep'], 'cs6tipback': ['chsweep'],
+       'cs5hash': ['chfilter'], 'cs5family': ['chfilter'], 'cs5switch': ['chfilter'], 'cs5warn': ['chfilter'], 'cs5srv5': ['server12'],
+       'cs5snap': ['server12'], 'cs5stk': ['chstack', 'chvals'], 'cs5hover': ['chtheme'], 'cs5dark': ['chtheme', 'chwhole'], 'cs5surface': ['chtheme'],
+       'cw4paint': ['chwhole', 'choff'], 'cw4origcfg': ['chwhole'], 'cw4store': ['chwhole'], 'cw4scope': ['chwhole'], 'cw4load': ['chwhole'],
+       'cw4refind': ['chwhole'], 'cw4again': ['chwhole'], 'cw4off': ['chwhole', 'choff'], 'cw4jump': ['chwhole'], 'cw4chip': ['chwhole'],
+       'cw4quiet': ['chwhole'], 'cw4srvkey': ['server11', 'server', 'server12'], 'cw4srvref': ['server11', 'server3'], 'cw4srvscope': ['server11', 'server'],
+       'cv3labels': ['chvals'], 'cv3placed': ['chvals'], 'cv3corner': ['chbar', 'chvals'], 'cv3hz': ['chvals'], 'cv3past': ['chvals'],
+       'cv3area': ['chvals'], 'cv3arc': ['chpie', 'chvals'], 'cv3size': ['chbar', 'chvals'], 'cv3quiet': ['chvals'], 'cv3hover': ['chvals'],
+       'cv3open': ['chvals'],
+       'cn2retry': ['chhidden'], 'cn2refind': ['ch2keep'], 'cn2slot': ['ch2keep'], 'cn2onecanvas': ['ch2keep'],
+'cnfooter': ['chbar', 'chpie'], 'cnmenu': ['chbar', 'chdrill'], 'cnbreak': ['chbar'], 'cnz': ['chbar', 'chsweep'], 'cnpath': ['chdrill'],
+       'cnseries': ['chbar'], 'cnunknown': ['chblank'], 'cnambig': ['chblank'], 'cnother': ['chother'], 'cnrefresh': ['chbar'],
+       'cnclosepin': ['chbar'], 'cnactive': ['choff'], 'cnhost': ['chbar'], 'cntokcase': ['chpie'], 'cnlayerpos': ['chbar'],
+       'sweepback': ['static7'], 'rcwide': ['rowcard'], 'rcclip': ['rowcard'], 'rcundrawn': ['rowcard', 'rowgrp'], 'rcnorowbox': ['rowcard'],
+       'rcnoopen': ['rowcard'], 'rcnoreveal': ['rowcard'], 'rcgone': ['rowcard'], 'delbyval': ['server6'], 'delnochunk': ['server6'],
+       'delparent': ['server6'], 'nobandpaint': ['bands'], 'bandgate': ['bands'], 'bandblank': ['bands'], 'bandfold': ['bands'], 'bandhost': ['bands'],
+       'bandreveal': ['bands'], 'nodelask': ['delthread'], 'noothers': ['delthread'], 'panelplain': ['delthread'], 'panelstatus': ['delthread'],
+       'nocascade': ['server6'], 'noauditreplies': ['server4'], 'nogone': ['rerender'], 'nopending': ['rerender'], 'notipremove': ['tooltip'], 'notiptitle': ['tooltip'],
+       'norowline': ['server3'], 'norefsnap': ['server3'], 'refkeyonly': ['server3'], 'wolfband': ['wolfpack'], 'nostriphtml': ['exports'], 'eq-nostriparray': ['exports'], 'nokeyshape': ['server'], 'noreplyscope': ['server'],
+       'nopvchip': ['jpanel'], 'nopvjump': ['jpanel'], 'nokeyunlock': ['off'], 'nosavenokey': ['off'], 'counttext': ['nested', 'exports'],
+       'noaway': ['nested'], 'nofollow': ['nested'], 'noreanchor': ['nested', 'jpanel'], 'pvscope': ['nested'],
+       'nosort': ['reorder', 'nested', 'single'], 'noother': ['rank'], 'flatall': ['flat'], 'nosummary': ['collapsed', 'nested', 'reveal']}
+
+old = {}
+p = os.path.join(HERE, 'mutants.json')
+if os.path.exists(p): old = json.load(open(p, encoding='utf-8'))
+texts = {k: open(os.path.join(base, rel), 'rb').read().decode('utf-8', 'surrogateescape') for k, rel in FILES.items()}
+out, bad = {}, 0
+for name, (f, edits, must) in M.items():
+    for a, b in edits:
+        n = texts[f].count(a)
+        if n != 1: print('ANCHOR %s: found %d times in %s: %r' % (name, n, f, a[:80])); bad += 1
+    keep = old.get(name, {}).get('must') if name in old else None
+    out[name] = {'file': f, 'edits': [list(e) for e in edits], 'must': must if must is not None else keep, 'scn': SCN.get(name)}
+json.dump(out, open(p, 'w', encoding='utf-8', newline='\n'), indent=1, ensure_ascii=False)
+print('%d mutants, %d bad anchors' % (len(out), bad))
+sys.exit(1 if bad else 0)

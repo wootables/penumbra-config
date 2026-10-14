@@ -1,0 +1,913 @@
+// Pivot perf + correctness driver (2026-09-16).
+// Synthetic data shaped like ?id=int-col-mat (3,242 rows over 1,793 records;
+// per-record vs per-row attribute cardinalities matched; shape 'real' adds the
+// report's @@HTML link columns and value lengths), fed through the REAL
+// processPivotData + generatePivotTable via the __PP closure export.
+//
+//   ?perf=<json matrix>  timing/hash matrix (diagnostics)
+//   ?suite=1             assertions for run.ps1
+(function () {
+  function rng(seed) { var s = seed >>> 0; return function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+  function pad(n, w) { var s = String(n); while (s.length < w) s = '0' + s; return s; }
+  function fnv(s) {
+    var h = 0x811c9dc5;
+    for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    return h.toString(16);
+  }
+  // Harness noise: delayed header re-stacking timers call window.stackHeaders,
+  // which main.js only defines when the report header container exists.
+  if (typeof window.stackHeaders !== 'function') window.stackHeaders = function () {};
+
+  // shape 'real' mirrors int-col-mat's measured value shapes: AWARD_ID and both
+  // college columns are @@HTML links, departments ~30 chars, PI names ~14,
+  // DD-MON-YY dates, and per-record values that vary within a record at the
+  // measured rates (LOG_DATE 8.5%, DEPARTMENT 16%, PI_NAME 35%, CONTRIB 7%).
+  function makeReal(n, recs, seed) {
+    var r = rng(seed || 42);
+    var MON = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    var TT = ['New', 'Supplement', 'Continuation', 'Incremental Funding', 'Modification', 'Renewal'];
+    var LAST = ['McLaughlin', 'Nguyen', 'Patel', 'Rodriguez', 'Chen', 'Johnson', 'Okafor', 'Schmidt', 'Yamamoto', 'Anderson-Lee'];
+    var FIRST = ['Gail', 'Wei', 'Priya', 'Carlos', 'Amara', 'James', 'Ifeoma', 'Lukas', 'Hana', 'Jordan'];
+    function dept(k) { return (170000 + k * 7) + '-' + ['Physics and Astronomy', 'Chemical and Biomolecular Engr', 'Forestry and Environmental Res', 'Crop and Soil Sciences Dept'][k % 4]; }
+    function pi(k) { return LAST[k % 10] + ' ' + (k % 124) + ', ' + FIRST[Math.floor(k / 10) % 10]; }
+    function college(col, k) { var v = (10 + k) + '-Co' + String.fromCharCode(65 + k); return '@@HTML<a href="#" data-search="' + col + ' = //' + v + '//">' + v + '</a>'; }
+    function date() { return pad(1 + Math.floor(r() * 28), 2) + '-' + MON[Math.floor(r() * 12)] + '-' + (20 + Math.floor(r() * 6)); }
+    var recAttr = [];
+    for (var k = 0; k < recs; k++) {
+      recAttr.push({ date: date(), tt: TT[Math.floor(r() * 6)], dept: dept(Math.floor(r() * 169)), pi: pi(Math.floor(r() * 1240)),
+        form: 'Form ' + Math.floor(r() * 16), contrib: Math.floor(r() * 17), lead: Math.floor(r() * 15), collab: r() < 0.5 ? 'Single' : 'Interdisciplinary' });
+    }
+    var rows = [];
+    for (var i = 0; i < n; i++) {
+      var rec = i < recs ? i : Math.floor(r() * recs);
+      var a = recAttr[rec], extra = i >= recs;
+      var id = pad(Math.floor(rec / 1000), 2) + '-' + pad(rec, 6);
+      var m = new Map();
+      m.set('RECORD_ID', id);
+      m.set('LOG_DATE', (extra && r() < 0.085) ? date() : a.date);
+      m.set('AMOUNT_TOTAL', (Math.floor(r() * 5000000) / 100).toFixed(2));
+      m.set('AWARD_ID', '@@HTML<a href="https://oitras.oit.ncsu.edu/resolver/103?id=PAM-P' + id + '" target="_new" title="View the project record (requires proper access)" class="resolver-link">PAM-P' + id + '</a>');
+      m.set('TRANSACTION_TYPE', (extra && r() < 0.046) ? TT[Math.floor(r() * 6)] : a.tt);
+      m.set('DEPARTMENT', (extra && r() < 0.16) ? dept(Math.floor(r() * 169)) : a.dept);
+      m.set('PI_NAME', (extra && r() < 0.35) ? pi(Math.floor(r() * 1240)) : a.pi);
+      m.set('FORM_OF_AWARD', a.form);
+      m.set('CONTRIB_COLLEGE', college('CONTRIB_COLLEGE', (extra && r() < 0.07) ? Math.floor(r() * 17) : a.contrib));
+      m.set('LEAD_COLLEGE', college('LEAD_COLLEGE', a.lead));
+      m.set('COLLAB_TYPE', a.collab);
+      rows.push(m);
+    }
+    return rows;
+  }
+
+  window.__makeData = function (n, recs, seed, blanks, shape) {
+    if (shape === 'real') return makeReal(n, recs, seed);
+    var r = rng(seed || 42);
+    var br = rng((seed || 42) + 7);
+    function b(v) { return (blanks && br() < blanks) ? '' : v; }
+    var recAttr = [];
+    for (var k = 0; k < recs; k++) {
+      recAttr.push({
+        date: '2025-' + pad(1 + Math.floor(r() * 12), 2) + '-' + pad(1 + Math.floor(r() * 21), 2),
+        ttype: 'TYPE_' + Math.floor(r() * 6),
+        form: 'FORM_' + Math.floor(r() * 16),
+        lead: 'LEAD_' + Math.floor(r() * 15),
+        collab: r() < 0.5 ? 'Single' : 'Interdisciplinary'
+      });
+    }
+    var rows = [];
+    for (var i = 0; i < n; i++) {
+      var rec = i < recs ? i : Math.floor(r() * recs);
+      var a = recAttr[rec];
+      var m = new Map();
+      m.set('RECORD_ID', 'R' + pad(rec, 6));
+      m.set('LOG_DATE', b(a.date));
+      m.set('AMOUNT_TOTAL', (Math.floor(r() * 5000000) / 100).toFixed(2));
+      m.set('AWARD_ID', 'A' + pad(rec, 6));
+      m.set('TRANSACTION_TYPE', b(a.ttype));
+      m.set('DEPARTMENT', b('DEPT_' + Math.floor(r() * 169)));
+      m.set('PI_NAME', b(blanks ? ('PI "' + Math.floor(r() * 1240) + '" & <co>') : ('PI_' + Math.floor(r() * 1240))));
+      m.set('FORM_OF_AWARD', a.form);
+      m.set('CONTRIB_COLLEGE', b('COL_' + Math.floor(r() * 17)));
+      m.set('LEAD_COLLEGE', a.lead);
+      m.set('COLLAB_TYPE', a.collab);
+      rows.push(m);
+    }
+    return rows;
+  };
+
+  var FIELDS = ['RECORD_ID', 'LOG_DATE', 'AWARD_ID', 'TRANSACTION_TYPE', 'DEPARTMENT', 'PI_NAME', 'FORM_OF_AWARD', 'CONTRIB_COLLEGE', 'LEAD_COLLEGE', 'COLLAB_TYPE'];
+
+  // Key twins (2026-09-17, section 10). DEPARTMENT / PI_NAME become a fixed-width
+  // id plus a suffix: the 'special' twin's suffixes hold backslashes, quotes, a
+  // tab, a form feed and line breaks, the 'safe' twin's plain characters in the
+  // same places. The id decides every sort, so a key-safe build gives both twins
+  // the same table; __ksCanon maps a key read from the special twin's DOM onto
+  // the safe twin's. Pairs are [special, safe].
+  var KS_DEPT = [['\\', '_'], ['\\12', '_12'], ['"\\', "'_"], ['\\"x', "_'x"], ['\nL', '~L'], ['\fF', '^F'], ['', ''], ['\\\\ a]', '__ a]'], ['\t\\x', '-_x']];
+  // ksExtra (eager builds only): a CR, which the HTML parser turns into LF, and a
+  // character reference to a backslash. Rows built on demand are looked up by raw
+  // key text, which these keys no longer match once in the DOM (older, separate).
+  var KS_DEPT_EXTRA = [['\r\nC', '__C'], ['&#92;E', '_E']];
+  var KS_PI = [['\\', '_'], ['', ''], ['\n', '~'], ['"', "'"], ['\\x', '_x']];
+  var _ksDom = Object.create(null);
+  // What an attribute written the way generatePivotTable writes it reads back as.
+  function ksDomForm(v) {
+    if (!(v in _ksDom)) {
+      var d = document.createElement('div');
+      d.innerHTML = '<i data-k="' + v.replace(/"/g, '&quot;') + '"></i>';
+      _ksDom[v] = d.firstChild.getAttribute('data-k');
+    }
+    return _ksDom[v];
+  }
+  function ksTwin(data, cfg) {
+    var col = cfg.ks === 'special' ? 0 : 1;
+    var sufD = KS_DEPT.concat(cfg.ksExtra ? KS_DEPT_EXTRA : []), sufP = KS_PI;
+    // ksNoLF: labels render a line break as <br>, and the data-column sort rebuilds
+    // group keys from label TEXT, so a line-break group loses its summary value
+    // there (a separate text-vs-key issue, not a selector one).
+    if (cfg.ksNoLF) {
+      var noLF = function (pair) { return !/[\r\n]/.test(pair[0]); };
+      sufD = sufD.filter(noLF);
+      sufP = sufP.filter(noLF);
+    }
+    data.forEach(function (m) {
+      var dm = /^DEPT_(\d+)$/.exec(m.get('DEPARTMENT') || ''), pm = /^PI_(\d+)$/.exec(m.get('PI_NAME') || '');
+      if (dm) {
+        var sd = sufD[+dm[1] % sufD.length], bd = 'D' + pad(+dm[1], 3);
+        m.set('DEPARTMENT', bd + sd[col]);
+        window.__ksPart[ksDomForm(bd + sd[col])] = bd + sd[1];
+      }
+      if (pm) {
+        var sp = sufP[+pm[1] % sufP.length], bp = 'P' + pad(+pm[1], 4);
+        m.set('PI_NAME', bp + sp[col]);
+        window.__ksPart[ksDomForm(bp + sp[col])] = bp + sp[1];
+      }
+    });
+  }
+  window.__ksCanon = function (key) {
+    if (key === null || key === undefined) return key;
+    return String(key).split('|||').map(function (p) { return (p in window.__ksPart) ? window.__ksPart[p] : p; }).join('|||');
+  };
+
+  function rulesFor(P, kind, rows) {
+    var cols = FIELDS.concat(['AMOUNT_TOTAL', 'AMOUNT_CROSS', 'COUNT', 'SUM']);
+    var out = [];
+    (kind || '').split('+').forEach(function (k) {
+      if (k === 'report') out = out.concat(P.reportRules());
+      if (k === 'row') { var c1 = 'COUNT > 1'; out.push({ type: 'row', condition: c1, style: 'color: rgb(200, 0, 0)', parsedCondition: P.parseQuery(c1, cols) }); }
+      if (k === 'fieldcell') {
+        var f = rows[Math.min(1, rows.length - 1)], c2 = f + " contains '1'";
+        out.push({ type: 'cell', targetColumn: f, condition: c2, style: 'font-weight: bold', parsedCondition: P.parseQuery(c2, cols) });
+      }
+    });
+    return out;
+  }
+
+  // Full-option pivot build. cfg: n, fields|order, cols, aggs, layout, expanded,
+  // rules, blanks, shape, rankN, rankScope, totalRowAggs, lazyMin (null = default)
+  window.__buildPivot = function (cfg) {
+    var P = window.__PP;
+    var n = cfg.n || 3242, recs = cfg.recs || Math.round(n * 1793 / 3242);
+    var data = window.__makeData(n, recs, cfg.seed || 42, cfg.blanks || 0, cfg.shape);
+    // bs: departments with a backslash inside / at the end, and a double quote.
+    if (cfg.bs) data.forEach(function (m, i) {
+      var d = m.get('DEPARTMENT');
+      if (d) m.set('DEPARTMENT', i % 4 === 0 ? d.replace('_', '\\') : i % 4 === 1 ? d + '\\' : i % 4 === 2 ? d.replace('_', '"') : d);
+    });
+    // ent: PI names with a numeric character reference (&#92; reads back as a
+    // backslash) or a plain ampersand; ent2: named references (&amp; &lt; &quot;).
+    // The HTML parser changes these keys on their way into the attributes.
+    if (cfg.ent) data.forEach(function (m, i) {
+      var v = m.get('PI_NAME');
+      if (i % 5 === 0) m.set('PI_NAME', v + '&#92;x');
+      else if (i % 5 === 1) m.set('PI_NAME', 'R&D ' + v);
+    });
+    if (cfg.ent2) data.forEach(function (m, i) {
+      var v = m.get('PI_NAME');
+      if (i % 5 === 0) m.set('PI_NAME', v + '&amp;x');
+      else if (i % 5 === 1) m.set('PI_NAME', 'A&lt;' + v);
+      else if (i % 5 === 2) m.set('PI_NAME', v + '&quot;q');
+    });
+    // esc: values shaped the way production serves them. query.php runs
+    // htmlspecialchars(ENT_QUOTES) on every plain cell, so ' & < > " arrive as
+    // &#039; &amp; &lt; &gt; &quot;. Chosen per VALUE, so a value keeps one
+    // spelling; escTop escapes LEAD_COLLEGE too (top-level keys when it is first).
+    if (cfg.esc) data.forEach(function (m) {
+      var dm = /^DEPT_(\d+)$/.exec(m.get('DEPARTMENT') || ''), pm = /^PI_(\d+)$/.exec(m.get('PI_NAME') || ''), lm = /^LEAD_(\d+)$/.exec(m.get('LEAD_COLLEGE') || '');
+      if (dm && +dm[1] % 3 !== 2) m.set('DEPARTMENT', 'Dept ' + dm[1] + ' &amp; Co');
+      if (pm) {
+        var q = +pm[1] % 4;
+        if (q === 0) m.set('PI_NAME', 'O&#039;Brien ' + pm[1]);
+        else if (q === 1) m.set('PI_NAME', 'PI ' + pm[1] + ' &lt;co&gt;');
+        else if (q === 2) m.set('PI_NAME', '&quot;PI ' + pm[1] + '&quot;');
+      }
+      if (lm && cfg.escTop) m.set('LEAD_COLLEGE', 'Lead &amp; ' + lm[1]);
+    });
+    // ks: 'special' | 'safe' key twins (section 10).
+    window.__ksPart = Object.create(null);
+    if (cfg.ks) ksTwin(data, cfg);
+    var rows = cfg.order ? cfg.order.map(function (i) { return FIELDS[i]; }) : FIELDS.slice(0, cfg.fields);
+    var cols = cfg.cols || [];
+    var aggs = cfg.aggs || ['count'];
+    var valField = 'AMOUNT_TOTAL';
+    var overrides = aggs.map(function () { return valField; });
+    var settings = {
+      v: 2, rows: rows, cols: cols, vals: valField, agg: aggs, aggLabels: null, aggColOverrides: overrides, aggFilters: null, aggFormulas: null,
+      rowLayout: cfg.layout, colLayout: 'nested', sortOrder: 'asc', colSortOrder: 'asc', stickyColCount: 3, totalColAggs: null,
+      totalRowAggs: cfg.totalRowAggs || null, totalRowAggLabels: null, totalRowAggBaseIdx: null,
+      rankN: cfg.rankN || null, rankDir: cfg.rankN ? 'top' : null, rankAgg: cfg.rankN ? aggs[0] : null, rankOther: true,
+      rankScope: cfg.rankScope || null, noBreakdown: false, startExpanded: !!cfg.expanded, hideEmpty: false
+    };
+    P.setSettings(settings);
+    P.setRules(rulesFor(P, cfg.rules, rows));
+    if (P.setLazyMin) P.setLazyMin(cfg.lazyMin === undefined ? null : cfg.lazyMin);
+    if (P.setSource) P.setSource(data);   // the column-order sort icon re-processes it
+    var t0 = performance.now();
+    var pd = P.collect(data, rows, cols, valField, aggs, P.extraVals(overrides, valField), null);
+    var t1 = performance.now();
+    var res = P.gen(pd, rows, cols, valField, cfg.layout, 'nested', aggs, 'asc', null, aggs.map(function () { return false; }),
+      null, settings.totalRowAggs, 'asc', 3, P.rankCfg(settings), null, overrides, null, false);
+    return { res: res, rowKeys: Object.keys(pd.data), numRowFields: rows.length, collectMs: t1 - t0, genMs: performance.now() - t1 };
+  };
+
+  // Back-compat for ?perf= matrices and the label tests.
+  window.__runPivot = function (cfg) {
+    var b = window.__buildPivot(cfg);
+    var out = {
+      n: cfg.n || 3242, fields: b.numRowFields, layout: cfg.layout, rules: cfg.rules || 'none',
+      collectMs: Math.round(b.collectMs), genMs: Math.round(b.genMs), htmlKB: Math.round(b.res.html.length / 1024), rowCount: b.res.rowCount,
+      trs: (b.res.html.match(/<tr[ >]/g) || []).length,
+      items: (b.res.html.match(/\(\d+ items\)/g) || []).length,
+      itemsGt1: (b.res.html.match(/\((?:[2-9]|\d\d+) items\)/g) || []).length,
+      other: (b.res.html.match(/\(Other\)/g) || []).length
+    };
+    if (cfg.hash) out.hash = fnv(b.res.html);
+    if (cfg.keep) { out._html = b.res.html; out._rowKeys = b.rowKeys; out._numRowFields = b.numRowFields; }
+    return out;
+  };
+
+  // ---- DOM helpers for the on-demand row tests --------------------------------
+  function table() { return document.getElementById('pivotResultTable'); }
+  function visibleRow(tr) { return tr.style.display !== 'none'; }
+  function canonNode(node) {
+    if (node.nodeType === 3) return JSON.stringify(node.nodeValue);
+    if (node.nodeType !== 1) return '';
+    var attrs = [];
+    for (var i = 0; i < node.attributes.length; i++) {
+      var a = node.attributes[i];
+      // An emptied class/style attribute is the same element as one that never had it.
+      if (a.name === 'style') { if (node.style.cssText) attrs.push('style=' + node.style.cssText); }
+      else if (a.name === 'class') { if (node.classList.length) attrs.push('class=' + Array.prototype.slice.call(node.classList).sort().join(' ')); }
+      else attrs.push(a.name + '=' + a.value);
+    }
+    attrs.sort();
+    var kids = [];
+    for (var c = node.firstChild; c; c = c.nextSibling) kids.push(canonNode(c));
+    return '<' + node.tagName + ' ' + attrs.join('|') + '>' + kids.join('') + '</' + node.tagName + '>';
+  }
+  function mount(cfg) {
+    var P = window.__PP;
+    var b = window.__buildPivot(cfg);
+    var $c = $('#pivot-output-container');
+    $c.empty().html(b.res.html);
+    if (P.lazy) P.lazy.bind();
+    var $t = $('#pivotResultTable');
+    $t.addClass('pivot-initializing');
+    if (b.res.isNested || $t.find('tbody td[rowspan]').length > 0) $t.addClass('is-nested-pivot');
+    $c.show();
+    P.zebra();
+    P.collapseBar();
+    P.sticky();
+    return b;
+  }
+  function snap(stripZebra) {
+    var P = window.__PP;
+    P.sticky();
+    var rows = table().tBodies[0].rows, vis = [];
+    for (var i = 0; i < rows.length; i++) {
+      if (!visibleRow(rows[i])) continue;
+      var s = canonNode(rows[i]);
+      if (stripZebra) s = s.replace(/ zebra-(light|dark)|zebra-(light|dark) ?/g, '');
+      vis.push(s);
+    }
+    var cnt = (P.lazy && P.lazy.count) ? P.lazy.count() : document.querySelectorAll('#pivotResultTable tbody tr').length;
+    return JSON.stringify({ vis: vis, count: cnt });
+  }
+  function fullDom() {
+    var P = window.__PP;
+    if (P.lazy && P.lazy.ensureAll) P.lazy.ensureAll();
+    P.sticky();
+    var rows = table().tBodies[0].rows, out = [];
+    for (var i = 0; i < rows.length; i++) {
+      var s = canonNode(rows[i]);
+      if (!visibleRow(rows[i])) s = s.replace(/ zebra-(light|dark)|zebra-(light|dark) ?/g, '');
+      out.push(s);
+    }
+    return fnv(out.join('\n')) + ':' + out.length;
+  }
+  function visibleToggles() {
+    var list = table().querySelectorAll('tbody .pivot-collapse-toggle-right'), out = [];
+    for (var i = 0; i < list.length; i++) {
+      var tr = list[i].closest('tr'), td = list[i].closest('td');
+      if (tr && visibleRow(tr) && !(td && td.style.display === 'none')) out.push(list[i]);
+    }
+    return out;
+  }
+  function helperClick(cls) {
+    var a = document.createElement('a');
+    a.className = cls; a.href = '#';
+    for (var i = 1; i < arguments.length; i++) if (arguments[i]) a.setAttribute(arguments[i][0], arguments[i][1]);
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  // Fixed interaction script: every pick is by position among VISIBLE toggles,
+  // so identical visible states select identical toggles in both runs.
+  function runScript(cfg, lazyMin) {
+    var P = window.__PP;
+    var trace = [];
+    mount(Object.assign({}, cfg, { lazyMin: lazyMin }));
+    var lazyAtMount = !!(P.lazy && P.lazy.get());
+    var builtAtMount = table().tBodies[0].rows.length;
+    trace.push(snap(true));
+    var striped = false;
+    var ops = [
+      function () { var t = visibleToggles(); t[Math.min(2, t.length - 1)].click(); },
+      function () { var t = visibleToggles(); t[Math.min(3, t.length - 1)].click(); },
+      function () { var t = visibleToggles(); t[Math.min(4, t.length - 1)].click(); },
+      function () { var t = visibleToggles(); t[Math.min(3, t.length - 1)].click(); },
+      function () { helperClick('pivot-expand-all-btn'); },
+      function () { var t = visibleToggles(); t[Math.min(5, t.length - 1)].click(); },
+      function () { var t = visibleToggles(); t[Math.min(1, t.length - 1)].click(); },
+      function () { helperClick('pivot-collapse-level-btn', ['data-view-level', '1']); },
+      function () { var t = visibleToggles(); t[Math.min(0, t.length - 1)].click(); },
+      function () { helperClick('pivot-collapse-all-btn'); },
+      function () { var t = visibleToggles(); t[Math.min(6, t.length - 1)].click(); },
+      function () { var t = visibleToggles(); t[t.length - 1].dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window })); }
+    ];
+    for (var i = 0; i < ops.length; i++) {
+      ops[i]();
+      trace.push(snap(false));
+    }
+    var csv = P.csvCopy(',');
+    var exports = fnv(csv.content) + ':' + csv.rowCount + '|' + fnv(JSON.stringify(P.pivotArray()));
+    return { trace: trace, exports: exports, full: fullDom(), lazyAtMount: lazyAtMount, builtAtMount: builtAtMount };
+  }
+
+  // ---- Level-wide toggles (2026-09-17) -------------------------------------------
+  // The chevron double-click and .pivot-batch-toggle used to fire a real click on
+  // every visible chevron at the level; togglePivotLevel now does the groups in
+  // one pass. oldLevelToggle is that old loop, verbatim, as a reference.
+  function levelChevron(level, collapsed) {
+    var list = table().querySelectorAll('tbody .pivot-collapse-toggle-right[data-group-level="' + level + '"]');
+    for (var i = 0; i < list.length; i++) {
+      var tr = list[i].closest('tr'), td = list[i].closest('td');
+      if (visibleRow(tr) && !(td && td.style.display === 'none') && list[i].classList.contains('pivot-group-collapsed') === collapsed) return list[i];
+    }
+    return null;
+  }
+  function oldLevelToggle(level, expand, dbl) {
+    var P = window.__PP, $table = $('#pivotResultTable');
+    $table.find('.pivot-collapse-toggle.pivot-collapse-toggle-right.' + (expand ? 'pivot-group-collapsed' : 'pivot-group-expanded') + '[data-group-level="' + level + '"]:visible').each(function () {
+      $(this).trigger('click');
+    });
+    if (dbl) {
+      P.zebra(); P.sortIcons(); P.minim(); P.borders();
+      requestAnimationFrame(function () { P.sticky(); });
+    }
+  }
+  // Steps: ['dbl', level, chevronCollapsed] | ['batch', level, 'expand'|'collapse'] | ['click', nth] | ['view', level]
+  function runLevelScript(cfg, lazyMin, useOld) {
+    var P = window.__PP;
+    mount(Object.assign({}, cfg, { lazyMin: lazyMin }));
+    var trace = [snap(false)], counts = [], flags = [];
+    var steps = [['dbl', 0, true], ['dbl', 1, true], ['click', 3], ['dbl', 2, true], ['dbl', 1, false], ['batch', 2, 'expand'],
+      ['view', 2], ['batch', 0, 'collapse'], ['dbl', 0, true], ['click', 5], ['batch', 3, 'expand'], ['dbl', 2, false], ['batch', 1, 'collapse']];
+    steps.forEach(function (st) {
+      var n = 0;
+      if (st[0] === 'dbl') {
+        var ch = levelChevron(st[1], st[2]);
+        if (ch) {
+          n = 1;
+          if (useOld) oldLevelToggle(st[1], st[2], true);
+          else ch.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window }));
+        }
+      } else if (st[0] === 'batch') {
+        if (useOld) oldLevelToggle(st[1], st[2] === 'expand', false);
+        else helperClick('pivot-batch-toggle', ['data-batch-level', String(st[1])], ['data-batch-action', st[2]]);
+        n = 1;
+      } else if (st[0] === 'click') {
+        var t = visibleToggles();
+        if (t.length) { t[Math.min(st[1], t.length - 1)].click(); n = 1; }
+      } else {
+        P.viewLevel(st[1]);
+        n = 1;
+      }
+      counts.push(n);
+      flags.push(P.batchFlag());
+      trace.push(snap(false));
+    });
+    var csv = P.csvCopy(',');
+    var exports = fnv(csv.content) + ':' + csv.rowCount + '|' + fnv(JSON.stringify(P.pivotArray()));
+    return { trace: trace, counts: counts.join(''), flags: flags.join(''), exports: exports, full: fullDom() };
+  }
+  // Replays a recorded op list (chevrons picked by key among visible ones). Steps:
+  // ['click'|'dbl', key, level, nth] | ['batch', level, action] | ['view', level] |
+  // ['expandAll'] | ['collapseAll'] | ['sort', thIndex]
+  function findVisibleToggle(key, level, nth) {
+    var t = visibleToggles(), n = 0;
+    for (var i = 0; i < t.length; i++) {
+      if (t[i].getAttribute('data-group-key') === key && t[i].getAttribute('data-group-level') === level && n++ === nth) return t[i];
+    }
+    return null;
+  }
+  function runOpScript(cfg, ops, useOld) {
+    var P = window.__PP;
+    P.resetSort();   // header sort state outlives a re-mount
+    mount(cfg);
+    var trace = [snap(false)], missing = 0, errors = [];
+    ops.forEach(function (st) {
+      // An error inside a real click/double-click reaches window.onerror, not the
+      // caller; the old loop's jQuery trigger would throw here instead.
+      try {
+        if (st[0] === 'click' || st[0] === 'dbl') {
+          var el = findVisibleToggle(st[1], st[2], st[3]);
+          if (!el) missing++;
+          else if (st[0] === 'click') el.click();
+          else if (useOld) oldLevelToggle(parseInt(st[2], 10), el.classList.contains('pivot-group-collapsed'), true);
+          else el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window }));
+        } else if (st[0] === 'batch') {
+          if (useOld) oldLevelToggle(st[1], st[2] === 'expand', false);
+          else helperClick('pivot-batch-toggle', ['data-batch-level', String(st[1])], ['data-batch-action', st[2]]);
+        } else if (st[0] === 'view') P.viewLevel(st[1]);
+        else if (st[0] === 'expandAll') helperClick('pivot-expand-all-btn');
+        else if (st[0] === 'collapseAll') helperClick('pivot-collapse-all-btn');
+        else if (st[0] === 'sort') table().tHead.querySelectorAll('th')[st[1]].click();
+      } catch (e) {
+        errors.push(String(e && e.message || e));
+      }
+      trace.push(snap(false));
+    });
+    return { trace: trace, missing: missing, full: fullDom() };
+  }
+
+  // ---- Key twins (2026-09-17) -----------------------------------------------------
+  // What the chevron code decides, for every built row, with keys mapped through
+  // __ksCanon: row visibility and classes, summary / group keys, each label cell's
+  // rowspan, display, alignment and classes, and every chevron in it (key, level,
+  // classes, arrow). Label text and pixel offsets are left out: they differ
+  // between the twins by design.
+  // (Class lists are compared sorted: the sticky classes come from a requestAnimationFrame.)
+  function ksClasses(el) { return Array.prototype.slice.call(el.classList).sort().join(' '); }
+  function ksSig() {
+    var t = table(), canon = window.__ksCanon;
+    var ths = t.tHead.querySelectorAll('th[data-row-field]'), head = [];
+    for (var h = 0; h < ths.length; h++) head.push(ksClasses(ths[h]));
+    var rows = t.tBodies[0].rows, out = [head.join(',')];
+    for (var i = 0; i < rows.length; i++) {
+      var tr = rows[i], parts = [visibleRow(tr) ? 'V' : 'H', ksClasses(tr)];
+      var sk = tr.getAttribute('data-pivot-group-summary');
+      if (sk !== null) parts.push('S' + tr.getAttribute('data-pivot-group-summary-level') + '=' + canon(sk));
+      for (var l = 0; l < ths.length; l++) {
+        var g = tr.getAttribute('data-pivot-group-' + l);
+        if (g !== null) parts.push('g' + l + '=' + canon(g));
+      }
+      var tds = tr.querySelectorAll('td[data-row-field]');
+      for (var c = 0; c < tds.length; c++) {
+        var td = tds[c], tg = [], ts = td.querySelectorAll('.pivot-collapse-toggle');
+        for (var k = 0; k < ts.length; k++) {
+          tg.push(canon(ts[k].getAttribute('data-group-key')) + '@' + ts[k].getAttribute('data-group-level') + ' ' + ksClasses(ts[k]) + ' ' + ts[k].innerHTML.charCodeAt(0));
+        }
+        parts.push('td' + td.getAttribute('data-row-field') + ' rs=' + td.getAttribute('rowspan') + ' d=' + td.style.display + ' va=' + td.style.verticalAlign + ' ' + ksClasses(td) + ' [' + tg.join(', ') + ']');
+      }
+      out.push(parts.join(' | '));
+    }
+    return out.join('\n');
+  }
+  // Label cells holding a chevron for the same key and level more than once.
+  function ksDups() {
+    var cells = table().querySelectorAll('tbody td'), dups = 0;
+    for (var i = 0; i < cells.length; i++) {
+      var ts = cells[i].querySelectorAll('.pivot-collapse-toggle'), seen = Object.create(null);
+      for (var k = 0; k < ts.length; k++) {
+        var id = ts[k].getAttribute('data-group-key') + '|@' + ts[k].getAttribute('data-group-level');
+        if (seen[id]) dups++;
+        else seen[id] = true;
+      }
+    }
+    return dups;
+  }
+  // The nth visible right chevron at `level` in state `collapsed` whose own value
+  // (its key's part at that level, id removed, safe-twin spelling) is `suffix`;
+  // null = any. Both twins pick the same chevron.
+  function ksToggle(level, collapsed, suffix, nth) {
+    var list = table().querySelectorAll('tbody .pivot-collapse-toggle-right'), n = 0;
+    for (var i = 0; i < list.length; i++) {
+      var el = list[i], tr = el.closest('tr'), td = el.closest('td');
+      if (!visibleRow(tr) || (td && td.style.display === 'none')) continue;
+      var lv = parseInt(el.getAttribute('data-group-level'), 10);
+      if (lv !== level || el.classList.contains('pivot-group-collapsed') !== collapsed) continue;
+      if (suffix !== null && (window.__ksCanon(el.getAttribute('data-group-key')).split('|||')[lv] || '').replace(/^[DP]\d+/, '') !== suffix) continue;
+      if (n++ === (nth || 0)) return el;
+    }
+    return null;
+  }
+  // Steps: ['click'|'dbl', level, collapsed, suffix, nth] | ['batch', level, action] | ['view', level] |
+  // ['expandAll'] | ['collapseAll'] | ['sortField', level] (row-field header) | ['sortData'] (first
+  // value header) | ['colSort'] (column-order icon) | ['collapseRestore'] | ['remountRestore']
+  function runKsScript(cfg, twin, steps) {
+    var P = window.__PP;
+    P.resetSort();   // header sort state outlives a re-mount
+    var full = Object.assign({}, cfg, { ks: twin });
+    mount(full);
+    var errorsBefore = (window.__errors || []).length;
+    var trace = [ksSig()], missing = [], thrown = [], picked = [], dups = 0;
+    steps.forEach(function (st, si) {
+      try {
+        if (st[0] === 'click' || st[0] === 'dbl') {
+          var el = ksToggle(st[1], st[2], st[3], st[4]);
+          if (!el) missing.push(si);
+          else {
+            // level:suffix of the chevron's own value (safe-twin spelling), for the report
+            var plv = parseInt(el.getAttribute('data-group-level'), 10);
+            var part = window.__ksCanon(el.getAttribute('data-group-key')).split('|||')[plv] || '';
+            picked.push(plv + ':' + (/^[DP]\d+/.test(part) ? (part.replace(/^[DP]\d+/, '') || '(none)') : '(other)'));
+            if (st[0] === 'click') el.click();
+            else el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window }));
+          }
+        } else if (st[0] === 'batch') helperClick('pivot-batch-toggle', ['data-batch-level', String(st[1])], ['data-batch-action', st[2]]);
+        else if (st[0] === 'view') P.viewLevel(st[1]);
+        else if (st[0] === 'expandAll') helperClick('pivot-expand-all-btn');
+        else if (st[0] === 'collapseAll') helperClick('pivot-collapse-all-btn');
+        else if (st[0] === 'sortField') table().tHead.querySelector('th[data-row-field="' + st[1] + '"]').click();
+        else if (st[0] === 'sortData') table().tHead.querySelector('th:not([data-row-field]):not([colspan])').click();
+        else if (st[0] === 'colSort') {
+          var icon = table().querySelector('.col-sort-icon');
+          if (!icon) missing.push(si);
+          else icon.click();
+        } else if (st[0] === 'collapseRestore') {
+          var cs = P.captureCollapse();
+          P.restoreCollapse(cs);
+          P.reapply();
+        } else if (st[0] === 'remountRestore') {
+          var ex = P.captureExpanded();
+          mount(full);
+          P.restoreExpanded(ex);
+        }
+      } catch (e) {
+        thrown.push(si + ': ' + String(e && e.message || e).slice(0, 200));
+      }
+      trace.push(ksSig());
+      dups = Math.max(dups, ksDups());
+    });
+    // A handler that throws on a real click reaches window.onerror, not this loop.
+    var pageErrors = (window.__errors || []).slice(errorsBefore);
+    if (window.__errors) window.__errors.length = errorsBefore;
+    if (P.lazy && P.lazy.ensureAll) P.lazy.ensureAll();
+    return { trace: trace, full: ksSig(), missing: missing, errors: thrown.concat(pageErrors), dups: dups, picked: picked };
+  }
+
+  // Independent expectation for every summary row's "(N items)" label.
+  function expectedItemCounts(rowKeys, numRowFields) {
+    var byGroup = Object.create(null);
+    rowKeys.forEach(function (rk) {
+      var parts = rk.split('|||');
+      for (var lvl = 0; lvl < numRowFields - 1; lvl++) {
+        var gk = parts.slice(0, lvl + 1).join('|||');
+        var child = parts.slice(0, lvl + 2).join('|||');
+        if (!byGroup[gk]) byGroup[gk] = { level: lvl, kids: Object.create(null), leaves: 0 };
+        byGroup[gk].kids[child] = true;
+        byGroup[gk].leaves++;
+      }
+    });
+    var exp = Object.create(null);
+    Object.keys(byGroup).forEach(function (gk) {
+      var g = byGroup[gk];
+      exp[gk] = (g.level === numRowFields - 2) ? g.leaves : Object.keys(g.kids).length;
+    });
+    return exp;
+  }
+  function summaryLabels(html) {
+    var re = /<tr class="pivot-group-summary-row pivot-group-summary-level-(\d+)" data-pivot-group-summary="([^"]*)"[\s\S]*?\((\d+) items\)/g;
+    var out = [], m;
+    while ((m = re.exec(html))) out.push({ level: +m[1], key: m[2].replace(/&quot;/g, '"'), n: +m[3] });
+    return out;
+  }
+
+  function report(txt) { var o = document.getElementById('out'); if (o) o.textContent = txt; }
+
+  function runSuite() {
+    var results = [];
+    function assert(name, cond, detail) { results.push({ name: name, pass: !!cond, detail: detail === undefined ? '' : String(detail) }); }
+    function guarded(name, fn) {
+      try { fn(); } catch (e) { assert(name + ' - threw', false, String(e && e.message || e).slice(0, 300)); }
+    }
+    var P = window.__PP;
+
+    // 1. Label correctness (built eagerly, so the whole table is in the HTML).
+    [
+      { name: '10 row fields, collapsed', cfg: { n: 800, fields: 10, layout: 'nested' } },
+      { name: '5 fields reordered, blanks + quote/&/< keys, report format rule', cfg: { n: 1200, order: [7, 8, 4, 5, 0], layout: 'nested', blanks: 0.1, rules: 'report' } },
+      { name: '5 row fields, start expanded', cfg: { n: 1500, fields: 5, layout: 'nested', expanded: true } }
+    ].forEach(function (t) {
+      guarded('labels: ' + t.name, function () {
+        var r = window.__runPivot(Object.assign({ keep: true, lazyMin: 1000000000 }, t.cfg));
+        var exp = expectedItemCounts(r._rowKeys, r._numRowFields);
+        var labels = summaryLabels(r._html);
+        var bad = labels.filter(function (l) { return exp[l.key] !== l.n; });
+        var gt1 = labels.filter(function (l) { return l.n > 1; }).length;
+        var groups = Object.keys(exp).length;
+        assert('labels: ' + t.name + ' - one summary row per group', labels.length === groups, labels.length + ' rows vs ' + groups + ' groups');
+        assert('labels: ' + t.name + ' - every "(N items)" matches the independent count', labels.length > 0 && bad.length === 0,
+          bad.length + ' wrong of ' + labels.length + (bad.length ? '; first: ' + JSON.stringify({ key: bad[0].key, shown: bad[0].n, expected: exp[bad[0].key] }) : ''));
+        assert('labels: ' + t.name + ' - non-vacuous (some counts > 1)', gt1 > 0, gt1 + ' labels > 1');
+      });
+    });
+
+    // 2. Timing of the eager build (pre-fix: ~22 s here via the O(groups^2) scan).
+    guarded('timing', function () {
+      var big = { n: 1600, fields: 8, lazyMin: 1000000000 };
+      var tn = window.__runPivot(Object.assign({ layout: 'nested' }, big));
+      var ts = window.__runPivot(Object.assign({ layout: 'nested-static' }, big));
+      assert('timing: 8 fields x 1,600 rows collapsible nested builds in < 5,000 ms', tn.genMs < 5000, tn.genMs + ' ms (' + tn.trs + ' rows)');
+      assert('timing: nested / nested-static build ratio < 25', tn.genMs / Math.max(ts.genMs, 20) < 25,
+        tn.genMs + ' ms / ' + ts.genMs + ' ms = ' + (tn.genMs / Math.max(ts.genMs, 20)).toFixed(1));
+    });
+
+    // 3. Build-speed caches: DOMPurify once per distinct label value, and no
+    //    per-cell toLocaleString (each call constructs an Intl.NumberFormat).
+    guarded('build caches', function () {
+      var sanitize = DOMPurify.sanitize, calls = 0;
+      var tls = Number.prototype.toLocaleString, tlsCalls = 0;
+      DOMPurify.sanitize = function () { calls++; return sanitize.apply(this, arguments); };
+      Number.prototype.toLocaleString = function () { tlsCalls++; return tls.apply(this, arguments); };
+      try {
+        window.__buildPivot({ n: 3242, fields: 10, layout: 'flat', shape: 'real', lazyMin: 1000000000 });
+      } finally {
+        DOMPurify.sanitize = sanitize;
+        Number.prototype.toLocaleString = tls;
+      }
+      assert('build caches: DOMPurify runs once per distinct link value, not per cell (< 2,500 calls)', calls > 0 && calls < 2500, calls + ' sanitize calls');
+      assert('build caches: no per-cell Number.toLocaleString during the build', tlsCalls === 0, tlsCalls + ' toLocaleString calls');
+    });
+
+    // 4. Hidden flat table is not restyled while a pivot is on screen.
+    guarded('hidden pass', function () {
+      var $tb = $('#resultsTable tbody').empty();
+      $('#resultsTable thead th').each(function (i) { $(this).attr('data-column', i === 0 ? '#' : String(i - 1)); });
+      var body = '';
+      for (var ri = 0; ri < 40; ri++) {
+        body += '<tr><td>' + (ri + 1) + '</td><td>COL' + (ri % 3) + '</td><td>FY2' + (ri % 4) + '</td><td>' + (1000 + ri) +
+          '</td><td>' + (ri % 2 ? 'Active' : 'Closed') + '</td><td>R' + ri + '</td></tr>';
+      }
+      $tb.html(body);
+      var cond = "STATUS = 'Active'";
+      P.setRules([{ type: 'cell', targetColumn: 'AMOUNT', condition: cond, style: 'background-color: rgb(255, 0, 0)',
+        parsedCondition: P.parseQuery(cond, ['#', 'COLLEGE', 'FY', 'AMOUNT', 'STATUS', 'RECORD_ID']) }]);
+      function styledRows() { return $('#resultsTable tbody tr').filter(function () { return this.cells[3].style.backgroundColor !== ''; }).length; }
+      function clearStyles() { $('#resultsTable tbody td').css('background-color', ''); }
+      $('#groupedResultsContainer').hide();
+      $('#pivot-output-container').hide().empty();
+      clearStyles(); P.cf();
+      var flat1 = styledRows();
+      assert('hidden pass: flat table showing - format(cell) still applied', flat1 === 20, flat1 + ' of 40 rows styled (expected 20)');
+      clearStyles();
+      $('#pivot-output-container').html('<table id="pivotResultTable"><tbody><tr><td>pivot</td></tr></tbody></table>').show();
+      P.cf();
+      var hidden = styledRows();
+      assert('hidden pass: pivot on screen - hidden flat table NOT restyled', $('#pivot-output-container').is(':visible') && hidden === 0,
+        hidden + ' hidden rows restyled while the pivot was showing (expected 0)');
+      $('#pivot-output-container').hide().empty();
+      P.cf();
+      var flat2 = styledRows();
+      assert('hidden pass: back to the flat table - formatting catches up', flat2 === 20, flat2 + ' of 40 rows styled (expected 20)');
+      P.setRules([]);
+      $tb.empty();
+    });
+
+    // 5. Rows built on demand: every plan entry built in order reproduces the
+    //    eager tbody, and the first render holds only the start-visible rows.
+    [
+      { name: '5 fields, collapsed, blanks + rules', cfg: { n: 900, fields: 5, layout: 'nested', blanks: 0.15, rules: 'row+fieldcell' } },
+      { name: '6 fields, real-shaped links, start expanded', cfg: { n: 900, fields: 6, layout: 'nested', shape: 'real', expanded: true, rules: 'report' } },
+      { name: 'per-group Top 3 with (Other) rows', cfg: { n: 900, order: [8, 7, 4], layout: 'nested', rankN: 3, rankScope: 'LEAD_COLLEGE' } }
+    ].forEach(function (t) {
+      guarded('on demand build: ' + t.name, function () {
+        var eager = window.__buildPivot(Object.assign({}, t.cfg, { lazyMin: 1000000000 })).res.html;
+        var lazyB = window.__buildPivot(Object.assign({}, t.cfg, { lazyMin: 0 }));
+        var lz = P.lazy && P.lazy.get();
+        if (!lz) { assert('on demand build: ' + t.name + ' - plan created', false, 'no _pivotLazy store'); return; }
+        var tb0 = eager.indexOf('<tbody>'), tb1 = eager.indexOf('</tbody>');
+        var full = lz.render(lz.entries);
+        assert('on demand build: ' + t.name + ' - every row built in order == eager rows', full === eager.substring(tb0 + 7, tb1),
+          lz.entries.length + ' entries, ' + full.length + ' vs ' + (tb1 - tb0 - 7) + ' chars');
+        var initialBody = lz.render(lz.initial.map(function (i) { return lz.entries[i]; }));
+        var expectLazy = eager.substring(0, tb0 + 7) + initialBody + eager.substring(tb1);
+        assert('on demand build: ' + t.name + ' - first render == eager minus hidden rows',
+          lazyB.res.html.replace(' data-pnb-lazy="' + lz.id + '"', '') === expectLazy && lz.initial.length < lz.entries.length,
+          lz.initial.length + ' of ' + lz.entries.length + ' rows built up front');
+      });
+    });
+
+    // 6. Same clicks, eager vs on demand, one page: visible rows after every step,
+    //    the exports, and the whole DOM once every row is built. The escaped-key
+    //    cases (2026-09-17): the plan was keyed by the key as WRITTEN while every
+    //    lookup uses the key an attribute reads back, so on demand an escaped group
+    //    expanded to nothing, and escaped top-level keys failed the bind check and
+    //    built every row.
+    [
+      { name: 'collapsed start, 5 fields, blanks + rules', cfg: { n: 700, fields: 5, layout: 'nested', blanks: 0.15, rules: 'row+fieldcell' } },
+      { name: 'expanded start, 4 fields, real-shaped', cfg: { n: 700, fields: 4, layout: 'nested', shape: 'real', expanded: true, rules: 'report' } },
+      { name: 'collapsed start, 4 fields, escaped keys at every level', cfg: { n: 700, order: [8, 4, 5, 3], layout: 'nested', esc: true, escTop: true } },
+      { name: 'expanded start, 3 fields, escaped keys below plain top-level keys', cfg: { n: 700, order: [9, 5, 4], layout: 'nested', esc: true, expanded: true } }
+    ].forEach(function (t) {
+      guarded('interaction: ' + t.name, function () {
+        var a = runScript(t.cfg, 1000000000);
+        var b = runScript(t.cfg, 0);
+        var firstBad = -1;
+        for (var i = 0; i < a.trace.length; i++) { if (a.trace[i] !== b.trace[i]) { firstBad = i; break; } }
+        assert('interaction: ' + t.name + ' - rows were built on demand', b.lazyAtMount && b.builtAtMount < a.builtAtMount,
+          'built at mount: on demand ' + b.builtAtMount + ' vs eager ' + a.builtAtMount);
+        assert('interaction: ' + t.name + ' - visible rows identical after all ' + (a.trace.length - 1) + ' steps', firstBad === -1,
+          firstBad === -1 ? '' : 'first difference after step ' + firstBad);
+        assert('interaction: ' + t.name + ' - copy CSV + export array identical', a.exports === b.exports, a.exports + ' vs ' + b.exports);
+        assert('interaction: ' + t.name + ' - whole table identical once every row is built', a.full === b.full, a.full + ' vs ' + b.full);
+      });
+    });
+
+    // 7. Load of the reported pivot: 10 row fields x 3,242 real-shaped rows,
+    //    collapsed. Only the 1,793 top-level rows are built.
+    guarded('load', function () {
+      if (!(P.lazy && P.setLazyMin)) {
+        assert('load: 10 fields x 3,242 rows builds only the top-level rows', false, 'no on-demand row support in this main.js (not run)');
+        assert('load: build + insert + collapse setup + layout in < 4,000 ms', false, 'not run');
+        return;
+      }
+      var t0 = performance.now();
+      var b = mount({ n: 3242, fields: 10, layout: 'nested', shape: 'real', rules: 'report', lazyMin: null });
+      void document.body.offsetHeight;
+      var ms = Math.round(performance.now() - t0);
+      var built = table().tBodies[0].rows.length;
+      assert('load: 10 fields x 3,242 rows builds only the top-level rows', built === 1793, built + ' rows built (eager: 22,587)');
+      assert('load: build + insert + collapse setup + layout in < 4,000 ms', ms < 4000, ms + ' ms');
+      $('#pivot-output-container').hide().empty();
+    });
+
+    // 8. Level-wide toggles (chevron double-click, .pivot-batch-toggle): the same
+    //    script run with the handlers and with the old click-per-chevron loop leaves
+    //    identical rows after every step, identical exports and table; and the
+    //    double-click that took ~16 s headless (474 groups) now takes well under 2 s.
+    [
+      { name: '5 fields, blanks + rules', cfg: { n: 300, fields: 5, layout: 'nested', blanks: 0.15, rules: 'row+fieldcell' } },
+      { name: '6 fields, real-shaped, start expanded', cfg: { n: 300, fields: 6, layout: 'nested', shape: 'real', expanded: true, rules: 'report' } }
+    ].forEach(function (t) {
+      [['on demand', 0], ['eager', 1000000000]].forEach(function (mode) {
+        var label = 'level toggles: ' + t.name + ' (' + mode[0] + ')';
+        guarded(label, function () {
+          var a = runLevelScript(t.cfg, mode[1], true);
+          var b = runLevelScript(t.cfg, mode[1], false);
+          var firstBad = -1;
+          for (var i = 0; i < a.trace.length; i++) { if (a.trace[i] !== b.trace[i]) { firstBad = i; break; } }
+          assert(label + ' - visible rows identical to one click per chevron after every step', firstBad === -1 && a.counts === b.counts,
+            firstBad === -1 ? (a.trace.length - 1) + ' steps, ran ' + b.counts : 'first difference after step ' + firstBad);
+          assert(label + ' - copy CSV + export array + whole table identical', a.exports === b.exports && a.full === b.full,
+            b.exports + ' ' + b.full + (a.exports === b.exports && a.full === b.full ? '' : ' vs old loop ' + a.exports + ' ' + a.full));
+          assert(label + ' - batch flag cleared after every step', b.flags.indexOf('true') === -1, b.flags);
+        });
+      });
+    });
+    guarded('level toggles: timing', function () {
+      mount({ n: 800, fields: 7, layout: 'nested', shape: 'real', seed: 4242, lazyMin: 0 });
+      P.viewLevel(1);
+      var level1 = '#pivotResultTable .pivot-collapse-toggle.pivot-collapse-toggle-right[data-group-level="1"]';
+      var closed = $(level1 + '.pivot-group-collapsed:visible').length;
+      var rows = table().tBodies[0].rows.length;
+      var t0 = performance.now();
+      levelChevron(1, true).dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window }));
+      var ms = Math.round(performance.now() - t0);
+      var opened = $(level1 + '.pivot-group-expanded:visible').length;
+      assert('level toggles: timing - double-click expands all 400+ level-1 groups of a 7-field pivot in < 2,000 ms',
+        ms < 2000 && closed > 400 && opened === closed, ms + ' ms, ' + opened + ' of ' + closed + ' groups open, ' + rows + ' rows before');
+      $('#pivot-output-container').hide().empty();
+    });
+
+    // 9. Tables where one cleanup at the end could differ from one per click. Both
+    //    op lists were found by the differential fuzzer (2026-09-17):
+    //    - after a column sort a group's summary row sits away from its rows, and a
+    //      per-click cleanup leaves a chevron in a row the final cleanup never picks,
+    //      so the handlers must click chevron by chevron (pivotLevelToggleNeedsClicks);
+    //    - keys ending in / containing a backslash: until the chevron lookups used
+    //      CSS.escape (same day) the existing-chevron check never matched, every
+    //      cleanup added another chevron, and these tables had to be clicked too.
+    //      Now they take the one-cleanup path and must still match a click per
+    //      chevron (section 10 checks such keys against plain ones);
+    //    - rows built on demand with keys the HTML parser changes (&#92;, &amp;,
+    //      &lt;, &quot;): while the plan was keyed by the text as written, such a
+    //      group's rows were never built, its parent's first visible row moved again,
+    //      and the handlers had to click (the first list, &# &bsol; &NewLine;, also
+    //      missed the named references). Since the plan is keyed the way attributes
+    //      read (same day) these take the one-cleanup path too.
+    [
+      { name: 'column-sorted table', cfg: { n: 220, fields: 5, layout: 'nested', blanks: 0.15, seed: 3467, lazyMin: 1000000000 },
+        ops: [['dbl', 'R000031', '0', 0], ['click', 'R000116', '0', 0], ['click', 'R000116', '0', 0], ['dbl', 'R000116', '0', 0],
+          ['dbl', 'R000046', '0', 0], ['batch', NaN, 'expand'], ['click', 'R000046', '0', 0], ['dbl', 'R000052', '0', 0], ['expandAll'],
+          ['click', 'R000072|||[Blank]|||A000072|||TYPE_3', '3', 0], ['click', 'R000072|||[Blank]|||A000072|||TYPE_3', '3', 0],
+          ['dbl', 'R000072|||[Blank]|||A000072|||TYPE_3', '3', 0], ['collapseAll'], ['sort', 0], ['click', 'R000111', '0', 0],
+          ['dbl', 'R000051', '0', 0], ['view', 4], ['batch', 4, 'expand'], ['click', 'R000120|||[Blank]', '1', 0],
+          ['dbl', 'R000066|||[Blank]|||A000066|||TYPE_1', '3', 0]] },
+      { name: 'backslash keys', cfg: { n: 240, order: [8, 4, 5, 3], layout: 'nested', bs: true, seed: 7298, lazyMin: 0 },
+        ops: [['batch', 0, 'collapse'], ['expandAll'], ['click', 'LEAD_0|||DEPT\\114|||PI_272', '2', 0], ['dbl', 'LEAD_2|||DEPT"106', '1', 0],
+          ['click', 'LEAD_10|||DEPT"91', '1', 0], ['expandAll'], ['click', 'LEAD_14|||DEPT"143', '1', 0], ['view', 2],
+          ['dbl', 'LEAD_12|||DEPT_63\\|||PI_1199', '2', 0]] },
+      { name: 'character-reference keys (&#92;), built on demand', cfg: { n: 200, order: [8, 5, 3], layout: 'nested', ent: true, seed: 6601, lazyMin: 0 },
+        ops: [['dbl', 'LEAD_5', '0', 0], ['dbl', 'LEAD_1|||PI_664\\x', '1', 0], ['click', 'LEAD_13|||PI_717', '1', 0], ['click', 'LEAD_9|||PI_1046', '1', 0],
+          ['batch', 1, 'expand'], ['click', 'LEAD_4|||PI_803', '1', 0], ['click', 'LEAD_12|||PI_285', '1', 0], ['dbl', 'LEAD_9|||PI_2', '1', 0], ['expandAll'],
+          ['dbl', 'LEAD_6|||PI_231\\x', '1', 0]] },
+      { name: 'named-reference keys (&amp; &lt; &quot;), built on demand', cfg: { n: 200, order: [8, 5, 3], layout: 'nested', ent2: true, seed: 2948, lazyMin: 0 },
+        ops: [['dbl', 'LEAD_9', '0', 0], ['dbl', 'LEAD_5|||PI_823&x', '1', 0], ['view', 1]] }
+    ].forEach(function (t) {
+      var label = 'level toggles vs one click per chevron: ' + t.name;
+      guarded(label, function () {
+        // Builds without the key-safe lookups throw inside the chevron handlers on
+        // backslash keys; those reach window.onerror and are not init errors of this run.
+        var errorsBefore = (window.__errors || []).length;
+        var a = runOpScript(t.cfg, t.ops, true);
+        var b = runOpScript(t.cfg, t.ops, false);
+        if (window.__errors) window.__errors.length = errorsBefore;
+        var firstBad = -1;
+        for (var i = 0; i < a.trace.length; i++) { if (a.trace[i] !== b.trace[i]) { firstBad = i; break; } }
+        assert(label + ' - every recorded chevron found', a.missing === 0 && b.missing === 0, a.missing + ' / ' + b.missing + ' missing');
+        assert(label + ' - visible rows + whole table identical to one click per chevron', firstBad === -1 && a.full === b.full,
+          firstBad === -1 ? b.full + (a.full === b.full ? '' : ' vs old loop ' + a.full) : 'first difference after step ' + firstBad);
+      });
+    });
+
+    // 10. Key-safe chevrons (2026-09-17). Every chevron lookup (click handler,
+    //     reapplyChildSummaryRowspan, restoreExpandedState, restoreCollapseState,
+    //     the column-order sort's restore, the nested sort's summary re-insertion)
+    //     built its selector escaping only `"`: a backslash in a key started a CSS
+    //     escape (no match - and reapply added another chevron on every pass), a
+    //     trailing one or a line break made the selector throw. Each script runs on
+    //     the special-key twin and the plain-key twin; the tables must match after
+    //     every step, with no errors and no chevron piled up.
+    [
+      { name: 'eager, 4 fields + a column field, CR and &#92; keys',
+        cfg: { n: 240, order: [4, 8, 5, 3], cols: ['COLLAB_TYPE'], layout: 'nested', ksExtra: true, seed: 5150, lazyMin: 1000000000 },
+        steps: [['click', 0, true, '_'], ['click', 0, true, '_12'], ['click', 1, true, null], ['click', 0, true, "'_"], ['click', 0, true, "_'x"],
+          ['click', 0, true, '~L'], ['click', 0, true, '^F'], ['click', 0, true, '__ a]'], ['click', 0, true, '-_x'], ['click', 0, true, '__C'],
+          ['click', 0, true, '_E'], ['dbl', 1, true, null], ['click', 2, true, '_'], ['click', 2, true, '~'], ['click', 2, true, "'"], ['click', 2, true, '_x'],
+          ['click', 1, false, null], ['click', 0, false, '_12'], ['sortField', 0], ['click', 0, true, '_12'], ['colSort'], ['collapseRestore'],
+          ['click', 0, true, '_'], ['remountRestore'], ['dbl', 1, true, null], ['batch', 2, 'expand'], ['click', 2, false, null], ['view', 2],
+          ['expandAll'], ['click', 0, false, '_'], ['collapseAll']] },
+      { name: 'on demand, 3 fields, department keys at level 1',
+        cfg: { n: 260, order: [8, 4, 5], layout: 'nested', seed: 6262, lazyMin: 0 },
+        steps: [['click', 0, true, null], ['click', 0, true, null], ['click', 0, true, null], ['click', 1, true, '_'], ['click', 1, true, '_12'],
+          ['click', 1, true, "'_"], ['click', 1, true, '~L'], ['click', 1, false, '_'], ['dbl', 1, true, null], ['click', 1, false, '^F'],
+          ['sortField', 1], ['click', 1, true, '^F'], ['collapseRestore'], ['remountRestore'], ['batch', 1, 'collapse'], ['view', 1],
+          ['click', 1, true, '-_x'], ['expandAll'], ['click', 1, false, '__ a]'], ['collapseAll']] },
+      { name: 'on demand, Top 3 per group + (Other), value-column sorts (no line breaks)',
+        cfg: { n: 300, order: [8, 4, 5], layout: 'nested', rankN: 3, rankScope: 'LEAD_COLLEGE', ksNoLF: true, seed: 233, lazyMin: 0 },
+        steps: [['click', 0, true, null], ['click', 0, true, null], ['click', 0, true, null], ['click', 0, true, null], ['click', 1, true, null],
+          ['click', 1, true, null, 1], ['sortData'], ['click', 1, false, null], ['sortField', 1], ['dbl', 1, true, null], ['sortData'],
+          ['collapseRestore'], ['expandAll'], ['sortData'], ['collapseAll']] }
+    ].forEach(function (t) {
+      var label = 'key-safe chevrons: ' + t.name;
+      guarded(label, function () {
+        var safe = runKsScript(t.cfg, 'safe', t.steps);
+        var special = runKsScript(t.cfg, 'special', t.steps);
+        var firstBad = -1, states = Object.create(null), distinct = 0;
+        for (var i = 0; i < safe.trace.length; i++) {
+          if (firstBad === -1 && safe.trace[i] !== special.trace[i]) firstBad = i;
+          if (!states[safe.trace[i]]) { states[safe.trace[i]] = true; distinct++; }
+        }
+        assert(label + ' - same table as the plain-key twin after every step', firstBad === -1 && safe.full === special.full,
+          firstBad === -1 ? (safe.full === special.full ? t.steps.length + ' steps, ' + distinct + ' distinct states' : 'whole table differs once every row is built')
+            : 'first difference after step ' + firstBad + ' ' + JSON.stringify(t.steps[firstBad - 1] || 'mount'));
+        assert(label + ' - no errors and no chevron twice in a cell', special.errors.length === 0 && special.dups === 0 && safe.errors.length === 0,
+          special.errors.length + ' errors, ' + special.dups + ' duplicate chevrons' + (special.errors.length ? '; first: ' + special.errors[0] : '') +
+          (safe.errors.length ? '; plain twin: ' + safe.errors[0] : ''));
+        var kinds = safe.picked.filter(function (p, i) { return safe.picked.indexOf(p) === i; });
+        assert(label + ' - every step found its chevron (non-vacuous)', safe.missing.length === 0 && special.missing.length === 0 && distinct > t.steps.length / 2,
+          'missing steps ' + JSON.stringify(safe.missing) + ' / ' + JSON.stringify(special.missing) + ', ' + distinct + ' distinct states; clicked ' +
+          safe.picked.length + ' chevrons, level:suffix ' + kinds.join(' '));
+      });
+    });
+    $('#pivot-output-container').hide().empty();
+    return results;
+  }
+
+  var m = /[?&]perf=([^&]+)/.exec(location.search);
+  var s = /[?&]suite=1/.test(location.search);
+  if (m || s) {
+    var results = [];
+    try {
+      if (!window.__PP) throw new Error('hooks unavailable: ' + (window.__PP_ERR || 'n/a') + ' / ' + (window.__errors || []).slice(0, 3).join(' | '));
+      if (s) {
+        results = runSuite();
+      } else {
+        JSON.parse(decodeURIComponent(m[1])).forEach(function (cfg) { results.push(window.__runPivot(cfg)); });
+      }
+      report('RESULTS_JSON:' + JSON.stringify({ results: results, pageErrors: (window.__errors || []).slice(0, 6) }));
+    } catch (e) {
+      report('RESULTS_JSON:' + JSON.stringify({ fatal: String(e && e.stack || e), results: results, pageErrors: (window.__errors || []).slice(0, 6) }));
+    }
+  }
+})();

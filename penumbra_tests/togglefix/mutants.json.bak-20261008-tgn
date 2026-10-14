@@ -1,0 +1,4028 @@
+{
+ "css-scope": {
+  "edits": [
+   [
+    "css/main.css",
+    ":is(#resultsTable, #groupedResultsContainer) .journal-toggle-box {\n    display: inline-flex;\n",
+    ".journal-toggle-box {\n    display: inline-flex;\n"
+   ]
+  ],
+  "must": [
+   "V-dark-off",
+   "V-darkgrp-off",
+   "V-wolf-hover"
+  ],
+  "scn": [
+   "dark",
+   "darkgrp",
+   "wolf"
+  ]
+ },
+ "css-on": {
+  "edits": [
+   [
+    "css/main.css",
+    "\n:is(#resultsTable, #groupedResultsContainer) .journal-toggle-box.is-on {\n",
+    "\n.journal-toggle-box.is-on {\n"
+   ]
+  ],
+  "must": [
+   "V-dark-on",
+   "V-wolf-onhover"
+  ],
+  "scn": [
+   "dark",
+   "wolf"
+  ]
+ },
+ "save-gate": {
+  "edits": [
+   [
+    "js/main.js",
+    "            viewOptions.journalEnabled = true;\n        }\n        // Phase 2: row identity + toggle config. Saved whether or not the journal\n",
+    "            viewOptions.journalEnabled = true;\n        }\n        if ($('#viewOptionJournal').is(':checked')) // MUTANT: key columns saved only while on\n        // Phase 2: row identity + toggle config. Saved whether or not the journal\n"
+   ]
+  ],
+  "must": [
+   "K-off-save"
+  ],
+  "scn": [
+   "offsave"
+  ]
+ },
+ "restore-gate": {
+  "edits": [
+   [
+    "js/main.js",
+    "                window._penumbraJournalKeyColumns = Array.isArray(_jvo.journalKeyColumns)\n",
+    "                window._penumbraJournalKeyColumns = (_jrnEnabled && Array.isArray(_jvo.journalKeyColumns))\n"
+   ]
+  ],
+  "must": [
+   "K-off-restored",
+   "K-off-turnon"
+  ],
+  "scn": [
+   "offsave"
+  ]
+ },
+ "reenable-notes": {
+  "edits": [
+   [
+    "js/main.js",
+    "                $('#journalRowNotesEnable').prop('checked', !!window._penumbraJournalRowNotes);\n                $('#journalToggleWhoEnable').prop('checked', !!window._penumbraJournalToggleWho);\n                populateKeyPicker();",
+    "                $('#journalToggleWhoEnable').prop('checked', !!window._penumbraJournalToggleWho);\n                populateKeyPicker();"
+   ]
+  ],
+  "must": [
+   "K-off-turnon"
+  ],
+  "scn": [
+   "offsave"
+  ]
+ },
+ "tab-gate": {
+  "edits": [
+   [
+    "js/penumbra_journal.js",
+    "        return !window._penumbraJournalHidden\n            && !!(window._penumbraJournalToggles && window._penumbraJournalToggles.length);\n",
+    "        return !!(window._penumbraJournalToggles && window._penumbraJournalToggles.length);\n"
+   ]
+  ],
+  "must": [
+   "K-off-tab"
+  ],
+  "scn": [
+   "offsave"
+  ]
+ },
+ "sw-guard-tg": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (rid !== jReportId()) return; // asked for the report the page has left (journalSwitchReport)\n",
+    ""
+   ]
+  ],
+  "must": [
+   "J-sw-stale"
+  ],
+  "scn": [
+   "switch"
+  ]
+ },
+ "sw-guard-notes": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (rid !== jReportId()) { if (cb) cb(); return; } // asked for the report the page has left\n",
+    ""
+   ]
+  ],
+  "must": [
+   "J-sw-stale"
+  ],
+  "scn": [
+   "switch"
+  ]
+ },
+ "sw-hist": {
+  "edits": [
+   [
+    "js/main.js",
+    "            hideHistPop();\n            _histCache = {};\n            _toggleSeq = {};\n",
+    "            hideHistPop();\n            _toggleSeq = {};\n"
+   ]
+  ],
+  "must": [
+   "J-sw-hist"
+  ],
+  "scn": [
+   "switch"
+  ]
+ },
+ "sw-bootvar": {
+  "edits": [
+   [
+    "js/main.js",
+    "            journalReportId = String(id || '');\n            window.Penumbra.journalReportId = journalReportId;\n",
+    "            window.Penumbra.journalReportId = String(id || '');\n"
+   ]
+  ],
+  "must": [
+   "J-sw-badge",
+   "J-sw-gate"
+  ],
+  "scn": [
+   "switch"
+  ]
+ },
+ "wire": {
+  "edits": [
+   [
+    "js/main.js",
+    "                window.Penumbra.journalSwitchReport(response.new_id || shortId);\n",
+    "                void 0;\n"
+   ]
+  ],
+  "must": [
+   "W-save-switch"
+  ],
+  "scn": [
+   "wire"
+  ]
+ },
+ "miss-validate": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (missing.length) return { ok: false, reason: 'missing', missing: missing, dup: 0, total: masterRowData.length };\n",
+    ""
+   ]
+  ],
+  "must": [
+   "K-miss-off",
+   "K-miss-note",
+   "K-miss-lock",
+   "K-miss-bulk"
+  ],
+  "scn": [
+   "missing"
+  ]
+ },
+ "miss-chip": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (cols.length) {\n                var inData = {};\n",
+    "            if (false) {\n                var inData = {};\n"
+   ]
+  ],
+  "must": [
+   "K-miss-chip",
+   "K-miss-untick"
+  ],
+  "scn": [
+   "missing"
+  ]
+ },
+ "miss-note-msg": {
+  "edits": [
+   [
+    "js/main.js",
+    "                + v.missing.map(function (c) { return '<strong>' + escapeHtml(c) + '</strong>'; }).join(' or ')\n",
+    "                + 'a key'\n"
+   ]
+  ],
+  "must": [
+   "K-miss-note"
+  ],
+  "scn": [
+   "missing"
+  ]
+ },
+ "miss-lock-msg": {
+  "edits": [
+   [
+    "js/main.js",
+    "                else if (v && v.reason === 'missing') msg = 'Toggle columns open once every key column in step 1 is in the data.';\n",
+    ""
+   ]
+  ],
+  "must": [
+   "K-miss-lock"
+  ],
+  "scn": [
+   "missing"
+  ]
+ },
+ "miss-bulk-msg": {
+  "edits": [
+   [
+    "js/main.js",
+    "                    ? 'The journal key column ' + _kv.missing.join(', ') + ' is not in this data, so rows cannot be identified.'\n",
+    "                    ? 'The journal key column is not unique for this data, so rows cannot be identified.'\n"
+   ]
+  ],
+  "must": [
+   "K-miss-bulk"
+  ],
+  "scn": [
+   "missing"
+  ]
+ },
+ "long-box": {
+  "edits": [
+   [
+    "js/main.js",
+    "            var blocked = rowKeyTooLong(rowKey);\n",
+    "            var blocked = false;\n"
+   ]
+  ],
+  "must": [
+   "K-long-box",
+   "K-long-click"
+  ],
+  "scn": [
+   "longkey"
+  ]
+ },
+ "eq-long-guard": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (this.disabled) return; // a key too long to store (toggleBtnHtml)\n",
+    ""
+   ]
+  ],
+  "must": [],
+  "scn": [
+   "longkey"
+  ]
+ },
+ "long-note": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (v && v.nLong) {\n",
+    "            if (false) {\n"
+   ]
+  ],
+  "must": [
+   "K-long-note"
+  ],
+  "scn": [
+   "longkey"
+  ]
+ },
+ "srv-case": {
+  "edits": [
+   [
+    "journal_export.php",
+    "            $parts[] = journalCleanKeyValueExport(isset($vals[$col]) ? $vals[$col] : null);\n",
+    "            $parts[] = journalCleanKeyValueExport(isset($row[$col]) ? $row[$col] : null);\n"
+   ]
+  ],
+  "must": [
+   "S-case-row"
+  ],
+  "scn": [
+   "srv"
+  ]
+ },
+ "srv-sid": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "    if (is_int($identifier)) return $byId($identifier);\n",
+    "    if (is_int($identifier) || ctype_digit(trim((string)$identifier))) return $byId($identifier);\n"
+   ]
+  ],
+  "must": [
+   "S-sid-digits"
+  ],
+  "scn": [
+   "srv"
+  ]
+ },
+ "srv-snap": {
+  "edits": [
+   [
+    "manage_snapshots.php",
+    "    if (is_int($identifier)) return $identifier;\n",
+    "    if (is_int($identifier) || ctype_digit(trim((string)$identifier))) return (int)$identifier;\n"
+   ]
+  ],
+  "must": [
+   "S-snap-digits"
+  ],
+  "scn": [
+   "srv"
+  ]
+ },
+ "srv-gate-list": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "    if ($action === 'list') {\n        $report_identifier = isset($_GET['report_id']) ? $_GET['report_id'] : '';\n        if (empty($report_identifier)) throw new Exception(\"report_id is required.\");\n\n        $report = journalGetReport($conn, $report_identifier);\n        if (!$report) throw new Exception(\"Report not found.\");\n        if (!journalCallerCanView($report, $currentUserKey, $user_ouc, $isAdmin)) {\n            echo json_encode(array('status' => 'error', 'message' => 'You do not have access to this report.'));\n            exit;\n        }\n        // The journal is off: only its peek reads it (journalCallerCanReadJournal).\n        if (!journalCallerCanReadJournal($report, $currentUserKey, $isAdmin)) {\n            echo json_encode(array('status' => 'error', 'message' => 'The Report Journal is off for this report.'));\n            exit;\n        }\n",
+    "    if ($action === 'list') {\n        $report_identifier = isset($_GET['report_id']) ? $_GET['report_id'] : '';\n        if (empty($report_identifier)) throw new Exception(\"report_id is required.\");\n\n        $report = journalGetReport($conn, $report_identifier);\n        if (!$report) throw new Exception(\"Report not found.\");\n        if (!journalCallerCanView($report, $currentUserKey, $user_ouc, $isAdmin)) {\n            echo json_encode(array('status' => 'error', 'message' => 'You do not have access to this report.'));\n            exit;\n        }\n"
+   ]
+  ],
+  "must": [
+   "S-gate-off"
+  ],
+  "scn": [
+   "srv"
+  ]
+ },
+ "srv-gate-attach": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "        // The journal is off: only its peek reads it (journalCallerCanReadJournal).\n        if (!journalCallerCanReadJournal($report, $currentUserKey, $isAdmin)) {\n            http_response_code(403);\n",
+    "        if (false) {\n            http_response_code(403);\n"
+   ]
+  ],
+  "must": [
+   "S-gate-off"
+  ],
+  "scn": [
+   "srv"
+  ]
+ },
+ "srv-enc": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "    $f = journalReportStateFlags($report);\n    return $f['enc'];\n",
+    "    return false;\n"
+   ]
+  ],
+  "must": [
+   "S-gate-enc"
+  ],
+  "scn": [
+   "srv"
+  ]
+ },
+ "srv-tgby": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "        if (isset($byKey[$k])) { $levels[$i] = $byKey[$k]; $changed = true; }\n",
+    "        if (false) { $levels[$i] = $byKey[$k]; $changed = true; }\n"
+   ]
+  ],
+  "must": [
+   "S-tg-groupby",
+   "S-sched-grouped"
+  ],
+  "scn": [
+   "srv"
+  ]
+ },
+ "srv-label": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "        if ($isToggle) return ((string)$val === '1') ? 'Checked' : 'Unchecked';\n",
+    ""
+   ]
+  ],
+  "must": [
+   "S-tg-label"
+  ],
+  "scn": [
+   "srv"
+  ]
+ },
+ "srv-flat": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "    if (is_array($flat_rows) && !empty($flat_rows)) {\n        require_once __DIR__ . '/journal_export.php';\n        if ($sched_is_pivot) {\n",
+    "    if (empty($state['groupBy']) && !$sched_is_pivot && is_array($flat_rows) && !empty($flat_rows)) {\n        require_once __DIR__ . '/journal_export.php';\n        if ($sched_is_pivot) {\n"
+   ]
+  ],
+  "must": [
+   "S-sched-grouped",
+   "S-sched-pivot"
+  ],
+  "scn": [
+   "srv"
+  ]
+ },
+ "srv-oneread": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "            $journal_toggle_resolver = $jt['resolver'];\n",
+    "            $journal_toggle_resolver = journalExportToggleResolver($report_id, $state, array_keys(reset($flat_rows)));\n"
+   ]
+  ],
+  "must": [
+   "S-sched-grouped",
+   "S-sched-oneread"
+  ],
+  "scn": [
+   "srv"
+  ]
+ },
+ "srv-reg": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "    penumbra_sched_toggle_cols($journal_toggle_cols);\n",
+    ""
+   ]
+  ],
+  "must": [
+   "S-sched-grouped",
+   "S-sched-pivot"
+  ],
+  "scn": [
+   "srv"
+  ]
+ },
+ "srv-dd": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "                    foreach ($_ddTg as $_ddCol) {\n",
+    "                    foreach (array() as $_ddCol) {\n"
+   ]
+  ],
+  "must": [
+   "S-dd-strip"
+  ],
+  "scn": [
+   "srv"
+  ]
+ },
+ "b-throttle": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (Date.now() - _jLastToggleLoad < minAgeMs) return;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "R-refresh-throttle",
+   "R-refresh-focus",
+   "R-refresh-same",
+   "R-refresh-fail",
+   "R-refresh-pending"
+  ],
+  "scn": [
+   "refresh"
+  ]
+ },
+ "b-focus": {
+  "edits": [
+   [
+    "js/main.js",
+    "        $(window).on('focus', function () { refreshTogglesIfStale(30000); });\n",
+    ""
+   ]
+  ],
+  "must": [
+   "R-refresh-focus",
+   "R-refresh-same",
+   "R-refresh-fail",
+   "R-refresh-pending"
+  ],
+  "scn": [
+   "refresh"
+  ]
+ },
+ "b-same": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (quiet && !recovered && sameToggleState(window._penumbraToggleState, next)) return;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "R-refresh-same"
+  ],
+  "scn": [
+   "refresh"
+  ]
+ },
+ "b-failkeep": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (!ok) { toggleLoadFailed(quiet); return; }\n",
+    "                if (!ok) { if (!quiet) { toggleLoadFailed(quiet); return; } resp = { toggles: {} }; }\n"
+   ]
+  ],
+  "must": [
+   "R-refresh-fail"
+  ],
+  "scn": [
+   "refresh"
+  ]
+ },
+ "b-overlay": {
+  "edits": [
+   [
+    "js/main.js",
+    "                overlayPendingFlips(next);\n",
+    ""
+   ]
+  ],
+  "must": [
+   "R-refresh-pending"
+  ],
+  "scn": [
+   "refresh"
+  ]
+ },
+ "b-answer": {
+  "edits": [
+   [
+    "js/main.js",
+    "                    if (_on) stateMap[rowKey] = { by: resp.by || me, at: resp.at || null };\n",
+    "                    if (_on) stateMap[rowKey] = { by: me, at: null };\n"
+   ]
+  ],
+  "must": [
+   "R-already",
+   "W-who-mine"
+  ],
+  "scn": [
+   "already",
+   "who"
+  ]
+ },
+ "b-toast": {
+  "edits": [
+   [
+    "js/main.js",
+    "                    if (resp.unchanged && _on && _other) {\n",
+    "                    if (false) {\n"
+   ]
+  ],
+  "must": [
+   "R-already"
+  ],
+  "scn": [
+   "already"
+  ]
+ },
+ "c-who-css": {
+  "edits": [
+   [
+    "css/main.css",
+    "/* A row whose key is too long for the journal to store, or empty (main.js toggleBtnHtml). */\n",
+    ":is(#resultsTable, #groupedResultsContainer) td.journal-toggle-col::after { content: 'pat 10/1'; }\n/* A row whose key is too long for the journal to store, or empty (main.js toggleBtnHtml). */\n"
+   ]
+  ],
+  "must": [
+   "W-who-cells"
+  ],
+  "scn": [
+   "who"
+  ]
+ },
+ "b-aria": {
+  "edits": [
+   [
+    "js/main.js",
+    "            return (lbl ? lbl + ', ' : '') + 'row ' + String(rowKey == null ? '' : rowKey).split(KEY_SEP).join(' · ') + ': ' + toggleTip(on, meta);\n",
+    "            return toggleTip(on, meta);\n"
+   ]
+  ],
+  "must": [
+   "W-who-aria",
+   "W-who-mine"
+  ],
+  "scn": [
+   "who"
+  ]
+ },
+ "b-popdate": {
+  "edits": [
+   [
+    "js/main.js",
+    "                    + (meta.at ? ' on ' + escapeHtml(fmtHistWhen(meta.at)) : '') + '</div>'\n",
+    "                    + '</div>'\n"
+   ]
+  ],
+  "must": [
+   "W-who-pop"
+  ],
+  "scn": [
+   "who"
+  ]
+ },
+ "b-prog": {
+  "edits": [
+   [
+    "js/main.js",
+    "            var defs = toggleActive() ? activeToggles() : [];\n            var hiddenWhy = defs.length ? null : togglesHiddenReason();\n",
+    "            var defs = [];\n            var hiddenWhy = defs.length ? null : togglesHiddenReason();\n"
+   ]
+  ],
+  "must": [
+   "P2-prog-text",
+   "P2-prog-tick",
+   "P2-prog-search"
+  ],
+  "scn": [
+   "progress"
+  ]
+ },
+ "b-progsearch": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (tr.classList.contains('search-hidden')) continue;\n                var idx = rowIndexOf(tr, hashCellOf(tr));\n",
+    "                var idx = rowIndexOf(tr, hashCellOf(tr));\n"
+   ]
+  ],
+  "must": [
+   "P2-prog-search"
+  ],
+  "scn": [
+   "progress"
+  ]
+ },
+ "b-undo": {
+  "edits": [
+   [
+    "js/main.js",
+    "                _bulkUndo = changed.length ? { rid: jReportId(), tk: toggleKey, state: !targetState, keys: changed } : null;\n",
+    "                _bulkUndo = null;\n"
+   ]
+  ],
+  "must": [
+   "B-undo-offer",
+   "B-undo-exact",
+   "B-undo-page"
+  ],
+  "scn": [
+   "bulkundo"
+  ]
+ },
+ "b-undokeys": {
+  "edits": [
+   [
+    "js/main.js",
+    "                var changed = Array.isArray(resp.changed) ? resp.changed : keys;\n",
+    "                var changed = visibleRowKeysInOrder(0);\n"
+   ]
+  ],
+  "must": [
+   "B-undo-exact",
+   "B-undo-page"
+  ],
+  "scn": [
+   "bulkundo"
+  ]
+ },
+ "b-arrows": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (next) {\n                next.focus();\n",
+    "            if (next) {\n"
+   ]
+  ],
+  "must": [
+   "A-arrow-down",
+   "A-arrow-up"
+  ],
+  "scn": [
+   "arrows"
+  ]
+ },
+ "b-confirm": {
+  "edits": [
+   [
+    "js/main.js",
+    "                        && !window.confirm('Clear ' + _cur.by + '\\'s mark on this row' + (_cur.at ? ' (made ' + fmtHistWhen(_cur.at) + ')' : '') + '?')) return;\n",
+    "                        && false) return;\n"
+   ]
+  ],
+  "must": [
+   "C-clear-ask",
+   "C-clear-yes"
+  ],
+  "scn": [
+   "confirmclear"
+  ]
+ },
+ "b-confirm-mine": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (_cur && _cur.by && me && String(_cur.by).toLowerCase() !== String(me).toLowerCase()\n",
+    "                if (_cur && _cur.by && me\n"
+   ]
+  ],
+  "must": [
+   "C-clear-mine"
+  ],
+  "scn": [
+   "confirmclear"
+  ]
+ },
+ "b-band": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (lbl) { if (nm.getAttribute('data-tg-col') !== lbl) nm.setAttribute('data-tg-col', lbl); }\n",
+    "                if (false) { if (nm.getAttribute('data-tg-col') !== lbl) nm.setAttribute('data-tg-col', lbl); }\n"
+   ]
+  ],
+  "must": [
+   "G-band-label"
+  ],
+  "scn": [
+   "bandlabel"
+  ]
+ },
+ "b-me": {
+  "edits": [
+   [
+    "js/penumbra_journal.js",
+    "        if (!$('#jHistMe').length && $('#jHistUser').length) {\n",
+    "        if (false) {\n"
+   ]
+  ],
+  "must": [
+   "H-me-filter"
+  ],
+  "scn": [
+   "histjump"
+  ]
+ },
+ "b-jumpbtn": {
+  "edits": [
+   [
+    "js/penumbra_journal.js",
+    "            +   (ev.parts && ev.parts.length\n",
+    "            +   (false\n"
+   ]
+  ],
+  "must": [
+   "H-jump"
+  ],
+  "scn": [
+   "histjump"
+  ]
+ },
+ "b-jumpfocus": {
+  "edits": [
+   [
+    "js/main.js",
+    "            var $tbox = (opts && opts.toggleKey)\n",
+    "            var $tbox = false\n"
+   ]
+  ],
+  "must": [
+   "H-jump"
+  ],
+  "scn": [
+   "histjump"
+  ]
+ },
+ "b-touch": {
+  "edits": [
+   [
+    "css/main.css",
+    "    :is(#resultsTable, #groupedResultsContainer) .journal-toggle-box::before { content: ''; position: absolute; inset: -6px; }\n",
+    ""
+   ]
+  ],
+  "must": [
+   "T-touch-rule"
+  ],
+  "scn": [
+   "touchcss"
+  ]
+ },
+ "b-touch-box": {
+  "edits": [
+   [
+    "css/main.css",
+    "    :is(#resultsTable, #groupedResultsContainer) .journal-toggle-box { position: relative; }\n",
+    "    :is(#resultsTable, #groupedResultsContainer) .journal-toggle-box { position: relative; width: 28px; height: 28px; }\n"
+   ]
+  ],
+  "must": [
+   "T-touch-rule"
+  ],
+  "scn": [
+   "touchcss"
+  ]
+ },
+ "b-dropvis": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (card && getComputedStyle(card).visibility === 'hidden') continue;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "D-hd-import"
+  ],
+  "scn": [
+   "hiddendrop"
+  ]
+ },
+ "b-srv-where": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "                   WHERE t.STATE <> :st3\n",
+    ""
+   ]
+  ],
+  "must": [
+   "SB-merge-sql"
+  ],
+  "scn": [
+   "srvb"
+  ]
+ },
+ "b-srv-audit": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "        if ($changed) {\n            logPenumbraAudit($report_id, 'JOURNAL_TOGGLE', null,\n",
+    "        if (true) {\n            logPenumbraAudit($report_id, 'JOURNAL_TOGGLE', null,\n"
+   ]
+  ],
+  "must": [
+   "SB-set-unchanged"
+  ],
+  "scn": [
+   "srvb"
+  ]
+ },
+ "b-srv-answer": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "            'by' => $cur['by'], 'at' => $cur['at'])));\n",
+    "            'by' => $currentUserKey, 'at' => $cur['at'])));\n"
+   ]
+  ],
+  "must": [
+   "SB-set-unchanged",
+   "SB-set-dup"
+  ],
+  "scn": [
+   "srvb"
+  ]
+ },
+ "b-srv-dup": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "            if (strpos((string)$e['message'], 'ORA-00001') !== false) $ok = oci_execute($stmt);\n",
+    ""
+   ]
+  ],
+  "must": [
+   "SB-set-dup"
+  ],
+  "scn": [
+   "srvb"
+  ]
+ },
+ "b-srv-bulk": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "            if ((int)oci_num_rows($stmt) > 0) $changed_keys[] = $rk;\n",
+    "            $changed_keys[] = $rk;\n"
+   ]
+  ],
+  "must": [
+   "SB-bulk-changed",
+   "SB-bulk-none"
+  ],
+  "scn": [
+   "srvb"
+  ]
+ },
+ "d-rowsql": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "            $byRow = is_string($needle) && strlen($needle) <= 3900;\n",
+    "            $byRow = false;\n"
+   ]
+  ],
+  "must": [
+   "SD-row-sql"
+  ],
+  "scn": [
+   "srvd"
+  ]
+ },
+ "d-summary": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "                    $sum['changes']++;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "SD-search-summary",
+   "SD-search-latest",
+   "SD-search-cap"
+  ],
+  "scn": [
+   "srvd"
+  ]
+ },
+ "d-cap": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "                    if (count($events) >= $EVENT_CAP) { $truncated = true; continue; }\n",
+    "                    if (count($events) >= $EVENT_CAP) { $truncated = true; break 2; }\n"
+   ]
+  ],
+  "must": [
+   "SD-search-cap"
+  ],
+  "scn": [
+   "srvd"
+  ]
+ },
+ "d-partial": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "            if (count($rows) >= $SCAN_CAP) { $truncated = true; $scanCapped = true; }\n",
+    "            if (count($rows) >= $SCAN_CAP) { $truncated = true; }\n"
+   ]
+  ],
+  "must": [
+   "SD-search-cap"
+  ],
+  "scn": [
+   "srvd"
+  ]
+ },
+ "d-now": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "                    $events[$i]['now'] = isset($now[$nk]) ? $now[$nk] : array('on' => false);\n",
+    ""
+   ]
+  ],
+  "must": [
+   "SD-search-now"
+  ],
+  "scn": [
+   "srvd"
+  ]
+ },
+ "d-latest": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "                    if ($fLatest) {\n",
+    "                    if (false) {\n"
+   ]
+  ],
+  "must": [
+   "SD-search-latest"
+  ],
+  "scn": [
+   "srvd"
+  ]
+ },
+ "d-state": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "                if ($fState !== '' && $state !== (int)$fState) continue;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "SD-search-state"
+  ],
+  "scn": [
+   "srvd"
+  ]
+ },
+ "d-state-needle": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "            $binds[':tkn'] = '\"toggle_key\":' . json_encode($fToggle);\n        }\n",
+    "            $binds[':tkn'] = '\"toggle_key\":' . json_encode($fToggle);\n        }\n        if ($fState !== '') { $where .= ' AND INSTR(\"AFTER\", :stn) > 0'; $binds[':stn'] = '\"state\":' . $fState; }\n"
+   ]
+  ],
+  "must": [
+   "SD-search-state"
+  ],
+  "scn": [
+   "srvd"
+  ]
+ },
+ "d-tk": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "            $binds[':tkn'] = '\"toggle_key\":' . json_encode($fToggle);\n",
+    ""
+   ]
+  ],
+  "must": [
+   "SD-search-tkfilter"
+  ],
+  "scn": [
+   "srvd"
+  ]
+ },
+ "d-js-summary": {
+  "edits": [
+   [
+    "js/penumbra_journal.js",
+    "        var html = jHistSummaryHtml(summary, partial, mine);\n",
+    "        var html = '';\n"
+   ]
+  ],
+  "must": [
+   "H2-summary",
+   "H2-person"
+  ],
+  "scn": [
+   "histplus"
+  ]
+ },
+ "d-js-now": {
+  "edits": [
+   [
+    "js/penumbra_journal.js",
+    "            +     jHistNowHtml(ev.now)\n",
+    "            +     ''\n"
+   ]
+  ],
+  "must": [
+   "H2-now"
+  ],
+  "scn": [
+   "histplus"
+  ]
+ },
+ "d-js-person": {
+  "edits": [
+   [
+    "js/penumbra_journal.js",
+    "            $('#jHistUser').val($(this).attr('data-user'));\n",
+    ""
+   ]
+  ],
+  "must": [
+   "H2-person"
+  ],
+  "scn": [
+   "histplus"
+  ]
+ },
+ "d-js-latest": {
+  "edits": [
+   [
+    "js/penumbra_journal.js",
+    "                + '&mode=' + encodeURIComponent(p.mode),\n",
+    "                + '&mode=',\n"
+   ]
+  ],
+  "must": [
+   "H2-latest"
+  ],
+  "scn": [
+   "histplus"
+  ]
+ },
+ "d-js-state": {
+  "edits": [
+   [
+    "js/penumbra_journal.js",
+    "                + '&state=' + encodeURIComponent(p.state)\n",
+    "                + '&state='\n"
+   ]
+  ],
+  "must": [
+   "H2-state"
+  ],
+  "scn": [
+   "histplus"
+  ]
+ },
+ "d-js-preset": {
+  "edits": [
+   [
+    "js/penumbra_journal.js",
+    "            from.setDate(from.getDate() - (days - 1));\n",
+    "            from.setDate(from.getDate() - days);\n"
+   ]
+  ],
+  "must": [
+   "H2-preset"
+  ],
+  "scn": [
+   "histplus"
+  ]
+ },
+ "d-js-preset-lift": {
+  "edits": [
+   [
+    "js/penumbra_journal.js",
+    "        $(document).on('change', '#jHistFrom, #jHistTo', function () { $('.jhist-preset').attr('aria-pressed', 'false'); });\n",
+    ""
+   ]
+  ],
+  "must": [
+   "H2-preset"
+  ],
+  "scn": [
+   "histplus"
+  ]
+ },
+ "d-js-guard": {
+  "edits": [
+   [
+    "js/penumbra_journal.js",
+    "            lines.push(line.map(function (v) { return cell(v, ','); }).join(','));\n",
+    "            lines.push(line.join(','));\n"
+   ]
+  ],
+  "must": [
+   "H2-export"
+  ],
+  "scn": [
+   "histplus"
+  ]
+ },
+ "d-js-bom": {
+  "edits": [
+   [
+    "js/penumbra_journal.js",
+    "        var blob = new Blob(['\\uFEFF' + lines.join(",
+    "        var blob = new Blob([lines.join("
+   ]
+  ],
+  "must": [
+   "H2-export"
+  ],
+  "scn": [
+   "histplus"
+  ]
+ },
+ "d-js-shown": {
+  "edits": [
+   [
+    "js/penumbra_journal.js",
+    "        _histShown = events;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "H2-export"
+  ],
+  "scn": [
+   "histplus"
+  ]
+ },
+ "eq-js-csvexport": {
+  "edits": [
+   [
+    "js/main.js",
+    "    window.Penumbra.escapeCsvCell = escapeCsvCell;\n",
+    ""
+   ]
+  ],
+  "must": [],
+  "scn": [
+   "histplus"
+  ]
+ },
+ "e-bulk-strval": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "        $clean_keys = array_map('strval', array_keys($clean_keys));\n        if (empty($clean_keys)) {\n            http_response_code(400);\n            echo json_encode(array('status' => 'error', 'message' => 'No usable row keys were supplied.'));\n            exit;\n        }\n        // The row cap, for the whole batch",
+    "        $clean_keys = array_keys($clean_keys);\n        if (empty($clean_keys)) {\n            http_response_code(400);\n            echo json_encode(array('status' => 'error', 'message' => 'No usable row keys were supplied.'));\n            exit;\n        }\n        // The row cap, for the whole batch"
+   ]
+  ],
+  "must": [
+   "SE-bulk-strval"
+  ],
+  "scn": [
+   "srve"
+  ]
+ },
+ "e-reader-sql": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "            if ($byRow && preg_match('/^(0|-?[1-9][0-9]{0,17})$/', $row_key)) {\n",
+    "            if (false) {\n"
+   ]
+  ],
+  "must": [
+   "SE-hist-int"
+  ],
+  "scn": [
+   "srve"
+  ]
+ },
+ "e-reader-php": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "                    $hit = in_array($row_key, array_map('strval', $aft['row_keys']), true);\n",
+    "                    $hit = in_array($row_key, $aft['row_keys'], true);\n"
+   ]
+  ],
+  "must": [
+   "SE-hist-int"
+  ],
+  "scn": [
+   "srve"
+  ]
+ },
+ "e-used-keys": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "            'used_keys' => utf8ize($used)));\n",
+    "            'used_keys' => array()));\n"
+   ]
+  ],
+  "must": [
+   "SE-used-keys"
+  ],
+  "scn": [
+   "srve"
+  ]
+ },
+ "e-sum-call": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "        if ($journal_toggle_resolver) $state = penumbra_sched_toggle_summaries($state, $journal_toggle_resolver);\n",
+    ""
+   ]
+  ],
+  "must": [
+   "SE-sched-sum"
+  ],
+  "scn": [
+   "srve"
+  ]
+ },
+ "e-sum-skip": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "            $to = (string)$cm['name'];\n            if (!isset($have[$from]) || isset($have[strtoupper($to)])) continue;\n",
+    "            $to = (string)$cm['name'];\n            if (!isset($have[$from])) continue;\n"
+   ]
+  ],
+  "must": [
+   "SE-sum-remap"
+  ],
+  "scn": [
+   "srve"
+  ]
+ },
+ "e-is-toggle": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "    return isset($reg[$u]);\n",
+    "    return false;\n"
+   ]
+  ],
+  "must": [
+   "SE-is-toggle"
+  ],
+  "scn": [
+   "srve"
+  ]
+ },
+ "e-eval-keep": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "        if (array_key_exists($tn, $row)) continue;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "SE-eval-keep"
+  ],
+  "scn": [
+   "srve"
+  ]
+ },
+ "e-js-fail-prev": {
+  "edits": [
+   [
+    "js/main.js",
+    "                    restoreFlipPrev(stateMap, rowKey, _hk, newState, me);\n                    paintBtn($btn, !newState); // revert (every copy, from the reverted state)\n",
+    "                    if (newState) delete stateMap[rowKey]; else stateMap[rowKey] = { by: me, at: null };\n                    paintBtn($btn, !newState); // revert (every copy, from the reverted state)\n"
+   ]
+  ],
+  "must": [
+   "E-fail-prev",
+   "E-fail-burst"
+  ],
+  "scn": [
+   "failsave"
+  ]
+ },
+ "e-js-fail-http": {
+  "edits": [
+   [
+    "js/main.js",
+    "                restoreFlipPrev(stateMap, rowKey, _hk, newState, me);\n                paintBtn($btn, !newState);\n                noteToggleFlip(null);\n",
+    "                if (newState) delete stateMap[rowKey]; else stateMap[rowKey] = { by: me, at: null };\n                paintBtn($btn, !newState);\n                noteToggleFlip(null);\n"
+   ]
+  ],
+  "must": [
+   "E-fail-prev-http"
+  ],
+  "scn": [
+   "failsave"
+  ]
+ },
+ "e-js-burst": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (!_pendingFlips[_hk]) {\n                var _pm = ownMeta(stateMap, rowKey);\n",
+    "            if (true) {\n                var _pm = ownMeta(stateMap, rowKey);\n"
+   ]
+  ],
+  "must": [
+   "E-fail-burst"
+  ],
+  "scn": [
+   "failsave"
+  ]
+ },
+ "e-js-hist-refetch": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (_histOpenKey === _hk) { renderHistPop(tk, rowKey); fetchHist(tk, rowKey); }\n            }).fail(function (xhr) {\n",
+    "                if (_histOpenKey === _hk) renderHistPop(tk, rowKey);\n            }).fail(function (xhr) {\n"
+   ]
+  ],
+  "must": [
+   "E-hist-flip"
+  ],
+  "scn": [
+   "histflip"
+  ]
+ },
+ "e-js-hist-bulk": {
+  "edits": [
+   [
+    "js/main.js",
+    "                dropHistCache(); // every row it changed has a new history event\n",
+    ""
+   ]
+  ],
+  "must": [
+   "E-hist-bulk"
+  ],
+  "scn": [
+   "histflip"
+  ]
+ },
+ "e-js-load-flag": {
+  "edits": [
+   [
+    "js/main.js",
+    "            var first = !_jToggleLoadFailed;\n            _jToggleLoadFailed = true;\n",
+    "            var first = !_jToggleLoadFailed;\n"
+   ]
+  ],
+  "must": [
+   "E-load-dim",
+   "E-load-refuse"
+  ],
+  "scn": [
+   "loadfail"
+  ]
+ },
+ "e-js-load-recover": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (recovered) { _jToggleLoadFailed = false; syncToggleUnloaded(); }\n",
+    "                if (recovered) { }\n"
+   ]
+  ],
+  "must": [
+   "E-load-retry"
+  ],
+  "scn": [
+   "loadfail"
+  ]
+ },
+ "e-js-click-guard": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (this.disabled) return; // a key too long to store (toggleBtnHtml)\n            if (_jToggleLoadFailed) { toggleLoadFailed(false); return; } // the marks are not known\n",
+    "            if (this.disabled) return; // a key too long to store (toggleBtnHtml)\n"
+   ]
+  ],
+  "must": [
+   "E-load-refuse"
+  ],
+  "scn": [
+   "loadfail"
+  ]
+ },
+ "e-js-bulk-guard": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (!isNote && _jToggleLoadFailed) {\n",
+    "            if (false) {\n"
+   ]
+  ],
+  "must": [
+   "E-load-refuse"
+  ],
+  "scn": [
+   "loadfail"
+  ]
+ },
+ "e-js-snap-guard": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (_jToggleLoadFailed) throw new Error(",
+    "            if (false) throw new Error("
+   ]
+  ],
+  "must": [
+   "E-load-refuse"
+  ],
+  "scn": [
+   "loadfail"
+  ]
+ },
+ "e-css-dim": {
+  "edits": [
+   [
+    "css/main.css",
+    "body.pnb-jtoggles-unloaded :is(#resultsTable, #groupedResultsContainer) .journal-toggle-box {\n    opacity: 0.4;\n",
+    "body.pnb-jtoggles-unloaded :is(#resultsTable, #groupedResultsContainer) .journal-toggle-box {\n"
+   ]
+  ],
+  "must": [
+   "E-load-dim"
+  ],
+  "scn": [
+   "loadfail"
+  ]
+ },
+ "e-js-grp-read": {
+  "edits": [
+   [
+    "js/main.js",
+    "rowMap.set(_tgCols[_tgc].name, _cell ? String(penumbraReadCellForSummary(_cell)).trim() : '');\n",
+    "rowMap.set(_tgCols[_tgc].name, _cell ? _cell.textContent.trim() : '');\n"
+   ]
+  ],
+  "must": [
+   "E-grp-foot"
+  ],
+  "scn": [
+   "grpfoot"
+  ]
+ },
+ "e-js-grp-colid": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (colId === undefined && String(colName).indexOf('__JOURNAL') === 0) colId = colName;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "E-grp-foot"
+  ],
+  "scn": [
+   "grpfoot"
+  ]
+ },
+ "e-js-snap": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (typeof isViewingSnapshot !== 'undefined' && isViewingSnapshot) {\n",
+    "            if (false) {\n"
+   ]
+  ],
+  "must": [
+   "E-snap-bulk"
+  ],
+  "scn": [
+   "snapbulk"
+  ]
+ },
+ "e-js-snapcmp": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if ($('body').hasClass('snapshot-comparison-active')) { bulkFail('Close the snapshot comparison to mark rows or add notes.'); return; }\n",
+    ""
+   ]
+  ],
+  "must": [
+   "E-snapcmp-bulk"
+  ],
+  "scn": [
+   "snapbulk"
+  ]
+ },
+ "e-js-warn-notes": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (up === 'NOTES') notesNamed = true;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "E-warn-notes"
+  ],
+  "scn": [
+   "notesname"
+  ]
+ },
+ "e-js-warn-pipe": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (lbl.indexOf('|') >= 0) piped.push(lbl);\n",
+    ""
+   ]
+  ],
+  "must": [
+   "E-warn-pipe"
+  ],
+  "scn": [
+   "notesname"
+  ]
+ },
+ "e-idx-live": {
+  "edits": [
+   [
+    "index.php",
+    "<div id=\"journalToggleWarn\" role=\"status\" aria-live=\"polite\" style=\"display:none;\"></div>",
+    "<div id=\"journalToggleWarn\" style=\"display:none;\"></div>"
+   ]
+  ],
+  "must": [
+   "E-warn-live"
+  ],
+  "scn": [
+   "notesname"
+  ]
+ },
+ "e-js-genkey": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (_jUsedToggleKeys) { for (var u = 0; u < _jUsedToggleKeys.length; u++) used[_jUsedToggleKeys[u]] = 1; }\n",
+    ""
+   ]
+  ],
+  "must": [
+   "E-genkey-used"
+  ],
+  "scn": [
+   "usedkeys"
+  ]
+ },
+ "e-js-usedkeys-load": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (Array.isArray(resp.used_keys)) _jUsedToggleKeys = resp.used_keys.slice();\n",
+    ""
+   ]
+  ],
+  "must": [
+   "E-genkey-used"
+  ],
+  "scn": [
+   "usedkeys"
+  ]
+ },
+ "e-css-print": {
+  "edits": [
+   [
+    "css/main.css",
+    "    :is(#resultsTable, #groupedResultsContainer) .journal-toggle-box.is-on {\n        -webkit-print-color-adjust: exact;\n        print-color-adjust: exact;\n",
+    "    :is(#resultsTable, #groupedResultsContainer) .journal-toggle-box.is-on {\n"
+   ]
+  ],
+  "must": [
+   "E-print-rule"
+  ],
+  "scn": [
+   "printrule"
+  ]
+ },
+ "e-js-replay": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (_jsVer > 0 && _jsReady\n                && window._pnbJournalSortReplayedFor !== masterRowData\n",
+    "            if (_jsVer > 0 && _jsReady\n                && (window._pnbJournalSortReplayedFor !== masterRowData || window._pnbJournalSortReplayedVer !== _jsVer)\n"
+   ]
+  ],
+  "must": [
+   "E-sort-stay"
+  ],
+  "scn": [
+   "noteresort"
+  ]
+ },
+ "e-js-replay-ready": {
+  "edits": [
+   [
+    "js/main.js",
+    "            var _jsReady = (!_jsNeedTg || _jToggleStateLoaded) && (!_jsNeedNotes || _jNoteCountsLoaded);\n",
+    "            var _jsReady = true;\n"
+   ]
+  ],
+  "must": [
+   "E-sort-first"
+  ],
+  "scn": [
+   "noteresort"
+  ]
+ },
+ "e-js-cf-src": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (_cfSrcIdx >= 0 && masterRowData && masterRowData[_cfSrcIdx]) rowDataMap.__pnbSrc = masterRowData[_cfSrcIdx];\n",
+    ""
+   ]
+  ],
+  "must": [
+   "E-cf-hidden"
+  ],
+  "scn": [
+   "cfhidden"
+  ]
+ },
+ "e-js-cf-lookup": {
+  "edits": [
+   [
+    "js/main.js",
+    "                    var rk = rowKeyFromMap((rowMap && rowMap.__pnbSrc) || rowMap);\n",
+    "                    var rk = rowKeyFromMap(rowMap);\n"
+   ]
+  ],
+  "must": [
+   "E-cf-hidden"
+  ],
+  "scn": [
+   "cfhidden"
+  ]
+ },
+ "e-js-regroup": {
+  "edits": [
+   [
+    "js/main.js",
+    "                $(document).on('penumbra:groupedSearched', _rgGo);\n                _rgTimer = setTimeout(_rgGo, 3000); // a search that never ends must not hold it\n                try { runTableSearch(); } catch (e) { _rgGo(); /* the groups stand unfiltered */ }\n",
+    "                try { runTableSearch(); } catch (e) { }\n                _rgGo();\n"
+   ]
+  ],
+  "must": [
+   "E-regroup-place"
+  ],
+  "scn": [
+   "regroupsearch"
+  ]
+ },
+ "e-js-snip-guard": {
+  "edits": [
+   [
+    "js/main.js",
+    "                    if (typeof renderReportSnippet === 'function' && namesJournalColumn(snip)) renderReportSnippet();\n",
+    "                    if (typeof renderReportSnippet === 'function') renderReportSnippet();\n"
+   ]
+  ],
+  "must": [
+   "E-snip-skip"
+  ],
+  "scn": [
+   "snipguard"
+  ]
+ },
+ "e-js-snip-debounce": {
+  "edits": [
+   [
+    "js/main.js",
+    "            }, 250);\n        }\n        // A band summary on a toggle column",
+    "            }, 0);\n        }\n        // A band summary on a toggle column"
+   ]
+  ],
+  "must": [
+   "E-snip-once"
+  ],
+  "scn": [
+   "snipjournal"
+  ]
+ },
+ "f-off": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "    if (!$f['on']) {\n        return ($toggleKey === null)\n",
+    "    if (false) {\n        return ($toggleKey === null)\n"
+   ]
+  ],
+  "must": [
+   "SF-off-mark",
+   "SF-off-notes"
+  ],
+  "scn": [
+   "srvf"
+  ]
+ },
+ "f-enc": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "    $f = journalReportStateFlags($report);\n    if ($f['enc']) return null;\n",
+    "    $f = journalReportStateFlags($report);\n"
+   ]
+  ],
+  "must": [
+   "SF-enc-open"
+  ],
+  "scn": [
+   "srvf"
+  ]
+ },
+ "f-key": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "    if ($toggleKey === null || !is_array($f['toggles']) || in_array($toggleKey, $f['toggles'], true)) return null;\n",
+    "    return null;\n"
+   ]
+  ],
+  "must": [
+   "SF-key-viewer",
+   "SF-key-bulk",
+   "SF-legacy"
+  ],
+  "scn": [
+   "srvf"
+  ]
+ },
+ "f-editor": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "    if ($isAdmin || penumbraIsReportOwner($report['OWNER_ID'], $uid) || journalCallerHoldsGrant($report, $uid)) return null;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "SF-key-editor"
+  ],
+  "scn": [
+   "srvf"
+  ]
+ },
+ "f-legacy": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "                    $keys[] = 'done';   // the single toggle of old (main.js maps it to the key 'done' too)\n",
+    ""
+   ]
+  ],
+  "must": [
+   "SF-legacy"
+  ],
+  "scn": [
+   "srvf"
+  ]
+ },
+ "f-cap-single": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "        if ($state === 1 && journalToggleRowCount($report_id) >= JOURNAL_MAX_TOGGLE_ROWS) {\n",
+    "        if (false) {\n"
+   ]
+  ],
+  "must": [
+   "SF-cap"
+  ],
+  "scn": [
+   "srvf"
+  ]
+ },
+ "f-cap-bulk": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "        if ($state === 1 && journalToggleRowCount($report_id) + count($clean_keys) > JOURNAL_MAX_TOGGLE_ROWS) {\n",
+    "        if (false) {\n"
+   ]
+  ],
+  "must": [
+   "SF-cap"
+  ],
+  "scn": [
+   "srvf"
+  ]
+ },
+ "f-set-gate": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "        // The write rules (2026-10-08): journal on, a saved toggle column, the row cap.\n        $refusal = journalToggleWriteRefusal($report, $toggle_key, $currentUserKey, $isAdmin);\n",
+    "        // The write rules (2026-10-08): journal on, a saved toggle column, the row cap.\n        $refusal = null;\n"
+   ]
+  ],
+  "must": [
+   "SF-off-mark",
+   "SF-key-viewer",
+   "SF-legacy"
+  ],
+  "scn": [
+   "srvf"
+  ]
+ },
+ "f-bulk-gate": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "        // The write rules (2026-10-08): journal on, a saved toggle column (the row cap below).\n        $refusal = journalToggleWriteRefusal($report, $toggle_key, $currentUserKey, $isAdmin);\n",
+    "        // The write rules (2026-10-08): journal on, a saved toggle column (the row cap below).\n        $refusal = null;\n"
+   ]
+  ],
+  "must": [
+   "SF-off-mark",
+   "SF-key-bulk"
+  ],
+  "scn": [
+   "srvf"
+  ]
+ },
+ "f-notes-gate": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "        $refusal = journalToggleWriteRefusal($report, null, $currentUserKey, $isAdmin);\n",
+    "        $refusal = null;\n"
+   ]
+  ],
+  "must": [
+   "SF-off-notes"
+  ],
+  "scn": [
+   "srvf"
+  ]
+ },
+ "g-js-noid": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (!jReportId()) return 'off';\n",
+    ""
+   ]
+  ],
+  "must": [
+   "G-state-off"
+  ],
+  "scn": [
+   "stateonly"
+  ]
+ },
+ "g-js-noid-bulk": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (!jReportId()) { bulkFail('Save the report first: marks and notes are kept with a saved report.'); return; }\n",
+    ""
+   ]
+  ],
+  "must": [
+   "G-state-bulk"
+  ],
+  "scn": [
+   "stateonly"
+  ]
+ },
+ "g-js-blank-dup": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (rowKeyBlank(k)) nBlank++;\n                else if (seen[k]) dup++; else seen[k] = 1;\n",
+    "                if (rowKeyBlank(k)) nBlank++;\n                if (seen[k]) dup++; else seen[k] = 1;\n"
+   ]
+  ],
+  "must": [
+   "G-blank-shown",
+   "G-blank-box",
+   "G-blank-notes",
+   "G-blank-bulk"
+  ],
+  "scn": [
+   "blankkey"
+  ]
+ },
+ "g-js-blank-box": {
+  "edits": [
+   [
+    "js/main.js",
+    "            else if (rowKeyBlank(rowKey)) { blocked = true; tip = 'This row cannot be marked: its key column is empty.'; }\n",
+    ""
+   ]
+  ],
+  "must": [
+   "G-blank-box"
+  ],
+  "scn": [
+   "blankkey"
+  ]
+ },
+ "g-js-blank-notes": {
+  "edits": [
+   [
+    "js/main.js",
+    "            var blank = rowKeyBlank(rowKey);\n",
+    "            var blank = false;\n"
+   ]
+  ],
+  "must": [
+   "G-blank-notes"
+  ],
+  "scn": [
+   "blankkey"
+  ]
+ },
+ "g-css-notes": {
+  "edits": [
+   [
+    "css/main.css",
+    ".journal-notes-btn:disabled,\n.journal-notes-btn:disabled:hover {\n",
+    ".journal-notes-btn-x:disabled,\n.journal-notes-btn-x:disabled:hover {\n"
+   ]
+  ],
+  "must": [
+   "G-blank-notes"
+  ],
+  "scn": [
+   "blankkey"
+  ]
+ },
+ "g-js-blank-note": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (v && v.nBlank) {\n",
+    "            if (false) {\n"
+   ]
+  ],
+  "must": [
+   "G-blank-note"
+  ],
+  "scn": [
+   "blankkey"
+  ]
+ },
+ "g-js-grpsort": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (_jsGrouped && typeof penumbraSortTbodyInPlace === 'function') {\n",
+    "                if (false) {\n"
+   ]
+  ],
+  "must": [
+   "G-grpsort"
+  ],
+  "scn": [
+   "grpsort"
+  ]
+ },
+ "g-js-grpsort-gate": {
+  "edits": [
+   [
+    "js/main.js",
+    "                && ($('#resultsTable').is(':visible') || _jsGrouped)\n",
+    "                && $('#resultsTable').is(':visible')\n"
+   ]
+  ],
+  "must": [
+   "G-grpsort"
+  ],
+  "scn": [
+   "grpsort"
+  ]
+ },
+ "g-js-notice": {
+  "edits": [
+   [
+    "js/main.js",
+    "            var hiddenWhy = defs.length ? null : togglesHiddenReason();\n",
+    "            var hiddenWhy = null;\n"
+   ]
+  ],
+  "must": [
+   "G-dup-notice",
+   "G-miss-notice"
+  ],
+  "scn": [
+   "dupkey",
+   "missnotice"
+  ]
+ },
+ "g-js-pop-side": {
+  "edits": [
+   [
+    "js/main.js",
+    "            var left = runR + 8, top = r.top - 4;\n",
+    "            var left = r.left, top = r.bottom + 6;\n"
+   ]
+  ],
+  "must": [
+   "G-pop-beside"
+  ],
+  "scn": [
+   "poppos"
+  ]
+ },
+ "g-js-pop-run": {
+  "edits": [
+   [
+    "js/main.js",
+    " if (jr.width) runR = Math.max(runR, jr.right); }\n",
+    " }\n"
+   ]
+  ],
+  "must": [
+   "G-pop-beside"
+  ],
+  "scn": [
+   "poppos"
+  ]
+ },
+ "g-js-pop-tap": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (Date.now() - _histTapAt < 1000) return;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "G-pop-tap"
+  ],
+  "scn": [
+   "poppos"
+  ]
+ },
+ "g-jr-label": {
+  "edits": [
+   [
+    "js/penumbra_journal.js",
+    "        return (jToggleKnown(ev.toggle) || !ev.label) ? jToggleLabel(ev.toggle) : String(ev.label);\n",
+    "        return jToggleLabel(ev.toggle);\n"
+   ]
+  ],
+  "must": [
+   "G-hist-removed",
+   "G-hist-csv"
+  ],
+  "scn": [
+   "histlabels"
+  ]
+ },
+ "g-jr-keycols": {
+  "edits": [
+   [
+    "js/penumbra_journal.js",
+    "        return (ev && ev.keyCols && ev.keyCols.length)\n",
+    "        return false\n"
+   ]
+  ],
+  "must": [
+   "G-hist-keycols",
+   "G-hist-csv"
+  ],
+  "scn": [
+   "histlabels"
+  ]
+ },
+ "g-jr-seq": {
+  "edits": [
+   [
+    "js/penumbra_journal.js",
+    "            if (seq !== _histSeq || reportId() !== rid) return;\n            if (!resp || resp.status !== 'success') {\n",
+    "            if (!resp || resp.status !== 'success') {\n"
+   ]
+  ],
+  "must": [
+   "G-hist-stale"
+  ],
+  "scn": [
+   "histlabels"
+  ]
+ },
+ "g-js-counts-row": {
+  "edits": [
+   [
+    "js/main.js",
+    "                    if (!rows[rk]) { rows[rk] = 1; nRows++; }\n",
+    "                    nRows++;\n"
+   ]
+  ],
+  "must": [
+   "G-key-count"
+  ],
+  "scn": [
+   "keywarn"
+  ]
+ },
+ "g-js-counts-own": {
+  "edits": [
+   [
+    "js/main.js",
+    "            var defs = activeToggles();\n            for (var d = 0; d < defs.length; d++) {\n                var m = ownMeta(st, defs[d].key);\n",
+    "            var defs = Object.keys(st).map(function (k) { return { key: k }; });\n            for (var d = 0; d < defs.length; d++) {\n                var m = ownMeta(st, defs[d].key);\n"
+   ]
+  ],
+  "must": [
+   "G-key-count"
+  ],
+  "scn": [
+   "keywarn"
+  ]
+ },
+ "g-js-loadedkey": {
+  "edits": [
+   [
+    "js/main.js",
+    "            try { if (document.getElementById('journalKeyUniqueNote') && keyCols()) refreshKeyNote(computeValidity()); } catch (e) { }\n",
+    ""
+   ]
+  ],
+  "must": [
+   "G-key-saved"
+  ],
+  "scn": [
+   "keywarn"
+  ]
+ },
+ "g-js-save-mark": {
+  "edits": [
+   [
+    "js/main.js",
+    "            // them as old names, 2026-10-08).\n            if (window.Penumbra && window.Penumbra.journalMarkLoadedKey) window.Penumbra.journalMarkLoadedKey((stateObject.viewOptions && stateObject.viewOptions.journalToggles) || []);\n",
+    "            // them as old names, 2026-10-08).\n"
+   ]
+  ],
+  "must": [
+   "W-save-loadedkey"
+  ],
+  "scn": [
+   "wireg"
+  ]
+ },
+ "g-js-pubcancel": {
+  "edits": [
+   [
+    "js/main.js",
+    "                        if (!on) $('#journalRowConfig').hide();\n",
+    ""
+   ]
+  ],
+  "must": [
+   "G-pub-cancel"
+  ],
+  "scn": [
+   "pubcancel"
+  ]
+ },
+ "g-js-band-head": {
+  "edits": [
+   [
+    "js/main.js",
+    "        var _rcaColName = penumbraGroupAggHeaderName(currentGroupAgg.column);   // a toggle's label -> its column\n",
+    "        var _rcaColName = currentGroupAgg.column;\n"
+   ]
+  ],
+  "must": [
+   "G-band-sum",
+   "G-band-rank",
+   "G-band-tick"
+  ],
+  "scn": [
+   "bandsum"
+  ]
+ },
+ "g-js-band-read": {
+  "edits": [
+   [
+    "js/main.js",
+    "                    cellTexts.push(_rcaTd ? String(penumbraReadCellForSummary(_rcaTd)).trim() : '');\n",
+    "                    cellTexts.push(_rcaTd ? _rcaTd.textContent.trim() : '');\n"
+   ]
+  ],
+  "must": [
+   "G-band-sum",
+   "G-band-rank",
+   "G-band-tick"
+  ],
+  "scn": [
+   "bandsum"
+  ]
+ },
+ "g-js-band-presort": {
+  "edits": [
+   [
+    "js/main.js",
+    "            var _preAggCol = penumbraGroupAggHeaderName(currentGroupAgg.column);   // a toggle's label -> its column\n",
+    "            var _preAggCol = currentGroupAgg.column;\n"
+   ]
+  ],
+  "must": [
+   "G-band-rank"
+  ],
+  "scn": [
+   "bandsum"
+  ]
+ },
+ "g-js-band-refresh": {
+  "edits": [
+   [
+    "js/main.js",
+    "                try { refreshToggleBandSummary(); } catch (e) { /* no grouped view */ }\n",
+    ""
+   ]
+  ],
+  "must": [
+   "G-band-sum",
+   "G-band-rank",
+   "G-band-tick"
+  ],
+  "scn": [
+   "bandsum"
+  ]
+ },
+ "g-js-band-rank": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (ranked) return;\n",
+    "            return;\n"
+   ]
+  ],
+  "must": [
+   "G-band-rank"
+  ],
+  "scn": [
+   "bandsum"
+  ]
+ },
+ "g-js-band-latch": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (!_jToggleStateLoaded || _jBandRankFor === masterRowData || typeof rebuildGroupedView !== 'function') return;\n",
+    "            if (!_jToggleStateLoaded || typeof rebuildGroupedView !== 'function') return;\n"
+   ]
+  ],
+  "must": [
+   "G-band-tick"
+  ],
+  "scn": [
+   "bandsum"
+  ]
+ },
+ "g-js-cf-meta": {
+  "edits": [
+   [
+    "js/main.js",
+    "                        if (_jfl && colNameToId[_jfl.toUpperCase()] === undefined) colNameToId[_jfl.toUpperCase()] = colId;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "G-cf-cell"
+  ],
+  "scn": [
+   "cfcell"
+  ]
+ },
+ "g-js-cf-header": {
+  "edits": [
+   [
+    "js/main.js",
+    "                    if (!$(`#resultsTable th[data-colname=\"${_hCol}\"]`).length && window.Penumbra && window.Penumbra.journalSentinelFor) _hCol = window.Penumbra.journalSentinelFor(_hCol) || _hCol;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "G-cf-header"
+  ],
+  "scn": [
+   "cfcell"
+  ]
+ },
+ "g-js-ctor-search": {
+  "edits": [
+   [
+    "js/main.js",
+    "                        return { kind: 'toggle', on: !!ownMeta(st, rk) };",
+    "                        return { kind: 'toggle', on: !!(st && st[rk]) };"
+   ]
+  ],
+  "must": [
+   "G-ctor-key"
+  ],
+  "scn": [
+   "ctorkey"
+  ]
+ },
+ "g-js-ctor-snap": {
+  "edits": [
+   [
+    "js/main.js",
+    "                    out[meta[j].name] = ownMeta(st, rk) ? '1' : '0';",
+    "                    out[meta[j].name] = (st && st[rk]) ? '1' : '0';"
+   ]
+  ],
+  "must": [
+   "G-ctor-key"
+  ],
+  "scn": [
+   "ctorkey"
+  ]
+ },
+ "g-js-tpl": {
+  "edits": [
+   [
+    "js/main.js",
+    " && !Object.prototype.hasOwnProperty.call(plainSubs, _jTplAlias[_ja].f)) plainSubs",
+    ") plainSubs"
+   ]
+  ],
+  "must": [
+   "G-tpl-real"
+  ],
+  "scn": [
+   "tpl"
+  ]
+ },
+ "g-audit-one": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "                json_encode(utf8ize(array_merge(array('row_key' => $row_key, 'toggle_key' => $toggle_key, 'state' => $state),\n                    journalToggleAuditContext($report, $toggle_key)))),\n",
+    "                json_encode(utf8ize(array('row_key' => $row_key, 'toggle_key' => $toggle_key, 'state' => $state))),\n"
+   ]
+  ],
+  "must": [
+   "SG-audit-one",
+   "SG-audit-none",
+   "SG-flags-list"
+  ],
+  "scn": [
+   "srvg"
+  ]
+ },
+ "g-audit-bulk": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "                ), journalToggleAuditContext($report, $toggle_key)))),\n",
+    "                )))),\n"
+   ]
+  ],
+  "must": [
+   "SG-audit-bulk"
+  ],
+  "scn": [
+   "srvg"
+  ]
+ },
+ "g-ctx-label": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "    if (is_array($f['labels']) && isset($f['labels'][$toggleKey])) $out['label'] = $f['labels'][$toggleKey];\n",
+    ""
+   ]
+  ],
+  "must": [
+   "SG-audit-one",
+   "SG-audit-bulk",
+   "SG-flags-list"
+  ],
+  "scn": [
+   "srvg"
+  ]
+ },
+ "g-ctx-keycols": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "    if (is_array($f['keyCols']) && $f['keyCols']) $out['key_cols'] = $f['keyCols'];\n",
+    ""
+   ]
+  ],
+  "must": [
+   "SG-audit-one",
+   "SG-audit-bulk",
+   "SG-audit-none"
+  ],
+  "scn": [
+   "srvg"
+  ]
+ },
+ "g-flags-empty": {
+  "edits": [
+   [
+    "manage_journal.php",
+    " && is_array($vo['journalToggles']) && count($vo['journalToggles'])) {\n",
+    " && is_array($vo['journalToggles'])) {\n"
+   ]
+  ],
+  "must": [
+   "SG-flags-list"
+  ],
+  "scn": [
+   "srvg"
+  ]
+ },
+ "g-search-ctx": {
+  "edits": [
+   [
+    "manage_journal.php",
+    "                    ), $evCtx);\n",
+    "                    ), array());\n"
+   ]
+  ],
+  "must": [
+   "SG-search-ctx"
+  ],
+  "scn": [
+   "srvg"
+  ]
+ },
+ "g-export-legacy": {
+  "edits": [
+   [
+    "journal_export.php",
+    "        if (empty($toggles) && !empty($vo['journalToggle'])) {\n",
+    "        if (false) {\n"
+   ]
+  ],
+  "must": [
+   "SG-export-legacy"
+  ],
+  "scn": [
+   "srvg"
+  ]
+ },
+ "h-hdr-box": {
+  "edits": [
+   [
+    "js/main.js",
+    "                th.innerHTML = '<button type=\"button\" class=\"journal-toggle-all\" role=\"checkbox\" aria-checked=\"false\" data-toggle-key=\"' + escapeHtml(key) + '\">'\n",
+    "                th.innerHTML = '<span class=\"journal-toggle-all-x\" data-toggle-key=\"' + escapeHtml(key) + '\">'\n"
+   ]
+  ],
+  "must": [
+   "H-hdr-state",
+   "H-hdr-mark",
+   "H-hdr-nosort",
+   "H-hdr-clear",
+   "H-hdr-search",
+   "H-hdr-pages",
+   "H-grp-state",
+   "H-grp-mark",
+   "H-grp-nosort"
+  ],
+  "scn": [
+   "hdrall",
+   "hdrpage",
+   "hdrgroup"
+  ]
+ },
+ "h-hdr-paint": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (defs.length) paintToggleAllBoxes();\n",
+    ""
+   ]
+  ],
+  "must": [
+   "H-hdr-state",
+   "H-hdr-mark",
+   "H-hdr-search",
+   "H-grp-state",
+   "H-grp-mark"
+  ],
+  "scn": [
+   "hdrall",
+   "hdrpage",
+   "hdrgroup"
+  ]
+ },
+ "h-hdr-stop": {
+  "edits": [
+   [
+    "js/main.js",
+    "            e.preventDefault();\n            e.stopPropagation();\n            if (rowFeaturesBlocked()) return;\n",
+    "            e.preventDefault();\n            if (rowFeaturesBlocked()) return;\n"
+   ]
+  ],
+  "must": [
+   "H-hdr-nosort",
+   "H-grp-nosort"
+  ],
+  "scn": [
+   "hdrall",
+   "hdrgroup"
+  ]
+ },
+ "h-hdr-scope": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (tr.classList.contains('search-hidden')) continue;\n                var k = rowKeyOfTr(tr);\n",
+    "                var k = rowKeyOfTr(tr);\n"
+   ]
+  ],
+  "must": [
+   "H-hdr-search"
+  ],
+  "scn": [
+   "hdrall"
+  ]
+ },
+ "h-hdr-kept": {
+  "edits": [
+   [
+    "js/main.js",
+    "            confirmBulkToggles(tk, todo, targetState, where, targetState ? n : 0, true);\n",
+    "            confirmBulkToggles(tk, todo, targetState, where, 0, true);\n"
+   ]
+  ],
+  "must": [
+   "H-hdr-mark",
+   "H-grp-mark"
+  ],
+  "scn": [
+   "hdrall",
+   "hdrgroup"
+  ]
+ },
+ "h-hdr-pages": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (drawn < total) where += ', on every page';\n",
+    ""
+   ]
+  ],
+  "must": [
+   "H-hdr-pages"
+  ],
+  "scn": [
+   "hdrpage"
+  ]
+ },
+ "h-hdr-ingroup": {
+  "edits": [
+   [
+    "js/main.js",
+    "            var inGroup = !!(tbl && tbl.closest('#groupedResultsContainer')), where = inGroup ? ' in this group' : ' the search shows';\n",
+    "            var inGroup = false, where = ' the search shows';\n"
+   ]
+  ],
+  "must": [
+   "H-grp-mark"
+  ],
+  "scn": [
+   "hdrgroup"
+  ]
+ },
+ "h-hdr-theirs": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (ask || theirs) {\n",
+    "            if (ask) {\n"
+   ]
+  ],
+  "must": [
+   "H-shift-theirs"
+  ],
+  "scn": [
+   "shiftrange"
+  ]
+ },
+ "h-hdr-unloaded": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (rowFeaturesBlocked()) return;\n            if (_jToggleLoadFailed) { toggleLoadFailed(false); return; } // the marks are not known\n",
+    "            if (rowFeaturesBlocked()) return;\n"
+   ]
+  ],
+  "must": [
+   "H-hdr-unloaded"
+  ],
+  "scn": [
+   "hdrfail"
+  ]
+ },
+ "h-shift-range": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (e.shiftKey && rangeClick(this, tk, rowKey)) return;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "H-shift-mark",
+   "H-shift-clear",
+   "H-shift-theirs"
+  ],
+  "scn": [
+   "shiftrange"
+  ]
+ },
+ "h-shift-anchor": {
+  "edits": [
+   [
+    "js/main.js",
+    "            _rangeAnchor = { tk: tk, rk: rowKey, table: this.closest('table') };\n",
+    ""
+   ]
+  ],
+  "must": [
+   "H-shift-mark",
+   "H-shift-clear",
+   "H-shift-theirs"
+  ],
+  "scn": [
+   "shiftrange"
+  ]
+ },
+ "h-shift-noselect": {
+  "edits": [
+   [
+    "js/main.js",
+    "        $(document).on('mousedown', '.journal-toggle-box, .journal-toggle-all', function (e) { if (e.shiftKey) e.preventDefault(); });\n",
+    ""
+   ]
+  ],
+  "must": [
+   "H-shift-noselect"
+  ],
+  "scn": [
+   "shiftrange"
+  ]
+ },
+ "h-css-mixed": {
+  "edits": [
+   [
+    "css/main.css",
+    ":is(#resultsTable, #groupedResultsContainer) .journal-toggle-all[aria-checked=\"mixed\"] .tg-dash { display: inline; }\n",
+    ""
+   ]
+  ],
+  "must": [
+   "H-hdr-state"
+  ],
+  "scn": [
+   "hdrall"
+  ]
+ },
+ "h-jr-name": {
+  "edits": [
+   [
+    "js/penumbra_journal.js",
+    "            +   (ev.by ? '<button type=\"button\" class=\"jhist-by jhist-by-btn\"",
+    "            +   (false ? '<button type=\"button\" class=\"jhist-by jhist-by-btn\""
+   ]
+  ],
+  "must": [
+   "H-histname"
+  ],
+  "scn": [
+   "histname"
+  ]
+ },
+ "h-jr-handler": {
+  "edits": [
+   [
+    "js/penumbra_journal.js",
+    "        $(document).on('click', '.jhist-person[data-user], .jhist-by-btn[data-user]', function () {\n",
+    "        $(document).on('click', '.jhist-person[data-user]', function () {\n"
+   ]
+  ],
+  "must": [
+   "H-histname"
+  ],
+  "scn": [
+   "histname"
+  ]
+ },
+ "h-css-name": {
+  "edits": [
+   [
+    "css/main.css",
+    "#journalLightbox .jhist-by-btn {\n    padding: 0;\n    border: 0;\n",
+    "#journalLightbox .jhist-by-btn-x {\n    padding: 0;\n    border: 0;\n"
+   ]
+  ],
+  "must": [
+   "H-histname"
+  ],
+  "scn": [
+   "histname"
+  ]
+ },
+ "i-js-cols": {
+  "edits": [
+   [
+    "js/main.js",
+    "                    if (jWho) {\n                        out.push({ name: lbl + ' by', kind: 'by'",
+    "                    if (false) {\n                        out.push({ name: lbl + ' by', kind: 'by'"
+   ]
+  ],
+  "must": [
+   "I-who-search",
+   "I-who-tpl",
+   "I-who-group"
+  ],
+  "scn": [
+   "whocols",
+   "whogroup"
+  ]
+ },
+ "i-js-value": {
+  "edits": [
+   [
+    "js/main.js",
+    "                    if (c.kind === 'by' || c.kind === 'on') {\n                        var wst = ",
+    "                    if (false) {\n                        var wst = "
+   ]
+  ],
+  "must": [
+   "I-who-search"
+  ],
+  "scn": [
+   "whocols"
+  ]
+ },
+ "i-js-engine": {
+  "edits": [
+   [
+    "js/main.js",
+    "                    if (_jv.kind === 'text') return testCondition(condition.op, condition.value, String(_jv.value == null ? '' : _jv.value));\n",
+    ""
+   ]
+  ],
+  "must": [
+   "I-who-search"
+  ],
+  "scn": [
+   "whocols"
+  ]
+ },
+ "i-js-sync": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (whoOn()) syncWhoCells(b.closest('tr'), tk, meta);   // its row's who / when cells (2026-10-08)\n",
+    ""
+   ]
+  ],
+  "must": [
+   "I-who-flip"
+  ],
+  "scn": [
+   "whocols"
+  ]
+ },
+ "i-js-head": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (!whoOn()) continue;\n                for (var wh = 0; wh < 2; wh++) {\n",
+    "                continue;\n                for (var wh = 0; wh < 2; wh++) {\n"
+   ]
+  ],
+  "must": [
+   "I-who-cols",
+   "I-who-sort",
+   "I-who-tpl",
+   "I-who-off"
+  ],
+  "scn": [
+   "whocols",
+   "whooff"
+  ]
+ },
+ "i-js-rows": {
+  "edits": [
+   [
+    "js/main.js",
+    "                        if (!whoOn()) continue;\n                        for (var wr = 0; wr < 2; wr++) {\n",
+    "                        continue;\n                        for (var wr = 0; wr < 2; wr++) {\n"
+   ]
+  ],
+  "must": [
+   "I-who-cols",
+   "I-who-flip",
+   "I-who-sort",
+   "I-who-tpl",
+   "I-who-sortload"
+  ],
+  "scn": [
+   "whocols",
+   "whosortload"
+  ]
+ },
+ "i-js-strip": {
+  "edits": [
+   [
+    "js/main.js",
+    "            var keepWho = whoOn() ? (keepKeys || []) : [];\n",
+    "            var keepWho = keepKeys || [];\n"
+   ]
+  ],
+  "must": [
+   "I-who-off"
+  ],
+  "scn": [
+   "whooff"
+  ]
+ },
+ "i-js-group": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (cols[i].kind !== 'toggle' && cols[i].kind !== 'by' && cols[i].kind !== 'on') continue;\n                var bySentinel",
+    "                if (cols[i].kind !== 'toggle') continue;\n                var bySentinel"
+   ]
+  ],
+  "must": [
+   "I-who-group"
+  ],
+  "scn": [
+   "whogroup"
+  ]
+ },
+ "i-js-prefix": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (cols[c].kind !== 'toggle' && cols[c].kind !== 'by' && cols[c].kind !== 'on') continue;\n                // An old name (2026-10-08) shows the name it stands for.\n",
+    "                if (cols[c].kind !== 'toggle') continue;\n                // An old name (2026-10-08) shows the name it stands for.\n"
+   ]
+  ],
+  "must": [
+   "I-who-group"
+  ],
+  "scn": [
+   "whogroup"
+  ]
+ },
+ "i-js-replay": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (ci.indexOf(TOGGLE_COL_PREFIX) === 0 || ci.indexOf(WHO_BY_PREFIX) === 0 || ci.indexOf(WHO_ON_PREFIX) === 0) _jsNeedTg = true;\n",
+    "                if (ci.indexOf(TOGGLE_COL_PREFIX) === 0) _jsNeedTg = true;\n"
+   ]
+  ],
+  "must": [
+   "I-who-sortload"
+  ],
+  "scn": [
+   "whosortload"
+  ]
+ },
+ "i-js-cmp": {
+  "edits": [
+   [
+    "js/main.js",
+    "            return n.indexOf(WHO_BY_PREFIX) === 0 || n.indexOf(WHO_ON_PREFIX) === 0;\n",
+    "            return false;\n"
+   ]
+  ],
+  "must": [
+   "I-who-cmp"
+  ],
+  "scn": [
+   "whocols"
+  ]
+ },
+ "i-js-save": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (window._penumbraJournalToggleWho) viewOptions.journalToggleWho = true;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "I-who-state"
+  ],
+  "scn": [
+   "whocols"
+  ]
+ },
+ "i-js-restore": {
+  "edits": [
+   [
+    "js/main.js",
+    "                window._penumbraJournalToggleWho = !!_jvo.journalToggleWho;   // who and when columns (2026-10-08)\n",
+    ""
+   ]
+  ],
+  "must": [
+   "I-who-cols",
+   "I-who-flip",
+   "I-who-search",
+   "I-who-sort",
+   "I-who-tpl",
+   "I-who-state",
+   "I-who-group",
+   "I-who-off",
+   "I-who-sortload"
+  ],
+  "scn": [
+   "whocols",
+   "whogroup",
+   "whooff",
+   "whosortload"
+  ]
+ },
+ "i-js-switch": {
+  "edits": [
+   [
+    "js/main.js",
+    "            window._penumbraJournalToggleWho = this.checked;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "I-who-off"
+  ],
+  "scn": [
+   "whooff"
+  ]
+ },
+ "i-js-friendly": {
+  "edits": [
+   [
+    "js/main.js",
+    " && dc.indexOf(WHO_BY_PREFIX) !== 0 && dc.indexOf(WHO_ON_PREFIX) !== 0) return null;\n",
+    ") return null;\n"
+   ]
+  ],
+  "must": [
+   "I-who-tpl"
+  ],
+  "scn": [
+   "whocols"
+  ]
+ },
+ "i-srv-meta": {
+  "edits": [
+   [
+    "journal_export.php",
+    "            if ($who) {\n                foreach (array('by' => ' BY', 'on' => ' ON') as $kind => $sfx) {\n",
+    "            if (false) {\n                foreach (array('by' => ' BY', 'on' => ' ON') as $kind => $sfx) {\n"
+   ]
+  ],
+  "must": [
+   "SI-res",
+   "SI-values",
+   "SI-columns",
+   "SI-sched",
+   "SI-filter"
+  ],
+  "scn": [
+   "srvi"
+  ]
+ },
+ "i-srv-sql": {
+  "edits": [
+   [
+    "journal_export.php",
+    "                $who\n                    ? \"SELECT TOGGLE_KEY, ROW_KEY, UPDATED_BY",
+    "                false\n                    ? \"SELECT TOGGLE_KEY, ROW_KEY, UPDATED_BY"
+   ]
+  ],
+  "must": [
+   "SI-res",
+   "SI-values",
+   "SI-columns",
+   "SI-filter"
+  ],
+  "scn": [
+   "srvi"
+  ]
+ },
+ "i-srv-decorate": {
+  "edits": [
+   [
+    "journal_export.php",
+    "            foreach (journalExportToggleRowValues($jt, $r, false) as $n => $v) $rows[$i][$n] = $v;\n",
+    "            foreach (journalExportToggleRowValues($jt, $r) as $n => $v) $rows[$i][$n] = $v;\n"
+   ]
+  ],
+  "must": [
+   "SI-decorate"
+  ],
+  "scn": [
+   "srvi"
+  ]
+ },
+ "i-srv-withwho": {
+  "edits": [
+   [
+    "journal_export.php",
+    "        if ($withWho && !empty($resolver['whoMeta'])) {\n",
+    "        if (!empty($resolver['whoMeta'])) {\n"
+   ]
+  ],
+  "must": [
+   "SI-values",
+   "SI-decorate"
+  ],
+  "scn": [
+   "srvi"
+  ]
+ },
+ "i-srv-sum": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "        // The who and when columns (2026-10-08): __JOURNAL_BY__<key> / __JOURNAL_ON__<key>.\n        if (!empty($resolver['whoMeta'])) {\n",
+    "        // The who and when columns (2026-10-08): __JOURNAL_BY__<key> / __JOURNAL_ON__<key>.\n        if (false) {\n"
+   ]
+  ],
+  "must": [
+   "SI-sched"
+  ],
+  "scn": [
+   "srvi"
+  ]
+ },
+ "i-srv-group": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "        if (isset($byWho[strtoupper($t)])) { $levels[$i] = $byWho[strtoupper($t)]; $changed = true; continue; }\n",
+    ""
+   ]
+  ],
+  "must": [
+   "SI-sched"
+  ],
+  "scn": [
+   "srvi"
+  ]
+ },
+ "i-srv-snippet": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "    foreach (array_merge($jt['colNames'], (isset($jt['whoNames']) && is_array($jt['whoNames'])) ? $jt['whoNames'] : array(), $old) as $n) {\n",
+    "    foreach (array_merge($jt['colNames'], $old) as $n) {\n"
+   ]
+  ],
+  "must": [
+   "SI-sched"
+  ],
+  "scn": [
+   "srvi"
+  ]
+ },
+ "i-srv-filter": {
+  "edits": [
+   [
+    "penumbra_search.php",
+    "        foreach (array_merge($toggleResolver['colNames'], $whoNames) as $tName) {\n",
+    "        foreach ($toggleResolver['colNames'] as $tName) {\n"
+   ]
+  ],
+  "must": [
+   "SI-filter"
+  ],
+  "scn": [
+   "srvi"
+  ]
+ },
+ "i-srv-registry": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "    penumbra_sched_toggle_cols($journal_toggle_cols);\n",
+    "    penumbra_sched_toggle_cols(array_merge($journal_toggle_cols, $journal_who_cols));\n"
+   ]
+  ],
+  "must": [
+   "SI-block"
+  ],
+  "scn": [
+   "srvi"
+  ]
+ },
+ "i-srv-runner-who": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "            $journal_who_cols = isset($jt['whoNames']) ? $jt['whoNames'] : array();\n",
+    ""
+   ]
+  ],
+  "must": [
+   "SI-block"
+  ],
+  "scn": [
+   "srvi"
+  ]
+ },
+ "i-wire-api": {
+  "edits": [
+   [
+    "index.php",
+    "            $journal_toggle_cols = array_merge($jt['colNames'], isset($jt['whoNames']) ? $jt['whoNames'] : array());\n",
+    "            $journal_toggle_cols = $jt['colNames'];\n"
+   ]
+  ],
+  "must": [
+   "W-api-who"
+  ],
+  "scn": [
+   "wirei"
+  ]
+ },
+ "i-wire-preserve": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "    $processed = apply_state_logic($flat_rows, $state, array_merge($journal_toggle_cols, $journal_who_cols));\n",
+    "    $processed = apply_state_logic($flat_rows, $state, $journal_toggle_cols);\n"
+   ]
+  ],
+  "must": [
+   "W-runner-who"
+  ],
+  "scn": [
+   "wirei"
+  ]
+ },
+ "m-js-restore": {
+  "edits": [
+   [
+    "js/main.js",
+    "                        if (old.length) d.oldLabels = old.map(function (o) { return o.trim().substring(0, 40); }).slice(-10);\n",
+    ""
+   ]
+  ],
+  "must": [
+   "M-old-format",
+   "M-old-snippet",
+   "M-old-search",
+   "M-old-names",
+   "M-old-tpl",
+   "M-old-button",
+   "M-grp-old",
+   "M-grp-tick",
+   "M-sum-old",
+   "M-sb-multi",
+   "M-sb-brace",
+   "M-undo",
+   "M-prec-warn",
+   "M-prec-save"
+  ],
+  "scn": [
+   "renamed",
+   "renamegrp",
+   "renamesum",
+   "renamesb",
+   "renameundo",
+   "renameprec"
+  ]
+ },
+ "m-js-alias-list": {
+  "edits": [
+   [
+    "js/main.js",
+    "                            out.push(al[e]);\n",
+    ""
+   ]
+  ],
+  "must": [
+   "M-old-format",
+   "M-old-snippet",
+   "M-old-search",
+   "M-old-names",
+   "M-old-tpl",
+   "M-old-button",
+   "M-grp-old",
+   "M-grp-tick",
+   "M-sum-old",
+   "M-sb-multi",
+   "M-sb-brace",
+   "M-live-search",
+   "M-live-typed",
+   "M-live-saved",
+   "M-undo"
+  ],
+  "scn": [
+   "renamed",
+   "renamegrp",
+   "renamesum",
+   "renamesb",
+   "renamelive",
+   "renameundo",
+   "renameprec"
+  ]
+ },
+ "m-js-saved-label": {
+  "edits": [
+   [
+    "js/main.js",
+    "            if (_jSavedLabels[d.key]) list.push(_jSavedLabels[d.key]);\n",
+    ""
+   ]
+  ],
+  "must": [
+   "M-live-search",
+   "M-live-status",
+   "M-live-typed",
+   "M-live-save",
+   "M-live-saved",
+   "M-live-back"
+  ],
+  "scn": [
+   "renamelive",
+   "renameundo",
+   "renameprec"
+  ]
+ },
+ "m-js-save": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (old.length) o.oldLabels = old;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "M-live-save",
+   "M-live-saved",
+   "M-live-back",
+   "M-undo",
+   "M-prec-save"
+  ],
+  "scn": [
+   "renamelive",
+   "renameundo",
+   "renameprec"
+  ]
+ },
+ "m-js-markkey": {
+  "edits": [
+   [
+    "js/main.js",
+    "            markSavedLabels(savedToggles);   // ...and the toggles' names (2026-10-08)\n",
+    ""
+   ]
+  ],
+  "must": [
+   "M-live-search",
+   "M-live-status",
+   "M-live-typed",
+   "M-live-save",
+   "M-live-saved",
+   "M-live-back"
+  ],
+  "scn": [
+   "renamelive",
+   "renameundo",
+   "renameprec"
+  ]
+ },
+ "m-js-markkey-saved": {
+  "edits": [
+   [
+    "js/main.js",
+    "                return toggleDef(d.key, d.label, s.oldLabels);\n",
+    "                return toggleDef(d.key, d.label, d.oldLabels);\n"
+   ]
+  ],
+  "must": [
+   "M-live-saved"
+  ],
+  "scn": [
+   "renamelive"
+  ]
+ },
+ "m-js-saved-arg": {
+  "edits": [
+   [
+    "js/main.js",
+    "window.Penumbra.journalMarkLoadedKey((stateObject.viewOptions && stateObject.viewOptions.journalToggles) || []);\n",
+    "window.Penumbra.journalMarkLoadedKey();\n"
+   ]
+  ],
+  "must": [
+   "W-save-oldnames"
+  ],
+  "scn": [
+   "wirem"
+  ]
+ },
+ "m-js-rename-keep": {
+  "edits": [
+   [
+    "js/main.js",
+    "toggleDef(d.key, label, d.oldLabels) : d; });\n",
+    "toggleDef(d.key, label) : d; });\n"
+   ]
+  ],
+  "must": [
+   "M-live-saved"
+  ],
+  "scn": [
+   "renamelive"
+  ]
+ },
+ "m-js-typed": {
+  "edits": [
+   [
+    "js/main.js",
+    "toggleDef(d.key, label, d.oldLabels) : d; });\n",
+    "toggleDef(d.key, label, (d.oldLabels || []).concat([d.label])) : d; });\n"
+   ]
+  ],
+  "must": [
+   "M-live-typed",
+   "M-live-save",
+   "M-live-saved",
+   "M-live-back"
+  ],
+  "scn": [
+   "renamelive"
+  ]
+ },
+ "m-js-undo": {
+  "edits": [
+   [
+    "js/main.js",
+    "            _jUndo = { def: toggleDef(removed.key, removed.label, removed.oldLabels), index: idx };\n",
+    "            _jUndo = { def: toggleDef(removed.key, removed.label), index: idx };\n"
+   ]
+  ],
+  "must": [
+   "M-undo"
+  ],
+  "scn": [
+   "renameundo"
+  ]
+ },
+ "m-js-undo-restore": {
+  "edits": [
+   [
+    "js/main.js",
+    "            next.splice(Math.min(u.index, next.length), 0, toggleDef(u.def.key, u.def.label, u.def.oldLabels));\n",
+    "            next.splice(Math.min(u.index, next.length), 0, toggleDef(u.def.key, u.def.label));\n"
+   ]
+  ],
+  "must": [
+   "M-undo"
+  ],
+  "scn": [
+   "renameundo"
+  ]
+ },
+ "m-js-cap": {
+  "edits": [
+   [
+    "js/main.js",
+    "            return out.slice(-MAX_OLD_LABELS);\n",
+    "            return out;\n"
+   ]
+  ],
+  "must": [
+   "M-cap"
+  ],
+  "scn": [
+   "renameundo"
+  ]
+ },
+ "m-js-notes": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (!o || u === cur || u === 'NOTES' || seen[u]) continue;\n",
+    "                if (!o || u === cur || seen[u]) continue;\n"
+   ]
+  ],
+  "must": [
+   "M-prec-save"
+  ],
+  "scn": [
+   "renameprec"
+  ]
+ },
+ "m-js-save-filter": {
+  "edits": [
+   [
+    "js/main.js",
+    "            return oldLabelsOf(d).filter(function (o) { return !cur[o.toUpperCase()]; });\n",
+    "            return oldLabelsOf(d);\n"
+   ]
+  ],
+  "must": [
+   "M-prec-save"
+  ],
+  "scn": [
+   "renameprec"
+  ]
+ },
+ "m-js-taken": {
+  "edits": [
+   [
+    "js/main.js",
+    "                            if (taken[au]) continue;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "M-prec-current"
+  ],
+  "scn": [
+   "renameprec"
+  ]
+ },
+ "m-js-alias-first": {
+  "edits": [
+   [
+    "js/main.js",
+    "                            out.push(al[e]);\n",
+    "                            out.unshift(al[e]);\n"
+   ]
+  ],
+  "must": [
+   "M-old-names"
+  ],
+  "scn": [
+   "renamed",
+   "renameprec"
+  ]
+ },
+ "m-js-warn": {
+  "edits": [
+   [
+    "js/main.js",
+    "                    msgs.push('“' + escapeHtml(kl) + '” was the name of “'",
+    "                    void ('“' + escapeHtml(kl) + '” was the name of “'"
+   ]
+  ],
+  "must": [
+   "M-prec-warn"
+  ],
+  "scn": [
+   "renameprec"
+  ]
+ },
+ "m-js-commit-msg": {
+  "edits": [
+   [
+    "js/main.js",
+    "                keeps = 'Searches, snippets, buttons and scheduled tasks that say <strong>' + escapeHtml(was) + '</strong> keep working. ';\n",
+    ""
+   ]
+  ],
+  "must": [
+   "M-live-status"
+  ],
+  "scn": [
+   "renamelive"
+  ]
+ },
+ "m-js-keyfor": {
+  "edits": [
+   [
+    "js/main.js",
+    "                if (cols[j].alias && cols[j].kind === 'toggle' && String(cols[j].name).toUpperCase() === want) return cols[j].key;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "M-old-button"
+  ],
+  "scn": [
+   "renamed"
+  ]
+ },
+ "m-js-bulklabel": {
+  "edits": [
+   [
+    "js/main.js",
+    "                toggleLabel = toggleLabelFor(toggleKey);   // its name now, when the button says an old one (2026-10-08)\n",
+    ""
+   ]
+  ],
+  "must": [
+   "M-old-button"
+  ],
+  "scn": [
+   "renamed"
+  ]
+ },
+ "m-js-tpl": {
+  "edits": [
+   [
+    "js/main.js",
+    "                window.Penumbra.journalOldNames(h.name).forEach(function (o) { _jTplAlias.push({ s: String(h.name).toUpperCase(), f: String(o).toUpperCase() }); });\n",
+    ""
+   ]
+  ],
+  "must": [
+   "M-old-tpl"
+  ],
+  "scn": [
+   "renamed"
+  ]
+ },
+ "m-js-band": {
+  "edits": [
+   [
+    "js/main.js",
+    "                var shown = cols[c].current || cols[c].name;\n",
+    "                var shown = cols[c].name;\n"
+   ]
+  ],
+  "must": [
+   "M-grp-old"
+  ],
+  "scn": [
+   "renamegrp"
+  ]
+ },
+ "m-sb-reverse": {
+  "edits": [
+   [
+    "js/search_builder.js",
+    "            if (now && !oldNow[u]) { oldNow[u] = now; allColNames.push(o.name); }\n",
+    "            if (false) { oldNow[u] = now; allColNames.push(o.name); }\n"
+   ]
+  ],
+  "must": [
+   "M-sb-multi"
+  ],
+  "scn": [
+   "renamesb"
+  ]
+ },
+ "m-sb-shown": {
+  "edits": [
+   [
+    "js/search_builder.js",
+    "                var shownCol = oldNow[colName.toUpperCase()] || colName;   // an old name: the name now\n",
+    "                var shownCol = colName;\n"
+   ]
+  ],
+  "must": [
+   "M-sb-multi"
+  ],
+  "scn": [
+   "renamesb"
+  ]
+ },
+ "m-sb-resolve": {
+  "edits": [
+   [
+    "js/search_builder.js",
+    "        return journalNameNow(upper, allCols);\n",
+    "        return '';\n"
+   ]
+  ],
+  "must": [
+   "M-sb-brace"
+  ],
+  "scn": [
+   "renamesb"
+  ]
+ },
+ "m-je-aliasmap": {
+  "edits": [
+   [
+    "journal_export.php",
+    "                    if (!isset($existing[$a]) && !isset($aliasMap[$a])) $aliasMap[$a] = $to;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "SM-res",
+   "SM-filter",
+   "SM-snippet",
+   "SM-filterrows",
+   "SM-lookup",
+   "SM-format",
+   "SM-rewrite",
+   "SM-groupby",
+   "SM-agg",
+   "SM-tpl"
+  ],
+  "scn": [
+   "srvm"
+  ]
+ },
+ "m-je-existing": {
+  "edits": [
+   [
+    "journal_export.php",
+    "                    if (!isset($existing[$a]) && !isset($aliasMap[$a])) $aliasMap[$a] = $to;\n",
+    "                    if (!isset($aliasMap[$a])) $aliasMap[$a] = $to;\n"
+   ]
+  ],
+  "must": [
+   "SM-res",
+   "SM-groupby"
+  ],
+  "scn": [
+   "srvm"
+  ]
+ },
+ "m-je-notes": {
+  "edits": [
+   [
+    "journal_export.php",
+    "                if ($u === '' || $u === 'NOTES') continue;\n",
+    "                if ($u === '') continue;\n"
+   ]
+  ],
+  "must": [
+   "SM-res",
+   "SM-snippet"
+  ],
+  "scn": [
+   "srvm"
+  ]
+ },
+ "m-je-who": {
+  "edits": [
+   [
+    "journal_export.php",
+    "                if (isset($outByKey[$tk]['by'])) $pairs[$u . ' BY'] = $outByKey[$tk]['by'];\n",
+    ""
+   ]
+  ],
+  "must": [
+   "SM-res",
+   "SM-filter",
+   "SM-snippet",
+   "SM-filterrows",
+   "SM-groupby",
+   "SM-tpl"
+  ],
+  "scn": [
+   "srvm"
+  ]
+ },
+ "m-ps-register": {
+  "edits": [
+   [
+    "penumbra_search.php",
+    "            foreach (array_keys($aliasCols) as $aName) $columns[] = (string)$aName;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "SM-filter"
+  ],
+  "scn": [
+   "srvm"
+  ]
+ },
+ "m-ps-real": {
+  "edits": [
+   [
+    "penumbra_search.php",
+    "            $aliasCols = journalExportAliasMapFor($toggleResolver, $columns);\n",
+    "            $aliasCols = journalExportAliasMapFor($toggleResolver);\n"
+   ]
+  ],
+  "must": [
+   "SM-filter-real"
+  ],
+  "scn": [
+   "srvm"
+  ]
+ },
+ "m-ps-apply": {
+  "edits": [
+   [
+    "penumbra_search.php",
+    "    $parsedQuery = _journal_alias_toggle_conditions($parsedQuery, $aliasCols);\n",
+    ""
+   ]
+  ],
+  "must": [
+   "SM-filter"
+  ],
+  "scn": [
+   "srvm"
+  ]
+ },
+ "m-sr-groupby": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "        if (isset($resolver['aliasMap'][strtoupper($t)])) { $levels[$i] = (string)$resolver['aliasMap'][strtoupper($t)]; $changed = true; continue; }\n",
+    ""
+   ]
+  ],
+  "must": [
+   "SM-groupby"
+  ],
+  "scn": [
+   "srvm"
+  ]
+ },
+ "m-sr-agg": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "            if (!$_ownAgg) $aggCol = $_toAgg;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "SM-agg"
+  ],
+  "scn": [
+   "srvm"
+  ]
+ },
+ "m-sr-agg-own": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "            if (!$_ownAgg) $aggCol = $_toAgg;\n",
+    "            $aggCol = $_toAgg;\n"
+   ]
+  ],
+  "must": [
+   "SM-agg"
+  ],
+  "scn": [
+   "srvm"
+  ]
+ },
+ "m-sr-tree": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "            if (isset($alias[$col])) { $tree[$k]['column'] = $alias[$col]; $col = strtoupper($alias[$col]); }\n",
+    ""
+   ]
+  ],
+  "must": [
+   "SM-snippet",
+   "SM-filterrows",
+   "SM-lookup",
+   "SM-format",
+   "SM-rewrite"
+  ],
+  "scn": [
+   "srvm"
+  ]
+ },
+ "m-sr-tree-rec": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "            $tree[$k] = _snippet_normalize_toggle_tree($node, $jt, $alias);\n",
+    "            $tree[$k] = _snippet_normalize_toggle_tree($node, $jt);\n"
+   ]
+  ],
+  "must": [
+   "SM-snippet"
+  ],
+  "scn": [
+   "srvm"
+  ]
+ },
+ "m-sr-merge": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "    $old = function_exists('journalExportAliasMapFor') ? array_map('strval', array_keys(journalExportAliasMapFor($jt, $out))) : array();\n",
+    "    $old = array();\n"
+   ]
+  ],
+  "must": [
+   "SM-snippet",
+   "SM-filterrows",
+   "SM-lookup"
+  ],
+  "scn": [
+   "srvm"
+  ]
+ },
+ "m-sr-filter": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "        return $data;\n    }\n    if ($jt) $parsed = _snippet_normalize_toggle_tree($parsed, $jt, $jAlias);\n",
+    "        return $data;\n    }\n    if ($jt) $parsed = _snippet_normalize_toggle_tree($parsed, $jt);\n"
+   ]
+  ],
+  "must": [
+   "SM-filterrows"
+  ],
+  "scn": [
+   "srvm"
+  ]
+ },
+ "m-sr-lookup": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "        return '';\n    }\n    if ($jt) $parsed = _snippet_normalize_toggle_tree($parsed, $jt, $jAlias);\n",
+    "        return '';\n    }\n    if ($jt) $parsed = _snippet_normalize_toggle_tree($parsed, $jt);\n"
+   ]
+  ],
+  "must": [
+   "SM-lookup"
+  ],
+  "scn": [
+   "srvm"
+  ]
+ },
+ "m-sr-fmt-target": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "            $prepared['targetColumn'] = strtoupper($_jAliasFmt[strtoupper($prepared['targetColumn'])]);\n",
+    ""
+   ]
+  ],
+  "must": [
+   "SM-format"
+  ],
+  "scn": [
+   "srvm"
+  ]
+ },
+ "m-sr-fmt-cols": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "            $prepared['_parsed'] = parse_format_condition($prepared['condition'], $_colsFmt);\n",
+    "            $prepared['_parsed'] = parse_format_condition($prepared['condition'], $columns);\n"
+   ]
+  ],
+  "must": [
+   "SM-format"
+  ],
+  "scn": [
+   "srvm"
+  ]
+ },
+ "m-sr-fmt-need": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "journalExportAliasMapFor($_jtFmt, $columns, true)",
+    "journalExportAliasMapFor($_jtFmt, $columns)"
+   ]
+  ],
+  "must": [
+   "SM-format"
+  ],
+  "scn": [
+   "srvm"
+  ]
+ },
+ "m-sr-rw-target": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "            $prepared['targetColumn'] = strtoupper($_jAliasRw[strtoupper($prepared['targetColumn'])]);\n",
+    ""
+   ]
+  ],
+  "must": [
+   "SM-rewrite"
+  ],
+  "scn": [
+   "srvm"
+  ]
+ },
+ "m-sr-rw-cols": {
+  "edits": [
+   [
+    "schedule_runner.php",
+    "            $prepared['_parsed'] = parse_format_condition($rule['condition'], $_colsRw);\n",
+    "            $prepared['_parsed'] = parse_format_condition($rule['condition'], $columns);\n"
+   ]
+  ],
+  "must": [
+   "SM-rewrite"
+  ],
+  "scn": [
+   "srvm"
+  ]
+ },
+ "m-tpl-fill": {
+  "edits": [
+   [
+    "penumbra_template.php",
+    "                if (!array_key_exists($a, $plain) && array_key_exists($to, $plain)) $plain[$a] = $plain[$to];\n",
+    ""
+   ]
+  ],
+  "must": [
+   "SM-tpl"
+  ],
+  "scn": [
+   "srvm"
+  ]
+ },
+ "m-ix-route": {
+  "edits": [
+   [
+    "index.php",
+    "                $_dsRouted = penumbra_route_dash_search((string)$_GET['dsearch'], $_dsRouteCols);\n",
+    "                $_dsRouted = penumbra_route_dash_search((string)$_GET['dsearch'], $_dsCols);\n"
+   ]
+  ],
+  "must": [
+   "W-dash-old"
+  ],
+  "scn": [
+   "wirem"
+  ]
+ }
+}

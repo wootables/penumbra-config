@@ -1,0 +1,86 @@
+/*
+ * anparity side-by-side (2026-10-01, increment 2): the before/after protocol
+ * cannot tell a changed build from live data moving while other sessions are
+ * busy on the app (two rollbacks: report rpt opened every ~2 min, ~10 events a
+ * minute from the dashboard tests). This compares the two builds on the SAME
+ * data: for each case it renders the LIVE page, a TEMP copy of the other build
+ * (same folder, name prefixed), and the LIVE page again, back to back. The
+ * temp build passes the case when it equals either live render (data can move
+ * between the renders, but it cannot match both ways by accident); otherwise
+ * the triple is retried. Needs anparity.js loaded first (pnbAP.factsOf).
+ */
+(function () {
+    var AP = window.pnbAP;
+    var BASE = 'https://www3.acs.ncsu.edu/sponsor_migration/penumbra/';
+    function grab(u) {
+        return fetch(BASE + u, { credentials: 'same-origin', redirect: 'follow', cache: 'no-store' }).then(function (r) {
+            return r.text().then(function (t) {
+                return { status: r.status, fin: r.url.replace(BASE, ''), facts: AP.factsOf(t), bytes: t.length };
+            });
+        }).catch(function (e) { return { status: 'ERR ' + e, fin: '', facts: {} }; });
+    }
+    // the 24h chart's first label carries the minute: equal but for its HH:MM
+    function labelMin(sa, sb) {
+        try {
+            var a = JSON.parse(sa), b = JSON.parse(sb);
+            return Array.isArray(a) && Array.isArray(b) && a.length > 0 && a.length === b.length
+                && a.slice(1).join('|') === b.slice(1).join('|')
+                && String(a[0]).slice(-3, -2) === ':' && String(b[0]).slice(-3, -2) === ':'
+                && String(a[0]).slice(0, -5) === String(b[0]).slice(0, -5);
+        } catch (e) { return false; }
+    }
+    function diffKeys(x, y) {
+        var all = {}, out = [];
+        Object.keys(x.facts).concat(Object.keys(y.facts)).forEach(function (k) { all[k] = 1; });
+        Object.keys(all).forEach(function (k) {
+            var a = x.facts[k], b = y.facts[k];
+            if (a === b) return;
+            if (/^js:labels#/.test(k) && labelMin(a, b)) return;
+            out.push(k);
+        });
+        return out;
+    }
+    AP.sbsLabelMin = labelMin;
+    AP.sbs = function (label, urls, tmpPrefix, tries) {
+        tries = tries || 4;
+        var res = { pass: 0, fail: [], retried: 0, keys: 0, prefix: tmpPrefix }, i = 0, t0 = Date.now();
+        AP.sbsStore = AP.sbsStore || {};
+        AP.sbsStore[label] = res;
+        AP.status = label + ' 0/' + urls.length;
+        function tmpOf(u) { return u.replace(/^(analytics(?:_all)?\.php)/, tmpPrefix + '$1'); }
+        function sameShape(L, T) { return L.status === T.status && L.fin === T.fin.split(tmpPrefix).join(''); }
+        // A render that failed to arrive proves nothing: a fetch error (the SSO
+        // session expired mid-run once, 2026-10-01 17:12, and 62 empty "passes"
+        // came back), or a 200 with no numbers on it, can never pass a case.
+        function real(x) { return typeof x.status === 'number' && (x.status !== 200 || Object.keys(x.facts).length > 0); }
+        function oneCase(u, attempt) {
+            return grab(u).then(function (L1) {
+                return grab(tmpOf(u)).then(function (T) {
+                    return grab(u).then(function (L2) {
+                        var d1 = diffKeys(L1, T), d2 = diffKeys(L2, T);
+                        if (real(T) && ((real(L1) && sameShape(L1, T) && !d1.length) || (real(L2) && sameShape(L2, T) && !d2.length))) {
+                            res.pass++; res.keys += Object.keys(T.facts).length; if (attempt) res.retried++;
+                            return;
+                        }
+                        if (attempt + 1 < tries) return oneCase(u, attempt + 1);
+                        res.fail.push({ i: urls.indexOf(u), status: [L1.status, T.status, L2.status], fin: [L1.fin, T.fin, L2.fin],
+                            d1: d1.slice(0, 12), d2: d2.slice(0, 12),
+                            sample: d1.slice(0, 3).map(function (k) { return k + ' :: ' + String(L1.facts[k]).slice(0, 140) + ' -> ' + String(T.facts[k]).slice(0, 140); }) });
+                    });
+                });
+            });
+        }
+        AP.running = (function next() {
+            if (i >= urls.length) {
+                AP.status = label + ' DONE ' + res.pass + ' pass, ' + res.fail.length + ' fail, ' + res.retried + ' retried, ' + res.keys + ' keys, ' + Math.round((Date.now() - t0) / 1000) + 's';
+                return Promise.resolve();
+            }
+            var u = urls[i++];
+            return oneCase(u, 0).then(function () {
+                AP.status = label + ' ' + i + '/' + urls.length + ' ' + Math.round((Date.now() - t0) / 1000) + 's';
+                return next();
+            });
+        })();
+        return AP.status;
+    };
+})();

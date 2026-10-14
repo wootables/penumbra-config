@@ -1,0 +1,34 @@
+# =============================================================================
+# Run the SQL function / package deny-list unit tests (added 2026-09-04).
+#
+#   powershell -File run.ps1
+#   powershell -File run.ps1 -Control     # must report FAIL 1 - proves the
+#                                         # harness can actually fail
+#
+# WHAT IS UNDER TEST. penumbraSqlForbiddenFunction() in db_connection.php - the
+# name-level deny that closes the user-SQL sandbox bypass found by the 2026-09-04
+# security sweep: the table allow-list extractor strips string literals and only
+# judges FROM/JOIN names, so DBMS_XMLGEN.GETXML('SELECT ... FROM anything') FROM
+# DUAL ran the inner SQL ungated for any authenticated viewer. The suite lifts the
+# REAL function by tokenizer, checks 27 blocked payload shapes (both dialects),
+# 13 allowed shapes (the DBMS_LOB helper the help text documents, literals,
+# comments, near-miss identifiers), and always runs a TARGETED MUTANT whose
+# broken family pattern must miss the headline payload.
+#
+# -n (skip php.ini) because from a workstation the ini cannot load oci8/sqlsrv.
+#
+# EXPECTED TAIL: "PASS 44   FAIL 0". Any other tail is a failure, a smaller
+# pass count included.
+# =============================================================================
+param([switch]$Control)
+
+$ErrorActionPreference = 'Stop'
+$here = $PSScriptRoot
+$php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+
+# NOT $args - that is an automatic variable in PowerShell.
+$phpArgs = @('-n', (Join-Path $here 'test_sqlfn.php'))
+if ($Control) { $phpArgs += '--control' }
+
+& $php @phpArgs
+exit $LASTEXITCODE

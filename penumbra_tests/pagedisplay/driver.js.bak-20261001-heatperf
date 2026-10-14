@@ -1,0 +1,126 @@
+// pagedisplay suite driver (2026-10-01). harness.html?scn=<name> boots the REAL
+// main.js on the 300-row fixture (25 rows a page unless the scenario says
+// otherwise), this runs the scenario and publishes what run.py asserts:
+//   render   what renderReportSnippet saw at each call after the reset: how many
+//            of the rows the search kept were DISPLAYED (window.__pdRender, written
+//            by run.py's hook) - the window where every match used to be displayed
+//   after    the state once the search has settled: the V_IDs displayed, the rows
+//            kept, the page info; page 2 for the search scenario
+//   heat*    per page, the V_AMOUNT cells' value and inline background (heatmap())
+//   expect   what the fixture says: the matches of the search, every V_ID
+// window.__HCRESULT = {...}, window.__HCDONE = true.
+(function () {
+  var SCN = window.__SCN;
+  var HC = window.__HC || {};
+  var R = { scn: SCN, notes: [], expect: {} };
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function hides() { return window.__HC_HIDES || 0; }
+  async function until(fn, ms) { var t = Date.now(); while (!fn() && Date.now() - t < ms) await sleep(20); return fn(); }
+  function colId(name) { return String(window.__COLS.indexOf(name)); }
+  function rowsOf() { return Array.prototype.slice.call(document.querySelectorAll('#resultsTable > tbody > tr')); }
+  function cellOf(tr, name) { return tr.querySelector('td[data-column="' + colId(name) + '"]'); }
+  function idOf(tr) { var td = cellOf(tr, 'V_ID'); return td ? td.textContent.trim() : '?'; }
+  function num(s) { var v = parseFloat(String(s).replace(/[^0-9.-]/g, '')); return isNaN(v) ? null : v; }
+
+  async function boot() {
+    if (!(await until(function () {
+      return window.__queryDone >= 1 && hides() >= 1 && document.querySelectorAll('#resultsTable > tbody > tr').length >= window.__rowsFixture.length;
+    }, 150000))) throw new Error('boot: the report never finished loading (150 s)');
+    await sleep(400);
+  }
+  async function settle() { await sleep(250); }
+  async function search(q) {
+    var before = hides();
+    window.__pdRender = [];
+    $('#tableSearch').val(q);
+    HC.runTableSearch();
+    if (!(await until(function () { return hides() > before; }, 30000))) R.notes.push('search "' + q + '" never finished (30 s)');
+    await sleep(300);
+  }
+  function snapshot() {
+    var displayed = [], kept = 0;
+    rowsOf().forEach(function (tr) {
+      if (tr.classList.contains('search-hidden')) return;
+      kept++;
+      if (tr.style.display !== 'none') displayed.push(idOf(tr));
+    });
+    return { displayed: displayed, kept: kept, pageInfo: $('#pageInfo').text(), resultCount: $('#resultCount').text(),
+             rpp: String($('#rowsPerPageSelector').val()), page: HC.getPage ? HC.getPage() : null };
+  }
+  function heatSnap() {
+    var out = [];
+    rowsOf().forEach(function (tr) {
+      if (tr.classList.contains('search-hidden') || tr.style.display === 'none') return;
+      var td = cellOf(tr, 'V_AMOUNT');
+      out.push({ id: idOf(tr), v: td ? num(td.textContent) : null, bg: td ? String(td.style.backgroundColor || '') : '' });
+    });
+    return out;
+  }
+  function expectMatches() {
+    return window.__rowsFixture.filter(function (r) { return r.V_STATUS === 'Open'; }).map(function (r) { return r.V_ID; });
+  }
+
+  var S = {
+    search: async function () {
+      R.expect.matches = expectMatches();
+      await search('V_STATUS = Open');
+      R.render = window.__pdRender.slice();
+      R.after = snapshot();
+      HC.setPage(2); await settle();
+      R.page2 = snapshot();
+    },
+    clear: async function () {
+      R.expect.all = window.__rowsFixture.map(function (r) { return r.V_ID; });
+      await search('V_STATUS = Open');
+      R.searchRender = window.__pdRender.slice();
+      await search('');
+      R.render = window.__pdRender.slice();
+      R.after = snapshot();
+    },
+    rowsall: async function () {
+      R.expect.matches = expectMatches();
+      await search('V_STATUS = Open');
+      R.render = window.__pdRender.slice();
+      R.after = snapshot();
+    },
+    rowsnone: async function () {
+      R.expect.matches = expectMatches();
+      await search('V_STATUS = Open');
+      R.render = window.__pdRender.slice();
+      R.after = snapshot();
+    },
+    heatpage: async function () {
+      R.expect.matches = expectMatches();
+      await search('V_STATUS = Open');
+      R.render = window.__pdRender.slice();
+      R.after = snapshot();
+      R.heat = {};
+      for (var p = 1; p <= 3; p++) { HC.setPage(p); await settle(); R.heat['p' + p] = heatSnap(); }
+    },
+    heatfiltered: async function () {
+      R.expect.matches = expectMatches();
+      await search('V_STATUS = Open');
+      R.render = window.__pdRender.slice();
+      R.after = snapshot();
+      R.heat = {};
+      for (var p = 1; p <= 3; p++) { HC.setPage(p); await settle(); R.heat['p' + p] = heatSnap(); }
+    }
+  };
+
+  (async function () {
+    try {
+      await boot();
+      if (!S[SCN]) throw new Error('unknown scenario ' + SCN);
+      await S[SCN]();
+      await sleep(50);
+    } catch (e) {
+      R.fatal = String((e && e.stack) || e);
+    }
+    R.errors = window.__errors.concat(window.__rejections).slice(0, 10);
+    R.hookErr = [window.__HC_ERR, window.__HC_ERR2, window.__HC_ERR3].filter(Boolean).join('; ');
+    R.missing = window.__HC_MISSING || [];
+    window.__HCRESULT = R;
+    window.__HCDONE = true;
+    document.getElementById('out').textContent = 'DONE';
+  })();
+})();

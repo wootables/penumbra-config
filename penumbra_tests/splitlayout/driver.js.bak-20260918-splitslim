@@ -1,0 +1,437 @@
+// Split header layout - browser suite (2026-09-18). Drives the REAL main.js
+// (ready closure unwrapped, window.__SL export hook) against the REAL main.css,
+// with the stage / pane / radio markup LIFTED from the index.php under test.
+//   A  apply + move: the snippet node itself travels, and comes back to its slot
+//   G  geometry: 50/50, the one-track header, who scrolls, the shared height cap
+//   S  the grouped view: bands and pane both stick to the VIEWPORT
+//   E  section embeds stand the split down
+//   D  a page with no stage markup builds its own
+//   N  (?narrow=1, a 900px window) the stacked fallback
+(function () {
+  var R = [];
+  function rec(name, pass, detail) { R.push({ name: name, pass: !!pass, detail: detail === undefined ? '' : String(detail).slice(0, 500) }); }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function errs() { return window.__errors.concat(window.__rejections); }
+  function finish(fatal) {
+    var payload = { results: R, pageErrors: errs().slice(0, 8), hookErr: [window.__SL_ERR, window.__SL_ERR2, (window.__SL_MISSING || []).join(',')].filter(Boolean).join('; ') };
+    if (fatal) payload.fatal = fatal;
+    document.getElementById('out').textContent = 'RESULTS_JSON:' + JSON.stringify(payload);
+  }
+  var NARROW = /[?&]narrow=1/.test(location.search);
+  var H = window.__SL || {};
+  function el(id) { return document.getElementById(id); }
+  function hdr() { return el('reportHeaderContainer'); }
+  function snip() { return el('reportSnippetOutput'); }
+  function stage() { return el('pnbSplitStage'); }
+  function pane() { return el('pnbSplitPane'); }
+  function tvc() { return el('table-view-container'); }
+  function wrap() { return el('results-wrapper'); }
+  function box(e) { return e.getBoundingClientRect(); }
+  function cs(e) { return getComputedStyle(e); }
+  function near(a, b, tol) { return Math.abs(a - b) <= (tol === undefined ? 1.5 : tol); }
+  function r1(n) { return Math.round(n * 10) / 10; }
+  function px(v) { return Math.round(parseFloat(v) * 10) / 10; }
+  function layout(mode) { if (H.applyHeaderLayout) H.applyHeaderLayout(mode); }
+  function isSplit() { return !!(stage() && stage().classList.contains('is-split')); }
+  function tracks(e) { return cs(e).gridTemplateColumns.split(' ').filter(Boolean).length; }
+  function scrolls(e) { var c = cs(e); return /auto|scroll/.test(c.overflowX + ' ' + c.overflowY); }
+  // The element siblings either side of a node - "the same slot" in the header.
+  function slot(n) {
+    var p = n.previousElementSibling, x = n.nextElementSibling;
+    return (n.parentNode ? n.parentNode.id : 'null') + ':' + (p ? p.id : '-') + '|' + (x ? x.id : '-');
+  }
+  function comments(root, text) {
+    var out = [], w = document.createTreeWalker(root, NodeFilter.SHOW_COMMENT, null);
+    while (w.nextNode()) if (w.currentNode.nodeValue === text) out.push(w.currentNode);
+    return out;
+  }
+
+  var COLS = ['C01', 'C02', 'C03', 'C04', 'C05', 'C06', 'C07', 'C08', 'C09', 'C10', 'C11', 'AMOUNT'];
+  function makeRows(n) {
+    var out = [];
+    for (var i = 1; i <= n; i++) {
+      var row = {};
+      for (var c = 0; c < COLS.length; c++) row[COLS[c]] = (COLS[c] === 'AMOUNT') ? String(i * 100) : ('value ' + COLS[c] + ' row ' + i + ' xx');
+      out.push(row);
+    }
+    return out;
+  }
+  async function runQuery(rows) {
+    window.__queryResponse = { data: rows };
+    var ed = H.getEditor ? H.getEditor() : null;
+    if (ed) ed.setValue('SELECT 1 FROM DUAL');
+    var before = window.__ajaxLog.length;
+    $('#executeQuery').trigger('click');
+    for (var i = 0; i < 200; i++) {
+      await sleep(25);
+      if (window.__ajaxLog.length > before && (window.__rejections.length || !$('#loadingOverlay').is(':visible'))) break;
+    }
+    await sleep(400);
+  }
+  // The page boots as "no report loaded"; a report view shows the title panel.
+  function showReportHeader() {
+    $('#reportHeaderContainer').show().removeClass('is-collapsed');
+    $('#reportInfoPanel').show();
+    $('#defaultTitleView').hide();
+  }
+  function fillSnippet() {
+    var s = snip();
+    s.innerHTML = '<div class="penumbra-card" id="slCard">Awards <b>42</b></div><canvas id="slCanvas" width="300" height="120"></canvas>';
+    // A script element runs once, now. Moving its parent must not run it again.
+    // (Measured 2026-09-18: neither a native move nor a jQuery .append() of an
+    // ATTACHED node does - jQuery marks an attached subtree's scripts as already
+    // evaluated. So this guards the invariant; it is the handler half of A4 and
+    // the identity check in A1 that tell a MOVE from a rebuild.)
+    var sc = document.createElement('script');
+    sc.text = 'window.__slRuns = (window.__slRuns || 0) + 1;';
+    s.appendChild(sc);
+  }
+
+  // ------------------------------------------------------------------------
+  function phaseA() {
+    showReportHeader();
+    fillSnippet();
+    var node = snip();
+    node.__slMark = 42;
+    var clicks = 0;
+    $('#slCanvas').on('click.sl', function () { clicks++; });
+    var home = slot(node);
+
+    rec('A0 control: Default keeps the snippet in the header, in its own slot, and nothing is split',
+      node.parentNode === hdr() && home === 'reportHeaderContainer:promptInfoContainer|hdrTail' && !isSplit() && window.__slRuns === 1 &&
+      !hdr().classList.contains('layout-split'),
+      'slot=' + home + ' split=' + isSplit() + ' runs=' + window.__slRuns);
+    if (!H.applyHeaderLayout) { rec('A1 split re-hosts the snippet node', false, 'applyHeaderLayout not exported: ' + (window.__SL_MISSING || []).join(',')); return false; }
+
+    layout('split');
+    var p = pane();
+    rec('A1 split re-hosts the SAME snippet node into the pane, beside the table',
+      !!p && snip() === node && node.__slMark === 42 && node.parentNode === p && p.parentNode === stage() && tvc().parentNode === stage() && !tvc().contains(p),
+      'parent=' + (node.parentNode && node.parentNode.id) + ' paneParent=' + (p && p.parentNode && p.parentNode.id) + ' tvcParent=' + (tvc().parentNode && tvc().parentNode.id));
+    if (!p) return false;
+    rec('A2 split marks the stage, the header and the body, and un-hides the pane',
+      isSplit() && hdr().classList.contains('layout-split') && !hdr().classList.contains('layout-dashboard') &&
+      document.body.classList.contains('pnb-layout-split') && !p.hidden && cs(p).display === 'block',
+      'stage=' + stage().className + ' hdr=' + hdr().className + ' hidden=' + p.hidden + ' display=' + cs(p).display);
+    rec('A3 the pane is a labelled, keyboard-reachable region (it owns a scrollbar)',
+      p.nodeName === 'ASIDE' && !!p.getAttribute('aria-label') && p.getAttribute('tabindex') === '0',
+      p.nodeName + ' label=' + p.getAttribute('aria-label') + ' tabindex=' + p.getAttribute('tabindex'));
+    $('#slCanvas').trigger('click');
+    rec('A4 it is a MOVE, not a rebuild: handlers on the snippet\'s children survive, and a script inside it does not run again',
+      clicks === 1 && window.__slRuns === 1, 'clicks=' + clicks + ' scriptRuns=' + window.__slRuns);
+    layout('split');
+    rec('A5 applying split twice is idempotent: one placeholder, one snippet',
+      comments(hdr(), 'pnbSplitHome').length === 1 && document.querySelectorAll('#reportSnippetOutput').length === 1 && node.parentNode === p,
+      'placeholders=' + comments(hdr(), 'pnbSplitHome').length);
+
+    layout('default');
+    rec('A6 back to Default: the same node returns to the SAME slot, not the end of the header',
+      snip() === node && slot(node) === home && comments(hdr(), 'pnbSplitHome').length === 0 && !isSplit() && p.hidden &&
+      !hdr().classList.contains('layout-split') && !document.body.classList.contains('pnb-layout-split') && window.__slRuns === 1,
+      'slot=' + slot(node) + ' want=' + home + ' runs=' + window.__slRuns);
+
+    layout('split'); layout('dashboard');
+    var crumbMoved = !!el('dashboardBreadcrumb') && el('dashboardBreadcrumb').parentNode === hdr();
+    rec('A7 split -> Dashboard: the snippet is back in the header and Dashboard is fully on',
+      node.parentNode === hdr() && hdr().classList.contains('layout-dashboard') && !hdr().classList.contains('layout-split') && !isSplit() && crumbMoved,
+      'parent=' + node.parentNode.id + ' hdr=' + hdr().className + ' crumbMoved=' + crumbMoved);
+    layout('split');
+    rec('A8 Dashboard -> split: Dashboard is fully undone (breadcrumb back in the title panel)',
+      node.parentNode === p && !hdr().classList.contains('layout-dashboard') && !el('dashboardBreadcrumb') &&
+      !!document.querySelector('#reportInfoPanel > div:first-child .safe-home-link'),
+      'hdr=' + hdr().className + ' crumbId=' + !!el('dashboardBreadcrumb'));
+
+    layout('bogus');
+    rec('A9 an unknown layout value is Default', node.parentNode === hdr() && !isSplit(), 'parent=' + node.parentNode.id);
+
+    var $radio = $('input[name="headerLayout"][value="split"]');
+    if (!$radio.length) { rec('A10 the Split radio engages it and is what gets saved', false, 'no Split radio in the index.php under test'); }
+    else {
+      // buildStateObject() refuses to build a state for an empty query box.
+      var ed = H.getEditor ? H.getEditor() : null;
+      if (ed) ed.setValue('SELECT 1 FROM DUAL');
+      $radio.prop('checked', true).trigger('change');
+      var engaged = isSplit() && node.parentNode === pane();
+      var st = null, stErr = '';
+      try { st = H.buildState ? H.buildState() : null; } catch (e) { stErr = String(e); }
+      var saved = st && st.viewOptions ? st.viewOptions.headerLayout : undefined;
+      $('input[name="headerLayout"][value="default"]').prop('checked', true).trigger('change');
+      var st2 = null; try { st2 = H.buildState ? H.buildState() : null; } catch (e2) {}
+      var saved2 = st2 && st2.viewOptions ? st2.viewOptions.headerLayout : undefined;
+      rec('A10 the Split radio engages it, is saved as headerLayout "split", and Default saves nothing',
+        engaged && saved === 'split' && saved2 === undefined && !isSplit(),
+        'engaged=' + engaged + ' saved=' + saved + ' afterDefault=' + saved2 + ' state=' + (st ? Object.keys(st).slice(0, 6).join('/') : String(st)) + ' vo=' + (st && st.viewOptions ? Object.keys(st.viewOptions).join('/') : 'none') + ' ' + stErr);
+    }
+    if (H.applyRestrictions) H.applyRestrictions({ headerLayout: 'split' });
+    rec('A11 a viewer with no View Options panel gets it from the saved state', isSplit() && node.parentNode === p, 'split=' + isSplit());
+    layout('default');
+    return true;
+  }
+
+  // ------------------------------------------------------------------------
+  async function phaseG() {
+    await runQuery(makeRows(60));
+    if (!wrap() && H.applyContainerization) H.applyContainerization();
+    var w = wrap();
+    var ok0 = !!w && document.querySelectorAll('#tableHeader th').length === 13 && document.querySelectorAll('#resultsTable > tbody > tr').length === 60;
+    rec('G0 fixture: the real render path built a 13-column, 60-row table inside #results-wrapper', ok0,
+      'wrapper=' + !!w + ' ths=' + document.querySelectorAll('#tableHeader th').length + ' rows=' + document.querySelectorAll('#resultsTable > tbody > tr').length + ' errs=' + errs().slice(0, 2).join(' / '));
+    if (!ok0) return false;
+    showReportHeader();
+    // A viewer's page: no admin console between the header and the controls
+    // bar. (main.js shows #admWrapper for the harness's admin user, and an open
+    // console pushes the table down to its 250px floor - where every cap is the
+    // same number and G4/G5 could not tell a right answer from a wrong one.)
+    $('#admWrapper').hide();
+    if (!snip().firstChild) fillSnippet();
+    if (window.stackHeaders) window.stackHeaders();
+
+    var fullW = box(tvc()).width;
+    layout('split');
+    if (!isSplit()) { rec('G1 the two sides are equal halves of the stage', false, 'split did not engage'); return false; }
+    var s = box(stage()), t = box(tvc()), p = box(pane());
+    var gap = px(cs(stage()).columnGap) || 0;
+    rec('G1 the two sides are equal halves of the stage, table left and pane right, tops level',
+      near(t.width, p.width) && near(t.width, (s.width - gap) / 2) && near(t.left, s.left) && near(p.right, s.right) && p.left >= t.right && near(t.top, p.top) && fullW > t.width * 1.8,
+      'stage=' + r1(s.width) + ' gap=' + gap + ' table=' + r1(t.width) + ' pane=' + r1(p.width) + ' tops=' + r1(t.top) + '/' + r1(p.top) + ' fullBefore=' + r1(fullW));
+
+    var one = tracks(hdr());
+    hdr().classList.add('has-pct-snippet');
+    var onePct = tracks(hdr());
+    hdr().classList.remove('has-pct-snippet');
+    rec('G2 the header is ONE track - no phantom snippet column - and a % chart cannot bring it back',
+      one === 1 && onePct === 1, 'tracks=' + one + ' withPctChart=' + onePct + ' [' + cs(hdr()).gridTemplateColumns + ']');
+
+    rec('G3 the stage and the table side never scroll; the pane scrolls itself',
+      !scrolls(stage()) && !scrolls(tvc()) && scrolls(pane()) && cs(stage()).display === 'grid',
+      'stage=' + cs(stage()).overflowX + '/' + cs(stage()).overflowY + ' tvc=' + cs(tvc()).overflowX + '/' + cs(tvc()).overflowY + ' pane=' + cs(pane()).overflowY);
+
+    if (H.updateContainerHeight) H.updateContainerHeight();
+    var capW = px(cs(w).maxHeight), capP = px(cs(pane()).maxHeight);
+    // What takes up room between the header and the controls bar (diagnostic).
+    var between = Array.prototype.filter.call(document.body.children, function (c) {
+      var b = box(c); return b.height > 8 && b.top >= box(hdr()).bottom - 1 && b.bottom <= box(el('resultsHeader')).top + 1;
+    }).map(function (c) { return (c.id || c.nodeName) + ':' + Math.round(box(c).height); }).join(',');
+    rec('G4 the pane takes the table box\'s own height cap (and the fixture is off the 250px floor)', capW > 300 && near(capW, capP, 0.6),
+      'wrapper=' + capW + ' pane=' + capP + ' innerH=' + window.innerHeight + ' hdr=' + r1(box(hdr()).top) + '+' + r1(box(hdr()).height) + ' bar=' + r1(box(el('resultsHeader')).top) + '+' + r1(box(el('resultsHeader')).height) + ' stageTop=' + r1(box(stage()).top) + ' wrapTop=' + r1(box(w).top) + ' between=[' + between + ']');
+    // Something ABOVE both boxes (an open admin console): the wrapper's cap
+    // shrinks because its top moved. Only updateContainerHeight() is called -
+    // the observers that would also fire are stubbed - so this proves both that
+    // the pane follows the WRAPPER (not the chrome arithmetic) and who tells it.
+    var spacer = document.createElement('div');
+    spacer.id = 'slSpacer'; spacer.style.height = '120px';
+    stage().parentNode.insertBefore(spacer, stage());
+    if (H.updateContainerHeight) H.updateContainerHeight();
+    var capW2 = px(cs(w).maxHeight), capP2 = px(cs(pane()).maxHeight);
+    spacer.parentNode.removeChild(spacer);
+    if (H.updateContainerHeight) H.updateContainerHeight();
+    rec('G5 with 120px pushed in above them, both caps shrink together',
+      capW2 < capW - 100 && near(capW2, capP2, 0.6) && near(px(cs(pane()).maxHeight), capW, 0.6),
+      'before=' + capW + ' wrapper=' + capW2 + ' pane=' + capP2 + ' restored=' + px(cs(pane()).maxHeight));
+
+    var bar = el('resultsHeader');
+    var wantTop = Math.round(box(hdr()).height + box(bar).height + (parseFloat(cs(bar).marginBottom) || 0));
+    rec('G6 the pane is sticky just below the chrome: header + controls bar + the bar\'s margin',
+      cs(pane()).position === 'sticky' && near(px(cs(pane()).top), wantTop, 1.5) && wantTop > 40,
+      'position=' + cs(pane()).position + ' top=' + cs(pane()).top + ' want=' + wantTop);
+
+    rec('G7 a table wider than its half scrolls sideways INSIDE the left half',
+      w.scrollWidth > w.clientWidth + 100 && box(w).right <= box(pane()).left + 0.5 && document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+      'scrollW=' + w.scrollWidth + ' clientW=' + w.clientWidth + ' wrapRight=' + r1(box(w).right) + ' paneLeft=' + r1(box(pane()).left) + ' pageScrollW=' + document.documentElement.scrollWidth + '/' + document.documentElement.clientWidth);
+
+    // Short content, then content far taller than the cap: the scrollbar that
+    // appears must not change the width a % chart resolves against.
+    var sn = snip();
+    var keep = sn.innerHTML;
+    sn.innerHTML = '<div id="slShort" style="height:40px">short</div>';
+    var wShort = box(sn).width, scrollShort = pane().scrollHeight > pane().clientHeight;
+    sn.innerHTML = '<div id="slTall" style="height:3000px">tall</div>';
+    var wTall = box(sn).width, scrollTall = pane().scrollHeight > pane().clientHeight;
+    var bw = pane().offsetWidth - pane().clientWidth - 2;   // 2 = the borders
+    rec('G8 a scrollbar appearing in the pane does not change the snippet\'s width',
+      !scrollShort && scrollTall && near(wShort, wTall, 0.2) && bw > 5,
+      'short=' + r1(wShort) + ' tall=' + r1(wTall) + ' overflowed=' + scrollShort + '/' + scrollTall + ' gutter=' + bw);
+    var base = H.vizBaseWidth ? H.vizBaseWidth('#reportSnippetOutput') : -1;
+    rec('G9 a % chart resolves against the pane, not the page',
+      near(base, box(sn).width, 1.5) && base < box(stage()).width / 2, 'base=' + base + ' snippet=' + r1(box(sn).width) + ' stage=' + r1(box(stage()).width));
+
+    // --- one side with nothing to show -------------------------------------
+    layout('default');
+    sn.innerHTML = '';
+    layout('split');
+    var e1 = stage().classList.contains('is-split-empty') && cs(pane()).display === 'none' && near(box(tvc()).width, box(stage()).width);
+    rec('G10 entering split with NO snippet output: the pane stands down and the table takes the full width', e1,
+      'empty=' + stage().classList.contains('is-split-empty') + ' paneDisplay=' + cs(pane()).display + ' table=' + r1(box(tvc()).width) + ' stage=' + r1(box(stage()).width));
+    $(sn).html('\n  <style>.x{color:red}</style>\n <span style="display:none">hidden()</span><br>\n');
+    await sleep(30);
+    var e2 = stage().classList.contains('is-split-empty');
+    $(sn).html('<div class="penumbra-card">now there is something</div>');
+    await sleep(30);
+    var e3 = !stage().classList.contains('is-split-empty') && cs(pane()).display === 'block' && near(box(tvc()).width, box(pane()).width);
+    $(sn).empty();
+    await sleep(30);
+    var e4 = stage().classList.contains('is-split-empty');
+    rec('G11 later writes are seen: rules-only output (whitespace, <style>, hidden) stays empty, real output splits, .empty() un-splits',
+      e2 && e3 && e4, 'rulesOnlyEmpty=' + e2 + ' contentSplits=' + e3 + ' emptiedAgain=' + e4);
+    sn.innerHTML = keep;
+    await sleep(30);
+
+    // Rows "None" collapses #table-view-container (flat view only).
+    document.body.classList.add('pnb-data-hidden');
+    var tH = box(tvc()).height, pn = box(pane()), st = box(stage()), pPos = cs(pane()).position, pCap = cs(pane()).maxHeight;
+    var g12 = tH < 1 && near(pn.width, st.width) && pPos === 'static' && pCap === 'none' && !scrolls(pane()) && pn.height > 20;
+    document.body.classList.remove('pnb-data-hidden');
+    rec('G12 Rows "None": the collapsed table gives the pane the full width, and the pane stops being a capped sticky box', g12,
+      'tableH=' + r1(tH) + ' pane=' + r1(pn.width) + '/' + r1(st.width) + ' position=' + pPos + ' maxHeight=' + pCap);
+
+    layout('default');
+    rec('G13 back to Default the stage is a plain block box again and the table has the full width',
+      cs(stage()).display === 'block' && near(box(tvc()).width, box(stage()).width) && near(box(tvc()).width, fullW) && tracks(hdr()) === 2,
+      'display=' + cs(stage()).display + ' table=' + r1(box(tvc()).width) + ' fullBefore=' + r1(fullW) + ' hdrTracks=' + tracks(hdr()));
+    return true;
+  }
+
+  // ------------------------------------------------------------------------
+  // The grouped view by hand, in the wrapper shape renderGroupNode() produces
+  // (the groupmode suite's sticky page does the same): this phase is about the
+  // STYLESHEET and the offsets, not about how groups are computed.
+  function buildGroups(n) {
+    var root = el('groupedResultsContainer');
+    root.innerHTML = '';
+    for (var g = 0; g < n; g++) {
+      var wr = document.createElement('div');
+      wr.className = 'group-wrapper open group-leaf';
+      wr.setAttribute('data-group-depth', '0');
+      var rows = '';
+      for (var i = 0; i < 40; i++) rows += '<tr><td>row ' + i + '</td><td>dept</td></tr>';
+      wr.innerHTML = '<div class="group-header"><span class="group-chevron">v</span><span class="group-name">Group ' + g + '</span><span class="group-count">40</span></div>' +
+        '<div class="group-content" style="display:block"><table><thead><tr><th>Name</th><th>Dept</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+      root.appendChild(wr);
+    }
+    root.style.display = 'block';
+  }
+  function bandTopAfterScroll() {
+    var band = document.querySelector('#groupedResultsContainer .group-wrapper:nth-child(2) > .group-header');
+    var wr = band.parentNode;
+    window.scrollTo(0, 0);
+    var y = box(wr).top + window.pageYOffset;      // document position of the 2nd group
+    window.scrollTo(0, Math.round(y + 120));       // its band has to be pinned by now
+    return { band: box(band).top, wrapperTop: box(wr).top, scrolled: window.pageYOffset };
+  }
+  function phaseS() {
+    if (!H.removeContainerization || !H.groupSync) { rec('S1 grouped view', false, 'exports missing: ' + (window.__SL_MISSING || []).join(',')); return; }
+    layout('default');
+    H.removeContainerization();
+    el('resultsTable').style.display = 'none';
+    buildGroups(8);
+    document.body.classList.add('group-mode-active');
+    if (window.stackHeaders) window.stackHeaders();
+    H.groupSync();
+    var root = el('groupedResultsContainer');
+    // Where "below the chrome" is, measured here and not read back from the app.
+    function chrome() { return Math.round(box(hdr()).height + box(el('resultsHeader')).height); }
+    var ctlChrome = chrome();
+    var ctl = bandTopAfterScroll();
+    rec('S0 control: in Default a scrolled group band pins to the viewport, just below the chrome',
+      !wrap() && ctl.scrolled > 100 && ctl.wrapperTop < ctl.band - 50 && near(ctl.band, ctlChrome, 1.5),
+      'band=' + r1(ctl.band) + ' chrome=' + ctlChrome + ' wrapperTop=' + r1(ctl.wrapperTop) + ' scrolled=' + ctl.scrolled);
+
+    // No stackHeaders() / groupSync() here on purpose: the header just lost its
+    // snippet and got SHORTER, and it is applyHeaderLayout's own re-anchoring
+    // that has to carry the bands up with it.
+    window.scrollTo(0, 0);
+    layout('split');
+    var spChrome = chrome();
+    var sp = bandTopAfterScroll();
+    var paneTop = box(pane()).top, wantPane = px(cs(pane()).top);
+    rec('S1 in split the band still pins to the VIEWPORT, below the (now shorter) chrome - the stage did not become its scroll box',
+      isSplit() && !wrap() && spChrome < ctlChrome - 20 && near(sp.band, spChrome, 1.5) && sp.wrapperTop < sp.band - 50 && !scrolls(stage()) && !scrolls(tvc()),
+      'band=' + r1(sp.band) + ' chrome=' + spChrome + ' (Default ' + ctlChrome + ') wrapperTop=' + r1(sp.wrapperTop));
+    rec('S2 the pane stays in view while the grouped page scrolls, pinned at its sticky top',
+      sp.scrolled > 100 && near(paneTop, wantPane, 1.5) && box(pane()).height > 20,
+      'paneTop=' + r1(paneTop) + ' want=' + wantPane + ' scrolled=' + sp.scrolled);
+    var half = near(box(root).width, (box(stage()).width - (px(cs(stage()).columnGap) || 0)) / 2, 2);
+    rec('S3 the grouped view fits its half (its leaf scrollers own any overflow) and the page gains no sideways scroll',
+      half && document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+      'grouped=' + r1(box(root).width) + ' stage=' + r1(box(stage()).width) + ' pageScrollW=' + document.documentElement.scrollWidth + '/' + document.documentElement.clientWidth);
+
+    window.scrollTo(0, 0);
+    document.body.classList.remove('group-mode-active');
+    root.innerHTML = ''; root.style.display = '';
+    el('resultsTable').style.display = '';
+    layout('default');
+    if (H.applyContainerization) H.applyContainerization();
+  }
+
+  // ------------------------------------------------------------------------
+  function phaseE() {
+    var node = snip();
+    ['embed-only-header', 'embed-only-table'].forEach(function (cls, i) {
+      document.body.classList.add('embed-view', cls);
+      layout('split');
+      var ok = node.parentNode === hdr() && !isSplit() && !hdr().classList.contains('layout-split');
+      layout('default');
+      document.body.classList.remove('embed-view', cls);
+      rec('E' + (i + 1) + ' a ' + cls + ' frame shows one half of the page: split stands down and the snippet stays in the header', ok,
+        'parent=' + (node.parentNode && node.parentNode.id));
+    });
+    document.body.classList.add('embed-view');
+    layout('split');
+    var full = isSplit();
+    layout('default');
+    document.body.classList.remove('embed-view');
+    rec('E3 a full-report embed still splits (its width decides, not the frame)', full, 'split=' + full);
+  }
+
+  // ------------------------------------------------------------------------
+  function phaseD() {
+    layout('default');
+    var st = stage(), t = tvc();
+    if (st) { st.parentNode.insertBefore(t, st); st.parentNode.removeChild(st); }
+    var gone = !stage() && !pane();
+    layout('split');
+    var ok = gone && isSplit() && !!pane() && snip().parentNode === pane() && tvc().parentNode === stage() && pane().previousElementSibling === tvc() &&
+      near(box(tvc()).width, box(pane()).width) && pane().nodeName === 'ASIDE' && !!pane().getAttribute('aria-label');
+    rec('D1 a page with no stage markup builds its own, around the table, and splits the same way', ok,
+      'removed=' + gone + ' split=' + isSplit() + ' table=' + (tvc() && r1(box(tvc()).width)) + ' pane=' + (pane() && r1(box(pane()).width)));
+    layout('default');
+  }
+
+  // ------------------------------------------------------------------------
+  async function phaseN() {
+    await runQuery(makeRows(20));
+    if (!wrap() && H.applyContainerization) H.applyContainerization();
+    showReportHeader();
+    $('#admWrapper').hide();
+    fillSnippet();
+    var vw = document.documentElement.clientWidth;
+    rec('N0 fixture: the window is under the 1000px breakpoint', vw < 1000 && vw > 400, 'clientWidth=' + vw);
+    if (!H.applyHeaderLayout) { rec('N1 stacked fallback', false, 'applyHeaderLayout not exported'); return; }
+    layout('split');
+    var p = pane();
+    if (!p || !isSplit()) { rec('N1 stacked fallback', false, 'split did not engage'); return; }
+    var pb = box(p), tb = box(tvc()), sb = box(stage());
+    rec('N1 under 1000px the sides STACK, snippets first, each the full width',
+      tracks(stage()) === 1 && near(pb.width, sb.width) && near(tb.width, sb.width) && pb.bottom <= tb.top + 0.5,
+      'tracks=' + tracks(stage()) + ' pane=' + r1(pb.width) + ' table=' + r1(tb.width) + ' stage=' + r1(sb.width) + ' paneBottom=' + r1(pb.bottom) + ' tableTop=' + r1(tb.top));
+    rec('N2 stacked, the pane is an ordinary box: not sticky, not capped, no scrollbar of its own',
+      cs(p).position === 'static' && cs(p).maxHeight === 'none' && !scrolls(p), 'position=' + cs(p).position + ' maxHeight=' + cs(p).maxHeight);
+    layout('default');
+  }
+
+  (async function () {
+    try {
+      if (NARROW) { await phaseN(); }
+      else {
+        var ok = phaseA();
+        if (ok) ok = await phaseG();
+        if (ok) { phaseS(); phaseE(); phaseD(); }
+      }
+      var pe = errs();
+      rec('Z no page errors or unhandled rejections during the run', pe.length === 0, pe.slice(0, 3).join(' | '));
+      finish();
+    } catch (e) {
+      finish(String(e && e.stack ? e.stack : e).slice(0, 600));
+    }
+  })();
+})();

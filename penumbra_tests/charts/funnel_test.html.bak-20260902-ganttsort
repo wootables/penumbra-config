@@ -1,0 +1,219 @@
+<!doctype html><meta charset="utf-8"><title>running</title><pre id="out">running</pre>
+<script src="SRC.js"></script>
+<script>
+var LOG = [], PASS = 0, FAIL = 0;
+function ok(name, cond, extra) {
+  if (cond) { PASS++; LOG.push('PASS  ' + name); }
+  else { FAIL++; LOG.push('FAIL  ' + name + (extra ? '   >> ' + extra : '')); }
+}
+function eq(name, got, want) {
+  ok(name, JSON.stringify(got) === JSON.stringify(want),
+     'got=' + JSON.stringify(got) + ' want=' + JSON.stringify(want));
+}
+
+try {
+  // main.js is CRLF - normalise or every \n anchor silently misses.
+  var code = String(window.__src).replace(/\r\n/g, '\n');
+
+  // Brace-matched extraction: far safer than indent anchors, which happily
+  // slice a JSDoc block in half and report a syntax error in the EXTRACT.
+  function grab(decl) {
+    var start = code.indexOf(decl);
+    if (start === -1) throw new Error('anchor not found: ' + decl);
+    var i = code.indexOf('{', start), depth = 0, inStr = null, inLine = false, inBlk = false, inRe = false;
+    for (var j = i; j < code.length; j++) {
+      var c = code[j], p = code[j - 1], n = code[j + 1];
+      if (inLine) { if (c === '\n') inLine = false; continue; }
+      if (inBlk) { if (c === '*' && n === '/') { inBlk = false; j++; } continue; }
+      if (inStr) { if (c === '\\') { j++; continue; } if (c === inStr) inStr = null; continue; }
+      if (inRe) { if (c === '\\') { j++; continue; } if (c === '/') inRe = false; continue; }
+      if (c === '/' && n === '/') { inLine = true; j++; continue; }
+      if (c === '/' && n === '*') { inBlk = true; j++; continue; }
+      if (c === '"' || c === "'" || c === '`') { inStr = c; continue; }
+      if (c === '/') {
+        // regex literal vs division: look back at the last non-space char
+        var k = j - 1; while (k >= 0 && /\s/.test(code[k])) k--;
+        if (k < 0 || /[=(,:;!&|?{}[\n+\-*%~^<>]/.test(code[k])) { inRe = true; continue; }
+      }
+      if (c === '{') depth++;
+      else if (c === '}') { depth--; if (depth === 0) return code.slice(start, j + 1); }
+    }
+    throw new Error('unbalanced: ' + decl);
+  }
+
+  // ---- 1. Funnel helper primitives (real shipped source) ----
+  var helperSrc = grab('function _vizParseFunnelMode(') + '\n' +
+                  grab('function _vizFormatDuration(') + '\n' +
+                  grab('function _vizFunnelShortNum(') + '\n' +
+                  grab('function applyFunnelChartConfig(');
+  var H = new Function(helperSrc +
+    '\nreturn {parse:_vizParseFunnelMode, dur:_vizFormatDuration, shortNum:_vizFunnelShortNum, apply:applyFunnelChartConfig};')();
+
+  eq('parse: empty -> conversion/days', H.parse(''), {mode:'conversion', unit:'days'});
+  eq('parse: undefined -> conversion/days', H.parse(undefined), {mode:'conversion', unit:'days'});
+  eq('parse: conversion', H.parse('conversion'), {mode:'conversion', unit:'days'});
+  eq('parse: duration bare -> days', H.parse('duration'), {mode:'duration', unit:'days'});
+  eq('parse: duration|hours', H.parse('duration|hours'), {mode:'duration', unit:'hours'});
+  eq('parse: duration|minutes', H.parse('duration|minutes'), {mode:'duration', unit:'minutes'});
+  eq('parse: duration|none', H.parse('duration|none'), {mode:'duration', unit:'none'});
+  eq('parse: case-insensitive', H.parse('DURATION|HOURS'), {mode:'duration', unit:'hours'});
+  eq('parse: junk unit falls back to days', H.parse('duration|fortnights'), {mode:'duration', unit:'days'});
+  eq('parse: junk mode falls back to conversion', H.parse('bogus'), {mode:'conversion', unit:'days'});
+  eq('parse: whitespace tolerated', H.parse('  duration | hours '), {mode:'duration', unit:'hours'});
+
+  eq('dur: whole days', H.dur(42, 'days'), '42 d');
+  eq('dur: fractional keeps 1dp', H.dur(42.53, 'days'), '42.5 d');
+  eq('dur: hours', H.dur(7, 'hours'), '7 h');
+  eq('dur: minutes', H.dur(90, 'minutes'), '90 m');
+  eq('dur: none -> bare number', H.dur(12, 'none'), '12');
+  eq('dur: thousands separator', H.dur(1234, 'days'), '1,234 d');
+  eq('dur: non-numeric passthrough', H.dur('n/a', 'days'), 'n/a');
+
+  eq('shortNum: plain', H.shortNum(950, ''), '950');
+  eq('shortNum: K ladder', H.shortNum(12500, ''), '13K');
+  eq('shortNum: M ladder', H.shortNum(2400000, ''), '2.4M');
+  eq('shortNum: B ladder', H.shortNum(3000000000, ''), '3B');
+  eq('shortNum: currency prefix', H.shortNum(1500000, '$'), '$1.5M');
+
+  // ---- 2. generateChartDataFromMaps funnel branch (real shipped source) ----
+  var genSrc = grab('function _vizParseVizOptions(')+'\n'+(/var PENUMBRA_PALETTE_NAMES = [^;]*;/.exec(code)||[''])[0]+'\n'+grab('function _vizParsePalette(')+'\n'+grab('function _vizParseFormat(')+'\n'+grab('function _vizParseUserNumber(')+'\n'+grab('function generateChartDataFromMaps(')+'\n'+grab('function _generateChartDataFromMaps(');
+  var stubs = [
+    'function cleanLabel(v){ return (v==null||String(v).trim()==="") ? "(blank)" : String(v).trim(); }',
+    'function parseAccountingNumber(v){ if(v==null) return NaN; var s=String(v).replace(/[$,\\s]/g,""); if(s==="") return NaN; var n=Number(s); return isNaN(n)?NaN:n; }',
+    'function getCustomSortComparator(){ return null; }',
+    'function vizExtraAggregate(){ return undefined; }',
+    'function getChartColor(i,a){ return "C"+i+"@"+a; }',
+    'function getChartBorderColor(i){ return "B"+i; }',
+    'function getComboSeriesConfig(){ return []; }',
+    'function evaluateParsedQuery(){ return true; }',
+    'function safeParseFilter(){ return {ast:null}; }',
+    // Faithful to the real one for a plain (token-free) axis: identity.
+    'function vizBucketRowsForAxis(r, x){ return (String(x||"").indexOf(":")===-1) ? r : r; }',
+    'function pivotWavgWeightCol(){ return null; }',
+    'function vizAggNeedsWeights(){ return false; }',
+    'function pivotParseFieldToken(){ return null; }',
+    'function decodeHtmlEntities(s){ return String(s==null?"":s).replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,String.fromCharCode(34)).replace(/&#39;/g,String.fromCharCode(39)); }'
+  ].join('\n');
+  var helperOnly = grab('function _vizParseFunnelMode(');
+  var gen = new Function(stubs + '\n' + helperOnly + '\n' + genSrc +
+                         '\nreturn generateChartDataFromMaps;')();
+
+  function rows(pairs) {
+    // pairs: [[stage, value], ...] -> one Map row each
+    return pairs.map(function (p) {
+      var m = new Map(); m.set('STAGE', p[0]); m.set('AMT', p[1]); return m;
+    });
+  }
+
+  // -- conversion funnel: sum, value desc --
+  var conv = gen(rows([['Proposal',100],['Submitted',60],['Awarded',25],['Active',10]]),
+                 'STAGE', 'AMT', null, 'sum', 10, 'funnel',
+                 'value', 'desc', 'default', false, false, null, 'conversion');
+  ok('conv: _isFunnel flag', conv._isFunnel === true);
+  eq('conv: mode', conv._funnelMode, 'conversion');
+  eq('conv: unit default', conv._funnelUnit, 'days');
+  eq('conv: labels sorted desc', conv.labels, ['Proposal','Submitted','Awarded','Active']);
+  eq('conv: raw values', conv._funnelValues, [100,60,25,10]);
+  eq('conv: max', conv._funnelMax, 100);
+  eq('conv: centred pairs', conv.datasets[0].data, [[-50,50],[-30,30],[-12.5,12.5],[-5,5]]);
+  eq('conv: per-stage colours', conv.datasets[0].backgroundColor, ['C0@0.78','C1@0.78','C2@0.78','C3@0.78']);
+  ok('conv: borderSkipped false', conv.datasets[0].borderSkipped === false);
+  eq('conv: _chartType tag', conv._chartType, 'funnel');
+
+  // -- count aggregation --
+  var cnt = gen(rows([['A',1],['A',1],['A',1],['B',1],['C',1],['C',1]]),
+                'STAGE', 'AMT', null, 'count', 10, 'funnel',
+                'value', 'desc', 'default', false, false, null, 'conversion');
+  eq('count: labels', cnt.labels, ['A','C','B']);
+  eq('count: values', cnt._funnelValues, [3,2,1]);
+
+  // -- duration funnel: label asc preserves stage order, NOT magnitude --
+  var dur = gen(rows([['1 Intake',5],['2 Review',30],['3 Negotiate',12],['4 Setup',3]]),
+                'STAGE', 'AMT', null, 'sum', 10, 'funnel',
+                'label', 'asc', 'default', false, false, null, 'duration|days');
+  eq('dur: mode', dur._funnelMode, 'duration');
+  eq('dur: unit', dur._funnelUnit, 'days');
+  eq('dur: stage order preserved (not re-ranked)', dur.labels,
+     ['1 Intake','2 Review','3 Negotiate','4 Setup']);
+  eq('dur: values follow stage order', dur._funnelValues, [5,30,12,3]);
+  eq('dur: max is the LONGEST stage', dur._funnelMax, 30);
+  eq('dur: widest bar is stage 2', dur.datasets[0].data[1], [-15,15]);
+
+  // -- otherBucket: allowed in conversion, suppressed in duration --
+  var many = rows([['a',10],['b',9],['c',8],['d',7],['e',6]]);
+  var obConv = gen(many, 'STAGE','AMT',null,'sum',3,'funnel','value','desc','default',false,true,null,'conversion');
+  eq('otherBucket conv: Other appended', obConv.labels, ['a','b','c','Other']);
+  eq('otherBucket conv: Other = 7+6', obConv._funnelValues[3], 13);
+  var obDur = gen(many, 'STAGE','AMT',null,'sum',3,'funnel','label','asc','default',false,true,null,'duration');
+  eq('otherBucket duration: suppressed (no time collapsed)', obDur.labels, ['a','b','c']);
+
+  // -- negative / zero values do not produce negative bar widths --
+  var neg = gen(rows([['X',-40],['Y',20]]), 'STAGE','AMT',null,'sum',10,'funnel',
+                'label','asc','default',false,false,null,'conversion');
+  eq('negative: bar width uses magnitude', neg.datasets[0].data[0], [-20,20]);
+  eq('negative: raw value preserved for labels', neg._funnelValues[0], -40);
+
+  // -- empty rowset still returns the shared _noData contract --
+  var empty = gen([], 'STAGE','AMT',null,'sum',10,'funnel','value','desc','default',false,false,null,'conversion');
+  ok('empty: _noData contract honoured', !!empty._noData);
+
+  // ---- 3. applyFunnelChartConfig against the real data payloads ----
+  function freshConfig() {
+    return { options: { scales: { x: { type:'linear', grid:{} }, y: { grid:{}, stacked:true } },
+                        plugins: { legend: { display:true }, tooltip: {}, datalabels: {} } } };
+  }
+  var cfgC = freshConfig();
+  H.apply(cfgC, conv, {showValues:true, textColor:'#111', isDark:false, currencyPrefix:'$', fsBoost:0});
+  eq('apply: indexAxis forced to y', cfgC.options.indexAxis, 'y');
+  ok('apply: value axis hidden', cfgC.options.scales.x.display === false);
+  ok('apply: legend suppressed', cfgC.options.plugins.legend.display === false);
+  ok('apply: symmetric min/max', cfgC.options.scales.x.min === -52 && cfgC.options.scales.x.max === 52);
+  ok('apply: linear type removed from value axis', cfgC.options.scales.x.type === undefined);
+  ok('apply: category axis unstacked', cfgC.options.scales.y.stacked === false);
+
+  var fmt = cfgC.options.plugins.datalabels.formatter;
+  eq('label conv stage0', fmt(null, {dataIndex:0}), '$100  (100%)');
+  eq('label conv stage2 (share of FIRST)', fmt(null, {dataIndex:2}), '$25  (25%)');
+  var tip = cfgC.options.plugins.tooltip.callbacks.label;
+  eq('tooltip conv stage0 has no prev step', tip({dataIndex:0}), '$100  (100.0% of first stage)');
+  eq('tooltip conv stage1 shows drop-off', tip({dataIndex:1}), '$60  (60.0% of first stage)  -  60.0% of previous');
+  eq('tooltip conv stage3 vs stage2', tip({dataIndex:3}), '$10  (10.0% of first stage)  -  40.0% of previous');
+
+  var cfgD = freshConfig();
+  H.apply(cfgD, dur, {showValues:true, textColor:'#eee', isDark:true, currencyPrefix:'', fsBoost:1});
+  var fmtD = cfgD.options.plugins.datalabels.formatter;
+  // total elapsed = 5+30+12+3 = 50
+  eq('label dur stage1 (share of TOTAL time)', fmtD(null, {dataIndex:1}), '30 d  (60%)');
+  eq('label dur stage0', fmtD(null, {dataIndex:0}), '5 d  (10%)');
+  var tipD = cfgD.options.plugins.tooltip.callbacks.label;
+  eq('tooltip dur stage0 cumulative', tipD({dataIndex:0}), '5 d  (10.0% of total time)  -  5 d elapsed');
+  eq('tooltip dur stage2 cumulative', tipD({dataIndex:2}), '12 d  (24.0% of total time)  -  47 d elapsed');
+  eq('tooltip dur stage3 cumulative = full total', tipD({dataIndex:3}), '3 d  (6.0% of total time)  -  50 d elapsed');
+  ok('apply: fsBoost reaches label font', cfgD.options.plugins.datalabels.font.size === 11);
+  ok('apply: dark halo chosen', cfgD.options.plugins.datalabels.textStrokeColor === 'rgba(0,0,0,0.75)');
+
+  // -- showValues=false must hide labels entirely --
+  var cfgH = freshConfig();
+  H.apply(cfgH, conv, {showValues:false, textColor:'#111', isDark:false, currencyPrefix:'', fsBoost:0});
+  ok('apply: showValues=false hides datalabels', cfgH.options.plugins.datalabels.display === false);
+
+  // -- guard: non-funnel payload must be ignored --
+  var cfgG = freshConfig();
+  H.apply(cfgG, {labels:[], datasets:[]}, {showValues:true});
+  ok('apply: no-op on non-funnel data', cfgG.options.indexAxis === undefined);
+
+  // -- all-zero stages must not divide by zero --
+  var zero = gen(rows([['A',0],['B',0]]), 'STAGE','AMT',null,'sum',10,'funnel',
+                 'label','asc','default',false,false,null,'conversion');
+  var cfgZ = freshConfig();
+  H.apply(cfgZ, zero, {showValues:true, textColor:'#111', isDark:false, currencyPrefix:'', fsBoost:0});
+  eq('zero: label degrades to value only, no NaN%', cfgZ.options.plugins.datalabels.formatter(null,{dataIndex:0}), '0');
+  ok('zero: no min/max written when max is 0', cfgZ.options.scales.x.min === undefined);
+
+  document.getElementById('out').textContent =
+    'RESULT ' + (FAIL === 0 ? 'ALL-PASS' : 'HAS-FAILURES') +
+    '  pass=' + PASS + ' fail=' + FAIL + '\n' + LOG.join('\n');
+} catch (e) {
+  document.getElementById('out').textContent = 'HARNESS-ERROR: ' + e.name + ': ' + e.message + '\n' + (e.stack || '');
+}
+</script>

@@ -1,0 +1,259 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>pivot row notes</title>
+<link rel="stylesheet" href="main.css">
+<link rel="stylesheet" href="penumbra_journal.css">
+</head>
+<body class="theme-default">
+<!-- pvnotes suite (2026-10-06): journal notes on PIVOT rows. A note icon at the
+     start of each pivot row's own label cell opens a floating card with that
+     row's thread; the key is the row's labels ([row field, value] pairs, sorted
+     by field, as JSON), so it needs no key column. The REAL main.js booted
+     through the REAL run path (stubbed query.php + manage_journal.php) on a
+     27-row fixture: DEPT x FY x PI, AMOUNT. The report is saved as a PIVOT
+     (state.pivot, per scenario below); the journal is on with row notes on and
+     NO key column (the user's Option 1: the Row notes switch no longer needs
+     one). ?scn=<name> picks the stored report; driver.js runs it.
+     Spliced in by run.py from the index.php under test: the View Options
+     journal panel (#journalRowConfig) at PV_VIEW_OPTIONS and the journal dialog
+     (#journalLightbox) at PV_JOURNAL_LIGHTBOX. -->
+
+<div id="reportHeaderContainer"><div id="defaultTitleView"></div><div id="reportInfoPanel" style="display:none"></div></div>
+<input id="reportTitle" value=""><input id="reportSubtitle" value=""><div id="admWrapper"></div><button id="toggleAdminViewBtn"></button>
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div><div id="mainReportTitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<button id="executeQuery">Run</button><button id="stopQueryBtn">Stop</button>
+<div id="loadingOverlay" style="display:none"><p id="execution-timer"></p><p id="loadingMessage"></p><div id="loadingTip"></div></div>
+<div id="importTimestamps"></div>
+<div id="resultsHeader" style="height:20px">controls</div>
+<div id="tableSearchContainer"><input id="tableSearch" value=""></div>
+<div id="resultCount"></div>
+<div id="paginatorContainer" style="visibility:hidden">
+  <div id="paginationControls"><span id="pageInfo"></span><select id="rowsPerPageSelector"><option value="25">25</option><option value="50">50</option><option value="200">200</option><option value="all">All</option></select></div>
+  <div id="groupActionsContainer" style="display:none">
+    <a href="#" id="expandAllGroups">Expand All</a> <a href="#" id="collapseAllGroups">Collapse All</a>
+    <span id="removeGroupingSep">&bull;</span> <a href="#" id="configureGroupingBtn" role="button">Configure Grouping</a> <a href="#" id="removeGroupingLink">Remove Grouping</a>
+  </div>
+</div>
+<!-- The pivot scrolls inside #results-wrapper (main.js re-wraps it at load; the page is what scrolls). -->
+<div id="table-view-container"><div id="container-parent"><div id="results-wrapper" style="width:1200px;height:200px;overflow:auto">
+  <table id="resultsTable" class="data-grid-table"><caption class="sr-only">Report results table</caption><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table>
+  <div id="groupedResultsContainer" style="display:none"></div>
+  <div id="pivot-output-container" style="display:none"></div>
+</div></div></div>
+<div id="errorBox"></div><div id="undo_text_container"></div>
+<div id="action_overlay"></div>
+<div id="pnbNoSearchMatches" style="display:none"></div>
+<div id="settingsPanelOverlay"></div>
+<div id="settingsPanel">
+  <select id="spThemeSelector"><option value="report-default">Report Default</option><option value="theme-default">Default</option></select>
+  <select id="spDensitySelector"><option value="report-default">Report Default</option><option value="standard">Standard</option></select>
+  <input type="checkbox" id="spRowExpandToggle"><input type="checkbox" id="spResolverToggle">
+  <div class="sp-section sp-columns-section"><div class="sp-column-container"><div id="spColumnList" class="sp-column-list"></div></div></div>
+  <div class="sp-actions"><button id="spApply">Save Column Layout</button><button id="spReset">Reset</button><span id="spPendingCount"></span></div>
+</div>
+<div id="view-options-tab">
+  <div class="view-options-eu"><div class="view-options-grid">
+    <div class="view-option-item"><label><input type="checkbox" id="viewOptionJournal" checked><div class="view-option-text"><strong>Report Journal</strong><small>Opt-in shared notes.</small></div></label></div>
+  </div></div>
+<!--PV_VIEW_OPTIONS-->
+</div>
+<!--PV_JOURNAL_LIGHTBOX-->
+<div id="pnbStatusBar">
+  <div class="sb-seg" id="sbColsSeg"><span id="sbCols"></span>
+    <span class="sb-chip" id="sbCustomCols" style="display:none;">custom layout</span>
+    <div class="sb-pop" id="sbCustomColsPop"><div id="sbCustomColsDiff"></div><button id="sbCustomColsReset">Reset</button><button id="sbCustomColsSave" style="display:none;">Save</button></div>
+  </div>
+  <div class="sb-seg" id="sbUserSeg"></div>
+</div>
+<div id="importDragOverlay" style="display: none;"><div class="drag-overlay-content"><p>Drop file to import</p></div></div>
+<input type="file" id="importDataFileInput" style="display:none">
+<div style="height:1500px"></div><!-- room to scroll the page: C-nested-follow -->
+<pre id="out">running</pre>
+
+<script>
+  (function () { try { localStorage.clear(); } catch (e) {} })();
+  window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' } };
+  window.PENUMBRA_THEME_IDS = ['theme-default'];
+  window.PENUMBRA_THEME_ALIASES = {};
+  window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  (function () {
+    var P = new URLSearchParams(location.search);
+    window.__SCN = P.get('scn') || 'nested';
+    var S = window.__SCN;
+    // The pivot row key, as main.js pivotKeyFor builds it: [field, value] pairs
+    // sorted by field, as JSON. Ground truth for every assert.
+    window.__pk = function (pairs) {
+      return JSON.stringify(pairs.slice().sort(function (a, b) { return a[0] < b[0] ? -1 : (a[0] > b[0] ? 1 : 0); }));
+    };
+    // --- the fixture: 3 departments x 3 fiscal years x 3 PIs ---------------
+    var DEPTS = ['Engineering', 'Sciences', 'Humanities'], FYS = ['FY2024', 'FY2025', 'FY2026'], PIS = ['Ada', 'Bo', 'Cy'];
+    var rows = [], n = 0;
+    DEPTS.forEach(function (d, di) {
+      FYS.forEach(function (y, yi) {
+        PIS.forEach(function (p, pi) {
+          n++;
+          // PI 'Cy' only under Engineering keeps the rank scenario's (Other) honest.
+          rows.push({ ID: String(1000 + n), DEPT: d, FY: y, PI: (d === 'Engineering' ? p : p + di), AMOUNT: String(100 * (di + 1) + 10 * (yi + 1) + pi) });
+        });
+      });
+    });
+    window.__rowsFixture = rows;
+    window.__DEPTS = DEPTS; window.__FYS = FYS;
+    var pk = window.__pk;
+    var K_LEAF = pk([['DEPT', 'Engineering'], ['FY', 'FY2026']]);   // 2 notes
+    var K_GRP = pk([['DEPT', 'Sciences']]);                         // 1 note (a group; a DEPT-only pivot's row)
+    window.__K = { leaf: K_LEAF, grp: K_GRP };
+    // --- the journal "server" --------------------------------------------
+    function note(id, key, text, by, at) { return { ID: id, REPORT_ID: 7, SCOPE: 'pivot', ROW_KEY: key, NOTE_TEXT: text, CREATED_BY: by, CREATED_AT: at, PARENT_ID: null }; }
+    window.__J = {
+      counts: {}, notes: {},           // table-row notes (none: no key column)
+      pcounts: {}, pnotes: {},         // pivot-row notes
+      posts: [], fetches: 0
+    };
+    window.__J.pnotes[K_LEAF] = [note(901, K_LEAF, 'FY2026 looks high.', 'pat', '2026-10-01 09:05:00'),
+                                 note(902, K_LEAF, 'Two late awards.', 'lee', '2026-10-01 11:00:00')];
+    window.__J.pcounts[K_LEAF] = 2;
+    window.__J.pnotes[K_GRP] = [note(903, K_GRP, 'Sciences reorganised in 2025.', 'pat', '2026-10-02 08:00:00')];
+    window.__J.pcounts[K_GRP] = 1;
+    // The J panel's list: one pivot-row note (with the snapshot its card took)
+    // and one table-row note, for the chip asserts.
+    window.__J.list = [
+      { ID: 901, SCOPE: 'pivot', ROW_KEY: K_LEAF, NOTE_TEXT: 'FY2026 looks high.', ROW_SNAPSHOT: JSON.stringify({ DEPT: 'Engineering', FY: 'FY2026' }),
+        MENTIONS: null, RESOLVED: null, CREATED_BY: 'pat', AUTHOR_NAME: 'Pat Doe', CREATED_AT: '2026-10-01 09:05:00', PARENT_ID: null },
+      { ID: 950, SCOPE: 'row', ROW_KEY: '1001', NOTE_TEXT: 'A table row note.', ROW_SNAPSHOT: JSON.stringify({ ID: '1001', DEPT: 'Engineering' }),
+        MENTIONS: null, RESOLVED: null, CREATED_BY: 'lee', AUTHOR_NAME: 'Lee Roe', CREATED_AT: '2026-10-01 08:00:00', PARENT_ID: null }
+    ];
+    // --- the scenario's stored report ------------------------------------
+    var COLS = ['ID', 'DEPT', 'FY', 'PI', 'AMOUNT'];
+    var order = []; for (var c = 0; c < COLS.length; c++) order.push(c);
+    function pivot(rowsF, layout, extra) {
+      var s = { v: 2, rows: rowsF, cols: [], vals: 'AMOUNT', agg: ['sum'], aggLabels: ['Amount'], aggColOverrides: ['AMOUNT'],
+        aggFilters: null, aggFormulas: null, rowLayout: layout, colLayout: 'nested', sortOrder: 'asc', colSortOrder: 'asc',
+        stickyColCount: 2, totalColAggs: null, totalRowAggs: null, totalRowAggLabels: null, totalRowAggBaseIdx: null,
+        rankN: null, rankDir: null, rankAgg: null, rankOther: true, rankScope: null, noBreakdown: false, startExpanded: true, hideEmpty: false };
+      for (var k in extra) s[k] = extra[k];
+      return s;
+    }
+    var vo = { journalEnabled: true, journalRowNotes: true };
+    var st = {
+      name: 'pvfix', query: 'SELECT * FROM PV_FIXTURE', reportTitle: 'Pivot notes fixture',
+      theme: 'theme-default', density: 'standard',
+      visibleColumns: ['#', 0, 1, 2, 3, 4], columnOrder: order,
+      sortCriteria: [], noLimit: true, rowExpandDefault: false, resolverLinksDefault: true,
+      rowsPerPage: '200', reportSnippet: '', viewOptions: vo,
+      pivot: pivot(['DEPT', 'FY'], 'nested', {})
+    };
+    if (S === 'static') st.pivot = pivot(['DEPT', 'FY'], 'nested-static', {});
+    if (S === 'flat') st.pivot = pivot(['DEPT', 'FY'], 'flat', {});
+    if (S === 'single') st.pivot = pivot(['DEPT'], 'nested', {});
+    if (S === 'reorder') st.pivot = pivot(['FY', 'DEPT'], 'nested', {});
+    if (S === 'rank') st.pivot = pivot(['PI'], 'nested', { rankN: 3, rankDir: 'top', rankAgg: 0, rankOther: true });
+    // collapsed + reveal: groups start collapsed; the rows under them are built
+    // on demand (driver forces the lazy threshold down to 1 before the render).
+    if (S === 'collapsed' || S === 'reveal') st.pivot = pivot(['DEPT', 'FY'], 'nested', { startExpanded: false });
+    // run.py's hook sets the pivot's on-demand row threshold from this at the end
+    // of main.js's init, before the query answers (default 3,000 rows).
+    if (S === 'collapsed' || S === 'reveal') window.__PV_LAZY_MIN = 1;
+    // off: row notes OFF when saved, and no key column at all.
+    if (S === 'off') st.viewOptions = { journalEnabled: true };
+    window.__STORED = st;
+    window.penumbra_vars = {
+      isAdmin: true, isGlobalAdmin: true, canEditReport: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+      tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+      imports: [], reports: [], themes: {}, prompts: {}, grants: [],
+      totalExemptions: [],
+      journal: { installed: true, enabled: true, total: 0, unseen: 0 },
+      journalAccess: true,
+      preloadedState: st
+    };
+    window.__queryResponse = { data: rows };
+  })();
+  window.__queryDone = 0;
+  window.__ajaxLog = [];
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  // Fake server. query.php -> the fixture; manage_journal.php -> window.__J.
+  function __pvJournal(url, opts) {
+    var m = /[?&]action=([a-z_]+)/.exec(url);
+    var action = m ? m[1] : null, body = null;
+    if (!action && opts.data && typeof opts.data === 'string') { try { body = JSON.parse(opts.data); action = body.action; } catch (e) { } }
+    var J = window.__J;
+    var copy = function (o) { return JSON.parse(JSON.stringify(o)); };
+    if (action === 'row_notes') {
+      J.fetches++;
+      return { status: 'success', counts: copy(J.counts), notes: copy(J.notes), pivot_counts: copy(J.pcounts), pivot_notes: copy(J.pnotes) };
+    }
+    if (action === 'toggles') return { status: 'success', installed: true, toggles: {} };
+    if (action === 'summary') return { status: 'success', installed: true, total: 0, unseen: 0 };
+    if (action === 'list') return { status: 'success', installed: true, data: copy(J.list), report: { id: 7, short_id: 'pvfix', title: 'Pivot notes fixture' } };
+    if (action === 'add' && body) {
+      J.posts.push(body);
+      if (body.scope === 'pivot') {
+        var k = body.row_key;
+        J.pnotes[k] = (J.pnotes[k] || []).concat([{ ID: 2000 + J.posts.length, REPORT_ID: 7, SCOPE: 'pivot', ROW_KEY: k, NOTE_TEXT: body.note_text,
+          CREATED_BY: 'harness', CREATED_AT: '2026-10-06 12:00:00', PARENT_ID: body.parent_id || null }]);
+        J.pcounts[k] = J.pnotes[k].length;
+      }
+      return { status: 'success', scope: body.scope, mention_results: [], reply_results: [] };
+    }
+    if (body) J.posts.push(body);
+    return { status: 'success' };
+  }
+  jQuery.ajax = function (a, b) {
+    var opts = (typeof a === 'string') ? jQuery.extend({ url: a }, b || {}) : (a || {});
+    var url = String(opts.url || '');
+    window.__ajaxLog.push(url);
+    var d = jQuery.Deferred();
+    var isQuery = /query\.php/.test(url);
+    var isJournal = /manage_journal\.php/.test(url);
+    var jState = isJournal && /[?&]action=(toggles|row_notes)/.test(url);
+    if (jState) window.__jPending = (window.__jPending || 0) + 1;
+    var isPeople = /get_email_recipients\.php/.test(url);
+    var resp = isQuery ? window.__queryResponse : (isJournal ? __pvJournal(url, opts) : (isPeople ? [{ username: 'pat', name: 'Pat Doe' }] : {}));
+    setTimeout(function () {
+      try { if (opts.success) opts.success(resp, 'success', { status: 200 }); } catch (e) { window.__errors.push('ajax success threw: ' + String(e)); }
+      try { if (opts.complete) opts.complete({ status: 200 }, 'success'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }
+      d.resolve(resp, 'success', { status: 200 });
+      if (isQuery) window.__queryDone++;
+      if (jState) window.__jPending--;
+    }, isJournal ? 30 : 0);
+    var p = d.promise(); p.abort = function () {}; return p;
+  };
+  jQuery.getJSON = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.post = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.get = jQuery.post;
+  jQuery.fx.off = true;
+  window.__errors = [];
+  window.__rejections = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    window.__rejections.push(String((r && r.message) || r) + ' @' + String((r && r.stack) || '').split('\n').slice(1, 2).join('').trim());
+    e.preventDefault();
+  });
+  window.__confirms = [];
+  window.confirm = function (m) { window.__confirms.push(String(m)); return true; };
+  window.alert = function (m) { window.__errors.push('alert: ' + m); };
+  window.prompt = function () { return null; };
+  if (typeof window.stackHeaders !== 'function') window.stackHeaders = function () {};
+</script>
+<script src="penumbra_userseg.js"></script>
+<script src="main_pv.js"></script>
+<script src="penumbra_journal_pv.js"></script>
+<script src="driver.js"></script>
+</body></html>
