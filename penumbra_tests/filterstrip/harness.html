@@ -1,0 +1,1043 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>filter strip harness</title>
+<!-- The real stylesheet (copied by run.ps1), so the fold, the label default and
+     the pressed glyph are asserted on COMPUTED styles, not on class names. -->
+<link rel="stylesheet" href="main.css"></head>
+<body>
+<!-- Minimal DOM, the pivot_trigger scaffold: main.js binds several builder
+     elements DIRECTLY at ready time, so they must exist before it loads. The
+     strip reads its state off #tableSearch and the two view containers, and
+     its columns off #resultsTable's columnNameToOriginalIndex data. -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<table id="resultsTable"><thead id="tableHeader"><tr>
+  <th data-colname="#">#</th><th data-colname="COLLEGE">COLLEGE</th><th data-colname="FY">FY</th>
+  <th data-colname="AMOUNT">AMOUNT</th><th data-colname="STATUS">STATUS</th><th data-colname="% CHANGE">% CHANGE</th>
+</tr></thead><tbody></tbody></table>
+<!-- The real #loadingOverlay markup (as in ..\switchmotion): _pnbMotionBusy()
+     reads its visibility, and the chip flow's "second click is dropped"
+     contract depends on it. Hidden by default because this page loads no CSS
+     (main.css hides it); showLoading() shows it, hideLoading() hides it. -->
+<div id="loadingOverlay" style="display:none">
+  <div class="loader"></div>
+  <p>Executing Query, Please Wait...</p>
+  <div style="display: flex; align-items: center; gap: 20px;">
+    <p id="execution-timer" style="font-size: 1.5em; margin: 0; font-weight: bold;"></p>
+    <button id="stopQueryBtn">Stop</button>
+  </div>
+  <div id="loadingTip" aria-live="polite"></div>
+</div>
+<div id="errorBox"></div>
+<div id="action_overlay"></div>
+<input id="tableSearch" value="">
+<span id="resultCount"></span>
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="snapshotComparisonContainer" style="display:none"></div>
+<div id="pivotLightbox" style="display:none">
+  <div id="pivot-source-columns"></div>
+  <div id="pivot-rows"></div><div id="pivot-cols"></div><div id="pivot-vals"></div>
+  <select id="pivot-aggregation-selector"><option value="">-</option><option value="sum">sum</option></select>
+  <table><tbody id="pivot-agg-table-body"></tbody></table>
+  <select id="pivot-rows-layout-select"><option value="nested">nested</option><option value="nested-static">nested-static</option><option value="flat">flat</option></select>
+  <select id="pivot-cols-layout-select"><option value="nested">nested</option><option value="flat">flat</option></select>
+  <select id="pivot-sort-order"><option value="asc">asc</option><option value="desc">desc</option></select>
+  <input id="pivot-sticky-cols" value="3">
+  <input type="checkbox" id="pivot-row-total-override-toggle">
+  <div id="pivot-row-total-override-container" style="display:none"><div id="pivot-row-total-slots"></div><div id="pivot-row-total-tokens"></div></div>
+  <select id="pivot-rank-dir"><option value="none">none</option><option value="top">top</option><option value="bottom">bottom</option></select>
+  <input id="pivot-rank-n" value="10"><select id="pivot-rank-agg"><option value="sum">sum</option><option value="count">count</option></select>
+  <select id="pivot-rank-scope"><option value="">Overall</option></select>
+  <input type="checkbox" id="pivot-rank-other" checked><label id="pivot-rank-other-label"></label>
+  <input type="checkbox" id="pivot-no-breakdown"><input type="checkbox" id="pivot-start-expanded">
+  <select id="pivotPresetSelect"><option value=""></option></select><button id="pivotDeletePresetBtn"></button><input type="checkbox" id="pivotAutoRunPreset">
+  <button id="generatePivotBtn">Generate</button>
+  <select id="pivotSnippetTargetSelect" style="display: none;"></select>
+  <button id="updatePivotSnippetBtn" type="button" style="display: none;">&#x27F3; Update Snippet</button>
+  <button id="copyPivotSnippetBtn">Snippet</button>
+  <button id="pivotSavePresetBtn"></button>
+</div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  // Same boot stubs as the pivot_trigger / parity harnesses.
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); };
+  window.__clip = null;
+  if (!navigator.clipboard) { try { Object.defineProperty(navigator, 'clipboard', { value: {}, configurable: true }); } catch (e) {} }
+  try { navigator.clipboard.writeText = function (s) { window.__clip = s; return Promise.resolve(); }; } catch (e) {}
+</script>
+<!-- The strip grammar (PenumbraTiles.strip) loads before main.js, as index.php
+     loads it; run.ps1 copies the file under test (-TilesJs) here. -->
+<script src="penumbra_tiles.js"></script>
+<!-- window.RANGE: the range corpus and penumbra_search.php's counts for it,
+     written by run.ps1 through range_php.php (section J). -->
+<script src="range_php.js"></script>
+<script src="main_patched.js"></script>
+<script>
+(function () {
+  function report(txt) { document.getElementById('out').textContent = txt; }
+  var results = [];
+  function assert(name, cond, detail) { results.push({ name: name, pass: !!cond, detail: detail === undefined ? '' : String(detail) }); }
+  function eq(name, got, want) { assert(name, JSON.stringify(got) === JSON.stringify(want), 'got ' + JSON.stringify(got) + ' want ' + JSON.stringify(want)); }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function finish() { report('RESULTS_JSON:' + JSON.stringify({ pageErrors: window.__errors.slice(0, 6), results: results })); }
+
+  var COLS = ['#', 'COLLEGE', 'FY', 'AMOUNT', 'STATUS', '% CHANGE'];
+  function row(n, college, fy, amount, status, pct) {
+    var m = new Map();
+    m.set('#', String(n)); m.set('COLLEGE', college); m.set('FY', fy); m.set('AMOUNT', amount); m.set('STATUS', status); m.set('% CHANGE', pct);
+    return m;
+  }
+  // 13 rows. COLLEGE: Eng 6 (one 'ENG', one @@HTML-wrapped), Sci 3, Ag 2, CHASS 1,
+  // one blank. FY: 2025 x7, 2024 x4, 2023 x2. STATUS: Active 8, Closed 3, Pending 2.
+  function fixture() {
+    return [
+      row(1, 'Eng', '2025', '100', 'Active', '5'),
+      row(2, 'Eng', '2025', '250', 'Closed', '5'),
+      row(3, 'Eng', '2024', '50', 'Active', '-2'),
+      row(4, 'Eng', '2023', '500', 'Pending', '10'),
+      row(5, 'ENG', '2024', '20', 'Active', '5'),
+      row(6, '@@HTML<a href="#">Eng</a>', '2025', '900', 'Active', '7'),
+      row(7, 'Sci', '2025', '300', 'Active', '5'),
+      row(8, 'Sci', '2024', '75', 'Closed', '1'),
+      row(9, 'Sci', '2023', '10', 'Active', '0'),
+      row(10, 'Ag', '2025', '40', 'Active', '5'),
+      row(11, 'Ag', '2024', '60', 'Closed', '3'),
+      row(12, 'CHASS', '2025', '5', 'Pending', '5'),
+      row(13, '', '2025', '1', 'Active', '9')
+    ];
+  }
+  function vals(g, col) {
+    var grp = null;
+    g.groups.forEach(function (x) { if (x.field.col === col) grp = x; });
+    return grp ? grp.values.map(function (e) { return [e.v, e.n, e.on]; }) : null;
+  }
+  function chipText(sel) { return $(sel).map(function () { return $(this).find('.pnb-fs-v').text(); }).get(); }
+  function matchCount(F, text, rows) {
+    var parsed = F.parseQ(text, COLS), n = 0;
+    rows.forEach(function (r) { if (F.evalQ(r, parsed, COLS)) n++; });
+    return n;
+  }
+
+  // ══════ I. the composable toggle: filter|COND / unfilter|COND (2026-09-29) ══════
+  // A toggle built on search| replaced the whole box: it wiped a strip's chips,
+  // and read OFF as soon as a chip was pressed beside it. filter| adds ONE
+  // condition to the AND-run and unfilter| takes it out, leaving the rest.
+  function until(fn, ms) {
+    var t0 = Date.now();
+    return new Promise(function (res) {
+      (function poll() {
+        var ok = false;
+        try { ok = !!fn(); } catch (e) { ok = false; }
+        if (ok || Date.now() - t0 > ms) res(ok); else setTimeout(poll, 40);
+      })();
+    });
+  }
+  function sectionI(F, draw, outText, S) {
+    var TG = '#reportSnippetOutput .pnb-toggle';
+    var box = function () { return String($('#tableSearch').val()); };
+    var tsOn = function (i) { return $(TG).eq(i).attr('data-ts-on'); };
+    $('#tableSearch').val('');
+    // Runs on every main.js (the positive control shows the number pass
+    // rewriting a search| toggle's command before this change).
+    return draw("toggle_switch('FY 2025 old', 'on|search|FY = 2025', 'off|search|')").then(function () {
+      eq('toggle: a number in a search| command reaches the markup unformatted', $('#reportSnippetOutput .pnb-toggle-btn').attr('data-ts-onc'), 'search|FY = 2025');
+      eq('toggle: ... and in its label', $('#reportSnippetOutput .pnb-toggle-label').text(), 'FY 2025 old');
+      var T = window.PenumbraTiles && window.PenumbraTiles.strip;
+      if (!T || typeof T.has !== 'function' || typeof T.add !== 'function' || typeof T.remove !== 'function') {
+        assert('cond: PenumbraTiles.strip.has/add/remove available', false, 'PenumbraTiles.strip=' + typeof T);
+        return null;
+      }
+      // I.1 has / add / remove
+      assert('cond: has finds a condition among the AND fragments', T.has('COLLEGE = /^(?:Eng)$/ and STATUS = Active', 'STATUS = Active') === true, '');
+      assert('cond: has ignores spacing around the operator', T.has('STATUS=Active', 'STATUS = Active') === true && T.has('STATUS = Active', 'STATUS=Active') === true, '');
+      assert('cond: has is exact otherwise (case counts)', T.has('status = active', 'STATUS = Active') === false, '');
+      assert('cond: has is false on a box holding a top-level or', T.has('STATUS = Active or FY = 2025', 'STATUS = Active') === false, '');
+      assert('cond: several conditions are all-or-nothing, in any order', T.has('A = 1 and B = 2', 'B = 2 and A = 1') === true && T.has('A = 1', 'A = 1 and B = 2') === false, '');
+      eq('cond: add to an empty box', T.add('', 'STATUS = Active'), 'STATUS = Active');
+      eq('cond: add keeps the chips and joins with and', T.add('COLLEGE = /^(?:Eng)$/', 'STATUS = Active'), 'COLLEGE = /^(?:Eng)$/ and STATUS = Active');
+      eq('cond: add never doubles a condition already there', T.add('STATUS = Active', 'STATUS=Active'), 'STATUS = Active');
+      eq('cond: add keeps the __ROW prefix in front', T.add('__ROW X = 1', 'Y = 2'), '__ROW X = 1 and Y = 2');
+      eq('cond: add keeps a regex alternation whole', T.add('', 'COLLEGE = /^(?:Eng|Sci)$/'), 'COLLEGE = /^(?:Eng|Sci)$/');
+      assert('cond: add refuses a box holding an or (null)', T.add('A = 1 or B = 2', 'C = 3') === null, String(T.add('A = 1 or B = 2', 'C = 3')));
+      assert('cond: add refuses a condition holding an or (null)', T.add('A = 1', 'B = 1 or C = 2') === null, String(T.add('A = 1', 'B = 1 or C = 2')));
+      eq('cond: remove takes out only that condition', T.remove('AMOUNT > 100 and STATUS = Active and FY = 2025', 'STATUS = Active'), 'AMOUNT > 100 and FY = 2025');
+      eq('cond: remove of the last condition empties the box, prefix and all', T.remove('__ROW STATUS = Active', 'STATUS = Active'), '');
+      eq('cond: remove of an absent condition leaves the text alone', T.remove('X = 1', 'STATUS = Active'), 'X = 1');
+      assert('cond: remove refuses a box holding an or (null)', T.remove('A = 1 or B = 2', 'A = 1') === null, '');
+      var sp = window.PenumbraTiles.splitSearch('__ROW A = 1 and B = /x and y/ or C = 3');
+      eq('split: splitSearch reads the same through the shared splitter', { p: sp.prefix, f: sp.fragments.map(function (x) { return x.col + ':' + x.text; }), or: sp.or },
+        { p: '__ROW ', f: ['A:A = 1', 'B:B = /x and y/', 'C:C = 3'], or: true });
+
+      // I.2 rendering
+      return draw("toggle_switch('Active only', 'on|filter|STATUS = Active')");
+    }).then(function (skip) {
+      if (skip === null) return null;
+      var $b = $('#reportSnippetOutput .pnb-toggle-btn');
+      assert('toggle: a filter|-only ON side renders without an off| side', $b.length === 1, outText().substring(0, 160));
+      eq('toggle: its OFF side is the implied unfilter|', $b.attr('data-ts-offc'), 'unfilter|STATUS = Active');
+      return draw("toggle_switch('Big Eng', 'on|filter|COLLEGE = Eng', 'on|filter|AMOUNT > 100')").then(function () {
+        eq('toggle: an implied OFF series undoes each step, last first', $('#reportSnippetOutput .pnb-toggle-btn').attr('data-ts-offc'), 'unfilter|AMOUNT > 100␟unfilter|COLLEGE = Eng');
+        return draw("toggle_switch('Mixed', 'on|filter|STATUS = Active', 'on|group_by|COLLEGE')");
+      }).then(function () {
+        assert('toggle: an ON side with anything besides filter| still needs its off| side', $(TG).length === 0 && outText().indexOf('needs at least one off|COMMAND') !== -1, outText().substring(0, 160));
+        return draw("toggle_switch('Empty', 'on|filter|')");
+      }).then(function () {
+        assert('toggle: filter| with no condition is refused by name', $(TG).length === 0 && outText().indexOf('filter| needs a condition') !== -1, outText().substring(0, 160));
+        return draw("toggle_switch('Or', 'on|filter|STATUS = Active or FY = 2025')");
+      }).then(function () {
+        assert('toggle: a condition holding an or is refused', $(TG).length === 0 && outText().indexOf('an or cannot be combined') !== -1, outText().substring(0, 160));
+        return draw("toggle_switch('Row', 'on|filter|__ROW STATUS = Active')");
+      }).then(function () {
+        assert('toggle: a condition carrying __ROW is refused', $(TG).length === 0 && outText().indexOf('cannot carry __ROW') !== -1, outText().substring(0, 160));
+        return draw("toggle_switch('FY 2025', 'on|filter|FY = 2025')");
+      }).then(function () {
+        eq('toggle: a number in a filter| condition reaches the markup unformatted', $('#reportSnippetOutput .pnb-toggle-btn').attr('data-ts-onc'), 'filter|FY = 2025');
+
+        // I.3 a strip and two toggles sharing the box
+        $('#tableSearch').val('');
+        return draw("filter_strip('College|COLLEGE', 'Fiscal Year|FY|az') toggle_switch('Active only', 'on|filter|STATUS = Active') toggle_switch('Active (old)', 'on|search|STATUS = Active', 'off|search|')");
+      }).then(function () {
+        F.syncToggles();
+        assert('flow: both toggles read OFF on an empty box', tsOn(0) === '0' && tsOn(1) === '0', tsOn(0) + ' ' + tsOn(1));
+        $(TG).eq(0).find('.pnb-toggle-btn').trigger('click');
+        return until(function () { return !F.motion() && box() !== ''; }, 5000);
+      }).then(function () {
+        eq('flow: the filter| toggle adds its condition', box(), 'STATUS = Active');
+        assert('flow: ... and reads ON', tsOn(0) === '1', tsOn(0));
+        assert('flow: the search| toggle with the same condition reads ON too (whole-box equality)', tsOn(1) === '1', tsOn(1));
+        $(S + ' .pnb-fs-chip[data-fs-val="Eng"]').trigger('click');
+        return until(function () { return !F.motion() && box() !== 'STATUS = Active'; }, 5000);
+      }).then(function () {
+        eq('flow: a chip joins the toggle condition instead of replacing it', box(), 'COLLEGE = /^(?:Eng)$/ and STATUS = Active');
+        assert('flow: the filter| toggle stays ON beside a pressed chip', tsOn(0) === '1', tsOn(0));
+        assert('flow: the search| toggle reads OFF once the box holds more (unchanged behaviour)', tsOn(1) === '0', tsOn(1));
+        eq('flow: the strip counts take the toggle condition into account', $(S + ' .pnb-fs-group:eq(1) .pnb-fs-chip .pnb-fs-n').map(function () { return $(this).text(); }).get(), ['0', '2', '2']);
+        $(TG).eq(0).find('.pnb-toggle-btn').trigger('click');
+        return until(function () { return !F.motion() && box() !== 'COLLEGE = /^(?:Eng)$/ and STATUS = Active'; }, 5000);
+      }).then(function () {
+        eq('flow: switching it OFF removes only its condition', box(), 'COLLEGE = /^(?:Eng)$/');
+        assert('flow: ... the chip stays pressed and the toggle reads OFF', $(S + ' .pnb-fs-chip[data-fs-val="Eng"]').attr('aria-pressed') === 'true' && tsOn(0) === '0',
+          $(S + ' .pnb-fs-chip[data-fs-val="Eng"]').attr('aria-pressed') + ' ' + tsOn(0));
+        $(TG).eq(1).find('.pnb-toggle-btn').trigger('click');
+        return until(function () { return !F.motion() && box() !== 'COLLEGE = /^(?:Eng)$/'; }, 5000);
+      }).then(function () {
+        eq('flow: the search| toggle still replaces the whole box (unchanged)', box(), 'STATUS = Active');
+
+        // I.4 a series of filter| steps
+        $('#tableSearch').val('');
+        return draw("toggle_switch('Big Eng', 'on|filter|COLLEGE = Eng', 'on|filter|AMOUNT > 100')");
+      }).then(function () {
+        $(TG).eq(0).find('.pnb-toggle-btn').trigger('click');
+        return until(function () { return !F.motion() && box() === 'COLLEGE = Eng and AMOUNT > 100'; }, 6000);
+      }).then(function () {
+        eq('series: an ON series of filter| steps adds each condition in order', box(), 'COLLEGE = Eng and AMOUNT > 100');
+        assert('series: ... and the toggle reads ON', tsOn(0) === '1', tsOn(0));
+        $(TG).eq(0).find('.pnb-toggle-btn').trigger('click');
+        return until(function () { return !F.motion() && box() === ''; }, 6000);
+      }).then(function () {
+        eq('series: the implied OFF series takes them all out again', box(), '');
+        assert('series: ... and the toggle reads OFF', tsOn(0) === '0', tsOn(0));
+
+        // I.5 the executor directly (chain() steps go through it too)
+        F.exec('filter|COLLEGE = /^(?:Eng|Sci)$/');
+        eq('exec: a pipe inside the condition survives (everything after the FIRST pipe)', box(), 'COLLEGE = /^(?:Eng|Sci)$/');
+        assert('exec: isActive reads the condition back', F.isActive('filter|COLLEGE = /^(?:Eng|Sci)$/') === true && F.isActive('unfilter|COLLEGE = /^(?:Eng|Sci)$/') === false, '');
+        F.exec('unfilter|COLLEGE = /^(?:Eng|Sci)$/');
+        eq('exec: unfilter| takes it out', box(), '');
+        assert('exec: unfilter| reads active on a box without the condition', F.isActive('unfilter|STATUS = Active') === true, '');
+        $('#tableSearch').val('COLLEGE = Eng or FY = 2025');
+        assert('exec: on a box holding an or, neither reads active', F.isActive('filter|STATUS = Active') === false && F.isActive('unfilter|STATUS = Active') === false, '');
+        F.exec('filter|STATUS = Active');
+        return wait(150);
+      }).then(function () {
+        eq('exec: a filter| step on an or box changes nothing', box(), 'COLLEGE = Eng or FY = 2025');
+        assert('exec: ... and says why in a notice', ($('#action_overlay').text() || '').indexOf('cannot add or remove one condition') !== -1, ($('#action_overlay').text() || '').substring(0, 200));
+        $('#tableSearch').val('');
+        return null;
+      });
+    });
+  }
+
+  // ══════ J. range fields: 'Label|COLUMN|range' (2026-09-30) ══════
+  // A from / to pair of boxes that writes COL >= X and COL <= Y. Both engines
+  // compare numbers as numbers and dates as dates at the search value's
+  // granularity; the corpus in range_corpus.json runs through both
+  // (window.RANGE.php = penumbra_search.php's counts, from range_php.php).
+  function sectionJ(F, draw, outText, S) {
+    var T = window.PenumbraTiles && window.PenumbraTiles.strip;
+    if (!T || typeof T.bound !== 'function' || typeof T.rangeInfo !== 'function') {
+      assert('range: PenumbraTiles.strip.bound / rangeInfo available', false, 'bound=' + typeof (T && T.bound));
+      return Promise.resolve();
+    }
+    var R = window.RANGE;
+    var box = function () { return String($('#tableSearch').val()); };
+    // J.1 parsing
+    var p1 = F.parseArgs(['Amount|AMOUNT|range']);
+    assert('range: the range option makes a range field', !p1.error && p1.fields[0].range === true && p1.fields[0].mode === 'in', JSON.stringify(p1));
+    assert('range: range and exclude together are refused', /cannot be both a range and exclude/.test(F.parseArgs(['Amount|AMOUNT|range|exclude']).error || ''), F.parseArgs(['Amount|AMOUNT|range|exclude']).error);
+    assert('range: top=N on a range is refused', /az and top=N order and fold chips/.test(F.parseArgs(['Amount|AMOUNT|range|top=3']).error || ''), F.parseArgs(['Amount|AMOUNT|range|top=3']).error);
+    assert('range: az on a range is refused', /az and top=N order and fold chips/.test(F.parseArgs(['Amount|AMOUNT|az|range']).error || ''), '');
+    assert('range: a chip field is not a range', F.parseArgs(['College|COLLEGE']).fields[0].range === false, '');
+    assert('range: the unknown-option error names range', /exclude, az, top=N, range, blank or list/.test(F.parseArgs(['Amount|AMOUNT|between']).error || ''), F.parseArgs(['Amount|AMOUNT|between']).error);
+    // J.2 bounds
+    eq('bound: currency and thousands become plain digits', T.bound('$1,250.50', 'number'), '1250.50');
+    eq('bound: an accounting negative', T.bound('(500)', 'number'), '-500');
+    eq('bound: a comma list is not a number', T.bound('1,6', 'number'), null);
+    eq('bound: text is refused', T.bound('abc', ''), null);
+    eq('bound: blank is no bound', T.bound('  ', 'number'), '');
+    eq('bound: a year is a number', T.bound('2024', 'number'), '2024');
+    eq('bound: a date is not a number', T.bound('01/15/2024', 'number'), null);
+    eq('bound: a US date becomes an ISO day', T.bound('01/15/2024', 'date'), '2024-01-15');
+    eq('bound: an Oracle date too, 69 and later in the 1900s', [T.bound('15-JAN-24', 'date'), T.bound('15-jan-70', 'date'), T.bound('15-jan-68', 'date')], ['2024-01-15', '1970-01-15', '2068-01-15']);
+    eq('bound: an impossible day is refused, a leap day is not', [T.bound('2024-02-30', 'date'), T.bound('02/29/2024', 'date'), T.bound('02/29/2023', 'date')], [null, '2024-02-29', null]);
+    eq('bound: a kind not known yet takes a number or a date', [T.bound('5', ''), T.bound('2024-1-5', '')], ['5', '2024-01-05']);
+    eq('bound: a date field refuses a bare number', T.bound('2024', 'date'), null);
+    // J.3 kinds
+    eq('kind: numbers (currency, thousands, accounting) with a blank', T.rangeInfo(['100', '$1,250.50', '(500)', '', '2,000']), { kind: 'number', lo: (-500).toLocaleString(), hi: (2000).toLocaleString() });
+    eq('kind: dates in three formats', T.rangeInfo(['01/15/2024', '2024-03-11', '15-JAN-24', '12/31/2023']), { kind: 'date', lo: '2023-12-31', hi: '2024-03-11' });
+    eq('kind: text', T.rangeInfo(['Active', '5']).kind, 'text');
+    eq('kind: plain numbers keep plain hints (a year column is not 2,025; 2026-09-30 late)', T.rangeInfo(['2023', '2025', '2024']), { kind: 'number', lo: '2023', hi: '2025' });
+    eq('kind: no values yet', T.rangeInfo([]).kind, '');
+    // J.4 state and compose (the kind set on the field, as the hosts do)
+    var AF = [{ label: 'Amount', col: 'AMOUNT', mode: 'in', top: 12, az: false, range: true, kind: 'number' }];
+    var DF = [{ label: 'Opened', col: 'OPENED', mode: 'in', top: 12, az: false, range: true, kind: 'date' }];
+    eq('state: a range is claimed', F.state('AMOUNT >= 100 and AMOUNT <= 2000', AF).range.AMOUNT, { min: '100', max: '2000' });
+    eq('state: a bound is read as a plain number', F.state('AMOUNT >= $1,000', AF).range.AMOUNT, { min: '1000', max: '' });
+    eq('state: > is not a range bound (typed, kept)', F.state('AMOUNT > 100', AF).rest, ['AMOUNT > 100']);
+    var s2 = F.state('AMOUNT >= 100 and AMOUNT >= 200', AF);
+    assert('state: only the first bound of a side is claimed', (s2.range.AMOUNT || {}).min === '100' && JSON.stringify(s2.rest) === '["AMOUNT >= 200"]', JSON.stringify(s2));
+    eq('state: a date range, a US date read as an ISO day', F.state('OPENED >= 2024-01-01 and OPENED <= 01/31/2024', DF).range.OPENED, { min: '2024-01-01', max: '2024-01-31' });
+    eq('state: a relative date stays typed', F.state('OPENED >= TODAY-30', DF).rest, ['OPENED >= TODAY-30']);
+    eq('state: a year or a month bound on a date field stays typed (it does not mean a day)', [F.state('OPENED <= 2024', DF).rest, F.state('OPENED <= 2024-05', DF).rest], [['OPENED <= 2024'], ['OPENED <= 2024-05']]);
+    eq('state: a date bound on a number field stays typed', F.state('AMOUNT >= 01/15/2024', AF).rest, ['AMOUNT >= 01/15/2024']);
+    eq('compose: min, then max, then the rest', F.compose({ prefix: '', sel: {}, range: { AMOUNT: { min: '100', max: '2000' } }, rest: ['STATUS = Active'] }, AF), 'AMOUNT >= 100 and AMOUNT <= 2000 and STATUS = Active');
+    eq('compose: one side only', F.compose({ prefix: '', sel: {}, range: { AMOUNT: { min: '', max: '2000' } }, rest: [] }, AF), 'AMOUNT <= 2000');
+    var CF = [{ label: 'College', col: 'COLLEGE', mode: 'in', top: 12, az: false, range: false }].concat(AF);
+    var rt = 'COLLEGE = /^(?:Eng)$/ and AMOUNT >= 100 and AMOUNT <= 2000 and STATUS = Active';
+    eq('compose: state(compose(x)) is a fixed point with chips and a range', F.compose(F.state(rt, CF), CF), rt);
+    // J.5 engine agreement: the browser and the server give the same rows
+    if (!R || !R.queries || !R.php) {
+      assert('parity: range_php.js loaded (the PHP half)', false, 'window.RANGE=' + typeof R);
+      return Promise.resolve();
+    }
+    var toMaps = function () {
+      return R.rows.map(function (o) { var m = new Map(); R.columns.forEach(function (c) { m.set(c, o[c] == null ? '' : String(o[c])); }); return m; });
+    };
+    var rrows = toMaps();
+    R.queries.forEach(function (qq) {
+      var parsed = F.parseQ(qq.q, R.columns), n = 0;
+      rrows.forEach(function (r) { if (F.evalQ(r, parsed, R.columns)) n++; });
+      eq('parity: ' + qq.q + ' (browser = server = ' + qq.expect + ')', [n, R.php[qq.q]], [qq.expect, qq.expect]);
+    });
+    // J.6 the control on the report page, over the corpus rows
+    F.setRows(toMaps());
+    $('#resultsTable').data('columnNameToOriginalIndex', { 'AMOUNT': 1, 'OPENED': 2, 'STATUS': 3, 'COLLEGE': 4 });
+    $('#tableSearch').val('');
+    var G = function (col) { return $(S + ' .pnb-fs-group[data-fs-col="' + col + '"]'); };
+    var B = function (col, b) { return G(col).find('.pnb-fs-bound[data-fs-bound="' + b + '"]'); };
+    var counts = function (col) { return G(col).find('.pnb-fs-chip .pnb-fs-n').map(function () { return $(this).text(); }).get(); };
+    var STRIP = "filter_strip('Status|STATUS', 'Amount|AMOUNT|range', 'Opened|OPENED|range', 'labels=left')";
+    return draw(STRIP).then(function () {
+      assert('render: a range field is a pair of boxes, no chips', G('AMOUNT').hasClass('pnb-fs-range') && G('AMOUNT').find('.pnb-fs-bound').length === 2 && G('AMOUNT').find('.pnb-fs-chip').length === 0, (G('AMOUNT').prop('outerHTML') || '').substring(0, 200));
+      eq('render: a number range is two text boxes with the data span as hints', [B('AMOUNT', 'min').attr('type'), B('AMOUNT', 'min').attr('placeholder'), B('AMOUNT', 'max').attr('placeholder'), G('AMOUNT').attr('data-fs-kind')],
+        ['text', (-500).toLocaleString(), (2000).toLocaleString(), 'number']);
+      eq('render: a date range is two date pickers', [B('OPENED', 'min').attr('type'), B('OPENED', 'max').attr('type'), G('OPENED').attr('data-fs-kind'), B('OPENED', 'min').attr('title')],
+        ['date', 'date', 'date', 'The data runs 2023-12-31 to 2024-03-11']);
+      eq('render: each box is named for screen readers', [B('AMOUNT', 'min').attr('aria-label'), B('AMOUNT', 'max').attr('aria-label')], ['Amount, from', 'Amount, to']);
+      var bcs = B('AMOUNT', 'min').length ? getComputedStyle(B('AMOUNT', 'min')[0]) : {};
+      assert('render: the boxes wear the chip pill (computed: 999px radius)', bcs.borderTopLeftRadius === '999px', bcs.borderTopLeftRadius);
+      eq('render: no bound set, no clear button', G('AMOUNT').find('.pnb-fs-clear').length, 0);
+      eq('render: STATUS counts before any range', counts('STATUS'), ['4', '2', '1']);
+      B('AMOUNT', 'min').val('100').trigger('focus').trigger($.Event('keydown', { key: 'Enter' }));
+      return until(function () { return !F.motion() && box() !== ''; }, 5000);
+    }).then(function () {
+      eq('commit: Enter writes the bound', box(), 'AMOUNT >= 100');
+      eq('commit: the redrawn box shows it', B('AMOUNT', 'min').val(), '100');
+      return wait(200);
+    }).then(function () {
+      assert('commit: focus stays on the box through the redraw', document.activeElement === B('AMOUNT', 'min')[0], document.activeElement && (document.activeElement.outerHTML || '').substring(0, 100));
+      eq('counts: a range narrows the chips like any condition', counts('STATUS'), ['1', '2', '1']);
+      assert('render: a bound set, a clear button', G('AMOUNT').find('.pnb-fs-clear').length === 1 && $(S + ' .pnb-fs-clearall').length === 1, '');
+      // Typing in one box and moving to the other writes nothing: the pair commits together.
+      B('AMOUNT', 'max').trigger('focus').val('1,250.50');
+      B('AMOUNT', 'min').trigger('focus');
+      F.sync();   // a sync while the pair is being edited (a motion settling, say)
+      return wait(250);
+    }).then(function () {
+      eq('pair: moving between the two boxes writes nothing yet', box(), 'AMOUNT >= 100');
+      eq('pair: ... and a sync meanwhile keeps the text in the other box', B('AMOUNT', 'max').val(), '1,250.50');
+      $('#tableSearch').trigger('focus');   // focus leaves the pair
+      return until(function () { return !F.motion() && box() !== 'AMOUNT >= 100'; }, 5000);
+    }).then(function () {
+      eq('pair: focus leaving the pair writes both (the number as digits)', box(), 'AMOUNT >= 100 and AMOUNT <= 1250.50');
+      return wait(400);   // any redraw the last search still owed has landed
+    }).then(function () {
+      B('AMOUNT', 'min').val('abc').trigger('focus').trigger($.Event('keydown', { key: 'Enter' }));
+      eq('invalid: a box that is not a number is marked at once', B('AMOUNT', 'min').attr('aria-invalid'), 'true');
+      return wait(250);
+    }).then(function () {
+      eq('invalid: ... and nothing is written', box(), 'AMOUNT >= 100 and AMOUNT <= 1250.50');
+      B('OPENED', 'min').val('2024-01-15').trigger('focus').trigger($.Event('keydown', { key: 'Enter' }));
+      return until(function () { return !F.motion() && box().indexOf('OPENED') > -1; }, 5000);
+    }).then(function () {
+      eq('date: the picker writes an ISO day', box(), 'AMOUNT >= 100 and AMOUNT <= 1250.50 and OPENED >= 2024-01-15');
+      eq('date: the other box forgot the bad text on the redraw', B('AMOUNT', 'min').val(), '100');
+      eq('date: the chips count what the three bounds leave', counts('STATUS'), ['1', '2', '0']);
+      // Focus off the boxes first: a focused box is never overwritten by a sync.
+      $('#tableSearch').trigger('focus').val('AMOUNT >= 250 and STATUS = Active');
+      F.sync();
+      eq('sync: a typed bound fills its box, the others empty', [B('AMOUNT', 'min').val(), B('AMOUNT', 'max').val(), B('OPENED', 'min').val()], ['250', '', '']);
+      $('#tableSearch').val('STATUS = /^(?:Closed)$/ and AMOUNT >= 100 and AMOUNT <= 1250.50 and OPENED >= 2024-01-15');
+      return draw(STRIP);
+    }).then(function () {
+      G('AMOUNT').find('.pnb-fs-clear').trigger('click');
+      return until(function () { return !F.motion() && box().indexOf('AMOUNT') === -1; }, 5000);
+    }).then(function () {
+      eq("clear: a range's clear removes both its bounds only", box(), 'STATUS = /^(?:Closed)$/ and OPENED >= 2024-01-15');
+      $(S + ' .pnb-fs-clearall').trigger('click');
+      return until(function () { return !F.motion() && box() === ''; }, 5000);
+    }).then(function () {
+      eq('clear all: ranges and chips together', box(), '');
+      $('#tableSearch').val('OPENED <= 2024');
+      return draw(STRIP);
+    }).then(function () {
+      eq('typed: a year bound on a date field leaves the pickers empty', [B('OPENED', 'min').val(), B('OPENED', 'max').val()], ['', '']);
+      B('AMOUNT', 'min').val('5').trigger('focus').trigger($.Event('keydown', { key: 'Enter' }));
+      return until(function () { return !F.motion() && box() !== 'OPENED <= 2024'; }, 5000);
+    }).then(function () {
+      eq('typed: ... and stays, after the strip conditions', box(), 'AMOUNT >= 5 and OPENED <= 2024');
+      $('#tableSearch').val('AMOUNT >= 1 or STATUS = Active');
+      return draw(STRIP);
+    }).then(function () {
+      assert('pause: an or query disables the boxes too', $(S).attr('data-fs-off') === 'or' && B('AMOUNT', 'min').prop('disabled') === true && B('OPENED', 'max').prop('disabled') === true, $(S).attr('data-fs-off'));
+      $('#tableSearch').val('');
+      return draw("filter_strip('Status|STATUS|range')");
+    }).then(function () {
+      assert('refused: a range on a text column is a loud error naming it', $(S).length === 0 && outText().indexOf('STATUS holds text, so it cannot be a range') !== -1, outText().substring(0, 160));
+      return null;
+    });
+  }
+
+  // ══════ K. the (blank) chip: 'Label|COLUMN|blank' (2026-09-30, late) ══════
+  // Empty cells as a chip of their own. The option keeps the empty alternative
+  // (COL = /^(?:Eng|)$/, or /^(?:)$/ alone), which both engines match against
+  // an empty cell - the fixture's row 13 here, the corpus's row 6 through
+  // penumbra_search.php in J.5 - and the chip is pinned last and never folded.
+  function sectionK(F, draw, outText, S) {
+    var box = function () { return String($('#tableSearch').val()); };
+    var G = function (col) { return $(S + ' .pnb-fs-group[data-fs-col="' + col + '"]'); };
+    var chipVals = function (col) { return G(col).find('.pnb-fs-chip').map(function () { return $(this).attr('data-fs-val'); }).get(); };
+    var BL = function (col) { return G(col).find('.pnb-fs-chip.pnb-fs-blank'); };
+    var CH = function (col, v) { return G(col).find('.pnb-fs-chip[data-fs-val="' + v + '"]'); };
+    // K.1 parsing
+    var p1 = F.parseArgs(['College|COLLEGE|blank']);
+    assert('blank: the option marks the field', !p1.error && p1.fields[0].blank === true && p1.fields[0].mode === 'in' && p1.fields[0].range === false, JSON.stringify(p1));
+    assert('blank: a chip field is not blank by default', F.parseArgs(['College|COLLEGE']).fields[0].blank === false, JSON.stringify(F.parseArgs(['College|COLLEGE']).fields[0]));
+    var p2 = F.parseArgs(['Status|STATUS|exclude|blank|top=2']);
+    assert('blank: goes with exclude and top=N', !p2.error && p2.fields[0].blank === true && p2.fields[0].mode === 'ex' && p2.fields[0].top === 2, JSON.stringify(p2));
+    assert('blank: refused on a range (a range has no chips)', /blank adds a chip, and Amount is a range/.test(F.parseArgs(['Amount|AMOUNT|range|blank']).error || ''), F.parseArgs(['Amount|AMOUNT|range|blank']).error);
+    assert('blank: the unknown-option error names blank', /top=N, range, blank or list/.test(F.parseArgs(['College|COLLEGE|empty']).error || ''), F.parseArgs(['College|COLLEGE|empty']).error);
+    // K.2 state and compose
+    var BF = [{ label: 'College', col: 'COLLEGE', mode: 'in', top: 12, az: false, range: false, blank: true }];
+    var NF = [{ label: 'College', col: 'COLLEGE', mode: 'in', top: 12, az: false, range: false, blank: false }];
+    eq('state: the empty alternative is a value on a blank field', F.state('COLLEGE = /^(?:Eng|)$/', BF).sel.COLLEGE, ['Eng', '']);
+    eq('state: the empty alternation alone', F.state('COLLEGE = /^(?:)$/', BF).sel.COLLEGE, ['']);
+    eq('state: on a field without the option the empty alternative is claimed like any value (it presses a chip that exists only while pressed)', F.state('COLLEGE = /^(?:Eng|)$/', NF).sel.COLLEGE, ['Eng', '']);
+    eq('compose: a blank among values', F.compose({ prefix: '', sel: { COLLEGE: ['Eng', ''] }, range: {}, rest: [] }, BF), 'COLLEGE = /^(?:Eng|)$/');
+    eq('compose: a blank alone', F.compose({ prefix: '', sel: { COLLEGE: [''] }, range: {}, rest: [] }, BF), 'COLLEGE = /^(?:)$/');
+    var rt = 'COLLEGE = /^(?:|Sci)$/ and FY = 2025';
+    eq('compose: state(compose(x)) is a fixed point with a blank', F.compose(F.state(rt, BF), BF), rt);
+    // K.3 engine A: an empty alternative matches the empty cell (row 13)
+    var rows = fixture();
+    eq('engine A: /^(?:)$/ matches the blank cell only', matchCount(F, 'COLLEGE = /^(?:)$/', rows), 1);
+    eq('engine A: /^(?:Eng|)$/ is Eng or blank (ENG and the @@HTML Eng included)', matchCount(F, 'COLLEGE = /^(?:Eng|)$/', rows), 7);
+    eq('engine A: != /^(?:)$/ is every row with a value', matchCount(F, 'COLLEGE != /^(?:)$/', rows), 12);
+    // K.4 counts: the blank chip counts the empty cells, cross-filtered like any value, last
+    var spec = { fields: [{ label: 'College', col: 'COLLEGE', mode: 'in', top: 12, az: false, range: false, blank: true }, { label: 'Fiscal Year', col: 'FY', mode: 'in', top: 12, az: true, range: false, blank: false }], mods: [] };
+    F.setRows(fixture());
+    $('#resultsTable').data('columnNameToOriginalIndex', { 'COLLEGE': 1, 'FY': 2, 'AMOUNT': 3, 'STATUS': 4, '% CHANGE': 5 });
+    eq('counts: the blank chip is last, the empty cells counted', vals(F.groups(spec, ''), 'COLLEGE'), [['Eng', 6, false], ['Sci', 3, false], ['Ag', 2, false], ['CHASS', 1, false], ['', 1, false]]);
+    eq('counts: it is narrowed by the other groups like any value', vals(F.groups(spec, 'FY = /^(?:2024)$/'), 'COLLEGE').pop(), ['', 0, false]);
+    eq('counts: a pressed blank is read back', vals(F.groups(spec, 'COLLEGE = /^(?:)$/'), 'COLLEGE').pop(), ['', 1, true]);
+    eq('counts: no blank chip without the option', vals(F.groups({ fields: [NF[0]], mods: [] }, ''), 'COLLEGE').length, 4);
+    eq('counts: a blank field on a column with no empty cells still gets the chip, count 0 (found on the live demo: STATUS)', vals(F.groups({ fields: [{ label: 'Status', col: 'STATUS', mode: 'in', top: 12, az: false, range: false, blank: true }], mods: [] }, ''), 'STATUS').pop(), ['', 0, false]);
+    var ga = F.groups({ fields: [{ label: 'College', col: 'COLLEGE', mode: 'in', top: 12, az: true, range: false, blank: true }], mods: [] }, '');
+    eq('counts: az keeps the blank chip last too', vals(ga, 'COLLEGE').map(function (e) { return e[0]; }), ['Ag', 'CHASS', 'Eng', 'Sci', '']);
+    var gt = F.groups({ fields: [NF[0], spec.fields[1]], mods: [] }, 'COLLEGE = /^(?:)$/');
+    eq('counts: a typed blank condition on a strip without the option narrows the other groups and presses a (blank) chip with the real count (found on the live demo)', [vals(gt, 'FY'), vals(gt, 'COLLEGE').pop()], [[['2023', 0, false], ['2024', 0, false], ['2025', 1, false]], ['', 1, true]]);
+    // K.5 on the page: the chip, its look, the fold, the click flow, the sync
+    $('#tableSearch').val('');
+    return draw("filter_strip('College|COLLEGE|blank|top=3', 'Fiscal Year|FY|az')").then(function () {
+      eq('render: the blank chip is last, with an empty value, its count and the group flag', [chipVals('COLLEGE'), BL('COLLEGE').find('.pnb-fs-v').text(), BL('COLLEGE').find('.pnb-fs-n').text(), G('COLLEGE').attr('data-fs-blank'), BL('COLLEGE').attr('title')],
+        [['Eng', 'Sci', 'Ag', 'CHASS', ''], '(blank)', '1', '1', 'Rows with no College value']);
+      var bcs = BL('COLLEGE').length ? getComputedStyle(BL('COLLEGE').find('.pnb-fs-v')[0]) : {};
+      assert('render: it reads in italics (computed)', bcs.fontStyle === 'italic', bcs.fontStyle);
+      assert('render: top=3 folds CHASS but never the blank chip (computed display)', CH('COLLEGE', 'CHASS').hasClass('pnb-fs-hid') && getComputedStyle(CH('COLLEGE', 'CHASS')[0]).display === 'none'
+        && !BL('COLLEGE').hasClass('pnb-fs-hid') && getComputedStyle(BL('COLLEGE')[0]).display !== 'none' && G('COLLEGE').find('.pnb-fs-more').text() === '+1 more',
+        JSON.stringify({ chass: CH('COLLEGE', 'CHASS').hasClass('pnb-fs-hid'), blank: BL('COLLEGE').hasClass('pnb-fs-hid'), more: G('COLLEGE').find('.pnb-fs-more').text() }));
+      G('COLLEGE').find('.pnb-fs-more').trigger('click');
+      G('COLLEGE').find('.pnb-fs-more').trigger('click');   // opened, then folded again in place
+      assert('render: folding back in place leaves the blank chip showing', !BL('COLLEGE').hasClass('pnb-fs-hid') && CH('COLLEGE', 'CHASS').hasClass('pnb-fs-hid') && G('COLLEGE').find('.pnb-fs-more').text() === '+1 more',
+        JSON.stringify({ chass: CH('COLLEGE', 'CHASS').hasClass('pnb-fs-hid'), blank: BL('COLLEGE').hasClass('pnb-fs-hid'), more: G('COLLEGE').find('.pnb-fs-more').text() }));
+      BL('COLLEGE').trigger('click');
+      return until(function () { return !F.motion() && box() !== ''; }, 5000);
+    }).then(function () {
+      eq('click: the blank chip writes the empty alternation', box(), 'COLLEGE = /^(?:)$/');
+      assert('click: the re-rendered chip reads as pressed, and only it', BL('COLLEGE').attr('aria-pressed') === 'true' && $(S + ' .pnb-fs-chip[aria-pressed="true"]').length === 1, $(S).html().substring(0, 200));
+      eq('click: the other group counts what the blank leaves (row 13 is FY 2025)', G('FY').find('.pnb-fs-chip .pnb-fs-n').map(function () { return $(this).text(); }).get(), ['0', '0', '1']);
+      CH('COLLEGE', 'Eng').trigger('click');
+      return until(function () { return !F.motion() && box() !== 'COLLEGE = /^(?:)$/'; }, 5000);
+    }).then(function () {
+      eq('click: a value joins the blank in the alternation', box(), 'COLLEGE = /^(?:|Eng)$/');
+      BL('COLLEGE').trigger('click');
+      return until(function () { return !F.motion() && box() !== 'COLLEGE = /^(?:|Eng)$/'; }, 5000);
+    }).then(function () {
+      eq('click: clicking the pressed blank chip releases it', box(), 'COLLEGE = /^(?:Eng)$/');
+      $('#tableSearch').val('COLLEGE = /^(?:Eng|)$/');
+      F.sync();
+      assert('sync: a hand-typed empty alternative presses the blank chip (the group flag read from the DOM)', BL('COLLEGE').attr('aria-pressed') === 'true' && CH('COLLEGE', 'Eng').attr('aria-pressed') === 'true' && CH('COLLEGE', 'Sci').attr('aria-pressed') === 'false',
+        JSON.stringify({ blank: BL('COLLEGE').attr('aria-pressed'), eng: CH('COLLEGE', 'Eng').attr('aria-pressed') }));
+      $('#tableSearch').val('');
+      return draw("filter_strip('College|COLLEGE|exclude|blank')");
+    }).then(function () {
+      BL('COLLEGE').trigger('click');
+      return until(function () { return !F.motion() && box() !== ''; }, 5000);
+    }).then(function () {
+      eq('exclude: the blank chip leaves the empty cells out', box(), 'COLLEGE != /^(?:)$/');
+      $('#tableSearch').val('');
+      return draw("filter_strip('College|COLLEGE')");
+    }).then(function () {
+      eq('render: no blank chip without the option (the blank row is not offered)', [BL('COLLEGE').length, chipVals('COLLEGE').length], [0, 4]);
+      $('#tableSearch').val('COLLEGE = /^(?:)$/');
+      return draw("filter_strip('College|COLLEGE')");
+    }).then(function () {
+      assert('typed: a blank condition on a strip without the option presses a (blank) chip that is only there while pressed', BL('COLLEGE').length === 1 && BL('COLLEGE').attr('aria-pressed') === 'true' && BL('COLLEGE').find('.pnb-fs-n').text() === '1' && chipVals('COLLEGE').length === 5, G('COLLEGE').html().substring(0, 300));
+      CH('COLLEGE', 'Sci').trigger('click');
+      return until(function () { return !F.motion() && box() !== 'COLLEGE = /^(?:)$/'; }, 5000);
+    }).then(function () {
+      eq('typed: a click joins the value to it (one condition on the column, never two)', box(), 'COLLEGE = /^(?:|Sci)$/');
+      BL('COLLEGE').trigger('click');
+      return until(function () { return !F.motion() && box() !== 'COLLEGE = /^(?:|Sci)$/'; }, 5000);
+    }).then(function () {
+      eq('typed: releasing it leaves the value, and the chip goes', [box(), BL('COLLEGE').length, chipVals('COLLEGE').length], ['COLLEGE = /^(?:Sci)$/', 0, 4]);
+      $('#tableSearch').val('');
+      return null;
+    });
+  }
+
+  // ══════ L. a pivot view: the chips filter the transactions the pivot is built from (2026-10-01) ══════
+  // A REAL pivot through the trigger executor (pivot|ROWS|COLS|VALS|AGG...), as a
+  // snippet's action(trigger) builds one. The flat table gets a '#' cell per fixture
+  // row first: the pivot reads its transactions through it.
+  function sectionL(F, draw, outText, S) {
+    var box = function () { return String($('#tableSearch').val()); };
+    var G = function (col) { return $(S + ' .pnb-fs-group[data-fs-col="' + col + '"]'); };
+    var CH = function (col, v) { return G(col).find('.pnb-fs-chip[data-fs-val="' + v + '"]'); };
+    // The pivot's cells, whole (its text runs them together: "Eng900900").
+    var pcells = function () { return $('#pivot-output-container td, #pivot-output-container th').map(function () { return $(this).text().trim(); }).get(); };
+    var ptext = function () { return pcells().join(' | '); };
+    var pvis = function () { return $('#pivot-output-container').is(':visible') && $('#pivot-output-container table').length > 0; };
+    var has = function (name) { return pcells().indexOf(name) !== -1; };
+    var rows = fixture();
+    F.setRows(rows);
+    $('#resultsTable').data('columnNameToOriginalIndex', { 'COLLEGE': 1, 'FY': 2, 'AMOUNT': 3, 'STATUS': 4, '% CHANGE': 5 });
+    $('#resultsTable tbody').html(rows.map(function (r) {
+      return '<tr><td data-column="0">' + r.get('#') + '</td><td data-column="1">' + r.get('COLLEGE') + '</td><td data-column="2">' + r.get('FY') + '</td><td data-column="3">' + r.get('AMOUNT') + '</td><td data-column="4">' + r.get('STATUS') + '</td></tr>';
+    }).join(''));
+    $('#tableSearch').val('');
+    var SPEC = { fields: F.parseArgs(['College|COLLEGE', 'Fiscal Year|FY|az']).fields, mods: [] };
+    return draw("filter_strip('College|COLLEGE', 'Fiscal Year|FY|az')").then(function () {
+      F.exec('pivot|COLLEGE|FY|AMOUNT|sum');
+      // The pivot's own loading veil must be down: a click while it is up is dropped (the switches' rule).
+      return until(function () { return pvis() && !F.busy(); }, 8000);
+    }).then(function (up) {
+      assert('pivot: a real pivot is on screen (COLLEGE by FY, Sum of AMOUNT)', up && has('Eng') && has('Sci') && has('Ag'), ptext().substring(0, 200));
+      F.sync();
+      assert('pivot: the strip stays live (no pause, no note, chips enabled)', $(S).attr('data-fs-off') === undefined && $(S + ' .pnb-fs-note').length === 0 && $(S + ' .pnb-fs-chip:disabled').length === 0, String($(S).attr('data-fs-off')));
+      var g0 = F.groups(SPEC, '');
+      assert('pivot: the counts come from the source rows, as in the table view', g0.off === null && JSON.stringify(vals(g0, 'COLLEGE')) === JSON.stringify([['Eng', 6, false], ['Sci', 3, false], ['Ag', 2, false], ['CHASS', 1, false]]), JSON.stringify(vals(g0, 'COLLEGE')));
+      var lbl = F.pivotLabels()[0];
+      eq('pivot: an aggregate condition in the box is left out of the counts (it keeps pivot rows, not transactions)', vals(F.groups(SPEC, 'COLLEGE = /^(?:Eng)$/ and ' + lbl + ' > 100'), 'FY'), [['2023', 1, false], ['2024', 2, false], ['2025', 3, false]]);
+      CH('COLLEGE', 'Sci').trigger('click');
+      return until(function () { return !F.motion() && box() !== '' && pvis() && !has('Eng'); }, 8000);
+    }).then(function () {
+      eq('pivot: a chip writes its condition and the pivot rebuilds from the matching transactions', [box(), has('Sci'), has('Eng') || has('Ag') || has('CHASS')], ['COLLEGE = /^(?:Sci)$/', true, false]);
+      assert('pivot: the re-rendered chip reads as pressed, with the counts of the source rows', CH('COLLEGE', 'Sci').attr('aria-pressed') === 'true' && CH('COLLEGE', 'Sci').find('.pnb-fs-n').text() === '3', $(S).html().substring(0, 200));
+      $('#tableSearch').val('COLLEGE = /^(?:Ag)$/').trigger('input').trigger($.Event('keydown', { key: 'Enter', keyCode: 13, which: 13 }));
+      return until(function () { return !F.motion() && pvis() && has('Ag') && !has('Sci'); }, 8000);
+    }).then(function () {
+      assert('pivot: a hand-typed source condition rebuilds the pivot and presses its chip', has('Ag') && !has('Sci'), ptext().substring(0, 160));
+      F.sync();
+      assert('pivot: ... the sync reads it', CH('COLLEGE', 'Ag').attr('aria-pressed') === 'true' && CH('COLLEGE', 'Sci').attr('aria-pressed') === 'false', $(S).html().substring(0, 200));
+      $(S + ' .pnb-fs-clearall').trigger('click');
+      return until(function () { return !F.motion() && box() === '' && pvis() && has('Eng'); }, 8000);
+    }).then(function () {
+      eq('pivot: Clear all rebuilds the whole pivot', [box(), has('Eng') && has('Sci') && has('Ag')], ['', true]);
+      // A chip column that shares its name with an aggregate label: the custom
+      // label AMOUNT on Sum of AMOUNT (position 17 of the trigger).
+      F.exec('pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|none|none|||AMOUNT');
+      return until(function () { return pvis() && JSON.stringify(F.pivotLabels()) === '["AMOUNT"]' && !F.busy(); }, 8000);
+    }).then(function (up) {
+      assert('pivot: an aggregate labelled like a source column (AMOUNT)', up, JSON.stringify(F.pivotLabels()));
+      return draw("filter_strip('College|COLLEGE', 'Amount|AMOUNT|az')");
+    }).then(function () {
+      CH('AMOUNT', '100').trigger('click');
+      return until(function () { return !F.motion() && box() !== '' && pvis() && !has('Sci'); }, 8000);
+    }).then(function () {
+      eq('pivot: the chip writes its condition under __SRC, so the engine reads the column, not the label (row 1 alone)', [box(), has('Eng'), has('Sci') || has('Ag')], ['__SRC AMOUNT = /^(?:100)$/', true, false]);
+      assert('pivot: the chip reads as pressed through the __SRC prefix', CH('AMOUNT', '100').attr('aria-pressed') === 'true', $(S).html().substring(0, 200));
+      CH('COLLEGE', 'Eng').trigger('click');
+      return until(function () { return !F.motion() && box().indexOf('COLLEGE') > -1; }, 8000);
+    }).then(function () {
+      // Composed in FIELD order (College first), as every strip is (section C), not press order.
+      eq('pivot: a second chip joins under the one __SRC (field order)', box(), '__SRC COLLEGE = /^(?:Eng)$/ and AMOUNT = /^(?:100)$/');
+      $(S + ' .pnb-fs-clearall').trigger('click');
+      return until(function () { return !F.motion() && box() === '' && pvis() && has('Sci'); }, 8000);
+    }).then(function () {
+      eq('pivot: Clear all drops the prefix with the last condition', box(), '');
+      // The harness has no exit button: hide the pivot as the exit does and re-read the view.
+      if ($('#exitPivotModeBtn').length) { $('#exitPivotModeBtn').trigger('click'); } else { $('#pivot-output-container').hide().empty(); F.syncLayout(); }
+      return until(function () { return !$('#pivot-output-container').is(':visible'); }, 4000);
+    }).then(function (down) {
+      assert('pivot: back to the table view', down, '');
+      $('#resultsTable tbody').empty();
+      $('#tableSearch').val('');
+      return null;
+    });
+  }
+
+  // ══════ M. the list option (2026-10-01): a type-to-find list of every value ══════
+  // A wide column: 30 sponsors (S01..S30) over 40 rows - S01..S08 twice (rows 31-38)
+  // and two blank cells (rows 39-40). The rows are the same chips in a scrolling
+  // column under a find box; typing hides what it misses, in place; Enter presses
+  // the first row showing; the typed text survives every re-render.
+  function sectionM(F, draw, outText, S) {
+    var box = function () { return String($('#tableSearch').val()); };
+    var G = function (col) { return $(S + ' .pnb-fs-group[data-fs-col="' + col + '"]'); };
+    var CH = function (col, v) { return G(col).find('.pnb-fs-chip[data-fs-val="' + v + '"]'); };
+    var FIND = function (col) { return G(col).find('.pnb-fs-find'); };
+    var shown = function (col) { return G(col).find('.pnb-fs-chip').not('.pnb-fs-hid').map(function () { return $(this).attr('data-fs-val'); }).get(); };
+    var allv = function (col) { return G(col).find('.pnb-fs-chip').map(function () { return $(this).attr('data-fs-val'); }).get(); };
+    var cs = function ($e) { return $e.length ? getComputedStyle($e[0]) : {}; };
+    var pad = function (n) { return 'S' + (n < 10 ? '0' + n : String(n)); };
+    var ARGS = ['Sponsor|SPONSOR|list|blank', 'College|COLLEGE'];
+    // A fresh event per keystroke: a re-triggered jQuery Event keeps its first target, a node the re-render replaced.
+    var enter = function () { return $.Event('keydown', { key: 'Enter', keyCode: 13, which: 13 }); };
+    var rows = [];
+    for (var i = 1; i <= 40; i++) {
+      var m = new Map();
+      m.set('#', String(i)); m.set('COLLEGE', i % 3 === 0 ? 'Eng' : 'Sci'); m.set('FY', '2025'); m.set('AMOUNT', String(i * 10)); m.set('STATUS', 'Active');
+      m.set('SPONSOR', i <= 30 ? pad(i) : (i <= 38 ? pad(i - 30) : ''));
+      rows.push(m);
+    }
+    F.setRows(rows);
+    $('#resultsTable').data('columnNameToOriginalIndex', { 'COLLEGE': 1, 'FY': 2, 'AMOUNT': 3, 'STATUS': 4, 'SPONSOR': 5 });
+    $('#resultsTable tbody').html(rows.map(function (r) {
+      return '<tr><td data-column="0">' + r.get('#') + '</td><td data-column="1">' + r.get('COLLEGE') + '</td><td data-column="2">' + r.get('FY') + '</td><td data-column="3">' + r.get('AMOUNT') + '</td><td data-column="4">' + r.get('STATUS') + '</td><td data-column="5">' + r.get('SPONSOR') + '</td></tr>';
+    }).join(''));
+    $('#tableSearch').val('');
+    var p1 = F.parseArgs(['Sponsor|SPONSOR|list']);
+    assert('list: the option parses (list true, the default top untouched)', !p1.error && p1.fields[0].list === true && p1.fields[0].top === 12, JSON.stringify(p1));
+    assert('list: top=N is refused on a list (there is no fold)', /top=N folds chips/.test(F.parseArgs(['Sponsor|SPONSOR|list|top=3']).error || ''), F.parseArgs(['Sponsor|SPONSOR|list|top=3']).error);
+    assert('list: range and list together are refused', /both a range and a list/.test(F.parseArgs(['Amount|AMOUNT|range|list']).error || ''), F.parseArgs(['Amount|AMOUNT|range|list']).error);
+    assert('list: the unknown-option message names list', /blank or list/.test(F.parseArgs(['Sponsor|SPONSOR|foo']).error || ''), F.parseArgs(['Sponsor|SPONSOR|foo']).error);
+    var SPEC = { fields: F.parseArgs(ARGS).fields, mods: [] };
+    var g0 = vals(F.groups(SPEC, ''), 'SPONSOR');
+    assert('list: the groups hold every value with its count (31 rows: S01..S08 twice, the blank cells last)', g0.length === 31 && g0[0][0] === 'S01' && g0[0][1] === 2 && g0[8][0] === 'S09' && g0[8][1] === 1 && g0[30][0] === '' && g0[30][1] === 2, JSON.stringify(g0.slice(0, 3)) + ' ... ' + JSON.stringify(g0.slice(-2)));
+    return draw("filter_strip('Sponsor|SPONSOR|list|blank', 'College|COLLEGE')").then(function () {
+      assert('list: the group is a list with a find box and every value as a row, none folded, no +n more', G('SPONSOR').hasClass('pnb-fs-list') && G('SPONSOR').attr('data-fs-list') === '1' && FIND('SPONSOR').length === 1 && allv('SPONSOR').length === 31 && shown('SPONSOR').length === 31 && G('SPONSOR').find('.pnb-fs-more').length === 0, G('SPONSOR').html().substring(0, 300));
+      eq('list: the rows keep the count order, the (blank) row last, with their counts', [allv('SPONSOR').slice(0, 3), allv('SPONSOR')[30], CH('SPONSOR', 'S01').find('.pnb-fs-n').text(), CH('SPONSOR', 'S09').find('.pnb-fs-n').text()], [['S01', 'S02', 'S03'], '', '2', '1']);
+      assert('list: the plain group beside it is still chips', !G('COLLEGE').hasClass('pnb-fs-list') && G('COLLEGE').find('.pnb-fs-find').length === 0 && G('COLLEGE').find('.pnb-fs-chip').length === 2, G('COLLEGE').html().substring(0, 120));
+      assert('list: the find box names its field for a screen reader and keeps the browser out of it', FIND('SPONSOR').attr('aria-label') === 'Find a Sponsor value' && FIND('SPONSOR').attr('autocomplete') === 'off' && FIND('SPONSOR').attr('type') === 'search' && FIND('SPONSOR').val() === '', FIND('SPONSOR').prop('outerHTML'));
+      var c = cs(G('SPONSOR').find('.pnb-fs-chips'));
+      assert('list: the rows stack in a scrolling column (computed: column, overflow-y auto, a max height)', c.flexDirection === 'column' && c.overflowY === 'auto' && c.maxHeight !== 'none' && parseFloat(c.maxHeight) > 0, c.flexDirection + ' ' + c.overflowY + ' ' + c.maxHeight);
+      assert('list: a row is full width with its count at the far end (computed)', cs(CH('SPONSOR', 'S01')).justifyContent === 'space-between' && CH('SPONSOR', 'S01').outerWidth() >= G('SPONSOR').find('.pnb-fs-chips').width() - 4, cs(CH('SPONSOR', 'S01')).justifyContent + ' ' + CH('SPONSOR', 'S01').outerWidth() + '/' + G('SPONSOR').find('.pnb-fs-chips').width());
+      // ── typing ──
+      FIND('SPONSOR').val('s1').trigger('input');
+      eq('list: typing hides the rows it misses, in place, without regard to case (S1x)', shown('SPONSOR'), ['S10', 'S11', 'S12', 'S13', 'S14', 'S15', 'S16', 'S17', 'S18', 'S19']);
+      assert('list: ... no search ran (the box is still empty, nothing pressed, the strip not re-rendered)', box() === '' && $(S + ' .pnb-fs-chip[aria-pressed="true"]').length === 0 && FIND('SPONSOR').val() === 's1', box());
+      FIND('SPONSOR').val('bl').trigger('input');
+      eq('list: the (blank) row is found by its name', shown('SPONSOR'), ['']);
+      FIND('SPONSOR').val('zzz').trigger('input');
+      assert('list: no match shows a note', shown('SPONSOR').length === 0 && G('SPONSOR').find('.pnb-fs-nomatch').text() === 'no value matches', G('SPONSOR').find('.pnb-fs-chips').html().substring(0, 120));
+      FIND('SPONSOR').val('S2').trigger('input');
+      eq('list: a wider text brings rows back and drops the note (S2 = S20..S29)', [shown('SPONSOR').length, G('SPONSOR').find('.pnb-fs-nomatch').length, shown('SPONSOR')[0]], [10, 0, 'S20']);
+      // ── Enter presses the first row showing ──
+      FIND('SPONSOR').trigger('focus').trigger(enter());
+      return until(function () { return !F.motion() && box() !== ''; }, 8000);
+    }).then(function () {
+      eq('list: Enter presses the first row still showing (S20), as a chip click would', box(), 'SPONSOR = /^(?:S20)$/');
+      assert('list: the re-rendered list keeps the typed text, and the pressed row comes first', FIND('SPONSOR').val() === 'S2' && allv('SPONSOR')[0] === 'S20' && CH('SPONSOR', 'S20').attr('aria-pressed') === 'true', FIND('SPONSOR').val() + ' ' + JSON.stringify(allv('SPONSOR').slice(0, 2)));
+      eq('list: ... and the rows the text misses stay hidden after the render', shown('SPONSOR'), ['S20', 'S21', 'S22', 'S23', 'S24', 'S25', 'S26', 'S27', 'S28', 'S29']);
+      eq('list: ... the counts narrowed like any chip (the College group counts the one S20 row)', vals(F.groups({ fields: F.parseArgs(ARGS).fields, mods: [] }, box()), 'COLLEGE'), [['Sci', 1, false], ['Eng', 0, false]]);
+      return until(function () { return document.activeElement === FIND('SPONSOR')[0]; }, 3000);
+    }).then(function (focused) {
+      assert('list: focus comes back to the find box after the re-render (not to the row Enter pressed)', focused, String(document.activeElement && document.activeElement.className));
+      FIND('SPONSOR').val('S1').trigger('input');
+      eq('list: a pressed row never hides, whatever is typed', shown('SPONSOR').slice(0, 2), ['S20', 'S10']);
+      FIND('SPONSOR').trigger(enter());
+      return until(function () { return !F.motion() && box().indexOf('S10') > -1; }, 8000);
+    }).then(function () {
+      eq('list: Enter again presses the first row showing that is not yet pressed (S10 joins)', box(), 'SPONSOR = /^(?:S20|S10)$/');
+      eq('list: both pressed rows first, in the group order (S10 before S20)', allv('SPONSOR').slice(0, 2), ['S10', 'S20']);
+      CH('SPONSOR', 'S20').trigger('click');
+      return until(function () { return !F.motion() && box() === 'SPONSOR = /^(?:S10)$/'; }, 8000);
+    }).then(function () {
+      eq('list: clicking a pressed row releases it, as a chip does', [box(), allv('SPONSOR')[0]], ['SPONSOR = /^(?:S10)$/', 'S10']);
+      $('#tableSearch').val('SPONSOR = /^(?:S25)$/');
+      F.sync();
+      assert('list: a hand-typed value presses its row through the sync, un-hidden though the find text misses it', CH('SPONSOR', 'S25').attr('aria-pressed') === 'true' && !CH('SPONSOR', 'S25').hasClass('pnb-fs-hid') && CH('SPONSOR', 'S10').attr('aria-pressed') === 'false', CH('SPONSOR', 'S25').prop('outerHTML'));
+      $('#tableSearch').val('SPONSOR = /^(?:S10)$/');
+      F.sync();
+      $(S + ' .pnb-fs-clearall').trigger('click');
+      return until(function () { return !F.motion() && box() === ''; }, 8000);
+    }).then(function () {
+      eq('list: Clear all releases the rows and keeps the typed text (it is not part of the filter)', [box(), FIND('SPONSOR').val(), $(S + ' .pnb-fs-chip[aria-pressed="true"]').length, shown('SPONSOR').length], ['', 'S1', 0, 10]);
+      FIND('SPONSOR').val('').trigger('input');
+      eq('list: an emptied find box shows every row again', shown('SPONSOR').length, 31);
+      return draw("filter_strip('Sponsor|SPONSOR|list|az|exclude', 'College|COLLEGE')");
+    }).then(function () {
+      eq('list: az orders the rows by value; exclude marks the group', [allv('SPONSOR').slice(0, 2), allv('SPONSOR').length, G('SPONSOR').attr('data-fs-mode'), G('SPONSOR').find('.pnb-fs-not').length], [['S01', 'S02'], 30, 'ex', 1]);
+      CH('SPONSOR', 'S03').trigger('click');
+      return until(function () { return !F.motion() && box() !== ''; }, 8000);
+    }).then(function () {
+      eq('list: an exclude list writes != like an exclude group', box(), 'SPONSOR != /^(?:S03)$/');
+      $(S + ' .pnb-fs-clearall').trigger('click');
+      return until(function () { return !F.motion() && box() === ''; }, 8000);
+    }).then(function () {
+      $('#tableSearch').val('SPONSOR = /^(?:S01)$/ or COLLEGE = /^(?:Eng)$/');
+      F.sync();
+      assert('list: the or pause disables the find box with the rows', FIND('SPONSOR').prop('disabled') === true && $(S).attr('data-fs-off') === 'or' && CH('SPONSOR', 'S01').prop('disabled') === true, String($(S).attr('data-fs-off')));
+      $('#tableSearch').val('');
+      F.sync();
+      assert('list: ... and lifting it re-enables the box', FIND('SPONSOR').prop('disabled') === false && CH('SPONSOR', 'S01').prop('disabled') === false, '');
+      $('#resultsTable tbody').empty();
+      $('#tableSearch').val('');
+      F.setRows(fixture());
+      $('#resultsTable').data('columnNameToOriginalIndex', { 'COLLEGE': 1, 'FY': 2, 'AMOUNT': 3, 'STATUS': 4, '% CHANGE': 5 });
+      return null;
+    });
+  }
+
+  function run() {
+    var F = window.__FS;
+    if (!F || typeof F.state !== 'function' || typeof F.compose !== 'function') {
+      report('RESULTS_JSON:' + JSON.stringify({ fatal: 'hooks unavailable: ' + (window.__FS_ERR || 'n/a'), pageErrors: window.__errors.slice(0, 6) }));
+      return;
+    }
+    var FIELDS = [{ label: 'College', col: 'COLLEGE', mode: 'in', top: 12, az: false }, { label: 'Fiscal Year', col: 'FY', mode: 'in', top: 12, az: true }];
+    var FIELDS3 = FIELDS.concat([{ label: 'Status', col: 'STATUS', mode: 'in', top: 12, az: false }]);
+
+    // ══════ A. argument parsing ══════
+    var a1 = F.parseArgs(['College|COLLEGE', 'Fiscal Year|FY|az']);
+    assert('args: two fields parse with defaults', !a1.error && a1.fields.length === 2 && a1.fields[0].label === 'College' && a1.fields[0].col === 'COLLEGE'
+      && a1.fields[0].mode === 'in' && a1.fields[0].top === 12 && a1.fields[0].az === false && a1.fields[1].az === true, JSON.stringify(a1));
+    var a2 = F.parseArgs(['wide', 'College|COLLEGE', 'Small']);
+    eq('args: bare words are keywords, case-forgiven, deduped', !a2.error && a2.mods, ['wide', 'small']);
+    var a3 = F.parseArgs(['sideways', 'College|COLLEGE']);
+    assert('args: an unknown keyword is a loud error naming itself', a3.error && a3.error.indexOf('unknown keyword sideways') !== -1, a3.error);
+    assert('args: a field with no column is refused', /needs a column/.test(F.parseArgs(['College|']).error || ''), F.parseArgs(['College|']).error);
+    assert('args: a field with no label is refused', /needs a label/.test(F.parseArgs(['|COLLEGE']).error || ''), F.parseArgs(['|COLLEGE']).error);
+    assert('args: a column listed twice is refused', /listed twice/.test(F.parseArgs(['A|COLLEGE', 'B|college']).error || ''), '');
+    assert('args: keywords alone are refused (at least one field)', /at least one field/.test(F.parseArgs(['wide']).error || ''), '');
+    var a8 = F.parseArgs(['Status|STATUS|exclude|top=3', 'X|Y|top=0']);
+    assert('args: exclude and top=N options', !a8.error && a8.fields[0].mode === 'ex' && a8.fields[0].top === 3 && a8.fields[1].top === 0, JSON.stringify(a8));
+    assert('args: an unknown option is a loud error', /unknown option foo/.test(F.parseArgs(['Status|STATUS|foo']).error || ''), F.parseArgs(['Status|STATUS|foo']).error);
+    eq('args: the column is upper-cased', F.parseArgs(['College|college']).fields[0].col, 'COLLEGE');
+    eq('args: look, label and alignment keywords become classes', F.parseArgs(['segmented', 'ghost', 'bare', 'labels=top', 'labels=left', 'right', 'center', 'College|COLLEGE']).mods,
+      ['segmented', 'ghost', 'bare', 'labels-top', 'labels-left', 'align-right', 'align-center']);
+    eq('args: columns=N becomes a cols class; labels=none is the default (no class)', F.parseArgs(['columns=3', 'labels=none', 'College|COLLEGE']).mods, ['cols-3']);
+    assert('args: nolabels is not a keyword any more (labels are hidden by default)', /unknown keyword nolabels/.test(F.parseArgs(['nolabels', 'College|COLLEGE']).error || ''), '');
+    assert('args: columns out of range is a loud error', /columns=9 is out of range/.test(F.parseArgs(['columns=9', 'College|COLLEGE']).error || ''), F.parseArgs(['columns=9', 'College|COLLEGE']).error);
+    assert('args: a prototype name is not a keyword', /unknown keyword constructor/.test(F.parseArgs(['constructor', 'College|COLLEGE']).error || ''), F.parseArgs(['constructor', 'College|COLLEGE']).error);
+    assert('args: the unknown-keyword error lists the looks', /segmented/.test(F.parseArgs(['sideways', 'College|COLLEGE']).error || ''), '');
+
+    // ══════ B. encoder / decoder ══════
+    eq('enc: plain value untouched', F.enc('Eng'), 'Eng');
+    var meta = 'a.b*c+d?e^f$g(h)i|j[k]l{m}n\\o';
+    assert('enc: metacharacters are escaped', F.enc(meta).indexOf('a\\.b\\*c\\+d\\?e\\^f\\$g\\(h\\)i\\|j\\[k\\]l\\{m\\}n\\\\o') === 0, F.enc(meta));
+    eq('enc: decode reverses the metacharacter escape', F.dec(F.enc(meta)), meta);
+    eq('enc: a slash becomes \\x2F (the tokenizer ends a regex at any slash)', F.enc('a/b'), 'a\\x2Fb');
+    eq('enc: \\x2F decodes back to a slash', F.dec('a\\x2Fb'), 'a/b');
+    eq('enc: literal text \\x2F in a value survives the round trip', F.dec(F.enc('has\\x2Fliteral')), 'has\\x2Fliteral');
+    var stP = F.state(F.compose({ prefix: '', sel: { COLLEGE: ['a|b', 'c'] }, rest: [] }, FIELDS), FIELDS);
+    eq('enc: a value containing a pipe is one value, not two', stP.sel.COLLEGE, ['a|b', 'c']);
+
+    // ══════ C. state from the search text ══════
+    var c1 = F.state('', FIELDS);
+    assert('state: empty text', Object.keys(c1.sel).length === 0 && c1.rest.length === 0 && c1.or === false && c1.prefix === '', JSON.stringify(c1));
+    eq('state: one strip condition is claimed', F.state('COLLEGE = /^(?:Eng|Sci)$/', FIELDS).sel.COLLEGE, ['Eng', 'Sci']);
+    var c3 = F.state('COLLEGE = /^(?:Eng)$/ and AMOUNT > 100 and FY = /^(?:2025)$/', FIELDS);
+    assert('state: two strip conditions plus a typed one (kept verbatim as rest)',
+      JSON.stringify(c3.sel.COLLEGE) === '["Eng"]' && JSON.stringify(c3.sel.FY) === '["2025"]' && JSON.stringify(c3.rest) === '["AMOUNT > 100"]' && !c3.or, JSON.stringify(c3));
+    var EXF = [{ label: 'Status', col: 'STATUS', mode: 'ex', top: 12, az: false }];
+    eq('state: an exclude field claims its != condition', F.state('STATUS != /^(?:Closed)$/', EXF).sel.STATUS, ['Closed']);
+    eq('state: the wrong operator for the field goes to rest, not the strip', F.state('STATUS = /^(?:Closed)$/', EXF).rest, ['STATUS = /^(?:Closed)$/']);
+    eq('state: no spaces around the operator still reads (operator padding)', F.state('COLLEGE=/^(?:Eng)$/', FIELDS).sel.COLLEGE, ['Eng']);
+    assert('state: a top-level or is detected', F.state('COLLEGE = /^(?:Eng)$/ or FY = 2025', FIELDS).or === true, '');
+    assert('state: AND with an upper-case joiner is not or', F.state('COLLEGE = /^(?:Eng)$/ AND FY = 2025', FIELDS).or === false, '');
+    var c7 = F.state('__ROW COLLEGE = /^(?:Eng)$/', FIELDS);
+    assert('state: a leading __ROW modifier is kept as the prefix', c7.prefix === '__ROW ' && JSON.stringify(c7.sel.COLLEGE) === '["Eng"]', JSON.stringify(c7));
+    var c8 = F.state('COLLEGE = /^(?:Arts and Sciences|Eng)$/', FIELDS);
+    assert('state: "and" inside the regex literal is a value, not a joiner', JSON.stringify(c8.sel.COLLEGE) === '["Arts and Sciences","Eng"]' && c8.rest.length === 0, JSON.stringify(c8));
+    var PCT = [{ label: 'Change', col: '% CHANGE', mode: 'in', top: 12, az: false }];
+    eq('state: a quoted column name is claimed', F.state("'% CHANGE' = /^(?:5)$/", PCT).sel['% CHANGE'], ['5']);
+    eq('state: the {COLUMN} form is claimed', F.state('{COLLEGE} = /^(?:Eng)$/', FIELDS).sel.COLLEGE, ['Eng']);
+    eq('state: the column name is matched case-insensitively', F.state('college = /^(?:Eng)$/', FIELDS).sel.COLLEGE, ['Eng']);
+    eq('state: a plain condition on a strip column is typed rest, not a selection', F.state('COLLEGE = Eng', FIELDS).rest, ['COLLEGE = Eng']);
+    eq('state: a quoted value with and inside stays one fragment', F.state('COLLEGE = /^(?:Eng)$/ and TITLE = "Arts and Sciences"', FIELDS).rest, ['TITLE = "Arts and Sciences"']);
+
+    // ══════ D. compose ══════
+    eq('compose: nothing selected, nothing typed = empty text', F.compose(F.state('', FIELDS), FIELDS), '');
+    eq('compose: a selection', F.compose({ prefix: '', sel: { COLLEGE: ['Eng', 'Sci'] }, rest: [] }, FIELDS), 'COLLEGE = /^(?:Eng|Sci)$/');
+    var d3 = F.state('AMOUNT > 100', FIELDS); d3.sel.COLLEGE = ['Eng'];
+    eq('compose: strip conditions first, then the typed rest', F.compose(d3, FIELDS), 'COLLEGE = /^(?:Eng)$/ and AMOUNT > 100');
+    eq('compose: an exclude field writes !=', F.compose({ prefix: '', sel: { STATUS: ['Closed'] }, rest: [] }, EXF), 'STATUS != /^(?:Closed)$/');
+    var hard = F.compose({ prefix: '', sel: { COLLEGE: ['A.B', 'c/d', 'e|f', 'g\\h'], FY: ['2025'] }, rest: ['AMOUNT > 100'] }, FIELDS);
+    eq('compose: state(compose(x)) is a fixed point on awkward values', F.compose(F.state(hard, FIELDS), FIELDS), hard);
+    eq('compose: awkward values decode back exactly', F.state(hard, FIELDS).sel.COLLEGE, ['A.B', 'c/d', 'e|f', 'g\\h']);
+    eq('compose: a column with a space is quoted', F.compose({ prefix: '', sel: { '% CHANGE': ['5'] }, rest: [] }, PCT), "'% CHANGE' = /^(?:5)$/");
+    var d7 = F.state('__ROW AMOUNT > 1', FIELDS); d7.sel.FY = ['2025'];
+    eq('compose: the __ROW prefix is kept in front', F.compose(d7, FIELDS), '__ROW FY = /^(?:2025)$/ and AMOUNT > 1');
+    eq('compose: rest only when nothing is selected', F.compose(F.state('AMOUNT > 100', FIELDS), FIELDS), 'AMOUNT > 100');
+    var rows = fixture();
+    var agree = F.compose({ prefix: '', sel: { COLLEGE: ['Eng', 'Sci'], FY: ['2025'] }, rest: [] }, FIELDS);
+    eq('engine agreement: the composed text filters the REAL evaluator to the expected rows', matchCount(F, agree, rows), 4);
+    eq('engine agreement: html-wrapped and differently-cased cells match the chip value', matchCount(F, F.compose({ prefix: '', sel: { COLLEGE: ['Eng'] }, rest: [] }, FIELDS), rows), 6);
+    var metaRows = [row(1, 'A.B', '2025', '1', 'x', '0'), row(2, 'AXB', '2025', '1', 'x', '0')];
+    eq('engine agreement: a value with a regex metacharacter matches only itself', matchCount(F, F.compose({ prefix: '', sel: { COLLEGE: ['A.B'] }, rest: [] }, FIELDS), metaRows), 1);
+    eq('engine agreement: a value with a slash matches through \\x2F', matchCount(F, F.compose({ prefix: '', sel: { COLLEGE: ['c/d'] }, rest: [] }, FIELDS), [row(1, 'c/d', '', '', '', ''), row(2, 'cXd', '', '', '', '')]), 1);
+    eq('engine agreement: an exclude selection removes exactly those rows', matchCount(F, F.compose({ prefix: '', sel: { STATUS: ['Closed'] }, rest: [] }, EXF), rows), 10);
+
+    // ══════ E. chip sets + counts ══════
+    F.setRows(rows);
+    $('#resultsTable').data('columnNameToOriginalIndex', { 'COLLEGE': 1, 'FY': 2, 'AMOUNT': 3, 'STATUS': 4, '% CHANGE': 5 });
+    var SPEC = { fields: FIELDS3, mods: [] };
+    var e1 = F.groups(SPEC, '');
+    eq('counts: full counts, blanks skipped, case and @@HTML merged, sorted by count', vals(e1, 'COLLEGE'), [['Eng', 6, false], ['Sci', 3, false], ['Ag', 2, false], ['CHASS', 1, false]]);
+    eq('counts: az sorts by value (numeric-aware)', vals(e1, 'FY'), [['2023', 2, false], ['2024', 4, false], ['2025', 7, false]]);
+    assert('counts: no off reason on a plain table', e1.off === null, String(e1.off));
+    var e3 = F.groups(SPEC, 'COLLEGE = /^(?:Eng)$/');
+    eq('counts: another column is cross-filtered by the selection', vals(e3, 'FY'), [['2023', 1, false], ['2024', 2, false], ['2025', 3, false]]);
+    eq('counts: a column is NOT narrowed by its own selection, and its chip is on', vals(e3, 'COLLEGE'), [['Eng', 6, true], ['Sci', 3, false], ['Ag', 2, false], ['CHASS', 1, false]]);
+    var e4 = F.groups(SPEC, 'COLLEGE = /^(?:Eng)$/ and FY = /^(?:2025)$/');
+    eq('counts: two selections narrow a third column', vals(e4, 'STATUS'), [['Active', 2, false], ['Closed', 1, false], ['Pending', 0, false]]);
+    eq('counts: each selected column sees the OTHER selection', vals(e4, 'COLLEGE'), [['Eng', 3, true], ['Sci', 1, false], ['Ag', 1, false], ['CHASS', 1, false]]);
+    var e5 = F.groups(SPEC, 'AMOUNT > 100');
+    eq('counts: a typed condition narrows every column', vals(e5, 'COLLEGE'), [['Eng', 3, false], ['Sci', 1, false], ['Ag', 0, false], ['CHASS', 0, false]]);
+    var e6 = vals(F.groups(SPEC, 'COLLEGE = /^(?:Zzz)$/'), 'COLLEGE');
+    assert('counts: a pressed value the data lacks still gets a chip (so it can be released)', JSON.stringify(e6[e6.length - 1]) === '["Zzz",0,true]', JSON.stringify(e6));
+    $('#pivot-output-container').show();
+    var e7 = F.groups(SPEC, 'COLLEGE = /^(?:Eng)$/');
+    $('#pivot-output-container').hide();
+    assert('counts: a visible pivot no longer pauses the strip (2026-10-01: its chips filter the transactions; the pressed chip and its counts read as in the table view)', e7.off === null && JSON.stringify(vals(e7, 'COLLEGE')) === JSON.stringify([['Eng', 6, true], ['Sci', 3, false], ['Ag', 2, false], ['CHASS', 1, false]]), JSON.stringify({ off: e7.off, c: vals(e7, 'COLLEGE') }));
+    var e8 = F.groups(SPEC, 'COLLEGE = /^(?:Eng)$/ or FY = 2025');
+    assert('counts: a top-level or pauses the strip (off=or)', e8.off === 'or' && JSON.stringify(vals(e8, 'COLLEGE')[0]) === '["Eng",6,false]', JSON.stringify({ off: e8.off }));
+    assert('counts: the same text and rows come back memoized', F.groups(SPEC, 'AMOUNT > 100') === F.groups(SPEC, 'AMOUNT > 100'), '');
+
+    // ══════ F. engine A rendering ══════
+    var A = F.renderA, ed = (window.Penumbra && window.Penumbra.getSnippetEditor) ? window.Penumbra.getSnippetEditor() : null;
+    if (typeof A !== 'function' || !ed) {
+      assert('engine A render hook available (renderReportSnippet + Penumbra.getSnippetEditor)', false, 'A=' + typeof A + ' ed=' + !!ed);
+      finish(); return;
+    }
+    var draw = function (src) { ed.setValue(src); return Promise.resolve().then(function () { return A(null, true); }); };
+    var outText = function () { return $('#reportSnippetOutput').text().trim(); };
+    var S = '#reportSnippetOutput .pnb-fstrip';
+    $('#tableSearch').val('');
+    draw("filter_strip('College|COLLEGE', 'Fiscal Year|FY|az')").then(function () {
+      assert('render: two groups with names and chips', $(S).length === 1 && $(S + ' .pnb-fs-group').length === 2
+        && $(S + ' .pnb-fs-group').eq(0).find('.pnb-fs-name').text() === 'College' && $(S + ' .pnb-fs-group').eq(0).find('.pnb-fs-chip').length === 4
+        && $(S + ' .pnb-fs-group').eq(1).find('.pnb-fs-chip').length === 3, $('#reportSnippetOutput').html().substring(0, 300));
+      eq('render: FY chips in az order', chipText(S + ' .pnb-fs-group:eq(1) .pnb-fs-chip'), ['2023', '2024', '2025']);
+      eq('render: counts are shown', $(S + ' .pnb-fs-group:eq(0) .pnb-fs-chip:eq(0) .pnb-fs-n').text(), '6');
+      assert('render: DOMPurify kept the control attributes', $(S + ' .pnb-fs-chip').first().attr('data-fs-val') === 'Eng' && $(S + ' .pnb-fs-chip').first().attr('aria-pressed') === 'false'
+        && $(S + ' .pnb-fs-group').first().attr('data-fs-col') === 'COLLEGE' && $(S).attr('role') === 'group', $(S + ' .pnb-fs-chip').first().prop('outerHTML'));
+      assert('render: nothing pressed = no clear buttons', $(S + ' .pnb-fs-clear').length === 0 && $(S + ' .pnb-fs-clearall').length === 0, '');
+      $('#tableSearch').val('COLLEGE = /^(?:Eng)$/');
+      return draw("filter_strip('College|COLLEGE', 'Fiscal Year|FY|az')");
+    }).then(function () {
+      assert('render: the pressed chip is read from the box, unclicked', $(S + ' .pnb-fs-chip[data-fs-val="Eng"]').attr('aria-pressed') === 'true'
+        && $(S + ' .pnb-fs-chip[data-fs-val="Sci"]').attr('aria-pressed') === 'false', $(S).html().substring(0, 200));
+      assert('render: a selected group gets a clear button and the strip a Clear all', $(S + ' .pnb-fs-group:eq(0) .pnb-fs-clear').length === 1 && $(S + ' .pnb-fs-clearall').length === 1, '');
+      eq('render: the cross-filtered FY counts are shown', $(S + ' .pnb-fs-group:eq(1) .pnb-fs-chip .pnb-fs-n').map(function () { return $(this).text(); }).get(), ['1', '2', '3']);
+      $('#tableSearch').val('');
+      return draw("filter_strip('sideways', 'College|COLLEGE')");
+    }).then(function () {
+      assert('render: unknown keyword errors and names itself', $(S).length === 0 && outText().indexOf('unknown keyword sideways') !== -1, outText().substring(0, 120));
+      return draw("filter_strip('College|NOPE')");
+    }).then(function () {
+      assert('render: a column the report lacks is refused by name', outText().indexOf('column NOPE is not in this report') !== -1, outText().substring(0, 120));
+      return draw("filter_strip('wide', 'small', 'nocounts', 'College|COLLEGE')");
+    }).then(function () {
+      assert('render: keywords become classes; nocounts hides the counts', $(S).hasClass('wide') && $(S).hasClass('small') && $(S + ' .pnb-fs-n').length === 0, $(S).attr('class'));
+      return draw("filter_strip('segmented', 'labels=top', 'columns=2', 'right', 'College|COLLEGE', 'Fiscal Year|FY')");
+    }).then(function () {
+      assert('render: look, label, column and alignment keywords reach the rendered strip', $(S).hasClass('segmented') && $(S).hasClass('labels-top') && $(S).hasClass('cols-2') && $(S).hasClass('align-right') && $(S + ' .pnb-fs-group').length === 2, $(S).attr('class'));
+      return draw("filter_strip('bare', 'College|COLLEGE', 'Status|STATUS|exclude')");
+    }).then(function () {
+      assert('render: by default the label is in the DOM for screen readers and no label class is set',
+        $(S).hasClass('bare') && !$(S).hasClass('labels-left') && !$(S).hasClass('labels-top') && $(S + ' .pnb-fs-name').first().text() === 'College', $(S).html().substring(0, 160));
+      assert('render: an exclude group carries both marker forms and a screen-reader suffix',
+        $(S + ' .pnb-fs-group:eq(1) .pnb-fs-not-short').text() === 'not' && $(S + ' .pnb-fs-group:eq(1) .pnb-fs-not-long').text() === 'is not'
+        && $(S + ' .pnb-fs-group:eq(1) .pnb-fs-name').text() === 'Status is not', $(S + ' .pnb-fs-group:eq(1)').html().substring(0, 200));
+      return draw("filter_strip('columns=7', 'College|COLLEGE')");
+    }).then(function () {
+      assert('render: columns out of range errors loudly', $(S).length === 0 && outText().indexOf('columns=7 is out of range') !== -1, outText().substring(0, 120));
+      return draw("filter_strip('College|COLLEGE|top=2', 'Status|STATUS|exclude')");
+    }).then(function () {
+      var shown = function () { return $(S + ' .pnb-fs-group:eq(0) .pnb-fs-chip').filter(function () { return getComputedStyle(this).display !== 'none'; }).length; };
+      assert('render: top=2 folds the rest behind +n more (COMPUTED display, the real stylesheet)', shown() === 2
+        && $(S + ' .pnb-fs-group:eq(0) .pnb-fs-more').text() === '+2 more', JSON.stringify({ shown: shown(), more: $(S + ' .pnb-fs-group:eq(0) .pnb-fs-more').text() }));
+      assert('render: an exclude field says so', $(S + ' .pnb-fs-group:eq(1) .pnb-fs-not-short').text() === 'not', $(S + ' .pnb-fs-group:eq(1) .pnb-fs-not').text());
+      var nameCs = getComputedStyle($(S + ' .pnb-fs-group:eq(0) .pnb-fs-name')[0]);
+      assert('render: the label is screen-reader-only by default (computed: absolute, 1px)', nameCs.position === 'absolute' && nameCs.width === '1px', nameCs.position + ' ' + nameCs.width);
+      $(S + ' .pnb-fs-group:eq(0) .pnb-fs-more').trigger('click');
+      assert('render: +n more opens the fold in place', shown() === 4 && $(S + ' .pnb-fs-group:eq(0) .pnb-fs-more').text() === 'less', String(shown()));
+      $(S + ' .pnb-fs-group:eq(0) .pnb-fs-more').trigger('click');
+      assert('render: less folds it again', shown() === 2, String(shown()));
+      return draw("filter_strip('labels=left', 'College|COLLEGE')");
+    }).then(function () {
+      var nameCs2 = getComputedStyle($(S + ' .pnb-fs-group:eq(0) .pnb-fs-name')[0]);
+      assert('render: labels=left shows the label in flow, as written (computed: static, no uppercase)', nameCs2.position === 'static' && nameCs2.textTransform === 'none' && $(S + ' .pnb-fs-name').text() === 'College', nameCs2.position + ' ' + nameCs2.textTransform);
+      $('#tableSearch').val('COLLEGE = /^(?:Eng)$/');
+      return draw("filter_strip('College|COLLEGE')");
+    }).then(function () {
+      var glyph = getComputedStyle($(S + ' .pnb-fs-chip[data-fs-val="Eng"]')[0], '::before').content;
+      assert('render: a pressed chip carries the check glyph (computed ::before content)', /2713|✓/.test(glyph), glyph);
+      $('#tableSearch').val('');
+
+      // ══════ G. the click flow (through the executor's own search action) ══════
+      return draw("filter_strip('College|COLLEGE', 'Fiscal Year|FY|az')");
+    }).then(function () {
+      $(S + ' .pnb-fs-chip[data-fs-val="Sci"]').trigger('click');
+      // The switches' rule: the control moves AT ONCE under a data-only veil.
+      assert('click: the chip paints its pending state at once', $(S + ' .pnb-fs-chip[data-fs-val="Sci"]').attr('aria-pressed') === 'true' && $(S).attr('aria-busy') === 'true',
+        JSON.stringify({ pressed: $(S + ' .pnb-fs-chip[data-fs-val="Sci"]').attr('aria-pressed'), busy: $(S).attr('aria-busy') }));
+      var mo = F.motion();
+      assert('click: a strip motion is live and scoped (the data-only veil)', !!mo && mo.kind === 'fs' && mo.scoped === true && mo.dispatched === true,
+        JSON.stringify(mo && { kind: mo.kind, scoped: mo.scoped, dispatched: mo.dispatched }));
+      assert('click: the controls read busy while the rows change', F.busy() === true, '');
+      $(S + ' .pnb-fs-chip[data-fs-val="Eng"]').trigger('click');   // must be dropped
+      return wait(300);
+    }).then(function () {
+      eq('click: a chip writes its condition into the box', $('#tableSearch').val(), 'COLLEGE = /^(?:Sci)$/');
+      assert('click: a second click while the change is in flight is dropped, then the motion settles', $('#tableSearch').val() === 'COLLEGE = /^(?:Sci)$/' && !F.motion() && $(S).attr('aria-busy') === undefined,
+        JSON.stringify({ box: $('#tableSearch').val(), motion: !!F.motion(), busy: $(S).attr('aria-busy') }));
+      assert('click: the re-rendered chip reads as pressed', $(S + ' .pnb-fs-chip[data-fs-val="Sci"]').attr('aria-pressed') === 'true', $(S).html().substring(0, 200));
+      $(S + ' .pnb-fs-chip[data-fs-val="Eng"]').trigger('click');
+      return wait(300);
+    }).then(function () {
+      eq('click: a second chip in the group joins the alternation', $('#tableSearch').val(), 'COLLEGE = /^(?:Sci|Eng)$/');
+      $(S + ' .pnb-fs-chip[data-fs-val="Sci"]').trigger('click');
+      return wait(300);
+    }).then(function () {
+      eq('click: clicking a pressed chip releases it', $('#tableSearch').val(), 'COLLEGE = /^(?:Eng)$/');
+      $(S + ' .pnb-fs-chip[data-fs-val="2025"]').trigger('click');
+      return wait(300);
+    }).then(function () {
+      eq('click: a chip in another group joins with and', $('#tableSearch').val(), 'COLLEGE = /^(?:Eng)$/ and FY = /^(?:2025)$/');
+      eq('click: the counts follow the selection', $(S + ' .pnb-fs-group:eq(0) .pnb-fs-chip .pnb-fs-n').map(function () { return $(this).text(); }).get(), ['3', '1', '1', '1']);
+      $(S + ' .pnb-fs-group:eq(1) .pnb-fs-clear').trigger('click');
+      return wait(300);
+    }).then(function () {
+      eq('click: a group clear removes only that group', $('#tableSearch').val(), 'COLLEGE = /^(?:Eng)$/');
+      $('#tableSearch').val('AMOUNT > 100');
+      return draw("filter_strip('College|COLLEGE', 'Fiscal Year|FY|az')");
+    }).then(function () {
+      $(S + ' .pnb-fs-chip[data-fs-val="Eng"]').trigger('click');
+      return wait(300);
+    }).then(function () {
+      eq('click: a typed condition survives a chip click', $('#tableSearch').val(), 'COLLEGE = /^(?:Eng)$/ and AMOUNT > 100');
+      $(S + ' .pnb-fs-clearall').trigger('click');
+      return wait(300);
+    }).then(function () {
+      eq('click: Clear all releases the chips and keeps the typed condition', $('#tableSearch').val(), 'AMOUNT > 100');
+      $('#tableSearch').val('COLLEGE = Eng or FY = 2025');
+      F.sync();
+      assert('sync: an or query pauses the rendered strip (chips disabled, note shown)', $(S).attr('data-fs-off') === 'or' && $(S + ' .pnb-fs-chip:disabled').length === 7 && $(S + ' .pnb-fs-note').length === 1, $(S).attr('data-fs-off') + ' ' + $(S + ' .pnb-fs-chip:disabled').length);
+      $(S + ' .pnb-fs-chip[data-fs-val="Sci"]').trigger('click');
+      return wait(200);
+    }).then(function () {
+      eq('sync: a click on a paused strip changes nothing', $('#tableSearch').val(), 'COLLEGE = Eng or FY = 2025');
+      $('#tableSearch').val('FY = /^(?:2024)$/');
+      F.sync();
+      assert('sync: a hand-typed condition presses its chip and lifts the pause', $(S).attr('data-fs-off') === undefined && $(S + ' .pnb-fs-chip[data-fs-val="2024"]').attr('aria-pressed') === 'true'
+        && $(S + ' .pnb-fs-chip[data-fs-val="2025"]').attr('aria-pressed') === 'false' && $(S + ' .pnb-fs-note').length === 0 && $(S + ' .pnb-fs-chip:disabled').length === 0, $(S).html().substring(0, 200));
+      $('#tableSearch').val('');
+      F.sync();
+      assert('sync: clearing the box by hand releases every chip', $(S + ' .pnb-fs-chip[aria-pressed="true"]').length === 0, '');
+
+      // ---- view changes go through penumbraSyncActiveLayout (a trigger-built
+      // pivot never re-renders the snippet, so the render-time pause alone
+      // left the chips live over a pivot - found on the live drive 2026-09-28)
+      $('#tableSearch').val('COLLEGE = /^(?:Eng)$/');
+      F.sync();
+      $('#pivot-output-container').show();
+      F.syncLayout();
+      assert('view sync: a pivot on screen no longer pauses the rendered strip (2026-10-01: no off reason, chips enabled, no note)',
+        $(S).attr('data-fs-off') === undefined && $(S + ' .pnb-fs-chip:disabled').length === 0 && $(S + ' .pnb-fs-note').length === 0,
+        JSON.stringify({ off: $(S).attr('data-fs-off'), dis: $(S + ' .pnb-fs-chip:disabled').length, note: $(S + ' .pnb-fs-note').text() }));
+      return wait(50);
+    }).then(function () {
+      $('#pivot-output-container').hide();
+      F.syncLayout();
+      assert('view sync: back in the table view the strip still reads the box',
+        $(S).attr('data-fs-off') === undefined && $(S + ' .pnb-fs-chip:disabled').length === 0 && $(S + ' .pnb-fs-note').length === 0
+        && $(S + ' .pnb-fs-chip[data-fs-val="Eng"]').attr('aria-pressed') === 'true',
+        JSON.stringify({ off: $(S).attr('data-fs-off'), dis: $(S + ' .pnb-fs-chip:disabled').length, eng: $(S + ' .pnb-fs-chip[data-fs-val="Eng"]').attr('aria-pressed') }));
+      $('#snapshotComparisonContainer').show();
+      F.syncLayout();
+      assert('view sync: a comparison on screen pauses it too', $(S).attr('data-fs-off') === 'compare' && $(S + ' .pnb-fs-note').text().indexOf('comparison') !== -1, String($(S).attr('data-fs-off')));
+      $('#snapshotComparisonContainer').hide();
+      F.syncLayout();
+      $('#tableSearch').val('');
+      F.sync();
+
+      // ══════ H. the other engines + the registry ══════
+      var b = F.engineB("before filter_strip('College|COLLEGE') after", rows, COLS);
+      var bh = (b && b.html !== undefined) ? String(b.html) : String(b);
+      assert('engine B: renders nothing for filter_strip (no control, no raw source)', bh.indexOf('filter_strip') === -1 && bh.indexOf('pnb-fstrip') === -1 && bh.indexOf('before') !== -1 && bh.indexOf('after') !== -1, bh.substring(0, 160));
+      assert('registry: filter_strip is a known snippet function', F.names().indexOf('filter_strip') !== -1, JSON.stringify(F.names().slice(-4)));
+      return draw("filter_strip('College|COLLEGE')");
+    }).then(function () {
+      assert('render: a fresh render with an empty box shows nothing pressed', $(S + ' .pnb-fs-chip[aria-pressed="true"]').length === 0 && $(S + ' .pnb-fs-chip').length === 4, '');
+      return sectionI(F, draw, outText, S).then(function () { return sectionJ(F, draw, outText, S); }).then(function () { return sectionK(F, draw, outText, S); }).then(function () { return sectionL(F, draw, outText, S); }).then(function () { return sectionM(F, draw, outText, S); });
+    }).catch(function (e) {
+      assert('render/click phases crashed', false, String(e && e.stack ? e.stack : e));
+    }).then(finish);
+  }
+  $(function () { setTimeout(run, 30); });
+})();
+</script>
+</body></html>

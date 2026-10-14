@@ -1,0 +1,568 @@
+/*
+ * daterange_browser_tests.js - [PROMPT;type=date-range], the BROWSER engine.
+ *
+ * Drives the SHIPPED code. window.__src holds js/main.js as text (baked by
+ * run.ps1); the functions under test are cut out of it by name and compiled
+ * together, with real jQuery, jQuery UI and moment on the page. Nothing here is
+ * a copy of main.js - a test of a paste proves the paste works.
+ *
+ * What it pins:
+ *   1. the helpers (split / parse / format / resolve / template / label);
+ *   2. processPrompts: every answer source, what gets STORED (the raw range,
+ *      never two frozen dates), what gets SENT (two binds), the refusals;
+ *   3. the dialog: quick ranges, the two fields, the TWO calendars (one per end,
+ *      each with its own month and year menus), clicking real day cells, OK /
+ *      inline errors / Reset;
+ *   4. THREE-ENGINE PARITY: window.__fixture is written by test_daterange.php
+ *      from the two PHP engines. Every case in it must come out of THIS engine
+ *      as the same SQL once the binds are written back in as literals.
+ */
+(function () {
+    var out = [];
+    var pass = 0, fail = 0;
+    function show(v) { try { return JSON.stringify(v); } catch (e) { return String(v); } }
+    function check(label, got, want) {
+        if (show(got) === show(want)) { pass++; out.push('  ok   ' + label); }
+        else { fail++; out.push('  FAIL ' + label + '\n         got:  ' + show(got) + '\n         want: ' + show(want)); }
+    }
+    function checkContains(label, hay, needle) {
+        if (typeof hay === 'string' && hay.indexOf(needle) >= 0) { pass++; out.push('  ok   ' + label); }
+        else { fail++; out.push('  FAIL ' + label + '\n         got:  ' + show(hay) + '\n         want it to contain: ' + show(needle)); }
+    }
+    // Flushed per section: if a later part hangs (a dialog promise that never
+    // settles), the dump still shows everything that ran and where it stopped.
+    function section(t) {
+        out.push('\n=== ' + t + ' ===');
+        document.getElementById('out').textContent = out.join('\n') + '\nSTALLED in: ' + t;
+    }
+    function finish() {
+        out.push('\nPASS: ' + pass + '   FAIL: ' + fail);
+        out.push('RESULT: ' + (fail === 0 ? 'GREEN' : 'RED'));
+        document.getElementById('out').textContent = out.join('\n') + '\nDONE';
+    }
+
+    // main.js is CRLF; every anchor below is written with \n.
+    var code = String(window.__src || '').replace(/\r\n/g, '\n');
+
+    function grabFn(name) {
+        var m = new RegExp('\\n    (?:async )?function ' + name + '\\(').exec(code);
+        if (!m) throw new Error('grab: function ' + name + ' not found in main.js');
+        var start = m.index + 1;
+        var end = code.indexOf('\n    }\n', start);
+        if (end < 0) throw new Error('grab: end of ' + name + ' not found');
+        return code.substring(start, end + 7);
+    }
+    function grabLine(re, what) {
+        var m = re.exec(code);
+        if (!m) throw new Error('grab: ' + what + ' not found in main.js');
+        return m[0];
+    }
+
+    var env;
+    try {
+        var names = [
+            'escapeHtml', 'decodeHtmlEntities', 'stripWrappingQuotePair',
+            'resolveDynamicValues', 'resolveKeywordDate', 'resolveDynamicDate',
+            'penumbraIsDateRangeType', 'penumbraSplitDateRange', 'penumbraJoinDateRange', 'penumbraRangeHasKeywordEnd',
+            'penumbraParseRangeEnd', 'penumbraFormatRangeEnd', 'penumbraRangeKeywordDate', 'penumbraResolveRangeEnd',
+            'penumbraResolveDateRange', 'penumbraApplyDateRangeTemplate', 'penumbraDateRangePresets',
+            'penumbraDateRangePresetFor', 'penumbraDateRangeLabel', 'penumbraDateRangeResolvedText', 'penumbraDateRangeRawDefault',
+            'parsePrompt', 'parseMultiSelectDefault', 'splitValidateRules', 'validatePromptInput', 'sanitizeCssString',
+            'penumbraSnippetQuoteState', 'penumbraEscapeSnippetValue',
+            'processPrompts', 'showPromptDialog', '_pnbDateRangeDialogHtml', '_pnbWireDateRangeDialog',
+            'generateResetLinkHtml', 'attachResetHandler', 'getPromptStorageKey', 'getPromptAnswerByName',
+            'autofillAuthFailed', 'autofillPayloadError', 'resolvePromptDateRange',
+            'promptTypeIconPaths', 'promptTypeIconSvg', '_pnbDatepickerBeforeShow',
+            'promptStateIconSvg', 'updatePromptDisplay', '_captureCurrentPrompts'
+        ];
+        // section= (2026-09-24): updatePromptDisplay calls these from then on;
+        // lifted only when the main.js under test has them, so this suite runs
+        // against builds from before AND after.
+        ['promptSectionKey', 'promptSectionMap'].forEach(function (n) {
+            if (new RegExp('\\n    function ' + n + '\\(').test(code)) names.push(n);
+        });
+        var src = "var PNB_DATE_RANGE_SEP = '..';\n"
+            + grabLine(/\n    const _isRangeKeyword = [^\n]+\n/, '_isRangeKeyword')
+            + 'var _promptRangeCache = new Map();\n'
+            + 'var _forceDefaultApplied = new Set();\n'
+            + 'var allResolvedPrompts = [];\n'
+            + names.map(grabFn).join('\n')
+            + '\nreturn {'
+            + names.map(function (n) { return n + ':' + n; }).join(',')
+            + ', _forceDefaultApplied: _forceDefaultApplied, _promptRangeCache: _promptRangeCache'
+            + ', getResolved: function () { return allResolvedPrompts; } };';
+
+        // The stubs main.js would otherwise supply. `calls` records what the
+        // code under test reached for, so a test can assert on it.
+        var calls = { snippet: 0, sessionExpired: 0, ajax: [] };
+        window.__rangeAnswer = { min: '1998-01-03', max: '2026-09-14' };
+        $.ajax = function (o) {
+            calls.ajax.push(o);
+            return Promise.resolve(window.__rangeAnswer);
+        };
+        window._pnbModalHost = function () { return $(document.body); };
+        env = new Function('getQuery', 'getSnippet', 'currentThemeId', 'penumbra_vars', 'editor', 'renderReportSnippet', 'handleSessionExpiredError',
+            'showLoading', 'hideLoading', 'show_text', src)(
+            function () { return window.__editorSql || ''; },   // the SQL editor's text
+            function () { return ''; },                         // the snippet editor's text
+            function () { return 'theme-default'; },   // theme plumbing, not under test
+            { shibboleth: {} },
+            { getValue: function () { return window.__editorSql || ''; } },
+            function () { calls.snippet++; },
+            function () { calls.sessionExpired++; },
+            function () { }, function () { }, function () { });
+        env.calls = calls;
+    } catch (e) {
+        out.push('HARNESS FAILED TO BUILD: ' + e.message);
+        fail++;
+        finish();
+        return;
+    }
+
+    function lit(m) { return m.format('DD-MMM-YY').toUpperCase(); }
+    function setUrl(q) { history.replaceState(null, '', location.pathname + (q ? '?' + q : '')); }
+    function clearAll() { localStorage.clear(); env._forceDefaultApplied.clear(); env._promptRangeCache.clear(); setUrl(''); }
+    // Writes the binds back into the template as quoted literals - the SQL the
+    // database finally sees, and the form the two PHP engines emit directly.
+    function inline(res) {
+        return res.query_template.replace(/:p(\d+)/g, function (m0, n) {
+            var v = res.params[parseInt(n, 10) - 1];
+            return v === null ? 'NULL' : "'" + String(v).replace(/'/g, "''") + "'";
+        });
+    }
+    function stored(tag) {
+        var s = localStorage.getItem(env.getPromptStorageKey(tag));
+        return s ? JSON.parse(s) : null;
+    }
+    async function run(sql, showPrompts, secure) {
+        try { return await env.processPrompts(sql, showPrompts === undefined ? false : showPrompts, secure === undefined ? true : secure); }
+        catch (e) { return 'REFUSED: ' + e.message; }
+    }
+    function tick(ms) { return new Promise(function (r) { setTimeout(r, ms || 0); }); }
+
+    (async function () {
+        try {
+            // =================================================================
+            section('1. helpers: type, split, parse, format');
+            check("type 'date-range'", env.penumbraIsDateRangeType('date-range'), true);
+            check("type ' Date-Range ' (tolerant, like the server engines)", env.penumbraIsDateRangeType(' Date-Range '), true);
+            check("type 'date' is NOT a range", env.penumbraIsDateRangeType('date'), false);
+            check('type null is NOT a range', env.penumbraIsDateRangeType(null), false);
+
+            check('split a..b', env.penumbraSplitDateRange('01-JUL-25..30-JUN-26'), { fromRaw: '01-JUL-25', toRaw: '30-JUN-26' });
+            check('split trims each half', env.penumbraSplitDateRange('  TODAY-30 ..  TODAY '), { fromRaw: 'TODAY-30', toRaw: 'TODAY' });
+            check('split: no separator', env.penumbraSplitDateRange('01-JUL-25'), null);
+            check('split: missing To', env.penumbraSplitDateRange('01-JUL-25..'), null);
+            check('split: missing From', env.penumbraSplitDateRange('..30-JUN-26'), null);
+            check('split: three halves', env.penumbraSplitDateRange('a..b..c'), null);
+            check('split: null / array / object', [env.penumbraSplitDateRange(null), env.penumbraSplitDateRange(['a', 'b']), env.penumbraSplitDateRange({ value: 'a..b' })], [null, null, null]);
+
+            var ymd = function (m) { return m ? [m.year(), m.month() + 1, m.date()] : null; };
+            check('DD-MON-YY', ymd(env.penumbraParseRangeEnd('01-AUG-26')), [2026, 8, 1]);
+            check('D-mon-YY, any case', ymd(env.penumbraParseRangeEnd('1-aug-26')), [2026, 8, 1]);
+            check('ISO', ymd(env.penumbraParseRangeEnd('2026-08-01')), [2026, 8, 1]);
+            check('US slash', ymd(env.penumbraParseRangeEnd('8/1/2026')), [2026, 8, 1]);
+            // moment alone reads 60 as 2060 (its pivot is 68). The database reads the
+            // emitted literal with Oracle's RR rule - 1960 - so the ordering check must too.
+            check('RR window: 60 is 1960 (moment alone says 2060)', ymd(env.penumbraParseRangeEnd('01-JAN-60')), [1960, 1, 1]);
+            check('RR window: 50 is 1950', ymd(env.penumbraParseRangeEnd('01-JAN-50')), [1950, 1, 1]);
+            check('RR window: 49 is 2049', ymd(env.penumbraParseRangeEnd('01-JAN-49')), [2049, 1, 1]);
+            check('31-FEB is not a date', env.penumbraParseRangeEnd('31-FEB-26'), null);
+            check('29-FEB in a non-leap year', env.penumbraParseRangeEnd('29-FEB-26'), null);
+            check('a date with a TIME is not accepted', env.penumbraParseRangeEnd('01-AUG-26 14:30'), null);
+            check('an unresolved phrase is not a date', env.penumbraParseRangeEnd('yesterday'), null);
+
+            check('format in the RR window', env.penumbraFormatRangeEnd(moment({ year: 2026, month: 7, day: 1 })), '01-AUG-26');
+            check('format 1949 keeps 4 digits', env.penumbraFormatRangeEnd(moment({ year: 1949, month: 11, day: 31 })), '31-DEC-1949');
+            check('format 2050 keeps 4 digits', env.penumbraFormatRangeEnd(moment({ year: 2050, month: 0, day: 1 })), '01-JAN-2050');
+
+            // =================================================================
+            section('2. helpers: resolve, template, label');
+            var r = env.penumbraResolveDateRange('01-JUL-25..30-JUN-26', null);
+            check('literal pair', [r.from, r.to, r.fromRaw, r.toRaw], ['01-JUL-25', '30-JUN-26', '01-JUL-25', '30-JUN-26']);
+            r = env.penumbraResolveDateRange('TODAY-30..TODAY', null);
+            check('TODAY-30..TODAY', [r.from, r.to], [lit(moment().subtract(30, 'days')), lit(moment())]);
+            r = env.penumbraResolveDateRange('first day of last month..last day of last month', null);
+            check('last month, as phrases', [r.from, r.to],
+                [lit(moment().subtract(1, 'month').startOf('month')), lit(moment().subtract(1, 'month').endOf('month'))]);
+            check('one-day range allowed', env.penumbraResolveDateRange('15-AUG-26..15-AUG-26', null).error, undefined);
+            check('REVERSED is refused', env.penumbraResolveDateRange('30-JUN-26..01-JUL-25', null).error, 'The From date must be on or before the To date.');
+            check('1960..2026 is in order under the RR window', env.penumbraResolveDateRange('01-JAN-60..01-JAN-26', null).error, undefined);
+            checkContains('one date is not a range', env.penumbraResolveDateRange('01-JUL-25', null).error, 'needs both a From and a To date');
+            checkContains('the bad half is NAMED', env.penumbraResolveDateRange('01-JUL-25..someday', null).error, "'someday' is not a date");
+            checkContains('text is never coerced into a date', env.penumbraResolveDateRange('Smith..Jones', null).error, "'Smith' is not a date");
+
+            r = env.penumbraResolveDateRange('min..max', null);
+            check('min..max with no bounds WIDENS (01-JAN-70..today)', [r.from, r.to], ['01-JAN-70', lit(moment())]);
+            r = env.penumbraResolveDateRange('min..max', { _rangeMinIso: '1998-01-03', _rangeMaxIso: '2026-09-14' });
+            check('min..max with looked-up bounds', [r.from, r.to], ['03-JAN-98', '14-SEP-26']);
+
+            var authorRule = { validate: 'min_date(2025-01-01),max_date(2026-12-31)' };
+            checkContains("an AUTHOR'S validate= fences both ends (From)", env.penumbraResolveDateRange('01-JUL-24..30-JUN-26', authorRule).error, 'on or after');
+            checkContains("an AUTHOR'S validate= fences both ends (To)", env.penumbraResolveDateRange('01-JUL-25..30-JUN-27', authorRule).error, 'on or before');
+            check('bounds INJECTED from an autofill= lookup do not: a range may overhang the data',
+                env.penumbraResolveDateRange('01-JUL-24..30-JUN-27', { validate: authorRule.validate, _validateInjected: true }).error, undefined);
+
+            check('template: none -> the bare pair', env.penumbraApplyDateRangeTemplate(null, ':p1', ':p2'), ':p1 AND :p2');
+            check('template: :from / :to', env.penumbraApplyDateRangeTemplate('AND d >= :from AND d <= :to', ':p1', ':p2'), 'AND d >= :p1 AND d <= :p2');
+            check('template: :val = the bare pair', env.penumbraApplyDateRangeTemplate('AND d BETWEEN :val', ':p1', ':p2'), 'AND d BETWEEN :p1 AND :p2');
+            check('template: word boundary', env.penumbraApplyDateRangeTemplate(':total :tomorrow :from_date :value', 'A', 'B'), ':total :tomorrow :from_date :value');
+            check('template: values are data ($& survives)', env.penumbraApplyDateRangeTemplate(':from|:to', '$&', "$'"), "$&|$'");
+
+            check('label: a quick range reads as its name', env.penumbraDateRangeLabel('first day of last month..last day of last month'), 'Last month');
+            check('label: case and spacing do not matter', env.penumbraDateRangeLabel('First Day  of last month .. LAST day of last month'), 'Last month');
+            check('label: anything else reads AS WRITTEN', env.penumbraDateRangeLabel('01-JUL-25..TODAY'), '01-JUL-25 to TODAY');
+            check('label: never the resolved dates', env.penumbraDateRangeLabel('TODAY-30..TODAY'), 'Last 30 days');
+            var presets = env.penumbraDateRangePresets();
+            check('quick ranges: a fixed list of 12, one needing a data source', [presets.length, presets.filter(function (p) { return p.needsSource; }).length], [12, 1]);
+            var bad = presets.filter(function (p) { return env.penumbraResolveDateRange(p.from + '..' + p.to, null).error; });
+            check('EVERY quick range resolves, in order, with the grammar as shipped', bad.map(function (p) { return p.label; }), []);
+
+            // =================================================================
+            section('3. processPrompts: sources, what is STORED, what is SENT');
+            var T = '[PROMPT;type=date-range;name=awd;message=Award date]';
+            clearAll(); setUrl('awd=01-JUL-25..30-JUN-26');
+            var res = await run('SELECT * FROM t WHERE d BETWEEN ' + T);
+            check('URL source: template', res.query_template, 'SELECT * FROM t WHERE d BETWEEN :p1 AND :p2');
+            check('URL source: TWO binds, resolved literals', res.params, ['01-JUL-25', '30-JUN-26']);
+            check('data(promptN): a range takes TWO slots, From then To', env.getResolved(), ['01-JUL-25', '30-JUN-26']);
+
+            clearAll(); setUrl('awd=' + encodeURIComponent('first day of last month..last day of last month'));
+            res = await run('WHERE d BETWEEN ' + T);
+            check('a ROLLING URL answer is sent resolved...', res.params,
+                [lit(moment().subtract(1, 'month').startOf('month')), lit(moment().subtract(1, 'month').endOf('month'))]);
+            var st = stored(T);
+            check('...and STORED RAW, labelled - not two dates frozen today', [st.value, st.display],
+                ['first day of last month..last day of last month', 'Last month']);
+
+            clearAll(); setUrl('awd=30-JUN-26..01-JUL-25');
+            checkContains('URL source: REVERSED is refused, naming the parameter and the syntax', await run('WHERE d BETWEEN ' + T),
+                "REFUSED: Invalid URL parameter for 'awd': The From date must be on or before the To date. Write it as awd=<from>..<to>");
+            clearAll(); setUrl('awd=01-JUL-25');
+            checkContains('URL source: one date is refused', await run('WHERE d BETWEEN ' + T), "REFUSED: Invalid URL parameter for 'awd': A date range needs both");
+
+            clearAll();
+            var TF = '[PROMPT;type=date-range;name=awd;message=Award date;forcedefault=first day of last fiscal year..last day of last fiscal year]';
+            res = await run('WHERE d BETWEEN ' + TF, true);
+            var fy = (moment().month() + 1) >= 7 ? moment().year() : moment().year() - 1;
+            check('forcedefault: no dialog, sent resolved', res.params, [lit(moment({ year: fy - 1, month: 6, day: 1 })), lit(moment({ year: fy, month: 5, day: 30 }))]);
+            st = stored(TF);
+            check('forcedefault: STORED RAW, labelled', [st.value, st.display],
+                ['first day of last fiscal year..last day of last fiscal year', 'Last fiscal year']);
+            check('forcedefault: not flagged interactive', res.anyPromptWasInteractive, false);
+
+            clearAll();
+            checkContains('forcedefault that is not a range is refused, naming the prompt',
+                await run('WHERE d BETWEEN [PROMPT;type=date-range;name=awd;message=Award date;forcedefault=01-JUL-25]', true), "REFUSED: Invalid value for 'Award date': A date range needs both");
+
+            clearAll();
+            localStorage.setItem(env.getPromptStorageKey(T), JSON.stringify({ value: 'TODAY-7..TODAY', display: 'Last 7 days', message: 'Award date' }));
+            res = await run('WHERE d BETWEEN ' + T);
+            check('stored source: resolved afresh on every run', res.params, [lit(moment().subtract(7, 'days')), lit(moment())]);
+
+            clearAll();
+            localStorage.setItem(env.getPromptStorageKey(T), JSON.stringify({ value: 'garbage', display: 'garbage', message: 'Award date' }));
+            var r2 = await run('WHERE d BETWEEN ' + T, false);
+            checkContains('a stored answer that no longer resolves does not wedge the report: it is dropped and the prompt is REQUIRED again', r2, 'REFUSED: PROMPT_REQUIRED:Award date');
+            check('...the bad answer is gone from storage', stored(T), null);
+
+            clearAll();
+            checkContains('no answer at all: PROMPT_REQUIRED, never BETWEEN NULL AND NULL', await run('WHERE d BETWEEN ' + T, false), 'REFUSED: PROMPT_REQUIRED:Award date');
+
+            clearAll(); setUrl('awd=01-JUL-25..30-JUN-26');
+            res = await run("WHERE d BETWEEN '" + T + "' AND x = 1");
+            check("the author's quotes around the tag are consumed", res.query_template, 'WHERE d BETWEEN :p1 AND :p2 AND x = 1');
+            res = await run('WHERE 1=1 [PROMPT;type=date-range;name=awd;template="AND d >= :from AND d < :to"]');
+            check('template :from / :to', [res.query_template, res.params], ['WHERE 1=1 AND d >= :p1 AND d < :p2', ['01-JUL-25', '30-JUN-26']]);
+            res = await run('WHERE 1=1 [PROMPT;type=date-range;name=awd;template="AND TRUNC(d) BETWEEN :val"]');
+            check('template :val', res.query_template, 'WHERE 1=1 AND TRUNC(d) BETWEEN :p1 AND :p2');
+            res = await run('WHERE 1=1 [PROMPT;type=date-range;name=awd;template=""]');
+            check('control prompt: no SQL and NO orphan binds', [res.query_template, res.params], ['WHERE 1=1 ', []]);
+            checkContains('noquote is refused for this type', await run('WHERE d BETWEEN [PROMPT;type=date-range;name=awd;noquote]'), 'uses noquote with type=date-range');
+            // forcedefault, not default: a plain default is only ever taken when a
+            // dialog is cancelled, and this run opens none.
+            res = await run("WHERE a = [PROMPT;type=text;name=t1;forcedefault=x] AND d BETWEEN " + T + " AND b = [PROMPT;type=text;name=t2;forcedefault=y]", true);
+            check('bind numbering stays in step around a two-bind prompt', [res.query_template, res.params],
+                ['WHERE a = :p1 AND d BETWEEN :p2 AND :p3 AND b = :p4', ['x', '01-JUL-25', '30-JUN-26', 'y']]);
+
+            clearAll(); setUrl('mode=N&awd=01-JUL-25..30-JUN-26');
+            res = await run('SELECT 1 FROM t WHERE x = 1 [PROMPT;type=select;name=mode;template="";options=Y,N] AND d BETWEEN [PROMPT;type=date-range;name=awd;resultif=mode:Y]');
+            check('resultif not met: "AND col BETWEEN" goes with the tag', res.query_template, 'SELECT 1 FROM t WHERE x = 1 ');
+
+            clearAll(); setUrl('awd=01-JUL-25..30-JUN-26');
+            check('snippet mode: a bare range PRINTS as "A to B", not as SQL', await run('Awards ' + T + '.', false, false), 'Awards 01-JUL-25 to 30-JUN-26.');
+            check('snippet mode: a template still places the halves',
+                await run('[PROMPT;type=date-range;name=awd;template="from :from through :to"]', false, false), 'from 01-JUL-25 through 30-JUN-26');
+
+            clearAll(); setUrl('pi=' + encodeURIComponent("O'Brien, Pat"));
+            env.calls.ajax.length = 0;
+            var TA = "[PROMPT;type=date-range;name=awd;forcedefault=min..max;nosave;autofill=STATS_V2.LOG_DATE|PI_NAME = '{pi}']";
+            res = await run("WHERE p = [PROMPT;type=text;name=pi] AND d BETWEEN " + TA, true);
+            check('min..max with autofill=: the data span, from ONE lookup', [res.params, env.calls.ajax.length], [["O'Brien, Pat", '03-JAN-98', '14-SEP-26'], 1]);
+            check('...asked in range mode, the {name} token filled and its quote doubled',
+                env.calls.ajax[0] ? [env.calls.ajax[0].data.mode, env.calls.ajax[0].data.table, env.calls.ajax[0].data.column, env.calls.ajax[0].data.condition] : null,
+                ['range', 'STATS_V2', 'LOG_DATE', "PI_NAME = 'O''Brien, Pat'"]);
+            check('...the keywords are what is STORED, so the span follows the data', stored(TA) ? [stored(TA).value, stored(TA).display] : null, ['min..max', 'All dates']);
+
+            section('3a. where a stored range is SHOWN: the chip, and a snapshot');
+            clearAll();
+            $('#chipHost').remove();
+            $(document.body).append('<div id="chipHost"><div id="promptInfoContainer"><ul id="promptInfoList"></ul><a id="resetAllPromptsLink"></a></div></div>');
+            window.__editorSql = 'SELECT 1 FROM t WHERE d BETWEEN ' + T;
+            localStorage.setItem(env.getPromptStorageKey(T), JSON.stringify({ value: 'first day of last month..last day of last month', display: 'Last month', message: 'Award date' }));
+            env.updatePromptDisplay();
+            var lastMonth = lit(moment().subtract(1, 'month').startOf('month')) + ' to ' + lit(moment().subtract(1, 'month').endOf('month'));
+            var $chip = $('#promptInfoList .prompt-byline-link');
+            check('chip: shows the LABEL, typed as a date range', [$chip.find('strong').text(), $chip.hasClass('prompt-type-date-range')], ['Last month', true]);
+            check('chip: the tooltip adds the dates that label means today', $chip.attr('title'), 'Last month (' + lastMonth + ')');
+            check('chip: carries the date-range glyph (the bar across the calendar)', $chip.find('.prompt-ic line[x1="7"][y1="15"]').length, 1);
+            // A snapshot outlives "last month"; the label alone would say nothing later.
+            check('snapshot: records the DATES the range stood for, not its label', env._captureCurrentPrompts(), [{ name: 'awd', value: lastMonth }]);
+            localStorage.setItem(env.getPromptStorageKey(T), JSON.stringify({ value: '01-JUL-25..30-JUN-26', display: '01-JUL-25 to 30-JUN-26', message: 'Award date' }));
+            env.updatePromptDisplay();
+            check('chip: literal dates need no second copy in the tooltip', $('#promptInfoList .prompt-byline-link').attr('title'), '01-JUL-25 to 30-JUN-26');
+            // 2026-10-04: the "to" between the two dates is its own plain span
+            check('chip: the two dates are bold around a PLAIN "to"', [$('#promptInfoList .prompt-byline-link strong').html().replace(/\s+/g, ' '), $('#promptInfoList .prompt-range-to').length],
+                ['01-JUL-25 <span class="prompt-range-to">to</span> 30-JUN-26', 1]);
+            // A TYPED phrase shows the dates it stands for today; the phrase moves to the tooltip
+            var typed = lit(moment().subtract(45, 'days')) + ' to ' + lit(moment().subtract(1, 'days'));
+            localStorage.setItem(env.getPromptStorageKey(T), JSON.stringify({ value: 'TODAY-45..TODAY-1', display: 'TODAY-45 to TODAY-1', message: 'Award date' }));
+            env.updatePromptDisplay();
+            check('chip: a typed phrase shows the DATES it means today (not the phrase)', $('#promptInfoList .prompt-byline-link strong').text(), typed);
+            check('chip: ...and the phrase moves to the tooltip, with the dates', $('#promptInfoList .prompt-byline-link').attr('title'), 'TODAY-45 to TODAY-1 (' + typed + ')');
+            check('chip: ...storage keeps the phrase (it keeps rolling)', JSON.parse(localStorage.getItem(env.getPromptStorageKey(T))).value, 'TODAY-45..TODAY-1');
+            localStorage.setItem(env.getPromptStorageKey(T), JSON.stringify({ value: 'first day of last month..last day of last month', display: 'Last month', message: 'Award date' }));
+            env.updatePromptDisplay();
+            check('chip: a QUICK range keeps its name, with no "to" span', [$('#promptInfoList .prompt-byline-link strong').text(), $('#promptInfoList .prompt-range-to').length], ['Last month', 0]);
+            localStorage.setItem(env.getPromptStorageKey(T), JSON.stringify({ value: 'min..max', display: 'All dates', message: 'Award date' }));
+            check('snapshot: a min/max range cannot be resolved without a lookup, so it keeps its label', env._captureCurrentPrompts(), [{ name: 'awd', value: 'All dates' }]);
+            window.__editorSql = '';
+            $('#chipHost').remove();
+
+            section('3b. CONTROLS: the types that were already here are untouched');
+            clearAll(); setUrl('x=01-JUL-22');
+            res = await run('WHERE d > [PROMPT;type=date;name=x]');
+            check('type=date still sends ONE bind', [res.query_template, res.params], ['WHERE d > :p1', ['01-JUL-22']]);
+            clearAll(); setUrl('t=a..b');
+            res = await run('WHERE c = [PROMPT;type=text;name=t]');
+            check('a ".." inside a TEXT answer is just text', [res.query_template, res.params], ['WHERE c = :p1', ['a..b']]);
+            clearAll(); setUrl('m=A,B');
+            // Parenthesised on purpose. Without the parens the browser engine has
+            // long emitted `WHERE IN (...)` - it drops the column (proven against
+            // the untouched original main.js, 2026-09-21; the two PHP engines keep
+            // it). That is not this feature's bug to fix or to pin.
+            res = await run('WHERE c IN ([PROMPT;type=multi-select;name=m;options=A,B,C])');
+            check('type=multi-select IN list is untouched', (typeof res === 'string') ? res : [res.query_template, res.params], ['WHERE c IN (:p1, :p2)', ['A', 'B']]);
+
+            // =================================================================
+            section('4. THREE-ENGINE PARITY (fixture written by the two PHP engines)');
+            var fx = window.__fixture;
+            if (!fx || !fx.cases || !fx.cases.length) {
+                check('the PHP fixture is present', false, true);
+            } else {
+                check('the PHP fixture was written TODAY (rolling dates must agree)', fx.today, lit(moment()));
+                for (var i = 0; i < fx.cases.length; i++) {
+                    var c = fx.cases[i];
+                    clearAll(); setUrl('awd=' + encodeURIComponent(c.answer));
+                    var got = await run(c.sql);
+                    if (c.refused) {
+                        check('parity (refusal): ' + c.label, (typeof got === 'string') ? got.indexOf(c.reason) >= 0 : false, true);
+                    } else {
+                        check('parity: ' + c.label, (typeof got === 'string') ? got : inline(got), c.php_sql);
+                    }
+                }
+            }
+
+            // =================================================================
+            section('5. the dialog: two calendars, one per end');
+            clearAll();
+            var cfg = env.parsePrompt('[PROMPT;type=date-range;name=awd;message=Award date;default=01-JUL-25..30-JUN-26]');
+            var p = env.showPromptDialog(cfg, null);
+            await tick(50);
+            var $ov = $('.modal-prompt-overlay').last();
+            var id = $ov.attr('id');
+            var $from = $('#' + id + '_input'), $to = $('#' + id + '_input2');
+            var $cal0 = $('#' + id + '_cal0'), $cal1 = $('#' + id + '_cal1');
+            // jQuery UI's month menu is 0-based: '6/2025' is July 2025.
+            var monthOf = function ($c) { return $c.find('select.ui-datepicker-month').val() + '/' + $c.find('select.ui-datepicker-year').val(); };
+            var dayCell = function ($c, day) {
+                return $c.find('td[data-handler="selectDay"]').filter(function () { return $(this).text() === String(day); }).first();
+            };
+            var blocked = function ($c) { return $c.find('td.ui-datepicker-unselectable:not(.ui-datepicker-other-month)').length; };
+            check('one dialog, the wide range box', [$ov.length, $ov.find('.modal-prompt-box--range').length], [1, 1]);
+            check('11 quick ranges without a data source ("All dates" needs autofill=)', $ov.find('.pnb-dr-preset').length, 11);
+            check('both fields seeded from the default', [$from.val(), $to.val()], ['01-JUL-25', '30-JUN-26']);
+            check('TWO calendars, one month each', [$cal0.find('.ui-datepicker-calendar').length, $cal1.find('.ui-datepicker-calendar').length, $ov.find('.ui-datepicker-group').length], [1, 1, 0]);
+            // The first build was ONE two-month calendar, and jQuery UI gives the menus
+            // to the first month of a multi-month calendar only: the second pane had
+            // plain text and could not be navigated on its own (found by hand, 09-21).
+            check('EACH calendar has its own month AND year menu',
+                [$cal0.find('select.ui-datepicker-month').length, $cal0.find('select.ui-datepicker-year').length,
+                 $cal1.find('select.ui-datepicker-month').length, $cal1.find('select.ui-datepicker-year').length], [1, 1, 1, 1]);
+            // The requirement is about PANES, not calendars: mutant G (each calendar showing
+            // two months) left the check above green, because each calendar still had ONE set
+            // of menus - on its first pane. Count the panes, and the panes that have menus.
+            var panes = $ov.find('.pnb-dr-cal .ui-datepicker-header');
+            check('NO month pane on screen is without its own month and year menu',
+                [panes.length, panes.filter(function () { return $(this).find('select.ui-datepicker-month').length === 1 && $(this).find('select.ui-datepicker-year').length === 1; }).length], [2, 2]);
+            check('each opens on ITS OWN end: July 2025 on the left, June 2026 on the right - both ends of a long range in view', [monthOf($cal0), monthOf($cal1)], ['6/2025', '5/2026']);
+            check('From is an edge in the From calendar, To in the To calendar', [$cal0.find('td.pnb-dr-edge-from').length, $cal1.find('td.pnb-dr-edge-to').length], [1, 1]);
+            check('the span is painted in BOTH (2-31 JUL = 30 days, 1-29 JUN = 29 days)', [$cal0.find('td.pnb-dr-in').length, $cal1.find('td.pnb-dr-in').length], [30, 29]);
+            check("jQuery UI's own selected/today fills are gone - only the range is filled",
+                $ov.find('.pnb-dr-cal .ui-state-active, .pnb-dr-cal .ui-state-highlight, .pnb-dr-cal .ui-datepicker-current-day').length, 0);
+            check('the calendars are a pointing device: aria-hidden, day links and menus out of the tab order',
+                [$ov.find('.pnb-dr-cal[aria-hidden="true"]').length,
+                 $ov.find('.pnb-dr-cal td a').filter(function () { return this.getAttribute('tabindex') !== '-1' || this.hasAttribute('href'); }).length,
+                 $ov.find('.pnb-dr-cal select').filter(function () { return this.getAttribute('tabindex') !== '-1'; }).length], [2, 0, 0]);
+
+            // Navigating ONE calendar by its menus leaves the other, and the answer, alone.
+            $cal1.find('select.ui-datepicker-year').val('2024').trigger('change');
+            $cal1.find('select.ui-datepicker-month').val('0').trigger('change');
+            check("the To calendar's menus move the To calendar only", [monthOf($cal0), monthOf($cal1)], ['6/2025', '0/2024']);
+            check('...and looking around changes nothing in the fields', [$from.val(), $to.val()], ['01-JUL-25', '30-JUN-26']);
+            check('...a re-render of its own (the menus) still leaves no jQuery UI fill behind', $cal1.find('.ui-state-active, .ui-state-highlight').length, 0);
+
+            $ov.find('.pnb-dr-preset[data-label="Last month"]').trigger('click');
+            var lm = moment().subtract(1, 'month'), nm = moment();
+            var lmView = lm.month() + '/' + lm.year();
+            check('quick range: the fields take the EXPRESSIONS, not dates', [$from.val(), $to.val()], ['first day of last month', 'last day of last month']);
+            check('...the hint shows what they mean today', [$('#' + id + '_hint0').text(), $('#' + id + '_hint1').text()],
+                ['= ' + lit(lm.clone().startOf('month')), '= ' + lit(lm.clone().endOf('month'))]);
+            check('...the quick range is marked active', $ov.find('.pnb-dr-preset.is-active').map(function () { return $(this).text(); }).get(), ['Last month']);
+            check('...and BOTH calendars moved to it', [monthOf($cal0), monthOf($cal1)], [lmView, lmView]);
+
+            // Real clicks on real day cells. Left calendar = From, right calendar = To.
+            dayCell($cal0, 5).trigger('click');
+            check('a click in the From calendar sets From, and only From', [$from.val(), $to.val()], [lit(lm.clone().date(5)), 'last day of last month']);
+            check('a click NEVER moves a view', [monthOf($cal0), monthOf($cal1)], [lmView, lmView]);
+            check('the To calendar cannot pick a day before From (1st-4th are dead), so a backwards range cannot be clicked', [blocked($cal1), dayCell($cal1, 4).length, dayCell($cal1, 5).length], [4, 0, 1]);
+            check('...the From calendar has no such floor', blocked($cal0), 0);
+            dayCell($cal1, 20).trigger('click');
+            check('a click in the To calendar sets To, and only To', [$from.val(), $to.val()], [lit(lm.clone().date(5)), lit(lm.clone().date(20))]);
+            check('...the span between them is painted in both calendars (6th-19th = 14 days)', [$cal0.find('td.pnb-dr-in').length, $cal1.find('td.pnb-dr-in').length], [14, 14]);
+            check('no quick range is active once the dates are custom', $ov.find('.pnb-dr-preset.is-active').length, 0);
+            dayCell($cal0, 25).trigger('click');
+            check('a From PAST the old To starts the range over (To is cleared, never left backwards)', [$from.val(), $to.val()], [lit(lm.clone().date(25)), '']);
+
+            $ov.find('#' + id + '_ok').trigger('click');
+            check('OK with one end empty: inline error, dialog stays open', [$('#' + id + '_err').text(), $('#' + id).length], ['Both a From and a To date are required.', 1]);
+            check('...the EMPTY field (To) is the one marked invalid, not From',
+                [$from.attr('aria-invalid') || null, $to.attr('aria-invalid') || null, $to.attr('aria-describedby')],
+                [null, 'true', id + '_hint1 ' + id + '_err']);
+            $from.val('TODAY').trigger('input'); $to.val('TODAY-30').trigger('input');
+            check('a backwards range can still be TYPED - it is flagged under To as it is typed', [$('#' + id + '_hint1').text(), $('#' + id + '_hint1').hasClass('is-bad')], ['Before the From date', true]);
+            $ov.find('#' + id + '_ok').trigger('click');
+            check('...and refused at OK: inline error, dialog stays open', [$('#' + id + '_err').text(), $('#' + id).length], ['The From date must be on or before the To date.', 1]);
+            check('...a fresh OK clears the last mark and re-marks', [$from.attr('aria-invalid') || null, $to.attr('aria-invalid') || null, $from.attr('aria-describedby')],
+                [null, 'true', id + '_hint0']);
+            $from.val('not a date').trigger('input');
+            check('"Not a date" under a field that does not resolve', [$('#' + id + '_hint0').text(), $('#' + id + '_hint0').hasClass('is-bad')], ['Not a date', true]);
+
+            $from.val('first day of this fiscal year').trigger('input'); $to.val('today').trigger('input');
+            check('typing a quick range by hand lights it up too', $ov.find('.pnb-dr-preset.is-active').text(), 'Fiscal year to date');
+            $to.trigger('change');
+            check('a typed To brings ITS calendar to that date (the From calendar stays put)', monthOf($cal1), nm.month() + '/' + nm.year());
+            $ov.find('#' + id + '_ok').trigger('click');
+            var answer = await p;
+            check('OK returns the RAW answer + its label', answer, { value: 'first day of this fiscal year..today', display: 'Fiscal year to date' });
+            check('...and the dialog is gone', $('#' + id).length, 0);
+
+            // re-open the way the chip does: {value, display}
+            p = env.showPromptDialog(cfg, { value: 'TODAY-30..TODAY', display: 'Last 30 days' });
+            await tick(50);
+            $ov = $('.modal-prompt-overlay').last(); id = $ov.attr('id');
+            var t30 = moment().subtract(30, 'days');
+            check('re-open seeds from the stored VALUE, not its label', [$('#' + id + '_input').val(), $('#' + id + '_input2').val()], ['TODAY-30', 'TODAY']);
+            check('...each calendar on its own end', [monthOf($('#' + id + '_cal0')), monthOf($('#' + id + '_cal1'))], [t30.month() + '/' + t30.year(), nm.month() + '/' + nm.year()]);
+            check('...Reset to default is offered', $('#' + id + '_reset').length, 1);
+            $('#' + id + '_reset').trigger('click');
+            check('Reset puts the default back in BOTH fields', [$('#' + id + '_input').val(), $('#' + id + '_input2').val()], ['01-JUL-25', '30-JUN-26']);
+            check('...and both calendars follow', [monthOf($('#' + id + '_cal0')), monthOf($('#' + id + '_cal1'))], ['6/2025', '5/2026']);
+            $('#' + id + '_cancel').trigger('click');
+            check('Cancel resolves null', await p, null);
+
+            // a default written for a SINGLE date (no "..") is not thrown away
+            p = env.showPromptDialog(env.parsePrompt('[PROMPT;type=date-range;name=awd;default=TODAY-30]'), null);
+            await tick(50);
+            $ov = $('.modal-prompt-overlay').last(); id = $ov.attr('id');
+            check('a default with no ".." lands in From instead of vanishing', [$('#' + id + '_input').val(), $('#' + id + '_input2').val()], ['TODAY-30', '']);
+            $('#' + id + '_cancel').trigger('click');
+            await p;
+
+            // nothing chosen yet: last month on the left, this month on the right
+            p = env.showPromptDialog(env.parsePrompt('[PROMPT;type=date-range;name=awd]'), null);
+            await tick(50);
+            $ov = $('.modal-prompt-overlay').last(); id = $ov.attr('id');
+            check('unanswered: last month on the left, this month on the right', [monthOf($('#' + id + '_cal0')), monthOf($('#' + id + '_cal1'))], [lmView, nm.month() + '/' + nm.year()]);
+            $('#' + id + '_cancel').trigger('click');
+            await p;
+
+            // with a data source: the 12th quick range, and min/max hints
+            var cfgA = env.parsePrompt("[PROMPT;type=date-range;name=awd;message=Award date;autofill=STATS_V2.LOG_DATE]");
+            p = env.showPromptDialog(cfgA, null);
+            await tick(50);
+            $ov = $('.modal-prompt-overlay').last(); id = $ov.attr('id');
+            check('12 quick ranges with a data source', $ov.find('.pnb-dr-preset').length, 12);
+            $ov.find('.pnb-dr-preset[data-label="All dates"]').trigger('click');
+            check('"All dates" stores the KEYWORDS and shows the span they mean',
+                [$('#' + id + '_input').val(), $('#' + id + '_input2').val(), $('#' + id + '_hint0').text(), $('#' + id + '_hint1').text()],
+                ['min', 'max', '= 03-JAN-98', '= 14-SEP-26']);
+            check('...with each calendar on its end of the data (JAN 1998, SEP 2026)', [monthOf($('#' + id + '_cal0')), monthOf($('#' + id + '_cal1'))], ['0/1998', '8/2026']);
+            $('#' + id + '_input').val('01-JAN-90').trigger('input');
+            $ov.find('#' + id + '_ok').trigger('click');
+            check('a range that overhangs the data is ACCEPTED (lookup bounds are not a fence here)', await p, { value: '01-JAN-90..max', display: '01-JAN-90 to max' });
+
+            // an author's fence IS enforced, and fences BOTH calendars
+            var cfgV = env.parsePrompt('[PROMPT;type=date-range;name=awd;validate=min_date(2025-01-01),max_date(2026-12-31)]');
+            p = env.showPromptDialog(cfgV, '01-JUL-24..30-JUN-26');
+            await tick(50);
+            $ov = $('.modal-prompt-overlay').last(); id = $ov.attr('id');
+            $ov.find('#' + id + '_ok').trigger('click');
+            checkContains("an author's min_date is enforced at OK", $('#' + id + '_err').text(), 'on or after 01-JAN-25');
+            $('#' + id + '_input').val('15-JAN-25').trigger('input').trigger('change');
+            check("...and fences the calendars: no going back past its month (the From calendar's Prev is dead in JAN 2025)",
+                [monthOf($('#' + id + '_cal0')), $('#' + id + '_cal0').find('.ui-datepicker-prev.ui-state-disabled').length], ['0/2025', 1]);
+            $('#' + id + '_cancel').trigger('click');
+            await p;
+
+            check('no dialog left behind', $('.modal-prompt-overlay').length, 0);
+
+            // run.ps1 -Control sets this: ONE deliberately false assertion. The run
+            // must end "FAIL: 1" / RED, or this file can no longer report a failure.
+            // =================================================================
+            section('12. data(promptN) is positional: a range takes TWO slots, From then To');
+            clearAll(); setUrl('awd=01-JUL-25..30-JUN-26');
+            await run('SELECT * FROM t WHERE d BETWEEN ' + T + ' UNION SELECT * FROM u WHERE e BETWEEN ' + T);
+            check('the same tag written twice is ONE prompt: two slots, not four', env.getResolved(), ['01-JUL-25', '30-JUN-26']);
+            clearAll(); setUrl('awd=01-JUL-25..30-JUN-26&x=A&y=B');
+            await run('SELECT * FROM t WHERE c = [PROMPT;type=text;name=x] AND d BETWEEN ' + T + ' AND e = [PROMPT;type=text;name=y]');
+            check('SQL order with the range in the middle', env.getResolved(), ['A', '01-JUL-25', '30-JUN-26', 'B']);
+            clearAll(); setUrl('x=A');
+            await run('SELECT * FROM t WHERE c = [PROMPT;type=text;name=x] AND e = [PROMPT;type=text;name=x]');
+            check('a repeated text tag is one slot', env.getResolved(), ['A']);
+            clearAll(); setUrl('x=A&y=B');
+            await run('SELECT * FROM t WHERE c = [PROMPT;type=text;name=x;message=First] AND e = [PROMPT;type=text;name=y;message=First]');
+            check('two DIFFERENT tags with one label are two slots', env.getResolved(), ['A', 'B']);
+            // Twin of the scheduler cases: section= is display only and not part of
+            // the answer key, so copies that differ ONLY in it are one prompt.
+            clearAll(); setUrl('x=A&y=B');
+            await run('SELECT * FROM t WHERE c = [PROMPT;type=text;name=x] AND e = [PROMPT;type=text;name=x;section=Dates] AND f = [PROMPT;type=text;name=y]');
+            check('copies differing ONLY in section= are one slot (the later copy names it)', env.getResolved(), ['A', 'B']);
+            clearAll(); setUrl('x=A&y=B');
+            await run('SELECT * FROM t WHERE c = [PROMPT;type=text;section=Dates;name=x] AND e = [PROMPT;type=text;name=x] AND f = [PROMPT;type=text;name=y]');
+            check('...and when the FIRST copy names it', env.getResolved(), ['A', 'B']);
+            clearAll(); setUrl('x=A&y=B');
+            await run('SELECT * FROM t WHERE c = [PROMPT;type=text;name=x;section=A] AND e = [PROMPT;type=text;name=x;subsection=B] AND f = [PROMPT;type=text;name=y]');
+            check('CONTROL - a look-alike key (subsection=) is a different tag, two slots', env.getResolved(), ['A', 'A', 'B']);
+
+            if (window.__control) {
+                section('CONTROL (must FAIL)');
+                check('CONTROL: a reversed range is accepted (deliberately false)', !!env.penumbraResolveDateRange('30-JUN-26..01-JUL-25', null).error, false);
+            }
+        } catch (e) {
+            fail++;
+            out.push('  FAIL (exception) ' + (e && e.stack ? e.stack : e));
+        }
+        finish();
+    })();
+})();

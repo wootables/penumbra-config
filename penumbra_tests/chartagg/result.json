@@ -1,0 +1,217 @@
+{
+    "pageErrors":  [
+
+                   ],
+    "results":  [
+                    {
+                        "name":  "L1 the chart module is up",
+                        "pass":  true,
+                        "detail":  "object"
+                    },
+                    {
+                        "name":  "S1 bullet Median = the median per category (A 2, B 5, C 7) - it used to SUM",
+                        "pass":  true,
+                        "detail":  "got [2,5,7] | want [2,5,7]"
+                    },
+                    {
+                        "name":  "S2 bullet Running Count = rows per category (3, 2, 1), no cumulation - it used to SUM the values",
+                        "pass":  true,
+                        "detail":  "got [3,2,1] | want [3,2,1]"
+                    },
+                    {
+                        "name":  "S3 funnel Median and Running Count",
+                        "pass":  true,
+                        "detail":  "got [[2,5,7],[3,2,1]] | want [[2,5,7],[3,2,1]]"
+                    },
+                    {
+                        "name":  "S4 waterfall Median and Running Count",
+                        "pass":  true,
+                        "detail":  "got [[2,5,7],[3,2,1]] | want [[2,5,7],[3,2,1]]"
+                    },
+                    {
+                        "name":  "S5 map Median and Running Count per state (NC 1,2,9 / VA 4,6 / SC 7)",
+                        "pass":  true,
+                        "detail":  "got [[2,5,7],[1,2,3]] | want [[2,5,7],[1,2,3]]"
+                    },
+                    {
+                        "name":  "S6 gauge Median = 5 over 1,2,4,6,7,9 and Running Count = 6 rows",
+                        "pass":  true,
+                        "detail":  "got [5,6] | want [5,6]"
+                    },
+                    {
+                        "name":  "S8 a category whose running value is 0 keeps all its rows (Average 2 / 1.5, Min 0 / 0): bullet, funnel, waterfall",
+                        "pass":  true,
+                        "detail":  "got [[2,1.5],[0,0],[2,1.5],[0,0],[2,1.5],[0,0]] | want [[2,1.5],[0,0],[2,1.5],[0,0],[2,1.5],[0,0]]"
+                    },
+                    {
+                        "name":  "S7 guard: specialty Sum and Average are untouched",
+                        "pass":  true,
+                        "detail":  "got [[12,10,7],[4,5,7],29] | want [[12,10,7],[4,5,7],29]"
+                    },
+                    {
+                        "name":  "O1 bar Other: Average / Median / Min / Max / Distinct of the pooled rows (5, 5, 1, 9, 3)",
+                        "pass":  true,
+                        "detail":  "got [5,5,1,9,3] | want [5,5,1,9,3]"
+                    },
+                    {
+                        "name":  "O2 guard: bar Other Sum and Count are unchanged (25, 5)",
+                        "pass":  true,
+                        "detail":  "got [25,5] | want [25,5]"
+                    },
+                    {
+                        "name":  "O3 grouped bar Other per group: Distinct of each group\u0027s pooled ids (G1 2, G2 1)",
+                        "pass":  true,
+                        "detail":  "got [true,2,1] | want [true,2,1]"
+                    },
+                    {
+                        "name":  "O4 grouped bar Other per group: Average (G1 1,5,7 = 4.333; G2 3,9 = 6)",
+                        "pass":  true,
+                        "detail":  "got [4.333,6] | want [4.333,6]"
+                    },
+                    {
+                        "name":  "O5 treemap Other tile: Average of the pooled rows (5)",
+                        "pass":  true,
+                        "detail":  "got 5 | want 5"
+                    },
+                    {
+                        "name":  "O6 funnel Other stage: Average of the pooled rows (5)",
+                        "pass":  true,
+                        "detail":  "got 5 | want 5"
+                    },
+                    {
+                        "name":  "O7 waterfall Other step: Average of the pooled rows (5)",
+                        "pass":  true,
+                        "detail":  "got 5 | want 5"
+                    },
+                    {
+                        "name":  "O8 older butterfly Other per group: Average (G1 4.333, G2 6)",
+                        "pass":  true,
+                        "detail":  "got [true,4.333,6] | want [true,4.333,6]"
+                    },
+                    {
+                        "name":  "P1 bar: every category counts its own 2 rows",
+                        "pass":  true,
+                        "detail":  "got [[\"__proto__\",\"constructor\",\"hasOwnProperty\",\"plain\",\"toString\",\"valueOf\"],[2,2,2,2,2,2]] | want [[\"__proto__\",\"constructor\",\"hasOwnProperty\",\"plain\",\"toString\",\"valueOf\"],[2,2,2,2,2,2]]"
+                    },
+                    {
+                        "name":  "P2 grouped bar (one group is named \"constructor\"): 1 row per category and group",
+                        "pass":  true,
+                        "detail":  "got [2,[1,1,1,1,1,1],[1,1,1,1,1,1]] | want [2,[1,1,1,1,1,1],[1,1,1,1,1,1]]"
+                    },
+                    {
+                        "name":  "P3 bar with an Other bucket: the top categories are real ones",
+                        "pass":  true,
+                        "detail":  "got [[\"__proto__\",\"constructor\",\"hasOwnProperty\",\"Other\"],[3,3,3,9]] | want [[\"__proto__\",\"constructor\",\"hasOwnProperty\",\"Other\"],[3,3,3,9]]"
+                    },
+                    {
+                        "name":  "P4 grouped bar with an Other bucket",
+                        "pass":  true,
+                        "detail":  "got [[\"__proto__\",\"constructor\",\"hasOwnProperty\",\"Other\"],[1,1,1,3],[2,2,2,6]] | want [[\"__proto__\",\"constructor\",\"hasOwnProperty\",\"Other\"],[1,1,1,3],[2,2,2,6]]"
+                    },
+                    {
+                        "name":  "P5 pie",
+                        "pass":  true,
+                        "detail":  "got [3,3,3,3,3,3] | want [3,3,3,3,3,3]"
+                    },
+                    {
+                        "name":  "P6 treemap",
+                        "pass":  true,
+                        "detail":  "got [3,3,3,3,3,3] | want [3,3,3,3,3,3]"
+                    },
+                    {
+                        "name":  "P7 bullet",
+                        "pass":  true,
+                        "detail":  "got [3,3,3,3,3,3] | want [3,3,3,3,3,3]"
+                    },
+                    {
+                        "name":  "P8 funnel",
+                        "pass":  true,
+                        "detail":  "got [3,3,3,3,3,3] | want [3,3,3,3,3,3]"
+                    },
+                    {
+                        "name":  "P9 waterfall",
+                        "pass":  true,
+                        "detail":  "got [3,3,3,3,3,3] | want [3,3,3,3,3,3]"
+                    },
+                    {
+                        "name":  "P10 combo (sum + count series)",
+                        "pass":  true,
+                        "detail":  "got [[3,3,3,3,3,3],[2,2,2,2,2,2]] | want [[3,3,3,3,3,3],[2,2,2,2,2,2]]"
+                    },
+                    {
+                        "name":  "P11 combo with an Other bucket",
+                        "pass":  true,
+                        "detail":  "got [[\"__proto__\",\"constructor\",\"hasOwnProperty\",\"Other\"],[3,3,3,9],[2,2,2,6]] | want [[\"__proto__\",\"constructor\",\"hasOwnProperty\",\"Other\"],[3,3,3,9],[2,2,2,6]]"
+                    },
+                    {
+                        "name":  "P12 butterfly (two filtered sides)",
+                        "pass":  true,
+                        "detail":  "got [[1,1,1,1,1,1],[2,2,2,2,2,2]] | want [[1,1,1,1,1,1],[2,2,2,2,2,2]]"
+                    },
+                    {
+                        "name":  "P13 older butterfly (Group By; one group is \"constructor\")",
+                        "pass":  true,
+                        "detail":  "got [[1,1,1,1,1,1],[2,2,2,2,2,2]] | want [[1,1,1,1,1,1],[2,2,2,2,2,2]]"
+                    },
+                    {
+                        "name":  "P15 box: every category gets its median (1.5) and n (2)",
+                        "pass":  true,
+                        "detail":  "got [[1.5,2],[1.5,2],[1.5,2],[1.5,2],[1.5,2],[1.5,2]] | want [[1.5,2],[1.5,2],[1.5,2],[1.5,2],[1.5,2],[1.5,2]]"
+                    },
+                    {
+                        "name":  "P16 gantt: every task gets its bar (2 rows, Jan 1 - Jan 10)",
+                        "pass":  true,
+                        "detail":  "got [\"2026-01-01..2026-01-10\",\"2026-01-01..2026-01-10\",\"2026-01-01..2026-01-10\",\"2026-01-01..2026-01-10\",\"2026-01-01..2026-01-10\",\"2026-01-01..2026-01-10\"] | want [\"2026-01-01..2026-01-10\",\"2026-01-01..2026-01-10\",\"2026-01-01..2026-01-10\",\"2026-01-01..2026-01-10\",\"2026-01-01..2026-01-10\",\"2026-01-01..2026-01-10\"]"
+                    },
+                    {
+                        "name":  "P17 butterfly sorted by value: a \"__proto__\" label takes its real place (it scored NaN)",
+                        "pass":  true,
+                        "detail":  "got [\"plain\",\"valueOf\",\"hasOwnProperty\",\"toString\",\"constructor\",\"__proto__\"] | want [\"plain\",\"valueOf\",\"hasOwnProperty\",\"toString\",\"constructor\",\"__proto__\"]"
+                    },
+                    {
+                        "name":  "P14 Distinct and Median per category",
+                        "pass":  true,
+                        "detail":  "got [[2,2,2,2,2,2],[1.5,1.5,1.5,1.5,1.5,1.5]] | want [[2,2,2,2,2,2],[1.5,1.5,1.5,1.5,1.5,1.5]]"
+                    },
+                    {
+                        "name":  "K1 grouped bar: \"a_b\" in group \"c\" and \"a\" in group \"b_c\" stay two bars",
+                        "pass":  true,
+                        "detail":  "got [[\"a\",\"a_b\"],[2,0],[0,1]] | want [[\"a\",\"a_b\"],[2,0],[0,1]]"
+                    },
+                    {
+                        "name":  "K2 older butterfly: the same two pairs make two groups (it saw ONE group and refused)",
+                        "pass":  true,
+                        "detail":  "got [[\"a\",\"a_b\"],[[\"b_c\",[2,0]],[\"c\",[0,1]]]] | want [[\"a\",\"a_b\"],[[\"b_c\",[2,0]],[\"c\",[0,1]]]]"
+                    },
+                    {
+                        "name":  "K3 guard: pie with a Group By, Other = Average of the folded rows (4)",
+                        "pass":  true,
+                        "detail":  "got [[\"A\",\"Other\"],[15,4]] | want [[\"A\",\"Other\"],[15,4]]"
+                    },
+                    {
+                        "name":  "N1 bar Other Sum = -9 and Running Total 15, 27, 18 (it read +9 and 36)",
+                        "pass":  true,
+                        "detail":  "got [[\"A\",\"B\",\"Other\"],[15,12,-9],[15,27,18]] | want [[\"A\",\"B\",\"Other\"],[15,12,-9],[15,27,18]]"
+                    },
+                    {
+                        "name":  "N2 grouped bar Other Sum per group (G1 -10, G2 1)",
+                        "pass":  true,
+                        "detail":  "got [true,-10,1] | want [true,-10,1]"
+                    },
+                    {
+                        "name":  "N3 older butterfly Other Sum per group (G1 -10, G2 1)",
+                        "pass":  true,
+                        "detail":  "got [-10,1] | want [-10,1]"
+                    },
+                    {
+                        "name":  "N4 older butterfly Other Average per group (G1 -5, G2 0.5)",
+                        "pass":  true,
+                        "detail":  "got [-5,0.5] | want [-5,0.5]"
+                    },
+                    {
+                        "name":  "N5 guard: a treemap Other tile is still a size (|-1| + |-8| = 9), like every tile",
+                        "pass":  true,
+                        "detail":  "got 9 | want 9"
+                    }
+                ]
+}

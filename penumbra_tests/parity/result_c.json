@@ -1,0 +1,866 @@
+[
+    {
+        "id": "sparkline_basic",
+        "snippet": "sparkline(AMOUNT)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;display:inline-table;vertical-align:middle;\"><tr><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"2\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:2px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"1\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:1px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"1\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:1px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"top\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"1\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:1px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"20\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:20px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"1\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:1px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td></tr></table></div>",
+        "out_plain": "<table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;display:inline-table;vertical-align:middle;\"><tr><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"2\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:2px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"1\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:1px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"1\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:1px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"top\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"1\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:1px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"20\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:20px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"1\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:1px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td></tr></table>"
+    },
+    {
+        "id": "sparkline_group",
+        "snippet": "sparkline(AMOUNT, NAME)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;display:inline-table;vertical-align:middle;\"><tr><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"20\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:20px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"5\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:5px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"1\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:1px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td></tr></table></div>",
+        "out_plain": "<table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;display:inline-table;vertical-align:middle;\"><tr><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"20\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:20px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"5\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:5px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"1\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:1px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td></tr></table>"
+    },
+    {
+        "id": "sparkline_color",
+        "snippet": "sparkline(AMOUNT, NAME, #ff0000)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;display:inline-table;vertical-align:middle;\"><tr><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"20\" bgcolor=\"#ff0000\" style=\"width:24px; height:20px; background-color:#ff0000; font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"5\" bgcolor=\"#ff0000\" style=\"width:24px; height:5px; background-color:#ff0000; font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"1\" bgcolor=\"#ff0000\" style=\"width:24px; height:1px; background-color:#ff0000; font-size:0; line-height:0;\">&nbsp;</td></tr></table></td></tr></table></div>",
+        "out_plain": "<table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;display:inline-table;vertical-align:middle;\"><tr><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"20\" bgcolor=\"#ff0000\" style=\"width:24px; height:20px; background-color:#ff0000; font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"5\" bgcolor=\"#ff0000\" style=\"width:24px; height:5px; background-color:#ff0000; font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"1\" bgcolor=\"#ff0000\" style=\"width:24px; height:1px; background-color:#ff0000; font-size:0; line-height:0;\">&nbsp;</td></tr></table></td></tr></table>"
+    },
+    {
+        "id": "sparkline_count_col",
+        "snippet": "sparkline(N)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;display:inline-table;vertical-align:middle;\"><tr><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"3\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:3px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"7\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:7px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"10\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:10px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"13\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:13px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"17\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:17px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"20\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:20px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td></tr></table></div>",
+        "out_plain": "<table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;display:inline-table;vertical-align:middle;\"><tr><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"3\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:3px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"7\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:7px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"10\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:10px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"13\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:13px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"17\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:17px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td><td valign=\"bottom\" height=\"20\" style=\"height:20px; padding:0 1px 0 0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"24\" style=\"width:24px; border-collapse:collapse;\"><tr><td width=\"24\" height=\"20\" bgcolor=\"var(--brand-primary)\" style=\"width:24px; height:20px; background-color:var(--brand-primary); font-size:0; line-height:0;\">&nbsp;</td></tr></table></td></tr></table>"
+    },
+    {
+        "id": "sparkline_bad_col",
+        "snippet": "sparkline(NOPE)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">[No Sparkline Data]</div>",
+        "out_plain": "[No Sparkline Data]"
+    },
+    {
+        "id": "sparkline_no_args",
+        "snippet": "sparkline()",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">[No Sparkline Data]</div>",
+        "out_plain": "[No Sparkline Data]"
+    },
+    {
+        "id": "plain_text",
+        "snippet": "Just some prose with no functions.",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">Just some prose with no functions.</div>",
+        "out_plain": "Just some prose with no functions."
+    },
+    {
+        "id": "literal_number",
+        "snippet": "Fiscal year 2026 total",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">Fiscal year 2,026 total</div>",
+        "out_plain": "Fiscal year 2,026 total"
+    },
+    {
+        "id": "literal_big_number",
+        "snippet": "Value 12345.678 here",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">Value 12,345.68 here</div>",
+        "out_plain": "Value 12,345.68 here"
+    },
+    {
+        "id": "backtick_literal",
+        "snippet": "Label `FY 2026` end",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">Label FY 2026 end</div>",
+        "out_plain": "Label FY 2026 end"
+    },
+    {
+        "id": "count",
+        "snippet": "count()",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">6</div>",
+        "out_plain": "6"
+    },
+    {
+        "id": "count_cond",
+        "snippet": "count(N>=2)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">5</div>",
+        "out_plain": "5"
+    },
+    {
+        "id": "sum",
+        "snippet": "sum(AMOUNT)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">11,470.33</div>",
+        "out_plain": "11,470.33"
+    },
+    {
+        "id": "sum_scope_all",
+        "snippet": "sum(AMOUNT, all)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">11,470.33</div>",
+        "out_plain": "11,470.33"
+    },
+    {
+        "id": "avg",
+        "snippet": "avg(AMOUNT)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">1,911.72</div>",
+        "out_plain": "1,911.72"
+    },
+    {
+        "id": "min_num",
+        "snippet": "min(AMOUNT)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">-75.75</div>",
+        "out_plain": "-75.75"
+    },
+    {
+        "id": "max_num",
+        "snippet": "max(AMOUNT)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">10,000</div>",
+        "out_plain": "10,000"
+    },
+    {
+        "id": "min_date",
+        "snippet": "min(DT)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">20-DEC-23</div>",
+        "out_plain": "20-DEC-23"
+    },
+    {
+        "id": "max_date",
+        "snippet": "max(DT)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">05-JUL-26</div>",
+        "out_plain": "05-JUL-26"
+    },
+    {
+        "id": "median",
+        "snippet": "median(AMOUNT)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">172.63</div>",
+        "out_plain": "172.63"
+    },
+    {
+        "id": "mode_text",
+        "snippet": "mode(NAME)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">Alpha</div>",
+        "out_plain": "Alpha"
+    },
+    {
+        "id": "distinct_text",
+        "snippet": "distinct(NAME)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">3</div>",
+        "out_plain": "3"
+    },
+    {
+        "id": "round_3dp",
+        "snippet": "round(1234.5678, 3)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">1,234.568</div>",
+        "out_plain": "1,234.568"
+    },
+    {
+        "id": "round_trailing0",
+        "snippet": "round(5, 2)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">5.00</div>",
+        "out_plain": "5.00"
+    },
+    {
+        "id": "round_default",
+        "snippet": "round(2.34567)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2</div>",
+        "out_plain": "2"
+    },
+    {
+        "id": "fixed_2dp",
+        "snippet": "fixed(1234.5, 2)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">1,234.50</div>",
+        "out_plain": "1,234.50"
+    },
+    {
+        "id": "abs",
+        "snippet": "abs(-5.5)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">5.5</div>",
+        "out_plain": "5.5"
+    },
+    {
+        "id": "floor",
+        "snippet": "floor(2.7)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2</div>",
+        "out_plain": "2"
+    },
+    {
+        "id": "ceil",
+        "snippet": "ceil(2.1)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">3</div>",
+        "out_plain": "3"
+    },
+    {
+        "id": "mod_float",
+        "snippet": "mod(10.5, 3)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">1.5</div>",
+        "out_plain": "1.5"
+    },
+    {
+        "id": "calc_basic",
+        "snippet": "calc(2+3*4)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">14</div>",
+        "out_plain": "14"
+    },
+    {
+        "id": "calc_modulo",
+        "snippet": "calc(10 % 3)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">1</div>",
+        "out_plain": "1"
+    },
+    {
+        "id": "calc_div",
+        "snippet": "calc(10/3)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">3.33</div>",
+        "out_plain": "3.33"
+    },
+    {
+        "id": "case_cond",
+        "snippet": "case(count()>2, big, small)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">big</div>",
+        "out_plain": "big"
+    },
+    {
+        "id": "string_upper",
+        "snippet": "string(upper, hello world)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">[Error: Invalid string type: upper]</div>",
+        "out_plain": "[Error: Invalid string type: upper]"
+    },
+    {
+        "id": "string_regex",
+        "snippet": "string(regex_replace, abc123, [0-9]+, #)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">abc#</div>",
+        "out_plain": "abc#"
+    },
+    {
+        "id": "nested_round_avg",
+        "snippet": "round(avg(AMOUNT),3)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">1,911.722</div>",
+        "out_plain": "1,911.722"
+    },
+    {
+        "id": "nested_calc_count",
+        "snippet": "calc(count()*2)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">12</div>",
+        "out_plain": "12"
+    },
+    {
+        "id": "nested_case_sum",
+        "snippet": "case(sum(AMOUNT)>1000, over, under)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">over</div>",
+        "out_plain": "over"
+    },
+    {
+        "id": "mixed_sentence",
+        "snippet": "There are count() rows totalling sum(AMOUNT) dollars.",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">There are 6 rows totalling 11,470.33 dollars.</div>",
+        "out_plain": "There are 6 rows totalling 11,470.33 dollars."
+    },
+    {
+        "id": "progress_bar",
+        "snippet": "progress_bar(30)",
+        "out": "",
+        "out_plain": ""
+    },
+    {
+        "id": "unknown_fn",
+        "snippet": "tabs(5) should stay literal",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">tabs(5) should stay literal</div>",
+        "out_plain": "tabs(5) should stay literal"
+    },
+    {
+        "id": "string_uppercase",
+        "snippet": "string(uppercase, hello world)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">HELLO WORLD</div>",
+        "out_plain": "HELLO WORLD"
+    },
+    {
+        "id": "progress_bar_2arg",
+        "snippet": "progress_bar(30, 100)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;\"><tr><td valign=\"middle\" style=\"padding:0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"120\" style=\"width:120px; height:20px; border:1px solid #ccc; border-collapse:collapse;\"><tr><td width=\"36\" style=\"width:36px; height:20px; background-color:var(brandprimary); font-size:0; line-height:0;\" bgcolor=\"var(brandprimary)\">&nbsp;</td><td width=\"84\" style=\"width:84px; height:20px; background-color:#e9ecef; font-size:0; line-height:0;\" bgcolor=\"#e9ecef\">&nbsp;</td></tr></table></td><td valign=\"middle\" style=\"padding:0 0 0 5px;\"><b style=\"font-size:10px; color:inherit; white-space:nowrap;\">30%</b></td></tr></table></div>",
+        "out_plain": "<table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;\"><tr><td valign=\"middle\" style=\"padding:0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"120\" style=\"width:120px; height:20px; border:1px solid #ccc; border-collapse:collapse;\"><tr><td width=\"36\" style=\"width:36px; height:20px; background-color:var(brandprimary); font-size:0; line-height:0;\" bgcolor=\"var(brandprimary)\">&nbsp;</td><td width=\"84\" style=\"width:84px; height:20px; background-color:#e9ecef; font-size:0; line-height:0;\" bgcolor=\"#e9ecef\">&nbsp;</td></tr></table></td><td valign=\"middle\" style=\"padding:0 0 0 5px;\"><b style=\"font-size:10px; color:inherit; white-space:nowrap;\">30%</b></td></tr></table>"
+    },
+    {
+        "id": "nest_round_avg4",
+        "snippet": "round(avg(AMOUNT),4)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">1,911.7222</div>",
+        "out_plain": "1,911.7222"
+    },
+    {
+        "id": "nest_round_sum1",
+        "snippet": "round(sum(AMOUNT),1)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">11,470.3</div>",
+        "out_plain": "11,470.3"
+    },
+    {
+        "id": "nest_calc_avg",
+        "snippet": "calc(avg(AMOUNT)*2)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">3,823.44</div>",
+        "out_plain": "3,823.44"
+    },
+    {
+        "id": "nest_calc_sum",
+        "snippet": "calc(sum(AMOUNT)+1)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">11,471.33</div>",
+        "out_plain": "11,471.33"
+    },
+    {
+        "id": "nest_abs_avg",
+        "snippet": "abs(avg(AMOUNT))",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">1,911.72</div>",
+        "out_plain": "1,911.72"
+    },
+    {
+        "id": "nest_fixed_avg",
+        "snippet": "fixed(avg(AMOUNT),4)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">1,911.7222</div>",
+        "out_plain": "1,911.7222"
+    },
+    {
+        "id": "nest_case_avg",
+        "snippet": "case(avg(AMOUNT)>1911.5, over, under)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">over</div>",
+        "out_plain": "over"
+    },
+    {
+        "id": "df_iso",
+        "snippet": "date_format(01-JAN-24, 'YYYY-MM-DD')",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2024-01-01</div>",
+        "out_plain": "2024-01-01"
+    },
+    {
+        "id": "df_long",
+        "snippet": "date_format(01-JAN-24, 'MMMM D, YYYY')",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">January 1, 2024</div>",
+        "out_plain": "January 1, 2024"
+    },
+    {
+        "id": "df_unquoted_comma",
+        "snippet": "date_format(01-JAN-24, MMMM D, YYYY)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">January 1, 2024</div>",
+        "out_plain": "January 1, 2024"
+    },
+    {
+        "id": "df_3char",
+        "snippet": "date_format(15-MAR-24, 'ddd MMM DD')",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">Fri Mar 15</div>",
+        "out_plain": "Fri Mar 15"
+    },
+    {
+        "id": "df_ordinal",
+        "snippet": "date_format(15-MAR-24, 'Do')",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">15th</div>",
+        "out_plain": "15th"
+    },
+    {
+        "id": "df_bracket_lit",
+        "snippet": "date_format(15-MAR-24, '[Week of] MMM D')",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">Week of Mar 15</div>",
+        "out_plain": "Week of Mar 15"
+    },
+    {
+        "id": "df_1char",
+        "snippet": "date_format(15-MAR-24, 'YY/M/D')",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">24/3/15</div>",
+        "out_plain": "24/3/15"
+    },
+    {
+        "id": "df_default_fmt",
+        "snippet": "date_format(15-MAR-24)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">03/15/2024</div>",
+        "out_plain": "03/15/2024"
+    },
+    {
+        "id": "df_bad_subject",
+        "snippet": "date_format(NOPE, 'YYYY')",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">Invalid Date</div>",
+        "out_plain": "Invalid Date"
+    },
+    {
+        "id": "df_nested_min",
+        "snippet": "date_format(min(DT), 'YYYY-MM-DD')",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2023-12-20</div>",
+        "out_plain": "2023-12-20"
+    },
+    {
+        "id": "df_nested_max",
+        "snippet": "date_format(max(DT), 'YYYY-MM-DD')",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2026-07-05</div>",
+        "out_plain": "2026-07-05"
+    },
+    {
+        "id": "df_offset_days",
+        "snippet": "date_format(01-JAN-24, 'YYYY-MM-DD', '+30 days')",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2024-01-31</div>",
+        "out_plain": "2024-01-31"
+    },
+    {
+        "id": "df_offset_chain",
+        "snippet": "date_format(01-JAN-24, 'YYYY-MM-DD', '+1 month', '+2 days')",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2024-02-03</div>",
+        "out_plain": "2024-02-03"
+    },
+    {
+        "id": "df_offset_negative",
+        "snippet": "date_format(15-MAR-24, 'YYYY-MM-DD', '-2 weeks')",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2024-03-01</div>",
+        "out_plain": "2024-03-01"
+    },
+    {
+        "id": "df_offset_quoted_fmt",
+        "snippet": "date_format(01-JAN-24, 'MMMM D, YYYY', '+45 days')",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">February 15, 2024</div>",
+        "out_plain": "February 15, 2024"
+    },
+    {
+        "id": "df_offset_only",
+        "snippet": "date_format(01-JAN-24, '+30 days')",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">01/31/2024</div>",
+        "out_plain": "01/31/2024"
+    },
+    {
+        "id": "df_offset_hours",
+        "snippet": "date_format(01-JAN-24, 'YYYY-MM-DD HH', '+36 hours')",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2024-01-02 12</div>",
+        "out_plain": "2024-01-02 12"
+    },
+    {
+        "id": "df_offset_month_clamp",
+        "snippet": "date_format(31-JAN-24, 'YYYY-MM-DD', '+1 month')",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2024-02-29</div>",
+        "out_plain": "2024-02-29"
+    },
+    {
+        "id": "df_offset_nested_min",
+        "snippet": "date_format(min(DT), 'YYYY-MM-DD', '+1 year')",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2024-12-20</div>",
+        "out_plain": "2024-12-20"
+    },
+    {
+        "id": "df_offset_column",
+        "snippet": "date_format(DT, 'YYYY-MM-DD', '-10 days')",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2023-12-22</div>",
+        "out_plain": "2023-12-22"
+    },
+    {
+        "id": "df_offset_legacy_regression",
+        "snippet": "date_format(20-DEC-23, dddd, MMMM D, YYYY)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">Wednesday, December 20, 2023</div>",
+        "out_plain": "Wednesday, December 20, 2023"
+    },
+    {
+        "id": "df_offset_unquoted_mix",
+        "snippet": "date_format(01-JAN-24, MMMM D, YYYY, +1 day)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">January 2, 2024</div>",
+        "out_plain": "January 2, 2024"
+    },
+    {
+        "id": "dd_days_default",
+        "snippet": "date_diff(15-MAR-24, 01-JAN-24)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">75</div>",
+        "out_plain": "75"
+    },
+    {
+        "id": "dd_days_reversed",
+        "snippet": "date_diff(01-JAN-24, 15-MAR-24)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">75</div>",
+        "out_plain": "75"
+    },
+    {
+        "id": "dd_same_day",
+        "snippet": "date_diff(01-JAN-24, 01-JAN-24, days)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">1</div>",
+        "out_plain": "1"
+    },
+    {
+        "id": "dd_weeks",
+        "snippet": "date_diff(15-MAR-24, 01-JAN-24, weeks)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">10</div>",
+        "out_plain": "10"
+    },
+    {
+        "id": "dd_months",
+        "snippet": "date_diff(15-MAR-24, 01-JAN-24, months)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2</div>",
+        "out_plain": "2"
+    },
+    {
+        "id": "dd_years",
+        "snippet": "date_diff(05-JUL-26, 20-DEC-23, years)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2</div>",
+        "out_plain": "2"
+    },
+    {
+        "id": "dd_template",
+        "snippet": "date_diff(05-JUL-26, 20-DEC-23, years, months and days)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2 years, 6 months and 13 days</div>",
+        "out_plain": "2 years, 6 months and 13 days"
+    },
+    {
+        "id": "dd_nested_minmax",
+        "snippet": "date_diff(max(DT), min(DT), days)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">929</div>",
+        "out_plain": "929"
+    },
+    {
+        "id": "dd_bad_subject",
+        "snippet": "date_diff(NOPE, 01-JAN-24)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">Invalid Date</div>",
+        "out_plain": "Invalid Date"
+    },
+    {
+        "id": "dd_big_no_commas",
+        "snippet": "date_diff(05-JUL-26, 20-DEC-23, days)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">929</div>",
+        "out_plain": "929"
+    },
+    {
+        "id": "now_default",
+        "snippet": "now()",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">10/14/2026</div>",
+        "out_plain": "10/14/2026"
+    },
+    {
+        "id": "now_iso",
+        "snippet": "now('YYYY-MM-DD')",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2026-10-14</div>",
+        "out_plain": "2026-10-14"
+    },
+    {
+        "id": "now_offset_1",
+        "snippet": "now('YYYY-MM-DD', '-1 year')",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2025-10-14</div>",
+        "out_plain": "2025-10-14"
+    },
+    {
+        "id": "now_offset_chain",
+        "snippet": "now('YYYY-MM-DD', '-1 year', '+6 days')",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2025-10-20</div>",
+        "out_plain": "2025-10-20"
+    },
+    {
+        "id": "now_long",
+        "snippet": "now('MMMM D, YYYY')",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">OCTOBER 14, 2026</div>",
+        "out_plain": "OCTOBER 14, 2026"
+    },
+    {
+        "id": "now_unquoted",
+        "snippet": "now(MM/DD/YYYY)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">10/14/2026</div>",
+        "out_plain": "10/14/2026"
+    },
+    {
+        "id": "now_bracket_lit",
+        "snippet": "now('[Run on] MMM D')",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">RUN ON OCT 14</div>",
+        "out_plain": "RUN ON OCT 14"
+    },
+    {
+        "id": "rank_top",
+        "snippet": "rank(1, AMOUNT)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">10,000</div>",
+        "out_plain": "10,000"
+    },
+    {
+        "id": "rank_second",
+        "snippet": "rank(2, AMOUNT)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">1,200.5</div>",
+        "out_plain": "1,200.5"
+    },
+    {
+        "id": "rank_bottom",
+        "snippet": "rank(-1, AMOUNT)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">-75.75</div>",
+        "out_plain": "-75.75"
+    },
+    {
+        "id": "rank_cond",
+        "snippet": "rank(1, AMOUNT, N>=3)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">10,000</div>",
+        "out_plain": "10,000"
+    },
+    {
+        "id": "rank_zero",
+        "snippet": "rank(0, AMOUNT)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">Invalid Rank</div>",
+        "out_plain": "Invalid Rank"
+    },
+    {
+        "id": "rank_bad_col",
+        "snippet": "rank(1, NOPE)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">N/A</div>",
+        "out_plain": "N/A"
+    },
+    {
+        "id": "rank_text_col",
+        "snippet": "rank(1, NAME)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">N/A</div>",
+        "out_plain": "N/A"
+    },
+    {
+        "id": "pct_50",
+        "snippet": "percentile(50, AMOUNT)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">172.63</div>",
+        "out_plain": "172.63"
+    },
+    {
+        "id": "pct_0",
+        "snippet": "percentile(0, AMOUNT)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">-75.75</div>",
+        "out_plain": "-75.75"
+    },
+    {
+        "id": "pct_100",
+        "snippet": "percentile(100, AMOUNT)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">10,000</div>",
+        "out_plain": "10,000"
+    },
+    {
+        "id": "pct_90",
+        "snippet": "percentile(90, AMOUNT)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">5,600.25</div>",
+        "out_plain": "5,600.25"
+    },
+    {
+        "id": "pct_out_of_range",
+        "snippet": "percentile(150, AMOUNT)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">Invalid Percentile</div>",
+        "out_plain": "Invalid Percentile"
+    },
+    {
+        "id": "pct_bad_col",
+        "snippet": "percentile(50, NOPE)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">0</div>",
+        "out_plain": "0"
+    },
+    {
+        "id": "stddev_amount",
+        "snippet": "stddev(AMOUNT)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">3,990.26</div>",
+        "out_plain": "3,990.26"
+    },
+    {
+        "id": "stddev_n",
+        "snippet": "stddev(N)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">1.87</div>",
+        "out_plain": "1.87"
+    },
+    {
+        "id": "stddev_cond",
+        "snippet": "stddev(AMOUNT, N>=3)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">5,005.32</div>",
+        "out_plain": "5,005.32"
+    },
+    {
+        "id": "stddev_bad_col",
+        "snippet": "stddev(NOPE)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">NaN</div>",
+        "out_plain": "NaN"
+    },
+    {
+        "id": "lookup_by_n",
+        "snippet": "lookup(NAME, N=1)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">Alpha</div>",
+        "out_plain": "Alpha"
+    },
+    {
+        "id": "lookup_first_match",
+        "snippet": "lookup(AMOUNT, NAME=Alpha)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">1200.50</div>",
+        "out_plain": "1200.50"
+    },
+    {
+        "id": "lookup_no_match",
+        "snippet": "lookup(NAME, N=99)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">N/A</div>",
+        "out_plain": "N/A"
+    },
+    {
+        "id": "lookup_gte",
+        "snippet": "lookup(AMOUNT, N>=5)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">10000</div>",
+        "out_plain": "10000"
+    },
+    {
+        "id": "lookup_bad_col",
+        "snippet": "lookup(NOPE, N=1)",
+        "out": "",
+        "out_plain": ""
+    },
+    {
+        "id": "wb_embedded_names",
+        "snippet": "metadata(1) and resume(2) and informal(3) stay literal",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">metadata(1) and resume(2) and informal(3) stay literal</div>",
+        "out_plain": "metadata(1) and resume(2) and informal(3) stay literal"
+    },
+    {
+        "id": "wb_dateformat_fmt",
+        "snippet": "date_format(01-JAN-24, 'YYYY') not format(...)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2024 not</div>",
+        "out_plain": "2024 not"
+    },
+    {
+        "id": "num_fixed_0dp",
+        "snippet": "fixed(1234.5, 0)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">1,235</div>",
+        "out_plain": "1,235"
+    },
+    {
+        "id": "num_fixed_3dp",
+        "snippet": "fixed(0.333, 3)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">0.333</div>",
+        "out_plain": "0.333"
+    },
+    {
+        "id": "num_round_neg",
+        "snippet": "round(-75.75, 1)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">-75.8</div>",
+        "out_plain": "-75.8"
+    },
+    {
+        "id": "num_calc_exponent",
+        "snippet": "calc(1e3 + 1)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">1,001</div>",
+        "out_plain": "1,001"
+    },
+    {
+        "id": "df_interior_year",
+        "snippet": "date_format(01-JAN-24, 'DD-YYYY-MM')",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">01-2024-01</div>",
+        "out_plain": "01-2024-01"
+    },
+    {
+        "id": "prose_iso_date",
+        "snippet": "Report window 2024-01-01 to 2024-12-31",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">Report window 2,024-1-1 to 2,024-12-31</div>",
+        "out_plain": "Report window 2,024-1-1 to 2,024-12-31"
+    },
+    {
+        "id": "rank_dup_top",
+        "snippet": "rank(1, DUP)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">30</div>",
+        "out_plain": "30"
+    },
+    {
+        "id": "rank_dup_2nd",
+        "snippet": "rank(2, DUP)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">20</div>",
+        "out_plain": "20"
+    },
+    {
+        "id": "rank_dup_3rd",
+        "snippet": "rank(3, DUP)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">10</div>",
+        "out_plain": "10"
+    },
+    {
+        "id": "rank_dup_bottom",
+        "snippet": "rank(-1, DUP)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">10</div>",
+        "out_plain": "10"
+    },
+    {
+        "id": "rank_dup_bot2",
+        "snippet": "rank(-2, DUP)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">20</div>",
+        "out_plain": "20"
+    },
+    {
+        "id": "distinct_dup",
+        "snippet": "distinct(DUP)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">3</div>",
+        "out_plain": "3"
+    },
+    {
+        "id": "progress_bar_thirds",
+        "snippet": "progress_bar(1, 3)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;\"><tr><td valign=\"middle\" style=\"padding:0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"120\" style=\"width:120px; height:20px; border:1px solid #ccc; border-collapse:collapse;\"><tr><td width=\"40\" style=\"width:40px; height:20px; background-color:var(brandprimary); font-size:0; line-height:0;\" bgcolor=\"var(brandprimary)\">&nbsp;</td><td width=\"80\" style=\"width:80px; height:20px; background-color:#e9ecef; font-size:0; line-height:0;\" bgcolor=\"#e9ecef\">&nbsp;</td></tr></table></td><td valign=\"middle\" style=\"padding:0 0 0 5px;\"><b style=\"font-size:10px; color:inherit; white-space:nowrap;\">33.3%</b></td></tr></table></div>",
+        "out_plain": "<table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;\"><tr><td valign=\"middle\" style=\"padding:0;\"><table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"120\" style=\"width:120px; height:20px; border:1px solid #ccc; border-collapse:collapse;\"><tr><td width=\"40\" style=\"width:40px; height:20px; background-color:var(brandprimary); font-size:0; line-height:0;\" bgcolor=\"var(brandprimary)\">&nbsp;</td><td width=\"80\" style=\"width:80px; height:20px; background-color:#e9ecef; font-size:0; line-height:0;\" bgcolor=\"#e9ecef\">&nbsp;</td></tr></table></td><td valign=\"middle\" style=\"padding:0 0 0 5px;\"><b style=\"font-size:10px; color:inherit; white-space:nowrap;\">33.3%</b></td></tr></table>"
+    },
+    {
+        "id": "data_prompt1",
+        "snippet": "data(prompt1)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">Engineering</div>",
+        "out_plain": "Engineering"
+    },
+    {
+        "id": "data_prompt2_year",
+        "snippet": "data(prompt2)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2026</div>",
+        "out_plain": "2026"
+    },
+    {
+        "id": "data_prompt3",
+        "snippet": "data(prompt3)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">ACTIVE</div>",
+        "out_plain": "ACTIVE"
+    },
+    {
+        "id": "data_prompt_missing",
+        "snippet": "data(prompt6)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">undefined</div>",
+        "out_plain": "undefined"
+    },
+    {
+        "id": "data_prompt_sentence",
+        "snippet": "Unit data(prompt1) for FY data(prompt2)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">Unit Engineering for FY 2026</div>",
+        "out_plain": "Unit Engineering for FY 2026"
+    },
+    {
+        "id": "data_prompt_nested",
+        "snippet": "string(uppercase, data(prompt1))",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">ENGINEERING</div>",
+        "out_plain": "ENGINEERING"
+    },
+    {
+        "id": "data_named_unit",
+        "snippet": "data(unit)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">Engineering</div>",
+        "out_plain": "Engineering"
+    },
+    {
+        "id": "data_subtitle",
+        "snippet": "data(subtitle)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">Awards by unit</div>",
+        "out_plain": "Awards by unit"
+    },
+    {
+        "id": "data_byline",
+        "snippet": "data(byline)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">Awards by unit</div>",
+        "out_plain": "Awards by unit"
+    },
+    {
+        "id": "data_rowlimit",
+        "snippet": "data(rowlimit)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">false</div>",
+        "out_plain": "false"
+    },
+    {
+        "id": "data_unknown_key",
+        "snippet": "data(nosuchkey)",
+        "out": "",
+        "out_plain": ""
+    },
+    {
+        "id": "me_fname",
+        "snippet": "me(fname)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">{FNAME}</div>",
+        "out_plain": "{FNAME}"
+    },
+    {
+        "id": "me_lname",
+        "snippet": "me(lname)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">{LNAME}</div>",
+        "out_plain": "{LNAME}"
+    },
+    {
+        "id": "me_email",
+        "snippet": "me(email)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">{EMAIL}</div>",
+        "out_plain": "{EMAIL}"
+    },
+    {
+        "id": "me_unityid",
+        "snippet": "me(unityid)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">{USERNAME}</div>",
+        "out_plain": "{USERNAME}"
+    },
+    {
+        "id": "me_default",
+        "snippet": "me()",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">{FNAME}</div>",
+        "out_plain": "{FNAME}"
+    },
+    {
+        "id": "info_default",
+        "snippet": "info()",
+        "out": "",
+        "out_plain": ""
+    }
+]

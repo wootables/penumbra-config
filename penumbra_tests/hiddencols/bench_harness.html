@@ -1,0 +1,271 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>hidden columns perf</title>
+<link rel="stylesheet" href="main.css">
+</head>
+<body class="theme-default">
+<!-- Perf harness (2026-09-30): the REAL main.js booted through the REAL run path
+     with a stubbed query.php answering a synthetic wide result set.
+     ?rows=N&cols=M&vis=K   M columns, the first K visible (preloaded report layout)
+     &narrow=1              the data holds ONLY the first K columns (the ideal)
+     &html=F                fraction of columns that are @@HTML resolver links
+     &json=J                number of @@JSON columns (placed after the visible ones) -->
+<div id="reportHeaderContainer"><div id="defaultTitleView"></div><div id="reportInfoPanel" style="display:none"></div></div>
+<input id="reportTitle" value=""><input id="reportSubtitle" value=""><div id="admWrapper"></div><button id="toggleAdminViewBtn"></button>
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div><div id="mainReportTitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<button id="executeQuery">Run</button><button id="stopQueryBtn">Stop</button>
+<div id="loadingOverlay" style="display:none"><p id="execution-timer"></p><p id="loadingMessage"></p></div>
+<div id="importTimestamps"></div>
+<div id="resultsHeader" style="height:20px">controls</div>
+<div id="table-view-container"><div id="container-parent"><div id="results-wrapper" style="width:1400px;height:700px;overflow:auto"><table id="resultsTable" class="data-grid-table"><caption class="sr-only">Report results table</caption><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table></div></div></div>
+<div id="paginationControls"><select id="rowsPerPageSelector"><option value="25">25</option><option value="50">50</option><option value="200">200</option><option value="all">All</option></select></div>
+<div id="errorBox"></div><div id="undo_text_container"></div>
+<div id="tableSearchContainer"><input id="tableSearch" value=""></div>
+<div id="resultCount"></div>
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="settingsPanelOverlay"></div>
+<div id="settingsPanel">
+  <select id="spThemeSelector"><option value="report-default">Report Default</option><option value="theme-default">Default</option></select>
+  <select id="spDensitySelector"><option value="report-default">Report Default</option><option value="standard">Standard</option></select>
+  <input type="checkbox" id="spRowExpandToggle"><input type="checkbox" id="spResolverToggle">
+  <div class="sp-section sp-columns-section"><div class="sp-column-container"><div id="spColumnList" class="sp-column-list"></div></div></div>
+  <div class="sp-actions"><button id="spApply">Save Column Layout</button><button id="spReset">Reset</button><span id="spPendingCount"></span></div>
+</div>
+<div id="pnbStatusBar">
+  <div class="sb-seg" id="sbColsSeg"><span id="sbCols"></span>
+    <span class="sb-chip" id="sbCustomCols" style="display:none;">custom layout</span>
+    <div class="sb-pop" id="sbCustomColsPop"><div id="sbCustomColsDiff"></div><button id="sbCustomColsReset">Reset</button><button id="sbCustomColsSave" style="display:none;">Save</button></div>
+  </div>
+  <div class="sb-seg" id="sbUserSeg"></div>
+</div>
+<pre id="out">running</pre>
+
+<script>
+  (function () { try { localStorage.clear(); } catch (e) {} })();
+  window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' } };
+  window.PENUMBRA_THEME_IDS = ['theme-default'];
+  window.PENUMBRA_THEME_ALIASES = {};
+  window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  (function () {
+  var P = new URLSearchParams(location.search);
+  var ROWS = +(P.get('rows') || 2000), COLS = +(P.get('cols') || 150), VIS = +(P.get('vis') || 10);
+  var NARROW = P.get('narrow') === '1', HTMLF = +(P.get('html') || 0), JSONC = +(P.get('json') || 0);
+  var NCOLS = NARROW ? VIS : COLS;
+  // Column names + kinds. Kinds cycle so every width has the same mix; @@HTML
+  // columns are spread evenly by fraction, @@JSON ones sit right after the
+  // visible block (so they are hidden in the wide layout).
+  var KINDS = ['text', 'num', 'date', 'code', 'text', 'money', 'text', 'num', 'code', 'text'];
+  var COLDEF = [];
+  var htmlEvery = HTMLF > 0 ? Math.max(1, Math.round(1 / HTMLF)) : 0;
+  for (var c = 0; c < COLS; c++) {
+    var kind = KINDS[c % KINDS.length];
+    if (htmlEvery && (c % htmlEvery) === 2) kind = 'html';
+    if (c >= VIS && c < VIS + JSONC) kind = 'json';
+    COLDEF.push({ name: 'COL_' + String(c + 1).padStart(3, '0') + '_' + kind.toUpperCase(), kind: kind });
+  }
+  var seed = 12345;
+  function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
+  var WORDS = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel', 'India', 'Juliet', 'Kilo', 'Lima', 'Research', 'Grant', 'Award', 'Sponsor', 'NIH', 'NSF', 'DOE', 'College'];
+  function val(kind, r) {
+    switch (kind) {
+      case 'num': return String(Math.floor(rnd() * 100000));
+      case 'money': return '$' + (rnd() * 1e6).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      case 'date': var d = new Date(2020, 0, 1 + Math.floor(rnd() * 2000)); return (d.getMonth() + 1) + '/' + d.getDate() + '/' + d.getFullYear();
+      case 'code': return WORDS[Math.floor(rnd() * 20)].slice(0, 3).toUpperCase() + '-' + Math.floor(rnd() * 999);
+      case 'html': var id = String(500000 + Math.floor(rnd() * 99999));
+        return '@@HTML<a href="https://oitras.oit.ncsu.edu/resolver/103?id=' + id + '" target="_new" title="View the project record (requires proper access)" class="resolver-link">' + id + '</a>';
+      case 'json': var arr = []; var k = 1 + Math.floor(rnd() * 3);
+        for (var q = 0; q < k; q++) arr.push({ SUB_ID: 'S' + Math.floor(rnd() * 999), SUB_AMT: Math.floor(rnd() * 5000), SUB_NAME: WORDS[Math.floor(rnd() * 20)] });
+        return '@@JSON' + JSON.stringify(arr);
+      default: return WORDS[Math.floor(rnd() * 20)] + ' ' + WORDS[Math.floor(rnd() * 20)] + ' ' + r;
+    }
+  }
+  window.__rows = function (n) {
+    var out = [];
+    for (var i = 1; i <= n; i++) {
+      var row = {};
+      for (var c = 0; c < NCOLS; c++) row[COLDEF[c].name] = val(COLDEF[c].kind, i);
+      out.push(row);
+    }
+    return out;
+  };
+  window.__COLDEF = COLDEF.slice(0, NCOLS);
+  var visIdx = ['#']; for (var v = 0; v < Math.min(VIS, NCOLS); v++) visIdx.push(v);
+  var order = []; for (var o = 0; o < NCOLS; o++) order.push(o);
+  window.__QUERY = 'SELECT * FROM PERF_FIXTURE';
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: [],
+    totalExemptions: ['AMOUNT', '_NUM', '_MONEY']
+  };
+  window.penumbra_vars.preloadedState = {
+    name: 'perffix', query: window.__QUERY, reportTitle: 'Perf fixture',
+    theme: 'theme-default', density: 'standard',
+    visibleColumns: visIdx, columnOrder: order,
+    sortCriteria: [], noLimit: true, rowExpandDefault: false, resolverLinksDefault: true,
+    rowsPerPage: '200', reportSnippet: (P.get('fmt') === '1' ? "format(row, COL_002_NUM > 50000, 'background-color:#fff3cd')" : '')
+  };
+  window.__T = {}; Error.stackTraceLimit = 40;
+  var _t0 = performance.now();
+  window.__queryResponse = { data: window.__rows(ROWS) };
+  window.__T.gen = performance.now() - _t0;
+  window.__queryDone = 0;
+  window.__ajaxLog = [];
+  })();
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  jQuery.ajax = function (a, b) {
+    var opts = (typeof a === 'string') ? jQuery.extend({ url: a }, b || {}) : (a || {});
+    var url = String(opts.url || '');
+    window.__ajaxLog.push(url);
+    var d = jQuery.Deferred();
+    var isQuery = /query\.php/.test(url);
+    var resp = isQuery ? window.__queryResponse : {};
+    setTimeout(function () {
+      if (isQuery) window.__T.success = performance.now();
+      try { if (opts.success) opts.success(resp, 'success', { status: 200 }); } catch (e) { window.__errors.push('ajax success threw: ' + String(e)); }
+      if (isQuery) window.__T.successRet = performance.now();
+      try { if (opts.complete) opts.complete({ status: 200 }, 'success'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }
+      d.resolve(resp, 'success', { status: 200 });
+      if (isQuery) window.__queryDone++;
+    }, 0);
+    var p = d.promise(); p.abort = function () {}; return p;
+  };
+  jQuery.getJSON = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.post = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.get = jQuery.post;
+  jQuery.fx.off = true;
+  // :visible spy, installed BEFORE main.js compiles any selector (Sizzle caches
+  // the pseudo function inside compiled matchers). Records only while on.
+  (function () {
+    var ps = jQuery.expr.pseudos, orig = ps.visible;
+    window.__visSpyOn = false; window.__visCalls = {};
+    ps.visible = function (elem) {
+      if (window.__visSpyOn) {
+        var st = String(new Error().stack || '').split(String.fromCharCode(10)).slice(2).filter(function (l) { return /main_perf\.js/.test(l) && !/pipAwareFind|PipAwareInit/.test(l); }).slice(0, 3).map(function (l) { return l.trim().replace(/\(?http:\/\/127\.0\.0\.1:\d+\//, '').replace(/\)$/, ''); }).join(' < ');
+        var rec = window.__visCalls[st];
+        if (!rec) {
+          var disp = 0, trs = document.querySelectorAll('#resultsTable tbody tr');
+          for (var i = 0; i < trs.length; i++) if (trs[i].style.display !== 'none') disp++;
+          rec = window.__visCalls[st] = { n: 0, displayedRowsAtFirstCall: disp };
+        }
+        rec.n++;
+      }
+      return orig(elem);
+    };
+  })();
+  window.__errors = [];
+  window.__rejections = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    window.__rejections.push(String((r && r.message) || r) + ' @' + String((r && r.stack) || '').split('\n').slice(1, 2).join('').trim());
+    e.preventDefault();
+  });
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  window.prompt = function () { return null; };
+  if (typeof window.stackHeaders !== 'function') window.stackHeaders = function () {};
+
+  // ---- bench helpers (called over CDP) -------------------------------------
+  function raf2() { return new Promise(function (r) { requestAnimationFrame(function () { requestAnimationFrame(function () { r(performance.now()); }); }); }); }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  async function waitHides(n, maxMs) {
+    var t = performance.now();
+    while ((window.__HP_HIDES || 0) < n && performance.now() - t < maxMs) await sleep(5);
+    return (window.__HP_HIDES || 0) >= n;
+  }
+  function census() {
+    var tb = document.querySelector('#resultsTable tbody');
+    var tds = tb ? tb.getElementsByTagName('td').length : 0;
+    var hidTd = 0, emptyHid = 0;
+    if (tb && tb.rows.length) {
+      var r0 = tb.rows[0];
+      for (var i = 0; i < r0.cells.length; i++) if (r0.cells[i].style.display === 'none') hidTd++;
+    }
+    var lazyLeft = tb ? tb.querySelectorAll('td[data-pnb-lazy]').length : 0;
+    var filledHidden = [];
+    if (tb && tb.rows.length) {
+      var ths = document.querySelectorAll('#tableHeader th');
+      for (var q = 0; q < ths.length; q++) {
+        if (ths[q].style.display === 'none' && ths[q].getAttribute('data-column') !== '#') {
+          var cell = tb.rows[0].cells[q];
+          if (cell && !cell.hasAttribute('data-pnb-lazy')) filledHidden.push(ths[q].getAttribute('data-colname'));
+        }
+      }
+    }
+    return { rows: tb ? tb.rows.length : 0, tds: tds, hiddenTdsPerRow: hidTd, lazyLeft: lazyLeft, filledHiddenCount: filledHidden.length, filledHiddenSample: filledHidden.slice(0, 8),
+             nodes: document.getElementsByTagName('*').length,
+             ths: document.querySelectorAll('#tableHeader th').length,
+             visThs: Array.prototype.filter.call(document.querySelectorAll('#tableHeader th'), function (th) { return th.style.display !== 'none'; }).length };
+  }
+  window.__bench = {
+    boot: async function () {
+      var ok = await waitHides(1, 600000);
+      var tDone = window.__HP_HIDE_T;
+      var tPaint = await raf2();
+      return { ok: ok, gen: window.__T.gen, success: window.__T.success, successRet: window.__T.successRet,
+               done: tDone, paint: tPaint, buildToDone: tDone - window.__T.success, buildToPaint: tPaint - window.__T.success,
+               census: census(), errors: window.__errors.concat(window.__rejections).slice(0, 5),
+               hpErr: [window.__HP_ERR, window.__HP_ERR2, (window.__HP_MISSING || []).join(',')].filter(Boolean).join('; ') };
+    },
+    search: async function (q) {
+      var before = window.__HP_HIDES || 0;
+      var t0 = performance.now();
+      $('#tableSearch').val(q);
+      window.__HP.runTableSearch();
+      var ok = await waitHides(before + 1, 600000);
+      var tDone = window.__HP_HIDE_T;
+      var tPaint = await raf2();
+      var shown = document.querySelectorAll('#resultsTable tbody tr:not(.search-hidden)').length;
+      return { ok: ok, toDone: tDone - t0, toPaint: tPaint - t0, matched: shown, count: $('#resultCount').text() };
+    },
+    sortClick: async function (colIdx) {
+      // click the visible header of data column colIdx (0-based data column)
+      var th = document.querySelector('#tableHeader th[data-column="' + colIdx + '"]');
+      var before = window.__HP_HIDES || 0;
+      var big = document.querySelectorAll('#resultsTable tbody tr').length > 500;
+      var t0 = performance.now();
+      $(th).trigger('click');
+      if (big) await waitHides(before + 1, 600000); else await sleep(0);
+      var tPaint = await raf2();
+      var first = document.querySelector('#resultsTable tbody tr');
+      return { toPaint: tPaint - t0, firstRowNum: first ? first.cells[0].textContent : null };
+    },
+    page: async function () {
+      var t0 = performance.now();
+      window.__HP.applyPagination();
+      var tPaint = await raf2();
+      return { toPaint: tPaint - t0 };
+    },
+    census: census,
+    // Record WHO calls jQuery's :visible (and how many rows are displayed at
+    // that moment) - the first call per distinct app caller.
+    visSpy: function (on) {
+      window.__visCalls = {};
+      window.__visSpyOn = !!on;
+      return on ? 'on' : 'off';
+    },
+    visReport: function () { return window.__visCalls; }
+  };
+</script>
+<script src="penumbra_userseg.js"></script>
+<script src="main_perf.js"></script>
+</body></html>

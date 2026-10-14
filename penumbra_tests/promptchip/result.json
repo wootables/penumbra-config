@@ -1,0 +1,44 @@
+{
+    "results":  [
+                    {
+                        "name":  "C1 a label wider than its slot stays INSIDE the chip (clear of the 24px pencil gutter)",
+                        "pass":  true,
+                        "detail":  "chip 5..263 x 5..68 em 43..238 x 10..44 strong 11..238 x 46..63"
+                    },
+                    {
+                        "name":  "C2 ...and its value is visible (was 0px wide)",
+                        "pass":  true,
+                        "detail":  "chip 5..263 x 5..68 em 43..238 x 10..44 strong 11..238 x 46..63"
+                    },
+                    {
+                        "name":  "C3 ...on its own line under the label",
+                        "pass":  true,
+                        "detail":  "chip 5..263 x 5..68 em 43..238 x 10..44 strong 11..238 x 46..63"
+                    },
+                    {
+                        "name":  "C4 ...and the label stays beside the icon (does not drop under it)",
+                        "pass":  true,
+                        "detail":  "ic 11..35 x 15..39 chip 5..263 x 5..68 em 43..238 x 10..44 strong 11..238 x 46..63"
+                    },
+                    {
+                        "name":  "C5 the chip itself stays inside its slot",
+                        "pass":  true,
+                        "detail":  "chip 5..263 x 5..68 em 43..238 x 10..44 strong 11..238 x 46..63"
+                    },
+                    {
+                        "name":  "C6 a short label + long value is unchanged: one line, the value ellipsizes beside the label",
+                        "pass":  true,
+                        "detail":  "chip 5..263 x 68..102 em 43..64 x 77..94 strong 72..238 x 77..94"
+                    },
+                    {
+                        "name":  "C7 with room, the long-label chip is one line (label then value)",
+                        "pass":  true,
+                        "detail":  "chip 5..700 x 102..136 em 43..289 x 111..128 strong 297..675 x 111..128"
+                    },
+                    {
+                        "name":  "C8 ...and its value shows in full (no squeeze)",
+                        "pass":  true,
+                        "detail":  "chip 5..700 x 102..136 em 43..289 x 111..128 strong 297..675 x 111..128"
+                    }
+                ]
+}

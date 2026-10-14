@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>search box harness</title>
+<script src="themes.js"></script>
+<script src="jquery-3.7.1.min.js"></script>
+<style>
+  body { margin: 0; padding: 14px 16px; }
+  #board { width: 1300px; }
+  #resultsHeader { position: static !important; }
+  #schedSlot { width: 560px; margin-top: 16px; }
+  #plainSlot { margin-top: 16px; width: 300px; }
+  #out { display: none; }
+</style>
+</head>
+<body>
+<!--
+  The search box (2026-10-06): the report search bar (#resultsHeader) and the
+  scheduler's Search Filter row, both LIFTED from the index.php under test,
+  under the css under test (main.css, density.css, search_builder.css), with the
+  REAL search_builder.js attached to both fields over a stub _penumbraSearchAPI.
+  run.py drives it over CDP: __combo(theme, density) re-themes in place,
+  __look(boxKey) measures one box, the behaviour checks use REAL mouse / keys.
+  #sbxPlain = a plain text field under the same theme: what a field's fill is.
+-->
+<div id="board">
+  <div id="reportSlot"></div>
+  <div id="schedSlot"></div>
+  <div id="plainSlot"><input type="text" id="sbxPlain" aria-label="plain field"></div>
+</div>
+<pre id="out"></pre>
+<script>
+(function () {
+  function get(u) { var x = new XMLHttpRequest(); x.open('GET', u, false); x.send(null); return x.responseText; }
+  function liftDiv(src, startIdx, what) {
+    if (startIdx < 0) throw new Error('lift: ' + what + ' not found');
+    var re = /<\/?div\b[^>]*>/g, depth = 0, m; re.lastIndex = startIdx;
+    while ((m = re.exec(src))) { depth += (m[0][1] === '/') ? -1 : 1; if (depth === 0) return src.slice(startIdx, m.index + m[0].length); }
+    throw new Error('lift: unbalanced ' + what);
+  }
+  try {
+    var idx = get('v/index.php');
+    document.getElementById('reportSlot').outerHTML = liftDiv(idx, idx.indexOf('<div id="resultsHeader">'), '#resultsHeader');
+    var s = idx.indexOf('id="schedSearchFilter"');
+    var html = liftDiv(idx, idx.lastIndexOf('<div class="sched-row"', s), 'the scheduler filter row');
+    if (html.indexOf('<?') >= 0) throw new Error('lifted markup contains PHP');
+    document.getElementById('schedSlot').innerHTML = html;
+  } catch (e) { window.__err = String(e && e.message || e); document.title = 'ERROR'; return; }
+  $('#tableSearchContainer').show();
+
+  window.__combo = function (theme, density) {
+    var row = (window.PNB_THEMES || []).filter(function (t) { return t.id === theme; })[0] || {};
+    var cls = [theme]; if (row.isDark) cls.push('is-dark'); if (row.modern) cls.push('registry-theme');
+    if (density && density !== 'standard') cls.push('density-' + density);
+    document.body.className = cls.join(' ');
+    document.body.setAttribute('data-theme', theme);
+    return document.body.className;
+  };
+  window.__text = function (on) {
+    $('#tableSearch').val(on ? 'COLLEGE = Engineering' : ''); $('#tableSearchContainer').toggleClass('has-text', !!on);
+    $('#schedSearchFilter').val(on ? 'STATUS = Active' : ''); $('#schedSearchFilter').closest('div').toggleClass('has-text', !!on);
+  };
+  var BOX = { report: '#tableSearch', sched: '#schedSearchFilter' };
+  // One box: the field and every segment, measured.
+  window.__look = function (key) {
+    var inp = document.querySelector(BOX[key]);
+    var wrap = inp && inp.parentElement;
+    var ib = inp.getBoundingClientRect(), ics = getComputedStyle(inp);
+    var segs = [];
+    $(wrap).children().not('input').each(function () {
+      var cs = getComputedStyle(this), b = this.getBoundingClientRect();
+      var svg = this.querySelector('svg'), scs = svg ? getComputedStyle(svg) : null;
+      segs.push({ id: this.id, cls: this.className, shown: this.getClientRects().length > 0 && cs.display !== 'none',
+        top: b.top - ib.top, bottom: ib.bottom - b.bottom, left: b.left - ib.left, right: ib.right - b.right, width: b.width,
+        bg: cs.backgroundColor, color: cs.color, bl: cs.borderLeftWidth + ' ' + cs.borderLeftStyle, br: cs.borderRightWidth + ' ' + cs.borderRightStyle,
+        bt: cs.borderTopWidth, bb: cs.borderBottomWidth, svgW: scs ? scs.width : null, svgFill: scs ? scs.fill : null, svgStroke: scs ? scs.stroke : null,
+        role: this.getAttribute('role'), label: this.getAttribute('aria-label'), title: this.getAttribute('title') });
+    });
+    var plain = getComputedStyle(document.getElementById('sbxPlain'));
+    return { wrapCls: wrap.className, h: ib.height, w: ib.width, pl: parseFloat(ics.paddingLeft), pr: parseFloat(ics.paddingRight),
+      bg: ics.backgroundColor, plainBg: plain.backgroundColor, border: ics.borderTopWidth + ' ' + ics.borderTopStyle,
+      borderColor: ics.borderTopColor, plainBorderColor: plain.borderTopColor, radius: ics.borderTopLeftRadius, shadow: ics.boxShadow,
+      muted: getComputedStyle(document.body).getPropertyValue('--text-muted').trim(), segs: segs };
+  };
+
+  var sheets = ['jquery-ui.css', 'v/main.css', 'penumbra_tiles.css', 'v/density.css', 'v/search_builder.css', 'penumbra_presets.css', 'themevars.css'];
+  var pending = sheets.length;
+  sheets.forEach(function (href) {
+    var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = href;
+    l.onload = l.onerror = function () { if (--pending === 0) loadJs(); };
+    document.head.appendChild(l);
+  });
+  function loadJs() {
+    var js = ['jquery-ui.min.js', 'moment.min.js', 'v/search_builder.js'], i = 0;
+    (function next() {
+      if (i >= js.length) return ready();
+      var sc = document.createElement('script'); sc.src = js[i++]; sc.onload = next; sc.onerror = next; document.head.appendChild(sc);
+    })();
+  }
+  function ready() {
+    var COLS = ['COLLEGE', 'DEPARTMENT', 'PI_NAME', 'AMOUNT', 'AWARD_DATE', 'STATUS', 'SPONSOR'];
+    var VALS = { COLLEGE: ['Agriculture', 'Engineering', 'Humanities', 'Sciences'], STATUS: ['Active', 'Closed', 'Pending'] };
+    window._penumbraSearchAPI = {
+      getColumns: function () { return COLS.map(function (c, i) { return { name: c, visible: i < 6 }; }); },
+      buildVirtualColumnNames: function () { return []; },
+      // SPONSOR has no value list (as main.js answers for long text / too many values)
+      getColumnAutocompleteValues: function (c) { return c === 'SPONSOR' ? null : (VALS[c] || ['a', 'b']); },
+      takeSrcModifier: function () { return { src: false }; }
+    };
+    window._penumbraSearchPresets = { getPresets: function () { return [{ name: 'Big awards', query: 'AMOUNT > 100000' }]; } };
+    window.__exec = 0;
+    var sb = window._penumbraSearchBuilder;
+    if (!sb || typeof sb.attachFilterAutocomplete !== 'function' || !$.fn.autocomplete) { window.__err = 'search_builder.js / jQuery UI not loaded'; document.title = 'ERROR'; return; }
+    sb.attachFilterAutocomplete('#tableSearch', { includePresets: true, onSearchExecute: function () { window.__exec++; } });
+    sb.attachFilterAutocomplete('#schedSearchFilter', { includePresets: false, includeRecipientVars: function () { return false; } });
+    window.__ready = true;
+    document.title = 'READY';
+  }
+})();
+</script>
+</body>
+</html>

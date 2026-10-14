@@ -1,0 +1,270 @@
+<?php
+/**
+ * maintenance - pins the PURE half of Penumbra's self-maintenance framework
+ * (penumbra_maintenance.php): the job registry, the once-a-day launch decision,
+ * the per-cycle plan (schedule + daily markers + run-now requests), and the
+ * detached launch command. penumbra_maintenance_tick() is the runner's I/O and
+ * is exercised by watching a live cycle, not here.
+ *
+ *   php -n test_maintenance.php <path-to-penumbra_maintenance.php>
+ *
+ * Requires the SHIPPED file straight from the app folder - never a copy.
+ * Tail must read "PASS: N   FAIL: 0" then "RESULT: GREEN".
+ */
+$lib = isset($argv[1]) ? $argv[1] : '';
+// The app folder holding the job files (a mutant run hands a temp copy of the
+// framework as $lib, so the job files cannot be found next to it).
+$app = isset($argv[2]) && $argv[2] !== '' ? rtrim($argv[2], '/\\') : dirname($lib);
+if (!is_file($lib)) { echo "library not found: $lib\n"; echo "RESULT: RED\n"; return; }
+require $lib;
+
+$PASS = 0; $FAIL = 0;
+function ok($cond, $label) {
+    global $PASS, $FAIL;
+    if ($cond) { $PASS++; echo "  ok   $label\n"; }
+    else       { $FAIL++; echo "  FAIL $label\n"; }
+}
+function eq($got, $want, $label) {
+    global $PASS, $FAIL;
+    if ($got === $want) { $PASS++; echo "  ok   $label\n"; }
+    else { $FAIL++; echo "  FAIL $label\n       want: " . var_export($want, true) . "\n       got:  " . var_export($got, true) . "\n"; }
+}
+
+// --------------------------------------------------------------- 1. registry
+echo "1. registry\n";
+$jobs = penumbra_maintenance_jobs();
+ok(isset($jobs['people_sync']), 'people_sync is registered');
+eq($jobs['people_sync']['file'], 'people_sync_job.php', 'its job file is people_sync_job.php');
+eq($jobs['people_sync']['function'], 'people_sync_run', 'its entry point is people_sync_run()');
+$bad = array();
+foreach ($jobs as $n => $j) {
+    if (!preg_match('/^[a-z][a-z0-9_]{0,40}$/', (string)$n)) $bad[] = "$n: name";
+    if (empty($j['file']) || !preg_match('/^[A-Za-z0-9_]+\.php$/', $j['file'])) $bad[] = "$n: file must be a bare .php in the app folder";
+    if (empty($j['function']) || !preg_match('/^[a-z][a-z0-9_]*$/', $j['function'])) $bad[] = "$n: function must be a plain identifier";
+    if (empty($j['label'])) $bad[] = "$n: label";
+    if (empty($j['log_prefix']) || !preg_match('/^[a-z0-9_]+_$/', $j['log_prefix'])) $bad[] = "$n: log_prefix (the admin tool finds log/<prefix><date>.log by it)";
+    if (empty($j['audit_action']) || !preg_match('/^[A-Z][A-Z0-9_]+$/', $j['audit_action'])) $bad[] = "$n: audit_action (the admin tool finds run history by it)";
+}
+eq($bad, array(), 'every job has a marker-safe name, a bare .php file (no path), a plain function name, a label, a log prefix and an audit action');
+// The job file must only DECLARE: the runner require_once's it inside the tick,
+// so anything that executed on include would run inside the runner's cycle.
+// Proven behaviourally: include it here and expect no output and no new globals.
+$jobFile = $app . DIRECTORY_SEPARATOR . $jobs['people_sync']['file'];
+ok(is_file($jobFile), 'the people_sync job file exists in the app folder');
+$jobCode = is_file($jobFile) ? php_strip_whitespace($jobFile) : '';   // comments removed: the docs mention exit() and popen()
+ok(preg_match('/(?<![\$\w])exit\s*[;(]/', $jobCode) === 0 && preg_match('/(?<![\$\w])die\s*[;(]/', $jobCode) === 0, 'it never calls exit()/die() (that would end the runner mid-cycle; a $exit variable is fine)');
+ok(preg_match('/\b(define|ini_set|register_shutdown_function|set_time_limit)\s*\(/', $jobCode) === 0, 'it never redefines process-wide state (define/ini_set/shutdown handler/time limit)');
+$globalsBefore = array_keys($GLOBALS);
+ob_start();
+if (is_file($jobFile)) require $jobFile;
+$includeOutput = ob_get_clean();
+$newGlobals = array_values(array_diff(array_keys($GLOBALS), $globalsBefore, array('globalsBefore', 'includeOutput')));   // the test's own two locals
+eq($includeOutput, '', 'including it prints nothing');
+eq($newGlobals, array(), 'including it creates no globals');
+ok(function_exists('people_sync_run'), 'and afterwards people_sync_run() is declared');
+eq($jobs['people_sync']['log_prefix'], 'people_sync_', 'people_sync logs to log/people_sync_<date>.log (what people_sync.php actually writes)');
+eq($jobs['people_sync']['audit_action'], 'PEOPLE_SYNC', 'people_sync audits as PEOPLE_SYNC (what people_sync.php actually writes)');
+
+// ------------------------------------------------------------------ 2. due()
+echo "2. due()\n";
+eq(penumbra_maintenance_due('05:30', '2026-09-23 05:25', '2026-09-22')['due'], false, 'five minutes early: not due');
+eq(penumbra_maintenance_due('05:30', '2026-09-23 05:30', '2026-09-22')['due'], true, 'at the configured minute: due');
+eq(penumbra_maintenance_due('05:30', '2026-09-23 05:34', '2026-09-22')['due'], true, 'the next tick after the time: due');
+eq(penumbra_maintenance_due('05:30', '2026-09-23 13:00', '')['due'], true, 'never launched (no marker), afternoon: due (a fresh deploy runs on its next cycle)');
+eq(penumbra_maintenance_due('05:30', '2026-09-23 05:35', '2026-09-23')['due'], false, 'already launched today: not due again');
+eq(penumbra_maintenance_due('05:30', '2026-09-23 23:59', '2026-09-23')['due'], false, 'still not due later the same day (one attempt per day, no retry)');
+eq(penumbra_maintenance_due('05:30', '2026-09-24 05:30', '2026-09-23')['due'], true, 'the following morning: due again');
+eq(penumbra_maintenance_due('00:00', '2026-09-23 00:00', '2026-09-22')['due'], true, 'midnight is a valid time');
+eq(penumbra_maintenance_due('23:59', '2026-09-23 23:59', '')['due'], true, 'last minute of the day is a valid time');
+foreach (array('', '5:30', '25:00', '05:60', '0530', 'noon') as $badT) {
+    $r = penumbra_maintenance_due($badT, '2026-09-23 13:00', '');
+    ok($r['due'] === false && strpos($r['reason'], 'not HH:MM') !== false, "time '$badT' is rejected (job off), with a reason");
+}
+$r = penumbra_maintenance_due('05:30', 'yesterday', '');
+ok($r['due'] === false && strpos($r['reason'], 'clock') !== false, 'a malformed clock string never launches');
+eq(penumbra_maintenance_due('05:30', '2026-09-23 13:00', 'garbage')['due'], true, 'a garbage marker counts as "not today" (launches, then overwrites it)');
+eq(penumbra_maintenance_due(' 05:30 ', '2026-09-23 13:00', " 2026-09-23\n")['due'], false, 'config and marker are trimmed');
+ok(strpos(penumbra_maintenance_due('05:30', '2026-09-23 05:25', '')['reason'], 'before 05:30') === 0, 'the reason names the configured time');
+
+// ----------------------------------------------------------------- 3. plan()
+echo "3. plan()\n";
+$reg = array(
+    'people_sync' => array('file' => 'people_sync_job.php', 'function' => 'people_sync_run', 'label' => 'directory', 'log_prefix' => 'people_sync_', 'audit_action' => 'PEOPLE_SYNC'),
+    'audit_prune' => array('file' => 'audit_prune_job.php', 'function' => 'audit_prune_run', 'label' => 'prune',     'log_prefix' => 'audit_prune_', 'audit_action' => 'AUDIT_PRUNE'),
+);
+$p = penumbra_maintenance_plan(array('people_sync' => '05:30'), '2026-09-23 05:35', array(), array(), $reg);
+eq(array_keys($p['launch']), array('people_sync'), 'a scheduled job past its time with no marker launches');
+eq($p['unknown'], array(), '...and nothing is unknown');
+$p = penumbra_maintenance_plan(array('people_sync' => '05:30'), '2026-09-23 05:35', array('people_sync' => '2026-09-23'), array(), $reg);
+eq($p['launch'], array(), 'already launched today: nothing launches');
+ok(isset($p['idle']['people_sync']) && strpos($p['idle']['people_sync'], 'already') !== false, 'it is reported idle with the reason');
+$p = penumbra_maintenance_plan(array('people_sync' => '05:30', 'audit_prune' => '02:00'), '2026-09-23 05:35', array('audit_prune' => '2026-09-23'), array(), $reg);
+eq(array_keys($p['launch']), array('people_sync'), 'two jobs, one already done today: only the other launches');
+$p = penumbra_maintenance_plan(array('people_sync' => '05:30', 'audit_prune' => '02:00'), '2026-09-23 05:35', array(), array(), $reg);
+eq(array_keys($p['launch']), array('people_sync', 'audit_prune'), 'two jobs both due: both launch, in config order');
+$p = penumbra_maintenance_plan(array('people_sync' => '05:30', 'audit_prune' => '02:00'), '2026-09-23 01:00', array(), array(), $reg);
+eq($p['launch'], array(), 'before both times: nothing');
+eq(count($p['idle']), 2, 'both reported idle');
+$p = penumbra_maintenance_plan(array('people_sync' => ''), '2026-09-23 13:00', array(), array(), $reg);
+eq($p['launch'], array(), "an empty time is 'off'");
+ok(strpos($p['idle']['people_sync'], 'off') !== false, 'and says so');
+foreach (array(null, '', '05:30', 5, false) as $notArr) {
+    $p = penumbra_maintenance_plan($notArr, '2026-09-23 13:00', array(), array(), $reg);
+    eq($p, array('launch' => array(), 'unknown' => array(), 'idle' => array()), 'non-array config ' . var_export($notArr, true) . ' = nothing scheduled, nothing reported');
+}
+$p = penumbra_maintenance_plan(array('rm_rf' => '05:30'), '2026-09-23 13:00', array(), array(), $reg);
+eq($p['launch'], array(), 'an unregistered name NEVER launches, whatever config says');
+ok(isset($p['unknown']['rm_rf']) && strpos($p['unknown']['rm_rf'], 'people_sync, audit_prune') !== false, 'it is reported unknown, naming the registry');
+$p = penumbra_maintenance_plan(array('rm_rf' => '05:30'), '2026-09-23 13:00', array('rm_rf' => '2026-09-23'), array(), $reg);
+eq($p['unknown'], array(), 'the unknown-name notice is once a day: silent when its marker is today');
+ok(isset($p['idle']['rm_rf']), '...but still accounted for as idle');
+$p = penumbra_maintenance_plan(array('people_sync' => '05:30'), '2026-09-23 04:00', array(), array('people_sync' => true), $reg);
+eq(array_keys($p['launch']), array('people_sync'), 'a run-now request launches BEFORE the scheduled time');
+ok(strpos($p['launch']['people_sync'], 'request') !== false, 'and the reason says it was requested');
+$p = penumbra_maintenance_plan(array('people_sync' => '05:30'), '2026-09-23 13:00', array('people_sync' => '2026-09-23'), array('people_sync' => true), $reg);
+eq(array_keys($p['launch']), array('people_sync'), 'a request launches again even though today already ran');
+$p = penumbra_maintenance_plan(array(), '2026-09-23 13:00', array(), array('audit_prune' => true), $reg);
+eq(array_keys($p['launch']), array('audit_prune'), 'a request for a registered but UNscheduled job still launches');
+$p = penumbra_maintenance_plan(array('audit_prune' => ''), '2026-09-23 13:00', array(), array('audit_prune' => true), $reg);
+eq(array_keys($p['launch']), array('audit_prune'), 'a request beats an empty (off) time');
+eq($p['idle'], array(), 'and it is no longer listed idle');
+$p = penumbra_maintenance_plan(array(), '2026-09-23 13:00', array(), array('rm_rf' => true), $reg);
+eq($p['launch'], array(), 'a request for an unregistered name is ignored');
+$p = penumbra_maintenance_plan(array('people_sync' => '05:30'), '2026-09-23 13:00', array(), array('people_sync' => false), $reg);
+eq(array_keys($p['launch']), array('people_sync'), 'a false request entry is just "no request" (the schedule still applies)');
+$p = penumbra_maintenance_plan(array('people_sync' => '05:30'), 'garbage', array(), array('people_sync' => true), $reg);
+eq($p, array('launch' => array(), 'unknown' => array(), 'idle' => array()), 'a malformed clock launches nothing, not even a request');
+$p = penumbra_maintenance_plan(array(' people_sync ' => '05:30'), '2026-09-23 13:00', array(), array(), $reg);
+eq(array_keys($p['launch']), array('people_sync'), 'config names are trimmed');
+$p = penumbra_maintenance_plan(array('people_sync' => '05:30'), '2026-09-23 13:00', array());
+ok(isset($p['launch']['people_sync']), 'the default registry is used when none is injected');
+$p = penumbra_maintenance_plan(array('people_sync' => '05:30'), '2026-09-23 13:00', array(), array(), $reg, array('people_sync' => true));
+eq($p['launch'], array(), 'a paused job does not launch on schedule');
+ok(isset($p['idle']['people_sync']) && strpos($p['idle']['people_sync'], 'paused') === 0, 'and is reported idle as paused');
+$p = penumbra_maintenance_plan(array('people_sync' => '05:30'), '2026-09-23 13:00', array(), array('people_sync' => true), $reg, array('people_sync' => true));
+eq(array_keys($p['launch']), array('people_sync'), 'a run-now request beats a pause (an explicit ask)');
+$p = penumbra_maintenance_plan(array('people_sync' => '05:30', 'audit_prune' => '02:00'), '2026-09-23 13:00', array(), array(), $reg, array('audit_prune' => true));
+eq(array_keys($p['launch']), array('people_sync'), 'pausing one job leaves the other on schedule');
+
+// ---------------------------------------------------- 3b. control files
+echo "3b. control files (state dir, flag rule, status for the admin tool)\n";
+ok(penumbra_maintenance_safe_name('people_sync') && !penumbra_maintenance_safe_name('../x') && !penumbra_maintenance_safe_name('People') && !penumbra_maintenance_safe_name(''), 'only lower-case identifiers make a file name');
+$DS = DIRECTORY_SEPARATOR;
+eq(penumbra_maintenance_control_path('people_sync', 'request', 'D:\\state\\'), 'D:\\state' . $DS . 'maint_people_sync.request', 'control path = <state dir>/maint_<job>.<kind>, trailing separator trimmed');
+eq(penumbra_maintenance_control_path('people_sync', 'delete', 'D:\\state'), null, 'an unknown kind has no path');
+eq(penumbra_maintenance_control_path('rm -rf', 'request', 'D:\\state'), null, 'an unsafe name has no path');
+$GLOBALS['config'] = array('maintenance_state_dir' => 'X:\\override\\');
+eq(penumbra_maintenance_state_dir(), 'X:\\override', "config 'maintenance_state_dir' overrides the default");
+unset($GLOBALS['config']);
+ok(strpos(penumbra_maintenance_state_dir(), 'PHP_8.2-p') !== false && stripos(penumbra_maintenance_state_dir(), 'logs') !== false, 'the default is the web-writable PHP logs folder (the notice/health state folder), not the webroot log/');
+eq(penumbra_maintenance_flag_from_content(null), false, 'no file = flag off');
+eq(penumbra_maintenance_flag_from_content(''), true, 'an EMPTY file = flag on (touch keeps working)');
+eq(penumbra_maintenance_flag_from_content("on\n"), true, '"on" = on');
+eq(penumbra_maintenance_flag_from_content("off\n"), false, '"off" = off (the web worker cannot delete, it writes off)');
+eq(penumbra_maintenance_flag_from_content("  OFF"), false, 'case and leading whitespace do not matter');
+eq(penumbra_maintenance_flag_from_content('offline'), false, 'anything starting with off is off (the rule is the first three characters)');
+eq(penumbra_maintenance_flag_from_content('2026-09-23'), true, 'a stray date is still on');
+$ctl = array('last' => array('people_sync' => '2026-09-23'), 'requested' => array(), 'paused' => array());
+$st = penumbra_maintenance_status(array('people_sync' => '05:30'), '2026-09-23 14:40', $ctl, $reg);
+eq(array_keys($st['jobs']), array('people_sync', 'audit_prune'), 'one status row per REGISTERED job, whether scheduled or not');
+$ps = $st['jobs']['people_sync'];
+eq(array($ps['scheduled'], $ps['time'], $ps['last'], $ps['requested'], $ps['paused'], $ps['will_run'], $ps['next']), array(true, '05:30', '2026-09-23', false, false, false, 'tomorrow'), 'scheduled job that already ran today: next = tomorrow');
+ok(strpos($ps['reason'], 'already launched today') !== false, 'with the plan reason');
+eq($st['jobs']['audit_prune']['next'], 'manual', 'an unscheduled registered job: manual only');
+eq($st['jobs']['audit_prune']['scheduled'], false, '...and not scheduled');
+$st = penumbra_maintenance_status(array('people_sync' => '05:30'), '2026-09-23 04:00', array('last' => array(), 'requested' => array(), 'paused' => array()), $reg);
+eq($st['jobs']['people_sync']['next'], 'today', 'before the time, not run yet: today');
+$st = penumbra_maintenance_status(array('people_sync' => '05:30'), '2026-09-23 06:00', array('last' => array(), 'requested' => array(), 'paused' => array()), $reg);
+eq(array($st['jobs']['people_sync']['will_run'], $st['jobs']['people_sync']['next']), array(true, 'next_cycle'), 'past the time, not run yet: next cycle');
+$st = penumbra_maintenance_status(array('people_sync' => '05:30'), '2026-09-23 04:00', array('last' => array(), 'requested' => array('people_sync' => true), 'paused' => array()), $reg);
+eq(array($st['jobs']['people_sync']['requested'], $st['jobs']['people_sync']['next']), array(true, 'next_cycle'), 'a request shows as requested and next cycle');
+$st = penumbra_maintenance_status(array('people_sync' => '05:30'), '2026-09-23 06:00', array('last' => array(), 'requested' => array(), 'paused' => array('people_sync' => true)), $reg);
+eq(array($st['jobs']['people_sync']['paused'], $st['jobs']['people_sync']['next'], $st['jobs']['people_sync']['will_run']), array(true, 'paused', false), 'a paused job shows paused and will not run');
+$st = penumbra_maintenance_status(array('people_sync' => '05:30', 'rm_rf' => '01:00'), '2026-09-23 06:00', array('last' => array(), 'requested' => array(), 'paused' => array()), $reg);
+ok(isset($st['unknown']['rm_rf']) && !isset($st['jobs']['rm_rf']), 'an unknown config name is reported, never listed as a job');
+$st = penumbra_maintenance_status(null, '2026-09-23 06:00', array(), $reg);
+eq(count($st['jobs']), 2, 'no config and no controls at all still lists every registered job');
+
+// ------------------------------------------------------------- 4. no spawn
+echo "4. inline execution (the server's php.ini disables every spawn function)\n";
+$fw = php_strip_whitespace($lib);   // comments removed: the header quotes the popen() error
+ok(preg_match('/\b(popen|proc_open|exec|shell_exec|system|passthru)\s*\(/', $fw) === 0, 'the framework never calls a process-spawning function (all are in disable_functions on oitras)');
+ok(strpos($fw, 'call_user_func($job[\'function\']') !== false, 'jobs run inline through their registered function');
+ok(strpos($fw, "require_once \$file") !== false, 'the job file is loaded with require_once (a second run in one process does not redeclare)');
+
+// ------------------------------------------------------- 5. run results
+echo "5. run results (maint_<job>.result: written by the tick, read by the hub and the Jobs tool)\n";
+$DS5 = DIRECTORY_SEPARATOR;
+$st5 = sys_get_temp_dir() . $DS5 . 'pnb_maint_state_' . getmypid();
+$ap5 = sys_get_temp_dir() . $DS5 . 'pnb_maint_app_' . getmypid();
+@mkdir($st5, 0777, true); @mkdir($ap5, 0777, true);
+eq(penumbra_maintenance_control_path('people_sync', 'result', $st5), $st5 . $DS5 . 'maint_people_sync.result', 'the result file sits beside the daily marker');
+eq(penumbra_maintenance_result_read('people_sync', $st5), null, 'no file: no result');
+ok(penumbra_maintenance_result_write('people_sync', $st5, array('finished' => '2026-09-24 05:31:07', 'exit' => 0, 'secs' => 17.24, 'error' => null, 'reason' => 'scheduled 05:30')), 'a result can be written');
+$r5 = penumbra_maintenance_result_read('people_sync', $st5);
+eq(array($r5['finished'], $r5['exit'], $r5['secs'], $r5['error'], $r5['reason'], $r5['label']), array('2026-09-24 05:31:07', 0, 17.24, null, 'scheduled 05:30', 'ok in 17.2 s'), 'and read back normalized, with its label');
+eq(array(penumbra_maintenance_exit_label(0), penumbra_maintenance_exit_label(1), penumbra_maintenance_exit_label(2), penumbra_maintenance_exit_label(3), penumbra_maintenance_exit_label(7), penumbra_maintenance_exit_label(null)),
+   array('ok', 'failed', 'skipped by a guard', 'locked (already running)', 'exit 7', 'threw'), 'the job contract: 0 ok, 1 failed, 2 guard, 3 locked, else raw, null threw');
+eq(penumbra_maintenance_result_label(array('exit' => null, 'error' => 'boom', 'secs' => 0.26)), 'threw - boom in 0.3 s', 'an exception labels as threw with its message');
+eq(penumbra_maintenance_result_label(array('exit' => 2)), 'skipped by a guard', 'no duration: no " in N s"');
+file_put_contents(penumbra_maintenance_control_path('people_sync', 'result', $st5), 'not json at all');
+eq(penumbra_maintenance_result_read('people_sync', $st5), null, 'garbage in the file reads as no result');
+penumbra_maintenance_result_write('people_sync', $st5, array('finished' => '2026-09-24 05:31:07', 'exit' => 1, 'secs' => 2.0, 'error' => null, 'reason' => 'requested'));
+$reg5 = array('people_sync' => $jobs['people_sync'], 'other_job' => $jobs['people_sync']);
+$ctl5 = penumbra_maintenance_read_controls(array('people_sync' => '05:30'), $reg5, $st5);
+eq(isset($ctl5['result']['people_sync']['exit']) ? $ctl5['result']['people_sync']['exit'] : 'missing', 1, 'read_controls carries the result');
+eq(isset($ctl5['result']['other_job']), false, 'and nothing for a job without one');
+$st = penumbra_maintenance_status(array('people_sync' => '05:30'), '2026-09-24 06:00', $ctl5, $reg5);
+eq($st['jobs']['people_sync']['result']['label'], 'failed in 2 s', 'the status row carries it, labelled');
+eq($st['jobs']['other_job']['result'], null, '...and null where there is none');
+// the tick writes it: two fake jobs in a scratch app folder, through the registry seam
+file_put_contents($ap5 . $DS5 . 'fake_job.php', '<?php function pnb_fake_job_run(array $o) { $GLOBALS["pnb_fake_ran"] = isset($GLOBALS["pnb_fake_ran"]) ? $GLOBALS["pnb_fake_ran"] + 1 : 1; return 2; }');
+file_put_contents($ap5 . $DS5 . 'throw_job.php', '<?php function pnb_throw_job_run(array $o) { throw new RuntimeException("boom"); }');
+$fake5 = array(
+    'fake_job'  => array('file' => 'fake_job.php',  'function' => 'pnb_fake_job_run',  'label' => 'Fake',   'log_prefix' => 'fake_',  'audit_action' => 'FAKE'),
+    'throw_job' => array('file' => 'throw_job.php', 'function' => 'pnb_throw_job_run', 'label' => 'Throws', 'log_prefix' => 'throw_', 'audit_action' => 'THROWS'),
+);
+$lines5 = array();
+$log5 = function ($m) use (&$lines5) { $lines5[] = $m; };
+$n5 = penumbra_maintenance_tick(array('fake_job' => '00:00', 'throw_job' => '00:00'), $ap5, $log5, $st5, $fake5);
+eq($n5, 1, 'the tick counts the job that ran (the one that threw does not count)');
+eq(isset($GLOBALS['pnb_fake_ran']) ? $GLOBALS['pnb_fake_ran'] : 0, 1, 'the fake job ran once, inline');
+$r5 = penumbra_maintenance_result_read('fake_job', $st5);
+ok(is_array($r5) && $r5['exit'] === 2 && $r5['error'] === null && $r5['reason'] !== '' && preg_match('/^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$/', $r5['finished']) === 1 && strpos($r5['label'], 'skipped by a guard in ') === 0, 'its result: exit 2, a timestamp, a duration, the launch reason');
+$r5 = penumbra_maintenance_result_read('throw_job', $st5);
+ok(is_array($r5) && $r5['exit'] === null && $r5['error'] === 'boom' && strpos($r5['label'], 'threw - boom in ') === 0, 'the job that threw: no exit code, the message, labelled threw');
+eq(trim((string)@file_get_contents(penumbra_maintenance_control_path('fake_job', 'last', $st5))), date('Y-m-d'), 'the daily marker was written first');
+ok(count($lines5) === 4 && strpos($lines5[1], "'fake_job' finished with exit 2") !== false && strpos($lines5[3], "'throw_job' threw after") !== false, 'four log lines: running/finished, running/threw');
+$n5 = penumbra_maintenance_tick(array('fake_job' => '00:00', 'throw_job' => '00:00'), $ap5, $log5, $st5, $fake5);
+eq(array($n5, $GLOBALS['pnb_fake_ran']), array(0, 1), 'the same day again: nothing relaunches');
+echo "5b. job checks (maint_<job>.checks: a job's own findings after a completed run, shown by the hub as warnings)\n";
+eq(penumbra_maintenance_control_path('people_sync', 'checks', $st5), $st5 . $DS5 . 'maint_people_sync.checks', 'the checks file sits beside the result');
+eq(penumbra_maintenance_checks_read('people_sync', $st5), null, 'no file: no checks');
+ok(penumbra_maintenance_checks_write('people_sync', array('PI eligibility differs from PI_ELIGIBLE_PROFILES for 41 people', '   ', 'PI eligibility cross-check skipped: reference is 4 days old'), $st5), 'a job can write its findings');
+$c5 = penumbra_maintenance_checks_read('people_sync', $st5);
+eq($c5['warnings'], array('PI eligibility differs from PI_ELIGIBLE_PROFILES for 41 people', 'PI eligibility cross-check skipped: reference is 4 days old'), 'read back in order, blank findings dropped');
+ok(preg_match('/^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$/', $c5['at']) === 1, 'stamped with the time they were written');
+$ctl5 = penumbra_maintenance_read_controls(array('people_sync' => '05:30'), $reg5, $st5);
+eq(isset($ctl5['checks']['people_sync']['warnings']) ? count($ctl5['checks']['people_sync']['warnings']) : 'missing', 2, 'read_controls carries the checks');
+eq(isset($ctl5['checks']['other_job']), false, 'and nothing for a job without any');
+$st = penumbra_maintenance_status(array('people_sync' => '05:30'), '2026-09-24 06:00', $ctl5, $reg5);
+eq($st['jobs']['people_sync']['checks']['warnings'][1], 'PI eligibility cross-check skipped: reference is 4 days old', 'the status row carries them');
+eq($st['jobs']['other_job']['checks'], null, '...and null where there are none');
+ok(penumbra_maintenance_checks_write('people_sync', array(), $st5), 'an all-clear run writes an empty list');
+$c5 = penumbra_maintenance_checks_read('people_sync', $st5);
+eq($c5['warnings'], array(), 'which clears the previous findings (a warning lives exactly as long as its condition)');
+ok(penumbra_maintenance_checks_write('people_sync', array(str_repeat('x', 500)), $st5), 'a long finding can be written');
+eq(strlen(penumbra_maintenance_checks_read('people_sync', $st5)['warnings'][0]), 400, 'and is capped at 400 characters');
+file_put_contents(penumbra_maintenance_control_path('people_sync', 'checks', $st5), '{"at":"2026-09-24 05:31:07","warnings":["a","   ",5,"b"]}');
+$c5 = penumbra_maintenance_checks_read('people_sync', $st5);
+eq($c5['warnings'], array('a', 'b'), 'a hand-edited file: non-strings and blanks are dropped on read too');
+ok(count(array_filter($c5['warnings'], 'is_string')) === count($c5['warnings']), 'the hub never sees a non-string finding');
+file_put_contents(penumbra_maintenance_control_path('people_sync', 'checks', $st5), '{"warnings":"not a list"}');
+eq(penumbra_maintenance_checks_read('people_sync', $st5), null, 'a malformed file reads as no checks');
+file_put_contents(penumbra_maintenance_control_path('people_sync', 'checks', $st5), 'garbage');
+eq(penumbra_maintenance_checks_read('people_sync', $st5), null, 'garbage reads as no checks');
+foreach (array('fake_job', 'throw_job', 'people_sync') as $j5) { foreach (array('last', 'result', 'request', 'paused', 'checks') as $k5) { @unlink(penumbra_maintenance_control_path($j5, $k5, $st5)); } }
+@unlink($ap5 . $DS5 . 'fake_job.php'); @unlink($ap5 . $DS5 . 'throw_job.php'); @rmdir($ap5); @rmdir($st5);
+
+echo "\nPASS: $PASS   FAIL: $FAIL\n";
+echo 'RESULT: ' . ($FAIL === 0 ? 'GREEN' : 'RED') . "\n";

@@ -1,0 +1,122 @@
+{
+    "pageErrors":  [
+
+                   ],
+    "results":  [
+                    {
+                        "name":  "P1 a trailing % marks the formula as a percentage",
+                        "pass":  true,
+                        "detail":  "expected true got true"
+                    },
+                    {
+                        "name":  "P2 ...and multiplies by 100 (1 of 4 = 25)",
+                        "pass":  true,
+                        "detail":  "expected 25 got 25"
+                    },
+                    {
+                        "name":  "P3 control: no % = a plain ratio, unflagged",
+                        "pass":  true,
+                        "detail":  "expected [false,0.25] got [false,0.25]"
+                    },
+                    {
+                        "name":  "P4 a % INSIDE a {label} is part of the label, not the marker",
+                        "pass":  true,
+                        "detail":  "expected [false,6] got [false,6]"
+                    },
+                    {
+                        "name":  "P5 a bare % is an empty formula",
+                        "pass":  true,
+                        "detail":  "expected \"Formula is empty\" got \"Formula is empty\""
+                    },
+                    {
+                        "name":  "P6 spaces around the % are fine",
+                        "pass":  true,
+                        "detail":  "expected [true,50] got [true,50]"
+                    },
+                    {
+                        "name":  "P7 division by zero still gives null (blank), % or not",
+                        "pass":  true,
+                        "detail":  "expected null got null"
+                    },
+                    {
+                        "name":  "Z1 Pat: 2 proposals, 0 awarded prints 0 and 0.0% (cell has rows)",
+                        "pass":  true,
+                        "detail":  "expected [\"2\",\"0\",\"1\",\"0.0%\",\"0.0%\"] got [\"2\",\"0\",\"1\",\"0.0%\",\"0.0%\"]"
+                    },
+                    {
+                        "name":  "Z2 Lee: 3 proposals, 2 awarded = 66.7%; no pending prints 0",
+                        "pass":  true,
+                        "detail":  "expected [\"3\",\"2\",\"0\",\"66.7%\",\"66.7%\"] got [\"3\",\"2\",\"0\",\"66.7%\",\"66.7%\"]"
+                    },
+                    {
+                        "name":  "Z3 Kim: 1 of 1 = 100.0%",
+                        "pass":  true,
+                        "detail":  "expected [\"1\",\"1\",\"0\",\"100.0%\",\"100.0%\"] got [\"1\",\"1\",\"0\",\"100.0%\",\"100.0%\"]"
+                    },
+                    {
+                        "name":  "Z4 the Grand Total row formats the % formulas too (5/9, 5/8)",
+                        "pass":  true,
+                        "detail":  "expected [\"Grand Total\",\"9\",\"5\",\"1\",\"55.6%\",\"62.5%\"] got [\"Grand Total\",\"9\",\"5\",\"1\",\"55.6%\",\"62.5%\"]"
+                    },
+                    {
+                        "name":  "Z5 an EMPTY cell (no rows) is still blank: count",
+                        "pass":  true,
+                        "detail":  "expected \"\" got \"\""
+                    },
+                    {
+                        "name":  "Z6 ...and sum",
+                        "pass":  true,
+                        "detail":  "expected \"\" got \"\""
+                    },
+                    {
+                        "name":  "Z7 ...and its formula (0/0)",
+                        "pass":  true,
+                        "detail":  "expected \"\" got \"\""
+                    },
+                    {
+                        "name":  "Z8 while Ray FY 2025 (rows) prints its 0 pending",
+                        "pass":  true,
+                        "detail":  "expected \"0\" got \"0\""
+                    },
+                    {
+                        "name":  "Z9 a filtered aggregation with no matches in a cell with rows prints 0",
+                        "pass":  true,
+                        "detail":  "expected \"0\" got \"0\""
+                    },
+                    {
+                        "name":  "Z10 plain formulas: no % sign; a 0 result with rows prints 0",
+                        "pass":  true,
+                        "detail":  "expected [\"20\",\"0\"] got [\"20\",\"0\"]"
+                    },
+                    {
+                        "name":  "N0 fixture: a nested 3-field pivot rendered with 3 row-field headers",
+                        "pass":  true,
+                        "detail":  "\u003ctable id=\"pivotResultTable\" class=\"is-nested-pivot\"\u003e\u003ccaption class=\"sr-only\"\u003ePivot table results\u003c/caption\u003e\u003cthead\u003e\u003ctr\u003e\u003cth class=\"pivot-sticky-col\" rowspan=\"2\" data-row-field=\"0\"\u003e\u003cdiv class=\"pivot-head"
+                    },
+                    {
+                        "name":  "N1 the footer spacer is tagged with the first column it spans",
+                        "pass":  true,
+                        "detail":  "expected \"1/2\" got \"1/2\""
+                    },
+                    {
+                        "name":  "N2 all collapsed: both child columns are minimized",
+                        "pass":  true,
+                        "detail":  "expected [true,true] got [true,true]"
+                    },
+                    {
+                        "name":  "N3 ...and so is the spacer that spans them",
+                        "pass":  true,
+                        "detail":  "expected true got true"
+                    },
+                    {
+                        "name":  "N4 the minimized columns take NO width (was 5.5px each)",
+                        "pass":  true,
+                        "detail":  "expected [0,0] got [0,0]"
+                    },
+                    {
+                        "name":  "N5 one college expanded: column 1 and the spacer are back",
+                        "pass":  true,
+                        "detail":  "expected [false,false] got [false,false]"
+                    }
+                ]
+}

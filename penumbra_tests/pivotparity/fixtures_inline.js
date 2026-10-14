@@ -1,0 +1,27979 @@
+window.__FIXTURES = {
+    "generated": "gen_fixtures.php",
+    "count": 1863,
+    "cases": [
+        {
+            "id": "001-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 1,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {}
+                },
+                "count",
+                null,
+                null
+            ],
+            "note": "empty/count"
+        },
+        {
+            "id": "002-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 1,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {}
+                },
+                "sum",
+                null,
+                null
+            ],
+            "note": "empty/sum"
+        },
+        {
+            "id": "003-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 1,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {}
+                },
+                "avg",
+                null,
+                null
+            ],
+            "note": "empty/avg"
+        },
+        {
+            "id": "004-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 1,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {}
+                },
+                "median",
+                null,
+                null
+            ],
+            "note": "empty/median"
+        },
+        {
+            "id": "005-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 1,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {}
+                },
+                "min",
+                null,
+                null
+            ],
+            "note": "empty/min"
+        },
+        {
+            "id": "006-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 1,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {}
+                },
+                "max",
+                null,
+                null
+            ],
+            "note": "empty/max"
+        },
+        {
+            "id": "007-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 1,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {}
+                },
+                "distinct",
+                null,
+                null
+            ],
+            "note": "empty/distinct"
+        },
+        {
+            "id": "008-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 1,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {}
+                },
+                "mode",
+                null,
+                null
+            ],
+            "note": "empty/mode"
+        },
+        {
+            "id": "009-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 1,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {}
+                },
+                "stddev",
+                null,
+                null
+            ],
+            "note": "empty/stddev"
+        },
+        {
+            "id": "010-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 1,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {}
+                },
+                "range",
+                null,
+                null
+            ],
+            "note": "empty/range"
+        },
+        {
+            "id": "011-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 1,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {}
+                },
+                "count_filled",
+                null,
+                null
+            ],
+            "note": "empty/count_filled"
+        },
+        {
+            "id": "012-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 1,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {}
+                },
+                "count_blank",
+                null,
+                null
+            ],
+            "note": "empty/count_blank"
+        },
+        {
+            "id": "013-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 1,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {}
+                },
+                "antimode",
+                null,
+                null
+            ],
+            "note": "empty/antimode"
+        },
+        {
+            "id": "014-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 1,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {}
+                },
+                "p10",
+                null,
+                null
+            ],
+            "note": "empty/p10"
+        },
+        {
+            "id": "015-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 1,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {}
+                },
+                "p25",
+                null,
+                null
+            ],
+            "note": "empty/p25"
+        },
+        {
+            "id": "016-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 1,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {}
+                },
+                "p50",
+                null,
+                null
+            ],
+            "note": "empty/p50"
+        },
+        {
+            "id": "017-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 1,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {}
+                },
+                "p75",
+                null,
+                null
+            ],
+            "note": "empty/p75"
+        },
+        {
+            "id": "018-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 1,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {}
+                },
+                "p90",
+                null,
+                null
+            ],
+            "note": "empty/p90"
+        },
+        {
+            "id": "019-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 1,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {}
+                },
+                "p99",
+                null,
+                null
+            ],
+            "note": "empty/p99"
+        },
+        {
+            "id": "020-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 1,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {}
+                },
+                "wavg@WT",
+                null,
+                null
+            ],
+            "note": "empty/wavg@WT"
+        },
+        {
+            "id": "021-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 1,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {}
+                },
+                "formula",
+                null,
+                null
+            ],
+            "note": "empty/formula"
+        },
+        {
+            "id": "022-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 1,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {}
+                },
+                "bogus_agg",
+                null,
+                null
+            ],
+            "note": "empty/bogus_agg"
+        },
+        {
+            "id": "023-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 30,
+                    "numericCount": 2,
+                    "min": 10,
+                    "max": 20,
+                    "distinct": [
+                        "10",
+                        "20"
+                    ],
+                    "values": [
+                        "10",
+                        "20"
+                    ],
+                    "wpairs": {
+                        "WT": {
+                            "w": 4,
+                            "wv": 70
+                        }
+                    }
+                },
+                "count",
+                null,
+                null
+            ],
+            "note": "nums/count"
+        },
+        {
+            "id": "024-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 30,
+                    "numericCount": 2,
+                    "min": 10,
+                    "max": 20,
+                    "distinct": [
+                        "10",
+                        "20"
+                    ],
+                    "values": [
+                        "10",
+                        "20"
+                    ],
+                    "wpairs": {
+                        "WT": {
+                            "w": 4,
+                            "wv": 70
+                        }
+                    }
+                },
+                "sum",
+                null,
+                null
+            ],
+            "note": "nums/sum"
+        },
+        {
+            "id": "025-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 30,
+                    "numericCount": 2,
+                    "min": 10,
+                    "max": 20,
+                    "distinct": [
+                        "10",
+                        "20"
+                    ],
+                    "values": [
+                        "10",
+                        "20"
+                    ],
+                    "wpairs": {
+                        "WT": {
+                            "w": 4,
+                            "wv": 70
+                        }
+                    }
+                },
+                "avg",
+                null,
+                null
+            ],
+            "note": "nums/avg"
+        },
+        {
+            "id": "026-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 30,
+                    "numericCount": 2,
+                    "min": 10,
+                    "max": 20,
+                    "distinct": [
+                        "10",
+                        "20"
+                    ],
+                    "values": [
+                        "10",
+                        "20"
+                    ],
+                    "wpairs": {
+                        "WT": {
+                            "w": 4,
+                            "wv": 70
+                        }
+                    }
+                },
+                "median",
+                null,
+                null
+            ],
+            "note": "nums/median"
+        },
+        {
+            "id": "027-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 30,
+                    "numericCount": 2,
+                    "min": 10,
+                    "max": 20,
+                    "distinct": [
+                        "10",
+                        "20"
+                    ],
+                    "values": [
+                        "10",
+                        "20"
+                    ],
+                    "wpairs": {
+                        "WT": {
+                            "w": 4,
+                            "wv": 70
+                        }
+                    }
+                },
+                "min",
+                null,
+                null
+            ],
+            "note": "nums/min"
+        },
+        {
+            "id": "028-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 30,
+                    "numericCount": 2,
+                    "min": 10,
+                    "max": 20,
+                    "distinct": [
+                        "10",
+                        "20"
+                    ],
+                    "values": [
+                        "10",
+                        "20"
+                    ],
+                    "wpairs": {
+                        "WT": {
+                            "w": 4,
+                            "wv": 70
+                        }
+                    }
+                },
+                "max",
+                null,
+                null
+            ],
+            "note": "nums/max"
+        },
+        {
+            "id": "029-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 30,
+                    "numericCount": 2,
+                    "min": 10,
+                    "max": 20,
+                    "distinct": [
+                        "10",
+                        "20"
+                    ],
+                    "values": [
+                        "10",
+                        "20"
+                    ],
+                    "wpairs": {
+                        "WT": {
+                            "w": 4,
+                            "wv": 70
+                        }
+                    }
+                },
+                "distinct",
+                null,
+                null
+            ],
+            "note": "nums/distinct"
+        },
+        {
+            "id": "030-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 30,
+                    "numericCount": 2,
+                    "min": 10,
+                    "max": 20,
+                    "distinct": [
+                        "10",
+                        "20"
+                    ],
+                    "values": [
+                        "10",
+                        "20"
+                    ],
+                    "wpairs": {
+                        "WT": {
+                            "w": 4,
+                            "wv": 70
+                        }
+                    }
+                },
+                "mode",
+                null,
+                null
+            ],
+            "note": "nums/mode"
+        },
+        {
+            "id": "031-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 30,
+                    "numericCount": 2,
+                    "min": 10,
+                    "max": 20,
+                    "distinct": [
+                        "10",
+                        "20"
+                    ],
+                    "values": [
+                        "10",
+                        "20"
+                    ],
+                    "wpairs": {
+                        "WT": {
+                            "w": 4,
+                            "wv": 70
+                        }
+                    }
+                },
+                "stddev",
+                null,
+                null
+            ],
+            "note": "nums/stddev"
+        },
+        {
+            "id": "032-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 30,
+                    "numericCount": 2,
+                    "min": 10,
+                    "max": 20,
+                    "distinct": [
+                        "10",
+                        "20"
+                    ],
+                    "values": [
+                        "10",
+                        "20"
+                    ],
+                    "wpairs": {
+                        "WT": {
+                            "w": 4,
+                            "wv": 70
+                        }
+                    }
+                },
+                "range",
+                null,
+                null
+            ],
+            "note": "nums/range"
+        },
+        {
+            "id": "033-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 30,
+                    "numericCount": 2,
+                    "min": 10,
+                    "max": 20,
+                    "distinct": [
+                        "10",
+                        "20"
+                    ],
+                    "values": [
+                        "10",
+                        "20"
+                    ],
+                    "wpairs": {
+                        "WT": {
+                            "w": 4,
+                            "wv": 70
+                        }
+                    }
+                },
+                "count_filled",
+                null,
+                null
+            ],
+            "note": "nums/count_filled"
+        },
+        {
+            "id": "034-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 30,
+                    "numericCount": 2,
+                    "min": 10,
+                    "max": 20,
+                    "distinct": [
+                        "10",
+                        "20"
+                    ],
+                    "values": [
+                        "10",
+                        "20"
+                    ],
+                    "wpairs": {
+                        "WT": {
+                            "w": 4,
+                            "wv": 70
+                        }
+                    }
+                },
+                "count_blank",
+                null,
+                null
+            ],
+            "note": "nums/count_blank"
+        },
+        {
+            "id": "035-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 30,
+                    "numericCount": 2,
+                    "min": 10,
+                    "max": 20,
+                    "distinct": [
+                        "10",
+                        "20"
+                    ],
+                    "values": [
+                        "10",
+                        "20"
+                    ],
+                    "wpairs": {
+                        "WT": {
+                            "w": 4,
+                            "wv": 70
+                        }
+                    }
+                },
+                "antimode",
+                null,
+                null
+            ],
+            "note": "nums/antimode"
+        },
+        {
+            "id": "036-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 30,
+                    "numericCount": 2,
+                    "min": 10,
+                    "max": 20,
+                    "distinct": [
+                        "10",
+                        "20"
+                    ],
+                    "values": [
+                        "10",
+                        "20"
+                    ],
+                    "wpairs": {
+                        "WT": {
+                            "w": 4,
+                            "wv": 70
+                        }
+                    }
+                },
+                "p10",
+                null,
+                null
+            ],
+            "note": "nums/p10"
+        },
+        {
+            "id": "037-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 30,
+                    "numericCount": 2,
+                    "min": 10,
+                    "max": 20,
+                    "distinct": [
+                        "10",
+                        "20"
+                    ],
+                    "values": [
+                        "10",
+                        "20"
+                    ],
+                    "wpairs": {
+                        "WT": {
+                            "w": 4,
+                            "wv": 70
+                        }
+                    }
+                },
+                "p25",
+                null,
+                null
+            ],
+            "note": "nums/p25"
+        },
+        {
+            "id": "038-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 30,
+                    "numericCount": 2,
+                    "min": 10,
+                    "max": 20,
+                    "distinct": [
+                        "10",
+                        "20"
+                    ],
+                    "values": [
+                        "10",
+                        "20"
+                    ],
+                    "wpairs": {
+                        "WT": {
+                            "w": 4,
+                            "wv": 70
+                        }
+                    }
+                },
+                "p50",
+                null,
+                null
+            ],
+            "note": "nums/p50"
+        },
+        {
+            "id": "039-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 30,
+                    "numericCount": 2,
+                    "min": 10,
+                    "max": 20,
+                    "distinct": [
+                        "10",
+                        "20"
+                    ],
+                    "values": [
+                        "10",
+                        "20"
+                    ],
+                    "wpairs": {
+                        "WT": {
+                            "w": 4,
+                            "wv": 70
+                        }
+                    }
+                },
+                "p75",
+                null,
+                null
+            ],
+            "note": "nums/p75"
+        },
+        {
+            "id": "040-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 30,
+                    "numericCount": 2,
+                    "min": 10,
+                    "max": 20,
+                    "distinct": [
+                        "10",
+                        "20"
+                    ],
+                    "values": [
+                        "10",
+                        "20"
+                    ],
+                    "wpairs": {
+                        "WT": {
+                            "w": 4,
+                            "wv": 70
+                        }
+                    }
+                },
+                "p90",
+                null,
+                null
+            ],
+            "note": "nums/p90"
+        },
+        {
+            "id": "041-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 30,
+                    "numericCount": 2,
+                    "min": 10,
+                    "max": 20,
+                    "distinct": [
+                        "10",
+                        "20"
+                    ],
+                    "values": [
+                        "10",
+                        "20"
+                    ],
+                    "wpairs": {
+                        "WT": {
+                            "w": 4,
+                            "wv": 70
+                        }
+                    }
+                },
+                "p99",
+                null,
+                null
+            ],
+            "note": "nums/p99"
+        },
+        {
+            "id": "042-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 30,
+                    "numericCount": 2,
+                    "min": 10,
+                    "max": 20,
+                    "distinct": [
+                        "10",
+                        "20"
+                    ],
+                    "values": [
+                        "10",
+                        "20"
+                    ],
+                    "wpairs": {
+                        "WT": {
+                            "w": 4,
+                            "wv": 70
+                        }
+                    }
+                },
+                "wavg@WT",
+                null,
+                null
+            ],
+            "note": "nums/wavg@WT"
+        },
+        {
+            "id": "043-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 30,
+                    "numericCount": 2,
+                    "min": 10,
+                    "max": 20,
+                    "distinct": [
+                        "10",
+                        "20"
+                    ],
+                    "values": [
+                        "10",
+                        "20"
+                    ],
+                    "wpairs": {
+                        "WT": {
+                            "w": 4,
+                            "wv": 70
+                        }
+                    }
+                },
+                "formula",
+                null,
+                null
+            ],
+            "note": "nums/formula"
+        },
+        {
+            "id": "044-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 30,
+                    "numericCount": 2,
+                    "min": 10,
+                    "max": 20,
+                    "distinct": [
+                        "10",
+                        "20"
+                    ],
+                    "values": [
+                        "10",
+                        "20"
+                    ],
+                    "wpairs": {
+                        "WT": {
+                            "w": 4,
+                            "wv": 70
+                        }
+                    }
+                },
+                "bogus_agg",
+                null,
+                null
+            ],
+            "note": "nums/bogus_agg"
+        },
+        {
+            "id": "045-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "a",
+                        "b"
+                    ],
+                    "values": [
+                        "a",
+                        "b",
+                        "c"
+                    ],
+                    "wpairs": {}
+                },
+                "count",
+                null,
+                null
+            ],
+            "note": "text/count"
+        },
+        {
+            "id": "046-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "a",
+                        "b"
+                    ],
+                    "values": [
+                        "a",
+                        "b",
+                        "c"
+                    ],
+                    "wpairs": {}
+                },
+                "sum",
+                null,
+                null
+            ],
+            "note": "text/sum"
+        },
+        {
+            "id": "047-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "a",
+                        "b"
+                    ],
+                    "values": [
+                        "a",
+                        "b",
+                        "c"
+                    ],
+                    "wpairs": {}
+                },
+                "avg",
+                null,
+                null
+            ],
+            "note": "text/avg"
+        },
+        {
+            "id": "048-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "a",
+                        "b"
+                    ],
+                    "values": [
+                        "a",
+                        "b",
+                        "c"
+                    ],
+                    "wpairs": {}
+                },
+                "median",
+                null,
+                null
+            ],
+            "note": "text/median"
+        },
+        {
+            "id": "049-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "a",
+                        "b"
+                    ],
+                    "values": [
+                        "a",
+                        "b",
+                        "c"
+                    ],
+                    "wpairs": {}
+                },
+                "min",
+                null,
+                null
+            ],
+            "note": "text/min"
+        },
+        {
+            "id": "050-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "a",
+                        "b"
+                    ],
+                    "values": [
+                        "a",
+                        "b",
+                        "c"
+                    ],
+                    "wpairs": {}
+                },
+                "max",
+                null,
+                null
+            ],
+            "note": "text/max"
+        },
+        {
+            "id": "051-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "a",
+                        "b"
+                    ],
+                    "values": [
+                        "a",
+                        "b",
+                        "c"
+                    ],
+                    "wpairs": {}
+                },
+                "distinct",
+                null,
+                null
+            ],
+            "note": "text/distinct"
+        },
+        {
+            "id": "052-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "a",
+                        "b"
+                    ],
+                    "values": [
+                        "a",
+                        "b",
+                        "c"
+                    ],
+                    "wpairs": {}
+                },
+                "mode",
+                null,
+                null
+            ],
+            "note": "text/mode"
+        },
+        {
+            "id": "053-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "a",
+                        "b"
+                    ],
+                    "values": [
+                        "a",
+                        "b",
+                        "c"
+                    ],
+                    "wpairs": {}
+                },
+                "stddev",
+                null,
+                null
+            ],
+            "note": "text/stddev"
+        },
+        {
+            "id": "054-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "a",
+                        "b"
+                    ],
+                    "values": [
+                        "a",
+                        "b",
+                        "c"
+                    ],
+                    "wpairs": {}
+                },
+                "range",
+                null,
+                null
+            ],
+            "note": "text/range"
+        },
+        {
+            "id": "055-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "a",
+                        "b"
+                    ],
+                    "values": [
+                        "a",
+                        "b",
+                        "c"
+                    ],
+                    "wpairs": {}
+                },
+                "count_filled",
+                null,
+                null
+            ],
+            "note": "text/count_filled"
+        },
+        {
+            "id": "056-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "a",
+                        "b"
+                    ],
+                    "values": [
+                        "a",
+                        "b",
+                        "c"
+                    ],
+                    "wpairs": {}
+                },
+                "count_blank",
+                null,
+                null
+            ],
+            "note": "text/count_blank"
+        },
+        {
+            "id": "057-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "a",
+                        "b"
+                    ],
+                    "values": [
+                        "a",
+                        "b",
+                        "c"
+                    ],
+                    "wpairs": {}
+                },
+                "antimode",
+                null,
+                null
+            ],
+            "note": "text/antimode"
+        },
+        {
+            "id": "058-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "a",
+                        "b"
+                    ],
+                    "values": [
+                        "a",
+                        "b",
+                        "c"
+                    ],
+                    "wpairs": {}
+                },
+                "p10",
+                null,
+                null
+            ],
+            "note": "text/p10"
+        },
+        {
+            "id": "059-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "a",
+                        "b"
+                    ],
+                    "values": [
+                        "a",
+                        "b",
+                        "c"
+                    ],
+                    "wpairs": {}
+                },
+                "p25",
+                null,
+                null
+            ],
+            "note": "text/p25"
+        },
+        {
+            "id": "060-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "a",
+                        "b"
+                    ],
+                    "values": [
+                        "a",
+                        "b",
+                        "c"
+                    ],
+                    "wpairs": {}
+                },
+                "p50",
+                null,
+                null
+            ],
+            "note": "text/p50"
+        },
+        {
+            "id": "061-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "a",
+                        "b"
+                    ],
+                    "values": [
+                        "a",
+                        "b",
+                        "c"
+                    ],
+                    "wpairs": {}
+                },
+                "p75",
+                null,
+                null
+            ],
+            "note": "text/p75"
+        },
+        {
+            "id": "062-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "a",
+                        "b"
+                    ],
+                    "values": [
+                        "a",
+                        "b",
+                        "c"
+                    ],
+                    "wpairs": {}
+                },
+                "p90",
+                null,
+                null
+            ],
+            "note": "text/p90"
+        },
+        {
+            "id": "063-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "a",
+                        "b"
+                    ],
+                    "values": [
+                        "a",
+                        "b",
+                        "c"
+                    ],
+                    "wpairs": {}
+                },
+                "p99",
+                null,
+                null
+            ],
+            "note": "text/p99"
+        },
+        {
+            "id": "064-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "a",
+                        "b"
+                    ],
+                    "values": [
+                        "a",
+                        "b",
+                        "c"
+                    ],
+                    "wpairs": {}
+                },
+                "wavg@WT",
+                null,
+                null
+            ],
+            "note": "text/wavg@WT"
+        },
+        {
+            "id": "065-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "a",
+                        "b"
+                    ],
+                    "values": [
+                        "a",
+                        "b",
+                        "c"
+                    ],
+                    "wpairs": {}
+                },
+                "formula",
+                null,
+                null
+            ],
+            "note": "text/formula"
+        },
+        {
+            "id": "066-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "a",
+                        "b"
+                    ],
+                    "values": [
+                        "a",
+                        "b",
+                        "c"
+                    ],
+                    "wpairs": {}
+                },
+                "bogus_agg",
+                null,
+                null
+            ],
+            "note": "text/bogus_agg"
+        },
+        {
+            "id": "067-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 5,
+                    "numericCount": 2,
+                    "min": 0,
+                    "max": 5,
+                    "distinct": [
+                        "0",
+                        "5"
+                    ],
+                    "values": [
+                        "0",
+                        "5"
+                    ],
+                    "wpairs": {}
+                },
+                "count",
+                null,
+                null
+            ],
+            "note": "zeromin/count"
+        },
+        {
+            "id": "068-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 5,
+                    "numericCount": 2,
+                    "min": 0,
+                    "max": 5,
+                    "distinct": [
+                        "0",
+                        "5"
+                    ],
+                    "values": [
+                        "0",
+                        "5"
+                    ],
+                    "wpairs": {}
+                },
+                "sum",
+                null,
+                null
+            ],
+            "note": "zeromin/sum"
+        },
+        {
+            "id": "069-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 5,
+                    "numericCount": 2,
+                    "min": 0,
+                    "max": 5,
+                    "distinct": [
+                        "0",
+                        "5"
+                    ],
+                    "values": [
+                        "0",
+                        "5"
+                    ],
+                    "wpairs": {}
+                },
+                "avg",
+                null,
+                null
+            ],
+            "note": "zeromin/avg"
+        },
+        {
+            "id": "070-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 5,
+                    "numericCount": 2,
+                    "min": 0,
+                    "max": 5,
+                    "distinct": [
+                        "0",
+                        "5"
+                    ],
+                    "values": [
+                        "0",
+                        "5"
+                    ],
+                    "wpairs": {}
+                },
+                "median",
+                null,
+                null
+            ],
+            "note": "zeromin/median"
+        },
+        {
+            "id": "071-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 5,
+                    "numericCount": 2,
+                    "min": 0,
+                    "max": 5,
+                    "distinct": [
+                        "0",
+                        "5"
+                    ],
+                    "values": [
+                        "0",
+                        "5"
+                    ],
+                    "wpairs": {}
+                },
+                "min",
+                null,
+                null
+            ],
+            "note": "zeromin/min"
+        },
+        {
+            "id": "072-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 5,
+                    "numericCount": 2,
+                    "min": 0,
+                    "max": 5,
+                    "distinct": [
+                        "0",
+                        "5"
+                    ],
+                    "values": [
+                        "0",
+                        "5"
+                    ],
+                    "wpairs": {}
+                },
+                "max",
+                null,
+                null
+            ],
+            "note": "zeromin/max"
+        },
+        {
+            "id": "073-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 5,
+                    "numericCount": 2,
+                    "min": 0,
+                    "max": 5,
+                    "distinct": [
+                        "0",
+                        "5"
+                    ],
+                    "values": [
+                        "0",
+                        "5"
+                    ],
+                    "wpairs": {}
+                },
+                "distinct",
+                null,
+                null
+            ],
+            "note": "zeromin/distinct"
+        },
+        {
+            "id": "074-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 5,
+                    "numericCount": 2,
+                    "min": 0,
+                    "max": 5,
+                    "distinct": [
+                        "0",
+                        "5"
+                    ],
+                    "values": [
+                        "0",
+                        "5"
+                    ],
+                    "wpairs": {}
+                },
+                "mode",
+                null,
+                null
+            ],
+            "note": "zeromin/mode"
+        },
+        {
+            "id": "075-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 5,
+                    "numericCount": 2,
+                    "min": 0,
+                    "max": 5,
+                    "distinct": [
+                        "0",
+                        "5"
+                    ],
+                    "values": [
+                        "0",
+                        "5"
+                    ],
+                    "wpairs": {}
+                },
+                "stddev",
+                null,
+                null
+            ],
+            "note": "zeromin/stddev"
+        },
+        {
+            "id": "076-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 5,
+                    "numericCount": 2,
+                    "min": 0,
+                    "max": 5,
+                    "distinct": [
+                        "0",
+                        "5"
+                    ],
+                    "values": [
+                        "0",
+                        "5"
+                    ],
+                    "wpairs": {}
+                },
+                "range",
+                null,
+                null
+            ],
+            "note": "zeromin/range"
+        },
+        {
+            "id": "077-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 5,
+                    "numericCount": 2,
+                    "min": 0,
+                    "max": 5,
+                    "distinct": [
+                        "0",
+                        "5"
+                    ],
+                    "values": [
+                        "0",
+                        "5"
+                    ],
+                    "wpairs": {}
+                },
+                "count_filled",
+                null,
+                null
+            ],
+            "note": "zeromin/count_filled"
+        },
+        {
+            "id": "078-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 5,
+                    "numericCount": 2,
+                    "min": 0,
+                    "max": 5,
+                    "distinct": [
+                        "0",
+                        "5"
+                    ],
+                    "values": [
+                        "0",
+                        "5"
+                    ],
+                    "wpairs": {}
+                },
+                "count_blank",
+                null,
+                null
+            ],
+            "note": "zeromin/count_blank"
+        },
+        {
+            "id": "079-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 5,
+                    "numericCount": 2,
+                    "min": 0,
+                    "max": 5,
+                    "distinct": [
+                        "0",
+                        "5"
+                    ],
+                    "values": [
+                        "0",
+                        "5"
+                    ],
+                    "wpairs": {}
+                },
+                "antimode",
+                null,
+                null
+            ],
+            "note": "zeromin/antimode"
+        },
+        {
+            "id": "080-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 5,
+                    "numericCount": 2,
+                    "min": 0,
+                    "max": 5,
+                    "distinct": [
+                        "0",
+                        "5"
+                    ],
+                    "values": [
+                        "0",
+                        "5"
+                    ],
+                    "wpairs": {}
+                },
+                "p10",
+                null,
+                null
+            ],
+            "note": "zeromin/p10"
+        },
+        {
+            "id": "081-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 5,
+                    "numericCount": 2,
+                    "min": 0,
+                    "max": 5,
+                    "distinct": [
+                        "0",
+                        "5"
+                    ],
+                    "values": [
+                        "0",
+                        "5"
+                    ],
+                    "wpairs": {}
+                },
+                "p25",
+                null,
+                null
+            ],
+            "note": "zeromin/p25"
+        },
+        {
+            "id": "082-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 5,
+                    "numericCount": 2,
+                    "min": 0,
+                    "max": 5,
+                    "distinct": [
+                        "0",
+                        "5"
+                    ],
+                    "values": [
+                        "0",
+                        "5"
+                    ],
+                    "wpairs": {}
+                },
+                "p50",
+                null,
+                null
+            ],
+            "note": "zeromin/p50"
+        },
+        {
+            "id": "083-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 5,
+                    "numericCount": 2,
+                    "min": 0,
+                    "max": 5,
+                    "distinct": [
+                        "0",
+                        "5"
+                    ],
+                    "values": [
+                        "0",
+                        "5"
+                    ],
+                    "wpairs": {}
+                },
+                "p75",
+                null,
+                null
+            ],
+            "note": "zeromin/p75"
+        },
+        {
+            "id": "084-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 5,
+                    "numericCount": 2,
+                    "min": 0,
+                    "max": 5,
+                    "distinct": [
+                        "0",
+                        "5"
+                    ],
+                    "values": [
+                        "0",
+                        "5"
+                    ],
+                    "wpairs": {}
+                },
+                "p90",
+                null,
+                null
+            ],
+            "note": "zeromin/p90"
+        },
+        {
+            "id": "085-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 5,
+                    "numericCount": 2,
+                    "min": 0,
+                    "max": 5,
+                    "distinct": [
+                        "0",
+                        "5"
+                    ],
+                    "values": [
+                        "0",
+                        "5"
+                    ],
+                    "wpairs": {}
+                },
+                "p99",
+                null,
+                null
+            ],
+            "note": "zeromin/p99"
+        },
+        {
+            "id": "086-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 5,
+                    "numericCount": 2,
+                    "min": 0,
+                    "max": 5,
+                    "distinct": [
+                        "0",
+                        "5"
+                    ],
+                    "values": [
+                        "0",
+                        "5"
+                    ],
+                    "wpairs": {}
+                },
+                "wavg@WT",
+                null,
+                null
+            ],
+            "note": "zeromin/wavg@WT"
+        },
+        {
+            "id": "087-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 5,
+                    "numericCount": 2,
+                    "min": 0,
+                    "max": 5,
+                    "distinct": [
+                        "0",
+                        "5"
+                    ],
+                    "values": [
+                        "0",
+                        "5"
+                    ],
+                    "wpairs": {}
+                },
+                "formula",
+                null,
+                null
+            ],
+            "note": "zeromin/formula"
+        },
+        {
+            "id": "088-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 2,
+                    "sum": 5,
+                    "numericCount": 2,
+                    "min": 0,
+                    "max": 5,
+                    "distinct": [
+                        "0",
+                        "5"
+                    ],
+                    "values": [
+                        "0",
+                        "5"
+                    ],
+                    "wpairs": {}
+                },
+                "bogus_agg",
+                null,
+                null
+            ],
+            "note": "zeromin/bogus_agg"
+        },
+        {
+            "id": "089-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": -15,
+                    "numericCount": 3,
+                    "min": -10,
+                    "max": -2,
+                    "distinct": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "values": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "wpairs": {}
+                },
+                "count",
+                null,
+                null
+            ],
+            "note": "neg/count"
+        },
+        {
+            "id": "090-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": -15,
+                    "numericCount": 3,
+                    "min": -10,
+                    "max": -2,
+                    "distinct": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "values": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "wpairs": {}
+                },
+                "sum",
+                null,
+                null
+            ],
+            "note": "neg/sum"
+        },
+        {
+            "id": "091-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": -15,
+                    "numericCount": 3,
+                    "min": -10,
+                    "max": -2,
+                    "distinct": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "values": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "wpairs": {}
+                },
+                "avg",
+                null,
+                null
+            ],
+            "note": "neg/avg"
+        },
+        {
+            "id": "092-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": -15,
+                    "numericCount": 3,
+                    "min": -10,
+                    "max": -2,
+                    "distinct": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "values": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "wpairs": {}
+                },
+                "median",
+                null,
+                null
+            ],
+            "note": "neg/median"
+        },
+        {
+            "id": "093-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": -15,
+                    "numericCount": 3,
+                    "min": -10,
+                    "max": -2,
+                    "distinct": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "values": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "wpairs": {}
+                },
+                "min",
+                null,
+                null
+            ],
+            "note": "neg/min"
+        },
+        {
+            "id": "094-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": -15,
+                    "numericCount": 3,
+                    "min": -10,
+                    "max": -2,
+                    "distinct": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "values": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "wpairs": {}
+                },
+                "max",
+                null,
+                null
+            ],
+            "note": "neg/max"
+        },
+        {
+            "id": "095-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": -15,
+                    "numericCount": 3,
+                    "min": -10,
+                    "max": -2,
+                    "distinct": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "values": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "wpairs": {}
+                },
+                "distinct",
+                null,
+                null
+            ],
+            "note": "neg/distinct"
+        },
+        {
+            "id": "096-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": -15,
+                    "numericCount": 3,
+                    "min": -10,
+                    "max": -2,
+                    "distinct": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "values": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "wpairs": {}
+                },
+                "mode",
+                null,
+                null
+            ],
+            "note": "neg/mode"
+        },
+        {
+            "id": "097-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": -15,
+                    "numericCount": 3,
+                    "min": -10,
+                    "max": -2,
+                    "distinct": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "values": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "wpairs": {}
+                },
+                "stddev",
+                null,
+                null
+            ],
+            "note": "neg/stddev"
+        },
+        {
+            "id": "098-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": -15,
+                    "numericCount": 3,
+                    "min": -10,
+                    "max": -2,
+                    "distinct": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "values": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "wpairs": {}
+                },
+                "range",
+                null,
+                null
+            ],
+            "note": "neg/range"
+        },
+        {
+            "id": "099-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": -15,
+                    "numericCount": 3,
+                    "min": -10,
+                    "max": -2,
+                    "distinct": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "values": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "wpairs": {}
+                },
+                "count_filled",
+                null,
+                null
+            ],
+            "note": "neg/count_filled"
+        },
+        {
+            "id": "100-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": -15,
+                    "numericCount": 3,
+                    "min": -10,
+                    "max": -2,
+                    "distinct": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "values": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "wpairs": {}
+                },
+                "count_blank",
+                null,
+                null
+            ],
+            "note": "neg/count_blank"
+        },
+        {
+            "id": "101-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": -15,
+                    "numericCount": 3,
+                    "min": -10,
+                    "max": -2,
+                    "distinct": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "values": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "wpairs": {}
+                },
+                "antimode",
+                null,
+                null
+            ],
+            "note": "neg/antimode"
+        },
+        {
+            "id": "102-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": -15,
+                    "numericCount": 3,
+                    "min": -10,
+                    "max": -2,
+                    "distinct": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "values": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "wpairs": {}
+                },
+                "p10",
+                null,
+                null
+            ],
+            "note": "neg/p10"
+        },
+        {
+            "id": "103-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": -15,
+                    "numericCount": 3,
+                    "min": -10,
+                    "max": -2,
+                    "distinct": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "values": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "wpairs": {}
+                },
+                "p25",
+                null,
+                null
+            ],
+            "note": "neg/p25"
+        },
+        {
+            "id": "104-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": -15,
+                    "numericCount": 3,
+                    "min": -10,
+                    "max": -2,
+                    "distinct": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "values": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "wpairs": {}
+                },
+                "p50",
+                null,
+                null
+            ],
+            "note": "neg/p50"
+        },
+        {
+            "id": "105-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": -15,
+                    "numericCount": 3,
+                    "min": -10,
+                    "max": -2,
+                    "distinct": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "values": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "wpairs": {}
+                },
+                "p75",
+                null,
+                null
+            ],
+            "note": "neg/p75"
+        },
+        {
+            "id": "106-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": -15,
+                    "numericCount": 3,
+                    "min": -10,
+                    "max": -2,
+                    "distinct": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "values": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "wpairs": {}
+                },
+                "p90",
+                null,
+                null
+            ],
+            "note": "neg/p90"
+        },
+        {
+            "id": "107-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": -15,
+                    "numericCount": 3,
+                    "min": -10,
+                    "max": -2,
+                    "distinct": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "values": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "wpairs": {}
+                },
+                "p99",
+                null,
+                null
+            ],
+            "note": "neg/p99"
+        },
+        {
+            "id": "108-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": -15,
+                    "numericCount": 3,
+                    "min": -10,
+                    "max": -2,
+                    "distinct": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "values": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "wpairs": {}
+                },
+                "wavg@WT",
+                null,
+                null
+            ],
+            "note": "neg/wavg@WT"
+        },
+        {
+            "id": "109-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": -15,
+                    "numericCount": 3,
+                    "min": -10,
+                    "max": -2,
+                    "distinct": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "values": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "wpairs": {}
+                },
+                "formula",
+                null,
+                null
+            ],
+            "note": "neg/formula"
+        },
+        {
+            "id": "110-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": -15,
+                    "numericCount": 3,
+                    "min": -10,
+                    "max": -2,
+                    "distinct": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "values": [
+                        "-10",
+                        "-3",
+                        "-2"
+                    ],
+                    "wpairs": {}
+                },
+                "bogus_agg",
+                null,
+                null
+            ],
+            "note": "neg/bogus_agg"
+        },
+        {
+            "id": "111-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 4,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "__proto__",
+                        "x"
+                    ],
+                    "values": [
+                        "__proto__",
+                        "__proto__",
+                        "__proto__",
+                        "x"
+                    ],
+                    "wpairs": {}
+                },
+                "count",
+                null,
+                null
+            ],
+            "note": "proto/count"
+        },
+        {
+            "id": "112-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 4,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "__proto__",
+                        "x"
+                    ],
+                    "values": [
+                        "__proto__",
+                        "__proto__",
+                        "__proto__",
+                        "x"
+                    ],
+                    "wpairs": {}
+                },
+                "sum",
+                null,
+                null
+            ],
+            "note": "proto/sum"
+        },
+        {
+            "id": "113-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 4,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "__proto__",
+                        "x"
+                    ],
+                    "values": [
+                        "__proto__",
+                        "__proto__",
+                        "__proto__",
+                        "x"
+                    ],
+                    "wpairs": {}
+                },
+                "avg",
+                null,
+                null
+            ],
+            "note": "proto/avg"
+        },
+        {
+            "id": "114-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 4,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "__proto__",
+                        "x"
+                    ],
+                    "values": [
+                        "__proto__",
+                        "__proto__",
+                        "__proto__",
+                        "x"
+                    ],
+                    "wpairs": {}
+                },
+                "median",
+                null,
+                null
+            ],
+            "note": "proto/median"
+        },
+        {
+            "id": "115-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 4,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "__proto__",
+                        "x"
+                    ],
+                    "values": [
+                        "__proto__",
+                        "__proto__",
+                        "__proto__",
+                        "x"
+                    ],
+                    "wpairs": {}
+                },
+                "min",
+                null,
+                null
+            ],
+            "note": "proto/min"
+        },
+        {
+            "id": "116-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 4,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "__proto__",
+                        "x"
+                    ],
+                    "values": [
+                        "__proto__",
+                        "__proto__",
+                        "__proto__",
+                        "x"
+                    ],
+                    "wpairs": {}
+                },
+                "max",
+                null,
+                null
+            ],
+            "note": "proto/max"
+        },
+        {
+            "id": "117-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 4,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "__proto__",
+                        "x"
+                    ],
+                    "values": [
+                        "__proto__",
+                        "__proto__",
+                        "__proto__",
+                        "x"
+                    ],
+                    "wpairs": {}
+                },
+                "distinct",
+                null,
+                null
+            ],
+            "note": "proto/distinct"
+        },
+        {
+            "id": "118-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 4,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "__proto__",
+                        "x"
+                    ],
+                    "values": [
+                        "__proto__",
+                        "__proto__",
+                        "__proto__",
+                        "x"
+                    ],
+                    "wpairs": {}
+                },
+                "mode",
+                null,
+                null
+            ],
+            "note": "proto/mode"
+        },
+        {
+            "id": "119-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 4,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "__proto__",
+                        "x"
+                    ],
+                    "values": [
+                        "__proto__",
+                        "__proto__",
+                        "__proto__",
+                        "x"
+                    ],
+                    "wpairs": {}
+                },
+                "stddev",
+                null,
+                null
+            ],
+            "note": "proto/stddev"
+        },
+        {
+            "id": "120-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 4,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "__proto__",
+                        "x"
+                    ],
+                    "values": [
+                        "__proto__",
+                        "__proto__",
+                        "__proto__",
+                        "x"
+                    ],
+                    "wpairs": {}
+                },
+                "range",
+                null,
+                null
+            ],
+            "note": "proto/range"
+        },
+        {
+            "id": "121-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 4,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "__proto__",
+                        "x"
+                    ],
+                    "values": [
+                        "__proto__",
+                        "__proto__",
+                        "__proto__",
+                        "x"
+                    ],
+                    "wpairs": {}
+                },
+                "count_filled",
+                null,
+                null
+            ],
+            "note": "proto/count_filled"
+        },
+        {
+            "id": "122-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 4,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "__proto__",
+                        "x"
+                    ],
+                    "values": [
+                        "__proto__",
+                        "__proto__",
+                        "__proto__",
+                        "x"
+                    ],
+                    "wpairs": {}
+                },
+                "count_blank",
+                null,
+                null
+            ],
+            "note": "proto/count_blank"
+        },
+        {
+            "id": "123-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 4,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "__proto__",
+                        "x"
+                    ],
+                    "values": [
+                        "__proto__",
+                        "__proto__",
+                        "__proto__",
+                        "x"
+                    ],
+                    "wpairs": {}
+                },
+                "antimode",
+                null,
+                null
+            ],
+            "note": "proto/antimode"
+        },
+        {
+            "id": "124-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 4,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "__proto__",
+                        "x"
+                    ],
+                    "values": [
+                        "__proto__",
+                        "__proto__",
+                        "__proto__",
+                        "x"
+                    ],
+                    "wpairs": {}
+                },
+                "p10",
+                null,
+                null
+            ],
+            "note": "proto/p10"
+        },
+        {
+            "id": "125-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 4,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "__proto__",
+                        "x"
+                    ],
+                    "values": [
+                        "__proto__",
+                        "__proto__",
+                        "__proto__",
+                        "x"
+                    ],
+                    "wpairs": {}
+                },
+                "p25",
+                null,
+                null
+            ],
+            "note": "proto/p25"
+        },
+        {
+            "id": "126-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 4,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "__proto__",
+                        "x"
+                    ],
+                    "values": [
+                        "__proto__",
+                        "__proto__",
+                        "__proto__",
+                        "x"
+                    ],
+                    "wpairs": {}
+                },
+                "p50",
+                null,
+                null
+            ],
+            "note": "proto/p50"
+        },
+        {
+            "id": "127-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 4,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "__proto__",
+                        "x"
+                    ],
+                    "values": [
+                        "__proto__",
+                        "__proto__",
+                        "__proto__",
+                        "x"
+                    ],
+                    "wpairs": {}
+                },
+                "p75",
+                null,
+                null
+            ],
+            "note": "proto/p75"
+        },
+        {
+            "id": "128-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 4,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "__proto__",
+                        "x"
+                    ],
+                    "values": [
+                        "__proto__",
+                        "__proto__",
+                        "__proto__",
+                        "x"
+                    ],
+                    "wpairs": {}
+                },
+                "p90",
+                null,
+                null
+            ],
+            "note": "proto/p90"
+        },
+        {
+            "id": "129-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 4,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "__proto__",
+                        "x"
+                    ],
+                    "values": [
+                        "__proto__",
+                        "__proto__",
+                        "__proto__",
+                        "x"
+                    ],
+                    "wpairs": {}
+                },
+                "p99",
+                null,
+                null
+            ],
+            "note": "proto/p99"
+        },
+        {
+            "id": "130-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 4,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "__proto__",
+                        "x"
+                    ],
+                    "values": [
+                        "__proto__",
+                        "__proto__",
+                        "__proto__",
+                        "x"
+                    ],
+                    "wpairs": {}
+                },
+                "wavg@WT",
+                null,
+                null
+            ],
+            "note": "proto/wavg@WT"
+        },
+        {
+            "id": "131-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 4,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "__proto__",
+                        "x"
+                    ],
+                    "values": [
+                        "__proto__",
+                        "__proto__",
+                        "__proto__",
+                        "x"
+                    ],
+                    "wpairs": {}
+                },
+                "formula",
+                null,
+                null
+            ],
+            "note": "proto/formula"
+        },
+        {
+            "id": "132-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 4,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "__proto__",
+                        "x"
+                    ],
+                    "values": [
+                        "__proto__",
+                        "__proto__",
+                        "__proto__",
+                        "x"
+                    ],
+                    "wpairs": {}
+                },
+                "bogus_agg",
+                null,
+                null
+            ],
+            "note": "proto/bogus_agg"
+        },
+        {
+            "id": "133-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "constructor",
+                        "y"
+                    ],
+                    "values": [
+                        "constructor",
+                        "constructor",
+                        "y"
+                    ],
+                    "wpairs": {}
+                },
+                "count",
+                null,
+                null
+            ],
+            "note": "ctor/count"
+        },
+        {
+            "id": "134-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "constructor",
+                        "y"
+                    ],
+                    "values": [
+                        "constructor",
+                        "constructor",
+                        "y"
+                    ],
+                    "wpairs": {}
+                },
+                "sum",
+                null,
+                null
+            ],
+            "note": "ctor/sum"
+        },
+        {
+            "id": "135-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "constructor",
+                        "y"
+                    ],
+                    "values": [
+                        "constructor",
+                        "constructor",
+                        "y"
+                    ],
+                    "wpairs": {}
+                },
+                "avg",
+                null,
+                null
+            ],
+            "note": "ctor/avg"
+        },
+        {
+            "id": "136-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "constructor",
+                        "y"
+                    ],
+                    "values": [
+                        "constructor",
+                        "constructor",
+                        "y"
+                    ],
+                    "wpairs": {}
+                },
+                "median",
+                null,
+                null
+            ],
+            "note": "ctor/median"
+        },
+        {
+            "id": "137-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "constructor",
+                        "y"
+                    ],
+                    "values": [
+                        "constructor",
+                        "constructor",
+                        "y"
+                    ],
+                    "wpairs": {}
+                },
+                "min",
+                null,
+                null
+            ],
+            "note": "ctor/min"
+        },
+        {
+            "id": "138-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "constructor",
+                        "y"
+                    ],
+                    "values": [
+                        "constructor",
+                        "constructor",
+                        "y"
+                    ],
+                    "wpairs": {}
+                },
+                "max",
+                null,
+                null
+            ],
+            "note": "ctor/max"
+        },
+        {
+            "id": "139-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "constructor",
+                        "y"
+                    ],
+                    "values": [
+                        "constructor",
+                        "constructor",
+                        "y"
+                    ],
+                    "wpairs": {}
+                },
+                "distinct",
+                null,
+                null
+            ],
+            "note": "ctor/distinct"
+        },
+        {
+            "id": "140-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "constructor",
+                        "y"
+                    ],
+                    "values": [
+                        "constructor",
+                        "constructor",
+                        "y"
+                    ],
+                    "wpairs": {}
+                },
+                "mode",
+                null,
+                null
+            ],
+            "note": "ctor/mode"
+        },
+        {
+            "id": "141-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "constructor",
+                        "y"
+                    ],
+                    "values": [
+                        "constructor",
+                        "constructor",
+                        "y"
+                    ],
+                    "wpairs": {}
+                },
+                "stddev",
+                null,
+                null
+            ],
+            "note": "ctor/stddev"
+        },
+        {
+            "id": "142-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "constructor",
+                        "y"
+                    ],
+                    "values": [
+                        "constructor",
+                        "constructor",
+                        "y"
+                    ],
+                    "wpairs": {}
+                },
+                "range",
+                null,
+                null
+            ],
+            "note": "ctor/range"
+        },
+        {
+            "id": "143-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "constructor",
+                        "y"
+                    ],
+                    "values": [
+                        "constructor",
+                        "constructor",
+                        "y"
+                    ],
+                    "wpairs": {}
+                },
+                "count_filled",
+                null,
+                null
+            ],
+            "note": "ctor/count_filled"
+        },
+        {
+            "id": "144-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "constructor",
+                        "y"
+                    ],
+                    "values": [
+                        "constructor",
+                        "constructor",
+                        "y"
+                    ],
+                    "wpairs": {}
+                },
+                "count_blank",
+                null,
+                null
+            ],
+            "note": "ctor/count_blank"
+        },
+        {
+            "id": "145-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "constructor",
+                        "y"
+                    ],
+                    "values": [
+                        "constructor",
+                        "constructor",
+                        "y"
+                    ],
+                    "wpairs": {}
+                },
+                "antimode",
+                null,
+                null
+            ],
+            "note": "ctor/antimode"
+        },
+        {
+            "id": "146-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "constructor",
+                        "y"
+                    ],
+                    "values": [
+                        "constructor",
+                        "constructor",
+                        "y"
+                    ],
+                    "wpairs": {}
+                },
+                "p10",
+                null,
+                null
+            ],
+            "note": "ctor/p10"
+        },
+        {
+            "id": "147-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "constructor",
+                        "y"
+                    ],
+                    "values": [
+                        "constructor",
+                        "constructor",
+                        "y"
+                    ],
+                    "wpairs": {}
+                },
+                "p25",
+                null,
+                null
+            ],
+            "note": "ctor/p25"
+        },
+        {
+            "id": "148-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "constructor",
+                        "y"
+                    ],
+                    "values": [
+                        "constructor",
+                        "constructor",
+                        "y"
+                    ],
+                    "wpairs": {}
+                },
+                "p50",
+                null,
+                null
+            ],
+            "note": "ctor/p50"
+        },
+        {
+            "id": "149-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "constructor",
+                        "y"
+                    ],
+                    "values": [
+                        "constructor",
+                        "constructor",
+                        "y"
+                    ],
+                    "wpairs": {}
+                },
+                "p75",
+                null,
+                null
+            ],
+            "note": "ctor/p75"
+        },
+        {
+            "id": "150-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "constructor",
+                        "y"
+                    ],
+                    "values": [
+                        "constructor",
+                        "constructor",
+                        "y"
+                    ],
+                    "wpairs": {}
+                },
+                "p90",
+                null,
+                null
+            ],
+            "note": "ctor/p90"
+        },
+        {
+            "id": "151-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "constructor",
+                        "y"
+                    ],
+                    "values": [
+                        "constructor",
+                        "constructor",
+                        "y"
+                    ],
+                    "wpairs": {}
+                },
+                "p99",
+                null,
+                null
+            ],
+            "note": "ctor/p99"
+        },
+        {
+            "id": "152-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "constructor",
+                        "y"
+                    ],
+                    "values": [
+                        "constructor",
+                        "constructor",
+                        "y"
+                    ],
+                    "wpairs": {}
+                },
+                "wavg@WT",
+                null,
+                null
+            ],
+            "note": "ctor/wavg@WT"
+        },
+        {
+            "id": "153-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "constructor",
+                        "y"
+                    ],
+                    "values": [
+                        "constructor",
+                        "constructor",
+                        "y"
+                    ],
+                    "wpairs": {}
+                },
+                "formula",
+                null,
+                null
+            ],
+            "note": "ctor/formula"
+        },
+        {
+            "id": "154-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 3,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [
+                        "constructor",
+                        "y"
+                    ],
+                    "values": [
+                        "constructor",
+                        "constructor",
+                        "y"
+                    ],
+                    "wpairs": {}
+                },
+                "bogus_agg",
+                null,
+                null
+            ],
+            "note": "ctor/bogus_agg"
+        },
+        {
+            "id": "155-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 8,
+                    "sum": 31,
+                    "numericCount": 8,
+                    "min": 2,
+                    "max": 9,
+                    "distinct": [
+                        "2",
+                        "4",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "values": [
+                        "2",
+                        "4",
+                        "4",
+                        "4",
+                        "5",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "wpairs": {}
+                },
+                "count",
+                null,
+                null
+            ],
+            "note": "spread/count"
+        },
+        {
+            "id": "156-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 8,
+                    "sum": 31,
+                    "numericCount": 8,
+                    "min": 2,
+                    "max": 9,
+                    "distinct": [
+                        "2",
+                        "4",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "values": [
+                        "2",
+                        "4",
+                        "4",
+                        "4",
+                        "5",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "wpairs": {}
+                },
+                "sum",
+                null,
+                null
+            ],
+            "note": "spread/sum"
+        },
+        {
+            "id": "157-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 8,
+                    "sum": 31,
+                    "numericCount": 8,
+                    "min": 2,
+                    "max": 9,
+                    "distinct": [
+                        "2",
+                        "4",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "values": [
+                        "2",
+                        "4",
+                        "4",
+                        "4",
+                        "5",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "wpairs": {}
+                },
+                "avg",
+                null,
+                null
+            ],
+            "note": "spread/avg"
+        },
+        {
+            "id": "158-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 8,
+                    "sum": 31,
+                    "numericCount": 8,
+                    "min": 2,
+                    "max": 9,
+                    "distinct": [
+                        "2",
+                        "4",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "values": [
+                        "2",
+                        "4",
+                        "4",
+                        "4",
+                        "5",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "wpairs": {}
+                },
+                "median",
+                null,
+                null
+            ],
+            "note": "spread/median"
+        },
+        {
+            "id": "159-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 8,
+                    "sum": 31,
+                    "numericCount": 8,
+                    "min": 2,
+                    "max": 9,
+                    "distinct": [
+                        "2",
+                        "4",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "values": [
+                        "2",
+                        "4",
+                        "4",
+                        "4",
+                        "5",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "wpairs": {}
+                },
+                "min",
+                null,
+                null
+            ],
+            "note": "spread/min"
+        },
+        {
+            "id": "160-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 8,
+                    "sum": 31,
+                    "numericCount": 8,
+                    "min": 2,
+                    "max": 9,
+                    "distinct": [
+                        "2",
+                        "4",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "values": [
+                        "2",
+                        "4",
+                        "4",
+                        "4",
+                        "5",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "wpairs": {}
+                },
+                "max",
+                null,
+                null
+            ],
+            "note": "spread/max"
+        },
+        {
+            "id": "161-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 8,
+                    "sum": 31,
+                    "numericCount": 8,
+                    "min": 2,
+                    "max": 9,
+                    "distinct": [
+                        "2",
+                        "4",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "values": [
+                        "2",
+                        "4",
+                        "4",
+                        "4",
+                        "5",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "wpairs": {}
+                },
+                "distinct",
+                null,
+                null
+            ],
+            "note": "spread/distinct"
+        },
+        {
+            "id": "162-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 8,
+                    "sum": 31,
+                    "numericCount": 8,
+                    "min": 2,
+                    "max": 9,
+                    "distinct": [
+                        "2",
+                        "4",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "values": [
+                        "2",
+                        "4",
+                        "4",
+                        "4",
+                        "5",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "wpairs": {}
+                },
+                "mode",
+                null,
+                null
+            ],
+            "note": "spread/mode"
+        },
+        {
+            "id": "163-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 8,
+                    "sum": 31,
+                    "numericCount": 8,
+                    "min": 2,
+                    "max": 9,
+                    "distinct": [
+                        "2",
+                        "4",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "values": [
+                        "2",
+                        "4",
+                        "4",
+                        "4",
+                        "5",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "wpairs": {}
+                },
+                "stddev",
+                null,
+                null
+            ],
+            "note": "spread/stddev"
+        },
+        {
+            "id": "164-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 8,
+                    "sum": 31,
+                    "numericCount": 8,
+                    "min": 2,
+                    "max": 9,
+                    "distinct": [
+                        "2",
+                        "4",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "values": [
+                        "2",
+                        "4",
+                        "4",
+                        "4",
+                        "5",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "wpairs": {}
+                },
+                "range",
+                null,
+                null
+            ],
+            "note": "spread/range"
+        },
+        {
+            "id": "165-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 8,
+                    "sum": 31,
+                    "numericCount": 8,
+                    "min": 2,
+                    "max": 9,
+                    "distinct": [
+                        "2",
+                        "4",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "values": [
+                        "2",
+                        "4",
+                        "4",
+                        "4",
+                        "5",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "wpairs": {}
+                },
+                "count_filled",
+                null,
+                null
+            ],
+            "note": "spread/count_filled"
+        },
+        {
+            "id": "166-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 8,
+                    "sum": 31,
+                    "numericCount": 8,
+                    "min": 2,
+                    "max": 9,
+                    "distinct": [
+                        "2",
+                        "4",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "values": [
+                        "2",
+                        "4",
+                        "4",
+                        "4",
+                        "5",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "wpairs": {}
+                },
+                "count_blank",
+                null,
+                null
+            ],
+            "note": "spread/count_blank"
+        },
+        {
+            "id": "167-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 8,
+                    "sum": 31,
+                    "numericCount": 8,
+                    "min": 2,
+                    "max": 9,
+                    "distinct": [
+                        "2",
+                        "4",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "values": [
+                        "2",
+                        "4",
+                        "4",
+                        "4",
+                        "5",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "wpairs": {}
+                },
+                "antimode",
+                null,
+                null
+            ],
+            "note": "spread/antimode"
+        },
+        {
+            "id": "168-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 8,
+                    "sum": 31,
+                    "numericCount": 8,
+                    "min": 2,
+                    "max": 9,
+                    "distinct": [
+                        "2",
+                        "4",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "values": [
+                        "2",
+                        "4",
+                        "4",
+                        "4",
+                        "5",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "wpairs": {}
+                },
+                "p10",
+                null,
+                null
+            ],
+            "note": "spread/p10"
+        },
+        {
+            "id": "169-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 8,
+                    "sum": 31,
+                    "numericCount": 8,
+                    "min": 2,
+                    "max": 9,
+                    "distinct": [
+                        "2",
+                        "4",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "values": [
+                        "2",
+                        "4",
+                        "4",
+                        "4",
+                        "5",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "wpairs": {}
+                },
+                "p25",
+                null,
+                null
+            ],
+            "note": "spread/p25"
+        },
+        {
+            "id": "170-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 8,
+                    "sum": 31,
+                    "numericCount": 8,
+                    "min": 2,
+                    "max": 9,
+                    "distinct": [
+                        "2",
+                        "4",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "values": [
+                        "2",
+                        "4",
+                        "4",
+                        "4",
+                        "5",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "wpairs": {}
+                },
+                "p50",
+                null,
+                null
+            ],
+            "note": "spread/p50"
+        },
+        {
+            "id": "171-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 8,
+                    "sum": 31,
+                    "numericCount": 8,
+                    "min": 2,
+                    "max": 9,
+                    "distinct": [
+                        "2",
+                        "4",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "values": [
+                        "2",
+                        "4",
+                        "4",
+                        "4",
+                        "5",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "wpairs": {}
+                },
+                "p75",
+                null,
+                null
+            ],
+            "note": "spread/p75"
+        },
+        {
+            "id": "172-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 8,
+                    "sum": 31,
+                    "numericCount": 8,
+                    "min": 2,
+                    "max": 9,
+                    "distinct": [
+                        "2",
+                        "4",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "values": [
+                        "2",
+                        "4",
+                        "4",
+                        "4",
+                        "5",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "wpairs": {}
+                },
+                "p90",
+                null,
+                null
+            ],
+            "note": "spread/p90"
+        },
+        {
+            "id": "173-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 8,
+                    "sum": 31,
+                    "numericCount": 8,
+                    "min": 2,
+                    "max": 9,
+                    "distinct": [
+                        "2",
+                        "4",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "values": [
+                        "2",
+                        "4",
+                        "4",
+                        "4",
+                        "5",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "wpairs": {}
+                },
+                "p99",
+                null,
+                null
+            ],
+            "note": "spread/p99"
+        },
+        {
+            "id": "174-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 8,
+                    "sum": 31,
+                    "numericCount": 8,
+                    "min": 2,
+                    "max": 9,
+                    "distinct": [
+                        "2",
+                        "4",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "values": [
+                        "2",
+                        "4",
+                        "4",
+                        "4",
+                        "5",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "wpairs": {}
+                },
+                "wavg@WT",
+                null,
+                null
+            ],
+            "note": "spread/wavg@WT"
+        },
+        {
+            "id": "175-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 8,
+                    "sum": 31,
+                    "numericCount": 8,
+                    "min": 2,
+                    "max": 9,
+                    "distinct": [
+                        "2",
+                        "4",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "values": [
+                        "2",
+                        "4",
+                        "4",
+                        "4",
+                        "5",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "wpairs": {}
+                },
+                "formula",
+                null,
+                null
+            ],
+            "note": "spread/formula"
+        },
+        {
+            "id": "176-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 8,
+                    "sum": 31,
+                    "numericCount": 8,
+                    "min": 2,
+                    "max": 9,
+                    "distinct": [
+                        "2",
+                        "4",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "values": [
+                        "2",
+                        "4",
+                        "4",
+                        "4",
+                        "5",
+                        "5",
+                        "7",
+                        "9"
+                    ],
+                    "wpairs": {}
+                },
+                "bogus_agg",
+                null,
+                null
+            ],
+            "note": "spread/bogus_agg"
+        },
+        {
+            "id": "177-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                null,
+                "count",
+                null,
+                null
+            ],
+            "note": "nullcell/count"
+        },
+        {
+            "id": "178-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                null,
+                "sum",
+                null,
+                null
+            ],
+            "note": "nullcell/sum"
+        },
+        {
+            "id": "179-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                null,
+                "avg",
+                null,
+                null
+            ],
+            "note": "nullcell/avg"
+        },
+        {
+            "id": "180-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                null,
+                "median",
+                null,
+                null
+            ],
+            "note": "nullcell/median"
+        },
+        {
+            "id": "181-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                null,
+                "min",
+                null,
+                null
+            ],
+            "note": "nullcell/min"
+        },
+        {
+            "id": "182-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                null,
+                "max",
+                null,
+                null
+            ],
+            "note": "nullcell/max"
+        },
+        {
+            "id": "183-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                null,
+                "distinct",
+                null,
+                null
+            ],
+            "note": "nullcell/distinct"
+        },
+        {
+            "id": "184-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                null,
+                "mode",
+                null,
+                null
+            ],
+            "note": "nullcell/mode"
+        },
+        {
+            "id": "185-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                null,
+                "stddev",
+                null,
+                null
+            ],
+            "note": "nullcell/stddev"
+        },
+        {
+            "id": "186-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                null,
+                "range",
+                null,
+                null
+            ],
+            "note": "nullcell/range"
+        },
+        {
+            "id": "187-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                null,
+                "count_filled",
+                null,
+                null
+            ],
+            "note": "nullcell/count_filled"
+        },
+        {
+            "id": "188-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                null,
+                "count_blank",
+                null,
+                null
+            ],
+            "note": "nullcell/count_blank"
+        },
+        {
+            "id": "189-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                null,
+                "antimode",
+                null,
+                null
+            ],
+            "note": "nullcell/antimode"
+        },
+        {
+            "id": "190-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                null,
+                "p10",
+                null,
+                null
+            ],
+            "note": "nullcell/p10"
+        },
+        {
+            "id": "191-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                null,
+                "p25",
+                null,
+                null
+            ],
+            "note": "nullcell/p25"
+        },
+        {
+            "id": "192-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                null,
+                "p50",
+                null,
+                null
+            ],
+            "note": "nullcell/p50"
+        },
+        {
+            "id": "193-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                null,
+                "p75",
+                null,
+                null
+            ],
+            "note": "nullcell/p75"
+        },
+        {
+            "id": "194-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                null,
+                "p90",
+                null,
+                null
+            ],
+            "note": "nullcell/p90"
+        },
+        {
+            "id": "195-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                null,
+                "p99",
+                null,
+                null
+            ],
+            "note": "nullcell/p99"
+        },
+        {
+            "id": "196-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                null,
+                "wavg@WT",
+                null,
+                null
+            ],
+            "note": "nullcell/wavg@WT"
+        },
+        {
+            "id": "197-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                null,
+                "formula",
+                null,
+                null
+            ],
+            "note": "nullcell/formula"
+        },
+        {
+            "id": "198-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                null,
+                "bogus_agg",
+                null,
+                null
+            ],
+            "note": "nullcell/bogus_agg"
+        },
+        {
+            "id": "199-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 0,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "count",
+                null,
+                0
+            ],
+            "note": "filtered-empty/count"
+        },
+        {
+            "id": "200-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 0,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "sum",
+                null,
+                0
+            ],
+            "note": "filtered-empty/sum"
+        },
+        {
+            "id": "201-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 0,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "avg",
+                null,
+                0
+            ],
+            "note": "filtered-empty/avg"
+        },
+        {
+            "id": "202-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 0,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "median",
+                null,
+                0
+            ],
+            "note": "filtered-empty/median"
+        },
+        {
+            "id": "203-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 0,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "min",
+                null,
+                0
+            ],
+            "note": "filtered-empty/min"
+        },
+        {
+            "id": "204-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 0,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "max",
+                null,
+                0
+            ],
+            "note": "filtered-empty/max"
+        },
+        {
+            "id": "205-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 0,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "distinct",
+                null,
+                0
+            ],
+            "note": "filtered-empty/distinct"
+        },
+        {
+            "id": "206-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 0,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "mode",
+                null,
+                0
+            ],
+            "note": "filtered-empty/mode"
+        },
+        {
+            "id": "207-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 0,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "stddev",
+                null,
+                0
+            ],
+            "note": "filtered-empty/stddev"
+        },
+        {
+            "id": "208-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 0,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "range",
+                null,
+                0
+            ],
+            "note": "filtered-empty/range"
+        },
+        {
+            "id": "209-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 0,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "count_filled",
+                null,
+                0
+            ],
+            "note": "filtered-empty/count_filled"
+        },
+        {
+            "id": "210-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 0,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "count_blank",
+                null,
+                0
+            ],
+            "note": "filtered-empty/count_blank"
+        },
+        {
+            "id": "211-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 0,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "antimode",
+                null,
+                0
+            ],
+            "note": "filtered-empty/antimode"
+        },
+        {
+            "id": "212-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 0,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "p10",
+                null,
+                0
+            ],
+            "note": "filtered-empty/p10"
+        },
+        {
+            "id": "213-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 0,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "p25",
+                null,
+                0
+            ],
+            "note": "filtered-empty/p25"
+        },
+        {
+            "id": "214-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 0,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "p50",
+                null,
+                0
+            ],
+            "note": "filtered-empty/p50"
+        },
+        {
+            "id": "215-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 0,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "p75",
+                null,
+                0
+            ],
+            "note": "filtered-empty/p75"
+        },
+        {
+            "id": "216-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 0,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "p90",
+                null,
+                0
+            ],
+            "note": "filtered-empty/p90"
+        },
+        {
+            "id": "217-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 0,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "p99",
+                null,
+                0
+            ],
+            "note": "filtered-empty/p99"
+        },
+        {
+            "id": "218-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 0,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "wavg@WT",
+                null,
+                0
+            ],
+            "note": "filtered-empty/wavg@WT"
+        },
+        {
+            "id": "219-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 0,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "formula",
+                null,
+                0
+            ],
+            "note": "filtered-empty/formula"
+        },
+        {
+            "id": "220-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 0,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "bogus_agg",
+                null,
+                0
+            ],
+            "note": "filtered-empty/bogus_agg"
+        },
+        {
+            "id": "221-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 30,
+                                "numericCount": 2,
+                                "min": 10,
+                                "max": 20,
+                                "distinct": [
+                                    "10",
+                                    "20"
+                                ],
+                                "values": [
+                                    "10",
+                                    "20"
+                                ],
+                                "wpairs": {
+                                    "WT": {
+                                        "w": 4,
+                                        "wv": 70
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "count",
+                null,
+                0
+            ],
+            "note": "filtered-nums/count"
+        },
+        {
+            "id": "222-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 30,
+                                "numericCount": 2,
+                                "min": 10,
+                                "max": 20,
+                                "distinct": [
+                                    "10",
+                                    "20"
+                                ],
+                                "values": [
+                                    "10",
+                                    "20"
+                                ],
+                                "wpairs": {
+                                    "WT": {
+                                        "w": 4,
+                                        "wv": 70
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "sum",
+                null,
+                0
+            ],
+            "note": "filtered-nums/sum"
+        },
+        {
+            "id": "223-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 30,
+                                "numericCount": 2,
+                                "min": 10,
+                                "max": 20,
+                                "distinct": [
+                                    "10",
+                                    "20"
+                                ],
+                                "values": [
+                                    "10",
+                                    "20"
+                                ],
+                                "wpairs": {
+                                    "WT": {
+                                        "w": 4,
+                                        "wv": 70
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "avg",
+                null,
+                0
+            ],
+            "note": "filtered-nums/avg"
+        },
+        {
+            "id": "224-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 30,
+                                "numericCount": 2,
+                                "min": 10,
+                                "max": 20,
+                                "distinct": [
+                                    "10",
+                                    "20"
+                                ],
+                                "values": [
+                                    "10",
+                                    "20"
+                                ],
+                                "wpairs": {
+                                    "WT": {
+                                        "w": 4,
+                                        "wv": 70
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "median",
+                null,
+                0
+            ],
+            "note": "filtered-nums/median"
+        },
+        {
+            "id": "225-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 30,
+                                "numericCount": 2,
+                                "min": 10,
+                                "max": 20,
+                                "distinct": [
+                                    "10",
+                                    "20"
+                                ],
+                                "values": [
+                                    "10",
+                                    "20"
+                                ],
+                                "wpairs": {
+                                    "WT": {
+                                        "w": 4,
+                                        "wv": 70
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "min",
+                null,
+                0
+            ],
+            "note": "filtered-nums/min"
+        },
+        {
+            "id": "226-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 30,
+                                "numericCount": 2,
+                                "min": 10,
+                                "max": 20,
+                                "distinct": [
+                                    "10",
+                                    "20"
+                                ],
+                                "values": [
+                                    "10",
+                                    "20"
+                                ],
+                                "wpairs": {
+                                    "WT": {
+                                        "w": 4,
+                                        "wv": 70
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "max",
+                null,
+                0
+            ],
+            "note": "filtered-nums/max"
+        },
+        {
+            "id": "227-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 30,
+                                "numericCount": 2,
+                                "min": 10,
+                                "max": 20,
+                                "distinct": [
+                                    "10",
+                                    "20"
+                                ],
+                                "values": [
+                                    "10",
+                                    "20"
+                                ],
+                                "wpairs": {
+                                    "WT": {
+                                        "w": 4,
+                                        "wv": 70
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "distinct",
+                null,
+                0
+            ],
+            "note": "filtered-nums/distinct"
+        },
+        {
+            "id": "228-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 30,
+                                "numericCount": 2,
+                                "min": 10,
+                                "max": 20,
+                                "distinct": [
+                                    "10",
+                                    "20"
+                                ],
+                                "values": [
+                                    "10",
+                                    "20"
+                                ],
+                                "wpairs": {
+                                    "WT": {
+                                        "w": 4,
+                                        "wv": 70
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "mode",
+                null,
+                0
+            ],
+            "note": "filtered-nums/mode"
+        },
+        {
+            "id": "229-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 30,
+                                "numericCount": 2,
+                                "min": 10,
+                                "max": 20,
+                                "distinct": [
+                                    "10",
+                                    "20"
+                                ],
+                                "values": [
+                                    "10",
+                                    "20"
+                                ],
+                                "wpairs": {
+                                    "WT": {
+                                        "w": 4,
+                                        "wv": 70
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "stddev",
+                null,
+                0
+            ],
+            "note": "filtered-nums/stddev"
+        },
+        {
+            "id": "230-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 30,
+                                "numericCount": 2,
+                                "min": 10,
+                                "max": 20,
+                                "distinct": [
+                                    "10",
+                                    "20"
+                                ],
+                                "values": [
+                                    "10",
+                                    "20"
+                                ],
+                                "wpairs": {
+                                    "WT": {
+                                        "w": 4,
+                                        "wv": 70
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "range",
+                null,
+                0
+            ],
+            "note": "filtered-nums/range"
+        },
+        {
+            "id": "231-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 30,
+                                "numericCount": 2,
+                                "min": 10,
+                                "max": 20,
+                                "distinct": [
+                                    "10",
+                                    "20"
+                                ],
+                                "values": [
+                                    "10",
+                                    "20"
+                                ],
+                                "wpairs": {
+                                    "WT": {
+                                        "w": 4,
+                                        "wv": 70
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "count_filled",
+                null,
+                0
+            ],
+            "note": "filtered-nums/count_filled"
+        },
+        {
+            "id": "232-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 30,
+                                "numericCount": 2,
+                                "min": 10,
+                                "max": 20,
+                                "distinct": [
+                                    "10",
+                                    "20"
+                                ],
+                                "values": [
+                                    "10",
+                                    "20"
+                                ],
+                                "wpairs": {
+                                    "WT": {
+                                        "w": 4,
+                                        "wv": 70
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "count_blank",
+                null,
+                0
+            ],
+            "note": "filtered-nums/count_blank"
+        },
+        {
+            "id": "233-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 30,
+                                "numericCount": 2,
+                                "min": 10,
+                                "max": 20,
+                                "distinct": [
+                                    "10",
+                                    "20"
+                                ],
+                                "values": [
+                                    "10",
+                                    "20"
+                                ],
+                                "wpairs": {
+                                    "WT": {
+                                        "w": 4,
+                                        "wv": 70
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "antimode",
+                null,
+                0
+            ],
+            "note": "filtered-nums/antimode"
+        },
+        {
+            "id": "234-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 30,
+                                "numericCount": 2,
+                                "min": 10,
+                                "max": 20,
+                                "distinct": [
+                                    "10",
+                                    "20"
+                                ],
+                                "values": [
+                                    "10",
+                                    "20"
+                                ],
+                                "wpairs": {
+                                    "WT": {
+                                        "w": 4,
+                                        "wv": 70
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "p10",
+                null,
+                0
+            ],
+            "note": "filtered-nums/p10"
+        },
+        {
+            "id": "235-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 30,
+                                "numericCount": 2,
+                                "min": 10,
+                                "max": 20,
+                                "distinct": [
+                                    "10",
+                                    "20"
+                                ],
+                                "values": [
+                                    "10",
+                                    "20"
+                                ],
+                                "wpairs": {
+                                    "WT": {
+                                        "w": 4,
+                                        "wv": 70
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "p25",
+                null,
+                0
+            ],
+            "note": "filtered-nums/p25"
+        },
+        {
+            "id": "236-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 30,
+                                "numericCount": 2,
+                                "min": 10,
+                                "max": 20,
+                                "distinct": [
+                                    "10",
+                                    "20"
+                                ],
+                                "values": [
+                                    "10",
+                                    "20"
+                                ],
+                                "wpairs": {
+                                    "WT": {
+                                        "w": 4,
+                                        "wv": 70
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "p50",
+                null,
+                0
+            ],
+            "note": "filtered-nums/p50"
+        },
+        {
+            "id": "237-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 30,
+                                "numericCount": 2,
+                                "min": 10,
+                                "max": 20,
+                                "distinct": [
+                                    "10",
+                                    "20"
+                                ],
+                                "values": [
+                                    "10",
+                                    "20"
+                                ],
+                                "wpairs": {
+                                    "WT": {
+                                        "w": 4,
+                                        "wv": 70
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "p75",
+                null,
+                0
+            ],
+            "note": "filtered-nums/p75"
+        },
+        {
+            "id": "238-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 30,
+                                "numericCount": 2,
+                                "min": 10,
+                                "max": 20,
+                                "distinct": [
+                                    "10",
+                                    "20"
+                                ],
+                                "values": [
+                                    "10",
+                                    "20"
+                                ],
+                                "wpairs": {
+                                    "WT": {
+                                        "w": 4,
+                                        "wv": 70
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "p90",
+                null,
+                0
+            ],
+            "note": "filtered-nums/p90"
+        },
+        {
+            "id": "239-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 30,
+                                "numericCount": 2,
+                                "min": 10,
+                                "max": 20,
+                                "distinct": [
+                                    "10",
+                                    "20"
+                                ],
+                                "values": [
+                                    "10",
+                                    "20"
+                                ],
+                                "wpairs": {
+                                    "WT": {
+                                        "w": 4,
+                                        "wv": 70
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "p99",
+                null,
+                0
+            ],
+            "note": "filtered-nums/p99"
+        },
+        {
+            "id": "240-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 30,
+                                "numericCount": 2,
+                                "min": 10,
+                                "max": 20,
+                                "distinct": [
+                                    "10",
+                                    "20"
+                                ],
+                                "values": [
+                                    "10",
+                                    "20"
+                                ],
+                                "wpairs": {
+                                    "WT": {
+                                        "w": 4,
+                                        "wv": 70
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "wavg@WT",
+                null,
+                0
+            ],
+            "note": "filtered-nums/wavg@WT"
+        },
+        {
+            "id": "241-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 30,
+                                "numericCount": 2,
+                                "min": 10,
+                                "max": 20,
+                                "distinct": [
+                                    "10",
+                                    "20"
+                                ],
+                                "values": [
+                                    "10",
+                                    "20"
+                                ],
+                                "wpairs": {
+                                    "WT": {
+                                        "w": 4,
+                                        "wv": 70
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "formula",
+                null,
+                0
+            ],
+            "note": "filtered-nums/formula"
+        },
+        {
+            "id": "242-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 30,
+                                "numericCount": 2,
+                                "min": 10,
+                                "max": 20,
+                                "distinct": [
+                                    "10",
+                                    "20"
+                                ],
+                                "values": [
+                                    "10",
+                                    "20"
+                                ],
+                                "wpairs": {
+                                    "WT": {
+                                        "w": 4,
+                                        "wv": 70
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "bogus_agg",
+                null,
+                0
+            ],
+            "note": "filtered-nums/bogus_agg"
+        },
+        {
+            "id": "243-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 3,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [
+                                    "a",
+                                    "b"
+                                ],
+                                "values": [
+                                    "a",
+                                    "b",
+                                    "c"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "count",
+                null,
+                0
+            ],
+            "note": "filtered-text/count"
+        },
+        {
+            "id": "244-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 3,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [
+                                    "a",
+                                    "b"
+                                ],
+                                "values": [
+                                    "a",
+                                    "b",
+                                    "c"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "sum",
+                null,
+                0
+            ],
+            "note": "filtered-text/sum"
+        },
+        {
+            "id": "245-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 3,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [
+                                    "a",
+                                    "b"
+                                ],
+                                "values": [
+                                    "a",
+                                    "b",
+                                    "c"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "avg",
+                null,
+                0
+            ],
+            "note": "filtered-text/avg"
+        },
+        {
+            "id": "246-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 3,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [
+                                    "a",
+                                    "b"
+                                ],
+                                "values": [
+                                    "a",
+                                    "b",
+                                    "c"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "median",
+                null,
+                0
+            ],
+            "note": "filtered-text/median"
+        },
+        {
+            "id": "247-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 3,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [
+                                    "a",
+                                    "b"
+                                ],
+                                "values": [
+                                    "a",
+                                    "b",
+                                    "c"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "min",
+                null,
+                0
+            ],
+            "note": "filtered-text/min"
+        },
+        {
+            "id": "248-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 3,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [
+                                    "a",
+                                    "b"
+                                ],
+                                "values": [
+                                    "a",
+                                    "b",
+                                    "c"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "max",
+                null,
+                0
+            ],
+            "note": "filtered-text/max"
+        },
+        {
+            "id": "249-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 3,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [
+                                    "a",
+                                    "b"
+                                ],
+                                "values": [
+                                    "a",
+                                    "b",
+                                    "c"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "distinct",
+                null,
+                0
+            ],
+            "note": "filtered-text/distinct"
+        },
+        {
+            "id": "250-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 3,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [
+                                    "a",
+                                    "b"
+                                ],
+                                "values": [
+                                    "a",
+                                    "b",
+                                    "c"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "mode",
+                null,
+                0
+            ],
+            "note": "filtered-text/mode"
+        },
+        {
+            "id": "251-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 3,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [
+                                    "a",
+                                    "b"
+                                ],
+                                "values": [
+                                    "a",
+                                    "b",
+                                    "c"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "stddev",
+                null,
+                0
+            ],
+            "note": "filtered-text/stddev"
+        },
+        {
+            "id": "252-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 3,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [
+                                    "a",
+                                    "b"
+                                ],
+                                "values": [
+                                    "a",
+                                    "b",
+                                    "c"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "range",
+                null,
+                0
+            ],
+            "note": "filtered-text/range"
+        },
+        {
+            "id": "253-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 3,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [
+                                    "a",
+                                    "b"
+                                ],
+                                "values": [
+                                    "a",
+                                    "b",
+                                    "c"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "count_filled",
+                null,
+                0
+            ],
+            "note": "filtered-text/count_filled"
+        },
+        {
+            "id": "254-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 3,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [
+                                    "a",
+                                    "b"
+                                ],
+                                "values": [
+                                    "a",
+                                    "b",
+                                    "c"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "count_blank",
+                null,
+                0
+            ],
+            "note": "filtered-text/count_blank"
+        },
+        {
+            "id": "255-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 3,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [
+                                    "a",
+                                    "b"
+                                ],
+                                "values": [
+                                    "a",
+                                    "b",
+                                    "c"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "antimode",
+                null,
+                0
+            ],
+            "note": "filtered-text/antimode"
+        },
+        {
+            "id": "256-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 3,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [
+                                    "a",
+                                    "b"
+                                ],
+                                "values": [
+                                    "a",
+                                    "b",
+                                    "c"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "p10",
+                null,
+                0
+            ],
+            "note": "filtered-text/p10"
+        },
+        {
+            "id": "257-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 3,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [
+                                    "a",
+                                    "b"
+                                ],
+                                "values": [
+                                    "a",
+                                    "b",
+                                    "c"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "p25",
+                null,
+                0
+            ],
+            "note": "filtered-text/p25"
+        },
+        {
+            "id": "258-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 3,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [
+                                    "a",
+                                    "b"
+                                ],
+                                "values": [
+                                    "a",
+                                    "b",
+                                    "c"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "p50",
+                null,
+                0
+            ],
+            "note": "filtered-text/p50"
+        },
+        {
+            "id": "259-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 3,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [
+                                    "a",
+                                    "b"
+                                ],
+                                "values": [
+                                    "a",
+                                    "b",
+                                    "c"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "p75",
+                null,
+                0
+            ],
+            "note": "filtered-text/p75"
+        },
+        {
+            "id": "260-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 3,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [
+                                    "a",
+                                    "b"
+                                ],
+                                "values": [
+                                    "a",
+                                    "b",
+                                    "c"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "p90",
+                null,
+                0
+            ],
+            "note": "filtered-text/p90"
+        },
+        {
+            "id": "261-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 3,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [
+                                    "a",
+                                    "b"
+                                ],
+                                "values": [
+                                    "a",
+                                    "b",
+                                    "c"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "p99",
+                null,
+                0
+            ],
+            "note": "filtered-text/p99"
+        },
+        {
+            "id": "262-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 3,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [
+                                    "a",
+                                    "b"
+                                ],
+                                "values": [
+                                    "a",
+                                    "b",
+                                    "c"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "wavg@WT",
+                null,
+                0
+            ],
+            "note": "filtered-text/wavg@WT"
+        },
+        {
+            "id": "263-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 3,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [
+                                    "a",
+                                    "b"
+                                ],
+                                "values": [
+                                    "a",
+                                    "b",
+                                    "c"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "formula",
+                null,
+                0
+            ],
+            "note": "filtered-text/formula"
+        },
+        {
+            "id": "264-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 3,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [
+                                    "a",
+                                    "b"
+                                ],
+                                "values": [
+                                    "a",
+                                    "b",
+                                    "c"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "bogus_agg",
+                null,
+                0
+            ],
+            "note": "filtered-text/bogus_agg"
+        },
+        {
+            "id": "265-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 8,
+                            "main": {
+                                "sum": 31,
+                                "numericCount": 8,
+                                "min": 2,
+                                "max": 9,
+                                "distinct": [
+                                    "2",
+                                    "4",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "values": [
+                                    "2",
+                                    "4",
+                                    "4",
+                                    "4",
+                                    "5",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "count",
+                null,
+                0
+            ],
+            "note": "filtered-spread/count"
+        },
+        {
+            "id": "266-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 8,
+                            "main": {
+                                "sum": 31,
+                                "numericCount": 8,
+                                "min": 2,
+                                "max": 9,
+                                "distinct": [
+                                    "2",
+                                    "4",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "values": [
+                                    "2",
+                                    "4",
+                                    "4",
+                                    "4",
+                                    "5",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "sum",
+                null,
+                0
+            ],
+            "note": "filtered-spread/sum"
+        },
+        {
+            "id": "267-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 8,
+                            "main": {
+                                "sum": 31,
+                                "numericCount": 8,
+                                "min": 2,
+                                "max": 9,
+                                "distinct": [
+                                    "2",
+                                    "4",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "values": [
+                                    "2",
+                                    "4",
+                                    "4",
+                                    "4",
+                                    "5",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "avg",
+                null,
+                0
+            ],
+            "note": "filtered-spread/avg"
+        },
+        {
+            "id": "268-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 8,
+                            "main": {
+                                "sum": 31,
+                                "numericCount": 8,
+                                "min": 2,
+                                "max": 9,
+                                "distinct": [
+                                    "2",
+                                    "4",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "values": [
+                                    "2",
+                                    "4",
+                                    "4",
+                                    "4",
+                                    "5",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "median",
+                null,
+                0
+            ],
+            "note": "filtered-spread/median"
+        },
+        {
+            "id": "269-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 8,
+                            "main": {
+                                "sum": 31,
+                                "numericCount": 8,
+                                "min": 2,
+                                "max": 9,
+                                "distinct": [
+                                    "2",
+                                    "4",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "values": [
+                                    "2",
+                                    "4",
+                                    "4",
+                                    "4",
+                                    "5",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "min",
+                null,
+                0
+            ],
+            "note": "filtered-spread/min"
+        },
+        {
+            "id": "270-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 8,
+                            "main": {
+                                "sum": 31,
+                                "numericCount": 8,
+                                "min": 2,
+                                "max": 9,
+                                "distinct": [
+                                    "2",
+                                    "4",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "values": [
+                                    "2",
+                                    "4",
+                                    "4",
+                                    "4",
+                                    "5",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "max",
+                null,
+                0
+            ],
+            "note": "filtered-spread/max"
+        },
+        {
+            "id": "271-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 8,
+                            "main": {
+                                "sum": 31,
+                                "numericCount": 8,
+                                "min": 2,
+                                "max": 9,
+                                "distinct": [
+                                    "2",
+                                    "4",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "values": [
+                                    "2",
+                                    "4",
+                                    "4",
+                                    "4",
+                                    "5",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "distinct",
+                null,
+                0
+            ],
+            "note": "filtered-spread/distinct"
+        },
+        {
+            "id": "272-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 8,
+                            "main": {
+                                "sum": 31,
+                                "numericCount": 8,
+                                "min": 2,
+                                "max": 9,
+                                "distinct": [
+                                    "2",
+                                    "4",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "values": [
+                                    "2",
+                                    "4",
+                                    "4",
+                                    "4",
+                                    "5",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "mode",
+                null,
+                0
+            ],
+            "note": "filtered-spread/mode"
+        },
+        {
+            "id": "273-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 8,
+                            "main": {
+                                "sum": 31,
+                                "numericCount": 8,
+                                "min": 2,
+                                "max": 9,
+                                "distinct": [
+                                    "2",
+                                    "4",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "values": [
+                                    "2",
+                                    "4",
+                                    "4",
+                                    "4",
+                                    "5",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "stddev",
+                null,
+                0
+            ],
+            "note": "filtered-spread/stddev"
+        },
+        {
+            "id": "274-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 8,
+                            "main": {
+                                "sum": 31,
+                                "numericCount": 8,
+                                "min": 2,
+                                "max": 9,
+                                "distinct": [
+                                    "2",
+                                    "4",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "values": [
+                                    "2",
+                                    "4",
+                                    "4",
+                                    "4",
+                                    "5",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "range",
+                null,
+                0
+            ],
+            "note": "filtered-spread/range"
+        },
+        {
+            "id": "275-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 8,
+                            "main": {
+                                "sum": 31,
+                                "numericCount": 8,
+                                "min": 2,
+                                "max": 9,
+                                "distinct": [
+                                    "2",
+                                    "4",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "values": [
+                                    "2",
+                                    "4",
+                                    "4",
+                                    "4",
+                                    "5",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "count_filled",
+                null,
+                0
+            ],
+            "note": "filtered-spread/count_filled"
+        },
+        {
+            "id": "276-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 8,
+                            "main": {
+                                "sum": 31,
+                                "numericCount": 8,
+                                "min": 2,
+                                "max": 9,
+                                "distinct": [
+                                    "2",
+                                    "4",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "values": [
+                                    "2",
+                                    "4",
+                                    "4",
+                                    "4",
+                                    "5",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "count_blank",
+                null,
+                0
+            ],
+            "note": "filtered-spread/count_blank"
+        },
+        {
+            "id": "277-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 8,
+                            "main": {
+                                "sum": 31,
+                                "numericCount": 8,
+                                "min": 2,
+                                "max": 9,
+                                "distinct": [
+                                    "2",
+                                    "4",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "values": [
+                                    "2",
+                                    "4",
+                                    "4",
+                                    "4",
+                                    "5",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "antimode",
+                null,
+                0
+            ],
+            "note": "filtered-spread/antimode"
+        },
+        {
+            "id": "278-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 8,
+                            "main": {
+                                "sum": 31,
+                                "numericCount": 8,
+                                "min": 2,
+                                "max": 9,
+                                "distinct": [
+                                    "2",
+                                    "4",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "values": [
+                                    "2",
+                                    "4",
+                                    "4",
+                                    "4",
+                                    "5",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "p10",
+                null,
+                0
+            ],
+            "note": "filtered-spread/p10"
+        },
+        {
+            "id": "279-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 8,
+                            "main": {
+                                "sum": 31,
+                                "numericCount": 8,
+                                "min": 2,
+                                "max": 9,
+                                "distinct": [
+                                    "2",
+                                    "4",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "values": [
+                                    "2",
+                                    "4",
+                                    "4",
+                                    "4",
+                                    "5",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "p25",
+                null,
+                0
+            ],
+            "note": "filtered-spread/p25"
+        },
+        {
+            "id": "280-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 8,
+                            "main": {
+                                "sum": 31,
+                                "numericCount": 8,
+                                "min": 2,
+                                "max": 9,
+                                "distinct": [
+                                    "2",
+                                    "4",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "values": [
+                                    "2",
+                                    "4",
+                                    "4",
+                                    "4",
+                                    "5",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "p50",
+                null,
+                0
+            ],
+            "note": "filtered-spread/p50"
+        },
+        {
+            "id": "281-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 8,
+                            "main": {
+                                "sum": 31,
+                                "numericCount": 8,
+                                "min": 2,
+                                "max": 9,
+                                "distinct": [
+                                    "2",
+                                    "4",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "values": [
+                                    "2",
+                                    "4",
+                                    "4",
+                                    "4",
+                                    "5",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "p75",
+                null,
+                0
+            ],
+            "note": "filtered-spread/p75"
+        },
+        {
+            "id": "282-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 8,
+                            "main": {
+                                "sum": 31,
+                                "numericCount": 8,
+                                "min": 2,
+                                "max": 9,
+                                "distinct": [
+                                    "2",
+                                    "4",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "values": [
+                                    "2",
+                                    "4",
+                                    "4",
+                                    "4",
+                                    "5",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "p90",
+                null,
+                0
+            ],
+            "note": "filtered-spread/p90"
+        },
+        {
+            "id": "283-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 8,
+                            "main": {
+                                "sum": 31,
+                                "numericCount": 8,
+                                "min": 2,
+                                "max": 9,
+                                "distinct": [
+                                    "2",
+                                    "4",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "values": [
+                                    "2",
+                                    "4",
+                                    "4",
+                                    "4",
+                                    "5",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "p99",
+                null,
+                0
+            ],
+            "note": "filtered-spread/p99"
+        },
+        {
+            "id": "284-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 8,
+                            "main": {
+                                "sum": 31,
+                                "numericCount": 8,
+                                "min": 2,
+                                "max": 9,
+                                "distinct": [
+                                    "2",
+                                    "4",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "values": [
+                                    "2",
+                                    "4",
+                                    "4",
+                                    "4",
+                                    "5",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "wavg@WT",
+                null,
+                0
+            ],
+            "note": "filtered-spread/wavg@WT"
+        },
+        {
+            "id": "285-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 8,
+                            "main": {
+                                "sum": 31,
+                                "numericCount": 8,
+                                "min": 2,
+                                "max": 9,
+                                "distinct": [
+                                    "2",
+                                    "4",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "values": [
+                                    "2",
+                                    "4",
+                                    "4",
+                                    "4",
+                                    "5",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "formula",
+                null,
+                0
+            ],
+            "note": "filtered-spread/formula"
+        },
+        {
+            "id": "286-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 8,
+                            "main": {
+                                "sum": 31,
+                                "numericCount": 8,
+                                "min": 2,
+                                "max": 9,
+                                "distinct": [
+                                    "2",
+                                    "4",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "values": [
+                                    "2",
+                                    "4",
+                                    "4",
+                                    "4",
+                                    "5",
+                                    "5",
+                                    "7",
+                                    "9"
+                                ],
+                                "wpairs": {}
+                            }
+                        }
+                    ]
+                },
+                "bogus_agg",
+                null,
+                0
+            ],
+            "note": "filtered-spread/bogus_agg"
+        },
+        {
+            "id": "287-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            },
+                            "_colData": {
+                                "OTHER": {
+                                    "sum": 30,
+                                    "numericCount": 2,
+                                    "min": 10,
+                                    "max": 20,
+                                    "distinct": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "values": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "wpairs": {
+                                        "WT": {
+                                            "w": 4,
+                                            "wv": 70
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "count",
+                "OTHER",
+                0
+            ],
+            "note": "filt+override/count"
+        },
+        {
+            "id": "288-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            },
+                            "_colData": {
+                                "OTHER": {
+                                    "sum": 30,
+                                    "numericCount": 2,
+                                    "min": 10,
+                                    "max": 20,
+                                    "distinct": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "values": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "wpairs": {
+                                        "WT": {
+                                            "w": 4,
+                                            "wv": 70
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "sum",
+                "OTHER",
+                0
+            ],
+            "note": "filt+override/sum"
+        },
+        {
+            "id": "289-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            },
+                            "_colData": {
+                                "OTHER": {
+                                    "sum": 30,
+                                    "numericCount": 2,
+                                    "min": 10,
+                                    "max": 20,
+                                    "distinct": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "values": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "wpairs": {
+                                        "WT": {
+                                            "w": 4,
+                                            "wv": 70
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "avg",
+                "OTHER",
+                0
+            ],
+            "note": "filt+override/avg"
+        },
+        {
+            "id": "290-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            },
+                            "_colData": {
+                                "OTHER": {
+                                    "sum": 30,
+                                    "numericCount": 2,
+                                    "min": 10,
+                                    "max": 20,
+                                    "distinct": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "values": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "wpairs": {
+                                        "WT": {
+                                            "w": 4,
+                                            "wv": 70
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "median",
+                "OTHER",
+                0
+            ],
+            "note": "filt+override/median"
+        },
+        {
+            "id": "291-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            },
+                            "_colData": {
+                                "OTHER": {
+                                    "sum": 30,
+                                    "numericCount": 2,
+                                    "min": 10,
+                                    "max": 20,
+                                    "distinct": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "values": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "wpairs": {
+                                        "WT": {
+                                            "w": 4,
+                                            "wv": 70
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "min",
+                "OTHER",
+                0
+            ],
+            "note": "filt+override/min"
+        },
+        {
+            "id": "292-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            },
+                            "_colData": {
+                                "OTHER": {
+                                    "sum": 30,
+                                    "numericCount": 2,
+                                    "min": 10,
+                                    "max": 20,
+                                    "distinct": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "values": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "wpairs": {
+                                        "WT": {
+                                            "w": 4,
+                                            "wv": 70
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "max",
+                "OTHER",
+                0
+            ],
+            "note": "filt+override/max"
+        },
+        {
+            "id": "293-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            },
+                            "_colData": {
+                                "OTHER": {
+                                    "sum": 30,
+                                    "numericCount": 2,
+                                    "min": 10,
+                                    "max": 20,
+                                    "distinct": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "values": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "wpairs": {
+                                        "WT": {
+                                            "w": 4,
+                                            "wv": 70
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "distinct",
+                "OTHER",
+                0
+            ],
+            "note": "filt+override/distinct"
+        },
+        {
+            "id": "294-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            },
+                            "_colData": {
+                                "OTHER": {
+                                    "sum": 30,
+                                    "numericCount": 2,
+                                    "min": 10,
+                                    "max": 20,
+                                    "distinct": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "values": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "wpairs": {
+                                        "WT": {
+                                            "w": 4,
+                                            "wv": 70
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "mode",
+                "OTHER",
+                0
+            ],
+            "note": "filt+override/mode"
+        },
+        {
+            "id": "295-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            },
+                            "_colData": {
+                                "OTHER": {
+                                    "sum": 30,
+                                    "numericCount": 2,
+                                    "min": 10,
+                                    "max": 20,
+                                    "distinct": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "values": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "wpairs": {
+                                        "WT": {
+                                            "w": 4,
+                                            "wv": 70
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "stddev",
+                "OTHER",
+                0
+            ],
+            "note": "filt+override/stddev"
+        },
+        {
+            "id": "296-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            },
+                            "_colData": {
+                                "OTHER": {
+                                    "sum": 30,
+                                    "numericCount": 2,
+                                    "min": 10,
+                                    "max": 20,
+                                    "distinct": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "values": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "wpairs": {
+                                        "WT": {
+                                            "w": 4,
+                                            "wv": 70
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "range",
+                "OTHER",
+                0
+            ],
+            "note": "filt+override/range"
+        },
+        {
+            "id": "297-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            },
+                            "_colData": {
+                                "OTHER": {
+                                    "sum": 30,
+                                    "numericCount": 2,
+                                    "min": 10,
+                                    "max": 20,
+                                    "distinct": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "values": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "wpairs": {
+                                        "WT": {
+                                            "w": 4,
+                                            "wv": 70
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "count_filled",
+                "OTHER",
+                0
+            ],
+            "note": "filt+override/count_filled"
+        },
+        {
+            "id": "298-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            },
+                            "_colData": {
+                                "OTHER": {
+                                    "sum": 30,
+                                    "numericCount": 2,
+                                    "min": 10,
+                                    "max": 20,
+                                    "distinct": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "values": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "wpairs": {
+                                        "WT": {
+                                            "w": 4,
+                                            "wv": 70
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "count_blank",
+                "OTHER",
+                0
+            ],
+            "note": "filt+override/count_blank"
+        },
+        {
+            "id": "299-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            },
+                            "_colData": {
+                                "OTHER": {
+                                    "sum": 30,
+                                    "numericCount": 2,
+                                    "min": 10,
+                                    "max": 20,
+                                    "distinct": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "values": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "wpairs": {
+                                        "WT": {
+                                            "w": 4,
+                                            "wv": 70
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "antimode",
+                "OTHER",
+                0
+            ],
+            "note": "filt+override/antimode"
+        },
+        {
+            "id": "300-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            },
+                            "_colData": {
+                                "OTHER": {
+                                    "sum": 30,
+                                    "numericCount": 2,
+                                    "min": 10,
+                                    "max": 20,
+                                    "distinct": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "values": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "wpairs": {
+                                        "WT": {
+                                            "w": 4,
+                                            "wv": 70
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "p10",
+                "OTHER",
+                0
+            ],
+            "note": "filt+override/p10"
+        },
+        {
+            "id": "301-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            },
+                            "_colData": {
+                                "OTHER": {
+                                    "sum": 30,
+                                    "numericCount": 2,
+                                    "min": 10,
+                                    "max": 20,
+                                    "distinct": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "values": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "wpairs": {
+                                        "WT": {
+                                            "w": 4,
+                                            "wv": 70
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "p25",
+                "OTHER",
+                0
+            ],
+            "note": "filt+override/p25"
+        },
+        {
+            "id": "302-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            },
+                            "_colData": {
+                                "OTHER": {
+                                    "sum": 30,
+                                    "numericCount": 2,
+                                    "min": 10,
+                                    "max": 20,
+                                    "distinct": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "values": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "wpairs": {
+                                        "WT": {
+                                            "w": 4,
+                                            "wv": 70
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "p50",
+                "OTHER",
+                0
+            ],
+            "note": "filt+override/p50"
+        },
+        {
+            "id": "303-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            },
+                            "_colData": {
+                                "OTHER": {
+                                    "sum": 30,
+                                    "numericCount": 2,
+                                    "min": 10,
+                                    "max": 20,
+                                    "distinct": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "values": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "wpairs": {
+                                        "WT": {
+                                            "w": 4,
+                                            "wv": 70
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "p75",
+                "OTHER",
+                0
+            ],
+            "note": "filt+override/p75"
+        },
+        {
+            "id": "304-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            },
+                            "_colData": {
+                                "OTHER": {
+                                    "sum": 30,
+                                    "numericCount": 2,
+                                    "min": 10,
+                                    "max": 20,
+                                    "distinct": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "values": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "wpairs": {
+                                        "WT": {
+                                            "w": 4,
+                                            "wv": 70
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "p90",
+                "OTHER",
+                0
+            ],
+            "note": "filt+override/p90"
+        },
+        {
+            "id": "305-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            },
+                            "_colData": {
+                                "OTHER": {
+                                    "sum": 30,
+                                    "numericCount": 2,
+                                    "min": 10,
+                                    "max": 20,
+                                    "distinct": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "values": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "wpairs": {
+                                        "WT": {
+                                            "w": 4,
+                                            "wv": 70
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "p99",
+                "OTHER",
+                0
+            ],
+            "note": "filt+override/p99"
+        },
+        {
+            "id": "306-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            },
+                            "_colData": {
+                                "OTHER": {
+                                    "sum": 30,
+                                    "numericCount": 2,
+                                    "min": 10,
+                                    "max": 20,
+                                    "distinct": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "values": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "wpairs": {
+                                        "WT": {
+                                            "w": 4,
+                                            "wv": 70
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "wavg@WT",
+                "OTHER",
+                0
+            ],
+            "note": "filt+override/wavg@WT"
+        },
+        {
+            "id": "307-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            },
+                            "_colData": {
+                                "OTHER": {
+                                    "sum": 30,
+                                    "numericCount": 2,
+                                    "min": 10,
+                                    "max": 20,
+                                    "distinct": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "values": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "wpairs": {
+                                        "WT": {
+                                            "w": 4,
+                                            "wv": 70
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "formula",
+                "OTHER",
+                0
+            ],
+            "note": "filt+override/formula"
+        },
+        {
+            "id": "308-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 9,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_filteredBuckets": [
+                        {
+                            "count": 2,
+                            "main": {
+                                "sum": 0,
+                                "numericCount": 0,
+                                "min": "+INF",
+                                "max": "-INF",
+                                "distinct": [],
+                                "values": [],
+                                "wpairs": {}
+                            },
+                            "_colData": {
+                                "OTHER": {
+                                    "sum": 30,
+                                    "numericCount": 2,
+                                    "min": 10,
+                                    "max": 20,
+                                    "distinct": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "values": [
+                                        "10",
+                                        "20"
+                                    ],
+                                    "wpairs": {
+                                        "WT": {
+                                            "w": 4,
+                                            "wv": 70
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "bogus_agg",
+                "OTHER",
+                0
+            ],
+            "note": "filt+override/bogus_agg"
+        },
+        {
+            "id": "309-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "count",
+                "OTHER",
+                null
+            ],
+            "note": "override/count"
+        },
+        {
+            "id": "310-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "sum",
+                "OTHER",
+                null
+            ],
+            "note": "override/sum"
+        },
+        {
+            "id": "311-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "avg",
+                "OTHER",
+                null
+            ],
+            "note": "override/avg"
+        },
+        {
+            "id": "312-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "median",
+                "OTHER",
+                null
+            ],
+            "note": "override/median"
+        },
+        {
+            "id": "313-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "min",
+                "OTHER",
+                null
+            ],
+            "note": "override/min"
+        },
+        {
+            "id": "314-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "max",
+                "OTHER",
+                null
+            ],
+            "note": "override/max"
+        },
+        {
+            "id": "315-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "distinct",
+                "OTHER",
+                null
+            ],
+            "note": "override/distinct"
+        },
+        {
+            "id": "316-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "mode",
+                "OTHER",
+                null
+            ],
+            "note": "override/mode"
+        },
+        {
+            "id": "317-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "stddev",
+                "OTHER",
+                null
+            ],
+            "note": "override/stddev"
+        },
+        {
+            "id": "318-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "range",
+                "OTHER",
+                null
+            ],
+            "note": "override/range"
+        },
+        {
+            "id": "319-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "count_filled",
+                "OTHER",
+                null
+            ],
+            "note": "override/count_filled"
+        },
+        {
+            "id": "320-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "count_blank",
+                "OTHER",
+                null
+            ],
+            "note": "override/count_blank"
+        },
+        {
+            "id": "321-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "antimode",
+                "OTHER",
+                null
+            ],
+            "note": "override/antimode"
+        },
+        {
+            "id": "322-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "p10",
+                "OTHER",
+                null
+            ],
+            "note": "override/p10"
+        },
+        {
+            "id": "323-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "p25",
+                "OTHER",
+                null
+            ],
+            "note": "override/p25"
+        },
+        {
+            "id": "324-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "p50",
+                "OTHER",
+                null
+            ],
+            "note": "override/p50"
+        },
+        {
+            "id": "325-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "p75",
+                "OTHER",
+                null
+            ],
+            "note": "override/p75"
+        },
+        {
+            "id": "326-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "p90",
+                "OTHER",
+                null
+            ],
+            "note": "override/p90"
+        },
+        {
+            "id": "327-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "p99",
+                "OTHER",
+                null
+            ],
+            "note": "override/p99"
+        },
+        {
+            "id": "328-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "wavg@WT",
+                "OTHER",
+                null
+            ],
+            "note": "override/wavg@WT"
+        },
+        {
+            "id": "329-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "formula",
+                "OTHER",
+                null
+            ],
+            "note": "override/formula"
+        },
+        {
+            "id": "330-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "bogus_agg",
+                "OTHER",
+                null
+            ],
+            "note": "override/bogus_agg"
+        },
+        {
+            "id": "331-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "sum",
+                "MISSING",
+                null
+            ],
+            "note": "override-missing/sum"
+        },
+        {
+            "id": "332-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "min",
+                "MISSING",
+                null
+            ],
+            "note": "override-missing/min"
+        },
+        {
+            "id": "333-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "max",
+                "MISSING",
+                null
+            ],
+            "note": "override-missing/max"
+        },
+        {
+            "id": "334-extractAgg",
+            "fn": "extractAgg",
+            "args": [
+                {
+                    "count": 7,
+                    "sum": 0,
+                    "numericCount": 0,
+                    "min": "+INF",
+                    "max": "-INF",
+                    "distinct": [],
+                    "values": [],
+                    "wpairs": {},
+                    "_colData": {
+                        "OTHER": {
+                            "sum": 30,
+                            "numericCount": 2,
+                            "min": 10,
+                            "max": 20,
+                            "distinct": [
+                                "10",
+                                "20"
+                            ],
+                            "values": [
+                                "10",
+                                "20"
+                            ],
+                            "wpairs": {
+                                "WT": {
+                                    "w": 4,
+                                    "wv": 70
+                                }
+                            }
+                        }
+                    }
+                },
+                "count_blank",
+                "MISSING",
+                null
+            ],
+            "note": "override-missing/count_blank"
+        },
+        {
+            "id": "335-stddev",
+            "fn": "stddev",
+            "args": [
+                []
+            ],
+            "note": "set0"
+        },
+        {
+            "id": "336-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [],
+                1
+            ],
+            "note": "set0/p1"
+        },
+        {
+            "id": "337-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [],
+                10
+            ],
+            "note": "set0/p10"
+        },
+        {
+            "id": "338-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [],
+                25
+            ],
+            "note": "set0/p25"
+        },
+        {
+            "id": "339-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [],
+                50
+            ],
+            "note": "set0/p50"
+        },
+        {
+            "id": "340-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [],
+                75
+            ],
+            "note": "set0/p75"
+        },
+        {
+            "id": "341-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [],
+                90
+            ],
+            "note": "set0/p90"
+        },
+        {
+            "id": "342-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [],
+                99
+            ],
+            "note": "set0/p99"
+        },
+        {
+            "id": "343-stddev",
+            "fn": "stddev",
+            "args": [
+                [
+                    5
+                ]
+            ],
+            "note": "set1"
+        },
+        {
+            "id": "344-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    5
+                ],
+                1
+            ],
+            "note": "set1/p1"
+        },
+        {
+            "id": "345-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    5
+                ],
+                10
+            ],
+            "note": "set1/p10"
+        },
+        {
+            "id": "346-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    5
+                ],
+                25
+            ],
+            "note": "set1/p25"
+        },
+        {
+            "id": "347-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    5
+                ],
+                50
+            ],
+            "note": "set1/p50"
+        },
+        {
+            "id": "348-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    5
+                ],
+                75
+            ],
+            "note": "set1/p75"
+        },
+        {
+            "id": "349-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    5
+                ],
+                90
+            ],
+            "note": "set1/p90"
+        },
+        {
+            "id": "350-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    5
+                ],
+                99
+            ],
+            "note": "set1/p99"
+        },
+        {
+            "id": "351-stddev",
+            "fn": "stddev",
+            "args": [
+                [
+                    1,
+                    2,
+                    3,
+                    4
+                ]
+            ],
+            "note": "set2"
+        },
+        {
+            "id": "352-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                1
+            ],
+            "note": "set2/p1"
+        },
+        {
+            "id": "353-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                10
+            ],
+            "note": "set2/p10"
+        },
+        {
+            "id": "354-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                25
+            ],
+            "note": "set2/p25"
+        },
+        {
+            "id": "355-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                50
+            ],
+            "note": "set2/p50"
+        },
+        {
+            "id": "356-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                75
+            ],
+            "note": "set2/p75"
+        },
+        {
+            "id": "357-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                90
+            ],
+            "note": "set2/p90"
+        },
+        {
+            "id": "358-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                99
+            ],
+            "note": "set2/p99"
+        },
+        {
+            "id": "359-stddev",
+            "fn": "stddev",
+            "args": [
+                [
+                    2,
+                    4,
+                    4,
+                    4,
+                    5,
+                    5,
+                    7,
+                    9
+                ]
+            ],
+            "note": "set3"
+        },
+        {
+            "id": "360-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    2,
+                    4,
+                    4,
+                    4,
+                    5,
+                    5,
+                    7,
+                    9
+                ],
+                1
+            ],
+            "note": "set3/p1"
+        },
+        {
+            "id": "361-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    2,
+                    4,
+                    4,
+                    4,
+                    5,
+                    5,
+                    7,
+                    9
+                ],
+                10
+            ],
+            "note": "set3/p10"
+        },
+        {
+            "id": "362-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    2,
+                    4,
+                    4,
+                    4,
+                    5,
+                    5,
+                    7,
+                    9
+                ],
+                25
+            ],
+            "note": "set3/p25"
+        },
+        {
+            "id": "363-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    2,
+                    4,
+                    4,
+                    4,
+                    5,
+                    5,
+                    7,
+                    9
+                ],
+                50
+            ],
+            "note": "set3/p50"
+        },
+        {
+            "id": "364-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    2,
+                    4,
+                    4,
+                    4,
+                    5,
+                    5,
+                    7,
+                    9
+                ],
+                75
+            ],
+            "note": "set3/p75"
+        },
+        {
+            "id": "365-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    2,
+                    4,
+                    4,
+                    4,
+                    5,
+                    5,
+                    7,
+                    9
+                ],
+                90
+            ],
+            "note": "set3/p90"
+        },
+        {
+            "id": "366-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    2,
+                    4,
+                    4,
+                    4,
+                    5,
+                    5,
+                    7,
+                    9
+                ],
+                99
+            ],
+            "note": "set3/p99"
+        },
+        {
+            "id": "367-stddev",
+            "fn": "stddev",
+            "args": [
+                [
+                    -10,
+                    -3,
+                    -2
+                ]
+            ],
+            "note": "set4"
+        },
+        {
+            "id": "368-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    -10,
+                    -3,
+                    -2
+                ],
+                1
+            ],
+            "note": "set4/p1"
+        },
+        {
+            "id": "369-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    -10,
+                    -3,
+                    -2
+                ],
+                10
+            ],
+            "note": "set4/p10"
+        },
+        {
+            "id": "370-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    -10,
+                    -3,
+                    -2
+                ],
+                25
+            ],
+            "note": "set4/p25"
+        },
+        {
+            "id": "371-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    -10,
+                    -3,
+                    -2
+                ],
+                50
+            ],
+            "note": "set4/p50"
+        },
+        {
+            "id": "372-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    -10,
+                    -3,
+                    -2
+                ],
+                75
+            ],
+            "note": "set4/p75"
+        },
+        {
+            "id": "373-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    -10,
+                    -3,
+                    -2
+                ],
+                90
+            ],
+            "note": "set4/p90"
+        },
+        {
+            "id": "374-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    -10,
+                    -3,
+                    -2
+                ],
+                99
+            ],
+            "note": "set4/p99"
+        },
+        {
+            "id": "375-stddev",
+            "fn": "stddev",
+            "args": [
+                [
+                    0,
+                    0,
+                    0
+                ]
+            ],
+            "note": "set5"
+        },
+        {
+            "id": "376-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    0,
+                    0,
+                    0
+                ],
+                1
+            ],
+            "note": "set5/p1"
+        },
+        {
+            "id": "377-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    0,
+                    0,
+                    0
+                ],
+                10
+            ],
+            "note": "set5/p10"
+        },
+        {
+            "id": "378-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    0,
+                    0,
+                    0
+                ],
+                25
+            ],
+            "note": "set5/p25"
+        },
+        {
+            "id": "379-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    0,
+                    0,
+                    0
+                ],
+                50
+            ],
+            "note": "set5/p50"
+        },
+        {
+            "id": "380-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    0,
+                    0,
+                    0
+                ],
+                75
+            ],
+            "note": "set5/p75"
+        },
+        {
+            "id": "381-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    0,
+                    0,
+                    0
+                ],
+                90
+            ],
+            "note": "set5/p90"
+        },
+        {
+            "id": "382-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    0,
+                    0,
+                    0
+                ],
+                99
+            ],
+            "note": "set5/p99"
+        },
+        {
+            "id": "383-stddev",
+            "fn": "stddev",
+            "args": [
+                [
+                    1.5,
+                    2.5,
+                    3.5
+                ]
+            ],
+            "note": "set6"
+        },
+        {
+            "id": "384-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    1.5,
+                    2.5,
+                    3.5
+                ],
+                1
+            ],
+            "note": "set6/p1"
+        },
+        {
+            "id": "385-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    1.5,
+                    2.5,
+                    3.5
+                ],
+                10
+            ],
+            "note": "set6/p10"
+        },
+        {
+            "id": "386-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    1.5,
+                    2.5,
+                    3.5
+                ],
+                25
+            ],
+            "note": "set6/p25"
+        },
+        {
+            "id": "387-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    1.5,
+                    2.5,
+                    3.5
+                ],
+                50
+            ],
+            "note": "set6/p50"
+        },
+        {
+            "id": "388-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    1.5,
+                    2.5,
+                    3.5
+                ],
+                75
+            ],
+            "note": "set6/p75"
+        },
+        {
+            "id": "389-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    1.5,
+                    2.5,
+                    3.5
+                ],
+                90
+            ],
+            "note": "set6/p90"
+        },
+        {
+            "id": "390-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    1.5,
+                    2.5,
+                    3.5
+                ],
+                99
+            ],
+            "note": "set6/p99"
+        },
+        {
+            "id": "391-stddev",
+            "fn": "stddev",
+            "args": [
+                [
+                    1000000,
+                    2,
+                    3
+                ]
+            ],
+            "note": "set7"
+        },
+        {
+            "id": "392-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    1000000,
+                    2,
+                    3
+                ],
+                1
+            ],
+            "note": "set7/p1"
+        },
+        {
+            "id": "393-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    1000000,
+                    2,
+                    3
+                ],
+                10
+            ],
+            "note": "set7/p10"
+        },
+        {
+            "id": "394-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    1000000,
+                    2,
+                    3
+                ],
+                25
+            ],
+            "note": "set7/p25"
+        },
+        {
+            "id": "395-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    1000000,
+                    2,
+                    3
+                ],
+                50
+            ],
+            "note": "set7/p50"
+        },
+        {
+            "id": "396-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    1000000,
+                    2,
+                    3
+                ],
+                75
+            ],
+            "note": "set7/p75"
+        },
+        {
+            "id": "397-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    1000000,
+                    2,
+                    3
+                ],
+                90
+            ],
+            "note": "set7/p90"
+        },
+        {
+            "id": "398-percentileOf",
+            "fn": "percentileOf",
+            "args": [
+                [
+                    1000000,
+                    2,
+                    3
+                ],
+                99
+            ],
+            "note": "set7/p99"
+        },
+        {
+            "id": "399-percentileP",
+            "fn": "percentileP",
+            "args": [
+                "p1"
+            ],
+            "note": "p1"
+        },
+        {
+            "id": "400-wavgCol",
+            "fn": "wavgCol",
+            "args": [
+                "p1"
+            ],
+            "note": "p1"
+        },
+        {
+            "id": "401-percentileP",
+            "fn": "percentileP",
+            "args": [
+                "p10"
+            ],
+            "note": "p10"
+        },
+        {
+            "id": "402-wavgCol",
+            "fn": "wavgCol",
+            "args": [
+                "p10"
+            ],
+            "note": "p10"
+        },
+        {
+            "id": "403-percentileP",
+            "fn": "percentileP",
+            "args": [
+                "p50"
+            ],
+            "note": "p50"
+        },
+        {
+            "id": "404-wavgCol",
+            "fn": "wavgCol",
+            "args": [
+                "p50"
+            ],
+            "note": "p50"
+        },
+        {
+            "id": "405-percentileP",
+            "fn": "percentileP",
+            "args": [
+                "p99"
+            ],
+            "note": "p99"
+        },
+        {
+            "id": "406-wavgCol",
+            "fn": "wavgCol",
+            "args": [
+                "p99"
+            ],
+            "note": "p99"
+        },
+        {
+            "id": "407-percentileP",
+            "fn": "percentileP",
+            "args": [
+                "p100"
+            ],
+            "note": "p100"
+        },
+        {
+            "id": "408-wavgCol",
+            "fn": "wavgCol",
+            "args": [
+                "p100"
+            ],
+            "note": "p100"
+        },
+        {
+            "id": "409-percentileP",
+            "fn": "percentileP",
+            "args": [
+                "p0"
+            ],
+            "note": "p0"
+        },
+        {
+            "id": "410-wavgCol",
+            "fn": "wavgCol",
+            "args": [
+                "p0"
+            ],
+            "note": "p0"
+        },
+        {
+            "id": "411-percentileP",
+            "fn": "percentileP",
+            "args": [
+                "p"
+            ],
+            "note": "p"
+        },
+        {
+            "id": "412-wavgCol",
+            "fn": "wavgCol",
+            "args": [
+                "p"
+            ],
+            "note": "p"
+        },
+        {
+            "id": "413-percentileP",
+            "fn": "percentileP",
+            "args": [
+                "pct_change"
+            ],
+            "note": "pct_change"
+        },
+        {
+            "id": "414-wavgCol",
+            "fn": "wavgCol",
+            "args": [
+                "pct_change"
+            ],
+            "note": "pct_change"
+        },
+        {
+            "id": "415-percentileP",
+            "fn": "percentileP",
+            "args": [
+                "wavg@X"
+            ],
+            "note": "wavg@X"
+        },
+        {
+            "id": "416-wavgCol",
+            "fn": "wavgCol",
+            "args": [
+                "wavg@X"
+            ],
+            "note": "wavg@X"
+        },
+        {
+            "id": "417-percentileP",
+            "fn": "percentileP",
+            "args": [
+                "sum"
+            ],
+            "note": "sum"
+        },
+        {
+            "id": "418-wavgCol",
+            "fn": "wavgCol",
+            "args": [
+                "sum"
+            ],
+            "note": "sum"
+        },
+        {
+            "id": "419-wavgOf",
+            "fn": "wavgOf",
+            "args": [
+                {
+                    "w": 4,
+                    "wv": 70
+                }
+            ],
+            "note": "pair0"
+        },
+        {
+            "id": "420-wavgOf",
+            "fn": "wavgOf",
+            "args": [
+                {
+                    "w": 0,
+                    "wv": 0
+                }
+            ],
+            "note": "pair1"
+        },
+        {
+            "id": "421-wavgOf",
+            "fn": "wavgOf",
+            "args": [
+                {
+                    "w": -2,
+                    "wv": 10
+                }
+            ],
+            "note": "pair2"
+        },
+        {
+            "id": "422-wavgOf",
+            "fn": "wavgOf",
+            "args": [
+                null
+            ],
+            "note": "pair3"
+        },
+        {
+            "id": "423-antimode",
+            "fn": "antimode",
+            "args": [
+                []
+            ],
+            "note": "set0"
+        },
+        {
+            "id": "424-parseNumericValues",
+            "fn": "parseNumericValues",
+            "args": [
+                []
+            ],
+            "note": "set0"
+        },
+        {
+            "id": "425-antimode",
+            "fn": "antimode",
+            "args": [
+                [
+                    "a"
+                ]
+            ],
+            "note": "set1"
+        },
+        {
+            "id": "426-parseNumericValues",
+            "fn": "parseNumericValues",
+            "args": [
+                [
+                    "a"
+                ]
+            ],
+            "note": "set1"
+        },
+        {
+            "id": "427-antimode",
+            "fn": "antimode",
+            "args": [
+                [
+                    "a",
+                    "a",
+                    "b"
+                ]
+            ],
+            "note": "set2"
+        },
+        {
+            "id": "428-parseNumericValues",
+            "fn": "parseNumericValues",
+            "args": [
+                [
+                    "a",
+                    "a",
+                    "b"
+                ]
+            ],
+            "note": "set2"
+        },
+        {
+            "id": "429-antimode",
+            "fn": "antimode",
+            "args": [
+                [
+                    "__proto__",
+                    "__proto__",
+                    "q"
+                ]
+            ],
+            "note": "set3"
+        },
+        {
+            "id": "430-parseNumericValues",
+            "fn": "parseNumericValues",
+            "args": [
+                [
+                    "__proto__",
+                    "__proto__",
+                    "q"
+                ]
+            ],
+            "note": "set3"
+        },
+        {
+            "id": "431-antimode",
+            "fn": "antimode",
+            "args": [
+                [
+                    "constructor",
+                    "y",
+                    "y"
+                ]
+            ],
+            "note": "set4"
+        },
+        {
+            "id": "432-parseNumericValues",
+            "fn": "parseNumericValues",
+            "args": [
+                [
+                    "constructor",
+                    "y",
+                    "y"
+                ]
+            ],
+            "note": "set4"
+        },
+        {
+            "id": "433-antimode",
+            "fn": "antimode",
+            "args": [
+                [
+                    "1",
+                    "1",
+                    "2",
+                    "3"
+                ]
+            ],
+            "note": "set5"
+        },
+        {
+            "id": "434-parseNumericValues",
+            "fn": "parseNumericValues",
+            "args": [
+                [
+                    "1",
+                    "1",
+                    "2",
+                    "3"
+                ]
+            ],
+            "note": "set5"
+        },
+        {
+            "id": "435-parseFieldToken",
+            "fn": "parseFieldToken",
+            "args": [
+                "AMOUNT"
+            ],
+            "note": "AMOUNT"
+        },
+        {
+            "id": "436-fieldDisplayLabel",
+            "fn": "fieldDisplayLabel",
+            "args": [
+                "AMOUNT"
+            ],
+            "note": "AMOUNT"
+        },
+        {
+            "id": "437-parseFieldToken",
+            "fn": "parseFieldToken",
+            "args": [
+                "AWARD_DATE:fy"
+            ],
+            "note": "AWARD_DATE:fy"
+        },
+        {
+            "id": "438-fieldDisplayLabel",
+            "fn": "fieldDisplayLabel",
+            "args": [
+                "AWARD_DATE:fy"
+            ],
+            "note": "AWARD_DATE:fy"
+        },
+        {
+            "id": "439-parseFieldToken",
+            "fn": "parseFieldToken",
+            "args": [
+                "AWARD_DATE:fy:fill"
+            ],
+            "note": "AWARD_DATE:fy:fill"
+        },
+        {
+            "id": "440-fieldDisplayLabel",
+            "fn": "fieldDisplayLabel",
+            "args": [
+                "AWARD_DATE:fy:fill"
+            ],
+            "note": "AWARD_DATE:fy:fill"
+        },
+        {
+            "id": "441-parseFieldToken",
+            "fn": "parseFieldToken",
+            "args": [
+                "AWARD_DATE:month"
+            ],
+            "note": "AWARD_DATE:month"
+        },
+        {
+            "id": "442-fieldDisplayLabel",
+            "fn": "fieldDisplayLabel",
+            "args": [
+                "AWARD_DATE:month"
+            ],
+            "note": "AWARD_DATE:month"
+        },
+        {
+            "id": "443-parseFieldToken",
+            "fn": "parseFieldToken",
+            "args": [
+                "AWARD_DATE:quarter"
+            ],
+            "note": "AWARD_DATE:quarter"
+        },
+        {
+            "id": "444-fieldDisplayLabel",
+            "fn": "fieldDisplayLabel",
+            "args": [
+                "AWARD_DATE:quarter"
+            ],
+            "note": "AWARD_DATE:quarter"
+        },
+        {
+            "id": "445-parseFieldToken",
+            "fn": "parseFieldToken",
+            "args": [
+                "AWARD_DATE:dow"
+            ],
+            "note": "AWARD_DATE:dow"
+        },
+        {
+            "id": "446-fieldDisplayLabel",
+            "fn": "fieldDisplayLabel",
+            "args": [
+                "AWARD_DATE:dow"
+            ],
+            "note": "AWARD_DATE:dow"
+        },
+        {
+            "id": "447-parseFieldToken",
+            "fn": "parseFieldToken",
+            "args": [
+                "AWARD_DATE:year"
+            ],
+            "note": "AWARD_DATE:year"
+        },
+        {
+            "id": "448-fieldDisplayLabel",
+            "fn": "fieldDisplayLabel",
+            "args": [
+                "AWARD_DATE:year"
+            ],
+            "note": "AWARD_DATE:year"
+        },
+        {
+            "id": "449-parseFieldToken",
+            "fn": "parseFieldToken",
+            "args": [
+                "AMOUNT:bin"
+            ],
+            "note": "AMOUNT:bin"
+        },
+        {
+            "id": "450-fieldDisplayLabel",
+            "fn": "fieldDisplayLabel",
+            "args": [
+                "AMOUNT:bin"
+            ],
+            "note": "AMOUNT:bin"
+        },
+        {
+            "id": "451-parseFieldToken",
+            "fn": "parseFieldToken",
+            "args": [
+                "AMOUNT:bin50000"
+            ],
+            "note": "AMOUNT:bin50000"
+        },
+        {
+            "id": "452-fieldDisplayLabel",
+            "fn": "fieldDisplayLabel",
+            "args": [
+                "AMOUNT:bin50000"
+            ],
+            "note": "AMOUNT:bin50000"
+        },
+        {
+            "id": "453-parseFieldToken",
+            "fn": "parseFieldToken",
+            "args": [
+                "AMOUNT:binlog"
+            ],
+            "note": "AMOUNT:binlog"
+        },
+        {
+            "id": "454-fieldDisplayLabel",
+            "fn": "fieldDisplayLabel",
+            "args": [
+                "AMOUNT:binlog"
+            ],
+            "note": "AMOUNT:binlog"
+        },
+        {
+            "id": "455-parseFieldToken",
+            "fn": "parseFieldToken",
+            "args": [
+                "AMOUNT:bins100000_250000"
+            ],
+            "note": "AMOUNT:bins100000_250000"
+        },
+        {
+            "id": "456-fieldDisplayLabel",
+            "fn": "fieldDisplayLabel",
+            "args": [
+                "AMOUNT:bins100000_250000"
+            ],
+            "note": "AMOUNT:bins100000_250000"
+        },
+        {
+            "id": "457-parseFieldToken",
+            "fn": "parseFieldToken",
+            "args": [
+                "AMOUNT:bins"
+            ],
+            "note": "AMOUNT:bins"
+        },
+        {
+            "id": "458-fieldDisplayLabel",
+            "fn": "fieldDisplayLabel",
+            "args": [
+                "AMOUNT:bins"
+            ],
+            "note": "AMOUNT:bins"
+        },
+        {
+            "id": "459-parseFieldToken",
+            "fn": "parseFieldToken",
+            "args": [
+                "AMOUNT:bins0_1_2"
+            ],
+            "note": "AMOUNT:bins0_1_2"
+        },
+        {
+            "id": "460-fieldDisplayLabel",
+            "fn": "fieldDisplayLabel",
+            "args": [
+                "AMOUNT:bins0_1_2"
+            ],
+            "note": "AMOUNT:bins0_1_2"
+        },
+        {
+            "id": "461-parseFieldToken",
+            "fn": "parseFieldToken",
+            "args": [
+                "AMOUNT:bogus"
+            ],
+            "note": "AMOUNT:bogus"
+        },
+        {
+            "id": "462-fieldDisplayLabel",
+            "fn": "fieldDisplayLabel",
+            "args": [
+                "AMOUNT:bogus"
+            ],
+            "note": "AMOUNT:bogus"
+        },
+        {
+            "id": "463-parseFieldToken",
+            "fn": "parseFieldToken",
+            "args": [
+                "WEIRD:COLON:NAME"
+            ],
+            "note": "WEIRD:COLON:NAME"
+        },
+        {
+            "id": "464-fieldDisplayLabel",
+            "fn": "fieldDisplayLabel",
+            "args": [
+                "WEIRD:COLON:NAME"
+            ],
+            "note": "WEIRD:COLON:NAME"
+        },
+        {
+            "id": "465-parseFieldToken",
+            "fn": "parseFieldToken",
+            "args": [
+                "AMOUNT:fill"
+            ],
+            "note": "AMOUNT:fill"
+        },
+        {
+            "id": "466-fieldDisplayLabel",
+            "fn": "fieldDisplayLabel",
+            "args": [
+                "AMOUNT:fill"
+            ],
+            "note": "AMOUNT:fill"
+        },
+        {
+            "id": "467-parseFieldToken",
+            "fn": "parseFieldToken",
+            "args": [
+                "amount:FY"
+            ],
+            "note": "amount:FY"
+        },
+        {
+            "id": "468-fieldDisplayLabel",
+            "fn": "fieldDisplayLabel",
+            "args": [
+                "amount:FY"
+            ],
+            "note": "amount:FY"
+        },
+        {
+            "id": "469-parseFieldToken",
+            "fn": "parseFieldToken",
+            "args": [
+                "AMOUNT:bin0"
+            ],
+            "note": "AMOUNT:bin0"
+        },
+        {
+            "id": "470-fieldDisplayLabel",
+            "fn": "fieldDisplayLabel",
+            "args": [
+                "AMOUNT:bin0"
+            ],
+            "note": "AMOUNT:bin0"
+        },
+        {
+            "id": "471-parseFieldToken",
+            "fn": "parseFieldToken",
+            "args": [
+                "AMOUNT:bin007"
+            ],
+            "note": "AMOUNT:bin007"
+        },
+        {
+            "id": "472-fieldDisplayLabel",
+            "fn": "fieldDisplayLabel",
+            "args": [
+                "AMOUNT:bin007"
+            ],
+            "note": "AMOUNT:bin007"
+        },
+        {
+            "id": "473-parseFieldToken",
+            "fn": "parseFieldToken",
+            "args": [
+                "A:bins250000_100000"
+            ],
+            "note": "A:bins250000_100000"
+        },
+        {
+            "id": "474-fieldDisplayLabel",
+            "fn": "fieldDisplayLabel",
+            "args": [
+                "A:bins250000_100000"
+            ],
+            "note": "A:bins250000_100000"
+        },
+        {
+            "id": "475-parseFieldToken",
+            "fn": "parseFieldToken",
+            "args": [
+                "A:bins5_5_5"
+            ],
+            "note": "A:bins5_5_5"
+        },
+        {
+            "id": "476-fieldDisplayLabel",
+            "fn": "fieldDisplayLabel",
+            "args": [
+                "A:bins5_5_5"
+            ],
+            "note": "A:bins5_5_5"
+        },
+        {
+            "id": "477-parseFieldToken",
+            "fn": "parseFieldToken",
+            "args": [
+                ""
+            ],
+            "note": ""
+        },
+        {
+            "id": "478-fieldDisplayLabel",
+            "fn": "fieldDisplayLabel",
+            "args": [
+                ""
+            ],
+            "note": ""
+        },
+        {
+            "id": "479-parseFieldToken",
+            "fn": "parseFieldToken",
+            "args": [
+                "AMOUNT:bin50000:fill"
+            ],
+            "note": "AMOUNT:bin50000:fill"
+        },
+        {
+            "id": "480-fieldDisplayLabel",
+            "fn": "fieldDisplayLabel",
+            "args": [
+                "AMOUNT:bin50000:fill"
+            ],
+            "note": "AMOUNT:bin50000:fill"
+        },
+        {
+            "id": "481-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "0",
+                1
+            ],
+            "note": "0/w1"
+        },
+        {
+            "id": "482-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "0",
+                10
+            ],
+            "note": "0/w10"
+        },
+        {
+            "id": "483-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "0",
+                50000
+            ],
+            "note": "0/w50000"
+        },
+        {
+            "id": "484-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "0",
+                null
+            ],
+            "note": "0/log"
+        },
+        {
+            "id": "485-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "0",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "0/edges"
+        },
+        {
+            "id": "486-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "0",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "0/edges2"
+        },
+        {
+            "id": "487-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "0"
+            ],
+            "note": "0"
+        },
+        {
+            "id": "488-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1",
+                1
+            ],
+            "note": "1/w1"
+        },
+        {
+            "id": "489-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1",
+                10
+            ],
+            "note": "1/w10"
+        },
+        {
+            "id": "490-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1",
+                50000
+            ],
+            "note": "1/w50000"
+        },
+        {
+            "id": "491-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "1",
+                null
+            ],
+            "note": "1/log"
+        },
+        {
+            "id": "492-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "1",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "1/edges"
+        },
+        {
+            "id": "493-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "1",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "1/edges2"
+        },
+        {
+            "id": "494-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "1"
+            ],
+            "note": "1"
+        },
+        {
+            "id": "495-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "9",
+                1
+            ],
+            "note": "9/w1"
+        },
+        {
+            "id": "496-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "9",
+                10
+            ],
+            "note": "9/w10"
+        },
+        {
+            "id": "497-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "9",
+                50000
+            ],
+            "note": "9/w50000"
+        },
+        {
+            "id": "498-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "9",
+                null
+            ],
+            "note": "9/log"
+        },
+        {
+            "id": "499-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "9",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "9/edges"
+        },
+        {
+            "id": "500-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "9",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "9/edges2"
+        },
+        {
+            "id": "501-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "9"
+            ],
+            "note": "9"
+        },
+        {
+            "id": "502-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "10",
+                1
+            ],
+            "note": "10/w1"
+        },
+        {
+            "id": "503-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "10",
+                10
+            ],
+            "note": "10/w10"
+        },
+        {
+            "id": "504-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "10",
+                50000
+            ],
+            "note": "10/w50000"
+        },
+        {
+            "id": "505-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "10",
+                null
+            ],
+            "note": "10/log"
+        },
+        {
+            "id": "506-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "10",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "10/edges"
+        },
+        {
+            "id": "507-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "10",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "10/edges2"
+        },
+        {
+            "id": "508-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "10"
+            ],
+            "note": "10"
+        },
+        {
+            "id": "509-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "999",
+                1
+            ],
+            "note": "999/w1"
+        },
+        {
+            "id": "510-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "999",
+                10
+            ],
+            "note": "999/w10"
+        },
+        {
+            "id": "511-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "999",
+                50000
+            ],
+            "note": "999/w50000"
+        },
+        {
+            "id": "512-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "999",
+                null
+            ],
+            "note": "999/log"
+        },
+        {
+            "id": "513-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "999",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "999/edges"
+        },
+        {
+            "id": "514-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "999",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "999/edges2"
+        },
+        {
+            "id": "515-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "999"
+            ],
+            "note": "999"
+        },
+        {
+            "id": "516-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1000",
+                1
+            ],
+            "note": "1000/w1"
+        },
+        {
+            "id": "517-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1000",
+                10
+            ],
+            "note": "1000/w10"
+        },
+        {
+            "id": "518-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1000",
+                50000
+            ],
+            "note": "1000/w50000"
+        },
+        {
+            "id": "519-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "1000",
+                null
+            ],
+            "note": "1000/log"
+        },
+        {
+            "id": "520-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "1000",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "1000/edges"
+        },
+        {
+            "id": "521-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "1000",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "1000/edges2"
+        },
+        {
+            "id": "522-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "1000"
+            ],
+            "note": "1000"
+        },
+        {
+            "id": "523-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1001",
+                1
+            ],
+            "note": "1001/w1"
+        },
+        {
+            "id": "524-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1001",
+                10
+            ],
+            "note": "1001/w10"
+        },
+        {
+            "id": "525-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1001",
+                50000
+            ],
+            "note": "1001/w50000"
+        },
+        {
+            "id": "526-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "1001",
+                null
+            ],
+            "note": "1001/log"
+        },
+        {
+            "id": "527-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "1001",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "1001/edges"
+        },
+        {
+            "id": "528-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "1001",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "1001/edges2"
+        },
+        {
+            "id": "529-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "1001"
+            ],
+            "note": "1001"
+        },
+        {
+            "id": "530-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "-5",
+                1
+            ],
+            "note": "-5/w1"
+        },
+        {
+            "id": "531-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "-5",
+                10
+            ],
+            "note": "-5/w10"
+        },
+        {
+            "id": "532-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "-5",
+                50000
+            ],
+            "note": "-5/w50000"
+        },
+        {
+            "id": "533-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "-5",
+                null
+            ],
+            "note": "-5/log"
+        },
+        {
+            "id": "534-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "-5",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "-5/edges"
+        },
+        {
+            "id": "535-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "-5",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "-5/edges2"
+        },
+        {
+            "id": "536-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "-5"
+            ],
+            "note": "-5"
+        },
+        {
+            "id": "537-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "-0.4",
+                1
+            ],
+            "note": "-0.4/w1"
+        },
+        {
+            "id": "538-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "-0.4",
+                10
+            ],
+            "note": "-0.4/w10"
+        },
+        {
+            "id": "539-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "-0.4",
+                50000
+            ],
+            "note": "-0.4/w50000"
+        },
+        {
+            "id": "540-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "-0.4",
+                null
+            ],
+            "note": "-0.4/log"
+        },
+        {
+            "id": "541-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "-0.4",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "-0.4/edges"
+        },
+        {
+            "id": "542-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "-0.4",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "-0.4/edges2"
+        },
+        {
+            "id": "543-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "-0.4"
+            ],
+            "note": "-0.4"
+        },
+        {
+            "id": "544-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "2500",
+                1
+            ],
+            "note": "2500/w1"
+        },
+        {
+            "id": "545-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "2500",
+                10
+            ],
+            "note": "2500/w10"
+        },
+        {
+            "id": "546-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "2500",
+                50000
+            ],
+            "note": "2500/w50000"
+        },
+        {
+            "id": "547-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "2500",
+                null
+            ],
+            "note": "2500/log"
+        },
+        {
+            "id": "548-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "2500",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "2500/edges"
+        },
+        {
+            "id": "549-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "2500",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "2500/edges2"
+        },
+        {
+            "id": "550-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "2500"
+            ],
+            "note": "2500"
+        },
+        {
+            "id": "551-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "$1,234.56",
+                1
+            ],
+            "note": "$1,234.56/w1"
+        },
+        {
+            "id": "552-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "$1,234.56",
+                10
+            ],
+            "note": "$1,234.56/w10"
+        },
+        {
+            "id": "553-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "$1,234.56",
+                50000
+            ],
+            "note": "$1,234.56/w50000"
+        },
+        {
+            "id": "554-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "$1,234.56",
+                null
+            ],
+            "note": "$1,234.56/log"
+        },
+        {
+            "id": "555-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "$1,234.56",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "$1,234.56/edges"
+        },
+        {
+            "id": "556-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "$1,234.56",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "$1,234.56/edges2"
+        },
+        {
+            "id": "557-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "$1,234.56"
+            ],
+            "note": "$1,234.56"
+        },
+        {
+            "id": "558-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "abc",
+                1
+            ],
+            "note": "abc/w1"
+        },
+        {
+            "id": "559-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "abc",
+                10
+            ],
+            "note": "abc/w10"
+        },
+        {
+            "id": "560-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "abc",
+                50000
+            ],
+            "note": "abc/w50000"
+        },
+        {
+            "id": "561-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "abc",
+                null
+            ],
+            "note": "abc/log"
+        },
+        {
+            "id": "562-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "abc",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "abc/edges"
+        },
+        {
+            "id": "563-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "abc",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "abc/edges2"
+        },
+        {
+            "id": "564-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "abc"
+            ],
+            "note": "abc"
+        },
+        {
+            "id": "565-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "",
+                1
+            ],
+            "note": "/w1"
+        },
+        {
+            "id": "566-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "",
+                10
+            ],
+            "note": "/w10"
+        },
+        {
+            "id": "567-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "",
+                50000
+            ],
+            "note": "/w50000"
+        },
+        {
+            "id": "568-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "",
+                null
+            ],
+            "note": "/log"
+        },
+        {
+            "id": "569-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "/edges"
+        },
+        {
+            "id": "570-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "/edges2"
+        },
+        {
+            "id": "571-parseValue",
+            "fn": "parseValue",
+            "args": [
+                ""
+            ],
+            "note": ""
+        },
+        {
+            "id": "572-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "0.5",
+                1
+            ],
+            "note": "0.5/w1"
+        },
+        {
+            "id": "573-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "0.5",
+                10
+            ],
+            "note": "0.5/w10"
+        },
+        {
+            "id": "574-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "0.5",
+                50000
+            ],
+            "note": "0.5/w50000"
+        },
+        {
+            "id": "575-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "0.5",
+                null
+            ],
+            "note": "0.5/log"
+        },
+        {
+            "id": "576-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "0.5",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "0.5/edges"
+        },
+        {
+            "id": "577-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "0.5",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "0.5/edges2"
+        },
+        {
+            "id": "578-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "0.5"
+            ],
+            "note": "0.5"
+        },
+        {
+            "id": "579-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1e3",
+                1
+            ],
+            "note": "1e3/w1"
+        },
+        {
+            "id": "580-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1e3",
+                10
+            ],
+            "note": "1e3/w10"
+        },
+        {
+            "id": "581-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1e3",
+                50000
+            ],
+            "note": "1e3/w50000"
+        },
+        {
+            "id": "582-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "1e3",
+                null
+            ],
+            "note": "1e3/log"
+        },
+        {
+            "id": "583-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "1e3",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "1e3/edges"
+        },
+        {
+            "id": "584-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "1e3",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "1e3/edges2"
+        },
+        {
+            "id": "585-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "1e3"
+            ],
+            "note": "1e3"
+        },
+        {
+            "id": "586-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1E3",
+                1
+            ],
+            "note": "1E3/w1"
+        },
+        {
+            "id": "587-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1E3",
+                10
+            ],
+            "note": "1E3/w10"
+        },
+        {
+            "id": "588-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1E3",
+                50000
+            ],
+            "note": "1E3/w50000"
+        },
+        {
+            "id": "589-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "1E3",
+                null
+            ],
+            "note": "1E3/log"
+        },
+        {
+            "id": "590-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "1E3",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "1E3/edges"
+        },
+        {
+            "id": "591-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "1E3",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "1E3/edges2"
+        },
+        {
+            "id": "592-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "1E3"
+            ],
+            "note": "1E3"
+        },
+        {
+            "id": "593-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "2.5e2",
+                1
+            ],
+            "note": "2.5e2/w1"
+        },
+        {
+            "id": "594-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "2.5e2",
+                10
+            ],
+            "note": "2.5e2/w10"
+        },
+        {
+            "id": "595-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "2.5e2",
+                50000
+            ],
+            "note": "2.5e2/w50000"
+        },
+        {
+            "id": "596-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "2.5e2",
+                null
+            ],
+            "note": "2.5e2/log"
+        },
+        {
+            "id": "597-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "2.5e2",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "2.5e2/edges"
+        },
+        {
+            "id": "598-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "2.5e2",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "2.5e2/edges2"
+        },
+        {
+            "id": "599-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "2.5e2"
+            ],
+            "note": "2.5e2"
+        },
+        {
+            "id": "600-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1e-3",
+                1
+            ],
+            "note": "1e-3/w1"
+        },
+        {
+            "id": "601-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1e-3",
+                10
+            ],
+            "note": "1e-3/w10"
+        },
+        {
+            "id": "602-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1e-3",
+                50000
+            ],
+            "note": "1e-3/w50000"
+        },
+        {
+            "id": "603-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "1e-3",
+                null
+            ],
+            "note": "1e-3/log"
+        },
+        {
+            "id": "604-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "1e-3",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "1e-3/edges"
+        },
+        {
+            "id": "605-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "1e-3",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "1e-3/edges2"
+        },
+        {
+            "id": "606-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "1e-3"
+            ],
+            "note": "1e-3"
+        },
+        {
+            "id": "607-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1E+3",
+                1
+            ],
+            "note": "1E+3/w1"
+        },
+        {
+            "id": "608-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1E+3",
+                10
+            ],
+            "note": "1E+3/w10"
+        },
+        {
+            "id": "609-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1E+3",
+                50000
+            ],
+            "note": "1E+3/w50000"
+        },
+        {
+            "id": "610-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "1E+3",
+                null
+            ],
+            "note": "1E+3/log"
+        },
+        {
+            "id": "611-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "1E+3",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "1E+3/edges"
+        },
+        {
+            "id": "612-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "1E+3",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "1E+3/edges2"
+        },
+        {
+            "id": "613-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "1E+3"
+            ],
+            "note": "1E+3"
+        },
+        {
+            "id": "614-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "-1e3",
+                1
+            ],
+            "note": "-1e3/w1"
+        },
+        {
+            "id": "615-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "-1e3",
+                10
+            ],
+            "note": "-1e3/w10"
+        },
+        {
+            "id": "616-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "-1e3",
+                50000
+            ],
+            "note": "-1e3/w50000"
+        },
+        {
+            "id": "617-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "-1e3",
+                null
+            ],
+            "note": "-1e3/log"
+        },
+        {
+            "id": "618-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "-1e3",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "-1e3/edges"
+        },
+        {
+            "id": "619-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "-1e3",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "-1e3/edges2"
+        },
+        {
+            "id": "620-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "-1e3"
+            ],
+            "note": "-1e3"
+        },
+        {
+            "id": "621-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1e",
+                1
+            ],
+            "note": "1e/w1"
+        },
+        {
+            "id": "622-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1e",
+                10
+            ],
+            "note": "1e/w10"
+        },
+        {
+            "id": "623-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1e",
+                50000
+            ],
+            "note": "1e/w50000"
+        },
+        {
+            "id": "624-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "1e",
+                null
+            ],
+            "note": "1e/log"
+        },
+        {
+            "id": "625-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "1e",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "1e/edges"
+        },
+        {
+            "id": "626-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "1e",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "1e/edges2"
+        },
+        {
+            "id": "627-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "1e"
+            ],
+            "note": "1e"
+        },
+        {
+            "id": "628-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "e3",
+                1
+            ],
+            "note": "e3/w1"
+        },
+        {
+            "id": "629-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "e3",
+                10
+            ],
+            "note": "e3/w10"
+        },
+        {
+            "id": "630-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "e3",
+                50000
+            ],
+            "note": "e3/w50000"
+        },
+        {
+            "id": "631-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "e3",
+                null
+            ],
+            "note": "e3/log"
+        },
+        {
+            "id": "632-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "e3",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "e3/edges"
+        },
+        {
+            "id": "633-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "e3",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "e3/edges2"
+        },
+        {
+            "id": "634-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "e3"
+            ],
+            "note": "e3"
+        },
+        {
+            "id": "635-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "2E7",
+                1
+            ],
+            "note": "2E7/w1"
+        },
+        {
+            "id": "636-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "2E7",
+                10
+            ],
+            "note": "2E7/w10"
+        },
+        {
+            "id": "637-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "2E7",
+                50000
+            ],
+            "note": "2E7/w50000"
+        },
+        {
+            "id": "638-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "2E7",
+                null
+            ],
+            "note": "2E7/log"
+        },
+        {
+            "id": "639-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "2E7",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "2E7/edges"
+        },
+        {
+            "id": "640-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "2E7",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "2E7/edges2"
+        },
+        {
+            "id": "641-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "2E7"
+            ],
+            "note": "2E7"
+        },
+        {
+            "id": "642-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1.5E+10",
+                1
+            ],
+            "note": "1.5E+10/w1"
+        },
+        {
+            "id": "643-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1.5E+10",
+                10
+            ],
+            "note": "1.5E+10/w10"
+        },
+        {
+            "id": "644-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1.5E+10",
+                50000
+            ],
+            "note": "1.5E+10/w50000"
+        },
+        {
+            "id": "645-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "1.5E+10",
+                null
+            ],
+            "note": "1.5E+10/log"
+        },
+        {
+            "id": "646-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "1.5E+10",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "1.5E+10/edges"
+        },
+        {
+            "id": "647-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "1.5E+10",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "1.5E+10/edges2"
+        },
+        {
+            "id": "648-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "1.5E+10"
+            ],
+            "note": "1.5E+10"
+        },
+        {
+            "id": "649-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "\u00021000\u0002",
+                1
+            ],
+            "note": "\u00021000\u0002/w1"
+        },
+        {
+            "id": "650-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "\u00021000\u0002",
+                10
+            ],
+            "note": "\u00021000\u0002/w10"
+        },
+        {
+            "id": "651-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "\u00021000\u0002",
+                50000
+            ],
+            "note": "\u00021000\u0002/w50000"
+        },
+        {
+            "id": "652-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "\u00021000\u0002",
+                null
+            ],
+            "note": "\u00021000\u0002/log"
+        },
+        {
+            "id": "653-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "\u00021000\u0002",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "\u00021000\u0002/edges"
+        },
+        {
+            "id": "654-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "\u00021000\u0002",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "\u00021000\u0002/edges2"
+        },
+        {
+            "id": "655-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "\u00021000\u0002"
+            ],
+            "note": "\u00021000\u0002"
+        },
+        {
+            "id": "656-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "(1,234.56)",
+                1
+            ],
+            "note": "(1,234.56)/w1"
+        },
+        {
+            "id": "657-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "(1,234.56)",
+                10
+            ],
+            "note": "(1,234.56)/w10"
+        },
+        {
+            "id": "658-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "(1,234.56)",
+                50000
+            ],
+            "note": "(1,234.56)/w50000"
+        },
+        {
+            "id": "659-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "(1,234.56)",
+                null
+            ],
+            "note": "(1,234.56)/log"
+        },
+        {
+            "id": "660-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "(1,234.56)",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "(1,234.56)/edges"
+        },
+        {
+            "id": "661-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "(1,234.56)",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "(1,234.56)/edges2"
+        },
+        {
+            "id": "662-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "(1,234.56)"
+            ],
+            "note": "(1,234.56)"
+        },
+        {
+            "id": "663-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "  42  ",
+                1
+            ],
+            "note": "  42  /w1"
+        },
+        {
+            "id": "664-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "  42  ",
+                10
+            ],
+            "note": "  42  /w10"
+        },
+        {
+            "id": "665-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "  42  ",
+                50000
+            ],
+            "note": "  42  /w50000"
+        },
+        {
+            "id": "666-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "  42  ",
+                null
+            ],
+            "note": "  42  /log"
+        },
+        {
+            "id": "667-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "  42  ",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "  42  /edges"
+        },
+        {
+            "id": "668-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "  42  ",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "  42  /edges2"
+        },
+        {
+            "id": "669-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "  42  "
+            ],
+            "note": "  42  "
+        },
+        {
+            "id": "670-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1,60",
+                1
+            ],
+            "note": "1,60/w1"
+        },
+        {
+            "id": "671-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1,60",
+                10
+            ],
+            "note": "1,60/w10"
+        },
+        {
+            "id": "672-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1,60",
+                50000
+            ],
+            "note": "1,60/w50000"
+        },
+        {
+            "id": "673-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "1,60",
+                null
+            ],
+            "note": "1,60/log"
+        },
+        {
+            "id": "674-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "1,60",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "1,60/edges"
+        },
+        {
+            "id": "675-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "1,60",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "1,60/edges2"
+        },
+        {
+            "id": "676-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "1,60"
+            ],
+            "note": "1,60"
+        },
+        {
+            "id": "677-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "+5",
+                1
+            ],
+            "note": "+5/w1"
+        },
+        {
+            "id": "678-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "+5",
+                10
+            ],
+            "note": "+5/w10"
+        },
+        {
+            "id": "679-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "+5",
+                50000
+            ],
+            "note": "+5/w50000"
+        },
+        {
+            "id": "680-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "+5",
+                null
+            ],
+            "note": "+5/log"
+        },
+        {
+            "id": "681-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "+5",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "+5/edges"
+        },
+        {
+            "id": "682-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "+5",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "+5/edges2"
+        },
+        {
+            "id": "683-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "+5"
+            ],
+            "note": "+5"
+        },
+        {
+            "id": "684-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "5.",
+                1
+            ],
+            "note": "5./w1"
+        },
+        {
+            "id": "685-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "5.",
+                10
+            ],
+            "note": "5./w10"
+        },
+        {
+            "id": "686-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "5.",
+                50000
+            ],
+            "note": "5./w50000"
+        },
+        {
+            "id": "687-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "5.",
+                null
+            ],
+            "note": "5./log"
+        },
+        {
+            "id": "688-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "5.",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "5./edges"
+        },
+        {
+            "id": "689-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "5.",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "5./edges2"
+        },
+        {
+            "id": "690-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "5."
+            ],
+            "note": "5."
+        },
+        {
+            "id": "691-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                ".5",
+                1
+            ],
+            "note": ".5/w1"
+        },
+        {
+            "id": "692-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                ".5",
+                10
+            ],
+            "note": ".5/w10"
+        },
+        {
+            "id": "693-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                ".5",
+                50000
+            ],
+            "note": ".5/w50000"
+        },
+        {
+            "id": "694-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                ".5",
+                null
+            ],
+            "note": ".5/log"
+        },
+        {
+            "id": "695-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                ".5",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": ".5/edges"
+        },
+        {
+            "id": "696-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                ".5",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": ".5/edges2"
+        },
+        {
+            "id": "697-parseValue",
+            "fn": "parseValue",
+            "args": [
+                ".5"
+            ],
+            "note": ".5"
+        },
+        {
+            "id": "698-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "0x10",
+                1
+            ],
+            "note": "0x10/w1"
+        },
+        {
+            "id": "699-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "0x10",
+                10
+            ],
+            "note": "0x10/w10"
+        },
+        {
+            "id": "700-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "0x10",
+                50000
+            ],
+            "note": "0x10/w50000"
+        },
+        {
+            "id": "701-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "0x10",
+                null
+            ],
+            "note": "0x10/log"
+        },
+        {
+            "id": "702-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "0x10",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "0x10/edges"
+        },
+        {
+            "id": "703-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "0x10",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "0x10/edges2"
+        },
+        {
+            "id": "704-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "0x10"
+            ],
+            "note": "0x10"
+        },
+        {
+            "id": "705-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1_000",
+                1
+            ],
+            "note": "1_000/w1"
+        },
+        {
+            "id": "706-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1_000",
+                10
+            ],
+            "note": "1_000/w10"
+        },
+        {
+            "id": "707-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1_000",
+                50000
+            ],
+            "note": "1_000/w50000"
+        },
+        {
+            "id": "708-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "1_000",
+                null
+            ],
+            "note": "1_000/log"
+        },
+        {
+            "id": "709-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "1_000",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "1_000/edges"
+        },
+        {
+            "id": "710-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "1_000",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "1_000/edges2"
+        },
+        {
+            "id": "711-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "1_000"
+            ],
+            "note": "1_000"
+        },
+        {
+            "id": "712-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "INF",
+                1
+            ],
+            "note": "INF/w1"
+        },
+        {
+            "id": "713-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "INF",
+                10
+            ],
+            "note": "INF/w10"
+        },
+        {
+            "id": "714-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "INF",
+                50000
+            ],
+            "note": "INF/w50000"
+        },
+        {
+            "id": "715-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "INF",
+                null
+            ],
+            "note": "INF/log"
+        },
+        {
+            "id": "716-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "INF",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "INF/edges"
+        },
+        {
+            "id": "717-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "INF",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "INF/edges2"
+        },
+        {
+            "id": "718-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "INF"
+            ],
+            "note": "INF"
+        },
+        {
+            "id": "719-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "NAN",
+                1
+            ],
+            "note": "NAN/w1"
+        },
+        {
+            "id": "720-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "NAN",
+                10
+            ],
+            "note": "NAN/w10"
+        },
+        {
+            "id": "721-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "NAN",
+                50000
+            ],
+            "note": "NAN/w50000"
+        },
+        {
+            "id": "722-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "NAN",
+                null
+            ],
+            "note": "NAN/log"
+        },
+        {
+            "id": "723-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "NAN",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "NAN/edges"
+        },
+        {
+            "id": "724-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "NAN",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "NAN/edges2"
+        },
+        {
+            "id": "725-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "NAN"
+            ],
+            "note": "NAN"
+        },
+        {
+            "id": "726-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1.2.3",
+                1
+            ],
+            "note": "1.2.3/w1"
+        },
+        {
+            "id": "727-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1.2.3",
+                10
+            ],
+            "note": "1.2.3/w10"
+        },
+        {
+            "id": "728-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "1.2.3",
+                50000
+            ],
+            "note": "1.2.3/w50000"
+        },
+        {
+            "id": "729-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "1.2.3",
+                null
+            ],
+            "note": "1.2.3/log"
+        },
+        {
+            "id": "730-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "1.2.3",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "1.2.3/edges"
+        },
+        {
+            "id": "731-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "1.2.3",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "1.2.3/edges2"
+        },
+        {
+            "id": "732-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "1.2.3"
+            ],
+            "note": "1.2.3"
+        },
+        {
+            "id": "733-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "50%",
+                1
+            ],
+            "note": "50%/w1"
+        },
+        {
+            "id": "734-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "50%",
+                10
+            ],
+            "note": "50%/w10"
+        },
+        {
+            "id": "735-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "50%",
+                50000
+            ],
+            "note": "50%/w50000"
+        },
+        {
+            "id": "736-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "50%",
+                null
+            ],
+            "note": "50%/log"
+        },
+        {
+            "id": "737-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "50%",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "50%/edges"
+        },
+        {
+            "id": "738-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "50%",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "50%/edges2"
+        },
+        {
+            "id": "739-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "50%"
+            ],
+            "note": "50%"
+        },
+        {
+            "id": "740-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "$-40",
+                1
+            ],
+            "note": "$-40/w1"
+        },
+        {
+            "id": "741-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "$-40",
+                10
+            ],
+            "note": "$-40/w10"
+        },
+        {
+            "id": "742-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "bin",
+                "$-40",
+                50000
+            ],
+            "note": "$-40/w50000"
+        },
+        {
+            "id": "743-binBucket",
+            "fn": "binBucket",
+            "args": [
+                "binlog",
+                "$-40",
+                null
+            ],
+            "note": "$-40/log"
+        },
+        {
+            "id": "744-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "$-40",
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "$-40/edges"
+        },
+        {
+            "id": "745-binsBucket",
+            "fn": "binsBucket",
+            "args": [
+                "$-40",
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "$-40/edges2"
+        },
+        {
+            "id": "746-parseValue",
+            "fn": "parseValue",
+            "args": [
+                "$-40"
+            ],
+            "note": "$-40"
+        },
+        {
+            "id": "747-autoBinWidth",
+            "fn": "autoBinWidth",
+            "args": [
+                0,
+                100
+            ],
+            "note": "min0max100"
+        },
+        {
+            "id": "748-autoBinWidth",
+            "fn": "autoBinWidth",
+            "args": [
+                0,
+                1
+            ],
+            "note": "min0max1"
+        },
+        {
+            "id": "749-autoBinWidth",
+            "fn": "autoBinWidth",
+            "args": [
+                5,
+                5
+            ],
+            "note": "min5max5"
+        },
+        {
+            "id": "750-autoBinWidth",
+            "fn": "autoBinWidth",
+            "args": [
+                -10,
+                10
+            ],
+            "note": "min-10max10"
+        },
+        {
+            "id": "751-autoBinWidth",
+            "fn": "autoBinWidth",
+            "args": [
+                0,
+                1000000
+            ],
+            "note": "min0max1000000"
+        },
+        {
+            "id": "752-autoBinWidth",
+            "fn": "autoBinWidth",
+            "args": [
+                3,
+                7
+            ],
+            "note": "min3max7"
+        },
+        {
+            "id": "753-normalizeBinEdges",
+            "fn": "normalizeBinEdges",
+            "args": [
+                [
+                    1,
+                    2,
+                    3
+                ]
+            ],
+            "note": "list0"
+        },
+        {
+            "id": "754-normalizeBinEdges",
+            "fn": "normalizeBinEdges",
+            "args": [
+                [
+                    "100000",
+                    "250000"
+                ]
+            ],
+            "note": "list1"
+        },
+        {
+            "id": "755-normalizeBinEdges",
+            "fn": "normalizeBinEdges",
+            "args": [
+                [
+                    3,
+                    1,
+                    2
+                ]
+            ],
+            "note": "list2"
+        },
+        {
+            "id": "756-normalizeBinEdges",
+            "fn": "normalizeBinEdges",
+            "args": [
+                [
+                    5,
+                    5
+                ]
+            ],
+            "note": "list3"
+        },
+        {
+            "id": "757-normalizeBinEdges",
+            "fn": "normalizeBinEdges",
+            "args": [
+                [
+                    -1,
+                    2
+                ]
+            ],
+            "note": "list4"
+        },
+        {
+            "id": "758-normalizeBinEdges",
+            "fn": "normalizeBinEdges",
+            "args": [
+                []
+            ],
+            "note": "list5"
+        },
+        {
+            "id": "759-normalizeBinEdges",
+            "fn": "normalizeBinEdges",
+            "args": [
+                [
+                    "abc"
+                ]
+            ],
+            "note": "list6"
+        },
+        {
+            "id": "760-normalizeBinEdges",
+            "fn": "normalizeBinEdges",
+            "args": [
+                [
+                    "1,000",
+                    "2,000"
+                ]
+            ],
+            "note": "list7"
+        },
+        {
+            "id": "761-binsLabels",
+            "fn": "binsLabels",
+            "args": [
+                [
+                    100000,
+                    250000
+                ]
+            ],
+            "note": "edges0"
+        },
+        {
+            "id": "762-binsLabels",
+            "fn": "binsLabels",
+            "args": [
+                [
+                    0,
+                    10,
+                    1000
+                ]
+            ],
+            "note": "edges1"
+        },
+        {
+            "id": "763-binsLabels",
+            "fn": "binsLabels",
+            "args": [
+                [
+                    5
+                ]
+            ],
+            "note": "edges2"
+        },
+        {
+            "id": "764-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "fy",
+                "2025-03-15"
+            ],
+            "note": "fy/2025-03-15"
+        },
+        {
+            "id": "765-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "year",
+                "2025-03-15"
+            ],
+            "note": "year/2025-03-15"
+        },
+        {
+            "id": "766-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "quarter",
+                "2025-03-15"
+            ],
+            "note": "quarter/2025-03-15"
+        },
+        {
+            "id": "767-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "month",
+                "2025-03-15"
+            ],
+            "note": "month/2025-03-15"
+        },
+        {
+            "id": "768-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "dow",
+                "2025-03-15"
+            ],
+            "note": "dow/2025-03-15"
+        },
+        {
+            "id": "769-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "day",
+                "2025-03-15"
+            ],
+            "note": "day/2025-03-15"
+        },
+        {
+            "id": "770-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "hour",
+                "2025-03-15"
+            ],
+            "note": "hour/2025-03-15"
+        },
+        {
+            "id": "771-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "fy",
+                "2025-07-01"
+            ],
+            "note": "fy/2025-07-01"
+        },
+        {
+            "id": "772-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "year",
+                "2025-07-01"
+            ],
+            "note": "year/2025-07-01"
+        },
+        {
+            "id": "773-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "quarter",
+                "2025-07-01"
+            ],
+            "note": "quarter/2025-07-01"
+        },
+        {
+            "id": "774-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "month",
+                "2025-07-01"
+            ],
+            "note": "month/2025-07-01"
+        },
+        {
+            "id": "775-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "dow",
+                "2025-07-01"
+            ],
+            "note": "dow/2025-07-01"
+        },
+        {
+            "id": "776-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "day",
+                "2025-07-01"
+            ],
+            "note": "day/2025-07-01"
+        },
+        {
+            "id": "777-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "hour",
+                "2025-07-01"
+            ],
+            "note": "hour/2025-07-01"
+        },
+        {
+            "id": "778-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "fy",
+                "2024-12-31"
+            ],
+            "note": "fy/2024-12-31"
+        },
+        {
+            "id": "779-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "year",
+                "2024-12-31"
+            ],
+            "note": "year/2024-12-31"
+        },
+        {
+            "id": "780-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "quarter",
+                "2024-12-31"
+            ],
+            "note": "quarter/2024-12-31"
+        },
+        {
+            "id": "781-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "month",
+                "2024-12-31"
+            ],
+            "note": "month/2024-12-31"
+        },
+        {
+            "id": "782-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "dow",
+                "2024-12-31"
+            ],
+            "note": "dow/2024-12-31"
+        },
+        {
+            "id": "783-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "day",
+                "2024-12-31"
+            ],
+            "note": "day/2024-12-31"
+        },
+        {
+            "id": "784-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "hour",
+                "2024-12-31"
+            ],
+            "note": "hour/2024-12-31"
+        },
+        {
+            "id": "785-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "fy",
+                "Feb 2025"
+            ],
+            "note": "fy/Feb 2025"
+        },
+        {
+            "id": "786-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "year",
+                "Feb 2025"
+            ],
+            "note": "year/Feb 2025"
+        },
+        {
+            "id": "787-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "quarter",
+                "Feb 2025"
+            ],
+            "note": "quarter/Feb 2025"
+        },
+        {
+            "id": "788-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "month",
+                "Feb 2025"
+            ],
+            "note": "month/Feb 2025"
+        },
+        {
+            "id": "789-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "dow",
+                "Feb 2025"
+            ],
+            "note": "dow/Feb 2025"
+        },
+        {
+            "id": "790-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "day",
+                "Feb 2025"
+            ],
+            "note": "day/Feb 2025"
+        },
+        {
+            "id": "791-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "hour",
+                "Feb 2025"
+            ],
+            "note": "hour/Feb 2025"
+        },
+        {
+            "id": "792-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "fy",
+                "2025"
+            ],
+            "note": "fy/2025"
+        },
+        {
+            "id": "793-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "year",
+                "2025"
+            ],
+            "note": "year/2025"
+        },
+        {
+            "id": "794-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "quarter",
+                "2025"
+            ],
+            "note": "quarter/2025"
+        },
+        {
+            "id": "795-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "month",
+                "2025"
+            ],
+            "note": "month/2025"
+        },
+        {
+            "id": "796-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "dow",
+                "2025"
+            ],
+            "note": "dow/2025"
+        },
+        {
+            "id": "797-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "day",
+                "2025"
+            ],
+            "note": "day/2025"
+        },
+        {
+            "id": "798-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "hour",
+                "2025"
+            ],
+            "note": "hour/2025"
+        },
+        {
+            "id": "799-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "fy",
+                "not a date"
+            ],
+            "note": "fy/not a date"
+        },
+        {
+            "id": "800-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "year",
+                "not a date"
+            ],
+            "note": "year/not a date"
+        },
+        {
+            "id": "801-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "quarter",
+                "not a date"
+            ],
+            "note": "quarter/not a date"
+        },
+        {
+            "id": "802-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "month",
+                "not a date"
+            ],
+            "note": "month/not a date"
+        },
+        {
+            "id": "803-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "dow",
+                "not a date"
+            ],
+            "note": "dow/not a date"
+        },
+        {
+            "id": "804-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "day",
+                "not a date"
+            ],
+            "note": "day/not a date"
+        },
+        {
+            "id": "805-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "hour",
+                "not a date"
+            ],
+            "note": "hour/not a date"
+        },
+        {
+            "id": "806-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "fy",
+                ""
+            ],
+            "note": "fy/"
+        },
+        {
+            "id": "807-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "year",
+                ""
+            ],
+            "note": "year/"
+        },
+        {
+            "id": "808-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "quarter",
+                ""
+            ],
+            "note": "quarter/"
+        },
+        {
+            "id": "809-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "month",
+                ""
+            ],
+            "note": "month/"
+        },
+        {
+            "id": "810-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "dow",
+                ""
+            ],
+            "note": "dow/"
+        },
+        {
+            "id": "811-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "day",
+                ""
+            ],
+            "note": "day/"
+        },
+        {
+            "id": "812-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "hour",
+                ""
+            ],
+            "note": "hour/"
+        },
+        {
+            "id": "813-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "fy",
+                "2025-06-30"
+            ],
+            "note": "fy/2025-06-30"
+        },
+        {
+            "id": "814-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "year",
+                "2025-06-30"
+            ],
+            "note": "year/2025-06-30"
+        },
+        {
+            "id": "815-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "quarter",
+                "2025-06-30"
+            ],
+            "note": "quarter/2025-06-30"
+        },
+        {
+            "id": "816-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "month",
+                "2025-06-30"
+            ],
+            "note": "month/2025-06-30"
+        },
+        {
+            "id": "817-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "dow",
+                "2025-06-30"
+            ],
+            "note": "dow/2025-06-30"
+        },
+        {
+            "id": "818-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "day",
+                "2025-06-30"
+            ],
+            "note": "day/2025-06-30"
+        },
+        {
+            "id": "819-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "hour",
+                "2025-06-30"
+            ],
+            "note": "hour/2025-06-30"
+        },
+        {
+            "id": "820-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "fy",
+                "2025-07-15 13:45:00"
+            ],
+            "note": "fy/2025-07-15 13:45:00"
+        },
+        {
+            "id": "821-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "year",
+                "2025-07-15 13:45:00"
+            ],
+            "note": "year/2025-07-15 13:45:00"
+        },
+        {
+            "id": "822-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "quarter",
+                "2025-07-15 13:45:00"
+            ],
+            "note": "quarter/2025-07-15 13:45:00"
+        },
+        {
+            "id": "823-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "month",
+                "2025-07-15 13:45:00"
+            ],
+            "note": "month/2025-07-15 13:45:00"
+        },
+        {
+            "id": "824-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "dow",
+                "2025-07-15 13:45:00"
+            ],
+            "note": "dow/2025-07-15 13:45:00"
+        },
+        {
+            "id": "825-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "day",
+                "2025-07-15 13:45:00"
+            ],
+            "note": "day/2025-07-15 13:45:00"
+        },
+        {
+            "id": "826-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "hour",
+                "2025-07-15 13:45:00"
+            ],
+            "note": "hour/2025-07-15 13:45:00"
+        },
+        {
+            "id": "827-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "fy",
+                "03/15/2025"
+            ],
+            "note": "fy/03/15/2025"
+        },
+        {
+            "id": "828-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "year",
+                "03/15/2025"
+            ],
+            "note": "year/03/15/2025"
+        },
+        {
+            "id": "829-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "quarter",
+                "03/15/2025"
+            ],
+            "note": "quarter/03/15/2025"
+        },
+        {
+            "id": "830-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "month",
+                "03/15/2025"
+            ],
+            "note": "month/03/15/2025"
+        },
+        {
+            "id": "831-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "dow",
+                "03/15/2025"
+            ],
+            "note": "dow/03/15/2025"
+        },
+        {
+            "id": "832-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "day",
+                "03/15/2025"
+            ],
+            "note": "day/03/15/2025"
+        },
+        {
+            "id": "833-splitBucket",
+            "fn": "splitBucket",
+            "args": [
+                "hour",
+                "03/15/2025"
+            ],
+            "note": "hour/03/15/2025"
+        },
+        {
+            "id": "834-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "pct_change"
+            ],
+            "note": "pct_change"
+        },
+        {
+            "id": "835-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "pct_change"
+            ],
+            "note": "pct_change"
+        },
+        {
+            "id": "836-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "pct_change"
+            ],
+            "note": "pct_change"
+        },
+        {
+            "id": "837-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "diff"
+            ],
+            "note": "diff"
+        },
+        {
+            "id": "838-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "diff"
+            ],
+            "note": "diff"
+        },
+        {
+            "id": "839-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "diff"
+            ],
+            "note": "diff"
+        },
+        {
+            "id": "840-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "pct_row_total"
+            ],
+            "note": "pct_row_total"
+        },
+        {
+            "id": "841-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "pct_row_total"
+            ],
+            "note": "pct_row_total"
+        },
+        {
+            "id": "842-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "pct_row_total"
+            ],
+            "note": "pct_row_total"
+        },
+        {
+            "id": "843-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "pct_col_total"
+            ],
+            "note": "pct_col_total"
+        },
+        {
+            "id": "844-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "pct_col_total"
+            ],
+            "note": "pct_col_total"
+        },
+        {
+            "id": "845-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "pct_col_total"
+            ],
+            "note": "pct_col_total"
+        },
+        {
+            "id": "846-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "pct_parent_row"
+            ],
+            "note": "pct_parent_row"
+        },
+        {
+            "id": "847-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "pct_parent_row"
+            ],
+            "note": "pct_parent_row"
+        },
+        {
+            "id": "848-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "pct_parent_row"
+            ],
+            "note": "pct_parent_row"
+        },
+        {
+            "id": "849-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "pct_parent_col"
+            ],
+            "note": "pct_parent_col"
+        },
+        {
+            "id": "850-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "pct_parent_col"
+            ],
+            "note": "pct_parent_col"
+        },
+        {
+            "id": "851-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "pct_parent_col"
+            ],
+            "note": "pct_parent_col"
+        },
+        {
+            "id": "852-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "pct_cum"
+            ],
+            "note": "pct_cum"
+        },
+        {
+            "id": "853-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "pct_cum"
+            ],
+            "note": "pct_cum"
+        },
+        {
+            "id": "854-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "pct_cum"
+            ],
+            "note": "pct_cum"
+        },
+        {
+            "id": "855-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "index"
+            ],
+            "note": "index"
+        },
+        {
+            "id": "856-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "index"
+            ],
+            "note": "index"
+        },
+        {
+            "id": "857-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "index"
+            ],
+            "note": "index"
+        },
+        {
+            "id": "858-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "pct_grand_total"
+            ],
+            "note": "pct_grand_total"
+        },
+        {
+            "id": "859-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "pct_grand_total"
+            ],
+            "note": "pct_grand_total"
+        },
+        {
+            "id": "860-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "pct_grand_total"
+            ],
+            "note": "pct_grand_total"
+        },
+        {
+            "id": "861-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "running_total"
+            ],
+            "note": "running_total"
+        },
+        {
+            "id": "862-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "running_total"
+            ],
+            "note": "running_total"
+        },
+        {
+            "id": "863-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "running_total"
+            ],
+            "note": "running_total"
+        },
+        {
+            "id": "864-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "running_count"
+            ],
+            "note": "running_count"
+        },
+        {
+            "id": "865-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "running_count"
+            ],
+            "note": "running_count"
+        },
+        {
+            "id": "866-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "running_count"
+            ],
+            "note": "running_count"
+        },
+        {
+            "id": "867-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "formula"
+            ],
+            "note": "formula"
+        },
+        {
+            "id": "868-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "formula"
+            ],
+            "note": "formula"
+        },
+        {
+            "id": "869-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "formula"
+            ],
+            "note": "formula"
+        },
+        {
+            "id": "870-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "ytd"
+            ],
+            "note": "ytd"
+        },
+        {
+            "id": "871-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "ytd"
+            ],
+            "note": "ytd"
+        },
+        {
+            "id": "872-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "ytd"
+            ],
+            "note": "ytd"
+        },
+        {
+            "id": "873-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "yoy"
+            ],
+            "note": "yoy"
+        },
+        {
+            "id": "874-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "yoy"
+            ],
+            "note": "yoy"
+        },
+        {
+            "id": "875-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "yoy"
+            ],
+            "note": "yoy"
+        },
+        {
+            "id": "876-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "prioryear"
+            ],
+            "note": "prioryear"
+        },
+        {
+            "id": "877-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "prioryear"
+            ],
+            "note": "prioryear"
+        },
+        {
+            "id": "878-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "prioryear"
+            ],
+            "note": "prioryear"
+        },
+        {
+            "id": "879-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "pct_change:down"
+            ],
+            "note": "pct_change:down"
+        },
+        {
+            "id": "880-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "pct_change:down"
+            ],
+            "note": "pct_change:down"
+        },
+        {
+            "id": "881-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "pct_change:down"
+            ],
+            "note": "pct_change:down"
+        },
+        {
+            "id": "882-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "diff:down"
+            ],
+            "note": "diff:down"
+        },
+        {
+            "id": "883-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "diff:down"
+            ],
+            "note": "diff:down"
+        },
+        {
+            "id": "884-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "diff:down"
+            ],
+            "note": "diff:down"
+        },
+        {
+            "id": "885-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "index:down"
+            ],
+            "note": "index:down"
+        },
+        {
+            "id": "886-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "index:down"
+            ],
+            "note": "index:down"
+        },
+        {
+            "id": "887-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "index:down"
+            ],
+            "note": "index:down"
+        },
+        {
+            "id": "888-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "pct_cum:down"
+            ],
+            "note": "pct_cum:down"
+        },
+        {
+            "id": "889-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "pct_cum:down"
+            ],
+            "note": "pct_cum:down"
+        },
+        {
+            "id": "890-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "pct_cum:down"
+            ],
+            "note": "pct_cum:down"
+        },
+        {
+            "id": "891-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "running_total:down"
+            ],
+            "note": "running_total:down"
+        },
+        {
+            "id": "892-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "running_total:down"
+            ],
+            "note": "running_total:down"
+        },
+        {
+            "id": "893-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "running_total:down"
+            ],
+            "note": "running_total:down"
+        },
+        {
+            "id": "894-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "running_count:down"
+            ],
+            "note": "running_count:down"
+        },
+        {
+            "id": "895-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "running_count:down"
+            ],
+            "note": "running_count:down"
+        },
+        {
+            "id": "896-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "running_count:down"
+            ],
+            "note": "running_count:down"
+        },
+        {
+            "id": "897-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "ytd:down"
+            ],
+            "note": "ytd:down"
+        },
+        {
+            "id": "898-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "ytd:down"
+            ],
+            "note": "ytd:down"
+        },
+        {
+            "id": "899-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "ytd:down"
+            ],
+            "note": "ytd:down"
+        },
+        {
+            "id": "900-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "yoy:down"
+            ],
+            "note": "yoy:down"
+        },
+        {
+            "id": "901-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "yoy:down"
+            ],
+            "note": "yoy:down"
+        },
+        {
+            "id": "902-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "yoy:down"
+            ],
+            "note": "yoy:down"
+        },
+        {
+            "id": "903-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "prioryear:down"
+            ],
+            "note": "prioryear:down"
+        },
+        {
+            "id": "904-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "prioryear:down"
+            ],
+            "note": "prioryear:down"
+        },
+        {
+            "id": "905-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "prioryear:down"
+            ],
+            "note": "prioryear:down"
+        },
+        {
+            "id": "906-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "pct_row_total:down"
+            ],
+            "note": "pct_row_total:down"
+        },
+        {
+            "id": "907-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "pct_row_total:down"
+            ],
+            "note": "pct_row_total:down"
+        },
+        {
+            "id": "908-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "pct_row_total:down"
+            ],
+            "note": "pct_row_total:down"
+        },
+        {
+            "id": "909-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "pct_col_total:down"
+            ],
+            "note": "pct_col_total:down"
+        },
+        {
+            "id": "910-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "pct_col_total:down"
+            ],
+            "note": "pct_col_total:down"
+        },
+        {
+            "id": "911-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "pct_col_total:down"
+            ],
+            "note": "pct_col_total:down"
+        },
+        {
+            "id": "912-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "pct_grand_total:down"
+            ],
+            "note": "pct_grand_total:down"
+        },
+        {
+            "id": "913-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "pct_grand_total:down"
+            ],
+            "note": "pct_grand_total:down"
+        },
+        {
+            "id": "914-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "pct_grand_total:down"
+            ],
+            "note": "pct_grand_total:down"
+        },
+        {
+            "id": "915-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "pct_parent_row:down"
+            ],
+            "note": "pct_parent_row:down"
+        },
+        {
+            "id": "916-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "pct_parent_row:down"
+            ],
+            "note": "pct_parent_row:down"
+        },
+        {
+            "id": "917-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "pct_parent_row:down"
+            ],
+            "note": "pct_parent_row:down"
+        },
+        {
+            "id": "918-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "pct_parent_col:down"
+            ],
+            "note": "pct_parent_col:down"
+        },
+        {
+            "id": "919-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "pct_parent_col:down"
+            ],
+            "note": "pct_parent_col:down"
+        },
+        {
+            "id": "920-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "pct_parent_col:down"
+            ],
+            "note": "pct_parent_col:down"
+        },
+        {
+            "id": "921-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "formula:down"
+            ],
+            "note": "formula:down"
+        },
+        {
+            "id": "922-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "formula:down"
+            ],
+            "note": "formula:down"
+        },
+        {
+            "id": "923-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "formula:down"
+            ],
+            "note": "formula:down"
+        },
+        {
+            "id": "924-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "roll3"
+            ],
+            "note": "roll3"
+        },
+        {
+            "id": "925-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "roll3"
+            ],
+            "note": "roll3"
+        },
+        {
+            "id": "926-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "roll3"
+            ],
+            "note": "roll3"
+        },
+        {
+            "id": "927-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "roll12"
+            ],
+            "note": "roll12"
+        },
+        {
+            "id": "928-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "roll12"
+            ],
+            "note": "roll12"
+        },
+        {
+            "id": "929-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "roll12"
+            ],
+            "note": "roll12"
+        },
+        {
+            "id": "930-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "roll3:down"
+            ],
+            "note": "roll3:down"
+        },
+        {
+            "id": "931-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "roll3:down"
+            ],
+            "note": "roll3:down"
+        },
+        {
+            "id": "932-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "roll3:down"
+            ],
+            "note": "roll3:down"
+        },
+        {
+            "id": "933-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "rollsum3"
+            ],
+            "note": "rollsum3"
+        },
+        {
+            "id": "934-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "rollsum3"
+            ],
+            "note": "rollsum3"
+        },
+        {
+            "id": "935-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "rollsum3"
+            ],
+            "note": "rollsum3"
+        },
+        {
+            "id": "936-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "rollsum12"
+            ],
+            "note": "rollsum12"
+        },
+        {
+            "id": "937-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "rollsum12"
+            ],
+            "note": "rollsum12"
+        },
+        {
+            "id": "938-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "rollsum12"
+            ],
+            "note": "rollsum12"
+        },
+        {
+            "id": "939-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "rollsum3:down"
+            ],
+            "note": "rollsum3:down"
+        },
+        {
+            "id": "940-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "rollsum3:down"
+            ],
+            "note": "rollsum3:down"
+        },
+        {
+            "id": "941-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "rollsum3:down"
+            ],
+            "note": "rollsum3:down"
+        },
+        {
+            "id": "942-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "roll"
+            ],
+            "note": "roll"
+        },
+        {
+            "id": "943-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "roll"
+            ],
+            "note": "roll"
+        },
+        {
+            "id": "944-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "roll"
+            ],
+            "note": "roll"
+        },
+        {
+            "id": "945-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "roll0"
+            ],
+            "note": "roll0"
+        },
+        {
+            "id": "946-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "roll0"
+            ],
+            "note": "roll0"
+        },
+        {
+            "id": "947-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "roll0"
+            ],
+            "note": "roll0"
+        },
+        {
+            "id": "948-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "rollsum"
+            ],
+            "note": "rollsum"
+        },
+        {
+            "id": "949-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "rollsum"
+            ],
+            "note": "rollsum"
+        },
+        {
+            "id": "950-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "rollsum"
+            ],
+            "note": "rollsum"
+        },
+        {
+            "id": "951-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "roll1"
+            ],
+            "note": "roll1"
+        },
+        {
+            "id": "952-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "roll1"
+            ],
+            "note": "roll1"
+        },
+        {
+            "id": "953-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "roll1"
+            ],
+            "note": "roll1"
+        },
+        {
+            "id": "954-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "rollsumx"
+            ],
+            "note": "rollsumx"
+        },
+        {
+            "id": "955-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "rollsumx"
+            ],
+            "note": "rollsumx"
+        },
+        {
+            "id": "956-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "rollsumx"
+            ],
+            "note": "rollsumx"
+        },
+        {
+            "id": "957-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "index@2024"
+            ],
+            "note": "index@2024"
+        },
+        {
+            "id": "958-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "index@2024"
+            ],
+            "note": "index@2024"
+        },
+        {
+            "id": "959-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "index@2024"
+            ],
+            "note": "index@2024"
+        },
+        {
+            "id": "960-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "index@FY25"
+            ],
+            "note": "index@FY25"
+        },
+        {
+            "id": "961-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "index@FY25"
+            ],
+            "note": "index@FY25"
+        },
+        {
+            "id": "962-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "index@FY25"
+            ],
+            "note": "index@FY25"
+        },
+        {
+            "id": "963-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "index@"
+            ],
+            "note": "index@"
+        },
+        {
+            "id": "964-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "index@"
+            ],
+            "note": "index@"
+        },
+        {
+            "id": "965-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "index@"
+            ],
+            "note": "index@"
+        },
+        {
+            "id": "966-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "index@ Q1"
+            ],
+            "note": "index@ Q1"
+        },
+        {
+            "id": "967-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "index@ Q1"
+            ],
+            "note": "index@ Q1"
+        },
+        {
+            "id": "968-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "index@ Q1"
+            ],
+            "note": "index@ Q1"
+        },
+        {
+            "id": "969-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "sum"
+            ],
+            "note": "sum"
+        },
+        {
+            "id": "970-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "sum"
+            ],
+            "note": "sum"
+        },
+        {
+            "id": "971-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "sum"
+            ],
+            "note": "sum"
+        },
+        {
+            "id": "972-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "count"
+            ],
+            "note": "count"
+        },
+        {
+            "id": "973-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "count"
+            ],
+            "note": "count"
+        },
+        {
+            "id": "974-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "count"
+            ],
+            "note": "count"
+        },
+        {
+            "id": "975-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "avg"
+            ],
+            "note": "avg"
+        },
+        {
+            "id": "976-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "avg"
+            ],
+            "note": "avg"
+        },
+        {
+            "id": "977-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "avg"
+            ],
+            "note": "avg"
+        },
+        {
+            "id": "978-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "min"
+            ],
+            "note": "min"
+        },
+        {
+            "id": "979-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "min"
+            ],
+            "note": "min"
+        },
+        {
+            "id": "980-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "min"
+            ],
+            "note": "min"
+        },
+        {
+            "id": "981-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "max"
+            ],
+            "note": "max"
+        },
+        {
+            "id": "982-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "max"
+            ],
+            "note": "max"
+        },
+        {
+            "id": "983-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "max"
+            ],
+            "note": "max"
+        },
+        {
+            "id": "984-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "median"
+            ],
+            "note": "median"
+        },
+        {
+            "id": "985-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "median"
+            ],
+            "note": "median"
+        },
+        {
+            "id": "986-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "median"
+            ],
+            "note": "median"
+        },
+        {
+            "id": "987-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "mode"
+            ],
+            "note": "mode"
+        },
+        {
+            "id": "988-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "mode"
+            ],
+            "note": "mode"
+        },
+        {
+            "id": "989-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "mode"
+            ],
+            "note": "mode"
+        },
+        {
+            "id": "990-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "stddev"
+            ],
+            "note": "stddev"
+        },
+        {
+            "id": "991-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "stddev"
+            ],
+            "note": "stddev"
+        },
+        {
+            "id": "992-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "stddev"
+            ],
+            "note": "stddev"
+        },
+        {
+            "id": "993-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "range"
+            ],
+            "note": "range"
+        },
+        {
+            "id": "994-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "range"
+            ],
+            "note": "range"
+        },
+        {
+            "id": "995-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "range"
+            ],
+            "note": "range"
+        },
+        {
+            "id": "996-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "antimode"
+            ],
+            "note": "antimode"
+        },
+        {
+            "id": "997-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "antimode"
+            ],
+            "note": "antimode"
+        },
+        {
+            "id": "998-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "antimode"
+            ],
+            "note": "antimode"
+        },
+        {
+            "id": "999-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "p50"
+            ],
+            "note": "p50"
+        },
+        {
+            "id": "1000-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "p50"
+            ],
+            "note": "p50"
+        },
+        {
+            "id": "1001-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "p50"
+            ],
+            "note": "p50"
+        },
+        {
+            "id": "1002-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "wavg@AMOUNT"
+            ],
+            "note": "wavg@AMOUNT"
+        },
+        {
+            "id": "1003-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "wavg@AMOUNT"
+            ],
+            "note": "wavg@AMOUNT"
+        },
+        {
+            "id": "1004-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "wavg@AMOUNT"
+            ],
+            "note": "wavg@AMOUNT"
+        },
+        {
+            "id": "1005-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "count_filled"
+            ],
+            "note": "count_filled"
+        },
+        {
+            "id": "1006-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "count_filled"
+            ],
+            "note": "count_filled"
+        },
+        {
+            "id": "1007-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "count_filled"
+            ],
+            "note": "count_filled"
+        },
+        {
+            "id": "1008-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "count_blank"
+            ],
+            "note": "count_blank"
+        },
+        {
+            "id": "1009-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "count_blank"
+            ],
+            "note": "count_blank"
+        },
+        {
+            "id": "1010-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "count_blank"
+            ],
+            "note": "count_blank"
+        },
+        {
+            "id": "1011-isDerivedAgg",
+            "fn": "isDerivedAgg",
+            "args": [
+                "bogus"
+            ],
+            "note": "bogus"
+        },
+        {
+            "id": "1012-isRoll",
+            "fn": "isRoll",
+            "args": [
+                "bogus"
+            ],
+            "note": "bogus"
+        },
+        {
+            "id": "1013-indexBaseLabel",
+            "fn": "indexBaseLabel",
+            "args": [
+                "bogus"
+            ],
+            "note": "bogus"
+        },
+        {
+            "id": "1014-emptyAggValue",
+            "fn": "emptyAggValue",
+            "args": [
+                "count"
+            ],
+            "note": "count"
+        },
+        {
+            "id": "1015-emptyAggValue",
+            "fn": "emptyAggValue",
+            "args": [
+                "sum"
+            ],
+            "note": "sum"
+        },
+        {
+            "id": "1016-emptyAggValue",
+            "fn": "emptyAggValue",
+            "args": [
+                "avg"
+            ],
+            "note": "avg"
+        },
+        {
+            "id": "1017-emptyAggValue",
+            "fn": "emptyAggValue",
+            "args": [
+                "median"
+            ],
+            "note": "median"
+        },
+        {
+            "id": "1018-emptyAggValue",
+            "fn": "emptyAggValue",
+            "args": [
+                "min"
+            ],
+            "note": "min"
+        },
+        {
+            "id": "1019-emptyAggValue",
+            "fn": "emptyAggValue",
+            "args": [
+                "max"
+            ],
+            "note": "max"
+        },
+        {
+            "id": "1020-emptyAggValue",
+            "fn": "emptyAggValue",
+            "args": [
+                "distinct"
+            ],
+            "note": "distinct"
+        },
+        {
+            "id": "1021-emptyAggValue",
+            "fn": "emptyAggValue",
+            "args": [
+                "mode"
+            ],
+            "note": "mode"
+        },
+        {
+            "id": "1022-emptyAggValue",
+            "fn": "emptyAggValue",
+            "args": [
+                "stddev"
+            ],
+            "note": "stddev"
+        },
+        {
+            "id": "1023-emptyAggValue",
+            "fn": "emptyAggValue",
+            "args": [
+                "range"
+            ],
+            "note": "range"
+        },
+        {
+            "id": "1024-emptyAggValue",
+            "fn": "emptyAggValue",
+            "args": [
+                "count_filled"
+            ],
+            "note": "count_filled"
+        },
+        {
+            "id": "1025-emptyAggValue",
+            "fn": "emptyAggValue",
+            "args": [
+                "count_blank"
+            ],
+            "note": "count_blank"
+        },
+        {
+            "id": "1026-emptyAggValue",
+            "fn": "emptyAggValue",
+            "args": [
+                "antimode"
+            ],
+            "note": "antimode"
+        },
+        {
+            "id": "1027-emptyAggValue",
+            "fn": "emptyAggValue",
+            "args": [
+                "p10"
+            ],
+            "note": "p10"
+        },
+        {
+            "id": "1028-emptyAggValue",
+            "fn": "emptyAggValue",
+            "args": [
+                "p25"
+            ],
+            "note": "p25"
+        },
+        {
+            "id": "1029-emptyAggValue",
+            "fn": "emptyAggValue",
+            "args": [
+                "p50"
+            ],
+            "note": "p50"
+        },
+        {
+            "id": "1030-emptyAggValue",
+            "fn": "emptyAggValue",
+            "args": [
+                "p75"
+            ],
+            "note": "p75"
+        },
+        {
+            "id": "1031-emptyAggValue",
+            "fn": "emptyAggValue",
+            "args": [
+                "p90"
+            ],
+            "note": "p90"
+        },
+        {
+            "id": "1032-emptyAggValue",
+            "fn": "emptyAggValue",
+            "args": [
+                "p99"
+            ],
+            "note": "p99"
+        },
+        {
+            "id": "1033-emptyAggValue",
+            "fn": "emptyAggValue",
+            "args": [
+                "wavg@WT"
+            ],
+            "note": "wavg@WT"
+        },
+        {
+            "id": "1034-emptyAggValue",
+            "fn": "emptyAggValue",
+            "args": [
+                "formula"
+            ],
+            "note": "formula"
+        },
+        {
+            "id": "1035-emptyAggValue",
+            "fn": "emptyAggValue",
+            "args": [
+                "bogus_agg"
+            ],
+            "note": "bogus_agg"
+        },
+        {
+            "id": "1036-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "10",
+                "AMT > 5"
+            ],
+            "note": "'10' vs AMT > 5"
+        },
+        {
+            "id": "1037-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "10",
+                "AMT < 5"
+            ],
+            "note": "'10' vs AMT < 5"
+        },
+        {
+            "id": "1038-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "10",
+                "AMT >= 5"
+            ],
+            "note": "'10' vs AMT >= 5"
+        },
+        {
+            "id": "1039-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "10",
+                "AMT <= 5"
+            ],
+            "note": "'10' vs AMT <= 5"
+        },
+        {
+            "id": "1040-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "10",
+                "AMT = 5"
+            ],
+            "note": "'10' vs AMT = 5"
+        },
+        {
+            "id": "1041-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "10",
+                "AMT != 5"
+            ],
+            "note": "'10' vs AMT != 5"
+        },
+        {
+            "id": "1042-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "10",
+                "AMT > 1000"
+            ],
+            "note": "'10' vs AMT > 1000"
+        },
+        {
+            "id": "1043-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "10",
+                "AMT contains 5"
+            ],
+            "note": "'10' vs AMT contains 5"
+        },
+        {
+            "id": "1044-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "10",
+                "AMT > A"
+            ],
+            "note": "'10' vs AMT > A"
+        },
+        {
+            "id": "1045-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "10",
+                "AMT < ZZZ"
+            ],
+            "note": "'10' vs AMT < ZZZ"
+        },
+        {
+            "id": "1046-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "1",
+                "AMT > 5"
+            ],
+            "note": "'1' vs AMT > 5"
+        },
+        {
+            "id": "1047-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "1",
+                "AMT < 5"
+            ],
+            "note": "'1' vs AMT < 5"
+        },
+        {
+            "id": "1048-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "1",
+                "AMT >= 5"
+            ],
+            "note": "'1' vs AMT >= 5"
+        },
+        {
+            "id": "1049-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "1",
+                "AMT <= 5"
+            ],
+            "note": "'1' vs AMT <= 5"
+        },
+        {
+            "id": "1050-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "1",
+                "AMT = 5"
+            ],
+            "note": "'1' vs AMT = 5"
+        },
+        {
+            "id": "1051-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "1",
+                "AMT != 5"
+            ],
+            "note": "'1' vs AMT != 5"
+        },
+        {
+            "id": "1052-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "1",
+                "AMT > 1000"
+            ],
+            "note": "'1' vs AMT > 1000"
+        },
+        {
+            "id": "1053-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "1",
+                "AMT contains 5"
+            ],
+            "note": "'1' vs AMT contains 5"
+        },
+        {
+            "id": "1054-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "1",
+                "AMT > A"
+            ],
+            "note": "'1' vs AMT > A"
+        },
+        {
+            "id": "1055-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "1",
+                "AMT < ZZZ"
+            ],
+            "note": "'1' vs AMT < ZZZ"
+        },
+        {
+            "id": "1056-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "5",
+                "AMT > 5"
+            ],
+            "note": "'5' vs AMT > 5"
+        },
+        {
+            "id": "1057-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "5",
+                "AMT < 5"
+            ],
+            "note": "'5' vs AMT < 5"
+        },
+        {
+            "id": "1058-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "5",
+                "AMT >= 5"
+            ],
+            "note": "'5' vs AMT >= 5"
+        },
+        {
+            "id": "1059-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "5",
+                "AMT <= 5"
+            ],
+            "note": "'5' vs AMT <= 5"
+        },
+        {
+            "id": "1060-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "5",
+                "AMT = 5"
+            ],
+            "note": "'5' vs AMT = 5"
+        },
+        {
+            "id": "1061-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "5",
+                "AMT != 5"
+            ],
+            "note": "'5' vs AMT != 5"
+        },
+        {
+            "id": "1062-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "5",
+                "AMT > 1000"
+            ],
+            "note": "'5' vs AMT > 1000"
+        },
+        {
+            "id": "1063-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "5",
+                "AMT contains 5"
+            ],
+            "note": "'5' vs AMT contains 5"
+        },
+        {
+            "id": "1064-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "5",
+                "AMT > A"
+            ],
+            "note": "'5' vs AMT > A"
+        },
+        {
+            "id": "1065-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "5",
+                "AMT < ZZZ"
+            ],
+            "note": "'5' vs AMT < ZZZ"
+        },
+        {
+            "id": "1066-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "$1,234.56",
+                "AMT > 5"
+            ],
+            "note": "'$1,234.56' vs AMT > 5"
+        },
+        {
+            "id": "1067-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "$1,234.56",
+                "AMT < 5"
+            ],
+            "note": "'$1,234.56' vs AMT < 5"
+        },
+        {
+            "id": "1068-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "$1,234.56",
+                "AMT >= 5"
+            ],
+            "note": "'$1,234.56' vs AMT >= 5"
+        },
+        {
+            "id": "1069-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "$1,234.56",
+                "AMT <= 5"
+            ],
+            "note": "'$1,234.56' vs AMT <= 5"
+        },
+        {
+            "id": "1070-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "$1,234.56",
+                "AMT = 5"
+            ],
+            "note": "'$1,234.56' vs AMT = 5"
+        },
+        {
+            "id": "1071-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "$1,234.56",
+                "AMT != 5"
+            ],
+            "note": "'$1,234.56' vs AMT != 5"
+        },
+        {
+            "id": "1072-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "$1,234.56",
+                "AMT > 1000"
+            ],
+            "note": "'$1,234.56' vs AMT > 1000"
+        },
+        {
+            "id": "1073-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "$1,234.56",
+                "AMT contains 5"
+            ],
+            "note": "'$1,234.56' vs AMT contains 5"
+        },
+        {
+            "id": "1074-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "$1,234.56",
+                "AMT > A"
+            ],
+            "note": "'$1,234.56' vs AMT > A"
+        },
+        {
+            "id": "1075-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "$1,234.56",
+                "AMT < ZZZ"
+            ],
+            "note": "'$1,234.56' vs AMT < ZZZ"
+        },
+        {
+            "id": "1076-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "(5)",
+                "AMT > 5"
+            ],
+            "note": "'(5)' vs AMT > 5"
+        },
+        {
+            "id": "1077-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "(5)",
+                "AMT < 5"
+            ],
+            "note": "'(5)' vs AMT < 5"
+        },
+        {
+            "id": "1078-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "(5)",
+                "AMT >= 5"
+            ],
+            "note": "'(5)' vs AMT >= 5"
+        },
+        {
+            "id": "1079-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "(5)",
+                "AMT <= 5"
+            ],
+            "note": "'(5)' vs AMT <= 5"
+        },
+        {
+            "id": "1080-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "(5)",
+                "AMT = 5"
+            ],
+            "note": "'(5)' vs AMT = 5"
+        },
+        {
+            "id": "1081-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "(5)",
+                "AMT != 5"
+            ],
+            "note": "'(5)' vs AMT != 5"
+        },
+        {
+            "id": "1082-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "(5)",
+                "AMT > 1000"
+            ],
+            "note": "'(5)' vs AMT > 1000"
+        },
+        {
+            "id": "1083-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "(5)",
+                "AMT contains 5"
+            ],
+            "note": "'(5)' vs AMT contains 5"
+        },
+        {
+            "id": "1084-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "(5)",
+                "AMT > A"
+            ],
+            "note": "'(5)' vs AMT > A"
+        },
+        {
+            "id": "1085-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "(5)",
+                "AMT < ZZZ"
+            ],
+            "note": "'(5)' vs AMT < ZZZ"
+        },
+        {
+            "id": "1086-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "notanum",
+                "AMT > 5"
+            ],
+            "note": "'notanum' vs AMT > 5"
+        },
+        {
+            "id": "1087-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "notanum",
+                "AMT < 5"
+            ],
+            "note": "'notanum' vs AMT < 5"
+        },
+        {
+            "id": "1088-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "notanum",
+                "AMT >= 5"
+            ],
+            "note": "'notanum' vs AMT >= 5"
+        },
+        {
+            "id": "1089-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "notanum",
+                "AMT <= 5"
+            ],
+            "note": "'notanum' vs AMT <= 5"
+        },
+        {
+            "id": "1090-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "notanum",
+                "AMT = 5"
+            ],
+            "note": "'notanum' vs AMT = 5"
+        },
+        {
+            "id": "1091-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "notanum",
+                "AMT != 5"
+            ],
+            "note": "'notanum' vs AMT != 5"
+        },
+        {
+            "id": "1092-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "notanum",
+                "AMT > 1000"
+            ],
+            "note": "'notanum' vs AMT > 1000"
+        },
+        {
+            "id": "1093-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "notanum",
+                "AMT contains 5"
+            ],
+            "note": "'notanum' vs AMT contains 5"
+        },
+        {
+            "id": "1094-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "notanum",
+                "AMT > A"
+            ],
+            "note": "'notanum' vs AMT > A"
+        },
+        {
+            "id": "1095-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "notanum",
+                "AMT < ZZZ"
+            ],
+            "note": "'notanum' vs AMT < ZZZ"
+        },
+        {
+            "id": "1096-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "",
+                "AMT > 5"
+            ],
+            "note": "'' vs AMT > 5"
+        },
+        {
+            "id": "1097-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "",
+                "AMT < 5"
+            ],
+            "note": "'' vs AMT < 5"
+        },
+        {
+            "id": "1098-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "",
+                "AMT >= 5"
+            ],
+            "note": "'' vs AMT >= 5"
+        },
+        {
+            "id": "1099-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "",
+                "AMT <= 5"
+            ],
+            "note": "'' vs AMT <= 5"
+        },
+        {
+            "id": "1100-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "",
+                "AMT = 5"
+            ],
+            "note": "'' vs AMT = 5"
+        },
+        {
+            "id": "1101-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "",
+                "AMT != 5"
+            ],
+            "note": "'' vs AMT != 5"
+        },
+        {
+            "id": "1102-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "",
+                "AMT > 1000"
+            ],
+            "note": "'' vs AMT > 1000"
+        },
+        {
+            "id": "1103-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "",
+                "AMT contains 5"
+            ],
+            "note": "'' vs AMT contains 5"
+        },
+        {
+            "id": "1104-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "",
+                "AMT > A"
+            ],
+            "note": "'' vs AMT > A"
+        },
+        {
+            "id": "1105-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "",
+                "AMT < ZZZ"
+            ],
+            "note": "'' vs AMT < ZZZ"
+        },
+        {
+            "id": "1106-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "1e3",
+                "AMT > 5"
+            ],
+            "note": "'1e3' vs AMT > 5"
+        },
+        {
+            "id": "1107-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "1e3",
+                "AMT < 5"
+            ],
+            "note": "'1e3' vs AMT < 5"
+        },
+        {
+            "id": "1108-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "1e3",
+                "AMT >= 5"
+            ],
+            "note": "'1e3' vs AMT >= 5"
+        },
+        {
+            "id": "1109-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "1e3",
+                "AMT <= 5"
+            ],
+            "note": "'1e3' vs AMT <= 5"
+        },
+        {
+            "id": "1110-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "1e3",
+                "AMT = 5"
+            ],
+            "note": "'1e3' vs AMT = 5"
+        },
+        {
+            "id": "1111-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "1e3",
+                "AMT != 5"
+            ],
+            "note": "'1e3' vs AMT != 5"
+        },
+        {
+            "id": "1112-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "1e3",
+                "AMT > 1000"
+            ],
+            "note": "'1e3' vs AMT > 1000"
+        },
+        {
+            "id": "1113-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "1e3",
+                "AMT contains 5"
+            ],
+            "note": "'1e3' vs AMT contains 5"
+        },
+        {
+            "id": "1114-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "1e3",
+                "AMT > A"
+            ],
+            "note": "'1e3' vs AMT > A"
+        },
+        {
+            "id": "1115-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "1e3",
+                "AMT < ZZZ"
+            ],
+            "note": "'1e3' vs AMT < ZZZ"
+        },
+        {
+            "id": "1116-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "2024",
+                "AMT > 5"
+            ],
+            "note": "'2024' vs AMT > 5"
+        },
+        {
+            "id": "1117-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "2024",
+                "AMT < 5"
+            ],
+            "note": "'2024' vs AMT < 5"
+        },
+        {
+            "id": "1118-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "2024",
+                "AMT >= 5"
+            ],
+            "note": "'2024' vs AMT >= 5"
+        },
+        {
+            "id": "1119-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "2024",
+                "AMT <= 5"
+            ],
+            "note": "'2024' vs AMT <= 5"
+        },
+        {
+            "id": "1120-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "2024",
+                "AMT = 5"
+            ],
+            "note": "'2024' vs AMT = 5"
+        },
+        {
+            "id": "1121-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "2024",
+                "AMT != 5"
+            ],
+            "note": "'2024' vs AMT != 5"
+        },
+        {
+            "id": "1122-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "2024",
+                "AMT > 1000"
+            ],
+            "note": "'2024' vs AMT > 1000"
+        },
+        {
+            "id": "1123-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "2024",
+                "AMT contains 5"
+            ],
+            "note": "'2024' vs AMT contains 5"
+        },
+        {
+            "id": "1124-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "2024",
+                "AMT > A"
+            ],
+            "note": "'2024' vs AMT > A"
+        },
+        {
+            "id": "1125-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "2024",
+                "AMT < ZZZ"
+            ],
+            "note": "'2024' vs AMT < ZZZ"
+        },
+        {
+            "id": "1126-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "ZZZ",
+                "AMT > 5"
+            ],
+            "note": "'ZZZ' vs AMT > 5"
+        },
+        {
+            "id": "1127-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "ZZZ",
+                "AMT < 5"
+            ],
+            "note": "'ZZZ' vs AMT < 5"
+        },
+        {
+            "id": "1128-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "ZZZ",
+                "AMT >= 5"
+            ],
+            "note": "'ZZZ' vs AMT >= 5"
+        },
+        {
+            "id": "1129-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "ZZZ",
+                "AMT <= 5"
+            ],
+            "note": "'ZZZ' vs AMT <= 5"
+        },
+        {
+            "id": "1130-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "ZZZ",
+                "AMT = 5"
+            ],
+            "note": "'ZZZ' vs AMT = 5"
+        },
+        {
+            "id": "1131-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "ZZZ",
+                "AMT != 5"
+            ],
+            "note": "'ZZZ' vs AMT != 5"
+        },
+        {
+            "id": "1132-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "ZZZ",
+                "AMT > 1000"
+            ],
+            "note": "'ZZZ' vs AMT > 1000"
+        },
+        {
+            "id": "1133-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "ZZZ",
+                "AMT contains 5"
+            ],
+            "note": "'ZZZ' vs AMT contains 5"
+        },
+        {
+            "id": "1134-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "ZZZ",
+                "AMT > A"
+            ],
+            "note": "'ZZZ' vs AMT > A"
+        },
+        {
+            "id": "1135-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "ZZZ",
+                "AMT < ZZZ"
+            ],
+            "note": "'ZZZ' vs AMT < ZZZ"
+        },
+        {
+            "id": "1136-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "0",
+                "AMT > 5"
+            ],
+            "note": "'0' vs AMT > 5"
+        },
+        {
+            "id": "1137-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "0",
+                "AMT < 5"
+            ],
+            "note": "'0' vs AMT < 5"
+        },
+        {
+            "id": "1138-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "0",
+                "AMT >= 5"
+            ],
+            "note": "'0' vs AMT >= 5"
+        },
+        {
+            "id": "1139-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "0",
+                "AMT <= 5"
+            ],
+            "note": "'0' vs AMT <= 5"
+        },
+        {
+            "id": "1140-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "0",
+                "AMT = 5"
+            ],
+            "note": "'0' vs AMT = 5"
+        },
+        {
+            "id": "1141-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "0",
+                "AMT != 5"
+            ],
+            "note": "'0' vs AMT != 5"
+        },
+        {
+            "id": "1142-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "0",
+                "AMT > 1000"
+            ],
+            "note": "'0' vs AMT > 1000"
+        },
+        {
+            "id": "1143-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "0",
+                "AMT contains 5"
+            ],
+            "note": "'0' vs AMT contains 5"
+        },
+        {
+            "id": "1144-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "0",
+                "AMT > A"
+            ],
+            "note": "'0' vs AMT > A"
+        },
+        {
+            "id": "1145-filterRow",
+            "fn": "filterRow",
+            "args": [
+                "0",
+                "AMT < ZZZ"
+            ],
+            "note": "'0' vs AMT < ZZZ"
+        },
+        {
+            "id": "1146-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "{AMT} > 5"
+            ],
+            "note": "{AMT} > 5"
+        },
+        {
+            "id": "1147-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "{ AMT } > 5"
+            ],
+            "note": "{ AMT } > 5"
+        },
+        {
+            "id": "1148-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "{ 'AWARD AMOUNT' } > 1000"
+            ],
+            "note": "{ 'AWARD AMOUNT' } > 1000"
+        },
+        {
+            "id": "1149-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "'AWARD AMOUNT' > 1000"
+            ],
+            "note": "'AWARD AMOUNT' > 1000"
+        },
+        {
+            "id": "1150-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AWARD AMOUNT > 1000"
+            ],
+            "note": "AWARD AMOUNT > 1000"
+        },
+        {
+            "id": "1151-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT CONTAINS 5"
+            ],
+            "note": "AMT CONTAINS 5"
+        },
+        {
+            "id": "1152-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "TITLE contains grant"
+            ],
+            "note": "TITLE contains grant"
+        },
+        {
+            "id": "1153-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "TITLE Contains AWARD"
+            ],
+            "note": "TITLE Contains AWARD"
+        },
+        {
+            "id": "1154-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "DEPT contains mist"
+            ],
+            "note": "DEPT contains mist"
+        },
+        {
+            "id": "1155-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "{DEPT} Chem"
+            ],
+            "note": "{DEPT} Chem"
+        },
+        {
+            "id": "1156-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "{ DEPT } Phys"
+            ],
+            "note": "{ DEPT } Phys"
+        },
+        {
+            "id": "1157-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "DEPT Chem"
+            ],
+            "note": "DEPT Chem"
+        },
+        {
+            "id": "1158-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "DEPT = /^chem/"
+            ],
+            "note": "DEPT = /^chem/"
+        },
+        {
+            "id": "1159-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "DEPT = /^CHEM/I"
+            ],
+            "note": "DEPT = /^CHEM/I"
+        },
+        {
+            "id": "1160-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "DEPT != /^phys/"
+            ],
+            "note": "DEPT != /^phys/"
+        },
+        {
+            "id": "1161-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "DEPT = //Chemistry//"
+            ],
+            "note": "DEPT = //Chemistry//"
+        },
+        {
+            "id": "1162-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "DEPT = //Chem//"
+            ],
+            "note": "DEPT = //Chem//"
+        },
+        {
+            "id": "1163-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT > {BUDGET}"
+            ],
+            "note": "AMT > {BUDGET}"
+        },
+        {
+            "id": "1164-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT < { BUDGET }"
+            ],
+            "note": "AMT < { BUDGET }"
+        },
+        {
+            "id": "1165-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT = { AMT }"
+            ],
+            "note": "AMT = { AMT }"
+        },
+        {
+            "id": "1166-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT eq 500"
+            ],
+            "note": "AMT eq 500"
+        },
+        {
+            "id": "1167-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT gt 499"
+            ],
+            "note": "AMT gt 499"
+        },
+        {
+            "id": "1168-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT ne 500"
+            ],
+            "note": "AMT ne 500"
+        },
+        {
+            "id": "1169-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT == 500"
+            ],
+            "note": "AMT == 500"
+        },
+        {
+            "id": "1170-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "TITLE = \"Grant AND Award\""
+            ],
+            "note": "TITLE = \"Grant AND Award\""
+        },
+        {
+            "id": "1171-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "TITLE = Grant AND Award"
+            ],
+            "note": "TITLE = Grant AND Award"
+        },
+        {
+            "id": "1172-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "STATUS = \"In Progress\""
+            ],
+            "note": "STATUS = \"In Progress\""
+        },
+        {
+            "id": "1173-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "STATUS = In Progress"
+            ],
+            "note": "STATUS = In Progress"
+        },
+        {
+            "id": "1174-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "DEPT = Physics OR AMT > 5 AND STATUS = \"In Progress\""
+            ],
+            "note": "DEPT = Physics OR AMT > 5 AND STATUS = \"In Progress\""
+        },
+        {
+            "id": "1175-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "DEPT = Physics OR AMT > 5 AND STATUS = Done"
+            ],
+            "note": "DEPT = Physics OR AMT > 5 AND STATUS = Done"
+        },
+        {
+            "id": "1176-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "Chemistry"
+            ],
+            "note": "Chemistry"
+        },
+        {
+            "id": "1177-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "nonsense"
+            ],
+            "note": "nonsense"
+        },
+        {
+            "id": "1178-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "contains"
+            ],
+            "note": "contains"
+        },
+        {
+            "id": "1179-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "contains Chem"
+            ],
+            "note": "contains Chem"
+        },
+        {
+            "id": "1180-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "!= Physics"
+            ],
+            "note": "!= Physics"
+        },
+        {
+            "id": "1181-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "= Chemistry"
+            ],
+            "note": "= Chemistry"
+        },
+        {
+            "id": "1182-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT > 5 AND"
+            ],
+            "note": "AMT > 5 AND"
+        },
+        {
+            "id": "1183-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "OR AMT > 5"
+            ],
+            "note": "OR AMT > 5"
+        },
+        {
+            "id": "1184-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT"
+            ],
+            "note": "AMT"
+        },
+        {
+            "id": "1185-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "{AMT}"
+            ],
+            "note": "{AMT}"
+        },
+        {
+            "id": "1186-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "DEPT = chemistry"
+            ],
+            "note": "DEPT = chemistry"
+        },
+        {
+            "id": "1187-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "DEPT != CHEMISTRY"
+            ],
+            "note": "DEPT != CHEMISTRY"
+        },
+        {
+            "id": "1188-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT = 1-600"
+            ],
+            "note": "AMT = 1-600"
+        },
+        {
+            "id": "1189-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT >= 500"
+            ],
+            "note": "AMT >= 500"
+        },
+        {
+            "id": "1190-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT <= 499.99"
+            ],
+            "note": "AMT <= 499.99"
+        },
+        {
+            "id": "1191-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "'Chemistry' = DEPT"
+            ],
+            "note": "'Chemistry' = DEPT"
+        },
+        {
+            "id": "1192-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "TITLE starts with Grant"
+            ],
+            "note": "TITLE starts with Grant"
+        },
+        {
+            "id": "1193-filterRow2",
+            "fn": "filterRow2",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "TITLE = /^grant/"
+            ],
+            "note": "TITLE = /^grant/"
+        },
+        {
+            "id": "1194-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "10",
+                "AMT > 5"
+            ],
+            "note": "B: '10' vs AMT > 5"
+        },
+        {
+            "id": "1195-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "10",
+                "AMT < 5"
+            ],
+            "note": "B: '10' vs AMT < 5"
+        },
+        {
+            "id": "1196-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "10",
+                "AMT >= 5"
+            ],
+            "note": "B: '10' vs AMT >= 5"
+        },
+        {
+            "id": "1197-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "10",
+                "AMT <= 5"
+            ],
+            "note": "B: '10' vs AMT <= 5"
+        },
+        {
+            "id": "1198-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "10",
+                "AMT = 5"
+            ],
+            "note": "B: '10' vs AMT = 5"
+        },
+        {
+            "id": "1199-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "10",
+                "AMT != 5"
+            ],
+            "note": "B: '10' vs AMT != 5"
+        },
+        {
+            "id": "1200-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "10",
+                "AMT > 1000"
+            ],
+            "note": "B: '10' vs AMT > 1000"
+        },
+        {
+            "id": "1201-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "10",
+                "AMT contains 5"
+            ],
+            "note": "B: '10' vs AMT contains 5"
+        },
+        {
+            "id": "1202-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "10",
+                "AMT > A"
+            ],
+            "note": "B: '10' vs AMT > A"
+        },
+        {
+            "id": "1203-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "10",
+                "AMT < ZZZ"
+            ],
+            "note": "B: '10' vs AMT < ZZZ"
+        },
+        {
+            "id": "1204-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "1",
+                "AMT > 5"
+            ],
+            "note": "B: '1' vs AMT > 5"
+        },
+        {
+            "id": "1205-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "1",
+                "AMT < 5"
+            ],
+            "note": "B: '1' vs AMT < 5"
+        },
+        {
+            "id": "1206-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "1",
+                "AMT >= 5"
+            ],
+            "note": "B: '1' vs AMT >= 5"
+        },
+        {
+            "id": "1207-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "1",
+                "AMT <= 5"
+            ],
+            "note": "B: '1' vs AMT <= 5"
+        },
+        {
+            "id": "1208-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "1",
+                "AMT = 5"
+            ],
+            "note": "B: '1' vs AMT = 5"
+        },
+        {
+            "id": "1209-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "1",
+                "AMT != 5"
+            ],
+            "note": "B: '1' vs AMT != 5"
+        },
+        {
+            "id": "1210-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "1",
+                "AMT > 1000"
+            ],
+            "note": "B: '1' vs AMT > 1000"
+        },
+        {
+            "id": "1211-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "1",
+                "AMT contains 5"
+            ],
+            "note": "B: '1' vs AMT contains 5"
+        },
+        {
+            "id": "1212-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "1",
+                "AMT > A"
+            ],
+            "note": "B: '1' vs AMT > A"
+        },
+        {
+            "id": "1213-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "1",
+                "AMT < ZZZ"
+            ],
+            "note": "B: '1' vs AMT < ZZZ"
+        },
+        {
+            "id": "1214-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "5",
+                "AMT > 5"
+            ],
+            "note": "B: '5' vs AMT > 5"
+        },
+        {
+            "id": "1215-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "5",
+                "AMT < 5"
+            ],
+            "note": "B: '5' vs AMT < 5"
+        },
+        {
+            "id": "1216-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "5",
+                "AMT >= 5"
+            ],
+            "note": "B: '5' vs AMT >= 5"
+        },
+        {
+            "id": "1217-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "5",
+                "AMT <= 5"
+            ],
+            "note": "B: '5' vs AMT <= 5"
+        },
+        {
+            "id": "1218-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "5",
+                "AMT = 5"
+            ],
+            "note": "B: '5' vs AMT = 5"
+        },
+        {
+            "id": "1219-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "5",
+                "AMT != 5"
+            ],
+            "note": "B: '5' vs AMT != 5"
+        },
+        {
+            "id": "1220-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "5",
+                "AMT > 1000"
+            ],
+            "note": "B: '5' vs AMT > 1000"
+        },
+        {
+            "id": "1221-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "5",
+                "AMT contains 5"
+            ],
+            "note": "B: '5' vs AMT contains 5"
+        },
+        {
+            "id": "1222-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "5",
+                "AMT > A"
+            ],
+            "note": "B: '5' vs AMT > A"
+        },
+        {
+            "id": "1223-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "5",
+                "AMT < ZZZ"
+            ],
+            "note": "B: '5' vs AMT < ZZZ"
+        },
+        {
+            "id": "1224-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "$1,234.56",
+                "AMT > 5"
+            ],
+            "note": "B: '$1,234.56' vs AMT > 5"
+        },
+        {
+            "id": "1225-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "$1,234.56",
+                "AMT < 5"
+            ],
+            "note": "B: '$1,234.56' vs AMT < 5"
+        },
+        {
+            "id": "1226-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "$1,234.56",
+                "AMT >= 5"
+            ],
+            "note": "B: '$1,234.56' vs AMT >= 5"
+        },
+        {
+            "id": "1227-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "$1,234.56",
+                "AMT <= 5"
+            ],
+            "note": "B: '$1,234.56' vs AMT <= 5"
+        },
+        {
+            "id": "1228-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "$1,234.56",
+                "AMT = 5"
+            ],
+            "note": "B: '$1,234.56' vs AMT = 5"
+        },
+        {
+            "id": "1229-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "$1,234.56",
+                "AMT != 5"
+            ],
+            "note": "B: '$1,234.56' vs AMT != 5"
+        },
+        {
+            "id": "1230-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "$1,234.56",
+                "AMT > 1000"
+            ],
+            "note": "B: '$1,234.56' vs AMT > 1000"
+        },
+        {
+            "id": "1231-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "$1,234.56",
+                "AMT contains 5"
+            ],
+            "note": "B: '$1,234.56' vs AMT contains 5"
+        },
+        {
+            "id": "1232-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "$1,234.56",
+                "AMT > A"
+            ],
+            "note": "B: '$1,234.56' vs AMT > A"
+        },
+        {
+            "id": "1233-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "$1,234.56",
+                "AMT < ZZZ"
+            ],
+            "note": "B: '$1,234.56' vs AMT < ZZZ"
+        },
+        {
+            "id": "1234-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "(5)",
+                "AMT > 5"
+            ],
+            "note": "B: '(5)' vs AMT > 5"
+        },
+        {
+            "id": "1235-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "(5)",
+                "AMT < 5"
+            ],
+            "note": "B: '(5)' vs AMT < 5"
+        },
+        {
+            "id": "1236-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "(5)",
+                "AMT >= 5"
+            ],
+            "note": "B: '(5)' vs AMT >= 5"
+        },
+        {
+            "id": "1237-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "(5)",
+                "AMT <= 5"
+            ],
+            "note": "B: '(5)' vs AMT <= 5"
+        },
+        {
+            "id": "1238-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "(5)",
+                "AMT = 5"
+            ],
+            "note": "B: '(5)' vs AMT = 5"
+        },
+        {
+            "id": "1239-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "(5)",
+                "AMT != 5"
+            ],
+            "note": "B: '(5)' vs AMT != 5"
+        },
+        {
+            "id": "1240-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "(5)",
+                "AMT > 1000"
+            ],
+            "note": "B: '(5)' vs AMT > 1000"
+        },
+        {
+            "id": "1241-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "(5)",
+                "AMT contains 5"
+            ],
+            "note": "B: '(5)' vs AMT contains 5"
+        },
+        {
+            "id": "1242-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "(5)",
+                "AMT > A"
+            ],
+            "note": "B: '(5)' vs AMT > A"
+        },
+        {
+            "id": "1243-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "(5)",
+                "AMT < ZZZ"
+            ],
+            "note": "B: '(5)' vs AMT < ZZZ"
+        },
+        {
+            "id": "1244-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "notanum",
+                "AMT > 5"
+            ],
+            "note": "B: 'notanum' vs AMT > 5"
+        },
+        {
+            "id": "1245-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "notanum",
+                "AMT < 5"
+            ],
+            "note": "B: 'notanum' vs AMT < 5"
+        },
+        {
+            "id": "1246-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "notanum",
+                "AMT >= 5"
+            ],
+            "note": "B: 'notanum' vs AMT >= 5"
+        },
+        {
+            "id": "1247-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "notanum",
+                "AMT <= 5"
+            ],
+            "note": "B: 'notanum' vs AMT <= 5"
+        },
+        {
+            "id": "1248-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "notanum",
+                "AMT = 5"
+            ],
+            "note": "B: 'notanum' vs AMT = 5"
+        },
+        {
+            "id": "1249-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "notanum",
+                "AMT != 5"
+            ],
+            "note": "B: 'notanum' vs AMT != 5"
+        },
+        {
+            "id": "1250-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "notanum",
+                "AMT > 1000"
+            ],
+            "note": "B: 'notanum' vs AMT > 1000"
+        },
+        {
+            "id": "1251-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "notanum",
+                "AMT contains 5"
+            ],
+            "note": "B: 'notanum' vs AMT contains 5"
+        },
+        {
+            "id": "1252-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "notanum",
+                "AMT > A"
+            ],
+            "note": "B: 'notanum' vs AMT > A"
+        },
+        {
+            "id": "1253-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "notanum",
+                "AMT < ZZZ"
+            ],
+            "note": "B: 'notanum' vs AMT < ZZZ"
+        },
+        {
+            "id": "1254-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "",
+                "AMT > 5"
+            ],
+            "note": "B: '' vs AMT > 5"
+        },
+        {
+            "id": "1255-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "",
+                "AMT < 5"
+            ],
+            "note": "B: '' vs AMT < 5"
+        },
+        {
+            "id": "1256-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "",
+                "AMT >= 5"
+            ],
+            "note": "B: '' vs AMT >= 5"
+        },
+        {
+            "id": "1257-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "",
+                "AMT <= 5"
+            ],
+            "note": "B: '' vs AMT <= 5"
+        },
+        {
+            "id": "1258-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "",
+                "AMT = 5"
+            ],
+            "note": "B: '' vs AMT = 5"
+        },
+        {
+            "id": "1259-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "",
+                "AMT != 5"
+            ],
+            "note": "B: '' vs AMT != 5"
+        },
+        {
+            "id": "1260-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "",
+                "AMT > 1000"
+            ],
+            "note": "B: '' vs AMT > 1000"
+        },
+        {
+            "id": "1261-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "",
+                "AMT contains 5"
+            ],
+            "note": "B: '' vs AMT contains 5"
+        },
+        {
+            "id": "1262-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "",
+                "AMT > A"
+            ],
+            "note": "B: '' vs AMT > A"
+        },
+        {
+            "id": "1263-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "",
+                "AMT < ZZZ"
+            ],
+            "note": "B: '' vs AMT < ZZZ"
+        },
+        {
+            "id": "1264-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "1e3",
+                "AMT > 5"
+            ],
+            "note": "B: '1e3' vs AMT > 5"
+        },
+        {
+            "id": "1265-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "1e3",
+                "AMT < 5"
+            ],
+            "note": "B: '1e3' vs AMT < 5"
+        },
+        {
+            "id": "1266-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "1e3",
+                "AMT >= 5"
+            ],
+            "note": "B: '1e3' vs AMT >= 5"
+        },
+        {
+            "id": "1267-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "1e3",
+                "AMT <= 5"
+            ],
+            "note": "B: '1e3' vs AMT <= 5"
+        },
+        {
+            "id": "1268-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "1e3",
+                "AMT = 5"
+            ],
+            "note": "B: '1e3' vs AMT = 5"
+        },
+        {
+            "id": "1269-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "1e3",
+                "AMT != 5"
+            ],
+            "note": "B: '1e3' vs AMT != 5"
+        },
+        {
+            "id": "1270-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "1e3",
+                "AMT > 1000"
+            ],
+            "note": "B: '1e3' vs AMT > 1000"
+        },
+        {
+            "id": "1271-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "1e3",
+                "AMT contains 5"
+            ],
+            "note": "B: '1e3' vs AMT contains 5"
+        },
+        {
+            "id": "1272-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "1e3",
+                "AMT > A"
+            ],
+            "note": "B: '1e3' vs AMT > A"
+        },
+        {
+            "id": "1273-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "1e3",
+                "AMT < ZZZ"
+            ],
+            "note": "B: '1e3' vs AMT < ZZZ"
+        },
+        {
+            "id": "1274-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "2024",
+                "AMT > 5"
+            ],
+            "note": "B: '2024' vs AMT > 5"
+        },
+        {
+            "id": "1275-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "2024",
+                "AMT < 5"
+            ],
+            "note": "B: '2024' vs AMT < 5"
+        },
+        {
+            "id": "1276-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "2024",
+                "AMT >= 5"
+            ],
+            "note": "B: '2024' vs AMT >= 5"
+        },
+        {
+            "id": "1277-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "2024",
+                "AMT <= 5"
+            ],
+            "note": "B: '2024' vs AMT <= 5"
+        },
+        {
+            "id": "1278-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "2024",
+                "AMT = 5"
+            ],
+            "note": "B: '2024' vs AMT = 5"
+        },
+        {
+            "id": "1279-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "2024",
+                "AMT != 5"
+            ],
+            "note": "B: '2024' vs AMT != 5"
+        },
+        {
+            "id": "1280-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "2024",
+                "AMT > 1000"
+            ],
+            "note": "B: '2024' vs AMT > 1000"
+        },
+        {
+            "id": "1281-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "2024",
+                "AMT contains 5"
+            ],
+            "note": "B: '2024' vs AMT contains 5"
+        },
+        {
+            "id": "1282-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "2024",
+                "AMT > A"
+            ],
+            "note": "B: '2024' vs AMT > A"
+        },
+        {
+            "id": "1283-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "2024",
+                "AMT < ZZZ"
+            ],
+            "note": "B: '2024' vs AMT < ZZZ"
+        },
+        {
+            "id": "1284-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "ZZZ",
+                "AMT > 5"
+            ],
+            "note": "B: 'ZZZ' vs AMT > 5"
+        },
+        {
+            "id": "1285-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "ZZZ",
+                "AMT < 5"
+            ],
+            "note": "B: 'ZZZ' vs AMT < 5"
+        },
+        {
+            "id": "1286-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "ZZZ",
+                "AMT >= 5"
+            ],
+            "note": "B: 'ZZZ' vs AMT >= 5"
+        },
+        {
+            "id": "1287-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "ZZZ",
+                "AMT <= 5"
+            ],
+            "note": "B: 'ZZZ' vs AMT <= 5"
+        },
+        {
+            "id": "1288-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "ZZZ",
+                "AMT = 5"
+            ],
+            "note": "B: 'ZZZ' vs AMT = 5"
+        },
+        {
+            "id": "1289-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "ZZZ",
+                "AMT != 5"
+            ],
+            "note": "B: 'ZZZ' vs AMT != 5"
+        },
+        {
+            "id": "1290-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "ZZZ",
+                "AMT > 1000"
+            ],
+            "note": "B: 'ZZZ' vs AMT > 1000"
+        },
+        {
+            "id": "1291-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "ZZZ",
+                "AMT contains 5"
+            ],
+            "note": "B: 'ZZZ' vs AMT contains 5"
+        },
+        {
+            "id": "1292-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "ZZZ",
+                "AMT > A"
+            ],
+            "note": "B: 'ZZZ' vs AMT > A"
+        },
+        {
+            "id": "1293-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "ZZZ",
+                "AMT < ZZZ"
+            ],
+            "note": "B: 'ZZZ' vs AMT < ZZZ"
+        },
+        {
+            "id": "1294-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "0",
+                "AMT > 5"
+            ],
+            "note": "B: '0' vs AMT > 5"
+        },
+        {
+            "id": "1295-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "0",
+                "AMT < 5"
+            ],
+            "note": "B: '0' vs AMT < 5"
+        },
+        {
+            "id": "1296-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "0",
+                "AMT >= 5"
+            ],
+            "note": "B: '0' vs AMT >= 5"
+        },
+        {
+            "id": "1297-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "0",
+                "AMT <= 5"
+            ],
+            "note": "B: '0' vs AMT <= 5"
+        },
+        {
+            "id": "1298-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "0",
+                "AMT = 5"
+            ],
+            "note": "B: '0' vs AMT = 5"
+        },
+        {
+            "id": "1299-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "0",
+                "AMT != 5"
+            ],
+            "note": "B: '0' vs AMT != 5"
+        },
+        {
+            "id": "1300-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "0",
+                "AMT > 1000"
+            ],
+            "note": "B: '0' vs AMT > 1000"
+        },
+        {
+            "id": "1301-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "0",
+                "AMT contains 5"
+            ],
+            "note": "B: '0' vs AMT contains 5"
+        },
+        {
+            "id": "1302-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "0",
+                "AMT > A"
+            ],
+            "note": "B: '0' vs AMT > A"
+        },
+        {
+            "id": "1303-filterRowB",
+            "fn": "filterRowB",
+            "args": [
+                "0",
+                "AMT < ZZZ"
+            ],
+            "note": "B: '0' vs AMT < ZZZ"
+        },
+        {
+            "id": "1304-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "{AMT} > 5"
+            ],
+            "note": "B: {AMT} > 5"
+        },
+        {
+            "id": "1305-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "{ AMT } > 5"
+            ],
+            "note": "B: { AMT } > 5"
+        },
+        {
+            "id": "1306-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "{ 'AWARD AMOUNT' } > 1000"
+            ],
+            "note": "B: { 'AWARD AMOUNT' } > 1000"
+        },
+        {
+            "id": "1307-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "'AWARD AMOUNT' > 1000"
+            ],
+            "note": "B: 'AWARD AMOUNT' > 1000"
+        },
+        {
+            "id": "1308-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AWARD AMOUNT > 1000"
+            ],
+            "note": "B: AWARD AMOUNT > 1000"
+        },
+        {
+            "id": "1309-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT CONTAINS 5"
+            ],
+            "note": "B: AMT CONTAINS 5"
+        },
+        {
+            "id": "1310-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "TITLE contains grant"
+            ],
+            "note": "B: TITLE contains grant"
+        },
+        {
+            "id": "1311-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "TITLE Contains AWARD"
+            ],
+            "note": "B: TITLE Contains AWARD"
+        },
+        {
+            "id": "1312-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "DEPT contains mist"
+            ],
+            "note": "B: DEPT contains mist"
+        },
+        {
+            "id": "1313-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "{DEPT} Chem"
+            ],
+            "note": "B: {DEPT} Chem"
+        },
+        {
+            "id": "1314-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "{ DEPT } Phys"
+            ],
+            "note": "B: { DEPT } Phys"
+        },
+        {
+            "id": "1315-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "DEPT Chem"
+            ],
+            "note": "B: DEPT Chem"
+        },
+        {
+            "id": "1316-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "DEPT = /^chem/"
+            ],
+            "note": "B: DEPT = /^chem/"
+        },
+        {
+            "id": "1317-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "DEPT = /^CHEM/I"
+            ],
+            "note": "B: DEPT = /^CHEM/I"
+        },
+        {
+            "id": "1318-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "DEPT != /^phys/"
+            ],
+            "note": "B: DEPT != /^phys/"
+        },
+        {
+            "id": "1319-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "DEPT = //Chemistry//"
+            ],
+            "note": "B: DEPT = //Chemistry//"
+        },
+        {
+            "id": "1320-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "DEPT = //Chem//"
+            ],
+            "note": "B: DEPT = //Chem//"
+        },
+        {
+            "id": "1321-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT > {BUDGET}"
+            ],
+            "note": "B: AMT > {BUDGET}"
+        },
+        {
+            "id": "1322-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT < { BUDGET }"
+            ],
+            "note": "B: AMT < { BUDGET }"
+        },
+        {
+            "id": "1323-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT = { AMT }"
+            ],
+            "note": "B: AMT = { AMT }"
+        },
+        {
+            "id": "1324-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT eq 500"
+            ],
+            "note": "B: AMT eq 500"
+        },
+        {
+            "id": "1325-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT gt 499"
+            ],
+            "note": "B: AMT gt 499"
+        },
+        {
+            "id": "1326-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT ne 500"
+            ],
+            "note": "B: AMT ne 500"
+        },
+        {
+            "id": "1327-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT == 500"
+            ],
+            "note": "B: AMT == 500"
+        },
+        {
+            "id": "1328-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "TITLE = \"Grant AND Award\""
+            ],
+            "note": "B: TITLE = \"Grant AND Award\""
+        },
+        {
+            "id": "1329-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "TITLE = Grant AND Award"
+            ],
+            "note": "B: TITLE = Grant AND Award"
+        },
+        {
+            "id": "1330-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "STATUS = \"In Progress\""
+            ],
+            "note": "B: STATUS = \"In Progress\""
+        },
+        {
+            "id": "1331-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "STATUS = In Progress"
+            ],
+            "note": "B: STATUS = In Progress"
+        },
+        {
+            "id": "1332-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "DEPT = Physics OR AMT > 5 AND STATUS = \"In Progress\""
+            ],
+            "note": "B: DEPT = Physics OR AMT > 5 AND STATUS = \"In Progress\""
+        },
+        {
+            "id": "1333-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "DEPT = Physics OR AMT > 5 AND STATUS = Done"
+            ],
+            "note": "B: DEPT = Physics OR AMT > 5 AND STATUS = Done"
+        },
+        {
+            "id": "1334-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "Chemistry"
+            ],
+            "note": "B: Chemistry"
+        },
+        {
+            "id": "1335-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "nonsense"
+            ],
+            "note": "B: nonsense"
+        },
+        {
+            "id": "1336-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "contains"
+            ],
+            "note": "B: contains"
+        },
+        {
+            "id": "1337-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "contains Chem"
+            ],
+            "note": "B: contains Chem"
+        },
+        {
+            "id": "1338-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "!= Physics"
+            ],
+            "note": "B: != Physics"
+        },
+        {
+            "id": "1339-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "= Chemistry"
+            ],
+            "note": "B: = Chemistry"
+        },
+        {
+            "id": "1340-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT > 5 AND"
+            ],
+            "note": "B: AMT > 5 AND"
+        },
+        {
+            "id": "1341-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "OR AMT > 5"
+            ],
+            "note": "B: OR AMT > 5"
+        },
+        {
+            "id": "1342-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT"
+            ],
+            "note": "B: AMT"
+        },
+        {
+            "id": "1343-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "{AMT}"
+            ],
+            "note": "B: {AMT}"
+        },
+        {
+            "id": "1344-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "DEPT = chemistry"
+            ],
+            "note": "B: DEPT = chemistry"
+        },
+        {
+            "id": "1345-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "DEPT != CHEMISTRY"
+            ],
+            "note": "B: DEPT != CHEMISTRY"
+        },
+        {
+            "id": "1346-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT = 1-600"
+            ],
+            "note": "B: AMT = 1-600"
+        },
+        {
+            "id": "1347-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT >= 500"
+            ],
+            "note": "B: AMT >= 500"
+        },
+        {
+            "id": "1348-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "AMT <= 499.99"
+            ],
+            "note": "B: AMT <= 499.99"
+        },
+        {
+            "id": "1349-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "'Chemistry' = DEPT"
+            ],
+            "note": "B: 'Chemistry' = DEPT"
+        },
+        {
+            "id": "1350-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "TITLE starts with Grant"
+            ],
+            "note": "B: TITLE starts with Grant"
+        },
+        {
+            "id": "1351-filterRow2B",
+            "fn": "filterRow2B",
+            "args": [
+                {
+                    "AMT": "500",
+                    "BUDGET": "400",
+                    "TITLE": "Grant AND Award",
+                    "STATUS": "In Progress",
+                    "DEPT": "Chemistry",
+                    "AWARD AMOUNT": "1,250"
+                },
+                "TITLE = /^grant/"
+            ],
+            "note": "B: TITLE = /^grant/"
+        },
+        {
+            "id": "1352-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "C: '2024-05-15' vs D > 2024"
+        },
+        {
+            "id": "1353-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "B: '2024-05-15' vs D > 2024"
+        },
+        {
+            "id": "1354-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "C: '2024-05-15' vs D >= 2024"
+        },
+        {
+            "id": "1355-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "B: '2024-05-15' vs D >= 2024"
+        },
+        {
+            "id": "1356-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "C: '2024-05-15' vs D = 2024"
+        },
+        {
+            "id": "1357-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "B: '2024-05-15' vs D = 2024"
+        },
+        {
+            "id": "1358-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "C: '2024-05-15' vs D < 2024"
+        },
+        {
+            "id": "1359-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "B: '2024-05-15' vs D < 2024"
+        },
+        {
+            "id": "1360-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "C: '2024-05-15' vs D = 2024-05"
+        },
+        {
+            "id": "1361-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "B: '2024-05-15' vs D = 2024-05"
+        },
+        {
+            "id": "1362-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "C: '2024-05-15' vs D != 2024-05"
+        },
+        {
+            "id": "1363-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "B: '2024-05-15' vs D != 2024-05"
+        },
+        {
+            "id": "1364-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "C: '2024-05-15' vs D < 2024-06-01"
+        },
+        {
+            "id": "1365-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "B: '2024-05-15' vs D < 2024-06-01"
+        },
+        {
+            "id": "1366-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "C: '2024-05-15' vs D = May 2024"
+        },
+        {
+            "id": "1367-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "B: '2024-05-15' vs D = May 2024"
+        },
+        {
+            "id": "1368-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "C: '2024-05-15' vs D > 05/01/2024"
+        },
+        {
+            "id": "1369-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "B: '2024-05-15' vs D > 05/01/2024"
+        },
+        {
+            "id": "1370-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "C: '2024-05-15' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1371-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "B: '2024-05-15' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1372-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "C: '2024-05-15' vs D != 2024-05-15"
+        },
+        {
+            "id": "1373-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "B: '2024-05-15' vs D != 2024-05-15"
+        },
+        {
+            "id": "1374-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "C: '2024-05-15' vs D > A"
+        },
+        {
+            "id": "1375-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "B: '2024-05-15' vs D > A"
+        },
+        {
+            "id": "1376-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "C: '2024-05-15' vs D < TODAY"
+        },
+        {
+            "id": "1377-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "B: '2024-05-15' vs D < TODAY"
+        },
+        {
+            "id": "1378-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "C: '2024-05-15' vs D > TODAY-36500"
+        },
+        {
+            "id": "1379-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "B: '2024-05-15' vs D > TODAY-36500"
+        },
+        {
+            "id": "1380-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "C: '2024-05-15' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1381-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "B: '2024-05-15' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1382-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "C: '2024-05-15' vs D contains 2024"
+        },
+        {
+            "id": "1383-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "B: '2024-05-15' vs D contains 2024"
+        },
+        {
+            "id": "1384-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "C: '2024-05-15' vs D = empty"
+        },
+        {
+            "id": "1385-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "B: '2024-05-15' vs D = empty"
+        },
+        {
+            "id": "1386-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "C: '15-MAY-24' vs D > 2024"
+        },
+        {
+            "id": "1387-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "B: '15-MAY-24' vs D > 2024"
+        },
+        {
+            "id": "1388-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "C: '15-MAY-24' vs D >= 2024"
+        },
+        {
+            "id": "1389-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "B: '15-MAY-24' vs D >= 2024"
+        },
+        {
+            "id": "1390-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "C: '15-MAY-24' vs D = 2024"
+        },
+        {
+            "id": "1391-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "B: '15-MAY-24' vs D = 2024"
+        },
+        {
+            "id": "1392-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "C: '15-MAY-24' vs D < 2024"
+        },
+        {
+            "id": "1393-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "B: '15-MAY-24' vs D < 2024"
+        },
+        {
+            "id": "1394-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "C: '15-MAY-24' vs D = 2024-05"
+        },
+        {
+            "id": "1395-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "B: '15-MAY-24' vs D = 2024-05"
+        },
+        {
+            "id": "1396-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "C: '15-MAY-24' vs D != 2024-05"
+        },
+        {
+            "id": "1397-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "B: '15-MAY-24' vs D != 2024-05"
+        },
+        {
+            "id": "1398-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "C: '15-MAY-24' vs D < 2024-06-01"
+        },
+        {
+            "id": "1399-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "B: '15-MAY-24' vs D < 2024-06-01"
+        },
+        {
+            "id": "1400-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "C: '15-MAY-24' vs D = May 2024"
+        },
+        {
+            "id": "1401-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "B: '15-MAY-24' vs D = May 2024"
+        },
+        {
+            "id": "1402-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "C: '15-MAY-24' vs D > 05/01/2024"
+        },
+        {
+            "id": "1403-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "B: '15-MAY-24' vs D > 05/01/2024"
+        },
+        {
+            "id": "1404-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "C: '15-MAY-24' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1405-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "B: '15-MAY-24' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1406-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "C: '15-MAY-24' vs D != 2024-05-15"
+        },
+        {
+            "id": "1407-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "B: '15-MAY-24' vs D != 2024-05-15"
+        },
+        {
+            "id": "1408-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "C: '15-MAY-24' vs D > A"
+        },
+        {
+            "id": "1409-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "B: '15-MAY-24' vs D > A"
+        },
+        {
+            "id": "1410-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "C: '15-MAY-24' vs D < TODAY"
+        },
+        {
+            "id": "1411-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "B: '15-MAY-24' vs D < TODAY"
+        },
+        {
+            "id": "1412-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "C: '15-MAY-24' vs D > TODAY-36500"
+        },
+        {
+            "id": "1413-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "B: '15-MAY-24' vs D > TODAY-36500"
+        },
+        {
+            "id": "1414-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "C: '15-MAY-24' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1415-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "B: '15-MAY-24' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1416-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "C: '15-MAY-24' vs D contains 2024"
+        },
+        {
+            "id": "1417-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "B: '15-MAY-24' vs D contains 2024"
+        },
+        {
+            "id": "1418-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "C: '15-MAY-24' vs D = empty"
+        },
+        {
+            "id": "1419-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "B: '15-MAY-24' vs D = empty"
+        },
+        {
+            "id": "1420-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "C: '05/15/2024' vs D > 2024"
+        },
+        {
+            "id": "1421-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "B: '05/15/2024' vs D > 2024"
+        },
+        {
+            "id": "1422-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "C: '05/15/2024' vs D >= 2024"
+        },
+        {
+            "id": "1423-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "B: '05/15/2024' vs D >= 2024"
+        },
+        {
+            "id": "1424-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "C: '05/15/2024' vs D = 2024"
+        },
+        {
+            "id": "1425-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "B: '05/15/2024' vs D = 2024"
+        },
+        {
+            "id": "1426-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "C: '05/15/2024' vs D < 2024"
+        },
+        {
+            "id": "1427-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "B: '05/15/2024' vs D < 2024"
+        },
+        {
+            "id": "1428-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "C: '05/15/2024' vs D = 2024-05"
+        },
+        {
+            "id": "1429-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "B: '05/15/2024' vs D = 2024-05"
+        },
+        {
+            "id": "1430-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "C: '05/15/2024' vs D != 2024-05"
+        },
+        {
+            "id": "1431-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "B: '05/15/2024' vs D != 2024-05"
+        },
+        {
+            "id": "1432-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "C: '05/15/2024' vs D < 2024-06-01"
+        },
+        {
+            "id": "1433-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "B: '05/15/2024' vs D < 2024-06-01"
+        },
+        {
+            "id": "1434-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "C: '05/15/2024' vs D = May 2024"
+        },
+        {
+            "id": "1435-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "B: '05/15/2024' vs D = May 2024"
+        },
+        {
+            "id": "1436-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "C: '05/15/2024' vs D > 05/01/2024"
+        },
+        {
+            "id": "1437-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "B: '05/15/2024' vs D > 05/01/2024"
+        },
+        {
+            "id": "1438-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "C: '05/15/2024' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1439-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "B: '05/15/2024' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1440-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "C: '05/15/2024' vs D != 2024-05-15"
+        },
+        {
+            "id": "1441-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "B: '05/15/2024' vs D != 2024-05-15"
+        },
+        {
+            "id": "1442-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "C: '05/15/2024' vs D > A"
+        },
+        {
+            "id": "1443-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "B: '05/15/2024' vs D > A"
+        },
+        {
+            "id": "1444-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "C: '05/15/2024' vs D < TODAY"
+        },
+        {
+            "id": "1445-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "B: '05/15/2024' vs D < TODAY"
+        },
+        {
+            "id": "1446-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "C: '05/15/2024' vs D > TODAY-36500"
+        },
+        {
+            "id": "1447-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "B: '05/15/2024' vs D > TODAY-36500"
+        },
+        {
+            "id": "1448-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "C: '05/15/2024' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1449-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "B: '05/15/2024' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1450-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "C: '05/15/2024' vs D contains 2024"
+        },
+        {
+            "id": "1451-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "B: '05/15/2024' vs D contains 2024"
+        },
+        {
+            "id": "1452-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "C: '05/15/2024' vs D = empty"
+        },
+        {
+            "id": "1453-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "05/15/2024",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "B: '05/15/2024' vs D = empty"
+        },
+        {
+            "id": "1454-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "C: '5/15/2024' vs D > 2024"
+        },
+        {
+            "id": "1455-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "B: '5/15/2024' vs D > 2024"
+        },
+        {
+            "id": "1456-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "C: '5/15/2024' vs D >= 2024"
+        },
+        {
+            "id": "1457-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "B: '5/15/2024' vs D >= 2024"
+        },
+        {
+            "id": "1458-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "C: '5/15/2024' vs D = 2024"
+        },
+        {
+            "id": "1459-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "B: '5/15/2024' vs D = 2024"
+        },
+        {
+            "id": "1460-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "C: '5/15/2024' vs D < 2024"
+        },
+        {
+            "id": "1461-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "B: '5/15/2024' vs D < 2024"
+        },
+        {
+            "id": "1462-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "C: '5/15/2024' vs D = 2024-05"
+        },
+        {
+            "id": "1463-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "B: '5/15/2024' vs D = 2024-05"
+        },
+        {
+            "id": "1464-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "C: '5/15/2024' vs D != 2024-05"
+        },
+        {
+            "id": "1465-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "B: '5/15/2024' vs D != 2024-05"
+        },
+        {
+            "id": "1466-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "C: '5/15/2024' vs D < 2024-06-01"
+        },
+        {
+            "id": "1467-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "B: '5/15/2024' vs D < 2024-06-01"
+        },
+        {
+            "id": "1468-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "C: '5/15/2024' vs D = May 2024"
+        },
+        {
+            "id": "1469-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "B: '5/15/2024' vs D = May 2024"
+        },
+        {
+            "id": "1470-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "C: '5/15/2024' vs D > 05/01/2024"
+        },
+        {
+            "id": "1471-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "B: '5/15/2024' vs D > 05/01/2024"
+        },
+        {
+            "id": "1472-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "C: '5/15/2024' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1473-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "B: '5/15/2024' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1474-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "C: '5/15/2024' vs D != 2024-05-15"
+        },
+        {
+            "id": "1475-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "B: '5/15/2024' vs D != 2024-05-15"
+        },
+        {
+            "id": "1476-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "C: '5/15/2024' vs D > A"
+        },
+        {
+            "id": "1477-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "B: '5/15/2024' vs D > A"
+        },
+        {
+            "id": "1478-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "C: '5/15/2024' vs D < TODAY"
+        },
+        {
+            "id": "1479-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "B: '5/15/2024' vs D < TODAY"
+        },
+        {
+            "id": "1480-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "C: '5/15/2024' vs D > TODAY-36500"
+        },
+        {
+            "id": "1481-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "B: '5/15/2024' vs D > TODAY-36500"
+        },
+        {
+            "id": "1482-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "C: '5/15/2024' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1483-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "B: '5/15/2024' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1484-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "C: '5/15/2024' vs D contains 2024"
+        },
+        {
+            "id": "1485-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "B: '5/15/2024' vs D contains 2024"
+        },
+        {
+            "id": "1486-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "C: '5/15/2024' vs D = empty"
+        },
+        {
+            "id": "1487-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "5/15/2024",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "B: '5/15/2024' vs D = empty"
+        },
+        {
+            "id": "1488-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "C: '2024-05' vs D > 2024"
+        },
+        {
+            "id": "1489-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "B: '2024-05' vs D > 2024"
+        },
+        {
+            "id": "1490-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "C: '2024-05' vs D >= 2024"
+        },
+        {
+            "id": "1491-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "B: '2024-05' vs D >= 2024"
+        },
+        {
+            "id": "1492-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "C: '2024-05' vs D = 2024"
+        },
+        {
+            "id": "1493-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "B: '2024-05' vs D = 2024"
+        },
+        {
+            "id": "1494-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "C: '2024-05' vs D < 2024"
+        },
+        {
+            "id": "1495-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "B: '2024-05' vs D < 2024"
+        },
+        {
+            "id": "1496-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "C: '2024-05' vs D = 2024-05"
+        },
+        {
+            "id": "1497-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "B: '2024-05' vs D = 2024-05"
+        },
+        {
+            "id": "1498-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "C: '2024-05' vs D != 2024-05"
+        },
+        {
+            "id": "1499-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "B: '2024-05' vs D != 2024-05"
+        },
+        {
+            "id": "1500-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "C: '2024-05' vs D < 2024-06-01"
+        },
+        {
+            "id": "1501-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "B: '2024-05' vs D < 2024-06-01"
+        },
+        {
+            "id": "1502-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "C: '2024-05' vs D = May 2024"
+        },
+        {
+            "id": "1503-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "B: '2024-05' vs D = May 2024"
+        },
+        {
+            "id": "1504-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "C: '2024-05' vs D > 05/01/2024"
+        },
+        {
+            "id": "1505-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "B: '2024-05' vs D > 05/01/2024"
+        },
+        {
+            "id": "1506-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "C: '2024-05' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1507-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "B: '2024-05' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1508-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "C: '2024-05' vs D != 2024-05-15"
+        },
+        {
+            "id": "1509-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "B: '2024-05' vs D != 2024-05-15"
+        },
+        {
+            "id": "1510-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "C: '2024-05' vs D > A"
+        },
+        {
+            "id": "1511-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "B: '2024-05' vs D > A"
+        },
+        {
+            "id": "1512-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "C: '2024-05' vs D < TODAY"
+        },
+        {
+            "id": "1513-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "B: '2024-05' vs D < TODAY"
+        },
+        {
+            "id": "1514-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "C: '2024-05' vs D > TODAY-36500"
+        },
+        {
+            "id": "1515-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "B: '2024-05' vs D > TODAY-36500"
+        },
+        {
+            "id": "1516-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "C: '2024-05' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1517-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "B: '2024-05' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1518-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "C: '2024-05' vs D contains 2024"
+        },
+        {
+            "id": "1519-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "B: '2024-05' vs D contains 2024"
+        },
+        {
+            "id": "1520-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "C: '2024-05' vs D = empty"
+        },
+        {
+            "id": "1521-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "B: '2024-05' vs D = empty"
+        },
+        {
+            "id": "1522-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "C: 'May 2024' vs D > 2024"
+        },
+        {
+            "id": "1523-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "B: 'May 2024' vs D > 2024"
+        },
+        {
+            "id": "1524-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "C: 'May 2024' vs D >= 2024"
+        },
+        {
+            "id": "1525-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "B: 'May 2024' vs D >= 2024"
+        },
+        {
+            "id": "1526-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "C: 'May 2024' vs D = 2024"
+        },
+        {
+            "id": "1527-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "B: 'May 2024' vs D = 2024"
+        },
+        {
+            "id": "1528-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "C: 'May 2024' vs D < 2024"
+        },
+        {
+            "id": "1529-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "B: 'May 2024' vs D < 2024"
+        },
+        {
+            "id": "1530-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "C: 'May 2024' vs D = 2024-05"
+        },
+        {
+            "id": "1531-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "B: 'May 2024' vs D = 2024-05"
+        },
+        {
+            "id": "1532-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "C: 'May 2024' vs D != 2024-05"
+        },
+        {
+            "id": "1533-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "B: 'May 2024' vs D != 2024-05"
+        },
+        {
+            "id": "1534-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "C: 'May 2024' vs D < 2024-06-01"
+        },
+        {
+            "id": "1535-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "B: 'May 2024' vs D < 2024-06-01"
+        },
+        {
+            "id": "1536-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "C: 'May 2024' vs D = May 2024"
+        },
+        {
+            "id": "1537-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "B: 'May 2024' vs D = May 2024"
+        },
+        {
+            "id": "1538-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "C: 'May 2024' vs D > 05/01/2024"
+        },
+        {
+            "id": "1539-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "B: 'May 2024' vs D > 05/01/2024"
+        },
+        {
+            "id": "1540-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "C: 'May 2024' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1541-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "B: 'May 2024' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1542-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "C: 'May 2024' vs D != 2024-05-15"
+        },
+        {
+            "id": "1543-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "B: 'May 2024' vs D != 2024-05-15"
+        },
+        {
+            "id": "1544-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "C: 'May 2024' vs D > A"
+        },
+        {
+            "id": "1545-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "B: 'May 2024' vs D > A"
+        },
+        {
+            "id": "1546-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "C: 'May 2024' vs D < TODAY"
+        },
+        {
+            "id": "1547-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "B: 'May 2024' vs D < TODAY"
+        },
+        {
+            "id": "1548-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "C: 'May 2024' vs D > TODAY-36500"
+        },
+        {
+            "id": "1549-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "B: 'May 2024' vs D > TODAY-36500"
+        },
+        {
+            "id": "1550-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "C: 'May 2024' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1551-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "B: 'May 2024' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1552-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "C: 'May 2024' vs D contains 2024"
+        },
+        {
+            "id": "1553-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "B: 'May 2024' vs D contains 2024"
+        },
+        {
+            "id": "1554-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "C: 'May 2024' vs D = empty"
+        },
+        {
+            "id": "1555-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "May 2024",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "B: 'May 2024' vs D = empty"
+        },
+        {
+            "id": "1556-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "C: '2024' vs D > 2024"
+        },
+        {
+            "id": "1557-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "B: '2024' vs D > 2024"
+        },
+        {
+            "id": "1558-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "C: '2024' vs D >= 2024"
+        },
+        {
+            "id": "1559-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "B: '2024' vs D >= 2024"
+        },
+        {
+            "id": "1560-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "C: '2024' vs D = 2024"
+        },
+        {
+            "id": "1561-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "B: '2024' vs D = 2024"
+        },
+        {
+            "id": "1562-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "C: '2024' vs D < 2024"
+        },
+        {
+            "id": "1563-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "B: '2024' vs D < 2024"
+        },
+        {
+            "id": "1564-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "C: '2024' vs D = 2024-05"
+        },
+        {
+            "id": "1565-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "B: '2024' vs D = 2024-05"
+        },
+        {
+            "id": "1566-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "C: '2024' vs D != 2024-05"
+        },
+        {
+            "id": "1567-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "B: '2024' vs D != 2024-05"
+        },
+        {
+            "id": "1568-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "C: '2024' vs D < 2024-06-01"
+        },
+        {
+            "id": "1569-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "B: '2024' vs D < 2024-06-01"
+        },
+        {
+            "id": "1570-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "C: '2024' vs D = May 2024"
+        },
+        {
+            "id": "1571-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "B: '2024' vs D = May 2024"
+        },
+        {
+            "id": "1572-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "C: '2024' vs D > 05/01/2024"
+        },
+        {
+            "id": "1573-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "B: '2024' vs D > 05/01/2024"
+        },
+        {
+            "id": "1574-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "C: '2024' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1575-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "B: '2024' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1576-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "C: '2024' vs D != 2024-05-15"
+        },
+        {
+            "id": "1577-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "B: '2024' vs D != 2024-05-15"
+        },
+        {
+            "id": "1578-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "C: '2024' vs D > A"
+        },
+        {
+            "id": "1579-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "B: '2024' vs D > A"
+        },
+        {
+            "id": "1580-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "C: '2024' vs D < TODAY"
+        },
+        {
+            "id": "1581-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "B: '2024' vs D < TODAY"
+        },
+        {
+            "id": "1582-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "C: '2024' vs D > TODAY-36500"
+        },
+        {
+            "id": "1583-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "B: '2024' vs D > TODAY-36500"
+        },
+        {
+            "id": "1584-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "C: '2024' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1585-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "B: '2024' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1586-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "C: '2024' vs D contains 2024"
+        },
+        {
+            "id": "1587-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "B: '2024' vs D contains 2024"
+        },
+        {
+            "id": "1588-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "C: '2024' vs D = empty"
+        },
+        {
+            "id": "1589-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "B: '2024' vs D = empty"
+        },
+        {
+            "id": "1590-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "C: '2024-05-15 13:45:00' vs D > 2024"
+        },
+        {
+            "id": "1591-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "B: '2024-05-15 13:45:00' vs D > 2024"
+        },
+        {
+            "id": "1592-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "C: '2024-05-15 13:45:00' vs D >= 2024"
+        },
+        {
+            "id": "1593-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "B: '2024-05-15 13:45:00' vs D >= 2024"
+        },
+        {
+            "id": "1594-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "C: '2024-05-15 13:45:00' vs D = 2024"
+        },
+        {
+            "id": "1595-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "B: '2024-05-15 13:45:00' vs D = 2024"
+        },
+        {
+            "id": "1596-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "C: '2024-05-15 13:45:00' vs D < 2024"
+        },
+        {
+            "id": "1597-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "B: '2024-05-15 13:45:00' vs D < 2024"
+        },
+        {
+            "id": "1598-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "C: '2024-05-15 13:45:00' vs D = 2024-05"
+        },
+        {
+            "id": "1599-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "B: '2024-05-15 13:45:00' vs D = 2024-05"
+        },
+        {
+            "id": "1600-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "C: '2024-05-15 13:45:00' vs D != 2024-05"
+        },
+        {
+            "id": "1601-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "B: '2024-05-15 13:45:00' vs D != 2024-05"
+        },
+        {
+            "id": "1602-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "C: '2024-05-15 13:45:00' vs D < 2024-06-01"
+        },
+        {
+            "id": "1603-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "B: '2024-05-15 13:45:00' vs D < 2024-06-01"
+        },
+        {
+            "id": "1604-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "C: '2024-05-15 13:45:00' vs D = May 2024"
+        },
+        {
+            "id": "1605-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "B: '2024-05-15 13:45:00' vs D = May 2024"
+        },
+        {
+            "id": "1606-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "C: '2024-05-15 13:45:00' vs D > 05/01/2024"
+        },
+        {
+            "id": "1607-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "B: '2024-05-15 13:45:00' vs D > 05/01/2024"
+        },
+        {
+            "id": "1608-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "C: '2024-05-15 13:45:00' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1609-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "B: '2024-05-15 13:45:00' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1610-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "C: '2024-05-15 13:45:00' vs D != 2024-05-15"
+        },
+        {
+            "id": "1611-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "B: '2024-05-15 13:45:00' vs D != 2024-05-15"
+        },
+        {
+            "id": "1612-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "C: '2024-05-15 13:45:00' vs D > A"
+        },
+        {
+            "id": "1613-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "B: '2024-05-15 13:45:00' vs D > A"
+        },
+        {
+            "id": "1614-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "C: '2024-05-15 13:45:00' vs D < TODAY"
+        },
+        {
+            "id": "1615-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "B: '2024-05-15 13:45:00' vs D < TODAY"
+        },
+        {
+            "id": "1616-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "C: '2024-05-15 13:45:00' vs D > TODAY-36500"
+        },
+        {
+            "id": "1617-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "B: '2024-05-15 13:45:00' vs D > TODAY-36500"
+        },
+        {
+            "id": "1618-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "C: '2024-05-15 13:45:00' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1619-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "B: '2024-05-15 13:45:00' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1620-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "C: '2024-05-15 13:45:00' vs D contains 2024"
+        },
+        {
+            "id": "1621-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "B: '2024-05-15 13:45:00' vs D contains 2024"
+        },
+        {
+            "id": "1622-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "C: '2024-05-15 13:45:00' vs D = empty"
+        },
+        {
+            "id": "1623-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2024-05-15 13:45:00",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "B: '2024-05-15 13:45:00' vs D = empty"
+        },
+        {
+            "id": "1624-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "C: '15-MAY-24 01.02.03.000000 PM' vs D > 2024"
+        },
+        {
+            "id": "1625-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "B: '15-MAY-24 01.02.03.000000 PM' vs D > 2024"
+        },
+        {
+            "id": "1626-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "C: '15-MAY-24 01.02.03.000000 PM' vs D >= 2024"
+        },
+        {
+            "id": "1627-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "B: '15-MAY-24 01.02.03.000000 PM' vs D >= 2024"
+        },
+        {
+            "id": "1628-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "C: '15-MAY-24 01.02.03.000000 PM' vs D = 2024"
+        },
+        {
+            "id": "1629-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "B: '15-MAY-24 01.02.03.000000 PM' vs D = 2024"
+        },
+        {
+            "id": "1630-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "C: '15-MAY-24 01.02.03.000000 PM' vs D < 2024"
+        },
+        {
+            "id": "1631-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "B: '15-MAY-24 01.02.03.000000 PM' vs D < 2024"
+        },
+        {
+            "id": "1632-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "C: '15-MAY-24 01.02.03.000000 PM' vs D = 2024-05"
+        },
+        {
+            "id": "1633-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "B: '15-MAY-24 01.02.03.000000 PM' vs D = 2024-05"
+        },
+        {
+            "id": "1634-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "C: '15-MAY-24 01.02.03.000000 PM' vs D != 2024-05"
+        },
+        {
+            "id": "1635-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "B: '15-MAY-24 01.02.03.000000 PM' vs D != 2024-05"
+        },
+        {
+            "id": "1636-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "C: '15-MAY-24 01.02.03.000000 PM' vs D < 2024-06-01"
+        },
+        {
+            "id": "1637-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "B: '15-MAY-24 01.02.03.000000 PM' vs D < 2024-06-01"
+        },
+        {
+            "id": "1638-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "C: '15-MAY-24 01.02.03.000000 PM' vs D = May 2024"
+        },
+        {
+            "id": "1639-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "B: '15-MAY-24 01.02.03.000000 PM' vs D = May 2024"
+        },
+        {
+            "id": "1640-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "C: '15-MAY-24 01.02.03.000000 PM' vs D > 05/01/2024"
+        },
+        {
+            "id": "1641-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "B: '15-MAY-24 01.02.03.000000 PM' vs D > 05/01/2024"
+        },
+        {
+            "id": "1642-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "C: '15-MAY-24 01.02.03.000000 PM' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1643-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "B: '15-MAY-24 01.02.03.000000 PM' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1644-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "C: '15-MAY-24 01.02.03.000000 PM' vs D != 2024-05-15"
+        },
+        {
+            "id": "1645-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "B: '15-MAY-24 01.02.03.000000 PM' vs D != 2024-05-15"
+        },
+        {
+            "id": "1646-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "C: '15-MAY-24 01.02.03.000000 PM' vs D > A"
+        },
+        {
+            "id": "1647-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "B: '15-MAY-24 01.02.03.000000 PM' vs D > A"
+        },
+        {
+            "id": "1648-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "C: '15-MAY-24 01.02.03.000000 PM' vs D < TODAY"
+        },
+        {
+            "id": "1649-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "B: '15-MAY-24 01.02.03.000000 PM' vs D < TODAY"
+        },
+        {
+            "id": "1650-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "C: '15-MAY-24 01.02.03.000000 PM' vs D > TODAY-36500"
+        },
+        {
+            "id": "1651-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "B: '15-MAY-24 01.02.03.000000 PM' vs D > TODAY-36500"
+        },
+        {
+            "id": "1652-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "C: '15-MAY-24 01.02.03.000000 PM' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1653-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "B: '15-MAY-24 01.02.03.000000 PM' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1654-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "C: '15-MAY-24 01.02.03.000000 PM' vs D contains 2024"
+        },
+        {
+            "id": "1655-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "B: '15-MAY-24 01.02.03.000000 PM' vs D contains 2024"
+        },
+        {
+            "id": "1656-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "C: '15-MAY-24 01.02.03.000000 PM' vs D = empty"
+        },
+        {
+            "id": "1657-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "15-MAY-24 01.02.03.000000 PM",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "B: '15-MAY-24 01.02.03.000000 PM' vs D = empty"
+        },
+        {
+            "id": "1658-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "C: '2023-12-31' vs D > 2024"
+        },
+        {
+            "id": "1659-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "B: '2023-12-31' vs D > 2024"
+        },
+        {
+            "id": "1660-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "C: '2023-12-31' vs D >= 2024"
+        },
+        {
+            "id": "1661-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "B: '2023-12-31' vs D >= 2024"
+        },
+        {
+            "id": "1662-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "C: '2023-12-31' vs D = 2024"
+        },
+        {
+            "id": "1663-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "B: '2023-12-31' vs D = 2024"
+        },
+        {
+            "id": "1664-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "C: '2023-12-31' vs D < 2024"
+        },
+        {
+            "id": "1665-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "B: '2023-12-31' vs D < 2024"
+        },
+        {
+            "id": "1666-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "C: '2023-12-31' vs D = 2024-05"
+        },
+        {
+            "id": "1667-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "B: '2023-12-31' vs D = 2024-05"
+        },
+        {
+            "id": "1668-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "C: '2023-12-31' vs D != 2024-05"
+        },
+        {
+            "id": "1669-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "B: '2023-12-31' vs D != 2024-05"
+        },
+        {
+            "id": "1670-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "C: '2023-12-31' vs D < 2024-06-01"
+        },
+        {
+            "id": "1671-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "B: '2023-12-31' vs D < 2024-06-01"
+        },
+        {
+            "id": "1672-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "C: '2023-12-31' vs D = May 2024"
+        },
+        {
+            "id": "1673-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "B: '2023-12-31' vs D = May 2024"
+        },
+        {
+            "id": "1674-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "C: '2023-12-31' vs D > 05/01/2024"
+        },
+        {
+            "id": "1675-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "B: '2023-12-31' vs D > 05/01/2024"
+        },
+        {
+            "id": "1676-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "C: '2023-12-31' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1677-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "B: '2023-12-31' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1678-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "C: '2023-12-31' vs D != 2024-05-15"
+        },
+        {
+            "id": "1679-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "B: '2023-12-31' vs D != 2024-05-15"
+        },
+        {
+            "id": "1680-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "C: '2023-12-31' vs D > A"
+        },
+        {
+            "id": "1681-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "B: '2023-12-31' vs D > A"
+        },
+        {
+            "id": "1682-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "C: '2023-12-31' vs D < TODAY"
+        },
+        {
+            "id": "1683-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "B: '2023-12-31' vs D < TODAY"
+        },
+        {
+            "id": "1684-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "C: '2023-12-31' vs D > TODAY-36500"
+        },
+        {
+            "id": "1685-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "B: '2023-12-31' vs D > TODAY-36500"
+        },
+        {
+            "id": "1686-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "C: '2023-12-31' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1687-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "B: '2023-12-31' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1688-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "C: '2023-12-31' vs D contains 2024"
+        },
+        {
+            "id": "1689-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "B: '2023-12-31' vs D contains 2024"
+        },
+        {
+            "id": "1690-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "C: '2023-12-31' vs D = empty"
+        },
+        {
+            "id": "1691-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2023-12-31",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "B: '2023-12-31' vs D = empty"
+        },
+        {
+            "id": "1692-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "C: '2025-01-01' vs D > 2024"
+        },
+        {
+            "id": "1693-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "B: '2025-01-01' vs D > 2024"
+        },
+        {
+            "id": "1694-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "C: '2025-01-01' vs D >= 2024"
+        },
+        {
+            "id": "1695-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "B: '2025-01-01' vs D >= 2024"
+        },
+        {
+            "id": "1696-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "C: '2025-01-01' vs D = 2024"
+        },
+        {
+            "id": "1697-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "B: '2025-01-01' vs D = 2024"
+        },
+        {
+            "id": "1698-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "C: '2025-01-01' vs D < 2024"
+        },
+        {
+            "id": "1699-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "B: '2025-01-01' vs D < 2024"
+        },
+        {
+            "id": "1700-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "C: '2025-01-01' vs D = 2024-05"
+        },
+        {
+            "id": "1701-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "B: '2025-01-01' vs D = 2024-05"
+        },
+        {
+            "id": "1702-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "C: '2025-01-01' vs D != 2024-05"
+        },
+        {
+            "id": "1703-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "B: '2025-01-01' vs D != 2024-05"
+        },
+        {
+            "id": "1704-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "C: '2025-01-01' vs D < 2024-06-01"
+        },
+        {
+            "id": "1705-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "B: '2025-01-01' vs D < 2024-06-01"
+        },
+        {
+            "id": "1706-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "C: '2025-01-01' vs D = May 2024"
+        },
+        {
+            "id": "1707-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "B: '2025-01-01' vs D = May 2024"
+        },
+        {
+            "id": "1708-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "C: '2025-01-01' vs D > 05/01/2024"
+        },
+        {
+            "id": "1709-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "B: '2025-01-01' vs D > 05/01/2024"
+        },
+        {
+            "id": "1710-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "C: '2025-01-01' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1711-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "B: '2025-01-01' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1712-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "C: '2025-01-01' vs D != 2024-05-15"
+        },
+        {
+            "id": "1713-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "B: '2025-01-01' vs D != 2024-05-15"
+        },
+        {
+            "id": "1714-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "C: '2025-01-01' vs D > A"
+        },
+        {
+            "id": "1715-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "B: '2025-01-01' vs D > A"
+        },
+        {
+            "id": "1716-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "C: '2025-01-01' vs D < TODAY"
+        },
+        {
+            "id": "1717-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "B: '2025-01-01' vs D < TODAY"
+        },
+        {
+            "id": "1718-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "C: '2025-01-01' vs D > TODAY-36500"
+        },
+        {
+            "id": "1719-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "B: '2025-01-01' vs D > TODAY-36500"
+        },
+        {
+            "id": "1720-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "C: '2025-01-01' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1721-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "B: '2025-01-01' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1722-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "C: '2025-01-01' vs D contains 2024"
+        },
+        {
+            "id": "1723-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "B: '2025-01-01' vs D contains 2024"
+        },
+        {
+            "id": "1724-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "C: '2025-01-01' vs D = empty"
+        },
+        {
+            "id": "1725-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "2025-01-01",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "B: '2025-01-01' vs D = empty"
+        },
+        {
+            "id": "1726-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "C: '' vs D > 2024"
+        },
+        {
+            "id": "1727-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "B: '' vs D > 2024"
+        },
+        {
+            "id": "1728-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "C: '' vs D >= 2024"
+        },
+        {
+            "id": "1729-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "B: '' vs D >= 2024"
+        },
+        {
+            "id": "1730-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "C: '' vs D = 2024"
+        },
+        {
+            "id": "1731-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "B: '' vs D = 2024"
+        },
+        {
+            "id": "1732-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "C: '' vs D < 2024"
+        },
+        {
+            "id": "1733-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "B: '' vs D < 2024"
+        },
+        {
+            "id": "1734-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "C: '' vs D = 2024-05"
+        },
+        {
+            "id": "1735-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "B: '' vs D = 2024-05"
+        },
+        {
+            "id": "1736-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "C: '' vs D != 2024-05"
+        },
+        {
+            "id": "1737-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "B: '' vs D != 2024-05"
+        },
+        {
+            "id": "1738-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "C: '' vs D < 2024-06-01"
+        },
+        {
+            "id": "1739-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "B: '' vs D < 2024-06-01"
+        },
+        {
+            "id": "1740-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "C: '' vs D = May 2024"
+        },
+        {
+            "id": "1741-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "B: '' vs D = May 2024"
+        },
+        {
+            "id": "1742-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "C: '' vs D > 05/01/2024"
+        },
+        {
+            "id": "1743-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "B: '' vs D > 05/01/2024"
+        },
+        {
+            "id": "1744-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "C: '' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1745-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "B: '' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1746-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "C: '' vs D != 2024-05-15"
+        },
+        {
+            "id": "1747-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "B: '' vs D != 2024-05-15"
+        },
+        {
+            "id": "1748-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "C: '' vs D > A"
+        },
+        {
+            "id": "1749-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "B: '' vs D > A"
+        },
+        {
+            "id": "1750-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "C: '' vs D < TODAY"
+        },
+        {
+            "id": "1751-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "B: '' vs D < TODAY"
+        },
+        {
+            "id": "1752-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "C: '' vs D > TODAY-36500"
+        },
+        {
+            "id": "1753-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "B: '' vs D > TODAY-36500"
+        },
+        {
+            "id": "1754-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "C: '' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1755-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "B: '' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1756-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "C: '' vs D contains 2024"
+        },
+        {
+            "id": "1757-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "B: '' vs D contains 2024"
+        },
+        {
+            "id": "1758-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "C: '' vs D = empty"
+        },
+        {
+            "id": "1759-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "B: '' vs D = empty"
+        },
+        {
+            "id": "1760-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "C: 'notadate' vs D > 2024"
+        },
+        {
+            "id": "1761-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "B: 'notadate' vs D > 2024"
+        },
+        {
+            "id": "1762-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "C: 'notadate' vs D >= 2024"
+        },
+        {
+            "id": "1763-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "B: 'notadate' vs D >= 2024"
+        },
+        {
+            "id": "1764-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "C: 'notadate' vs D = 2024"
+        },
+        {
+            "id": "1765-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "B: 'notadate' vs D = 2024"
+        },
+        {
+            "id": "1766-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "C: 'notadate' vs D < 2024"
+        },
+        {
+            "id": "1767-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "B: 'notadate' vs D < 2024"
+        },
+        {
+            "id": "1768-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "C: 'notadate' vs D = 2024-05"
+        },
+        {
+            "id": "1769-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "B: 'notadate' vs D = 2024-05"
+        },
+        {
+            "id": "1770-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "C: 'notadate' vs D != 2024-05"
+        },
+        {
+            "id": "1771-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "B: 'notadate' vs D != 2024-05"
+        },
+        {
+            "id": "1772-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "C: 'notadate' vs D < 2024-06-01"
+        },
+        {
+            "id": "1773-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "B: 'notadate' vs D < 2024-06-01"
+        },
+        {
+            "id": "1774-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "C: 'notadate' vs D = May 2024"
+        },
+        {
+            "id": "1775-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "B: 'notadate' vs D = May 2024"
+        },
+        {
+            "id": "1776-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "C: 'notadate' vs D > 05/01/2024"
+        },
+        {
+            "id": "1777-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "B: 'notadate' vs D > 05/01/2024"
+        },
+        {
+            "id": "1778-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "C: 'notadate' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1779-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "B: 'notadate' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1780-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "C: 'notadate' vs D != 2024-05-15"
+        },
+        {
+            "id": "1781-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "B: 'notadate' vs D != 2024-05-15"
+        },
+        {
+            "id": "1782-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "C: 'notadate' vs D > A"
+        },
+        {
+            "id": "1783-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "B: 'notadate' vs D > A"
+        },
+        {
+            "id": "1784-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "C: 'notadate' vs D < TODAY"
+        },
+        {
+            "id": "1785-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "B: 'notadate' vs D < TODAY"
+        },
+        {
+            "id": "1786-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "C: 'notadate' vs D > TODAY-36500"
+        },
+        {
+            "id": "1787-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "B: 'notadate' vs D > TODAY-36500"
+        },
+        {
+            "id": "1788-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "C: 'notadate' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1789-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "B: 'notadate' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1790-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "C: 'notadate' vs D contains 2024"
+        },
+        {
+            "id": "1791-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "B: 'notadate' vs D contains 2024"
+        },
+        {
+            "id": "1792-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "C: 'notadate' vs D = empty"
+        },
+        {
+            "id": "1793-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "notadate",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "B: 'notadate' vs D = empty"
+        },
+        {
+            "id": "1794-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "C: 'A' vs D > 2024"
+        },
+        {
+            "id": "1795-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D > 2024"
+            ],
+            "note": "B: 'A' vs D > 2024"
+        },
+        {
+            "id": "1796-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "C: 'A' vs D >= 2024"
+        },
+        {
+            "id": "1797-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D >= 2024"
+            ],
+            "note": "B: 'A' vs D >= 2024"
+        },
+        {
+            "id": "1798-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "C: 'A' vs D = 2024"
+        },
+        {
+            "id": "1799-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D = 2024"
+            ],
+            "note": "B: 'A' vs D = 2024"
+        },
+        {
+            "id": "1800-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "C: 'A' vs D < 2024"
+        },
+        {
+            "id": "1801-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D < 2024"
+            ],
+            "note": "B: 'A' vs D < 2024"
+        },
+        {
+            "id": "1802-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "C: 'A' vs D = 2024-05"
+        },
+        {
+            "id": "1803-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D = 2024-05"
+            ],
+            "note": "B: 'A' vs D = 2024-05"
+        },
+        {
+            "id": "1804-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "C: 'A' vs D != 2024-05"
+        },
+        {
+            "id": "1805-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D != 2024-05"
+            ],
+            "note": "B: 'A' vs D != 2024-05"
+        },
+        {
+            "id": "1806-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "C: 'A' vs D < 2024-06-01"
+        },
+        {
+            "id": "1807-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D < 2024-06-01"
+            ],
+            "note": "B: 'A' vs D < 2024-06-01"
+        },
+        {
+            "id": "1808-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "C: 'A' vs D = May 2024"
+        },
+        {
+            "id": "1809-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D = May 2024"
+            ],
+            "note": "B: 'A' vs D = May 2024"
+        },
+        {
+            "id": "1810-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "C: 'A' vs D > 05/01/2024"
+        },
+        {
+            "id": "1811-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D > 05/01/2024"
+            ],
+            "note": "B: 'A' vs D > 05/01/2024"
+        },
+        {
+            "id": "1812-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "C: 'A' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1813-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D = 15-MAY-24"
+            ],
+            "note": "B: 'A' vs D = 15-MAY-24"
+        },
+        {
+            "id": "1814-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "C: 'A' vs D != 2024-05-15"
+        },
+        {
+            "id": "1815-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D != 2024-05-15"
+            ],
+            "note": "B: 'A' vs D != 2024-05-15"
+        },
+        {
+            "id": "1816-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "C: 'A' vs D > A"
+        },
+        {
+            "id": "1817-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D > A"
+            ],
+            "note": "B: 'A' vs D > A"
+        },
+        {
+            "id": "1818-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "C: 'A' vs D < TODAY"
+        },
+        {
+            "id": "1819-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D < TODAY"
+            ],
+            "note": "B: 'A' vs D < TODAY"
+        },
+        {
+            "id": "1820-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "C: 'A' vs D > TODAY-36500"
+        },
+        {
+            "id": "1821-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D > TODAY-36500"
+            ],
+            "note": "B: 'A' vs D > TODAY-36500"
+        },
+        {
+            "id": "1822-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "C: 'A' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1823-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D < \"first day of this month\""
+            ],
+            "note": "B: 'A' vs D < \"first day of this month\""
+        },
+        {
+            "id": "1824-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "C: 'A' vs D contains 2024"
+        },
+        {
+            "id": "1825-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D contains 2024"
+            ],
+            "note": "B: 'A' vs D contains 2024"
+        },
+        {
+            "id": "1826-filterDate",
+            "fn": "filterDate",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "C: 'A' vs D = empty"
+        },
+        {
+            "id": "1827-filterDateB",
+            "fn": "filterDateB",
+            "args": [
+                {
+                    "D": "A",
+                    "OTHER": "x"
+                },
+                "D = empty"
+            ],
+            "note": "B: 'A' vs D = empty"
+        },
+        {
+            "id": "1828-collect",
+            "fn": "collect",
+            "args": [
+                [
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "10",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "$20.50",
+                        "WT": "3",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2025",
+                        "AMT": "(5)",
+                        "WT": "1",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2024",
+                        "AMT": "",
+                        "WT": "4",
+                        "TXT": ""
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "notanum",
+                        "WT": "",
+                        "TXT": "c"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "1,234.56",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "",
+                        "FY": "2025",
+                        "AMT": "7",
+                        "WT": "1",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "",
+                        "AMT": "3",
+                        "WT": "1",
+                        "TXT": "b"
+                    }
+                ],
+                {
+                    "rows": [
+                        "COLLEGE"
+                    ],
+                    "cols": [
+                        "FY"
+                    ],
+                    "val": "AMT",
+                    "extra": null,
+                    "filters": null,
+                    "aggs": [
+                        "sum"
+                    ]
+                }
+            ],
+            "note": "case0 sum"
+        },
+        {
+            "id": "1829-collect",
+            "fn": "collect",
+            "args": [
+                [
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "10",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "$20.50",
+                        "WT": "3",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2025",
+                        "AMT": "(5)",
+                        "WT": "1",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2024",
+                        "AMT": "",
+                        "WT": "4",
+                        "TXT": ""
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "notanum",
+                        "WT": "",
+                        "TXT": "c"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "1,234.56",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "",
+                        "FY": "2025",
+                        "AMT": "7",
+                        "WT": "1",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "",
+                        "AMT": "3",
+                        "WT": "1",
+                        "TXT": "b"
+                    }
+                ],
+                {
+                    "rows": [
+                        "COLLEGE"
+                    ],
+                    "cols": [
+                        "FY"
+                    ],
+                    "val": "AMT",
+                    "extra": null,
+                    "filters": null,
+                    "aggs": [
+                        "wavg@WT"
+                    ]
+                }
+            ],
+            "note": "case1 wavg@WT"
+        },
+        {
+            "id": "1830-collect",
+            "fn": "collect",
+            "args": [
+                [
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "10",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "$20.50",
+                        "WT": "3",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2025",
+                        "AMT": "(5)",
+                        "WT": "1",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2024",
+                        "AMT": "",
+                        "WT": "4",
+                        "TXT": ""
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "notanum",
+                        "WT": "",
+                        "TXT": "c"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "1,234.56",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "",
+                        "FY": "2025",
+                        "AMT": "7",
+                        "WT": "1",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "",
+                        "AMT": "3",
+                        "WT": "1",
+                        "TXT": "b"
+                    }
+                ],
+                {
+                    "rows": [
+                        "COLLEGE"
+                    ],
+                    "cols": [
+                        "FY"
+                    ],
+                    "val": "TXT",
+                    "extra": null,
+                    "filters": null,
+                    "aggs": [
+                        "mode"
+                    ]
+                }
+            ],
+            "note": "case2 mode"
+        },
+        {
+            "id": "1831-collect",
+            "fn": "collect",
+            "args": [
+                [
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "10",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "$20.50",
+                        "WT": "3",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2025",
+                        "AMT": "(5)",
+                        "WT": "1",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2024",
+                        "AMT": "",
+                        "WT": "4",
+                        "TXT": ""
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "notanum",
+                        "WT": "",
+                        "TXT": "c"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "1,234.56",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "",
+                        "FY": "2025",
+                        "AMT": "7",
+                        "WT": "1",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "",
+                        "AMT": "3",
+                        "WT": "1",
+                        "TXT": "b"
+                    }
+                ],
+                {
+                    "rows": [
+                        "COLLEGE"
+                    ],
+                    "cols": [],
+                    "val": "AMT",
+                    "extra": null,
+                    "filters": null,
+                    "aggs": [
+                        "sum"
+                    ]
+                }
+            ],
+            "note": "case3 sum"
+        },
+        {
+            "id": "1832-collect",
+            "fn": "collect",
+            "args": [
+                [
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "10",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "$20.50",
+                        "WT": "3",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2025",
+                        "AMT": "(5)",
+                        "WT": "1",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2024",
+                        "AMT": "",
+                        "WT": "4",
+                        "TXT": ""
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "notanum",
+                        "WT": "",
+                        "TXT": "c"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "1,234.56",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "",
+                        "FY": "2025",
+                        "AMT": "7",
+                        "WT": "1",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "",
+                        "AMT": "3",
+                        "WT": "1",
+                        "TXT": "b"
+                    }
+                ],
+                {
+                    "rows": [
+                        "COLLEGE",
+                        "FY"
+                    ],
+                    "cols": [],
+                    "val": "AMT",
+                    "extra": null,
+                    "filters": null,
+                    "aggs": [
+                        "sum"
+                    ]
+                }
+            ],
+            "note": "case4 sum"
+        },
+        {
+            "id": "1833-collect",
+            "fn": "collect",
+            "args": [
+                [
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "10",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "$20.50",
+                        "WT": "3",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2025",
+                        "AMT": "(5)",
+                        "WT": "1",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2024",
+                        "AMT": "",
+                        "WT": "4",
+                        "TXT": ""
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "notanum",
+                        "WT": "",
+                        "TXT": "c"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "1,234.56",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "",
+                        "FY": "2025",
+                        "AMT": "7",
+                        "WT": "1",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "",
+                        "AMT": "3",
+                        "WT": "1",
+                        "TXT": "b"
+                    }
+                ],
+                {
+                    "rows": [
+                        "COLLEGE"
+                    ],
+                    "cols": [
+                        "FY"
+                    ],
+                    "val": "AMT",
+                    "extra": [
+                        "WT"
+                    ],
+                    "filters": null,
+                    "aggs": [
+                        "sum"
+                    ]
+                }
+            ],
+            "note": "case5 sum"
+        },
+        {
+            "id": "1834-collect",
+            "fn": "collect",
+            "args": [
+                [
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "10",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "$20.50",
+                        "WT": "3",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2025",
+                        "AMT": "(5)",
+                        "WT": "1",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2024",
+                        "AMT": "",
+                        "WT": "4",
+                        "TXT": ""
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "notanum",
+                        "WT": "",
+                        "TXT": "c"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "1,234.56",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "",
+                        "FY": "2025",
+                        "AMT": "7",
+                        "WT": "1",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "",
+                        "AMT": "3",
+                        "WT": "1",
+                        "TXT": "b"
+                    }
+                ],
+                {
+                    "rows": [
+                        "COLLEGE"
+                    ],
+                    "cols": [
+                        "FY"
+                    ],
+                    "val": "AMT",
+                    "extra": null,
+                    "filters": [
+                        "AMT > 5"
+                    ],
+                    "aggs": [
+                        "sum"
+                    ]
+                }
+            ],
+            "note": "case6 sum"
+        },
+        {
+            "id": "1835-collect",
+            "fn": "collect",
+            "args": [
+                [
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "10",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2024",
+                        "AMT": "$20.50",
+                        "WT": "3",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "2025",
+                        "AMT": "(5)",
+                        "WT": "1",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2024",
+                        "AMT": "",
+                        "WT": "4",
+                        "TXT": ""
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "notanum",
+                        "WT": "",
+                        "TXT": "c"
+                    },
+                    {
+                        "COLLEGE": "Sci",
+                        "FY": "2025",
+                        "AMT": "1,234.56",
+                        "WT": "2",
+                        "TXT": "a"
+                    },
+                    {
+                        "COLLEGE": "",
+                        "FY": "2025",
+                        "AMT": "7",
+                        "WT": "1",
+                        "TXT": "b"
+                    },
+                    {
+                        "COLLEGE": "Eng",
+                        "FY": "",
+                        "AMT": "3",
+                        "WT": "1",
+                        "TXT": "b"
+                    }
+                ],
+                {
+                    "rows": [
+                        "FY"
+                    ],
+                    "cols": [
+                        "COLLEGE"
+                    ],
+                    "val": "AMT",
+                    "extra": null,
+                    "filters": null,
+                    "aggs": [
+                        "sum"
+                    ]
+                }
+            ],
+            "note": "case7 sum"
+        },
+        {
+            "id": "1836-minOfRange",
+            "fn": "minOfRange",
+            "args": [
+                1000
+            ],
+            "note": "n=1000"
+        },
+        {
+            "id": "1837-maxOfRange",
+            "fn": "maxOfRange",
+            "args": [
+                1000
+            ],
+            "note": "n=1000"
+        },
+        {
+            "id": "1838-minOfRange",
+            "fn": "minOfRange",
+            "args": [
+                100000
+            ],
+            "note": "n=100000"
+        },
+        {
+            "id": "1839-maxOfRange",
+            "fn": "maxOfRange",
+            "args": [
+                100000
+            ],
+            "note": "n=100000"
+        },
+        {
+            "id": "1840-minOfRange",
+            "fn": "minOfRange",
+            "args": [
+                130000
+            ],
+            "note": "n=130000"
+        },
+        {
+            "id": "1841-maxOfRange",
+            "fn": "maxOfRange",
+            "args": [
+                130000
+            ],
+            "note": "n=130000"
+        },
+        {
+            "id": "1842-aggLabel",
+            "fn": "aggLabel",
+            "args": [
+                "count"
+            ],
+            "note": "count"
+        },
+        {
+            "id": "1843-aggLabel",
+            "fn": "aggLabel",
+            "args": [
+                "sum"
+            ],
+            "note": "sum"
+        },
+        {
+            "id": "1844-aggLabel",
+            "fn": "aggLabel",
+            "args": [
+                "avg"
+            ],
+            "note": "avg"
+        },
+        {
+            "id": "1845-aggLabel",
+            "fn": "aggLabel",
+            "args": [
+                "median"
+            ],
+            "note": "median"
+        },
+        {
+            "id": "1846-aggLabel",
+            "fn": "aggLabel",
+            "args": [
+                "min"
+            ],
+            "note": "min"
+        },
+        {
+            "id": "1847-aggLabel",
+            "fn": "aggLabel",
+            "args": [
+                "max"
+            ],
+            "note": "max"
+        },
+        {
+            "id": "1848-aggLabel",
+            "fn": "aggLabel",
+            "args": [
+                "distinct"
+            ],
+            "note": "distinct"
+        },
+        {
+            "id": "1849-aggLabel",
+            "fn": "aggLabel",
+            "args": [
+                "mode"
+            ],
+            "note": "mode"
+        },
+        {
+            "id": "1850-aggLabel",
+            "fn": "aggLabel",
+            "args": [
+                "stddev"
+            ],
+            "note": "stddev"
+        },
+        {
+            "id": "1851-aggLabel",
+            "fn": "aggLabel",
+            "args": [
+                "range"
+            ],
+            "note": "range"
+        },
+        {
+            "id": "1852-aggLabel",
+            "fn": "aggLabel",
+            "args": [
+                "count_filled"
+            ],
+            "note": "count_filled"
+        },
+        {
+            "id": "1853-aggLabel",
+            "fn": "aggLabel",
+            "args": [
+                "count_blank"
+            ],
+            "note": "count_blank"
+        },
+        {
+            "id": "1854-aggLabel",
+            "fn": "aggLabel",
+            "args": [
+                "antimode"
+            ],
+            "note": "antimode"
+        },
+        {
+            "id": "1855-aggLabel",
+            "fn": "aggLabel",
+            "args": [
+                "p10"
+            ],
+            "note": "p10"
+        },
+        {
+            "id": "1856-aggLabel",
+            "fn": "aggLabel",
+            "args": [
+                "p25"
+            ],
+            "note": "p25"
+        },
+        {
+            "id": "1857-aggLabel",
+            "fn": "aggLabel",
+            "args": [
+                "p50"
+            ],
+            "note": "p50"
+        },
+        {
+            "id": "1858-aggLabel",
+            "fn": "aggLabel",
+            "args": [
+                "p75"
+            ],
+            "note": "p75"
+        },
+        {
+            "id": "1859-aggLabel",
+            "fn": "aggLabel",
+            "args": [
+                "p90"
+            ],
+            "note": "p90"
+        },
+        {
+            "id": "1860-aggLabel",
+            "fn": "aggLabel",
+            "args": [
+                "p99"
+            ],
+            "note": "p99"
+        },
+        {
+            "id": "1861-aggLabel",
+            "fn": "aggLabel",
+            "args": [
+                "wavg@WT"
+            ],
+            "note": "wavg@WT"
+        },
+        {
+            "id": "1862-aggLabel",
+            "fn": "aggLabel",
+            "args": [
+                "formula"
+            ],
+            "note": "formula"
+        },
+        {
+            "id": "1863-aggLabel",
+            "fn": "aggLabel",
+            "args": [
+                "bogus_agg"
+            ],
+            "note": "bogus_agg"
+        }
+    ]
+};

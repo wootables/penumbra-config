@@ -1,0 +1,236 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>infobox tile|/embed| harness</title>
+<link rel="stylesheet" href="penumbra_tiles.css"></head>
+<body>
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<div id="resultsTable"></div><div id="errorBox"></div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script src="penumbra_tiles.js"></script>
+<script>
+  // Same boot as the parity / auditfixes harnesses: enough shape that the ready
+  // closure runs to completion (consts past an early death stay in the TDZ).
+  window.penumbra_vars = {
+    isAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  // ResizeObserver: the REAL one underneath (the frame-fit relies on it), but
+  // observe() swallows the non-elements main.js hands it at boot in this bare
+  // DOM - an uncaught TypeError there kills the ready closure and strands every
+  // later const in the TDZ (the parity-harness lesson). nodeType, not
+  // instanceof: framed documents are another realm.
+  (function () {
+    var RealRO = window.ResizeObserver;
+    window.ResizeObserver = function (cb) {
+      var ro = RealRO ? new RealRO(cb) : null;
+      this.observe = function (el) { try { if (ro && el && el.nodeType === 1) { ro.observe(el); } } catch (e) {} };
+      this.unobserve = function (el) { try { if (ro && el) { ro.unobserve(el); } } catch (e) {} };
+      this.disconnect = function () { try { if (ro) { ro.disconnect(); } } catch (e) {} };
+    };
+  })();
+  window.IntersectionObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  if (!window._pnbModalHost) { window._pnbModalHost = function () { return jQuery(document.body); }; }
+  window.__errors = [];
+  window.onerror = function (m) { window.__errors.push(String(m)); return true; };
+</script>
+<script src="main_patched.js"></script>
+<script>
+(function () {
+  function report(txt) { document.getElementById('out').textContent = txt; }
+  var lines = [], pass = 0, fail = 0;
+  function t(name, cond, detail) {
+    if (cond) { pass++; lines.push('PASS ' + name); }
+    else { fail++; lines.push('FAIL ' + name + (detail !== undefined ? '  [' + detail + ']' : '')); }
+    report('PARTIAL ' + lines.length + ' checks; last: ' + lines[lines.length - 1] + ' errors=' + JSON.stringify(window.__errors.slice(0, 3)));
+  }
+  function finish() {
+    var A = 'RES' + 'ULT>>', B = '<' + '<FIN';
+    report(A + lines.join(' ;; ') + B + '\nJS_FAIL=' + fail + ' pageErrors=' + JSON.stringify(window.__errors.slice(0, 3)));
+  }
+
+  window.addEventListener('unhandledrejection', function (ev) { window.__errors.push('unhandledrejection: ' + (ev.reason && ev.reason.message ? ev.reason.message : JSON.stringify(ev.reason))); });
+  setTimeout(function () {
+    report('STAGE boot: TL=' + (typeof window.__TL) + ' err=' + (window.__TL_ERR || 'n/a') + ' pageErrors=' + JSON.stringify(window.__errors.slice(0, 3)));
+    var TL = window.__TL;
+    if (!TL) { lines.push('FAIL TL_UNAVAILABLE err=' + (window.__TL_ERR || 'n/a') + ' pageErrors=' + JSON.stringify(window.__errors.slice(0, 3))); fail++; finish(); return; }
+   try {
+    var T = window.PenumbraTiles;
+    var rows = [{ AMOUNT: '10', DEPT: 'A' }, { AMOUNT: '20', DEPT: 'B' }, { AMOUNT: '30', DEPT: 'A' }]
+      .map(function (o) { return new Map(Object.keys(o).map(function (k) { return [k, o[k]]; })); });
+    var cols = ['AMOUNT', 'DEPT'];
+    var CALLS = [], AJAX = [];
+    // Post-boot stubs: fetchRows -> $.getJSON ; URL-mode infoboxes -> $.ajax.
+    jQuery.getJSON = function (url, params) {
+      CALLS.push(url + '?' + jQuery.param(params || {}));
+      var d = jQuery.Deferred();
+      setTimeout(function () {
+        if (url === 'index.php') {
+          if (params && params.id === 'repA') { d.resolve({ data: [{ AMOUNT: '10', DEPT: 'A' }, { AMOUNT: '20', DEPT: 'B' }] }); }
+          else { d.reject({ status: 403 }); }
+        } else { d.reject({ status: 404 }); }
+      }, 10);
+      return d.promise();
+    };
+    jQuery.ajax = function (o) {
+      AJAX.push(o && o.url);
+      var d = jQuery.Deferred();
+      setTimeout(function () { d.resolve([{ X: 1 }]); }, 10);
+      return d.promise();
+    };
+    // jQuery fades run on requestAnimationFrame, which never ticks under
+    // --virtual-time-budget: finish animations instantly so close = removed.
+    jQuery.fx.off = true;
+    var reg;
+    try { reg = TL.registry(); t('registry reachable (ready closure completed)', !!reg); }
+    catch (e) { t('registry reachable (ready closure completed)', false, String(e)); }
+    t('no boot errors', window.__errors.length === 0, JSON.stringify(window.__errors.slice(0, 3)));
+    t('same-origin helper delegates to the engine', TL.isSameOriginUrl('index.php?id=1') === true && TL.isSameOriginUrl('https://example.com/x') === false);
+
+    // ---- engine B link rendering ----
+    var r1 = TL.resolveInfoboxSnippet("action(infobox, Stats, 'tile|{\"agg\":\"count\"}')", rows, cols);
+    var $a1 = jQuery('<div>').html(r1.html).find('a.snippet-action');
+    t('engine B: tile| renders an infobox link with mode tile', $a1.length === 1 && $a1.attr('data-action-mode') === 'tile' && $a1.attr('data-action-isurl') === '0', r1.html);
+    var key1 = $a1.attr('data-action-value');
+    t('engine B: registry entry carries spec + mode + rows', reg && reg[key1] && reg[key1].mode === 'tile' && reg[key1].snippet === '{"agg":"count"}' && reg[key1].rowData === rows,
+      JSON.stringify(reg && reg[key1] && { mode: reg[key1].mode, snippet: reg[key1].snippet }));
+    var r2 = TL.resolveInfoboxSnippet("action(infobox, KPI, 'embed|rpt-x?show=header')", rows, cols);
+    t('engine B: embed| link', /data-action-mode="embed"/.test(r2.html), r2.html);
+    var r2b = TL.resolveInfoboxSnippet('action(infobox, KPI, "embed|rpt-x?show=header")', rows, cols);
+    t('engine B: embed| double-quoted form too', /data-action-mode="embed"/.test(r2b.html), r2b.html);
+    var r2c = TL.resolveInfoboxSnippet("action(infobox, Cond, 1 = 2, 'tile|{\"agg\":\"count\"}')", rows, cols);
+    t('engine B: false condition hides the tile link', r2c.html.trim() === '', r2c.html);
+    var r3 = TL.resolveInfoboxSnippet("action(infobox, Nope, 'bogus|x')", rows, cols);
+    t('engine B: unknown mode renders nothing', r3.html.trim() === '', r3.html);
+    var r3b = TL.resolveInfoboxSnippet("action(infobox, Raw, 'raw|Hello count()')", rows, cols);
+    t('engine B: raw| still registers with mode raw', /data-action-mode="raw"/.test(r3b.html) && (function () { var k = jQuery('<div>').html(r3b.html).find('a').attr('data-action-value'); return reg[k] && reg[k].mode === 'raw'; })(), r3b.html);
+    // Depth guard
+    document.body.classList.add('embed-view');
+    var r4 = TL.resolveInfoboxSnippet("action(infobox, KPI, 'embed|rpt-x?show=header&date=1')", rows, cols);
+    document.body.classList.remove('embed-view');
+    t('depth guard: inside an embedded page embed| is a plain new-tab link',
+      /<a href="index\.php\?id=rpt-x&amp;date=1&amp;via=infobox%20report" target="_blank"/.test(r4.html) && r4.html.indexOf('snippet-action') === -1, r4.html);
+    // Harvester guard
+    reg['ib_tiletest'] = { snippet: '{"type":"stat","column":"VISITS"}', rowData: rows, columns: cols, mode: 'tile' };
+    var entries = window.penumbraCollectCarouselEntries();
+    t('carousel harvester skips tile| registry entries', !entries.some(function (e) { return e.infoboxKey === 'ib_tiletest'; }), entries.length + ' entries');
+    delete reg['ib_tiletest'];
+
+   } catch (e) { lines.push('FAIL HARNESS_ERROR (sync): ' + e.name + ': ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); fail++; finish(); return; }
+    // ---- dialogs ----
+    try { TL.showInfoboxDialog({ title: 'Stats', content: '{"agg":"count"}', mode: 'tile', isUrl: false, rowData: rows, columns: cols }); }
+    catch (e) { lines.push('FAIL HARNESS_ERROR (open dialog): ' + e.name + ': ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); fail++; finish(); return; }
+    setTimeout(function () {
+      var $ov = jQuery('.infobox-overlay').last();
+      t('dialog: tile| renders a card over the current rows', $ov.find('.pnb-tiles .pnb-tile').length === 1 && $ov.find('.dash-stat-value').text() === '3' && $ov.find('.pnb-tile-badge').text() === 'this report', $ov.find('.pnb-tiles').text());
+      t('dialog: current-row card has no open link', $ov.find('.pnb-tile-open').length === 0);
+      t('dialog: title shown', $ov.find('.pnb-dlg-title').text() === 'Stats');
+      $ov.find('.close-lightbox').click();
+      TL.showInfoboxDialog({ title: 'Multi', content: '[{"type":"stat","report":"repA","agg":"sum","column":"AMOUNT","format":"currency","w":4},{"type":"table","report":"repA","columns":["AMOUNT","DEPT"],"rows":5,"w":8},{"type":"chart","report":"repA","groupBy":"DEPT","chartType":"pie"},{"type":"note","text":"<b>hi</b>"}]', mode: 'tile', isUrl: false, rowData: rows, columns: cols });
+      setTimeout(function () {
+        var $ov2 = jQuery('.infobox-overlay').last();
+        t('dialog: four cards', $ov2.find('.pnb-tile').length === 4, $ov2.find('.pnb-tile').length + '');
+        t('dialog: stat card sums the fetched report', $ov2.find('.pnb-tile').eq(0).find('.dash-stat-value').text() === '$30.00', $ov2.find('.pnb-tile').eq(0).text());
+        t('dialog: table card rows + foot', $ov2.find('.pnb-tile').eq(1).find('tbody tr').length === 2 && /2 rows/.test($ov2.find('.pnb-tile').eq(1).find('.pnb-tile-foot').text()), $ov2.find('.pnb-tile').eq(1).text());
+        var cv = $ov2.find('.pnb-tile').eq(2).find('canvas')[0];
+        t('dialog: chart card mounted Chart.js (lazy-loaded)', !!(cv && window.Chart && Chart.getChart(cv) && Chart.getChart(cv).config.type === 'pie'), cv ? ('canvas, Chart=' + typeof window.Chart) : $ov2.find('.pnb-tile').eq(2).text());
+        t('dialog: note card renders html', $ov2.find('.pnb-tile').eq(3).find('b').length === 1);
+        t('dialog: open links carry via=infobox', ($ov2.find('.pnb-tile-open').first().attr('href') || '').indexOf('index.php?id=repA&via=infobox%20report') === 0, $ov2.find('.pnb-tile-open').first().attr('href'));
+        t('dialog: card widths from w', ($ov2.find('.pnb-tile').eq(0).attr('style') || '').indexOf('--pnb-tile-w:4') > -1, $ov2.find('.pnb-tile').eq(0).attr('style'));
+        t('dialog: report badge absent for live report cards', $ov2.find('.pnb-tile').eq(0).find('.pnb-tile-badge').length === 0);
+        $ov2.find('.close-lightbox').click();
+        setTimeout(function () {
+          t('dialog: closing destroys the chart', !(cv && window.Chart && Chart.getChart(cv)));
+          t('dialog: closing removes the overlay', jQuery('.infobox-overlay').length === 0, jQuery('.infobox-overlay').length + '');
+          TL.showInfoboxDialog({ title: 'Denied', content: '{"type":"stat","report":"secret","agg":"count"}', mode: 'tile', isUrl: false, rowData: rows, columns: cols });
+          setTimeout(function () {
+            var $ov3 = jQuery('.infobox-overlay').last();
+            t('dialog: denied report card fails closed with the access message', /do not have access/.test($ov3.find('.pnb-tile-err').text()), $ov3.find('.pnb-tile-err').text());
+            $ov3.find('.close-lightbox').click();
+            TL.showInfoboxDialog({ title: 'Bad', content: 'not json', mode: 'tile', isUrl: false, rowData: rows, columns: cols });
+            setTimeout(function () {
+              var $ov4 = jQuery('.infobox-overlay').last();
+              t('dialog: invalid tile spec explained', /JSON/.test($ov4.find('.pnb-tile-err').text()), $ov4.find('.pnb-tile-err').text());
+              $ov4.find('.close-lightbox').click();
+              TL.showInfoboxDialog({ title: 'KPI', content: 'rpt-x?show=table&date=01-JUL-25', mode: 'embed', isUrl: false, rowData: rows, columns: cols });
+              setTimeout(function () {
+                var $ov5 = jQuery('.infobox-overlay').last(); var $fr = $ov5.find('iframe.pnb-embed-frame');
+                t('dialog: embed| probed the session before mounting', AJAX.some(function (u) { return String(u).indexOf('pnbSsoProbe') > -1; }), AJAX.slice(-3).join(' | '));
+                // The host page's theme rides into the frame (main.js stamps the
+                // landing default at boot, so a &theme= segment may be present).
+                t('dialog: embed| frames the report section', $fr.length === 1 && /^index\.php\?id=rpt-x&noadm&embed=1&eview=table(&theme=theme-[\w-]+)?&via=infobox%20report&date=01-JUL-25$/.test($fr.attr('src') || ''), $fr.attr('src'));
+                t('dialog: embed| offers the full-report link', ($ov5.find('.pnb-embed-note a').attr('href') || '') === 'index.php?id=rpt-x&date=01-JUL-25&via=infobox%20report', $ov5.find('.pnb-embed-note a').attr('href'));
+                var fits = $ov5.data('pnbFits');
+                t('dialog: embed| registers a frame-fit handle', !!(fits && fits.length === 1));
+                setTimeout(function () {
+                  t('dialog: embed| auto-height measured the framed stub (px set)', /^\d+px$/.test($fr[0].style.height || ''), $fr[0].style.height || '(none)');
+                  $ov5.find('.close-lightbox').click();
+                  TL.showInfoboxDialog({ title: 'Chart', content: 'rpt-x?chart=2&height=300', mode: 'embed', isUrl: false });
+                  setTimeout(function () {
+                    var $ov6 = jQuery('.infobox-overlay').last(); var $f6 = $ov6.find('iframe.pnb-embed-frame');
+                    t('dialog: chart embed uses fspages + fixed height, no fit', ($f6.attr('src') || '').indexOf('&fullscreen=true&fspages=2') > -1 && $f6[0].style.height === '300px' && ($ov6.data('pnbFits') || []).length === 0, ($f6.attr('src') || '') + ' h=' + $f6[0].style.height);
+                    $ov6.find('.close-lightbox').click();
+                    var ajaxBefore = AJAX.length;
+                    TL.showInfoboxDialog({ title: 'X', content: 'https://example.com/x.json', mode: 'jsontable', isUrl: true });
+                    setTimeout(function () {
+                      var $ov7 = jQuery('.infobox-overlay').last();
+                      t('jsontable: cross-origin URL refused with the CSP reason, no request, no SSO dialog',
+                        /cannot be fetched/.test($ov7.text()) && /same-origin/.test($ov7.text()) && AJAX.length === ajaxBefore && jQuery('.sso-status').length === 0,
+                        $ov7.find('.infobox-body').text().slice(0, 140) + ' ajax=' + (AJAX.length - ajaxBefore) + ' sso=' + jQuery('.sso-status').length);
+                      $ov7.find('.close-lightbox').click();
+                      TL.showInfoboxDialog({ title: 'Y', content: '/penumbra/index.php?id=z&json=1', mode: 'jsontable', isUrl: true });
+                      setTimeout(function () {
+                        t('jsontable: same-origin URL is fetched', AJAX.length === ajaxBefore + 1 && AJAX[AJAX.length - 1] === '/penumbra/index.php?id=z&json=1', AJAX.join(' | '));
+                        jQuery('.infobox-overlay').last().find('.close-lightbox').click();
+                        TL.showInfoboxDialog({ title: 'Z', content: '<h3>T</h3> jsontable(https://example.com/r.json)', mode: 'raw', isUrl: false, rowData: rows, columns: cols });
+                        setTimeout(function () {
+                          var $ov9 = jQuery('.infobox-overlay').last();
+                          t('raw jsontable(URL): cross-origin slot explained, no request', /cannot be fetched/.test($ov9.text()) && AJAX.length === ajaxBefore + 1, $ov9.find('.infobox-body').text().slice(0, 140));
+                          $ov9.find('.close-lightbox').click();
+                          TL.showInfoboxDialog({ title: 'Ent', content: '[{"Na&amp;me":"Bob &amp; Carol","Amt":"1&#39;2"}]', mode: 'jsontable', isUrl: false });
+                          setTimeout(function () {
+                            var $ovE = jQuery('.infobox-overlay').last();
+                            var et = $ovE.text();
+                            t('jsontable: entity-encoded cells and headers decode once',
+                              et.indexOf('Bob & Carol') > -1 && et.indexOf("1'2") > -1 && et.indexOf('Na&me') > -1 && et.indexOf('&amp;') === -1,
+                              et.replace(/\s+/g, ' ').slice(0, 160));
+                            $ovE.find('.close-lightbox').click();
+                            t('no exceptions during the run', window.__errors.length === 0, JSON.stringify(window.__errors.slice(0, 3)));
+                            finish();
+                          }, 250);
+                        }, 200);
+                      }, 200);
+                    }, 200);
+                  }, 200);
+                }, 1400);
+              }, 200);
+            }, 200);
+          }, 200);
+        }, 400);
+      }, 1200);
+    }, 200);
+  }, 400);
+})();
+</script>
+</body></html>

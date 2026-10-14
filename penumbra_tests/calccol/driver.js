@@ -1,0 +1,158 @@
+// calccol suite - page half (2026-10-10). The REAL main.js + js/penumbra_calc.js on
+// the saveconf harness (300 fixture rows; the stored report shows columns 0-5).
+// window.__HC.bso = buildStateObject (exposed by run.py's hook).
+(function () {
+  var SCN = window.__SCN;
+  var R = { scn: SCN, chk: {}, info: {}, notes: [] };
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  async function until(fn, ms) { var t = Date.now(); while (!fn() && Date.now() - t < ms) await sleep(20); return fn(); }
+  async function boot() {
+    if (!(await until(function () { return window.__queryDone >= 1 && (window.__HC_HIDES || 0) >= 1; }, 150000))) throw new Error('boot: never loaded');
+    await sleep(500);
+  }
+  function th(name) { return document.querySelector('#tableHeader th[data-colname="' + name + '"]'); }
+  function shown(name) { var t = th(name); return !!t && t.style.display !== 'none'; }
+  // the first body row's cell under a column (by the header's position among the ths)
+  function cell(name) {
+    var t = th(name); if (!t) return null;
+    var ths = Array.prototype.slice.call(document.querySelectorAll('#tableHeader th'));
+    var i = ths.indexOf(t);
+    var tr = document.querySelector('#resultsTable tbody tr');
+    return tr && tr.children[i] ? tr.children[i].textContent.trim() : null;
+  }
+  function toast() { var t = document.getElementById('action_overlay'); return t ? t.textContent.replace(/\s+/g, ' ') : ''; }
+  var F = function () { return window.__rowsFixture[0]; };
+  function num(v) { return parseFloat(String(v).replace(/[$,]/g, '')); }
+  var S = {
+    // &calc= on the URL: the columns arrive with the rows, shown, worked out; a bad one is named
+    curl: async function () {
+      await sleep(1200);   // (the module says what it left out once the table is built)
+      var f = F();
+      R.chk.halfShown = shown('HALF') && cell('HALF') === String(Number((num(f.H_NUM) / 2).toFixed(6)));
+      var dbl = num(f.V_AMOUNT) * 2;
+      R.chk.dblCurrency = shown('DBL') && cell('DBL') === '$' + dbl.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      R.chk.flagText = shown('FLAG') && cell('FLAG') === (String(f.V_STATUS).toLowerCase() === 'open' ? 'yes' : 'no');
+      R.chk.badLeftOut = !th('BAD') && /BAD.*left out/.test(toast());
+      R.chk.atEnd = (function () { var m = $('#resultsTable').data('columnNameToOriginalIndex') || {}; return m.HALF === 20 && m.DBL === 21 && m.FLAG === 22; })();
+      R.chk.panelFromLink = !!document.querySelector('#pnbCalcList [data-calc-keep="HALF"]') && /not shown/.test((document.querySelector('#pnbCalcList') || {}).textContent || '');
+      // 2026-10-10 calcsweep: by exact name, not pushed into the substring whitelist
+      R.chk.summable = !!(window.PenumbraCalc && window.PenumbraCalc.isSummable && window.PenumbraCalc.isSummable('HALF')) &&
+        (penumbra_vars.totalExemptions || []).indexOf('HALF') === -1;
+      R.info = { half: cell('HALF'), dbl: cell('DBL'), flag: cell('FLAG'), toast: toast().slice(0, 200), map: $('#resultsTable').data('columnNameToOriginalIndex') };
+    },
+    // the panel's dialog: add -> the query runs again and the column is there; edit; remove
+    cadd: async function () {
+      // the Settings panel is OPEN while the column is added (calccol3: its list must follow)
+      document.getElementById('settingsPanel').classList.add('is-open');
+      var b = document.getElementById('pnbCalcAdd');
+      R.chk.addButton = !!b;
+      if (!b) return;
+      b.click();
+      R.chk.dialog = !!document.getElementById('pnbCalcOverlay');
+      // the layout (2026-10-10, calccol2): each label sits directly ABOVE its field, left edges lined up
+      function lab(id) {
+        var l = document.querySelector('#pnbCalcOverlay label[for="' + id + '"]'), f = document.getElementById(id);
+        if (!l || !f) return false;
+        var a = l.getBoundingClientRect(), b = f.getBoundingClientRect();
+        return a.bottom <= b.top + 1 && Math.abs(a.left - b.left) <= 2 && b.width > 120;
+      }
+      R.chk.layout = lab('pnbCalcName') && lab('pnbCalcFmt') && lab('pnbCalcFormula') && !document.getElementById('pnbCalcCol');
+      R.chk.noEarlyError = document.getElementById('pnbCalcErr').textContent === '';
+      // the columns: the copy templates' list - click one, it goes in at the cursor
+      var chips = Array.prototype.slice.call(document.querySelectorAll('#pnbCalcCols.pnb-tpl-placeholders code'));
+      R.chk.chips = chips.length === 20 && chips.some(function (c) { return c.textContent === '{H_NUM}'; })
+        && document.getElementById('pnbCalcFormula').classList.contains('pnb-tpl-field');
+      document.getElementById('pnbCalcName').value = 'Ratio';
+      var ta = document.getElementById('pnbCalcFormula');
+      ta.focus();
+      ta.value = 'ROUND( / {H_AMT}, 2)';
+      ta.setSelectionRange(6, 6);
+      ta.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
+      var chip = chips.filter(function (c) { return c.textContent === '{H_NUM}'; })[0];
+      if (chip) chip.click();
+      await sleep(300);
+      R.chk.chipInserts = ta.value === 'ROUND({H_NUM} / {H_AMT}, 2)' && ta.selectionStart === 13;
+      if (!R.chk.chipInserts) ta.value = 'ROUND({H_NUM} / {H_AMT}, 2)';   // the rest of the scenario still runs
+      R.info.ta = ta.value;
+      R.chk.preview = document.querySelectorAll('#pnbCalcPrev tbody tr').length === 5 && document.getElementById('pnbCalcErr').textContent === '';
+      var q0 = window.__queryDone;
+      document.getElementById('pnbCalcGo').click();
+      await until(function () { return window.__queryDone > q0 && !!th('RATIO'); }, 15000); await sleep(400);
+      var f = F();
+      var want = Math.round(num(f.H_NUM) / num(f.H_AMT) * 100 * (1 + 1e-12)) / 100;
+      R.chk.reran = window.__queryDone > q0;
+      R.chk.added = shown('RATIO') && Number(cell('RATIO')) === want;
+      function listed(n) { return Array.prototype.some.call(document.querySelectorAll('#spColumnList .sp-col-item'), function (el) { return el.textContent.indexOf(n) !== -1; }); }
+      await until(function () { return listed('RATIO'); }, 4000);
+      R.chk.listAfterAdd = listed('RATIO') && listed('V_ID');
+      // edit it (no RATIO to edit = the add failed: the checks below stay unset, so red)
+      var editBtn = document.querySelector('#pnbCalcList [data-calc-edit="RATIO"]');
+      if (!editBtn) { R.info = { ta: R.info.ta, err: (document.getElementById('pnbCalcErr') || {}).textContent }; return; }
+      editBtn.click();
+      document.getElementById('pnbCalcFormula').value = '{H_NUM} * 0';
+      var q1 = window.__queryDone;
+      document.getElementById('pnbCalcGo').click();
+      await until(function () { return window.__queryDone > q1; }, 15000); await sleep(400);
+      R.chk.edited = cell('RATIO') === '0';
+      // remove it
+      var q2 = window.__queryDone;
+      document.querySelector('#pnbCalcList [data-calc-del="RATIO"]').click();
+      await until(function () { return window.__queryDone > q2; }, 15000); await sleep(400);
+      R.chk.removed = !th('RATIO');
+      await until(function () { return !listed('RATIO'); }, 4000);
+      R.chk.listAfterRemove = !listed('RATIO') && listed('V_ID');
+      R.info = { ratio: cell('RATIO'), want: want, q: [q0, q1, q2, window.__queryDone], act: window.PenumbraCalc.active(), applied: window.PenumbraCalc.applied() };
+    },
+    // Clear All Custom Preferences takes the calculated columns too (calccol3)
+    cclear: async function () {
+      window.PenumbraCalc.openDialog(null);
+      document.getElementById('pnbCalcName').value = 'GONE';
+      document.getElementById('pnbCalcFormula').value = '{H_NUM} + 1';
+      var q0 = window.__queryDone;
+      document.getElementById('pnbCalcGo').click();
+      await until(function () { return window.__queryDone > q0 && !!th('GONE'); }, 15000); await sleep(300);
+      R.chk.before = window.PenumbraCalc.active().some(function (d) { return d.name === 'GONE'; });
+      var asked = null;
+      window.confirm = function (m) { asked = String(m); return true; };
+      document.getElementById('spClearStorage').click();
+      // (2026-10-13) this page has no ?id=: the column is the page's alone, yet Clear must list it (not
+      // "Nothing is saved", which returned before clearing anything) and clear it
+      R.chk.listed = !!asked && /Calculated columns: [^\n]*\bGONE\b/.test(asked);
+      R.chk.cleared = !window.PenumbraCalc.active().some(function (d) { return d.name === 'GONE'; });
+      R.info = { act: window.PenumbraCalc.active(), asked: asked };
+    },
+    // a view link's state.calcColumns: shown; in the view state; never in a Save
+    cstate: async function () {
+      var f = F();
+      R.chk.stateShown = shown('TRIPLE') && cell('TRIPLE') === String(num(f.H_NUM) * 3);
+      var st = window.__HC.bso();
+      R.chk.viewStateCarries = !!st && Array.isArray(st.calcColumns) && st.calcColumns.some(function (d) { return d.name === 'TRIPLE' && d.formula === '{H_NUM} * 3'; })
+        && st.visibleColumns.indexOf(20) !== -1;
+      // calcsrv (2026-10-11): a stored report's column is the REPORT's and a save keeps it -
+      // unless it is unticked in the Save dialog's Last Stop list, as here: then it is stripped
+      if (!document.getElementById('lastStopCardBody')) { var lsb = document.createElement('div'); lsb.id = 'lastStopCardBody'; document.body.appendChild(lsb); }
+      if (window.PenumbraCalc.renderSaveList) window.PenumbraCalc.renderSaveList();
+      var tcb = document.querySelector('#pnbCalcSaveRow input[data-calc-save="TRIPLE"]'); if (tcb) tcb.checked = false;
+      window.__SAVE_ANSWER = function (b) { return { ok: true, json: { success: true, new_id: b.short_id, numeric_id: 7, is_new: false, updated_at: '2026-10-10 10:00:00.000000' } }; };
+      var n = window.__saves.length;
+      $('#confirmServerSaveBtn').prop('disabled', false).trigger('click');
+      await until(function () { return window.__saves.length > n; }, 8000); await sleep(150);
+      var s = window.__saves[window.__saves.length - 1], sd = null;
+      try { sd = JSON.parse(s.state_data); } catch (e) {}
+      R.chk.saveStrips = !!sd && !('calcColumns' in sd) && sd.visibleColumns.indexOf(20) === -1 && sd.columnOrder.indexOf(20) === -1 && sd.visibleColumns.indexOf(0) !== -1;
+      R.info = { vis: sd && sd.visibleColumns, order: sd && sd.columnOrder && sd.columnOrder.slice(-3), act: window.PenumbraCalc && window.PenumbraCalc.active(),
+        pre: penumbra_vars.preloadedState && penumbra_vars.preloadedState.calcColumns, applied: window.PenumbraCalc && window.PenumbraCalc.applied() };
+    }
+  };
+  (async function () {
+    try {
+      await boot();
+      if (!S[SCN]) throw new Error('unknown scenario ' + SCN);
+      await S[SCN]();
+    } catch (e) { R.fatal = String((e && e.stack) || e); }
+    R.errors = window.__errors.concat(window.__rejections).slice(0, 10);
+    R.hookErr = [window.__HC_ERR, window.__HC_ERR2].filter(Boolean).join('; ');
+    window.__HCRESULT = R; window.__HCDONE = true;
+    document.getElementById('out').textContent = 'DONE';
+  })();
+})();

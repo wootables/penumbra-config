@@ -1,0 +1,287 @@
+# =============================================================================
+# COLVALS SUITE (2026-10-13) - the Visual Search Builder's VALUE ARROW.
+#
+# The ask: the search bars' arrow lists a column's VALUES when the box ends with
+# that column (searchbox suite, H / H2 / V*), and the builder's value box gets an
+# arrow too, so the whole value list (a multi-select's ticks included) is one
+# click away instead of a double-click. This suite is the builder half: the REAL
+# search_builder.js / .css over acrow's harness page and stubs (../acrow
+# harness.html + driver.js, its NAME column: Alice Alan Albert Bob [1,2] X|Y).
+#
+#   W0  a row with no column ('-- Any Column --'): no arrow
+#   W1  a row with a column: the arrow at the From box's right edge, spanning
+#       its inner height, the typed text clear of it (padding), role + title
+#   W2  a REAL click on it opens the row's whole value list, focus in the box
+#   W3  a second click closes it, the focus stays (no blur on either click)
+#   W4  two values ticked and settled ("Multiple Values Selected (2)"): ONE click
+#       on the arrow reopens the list with both still ticked
+#   W5  Alt+Down in the box opens the same list
+#   W6  a between row's To box has no arrow
+#   W7  no page errors
+#   W8  (sweep) a row whose column has NO value list (a stub NOTE column): no arrow
+#   W9  ...switched to a column with values: the arrow is back
+#   W10 (sweep) a date column: the calendar button beside the arrow, inside the box, no overlap
+#
+#   py -3 run.py                     the live files
+#   py -3 run.py --stage <dir>       search_builder.js / search_builder.css from <dir>
+#   py -3 run.py --mutant <name> / --mutants
+# cd into this folder first. Stages into %TEMP%; writes nothing to the webroot.
+# =============================================================================
+import json, os, shutil, socket, subprocess, sys, tempfile, time, urllib.request
+import websocket
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ACROW = os.path.join(os.path.dirname(HERE), 'acrow')
+APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+CR = '\r\n'
+
+MUTANTS = {
+    'noshow':   ('css', '.sb-value-cell:not(.sb-value-cell-secondary) > .sb-value-arrow {' + CR + '    display: flex;',
+                 '.sb-value-cell:not(.sb-value-cell-secondary) > .sb-value-arrow {' + CR + '    display: none;', ['W1', 'W2', 'W4']),
+    'anycol':   ('css', '.sb-condition-row:not(.sb-row-novals):has(.sb-col-select option:checked:not([value=""])) .sb-value-cell:not(.sb-value-cell-secondary) > .sb-value-arrow {',
+                 '.sb-condition-row:not(.sb-row-novals) .sb-value-cell:not(.sb-value-cell-secondary) > .sb-value-arrow {', ['W0']),
+    'nopad':    ('css', '.sb-value-cell:not(.sb-value-cell-secondary) > .sb-value-input {' + CR + '    padding-right: 28px;',
+                 '.sb-value-cell:not(.sb-value-cell-secondary) > .sb-value-input {' + CR + '    padding-right: 8px;', ['W1']),
+    'notoggle': ('js', "            $(this).data('sbWasOpen', !!(inputEl && isAutocompleteVisible() && _acActiveInput === inputEl));",
+                 "            $(this).data('sbWasOpen', false);", ['W3']),
+    'mdblur':   ('js', "            if (e.button !== 0) return;" + CR + "            e.preventDefault();" + CR + "            var inputEl",
+                 "            if (e.button !== 0) return;" + CR + "            var inputEl", ['W3']),
+    'novals':   ('js', "        $row.toggleClass('sb-row-novals', !!col && !(vals && vals.length) && !_sbMode.includeRecipientVars);",
+                 "        $row.toggleClass('sb-row-novals', false);", ['W8']),
+    'novalcss': ('css', '.sb-condition-row:not(.sb-row-novals):has(.sb-col-select option:checked:not([value=""])) .sb-value-cell:not(.sb-value-cell-secondary) > .sb-value-arrow {',
+                 '.sb-condition-row:has(.sb-col-select option:checked:not([value=""])) .sb-value-cell:not(.sb-value-cell-secondary) > .sb-value-arrow {', ['W8']),
+    'noalt':    ('js', "            // Alt+Down = the value arrow (2026-10-13), as on the search bars." + CR + "            if (e.altKey",
+                 "            // Alt+Down = the value arrow (2026-10-13), as on the search bars." + CR + "            if (false && e.altKey", ['W5']),
+}
+
+R = []
+def rec(i, name, ok, detail=''): R.append((i, name, bool(ok), str(detail)[:400]))
+def read(p): return open(p, 'rb').read().decode('utf-8', 'surrogateescape')
+
+def free_port():
+    s = socket.socket(); s.bind(('127.0.0.1', 0)); p = s.getsockname()[1]; s.close(); return p
+
+class Page(object):
+    def __init__(self, ws_url):
+        self.ws = websocket.create_connection(ws_url, timeout=60, suppress_origin=True); self.n = 0
+    def call(self, m, **p):
+        self.n += 1; mid = self.n
+        self.ws.send(json.dumps({'id': mid, 'method': m, 'params': p}))
+        while True:
+            r = json.loads(self.ws.recv())
+            if r.get('id') == mid:
+                if 'error' in r: raise RuntimeError('%s: %s' % (m, r['error']))
+                return r.get('result', {})
+    def ev(self, expr):
+        r = self.call('Runtime.evaluate', expression=expr, returnByValue=True)
+        if r.get('exceptionDetails'): raise RuntimeError('JS: ' + json.dumps(r['exceptionDetails'])[:400])
+        return r.get('result', {}).get('value')
+    def wait(self, expr, ms=5000):
+        t0 = time.time()
+        while time.time() - t0 < ms / 1000.0:
+            try:
+                if self.ev(expr): return True
+            except Exception: pass
+            time.sleep(0.08)
+        return False
+    def mouse(self, typ, x, y, button='none', buttons=0, count=0):
+        p = {'type': typ, 'x': x, 'y': y, 'button': button, 'buttons': buttons}
+        if count: p['clickCount'] = count
+        self.call('Input.dispatchMouseEvent', **p)
+    def click(self, x, y):
+        self.mouse('mouseMoved', x, y); time.sleep(0.03)
+        self.mouse('mousePressed', x, y, 'left', 1, 1); time.sleep(0.04)
+        self.mouse('mouseReleased', x, y, 'left', 0, 1)
+    def key(self, k, code, mods=0):
+        self.call('Input.dispatchKeyEvent', type='rawKeyDown', key=k, code=k, windowsVirtualKeyCode=code, modifiers=mods)
+        self.call('Input.dispatchKeyEvent', type='keyUp', key=k, code=k, windowsVirtualKeyCode=code, modifiers=mods)
+
+PROBE = r"""
+window.V = {
+  row: function (i) { return $('#sbConditionsContainer .sb-condition-row').eq(i || 0); },
+  arrow: function (i) { return V.row(i).find('.sb-value-cell').not('.sb-value-cell-secondary').children('.sb-value-arrow')[0]; },
+  box: function (i) { return V.row(i).find('.sb-value-input').not('.sb-value-input-secondary')[0]; },
+  geo: function (i) {
+    var a = V.arrow(i), b = V.box(i);
+    if (!a || !b) return null;
+    var ab = a.getBoundingClientRect(), bb = b.getBoundingClientRect(), cs = getComputedStyle(b);
+    return { shown: a.getClientRects().length > 0 && getComputedStyle(a).display !== 'none',
+             right: bb.right - ab.right, top: ab.top - bb.top, bottom: bb.bottom - ab.bottom, w: ab.width,
+             pr: parseFloat(cs.paddingRight), x: ab.left + ab.width / 2, y: ab.top + ab.height / 2,
+             role: a.getAttribute('role'), title: a.getAttribute('title') };
+  },
+  item: function (v) {
+    var el = $('#sbAutocompleteDropdown .sb-ac-item').filter(function () { return $(this).attr('data-value') === v; })[0];
+    if (!el) return null; var r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  },
+  blurs: 0
+};
+true
+"""
+
+def stage(js, css):
+    d = tempfile.mkdtemp(prefix='pnb_colvals_')
+    for f in ('jquery-3.7.1.min.js', 'jquery-ui.min.js'): shutil.copyfile(os.path.join(APP, 'js', f), os.path.join(d, f))
+    shutil.copyfile(os.path.join(APP, 'css', 'main.css'), os.path.join(d, 'main.css'))
+    for f in ('harness.html', 'driver.js'): shutil.copyfile(os.path.join(ACROW, f), os.path.join(d, f))
+    sbc = read(os.path.join(APP, 'search_builder_content.php'))
+    at = sbc.find('?>')
+    open(os.path.join(d, 'sbc.html'), 'wb').write(sbc[at + 2:].lstrip('\r\n').encode('utf-8', 'surrogateescape'))
+    open(os.path.join(d, 'search_builder.js'), 'wb').write(js.encode('utf-8', 'surrogateescape'))
+    open(os.path.join(d, 'search_builder.css'), 'wb').write(css.encode('utf-8', 'surrogateescape'))
+    return d
+
+def checks(pg):
+    def st(): return pg.ev('JSON.stringify(T.state(0))')
+    def S(): return json.loads(st())
+    def geo(): return pg.ev('V.geo(0)')
+    def is_open(): return bool(pg.ev("$('#sbAutocompleteDropdown').is(':visible')"))
+    # NOTE: a column with NO value list (main.js answers null for long text / too many values)
+    pg.ev("(function(){var a=window._penumbraSearchAPI, g=a.getColumns, v=a.getColumnAutocompleteValues;"
+          " a.getColumns=function(){return g.apply(this, arguments).concat([{name:'NOTE', visible:true}]);};"
+          " a.getColumnAutocompleteValues=function(c){return c==='NOTE' ? null : v.apply(this, arguments);}; a.getColumnDateInfo=function(c){return c==='CITY' ? {isDate:true, jqFormat:'mm/dd/yy', isUpper:false} : null;};})(); true")
+    pg.ev("T.open('report')"); pg.wait('T.isOpen()', 10000); time.sleep(0.3)
+    pg.ev(PROBE)
+    # W0: no column
+    pg.ev("T.setup(''); V.row(0).find('.sb-col-select').val('').trigger('change'); true"); time.sleep(0.3)
+    g = geo()
+    rec('W0', "a row with no column ('-- Any Column --'): no arrow", g is not None and not g['shown'], g)
+    # W1: a column
+    pg.ev("T.setup('NAME = Zed'); true"); time.sleep(0.4)
+    pg.ev("$('#sbAutocompleteDropdown').hide(); V.box(0).blur(); true"); time.sleep(0.2)
+    g = geo()
+    ok1 = g and g['shown'] and abs(g['right'] - 1) <= 0.6 and abs(g['top'] - 1) <= 0.6 and abs(g['bottom'] - 1) <= 0.6 and g['pr'] >= g['w'] + 1 \
+        and g['role'] == 'button' and (g['title'] or '').startswith('(Alt+Down)')
+    rec('W1', "a row with a column: the arrow at the From box's right edge, its inner height, text clear of it, role + title", ok1, g)
+    # W2: one click opens the whole list
+    pg.ev("V.box(0).addEventListener('blur', function () { V.blurs++; }); true")
+    if g and g['shown']:
+        pg.click(g['x'], g['y']); pg.wait("$('#sbAutocompleteDropdown').is(':visible')", 3000); time.sleep(0.3)
+    s = S()
+    rec('W2', "a REAL click opens the row's whole value list, focus in the box",
+        s['open'] and s['shown'][:6] == ['Alice', 'Alan', 'Albert', 'Bob', '[1,2]', 'X|Y'] and s['focus'], {k: s[k] for k in ('open', 'shown', 'focus')})
+    # W3: a second click closes it, focus kept, no blur
+    b0 = pg.ev('V.blurs')
+    g = geo()
+    if g and g['shown']: pg.click(g['x'] + 1, g['y']); time.sleep(0.4)
+    s = S()
+    rec('W3', 'a second click closes it; the focus stays (no blur)', not s['open'] and s['focus'] and pg.ev('V.blurs') == b0,
+        {'open': s['open'], 'focus': s['focus'], 'blurs': pg.ev('V.blurs') - b0})
+    # W4: tick two, settle, ONE click reopens with both ticked
+    g = geo()
+    pg.click(g['x'], g['y']); pg.wait("$('#sbAutocompleteDropdown').is(':visible')", 3000); time.sleep(0.3)
+    for v in ('Alice', 'Bob'):
+        c = pg.ev('V.item(%s)' % json.dumps(v))
+        if c: pg.click(c['x'] - 30, c['y']); time.sleep(0.35)
+    pg.key('Escape', 27); time.sleep(0.4)
+    s0 = S()
+    g = geo()
+    if g and g['shown']:
+        pg.click(g['x'], g['y']); pg.wait("$('#sbAutocompleteDropdown').is(':visible')", 3000); time.sleep(0.35)
+    s = S()
+    rec('W4', 'two values ticked and settled ("Multiple Values Selected (2)"): ONE click reopens the list with both ticked',
+        s0['boxMulti'] and '(2)' in (s0['ph'] or '') and s['open'] and sorted(s['ticks'] or []) == ['Alice', 'Bob'],
+        {'settled': {k: s0[k] for k in ('set', 'ph', 'boxMulti')}, 'reopened': {k: s[k] for k in ('open', 'ticks')}})
+    pg.key('Escape', 27); time.sleep(0.3)
+    # W5: Alt+Down
+    pg.ev("T.setup('NAME = Zed'); $('#sbAutocompleteDropdown').hide(); V.box(0).focus(); true"); time.sleep(0.3)
+    pg.ev("$('#sbAutocompleteDropdown').hide(); true")
+    pg.key('ArrowDown', 40, 1); pg.wait("$('#sbAutocompleteDropdown').is(':visible')", 3000); time.sleep(0.3)
+    s = S()
+    rec('W5', 'Alt+Down in the box opens the same list', s['open'] and len(s['shown'] or []) >= 6, {k: s[k] for k in ('open', 'shown')})
+    pg.key('Escape', 27); time.sleep(0.3)
+    # W6: between's To box
+    pg.ev("T.setup('NAME = Zed'); true"); time.sleep(0.2)
+    ops = pg.ev("V.row(0).find('.sb-op-select option').map(function(){return this.value;}).get()") or []
+    btw = [o for o in ops if 'between' in o.lower()]
+    if btw: pg.ev("T.op(0, %s); true" % json.dumps(btw[0])); time.sleep(0.3)
+    sec = pg.ev("(function(){var c=V.row(0).find('.sb-value-cell-secondary'); return [c.is(':visible'), c.find('.sb-value-arrow').length];})()")
+    rec('W6', "a between row's To box has no arrow", bool(btw) and sec[0] and sec[1] == 0, {'between': btw, 'to shown / arrows': sec})
+    # W8 / W9 (sweep): no arrow on a column with nothing to list; it comes with a column that has values
+    pg.ev("$('#sbAutocompleteDropdown').hide(); true"); time.sleep(0.2)
+    pg.ev("T.setup('NOTE = x'); $('#sbAutocompleteDropdown').hide(); V.box(0).blur(); true"); time.sleep(0.4)
+    g8 = geo(); col8 = pg.ev("V.row(0).find('.sb-col-select').val()")
+    rec('W8', 'a row whose column has no value list (NOTE): no arrow, the text keeps the plain padding',
+        pg.ev('T.isOpen()') is True and col8 == 'NOTE' and g8 is not None and not g8['shown'] and g8['pr'] < 20, {'col': col8, 'geo': g8})
+    pg.ev("T.col(0, 'NAME'); $('#sbAutocompleteDropdown').hide(); V.box(0).blur(); true"); time.sleep(0.4)
+    g9 = geo()
+    rec('W9', '...the same row switched to a column with values (NAME): the arrow is back', pg.ev('T.isOpen()') is True and g9 is not None and g9['shown'], g9)
+    # W10 (sweep): a date column's calendar button moves in beside the arrow: inside the box,
+    # no overlap, the typed text clear of both
+    pg.ev("T.setup('CITY = x'); $('#sbAutocompleteDropdown').hide(); V.box(0).blur(); true"); time.sleep(0.5)
+    g10 = pg.ev("""(function(){var a=V.arrow(0), b=V.box(0), t=$(b).siblings('.ui-datepicker-trigger')[0]; if(!a||!b||!t) return {missing:[!!a,!!b,!!t]};
+      var ar=a.getBoundingClientRect(), br=b.getBoundingClientRect(), tr=t.getBoundingClientRect(), pr=parseFloat(getComputedStyle(b).paddingRight);
+      return {arrow:[ar.left,ar.right], trig:[tr.left,tr.right,tr.top,tr.bottom], box:[br.left,br.right,br.top,br.bottom], pr:pr,
+              ok: getComputedStyle(a).display!=='none' && tr.right <= ar.left + 0.5 && tr.left >= br.left && tr.top >= br.top - 6 && pr >= br.right - tr.left - 0.5};})()""")
+    rec('W10', "a date column: the calendar button sits left of the arrow inside the box, no overlap, text clear of both",
+        pg.ev('T.isOpen()') is True and isinstance(g10, dict) and g10.get('ok'), g10)
+    errs = json.loads(st()).get('errs', [])
+    rec('W7', 'no page errors', not errs, errs)
+
+def run_build(js, css, quiet=False):
+    del R[:]
+    d = stage(js, css)
+    hp, dp = free_port(), free_port()
+    prof = tempfile.mkdtemp(prefix='pnbedge_colvals_')
+    srv = subprocess.Popen([sys.executable, '-m', 'http.server', str(hp), '--bind', '127.0.0.1', '--directory', d], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    edge = subprocess.Popen([EDGE, '--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check', '--disable-sync',
+                             '--disable-extensions', '--user-data-dir=' + prof, '--window-size=1366,900', '--force-device-scale-factor=1',
+                             '--remote-debugging-port=%d' % dp, '--remote-allow-origins=*', 'about:blank'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        ws = None
+        for _ in range(150):
+            try:
+                for t in json.load(urllib.request.urlopen('http://127.0.0.1:%d/json' % dp)):
+                    if t.get('type') == 'page': ws = t['webSocketDebuggerUrl']
+                if ws: break
+            except Exception: pass
+            time.sleep(0.2)
+        if not ws: raise RuntimeError('Edge did not start')
+        pg = Page(ws)
+        pg.call('Network.enable'); pg.call('Network.setCacheDisabled', cacheDisabled=True)
+        pg.call('Page.enable'); pg.call('Emulation.setFocusEmulationEnabled', enabled=True)
+        pg.call('Page.navigate', url='http://127.0.0.1:%d/harness.html?t=%d' % (hp, int(time.time() * 1000)))
+        if not pg.wait("!!(window.T && window._penumbraSearchBuilder && document.readyState === 'complete')", 15000): raise RuntimeError('harness did not load')
+        checks(pg)
+    except Exception as e:
+        rec('Z0', 'the suite ran', False, repr(e))
+    finally:
+        for p in (edge, srv):
+            try: p.kill()
+            except Exception: pass
+        time.sleep(0.5)
+        shutil.rmtree(prof, ignore_errors=True); shutil.rmtree(d, ignore_errors=True)
+    if not quiet:
+        for i, n, ok, det in R: print(('  PASS  ' if ok else '  FAIL  ') + i + ' ' + n + ('' if ok else '\n          ' + det))
+    return [i for i, n, ok, det in R if not ok], len(R)
+
+def main():
+    args = sys.argv[1:]
+    def opt(n):
+        if n in args: i = args.index(n); v = args[i + 1]; del args[i:i + 2]; return v
+        return None
+    st = opt('--stage'); mut = opt('--mutant'); allm = '--mutants' in args
+    js_p = os.path.join(st, 'search_builder.js') if st and os.path.exists(os.path.join(st, 'search_builder.js')) else os.path.join(APP, 'js', 'search_builder.js')
+    css_p = os.path.join(st, 'search_builder.css') if st and os.path.exists(os.path.join(st, 'search_builder.css')) else os.path.join(APP, 'css', 'search_builder.css')
+    print('files: ' + js_p + ' | ' + css_p)
+    files = {'js': read(js_p), 'css': read(css_p)}
+    def mutate(name):
+        f = dict(files); k, old, new, _ = MUTANTS[name]
+        n = f[k].count(old)
+        if n != 1: raise SystemExit("mutant '%s' anchor found %d times" % (name, n))
+        f[k] = f[k].replace(old, new); return f
+    if allm:
+        ok = 0
+        for n, m in MUTANTS.items():
+            f = mutate(n); red, _ = run_build(f['js'], f['css'], quiet=True)
+            bites = all(x in red for x in m[3]); ok += bites
+            print('MUTANT %-9s %s   red: %s' % (n, 'BITES' if bites else 'SURVIVES (wanted ' + ' '.join(m[3]) + ')', ' '.join(red) or '-'))
+        print('MUTANTS %d / %d bite' % (ok, len(MUTANTS))); print('RESULT: ' + ('GREEN' if ok == len(MUTANTS) else 'RED')); return
+    f = mutate(mut) if mut else files
+    red, total = run_build(f['js'], f['css'])
+    print('TOTAL pass=%d fail=%d' % (total - len(red), len(red)))
+    print('RESULT: ' + ('GREEN' if not red else 'RED'))
+
+if __name__ == '__main__':
+    main()

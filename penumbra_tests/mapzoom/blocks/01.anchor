@@ -1,0 +1,4 @@
+        config.options.onClick = function (evt, elements, chart) {
+            if (prevOnClick) { try { prevOnClick.call(this, evt, elements, chart); } catch (e) { } }
+            if (!elements || !elements.length) return;
+            var picked = elements[0];

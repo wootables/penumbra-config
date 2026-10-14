@@ -1,0 +1,302 @@
+# =============================================================================
+# PAGED SEARCH DISPLAY SUITE (2026-10-01) + the heatmap colour-lookup cost
+#
+# A flat search's phase 2 used to set display '' on EVERY match, then the snippet
+# rendered, then applyPagination re-hid everything past page 1 - so a forced style
+# read in that window (a format() rule's pass asks :visible of the containers)
+# restyled every match, hidden columns' cells included. Now a match past the first
+# page is hidden as it is marked (the clear-search branch too), and heatmap(scope=
+# page) reads its domain afresh on every pass instead of caching it across pages.
+# Later the same day: a heatmap colour lookup read the theme's text colour through
+# a computed-style call for every uncached ramp position - between the heat pass's
+# cell writes, a forced style pass of the whole table per cell (1.9 s of a 4.7 s
+# search render on 1,001 x 15). The colorizer now reads it once.
+#
+# The REAL main.js through the real run path on the lazyrows fixture (300 rows,
+# 25 a page: a search for V_STATUS = Open keeps ~100 rows over four pages; the
+# heatbench scenario builds 1,001 rows, 200 a page), in headless Edge over CDP.
+# run.py's hook records what renderReportSnippet SAW - how many of the rows the
+# search kept were displayed - and driver.js publishes the state after. Assertions:
+#   R-<scn>  at the snippet render: search / clear / heat* -> exactly one page (25)
+#            displayed, heatbench 200; rowsall / rowsnone -> every match (no cap)
+#   A-<scn>  after: the page's V_IDs, the rows kept, the page info (search: page 2
+#            too); rowsnone: every match left displayed (the email embed's rows)
+#   H-heatpage      the page's min / max amount carry the ramp's two end colours
+#                   on pages 1, 2 and 3 alike (the domain is the page's)
+#   H-heatfiltered  one domain across pages: only the page holding the global max
+#                   carries the top colour (scope=filtered is untouched)
+#   G-heatbench     the render of a search keeping all 1,001 rows under two
+#                   heatmap() rules makes at most 40 computed-style reads (it
+#                   made one per coloured cell); its wall time is reported
+#   E-<scn>  no page errors, no hook errors
+#
+#   py -3 run.py                               candidate = live js\main.js
+#   py -3 run.py --candidate <main.js>         any build (the stage before the deploy)
+#   py -3 run.py --control <main.js>           the PRE-FIX build: exactly the five R-*
+#                                              of the 25/100-a-page scenarios, H-heatpage
+#                                              and G-heatbench must go RED
+#   py -3 run.py --mutant NAME / --mutants     single-point changes to the candidate;
+#                                              each must turn only its own assertions red
+#   --scn a,b                                  a subset of scenarios
+# Headless Edge over CDP; stages into %TEMP%; writes nothing to the webroot.
+# =============================================================================
+import glob, json, os, shutil, socket, subprocess, sys, tempfile, time, urllib.request
+import websocket
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js',
+        'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
+        'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js']
+JS_LIBS = ['jspdf-2.5.1.umd.min.js', 'jspdf-autotable-3.5.23.min.js', 'exceljs-4.4.0.min.js']
+SCN = ['search', 'clear', 'rowsall', 'rowsnone', 'heatpage', 'heatfiltered', 'heatbench']
+EXTRA = {'heatbench': '&rows=1001'}
+RPP = 25
+BENCH_RPP = 200
+GCS_MAX = 40
+CONTROL_RED = ['R-search', 'R-clear', 'R-heatpage', 'R-heatfiltered', 'R-heatbench', 'H-heatpage', 'G-heatbench']
+
+MUTANTS = {
+    # phase 2 displays every match again (every capped scenario that searches sees it)
+    'nocap':      ([("                    row.style.display = match ? ((_onPage++ < _pageCap) ? '' : 'none') : 'none';\r\n",
+                     "                    row.style.display = match ? '' : 'none';\r\n")], ['R-search', 'R-heatpage', 'R-heatfiltered', 'R-heatbench']),
+    # one row too many on the first page
+    'offbyone':   ([("                    row.style.display = match ? ((_onPage++ < _pageCap) ? '' : 'none') : 'none';\r\n",
+                     "                    row.style.display = match ? ((_onPage++ <= _pageCap) ? '' : 'none') : 'none';\r\n")], ['R-search', 'R-heatpage', 'R-heatfiltered', 'R-heatbench']),
+    # the clear-search branch displays every row again
+    'clearnocap': ([("                    clearRows[ci].style.display = (ci < _clearCap) ? '' : 'none';\r\n",
+                     "                    clearRows[ci].style.display = '';\r\n")], ['R-clear']),
+    # Rows = All / None get a cap of zero: nothing displayed at the render, and under
+    # Rows = None (which pages nothing) nothing displayed after either
+    'capall':     ([("        return (v > 0) ? v : Infinity;\r\n", "        return (v > 0) ? v : 0;\r\n")], ['R-rowsall', 'R-rowsnone', 'A-rowsnone']),
+    # heatmap(scope=page) caches its domain across pages again
+    'heatcached': ([("                if (rule.scope === 'page' || rule._heatCacheKey !== cacheKey) {\r\n",
+                     "                if (rule._heatCacheKey !== cacheKey) {\r\n")], ['H-heatpage']),
+    # every scope reads the page's rows: scope=filtered becomes scope=page
+    'pagealways': ([("                let $domainRows = $rows;\r\n",
+                     "                let $domainRows = $rows.filter(function () { return this.style.display !== 'none'; });\r\n")], ['H-heatfiltered']),
+    # the colour lookup reads the theme's text colour per value again
+    'themeperval': ([("                    var fg = readableOn(fill, textMain);\r\n",
+                      "                    var fg = readableOn(fill);\r\n")], ['G-heatbench']),
+}
+
+args = sys.argv[1:]
+def opt(name, default=None):
+    if name in args:
+        i = args.index(name); v = args[i + 1]; del args[i:i + 2]; return v
+    return default
+def flag(name):
+    if name in args: args.remove(name); return True
+    return False
+cand_path = opt('--candidate', os.path.join(APP, 'js', 'main.js'))
+control_path = opt('--control', None)
+scn_arg = opt('--scn', None)
+one_mutant = opt('--mutant', None)
+all_mutants = flag('--mutants')
+verbose = flag('--verbose')
+if control_path: cand_path = control_path
+
+def read_b(p): return open(p, 'rb').read().decode('utf-8', 'surrogateescape')
+def hook(src):
+    anchor = '$(document).ready(function () {'
+    i = src.find(anchor)
+    if i < 0 or i > 400: raise SystemExit('closure anchor not found')
+    names = ['runTableSearch', 'applyPagination']
+    h = ('\r\n;try { window.__HC = { setPage: function (p) { currentPage = p; applyPagination(); }, getPage: function () { return currentPage; } }; }'
+         ' catch (e) { window.__HC_ERR = String(e); }\r\n'
+         'try { [' + ','.join('"%s"' % n for n in names) + '].forEach(function (k) { try { window.__HC[k] = eval(k); } catch (e) { (window.__HC_MISSING = window.__HC_MISSING || []).push(k); } }); }'
+         ' catch (e) { window.__HC_ERR2 = String(e); }\r\n')
+    # What the snippet render SAW: of the rows the search kept, how many were displayed.
+    h += ('try { var __pdRRS = renderReportSnippet; renderReportSnippet = function () {'
+          ' try { var rows = document.querySelectorAll("#resultsTable > tbody > tr"), d = 0, k = 0;'
+          ' for (var i = 0; i < rows.length; i++) { if (rows[i].classList.contains("search-hidden")) continue; k++; if (rows[i].style.display !== "none") d++; }'
+          ' (window.__pdRender = window.__pdRender || []).push({ displayed: d, kept: k, page: currentPage, rpp: String($("#rowsPerPageSelector").val()) });'
+          ' } catch (e) { (window.__pdRender = window.__pdRender || []).push({ err: String(e) }); }'
+          ' return __pdRRS.apply(this, arguments); }; } catch (e) { window.__HC_ERR3 = String(e); }\r\n')
+    out = src[:i] + ';(function () {' + h + src[i + len(anchor):]
+    j = out.rfind('});')
+    out = out[:j] + '})();' + out[j + 3:]
+    hl = '    function hideLoading() {\r\n'
+    if out.count(hl) != 1: raise SystemExit('hideLoading anchor count %d' % out.count(hl))
+    return out.replace(hl, hl + '        window.__HC_HIDES = (window.__HC_HIDES || 0) + 1;\r\n')
+def mutate(src, name):
+    for old, new in MUTANTS[name][0]:
+        if src.count(old) != 1: raise SystemExit("mutant '%s': anchor found %d times (needs the FIXED build): %r" % (name, src.count(old), old[:90]))
+        src = src.replace(old, new)
+    return src
+
+stage = tempfile.mkdtemp(prefix='pnb_pd_')
+os.makedirs(os.path.join(stage, 'js'))
+for f in LIBS: shutil.copyfile(os.path.join(APP, 'js', f), os.path.join(stage, f))
+for f in JS_LIBS: shutil.copyfile(os.path.join(APP, 'js', f), os.path.join(stage, 'js', f))
+shutil.copyfile(os.path.join(APP, 'css', 'main.css'), os.path.join(stage, 'main.css'))
+for f in ('harness.html', 'driver.js'): shutil.copyfile(os.path.join(HERE, f), os.path.join(stage, f))
+def free_port():
+    s = socket.socket(); s.bind(('127.0.0.1', 0)); p = s.getsockname()[1]; s.close(); return p
+hp, dp = free_port(), free_port()
+srv = subprocess.Popen([sys.executable, '-m', 'http.server', str(hp), '--bind', '127.0.0.1', '--directory', stage], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+edge = subprocess.Popen([EDGE, '--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check', '--disable-sync',
+                         '--disable-extensions', '--user-data-dir=' + os.path.join(stage, 'profile'), '--window-size=1500,900',
+                         '--remote-debugging-port=%d' % dp, '--remote-allow-origins=*', 'about:blank'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+def jget(p, m='GET'):
+    return json.loads(urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:%d%s' % (dp, p), method=m), timeout=15).read().decode())
+for _ in range(150):
+    try: jget('/json/version'); break
+    except Exception: time.sleep(0.2)
+
+def run_page(scn):
+    t = jget('/json/new?about:blank', 'PUT')
+    ws = websocket.create_connection(t['webSocketDebuggerUrl'], timeout=300, suppress_origin=True)
+    n = [0]
+    def call(m, p=None):
+        n[0] += 1; mid = n[0]
+        ws.send(json.dumps({'id': mid, 'method': m, 'params': p or {}}))
+        while True:
+            r = json.loads(ws.recv())
+            if r.get('id') == mid: return r.get('result', {})
+    try:
+        call('Network.enable')
+        call('Network.setCacheDisabled', {'cacheDisabled': True})   # every build is written to the same main_hc.js
+        call('Page.navigate', {'url': 'http://127.0.0.1:%d/harness.html?scn=%s%s' % (hp, scn, EXTRA.get(scn, ''))})
+        t0 = time.time()
+        while time.time() - t0 < 300:
+            time.sleep(0.25)
+            v = call('Runtime.evaluate', {'expression': 'window.__HCDONE ? JSON.stringify(window.__HCRESULT) : null', 'returnByValue': True}).get('result', {}).get('value')
+            if v: return json.loads(v)
+        return {'fatal': 'timeout (300 s)'}
+    finally:
+        try: ws.close()
+        except Exception: pass
+        try: urllib.request.urlopen('http://127.0.0.1:%d/json/close/%s' % (dp, t['id']), timeout=10).read()
+        except Exception: pass
+
+def run_build(text, scns):
+    open(os.path.join(stage, 'main_hc.js'), 'wb').write(hook(text).encode('utf-8', 'surrogateescape'))
+    out = {}
+    for s in scns:
+        r = run_page(s)
+        if r.get('fatal') and 'never finished loading' in r['fatal']:
+            r = run_page(s); r['retried'] = True
+        out[s] = r
+    return out
+
+def pages(n, rpp): return max(1, -(-n // rpp))
+def ends(rows):
+    """(min colour, max colour, count) of a page's V_AMOUNT cells."""
+    vals = [r for r in rows if r.get('v') is not None]
+    if not vals: return (None, None, len(rows))
+    lo = min(vals, key=lambda r: r['v']); hi = max(vals, key=lambda r: r['v'])
+    return (lo['bg'], hi['bg'], len(rows))
+
+def evaluate(res, scns):
+    out = []
+    add = lambda aid, ok, d: out.append((aid, bool(ok), d))
+    for s in scns:
+        r = res.get(s, {})
+        if r.get('fatal'):
+            add('F-' + s, False, (r.get('fatal') or '')[:300] + ' | boot state %s | page errors %s' % (r.get('bootState'), (r.get('errors') or [])[:3])); continue
+        ren = r.get('render') or []
+        last = ren[-1] if ren else {}
+        exp = r.get('expect') or {}
+        matches = exp.get('matches') or []
+        after = r.get('after') or {}
+        # --- what the render saw ---
+        if s in ('rowsall', 'rowsnone'):
+            want = last.get('kept')      # no cap: every match
+        elif s == 'heatbench':
+            want = BENCH_RPP             # 100 a page
+        else:
+            want = RPP                   # 25 a page: the first page only
+        ok = len(ren) == 1 and 'err' not in last and last.get('displayed') == want and (last.get('kept') or 0) > RPP
+        add('R-' + s, ok, 'at the snippet render %d of %d kept rows displayed (expected %s); renders=%d' % (last.get('displayed', -1), last.get('kept', -1), want, len(ren)))
+        # --- the state after ---
+        if s == 'search':
+            p2 = r.get('page2') or {}
+            n = len(matches)
+            ok = (after.get('displayed') == matches[:RPP] and after.get('kept') == n and after.get('pageInfo') == 'Page 1 of %d' % pages(n, RPP)
+                  and p2.get('displayed') == matches[RPP:2 * RPP] and p2.get('pageInfo') == 'Page 2 of %d' % pages(n, RPP))
+            add('A-' + s, ok, 'page 1 = matches 1-%d (%s), kept %s of %d, "%s"; page 2 = matches %d-%d (%s), "%s"' % (
+                RPP, after.get('displayed') == matches[:RPP], after.get('kept'), n, after.get('pageInfo'),
+                RPP + 1, 2 * RPP, p2.get('displayed') == matches[RPP:2 * RPP], p2.get('pageInfo')))
+        elif s == 'clear':
+            alls = exp.get('all') or []
+            ok = after.get('displayed') == alls[:RPP] and after.get('kept') == len(alls) and after.get('pageInfo') == 'Page 1 of %d' % pages(len(alls), RPP)
+            add('A-' + s, ok, 'page 1 = rows 1-%d (%s), kept %s of %d, "%s"' % (RPP, after.get('displayed') == alls[:RPP], after.get('kept'), len(alls), after.get('pageInfo')))
+        elif s == 'rowsall':
+            ok = after.get('displayed') == matches and after.get('kept') == len(matches)
+            add('A-' + s, ok, 'every match displayed (%s), kept %s of %d, "%s"' % (after.get('displayed') == matches, after.get('kept'), len(matches), after.get('pageInfo')))
+        elif s == 'rowsnone':
+            ok = after.get('displayed') == matches and after.get('kept') == len(matches)
+            add('A-' + s, ok, 'Rows = None pages nothing: every match left displayed (%s), kept %s of %d' % (after.get('displayed') == matches, after.get('kept'), len(matches)))
+        elif s in ('heatpage', 'heatfiltered'):
+            n = len(matches)
+            ok = after.get('displayed') == matches[:RPP] and after.get('kept') == n
+            add('A-' + s, ok, 'page 1 = matches 1-%d (%s), kept %s of %d' % (RPP, after.get('displayed') == matches[:RPP], after.get('kept'), n))
+        elif s == 'heatbench':
+            n = len(matches)
+            ok = after.get('displayed') == matches[:BENCH_RPP] and after.get('kept') == n and n == 1001
+            add('A-' + s, ok, 'page 1 = rows 1-%d (%s), kept %s of %d, "%s"' % (BENCH_RPP, after.get('displayed') == matches[:BENCH_RPP], after.get('kept'), n, after.get('pageInfo')))
+        # --- heat ---
+        if s in ('heatpage', 'heatfiltered'):
+            heat = r.get('heat') or {}
+            e = [ends(heat.get('p%d' % p) or []) for p in (1, 2, 3)]
+            counts_ok = all(x[2] == RPP for x in e) and all(x[0] and x[1] for x in e)
+            if s == 'heatpage':
+                ok = counts_ok and e[0][0] == e[1][0] == e[2][0] and e[0][1] == e[1][1] == e[2][1] and e[0][0] != e[0][1]
+                add('H-' + s, ok, 'per page (min colour, max colour, rows): %s - the two end colours must repeat on every page' % (e,))
+            else:
+                allrows = [x for p in (1, 2, 3) for x in (heat.get('p%d' % p) or []) if x.get('v') is not None]
+                gmax = max(allrows, key=lambda x: x['v']) if allrows else None
+                top = [x[1] for x in e]
+                others = [c for i, c in enumerate(top) if gmax and (heat.get('p%d' % (i + 1)) or []) and max((y['v'] for y in heat['p%d' % (i + 1)] if y.get('v') is not None), default=None) != gmax['v']]
+                ok = counts_ok and gmax is not None and all(c != gmax['bg'] for c in others) and len(others) == 2
+                add('H-' + s, ok, 'global max %s on one page carries %s; the other pages\' maxima carry %s (must differ)' % (gmax and gmax['id'], gmax and gmax['bg'], others))
+        if s == 'heatbench':
+            heat = (r.get('heat') or {}).get('p1') or []
+            coloured = len([x for x in heat if x.get('bg')])
+            g = r.get('gcsDuringSearch')
+            ok = isinstance(g, int) and g <= GCS_MAX and coloured == BENCH_RPP
+            add('G-' + s, ok, 'computed-style reads during the render: %s (max %d); render %s ms; page 1 cells coloured %d of %d' % (g, GCS_MAX, r.get('renderMs'), coloured, BENCH_RPP))
+        add('E-' + s, not r.get('errors') and not r.get('hookErr') and not r.get('missing'), '%s %s %s' % (r.get('errors'), r.get('hookErr'), r.get('missing')))
+    return out
+
+try:
+    cand_text = read_b(cand_path)
+    print('candidate: %s%s' % (cand_path, '   (CONTROL: the pre-fix build)' if control_path else ''))
+    names = [s for s in SCN if not scn_arg or s in scn_arg.split(',')]
+    if all_mutants or one_mutant:
+        ok = bad = 0
+        for m in ([one_mutant] if one_mutant else list(MUTANTS)):
+            edits, must = MUTANTS[m]
+            res = evaluate(run_build(mutate(cand_text, m), names), names)
+            red = [a for a, p, _ in res if not p]
+            good = sorted(red) == sorted(must)
+            ok += good; bad += (not good)
+            print('  %s  mutant %-12s turns %s red   [red: %s]' % ('PASS' if good else 'FAIL', m, ' '.join(must), ' '.join(red)))
+            if verbose or not good:
+                for a, p, d in res:
+                    if not p: print('        %-16s %s' % (a, d[:300]))
+        print('SUMMARY mutants ok=%d bad=%d' % (ok, bad))
+        print('RESULT: GREEN' if bad == 0 and ok > 0 else 'RESULT: RED')
+    else:
+        res = evaluate(run_build(cand_text, names), names)
+        p = f = 0; failed = []
+        for a, passed, d in res:
+            print('  %s  %-16s %s' % ('PASS' if passed else 'FAIL', a, d[:400]))
+            if passed: p += 1
+            else: f += 1; failed.append(a)
+        print('TOTAL pass=%d fail=%d   failed: %s' % (p, f, ' '.join(failed)))
+        if control_path:
+            want = [a for a in CONTROL_RED if a.split('-')[1] in names]
+            print('CONTROL: %s (expected red: %s)' % ('as expected' if sorted(failed) == sorted(want) else 'NOT as expected', ' '.join(want)))
+            print('RESULT: GREEN' if sorted(failed) == sorted(want) else 'RESULT: RED')
+        else:
+            print('RESULT: GREEN' if f == 0 and p > 0 else 'RESULT: RED')
+finally:
+    try: edge.kill()
+    except Exception: pass
+    try: srv.kill()
+    except Exception: pass
+    time.sleep(1)
+    shutil.rmtree(stage, ignore_errors=True)

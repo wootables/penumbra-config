@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mobile suite - dashboard page stand-in</title>
+<link rel="stylesheet" href="css/main.css">
+<link rel="stylesheet" href="css/penumbra_dashboard.css">
+</head>
+<body class="pnb-dash theme-wolfpack">
+<div id="dashApp">
+  <header class="dash-head" id="dashHead">
+    <span class="pnb-crumb"><a href="#">Penumbra</a><span class="pnb-crumb-sep">&rsaquo;</span><span class="pnb-crumb-step">Dashboards</span></span>
+    <div class="dash-head-actions" id="dashHeadActions">
+      <button class="dash-btn">&#8635; Refresh</button><button class="dash-btn">&#9974; Kiosk</button><button class="dash-btn">Pause refresh</button><button class="dash-btn dash-btn-primary">&#9998; Edit</button><button class="dash-btn dash-help-link" id="dashHelpBtn">? Help</button>
+    </div>
+    <div class="dash-head-title"><h1>test</h1><div>jes</div></div>
+    <div class="dash-filter"><input type="search" placeholder="Filter every tile, e.g. COLLEGE = Engineering"></div>
+  </header>
+  <main class="dash-main"><div class="dash-grid"><div class="dash-tile"><div class="dash-tile-head">Yeap</div><div class="dash-tile-body">Its a note</div></div></div></main>
+</div>
+<script>
+window.__state = function () {
+  var cw = document.documentElement.clientWidth;
+  var e = document.getElementById('dashHeadActions'); var b = e.getBoundingClientRect();
+  return { cw: cw, sw: document.documentElement.scrollWidth, actions: {l: Math.round(b.left), r: Math.round(b.right), h: Math.round(b.height)} };
+};
+</script>
+</body></html>

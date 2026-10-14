@@ -1,0 +1,247 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>json group</title>
+<link rel="stylesheet" href="main.css">
+</head>
+<body class="theme-default">
+<!-- @@JSON grouping suite (2026-09-30). The REAL main.js booted through the REAL
+     run path (a stubbed query.php) on a 240-row fixture whose J_SUBS column holds
+     @@JSON nested tables (SUB_NAME / SUB_AMT / SUB_ROLE). ?scn=<name> picks the
+     preloaded report state; driver.js reorders the FLAT table the way a user
+     does (a saved sort, a header click, an open journal note row), groups
+     through the REAL dialog (#groupTableBtn -> picker -> Apply Grouping), and
+     compares what each band holds against ground truth computed from the
+     fixture itself - never from the app's own parsing. -->
+<div id="reportHeaderContainer"><div id="defaultTitleView"></div><div id="reportInfoPanel" style="display:none"></div></div>
+<input id="reportTitle" value=""><input id="reportSubtitle" value=""><div id="admWrapper"></div><button id="toggleAdminViewBtn"></button>
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div><div id="mainReportTitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<button id="executeQuery">Run</button><button id="stopQueryBtn">Stop</button>
+<div id="loadingOverlay" style="display:none"><p id="execution-timer"></p><p id="loadingMessage"></p><div id="loadingTip"></div></div>
+<div id="importTimestamps"></div>
+<div id="resultsHeader" style="height:20px">controls</div>
+<div id="tableSearchContainer"><input id="tableSearch" value=""></div>
+<div id="resultCount"></div>
+<!-- index.php's results toolbar: pagination and the grouped view's actions share
+     #paginatorContainer; the Group icon is bound directly at ready time. -->
+<div id="paginatorContainer" style="visibility:hidden">
+  <div id="paginationControls"><span id="pageInfo"></span><select id="rowsPerPageSelector"><option value="25">25</option><option value="50">50</option><option value="200">200</option><option value="all">All</option></select></div>
+  <div id="groupActionsContainer" style="display:none">
+    <a href="#" id="expandAllGroups">Expand All</a> <a href="#" id="collapseAllGroups">Collapse All</a>
+    <span id="removeGroupingSep">&bull;</span> <a href="#" id="configureGroupingBtn" role="button">Configure Grouping</a> <a href="#" id="removeGroupingLink">Remove Grouping</a>
+  </div>
+</div>
+<svg class="export-icon" id="groupTableBtn" role="button" tabindex="0" viewBox="0 0 24 24" width="16" height="16"><rect x="2" y="2" width="20" height="20"></rect></svg>
+<div id="table-view-container"><div id="container-parent"><div id="results-wrapper" style="width:1400px;height:700px;overflow:auto"><table id="resultsTable" class="data-grid-table"><caption class="sr-only">Report results table</caption><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table></div></div></div>
+<div id="errorBox"></div><div id="undo_text_container"></div>
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="pnbNoSearchMatches" style="display:none"></div>
+<div id="settingsPanelOverlay"></div>
+<div id="settingsPanel">
+  <select id="spThemeSelector"><option value="report-default">Report Default</option><option value="theme-default">Default</option></select>
+  <select id="spDensitySelector"><option value="report-default">Report Default</option><option value="standard">Standard</option></select>
+  <input type="checkbox" id="spRowExpandToggle"><input type="checkbox" id="spResolverToggle">
+  <div class="sp-section sp-columns-section"><div class="sp-column-container"><div id="spColumnList" class="sp-column-list"></div></div></div>
+  <div class="sp-actions"><button id="spApply">Save Column Layout</button><button id="spReset">Reset</button><span id="spPendingCount"></span></div>
+</div>
+<!-- The grouping dialog, as index.php ships it (the PHP-only admin Snippet button
+     left out). Every control the Apply handler reads is here. -->
+<div id="groupingLightbox" class="help-lightbox">
+    <div class="lightbox-content pnb-dlg">
+        <div class="pnb-dlg-head">
+            <div class="pnb-dlg-tt"><h3 class="pnb-dlg-title">Group Table by Column</h3></div>
+            <span class="pnb-dlg-action" id="groupPresetMount"></span>
+            <button type="button" class="close-lightbox" aria-label="Close" title="Close (Esc)">&times;</button>
+        </div>
+        <p id="pivotWarningForGrouping" style="display: none;">Note, you are viewing a pivot table.</p>
+        <div class="grp-lb-body">
+          <div class="grp-lb-left">
+            <div id="groupingColumnSelector" class="penumbra-custom-select" style="width: 100%; margin-bottom: 15px;">
+                <div class="pcs-selected" data-value="" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-label="Column to group by">-- Select a Column to Group By --</div>
+                <div class="pcs-dropdown" role="listbox" aria-label="Columns to group by"></div>
+            </div>
+            <div id="groupLevel2Row" style="display: none; margin-bottom: 15px;">
+                <div id="groupingColumnSelector2" class="penumbra-custom-select" style="width: 100%;">
+                    <div class="pcs-selected" data-value="" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-label="Second grouping level">-- None --</div>
+                    <div class="pcs-dropdown" role="listbox" aria-label="Second grouping level"></div>
+                </div>
+            </div>
+            <div id="groupLevel3Row" style="display: none; margin-bottom: 15px;">
+                <div id="groupingColumnSelector3" class="penumbra-custom-select" style="width: 100%;">
+                    <div class="pcs-selected" data-value="" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-label="Third grouping level">-- None --</div>
+                    <div class="pcs-dropdown" role="listbox" aria-label="Third grouping level"></div>
+                </div>
+            </div>
+            <div id="groupBinOptions" style="display: none; margin-bottom: 15px;">
+                <span id="groupBinColName"></span>
+                <input type="number" id="groupBinWidth" min="1" step="1" autocomplete="off" aria-label="Fixed bin width">
+                <input type="text" id="groupBinEdges" autocomplete="off" aria-label="Custom range cut points">
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label><input type="checkbox" id="groupAggCheckbox"> Include additional summary in each group header</label>
+                <div id="groupAggOptions" style="display: none;">
+                    <div id="groupAggColumn" class="penumbra-custom-select" style="flex: 1;">
+                        <div class="pcs-selected" data-value="" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-label="Column to aggregate">-- Column --</div>
+                        <div class="pcs-dropdown" role="listbox" aria-label="Columns to aggregate"></div>
+                    </div>
+                    <select id="groupAggType">
+                        <option value="sum">Sum</option><option value="avg">Average</option><option value="median">Median</option>
+                        <option value="min">Min</option><option value="max">Max</option><option value="range">Range (max - min)</option>
+                        <option value="stddev">Std Deviation</option><option value="count">Count (non-blank)</option>
+                        <option value="count_blank">Count (blank)</option><option value="count_distinct">Count (distinct)</option>
+                        <option value="mode">Mode (most common)</option><option value="antimode">Antimode (least common)</option>
+                    </select>
+                    <div id="groupSummaryFilterHint"></div>
+                </div>
+            </div>
+          </div>
+          <div class="grp-lb-right">
+            <select id="groupSortSelect">
+                <option value="label|asc">Label A&ndash;Z</option><option value="label|desc">Label Z&ndash;A</option>
+                <option value="count|asc">Fewest items</option><option value="count|desc">Most items</option>
+            </select>
+            <div id="groupLimitRow"><select id="groupLimitDir"><option value="top">Top</option><option value="bottom">Bottom</option></select>
+                <input type="number" id="groupLimitN" min="0" step="1" placeholder="all"></div>
+            <label><input type="checkbox" id="groupLimitOther" checked> Roll the rest into &ldquo;(Other)&rdquo;</label>
+            <div id="groupLimitMinRow"><input type="number" id="groupLimitMinRows" min="0" step="1" placeholder="0"></div>
+            <div id="groupStartDepthRow"><select id="groupStartDepth">
+                <option value="0">Nothing (all collapsed)</option><option value="1">Level 1</option><option value="2">Level 2</option><option value="3">All levels</option>
+            </select></div>
+          </div>
+        </div>
+        <div>
+            <button id="resetGroupingBtn">Reset</button>
+            <button id="ungroupBtn" style="display: none;">Remove Grouping</button>
+            <button id="confirmGroupingBtn">Apply Grouping</button>
+        </div>
+    </div>
+</div>
+<div id="pnbStatusBar">
+  <div class="sb-seg" id="sbColsSeg"><span id="sbCols"></span>
+    <span class="sb-chip" id="sbCustomCols" style="display:none;">custom layout</span>
+    <div class="sb-pop" id="sbCustomColsPop"><div id="sbCustomColsDiff"></div><button id="sbCustomColsReset">Reset</button><button id="sbCustomColsSave" style="display:none;">Save</button></div>
+  </div>
+  <div class="sb-seg" id="sbUserSeg"></div>
+</div>
+<pre id="out">running</pre>
+
+<script>
+  (function () { try { localStorage.clear(); } catch (e) {} })();
+  window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' } };
+  window.PENUMBRA_THEME_IDS = ['theme-default'];
+  window.PENUMBRA_THEME_ALIASES = {};
+  window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  (function () {
+    var P = new URLSearchParams(location.search);
+    window.__SCN = P.get('scn') || 'plain';
+    // --- the fixture ------------------------------------------------------
+    var COLS = ['V_ID', 'V_NAME', 'V_AMOUNT', 'V_STATUS', 'V_REGION', 'J_SUBS'];
+    window.__COLS = COLS;
+    var seed = 20260930;
+    function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
+    function pick(a) { return a[Math.floor(rnd() * a.length)]; }
+    var W = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel'];
+    var REG = ['North', 'South', 'East', 'West', 'Central', 'Coastal', 'Mountain', 'Valley'];
+    function money() { return '$' + (rnd() * 90000 + 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+    var rows = [];
+    for (var i = 1; i <= 240; i++) {
+      var r = {};
+      r.V_ID = 'ID-' + String(1000 + i);
+      r.V_NAME = pick(W) + ' ' + pick(W);
+      r.V_AMOUNT = money();
+      r.V_STATUS = pick(['Open', 'Closed', 'Pending']);
+      r.V_REGION = pick(REG);
+      var sub = [];
+      for (var k = 0, n = 1 + Math.floor(rnd() * 3); k < n; k++) {
+        sub.push({ SUB_NAME: pick(W), SUB_AMT: 1 + Math.floor(rnd() * 5000), SUB_ROLE: pick(['PI', 'Co-PI', 'Staff']) });
+      }
+      // Edge shapes past the first ten rows (the app samples rows 1-10 for the
+      // nested column names and 1-5 for the @@JSON parent): a blank nested value
+      // (-> [Blank]), a padded one (-> trimmed), a name twice in one row (-> once).
+      if (i > 10 && i % 13 === 0) sub[0].SUB_NAME = '';
+      if (i > 10 && i % 17 === 0) sub[0].SUB_NAME = '  ' + sub[0].SUB_NAME + ' ';
+      if (i > 10 && i % 19 === 0) sub.push({ SUB_NAME: sub[0].SUB_NAME, SUB_AMT: 7, SUB_ROLE: 'Staff' });
+      r.J_SUBS = (i > 10 && i % 9 === 0) ? null : (i === 50 ? '@@JSON[]' : '@@JSON' + JSON.stringify(sub));
+      rows.push(r);
+    }
+    window.__rowsFixture = rows;
+    // --- the scenario's stored report ------------------------------------
+    var order = []; for (var c = 0; c < COLS.length; c++) order.push(c);
+    var st = {
+      name: 'jgfix', query: 'SELECT * FROM JG_FIXTURE', reportTitle: '@@JSON grouping fixture',
+      theme: 'theme-default', density: 'standard',
+      visibleColumns: ['#', 0, 1, 2, 3, 4, 5], columnOrder: order,
+      sortCriteria: [], noLimit: true, rowExpandDefault: false, resolverLinksDefault: true,
+      rowsPerPage: '200', reportSnippet: ''
+    };
+    var S = window.__SCN;
+    // A SAVED flat sort: the load path reorders the flat <tbody> in place.
+    if (S === 'sortload' || S === 'sortsearch' || S === 'sumsort' || S === 'sumsortboth') {
+      st.sortCriteria = [{ colIdentifier: 'V_AMOUNT', colIndex: 2, direction: 'desc' }];
+    }
+    window.__STORED = st;
+    window.penumbra_vars = {
+      isAdmin: true, isGlobalAdmin: true, canEditReport: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+      tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+      imports: [], reports: [], themes: {}, prompts: {}, grants: [],
+      totalExemptions: [],
+      preloadedState: st
+    };
+    window.__queryResponse = { data: rows };
+  })();
+  window.__T = {};
+  window.__queryDone = 0;
+  window.__ajaxLog = [];
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  jQuery.ajax = function (a, b) {
+    var opts = (typeof a === 'string') ? jQuery.extend({ url: a }, b || {}) : (a || {});
+    var url = String(opts.url || '');
+    window.__ajaxLog.push(url);
+    var d = jQuery.Deferred();
+    var isQuery = /query\.php/.test(url);
+    var resp = isQuery ? window.__queryResponse : {};
+    setTimeout(function () {
+      try { if (opts.success) opts.success(resp, 'success', { status: 200 }); } catch (e) { window.__errors.push('ajax success threw: ' + String(e)); }
+      try { if (opts.complete) opts.complete({ status: 200 }, 'success'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }
+      d.resolve(resp, 'success', { status: 200 });
+      if (isQuery) window.__queryDone++;
+    }, 0);
+    var p = d.promise(); p.abort = function () {}; return p;
+  };
+  jQuery.getJSON = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.post = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.get = jQuery.post;
+  jQuery.fx.off = true;
+  window.__errors = [];
+  window.__rejections = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    window.__rejections.push(String((r && r.message) || r) + ' @' + String((r && r.stack) || '').split('\n').slice(1, 2).join('').trim());
+    e.preventDefault();
+  });
+  window.confirm = function () { return true; };
+  window.alert = function (m) { window.__errors.push('alert: ' + m); };
+  window.prompt = function () { return null; };
+  if (typeof window.stackHeaders !== 'function') window.stackHeaders = function () {};
+</script>
+<script src="penumbra_userseg.js"></script>
+<script src="main_jg.js"></script>
+<script src="driver.js"></script>
+</body></html>

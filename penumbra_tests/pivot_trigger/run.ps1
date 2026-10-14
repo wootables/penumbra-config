@@ -1,0 +1,251 @@
+# =============================================================================
+# Penumbra PIVOT TRIGGER ROUND-TRIP HARNESS  -  one-command rebuild + run
+#
+# Boots the LIVE js/main.js headlessly (same recipe as ..\parity) and drives the
+# real code paths of the pivot action(trigger) feature:
+#   - the `pivot|...` trigger PARSER (click handler on #reportSnippetOutput)
+#   - the pivot builder's COPY SNIPPET writer (#copyPivotSnippetBtn)
+#   - engine A (renderReportSnippet) and engine B (resolveInfoboxSnippet)
+#     rendering of action(trigger, ..., 'pivot|...') links
+# and asserts the round trip: custom aggregation labels (position 17), filters,
+# formulas, column overrides and CASE survive snippet -> pivot -> snippet.
+#
+#   powershell -File run.ps1                 (tests the LIVE js/main.js)
+#   powershell -File run.ps1 -MainJs <path>  (e.g. a .bak - positive control:
+#                                             the pre-2026-08-19 file must FAIL
+#                                             the label / dedupe / case asserts)
+#   powershell -File run.ps1 -Mutant <name>  (ONE single-point change to the main.js
+#                                             under test, to SHOW a named assertion
+#                                             bites. Measured 2026-09-18, 396 asserts:
+#       seriestoken  395/1  chart map: a bucketed column field is passed through as the series token
+#       serieswarn   395/1  chart map: bucketed columns no longer warn
+#     2026-10-12, 408 asserts (toggle_switch on a prompt, the "tsp:" block):
+#       promptdetect  404/4  prompt is no longer observable: the switch refuses to render
+#       promptdisplay 407/1  only the stored value is compared, a Display:Value answer never reads ON
+#     2026-10-13 (column-name case in the pivot currency flags, the "cc:" block):
+#       curcase / colidscan - counts in the header of the cc: block in harness.html
+#                                             Control: the pre-feature main.js fails "tsp: hooks available", 397/1.
+#                                             Their positive control is -MainJs
+#                                             js\main.js.bak-20260904-autobuild, the last
+#                                             file before the series slot took bucket
+#                                             tokens: it fails exactly those two, 394/2.)
+#
+# If the UNC execution policy refuses the script ("not digitally signed"), run
+# its body as a scriptblock from the workstation:
+#   $dir='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivot_trigger'
+#   & ([scriptblock]::Create([IO.File]::ReadAllText("$dir\run.ps1").Replace('$here = $PSScriptRoot',"`$here = '$dir'")))
+# and do NOT pipe the invocation (a lingering Edge child keeps stdout open and
+# the pipeline never sees EOF); the script prints its own summary.
+#
+# Rebuilds from the LIVE app files each run; writes nothing to the webroot.
+# Exit code 1 when any assertion fails.
+# =============================================================================
+param([string]$MainJs = '', [switch]$PerfMode, [string]$Mutant = '')
+$ErrorActionPreference = 'Stop'
+$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivot_trigger' }   # empty when run as a scriptblock: never fall back to the caller's cwd
+$app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+$js   = "$app\js"
+if (-not $MainJs) { $MainJs = "$js\main.js" }
+$edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }
+
+Write-Host "[1/3] staging JS + patching main.js ..."
+$libs = @('jquery-3.7.1.min.js','jquery-ui.min.js','moment.min.js','pako.min.js',
+          'codemirror.min.js','sql.min.js','show-hint.js','foldcode.js','foldgutter.js',
+          'brace-fold.js','comment-fold.js','placeholder.js','penumbra_snippet_help.js',
+          'purify.min.js','penumbra_template.js')
+foreach ($f in $libs) { Copy-Item "$js\$f" "$here\$f" -Force }
+# chart-4.5.1.min.js deliberately NOT loaded (spins rAF under virtual time).
+
+Write-Host "      main.js under test: $MainJs"
+$src = [IO.File]::ReadAllText($MainJs, (New-Object System.Text.UTF8Encoding($false)))
+$anchor = '$(document).ready(function () {'
+if (-not $src.Substring(0, 200).Contains($anchor)) { throw "main.js closure anchor not found - update run.ps1" }
+# Targeted mutants: ONE single-point change each, applied to the source before
+# the hooks go in. The anchor must occur exactly once or the run throws - a
+# mutant that quietly stopped applying would read as a vacuous pass.
+# Entry: @(old, new)
+$mutants = @{
+  # Chart This Pivot, bucketed COLUMN field (the 2026-09-04 series tokens):
+  # 'seriestoken' drops the token back to its base column without a word,
+  # 'serieswarn' keeps the token but apologises the way the old mapper did.
+  'seriestoken' = @('groupBy = P.colFields[0];', 'groupBy = pivotFieldBase(P.colFields[0]);')
+  'serieswarn'  = @('groupBy = P.colFields[0];', "groupBy = P.colFields[0]; if (pivotParseFieldToken(groupBy).split) { warn.push('MUTANT: the buckets did not carry over.'); }")
+  # toggle_switch on a prompt (2026-10-12): 'promptdetect' forgets prompt is
+  # observable (the switch refuses to render); 'promptdisplay' compares only the
+  # stored value, so an options= Display:Value answer never reads ON.
+  'promptdetect'  = @("|| kind === 'unfilter' || kind === 'prompt';", "|| kind === 'unfilter';")
+  'promptdisplay' = @('(ran.value.trim() === pp.value || ran.display.trim() === pp.value)', '(ran.value.trim() === pp.value)')
+  # Column lookup case (2026-10-13, the "cc:" block): 'curcase' puts the
+  # upper-case-only lookup back in the pivot currency flags (a quoted "Amount"
+  # alias loses its '$'); 'colidscan' drops the case-insensitive key scan from
+  # penumbraColIdFor, leaving exact + upper case.
+  'curcase'   = @('var cid = penumbraColIdFor(nameToIdx, colName);', 'var cid = nameToIdx[String(colName).toUpperCase()];')
+  'colidscan' = @('if (keys[i].toUpperCase() === up) return nameToIdx[keys[i]];', 'if (false) return nameToIdx[keys[i]];')
+}
+if ($Mutant) {
+  if (-not $mutants.ContainsKey($Mutant)) { throw "unknown mutant '$Mutant' (known: $(($mutants.Keys | Sort-Object) -join ', '))" }
+  $mOld = $mutants[$Mutant][0]; $mNew = $mutants[$Mutant][1]
+  $mN = ([regex]::Matches($src, [regex]::Escape($mOld))).Count
+  if ($mN -ne 1) { throw "mutant '$Mutant' anchor found $mN times, expected 1: $mOld" }
+  $src = $src.Replace($mOld, $mNew)
+  Write-Host "      + MUTANT $Mutant"
+}
+# Export the closure-internal functions as the closure's FIRST statement:
+# function declarations hoist, so this works even if later init throws.
+$hooks = @(
+  'window.__PT = { addAggregationRow: addAggregationRow, getAggregationTokens: getAggregationTokens, getAggregationCustomLabels: getAggregationCustomLabels,',
+  '  getAggregationColOverrides: getAggregationColOverrides, getAggregationFilters: getAggregationFilters, getAggregationFormulas: getAggregationFormulas,',
+  '  validatePivotFormulas: validatePivotFormulas, refreshAggTokenLabels: refreshAggTokenLabels };',
+  'window.__ENGINE_B = resolveInfoboxSnippet; window.__RENDER_A = renderReportSnippet;'
+) -join ' '
+# Second hook set: the 2026-08-19 dblclick-edit feature. Separate try/catch so a
+# pre-feature main.js (positive-control runs against a .bak) still exposes __PT
+# and the original assertions run; only the new tests fail loudly.
+$hooks2 = @(
+  'try { window.__PT2 = { locate: penumbraLocatePivotActionCall, list: penumbraListPivotActionCalls,',
+  '  sole: _pivotSoleSnippetActionCall, open: penumbraOpenPivotBuilderFromEditor,',
+  '  build: penumbraBuildPivotTriggerFromUI, refreshTargetUI: _pivotRefreshSnippetTargetUI,',
+  '  getTarget: function () { return _pivotSnippetEditTarget; },',
+  '  setRows: function (r) { masterRowData = r; },',
+  '  render: renderReportSnippet, chainStep: executeChainStep };',
+  '} catch (e) { window.__PT2_ERR = String(e); }'
+) -join ' '
+# Third hook set: the 2026-08-21 layout_switch / toggle_switch controls. Own
+# try/catch for the same reason as __PT2 - a pre-feature main.js (positive
+# control) still runs phases 1-2, and only the phase-3 tests fail loudly.
+$hooks3 = @(
+  'try { window.__PT3 = { syncLayout: penumbraSyncActiveLayout, syncToggles: _pnbSyncToggles,',
+  '  cmdDetectable: _pnbCommandIsDetectable, cmdActive: _pnbCommandIsActive,',
+  '  idFromTrigger: _pivotIdentityFromTrigger, idFromView: _pivotIdentityFromCurrentView };',
+  '} catch (e) { window.__PT3_ERR = String(e); }'
+) -join ' '
+# Fifth hook set: the 2026-08-25 new aggregate types (stddev/range/count_filled/
+# count_blank/antimode). Own try/catch so pre-feature .bak control runs still
+# expose the earlier hooks and only the new tests fail loudly.
+$hooks5 = @(
+  'try { window.__PT5 = { stddev: pivotSampleStdDev, antimode: pivotAntimodeFromValues,',
+  '  antimodeMap: pivotAntimodeFromMap, parseNums: pivotParseNumericValues,',
+  '  extract: extractAggregationValue };',
+  '} catch (e) { window.__PT5_ERR = String(e); }'
+) -join ' '
+# Sixth hook set: the 2026-08-25 date-split tokens (AWARD_DATE:fy etc.).
+$hooks6 = @(
+  'try { window.__PT6 = { parseTok: pivotParseFieldToken, composeTok: pivotComposeFieldToken,',
+  '  dispLabel: pivotFieldDisplayLabel, bucket: pivotSplitBucketLabel, vcmp: pivotVariantCompare,',
+  '  splitsGet: function () { return PENUMBRA_PIVOT_SPLITS; },',
+  '  fillSpec: pivotColFieldsFillSpec, expand: pivotExpandColKeysWithGaps,',
+  '  buildPill: _pivotBuildZonePill, tokFromPill: _pivotTokenFromPill };',
+  '} catch (e) { window.__PT6_ERR = String(e); }'
+) -join ' '
+# Seventh hook set: the 2026-08-26 numeric binning (AMOUNT:bin50000 / :binlog).
+# HOISTED FNS ONLY (vars would be undefined at anchor time - see hooks6 trap).
+$hooks7 = @(
+  'try { window.__PT7 = { binBucket: pivotBinBucketLabel, autoW: pivotAutoBinWidth,',
+  '  resolveW: pivotResolveAutoBinWidth, chip: _pivotBinChipLabel,',
+  '  isNum: _pivotFieldIsNumericColumn, kindOf: _pivotFieldSplitKind };',
+  '} catch (e) { window.__PT7_ERR = String(e); }'
+) -join ' '
+# Eighth hook set: the 2026-08-27 custom-edge bins (AMOUNT:bins100000_250000).
+$hooks8 = @(
+  'try { window.__PT8 = { binsBucket: pivotBinsBucketLabel, normEdges: pivotNormalizeBinEdges,',
+  '  edgeList: _pivotParseEdgeList };',
+  '} catch (e) { window.__PT8_ERR = String(e); }'
+) -join ' '
+# Ninth hook set: the 2026-08-27 percentile aggregations (p10/p25/p90...).
+$hooks9 = @(
+  'try { window.__PT9 = { pctP: pivotPercentileP, pctOf: pivotPercentileOf,',
+  '  aggLabel: getAggregationLabel, snippetPctOf: penumbraPercentileOf,',
+  '  wavgCol: pivotWavgWeightCol, wavgOf: pivotWavgOf, wavgAdd: _pivotWavgAdd,',
+  '  wavgPair: _pivotWavgPair, aggCellHtml: _patAggCellHtml };',
+  '} catch (e) { window.__PT9_ERR = String(e); }'
+) -join ' '
+# Tenth hook set: chart-this-pivot (2026-08-27). setStash injects a fake render
+# so the pure mapping can be tested without drawing a pivot.
+$hooks10 = @(
+  'try { window.__PT10 = { toViz: pivotToVizConfig,',
+  '  vizAggsGet: function () { return PENUMBRA_VIZ_AGGS; },',
+  '  bucketVariants: _vizBucketVariantsFor, sortCmp: getCustomSortComparator,',
+  '  bucketRows: vizBucketRowsForAxis, extraAgg: vizExtraAggregate,',
+  '  canAgg: _vizCanAgg,',
+  '  setStash: function (s) { _lastPivotChart = s; } };',
+  '} catch (e) { window.__PT10_ERR = String(e); }'
+) -join ' '
+# Time intelligence (YTD). All hoisted function declarations, so exporting the
+# REFERENCE here is safe even though PENUMBRA_PIVOT_SPLITS is a var not populated
+# until later - the tests call these after the closure body has already run.
+$hooks11 = @(
+  'try { window.__PT11 = { periodInfo: pivotPeriodInfo, keyYear: pivotKeyYear,',
+  '  isYtd: pivotIsYtd, reset: pivotYtdReset, axisOk: pivotYtdAxisUsable,',
+  '  runLike: _isRunningTotalLike, runDown: _isRunningDown, totDown: _isRunTotalDown,',
+  '  isDerived: _isDerivedAgg, label: getAggregationLabel,',
+  '  isYoy: pivotIsYoy, periodKey: pivotPeriodKey, yoyIndex: pivotYoyIndex, yoyPrev: pivotYoyPrevKey,',
+  '  rollN: pivotRollN, isRoll: pivotIsRoll, isRollDown: pivotIsRollDown, rollMean: pivotRollMean,',
+  '  slotScalar: pivotTotalSlotScalar,',
+  '  inheritsUnits: _pivotInheritsBaseUnits, countLike: _pivotIsCountLike,',
+  '  isRoll: pivotIsRoll, isRollSum: pivotIsRollSum, isPriorYear: pivotIsPriorYear,',
+  '  indexBase: pivotIndexBaseLabel, isIndexAgg: pivotIsIndexAgg, isIndexDown: pivotIsIndexDown,',
+  '  resolveBaseline: pivotResolveBaselineKey };',
+  '} catch (e) { window.__PT11_ERR = String(e); }'
+) -join ' '
+# Twelfth hook set: toggle_switch on a prompt (2026-10-12). The ran-with map is a
+# const declared AFTER the hooks run (temporal dead zone), so it is read through
+# a getter, never exported by reference.
+$hooks12 = @(
+  'try { window.__PT12 = { promptParts: _pnbPromptStepParts, setPrompt: _pnbSetPromptAnswer,',
+  '  promptRan: function () { return _pnbPromptRanByName; } };',
+  '} catch (e) { window.__PT12_ERR = String(e); }'
+) -join ' '
+# Thirteenth hook set: column-name case in the pivot currency flags (2026-10-13).
+# curFlags exists in every recent main.js, so a pre-fix file (the control) runs
+# the real assertions and fails them; colId is the new helper, hooked apart.
+$hooks13 = @(
+  'try { window.__PT13 = { curFlags: penumbraPivotCurrencyFlags };',
+  '  try { window.__PT13.colId = penumbraColIdFor; } catch (e2) { window.__PT13_COLID_ERR = String(e2); }',
+  '} catch (e) { window.__PT13_ERR = String(e); }'
+) -join ' '
+$inject  = $anchor + "`r`n    try { $hooks } catch (e) { window.__PT_ERR = String(e); }`r`n    $hooks2`r`n    $hooks3`r`n    $hooks5`r`n    $hooks6`r`n    $hooks7`r`n    $hooks8`r`n    $hooks9`r`n    $hooks10`r`n    $hooks11`r`n    $hooks12`r`n    $hooks13`r`n"
+$patched = $src.Substring(0, $src.IndexOf($anchor)) + $inject + $src.Substring($src.IndexOf($anchor) + $anchor.Length)
+if ($PerfMode) {
+  # Perf mode measures SYNCHRONOUSLY during initial script execution, before the
+  # load event --dump-dom waits for. jQuery 3 fires ready callbacks through a
+  # setTimeout, so the closure would not have run yet - unwrap it into an IIFE
+  # so main.js initializes inline (the harness DOM is parsed above the scripts).
+  $i = $patched.IndexOf($anchor)
+  $patched = $patched.Substring(0, $i) + ';(function () {' + $patched.Substring($i + $anchor.Length)
+  $j = $patched.LastIndexOf('});')
+  if ($j -lt 0) { throw 'closure tail not found for PerfMode unwrap' }
+  $patched = $patched.Substring(0, $j) + '})();' + $patched.Substring($j + 3)
+}
+[IO.File]::WriteAllText("$here\main_patched.js", $patched, (New-Object System.Text.UTF8Encoding($false)))
+
+Write-Host "[2/3] running harness in headless Edge ..."
+$udd = Join-Path $here 'edgeprofile'
+$dom = Join-Path $here 'dom.txt'
+if (Test-Path $dom) { Remove-Item $dom -Force }
+$url = 'file:///' + $here.Replace([char]92, [char]47) + '/harness.html'
+# -PerfMode: real-clock measurements. The harness runs them SYNCHRONOUSLY during
+# initial script execution (?perf=1 branch), so no virtual-time budget is needed
+# or wanted - virtual time virtualizes performance.now() and reads 0ms for CPU work.
+$edgeArgs = @('--headless=new','--disable-gpu','--no-sandbox','--allow-file-access-from-files',"--user-data-dir=$udd")
+if ($PerfMode) { $url += '?perf=1' } else { $edgeArgs += '--virtual-time-budget=30000' }
+$edgeArgs += @('--dump-dom', $url)
+Start-Process -FilePath $edge -Wait -NoNewWindow -RedirectStandardOutput $dom -ArgumentList $edgeArgs
+$d = [IO.File]::ReadAllText($dom)
+$i = $d.IndexOf('<pre id="out">'); $j = $d.IndexOf('</pre>', $i)
+if ($i -lt 0) { throw "no <pre id=out> in dump (Edge produced $($d.Length) bytes)" }
+$txt = [System.Net.WebUtility]::HtmlDecode($d.Substring($i + 14, $j - $i - 14))
+if (-not $txt.StartsWith('RESULTS_JSON:')) { throw "harness did not finish: $($txt.Substring(0,[Math]::Min(400,$txt.Length)))" }
+$parsed = $txt.Substring(13) | ConvertFrom-Json
+[IO.File]::WriteAllText("$here\result.json", ($parsed | ConvertTo-Json -Depth 6))
+
+Write-Host "[3/3] results"
+if ($parsed.fatal) { throw "FATAL: $($parsed.fatal)" }
+if ($parsed.pageErrors -and $parsed.pageErrors.Count) { Write-Warning "main.js init errors (may invalidate results): $($parsed.pageErrors -join '; ')" }
+$fail = 0
+foreach ($r in $parsed.results) {
+  if ($r.pass) { Write-Host ("  PASS  " + $r.name) -ForegroundColor Green }
+  else { $fail++; Write-Host ("  FAIL  " + $r.name) -ForegroundColor Red; Write-Host ("        " + $r.detail) -ForegroundColor DarkYellow }
+}
+Write-Host ("{0} assertions, {1} failed" -f $parsed.results.Count, $fail)
+if ($fail -gt 0) { exit 1 }

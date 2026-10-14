@@ -1,0 +1,11 @@
+penumbra_get_themes
+penumbra_get_active_theme_ids
+penumbra_build_theme_styles
+penumbra_build_email_header_themes
+penumbra_build_theme_map
+penumbra_hex_to_argb
+penumbra_build_js_payload
+penumbra_build_alias_map
+penumbra_emit_themes_js
+penumbra_render_theme_options
+penumbra_emit_theme_css

@@ -1,0 +1,176 @@
+<!doctype html><html><head><meta charset="utf-8"><title>pivot probe</title></head>
+<body>
+<div id="reportSnippetOutput"></div><div id="pivotResultTable"></div>
+<pre id="out">RUNNING</pre>
+<script>window.__pageErrors=[];window.onerror=function(m){window.__pageErrors.push(String(m));};</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="purify.min.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_template.js"></script>
+<script src="main_probe.js"></script>
+<script>
+(function(){
+  var R=[];
+  function t(name,fn){ try{ var d=fn(); R.push({name:name,pass:d===true,detail:(d===true?'':String(d))}); }
+                       catch(e){ R.push({name:name,pass:false,detail:'THREW '+e}); } }
+  function done(){ document.getElementById('out').textContent='RESULTS_JSON:'+JSON.stringify({pageErrors:window.__pageErrors,results:R}); }
+  setTimeout(function(){
+    var P5=window.__PT5, P7=window.__PT7, P9=window.__PT9;
+    if(!P5||!P9){ R.push({name:'hooks present',pass:false,detail:'PT5='+!!P5+' PT9='+!!P9+' err='+(window.__PT5_ERR||'')+(window.__PT9_ERR||'')}); return done(); }
+
+    // ---- Build a cell exactly like the collector does, for agg index 0 that
+    // has BOTH a filter and a wavg@WT type. Rows: (v=10,w=1),(v=20,w=3)
+    // true weighted avg = (10*1 + 20*3)/(1+3) = 70/4 = 17.5
+    function bucket(pairs){
+      var b={sum:0,numericCount:0,min:Infinity,max:-Infinity,distinct:new Set(),values:[],wpairs:{}};
+      pairs.forEach(function(p){ b.sum+=p.v; b.numericCount++; if(p.v<b.min)b.min=p.v; if(p.v>b.max)b.max=p.v;
+        b.distinct.add(String(p.v)); b.values.push(String(p.v));
+        var s=b.wpairs['WT']||(b.wpairs['WT']={w:0,wv:0}); s.w+=p.w; s.wv+=p.v*p.w; });
+      return b;
+    }
+    var fbMain = bucket([{v:10,w:1},{v:20,w:3}]);
+    var cellFiltered = { count:5, sum:0, numericCount:0, min:Infinity, max:-Infinity,
+                         distinct:new Set(), values:[], wpairs:{},
+                         _filteredBuckets: { 0: { count:2, main: fbMain } } };
+
+    t('B1 wavg@WT WITH an agg filter returns 17.5 in the CELL', function(){
+      var got = P5.extract(cellFiltered,'wavg@WT',null,0);
+      return got===17.5 ? true : 'cell value = '+got+' (expected 17.5)';
+    });
+    t('B1b ...while the TOTALS path on the same bucket gives 17.5', function(){
+      var got = P9.wavgOf(P9.wavgPair(fbMain,'WT'));
+      return got===17.5 ? true : 'totals value = '+got;
+    });
+
+    // control: same wavg with NO filter works
+    var cellPlain = bucket([{v:10,w:1},{v:20,w:3}]); cellPlain.count=2;
+    t('B1c control: wavg@WT with NO filter works', function(){
+      var got = P5.extract(cellPlain,'wavg@WT',null,null);
+      return got===17.5 ? true : 'got '+got;
+    });
+
+    // ---- mode vs prototype-named values
+    var vals=['__proto__','__proto__','__proto__','x'];
+    var mb={count:4,sum:0,numericCount:0,min:Infinity,max:-Infinity,distinct:new Set(vals),values:vals,wpairs:{}};
+    t('B2 mode of ["__proto__" x3,"x"] is "__proto__"', function(){
+      var got=P5.extract(mb,'mode');
+      return got==='__proto__' ? true : 'mode = '+JSON.stringify(got);
+    });
+    var vals2=['constructor','constructor','y'];
+    var mb2={count:3,sum:0,numericCount:0,min:Infinity,max:-Infinity,distinct:new Set(vals2),values:vals2,wpairs:{}};
+    t('B2b mode of ["constructor" x2,"y"] is "constructor"', function(){
+      var got=P5.extract(mb2,'constructor'==='x'?'mode':'mode');
+      return got==='constructor' ? true : 'mode = '+JSON.stringify(got);
+    });
+    t('B2c control: antimode handles "__proto__" fine', function(){
+      var v=['__proto__','__proto__','q'];
+      var b={count:3,sum:0,numericCount:0,min:Infinity,max:-Infinity,distinct:new Set(v),values:v,wpairs:{}};
+      var got=P5.extract(b,'antimode');
+      return got==='q' ? true : 'antimode = '+JSON.stringify(got);
+    });
+
+    // ---- auto bin width: a non-Map row aborts the whole min/max scan
+    if(P7){
+      var rows=[]; for(var i=0;i<50;i++){ rows.push(new Map([['AMT',String(i*1000)]])); }
+      t('B3 control: auto bin width over clean rows', function(){
+        var w=P7.resolveW('AMT',rows); return w>1 ? true : 'width='+w;
+      });
+      var rows2=[new Map([['AMT','0']]), null];
+      for(var j=0;j<50;j++){ rows2.push(new Map([['AMT',String(j*1000)]])); }
+      t('B3b a single null row must not collapse auto bin width to 1', function(){
+        var w=P7.resolveW('AMT',rows2); return w>1 ? true : 'width='+w+' (scan aborted at the null row)';
+      });
+    }
+
+    // ---- count_blank with a column override
+    var ovCell={count:10,sum:0,numericCount:0,min:Infinity,max:-Infinity,distinct:new Set(),values:['a','b'],wpairs:{},
+      _colData:{ 'OTHER': {sum:0,numericCount:0,min:Infinity,max:-Infinity,distinct:new Set(['z']),values:['z'],wpairs:{}} }};
+    t('B4 count_blank on an override col counts that col\'s blanks (10-1=9)', function(){
+      var got=P5.extract(ovCell,'count_blank','OTHER');
+      return got===9 ? true : 'got '+got;
+    });
+
+    // ---- min/max on a cell with no numeric values
+    var txtCell={count:3,sum:0,numericCount:0,min:Infinity,max:-Infinity,distinct:new Set(['a']),values:['a','b','c'],wpairs:{}};
+    t('B5 min of an all-text cell returns Infinity (renderer already blanks it)', function(){
+      var got=P5.extract(txtCell,'min');
+      return got===Infinity ? true : 'min = '+got+' - the renderer blanks only Infinity, and min/max are excluded from zero-blanking, so 0 displays as a real measurement';
+    });
+    t('B5b max of an all-text cell returns -Infinity', function(){
+      var got=P5.extract(txtCell,'max');
+      return got===-Infinity ? true : 'max = '+got;
+    });
+    t('B5c control: the no-cellData path ALREADY returns Infinity for min', function(){
+      var got=P5.extract(null,'min');
+      return got===Infinity ? true : 'got '+got;
+    });
+    t('B5d a GENUINE min of 0 still returns 0, not Infinity', function(){
+      var z=['0','5']; var zc={count:2,sum:5,numericCount:2,min:0,max:5,distinct:new Set(z),values:z,wpairs:{}};
+      var got=P5.extract(zc,'min');
+      return got===0 ? true : 'got '+got;
+    });
+    t('B5e (info) range of an all-text cell returns 0 - already renders blank', function(){
+      var got=P5.extract(txtCell,'range');
+      return got===0 ? true : 'got '+got;
+    });
+
+    // ---- percentile p50 == median parity
+    var pv=['1','2','3','4'];
+    var pc={count:4,sum:10,numericCount:4,min:1,max:4,distinct:new Set(pv),values:pv,wpairs:{}};
+    t('B6 p50 == median', function(){
+      var a=P5.extract(pc,'p50'), b=P5.extract(pc,'median');
+      return a===b ? true : 'p50='+a+' median='+b;
+    });
+    t('B6b p100 is rejected by the pNN grammar (falls through to 0)', function(){
+      var a=P5.extract(pc,'p100');
+      return a===0 ? true : 'p100='+a;
+    });
+
+    // ---- wavg where every weight is 0
+    var zb={count:2,sum:30,numericCount:2,min:10,max:20,distinct:new Set(),values:['10','20'],
+            wpairs:{'WT':{w:0,wv:0}}};
+    t('B7 (info) wavg all-zero weights returns 0 - renders blank, matches the totals path', function(){
+      var got=P5.extract(zb,'wavg@WT');
+      return got===0 ? true : 'got '+got;
+    });
+
+    // ---- P2 coverage for the OTHER frequency counters that are module-scope
+    t('B8 antimode over a Map (totals path) is unaffected by __proto__', function(){
+      var m=new Map([['__proto__',2],['q',1]]);
+      var got=(window.__PT5.antimodeMap ? window.__PT5.antimodeMap(m) : null);
+      return got===null ? 'antimodeMap not hooked (skipped)' : (got==='q' ? true : 'got '+JSON.stringify(got));
+    });
+
+    // ---- P3: the shared format-condition aggregate detector
+    var CF=window.__CF;
+    if(!CF){ R.push({name:'C0 detector hooks present',pass:false,detail:'__CF missing: '+(window.__CF_ERR||'')}); }
+    else {
+      [['sum(AMOUNT) > 5',true],['count(X) > 0',true],['median(A) < 2',true],
+       ['stddev(AMOUNT) > 5',true],['range(A) > 1',true],['p90(A) > 3',true],
+       ['count_filled(A) > 0',true],['count_blank(A) > 0',true],
+       ['antimode(A) > 0',true],['wavg(A) > 0',true],
+       ['AMOUNT > 5',false],['TOP10(A) > 3',false],['xsum(A) > 1',false]
+      ].forEach(function(c){
+        t('C1 detect '+JSON.stringify(c[0])+' -> '+c[1], function(){
+          var got=CF.detect().test(c[0]);
+          return got===c[1] ? true : 'detector returned '+got;
+        });
+      });
+      t('C2 count_filled is not shadowed by count', function(){
+        var m=CF.call().exec('count_filled(A)');
+        return (m && m[1].toLowerCase()==='count_filled') ? true : 'matched '+(m?m[1]:'nothing');
+      });
+      t('C3 pNN grammar: p90 detected, p100 is not', function(){
+        return (CF.detect().test('p90(A) > 1') && !CF.detect().test('p100(A) > 1'))
+          ? true : 'p90='+CF.detect().test('p90(A) > 1')+' p100='+CF.detect().test('p100(A) > 1');
+      });
+    }
+
+    done();
+  },50);
+})();
+</script>
+</body></html>

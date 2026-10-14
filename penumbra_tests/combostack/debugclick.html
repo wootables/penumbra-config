@@ -1,0 +1,769 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>combo stack groups</title>
+<link rel="stylesheet" href="main_css_under_test.css">
+</head>
+<body>
+<!-- COMBO STACK GROUPS (2026-10-06). run.ps1 builds harness_built.html from this
+     file: the chart builder's REAL markup (the #visualizationLightbox block of the
+     index.php under test) replaces the marker below, so the builder that is driven
+     here is the one the app ships. main.js binds builder elements at ready time, so
+     the markup must be in the page before main.js loads. -->
+<div id="editorTabs"></div><div id="reportHeaderContainer"></div><div id="mainReportSubtitle"></div>
+<div id="reportSnippetOutput" style="width: 900px"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<table id="resultsTable"><thead id="tableHeader"><tr>
+  <th data-colname="#">#</th><th data-colname="FY">FY</th><th data-colname="DOD_DOW">DOD_DOW</th><th data-colname="NSA">NSA</th>
+  <th data-colname="AMOUNT">AMOUNT</th><th data-colname="AWARD_ID">AWARD_ID</th>
+</tr></thead><tbody></tbody></table>
+<div id="errorBox"></div>
+<input id="tableSearch" value="">
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="visualizationLightbox" class="help-lightbox">
+    <div class="lightbox-content pnb-dlg viz-shell">
+        <div class="pnb-dlg-head">
+            <span class="pnb-dlg-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#pnbi-visualize"/></svg></span>
+            <div class="pnb-dlg-tt">
+                <h3 class="pnb-dlg-title">Data Visualization Builder <span class="tab-help-icon" data-target="#visualizationBuilderHelpLightbox" title="Visualization Builder Help">?</span></h3>
+                <p class="pnb-dlg-sub">Chart the current result set</p>
+            </div>
+            <span class="pnb-dlg-action" id="vizPresetMount"></span>
+            <button type="button" class="close-lightbox" aria-label="Close" title="Close (Esc)">&times;</button>
+        </div>
+
+        <!-- ============ CHART TYPE (carousel: one row, arrows page by a full
+             viewport of tiles and STOP at each end - no wrap, so a disabled
+             arrow is the cue that you have seen them all) ============ -->
+        <div class="viz-carousel">
+            <button type="button" id="vizCarouPrev" class="viz-carou-btn" aria-label="Previous chart types" title="Previous chart types" disabled>&#x2039;</button>
+            <div class="viz-carou-win" id="vizCarouWin">
+                <div class="viz-type-selector" id="vizTypeSelector" role="listbox" aria-label="Chart type" tabindex="0">
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="bar">
+                        <svg viewBox="0 0 36 28"><rect class="viz-icon-fill" x="4" y="12" width="7" height="14" rx="1.5" fill="#336699"/><rect class="viz-icon-fill" x="14" y="4" width="7" height="22" rx="1.5" fill="#336699"/><rect class="viz-icon-fill" x="24" y="8" width="7" height="18" rx="1.5" fill="#336699"/></svg>
+                        <strong>Bar</strong>
+                        <div class="viz-option-desc">Categories</div>
+                    </div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="line">
+                        <svg viewBox="0 0 36 28"><polyline points="3,20 12,8 22,15 33,4" fill="none" class="viz-icon-stroke" stroke="#336699" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle class="viz-icon-fill" cx="3" cy="20" r="2" fill="#336699"/><circle class="viz-icon-fill" cx="12" cy="8" r="2" fill="#336699"/><circle class="viz-icon-fill" cx="22" cy="15" r="2" fill="#336699"/><circle class="viz-icon-fill" cx="33" cy="4" r="2" fill="#336699"/></svg>
+                        <strong>Line</strong>
+                        <div class="viz-option-desc">Trends</div>
+                    </div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="combo">
+                        <svg viewBox="0 0 36 28"><rect class="viz-icon-fill" x="4" y="12" width="6" height="14" rx="1.5" fill="#336699"/><rect class="viz-icon-fill" x="15" y="8" width="6" height="18" rx="1.5" fill="#336699"/><rect class="viz-icon-fill" x="26" y="14" width="6" height="12" rx="1.5" fill="#336699"/><polyline points="7,9 18,4 29,11" fill="none" stroke="#dc3545" stroke-width="2" stroke-linecap="round"/></svg>
+                        <strong>Combo</strong>
+                        <div class="viz-option-desc">Multi Bar+Line</div>
+                    </div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="butterfly">
+                        <svg viewBox="0 0 36 28"><rect class="viz-icon-fill" x="3" y="3" width="12" height="5" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="3" y="11" width="8" height="5" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="3" y="19" width="14" height="5" rx="1" fill="#336699"/><rect x="19" y="3" width="10" height="5" rx="1" fill="#c0392b" opacity="0.8"/><rect x="19" y="11" width="14" height="5" rx="1" fill="#c0392b" opacity="0.8"/><rect x="19" y="19" width="6" height="5" rx="1" fill="#c0392b" opacity="0.8"/><line x1="17.5" y1="0" x2="17.5" y2="28" class="viz-icon-line" stroke="#aaa" stroke-width="0.5" stroke-dasharray="2,2"/></svg>
+                        <strong>Butterfly</strong>
+                        <div class="viz-option-desc">Left vs Right</div>
+                    </div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="pie">
+                        <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="12" class="viz-icon-mute" fill="#e5e7eb"/><path class="viz-icon-fill" d="M16,16 L16,4 A12,12 0 0,1 27.4,22 Z" fill="#336699"/></svg>
+                        <strong>Pie</strong>
+                        <div class="viz-option-desc">Proportions</div>
+                    </div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="doughnut">
+                        <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="12" class="viz-icon-mute" fill="#e5e7eb"/><path class="viz-icon-fill" d="M16,16 L16,4 A12,12 0 0,1 27.4,22 Z" fill="#336699"/><circle cx="16" cy="16" r="5.5" fill="var(--bg-surface, #fff)"/></svg>
+                        <strong>Doughnut</strong>
+                        <div class="viz-option-desc">Proportions</div>
+                    </div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="scatter">
+                        <svg viewBox="0 0 36 28"><circle class="viz-icon-fill" cx="6" cy="18" r="2.5" fill="#336699" opacity="0.7"/><circle class="viz-icon-fill" cx="13" cy="7" r="2.5" fill="#336699" opacity="0.7"/><circle class="viz-icon-fill" cx="19" cy="20" r="2.5" fill="#336699" opacity="0.7"/><circle class="viz-icon-fill" cx="26" cy="10" r="2.5" fill="#336699" opacity="0.7"/><circle class="viz-icon-fill" cx="31" cy="14" r="2.5" fill="#336699" opacity="0.7"/></svg>
+                        <strong>Scatter</strong>
+                        <div class="viz-option-desc">X/Y + Bubble</div>
+                    </div>
+
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="radar">
+                        <svg viewBox="0 0 32 32"><polygon points="16,4 27,12 24,26 8,26 5,12" fill="none" class="viz-icon-mute-stroke" stroke="#e5e7eb" stroke-width="1"/><polygon class="viz-icon-fill" points="16,8 23,13 21,23 11,23 9,13" fill="#336699" opacity="0.25" stroke="#336699" stroke-width="1.5"/></svg>
+                        <strong>Radar</strong>
+                        <div class="viz-option-desc">Multi-axis</div>
+                    </div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="treemap">
+                        <svg viewBox="0 0 36 28"><rect class="viz-icon-fill" x="1" y="1" width="20" height="16" rx="1.5" fill="#336699"/><rect class="viz-icon-fill" x="22" y="1" width="13" height="16" rx="1.5" fill="#336699" opacity="0.65"/><rect class="viz-icon-fill" x="1" y="18" width="12" height="9" rx="1.5" fill="#336699" opacity="0.45"/><rect class="viz-icon-fill" x="14" y="18" width="10" height="9" rx="1.5" fill="#336699" opacity="0.3"/><rect class="viz-icon-fill" x="25" y="18" width="10" height="9" rx="1.5" fill="#336699" opacity="0.55"/></svg>
+                        <strong>Treemap</strong>
+                        <div class="viz-option-desc">Hierarchy</div>
+                    </div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="histogram">
+                        <svg viewBox="0 0 36 28"><rect class="viz-icon-fill" x="2" y="16" width="5" height="10" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="8" y="8" width="5" height="18" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="14" y="3" width="5" height="23" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="20" y="6" width="5" height="20" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="26" y="13" width="5" height="13" rx="1" fill="#336699"/><rect class="viz-icon-fill" x="32" y="21" width="3" height="5" rx="1" fill="#336699"/></svg>
+                        <strong>Histogram</strong>
+                        <div class="viz-option-desc">Distribution</div>
+                    </div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="waterfall">
+                        <svg viewBox="0 0 36 28"><rect x="2" y="16" width="5" height="10" rx="1" fill="#4CAF50"/><rect x="9" y="10" width="5" height="6" rx="1" fill="#4CAF50"/><rect x="16" y="6" width="5" height="4" rx="1" fill="#4CAF50"/><rect x="23" y="8" width="5" height="4" rx="1" fill="#c0392b" opacity="0.8"/><rect class="viz-icon-fill" x="30" y="2" width="5" height="24" rx="1" fill="#336699" opacity="0.6"/></svg>
+                        <strong>Waterfall</strong>
+                        <div class="viz-option-desc">Build-up</div>
+                    </div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="funnel">
+                        <svg viewBox="0 0 36 28"><rect class="viz-icon-fill" x="2" y="2" width="32" height="5" rx="1.5" fill="#336699"/><rect class="viz-icon-fill" x="6" y="9" width="24" height="5" rx="1.5" fill="#336699" opacity="0.8"/><rect class="viz-icon-fill" x="10" y="16" width="16" height="5" rx="1.5" fill="#336699" opacity="0.6"/><rect class="viz-icon-fill" x="14" y="23" width="8" height="4" rx="1.5" fill="#336699" opacity="0.45"/></svg>
+                        <strong>Funnel</strong>
+                        <div class="viz-option-desc">Stages</div>
+                    </div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="gauge">
+                        <svg viewBox="0 0 36 28"><path d="M4,24 A14,14 0 0,1 32,24" fill="none" class="viz-icon-mute-stroke" stroke="#e5e7eb" stroke-width="5" stroke-linecap="round"/><path class="viz-icon-stroke" d="M4,24 A14,14 0 0,1 14.5,10.5" fill="none" stroke="#336699" stroke-width="5" stroke-linecap="round"/><line x1="18" y1="24" x2="24" y2="15" stroke="#c0392b" stroke-width="2" stroke-linecap="round"/><circle cx="18" cy="24" r="2" fill="#c0392b"/></svg>
+                        <strong>Gauge</strong>
+                        <div class="viz-option-desc">One KPI</div>
+                    </div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="bullet">
+                        <svg viewBox="0 0 36 28"><rect x="2" y="3" width="32" height="6" rx="1" class="viz-icon-mute" fill="#e5e7eb"/><rect x="2" y="3" width="21" height="6" rx="1" class="viz-icon-mute" fill="#d1d5db"/><rect class="viz-icon-fill" x="2" y="4.5" width="17" height="3" rx="1" fill="#336699"/><line x1="25" y1="2" x2="25" y2="10" stroke="#c0392b" stroke-width="2"/><rect x="2" y="14" width="32" height="6" rx="1" class="viz-icon-mute" fill="#e5e7eb"/><rect x="2" y="14" width="21" height="6" rx="1" class="viz-icon-mute" fill="#d1d5db"/><rect class="viz-icon-fill" x="2" y="15.5" width="26" height="3" rx="1" fill="#336699"/><line x1="20" y1="13" x2="20" y2="21" stroke="#c0392b" stroke-width="2"/></svg>
+                        <strong>Bullet</strong>
+                        <div class="viz-option-desc">vs Target</div>
+                    </div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="box">
+                        <svg viewBox="0 0 36 28"><line x1="7" y1="3" x2="7" y2="25" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="4" y1="3" x2="10" y2="3" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="4" y1="25" x2="10" y2="25" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><rect class="viz-icon-fill viz-icon-stroke" x="3" y="9" width="8" height="10" rx="1" fill="#336699" opacity="0.55" stroke="#336699"/><line x1="3" y1="14" x2="11" y2="14" class="viz-icon-stroke" stroke="#1b3a5c" stroke-width="2"/><line x1="19" y1="6" x2="19" y2="27" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="16" y1="6" x2="22" y2="6" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="16" y1="27" x2="22" y2="27" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><rect class="viz-icon-fill viz-icon-stroke" x="15" y="12" width="8" height="9" rx="1" fill="#336699" opacity="0.55" stroke="#336699"/><line x1="15" y1="17" x2="23" y2="17" class="viz-icon-stroke" stroke="#1b3a5c" stroke-width="2"/><circle cx="19" cy="2" r="1.6" fill="none" class="viz-icon-line" stroke="#888"/><line x1="31" y1="8" x2="31" y2="24" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="28" y1="8" x2="34" y2="8" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><line x1="28" y1="24" x2="34" y2="24" class="viz-icon-line" stroke="#888" stroke-width="1.5"/><rect class="viz-icon-fill viz-icon-stroke" x="27" y="12" width="8" height="8" rx="1" fill="#336699" opacity="0.55" stroke="#336699"/><line x1="27" y1="16" x2="35" y2="16" class="viz-icon-stroke" stroke="#1b3a5c" stroke-width="2"/></svg>
+                        <strong>Box Plot</strong>
+                        <div class="viz-option-desc">Spread</div>
+                    </div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="gantt">
+                        <svg viewBox="0 0 36 28"><rect class="viz-icon-fill" x="2" y="3" width="16" height="4" rx="1.5" fill="#336699"/><rect class="viz-icon-fill" x="8" y="9" width="18" height="4" rx="1.5" fill="#336699" opacity="0.8"/><rect class="viz-icon-fill" x="14" y="15" width="12" height="4" rx="1.5" fill="#336699" opacity="0.65"/><rect class="viz-icon-fill" x="20" y="21" width="14" height="4" rx="1.5" fill="#336699" opacity="0.5"/><line x1="24" y1="1" x2="24" y2="27" stroke="#c0392b" stroke-width="1.5" stroke-dasharray="3,2"/></svg>
+                        <strong>Gantt</strong>
+                        <div class="viz-option-desc">Timeline</div>
+                    </div>
+                    <div class="viz-type-option" role="option" aria-selected="false" data-type="map">
+                        <svg viewBox="0 0 36 28"><rect class="viz-icon-fill" x="1" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.25"/><rect class="viz-icon-fill" x="8" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.5"/><rect class="viz-icon-fill" x="15" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.85"/><rect class="viz-icon-fill" x="22" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.4"/><rect class="viz-icon-fill" x="29" y="2" width="6" height="5" rx="1" fill="#336699" opacity="0.6"/><rect class="viz-icon-fill" x="1" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.6"/><rect class="viz-icon-fill" x="8" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.3"/><rect class="viz-icon-fill" x="15" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.75"/><rect class="viz-icon-fill" x="22" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.95"/><rect class="viz-icon-fill" x="29" y="9" width="6" height="5" rx="1" fill="#336699" opacity="0.35"/><rect class="viz-icon-fill" x="8" y="16" width="6" height="5" rx="1" fill="#336699" opacity="0.45"/><rect class="viz-icon-fill" x="15" y="16" width="6" height="5" rx="1" fill="#336699" opacity="0.7"/><rect class="viz-icon-fill" x="22" y="16" width="6" height="5" rx="1" fill="#336699" opacity="0.2"/><rect class="viz-icon-fill" x="15" y="23" width="6" height="4" rx="1" fill="#336699" opacity="0.55"/></svg>
+                        <strong>Map</strong>
+                        <div class="viz-option-desc">By State</div>
+                    </div>
+                </div>
+                <!-- Position rail: with only 8 of the 17 tiles in view, this is
+                     what says how far along the row you are. Sized and moved by
+                     vizSyncCarousel(). -->
+                <div class="viz-carou-rail" role="scrollbar" aria-controls="vizTypeSelector" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" title="Chart types: click to jump, drag to scroll"><i></i></div>
+            </div>
+            <button type="button" id="vizCarouNext" class="viz-carou-btn" aria-label="More chart types" title="More chart types">&#x203A;</button>
+        </div>
+
+        <!-- ============ CONFIGURATION TABS ============
+             Four tabs. The first three are fixed; the fourth is CONTEXTUAL - it
+             renames itself to the selected chart type and holds that type&#39;s own
+             strip (Combo series, Map bands, Gantt end date, ...). That is what
+             lets .viz-panes take a FIXED height: no strip can push the preview
+             down any more. Every #viz* id below is unchanged - the fields were
+             re-parented, not rewritten. ============ -->
+        <div class="viz-tabs" role="tablist" aria-label="Chart settings">
+            <button type="button" class="viz-tab active" role="tab" id="vizTabData" data-viz-tab="data" aria-selected="true" aria-controls="vizPaneData">Data</button>
+            <button type="button" class="viz-tab" role="tab" id="vizTabAppearance" data-viz-tab="appearance" aria-selected="false" aria-controls="vizPaneAppearance">Appearance</button>
+            <button type="button" class="viz-tab" role="tab" id="vizTabAxes" data-viz-tab="axes" aria-selected="false" aria-controls="vizPaneAxes">Axes &amp; Scale</button>
+            <button type="button" class="viz-tab viz-tab-ctx" role="tab" id="vizTabType" data-viz-tab="type" aria-selected="false" aria-controls="vizPaneType" title="Settings that belong to the selected chart type">
+                <span id="vizTabTypeLabel">Bar options</span>
+                <span class="viz-tab-dot" id="vizTabTypeDot" hidden title="This chart type has settings of its own"></span>
+            </button>
+        </div>
+
+        <div class="viz-panes" id="vizPanes">
+
+            <!-- ---- DATA: what is plotted ---- -->
+            <div class="viz-pane active" id="vizPaneData" role="tabpanel" aria-labelledby="vizTabData">
+                <div class="viz-row">
+                    <div class="viz-fld" id="vizXAxisFld" style="flex:1; min-width:0">
+                        <span class="viz-lbl" id="vizXAxisLbl"><span class="viz-lbl-text">X-Axis</span> <span class="bld-help-icon" data-tip="viz-x-axis"></span></span>
+                        <select id="vizXAxis" style="width:100%"><option value="">Select column...</option></select>
+                    </div>
+                    <div class="viz-fld" id="vizYAxisFld" style="flex:1; min-width:0">
+                        <span class="viz-lbl" id="vizYAxisLbl"><span class="viz-lbl-text">Y-Axis</span> <span class="bld-help-icon" data-tip="viz-y-axis"></span></span>
+                        <select id="vizYAxis" style="width:100%"><option value="">Select column...</option></select>
+                    </div>
+                    <div class="viz-fld" id="vizAggFld">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Aggregation</span> <span class="bld-help-icon" data-tip="viz-aggregation"></span></span>
+                        <select id="vizAggregation">
+                            <option value="sum" selected>Sum</option>
+                            <option value="count">Count</option>
+                            <option value="avg">Average</option>
+                            <option value="min">Minimum</option>
+                            <option value="max">Maximum</option>
+                            <option value="median">Median</option>
+                            <option value="distinct">Distinct Count</option>
+                            <option value="running_total">Running Total</option>
+                            <option value="running_count">Running Count</option>
+                            <option value="stddev">Std Deviation</option>
+                            <option value="range">Range (Max - Min)</option>
+                            <option value="p10">P10 (10th percentile)</option>
+                            <option value="p25">P25 (lower quartile)</option>
+                            <option value="p75">P75 (upper quartile)</option>
+                            <option value="p90">P90 (90th percentile)</option>
+                            <option value="p95">P95 (95th percentile)</option>
+                            <option value="p99">P99 (99th percentile)</option>
+                            <option value="wavg">Weighted Average&hellip;</option>
+                        </select>
+                    </div>
+                    <div class="viz-fld" id="vizWavgFld" style="display:none;">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Weight By</span></span>
+                        <select id="vizWavgWeight" title="Weight each row by this column"></select>
+                    </div>
+                    <div class="viz-fld">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Group By</span> <span class="bld-help-icon" data-tip="viz-group-by"></span></span>
+                        <select id="vizGroupBy"><option value="">No grouping</option></select>
+                    </div>
+                </div>
+                <div class="viz-row">
+                    <!-- Custom bin ranges for a NUMERIC X-Axis. Sits directly under
+                         X-Axis because that is what it rewrites: typing cut points
+                         here switches the axis to its COL:bins<e1>_<e2>... form -
+                         the same token the pivot's "Custom ranges" split emits, and
+                         one the chart engine already understood. Shown only when the
+                         X-Axis column is numeric (see vizSyncBinEdgesUI). -->
+                    <div class="viz-fld" id="vizBinEdgesFld" style="width:186px; display:none;">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Custom Ranges</span> <span class="bld-help-icon" data-tip="viz-bin-edges"></span></span>
+                        <input type="text" id="vizBinEdges" placeholder="e.g. 100K, 250K, 1M" autocomplete="off" aria-label="Custom bin ranges for the X-Axis">
+                    </div>
+                    <div class="viz-fld" id="vizFilterExprFld" style="flex:2; min-width:0">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Filter Expression</span> <span class="bld-help-icon" data-tip="viz-filter-expression"></span></span>
+                        <input type="text" id="vizFilterExpression" placeholder="e.g. STATUS = Active AND AMOUNT > 1000" style="width:100%" autocomplete="off" aria-label="Chart filter expression">
+                    </div>
+                    <div class="viz-fld" id="vizSortByFld">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Sort By</span> <span class="bld-help-icon" data-tip="viz-sort-by"></span></span>
+                        <select id="vizSortBy">
+                            <option value="value">Value (Y-Axis)</option>
+                            <option value="label">Label (X-Axis)</option>
+                            <!-- Gantt only. A timeline's "Value" IS the start date, so
+                                 the LENGTH of a bar had no sort of its own: picking
+                                 Value moved the bars by when they began while the day
+                                 counts printed on them stayed in no visible order.
+                                 Hidden for every other type (the same per-type option
+                                 hiding the Values row already uses for scatter), and
+                                 revealed by the Gantt branches in main.js. It lives in
+                                 the markup rather than being injected so a saved chart
+                                 with sortBy=duration always has an option to land on -
+                                 .val() on a missing option is a silent no-op. -->
+                            <option value="duration" style="display:none">Duration</option>
+                        </select>
+                    </div>
+                    <div class="viz-fld" id="vizSortDirFld">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Sort Order</span> <span class="bld-help-icon" data-tip="viz-sort-order"></span></span>
+                        <select id="vizSortDir">
+                            <option value="desc">Desc</option>
+                            <option value="asc">Asc</option>
+                        </select>
+                    </div>
+                    <div class="viz-fld" id="vizLimitFld">
+                        <span class="viz-lbl" id="vizLimitLbl"><span class="viz-lbl-text">Limit</span> <span class="bld-help-icon" data-tip="viz-limit"></span></span>
+                        <input type="number" id="vizLimit" value="10" min="1" max="9999" style="width:62px">
+                    </div>
+                </div>
+                <div class="viz-chip-row">
+                    <div id="vizAllowFilterWrap">
+                        <label class="viz-chip" data-tip="Let viewers filter the chart via its settings cog: by individual X-Axis categories and/or by Group values (whichever the chart type supports). Filter state is preserved on re-renders.">
+                            <input type="checkbox" id="vizAllowFilter" checked> Allow Filtering
+                        </label>
+                    </div>
+                    <label class="viz-chip" data-tip="Combine all categories beyond the Limit into a single 'Other' bar or slice, so totals reflect the full dataset.">
+                        <input type="checkbox" id="vizOtherBucket"> +Other Bucket
+                    </label>
+                    <!-- Hidden state inputs: the combined "Allow Filtering" chip is
+                         the user-facing control, but the underlying config still
+                         stores separate filterXAxis / filterGroup flags (and the
+                         chart-type handler disables them individually for types
+                         that can't support each).  These inputs hold that state. -->
+                    <input type="checkbox" id="vizFilterXAxis" checked style="display:none">
+                    <input type="checkbox" id="vizFilterGroup" checked style="display:none">
+                </div>
+            </div>
+
+            <!-- ---- APPEARANCE: how it reads ---- -->
+            <div class="viz-pane" id="vizPaneAppearance" role="tabpanel" aria-labelledby="vizTabAppearance">
+                <div class="viz-row">
+                    <!-- col 1: auto-title button -->
+                    <button id="autoTitleBtn" class="viz-auto-btn" title="Auto-generate title from selected columns">&#x26A1;</button>
+                    <div class="viz-fld" style="flex:1">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Title</span> <span class="bld-help-icon" data-tip="viz-title"></span></span>
+                        <input type="text" id="vizTitle" placeholder="Enter chart title...">
+                    </div>
+                    <div class="viz-fld" style="width:56px; flex-shrink:0">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Pos</span> <span class="bld-help-icon" data-tip="viz-title-pos"></span></span>
+                        <select id="vizTitlePosition">
+                            <option value="top" selected>Top</option>
+                            <option value="bottom">Bottom</option>
+                        </select>
+                    </div>
+                    <!-- flex:1.5, not grid-column. `.viz-row` is display:flex, so the
+                         grid-column this carried was INERT - the field got no flex at
+                         all, fell back to its content width and sat frozen at 160px no
+                         matter how wide the panel grew (17% of the Title at a 1180px
+                         panel). A subtitle usually carries the descriptive line and runs
+                         LONGER than the title, so it now takes half again the Title's
+                         share and grows with the panel like every other fluid field. -->
+                    <div class="viz-fld" style="flex:1.5; min-width:0">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Subtitle</span> <span class="bld-help-icon" data-tip="viz-subtitle"></span></span>
+                        <input type="text" id="vizSubtitle" placeholder="Subtitle...">
+                    </div>
+                </div>
+                <div class="viz-row">
+                    <div id="vizAxisLabelsRow" style="flex:2; min-width:0; display:flex; gap:7px; align-items:flex-end;">
+                        <div class="viz-fld" style="flex:1; min-width:0">
+                            <span class="viz-lbl"><span class="viz-lbl-text">X Label</span> <span class="bld-help-icon" data-tip="viz-x-label"></span></span>
+                            <input type="text" id="vizXAxisLabel" placeholder="X-axis label...">
+                        </div>
+                        <div class="viz-fld" style="flex:1">
+                            <span class="viz-lbl"><span class="viz-lbl-text">Y Label</span> <span class="bld-help-icon" data-tip="viz-y-label"></span></span>
+                            <input type="text" id="vizYAxisLabel" placeholder="Y-axis label...">
+                        </div>
+                        <!-- Right-axis title: a dual-axis combo only (shown by _vizSyncY2LabelUI) -->
+                        <div class="viz-fld" id="vizY2AxisLabelWrap" style="flex:1; min-width:0; display:none">
+                            <span class="viz-lbl"><span class="viz-lbl-text">Right Y Label</span> <span class="bld-help-icon" data-tip="viz-y2-label"></span></span>
+                            <input type="text" id="vizY2AxisLabel" placeholder="Right axis label...">
+                        </div>
+                    </div>
+                    <div class="viz-fld" style="width:96px">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Legend</span> <span class="bld-help-icon" data-tip="viz-legend"></span></span>
+                        <select id="vizLegend">
+                            <option value="none">None</option>
+                            <option value="top" selected>Top</option>
+                            <option value="right">Right</option>
+                            <option value="bottom">Bottom</option>
+                            <option value="left">Left</option>
+                        </select>
+                    </div>
+                    <div class="viz-fld" style="width:100px">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Values</span> <span class="bld-help-icon" data-tip="viz-values"></span></span>
+                        <select id="vizValues">
+                            <option value="none">None</option>
+                            <option value="end">Edge</option>
+                            <option value="center">Center</option>
+                            <option value="start">Base</option>
+                            <option value="auto" selected>Auto</option>
+                        </select>
+                    </div>
+                    <!-- Colours come from the THEME by default. This is a single
+                         swatch choice, deliberately not a per-element colour
+                         system: the theme stays the source of truth, and one
+                         picker is a choice rather than a configuration surface.
+                         (Per-series overrides live in the combo/butterfly series
+                         list, where a series already has its own row.) -->
+                    <div class="viz-fld" style="width:118px">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Palette</span> <span class="bld-help-icon" data-tip="viz-palette"></span></span>
+                        <select id="vizPalette">
+                            <option value="auto" selected>Auto (theme)</option>
+                            <option value="classic">Classic</option>
+                            <option value="warm">Warm</option>
+                            <option value="cool">Cool</option>
+                            <option value="mono">Mono</option>
+                        </select>
+                    </div>
+                    <!-- Number format. Every control defaults to Auto/blank, and
+                         nothing is emitted into the vis() call until one of them
+                         moves - so an untouched chart keeps the exact labels it
+                         had before this row existed. -->
+                    <div class="viz-fld" style="width:118px">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Number</span> <span class="bld-help-icon" data-tip="viz-num-style"></span></span>
+                        <select id="vizNumStyle">
+                            <option value="auto" selected>Auto</option>
+                            <option value="compact">Compact 1.2M</option>
+                            <option value="plain">Full 1,234,567</option>
+                            <option value="percent">Percent</option>
+                        </select>
+                    </div>
+                    <div class="viz-fld" style="width:82px">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Decimals</span> <span class="bld-help-icon" data-tip="viz-num-decimals"></span></span>
+                        <!-- 0-6 covers the parser's whole accepted range, so a
+                             snippet-authored value always has an option to land
+                             on and cannot be silently dropped on re-save. -->
+                        <select id="vizNumDecimals">
+                            <option value="auto" selected>Auto</option>
+                            <option value="0">0</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                            <option value="6">6</option>
+                        </select>
+                    </div>
+                    <div class="viz-fld" style="width:74px">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Prefix</span> <span class="bld-help-icon" data-tip="viz-num-prefix"></span></span>
+                        <input type="text" id="vizNumPrefix" placeholder="auto" maxlength="8">
+                    </div>
+                    <div class="viz-fld" style="width:74px">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Suffix</span> <span class="bld-help-icon" data-tip="viz-num-suffix"></span></span>
+                        <input type="text" id="vizNumSuffix" placeholder="none" maxlength="8">
+                    </div>
+                    <div class="viz-fld" style="width:90px">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Width</span> <span class="bld-help-icon" data-tip="viz-width"></span></span>
+                        <input type="text" id="vizWidth" value="100%" title="Pixels (e.g. 800) or a responsive percentage of the space the snippet is given (e.g. 100%). No unit = pixels. New charts default to 100%.">
+                    </div>
+                    <div class="viz-fld" style="width:92px">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Height</span> <span class="bld-help-icon" data-tip="viz-height"></span></span>
+                        <input type="text" id="vizHeight" value="420" title="Pixels. Applies to snippet output, not the preview below. New charts get a height proportional to their width, which varies by chart type.">
+                    </div>
+                </div>
+                <div class="viz-chip-row">
+                    <!-- Layout group -->
+                    <div id="vizHorizontalWrap">
+                        <label class="viz-chip" data-tip="Rotate the chart so bars run left-to-right instead of bottom-to-top - useful when category names are long. Available for Bar, Line, Histogram and Box Plot. A Butterfly chart is already horizontal by definition, so it does not use this.">
+                            <input type="checkbox" id="vizHorizontal"> Horizontal
+                        </label>
+                    </div>
+                    <div id="vizFillWrap" style="display:none">
+                        <label class="viz-chip" data-tip="Fill the area under a line chart to create an area chart. Only available for Line chart type.">
+                            <input type="checkbox" id="vizFill"> Fill Area
+                        </label>
+                    </div>
+                    <div id="vizStackedWrap">
+                        <label class="viz-chip" data-tip="Stack grouped bars on top of each other instead of side-by-side. Requires Group By to be set. Enables Stack Order and Stack to 100% options. On a Combo chart it stacks the bar series instead: each series' Stack number picks the bar it joins, and lines never stack.">
+                            <input type="checkbox" id="vizStacked"> Stack Data
+                        </label>
+                    </div>
+                    <div id="vizStackOptionsWrap" style="display:none">
+                        <label class="viz-chip" data-tip="Normalise all stacks to 100% so each bar shows proportional share rather than absolute values. Requires Stack Data and Group By.">
+                            <input type="checkbox" id="vizStackNormalize"> Stack to 100%
+                        </label>
+                    </div>
+                    <span class="viz-chip-group-sep" aria-hidden="true"></span>
+                    <!-- Display group -->
+                    <div id="vizShowSettingsWrap">
+                        <label class="viz-chip" data-tip="Show the settings cog icon on this chart. When unchecked, the cog is hidden so viewers see a cleaner chart - power users can still right-click the chart to access sort, filter, drill, fullscreen, and download options.">
+                            <input type="checkbox" id="vizShowSettings" checked> Show Settings
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ---- AXES &amp; SCALE: the numeric treatment ---- -->
+            <div class="viz-pane" id="vizPaneAxes" role="tabpanel" aria-labelledby="vizTabAxes">
+                <div class="viz-row">
+                    <div class="viz-fld" id="vizTrendWrap" style="width:120px">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Trend Line</span> <span class="bld-help-icon" data-tip="viz-trend"></span></span>
+                        <select id="vizTrendLine">
+                            <option value="none">None</option>
+                            <option value="ma3">Moving Avg (3)</option>
+                            <option value="ma5">Moving Avg (5)</option>
+                            <option value="ma7">Moving Avg (7)</option>
+                            <option value="regression">Linear Regression</option>
+                        </select>
+                    </div>
+                    <div class="viz-fld" id="vizRefLineWrap" style="width:150px">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Reference Line</span> <span class="bld-help-icon" data-tip="viz-refline"></span></span>
+                        <input type="text" id="vizReferenceLine" placeholder="e.g. 50000|Target" title="Draw a marker line at a value on the value axis. Format: value or value|label (e.g. 50000 or 50000|Budget).">
+                    </div>
+                    <div id="vizYRangeWrap" style="display:none; gap:6px; align-items:flex-end; flex-shrink:0;">
+                        <div class="viz-fld" style="width:88px">
+                            <span class="viz-lbl"><span class="viz-lbl-text">Y Min</span> <span class="bld-help-icon" data-tip="viz-y-min"></span></span>
+                            <input type="text" id="vizYMin" placeholder="auto" style="width:100%">
+                        </div>
+                        <div class="viz-fld" style="width:88px">
+                            <span class="viz-lbl"><span class="viz-lbl-text">Y Max</span> <span class="bld-help-icon" data-tip="viz-y-max"></span></span>
+                            <input type="text" id="vizYMax" placeholder="auto" style="width:100%">
+                        </div>
+                    </div>
+                    <!-- Stack Order - shown only when Group By + Stack Data are both active -->
+                    <div id="vizGroupOrderWrap" class="viz-grp-disabled">
+                        <div class="viz-fld">
+                            <span class="viz-lbl"><span class="viz-lbl-text">Stack Order</span> <span class="bld-help-icon" data-tip="viz-stack-order"></span></span>
+                            <select id="vizStackOrder">
+                                <option value="default">Groups: A&#x2192;Z</option>
+                                <option value="name-desc">Groups: Z&#x2192;A</option>
+                                <option value="total-desc">Groups: Largest first</option>
+                                <option value="total-asc">Groups: Smallest first</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="viz-chip-row">
+                    <!-- Scale group -->
+                    <div id="vizLogScaleWrap">
+                        <label class="viz-chip" data-tip="Use a logarithmic Y axis. Useful when values span several orders of magnitude (e.g. $500 and $50M on the same chart) - small values stay visible instead of being squashed to the baseline.">
+                            <input type="checkbox" id="vizLogScale"> Log Scale
+                        </label>
+                    </div>
+                </div>
+                <p class="viz-pane-note">Trend line, reference line and log scale grey out for the chart types that cannot carry them - the same rules as before, no longer spread across three rows.</p>
+            </div>
+
+            <!-- ---- TYPE: the eight former &quot;X only&quot; strips, unchanged. The
+                 chart-type handler still does hide-all-then-show-one on these ids,
+                 so its logic did not have to change. #vizTypeNoOptions is shown by
+                 that same handler when the selected type has no strip. ---- -->
+            <div class="viz-pane" id="vizPaneType" role="tabpanel" aria-labelledby="vizTabType">
+                <div class="viz-pane-empty" id="vizTypeNoOptions">
+                    <strong id="vizTypeNoOptionsTitle">This chart type has no settings of its own</strong>
+                    Everything it supports lives in Data, Appearance and Axes &amp; Scale.
+                </div>
+                <!-- ── SCATTER SIZE COLUMN - optional, turns scatter into bubble ── -->
+                <div id="vizBubbleRow" style="display:none" class="viz-combo-strip">
+                    <span class="viz-combo-badge">Scatter<br>option</span>
+                    <div class="viz-fld" style="flex:3">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Size Column (optional)</span> <span class="bld-help-icon" data-tip="viz-bubble-size"></span></span>
+                        <select id="vizBubbleSize"><option value="">None (uniform dots)</option></select>
+                    </div>
+                </div>
+                <!-- ── FUNNEL STRIP - shown only for Funnel chart type ── -->
+                <div id="vizFunnelRow" style="display:none" class="viz-combo-strip">
+                    <span class="viz-combo-badge">Funnel<br>only</span>
+                    <div class="viz-fld" style="flex:1; min-width:0">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Stage Measure</span> <span class="bld-help-icon" data-tip="viz-funnel-mode"></span></span>
+                        <select id="vizFunnelMode">
+                            <option value="conversion" selected>Conversion (how many remain)</option>
+                            <option value="duration">Duration (how long each stage took)</option>
+                        </select>
+                    </div>
+                    <div class="viz-fld" id="vizFunnelUnitFld" style="width:150px; display:none">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Time Unit</span> <span class="bld-help-icon" data-tip="viz-funnel-unit"></span></span>
+                        <select id="vizFunnelUnit">
+                            <option value="days" selected>Days</option>
+                            <option value="hours">Hours</option>
+                            <option value="minutes">Minutes</option>
+                            <option value="none">Plain number</option>
+                        </select>
+                    </div>
+                    <div class="viz-fld" style="flex:2; min-width:0; align-self:flex-end">
+                        <span class="viz-funnel-hint" id="vizFunnelHint">Conversion sorts stages largest first so the funnel narrows, and labels each with its share of the first stage.</span>
+                    </div>
+                </div>
+                <!-- ── MAP STRIP - shown only for Map ── -->
+                <div id="vizMapRow" style="display:none" class="viz-combo-strip">
+                    <span class="viz-combo-badge">Map<br>only</span>
+                    <div class="viz-fld" style="width:150px">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Map</span> <span class="bld-help-icon" data-tip="viz-map-kind"></span></span>
+                        <select id="vizMapKind">
+                            <option value="us-grid" selected>US states (grid)</option>
+                            <option value="us-outline">US states (outline)</option>
+                            <option value="nc-counties">NC counties (outline)</option>
+                            <option value="world">World countries (outline)</option>
+                        </select>
+                    </div>
+                    <div class="viz-fld" style="width:165px">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Match Column By</span> <span class="bld-help-icon" data-tip="viz-map-match"></span></span>
+                        <select id="vizMapMatch">
+                            <option value="auto" selected>Auto-detect</option>
+                            <option value="postal">Postal code (NC)</option>
+                            <option value="name">Full name</option>
+                            <option value="fips">FIPS code</option>
+                        </select>
+                    </div>
+                    <div class="viz-fld" style="width:170px">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Shade Bands</span> <span class="bld-help-icon" data-tip="viz-map-bins"></span></span>
+                        <select id="vizMapBins">
+                            <option value="quantile" selected>Quintiles (equal counts)</option>
+                            <option value="equal">Equal value steps</option>
+                        </select>
+                    </div>
+                    <label class="viz-chip" style="margin-bottom:6px" data-tip="Draw each state's postal code inside its tile. Strongly recommended: the grid is schematic, so the label is what identifies each square.">
+                        <input type="checkbox" id="vizMapLabels" checked> Labels
+                    </label>
+                    <div class="viz-fld" style="flex:1; min-width:0; align-self:flex-end">
+                        <span class="viz-funnel-hint" id="vizMapHint">Each state is one equal square, so small states stay readable. Values are binned into 5 shades; <b>Y Min</b> / <b>Y Max</b> on the <b>Axes &amp; Scale</b> tab pin the scale.</span>
+                    </div>
+                </div>
+                <!-- ── GANTT STRIP - shown only for Gantt ── -->
+                <div id="vizGanttRow" style="display:none" class="viz-combo-strip">
+                    <span class="viz-combo-badge">Gantt<br>only</span>
+                    <div class="viz-fld" style="flex:1; min-width:0">
+                        <span class="viz-lbl"><span class="viz-lbl-text">End Date Column</span> <span class="bld-help-icon" data-tip="viz-gantt-end"></span></span>
+                        <select id="vizGanttEnd"><option value="">Select column...</option></select>
+                    </div>
+                    <div class="viz-fld" style="flex:2; min-width:0; align-self:flex-end">
+                        <span class="viz-funnel-hint" id="vizGanttHint">Y-Axis is the <b>start</b> date and this is the <b>end</b> date. Put <code>today</code> in <b>Marker Date</b> on the <b>Axes &amp; Scale</b> tab to mark today.</span>
+                    </div>
+                </div>
+                <!-- ── BOX PLOT STRIP - shown only for Box Plot ── -->
+                <div id="vizBoxRow" style="display:none" class="viz-combo-strip">
+                    <span class="viz-combo-badge">Box<br>only</span>
+                    <div class="viz-fld" style="width:230px">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Whiskers</span> <span class="bld-help-icon" data-tip="viz-box-whiskers"></span></span>
+                        <select id="vizBoxWhiskers">
+                            <option value="tukey" selected>1.5 x IQR (outliers shown)</option>
+                            <option value="minmax">Min to max (no outliers)</option>
+                        </select>
+                    </div>
+                    <div class="viz-fld" style="flex:2; min-width:0; align-self:flex-end">
+                        <span class="viz-funnel-hint" id="vizBoxHint">Whiskers reach the furthest value still within 1.5 x the interquartile range; anything beyond is drawn as an outlier dot.</span>
+                    </div>
+                </div>
+                <!-- ── GAUGE / BULLET STRIP - shown for Gauge and Bullet ── -->
+                <div id="vizGaugeRow" style="display:none" class="viz-combo-strip">
+                    <span class="viz-combo-badge" id="vizGaugeBadge">Gauge<br>only</span>
+                    <div class="viz-fld" style="width:190px">
+                        <span class="viz-lbl"><span class="viz-lbl-text">Bands</span> <span class="bld-help-icon" data-tip="viz-gauge-bands"></span></span>
+                        <input type="text" id="vizGaugeBands" placeholder="e.g. 50|80" autocomplete="off">
+                    </div>
+                    <div class="viz-fld" style="flex:2; min-width:0; align-self:flex-end">
+                        <span class="viz-funnel-hint" id="vizGaugeHint">This chart&#39;s target is the <b>Target</b> field on the <b>Axes &amp; Scale</b> tab. Bands are ascending cut points on the same scale, shading the track into qualitative ranges.</span>
+                    </div>
+                </div>
+                <!-- ── BUTTERFLY STRIP - shown only for Butterfly chart type ── -->
+                <div id="vizButterflyRow" style="display:none" class="viz-combo-strip">
+                    <span class="viz-combo-badge">Butterfly<br>only</span>
+                    <div style="flex:1; min-width:0;">
+                        <div id="vizButterflySeriesList"></div>
+                    </div>
+                </div>
+                <!-- ── COMBO STRIP - shown only for Combo chart type ── -->
+                <div id="vizComboRow" style="display:none" class="viz-combo-strip">
+                    <span class="viz-combo-badge">Combo<br>only</span>
+                    <div style="flex:1; min-width:0;">
+                        <div id="vizComboSeriesList"></div>
+                        <div class="viz-combo-footer">
+                            <button type="button" id="vizAddComboSeries" class="viz-combo-add-btn" data-tip="Add another bar or line series to this combo chart (max 10).">+ Add Series</button>
+                            <label class="viz-chip" style="margin-bottom:0; border-color:#b8d4f5;" data-tip="Pareto: rescales a cumulative line series (Running Total / Running Count) to a percentage of its own grand total, pins the right axis to 0-100% and draws the 80% marker. Sort by Value descending and turn on +Other Bucket so the line reaches a true 100%.">
+                                <input type="checkbox" id="vizPareto"> Pareto
+                            </label>
+                            <label class="viz-chip" style="margin-bottom:0; border-color:#b8d4f5;" data-tip="Adds a second Y axis on the right scaled to line data. Use when bar and line values are in very different numeric ranges (e.g. dollars vs. count).">
+                                <input type="checkbox" id="vizDualAxis"> Dual Y-Axis
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div><!-- /viz-panes -->
+
+        <!-- ============ PREVIEW ============ -->
+        <div id="vizPreviewContainer">
+            <div style="text-align: center; padding: 30px 0;" class="viz-placeholder-text">
+                <h4>Chart Preview</h4>
+                <p>Pick an X-Axis column on the <strong>Data</strong> tab to see a live preview.</p>
+            </div>
+            <canvas id="vizChart" style="display: none;"></canvas>
+            <!-- The live "N categories / N source rows" summary line used to sit
+                 here. REMOVED 2026-08-27: with the preview now a fixed-height
+                 pane it rendered as a horizontal band across the bottom of the
+                 chart and read as part of the chart itself. updateVizPreviewDataSummary()
+                 is left in main.js, inert, if it is ever wanted somewhere else. -->
+        </div>
+
+        <!-- ============ BUTTONS - docked at the bottom of the dialog, after the
+             preview, the same way #pivot-action-bar sits under the pivot builder.
+             Same buttons, same ids, same handlers. ============ -->
+        <div class="viz-btn-bar">
+            <div class="viz-btn-group">
+                <!-- Getting-started action, deliberately first in the bar. Its label and
+                     tooltip are rewritten by vizSyncAutoBuildBtn() each time the builder
+                     opens, so it always names the layout it would actually read
+                     (pivot / groups / report). Successor to "Chart This Pivot". -->
+                <button id="vizAutoBuildBtn" class="pnb-btn pnb-btn-secondary" title="Fill the builder in from the table behind this dialog, then adjust whatever you like.">&#x1F4CA; Auto-build from report</button>
+                <button id="copyChartImage" class="pnb-btn pnb-btn-secondary" disabled title="Copy chart image to clipboard">&#x1F4CB; Copy Image</button>
+                <button id="downloadChart" class="pnb-btn pnb-btn-secondary" disabled>Download PNG</button>
+                <button id="vizResetBtn" class="pnb-btn pnb-btn-secondary" title="Reset the builder back to default settings (clears chart type, axes, all options, and any loaded preset)">&#x21BA; Reset</button>
+            </div>
+            
+            <div id="vizAdminRow" class="viz-btn-group" style="display: none;">
+                <span class="viz-admin-badge">&#x1F512; Admin</span>
+                <select id="vizChartDropdown">
+                    <option value="__new__">&#x2795; Add as new chart</option>
+                </select>
+                <!-- Actions menu: five admin buttons that together overflowed the
+                     docked bar onto a second line (1393px of groups in a 1222px
+                     bar), which cost the preview ~44px. They are MOVED, not
+                     changed - same ids, same classes, same handlers, and
+                     updateVizAdminButtons() still shows/hides each one
+                     independently. Update stays outside as the primary action. -->
+                <div class="viz-actions-menu" id="vizActionsMenu">
+                    <button type="button" id="vizActionsBtn" class="pnb-btn pnb-btn-sm pnb-btn-secondary viz-actions-btn" aria-haspopup="true" aria-expanded="false" aria-controls="vizActionsPanel" title="Ways to get this chart into the report&#39;s Custom Code">Actions</button>
+                    <div class="viz-actions-panel" id="vizActionsPanel" role="menu" aria-labelledby="vizActionsBtn" hidden>
+                        <button id="copyVizSnippetBtn" role="menuitem" class="pnb-btn pnb-btn-sm pnb-btn-secondary" style="display: none;" title="Writes a vis() call for this chart straight into the Custom Code editor, at the cursor.">&#x2913; Insert into Custom Code</button>
+                        <button id="injectVizInfoboxBtn" role="menuitem" class="pnb-btn pnb-btn-sm pnb-btn-secondary" style="display: none;" title="Same as above, but wraps the vis() call in infobox() first so the chart renders inside a bordered panel.">&#x1F4E6; Insert as an infobox</button>
+                        <button id="copyVizClipboardBtn" role="menuitem" class="pnb-btn pnb-btn-sm pnb-btn-secondary" style="display: none;" title="Copies the vis() call to the clipboard so you can paste it wherever you want it, rather than at the cursor.">&#x1F4CB; Copy vis() to clipboard</button>
+                        <button id="vizMoveToInfoboxBtn" role="menuitem" class="pnb-btn pnb-btn-sm pnb-btn-secondary" style="display: none;" title="Wraps this chart's existing vis() call in action(infobox, ...) where it already sits, so it becomes a link that opens the chart in a panel instead of drawing inline. Only offered for a chart that is currently inline.">&#x1F4E5; Move inside an infobox</button>
+                        <button id="vizMoveToSlideBtn" role="menuitem" class="pnb-btn pnb-btn-sm pnb-btn-secondary" style="display: none;" title="Wraps this chart's existing vis() call in slide(..., false) where it already sits, so it becomes a fullscreen presentation slide instead of drawing inline. The slide is hidden in the normal report and appears only when fullscreen is activated - use the Fullscreen action to control that. Only offered for a chart that is currently inline.">&#x1F5A5;&#xFE0F; Move to fullscreen slide</button>
+                        <button id="vizFullscreenActionBtn" role="menuitem" class="pnb-btn pnb-btn-sm pnb-btn-secondary" title="Adds an action(trigger, fullscreen, ...) command at the top of the snippet, which gives the report a button that opens its charts as a fullscreen carousel (dashboard mode).">&#x26F6; Set up fullscreen mode</button>
+                        <button id="removeVizSnippetBtn" role="menuitem" class="pnb-btn pnb-btn-sm pnb-btn-danger" style="display: none;" title="Deletes the selected chart&#39;s vis() call out of the Custom Code editor. The chart above is left alone.">&#x1F5D1; Remove this chart</button>
+                    </div>
+                </div>
+                <button id="updateVizSnippetBtn" class="pnb-btn pnb-btn-sm pnb-btn-primary" style="display: none;" title="Rewrites the selected chart&#39;s vis() call in the Custom Code editor with the settings above."><strong>&#x27F3; Update chart</strong></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<div style="width: 800px"><canvas id="cs_a" width="800" height="380"></canvas></div>
+<div style="width: 800px"><canvas id="cs_b" width="800" height="380"></canvas></div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  // A native dialog would stall a headless run; nothing on these paths should raise one.
+  window.alert = function (m) { (window.__dialogs = window.__dialogs || []).push('alert: ' + m); };
+  window.confirm = function (m) { (window.__dialogs = window.__dialogs || []).push('confirm: ' + m); return true; };
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (e) { window.__errors.push('unhandled rejection: ' + (e.reason && e.reason.message ? e.reason.message : e.reason)); });
+</script>
+<script src="main_patched.js"></script>
+<script src="js/penumbra_a11y.js"></script>
+<script>
+// DEBUG PAGE (2026-10-06): reproduce the stacked-combo bar-click freeze headless.
+(function () {
+  function M(o) { var m = new Map(); Object.keys(o).forEach(function (k) { m.set(k, o[k]); }); return m; }
+  function r(fy, kind, nsa, amt, id) { return M({ FY: fy, DOD_DOW: kind, NSA: nsa ? kind : '', AMOUNT: amt, AWARD_ID: id }); }
+  var ROWS = [
+    r('FY 2024', 'Award', true, '$30', 'PAM-P24-000001'), r('FY 2024', 'Award', true, '$10', 'PAM-P24-000002'),
+    r('FY 2024', 'Award', false, '$70', 'PAM-P24-000003'),
+    r('FY 2024', 'Expenditure', true, '$20', 'PAM-P24-000001'), r('FY 2024', 'Expenditure', false, '$50', 'PAM-P24-000003'),
+    r('FY 2025', 'Award', true, '$40', 'PAM-P24-000001'), r('FY 2025', 'Award', false, '$60', 'P25-000004-01'),
+    r('FY 2025', 'Expenditure', true, '$25', 'PAM-P24-000001'), r('FY 2025', 'Expenditure', false, '$55', 'P25-000004-01'),
+    r('FY 2026', 'Award', true, '$35', '2026-0006'), r('FY 2026', 'Award', false, '$80', 'PAM-P24-000003'),
+    r('FY 2026', 'Expenditure', true, '$22', '2026-0006'), r('FY 2026', 'Expenditure', false, '$66', 'PAM-P24-000003')
+  ];
+  var S = JSON.stringify([
+    { col: 'AMOUNT', type: 'bar', agg: 'sum', color: '#990000', filterExpression: 'DOD_DOW = Award AND NSA = Award', label: 'NSA awards ($)', values: 'center' },
+    { col: 'AMOUNT', type: 'bar', agg: 'sum', color: '#ffb49f', filterExpression: 'DOD_DOW = Award AND NSA = empty', label: 'Other awards ($)' },
+    { col: 'AMOUNT', type: 'bar', agg: 'sum', color: '#bc3227', filterExpression: 'DOD_DOW = Expenditure AND NSA = Expenditure', label: 'NSA R&D ($)', values: 'center', stack: '2' },
+    { col: 'AMOUNT', type: 'bar', agg: 'sum', color: '#ff7462', filterExpression: 'DOD_DOW = Expenditure AND NSA = empty', label: 'Other R&D ($)', stack: '2' },
+    { col: 'AWARD_ID', type: 'line', agg: 'distinct', color: '#262626', filterExpression: 'DOD_DOW = Award AND AMOUNT > 0', label: 'DOD awards (#)' },
+    { col: 'AWARD_ID', type: 'line', agg: 'distinct', color: '#de5445', filterExpression: 'NSA = Award AND AMOUNT > 0', label: 'NSA awards (#)' }
+  ]);
+  var STACKED = (location.hash.indexOf('unstacked') === -1);
+  var code = "vis('combo', 'FY', 'none', 'none', 'sum', 10, 'T', true, true, '100%', 420, 'top', 'auto', true, " + STACKED + ", true, 'top', 'label', 'asc', 'default', false, 'S', '', 'Dollars', false, false, false, false, '', '', '" + S + "', 'none', false, false, '', '', '', '', '', false, '{\"palette\":\"mono\",\"format\":{\"style\":\"compact\"},\"y2Label\":\"Number of awards\"}')";
+  window.__state = 'starting';
+  (async function () {
+    for (var i = 0; i < 100 && !window.__CS; i++) await new Promise(function (res) { setTimeout(res, 100); });
+    var F = window.__CS;
+    try {
+      await F.loadScript('js/chart-4.5.1.min.js');
+      await F.loadScript('js/chartjs-plugin-datalabels-2.0.0.min.js');
+      await F.loadScript('js/chartjs-chart-treemap-3.1.0.min.js');
+      await F.loadChartModule();
+      if (window.ChartDataLabels) Chart.register(ChartDataLabels);
+      F.setSnippet(code);
+      // setValue fires the editor's live-edit render (1 s debounce, no rows):
+      // let it pass, THEN render with the rows, or it replaces this chart.
+      await new Promise(function (res) { setTimeout(res, 1600); });
+      await F.renderSnippet(ROWS, false, { ignorePendingViewState: true });
+      for (var w = 0; w < 60 && !document.querySelector('#reportSnippetOutput canvas'); w++) await new Promise(function (res) { setTimeout(res, 100); });
+      await new Promise(function (res) { setTimeout(res, 1500); });
+      window.__state = 'ready:' + (document.querySelector('#reportSnippetOutput canvas') ? 'canvas' : 'nocanvas') + ':stacked=' + STACKED;
+    } catch (e) { window.__state = 'error: ' + e; }
+  })();
+  window.__clickBar = function () {
+    var cv = document.querySelector('#reportSnippetOutput canvas'); var ch = Chart.getChart(cv);
+    var el = ch.getDatasetMeta(1).data[1].getProps(['x', 'y', 'base'], true);
+    var rc = cv.getBoundingClientRect();
+    var x = rc.left + el.x, y = rc.top + (el.y + el.base) / 2;
+    window.__clickState = 'dispatching';
+    ['mousemove', 'mousedown', 'mouseup', 'click'].forEach(function (t) {
+      cv.dispatchEvent(new MouseEvent(t, { clientX: x, clientY: y, bubbles: true, cancelable: true, view: window }));
+    });
+    window.__clickState = 'returned';
+    return 'clicked at ' + Math.round(x) + ',' + Math.round(y);
+  };
+})();
+</script>
+</body></html>

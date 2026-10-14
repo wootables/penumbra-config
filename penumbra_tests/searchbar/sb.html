@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Search Bar harness</title>
+<script src="themes.js"></script>
+<script src="js/jquery-3.7.1.min.js"></script>
+<style>
+  #out { white-space: pre-wrap; word-break: break-all; font: 11px/1.3 Consolas, monospace; margin: 12px 0 0; }
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+  body { margin: 0; }
+  #reportHeaderContainer { height: 120px; }
+  #hiddenOpts { position: absolute; left: -9999px; }
+</style>
+</head>
+<body>
+<div id="reportHeaderContainer">report header stand-in</div>
+<div id="barSlot"></div>
+<div id="tableSlot"></div>
+<div id="hiddenOpts"><div class="view-options-grid"><input type="checkbox" id="viewOptionSearch" checked><input type="checkbox" id="viewOptionSnapshots" checked><input type="checkbox" id="viewOptionEmail" checked><input type="checkbox" id="viewOptionGrouping" checked><input type="checkbox" id="viewOptionClipboard" checked><input type="checkbox" id="viewOptionExport" checked><input type="checkbox" id="viewOptionPivot" checked><input type="checkbox" id="viewOptionViz" checked><input type="checkbox" id="viewOptionPagination" checked><input type="checkbox" id="viewOptionJournal"><input type="checkbox" id="viewOptionColumns" checked></div></div>
+<pre id="out"></pre>
+<script>
+/*
+ * The control bar (#resultsHeader, LIFTED from the index.php under test) under the
+ * css\main.css under test, driven by the REAL applyUserViewRestrictions /
+ * penumbraSyncControlBar / updateStickyHeaderOffset / the admin markers, sliced
+ * out of the main.js under test. ?case=<name> (see CASES), &idx= &js= &css=.
+ * Result: window.__vo = { asserts: [...] } (async cases finish a few frames later).
+ * case=cursor also leaves window.__hoverPlan for cdp.py's trusted mouse pass
+ * (the job's "hover" key); its V19 reads FAIL until that pass reports back.
+ */
+(function () {
+  var q = new URLSearchParams(location.search), A = [];
+  function T(id, name, pass, detail) { A.push({ id: id, name: name, pass: !!pass, detail: String(detail === undefined ? '' : detail) }); }
+  function done() { window.__vo = { asserts: A }; document.getElementById('out').textContent = JSON.stringify(A, null, 1); window.__voDone = true; }
+  function fail(m) { T('Z0', 'the harness set up', false, m); done(); }
+  function get(u) { var x = new XMLHttpRequest(); x.open('GET', u, false); x.send(null); return x.responseText; }
+  function slice(code, a, b, max) {
+    var i = code.indexOf(a); if (i < 0) throw new Error('anchor missing: ' + a.slice(0, 60));
+    var j = code.indexOf(b, i + a.length); if (j < 0) throw new Error('end anchor missing after: ' + a.slice(0, 60));
+    if (max && j - i > max) throw new Error('slice too long (' + (j - i) + ') for: ' + a.slice(0, 60));
+    return code.slice(i, j);
+  }
+  var fns, rec = { uch: 0, stack: 0 }, pv = { isAdmin: q.get('admin') === '1' }, noadm = q.get('noadm') === '1';
+  try {
+    var idx = get(q.get('idx') || 'index.php');
+    var a = idx.indexOf('<div id="resultsHeader">');
+    if (a < 0) throw new Error('no #resultsHeader');
+    var re = /<\/?div\b[^>]*>/g, depth = 0, end = -1, m;
+    re.lastIndex = a;
+    while ((m = re.exec(idx))) { depth += (m[0][1] === '/') ? -1 : 1; if (depth === 0) { end = m.index + m[0].length; break; } }
+    if (end < 0) throw new Error('unbalanced #resultsHeader');
+    var html = idx.slice(a, end);
+    if (html.indexOf('<?') >= 0) throw new Error('lifted bar contains PHP');
+    document.getElementById('barSlot').outerHTML = html;
+    // The table below the bar: inside #results-wrapper (flat), or bare (grouped - its
+    // header then sticks to the WINDOW below the chrome, the offset under test).
+    var rows = ''; for (var i = 0; i < 60; i++) rows += '<tr><td>row ' + i + '</td><td>' + (i * 7) + '</td></tr>';
+    var table = '<table id="resultsTable"><thead><tr><th>A</th><th>B</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    document.getElementById('tableSlot').outerHTML = q.get('grouped') === '1' ? table : '<div id="results-wrapper">' + table + '</div>';
+
+    var js = get(q.get('js') || 'main.js').replace(/\r\n/g, '\n');
+    var code = slice(js, '    var PNB_USER_HIDDEN_TARGETS = {', '    function applyUserViewRestrictions(viewOptions) {', 20000) +
+               slice(js, '    function applyUserViewRestrictions(viewOptions) {', '    /**\n * Checks for visible columns', 20000) +
+               slice(js, '    function updateStickyHeaderOffset() {', "_groupSyncStickyOffsets();\n    }\n", 8000) + "_groupSyncStickyOffsets();\n    }\n" +
+               // the View Options live toggles (2026-09-25 night: &noadm takes effect at once)
+               slice(js, '    // --- Live Toggling for View Options ---', '    // (Theme menu, floating theme button, and outside-click handlers removed', 12000);
+    fns = new Function('$', 'penumbra_vars', 'isNoAdmView', 'rec',
+      'function applyHeaderLayout() {}\nfunction updateContainerHeight() { rec.uch++; }\nfunction applyClickToFilter() {}\nfunction _spSyncFreezeControl() {}\nwindow.stackHeaders = function () { rec.stack++; };\n' + code +
+      '\nreturn { apply: applyUserViewRestrictions, sync: (typeof penumbraSyncControlBar === "function" ? penumbraSyncControlBar : function () {}), markers: penumbraRefreshUserHiddenMarkers, sticky: updateStickyHeaderOffset };')($, pv, noadm, rec);
+  } catch (e) { fail(e.message); return; }
+
+  var theme = q.get('theme') || 'theme-hello-kitty';
+  document.body.classList.add(theme); document.body.setAttribute('data-theme', theme);
+  var sheets = ['css/jquery-ui.css', q.get('css') || 'main.css', 'css/penumbra_tiles.css', 'css/density.css', 'css/search_builder.css', 'css/penumbra_presets.css', 'css/penumbra_colwidths.css', 'themevars.css'];
+  var pending = sheets.length;
+  sheets.forEach(function (href) {
+    var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = href;
+    l.onload = l.onerror = function () { if (--pending === 0) go(); };
+    document.head.appendChild(l);
+  });
+
+  var ALL_OFF = { hideSearch: true, hideSnapshots: true, hideEmail: true, hideGrouping: true, hideClipboard: true, hideExport: true, hidePivot: true, hideViz: true, hidePagination: true };
+  function vo(over) { var o = {}; for (var k in ALL_OFF) o[k] = ALL_OFF[k]; for (var k2 in (over || {})) o[k2] = over[k2]; return o; }
+  function frames(n, cb) { if (n <= 0) { cb(); return; } requestAnimationFrame(function () { frames(n - 1, cb); }); }
+  function st() {
+    var rh = document.getElementById('resultsHeader'), sw = document.querySelector('#tableSearchContainer .search-wrapper');
+    var rc = document.getElementById('resultCount'), tbl = document.getElementById('results-wrapper') || document.getElementById('resultsTable');
+    var hdr = document.getElementById('reportHeaderContainer').getBoundingClientRect();
+    var th = document.querySelector('#resultsTable thead th');
+    return {
+      collapsed: document.body.classList.contains('pnb-no-controlbar'),
+      rhDisplay: getComputedStyle(rh).display, rhH: rh.offsetHeight,
+      search: !!(sw && sw.getClientRects().length && getComputedStyle(sw).display !== 'none'),
+      count: !!(rc && getComputedStyle(rc).display !== 'none' && rc.closest('#tableSearchContainer') && getComputedStyle(rc.closest('#tableSearchContainer')).display !== 'none'),
+      icons: Array.prototype.slice.call(document.querySelectorAll('#resultsHeader .header-right [role="button"]')).filter(function (e) { return e.getClientRects().length > 0; }).length,
+      tableGap: Math.round(tbl.getBoundingClientRect().top - hdr.bottom),
+      thTop: th ? th.style.top : '', marker: !!(sw && sw.classList.contains('pnb-user-hidden')),
+      ring: sw ? getComputedStyle(sw).outlineStyle + '/' + getComputedStyle(sw).outlineWidth : ''
+    };
+  }
+  function J(o) { return JSON.stringify(o); }
+
+  // --- The paginator arrows' cursor (2026-10-01: they showed the plain arrow, so
+  // they looked inert). Every way the bar can be drawn: each registry theme stamped
+  // as applyTheme() stamps it, the three densities, a viewer, an admin, the admin's
+  // View Options marker (painted by the REAL penumbraRefreshUserHiddenMarkers) and
+  // both embed views, with the arrows in each state applyPagination() leaves them.
+  var ARROWS = ['firstPageBtn', 'prevPageBtn', 'nextPageBtn', 'lastPageBtn'];
+  // 1 = disabled. 'all' = Rows All, no rows, or Pagination hidden (rows forced to All).
+  var PAGE_STATES = { page1: [1, 1, 0, 0], middle: [0, 0, 0, 0], last: [0, 0, 1, 1], all: [1, 1, 1, 1] };
+  var VARIANTS = { viewer: {}, admin: { admin: 1 }, marker: { admin: 1, marker: 1 }, embed: { embed: 'embed-view' }, embedtable: { embed: 'embed-view embed-only-table' } };
+  function themeRow(id) { return (window.PNB_THEMES || []).filter(function (t) { return t.id === id; })[0] || { isDark: false, modern: false }; }
+  function setCombo(theme, density, variant) {
+    var v = VARIANTS[variant], row = themeRow(theme), cls = [];
+    if (theme !== 'theme-default') cls.push(theme);
+    if (row.isDark) cls.push('is-dark');
+    if (row.modern) cls.push('registry-theme');
+    if (density !== 'standard') cls.push('density-' + density);
+    if (v.admin) cls.push('admin-view');
+    if (v.embed) cls.push(v.embed);
+    document.body.className = cls.join(' ');
+    document.body.setAttribute('data-theme', theme);
+    // The marker code returns early for a viewer, so clear (or paint) it as an admin.
+    pv.isAdmin = true; document.getElementById('viewOptionPagination').checked = !v.marker; fns.markers();
+    pv.isAdmin = !!v.admin;
+  }
+  function setPage(state) { ARROWS.forEach(function (id, i) { $('#' + id).prop('disabled', !!PAGE_STATES[state][i]); }); }
+  function wantCursor(disabled) { return disabled ? 'not-allowed' : 'pointer'; }
+  function verdict(list) {
+    var bad = list.filter(function (x) { return !x.ok; });
+    return { pass: list.length > 0 && !bad.length, detail: list.length + ' checks, ' + bad.length + ' wrong' + (bad.length ? ': ' + bad.slice(0, 5).map(function (x) { return x.k + '=' + x.got; }).join('; ') + (bad.length > 5 ? '; ...' : '') : '') };
+  }
+  function cursorCase() {
+    var themes = (window.PNB_THEMES || []).map(function (t) { return t.id; }), checks = [], info = [], marks = [], bgs = {};
+    themes.forEach(function (theme) {
+      ['standard', 'compact', 'easy-read'].forEach(function (density) {
+        Object.keys(VARIANTS).forEach(function (variant) {
+          setCombo(theme, density, variant);
+          var pc = document.getElementById('paginationControls');
+          marks.push({ k: theme + '/' + density + '/' + variant, variant: variant, on: pc.classList.contains('pnb-user-hidden') && getComputedStyle(pc).outlineStyle === 'dashed' });
+          Object.keys(PAGE_STATES).forEach(function (state) {
+            setPage(state);
+            ARROWS.forEach(function (id) {
+              var b = document.getElementById(id), got = getComputedStyle(b).cursor;
+              checks.push({ k: theme + '/' + density + '/' + variant + '/' + state + ' #' + id, density: density, variant: variant, disabled: b.disabled, got: got, ok: got === wantCursor(b.disabled) });
+            });
+            if (state === 'middle' && density === 'standard' && variant === 'viewer') bgs[getComputedStyle(document.getElementById('nextPageBtn')).backgroundColor] = 1;
+          });
+          info.push({ k: theme + '/' + density + '/' + variant, got: getComputedStyle(document.getElementById('pageInfo')).cursor });
+        });
+      });
+    });
+    function plain(x) { return x.density === 'standard' && (x.variant === 'viewer' || x.variant === 'admin'); }
+    var r13 = verdict(checks.filter(function (x) { return plain(x) && !x.disabled; }));
+    T('V13', 'an ENABLED paginator arrow shows a pointer, in every registry theme (viewer and admin)', r13.pass && themes.length >= 6 && Object.keys(bgs).length > 1, themes.length + ' themes, ' + Object.keys(bgs).length + ' distinct arrow backgrounds; ' + r13.detail);
+    var r14 = verdict(checks.filter(function (x) { return plain(x) && x.disabled; }));
+    T('V14', '...and a DISABLED one keeps not-allowed (first/prev on page 1, next/last on the last page, all four on Rows All)', r14.pass, r14.detail);
+    var r15 = verdict(checks.filter(function (x) { return x.density !== 'standard'; }));
+    T('V15', 'the same in density-compact and density-easy-read, every theme', r15.pass, r15.detail);
+    var stray = marks.filter(function (m) { return (m.variant === 'marker') !== m.on; });
+    var r16 = verdict(checks.filter(function (x) { return x.variant === 'marker'; }));
+    T('V16', 'the same under the admin\'s View Options marker (#paginationControls.pnb-user-hidden, dashed ring), every theme and density', r16.pass && !stray.length, 'marker wrong in ' + stray.length + ' of ' + marks.length + ' combos' + (stray.length ? ' (' + stray[0].k + ')' : '') + '; ' + r16.detail);
+    var r17 = verdict(checks.filter(function (x) { return x.variant.indexOf('embed') === 0; }));
+    T('V17', 'the same in an embed (dashboard Embedded report tiles: embed-view, embed-only-table), every theme and density', r17.pass, r17.detail);
+    var seen = {}; info.forEach(function (x) { seen[x.got] = 1; });
+    var ptr = info.filter(function (x) { return x.got === 'pointer'; });
+    T('V18', 'the page counter (#pageInfo) between the arrows is plain text: never a pointer', info.length > 0 && !ptr.length, info.length + ' combos, cursor ' + Object.keys(seen).join('/') + (ptr.length ? '; pointer in ' + ptr.slice(0, 3).map(function (x) { return x.k; }).join('; ') : ''));
+
+    // The user's words are "on hover": cdp.py moves a REAL (trusted) mouse over each
+    // arrow, every theme first, then admin / both densities / marker / both embeds on
+    // the default theme, page 1 and the last page (each arrow both ways).
+    var steps = [];
+    themes.map(function (t) { return [t, 'standard', 'viewer']; })
+      .concat([['standard', 'admin'], ['compact', 'viewer'], ['easy-read', 'viewer'], ['standard', 'marker'], ['standard', 'embed'], ['standard', 'embedtable']].map(function (dv) { return ['theme-default', dv[0], dv[1]]; }))
+      .forEach(function (p) { ['page1', 'last'].forEach(function (s) { steps.push(p.concat([s])); }); });
+    var hoverName = 'a REAL mouse hover (trusted CDP mouseMoved) over each arrow lands on it and shows a pointer when enabled, not-allowed when disabled: every theme, then admin / both densities / marker / both embeds';
+    T('V19', hoverName, false, 'no trusted hover pass reported back (cdp.py job key "hover")');
+    window.__hoverPlan = {
+      n: steps.length,
+      setup: function (i) {
+        var s = steps[i];
+        setCombo(s[0], s[1], s[2]); setPage(s[3]);
+        document.getElementById('paginationControls').scrollIntoView({ block: 'center' });
+        return ARROWS.map(function (id) {
+          var r = document.getElementById(id).getBoundingClientRect();
+          return { id: id, k: s.join('/') + ' #' + id, x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+        });
+      },
+      read: function (t) {
+        return new Promise(function (res) {
+          frames(2, function () {
+            var b = document.getElementById(t.id), got = getComputedStyle(b).cursor, hit = document.elementFromPoint(t.x, t.y) === b, hov = b.matches(':hover');
+            res({ k: t.k, disabled: b.disabled, got: got + (hit ? '' : ' (not the hit target)') + (hov ? '' : ' (no :hover)'), ok: hit && hov && got === wantCursor(b.disabled) });
+          });
+        });
+      },
+      finish: function (readings, err) {
+        A = A.filter(function (a) { return a.id !== 'V19'; });
+        var r = verdict(readings || []), want = steps.length * ARROWS.length;
+        T('V19', hoverName, !err && r.pass && (readings || []).length === want, (err ? 'error: ' + err + '; ' : '') + (readings || []).length + '/' + want + ' hovers; ' + r.detail);
+        window.__vo = { asserts: A };
+        return window.__vo;
+      }
+    };
+    done();
+  }
+
+  function go() {
+    try {
+      // The loaded-report state the app leaves before restrictions apply.
+      $('#tableSearchContainer').show(); $('.export-container').show(); $('#paginatorContainer').css('visibility', 'visible');
+      document.getElementById('resultCount').textContent = '60 rows';
+      var c = q.get('case') || 'alloff';
+      var s0 = st();   // before any option applies: the bar's own height
+      if (c === 'alloff') {
+        fns.apply(vo()); fns.sticky();
+        frames(2, function () {
+          var s = st();
+          T('V1', 'every control-bar option off: a viewer\'s bar is gone and the table moves up into its row', s.collapsed && s.rhDisplay === 'none' && s.rhH === 0 && s.tableGap <= s0.tableGap - s0.rhH + 1 && s0.rhH > 20, 'before=' + J(s0) + ' after=' + J(s) + ' containerHeight/stack re-run=' + rec.uch + '/' + rec.stack);
+          T('V2', '...and everything stacked on it re-anchors (container height + header stack re-run)', rec.uch > 0 && rec.stack > 0, 'updateContainerHeight=' + rec.uch + ' stackHeaders=' + rec.stack);
+          done();
+        });
+      } else if (c === 'searchon') {
+        fns.apply(vo({ hideSearch: false }));
+        frames(2, function () { var s = st(); T('V3', 'only the search box left: the bar stays, with the box', !s.collapsed && s.rhH > 20 && s.search, J(s)); done(); });
+      } else if (c === 'searchoff') {
+        fns.apply({ hideSearch: true });
+        frames(2, function () { var s = st(); T('V4', 'Search Bar off alone: the box goes, the icons stay, and so does the bar', !s.collapsed && !s.search && s.icons >= 6, J(s)); done(); });
+      } else if (c === 'active') {
+        fns.apply(vo());
+        frames(2, function () {
+          var s1 = st();
+          $('#tableSearchContainer').addClass('has-text'); $('#tableSearch').val('BIO');
+          frames(3, function () {
+            var s2 = st();
+            $('#tableSearchContainer').removeClass('has-text'); $('#tableSearch').val('');
+            frames(3, function () {
+              var s3 = st();
+              T('V5', 'an ACTIVE search (Click-to-Filter, a link) brings the box back - and the bar with it - so it can be seen and cleared; cleared, the bar goes again', s1.collapsed && !s2.collapsed && s2.search && s2.rhH > 20 && s3.collapsed && !s3.search, 'off=' + J(s1) + ' | active=' + J(s2) + ' | cleared=' + J(s3));
+              done();
+            });
+          });
+        });
+      } else if (c === 'grouped') {
+        fns.apply(vo());
+        frames(2, function () {
+          var s1 = st();
+          $('#groupActionsContainer').show();   // a report the author saved grouped: Expand / Collapse All
+          frames(3, function () {
+            var s2 = st();
+            T('V6', 'a grouped report keeps the bar for Expand / Collapse All (Remove Grouping stays hidden)', s1.collapsed && !s2.collapsed && s2.rhH > 20 && $('#expandAllGroups').is(':visible') && !$('#removeGroupingLink').is(':visible'), 'plain=' + J(s1) + ' | grouped=' + J(s2));
+            done();
+          });
+        });
+      } else if (c === 'reload') {
+        fns.apply(vo({ hideEmail: false }));   // one option still on
+        frames(2, function () {
+          var s1 = st();
+          // A data reload hides the containers for a moment (as the app does).
+          $('.export-container').hide(); $('#tableSearchContainer').hide();
+          frames(3, function () {
+            var s2 = st();
+            T('V7', 'with ANY bar option still on the bar never goes - not even while a reload hides its icons (no flicker)', !s1.collapsed && !s2.collapsed, 'loaded=' + J(s1) + ' | reloading=' + J(s2));
+            done();
+          });
+        });
+      } else if (c === 'admin') {
+        document.getElementById('viewOptionSearch').checked = false;
+        fns.apply(vo()); fns.markers();
+        frames(2, function () {
+          var s = st();
+          T('V8', 'an admin keeps the bar whatever the options, and the search box wears the "hidden from users" marker - a DRAWN dashed ring', !s.collapsed && s.rhH > 20 && s.marker && s.ring === 'dashed/1px', J(s));
+          done();
+        });
+      } else if (c === 'noadm') {
+        ['Search', 'Snapshots', 'Email', 'Grouping', 'Clipboard', 'Export', 'Pivot', 'Viz', 'Pagination'].forEach(function (o) { document.getElementById('viewOption' + o).checked = false; });
+        fns.apply(vo());
+        frames(2, function () { var s = st(); T('V9', 'an admin previewing with &noadm sees what a viewer sees: no bar', s.collapsed && s.rhH === 0, J(s)); done(); });
+      } else if (c === 'noadmlive') {
+        // &noadm, the report's options all on; the admin unticks them one by one.
+        fns.apply({});
+        var order = ['Search', 'Snapshots', 'Email', 'Grouping', 'Clipboard', 'Export', 'Pivot', 'Viz', 'Pagination'], k = 0, trail = [];
+        (function next() {
+          if (k < order.length) {
+            document.getElementById('viewOption' + order[k]).click();   // a real change event
+            var st1 = st();
+            trail.push(order[k] + ':' + (order[k] === 'Search' ? (st1.search ? 'box' : 'nobox') : (order[k] === 'Email' ? ($('#emailTableBtn').is(':visible') ? 'icon' : 'noicon') : '')) + (st1.collapsed ? '/GONE' : ''));
+            k++; frames(1, next); return;
+          }
+          frames(3, function () {
+            var sOff = st(), markers = document.querySelectorAll('.pnb-user-hidden').length;
+            document.getElementById('viewOptionEmail').click();
+            frames(3, function () {
+              var sBack = st();
+              T('V11', '&noadm: unticking the options live takes effect at once as the viewer gets it - the box and icons go, no admin markers, and with the last one the bar goes; ticking Email back brings the icon and the bar back',
+                trail[0] === 'Search:nobox' && trail[2] === 'Email:noicon' && trail.slice(0, -1).join(',').indexOf('GONE') < 0 && sOff.collapsed && sOff.rhH === 0 && markers === 0 && !sBack.collapsed && sBack.rhH > 20 && $('#emailTableBtn').is(':visible'),
+                'trail=' + trail.join(',') + ' | allOff=' + J(sOff) + ' markers=' + markers + ' | emailBack=' + J(sBack));
+              done();
+            });
+          });
+        })();
+      } else if (c === 'adminlive') {
+        // A real admin unticks Search Bar live: the ring, the box stays, no viewer class.
+        fns.apply({}); fns.markers();
+        document.getElementById('viewOptionSearch').click();
+        frames(2, function () {
+          var s = st();
+          T('V12', 'an admin unticking Search Bar live: the box stays, wears the dashed ring at once, the bar stays, and no viewer class lands', s.search && s.marker && s.ring === 'dashed/1px' && !s.collapsed && s.rhH > 20 && !document.body.classList.contains('restrict-search'), J(s));
+          done();
+        });
+      } else if (c === 'offset') {
+        // Grouped view (no wrapper): the header sticks to the WINDOW, below the chrome.
+        fns.sticky(); var before = document.querySelector('#resultsTable thead th').style.top;
+        var barH = $('#resultsHeader').outerHeight(), hdrH = $('#reportHeaderContainer').outerHeight();
+        fns.apply(vo());
+        frames(2, function () {
+          var s = st();
+          T('V10', 'the grouped view\'s sticky header re-anchors to the report header alone once the bar is gone', Math.abs(parseFloat(before) - (hdrH + barH)) < 0.6 && barH > 20 && Math.abs(parseFloat(s.thTop) - hdrH) < 0.6, 'with bar=' + before + ' (header ' + hdrH + ' + bar ' + barH + ') -> without=' + s.thTop);
+          done();
+        });
+      } else if (c === 'cursor') {
+        cursorCase();
+      } else { fail('unknown case ' + c); }
+    } catch (e) { fail('run: ' + e.message); }
+  }
+})();
+</script>
+</body>
+</html>

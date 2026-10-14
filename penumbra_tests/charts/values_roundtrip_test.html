@@ -1,0 +1,99 @@
+<!doctype html><meta charset="utf-8"><title>running</title><pre id="out">running</pre>
+<!--
+  VIZ BUILDER VALUES ROUND TRIP (2026-10-06)
+
+  The Values select (#vizValues: none / end / center / start / auto) is written
+  from a saved vis() call by restoreVizConfig and read back by the live preview
+  and by the snippet emitter. restoreVizConfig used to put a chart saved with
+  values=false on 'auto', which BOTH readers treat as "labels on" - so opening a
+  chart in the builder and clicking Update chart switched its labels on (found
+  on ?id=awdgeo). Every statement involved is LIFTED from main.js by its text,
+  so this tests the real lines, and a select stand-in behaves like a <select>
+  (a value it does not offer leaves it empty).
+
+  Expected: the values flag survives every round trip; a position survives when
+  labels are on; labels off always comes back as 'end' (the emitter's fixed
+  filler for a hidden position, and what every builder-written call carries).
+-->
+<script src="SRC.js"></script>
+<script>
+var LOG = [], PASS = 0, FAIL = 0;
+function ok(n, c, x) { if (c) { PASS++; LOG.push('PASS  ' + n); } else { FAIL++; LOG.push('FAIL  ' + n + (x ? '   >> ' + x : '')); } }
+function eq(n, g, w) { ok(n, JSON.stringify(g) === JSON.stringify(w), 'got=' + JSON.stringify(g) + ' want=' + JSON.stringify(w)); }
+try {
+  var code = String(window.__src).replace(/\r\n/g, '\n');
+  function slice(from, to, allowRepeat) {
+    var a = code.indexOf(from);
+    if (a === -1) throw new Error('anchor not found: ' + from);
+    if (!allowRepeat && code.indexOf(from, a + 1) !== -1) throw new Error('anchor not unique: ' + from);
+    var b = code.indexOf(to, a);
+    if (b === -1) throw new Error('end anchor not found: ' + to);
+    return code.slice(a, b + to.length);
+  }
+  // The four places Values passes through.
+  var restoreSrc = slice("if (c.values === true) { $('#vizValues').val(", "else { $('#vizValues').val('auto'); }");
+  var previewSrc = slice("const vizValuesVal = $('#vizValues').val();", "const valuePos = showValues ? vizValuesVal : 'end';");
+  var emitSrc    = slice("var vv = $('#vizValues').val();", "var vp = sv ? vv : 'end';");
+  // The builder's vis() reader and the renderer each declare this same one-liner.
+  var boolSrc    = slice("var bool = function (a) { return String(a).trim() === 'true'; };", "};", true);
+  ok('lift: the vis() parser still reads values from arg 8 and the position from arg 12',
+     code.indexOf("values: bool(args[8]),") !== -1 && code.indexOf("valuePos: clean(args[12]) || 'end',") !== -1);
+
+  // A <select> stand-in: only the offered values stick.
+  var OPTIONS = ['none', 'end', 'center', 'start', 'auto'];
+  function makeDollar() {
+    var sel = { value: null };
+    var $ = function (s) {
+      if (s !== '#vizValues') throw new Error('unexpected selector ' + s);
+      return { val: function (v) { if (arguments.length) { sel.value = OPTIONS.indexOf(v) !== -1 ? v : null; return this; } return sel.value; } };
+    };
+    $.sel = sel;
+    return $;
+  }
+  var restore = new Function('c', '$', restoreSrc);
+  var preview = new Function('$', previewSrc + '\nreturn { showValues: showValues, valuePos: valuePos };');
+  var emit    = new Function('$', emitSrc + '\nreturn { sv: sv, vp: vp };');
+  var bool    = new Function(boolSrc + '\nreturn bool;')();
+  function parse(arg8, arg12) {   // the parser's own two lines, with the real bool()
+    var clean = function (a) { return a == null ? '' : String(a).replace(/^'|'$/g, ''); };
+    return { values: bool(arg8), valuePos: clean(arg12) || 'end' };
+  }
+
+  var A8 = ['true', 'false', undefined], A12 = ["'end'", "'center'", "'start'", "'auto'", undefined];
+  A8.forEach(function (a8) {
+    A12.forEach(function (a12) {
+      var tag = 'arg8=' + a8 + ' arg12=' + a12 + ': ';
+      var c = parse(a8, a12);
+      var $ = makeDollar();
+      restore(c, $);
+      var p = preview($), e = emit($);
+      // 1. the flag survives
+      eq(tag + 'values survives restore -> emit', e.sv, c.values);
+      // 2. a shown position survives; a hidden one is the fixed 'end'
+      eq(tag + 'position survives', e.vp, c.values ? c.valuePos : 'end');
+      // 3. the preview draws what will be saved
+      eq(tag + 'the preview agrees with the emitter', [p.showValues, p.valuePos], [e.sv, e.vp]);
+      // 4. and a second trip changes nothing
+      var c2 = parse(String(e.sv), "'" + e.vp + "'"), $2 = makeDollar();
+      restore(c2, $2);
+      eq(tag + 'a second round trip is identical', emit($2), e);
+    });
+  });
+
+  // The select itself, for the reader's benefit.
+  (function () {
+    var $ = makeDollar(); restore({ values: false, valuePos: 'end' }, $);
+    eq('labels OFF restores the select to None', $.sel.value, 'none');
+    $ = makeDollar(); restore({ values: true, valuePos: 'center' }, $);
+    eq('labels ON keeps its position', $.sel.value, 'center');
+    $ = makeDollar(); restore({}, $);
+    eq('a config with no values at all takes the Auto default', $.sel.value, 'auto');
+    eq('...and Auto means labels on, automatic position', emit($), { sv: true, vp: 'auto' });
+  })();
+} catch (e) {
+  ok('harness ran to the end', false, e && e.message);
+}
+document.getElementById('out').textContent =
+  'RESULT ' + (FAIL === 0 ? 'ALL-PASS' : 'HAS-FAILURES') + '  pass=' + PASS + ' fail=' + FAIL + '\n' + LOG.join('\n');
+document.title = 'done';
+</script>

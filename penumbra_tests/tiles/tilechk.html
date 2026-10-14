@@ -1,0 +1,310 @@
+<!doctype html><html><head>
+<link rel="stylesheet" href="penumbra_tiles.css"><link rel="stylesheet" href="penumbra_dashboard.css">
+</head><body class="pnb-dash theme-default">
+<div id="dashApp"><header class="dash-head" id="dashHead">
+  <a class="dash-brand" href="#"><span>Dashboards</span></a>
+  <div class="dash-head-title" id="dashHeadTitle"></div>
+  <div class="dash-head-actions" id="dashHeadActions"></div>
+</header><main id="dashMain"></main></div>
+<div id="ibx"></div>
+<pre id="out">running</pre>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="chart-4.5.1.min.js"></script>
+<script src="purify.min.js"></script>
+<script>
+var CALLS = [], ERRORS = [], ALERTS = [];
+window.onerror = function (m) { ERRORS.push('onerror: ' + m); };
+window.alert = function (m) { ALERTS.push(String(m)); };
+
+var API_ROWS = [
+  { NAME: 'Alice', AMOUNT: '$1,000.50', DEPT: 'R&amp;D' },
+  { NAME: 'Bob',   AMOUNT: '2,499.50',  DEPT: 'Ops' },
+  { NAME: 'Cy',    AMOUNT: '(500)',     DEPT: 'R&amp;D' }
+];
+var REP_A = [
+  { AMOUNT: '10', DEPT: 'A' }, { AMOUNT: '20', DEPT: 'B' }
+];
+function deferred(fn) { var d = $.Deferred(); setTimeout(function () { fn(d); }, 10); return d.promise(); }
+
+$.getJSON = function (url, params) {
+  CALLS.push(url + '?' + $.param(params || {}));
+  return deferred(function (d) {
+    if (url === 'index.php') {
+      if (params.id === 'repA') { d.resolve({ data: REP_A }); }
+      else if (params.id === 'denied') { d.reject({ status: 403 }); }
+      else { d.resolve({ error: 'Unknown report' }); }
+    } else if (url === 'api_rows.json') { d.resolve(API_ROWS); }
+    else if (url === 'api_env.json') { d.resolve({ data: API_ROWS.slice(0, 2), total_rows: 77 }); }
+    else if (url === 'api_grouped.json') { d.resolve({ viewMode: 'grouped', data: { g1: [{ V: '1' }], g2: [{ V: '2' }, { V: '3' }] } }); }
+    else if (url === 'api_bad.json') { d.resolve({ nonsense: true }); }
+    else if (url === 'manage_snapshots.php') { d.resolve({ status: 'success', data: [] }); }
+    else if (url === 'manage_dashboard.php') { d.resolve({ status: 'success', unnamed: 0, has_me: false, data: [] }); }
+    else { d.reject({ status: 404 }); }
+  });
+};
+$.ajax = function () { CALLS.push('ajax'); return deferred(function (d) { d.resolve({ status: 'success' }); }); };
+
+const penumbra_dash_vars = {
+  currentUserKey: 'tester', isAdmin: true, canCreate: true, reportGrantPatterns: [],
+  shortId: 'demo', found: true, canEdit: true,
+  meta: { short_id: 'demo', title: 'Demo', owner_id: 'tester', authorized: 'tester', updated_at: '' },
+  state: { version: 1, theme: 'theme-default', refreshSeconds: 0, tiles: [
+    { id: 'u1', type: 'stat',  source: 'url', url: 'api_rows.json', label: 'URL sum', agg: 'sum', column: 'AMOUNT', format: 'number', w: 3, h: 1 },
+    { id: 'u3', type: 'stat',  source: 'url', url: 'api_rows.json', label: '', agg: 'count', w: 3, h: 1 },
+    { id: 'u2', type: 'table', source: 'url', url: 'api_rows.json', label: 'URL table', columns: ['NAME', 'AMOUNT'], rows: 5, w: 6, h: 2 },
+    { id: 'i1', type: 'stat',  source: 'inline', json: '[{"X":"1"},{"X":"2"}]', label: 'Inline count', agg: 'count', w: 3, h: 1 },
+    { id: 'i2', type: 'chart', source: 'inline', json: '{"data":[{"D":"a","V":"1"},{"D":"b","V":"3"},{"D":"a","V":"2"}]}', label: 'Inline chart', chartType: 'bar', groupBy: 'D', valueAgg: 'sum', valueColumn: 'V', topN: 10, w: 6, h: 2 },
+    { id: 'x1', type: 'stat',  source: 'url', url: 'https://example.com/rows.json', label: 'Cross origin', agg: 'count', w: 3, h: 1 },
+    { id: 'e1', type: 'stat',  source: 'url', url: 'api_env.json', label: 'Envelope', agg: 'count', w: 3, h: 1 },
+    { id: 'g1', type: 'stat',  source: 'url', url: 'api_grouped.json', label: 'Grouped', agg: 'sum', column: 'V', w: 3, h: 1 },
+    { id: 'b1', type: 'stat',  source: 'url', url: 'api_bad.json', label: 'Bad shape', agg: 'count', w: 3, h: 1 },
+    { id: 'r1', type: 'stat',  source: 'live', report: 'repA', label: 'Report', agg: 'sum', column: 'AMOUNT', w: 3, h: 1 }
+  ] },
+  themes: [{ id: 'theme-default', label: 'Default Light', isDark: false }]
+};
+</script>
+<script src="penumbra_tiles.js"></script><script src="dash.js"></script>
+<script>
+var L = [];
+function ok(n, c, x) { L.push((c ? 'PASS ' : 'FAIL ') + n + (x ? '  [' + x + ']' : '')); }
+function tile(id) { return $('.dash-tile[data-tile-id="' + id + '"]'); }
+var T = window.PenumbraTiles;
+
+// ---------------- Pure engine checks (no DOM timing) ----------------
+try {
+  ok('engine exported', !!T && T.version === 1);
+  // Origin checks (file:// harness: relative = same origin; other hosts never).
+  ok('same-origin: relative URL ok', T.isSameOrigin('index.php?id=1&json=1'));
+  ok('same-origin: https other host refused', !T.isSameOrigin('https://example.com/x.json'));
+  ok('same-origin: protocol-relative other host refused', !T.isSameOrigin('//other.host/x.json'));
+  ok('same-origin: javascript: refused', !T.isSameOrigin('javascript:alert(1)'));
+  // Envelope normalisation.
+  var n1 = T.normalizeEnvelope([{ a: 1 }]);
+  ok('envelope: bare array', n1.rows && n1.rows.length === 1 && n1.totalRows === null);
+  var n2 = T.normalizeEnvelope({ viewMode: 'grouped', data: { g1: [{ v: 1 }], g2: [{ v: 2 }, { v: 3 }] } });
+  ok('envelope: grouped flattens', n2.rows && n2.rows.length === 3, JSON.stringify(n2));
+  ok('envelope: {rows:[...]} shape', T.normalizeEnvelope({ rows: [{ a: 1 }, { a: 2 }] }).rows.length === 2);
+  ok('envelope: error passthrough', T.normalizeEnvelope({ error: 'nope' }).error === 'nope');
+  ok('envelope: encrypted refused', /encrypted/.test(T.normalizeEnvelope({ encrypted: true }).error || ''));
+  var n3 = T.normalizeEnvelope(['a', 'b']);
+  ok('envelope: scalar rows wrapped as VALUE', n3.rows[0].VALUE === 'a' && n3.rows[1].VALUE === 'b');
+  ok('envelope: total_rows carried', T.normalizeEnvelope({ data: [{ a: 1 }], total_rows: 99 }).totalRows === 99);
+  ok('envelope: numeric-keyed object = rows', T.normalizeEnvelope({ data: { '0': { a: 1 }, '1': { a: 2 } } }).rows.length === 2);
+  ok('envelope: junk object is an error', !!T.normalizeEnvelope({ nonsense: true }).error);
+  // The report API refuses with HTTP 200 + one ERROR-only row (seen live: an
+  // unknown id answers {"data":[{"ERROR":"Report Not Found (ID: x)"}]}).
+  ok('envelope: API error-row convention is an error, not one row',
+     /Not Found/.test(T.normalizeEnvelope({ data: [{ ERROR: 'Report Not Found (ID: x)' }], report_title: 'Report Not Found' }).error || ''));
+  ok('envelope: a real one-row dataset with an ERROR column plus others stays data',
+     (T.normalizeEnvelope({ data: [{ ERROR: 'x', ID: 1 }] }).rows || []).length === 1);
+  // Map rows (the report page's own rowDataMaps).
+  var m1 = new Map([['AMOUNT', '$1,000.50'], ['Dept', 'R&amp;D']]);
+  var m2 = new Map([['AMOUNT', '(500)'], ['Dept', 'Ops']]);
+  ok('getCell: Map exact + case-insensitive', T.getCell(m1, 'AMOUNT') === '$1,000.50' && T.getCell(m1, 'dept') === 'R&amp;D');
+  ok('getCell: object case-insensitive', T.getCell({ Amount: '5' }, 'AMOUNT') === '5');
+  ok('computeStat over Maps', T.computeStat([m1, m2], 'sum', 'amount') === 500.5, String(T.computeStat([m1, m2], 'sum', 'amount')));
+  // Prototype-named cell values. A plain {} cannot hold a "__proto__" key -- the
+  // assignment is a silent no-op -- so a frequency map built on one never counts
+  // it and mode/antimode return the runner-up. Object.create(null) is the fix;
+  // these go red against penumbra_tiles.js.bak-20260829-protokeys.
+  var pk = ['__proto__', '__proto__', '__proto__', 'beta', 'beta'].map(function (v) { return new Map([['K', v]]); });
+  ok('computeStat mode: a "__proto__" value can win',
+     T.computeStat(pk, 'mode', 'K') === '__proto__', String(T.computeStat(pk, 'mode', 'K')));
+  ok('computeStat antimode: "__proto__" counted, so beta is not the least common',
+     T.computeStat(pk, 'antimode', 'K') === 'beta', String(T.computeStat(pk, 'antimode', 'K')));
+  var pk2 = ['constructor', 'constructor', 'toString'].map(function (v) { return new Map([['K', v]]); });
+  ok('computeStat mode: inherited method names counted',
+     T.computeStat(pk2, 'mode', 'K') === 'constructor', String(T.computeStat(pk2, 'mode', 'K')));
+  ok('computeStat distinct: prototype names counted once each',
+     T.computeStat(pk, 'distinct', 'K') === 2, String(T.computeStat(pk, 'distinct', 'K')));
+  ok('sniffColumns over Maps', T.sniffColumns([m1, m2]).map(function (c) { return c.name + (c.numeric ? '#' : ''); }).join(',') === 'AMOUNT#,Dept');
+  ok('bucketRows over Maps decodes entities', T.bucketRows([m1, m2], 'Dept').keys.join(',') === 'R&D,Ops');
+  // Spec parsing.
+  var p1 = T.parseTileSpec('{"type":"stat","report":"r","agg":"sum"}');
+  ok('tile spec: sum needs a column', /column/.test(p1.error || ''), p1.error);
+  var p2 = T.parseTileSpec('[{"type":"chart","report":"r","groupBy":"D"}]');
+  ok('tile spec: chart defaults', p2.specs && p2.specs[0].valueAgg === 'count' && p2.specs[0].topN === 10 && p2.specs[0].w === 12 && p2.specs[0].h === 2, JSON.stringify(p2));
+  ok('tile spec: invalid JSON explained', /JSON/.test(T.parseTileSpec('nonsense').error || ''));
+  ok('tile spec: unknown type refused', /Unknown tile type/.test(T.parseTileSpec('{"type":"pivot"}').error || ''));
+  var p3 = T.parseTileSpec('{"agg":"count"}');
+  ok('tile spec: defaults to stat over the current rows', p3.specs && p3.specs[0].type === 'stat' && T.effectiveSource(p3.specs[0]) === 'current');
+  // Row height (2026-09-05): 'grow' is the only stored value; anything else is uniform (absent).
+  var p5 = T.parseTileSpec('{"type":"table","report":"r","columns":"A","rowHeight":"GROW"}');
+  ok('tile spec: rowHeight normalised to grow', !!(p5.specs && p5.specs[0].rowHeight === 'grow'), JSON.stringify(p5));
+  var p6 = T.parseTileSpec('{"type":"table","report":"r","columns":"A","rowHeight":"nope"}');
+  ok('tile spec: unknown rowHeight dropped (uniform)', !!(p6.specs && p6.specs[0].rowHeight === undefined), JSON.stringify(p6));
+  var $rt = $('<div>');
+  T.renderInto($rt, { type: 'table', columns: ['A'], rows: 2, rowHeight: 'grow' }, { rows: [{ A: 'x' }], totalRows: 1 });
+  ok('table tile: grow-to-fit classes the table', $rt.find('table.dash-table').hasClass('dash-table-grow'), $rt.html());
+  T.renderInto($rt, { type: 'table', columns: ['A'], rows: 2 }, { rows: [{ A: 'x' }], totalRows: 1 });
+  ok('table tile: uniform rows leave the table unclassed', $rt.find('table.dash-table').length === 1 && !$rt.find('table.dash-table').hasClass('dash-table-grow'));
+  var p4 = T.parseTileSpec('{"type":"table","report":"r","columns":"A, B","rows":"500"}');
+  ok('tile spec: table columns string split + rows capped', p4.specs && p4.specs[0].columns.join('|') === 'A|B' && p4.specs[0].rows === 200, JSON.stringify(p4));
+  var e1 = T.parseEmbedSpec('rpt-x?show=header&date=01-JUL-25');
+  ok('embed spec: shorthand', e1.spec && e1.spec.report === 'rpt-x' && e1.spec.show === 'header' && e1.spec.prompts.date === '01-JUL-25', JSON.stringify(e1));
+  var e2 = T.parseEmbedSpec('rpt-x?chart=2&search=STATUS%20%3D%20Open&height=400&label=My%20chart');
+  ok('embed spec: chart/search/height/label', e2.spec && e2.spec.show === 'chart' && e2.spec.chartN === 2 && e2.spec.search === 'STATUS = Open' && e2.spec.height === '400' && e2.spec.label === 'My chart', JSON.stringify(e2));
+  ok('embed spec: bad id refused', !!T.parseEmbedSpec('bad id!').error);
+  ok('embed spec: JSON form', T.parseEmbedSpec('{"report":"r2","show":"table"}').spec.show === 'table');
+  ok('embed spec: unknown show falls back to both', T.parseEmbedSpec('r?show=sideways').spec.show === 'both');
+  // URLs.
+  var u1 = T.embedUrl({ report: 'r', show: 'header', prompts: { date: 'x' } }, { theme: 'theme-midnight', via: 'infobox rep' });
+  ok('embedUrl: header section + theme + via + prompts', u1 === 'index.php?id=r&noadm&embed=1&eview=header&theme=theme-midnight&via=infobox%20rep&date=x', u1);
+  var u2 = T.embedUrl({ report: 'r', show: 'chart', chartN: 3, label: 'My chart', prompts: { embed: 'evil', json: '1' } }, { theme: 'theme-default' });
+  ok('embedUrl: chart page + title, reserved prompt keys dropped, default theme omitted', u2 === 'index.php?id=r&noadm&embed=1&fullscreen=true&fspages=3&fstitle=My%20chart', u2);
+  // 2026-09-05: a host that wants its theme to win INSIDE the carousel passes
+  // opts.fstheme (the dashboard always does, theme-default included); a chart
+  // embed without it keeps the snippet's own pinned theme (u2 above).
+  var u4 = T.embedUrl({ report: 'r', show: 'chart', chartN: 1, prompts: { fstheme: 'evil' } }, { theme: 'theme-default', fstheme: 'theme-default' });
+  ok('embedUrl: fstheme rides a chart embed (default included), reserved fstheme prompt dropped', u4 === 'index.php?id=r&noadm&embed=1&fullscreen=true&fspages=1&fstheme=theme-default', u4);
+  var u5 = T.embedUrl({ report: 'r', show: 'table' }, { theme: 'theme-matrix', fstheme: 'theme-matrix' });
+  ok('embedUrl: fstheme is chart-only (a table embed never carries it)', u5 === 'index.php?id=r&noadm&embed=1&eview=table&theme=theme-matrix', u5);
+  var u3 = T.openUrl({ type: 'embed', report: 'r', prompts: { a: '1' }, search: 'q' }, { via: 'v' });
+  ok('openUrl: prompts + search + via', u3 === 'index.php?id=r&a=1&search=q&via=v', u3);
+  // Snippet writer.
+  var sn = T.tileToInfoboxSnippet({ id: 't1', type: 'stat', report: 'r', agg: 'sum', column: 'A', format: 'currency', w: 3, h: 1, label: "Bob's", refreshSeconds: 60, prompts: {} });
+  ok('snippet: single-quoted tile| JSON, layout keys dropped, apostrophe escaped',
+     sn.indexOf("action(infobox, Bob s, 'tile|{") === 0 && sn.indexOf('"id"') === -1 && sn.indexOf('refreshSeconds') === -1 &&
+     sn.indexOf('"prompts"') === -1 && sn.indexOf("Bob\\'s") > -1 && sn.slice(-2) === "')", sn);
+  var sn2 = T.tileToInfoboxSnippet({ type: 'embed', report: 'r', show: 'header', source: 'live', autoHeight: true, w: 12, h: 2 }, 'KPI strip');
+  ok('snippet: embed tiles use embed| without type/source/autoHeight', sn2.indexOf("'embed|{") > -1 && sn2.indexOf('"type"') === -1 && sn2.indexOf('"source"') === -1 && sn2.indexOf('autoHeight') === -1 && sn2.indexOf('"show":"header"') > -1, sn2);
+  // Badges.
+  ok('badge vocabulary', T.sourceBadge({ source: 'url' }).text === 'JSON URL' && T.sourceBadge({ source: 'inline' }).text === 'inline data' &&
+     T.sourceBadge({ source: 'snapshot' }).text === 'snapshot' && T.sourceBadge({ source: 'live', report: 'r' }).text === '' &&
+     T.sourceBadge({ type: 'trend' }).text === 'history' && T.sourceBadge({ type: 'embed' }).text === 'embedded' && T.sourceBadge({}).text === 'this report');
+  // Renderers over Maps into a detached host.
+  var $h = $('<div>');
+  T.renderTable($h, { type: 'table', columns: ['AMOUNT', 'Dept'], rows: 10 }, [m1, m2], 2);
+  ok('renderTable over Maps', $h.find('tbody tr').length === 2 && $h.text().indexOf('R&D') > -1, $h.text());
+  $h.find('th[data-col="AMOUNT"]').click();
+  ok('renderTable sorts Maps numerically (asc: -500 first)', $h.find('tbody tr').first().text().indexOf('(500)') > -1, $h.find('tbody tr').first().text());
+  var $s = $('<div>');
+  var shown = T.renderStat($s, [m1, m2], { agg: 'sum', column: 'AMOUNT', format: 'currency' });
+  ok('renderStat currency', shown === '$500.50' && $s.find('.dash-stat-value').text() === '$500.50', shown);
+  var $he = $('<div>');
+  T.renderTable($he, { type: 'table', columns: ['DEPT &amp; UNIT'], rows: 5 }, [{ 'DEPT &amp; UNIT': 'R&amp;D' }], 1);
+  ok('renderTable decodes entity-encoded headers and cells',
+     $he.find('th').first().text().indexOf('DEPT & UNIT') === 0 && $he.find('td').first().text() === 'R&D' &&
+     $he.find('th').first().attr('data-col') === 'DEPT &amp; UNIT',
+     $he.find('th').first().text() + ' / ' + $he.find('td').first().text());
+} catch (e) { L.push('HARNESS_ERROR (pure): ' + e.name + ': ' + e.message); }
+
+// fetchRows: current rows + inline + url + cross-origin, through the promise API.
+var F = {};
+T.fetchRows({ agg: 'count' }, { currentRows: [new Map([['A', '1']])] }).then(function (r) { F.cur = r; }, function (e) { F.cur = { err: e }; });
+T.fetchRows({ source: 'inline', json: '[{"A":"1"},{"A":"2"}]' }).then(function (r) { F.inl = r; }, function (e) { F.inl = { err: e }; });
+T.fetchRows({ source: 'inline', json: '{bad' }).then(function (r) { F.inlBad = r; }, function (e) { F.inlBad = { err: e }; });
+T.fetchRows({ source: 'url', url: 'https://example.com/x.json' }).then(function (r) { F.xo = r; }, function (e) { F.xo = { err: e }; });
+T.fetchRows({ source: 'url', url: 'api_env.json' }).then(function (r) { F.env = r; }, function (e) { F.env = { err: e }; });
+T.fetchRows({ report: 'denied' }).then(function (r) { F.den = r; }, function (e) { F.den = { err: e }; });
+T.fetchRows({ agg: 'count' }, {}).then(function (r) { F.nocur = r; }, function (e) { F.nocur = { err: e }; });
+
+// Frame fit: the 300-line stub is tall; the cap must win.
+var fr = document.createElement('iframe');
+fr.src = 'index.php?id=stub&embed=1';
+fr.style.width = '400px';
+document.getElementById('ibx').appendChild(fr);
+var fit = T.fitFrameHeight(fr, { min: 100, max: 600 });
+
+setTimeout(function () {
+  try {
+    ok('no exception escaped', ERRORS.length === 0, ERRORS.join(';') || 'none');
+    ok('fetchRows current: Map rows returned', F.cur && F.cur.rows && F.cur.rows.length === 1 && F.cur.totalRows === 1, JSON.stringify(F.cur));
+    ok('fetchRows inline: parsed', F.inl && F.inl.rows && F.inl.rows.length === 2, JSON.stringify(F.inl));
+    ok('fetchRows inline: bad JSON rejects with reason', F.inlBad && F.inlBad.err && /parsed/.test(F.inlBad.err.error || ''), JSON.stringify(F.inlBad));
+    ok('fetchRows url: cross-origin refused BEFORE fetching', F.xo && F.xo.err && /same-origin/.test(F.xo.err.error || '') && CALLS.filter(function (c) { return c.indexOf('example.com') > -1; }).length === 0, JSON.stringify(F.xo));
+    ok('fetchRows url: envelope + total_rows', F.env && F.env.rows && F.env.rows.length === 2 && F.env.totalRows === 77, JSON.stringify(F.env));
+    ok('fetchRows live: 403 = access message', F.den && F.den.err && /do not have access/.test(F.den.err.error || ''), JSON.stringify(F.den));
+    ok('fetchRows current: no rows in host = error', F.nocur && F.nocur.err && /current-report/.test(F.nocur.err.error || ''), JSON.stringify(F.nocur));
+    ok('fitFrameHeight: capped at max', fr.style.height === '600px', fr.style.height || '(none)');
+    fit.stop();
+
+    // ---------------- Dashboard tiles over url / inline sources ----------------
+    ok('ten tiles rendered', $('.dash-tile').length === 10, $('.dash-tile').length + '');
+    ok('url stat sums fetched rows', tile('u1').find('.dash-stat-value').text() === '3,000', tile('u1').find('.dash-stat-value').text() || tile('u1').find('.dash-tile-err').text());
+    ok('url stat badge + no open link + label fallback', tile('u1').find('.dash-src-badge').text() === 'JSON URL' && tile('u1').find('.dash-tile-open').length === 0 &&
+       tile('u3').find('.dash-tile-label').text() === 'JSON URL', tile('u3').find('.dash-tile-label').text());
+    ok('url table renders fetched rows', tile('u2').find('tbody tr').length === 3 && tile('u2').find('th').length === 2, tile('u2').find('tbody tr').length + ' rows');
+    var apiCalls = CALLS.filter(function (c) { return c.indexOf('api_rows.json') === 0; });
+    ok('same-URL stats share one fetch; table (limit) has its own', apiCalls.length === 2, apiCalls.length + ' calls');
+    ok('inline stat counts its rows', tile('i1').find('.dash-stat-value').text() === '2' && tile('i1').find('.dash-src-badge').text() === 'inline data', tile('i1').text());
+    var c2 = Chart.getChart(tile('i2').find('canvas')[0]);
+    ok('inline chart groups + sums', c2 && c2.data.labels.join(',') === 'a,b' && JSON.stringify(c2.data.datasets[0].data) === '[3,3]', c2 ? c2.data.labels.join(',') + ' ' + JSON.stringify(c2.data.datasets[0].data) : 'no chart');
+    ok('cross-origin url tile fails closed with the reason', /same-origin/.test(tile('x1').find('.dash-tile-err').text()), tile('x1').find('.dash-tile-err').text());
+    ok('envelope url tile reports the true total', tile('e1').find('.dash-stat-value').text() === '2' && tile('e1').find('.dash-tile-foot').text().indexOf('77 rows') > -1, tile('e1').find('.dash-tile-foot').text());
+    ok('grouped url payload flattens', tile('g1').find('.dash-stat-value').text() === '6', tile('g1').find('.dash-stat-value').text() || tile('g1').find('.dash-tile-err').text());
+    ok('junk url payload is an error, not a crash', /Unexpected/.test(tile('b1').find('.dash-tile-err').text()), tile('b1').find('.dash-tile-err').text());
+    ok('report tile still works through the engine', tile('r1').find('.dash-stat-value').text() === '30' && tile('r1').find('.dash-tile-open').length === 1, tile('r1').text());
+    ok('inline tile fetch keys hash the JSON (no collision with url tiles)', CALLS.filter(function (c) { return c.indexOf('index.php?id=repA') === 0; }).length === 1, CALLS.join(' | '));
+
+    // ---------------- Editor: source switching, sniffing, copy-as-infobox ----------------
+    $('#dashEditBtn').click();
+    $('#dashAddTileBtn').click();
+    ok('editor has the four data sources', $('#teSource option').length === 4 && $('#teSource').val() === 'live', $('#teSource option').map(function () { return this.value; }).get().join(','));
+    ok('live source shows the report picker, hides URL/JSON boxes', $('#teReportField').is(':visible') && !$('#teUrlField').is(':visible') && !$('#teJsonField').is(':visible'));
+    $('#teSource').val('url').trigger('change');
+    ok('url source swaps picker for the URL box and hides prompts', !$('#teReportField').is(':visible') && $('#teUrlField').is(':visible') && !$('#teDataFields').is(':visible'));
+    $('#teUrl').val('https://example.com/x.json').trigger('change');
+    ok('cross-origin URL flagged inline while editing', /same-origin/.test($('#teUrlHint').text()), $('#teUrlHint').text());
+    $('#teApply').click();
+    ok('apply refuses a cross-origin URL', ALERTS.length === 1 && /same-origin/.test(ALERTS[0]), ALERTS.join(' | '));
+    $('#teUrl').val('api_rows.json').trigger('change');
+    setTimeout(function () {
+      ok('url sniff fills the column pickers', $('#teUrlHint').text().indexOf('3 rows') > -1 && $('#teColumn option[value="AMOUNT"]').length === 1, $('#teUrlHint').text() + ' / ' + $('#teColumn option').length + ' cols');
+      $('#teAgg').val('sum'); $('#teColumn').val('AMOUNT'); $('#teFormat').val('currency'); $('#teLabel').val('API total');
+      $('#teCopySnippet').click();
+      var snip = $('#teSnippetText').val();
+      ok('copy-as-infobox emits a tile| snippet for the url tile', $('#teSnippetOut').is(':visible') &&
+         snip.indexOf("action(infobox, API total, 'tile|{") === 0 && snip.indexOf('"source":"url"') > -1 && snip.indexOf('"url":"api_rows.json"') > -1 &&
+         snip.indexOf('"agg":"sum"') > -1 && snip.indexOf('"w":3') > -1 && snip.indexOf('"id"') === -1, snip);
+      // The snippet round-trips through the engine's parser.
+      var rt = T.parseTileSpec(snip.substring(snip.indexOf("'tile|") + 6, snip.length - 2));
+      ok('emitted snippet parses back to the same tile', rt.specs && rt.specs[0].type === 'stat' && rt.specs[0].url === 'api_rows.json' && rt.specs[0].column === 'AMOUNT', JSON.stringify(rt));
+      $('#teApply').click();
+      setTimeout(function () {
+        var $new = $('.dash-tile').last();
+        ok('applied url tile renders', $('.dash-tile').length === 11 && $new.find('.dash-stat-value').text() === '$3,000' && $new.find('.dash-src-badge').text() === 'JSON URL', $new.text());
+        // Inline source, table type, invalid then valid JSON.
+        $('#dashAddTileBtn').click();
+        $('#teType').val('table').trigger('change');
+        $('#teSource').val('inline').trigger('change');
+        ok('inline source shows the JSON box', $('#teJsonField').is(':visible') && !$('#teReportField').is(':visible'));
+        $('#teJson').val('{bad json').trigger('change');
+        setTimeout(function () {
+          ok('bad JSON flagged inline', /parsed/.test($('#teJsonHint').text()), $('#teJsonHint').text());
+          $('#teApply').click();
+          ok('apply refuses bad JSON', ALERTS.length === 2 && /valid JSON/.test(ALERTS[1]), ALERTS.join(' | '));
+          $('#teJson').val('[{"Name":"A","Amt":"100"},{"Name":"B","Amt":"250"}]').trigger('change');
+          setTimeout(function () {
+            ok('inline sniff lists columns as checkboxes', $('#teCols input[value="Amt"]').length === 1 && $('#teJsonHint').text().indexOf('2 rows') > -1, $('#teJsonHint').text());
+            $('#teCols input').prop('checked', true);
+            $('#teLabel').val('Inline tbl');
+            $('#teApply').click();
+            setTimeout(function () {
+              var $t2 = $('.dash-tile').last();
+              ok('applied inline table renders its rows', $('.dash-tile').length === 12 && $t2.find('tbody tr').length === 2 && $t2.find('.dash-src-badge').text() === 'inline data', $t2.text());
+              // Embed type: the Data select hides, the picker comes back, copy emits embed|.
+              $('#dashAddTileBtn').click();
+              $('#teType').val('embed').trigger('change');
+              ok('embed type hides the Data select and shows the picker', !$('#teSourceField').is(':visible') && $('#teReportField').is(':visible'));
+              $('#teReportSearch').val('repA').trigger('change');
+              $('#teShow').val('header').trigger('change');
+              $('#teLabel').val('KPI strip');
+              $('#teCopySnippet').click();
+              var sn3 = $('#teSnippetText').val();
+              ok('copy-as-infobox emits embed| for embed tiles', sn3.indexOf("action(infobox, KPI strip, 'embed|{") === 0 && sn3.indexOf('"report":"repA"') > -1 && sn3.indexOf('"show":"header"') > -1, sn3);
+              $('.dash-panel-close').click();
+              publish();
+            }, 200);
+          }, 200);
+        }, 200);
+      }, 300);
+    }, 300);
+  } catch (e) { L.push('HARNESS_ERROR: ' + e.name + ': ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); publish(); }
+}, 1500);
+
+function publish() {
+  var A = 'RES' + 'ULT>>', B = '<' + '<FIN';
+  document.getElementById('out').textContent = A + L.join(' ;; ') + B;
+}
+</script></body></html>

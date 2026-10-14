@@ -1,0 +1,127 @@
+<!doctype html><meta charset="utf-8"><title>running</title><pre id="out">running</pre>
+<script>
+window.onerror = function (msg, src, line, col) {
+  var el = document.getElementById('out');
+  if (el && el.textContent === 'running') {
+    el.textContent = 'SCRIPT-ERROR: ' + msg + '  (line ' + line + ':' + col + ')';
+  }
+  return false;
+};
+</script>
+<script src="moment.min.js"></script>
+<script src="penumbra_charts.js"></script>
+<script>
+var LOG=[],PASS=0,FAIL=0;
+function ok(n,c,x){ if(c){PASS++;LOG.push('PASS  '+n);} else {FAIL++;LOG.push('FAIL  '+n+(x?'   >> '+x:''));} }
+function eq(n,g,w){ ok(n, JSON.stringify(g)===JSON.stringify(w), 'got='+JSON.stringify(g)+' want='+JSON.stringify(w)); }
+
+try {
+  // ---- the module loads standalone, with NO main.js present ----
+  ok('module: global exposed', typeof window.PenumbraCharts === 'object');
+  var PC = window.PenumbraCharts;
+  ok('module: init is a function', typeof PC.init === 'function');
+
+  // ---- init CONTRACT: refuses loudly on missing deps, does not half-arm ----
+  var errs = [];
+  var realErr = console.error;
+  console.error = function(){ errs.push([].slice.call(arguments).join(' ')); };
+  eq('init: rejects an empty dep bag', PC.init({}), false);
+  ok('init: names what was missing', /penumbraPercentileOf/.test(errs.join('|')), errs.join('|'));
+  errs.length = 0;
+  eq('init: rejects a PARTIAL dep bag', PC.init({ getChartColor: function(){} }), false);
+  console.error = realErr;
+
+  // ---- arm it properly ----
+  eq('init: accepts a complete dep bag', PC.init({
+    getChartColor: function(i,a){ return '#336699'; },
+    getChartBorderColor: function(i){ return 'B'+i; },
+    hexToRgba: function(c,a){ return 'rgba(51,102,153,'+a+')'; },
+    parseDate: function(s){ var m = moment(String(s), ['MM/DD/YYYY','YYYY-MM-DD','DD-MMM-YY'], true);
+                            return m.isValid() ? {date:m, granularity:'day'} : null; },
+    penumbraPercentileOf: function(s,p){ var n=s.length; if(!n) return 0; if(n===1) return s[0];
+                            var r=(p/100)*(n-1),lo=Math.floor(r),hi=Math.ceil(r);
+                            return lo===hi?s[lo]:s[lo]+(s[hi]-s[lo])*(r-lo); }
+  }), true);
+
+  // ---- every promised export is actually present and callable ----
+  var expected = ['applyFunnelChartConfig','applyGaugeChartConfig','applyBulletChartConfig',
+                  'applyBoxChartConfig','applyGanttChartConfig','applyMapChartConfig',
+                  'applyParetoChartConfig','_vizParseFunnelMode','_vizFormatDuration',
+                  '_vizFunnelShortNum','_vizParseBands','_vizParseTarget','_vizGaugeRange',
+                  '_vizBandColor','_vizParseWhiskerMode','_vizBoxStats','_vizDateMs',
+                  '_vizGanttTickFmt','_vizGanttMarker','_vizResolveState','_vizParseVizOptions'];
+  var missing = expected.filter(function(k){ return typeof PC[k] !== 'function'; });
+  eq('module: every promised function is exported', missing, []);
+  ok('module: grid table exported', PC.PENUMBRA_US_GRID && Object.keys(PC.PENUMBRA_US_GRID).length === 55);
+  eq('module: grid dims exported', [PC.PENUMBRA_US_GRID_COLS, PC.PENUMBRA_US_GRID_ROWS], [11,8]);
+
+  // ---- behaviour must be IDENTICAL to the in-main.js versions ----
+  eq('parity: funnel mode', PC._vizParseFunnelMode('duration|hours'), {mode:'duration',unit:'hours'});
+  eq('parity: duration format', PC._vizFormatDuration(42.53,'days'), '42.5 d');
+  eq('parity: short num', PC._vizFunnelShortNum(2400000,'$'), '$2.4M');
+  eq('parity: bands parsed + capped', PC._vizParseBands('10|20|30|40|50'), [10,20,30]);
+  eq('parity: target', PC._vizParseTarget('80|Goal'), {value:80,label:'Goal'});
+  eq('parity: whisker mode', PC._vizParseWhiskerMode('MinMax'), 'minmax');
+  eq('parity: options object', PC._vizParseVizOptions('{"bins":"equal"}'), {bins:'equal'});
+  eq('parity: options degrade', PC._vizParseVizOptions('{broken'), {});
+  eq('parity: state postal', PC._vizResolveState('NC'), 'NC');
+  eq('parity: state parenthetical', PC._vizResolveState('Georgia (State)'), 'GA');
+  eq('parity: territory', PC._vizResolveState('Puerto Rico'), 'PR');
+  eq('parity: zip is not a state', PC._vizResolveState('27695'), null);
+
+  // box stats route through the INJECTED percentile
+  var bs = PC._vizBoxStats([1,2,3,4,5,6,7,8,9],'tukey');
+  eq('parity: box quartiles via injected percentile', [bs.q1,bs.q2,bs.q3], [3,5,7]);
+  eq('parity: box outliers', PC._vizBoxStats([1,2,3,4,5,6,7,8,9,100],'tukey').outliers, [100]);
+
+  // date helpers route through the INJECTED parseDate
+  ok('parity: date ms via injected parseDate', PC._vizDateMs('01/15/2026') !== null);
+  eq('parity: gantt tick', PC._vizGanttTickFmt(PC._vizDateMs('2026-06-15'), 30), '15 Jun');
+  ok('parity: gantt marker today', PC._vizGanttMarker('today') !== null);
+
+  eq('parity: gauge range', PC._vizGaugeRange([50],null,[],'0','100'), {min:0,max:100});
+  // _vizBandColor builds a neutral black/white ramp directly - it does NOT go
+  // through hexToRgba, because the gauge/bullet band track is deliberately
+  // colourless (see the "never traffic lights" note).
+  ok('parity: band colour is a light-theme black ramp', /^rgba\(0,0,0,0\.\d+\)$/.test(PC._vizBandColor(2,5,false)), PC._vizBandColor(2,5,false));
+  ok('parity: band colour flips to white on dark', /^rgba\(255,255,255,/.test(PC._vizBandColor(2,5,true)));
+  ok('parity: band ramp darkens with k', PC._vizBandColor(0,5,false) !== PC._vizBandColor(4,5,false));
+
+  // ---- a full apply* still builds a config using the injected colour fns ----
+  function cfg(){ return { options:{ indexAxis:'y', scales:{x:{grid:{}},y:{grid:{}}},
+                                     plugins:{legend:{display:true},tooltip:{},datalabels:{}} } }; }
+  var tiles = Object.keys(PC.PENUMBRA_US_GRID).map(function(st,i){
+    var g = PC.PENUMBRA_US_GRID[st];
+    return { st:st, name:g.name, r:g.r, c:g.c, value:(st==='NC'?100:(i%7===0?i:null)), n:1 };
+  });
+  var mc = cfg();
+  PC.applyMapChartConfig(mc, { _isMap:true, _mapTiles:tiles, _mapMin:0, _mapMax:100,
+                               _mapBins:'quantile', _mapShowLabels:true, _mapUnmatched:0 },
+                         { showValues:false, textColor:'#111', isDark:false, currencyPrefix:'', fsBoost:0 });
+  eq('apply: map builds a scatter', mc.type, 'scatter');
+  eq('apply: one point per tile', mc.data.datasets[0].data.length, 55);
+  // POPULATED tiles are filled through the injected hexToRgba(getChartColor(...));
+  // no-data tiles deliberately get a flat neutral instead, so they read as absent
+  // rather than as a very small value.
+  var popFills = tiles.map(function(t,i){ return t.value == null ? null : mc.data.datasets[0].backgroundColor[i]; })
+                      .filter(Boolean);
+  ok('apply: populated fills came from the injected hexToRgba',
+     popFills.length > 0 && popFills.every(function(c){ return /^rgba\(51,102,153,/.test(c); }), popFills.slice(0,3).join(' '));
+  var emptyFills = tiles.map(function(t,i){ return t.value == null ? mc.data.datasets[0].backgroundColor[i] : null; })
+                        .filter(Boolean);
+  ok('apply: no-data tiles get a neutral, not the brand colour',
+     emptyFills.every(function(c){ return c.indexOf('51,102,153') === -1; }), emptyFills[0]);
+
+  var fc = cfg();
+  PC.applyFunnelChartConfig(fc, { _isFunnel:true, _funnelMode:'conversion', _funnelUnit:'days',
+                                  _funnelValues:[100,60,25], _funnelMax:100 },
+                            { showValues:true, textColor:'#111', isDark:false, currencyPrefix:'$', fsBoost:0 });
+  eq('apply: funnel forces indexAxis y', fc.options.indexAxis, 'y');
+  eq('apply: funnel label', fc.options.plugins.datalabels.formatter(null,{dataIndex:0}), '$100  (100%)');
+
+  document.getElementById('out').textContent =
+    'RESULT '+(FAIL===0?'ALL-PASS':'HAS-FAILURES')+'  pass='+PASS+' fail='+FAIL+'\n'+LOG.join('\n');
+} catch(e) {
+  document.getElementById('out').textContent='HARNESS-ERROR: '+e.name+': '+e.message+'\n'+(e.stack||'');
+}
+</script>

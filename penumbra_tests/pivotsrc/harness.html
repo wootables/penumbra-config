@@ -1,0 +1,282 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>pivot shared names and __SRC</title></head>
+<body>
+<!-- Same boot as ..\pivotsortkeep\harness.html, plus the search box, the flat header the
+     builder reads its columns from, the builder's container and the task form's filter. -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<div id="reportHeaderContainer"></div>
+<input type="hidden" id="reportSubtitle" value="Harness">
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<div id="tableSearchContainer"><input type="text" id="tableSearch" autocomplete="off"></div>
+<div id="resultCount"></div>
+<div id="loadingOverlay" style="display:none"><p></p></div>
+<table id="resultsTable"><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table>
+<div id="errorBox"></div>
+<div id="action_overlay" class="pnb-toast-dock"></div>
+<div id="pivot-output-container" style="display:none"></div>
+<div id="searchBuilderContainer"></div>
+<select id="schedEventType"><option value="EMAIL" selected>EMAIL</option></select>
+<input type="text" id="schedSearchFilter"><div id="schedSearchFilterHint"></div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script src="fixture.js"></script>
+<script src="sb_markup.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax;
+  // The builder lazy-loads its markup with $.get(url, callback): hand it the real file's HTML.
+  jQuery.get = function (url, a, b) {
+    var cb = typeof a === 'function' ? a : (typeof b === 'function' ? b : null);
+    var d = jQuery.Deferred();
+    if (String(url).indexOf('search_builder_content.php') === 0) { if (cb) cb(window.__SB_MARKUP); d.resolve(window.__SB_MARKUP); }
+    else { d.resolve({}); }
+    return d.promise();
+  };
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  if (!window._pnbModalHost) { window._pnbModalHost = function () { return jQuery(document.body); }; }
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (ev) { window.__errors.push('unhandledrejection: ' + (ev.reason && ev.reason.message ? ev.reason.message : String(ev.reason))); });
+</script>
+<script src="main_patched.js"></script>
+<script src="sb_patched.js"></script>
+<script>
+(function () {
+  function report(txt) { document.getElementById('out').textContent = txt; }
+  var results = [], info = [], emailCounts = {}, infoCounts = {}, reportTxns = {};
+  function t(name, cond, detail) { results.push({ name: name, pass: !!cond, detail: detail === undefined ? '' : String(detail) }); }
+  function eq(name, actual, expected) { var a = JSON.stringify(actual), e = JSON.stringify(expected); t(name, a === e, 'expected ' + e + ' got ' + a); }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function M(o) { return new Map(Object.keys(o).map(function (k) { return [k, o[k]]; })); }
+  var FX = window.__FIXTURE;
+  function rows() { return FX.rows.map(M); }   // fresh Maps per pivot (the search caches on the rows)
+  function fillHeader() {
+    var cols = ['#'].concat(Object.keys(FX.rows[0]));
+    jQuery('#tableHeader').html(cols.map(function (c) { return '<th data-colname="' + c + '">' + c + '</th>'; }).join(''));
+  }
+  function base(extra) {
+    var s = { v: 2, rows: ['FUNDER'], cols: ['FY'], vals: 'AMOUNT', agg: ['sum'], aggLabels: null,
+      aggColOverrides: null, aggFilters: null, aggFormulas: null, rowLayout: 'flat', colLayout: 'nested',
+      sortOrder: 'asc', colSortOrder: 'asc', stickyColCount: 1, totalColAggs: null, totalRowAggs: null,
+      totalRowAggLabels: null, totalRowAggBaseIdx: null, rankN: null, rankDir: null, rankAgg: null, rankOther: true,
+      rankScope: null, noBreakdown: false, startExpanded: false, hideEmpty: false };
+    Object.keys(extra).forEach(function (k) { s[k] = extra[k]; });
+    return s;
+  }
+  // ?id=sponawd's shape: Amount | %Δ | Awards over AMOUNT, FUNDER x FY. "Amount" is shared.
+  function S1() { return base({ agg: ['sum', 'pct_change', 'count'], aggLabels: ['Amount', '%Δ', 'Awards'], aggColOverrides: ['AMOUNT', 'AMOUNT', 'AMOUNT'] }); }
+  // Default labels Sum | Count: the default "Count" collides with the fixture's COUNT column.
+  function S2() { return base({ agg: ['sum', 'count'], aggColOverrides: ['AMOUNT', 'AMOUNT'] }); }
+  // One aggregate with its own label: the single-aggregate value-field alias case.
+  function S3() { return base({ agg: ['count'], aggLabels: ['Txns'], aggColOverrides: ['AMOUNT'] }); }
+
+  async function exec(q) {
+    window.__PSRC_hides = 0;
+    window.__PSRC.search(q);
+    for (var i = 0; i < 500 && !(window.__PSRC_hides > 0); i++) { await sleep(10); }
+    await sleep(30);
+    var html = jQuery('#resultCount').html() || '';
+    var m = /with ([\d,]+) filtered results/.exec(html), m2 = /([\d,]+) of ([\d,]+) source transactions/.exec(html);
+    var funders = Array.prototype.map.call(document.querySelectorAll('#pivotResultTable tbody tr'), function (tr) {
+      return tr.cells[0] ? tr.cells[0].textContent.trim() : '';
+    }).filter(function (x) { return x && !/total/i.test(x); });
+    return { pivotRows: m ? parseInt(m[1].replace(/,/g, ''), 10) : -1, txns: m2 ? parseInt(m2[1].replace(/,/g, ''), 10) : -1,
+             funders: funders, text: html.replace(/<[^>]+>/g, '').trim() };
+  }
+  function prev(q, opts) { var r = window._penumbraSearchAPI.countMatchingRows(q, opts); return { pivotRows: r.pivotMatching, txns: r.matching }; }
+  async function engineCase(id, label, q, funders, txns) {
+    var r = await exec(q);
+    t(id + ' ' + label, JSON.stringify(r.funders) === JSON.stringify(funders) && r.txns === txns && r.pivotRows === funders.length,
+      'want ' + JSON.stringify(funders) + ' / ' + txns + ' txns; got ' + JSON.stringify(r.funders) + ' / ' + r.txns + ' txns (' + r.text + ')');
+    var p = prev(q);
+    t('V' + id.slice(1) + ' preview == executed: ' + q, p.pivotRows === r.pivotRows && p.txns === r.txns,
+      'preview ' + p.pivotRows + ' rows / ' + p.txns + ' txns, executed ' + r.pivotRows + ' / ' + r.txns);
+    return r;
+  }
+  async function openReport(q) { jQuery('#tableSearch').val(q); window.openSearchBuilder(); await sleep(400); }
+  async function openSched(q) { jQuery('#schedSearchFilter').val(q); window._penumbraSearchBuilder.openForScheduler(function () {}); await sleep(400); }
+  function rowCols() { return jQuery('#sbConditionsContainer .sb-condition-row .sb-col-select').map(function () { return jQuery(this).val(); }).get(); }
+  function preview() { return jQuery('#sbQueryPreview').text(); }
+  function countText() { return jQuery('#sbQueryCount').text(); }
+  function shown(sel) { return jQuery(sel).length > 0 && jQuery(sel).css('display') !== 'none'; }
+
+  async function run() {
+    var P = window.__PSRC, api = window._penumbraSearchAPI, SB = window._penumbraSearchBuilder;
+    if (!P) { report('RESULTS_JSON:' + JSON.stringify({ fatal: 'hooks unavailable: ' + (window.__PSRC_ERR || 'n/a'), pageErrors: window.__errors.slice(0, 6) })); return; }
+    P.wrapHide();
+    fillHeader();
+
+    // ---- E / V: the executed search and the builder's preview ----------------
+    P.setPivot(S1(), rows());
+    eq('E0 setup: sponawd-shaped labels', api.getPivotAggregateColumns(), ['Amount', '%Δ', 'Awards']);
+    eq('E0b ...and Amount is the one name a column shares', typeof api.getPivotSharedNames === 'function' ? api.getPivotSharedNames() : 'no getPivotSharedNames', [{ label: 'Amount', column: 'AMOUNT' }]);
+    var all4 = ['Alpha', 'Bravo', 'Delta', 'Echo'];
+    var r1 = await engineCase('E1', "AMOUNT > 100 reads the pivot's Amount (any year)", 'AMOUNT > 100', all4, 11);
+    reportTxns['AMOUNT > 100'] = r1.txns;
+    await engineCase('E2', 'amount > 100 (lower case) reads the same', 'amount > 100', all4, 11);
+    await engineCase('E2b', '{Amount} > 100 (braces) reads the same', '{Amount} > 100', all4, 11);
+    await engineCase('E3', '__SRC AMOUNT > 100 filters the transactions, then re-pivots', '__SRC AMOUNT > 100', ['Bravo', 'Delta'], 2);
+    await engineCase('E4', '__ALL __SRC AMOUNT > 100 (either order) = E3', '__ALL __SRC AMOUNT > 100', ['Bravo', 'Delta'], 2);
+    await engineCase('E4b', '__SRC __ALL AMOUNT > 100 = E3', '__SRC __ALL AMOUNT > 100', ['Bravo', 'Delta'], 2);
+    await engineCase('E5', '__ALL AMOUNT > 100: over 100 in every year', '__ALL AMOUNT > 100', ['Delta'], 3);
+    await engineCase('E6', 'AMOUNT > 50 and Awards > 1: both aggregates, one cell', 'AMOUNT > 50 and Awards > 1', ['Alpha', 'Delta', 'Echo'], 9);
+    await engineCase('E7', '__SRC AMOUNT > 50 and Awards > 1: rows over 50, then 2+ of them in a year', '__SRC AMOUNT > 50 and Awards > 1', ['Alpha'], 2);
+    await engineCase('E8', '%Δ > 0 (a label no column shares)', '%Δ > 0', ['Alpha'], 3);
+    await engineCase('E8b', '__SRC %Δ > 0 still reads the pivot', '__SRC %Δ > 0', ['Alpha'], 3);
+    await engineCase('E9', '__SRC TRANSACTION_TYPE = New = without it', '__SRC TRANSACTION_TYPE = New', ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo'], 9);
+    // No aggregate named: the preview's per-row path must read __ROW / __ALL as the
+    // pivot search does (it used to keep each as a search term: preview 0).
+    await engineCase('E12', '__ROW TRANSACTION_TYPE = New (no aggregate named)', '__ROW TRANSACTION_TYPE = New', ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo'], 9);
+    await engineCase('E13', '__ALL TRANSACTION_TYPE = New (no aggregate named)', '__ALL TRANSACTION_TYPE = New', ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo'], 9);
+
+    // Email reading, every fixture query, pivot on screen (the task form's hint path).
+    FX.emailQueries.forEach(function (q) { emailCounts[q] = prev(q, { email: true }).txns; });
+    FX.infoQueries.forEach(function (q) { infoCounts[q] = prev(q, { email: true }).txns; });
+    var em = prev('AMOUNT > 100', { email: true });
+    t('M00 email reading on the pivot: AMOUNT > 100 = 2 funders from 2 transactions', em.pivotRows === 2 && em.txns === 2, JSON.stringify(em));
+
+    P.setPivot(S2(), rows());
+    eq('E10 setup: default labels Sum | Count; Count is shared with the COUNT column', typeof api.getPivotSharedNames === 'function' ? api.getPivotSharedNames() : 'n/a', [{ label: 'Count', column: 'COUNT' }]);
+    await engineCase('E10a', "COUNT > 1 reads the pivot's default Count label", 'COUNT > 1', ['Alpha', 'Delta', 'Echo'], 9);
+    await engineCase('E10b', '__SRC COUNT > 1 reads the COUNT column', '__SRC COUNT > 1', ['Bravo', 'Charlie'], 2);
+
+    P.setPivot(S3(), rows());
+    await engineCase('E11', '__SRC AMOUNT > 100 and Txns > 0: AMOUNT is the column (no single-aggregate alias)', '__SRC AMOUNT > 100 and Txns > 0', ['Bravo', 'Delta'], 2);
+    // The single-aggregate alias (removed 2026-09-28) read AMOUNT twice here - as the rows'
+    // column AND as "count > 100" - and kept 0 funders.
+    await engineCase('E11b', 'AMOUNT > 100 and Txns > 0: AMOUNT is the column, read once (was 0 rows)', 'AMOUNT > 100 and Txns > 0', ['Bravo', 'Delta'], 2);
+
+    // Flat view: __SRC is a no-op, never a search term.
+    P.hidePivot();
+    var fa = prev('__SRC TRANSACTION_TYPE = New'), fb = prev('TRANSACTION_TYPE = New');
+    t('F1 flat view: __SRC TRANSACTION_TYPE = New counts like without it (9)', fa.txns === 9 && fb.txns === 9, JSON.stringify([fa, fb]));
+    var fr = prev('__ROW TRANSACTION_TYPE = New');
+    t('F2 flat view: __ROW TRANSACTION_TYPE = New previews 9 (the flat search strips __ROW)', fr.txns === 9, JSON.stringify(fr));
+    var fl = prev('__ALL TRANSACTION_TYPE = New');
+    t('F3 guard: flat view keeps __ALL as a term, as the flat search does (0)', fl.txns === 0, JSON.stringify(fl));
+
+    // ---- B: the Visual Search Builder ------------------------------------------
+    P.setPivot(S1(), rows());
+    var c1 = SB.getAvailableColumns({ pivotSearch: true });
+    t('B1 report search lists Amount under Pivot Aggregates and drops the look-alike AMOUNT', c1.aggregate.indexOf('Amount') !== -1 && c1.visible.indexOf('AMOUNT') === -1, JSON.stringify(c1));
+    var c2 = SB.getAvailableColumns({ pivotSearch: true, srcRows: true });
+    t('B2 ...under __SRC the column is back, Amount gone, Awards still an aggregate', c2.visible.indexOf('AMOUNT') !== -1 && c2.aggregate.indexOf('Amount') === -1 && c2.aggregate.indexOf('Awards') !== -1, JSON.stringify(c2));
+    var c3 = SB.getAvailableColumns();
+    t('B3 guard: no context (the grouping picker) keeps the column', c3.visible.indexOf('AMOUNT') !== -1, JSON.stringify(c3));
+    var c4 = SB.getAvailableColumns({ schedFilter: true });
+    t('B4 guard: scheduler context keeps the column (an email filters source rows)', c4.visible.indexOf('AMOUNT') !== -1 && c4.aggregate.indexOf('Amount') === -1, JSON.stringify(c4));
+
+    // Three readings, three counts: __SRC (rows over 100, then any count) = 2 funders from
+    // 2 rows; the pivot's Amount = 4 funders from 11; __SRC left as a search term = 0.
+    await openReport('__SRC AMOUNT > 100 and Awards > 0');
+    t('B5 report builder, shared name on screen: the __SRC box is offered', shown('#sbSrcRowsLabel'), jQuery('#sbSrcRowsLabel').length ? jQuery('#sbSrcRowsLabel').attr('style') : 'no #sbSrcRowsLabel');
+    t('B6 ...ticked from the query; rows AMOUNT + Awards; the query round-trips',
+      jQuery('#sbSrcRowsCheck').is(':checked') && JSON.stringify(rowCols()) === JSON.stringify(['AMOUNT', 'Awards']) && preview() === '__SRC AMOUNT > 100 and Awards > 0',
+      'checked=' + jQuery('#sbSrcRowsCheck').is(':checked') + ' rows=' + JSON.stringify(rowCols()) + ' query=' + preview());
+    var cntSrc = countText();
+    t('B6b ...its count is the source reading (2 funders from 2 rows)', /with 2 filtered results \(2 of 13/.test(cntSrc), cntSrc);
+    jQuery('#sbSrcRowsCheck').prop('checked', false).trigger('change');
+    await sleep(350);
+    t('B7 unticking keeps each row (Amount, now the pivot label) and drops the prefix',
+      JSON.stringify(rowCols()) === JSON.stringify(['Amount', 'Awards']) && preview() === 'Amount > 100 and Awards > 0',
+      'rows=' + JSON.stringify(rowCols()) + ' query=' + preview());
+    t('B8 ...and the count moves to the pivot reading (4 funders from 11 rows)', /with 4 filtered results \(11 of 13/.test(countText()), cntSrc + ' -> ' + countText());
+
+    await openReport('AMOUNT > 100');
+    var $opt = jQuery('#sbConditionsContainer .sb-col-select').first().find('option:selected');
+    t('B9 a bare shared name opens as the pivot label, under Pivot Aggregates',
+      !jQuery('#sbSrcRowsCheck').is(':checked') && $opt.val() === 'Amount' && $opt.parent('optgroup').attr('label') === 'Pivot Aggregates',
+      'checked=' + jQuery('#sbSrcRowsCheck').is(':checked') + ' value=' + $opt.val() + ' group=' + $opt.parent('optgroup').attr('label'));
+
+    await openReport('__ALL __SRC AMOUNT > 100');
+    t('B10 __ALL __SRC in that order: both boxes ticked, written back as __SRC __ALL',
+      jQuery('#sbAllColumnsCheck').is(':checked') && jQuery('#sbSrcRowsCheck').is(':checked') && preview() === '__SRC __ALL AMOUNT > 100',
+      'all=' + jQuery('#sbAllColumnsCheck').is(':checked') + ' src=' + jQuery('#sbSrcRowsCheck').is(':checked') + ' query=' + preview());
+
+    // A value-side column reference is rebuilt by the same toggle: it must keep its name too.
+    await openReport('__SRC COUNT > {AMOUNT}');
+    var refBefore = jQuery('#sbConditionsContainer .sb-colref-select').first().val(), qBefore = preview();
+    jQuery('#sbSrcRowsCheck').prop('checked', false).trigger('change');
+    await sleep(350);
+    var refAfter = jQuery('#sbConditionsContainer .sb-colref-select').first().val();
+    t('B14 a {AMOUNT} column reference survives the toggle (AMOUNT -> Amount), query intact',
+      refBefore === 'AMOUNT' && qBefore === '__SRC COUNT > {AMOUNT}' && refAfter === 'Amount' && preview() === 'COUNT > {Amount}',
+      'before ' + refBefore + ' / ' + qBefore + '; after ' + refAfter + ' / ' + preview());
+
+    await openSched('AMOUNT > 100');
+    t('B11 scheduler builder: no __SRC box, AMOUNT stays the column', !shown('#sbSrcRowsLabel') && rowCols()[0] === 'AMOUNT',
+      'shown=' + shown('#sbSrcRowsLabel') + ' rows=' + JSON.stringify(rowCols()));
+    t("B12 ...and its count is the email's: 2 funders from 2 transactions", /with 2 filtered results \(2 of 13 source transactions/.test(countText()), countText());
+
+    P.hidePivot();
+    await openReport('__SRC TRANSACTION_TYPE = New');
+    t('B13 no pivot on screen: no __SRC box, and Search leaves the no-op prefix out', !shown('#sbSrcRowsLabel') && preview() === 'TRANSACTION_TYPE = New',
+      'shown=' + shown('#sbSrcRowsLabel') + ' query=' + preview());
+    jQuery('#searchBuilderLightbox').hide();
+
+    // ---- H: the task form's hint -------------------------------------------------
+    P.setPivot(S1(), rows());
+    var h1 = P.hint('AMOUNT > 100');
+    t("H1 task form: the count is the email's (2 of 13), not the report's 11", /^13 total rows, with 2 filtered results/.test(h1), h1);
+    t('H2 ...and it says AMOUNT is the column in emails', h1.indexOf("In emails, AMOUNT filters the source rows, not the pivot's Amount.") !== -1, h1);
+    var h3 = P.hint('Awards > 1');
+    t('H3 a pivot-only label gets the other note', h3.indexOf("Emails can't filter by the pivot's Awards: it is not a column there.") !== -1, h3);
+    var h4 = P.hint('TRANSACTION_TYPE = New');
+    t('H4 a plain column: count only, no note', h4.trim() === '13 total rows, with 9 filtered results', h4);
+    P.hidePivot();
+    var h5 = P.hint('AMOUNT > 100');
+    t('H5 no pivot on screen: no note', h5.trim() === '13 total rows, with 2 filtered results', h5);
+
+    // ---- A: the search bar's own autocomplete --------------------------------------
+    P.setPivot(S1(), rows());
+    var acItems = null;
+    try {
+      P.initAC();
+      var inp = document.getElementById('tableSearch');
+      jQuery(inp).val('amo'); inp.focus();
+      inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'o', keyCode: 79, which: 79, bubbles: true }));
+      await sleep(900);
+      acItems = jQuery('ul.ui-autocomplete li').map(function () { return jQuery(this).text().trim(); }).get();
+    } catch (eAc) { info.push('autocomplete drive failed: ' + eAc.message); }
+    if (acItems && acItems.length) {
+      var aggAt = acItems.indexOf('Pivot Aggregates');
+      t('A1 search bar autocomplete: "amo" offers Amount under Pivot Aggregates, no AMOUNT column',
+        aggAt !== -1 && acItems.indexOf('Amount') > aggAt && acItems.indexOf('AMOUNT') === -1, JSON.stringify(acItems));
+    } else {
+      info.push('autocomplete menu did not render headless (' + JSON.stringify(acItems) + ') - A1 not run');
+    }
+
+    t('no page errors', window.__errors.length === 0, JSON.stringify(window.__errors.slice(0, 4)));
+    report('RESULTS_JSON:' + JSON.stringify({ results: results, emailCounts: emailCounts, infoCounts: infoCounts, reportTxns: reportTxns, info: info, pageErrors: window.__errors.slice(0, 6) }));
+  }
+  setTimeout(function () {
+    run().catch(function (e) { report('RESULTS_JSON:' + JSON.stringify({ fatal: 'run threw: ' + (e && e.stack ? e.stack : e), results: results, emailCounts: emailCounts, info: info, pageErrors: window.__errors.slice(0, 6) })); });
+  }, 300);
+})();
+</script>
+</body></html>

@@ -1,0 +1,76 @@
+<!doctype html><meta charset="utf-8"><body><pre id="r">PENDING</pre>
+<script src="rt_funcs.js"></script>
+<script>
+// Build every backslash from a char code so no source-level escaping layer can
+// silently eat one (an earlier version of this harness lost a backslash and
+// produced a false "apostrophes are broken" result).
+var BS = String.fromCharCode(92);   // \
+var DQ = String.fromCharCode(34);   // "
+var SQ = String.fromCharCode(39);   // '
+
+var out = [], pass = 0, fail = 0;
+function ok(name, got, want) {
+  var good = (got === want);
+  if (good) pass++; else fail++;
+  out.push((good ? 'PASS ' : 'FAIL ') + name +
+    '\n      got  = ' + JSON.stringify(got) +
+    '\n      want = ' + JSON.stringify(want));
+}
+
+var cleanOld = function (a) { return stripWrappingQuotePair(a || ''); };
+var cleanNew = function (a) { return stripWrappingQuotePair(a || '').split(BS + DQ).join(DQ); };
+
+// vizBuildCodeFromForm: title wrapped in single quotes, literal ' escaped as \'
+function buildVis(title) {
+  var t = String(title).split(SQ).join(BS + SQ);
+  return 'vis(bar,STATE,AMOUNT,none,sum,10,' + SQ + t + SQ + ',true,true)';
+}
+// _buildInfoboxCode (main.js ~7773): every literal " in the vis() call escaped
+function buildInfobox(visCode, label) {
+  var l = String(label).split(SQ).join(BS + SQ);
+  var v = String(visCode).split(DQ).join(BS + DQ);
+  return 'action(infobox, ' + SQ + l + SQ + ', ' + DQ + 'raw|' + v + DQ + ')';
+}
+function roundTrip(title, cleanFn) {
+  var code = buildInfobox(buildVis(title), 'Bar: ' + title);
+  var outer = parseFunctionArgs(code.substring(code.indexOf('(') + 1, code.lastIndexOf(')')));
+  var payload = String(outer[2]).replace(/^raw\|/, '');
+  var inner = parseFunctionArgs(payload.substring(payload.indexOf('(') + 1, payload.lastIndexOf(')')));
+  return cleanFn(inner[6]);
+}
+
+// Sanity: the harness really is escaping now.
+out.push('harness check, vis code for "Sponsor' + SQ + 's Board":');
+out.push('  ' + buildVis("Sponsor's Board"));
+out.push('');
+
+var TITLES = [
+  'He said ' + DQ + 'hi' + DQ,
+  'Awards > $1M ' + DQ + 'Big Ticket' + DQ,
+  'Sponsor' + SQ + 's Board',
+  'plain title',
+  'both ' + SQ + 'q' + SQ + ' and ' + DQ + 'd' + DQ,
+  'Q1 ' + DQ + 'FY26' + DQ + ' vs Q2'
+];
+TITLES.forEach(function (t) { ok('NEW  ' + JSON.stringify(t), roundTrip(t, cleanNew), t); });
+
+out.push('');
+out.push('--- old helper, same inputs (documents the bug being fixed) ---');
+TITLES.forEach(function (t) {
+  var g = roundTrip(t, cleanOld);
+  out.push((g === t ? '  ok      ' : '  CORRUPT ') + JSON.stringify(t) + '  ->  ' + JSON.stringify(g));
+});
+
+// Compounding: save, reopen, save again.
+out.push('');
+var t0 = 'He said ' + DQ + 'hi' + DQ;
+ok('NEW  idempotent across two saves', roundTrip(roundTrip(t0, cleanNew), cleanNew), t0);
+var o1 = roundTrip(t0, cleanOld);
+out.push('  old after 1 save : ' + JSON.stringify(o1));
+out.push('  old after 2 saves: ' + JSON.stringify(roundTrip(o1, cleanOld)));
+
+ok('CONTROL (must fail)', 'x', 'y');
+
+document.getElementById('r').textContent =
+  'pass=' + pass + ' fail=' + fail + '  (exactly 1 failure expected: the control)\n\n' + out.join('\n');
+</script></body>

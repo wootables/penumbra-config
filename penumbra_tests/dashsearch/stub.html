@@ -1,0 +1,86 @@
+<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;font:12px sans-serif}</style></head><body>
+<!-- Test double for a FRAMED REPORT PAGE (the dashboard harness frames
+     index.php?id=...). It stands in for main.js's side of dashboard search:
+     routes ?dsearch= against a fixed column list per report, shows the result
+     in a search box, posts { type: 'penumbra:dsearch', dsearch, skipped } to the
+     parent, and exposes Penumbra.applyDashboardSearch - except for id=legacy,
+     which plays a report page from before the hook existed. The real main.js
+     half is tested in main.html.
+     For builder.html (the Visual Search Builder on the dashboard) it also
+     exposes the slice of main.js's window._penumbraSearchAPI the dashboard's
+     adapter reads: getColumns (NOTE hidden), buildVirtualColumnNames (repD's
+     nested SPECIES), getColumnAutocompleteValues and getColumnDateInfo, from
+     the per-report values below. It routes as main.js _pnbDashLoadText does:
+     the report's columns, '#' and its nested columns (until 2026-09-29 evening
+     this double routed by the top-level columns alone, and the adapter left
+     nested columns out to match). -->
+<input id="tableSearch" value="">
+<div id="pad" style="height:220px">framed stub</div>
+<script>
+(function () {
+  var q = {};
+  location.search.replace(/^\?/, '').split('&').forEach(function (p) {
+    if (!p) { return; }
+    var i = p.indexOf('='), k = i < 0 ? p : p.slice(0, i), v = i < 0 ? '' : p.slice(i + 1);
+    try { q[decodeURIComponent(k)] = decodeURIComponent(v.replace(/\+/g, ' ')); } catch (e) { q[k] = v; }
+  });
+  var COLS = { repA: ['COLLEGE', 'AMOUNT', 'STATUS'], repB: ['NAME', 'AMOUNT'], repD: ['DEPT', 'OPENED', 'AMOUNT', 'NOTE'], legacy: ['COLLEGE'] }[q.id] || [];
+  var HIDDEN = ['NOTE'];
+  var NESTED = { repD: ['SPECIES'] }[q.id] || [];
+  var ROUTE_COLS = COLS.concat(['#'], NESTED);
+  var VALUES = {
+    repA: { COLLEGE: ['Eng', 'Sci', 'Zoo'], AMOUNT: ['10', '20'], STATUS: ['Open', 'Closed'] },
+    repB: { NAME: ['Ada', 'Bob'], AMOUNT: ['7', '2'] },
+    repD: { DEPT: ['Ops', 'Lab'], OPENED: ['01/15/2024', '02/01/2024'], AMOUNT: ['12', '40'], NOTE: ['x'], SPECIES: ['Chicken', 'Duck'] }
+  }[q.id] || {};
+  window.__boot = Math.random();
+  // A cell click in a hosted report page (main.js _pnbCellFilter, 2026-09-30), on demand.
+  window.__xfilter = function (col, val) { try { parent.postMessage({ type: 'penumbra:xfilter', col: col, value: val }, '*'); } catch (e) { } };
+  // A stacked segment's click: every criterion at once (main.js _pnbDashPostFilter with pairs).
+  window.__xfilterPairs = function (pairs) { try { parent.postMessage({ type: 'penumbra:xfilter', col: pairs[0].col, value: pairs[0].value, pairs: pairs }, '*'); } catch (e) { } };
+  window.__applied = [];
+  function route(dsearch) {
+    var out = { text: '', skipped: [], applied: [] }, spec;
+    try { spec = JSON.parse(dsearch); } catch (e) { return out; }
+    var keep = [];
+    (spec.f || []).forEach(function (fr) {
+      var c = String(fr[0] || '').toUpperCase();
+      if (!c || ROUTE_COLS.indexOf(c) > -1) { keep.push(fr[1]); if (c) { out.applied.push(c); } }
+      else if (out.skipped.indexOf(c) < 0) { out.skipped.push(c); }
+    });
+    out.text = keep.length ? (spec.p || '') + keep.join(' and ') : '';
+    return out;
+  }
+  function apply(ds, s) {
+    var text = s || '';
+    if (ds) {
+      var r = route(ds);
+      text = r.text;
+      try { parent.postMessage({ type: 'penumbra:dsearch', dsearch: ds, skipped: r.skipped, applied: r.applied }, '*'); } catch (e) { }
+    }
+    document.getElementById('tableSearch').value = text;
+  }
+  apply(q.dsearch || '', q.search || '');
+  if (q.id !== 'legacy') {
+    window.Penumbra = { applyDashboardSearch: function (p) {
+      if (!p || typeof p !== 'object') { return false; }
+      window.__applied.push(p);
+      apply(p.dsearch || '', p.search || '');
+      return true;
+    } };
+    window.__apiCalls = [];
+    window._penumbraSearchAPI = {
+      getColumns: function () { window.__apiCalls.push('getColumns'); return COLS.map(function (c) { return { name: c, visible: HIDDEN.indexOf(c) < 0 }; }); },
+      buildVirtualColumnNames: function () { return NESTED.slice(); },
+      getColumnAutocompleteValues: function (col) {
+        window.__apiCalls.push('values:' + col);
+        return Object.prototype.hasOwnProperty.call(VALUES, col) ? VALUES[col].slice() : null;
+      },
+      getColumnDateInfo: function (col) {
+        window.__apiCalls.push('date:' + col);
+        return col === 'OPENED' ? { isDate: true, format: 'MM/DD/YYYY', jqFormat: 'mm/dd/yy', isUpper: false, sampleValue: '01/15/2024' } : { isDate: false };
+      }
+    };
+  }
+})();
+</script></body></html>

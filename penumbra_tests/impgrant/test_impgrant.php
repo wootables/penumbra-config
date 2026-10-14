@@ -1,0 +1,120 @@
+<?php
+// impgrant suite - PHP half (2026-10-09). 'imports' as a grants-tool connection.
+//   php -n test_impgrant.php <db_connection.php> <manage_imports.php> <query.php> <grants_admin.php>
+// LIFTED and run: penumbraImportGrantScope / penumbraImportGrantCovers (db_connection),
+// pnbImportMay (manage_imports), pnb_validate_grants (grants_admin). By source: the
+// endpoint's gate / list / save / append / undo / load / duplicate, query.php's guard
+// and by-name fallback, the grants tool's picker data.
+$pass = 0; $fail = 0;
+function ok($c, $name) { global $pass, $fail; if ($c) { $pass++; echo "  PASS  $name\n"; } else { $fail++; echo "  FAIL  $name\n"; } }
+$db = @file_get_contents($argv[1]); $mi = @file_get_contents($argv[2]); $q = @file_get_contents($argv[3]); $ga = @file_get_contents($argv[4]);
+ok($db && $mi && $q && $ga, 'S0 the four files read');
+function lift($src, $fn, $indent) {
+    if (preg_match('/^' . $indent . 'function ' . $fn . '\(.*?\n' . $indent . '\}/sm', $src, $m)) { eval($m[0]); return true; }
+    return false;
+}
+function section($s, $from, $len) { $p = strpos($s, $from); return $p === false ? '' : substr($s, $p, $len); }
+
+// --- the scope helpers ---------------------------------------------------------
+$l1 = lift($db, 'penumbraImportGrantScope', '    ') && lift($db, 'penumbraImportGrantCovers', '    ');
+ok($l1, 'S1 penumbraImportGrantScope + Covers lifted');
+if ($l1) {
+    $E = array('sql' => array(), 'reports' => array(), 'tags' => array());
+    ok(penumbraImportGrantScope($E) === null && penumbraImportGrantScope(array('sql' => array('fin' => '*'))) === null && penumbraImportGrantScope(null) === null,
+       'S2 no imports grant -> null (another connection is not one)');
+    ok(penumbraImportGrantScope(array('sql' => array('imports' => '*'))) === '*', 'S3 the whole connection -> "*"');
+    ok(penumbraImportGrantScope(array('sql' => array('imports' => array('221', ' 7', '221', 'ABC', '0', '-3', '1234567890123')))) === array(221, 7),
+       'S4 the checked imports -> their IDs as ints (deduped; junk, 0, negatives, over-long skipped)');
+    ok(penumbraImportGrantScope(array('sql' => array('imports' => array()))) === null && penumbraImportGrantScope(array('sql' => array('imports' => array('X')))) === null,
+       'S5 an empty or all-junk list is NO grant (fail-closed), never "every import"');
+    $g = array('sql' => array('imports' => array('5')));
+    ok(penumbraImportGrantCovers($g, 5) && penumbraImportGrantCovers($g, '5') && !penumbraImportGrantCovers($g, 6) && !penumbraImportGrantCovers($E, 5)
+       && penumbraImportGrantCovers(array('sql' => array('imports' => '*')), 999), 'S6 Covers: the granted ID only; "*" covers any; none covers nothing');
+}
+
+// --- pnbImportMay ---------------------------------------------------------------
+$l2 = lift($mi, 'pnbImportMay', '');
+ok($l2, 'M0 pnbImportMay lifted');
+if ($l2 && $l1) {
+    $g5 = array('sql' => array('imports' => array('5')));
+    ok(pnbImportMay(array('ID' => 9, 'USER_ID' => 'x'), true, 'me', array()), 'M1 an admin may, always');
+    ok(pnbImportMay(array('ID' => 9, 'USER_ID' => ' ME '), false, 'me', array()), 'M2 the owner may (case and padding folded)');
+    ok(pnbImportMay(array('ID' => 5, 'USER_ID' => 'ann'), false, 'me', $g5) && pnbImportMay(array('ID' => '5', 'USER_ID' => 'ann'), false, 'me', $g5), 'M3 a grant that covers the ID may');
+    ok(!pnbImportMay(array('ID' => 6, 'USER_ID' => 'ann'), false, 'me', $g5) && !pnbImportMay(array('ID' => 5, 'USER_ID' => 'ann'), false, 'me', array())
+       && !pnbImportMay(null, false, 'me', $g5) && !pnbImportMay(array('ID' => 0, 'USER_ID' => ''), false, '', $g5), 'M4 anything else may not (another ID, no grant, no row, an empty owner)');
+}
+
+// --- the endpoint (source) -------------------------------------------------------
+$pGate = strpos($mi, "if (!\$isAdmin && \$impScope === null) {");
+$pList = strpos($mi, "if (\$action === 'list') {");
+ok($pGate !== false && $pList !== false && $pGate < $pList && strpos($mi, "\$impScope = \$isAdmin ? '*' : penumbraImportGrantScope(\$userGrants);") !== false
+   && strpos($mi, "\$impCanCreate = \$isAdmin || \$impScope === '*';") !== false, 'G1 past list_for_report: an admin, or an imports grant; creating needs the whole connection');
+ok(strpos($mi, "if (\$action === 'list_for_report') {") < $pGate, 'G2 list_for_report stays ahead of the gate (viewers of a report)');
+$list = section($mi, "if (\$action === 'list') {", 2200);
+ok(strpos($list, "implode(',', array_map('intval', \$impScope))") !== false && strpos($list, "\$rows[\$i]['MINE']") !== false
+   && strpos($list, "WHERE USER_ID = :p_userid\"") !== false, 'L1 list: yours (an admin: still only yours) + the granted IDs (ints only), each marked MINE');
+$save = section($mi, "if (\$action === 'save') {", 9000);
+$save = substr($save, 0, strpos($save, "if (\$action === 'append') {") ?: strlen($save));
+ok(strpos($save, 'DELETE FROM PENUMBRA_IMPORTS') === false && strpos($save, "execClobUpdate(null, 'PENUMBRA_IMPORTS'") !== false && strpos($save, '$newId = $existingId;') !== false,
+   'SV1 a replace is IN PLACE (keeps the ID - grants are by ID - and REPORT_ID)');
+$pc = strpos($save, 'if (!$impCanCreate) {'); $pi = strpos($save, 'execClobInsert(');
+ok($pc !== false && $pi !== false && $pc < $pi && $pc > strpos($save, 'if (!empty($existing)) {'), 'SV2 a NEW import needs the right to create, checked before the insert');
+$pr = strpos($save, '$replaceId = isset($data[\'replace_id\'])'); $pm = strpos($save, '!pnbImportMay($existing[0], $isAdmin, $currentUserKey, $userGrants)');
+ok($pr !== false && $pm !== false && $pm < strpos($save, 'execClobUpdate('), 'SV3 replace_id: only an import you may write, checked before the write');
+$app = section($mi, "if (\$action === 'append') {", 6000);
+$app = substr($app, 0, strpos($app, "if (\$action === 'append_undo') {"));
+$und = section($mi, "if (\$action === 'append_undo') {", 4500);
+ok(($a1 = strpos($app, 'pnbImportMay($meta[0]')) !== false && $a1 < strpos($app, 'execClobUpdate(') && strpos($app, 'WHERE USER_ID = :p_userid AND IMPORT_NAME = :iname') !== false,
+   'AP1 append by ID: one you may write (checked before the write); by name: still only yours');
+ok(($u1 = strpos($und, 'pnbImportMay($meta[0]')) !== false && $u1 < strpos($und, 'execClobUpdate('), 'AU1 undo by ID: the same check, before the write');
+$load = section($mi, "if (\$action === 'load') {", 2500);
+ok(($l3 = strpos($load, 'pnbImportMay(')) !== false && $l3 < strpos($load, 'readClobViaOci8('), 'LD1 load: only an import you may read, checked before the CLOB is read');
+$dup = section($mi, "if (\$action === 'duplicate') {", 4000);
+ok(($d1 = strpos($dup, 'if (!$impCanCreate) {')) !== false && $d1 < strpos($dup, 'execClobInsert('), 'DU1 a duplicate is a new import: the right to create, before the insert');
+ok(substr_count($mi, 'http_response_code(409);' . "\n" . "            echo json_encode(array('status' => 'error', 'message' => 'You can only") === 3,
+   'R1 the owner-only refusals answer 409 (a holder reaches them; the page reads 403 as a lost session)');
+ok(strpos($mi, ':uid') === false, 'R2 no :uid bind (ORA-01745)');
+
+// --- query.php -----------------------------------------------------------------
+ok(strpos($q, "\$_importGranted = penumbraImportGrantCovers(\$userGrants, (int)\$meta['ID']);") !== false && strpos($q, 'if (!$_ownsImport && !$_importForRpt && !$_importGranted) {') !== false,
+   'Q1 the IDOR guard lets a granted import through (and nothing else new)');
+ok(strpos($q, "\$_impGrantOr = is_array(\$_impGrantScope) ? (\" OR ID IN (\" . implode(',', array_map('intval', \$_impGrantScope)) . \")\") : '';") !== false
+   && strpos($q, "OR REPORT_ID = :rid\" . \$_impGrantOr . \") \"") !== false && strpos($q, "':isadm' => ((\$isAdmin || \$_impGrantScope === '*') ? 1 : 0),") !== false,
+   'Q2 the by-name fallback: + the granted IDs (ints), "*" counts as admin');
+ok(strpos($q, '$_impGrantScope = $isAdmin ? null : penumbraImportGrantScope($userGrants);') < strpos($q, "OR REPORT_ID = :rid\" . \$_impGrantOr"), 'Q3 ... computed before that lookup');
+
+// --- grants_admin.php ------------------------------------------------------------
+ok(strpos($ga, "if (!in_array('imports', \$VALID_CONNS, true)) \$VALID_CONNS[] = 'imports';") !== false, 'V1 "imports" is a connection the tool offers and the validator accepts');
+function penumbraReportPatternTooBroad($p) { return false; }
+$allowedUsers = array('Boss1', 'boss2');
+$l5 = lift($ga, 'pnb_admin_ids', '');
+if (!$l5) { function pnb_admin_ids() { return array(); } }
+$l4 = lift($ga, 'pnb_validate_grants', '');
+ok($l4, 'V0 pnb_validate_grants lifted');
+if ($l4) {
+    $conns = array('ieprd', 'fin', 'imports'); $e = '';
+    $v = pnb_validate_grants(array('ann' => array(array('sql' => 'imports', 'tables' => array('221', '7')))), $conns, $e);
+    ok(is_array($v) && $v['ann'][0] === array('sql' => 'imports', 'tables' => array('221', '7')), 'V2a imports by ID are kept');
+    $v = pnb_validate_grants(array('ann' => array(array('sql' => 'imports', 'tables' => array('BUDGET')))), $conns, $e);
+    ok($v === null && strpos($e, "invalid import id 'BUDGET'") !== false, 'V2 a NAME (or anything not an ID) is refused for imports');
+    $v = pnb_validate_grants(array('ann' => array(array('sql' => 'imports'))), $conns, $e);
+    ok(is_array($v) && $v['ann'][0] === array('sql' => 'imports'), 'V3 none checked = the whole connection (every import)');
+    $v = pnb_validate_grants(array('ann' => array(array('sql' => 'fin', 'tables' => array('PS_NC_LEDGER')))), $conns, $e);
+    ok(is_array($v), 'V4 a table name on a data connection still passes');
+    $v = pnb_validate_grants(array('BOSS1' => array(array('sql' => 'fin'))), $conns, $e);
+    ok($l5 && $v === null && strpos($e, "is already an administrator") !== false, 'A1 an administrator (any case) cannot be given a grant');
+    $v = pnb_validate_grants(array('ann' => array(array('sql' => 'fin')), 'boss2' => array(array('tag' => 'OSP'))), $conns, $e);
+    ok($v === null, 'A2 ... not even alongside other users');
+}
+ok(strpos($ga, "var ADMIN_IDS = <?php echo json_encode(pnb_admin_ids()); ?>;") !== false
+   && strpos($ga, "if (ADMIN_IDS.indexOf(uid.toLowerCase()) !== -1) {") !== false, 'A3 the tool refuses to add an administrator as a user');
+ok(strpos($ga, 'SELECT ID, IMPORT_NAME, USER_ID, ROW_COUNT FROM PENUMBRA_IMPORTS') !== false && strpos($ga, "var IMPORT_INDEX = <?php echo json_encode(\$IMPORT_INDEX); ?>;") !== false
+   && strpos($ga, "'\"><input type=\"checkbox\" value=\"' + esc(im.id) + '\">' + esc(im.name)") !== false, 'V5 the picker lists every import, its checkbox value the ID, labelled by name + owner');
+ok(strpos($ga, '<div class="tp-list tp-imports">') !== false && strpos($ga, '.tp-list.tp-imports { grid-template-columns:1fr; }') !== false
+   && strpos($ga, 'min-width:0; overflow:hidden; }') !== false, 'V7 the imports list is one column, and a long label clips in its cell (never runs over the next)');
+ok(strpos($ga, 'The <em>imports</em> connection covers imported files instead') !== false, 'V8 the SQL scope card explains the imports connection');
+ok(strpos($ga, "if (g.sql === 'imports') t = (g.tables && g.tables.length) ? ' [' + g.tables.map(importLabel).join(', ') + ']' : ' (every import)';") !== false
+   && strpos($ga, "if (\$g['sql'] === 'imports') {") !== false, 'V6 a chip and the change email name the imports (not bare IDs)');
+
+echo "TOTAL pass=$pass fail=$fail\n";
+echo ($fail === 0 && $pass > 0) ? "RESULT: GREEN\n" : "RESULT: RED\n";

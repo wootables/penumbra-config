@@ -1,0 +1,151 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>pop-out tooltip hosting</title>
+<!-- The REAL stylesheets, in index.php order: jquery-ui.css makes .ui-tooltip
+     position:absolute, main.css sizes and themes it. The pop-out re-links every
+     one of them into its own document (_pipCopyStyles). -->
+<link rel="stylesheet" href="jquery-ui.css">
+<link rel="stylesheet" href="codemirror.min.css">
+<link rel="stylesheet" href="show-hint.css">
+<link rel="stylesheet" href="main.css">
+</head>
+<body>
+<!-- Pop-out tooltip hosting suite (2026-09-25). The console holds the four
+     tooltip hosts main.js and penumbra_snippet_help.js build, nested the way
+     index.php nests them: #admWrapper > #admin-flex-container > the Custom Code
+     helper panel (#snippetHelperPanel, shown by main.js only while the Custom
+     Code tab is active) beside #editorTabs - the REAL jQuery UI tab strip - whose
+     Custom Code tab (#report-options-tab) holds the snippet editor, where
+     main.js underlines each function call, and whose Scheduler tab holds the
+     File Drop string() help and the cron help. The copy dialog's string() help
+     stays report-side. -->
+<div id="reportHeaderContainer"><div id="defaultTitleView"></div><div id="reportInfoPanel" style="display:none"></div></div>
+<input id="reportTitle" value=""><button id="toggleAdminViewBtn"></button>
+<div id="admWrapper" class="admin-view">
+  <div id="admin-flex-container" style="display: flex; align-items: stretch; height: auto;">
+    <div id="snippetHelperPanel" style="display: none;"></div>
+    <div id="editorTabs" style="flex-grow: 1;">
+      <div class="ui-tabs-nav-wrapper">
+        <div id="editor-toolbar"><div id="editor-toolbar-icons">
+          <button id="saveQuery" class="toolbar-icon" title="(CTRL+S) Save Options">Save</button>
+          <button id="executeQuery" class="toolbar-icon" title="Run Query (F9)">Run</button>
+        </div></div>
+        <ul>
+          <li><a href="#sql-editor-tab">SQL Editor</a></li>
+          <li><a href="#report-options-tab">Custom Code</a></li>
+          <li><a href="#view-options-tab">View Options</a></li>
+          <li><a href="#scheduler-tab">Scheduler</a></li>
+        </ul>
+      </div>
+      <div id="sql-editor-tab"><textarea id="sqlQuery"></textarea></div>
+      <div id="report-options-tab" style="position: relative;">
+        <!-- CodeMirror takes this over; main.js underlines sum( and lookup( on tab activate -->
+        <textarea id="reportSnippet">sum(AMOUNT) and lookup(NAME, ID == 1)</textarea>
+        <!-- an underline hard against the tab's right edge: the flip/fit case -->
+        <span class="cm-function-underline" data-fn="lookup" id="tthFnEdge" style="position: absolute; right: 2px; top: 150px;">lookup</span>
+        <button type="button" id="tthConsoleBtn" title="A console button's plain title">console button</button>
+      </div>
+      <div id="view-options-tab"></div>
+      <div id="scheduler-tab">
+        <!-- index.php, scheduler File Drop panel and the Schedule label -->
+        <p><span id="schedDropTplStringHelp" class="pnb-hover-help"><code>string()</code> functions, regex &amp; <code>data()</code> report values</span></p>
+        <label style="flex: 0 0 130px; margin-right: 15px;"><span class="cron-help-trigger" id="cronExprHelp">Schedule:</span></label>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="subquerySql"></textarea>
+<button id="stopQueryBtn">Stop</button>
+<div id="loadingOverlay" style="display:none"><p id="execution-timer"></p><p id="loadingMessage"></p></div>
+<div id="importTimestamps"></div>
+<div id="table-view-container"><div id="container-parent"><div id="results-wrapper" style="width:900px;height:200px"><table id="resultsTable"><thead><tr id="tableHeader"></tr></thead><tbody id="tableBody"></tbody></table></div></div></div>
+<div id="errorBox"></div><div id="undo_text_container"></div>
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<!-- report side: the copy dialog's string() help and a titled toolbar button -->
+<p><span id="templateStringHelp" class="pnb-hover-help"><code>string()</code> functions in the copy dialog</span></p>
+<button type="button" id="tthReportBtn" title="A report-side button title">report button</button>
+<pre id="out">running</pre>
+
+<script>
+  (function () { try { localStorage.clear(); } catch (e) {} })();
+  window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' }, 'theme-dark': { label: 'Dark', dark: true } };
+  window.PENUMBRA_THEME_IDS = ['theme-default', 'theme-dark'];
+  window.PENUMBRA_THEME_ALIASES = {};
+  window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  // main.js's lazy loader (ensureSnippetHelp) reads this; the files sit next to the page.
+  window.PENUMBRA_SNIPPET_HELP_ASSETS = { js: 'penumbra_snippet_help.js', css: 'penumbra_snippet_help.css' };
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: [],
+    totalExemptions: []
+  };
+  window.__ajaxLog = [];
+  jQuery.ajax = function (a, b) {
+    var opts = (typeof a === 'string') ? jQuery.extend({ url: a }, b || {}) : (a || {});
+    window.__ajaxLog.push(String(opts.url || ''));
+    var d = jQuery.Deferred(), resp = {};
+    setTimeout(function () {
+      try { if (opts.success) opts.success(resp, 'success', { status: 200 }); } catch (e) { window.__errors.push('ajax success threw: ' + String(e)); }
+      try { if (opts.complete) opts.complete({ status: 200 }, 'success'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }
+      d.resolve(resp, 'success', { status: 200 });
+    }, 0);
+    var p = d.promise(); p.abort = function () {}; return p;
+  };
+  jQuery.getJSON = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.post = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.get = jQuery.post;
+  // real_input.py (?real=1) drives real frames, real pointer input and the
+  // real fade animations over CDP. Every other run is --dump-dom, which renders
+  // no frames: animations off and the frame-driven APIs stubbed.
+  window.__REAL = /[?&]real=1/.test(location.search);
+  if (!window.__REAL) {
+    jQuery.fx.off = true;
+    window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+    window.IntersectionObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+    window.requestAnimationFrame = function (cb) { return setTimeout(function () { cb(Date.now()); }, 0); };
+    window.cancelAnimationFrame = function (id) { clearTimeout(id); };
+  }
+  window.__errors = [];
+  window.__rejections = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    window.__rejections.push(String((r && r.message) || r));
+    e.preventDefault();
+  });
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  window.prompt = function () { return null; };
+  // index.php defines this in the split-header layout script; main.js calls it.
+  window.stackHeaders = function () {};
+  // The console window asks for 0.9 x the screen. A screen narrower than this
+  // tab makes the console window the NARROWER of the two, which is the only
+  // arrangement where flip/fit against the wrong window shows (P6).
+  try {
+    Object.defineProperty(window.screen, 'availWidth', { configurable: true, get: function () { return 1000; } });
+    Object.defineProperty(window.screen, 'availHeight', { configurable: true, get: function () { return 800; } });
+  } catch (e) { window.__errors.push('screen override: ' + e); }
+</script>
+<script src="penumbra_a11y.js"></script>
+<script src="penumbra_userseg.js"></script>
+<script src="main_tth.js"></script>
+<script src="driver.js"></script>
+</body></html>

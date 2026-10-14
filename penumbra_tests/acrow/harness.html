@@ -1,0 +1,25 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<title>acrow - search builder value row</title>
+<!-- The REAL main.css (the builder lightbox's layering) and the candidate
+     search_builder.css / search_builder.js, staged next to this page by run.py.
+     driver.js loads BEFORE the builder: stubs first (window._penumbraSearchAPI,
+     $.get for search_builder_content.php, the preset chip, confirm/alert). -->
+<link rel="stylesheet" href="main.css">
+<link rel="stylesheet" href="search_builder.css">
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="driver.js"></script>
+<script src="search_builder.js"></script>
+</head>
+<body style="background:#fff">
+<!-- The three hosts' target boxes: the report search bar, the scheduler's
+     Search Filter (an EMAIL task, so the recipient tokens are offered), the
+     dashboard filter box. -->
+<div id="tableSearchContainer"><input id="tableSearch" type="text"></div>
+<input id="schedSearchFilter" type="text">
+<select id="schedEventType"><option value="QUERY">QUERY</option><option value="EMAIL">EMAIL</option></select>
+<input id="dashSearchInput" type="text">
+<button type="button" id="searchBuilderIcon">builder</button>
+<div id="searchBuilderContainer"></div>
+</body></html>

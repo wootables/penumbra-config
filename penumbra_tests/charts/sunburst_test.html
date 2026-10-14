@@ -1,0 +1,139 @@
+<!doctype html><meta charset="utf-8"><title>running</title><pre id="out">running</pre>
+<!--
+  GROUPED DOUGHNUT = SUNBURST (2026-10-12) - js/penumbra_charts.js standing
+  alone, plus the real Chart.js 4.5.1 drawing what it builds.
+    build    buildSunburstData: both rings carry the SAME total; a group equals
+             the sum of its children; children sit in their parent's order; the
+             inner ring keeps 8 groups (+ Other), the outer the Limit largest X
+             values (+ an Other per group); a single leftover is not folded;
+             negatives left out and counted; only count / sum; filter-panel and
+             a11y fields carry the kept names, never the synthetic Other
+    config   applySunburstChartConfig: two doughnut rings (0 = outer), group
+             colours inside, lighter group hues outside, a legend of the groups
+             that cannot hide one index in both rings, labels only when asked
+    render   a real chart: every outer arc lies inside its group's inner arc
+-->
+<script>
+window.onerror = function (msg, src, line, col) {
+  var el = document.getElementById('out');
+  if (el && el.textContent === 'running') el.textContent = 'SCRIPT-ERROR: ' + msg + '  (line ' + line + ':' + col + ')';
+  return false;
+};
+</script>
+<script src="moment.min.js"></script>
+<script src="chart-4.5.1.min.js"></script>
+<script src="penumbra_charts.js"></script>
+<canvas id="c" width="600" height="600" style="width:600px;height:600px"></canvas>
+<script>
+var LOG=[],PASS=0,FAIL=0;
+function ok(n,c,x){ if(c){PASS++;LOG.push('PASS  '+n);} else {FAIL++;LOG.push('FAIL  '+n+(x?'   >> '+x:''));} }
+function eq(n,g,w){ ok(n, JSON.stringify(g)===JSON.stringify(w), 'got='+JSON.stringify(g)+' want='+JSON.stringify(w)); }
+function rows(list){ return list.map(function(o){ var m = new Map(); Object.keys(o).forEach(function(k){ m.set(k.toUpperCase(), o[k]); }); return m; }); }
+function clean(v){ var s = String(v == null ? '' : v).trim(); return s || 'Unknown'; }
+function num(v){ return parseFloat(String(v == null ? '' : v).replace(/[$,\s]/g,'')); }
+function sum(a, f){ return a.reduce(function(s, x){ return s + f(x); }, 0); }
+
+try {
+  var PC = window.PenumbraCharts;
+  eq('arm', PC.init({
+    getChartColor: function(i,a){ var c = ['42,120,214','235,104,52','27,175,122','237,161,0','232,123,164','0,131,0','74,58,167','227,73,72'][i % 8]; return 'rgba(' + c + ',' + (a == null ? 1 : a) + ')'; },
+    getChartBorderColor: function(){ return '#000'; },
+    hexToRgba: function(c,a){ return 'rgba(138,137,132,' + a + ')'; },
+    parseDate: function(){ return null; },
+    penumbraPercentileOf: function(){ return 0; }
+  }), true);
+  ok('export buildSunburstData', typeof PC.buildSunburstData === 'function');
+  ok('export applySunburstChartConfig', typeof PC.applySunburstChartConfig === 'function');
+
+  var O = function (extra) { var o = { xCol: 'ROUTE', groupCol: 'AGENCY', valueCol: 'AMT', agg: 'sum', limit: 3, cleanLabel: clean, parseNum: num }; for (var k in extra) o[k] = extra[k]; return o; };
+  var R0 = rows([{AGENCY:'a', ROUTE:'x', AMT:'5'}]);
+  ok('refuse: avg', /Count or a Sum/.test(PC.buildSunburstData(R0, O({agg:'avg'}))._noData || ''));
+  ok('refuse: distinct', /Count or a Sum/.test(PC.buildSunburstData(R0, O({agg:'distinct'}))._noData || ''));
+  ok('refuse: sum with no value column', /Y-Axis column/.test(PC.buildSunburstData(R0, O({valueCol:'none'}))._noData || ''));
+  ok('refuse: all negative', /negative/.test(PC.buildSunburstData(rows([{AGENCY:'a', ROUTE:'x', AMT:'-5'}]), O({}))._noData || ''));
+
+  // Navy 600 (Direct 400, Pass 200), Army 300 (Pass 250, Direct 50), NSA 100 (Direct 100),
+  // plus X values that fall out of a limit of 2 (Consortium, Grant) and a blank route.
+  var src = [
+    {AGENCY:'Navy', ROUTE:'Direct', AMT:'$300'}, {AGENCY:'Navy', ROUTE:'Direct', AMT:'100'}, {AGENCY:'Navy', ROUTE:'Pass', AMT:'200'},
+    {AGENCY:'Army', ROUTE:'Pass', AMT:'250'}, {AGENCY:'Army', ROUTE:'Direct', AMT:'50'},
+    {AGENCY:'NSA', ROUTE:'Direct', AMT:'100'},
+    {AGENCY:'Army', ROUTE:'Consortium', AMT:'30'}, {AGENCY:'Navy', ROUTE:'Grant', AMT:'20'}, {AGENCY:'Navy', ROUTE:'', AMT:'10'},
+    {AGENCY:'Army', ROUTE:'Pass', AMT:'-40'}, {AGENCY:'NSA', ROUTE:'Direct', AMT:'0'}
+  ];
+  var D = PC.buildSunburstData(rows(src), O({limit: 2}));
+  ok('build: is a sunburst', D._isSunburst === true && D._chartType === 'doughnut', JSON.stringify(D._noData));
+  var S = D._sunburst;
+  eq('build: total = positive rows', S.total, 1060);
+  eq('build: negatives counted', [S.negCount, S.negSum], [1, -40]);
+  eq('build: inner ring = total', sum(S.inner, function(s){ return s.total; }), 1060);
+  eq('build: outer ring = total', sum(S.outer, function(s){ return s.total; }), 1060);
+  S.inner.forEach(function (g, gi) {
+    var kids = S.outer.filter(function (o) { return o.parent === gi; });
+    if (sum(kids, function (k) { return k.total; }) !== g.total) ok('build: ' + g.name + ' = its children', false);
+  });
+  ok('build: every group equals the sum of its children', true);
+  eq('build: groups largest first', S.inner.map(function(s){ return s.name; }), ['Navy','Army','NSA']);
+  var parents = S.outer.map(function(o){ return o.parent; });
+  ok('build: children sit in their parent\'s order', parents.every(function(p, i){ return i === 0 || p >= parents[i-1]; }), JSON.stringify(parents));
+  eq('build: X kept = the 2 largest across the chart', S.keptX, ['Direct','Pass']);
+  eq('build: Navy\'s children (Other last)', S.outer.filter(function(o){ return o.parent === 0; }).map(function(o){ return [o.name, o.total]; }), [['Direct',400],['Pass',200],['Other',30]]);
+  ok('build: an Other child carries no value (the drill reads kept lists)', S.outer.filter(function(o){ return o.other; }).every(function(o){ return o.value === null; }));
+  eq('build: filter panel labels = kept X', D.labels, ['Direct','Pass']);
+  eq('build: filter panel groups = kept groups', D._groupOrder, ['Navy','Army','NSA']);
+  eq('build: group colour slots', D._groupColorMap, {Navy:0, Army:1, NSA:2});
+  eq('build: a11y = one row per outer slice', D._a11yRows.rows.length, S.outer.length);
+  eq('build: a11y columns', D._a11yRows.columns, ['AGENCY','ROUTE','Value']);
+  var D2 = PC.buildSunburstData(rows(src), O({limit: 9999}));
+  ok('build: 9999 = every X value kept, no Other', D2._sunburst.outer.every(function(o){ return !o.other; }) && D2._sunburst.keptX.indexOf('Unknown') !== -1);
+  var C = PC.buildSunburstData(rows(src), O({agg: 'count', valueCol: 'none', limit: 9999}));
+  eq('count: one per row, negatives included as rows', C._sunburst.total, 11);
+
+  // the group cap: 10 groups -> 8 + Other (2); 9 groups -> all 9 (a single leftover is not folded)
+  function nGroups(n){ var a = []; for (var i = 0; i < n; i++) a.push({AGENCY: 'G' + i, ROUTE: 'x', AMT: String(100 - i)}); return a; }
+  var G10 = PC.buildSunburstData(rows(nGroups(10)), O({limit: 9999}))._sunburst.inner;
+  eq('cap: 10 groups -> 8 + Other (2)', [G10.length, G10[8].name, G10[8].colorIdx], [9, 'Other (2)', -1]);
+  eq('cap: 9 groups -> all 9 shown', PC.buildSunburstData(rows(nGroups(9)), O({limit: 9999}))._sunburst.inner.length, 9);
+
+  // ---- config ----
+  var cfg = { type: 'doughnut', data: {}, options: { scales: { x: {} }, plugins: { legend: { display: true, position: 'right' }, datalabels: {} } }, plugins: [] };
+  D._fmt = null;
+  PC.applySunburstChartConfig(cfg, D, { textColor: '#111', isDark: false, currencyPrefix: '$', showValues: true, showLegend: true, legendPos: 'right' });
+  eq('config: type doughnut, two rings', [cfg.type, cfg.data.datasets.length], ['doughnut', 2]);
+  eq('config: ring 0 is the outer ring', [cfg.data.datasets[0]._ring, cfg.data.datasets[1]._ring], ['outer','inner']);
+  eq('config: ring values', [cfg.data.datasets[0].data.length, cfg.data.datasets[1].data], [S.outer.length, [630, 330, 100]]);
+  ok('config: scales removed', cfg.options.scales === undefined);
+  eq('config: a11y + type ride chart.data', [cfg.data._a11yRows === D._a11yRows, cfg.data._chartType], [true, 'doughnut']);
+  eq('config: inner = the group colours', cfg.data.datasets[1].backgroundColor, ['rgba(42,120,214,1)','rgba(235,104,52,1)','rgba(27,175,122,1)']);
+  ok('config: a child wears its group\'s hue, lighter', /^rgba\(42,120,214,0\.\d+\)$/.test(cfg.data.datasets[0].backgroundColor[0]), cfg.data.datasets[0].backgroundColor[0]);
+  ok('config: siblings alternate lightness', cfg.data.datasets[0].backgroundColor[0] !== cfg.data.datasets[0].backgroundColor[1]);
+  var legItems = cfg.options.plugins.legend.labels.generateLabels();
+  eq('config: legend = the groups', legItems.map(function(i){ return i.text; }), ['Navy','Army','NSA']);
+  ok('config: legend click cannot hide an index in both rings', typeof cfg.options.plugins.legend.onClick === 'function' && cfg.options.plugins.legend.onClick() === undefined);
+  var tipOuter = cfg.options.plugins.tooltip.callbacks.label({ dataset: cfg.data.datasets[0], dataIndex: 0 });
+  ok('config: outer tooltip names group -> child, share of group and total', /Navy/.test(tipOuter[0]) && /Direct/.test(tipOuter[0]) && /of Navy/.test(tipOuter[1]) && /of the total/.test(tipOuter[1]), JSON.stringify(tipOuter));
+  eq('config: inner datalabel = the group', cfg.options.plugins.datalabels.formatter(0, { dataset: cfg.data.datasets[1], dataIndex: 0 }), 'Navy');
+  ok('config: a tiny slice gets no label', cfg.options.plugins.datalabels.display({ dataset: cfg.data.datasets[0], dataIndex: 5 }) === false);
+  var cfgNoVal = { options: { plugins: {} } };
+  PC.applySunburstChartConfig(cfgNoVal, D, { showValues: false });
+  ok('config: Values off = no labels', cfgNoVal.options.plugins.datalabels.display({ dataset: cfgNoVal.data.datasets[1], dataIndex: 0 }) === false);
+  ok('config: negative-row note', cfg.plugins.some(function(p){ return p.id === 'pnbSunburstNote'; }));
+  eq('config: drill metadata on both rings', [cfg.data.datasets[0]._pnbSun.groupCol, cfg.data.datasets[1]._pnbSun.keptX], ['AGENCY', ['Direct','Pass']]);
+
+  // ---- a real chart: every outer arc inside its parent's inner arc ----
+  cfg.options.animation = false; cfg.options.responsive = false;
+  var chart = new Chart(document.getElementById('c').getContext('2d'), cfg);
+  var outerArcs = chart.getDatasetMeta(0).data, innerArcs = chart.getDatasetMeta(1).data;
+  eq('render: arcs drawn', [outerArcs.length, innerArcs.length], [S.outer.length, S.inner.length]);
+  ok('render: the outer ring is outside the inner', outerArcs[0].innerRadius >= innerArcs[0].outerRadius - 0.5, outerArcs[0].innerRadius + ' vs ' + innerArcs[0].outerRadius);
+  var bad = [];
+  S.outer.forEach(function (o, i) {
+    var a = outerArcs[i], p = innerArcs[o.parent];
+    if (a.startAngle < p.startAngle - 0.02 || a.endAngle > p.endAngle + 0.02) bad.push(o.name + '@' + S.inner[o.parent].name);
+  });
+  eq('render: every outer slice lies under its group', bad, []);
+  chart.destroy();
+} catch (e) { FAIL++; LOG.push('FAIL  threw: ' + (e && e.stack || e)); }
+document.getElementById('out').textContent = 'pass=' + PASS + ' fail=' + FAIL + '\n' + LOG.join('\n');
+document.title = FAIL ? 'FAIL' : 'PASS';
+</script>

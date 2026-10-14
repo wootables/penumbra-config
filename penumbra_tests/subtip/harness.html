@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>subtip</title>
+<link rel="stylesheet" href="main.css">
+<style>
+  /* harness-only frame: a report header on top, a slice of the scheduler form below */
+  body { margin: 0; padding: 0; background: #fff; font-family: "Segoe UI", Roboto, sans-serif; }
+  #reportHeaderContainer { padding: 14px 18px; border-bottom: 1px solid #ddd; }
+  #mainReportTitle { margin: 0; font-size: 20px; }
+  #scheduler-tab { margin: 24px 18px; width: 900px; }
+  .scheduler-config-panel { display: block; }
+  #out { white-space: pre-wrap; font-size: 11px; margin: 18px; }
+</style>
+</head>
+<body class="theme-default">
+<!-- Header: the Subscribe slot, as index.php renders it (main.js fills it). -->
+<div id="reportHeaderContainer">
+  <!-- main.css starts #reportInfoPanel hidden; the app shows it once a report loads. -->
+  <div id="reportInfoPanel" style="display: block;">
+    <h2 id="mainReportTitle">Proposal Hit Ratio by College, Department and PI</h2>
+    <div id="pnbSubscribeSlot" style="display:none;"></div>
+  </div>
+</div>
+<!-- Scheduler form slice: the REAL Delivery Options row is lifted from index.php into
+     #deliveryHost by run.ps1 (fixture.js). -->
+<div id="scheduler-tab">
+  <div class="scheduler-config-panel">
+    <input type="hidden" id="schedTaskId" value="">
+    <div id="deliveryHost"></div>
+  </div>
+</div>
+<div id="pivot-output-container" style="display:none;">pivot</div>
+<textarea id="reportSnippet" style="display:none;"></textarea>
+<input type="text" id="elsewhere" aria-label="elsewhere">
+<pre id="out">RUNNING</pre>
+<script src="jquery.js"></script>
+<script src="central.js"></script>
+<script src="fixture.js"></script>
+<script src="lifted.js"></script>
+<script src="tests.js"></script>
+</body>
+</html>

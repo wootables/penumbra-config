@@ -1,0 +1,152 @@
+// shade suite - page half (2026-10-10). The REAL main.js on the saveconf fixture
+// (300 rows; V_AMOUNT is money, shown; V_NAME is text, shown).
+//   sbar    &shade=V_AMOUNT|bar   - data bars on the cells, lengths from 0 to the p99
+//   sscale  &shade=V_AMOUNT       - a color scale (a fill, no bar)
+//   spanel  the Settings panel chip: on number columns only, its menu, Data bar,
+//           saved in the column prefs, None clears the cells and the pref
+//   sclear  Clear All Custom Preferences takes the shading
+//   parity  the bar / fill css from PenumbraHeat for the shared fixture -> run.py
+//           hands it to the PHP twin
+(function () {
+  var SCN = window.__SCN;
+  var R = { scn: SCN, chk: {}, info: {}, notes: [] };
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  async function until(fn, ms) { var t = Date.now(); while (!fn() && Date.now() - t < ms) await sleep(20); return fn(); }
+  async function boot() {
+    if (!(await until(function () { return window.__queryDone >= 1 && (window.__HC_HIDES || 0) >= 1; }, 150000))) throw new Error('boot: never loaded');
+    await sleep(600);
+  }
+  function colCells(name) {
+    var ths = Array.prototype.slice.call(document.querySelectorAll('#tableHeader th'));
+    var i = ths.findIndex(function (t) { return t.dataset.colname === name; });
+    if (i < 0) return [];
+    return Array.prototype.slice.call(document.querySelectorAll('#resultsTable tbody tr')).filter(function (tr) { return tr.style.display !== 'none'; })
+      .map(function (tr) { return tr.children[i]; }).filter(Boolean);
+  }
+  function num(t) { var s = String(t).replace(/[$,\s]/g, ''); var n = parseFloat(s); return isFinite(n) ? n : null; }
+  function pctOf(css) { var m = /,\s*transparent\s+([\d.]+)%/.exec(css || ''); return m ? parseFloat(m[1]) : null; }
+  function p99(vals) {
+    var s = vals.slice().sort(function (a, b) { return a - b; });
+    var idx = 0.99 * (s.length - 1), lo = Math.floor(idx), hi = Math.ceil(idx);
+    return lo === hi ? s[lo] : s[lo] + (s[hi] - s[lo]) * (idx - lo);
+  }
+  function prefsShade() {
+    try { var p = JSON.parse(localStorage.getItem('penumbra_column_prefs') || '{}'); var e = p.lrfix; return e && e.shade ? e.shade : null; } catch (e) { return 'ERR'; }
+  }
+  var S = {
+    sbar: async function () {
+      var cells = colCells('V_AMOUNT');
+      var all = window.__rowsFixture.map(function (r) { return num(r.V_AMOUNT); });
+      var top = p99(all);
+      var bad = 0, n = 0, first = null;
+      cells.slice(0, 40).forEach(function (td) {
+        var bg = td.style.backgroundImage || '';
+        var v = num(td.textContent);
+        var want = Math.round(Math.max(0, Math.min(1, v / top)) * 1000) / 10;
+        var got = pctOf(bg);
+        if (first === null) first = { bg: bg, v: v, want: want, got: got };
+        n++;
+        if (got === null || Math.abs(got - want) > 0.05 || td.style.backgroundRepeat !== 'no-repeat') bad++;
+      });
+      R.chk.bars = n >= 20 && bad === 0;
+      R.chk.noFill = cells.slice(0, 20).every(function (td) { return !td.style.backgroundColor; });
+      R.chk.textUntouched = cells.slice(0, 20).every(function (td) { return !td.style.color; });
+      R.chk.otherColsPlain = colCells('V_NAME').slice(0, 10).every(function (td) { return !td.style.backgroundImage && !td.style.backgroundColor; });
+      R.info = { first: first, bad: bad, n: n, top: top };
+    },
+    sscale: async function () {
+      var cells = colCells('V_AMOUNT');
+      R.chk.fills = cells.length >= 20 && cells.slice(0, 20).every(function (td) { return /rgb/.test(td.style.backgroundColor) && !td.style.backgroundImage; });
+      var colours = {}; cells.slice(0, 40).forEach(function (td) { colours[td.style.backgroundColor] = 1; });
+      R.chk.graded = Object.keys(colours).length >= 5;
+      R.info = { n: Object.keys(colours).length, sample: cells.slice(0, 3).map(function (td) { return td.getAttribute('style'); }) };
+    },
+    spanel: async function () {
+      document.getElementById('settingsPanel').classList.add('is-open');
+      window.Penumbra.refreshSettingsColumns();
+      await sleep(200);
+      function item(n) { return Array.prototype.slice.call(document.querySelectorAll('#spColumnList .sp-col-item')).filter(function (el) { return el.getAttribute('data-colname') === n || (el.querySelector('.sp-col-name') || {}).textContent === n; })[0]; }
+      var amt = item('V_AMOUNT'), name = item('V_NAME'), hnum = item('H_NUM');
+      R.chk.chipOnNumbers = !!amt && !!amt.querySelector('.sp-col-shade.is-none') && !!hnum && !!hnum.querySelector('.sp-col-shade');
+      R.chk.noChipOnText = !!name && !name.querySelector('.sp-col-shade');
+      var chip = amt && amt.querySelector('.sp-col-shade');
+      if (!chip) return;
+      chip.click();
+      var menu = document.querySelector('.pnb-shade-menu');
+      R.chk.menu = !!menu && menu.querySelectorAll('.pnb-shade-opt').length === 3 && !!menu.querySelector('.pnb-shade-opt.is-current[data-shade=""]');
+      R.chk.rowNotSelected = !amt.classList.contains('sp-selected');
+      menu.querySelector('.pnb-shade-opt[data-shade="bar"]').click();
+      await sleep(250);
+      var cells = colCells('V_AMOUNT');
+      R.chk.barApplied = cells.length >= 20 && cells.slice(0, 20).every(function (td) { return /linear-gradient/.test(td.style.backgroundImage); });
+      R.chk.saved = JSON.stringify(prefsShade()) === '{"V_AMOUNT":"bar"}';
+      var chip2 = item('V_AMOUNT').querySelector('.sp-col-shade');
+      R.chk.chipReads = !!chip2 && chip2.textContent === 'BAR' && !chip2.classList.contains('is-none') && !document.querySelector('.pnb-shade-menu');
+      // None: the cells and the pref both go
+      chip2.click();
+      document.querySelector('.pnb-shade-menu .pnb-shade-opt[data-shade=""]').click();
+      await sleep(250);
+      cells = colCells('V_AMOUNT');
+      R.chk.noneClears = cells.slice(0, 40).every(function (td) { return !td.style.backgroundImage && !td.style.backgroundColor; });
+      R.chk.noneUnsaves = prefsShade() === null;
+      R.info = { prefs: prefsShade(), chip: chip2 && chip2.outerHTML.slice(0, 160) };
+    },
+    sclear: async function () {
+      window.Penumbra.setShade('V_AMOUNT', 'scale');
+      R.chk.set = JSON.stringify(prefsShade()) === '{"V_AMOUNT":"scale"}';
+      window.confirm = function () { return true; };
+      document.getElementById('spClearStorage').click();
+      R.chk.cleared = prefsShade() === null;
+    },
+    parity: async function () {
+      var H = window.PenumbraHeat;
+      // &dark=1 (2026-10-11, darkbar): wolfpack-dark's colours on the body, where themeVar reads
+      var DARK = /[?&]dark=1/.test(location.search);
+      if (DARK) { document.body.style.setProperty('--bg-surface', '#2c2c2c'); document.body.style.setProperty('--brand-primary', '#cc0000'); document.body.style.setProperty('--text-main', '#e0e0e0'); }
+      var theme = { surf: H.themeVar('--bg-surface', '#ffffff'), prim: H.themeVar('--brand-primary', '#336699'), text: H.themeVar('--text-main', '#222222') };
+      var CASES = [
+        { id: 'pos', values: [0, 5, 10, 37, 100], opts: { mode: 'bar' } },
+        { id: 'money', values: [80000, 125000, 640000, 910000, 1250000, 17000000], opts: { mode: 'bar', range: '0:p99' } },
+        { id: 'straddle', values: [-50, -10, 0, 20, 100], opts: { mode: 'bar' } },
+        { id: 'allneg', values: [-5, -20, -100], opts: { mode: 'bar' } },
+        { id: 'mid', values: [0, 4, 10, 15, 20], opts: { mode: 'bar', mid: '10' } },
+        { id: 'logbins', values: [1, 10, 100, 1000, 10000], opts: { mode: 'bar', curve: 'log', bins: 4 } },
+        { id: 'warm', values: [1, 2, 3], opts: { mode: 'bar', ramp: 'warm' } },
+        { id: 'rank', values: [3, 1, 2, 2, 9], opts: { mode: 'bar', curve: 'rank' } },
+        { id: 'lowpinned', values: [10, 20, 50, 90], opts: { mode: 'bar', range: '10:90' } },
+        { id: 'fill', values: [1, 2, 3, 50], opts: { mode: 'fill' } }
+      ];
+      var out = CASES.map(function (c) {
+        var d = H.domainFrom(c.values, c.opts.range || null, c.opts.mid != null ? c.opts.mid : null);
+        var fn = H.colorizer(d, c.opts);
+        return { id: c.id, css: c.values.map(function (v) { return fn(v); }) };
+      });
+      // the theme as hex, for the PHP side's stubbed theme variables
+      function hex(css) { var rgb = H.parseColor(css); return rgb ? H.toHex(rgb) : null; }
+      R.info = { theme: { 'bg-surface': hex(theme.surf), 'brand-primary': hex(theme.prim), 'text-main': hex(theme.text) }, out: out, cases: CASES };
+      R.chk.ran = out.length === CASES.length && out.length > 0;
+      // a dark theme's bar must SHOW: >= 1.9:1 against the surface (the old 60% start drew
+      // rgb(139,44,35) on #2c2c2c = ~1.6) while the text keeps AA on it
+      function lum(rgb) { return rgb.map(function (c) { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }).reduce(function (t, c, i) { return t + c * [0.2126, 0.7152, 0.0722][i]; }, 0); }
+      function cr(a, b) { var x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+      var barM = /linear-gradient\(90deg,(#[0-9a-f]{6}) 0%/i.exec(out[0].css[4] || '');
+      var barRgb = barM ? H.parseColor(barM[1]) : null;
+      R.chk.strong = !DARK || (!!barRgb && cr(barRgb, H.parseColor(theme.surf)) >= 1.9 && cr(barRgb, H.parseColor(theme.text)) >= 4.5);
+      R.chk.barInfo = barM ? barM[1] + ' vsSurf=' + (barRgb ? cr(barRgb, H.parseColor(theme.surf)).toFixed(2) : '?') + ' vsText=' + (barRgb ? cr(barRgb, H.parseColor(theme.text)).toFixed(2) : '?') : 'no bar';
+      // the snippet keyword: style=bar parses to rule.mode, and rule.style stays unset
+      var pr = H.parseArgs(['cell', 'AMOUNT', 'style=bar']), pf = H.parseArgs(['cell', 'AMOUNT', 'style=nonsense']);
+      R.chk.parseBar = !!pr && pr.mode === 'bar' && pr.style === undefined && !!pf && pf.mode === 'fill';
+    }
+  };
+  (async function () {
+    try {
+      await boot();
+      if (!S[SCN]) throw new Error('unknown scenario ' + SCN);
+      await S[SCN]();
+    } catch (e) { R.fatal = String((e && e.stack) || e); }
+    R.errors = window.__errors.concat(window.__rejections).slice(0, 10);
+    R.hookErr = [window.__HC_ERR, window.__HC_ERR2].filter(Boolean).join('; ');
+    window.__HCRESULT = R; window.__HCDONE = true;
+    document.getElementById('out').textContent = 'DONE';
+  })();
+})();

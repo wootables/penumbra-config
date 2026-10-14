@@ -1,0 +1,646 @@
+window.__CORPUS = {
+    "columns": [
+        "NAME",
+        "N",
+        "AMOUNT",
+        "DT",
+        "DUP"
+    ],
+    "rows": [
+        {
+            "NAME": "Alpha",
+            "N": "1",
+            "AMOUNT": "1200.50",
+            "DT": "01-JAN-24",
+            "DUP": "10"
+        },
+        {
+            "NAME": "Beta",
+            "N": "2",
+            "AMOUNT": "300.25",
+            "DT": "15-MAR-24",
+            "DUP": "20"
+        },
+        {
+            "NAME": "Alpha",
+            "N": "3",
+            "AMOUNT": "45.00",
+            "DT": "09-FEB-25",
+            "DUP": "20"
+        },
+        {
+            "NAME": "",
+            "N": "4",
+            "AMOUNT": "-75.75",
+            "DT": "20-DEC-23",
+            "DUP": "30"
+        },
+        {
+            "NAME": "  ",
+            "N": "5",
+            "AMOUNT": "10000",
+            "DT": "05-JUL-26",
+            "DUP": "30"
+        },
+        {
+            "NAME": "Gamma ",
+            "N": "6",
+            "AMOUNT": "0.333",
+            "DT": "28-FEB-24",
+            "DUP": "30"
+        }
+    ],
+    "cases": [
+        {
+            "id": "sparkline_basic",
+            "snippet": "sparkline(AMOUNT)"
+        },
+        {
+            "id": "sparkline_group",
+            "snippet": "sparkline(AMOUNT, NAME)"
+        },
+        {
+            "id": "sparkline_color",
+            "snippet": "sparkline(AMOUNT, NAME, #ff0000)"
+        },
+        {
+            "id": "sparkline_count_col",
+            "snippet": "sparkline(N)"
+        },
+        {
+            "id": "sparkline_bad_col",
+            "snippet": "sparkline(NOPE)"
+        },
+        {
+            "id": "sparkline_no_args",
+            "snippet": "sparkline()"
+        },
+        {
+            "id": "plain_text",
+            "snippet": "Just some prose with no functions."
+        },
+        {
+            "id": "literal_number",
+            "snippet": "Fiscal year 2026 total"
+        },
+        {
+            "id": "literal_big_number",
+            "snippet": "Value 12345.678 here"
+        },
+        {
+            "id": "backtick_literal",
+            "snippet": "Label `FY 2026` end"
+        },
+        {
+            "id": "count",
+            "snippet": "count()"
+        },
+        {
+            "id": "count_cond",
+            "snippet": "count(N>=2)"
+        },
+        {
+            "id": "sum",
+            "snippet": "sum(AMOUNT)"
+        },
+        {
+            "id": "sum_scope_all",
+            "snippet": "sum(AMOUNT, all)"
+        },
+        {
+            "id": "avg",
+            "snippet": "avg(AMOUNT)"
+        },
+        {
+            "id": "min_num",
+            "snippet": "min(AMOUNT)"
+        },
+        {
+            "id": "max_num",
+            "snippet": "max(AMOUNT)"
+        },
+        {
+            "id": "min_date",
+            "snippet": "min(DT)"
+        },
+        {
+            "id": "max_date",
+            "snippet": "max(DT)"
+        },
+        {
+            "id": "median",
+            "snippet": "median(AMOUNT)"
+        },
+        {
+            "id": "mode_text",
+            "snippet": "mode(NAME)"
+        },
+        {
+            "id": "distinct_text",
+            "snippet": "distinct(NAME)"
+        },
+        {
+            "id": "round_3dp",
+            "snippet": "round(1234.5678, 3)"
+        },
+        {
+            "id": "round_trailing0",
+            "snippet": "round(5, 2)"
+        },
+        {
+            "id": "round_default",
+            "snippet": "round(2.34567)"
+        },
+        {
+            "id": "fixed_2dp",
+            "snippet": "fixed(1234.5, 2)"
+        },
+        {
+            "id": "abs",
+            "snippet": "abs(-5.5)"
+        },
+        {
+            "id": "floor",
+            "snippet": "floor(2.7)"
+        },
+        {
+            "id": "ceil",
+            "snippet": "ceil(2.1)"
+        },
+        {
+            "id": "mod_float",
+            "snippet": "mod(10.5, 3)"
+        },
+        {
+            "id": "calc_basic",
+            "snippet": "calc(2+3*4)"
+        },
+        {
+            "id": "calc_modulo",
+            "snippet": "calc(10 % 3)"
+        },
+        {
+            "id": "calc_div",
+            "snippet": "calc(10/3)"
+        },
+        {
+            "id": "case_cond",
+            "snippet": "case(count()>2, big, small)"
+        },
+        {
+            "id": "string_upper",
+            "snippet": "string(upper, hello world)"
+        },
+        {
+            "id": "string_regex",
+            "snippet": "string(regex_replace, abc123, [0-9]+, #)"
+        },
+        {
+            "id": "nested_round_avg",
+            "snippet": "round(avg(AMOUNT),3)"
+        },
+        {
+            "id": "nested_calc_count",
+            "snippet": "calc(count()*2)"
+        },
+        {
+            "id": "nested_case_sum",
+            "snippet": "case(sum(AMOUNT)>1000, over, under)"
+        },
+        {
+            "id": "mixed_sentence",
+            "snippet": "There are count() rows totalling sum(AMOUNT) dollars."
+        },
+        {
+            "id": "progress_bar",
+            "snippet": "progress_bar(30)"
+        },
+        {
+            "id": "unknown_fn",
+            "snippet": "tabs(5) should stay literal"
+        },
+        {
+            "id": "string_uppercase",
+            "snippet": "string(uppercase, hello world)"
+        },
+        {
+            "id": "progress_bar_2arg",
+            "snippet": "progress_bar(30, 100)"
+        },
+        {
+            "id": "nest_round_avg4",
+            "snippet": "round(avg(AMOUNT),4)"
+        },
+        {
+            "id": "nest_round_sum1",
+            "snippet": "round(sum(AMOUNT),1)"
+        },
+        {
+            "id": "nest_calc_avg",
+            "snippet": "calc(avg(AMOUNT)*2)"
+        },
+        {
+            "id": "nest_calc_sum",
+            "snippet": "calc(sum(AMOUNT)+1)"
+        },
+        {
+            "id": "nest_abs_avg",
+            "snippet": "abs(avg(AMOUNT))"
+        },
+        {
+            "id": "nest_fixed_avg",
+            "snippet": "fixed(avg(AMOUNT),4)"
+        },
+        {
+            "id": "nest_case_avg",
+            "snippet": "case(avg(AMOUNT)>1911.5, over, under)"
+        },
+        {
+            "id": "df_iso",
+            "snippet": "date_format(01-JAN-24, 'YYYY-MM-DD')"
+        },
+        {
+            "id": "df_long",
+            "snippet": "date_format(01-JAN-24, 'MMMM D, YYYY')"
+        },
+        {
+            "id": "df_unquoted_comma",
+            "snippet": "date_format(01-JAN-24, MMMM D, YYYY)"
+        },
+        {
+            "id": "df_3char",
+            "snippet": "date_format(15-MAR-24, 'ddd MMM DD')"
+        },
+        {
+            "id": "df_ordinal",
+            "snippet": "date_format(15-MAR-24, 'Do')"
+        },
+        {
+            "id": "df_bracket_lit",
+            "snippet": "date_format(15-MAR-24, '[Week of] MMM D')"
+        },
+        {
+            "id": "df_1char",
+            "snippet": "date_format(15-MAR-24, 'YY/M/D')"
+        },
+        {
+            "id": "df_default_fmt",
+            "snippet": "date_format(15-MAR-24)"
+        },
+        {
+            "id": "df_bad_subject",
+            "snippet": "date_format(NOPE, 'YYYY')"
+        },
+        {
+            "id": "df_nested_min",
+            "snippet": "date_format(min(DT), 'YYYY-MM-DD')"
+        },
+        {
+            "id": "df_nested_max",
+            "snippet": "date_format(max(DT), 'YYYY-MM-DD')"
+        },
+
+        {
+            "id": "df_offset_days",
+            "snippet": "date_format(01-JAN-24, 'YYYY-MM-DD', '+30 days')"
+        },
+        {
+            "id": "df_offset_chain",
+            "snippet": "date_format(01-JAN-24, 'YYYY-MM-DD', '+1 month', '+2 days')"
+        },
+        {
+            "id": "df_offset_negative",
+            "snippet": "date_format(15-MAR-24, 'YYYY-MM-DD', '-2 weeks')"
+        },
+        {
+            "id": "df_offset_quoted_fmt",
+            "snippet": "date_format(01-JAN-24, 'MMMM D, YYYY', '+45 days')"
+        },
+        {
+            "id": "df_offset_only",
+            "snippet": "date_format(01-JAN-24, '+30 days')"
+        },
+        {
+            "id": "df_offset_hours",
+            "snippet": "date_format(01-JAN-24, 'YYYY-MM-DD HH', '+36 hours')"
+        },
+        {
+            "id": "df_offset_month_clamp",
+            "snippet": "date_format(31-JAN-24, 'YYYY-MM-DD', '+1 month')"
+        },
+        {
+            "id": "df_offset_nested_min",
+            "snippet": "date_format(min(DT), 'YYYY-MM-DD', '+1 year')"
+        },
+        {
+            "id": "df_offset_column",
+            "snippet": "date_format(DT, 'YYYY-MM-DD', '-10 days')"
+        },
+        {
+            "id": "df_offset_legacy_regression",
+            "snippet": "date_format(20-DEC-23, dddd, MMMM D, YYYY)"
+        },
+        {
+            "id": "df_offset_unquoted_mix",
+            "snippet": "date_format(01-JAN-24, MMMM D, YYYY, +1 day)"
+        },
+
+        {
+            "id": "dd_days_default",
+            "snippet": "date_diff(15-MAR-24, 01-JAN-24)"
+        },
+        {
+            "id": "dd_days_reversed",
+            "snippet": "date_diff(01-JAN-24, 15-MAR-24)"
+        },
+        {
+            "id": "dd_same_day",
+            "snippet": "date_diff(01-JAN-24, 01-JAN-24, days)"
+        },
+        {
+            "id": "dd_weeks",
+            "snippet": "date_diff(15-MAR-24, 01-JAN-24, weeks)"
+        },
+        {
+            "id": "dd_months",
+            "snippet": "date_diff(15-MAR-24, 01-JAN-24, months)"
+        },
+        {
+            "id": "dd_years",
+            "snippet": "date_diff(05-JUL-26, 20-DEC-23, years)"
+        },
+        {
+            "id": "dd_template",
+            "snippet": "date_diff(05-JUL-26, 20-DEC-23, years, months and days)"
+        },
+        {
+            "id": "dd_nested_minmax",
+            "snippet": "date_diff(max(DT), min(DT), days)"
+        },
+        {
+            "id": "dd_bad_subject",
+            "snippet": "date_diff(NOPE, 01-JAN-24)"
+        },
+        {
+            "id": "dd_big_no_commas",
+            "snippet": "date_diff(05-JUL-26, 20-DEC-23, days)"
+        },
+        {
+            "id": "now_default",
+            "snippet": "now()"
+        },
+        {
+            "id": "now_iso",
+            "snippet": "now('YYYY-MM-DD')"
+        },
+        {
+            "id": "now_offset_1",
+            "snippet": "now('YYYY-MM-DD', '-1 year')"
+        },
+        {
+            "id": "now_offset_chain",
+            "snippet": "now('YYYY-MM-DD', '-1 year', '+6 days')"
+        },
+        {
+            "id": "now_long",
+            "snippet": "now('MMMM D, YYYY')"
+        },
+        {
+            "id": "now_unquoted",
+            "snippet": "now(MM/DD/YYYY)"
+        },
+        {
+            "id": "now_bracket_lit",
+            "snippet": "now('[Run on] MMM D')"
+        },
+        {
+            "id": "rank_top",
+            "snippet": "rank(1, AMOUNT)"
+        },
+        {
+            "id": "rank_second",
+            "snippet": "rank(2, AMOUNT)"
+        },
+        {
+            "id": "rank_bottom",
+            "snippet": "rank(-1, AMOUNT)"
+        },
+        {
+            "id": "rank_cond",
+            "snippet": "rank(1, AMOUNT, N>=3)"
+        },
+        {
+            "id": "rank_zero",
+            "snippet": "rank(0, AMOUNT)"
+        },
+        {
+            "id": "rank_bad_col",
+            "snippet": "rank(1, NOPE)"
+        },
+        {
+            "id": "rank_text_col",
+            "snippet": "rank(1, NAME)"
+        },
+        {
+            "id": "pct_50",
+            "snippet": "percentile(50, AMOUNT)"
+        },
+        {
+            "id": "pct_0",
+            "snippet": "percentile(0, AMOUNT)"
+        },
+        {
+            "id": "pct_100",
+            "snippet": "percentile(100, AMOUNT)"
+        },
+        {
+            "id": "pct_90",
+            "snippet": "percentile(90, AMOUNT)"
+        },
+        {
+            "id": "pct_out_of_range",
+            "snippet": "percentile(150, AMOUNT)"
+        },
+        {
+            "id": "pct_bad_col",
+            "snippet": "percentile(50, NOPE)"
+        },
+        {
+            "id": "stddev_amount",
+            "snippet": "stddev(AMOUNT)"
+        },
+        {
+            "id": "stddev_n",
+            "snippet": "stddev(N)"
+        },
+        {
+            "id": "stddev_cond",
+            "snippet": "stddev(AMOUNT, N>=3)"
+        },
+        {
+            "id": "stddev_bad_col",
+            "snippet": "stddev(NOPE)"
+        },
+        {
+            "id": "lookup_by_n",
+            "snippet": "lookup(NAME, N=1)"
+        },
+        {
+            "id": "lookup_first_match",
+            "snippet": "lookup(AMOUNT, NAME=Alpha)"
+        },
+        {
+            "id": "lookup_no_match",
+            "snippet": "lookup(NAME, N=99)"
+        },
+        {
+            "id": "lookup_gte",
+            "snippet": "lookup(AMOUNT, N>=5)"
+        },
+        {
+            "id": "lookup_bad_col",
+            "snippet": "lookup(NOPE, N=1)"
+        },
+        {
+            "id": "wb_embedded_names",
+            "snippet": "metadata(1) and resume(2) and informal(3) stay literal"
+        },
+        {
+            "id": "wb_dateformat_fmt",
+            "snippet": "date_format(01-JAN-24, 'YYYY') not format(...)"
+        },
+        {
+            "id": "num_fixed_0dp",
+            "snippet": "fixed(1234.5, 0)"
+        },
+        {
+            "id": "num_fixed_3dp",
+            "snippet": "fixed(0.333, 3)"
+        },
+        {
+            "id": "num_round_neg",
+            "snippet": "round(-75.75, 1)"
+        },
+        {
+            "id": "num_calc_exponent",
+            "snippet": "calc(1e3 + 1)"
+        },
+        {
+            "id": "df_interior_year",
+            "snippet": "date_format(01-JAN-24, 'DD-YYYY-MM')"
+        },
+        {
+            "id": "prose_iso_date",
+            "snippet": "Report window 2024-01-01 to 2024-12-31"
+        },
+        {
+            "id": "rank_dup_top",
+            "snippet": "rank(1, DUP)"
+        },
+        {
+            "id": "rank_dup_2nd",
+            "snippet": "rank(2, DUP)"
+        },
+        {
+            "id": "rank_dup_3rd",
+            "snippet": "rank(3, DUP)"
+        },
+        {
+            "id": "rank_dup_bottom",
+            "snippet": "rank(-1, DUP)"
+        },
+        {
+            "id": "rank_dup_bot2",
+            "snippet": "rank(-2, DUP)"
+        },
+        {
+            "id": "distinct_dup",
+            "snippet": "distinct(DUP)"
+        },
+        {
+            "id": "progress_bar_thirds",
+            "snippet": "progress_bar(1, 3)"
+        },
+        {
+            "id": "data_prompt1",
+            "snippet": "data(prompt1)"
+        },
+        {
+            "id": "data_prompt2_year",
+            "snippet": "data(prompt2)"
+        },
+        {
+            "id": "data_prompt3",
+            "snippet": "data(prompt3)"
+        },
+        {
+            "id": "data_prompt_missing",
+            "snippet": "data(prompt6)"
+        },
+        {
+            "id": "data_prompt_sentence",
+            "snippet": "Unit data(prompt1) for FY data(prompt2)"
+        },
+        {
+            "id": "data_prompt_nested",
+            "snippet": "string(uppercase, data(prompt1))"
+        },
+        {
+            "id": "data_named_unit",
+            "snippet": "data(unit)"
+        },
+        {
+            "id": "data_subtitle",
+            "snippet": "data(subtitle)"
+        },
+        {
+            "id": "data_byline",
+            "snippet": "data(byline)"
+        },
+        {
+            "id": "data_rowlimit",
+            "snippet": "data(rowlimit)"
+        },
+        {
+            "id": "data_unknown_key",
+            "snippet": "data(nosuchkey)"
+        },
+        {
+            "id": "me_fname",
+            "snippet": "me(fname)"
+        },
+        {
+            "id": "me_lname",
+            "snippet": "me(lname)"
+        },
+        {
+            "id": "me_email",
+            "snippet": "me(email)"
+        },
+        {
+            "id": "me_unityid",
+            "snippet": "me(unityid)"
+        },
+        {
+            "id": "me_default",
+            "snippet": "me()"
+        },
+        {
+            "id": "info_default",
+            "snippet": "info()"
+        }
+    ],
+    "promptValues": [
+        "Engineering",
+        "2026",
+        "ACTIVE"
+    ],
+    "promptNamed": {
+        "unit": "Engineering"
+    },
+    "reportMeta": {
+        "reportSubtitle": "Awards by unit",
+        "searchFilter": "",
+        "noLimit": true
+    }
+};

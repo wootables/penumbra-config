@@ -1,0 +1,189 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>save layout</title>
+<link rel="stylesheet" href="main.css">
+</head>
+<body>
+<!-- Minimal DOM for the save-layout suite (2026-09-24). The page and run path are
+     the flatfreeze harness's (known to boot main.js and render a query through the
+     real code); added: the two Save dialogs' fields, so the REAL #confirmServerSaveBtn
+     and #confirmLocalSaveBtn handlers run end to end.
+     ?mode=report    penumbra_vars.preloadedState = a report with a CUSTOM layout
+                     (hidden + reordered columns); the boot loads it and runs it
+     ?mode=bootfail  the same report, but its very first run fails (HTTP 500)
+     ?mode=adhoc     no report loaded: an ad-hoc query page -->
+<div id="reportHeaderContainer"><div id="defaultTitleView"></div><div id="reportInfoPanel" style="display:none"></div></div>
+<input id="reportTitle" value=""><input id="reportSubtitle" value=""><div id="admWrapper"></div><button id="toggleAdminViewBtn"></button>
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div><div id="mainReportTitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<button id="executeQuery">Run</button><button id="stopQueryBtn">Stop</button>
+<div id="loadingOverlay" style="display:none"><p id="execution-timer"></p><p id="loadingMessage"></p></div>
+<div id="importTimestamps"></div>
+<div id="resultsHeader" style="height:20px">controls</div>
+<div id="table-view-container"><div id="container-parent"><div id="results-wrapper" style="width:900px;height:420px"><table id="resultsTable"><caption class="sr-only">Report results table</caption><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table></div></div></div>
+<div id="paginationControls"><select id="rowsPerPageSelector"><option value="25">25</option><option value="50">50</option><option value="200">200</option><option value="all">All</option></select></div>
+<div id="errorBox"></div><div id="undo_text_container"></div>
+<input id="tableSearch" value="">
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="settingsPanelOverlay"></div>
+<div id="settingsPanel">
+  <select id="spThemeSelector"><option value="report-default">Report Default</option><option value="theme-default">Default</option></select>
+  <select id="spDensitySelector"><option value="report-default">Report Default</option><option value="standard">Standard</option></select>
+  <input type="checkbox" id="spRowExpandToggle"><input type="checkbox" id="spResolverToggle">
+  <div class="sp-section sp-columns-section"><div class="sp-column-container"><div id="spColumnList" class="sp-column-list"></div></div></div>
+  <div class="sp-actions"><button id="spApply">Save Column Layout</button><button id="spReset">Reset</button><span id="spPendingCount"></span></div>
+</div>
+<div id="pnbStatusBar">
+  <div class="sb-seg" id="sbColsSeg"><span id="sbCols"></span>
+    <span class="sb-chip" id="sbCustomCols" style="display:none;">custom layout</span>
+    <div class="sb-pop" id="sbCustomColsPop"><div id="sbCustomColsDiff"></div><button id="sbCustomColsReset">Reset</button><button id="sbCustomColsSave" style="display:none;">Save</button></div>
+  </div>
+  <div class="sb-seg" id="sbUserSeg"></div>
+</div>
+<!-- The Save dialog: every field the two confirm handlers read. -->
+<button id="saveQuery">Save</button>
+<div id="saveStateLightbox" style="display:none">
+  <input id="localSaveNameInput" value=""><div id="localSaveStatus"></div>
+  <input type="checkbox" id="enableLocalReportPassword"><input id="localSavePassword"><input id="localSavePasswordConfirm">
+  <button id="confirmLocalSaveBtn">Save locally</button>
+  <input id="serverSaveIdInput" value=""><input id="serverSaveTitleInput" value=""><input id="serverSaveSubtitleInput" value="">
+  <input type="checkbox" id="serverSaveOverwriteCheckbox" checked>
+  <div id="authAccessContainer"></div><input id="authAccessInput" value=""><input type="hidden" id="serverSaveAuthorized" value="">
+  <select id="serverSaveTheme"><option value="theme-default">Default</option></select>
+  <select id="serverSaveDensity"><option value="standard">Standard</option></select>
+  <input type="checkbox" id="serverSaveRowHeight"><input type="checkbox" id="serverSaveResolver">
+  <select id="serverSaveRowsPerPage"><option value="25">25</option><option value="200" selected>200</option></select>
+  <input type="checkbox" id="serverSaveSortNone">
+  <input type="checkbox" id="enableReportPassword"><input id="serverSavePassword"><input id="serverSavePasswordConfirm">
+  <div id="serverSaveStatus"></div>
+  <button id="confirmServerSaveBtn">Save to server</button>
+</div>
+<pre id="out">running</pre>
+
+<script>
+  (function () {
+    try { localStorage.clear(); } catch (e) {}
+  })();
+  window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' } };
+  window.PENUMBRA_THEME_IDS = ['theme-default'];
+  window.PENUMBRA_THEME_ALIASES = {};
+  window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  window.__MODE = (/[?&]mode=(\w+)/.exec(location.search) || [])[1] || 'report';
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  // The report as STORED: ID NAME DEPT EMAIL PHONE TITLE = columns 0..5, shown
+  // EMAIL, ID, NAME (then hidden DEPT, TITLE, PHONE) with the row number on.
+  // These two arrays are exactly what the builder writes for that screen.
+  window.__STORED = { visibleColumns: ['#', 3, 0, 1], columnOrder: [3, 0, 1, 2, 5, 4] };
+  window.__QUERY = 'SELECT ID, NAME, DEPT, EMAIL, PHONE, TITLE FROM LAYOUT_FIXTURE';
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: [],
+    totalExemptions: ['AMOUNT']
+  };
+  if (window.__MODE === 'report' || window.__MODE === 'bootfail') {
+    // name = the report key (currentLoadedStateName) without an ?id= in the URL.
+    window.penumbra_vars.preloadedState = {
+      name: 'layoutfix', query: window.__QUERY, reportTitle: 'Layout fixture',
+      theme: 'theme-default', density: 'standard',
+      visibleColumns: window.__STORED.visibleColumns.slice(), columnOrder: window.__STORED.columnOrder.slice(),
+      sortCriteria: [], noLimit: true, rowExpandDefault: false, resolverLinksDefault: false,
+      rowsPerPage: '200', reportSnippet: ''
+    };
+  }
+  var _COLS = ['ID', 'NAME', 'DEPT', 'EMAIL', 'PHONE', 'TITLE'];
+  window.__rows = function (n) {
+    var out = [];
+    for (var i = 1; i <= n; i++) {
+      var r = {};
+      for (var c = 0; c < _COLS.length; c++) r[_COLS[c]] = _COLS[c].toLowerCase() + ' ' + i;
+      out.push(r);
+    }
+    return out;
+  };
+  // query.php answers (driver-controlled):
+  //   __queryFail  {status, error} -> the error callback, like query.php's 500
+  //   __queryDelay ms before any answer (a run still in flight)
+  //   __queryResponse the JSON body otherwise
+  // save_server_state.php: the POSTed body is kept in __savePosts, answer = success.
+  window.__queryResponse = { data: window.__rows(5) };
+  window.__queryFail = (window.__MODE === 'bootfail') ? { status: 500, error: 'ORA-00933: SQL command not properly ended' } : null;
+  window.__queryDelay = 0;
+  window.__queryDone = 0;
+  window.__savePosts = [];
+  window.__ajaxLog = [];
+  jQuery.ajax = function (a, b) {
+    var opts = (typeof a === 'string') ? jQuery.extend({ url: a }, b || {}) : (a || {});
+    var url = String(opts.url || '');
+    window.__ajaxLog.push(url);
+    var d = jQuery.Deferred();
+    var isQuery = /query\.php/.test(url);
+    var fail = isQuery ? window.__queryFail : null;
+    var resp = {};
+    if (isQuery) resp = window.__queryResponse;
+    if (/save_server_state\.php/.test(url)) {
+      var body = {}; try { body = JSON.parse(opts.data); } catch (e) {}
+      window.__savePosts.push(body);
+      resp = { success: true, message: 'Report saved successfully!', new_id: body.short_id, numeric_id: 1522, is_new: false };
+    }
+    var delay = isQuery ? (window.__queryDelay || 0) : 0;
+    setTimeout(function () {
+      if (fail) {
+        var xhr = { status: fail.status, statusText: 'Internal Server Error', responseJSON: { error: fail.error },
+                    responseText: JSON.stringify({ error: fail.error }), getResponseHeader: function () { return null; } };
+        try { if (opts.error) opts.error(xhr, 'error', 'Internal Server Error'); } catch (e) { window.__errors.push('ajax error threw: ' + String(e)); }
+        try { if (opts.complete) opts.complete(xhr, 'error'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }
+        d.reject(xhr, 'error', 'Internal Server Error');
+      } else {
+        try { if (opts.success) opts.success(resp, 'success', { status: 200 }); } catch (e) { window.__errors.push('ajax success threw: ' + String(e)); }
+        try { if (opts.complete) opts.complete({ status: 200 }, 'success'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }
+        d.resolve(resp, 'success', { status: 200 });
+      }
+      if (isQuery) window.__queryDone++;
+    }, delay);
+    var p = d.promise(); p.abort = function () {}; return p;
+  };
+  jQuery.getJSON = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.post = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.get = jQuery.post;
+  jQuery.fx.off = true;
+  // --dump-dom renders no frames: no ResizeObserver callbacks, no rAF.
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.IntersectionObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.requestAnimationFrame = function (cb) { return setTimeout(function () { cb(Date.now()); }, 0); };
+  window.cancelAnimationFrame = function (id) { clearTimeout(id); };
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  window.__errors = [];
+  window.__rejections = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    window.__rejections.push(String((r && r.message) || r) + ' @' + String((r && r.stack) || '').split('\n').slice(1, 2).join('').trim());
+    e.preventDefault();
+  });
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  window.prompt = function () { return null; };
+</script>
+<script src="penumbra_userseg.js"></script>
+<script src="main_sl.js"></script>
+<script src="driver.js"></script>
+</body></html>

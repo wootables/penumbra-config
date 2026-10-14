@@ -1,0 +1,308 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>dashboard search - report page, real loads</title></head>
+<body>
+<!-- The REPORT PAGE half, part two (2026-09-29 evening): main.js (hooks
+     window.__DSM) runs REAL query loads - the Run button, query.php stubbed to
+     answer with rows that carry an @@JSON sub-table - framed inside
+     mainframe.html and loaded as mainload.html?dsearch=<nested condition>. It
+     checks what the framed tile SHOWS after its on-load pre-filter (and the
+     snapshot table's), not only what it routes: a condition routed to the page
+     must also be one its parser reads as a condition, never as a literal that
+     hides every row. DOM = the flatfreeze harness's (known to run a query
+     through the real render path). -->
+<div id="reportHeaderContainer"><div id="defaultTitleView"></div><div id="reportInfoPanel" style="display:none"></div></div>
+<input id="reportTitle" value=""><div id="admWrapper"></div><button id="toggleAdminViewBtn"></button>
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<button id="executeQuery">Run</button><button id="stopQueryBtn">Stop</button>
+<div id="loadingOverlay" style="display:none"><p id="execution-timer"></p><p id="loadingMessage"></p></div>
+<div id="importTimestamps"></div>
+<div id="resultsHeader" style="height:20px">controls</div>
+<div id="table-view-container"><div id="container-parent"><div id="results-wrapper" style="width:900px;height:420px"><table id="resultsTable"><caption class="sr-only">Report results table</caption><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table></div></div></div>
+<div id="paginationControls"><select id="rowsPerPageSelector"><option value="25">25</option><option value="50">50</option><option value="100">100</option><option value="all">All</option></select></div>
+<div id="errorBox"></div><div id="undo_text_container"></div>
+<input id="tableSearch" value="">
+<span id="resultCount"></span>
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="snapshotComparisonContainer" style="display:none"></div>
+<div id="pivotLightbox" style="display:none">
+  <div id="pivot-source-columns"></div>
+  <div id="pivot-rows"></div><div id="pivot-cols"></div><div id="pivot-vals"></div>
+  <select id="pivot-aggregation-selector"><option value="">-</option><option value="sum">sum</option></select>
+  <table><tbody id="pivot-agg-table-body"></tbody></table>
+  <button id="generatePivotBtn">Generate</button>
+  <button id="copyPivotSnippetBtn">Snippet</button>
+</div>
+<button id="saveQuery">Save</button>
+<input id="serverSaveTitleInput"><input id="serverSaveSubtitleInput">
+<select id="serverSaveTheme"><option value="theme-default">Default</option></select>
+<select id="serverSaveDensity"><option value="standard">Standard</option></select>
+
+<script>
+  (function () { try { localStorage.clear(); } catch (e) {} })();
+  window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' }, 'theme-dark': { label: 'Dark', dark: true } };
+  window.PENUMBRA_THEME_IDS = ['theme-default', 'theme-dark'];
+  window.PENUMBRA_THEME_ALIASES = {};
+  window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: [], totalExemptions: ['AMOUNT']
+  };
+  // query.php answers with window.__queryResponse; manage_journal.php (the
+  // journal STATE: toggles, row-note counts) with window.__journal, after
+  // window.__journalDelay ms - the race a real load runs; everything else {}.
+  window.__ajaxLog = [];
+  window.__journalDelay = 0;
+  window.__journal = {
+    toggles: { status: 'success', toggles: { done: { P1: { by: 'h', at: null }, P3: { by: 'h', at: null } } } },
+    row_notes: { status: 'success', notes: {}, counts: { P2: 2 } }
+  };
+  jQuery.ajax = function (a, b) {
+    var opts = (typeof a === 'string') ? jQuery.extend({ url: a }, b || {}) : (a || {});
+    var url = String(opts.url || '');
+    window.__ajaxLog.push(url);
+    var d = jQuery.Deferred();
+    var jm = /manage_journal\.php\?action=(toggles|row_notes)/.exec(url);
+    var resp = /query\.php/.test(url) ? (window.__queryResponse || { data: [] }) : (jm ? JSON.parse(JSON.stringify(window.__journal[jm[1]])) : {});
+    setTimeout(function () {
+      try { if (opts.success) opts.success(resp, 'success', { status: 200 }); } catch (e) { window.__errors.push('ajax success threw: ' + String(e)); }
+      try { if (opts.complete) opts.complete({ status: 200 }, 'success'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }
+      d.resolve(resp, 'success', { status: 200 });
+    }, jm ? window.__journalDelay : 0);
+    var p = d.promise(); p.abort = function () {}; return p;
+  };
+  jQuery.getJSON = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.post = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.get = jQuery.post;
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.IntersectionObserver = window.ResizeObserver;
+  window.requestAnimationFrame = function (cb) { return setTimeout(function () { cb(Date.now()); }, 0); };
+  window.cancelAnimationFrame = function (id) { clearTimeout(id); };
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  window.__errors = [];
+  window.__rejections = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    window.__rejections.push(String((r && r.message) || r) + ' @' + String((r && r.stack) || '').split('\n').slice(1, 2).join('').trim());
+    e.preventDefault();
+  });
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  window.prompt = function () { return null; };
+</script>
+<script src="main_patched.js"></script>
+<!-- The search box's suggestion engine lives here since 2026-09-29 (it was
+     main.js _initFilterAutocomplete; main.js keeps a wrapper). -->
+<script src="search_builder.js"></script>
+<script>
+(function () {
+  var L = [], EXPECT = [];
+  function acList() { return $('ul.ui-autocomplete:visible li').map(function () { return $(this).text().trim(); }).get(); }
+  function ok(n, c, x) { L.push((c ? 'PASS ' : 'FAIL ') + n + (!c && x !== undefined ? '  [' + x + ']' : '')); }
+  function eq(n, got, want) { ok(n, JSON.stringify(got) === JSON.stringify(want), 'got ' + JSON.stringify(got) + ' want ' + JSON.stringify(want)); }
+  function send(type, extra) { var m = $.extend({ type: type }, extra || {}); try { parent.postMessage(m, '*'); } catch (e) { } }
+  function expectMsg(name, dsearch, skipped, applied) { EXPECT.push({ name: name, dsearch: dsearch, skipped: skipped, applied: applied }); }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function errs() { return window.__errors.concat(window.__rejections); }
+
+  // P1..P4 carry a SUB sub-table (SPECIES, N). SPECIES = Chicken: P1, P3, P4.
+  // With __ROW, SPECIES = Chicken and N = 1 must hold in ONE sub-row: P3 only
+  // (P4 has a Chicken and an N = 1, in different sub-rows).
+  var ROWS = [
+    { PROJ: 'P1', AMOUNT: '10', SUB: '@@JSON[{"SPECIES":"Chicken","N":"2"}]' },
+    { PROJ: 'P2', AMOUNT: '20', SUB: '@@JSON[{"SPECIES":"Duck","N":"1"}]' },
+    { PROJ: 'P3', AMOUNT: '30', SUB: '@@JSON[{"SPECIES":"Chicken","N":"1"},{"SPECIES":"Goose","N":"5"}]' },
+    { PROJ: 'P4', AMOUNT: '40', SUB: '@@JSON[{"SPECIES":"Goose","N":"1"},{"SPECIES":"Chicken","N":"5"}]' }
+  ];
+  var DSN = '{"p":"","f":[["SPECIES","SPECIES = Chicken"]]}';
+  var DSD = '{"p":"","f":[["SPECIES","SPECIES = Duck"]]}';
+  var DSR = '{"p":"__ROW ","f":[["SPECIES","SPECIES = Chicken"],["N","N = 1"]]}';
+
+  // The PROJ of every row the table shows (not .search-hidden), in order.
+  function shown() {
+    var idx = $('#resultsTable').data('columnNameToOriginalIndex') || {};
+    var pi = (idx.PROJ !== undefined) ? idx.PROJ : idx.proj;
+    return $('#resultsTable tbody tr').filter(function () { return !this.classList.contains('search-hidden'); })
+      .map(function () { return $(this).children('td[data-column="' + pi + '"]').text().trim(); }).get().join(',');
+  }
+  async function runQuery(resp) {
+    window.__queryResponse = resp || { data: JSON.parse(JSON.stringify(ROWS)) };
+    window.__DSM.sql('SELECT 1 FROM DUAL');
+    var before = window.__ajaxLog.length;
+    $('#executeQuery').trigger('click');
+    for (var i = 0; i < 200; i++) {
+      await sleep(25);
+      if (window.__ajaxLog.filter(function (u) { return /query\.php/.test(u); }).length && window.__ajaxLog.length > before &&
+          (window.__rejections.length || !$('#loadingOverlay').is(':visible'))) { break; }
+    }
+    await sleep(400);
+  }
+  async function waitFor(fn, ms) {
+    var t0 = Date.now();
+    while (Date.now() - t0 < ms) {
+      try { if (fn()) { break; } } catch (e) { }
+      await sleep(100);
+    }
+    await sleep(200);
+  }
+  async function settle() {
+    for (var i = 0; i < 120; i++) {
+      await sleep(50);
+      if (!window.__DSM.get().retry && !$('#loadingOverlay').is(':visible')) { break; }
+    }
+    await sleep(300);
+  }
+
+  async function run() {
+    var D = window.__DSM;
+    if (!D || typeof D.sql !== 'function') { send('harness:fatal', { msg: 'hooks unavailable: ' + (window.__DSM_ERR || 'n/a') }); return; }
+    ok('the address carries the nested dashboard filter', D.overrides().dsearch === DSN, D.overrides().dsearch);
+
+    // ---- 1. the page loads with the dashboard filter in its address
+    await runQuery();
+    ok('the load ran (4 rows fetched and built)', $('#resultsTable tbody tr').length === 4, $('#resultsTable tbody tr').length + ' rows; errs=' + errs().slice(0, 2).join(' | '));
+    expectMsg('load: nested column routed', DSN, [], ['SPECIES']);
+    eq('on load: a nested-column condition FILTERS the framed table (P1,P3,P4 - not a literal that hides every row)', shown(), 'P1,P3,P4');
+    eq('on load: the box shows the routed condition', $('#tableSearch').val(), 'SPECIES = Chicken');
+
+    // ---- 2. in place (the dashboard's filter changes while the page is open)
+    window.Penumbra.applyDashboardSearch({ dsearch: DSD, search: '' });
+    await settle();
+    expectMsg('in place: nested column routed', DSD, [], ['SPECIES']);
+    eq('in place: a nested-column condition filters (P2)', shown(), 'P2');
+
+    // ---- 3. __ROW at load: the conditions must meet in ONE sub-row
+    D.set({ dsearch: DSR, search: '' });
+    $('#tableSearch').val('');
+    await runQuery();
+    expectMsg('load: __ROW nested', DSR, [], ['SPECIES', 'N']);
+    eq('on load: __ROW holds nested conditions to one sub-row (P3)', shown(), 'P3');
+    eq('on load: the box keeps the __ROW prefix', $('#tableSearch').val(), '__ROW SPECIES = Chicken and N = 1');
+
+    // ---- 4. a report's OWN ?search= at load (no dashboard): the same pre-filter
+    D.set(null);
+    var ov = D.overrides(), hadSearch = ov.search;
+    ov.search = 'SPECIES = Duck';
+    $('#tableSearch').val('');
+    await runQuery();
+    eq('on load: a ?search= on a nested column filters too (P2)', shown(), 'P2');
+    ov.search = hadSearch;
+
+    // ---- 5. the snapshot table's pre-filter (rebuildTableFromMasterData)
+    D.set({ dsearch: DSN, search: '' });
+    $('#tableSearch').val('');
+    D.rows(ROWS.map(function (row) { var m = new Map(); for (var k in row) { m.set(k, row[k]); } return m; }));
+    try { D.rebuild(true); } catch (e) { ok('the snapshot rebuild ran', false, String(e && e.message)); }
+    expectMsg('snapshot: nested column routed', DSN, [], ['SPECIES']);
+    eq('snapshot table: a nested-column condition filters (P1,P3,P4)', shown(), 'P1,P3,P4');
+
+    // ---- 6. journal columns (2026-09-29 evening). The config is restored with
+    // the state (as main.js's state load does), the journal STATE is fetched and
+    // answers 700 ms AFTER the query: the on-load pre-filter runs without it.
+    // Routed like index.php routes them (DONE), read once the state has landed.
+    // P1 and P3 are checked Done; P2 has 2 row notes.
+    var DSJ = '{"p":"","f":[["DONE","Done = ☑"]]}';
+    var DSJU = '{"p":"","f":[["DONE","Done = unchecked"]]}';
+    var DSRN = '{"p":"","f":[["NOTES","Notes > 0"]]}';
+    window._penumbraJournalHidden = false;
+    window._penumbraJournalToggles = [{ key: 'done', label: 'Done' }];
+    window._penumbraJournalKeyColumns = ['PROJ'];
+    window._penumbraJournalRowNotes = true;
+    window.Penumbra.journalReportId = 'jrnl';
+    window.__journalDelay = 700;
+    D.set({ dsearch: DSJ, search: '' });
+    $('#tableSearch').val('');
+    window.Penumbra.loadJournalToggles();
+    window.Penumbra.loadJournalRowNotes();
+    ok('the journal state fetches are in flight when the report loads',
+       typeof window.Penumbra.journalDataPending === 'function' && window.Penumbra.journalDataPending().length === 2,
+       typeof window.Penumbra.journalDataPending === 'function' ? window.Penumbra.journalDataPending().length : 'no journalDataPending');
+    await runQuery();
+    expectMsg('load: journal toggle routed', DSJ, [], ['DONE']);
+    await waitFor(function () { return shown() === 'P1,P3'; }, 5000);
+    eq('on load: Done = ☑ shows the checked rows once the toggle state lands (P1,P3)', shown(), 'P1,P3');
+
+    window.Penumbra.applyDashboardSearch({ dsearch: DSJU, search: '' });
+    await settle();
+    expectMsg('in place: journal toggle routed', DSJU, [], ['DONE']);
+    eq('in place: Done = unchecked (P2,P4)', shown(), 'P2,P4');
+
+    // The counts refetch and CHANGE (P2's notes gone, P4 has one): the pre-filter
+    // reads the old counts, the re-run the new ones.
+    window.__journal.row_notes = { status: 'success', notes: {}, counts: { P4: 1 } };
+    D.set({ dsearch: DSRN, search: '' });
+    $('#tableSearch').val('');
+    window.Penumbra.loadJournalRowNotes();
+    await runQuery();
+    expectMsg('load: journal notes routed', DSRN, [], ['NOTES']);
+    await waitFor(function () { return shown() === 'P4'; }, 5000);
+    eq('on load: Notes > 0 shows the row with notes once the new counts land (P4)', shown(), 'P4');
+    window.__journalDelay = 0;
+
+    // ---- 7. the report search box's suggestions: the engine now lives in
+    // search_builder.js (attachFilterAutocomplete); main.js wires it after a load.
+    // (No focus() here: focusing inside this frame would take the host page's
+    // focus, which mainframe.html checks main.js never does on its own.)
+    var $ts = $('#tableSearch');
+    ok('the report search box has its suggestion engine attached after a load', !!$ts.data('ui-autocomplete'));
+    $ts.val('').trigger('dblclick');
+    await waitFor(function () { return acList().length > 0; }, 3000);
+    var al = acList();
+    ok('a double-click in the report search box lists the columns, nested ones too',
+       al.indexOf('PROJ') > -1 && al.indexOf('Nested Table Columns') > -1 && al.indexOf('SPECIES') > -1, JSON.stringify(al).slice(0, 300));
+    try { $ts.autocomplete('close'); } catch (e) { }
+    $ts.val('PROJ = ');
+    $ts.trigger($.Event('keydown', { key: ' ', keyCode: 32, which: 32, ctrlKey: true }));
+    await waitFor(function () { return acList().indexOf('P1') > -1; }, 3000);
+    eq('Ctrl+Space after PROJ = lists that column\'s values', acList(), ['P1', 'P2', 'P3', 'P4']);
+    try { $ts.autocomplete('close'); } catch (e) { }
+    $ts.val('');
+
+    // ---- 6. a query with NO rows at all (2026-10-01): the driver's metadata names the columns,
+    // so the dashboard filter is still routed and posted, and the search API lists them.
+    var DSX = '{"p":"","f":[["AMOUNT","AMOUNT > 5"],["DEPT","DEPT = X"],["ZZZ","ZZZ = 1"]]}';
+    D.set({ dsearch: DSX, search: '' });
+    $('#tableSearch').val('');
+    await runQuery({ data: [], columns_meta: [{ name: 'PROJ', native_type: 'VARCHAR2' }, { name: 'AMOUNT', native_type: 'NUMBER' }, { name: 'DEPT', native_type: 'VARCHAR2' }] });
+    ok('no rows: the load ran and built no row', $('#resultsTable tbody tr').length === 0, $('#resultsTable tbody tr').length + ' rows; errs=' + errs().slice(0, 2).join(' | '));
+    expectMsg('no rows: routed by the metadata (ZZZ skipped, AMOUNT and DEPT applied)', DSX, ['ZZZ'], ['AMOUNT', 'DEPT']);
+    eq('no rows: the search API names the metadata columns though no header row was built', window._penumbraSearchAPI.getColumns().map(function (c) { return c.name; }), ['PROJ', 'AMOUNT', 'DEPT']);
+    eq('no rows: the header map holds them for the page\'s own readers', Object.keys($('#resultsTable').data('columnNameToOriginalIndex') || {}), ['PROJ', 'AMOUNT', 'DEPT']);
+    // ---- 7. no rows and no metadata: nothing is named - never the last query's columns
+    D.set({ dsearch: DSX, search: '' });
+    await runQuery({ data: [] });
+    eq('no rows, no metadata: the search API names nothing', window._penumbraSearchAPI.getColumns().length, 0);
+    eq('no rows, no metadata: the header map is empty, not the last query\'s', Object.keys($('#resultsTable').data('columnNameToOriginalIndex') || {}).length, 0);
+
+    ok('main.js ran the loads without page errors', errs().length === 0, errs().slice(0, 3).join(' | '));
+    send('harness:results', { lines: L, expect: EXPECT });
+  }
+  $(function () { setTimeout(function () {
+    run().catch(function (e) { send('harness:fatal', { msg: 'harness threw: ' + (e && e.message) + ' @ ' + String(e && e.stack || '').split('\n')[1] }); });
+  }, 60); });
+})();
+</script>
+</body></html>

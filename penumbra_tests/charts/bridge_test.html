@@ -1,0 +1,230 @@
+<!doctype html><meta charset="utf-8"><title>running</title><pre id="out">running</pre>
+<script>
+window.onerror = function (msg, src, line, col) {
+  var el = document.getElementById('out');
+  if (el && el.textContent === 'running') {
+    el.textContent = 'SCRIPT-ERROR: ' + msg + '  (line ' + line + ':' + col + ')';
+  }
+  return false;
+};
+</script>
+<script src="SRC.js"></script>
+<script>
+var LOG = [], PASS = 0, FAIL = 0;
+function ok(name, cond, extra) {
+  if (cond) { PASS++; LOG.push('PASS  ' + name); }
+  else { FAIL++; LOG.push('FAIL  ' + name + (extra ? '   >> ' + extra : '')); }
+}
+function eq(name, got, want) {
+  ok(name, JSON.stringify(got) === JSON.stringify(want),
+     'got=' + JSON.stringify(got) + ' want=' + JSON.stringify(want));
+}
+
+try {
+  // SRC.js is penumbra_charts.js + main.js, module first. Split them so each
+  // half can be asserted on independently - the whole point of this suite is
+  // that the two halves agree about who owns what.
+  var all = String(window.__src).replace(/\r\n/g, '\n');
+  var cut = all.indexOf('$(document).ready(function () {');
+  ok('setup: found the main.js boundary in SRC.js', cut > 0, 'cut=' + cut);
+  var modSrc  = all.slice(0, cut);
+  var mainSrc = all.slice(cut);
+
+  // ── 1. The excised block is really gone from main.js ────────────────────
+  // Every builder body carries a distinctive marker; if any survived in
+  // main.js the excision left a duplicate that would silently win.
+  // Match the REGISTRATION (`id: 'penumbraX'`), not the bare name: main.js
+  // legitimately keeps cross-reference comments naming these plugins, and a
+  // comment is not a second copy of the code.
+  var PLUGIN_IDS = ['penumbraGaugeDecor', 'penumbraBulletDecor', 'penumbraBoxDecor',
+                    'penumbraParetoMarker', 'penumbraGanttMarker', 'penumbraMapLegend'];
+  PLUGIN_IDS.forEach(function (id) {
+    var reg = "id: '" + id + "'";
+    ok('excised: ' + id + ' is registered ONLY in the module',
+       mainSrc.indexOf(reg) === -1 && modSrc.indexOf(reg) !== -1);
+  });
+  ok('excised: the US grid table is not in main.js', mainSrc.indexOf('PENUMBRA_US_GRID_COLS') === -1);
+  ok('excised: the US grid table IS in the module', modSrc.indexOf('PENUMBRA_US_GRID_COLS') !== -1);
+
+  // ── 2. Every module export main.js still names has exactly one shim ─────
+  var exportBlock = modSrc.slice(modSrc.indexOf('global.PenumbraCharts = {'));
+  var EXPORTS = [];
+  exportBlock.replace(/^\s{8}(\w+):/gm, function (_, k) { EXPORTS.push(k); return _; });
+  ok('exports: parsed the module export list', EXPORTS.length >= 22, 'n=' + EXPORTS.length);
+
+  // Exports that deliberately have NO main.js shim:
+  //  - init / initGeo / armed are called on the module object itself by the loader
+  //  - the grid table is a closure var filled at arm time, not a function
+  //  - _vizCountyKey and _geoCentroid are internals of the geo join; main.js
+  //    reaches that behaviour through _vizResolveCounty / _vizGeoLayer instead,
+  //    and shimming them would imply a call site that does not exist.
+  var NO_SHIM = { init: 1, initGeo: 1, armed: 1, _vizCountyKey: 1, _geoCentroid: 1,
+                  PENUMBRA_US_GRID: 1, PENUMBRA_US_GRID_COLS: 1, PENUMBRA_US_GRID_ROWS: 1 };
+  EXPORTS.forEach(function (name) {
+    if (NO_SHIM[name]) return;
+    var decl = new RegExp('^    function ' + name + '\\(', 'gm');
+    var n = (mainSrc.match(decl) || []).length;
+    eq('shim: exactly one main.js shim for ' + name, n, 1);
+  });
+
+  // PENUMBRA_US_GRID is a VALUE, so it gets a closure var filled at arm time
+  // rather than a function shim. Assert that arrangement explicitly.
+  ok('grid: main.js declares the closure var',
+     /^    var PENUMBRA_US_GRID = null;$/m.test(mainSrc));
+  ok('grid: penumbraLoadChartModule fills it',
+     /PENUMBRA_US_GRID = m\.PENUMBRA_US_GRID;/.test(mainSrc));
+
+  // ── 3. No main.js call site references a chart symbol with no shim ──────
+  // (catches a helper that was moved out but whose caller was left behind)
+  var ORPHAN_HUNT = ['_vizGanttDayMs', '_vizGanttSpanDays', '_vizBoxWhiskerBounds'];
+  ORPHAN_HUNT.forEach(function (n) {
+    ok('orphan: ' + n + ' is referenced nowhere in main.js', mainSrc.indexOf(n) === -1);
+  });
+
+  // ── 4. The shim block RUNS and delegates, with a fake module ────────────
+  function grabBlock(startAnchor, endAnchor) {
+    var a = mainSrc.indexOf(startAnchor);
+    var b = mainSrc.indexOf(endAnchor, a);
+    if (a === -1 || b === -1) throw new Error('bridge block anchors not found');
+    return mainSrc.slice(a, b);
+  }
+  var bridgeSrc = grabBlock('var _penumbraChartModPromise = null;',
+                            '    /**\n     * Restores the visualization form');
+  ok('bridge: extracted the block', bridgeSrc.length > 2000, 'len=' + bridgeSrc.length);
+
+  // Stubs for everything the block closes over. loadScript is the only one it
+  // calls before arming; the five deps are only read when init() fires.
+  var loadedSrc = null, initArgs = null, loadedAll = [];
+  var B = new Function('loadScript', 'getChartColor', 'getChartBorderColor', 'hexToRgba',
+                       'parseDate', 'penumbraPercentileOf',
+    bridgeSrc +
+    '\nreturn { load: penumbraLoadChartModule, pcm: _pcm, grid: function(){ return PENUMBRA_US_GRID; },' +
+    '  fns: { applyFunnelChartConfig: applyFunnelChartConfig, applyGaugeChartConfig: applyGaugeChartConfig,' +
+    '         applyBulletChartConfig: applyBulletChartConfig, applyBoxChartConfig: applyBoxChartConfig,' +
+    '         applyGanttChartConfig: applyGanttChartConfig, applyMapChartConfig: applyMapChartConfig,' +
+    '         applyParetoChartConfig: applyParetoChartConfig,' +
+    '         _vizParseFunnelMode: _vizParseFunnelMode, _vizFormatDuration: _vizFormatDuration,' +
+    '         _vizFunnelShortNum: _vizFunnelShortNum, _vizParseBands: _vizParseBands,' +
+    '         _vizParseTarget: _vizParseTarget, _vizGaugeRange: _vizGaugeRange,' +
+    '         _vizBandColor: _vizBandColor, _vizParseWhiskerMode: _vizParseWhiskerMode,' +
+    '         _vizBoxStats: _vizBoxStats, _vizDateMs: _vizDateMs, _vizGanttTickFmt: _vizGanttTickFmt,' +
+    '         _vizGanttMarker: _vizGanttMarker, _vizResolveState: _vizResolveState,' +
+    '         _vizParseVizOptions: _vizParseVizOptions } };'
+  )(
+    function (src) { loadedSrc = src; loadedAll.push(src); return Promise.resolve(); },
+    function gcc() { return '#336699'; }, function gbc() { return '#123'; },
+    function h2r() { return 'rgba(1,2,3,1)'; }, function pd() { return null; },
+    function pp() { return 0; }
+  );
+
+  // 4a. UNARMED: every shim must refuse loudly and hand back the documented
+  //     neutral, never undefined - a caller reading .mode off undefined is a
+  //     harder bug than a console line that names the call.
+  var errs = [];
+  var realErr = console.error;
+  console.error = function () { errs.push([].slice.call(arguments).join(' ')); };
+  delete window.PenumbraCharts;
+
+  eq('unarmed: funnel mode neutral', B.fns._vizParseFunnelMode('duration|hours'), { mode: 'conversion', unit: 'days' });
+  eq('unarmed: bands neutral', B.fns._vizParseBands('10|20'), []);
+  eq('unarmed: target neutral', B.fns._vizParseTarget('80'), null);
+  eq('unarmed: whisker neutral', B.fns._vizParseWhiskerMode('minmax'), 'tukey');
+  eq('unarmed: vizOptions neutral', B.fns._vizParseVizOptions('{"bins":"equal"}'), {});
+  eq('unarmed: gauge range neutral', B.fns._vizGaugeRange([5], null, [], '', ''), { min: 0, max: 1 });
+  eq('unarmed: state neutral', B.fns._vizResolveState('NC'), null);
+  eq('unarmed: box stats neutral', B.fns._vizBoxStats([1, 2, 3], 'tukey'), null);
+  var cfgU = { options: {} };
+  B.fns.applyMapChartConfig(cfgU, { _isMap: true }, {});
+  eq('unarmed: apply* is a no-op, not a throw', cfgU, { options: {} });
+  ok('unarmed: every refusal named its caller', errs.length === 9, 'n=' + errs.length);
+  ok('unarmed: the message names the file to load',
+     errs.every(function (m) { return m.indexOf('penumbra_charts.js') !== -1; }));
+  ok('unarmed: the message names the offending call',
+     errs.some(function (m) { return m.indexOf('_vizParseBands') !== -1; }));
+  console.error = realErr;
+
+  // 4b. ARMED: the loader fetches the right file, injects exactly the five
+  //     shared contracts, fills the grid var, and delegates argument-for-argument.
+  var calls = [];
+  window.PenumbraCharts = {
+    armed: false,
+    init: function (deps) { initArgs = deps; window.PenumbraCharts.armed = true; return true; },
+    PENUMBRA_US_GRID: { NC: { r: 5, c: 8 } }
+  };
+  ['applyFunnelChartConfig', 'applyGaugeChartConfig', 'applyBulletChartConfig', 'applyBoxChartConfig',
+   'applyGanttChartConfig', 'applyMapChartConfig', 'applyParetoChartConfig'].forEach(function (n) {
+    window.PenumbraCharts[n] = function (a, b, c) { calls.push([n, a, b, c]); };
+  });
+  window.PenumbraCharts._vizParseBands = function (raw) { calls.push(['_vizParseBands', raw]); return ['DELEGATED', raw]; };
+  window.PenumbraCharts._vizGaugeRange = function (v, t, b, lo, hi) { return { min: lo, max: hi, saw: [v, t, b] }; };
+  window.PenumbraCharts._vizResolveState = function (raw, mode) { return raw + '/' + mode; };
+
+  // The page publishes a filemtime-versioned URL the same way every other lazy
+  // module gets one; the bare literal is only the no-global fallback.
+  ok('cachebust: main.js prefers PENUMBRA_CHARTS_ASSETS.js',
+     /window\.PENUMBRA_CHARTS_ASSETS && window\.PENUMBRA_CHARTS_ASSETS\.js/.test(mainSrc));
+  ok('cachebust: main.js still falls back to the bare path',
+     /\|\|\s*\n?\s*'js\/penumbra_charts\.js'/.test(mainSrc));
+  window.PENUMBRA_CHARTS_ASSETS = { js: 'js/penumbra_charts.js?v=1756300000' };
+  window.PENUMBRA_GEO_ASSETS = { js: 'js/penumbra_geo_us.js?v=1756300001' };
+
+  B.load().then(function () {
+    eq('armed: loader fetched the VERSIONED module url', loadedAll[0], 'js/penumbra_charts.js?v=1756300000');
+    // The boundary geometry rides along with the chart module rather than
+    // loading on demand, because the map DATA branch resolves county names
+    // synchronously inside generateChartDataFromMaps.
+    eq('armed: geometry is fetched too, versioned, and AFTER the module',
+       loadedAll[1], 'js/penumbra_geo_us.js?v=1756300001');
+    eq('armed: exactly two scripts, no duplicates', loadedAll.length, 2);
+    eq('armed: injected exactly the five shared contracts',
+       Object.keys(initArgs).sort(),
+       ['getChartBorderColor', 'getChartColor', 'hexToRgba', 'parseDate', 'penumbraPercentileOf']);
+    ok('armed: injected real functions, not names',
+       Object.keys(initArgs).every(function (k) { return typeof initArgs[k] === 'function'; }));
+    eq('armed: getChartColor is the injected one', initArgs.getChartColor(), '#336699');
+    eq('armed: the grid closure var was filled', B.grid(), { NC: { r: 5, c: 8 } });
+
+    // delegation, argument for argument
+    eq('armed: parser delegates and returns the module value',
+       B.fns._vizParseBands('10|20'), ['DELEGATED', '10|20']);
+    eq('armed: multi-arg parser passes every argument through',
+       B.fns._vizGaugeRange([1], { value: 2 }, [3], 0, 99),
+       { min: 0, max: 99, saw: [[1], { value: 2 }, [3]] });
+    eq('armed: optional second arg survives', B.fns._vizResolveState('NC', 'postal'), 'NC/postal');
+
+    var cfg = { options: { A: 1 } }, dat = { _isMap: true }, opt = { isDark: true };
+    B.fns.applyMapChartConfig(cfg, dat, opt);
+    var last = calls[calls.length - 1];
+    eq('armed: apply* delegates by name', last[0], 'applyMapChartConfig');
+    ok('armed: apply* forwards config/data/opts by REFERENCE (it mutates in place)',
+       last[1] === cfg && last[2] === dat && last[3] === opt);
+
+    // 4c. The load promise is memoised - five call sites must not fetch five times.
+    var firstSrc = loadedAll[0];
+    loadedSrc = null; loadedAll.length = 0;
+    return B.load().then(function () {
+      ok('armed: repeat load() does not re-fetch', loadedAll.length === 0, 'refetched=' + loadedAll.join(','));
+      ok('armed: first load did fetch', firstSrc === 'js/penumbra_charts.js?v=1756300000', firstSrc);
+
+      // ── 5. All five Chart.js load sites await the module ────────────────
+      // Count CODE lines only - the bridge banner names the file in prose.
+      var sites = mainSrc.split('\n').map(function (l, i) { return [i + 1, l]; })
+        .filter(function (p) { return /chart-4\.5\.1\.min\.js/.test(p[1]) && !/^\s*\/\//.test(p[1]); });
+      eq('wiring: Chart.js is loaded from five places', sites.length, 5);
+      sites.forEach(function (p) {
+        // the module load must appear within a few lines of each Chart.js load
+        var lines = mainSrc.split('\n').slice(p[0] - 1, p[0] + 5).join('\n');
+        ok('wiring: line ' + p[0] + ' loads the chart module too',
+           /penumbraLoadChartModule\(\)/.test(lines), lines.split('\n')[0].trim());
+      });
+
+      document.getElementById('out').textContent =
+        'RESULT ' + (FAIL === 0 ? 'ALL-PASS' : 'HAS-FAILURES') + '  pass=' + PASS + ' fail=' + FAIL + '\n' + LOG.join('\n');
+    });
+  }).catch(function (e) {
+    document.getElementById('out').textContent = 'ASYNC-ERROR: ' + e.name + ': ' + e.message + '\n' + (e.stack || '');
+  });
+} catch (e) {
+  document.getElementById('out').textContent = 'HARNESS-ERROR: ' + e.name + ': ' + e.message + '\n' + (e.stack || '');
+}
+</script>

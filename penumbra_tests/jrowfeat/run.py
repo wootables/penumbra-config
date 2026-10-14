@@ -1,0 +1,387 @@
+# =============================================================================
+# JOURNAL ROW FEATURES SUITE "jrowfeat" (2026-10-02)
+#
+# The report journal's row features - shared toggle columns ("Reviewed") and row
+# notes - live in columns the journal pass adds to the table AFTER it renders.
+# On eirbprotsum (saved GROUPED by Protocol Type) they never appeared: the pass
+# only ran for a VISIBLE flat table, nothing re-ran it when Remove Grouping
+# un-hid the flat table (no row is added, so its row observer never fired), and
+# a header sort replaced the tbody under the observer for good. The fix paints
+# the flat table whenever the features are on (hidden or not), paints every leaf
+# table of the grouped view too, re-watches a replaced tbody, keeps every copy of
+# a row's box in step, and the View Options setup panel now numbers its two
+# steps, says why step 2 is locked and confirms each add / name / remove.
+#
+# Each scenario boots the REAL main.js through the real run path (stubbed
+# query.php + manage_journal.php) on a 36-row fixture shaped like eirbprotsum
+# (key "PROTOCOL NO." + "PROTOCOL TYPE"), with the View Options journal panel
+# lifted from the index.php under test. driver.js records the asserts:
+#   F-*  flat table          G-*  grouped view (saved grouped)    U-*  Remove Grouping
+#   S-*  rows rebuilt after a tbody-replacing sort                C-*  a click in a group
+#   N-*  row notes in a group                                     R-*  flat mark -> group -> back
+#   K-*  setup panel: key step / lock / key-change warning        T-*  setup panel: toggle add/name/remove/undo, notes, copy
+#   P-*  preconditions        E-*  no page errors
+#
+#   py -3 run.py                                 candidate = live js\main.js + live index.php
+#   py -3 run.py --candidate F --index F         any build (the stage before the deploy)
+#   py -3 run.py --control                       the PRE-FIX build (default: the newest
+#                                                js\main.js.bak-*-jrowfeat + index.php.bak-*-jrowfeat,
+#                                                or pass --baseline/--baseline-index): EXACTLY
+#                                                CONTROL_RED must fail, everything else pass
+#                                                (round 1's scenarios, ORIG_SCN)
+#   py -3 run.py --control-grp                   the build round 2 replaced (default: the newest
+#                                                js\main.js.bak-*-jrowgrp, or --baseline) on rounds
+#                                                1 + 2: EXACTLY CONTROL_RED_GRP must fail
+#   py -3 run.py --control-grp3                  the build round 3 replaced (default: the newest
+#                                                js\main.js.bak-*-jrowgrp3, or --baseline) on every
+#                                                scenario: EXACTLY CONTROL_RED_GRP3 must fail
+#   py -3 run.py --mutant NAME / --mutants       single-point reverts of the candidate; each must
+#                                                turn exactly its own asserts red
+#   --css F / --jcss F   the main.css / penumbra_journal.css under test (default: the app's)
+#   B-*  the row-note Post button vs the panel's     D-*  drop a file on a note = attach (the import keeps the rest)
+#   --scn a,b    a subset of scenarios;   --keep keeps the staging dir;   --app DIR libs source
+#
+# Headless Edge over CDP; stages into %TEMP%; writes nothing to the webroot.
+# Needs Python 3 + websocket-client (py -3 -m pip install websocket-client).
+# =============================================================================
+import glob, json, os, shutil, socket, subprocess, sys, tempfile, time, urllib.request
+import websocket
+try: sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+except Exception: pass
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+sys.path.insert(0, r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver'); from oldver import bak_glob, bak_path   # .bak copies come from git since 2026-10-14
+EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js',
+        'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
+        'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js']
+ORIG_SCN = ['flat', 'grouped', 'hashshown', 'ungroup', 'stale', 'clickgrp', 'notegrp', 'regroup', 'cfg', 'keychg', 'postbtn', 'dropnote',
+            'cfggrp', 'footer', 'ccpill']
+# Round 2 (2026-10-02): grouped BY the toggle. A report saved grouped by it opened flat ("column
+# was removed"), and a ticked row stayed in its old Checked/Unchecked band until a regroup.
+#   Y-*  grouped by the toggle: saved by label / sentinel, late state, a tick (stays while the
+#        clicks settle, then moves; place, sort, flash), keyboard focus, an open note holds it,
+#        a tick undone moves nothing, the toggle as level 2, the dialog, a same-named real
+#        column, a search kept
+GRP_SCN = ['bytoggle', 'bysentinel', 'bylate', 'flipgrp', 'flipkbd', 'notewait', 'dblflip', 'nested', 'nestedsent', 'pickgrp',
+           'shadow', 'flipsearch', 'cmpexit']
+# Round 3 (2026-10-02): a tick that CREATES a band went into it CLOSED and out of sight ("sending
+# it nowhere"); the last mark unticked left the row hidden inside Unchecked's own scrolled box.
+#   Z-*  a new band opens and is shown (first tick, every row checked, level 2), the row is shown
+#        where it joined when its band empties, a band created by late state follows "start
+#        expanded to"
+GRP3_SCN = ['firsttick', 'lasttick', 'alltick', 'nestfirst', 'latebands', 'lastdesc']
+ALL_SCN = ORIG_SCN + GRP_SCN + GRP3_SCN
+
+# grouped / hashshown: the journal state lands 1.5 s AFTER the report has rendered and grouped,
+# so the groups are painted from it in place (the content pass), not at their build.
+# bylate: the same for a report grouped BY the toggle - its first build has every row Unchecked.
+EXTRA = {'grouped': '&jdelay=1500', 'hashshown': '&jdelay=1500', 'bylate': '&jdelay=1500', 'latebands': '&jdelay=1500'}
+# Every assert a scenario must record; a missing one counts as FAILED.
+EXPECT = {
+    'flat': ['F-flat'],
+    'grouped': ['G-grouped', 'G-flatbehind'],
+    'hashshown': ['G-hashshown'],
+    'ungroup': ['U-ungroup'],
+    'stale': ['P-stale-swap', 'P-stale-before', 'S-stale'],
+    'clickgrp': ['P-clickgrp-box', 'C-clickgrp-post', 'C-clickgrp-twin', 'C-clickgrp-label', 'C-clickgrp-off'],
+    'notegrp': ['P-notegrp-btns', 'N-notegrp-open', 'N-notegrp-one', 'N-notegrp-hint', 'N-notegrp-mention', 'N-notegrp-esc', 'N-notegrp-band'],
+    'regroup': ['R-regroup', 'R-regroup-all', 'R-regroup-back'],
+    'cfg': ['P-cfg-panel', 'K-cfg-locked', 'K-cfg-dup', 'K-cfg-open', 'T-cfg-add', 'T-cfg-fresh', 'T-cfg-name', 'T-cfg-empty',
+            'T-cfg-remove', 'T-cfg-undo', 'T-cfg-notes', 'T-cfg-copy'],
+    'keychg': ['K-keychg', 'K-keyback'],
+    'postbtn': ['P-postbtn-open', 'B-postbtn-dark', 'B-postbtn-size'],
+    'dropnote': ['P-drop-open', 'D-drop-armed', 'D-drop-attach', 'D-drop-elsewhere'],
+    'cfggrp': ['G-cfggrp-add', 'G-cfggrp-notesoff'],
+    'footer': ['P-footer', 'F-footer-align', 'F-footer-hidden'],
+    'ccpill': ['C-ccpill'],
+    'bytoggle': ['Y-bytoggle-load'],
+    'bysentinel': ['Y-bysentinel-load'],
+    'bylate': ['P-bylate-early', 'Y-bylate-bands'],
+    'flipgrp': ['Y-flipgrp-stay', 'Y-flipgrp-moved', 'Y-flipgrp-place', 'Y-flipgrp-sort', 'Y-flipgrp-flash'],
+    'flipkbd': ['P-flipkbd-fv', 'Y-flipkbd-focus'],
+    'notewait': ['Y-notewait-held', 'Y-notewait-after'],
+    'dblflip': ['Y-dblflip'],
+    'nested': ['Y-nested-bands', 'Y-nested-flip', 'Y-nested-boxscroll'],
+    'nestedsent': ['Y-nestedsent-bands'],
+    'pickgrp': ['P-pickgrp-offered', 'Y-pickgrp', 'Y-pickgrp-nested'],
+    'shadow': ['Y-shadow'],
+    'flipsearch': ['P-flipsearch-on', 'Y-flipsearch'],
+    'cmpexit': ['Y-cmpexit'],
+    'firsttick': ['Z-first-band', 'Z-first-seen', 'Z-first-flash'],
+    'lasttick': ['Z-last-gone', 'Z-last-seen'],
+    'alltick': ['Z-all-band', 'Z-all-seen'],
+    'nestfirst': ['Z-nest-band', 'Z-nest-seen'],
+    'latebands': ['P-late-first', 'Z-late-open'],
+    'lastdesc': ['P-desc-order', 'Z-desc-seen'],
+}
+
+# What the pre-fix build gets wrong. Filled in from the first control run and
+# then frozen: every other assert must PASS on the old build too, which is what
+# proves the fixture and the read-out are not the bug.
+CONTROL_RED = ['G-grouped', 'G-flatbehind', 'G-hashshown', 'U-ungroup', 'S-stale', 'P-clickgrp-box',
+               'C-clickgrp-post', 'C-clickgrp-twin', 'C-clickgrp-label', 'C-clickgrp-off', 'P-notegrp-btns',
+               'N-notegrp-open', 'N-notegrp-one', 'N-notegrp-hint', 'N-notegrp-mention', 'N-notegrp-esc',
+               'N-notegrp-band', 'K-cfg-locked', 'K-cfg-dup', 'K-cfg-open', 'T-cfg-add', 'T-cfg-name',
+               'T-cfg-empty', 'T-cfg-remove', 'T-cfg-undo', 'T-cfg-notes', 'T-cfg-copy', 'K-keychg',
+               'B-postbtn-dark', 'B-postbtn-size', 'D-drop-armed', 'D-drop-attach',
+               'G-cfggrp-add', 'G-cfggrp-notesoff', 'F-footer-align', 'T-cfg-fresh', 'C-ccpill']
+# --control runs the ORIG_SCN scenarios against that pre-fix build (round 2's scenarios have
+# nothing to show on a build whose grouped rows carry no journal columns at all).
+#
+# --control-grp: the build round 2 replaced (live 2026-10-02 13:31, main.js 73712d78; the deploy
+# leaves js\main.js.bak-<stamp>-jrowgrp) on EVERY scenario: exactly these fail, the whole of
+# round 1 still passes. Frozen from its first control run.
+CONTROL_RED_GRP = ['Y-bytoggle-load', 'Y-bysentinel-load', 'P-bylate-early', 'Y-bylate-bands',
+                   'Y-flipgrp-stay', 'Y-flipgrp-moved', 'Y-flipgrp-place', 'Y-flipgrp-sort',
+                   'Y-flipgrp-flash', 'E-flipgrp', 'P-flipkbd-fv', 'Y-flipkbd-focus', 'E-flipkbd',
+                   'Y-notewait-held', 'Y-notewait-after', 'E-notewait', 'Y-dblflip', 'E-dblflip',
+                   'Y-nested-bands', 'Y-nested-flip', 'Y-nested-boxscroll', 'E-nested', 'Y-nestedsent-bands', 'Y-pickgrp-nested',
+                   'Y-shadow', 'P-flipsearch-on', 'Y-flipsearch', 'E-flipsearch', 'Y-cmpexit']
+# --control-grp3: the build round 3 replaced (live 2026-10-02 14:57, main.js a89d3e23; the deploy
+# leaves js\main.js.bak-<stamp>-jrowgrp3) on EVERY scenario: exactly these fail, rounds 1 + 2
+# still pass. Frozen from its first control run.
+CONTROL_RED_GRP3 = ['Z-first-band', 'Z-first-seen', 'Z-first-flash', 'Z-last-seen', 'Z-all-band',
+                    'Z-all-seen', 'Z-nest-band', 'Z-nest-seen', 'Z-late-open', 'Z-desc-seen']
+
+# --- mutants: name -> (edits on the CANDIDATE, assert ids that MUST go red, scenarios) ------------
+# Kept in mutants.json (built by mk_mutants.py, which checks every anchor against the build it
+# was made for). must = null means "not frozen yet": the run prints the red set for review.
+# An "eq-" mutant is EQUIVALENT by design (another site backs the reverted one up): it must stay green.
+MUTANTS = {}
+for _k, _v in json.load(open(os.path.join(HERE, 'mutants.json'), encoding='utf-8')).items():
+    MUTANTS[_k] = ([tuple(e) for e in _v['edits']], _v['must'], _v['scn'])
+
+args = sys.argv[1:]
+def opt(name, default=None):
+    if name in args:
+        i = args.index(name); v = args[i + 1]; del args[i:i + 2]; return v
+    return default
+def flag(name):
+    if name in args: args.remove(name); return True
+    return False
+cand_path = opt('--candidate', os.path.join(APP, 'js', 'main.js'))
+index_path = opt('--index', os.path.join(APP, 'index.php'))
+css_path = opt('--css', None)          # the main.css under test (default: <app>\css\main.css)
+jcss_path = opt('--jcss', None)        # penumbra_journal.css (default: <app>\css\penumbra_journal.css)
+base_path = opt('--baseline', None)
+base_index = opt('--baseline-index', None)
+app_dir = opt('--app', APP)
+scn_arg = opt('--scn', None)
+one_mutant = opt('--mutant', None)
+all_mutants = flag('--mutants')
+control = flag('--control')
+control_grp = flag('--control-grp')
+control_grp3 = flag('--control-grp3')
+keep = flag('--keep')
+verbose = flag('--verbose')
+if args: raise SystemExit('unknown arguments: %s' % ' '.join(args))
+if control:
+    if not base_path:
+        baks = bak_glob(os.path.join(APP, 'js', 'main.js.bak-*-jrowfeat'))
+        if not baks: raise SystemExit('no baseline: pass --baseline <main.js before the fix> (the deploy leaves js\\main.js.bak-<stamp>-jrowfeat)')
+        base_path = baks[-1]
+    if not base_index:
+        baks = bak_glob(os.path.join(APP, 'index.php.bak-*-jrowfeat'))
+        if not baks: raise SystemExit('no baseline index: pass --baseline-index <index.php before the fix>')
+        base_index = baks[-1]
+    if not css_path:
+        baks = bak_glob(os.path.join(APP, 'css', 'main.css.bak-*-jrowfeat'))
+        if baks: css_path = baks[-1]   # the stylesheet the pre-fix build shipped with (the B-* asserts read it)
+    cand_path, index_path = base_path, base_index
+elif control_grp or control_grp3:
+    tag = 'jrowgrp3' if control_grp3 else 'jrowgrp'
+    if not base_path:
+        baks = bak_glob(os.path.join(APP, 'js', 'main.js.bak-*-' + tag))
+        if not baks: raise SystemExit('no baseline: pass --baseline <main.js before that round> (its deploy leaves js\\main.js.bak-<stamp>-' + tag + ')')
+        base_path = baks[-1]
+    cand_path = base_path
+    if base_index: index_path = base_index   # rounds 2 and 3 left index.php as it was
+    if control_grp3 and not css_path:
+        baks = bak_glob(os.path.join(APP, 'css', 'main.css.bak-*-jrowgrp3'))
+        if baks: css_path = baks[-1]   # round 3 added the band-header flash to main.css
+
+def read_b(p): return open(p, 'rb').read().decode('utf-8', 'surrogateescape')
+
+def lift_panel(index_text):
+    """The View Options journal panel, verbatim: <div id="journalRowConfig" ...> to its close."""
+    a = index_text.find('<div id="journalRowConfig"')
+    if a < 0: raise SystemExit('index.php: no #journalRowConfig')
+    depth, i = 0, a
+    while True:
+        o = index_text.find('<div', i); c = index_text.find('</div>', i)
+        if c < 0: raise SystemExit('index.php: #journalRowConfig never closes')
+        if o != -1 and o < c: depth += 1; i = o + 4
+        else:
+            depth -= 1; i = c + 6
+            if depth == 0: break
+    block = index_text[a:i]
+    if '<?' in block: raise SystemExit('index.php: PHP inside #journalRowConfig - the lift needs updating')
+    return block
+
+def hook(src):
+    """The ready closure becomes an IIFE with a name-by-name export hook, and
+    hideLoading counts its calls (the end of a run / grouping / ungroup)."""
+    anchor = '$(document).ready(function () {'
+    i = src.find(anchor)
+    if i < 0 or i > 400: raise SystemExit('closure anchor not found')
+    names = ['runTableSearch', 'rebuildTableFromMasterData', 'removeGrouping', 'applyPagination', 'updateTotalRow',
+             '_restorePreCompareGrouping']
+    # setPreCompare: what a snapshot comparison stashes on entry (cmpexit), set from outside.
+    h = ('\r\n;try { window.__JR = { master: function () { try { return eval("masterRowData"); } catch (e) { return null; } },'
+         ' setPreCompare: eval("(function (v) { _preCompareGrouping = v; })") }; } catch (e) { window.__JR_ERR = String(e); }\r\n'
+         'try { [' + ','.join('"%s"' % n for n in names) + '].forEach(function (k) { try { window.__JR[k] = eval(k); } catch (e) { (window.__JR_MISSING = window.__JR_MISSING || []).push(k); } }); } catch (e) { window.__JR_ERR2 = String(e); }\r\n')
+    out = src[:i] + ';(function () {' + h + src[i + len(anchor):]
+    j = out.rfind('});')
+    out = out[:j] + '})();' + out[j + 3:]
+    hl = '    function hideLoading() {\r\n'
+    if out.count(hl) != 1: raise SystemExit('hideLoading anchor count %d' % out.count(hl))
+    return out.replace(hl, hl + '        window.__JR_HIDES = (window.__JR_HIDES || 0) + 1;\r\n')
+
+def mutate(src, name):
+    for old, new in MUTANTS[name][0]:
+        if src.count(old) != 1: raise SystemExit("mutant '%s': anchor found %d times (needs the FIXED build): %r" % (name, src.count(old), old[:90]))
+        src = src.replace(old, new)
+    return src
+
+stage = tempfile.mkdtemp(prefix='pnb_jr_')
+for f in LIBS: shutil.copyfile(os.path.join(app_dir, 'js', f), os.path.join(stage, f))
+shutil.copyfile(css_path or os.path.join(app_dir, 'css', 'main.css'), os.path.join(stage, 'main.css'))
+shutil.copyfile(jcss_path or os.path.join(app_dir, 'css', 'penumbra_journal.css'), os.path.join(stage, 'penumbra_journal.css'))
+shutil.copyfile(os.path.join(HERE, 'driver.js'), os.path.join(stage, 'driver.js'))
+harness = open(os.path.join(HERE, 'harness.html'), encoding='utf-8').read()
+if harness.count('<!--JR_VIEW_OPTIONS-->') != 1: raise SystemExit('harness: splice marker missing')
+
+def free_port():
+    s = socket.socket(); s.bind(('127.0.0.1', 0)); p = s.getsockname()[1]; s.close(); return p
+hp, dp = free_port(), free_port()
+srv = subprocess.Popen([sys.executable, '-m', 'http.server', str(hp), '--bind', '127.0.0.1', '--directory', stage], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+# This machine's headless Edge reports (hover: none) / (pointer: coarse) since 2026-10-07: force a
+# mouse, the desktop this suite's geometry is built for (the toggle box's touch size would apply).
+edge = subprocess.Popen([EDGE, '--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check', '--disable-sync',
+                         '--disable-extensions', '--user-data-dir=' + os.path.join(stage, 'profile'), '--window-size=1500,900',
+                         '--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4',
+                         '--remote-debugging-port=%d' % dp, '--remote-allow-origins=*', 'about:blank'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+def jget(p, m='GET'):
+    return json.loads(urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:%d%s' % (dp, p), method=m), timeout=15).read().decode())
+for _ in range(150):
+    try: jget('/json/version'); break
+    except Exception: time.sleep(0.2)
+
+# A TRUSTED key press, asked for by the page (window.__wantKeys = [' ']): a script's focus()
+# and a dispatched KeyboardEvent are neither keyboard focus (:focus-visible) nor a key that
+# activates a button - flipkbd needs both, as a keyboard user makes them.
+KEYS = {' ': ('Space', 32, ' '), 'Tab': ('Tab', 9, None), 'Enter': ('Enter', 13, '\r')}
+def press(call, key):
+    code, vk, text = KEYS[key]
+    down = {'type': 'keyDown', 'key': key, 'code': code, 'windowsVirtualKeyCode': vk, 'nativeVirtualKeyCode': vk}
+    if text: down['text'] = text
+    call('Input.dispatchKeyEvent', down)
+    call('Input.dispatchKeyEvent', {'type': 'keyUp', 'key': key, 'code': code, 'windowsVirtualKeyCode': vk, 'nativeVirtualKeyCode': vk})
+
+def run_page(scn):
+    t = jget('/json/new?about:blank', 'PUT')
+    ws = websocket.create_connection(t['webSocketDebuggerUrl'], timeout=300, suppress_origin=True)
+    n = [0]
+    def call(m, p=None):
+        n[0] += 1; mid = n[0]
+        ws.send(json.dumps({'id': mid, 'method': m, 'params': p or {}}))
+        while True:
+            r = json.loads(ws.recv())
+            if r.get('id') == mid: return r.get('result', {})
+    try:
+        call('Network.enable')
+        call('Network.setCacheDisabled', {'cacheDisabled': True})   # every build is written to the same main_jr.js
+        call('Emulation.setFocusEmulationEnabled', {'enabled': True})   # the page keeps focus for the key presses
+        call('Page.navigate', {'url': 'http://127.0.0.1:%d/harness.html?id=jrfix&scn=%s%s' % (hp, scn, EXTRA.get(scn, ''))})
+        t0 = time.time()
+        while time.time() - t0 < 180:
+            time.sleep(0.25)
+            k = call('Runtime.evaluate', {'expression': '(window.__wantKeys && !window.__keysSent) ? JSON.stringify(window.__wantKeys) : null', 'returnByValue': True}).get('result', {}).get('value')
+            if k:
+                for key in json.loads(k): press(call, key)
+                call('Runtime.evaluate', {'expression': 'window.__keysSent = true'})
+            v = call('Runtime.evaluate', {'expression': 'window.__JRDONE ? JSON.stringify(window.__JRRESULT) : null', 'returnByValue': True}).get('result', {}).get('value')
+            if v: return json.loads(v)
+        return {'fatal': 'timeout (180 s)'}
+    finally:
+        try: ws.close()
+        except Exception: pass
+        try: urllib.request.urlopen('http://127.0.0.1:%d/json/close/%s' % (dp, t['id']), timeout=10).read()
+        except Exception: pass
+
+def run_build(text, index_text, scns):
+    open(os.path.join(stage, 'main_jr.js'), 'wb').write(hook(text).encode('utf-8', 'surrogateescape'))
+    open(os.path.join(stage, 'harness.html'), 'w', encoding='utf-8').write(harness.replace('<!--JR_VIEW_OPTIONS-->', lift_panel(index_text)))
+    return {s: run_page(s) for s in scns}
+
+def evaluate(res, scns):
+    out = []
+    for s in scns:
+        r = res.get(s, {})
+        got = {a['id']: a for a in (r.get('asserts') or [])}
+        for aid in EXPECT[s]:
+            if aid in got: out.append((aid, got[aid]['ok'], got[aid]['detail']))
+            else: out.append((aid, False, 'NOT RECORDED' + (' | fatal: ' + (r.get('fatal') or '')[:300] if r.get('fatal') else '')))
+        for aid, a in got.items():
+            if aid not in EXPECT[s]: out.append((aid, a['ok'], 'UNEXPECTED ID ' + a['detail']))
+        out.append(('E-' + s, not r.get('errors') and not r.get('hookErr') and not r.get('missing') and not r.get('fatal'),
+                    'errors %s hook %s missing %s fatal %s' % (r.get('errors'), r.get('hookErr'), r.get('missing'), (r.get('fatal') or '')[:200])))
+    return out
+
+try:
+    cand_text = read_b(cand_path)
+    index_text = read_b(index_path)
+    print('candidate: %s%s\nindex:     %s' % (cand_path, '   (CONTROL: the pre-fix build)' if control else ('   (CONTROL-GRP: the build before round 2)' if control_grp
+          else ('   (CONTROL-GRP3: the build before round 3)' if control_grp3 else '')), index_path))
+    pool = ORIG_SCN if control else (ORIG_SCN + GRP_SCN if control_grp else ALL_SCN)
+    names = [s for s in pool if not scn_arg or s in scn_arg.split(',')]
+    if all_mutants or one_mutant:
+        ok = bad = 0
+        for m in (one_mutant.split(',') if one_mutant else list(MUTANTS)):
+            edits, must, mscn = MUTANTS[m]
+            sc = [s for s in (mscn or names) if s in names]
+            res = evaluate(run_build(mutate(cand_text, m), index_text, sc), sc)
+            red = [a for a, p, _ in res if not p]
+            if must is None:
+                print('  EXPLORE mutant %-16s red: %s' % (m, ' '.join(red) or '(nothing)'))
+                for a, p, d in res:
+                    if not p: print('        %-18s %s' % (a, d[:300]))
+                bad += 1
+                continue
+            good = sorted(red) == sorted(must)
+            ok += good; bad += (not good)
+            print('  %s  mutant %-14s turns %s red   [red: %s]' % ('PASS' if good else 'FAIL', m, ' '.join(must) or '(nothing)', ' '.join(red)))
+            if verbose or not good:
+                for a, p, d in res:
+                    if not p: print('        %-18s %s' % (a, d[:300]))
+        print('SUMMARY mutants ok=%d bad=%d' % (ok, bad))
+        print('RESULT: GREEN' if bad == 0 and ok > 0 else 'RESULT: RED')
+    else:
+        res = evaluate(run_build(cand_text, index_text, names), names)
+        p = f = 0; failed = []
+        for a, passed, d in res:
+            print('  %s  %-18s %s' % ('PASS' if passed else 'FAIL', a, d[:420]))
+            if passed: p += 1
+            else: f += 1; failed.append(a)
+        print('TOTAL pass=%d fail=%d   failed: %s' % (p, f, ' '.join(failed)))
+        if control or control_grp or control_grp3:
+            reds = CONTROL_RED if control else (CONTROL_RED_GRP if control_grp else CONTROL_RED_GRP3)
+            if reds is None:
+                print('CONTROL: not frozen yet - red set: %s' % ' '.join(failed))
+                print('RESULT: RED')
+            else:
+                want = [a for a in reds if any(a in EXPECT[s] or a == 'E-' + s for s in names)]
+                print('CONTROL: %s (expected red: %s)' % ('as expected' if sorted(failed) == sorted(want) else 'NOT as expected', ' '.join(want)))
+                print('RESULT: GREEN' if sorted(failed) == sorted(want) else 'RESULT: RED')
+        else:
+            print('RESULT: GREEN' if f == 0 and p > 0 else 'RESULT: RED')
+finally:
+    try: edge.kill()
+    except Exception: pass
+    try: srv.kill()
+    except Exception: pass
+    time.sleep(1)
+    if keep: print('kept: ' + stage)
+    else: shutil.rmtree(stage, ignore_errors=True)

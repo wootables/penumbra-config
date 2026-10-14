@@ -1,0 +1,290 @@
+{
+ "firstonly": {
+  "why": "parseXLSXToObjects keeps only the first tab with data - the stacking undone",
+  "edits": [
+   [
+    "        if (found.length === 1) {\r\n",
+    "        if (found.length >= 1) {\r\n"
+   ]
+  ],
+  "must": [
+   "J-three",
+   "J-meta",
+   "J-collide",
+   "J-legacy",
+   "J-case",
+   "J-ods",
+   "G-save",
+   "G-grouped",
+   "G-order",
+   "G-counts",
+   "G-collapsed",
+   "G-csort",
+   "G-toast",
+   "V-grouped",
+   "V-bands",
+   "V-reset",
+   "V-collapsed",
+   "W-grouped",
+   "W-toast",
+   "O-confirm",
+   "O-again",
+   "L-save",
+   "L-bands",
+   "Z-nosave",
+   "Z-noquery",
+   "Z-toast",
+   "Z-next"
+  ],
+  "scn": null
+ },
+ "nohidden": {
+  "why": "hidden tabs are stacked like visible ones",
+  "edits": [
+   [
+    "            if (props[si] && props[si].Hidden) {\r\n",
+    "            if (false) {\r\n"
+   ]
+  ],
+  "must": [
+   "J-three",
+   "J-meta",
+   "J-legacy",
+   "G-save",
+   "G-order",
+   "G-counts",
+   "G-collapsed",
+   "G-csort",
+   "G-toast",
+   "V-bands",
+   "V-collapsed",
+   "O-confirm",
+   "O-again",
+   "L-save",
+   "L-bands"
+  ],
+  "scn": null
+ },
+ "noblank": {
+  "why": "a column a tab lacks is left OFF its rows instead of blank",
+  "edits": [
+   [
+    "obj[columns[c]] = Object.prototype.hasOwnProperty.call(r, columns[c]) ? r[columns[c]] : '';",
+    "if (Object.prototype.hasOwnProperty.call(r, columns[c])) obj[columns[c]] = r[columns[c]];"
+   ]
+  ],
+  "must": [
+   "J-three",
+   "J-collide",
+   "J-legacy",
+   "J-ods",
+   "G-save",
+   "L-save"
+  ],
+  "scn": null
+ },
+ "nostash": {
+  "why": "the query start never consumes the import's grouping",
+  "edits": [
+   [
+    "        if (pendingImportSheetGroup) {\r\n",
+    "        if (false && pendingImportSheetGroup) {\r\n"
+   ]
+  ],
+  "must": [
+   "G-grouped",
+   "G-order",
+   "G-counts",
+   "G-collapsed",
+   "G-pending",
+   "V-grouped",
+   "V-bands",
+   "V-reset",
+   "V-collapsed",
+   "W-grouped",
+   "W-toast",
+   "O-again",
+   "L-bands"
+  ],
+  "scn": null
+ },
+ "noreset": {
+  "why": "the import's grouping inherits the previous grouping's sort, start depth and top-N limit",
+  "edits": [
+   [
+    "            currentGroupSort = { key: 'label', dir: 'asc' };\r\n            currentGroupStartDepth = 0;\r\n            currentGroupLimit = null;\r\n            pendingImportSheetGroup = null;\r\n",
+    "            pendingImportSheetGroup = null;\r\n"
+   ]
+  ],
+  "must": [
+   "V-bands",
+   "V-reset",
+   "V-collapsed"
+  ],
+  "scn": null
+ },
+ "noaggnull": {
+  "why": "the previous grouping's summary rides onto the import's grouping",
+  "edits": [
+   [
+    "            pendingGroupAgg = null;\r\n            currentGroupSort = { key: 'label', dir: 'asc' };\r\n",
+    "            currentGroupSort = { key: 'label', dir: 'asc' };\r\n"
+   ]
+  ],
+  "must": [
+   "V-agg"
+  ],
+  "scn": null
+ },
+ "nopivotnull": {
+  "why": "a pivot on screen keeps the stash, so the pivot branch outranks the import's grouping",
+  "edits": [
+   [
+    "            pendingPivotSettings = null;\r\n            pendingGroupByColumn = pendingImportSheetGroup;\r\n",
+    "            pendingGroupByColumn = pendingImportSheetGroup;\r\n"
+   ]
+  ],
+  "must": [
+   "W-grouped",
+   "W-toast"
+  ],
+  "scn": null
+ },
+ "nocsort": {
+  "why": "no tab order written: the bands fall back to alphabetical",
+  "edits": [
+   [
+    "            values: book.sheets.map(function (s) { return s.name; }),\r\n",
+    "            values: [],\r\n"
+   ]
+  ],
+  "must": [
+   "G-order",
+   "G-counts",
+   "G-csort",
+   "V-bands",
+   "O-again"
+  ],
+  "scn": null
+ },
+ "nocap": {
+  "why": "no row-cap pre-flight: an oversize stacked workbook is posted, refused, and leaves its grouping armed",
+  "edits": [
+   [
+    "        if (parsedData.length > PENUMBRA_IMPORT_MAX_ROWS) {\r\n",
+    "        if (false) {\r\n"
+   ]
+  ],
+  "must": [
+   "Z-nosave",
+   "Z-toast",
+   "Z-next"
+  ],
+  "scn": null
+ },
+ "confirmtext": {
+  "why": "the overwrite prompt no longer says the new data is stacked",
+  "edits": [
+   [
+    "            var newDesc = parsedData.length + ' rows' + (book\r\n",
+    "            var newDesc = parsedData.length + ' rows' + (false && book\r\n"
+   ]
+  ],
+  "must": [
+   "O-confirm"
+  ],
+  "scn": null
+ },
+ "noskipped": {
+  "why": "the notice no longer names the tabs it skipped",
+  "edits": [
+   [
+    "            + \".\" + skippedTxt + \"</p>\", 10000);\r\n",
+    "            + \".\" + \"</p>\", 10000);\r\n"
+   ]
+  ],
+  "must": [
+   "G-toast"
+  ],
+  "scn": null
+ },
+ "keepstaleid": {
+  "why": "a refused save keeps the name's stored ID (both maps): the query reads the PREVIOUS upload - the bug itself",
+  "edits": [
+   [
+    "                delete window._penumbraImportIds[safeName];\r\n                if (window._penumbraImportMeta[safeName]) delete window._penumbraImportMeta[safeName].id;\r\n",
+    ""
+   ]
+  ],
+  "must": [
+   "S-rows",
+   "S-inline",
+   "S-rerun"
+  ],
+  "scn": null
+ },
+ "keepid": {
+  "why": "a refused save forgets the meta's ID but keeps _penumbraImportIds, which the query reads FIRST",
+  "edits": [
+   [
+    "                delete window._penumbraImportIds[safeName];\r\n                if (window._penumbraImportMeta[safeName]) delete window._penumbraImportMeta[safeName].id;\r\n",
+    "                if (window._penumbraImportMeta[safeName]) delete window._penumbraImportMeta[safeName].id;\r\n"
+   ]
+  ],
+  "must": [
+   "S-rows",
+   "S-inline",
+   "S-rerun"
+  ],
+  "scn": [
+   "savefail"
+  ]
+ },
+ "keepmetaid": {
+  "why": "a refused save forgets _penumbraImportIds but keeps the meta's ID, the query's second choice",
+  "edits": [
+   [
+    "                delete window._penumbraImportIds[safeName];\r\n                if (window._penumbraImportMeta[safeName]) delete window._penumbraImportMeta[safeName].id;\r\n",
+    "                delete window._penumbraImportIds[safeName];\r\n"
+   ]
+  ],
+  "must": [
+   "S-rows",
+   "S-inline",
+   "S-rerun"
+  ],
+  "scn": [
+   "savefail"
+  ]
+ },
+ "nofailtoast": {
+  "why": "a refused save is silent again (the rows are right, nothing says they were not saved)",
+  "edits": [
+   [
+    "                show_text(\"<p id='undo_text'><span style='color: var(--accent-danger, #cc0000)'>ERROR:</span> <strong>\" + escapeHtml(fileName)\r\n",
+    "                if (false) show_text(\"<p id='undo_text'><span style='color: var(--accent-danger, #cc0000)'>ERROR:</span> <strong>\" + escapeHtml(fileName)\r\n"
+   ]
+  ],
+  "must": [
+   "S-toast"
+  ],
+  "scn": [
+   "savefail"
+  ]
+ },
+ "noreason": {
+  "why": "the toast drops the server's own reason for refusing the save",
+  "edits": [
+   [
+    "                    + (why ? \" \" + escapeHtml(String(why)) : \"\") + \"</p>\", 11000);\r\n",
+    "                    + \"</p>\", 11000);\r\n"
+   ]
+  ],
+  "must": [
+   "S-toast"
+  ],
+  "scn": [
+   "savefail"
+  ]
+ }
+}

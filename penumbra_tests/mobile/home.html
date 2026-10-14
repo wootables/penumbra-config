@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mobile suite - home landing stand-in</title>
+<link rel="stylesheet" href="css/main.css">
+</head>
+<body class="pnl-landing-active theme-wolfpack">
+<!-- The landing's two-column grid as index.php emits it (ids/classes verbatim):
+     the main card's title row carries the no-wrap pin hint, the rows carry
+     long titles + short-id suffixes. On a phone the whole thing must stay
+     inside the viewport. -->
+<div class="landing-container pnl-landing">
+  <div class="pnl-band">
+    <div class="pnl-metric"><div class="pnl-metric-label">Reports</div><div class="pnl-metric-num">83</div></div>
+    <div class="pnl-metric"><div class="pnl-metric-label">Users, last 30 days</div><div class="pnl-metric-num">11</div></div>
+    <div class="pnl-metric"><div class="pnl-metric-label">Views, last 30 days</div><div class="pnl-metric-num">3,531</div></div>
+  </div>
+  <div id="pnlCols" class="pnl-cols pnl-has-rail">
+    <div class="pnl-card pnl-main-card">
+      <div class="pnl-card-title"><span class="pnl-card-ico">&#9829;</span> Your reports <span class="pnl-count" id="pnlReportsCount">(31)</span><span class="pnl-ghost" id="pnlPinGhost">tap &#9825; on any report to pin it on top</span></div>
+      <div id="pnlCardSub" class="pnl-card-sub">9 pinned</div>
+      <div id="pnlListScroll">
+        <div id="pnlPinnedList">
+          <div class="pnl-row"><button class="pin-toggle">&#9829;</button><a class="pnl-row-link" href="#"><span class="pnl-row-title">eIRB: protocol type summary by committee and review path</span><span class="pnl-row-sid">eirbprotsum</span></a><span class="pnl-row-time">56m ago</span></div>
+          <div class="pnl-row"><button class="pin-toggle">&#9829;</button><a class="pnl-row-link" href="#"><span class="pnl-row-title">RPT Sponsored Programs Report (fiscal year to date, by college)</span><span class="pnl-row-sid">rpt</span></a><span class="pnl-row-time">5h ago</span></div>
+          <div class="pnl-row"><button class="pin-toggle">&#9829;</button><a class="pnl-row-link" href="#"><span class="pnl-row-title">IACUC RED Data Feed</span><span class="pnl-row-sid">iacucred</span></a><span class="pnl-row-time">17h ago</span></div>
+        </div>
+      </div>
+    </div>
+    <aside id="pnlRail" class="pnl-card pnl-rail">
+      <div id="pnlRailHealth" class="pnl-rail-blk"><div class="pnl-rail-h">System health</div><div>INFOED unreachable</div></div>
+      <div class="pnl-rail-blk"><div class="pnl-rail-h">Arriving by email</div><div class="pnl-rail-tip">PENUMBRA Audit Log - Mon, Oct 5, 9:00 am - Every weekday at 9:00 AM</div></div>
+    </aside>
+  </div>
+</div>
+<script>
+window.__state = function () {
+  var cw = document.documentElement.clientWidth;
+  var r = function (sel) { var e = document.querySelector(sel); if (!e) return null; var b = e.getBoundingClientRect(); return {l: Math.round(b.left), r: Math.round(b.right), w: Math.round(b.width), t: Math.round(b.top), b: Math.round(b.bottom)}; };
+  var cols = document.getElementById('pnlCols');
+  var ghost = document.getElementById('pnlPinGhost');
+  return {
+    cw: cw, sw: document.documentElement.scrollWidth,
+    cols: r('#pnlCols'), card: r('.pnl-main-card'), rail: r('#pnlRail'),
+    gtc: getComputedStyle(cols).gridTemplateColumns,
+    tracks: getComputedStyle(cols).gridTemplateColumns.trim().split(/\s+/).length,
+    ghostDisplay: getComputedStyle(ghost).display
+  };
+};
+</script>
+</body></html>

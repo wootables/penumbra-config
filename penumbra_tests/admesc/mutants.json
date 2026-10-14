@@ -1,0 +1,92 @@
+{
+ "noguard": {
+  "why": "single-point revert: the guard gone = the pre-fix behaviour (must match the control's red set exactly)",
+  "edits": [
+   [
+    "        if (!$wrapper.length) { return; }\r\n        const $btn = $('#toggleAdminViewBtn');",
+    "        if (false) { return; }\r\n        const $btn = $('#toggleAdminViewBtn');"
+   ]
+  ],
+  "must": [
+   "V-rownote-err",
+   "V-rownote-pref",
+   "V-rownote-push",
+   "V-body-err",
+   "V-body-pref",
+   "V-body-push",
+   "V-double-err",
+   "V-double-pref",
+   "V-double-push",
+   "V-drop-pref",
+   "V-drop-push",
+   "V-drop-caught",
+   "V-drop-toast",
+   "H-home-err",
+   "H-home-pref",
+   "H-home-push",
+   "H-home-landing"
+  ],
+  "scn": [
+   "rownote",
+   "bodyesc",
+   "double",
+   "drop",
+   "home",
+   "editor",
+   "popout"
+  ]
+ },
+ "lateguard": {
+  "why": "the guard moved down to the drawer's $wrapper[0] read: no exception any more, but the preference, the home cards and the report blocks still move - why the guard sits at the top",
+  "edits": [
+   [
+    "        if (!$wrapper.length) { return; }\r\n        const $btn = $('#toggleAdminViewBtn');",
+    "        if (false) { return; }\r\n        const $btn = $('#toggleAdminViewBtn');"
+   ],
+   [
+    "                $wrapper[0].getBoundingClientRect();",
+    "                if (!$wrapper[0]) return;\r\n                $wrapper[0].getBoundingClientRect();"
+   ]
+  ],
+  "must": [
+   "V-rownote-pref",
+   "V-rownote-push",
+   "V-body-pref",
+   "V-body-push",
+   "V-double-pref",
+   "V-double-push",
+   "V-drop-pref",
+   "V-drop-push",
+   "H-home-pref",
+   "H-home-push",
+   "H-home-landing"
+  ],
+  "scn": [
+   "rownote",
+   "bodyesc",
+   "double",
+   "drop",
+   "home"
+  ]
+ },
+ "invguard": {
+  "why": "the guard inverted: the REAL console never opens or comes home - the C-* asserts must catch a guard that kills it",
+  "edits": [
+   [
+    "        if (!$wrapper.length) { return; }\r\n        const $btn = $('#toggleAdminViewBtn');",
+    "        if ($wrapper.length) { return; }\r\n        const $btn = $('#toggleAdminViewBtn');"
+   ]
+  ],
+  "must": [
+   "C-open",
+   "C-close",
+   "C-pop-esc",
+   "C-pop-close",
+   "C-pop-pipesc"
+  ],
+  "scn": [
+   "editor",
+   "popout"
+  ]
+ }
+}

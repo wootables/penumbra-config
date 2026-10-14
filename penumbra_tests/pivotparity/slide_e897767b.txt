@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>slide detection</title><style>.cm-hint-data-cylinder { padding-left: 20px !important; background: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzU1NSI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNC4wMiAyIDYuNVYxNy41QzIgMTkuOTggNi40OCAyMiAxMiAyMkMxNy41MiAyMiAyMiAxOS45OCAyMiAxNy41VjYuNUMyMiA0LjAyIDE3LjUyIDIgMTIgMnogTTEyIDRjNC40MiAwIDggMS43OSA4IDRzLTMuNTggNC04IDRzLTgtMS43OS04LTRTNC41OCA0IDEyIDR6IE00IDE3LjVWMTEuODNjMS45IDEuMDYgNC44MSAxLjY3IDggMS42N2MzLjE5IDAgNi4xLTAuNjEgOC0xLjY3VjE3LjVjMCAxLjM4LTMuNTggMi41LTggMi41UzQgMTguODggNCAxNy41eiIvPjwvc3ZnPg==") no-repeat 0 50% !important; background-size: 14px 14px !important; } .cm-hint-table-icon { padding-left: 20px !important; background: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzU1NSI+PHBhdGggZD0iTTQgM0MyLjkgMyAyIDMuOSAyIDV2MTRjMCAxLjEuOSAyIDIgMmgxNmMxLjEgMCAyLS45IDItMlY1YzAtMS4xLS45LTItMi0ySDR6bTAgNGgxNnY0SDRWN3ptMCAxMnYtNmg3djZINGptOSAwdi02aDd2NmgtN3oiLz48L3N2Zz4=") no-repeat 0 50% !important; background-size: 14px 14px !important; }</style><script src="js/chart-4.5.1.min.js"></script></head>
+<body class="admin-view theme-wolfpack" data-theme="theme-wolfpack">
+<div id="reportSnippetOutput"><div class="penumbra-slide-frame penumbra-slide-hidden penumbra-web-only" data-slide-idx="0" data-slide-inline="false" aria-hidden="true" style="display:none"><div class="penumbra-slide-body"><span style="color:var(--accent-danger, #cc0000); font-size:10px;">[Chart Error: Script load error for js/chart-4.5.1.min.js]</span></div></div></div><div id="pivotResultTable"></div>
+<textarea id="sqlQuery" style="display:none"></textarea><div class="CodeMirror CodeMirror-wrap CodeMirror-empty cm-s-theme-wolfpack CodeMirror-focused" translate="no" style="padding-bottom: 15px; height: 400px;"><div style="overflow: hidden; position: relative; width: 3px; height: 0px; top: 90px; left: 715px;"><textarea autocorrect="off" autocapitalize="off" spellcheck="false" tabindex="0" aria-label="Code editor" style="position: absolute; bottom: -1em; padding: 0px; width: 1000px; height: 1em; min-height: 1em; outline: none;"></textarea></div><div class="CodeMirror-vscrollbar" tabindex="-1" cm-not-content="true" style="width: 18px; pointer-events: none;"><div style="min-width: 1px; height: 0px;"></div></div><div class="CodeMirror-hscrollbar" tabindex="-1" cm-not-content="true" style="display: block; right: 0px; left: 725px; height: 18px; pointer-events: none;"><div style="height: 100%; min-height: 1px; width: 1444px;"></div></div><div class="CodeMirror-scrollbar-filler" cm-not-content="true"></div><div class="CodeMirror-gutter-filler" cm-not-content="true"></div><div class="CodeMirror-scroll" tabindex="-1"><div class="CodeMirror-sizer" style="margin-left: 725px; margin-bottom: 0px; border-right-width: 50px; min-height: 46px; padding-right: 0px; padding-bottom: 0px;"><div style="position: relative; top: 0px;"><div class="CodeMirror-lines" role="presentation"><div role="presentation" style="position: relative; outline: none;"><pre class="CodeMirror-placeholder CodeMirror-line-like" style="height: 0px; overflow: visible; direction: ltr;"><span class="pnb-cm-ph"><span class="pnb-cm-ph-lead">Enter your SQL here, using data sources from the tables on the left.</span><span class="pnb-cm-ph-eg"><span class="pnb-cm-ph-eg-label">Example</span><span class="pnb-cm-ph-eg-code">SELECT * FROM STATS_COMBINED_V2</span></span><span class="pnb-cm-ph-tip">Press <kbd class="pnb-cm-ph-kbd">Ctrl</kbd> + <kbd class="pnb-cm-ph-kbd">Space</kbd> (or double-click) to suggest tables, columns, or values depending on context.</span></span></pre><div class="CodeMirror-measure"><pre class="CodeMirror-line-like"><span>xxxxxxxxxx</span></pre><div class="CodeMirror-linenumber CodeMirror-gutter-elt"><div>1</div></div></div><div class="CodeMirror-measure"></div><div style="position: relative; z-index: 1;"></div><div class="CodeMirror-cursors" style=""><div class="CodeMirror-cursor" style="left: 0px; top: 0px; height: 15px;">&nbsp;</div></div><div class="CodeMirror-code" role="presentation"><div style="position: relative;"><div class="CodeMirror-gutter-wrapper" aria-hidden="true" style="left: -725px;"><div class="CodeMirror-linenumber CodeMirror-gutter-elt" style="left: 8px; width: 726px;">1</div></div><pre class=" CodeMirror-line " role="presentation"><span role="presentation" style="padding-right: 0.1px;"><span cm-text="">​</span></span></pre></div></div></div></div></div></div><div style="position: absolute; height: 50px; width: 1px; border-bottom: 0px solid transparent; top: 46px;"></div><div class="CodeMirror-gutters" style="height: 96px; left: 0px;"><div class="CodeMirror-gutter CodeMirror-linenumbers" style="width: 726px;"></div><div class="CodeMirror-gutter CodeMirror-foldgutter"></div></div></div><div class="gutter-fold-all-btn" title="(CTRL+Q) Fold All" style="left: 8px; width: 725px; display: block;">≡</div></div>
+<textarea id="reportSnippet" style="display:none"></textarea><div class="CodeMirror CodeMirror-wrap cm-s-theme-wolfpack" translate="no" style="padding-bottom: 15px; height: 400px;"><div style="overflow: hidden; position: relative; width: 3px; height: 0px; top: 405px; left: 715px;"><textarea autocorrect="off" autocapitalize="off" spellcheck="false" tabindex="0" aria-label="Code editor" style="position: absolute; bottom: -1em; padding: 0px; width: 1000px; height: 1em; min-height: 1em; outline: none;"></textarea></div><div class="CodeMirror-vscrollbar" tabindex="-1" cm-not-content="true" style="width: 18px; pointer-events: none; bottom: 0px; display: block;"><div style="min-width: 1px; height: 419px;"></div></div><div class="CodeMirror-hscrollbar" tabindex="-1" cm-not-content="true" style="display: block; right: 0px; left: 725px; height: 18px; pointer-events: none;"><div style="height: 100%; min-height: 1px; width: 726px;"></div></div><div class="CodeMirror-scrollbar-filler" cm-not-content="true"></div><div class="CodeMirror-gutter-filler" cm-not-content="true"></div><div class="CodeMirror-scroll" tabindex="-1"><div class="CodeMirror-sizer" style="margin-left: 725px; margin-bottom: 0px; border-right-width: 50px; min-height: 46px; padding-right: 0px; padding-bottom: 0px;"><div style="position: relative; top: 0px;"><div class="CodeMirror-lines" role="presentation"><div role="presentation" style="position: relative; outline: none;"><div class="CodeMirror-measure"><pre class="CodeMirror-line-like"><span>xxxxxxxxxx</span></pre><div class="CodeMirror-linenumber CodeMirror-gutter-elt"><div>1</div></div></div><div class="CodeMirror-measure"></div><div style="position: relative; z-index: 1;"></div><div class="CodeMirror-cursors"><div class="CodeMirror-cursor" style="left: 0px; top: 0px; height: 15px;">&nbsp;</div></div><div class="CodeMirror-code" role="presentation"><div style="position: relative;"><div class="CodeMirror-gutter-wrapper" aria-hidden="true" style="left: -725px;"><div class="CodeMirror-linenumber CodeMirror-gutter-elt" style="left: 8px; width: 726px;">1</div></div><pre class=" CodeMirror-line " role="presentation"><span role="presentation" style="padding-right: 0.1px;"><span class="cm-keyword cm-function-underline" data-fn="slide">slide</span>(<span class="cm-keyword cm-function-underline" data-fn="vis">vis</span>(<span class="cm-string">'bar'</span>,<span class="cm-string">'DEPT'</span>,<span class="cm-string">'AMT'</span>,<span class="cm-string">'none'</span>,<span class="cm-string">'sum'</span>,<span class="cm-number">10</span>,<span class="cm-string">'Plain'</span>,true,false,<span class="cm-number">800</span>,<span class="cm-number">450</span>), false)</span></pre></div></div></div></div></div></div><div style="position: absolute; height: 50px; width: 1px; border-bottom: 0px solid transparent; top: 46px;"></div><div class="CodeMirror-gutters" style="height: 96px; left: 0px;"><div class="CodeMirror-gutter CodeMirror-linenumbers" style="width: 726px;"></div><div class="CodeMirror-gutter CodeMirror-foldgutter"></div></div></div><div class="gutter-fold-all-btn" title="(CTRL+Q) Fold All" style="left: 8px; width: 725px; display: block;">≡</div></div>
+<textarea id="subquerySql" style="display:none"></textarea><div class="CodeMirror CodeMirror-wrap CodeMirror-empty cm-s-theme-wolfpack" translate="no" style="padding-bottom: 15px;"><div style="overflow: hidden; position: relative; width: 3px; height: 0px; top: 90px; left: 715px;"><textarea autocorrect="off" autocapitalize="off" spellcheck="false" tabindex="0" aria-label="Code editor" style="position: absolute; bottom: -1em; padding: 0px; width: 1000px; height: 1em; min-height: 1em; outline: none;"></textarea></div><div class="CodeMirror-vscrollbar" tabindex="-1" cm-not-content="true" style="width: 18px; pointer-events: none;"><div style="min-width: 1px; height: 0px;"></div></div><div class="CodeMirror-hscrollbar" tabindex="-1" cm-not-content="true" style="display: block; right: 0px; left: 725px; height: 18px; pointer-events: none;"><div style="height: 100%; min-height: 1px; width: 726px;"></div></div><div class="CodeMirror-scrollbar-filler" cm-not-content="true"></div><div class="CodeMirror-gutter-filler" cm-not-content="true"></div><div class="CodeMirror-scroll" tabindex="-1"><div class="CodeMirror-sizer" style="margin-left: 725px; margin-bottom: 0px; border-right-width: 50px; min-height: 46px; padding-right: 0px; padding-bottom: 0px;"><div style="position: relative; top: 0px;"><div class="CodeMirror-lines" role="presentation"><div role="presentation" style="position: relative; outline: none;"><pre class="CodeMirror-placeholder CodeMirror-line-like" style="height: 0px; overflow: visible; direction: ltr;"><span class="pnb-cm-ph"><span class="pnb-cm-ph-lead">Enter the SELECT statement to run on the target database.</span><span class="pnb-cm-ph-eg"><span class="pnb-cm-ph-eg-label">Example</span><span class="pnb-cm-ph-eg-code">SELECT COLUMN FROM TABLE WHERE ...</span></span></span></pre><div class="CodeMirror-measure"><pre class="CodeMirror-line-like"><span>xxxxxxxxxx</span></pre><div class="CodeMirror-linenumber CodeMirror-gutter-elt"><div>1</div></div></div><div class="CodeMirror-measure"></div><div style="position: relative; z-index: 1;"></div><div class="CodeMirror-cursors"><div class="CodeMirror-cursor" style="left: 0px; top: 0px; height: 15px;">&nbsp;</div></div><div class="CodeMirror-code" role="presentation"><div style="position: relative;"><div class="CodeMirror-gutter-wrapper" aria-hidden="true" style="left: -725px;"><div class="CodeMirror-linenumber CodeMirror-gutter-elt" style="left: 8px; width: 726px;">1</div></div><pre class=" CodeMirror-line " role="presentation"><span role="presentation" style="padding-right: 0.1px;"><span cm-text="">​</span></span></pre></div></div></div></div></div></div><div style="position: absolute; height: 50px; width: 1px; border-bottom: 0px solid transparent; top: 46px;"></div><div class="CodeMirror-gutters" style="height: 96px; left: 0px;"><div class="CodeMirror-gutter CodeMirror-linenumbers" style="width: 726px;"></div><div class="CodeMirror-gutter CodeMirror-foldgutter"></div></div></div></div>
+<div id="selectorBox"></div>
+<pre id="out">RESULTS_JSON:{"pageErrors":[],"results":[{"name":"A bare inline vis() is NOT in a slide","pass":true,"detail":""},{"name":"B vis() inside slide(...) IS detected as inSlide","pass":true,"detail":""},{"name":"C slide() with inline=true still counts as inSlide","pass":true,"detail":""},{"name":"D infobox-wrapped chart is isInfobox and NOT inSlide","pass":true,"detail":""},{"name":"E a slide AFTER the chart must not capture it","pass":true,"detail":""},{"name":"F a CLOSED slide before the chart must not capture it","pass":true,"detail":""},{"name":"G the word \"slideshow\" must not register as a wrapper","pass":true,"detail":""},{"name":"H the word slide inside a QUOTED label must not register","pass":true,"detail":""},{"name":"I two charts: only the slide-wrapped one is flagged","pass":true,"detail":""},{"name":"J slideFrom/slideTo bracket the slide() call","pass":true,"detail":""}]}</pre>
+<script>window.__pageErrors=[];window.onerror=function(m){window.__pageErrors.push(String(m));return true;};</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  window.penumbra_vars = { isAdmin:true, isGlobalAdmin:true, currentUserKey:'harness',
+    shibboleth:{ouc:'',dept:''}, tables:{oracle:[],pins:[],infoed:[],hr:[],fin:[]},
+    imports:[], reports:[], themes:{}, prompts:{}, grants:[] };
+  jQuery.ajax = function(){ var d=jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  jQuery.fx.off = true;
+  window.ResizeObserver = function(){ this.observe=function(){}; this.unobserve=function(){}; this.disconnect=function(){}; };
+  window.IntersectionObserver = window.ResizeObserver;
+  if(!window.matchMedia){ window.matchMedia=function(){return{matches:false,addListener:function(){},removeListener:function(){},addEventListener:function(){},removeEventListener:function(){}};}; }
+</script>
+<script src="main_slide.js"></script>
+<script>
+(function(){
+  var R=[];
+  function t(name, fn){ try{ var d=fn(); R.push({name:name,pass:d===true,detail:(d===true?'':String(d))}); }
+                        catch(e){ R.push({name:name,pass:false,detail:'THREW '+e}); } }
+  function done(){ document.getElementById('out').textContent='RESULTS_JSON:'+JSON.stringify({pageErrors:window.__pageErrors,results:R}); }
+  setTimeout(function(){
+    var S = window.__SLIDE;
+    if(!S || !S.enumVis){ R.push({name:'hooks present',pass:false,detail:'__SLIDE missing: '+(window.__SLIDE_ERR||'')}); return done(); }
+    var ed = S.getEditor && S.getEditor();
+    if(!ed){ R.push({name:'snippetEditor exists',pass:false,detail:'editor is '+ed}); return done(); }
+
+    var V = "vis('bar','DEPT','AMT','none','sum',10,'Plain',true,false,800,450)";
+    function setAndEnum(txt){ ed.setValue(txt); return S.enumVis(); }
+
+    t('A bare inline vis() is NOT in a slide', function(){
+      var l = setAndEnum(V);
+      return (l.length===1 && l[0].inSlide===false && l[0].isInfobox===false)
+        ? true : 'len='+l.length+' inSlide='+(l[0]&&l[0].inSlide)+' isInfobox='+(l[0]&&l[0].isInfobox);
+    });
+    t('B vis() inside slide(...) IS detected as inSlide', function(){
+      var l = setAndEnum('slide(' + V + ', false)');
+      return (l.length===1 && l[0].inSlide===true) ? true : 'len='+l.length+' inSlide='+(l[0]&&l[0].inSlide);
+    });
+    t('C slide() with inline=true still counts as inSlide', function(){
+      var l = setAndEnum('slide(' + V + ', true)');
+      return (l.length===1 && l[0].inSlide===true) ? true : 'inSlide='+(l[0]&&l[0].inSlide);
+    });
+    t('D infobox-wrapped chart is isInfobox and NOT inSlide', function(){
+      var l = setAndEnum('action(infobox, \'Bar: X\', "raw|' + V.replace(/"/g,'\\"') + '")');
+      return (l.length===1 && l[0].isInfobox===true && l[0].inSlide===false)
+        ? true : 'isInfobox='+(l[0]&&l[0].isInfobox)+' inSlide='+(l[0]&&l[0].inSlide);
+    });
+    t('E a slide AFTER the chart must not capture it', function(){
+      var l = setAndEnum(V + '\nslide(<p>later</p>, false)');
+      return (l.length===1 && l[0].inSlide===false) ? true : 'inSlide='+(l[0]&&l[0].inSlide);
+    });
+    t('F a CLOSED slide before the chart must not capture it', function(){
+      var l = setAndEnum('slide(<p>earlier</p>, false)\n' + V);
+      return (l.length===1 && l[0].inSlide===false) ? true : 'inSlide='+(l[0]&&l[0].inSlide);
+    });
+    t('G the word "slideshow" must not register as a wrapper', function(){
+      var l = setAndEnum('<p>slideshow notes</p>\n' + V);
+      return (l.length===1 && l[0].inSlide===false) ? true : 'inSlide='+(l[0]&&l[0].inSlide);
+    });
+    t('H the word slide inside a QUOTED label must not register', function(){
+      var l = setAndEnum("vis('bar','DEPT','AMT','none','sum',10,'My slide title',true,false,800,450)");
+      return (l.length===1 && l[0].inSlide===false) ? true : 'inSlide='+(l[0]&&l[0].inSlide);
+    });
+    t('I two charts: only the slide-wrapped one is flagged', function(){
+      var l = setAndEnum(V + '\nslide(' + V.replace('Plain','InSlide') + ', false)');
+      return (l.length===2 && l[0].inSlide===false && l[1].inSlide===true)
+        ? true : 'len='+l.length+' a='+(l[0]&&l[0].inSlide)+' b='+(l[1]&&l[1].inSlide);
+    });
+    t('J slideFrom/slideTo bracket the slide() call', function(){
+      var l = setAndEnum('slide(' + V + ', false)');
+      var e = l[0];
+      return (e && e.slideFrom && e.slideTo && e.slideFrom.ch === 0)
+        ? true : 'slideFrom='+JSON.stringify(e&&e.slideFrom)+' slideTo='+JSON.stringify(e&&e.slideTo);
+    });
+    done();
+  }, 120);
+})();
+</script>
+
+<div role="log" aria-live="assertive" aria-relevant="additions" class="ui-helper-hidden-accessible"></div>
+        <div id="jsonStateEditorLightbox" class="help-lightbox" style="display: none;">
+            <div class="lightbox-content" style="width: 80%; max-width: 1200px;">
+                <button type="button" class="close-lightbox" aria-label="Close" title="Close (Esc)">×</button>
+                <h3 id="jsonStateEditorTitle">Edit State: <span></span></h3>
+                <p style="font-size: 11px; color: #6c757d; margin-top: -10px; margin-bottom: 15px;">
+                    Modify the state configuration below. Warning: Invalid JSON or incorrect properties may cause the state to stop working.
+                </p>
+                <textarea id="jsonStateEditorText"></textarea>
+                <div style="text-align: right; margin-top: 20px;">
+                    <button id="saveJsonStateBtn">Save Changes</button>
+                </div>
+            </div>
+        </div><div id="pivot-th-tooltip"></div><ul id="chartContextMenu"><li class="ctx-summary-root" style="display:none;"></li><li class="ctx-has-submenu ctx-sorting-root" data-action="sorting"><span class="ctx-icon">⇵</span> Sorting <span class="ctx-arrow">▸</span><ul class="ctx-submenu ctx-submenu-sorting"><li data-action="sort" data-sortby="value" data-sortdir="desc"><span class="ctx-icon">↓</span> Sort by Value (high → low)</li><li data-action="sort" data-sortby="value" data-sortdir="asc"><span class="ctx-icon">↑</span> Sort by Value (low → high)</li><li data-action="sort" data-sortby="label" data-sortdir="asc"><span class="ctx-icon">↑</span> Sort by Label (A → Z)</li><li data-action="sort" data-sortby="label" data-sortdir="desc"><span class="ctx-icon">↓</span> Sort by Label (Z → A)</li><li class="ctx-divider ctx-stack-order-divider" style="display:none;"></li><li class="ctx-stack-order-item" data-action="stackorder" data-stackorder="default" style="display:none;"><span class="ctx-icon">☰</span> Stack Order: Groups A → Z</li><li class="ctx-stack-order-item" data-action="stackorder" data-stackorder="name-desc" style="display:none;"><span class="ctx-icon">☰</span> Stack Order: Groups Z → A</li><li class="ctx-stack-order-item" data-action="stackorder" data-stackorder="total-desc" style="display:none;"><span class="ctx-icon">☰</span> Stack Order: Largest first</li><li class="ctx-stack-order-item" data-action="stackorder" data-stackorder="total-asc" style="display:none;"><span class="ctx-icon">☰</span> Stack Order: Smallest first</li></ul></li><li class="ctx-has-submenu ctx-filtering-root" data-action="filtering" style="display:none;"><span class="ctx-icon">▣</span> Filtering <span class="ctx-arrow">▸</span><ul class="ctx-submenu ctx-submenu-filtering"><li class="ctx-has-submenu ctx-filter-x-root" data-action="filterX" style="display:none;"><span class="ctx-icon">▣</span> Filter X-Axis <span class="ctx-arrow">▸</span><ul class="ctx-submenu ctx-submenu-filter-x"></ul></li><li class="ctx-has-submenu ctx-filter-g-root" data-action="filterG" style="display:none;"><span class="ctx-icon">▣</span> Filter Groups <span class="ctx-arrow">▸</span><ul class="ctx-submenu ctx-submenu-filter-g"></ul></li><li class="ctx-backfill-root" data-action="toggleBackfill" style="display:none;" title="When items are filtered out, bring in the next-ranked items so the chart's limit stays filled."><span class="ctx-icon ctx-backfill-check">&nbsp;</span> Backfill filtered items</li><li class="ctx-clear-filters-root" data-action="clearFilters" style="display:none;" title="Re-check every filter value and restore the chart to its unfiltered state."><span class="ctx-icon">↺</span> Clear all filters</li><li class="ctx-sync-to-table-root" data-action="syncToTable" style="display:none;" title="Copy every chart filter exclusion on this report into the table's search bar so the table below hides the same rows the charts are hiding. The search bar flashes red so you know it was installed; clear it from the × in the search bar."><span class="ctx-icon">⇣</span> Sync to table</li></ul></li><li class="ctx-has-submenu ctx-drill-root" data-action="drill"><span class="ctx-icon">🔍</span> Drill into <span class="ctx-arrow">▸</span><ul class="ctx-submenu ctx-submenu-x"></ul></li><li class="ctx-divider"></li><li class="ctx-has-submenu ctx-image-root" data-action="image"><span class="ctx-icon">🖼</span> Image <span class="ctx-arrow">▸</span><ul class="ctx-submenu ctx-submenu-image"><li data-action="openNewTab"><span class="ctx-icon">🖼</span> Open Image in New Tab</li><li data-action="copyImage"><span class="ctx-icon">📋</span> Copy Image</li><li data-action="downloadPng"><span class="ctx-icon">📥</span> Download PNG</li></ul></li><li class="ctx-has-submenu ctx-data-root" data-action="dataExport"><span class="ctx-icon">📄</span> Data <span class="ctx-arrow">▸</span><ul class="ctx-submenu ctx-submenu-data"><li data-action="copyData"><span class="ctx-icon">📋</span> Copy Data (CSV)</li><li data-action="downloadCsv"><span class="ctx-icon">📥</span> Download CSV</li></ul></li><li data-action="fullscreen"><span class="ctx-icon">⛶</span> Full Screen</li><li data-action="directLink" title="Copy a direct link that opens this chart in fullscreen - includes the current prompt answers and search filter"><span class="ctx-icon">🔗</span> Direct Link</li><li class="ctx-divider"></li><li class="ctx-has-submenu ctx-presets-root" data-action="presets"><span class="ctx-icon">★</span> Presets <span class="ctx-arrow">▸</span><ul class="ctx-submenu ctx-submenu-presets"></ul></li><li class="ctx-divider"></li><li data-action="editChart"><span class="ctx-icon">✏</span> Chart Configuration</li></ul></body></html>

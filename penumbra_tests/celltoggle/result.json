@@ -1,0 +1,107 @@
+{
+    "pageErrors":  [
+
+                   ],
+    "results":  [
+                    {
+                        "name":  "F0 fixture: a collapsible 2-field pivot, all three colleges expanded with a chevron",
+                        "pass":  true,
+                        "detail":  "expanded,expanded,expanded"
+                    },
+                    {
+                        "name":  "F1 fixture: C2 label holds its data-search link, C3 its plain anchor",
+                        "pass":  true,
+                        "detail":  "\u003cdiv class=\"pivot-row-sticky-text\" style=\" font-weight: bold;\"\u003e\u003ca href=\"#lnk\" data-search=\"COLLEGE:C2\"\u003eC2\u003c/a\u003e\u003cspan class=\"pivot-collapse-toggle pivot-collapse-toggle-right pivot-group-expanded\" data-g"
+                    },
+                    {
+                        "name":  "C1 the chevron itself still toggles its group exactly once",
+                        "pass":  true,
+                        "detail":  "expected [\"collapsed\",false] got [\"collapsed\",false]"
+                    },
+                    {
+                        "name":  "C2 a click on the label TEXT expands the group (collapsed summary row)",
+                        "pass":  true,
+                        "detail":  "expected [\"expanded\",true] got [\"expanded\",true]"
+                    },
+                    {
+                        "name":  "C3 a click on the label CELL (expanded group, rowspan cell) collapses it",
+                        "pass":  true,
+                        "detail":  "expected [\"collapsed\",false] got [\"collapsed\",false]"
+                    },
+                    {
+                        "name":  "C4 a click on a data-search link in the label does NOT toggle",
+                        "pass":  true,
+                        "detail":  "expected [\"expanded\",true] got [\"expanded\",true]"
+                    },
+                    {
+                        "name":  "C5 ...and the link\u0027s own handler still took the click (it prevents the default)",
+                        "pass":  true,
+                        "detail":  "expected true got true"
+                    },
+                    {
+                        "name":  "C6 a click on a plain anchor in the label does NOT toggle",
+                        "pass":  true,
+                        "detail":  "expected [\"expanded\",true] got [\"expanded\",true]"
+                    },
+                    {
+                        "name":  "C7 ...while a click beside that link, in the same cell, toggles",
+                        "pass":  true,
+                        "detail":  "expected \"collapsed\" got \"collapsed\""
+                    },
+                    {
+                        "name":  "C8 a click that ends a text selection in the label does NOT toggle",
+                        "pass":  true,
+                        "detail":  "expected \"expanded\" got \"expanded\""
+                    },
+                    {
+                        "name":  "C9 the second click of a double-click does NOT toggle",
+                        "pass":  true,
+                        "detail":  "expected \"expanded\" got \"expanded\""
+                    },
+                    {
+                        "name":  "C10 a label cell with no chevron (the leaf department) does nothing",
+                        "pass":  true,
+                        "detail":  "expected [\"collapsed,expanded,expanded\",\"\"] got [\"collapsed,expanded,expanded\",\"\"]"
+                    },
+                    {
+                        "name":  "H1 the cell holding a chevron shows a pointer",
+                        "pass":  true,
+                        "detail":  "expected \"pointer\" got \"pointer\""
+                    },
+                    {
+                        "name":  "H2 a label cell WITHOUT a chevron keeps its normal cursor",
+                        "pass":  true,
+                        "detail":  "auto"
+                    },
+                    {
+                        "name":  "H3 at rest the chevron is dim with no chip",
+                        "pass":  true,
+                        "detail":  "expected [0.5,0] got [0.5,0]"
+                    },
+                    {
+                        "name":  "H4 hovering the cell lifts the chevron to full opacity on a soft chip",
+                        "pass":  true,
+                        "detail":  "expected [1,true] got [1,true]"
+                    },
+                    {
+                        "name":  "H5 ...and the cell keeps the row\u0027s normal hover highlight (same as a data cell in the row)",
+                        "pass":  true,
+                        "detail":  "expected \"rgb(255, 238, 238)\" got \"rgb(255, 238, 238)\""
+                    },
+                    {
+                        "name":  "H5b ...which differs from the resting background",
+                        "pass":  true,
+                        "detail":  "rgb(245, 245, 245) -\u003e rgb(255, 238, 238)"
+                    },
+                    {
+                        "name":  "H6 hovering the chevron itself strengthens the chip a notch",
+                        "pass":  true,
+                        "detail":  "[1,0.14] -\u003e [1,0.26]"
+                    },
+                    {
+                        "name":  "H7 hovering a LINK in the label leaves the chevron at rest",
+                        "pass":  true,
+                        "detail":  "expected [0.5,0] got [0.5,0]"
+                    }
+                ]
+}

@@ -1,0 +1,221 @@
+<?php
+/**
+ * Run fixtures.json through the EXTRACTED schedule_runner pivot mirror and emit
+ * canonical results as JSON. Never touches schedule_runner.php itself.
+ *
+ *   php php_driver.php > php_results.json
+ */
+require_once __DIR__ . '/pivot_mirror.php';
+// penumbra_search.php (2026-09-23): the pivot per-aggregation filter runs on engine C now
+// (parse_format_condition / evaluate_format_condition), whose _cf_test_condition calls
+// _sr_resolve_keyword_date() - a penumbra_search.php function the mirror cannot carry
+// (extract_mirror.php lifts only what schedule_runner.php DECLARES; the runner requires this
+// file at its line 48). Pure declarations, so it is required directly - from the SAME tree as
+// the mirror (run.ps1 passes it). Without it every text-valued filter died in the driver.
+$__app = (isset($argv[1]) && $argv[1] !== '') ? rtrim($argv[1], '/\\')
+       : '\\\\oitras.oit.ncsu.edu\\c$\\inetpub\\wwwroot\\sponsor_migration\\penumbra';
+if (!function_exists('_sr_resolve_keyword_date')) require $__app . DIRECTORY_SEPARATOR . 'penumbra_search.php';
+
+/** One row through the Search Filter engine exactly as php_apply_search_filter does: parse over the row's keys, evaluate. */
+function search_filter_row($row, $filter) {
+    $cols = array_keys($row);
+    $parsed = php_parse_search_query($filter, $cols);
+    return empty($parsed) ? true : (bool)php_evaluate_search_row($row, $parsed, $cols);
+}
+
+$fx = json_decode(file_get_contents(__DIR__ . '/fixtures.json'), true);
+if (!$fx) { fwrite(STDERR, "cannot read fixtures.json\n"); exit(2); }
+
+// ---- sentinels ------------------------------------------------------------
+// Fixtures carry "+INF"/"-INF" as strings; PHP's mirror uses 1e308.
+function mat($v) {
+    if (is_string($v)) {
+        if ($v === '+INF') return 1e308;
+        if ($v === '-INF') return -1e308;
+        return $v;
+    }
+    if (is_array($v)) { $o = array(); foreach ($v as $k => $x) { $o[$k] = mat($x); } return $o; }
+    return $v;
+}
+
+// ---- canonical encoder (must match canon() in js_driver.html) --------------
+function canon($v) {
+    if ($v === null) return 'null';
+    if (is_bool($v)) return $v ? 'b:true' : 'b:false';
+    if (is_int($v) || is_float($v)) {
+        if (is_nan($v)) return 'NONNUMERIC';
+        if ($v >= 1e308) return 'n:+INF';
+        if ($v <= -1e308) return 'n:-INF';
+        if (is_infinite($v)) return $v > 0 ? 'n:+INF' : 'n:-INF';
+        // Full precision on purpose: the differ compares n: values NUMERICALLY
+        // with a relative tolerance, so printf-vs-JS formatting differences can
+        // never masquerade as engine divergence.
+        // 12 significant digits, matching Number(v.toPrecision(12)) on the JS
+        // side. Full precision cannot work for NESTED numbers: the differ's
+        // numeric tolerance only applies to a top-level n: value, so a float
+        // buried inside a collector bucket compared as raw text and
+        // 1234.5599999999999 vs 1234.56 read as engine drift.
+        $s = sprintf('%.12G', $v);
+        if ($s === '-0') $s = '0';
+        return 'n:' . $s;
+    }
+    if (is_string($v)) return 's:' . $v;
+    if (is_array($v)) {
+        // count()===0 must short-circuit: range(0,-1) yields [0,-1], not [], so
+        // an empty array would fail the list test and serialize as o:{} while JS
+        // emitted a:[] - a pure harness artifact masquerading as divergence.
+        $isList = (count($v) === 0) || (array_keys($v) === range(0, count($v) - 1));
+        if ($isList) {
+            $p = array(); foreach ($v as $x) { $p[] = canon($x); }
+            return 'a:[' . implode(',', $p) . ']';
+        }
+        $ks = array_keys($v); sort($ks);
+        $p = array(); foreach ($ks as $k) { $p[] = $k . '=' . canon($v[$k]); }
+        return 'o:{' . implode(',', $p) . '}';
+    }
+    if (is_object($v)) return canon((array)$v);
+    return 's:' . strval($v);
+}
+// PHP marks "not a number" with `false` where JS uses NaN, so those two must
+// canon to one shared token - but ONLY for the functions whose false MEANS
+// that. A predicate like pivot_is_roll() returns a genuine boolean false, and
+// blanket-mapping it to NONNUMERIC made 81 perfectly-agreeing cases look like
+// divergences. Keep this list tight: add a function here only when its `false`
+// is a parse failure, never when it is an answer.
+$GLOBALS['__falseIsNaN'] = array('parseValue' => true);
+function canonR($v, $fn = '') {
+    if ($v === false && isset($GLOBALS['__falseIsNaN'][$fn])) { return 'NONNUMERIC'; }
+    return canon($v);
+}
+
+// ---- collector shape normalization ----------------------------------------
+// The two collectors store the SAME facts in language-native containers. These
+// are representation differences, not drift, and each is neutralized here so a
+// real bucket difference is not buried under eight cosmetic ones:
+//   distinct  - PHP keys an array (val => true); JS uses a Set. Both are sets,
+//               so both become a SORTED list. (`values` order is NOT sorted -
+//               that ordering is meaningful and must still be compared.)
+//   colValues - array_keys() coerces numeric-string keys to INT in PHP, so
+//               "2024" comes back as 2024. Cast to string on both sides.
+//   wpairs    - JS always emits {}, PHP omits it or leaves an empty array.
+function norm_collect($r) {
+    if (!is_array($r)) return $r;
+    foreach (array('rowValues', 'colValues') as $k) {
+        if (isset($r[$k]) && is_array($r[$k])) { $r[$k] = array_map('strval', $r[$k]); }
+    }
+    if (isset($r['data']) && is_array($r['data'])) {
+        foreach ($r['data'] as $rk => $cols) {
+            if (!is_array($cols)) continue;
+            foreach ($cols as $ck => $cell) {
+                $r['data'][$rk][$ck] = norm_bucket($cell);
+            }
+        }
+    }
+    return $r;
+}
+function norm_bucket($b) {
+    if (!is_array($b)) return $b;
+    if (isset($b['distinct']) && is_array($b['distinct'])) {
+        $keys = array();
+        foreach ($b['distinct'] as $dk => $dv) { $keys[] = (string)(($dv === true) ? $dk : $dv); }
+        // SORT_STRING, not the default: PHP's default sort compares
+        // numeric-looking strings NUMERICALLY (3 before 10) while JS's .sort()
+        // is lexicographic ("10" before "3"). Without this the same set of
+        // distinct values reads as a difference.
+        sort($keys, SORT_STRING);
+        $b['distinct'] = $keys;
+    }
+    // An EMPTY wpairs is dropped on both sides. PHP cannot tell an empty map
+    // from an empty list, so it canons as a:[] while JS's {} canons as o:{} -
+    // a pure notation clash. Non-empty wpairs still compare in full.
+    if (empty($b['wpairs'])) { unset($b['wpairs']); }
+    if (isset($b['_colData']) && is_array($b['_colData'])) {
+        foreach ($b['_colData'] as $ck => $sub) { $b['_colData'][$ck] = norm_bucket($sub); }
+    }
+    if (isset($b['_filteredBuckets']) && is_array($b['_filteredBuckets'])) {
+        // Force a STRING-KEYED map. PHP indexes these numerically, so canon sees
+        // a list (a:[...]) while the JS object canons as o:{0=...} - the same
+        // empty-map/empty-list ambiguity as wpairs, one level down.
+        $fbOut = array();
+        foreach ($b['_filteredBuckets'] as $fi => $fb) { $fbOut['k' . $fi] = $fb; }
+        $b['_filteredBuckets'] = $fbOut;
+        foreach ($b['_filteredBuckets'] as $fi => $fb) {
+            if (isset($fb['main'])) { $fb['main'] = norm_bucket($fb['main']); }
+            if (isset($fb['_colData']) && is_array($fb['_colData'])) {
+                foreach ($fb['_colData'] as $ck => $sub) { $fb['_colData'][$ck] = norm_bucket($sub); }
+            }
+            $b['_filteredBuckets'][$fi] = $fb;
+        }
+    }
+    return $b;
+}
+
+// ---- dispatch -------------------------------------------------------------
+function call_fn($fn, $a) {
+    switch ($fn) {
+        case 'extractAgg':          return pivot_extract_agg_value(mat($a[0]), $a[1], $a[2], $a[3]);
+        case 'stddev':              return pivot_sample_stddev($a[0]);
+        case 'percentileOf':        return pivot_percentile_of($a[0], $a[1]);
+        case 'percentileP':         return pivot_percentile_p($a[0]);
+        case 'wavgCol':             return pivot_wavg_weight_col($a[0]);
+        case 'wavgOf':              return pivot_wavg_of($a[0]);
+        case 'antimode':            return pivot_antimode_from_values($a[0]);
+        case 'parseNumericValues':  return pivot_parse_numeric_values($a[0]);
+        case 'parseFieldToken':     return pivot_parse_field_token($a[0]);
+        case 'fieldDisplayLabel':   return pivot_field_display_label($a[0]);
+        case 'binBucket':           return pivot_bin_bucket_label($a[0], $a[1], $a[2]);
+        case 'binsBucket':          return pivot_bins_bucket_label($a[0], $a[1]);
+        case 'splitBucket':         return pivot_split_bucket_label($a[0], $a[1]);
+        case 'autoBinWidth':        return pivot_auto_bin_width($a[0], $a[1]);
+        case 'normalizeBinEdges':   return pivot_normalize_bin_edges($a[0]);
+        case 'binsLabels':          return pivot_bins_labels($a[0]);
+        case 'aggLabel':            return pivot_get_agg_label($a[0]);
+        case 'parseValue':          return pivot_parse_value($a[0]);
+        // PHP min()/max() have no argument-count ceiling; the JS side must be
+        // loop-based (penumbraMinOf/MaxOf) to agree at six-figure sizes.
+        case 'emptyAggValue':       return pivot_empty_agg_value($a[0]);
+        case 'filterRow':
+            return pivot_evaluate_filter(array('AMT' => $a[0], 'OTHER' => 'x'), $a[1]);
+        case 'filterRow2':
+            // The grammar cases (braces, quoted names, contains, regex, AND/OR, quoted values
+            // with " AND " ...) over a richer row - columns = the row's keys, as in the collector.
+            return pivot_evaluate_filter($a[0], $a[1]);
+        // The SAME cases through the scheduled Search Filter's engine (penumbra_search.php,
+        // 2026-09-24): its browser twin is the same parseAdvancedQuery / evaluateParsedQuery,
+        // so the JS side of these families is identical to filterRow / filterRow2 / filterDate.
+        case 'filterRowB':
+            return search_filter_row(array('AMT' => $a[0], 'OTHER' => 'x'), $a[1]);
+        case 'filterRow2B':
+        case 'filterDateB':
+            return search_filter_row($a[0], $a[1]);
+        case 'filterDate':
+            return pivot_evaluate_filter($a[0], $a[1]);
+        case 'collect': {
+            // named mapping, not a splat: the two signatures differ in order
+            $c = $a[1];
+            return norm_collect(pivot_process_data($a[0], $c['rows'], $c['cols'], $c['val'],
+                                                   $c['extra'], $c['filters'], $c['aggs']));
+        }
+        case 'isDerivedAgg':        return pivot_is_derived_agg($a[0]);
+        case 'isRoll':              return pivot_is_roll($a[0]);
+        case 'indexBaseLabel':      return pivot_index_base_label($a[0]);
+        case 'minOfRange':          return min(range(0, $a[0] - 1));
+        case 'maxOfRange':          return max(range(0, $a[0] - 1));
+    }
+    return '__NO_SUCH_FN__';
+}
+
+$out = array();
+foreach ($fx['cases'] as $c) {
+    $r = null; $err = null;
+    try {
+        set_error_handler(function ($no, $str) { throw new ErrorException($str, 0, $no); });
+        $r = call_fn($c['fn'], $c['args']);
+        restore_error_handler();
+    } catch (Throwable $e) {
+        restore_error_handler();
+        $err = get_class($e) . ': ' . $e->getMessage();
+    }
+    $out[$c['id']] = ($err !== null) ? ('ERR:' . $err) : canonR($r, $c['fn']);
+}
+echo json_encode(array('engine' => 'php', 'results' => $out), JSON_UNESCAPED_SLASHES);

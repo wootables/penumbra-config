@@ -1,0 +1,244 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>pivot zero / formula % / minimized spacer</title></head>
+<body>
+<!-- Minimal DOM, same shape as ..\pivot_trigger\harness.html: main.js binds the
+     pivot-builder elements DIRECTLY at ready time, so they must exist before it
+     loads. The trigger parser resolves the Value column against
+     #tableHeader th[data-colname]. -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<table id="resultsTable"><thead id="tableHeader"><tr>
+  <th data-colname="#">#</th><th data-colname="FY">FY</th><th data-colname="MONTH">MONTH</th>
+  <th data-colname="AMOUNT">AMOUNT</th><th data-colname="AWARDS">AWARDS</th><th data-colname="FY_AGO">FY_AGO</th>
+</tr></thead><tbody></tbody></table>
+<div id="errorBox"></div>
+<input id="tableSearch" value="">
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="pivotLightbox" style="display:none">
+  <div id="pivot-source-columns"></div>
+  <div id="pivot-rows"></div><div id="pivot-cols"></div><div id="pivot-vals"></div>
+  <select id="pivot-aggregation-selector"><option value="">-</option><optgroup label="Basic"><option value="sum">Sum</option><option value="count">Count</option><option value="avg">Average</option><option value="max">Max</option></optgroup></select>
+  <table><tbody id="pivot-agg-table-body"></tbody></table>
+  <select id="pivot-rows-layout-select"><option value="nested">nested</option><option value="nested-static">nested-static</option><option value="flat">flat</option></select>
+  <select id="pivot-cols-layout-select"><option value="nested">nested</option><option value="flat">flat</option></select>
+  <select id="pivot-sort-order"><option value="asc">asc</option><option value="desc">desc</option></select>
+  <input id="pivot-sticky-cols" value="3">
+  <input type="checkbox" id="pivot-row-total-override-toggle">
+  <div id="pivot-row-total-override-container" style="display:none"><div id="pivot-row-total-slots"></div><div id="pivot-row-total-tokens"></div></div>
+  <select id="pivot-rank-dir"><option value="none">none</option><option value="top">top</option><option value="bottom">bottom</option></select>
+  <input id="pivot-rank-n" value="10"><select id="pivot-rank-agg"><option value="sum">sum</option><option value="count">count</option></select>
+  <select id="pivot-rank-scope"><option value="">Overall</option></select>
+  <input type="checkbox" id="pivot-rank-other" checked><label id="pivot-rank-other-label"></label>
+  <input type="checkbox" id="pivot-no-breakdown"><input type="checkbox" id="pivot-start-expanded"><input type="checkbox" id="pivot-hide-empty">
+  <select id="pivotPresetSelect"><option value=""></option></select><button id="pivotDeletePresetBtn"></button><input type="checkbox" id="pivotAutoRunPreset">
+  <button id="generatePivotBtn">Generate</button>
+  <select id="pivotSnippetTargetSelect" style="display: none;"></select>
+  <button id="updatePivotSnippetBtn" type="button" style="display: none;">Update Snippet</button>
+  <button id="copyPivotSnippetBtn">Snippet</button>
+  <button id="pivotSavePresetBtn"></button>
+</div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); try { var o = document.getElementById('out'); if (o && o.textContent === 'running') o.textContent = 'PAGE_ERROR: ' + window.__errors[0]; } catch (x) {} return true; };
+</script>
+<script src="main_patched.js"></script>
+<script>
+(function () {
+  function report(txt) { document.getElementById('out').textContent = txt; }
+  var results = [];
+  function assert(name, cond, detail) { results.push({ name: name, pass: !!cond, detail: detail === undefined ? '' : String(detail) }); }
+  function eq(name, actual, expected) {
+    var a = JSON.stringify(actual), e = JSON.stringify(expected);
+    assert(name, a === e, 'expected ' + e + ' got ' + a);
+  }
+  function M(o) { var m = new Map(); Object.keys(o).forEach(function (k) { m.set(k, o[k]); }); return m; }
+
+  // Proposals: two colleges, departments, PIs. Pat (C1/D1) has 2 proposals and
+  // NO award, Lee (C1/D1) 2 of 3 awarded, Kim (C1/D2) 1 of 1; Ray (C2/D3) has
+  // proposals only in FY 2025, so Ray's FY 2026 cell has NO rows (empty).
+  function prop(c, d, pi, fy, id, awd, pend) {
+    return M({ COLLEGE: c, DEPARTMENT: d, PI: pi, FY: fy, PROPOSAL: id, AWARDED: String(awd), PENDING: String(pend) });
+  }
+  var PROPS = [
+    prop('C1', 'D1', 'Pat', 'FY 2025', 'p1', 0, 0), prop('C1', 'D1', 'Pat', 'FY 2025', 'p2', 0, 1),
+    prop('C1', 'D1', 'Lee', 'FY 2025', 'p3', 1, 0), prop('C1', 'D1', 'Lee', 'FY 2025', 'p4', 1, 0), prop('C1', 'D1', 'Lee', 'FY 2025', 'p5', 0, 0),
+    prop('C1', 'D2', 'Kim', 'FY 2025', 'p6', 1, 0),
+    prop('C2', 'D3', 'Ray', 'FY 2025', 'p7', 0, 0), prop('C2', 'D3', 'Ray', 'FY 2025', 'p8', 1, 0),
+    prop('C2', 'D3', 'Amy', 'FY 2026', 'p9', 1, 0)
+  ];
+
+  function run() {
+    var F = window.__FY;
+    if (!F || typeof F.pivotTable !== 'function') {
+      report('RESULTS_JSON:' + JSON.stringify({ fatal: 'hooks unavailable: ' + (window.__FY_ERR || 'n/a'), pageErrors: window.__errors.slice(0, 6) }));
+      return;
+    }
+    $('#generatePivotBtn').off('click');
+
+    // ---------------- P: the trailing '%' in a formula --------------------------
+    // A parse error must fail ITS checks, not end the run (the control throws on every %)
+    function tp(s) { try { return F.parseFormula(s); } catch (e) { return { error: e.message }; } }
+    function te(a, ctx) { return (a && !a.error) ? F.evalFormula(a, ctx) : 'PARSE ERROR: ' + (a && a.error); }
+    var ast = tp('{Awarded} / {Proposals} %');
+    eq('P1 a trailing % marks the formula as a percentage', ast.pct === true, true);
+    eq('P2 ...and multiplies by 100 (1 of 4 = 25)', te(ast, { Awarded: 1, Proposals: 4 }), 25);
+    var plain = tp('{Awarded} / {Proposals}');
+    eq('P3 control: no % = a plain ratio, unflagged', [plain.pct === true, te(plain, { Awarded: 1, Proposals: 4 })], [false, 0.25]);
+    var inLabel = tp('{Hit %} * 2');
+    eq('P4 a % INSIDE a {label} is part of the label, not the marker', [inLabel.pct === true, te(inLabel, { 'Hit %': 3 })], [false, 6]);
+    var thrown = '';
+    try { F.parseFormula('%'); } catch (e) { thrown = e.message; }
+    eq('P5 a bare % is an empty formula', thrown, 'Formula is empty');
+    var spaced = tp('({Awarded}) / ({Proposals} - {Still Pending})  % ');
+    eq('P6 spaces around the % are fine', [spaced.pct === true, te(spaced, { Awarded: 1, Proposals: 3, 'Still Pending': 1 })], [true, 50]);
+    eq('P7 division by zero still gives null (blank), % or not', te(spaced, { Awarded: 0, Proposals: 1, 'Still Pending': 1 }), null);
+
+    // ---------------- pivot fixture --------------------------------------------
+    function pivot(opts) {
+      var settings = {
+        v: 2, rows: opts.rows || ['COLLEGE', 'DEPARTMENT', 'PI'], cols: opts.cols || [], vals: 'PROPOSAL',
+        agg: ['count', 'sum', 'sum', 'formula', 'formula'],
+        aggLabels: ['Proposals', 'Awarded', 'Still Pending', 'Hit Ratio', 'Decided'],
+        aggColOverrides: ['PROPOSAL', 'AWARDED', 'PENDING', null, null], aggFilters: opts.aggFilters || null,
+        aggFormulas: [null, null, null, opts.f3 || '{Awarded} / {Proposals} %', opts.f4 || '{Awarded} / ({Proposals} - {Still Pending}) %'],
+        rowLayout: 'nested', colLayout: 'nested', sortOrder: 'asc', colSortOrder: 'asc', stickyColCount: 1,
+        totalColAggs: null, totalRowAggs: null, totalRowAggLabels: null, totalRowAggBaseIdx: null,
+        rankN: null, rankDir: null, rankAgg: null, rankOther: true, rankScope: null, noBreakdown: false,
+        startExpanded: !!opts.expanded, hideEmpty: false
+      };
+      F.setPivotSettings(settings);
+      F.setFormulas(settings.aggFormulas.map(function (f) { var a = f ? tp(f) : null; return (a && !a.error) ? a : null; }));
+      var extra = F.extraVals(settings.aggColOverrides, settings.vals);
+      var pd = F.processPivot(PROPS, settings.rows, settings.cols, settings.vals, settings.agg, extra, settings.aggFilters);
+      var res = F.pivotTable(pd, settings.rows, settings.cols, settings.vals, settings.rowLayout, settings.colLayout,
+        settings.agg, 'asc', null, [false, false, false, false, false], null, null, 'asc', 1, null,
+        null, settings.aggColOverrides, null, false);
+      return (res && res.html) ? res.html : String(res);
+    }
+    function box(html) { var b = document.createElement('div'); b.innerHTML = html; return b; }
+    // The data cells of the row whose LAST row-field cell reads `label`
+    function rowCells(b, label) {
+      var trs = b.querySelectorAll('tbody tr');
+      for (var i = 0; i < trs.length; i++) {
+        var rf = trs[i].querySelectorAll('td[data-row-field]');
+        var last = rf.length ? rf[rf.length - 1].textContent.replace(/[▶◀▼]/g, '').trim() : '';
+        if (last === label) {
+          return Array.prototype.map.call(trs[i].querySelectorAll('td:not([data-row-field])'), function (td) { return td.textContent.trim(); });
+        }
+      }
+      return '(no row ' + label + ')';
+    }
+
+    // ---------------- Z: a 0 with rows behind it prints -----------------------
+    var b1 = box(pivot({ expanded: true }));
+    eq('Z1 Pat: 2 proposals, 0 awarded prints 0 and 0.0% (cell has rows)', rowCells(b1, 'Pat'), ['2', '0', '1', '0.0%', '0.0%']);
+    eq('Z2 Lee: 3 proposals, 2 awarded = 66.7%; no pending prints 0', rowCells(b1, 'Lee'), ['3', '2', '0', '66.7%', '66.7%']);
+    eq('Z3 Kim: 1 of 1 = 100.0%', rowCells(b1, 'Kim'), ['1', '1', '0', '100.0%', '100.0%']);
+    var foot = Array.prototype.map.call(b1.querySelectorAll('tfoot td'), function (td) { return td.textContent.trim(); }).filter(function (t) { return t !== ''; });
+    eq('Z4 the Grand Total row formats the % formulas too (5/9, 5/8)', foot, ['Grand Total', '9', '5', '1', '55.6%', '62.5%']);
+
+    // An empty cell (no rows at all) stays blank - FY columns, Ray has no FY 2026
+    var b2 = box(pivot({ expanded: true, cols: ['FY'] }));
+    function cellOf(b, pi, ck, ai) {
+      var trs = b.querySelectorAll('tbody tr');
+      for (var i = 0; i < trs.length; i++) {
+        if (trs[i].textContent.indexOf(pi) === -1) continue;
+        var tds = trs[i].querySelectorAll('td:not([data-row-field])');
+        var c = tds[ck * 5 + ai];   // formula cells carry no data-col-key / data-agg-idx
+        if (c) return c.textContent.trim();
+      }
+      return '(no cell)';
+    }
+    eq('Z5 an EMPTY cell (no rows) is still blank: count', cellOf(b2, 'Ray', 1, 0), '');
+    eq('Z6 ...and sum', cellOf(b2, 'Ray', 1, 1), '');
+    eq('Z7 ...and its formula (0/0)', cellOf(b2, 'Ray', 1, 3), '');
+    eq('Z8 while Ray FY 2025 (rows) prints its 0 pending', cellOf(b2, 'Ray', 0, 2), '0');
+
+    // A FILTERED count that matches nothing in a cell WITH rows prints 0 too
+    var b3 = box(pivot({ expanded: true, aggFilters: [null, 'AWARDED = 1', null, null, null] }));
+    eq('Z9 a filtered aggregation with no matches in a cell with rows prints 0', rowCells(b3, 'Pat')[1], '0');
+
+    // A plain formula (no %) keeps the old number format
+    var b4 = box(pivot({ expanded: true, f3: '{Awarded} * 10', f4: '{Proposals} - {Proposals}' }));
+    eq('Z10 plain formulas: no % sign; a 0 result with rows prints 0', [rowCells(b4, 'Lee')[3], rowCells(b4, 'Lee')[4]], ['20', '0']);
+
+    // ---------------- N: the footer spacer minimizes with the columns ---------
+    var x = new XMLHttpRequest(); x.open('GET', 'main_css_under_test.css', false); x.send();
+    var st = document.createElement('style'); st.textContent = x.responseText; document.head.appendChild(st);
+    var host = document.getElementById('pivot-output-container');
+    host.style.display = 'block'; host.style.width = '900px';
+    host.innerHTML = pivot({ expanded: false });
+    var tbl = document.getElementById('pivotResultTable');
+    if (tbl) tbl.classList.add('is-nested-pivot');   // the app adds it after insertion (main.js injectPivotCollapseBar)
+    assert('N0 fixture: a nested 3-field pivot rendered with 3 row-field headers', !!tbl && tbl.querySelectorAll('thead th[data-row-field]').length === 3, tbl ? tbl.outerHTML.slice(0, 200) : 'no table');
+    var spacer = tbl.querySelector('tfoot td[data-row-field-span-from]') || tbl.querySelector('tfoot td:not(.pivot-sticky-col)');   // untagged (control): the plain spacer
+    eq('N1 the footer spacer is tagged with the first column it spans', spacer ? spacer.getAttribute('data-row-field-span-from') + '/' + spacer.colSpan : 'none', '1/2');
+    if (!spacer) spacer = document.createElement('td');   // keep the later checks running (they fail on their own)
+    F.minimize();
+    var th1 = tbl.querySelector('thead th[data-row-field="1"]'), th2 = tbl.querySelector('thead th[data-row-field="2"]');
+    eq('N2 all collapsed: both child columns are minimized', [th1.classList.contains('pivot-row-field-minimized'), th2.classList.contains('pivot-row-field-minimized')], [true, true]);
+    eq('N3 ...and so is the spacer that spans them', spacer.classList.contains('pivot-row-field-minimized'), true);
+    eq('N4 the minimized columns take NO width (was 5.5px each)', [Math.round(th1.getBoundingClientRect().width * 10) / 10, Math.round(th2.getBoundingClientRect().width * 10) / 10], [0, 0]);
+    // Expand one college: column 1 comes back, the spacer with it
+    var tg = Array.prototype.filter.call(tbl.querySelectorAll('.pivot-collapse-toggle-right[data-group-level="0"]'), function (t) { return t.closest('tr').style.display !== 'none'; })[0];
+    tg.classList.remove('pivot-group-collapsed'); tg.classList.add('pivot-group-expanded');
+    F.minimize();
+    eq('N5 one college expanded: column 1 and the spacer are back', [th1.classList.contains('pivot-row-field-minimized'), spacer.classList.contains('pivot-row-field-minimized')], [false, false]);
+    host.innerHTML = '';
+
+    report('RESULTS_JSON:' + JSON.stringify({ pageErrors: window.__errors.slice(0, 6), results: results }));
+  }
+
+  // js/penumbra_snippet_help.js binds `P = window.Penumbra` ONCE, when it loads. The app
+  // lazy-loads it long after main.js built that object; the static <script> above runs
+  // BEFORE main.js's ready code, so its P was an empty stand-in (harness Q, 2026-09-26).
+  // Once main.js is up, load it again the way the app does, then run.
+  function reloadSnippetHelp(done) {
+    // The module refuses to load twice (`if (w.PenumbraSnippetHelp) return;`).
+    try { delete window.PenumbraSnippetHelp; } catch (e) { window.PenumbraSnippetHelp = undefined; }
+    var s = document.createElement('script');
+    s.src = 'penumbra_snippet_help.js?reload=' + Date.now();
+    s.onload = s.onerror = function () { done(); };
+    document.head.appendChild(s);
+  }
+  var tries = 0;
+  (function wait() {
+    tries++;
+    if (window.__FY && !wait.reloaded) { wait.reloaded = true; reloadSnippetHelp(wait); return; }
+    if (window.__FY || tries > 40) { setTimeout(function () { try { run(); } catch (e) { report('RESULTS_JSON:' + JSON.stringify({ fatal: 'run threw: ' + e + ' ' + (e.stack || '').split('\n').slice(0, 3).join(' | '), pageErrors: window.__errors.slice(0, 6) })); } }, 300); }
+    else { setTimeout(wait, 100); }
+  })();
+})();
+</script>
+</body></html>

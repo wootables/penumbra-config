@@ -1,0 +1,475 @@
+<!doctype html><meta charset="utf-8"><title>running</title><pre id="out">running</pre>
+<script src="SRC.js"></script>
+<script>
+// =============================================================================
+// AUTO-BUILD harness (2026-09-04)
+//
+// Exercises the three "Auto-build from ..." readers (report / groups / pivot),
+// the shape rules they share (_vizAutoShape and friends) and the settings they
+// hand the applier, against synthetic rows shaped like the live reports that
+// surfaced the defects. The readers are REAL shipped source, grabbed from
+// main.js; only the DOM (a tiny jQuery stand-in), the date parser and the
+// pivot token helpers are stubbed.
+// =============================================================================
+var LOG = [], PASS = 0, FAIL = 0;
+function ok(name, cond, extra) {
+  if (cond) { PASS++; LOG.push('PASS  ' + name); }
+  else { FAIL++; LOG.push('FAIL  ' + name + (extra ? '   >> ' + extra : '')); }
+}
+function eq(name, got, want) {
+  ok(name, JSON.stringify(got) === JSON.stringify(want),
+     'got=' + JSON.stringify(got) + ' want=' + JSON.stringify(want));
+}
+function has(name, arr, re) {
+  ok(name, (arr || []).some(function (s) { return re.test(String(s)); }), 'warnings=' + JSON.stringify(arr));
+}
+function hasNot(name, arr, re) {
+  ok(name, !(arr || []).some(function (s) { return re.test(String(s)); }), 'warnings=' + JSON.stringify(arr));
+}
+
+try {
+  var code = String(window.__src).replace(/\r\n/g, '\n');
+
+  function grab(decl) {
+    var start = code.indexOf(decl);
+    if (start === -1) throw new Error('anchor not found: ' + decl);
+    var i = code.indexOf('{', start), depth = 0, inStr = null, inLine = false, inBlk = false, inRe = false;
+    for (var j = i; j < code.length; j++) {
+      var c = code[j], n = code[j + 1];
+      if (inLine) { if (c === '\n') inLine = false; continue; }
+      if (inBlk) { if (c === '*' && n === '/') { inBlk = false; j++; } continue; }
+      if (inStr) { if (c === '\\') { j++; continue; } if (c === inStr) inStr = null; continue; }
+      if (inRe) { if (c === '\\') { j++; continue; } if (c === '/') inRe = false; continue; }
+      if (c === '/' && n === '/') { inLine = true; j++; continue; }
+      if (c === '/' && n === '*') { inBlk = true; j++; continue; }
+      if (c === '"' || c === "'" || c === '`') { inStr = c; continue; }
+      if (c === '/') {
+        var k = j - 1; while (k >= 0 && /\s/.test(code[k])) k--;
+        if (k < 0 || /[=(,:;!&|?{}[\n+\-*%~^<>]/.test(code[k])) { inRe = true; continue; }
+      }
+      if (c === '{') depth++;
+      else if (c === '}') { depth--; if (depth === 0) return code.slice(start, j + 1); }
+    }
+    throw new Error('unbalanced: ' + decl);
+  }
+  function grabVar(name) {
+    var re = new RegExp('var ' + name.replace(/\$/g, '\\$') + ' = [^;]*;');
+    var m = re.exec(code);
+    if (!m) throw new Error('var not found: ' + name);
+    return m[0];
+  }
+  function grabObjVar(name) {
+    var re = new RegExp('var ' + name + ' = \\{[\\s\\S]*?\\n    \\};');
+    var m = re.exec(code);
+    if (!m) throw new Error('object var not found: ' + name);
+    return m[0];
+  }
+
+  // ---- 0. Static facts about the shipped source -------------------------
+  ok('static: _vizClearPreviewChrome is defined', code.indexOf('function _vizClearPreviewChrome(') !== -1);
+  var _hidePairs = (code.match(/\$\('#vizChart'\)\.hide\(\);\n\s+_vizClearPreviewChrome\(\);/g) || []).length;
+  eq('static: every canvas-hide in the preview clears the cog (4 early exits + restore)', _hidePairs, 5);
+  // In the render path the helper call sits directly above the filter-state
+  // cache reset (the five lines it replaced used to). Anchoring on that comment
+  // keeps this from matching one of the early-exit calls further up.
+  ok('static: the render path clears the previous cog through the helper',
+     /_vizClearPreviewChrome\(\);\n\s+\/\/ Clear cached panel HTML so the filter panel rebuilds fresh/.test(code));
+  ok('static: getSmartVizDefaults treats doughnut like pie',
+     /chartType === 'pie' \|\| chartType === 'doughnut'/.test(grab('function getSmartVizDefaults(')));
+  ok('static: data builder buckets a series token before the cardinality guard',
+     /_gbRepurposed && String\(groupBy\)\.indexOf\(':'\) !== -1\) \{\n\s+rowDataMaps = vizBucketRowsForAxis\(rowDataMaps, groupBy\);/.test(code));
+  ok('static: default series order uses the bucket comparator for a token',
+     /getCustomSortComparator\(groupBy\) : null;\n\s+if \(typeof _gkCmp === 'function'\) groupKeys\.sort\(_gkCmp\); else groupKeys\.sort\(\);/.test(code));
+  ok('static: Group By dropdown receives the bucket variants', /groupSelect\.append\(_vOpt\);/.test(grab('function populateVisualizationColumns(')));
+  ok('static: restoreVizConfig ensures a token option before selecting Group By',
+     /_vizEnsureGroupOption\(c\.groupBy\);\n\s+setSelectCaseInsensitive\(\$\('#vizGroupBy'\), c\.groupBy\);/.test(grab('function restoreVizConfig(')));
+  ok('static: applier ensures the series token and sets a smart legend',
+     /_vizEnsureGroupOption\(mapped\.config\.groupBy\);[\s\S]*getSmartVizDefaults\(_autoType/.test(grab('function _vizApplyAutoConfig(')));
+  ok('static: applier never warns about a Limit on a gauge', /_autoType !== 'gauge'/.test(grab('function _vizApplyAutoConfig(')));
+  // Round 2 (same day): one render, filtering on by default, rail = scroll bar.
+  ok('static: applier cancels the title debounce before its single render',
+     /\$\('#autoTitleBtn'\)\.trigger\('click'\);[\s\S]{0,700}clearTimeout\(window\.vizTitleDebounce\);\s*\n\s*if \(typeof window\.vizRunLiveUpdate === 'function'\) window\.vizRunLiveUpdate\(\);/.test(grab('function _vizApplyAutoConfig(')));
+  ok('static: applier turns viewer filtering on (X unless gauge/histogram/scatter, series when there is one)',
+     /mapped\.config\.filterXAxis = !_VIZ_AUTO_NO_XFILTER\[_autoType\];\s*\n\s*mapped\.config\.filterGroup = !!_autoGroup && VIZ_NO_GROUP\.indexOf\(_autoType\) === -1;/.test(grab('function _vizApplyAutoConfig(')));
+  ok('static: the no-X-filter table names exactly gauge, histogram, scatter',
+     /var _VIZ_AUTO_NO_XFILTER = \{ gauge: 1, histogram: 1, scatter: 1 \};/.test(code));
+  ok('static: carousel rail has pointer handlers (down/move/up) that scroll #vizTypeSelector',
+     /pointerdown\.vizRail[\s\S]{0,2500}pointermove\.vizRail[\s\S]{0,900}pointerup\.vizRail pointercancel\.vizRail/.test(code));
+  ok('static: rail jump centres the thumb on the click', /frac \* t\.scrollWidth - t\.clientWidth \/ 2/.test(code));
+  ok('static: rail drag scale is scrollWidth over rail width', /scale: t\.scrollWidth \/ Math\.max\(1, r\.width\)/.test(code));
+  ok('static: vizSyncCarousel reports aria-valuenow on the rail', /aria-valuenow/.test(grab('function vizSyncCarousel(')));
+
+  // ---- 1. Sandbox: real readers + shape rules, stubbed DOM ----------------
+  var stubs = [
+    // pivot token grammar - enough of it for COL and COL:split
+    'function pivotParseFieldToken(t){ t=String(t==null?"":t); var i=t.indexOf(":"); if(i===-1) return {base:t, split:""}; var sp=t.slice(i+1); var m=/^(bin)(\\d+)$/.exec(sp); return {base:t.slice(0,i), split: m?m[1]:sp, binWidth: m?+m[2]:undefined}; }',
+    'function pivotFieldBase(t){ return pivotParseFieldToken(t).base; }',
+    'function pivotFieldDisplayLabel(t){ var p=pivotParseFieldToken(t); return p.split? p.base+" ("+p.split+")" : p.base; }',
+    'function pivotPercentileP(a){ var m=/^p(\\d{1,2})$/.exec(String(a||"")); return m? +m[1] : null; }',
+    'function pivotWavgWeightCol(a){ var m=/^wavg@(.+)$/.exec(String(a||"")); return m? m[1] : null; }',
+    // date granularity per column, set by the scenario (2 = day, 0 = year, -1 = not a date)
+    'var DATEGRAN = {}; function _pivotFieldDateGran(b){ var k=String(b||"").toUpperCase(); return DATEGRAN.hasOwnProperty(k)? DATEGRAN[k] : -1; }',
+    'function parseDate(s){ s=String(s).trim(); var m=/^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(s); if(m) return {date:new Date(+m[1],+m[2]-1,+m[3]), granularity:"day"}; m=/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/.exec(s); if(m) return {date:new Date(+m[3],+m[1]-1,+m[2]), granularity:"day"}; m=/^(\\d{4})$/.exec(s); if(m) return {date:new Date(+m[1],0,1), granularity:"year"}; return null; }',
+    // the axis bucketer, minimal: fy / year / ym / month / bin
+    'function vizBucketRowsForAxis(rows, tok){ var p=pivotParseFieldToken(tok); if(!p.split||!rows||!rows.length) return rows; var key=String(tok).toUpperCase(), base=p.base.toUpperCase(); return rows.map(function(m){ var raw=m.get(base), d=parseDate(String(raw==null?"":raw)), lab=""; if(p.split==="bin"){ var n=parseFloat(String(raw).replace(/[$,]/g,"")); lab=isNaN(n)?"":String(Math.floor(n/1000)*1000); } else if(d&&d.date){ var y=d.date.getFullYear(), mo=d.date.getMonth(); if(p.split==="fy") lab="FY"+String((mo>=6?y+1:y)).slice(2); else if(p.split==="year") lab=String(y); else if(p.split==="ym") lab=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][mo]+" "+y; else if(p.split==="month") lab=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][mo]; else if(p.split==="yq") lab=y+" Q"+(Math.floor(mo/3)+1); else lab=String(raw); } var c=new Map(m); c.set(key, lab); return c; }); }',
+    // module state the readers consult
+    'var currentGroupingColumn = "", currentGroupingColumns = [], currentGroupAgg = null, _lastPivotChart = null;',
+    // the DOM stand-in: one shared state object, swapped per scenario
+    'var DOM = { cols: [], props: {}, cni: {}, pivotVisible: false, groupedVisible: false };',
+    'function $(sel){',
+    '  if (sel && sel.__col) return { data: function(){ return sel.__col; } };',
+    '  if (sel === "#resultsTable thead th[data-colname]") return { length: DOM.cols.length, each: function(fn){ DOM.cols.forEach(function(c){ fn.call({__col:c}); }); } };',
+    '  if (sel === "#resultsTable") return { data: function(k){ return k === "columnProperties" ? DOM.props : DOM.cni; } };',
+    '  if (sel === "#pivot-output-container") return { is: function(){ return !!DOM.pivotVisible; } };',
+    '  if (sel === "#groupedResultsContainer") return { is: function(){ return !!DOM.groupedVisible; } };',
+    '  return { length: 0, val: function(){ return ""; }, is: function(){ return false; }, data: function(){ return undefined; }, find: function(){ return this; }, filter: function(){ return this; }, each: function(){}, text: function(){ return ""; } };',
+    '}'
+  ].join('\n');
+
+  var real = [
+    grabVar('_VIZ_ID_NAME_RE'), grabVar('_VIZ_TIME_SPLITS'), grabVar('_VIZ_PERIOD_NAME_RE'),
+    grabVar('_VIZ_NOT_MEASURE_RE'), grabVar('_VIZ_ADDITIVE_AGGS'), grabVar('_VIZ_SPLIT_WORDS'),
+    grabVar('PENUMBRA_VIZ_AGGS'), grabObjVar('_GROUP_AGG_LABELS'),
+    grab('function _vizXLabelStats('), grab('function _vizDistinctCount('), grab('function _vizScoreXCandidate('),
+    grab('function _vizPickAutoType('), grab('function _vizXIsSequence('), grab('function _vizAutoSort('),
+    grab('function _vizAutoDateSplit('), grab('function _vizDistinctCountTok('), grab('function _vizColHasNegative('),
+    grab('function _vizColLooksLikeYear('), grab('function _vizPickAutoMeasure('), grab('function _vizSplitWord('),
+    grab('function _vizAutoShape('), grab('function _vizPropsForCol('), grab('function _vizChartableCols('),
+    grab('function _vizCanAgg('), grab('function groupsToVizConfig('), grab('function reportToVizConfig('),
+    grab('function pivotToVizConfig('), grab('function _vizAutoSource('), grab('function getSmartVizDefaults(')
+  ].join('\n');
+
+  var SB = new Function(stubs + '\n' + real + '\n' +
+    'return { DOM: DOM, DATEGRAN: DATEGRAN, set: function(k, v){ eval(k + " = v"); },' +
+    ' isSeq: _vizXIsSequence, autoSort: _vizAutoSort, dateSplit: _vizAutoDateSplit, distinctTok: _vizDistinctCountTok,' +
+    ' hasNeg: _vizColHasNegative, looksYear: _vizColLooksLikeYear, pickMeasure: _vizPickAutoMeasure, shape: _vizAutoShape,' +
+    ' score: _vizScoreXCandidate, groups: groupsToVizConfig, report: reportToVizConfig, pivot: pivotToVizConfig,' +
+    ' source: _vizAutoSource, smart: getSmartVizDefaults };')();
+
+  // ---- scenario builders -------------------------------------------------
+  // defs: [[name, kind]] kind = text | money | num | date | bool | year(=date at year granularity)
+  function setTable(defs) {
+    SB.DOM.cols = ['#'].concat(defs.map(function (d) { return d[0]; }));
+    SB.DOM.props = {}; SB.DOM.cni = {};
+    for (var k in SB.DATEGRAN) delete SB.DATEGRAN[k];
+    defs.forEach(function (d, i) {
+      SB.DOM.cni[d[0].toUpperCase()] = i;
+      SB.DOM.props[i] = { isCurrency: d[1] === 'money', isDate: d[1] === 'date' || d[1] === 'year', isNumeric: d[1] === 'num', isBoolean: d[1] === 'bool' };
+      if (d[1] === 'date') SB.DATEGRAN[d[0].toUpperCase()] = 2;
+      if (d[1] === 'year') SB.DATEGRAN[d[0].toUpperCase()] = 0;
+    });
+  }
+  function setRows(n, fn) {
+    var out = [];
+    for (var i = 0; i < n; i++) {
+      var o = fn(i), m = new Map();
+      Object.keys(o).forEach(function (k) { m.set(k.toUpperCase(), o[k]); });
+      out.push(m);
+    }
+    window.vizCachedData = out;
+    return out;
+  }
+  function iso(y, m, d) { return y + '-' + ('0' + m).slice(-2) + '-' + ('0' + d).slice(-2); }
+  var STATUS = ['Active', 'Closed', 'Pending'];
+  var SPONSORS = ['NSF', 'DOD', 'DOE', 'USDA', 'DHHS'];
+  var LONG = ['Educational and Research Institutions', 'Business and Industry', 'Nonprofit Organization', 'US Federal', 'Association'];
+
+  // The live report the audit ran against (awdspon): FY is a DATE at year
+  // granularity, AMOUNT is money, LOG_DATE a full date, the rest text.
+  var AWD = [['FY', 'year'], ['AMOUNT', 'money'], ['PRIME_SPONSOR_CATEGORY', 'text'], ['DIRECT_SPONSOR_NAME', 'text'],
+             ['RED_PT_ID', 'text'], ['ORIGINATING SPONSOR', 'text'], ['LOG_DATE', 'date'], ['TRANSACTION_TYPE', 'text']];
+  function awdRows(n, prime) {
+    return setRows(n, function (i) {
+      var y = 2022 + (i % 5);
+      return { FY: String(y + 1), AMOUNT: '$' + (1000 + (i * 37) % 9000) + '.00',
+               PRIME_SPONSOR_CATEGORY: prime || ['US Federal', 'State', 'Industry'][i % 3],
+               DIRECT_SPONSOR_NAME: 'Sponsor ' + (i % 40), RED_PT_ID: 'P' + (100000 + i),
+               'ORIGINATING SPONSOR': SPONSORS[i % 5], LOG_DATE: iso(y, 1 + (i % 12), 1 + (i % 27)),
+               TRANSACTION_TYPE: ['New', 'Continuation'][i % 2] };
+    });
+  }
+
+  // ---- 2. Sequence detection + sort ---------------------------------------
+  setTable(AWD); awdRows(200);
+  ok('seq: FY (date @ year granularity) is a sequence', SB.isSeq('FY'));
+  ok('seq: a bucket token is a sequence', SB.isSeq('LOG_DATE:fy'));
+  ok('seq: a full date column is a sequence', SB.isSeq('LOG_DATE'));
+  ok('seq: STATUS-like text is not', !SB.isSeq('TRANSACTION_TYPE'));
+  ok('seq: a PERIOD name is a sequence even as unknown text', SB.isSeq('FISCAL_YEAR'));
+  ok('seq: QTR name', SB.isSeq('AWARD_QTR'));
+  ok('seq: "FYI_NOTES" does not match the FY pattern', !SB.isSeq('FYI_NOTES'));
+  eq('sort: sequence -> label asc', SB.autoSort('FY'), { sortBy: 'label', sortDir: 'asc' });
+  eq('sort: category -> value desc', SB.autoSort('TRANSACTION_TYPE'), { sortBy: 'value', sortDir: 'desc' });
+  eq('sort: token -> label asc', SB.autoSort('AMOUNT:bin'), { sortBy: 'label', sortDir: 'asc' });
+
+  // ---- 3. Date split from span ---------------------------------------------
+  eq('dateSplit: ~4.9y of dates -> quarters', SB.dateSplit('LOG_DATE'), 'yq');
+  setRows(60, function (i) { return { LOG_DATE: iso(2025, 1 + (i % 12), 1 + (i % 28)) }; });
+  eq('dateSplit: one year of dates -> months', SB.dateSplit('LOG_DATE'), 'ym');
+  setRows(60, function (i) { return { LOG_DATE: iso(2010 + (i % 15), 1 + (i % 12), 3) }; });
+  eq('dateSplit: 15 years of dates -> years', SB.dateSplit('LOG_DATE'), 'year');
+  eq('dateSplit: a bare-year column is already a bucket -> none', SB.dateSplit('FY'), '');
+  eq('dateSplit: not a date -> none', SB.dateSplit('TRANSACTION_TYPE'), '');
+  eq('dateSplit: date column with no cached rows -> months (safe default)', (function () { var keep = window.vizCachedData; window.vizCachedData = []; var r = SB.dateSplit('LOG_DATE'); window.vizCachedData = keep; return r; })(), 'ym');
+
+  // ---- 4. Distinct-through-a-token, negatives, year-like, measure pick ----
+  awdRows(200);
+  eq('distinctTok: LOG_DATE:fy resolves to fiscal years, not dates', SB.distinctTok('LOG_DATE:fy'), 6);
+  eq('distinctTok: plain column', SB.distinctTok('ORIGINATING SPONSOR'), 5);
+  eq('distinctTok: nothing cached -> -1', (function () { var keep = window.vizCachedData; window.vizCachedData = []; var r = SB.distinctTok('FY'); window.vizCachedData = keep; return r; })(), -1);
+  ok('hasNeg: all-positive money -> false', !SB.hasNeg('AMOUNT'));
+  setRows(20, function (i) { return { AMT: i === 7 ? '($1,200.00)' : '$50.00' }; });
+  ok('hasNeg: accounting parenthesis negative -> true', SB.hasNeg('AMT'));
+  setRows(20, function (i) { return { AMT: i === 3 ? '-15' : '12' }; });
+  ok('hasNeg: leading minus -> true', SB.hasNeg('AMT'));
+  setRows(20, function (i) { return { AMT: i === 3 ? '(0)' : '12' }; });
+  ok('hasNeg: a bracketed zero is not negative', !SB.hasNeg('AMT'));
+  setRows(30, function (i) { return { YRC: String(2019 + (i % 6)), CNT: String(i % 9), BIG: String(1900 + i * 10) }; });
+  ok('looksYear: 2019..2024 values look like years', SB.looksYear('YRC'));
+  ok('looksYear: small counts do not', !SB.looksYear('CNT'));
+  ok('looksYear: 4-digit values past 2100 do not', !SB.looksYear('BIG'));
+  eq('measure: money wins', SB.pickMeasure(['AMOUNT'], ['CNT']), 'AMOUNT');
+  eq('measure: id / fy / zip numerics are skipped for a real count', SB.pickMeasure([], ['EMPLID', 'FY', 'ZIP', 'SUBAWARD_COUNT']), 'SUBAWARD_COUNT');
+  eq('measure: only codes -> none (count rows instead)', SB.pickMeasure([], ['EMPLID', 'ZIP_CODE', 'RECORD_NO']), '');
+  eq('measure: year-like VALUES are skipped whatever the name', SB.pickMeasure([], ['YRC', 'CNT']), 'CNT');
+
+  // ---- 5. Shape rules ------------------------------------------------------
+  setTable(AWD); awdRows(200);
+  var s;
+  s = SB.shape({ xAxis: 'TRANSACTION_TYPE', groupBy: 'none', agg: 'sum', yAxis: 'AMOUNT', warnings: [] });
+  eq('shape: 2 categories, sum of non-negative money -> doughnut', [s.type, s.horizontal, s.stacked], ['doughnut', false, false]);
+  s = SB.shape({ xAxis: 'PRIME_SPONSOR_CATEGORY', groupBy: 'none', agg: 'count', yAxis: '', warnings: [] });
+  eq('shape: 3 categories, count -> doughnut', s.type, 'doughnut');
+  s = SB.shape({ xAxis: 'PRIME_SPONSOR_CATEGORY', groupBy: 'none', agg: 'avg', yAxis: 'AMOUNT', warnings: [] });
+  eq('shape: average is not additive -> bar', s.type, 'bar');
+  s = SB.shape({ xAxis: 'FY', groupBy: 'none', agg: 'sum', yAxis: 'AMOUNT', warnings: [] });
+  eq('shape: 5 fiscal years are a sequence -> bar, upright', [s.type, s.horizontal], ['bar', false]);
+  s = SB.shape({ xAxis: 'ORIGINATING SPONSOR', groupBy: 'none', agg: 'sum', yAxis: 'AMOUNT', warnings: [] });
+  eq('shape: 5 sponsors, sum -> doughnut', s.type, 'doughnut');
+  s = SB.shape({ xAxis: 'ORIGINATING SPONSOR', groupBy: 'FY', agg: 'sum', yAxis: 'AMOUNT', warnings: [] });
+  eq('shape: 5 sponsors x 5 FY series, sum -> stacked upright bar', [s.type, s.stacked, s.horizontal, s.groupBy], ['bar', true, false, 'FY']);
+  s = SB.shape({ xAxis: 'ORIGINATING SPONSOR', groupBy: 'FY', agg: 'avg', yAxis: 'AMOUNT', warnings: [] });
+  eq('shape: 5 x 5 series but AVERAGE never stacks', s.stacked, false);
+  s = SB.shape({ xAxis: 'ORIGINATING SPONSOR', groupBy: 'TRANSACTION_TYPE', agg: 'sum', yAxis: 'AMOUNT', warnings: [] });
+  eq('shape: 5 x 2 series = 10 bars -> side by side', s.stacked, false);
+  s = SB.shape({ xAxis: 'DIRECT_SPONSOR_NAME', groupBy: 'TRANSACTION_TYPE', agg: 'sum', yAxis: 'AMOUNT', warnings: [] });
+  eq('shape: 40 x 2 series = 80 bars -> stacked and horizontal', [s.stacked, s.horizontal], [true, true]);
+  s = SB.shape({ xAxis: 'DIRECT_SPONSOR_NAME', groupBy: 'none', agg: 'sum', yAxis: 'AMOUNT', warnings: [] });
+  eq('shape: 40 categories -> horizontal bar (never a doughnut)', [s.type, s.horizontal], ['bar', true]);
+  setRows(50, function (i) { return { CAT: LONG[i % 5], AMOUNT: '$10.00' }; });
+  s = SB.shape({ xAxis: 'CAT', groupBy: 'none', agg: 'avg', yAxis: 'AMOUNT', warnings: [] });
+  eq('shape: 5 long labels, non-additive -> horizontal bar', [s.type, s.horizontal], ['bar', true]);
+  setRows(50, function (i) { return { CAT: STATUS[i % 3], AMOUNT: i === 4 ? '($200.00)' : '$10.00' }; });
+  s = SB.shape({ xAxis: 'CAT', groupBy: 'none', agg: 'sum', yAxis: 'AMOUNT', warnings: [] });
+  eq('shape: a negative in the measure vetoes the doughnut', s.type, 'bar');
+
+  // constant X with a series: promote the series
+  setTable(AWD); awdRows(120, 'US Federal');
+  var w = [];
+  s = SB.shape({ xAxis: 'PRIME_SPONSOR_CATEGORY', groupBy: 'LOG_DATE:fy', agg: 'sum', yAxis: 'AMOUNT', warnings: w });
+  eq('shape: constant X + bucketed series -> the series becomes the X axis', [s.xAxis, s.groupBy], ['LOG_DATE:fy', 'none']);
+  eq('shape: ... and a fiscal-year axis is a LINE', s.type, 'line');
+  has('shape: ... with a warning naming the single value', w, /PRIME_SPONSOR_CATEGORY has a single value \(US Federal\)/);
+  w = [];
+  s = SB.shape({ xAxis: 'PRIME_SPONSOR_CATEGORY', groupBy: 'none', agg: 'sum', yAxis: 'AMOUNT', warnings: w });
+  eq('shape: constant X with NO series stays put (nothing to promote)', [s.xAxis, w.length], ['PRIME_SPONSOR_CATEGORY', 0]);
+
+  // raw date axis
+  awdRows(200); w = [];
+  s = SB.shape({ xAxis: 'LOG_DATE', groupBy: 'none', agg: 'sum', yAxis: 'AMOUNT', warnings: w });
+  eq('shape: raw date with many dates -> bucketed by quarter, as a line', [s.xAxis, s.type], ['LOG_DATE:yq', 'line']);
+  has('shape: ... says so', w, /LOG_DATE holds \d+ distinct dates, so it is charted by quarter/);
+  s = SB.shape({ xAxis: 'LOG_DATE:month', groupBy: 'none', agg: 'sum', yAxis: 'AMOUNT', warnings: [] });
+  eq('shape: cyclical month bucket -> upright bar (12 short labels, not a time line)', [s.type, s.horizontal], ['bar', false]);
+  s = SB.shape({ xAxis: 'LOG_DATE:ym', groupBy: 'TRANSACTION_TYPE', agg: 'sum', yAxis: 'AMOUNT', warnings: [] });
+  eq('shape: month sequence with a series -> multi-line, never stacked', [s.type, s.stacked], ['line', false]);
+  s = SB.shape({ xAxis: 'AMOUNT:bin', groupBy: 'none', agg: 'count', yAxis: '', warnings: [] });
+  eq('shape: numeric bins are a sequence -> bar, upright, not a doughnut', [s.type, s.horizontal], ['bar', false]);
+  setRows(12, function (i) { return { FEW: 'D' + i, AMOUNT: '$1.00' }; });
+  s = SB.shape({ xAxis: 'FEW', groupBy: 'none', agg: 'sum', yAxis: 'AMOUNT', warnings: [] });
+  eq('shape: 12 distinct plain values -> bar (doughnut stops at 5)', s.type, 'bar');
+  window.vizCachedData = [];
+  s = SB.shape({ xAxis: 'TRANSACTION_TYPE', groupBy: 'FY', agg: 'sum', yAxis: 'AMOUNT', warnings: [] });
+  eq('shape: no cached rows -> plain bar, nothing promoted or stacked', [s.type, s.xAxis, s.groupBy, s.stacked], ['bar', 'TRANSACTION_TYPE', 'FY', false]);
+
+  // ---- 6. Reader: groups ---------------------------------------------------
+  setTable(AWD); awdRows(200);
+  SB.set('currentGroupingColumn', 'FY'); SB.set('currentGroupingColumns', ['FY']);
+  SB.set('currentGroupAgg', { column: 'AMOUNT', type: 'sum' });
+  var g = SB.groups();
+  eq('groups: FY + Sum(AMOUNT) -> bar of sum by FY', [g.config.type, g.config.xAxis, g.config.yAxis, g.config.agg, g.config.groupBy], ['bar', 'FY', 'AMOUNT', 'sum', 'none']);
+  eq('groups: ... sorted as a sequence (the live bug: 2027 2025 2026 2023 2024)', [g.sortBy, g.sortDir], ['label', 'asc']);
+  eq('groups: ... no warnings', g.warnings, []);
+
+  SB.set('currentGroupingColumn', 'ORIGINATING SPONSOR'); SB.set('currentGroupingColumns', ['ORIGINATING SPONSOR', 'FY']);
+  g = SB.groups();
+  eq('groups: two levels -> level 2 is the series, stacked (5 FY series of a sum)', [g.config.groupBy, g.config.stacked], ['FY', true]);
+
+  SB.set('currentGroupingColumn', 'ORIGINATING SPONSOR'); SB.set('currentGroupingColumns', ['ORIGINATING SPONSOR', 'LOG_DATE:fy']);
+  g = SB.groups();
+  eq('groups: a bucketed level 2 rides through as the series token', g.config.groupBy, 'LOG_DATE:fy');
+  eq('groups: ... 6 fiscal-year series of a sum -> stacked', g.config.stacked, true);
+
+  awdRows(120, 'US Federal');
+  SB.set('currentGroupingColumn', 'PRIME_SPONSOR_CATEGORY'); SB.set('currentGroupingColumns', ['PRIME_SPONSOR_CATEGORY', 'LOG_DATE:fy']);
+  g = SB.groups();
+  eq('groups: constant level 1 + bucketed level 2 (the live one-bar chart) -> line by fiscal year', [g.config.type, g.config.xAxis, g.config.groupBy], ['line', 'LOG_DATE:fy', 'none']);
+  eq('groups: ... label/asc so FY23..FY27 read in order', [g.sortBy, g.sortDir], ['label', 'asc']);
+
+  awdRows(200);
+  SB.set('currentGroupingColumn', 'ORIGINATING SPONSOR'); SB.set('currentGroupingColumns', ['ORIGINATING SPONSOR', 'FY', 'TRANSACTION_TYPE']);
+  g = SB.groups();
+  has('groups: three levels -> warns that the third is not plotted', g.warnings, /3 levels.*not plotted/);
+
+  SB.set('currentGroupingColumns', ['ORIGINATING SPONSOR']);
+  SB.set('currentGroupAgg', { column: 'DIRECT_SPONSOR_NAME', type: 'mode' });
+  g = SB.groups();
+  eq('groups: Mode cannot be a Y axis -> count', [g.config.agg, g.config.yAxis], ['count', '']);
+  has('groups: ... and says the builder cannot do Mode', g.warnings, /cannot do Mode/);
+  eq('groups: 5 sponsors counted -> doughnut', g.config.type, 'doughnut');
+  SB.set('currentGroupAgg', { column: 'RED_PT_ID', type: 'count_distinct' });
+  g = SB.groups();
+  eq('groups: count_distinct -> distinct (not additive -> bar)', [g.config.agg, g.config.type], ['distinct', 'bar']);
+  SB.set('currentGroupAgg', { column: 'AMOUNT', type: 'p90' });
+  g = SB.groups();
+  eq('groups: a percentile carries over', g.config.agg, 'p90');
+  SB.set('currentGroupAgg', null);
+  g = SB.groups();
+  has('groups: no summary -> counts rows and says so', g.warnings, /no per-group summary/);
+  SB.set('currentGroupingColumn', '__SNAP_TYPE');
+  eq('groups: a snapshot comparison is not chartable', SB.groups(), null);
+  SB.set('currentGroupingColumn', ''); SB.set('currentGroupingColumns', []);
+  eq('groups: nothing grouped -> null', SB.groups(), null);
+
+  // ---- 7. Reader: pivot ----------------------------------------------------
+  setTable(AWD); awdRows(200);
+  SB.set('_lastPivotChart', null);
+  eq('pivot: no pivot -> null', SB.pivot(), null);
+  SB.set('_lastPivotChart', { aggTypes: ['sum'], aggLabels: ['Sum'], rowFields: ['ORIGINATING SPONSOR'], colFields: ['LOG_DATE:fy'], valField: 'AMOUNT' });
+  var p = SB.pivot();
+  eq('pivot: bucketed column field becomes the series TOKEN', p.config.groupBy, 'LOG_DATE:fy');
+  hasNot('pivot: ... no "did not carry over" apology any more', p.warnings, /did not carry over/);
+  eq('pivot: 5 x 6 FY series -> stacked bar', [p.config.type, p.config.stacked], ['bar', true]);
+  eq('pivot: category X -> value desc', [p.sortBy, p.sortDir], ['value', 'desc']);
+
+  SB.set('_lastPivotChart', { aggTypes: ['sum'], aggLabels: ['Sum'], rowFields: ['ORIGINATING SPONSOR', 'TRANSACTION_TYPE'], colFields: [], valField: 'AMOUNT' });
+  p = SB.pivot();
+  eq('pivot: nested rows, no column field -> row 2 becomes the series', [p.config.xAxis, p.config.groupBy], ['ORIGINATING SPONSOR', 'TRANSACTION_TYPE']);
+  has('pivot: ... explained', p.warnings, /second row field, TRANSACTION_TYPE, became the series\./);
+
+  SB.set('_lastPivotChart', { aggTypes: ['sum'], aggLabels: ['Sum'], rowFields: ['ORIGINATING SPONSOR', 'TRANSACTION_TYPE', 'FY'], colFields: [], valField: 'AMOUNT' });
+  p = SB.pivot();
+  has('pivot: three row fields -> deeper one reported', p.warnings, /deeper row field is not plotted/);
+
+  SB.set('_lastPivotChart', { aggTypes: ['sum'], aggLabels: ['Sum'], rowFields: ['ORIGINATING SPONSOR', 'TRANSACTION_TYPE'], colFields: ['FY'], valField: 'AMOUNT' });
+  p = SB.pivot();
+  eq('pivot: nested rows WITH a column field -> column field is the series', p.config.groupBy, 'FY');
+  has('pivot: ... nested rows reported', p.warnings, /only ORIGINATING SPONSOR came across/);
+
+  SB.set('_lastPivotChart', { aggTypes: ['mode'], aggLabels: ['Mode'], rowFields: ['FY'], colFields: [], valField: 'AMOUNT' });
+  p = SB.pivot();
+  eq('pivot: unsupported agg -> sum', p.config.agg, 'sum');
+  has('pivot: ... says so', p.warnings, /cannot do Mode/);
+  eq('pivot: FY rows -> sequence sort', [p.sortBy, p.sortDir], ['label', 'asc']);
+
+  SB.set('_lastPivotChart', { aggTypes: ['sum', 'avg'], aggLabels: ['Sum', 'Avg'], rowFields: ['LOG_DATE:ym'], colFields: [], valField: 'AMOUNT' });
+  p = SB.pivot();
+  eq('pivot: month sequence rows -> line', p.config.type, 'line');
+  has('pivot: second measure reported', p.warnings, /Not charted: Avg/);
+
+  SB.set('_lastPivotChart', { aggTypes: ['count'], aggLabels: ['Count'], rowFields: ['FY'], colFields: ['TRANSACTION_TYPE', 'PRIME_SPONSOR_CATEGORY'], valField: 'RED_PT_ID' });
+  p = SB.pivot();
+  has('pivot: two column fields -> only the first is the series', p.warnings, /Only the first column field \(TRANSACTION_TYPE\)/);
+  eq('pivot: FY x 2 series count -> side-by-side bar', [p.config.type, p.config.stacked], ['bar', false]);
+
+  awdRows(120, 'US Federal');
+  SB.set('_lastPivotChart', { aggTypes: ['sum'], aggLabels: ['Sum'], rowFields: ['PRIME_SPONSOR_CATEGORY'], colFields: ['FY'], valField: 'AMOUNT' });
+  p = SB.pivot();
+  eq('pivot: constant row field with a column field -> the column field becomes the X axis', [p.config.xAxis, p.config.groupBy], ['FY', 'none']);
+
+  // ---- 8. Reader: report ---------------------------------------------------
+  setTable(AWD); awdRows(200);
+  var r = SB.report();
+  eq('report: awdspon-shaped table -> X is the best CATEGORY, Y is the money column', [r.config.xAxis, r.config.yAxis, r.config.agg], ['PRIME_SPONSOR_CATEGORY', 'AMOUNT', 'sum']);
+  eq('report: 3 shares of a sum -> doughnut', r.config.type, 'doughnut');
+  eq('report: doughnut of categories -> value desc', [r.sortBy, r.sortDir], ['value', 'desc']);
+  has('report: first warning names the pair', [r.warnings[0]], /^Charting the total of AMOUNT by PRIME_SPONSOR_CATEGORY/);
+
+  setTable([['RECORD_ID', 'text'], ['STATUS', 'text'], ['AMOUNT', 'money'], ['EMPLID', 'num'], ['SUBAWARD_COUNT', 'num']]);
+  setRows(80, function (i) { return { RECORD_ID: 'R' + i, STATUS: STATUS[i % 3], AMOUNT: '$' + (i * 10), EMPLID: String(100000 + i), SUBAWARD_COUNT: String(i % 4) }; });
+  r = SB.report();
+  eq('report: STATUS beats RECORD_ID for X (merit, not table order)', r.config.xAxis, 'STATUS');
+  eq('report: money beats the numerics for Y', r.config.yAxis, 'AMOUNT');
+
+  setTable([['RECORD_ID', 'text'], ['STATUS', 'text'], ['EMPLID', 'num'], ['SUBAWARD_COUNT', 'num']]);
+  setRows(80, function (i) { return { RECORD_ID: 'R' + i, STATUS: STATUS[i % 3], EMPLID: String(100000 + i), SUBAWARD_COUNT: String(i % 4) }; });
+  r = SB.report();
+  eq('report: no money -> the non-id numeric is the measure', r.config.yAxis, 'SUBAWARD_COUNT');
+
+  setTable([['RECORD_ID', 'text'], ['STATUS', 'text'], ['EMPLID', 'num'], ['ZIP', 'num']]);
+  setRows(80, function (i) { return { RECORD_ID: 'R' + i, STATUS: STATUS[i % 3], EMPLID: String(100000 + i), ZIP: String(27600 + (i % 20)) }; });
+  r = SB.report();
+  eq('report: only code-like numerics -> count rows', [r.config.yAxis, r.config.agg], ['', 'count']);
+  has('report: ... and says why', r.warnings, /look like identifiers or codes/);
+  has('report: ... lead message is the count form', [r.warnings[0]], /counts rows by STATUS/);
+
+  setTable([['RECORD_ID', 'text'], ['AMOUNT', 'money']]);
+  setRows(80, function (i) { return { RECORD_ID: 'R' + i, AMOUNT: '$' + (i * 10) }; });
+  r = SB.report();
+  eq('report: identifiers + a measure -> histogram of the measure', [r.config.type, r.config.xAxis, r.config.yAxis, r.config.agg], ['histogram', 'AMOUNT', '', 'count']);
+  has('report: ... explained', r.warnings, /distributed \(a histogram\)/);
+
+  setTable([['RECORD_ID', 'text'], ['LOG_DATE', 'date'], ['AMOUNT', 'money']]);
+  setRows(80, function (i) { return { RECORD_ID: 'R' + i, LOG_DATE: iso(2022 + (i % 4), 1 + (i % 12), 5), AMOUNT: '$' + (i * 10) }; });
+  r = SB.report();
+  eq('report: identifiers + a date + a measure -> the date wins: line per quarter', [r.config.type, r.config.xAxis], ['line', 'LOG_DATE:yq']);
+  eq('report: ... in calendar order', [r.sortBy, r.sortDir], ['label', 'asc']);
+  has('report: ... lead message spells the bucket out', [r.warnings[0]], /by LOG_DATE by quarter/);
+
+  setTable([['RECORD_ID', 'text'], ['FY', 'year'], ['AMOUNT', 'money']]);
+  setRows(80, function (i) { return { RECORD_ID: 'R' + i, FY: String(2022 + (i % 4)), AMOUNT: '$' + (i * 10) }; });
+  r = SB.report();
+  eq('report: a bare-year date column is used as it is (no split)', r.config.xAxis, 'FY');
+  eq('report: ... as a sequence', [r.config.type, r.sortBy], ['bar', 'label']);
+
+  setTable([['DEPT', 'text'], ['TOTAL', 'money'], ['HEADCOUNT', 'num']]);
+  setRows(1, function () { return { DEPT: 'Chemistry', TOTAL: '$1,234,567.00', HEADCOUNT: '42' }; });
+  r = SB.report();
+  eq('report: a single row is a KPI -> gauge of the money column', [r.config.type, r.config.yAxis, r.config.agg], ['gauge', 'TOTAL', 'sum']);
+  ok('report: ... with an X axis set so the applier accepts it', !!r.config.xAxis);
+  has('report: ... explained', r.warnings, /single row, so TOTAL is shown as a gauge/);
+
+  setTable([['RECORD_ID', 'text'], ['NOTE', 'text']]);
+  setRows(40, function (i) { return { RECORD_ID: 'R' + i, NOTE: 'note ' + i }; });
+  r = SB.report();
+  eq('report: nothing but identifiers -> still charts, counting rows by the closest column', [r.config.agg, r.config.type], ['count', 'bar']);
+  has('report: ... and admits it may read like a list', r.warnings, /may read more like a list/);
+
+  setTable([]);
+  eq('report: no columns -> null', SB.report(), null);
+
+  // ---- 9. Legend default + source detection --------------------------------
+  setTable(AWD); awdRows(200);
+  eq('legend: doughnut -> right (was falling to "none")', SB.smart('doughnut', 'STATUS', '', false, window.vizCachedData).legendVal, 'right');
+  eq('legend: pie -> right', SB.smart('pie', 'STATUS', '', false, window.vizCachedData).legendVal, 'right');
+  eq('legend: single-series bar -> none', SB.smart('bar', 'FY', '', false, window.vizCachedData).legendVal, 'none');
+  eq('legend: bar with a series -> bottom', SB.smart('bar', 'FY', 'TRANSACTION_TYPE', true, window.vizCachedData).legendVal, 'bottom');
+
+  SB.DOM.pivotVisible = true; SB.set('_lastPivotChart', { aggTypes: ['sum'], aggLabels: ['Sum'], rowFields: ['FY'], colFields: [], valField: 'AMOUNT' });
+  eq('source: pivot on screen -> pivot', SB.source().kind, 'pivot');
+  SB.DOM.pivotVisible = true; SB.set('_lastPivotChart', null);
+  eq('source: pivot container visible but nothing rendered -> not pivot', SB.source().kind, 'report');
+  SB.DOM.pivotVisible = false; SB.DOM.groupedVisible = true; SB.set('currentGroupingColumn', 'FY');
+  eq('source: grouping on screen -> groups', SB.source().kind, 'groups');
+  SB.set('currentGroupingColumn', '__SNAP_TYPE');
+  eq('source: snapshot comparison -> report', SB.source().kind, 'report');
+  SB.DOM.groupedVisible = false; SB.set('currentGroupingColumn', '');
+  eq('source: flat -> report', SB.source().kind, 'report');
+  ok('source: report tip mentions the gauge and per-period fallbacks', /gauge/.test(SB.source().tip) && /per period/.test(SB.source().tip));
+
+} catch (e) {
+  FAIL++; LOG.push('HARNESS-ERROR ' + (e && e.stack || e));
+}
+document.getElementById('out').textContent = 'pass=' + PASS + ' fail=' + FAIL + '\n' + LOG.join('\n');
+document.title = 'done';
+</script>

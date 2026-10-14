@@ -1,0 +1,206 @@
+<!doctype html><meta charset="utf-8"><title>sqlfmt tests</title>
+<pre id="out" style="font:12px Consolas;white-space:pre"></pre>
+<script src="sql-formatter.min.js"></script>
+<script src="penumbra_sqlfmt.js"></script>
+<script>
+var out = [], pass = 0, fail = 0, ctrl = { pass: 0, fail: 0 };
+function vis(s) { return String(s).replace(/^ +/gm, function (m) { return m.replace(/ /g, '·'); }); }
+function ok(name, cond, detail) { if (cond) { pass++; } else { fail++; out.push('FAIL ' + name + (detail ? '\n' + vis(detail) : '')); } }
+function has(name, text, needle) { ok(name, text.indexOf(needle) >= 0, 'missing: ' + needle + '\n--- in ---\n' + text); }
+function lacks(name, text, needle) { ok(name, text.indexOf(needle) < 0, 'unexpected: ' + needle + '\n--- in ---\n' + text); }
+var F = window.PenumbraSqlFormat;
+function fmt(sql, db) { return F.format(sql, db || 'oracle'); }
+function idem(name, sql, db) { var a = fmt(sql, db), b = fmt(a, db); ok(name + ' idempotent', a === b, 'first:\n' + a + '\n--- second ---\n' + b); return a; }
+
+// 1. main report-style query
+var MAIN = "with dept_totals as (select d.ouc, d.dept_name, sum(s.amount_total) total_amt, count(distinct s.red_pam_id) award_ct from nc_reporting.stats_combined_v2 s join nc_reporting.departments d on d.ouc = s.ouc where s.pi_order = 1 and s.award_date between [PROMPT;start_date;date;default=2025-07-01] and [PROMPT;end_date;date] and s.sponsor_type in ('Federal','State','Industry') group by d.ouc, d.dept_name)\n-- pull the winners\nselect t.ouc, t.dept_name as \"Department\", t.total_amt, case when t.total_amt > 1000000 then 'Large' when t.total_amt > 100000 then 'Medium' else 'Small' end as size_band, '<a href=\"x/' || t.ouc || '\">link</a>' as \"@@HTML Link\", row_number() over (partition by substr(t.ouc,1,2) order by t.total_amt desc) rn, (select max(x.award_date) from nc_reporting.stats_combined_v2 x where x.ouc = t.ouc) last_award, nvl(to_char(t.total_amt,'FM$999,999,999'), '-') pretty from dept_totals t left join [SUBQUERY;db=hr;SELECT ouc, head_name FROM hr_heads] h on h.ouc = t.ouc where t.award_ct >= 3 and (t.dept_name like '%Engineering%' or t.dept_name like '%Science%') and t.ouc not in ('000000','999999') order by t.total_amt desc nulls last";
+var m = idem('main', MAIN);
+ok('main starts WITH', /^WITH\n/.test(m), m);
+has('main prompt 1 verbatim', m, '[PROMPT;start_date;date;default=2025-07-01]');
+has('main prompt 2 verbatim', m, '[PROMPT;end_date;date]');
+has('main subquery verbatim', m, 'LEFT JOIN [SUBQUERY;db=hr;SELECT ouc, head_name FROM hr_heads] h ON h.ouc = t.ouc');
+has('main @@HTML alias verbatim', m, 'AS "@@HTML Link"');
+lacks('main no mask leak', m, 'PNB_MASK');
+has('main OVER collapsed', m, 'ROW_NUMBER() OVER (PARTITION BY SUBSTR(t.ouc, 1, 2) ORDER BY t.total_amt DESC) rn,');
+has('main NULLS LAST upper', m, 'ORDER BY\n    t.total_amt DESC NULLS LAST');
+has('main comment kept', m, '-- pull the winners');
+has('main river indent', m, 'WHERE\n    t.award_ct >= 3\n    AND (\n        t.dept_name LIKE');
+has('main func upper', m, 'NVL(TO_CHAR(t.total_amt, \'FM$999,999,999\'), \'-\') pretty');
+has('main html string untouched', m, '\'<a href="x/\' || t.ouc || \'">link</a>\'');
+ok('main already-formatted check', fmt(m) === m);
+
+// 2. Oracle analytics
+var ORA = "select /*+ parallel(4) */ p.red_pam_id, listagg(p.pi_name, '; ') within group (order by p.pi_order) as pis, max(p.amount) keep (dense_rank first order by p.trans_date desc) last_amt, lag(p.amt) over (order by p.trans_date) prev_amt, extract(year from p.award_date) yr, trunc(sysdate,'MM') eom, my_func(p.x) mf, hr.pkg_x.calc(p.y) pk, rownum r, sum(p.amt) over (partition by p.ouc order by p.trans_date rows between unbounded preceding and current row) running from nc_reporting.stats_combined_v2 p where p.trans_date >= add_months(trunc(sysdate,'YEAR'), -12) group by p.red_pam_id order by 1 desc nulls last fetch first 100 rows only";
+var o = idem('oracle', ORA);
+has('listagg', o, "LISTAGG(p.pi_name, '; ') WITHIN GROUP (ORDER BY p.pi_order) AS pis,");
+has('keep', o, 'MAX(p.amount) KEEP (DENSE_RANK FIRST ORDER BY p.trans_date DESC) last_amt,');
+has('lag over', o, 'LAG(p.amt) OVER (ORDER BY p.trans_date) prev_amt,');
+has('extract', o, 'EXTRACT(YEAR FROM p.award_date) yr,');
+has('sysdate upper', o, "TRUNC(SYSDATE, 'MM') eom,");
+has('user func tight', o, 'my_func(p.x) mf,');
+has('pkg func tight', o, 'hr.pkg_x.calc(p.y) pk,');
+has('rownum upper', o, 'ROWNUM r,');
+has('window frame', o, 'SUM(p.amt) OVER (PARTITION BY p.ouc ORDER BY p.trans_date ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) running');
+has('fetch first own line', o, 'ORDER BY\n    1 DESC NULLS LAST\nFETCH FIRST 100 ROWS ONLY');
+has('hint pinned to SELECT', o, 'SELECT /*+ parallel(4) */\n    p.red_pam_id,');
+var hint2 = idem('hint alone', "select\n/*+ full(t) */\na from t");
+has('hint alone pinned', hint2, 'SELECT /*+ full(t) */\n    a\nFROM');
+var hint3 = idem('hint distinct', "select distinct /*+ x */ a, b from t");
+has('hint distinct pinned', hint3, 'SELECT DISTINCT /*+ x */\n    a,\n    b\nFROM');
+
+// 3. offset / fetch next
+var off = idem('offset', "select a from t order by a offset 10 rows fetch next 5 rows only");
+has('offset line', off, '\nOFFSET 10 ROWS\nFETCH NEXT 5 ROWS ONLY');
+
+// 4. literals and comments are never touched
+var LIT = "select 'over (x' a, \"over (\" b, q'[keep (]' c, n'rownum' d, 'it''s' e from dual -- over (\n/* keep (\n sysdate */ where x = 1";
+var l = idem('literals', LIT);
+has('single-quoted kept', l, "'over (x' a,");
+has('double-quoted kept', l, '"over (" b,');
+has('q-quote kept', l, "q'[keep (]' c,");
+has('n-string kept', l, "n'rownum' d,");
+has('doubled quote kept', l, "'it''s' e");
+has('dual upper', l, 'FROM\n    DUAL');
+has('line comment kept', l, '-- over (');
+has('block comment kept 1', l, '/* keep (');
+has('block comment kept 2', l, 'sysdate */');
+
+// 5. MS-SQL subquery dialect
+var ms = idem('mssql', "select top 10 a, isnull(b,0) bb, datediff(day, c, getdate()) dd, row_number() over (partition by a order by c) rn from t with (nolock) where c = 1 order by a", 'mssql');
+has('tsql top', ms, 'TOP 10');
+has('tsql isnull', ms, 'ISNULL(b, 0) bb,');
+has('tsql with nolock beside table', ms, 'FROM\n    t WITH (NOLOCK)\nWHERE');
+var ms2 = idem('mssql cte + hints', "with c as (select a from t1 with (nolock, index(ix1))) select c.a, x.b from c join t2 x with (nolock) on x.a = c.a", 'mssql');
+has('tsql cte WITH intact', ms2, 'WITH\n    c AS (');
+has('tsql multi hint', ms2, 't1 WITH (NOLOCK, INDEX(ix1))');
+has('tsql join hint', ms2, 'JOIN t2 x WITH (NOLOCK) ON x.a = c.a');
+has('tsql over collapsed', ms, 'ROW_NUMBER() OVER (PARTITION BY a ORDER BY c) rn');
+
+// 6. a long window stays multi-line
+var LONG = "select sum(x) over (partition by very_long_column_name_one, very_long_column_name_two, very_long_column_name_three order by very_long_column_name_four desc, very_long_column_name_five) s from t";
+var lg = idem('long window', LONG);
+has('long over multi-line', lg, 'OVER (\n        PARTITION BY\n');
+
+// 7. prompt with quotes / dashes inside stays verbatim; tag inside a string too
+var pq = idem('prompt quotes', "select a from t where b = [PROMPT;name;text;default=O'Brien -- x] and c = '[PROMPT;inner;text]'");
+has('prompt with quote verbatim', pq, "b = [PROMPT;name;text;default=O'Brien -- x]");
+has('prompt inside string verbatim', pq, "c = '[PROMPT;inner;text]'");
+
+// 8. sql-formatter-disable region honoured
+var dis = idem('disable', "select a from t where x = 1\n/* sql-formatter-disable */\nselect   b   from   t2\n/* sql-formatter-enable */\nselect c from t3 where y = 2");
+has('disabled region verbatim', dis, 'select   b   from   t2');
+
+// 9. hierarchical / set ops / pivot
+var h = idem('hier', "select level lvl, ouc, sys_connect_by_path(ouc,'/') pth from nc_reporting.org_tree start with parent_ouc is null connect by prior ouc = parent_ouc order siblings by ouc");
+has('connect by', h, 'START WITH parent_ouc IS NULL\nCONNECT BY PRIOR ouc = parent_ouc\nORDER SIBLINGS BY\n    ouc');
+var pv = idem('pivot', "select * from (select ouc, fy, amt from t) pivot (sum(amt) for fy in (2024 as fy24, 2025 as fy25)) where ouc like '15%'");
+has('pivot upper', pv, ') PIVOT (SUM(amt) FOR fy IN (2024 AS fy24, 2025 AS fy25))');
+var u = idem('union', "select a from t1 union all select a from t2 minus select a from t3");
+has('union', u, 'FROM\n    t1\nUNION ALL\nSELECT');
+
+// 10. prototype-named identifiers do not crash the tighten pass
+var proto = idem('proto names', "select constructor(a) x, hasOwnProperty (b) y, toString (c) z from t");
+has('proto tight 1', proto, 'hasOwnProperty(b) y,');
+has('proto tight 2', proto, 'toString(c) z');
+
+// 11. CTE column list / IN / EXISTS keep their space
+var sp = idem('spacing', "with c (a, b) as (select 1, 2 from dual) select a from c where a in (1, 2) and exists (select 1 from dual) and not (b = 2)");
+has('AS ( keeps space', sp, 'c(a, b) AS (\n');
+has('IN ( keeps space', sp, 'a IN (1, 2)');
+has('EXISTS ( keeps space', sp, 'AND EXISTS (\n');
+has('NOT ( keeps space', sp, 'AND NOT (b = 2)');
+
+// 12. missing library -> null; garbage -> string or throw, never a crash
+var saved = window.sqlFormatter; window.sqlFormatter = undefined;
+ok('null without library', fmt('select 1 from dual') === null);
+window.sqlFormatter = saved;
+var threw = false, res = null;
+try { res = fmt("select ) from ( where"); } catch (e) { threw = true; }
+ok('garbage handled', threw || typeof res === 'string');
+
+// 13. CRLF input survives
+var crlf = idem('crlf', "select a,\r\n b\r\nfrom t\r\nwhere a = 1");
+has('crlf formatted', crlf, 'SELECT\n    a,\n    b\nFROM');
+
+// 14. [IMPORT; name=X] tags - the fourth bracket tag. Left out of the mask
+//     list until 2026-09-10, so ANY report using an import threw
+//     'Parse error: Unexpected "[IMPORT; n"' instead of formatting.
+//     A tag the mask list misses THROWS, so these go through idemSafe: a
+//     regression must report as a FAIL, not kill the page and print NO RESULT.
+function idemSafe(name, sql, db) {
+    try { return idem(name, sql, db); }
+    catch (e) { ok(name + ' idempotent', false, 'THREW: ' + (e && e.message ? e.message : e)); return ''; }
+}
+var imp = idemSafe('import join', "select a.id, i.amount from my_table a join [IMPORT; name=Award List] i on i.id = a.id where a.status = 'A' order by a.id");
+has('import tag verbatim', imp, 'JOIN [IMPORT; name=Award List] i ON i.id = a.id');
+lacks('import no mask leak', imp, 'PNB_MASK');
+var impc = idemSafe('import cte', "with r as (select * from [IMPORT; name=Dept Roster]) select * from r");
+has('import in CTE verbatim', impc, '[IMPORT; name=Dept Roster]');
+var imps = idemSafe('import spaced', "select * from [ IMPORT ; name = Some Name ]");
+has('import spaced verbatim', imps, '[ IMPORT ; name = Some Name ]');
+var impp = idemSafe('import plus prompt', "select * from [IMPORT; name=X] where dept = [PROMPT;dept;text]");
+has('import beside prompt', impp, '[IMPORT; name=X]');
+has('prompt beside import', impp, '[PROMPT;dept;text]');
+
+// 15. T-SQL bracket identifiers are NOT tags (the Tag Generator's Subqueries
+//     tab formats PINS / InfoEd inner queries with the transactsql grammar,
+//     where [Import Date] is a quoted column name). A Penumbra tag ALWAYS
+//     carries the ";" that shared_logic.php's extractSubqueryTags requires -
+//     without that in the mask regex these columns were masked as tags.
+function maskCount(sql) { return F._internals.maskTags(sql).masks.length; }
+ok('tsql lookalike columns not masked',
+   maskCount("select [Import Date], [Prompt], [Subquery Type] from dbo.Awards") === 0,
+   'masked: ' + JSON.stringify(F._internals.maskTags("select [Import Date], [Prompt], [Subquery Type] from dbo.Awards").masks));
+ok('real tags still masked',
+   maskCount("select * from [IMPORT; name=X] where a = [PROMPT;p;text] and b in [SUBQUERY;db=hr;select 1] and c in [CTE_SUBQUERY;db=hr;select 2]") === 4);
+var tq = idemSafe('tsql brackets', "select [Import Date], [Award ID] from dbo.Awards where [Import Date] > '2025-01-01' order by [Award ID]", 'mssql');
+has('tsql column verbatim', tq, '[Import Date] > \'2025-01-01\'');
+lacks('tsql no mask leak', tq, 'PNB_MASK');
+var th = idemSafe('tsql hint plus brackets', "select p.[Import Date] from dbo.[Project Import] p with (nolock) where p.[Import Date] is not null", 'mssql');
+has('tsql NOLOCK rejoined beside bracket table', th, 'dbo.[Project Import] p WITH (NOLOCK)');
+var tt = idemSafe('tsql tags inside inner query', "select [Award ID] from dbo.Awards where [Import Date] >= [PROMPT;start;date] and [Dept] = [PROMPT;dept;text]", 'mssql');
+has('tsql prompt verbatim', tt, '[Import Date] >= [PROMPT;start;date]');
+var ti = idemSafe('tsql import tag', "select i.[Award ID] from [IMPORT; name=Award List] i join dbo.Awards a on a.[Award ID] = i.[Award ID]", 'mssql');
+has('tsql import verbatim', ti, 'FROM\n    [IMPORT; name=Award List] i');
+
+// 16. Tags are BRACKET-BALANCED, like shared_logic.php's extractSubqueryTags /
+//     extractPromptTags and main.js's extractBalancedTags. A subquery's inner
+//     SQL runs on PINS / InfoEd, where [Award ID] is an ordinary column, so a
+//     first-"]" match cut the tag in half and the leftover tail threw.
+function masksOf(sql) { return F._internals.maskTags(sql).masks; }
+function oneMask(name, sql, expect) {
+    var ms = masksOf(sql);
+    ok(name + ' masks as ONE tag', ms.length === 1 && ms[0] === expect,
+       'got ' + JSON.stringify(ms) + '\nwant [' + JSON.stringify(expect) + ']');
+}
+var SUBQ_TSQL = "[SUBQUERY;db=pins;SELECT [Award ID] FROM dbo.Awards WHERE [Import Date] > '2025-01-01']";
+oneMask('subquery w/ tsql columns', "select * from awards where ouc in " + SUBQ_TSQL + " and rownum < 10", SUBQ_TSQL);
+var nb = idemSafe('subquery nested brackets', "select * from awards where ouc in " + SUBQ_TSQL + " and rownum < 10");
+has('subquery nested verbatim', nb, SUBQ_TSQL);
+lacks('subquery nested no leak', nb, 'PNB_MASK');
+var CTE_TSQL = "[CTE_SUBQUERY;db=infoed;SELECT [Dept Code], [Head Name] FROM dbo.Heads]";
+oneMask('cte_subquery w/ tsql columns', "with h as " + CTE_TSQL + " select * from h", CTE_TSQL);
+var cb = idemSafe('cte nested brackets', "with h as " + CTE_TSQL + " select * from h");
+has('cte nested verbatim', cb, CTE_TSQL);
+var QUAL = "[SUBQUERY;db=pins;SELECT [ID] FROM [dbo].[My Table]]";
+oneMask('schema-qualified bracket table', "select * from t where id in " + QUAL, QUAL);
+var STRB = "[SUBQUERY;db=hr;SELECT x FROM t WHERE a = 'p]q']";
+oneMask('bracket inside a string literal', "select * from t where id in " + STRB, STRB);
+var CMT = "[SUBQUERY;db=hr;SELECT 1 -- keep\n]";
+oneMask('closing bracket after a line comment', "select * from t where id in " + CMT, CMT);
+// The balanced scan must NOT regress the flat forms section 7 covers: a lone
+// apostrophe in a default opens a quote run that never closes, so maskTags
+// falls back to the first "]".
+oneMask('apostrophe default falls back to flat', "select a from t where b = [PROMPT;name;text;default=O'Brien -- x]",
+        "[PROMPT;name;text;default=O'Brien -- x]");
+ok('unterminated tag left as typed', masksOf("select * from t where x in [SUBQUERY;db=hr;SELECT 1").length === 0);
+
+// CONTROL: the harness must be able to report a failure
+(function () { var save = [pass, fail]; ok('control-must-fail', false, ''); ctrl.fail = fail - save[1]; pass = save[0]; fail = save[1]; out.pop(); })();
+
+out.push('RESULT pass=' + pass + ' fail=' + fail + ' control=' + (ctrl.fail === 1 ? 'ok' : 'BROKEN'));
+out.push('--- sample: main ---\n' + vis(m));
+out.push('--- sample: oracle ---\n' + vis(o));
+document.getElementById('out').textContent = out.join('\n');
+document.title = out.filter(function (l) { return l.indexOf('RESULT ') === 0; })[0] || 'NO RESULT';
+</script>

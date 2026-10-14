@@ -1,0 +1,566 @@
+<!doctype html><meta charset="utf-8"><title>running</title><pre id="out">running</pre>
+<script>
+window.onerror = function (msg, src, line, col) {
+  var el = document.getElementById('out');
+  if (el && el.textContent === 'running') {
+    el.textContent = 'SCRIPT-ERROR: ' + msg + '  (line ' + line + ':' + col + ')';
+  }
+  return false;
+};
+</script>
+<script src="penumbra_geo_us.js"></script>
+<script src="SRC.js"></script>
+<script>
+var LOG = [], PASS = 0, FAIL = 0;
+function ok(n, c, x) { if (c) { PASS++; LOG.push('PASS  ' + n); } else { FAIL++; LOG.push('FAIL  ' + n + (x ? '   >> ' + x : '')); } }
+function eq(n, g, w) { ok(n, JSON.stringify(g) === JSON.stringify(w), 'got=' + JSON.stringify(g) + ' want=' + JSON.stringify(w)); }
+
+try {
+  var ASSET = window.PenumbraGeoUS;
+  var code = String(window.__src).replace(/\r\n/g, '\n');
+
+  function grab(decl) {
+    var start = code.indexOf(decl);
+    if (start === -1) throw new Error('anchor not found: ' + decl);
+    var i = code.indexOf('{', start), depth = 0, inStr = null, inLine = false, inBlk = false, inRe = false;
+    for (var j = i; j < code.length; j++) {
+      var c = code[j], n = code[j + 1];
+      if (inLine) { if (c === '\n') inLine = false; continue; }
+      if (inBlk) { if (c === '*' && n === '/') { inBlk = false; j++; } continue; }
+      if (inStr) { if (c === '\\') { j++; continue; } if (c === inStr) inStr = null; continue; }
+      if (inRe) { if (c === '\\') { j++; continue; } if (c === '/') inRe = false; continue; }
+      if (c === '/' && n === '/') { inLine = true; j++; continue; }
+      if (c === '/' && n === '*') { inBlk = true; j++; continue; }
+      if (c === '"' || c === "'" || c === '`') { inStr = c; continue; }
+      if (c === '/') {
+        var k = j - 1; while (k >= 0 && /\s/.test(code[k])) k--;
+        if (k < 0 || /[=(,:;!&|?{}[\n+\-*%~^<>]/.test(code[k])) { inRe = true; continue; }
+      }
+      if (c === '{') depth++;
+      else if (c === '}') { depth--; if (depth === 0) return code.slice(start, j + 1); }
+    }
+    throw new Error('unbalanced: ' + decl);
+  }
+  function grabVar(name) {
+    // Stop at the first ';', NOT at ';\n' - several of these declarations carry
+    // a trailing comment, and matching to the newline swallowed the following
+    // statements and produced a syntax error inside the extract rather than a
+    // clear "anchor not found".
+    var re = new RegExp('\\n\\s*var ' + name + '\\b[^;]*;');
+    var m = code.match(re);
+    if (!m) throw new Error('var not found: ' + name);
+    return m[0];
+  }
+
+  // ══ 0. THE GENERATED ASSET ITSELF ══════════════════════════════════════
+  ok('asset: penumbra_geo_us.js exposes a global', typeof ASSET === 'object' && !!ASSET);
+  ok('asset: both layers present', !!(ASSET.states && ASSET.ncCounties));
+  eq('asset: 52 state features (50 + DC + PR)', ASSET.states.features.length, 52);
+  eq('asset: 100 NC counties', ASSET.ncCounties.features.length, 100);
+  ok('asset: states box is landscape', ASSET.states.box.w > ASSET.states.box.h, JSON.stringify(ASSET.states.box));
+  ok('asset: coordinates are flat pairs, not [x,y] tuples',
+     ASSET.states.features.every(function (f) {
+       return f.rings.every(function (r) { return typeof r[0] === 'number' && r.length % 2 === 0; });
+     }));
+  ok('asset: every feature has a FIPS id and a name',
+     ASSET.states.features.concat(ASSET.ncCounties.features)
+       .every(function (f) { return /^\d{2,5}$/.test(f.id) && f.name; }));
+  // The whole point of pre-projecting: nothing may fall outside the declared box.
+  (function () {
+    var bad = [];
+    ['states', 'ncCounties'].forEach(function (L) {
+      ASSET[L].features.forEach(function (f) {
+        f.rings.forEach(function (r) {
+          for (var i = 0; i + 1 < r.length; i += 2) {
+            if (r[i] < -0.5 || r[i] > ASSET[L].box.w + 0.5 ||
+                r[i + 1] < -0.5 || r[i + 1] > ASSET[L].box.h + 0.5) { bad.push(L + ':' + f.name); return; }
+          }
+        });
+      });
+    });
+    eq('asset: no coordinate escapes its declared box', bad.slice(0, 3), []);
+  })();
+
+  // Landmark positions - the cheapest possible proof that the Albers USA
+  // composite is right way up and not mirrored. Checked as fractions of the
+  // box so the simplification tolerance can change without breaking this.
+  (function () {
+    var byName = {};
+    ASSET.states.features.forEach(function (f) { byName[f.name] = f; });
+    function frac(nm) {
+      var f = byName[nm], sx = 0, sy = 0, n = 0;
+      f.rings.forEach(function (r) { for (var i = 0; i + 1 < r.length; i += 2) { sx += r[i]; sy += r[i + 1]; n++; } });
+      return { x: (sx / n) / ASSET.states.box.w, y: (sy / n) / ASSET.states.box.h };
+    }
+    var ca = frac('California'), me = frac('Maine'), fl = frac('Florida'),
+        wa = frac('Washington'), nc = frac('North Carolina'), ak = frac('Alaska'), pr = frac('Puerto Rico');
+    ok('projection: California is on the far left', ca.x < 0.15, JSON.stringify(ca));
+    ok('projection: Maine is top-right', me.x > 0.9 && me.y < 0.25, JSON.stringify(me));
+    ok('projection: Florida is bottom-right', fl.x > 0.7 && fl.y > 0.7, JSON.stringify(fl));
+    ok('projection: Washington is top-left', wa.x < 0.15 && wa.y < 0.15, JSON.stringify(wa));
+    ok('projection: North Carolina is right of centre, mid height',
+       nc.x > 0.75 && nc.y > 0.35 && nc.y < 0.65, JSON.stringify(nc));
+    ok('projection: Alaska is the bottom-left inset', ak.x < 0.35 && ak.y > 0.6, JSON.stringify(ak));
+    ok('projection: Puerto Rico is the bottom-right inset', pr.x > 0.7 && pr.y > 0.7, JSON.stringify(pr));
+  })();
+
+  // ══ 1. THE ASSET JOIN ════════════════════════════════════════════════════
+  // `global` is the module IIFE's own parameter (initGeo logs through it). The
+  // four module-level geo vars are extracted too: without them the functions
+  // would resolve GEO against the harness's own scope, which quietly made an
+  // earlier version of this file test nothing.
+  var G = new Function('PENUMBRA_US_GRID', 'global',
+    grabVar('GEO') + '\n' +
+    grabVar('_geoStateByPostal') + '\n' +
+    grabVar('_geoCountyByKey') + '\n' +
+    grabVar('_geoById') + '\n' +
+    grab('function _vizCountyKey(') + '\n' +
+    grab('function _geoCentroid(') + '\n' +
+    grab('function initGeo(') + '\n' +
+    grab('function _vizResolveCounty(') + '\n' +
+    grab('function _vizGeoLayer(') + '\n' +
+    'return { init:initGeo, key:_vizCountyKey, county:_vizResolveCounty,' +
+    '         layer:_vizGeoLayer, centroid:_geoCentroid,' +
+    '         stateByPostal: function(){ return _geoStateByPostal; } };')(
+      (function () {
+        var g = {};
+        var src = grabVar('PENUMBRA_US_GRID');
+        (new Function(src + '\nreturn PENUMBRA_US_GRID;'))().constructor;   // parse check
+        return (new Function(src + '\nreturn PENUMBRA_US_GRID;'))();
+      })(),
+      { console: { error: function () {} } }
+    );
+
+  eq('geo: unarmed layer lookup is null, not a throw', G.layer('us-outline'), null);
+  eq('geo: initGeo refuses junk', G.init({}), false);
+  eq('geo: initGeo accepts the real asset', G.init(ASSET), true);
+  ok('geo: us-outline resolves to the states layer', G.layer('us-outline') === ASSET.states);
+  ok('geo: nc-counties resolves to the county layer', G.layer('nc-counties') === ASSET.ncCounties);
+  eq('geo: an unknown kind is null', G.layer('mars'), null);
+
+  (function () {
+    var byPostal = G.stateByPostal();
+    var joined = Object.keys(byPostal).length;
+    ok('geo: every state outline joined to a postal code', joined >= 51, 'joined=' + joined);
+    eq('geo: NC joins', byPostal.NC ? byPostal.NC.name : null, 'North Carolina');
+    eq('geo: DC joins', byPostal.DC ? byPostal.DC.name : null, 'District of Columbia');
+    eq('geo: PR joins', byPostal.PR ? byPostal.PR.name : null, 'Puerto Rico');
+    // The join runs through the grid's name table, so a feature that gained a
+    // postal code must have had one there - never invented here.
+    ok('geo: the join stamps _st back onto the feature',
+       byPostal.NC && byPostal.NC._st === 'NC');
+  })();
+
+  // ══ 1b. THE WORLD LAYER, AND UNIVERSAL ARMING ═══════════════════════════
+  // 2026-08-28: the world layer landed in the asset (build_geo.pl, 12:06) and
+  // the renderer learned to draw it (12:09), but initGeo was still arming
+  // features layer by NAME - states and counties only. So all 240 countries
+  // reached applyOutlineMapConfig with no _c and the first draw threw
+  //   Uncaught TypeError: Cannot read properties of undefined (reading 'x')
+  // out of `f._c.x`, at 12:10. These asserts are the two halves of that: the
+  // layer is really there, and everything the asset carries comes out armed.
+  ok('world: the asset carries a world layer', !!(ASSET.world && ASSET.world.features));
+  eq('world: 240 country features', ASSET.world.features.length, 240);
+  ok('world: box is landscape', ASSET.world.box.w > ASSET.world.box.h, JSON.stringify(ASSET.world.box));
+  // ISO numeric, or an x-prefixed synthetic for the five bodies that have no
+  // ISO code (Somaliland, Kosovo, N. Cyprus, Indian Ocean Ter., Siachen).
+  ok('world: every country has an id and a name',
+     ASSET.world.features.every(function (f) { return /^(\d{3}|x\d+)$/.test(f.id) && f.name; }),
+     ASSET.world.features.filter(function (f) { return !/^(\d{3}|x\d+)$/.test(f.id) || !f.name; })
+       .map(function (f) { return f.id; }).slice(0, 5).join(','));
+  ok('world: coordinates are flat pairs, not [x,y] tuples',
+     ASSET.world.features.every(function (f) {
+       return f.rings.every(function (r) { return typeof r[0] === 'number' && r.length % 2 === 0; });
+     }));
+  (function () {
+    var bad = [];
+    ASSET.world.features.forEach(function (f) {
+      f.rings.forEach(function (r) {
+        for (var i = 0; i + 1 < r.length; i += 2) {
+          if (r[i] < -0.5 || r[i] > ASSET.world.box.w + 0.5 ||
+              r[i + 1] < -0.5 || r[i + 1] > ASSET.world.box.h + 0.5) { bad.push(f.name); return; }
+        }
+      });
+    });
+    eq('world: no coordinate escapes the world box', bad.slice(0, 3), []);
+  })();
+  ok('geo: world resolves to the world layer', G.layer('world') === ASSET.world);
+
+  // THE REGRESSION ITSELF. Enumerated FROM THE ASSET rather than from a list
+  // of layer names written here - a list is precisely what failed - so a
+  // fourth layer added to penumbra_geo_us.js is covered the day it lands.
+  (function () {
+    var unarmed = [], layers = [];
+    Object.keys(ASSET).forEach(function (k) {
+      var L = ASSET[k];
+      if (!L || !L.features || typeof L.features.length !== 'number') return;
+      layers.push(k + '=' + L.features.length);
+      L.features.forEach(function (f) {
+        var c = f._c;
+        if (!c || typeof c.x !== 'number' || typeof c.y !== 'number' ||
+            !isFinite(c.x) || !isFinite(c.y)) unarmed.push(k + ':' + f.name);
+      });
+    });
+    ok('arming: initGeo walked every layer the asset carries', layers.length >= 3, layers.join(' '));
+    eq('arming: EVERY feature of EVERY layer has a usable _c after initGeo',
+       unarmed.slice(0, 5), []);
+  })();
+
+  // ══ 2. COUNTY NAME RESOLUTION ══════════════════════════════════════════
+  eq('county key: plain name', G.key('Wake'), 'WAKE');
+  eq('county key: the warehouse suffix is stripped', G.key('Wake County'), 'WAKE');
+  eq('county key: abbreviated suffix', G.key('Wake Co.'), 'WAKE');
+  eq('county key: case and spacing do not matter', G.key('  wake   COUNTY '), 'WAKE');
+  eq('county key: trailing parenthetical is dropped', G.key('Wake (County)'), 'WAKE');
+  eq('county key: internal punctuation is dropped', G.key("O'Brien"), 'OBRIEN');
+  eq('county key: two words survive as one key', G.key('New Hanover County'), 'NEWHANOVER');
+  eq('county key: empty', G.key(''), '');
+
+  eq('county: Wake resolves to its FIPS', G.county('Wake County'), '37183');
+  eq('county: bare name resolves the same', G.county('Wake'), '37183');
+  eq('county: Mecklenburg', G.county('MECKLENBURG COUNTY'), '37119');
+  eq('county: New Hanover (two words)', G.county('New Hanover County'), '37129');
+  eq('county: a non-NC county is not invented', G.county('Travis County'), null);
+  eq('county: junk is null', G.county('not a county'), null);
+  eq('county: empty is null', G.county(''), null);
+  eq('county: null input', G.county(null), null);
+  // Every county in the asset must be resolvable by its own name, or the map
+  // would draw shapes the data can never reach.
+  (function () {
+    var miss = ASSET.ncCounties.features.filter(function (f) { return G.county(f.name + ' County') !== f.id; });
+    eq('county: all 100 resolve from "<name> County"', miss.map(function (f) { return f.name; }), []);
+  })();
+
+  // ══ 3. CENTROIDS ════════════════════════════════════════════════════════
+  // Every layer, and read f._c DIRECTLY. An earlier version of this block
+  // recomputed the centroid whenever the feature had none - which is exactly
+  // the state the world-layer bug left the asset in, so the one check that
+  // could have caught it quietly passed instead. The fallback is gone: a
+  // missing anchor is now a named failure.
+  (function () {
+    var outside = [], missing = [];
+    Object.keys(ASSET).forEach(function (k) {
+      var L = ASSET[k];
+      if (!L || !L.features || typeof L.features.length !== 'number') return;
+      L.features.forEach(function (f) {
+        var c = f._c;
+        if (!c || typeof c.x !== 'number') { missing.push(k + ':' + f.name); return; }
+        var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        f.rings.forEach(function (r) {
+          for (var i = 0; i + 1 < r.length; i += 2) {
+            if (r[i] < minX) minX = r[i]; if (r[i] > maxX) maxX = r[i];
+            if (r[i + 1] < minY) minY = r[i + 1]; if (r[i + 1] > maxY) maxY = r[i + 1];
+          }
+        });
+        if (c.x < minX - 0.01 || c.x > maxX + 0.01 ||
+            c.y < minY - 0.01 || c.y > maxY + 0.01) outside.push(k + ':' + f.name);
+      });
+    });
+    eq('centroid: none missing - read off the feature, never recomputed here',
+       missing.slice(0, 5), []);
+    eq('centroid: every label anchor lands inside its own bounding box',
+       outside.slice(0, 5), []);
+  })();
+
+  // ══ 4. THE OUTLINE RENDERER ════════════════════════════════════════════
+  var R = new Function('getChartColor', 'getChartBorderColor', 'hexToRgba', 'penumbraPercentileOf',
+                       '_vizGeoLayer', 'penumbraFormatChartNumber',
+    grabVar('PENUMBRA_US_GRID_COLS') + '\n' +
+    grab('function applyOutlineMapConfig(') + '\n' +
+    grab('function applyMapChartConfig(') + '\nreturn applyMapChartConfig;'
+  )(function () { return '#336699'; }, function (i) { return 'B' + i; },
+    function (c, a) { return 'rgba(51,102,153,' + a + ')'; },
+    function (s, p) { var n = s.length; if (!n) return 0; var r = (p / 100) * (n - 1);
+                      var lo = Math.floor(r), hi = Math.ceil(r);
+                      return lo === hi ? s[lo] : s[lo] + (s[hi] - s[lo]) * (r - lo); },
+    G.layer, function () { return null; });
+
+  function cfg() {
+    return { options: { indexAxis: 'y', scales: { x: {}, y: {} },
+                        plugins: { legend: { display: true }, tooltip: {}, datalabels: {} } } };
+  }
+  function stateTiles(values) {
+    return ASSET.states.features.map(function (f, i) {
+      var v = values && values.hasOwnProperty(f._st) ? values[f._st] : null;
+      return { st: f._st || '', name: f.name, id: f.id, r: 0, c: 0, value: v, n: v == null ? 0 : 3 };
+    });
+  }
+
+  var vals = { NC: 100, CA: 80, TX: 60, NY: 40, FL: 20 };
+  var c1 = cfg();
+  var d1 = { _isMap: true, _mapOutline: 'us-outline', _mapTiles: stateTiles(vals),
+             _mapMin: 20, _mapMax: 100, _mapBins: 'quantile', _mapShowLabels: true };
+  applyMapChartConfigTest(c1, d1);
+  function applyMapChartConfigTest(c, d) {
+    R(c, d, { showValues: false, textColor: '#111', isDark: false, currencyPrefix: '$', fsBoost: 0 });
+  }
+
+  eq('outline: builds a scatter', c1.type, 'scatter');
+  eq('outline: one hit point per FEATURE, not per matched value', c1.data.datasets[0].data.length, 52);
+  eq('outline: hit points are invisible', [c1.data.datasets[0].radius, c1.data.datasets[0].borderWidth], [0, 0]);
+  eq('outline: hover finds the nearest area without needing a hit',
+     [c1.options.interaction.mode, c1.options.interaction.intersect], ['nearest', false]);
+  eq('outline: y axis is reversed (geo y grows downward)', c1.options.scales.y.reverse, true);
+  eq('outline: axes are scaffolding, never shown',
+     [c1.options.scales.x.display, c1.options.scales.y.display], [false, false]);
+  var pluginIds = (c1.plugins || []).map(function (p) { return p.id; });
+  ok('outline: registers its own painter', pluginIds.indexOf('penumbraMapOutline') !== -1, pluginIds.join(','));
+  ok('outline: does NOT register the tile legend plugin', pluginIds.indexOf('penumbraMapLegend') === -1);
+
+  // Letterboxing. The transform is derived from chartArea, so the test drives
+  // the point-placement hook and reads back where the corners of the box land -
+  // exactly what the paint uses.
+  (function () {
+    var plug = c1.plugins.filter(function (p) { return p.id === 'penumbraMapOutline'; })[0];
+    var box = ASSET.states.box;
+
+    // A stand-in for a Chart.js linear scale: enough of the contract that
+    // fitScales() can range it and the paint can read pixels back out.
+    function scale(px0, px1, reverse) {
+      return {
+        min: 0, max: 1, _p0: px0, _p1: px1, _rev: !!reverse,
+        configure: function () { this._span = this.max - this.min; },
+        getPixelForValue: function (v) {
+          var t = (v - this.min) / (this.max - this.min);
+          if (this._rev) t = 1 - t;
+          return this._p0 + t * (this._p1 - this._p0);
+        }
+      };
+    }
+    function place(caW, caH) {
+      var xs = scale(0, caW, false), ys = scale(0, caH, true);
+      var chart = { chartArea: { left: 0, top: 0, right: caW, bottom: caH },
+                    scales: { x: xs, y: ys } };
+      plug.afterLayout(chart);
+      // px per box unit on each axis - these must agree, or the map is stretched.
+      return { sx: Math.abs(xs.getPixelForValue(1) - xs.getPixelForValue(0)),
+               sy: Math.abs(ys.getPixelForValue(1) - ys.getPixelForValue(0)),
+               xr: xs.max - xs.min, yr: ys.max - ys.min,
+               cx: (xs.min + xs.max) / 2, cy: (ys.min + ys.max) / 2 };
+    }
+
+    var wide = place(1200, 300);
+    var tall = place(300, 1200);
+    ok('letterbox: x and y end up at the SAME px-per-unit, so nothing stretches',
+       Math.abs(wide.sx - wide.sy) < 1e-9 && Math.abs(tall.sx - tall.sy) < 1e-9,
+       'wide=' + wide.sx.toFixed(5) + '/' + wide.sy.toFixed(5) +
+       ' tall=' + tall.sx.toFixed(5) + '/' + tall.sy.toFixed(5));
+    ok('letterbox: a short plot area is limited by HEIGHT',
+       Math.abs(wide.sx - 300 / box.h) < 1e-9, 'sx=' + wide.sx.toFixed(5));
+    ok('letterbox: a narrow plot area is limited by WIDTH',
+       Math.abs(tall.sx - 300 / box.w) < 1e-9, 'sx=' + tall.sx.toFixed(5));
+    ok('letterbox: the map stays centred in the spare axis',
+       Math.abs(wide.cx - box.w / 2) < 1e-6 && Math.abs(tall.cy - box.h / 2) < 1e-6);
+    ok('letterbox: the visible range always covers the whole map',
+       wide.xr >= box.w - 1e-6 && wide.yr >= box.h - 1e-6 &&
+       tall.xr >= box.w - 1e-6 && tall.yr >= box.h - 1e-6);
+
+    // Degenerate plot areas must not poison the scales with NaN.
+    var xs0 = scale(0, 0, false), ys0 = scale(0, 0, true);
+    plug.afterLayout({ chartArea: { left: 0, top: 0, right: 0, bottom: 0 },
+                       scales: { x: xs0, y: ys0 } });
+    eq('letterbox: a zero-size plot area is left alone', [xs0.min, xs0.max], [0, 1]);
+    plug.afterLayout({ scales: { x: xs0, y: ys0 } });
+    eq('letterbox: a chart with no chartArea yet is survivable', [xs0.min, xs0.max], [0, 1]);
+  })();
+
+  // Painting: drive the hook against a recording context.
+  (function () {
+    var plug = c1.plugins.filter(function (p) { return p.id === 'penumbraMapOutline'; })[0];
+    var fills = 0, strokes = 0, rects = 0, moves = 0;
+    var chart = {
+      chartArea: { left: 0, top: 0, right: 800, bottom: 500 },
+      scales: { x: { getPixelForValue: function (v) { return v * 0.8; } },
+                y: { getPixelForValue: function (v) { return v * 0.8; } } },
+      ctx: { save: function () {}, restore: function () {},
+             beginPath: function () {}, closePath: function () {},
+             moveTo: function () { moves++; }, lineTo: function () {},
+             fill: function () { fills++; }, stroke: function () { strokes++; },
+             fillRect: function () { rects++; }, strokeRect: function () {},
+             fillText: function () {} }
+    };
+    plug.beforeDatasetsDraw(chart);
+    ok('paint: fills at least one path per feature', fills >= 52, 'fills=' + fills);
+    eq('paint: every filled path is also stroked', fills, strokes);
+    ok('paint: begins a subpath for each ring drawn', moves >= 52, 'moves=' + moves);
+    ok('paint: tiny features (DC) get a minimum-size marker', rects >= 1, 'rects=' + rects);
+  })();
+
+  // Labels: a shape too small for its own label must not draw one.
+  (function () {
+    var dl = c1.options.plugins.datalabels;
+    // chartArea sized so the fit lands on the scale we want to probe.
+    // The label gate measures through the x scale, so hand it one directly.
+    function chartAt(s) {
+      return { scales: { x: { getPixelForValue: function (v) { return v * s; } } } };
+    }
+    var idxTX = null, idxDC = null;
+    ASSET.states.features.forEach(function (f, i) {
+      if (f._st === 'TX') idxTX = i;
+      if (f._st === 'DC') idxDC = i;
+    });
+    ok('labels: a big state is labelled at normal size',
+       dl.display({ chart: chartAt(0.8), dataIndex: idxTX }) === true);
+    ok('labels: a long name is suppressed where a short one fits',
+       (function () {
+         var idxLong = null, idxShort = null;
+         ASSET.ncCounties.features.forEach(function (f, i) {
+           if (f.name === 'Northampton') idxLong = i;
+           if (f.name === 'Wake') idxShort = i;
+         });
+         return idxLong !== null && idxShort !== null;
+       })());
+    ok('labels: DC is NOT labelled - it is two pixels across',
+       dl.display({ chart: chartAt(0.8), dataIndex: idxDC }) === false);
+    ok('labels: nothing is labelled on a tiny canvas',
+       dl.display({ chart: chartAt(0.02), dataIndex: idxTX }) === false);
+    eq('labels: the postal code is the label', dl.formatter(null, { dataIndex: idxTX }), 'TX');
+  })();
+
+  // Tooltip wording differs by layer, because "Wake (NC)" would be wrong.
+  (function () {
+    var cc = cfg();
+    var ctiles = ASSET.ncCounties.features.map(function (f) {
+      return { st: '', name: f.name, id: f.id, r: 0, c: 0, value: f.id === '37183' ? 99 : null, n: 1 };
+    });
+    R(cc, { _isMap: true, _mapOutline: 'nc-counties', _mapTiles: ctiles,
+            _mapMin: 0, _mapMax: 99, _mapBins: 'quantile', _mapShowLabels: true },
+      { showValues: false, textColor: '#111', isDark: false, currencyPrefix: '', fsBoost: 0 });
+    eq('counties: one hit point per county', cc.data.datasets[0].data.length, 100);
+    var wakeIdx = 0;
+    ASSET.ncCounties.features.forEach(function (f, i) { if (f.id === '37183') wakeIdx = i; });
+    eq('counties: tooltip says "<name> County"',
+       cc.options.plugins.tooltip.callbacks.title([{ dataIndex: wakeIdx }]), 'Wake County');
+    eq('counties: an unmatched county reads as No data',
+       cc.options.plugins.tooltip.callbacks.label({ dataIndex: (wakeIdx + 1) % 100 }), 'No data');
+    eq('states: tooltip names the state and its postal code',
+       c1.options.plugins.tooltip.callbacks.title([{ dataIndex: 0 }]).indexOf('(') > -1, true);
+  })();
+
+  // ══ 4b. THE WORLD OUTLINE, END TO END ═══════════════════════════════════
+  // The exact call that threw on 2026-08-28. Building the config walks all
+  // 240 countries reading f._c.x, so an unarmed layer cannot survive this -
+  // and it is wrapped, because the pre-fix module THROWS here rather than
+  // returning a bad config, and a throw has to read as one clean FAIL, not
+  // as a dead harness that never reaches the rest of the file.
+  (function () {
+    var cw = cfg();
+    // main.js aggregates world values under the FEATURE ID and carries it as
+    // _key; the scatter point has to come back out in the same vocabulary.
+    var VALUED = { '840': 500, '076': 250 };
+    var wtiles = ASSET.world.features.map(function (f) {
+      var v = VALUED.hasOwnProperty(f.id) ? VALUED[f.id] : null;
+      return { st: '', name: f.name, id: f.id, r: 0, c: 0, _key: f.id,
+               value: v, n: v == null ? 0 : 2 };
+    });
+    var built = true, why = '';
+    try {
+      R(cw, { _isMap: true, _mapOutline: 'world', _mapTiles: wtiles,
+              _mapMin: 250, _mapMax: 500, _mapBins: 'quantile', _mapShowLabels: true },
+        { showValues: false, textColor: '#111', isDark: false, currencyPrefix: '$', fsBoost: 0 });
+    } catch (e) { built = false; why = e.name + ': ' + e.message; }
+    ok('world: the outline config BUILDS (the 2026-08-28 crash)', built, why);
+    if (!built) return;
+
+    var pts = cw.data.datasets[0].data;
+    eq('world: builds a scatter', cw.type, 'scatter');
+    eq('world: one hit point per COUNTRY, matched or not', pts.length, 240);
+    eq('world: every point has finite coordinates',
+       pts.filter(function (p) { return !isFinite(p.x) || !isFinite(p.y); }).length, 0);
+
+    var usIdx = -1, brIdx = -1, noneIdx = -1;
+    ASSET.world.features.forEach(function (f, i) {
+      if (f.id === '840') usIdx = i;
+      if (f.id === '076') brIdx = i;
+      if (noneIdx < 0 && !VALUED.hasOwnProperty(f.id)) noneIdx = i;
+    });
+    ok('world: the US and Brazil are both in the layer', usIdx >= 0 && brIdx >= 0,
+       'us=' + usIdx + ' br=' + brIdx);
+    eq('world: _key is the feature id - the vocabulary rows aggregate under',
+       [pts[usIdx]._key, pts[brIdx]._key], ['840', '076']);
+    eq('world: _id is carried through as well', pts[usIdx]._id, '840');
+    // "United States of America County" and "... (US)" are both wrong here:
+    // the county suffix belongs to nc-counties and the postal parenthetical
+    // to us-outline. A country has neither.
+    var wtitle = cw.options.plugins.tooltip.callbacks.title([{ dataIndex: usIdx }]);
+    eq('world: tooltip is the bare country name', wtitle, ASSET.world.features[usIdx].name);
+    ok('world: tooltip has no county suffix and no postal parenthetical',
+       wtitle.indexOf(' County') === -1 && wtitle.indexOf('(') === -1, wtitle);
+    ok('world: a matched country reports its value',
+       cw.options.plugins.tooltip.callbacks.label({ dataIndex: usIdx }).indexOf('500') !== -1,
+       cw.options.plugins.tooltip.callbacks.label({ dataIndex: usIdx }));
+    eq('world: an unmatched country reads as No data',
+       cw.options.plugins.tooltip.callbacks.label({ dataIndex: noneIdx }), 'No data');
+    var wIds = (cw.plugins || []).map(function (p) { return p.id; });
+    ok('world: paints through the outline plugin, not the tile grid',
+       wIds.indexOf('penumbraMapOutline') !== -1 && wIds.indexOf('penumbraMapLegend') === -1,
+       wIds.join(','));
+  })();
+
+  // ══ 5. THE FALLBACK ════════════════════════════════════════════════════
+  // If the geometry never loaded, an outline request must still draw SOMETHING.
+  (function () {
+    var noGeo = new Function('getChartColor', 'getChartBorderColor', 'hexToRgba', 'penumbraPercentileOf',
+                             '_vizGeoLayer', 'penumbraFormatChartNumber', 'applyOutlineMapConfig',
+      grabVar('PENUMBRA_US_GRID_COLS') + '\n' +
+      grab('function applyMapChartConfig(') + '\nreturn applyMapChartConfig;'
+    )(function () { return '#336699'; }, function (i) { return 'B' + i; },
+      function (c, a) { return 'rgba(51,102,153,' + a + ')'; },
+      function (s) { return s[0] || 0; },
+      function () { return null; },                    // geometry unavailable
+      function () { return null; },
+      function () { throw new Error('outline path must not run without geometry'); });
+    var cf = cfg();
+    noGeo(cf, { _isMap: true, _mapOutline: 'us-outline',
+                _mapTiles: [{ st: 'NC', name: 'North Carolina', r: 5, c: 8, value: 1, n: 1 }],
+                _mapMin: 1, _mapMax: 1, _mapBins: 'quantile' },
+          { showValues: false, textColor: '#111', isDark: false, currencyPrefix: '', fsBoost: 0 });
+    eq('fallback: still produces a chart', cf.type, 'scatter');
+    ok('fallback: uses the TILE legend, i.e. it fell back to the grid',
+       (cf.plugins || []).map(function (p) { return p.id; }).indexOf('penumbraMapLegend') !== -1);
+  })();
+
+  // ══ 6. A LAYER initGeo HAS NEVER HEARD OF ═══════════════════════════════
+  // The 2026-08-28 bug was not "world was forgotten", it was "arming is a
+  // hand-maintained list". This is that same failure one layer into the
+  // future: a geo file that gains a layer must not need an edit inside
+  // initGeo before its features are drawable. Runs LAST because initGeo
+  // re-points the module-level GEO at whatever it is handed - the real asset
+  // goes back at the end of the block, and that is asserted too.
+  (function () {
+    function ring(x, y) { return [x, y, x + 10, y, x + 10, y + 10, x, y + 10, x, y]; }
+    var synth = {
+      states:     { box: { w: 100, h: 100 },
+                    features: [{ id: '01', name: 'Alabama', rings: [ring(1, 1)] }] },
+      ncCounties: { box: { w: 100, h: 100 },
+                    features: [{ id: '37183', name: 'Wake', rings: [ring(20, 20)] }] },
+      provinces:  { box: { w: 100, h: 100 },
+                    features: [{ id: '999', name: 'Nowhere', rings: [ring(40, 40)] }] }
+    };
+    eq('future layer: initGeo accepts an asset carrying an extra layer',
+       G.init(synth), true);
+    var nf = synth.provinces.features[0];
+    ok('future layer: its features are armed without naming the layer in initGeo',
+       !!(nf._c && typeof nf._c.x === 'number' && isFinite(nf._c.x)),
+       'provinces._c=' + JSON.stringify(nf._c));
+    ok('future layer: the anchor is inside the shape, not a 0,0 placeholder',
+       !!(nf._c && nf._c.x >= 40 && nf._c.x <= 50 && nf._c.y >= 40 && nf._c.y <= 50),
+       JSON.stringify(nf._c));
+    ok('future layer: the named layers are still armed',
+       !!(synth.states.features[0]._c && synth.ncCounties.features[0]._c));
+    ok('future layer: a non-layer property is skipped, not walked',
+       G.init({ states: synth.states, ncCounties: synth.ncCounties,
+                countryKeys: { US: '840' } }) === true);
+    // Put the real asset back: _vizGeoLayer resolves against the module-level
+    // GEO, so anything added after this would otherwise see the synthetic one.
+    eq('future layer: the real asset re-arms cleanly', G.init(ASSET), true);
+    ok('future layer: us-outline resolves again', G.layer('us-outline') === ASSET.states);
+    ok('future layer: world resolves again', G.layer('world') === ASSET.world);
+  })();
+
+  document.getElementById('out').textContent =
+    'RESULT ' + (FAIL === 0 ? 'ALL-PASS' : 'HAS-FAILURES') + '  pass=' + PASS + ' fail=' + FAIL + '\n' + LOG.join('\n');
+} catch (e) {
+  document.getElementById('out').textContent = 'HARNESS-ERROR: ' + e.name + ': ' + e.message + '\n' + (e.stack || '');
+}
+</script>

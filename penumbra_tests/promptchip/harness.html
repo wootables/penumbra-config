@@ -1,0 +1,42 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>prompt chip squeeze</title></head>
+<body class="theme-light-sepia">
+<!-- The answered-prompts chip (markup as updatePromptDisplay writes it) in
+     header slots of three widths, styled by the css/main.css under test. -->
+<div id="slot1" style="width:258px"><ul id="promptInfoList"><li><a class="prompt-byline-link"><span class="prompt-ic"><svg width="16" height="16"></svg></span><em>Proposals first submitted between:</em><strong>first day of 5 fiscal years ago to last day of las...</strong></a></li></ul></div>
+<div id="slot2" style="width:258px"><ul class="pl"><li><a class="prompt-byline-link"><span class="prompt-ic"><svg width="16" height="16"></svg></span><em>PI:</em><strong>Limon, Bruce (4095) and a much longer value that cannot fit</strong></a></li></ul></div>
+<div id="slot3" style="width:1200px"><ul class="pl"><li><a class="prompt-byline-link"><span class="prompt-ic"><svg width="16" height="16"></svg></span><em>Proposals first submitted between:</em><strong>first day of 5 fiscal years ago to last day of las...</strong></a></li></ul></div>
+<pre id="out">running</pre>
+<script>
+(function () {
+  var results = [];
+  function assert(name, cond, detail) { results.push({ name: name, pass: !!cond, detail: detail === undefined ? '' : String(detail) }); }
+  try {
+    var x = new XMLHttpRequest(); x.open('GET', 'main_css_under_test.css', false); x.send();
+    var st = document.createElement('style'); st.textContent = x.responseText; document.head.appendChild(st);
+    // the other two lists get #promptInfoList's own rules (an id may be used once)
+    var st2 = document.createElement('style');
+    st2.textContent = '.pl { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 0; list-style: none; align-items: center; min-width: 0; } .pl li { margin: 0; min-width: 0; }';
+    document.head.appendChild(st2);
+    function parts(slot) {
+      var a = document.querySelector('#' + slot + ' .prompt-byline-link');
+      var R = function (e) { return e.getBoundingClientRect(); };
+      return { chip: R(a), ic: R(a.querySelector('.prompt-ic')), em: R(a.querySelector('em')), st: R(a.querySelector('strong')) };
+    }
+    function f(r) { return Math.round(r.left) + '..' + Math.round(r.right) + ' x ' + Math.round(r.top) + '..' + Math.round(r.bottom); }
+    var p = parts('slot1'), d = 'chip ' + f(p.chip) + ' em ' + f(p.em) + ' strong ' + f(p.st);
+    assert('C1 a label wider than its slot stays INSIDE the chip (clear of the 24px pencil gutter)', p.em.right <= p.chip.right - 23, d);
+    assert('C2 ...and its value is visible (was 0px wide)', p.st.width >= 100, d);
+    assert('C3 ...on its own line under the label', p.st.top >= p.em.bottom - 1, d);
+    assert('C4 ...and the label stays beside the icon (does not drop under it)', p.em.left > p.ic.right && p.em.top < p.ic.bottom, 'ic ' + f(p.ic) + ' ' + d);
+    assert('C5 the chip itself stays inside its slot', p.chip.right <= document.getElementById('slot1').getBoundingClientRect().right + 0.5, d);
+    var q = parts('slot2'), dq = 'chip ' + f(q.chip) + ' em ' + f(q.em) + ' strong ' + f(q.st);
+    assert('C6 a short label + long value is unchanged: one line, the value ellipsizes beside the label', Math.abs(q.st.top - q.em.top) < 2 && q.st.left > q.em.right && q.st.right <= q.chip.right - 23, dq);
+    var w = parts('slot3'), dw = 'chip ' + f(w.chip) + ' em ' + f(w.em) + ' strong ' + f(w.st);
+    assert('C7 with room, the long-label chip is one line (label then value)', Math.abs(w.st.top - w.em.top) < 2 && w.st.left > w.em.right, dw);
+    assert('C8 ...and its value shows in full (no squeeze)', w.st.width > 300, dw);
+  } catch (e) { results.push({ name: 'harness threw', pass: false, detail: String(e) }); }
+  document.getElementById('out').textContent = 'RESULTS_JSON:' + JSON.stringify({ results: results });
+})();
+</script>
+</body></html>

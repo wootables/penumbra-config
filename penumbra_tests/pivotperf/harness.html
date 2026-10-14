@@ -1,0 +1,94 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>pivot perf</title></head>
+<body>
+<!-- Minimal DOM. main.js binds #copyPivotSnippetBtn DIRECTLY at ready time, so
+     the pivot-builder elements must exist BEFORE main.js loads. The trigger
+     handler is delegated off #reportSnippetOutput. The parser resolves the
+     Value column against #tableHeader th[data-colname]. -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<table id="resultsTable"><thead id="tableHeader"><tr>
+  <th data-colname="#">#</th><th data-colname="COLLEGE">COLLEGE</th><th data-colname="FY">FY</th>
+  <th data-colname="AMOUNT">AMOUNT</th><th data-colname="STATUS">STATUS</th><th data-colname="RECORD_ID">RECORD_ID</th>
+</tr></thead><tbody></tbody></table>
+<div id="errorBox"></div>
+<!-- Phase 3 (2026-08-21): layout_switch / toggle_switch. The toggle reads its
+     own state off the LIVE report, so the three things it reads must exist:
+     the search box, and the two view containers (hidden = the flat table, which
+     is the baseline state every toggle assertion starts from). -->
+<input id="tableSearch" value="">
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="pivotLightbox" style="display:none">
+  <div id="pivot-source-columns"></div>
+  <div id="pivot-rows"></div><div id="pivot-cols"></div><div id="pivot-vals"></div>
+  <select id="pivot-aggregation-selector"><option value="">-</option><option value="sum">sum</option></select>
+  <table><tbody id="pivot-agg-table-body"></tbody></table>
+  <select id="pivot-rows-layout-select"><option value="nested">nested</option><option value="nested-static">nested-static</option><option value="flat">flat</option></select>
+  <select id="pivot-cols-layout-select"><option value="nested">nested</option><option value="flat">flat</option></select>
+  <select id="pivot-sort-order"><option value="asc">asc</option><option value="desc">desc</option></select>
+  <input id="pivot-sticky-cols" value="3">
+  <input type="checkbox" id="pivot-row-total-override-toggle">
+  <div id="pivot-row-total-override-container" style="display:none"><div id="pivot-row-total-slots"></div><div id="pivot-row-total-tokens"></div></div>
+  <select id="pivot-rank-dir"><option value="none">none</option><option value="top">top</option><option value="bottom">bottom</option></select>
+  <input id="pivot-rank-n" value="10"><select id="pivot-rank-agg"><option value="sum">sum</option><option value="count">count</option></select>
+  <select id="pivot-rank-scope"><option value="">Overall</option></select>
+  <input type="checkbox" id="pivot-rank-other" checked><label id="pivot-rank-other-label"></label>
+  <input type="checkbox" id="pivot-no-breakdown"><input type="checkbox" id="pivot-start-expanded">
+  <select id="pivotPresetSelect"><option value=""></option></select><button id="pivotDeletePresetBtn"></button><input type="checkbox" id="pivotAutoRunPreset">
+  <button id="generatePivotBtn">Generate</button>
+  <select id="pivotSnippetTargetSelect" style="display: none;"></select>
+  <button id="updatePivotSnippetBtn" type="button" style="display: none;">&#x27F3; Update Snippet</button>
+  <button id="copyPivotSnippetBtn">Snippet</button>
+  <button id="pivotSavePresetBtn"></button>
+</div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  // Same boot stubs as the parity harness (see ..\parity\harness_b.html for why).
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  // Synchronous show/hide: the fx ticker's rAF never fires under --dump-dom,
+  // so animated fadeIn would otherwise leave display:none and break :visible.
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () {
+    this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {};
+  };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  // NOTE: do NOT null window.requestAnimationFrame here - main.js calls it during
+  // init and the ready-closure then dies before any handler is bound. Instead,
+  // jQuery.fx.off (set after jQuery loads, below the vendor scripts) makes
+  // fadeIn/fadeOut synchronous so :visible assertions work headless.
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); try { var o = document.getElementById('out'); if (o && o.textContent === 'running') o.textContent = 'PAGE_ERROR: ' + window.__errors[0]; } catch (x) {} return true; };
+  // Clipboard capture for the Copy Snippet handler.
+  window.__clip = null;
+  if (!navigator.clipboard) { try { Object.defineProperty(navigator, 'clipboard', { value: {}, configurable: true }); } catch (e) {} }
+  try { navigator.clipboard.writeText = function (s) { window.__clip = s; return Promise.resolve(); }; } catch (e) {}
+</script>
+<script src="main_perf.js"></script>
+<script src="perf_driver.js"></script>
+</body></html>

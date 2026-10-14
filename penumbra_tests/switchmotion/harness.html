@@ -1,0 +1,258 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>switch motion</title>
+<link rel="stylesheet" href="main.css">
+<style>
+  /* The harness has no theme stylesheet: pin the page so the data region's box
+     is deterministic (report header on top, the table stage below it). */
+  body { margin: 0; }
+  #reportHeaderContainer { min-height: 120px; padding: 10px; }
+  #results-wrapper { width: 1000px; height: 480px; overflow: auto; }
+</style>
+</head>
+<body>
+<!-- switch motion suite (2026-09-24). The page and run path are the savelayout
+     harness's (known to boot main.js and render a query through the real code),
+     laid out like index.php where it matters here:
+       - #reportSnippetOutput INSIDE #reportHeaderContainer (the control lives in
+         the header, the veil must not cover it)
+       - the REAL #loadingOverlay markup (loader, message p, timer row, #loadingTip)
+       - #resultsHeader above #pnbSplitStage > #table-view-container
+       - the grouping dialog + the pivot builder, so group_by / pivot / flat run
+         through their real handlers (#confirmGroupingBtn, #generatePivotBtn,
+         #exitPivotModeBtn, removeGrouping)
+     ?mode=switch   the report snippet holds a layout_switch, a toggle_switch and
+                    a data(group) case() (so the view-state gated render runs)
+     ?mode=plain    no data(...) in the snippet: nothing re-renders at the end -->
+<div id="reportHeaderContainer" role="banner">
+  <div id="defaultTitleView"></div><div id="reportInfoPanel" style="display:none"></div>
+  <div id="mainReportTitle"></div><div id="mainReportSubtitle"></div>
+  <div id="reportSnippetOutput"></div>
+</div>
+<!-- The editors live in the (closed) admin console in the app. Visible here,
+     their three CodeMirror instances push the table ~1,200px down the page and
+     the veil (correctly) falls back to full screen - so they are kept out of
+     the layout, the way a viewer's page has them. -->
+<div id="harnessOffstage" style="display:none">
+  <input id="reportTitle" value=""><input id="reportSubtitle" value=""><div id="admWrapper"></div><button id="toggleAdminViewBtn"></button>
+  <div id="editorTabs"></div>
+  <textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+  <button id="executeQuery">Run</button>
+</div>
+<div id="loadingOverlay">
+  <div class="loader"></div>
+  <p>Executing Query, Please Wait...</p>
+  <div style="display: flex; align-items: center; gap: 20px;">
+    <p id="execution-timer" style="font-size: 1.5em; margin: 0; font-weight: bold;"></p>
+    <button id="stopQueryBtn">Stop</button>
+  </div>
+  <div id="loadingTip" aria-live="polite"></div>
+</div>
+<div id="importTimestamps"></div>
+<div id="errorBox"></div><div id="undo_text_container"></div>
+<div id="resultsHeader">
+  <div id="tableSearchContainer"><input id="tableSearch" value=""></div>
+  <div id="paginatorContainer">
+    <div id="paginationControls"><span id="resultCount"></span><select id="rowsPerPageSelector"><option value="25">25</option><option value="50">50</option><option value="200" selected>200</option><option value="all">All</option></select></div>
+    <div id="groupActionsContainer" style="display: none;"><a href="#" id="removeGroupingLink">Remove Grouping</a><a href="#" id="expandAllGroups">Expand all</a><a href="#" id="collapseAllGroups">Collapse all</a></div>
+    <button id="modifyPivotBtn" style="display: none;">Modify Pivot Table</button>
+    <button id="exitPivotModeBtn" style="display: none;">Restore Transaction List</button>
+    <div id="pivot-collapse-bar" style="display:none"></div>
+  </div>
+</div>
+<div id="groupWarningForSnapshot" style="display:none"></div><div id="pivotWarningForGrouping" style="display:none"></div><div id="pivotWarningForSnapshot" style="display:none"></div>
+<div id="pnbSplitStage">
+  <div id="table-view-container" role="main" tabindex="-1">
+    <div id="container-parent"><div id="results-wrapper"><table id="resultsTable"><caption class="sr-only">Report results table</caption><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table></div></div>
+    <div id="groupedResultsContainer" style="display:none"></div>
+    <div id="pivot-output-container" style="display:none"></div>
+    <div id="pnbNoSearchMatches" style="display: none;"><h3>No rows match your search</h3><p id="pnbNoSearchMatchesHint"></p></div>
+  </div>
+  <aside id="pnbSplitPane" aria-label="Report snippets" hidden></aside>
+</div>
+<div id="snapshotComparisonContainer" style="display:none"></div>
+<!-- the grouping dialog (groupmode harness) + its confirm button -->
+<div id="groupingLightbox" style="display:none">
+  <input type="checkbox" id="groupAggCheckbox">
+  <div id="groupAggOptions" style="display:none"></div>
+  <select id="groupAggType"><option value="sum">sum</option><option value="avg">avg</option></select>
+  <select id="groupSortSelect">
+    <option value="label|asc">label asc</option><option value="label|desc">label desc</option>
+    <option value="count|asc">count asc</option><option value="count|desc">count desc</option>
+  </select>
+  <div id="groupingColumnSelector" class="penumbra-custom-select"><div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div></div>
+  <div id="groupLevel2Row" style="display:none"><div id="groupingColumnSelector2" class="penumbra-custom-select"><div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div></div></div>
+  <div id="groupLevel3Row" style="display:none"><div id="groupingColumnSelector3" class="penumbra-custom-select"><div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div></div></div>
+  <div id="groupAggColumn" class="penumbra-custom-select"><div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div></div>
+  <select id="groupStartDepth"><option value="0">Collapsed</option><option value="1">Level 1</option><option value="2">Level 2</option><option value="3">All levels</option></select>
+  <select id="groupLimitDir"><option value="top">top</option><option value="bottom">bottom</option></select>
+  <input type="text" id="groupLimitN"><input type="text" id="groupLimitMinRows"><input type="checkbox" id="groupLimitOther" checked>
+  <div id="groupSummaryFilterHint" style="display:none"></div>
+  <button id="resetGroupingBtn" type="button">Reset</button>
+  <div id="groupPresetMount"></div>
+  <button id="copyGroupSnippetBtn" type="button">Snippet</button>
+  <button id="confirmGroupingBtn" type="button">Group</button>
+</div>
+<!-- the pivot builder (pivot_trigger harness) -->
+<div id="pivotLightbox" style="display:none">
+  <div id="pivotErrorBox" style="display:none"></div>
+  <div id="pivot-source-columns"></div>
+  <div id="pivot-rows"></div><div id="pivot-cols"></div><div id="pivot-vals"></div>
+  <select id="pivot-aggregation-selector"><option value="">-</option><option value="sum">sum</option></select>
+  <table><tbody id="pivot-agg-table-body"></tbody></table>
+  <select id="pivot-rows-layout-select"><option value="nested">nested</option><option value="nested-static">nested-static</option><option value="flat">flat</option></select>
+  <select id="pivot-cols-layout-select"><option value="nested">nested</option><option value="flat">flat</option></select>
+  <select id="pivot-sort-order"><option value="asc">asc</option><option value="desc">desc</option></select>
+  <input id="pivot-sticky-cols" value="3">
+  <input type="checkbox" id="pivot-row-total-override-toggle">
+  <div id="pivot-row-total-override-container" style="display:none"><div id="pivot-row-total-slots"></div><div id="pivot-row-total-tokens"></div></div>
+  <select id="pivot-rank-dir"><option value="none">none</option><option value="top">top</option><option value="bottom">bottom</option></select>
+  <input id="pivot-rank-n" value="10"><select id="pivot-rank-agg"><option value="sum">sum</option><option value="count">count</option></select>
+  <select id="pivot-rank-scope"><option value="">Overall</option></select>
+  <input type="checkbox" id="pivot-rank-other" checked><label id="pivot-rank-other-label"></label>
+  <input type="checkbox" id="pivot-no-breakdown"><input type="checkbox" id="pivot-start-expanded">
+  <select id="pivotPresetSelect"><option value=""></option></select><button id="pivotDeletePresetBtn"></button><input type="checkbox" id="pivotAutoRunPreset">
+  <button id="generatePivotBtn">Generate</button>
+  <select id="pivotSnippetTargetSelect" style="display: none;"></select>
+  <button id="updatePivotSnippetBtn" type="button" style="display: none;">Update Snippet</button>
+  <button id="copyPivotSnippetBtn">Snippet</button>
+  <button id="pivotSavePresetBtn"></button>
+</div>
+<div id="settingsPanelOverlay"></div>
+<div id="settingsPanel">
+  <select id="spThemeSelector"><option value="report-default">Report Default</option><option value="theme-default">Default</option></select>
+  <select id="spDensitySelector"><option value="report-default">Report Default</option><option value="standard">Standard</option></select>
+  <input type="checkbox" id="spRowExpandToggle"><input type="checkbox" id="spResolverToggle">
+  <div class="sp-section sp-columns-section"><div class="sp-column-container"><div id="spColumnList" class="sp-column-list"></div></div></div>
+  <div class="sp-actions"><button id="spApply">Save Column Layout</button><button id="spReset">Reset</button><span id="spPendingCount"></span></div>
+</div>
+<div id="pnbStatusBar">
+  <div class="sb-seg" id="sbColsSeg"><span id="sbCols"></span>
+    <span class="sb-chip" id="sbCustomCols" style="display:none;">custom layout</span>
+    <div class="sb-pop" id="sbCustomColsPop"><div id="sbCustomColsDiff"></div><button id="sbCustomColsReset">Reset</button><button id="sbCustomColsSave" style="display:none;">Save</button></div>
+  </div>
+  <div class="sb-seg" id="sbUserSeg"></div>
+</div>
+<pre id="out">running</pre>
+
+<script>
+  (function () {
+    try { localStorage.clear(); } catch (e) {}
+  })();
+  window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' }, 'theme-midnight': { label: 'Midnight' } };
+  window.PENUMBRA_THEME_IDS = ['theme-default', 'theme-midnight'];
+  window.PENUMBRA_THEME_ALIASES = {};
+  window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  window.__MODE = (/[?&]mode=(\w+)/.exec(location.search) || [])[1] || 'switch';
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  // Positions: 0 flat, 1 By Dept, 2 By Type, 3 a column that does not exist
+  // (the step is refused with a notice - nothing loads), 4 a pivot.
+  // The toggle filters to rows mentioning "alpha" and clears the filter again.
+  window.__SNIPPET_SWITCH =
+    "layout_switch('Transactions|flat', 'By Dept|group_by|DEPT', 'By Type|group_by|TYPE', 'Missing|group_by|NOPE', 'Dept Pivot|pivot|DEPT|none|AMOUNT|sum')\n" +
+    "toggle_switch('Alpha only', 'on|search|alpha', 'off|search|')\n" +
+    "toggle_switch('Midnight', 'on|theme|theme-midnight', 'off|theme|theme-default')\n" +
+    "<span id=\"viewState\">case(data(group) = 'true', 'GROUPED', 'FLAT')</span>";
+  window.__SNIPPET_PLAIN =
+    "layout_switch('Transactions|flat', 'By Dept|group_by|DEPT', 'By Type|group_by|TYPE')\n" +
+    "<span id=\"plainMark\">plain</span>";
+  // ?mode=restore (2026-09-25): the switch snippet plus two plain action links -
+  // a grouping NOT started from a switch (the dialog's path: from a pivot it
+  // exits first, with onComplete) and a sort trigger. 600 rows, so a sort takes
+  // the loading path (over 500 rows).
+  window.__SNIPPET_RESTORE = window.__SNIPPET_SWITCH + "\n" +
+    "action(trigger, 'Group by dept', 'group_by|DEPT') action(trigger, 'Sort by amount', 'sort|AMOUNT|desc')";
+  window.__QUERY = 'SELECT ID, NAME, DEPT, TYPE, AMOUNT FROM MOTION_FIXTURE';
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: [],
+    totalExemptions: []
+  };
+  window.penumbra_vars.preloadedState = {
+    name: 'motionfix', query: window.__QUERY, reportTitle: 'Switch motion fixture',
+    theme: 'theme-default', density: 'standard',
+    sortCriteria: [], noLimit: true, rowExpandDefault: false, resolverLinksDefault: false,
+    rowsPerPage: '200',
+    reportSnippet: (window.__MODE === 'plain') ? window.__SNIPPET_PLAIN
+      : (window.__MODE === 'restore') ? window.__SNIPPET_RESTORE : window.__SNIPPET_SWITCH
+  };
+  window.__rows = function (n) {
+    var out = [], depts = ['a', 'b', 'c'], types = ['x', 'y'];
+    for (var i = 1; i <= n; i++) {
+      out.push({ ID: String(i), NAME: (i % 4 === 0 ? 'alpha ' : 'beta ') + i, DEPT: depts[i % 3], TYPE: types[i % 2], AMOUNT: String(i * 10) });
+    }
+    return out;
+  };
+  // ?rows=N: a bigger table for the real-frame (CDP) demo, where a load has to
+  // last long enough to be seen. The suite always runs the default 30.
+  window.__queryResponse = { data: window.__rows(parseInt((/[?&]rows=(\d+)/.exec(location.search) || [])[1], 10) || (window.__MODE === 'restore' ? 600 : 30)) };
+  window.__queryFail = null;
+  window.__queryDelay = 0;
+  window.__queryDone = 0;
+  window.__ajaxLog = [];
+  jQuery.ajax = function (a, b) {
+    var opts = (typeof a === 'string') ? jQuery.extend({ url: a }, b || {}) : (a || {});
+    var url = String(opts.url || '');
+    window.__ajaxLog.push(url);
+    var d = jQuery.Deferred();
+    var isQuery = /query\.php/.test(url);
+    var resp = isQuery ? window.__queryResponse : {};
+    setTimeout(function () {
+      try { if (opts.success) opts.success(resp, 'success', { status: 200 }); } catch (e) { window.__errors.push('ajax success threw: ' + String(e)); }
+      try { if (opts.complete) opts.complete({ status: 200 }, 'success'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }
+      d.resolve(resp, 'success', { status: 200 });
+      if (isQuery) window.__queryDone++;
+    }, isQuery ? (window.__queryDelay || 0) : 0);
+    var p = d.promise(); p.abort = function () {}; return p;
+  };
+  jQuery.getJSON = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.post = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.get = jQuery.post;
+  jQuery.fx.off = true;
+  // --dump-dom renders no frames: no ResizeObserver callbacks, no rAF. The CDP
+  // demo (?mode=demo) renders real frames and keeps the real ones.
+  if (window.__MODE !== 'demo') {
+    window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+    window.IntersectionObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+    window.requestAnimationFrame = function (cb) { return setTimeout(function () { cb(Date.now()); }, 16); };
+    window.cancelAnimationFrame = function (id) { clearTimeout(id); };
+  }
+  // Reduced motion OFF for main.js's JS checks. CSS media queries follow the HOST
+  // setting regardless of this stub - the driver reports that (a host with
+  // reduced motion on has no transitions to assert, see __HOST_REDUCED).
+  window.__HOST_REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  window.matchMedia = function (q) {
+    return { matches: false, media: q, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} };
+  };
+  window.__errors = [];
+  window.__rejections = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    window.__rejections.push(String((r && r.message) || r) + ' @' + String((r && r.stack) || '').split('\n').slice(1, 2).join('').trim());
+    e.preventDefault();
+  });
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  window.prompt = function () { return null; };
+</script>
+<script src="penumbra_userseg.js"></script>
+<script src="main_sm.js"></script>
+<script src="driver.js"></script>
+</body></html>

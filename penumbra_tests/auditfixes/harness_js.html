@@ -1,0 +1,137 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>audit-fix JS harness</title></head>
+<body>
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<table id="resultsTable"><tbody></tbody></table><div id="errorBox"></div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  // Same boot as the parity harness (harness_b.html): enough shape that the
+  // ready closure gets far before tripping on missing DOM.
+  window.penumbra_vars = {
+    isAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  window.ResizeObserver = function () {
+    this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {};
+  };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  window.__errors = [];
+  window.onerror = function (m) { window.__errors.push(String(m)); return true; };
+</script>
+<script src="main_patched.js"></script>
+<script>
+(function () {
+  function report(txt) { document.getElementById('out').textContent = txt; }
+  var lines = [], pass = 0, fail = 0;
+  function t(name, cond, detail) {
+    if (cond) { pass++; lines.push('PASS  ' + name); }
+    else { fail++; lines.push('FAIL  ' + name + (detail !== undefined ? '  :: ' + detail : '')); }
+  }
+  function j(x) { try { return JSON.stringify(x); } catch (e) { return String(x); } }
+
+  function run() {
+    var AF = window.__AF;
+    if (!AF) { report('AF_UNAVAILABLE err=' + (window.__AF_ERR || 'n/a') + ' pageErrors=' + j(window.__errors.slice(0, 3)) + '\nJS_FAIL=999'); return; }
+    var P = AF.parseAdvancedQuery, E = AF.evaluateParsedQuery, V = AF.validatePromptInput, S = AF.splitValidateRules, C = AF.validateCronExpression;
+    var cols = ['TITLE', 'STATUS', 'AMOUNT'];
+    function wrap(fn) { try { return fn(); } catch (e) { return 'THREW: ' + (e && e.message ? e.message : e); } }
+
+    // ---- parser: word operators -------------------------------------------------
+    var q = wrap(function () { return P('TITLE contains grant', cols); });
+    t('parse: TITLE contains grant -> one contains condition', Array.isArray(q) && q.length === 1 && q[0].type === 'condition' && q[0].column === 'TITLE' && q[0].op === 'contains' && q[0].value === 'grant', j(q));
+    q = wrap(function () { return P('TITLE Contains Grant', cols); });
+    t('parse: case-insensitive CONTAINS keyword', Array.isArray(q) && q.length === 1 && q[0].op === 'contains' && q[0].value === 'Grant', j(q));
+    q = wrap(function () { return P('TITLE starts with Gr', cols); });
+    t('parse: "starts with" is NOT a typed operator (builder owns it as = /^X/)', Array.isArray(q) && !q.some(function (n) { return n.op === 'startswith'; }), j(q));
+    q = wrap(function () { return P('TITLE = /^Gr/', cols); });
+    t('parse: prefix test is the anchored regex form', Array.isArray(q) && q.length === 1 && q[0].op === '=' && q[0].value === '/^Gr/', j(q));
+    q = wrap(function () { return P('{TITLE} contains Gr', cols); });
+    t('parse: {TITLE} contains Gr', Array.isArray(q) && q.length === 1 && q[0].op === 'contains' && q[0].column === 'TITLE', j(q));
+    q = wrap(function () { return P("'TITLE' contains x", cols); });
+    t("parse: 'TITLE' contains x", Array.isArray(q) && q.length === 1 && q[0].op === 'contains' && q[0].column === 'TITLE', j(q));
+    q = wrap(function () { return P('TITLE grant', cols); });
+    t('parse: implicit contains still works', Array.isArray(q) && q.length === 1 && q[0].op === 'contains' && q[0].value === 'grant', j(q));
+    q = wrap(function () { return P('contains', cols); });
+    t('parse: bare "contains" stays a global search term', Array.isArray(q) && q.length === 1 && q[0].type === 'global' && q[0].op === 'contains' && q[0].value === 'contains', j(q));
+    q = wrap(function () { return P('contains grant', cols); });
+    t('parse: "contains grant" = two global terms', Array.isArray(q) && q.length === 3 && q[0].type === 'global' && q[0].value === 'contains' && q[2].type === 'global' && q[2].value === 'grant', j(q));
+    q = wrap(function () { return P('STATUS = Active AND AMOUNT > 1000', cols); });
+    t('parse: regression - symbolic operators unchanged', Array.isArray(q) && q.length === 3 && q[0].op === '=' && q[0].value === 'Active' && q[1].type === 'logical' && q[1].op === 'and' && q[2].op === '>' && q[2].value === '1000', j(q));
+    q = wrap(function () { return P('STATUS eq Active', cols); });
+    t('parse: regression - word alias eq', Array.isArray(q) && q.length === 1 && q[0].op === '=' , j(q));
+
+    // ---- evaluator: startswith / contains ---------------------------------------
+    var row = new Map(); row.set('TITLE', 'Grant award'); row.set('STATUS', 'Active'); row.set('AMOUNT', '1500');
+    function ev(expr) { return wrap(function () { return E(row, P(expr, cols), cols); }); }
+    t('eval: TITLE = /^gr/ -> true (anchored regex prefix)', ev('TITLE = /^gr/') === true, j(ev('TITLE = /^gr/')));
+    t('eval: TITLE = /^award/ -> false', ev('TITLE = /^award/') === false, j(ev('TITLE = /^award/')));
+    t('eval: TITLE contains award -> true', ev('TITLE contains award') === true, j(ev('TITLE contains award')));
+    t('eval: TITLE contains nope -> false', ev('TITLE contains nope') === false, j(ev('TITLE contains nope')));
+    t('eval: combined with AND', ev('TITLE contains grant AND AMOUNT > 1000') === true, j(ev('TITLE contains grant AND AMOUNT > 1000')));
+    t('eval: regression - STATUS = Active', ev('STATUS = Active') === true, j(ev('STATUS = Active')));
+
+    // ---- validate=: multi-rule ----------------------------------------------------
+    function v(val, rule) { return wrap(function () { return V(val, { validate: rule }); }); }
+    t('validate: regex + range, valid answer -> null', v('123', '/^\\d+$/,range(1,9999)') === null, j(v('123', '/^\\d+$/,range(1,9999)')));
+    t('validate: regex + range, non-digit -> error', typeof v('abc', '/^\\d+$/,range(1,9999)') === 'string', j(v('abc', '/^\\d+$/,range(1,9999)')));
+    t('validate: regex + range, out of range -> range error', /between 1 and 9999/.test(String(v('99999', '/^\\d+$/,range(1,9999)'))), j(v('99999', '/^\\d+$/,range(1,9999)')));
+    t('validate: comma inside a regex quantifier is not a separator', v('12345', '/^\\d{3,5}$/') === null && typeof v('12', '/^\\d{3,5}$/') === 'string', j([v('12345', '/^\\d{3,5}$/'), v('12', '/^\\d{3,5}$/')]));
+    t('validate: date bounds pair still checked together', v('2026-06-15', 'min_date(2026-01-01),max_date(2026-12-31)') === null && typeof v('2027-06-15', 'min_date(2026-01-01),max_date(2026-12-31)') === 'string', j([v('2026-06-15', 'min_date(2026-01-01),max_date(2026-12-31)'), v('2027-06-15', 'min_date(2026-01-01),max_date(2026-12-31)')]));
+    t('validate: single range unchanged', v('2', 'range(1,3)') === null && typeof v('5', 'range(1,3)') === 'string', j([v('2', 'range(1,3)'), v('5', 'range(1,3)')]));
+    t('validate: single regex unchanged', v('ab', '/^ab$/') === null && typeof v('abc', '/^ab$/') === 'string');
+    t('validate: regex passes but range fails -> error (AND semantics)', typeof v('x', '/^x$/,range(1,3)') === 'string', j(v('x', '/^x$/,range(1,3)')));
+    t('validate: malformed rule still reports "Invalid regex format"', /Invalid regex format/.test(String(v('1', 'range(1,)'))), j(v('1', 'range(1,)')));
+    t('validate: no rule -> null', wrap(function () { return V('anything', {}); }) === null);
+    if (S) {
+      var parts = wrap(function () { return S('/^a,b$/i,range(1,2),min_date(2026-01-01)'); });
+      t('split: three rules, commas inside regex/parens kept', Array.isArray(parts) && parts.length === 3 && parts[0] === '/^a,b$/i' && parts[1] === 'range(1,2)' && parts[2] === 'min_date(2026-01-01)', j(parts));
+      parts = wrap(function () { return S('/a\\/b,c/'); });
+      t('split: escaped slash inside regex', Array.isArray(parts) && parts.length === 1, j(parts));
+    } else { t('split: helper exported', false, 'splitValidateRules missing (pre-fix main.js?)'); }
+
+    // ---- cron validator (client) --------------------------------------------------
+    t('cron: client accepts DOW 7 (server now does too)', wrap(function () { return C('0 9 * * 7'); }) === true);
+    t('cron: client rejects DOW 8', wrap(function () { return C('0 9 * * 8'); }) === false);
+    var N = AF.calculateNextCronRun;
+    if (N) {
+      var d7 = wrap(function () { return N('0 9 * * 7'); });
+      t('cron preview: DOW 7 resolves to a Sunday 09:00', d7 instanceof Date && d7.getDay() === 0 && d7.getHours() === 9, String(d7));
+      var d0 = wrap(function () { return N('0 9 * * 0'); });
+      t('cron preview: DOW 7 and DOW 0 are the same occurrence', d7 instanceof Date && d0 instanceof Date && d7.getTime() === d0.getTime(), String(d7) + ' vs ' + String(d0));
+      var d15 = wrap(function () { return N('0 9 * * 1-5'); });
+      t('cron preview: weekday range unaffected', d15 instanceof Date && d15.getDay() >= 1 && d15.getDay() <= 5, String(d15));
+    } else { t('cron preview: calculateNextCronRun exported', false, 'missing'); }
+
+    report(lines.join('\n') + '\n\n' + pass + ' passed, ' + fail + ' failed' + (window.__errors.length ? '\npageErrors=' + j(window.__errors.slice(0, 4)) : '') + '\nJS_FAIL=' + fail);
+  }
+  var tries = 0;
+  (function wait() {
+    tries++;
+    if (window.__AF || tries > 40) { setTimeout(run, 250); } else { setTimeout(wait, 100); }
+  })();
+})();
+</script>
+</body></html>

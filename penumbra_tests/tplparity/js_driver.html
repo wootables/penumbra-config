@@ -1,0 +1,172 @@
+<!doctype html><html><head><meta charset="utf-8"><title>tplparity - JS side</title></head>
+<body>
+<!--
+  The BROWSER half of tplparity: the app's real custom-template path -
+  formatCellContent() to render each cell, generateTemplateOutput() /
+  _tplRenderHeaderLine() / _buildCustomDownloadText() to build the text, and
+  _fireCustomDownload() to produce the actual Blob - run inside the real main.js
+  ready closure (main_tpl.js = js/main.js + a one-line eval hook).
+  CodeMirror mount points below are NOT decorative: main.js init dies without them
+  (see ..\pivotparity\js_driver.html).
+-->
+<div id="reportSnippetOutput"></div>
+<textarea id="sqlQuery" style="display:none"></textarea>
+<textarea id="reportSnippet" style="display:none"></textarea>
+<textarea id="subquerySql" style="display:none"></textarea>
+<div id="selectorBox"></div>
+<input id="tableSearch" value="">
+<!-- getReportFilename() / data(title) read these -->
+<input id="reportTitle" value="Parity Report &amp; Co">
+<input id="reportSubtitle" value="">
+<table id="resultsTable"><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="pivot-output-container" style="display:none"></div>
+<pre id="out">RUNNING</pre>
+<script>window.__pageErrors=[];window.onerror=function(m){window.__pageErrors.push(String(m));return true;};</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+</script>
+<script src="corpus_inline.js"></script>
+<script src="main_tpl.js"></script>
+<script>
+(function () {
+  function fin(o) { document.getElementById('out').textContent = 'RESULTS_JSON:' + JSON.stringify(o); }
+  function b64bytes(u8) { var s = ''; for (var i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]); return btoa(s); }
+  function b64(str) { return b64bytes(new TextEncoder().encode(String(str))); }
+
+  setTimeout(function () {
+    var T = window.__TPL, C = window.__CORPUS;
+    if (!T) return fin({ fatal: 'hook missing: ' + (window.__TPL_ERR || ''), pageErrors: window.__pageErrors });
+    if (!C) return fin({ fatal: 'corpus missing' });
+    function fn(n) { try { return T.ev(n); } catch (e) { return undefined; } }
+    var need = ['generateTemplateOutput', '_tplRenderHeaderLine', '_buildCustomDownloadText', '_fireCustomDownload',
+                'formatCellContent', 'getFlatPivotHeaders', 'getPivotDataAsArray', 'processPivotData', 'generatePivotTable'];
+    var missing = need.filter(function (n) { return typeof fn(n) !== 'function'; });
+    if (missing.length) return fin({ fatal: 'not reachable in the main.js closure: ' + missing.join(', '), pageErrors: window.__pageErrors });
+
+    var fmt = fn('formatCellContent'), build = fn('_buildCustomDownloadText'), fire = fn('_fireCustomDownload');
+    var out = { cases: {}, fired: {}, ops: {}, meta: {}, notes: [] };
+
+    // ---- the flat table, built the way the app builds it --------------------
+    function buildFlat() {
+      $('#pivot-output-container').hide().empty();
+      $('#groupedResultsContainer').hide();
+      $('#resultsTable').show();
+      var hr = $('#tableHeader').empty()[0];
+      var th0 = document.createElement('th'); th0.setAttribute('data-column', '#'); th0.setAttribute('data-colname', '#'); th0.textContent = '#';
+      hr.appendChild(th0);
+      C.columns.forEach(function (c, i) {
+        var th = document.createElement('th');
+        th.setAttribute('data-column', String(i)); th.setAttribute('data-colname', c); th.textContent = c;
+        if (C.hidden.indexOf(c) !== -1) th.style.display = 'none';
+        hr.appendChild(th);
+      });
+      var tb = $('#resultsTable tbody').empty()[0];
+      C.rows.forEach(function (r, di) {
+        var tr = document.createElement('tr');
+        var td0 = document.createElement('td'); td0.setAttribute('data-column', '#'); td0.textContent = String(C.masterIndex[di]);
+        tr.appendChild(td0);
+        C.columns.forEach(function (c, i) {
+          var td = document.createElement('td');
+          td.setAttribute('data-column', String(i));
+          td.innerHTML = fmt(r[c]);
+          if (C.hidden.indexOf(c) !== -1) td.style.display = 'none';
+          tr.appendChild(td);
+        });
+        tb.appendChild(tr);
+      });
+    }
+
+    // ---- a real browser pivot ----------------------------------------------
+    function buildPivot(pv) {
+      var maps = C.pivotData[pv.data].map(function (r) {
+        var m = new Map(); Object.keys(r).forEach(function (k) { m.set(k.toUpperCase(), r[k]); }); return m;
+      });
+      T.ev('(function (m) { masterRowData = m; currentPivotSourceData = m; pivotMasterDataSource = m; })')(maps);
+      T.ev('(function (s) { currentPivotSettings = s; })')(pv);
+      var pd = fn('processPivotData')(maps, pv.rows, pv.cols, pv.vals, pv.agg, [], null);
+      var cur = (typeof fn('penumbraPivotCurrencyFlags') === 'function') ? fn('penumbraPivotCurrencyFlags')(pv.vals, null, pv.agg) : false;
+      var res = fn('generatePivotTable')(pd, pv.rows, pv.cols, pv.vals, pv.rowLayout, pv.colLayout, pv.agg, pv.sortOrder,
+        null, cur, null, null, pv.sortOrder, 3, null, null, null, null, false);
+      $('#resultsTable').hide();
+      $('#pivot-output-container').empty().html(res.html).show();
+      try { fn('penumbraPivotLazyBind')(); } catch (e) { out.notes.push('lazyBind: ' + e.message); }
+    }
+
+    // ---- capture the Blob _fireCustomDownload() hands to the browser ---------
+    var captured = [];
+    var _origCreate = URL.createObjectURL;
+    URL.createObjectURL = function (b) { captured.push(b); return 'blob:tplparity'; };
+    URL.revokeObjectURL = function () {};
+    HTMLAnchorElement.prototype.click = function () {};
+
+    var pending = [];
+    function runCase(c) {
+      try {
+        $('#tableSearch').val(C.search || '');
+        var built = build({ header: c.header, body: c.body, newline: !!c.newline });
+        out.cases[c.id] = b64(built.text);
+        out.meta['rows_' + c.id] = built.rows;
+      } catch (e) { out.cases[c.id] = 'ERR:' + (e && e.name) + ': ' + (e && e.message); }
+      try {
+        var before = captured.length;
+        var ok = fire({ header: c.header, body: c.body, newline: !!c.newline, ext: c.ext });
+        if (ok && captured.length > before) {
+          (function (id, blob) {
+            pending.push(blob.arrayBuffer().then(function (ab) { out.fired[id] = b64bytes(new Uint8Array(ab)); }));
+          })(c.id, captured[captured.length - 1]);
+        } else { out.fired[c.id] = 'NOFIRE'; }
+      } catch (e) { out.fired[c.id] = 'ERR:' + (e && e.name) + ': ' + (e && e.message); }
+    }
+
+    try {
+      buildFlat();
+      C.cases.filter(function (c) { return c.mode === 'flat'; }).forEach(runCase);
+      Object.keys(C.pivots).forEach(function (pid) {
+        try {
+          buildPivot(C.pivots[pid]);
+          out.meta[pid] = { columns: fn('getFlatPivotHeaders')(), rows: fn('getPivotDataAsArray')().slice($('#pivotResultTable thead tr').length) };
+        } catch (e) { out.notes.push('pivot ' + pid + ': ' + (e && e.message) + ' | ' + String(e && e.stack).split('\n').slice(0, 3).join(' | ')); return; }
+        C.cases.filter(function (c) { return c.mode === pid; }).forEach(runCase);
+      });
+      C.ops.forEach(function (o) {
+        try {
+          var r = PenumbraTemplate.stringOp(o.op, o.subject, o.params);
+          out.ops[o.id] = b64(r.ok ? String(r.result) : '[' + r.error + ']');
+        } catch (e) { out.ops[o.id] = 'ERR:' + (e && e.name) + ': ' + (e && e.message); }
+      });
+    } catch (e) { out.notes.push('driver: ' + (e && e.message)); }
+
+    Promise.all(pending).then(function () { out.pageErrors = window.__pageErrors; fin(out); },
+                              function (e) { out.notes.push('blob read: ' + e); out.pageErrors = window.__pageErrors; fin(out); });
+  }, 80);
+})();
+</script>
+</body></html>

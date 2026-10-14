@@ -1,0 +1,101 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>engine B corpus</title></head>
+<body>
+<!-- Minimal DOM so main.js's ready handler gets further before it trips on
+     missing elements. It does not need to complete: engine B is exported as the
+     closure's FIRST statement (function declarations hoist). -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<input type="hidden" id="reportSubtitle" value="Awards by unit">
+<div id="resultsTable"></div><div id="errorBox"></div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  // Keep the app's own bootstrapping from making network calls in the harness.
+  // Mirror the shape index.php injects. Without .tables the closure dies at
+  // main.js:1707 and every `const` declared after that stays in the temporal dead
+  // zone - which made engine B throw "Cannot access '_couldBeDate' before
+  // initialization" and silently return snippets unresolved.
+  window.penumbra_vars = {
+    isAdmin: true, currentUserKey: 'harness', shibboleth: { fname: 'Bruce', lname: 'Limon', email: 'bplimon@ncsu.edu', unityid: 'bplimon', ouc: '060401', dept: 'OIT' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  // Tolerant stubs for browser APIs main.js's init calls on elements this bare
+  // page doesn't have. Each real throw stops the closure, leaving every later
+  // `const` in the temporal dead zone and breaking engine B's helpers.
+  window.ResizeObserver = function () {
+    this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {};
+  };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  window.__errors = [];
+  window.onerror = function (m) { window.__errors.push(String(m)); return true; };
+</script>
+<script src="main_patched.js"></script>
+<script src="corpus_inline.js"></script>
+<script>
+(function () {
+  function report(txt) { document.getElementById('out').textContent = txt; }
+
+  function run() {
+    var B = window.__ENGINE_B;
+    if (typeof B !== 'function') {
+      report('ENGINE_B_UNAVAILABLE err=' + (window.__ENGINE_B_ERR || 'n/a') +
+             ' pageErrors=' + JSON.stringify(window.__errors.slice(0, 3)));
+      return;
+    }
+    var corpus = window.__CORPUS;
+    var columns = corpus.columns.map(function (c) { return c.toUpperCase(); });
+    // main.js uppercases row-map keys at ingestion; mirror that exactly.
+    var maps = corpus.rows.map(function (r) {
+      var m = new Map();
+      Object.keys(r).forEach(function (k) { m.set(k.toUpperCase(), r[k]); });
+      return m;
+    });
+
+    var results = corpus.cases.map(function (c) {
+      var entry = { id: c.id, snippet: c.snippet };
+      window.__B_ERRS = [];   // capture what B's internal catch swallows per case
+      try {
+        var res = B(c.snippet, maps, columns);
+        entry.out = (res && typeof res === 'object' && 'html' in res) ? res.html : String(res);
+      } catch (e) {
+        entry.error = String(e && e.message ? e.message : e);
+      }
+      if (window.__B_ERRS && window.__B_ERRS.length) { entry.swallowed = window.__B_ERRS.slice(0, 3); }
+      return entry;
+    });
+    report('RESULTS_JSON:' + JSON.stringify({ pageErrors: window.__errors.slice(0, 6), cases: results }));
+  }
+
+  // The export happens at closure entry, but engine B's dependencies may still be
+  // initialising; give the ready handler a chance to finish before calling.
+  var tries = 0;
+  (function wait() {
+    tries++;
+    if (typeof window.__ENGINE_B === 'function' || tries > 40) { setTimeout(run, 250); }
+    else { setTimeout(wait, 100); }
+  })();
+})();
+</script>
+</body></html>

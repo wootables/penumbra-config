@@ -1,0 +1,122 @@
+<?php
+/**
+ * P3 verification for the SCHEDULED-EMAIL path.
+ *
+ * P3 changed how a format() condition naming an aggregate is gated and
+ * evaluated, in both engines. The email side is the one that was never
+ * exercised - it runs through evaluate_aggregate_condition_php(), which takes
+ * its rows as an argument, so the extracted mirror can drive it directly
+ * without sending a single message.
+ *
+ * The rule under test:
+ *   - the 8 original aggregates keep working exactly as before
+ *   - stddev / range / pNN / count_filled / count_blank now COMPUTE
+ *   - antimode / wavg are recognized but not computable -> the call resolves to
+ *     'NaN' so the numeric gate fails and the condition is FALSE
+ *   - '0' would have been catastrophic there: "stddev(X) < 5" would read as
+ *     "0 < 5" and come out TRUE, styling every row on a false premise
+ */
+error_reporting(E_ALL);
+require_once __DIR__ . '/pivot_mirror.php';
+
+// --- penumbra_search.php, required LIVE (2026-09-19). ---------------------------
+// extract_mirror.php lifts only what schedule_runner.php itself DECLARES and never
+// follows its require_once lines (following them would drag in db_connection.php).
+// The runner loads penumbra_search.php unconditionally (schedule_runner.php:48), and
+// since that file was split out on 2026-09-05 evaluate_aggregate_condition_php()
+// reaches it on EVERY call: _snippet_expand_virtual_rows() ->
+// _snippet_detect_virtual_columns() -> _search_get_virtual_columns(). Without it this
+// script died on its first assertion ("Call to undefined function
+// _search_get_virtual_columns()", exit 255) and not one of its checks ran.
+// Same fix as groupmode\test_nested_php.php: AFTER the mirror and guarded on the
+// FUNCTION, because pivot_mirror.php's declarations are NOT function_exists-wrapped -
+// loading the file first would fatal on redeclaration the day the runner declares one
+// of these names itself; this way the mirror's copy wins. Pre-flighted with the
+// tokenizer: 18 pure declarations, no top-level code, no requires of its own, no name
+// collisions with the runner's 402.
+//   php -n verify_p3.php [appDir]     (default: the live webroot run.ps1 lifts from)
+$appDir = (isset($argv[1]) && $argv[1] !== '') ? rtrim($argv[1], '/\\')
+        : '\\\\oitras.oit.ncsu.edu\\c$\\inetpub\\wwwroot\\sponsor_migration\\penumbra';
+$searchFile = $appDir . DIRECTORY_SEPARATOR . 'penumbra_search.php';
+if (!function_exists('_search_get_virtual_columns') && is_file($searchFile)) {
+    require $searchFile;
+}
+$searchMissing = array();
+foreach (array('_search_get_virtual_columns', '_search_get_structured_virtual_data', '_sr_resolve_keyword_date') as $fn) {
+    if (!function_exists($fn)) $searchMissing[] = $fn . '()';
+}
+if ($searchMissing) {
+    // Loud and named, not a fatal deep inside the first condition.
+    echo "FATAL  penumbra_search.php not loaded ($searchFile) - evaluate_aggregate_condition_php() reaches "
+       . implode(', ', $searchMissing) . " through it\n";
+    exit(2);
+}
+
+$pass = 0; $fail = 0;
+function t($name, $got, $want) {
+    global $pass, $fail;
+    if ($got === $want) { $pass++; printf("  PASS  %s\n", $name); }
+    else { $fail++; printf("  FAIL  %s\n        got %s want %s\n", $name, var_export($got, true), var_export($want, true)); }
+}
+
+// AMOUNT: 10, 20, 30, 40 and one BLANK  -> sum 100, avg 25, min 10, max 40,
+// range 30, median/p50 25, stddev(sample over 4) = 12.9099..., filled 4, blank 1
+$rows = array(
+    array('AMOUNT' => '10', 'STATUS' => 'Active'),
+    array('AMOUNT' => '20', 'STATUS' => 'Active'),
+    array('AMOUNT' => '30', 'STATUS' => 'Closed'),
+    array('AMOUNT' => '40', 'STATUS' => 'Closed'),
+    array('AMOUNT' => '',   'STATUS' => 'Active'),
+);
+function ev($c) { global $rows; return evaluate_aggregate_condition_php($c, $rows); }
+
+echo "1. the original eight still behave\n";
+t('sum(AMOUNT) > 50',        ev('sum(AMOUNT) > 50'), true);
+t('sum(AMOUNT) > 500',       ev('sum(AMOUNT) > 500'), false);
+t('count() > 3',             ev('count() > 3'), true);
+t('avg(AMOUNT) = 25',        ev('avg(AMOUNT) = 25'), true);
+t('min(AMOUNT) < 15',        ev('min(AMOUNT) < 15'), true);
+t('max(AMOUNT) > 35',        ev('max(AMOUNT) > 35'), true);
+t('median(AMOUNT) = 25',     ev('median(AMOUNT) = 25'), true);
+t('distinct(STATUS) = 2',    ev('distinct(STATUS) = 2'), true);
+
+echo "\n2. the new aggregates now COMPUTE (they used to be unrecognized)\n";
+t('range(AMOUNT) = 30',        ev('range(AMOUNT) = 30'), true);
+t('range(AMOUNT) > 100',       ev('range(AMOUNT) > 100'), false);
+t('stddev(AMOUNT) > 5',        ev('stddev(AMOUNT) > 5'), true);
+t('stddev(AMOUNT) > 50',       ev('stddev(AMOUNT) > 50'), false);
+t('p50(AMOUNT) = 25',          ev('p50(AMOUNT) = 25'), true);
+t('p10(AMOUNT) < 20',          ev('p10(AMOUNT) < 20'), true);
+t('p90(AMOUNT) > 30',          ev('p90(AMOUNT) > 30'), true);
+t('count_filled(AMOUNT) = 4',  ev('count_filled(AMOUNT) = 4'), true);
+t('count_blank(AMOUNT) = 1',   ev('count_blank(AMOUNT) = 1'), true);
+
+echo "\n3. THE CRITICAL ONE - uncomputable aggregates must fail CLOSED\n";
+echo "   ('0' as the fallback would make a '<' comparison come out TRUE)\n";
+t('antimode(AMOUNT) > 0  is false', ev('antimode(AMOUNT) > 0'), false);
+t('antimode(AMOUNT) < 5  is false', ev('antimode(AMOUNT) < 5'), false);
+t('wavg(AMOUNT) > 0      is false', ev('wavg(AMOUNT) > 0'), false);
+t('wavg(AMOUNT) < 5      is false', ev('wavg(AMOUNT) < 5'), false);
+
+echo "\n4. word-boundary change: a name glued to another identifier is NOT an aggregate\n";
+t('xsum(AMOUNT) > 1  is false',  ev('xsum(AMOUNT) > 1'), false);
+t('TOP10(AMOUNT) > 1 is false',  ev('TOP10(AMOUNT) > 1'), false);
+
+echo "\n5. non-aggregate and edge conditions\n";
+t('empty condition is true',     ev(''), true);
+t('plain comparison 5 > 2',      ev('5 > 2'), true);
+t('plain comparison 2 > 5',      ev('2 > 5'), false);
+t('negative sum survives',       ev('sum(AMOUNT) > -1'), true);
+
+echo "\n6. the detector list is the twin of the browser's\n";
+$names = cf_agg_fn_names();
+foreach (array('count_filled','count_blank','count','sum','avg','min','max','distinct',
+               'median','mode','stddev','range','antimode','wavg') as $n) {
+    t("detector lists '$n'", strpos($names, $n) !== false, true);
+}
+t('detector carries the pNN form', strpos($names, 'p\d{1,2}') !== false, true);
+t('count_filled precedes count (no shadowing)',
+  strpos($names, 'count_filled') < strpos($names, '|count|'), true);
+
+echo "\n$pass passed, $fail failed\n";
+exit($fail > 0 ? 1 : 0);

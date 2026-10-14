@@ -1,0 +1,296 @@
+<!doctype html><meta charset="utf-8"><title>running</title><pre id="out">running</pre>
+<script>
+window.onerror = function (msg, src, line, col) {
+  var el = document.getElementById('out');
+  if (el && el.textContent === 'running') {
+    el.textContent = 'SCRIPT-ERROR: ' + msg + '  (line ' + line + ':' + col + ')';
+  }
+  return false;
+};
+</script>
+<script src="SRC.js"></script>
+<script>
+var LOG = [], PASS = 0, FAIL = 0;
+function ok(n, c, x) { if (c) { PASS++; LOG.push('PASS  ' + n); } else { FAIL++; LOG.push('FAIL  ' + n + (x ? '   >> ' + x : '')); } }
+function eq(n, g, w) { ok(n, JSON.stringify(g) === JSON.stringify(w), 'got=' + JSON.stringify(g) + ' want=' + JSON.stringify(w)); }
+
+try {
+  var code = String(window.__src).replace(/\r\n/g, '\n');
+
+  function grab(decl) {
+    var start = code.indexOf(decl);
+    if (start === -1) throw new Error('anchor not found: ' + decl);
+    var i = code.indexOf('{', start), depth = 0, inStr = null, inLine = false, inBlk = false, inRe = false;
+    for (var j = i; j < code.length; j++) {
+      var c = code[j], n = code[j + 1];
+      if (inLine) { if (c === '\n') inLine = false; continue; }
+      if (inBlk) { if (c === '*' && n === '/') { inBlk = false; j++; } continue; }
+      if (inStr) { if (c === '\\') { j++; continue; } if (c === inStr) inStr = null; continue; }
+      if (inRe) { if (c === '\\') { j++; continue; } if (c === '/') inRe = false; continue; }
+      if (c === '/' && n === '/') { inLine = true; j++; continue; }
+      if (c === '/' && n === '*') { inBlk = true; j++; continue; }
+      if (c === '"' || c === "'" || c === '`') { inStr = c; continue; }
+      if (c === '/') {
+        var k = j - 1; while (k >= 0 && /\s/.test(code[k])) k--;
+        if (k < 0 || /[=(,:;!&|?{}[\n+\-*%~^<>]/.test(code[k])) { inRe = true; continue; }
+      }
+      if (c === '{') depth++;
+      else if (c === '}') { depth--; if (depth === 0) return code.slice(start, j + 1); }
+    }
+    throw new Error('unbalanced: ' + decl);
+  }
+
+  // ── Stand the palette engine up outside the app ─────────────────────────
+  // The colour maths lives in the heat module's oklab helpers, so the sandbox
+  // has to build PenumbraHeat before the palette builder can run. themeVar is
+  // the exact seam a theme switch moves, so the tests drive it directly rather
+  // than trying to fake a stylesheet.
+  function grabVar(re) {
+    var m = re.exec(code);
+    if (!m) throw new Error('var not found: ' + re);
+    return m[0];
+  }
+
+  var heatSrc =
+    grab('function srgbToLinear(') + '\n' + grab('function linearToSrgb(') + '\n' + 
+    grab('function rgbToOklab(') + '\n' + grab('function oklabToRgb(') + '\n' +
+    grab('function rotateHue(') + '\n' +
+    'window.PenumbraHeat = { rgbToOklab: rgbToOklab, oklabToRgb: oklabToRgb,' +
+    '  rotateHue: rotateHue,' +
+    '  themeVar: function () { return BRAND; },' +
+    '  parseColor: function (css) {' +
+    '    var h = String(css).replace("#", "");' +
+    '    return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];' +
+    '  } };';
+
+  var palSrc =
+    grabVar(/var PENUMBRA_PALETTE_CHROMA_FLOOR = [^;]*;/) + '\n' +
+    grabVar(/var PENUMBRA_PALETTE_NAMES = [^;]*;/) + '\n' +
+    grabVar(/var PENUMBRA_PALETTE_SIZE = [^;]*;/) + '\n' +
+    grabVar(/var PENUMBRA_PALETTE_CLASSIC = \[[\s\S]*?\];/) + '\n' +
+    'var _penumbraPaletteCache = {};\n' +
+    'var _penumbraActivePalette = "auto";\n' +
+    'var _isDark = true; function bodyIsDark() { return _isDark; }\n' +
+    grab('function _penumbraPaletteDist(') + '\n' +
+    grab('function _penumbraBuildPalette(') + '\n' +
+    grab('function penumbraResetPaletteCache(') + '\n' +
+    grab('function _penumbraPaletteRgb(') + '\n' +
+    grab('function penumbraPaletteColor(') + '\n' +
+    grab('function getChartColor(') + '\n' +
+    grab('function _vizParseVizOptions(') + '\n' +
+    grab('function _vizParsePalette(');
+
+  var P = new Function(
+    'var BRAND = "#336699";\n' + heatSrc + '\n' + palSrc + '\n' +
+    'return { build:_penumbraBuildPalette, rgb:_penumbraPaletteRgb,' +
+    '         color:penumbraPaletteColor, chart:getChartColor,' +
+    '         parse:_vizParsePalette, dist:_penumbraPaletteDist,' +
+    '         reset:penumbraResetPaletteCache, NAMES:PENUMBRA_PALETTE_NAMES,' +
+    '         CLASSIC:PENUMBRA_PALETTE_CLASSIC, FLOOR:PENUMBRA_PALETTE_CHROMA_FLOOR,' +
+    '         SIZE:PENUMBRA_PALETTE_SIZE, lab:rgbToOklab, rot:rotateHue,' +
+    '         setActive:function(n){ _penumbraActivePalette = n; },' +
+    '         setDark:function(b){ _isDark = b; },' +
+    '         setBrand:function(c){ BRAND = c; } };')();
+
+  var MATRIX = [0, 255, 65];      // --brand-primary on the Matrix theme
+  var MUTED  = [51, 102, 153];    // the default theme: low chroma, on purpose
+  function chroma(rgb) { var l = P.lab(rgb); return Math.sqrt(l[1] * l[1] + l[2] * l[2]); }
+  function minSep(pal) {
+    var w = Infinity;
+    for (var i = 0; i < pal.length; i++)
+      for (var j = i + 1; j < pal.length; j++) w = Math.min(w, P.dist(pal[i], pal[j]));
+    return w;
+  }
+  function minSepN(pal, n) { return minSep(pal.slice(0, n)); }
+  // Series 1 is asserted by DISTANCE, not equality: it round-trips through
+  // oklab, so a channel can land a unit away. Distance still fails loudly if
+  // series 1 ever stops being the brand, which is the thing worth protecting.
+  function isBrand(pal, brand) { return P.dist(pal[0], brand) < 0.02; }
+
+  // ══ 1. THE PARSER DEGRADES TO auto, NEVER TO BLANK ══════════════════════
+  eq('parse: no options at all', P.parse(''), 'auto');
+  eq('parse: options with no palette key', P.parse('{"map":"us-grid"}'), 'auto');
+  eq('parse: a typo falls back to auto', P.parse('{"palette":"clasic"}'), 'auto');
+  eq('parse: null palette', P.parse('{"palette":null}'), 'auto');
+  eq('parse: a number is not a palette', P.parse('{"palette":3}'), 'auto');
+  eq('parse: case and padding are forgiven', P.parse('{"palette":"  MONO "}'), 'mono');
+  for (var ni = 0; ni < P.NAMES.length; ni++) {
+    eq('parse: accepts ' + P.NAMES[ni], P.parse('{"palette":"' + P.NAMES[ni] + '"}'), P.NAMES[ni]);
+  }
+
+  // ══ 2. SERIES 1 IS THE BRAND, UNTOUCHED ════════════════════════════════
+  // The whole point of `auto` is that the first thing you see is the theme's
+  // own colour. If this ever drifts, the feature stops reading as "my theme"
+  // even while every separation assertion below still passes.
+  var pn = ['auto', 'warm', 'cool', 'mono'];
+  for (var bi = 0; bi < pn.length; bi++) {
+    ok('build: series 1 IS the brand on ' + pn[bi], isBrand(P.build(pn[bi], MATRIX), MATRIX),
+       'dist=' + P.dist(P.build(pn[bi], MATRIX)[0], MATRIX).toFixed(4));
+  }
+  ok('build: series 1 is CLOSER to the brand than any other series is',
+     (function () {
+       var pal = P.build('auto', MATRIX), d0 = P.dist(pal[0], MATRIX);
+       for (var i = 1; i < pal.length; i++) { if (P.dist(pal[i], MATRIX) <= d0) return false; }
+       return true;
+     })());
+
+  // ══ 3. EVERY PALETTE FILLS TEN SLOTS AND REPEATS NONE ══════════════════
+  for (var k = 0; k < pn.length; k++) {
+    var pal = P.build(pn[k], MATRIX);
+    eq('build: ' + pn[k] + ' fills all ' + P.SIZE + ' slots', pal.length, P.SIZE);
+    var seen = {}, dupe = false, bad = false;
+    for (var q = 0; q < pal.length; q++) {
+      if (seen[pal[q].toString()]) dupe = true;
+      seen[pal[q].toString()] = 1;
+      for (var c2 = 0; c2 < 3; c2++) { if (!(pal[q][c2] >= 0 && pal[q][c2] <= 255)) bad = true; }
+    }
+    ok('build: ' + pn[k] + ' repeats no colour', !dupe);
+    ok('build: ' + pn[k] + ' stays inside the sRGB gamut', !bad);
+  }
+
+  // ══ 4. THE GREEDY SEARCH IS WHY THIS IS NOT FIXED OFFSETS ══════════════
+  // Build the alternative the implementation REJECTED - even steps round the
+  // wheel - and prove the shipped palette beats it. A hard-coded threshold
+  // would only pin one measurement; this fails the moment someone swaps the
+  // search back out for offsets, which is the actual regression to catch.
+  function fixedOffsets(brand) {
+    var out = [brand];
+    for (var i = 1; i < P.SIZE; i++) out.push(P.rot(brand, i * (360 / P.SIZE)));
+    return out;
+  }
+  ok('greedy: beats even offsets on Matrix green',
+     minSep(P.build('auto', MATRIX)) > minSep(fixedOffsets(MATRIX)),
+     'greedy=' + minSep(P.build('auto', MATRIX)).toFixed(4) +
+     ' fixed=' + minSep(fixedOffsets(MATRIX)).toFixed(4));
+  ok('greedy: beats even offsets on the muted default brand too',
+     minSep(P.build('auto', MUTED)) > minSep(fixedOffsets(MUTED)),
+     'greedy=' + minSep(P.build('auto', MUTED)).toFixed(4) +
+     ' fixed=' + minSep(fixedOffsets(MUTED)).toFixed(4));
+
+  // ══ 5. THE CHROMA FLOOR RESCUES A MUTED BRAND ══════════════════════════
+  // Rotating a muted blue only yields more muted mid-tones - the default theme
+  // measured 0.069 before the floor and 0.145 after. Series 1 is EXEMPT: it is
+  // the brand verbatim, floor or no floor.
+  var mutedPal = P.build('auto', MUTED);
+  var lowest = Infinity, chromaSum = 0;
+  for (var mi = 1; mi < mutedPal.length; mi++) {
+    lowest = Math.min(lowest, chroma(mutedPal[mi]));
+    chromaSum += chroma(mutedPal[mi]);
+  }
+  var chromaAvg = chromaSum / (mutedPal.length - 1);
+  // The floor is a TARGET, not a guarantee: lifting chroma can push a colour
+  // outside sRGB and oklabToRgb clips it back. What must hold is that every
+  // derived colour ends up more saturated than the brand it was rotated from.
+  // Not EVERY derived colour clears the brand - one hue clips back to 0.0948
+  // against the brand's own 0.0987 - so the claim is about the set, not each
+  // member. Averaging is what the floor actually buys, and it is substantial.
+  ok('floor: the derived set is markedly more saturated than the muted brand',
+     chromaAvg > chroma(MUTED) * 1.3, 'avg=' + chromaAvg.toFixed(4) +
+     ' brand=' + chroma(MUTED).toFixed(4) + ' floor=' + P.FLOOR);
+  ok('floor: the muted brand itself is NOT lifted',
+     chroma(mutedPal[0]) < P.FLOOR, 'brandChroma=' + chroma(mutedPal[0]).toFixed(4));
+  // Five series is the realistic case; ten is the ceiling nobody reaches.
+  ok('floor: the first five series on a muted brand separate',
+     minSepN(mutedPal, 5) > 0.12, 'minSep5=' + minSepN(mutedPal, 5).toFixed(4));
+
+  // ══ 6. MONO IS ONE HUE IN STEPPED LIGHTNESS ════════════════════════════
+  var mono = P.build('mono', MATRIX);
+  var hue0 = Math.atan2(P.lab(mono[0])[2], P.lab(mono[0])[1]);
+  var hueDrift = 0, minL = Infinity, maxL = -Infinity;
+  for (var mj = 0; mj < mono.length; mj++) {
+    var lab = P.lab(mono[mj]);
+    hueDrift = Math.max(hueDrift, Math.abs(Math.atan2(lab[2], lab[1]) - hue0));
+    minL = Math.min(minL, lab[0]); maxL = Math.max(maxL, lab[0]);
+  }
+  ok('mono: every step holds the brand hue', hueDrift < 0.06, 'drift=' + hueDrift.toFixed(4));
+  ok('mono: lightness actually moves', (maxL - minL) > 0.15, 'spread=' + (maxL - minL).toFixed(4));
+  // A ten-rung ladder handed out IN ORDER gave a three-series chart three
+  // adjacent rungs (#009c00 beside #00aa00, measured live on Matrix). The rungs
+  // are dealt from both ends now, so the first few series - all most charts
+  // ever use - get the whole range instead of one corner of it.
+  ok('mono: the first four are spread, not adjacent rungs',
+     minSepN(mono, 4) > 0.10, 'minSep4=' + minSepN(mono, 4).toFixed(4));
+
+  // ══ 7. classic IS FROZEN, AND IGNORES THE THEME ════════════════════════
+  // These are the exact values charts used before palettes existed. Someone
+  // "tidying" them silently restyles every report pinned to classic.
+  eq('classic: the first colour is the historic blue', P.CLASSIC[0], [51, 102, 153]);
+  eq('classic: the second is the historic red', P.CLASSIC[1], [255, 99, 132]);
+  eq('classic: the third is the historic teal', P.CLASSIC[2], [75, 192, 192]);
+  eq('classic: ten colours, as always', P.CLASSIC.length, 10);
+  P.setBrand('#00ff41'); P.reset();
+  eq('classic: a wild brand colour changes nothing', P.rgb('classic', 0), [51, 102, 153]);
+  eq('classic: still nothing at index 4', P.rgb('classic', 4), P.CLASSIC[4]);
+  eq('classic: the index wraps past ten', P.rgb('classic', 13), P.CLASSIC[3]);
+
+  // ══ 8. auto FOLLOWS THE THEME, WHICH IS THE ENTIRE FEATURE ═════════════
+  P.setBrand('#00ff41'); P.reset();
+  var onMatrix = P.rgb('auto', 0);
+  P.setBrand('#336699'); P.reset();
+  var onDefault = P.rgb('auto', 0);
+  ok('auto: the same series index is a DIFFERENT colour on a different theme',
+     onMatrix.toString() !== onDefault.toString(), onMatrix + ' vs ' + onDefault);
+  ok('auto: and it is the brand each time', P.dist(onDefault, MUTED) < 0.02, 'got=' + onDefault);
+
+  // ══ 9. THE CACHE IS KEYED BY BRAND, SO A THEME SWITCH IS NOT STALE ═════
+  // penumbraResetPaletteCache runs from applyTheme, but the key carries the
+  // brand too - so even a missed reset cannot serve the old theme's colours.
+  P.setBrand('#00ff41');
+  var noReset = P.rgb('auto', 3);
+  P.reset();
+  eq('cache: keyed by brand, so a missed reset still cannot go stale', noReset, P.rgb('auto', 3));
+  eq('cache: repeated calls are deterministic', P.rgb('auto', 5), P.rgb('auto', 5));
+
+  // ══ 10. warm / cool TILT auto WITHOUT COLLAPSING IT ════════════════════
+  var a2 = P.build('auto', MATRIX), w2 = P.build('warm', MATRIX), c3 = P.build('cool', MATRIX);
+  ok('tilt: warm differs from auto', a2[1].toString() !== w2[1].toString());
+  ok('tilt: cool differs from auto', a2[1].toString() !== c3[1].toString());
+  ok('tilt: warm and cool differ from each other', w2[1].toString() !== c3[1].toString());
+  // The tilt is a uniform rotation, so it must PRESERVE the separation the
+  // greedy pass bought rather than folding two series back together.
+  // Rotation preserves Oklab distance but the CLIP back into sRGB does not, so
+  // the tilt is measured against auto rather than an absolute floor. Before the
+  // second liftChroma pass, cool held only 0.0535 of auto's 0.1041 - which is
+  // the regression this pair exists to catch.
+  var sepA = minSep(a2);
+  ok('tilt: warm holds most of the separation auto bought', minSep(w2) > sepA * 0.75,
+     'warm=' + minSep(w2).toFixed(4) + ' auto=' + sepA.toFixed(4));
+  ok('tilt: cool holds half the separation auto bought', minSep(c3) > sepA * 0.45,
+     'cool=' + minSep(c3).toFixed(4) + ' auto=' + sepA.toFixed(4));
+  // The tilt costs real separation even across the first five, which is the
+  // range a reader actually sees: cool measures 0.1475 against auto's 0.2225,
+  // about two thirds. So the bar is absolute usability, not parity with auto -
+  // 0.12 being what the muted default brand gets on auto, and that reads fine.
+  ok('tilt: the first five warm series stay tellable apart', minSepN(w2, 5) > 0.12,
+     'warm5=' + minSepN(w2, 5).toFixed(4));
+  ok('tilt: the first five cool series stay tellable apart', minSepN(c3, 5) > 0.12,
+     'cool5=' + minSepN(c3, 5).toFixed(4));
+
+  // ══ 11. THE getChartColor CONTRACT ITS 23 CALL SITES DEPEND ON ═════════
+  // Driven on `classic` so the expected strings are exact: `auto` round-trips
+  // through oklab and would make these assertions about rounding.
+  P.setBrand('#336699'); P.reset(); P.setDark(true);
+  P.setActive('classic');
+  eq('shim: getChartColor honours the active palette', P.chart(1, 1), 'rgba(255, 99, 132, 1)');
+  eq('shim: alpha is passed straight through', P.chart(1, 0.5), 'rgba(255, 99, 132, 0.5)');
+  eq('shim: the index wraps', P.chart(11, 1), 'rgba(255, 99, 132, 1)');
+  P.setActive('auto');
+  ok('shim: and follows a switch to auto', P.chart(1, 1) !== 'rgba(255, 99, 132, 1)',
+     'got=' + P.chart(1, 1));
+  P.setActive('bogus');
+  ok('shim: an unknown active palette degrades to auto, never to blank',
+     P.chart(0, 1) === P.color(0, 1, 'auto'), 'got=' + P.chart(0, 1));
+  // Preserved from the original: a LIGHT theme darkens a translucent fill so
+  // the white value labels drawn on top stay readable.
+  P.setActive('classic'); P.setDark(false);
+  eq('shim: light theme darkens a translucent fill', P.chart(0, 0.5), 'rgba(43, 87, 130, 0.5)');
+  eq('shim: light theme leaves an OPAQUE fill alone', P.chart(0, 1), 'rgba(51, 102, 153, 1)');
+  P.setDark(true);
+  eq('shim: dark theme never darkens', P.chart(0, 0.5), 'rgba(51, 102, 153, 0.5)');
+
+  document.getElementById('out').textContent =
+    'RESULT ' + (FAIL === 0 ? 'ALL-PASS' : 'HAS-FAILURES') + '  pass=' + PASS + ' fail=' + FAIL + '\n' + LOG.join('\n');
+} catch (e) {
+  document.getElementById('out').textContent = 'HARNESS-ERROR: ' + e.name + ': ' + e.message + '\n' + (e.stack || '');
+}
+</script>

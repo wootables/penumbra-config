@@ -1,0 +1,141 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>dashboard search - hosted report page (cross-filter)</title></head>
+<body>
+<!-- The REPORT PAGE half of dashboard search (main.js booted headlessly, hooks
+     window.__DSM), run INSIDE mainframe.html so its postMessage to the parent
+     dashboard is real. Loaded as main.html?dsearch=<fragment list>, so the URL
+     override is parsed exactly as on a framed tile. Scaffold = the filterstrip /
+     pivot_trigger harness DOM. -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<table id="resultsTable"><thead id="tableHeader"><tr>
+  <th data-colname="#">#</th><th data-colname="COLLEGE">COLLEGE</th><th data-colname="AMOUNT">AMOUNT</th>
+</tr></thead><tbody></tbody></table>
+<div id="loadingOverlay" style="display:none">
+  <div class="loader"></div>
+  <p>Executing Query, Please Wait...</p>
+  <div style="display: flex; align-items: center; gap: 20px;">
+    <p id="execution-timer" style="font-size: 1.5em; margin: 0; font-weight: bold;"></p>
+    <button id="stopQueryBtn">Stop</button>
+  </div>
+  <div id="loadingTip" aria-live="polite"></div>
+</div>
+<div id="errorBox"></div>
+<input id="tableSearch" value="">
+<span id="resultCount"></span>
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="snapshotComparisonContainer" style="display:none"></div>
+<div id="pivotLightbox" style="display:none">
+  <div id="pivot-source-columns"></div>
+  <div id="pivot-rows"></div><div id="pivot-cols"></div><div id="pivot-vals"></div>
+  <select id="pivot-aggregation-selector"><option value="">-</option><option value="sum">sum</option></select>
+  <table><tbody id="pivot-agg-table-body"></tbody></table>
+  <select id="pivot-rows-layout-select"><option value="nested">nested</option><option value="nested-static">nested-static</option><option value="flat">flat</option></select>
+  <select id="pivot-cols-layout-select"><option value="nested">nested</option><option value="flat">flat</option></select>
+  <select id="pivot-sort-order"><option value="asc">asc</option><option value="desc">desc</option></select>
+  <input id="pivot-sticky-cols" value="3">
+  <input type="checkbox" id="pivot-row-total-override-toggle">
+  <div id="pivot-row-total-override-container" style="display:none"><div id="pivot-row-total-slots"></div><div id="pivot-row-total-tokens"></div></div>
+  <select id="pivot-rank-dir"><option value="none">none</option><option value="top">top</option><option value="bottom">bottom</option></select>
+  <input id="pivot-rank-n" value="10"><select id="pivot-rank-agg"><option value="sum">sum</option><option value="count">count</option></select>
+  <select id="pivot-rank-scope"><option value="">Overall</option></select>
+  <input type="checkbox" id="pivot-rank-other" checked><label id="pivot-rank-other-label"></label>
+  <input type="checkbox" id="pivot-no-breakdown"><input type="checkbox" id="pivot-start-expanded">
+  <select id="pivotPresetSelect"><option value=""></option></select><button id="pivotDeletePresetBtn"></button><input type="checkbox" id="pivotAutoRunPreset">
+  <button id="generatePivotBtn">Generate</button>
+  <select id="pivotSnippetTargetSelect" style="display: none;"></select>
+  <button id="updatePivotSnippetBtn" type="button" style="display: none;">&#x27F3; Update Snippet</button>
+  <button id="copyPivotSnippetBtn">Snippet</button>
+  <button id="pivotSavePresetBtn"></button>
+</div>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); };
+</script>
+<script src="main_patched.js"></script>
+<!-- mainxf.html (generated from main.html's scaffold by xf_tests.pl, 2026-09-30):
+     the real main.js framed as a DASHBOARD TILE (via=dashboard demo in the
+     address). A cell's click-to-filter must go to the dashboard (penumbra:xfilter
+     to the parent, checked by mainframe.html), not into this page's search box,
+     and the cells are clickable without the report's own Click-to-Filter option. -->
+<script>
+(function () {
+  var L = [];
+  function ok(n, c, x) { L.push((c ? 'PASS ' : 'FAIL ') + n + (!c && x !== undefined ? '  [' + x + ']' : '')); }
+  function eq(n, got, want) { ok(n, JSON.stringify(got) === JSON.stringify(want), 'got ' + JSON.stringify(got) + ' want ' + JSON.stringify(want)); }
+  function send(type, extra) { var m = $.extend({ type: type }, extra || {}); try { parent.postMessage(m, '*'); } catch (e) { } }
+  function run() {
+    var D = window.__DSM;
+    if (!D || typeof D.overrides !== 'function') { send('harness:fatal', { msg: 'hooks unavailable: ' + (window.__DSM_ERR || 'n/a') }); return; }
+    ok('hosted: the page is framed and its address names the dashboard', window.parent !== window && /^dashboard /.test(String(D.overrides().via || '')), String(D.overrides().via));
+    ok('hosted: the cells are clickable without the report\'s own Click-to-Filter option', document.body.classList.contains('pnb-click-filter'), document.body.className);
+    // A table as the page builds one: header cells carry the column index and its name, body cells the index.
+    $('#tableHeader tr').html('<th data-column="0" data-colname="#">#</th><th data-column="1" data-colname="COLLEGE">COLLEGE</th><th data-column="2" data-colname="AMOUNT">AMOUNT</th>');
+    $('#resultsTable tbody').html('<tr><td data-column="0">1</td><td data-column="1">Eng</td><td data-column="2">10</td></tr><tr><td data-column="0">2</td><td data-column="1">Sci</td><td data-column="2">20</td></tr>');
+    $('#tableSearch').val('');
+    $('#resultsTable tbody td[data-column="1"]').first().trigger('click');
+    setTimeout(function () {
+      eq('hosted: the click leaves this page\'s own search box alone', $('#tableSearch').val(), '');
+      $('#resultsTable tbody td[data-column="0"]').first().trigger('click');   // the row number never filters
+      setTimeout(function () {
+        // A chart this page drew (a vis() bar chart's canvas carries its config and source rows):
+        // clicked while hosted, its criteria go to the dashboard and no drill popup opens.
+        var cv = document.createElement('canvas'); cv.id = 'xfChart'; document.body.appendChild(cv);
+        $(cv).data('vizConfig', { type: 'bar', xAxis: 'COLLEGE', yAxis: 'AMOUNT', groupBy: 'none' });
+        $(cv).data('sourceRowData', [new Map([['COLLEGE', 'Eng'], ['AMOUNT', '10']]), new Map([['COLLEGE', 'Sci'], ['AMOUNT', '20']])]);
+        var fakeChart = { canvas: cv, data: { labels: ['Eng', 'Sci'], datasets: [{ label: 'AMOUNT', data: [10, 20] }] } };
+        ok('hosted: the page reads as hosted', typeof D.hosted === 'function' && D.hosted() === true);
+        var popupsBefore = $('.chart-drill-popup, .chart-drill-choice, .chart-drill-breakdown').length;
+        try { D.chartClick(fakeChart, { datasetIndex: 0, index: 0 }, { clientX: 10, clientY: 10 }); } catch (e) { ok('hosted: the chart click ran', false, e && e.message); }
+        setTimeout(function () {
+          ok('hosted: a chart click opens no drill popup on the page', $('.chart-drill-popup, .chart-drill-choice, .chart-drill-breakdown').length === popupsBefore,
+             $('.chart-drill-popup, .chart-drill-choice, .chart-drill-breakdown').length + ' vs ' + popupsBefore);
+          // A search link in a cell (the report's data-search convention), hosted: its
+          // text goes to the dashboard (2026-10-01), and this page's box stays untouched.
+          $('#resultsTable tbody td[data-column="1"]').first().html('<a href="#" data-search="COLLEGE = //Eng//">Eng</a>');
+          $('#resultsTable a[data-search]').first().trigger('click');
+          setTimeout(function () {
+            eq('hosted: a search link leaves this page\'s own search box alone', $('#tableSearch').val(), '');
+            ok('main.js booted without page errors', window.__errors.length === 0, window.__errors.slice(0, 3).join(' | '));
+            send('harness:results', { lines: L, expect: [], expectXf: [{ col: 'COLLEGE', value: 'Eng', pairs: null }, { col: 'COLLEGE', value: 'Eng', pairs: [{ col: 'COLLEGE', value: 'Eng' }] }, { pairs: null, text: 'COLLEGE = //Eng//' }] });
+          }, 300);
+        }, 300);
+      }, 300);
+    }, 300);
+  }
+  $(function () { setTimeout(function () {
+    try { run(); } catch (e) { send('harness:fatal', { msg: 'harness threw: ' + (e && e.message) + ' @ ' + String(e && e.stack || '').split('\n')[1] }); }
+  }, 60); });
+})();
+</script>
+</body></html>

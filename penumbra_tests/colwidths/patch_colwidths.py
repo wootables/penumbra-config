@@ -1,0 +1,449 @@
+"""Column widths (2026-09-24): the edits to the four EXISTING files, as data.
+
+    py -3 patch_colwidths.py forward SRC_DIR OUT_DIR    insert every hunk (deploy build)
+    py -3 patch_colwidths.py reverse SRC_DIR OUT_DIR    remove every hunk (rollback build)
+    py -3 patch_colwidths.py check   SRC_DIR            report which way SRC_DIR stands
+
+SRC_DIR / OUT_DIR hold js/main.js, index.php, help_content.php, README.md (the
+app layout). Every hunk is "insert TEXT right after ANCHOR". Forward needs each
+ANCHOR exactly once and TEXT absent; reverse needs ANCHOR+TEXT exactly once and
+removes TEXT. Anything else aborts BEFORE a byte is written, naming the hunk -
+so the same script re-applies cleanly to a newer live file (another session
+deployed meanwhile) and a rollback removes exactly these lines and nothing that
+was deployed on top of them. README's hunks are BLOCKS (2026-10-01): whole
+lines that check and reverse find by their OWN text - exactly once, starting a
+line - wherever they now sit; only forward still needs the ANCHOR. Other
+sessions kept writing around them (a sentence appended to the anchor line, a
+bullet and two suite-comment paragraphs slipped in between), the anchor+text
+test stopped matching, and a full rollback.ps1 -Restore skipped round 1
+without a word. Line endings follow each file (main.js and
+help_content.php are CRLF, index.php and README.md LF); NUL bytes and every
+other byte are carried through untouched. The two NEW files
+(js/penumbra_colwidths.js, css/penumbra_colwidths.css) are not handled here.
+"""
+import os
+import sys
+
+HUNKS = {}
+BLOCK = 'block'  # a hunk's optional 4th item: found by its own text (see above)
+
+# ----------------------------------------------------------------- js/main.js
+HUNKS['js/main.js'] = [
+('state layer',
+"""    function penumbraFrozenColsWanted() {
+        if (typeof userFrozenCols === 'number') return penumbraClampFrozenCols(userFrozenCols, 0);
+        return penumbraClampFrozenCols(reportFrozenCols, 0);
+    }
+""",
+"""
+    // Column widths of the FLAT table (2026-09-24). js/penumbra_colwidths.js
+    // owns everything you can see or touch - the header grips, the + / - / 0
+    // keys and the generated width stylesheet. This is only the STATE, kept
+    // here so it outlives that module being switched off
+    // (js/penumbra_colwidths.off): a report saved meanwhile still carries the
+    // widths its author set.
+    //
+    // Two layers, the frozen count's rule above: the viewer's pick wins, else
+    // the report's saved width, else the column sizes to its content exactly
+    // as it always has. Keyed by UPPERCASE column NAME like columnSummaries, so
+    // moving, hiding or renaming a column never points a width at the wrong
+    // one - a name the query no longer returns simply matches nothing.
+    const PENUMBRA_COLW_MIN = 40, PENUMBRA_COLW_MAX = 2000;
+    let reportColumnWidths = Object.create(null);  // { NAME: px } = STATE_DATA.columnWidths
+    let userColumnWidths = Object.create(null);    // { NAME: px | 'auto' }, only where it differs
+    // A clean copy of a stored map: whole pixels inside the bounds, names
+    // upper-cased, anything else dropped - a hand-edited state must never reach
+    // the stylesheet. 'auto' ("fit this column to its content", over a width
+    // the report set) is kept only for the viewer's layer.
+    function penumbraCleanColWidths(m, allowAuto) {
+        const out = Object.create(null);
+        if (!m || typeof m !== 'object' || Array.isArray(m)) return out;
+        Object.keys(m).forEach(function (k) {
+            const name = String(k).trim().toUpperCase();
+            const v = m[k];
+            if (!name) return;
+            if (v === 'auto') { if (allowAuto) out[name] = 'auto'; return; }
+            if (typeof v !== 'number' && typeof v !== 'string') return;
+            const n = Math.round(Number(v));
+            if (isFinite(n) && n >= PENUMBRA_COLW_MIN && n <= PENUMBRA_COLW_MAX) out[name] = n;
+        });
+        return out;
+    }
+    // The width a column shows at, or null for "sized by its content".
+    function penumbraColWidthFor(name) {
+        const n = String(name || '').toUpperCase();
+        if (n in userColumnWidths) return (userColumnWidths[n] === 'auto') ? null : userColumnWidths[n];
+        return (n in reportColumnWidths) ? reportColumnWidths[n] : null;
+    }
+    // The viewer's picks that really depart from the report: what is stored,
+    // and what the status bar's custom-layout pill reports.
+    function penumbraColWidthsUserDiff() {
+        const out = Object.create(null);
+        Object.keys(userColumnWidths).forEach(function (n) {
+            const r = (n in reportColumnWidths) ? reportColumnWidths[n] : 'auto';
+            if (userColumnWidths[n] !== r) out[n] = userColumnWidths[n];
+        });
+        return out;
+    }
+    // The same gate as every other column customization: with Column
+    // Organization switched off, non-admins see the author's widths only.
+    function penumbraColWidthsRestricted() {
+        return !penumbra_vars.isAdmin && !!window._penumbraHideColumns;
+    }
+    // Stored beside the layout keys under the frozen count's rule: only where
+    // it DIFFERS from the report, so a viewer who never touched a column keeps
+    // following the author if the author later changes it. No-op for an ad-hoc
+    // query - no report id to file it under; the in-memory map lasts the session.
+    function persistColumnWidthsPref() {
+        userColumnWidths = penumbraColWidthsUserDiff();
+        if (!currentLoadedStateName) return;
+        try {
+            const prefs = _spPrefMap('penumbra_column_prefs');
+            const entry = prefs[currentLoadedStateName] || {};
+            const keep = {};
+            Object.keys(userColumnWidths).forEach(function (n) { keep[n] = userColumnWidths[n]; });
+            if (Object.keys(keep).length) entry.widths = keep;
+            else delete entry.widths;
+            if (Object.keys(entry).length === 0) delete prefs[currentLoadedStateName];
+            else prefs[currentLoadedStateName] = entry;
+            localStorage.setItem('penumbra_column_prefs', JSON.stringify(prefs));
+        } catch (e) { /* storage blocked or full: the in-memory pick still holds */ }
+    }
+    function penumbraColWidthsRefresh() {
+        try { if (window.Penumbra && window.Penumbra.colWidths) window.Penumbra.colWidths.refresh(); } catch (e) {}
+    }
+    // What buildStateObject() writes: the widths as the author sees them now
+    // (WYSIWYG, like visibleColumns) for the columns the flat header holds.
+    // With no header to read - a failed, empty or in-flight run, the trap
+    // _pnbStoredLayout covers for the layout - or with the width module
+    // switched off, the report's own map goes through untouched. It runs
+    // inside every save, so it fails SAFE: any surprise saves the report's map.
+    function penumbraColWidthsForSave() {
+        const stored = {};
+        Object.keys(reportColumnWidths).forEach(function (n) { stored[n] = reportColumnWidths[n]; });
+        try {
+            const ths = document.querySelectorAll('#tableHeader th[data-colname]');
+            if (!ths.length || !(window.Penumbra && window.Penumbra.colWidths)) return stored;
+            const out = {};
+            for (let i = 0; i < ths.length; i++) {
+                const n = String(ths[i].getAttribute('data-colname') || '').toUpperCase();
+                const w = penumbraColWidthFor(n);
+                if (w) out[n] = w;
+            }
+            return out;
+        } catch (e) { return stored; }
+    }
+    // After a save the widths it wrote ARE the report's, and the viewer's picks
+    // that now match them are dropped - otherwise they would pin this browser
+    // to today's widths after the author changes them. Called from the save
+    // handlers' success paths, so nothing in here may throw into them.
+    function penumbraColWidthsSaved(saved) {
+        try {
+            reportColumnWidths = penumbraCleanColWidths(saved, false);
+            persistColumnWidthsPref();
+            penumbraColWidthsRefresh();
+            document.dispatchEvent(new CustomEvent('penumbra:columns-changed'));
+        } catch (e) { /* widths are cosmetic; the save itself already succeeded */ }
+    }
+    window.Penumbra = window.Penumbra || {};
+    window.Penumbra.colWidthsHost = {
+        min: PENUMBRA_COLW_MIN,
+        max: PENUMBRA_COLW_MAX,
+        widthFor: penumbraColWidthFor,
+        restricted: penumbraColWidthsRestricted,
+        // One viewer pick: whole px, 'auto' (fit to content, even over a width
+        // the report set) or null (follow the report again).
+        setUser: function (name, v) {
+            const n = String(name || '').toUpperCase();
+            if (!n || penumbraColWidthsRestricted()) return;
+            if (v === null || v === undefined) delete userColumnWidths[n];
+            else {
+                const one = {};
+                one[n] = v;
+                const c = penumbraCleanColWidths(one, true);
+                if (!(n in c)) return;
+                userColumnWidths[n] = c[n];
+            }
+            persistColumnWidthsPref();
+            try { document.dispatchEvent(new CustomEvent('penumbra:columns-changed')); } catch (e) {}
+        },
+        clearUser: function () {
+            userColumnWidths = Object.create(null);
+            persistColumnWidthsPref();
+            try { document.dispatchEvent(new CustomEvent('penumbra:columns-changed')); } catch (e) {}
+        },
+        userDiff: function () { return Object.keys(penumbraColWidthsUserDiff()); },
+        friendly: function (n) {
+            return (window.Penumbra && window.Penumbra.journalFriendlyCol && window.Penumbra.journalFriendlyCol(n)) || n;
+        },
+        // For the suite and the console.
+        state: function () {
+            return { report: Object.assign({}, reportColumnWidths), user: Object.assign({}, userColumnWidths), key: currentLoadedStateName || null };
+        }
+    };
+"""),
+('hydrate',
+"""        userFrozenCols = (prefs && typeof prefs.frozen === 'number') ? prefs.frozen : null;
+""",
+"""        // Column widths ride in the same entry, behind the same gate.
+        userColumnWidths = penumbraCleanColWidths(prefs && prefs.widths, true);
+        penumbraColWidthsRefresh();
+"""),
+('render-path report widths',
+"""                reportFrozenCols = penumbraClampFrozenCols(decodedState ? decodedState.frozenCols : 0, 0);
+""",
+"""                // Same always-reassign rule for the author's column widths.
+                reportColumnWidths = penumbraCleanColWidths(decodedState ? decodedState.columnWidths : null, false);
+                penumbraColWidthsRefresh();
+"""),
+('boot-path report widths',
+"""                reportFrozenCols = penumbraClampFrozenCols(decodedState.frozenCols, 0);
+""",
+"""                reportColumnWidths = penumbraCleanColWidths(decodedState.columnWidths, false);
+                penumbraColWidthsRefresh();
+"""),
+('saveColumnPrefs carry',
+"""        if (existing && typeof existing.frozen === 'number') savedData.frozen = existing.frozen;
+""",
+"""        // ...and the column widths, which the header grips set, not this pass.
+        if (existing && existing.widths && typeof existing.widths === 'object') savedData.widths = existing.widths;
+"""),
+('buildStateObject',
+"""        if (_frozenCols > 0) {
+            state.frozenCols = _frozenCols;
+        }
+""",
+"""        // Column widths of the flat table, name-keyed. Absent = every column
+        // sized by its content, so an untouched report carries no key.
+        const _colWidths = penumbraColWidthsForSave();
+        if (Object.keys(_colWidths).length > 0) {
+            state.columnWidths = _colWidths;
+        }
+"""),
+('local save capture',
+"""        const savedLayout = _pnbLayoutOf(stateObject);
+""",
+"""        const savedWidths = stateObject.columnWidths;
+"""),
+('local save stored',
+"""            _pnbStoredLayout = savedLayout;
+""",
+"""            penumbraColWidthsSaved(savedWidths);
+"""),
+('server save stored',
+"""            _pnbStoredLayout = _pnbLayoutOf(stateObject);
+""",
+"""            // ...and the column widths it stores become the report's own.
+            penumbraColWidthsSaved(stateObject && stateObject.columnWidths);
+"""),
+('pill summary',
+"""                parts.push('Frozen columns: ' + fz(d.frozen.here) + ' here, ' + fz(d.frozen.saved) + ' in the report');
+            }
+""",
+"""            if (d.widths) parts.push('Column widths set here: ' + d.widths.map(friendly).join(', '));
+"""),
+('pill diff fn',
+"""            return (here !== reportFrozenCols) ? { here: here, saved: reportFrozenCols } : null;
+        }
+""",
+"""        // The viewer's column widths, where they depart from the report's, for
+        // the columns this table has. Only while the width module runs: with it
+        // switched off the widths apply nowhere, so there is nothing to report.
+        function _ccWidthsDiff() {
+            if (!currentLoadedStateName || !(window.Penumbra && window.Penumbra.colWidths)) return null;
+            if (penumbraColWidthsRestricted()) return null;
+            var present = Object.create(null);
+            $('#tableHeader th[data-colname]').each(function () { present[String($(this).attr('data-colname') || '').toUpperCase()] = true; });
+            var names = Object.keys(penumbraColWidthsUserDiff()).filter(function (n) { return present[n] === true; });
+            return names.length ? names : null;
+        }
+"""),
+('pill diff use',
+"""                d.frozen = frozenDiff;
+            }
+""",
+"""            var widthsDiff = _ccWidthsDiff();
+            if (widthsDiff) {
+                d = d || { hidden: [], shown: [], reordered: false, numChanged: false };
+                d.widths = widthsDiff;
+            }
+"""),
+('pill reset',
+"""                    delete _e.frozen;
+""",
+"""                    // ...and so are the column widths.
+                    delete _e.widths;
+"""),
+]
+
+# ------------------------------------------------------------------ index.php
+HUNKS['index.php'] = [
+('module include',
+"""<script defer src="js/search_builder.js?v=<?php echo filemtime('js/search_builder.js'); ?>"></script>
+""",
+"""<?php /* AFTER main.js: flat-table column widths (js/penumbra_colwidths.js +
+         css/penumbra_colwidths.css, 2026-09-24) - the header grips, the
+         + / - / 0 keys and the width stylesheet. main.js keeps the widths'
+         STATE either way, so a report saved while this is off keeps them.
+         ROLLBACK SWITCH: an empty js/penumbra_colwidths.off stops both files
+         loading - no deploy, no restore - and deleting it switches the
+         feature back on. */
+$pnbColwOn = !file_exists(__DIR__ . '/js/penumbra_colwidths.off')
+    && is_file(__DIR__ . '/js/penumbra_colwidths.js') && is_file(__DIR__ . '/css/penumbra_colwidths.css');
+if ($pnbColwOn): ?>
+<link rel="stylesheet" href="css/penumbra_colwidths.css?v=<?php echo filemtime(__DIR__ . '/css/penumbra_colwidths.css'); ?>">
+<script defer src="js/penumbra_colwidths.js?v=<?php echo filemtime(__DIR__ . '/js/penumbra_colwidths.js'); ?>"></script>
+<?php endif; ?>
+"""),
+]
+
+# ----------------------------------------------------------- help_content.php
+HUNKS['help_content.php'] = [
+('help entry',
+"""(a pivot has its own <em>Frozen</em> setting in the pivot builder).</li>
+""",
+"""            <li id="us-colwidths"><strong>Column widths</strong> (on the table itself) -- Drag the right edge of a column heading to make that column wider or narrower. A line shows where the edge will land, with the new width beside it, and the table changes when you let go. Double-click the same edge to fit the column to its content again. From the keyboard, Tab to a column heading and press <kbd>+</kbd> to widen it, <kbd>-</kbd> to narrow it, or <kbd>0</kbd> to fit it to its content. A narrowed column cuts long values short with an ellipsis; hover a cell to read all of it, as usual. Your widths are remembered for this report in this browser. While you have any, this panel shows a <strong>Reset widths</strong> button and the status bar's <em>custom layout</em> chip lists the columns; a report editor can make them the report's widths by saving the report. Widths apply to the flat table on screen only: the grouped and pivot views, downloads, emails and scheduled output keep sizing columns to their content.</li>
+"""),
+]
+
+# ------------------------------------------------------------------ README.md
+# All BLOCKS. The anchors are only where forward would put them back, as the
+# README stood on 2026-10-01 (the design note's 2026-09-24 anchor, the end of
+# the frozen-columns bullet, has text after it since; the suite comment's two
+# run lines follow later sessions' phase paragraphs).
+HUNKS['README.md'] = [
+('design note',
+"""  opened from the keyboard over an open card takes a second Escape.
+""",
+"""- **Column widths on the FLAT table live in their own module, with an off switch (2026-09-24).**
+  Drag a flat header's right edge (a `::after` strip - no element is added to the `<th>`, because
+  the email and export builders copy header HTML and strip only classes they know), double-click
+  it to fit the column to its content, or on a focused header press `+` / `-` / `0`.
+  `js/penumbra_colwidths.js` + `css/penumbra_colwidths.css` hold ALL the behaviour; main.js holds
+  only the STATE, beside the frozen count: `reportColumnWidths` (STATE_DATA `columnWidths`,
+  `{NAME: px}`) and the viewer's picks (`penumbra_column_prefs[report].widths`, `px | 'auto'`,
+  stored only where they DIFFER), exposed as `window.Penumbra.colWidthsHost`. **The table is AUTO
+  layout** - its `table-layout: fixed` is inert because the table has no explicit width - so a
+  width on the `<th>` alone can widen a column but never narrow it: the generated rules name the
+  header, body and footer cells together (thead/tbody by DOM index, tfoot by VISIBLE ordinal, the
+  freeze recipe). Its `!important` and `:not([colspan])` are DEFENSIVE - full-height rows pin
+  `max-width:none` / `min-width:auto` with `!important`, yet the width measurably holds without
+  it, and a spanning cell spans the table whatever it is given - so only the rule-text assert
+  pins those two (their mutants are listed as such). A drag moves only a guide line and the width
+  lands once, on release: one relayout, ~20 ms at 200 rows and ~230 ms at 7,000, where relaying
+  out on every mouse move measured 140-500 ms a frame past 2,000 rows. **Rollback without a
+  deploy:** create an empty `js/penumbra_colwidths.off` and index.php stops loading both files;
+  delete it to switch back on (`&colwidths=off` does the same for one page). With the module off,
+  main.js still carries a report's saved widths through a save (`penumbraColWidthsForSave()`)
+  and the custom-layout pill stops reporting them. Screen only: the grouped view, the pivot,
+  downloads, email and the scheduler never read `columnWidths`. Suite `colwidths`.
+""", BLOCK),
+('runbook',
+"""visible in the log and the platform-wide count.
+""",
+"""
+### "Column resizing is misbehaving - switch it off"
+
+Create an empty `js\\penumbra_colwidths.off` in the app folder, or run
+`penumbra_tests\\colwidths\\rollback.ps1 -Disable`. The next page load no longer loads the module:
+every column is content-sized again and nothing else changes (saved widths stay in the reports,
+unused). Delete the file, or `rollback.ps1 -Enable`, to switch it back on. `rollback.ps1 -Restore`
+takes the feature's code back OUT of main.js, index.php, help_content.php and README.md - it
+removes exactly the inserted lines (`patch_colwidths.py reverse`), so anything deployed on top
+of it stays - after the same hash-guarded, atomic swap the deploy used.
+""", BLOCK),
+('suite entry',
+"""& ([scriptblock]::Create([IO.File]::ReadAllText('\\\\oitras\\d$\\Utilities\\PHP_8.2-p\\penumbra_tests\\savelayout\\run.ps1'))) -Mutants
+""",
+"""# Flat-table column widths (2026-09-24): js/penumbra_colwidths.js + the state layer in main.js.
+# The REAL main.js (closure unwrapped), the module, main.css and the module's CSS in headless Edge,
+# a query through the real render path: the rule text, geometry (narrow AND widen, hidden columns,
+# the footer's visible ordinal, colspan rows, untouched neighbours), a drag (the guide moves, the
+# table does not until the release, and the click after it does not sort), double-click fit, the
+# + / - / 0 keys (Ctrl+plus left to the browser), persistence (only differences stored, the
+# carry-over, hydrate, the WYSIWYG save, carry-forward with no header or with the module off),
+# the restricted-viewer gate, the custom-layout pill, the Settings panel reset, frozen offsets
+# following a resize and &colwidths=off. real_input.py repeats the drag and the keys with REAL
+# mouse and keyboard events over CDP. `-Control` runs the pre-feature .baks (RED);
+# `-Mutants` runs every mutant against the asserts it must turn red.
+""", BLOCK),
+('suite entry run lines',
+"""# 135 browser asserts, 94 mutants (7 for breakdowns).
+""",
+"""& ([scriptblock]::Create([IO.File]::ReadAllText('\\\\oitras\\d$\\Utilities\\PHP_8.2-p\\penumbra_tests\\colwidths\\run.ps1')))
+& ([scriptblock]::Create([IO.File]::ReadAllText('\\\\oitras\\d$\\Utilities\\PHP_8.2-p\\penumbra_tests\\colwidths\\run.ps1'))) -Mutants
+""", BLOCK),
+]
+
+
+def eol_of(text):
+    crlf = text.count('\r\n')
+    lf = text.count('\n') - crlf
+    if crlf and lf:
+        raise SystemExit('mixed line endings (%d CRLF, %d LF) - refusing to guess' % (crlf, lf))
+    return '\r\n' if crlf else '\n'
+
+
+def run(mode, src, out):
+    plans = {}
+    for rel, hunks in HUNKS.items():
+        p = os.path.join(src, *rel.split('/'))
+        raw = open(p, 'rb').read()
+        text = raw.decode('utf-8')
+        eol = eol_of(text)
+        state = []
+        for name, anchor, ins, *kind in hunks:
+            block = kind == [BLOCK]
+            a = anchor.replace('\n', eol)
+            t = ins.replace('\n', eol)
+            n_anchor = text.count(a)
+            # A block is whole lines: the line before it ends where it starts.
+            n_both = text.count(eol + t) if block else text.count(a + t)
+            state.append((name, a, t, n_anchor, n_both, block))
+        plans[rel] = (p, text, eol, state)
+
+    if mode == 'check':
+        for rel, (p, text, eol, state) in plans.items():
+            for name, a, t, na, nb, block in state:
+                if nb == 1:
+                    way = 'APPLIED'
+                elif block:
+                    way = ('BLOCK x%d' % nb) if nb else ('absent' if na == 1 else 'absent, forward anchor x%d' % na)
+                else:
+                    way = 'absent' if na == 1 else 'ANCHOR x%d' % na
+                print('%-18s %-28s %s' % (rel, name, way))
+        return
+
+    errors = []
+    for rel, (p, text, eol, state) in plans.items():
+        for name, a, t, na, nb, block in state:
+            if mode == 'forward' and (na != 1 or nb != 0):
+                errors.append('%s [%s]: anchor x%d, already applied x%d (need 1 / 0)' % (rel, name, na, nb))
+            if mode == 'reverse' and nb != 1:
+                errors.append('%s [%s]: %s found x%d (need exactly 1)' % (rel, name, 'block' if block else 'anchor+insert', nb))
+    if errors:
+        print('ABORT - nothing written:')
+        for e in errors:
+            print('  ' + e)
+        sys.exit(2)
+
+    for rel, (p, text, eol, state) in plans.items():
+        new = text
+        for name, a, t, na, nb, block in state:
+            if mode == 'forward':
+                new = new.replace(a, a + t)
+            else:
+                new = new.replace(eol + t, eol) if block else new.replace(a + t, a)
+        dst = os.path.join(out, *rel.split('/'))
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        open(dst, 'wb').write(new.encode('utf-8'))
+        print('%-18s %s %d hunk(s) -> %s  (%d -> %d bytes, %s)' % (
+            rel, mode, len(state), dst, len(text.encode('utf-8')), len(new.encode('utf-8')),
+            'CRLF' if eol == '\r\n' else 'LF'))
+
+
+if __name__ == '__main__':
+    if len(sys.argv) < 3 or sys.argv[1] not in ('forward', 'reverse', 'check'):
+        raise SystemExit(__doc__)
+    mode = sys.argv[1]
+    run(mode, sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)

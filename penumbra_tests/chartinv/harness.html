@@ -1,0 +1,606 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>chart invariants</title>
+<link rel="stylesheet" href="main_css_under_test.css">
+</head>
+<body>
+<!-- CHART INVARIANTS (2026-10-13). run.ps1 builds harness_built.html from this file:
+     the REAL builder markup (index.php's #visualizationLightbox) replaces the marker,
+     and main_patched.js is the main.js under test with hooks into its closure. -->
+<div id="editorTabs"></div><div id="reportHeaderContainer"></div><div id="mainReportSubtitle"></div>
+<div id="reportSnippetOutput" style="width: 900px"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<table id="resultsTable"><thead id="tableHeader"><tr>
+  <th data-colname="#">#</th><th data-colname="DEPT">DEPT</th><th data-colname="STATUS">STATUS</th><th data-colname="FY">FY</th>
+  <th data-colname="AMOUNT">AMOUNT</th><th data-colname="AWARD_ID">AWARD_ID</th><th data-colname="STATE">STATE</th>
+  <th data-colname="N">N</th><th data-colname="START_DATE">START_DATE</th><th data-colname="END_DATE">END_DATE</th>
+</tr></thead><tbody></tbody></table>
+<div id="errorBox"></div>
+<input id="tableSearch" value="">
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<!--VIZ_LIGHTBOX-->
+<div style="width: 900px"><canvas id="ci_c" width="900" height="560"></canvas></div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script src="penumbra_a11y.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  window.alert = function (m) { (window.__dialogs = window.__dialogs || []).push('alert: ' + m); };
+  window.confirm = function (m) { (window.__dialogs = window.__dialogs || []).push('confirm: ' + m); return true; };
+  window.prompt = function (m) { (window.__dialogs = window.__dialogs || []).push('prompt: ' + m); return null; };
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (e) { window.__errors.push('unhandled rejection: ' + (e.reason && e.reason.message ? e.reason.message : e.reason)); });
+</script>
+<script src="main_patched.js"></script>
+<script>
+(function () {
+  var ONLY = '__ONLY__';
+  function report(txt) { document.getElementById('out').textContent = txt; }
+  var results = [];
+  function assert(name, cond, detail) { results.push({ name: name, pass: !!cond, detail: detail === undefined ? '' : String(detail) }); }
+  function eq(name, got, want) { var g = JSON.stringify(got), w = JSON.stringify(want); assert(name, g === w, 'got ' + g + ' | want ' + w); }
+  function section(tag, fn) {
+    if (ONLY && ONLY !== tag) return;
+    try { return fn(); } catch (e) { assert(tag + ' section ran to the end', false, String(e) + ' ' + String(e.stack || '').split('\n').slice(1, 4).join(' | ')); }
+  }
+  async function asection(tag, fn) {
+    try { return await fn(); } catch (e) { assert(tag + ' section ran to the end', false, String(e) + ' ' + String(e.stack || '').split('\n').slice(1, 4).join(' | ')); }
+  }
+  function M(o) { var m = new Map(); Object.keys(o).forEach(function (k) { m.set(k, o[k]); }); return m; }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  // ---- the fixture: 160 deterministic rows ------------------------------------------
+  var seed = 20261013;
+  function rnd() { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; }
+  function pick(a) { return a[Math.floor(rnd() * a.length)]; }
+  var DEPTS = ['Engineering', 'Engineering', 'Engineering', 'Sciences', 'Sciences', 'Agriculture', 'Agriculture', 'Design',
+               'Education', 'Humanities', 'Management', 'Textiles', 'Vet Med', 'Other', ''];
+  var STATUS = ['Awarded', 'Awarded', 'Pending', 'Declined'];
+  var STATES = ['NC', 'NC', 'NC', 'VA', 'SC', 'GA', 'North Carolina', 'TX', 'CA', 'Georgia (State)'];
+  function money(v) { var s = '$' + Math.abs(v).toLocaleString('en-US'); return v < 0 ? '-' + s : s; }
+  function ymd(d) { return d.toISOString().slice(0, 10); }
+  var FIX = [];
+  for (var k = 0; k < 160; k++) {
+    var amtRoll = rnd(), amt;
+    if (amtRoll < 0.06) amt = '';
+    else if (amtRoll < 0.1) amt = '$0';
+    else if (amtRoll < 0.18) amt = money(-Math.round(rnd() * 20000));
+    else amt = money(Math.round(rnd() * 250000));
+    var start = new Date(Date.UTC(2023, 0, 1) + Math.floor(rnd() * 1300) * 86400000);
+    var end = new Date(start.getTime() + Math.floor(30 + rnd() * 700) * 86400000);
+    var fyNum = start.getUTCMonth() >= 6 ? start.getUTCFullYear() + 1 : start.getUTCFullYear();
+    FIX.push(M({ '#': String(k + 1), DEPT: pick(DEPTS), STATUS: pick(STATUS), FY: 'FY ' + fyNum, AMOUNT: amt,
+      AWARD_ID: 'P-' + (1 + Math.floor(rnd() * 40)), STATE: pick(STATES), N: String(1 + Math.floor(rnd() * 100)),
+      START_DATE: ymd(start), END_DATE: ymd(end) }));
+  }
+  // The table the builder lists its columns from.
+  (function () {
+    var cols = ['#', 'DEPT', 'STATUS', 'FY', 'AMOUNT', 'AWARD_ID', 'STATE', 'N', 'START_DATE', 'END_DATE'];
+    var html = FIX.map(function (m) { return '<tr>' + cols.map(function (c) { return '<td data-column="' + c + '">' + (m.get(c) || '') + '</td>'; }).join('') + '</tr>'; }).join('');
+    document.querySelector('#resultsTable tbody').innerHTML = html;
+  })();
+
+  // ---- the app's own reading of a cell, for the expected aggregates --------------------
+  function cleanTxt(v) {
+    var s = String(v == null ? '' : v);
+    if (s.indexOf('@@HTML') === 0 || s.indexOf('@@JSON') === 0) s = s.slice(6);
+    s = s.replace(/<[^>]*>/g, '').trim();
+    return s;
+  }
+  function aggOf(rows, agg, yCol) {
+    var F = window.__CI;
+    var Y = String(yCol || '').toUpperCase();
+    if (agg === 'count') return rows.length;
+    if (agg === 'distinct') {
+      var seen = Object.create(null), n = 0;
+      rows.forEach(function (r) { var t = cleanTxt(r.get(Y)); if (t && !seen[t]) { seen[t] = 1; n++; } });
+      return n;
+    }
+    var nums = [];
+    rows.forEach(function (r) { var v = F.parseNum(r.get(Y)); if (typeof v === 'number' && isFinite(v)) nums.push(v); });
+    if (agg === 'sum') return nums.reduce(function (s, v) { return s + v; }, 0);
+    if (!nums.length) return 0;
+    if (agg === 'avg') return nums.reduce(function (s, v) { return s + v; }, 0) / nums.length;
+    if (agg === 'min') return Math.min.apply(null, nums);
+    if (agg === 'max') return Math.max.apply(null, nums);
+    if (agg === 'median') { var s = nums.slice().sort(function (a, b) { return a - b; }), h = Math.floor(s.length / 2); return s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2; }
+    return NaN;
+  }
+  function elemValue(type, raw) {
+    if (raw == null) return null;
+    if (typeof raw === 'number') return raw;
+    if (Array.isArray(raw)) return (raw.length === 2 && typeof raw[0] === 'number') ? raw[1] - raw[0] : null;
+    if (typeof raw === 'object') {
+      if (raw._l && typeof raw._l.flow === 'number') return raw._l.flow;
+      if (typeof raw.v === 'number') return raw.v;
+      if (typeof raw._value === 'number') return raw._value;
+      if (typeof raw.value === 'number') return raw.value;
+      if (typeof raw.y === 'number') return raw.y;
+    }
+    return null;
+  }
+
+  var CANVAS = 'ci_c';
+  function buildAndRender(cfg, rows) {
+    var F = window.__CI;
+    var data = F.chartData(rows, cfg.xAxis, cfg.yAxis || 'none', cfg.groupBy || 'none', cfg.agg, cfg.limit, cfg.type,
+      cfg.sortBy || 'value', cfg.sortDir || 'desc', 'default', !!cfg.normalize, !!cfg.otherBucket, cfg.comboSeries || null,
+      cfg.funnelMode || '', cfg);
+    if (data && (data._noData || data._groupByError)) return { data: data, chart: null };
+    var _pre = JSON.stringify(((data.datasets || [])[0] || {}).data || []).slice(0, 200);
+    var old = Chart.getChart(CANVAS); if (old) old.destroy();
+    F.renderSnip(CANVAS, cfg.type, data, 'T', true, true, 'top', 'end', false, !!cfg.stacked, !!cfg.horizontal, 'top', false,
+      !!cfg.normalize, '', '', '', false, '', '', cfg.comboSeries || null, false, '');
+    $('#' + CANVAS).data('vizConfig', cfg).data('sourceRowData', rows);
+    return { data: data, chart: Chart.getChart(CANVAS), pre: _pre };
+  }
+
+  // ---- C: clicks add up -------------------------------------------------------------------
+  // One config per line: name, then the vizConfig fields the renderer and the drill read.
+  var C_CONFIGS = [
+    ['bar sum',                 { type: 'bar', xAxis: 'DEPT', yAxis: 'AMOUNT', agg: 'sum', limit: 9999 }],
+    ['bar sum top 5 + Other',   { type: 'bar', xAxis: 'DEPT', yAxis: 'AMOUNT', agg: 'sum', limit: 5, otherBucket: true }],
+    ['bar count top 4 + Other', { type: 'bar', xAxis: 'DEPT', yAxis: 'none', agg: 'count', limit: 4, otherBucket: true }],
+    ['bar avg',                 { type: 'bar', xAxis: 'DEPT', yAxis: 'AMOUNT', agg: 'avg', limit: 9999 }],
+    ['bar min',                 { type: 'bar', xAxis: 'DEPT', yAxis: 'AMOUNT', agg: 'min', limit: 9999 }],
+    ['bar max',                 { type: 'bar', xAxis: 'DEPT', yAxis: 'AMOUNT', agg: 'max', limit: 9999 }],
+    ['bar median',              { type: 'bar', xAxis: 'DEPT', yAxis: 'AMOUNT', agg: 'median', limit: 9999 }],
+    ['bar distinct ids',        { type: 'bar', xAxis: 'DEPT', yAxis: 'AWARD_ID', agg: 'distinct', limit: 9999 }],
+    ['bar grouped sum',         { type: 'bar', xAxis: 'DEPT', yAxis: 'AMOUNT', groupBy: 'STATUS', agg: 'sum', limit: 9999 }],
+    ['bar grouped stacked',     { type: 'bar', xAxis: 'DEPT', yAxis: 'AMOUNT', groupBy: 'STATUS', agg: 'sum', limit: 6, stacked: true, otherBucket: true }],
+    ['bar horizontal count',    { type: 'bar', xAxis: 'STATE', yAxis: 'none', agg: 'count', limit: 9999, horizontal: true }],
+    ['bar by fiscal year (START_DATE:fy)', { type: 'bar', xAxis: 'START_DATE:fy', yAxis: 'AMOUNT', agg: 'sum', limit: 9999, sortBy: 'label', sortDir: 'asc' }],
+    ['bar by N:bin',            { type: 'bar', xAxis: 'N:bin', yAxis: 'none', agg: 'count', limit: 9999, sortBy: 'label', sortDir: 'asc' }],
+    ['bar grouped by FY',       { type: 'bar', xAxis: 'STATUS', yAxis: 'AMOUNT', groupBy: 'FY', agg: 'sum', limit: 9999 }],
+    ['line sum by FY',          { type: 'line', xAxis: 'FY', yAxis: 'AMOUNT', agg: 'sum', limit: 9999, sortBy: 'label', sortDir: 'asc' }],
+    ['line grouped count',      { type: 'line', xAxis: 'FY', yAxis: 'none', groupBy: 'STATUS', agg: 'count', limit: 9999, sortBy: 'label', sortDir: 'asc' }],
+    ['pie sum top 5 + Other',   { type: 'pie', xAxis: 'DEPT', yAxis: 'AMOUNT', agg: 'sum', limit: 5, otherBucket: true }],
+    ['pie count',               { type: 'pie', xAxis: 'STATUS', yAxis: 'none', agg: 'count', limit: 9999 }],
+    ['doughnut count + Other',  { type: 'doughnut', xAxis: 'STATE', yAxis: 'none', agg: 'count', limit: 4, otherBucket: true }],
+    ['doughnut grouped (sunburst) sum', { type: 'doughnut', xAxis: 'DEPT', yAxis: 'AMOUNT', groupBy: 'STATUS', agg: 'sum', limit: 4 }],
+    ['doughnut grouped (sunburst) count', { type: 'doughnut', xAxis: 'STATUS', yAxis: 'none', groupBy: 'DEPT', agg: 'count', limit: 9999 }],
+    ['radar count',             { type: 'radar', xAxis: 'DEPT', yAxis: 'none', agg: 'count', limit: 9999 }],
+    ['treemap sum',             { type: 'treemap', xAxis: 'DEPT', yAxis: 'AMOUNT', agg: 'sum', limit: 9999 }],
+    ['treemap grouped count',   { type: 'treemap', xAxis: 'DEPT', yAxis: 'none', groupBy: 'STATUS', agg: 'count', limit: 9999 }],
+    ['treemap top 4 + Other',   { type: 'treemap', xAxis: 'DEPT', yAxis: 'none', agg: 'count', limit: 4, otherBucket: true }],
+    ['histogram of N',          { type: 'histogram', xAxis: 'N', yAxis: 'none', agg: 'count', limit: 10 }],
+    // compact bin labels (25K - 50K) the drill used to parse back - and could not
+    ['histogram of AMOUNT',     { type: 'histogram', xAxis: 'AMOUNT', yAxis: 'none', agg: 'count', limit: 8 }],
+    // a REAL "Other" tile kept beside the bucket: the plugin merged same-named leaves
+    ['treemap top 8 + Other keeps a real Other', { type: 'treemap', xAxis: 'DEPT', yAxis: 'none', agg: 'count', limit: 8, otherBucket: true }],
+    ['pie top 6 + Other keeps a real Other', { type: 'pie', xAxis: 'DEPT', yAxis: 'AMOUNT', agg: 'sum', limit: 6, otherBucket: true }],
+    // a Y column with no numbers at all: 0 everywhere, never NaN
+    ['bar sum of a text column', { type: 'bar', xAxis: 'DEPT', yAxis: 'STATUS', agg: 'sum', limit: 9999 }],
+    ['bar avg of a text column', { type: 'bar', xAxis: 'DEPT', yAxis: 'STATUS', agg: 'avg', limit: 9999 }],
+    ['waterfall sum by FY',     { type: 'waterfall', xAxis: 'FY', yAxis: 'AMOUNT', agg: 'sum', limit: 9999, sortBy: 'label', sortDir: 'asc' }],
+    ['funnel count',            { type: 'funnel', xAxis: 'STATUS', yAxis: 'none', agg: 'count', limit: 9999 }],
+    ['bullet sum',              { type: 'bullet', xAxis: 'DEPT', yAxis: 'AMOUNT', agg: 'sum', limit: 5, referenceLine: '100000' }],
+    ['map sum',                 { type: 'map', xAxis: 'STATE', yAxis: 'AMOUNT', agg: 'sum', limit: 9999, vizOptions: '{"map":"us-grid"}' }],
+    ['map count',               { type: 'map', xAxis: 'STATE', yAxis: 'none', agg: 'count', limit: 9999, vizOptions: '{"map":"us-grid"}' }],
+    ['sankey sum 3 stages',     { type: 'sankey', xAxis: 'DEPT', yAxis: 'AMOUNT', groupBy: 'STATUS', agg: 'sum', limit: 4, vizOptions: '{"stages":["FY"]}' }],
+    ['sankey count',            { type: 'sankey', xAxis: 'STATUS', yAxis: 'none', groupBy: 'STATE', agg: 'count', limit: 3 }],
+    ['sankey bucketed stage',   { type: 'sankey', xAxis: 'DEPT', yAxis: 'none', groupBy: 'START_DATE:fy', agg: 'count', limit: 3 }]
+  ];
+
+  function runC() {
+    var F = window.__CI;
+    C_CONFIGS.forEach(function (pair) {
+      var name = pair[0], cfg = pair[1];
+      section('C', function () {
+        var rows = FIX;
+        var br = buildAndRender(cfg, rows);
+        if (!br.chart) { assert('C ' + name + ': renders', false, JSON.stringify(br.data && (br.data._noData || br.data._groupByError))); return; }
+        var chart = br.chart;
+        var probeRows = F.probe(rows, [cfg.xAxis, cfg.groupBy]);
+        var checked = 0, noCrit = 0, noVal = 0, bad = [];
+        chart.data.datasets.forEach(function (ds, d) {
+          if (ds._isTrendLine) return;
+          var meta = chart.getDatasetMeta(d);
+          (meta.data || []).forEach(function (el, i) {
+            var raw = ds.data[i];
+            var v = elemValue(cfg.type, raw);
+            // A map tile's value is kept beside the point (data._mapTiles, same
+            // order); an absent state is null = no rows.
+            if (cfg.type === 'map') { var tile = (br.data._mapTiles || [])[i]; v = tile ? (tile.value == null ? 0 : tile.value) : null; }
+            var crit = F.criteria(chart, { datasetIndex: d, index: i }, cfg);
+            if (!crit) { noCrit++; return; }
+            if (v === null || !isFinite(v)) { noVal++; return; }
+            var match = rows.filter(function (r, ri) { return crit.rowFilter(probeRows[ri]); });
+            var want = aggOf(match, cfg.agg, cfg.yAxis);
+            checked++;
+            if (!(Math.abs(v - want) <= 0.005 + 1e-9 * Math.abs(want))) {
+              var lbl = (chart.data.labels || [])[i];
+              bad.push('[' + d + ',' + i + '] ' + (lbl != null ? lbl : '') + ' ' + (crit.titleParts || []).join(' & ') + ' drew ' + v + ' rows say ' + want + ' (' + match.length + ' rows)');
+            }
+          });
+        });
+        assert('C ' + name + ': every clicked element lists rows that add up to it (' + checked + ' checked, ' + noCrit + ' unclickable, ' + noVal + ' no value)',
+          checked > 0 && bad.length === 0, bad.slice(0, 4).join(' || ') + (bad.length > 4 ? ' || +' + (bad.length - 4) + ' more' : '') +
+          (bad.length ? ' || BUILT labels=' + JSON.stringify(br.data.labels || []) + ' PRE=' + br.pre + ' data0=' + JSON.stringify(((br.data.datasets || [])[0] || {}).data || []).slice(0, 300) +
+            ' CHART labels=' + JSON.stringify(chart.data.labels || []) : ''));
+      });
+    });
+  }
+
+  // ---- the builder, opened the way the Chart button opens it (minus AJAX) ----------------
+  function openBuilder() {
+    var F = window.__CI;
+    window.vizCachedData = FIX;
+    F.resetViz();
+    F.populateCols();
+    $('.viz-type-option').removeClass('active');
+    $('.viz-type-option[data-type="bar"]').addClass('active');
+  }
+  function setv(sel, v) { var $e = $(sel); if (!$e.length) throw new Error('no element ' + sel); $e.val(v).trigger('change'); if ($e.is('select') && $e.val() !== v) throw new Error(sel + ' has no option ' + v); }
+  function check(sel, on) { $(sel).prop('checked', !!on).trigger('change'); }
+  function clickType(t) { var $o = $('.viz-type-option[data-type="' + t + '"]'); if (!$o.length) throw new Error('no type tile ' + t); $o.trigger('click'); }
+
+  // Per type: the axes plus that type's own settings, set through its own controls.
+  var R_SETUPS = {
+    bar: function () { setv('#vizXAxis', 'DEPT'); clickType('bar'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); setv('#vizGroupBy', 'STATUS'); check('#vizStacked', true); check('#vizHorizontal', true); setv('#vizLimit', '6'); check('#vizOtherBucket', true); },
+    line: function () { setv('#vizXAxis', 'FY'); clickType('line'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'avg'); setv('#vizGroupBy', 'STATUS'); check('#vizFill', true); setv('#vizTrendLine', 'regression'); setv('#vizReferenceLine', '100000|Goal'); setv('#vizSortBy', 'label'); setv('#vizSortDir', 'asc'); },
+    pie: function () { setv('#vizXAxis', 'DEPT'); clickType('pie'); setv('#vizAggregation', 'count'); setv('#vizLimit', '5'); check('#vizOtherBucket', true); setv('#vizLegend', 'bottom'); },
+    doughnut: function () { setv('#vizXAxis', 'DEPT'); clickType('doughnut'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); setv('#vizGroupBy', 'STATUS'); setv('#vizLimit', '4'); },
+    scatter: function () { setv('#vizXAxis', 'N'); clickType('scatter'); setv('#vizYAxis', 'AMOUNT'); setv('#vizBubbleSize', 'N'); },
+    radar: function () { setv('#vizXAxis', 'DEPT'); clickType('radar'); setv('#vizAggregation', 'count'); },
+    combo: function () { setv('#vizXAxis', 'FY'); setv('#vizYAxis', 'AMOUNT'); clickType('combo'); check('#vizDualAxis', true); },
+    butterfly: function () { setv('#vizXAxis', 'DEPT'); setv('#vizYAxis', 'AMOUNT'); clickType('butterfly'); },
+    treemap: function () { setv('#vizXAxis', 'DEPT'); clickType('treemap'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); setv('#vizGroupBy', 'STATUS'); },
+    histogram: function () { setv('#vizXAxis', 'N'); clickType('histogram'); setv('#vizLimit', '8'); },
+    waterfall: function () { setv('#vizXAxis', 'FY'); clickType('waterfall'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); },
+    funnel: function () { setv('#vizXAxis', 'STATUS'); clickType('funnel'); setv('#vizAggregation', 'count'); },
+    gauge: function () { clickType('gauge'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); setv('#vizReferenceLine', '5000000|Goal'); $('#vizGaugeBands').val('2000000|4000000').trigger('input').trigger('change'); },
+    bullet: function () { setv('#vizXAxis', 'DEPT'); clickType('bullet'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); setv('#vizReferenceLine', '1000000'); },
+    box: function () { setv('#vizXAxis', 'DEPT'); clickType('box'); setv('#vizYAxis', 'AMOUNT'); setv('#vizBoxWhiskers', 'minmax'); },
+    gantt: function () { setv('#vizXAxis', 'AWARD_ID'); clickType('gantt'); setv('#vizYAxis', 'START_DATE'); setv('#vizGanttEnd', 'END_DATE'); setv('#vizReferenceLine', 'today'); setv('#vizSortBy', 'duration'); },
+    map: function () { setv('#vizXAxis', 'STATE'); clickType('map'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); setv('#vizMapBins', 'equal'); check('#vizMapLabels', false); },
+    sankey: function () { setv('#vizXAxis', 'DEPT'); clickType('sankey'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); setv('#vizSankeyTo', 'STATUS'); setv('#vizSankeyStage3', 'FY'); setv('#vizLimit', '5'); }
+  };
+  // Settings every type carries, applied after the type's own.
+  function commonSettings(t) {
+    $('#vizTitle').val('RT ' + t).trigger('change');
+    if (!$('#vizNumStyle').prop('disabled')) setv('#vizNumStyle', 'compact');
+    $('#vizFilterExpression').val('STATUS != Declined').trigger('input').trigger('change');
+  }
+
+  function runR() {
+    var F = window.__CI;
+    Object.keys(R_SETUPS).forEach(function (t) {
+      section('R', function () {
+        openBuilder(); R_SETUPS[t](); commonSettings(t);
+        var code1 = window.vizBuildCodeFromForm();
+        assert('R ' + t + ': the builder emits a vis() call of its own type', code1.indexOf("vis('" + (t === 'line' && $('#vizFill').is(':checked') ? 'area' : t) + "'") === 0, code1.slice(0, 80));
+        F.setSnippet(code1);
+        var parsed = F.enumVis();
+        if (!parsed.length) { assert('R ' + t + ': the emitted call parses', false, code1.slice(0, 120)); return; }
+        var cfg1 = parsed[0].config;
+        openBuilder(); F.restore(cfg1);
+        var code2 = window.vizBuildCodeFromForm();
+        eq('R ' + t + ': vis() -> parse -> reopen -> vis() is the same call', code2, code1);
+        // Presets: snapshot -> apply on a fresh builder -> snapshot again, and the call it emits.
+        openBuilder(); R_SETUPS[t](); commonSettings(t);
+        var s1 = F.snapshot();
+        openBuilder(); F.applySnap(clone(s1));
+        var s2 = F.snapshot();
+        var strip = function (s) { var o = clone(s); delete o._dimUser; delete o._limUser; return o; };
+        eq('R ' + t + ': preset snapshot -> apply -> snapshot is the same', strip(s2), strip(s1));
+        eq('R ' + t + ': a reapplied preset emits the same vis() call', window.vizBuildCodeFromForm(), code1);
+      });
+    });
+  }
+
+  // ---- L: switching types does not leak -------------------------------------------------
+  function sig() {
+    var o = {};
+    ['#vizXAxis', '#vizYAxis', '#vizGroupBy', '#vizAggregation', '#vizLimit', '#vizSortBy', '#vizSortDir', '#vizValues', '#vizLegend',
+     '#vizStacked', '#vizHorizontal', '#vizOtherBucket', '#vizFilterGroup', '#vizFilterXAxis', '#vizLogScale', '#vizTrendLine', '#vizReferenceLine',
+     '#vizNumStyle', '#vizNumDecimals', '#vizNumPrefix', '#vizNumSuffix', '#vizStackNormalize', '#vizFill', '#vizDualAxis'].forEach(function (id) {
+      var $e = $(id); if (!$e.length) return;
+      var $f = $e.closest('.viz-fld'), $c = $e.closest('label.viz-chip');
+      o[id + ' disabled'] = !!$e.prop('disabled');
+      if ($f.length) o[id + ' dim'] = $f.hasClass('viz-fld-dim');
+      if ($c.length) { o[id + ' chipdim'] = $c.hasClass('viz-chip-dim'); o[id + ' tip'] = $c.attr('data-tip') || ''; }
+    });
+    ['#vizXAxisLbl', '#vizYAxisLbl', '#vizLimitLbl'].forEach(function (id) { o[id + ' text'] = $(id).children('.viz-lbl-text').text(); });
+    o['refline label'] = $('#vizRefLineWrap .viz-lbl-text').text();
+    o['refline placeholder'] = $('#vizReferenceLine').attr('placeholder') || '';
+    ['#vizSortByFld', '#vizSortDirFld'].forEach(function (id) { o[id + ' tip'] = $(id + ' .bld-help-icon').attr('data-tip') || ''; });
+    o['legend tip'] = $('#vizLegend').closest('.viz-fld').find('.bld-help-icon').attr('data-tip') || '';
+    ['#vizComboRow', '#vizButterflyRow', '#vizBubbleRow', '#vizFunnelRow', '#vizGaugeRow', '#vizBoxRow', '#vizGanttRow', '#vizMapRow', '#vizSankeyRow',
+     '#vizAxisLabelsRow', '#vizYRangeWrap', '#vizFillWrap', '#vizStackOptionsWrap'].forEach(function (id) { var el = $(id)[0]; o[id + ' display'] = el ? (el.style.display || '') : 'n/a'; });
+    o['groupBy first option'] = $('#vizGroupBy option').first().text();
+    o['sortBy value text'] = $('#vizSortBy option[value="value"]').text();
+    o['sortBy duration shown'] = $('#vizSortBy option[value="duration"]').css('display') !== 'none';
+    o['values center shown'] = $('#vizValues option[value="center"]').css('display') !== 'none';
+    o['values start shown'] = $('#vizValues option[value="start"]').css('display') !== 'none';
+    o['filter group text'] = $('#vizFilterGroupWrap .viz-chip-text').text();
+    return o;
+  }
+  function runL() {
+    var F = window.__CI;
+    var types = $('.viz-type-option').map(function () { return $(this).data('type'); }).get();
+    assert('L the picker lists the types this suite knows', types.length === Object.keys(R_SETUPS).length, types.join(','));
+    types.forEach(function (b) {
+      section('L', function () {
+        openBuilder(); setv('#vizXAxis', 'DEPT'); setv('#vizYAxis', 'AMOUNT'); clickType(b);
+        var fresh = sig();
+        var leaks = Object.create(null);
+        types.forEach(function (a) {
+          if (a === b) return;
+          openBuilder(); setv('#vizXAxis', 'DEPT'); setv('#vizYAxis', 'AMOUNT');
+          clickType(a);
+          clickType(b);
+          var s = sig();
+          Object.keys(fresh).forEach(function (k) { if (JSON.stringify(s[k]) !== JSON.stringify(fresh[k])) (leaks[k] = leaks[k] || []).push(a + '=' + JSON.stringify(s[k])); });
+        });
+        var keys = Object.keys(leaks);
+        assert('L -> ' + b + ': no control depends on the type you came from', keys.length === 0,
+          keys.slice(0, 5).map(function (k) { return k + ' (fresh ' + JSON.stringify(fresh[k]) + '; ' + leaks[k].slice(0, 3).join(', ') + (leaks[k].length > 3 ? ', +' + (leaks[k].length - 3) : '') + ')'; }).join(' || ') + (keys.length > 5 ? ' || +' + (keys.length - 5) + ' more' : ''));
+        // The restore path must agree with the click path on the same chart.
+        openBuilder(); setv('#vizXAxis', 'DEPT'); setv('#vizYAxis', 'AMOUNT'); clickType(b);
+        var snap = F.snapshot();
+        openBuilder(); F.restore(snap);
+        var rs = sig(), diff = [];
+        Object.keys(fresh).forEach(function (k) { if (JSON.stringify(rs[k]) !== JSON.stringify(fresh[k])) diff.push(k + ': click ' + JSON.stringify(fresh[k]) + ' / reopen ' + JSON.stringify(rs[k])); });
+        assert('L ' + b + ': reopening a saved chart shows the same controls as picking the type', diff.length === 0, diff.slice(0, 5).join(' || ') + (diff.length > 5 ? ' || +' + (diff.length - 5) + ' more' : ''));
+      });
+    });
+  }
+
+  function tick(ms) { return new Promise(function (r) { setTimeout(r, ms || 0); }); }
+  function round6(v) { return (typeof v === 'number' && isFinite(v)) ? Math.round(v * 1e6) / 1e6 : v; }
+  function simp(v) {
+    if (v == null || typeof v !== 'object') return round6(v);
+    if (Array.isArray(v)) return v.map(simp);
+    var o = {};
+    ['x', 'y', 'v', 'flow', 'from', 'to', '_label', '_group', '_key', 'value'].forEach(function (k) { if (k in v && typeof v[k] !== 'function') o[k] = simp(v[k]); });
+    return o;
+  }
+  // What a chart IS, minus how big it is drawn: type, categories, every series'
+  // name / kind / stack / axis / values, the axes' kinds and stacking, the legend.
+  function chartSig(ch) {
+    if (!ch) return null;
+    var c = ch.config, o = c.options || {}, d = c.data || {};
+    var sc = o.scales || {};
+    return {
+      type: c.type, labels: d.labels || null, indexAxis: o.indexAxis || 'x',
+      datasets: (d.datasets || []).map(function (ds) {
+        return { label: ds.label, type: ds.type || null, stack: ds.stack == null ? null : ds.stack, axis: ds.yAxisID || ds.xAxisID || null,
+          hidden: !!ds.hidden,
+          // a treemap's rectangles are LAYOUT (they follow the canvas size): compare its values and names only
+          data: c.type === 'treemap' ? (ds.data || []).map(function (r) { return [round6(r && r.v), r && r._data ? (r._data._label || r._data.label || r.g || null) : null]; }) : simp(ds.data),
+          tree: ds.tree ? ds.tree.length : null };
+      }),
+      scales: Object.keys(sc).sort().map(function (k) { return [k, sc[k].type || null, !!sc[k].stacked, sc[k].display !== false]; }),
+      legend: o.plugins && o.plugins.legend ? [o.plugins.legend.display !== false, o.plugins.legend.position || null] : null
+    };
+  }
+  async function renderReport(code) {
+    var F = window.__CI;
+    $('#reportSnippetOutput').empty();
+    F.setSnippet(code);
+    await F.renderSnippet(FIX, false, { ignorePendingViewState: true });
+    for (var w = 0; w < 60 && !document.querySelector('#reportSnippetOutput canvas'); w++) await tick(50);
+    var cv = document.querySelector('#reportSnippetOutput canvas');
+    return cv ? { canvas: cv, chart: Chart.getChart(cv), cfg: $(cv).data('vizConfig') } : { canvas: null, chart: null, text: $('#reportSnippetOutput').text().slice(0, 200) };
+  }
+  var EXPORT_CODES = {};
+
+  // ---- P + A: the builder's preview is the report's chart; the report's chart has its table ----
+  async function runPA() {
+    var F = window.__CI;
+    var types = Object.keys(R_SETUPS);
+    for (var ti = 0; ti < types.length; ti++) {
+      var t = types[ti];
+      await asection('P', async function () {
+        openBuilder(); R_SETUPS[t](); commonSettings(t);
+        window.vizRunLiveUpdate();
+        var pv = Chart.getChart('vizChart');
+        var code = window.vizBuildCodeFromForm();
+        EXPORT_CODES[t] = code;
+        var rr = await renderReport(code);
+        assert('P ' + t + ': the report renders the builder\'s chart', !!rr.chart, rr.text || '');
+        assert('P ' + t + ': the builder drew a preview', !!pv, '');
+        if (!rr.chart || !pv) return;
+        var a = chartSig(pv), b = chartSig(rr.chart), diffs = [];
+        Object.keys(a).forEach(function (k) { if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) diffs.push(k + ': preview ' + JSON.stringify(a[k]).slice(0, 160) + ' | report ' + JSON.stringify(b[k]).slice(0, 160)); });
+        assert('P ' + t + ': the preview and the report draw the same chart', diffs.length === 0, diffs.join(' || '));
+        // A: the screen-reader table beside the report's canvas.
+        var cv = rr.canvas, tbl = document.getElementById(cv.id + '-a11y-table');
+        var label = cv.getAttribute('aria-label') || '';
+        assert('A ' + t + ': the canvas is labelled for screen readers', /chart/i.test(label) && cv.getAttribute('role') === 'img', label);
+        var trs = tbl ? tbl.querySelectorAll('tbody tr') : [];
+        assert('A ' + t + ': a data table sits beside the chart, with rows', !!tbl && trs.length > 0, tbl ? 'empty' : 'no table');
+        var d = rr.chart.config.data || {};
+        var plain = !d._a11yRows && Array.isArray(d.labels) && d.labels.length && (d.datasets || []).length &&
+          (d.datasets || []).every(function (ds) { return Array.isArray(ds.data) && ds.data.every(function (v) { return v == null || typeof v === 'number'; }); });
+        if (plain && tbl) {
+          var bad = [];
+          eq('A ' + t + ': one table row per category', trs.length, d.labels.length);
+          Array.prototype.forEach.call(trs, function (tr, i) {
+            var tds = tr.querySelectorAll('td');
+            d.datasets.forEach(function (ds, di) {
+              var want = ds.data[i], got = tds[di] ? tds[di].textContent : '';
+              if (want == null ? got !== '' : Math.abs(parseFloat(got) - want) > 1e-6) bad.push(d.labels[i] + '/' + ds.label + ': table ' + got + ' chart ' + want);
+            });
+          });
+          assert('A ' + t + ': every table cell is the value the chart drew', bad.length === 0, bad.slice(0, 4).join(' || '));
+        }
+      });
+    }
+  }
+
+  // ---- F: the chart's filter panel removes exactly what it unticks ------------------------
+  function sumData(ch, di) { return ((ch.data.datasets[di || 0] || {}).data || []).reduce(function (s, v) { return s + (typeof v === 'number' ? v : 0); }, 0); }
+  async function runF() {
+    var F = window.__CI;
+    var cases = [
+      ['bar by DEPT, untick a category', function () { setv('#vizXAxis', 'DEPT'); clickType('bar'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); setv('#vizLimit', '9999'); }, 'DEPT', 'Engineering'],
+      ['grouped bar, untick a group', function () { setv('#vizXAxis', 'DEPT'); clickType('bar'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); setv('#vizGroupBy', 'STATUS'); setv('#vizLimit', '9999'); }, 'STATUS', 'Pending'],
+      ['pie by STATUS, untick a slice', function () { setv('#vizXAxis', 'STATUS'); clickType('pie'); setv('#vizAggregation', 'count'); }, 'STATUS', 'Declined'],
+      ['sunburst, untick a group', function () { setv('#vizXAxis', 'DEPT'); clickType('doughnut'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); setv('#vizGroupBy', 'STATUS'); setv('#vizLimit', '9999'); }, 'STATUS', 'Awarded']
+    ];
+    for (var ci = 0; ci < cases.length; ci++) {
+      var cs = cases[ci];
+      await asection('F', async function () {
+        openBuilder(); cs[1](); check('#vizAllowFilter', true);
+        var code = window.vizBuildCodeFromForm();
+        var rr = await renderReport(code);
+        if (!rr.chart) { assert('F ' + cs[0] + ': renders', false, rr.text); return; }
+        var $w = $(rr.canvas).closest('.penumbra-chart-filter-wrapper');
+        var $item = $w.find('.chart-filter-item').filter(function () { return String($(this).data('column')) === cs[2] && String($(this).data('value')) === cs[3]; });
+        assert('F ' + cs[0] + ': the panel offers ' + cs[2] + ' = ' + cs[3], $item.length === 1, $w.find('.chart-filter-item').map(function () { return $(this).data('column') + '=' + $(this).data('value'); }).get().join(', '));
+        if ($item.length !== 1) return;
+        // The total the chart should lose = that value's own rows, aggregated the chart's way.
+        var cfg = rr.cfg, Y = String(cfg.yAxis || '').toUpperCase();
+        var before = rr.chart.data.datasets.reduce(function (s, ds, di) { return s + sumData(rr.chart, di); }, 0);
+        var lost = FIX.filter(function (m) { return cleanTxt(m.get(cs[2])) === cs[3]; });
+        // (a sunburst draws positive values only, so only those can be lost)
+        var _posOnly = cfg.type === 'doughnut' && cfg.groupBy && cfg.groupBy !== 'none';
+        var lostV = cfg.agg === 'count' ? lost.length : lost.reduce(function (s, m) { var v = F.parseNum(m.get(Y)); return s + (isFinite(v) && (!_posOnly || v > 0) ? v : 0); }, 0);
+        $item.find('input').prop('checked', false);
+        F.updatePanel($w);
+        var after = Chart.getChart(rr.canvas);
+        var afterTot = after.data.datasets.reduce(function (s, ds, di) { return s + sumData(after, di); }, 0);
+        // A sunburst counts each row twice (inner + outer ring).
+        var rings = (cfg.type === 'doughnut' && cfg.groupBy && cfg.groupBy !== 'none') ? 2 : 1;
+        assert('F ' + cs[0] + ': the chart loses exactly that value\'s rows', Math.abs((before - afterTot) - rings * lostV) < 0.01,
+          'before ' + before + ' after ' + afterTot + ' lost should be ' + rings * lostV);
+        var shown = JSON.stringify([after.data.labels || [], after.data.datasets.map(function (ds) { return ds.label; })]);
+        assert('F ' + cs[0] + ': ' + cs[3] + ' is gone from the chart', cfg.type === 'doughnut' || shown.indexOf('"' + cs[3] + '"') === -1, shown.slice(0, 300));
+        // ...and every element still drills to rows that add up to it, the panel's cut applied.
+        var rows = F.panelExclusions(rr.canvas, FIX.slice());
+        var probeRows = F.probe(rows, [cfg.xAxis, cfg.groupBy]), bad = [];
+        after.data.datasets.forEach(function (ds, d) {
+          (after.getDatasetMeta(d).data || []).forEach(function (el, i) {
+            var crit = F.criteria(after, { datasetIndex: d, index: i }, cfg); if (!crit) return;
+            var v = elemValue(cfg.type, ds.data[i]); if (v == null) return;
+            var m = rows.filter(function (r, ri) { return crit.rowFilter(probeRows[ri]); });
+            var want = aggOf(m.filter(function (r) { return !(cfg.type === 'doughnut' && cfg.agg === 'sum') || F.parseNum(r.get(Y)) > 0; }), cfg.agg, cfg.yAxis);
+            if (Math.abs(v - want) > 0.01) bad.push((crit.titleParts || []).join(' & ') + ': drew ' + v + ' rows ' + want);
+          });
+        });
+        assert('F ' + cs[0] + ': after the cut, every element still drills to rows that add up to it', bad.length === 0, bad.slice(0, 4).join(' || '));
+      });
+    }
+  }
+
+  // ---- D: "Drill into" a column - the child chart is the clicked element, split ----------
+  async function runD() {
+    var F = window.__CI;
+    var cases = [
+      ['bar -> STATUS', function () { setv('#vizXAxis', 'DEPT'); clickType('bar'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); setv('#vizLimit', '9999'); }, 'STATUS'],
+      ['bar count -> FY', function () { setv('#vizXAxis', 'DEPT'); clickType('bar'); setv('#vizAggregation', 'count'); setv('#vizLimit', '9999'); }, 'FY'],
+      ['grouped bar -> FY', function () { setv('#vizXAxis', 'DEPT'); clickType('bar'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); setv('#vizGroupBy', 'STATUS'); setv('#vizLimit', '9999'); }, 'FY'],
+      ['line -> DEPT', function () { setv('#vizXAxis', 'FY'); clickType('line'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); }, 'DEPT'],
+      ['pie -> DEPT', function () { setv('#vizXAxis', 'STATUS'); clickType('pie'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); }, 'DEPT'],
+      ['treemap -> FY', function () { setv('#vizXAxis', 'DEPT'); clickType('treemap'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); setv('#vizGroupBy', 'STATUS'); }, 'FY'],
+      ['sunburst outer -> FY', function () { setv('#vizXAxis', 'DEPT'); clickType('doughnut'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); setv('#vizGroupBy', 'STATUS'); setv('#vizLimit', '9999'); }, 'FY'],
+      ['sankey band -> FY', function () { setv('#vizXAxis', 'DEPT'); clickType('sankey'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); setv('#vizSankeyTo', 'STATUS'); setv('#vizLimit', '9999'); }, 'FY']
+    ];
+    for (var ci = 0; ci < cases.length; ci++) {
+      var cs = cases[ci];
+      await asection('D', async function () {
+        openBuilder(); cs[1]();
+        var rr = await renderReport(window.vizBuildCodeFromForm());
+        if (!rr.chart) { assert('D ' + cs[0] + ': renders', false, rr.text); return; }
+        var ch = rr.chart, cfg = rr.cfg, bad = [], tried = 0;
+        // Up to 4 elements per chart (each drill redraws the canvas, so re-render between).
+        var picks = [];
+        ch.data.datasets.forEach(function (ds, d) { (ch.getDatasetMeta(d).data || []).forEach(function (el, i) { if (picks.length < 4) picks.push([d, i]); }); });
+        for (var pi = 0; pi < picks.length; pi++) {
+          if (pi) { rr = await renderReport(window.vizBuildCodeFromForm()); ch = rr.chart; }
+          var d = picks[pi][0], i = picks[pi][1], ds = ch.data.datasets[d];
+          var crit = F.criteria(ch, { datasetIndex: d, index: i }, cfg);
+          var v = elemValue(cfg.type, ds.data[i]);
+          if (!crit || v == null) continue;
+          var steps = (crit.titleParts || []).map(function (tp) { var at = tp.indexOf(' = '); return at < 0 ? null : { col: tp.slice(0, at), val: tp.slice(at + 3) }; });
+          if (steps.some(function (s) { return !s || s.val === '(Other)'; })) continue;
+          tried++;
+          F.drillInPlace(rr.canvas, { parentVizConfig: cfg, nextCol: cs[2], clickSteps: steps, originalRows: FIX.slice() });
+          var child = Chart.getChart(rr.canvas);
+          var childTot = NaN;
+          if (child && child.config.type === 'treemap') {
+            childTot = ((child.data.datasets[0] || {}).tree || []).reduce(function (s, o) { return s + (o._value || 0); }, 0);
+          } else if (child && child.data.datasets[1] && child.data.datasets[1]._ring === 'inner') {
+            childTot = sumData(child, 1);   // a sunburst: the inner ring is the whole
+          } else if (child) {
+            childTot = child.data.datasets.reduce(function (s, x, xi) { return s + sumData(child, xi); }, 0);
+          }
+          if (!(Math.abs(childTot - v) < 0.01)) bad.push(steps.map(function (s) { return s.col + '=' + s.val; }).join(' & ') + ': parent ' + v + ', drilled chart totals ' + childTot);
+        }
+        assert('D ' + cs[0] + ': a drilled element\'s chart adds up to the element (' + tried + ' drilled)', tried > 0 && bad.length === 0, bad.slice(0, 3).join(' || '));
+      });
+    }
+  }
+
+  async function run() {
+    var F = window.__CI;
+    if (!F || typeof F.chartData !== 'function') {
+      report('RESULTS_JSON:' + JSON.stringify({ fatal: 'hooks unavailable: ' + (window.__CI_ERR || 'n/a'), pageErrors: window.__errors.slice(0, 6) }));
+      return;
+    }
+    $('#visualizationLightbox').css('display', 'block');
+    await asection('LIB', async function () {
+      await F.loadScript('js/chart-4.5.1.min.js');
+      await F.loadScript('js/chartjs-plugin-datalabels-2.0.0.min.js');
+      await F.loadScript('js/chartjs-chart-treemap-3.1.0.min.js');
+      await F.loadScript('js/chartjs-chart-sankey-0.19.1.min.js');
+      await F.loadChartModule();
+      if (window.ChartDataLabels) Chart.register(ChartDataLabels);
+      assert('LIB Chart.js, the plugins and the chart module are up', typeof Chart === 'function' && window.PenumbraCharts && window.PenumbraCharts.armed);
+    });
+    window.vizCachedData = FIX;
+    if (!ONLY || ONLY === 'C') runC();
+    if (!ONLY || ONLY === 'R') runR();
+    if (!ONLY || ONLY === 'L') runL();
+    if (!ONLY || ONLY === 'P' || ONLY === 'A') await runPA();
+    if (!ONLY || ONLY === 'F') await runF();
+    if (!ONLY || ONLY === 'D') await runD();
+    // E (email / PDF) runs in the vischarts suite on these very calls and rows.
+    Object.keys(EXPORT_CODES).forEach(function (t) { results.push({ name: 'EXPORT code ' + t, pass: true, detail: EXPORT_CODES[t], export: true }); });
+    var cols = ['DEPT', 'STATUS', 'FY', 'AMOUNT', 'AWARD_ID', 'STATE', 'N', 'START_DATE', 'END_DATE'];
+    results.push({ name: 'EXPORT fixture', pass: true, export: true,
+      detail: [cols.join('|')].concat(FIX.map(function (m) { return cols.map(function (c) { return String(m.get(c) || '').replace(/\|/g, '/'); }).join('|'); })).join('\n') });
+    report('RESULTS_JSON:' + JSON.stringify({ pageErrors: window.__errors.slice(0, 8), dialogs: (window.__dialogs || []).slice(0, 4), results: results }));
+  }
+
+  var tries = 0;
+  (function wait() {
+    tries++;
+    if (window.__CI || tries > 60) {
+      setTimeout(function () {
+        run().catch(function (e) { report('RESULTS_JSON:' + JSON.stringify({ fatal: 'run threw: ' + e + ' ' + String(e.stack || '').split('\n').slice(0, 3).join(' | '), pageErrors: window.__errors.slice(0, 6) })); });
+      }, 300);
+    } else { setTimeout(wait, 100); }
+  })();
+})();
+</script>
+</body></html>

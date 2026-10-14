@@ -1,0 +1,101 @@
+<!doctype html><html><head><meta charset="utf-8"><title>slide detection</title></head>
+<body>
+<div id="reportSnippetOutput"></div><div id="pivotResultTable"></div>
+<textarea id="sqlQuery" style="display:none"></textarea>
+<textarea id="reportSnippet" style="display:none"></textarea>
+<textarea id="subquerySql" style="display:none"></textarea>
+<div id="selectorBox"></div>
+<pre id="out">RUNNING</pre>
+<script>window.__pageErrors=[];window.onerror=function(m){window.__pageErrors.push(String(m));return true;};</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  window.penumbra_vars = { isAdmin:true, isGlobalAdmin:true, currentUserKey:'harness',
+    shibboleth:{ouc:'',dept:''}, tables:{oracle:[],pins:[],infoed:[],hr:[],fin:[]},
+    imports:[], reports:[], themes:{}, prompts:{}, grants:[] };
+  jQuery.ajax = function(){ var d=jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  jQuery.fx.off = true;
+  window.ResizeObserver = function(){ this.observe=function(){}; this.unobserve=function(){}; this.disconnect=function(){}; };
+  window.IntersectionObserver = window.ResizeObserver;
+  if(!window.matchMedia){ window.matchMedia=function(){return{matches:false,addListener:function(){},removeListener:function(){},addEventListener:function(){},removeEventListener:function(){}};}; }
+</script>
+<script src="main_slide.js"></script>
+<script>
+(function(){
+  var R=[];
+  function t(name, fn){ try{ var d=fn(); R.push({name:name,pass:d===true,detail:(d===true?'':String(d))}); }
+                        catch(e){ R.push({name:name,pass:false,detail:'THREW '+e}); } }
+  function done(){ document.getElementById('out').textContent='RESULTS_JSON:'+JSON.stringify({pageErrors:window.__pageErrors,results:R}); }
+  setTimeout(function(){
+    var S = window.__SLIDE;
+    if(!S || !S.enumVis){ R.push({name:'hooks present',pass:false,detail:'__SLIDE missing: '+(window.__SLIDE_ERR||'')}); return done(); }
+    var ed = S.getEditor && S.getEditor();
+    if(!ed){ R.push({name:'snippetEditor exists',pass:false,detail:'editor is '+ed}); return done(); }
+
+    var V = "vis('bar','DEPT','AMT','none','sum',10,'Plain',true,false,800,450)";
+    function setAndEnum(txt){ ed.setValue(txt); return S.enumVis(); }
+
+    t('A bare inline vis() is NOT in a slide', function(){
+      var l = setAndEnum(V);
+      return (l.length===1 && l[0].inSlide===false && l[0].isInfobox===false)
+        ? true : 'len='+l.length+' inSlide='+(l[0]&&l[0].inSlide)+' isInfobox='+(l[0]&&l[0].isInfobox);
+    });
+    t('B vis() inside slide(...) IS detected as inSlide', function(){
+      var l = setAndEnum('slide(' + V + ', false)');
+      return (l.length===1 && l[0].inSlide===true) ? true : 'len='+l.length+' inSlide='+(l[0]&&l[0].inSlide);
+    });
+    t('C slide() with inline=true still counts as inSlide', function(){
+      var l = setAndEnum('slide(' + V + ', true)');
+      return (l.length===1 && l[0].inSlide===true) ? true : 'inSlide='+(l[0]&&l[0].inSlide);
+    });
+    t('D infobox-wrapped chart is isInfobox and NOT inSlide', function(){
+      var l = setAndEnum('action(infobox, \'Bar: X\', "raw|' + V.replace(/"/g,'\\"') + '")');
+      return (l.length===1 && l[0].isInfobox===true && l[0].inSlide===false)
+        ? true : 'isInfobox='+(l[0]&&l[0].isInfobox)+' inSlide='+(l[0]&&l[0].inSlide);
+    });
+    t('E a slide AFTER the chart must not capture it', function(){
+      var l = setAndEnum(V + '\nslide(<p>later</p>, false)');
+      return (l.length===1 && l[0].inSlide===false) ? true : 'inSlide='+(l[0]&&l[0].inSlide);
+    });
+    t('F a CLOSED slide before the chart must not capture it', function(){
+      var l = setAndEnum('slide(<p>earlier</p>, false)\n' + V);
+      return (l.length===1 && l[0].inSlide===false) ? true : 'inSlide='+(l[0]&&l[0].inSlide);
+    });
+    t('G the word "slideshow" must not register as a wrapper', function(){
+      var l = setAndEnum('<p>slideshow notes</p>\n' + V);
+      return (l.length===1 && l[0].inSlide===false) ? true : 'inSlide='+(l[0]&&l[0].inSlide);
+    });
+    t('H the word slide inside a QUOTED label must not register', function(){
+      var l = setAndEnum("vis('bar','DEPT','AMT','none','sum',10,'My slide title',true,false,800,450)");
+      return (l.length===1 && l[0].inSlide===false) ? true : 'inSlide='+(l[0]&&l[0].inSlide);
+    });
+    t('I two charts: only the slide-wrapped one is flagged', function(){
+      var l = setAndEnum(V + '\nslide(' + V.replace('Plain','InSlide') + ', false)');
+      return (l.length===2 && l[0].inSlide===false && l[1].inSlide===true)
+        ? true : 'len='+l.length+' a='+(l[0]&&l[0].inSlide)+' b='+(l[1]&&l[1].inSlide);
+    });
+    t('J slideFrom/slideTo bracket the slide() call', function(){
+      var l = setAndEnum('slide(' + V + ', false)');
+      var e = l[0];
+      return (e && e.slideFrom && e.slideTo && e.slideFrom.ch === 0)
+        ? true : 'slideFrom='+JSON.stringify(e&&e.slideFrom)+' slideTo='+JSON.stringify(e&&e.slideTo);
+    });
+    done();
+  }, 120);
+})();
+</script>
+</body></html>

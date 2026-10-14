@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Auditor Changes harness</title>
+<script src="themes.js"></script>
+<script src="js/jquery-3.7.1.min.js"></script>
+<script src="js/jquery-ui.min.js"></script>
+<script src="js/moment.min.js"></script>
+<style>
+  #out { white-space: pre-wrap; word-break: break-all; font: 11px/1.3 Consolas, monospace; margin: 12px 0 0; }
+  /* settled layout only (stylesheets load after the markup) */
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+  .navstub { height: 40px; flex: 0 0 auto; }
+</style>
+</head>
+<body class="admin-view">
+<div id="admWrapper" class="admin-view">
+  <div id="admin-flex-container" style="display: flex; align-items: stretch; height: auto;">
+    <div id="editorTabs" class="ui-tabs ui-corner-all ui-widget ui-widget-content" style="flex-grow: 1;">
+      <div class="ui-tabs-nav-wrapper navstub"></div>
+      <div id="tabSlot"></div>
+    </div>
+  </div>
+</div>
+<div id="dlgSlot"></div>
+<pre id="out"></pre>
+<script>
+/*
+ * Auditor > Changes and the Version History dialog, rendered by the REAL audit
+ * module of the main.js under test (everything from `var _auditLogLimit` to the
+ * audit-log sorting handler: the segment bar, _auditShowSeg, _auditRenderChanges,
+ * _auditPaintChanges, the filter, the diff painter and every delegated click
+ * handler) plus the REAL vhOpen, inside the REAL #auditor-tab and
+ * #versionHistoryLightbox lifted from the index.php under test, under index.php's
+ * stylesheet set with the css/main.css under test. $.ajax is the only fake:
+ * get_audit_log.php / get_audit_data.php answer from fixtures shaped like the
+ * live payloads, and every request is recorded.
+ *
+ *   ?idx= &js= &css=     files under test          &id=grantprofiles (read by _auditShortId)
+ *   &surface=pane|dialog &w=<#auditor-tab width>   &compact=1  &theme=
+ *   &n=<versions>        &capped=1 (the server holds more than the list asks for)
+ *   &tip=1               also run main.js's global $(document).tooltip (hover shots)
+ *
+ * window.__h = helpers for the driver (measure, click, filter, ...).
+ */
+(function () {
+  var q = new URLSearchParams(location.search);
+  var W = parseFloat(q.get('w') || '1708');
+  var theme = q.get('theme') || 'theme-hello-kitty';
+  var surface = q.get('surface') || 'pane';
+  var N = parseInt(q.get('n') || '17', 10);
+  var capped = q.get('capped') === '1';
+  var out = document.getElementById('out');
+  function fail(m) { window.__vo = { error: String(m) }; out.textContent = 'ERROR ' + m; window.__voDone = true; }
+  function get(u) { var x = new XMLHttpRequest(); x.open('GET', u, false); x.send(null); return x.responseText; }
+  function slice(code, a, b, max) {
+    var i = code.indexOf(a); if (i < 0) throw new Error('anchor missing: ' + a);
+    var j = code.indexOf(b, i + a.length); if (j < 0) throw new Error('end anchor missing after: ' + a);
+    if (max && j - i > max) throw new Error('slice too long (' + (j - i) + ') for: ' + a);
+    return code.slice(i, j);
+  }
+  function lift(idx, open) {
+    var a = idx.indexOf(open);
+    if (a < 0) throw new Error('no ' + open);
+    // Walk <div>/</div> from the open tag to its own close.
+    var re = /<\/?div\b[^>]*>/g, depth = 0, end = -1, m;
+    re.lastIndex = a;
+    while ((m = re.exec(idx))) { depth += (m[0][1] === '/') ? -1 : 1; if (depth === 0) { end = m.index + m[0].length; break; } }
+    if (end < 0) throw new Error('unbalanced ' + open);
+    var html = idx.slice(a, end);
+    if (html.indexOf('<?') >= 0) throw new Error('lifted block contains PHP: ' + open);
+    return html;
+  }
+
+  // ---- fixtures: a grantprofiles-like history, newest first ----------------
+  var ACTS = ['UPDATE', 'UPDATE', 'SCHEDULE_UPDATE', 'UPDATE', 'ROLLBACK', 'UPDATE', 'UPDATE', 'SCHEDULE_NEW', 'UPDATE', 'UPDATE', 'RENAME', 'UPDATE'];
+  var USERS = ['bplimon', 'jsmith4', 'bplimon', 'akpatel', 'bplimon', 'mrgarcia'];
+  var CATS = [['sql'], ['code'], ['sql', 'code'], [], ['title'], ['access'], ['code']];
+  function mkRows(total) {
+    var rows = [], t = moment('2026-09-25 14:14:05', 'YYYY-MM-DD HH:mm:ss');
+    for (var i = 0; i < total; i++) {
+      var last = i === total - 1;
+      var act = last ? 'CREATE' : ACTS[i % ACTS.length];
+      var sd = { ip_address: '10.40.' + (i % 7) + '.' + (20 + i % 50) };
+      if (act === 'UPDATE' || act === 'ROLLBACK') {
+        var cats = CATS[i % CATS.length], st = (i % 3 === 0) ? 2 : 0;
+        sd.changed = { cats: cats, state: st, keys: cats.map(function (c) { return c === 'sql' ? 'query' : (c === 'code' ? 'reportSnippet' : c); }).concat(st ? ['pageSize', 'theme'] : []) };
+        sd.message = 'Changed: ' + (sd.changed.keys.join(', ') || 'nothing');
+      }
+      if (act.indexOf('SCHEDULE') === 0) sd.message = 'Email - Weekly grant profile digest to 4 recipients';
+      rows.push({ ID: 900000 - i, ACTION: act, AUDIT_TIME: t.clone().subtract(i * 19, 'hours').format('DD-MMM-YYYY hh:mm:ss A').toUpperCase(), USER_ID: USERS[i % USERS.length], SOURCE_DATA: sd });
+    }
+    return rows;
+  }
+  var ROWS = mkRows(capped ? Math.max(N, 260) : N);
+  function snap(i, side) {
+    var q1 = ['SELECT p.award_id,', '       p.sponsor_name,', '       p.pi_name,', '       p.start_dt,', '       p.end_dt,', '       p.amount', '  FROM grant_profiles p', ' WHERE p.status = \'ACTIVE\''];
+    if (side === 'after') { q1.splice(3, 0, '       p.dept_name,'); q1.push('   AND p.fy >= 2024'); }
+    var code = ['heading("Grant profiles")', 'tile(sum(AMOUNT), "Total")'];
+    if (side === 'after') code.push('tile(count(AWARD_ID), "Awards")');
+    return { title: 'Grant Profiles', authorized: 'bplimon,jsmith4', short_id: 'grantprofiles', owner_id: 'bplimon',
+             report: { query: q1.join('\n'), reportSnippet: code.join('\n'), pageSize: side === 'after' ? 100 : 50, theme: 'theme-hello-kitty' } };
+  }
+
+  window.__ajax = [];
+  var H = {
+    rid: 'grantprofiles',
+    noop: function () { },
+    shown: [],
+    show_text: function (h) { H.shown.push(String(h)); },
+    vars: { isAdmin: true, isGlobalAdmin: true, currentUserKey: 'bplimon' }
+  };
+  window.__H = H;
+  $.fx.off = true;
+  $.ajax = function (o) {
+    var url = String(o.url || ''), data = o.data || {};
+    window.__ajax.push({ url: url, data: JSON.parse(JSON.stringify(data)) });
+    var d = $.Deferred();
+    setTimeout(function () {
+      var resp;
+      if (url.indexOf('get_audit_log.php') === 0) {
+        var lim = parseInt(data.limit, 10) || 100;
+        resp = { status: 'success', data: ROWS.slice(0, lim) };
+      } else if (url.indexOf('get_audit_data.php') === 0) {
+        var id = parseInt(data.audit_id, 10), row = null;
+        for (var k = 0; k < ROWS.length; k++) if (ROWS[k].ID === id) row = ROWS[k];
+        resp = row ? { status: 'success', action: row.ACTION, before: snap(k, 'before'), after: snap(k, 'after') } : { status: 'error', message: 'no row ' + id };
+      } else {
+        resp = { status: 'error', message: 'unmocked ' + url };
+      }
+      try { if (o.success) o.success(resp, 'success', { status: 200 }); } catch (e) { (window.__errs = window.__errs || []).push('success threw: ' + e.message); }
+      try { if (o.complete) o.complete({ status: 200 }, 'success'); } catch (e) { }
+      d.resolve(resp);
+    }, 0);
+    var p = d.promise(); p.abort = function () { }; return p;
+  };
+  window._pnbHostDialog = function () { };
+  window.onerror = function (m, src, line) { (window.__errs = window.__errs || []).push(String(m) + ' @' + line); return true; };
+
+  var api;
+  try {
+    var idx = get(q.get('idx') || 'index.php');
+    document.getElementById('tabSlot').outerHTML = lift(idx, '<div id="auditor-tab">');
+    document.getElementById('auditor-tab').className = 'ui-tabs-panel ui-corner-bottom ui-widget-content';
+    document.getElementById('dlgSlot').outerHTML = lift(idx, '<div id="versionHistoryLightbox"');
+
+    var js = get(q.get('js') || 'main.js').replace(/\r\n/g, '\n');   // main.js is CRLF
+    var code = 'var show_text = H.show_text, handleSessionExpiredError = H.noop, penumbra_vars = H.vars;\n' +
+               'function _pnbSingleKeyTip(el, t) { return t; }\n' +
+               slice(js, 'function escapeHtml(text) {', '\n    }\n', 800) + '\n    }\n' +
+               slice(js, '    var _auditLogLimit = 50;', '    // --- Audit Log Sorting Handler ---', 600000) +
+               '\nvar vhReportId = H.rid, vhDefaultSub = null;\n' +
+               slice(js, '        function vhOpen(selectId, otherShortId, otherTitle) {', '        // Published on the shared bridge', 8000) +
+               '\nwindow.Penumbra = window.Penumbra || {}; window.Penumbra.openVersionHistory = vhOpen;\n' +
+               (q.get('tip') === '1' ? slice(js, '    $(document).tooltip({', "    $('#report-options-tab').tooltip({", 8000) : '') +
+               // The REAL Ctrl+Shift+Y case of the capture-phase hotkey listener.
+               '\nwindow.__hotY = function () { var e = { preventDefault: function () { }, stopPropagation: function () { } }; switch (\'Y\') {\n' +
+               slice(js, "                case 'Y': // Open Version History", '\n            }\n        }\n', 3000) + '\n} };\n' +
+               '\nreturn { bar: renderAuditSegBar, seg: _auditShowSeg, render: _auditRenderChanges,\n' +
+               '  st: function () { return { root: _auditChangesRoot, seg: _auditSeg, limit: _auditChangesLimit, fetched: _auditChangesFetched, filter: _auditVerFilter }; } };';
+    api = new Function('$', 'moment', 'H', code)($, moment, H);
+  } catch (e) { fail(e.message); return; }
+  window.__api = api;
+
+  var row = (window.PNB_THEMES || []).filter(function (t) { return t.id === theme; })[0] || { isDark: false, modern: false };
+  if (theme !== 'theme-default') document.body.classList.add(theme);
+  document.body.setAttribute('data-theme', theme);
+  document.body.classList.toggle('is-dark', !!row.isDark);
+  document.body.classList.toggle('registry-theme', !!row.modern);
+  if (q.get('compact') === '1') { document.getElementById('admWrapper').classList.add('compact-admin-mode'); document.body.classList.add('compact-admin-mode'); }
+
+  var sheets = ['css/jquery-ui.css', q.get('css') || 'main.css', 'css/penumbra_tiles.css', 'css/density.css', 'css/search_builder.css', 'css/penumbra_presets.css', 'css/penumbra_colwidths.css', 'themevars.css'];
+  var pending = sheets.length;
+  sheets.forEach(function (href) {
+    var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = href;
+    l.onload = l.onerror = function () { if (--pending === 0) go(); };
+    document.head.appendChild(l);
+  });
+
+  function r(el) { if (!el) return null; var b = el.getBoundingClientRect(); return { x: +b.left.toFixed(1), y: +b.top.toFixed(1), w: +b.width.toFixed(1), h: +b.height.toFixed(1), b: +b.bottom.toFixed(1), rr: +b.right.toFixed(1) }; }
+  function visible(el) {
+    if (!el) return false;
+    var b = el.getBoundingClientRect();
+    if (b.width < 1 || b.height < 1) return false;
+    var hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+    return !!hit && (hit === el || el.contains(hit));
+  }
+  function settle(cb, n) { setTimeout(function () { requestAnimationFrame(function () { requestAnimationFrame(cb); }); }, n || 30); }
+
+  function go() {
+    try {
+      var wrap = document.getElementById('admWrapper');
+      wrap.style.width = (W + 40) + 'px';
+      var off = wrap.getBoundingClientRect().width - document.getElementById('auditor-tab').getBoundingClientRect().width;
+      wrap.style.width = (W + off) + 'px';
+      api.bar({ total: 1121, change: ROWS.length }, { attention: { badpass: 0, denied: 0, email_fail: 0, sched_fail: 0, last: '' }, ack_last: '' }, H.rid);
+      api.seg('changes');
+      // &seg=pulse|events|health: move on from Changes, the way a click on a pill does.
+      if (q.get('seg')) api.seg(q.get('seg'));
+      if (surface === 'dialog') {
+        // The dialog alone (Ctrl+Shift+Y): the pane is not what is under test.
+        api.seg('events');
+        window.Penumbra.openVersionHistory();
+      }
+    } catch (e) { fail('paint: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); return; }
+    settle(function () { window.__vo = measure(); window.__voDone = true; out.textContent = JSON.stringify(window.__vo); }, 60);
+  }
+
+  // ---- what the driver reads -------------------------------------------------
+  function measure() {
+    var pane = document.getElementById('auditSegChanges');
+    var dlg = document.getElementById('vhChanges');
+    var root = surface === 'dialog' ? dlg : pane;
+    var chg = root.querySelector('.audit-chg');
+    var list = root.querySelector('.audit-verlist');
+    var diff = root.querySelector('.audit-diff');
+    var head = root.querySelector('.audit-diff-head');
+    var rowEl = document.getElementById('auditMainRow');
+    var cs = getComputedStyle(root);
+    var pb = parseFloat(cs.paddingBottom) || 0;
+    var rootR = r(root);
+    var pop = document.getElementById('auditChangesPopOut');
+    var more = root.querySelector('[data-audit-vermore]');
+    var cnt = root.querySelector('.audit-vf-count');
+    var vers = root.querySelectorAll('.audit-ver');
+    var lastVer = vers.length ? vers[vers.length - 1] : null;
+    var bar = document.getElementById('auditSegBar');
+    var o = {
+      surface: surface, w: W, errs: window.__errs || [],
+      rowMinH: getComputedStyle(rowEl).minHeight,
+      row: r(rowEl),
+      root: rootR, rootClient: root.clientHeight, rootScroll: root.scrollHeight, overflow: root.scrollHeight - root.clientHeight,
+      chg: r(chg), list: r(list), diff: r(diff), head: r(head),
+      listClient: list ? list.clientHeight : 0,
+      // How far the version list / diff stop short of the panel's bottom edge
+      // (the footer used to sit in that gap).
+      gapBelow: (chg && rootR) ? +(rootR.b - pb - chg.getBoundingClientRect().bottom).toFixed(1) : null,
+      footers: root.querySelectorAll('.audit-foot-note').length,
+      footersPane: pane.querySelectorAll('.audit-foot-note').length,
+      footersDlg: dlg ? dlg.querySelectorAll('.audit-foot-note').length : -1,
+      versions: vers.length,
+      bar: r(bar), barLines: 0,
+      pop: pop ? {
+        where: pop.closest('#auditSegBar') ? 'bar' : (pop.closest('.audit-diff-head') ? 'diffhead' : (pop.closest('.audit-diff') ? 'diff' : (pop.closest('.audit-verlist') ? 'list' : (pop.closest('.audit-foot-note') ? 'footer' : 'other')))),
+        inPane: !!pop.closest('#auditSegChanges'), inDlg: !!pop.closest('#vhChanges'), inBar: !!pop.closest('#auditSegBar'),
+        rect: r(pop), visible: visible(pop), title: pop.getAttribute('title') || '', aria: pop.getAttribute('aria-label') || '',
+        keys: pop.getAttribute('aria-keyshortcuts') || '', text: (pop.textContent || '').replace(/\s+/g, ' ').trim(), tag: pop.tagName, type: pop.getAttribute('type') || '',
+        display: getComputedStyle(pop).display
+      } : null,
+      popCount: document.querySelectorAll('#auditChangesPopOut').length,
+      popInDlg: dlg ? dlg.querySelectorAll('#auditChangesPopOut, .audit-chg-popout').length : 0,
+      more: more ? { inList: !!more.closest('.audit-verlist'), afterLast: lastVer ? !!(lastVer.compareDocumentPosition(more) & Node.DOCUMENT_POSITION_FOLLOWING) : false,
+                     rect: r(more), text: (more.textContent || '').trim(), note: ((more.closest('.audit-vermore-row') || more.parentNode).textContent || '').replace(/\s+/g, ' ').trim() } : null,
+      count: cnt ? { text: (cnt.textContent || '').trim(), inList: !!cnt.closest('.audit-verlist'), shown: cnt.getClientRects().length > 0 && getComputedStyle(cnt).display !== 'none' && (cnt.textContent || '').trim() !== '' } : null,
+      st: api.st(),
+      ajax: window.__ajax.slice()
+    };
+    if (bar) {
+      // Lines = clusters of the visible banner items' vertical centres (the
+      // pills, the title, Pop out and the metrics link differ in height).
+      var cs = [];
+      bar.querySelectorAll('.audit-seg-title, .audit-seg, #auditChangesPopOut, #auditFootMetricsLink').forEach(function (k) {
+        var b = k.getBoundingClientRect(); if (b.width > 0 && b.height > 0) cs.push(b.top + b.height / 2);
+      });
+      cs.sort(function (a, b) { return a - b; });
+      var lines = 0, last = -1e9; cs.forEach(function (c) { if (c - last > 10) { lines++; last = c; } });
+      o.barLines = lines;
+      o.link = r(document.getElementById('auditFootMetricsLink'));
+      var pt = document.querySelector('#auditChangesPopOut .audit-seg-pop-t');
+      o.popLabelShown = !!pt && pt.getBoundingClientRect().width > 1;
+    }
+    if (surface === 'dialog') {
+      var box = document.querySelector('#versionHistoryLightbox .lightbox-content');
+      o.dlgBox = r(box);
+      o.dlgBody = r(dlg);
+      o.dlgGapBelow = (chg && dlg) ? +(dlg.getBoundingClientRect().bottom - chg.getBoundingClientRect().bottom).toFixed(1) : null;
+    }
+    return o;
+  }
+
+  // ---- driver helpers ----------------------------------------------------------
+  window.__h = {
+    measure: measure,
+    rect: function (sel) { var e = document.querySelector(sel); return e ? r(e) : null; },
+    visible: function (sel) { return visible(document.querySelector(sel)); },
+    click: function (sel) { var e = document.querySelector(sel); if (!e) return false; e.click(); return true; },
+    selectVer: function (i) { var v = document.querySelectorAll((surface === 'dialog' ? '#vhChanges' : '#auditSegChanges') + ' .audit-ver')[i]; if (!v) return null; v.click(); return v.getAttribute('data-audit-ver'); },
+    filter: function (cat, user) {
+      var root = document.querySelector(surface === 'dialog' ? '#vhChanges' : '#auditSegChanges');
+      var c = root.querySelector('.audit-vf-cat'), u = root.querySelector('.audit-vf-user');
+      if (cat !== null && c) { c.value = cat; $(c).trigger('change'); }
+      if (user !== null && u) { u.value = user; $(u).trigger('change'); }
+      return true;
+    },
+    state: function () {
+      var pane = document.getElementById('auditSegChanges'), dlg = document.getElementById('vhChanges');
+      var lb = document.getElementById('versionHistoryLightbox');
+      var sel = function (root) { var s = root ? root.querySelector('.audit-ver[aria-pressed="true"]') : null; return s ? s.getAttribute('data-audit-ver') : null; };
+      var pop = document.getElementById('auditChangesPopOut');
+      return { st: api.st(), dlgShown: !!lb && getComputedStyle(lb).display !== 'none', dlgSel: sel(dlg), paneSel: sel(pane),
+               popShown: visible(pop), paneVersions: pane.querySelectorAll('.audit-ver').length, paneMore: pane.querySelectorAll('[data-audit-vermore]').length,
+               firstId: ROWS.length ? String(ROWS[0].ID) : null, secondId: ROWS.length > 1 ? String(ROWS[1].ID) : null,
+               paneOn: pane.classList.contains('on'), eventsOn: document.getElementById('auditSegEvents').classList.contains('on'),
+               selectedTab: ($('#auditSegBar .audit-seg[aria-selected="true"]').attr('data-seg') || ''),
+               dlgVersions: dlg ? dlg.querySelectorAll('.audit-ver').length : 0, ajax: window.__ajax.slice(), shown: H.shown.slice(), errs: window.__errs || [] };
+    },
+    tooltip: function () { var t = document.querySelector('.ui-tooltip'); return t ? { text: t.textContent, rect: r(t), shown: getComputedStyle(t).display !== 'none' } : null; },
+    // The filter bar's parts: the two selects' boxes, the count's box and text,
+    // how many version rows are showing, and the no-match note.
+    filterBar: function () {
+      var root = document.querySelector(surface === 'dialog' ? '#vhChanges' : '#auditSegChanges');
+      var c = root.querySelector('.audit-vf-cat'), u = root.querySelector('.audit-vf-user'), n = root.querySelector('.audit-vf-count');
+      var none = root.querySelector('.audit-vf-none');
+      return { cat: r(c), user: r(u), count: n ? { rect: r(n), text: (n.textContent || '').trim(), shown: n.getClientRects().length > 0 && getComputedStyle(n).display !== 'none',
+                                                 inBar: !!n.closest('.audit-verfilter'), role: n.getAttribute('role') || '' } : null,
+               showing: root.querySelectorAll('.audit-ver:not(.audit-ver-hidden)').length, total: root.querySelectorAll('.audit-ver').length,
+               noneShown: !!none && getComputedStyle(none).display !== 'none' };
+    },
+    // The version row after the one with this id (visible rows, list order).
+    nextId: function (id) {
+      var vs = Array.prototype.slice.call(document.querySelectorAll((surface === 'dialog' ? '#vhChanges' : '#auditSegChanges') + ' .audit-ver:not(.audit-ver-hidden)'));
+      for (var i = 0; i < vs.length - 1; i++) if (vs[i].getAttribute('data-audit-ver') === String(id)) return vs[i + 1].getAttribute('data-audit-ver');
+      return null;
+    },
+    focus: function (sel) { var e = document.querySelector(sel); if (!e) return false; e.focus(); return document.activeElement === e; },
+    vfValue: function () { var c = document.querySelector((surface === 'dialog' ? '#vhChanges' : '#auditSegChanges') + ' .audit-vf-cat'); return c ? c.value : null; },
+    // Pop out's colours, and WCAG ratios over what is really behind them: its
+    // text over its own (composited) fill; its border over the band's right end
+    // (3% brand over the panel) - the band is a gradient and the button sits
+    // at its far end.
+    popStyle: function () {
+      var b = document.getElementById('auditChangesPopOut');
+      if (!b) return null;
+      var cs = getComputedStyle(b);
+      var bar = document.getElementById('auditSegBar');
+      var fill = opaqueBg(b), txt = over(rgba(cs.color), fill);
+      var bandR = over(resolve('color-mix(in srgb, var(--brand-primary, #336699) 3%, var(--bg-surface, #fff))', bar), opaqueBg(bar.parentElement));
+      var bord = over(rgba(cs.borderTopColor), bandR);
+      return { color: cs.color, bg: cs.backgroundColor, border: cs.borderTopColor, deco: cs.textDecorationLine, shadow: cs.boxShadow !== 'none',
+               text: +ratio(txt, fill).toFixed(2), edge: +ratio(bord, bandR).toFixed(2), fillVsBand: +ratio(fill, bandR).toFixed(2) };
+    }
+  };
+  function rgba(s) {
+    var m = String(s).match(/rgba?\(([^)]+)\)/), c;
+    if (m) { c = m[1].split(/[\s,\/]+/).filter(Boolean).map(parseFloat); return [c[0], c[1], c[2], c.length > 3 ? c[3] : 1]; }
+    m = String(s).match(/color\(srgb ([^)]+)\)/);
+    if (m) { c = m[1].split(/[\s\/]+/).filter(Boolean).map(parseFloat); return [c[0] * 255, c[1] * 255, c[2] * 255, c.length > 3 ? c[3] : 1]; }
+    return [0, 0, 0, 1];
+  }
+  function over(fg, bg) { var a = fg[3]; return [fg[0] * a + bg[0] * (1 - a), fg[1] * a + bg[1] * (1 - a), fg[2] * a + bg[2] * (1 - a), 1]; }
+  function lum(c) { var v = c.slice(0, 3).map(function (x) { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; }
+  function ratio(a, b) { var l1 = lum(a), l2 = lum(b); return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05); }
+  function resolve(expr, host) { var p = document.createElement('span'); p.style.color = expr; host.appendChild(p); var c = rgba(getComputedStyle(p).color); p.remove(); return c; }
+  function opaqueBg(el) {
+    var stack = [], n = el;
+    while (n && n.nodeType === 1) { var c = rgba(getComputedStyle(n).backgroundColor); if (c && c[3] > 0) stack.push(c); if (c && c[3] >= 1) break; n = n.parentElement; }
+    var base = [255, 255, 255, 1]; for (var i = stack.length - 1; i >= 0; i--) base = over(stack[i], base); return base;
+  }
+})();
+</script>
+</body>
+</html>

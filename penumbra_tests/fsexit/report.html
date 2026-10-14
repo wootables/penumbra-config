@@ -1,0 +1,155 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>fsexit - a report page</title>
+<link rel="stylesheet" href="main.css">
+</head>
+<body>
+<!-- fsexit suite (2026-10-01). The control case: a report page at top level
+     (NOT an embed). #launch opens the carousel on a click, as the inline
+     Full Screen link does, so the browser grants true fullscreen; its × must
+     still CLOSE the carousel (not merely leave fullscreen). -->
+<button id="launch" type="button" style="position:absolute;left:10px;top:10px;z-index:5">Full Screen</button>
+<div id="editorTabs"></div><div id="reportSnippetOutput" style="margin-top:50px"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<div id="table-view-container" role="main" tabindex="-1"><table id="resultsTable"><thead id="tableHeader"><tr>
+  <th data-colname="#">#</th><th data-colname="COLLEGE">COLLEGE</th><th data-colname="AMOUNT">AMOUNT</th>
+</tr></thead><tbody></tbody></table></div>
+<div id="loadingOverlay" style="display:none">
+  <div class="loader"></div>
+  <p>Executing Query, Please Wait...</p>
+  <div style="display: flex; align-items: center; gap: 20px;">
+    <p id="execution-timer" style="font-size: 1.5em; margin: 0; font-weight: bold;"></p>
+    <button id="stopQueryBtn">Stop</button>
+  </div>
+  <div id="loadingTip" aria-live="polite"></div>
+</div>
+<div id="errorBox"></div>
+<input id="tableSearch" value="">
+<span id="resultCount"></span>
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="snapshotComparisonContainer" style="display:none"></div>
+
+<script>
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push('report: ' + String(m) + ' @' + String(src).split('/').pop() + ':' + line); };
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    window.__errors.push('report rejection: ' + String((r && r.message) || r));
+  });
+  window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' } };
+  window.PENUMBRA_THEME_IDS = ['theme-default'];
+  window.PENUMBRA_THEME_ALIASES = {};
+  window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script src="chart-4.5.1.min.js"></script>
+<script src="chartjs-plugin-datalabels-2.0.0.min.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  jQuery.fx.off = true;
+  // index.php defines this inline (the sticky-header stacker); main.js calls it.
+  if (typeof window.stackHeaders !== "function") { window.stackHeaders = function () {}; }
+  // fsfit (2026-10-01): count every chart the carousel mounts on its stage
+  // canvas - one per page shown, plus one per re-fit. A click-launched
+  // fullscreen must mount (and animate) ONCE.
+  window.__ccMounts = 0;
+  Chart.register({ id: 'pnbMountCount', afterInit: function (c) {
+    if (c.canvas && c.canvas.classList && c.canvas.classList.contains('cc-canvas')) { window.__ccMounts++; }
+  } });
+</script>
+<script src="penumbra_a11y.js"></script>
+<script src="main.js"></script>
+<script>
+  function fsName(d) { var el = d.fullscreenElement; return el ? (el.id || el.tagName) : null; }
+  // The page on stage vs the stage it sits in: the chart's own size
+  // (Chart.js width/height, CSS px) and the stage's content box.
+  window.__fit = function () {
+    var ov = document.getElementById('chartCarouselOverlay');
+    if (!ov) { return { overlay: false, mounts: window.__ccMounts }; }
+    var cv = ov.querySelector('.cc-canvas'), ch = cv && Chart.getChart(cv), st = ov.querySelector('.cc-stage'), cs = getComputedStyle(st);
+    return { overlay: true, fs: !!document.fullscreenElement, denied: ov.classList.contains('cc-fs-denied'),
+             vw: innerWidth, vh: innerHeight, cw: ch ? ch.width : 0, ch: ch ? ch.height : 0,
+             sw: Math.round(st.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)),
+             sh: Math.round(st.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)),
+             mounts: window.__ccMounts, counter: (ov.querySelector('.cc-counter') || {}).textContent || '' };
+  };
+  // Open WITHOUT a gesture (called from a CDP evaluate, no user activation):
+  // the browser refuses fullscreen, as on the ?fullscreen=true autoload path.
+  // Logs each counter change (ms after the open) to time the slideshow.
+  window.__counterLog = [];
+  window.__openNoGesture = function (opts) {
+    window.__openAt = performance.now();
+    window.__counterLog = [];
+    window.openChartCarousel(document.getElementById('c1'), opts || {});
+    var last = '';
+    new MutationObserver(function () {
+      var c = document.querySelector('#chartCarouselOverlay .cc-counter');
+      var t = c ? c.textContent : '';
+      if (t !== last) { last = t; window.__counterLog.push({ ms: Math.round(performance.now() - window.__openAt), text: t }); }
+    }).observe(document.body, { subtree: true, childList: true, characterData: true });
+    return true;
+  };
+  window.__probe = function (sel) {
+    var el = document.querySelector(sel);
+    if (!el) { return { exists: false }; }
+    var cs = getComputedStyle(el), r = el.getBoundingClientRect();
+    var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    var hit = (r.width > 0 && r.height > 0) ? document.elementFromPoint(cx, cy) : null;
+    var de = document.documentElement;
+    return { exists: true, display: cs.display, opacity: cs.opacity, visibility: cs.visibility, pe: cs.pointerEvents,
+             w: r.width, h: r.height, x: cx, y: cy,
+             inView: r.width > 0 && r.left >= 0 && r.top >= 0 && r.right <= de.clientWidth && r.bottom <= de.clientHeight,
+             onTop: !!hit && (hit === el || el.contains(hit)), hitDesc: hit ? (hit.tagName + (hit.id ? "#" + hit.id : "") + (typeof hit.className === "string" && hit.className ? "." + hit.className.split(" ").join(".") : "")) : null,
+             title: el.getAttribute('title'), aria: el.getAttribute('aria-label') };
+  };
+  window.__state = function () {
+    var ov = document.getElementById('chartCarouselOverlay');
+    var cv = ov && ov.querySelector('.cc-canvas');
+    return { ready: !!window.__READY, hostFs: fsName(document), tileFs: null,
+             overlay: !!ov, persistent: !!ov && ov.classList.contains('cc-persistent'),
+             denied: !!ov && ov.classList.contains('cc-fs-denied'),
+             chart: !!(cv && window.Chart && Chart.getChart(cv)), errors: window.__errors.slice() };
+  };
+  $(function () {
+    setTimeout(function () {
+      try {
+        if (typeof window.openChartCarousel !== 'function') { window.__errors.push('report: openChartCarousel is not exported'); window.__READY = true; return; }
+        // ?charts=2 adds a second chart: a two-page carousel (fsfit's slideshow timing).
+        var nCharts = Math.max(1, parseInt(new URLSearchParams(location.search).get('charts') || '1', 10));
+        var html = '';
+        for (var i = 1; i <= nCharts; i++) { html += '<div class="penumbra-chart-filter-wrapper"><canvas id="c' + i + '" width="600" height="300"></canvas></div>'; }
+        $('#reportSnippetOutput').html(html);
+        for (var j = 1; j <= nCharts; j++) {
+          var cj = document.getElementById('c' + j);
+          new Chart(cj, { type: 'bar', data: { labels: ['Engineering', 'Agriculture', 'Sciences', 'Humanities'],
+            datasets: [{ label: 'Amount', data: j === 1 ? [12, 7, 9, 4] : [3, 8, 5, 11] }] }, options: { animation: false, responsive: false } });
+          $(cj).data('vizConfig', { type: 'bar', title: j === 1 ? 'Awards by college' : 'Awards by sponsor' });
+        }
+        var cv = document.getElementById('c1');
+        document.getElementById('launch').addEventListener('click', function () { window.openChartCarousel(cv); });
+      } catch (e) { window.__errors.push('report: harness threw ' + (e && e.message)); }
+      window.__READY = true;
+    }, 60);
+  });
+</script>
+</body></html>

@@ -1,0 +1,103 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>fsexit - framed report page (the chart tile)</title>
+<link rel="stylesheet" href="main.css">
+</head>
+<body class="embed-view">
+<!-- fsexit suite (2026-10-01). The REPORT PAGE half of a dashboard chart tile:
+     the REAL main.js + main.css in a same-origin frame (host.html), body
+     .embed-view like index.php?embed=1, and the carousel opened exactly as the
+     ?fullscreen=true autoload intent opens it in an embed (persistent, one
+     page, the tile's label as the page title, fromAutoload - so its own
+     fullscreen request is refused: no gesture). Scaffold = the dashsearch
+     main.html DOM, which boots main.js without page errors. -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<div id="table-view-container" role="main" tabindex="-1"><table id="resultsTable"><thead id="tableHeader"><tr>
+  <th data-colname="#">#</th><th data-colname="COLLEGE">COLLEGE</th><th data-colname="AMOUNT">AMOUNT</th>
+</tr></thead><tbody></tbody></table></div>
+<div id="loadingOverlay" style="display:none">
+  <div class="loader"></div>
+  <p>Executing Query, Please Wait...</p>
+  <div style="display: flex; align-items: center; gap: 20px;">
+    <p id="execution-timer" style="font-size: 1.5em; margin: 0; font-weight: bold;"></p>
+    <button id="stopQueryBtn">Stop</button>
+  </div>
+  <div id="loadingTip" aria-live="polite"></div>
+</div>
+<div id="errorBox"></div>
+<input id="tableSearch" value="">
+<span id="resultCount"></span>
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="snapshotComparisonContainer" style="display:none"></div>
+
+<script>
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push('tile: ' + String(m) + ' @' + String(src).split('/').pop() + ':' + line); };
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason, s = String((r && r.message) || r);
+    // A refused fullscreen request is the EXPECTED autoload outcome (no gesture);
+    // the carousel swallows it - anything else is a real failure.
+    if (!/fullscreen|Permissions check failed/i.test(s)) { window.__errors.push('tile rejection: ' + s); }
+  });
+  window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' } };
+  window.PENUMBRA_THEME_IDS = ['theme-default'];
+  window.PENUMBRA_THEME_ALIASES = {};
+  window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  // Did an Escape reach THIS page at all? (In native fullscreen the browser
+  // normally keeps it.) Window capture, registered before main.js's own
+  // capture handler, so it is counted even when that handler stops it.
+  window.__escSeen = 0;
+  window.addEventListener('keydown', function (e) { if (e.key === 'Escape') { window.__escSeen++; } }, true);
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script src="chart-4.5.1.min.js"></script>
+<script src="chartjs-plugin-datalabels-2.0.0.min.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  jQuery.fx.off = true;
+  // index.php defines this inline (the sticky-header stacker); main.js calls it.
+  if (typeof window.stackHeaders !== "function") { window.stackHeaders = function () {}; }
+</script>
+<script src="penumbra_a11y.js"></script>
+<script src="main.js"></script>
+<script>
+  // After main.js has booted: one chart in the snippet area (what a vis()
+  // renders), then the embed's autoload hand-off.
+  $(function () {
+    setTimeout(function () {
+      try {
+        if (typeof window.openChartCarousel !== 'function') { window.__errors.push('tile: openChartCarousel is not exported'); window.__READY = true; return; }
+        $('#reportSnippetOutput').html('<div class="penumbra-chart-filter-wrapper"><canvas id="c1" width="600" height="300"></canvas></div>');
+        var cv = document.getElementById('c1');
+        new Chart(cv, { type: 'bar', data: { labels: ['Engineering', 'Agriculture', 'Sciences', 'Humanities'],
+          datasets: [{ label: 'Amount', data: [12, 7, 9, 4] }] }, options: { animation: false, responsive: false } });
+        $(cv).data('vizConfig', { type: 'bar', title: 'Awards by college' });
+        window.openChartCarousel(null, { title: '', subtitle: '', animate: true, chartnumber: '1', interval: 10,
+          persistent: true, pageTitle: 'Awards by college', fromAutoload: true });
+      } catch (e) { window.__errors.push('tile: harness threw ' + (e && e.message)); }
+      window.__READY = true;
+    }, 60);
+  });
+</script>
+</body></html>

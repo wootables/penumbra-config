@@ -1,0 +1,211 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>penumbra_a11y.js harness</title></head><body>
+<pre id="out">running</pre>
+<!-- Fixture DOM: one of every pattern the module owns. run.ps1 stages the module
+     under test as a11y_check.js beside this file. -->
+<main class="main"><p>content</p></main>
+<div id="stage">
+  <svg id="s1" viewBox="0 0 10 10"></svg>
+  <svg id="s2" aria-label="labelled" viewBox="0 0 10 10"></svg>
+  <svg id="s3" viewBox="0 0 10 10"><title>titled</title></svg>
+  <div class="action-icon" id="ai" title="Favourite"></div>
+  <div class="item-icon" data-action="import-more-options" id="ii"></div>
+  <span class="tab-help-icon" id="th">?</span>
+  <span class="sort-icon" id="si1">&#9650;&#9660;</span>
+  <svg class="favorite-icon" id="fav" viewBox="0 0 10 10"></svg>
+  <button id="opener">open</button>
+  <div class="help-lightbox" id="dlg" style="display:none"><h3>Dialog title</h3><span class="close-lightbox">x</span><input id="f1"><button id="b2">ok</button></div>
+  <button id="pb" aria-expanded="false">tools</button>
+  <div role="menu" id="m2" hidden><a role="menuitem" href="#" id="pa">x</a><a role="menuitem" href="#" id="pb2">y</a></div>
+  <canvas id="c1" width="10" height="10"></canvas>
+  <canvas width="10" height="10" class="noid"></canvas>
+  <canvas width="10" height="10" class="noid"></canvas>
+  <canvas id="c4" aria-hidden="true" width="10" height="10"></canvas>
+  <button id="pb3" aria-expanded="false">more</button>
+  <div role="menu" id="m3" hidden><div role="menuitem" id="m3a" tabindex="-1">A</div><div role="menuitem" id="m3b" tabindex="-1" aria-disabled="true">B</div><div role="menuitem" id="m3c" tabindex="-1">C</div></div>
+</div>
+<script src="a11y_check.js"></script>
+<script>
+(function () {
+  var out = [], T = 0, P = 0;
+  function t(name, cond, detail) { T++; if (cond) P++; out.push((cond ? 'PASS' : 'FAIL') + ' ' + name + (detail ? ' [' + detail + ']' : '')); }
+  function key(el, k, opts) { opts = opts || {}; var e = new KeyboardEvent('keydown', Object.assign({ bubbles: true, cancelable: true, key: k.key, keyCode: k.code, which: k.code }, opts)); el.dispatchEvent(e); return e; }
+  var K = { enter: { key: 'Enter', code: 13 }, space: { key: ' ', code: 32 }, tab: { key: 'Tab', code: 9 }, esc: { key: 'Escape', code: 27 }, down: { key: 'ArrowDown', code: 40 }, up: { key: 'ArrowUp', code: 38 }, end: { key: 'End', code: 35 }, home: { key: 'Home', code: 36 }, a: { key: 'a', code: 65 } };
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function id(x) { return document.getElementById(x); }
+  function ae() { return document.activeElement; }
+  function aeId() { var a = ae(); return a ? (a.id || a.className || a.tagName) : 'none'; }
+  function done() { out.unshift('SUMMARY ' + P + '/' + T + ' passed'); id('out').textContent = out.join('\n'); }
+
+  (async function () {
+    await wait(50);
+    t('module loaded', !!window.PenumbraA11y && typeof window.PenumbraA11y.version === 'string');
+    t('enhanceChartA11y exported', typeof window.enhanceChartA11y === 'function');
+    t('_pnbA11yAttach exported', typeof window._pnbA11yAttach === 'function');
+    var sk = document.querySelector('.pnb-skip-link');
+    t('skip link injected first in body', !!sk && sk === document.body.firstElementChild && sk.getAttribute('href') === '#pnbMain', sk && sk.getAttribute('href'));
+    var mn = document.querySelector('main');
+    t('main got id + tabindex', mn.id === 'pnbMain' && mn.getAttribute('tabindex') === '-1');
+    t('decorative svg hidden', id('s1').getAttribute('aria-hidden') === 'true' && id('s1').getAttribute('focusable') === 'false');
+    t('labelled svg kept', !id('s2').hasAttribute('aria-hidden'));
+    t('titled svg kept', !id('s3').hasAttribute('aria-hidden'));
+    t('sort glyph decorative', id('si1').getAttribute('aria-hidden') === 'true');
+    t('single-key off switch helper', typeof window.penumbraSingleKeysOff === 'function' && window.penumbraSingleKeysOff() === false);
+    // series told apart without colour + 3:1 stroke floor (fake chart: two line series on a white canvas)
+    var fake = { canvas: id('c1'), _updated: 0, update: function () { this._updated++; },
+                 config: { type: 'line', data: { labels: ['a'], datasets: [{ label: 'y', borderColor: '#ffcd56', data: [1] }, { label: 'g', borderColor: '#333333', data: [2] }] } } };
+    var chg = window.penumbraDistinguishSeries(fake);
+    var d0 = fake.config.data.datasets[0], d1 = fake.config.data.datasets[1];
+    t('line series get shapes + dashes', chg === true && d0.pointStyle === 'circle' && d1.pointStyle === 'rect' && d0.borderDash === undefined && Array.isArray(d1.borderDash) && fake._updated === 1, d0.pointStyle + '/' + d1.pointStyle);
+    t('pale stroke pulled to 3:1', /^rgb\(/.test(d0.borderColor) && d0.borderColor !== '#ffcd56' && d1.borderColor === '#333333', d0.borderColor);
+    t('second call is a no-op', window.penumbraDistinguishSeries(fake) === false && fake._updated === 1);
+    var bar = { canvas: id('c1'), update: function () {}, config: { type: 'bar', data: { datasets: [{ borderColor: '#ffcd56', data: [1] }, { borderColor: '#333', data: [2] }] } } };
+    t('bar series untouched', window.penumbraDistinguishSeries(bar) === false && bar.config.data.datasets[0].pointStyle === undefined);
+    t('action-icon stamped', id('ai').getAttribute('role') === 'button' && id('ai').getAttribute('tabindex') === '0');
+    t('item-icon name derived', id('ii').getAttribute('aria-label') === 'Import more options', id('ii').getAttribute('aria-label'));
+    t('tab-help-icon named Help', id('th').getAttribute('aria-label') === 'Help');
+    var clicks = { ai: 0, fav: 0, close: 0 };
+    id('ai').addEventListener('click', function () { clicks.ai++; });
+    id('fav').addEventListener('click', function () { clicks.fav++; });
+    key(id('ai'), K.enter); key(id('ai'), K.space); key(id('ai'), K.a);
+    t('Enter/Space click icon, other keys ignored', clicks.ai === 2, 'clicks=' + clicks.ai);
+    var e2 = key(id('fav'), K.enter);
+    t('svg favorite-icon activates via keyboard', clicks.fav === 1 && e2.defaultPrevented);
+    window.__pnbA11ySuspended = true;
+    var s4 = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s4.id = 's4'; id('stage').appendChild(s4);
+    await wait(550);
+    t('observer paused while suspended', !s4.hasAttribute('aria-hidden'));
+    window.__pnbA11ySuspended = false;
+    var s5 = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s5.id = 's5'; id('stage').appendChild(s5);
+    await wait(550);
+    t('observer resumes (new svg hidden, older one too)', s5.getAttribute('aria-hidden') === 'true' && s4.getAttribute('aria-hidden') === 'true');
+    var op = id('opener'), dlg = id('dlg');
+    op.focus(); key(op, K.enter);
+    dlg.style.display = 'flex';
+    await wait(120);
+    t('lightbox role/aria-modal/labelledby', dlg.getAttribute('role') === 'dialog' && dlg.getAttribute('aria-modal') === 'true' && !!dlg.getAttribute('aria-labelledby'));
+    var cl = dlg.querySelector('.close-lightbox');
+    t('close span made reachable', cl.getAttribute('tabindex') === '0' && cl.getAttribute('role') === 'button' && cl.getAttribute('aria-label') === 'Close dialog');
+    t('focus moved to first data field', ae() === id('f1'), aeId());
+    id('b2').focus(); key(id('b2'), K.tab);
+    t('Tab wraps last -> first', ae() === cl, aeId());
+    key(cl, K.tab, { shiftKey: true });
+    t('Shift+Tab wraps first -> last', ae() === id('b2'), aeId());
+    cl.addEventListener('click', function () { clicks.close++; });
+    key(cl, K.enter);
+    t('Enter on close span clicks it', clicks.close === 1);
+    dlg.style.display = 'none';
+    await wait(60);
+    t('focus restored to opener on close', ae() === op, aeId());
+    t('aria-modal stripped on close (we stamped it)', !dlg.hasAttribute('aria-modal'));
+    op.focus();
+    var ov = document.createElement('div'); ov.className = 'modal-prompt-overlay';
+    ov.innerHTML = '<div class="modal-prompt-box"><h3>Prompt</h3><input id="p1"><button id="p2">ok</button></div>';
+    document.body.appendChild(ov);
+    await wait(80);
+    t('prompt overlay stamped', ov.getAttribute('role') === 'dialog' && ov.getAttribute('aria-modal') === 'true' && !!ov.getAttribute('aria-labelledby'));
+    t('prompt focus on field', ae() === id('p1'), aeId());
+    id('p2').focus(); key(id('p2'), K.tab);
+    t('prompt Tab wraps', ae() === id('p1'), aeId());
+    document.body.removeChild(ov);
+    await wait(30);
+    t('prompt close restores focus', ae() === op, aeId());
+    op.focus();
+    var m1 = document.createElement('div'); m1.setAttribute('role', 'menu'); m1.id = 'm1';
+    m1.innerHTML = '<div role="menuitem" id="mi1" tabindex="0">a</div><div role="menuitem" id="mi2" tabindex="0">b</div><div role="menuitem" id="mi3" tabindex="0">c</div>';
+    document.body.appendChild(m1);
+    await wait(30);
+    t('dynamic menu focuses first item + roving', ae() === id('mi1') && id('mi1').getAttribute('tabindex') === '0' && id('mi2').getAttribute('tabindex') === '-1', aeId());
+    key(id('mi1'), K.down); t('ArrowDown roves', ae() === id('mi2'), aeId());
+    key(id('mi2'), K.end); t('End roves to last', ae() === id('mi3'), aeId());
+    key(id('mi3'), K.down); t('Down wraps to first', ae() === id('mi1'), aeId());
+    key(id('mi1'), K.up); t('Up wraps to last', ae() === id('mi3'), aeId());
+    key(id('mi3'), K.esc);
+    t('Escape removes dynamic menu + restores focus', !document.body.contains(m1) && ae() === op, aeId());
+    var pb = id('pb'), m2 = id('m2');
+    pb.focus(); pb.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    m2.hidden = false;
+    await wait(40);
+    t('persistent menu focuses first item on activation', ae() === id('pa'), aeId());
+    key(id('pa'), K.down); t('persistent menu ArrowDown', ae() === id('pb2'), aeId());
+    key(id('pb2'), K.esc);
+    t('Escape on persistent menu keeps node, restores focus', document.body.contains(m2) && ae() === pb, aeId());
+    m2.hidden = true; await wait(20);
+    m2.hidden = false; await wait(40);
+    t('re-open within activation window focuses first again', ae() === id('pa'), aeId());
+    m2.hidden = true; await wait(1600);
+    m2.hidden = false; await wait(40);
+    t('open without recent activation does not steal focus', ae() !== id('pa'), aeId());
+    m2.hidden = true;
+    var mk = function (c, type, title) { return { canvas: c, config: { type: type, data: { labels: ['a', 'b'], datasets: [{ label: 'S', data: [1, { y: 2 }] }] }, options: { plugins: { title: { text: title } } } } }; };
+    window.enhanceChartA11y(mk(id('c1'), 'bar', 'T1'));
+    var w1 = id('c1-a11y-table-wrap');
+    t('chart table built + linked', !!w1 && w1.classList.contains('sr-only') && w1.classList.contains('pnb-chart-a11y') && id('c1').getAttribute('aria-describedby') === 'c1-a11y-table' && w1.querySelectorAll('tbody tr').length === 2);
+    t('chart label', /^Bar chart: T1\. 1 data series, 2 categories; full data/.test(id('c1').getAttribute('aria-label')), id('c1').getAttribute('aria-label'));
+    t('object point value read', w1.querySelectorAll('td')[1].textContent === '2');
+    window.enhanceChartA11y(mk(id('c1'), 'line', 'T2'));
+    t('re-render replaces (one wrap)', document.querySelectorAll('#c1-a11y-table-wrap').length === 1 && /Line chart: T2/.test(id('c1').getAttribute('aria-label')));
+    var noid = document.querySelectorAll('canvas.noid');
+    window.enhanceChartA11y(mk(noid[0], 'pie', 'A')); window.enhanceChartA11y(mk(noid[1], 'pie', 'B'));
+    t('id-less canvases get distinct ids + tables', !!noid[0].id && !!noid[1].id && noid[0].id !== noid[1].id && document.querySelectorAll('.pnb-chart-a11y').length === 3, noid[0].id + '/' + noid[1].id);
+    window.enhanceChartA11y(mk(id('c4'), 'bar', 'H'));
+    t('aria-hidden canvas left alone', !id('c4').hasAttribute('role') && document.querySelectorAll('.pnb-chart-a11y').length === 3);
+    // Builder-supplied rows and chart type name; [a, b] pairs read as "a to b".
+    var gcfg = mk(id('c1'), 'doughnut', 'Progress'); gcfg.config.data._chartType = 'gauge';
+    gcfg.config.data._a11yRows = { columns: ['Measure', 'Value'], rows: [['Value', 62], ['Target', 80], ['Range', [0, 100]]] };
+    window.enhanceChartA11y(gcfg);
+    var gw = id('c1-a11y-table-wrap');
+    t('custom rows table', !!gw && gw.querySelectorAll('thead th').length === 2 && gw.querySelectorAll('tbody tr').length === 3 && gw.querySelectorAll('tbody th')[0].textContent === 'Value', gw && gw.textContent.slice(0, 40));
+    t('pair value reads as a range', gw.querySelectorAll('tbody tr')[2].querySelector('td').textContent === '0 to 100');
+    t('name uses the chosen chart type', /^Gauge chart: Progress\. 3 rows; full data/.test(id('c1').getAttribute('aria-label')), id('c1').getAttribute('aria-label'));
+    var pcfg = mk(id('c1'), 'bar', 'Timeline'); pcfg.config.data.datasets[0].data = [[1, 5], [2, 9]]; pcfg.config.data._chartType = 'gantt';
+    window.enhanceChartA11y(pcfg);
+    t('generic table renders [start,end] pairs as ranges', id('c1-a11y-table-wrap').querySelectorAll('td')[0].textContent === '1 to 5' && /^Gantt chart/.test(id('c1').getAttribute('aria-label')));
+    var tcfg = { canvas: id('c1'), config: { type: 'treemap', data: { datasets: [{ tree: [{ _label: 'a', _group: 'g1', _value: 3 }, { _label: 'b', _group: 'g2', _value: 4 }], key: '_value', groups: ['_group', '_label'] }] }, options: {} } };
+    window.enhanceChartA11y(tcfg);
+    var tw = id('c1-a11y-table-wrap');
+    t('treemap dataset.tree becomes a Label/Group/Value table', !!tw && tw.querySelectorAll('thead th').length === 3 && tw.querySelectorAll('tbody tr').length === 2 && tw.querySelectorAll('tbody tr')[1].textContent === 'bg24' && /^Treemap chart\. 2 rows/.test(id('c1').getAttribute('aria-label')), tw && tw.textContent.slice(0, 30));
+    // A dialog that opens on its own inside a FRAME that does not have focus must
+    // not pull the host's focus into the frame (a chart embed tile's carousel).
+    op.focus();
+    var fr = document.createElement('iframe'); fr.id = 'fr1'; fr.setAttribute('srcdoc', '<script src="a11y_check.js"><\/script><button id="fb">in frame</button><div class="help-lightbox" id="fdlg" style="display:none"><h3>Frame dialog</h3><input id="fi"></div>');
+    document.body.appendChild(fr);
+    await new Promise(function (r) { var n = 0; (function p() { var d = fr.contentDocument; if ((d && d.getElementById('fdlg') && fr.contentWindow.PenumbraA11y) || ++n > 20) r(); else setTimeout(p, 100); })(); });
+    var fd = fr.contentDocument, fw = fr.contentWindow;
+    t('frame module loaded', !!(fw && fw.PenumbraA11y));
+    fd.getElementById('fdlg').style.display = 'flex'; await wait(700);
+    t('auto-opened frame dialog leaves the host focus alone', document.activeElement === op && fd.activeElement !== fd.getElementById('fi'), aeId() + ' / ' + (fd.activeElement && fd.activeElement.id));
+    t('frame dialog still stamped and trapped', fd.getElementById('fdlg').getAttribute('aria-modal') === 'true' && !!fd.getElementById('fdlg').__modalOpen);
+    fd.getElementById('fdlg').style.display = 'none'; await wait(100);
+    fd.getElementById('fb').dispatchEvent(new fw.MouseEvent('mousedown', { bubbles: true }));   // a gesture INSIDE the frame
+    fd.getElementById('fdlg').style.display = 'flex'; await wait(300);
+    t('gesture-opened frame dialog takes focus inside the frame', fd.activeElement === fd.getElementById('fi'), fd.activeElement && fd.activeElement.id);
+    document.body.removeChild(fr); op.focus();
+    // Plain-element menu items: Enter activates, aria-disabled items are skipped,
+    // and hiding the menu while focus is inside hands focus back to the opener.
+    var pb3 = id('pb3'), m3 = id('m3'), m3clicks = 0;
+    id('m3a').addEventListener('click', function () { m3clicks++; });
+    pb3.focus(); pb3.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    m3.hidden = false; await wait(40);
+    t('li-style menu focuses first item', ae() === id('m3a'), aeId());
+    key(id('m3a'), K.enter);
+    t('Enter activates a non-native menuitem', m3clicks === 1, 'clicks=' + m3clicks);
+    key(id('m3a'), K.down);
+    t('ArrowDown skips an aria-disabled item', ae() === id('m3c'), aeId());
+    m3.hidden = true; await wait(40);
+    t('hiding the menu with focus inside restores the opener', ae() === pb3, aeId());
+    // A lightbox created after load is picked up by the sweep; removing it while
+    // open (the carousel pattern) restores focus too.
+    op.focus(); key(op, K.enter);
+    var dlg2 = document.createElement('div'); dlg2.className = 'help-lightbox'; dlg2.id = 'dlg2'; dlg2.style.display = 'flex';
+    dlg2.innerHTML = '<h3>Late dialog</h3><input id="late1"><button id="late2">ok</button>';
+    document.body.appendChild(dlg2);
+    await wait(700);
+    t('late dialog picked up by the sweep (focus in, aria-modal)', ae() === id('late1') && dlg2.getAttribute('aria-modal') === 'true', aeId());
+    document.body.removeChild(dlg2); await wait(40);
+    t('removing an open dialog restores focus to the opener', ae() === op, aeId());
+    done();
+  })().catch(function (e) { out.push('HARNESS ERROR ' + e.message + ' ' + (e.stack || '')); done(); });
+})();
+</script>
+</body></html>

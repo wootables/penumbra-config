@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mobile suite - admin tool page stand-in</title>
+<link rel="stylesheet" href="css/main.css">
+<link rel="stylesheet" href="css/grants.css">
+</head>
+<body class="pnb-adm theme-wolfpack">
+<!-- The shared admin chrome (penumbra_admin_header): sticky bar with crumb,
+     titles, the seven tool pills, the signed-in cell. -->
+<div class="pnb-adm-stick">
+  <header class="pnb-adm-bar">
+    <span class="pnb-crumb"><a href="#">Penumbra</a><span class="pnb-crumb-sep">&rsaquo;</span><span class="pnb-crumb-step">Admin</span></span>
+    <div class="pnb-adm-titles"><h1>System Health</h1><p>checked 2026-10-02T17:51:56-04:00</p></div>
+    <nav class="pnb-adm-nav">
+      <a href="#">&#128193; Repository</a><a href="#">&#128202; Metrics</a><a href="#">&#128197; Calendar</a><a href="#" class="on">&#10084; Health</a><a href="#">&#9889; Grants</a><a href="#">&#128276; Notice</a><a href="#">&#127991; Tags</a>
+    </nav>
+    <div class="pnb-adm-who"><span class="pnb-adm-who-lbl">Signed in as</span> Bruce</div>
+  </header>
+</div>
+<main class="pnb-adm-main">
+  <!-- Health hub maintenance card rows (health.php). -->
+  <div class="pnb-rows pnb-rows-jobs">
+    <div class="pnb-row" data-job="purge">
+      <span class="t">03:30 daily</span><span class="c">OK</span><span class="d">Purge expired report rows</span><span class="to">2026-10-02 03:30:12</span><span class="p">0 rows &middot; next: tomorrow 03:30</span>
+      <span class="k" id="jobK"><button type="button" class="pnb-job-btn">Run now</button><button type="button" class="pnb-job-btn">Pause</button><a href="#pnbLog" class="pnb-log-jump">log &#8599;</a></span>
+    </div>
+  </div>
+  <div class="pnb-rows pnb-rows-runs">
+    <div class="pnb-row">
+      <span class="t">10-02 03:30</span><span class="c">OK</span><span class="d">Purge expired report rows</span><span class="to">scheduler</span><span class="p" id="runP">Deleted 0 report rows and 0 audit rows older than the retention window; nothing to do.</span><span class="k">rows 0 audit 0</span>
+    </div>
+  </div>
+  <!-- grants_admin.php's sticky save bar (its inline <style> is extracted into css/grants.css). -->
+  <div class="bar"><div class="bar-inner">
+    <button class="btn-save" id="saveBtn">Save changes</button>
+    <span class="status" id="status">Loaded 0 user(s).</span>
+    <span class="muted mono" id="dirty"></span>
+    <div class="bar-note">Grants here <strong>never</strong> exceed the global allow-list, and cannot make anyone a full admin (that stays in the secrets config). Saving requires a one-time code emailed to <strong class="mono">bplimon@ncsu.edu</strong>.</div>
+  </div></div>
+</main>
+<div id="pnbStatusBar" role="status"><div class="sb-seg sb-lead"><span class="sb-val sb-b" id="sbRows">Health</span></div><div class="sb-spring"></div><div class="sb-seg sb-user" id="sbUserSeg"><button type="button" id="sbUserBtn" class="sb-user-btn"><span class="sb-ava">B</span><span class="sb-val">Bruce</span></button></div></div>
+<script>
+window.__state = function () {
+  var cw = document.documentElement.clientWidth;
+  var q = function (sel) { return document.querySelector(sel); };
+  var r = function (sel) { var e = q(sel); if (!e) return null; var b = e.getBoundingClientRect(); return {l: Math.round(b.left), r: Math.round(b.right), w: Math.round(b.width), t: Math.round(b.top), b: Math.round(b.bottom), h: Math.round(b.height)}; };
+  var cs = function (sel, p) { var e = q(sel); return e ? getComputedStyle(e)[p] : null; };
+  return {
+    cw: cw, sw: document.documentElement.scrollWidth,
+    nav: r('.pnb-adm-nav'), bar: r('.pnb-adm-bar'), stickPos: cs('.pnb-adm-stick', 'position'), stickDisplay: cs('.pnb-adm-stick', 'display'),
+    jobK: r('#jobK'), jobRow: r('.pnb-rows-jobs .pnb-row'), jobTo: cs('.pnb-rows-jobs .to', 'display'),
+    runP: r('#runP'), runRow: r('.pnb-rows-runs .pnb-row'), runPws: cs('#runP', 'whiteSpace'),
+    save: r('#saveBtn'), note: r('.bar-note'),
+    sbDisplay: cs('#pnbStatusBar', 'display')
+  };
+};
+</script>
+</body></html>

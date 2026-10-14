@@ -1,0 +1,156 @@
+<!doctype html><html><head><meta charset="utf-8"><title>tplparity - scheduler File Drop custom-template panel</title></head>
+<body>
+<!--
+  The scheduler's File Drop "Custom Template" panel, driven for real: the markup
+  is SLICED out of index.php by run.ps1 (so a renamed id fails here, not in
+  production), and the behaviour is the real js/main.js + js/penumbra_presets.js.
+-->
+<div id="reportSnippetOutput"></div>
+<textarea id="sqlQuery" style="display:none"></textarea>
+<textarea id="reportSnippet" style="display:none"></textarea>
+<textarea id="subquerySql" style="display:none"></textarea>
+<div id="selectorBox"></div>
+<input id="tableSearch" value=""><input id="reportTitle" value="UI"><input id="reportSubtitle" value="">
+<table id="resultsTable"><thead><tr id="tableHeader">
+  <th data-column="#" data-colname="#">#</th>
+  <th data-column="0" data-colname="ID">ID</th>
+  <th data-column="1" data-colname="NAME">NAME</th>
+  <th data-column="2" data-colname="SECRET_COL" style="display:none">SECRET_COL</th>
+</tr></thead><tbody><tr><td data-column="#">1</td><td data-column="0">1</td><td data-column="1">n</td><td data-column="2" style="display:none">s</td></tr></tbody></table>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="pivot-output-container" style="display:none"></div>
+<!--@@SCHED_DROP_MARKUP@@-->
+<pre id="out">RUNNING</pre>
+<script>window.__pageErrors=[];window.onerror=function(m){window.__pageErrors.push(String(m));return true;};</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script src="penumbra_presets.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.IntersectionObserver = window.ResizeObserver;
+  window.alert = function () {}; window.confirm = function () { return true; }; window.prompt = function () { return null; };
+  try { localStorage.removeItem('penumbra_presets'); } catch (e) {}
+</script>
+<script src="main_tpl.js"></script>
+<script>
+(function () {
+  function fin(o) { document.getElementById('out').textContent = 'RESULTS_JSON:' + JSON.stringify(o); }
+  var results = [];
+  function ok(name, cond, detail) { results.push({ name: name, ok: !!cond, detail: (detail === undefined ? '' : String(detail)).slice(0, 300) }); }
+  function later(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  setTimeout(async function () {
+    var T = window.__TPL;
+    if (!T) return fin({ fatal: 'hook missing: ' + (window.__TPL_ERR || ''), pageErrors: window.__pageErrors });
+    function fn(n) { try { return T.ev(n); } catch (e) { return undefined; } }
+    try {
+      $('#schedDropFileOptionsBox').show();
+      ok('markup: panel, fields, mount and help ids exist',
+         $('#schedDropFormatCustom, #schedDropCustomOptions, #schedDropCustomHeader, #schedDropCustomTemplate, #schedDropCustomNewline, #schedDropCustomExt, #schedDropTplPresetMount, #schedDropTplPlaceholders, #schedDropTplStringHelp, #schedDropCustomExtWarn').length === 10);
+      ok('markup: file types are the Download dialog list',
+         $('#schedDropCustomExt option').map(function () { return this.value; }).get().join(',') === 'txt,csv,tsv,md,json,xml,cstm');
+      ok('markup: both template fields carry .pnb-tpl-field', $('#schedDropCustomHeader.pnb-tpl-field, #schedDropCustomTemplate.pnb-tpl-field').length === 2);
+      ok('main.js: helpers are reachable', typeof fn('applyDropCustomTemplateUI') === 'function' && typeof fn('_schedDropCustomExtClash') === 'function');
+
+      ok('panel hidden until Custom is ticked', !$('#schedDropCustomOptions').is(':visible'));
+      $('#schedDropFormatCustom').prop('checked', true).trigger('change');
+      ok('ticking Custom shows the panel', $('#schedDropCustomOptions').is(':visible'));
+      var ph = $('#schedDropTplPlaceholders code').map(function () { return $(this).text(); }).get();
+      ok('placeholders list the open report columns, hidden ones included', ph.indexOf('{ID}') !== -1 && ph.indexOf('{NAME}') !== -1 && ph.indexOf('{SECRET_COL}') !== -1, ph.join(' '));
+      ok('placeholders include the \\t chip', ph.indexOf('\\t') !== -1);
+      ok('header prefilled with the column names', $('#schedDropCustomHeader').val() === fn('_dlDefaultHeader')() && $('#schedDropCustomHeader').val().indexOf('{NAME}') !== -1, $('#schedDropCustomHeader').val());
+
+      // click-to-insert: with no field focused it goes to the row template (data-tpl-default)
+      T.ev('_tplActiveField = null');
+      $('#schedDropCustomTemplate').val('');
+      $('#schedDropTplPlaceholders code').filter(function () { return $(this).text() === '{NAME}'; }).trigger('click');
+      ok('clicking a chip inserts it into the row template', $('#schedDropCustomTemplate').val() === '{NAME}', $('#schedDropCustomTemplate').val());
+      // ...and at the caret of whichever field was last active
+      var ta = document.getElementById('schedDropCustomTemplate');
+      ta.value = 'AB'; ta.focus(); ta.setSelectionRange(1, 1); $(ta).trigger('click');
+      $('#schedDropTplPlaceholders code').filter(function () { return $(this).text() === '{ID}'; }).trigger('click');
+      ok('insert lands at the caret', ta.value === 'A{ID}B', ta.value);
+      var hd = document.getElementById('schedDropCustomHeader');
+      hd.value = ''; hd.focus(); hd.setSelectionRange(0, 0); $(hd).trigger('click');
+      $('#schedDropTplPlaceholders code').filter(function () { return $(this).text() === '{SECRET_COL}'; }).trigger('click');
+      ok('the header field takes inserts when it is the active field', hd.value === '{SECRET_COL}', hd.value);
+
+      // cleared-on-purpose header is not refilled
+      $(hd).val('').trigger('input');
+      fn('applyDropCustomTemplateUI')();
+      ok('a header the user cleared stays cleared', $('#schedDropCustomHeader').val() === '');
+
+      // file-type clash with the task's own CSV / JSON drop
+      $('#schedDropFormatCsv').prop('checked', true);
+      $('#schedDropCustomExt').val('csv').trigger('change');
+      ok('.csv + CSV ticked = clash message', fn('_schedDropCustomExtClash')().indexOf('.csv') !== -1 && $('#schedDropCustomExtWarn').is(':visible'));
+      $('#schedDropFormatCsv').prop('checked', false).trigger('change');
+      ok('unticking CSV clears the clash', fn('_schedDropCustomExtClash')() === '' && !$('#schedDropCustomExtWarn').is(':visible'));
+      $('#schedDropFormatJson').prop('checked', true); $('#schedDropCustomExt').val('json').trigger('change');
+      ok('.json + JSON ticked = clash message', fn('_schedDropCustomExtClash')().indexOf('.json') !== -1);
+      $('#schedDropFormatJson').prop('checked', false); $('#schedDropCustomExt').val('txt').trigger('change');
+
+      // double-click autocomplete is wired to both fields
+      ok('autocomplete wired on the row template', !!$('#schedDropCustomTemplate').data('ui-autocomplete'));
+      ok('autocomplete wired on the header', !!$('#schedDropCustomHeader').data('ui-autocomplete'));
+      ta.value = ''; ta.focus(); ta.setSelectionRange(0, 0);
+      ta.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+      await later(60);
+      var menuItems = $('.ui-autocomplete:visible .ui-menu-item').map(function () { return $(this).text(); }).get();
+      ok('double-click opens the suggestion menu (columns + string() ops)', menuItems.some(function (t) { return t.indexOf('{NAME}') !== -1; }) && menuItems.some(function (t) { return t.indexOf('string(regex_replace') !== -1; }), menuItems.slice(0, 6).join(' | '));
+      try { $('#schedDropCustomTemplate').autocomplete('close'); } catch (e) {}
+
+      // hover help shares the Download dialog's text
+      ok('hover help carries the string()/regex reference', String($('#schedDropTplStringHelp').attr('title') || $('#schedDropTplStringHelp').data('ui-tooltip-title') || '').indexOf('regex_replace') !== -1);
+
+      // ---- presets: ONE store with the Download dialog (ns tpldownload) ------
+      var P = window.PenumbraPresets, rid = P.reportId();
+      P.save('tpldownload', rid, 'From Download', { header: 'H1,H2', template: '{ID}!string(uppercase, {NAME})', ext: 'md', newline: false });
+      fn('applyDropCustomTemplateUI')();   // refresh() mounts the picker
+      await later(80);
+      var $chip = $('#schedDropTplPresetMount .pnb-preset-chip');
+      ok('preset picker mounted in the scheduler panel', $chip.length === 1);
+      $chip.trigger('click');
+      await later(80);
+      var $pick = $('.pnb-preset-pick').filter(function () { return $(this).find('.pnb-preset-rname').text() === 'From Download'; });
+      ok('a preset saved under the DOWNLOAD namespace is listed here', $pick.length >= 1, $('.pnb-preset-rname').map(function () { return $(this).text(); }).get().join(' | '));
+      if ($pick.length) { $pick[0].click(); await later(60); }
+      ok('loading it fills header / template / file type / newline',
+         $('#schedDropCustomHeader').val() === 'H1,H2' && $('#schedDropCustomTemplate').val() === '{ID}!string(uppercase, {NAME})'
+         && $('#schedDropCustomExt').val() === 'md' && $('#schedDropCustomNewline').is(':checked') === false,
+         [$('#schedDropCustomHeader').val(), $('#schedDropCustomTemplate').val(), $('#schedDropCustomExt').val(), $('#schedDropCustomNewline').is(':checked')].join(' ~ '));
+      fn('applyDropCustomTemplateUI')();
+      ok('a loaded preset header is not overwritten by the default', $('#schedDropCustomHeader').val() === 'H1,H2');
+
+      // unticking hides the panel but keeps the text
+      $('#schedDropFormatCustom').prop('checked', false).trigger('change');
+      ok('unticking hides the panel and keeps the template', !$('#schedDropCustomOptions').is(':visible') && $('#schedDropCustomTemplate').val() !== '');
+    } catch (e) {
+      ok('driver completed without throwing', false, (e && e.message) + ' | ' + String(e && e.stack).split('\n').slice(0, 3).join(' | '));
+    }
+    fin({ results: results, pageErrors: window.__pageErrors });
+  }, 80);
+})();
+</script>
+</body></html>

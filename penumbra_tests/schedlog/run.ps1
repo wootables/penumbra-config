@@ -1,0 +1,23 @@
+# =============================================================================
+# Run the spanning-log-tail tests (daily rotation, day pinning, severity).
+#
+#   powershell -File run.ps1
+#
+# Exercises the LIVE penumbra_logs.php against the LIVE scheduler log directory,
+# READ-ONLY - it opens real rotated files and never writes one. That is
+# deliberate: the thing being tested is behaviour across real daily boundaries,
+# and a synthetic two-file fixture would not have caught the ordering bug this
+# suite guards (files walked newest-first read the whole log backwards).
+#
+# -n (skip php.ini) because from a workstation the ini fails to load
+# oci8/pdo_oci/sqlsrv; nothing here needs an extension.
+#
+# EXPECTED TAIL: "SUMMARY  pass=NN  fail=0".
+# =============================================================================
+$ErrorActionPreference = 'Stop'
+$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\schedlog' }   # empty when run as a scriptblock: never fall back to the caller's cwd
+$php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+$app  = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+
+& $php -n (Join-Path $here 'test_schedlog.php') $app
+exit $LASTEXITCODE

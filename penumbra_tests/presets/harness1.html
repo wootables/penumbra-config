@@ -1,0 +1,349 @@
+<html><body><pre id="out">running</pre>
+<!--
+  Unit tests for the unified preset store in js/penumbra_presets.js.
+
+  The module is executed from SRC.js, which run.ps1 writes as
+  `window.__src = "<the whole file as a JSON string>"`. That form needs no
+  --allow-file-access-from-files and no XHR: on file:// a script error is
+  sanitised to "Script error.", so a harness that <script src>'d the real file
+  could report success while testing nothing.
+
+  localStorage is unusable on file:// (opaque origin), so every test runs
+  against a fake store injected through PenumbraPresets._setStorage - which is
+  also how the "storage unavailable" path gets exercised at all.
+
+  TWO positive controls, because one cannot reach both invariants:
+    __break=1  mutate() stops stamping i:1, so a bucket never imports.
+               ONLY the delete-resurrection tests catch this - every read-path
+               test still passes, because merge-on-read is what it breaks.
+    __break=2  Object.create(null) becomes {}, so name keys inherit from
+               Object.prototype. ONLY the prototype-key tests catch this.
+  A control that cannot fail proves nothing (memory js_syntax_check_via_cscript).
+-->
+<script src="SRC.js"></script><script>window.__break=1;</script>
+<script>
+(function () {
+  var out = document.getElementById('out');
+  var log = [], pass = 0, fail = 0, group = '';
+
+  function sec(name) { group = name; log.push(''); log.push('-- ' + name); }
+
+  function eq(label, got, want) {
+    var g = JSON.stringify(got), wv = JSON.stringify(want);
+    if (g === wv) { pass++; log.push('  ok   ' + label); }
+    else { fail++; log.push('  FAIL ' + label + '\n         got:  ' + g + '\n         want: ' + wv); }
+  }
+
+  function ok(label, cond) { eq(label, !!cond, true); }
+
+  // ── fake storage ────────────────────────────────────────────────────────
+  function makeStore() {
+    var mem = {};
+    return {
+      getItem: function (k) { return Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : null; },
+      setItem: function (k, v) { mem[k] = String(v); },
+      removeItem: function (k) { delete mem[k]; },
+      seed: function (k, obj) { mem[k] = JSON.stringify(obj); },
+      raw: function (k) { return mem[k]; },
+      _mem: mem
+    };
+  }
+
+  var P, S;
+
+  // Fresh store + fresh module state before each section.
+  function reset() {
+    S = makeStore();
+    P._setStorage(S);
+    return S;
+  }
+
+  // names only, for terse list assertions
+  function names(ns, id) {
+    return P.list(ns, id).map(function (e) { return e.name; });
+  }
+
+  try {
+    var code = String(window.__src).replace(/\r\n/g, '\n');
+
+    if (window.__break === 1) {
+      // Never stamp the bucket imported -> legacy keeps being merged forever.
+      var b1 = code.replace('r.ns[ns][id] = { i: 1, p: items };',
+                            'r.ns[ns][id] = { i: 0, p: items };');
+      if (b1 === code) { throw new Error('break-1 anchor missed'); }
+      code = b1;
+    }
+    if (window.__break === 2) {
+      // Name keys inherit from Object.prototype again.
+      var before = code;
+      code = code.split('Object.create(null)').join('{}');
+      if (before === code) { throw new Error('break-2 anchor missed'); }
+    }
+
+    // new Function parses without executing, so a missing global can never
+    // masquerade as a syntax error; calling it runs the module's IIFE.
+    new Function(code)();
+    P = window.PenumbraPresets;
+    if (!P) { throw new Error('module loaded but exposed nothing'); }
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('fresh store');
+    reset();
+    eq('empty list',            P.list('pivot', 'r1'), []);
+    eq('get of nothing',        P.get('pivot', 'r1', 'nope'), null);
+    eq('save returns true',     P.save('pivot', 'r1', 'Beta', { rows: ['A'] }), true);
+    eq('save a second',         P.save('pivot', 'r1', 'alpha', { rows: ['B'] }), true);
+    eq('list is name-sorted, case-insensitive', names('pivot', 'r1'), ['alpha', 'Beta']);
+    eq('get round-trips',       P.get('pivot', 'r1', 'Beta'), { rows: ['A'] });
+    eq('buckets are per report', names('pivot', 'r2'), []);
+    eq('namespaces are separate', names('viz', 'r1'), []);
+    eq('exists true',           P.exists('pivot', 'r1', 'alpha'), true);
+    eq('exists false',          P.exists('pivot', 'r1', 'Alpha'), false);
+
+    // get must hand back a CLONE - a caller mutating it must not reach back
+    // into the store (the old pivot loader had to JSON round-trip by hand).
+    var got = P.get('pivot', 'r1', 'Beta');
+    got.rows.push('MUTATED');
+    eq('get returns a clone',   P.get('pivot', 'r1', 'Beta'), { rows: ['A'] });
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('prototype-key safety');
+    reset();
+    // Preset names are user-authored, so they land in the store as object keys.
+    // A bare {} silently no-ops on x['__proto__'] = v and reports inherited
+    // members as present. See memory prototype_key_frequency_maps.
+    P.save('pivot', 'r1', '__proto__', { k: 1 });
+    P.save('pivot', 'r1', 'constructor', { k: 2 });
+    P.save('pivot', 'r1', 'toString', { k: 3 });
+    P.save('pivot', 'r1', 'hasOwnProperty', { k: 4 });
+    eq('__proto__ saved',        P.get('pivot', 'r1', '__proto__'), { k: 1 });
+    eq('constructor saved',      P.get('pivot', 'r1', 'constructor'), { k: 2 });
+    eq('toString saved',         P.get('pivot', 'r1', 'toString'), { k: 3 });
+    eq('hasOwnProperty saved',   P.get('pivot', 'r1', 'hasOwnProperty'), { k: 4 });
+    eq('all four listed',        names('pivot', 'r1').length, 4);
+    eq('unsaved inherited name absent', P.exists('pivot', 'r1', 'valueOf'), false);
+    eq('delete a prototype name', P.remove('pivot', 'r1', 'constructor'), true);
+    eq('and it is gone',         P.exists('pivot', 'r1', 'constructor'), false);
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('legacy merge - map shape (pivot, viz, templates)');
+    reset();
+    S.seed('penumbra_pivot_presets', { r1: { Rollup: { rows: ['COLLEGE'] }, Sponsors: { rows: ['SPONSOR'] } } });
+    eq('legacy presets are visible', names('pivot', 'r1'), ['Rollup', 'Sponsors']);
+    eq('legacy data reads through',  P.get('pivot', 'r1', 'Rollup'), { rows: ['COLLEGE'] });
+    eq('bucket not yet imported',    P._stats('pivot', 'r1').imported, false);
+    eq('other reports unaffected',   names('pivot', 'r2'), []);
+
+    reset();
+    S.seed('penumbra_template_presets', { r1: { Pipe: { template: '{A}|{B}' } } });
+    eq('copy-template legacy',       names('tplcopy', 'r1'), ['Pipe']);
+    S.seed('penumbra_download_template_presets', { r1: { Csv: { template: '{A},{B}', ext: 'csv' } } });
+    eq('download-template legacy',   names('tpldownload', 'r1'), ['Csv']);
+    eq('the two template stores stay separate', names('tplcopy', 'r1'), ['Pipe']);
+
+    reset();
+    S.seed('penumbra_pivot_presets', { __adhoc__: { Scratch: { rows: [] } } });
+    eq('__adhoc__ bucket reads',     names('pivot', '__adhoc__'), ['Scratch']);
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('legacy merge - array shape (search)');
+    reset();
+    S.seed('penumbra_search_presets', {
+      r1: [
+        { name: 'Active', query: 'STATUS = Active', conditions: [1], logic: 'and', isDefault: true, created: 'x' },
+        { name: 'Federal', query: 'TYPE = Fed', conditions: [], logic: 'or' }
+      ]
+    });
+    eq('array converts to names',    names('search', 'r1'), ['Active', 'Federal']);
+    eq('payload keeps its fields',   P.get('search', 'r1', 'Federal'),
+       { query: 'TYPE = Fed', conditions: [], logic: 'or' });
+    eq('name is hoisted out of the payload',
+       Object.prototype.hasOwnProperty.call(P.get('search', 'r1', 'Active'), 'name'), false);
+    eq('isDefault is hoisted out too',
+       Object.prototype.hasOwnProperty.call(P.get('search', 'r1', 'Active'), 'isDefault'), false);
+    eq('isDefault becomes the pin',  P.getPin('search', 'r1'), { builder: 'search', name: 'Active' });
+    eq('and reads as pinned',        P.isPinned('search', 'r1', 'Active'), true);
+    eq('the other one is not',       P.isPinned('search', 'r1', 'Federal'), false);
+
+    // The old save path pushed new presets onto the END of the array, so on an
+    // exact-name collision the LATER row is the more recently written one.
+    reset();
+    S.seed('penumbra_search_presets', {
+      r1: [{ name: 'Dup', query: 'first' }, { name: 'Dup', query: 'second' }]
+    });
+    eq('exact duplicate: last wins', P.get('search', 'r1', 'Dup'), { query: 'second' });
+    eq('and collapses to one row',   names('search', 'r1'), ['Dup']);
+
+    // Names differing only by case were reachable in old data; merging them
+    // would silently destroy user-authored work, so both survive.
+    reset();
+    S.seed('penumbra_search_presets', {
+      r1: [{ name: 'Case', query: 'a' }, { name: 'CASE', query: 'b' }]
+    });
+    eq('case-variant names both kept', names('search', 'r1').length, 2);
+
+    reset();
+    S.seed('penumbra_search_presets', { r1: [{ query: 'no name' }, { name: '', query: 'blank' }] });
+    eq('rows with no usable name are dropped', names('search', 'r1'), []);
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('new store shadows legacy');
+    reset();
+    S.seed('penumbra_pivot_presets', { r1: { Rollup: { v: 'old' } } });
+    P.save('pivot', 'r1', 'Rollup', { v: 'new' });
+    eq('same name resolves to the new value', P.get('pivot', 'r1', 'Rollup'), { v: 'new' });
+    eq('and appears once',                    names('pivot', 'r1'), ['Rollup']);
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('copy-on-write import');
+    reset();
+    S.seed('penumbra_pivot_presets', { r1: { A: { v: 1 }, B: { v: 2 } } });
+    eq('not imported before any write', P._stats('pivot', 'r1').imported, false);
+    P.save('pivot', 'r1', 'C', { v: 3 });
+    eq('imported after the first write', P._stats('pivot', 'r1').imported, true);
+    eq('legacy entries were materialised', P._stats('pivot', 'r1').count, 3);
+    eq('all three list',                 names('pivot', 'r1'), ['A', 'B', 'C']);
+    eq('legacy key is left untouched',
+       JSON.parse(S.raw('penumbra_pivot_presets')), { r1: { A: { v: 1 }, B: { v: 2 } } });
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('delete must not resurrect from legacy');   // __break=1 lands here
+    reset();
+    S.seed('penumbra_pivot_presets', { r1: { A: { v: 1 }, B: { v: 2 } } });
+    eq('both present first',      names('pivot', 'r1'), ['A', 'B']);
+    eq('remove returns true',     P.remove('pivot', 'r1', 'A'), true);
+    eq('gone immediately',        names('pivot', 'r1'), ['B']);
+    eq('still gone on re-read',   names('pivot', 'r1'), ['B']);
+    eq('and get agrees',          P.get('pivot', 'r1', 'A'), null);
+    eq('removing what is absent', P.remove('pivot', 'r1', 'A'), false);
+
+    reset();
+    S.seed('penumbra_search_presets', { r1: [{ name: 'X', query: 'q' }] });
+    eq('array-shape delete sticks too',
+       (P.remove('search', 'r1', 'X'), names('search', 'r1')), []);
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('pin: one slot, shared by pivot and group');
+    reset();
+    P.save('pivot', 'r1', 'P1', {});
+    P.save('group', 'r1', 'G1', {});
+    eq('pivot and group share a scope', [P.pinScopeFor('pivot'), P.pinScopeFor('group')], ['layout', 'layout']);
+    eq('viz has its own',               P.pinScopeFor('viz'), 'viz');
+    eq('templates have none',           P.pinScopeFor('tplcopy'), null);
+
+    P.setPin('layout', 'r1', 'pivot', 'P1');
+    eq('pivot holds the slot',   P.getPin('layout', 'r1'), { builder: 'pivot', name: 'P1' });
+    eq('isPinned agrees',        P.isPinned('pivot', 'r1', 'P1'), true);
+    eq('group does not',         P.isPinned('group', 'r1', 'P1'), false);
+
+    P.setPin('layout', 'r1', 'group', 'G1');
+    eq('group took the slot',    P.getPin('layout', 'r1'), { builder: 'group', name: 'G1' });
+    eq('pivot was released with no coordination', P.isPinned('pivot', 'r1', 'P1'), false);
+
+    P.setPin('viz', 'r1', 'viz', 'V1');
+    eq('viz pin is independent', P.getPin('viz', 'r1'), { builder: 'viz', name: 'V1' });
+    eq('layout is untouched',    P.getPin('layout', 'r1'), { builder: 'group', name: 'G1' });
+    eq('pins are per report',    P.getPin('layout', 'r2'), null);
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('pin: legacy pointers');
+    reset();
+    S.seed('penumbra_view_autorun', { r1: { type: 'pivot', name: 'Legacy P' } });
+    eq('typed legacy pointer reads', P.getPin('layout', 'r1'), { builder: 'pivot', name: 'Legacy P' });
+
+    reset();
+    S.seed('penumbra_view_autorun', { r1: { type: 'group', name: 'Legacy G' } });
+    eq('type=group reads too',       P.getPin('layout', 'r1'), { builder: 'group', name: 'Legacy G' });
+
+    reset();
+    S.seed('penumbra_view_autorun', { r1: { type: 'bogus', name: 'X' } });
+    eq('unknown type is refused',    P.getPin('layout', 'r1'), null);
+
+    reset();
+    S.seed('penumbra_viz_autorun', { r1: 'Legacy V' });
+    eq('flat viz pointer reads',     P.getPin('viz', 'r1'), { builder: 'viz', name: 'Legacy V' });
+
+    // Clearing a pin that only exists in legacy must STICK - without a
+    // tombstone the next read falls straight back to the old key.
+    reset();
+    S.seed('penumbra_view_autorun', { r1: { type: 'pivot', name: 'Legacy P' } });
+    P.setPin('layout', 'r1', null, null);
+    eq('cleared legacy pin stays cleared', P.getPin('layout', 'r1'), null);
+    eq('legacy key still untouched',
+       JSON.parse(S.raw('penumbra_view_autorun')), { r1: { type: 'pivot', name: 'Legacy P' } });
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('pin follows rename, releases on delete');
+    reset();
+    P.save('pivot', 'r1', 'Old', { v: 1 });
+    P.setPin('layout', 'r1', 'pivot', 'Old');
+    eq('rename returns true',   P.rename('pivot', 'r1', 'Old', 'New'), true);
+    eq('renamed in the list',   names('pivot', 'r1'), ['New']);
+    eq('data came with it',     P.get('pivot', 'r1', 'New'), { v: 1 });
+    eq('pin followed the name', P.getPin('layout', 'r1'), { builder: 'pivot', name: 'New' });
+    eq('rename of a missing preset', P.rename('pivot', 'r1', 'Nope', 'X'), false);
+
+    P.remove('pivot', 'r1', 'New');
+    eq('delete released the pin', P.getPin('layout', 'r1'), null);
+
+    // A rename must not silently drag the pin off a DIFFERENT preset.
+    reset();
+    P.save('pivot', 'r1', 'A', {}); P.save('pivot', 'r1', 'B', {});
+    P.setPin('layout', 'r1', 'pivot', 'B');
+    P.rename('pivot', 'r1', 'A', 'A2');
+    eq('unrelated rename leaves the pin', P.getPin('layout', 'r1'), { builder: 'pivot', name: 'B' });
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('legacy search default survives import');
+    reset();
+    S.seed('penumbra_search_presets', {
+      r1: [{ name: 'Active', query: 'a', isDefault: true }, { name: 'Other', query: 'b' }]
+    });
+    eq('pin before import', P.getPin('search', 'r1'), { builder: 'search', name: 'Active' });
+    P.save('search', 'r1', 'Third', { query: 'c' });          // forces the import
+    eq('bucket imported',   P._stats('search', 'r1').imported, true);
+    eq('pin survived it',   P.getPin('search', 'r1'), { builder: 'search', name: 'Active' });
+    eq('all three list',    names('search', 'r1'), ['Active', 'Other', 'Third']);
+
+    // An existing pin must win over the legacy default at import time.
+    reset();
+    S.seed('penumbra_search_presets', {
+      r1: [{ name: 'Active', query: 'a', isDefault: true }, { name: 'Other', query: 'b' }]
+    });
+    P.setPin('search', 'r1', 'search', 'Other');
+    P.save('search', 'r1', 'Third', { query: 'c' });
+    eq('import does not clobber a real choice', P.getPin('search', 'r1'), { builder: 'search', name: 'Other' });
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('storage unavailable');
+    P._setStorage({
+      getItem: function () { throw new Error('denied'); },
+      setItem: function () { throw new Error('quota'); }
+    });
+    eq('list degrades to empty', P.list('pivot', 'r1'), []);
+    eq('get degrades to null',   P.get('pivot', 'r1', 'A'), null);
+    eq('save reports failure',   P.save('pivot', 'r1', 'A', {}), false);
+    eq('setPin reports failure', P.setPin('layout', 'r1', 'pivot', 'A'), false);
+    eq('getPin degrades',        P.getPin('layout', 'r1'), null);
+
+    // Corrupt JSON must read as "no presets", never throw into the page.
+    S = makeStore(); P._setStorage(S);
+    S._mem['penumbra_presets'] = '{not json';
+    S._mem['penumbra_pivot_presets'] = 'also not json';
+    eq('corrupt store reads empty', P.list('pivot', 'r1'), []);
+    eq('and is writable again',     P.save('pivot', 'r1', 'A', { v: 1 }), true);
+    eq('and reads back',            names('pivot', 'r1'), ['A']);
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('escape hook is inert with nothing open');
+    eq('handleEscape returns false', P.handleEscape(), false);
+
+    out.textContent = log.join('\n') + '\n\n' + pass + ' passed, ' + fail + ' failed'
+      + (window.__break ? '   [BREAK=' + window.__break + ' CONTROL: failures are REQUIRED]' : '');
+  } catch (e) {
+    out.textContent = 'HARNESS-ERROR' + (window.__break ? ' [BREAK=' + window.__break + ']' : '')
+      + ': ' + e.name + ': ' + e.message + '\n\n' + log.join('\n');
+  }
+})();
+</script>
+</body></html>

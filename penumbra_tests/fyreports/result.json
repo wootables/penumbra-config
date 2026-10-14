@@ -1,0 +1,637 @@
+{
+    "pageErrors":  [
+
+                   ],
+    "results":  [
+                    {
+                        "name":  "T1 a constant column resolves from the series rows",
+                        "pass":  true,
+                        "detail":  "expected \"FY 2027\" got \"FY 2027\""
+                    },
+                    {
+                        "name":  "T2 token plus literal text",
+                        "pass":  true,
+                        "detail":  "expected \"FY 2027 YTD\" got \"FY 2027 YTD\""
+                    },
+                    {
+                        "name":  "T3 a per-row column resolves from the rows the SERIES counts (FY_AGO = 1)",
+                        "pass":  true,
+                        "detail":  "expected \"FY 2026 YTD\" got \"FY 2026 YTD\""
+                    },
+                    {
+                        "name":  "T4 an unknown column keeps its token as typed",
+                        "pass":  true,
+                        "detail":  "expected \"plain {NOPE}\" got \"plain {NOPE}\""
+                    },
+                    {
+                        "name":  "T5 a series with no rows falls back to the chart first row",
+                        "pass":  true,
+                        "detail":  "expected \"FY 2025 none\" got \"FY 2025 none\""
+                    },
+                    {
+                        "name":  "T6 no label = the old generated default (never tokenised)",
+                        "pass":  true,
+                        "detail":  "expected \"AMOUNT (sum) [FY_AGO = 0]\" got \"AMOUNT (sum) [FY_AGO = 0]\""
+                    },
+                    {
+                        "name":  "T7 token names are case-insensitive",
+                        "pass":  true,
+                        "detail":  "expected \"FY 2025 lower-case\" got \"FY 2025 lower-case\""
+                    },
+                    {
+                        "name":  "T8 butterfly labels resolve too",
+                        "pass":  true,
+                        "detail":  "expected [\"FY 2026 left\",\"FY 2027 right\"] got [\"FY 2026 left\",\"FY 2027 right\"]"
+                    },
+                    {
+                        "name":  "G1 labels are the three months in order",
+                        "pass":  true,
+                        "detail":  "expected [\"01 Jul\",\"02 Aug\",\"03 Sep\"] got [\"01 Jul\",\"02 Aug\",\"03 Sep\"]"
+                    },
+                    {
+                        "name":  "G2 current-FY running total ENDS at its last month (no flat run to the edge)",
+                        "pass":  true,
+                        "detail":  "expected [120,null,null] got [120,null,null]"
+                    },
+                    {
+                        "name":  "G3 a gap BETWEEN real points still holds level",
+                        "pass":  true,
+                        "detail":  "expected [110,110,440] got [110,110,440]"
+                    },
+                    {
+                        "name":  "G4 a plain-sum line ends too (no drop to the floor)",
+                        "pass":  true,
+                        "detail":  "expected [120,null,null] got [120,null,null]"
+                    },
+                    {
+                        "name":  "G5 a line with no rows is all gap",
+                        "pass":  true,
+                        "detail":  "expected [null,null,null] got [null,null,null]"
+                    },
+                    {
+                        "name":  "G6 bars are untouched (0, not null)",
+                        "pass":  true,
+                        "detail":  "expected [120,0,0] got [120,0,0]"
+                    },
+                    {
+                        "name":  "G7 a complete series is unchanged",
+                        "pass":  true,
+                        "detail":  "expected [100,300,600] got [100,300,600]"
+                    },
+                    {
+                        "name":  "G8 pareto rescales against the last REAL point (100% at Jul, gaps after)",
+                        "pass":  true,
+                        "detail":  "[100,null,null]"
+                    },
+                    {
+                        "name":  "G9 a normal pareto line still ends at 100%",
+                        "pass":  true,
+                        "detail":  "[28.448275862068968,45.689655172413794,100]"
+                    },
+                    {
+                        "name":  "B1 a filled cell still formats ($)",
+                        "pass":  true,
+                        "detail":  "expected \"$120\" got \"$120\""
+                    },
+                    {
+                        "name":  "B2 an EMPTY money cell is blank, not $0",
+                        "pass":  true,
+                        "detail":  "expected \"\" got \"\""
+                    },
+                    {
+                        "name":  "B3 an EMPTY count cell is blank, not 0",
+                        "pass":  true,
+                        "detail":  "expected \"\" got \"\""
+                    },
+                    {
+                        "name":  "B4 an empty cell in a past year is blank too",
+                        "pass":  true,
+                        "detail":  "expected \"\" got \"\""
+                    },
+                    {
+                        "name":  "H1 control: the default pivot HAS a Grand Total column",
+                        "pass":  true,
+                        "detail":  "cells=11"
+                    },
+                    {
+                        "name":  "H2 an EMPTY override leaves no .pivot-grand-total cell anywhere",
+                        "pass":  true,
+                        "detail":  "expected 0 got 0"
+                    },
+                    {
+                        "name":  "H3 no header reads \"Grand Total\"",
+                        "pass":  true,
+                        "detail":  "MONTH▲▼|▶FY 2025|FY 2026|FY 2027|Amount▲▼|Awards▲▼|Amount▲▼|Awards▲▼|Amount▲▼|Awards▲▼"
+                    },
+                    {
+                        "name":  "H4 the footer ROW (column totals) stays",
+                        "pass":  true,
+                        "detail":  "Grand Total$6006$4404$1201"
+                    },
+                    {
+                        "name":  "H5 footer still totals FY 2025 amounts",
+                        "pass":  true,
+                        "detail":  "expected \"$100\" got \"$100\""
+                    },
+                    {
+                        "name":  "H6 body and header still line up",
+                        "pass":  true,
+                        "detail":  "body=7 header=6"
+                    },
+                    {
+                        "name":  "H7 7 body cells = MONTH + 3 FYs x 2 values, nothing on the right",
+                        "pass":  true,
+                        "detail":  "expected 7 got 7"
+                    },
+                    {
+                        "name":  "H8 null (no override) still renders the column",
+                        "pass":  true,
+                        "detail":  "11"
+                    },
+                    {
+                        "name":  "C1 override on the money value keeps $",
+                        "pass":  true,
+                        "detail":  "expected \"$330\" got \"$330\""
+                    },
+                    {
+                        "name":  "C2 override on the COUNT value has no $ (was $3)",
+                        "pass":  true,
+                        "detail":  "expected \"3\" got \"3\""
+                    },
+                    {
+                        "name":  "C3 override corner: the Amount slot",
+                        "pass":  true,
+                        "detail":  "expected \"$1,160\" got \"$1,160\""
+                    },
+                    {
+                        "name":  "C4 override corner: the Awards slot totals Awards (was 1,160)",
+                        "pass":  true,
+                        "detail":  "expected \"11\" got \"11\""
+                    },
+                    {
+                        "name":  "C5 column-total override corner: the Amount slot",
+                        "pass":  true,
+                        "detail":  "expected \"$1,160\" got \"$1,160\""
+                    },
+                    {
+                        "name":  "C6 column-total override corner: the Awards slot totals Awards (was 1,160)",
+                        "pass":  true,
+                        "detail":  "expected \"11\" got \"11\""
+                    },
+                    {
+                        "name":  "F1 the rule hides every -100.0% cell (two in the fixture)",
+                        "pass":  true,
+                        "detail":  "[{\"t\":\"10.0%\",\"hid\":false},{\"t\":\"9.1%\",\"hid\":false},{\"t\":\"-100.0%\",\"hid\":true},{\"t\":\"10.0%\",\"hid\":false},{\"t\":\"-100.0%\",\"hid\":true}]"
+                    },
+                    {
+                        "name":  "F2 ...and no other % cell",
+                        "pass":  true,
+                        "detail":  "[{\"t\":\"10.0%\",\"hid\":false},{\"t\":\"9.1%\",\"hid\":false},{\"t\":\"-100.0%\",\"hid\":true},{\"t\":\"10.0%\",\"hid\":false},{\"t\":\"-100.0%\",\"hid\":true}]"
+                    },
+                    {
+                        "name":  "D1 reached months compute as % Change (10.0%, 9.1%)",
+                        "pass":  true,
+                        "detail":  "expected [\"10.0%\",\"9.1%\"] got [\"10.0%\",\"9.1%\"]"
+                    },
+                    {
+                        "name":  "D2 FY 2026 Aug (no rows) is blank, not -100.0%",
+                        "pass":  true,
+                        "detail":  "expected \"\" got \"\""
+                    },
+                    {
+                        "name":  "D3 FY 2027 Sep (not reached) is blank, not -100.0%",
+                        "pass":  true,
+                        "detail":  "expected \"\" got \"\""
+                    },
+                    {
+                        "name":  "D4 Grand Total row compares like for like: FY 2026 10.0%, FY 2027 9.1%",
+                        "pass":  true,
+                        "detail":  "expected [\"10.0%\",\"9.1%\"] got [\"10.0%\",\"9.1%\"]"
+                    },
+                    {
+                        "name":  "D5 Grand Total column: Jul 20.0%, Sep blank",
+                        "pass":  true,
+                        "detail":  "expected [\"20.0%\",\"\"] got [\"20.0%\",\"\"]"
+                    },
+                    {
+                        "name":  "D6 corner: Jul vs Jul = 20.0%",
+                        "pass":  true,
+                        "detail":  "expected \"20.0%\" got \"20.0%\""
+                    },
+                    {
+                        "name":  "D7 regression: plain % Change still -100.0%, footer -26.7%",
+                        "pass":  true,
+                        "detail":  "expected [\"-100.0%\",\"-26.7%\"] got [\"-100.0%\",\"-26.7%\"]"
+                    },
+                    {
+                        "name":  "R1 FY 2027 runs $120, then Aug and Sep are blank (were $120)",
+                        "pass":  true,
+                        "detail":  "expected [\"$120\",\"\",\"\"] got [\"$120\",\"\",\"\"]"
+                    },
+                    {
+                        "name":  "R2 FY 2026 Aug still carries $110 (data resumes in Sep), Sep $440",
+                        "pass":  true,
+                        "detail":  "expected [\"$110\",\"$440\"] got [\"$110\",\"$440\"]"
+                    },
+                    {
+                        "name":  "R3 across: Aug blank after FY 2025, Jul runs to $330",
+                        "pass":  true,
+                        "detail":  "expected [\"\",\"\",\"$330\"] got [\"\",\"\",\"$330\"]"
+                    },
+                    {
+                        "name":  "R4 a Running Total ↓ Grand Total row is each year\u0027s final figure ($600, $440, $120)",
+                        "pass":  true,
+                        "detail":  "expected [\"$600\",\"$440\",\"$120\"] got [\"$600\",\"$440\",\"$120\"]"
+                    },
+                    {
+                        "name":  "R5 ...and a Running Count ↓ one each year\u0027s final count (3, 2, 1)",
+                        "pass":  true,
+                        "detail":  "expected [\"3\",\"2\",\"1\"] got [\"3\",\"2\",\"1\"]"
+                    },
+                    {
+                        "name":  "L1 every combo series \"values\":\"none\": no blank band above the chart",
+                        "pass":  true,
+                        "detail":  "expected 0 got 0"
+                    },
+                    {
+                        "name":  "L2 control: a series that inherits the chart\u0027s values still gets room",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "L3 a series that asks for labels gets room even with the chart\u0027s values off",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "W1 two 50% charts and the 15px gap fit a 1000px row",
+                        "pass":  true,
+                        "detail":  "expected [492,true] got [492,true]"
+                    },
+                    {
+                        "name":  "W2 three 33.33% charts and two gaps fit",
+                        "pass":  true,
+                        "detail":  "w33=323"
+                    },
+                    {
+                        "name":  "W3 100% keeps the whole row",
+                        "pass":  true,
+                        "detail":  "expected 1000 got 1000"
+                    },
+                    {
+                        "name":  "W4 no flex gap: 50% is exactly half, as before",
+                        "pass":  true,
+                        "detail":  "expected 500 got 500"
+                    },
+                    {
+                        "name":  "M1 flags: Amount, its Running Total, Awards, ITS Running Total",
+                        "pass":  true,
+                        "detail":  "expected [true,true,false,false] got [true,true,false,false]"
+                    },
+                    {
+                        "name":  "M2 mirror: a plain primary no longer strips a money Running Total of its $",
+                        "pass":  true,
+                        "detail":  "expected [false,false,true,true] got [false,false,true,true]"
+                    },
+                    {
+                        "name":  "M3 Change, YTD and prior year follow their base too",
+                        "pass":  true,
+                        "detail":  "expected [true,false,false,false,false] got [true,false,false,false,false]"
+                    },
+                    {
+                        "name":  "M4 guard: % and formula slots keep the old rule; no overrides = one flag for all",
+                        "pass":  true,
+                        "detail":  "expected [[true,false,true,true],[true,true],[false,false]] got [[true,false,true,true],[true,true],[false,false]]"
+                    },
+                    {
+                        "name":  "M5 the Running Total of Awards prints 6 and 4, not $6 and $4",
+                        "pass":  true,
+                        "detail":  "expected [\"6\",\"4\"] got [\"6\",\"4\"]"
+                    },
+                    {
+                        "name":  "M6 the Running Total of Amount keeps its $",
+                        "pass":  true,
+                        "detail":  "expected [\"$600\",\"$440\"] got [\"$600\",\"$440\"]"
+                    },
+                    {
+                        "name":  "M7 ...and the Grand Total row agrees",
+                        "pass":  true,
+                        "detail":  "expected [\"$600\",\"6\",\"$440\",\"4\"] got [\"$600\",\"6\",\"$440\",\"4\"]"
+                    },
+                    {
+                        "name":  "M8 the Grand Total column\u0027s Running Total of Awards has no $ (Sep and the corner)",
+                        "pass":  true,
+                        "detail":  "[[\"$630\",\"$120\",\"6\",\"1\"],[\"$1,160\",\"$1,160\",\"11\",\"11\"]]"
+                    },
+                    {
+                        "name":  "P1 ChgTD \u003e 5 matches Jul and Sep (FY 2026 +10.0% each)",
+                        "pass":  true,
+                        "detail":  "expected 2 got 2"
+                    },
+                    {
+                        "name":  "P2 ChgTD \u003c -50 matches nothing: FY 2027 Jul has no rows for the base, so it is blank, not -100%",
+                        "pass":  true,
+                        "detail":  "expected 0 got 0"
+                    },
+                    {
+                        "name":  "P3 guard: plain Chg \u003c -50 still matches Jul (FY 2027 -100.0%)",
+                        "pass":  true,
+                        "detail":  "expected 1 got 1"
+                    },
+                    {
+                        "name":  "A1 an auto bar and line with the same filter share one colour",
+                        "pass":  true,
+                        "detail":  "[\"#336699\",\"#ba0c00\",\"#336699\",\"#ba0c00\",\"#123456\"]"
+                    },
+                    {
+                        "name":  "A2 different filters get different colours",
+                        "pass":  true,
+                        "detail":  "[\"#336699\",\"#ba0c00\",\"#336699\",\"#ba0c00\",\"#123456\"]"
+                    },
+                    {
+                        "name":  "A3 the auto colours are the Palette\u0027s slots 0 and 1",
+                        "pass":  true,
+                        "detail":  "expected [\"#336699\",\"#ba0c00\"] got [\"#336699\",\"#ba0c00\"]"
+                    },
+                    {
+                        "name":  "A4 guard: a fixed colour is kept",
+                        "pass":  true,
+                        "detail":  "expected \"#123456\" got \"#123456\""
+                    },
+                    {
+                        "name":  "A5 under palette mono the auto series take mono\u0027s slots",
+                        "pass":  true,
+                        "detail":  "expected [\"#336699\",\"#b3eaff\"] got [\"#336699\",\"#b3eaff\"]"
+                    },
+                    {
+                        "name":  "A6 auto series with no filter get a slot each",
+                        "pass":  true,
+                        "detail":  "[\"#336699\",\"#ba0c00\"]"
+                    },
+                    {
+                        "name":  "A7 an auto butterfly takes the Palette\u0027s slots 0 and 1",
+                        "pass":  true,
+                        "detail":  "expected [\"rgba(51, 102, 153, 0.75)\",\"rgba(186, 12, 0, 0.75)\"] got [\"rgba(51, 102, 153, 0.75)\",\"rgba(186, 12, 0, 0.75)\"]"
+                    },
+                    {
+                        "name":  "A8 the chart builder stands up in the harness",
+                        "pass":  true,
+                        "detail":  "window.addComboSeriesRow missing"
+                    },
+                    {
+                        "name":  "A9 an untouched row and a saved \"auto\" save \"auto\"; a picked colour saves its hex",
+                        "pass":  true,
+                        "detail":  "expected [\"auto\",\"auto\",\"#123456\"] got [\"auto\",\"auto\",\"#123456\"]"
+                    },
+                    {
+                        "name":  "A10 both FY_AGO = 0 swatches show the colour the chart draws",
+                        "pass":  true,
+                        "detail":  "expected [\"#336699\",\"#336699\"] got [\"#336699\",\"#336699\"]"
+                    },
+                    {
+                        "name":  "A11 the corner arrow puts a fixed row back on the Palette (slot 1)",
+                        "pass":  true,
+                        "detail":  "expected [\"auto\",\"#ba0c00\"] got [\"auto\",\"#ba0c00\"]"
+                    },
+                    {
+                        "name":  "A12 a Palette change re-colours every auto swatch",
+                        "pass":  true,
+                        "detail":  "expected [\"#336699\",\"#336699\",\"#b3eaff\"] got [\"#336699\",\"#336699\",\"#b3eaff\"]"
+                    },
+                    {
+                        "name":  "A13 picking a colour by hand fixes that row only",
+                        "pass":  true,
+                        "detail":  "expected [\"#abcdef\",\"auto\",\"auto\"] got [\"#abcdef\",\"auto\",\"auto\"]"
+                    },
+                    {
+                        "name":  "K1 \"Amount\" (a label that is also the Values field) styles only the Amount columns",
+                        "pass":  true,
+                        "detail":  "expected [false,true,false,false,true,false,false,true,false,false,true,false,false] got [false,true,false,false,true,false,false,true,false,false,true,false,false]"
+                    },
+                    {
+                        "name":  "K2 ...and only the Amount cells of the Grand Total row",
+                        "pass":  true,
+                        "detail":  "expected [false,true,false,false,true,false,false,true,false,false,true,false,false] got [false,true,false,false,true,false,false,true,false,false,true,false,false]"
+                    },
+                    {
+                        "name":  "K3 guard: a Values-field target no aggregation is named after still styles every value cell",
+                        "pass":  true,
+                        "detail":  "expected [false,true,true,true,true,true,true,true,true,true,true,true,true] got [false,true,true,true,true,true,true,true,true,true,true,true,true]"
+                    },
+                    {
+                        "name":  "K4 two columns sharing the label \"%Δ\" are both styled",
+                        "pass":  true,
+                        "detail":  "expected [true,true,true,true,false,false] got [true,true,true,true,false,false]"
+                    },
+                    {
+                        "name":  "K5 format(header, Amount, \u0027border-left: ...; border-right: none\u0027) reaches every Amount header cell",
+                        "pass":  true,
+                        "detail":  "[\"border-left: 5px solid rgb(255, 0, 0); border-right-width: medium; border-right-style: none; border-right-color: currentcolor;\",\"border-left: 5px solid rgb(255, 0, 0); border-right-width: medium; border-right-style: none; border-right-color: currentcolor;\",\"border-left: 5px solid rgb(255, 0, 0); border-right-width: medium; border-right-style: none; border-right-color: currentcolor;\",\"border-left: 5px solid rgb(255, 0, 0); border-right-width: medium; border-right-style: none; border-right-color: currentcolor;\"]"
+                    },
+                    {
+                        "name":  "V1 Jul FY 2026: Amount %Δ +50% green, Count %Δ -50% red (were red / green)",
+                        "pass":  true,
+                        "detail":  "expected [\"g\",\"r\"] got [\"g\",\"r\"]"
+                    },
+                    {
+                        "name":  "V2 Aug FY 2026: Amount %Δ -50% red, Count %Δ +400% green",
+                        "pass":  true,
+                        "detail":  "expected [\"r\",\"g\"] got [\"r\",\"g\"]"
+                    },
+                    {
+                        "name":  "V3 a shared label named from another column reads the one on ITS base: Amount bold where Amount\u0027s %Δ \u003c 0, Count underlined where Count\u0027s is",
+                        "pass":  true,
+                        "detail":  "expected [\"-\",\"-B\",\"-U\",\"-\"] got [\"-\",\"-B\",\"-U\",\"-\"]"
+                    },
+                    {
+                        "name":  "V4 group summary rows too: Amount %Δ -16.7% red, Count %Δ +40.0% green, Amount bold",
+                        "pass":  true,
+                        "detail":  "expected [\"r\",\"g\",\"-B\"] got [\"r\",\"g\",\"-B\"]"
+                    },
+                    {
+                        "name":  "J1 the pivot is written in three places (a new writer must be checked here)",
+                        "pass":  true,
+                        "detail":  "expected 3 got 3"
+                    },
+                    {
+                        "name":  "J2 every writer re-applies format(header) rules",
+                        "pass":  true,
+                        "detail":  "[{\"line\":38476,\"reapplies\":true},{\"line\":45031,\"reapplies\":true},{\"line\":69361,\"reapplies\":true}]"
+                    },
+                    {
+                        "name":  "Q1 while a pivot is on screen the bridge lists its columns",
+                        "pass":  true,
+                        "detail":  "expected [\"Amount\",\"%Δ\",\"Count\"] got [\"Amount\",\"%Δ\",\"Count\"]"
+                    },
+                    {
+                        "name":  "Q2 inside format(cell, TARGET, ...): the pivot columns come FIRST",
+                        "pass":  true,
+                        "detail":  "expected [\"Amount (pivot)\",\"%Δ (pivot)\",\"Count (pivot)\"] got [\"Amount (pivot)\",\"%Δ (pivot)\",\"Count (pivot)\"]"
+                    },
+                    {
+                        "name":  "Q3 inside heatmap(pivot, ...) too",
+                        "pass":  true,
+                        "detail":  "expected [\"Amount (pivot)\",\"%Δ (pivot)\",\"Count (pivot)\"] got [\"Amount (pivot)\",\"%Δ (pivot)\",\"Count (pivot)\"]"
+                    },
+                    {
+                        "name":  "Q4 inside sum(): none (it reads the source rows)",
+                        "pass":  true,
+                        "detail":  "expected [] got []"
+                    },
+                    {
+                        "name":  "Q5 no pivot on screen: the bridge lists nothing and format() offers none",
+                        "pass":  true,
+                        "detail":  "expected [[],[]] got [[],[]]"
+                    },
+                    {
+                        "name":  "U0 builder repopulated: two aggregation rows",
+                        "pass":  true,
+                        "detail":  "expected 2 got 2"
+                    },
+                    {
+                        "name":  "U1 ticking Override prefills one chip per value",
+                        "pass":  true,
+                        "detail":  "expected 2 got 2"
+                    },
+                    {
+                        "name":  "U2 the prefilled set is pristine",
+                        "pass":  true,
+                        "detail":  "expected \"1\" got \"1\""
+                    },
+                    {
+                        "name":  "U3 pristine = NO override (tokens null)",
+                        "pass":  true,
+                        "detail":  "expected null got null"
+                    },
+                    {
+                        "name":  "U4 pristine writes RowTotals none (trimmed away)",
+                        "pass":  true,
+                        "detail":  "expected true got true"
+                    },
+                    {
+                        "name":  "U5 every box has an x",
+                        "pass":  true,
+                        "detail":  "expected 2 got 2"
+                    },
+                    {
+                        "name":  "U6 x on the Awards box: only the Amount total remains",
+                        "pass":  true,
+                        "detail":  "expected [\"sum\"] got [\"sum\"]"
+                    },
+                    {
+                        "name":  "U7 ...tied to value 0",
+                        "pass":  true,
+                        "detail":  "expected [0] got [0]"
+                    },
+                    {
+                        "name":  "U8 the cleared box says so",
+                        "pass":  true,
+                        "detail":  "Awards (AWARDS)+ AddSumCountAverageMax×Removed from the Grand Total column by your override"
+                    },
+                    {
+                        "name":  "U9 no longer pristine",
+                        "pass":  true,
+                        "detail":  "expected undefined got undefined"
+                    },
+                    {
+                        "name":  "U10 trigger writes the one remaining total with its label",
+                        "pass":  true,
+                        "detail":  "expected \"sum:Amount@0\" got \"sum:Amount@0\""
+                    },
+                    {
+                        "name":  "U11 every box cleared = [] (no Grand Total column)",
+                        "pass":  true,
+                        "detail":  "expected [] got []"
+                    },
+                    {
+                        "name":  "U12 ...and the trigger writes hide",
+                        "pass":  true,
+                        "detail":  "expected \"hide\" got \"hide\""
+                    },
+                    {
+                        "name":  "U13 + Add brings a value back",
+                        "pass":  true,
+                        "detail":  "expected [\"sum\"] got [\"sum\"]"
+                    },
+                    {
+                        "name":  "U14 ...tied to the box it was added in",
+                        "pass":  true,
+                        "detail":  "expected [1] got [1]"
+                    },
+                    {
+                        "name":  "U15 chip x on the last chip = [] again",
+                        "pass":  true,
+                        "detail":  "expected [] got []"
+                    },
+                    {
+                        "name":  "U16 re-ticking an emptied override starts from pristine defaults",
+                        "pass":  true,
+                        "detail":  "expected null got null"
+                    },
+                    {
+                        "name":  "U17 ...with both chips back",
+                        "pass":  true,
+                        "detail":  "expected 2 got 2"
+                    },
+                    {
+                        "name":  "U18 parsing RowTotals hide ticks Override",
+                        "pass":  true,
+                        "detail":  "expected true got true"
+                    },
+                    {
+                        "name":  "U19 ...with the value boxes present and empty",
+                        "pass":  true,
+                        "detail":  "expected [2,0] got [2,0]"
+                    },
+                    {
+                        "name":  "U20 ...so the builder reads [] back",
+                        "pass":  true,
+                        "detail":  "expected [] got []"
+                    },
+                    {
+                        "name":  "U21 ...and writes hide again (round trip)",
+                        "pass":  true,
+                        "detail":  "expected \"hide\" got \"hide\""
+                    },
+                    {
+                        "name":  "U22 saved [] reopens with Override ticked",
+                        "pass":  true,
+                        "detail":  "expected true got true"
+                    },
+                    {
+                        "name":  "U23 ...and reads [] back",
+                        "pass":  true,
+                        "detail":  "expected [] got []"
+                    },
+                    {
+                        "name":  "U24 a saved override repopulates exactly (not pristine)",
+                        "pass":  true,
+                        "detail":  "expected [[\"avg\",\"count\"],[0,1],null] got [[\"avg\",\"count\"],[0,1],null]"
+                    },
+                    {
+                        "name":  "S1 toggle hover armor rule exists at (0,4,0)",
+                        "pass":  true,
+                        "detail":  "rule not found"
+                    },
+                    {
+                        "name":  "S2 ...and keeps the switch transparent",
+                        "pass":  true,
+                        "detail":  ".pnb-toggle .pnb-toggle-btn:hover:not(:disabled),\n.pnb-toggle .pnb-toggle-btn:active:not(:disabled) {\n    background: transparent;\n    background-color: transparent;\n    border: 0;\n    box-shadow: none;\n    color: var(--text-main, #222);\n"
+                    },
+                    {
+                        "name":  "S3 the wolfpack blanket it must beat is (0,3,1)",
+                        "pass":  true,
+                        "detail":  "blanket moved?"
+                    },
+                    {
+                        "name":  "S4 box-x rule is ID-scoped (beats the button blankets)",
+                        "pass":  true,
+                        "detail":  "rule not found"
+                    },
+                    {
+                        "name":  "S5 an emptied row-total box shows its hint (beats the blanket display:none)",
+                        "pass":  true,
+                        "detail":  "rule not found"
+                    }
+                ]
+}

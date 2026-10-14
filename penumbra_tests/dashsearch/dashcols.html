@@ -1,0 +1,162 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="main.css"><link rel="stylesheet" href="penumbra_tiles.css"><link rel="stylesheet" href="penumbra_dashboard.css">
+</head><body class="pnb-dash theme-wolfpack-dark is-dark">
+<!-- The column ENVELOPE (2026-09-30): index.php's ?json=1 carries the report's
+     column list even when the filter leaves it no rows, and the dashboard reads
+     it. Opened with ?search=NAME Zed - a short form whose column only repB has,
+     and whose fetch gives repB NO rows (no NAME contains "Zed"): before the
+     envelope, no tile could ever say NAME is a column, so every tile searched
+     its cells for the words and showed 0 rows for good. Now repB's rowless
+     answer names its columns, NAME resolves, and the repA tiles are sent the
+     routed list: every row back, and the reason in the note. Same scaffolding
+     as dashlead.html; no repB frame, so nothing but the envelope can name NAME. -->
+<div id="dashApp" class="dash-app"><header class="dash-head" id="dashHead">
+  <div class="dash-head-title" id="dashHeadTitle"></div>
+  <div class="dash-head-actions" id="dashHeadActions"></div>
+</header><main id="dashMain"></main></div>
+<pre id="out">running</pre>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="chart-4.5.1.min.js"></script>
+<script>
+var CALLS = [], ERRORS = [], REPLACED = [];
+window.onerror = function (m, src, line) { ERRORS.push('onerror: ' + m + ' @' + String(src).split('/').pop() + ':' + line); };
+history.replaceState = function (s, t, u) { REPLACED.push(String(u)); };
+
+var REP = {
+  repA: [ { COLLEGE: 'Eng', AMOUNT: '10', STATUS: 'Open' }, { COLLEGE: 'Sci', AMOUNT: '20', STATUS: 'Open' },
+          { COLLEGE: 'Eng', AMOUNT: '3', STATUS: 'Closed' }, { COLLEGE: 'Ag', AMOUNT: '200', STATUS: 'Closed' } ],
+  repB: [ { NAME: 'Ada', AMOUNT: '7' }, { NAME: 'Bob', AMOUNT: '2' }, { NAME: 'Cy', AMOUNT: '150' } ]
+};
+function cond(row, part) {
+  var m = part.match(/^\s*(\w+)\s*(=|>|<)\s*(.+?)\s*$/);
+  if (!m) {
+    var b = part.match(/^\s*(\w+)\s+(\S+)\s*$/);
+    if (b && row[b[1].toUpperCase()] !== undefined) { return String(row[b[1].toUpperCase()]).toLowerCase().indexOf(b[2].toLowerCase()) > -1; }
+    var needle = part.trim().toLowerCase();
+    return Object.keys(row).some(function (k) { return String(row[k]).toLowerCase().indexOf(needle) > -1; });
+  }
+  var v = row[m[1].toUpperCase()];
+  if (v === undefined) { return false; }
+  if (m[2] === '=') { return String(v).toLowerCase() === m[3].toLowerCase(); }
+  var a = parseFloat(v), b2 = parseFloat(m[3]);
+  return m[2] === '>' ? a > b2 : a < b2;
+}
+function filt(rows, text) {
+  if (!text) { return rows; }
+  var ors = text.split(/\s+or\s+/i).map(function (s) { return s.split(/\s+and\s+/i); });
+  return rows.filter(function (r) { return ors.some(function (ands) { return ands.every(function (p) { return cond(r, p); }); }); });
+}
+function routeStub(ds, cols) {
+  var spec = JSON.parse(ds), keep = [], skipped = [];
+  spec.f.forEach(function (fr) {
+    var c = String(fr[0] || '').toUpperCase();
+    if (!c || cols.indexOf(c) > -1) { keep.push(fr[1]); } else if (skipped.indexOf(c) < 0) { skipped.push(c); }
+  });
+  return { text: keep.length ? (spec.p || '') + keep.join(' and ') : '', skipped: skipped };
+}
+// The server: index.php's envelope names the columns BEFORE the search steps
+// (columns + '#'), whatever the filter leaves.
+$.getJSON = function (url, params) {
+  params = params || {};
+  CALLS.push({ url: url, p: $.extend({}, params) });
+  var d = $.Deferred();
+  setTimeout(function () {
+    if (url === 'index.php') {
+      var rows = REP[params.id];
+      if (!rows) { d.resolve({ data: [{ ERROR: 'Report Not Found (ID: ' + params.id + ')' }] }); return; }
+      var resp = { columns: Object.keys(rows[0]).concat(['#']) };
+      if (params.search) { rows = filt(rows, params.search); }
+      if (params.dsearch) {
+        var r = routeStub(params.dsearch, Object.keys(REP[params.id][0]));
+        rows = filt(rows, r.text);
+        resp.search_skipped = r.skipped;
+      }
+      if (params.limit && rows.length > params.limit) { resp.total_rows = rows.length; rows = rows.slice(0, params.limit); }
+      resp.data = rows;
+      d.resolve(resp);
+    } else if (url === 'manage_dashboard.php') {
+      d.resolve({ status: 'success', data: [] });
+    } else { d.reject({ status: 404 }); }
+  }, 10);
+  return d.promise();
+};
+$.ajax = function () { var d = $.Deferred(); d.resolve({ status: 'success' }); return d.promise(); };
+
+const penumbra_dash_vars = {
+  currentUserKey: 'tester', isAdmin: true, canCreate: true, reportGrantPatterns: [],
+  shortId: 'demo', found: true, canEdit: true,
+  urlSearchOverride: '?fy=2026&search=NAME%20Zed',
+  shibboleth: { name: 'Ada', fname: 'Ada' },
+  meta: { short_id: 'demo', title: 'Columns demo', owner_id: 'tester', authorized: 'tester', updated_at: '' },
+  state: { version: 1, theme: 'theme-default', refreshSeconds: 0, tiles: [
+    { id: 'd1', type: 'stat',  report: 'repA', label: 'A total', agg: 'sum', column: 'AMOUNT', format: 'number', w: 4, h: 1, source: 'live' },
+    { id: 'd2', type: 'table', report: 'repB', label: 'People', columns: ['NAME', 'AMOUNT'], rows: 5, w: 4, h: 2, source: 'live' },
+    { id: 'd7', type: 'note',  label: '', text: 'a note', w: 4, h: 1 },
+    // repB is read by DATA tiles only: a framed repB page would name NAME itself,
+    // so here only repB's rowless envelope can (what this page proves).
+    { id: 'e1', type: 'embed', report: 'repA', label: 'A table', show: 'table', w: 6, h: 3, autoHeight: false }
+  ] },
+  themes: [{ id: 'theme-default', label: 'Default Light', isDark: false }]
+};
+</script>
+<script src="purify.min.js"></script><script src="penumbra_tiles.js"></script>
+<script>
+(function () {
+  var real = PenumbraTiles.embedUrl;
+  PenumbraTiles.embedUrl = function (spec, opts) { return String(real.call(PenumbraTiles, spec, opts)).replace(/^index\.php\?/, 'stub.html?'); };
+})();
+</script>
+<script src="dash.js"></script>
+<script>
+var L = [];
+function ok(n, c, x) { L.push((c ? 'PASS ' : 'FAIL ') + n + (x !== undefined && !c ? '  [' + x + ']' : '')); }
+function eq(n, got, want) { ok(n, JSON.stringify(got) === JSON.stringify(want), 'got ' + JSON.stringify(got) + ' want ' + JSON.stringify(want)); }
+function tile(id) { return $('.dash-tile[data-tile-id="' + id + '"]'); }
+function frame(id) { return tile(id).find('iframe.dash-embed')[0] || null; }
+function fwin(id) { var f = frame(id); try { return f ? f.contentWindow : null; } catch (e) { return null; } }
+function booted(id) { var w = fwin(id); try { return !!(w && w.__boot); } catch (e) { return false; } }
+function stat(id) { return tile(id).find('.dash-stat-value').text(); }
+function calls(id) { return CALLS.filter(function (c) { return c.url === 'index.php' && c.p.id === id; }).map(function (c) { return c.p; }); }
+function lastCall(id) { var c = calls(id); return c.length ? c[c.length - 1] : null; }
+function search(id) { try { return fwin(id).document.getElementById('tableSearch').value; } catch (e) { return 'x'; } }
+function note() { return $('#dashFilterNote').text(); }
+function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+function until(fn, ms) {
+  var t0 = Date.now();
+  return new Promise(function (res) {
+    (function poll() { var v = false; try { v = fn(); } catch (e) { } if (v || Date.now() - t0 > ms) { res(!!v); } else { setTimeout(poll, 100); } })();
+  });
+}
+function publish() {
+  var A = 'RES' + 'ULT>>', B = '<' + '<FIN';
+  document.getElementById('out').textContent = A + L.join(' ;; ') + B;
+}
+var DS0 = '{"p":"","f":[["","NAME Zed"]]}';
+var DS1 = '{"p":"","f":[["NAME","NAME Zed"]]}';
+
+setTimeout(function () { window.scrollTo(0, document.body.scrollHeight); }, 250);
+setTimeout(function () { window.scrollTo(0, 0); }, 600);
+
+until(function () { return ['e1'].every(booted) && stat('d1') !== ''; }, 9000).then(function (ready) {
+  ok('every frame and data tile loaded', ready, ['e1'].map(function (id) { return id + ':' + booted(id); }).join(' ') + ' d1=' + stat('d1'));
+  eq('the box shows the filter from the address', $('#dashSearchInput').val(), 'NAME Zed');
+  var firstA = calls('repA')[0] || null, firstB = calls('repB')[0] || null;
+  ok('at load the short form went out as a global term to both reports', !!firstA && firstA.dsearch === DS0 && !!firstB && firstB.dsearch === DS0, JSON.stringify([firstA, firstB]));
+  // repB answered with NO rows - only its envelope can say it has NAME.
+  return until(function () { return stat('d1') === '233' && search('e1') === ''; }, 6000);
+}).then(function (moved) {
+  ok('a rowless answer still names its columns: NAME resolved and the report without it was sent the routed list', moved && (lastCall('repA') || {}).dsearch === DS1, JSON.stringify(calls('repA')));
+  eq('the report without NAME shows every row again', stat('d1'), '233');
+  ok('the report with NAME keeps the (empty) result, unmarked', tile('d2').find('tbody tr').length === 0 && tile('d2').find('.dash-nofilter-badge').length === 0, tile('d2').find('tbody').text());
+  ok('the note names the tiles without NAME', note().indexOf('A total (its report has no NAME column)') > -1 && note().indexOf('A table (its report has no NAME column)') > -1 && note().indexOf('People') === -1, note());
+  eq('the framed report without NAME is left out', search('e1'), '');
+  var cols = [];
+  try { cols = window._penumbraSearchAPI.getColumns().map(function (c) { return c.name; }); } catch (e) { cols = ['threw ' + e.message]; }
+  ok('the builder lists the rowless report\'s columns from the envelope', cols.indexOf('NAME') > -1 && cols.indexOf('COLLEGE') > -1, cols.join(','));
+  ok('no exception escaped', ERRORS.length === 0, ERRORS.join(' | '));
+  publish();
+}).catch(function (e) {
+  L.push('HARNESS_ERROR: ' + (e && e.message ? e.message : e) + ' @ ' + String(e && e.stack || '').split('\n')[1]);
+  publish();
+});
+</script></body></html>

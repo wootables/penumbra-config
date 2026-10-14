@@ -1,0 +1,210 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>chart distinct count</title></head>
+<body>
+<!-- CHART DISTINCT COUNT (2026-10-06). Every chart path's "Distinct Count" counts
+     the column's own NON-BLANK TEXT - the pivot's rule (`valStr.trim() !== ''`) -
+     and an X value a series has NO rows for counts 0, not 1. Same minimal boot as
+     ..\fyreports\harness.html; run.ps1 patches main.js with the hooks. -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<table id="resultsTable"><thead id="tableHeader"><tr>
+  <th data-colname="#">#</th><th data-colname="CAT">CAT</th><th data-colname="GRP">GRP</th><th data-colname="ID">ID</th>
+  <th data-colname="NUM">NUM</th><th data-colname="ST">ST</th><th data-colname="STAGE">STAGE</th>
+</tr></thead><tbody></tbody></table>
+<div id="errorBox"></div>
+<input id="tableSearch" value="">
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  window.alert = function () {}; window.confirm = function () { return true; };
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+</script>
+<script src="main_patched.js"></script>
+<script>
+(function () {
+  function report(txt) { document.getElementById('out').textContent = txt; }
+  var results = [];
+  function assert(name, cond, detail) { results.push({ name: name, pass: !!cond, detail: detail === undefined ? '' : String(detail) }); }
+  function eq(name, got, want) { var g = JSON.stringify(got), w = JSON.stringify(want); assert(name, g === w, 'got ' + g + ' | want ' + w); }
+  function section(tag, fn) {
+    try { fn(); } catch (e) { assert(tag + ' section ran to the end', false, String(e) + ' ' + String(e.stack || '').split('\n').slice(1, 3).join(' | ')); }
+  }
+  function M(o) { var m = new Map(); Object.keys(o).forEach(function (k) { m.set(k, o[k]); }); return m; }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  // ID: text ids with a DUPLICATE (X-1 twice in A), a BLANK (row 4) and a
+  // whitespace-only value (row 6) - neither blank counts, as in the pivot.
+  // Expected distinct ID by CAT: A {X-1, X-2} = 2, B {X-3} = 1, C {X-4, X-5} = 2.
+  function r(cat, grp, id, num, st, stage) { return M({ CAT: cat, GRP: grp, ID: id, NUM: num, ST: st, STAGE: stage }); }
+  var ROWS = [
+    r('A', 'G1', 'X-1', '5', 'NC', 'Applied'),
+    r('A', 'G1', 'X-1', '5', 'NC', 'Applied'),
+    r('A', 'G2', 'X-2', '7', 'VA', 'Applied'),
+    r('A', 'G2', '', '7', 'VA', 'Interviewed'),
+    r('B', 'G1', 'X-3', '1', 'NC', 'Interviewed'),
+    r('B', 'G1', '  ', '2', 'NC', 'Hired'),
+    r('C', 'G2', 'X-4', '3', 'VA', 'Hired'),
+    r('C', 'G2', 'X-5', '3', 'VA', 'Hired'),
+    r('C', 'G2', 'X-4', '4', 'VA', 'Interviewed')
+  ];
+  // generateChartDataFromMaps(rows, x, y, groupBy, agg, limit, type, sortBy, sortDir, stackOrder, normalize, otherBucket, comboSeries, funnelMode, extras)
+  function cd(x, y, g, agg, type, opts) {
+    opts = opts || {};
+    return window.__CD.chartData(opts.rows || ROWS, x, y, g || 'none', agg, opts.limit || 10, type, opts.sortBy || 'label', opts.sortDir || 'asc', 'default',
+      false, !!opts.other, opts.series ? clone(opts.series) : null, opts.funnel || '', opts.extras || {});
+  }
+  function rowsOf(d) { return (d && d._a11yRows && d._a11yRows.rows) ? d._a11yRows.rows : []; }
+
+  async function run() {
+    var F = window.__CD;
+    if (!F || typeof F.chartData !== 'function') {
+      report('RESULTS_JSON:' + JSON.stringify({ fatal: 'hooks unavailable: ' + (window.__CD_ERR || 'n/a'), pageErrors: window.__errors.slice(0, 6) }));
+      return;
+    }
+    try { await F.loadChartModule(); } catch (e) { assert('L0 chart module loads', false, String(e)); }
+    assert('L1 the chart module is up (map, gauge and funnel helpers live there)', !!(window.PenumbraCharts && window.PenumbraCharts.armed), typeof window.PenumbraCharts);
+
+    // ---------------- G: the generic path (bar, line, pie, radar ...) ------------------
+    section('G', function () {
+      var d = cd('CAT', 'ID', 'none', 'distinct', 'bar');
+      eq('G1 bar: Distinct Count of a TEXT id by category counts the ids (dup once, blanks never)', [d.labels, d.datasets[0].data], [['A', 'B', 'C'], [2, 1, 2]]);
+      var p = cd('CAT', 'ID', 'none', 'distinct', 'pie');
+      eq('G2 pie takes the same path', p.datasets[0].data, [2, 1, 2]);
+      var g = cd('CAT', 'ID', 'GRP', 'distinct', 'bar');
+      var byGroup = {};
+      g.datasets.forEach(function (ds) { byGroup[ds.label] = ds.data; });
+      eq('G3 grouped bar (Group By GRP): each category x group counts its own ids', [g.labels, byGroup.G1, byGroup.G2], [['A', 'B', 'C'], [1, 1, 0], [1, 0, 2]]);
+      var n = cd('CAT', 'NUM', 'none', 'distinct', 'bar');
+      eq('G4 guard: a NUMERIC column still counts distinct values (5,5,7,7 = 2)', n.datasets[0].data, [2, 2, 2]);
+      var c = cd('CAT', 'ID', 'none', 'count', 'bar');
+      eq('G5 guard: Count is untouched (rows, blanks included)', c.datasets[0].data, [4, 2, 3]);
+      var s = cd('CAT', 'NUM', 'none', 'sum', 'bar');
+      eq('G6 guard: Sum is untouched', s.datasets[0].data, [24, 3, 10]);
+    });
+
+    // ---------------- B: butterfly, both formats -------------------------------------
+    section('B', function () {
+      var series = [
+        { col: 'ID', type: 'bar', agg: 'distinct', color: '#111111', filterExpression: 'GRP = G1' },
+        { col: 'ID', type: 'bar', agg: 'distinct', color: '#222222', filterExpression: 'GRP = G2' }
+      ];
+      var b = cd('CAT', 'none', 'none', 'distinct', 'butterfly', { series: series });
+      var L = b.datasets[0].data.map(function (v) { return Math.abs(v); }), R = b.datasets[1].data;
+      eq('B1 butterfly sides count distinct text ids (G1: A 1, B 1 - the "  " is blank; G2: A 1, C 2)', [b.labels, L.slice(0, 2), R[0], R[2]], [['A', 'B', 'C'], [1, 1], 1, 2]);
+      eq('B2 a label one side has NO rows for counts 0 there, not 1 (G1 has no C, G2 no B)', [L[2], R[1]], [0, 0]);
+      var cnt = [
+        { col: 'ID', type: 'bar', agg: 'count', color: '#111111', filterExpression: 'GRP = G1' },
+        { col: 'ID', type: 'bar', agg: 'count', color: '#222222', filterExpression: 'GRP = G2' }
+      ];
+      var bo = cd('CAT', 'none', 'none', 'count', 'butterfly', { series: cnt, limit: 2, other: true });
+      eq('B3 butterfly Other bucket: a tail label with no rows on a side adds nothing (Count G1 Other = 0)',
+        [bo.labels, Math.abs(bo.datasets[0].data[2]), bo.datasets[1].data[2]], [['A', 'B', 'Other'], 0, 3]);
+      var og = cd('CAT', 'ID', 'GRP', 'distinct', 'butterfly');
+      var gv = {};
+      og.datasets.forEach(function (ds) { gv[ds.label] = ds.data.map(function (v) { return Math.abs(v); }); });
+      eq('B4 older butterfly (Group By, two groups) counts distinct text ids', [og.labels, gv.G1, gv.G2], [['A', 'B', 'C'], [1, 1, 0], [1, 0, 2]]);
+    });
+
+    // ---------------- C: combo -------------------------------------------------------
+    section('C', function () {
+      var series = [
+        { col: 'ID', type: 'bar', agg: 'distinct', color: '#111111', filterExpression: 'GRP = G1' },
+        { col: 'ID', type: 'bar', agg: 'count', color: '#222222', filterExpression: 'GRP = G2' },
+        { col: 'ID', type: 'bar', agg: 'running_count', color: '#333333', filterExpression: 'GRP = G2' },
+        { col: 'ID', type: 'bar', agg: 'distinct', color: '#444444', filterExpression: 'GRP = G2' }
+      ];
+      var c = cd('CAT', 'none', 'none', 'sum', 'combo', { series: series });
+      eq('C1 combo Distinct skips a whitespace-only id (G1 by CAT: A {X-1} 1, B {X-3} 1)', c.datasets[0].data.slice(0, 2), [1, 1]);
+      eq('C2 a category a series has NO rows for counts 0: Count, Running Count, Distinct (G2 has no B)',
+        [c.datasets[1].data, c.datasets[2].data, c.datasets[3].data], [[2, 0, 3], [2, 2, 5], [1, 0, 2]]);
+      var co = cd('CAT', 'none', 'none', 'sum', 'combo', { limit: 2, other: true,
+        series: [{ col: 'ID', type: 'bar', agg: 'count', color: '#111111', filterExpression: 'GRP = G1' },
+                 { col: 'ID', type: 'bar', agg: 'sum', color: '#222222' }] });
+      eq('C3 combo Other bucket with no rows for a series counts 0 (G1 has no C)', [co.labels, co.datasets[0].data], [['A', 'B', 'Other'], [2, 2, 0]]);
+      // The categories are scored by the SUM of every series, so the second series
+      // matches no row and adds nothing: the order is the distinct count's alone.
+      // Counting blanks would make it A 3, B 2, C 2 -> A, B, C.
+      var cs = cd('CAT', 'none', 'none', 'sum', 'combo', { sortBy: 'value', sortDir: 'desc',
+        series: [{ col: 'ID', type: 'bar', agg: 'distinct', color: '#111111' },
+                 { col: 'NUM', type: 'line', agg: 'sum', color: '#222222', filterExpression: 'GRP = NONE' }] });
+      eq('C4 sort by a distinct count of text, blanks not counted: A 2, C 2, B 1', [cs.labels, cs.datasets[0].data], [['A', 'C', 'B'], [2, 2, 1]]);
+    });
+
+    // ---------------- T M U F W A: the other types --------------------------------
+    section('T', function () {
+      var t = cd('CAT', 'ID', 'none', 'distinct', 'treemap');
+      var tv = {}; rowsOf(t).forEach(function (row) { tv[row[0]] = row[1]; });
+      eq('T1 treemap: blanks and whitespace are not distinct values (A 2, B 1, C 2)', [tv.A, tv.B, tv.C], [2, 1, 2]);
+    });
+    section('M', function () {
+      var m = cd('ST', 'ID', 'none', 'distinct', 'map', { extras: { vizOptions: '{"map":"us-grid"}' } });
+      var vals = rowsOf(m).map(function (row) { return row[1]; }).filter(function (v) { return v != null; }).sort();
+      eq('M1 map: distinct ids per state (NC {X-1, X-3} 2, VA {X-2, X-4, X-5} 3) - it used to SUM', vals, [2, 3]);
+    });
+    section('U', function () {
+      var u = cd('CAT', 'ID', 'none', 'distinct', 'bullet');
+      eq('U1 bullet: distinct ids per category - it used to SUM', u._bulletValues, [2, 1, 2]);
+    });
+    section('F', function () {
+      var f = cd('STAGE', 'ID', 'none', 'distinct', 'funnel', { funnel: 'conversion', sortBy: 'value', sortDir: 'desc' });
+      var fv = {}; (f.labels || []).forEach(function (l, i) { fv[l] = f._funnelValues[i]; });
+      eq('F1 funnel: distinct ids per stage (Applied 2, Interviewed 2, Hired 2) - it used to SUM', [fv.Applied, fv.Interviewed, fv.Hired], [2, 2, 2]);
+    });
+    section('W', function () {
+      var w = cd('CAT', 'ID', 'none', 'distinct', 'waterfall');
+      var wv = {}; rowsOf(w).forEach(function (row) { wv[row[0]] = row[1]; });
+      eq('W1 waterfall: distinct ids per step - it used to SUM', [wv.A, wv.B, wv.C], [2, 1, 2]);
+    });
+    section('A', function () {
+      var a = cd('none', 'ID', 'none', 'distinct', 'gauge');
+      eq('A1 gauge: distinct ids overall (X-1..X-5 = 5) - it used to SUM', a._gaugeValue, 5);
+      var a2 = cd('none', 'NUM', 'none', 'sum', 'gauge');
+      eq('A2 guard: a gauge Sum is untouched', a2._gaugeValue, 37);
+    });
+
+    report('RESULTS_JSON:' + JSON.stringify({ pageErrors: window.__errors.slice(0, 8), results: results }));
+  }
+
+  var tries = 0;
+  (function wait() {
+    tries++;
+    if (window.__CD || tries > 60) {
+      setTimeout(function () {
+        run().catch(function (e) { report('RESULTS_JSON:' + JSON.stringify({ fatal: 'run threw: ' + e, pageErrors: window.__errors.slice(0, 6) })); });
+      }, 300);
+    } else { setTimeout(wait, 100); }
+  })();
+})();
+</script>
+</body></html>

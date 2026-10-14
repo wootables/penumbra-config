@@ -1,0 +1,1697 @@
+{
+    "pageErrors":  [
+
+                   ],
+    "results":  [
+                    {
+                        "name":  "1 level: two top-level groups",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "1 level: every wrapper is a leaf",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "1 level: no branch wrappers",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "1 level: no nested wrappers at all",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "1 level: Eng holds 3 rows",
+                        "pass":  true,
+                        "detail":  "got 3 want 3"
+                    },
+                    {
+                        "name":  "1 level: Sci holds 3 rows",
+                        "pass":  true,
+                        "detail":  "got 3 want 3"
+                    },
+                    {
+                        "name":  "1 level: every source row appears exactly once",
+                        "pass":  true,
+                        "detail":  "got 6 want 6"
+                    },
+                    {
+                        "name":  "1 level: depth is 0",
+                        "pass":  true,
+                        "detail":  "got \"0\" want \"0\""
+                    },
+                    {
+                        "name":  "1 level: path is the bare label",
+                        "pass":  true,
+                        "detail":  "got \"Eng\" want \"Eng\""
+                    },
+                    {
+                        "name":  "1 level: count pill is the row count",
+                        "pass":  true,
+                        "detail":  "got \"3\" want \"3\""
+                    },
+                    {
+                        "name":  "1 level: data-group-col names the level column",
+                        "pass":  true,
+                        "detail":  "got \"COLLEGE\" want \"COLLEGE\""
+                    },
+                    {
+                        "name":  "1 level: label sort puts Eng before Sci",
+                        "pass":  true,
+                        "detail":  "got \"Eng\" want \"Eng\""
+                    },
+                    {
+                        "name":  "2 levels: still two top-level groups",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "2 levels: top level is a BRANCH",
+                        "pass":  true,
+                        "detail":  "got true want true"
+                    },
+                    {
+                        "name":  "2 levels: a branch owns no table of its own",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "2 levels: Eng splits into 2 departments",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "2 levels: Sci splits into 2 departments",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "2 levels: ECE holds 2 rows",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "2 levels: ME holds 1 row",
+                        "pass":  true,
+                        "detail":  "got 1 want 1"
+                    },
+                    {
+                        "name":  "2 levels: CHEM holds 1 row",
+                        "pass":  true,
+                        "detail":  "got 1 want 1"
+                    },
+                    {
+                        "name":  "2 levels: no row duplicated or dropped",
+                        "pass":  true,
+                        "detail":  "got 6 want 6"
+                    },
+                    {
+                        "name":  "2 levels: child is a leaf",
+                        "pass":  true,
+                        "detail":  "got true want true"
+                    },
+                    {
+                        "name":  "2 levels: child depth is 1",
+                        "pass":  true,
+                        "detail":  "got \"1\" want \"1\""
+                    },
+                    {
+                        "name":  "2 levels: child path carries its ancestor",
+                        "pass":  true,
+                        "detail":  "got \"Eng|||ECE\" want \"Eng|||ECE\""
+                    },
+                    {
+                        "name":  "2 levels: child data-group-col is the CHILD column",
+                        "pass":  true,
+                        "detail":  "got \"DEPT\" want \"DEPT\""
+                    },
+                    {
+                        "name":  "2 levels: branch count pill totals its children",
+                        "pass":  true,
+                        "detail":  "got \"3\" want \"3\""
+                    },
+                    {
+                        "name":  "2 levels: sub-groups sort by label",
+                        "pass":  true,
+                        "detail":  "got \"BIO\" want \"BIO\""
+                    },
+                    {
+                        "name":  "2 levels: same label under different parents gets distinct paths",
+                        "pass":  true,
+                        "detail":  "Eng|||ECE vs Sci|||BIO"
+                    },
+                    {
+                        "name":  "3 levels: two top-level groups",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "3 levels: Eng spans FY24 and FY25",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "3 levels: fiscal years are chronological",
+                        "pass":  true,
+                        "detail":  "got \"FY24\" want \"FY24\""
+                    },
+                    {
+                        "name":  "3 levels: FY24 under Eng holds 2 rows across its leaves",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "3 levels: FY25 under Eng holds 1 row",
+                        "pass":  true,
+                        "detail":  "got 1 want 1"
+                    },
+                    {
+                        "name":  "3 levels: Sci spans FY25 and FY26",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "3 levels: Sci fiscal years are chronological",
+                        "pass":  true,
+                        "detail":  "got \"FY25/FY26\" want \"FY25/FY26\""
+                    },
+                    {
+                        "name":  "3 levels: bucketed level names its TOKEN as the column",
+                        "pass":  true,
+                        "detail":  "got \"AWARD_DATE:fy\" want \"AWARD_DATE:fy\""
+                    },
+                    {
+                        "name":  "3 levels: deepest node is a leaf",
+                        "pass":  true,
+                        "detail":  "got true want true"
+                    },
+                    {
+                        "name":  "3 levels: deepest depth is 2",
+                        "pass":  true,
+                        "detail":  "got \"2\" want \"2\""
+                    },
+                    {
+                        "name":  "3 levels: deepest path has three segments",
+                        "pass":  true,
+                        "detail":  "got 3 want 3"
+                    },
+                    {
+                        "name":  "3 levels: no row duplicated or dropped",
+                        "pass":  true,
+                        "detail":  "got 6 want 6"
+                    },
+                    {
+                        "name":  "3 levels: FY24 under Eng splits into 2 departments",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "nesting API is present (__GM2)",
+                        "pass":  true,
+                        "detail":  "GM2_ERR=undefined"
+                    },
+                    {
+                        "name":  "cap: the ceiling is 3",
+                        "pass":  true,
+                        "detail":  "got 3 want 3"
+                    },
+                    {
+                        "name":  "cap: a fourth level is clamped away",
+                        "pass":  true,
+                        "detail":  "got 3 want 3"
+                    },
+                    {
+                        "name":  "mirror: currentGroupingColumn is level 0",
+                        "pass":  true,
+                        "detail":  "got \"COLLEGE\" want \"COLLEGE\""
+                    },
+                    {
+                        "name":  "mirror: an empty stack nulls the mirror",
+                        "pass":  true,
+                        "detail":  "got null want null"
+                    },
+                    {
+                        "name":  "setter: a bare string is accepted as one level",
+                        "pass":  true,
+                        "detail":  "got 1 want 1"
+                    },
+                    {
+                        "name":  "setter: blank levels are dropped",
+                        "pass":  true,
+                        "detail":  "got 1 want 1"
+                    },
+                    {
+                        "name":  "missing level: falls back to one level rather than failing",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "missing level: outer level still renders leaves",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "missing level: rows are intact",
+                        "pass":  true,
+                        "detail":  "got 6 want 6"
+                    },
+                    {
+                        "name":  "bucketSpec: a token resolves",
+                        "pass":  true,
+                        "detail":  "[object Object]"
+                    },
+                    {
+                        "name":  "bucketSpec: base is the column",
+                        "pass":  true,
+                        "detail":  "got \"AWARD_DATE\" want \"AWARD_DATE\""
+                    },
+                    {
+                        "name":  "bucketSpec: fiscal year of a March date",
+                        "pass":  true,
+                        "detail":  "got \"FY24\" want \"FY24\""
+                    },
+                    {
+                        "name":  "bucketSpec: fiscal year of an August date",
+                        "pass":  true,
+                        "detail":  "got \"FY25\" want \"FY25\""
+                    },
+                    {
+                        "name":  "bucketSpec: blank in, blank out",
+                        "pass":  true,
+                        "detail":  "got \"\" want \"\""
+                    },
+                    {
+                        "name":  "bucketSpec: a plain column is not a bucket",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "labeler: resolves for a real column",
+                        "pass":  true,
+                        "detail":  "function"
+                    },
+                    {
+                        "name":  "labeler: reads the row and buckets it",
+                        "pass":  true,
+                        "detail":  "got \"FY24\" want \"FY24\""
+                    },
+                    {
+                        "name":  "labeler: a missing column returns null",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "binWorthwhile: a 0/1 flag is not worth binning",
+                        "pass":  true,
+                        "detail":  "got false want false"
+                    },
+                    {
+                        "name":  "variants: a boolean-ish numeric offers no buckets",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "variants: a text column offers no buckets",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "variants: a date column offers period buckets",
+                        "pass":  true,
+                        "detail":  "11"
+                    },
+                    {
+                        "name":  "variants: fiscal year is among them",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "variants: bucket tokens display as a friendly label",
+                        "pass":  true,
+                        "detail":  "got \"AWARD_DATE (Fiscal Year)\" want \"AWARD_DATE (Fiscal Year)\""
+                    },
+                    {
+                        "name":  "sort: with no custom order, FY24 precedes FY25",
+                        "pass":  true,
+                        "detail":  "-1"
+                    },
+                    {
+                        "name":  "sort: a custom order flips the variant order",
+                        "pass":  true,
+                        "detail":  "1"
+                    },
+                    {
+                        "name":  "sort: and orders the whole list by it",
+                        "pass":  true,
+                        "detail":  "-2"
+                    },
+                    {
+                        "name":  "sort: an unrelated custom order degrades to the calendar",
+                        "pass":  true,
+                        "detail":  "-1"
+                    },
+                    {
+                        "name":  "sort: the rendered fiscal bands follow the custom order",
+                        "pass":  true,
+                        "detail":  "got \"FY25\" want \"FY25\""
+                    },
+                    {
+                        "name":  "collapse: the branch header exists",
+                        "pass":  true,
+                        "detail":  "got 1 want 1"
+                    },
+                    {
+                        "name":  "collapse: clicking a branch header opens it",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "collapse: the nested leaf header exists",
+                        "pass":  true,
+                        "detail":  "got 1 want 1"
+                    },
+                    {
+                        "name":  "collapse: a nested leaf toggles independently of its parent",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "collapse: toggling the child left the parent open",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "expand all: the tree has wrappers at more than one depth",
+                        "pass":  true,
+                        "detail":  "12 wrappers"
+                    },
+                    {
+                        "name":  "expand all: every wrapper is open",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "expand all: no content left hidden",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "expand all: the deepest level opened too",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "collapse all: no wrapper left open",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "collapse all: every content is hidden",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "collapse all: the deepest level closed too",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "collapse all: a single header still toggles afterwards",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "agg 1 level: Eng totals its rows",
+                        "pass":  true,
+                        "detail":  "got \"400,000\" want \"400,000\""
+                    },
+                    {
+                        "name":  "agg 1 level: Sci totals its rows",
+                        "pass":  true,
+                        "detail":  "got \"500,000\" want \"500,000\""
+                    },
+                    {
+                        "name":  "grand total: the bar is rendered",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "grand total: it totals every row",
+                        "pass":  true,
+                        "detail":  "got \"900,000\" want \"900,000\""
+                    },
+                    {
+                        "name":  "grand total: it counts every row",
+                        "pass":  true,
+                        "detail":  "got \"6\" want \"6\""
+                    },
+                    {
+                        "name":  "grand total: it is the LAST child of the container",
+                        "pass":  true,
+                        "detail":  "got {} want {}"
+                    },
+                    {
+                        "name":  "grand total: it is not a group wrapper",
+                        "pass":  true,
+                        "detail":  "group-grand-total"
+                    },
+                    {
+                        "name":  "agg 2 levels: the branch totals its subtree",
+                        "pass":  true,
+                        "detail":  "got \"400,000\" want \"400,000\""
+                    },
+                    {
+                        "name":  "agg 2 levels: a leaf totals only its own rows",
+                        "pass":  true,
+                        "detail":  "got \"350,000\" want \"350,000\""
+                    },
+                    {
+                        "name":  "agg 2 levels: the other leaf too",
+                        "pass":  true,
+                        "detail":  "got \"50,000\" want \"50,000\""
+                    },
+                    {
+                        "name":  "agg 2 levels: second branch",
+                        "pass":  true,
+                        "detail":  "got \"500,000\" want \"500,000\""
+                    },
+                    {
+                        "name":  "agg 2 levels: and its leaves",
+                        "pass":  true,
+                        "detail":  "got \"375,000\" want \"375,000\""
+                    },
+                    {
+                        "name":  "agg 2 levels: Eng children sum to the Eng band",
+                        "pass":  true,
+                        "detail":  "children=400000 parent=400000"
+                    },
+                    {
+                        "name":  "agg 2 levels: Sci children sum to the Sci band",
+                        "pass":  true,
+                        "detail":  "children=500000 parent=500000"
+                    },
+                    {
+                        "name":  "agg 2 levels: the two branches sum to the grand total",
+                        "pass":  true,
+                        "detail":  "children=900000 parent=900000"
+                    },
+                    {
+                        "name":  "agg 2 levels: grand total still 900,000",
+                        "pass":  true,
+                        "detail":  "got \"900,000\" want \"900,000\""
+                    },
+                    {
+                        "name":  "agg 2 levels: exactly one summary per band",
+                        "pass":  true,
+                        "detail":  "a band carries more than one summary"
+                    },
+                    {
+                        "name":  "agg 3 levels: depth-0 branch still totals everything below it",
+                        "pass":  true,
+                        "detail":  "got \"400,000\" want \"400,000\""
+                    },
+                    {
+                        "name":  "agg 3 levels: a bucketed middle level totals its own band",
+                        "pass":  true,
+                        "detail":  "got \"150,000\" want \"150,000\""
+                    },
+                    {
+                        "name":  "agg 3 levels: and the deepest leaf",
+                        "pass":  true,
+                        "detail":  "got \"100,000\" want \"100,000\""
+                    },
+                    {
+                        "name":  "agg 3 levels: grand total unchanged by depth",
+                        "pass":  true,
+                        "detail":  "got \"900,000\" want \"900,000\""
+                    },
+                    {
+                        "name":  "share: a depth-0 band shows only its share of the total",
+                        "pass":  true,
+                        "detail":  "got \"44.4% of total\" want \"44.4% of total\""
+                    },
+                    {
+                        "name":  "share: the other one too",
+                        "pass":  true,
+                        "detail":  "got \"55.6% of total\" want \"55.6% of total\""
+                    },
+                    {
+                        "name":  "share: a nested band shows parent AND total",
+                        "pass":  true,
+                        "detail":  "got \"87.5% of parent · 38.9% of total\" want \"87.5% of parent · 38.9% of total\""
+                    },
+                    {
+                        "name":  "share: and its sibling",
+                        "pass":  true,
+                        "detail":  "got \"12.5% of parent · 5.6% of total\" want \"12.5% of parent · 5.6% of total\""
+                    },
+                    {
+                        "name":  "share: sibling shares of the parent total 100%",
+                        "pass":  true,
+                        "detail":  "87.5 + 12.5"
+                    },
+                    {
+                        "name":  "share: depth 0 does not repeat the same number twice",
+                        "pass":  true,
+                        "detail":  "44.4% of total"
+                    },
+                    {
+                        "name":  "share: avg gets no share (a percentage of an average is meaningless)",
+                        "pass":  true,
+                        "detail":  "null"
+                    },
+                    {
+                        "name":  "share: but avg still renders its own value",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "share: count_distinct gets no share (children do not total 100%)",
+                        "pass":  true,
+                        "detail":  "null"
+                    },
+                    {
+                        "name":  "share: count DOES get one (its parts add up)",
+                        "pass":  true,
+                        "detail":  "50% of total"
+                    },
+                    {
+                        "name":  "grand total: no summary configured means no bar",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "grand total: and no band carries a summary either",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "collapse-state API is present (__GM4)",
+                        "pass":  true,
+                        "detail":  "GM4_ERR=undefined"
+                    },
+                    {
+                        "name":  "persist: everything starts collapsed",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "persist: the branch is open",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "persist: the nested leaf is open",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "persist: a sibling stayed shut",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "persist: the other branch stayed shut",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "persist: the branch is still open after a re-render",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "persist: so is the nested leaf",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "persist: and the shut sibling is still shut",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "persist: the other branch is still shut",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "persist: a restored group is actually shown",
+                        "pass":  true,
+                        "detail":  "got \"block\" want \"block\""
+                    },
+                    {
+                        "name":  "persist: an identically-named band elsewhere is unaffected",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "persist: capture records the open paths",
+                        "pass":  true,
+                        "detail":  "Eng,Eng|||ECE"
+                    },
+                    {
+                        "name":  "persist: capture does NOT record the shut ones",
+                        "pass":  true,
+                        "detail":  "Eng,Eng|||ECE"
+                    },
+                    {
+                        "name":  "persist: an unknown path restores nothing",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "persist: the new grouping actually rendered",
+                        "pass":  true,
+                        "detail":  "4 wrappers"
+                    },
+                    {
+                        "name":  "persist: a different grouping starts collapsed",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "picker/grammar API is present (__GM3)",
+                        "pass":  true,
+                        "detail":  "GM3_ERR=undefined"
+                    },
+                    {
+                        "name":  "grammar: a comma string becomes two levels",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "grammar: level 0 is the first",
+                        "pass":  true,
+                        "detail":  "got \"COLLEGE\" want \"COLLEGE\""
+                    },
+                    {
+                        "name":  "grammar: surrounding spaces are trimmed",
+                        "pass":  true,
+                        "detail":  "got \"AWARD_DATE:fy\" want \"AWARD_DATE:fy\""
+                    },
+                    {
+                        "name":  "grammar: an empty segment is dropped",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "grammar: the comma form still respects the cap",
+                        "pass":  true,
+                        "detail":  "got 3 want 3"
+                    },
+                    {
+                        "name":  "level0Of: reads the outermost level",
+                        "pass":  true,
+                        "detail":  "got \"COLLEGE\" want \"COLLEGE\""
+                    },
+                    {
+                        "name":  "level0Of: a single column is its own level 0",
+                        "pass":  true,
+                        "detail":  "got \"COLLEGE\" want \"COLLEGE\""
+                    },
+                    {
+                        "name":  "level0Of: empty in, empty out",
+                        "pass":  true,
+                        "detail":  "got \"\" want \"\""
+                    },
+                    {
+                        "name":  "level0Of: leaves a bucket token intact",
+                        "pass":  true,
+                        "detail":  "got \"AWARD_DATE:fy\" want \"AWARD_DATE:fy\""
+                    },
+                    {
+                        "name":  "picker: level 1 holds the outer column",
+                        "pass":  true,
+                        "detail":  "got \"COLLEGE\" want \"COLLEGE\""
+                    },
+                    {
+                        "name":  "picker: level 2 holds the inner column",
+                        "pass":  true,
+                        "detail":  "got \"DEPT\" want \"DEPT\""
+                    },
+                    {
+                        "name":  "picker: the dialog reports both levels",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "picker: level 2 row is visible",
+                        "pass":  true,
+                        "detail":  "got true want true"
+                    },
+                    {
+                        "name":  "picker: level 3 row is visible once level 2 is set",
+                        "pass":  true,
+                        "detail":  "got true want true"
+                    },
+                    {
+                        "name":  "picker: an outer level’s column is excluded from level 2",
+                        "pass":  true,
+                        "detail":  "|#|DEPT|AWARD_DATE|AWARD_DATE:year|AWARD_DATE:fy|AWARD_DATE:yq|AWARD_DATE:fyq|AWARD_DATE:ym|AWARD_DATE:quarter|AWARD_DATE:fquarter|AWARD_DATE:month|AWARD_DATE:monthnum|AWARD_DATE:dow|AWARD_DATE:hour|AMOUNT|ACTIVE"
+                    },
+                    {
+                        "name":  "picker: level 2 still offers other columns",
+                        "pass":  true,
+                        "detail":  "|#|DEPT|AWARD_DATE|AWARD_DATE:year|AWARD_DATE:fy|AWARD_DATE:yq|AWARD_DATE:fyq|AWARD_DATE:ym|AWARD_DATE:quarter|AWARD_DATE:fquarter|AWARD_DATE:month|AWARD_DATE:monthnum|AWARD_DATE:dow|AWARD_DATE:hour|AMOUNT|ACTIVE"
+                    },
+                    {
+                        "name":  "picker: level 2 offers a None row",
+                        "pass":  true,
+                        "detail":  "|#|DEPT|AWARD_DATE|AWARD_DATE:year|AWARD_DATE:fy|AWARD_DATE:yq|AWARD_DATE:fyq|AWARD_DATE:ym|AWARD_DATE:quarter|AWARD_DATE:fquarter|AWARD_DATE:month|AWARD_DATE:monthnum|AWARD_DATE:dow|AWARD_DATE:hour|AMOUNT|ACTIVE"
+                    },
+                    {
+                        "name":  "picker: level 2 offers bucket variants",
+                        "pass":  true,
+                        "detail":  "|#|DEPT|AWARD_DATE|AWARD_DATE:year|AWARD_DATE:fy|AWARD_DATE:yq|AWARD_DATE:fyq|AWARD_DATE:ym|AWARD_DATE:quarter|AWARD_DATE:fquarter|AWARD_DATE:month|AWARD_DATE:monthnum|AWARD_DATE:dow|AWARD_DATE:hour|AMOUNT|ACTIVE"
+                    },
+                    {
+                        "name":  "picker: one level reports one level",
+                        "pass":  true,
+                        "detail":  "got 1 want 1"
+                    },
+                    {
+                        "name":  "picker: level 3 row hides when level 2 is empty",
+                        "pass":  true,
+                        "detail":  "got false want false"
+                    },
+                    {
+                        "name":  "picker: a gap truncates rather than skipping a level",
+                        "pass":  true,
+                        "detail":  "got 1 want 1"
+                    },
+                    {
+                        "name":  "picker: an empty stack reports nothing",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "picker: level 2 row hides with no level 1",
+                        "pass":  true,
+                        "detail":  "got false want false"
+                    },
+                    {
+                        "name":  "snippet: one level emits the plain column",
+                        "pass":  true,
+                        "detail":  "action(trigger, \u0027Group by COLLEGE\u0027, \u0027group_by|COLLEGE\u0027)"
+                    },
+                    {
+                        "name":  "snippet: one level adds no comma",
+                        "pass":  true,
+                        "detail":  "action(trigger, \u0027Group by COLLEGE\u0027, \u0027group_by|COLLEGE\u0027)"
+                    },
+                    {
+                        "name":  "snippet: two levels are comma-joined",
+                        "pass":  true,
+                        "detail":  "action(trigger, \u0027Group by COLLEGE \u003e DEPT\u0027, \u0027group_by|COLLEGE,DEPT\u0027)"
+                    },
+                    {
+                        "name":  "snippet: three levels including a bucket token round-trip",
+                        "pass":  true,
+                        "detail":  "action(trigger, \u0027Group by COLLEGE \u003e AWARD_DATE (Fiscal Year) \u003e DEPT\u0027, \u0027group_by|COLLEGE,AWARD_DATE:fy,DEPT\u0027)"
+                    },
+                    {
+                        "name":  "snippet: the caption names every level in order",
+                        "pass":  true,
+                        "detail":  "action(trigger, \u0027Group by COLLEGE \u003e AWARD_DATE (Fiscal Year) \u003e DEPT\u0027, \u0027group_by|COLLEGE,AWARD_DATE:fy,DEPT\u0027)"
+                    },
+                    {
+                        "name":  "snippet: it is an action(trigger, ...) call",
+                        "pass":  true,
+                        "detail":  "action(trigger, \u0027Group by COLLEGE \u003e AWARD_DATE (Fiscal Year) \u003e DEPT\u0027, \u0027group_by|COLLEGE,AWARD_DATE:fy,DEPT\u0027)"
+                    },
+                    {
+                        "name":  "snippet: the emitted trigger re-applies as three levels",
+                        "pass":  true,
+                        "detail":  "got 3 want 3"
+                    },
+                    {
+                        "name":  "snippet: and its bucket level survives the round trip",
+                        "pass":  true,
+                        "detail":  "got \"AWARD_DATE:fy\" want \"AWARD_DATE:fy\""
+                    },
+                    {
+                        "name":  "denominator: depth 0 is stamped with its unfiltered count",
+                        "pass":  true,
+                        "detail":  "got 3 want 3"
+                    },
+                    {
+                        "name":  "denominator: the other depth-0 band too",
+                        "pass":  true,
+                        "detail":  "got 3 want 3"
+                    },
+                    {
+                        "name":  "denominator: a nested leaf carries its own total",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "denominator: an only-child leaf too",
+                        "pass":  true,
+                        "detail":  "got 1 want 1"
+                    },
+                    {
+                        "name":  "denominator: under the other parent as well",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "denominator: and its single-row sibling",
+                        "pass":  true,
+                        "detail":  "got 1 want 1"
+                    },
+                    {
+                        "name":  "denominator: no band is left unstamped or negative",
+                        "pass":  true,
+                        "detail":  "6 wrappers; bad: none"
+                    },
+                    {
+                        "name":  "denominator: the -1 sentinel never reaches a count pill (render-time)",
+                        "pass":  true,
+                        "detail":  "3|2|1|3|2|1"
+                    },
+                    {
+                        "name":  "denominator: a bucketed middle level still stamps every band",
+                        "pass":  true,
+                        "detail":  "12 wrappers, 0 bad"
+                    },
+                    {
+                        "name":  "denominator: the leaf totals account for all six rows",
+                        "pass":  true,
+                        "detail":  "1+1+1+1+1+1 = 6 want 6"
+                    },
+                    {
+                        "name":  "emailrows: everything collapsed embeds nothing",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "emailrows: and attributes every row to collapsed groups",
+                        "pass":  true,
+                        "detail":  "got 6 want 6"
+                    },
+                    {
+                        "name":  "emailrows: an open BRANCH does not embed its closed leaves rows",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "emailrows: those rows are still counted as collapsed",
+                        "pass":  true,
+                        "detail":  "got 6 want 6"
+                    },
+                    {
+                        "name":  "emailrows: fully expanded embeds every row",
+                        "pass":  true,
+                        "detail":  "got 6 want 6"
+                    },
+                    {
+                        "name":  "emailrows: with nothing left collapsed",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "emailrows: one level still counts every row",
+                        "pass":  true,
+                        "detail":  "got 6 want 6"
+                    },
+                    {
+                        "name":  "emailrows: and still zero when collapsed",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "limit: group-limit API is present (__GM7)",
+                        "pass":  true,
+                        "detail":  "GM7_ERR=undefined"
+                    },
+                    {
+                        "name":  "limit: the level stack beats a stale dialog picker",
+                        "pass":  true,
+                        "detail":  "got \"DEPT,DEPT,DEPT,DEPT\" want \"DEPT,DEPT,DEPT,DEPT\""
+                    },
+                    {
+                        "name":  "limit: with no limit every group renders",
+                        "pass":  true,
+                        "detail":  "got 4 want 4"
+                    },
+                    {
+                        "name":  "limit top 2: two real groups plus the rollup",
+                        "pass":  true,
+                        "detail":  "got 3 want 3"
+                    },
+                    {
+                        "name":  "limit top 2: the rollup is LAST",
+                        "pass":  true,
+                        "detail":  "got \"(Other)\" want \"(Other)\""
+                    },
+                    {
+                        "name":  "limit top 2: the kept groups are the first two in sort order",
+                        "pass":  true,
+                        "detail":  "BIO,CHEM,(Other)"
+                    },
+                    {
+                        "name":  "limit: the rollup carries the excluded rows",
+                        "pass":  true,
+                        "detail":  "got 3 want 3"
+                    },
+                    {
+                        "name":  "limit: and every row is still present exactly once",
+                        "pass":  true,
+                        "detail":  "got 6 want 6"
+                    },
+                    {
+                        "name":  "limit: it records how many groups it replaced",
+                        "pass":  true,
+                        "detail":  "got \"2\" want \"2\""
+                    },
+                    {
+                        "name":  "limit: the rollup has no hide-group button",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "limit: with the rollup off only the kept groups render",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "limit: and no (Other) band exists",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "limit: so rows ARE dropped from the view",
+                        "pass":  true,
+                        "detail":  "got 3 want 3"
+                    },
+                    {
+                        "name":  "limit bottom 1: keeps the last group in sort order",
+                        "pass":  true,
+                        "detail":  "got \"ME\" want \"ME\""
+                    },
+                    {
+                        "name":  "limit minRows: single-row groups are dropped",
+                        "pass":  true,
+                        "detail":  "BIO,ECE"
+                    },
+                    {
+                        "name":  "limit minRows: larger ones stay",
+                        "pass":  true,
+                        "detail":  "BIO,ECE"
+                    },
+                    {
+                        "name":  "limit: min-size runs before top-N, so both survivors are the big ones",
+                        "pass":  true,
+                        "detail":  "got \"BIO,ECE\" want \"BIO,ECE\""
+                    },
+                    {
+                        "name":  "limit: everything filtered out lands in the rollup",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "limit: an all-zero limit normalizes to null",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "limit: a blank limit normalizes to null",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "limit: a negative n is clamped away",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "limit: an unknown dir falls back to top",
+                        "pass":  true,
+                        "detail":  "got \"top\" want \"top\""
+                    },
+                    {
+                        "name":  "limit: other defaults ON",
+                        "pass":  true,
+                        "detail":  "got true want true"
+                    },
+                    {
+                        "name":  "viz: grouped-reader API is present (__GM6)",
+                        "pass":  true,
+                        "detail":  "GM6_ERR=undefined"
+                    },
+                    {
+                        "name":  "viz 1 level: the group column is the X axis",
+                        "pass":  true,
+                        "detail":  "got \"COLLEGE\" want \"COLLEGE\""
+                    },
+                    {
+                        "name":  "viz 1 level: no series",
+                        "pass":  true,
+                        "detail":  "got \"none\" want \"none\""
+                    },
+                    {
+                        "name":  "viz 1 level: the summary column is the Y axis",
+                        "pass":  true,
+                        "detail":  "got \"AMOUNT\" want \"AMOUNT\""
+                    },
+                    {
+                        "name":  "viz 1 level: and its aggregation carries over",
+                        "pass":  true,
+                        "detail":  "got \"sum\" want \"sum\""
+                    },
+                    {
+                        "name":  "viz 2 levels: level 1 is still the X axis",
+                        "pass":  true,
+                        "detail":  "got \"COLLEGE\" want \"COLLEGE\""
+                    },
+                    {
+                        "name":  "viz 2 levels: level 2 becomes the SERIES",
+                        "pass":  true,
+                        "detail":  "got \"DEPT\" want \"DEPT\""
+                    },
+                    {
+                        "name":  "viz 2 levels: no warning is needed",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "viz 3 levels: X axis unchanged",
+                        "pass":  true,
+                        "detail":  "got \"COLLEGE\" want \"COLLEGE\""
+                    },
+                    {
+                        "name":  "viz 3 levels: series is still level 2",
+                        "pass":  true,
+                        "detail":  "got \"DEPT\" want \"DEPT\""
+                    },
+                    {
+                        "name":  "viz 3 levels: the unplottable level is called out, not dropped silently",
+                        "pass":  true,
+                        "detail":  "This grouping has 3 levels, but a chart has room for an X axis and one series. Level 1 became the X axis and level 2 the series; the deeper level is not plotted."
+                    },
+                    {
+                        "name":  "viz: a bucket token passes through to the series",
+                        "pass":  true,
+                        "detail":  "got \"AWARD_DATE:fy\" want \"AWARD_DATE:fy\""
+                    },
+                    {
+                        "name":  "viz: median is chartable",
+                        "pass":  true,
+                        "detail":  "got true want true"
+                    },
+                    {
+                        "name":  "viz: stddev is chartable",
+                        "pass":  true,
+                        "detail":  "got true want true"
+                    },
+                    {
+                        "name":  "viz: range is chartable",
+                        "pass":  true,
+                        "detail":  "got true want true"
+                    },
+                    {
+                        "name":  "viz: mode is NOT (it returns text, which cannot be a Y axis)",
+                        "pass":  true,
+                        "detail":  "got false want false"
+                    },
+                    {
+                        "name":  "viz: a text aggregate falls back to counting rows",
+                        "pass":  true,
+                        "detail":  "got \"count\" want \"count\""
+                    },
+                    {
+                        "name":  "viz: and says so",
+                        "pass":  true,
+                        "detail":  "The chart builder cannot do Mode, so the chart counts rows instead."
+                    },
+                    {
+                        "name":  "depth: start-depth API is present (__GM5)",
+                        "pass":  true,
+                        "detail":  "GM5_ERR=undefined"
+                    },
+                    {
+                        "name":  "depth 0: nothing opens (the historical default)",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "depth 1: the outer bands open",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "depth 1: but their children stay shut",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "depth 1: an opened band is genuinely shown",
+                        "pass":  true,
+                        "detail":  "block"
+                    },
+                    {
+                        "name":  "depth 2: outer bands open",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "depth 2: and so do their children",
+                        "pass":  true,
+                        "detail":  "got 4 want 4"
+                    },
+                    {
+                        "name":  "depth: applied on the first render",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "depth: reader collapses everything",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "depth: a re-render does NOT re-apply the default over the reader",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "depth: a new grouping re-applies it",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "depth: 0 is omitted from saved state",
+                        "pass":  true,
+                        "detail":  "undefined"
+                    },
+                    {
+                        "name":  "depth: a non-default value is saved",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "vocab: sum unchanged",
+                        "pass":  true,
+                        "detail":  "got \"400,000\" want \"400,000\""
+                    },
+                    {
+                        "name":  "vocab: min unchanged",
+                        "pass":  true,
+                        "detail":  "got \"50,000\" want \"50,000\""
+                    },
+                    {
+                        "name":  "vocab: max unchanged",
+                        "pass":  true,
+                        "detail":  "got \"250,000\" want \"250,000\""
+                    },
+                    {
+                        "name":  "vocab: count still means NON-BLANK",
+                        "pass":  true,
+                        "detail":  "got \"3\" want \"3\""
+                    },
+                    {
+                        "name":  "vocab: count_distinct still means UNIQUE",
+                        "pass":  true,
+                        "detail":  "got \"2\" want \"2\""
+                    },
+                    {
+                        "name":  "vocab: median",
+                        "pass":  true,
+                        "detail":  "got \"100,000\" want \"100,000\""
+                    },
+                    {
+                        "name":  "vocab: range = max - min",
+                        "pass":  true,
+                        "detail":  "got \"200,000\" want \"200,000\""
+                    },
+                    {
+                        "name":  "vocab: stddev renders a spread",
+                        "pass":  true,
+                        "detail":  "104,083.30"
+                    },
+                    {
+                        "name":  "vocab: mode is the most common value",
+                        "pass":  true,
+                        "detail":  "got \"ECE\" want \"ECE\""
+                    },
+                    {
+                        "name":  "vocab: antimode is the least common",
+                        "pass":  true,
+                        "detail":  "got \"ME\" want \"ME\""
+                    },
+                    {
+                        "name":  "vocab: median gets no % share (parts do not sum to the whole)",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "vocab: but sum still does",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "proto: grouping on prototype-named values does not throw",
+                        "pass":  true,
+                        "detail":  "null"
+                    },
+                    {
+                        "name":  "proto: one band per distinct value, none lost",
+                        "pass":  true,
+                        "detail":  "got 5 want 5"
+                    },
+                    {
+                        "name":  "proto: every prototype name survives as its own band",
+                        "pass":  true,
+                        "detail":  "got \"Eng,__proto__,constructor,hasOwnProperty,toString\" want \"Eng,__proto__,constructor,hasOwnProperty,toString\""
+                    },
+                    {
+                        "name":  "proto: every row is placed exactly once",
+                        "pass":  true,
+                        "detail":  "got 7 want 7"
+                    },
+                    {
+                        "name":  "proto: constructor holds its 2 rows",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "proto: __proto__ holds its 2 rows",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "proto: toString holds its 1 row",
+                        "pass":  true,
+                        "detail":  "got 1 want 1"
+                    },
+                    {
+                        "name":  "proto: the count pill is a real number, not a stringified function",
+                        "pass":  true,
+                        "detail":  "got \"2\" want \"2\""
+                    },
+                    {
+                        "name":  "proto: no pill leaked a function body",
+                        "pass":  true,
+                        "detail":  "[\"2\",\"1\",\"2\",\"1\"]"
+                    },
+                    {
+                        "name":  "proto: nesting under a prototype-named parent does not throw",
+                        "pass":  true,
+                        "detail":  "null"
+                    },
+                    {
+                        "name":  "proto: still 5 top-level bands when nested",
+                        "pass":  true,
+                        "detail":  "got 5 want 5"
+                    },
+                    {
+                        "name":  "proto: no row duplicated or dropped when nested",
+                        "pass":  true,
+                        "detail":  "got 7 want 7"
+                    },
+                    {
+                        "name":  "proto: constructor splits into its 2 departments",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "proto: and its band is stamped with a numeric denominator",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "reset: the button is wired",
+                        "pass":  true,
+                        "detail":  "GM3_ERR=undefined"
+                    },
+                    {
+                        "name":  "reset: the form really was dirty first",
+                        "pass":  true,
+                        "detail":  "got \"COLLEGE,DEPT,AWARD_DATE:fy/summary|desc/5\" want \"COLLEGE,DEPT,AWARD_DATE:fy/summary|desc/5\""
+                    },
+                    {
+                        "name":  "reset: every grouping level is cleared",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "reset: level 2 row is hidden again",
+                        "pass":  true,
+                        "detail":  "got false want false"
+                    },
+                    {
+                        "name":  "reset: level 3 row is hidden again",
+                        "pass":  true,
+                        "detail":  "got false want false"
+                    },
+                    {
+                        "name":  "reset: the summary checkbox is off",
+                        "pass":  true,
+                        "detail":  "got false want false"
+                    },
+                    {
+                        "name":  "reset: the summary panel is hidden",
+                        "pass":  true,
+                        "detail":  "got false want false"
+                    },
+                    {
+                        "name":  "reset: the summary column is cleared",
+                        "pass":  true,
+                        "detail":  "got \"\" want \"\""
+                    },
+                    {
+                        "name":  "reset: the aggregate falls back to sum",
+                        "pass":  true,
+                        "detail":  "got \"sum\" want \"sum\""
+                    },
+                    {
+                        "name":  "reset: the summary sort options are removed",
+                        "pass":  true,
+                        "detail":  "got 0 want 0"
+                    },
+                    {
+                        "name":  "reset: sort falls back to label ascending",
+                        "pass":  true,
+                        "detail":  "got \"label|asc\" want \"label|asc\""
+                    },
+                    {
+                        "name":  "reset: start depth falls back to collapsed",
+                        "pass":  true,
+                        "detail":  "got \"0\" want \"0\""
+                    },
+                    {
+                        "name":  "reset: the limit direction falls back to top",
+                        "pass":  true,
+                        "detail":  "got \"top\" want \"top\""
+                    },
+                    {
+                        "name":  "reset: the top-N box is emptied",
+                        "pass":  true,
+                        "detail":  "got \"\" want \"\""
+                    },
+                    {
+                        "name":  "reset: the minimum-size box is emptied",
+                        "pass":  true,
+                        "detail":  "got \"\" want \"\""
+                    },
+                    {
+                        "name":  "reset: the rollup checkbox is back on",
+                        "pass":  true,
+                        "detail":  "got true want true"
+                    },
+                    {
+                        "name":  "reset: the summary filter tip is hidden",
+                        "pass":  true,
+                        "detail":  "got false want false"
+                    },
+                    {
+                        "name":  "reset: the applied grouping still renders its bands",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "reset: and is still the nested stack",
+                        "pass":  true,
+                        "detail":  "got \"COLLEGE,DEPT\" want \"COLLEGE,DEPT\""
+                    },
+                    {
+                        "name":  "reset/preset: the chip is mounted",
+                        "pass":  true,
+                        "detail":  "PenumbraPresets=object"
+                    },
+                    {
+                        "name":  "reset/preset: saving puts the name on the chip",
+                        "pass":  true,
+                        "detail":  "got \"Suite Preset\" want \"Suite Preset\""
+                    },
+                    {
+                        "name":  "reset/preset: the pin really was set first",
+                        "pass":  true,
+                        "detail":  "{\"builder\":\"group\",\"name\":\"Suite Preset\"}"
+                    },
+                    {
+                        "name":  "reset/preset: the chip drops the loaded name",
+                        "pass":  true,
+                        "detail":  "got \"Presets\" want \"Presets\""
+                    },
+                    {
+                        "name":  "reset/preset: but the preset itself is NOT deleted",
+                        "pass":  true,
+                        "detail":  "got \"Suite Preset\" want \"Suite Preset\""
+                    },
+                    {
+                        "name":  "reset/preset: and its on-load pin survives",
+                        "pass":  true,
+                        "detail":  "got \"{\\\"builder\\\":\\\"group\\\",\\\"name\\\":\\\"Suite Preset\\\"}\" want \"{\\\"builder\\\":\\\"group\\\",\\\"name\\\":\\\"Suite Preset\\\"}\""
+                    },
+                    {
+                        "name":  "container: containerization API is present (__GM8)",
+                        "pass":  true,
+                        "detail":  "GM8_ERR=undefined"
+                    },
+                    {
+                        "name":  "container: the flat view IS containerized (guard)",
+                        "pass":  true,
+                        "detail":  "threw=null"
+                    },
+                    {
+                        "name":  "container: and the table sits inside the wrapper",
+                        "pass":  true,
+                        "detail":  "got \"results-wrapper\" want \"results-wrapper\""
+                    },
+                    {
+                        "name":  "container: removeContainerization tears it down again",
+                        "pass":  true,
+                        "detail":  "threw=null"
+                    },
+                    {
+                        "name":  "container: the grouped view is NOT wrapped",
+                        "pass":  true,
+                        "detail":  "threw=null"
+                    },
+                    {
+                        "name":  "container: the grouped container is still a direct child of the view",
+                        "pass":  true,
+                        "detail":  "table-view-container"
+                    },
+                    {
+                        "name":  "container: and the results table was not wrapped either",
+                        "pass":  true,
+                        "detail":  "table-view-container"
+                    },
+                    {
+                        "name":  "container: the flat view still containerizes afterwards",
+                        "pass":  true,
+                        "detail":  "threw=null"
+                    },
+                    {
+                        "name":  "preview: the search API bridge is present",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "preview: the fixture renders one band per prototype name",
+                        "pass":  true,
+                        "detail":  "got 6 want 6"
+                    },
+                    {
+                        "name":  "preview/rows: a group called hasOwnProperty does not kill the count",
+                        "pass":  true,
+                        "detail":  "matching=8"
+                    },
+                    {
+                        "name":  "preview/rows: it is still recognised as grouped",
+                        "pass":  true,
+                        "detail":  "got true want true"
+                    },
+                    {
+                        "name":  "preview/rows: every matching row is counted",
+                        "pass":  true,
+                        "detail":  "got 8 want 8"
+                    },
+                    {
+                        "name":  "preview/rows: and every group holding one",
+                        "pass":  true,
+                        "detail":  "got 5 want 5"
+                    },
+                    {
+                        "name":  "preview/rows: the row denominator is the whole fixture",
+                        "pass":  true,
+                        "detail":  "got 9 want 9"
+                    },
+                    {
+                        "name":  "preview/rows: the group denominator is the rendered band count",
+                        "pass":  true,
+                        "detail":  "got 6 want 6"
+                    },
+                    {
+                        "name":  "preview/rows: the no-DOM fallback still sees the grouping",
+                        "pass":  true,
+                        "detail":  "got true want true"
+                    },
+                    {
+                        "name":  "preview/rows: and counts every distinct group value itself",
+                        "pass":  true,
+                        "detail":  "got 6 want 6"
+                    },
+                    {
+                        "name":  "preview/summary: a summary filter over prototype-named groups does not throw",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "preview/summary: only the two groups over the threshold match",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "preview/summary: and the rows in them are counted",
+                        "pass":  true,
+                        "detail":  "got 4 want 4"
+                    },
+                    {
+                        "name":  "preview/distinct: a distinct count over prototype-named values does not throw",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "preview/distinct: hasOwnProperty has two departments, so three groups match",
+                        "pass":  true,
+                        "detail":  "got 3 want 3"
+                    },
+                    {
+                        "name":  "preview/distinct: and six rows sit in them",
+                        "pass":  true,
+                        "detail":  "got 6 want 6"
+                    },
+                    {
+                        "name":  "preview/nested: counting a virtual grouping column does not throw",
+                        "pass":  true,
+                        "detail":  "matching=6"
+                    },
+                    {
+                        "name":  "preview/nested: a row counts once per distinct nested group it is in",
+                        "pass":  true,
+                        "detail":  "got 6 want 6"
+                    },
+                    {
+                        "name":  "preview/nested: and every nested value is its own group",
+                        "pass":  true,
+                        "detail":  "got 6 want 6"
+                    },
+                    {
+                        "name":  "preview/nested: a summary filter on a nested aggregate does not throw",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "preview/nested: the two nested groups at or over 300 match",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "preview/nested: one parent row in each",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "preview: nothing was written onto Object.prototype",
+                        "pass":  true,
+                        "detail":  "got \"\" want \"\""
+                    },
+                    {
+                        "name":  "aggtype: normalizer API is present (__GM9)",
+                        "pass":  true,
+                        "detail":  "GM9_ERR=undefined"
+                    },
+                    {
+                        "name":  "aggtype: every dialog type passes through unchanged",
+                        "pass":  true,
+                        "detail":  "got 12 want 12"
+                    },
+                    {
+                        "name":  "aggtype: the labels map is that same twelve",
+                        "pass":  true,
+                        "detail":  "got \"antimode,avg,count,count_blank,count_distinct,max,median,min,mode,range,stddev,sum\" want \"antimode,avg,count,count_blank,count_distinct,max,median,min,mode,range,stddev,sum\""
+                    },
+                    {
+                        "name":  "aggtype: case and padding are forgiven",
+                        "pass":  true,
+                        "detail":  "got \"median\" want \"median\""
+                    },
+                    {
+                        "name":  "aggtype: empty means the documented default",
+                        "pass":  true,
+                        "detail":  "got \"sum\" want \"sum\""
+                    },
+                    {
+                        "name":  "aggtype: null means the documented default",
+                        "pass":  true,
+                        "detail":  "got \"sum\" want \"sum\""
+                    },
+                    {
+                        "name":  "aggtype: alias average",
+                        "pass":  true,
+                        "detail":  "got \"avg\" want \"avg\""
+                    },
+                    {
+                        "name":  "aggtype: alias distinct",
+                        "pass":  true,
+                        "detail":  "got \"count_distinct\" want \"count_distinct\""
+                    },
+                    {
+                        "name":  "aggtype: alias unique",
+                        "pass":  true,
+                        "detail":  "got \"count_distinct\" want \"count_distinct\""
+                    },
+                    {
+                        "name":  "aggtype: alias blank",
+                        "pass":  true,
+                        "detail":  "got \"count_blank\" want \"count_blank\""
+                    },
+                    {
+                        "name":  "aggtype: alias stdev",
+                        "pass":  true,
+                        "detail":  "got \"stddev\" want \"stddev\""
+                    },
+                    {
+                        "name":  "aggtype: registry name count_filled",
+                        "pass":  true,
+                        "detail":  "got \"count\" want \"count\""
+                    },
+                    {
+                        "name":  "aggtype: registry name count_unique",
+                        "pass":  true,
+                        "detail":  "got \"count_distinct\" want \"count_distinct\""
+                    },
+                    {
+                        "name":  "aggtype: alias total",
+                        "pass":  true,
+                        "detail":  "got \"sum\" want \"sum\""
+                    },
+                    {
+                        "name":  "aggtype: a typo is unknown, never Sum",
+                        "pass":  true,
+                        "detail":  "got \"\" want \"\""
+                    },
+                    {
+                        "name":  "aggtype: a plausible wrong word is unknown",
+                        "pass":  true,
+                        "detail":  "got \"\" want \"\""
+                    },
+                    {
+                        "name":  "aggtype: prototype names are unknown",
+                        "pass":  true,
+                        "detail":  "got \"\" want \"\""
+                    },
+                    {
+                        "name":  "aggtype: __proto__ is unknown",
+                        "pass":  true,
+                        "detail":  "got \"\" want \"\""
+                    }
+                ]
+}

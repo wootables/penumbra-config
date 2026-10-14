@@ -1,0 +1,75 @@
+<!doctype html><html><head><meta charset="utf-8"><title>health single keys</title></head>
+<body>
+<!-- Single-key hints - the Health page's log console (2026-09-25). The console
+     script is LIFTED by run.ps1 from the health.php under test (health_log.js);
+     this is the markup it binds to, and fetch() is a counter. -->
+<section id="pnbLog">
+  <div class="pnb-log-tabs" role="tablist">
+    <button type="button" class="pnb-log-tab on" data-log="php" role="tab" aria-controls="logBody" aria-selected="true" title="PHP errors">PHP</button>
+    <button type="button" class="pnb-log-tab" data-log="iis" role="tab" aria-controls="logBody" aria-selected="false" title="IIS">IIS</button>
+    <button type="button" class="pnb-log-tab" data-log="sched" role="tab" aria-controls="logBody" aria-selected="false" title="Scheduler">Scheduler</button>
+    <button type="button" class="pnb-log-tab" data-log="job_x" role="tab" aria-controls="logBody" aria-selected="false" title="Job">Job</button>
+  </div>
+  <div class="pnb-log-ctl">
+    <input type="text" id="logFilter" placeholder="filter (substring)" autocomplete="off" aria-label="Filter log lines by substring">
+    <label id="logCtxWrap" hidden>&plusmn;<input type="number" id="logCtx" value="5" min="0" max="50" step="1" aria-label="context"> ctx</label>
+    <label><input type="checkbox" id="logErrOnly">problems only</label>
+    <label><input type="checkbox" id="logNewest" checked>newest first</label>
+    <label><input type="checkbox" id="logWrap" checked>wrap</label>
+    <button type="button" id="logCopy">Copy</button>
+    <select id="logLines" hidden><option value="300" selected>300 lines</option></select>
+  </div>
+  <div class="pnb-log-meta">
+    <span id="logMeta">&nbsp;</span>
+    <span id="logLinesLinks">show <a href="#" data-lines="300">300</a></span>
+    <select id="logDay" aria-label="Day to show" hidden></select>
+    <button type="button" id="logKeys" aria-pressed="true">keys on</button>
+    <span id="logLive"></span>
+  </div>
+  <pre id="logBody" tabindex="0" role="tabpanel" aria-label="Log lines"></pre>
+  <div id="logHint"></div>
+</section>
+<pre id="out">running</pre>
+<script>
+var ERRORS = [], FETCHES = [];
+window.onerror = function (m, src, line) { ERRORS.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+try { localStorage.clear(); } catch (e) {}
+window.fetch = function (url) {
+  FETCHES.push(String(url));
+  return Promise.resolve({ ok: true, json: function () { return Promise.resolve({ rows: [{ t: 'line one' }], shown: 1, file: 'x.log' }); } });
+};
+</script>
+<!-- the a11y layer loads on Health too (admin status bar); it owns penumbraSingleKeysOff -->
+<script src="penumbra_a11y.js"></script>
+<script src="health_log.js"></script>
+<script>
+(function () {
+  var R = [];
+  function rec(name, pass, detail) { R.push({ name: name, pass: !!pass, detail: detail === undefined ? '' : String(detail).slice(0, 500) }); }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function key(target, k) { var ev = new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }); target.dispatchEvent(ev); return ev.defaultPrevented; }
+  function n() { return FETCHES.length; }
+  async function main() {
+    await sleep(100);
+    rec('H0 fixture: the lifted log console booted and made its first load', n() >= 1 && typeof window.pnbLog === 'object', 'fetches=' + n());
+    var a = n(); var pr = key(document.body, 'r'); await sleep(20);
+    rec('H1 r reloads the log (unchanged)', n() === a + 1 && pr, 'fetches ' + a + '->' + n());
+    var b = n(); var pR = key(document.body, 'R'); await sleep(20);
+    rec('H2 R - Caps Lock on - reloads it too (the fix)', n() === b + 1 && pR, 'fetches ' + b + '->' + n() + ' prevented=' + pR);
+    var f = document.getElementById('logFilter'); f.focus();
+    var c = n(); key(f, 'R'); await sleep(20); f.blur();
+    rec('H3 R typed into the filter stays a letter', n() === c, 'fetches ' + c + '->' + n());
+    try { localStorage.setItem('pnb_single_keys', 'off'); } catch (e) {}
+    var d = n(); key(document.body, 'R'); key(document.body, 'r'); await sleep(20);
+    try { localStorage.setItem('pnb_single_keys', 'on'); } catch (e) {}
+    rec('H4 switched off: neither r nor R reloads', n() === d, 'fetches ' + d + '->' + n());
+    var e0 = n(); key(document.body, '2'); await sleep(20);
+    var sel = document.querySelector('.pnb-log-tab[data-log="iis"]').getAttribute('aria-selected');
+    rec('H5 2 still picks the second log (unchanged)', sel === 'true' && n() === e0 + 1, 'aria-selected=' + sel + ' fetches ' + e0 + '->' + n());
+    rec('Z3 no page errors (health)', ERRORS.length === 0, ERRORS.slice(0, 5).join(' | ') || 'none');
+    document.getElementById('out').textContent = 'RESULTS_JSON:' + JSON.stringify({ results: R, pageErrors: ERRORS.slice(0, 8) });
+  }
+  main().catch(function (e) { document.getElementById('out').textContent = 'RESULTS_JSON:' + JSON.stringify({ results: R, fatal: 'driver threw: ' + (e && e.stack || e) }); });
+})();
+</script>
+</body></html>

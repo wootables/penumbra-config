@@ -1,0 +1,312 @@
+[
+    {
+        "name":  "L1 Chart.js and the chart module are up",
+        "pass":  true,
+        "detail":  "function / true"
+    },
+    {
+        "name":  "D1 one category per fiscal year, in order",
+        "pass":  true,
+        "detail":  "got [\"FY 2024\",\"FY 2025\",\"FY 2026\"] | want [\"FY 2024\",\"FY 2025\",\"FY 2026\"]"
+    },
+    {
+        "name":  "D2 the four dollar series sum their rows",
+        "pass":  true,
+        "detail":  "got [[40,40,35],[70,60,80],[20,25,22],[50,55,66]] | want [[40,40,35],[70,60,80],[20,25,22],[50,55,66]]"
+    },
+    {
+        "name":  "D3 a distinct count of TEXT award ids counts the ids (a $0 action excluded by its filter)",
+        "pass":  true,
+        "detail":  "got [[3,2,2],[2,1,1]] | want [[3,2,2],[2,1,1]]"
+    },
+    {
+        "name":  "D4 bars record their stack group, default group 1; lines record none",
+        "pass":  true,
+        "detail":  "got [\"grp1\",\"grp1\",\"grp2\",\"grp2\",null,null] | want [\"grp1\",\"grp1\",\"grp2\",\"grp2\",null,null]"
+    },
+    {
+        "name":  "D5 the data builder sets no Chart.js stack id itself (that is the renderer\u0027s call)",
+        "pass":  true,
+        "detail":  "got [false,false,false,false,false,false] | want [false,false,false,false,false,false]"
+    },
+    {
+        "name":  "D6 an out-of-range or junk stack is group 1; \" 3 \" and the number 4 are read",
+        "pass":  true,
+        "detail":  "got [\"grp1\",\"grp3\",\"grp1\",\"grp4\"] | want [\"grp1\",\"grp3\",\"grp1\",\"grp4\"]"
+    },
+    {
+        "name":  "D7 options y2Label rides the data (trimmed); none = empty",
+        "pass":  true,
+        "detail":  "got [\"Number of awards\",\"N\",\"\",\"\"] | want [\"Number of awards\",\"N\",\"\",\"\"]"
+    },
+    {
+        "name":  "D8 sorting by a distinct count of text orders by the real counts (a = 3 ids, b = 1)",
+        "pass":  true,
+        "detail":  "got [[\"a\",\"b\"],[3,1]] | want [[\"a\",\"b\"],[3,1]]"
+    },
+    {
+        "name":  "R1 stacked: both axes stack",
+        "pass":  true,
+        "detail":  "got [true,true] | want [true,true]"
+    },
+    {
+        "name":  "R2 stacked: bars take their group, every line a stack of its own, lines on the right axis",
+        "pass":  true,
+        "detail":  "got [[\"grp1\",\"y\"],[\"grp1\",\"y\"],[\"grp2\",\"y\"],[\"grp2\",\"y\"],[\"__line4\",\"y2\"],[\"__line5\",\"y2\"]] | want [[\"grp1\",\"y\"],[\"grp1\",\"y\"],[\"grp2\",\"y\"],[\"grp2\",\"y\"],[\"__line4\",\"y2\"],[\"__line5\",\"y2\"]]"
+    },
+    {
+        "name":  "R3 the right axis carries the y2Label title",
+        "pass":  true,
+        "detail":  "got [true,\"Number of awards\"] | want [true,\"Number of awards\"]"
+    },
+    {
+        "name":  "R4 per year: the award bars share one column, the R\u0026D bars another, side by side",
+        "pass":  true,
+        "detail":  "[[106,106,201,201],[343,343,437,437],[579,579,674,674]]"
+    },
+    {
+        "name":  "R5 the top award segment ends at the stack total (FY 2024: 40 + 70)",
+        "pass":  true,
+        "detail":  "110.43333333333335 vs 110.43333333333335"
+    },
+    {
+        "name":  "R6 ...and starts where the NSA segment ends",
+        "pass":  true,
+        "detail":  "264.6666666666667 vs 264.6666666666667"
+    },
+    {
+        "name":  "R7 the top R\u0026D segment ends at its own stack total (20 + 50), not the awards\u0027",
+        "pass":  true,
+        "detail":  "198.56666666666666 vs 198.56666666666666"
+    },
+    {
+        "name":  "R8 a count line sits at its own value on the right axis (NSA FY 2024 = 2, not 3 + 2)",
+        "pass":  true,
+        "detail":  "176.53333333333336 vs 176.53333333333336"
+    },
+    {
+        "name":  "R9 the right axis prints plain counts (no $)",
+        "pass":  true,
+        "detail":  "0 0.5 1 1.5 2 2.5 3"
+    },
+    {
+        "name":  "R10 unstacked: no dataset carries a stack id",
+        "pass":  true,
+        "detail":  "got [true,true,true,true,true,true] | want [true,true,true,true,true,true]"
+    },
+    {
+        "name":  "R11 unstacked: four bars, four columns",
+        "pass":  true,
+        "detail":  "[77,126,176,225]"
+    },
+    {
+        "name":  "R12 a stacked then unstacked render of the same data leaves no stale stack id",
+        "pass":  true,
+        "detail":  "got [true,true,true,true,true,true] | want [true,true,true,true,true,true]"
+    },
+    {
+        "name":  "R13 stacked, one axis: the second line sits at its own value (2), not on the first",
+        "pass":  true,
+        "detail":  "348.3933333333333 vs 348.3933333333333"
+    },
+    {
+        "name":  "R14 no y2Label = no right-axis title",
+        "pass":  true,
+        "detail":  "got [false] | want [false]"
+    },
+    {
+        "name":  "R15 a stacked combo saved before stack groups still stacks all its bars together",
+        "pass":  true,
+        "detail":  "[157,157,157,157]"
+    },
+    {
+        "name":  "B1 Stack Data is offered on a combo (enabled, unticked, chip not dimmed)",
+        "pass":  true,
+        "detail":  "got [false,false,false] | want [false,false,false]"
+    },
+    {
+        "name":  "B2 no Stack column until Stack Data is ticked",
+        "pass":  true,
+        "detail":  "got [false,\"none\"] | want [false,\"none\"]"
+    },
+    {
+        "name":  "B3 ticking Stack Data shows the Stack column (header and rows)",
+        "pass":  true,
+        "detail":  "got [true,\"block\",\"block\"] | want [true,\"block\",\"block\"]"
+    },
+    {
+        "name":  "B3b the Stack header and its ? icon end at least 4px before the Agg header",
+        "pass":  true,
+        "detail":  "gap 8px; stack cell [576,634] icon [617,632] agg [640,773] stack text w 58 icon css relative/inline-flex/13px"
+    },
+    {
+        "name":  "B4 every row starts on Stack 1; a line row hides and disables its picker",
+        "pass":  true,
+        "detail":  "got [[\"1\",\"visible\",false],[\"1\",\"visible\",false],[\"1\",\"visible\",false],[\"1\",\"visible\",false],[\"1\",\"hidden\",true],[\"1\",\"hidden\",true]] | want [[\"1\",\"visible\",false],[\"1\",\"visible\",false],[\"1\",\"visible\",false],[\"1\",\"visible\",false],[\"1\",\"hidden\",true],[\"1\",\"hidden\",true]]"
+    },
+    {
+        "name":  "B5 Stack to 100% stays hidden on a combo",
+        "pass":  true,
+        "detail":  "got \"none\" | want \"none\""
+    },
+    {
+        "name":  "B6 switching a row to Line hides its picker, back to Bar shows it",
+        "pass":  true,
+        "detail":  "got [\"hidden\",\"visible\"] | want [\"hidden\",\"visible\"]"
+    },
+    {
+        "name":  "B7 Right Y Label is hidden until Dual Y-Axis is ticked",
+        "pass":  true,
+        "detail":  "got \"none\" | want \"none\""
+    },
+    {
+        "name":  "B8 ...and shown once it is",
+        "pass":  true,
+        "detail":  "got true | want true"
+    },
+    {
+        "name":  "B9 the series list saves \"stack\" only for bars off Stack 1",
+        "pass":  true,
+        "detail":  "got [null,null,\"2\",\"2\",null,null] | want [null,null,\"2\",\"2\",null,null]"
+    },
+    {
+        "name":  "B10 the options carry y2Label",
+        "pass":  true,
+        "detail":  "got \"Number of awards\" | want \"Number of awards\""
+    },
+    {
+        "name":  "B11 the builder drew a preview",
+        "pass":  true,
+        "detail":  "no chart on #vizChart"
+    },
+    {
+        "name":  "B12 the PREVIEW stacks (it used to force a combo unstacked)",
+        "pass":  true,
+        "detail":  "got [true,true] | want [true,true]"
+    },
+    {
+        "name":  "B13 the preview groups the bars by stack and keeps each line alone on the right axis",
+        "pass":  true,
+        "detail":  "got [[\"grp1\",\"y\"],[\"grp1\",\"y\"],[\"grp2\",\"y\"],[\"grp2\",\"y\"],[\"__line4\",\"y2\"],[\"__line5\",\"y2\"]] | want [[\"grp1\",\"y\"],[\"grp1\",\"y\"],[\"grp2\",\"y\"],[\"grp2\",\"y\"],[\"__line4\",\"y2\"],[\"__line5\",\"y2\"]]"
+    },
+    {
+        "name":  "B14 the preview titles the right axis",
+        "pass":  true,
+        "detail":  "got [true,\"Number of awards\"] | want [true,\"Number of awards\"]"
+    },
+    {
+        "name":  "B15 the builder emits one vis() call the app can parse",
+        "pass":  true,
+        "detail":  "vis(\u0027combo\u0027, \u0027FY\u0027, \u0027none\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027\u0027, true, true, \u0027100%\u0027, 455, \u0027bottom\u0027, \u0027auto\u0027, true, true, true, \u0027top\u0027, \u0027label\u0027, \u0027asc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, true, false, \u0027\u0027, \u0027\u0027, "
+    },
+    {
+        "name":  "B16 ...stacked, Dual Y-Axis, Stack 2 on the R\u0026D bars, y2Label in the options, no Group By stack options",
+        "pass":  true,
+        "detail":  "got [\"combo\",true,true,[null,null,\"2\",\"2\",null,null],\"Number of awards\",false,\"default\"] | want [\"combo\",true,true,[null,null,\"2\",\"2\",null,null],\"Number of awards\",false,\"default\"]"
+    },
+    {
+        "name":  "X1 the report rendered the chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "X2 report datasets = preview datasets (label, type, stack, axis, values)",
+        "pass":  true,
+        "detail":  "got [[\"NSA awards\",\"bar\",\"grp1\",\"y\",[40,40,35]],[\"Other DOD/DOW awards\",\"bar\",\"grp1\",\"y\",[70,60,80]],[\"NSA R\u0026D\",\"bar\",\"grp2\",\"y\",[20,25,22]],[\"Other DOD/DOW R\u0026D\",\"bar\",\"grp2\",\"y\",[50,55,66]],[\"DOD/DOW awards (#)\",\"line\",\"__line4\",\"y2\",[3,2,2]],[\"NSA awards (#)\",\"line\",\"__line5\",\"y2\",[2,1,1]]] | want [[\"NSA awards\",\"bar\",\"grp1\",\"y\",[40,40,35]],[\"Other DOD/DOW awards\",\"bar\",\"grp1\",\"y\",[70,60,80]],[\"NSA R\u0026D\",\"bar\",\"grp2\",\"y\",[20,25,22]],[\"Other DOD/DOW R\u0026D\",\"bar\",\"grp2\",\"y\",[50,55,66]],[\"DOD/DOW awards (#)\",\"line\",\"__line4\",\"y2\",[3,2,2]],[\"NSA awards (#)\",\"line\",\"__line5\",\"y2\",[2,1,1]]]"
+    },
+    {
+        "name":  "X3 report axes = preview axes (stacking, right-axis title)",
+        "pass":  true,
+        "detail":  "got [true,true,[true,\"Number of awards\"]] | want [true,true,[true,\"Number of awards\"]]"
+    },
+    {
+        "name":  "X4 ...and both are the design: stacked, titled right axis",
+        "pass":  true,
+        "detail":  "got [true,true,[true,\"Number of awards\"]] | want [true,true,[true,\"Number of awards\"]]"
+    },
+    {
+        "name":  "X5 in the report, FY 2025 shows two stacked columns",
+        "pass":  true,
+        "detail":  "[386,386,494,494]"
+    },
+    {
+        "name":  "X6 the report\u0027s years run in order and its count lines read 3/2/2 and 2/1/1",
+        "pass":  true,
+        "detail":  "got [[\"FY 2024\",\"FY 2025\",\"FY 2026\"],[[3,2,2],[2,1,1]]] | want [[\"FY 2024\",\"FY 2025\",\"FY 2026\"],[[3,2,2],[2,1,1]]]"
+    },
+    {
+        "name":  "O1 re-opened: Stack Data and Dual Y-Axis ticked, Stack Data enabled, Stack column shown",
+        "pass":  true,
+        "detail":  "got [true,false,true,true] | want [true,false,true,true]"
+    },
+    {
+        "name":  "O2 re-opened: every row\u0027s Stack number is back (lines hidden)",
+        "pass":  true,
+        "detail":  "got [[\"1\",\"visible\",false],[\"1\",\"visible\",false],[\"2\",\"visible\",false],[\"2\",\"visible\",false],[\"1\",\"hidden\",true],[\"1\",\"hidden\",true]] | want [[\"1\",\"visible\",false],[\"1\",\"visible\",false],[\"2\",\"visible\",false],[\"2\",\"visible\",false],[\"1\",\"hidden\",true],[\"1\",\"hidden\",true]]"
+    },
+    {
+        "name":  "O3 re-opened: Right Y Label is back and shown",
+        "pass":  true,
+        "detail":  "got [\"Number of awards\",true] | want [\"Number of awards\",true]"
+    },
+    {
+        "name":  "O4 re-opened and re-emitted: the same chart (type, stacking, axis, series, options)",
+        "pass":  true,
+        "detail":  "got [\"combo\",true,true,[{\"col\":\"AMOUNT\",\"type\":\"bar\",\"agg\":\"sum\",\"color\":\"#990000\",\"filterExpression\":\"DOD_DOW = Award AND NSA = Award\",\"label\":\"NSA awards\",\"values\":\"none\"},{\"col\":\"AMOUNT\",\"type\":\"bar\",\"agg\":\"sum\",\"color\":\"#990000\",\"filterExpression\":\"DOD_DOW = Award AND NSA = empty\",\"label\":\"Other DOD/DOW awards\",\"values\":\"none\"},{\"col\":\"AMOUNT\",\"type\":\"bar\",\"agg\":\"sum\",\"color\":\"#990000\",\"filterExpression\":\"DOD_DOW = Expenditure AND NSA = Expenditure\",\"label\":\"NSA R\u0026D\",\"values\":\"none\",\"stack\":\"2\"},{\"col\":\"AMOUNT\",\"type\":\"bar\",\"agg\":\"sum\",\"color\":\"#990000\",\"filterExpression\":\"DOD_DOW = Expenditure AND NSA = empty\",\"label\":\"Other DOD/DOW R\u0026D\",\"values\":\"none\",\"stack\":\"2\"},{\"col\":\"AWARD_ID\",\"type\":\"line\",\"agg\":\"distinct\",\"color\":\"#990000\",\"filterExpression\":\"DOD_DOW = Award AND AMOUNT \u003e 0\",\"label\":\"DOD/DOW awards (#)\",\"values\":\"none\"},{\"col\":\"AWARD_ID\",\"type\":\"line\",\"agg\":\"distinct\",\"color\":\"#990000\",\"filterExpression\":\"NSA = Award AND AMOUNT \u003e 0\",\"label\":\"NSA awards (#)\",\"values\":\"none\"}],\"{\\\"y2Label\\\":\\\"Number of awards\\\"}\"] | want [\"combo\",true,true,[{\"col\":\"AMOUNT\",\"type\":\"bar\",\"agg\":\"sum\",\"color\":\"#990000\",\"filterExpression\":\"DOD_DOW = Award AND NSA = Award\",\"label\":\"NSA awards\",\"values\":\"none\"},{\"col\":\"AMOUNT\",\"type\":\"bar\",\"agg\":\"sum\",\"color\":\"#990000\",\"filterExpression\":\"DOD_DOW = Award AND NSA = empty\",\"label\":\"Other DOD/DOW awards\",\"values\":\"none\"},{\"col\":\"AMOUNT\",\"type\":\"bar\",\"agg\":\"sum\",\"color\":\"#990000\",\"filterExpression\":\"DOD_DOW = Expenditure AND NSA = Expenditure\",\"label\":\"NSA R\u0026D\",\"values\":\"none\",\"stack\":\"2\"},{\"col\":\"AMOUNT\",\"type\":\"bar\",\"agg\":\"sum\",\"color\":\"#990000\",\"filterExpression\":\"DOD_DOW = Expenditure AND NSA = empty\",\"label\":\"Other DOD/DOW R\u0026D\",\"values\":\"none\",\"stack\":\"2\"},{\"col\":\"AWARD_ID\",\"type\":\"line\",\"agg\":\"distinct\",\"color\":\"#990000\",\"filterExpression\":\"DOD_DOW = Award AND AMOUNT \u003e 0\",\"label\":\"DOD/DOW awards (#)\",\"values\":\"none\"},{\"col\":\"AWARD_ID\",\"type\":\"line\",\"agg\":\"distinct\",\"color\":\"#990000\",\"filterExpression\":\"NSA = Award AND AMOUNT \u003e 0\",\"label\":\"NSA awards (#)\",\"values\":\"none\"}],\"{\\\"y2Label\\\":\\\"Number of awards\\\"}\"]"
+    },
+    {
+        "name":  "O5 unticking Stack Data hides the column and saves no stack keys",
+        "pass":  true,
+        "detail":  "got [false,false] | want [false,false]"
+    },
+    {
+        "name":  "O6 Dual Y-Axis off: Right Y Label hidden and not in the options",
+        "pass":  true,
+        "detail":  "got [\"none\",true] | want [\"none\",true]"
+    },
+    {
+        "name":  "N1 arriving at a combo clears Stack to 100% and Stack Order",
+        "pass":  true,
+        "detail":  "got [false,\"default\"] | want [false,\"default\"]"
+    },
+    {
+        "name":  "N2 a stacked combo\u0027s vis() call never carries Stack to 100% or a Stack Order",
+        "pass":  true,
+        "detail":  "got [true,false,\"default\"] | want [true,false,\"default\"]"
+    },
+    {
+        "name":  "N3 updateStackOptions keeps Stack to 100% hidden on a stacked combo",
+        "pass":  true,
+        "detail":  "got \"none\" | want \"none\""
+    },
+    {
+        "name":  "T1 a combo puts the real Stack Data tip back (not the Group By \"Disabled\" one)",
+        "pass":  true,
+        "detail":  "got [true,true] | want [true,true]"
+    },
+    {
+        "name":  "T2 the Stack Data tip explains the combo case",
+        "pass":  true,
+        "detail":  "Stack grouped bars on top of each other instead of side-by-side. Requires Group By to be set. Enables Stack Order and Stack to 100% options. On a Combo chart it stacks the bar series instead: each series\u0027 Stack number picks the bar it joins, and lines never stack."
+    },
+    {
+        "name":  "S1 help: a viz-series-stack tip exists",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "S2 help: a viz-y2-label tip exists",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "S3 help: arg 31 documents the \"stack\" key, arg 41 y2Label",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "S4 index: the Right Y Label field, hidden by default, with its tip",
+        "pass":  true,
+        "detail":  ""
+    }
+]

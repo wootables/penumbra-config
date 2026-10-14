@@ -1,0 +1,312 @@
+<?php
+/**
+ * peoplesync - pins the PURE half of the employee-directory sync
+ * (people_sync_lib.php): the column map, the HR extraction SQL, row
+ * normalization, array-bind chunking, the guard verdicts, and the DDL/MERGE text.
+ *
+ *   php -n test_peoplesync.php <path-to-people_sync_lib.php>
+ *
+ * Requires the SHIPPED library straight from the app folder - never a copy.
+ * No database anywhere: everything under test is a function of its arguments.
+ * Tail must read "PASS: N   FAIL: 0" then "RESULT: GREEN".
+ */
+$lib = isset($argv[1]) ? $argv[1] : (dirname(__FILE__) . '/../../../../c$/inetpub/wwwroot/sponsor_migration/penumbra/people_sync_lib.php');
+if (!is_file($lib)) { echo "library not found: $lib\n"; echo "RESULT: RED\n"; return; }
+require $lib;
+
+$PASS = 0; $FAIL = 0;
+function ok($cond, $label) {
+    global $PASS, $FAIL;
+    if ($cond) { $PASS++; echo "  ok   $label\n"; }
+    else       { $FAIL++; echo "  FAIL $label\n"; }
+}
+function eq($got, $want, $label) {
+    global $PASS, $FAIL;
+    if ($got === $want) { $PASS++; echo "  ok   $label\n"; }
+    else { $FAIL++; echo "  FAIL $label\n       want: " . var_export($want, true) . "\n       got:  " . var_export($got, true) . "\n"; }
+}
+
+// ---------------------------------------------------------------- 1. columns
+echo "1. column map\n";
+$cols = people_sync_columns();
+eq(count($cols), 37, '37 columns (PI_ELIGIBLE joined the map on 2026-09-23, OUCS_ALL that night)');
+eq(array_keys($cols)[0], 'EMPLID', 'EMPLID first (the PK / MERGE key)');
+$bad = array();
+foreach ($cols as $c => $spec) {
+    if (!in_array($spec[0], array('S', 'N', 'D'), true)) $bad[] = $c;
+    if ($spec[0] === 'S' && (int)$spec[1] <= 0) $bad[] = $c . ' width';
+    if (!preg_match('/^[A-Z][A-Z0-9_]*$/', $c)) $bad[] = $c . ' name';
+}
+eq($bad, array(), 'every column has a valid type, a width when VARCHAR2, and an Oracle-safe name');
+ok(!isset($cols['EMAIL_ALIAS']), 'no EMAIL_ALIAS column: HR EMAIL_ADDR is the SUPERVISOR address, not an alias (renamed 2026-09-23)');
+foreach (array('EMAIL', 'SUPERVISOR_EMAIL', 'UNITY_ID', 'OUC', 'DEPT_NAME', 'JOBCODE', 'ACTIVE', 'HR_ACTION_DT', 'JOBCODES_ALL') as $must) {
+    ok(isset($cols[$must]), "has $must");
+}
+eq($cols['ACTIVE'][0], 'N', 'ACTIVE is numeric');
+eq($cols['HIRE_DT'][0], 'D', 'HIRE_DT is a date');
+
+// ------------------------------------------------------------- 2. extract SQL
+echo "2. HR extraction SQL\n";
+$sql = people_sync_extract_sql();
+ok(stripos($sql, 'PS_NC_ASSGN_EMP_VW') !== false, 'reads PS_NC_ASSGN_EMP_VW');
+ok(stripos($sql, 'PS_JOB') !== false, 'reads PS_JOB for JOB_INDICATOR');
+ok(stripos($sql, 'PS_NC_OPRDEFN_VW') !== false, 'reads PS_NC_OPRDEFN_VW for the Unity ID');
+ok(preg_match('/EFFDT\s*<\s*TRUNC\(SYSDATE\)\s*\+\s*1/', $sql) === 1, 'future-dated rows excluded (the view holds rows dated to 2027)');
+ok(substr_count($sql, 'ORDER BY EFFDT DESC, EFFSEQ DESC') >= 2, 'current row = latest EFFDT/EFFSEQ, on the view AND on PS_JOB');
+ok(strpos($sql, 'ORDER BY C.IS_ACTIVE DESC') !== false, 'primary job: active first');
+ok(strpos($sql, "JOB_INDICATOR = 'P'") !== false, 'primary job: then JOB_INDICATOR = P');
+ok(preg_match('/C\.FTE DESC,\s*C\.EMPL_RCD\)/', $sql) === 1, 'primary job: then FTE desc, then lowest EMPL_RCD');
+ok(strpos($sql, "EMPL_STATUS IN ('A','L','P','S','W')") !== false, 'ACTIVE = A/L/P/S/W');
+ok(strpos($sql, 'ACCTLOCK = 0') !== false, 'Unity map: unlocked accounts only');
+ok(strpos($sql, 'LOWER(MIN(NC_UNITYID)) AS UNITY_ID') !== false, 'Unity ID stored lower-case (PeopleSoft OPRIDs are upper-case; every Penumbra id is lower-case)');
+ok(strpos($sql, 'LOWER(TRIM(R.EMAILID))') !== false && strpos($sql, 'AS EMAIL,') !== false, 'EMAIL is the EMAILID (unity) form, lower-cased');
+ok(strpos($sql, 'LOWER(TRIM(R.EMAIL_ADDR))') !== false && strpos($sql, 'AS SUPERVISOR_EMAIL') !== false, 'SUPERVISOR_EMAIL is EMAIL_ADDR (the supervisor address the view carries after REPORTS_TO)');
+ok(strpos($sql, 'EMAIL_ALIAS') === false, 'nothing is still called EMAIL_ALIAS');
+ok(preg_match('/\bWHERE\s+R\.PRN\s*=\s*1\s*$/', trim($sql)) === 1, 'ends by taking exactly the primary row per person');
+ok(stripos($sql, 'EMPL_STATUS IN (\'A\'') !== false && stripos($sql, "WHERE R.EMPL_STATUS") === false, 'terminated people are NOT filtered out (kept with ACTIVE = 0)');
+$missing = array();
+foreach (array_keys($cols) as $c) {
+    if ($c === 'EMPLID' || $c === 'UNITY_ID') continue;   // selected bare
+    if (!preg_match('/\bAS\s+' . $c . '\b/', $sql)) $missing[] = $c;
+}
+eq($missing, array(), 'every column in the map is projected under its own name');
+foreach (array('HIRE_DT', 'TERMINATION_DT', 'HR_EFFDT', 'HR_ACTION_DT') as $d) {
+    ok(preg_match("/TO_CHAR\\([A-Z_.]+,\\s*'YYYY-MM-DD'\\)\\s+AS $d\\b/", $sql) === 1, "$d leaves HR as TO_CHAR YYYY-MM-DD (no NLS assumption)");
+}
+foreach (array('BIRTHDATE', 'SEX', 'HISP_LATINO', 'NC_EG1_DESCR', 'CITIZENSHIP', 'VISA', 'COMPRATE', 'ANNUAL_RT', 'MONTHLY_RT', 'HOURLY_RT', 'VACLVE', 'SICKLVE', 'ADDRESS1', 'POSTAL') as $sensitive) {
+    ok(stripos($sql, $sensitive) === false, "never reads $sensitive");
+}
+
+// -------------------------------------------------------------- 3. normalize
+echo "3. normalization\n";
+$p = array();
+$row = array('EMPLID' => ' 000123456 ', 'FIRST_NAME' => 'Ada', 'MIDDLE_NAME' => ' ', 'LAST_NAME' => '', 'ACTIVE' => '1',
+             'FTE' => '1.000000', 'HIRE_DT' => '2019-08-16', 'TERMINATION_DT' => null, 'UNKNOWN_COL' => 'x');
+$n = people_sync_normalize_row($row, $p);
+eq(array_keys($n), array_keys($cols), 'output keys = the column map, in order');
+eq($n['EMPLID'], '000123456', 'trimmed');
+eq($n['MIDDLE_NAME'], null, "a lone space (PeopleSoft's empty) becomes NULL");
+eq($n['LAST_NAME'], null, 'empty string becomes NULL');
+eq($n['TERMINATION_DT'], null, 'null stays null');
+eq($n['OUC'], null, 'a column absent from the row is NULL, not an undefined-index warning');
+ok(!array_key_exists('UNKNOWN_COL', $n), 'unknown source columns are dropped');
+eq($n['ACTIVE'], '1', 'numeric kept as text (bound as text)');
+eq($n['FTE'], '1.000000', 'numeric text kept verbatim');
+eq($p, array(), 'a clean row reports no problems');
+
+$p = array();
+$long = str_repeat('x', 130);
+$n = people_sync_normalize_row(array('EMPLID' => '1', 'FIRST_NAME' => $long, 'ACTIVE' => 'yes', 'HIRE_DT' => '16-AUG-19', 'EMPL_RCD' => '0'), $p);
+eq(strlen($n['FIRST_NAME']), 120, 'over-width VARCHAR2 value clamped to the column width');
+eq($n['ACTIVE'], null, 'non-numeric in a NUMBER column becomes NULL');
+eq($n['HIRE_DT'], null, 'a date not in YYYY-MM-DD becomes NULL');
+eq($n['EMPL_RCD'], '0', "'0' is a real value, not blank");
+eq(count($p), 3, 'each of the three repairs is reported');
+ok(strpos($p[0], 'FIRST_NAME') === 0 && strpos($p[0], 'clamped') !== false, 'the clamp is named by column');
+
+$p = array();
+$acc = str_repeat("\xC3\xA9", 70);   // 70 x 'e-acute' = 140 bytes, 70 chars
+$n = people_sync_normalize_row(array('EMPLID' => '1', 'FIRST_NAME' => $acc), $p);
+ok(strlen($n['FIRST_NAME']) <= 120 && strlen($n['FIRST_NAME']) % 2 === 0, 'the byte clamp never splits a multibyte sequence');
+ok(function_exists('mb_strcut') ? (mb_check_encoding($n['FIRST_NAME'], 'UTF-8')) : true, 'clamped value is still valid UTF-8');
+
+// ------------------------------------------------------------------ 4. chunk
+echo "4. array-bind chunking\n";
+$rows = array(
+    people_sync_normalize_row(array('EMPLID' => '1', 'FIRST_NAME' => 'A', 'ACTIVE' => '1')),
+    people_sync_normalize_row(array('EMPLID' => '2', 'ACTIVE' => '0', 'HIRE_DT' => '2001-01-01')),
+);
+$ch = people_sync_chunk_columns($rows);
+eq($ch['__n'], 2, 'row count carried');
+$lens = array(); foreach (array_keys($cols) as $c) $lens[count($ch[$c])] = true;
+eq(array_keys($lens), array(2), 'every column array has exactly the row count (OCI array binds are positional)');
+eq($ch['EMPLID'], array('1', '2'), 'values in row order');
+eq($ch['FIRST_NAME'], array('A', ''), 'NULL becomes an empty string for the bind');
+eq($ch['HIRE_DT'], array('', '2001-01-01'), 'dates pass through as text');
+$empty = people_sync_chunk_columns(array());
+eq($empty['__n'], 0, 'empty chunk has zero rows');
+
+// ------------------------------------------------------------ 5. insert SQL
+echo "5. staging INSERT\n";
+$ins = people_sync_stage_insert_sql('NC_REPORTING');
+ok(strpos($ins, 'BEGIN FORALL i IN 1 .. :n INSERT INTO NC_REPORTING.PENUMBRA_PEOPLE_STG (') === 0, 'a PL/SQL FORALL block over the chunk (collections cannot be bound to plain SQL - ORA-01484 on the first live run)');
+ok(substr($ins, -5) === ' END;', 'closes the block');
+eq(preg_match_all('/:[a-z_]+\(i\)/', $ins), 37, 'one collection element bind :col(i) per column');
+eq(substr_count($ins, ':n '), 1, 'plus the scalar :n chunk size');
+foreach (array('hire_dt', 'termination_dt', 'hr_effdt', 'hr_action_dt') as $d) {
+    ok(strpos($ins, "TO_DATE(:$d(i), 'YYYY-MM-DD')") !== false, "date column $d goes through TO_DATE");
+}
+ok(strpos($ins, 'TO_DATE(:emplid') === false, 'non-date columns bind directly');
+preg_match('/STG \((.*?)\) VALUES/', $ins, $m);
+eq(array_map('trim', explode(',', $m[1])), array_keys($cols), 'column list is the map, in map order');
+
+// ----------------------------------------------------------------- 6. guards
+echo "6. guards\n";
+$today = '2026-09-22';
+$g = people_sync_guards(array('rows' => 71866, 'active' => 24636, 'max_action_dt' => '2026-09-21'), array('rows' => 0, 'active' => 0), $today);
+eq($g['ok'], true, 'first run (empty directory) passes');
+eq(count($g['skipped']), 2, 'first run: both ratio rules reported as skipped, not silently passed');
+$g = people_sync_guards(array('rows' => 71866, 'active' => 24636, 'max_action_dt' => '2026-09-21'), array('rows' => 71800, 'active' => 24600), $today);
+eq($g['ok'], true, 'normal night passes');
+eq($g['skipped'], array(), 'normal night skips nothing');
+$g = people_sync_guards(array('rows' => 0, 'active' => 0, 'max_action_dt' => null), array('rows' => 71800, 'active' => 24600), $today);
+eq($g['ok'], false, 'an empty extract is refused');
+ok(count($g['reasons']) >= 1 && strpos($g['reasons'][0], 'empty') === 0, 'and says so first');
+$g = people_sync_guards(array('rows' => 60000, 'active' => 24600, 'max_action_dt' => '2026-09-21'), array('rows' => 71800, 'active' => 24600), $today);
+eq($g['ok'], false, 'a row count under 90% of the directory is refused (truncated extract)');
+ok(strpos(implode('|', $g['reasons']), 'rows:') !== false, 'names the rows rule');
+$g = people_sync_guards(array('rows' => 71866, 'active' => 20000, 'max_action_dt' => '2026-09-21'), array('rows' => 71800, 'active' => 24600), $today);
+eq($g['ok'], false, 'an active count under 90% is refused (everyone would go terminated)');
+ok(strpos(implode('|', $g['reasons']), 'active:') !== false, 'names the active rule');
+$g = people_sync_guards(array('rows' => 64620, 'active' => 22140, 'max_action_dt' => '2026-09-21'), array('rows' => 71800, 'active' => 24600), $today);
+eq($g['ok'], true, 'exactly 90% is still accepted (threshold is inclusive)');
+$g = people_sync_guards(array('rows' => 71866, 'active' => 24636, 'max_action_dt' => '2026-09-14'), array('rows' => 71800, 'active' => 24600), $today);
+eq($g['ok'], false, 'newest HR_ACTION_DT 8 days old is refused (stale copy)');
+ok(strpos(implode('|', $g['reasons']), 'stale:') !== false, 'names the stale rule');
+$g = people_sync_guards(array('rows' => 71866, 'active' => 24636, 'max_action_dt' => '2026-09-15'), array('rows' => 71800, 'active' => 24600), $today);
+eq($g['ok'], true, '7 days old is still accepted');
+$g = people_sync_guards(array('rows' => 71866, 'active' => 24636, 'max_action_dt' => ''), array('rows' => 71800, 'active' => 24600), $today);
+eq($g['ok'], false, 'no HR_ACTION_DT at all is refused');
+$g = people_sync_guards(array('rows' => 100, 'active' => 50, 'max_action_dt' => '2026-09-21'), array('rows' => 71800, 'active' => 24600), $today, array('min_ratio' => 0.001));
+eq($g['ok'], true, 'thresholds are overridable');
+$g = people_sync_guards(array('rows' => 60000, 'active' => 20000, 'max_action_dt' => '2026-09-01'), array('rows' => 71800, 'active' => 24600), $today);
+eq(count($g['reasons']), 3, 'every failing rule is reported, not just the first');
+
+// --------------------------------------------------------------- 7. PI guard
+echo "7. PI guard\n";
+eq(people_sync_pi_guard('2026-09-22', $today)['ok'], true, 'processed today: ok');
+eq(people_sync_pi_guard('2026-09-19', $today)['ok'], true, '3 days old: ok');
+eq(people_sync_pi_guard('2026-09-18', $today)['ok'], false, '4 days old: skipped');
+eq(people_sync_pi_guard(null, $today)['ok'], false, 'no date: skipped');
+eq(people_sync_pi_guard('yesterday', $today)['ok'], false, 'garbage date: skipped');
+eq(people_sync_days_between('2026-09-01', '2026-09-22'), 21, 'days_between');
+eq(people_sync_days_between('2026-13-01', '2026-09-22'), null, 'days_between rejects a bad date');
+
+// ------------------------------------------------------------- 8. MERGE etc.
+echo "8. MERGE / deactivate / PI SQL\n";
+$mg = people_sync_merge_sql('NC_REPORTING');
+ok(strpos($mg, 'ON (P.EMPLID = S.EMPLID)') !== false, 'MERGE keys on EMPLID');
+ok(strpos($mg, 'P.EMPLID = S.EMPLID,') === false && strpos($mg, 'SET P.UNITY_ID = S.UNITY_ID') !== false, 'UPDATE SET covers the columns but never the key');
+$notSet = array();
+foreach (array_keys($cols) as $c) { if ($c !== 'EMPLID' && strpos($mg, "P.$c = S.$c") === false) $notSet[] = $c; }
+eq($notSet, array(), 'every mapped column is updated on match');
+ok(strpos($mg, 'P.LAST_SEEN = SYSDATE') !== false, 'LAST_SEEN stamped on every match (the soft-delete signal)');
+ok(strpos($mg, 'P.UPDATED_AT = CASE WHEN') !== false, 'UPDATED_AT only moves on a real change');
+ok(strpos($mg, 'FIRST_SEEN, LAST_SEEN, UPDATED_AT') !== false && strpos($mg, 'SYSDATE, SYSDATE, SYSDATE') !== false, 'INSERT stamps all three dates');
+ok(strpos($mg, 'P.PI_ELIGIBLE = S.PI_ELIGIBLE') !== false, 'MERGE carries PI_ELIGIBLE from staging (the sync owns the rule since 2026-09-23)');
+$da = people_sync_deactivate_sql('NC_REPORTING');
+ok(strpos($da, 'SET ACTIVE = 0') !== false && strpos($da, 'WHERE ACTIVE = 1 AND LAST_SEEN < TRUNC(SYSDATE)') !== false, 'deactivate = active rows the extract did not touch today');
+ok(stripos($da, 'DELETE') === false, 'never deletes');
+$pi = people_sync_pi_drift_sql('NC_REPORTING');
+ok(strpos($pi, 'NC_REPORTING.PI_ELIGIBLE_PROFILES') !== false && substr_count($pi, 'NOT EXISTS') === 2 && strpos($pi, 'AS ONLY_OURS') !== false && strpos($pi, 'AS ONLY_REF') !== false, 'the cross-check counts the disagreement each way against PI_ELIGIBLE_PROFILES');
+ok(stripos($pi, 'UPDATE') === false && stripos($pi, 'MERGE') === false && stripos($pi, 'INSERT') === false, 'the cross-check never writes');
+ok(!function_exists('people_sync_pi_update_sql'), 'the old copy-from-the-reference step is gone');
+
+// -------------------------------------------------------------------- 9. DDL
+echo "9. DDL\n";
+$ddl = people_sync_ddl('NC_REPORTING', 'ORIED_RO');
+$types = array(); foreach ($ddl as $o) $types[] = $o['type'];
+eq(array_values(array_unique($types)), array('TABLE', 'INDEX', 'VIEW', 'GRANT'), 'order: tables, indexes, view, grants');
+$byName = array(); foreach ($ddl as $o) $byName[$o['type'] . ':' . $o['name']] = $o['sql'];
+ok(isset($byName['TABLE:PENUMBRA_PEOPLE']) && isset($byName['TABLE:PENUMBRA_PEOPLE_STG']) && isset($byName['TABLE:PENUMBRA_PEOPLE_TAGS']) && isset($byName['TABLE:PENUMBRA_REPORT_TAGS']), 'four tables (report tags since 2026-10-08)');
+$pt = $byName['TABLE:PENUMBRA_PEOPLE'];
+ok(strpos($pt, 'CONSTRAINT PK_PENUMBRA_PEOPLE PRIMARY KEY (EMPLID)') !== false, 'PEOPLE has the EMPLID primary key');
+ok(strpos($pt, 'PI_ELIGIBLE        NUMBER(1) DEFAULT 0 NOT NULL') !== false, 'PEOPLE has PI_ELIGIBLE');
+ok(strpos($pt, 'LAST_SEEN          DATE NOT NULL') !== false, 'PEOPLE has LAST_SEEN');
+ok(strpos($pt, "SOURCE             VARCHAR2(12) DEFAULT 'HR' NOT NULL") !== false && strpos($pt, "KIND               VARCHAR2(16) DEFAULT 'person' NOT NULL") !== false, 'PEOPLE has SOURCE and KIND with HR / person defaults (hand-registered accounts, 2026-09-25)');
+ok(strpos($byName['TABLE:PENUMBRA_PEOPLE_STG'], 'SOURCE') === false && strpos($byName['TABLE:PENUMBRA_PEOPLE_STG'], 'KIND') === false, 'staging carries neither: they are not HR columns');
+ok(strpos(people_sync_deactivate_sql('NC_REPORTING'), "AND SOURCE = 'HR'") !== false, 'the deactivate step touches HR rows only, so a hand-registered account survives the night');
+ok(strpos(people_sync_merge_sql('NC_REPORTING'), 'SOURCE') === false && strpos(people_sync_merge_sql('NC_REPORTING'), 'KIND') === false, 'the MERGE never sets SOURCE or KIND (the defaults make an inserted HR row HR / person)');
+ok(strpos($pt, 'EMAIL              VARCHAR2(280)') !== false, 'widths come from the column map');
+$stg = $byName['TABLE:PENUMBRA_PEOPLE_STG'];
+ok(strpos($stg, 'NOT NULL') === false && strpos($stg, 'PRIMARY KEY') === false, 'staging has no constraints (a bad extract must land so the guards can judge it)');
+ok(strpos($stg, 'PI_ELIGIBLE') !== false && strpos($stg, 'LAST_SEEN') === false, 'staging carries PI_ELIGIBLE (computed in the extract) but no bookkeeping columns');
+$tg = $byName['TABLE:PENUMBRA_PEOPLE_TAGS'];
+ok(strpos($tg, 'PRIMARY KEY (EMPLID, TAG)') !== false, 'TAGS keyed (EMPLID, TAG)');
+ok(strpos($tg, "REGEXP_LIKE(TAG, '^[A-Z][A-Z0-9_]{0,59}$')") !== false, 'tag names constrained to UPPER identifiers');
+ok(strpos($tg, 'REFERENCES NC_REPORTING.PENUMBRA_PEOPLE (EMPLID)') !== false, 'TAGS -> PEOPLE foreign key');
+// Report tags (2026-10-08): the people table's twin, keyed by the report's numeric id.
+$rt = $byName['TABLE:PENUMBRA_REPORT_TAGS'];
+ok(strpos($rt, 'PRIMARY KEY (REPORT_ID, TAG)') !== false, 'REPORT_TAGS keyed (REPORT_ID, TAG)');
+ok(strpos($rt, 'REPORT_ID  NUMBER NOT NULL') !== false && strpos($rt, 'SHORT_ID') === false, 'REPORT_TAGS keyed by the NUMERIC report id, never the short id (a rename keeps the tags)');
+ok(strpos($rt, "REGEXP_LIKE(TAG, '^[A-Z][A-Z0-9_]{0,59}$')") !== false, 'REPORT_TAGS: the same name rule as people tags');
+ok(strpos($rt, 'REFERENCES NC_REPORTING.PENUMBRA_REPORTS (ID) ON DELETE CASCADE') !== false, 'REPORT_TAGS -> REPORTS foreign key, cascading on delete');
+ok(preg_match('/\bVAL\b/', $rt) === 0 && strpos($rt, 'SOURCE') === false, 'REPORT_TAGS carries no value and no source (a label, hand-set only)');
+ok(strpos($byName['INDEX:IX_REPORT_TAGS_TAG'], 'ON NC_REPORTING.PENUMBRA_REPORT_TAGS (TAG, REPORT_ID)') !== false, 'report tags indexed by tag (the grant map and the repository search)');
+// Dashboard tags (2026-10-09): the report table's twin, keyed by the dashboard's numeric id.
+$dt = $byName['TABLE:PENUMBRA_DASHBOARD_TAGS'];
+ok(strpos($dt, 'PRIMARY KEY (DASHBOARD_ID, TAG)') !== false, 'DASHBOARD_TAGS keyed (DASHBOARD_ID, TAG)');
+ok(strpos($dt, 'DASHBOARD_ID  NUMBER NOT NULL') !== false && strpos($dt, 'SHORT_ID') === false, 'DASHBOARD_TAGS keyed by the NUMERIC dashboard id, never the short id');
+ok(strpos($dt, "REGEXP_LIKE(TAG, '^[A-Z][A-Z0-9_]{0,59}$')") !== false, 'DASHBOARD_TAGS: the same name rule as the other two');
+ok(strpos($dt, 'REFERENCES NC_REPORTING.PENUMBRA_DASHBOARDS (ID) ON DELETE CASCADE') !== false, 'DASHBOARD_TAGS -> DASHBOARDS foreign key, cascading on delete');
+ok(preg_match('/\bVAL\b/', $dt) === 0 && strpos($dt, 'SOURCE') === false, 'DASHBOARD_TAGS carries no value and no source');
+ok(strpos($byName['INDEX:IX_DASH_TAGS_TAG'], 'ON NC_REPORTING.PENUMBRA_DASHBOARD_TAGS (TAG, DASHBOARD_ID)') !== false, 'dashboard tags indexed by tag (the grant map and the home filter)');
+eq($byName['GRANT:PENUMBRA_DASHBOARD_TAGS'], 'GRANT SELECT, INSERT, UPDATE, DELETE ON NC_REPORTING.PENUMBRA_DASHBOARD_TAGS TO ORIED_RO', 'dashboard tags: DML to the app (the Tags tool and the dashboard settings write it)');
+eq(count(array_filter($ddl, function ($o) { return $o['type'] === 'INDEX'; })), 8, 'eight indexes (the dashboard tags index since 2026-10-09)');
+ok(isset($byName['INDEX:IX_PEOPLE_EMAIL']) && isset($byName['INDEX:IX_PEOPLE_UNITY']) && isset($byName['INDEX:IX_PEOPLE_OUC']), 'email, unity, ouc indexed (the lookups the app does)');
+ok(strpos($byName['INDEX:IX_PEOPLE_LNAME'], 'UPPER(LAST_NAME), UPPER(FIRST_NAME)') !== false, 'name index is function-based on UPPER');
+$v = $byName['VIEW:PENUMBRA_PEOPLE_V'];
+ok(strpos($v, 'CREATE OR REPLACE VIEW NC_REPORTING.PENUMBRA_PEOPLE_V') === 0, 'view is CREATE OR REPLACE');
+ok(strpos($v, "'|' || LISTAGG(TAG, '|' ON OVERFLOW TRUNCATE) WITHIN GROUP (ORDER BY TAG) || '|'") !== false, "TAGS is '|A|B|' so LIKE '%|X|%' is exact");
+ok(strpos($v, "JSON_OBJECTAGG(KEY TAG VALUE NVL(VAL, '1'))") !== false, 'ATTRS is a JSON object of tag -> value');
+ok(strpos($v, 'LEFT JOIN (SELECT EMPLID,') !== false && strpos($v, 'GROUP BY EMPLID) T ON T.EMPLID = P.EMPLID') !== false, 'tags pre-aggregated then joined once (not per-row scalar subqueries)');
+eq($byName['GRANT:PENUMBRA_PEOPLE'], 'GRANT SELECT ON NC_REPORTING.PENUMBRA_PEOPLE TO ORIED_RO', 'directory: SELECT only to the app');
+eq($byName['GRANT:PENUMBRA_PEOPLE_TAGS'], 'GRANT SELECT, INSERT, UPDATE, DELETE ON NC_REPORTING.PENUMBRA_PEOPLE_TAGS TO ORIED_RO', 'tags: DML to the app (Penumbra-owned data)');
+eq($byName['GRANT:PENUMBRA_REPORT_TAGS'], 'GRANT SELECT, INSERT, UPDATE, DELETE ON NC_REPORTING.PENUMBRA_REPORT_TAGS TO ORIED_RO', 'report tags: DML to the app (the Tags tool and Save As write it)');
+eq($byName['GRANT:PENUMBRA_PEOPLE_V'], 'GRANT SELECT ON NC_REPORTING.PENUMBRA_PEOPLE_V TO ORIED_RO', 'view: SELECT to the app');
+ok(!isset($byName['GRANT:PENUMBRA_PEOPLE_STG']), 'staging is never granted');
+foreach ($ddl as $o) { ok(preg_match('/\b(BIRTHDATE|COMPRATE|ANNUAL_RT|VISA|CITIZEN)\b/i', $o['sql']) === 0, 'DDL ' . $o['name'] . ' carries no sensitive column'); }
+// Dictionary comments (2026-09-24): every column explained; the job applies what the dictionary lacks.
+$cc = people_sync_column_comments();
+eq(array_values(array_diff(array_keys($cols), array_keys($cc))), array(), 'every column of the map has a comment');
+eq(array_values(array_diff(array('SOURCE', 'KIND', 'FIRST_SEEN', 'LAST_SEEN', 'UPDATED_AT'), array_keys($cc))), array(), 'and so do the five bookkeeping columns');
+eq(array_values(array_diff(array_keys($cc), array_merge(array_keys($cols), array('SOURCE', 'KIND', 'FIRST_SEEN', 'LAST_SEEN', 'UPDATED_AT')))), array(), 'no comment names a column the table does not have');
+$w = people_sync_comments_wanted();
+eq(array_keys($w), array('PENUMBRA_PEOPLE', 'PENUMBRA_PEOPLE_STG', 'PENUMBRA_PEOPLE_TAGS', 'PENUMBRA_PEOPLE_V', 'PENUMBRA_REPORT_TAGS', 'PENUMBRA_DASHBOARD_TAGS'), 'six objects carry a table comment (dashboard tags since 2026-10-09)');
+eq(array_keys($w['PENUMBRA_REPORT_TAGS']), array('', 'REPORT_ID', 'TAG', 'ADDED_BY', 'ADDED_AT', 'NOTE'), 'the report-tags table and each of its five columns are explained');
+eq(array_keys($w['PENUMBRA_DASHBOARD_TAGS']), array('', 'DASHBOARD_ID', 'TAG', 'ADDED_BY', 'ADDED_AT', 'NOTE'), 'the dashboard-tags table and each of its five columns are explained');
+eq(count($w['PENUMBRA_PEOPLE_V']) - count($w['PENUMBRA_PEOPLE']), 3, "the view repeats the table's column comments and adds TAGS, ATTRS and N_TAGS");
+$bad = array(); foreach ($w as $o => $cs) { foreach ($cs as $c => $t) { if (strlen($t) > 3900 || strpos($t, "\n") !== false || trim($t) === '') $bad[] = "$o.$c"; } }
+eq($bad, array(), 'no comment is empty, multi-line or near the 4000-byte limit');
+ok(strpos($cc['EMPL_RCD'], 'record number') !== false && strpos($cc['EMPL_RCD'], 'not a rank') !== false, 'EMPL_RCD: the record number is a label, not a rank');
+ok(strpos($cc['JOB_INDICATOR'], 'P primary job, S secondary job, N not applicable') !== false && strpos($cc['JOB_INDICATOR'], 'secondary appointment') !== false, 'JOB_INDICATOR: P/S/N, and what S means on this row');
+ok(strpos($cc['N_ACTIVE_JOBS'], 'currently active') !== false && strpos($cc['N_ACTIVE_JOBS'], '2 or more') !== false, 'N_ACTIVE_JOBS: the count of active records');
+eq(people_sync_comment_sql('NC_REPORTING', 'PENUMBRA_PEOPLE', '', "It's one"), "COMMENT ON TABLE NC_REPORTING.PENUMBRA_PEOPLE IS 'It''s one'", 'a table comment statement, quote doubled');
+eq(people_sync_comment_sql('NC_REPORTING', 'PENUMBRA_PEOPLE_V', 'TAGS', 'x'), "COMMENT ON COLUMN NC_REPORTING.PENUMBRA_PEOPLE_V.TAGS IS 'x'", 'a column comment statement');
+
+// ----------------------------------------------------------------- 10. misc
+echo "11. the PI eligibility rule (owned since 2026-09-23)\n";
+$l = people_sync_pi_rule_lists();
+eq($l['classes'], array('EFX', 'ENF', 'ES1', 'ES2', 'ECX'), 'the five EPA classes, ES2 included (the 12/2025 addition)');
+eq($l['statuses'], array('A', 'L', 'P'), 'active, leave, leave-with-pay only (S and W do not confer eligibility)');
+eq(count($l['exclude']), 13, 'thirteen title exclusions (professional/teaching/coach/athletic and the HR misspellings)');
+eq(count($l['include']), 10, 'ten title inclusions (prof/head/dean/agent/chan/director/provost + major cntr/pubsrvcpro/extension specialist)');
+eq($l['ouc_not_prefix'], '10', 'units under OUC 10 are excluded');
+$rs = people_sync_pi_rule_sql('X');
+ok(strpos($rs, "X.EMPL_STATUS IN ('A','L','P')") !== false && strpos($rs, "X.EMPL_CLASS IN ('EFX','ENF','ES1','ES2','ECX')") !== false, 'SQL: the status and class lists');
+ok(substr_count($rs, "LOWER(X.NC_JOBCODE_DESCR) LIKE '%") === 23 && strpos($rs, "AND NOT (LOWER(X.NC_JOBCODE_DESCR) LIKE '%professional%'") !== false, 'SQL: 23 title LIKEs, the exclusions negated');
+ok(strpos($rs, "SUBSTR(X.DEPTID, 1, 2) <> '10'") !== false, 'SQL: the OUC exclusion');
+eq(people_sync_pi_rule_php('A', 'EFX', 'Professor', '060401'), 1, 'a professor is eligible');
+eq(people_sync_pi_rule_php('L', 'ENF', 'Assoc Dean', '140201'), 1, 'on leave, an associate dean is eligible');
+eq(people_sync_pi_rule_php('A', 'ES2', 'Extension Specialist', '110101'), 1, 'an ES2 extension specialist (the 12/2025 addition)');
+eq(people_sync_pi_rule_php('A', 'EFX', 'Teaching Professor', '060401'), 0, 'teaching titles are excluded even though they contain prof');
+eq(people_sync_pi_rule_php('A', 'ENF', 'IT Programmer Analyst Sprvsr', '060401'), 0, 'a title with no included word is not eligible');
+eq(people_sync_pi_rule_php('A', 'ENF', 'Athletic Director', '060401'), 0, 'athletic beats director');
+eq(people_sync_pi_rule_php('A', 'STW', 'Professor', '060401'), 0, 'a student worker titled professor is not eligible (class rule)');
+eq(people_sync_pi_rule_php('T', 'EFX', 'Professor', '060401'), 0, 'terminated is not eligible');
+eq(people_sync_pi_rule_php('A', 'EFX', 'Professor', '100100'), 0, 'OUC 10xxxx is excluded');
+eq(people_sync_pi_rule_php('A', 'EFX', 'PROFESSOR', '060401'), 1, 'case-insensitive, like LOWER() LIKE');
+ok(strpos(people_sync_extract_sql(), people_sync_pi_rule_sql('X')) !== false && strpos(people_sync_extract_sql(), 'THEN 1 ELSE 0 END) AS PI_ELIGIBLE') !== false, 'the extract applies the rule to every current job row and takes the MAX per person');
+eq(PEOPLE_SYNC_PI_DRIFT_WARN, 10, 'drift above ten people raises the hub warning');
+echo "12. OUCS_ALL - every active appointment's OUC (2026-09-23 night)\n";
+$x = people_sync_extract_sql();
+ok(strpos($x, "LISTAGG(DISTINCT CASE WHEN X.IS_ACTIVE = 1 THEN TRIM(X.DEPTID) END, '|' ON OVERFLOW TRUNCATE)") !== false && strpos($x, 'ORDER BY CASE WHEN X.IS_ACTIVE = 1 THEN TRIM(X.DEPTID) END) AS OUCS_ALL') !== false && strpos($x, 'A.OUCS_ALL                            AS OUCS_ALL') !== false, 'the extract lists the distinct OUCs of the ACTIVE appointments, trimmed, pipe-joined and sorted, and projects them');
+eq(people_sync_columns()['OUCS_ALL'], array('S', 400), 'OUCS_ALL is a 400-character string column (staging DDL, the FORALL bind and the MERGE follow the map)');
+ok(strpos(people_sync_merge_sql('NC_REPORTING'), 'P.OUCS_ALL = S.OUCS_ALL') !== false, 'the MERGE carries it');
+echo "10. summary line\n";
+eq(people_sync_summary_line(array('staged' => 5, 'inserted' => 2, 'seconds' => 1.5, 'other' => 'x')), 'staged=5 inserted=2 seconds=1.5', 'known keys only, fixed order');
+// (The runner's launch decision lives in penumbra_maintenance.php and is pinned
+//  by penumbra_tests\maintenance, not here.)
+
+echo "\nPASS: $PASS   FAIL: $FAIL\n";
+echo 'RESULT: ' . ($FAIL === 0 ? 'GREEN' : 'RED') . "\n";

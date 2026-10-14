@@ -1,0 +1,827 @@
+# =============================================================================
+# TOGGLE FIXES SUITE "togglefix" (2026-10-07)
+#
+# Round A of the journal ROW TOGGLES sweep (user, 10-07: "Build the fix-first items
+# plus the cheap wins"):
+#   F1 dark themes drew a check in every UNCHECKED box; Wolfpack Red's hover filled
+#      a box solid red                                         (css/main.css)
+#   F2 scheduled sends of GROUPED / PIVOT reports dropped the toggles; the state was
+#      read twice per run; DB dumps of a grouped send          (schedule_runner.php)
+#   F3 a key column aliased in mixed case read every toggle 0 on the server
+#                                                              (journal_export.php)
+#   F4 an all-digit SHORT_ID was taken as another report's internal ID
+#                                                    (manage_journal / manage_snapshots)
+#   F5 the journal's reads let a plain viewer of a journal-OFF report read it
+#   F6 saving with the journal OFF dropped the key / toggle / row-notes setup
+#   F7 a save under another id (Save as Copy ...) kept the original's marks on screen
+#   F8 a key column missing from the data was read as blank
+#   C7 a key over the 1,000 bytes the journal stores
+#
+# Browser scenarios boot the REAL main.js through the real run path (stubbed
+# query.php + manage_journal.php, jrowfeat's 36-row fixture), with the View Options
+# journal panel and the journal dialog lifted from the index.php under test; the
+# 'srv' scenario runs server_check.php (php -n) on the build's PHP files; 'wire'
+# reads the save handler. driver.js / server_check.php record the asserts.
+#
+#   py -3 run.py                        candidate = the live webroot
+#   py -3 run.py --dir D                any build laid out like the webroot (js\main.js,
+#                                       css\main.css, js\penumbra_journal.js, index.php,
+#                                       the four PHP files); a file D lacks comes from --app
+#   py -3 run.py --control --dir D      the PRE-FIX build on Round A's scenarios: EXACTLY
+#                                       CONTROL_RED must fail (default D: the newest
+#                                       *.bak-*-tga files on live)
+#   py -3 run.py --control-c --dir D    the build before the who / when label came out
+#                                       (2026-10-08; default: *.bak-*-tgd): EXACTLY W-who-cells
+#   py -3 run.py --control-b --dir D    the Round A build on EVERY scenario: EXACTLY
+#                                       CONTROL_RED_B (Round B's asserts) must fail
+#                                       (default D: the newest *.bak-*-tgb files on live)
+#
+# Round B (2026-10-07, the cheap wins): the shared state refreshes on focus / every 3 min
+# (R-*), "Already marked by", who / when beside a box and its accessible name (W-*), the
+# status bar's "Reviewed: 2 of 36" (P2-*), bulk Undo (B-*), Arrow Up / Down (A-*, real
+# keys), a confirm before clearing another's mark (C-*), "Reviewed: Checked" bands (G-*),
+# Toggle History "Me" + jump (H-*), the touch-size rule (T-*); srvb = the server's no-op
+# toggle writes (server_check.php mode b).
+#   py -3 run.py --mutant NAME / --mutants   single-point reverts of the candidate; each
+#                                       must turn exactly its own asserts red
+#   --scn a,b    a subset;   --keep keeps the staging dir;   --verbose
+#
+# Round D (2026-10-08, user: "build 1 through 5" - Toggle History): a summary (changes / rows /
+# marked / unmarked, people who filter), each change's row state NOW, Latest per row, Marked /
+# Unmarked, Today / 7 days / 30 days, Export CSV (H2-*, scenario histplus); srvd = the server
+# half (server_check.php mode d): the per-row hover history found BY ROW in SQL, the search's
+# summary past the list cap, the marks now, latest, the state + column prefilters (SD-*).
+#   py -3 run.py --control-n --dir D    the build before Round N (default: *.bak-*-tgn) on
+#                                       EVERY scenario: EXACTLY CONTROL_RED_N must fail
+#   py -3 run.py --control-m --dir D    the build before Round M (default: *.bak-*-tgm) on
+#                                       EVERY scenario: EXACTLY CONTROL_RED_M must fail
+#   py -3 run.py --control-i --dir D    the build before Round I (default: *.bak-*-tgl) on
+#                                       EVERY scenario: EXACTLY CONTROL_RED_I must fail
+#   py -3 run.py --control-h --dir D    the build before Round H (default: *.bak-*-tgk) on
+#                                       EVERY scenario: EXACTLY CONTROL_RED_H must fail
+#   py -3 run.py --control-g --dir D    the build before Round G (default: *.bak-*-tgj) on
+#                                       EVERY scenario: EXACTLY CONTROL_RED_G must fail
+#   py -3 run.py --control-d --dir D    the build before Round D (default: *.bak-*-tge) on
+#                                       EVERY scenario: EXACTLY CONTROL_RED_D must fail
+#
+# Headless Edge over CDP; stages into %TEMP%; writes nothing to the webroot.
+# =============================================================================
+import glob, json, os, shutil, socket, subprocess, sys, tempfile, time, urllib.request
+import websocket
+try: sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+except Exception: pass
+
+HERE = os.path.dirname(os.path.abspath(__file__)) or os.getcwd()
+APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+sys.path.insert(0, r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver'); from oldver import bak_glob, bak_path   # .bak copies come from git since 2026-10-14
+EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js',
+        'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
+        'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js']
+FILES = ['js/main.js', 'css/main.css', 'js/penumbra_journal.js', 'index.php',
+         'journal_export.php', 'manage_journal.php', 'manage_snapshots.php', 'schedule_runner.php',
+         'css/penumbra_journal.css', 'penumbra_search.php', 'js/search_builder.js', 'penumbra_template.php',
+         'db_connection.php']
+# penumbra_search.php (Round I): pure functions - the who / when columns' task filter is run on it.
+# Round M: js/search_builder.js (the renamesb scenario loads it) and penumbra_template.php (srvm runs it).
+# Round P: db_connection.php (srvp lifts execClobInsert and queryViaOci8Each from it).
+PHP_FILES = ['journal_export.php', 'manage_journal.php', 'manage_snapshots.php', 'schedule_runner.php', 'penumbra_search.php',
+             'penumbra_template.php', 'db_connection.php']
+ROUND_A_BROWSER = ['dark', 'darkgrp', 'wolf', 'offsave', 'switch', 'missing', 'longkey']
+# Round B (2026-10-07, the cheap wins): refresh / "Already marked by" / who + when / the
+# status bar's "Reviewed: 2 of 36" / bulk Undo / Arrow keys / clearing another's mark /
+# "Reviewed: Checked" bands / Toggle History "Me" + jump / the touch-size rule; srvb = the
+# server's no-op toggle writes.
+ROUND_B_BROWSER = ['refresh', 'already', 'who', 'progress', 'bulkundo', 'arrows', 'confirmclear', 'bandlabel', 'histjump', 'touchcss',
+                   'hiddendrop']
+# Round D (2026-10-08): Toggle History's summary / now / latest / filters / Export CSV; srvd =
+# the server half.
+ROUND_D_BROWSER = ['histplus']
+# Round E (2026-10-08, the sweep's items 1-7): failed saves, the hover history, marks that
+# cannot load, group footers, no bulk from a snapshot, the label warnings, used keys, print,
+# the sort replay, format() with a hidden key, a regroup with a search, the snippet guard;
+# srve = the server half.
+ROUND_E_BROWSER = ['failsave', 'histflip', 'loadfail', 'grpfoot', 'snapbulk', 'notesname', 'usedkeys', 'printrule',
+                   'noteresort', 'cfhidden', 'regroupsearch', 'snipguard', 'snipjournal']
+# Round G (2026-10-08, "the smaller leftovers"): a ?state= link, an empty key, a grouped sort
+# on a toggle, the hidden-columns notice, the hover history beside the box, Toggle History's
+# names from then, step 1's counts / the saved key / a cancelled turn-on, band summaries,
+# format() by label, a "constructor" key, a template beside a real column; wireg = the save's
+# saved key, srvg = the server half.
+ROUND_G_BROWSER = ['stateonly', 'blankkey', 'grpsort', 'dupkey', 'missnotice', 'poppos', 'histlabels', 'keywarn',
+                   'pubcancel', 'bandsum', 'cfcell', 'ctorkey', 'tpl']
+# Round H (2026-10-08, item 8 - bulk ticking for every viewer): the header's box (every row the
+# search shows; a group's own), Shift+click ranges; and a Toggle History name filters to that person.
+ROUND_H_BROWSER = ['hdrall', 'hdrpage', 'hdrgroup', 'hdrfail', 'shiftrange', 'histname']
+# Round I (2026-10-08, item 9 - the who and when columns): "Reviewed by" / "Reviewed on" beside the
+# toggle - their values, a tick, search, sort, a template, grouping, the switch off and on, a saved
+# sort on one; wirei = the API's and the runner's reorders keep them, srvi = the server half.
+ROUND_I_BROWSER = ['whocols', 'whogroup', 'whooff', 'whosortload']
+# Round M (2026-10-08, item 10 - safe renames): a toggle renamed from "Reviewed" to "Complete" - what was
+# saved under "Reviewed" (search, snippet, format, template, button, grouping, band summary, the builder),
+# a rename in the setup, Undo, a name a current column holds; wirem = the save and the dashboard routing,
+# srvm = the server half.
+ROUND_M_BROWSER = ['renamed', 'renamegrp', 'renamesum', 'renamesb', 'renamelive', 'renameundo', 'renameprec']
+# Round N (2026-10-08, item 11 - key changes): the boxes wait for a key changed on screen, a save moves the
+# marks and notes with their rows, step 1 lists (and moves) what is filed under earlier keys, every row write
+# names the page's key columns; srvn = the server half (server_check.php mode n: its own in-memory journal).
+ROUND_N_BROWSER = ['keydirty', 'rekeysave', 'parked', 'writekey', 'rekeyshared', 'rekeydupnew', 'rekeynokey']
+# Round O (2026-10-09, the accented-letters item): the page's names for accented toggles (the parity list) and
+# its search; srvo = server_check.php mode o (the REAL resolver and its consumers; mbstring loaded).
+ROUND_O_BROWSER = ['accent']
+BROWSER_SCN = ROUND_A_BROWSER + ROUND_B_BROWSER + ROUND_D_BROWSER + ROUND_E_BROWSER + ROUND_G_BROWSER + ROUND_H_BROWSER + ROUND_I_BROWSER + ROUND_M_BROWSER + ROUND_N_BROWSER + ROUND_O_BROWSER
+ROUND_A_SCN = ROUND_A_BROWSER + ['srv', 'wire']
+ROUND_B_SCN = ROUND_B_BROWSER + ['srvb']
+ROUND_D_SCN = ROUND_D_BROWSER + ['srvd']
+ROUND_E_SCN = ROUND_E_BROWSER + ['srve']
+# Round F (2026-10-08, item 12): the toggle write rules - server only (srvf = mode f).
+ROUND_F_SCN = ['srvf']
+ROUND_G_SCN = ROUND_G_BROWSER + ['wireg', 'srvg']
+ROUND_H_SCN = ROUND_H_BROWSER
+ROUND_I_SCN = ROUND_I_BROWSER + ['wirei', 'srvi']
+ROUND_M_SCN = ROUND_M_BROWSER + ['wirem', 'srvm']
+ROUND_N_SCN = ROUND_N_BROWSER + ['srvn']
+ROUND_O_SCN = ROUND_O_BROWSER + ['srvo']
+# Round P (2026-10-09, the close-out bug sweep): the server alone - srvp = server_check.php mode p (mode n's
+# in-memory journal; mbstring loaded): the filing by the saved key, the writes' hold, the endpoint's gaps.
+ROUND_P_SCN = ['srvp']
+# Round Q (2026-10-09, the close-out's consumers): srvq = server_check.php mode q (the real resolver + search engine,
+# the runner's group-summary branch; mbstring), wireq = the API's sort / grouping and the DB-dump picker / strip.
+ROUND_Q_SCN = ['srvq', 'wireq']
+# Round R (2026-10-09, the close-out's toggle client): each bulk toast's own Undo, the footer after a bulk, the header box
+# by keyboard, a late load vs a tick and one row's saves in order, ranges on the drawn rows, a key changed on screen, long
+# keys and one bulk at a time, a dropped first marks read and a snapshot while loading, the jump to another page, a
+# rename's accessible names, a failed move, the key's verdict per result set, the renamed-column move, the move queue,
+# saved with no key, a move needing the new key's columns.
+ROUND_R_BROWSER = ['switch2', 'rundo', 'rfoot', 'rhdrkey', 'rrace', 'rrange', 'rkeydirty', 'rlongbulk', 'rstatus0', 'rjump', 'rrename',
+                   'rmovefail', 'rvalid', 'rsame', 'rqueue', 'rnokey', 'rpairs', 'rmovekey', 'rsaveclear', 'rundoswitch']
+ROUND_R_SCN = ROUND_R_BROWSER
+# Round S (2026-10-09, the close-out's journal panel client): refusals said with the server's reason, the length limit,
+# a note deleted meanwhile, the table after a panel change, the exact person filter, a card's mention warnings, reply
+# roots, a Save as Copy under the open panel, the card's listener, Export while loading, a refused drop, Escape on a
+# hover card, the history's live region, 25 mentioned names, a filed note's chip.
+ROUND_S_BROWSER = ['sfail', 'scardfail', 'srownotes', 'sexact', 'smention', 'sreply', 'sswitch', 'sleak', 'sexport', 'sdrop',
+                   'sesc', 'sannounce', 'snames', 'sfiled']
+ROUND_S_SCN = ROUND_S_BROWSER
+# Round T (2026-10-09, "fix them all": the live E2E's finding + the open list): srvt = server_check.php mode t - the
+# real search engine (bare terms beside materialized toggle columns, "0", range bounds), the scheduler's task filter,
+# the snippet engine's nested-column cache, C8 (the row copy only when read, the name cache, the resolver memo).
+ROUND_T_SCN = ['srvt']
+# Round U (2026-10-09, "fix them all": the close-out's S3): srvu = server_check.php mode u (the delete rule, one person's
+# share of the notes); udel / uview = the delete buttons for an editor who is not an app admin / a plain viewer.
+ROUND_U_BROWSER = ['udel', 'uview']
+ROUND_U_SCN = ROUND_U_BROWSER + ['srvu']
+# Round V (2026-10-09, "yes, widen the column and deploy after testing"): srvv = server_check.php mode v (mode n's fakes):
+# the ROW_KEY width the filing reads, a long key's filing at 1500 and at 1000, the install action's widen, the DDL.
+ROUND_V_SCN = ['srvv']
+# Round W (2026-10-09, jexplore): exploring another table from a journal report (a table double-clicked, an import
+# opened - performClearAllAction): the report's journal stands down - no toggle boxes / Notes column / search words
+# on the explored table (whose rows here carry the same key columns), no Journal button.
+ROUND_W_BROWSER = ['jexplore']
+ROUND_W_SCN = ROUND_W_BROWSER
+# Round X (2026-10-14, glsweep): the List layout draws a selected outer group's groups as ONE table under the first
+# one's header; its header box, and a Shift range, reach all of them (window.Penumbra.groupList.mergeTables names
+# them - stood in here, the List module is not loaded).
+ROUND_X_BROWSER = ['hdrmerge']
+ROUND_X_SCN = ROUND_X_BROWSER
+BROWSER_SCN = BROWSER_SCN + ROUND_U_BROWSER
+BROWSER_SCN = BROWSER_SCN + ROUND_R_BROWSER + ROUND_S_BROWSER + ROUND_W_BROWSER + ROUND_X_BROWSER
+ALL_SCN = ROUND_A_SCN + ROUND_B_SCN + ROUND_D_SCN + ROUND_E_SCN + ROUND_F_SCN + ROUND_G_SCN + ROUND_H_SCN + ROUND_I_SCN + ROUND_M_SCN + ROUND_N_SCN + ROUND_O_SCN + ROUND_P_SCN + ROUND_Q_SCN + ROUND_R_SCN + ROUND_S_SCN + ROUND_T_SCN + ROUND_U_SCN
+ALL_SCN_U = ALL_SCN   # --control-u's pool: every round through U
+ALL_SCN = ALL_SCN + ROUND_V_SCN + ROUND_W_SCN + ROUND_X_SCN
+EXTRA = {'switch': '&jslow=jrfix:400', 'rstatus0': '&jslow=jrfix:4000', 'switch2': '&jslow=jrcopy2:800'}
+# A scenario's whole query when it is not ?id=jrfix&scn=<name>: a ?state= link has no id.
+URLQ = {'stateonly': 'scn=stateonly&state=1'}
+EXPECT = {
+    'dark': ['P-dark-theme', 'V-dark-off', 'V-dark-on'],
+    'darkgrp': ['P-darkgrp-grouped', 'V-darkgrp-off'],
+    'wolf': ['P-wolf-hover', 'V-wolf-hover', 'V-wolf-onhover'],
+    'offsave': ['P-off-hidden', 'K-off-restored', 'K-off-tab', 'K-off-turnon', 'K-off-save'],
+    'switch': ['P-sw-marks', 'J-sw-api', 'J-sw-marks', 'J-sw-badge', 'J-sw-hist', 'J-sw-click', 'J-sw-gate', 'J-sw-stale'],
+    'missing': ['K-miss-off', 'K-miss-note', 'K-miss-chip', 'K-miss-lock', 'K-miss-bulk', 'K-miss-untick'],
+    'longkey': ['P-long-active', 'K-long-box', 'K-long-click', 'K-long-note'],
+    'srv': ['S-case-row', 'S-case-caps', 'S-sid-digits', 'S-sid-sane', 'S-snap-digits', 'S-snap-sane', 'S-gate-off', 'S-gate-on',
+            'S-gate-owner', 'S-gate-admin', 'S-gate-enc', 'S-tg-groupby', 'S-tg-label', 'S-sched-grouped', 'S-sched-pivot',
+            'S-sched-oneread', 'S-dd-strip'],
+    'wire': ['W-save-switch'],
+    'refresh': ['R-refresh-throttle', 'R-refresh-focus', 'R-refresh-same', 'R-refresh-fail', 'R-refresh-pending'],
+    'already': ['R-already', 'R-already-clear'],
+    'who': ['W-who-cells', 'W-who-aria', 'W-who-pop', 'W-who-mine'],
+    'progress': ['P2-prog-text', 'P2-prog-tick', 'P2-prog-search'],
+    'bulkundo': ['B-undo-offer', 'B-undo-exact', 'B-undo-page'],
+    'arrows': ['A-arrow-down', 'A-arrow-up'],
+    'confirmclear': ['C-clear-ask', 'C-clear-yes', 'C-clear-mine'],
+    'bandlabel': ['G-band-label'],
+    'histjump': ['H-me-filter', 'H-jump'],
+    'touchcss': ['T-touch-rule'],
+    'hiddendrop': ['P-hd-hidden', 'D-hd-import'],
+    'srvb': ['SB-merge-sql', 'SB-set-changed', 'SB-set-unchanged', 'SB-set-dup', 'SB-bulk-changed', 'SB-bulk-none'],
+    'histplus': ['H2-summary', 'H2-now', 'H2-person', 'H2-latest', 'H2-state', 'H2-preset', 'H2-export'],
+    'srvd': ['SD-row-sql', 'SD-search-summary', 'SD-search-now', 'SD-search-latest', 'SD-search-state', 'SD-search-tkfilter',
+             'SD-search-cap'],
+    'failsave': ['E-fail-prev', 'E-fail-prev-http', 'E-fail-burst'],
+    'histflip': ['E-hist-flip', 'E-hist-bulk'],
+    'loadfail': ['E-load-dim', 'E-load-refuse', 'E-load-retry'],
+    'grpfoot': ['E-grp-foot'],
+    'snapbulk': ['E-snap-bulk', 'E-snapcmp-bulk'],
+    'notesname': ['E-warn-notes', 'E-warn-pipe', 'E-warn-live'],
+    'usedkeys': ['E-genkey-used'],
+    'printrule': ['E-print-rule'],
+    'noteresort': ['E-sort-first', 'E-sort-stay'],
+    'cfhidden': ['P-cf-hidden', 'E-cf-hidden'],
+    'regroupsearch': ['P-regroup-moved', 'E-regroup-place'],
+    'snipguard': ['P-snip-shown', 'E-snip-skip'],
+    'snipjournal': ['P-snipj-shown', 'E-snip-once'],
+    'srve': ['SE-bulk-strval', 'SE-hist-int', 'SE-used-keys', 'SE-sum-remap', 'SE-is-toggle', 'SE-sched-sum', 'SE-eval-keep'],
+    'srvf': ['SF-off-mark', 'SF-off-notes', 'SF-enc-open', 'SF-key-viewer', 'SF-key-bulk', 'SF-key-editor', 'SF-legacy', 'SF-cap'],
+    'stateonly': ['P-state-noid', 'G-state-off', 'G-state-bulk'],
+    'blankkey': ['G-blank-shown', 'G-blank-box', 'G-blank-notes', 'G-blank-bulk', 'G-blank-note'],
+    'grpsort': ['P-grpsort-grouped', 'G-grpsort'],
+    'dupkey': ['P-dup-hidden', 'G-dup-notice'],
+    'missnotice': ['G-miss-notice'],
+    'poppos': ['G-pop-beside', 'G-pop-tap', 'P-pop-mouse'],
+    'histlabels': ['G-hist-removed', 'G-hist-keycols', 'G-hist-csv', 'G-hist-stale'],
+    'keywarn': ['G-key-count', 'G-key-saved'],
+    'pubcancel': ['P-pub-asked', 'G-pub-cancel'],
+    'bandsum': ['G-band-sum', 'G-band-rank', 'G-band-tick'],
+    'cfcell': ['G-cf-cell', 'G-cf-header'],
+    'ctorkey': ['P-ctor-box', 'G-ctor-key'],
+    'tpl': ['G-tpl-real'],
+    'wireg': ['W-save-loadedkey'],
+    'srvg': ['SG-audit-one', 'SG-audit-bulk', 'SG-audit-none', 'SG-flags-list', 'SG-search-ctx', 'SG-export-legacy'],
+    'hdrall': ['H-hdr-state', 'H-hdr-mark', 'H-hdr-nosort', 'H-hdr-clear', 'H-hdr-search'],
+    'hdrpage': ['H-hdr-pages'],
+    'hdrgroup': ['H-grp-state', 'H-grp-mark', 'H-grp-nosort'],
+    'hdrmerge': ['X-merge-paint', 'X-merge-mark', 'X-merge-range'],
+    'hdrfail': ['H-hdr-unloaded'],
+    'shiftrange': ['H-shift-mark', 'H-shift-clear', 'H-shift-theirs', 'H-shift-noselect'],
+    'histname': ['H-histname'],
+    'whocols': ['I-who-cols', 'I-who-flip', 'I-who-search', 'I-who-sort', 'I-who-tpl', 'I-who-cmp', 'I-who-state'],
+    'whogroup': ['I-who-group'],
+    'whooff': ['I-who-off'],
+    'whosortload': ['I-who-sortload'],
+    'wirei': ['W-api-who', 'W-runner-who'],
+    'srvi': ['SI-res', 'SI-res-off', 'SI-values', 'SI-decorate', 'SI-columns', 'SI-sched', 'SI-block', 'SI-filter'],
+    'renamed': ['M-old-format', 'M-old-snippet', 'M-old-search', 'M-old-names', 'M-old-tpl', 'M-old-button'],
+    'renamegrp': ['M-grp-old', 'M-grp-tick'],
+    'renamesum': ['M-sum-old'],
+    'renamesb': ['M-sb-multi', 'M-sb-brace'],
+    'renamelive': ['M-live-search', 'M-live-status', 'M-live-typed', 'M-live-save', 'M-live-saved', 'M-live-back'],
+    'renameundo': ['M-undo', 'M-cap'],
+    'renameprec': ['M-prec-real', 'M-prec-notes', 'M-prec-current', 'M-prec-warn', 'M-prec-save'],
+    'wirem': ['W-dash-old', 'W-save-oldnames'],
+    'srvm': ['SM-res', 'SM-filter', 'SM-filter-real', 'SM-snippet', 'SM-filterrows', 'SM-lookup', 'SM-format', 'SM-rewrite', 'SM-groupby',
+             'SM-agg', 'SM-tpl'],
+    'keydirty': ['N-dirty-box', 'N-dirty-note', 'N-dirty-bulk', 'N-dirty-back'],
+    'rekeysave': ['N-save-plan', 'N-save-pairs', 'N-save-shown', 'N-save-toast'],
+    'parked': ['N-parked-note', 'N-parked-move'],
+    'writekey': ['N-write-keycols'],
+    'rekeyshared': ['N-shared-old'],
+    'rekeydupnew': ['N-shared-new'],
+    'rekeynokey': ['N-save-nokey'],
+    'accent': ['O-names', 'O-search'],
+    'jexplore': ['W-sane-before', 'W-cols-gone', 'W-button-hidden', 'W-search-vocab', 'W-url'],
+    'srvo': ['SO-mb', 'SO-names', 'SO-alias', 'SO-filter', 'SO-snippet', 'SO-format', 'SO-groupby', 'SO-tpl'],
+    'srvn': ['SN-sig', 'SN-first', 'SN-refile', 'SN-once', 'SN-reads', 'SN-read-files', 'SN-refuse', 'SN-plan', 'SN-move', 'SN-history', 'SN-writes',
+             'SN-export', 'SN-wired', 'SN-sql'],
+    'srvp': ['SP-saved-key', 'SP-enc', 'SP-one-record', 'SP-race', 'SP-long-key', 'SP-hold', 'SP-cleared', 'SP-rekey-page', 'SP-filed-form',
+             'SP-add-gate', 'SP-reply-filed', 'SP-mention-row', 'SP-summary', 'SP-bulk-atomic', 'SP-delete', 'SP-grant', 'SP-filename',
+             'SP-attach-fail', 'SP-hist-legacy', 'SP-hist-era', 'SP-hist-memory', 'SP-user-exact', 'SP-db', 'SP-wired', 'SP-safe-msg', 'SP-sql'],
+    'srvq': ['SQ-keys', 'SQ-keymiss', 'SQ-bare', 'SQ-dual', 'SQ-groupsum', 'SQ-who-sig', 'SQ-sort', 'SQ-group'],
+    'wireq': ['W-q-dbdump', 'W-q-api'],
+    'switch2': ['J-sw-early'], 'rundo': ['R-undo-own'], 'rfoot': ['R-foot-bulk'], 'rhdrkey': ['R-hdr-key'], 'rrace': ['R-race-load', 'R-race-chain', 'R-race-older', 'R-race-live'],
+    'rrange': ['R-range-drawn'], 'rkeydirty': ['R-dirty-none', 'R-dirty-note', 'R-dirty-snap', 'R-dirty-back'],
+    'rlongbulk': ['R-bulk-long', 'R-bulk-busy'], 'rstatus0': ['R-snap-loading', 'R-load-status0'], 'rjump': ['R-jump-page'],
+    'rrename': ['R-aria-rename'], 'rmovefail': ['R-move-fail'], 'rvalid': ['R-valid-new'], 'rsame': ['R-same-values'],
+    'rqueue': ['R-move-queue'], 'rnokey': ['R-nokey-dirty'], 'rpairs': ['R-pairs-newkey'],
+    'rmovekey': ['R-move-keychange'], 'rsaveclear': ['R-save-none', 'R-save-moved'], 'rundoswitch': ['R-undo-switch'],
+    'sfail': ['S-fail-panel', 'S-too-long', 'S-del-gone'], 'scardfail': ['S-card-fail', 'S-card-del'], 'srownotes': ['S-panel-count'],
+    'sexact': ['S-hist-exact', 'S-hist-me-latest'], 'smention': ['S-card-warn', 'S-card-result'], 'sreply': ['S-reply-root', 'S-reply-gone'],
+    'sswitch': ['S-switch-reset'], 'sleak': ['S-leak'], 'sexport': ['S-export-loading'], 'sdrop': ['S-drop-keep'], 'sesc': ['S-esc-pop'],
+    'sannounce': ['S-hist-announce'], 'snames': ['S-names-25'], 'sfiled': ['S-filed-chip'],
+    'srvu': ['SU-delete', 'SU-cap', 'SU-cap-exempt'], 'udel': ['U-del-editor'], 'uview': ['U-del-viewer'],
+    'srvv': ['SV-cap', 'SV-file-long', 'SV-install', 'SV-ddl'],
+    'srvt': ['ST-bare-mat', 'ST-zero', 'ST-filter-set', 'ST-range', 'ST-runner-zero', 'ST-vcache', 'ST-c8-read', 'ST-c8-wire',
+             'ST-c8-upper', 'ST-c8-memo', 'ST-c8-memo-wire'],
+}
+# What the pre-fix build gets wrong (frozen from its first control run). Everything else
+# must PASS on it too: that is what proves the fixture and the read-out are not the bug.
+# Frozen 2026-10-07 from the control run on the pre-fix build (tga/orig = live at 18:36).
+CONTROL_RED = ['V-dark-off', 'V-darkgrp-off', 'V-wolf-hover', 'V-wolf-onhover', 'K-off-restored',
+               'K-off-turnon', 'K-off-save', 'J-sw-api', 'J-sw-marks', 'J-sw-badge', 'J-sw-hist',
+               'J-sw-click', 'J-sw-gate', 'J-sw-stale', 'K-miss-off', 'K-miss-note', 'K-miss-chip',
+               'K-miss-lock', 'K-miss-bulk', 'K-miss-untick', 'K-long-box', 'K-long-click', 'K-long-note',
+               'S-case-row', 'S-sid-digits', 'S-snap-digits', 'S-gate-off', 'S-tg-groupby', 'S-tg-label',
+               'S-sched-grouped', 'S-sched-pivot', 'S-sched-oneread', 'S-dd-strip', 'W-save-switch']
+# --control-b: the Round A build (the newest *.bak-*-tgb files after Round B's deploy, or
+# --dir) on EVERY scenario: exactly these fail, Round A's all pass. Frozen from its first run.
+CONTROL_RED_B = ['R-refresh-focus', 'R-refresh-same', 'R-refresh-fail', 'R-refresh-pending', 'R-already',
+                 'R-already-clear', 'W-who-aria', 'W-who-pop', 'W-who-mine', 'P2-prog-text',
+                 'P2-prog-tick', 'P2-prog-search', 'B-undo-offer', 'B-undo-exact', 'B-undo-page',
+                 'A-arrow-down', 'A-arrow-up', 'C-clear-ask', 'C-clear-yes', 'G-band-label', 'H-me-filter',
+                 'H-jump', 'T-touch-rule', 'D-hd-import', 'SB-merge-sql', 'SB-set-changed', 'SB-set-unchanged',
+                 'SB-set-dup', 'SB-bulk-changed', 'SB-bulk-none']
+# --control-c: the build before the who / when label came out (2026-10-08; the newest *.bak-*-tgd files,
+# or --dir) on EVERY scenario: exactly the label check fails.
+CONTROL_RED_C = ['W-who-cells']
+# (R-refresh-throttle and C-clear-mine pass on the Round A build too - no refresh, no question at
+# all; their mutants, eq-free, make them bite.)
+# (--control, --control-b and --control-c run the scenarios of their own round and the ones
+# before it; Round D's came later.)
+# --control-d: the build before Round D (2026-10-08; the newest *.bak-*-tge files, or --dir) on
+# EVERY scenario: exactly Round D's asserts fail. Frozen 2026-10-08 from its first run (tge/orig =
+# live at 00:23, the 40b3afc build): 101 others pass on it.
+CONTROL_RED_D = ['H2-summary', 'H2-now', 'H2-person', 'H2-latest', 'H2-state', 'H2-preset', 'H2-export',
+                 'SD-row-sql', 'SD-search-summary', 'SD-search-now', 'SD-search-latest', 'SD-search-state',
+                 'SD-search-tkfilter', 'SD-search-cap']
+# (--control-d runs Round A, B and D's scenarios; Round E's came later.)
+# --control-e: the build before Round E (2026-10-08; the newest *.bak-*-tgg files, or --dir) on
+# EVERY scenario: exactly Round E's asserts fail. Frozen 2026-10-08 from its first run (tgg/orig =
+# live at 01:00, the 9973cb0 build): every other assert passes on it. (E-sort-first passes there
+# too - that build re-sorted on the marks' arrival; mutant e-js-replay-ready makes it bite.)
+CONTROL_RED_E = ['E-fail-prev', 'E-fail-prev-http', 'E-fail-burst', 'E-hist-flip', 'E-hist-bulk', 'E-load-dim',
+                 'E-load-refuse', 'E-load-retry', 'E-grp-foot', 'E-snap-bulk', 'E-snapcmp-bulk', 'E-warn-notes',
+                 'E-warn-pipe', 'E-warn-live', 'E-genkey-used', 'E-print-rule', 'E-sort-stay', 'E-cf-hidden',
+                 'E-regroup-place', 'E-snip-skip', 'E-snip-once', 'SE-bulk-strval', 'SE-hist-int', 'SE-used-keys',
+                 'SE-sum-remap', 'SE-is-toggle', 'SE-sched-sum', 'SE-eval-keep']
+# (--control-e runs Rounds A-E's scenarios; Round F's came later.)
+# --control-f: the build before Round F (the newest *.bak-*-tgi files, or --dir) on EVERY
+# scenario: exactly Round F's asserts fail. Frozen 2026-10-08 from its first run (tgi/orig = live
+# at 11:33, the aee4c22 build). SF-enc-open and SF-key-editor pass there too - that build wrote
+# everything; mutants f-enc / f-editor make them bite.
+CONTROL_RED_F = ['SF-off-mark', 'SF-off-notes', 'SF-key-viewer', 'SF-key-bulk', 'SF-legacy', 'SF-cap']
+# (--control-f runs Rounds A-F's scenarios; Round G's came later.)
+# --control-g: the build before Round G (2026-10-08; the newest *.bak-*-tgj files, or --dir) on
+# EVERY scenario: EXACTLY CONTROL_RED_G must fail. Frozen 2026-10-08 from the control run on the
+# live build before Round G (tgj/orig): 189 pass, these 33 fail - every P-* precondition passes there.
+CONTROL_RED_G = ['G-state-off', 'G-state-bulk', 'G-blank-shown', 'G-blank-box', 'G-blank-notes', 'G-blank-bulk', 'G-blank-note',
+                 'G-grpsort', 'G-dup-notice', 'G-miss-notice', 'G-pop-beside', 'G-pop-tap', 'G-hist-removed', 'G-hist-keycols',
+                 'G-hist-csv', 'G-hist-stale', 'G-key-count', 'G-key-saved', 'G-pub-cancel', 'G-band-sum', 'G-band-rank', 'G-band-tick',
+                 'G-cf-cell', 'G-cf-header', 'G-ctor-key', 'G-tpl-real', 'W-save-loadedkey', 'SG-audit-one', 'SG-audit-bulk',
+                 'SG-audit-none', 'SG-flags-list', 'SG-search-ctx', 'SG-export-legacy']
+# (--control-g runs Rounds A-G's scenarios; Round H's came later.)
+# --control-h: the build before Round H (2026-10-08; the newest *.bak-*-tgk files, or --dir) on
+# EVERY scenario: EXACTLY CONTROL_RED_H must fail. Frozen 2026-10-08 from the control run on the
+# live build before Round H (tgk/orig), run ALONE: 228 pass, these 15 fail. (A first run beside the
+# 22-suite sweep timed 'wolf' out at 180 s - its real-pointer hover; alone it passes.)
+CONTROL_RED_H = ['H-hdr-state', 'H-hdr-mark', 'H-hdr-nosort', 'H-hdr-clear', 'H-hdr-search', 'H-hdr-pages', 'H-grp-state', 'H-grp-mark',
+                 'H-grp-nosort', 'H-hdr-unloaded', 'H-shift-mark', 'H-shift-clear', 'H-shift-theirs', 'H-shift-noselect', 'H-histname']
+# (--control-h runs Rounds A-H's scenarios; Round I's came later.)
+# --control-i: the build before Round I (2026-10-08; the newest *.bak-*-tgl files, or --dir) on
+# EVERY scenario: EXACTLY CONTROL_RED_I must fail. Frozen 2026-10-08 from the control run on the
+# live build before Round I (tgl/orig): 249 pass, these 18 fail. SI-res-off and SI-decorate pass
+# there too - they guard what must NOT change (no who columns when off; snapshots without them).
+CONTROL_RED_I = ['I-who-cols', 'I-who-flip', 'I-who-search', 'I-who-sort', 'I-who-tpl', 'I-who-cmp', 'I-who-state', 'I-who-group',
+                 'I-who-off', 'I-who-sortload', 'W-api-who', 'W-runner-who', 'SI-res', 'SI-values', 'SI-columns', 'SI-sched',
+                 'SI-block', 'SI-filter']
+# (--control-i runs Rounds A-I's scenarios; Round M's came later.)
+# --control-m: the build before Round M (2026-10-08; the newest *.bak-*-tgm files, or --dir) on EVERY
+# scenario: EXACTLY CONTROL_RED_M must fail. Frozen 2026-10-08 from the control run on the live build
+# before Round M (tgm/orig): 277 pass, these 34 fail. M-prec-real, M-prec-current and SM-filter-real pass
+# there too - they guard what must NOT change (a data column's name, another toggle's current name win).
+# --control-n: the build before Round N (2026-10-08; the newest *.bak-*-tgn files, or --dir) on EVERY
+# scenario: EXACTLY CONTROL_RED_N must fail. Frozen 2026-10-08 from the control run on the live build
+# before Round N (tgn/orig): 320 pass, these 26 fail. N-dirty-back and SN-sql pass there too - they guard
+# what must NOT change (the saved key's marks show; every statement the fake knows).
+CONTROL_RED_N = ['N-dirty-box', 'N-dirty-note', 'N-dirty-bulk', 'N-save-plan', 'N-save-pairs', 'N-save-shown', 'N-save-toast',
+                 'N-parked-note', 'N-parked-move', 'N-write-keycols', 'N-shared-old', 'N-shared-new', 'N-save-nokey',
+                 'SN-sig', 'SN-first', 'SN-refile', 'SN-once', 'SN-reads', 'SN-read-files', 'SN-refuse', 'SN-plan', 'SN-move',
+                 'SN-history', 'SN-writes', 'SN-export', 'SN-wired']
+# --control-o: the build before Round O (2026-10-09; the newest *.bak-*-tgo files, or --dir) on EVERY
+# scenario: EXACTLY CONTROL_RED_O must fail. Frozen 2026-10-09 from the control run on the live build
+# before Round O (tgo/orig): 351 pass, these 6 fail. SO-mb, SO-tpl, O-names and O-search pass there too:
+# the harness loads mbstring, templates and the page were Unicode-aware already (guards).
+CONTROL_RED_O = ['SO-names', 'SO-alias', 'SO-filter', 'SO-snippet', 'SO-format', 'SO-groupby']
+# --control-p: the build before Round P (2026-10-09; the newest *.bak-*-tgp files, or --dir) on EVERY
+# scenario: EXACTLY CONTROL_RED_P must fail. Frozen 2026-10-09 from the control run on the live build before
+# Round P (srvp + srvn: 16 pass, these 24 fail). SP-sql passes there too (every statement the old build runs is
+# known to the fake), and SP-delete (a guard of the documented delete rule, which Round P leaves as it was).
+CONTROL_RED_P = ['SP-saved-key', 'SP-enc', 'SP-one-record', 'SP-race', 'SP-long-key', 'SP-hold', 'SP-cleared', 'SP-rekey-page',
+                 'SP-filed-form', 'SP-add-gate', 'SP-reply-filed', 'SP-mention-row', 'SP-summary', 'SP-bulk-atomic',
+                 'SP-grant', 'SP-filename', 'SP-attach-fail', 'SP-hist-legacy', 'SP-hist-era', 'SP-hist-memory', 'SP-user-exact',
+                 'SP-db', 'SP-wired', 'SP-safe-msg']
+# --control-q: the build before Round Q (2026-10-09; the newest *.bak-*-tgq files, or --dir) on EVERY scenario:
+# EXACTLY CONTROL_RED_Q must fail. Frozen 2026-10-09 from the control run on the live build before Round Q (= Round P's):
+# all ten of the round's asserts fail there, each showing its finding.
+CONTROL_RED_Q = ['SQ-keys', 'SQ-keymiss', 'SQ-bare', 'SQ-dual', 'SQ-groupsum', 'SQ-who-sig', 'SQ-sort', 'SQ-group', 'W-q-dbdump', 'W-q-api']
+# --control-r: the build before Round R (2026-10-09; the newest *.bak-*-tgr files, or --dir) on EVERY scenario: EXACTLY
+# CONTROL_RED_R must fail (frozen 2026-10-09 04:57: Round R's 25 + K-miss-untick, which Round R changed on
+# purpose - a key on screen that is not the saved one shows no marks). R-dirty-note / R-dirty-back / R-save-moved
+# are green there by design (they guard Round R's own rework, not a sweep finding).
+# --control-s: the build before Round S (2026-10-09; --dir, or the newest *.bak-*-tgs files) on EVERY scenario: EXACTLY
+# CONTROL_RED_S must fail (frozen 2026-10-09 05:50: all 20 of Round S's asserts; every other assert green).
+# --control-t: the build before Round T (2026-10-09; --dir, or the newest *.bak-*-tgt files): EXACTLY CONTROL_RED_T.
+# --control-u: the build before Round U (2026-10-09; --dir, or the newest *.bak-*-tgu files): EXACTLY CONTROL_RED_U.
+CONTROL_RED_U = ['U-del-editor', 'SU-delete', 'SU-cap', 'SU-cap-exempt']   # frozen 2026-10-09 (uview is a guard, green on both)
+# --control-v: the build before Round V (2026-10-09; --dir, or the newest *.bak-*-tgv files): EXACTLY CONTROL_RED_V.
+CONTROL_RED_V = ['SV-cap', 'SV-file-long', 'SV-install', 'SV-ddl']   # frozen 2026-10-09
+CONTROL_RED_T = ['ST-bare-mat', 'ST-zero', 'ST-filter-set', 'ST-range', 'ST-runner-zero', 'ST-vcache', 'ST-c8-read', 'ST-c8-wire',
+                 'ST-c8-memo', 'ST-c8-memo-wire']   # frozen 2026-10-09 (ST-c8-upper is a guard: green before and after)
+CONTROL_RED_S = ['S-fail-panel', 'S-too-long', 'S-del-gone', 'S-card-fail', 'S-card-del', 'S-panel-count', 'S-hist-exact', 'S-hist-me-latest', 'S-card-warn', 'S-card-result', 'S-reply-root', 'S-reply-gone', 'S-switch-reset', 'S-leak', 'S-export-loading', 'S-drop-keep', 'S-esc-pop', 'S-hist-announce', 'S-names-25', 'S-filed-chip']
+CONTROL_RED_R = ['K-miss-untick', 'R-undo-own', 'R-foot-bulk', 'R-hdr-key', 'R-race-load', 'R-race-chain', 'R-race-older', 'R-race-live', 'R-range-drawn', 'R-dirty-none', 'R-dirty-snap', 'R-bulk-long', 'R-bulk-busy', 'R-snap-loading', 'R-load-status0', 'R-jump-page', 'R-aria-rename', 'R-move-fail', 'R-valid-new', 'R-same-values', 'R-move-queue', 'R-nokey-dirty', 'R-pairs-newkey', 'R-move-keychange', 'R-save-none', 'R-undo-switch']
+CONTROL_RED_M = ['M-old-format', 'M-old-snippet', 'M-old-search', 'M-old-names', 'M-old-tpl', 'M-old-button', 'M-grp-old', 'M-grp-tick',
+                 'M-sum-old', 'M-sb-multi', 'M-sb-brace', 'M-live-search', 'M-live-status', 'M-live-typed', 'M-live-save', 'M-live-saved',
+                 'M-live-back', 'M-undo', 'M-cap', 'M-prec-notes', 'M-prec-warn', 'M-prec-save', 'W-dash-old', 'W-save-oldnames',
+                 'SM-res', 'SM-filter', 'SM-snippet', 'SM-filterrows', 'SM-lookup', 'SM-format', 'SM-rewrite', 'SM-groupby', 'SM-agg', 'SM-tpl']
+
+MUTANTS = {}
+_mp = os.path.join(HERE, 'mutants.json')
+if os.path.exists(_mp):
+    for _k, _v in json.load(open(_mp, encoding='utf-8')).items():
+        MUTANTS[_k] = ([tuple(e) for e in _v['edits']], _v['must'], _v['scn'])
+
+args = sys.argv[1:]
+def opt(name, default=None):
+    if name in args:
+        i = args.index(name); v = args[i + 1]; del args[i:i + 2]; return v
+    return default
+def flag(name):
+    if name in args: args.remove(name); return True
+    return False
+cand_dir = opt('--dir', None)
+app_dir = opt('--app', APP)
+scn_arg = opt('--scn', None)
+one_mutant = opt('--mutant', None)
+all_mutants = flag('--mutants')
+control = flag('--control')
+control_b = flag('--control-b')
+control_c = flag('--control-c')
+control_d = flag('--control-d')
+control_e = flag('--control-e')
+control_f = flag('--control-f')
+control_g = flag('--control-g')
+control_h = flag('--control-h')
+control_i = flag('--control-i')
+control_m = flag('--control-m')
+control_n = flag('--control-n')
+control_o = flag('--control-o')
+control_p = flag('--control-p')
+control_q = flag('--control-q')
+control_r = flag('--control-r')
+control_s = flag('--control-s')
+control_t = flag('--control-t')
+control_u = flag('--control-u')
+control_v = flag('--control-v')
+keep = flag('--keep')
+verbose = flag('--verbose')
+if args: raise SystemExit('unknown arguments: %s' % ' '.join(args))
+
+def read_b(p): return open(p, 'rb').read().decode('utf-8', 'surrogateescape')
+
+def build_files():
+    """rel path -> text of the build under test."""
+    out = {}
+    for rel in FILES:
+        p = None
+        if cand_dir:
+            q = os.path.join(cand_dir, *rel.split('/'))
+            if os.path.exists(q): p = q
+        elif control or control_b or control_c or control_d or control_e or control_f or control_g or control_h or control_i or control_m or control_n or control_o or control_p or control_q or control_r or control_s or control_t or control_u or control_v:
+            suf = '.bak-*-tgv' if control_v else '.bak-*-tgu' if control_u else '.bak-*-tgt' if control_t else '.bak-*-tgs' if control_s else '.bak-*-tgr' if control_r else '.bak-*-tgq' if control_q else '.bak-*-tgp' if control_p else '.bak-*-tgo' if control_o else '.bak-*-tgn' if control_n else '.bak-*-tgm' if control_m else '.bak-*-tgl' if control_i else '.bak-*-tgk' if control_h else '.bak-*-tgj' if control_g else '.bak-*-tgi' if control_f else '.bak-*-tgg' if control_e else ('.bak-*-tge' if control_d else ('.bak-*-tgd' if control_c else ('.bak-*-tgb' if control_b else '.bak-*-tga')))
+            baks = bak_glob(os.path.join(app_dir, *rel.split('/')) + suf)
+            if baks: p = baks[-1]
+        if p is None: p = os.path.join(app_dir, *rel.split('/'))
+        out[rel] = (p, read_b(p))
+    return out
+
+def lift_div(index_text, opener, what):
+    a = index_text.find(opener)
+    if a < 0: raise SystemExit('index.php: no ' + what)
+    depth, i = 0, a
+    while True:
+        o = index_text.find('<div', i); c = index_text.find('</div>', i)
+        if c < 0: raise SystemExit('index.php: ' + what + ' never closes')
+        if o != -1 and o < c: depth += 1; i = o + 4
+        else:
+            depth -= 1; i = c + 6
+            if depth == 0: break
+    block = index_text[a:i]
+    if '<?' in block: raise SystemExit('index.php: PHP inside ' + what + ' - the lift needs updating')
+    return block
+
+def hook(src):
+    """The ready closure becomes an IIFE with a name-by-name export hook, and
+    hideLoading counts its calls (the end of a run / grouping)."""
+    anchor = '$(document).ready(function () {'
+    i = src.find(anchor)
+    if i < 0 or i > 400: raise SystemExit('closure anchor not found')
+    names = ['buildStateObject', 'runTableSearch', 'generateTemplateOutput', 'performClearAllAction']   # (Round W: exploring a table)
+    h = ('\r\n;try { window.__JR = {}; } catch (e) { window.__JR_ERR = String(e); }\r\n'
+         'try { [' + ','.join('"%s"' % n for n in names) + '].forEach(function (k) { try { window.__JR[k] = eval(k); } catch (e) { (window.__JR_MISSING = window.__JR_MISSING || []).push(k); } }); } catch (e) { window.__JR_ERR2 = String(e); }\r\n'
+         # Round E (2026-10-08): closure state a scenario sets or reads - the snapshot view
+         # flag, the page, the row data.
+         'window.__JR_set = function (k, v) { if (k === "snap") isViewingSnapshot = v; else if (k === "page") { currentPage = v; applyPagination(); } else if (k === "master") { masterRowData = v; } };\r\n'
+         'window.__JR_get = function (k) { return k === "page" ? currentPage : (k === "master" ? masterRowData : null); };\r\n')
+    out = src[:i] + ';(function () {' + h + src[i + len(anchor):]
+    j = out.rfind('});')
+    out = out[:j] + '})();' + out[j + 3:]
+    hl = '    function hideLoading() {\r\n'
+    if out.count(hl) != 1: raise SystemExit('hideLoading anchor count %d' % out.count(hl))
+    return out.replace(hl, hl + '        window.__JR_HIDES = (window.__JR_HIDES || 0) + 1;\r\n')
+
+def mutate(files, name):
+    files = dict(files)
+    for rel, old, new in MUTANTS[name][0]:
+        p, t = files[rel]
+        if '\r\n' in t: old, new = old.replace('\n', '\r\n'), new.replace('\n', '\r\n')
+        if t.count(old) != 1: raise SystemExit("mutant '%s': %s anchor found %d times (needs the FIXED build): %r" % (name, rel, t.count(old), old[:90]))
+        files[rel] = (p, t.replace(old, new))
+    return files
+
+stage = tempfile.mkdtemp(prefix='pnb_tf_')
+# Round M: the Visual Search Builder's markup (search_builder_content.php past its PHP header), for renamesb.
+_sbc = read_b(os.path.join(app_dir, 'search_builder_content.php'))
+_sbcAt = _sbc.find('?>')
+if _sbcAt < 0 or _sbc.find('searchBuilderLightbox', _sbcAt) < 0: raise SystemExit('search_builder_content.php: no markup after the PHP header - update run.py')
+open(os.path.join(stage, 'sbc.html'), 'wb').write(_sbc[_sbcAt + 2:].lstrip('\r\n').encode('utf-8', 'surrogateescape'))
+for f in LIBS: shutil.copyfile(os.path.join(app_dir, 'js', f), os.path.join(stage, f))
+shutil.copyfile(os.path.join(app_dir, 'css', 'penumbra_journal.css'), os.path.join(stage, 'penumbra_journal.css'))
+shutil.copyfile(os.path.join(HERE, 'driver.js'), os.path.join(stage, 'driver.js'))
+harness = open(os.path.join(HERE, 'harness.html'), encoding='utf-8').read()
+for m in ('<!--TF_VIEW_OPTIONS-->', '<!--TF_JOURNAL_PANEL-->'):
+    if harness.count(m) != 1: raise SystemExit('harness: splice marker missing: ' + m)
+
+def free_port():
+    s = socket.socket(); s.bind(('127.0.0.1', 0)); p = s.getsockname()[1]; s.close(); return p
+hp, dp = free_port(), free_port()
+srv = subprocess.Popen([sys.executable, '-m', 'http.server', str(hp), '--bind', '127.0.0.1', '--directory', stage], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+# This machine's headless Edge reports (hover: none) / (pointer: coarse) since 10-07: force a mouse.
+edge = subprocess.Popen([EDGE, '--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check', '--disable-sync',
+                         '--disable-extensions', '--user-data-dir=' + os.path.join(stage, 'profile'), '--window-size=1500,900',
+                         '--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4',
+                         '--remote-debugging-port=%d' % dp, '--remote-allow-origins=*', 'about:blank'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+def jget(p, m='GET'):
+    return json.loads(urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:%d%s' % (dp, p), method=m), timeout=15).read().decode())
+for _ in range(150):
+    try: jget('/json/version'); break
+    except Exception: time.sleep(0.2)
+
+HOVER_PT = ('(function(){var e=document.querySelector(%s); if(!e) return null; var r=e.getBoundingClientRect();'
+            ' return JSON.stringify({x:r.left+r.width/2,y:r.top+r.height/2});})()')
+# TRUSTED key presses, asked for by the page (window.__keyReq = {n, keys}): a dispatched
+# KeyboardEvent is not what a keyboard user sends.
+KEYS = {'ArrowDown': ('ArrowDown', 40), 'ArrowUp': ('ArrowUp', 38), 'Tab': ('Tab', 9), ' ': ('Space', 32), 'Escape': ('Escape', 27)}
+def press(call, key):
+    code, vk = KEYS[key]
+    down = {'type': 'keyDown', 'key': key, 'code': code, 'windowsVirtualKeyCode': vk, 'nativeVirtualKeyCode': vk}
+    if key == ' ': down['text'] = ' '
+    call('Input.dispatchKeyEvent', down)
+    call('Input.dispatchKeyEvent', {'type': 'keyUp', 'key': key, 'code': code, 'windowsVirtualKeyCode': vk, 'nativeVirtualKeyCode': vk})
+
+def run_page(scn):
+    t = jget('/json/new?about:blank', 'PUT')
+    ws = websocket.create_connection(t['webSocketDebuggerUrl'], timeout=300, suppress_origin=True)
+    n = [0]
+    def call(m, p=None):
+        n[0] += 1; mid = n[0]
+        ws.send(json.dumps({'id': mid, 'method': m, 'params': p or {}}))
+        while True:
+            r = json.loads(ws.recv())
+            if r.get('id') == mid: return r.get('result', {})
+    def ev(expr):
+        return call('Runtime.evaluate', {'expression': expr, 'returnByValue': True}).get('result', {}).get('value')
+    try:
+        call('Network.enable')
+        call('Network.setCacheDisabled', {'cacheDisabled': True})   # every build is written to the same main_tf.js
+        call('Emulation.setFocusEmulationEnabled', {'enabled': True})
+        q = URLQ.get(scn) or ('id=jrfix&scn=%s%s' % (scn, EXTRA.get(scn, '')))
+        call('Page.navigate', {'url': 'http://127.0.0.1:%d/harness.html?%s' % (hp, q)})
+        t0 = time.time()
+        while time.time() - t0 < 180:
+            time.sleep(0.2)
+            h = ev('(window.__hoverReq && window.__hoverReq.n !== window.__hoverDone) ? JSON.stringify(window.__hoverReq) : null')
+            if h:
+                req = json.loads(h)
+                pt = ev(HOVER_PT % json.dumps(req['sel']))
+                if pt:
+                    xy = json.loads(pt)
+                    call('Input.dispatchMouseEvent', {'type': 'mouseMoved', 'x': xy['x'], 'y': xy['y'], 'pointerType': 'mouse'})
+                ev('window.__hoverDone = %d' % req['n'])
+            k = ev('(window.__keyReq && window.__keyReq.n !== window.__keyDone) ? JSON.stringify(window.__keyReq) : null')
+            if k:
+                kr = json.loads(k)
+                for key in kr['keys']: press(call, key)
+                ev('window.__keyDone = %d' % kr['n'])
+            v = ev('window.__JRDONE ? JSON.stringify(window.__JRRESULT) : null')
+            if v: return json.loads(v)
+        return {'fatal': 'timeout (180 s)'}
+    finally:
+        try: ws.close()
+        except Exception: pass
+        try: urllib.request.urlopen('http://127.0.0.1:%d/json/close/%s' % (dp, t['id']), timeout=10).read()
+        except Exception: pass
+
+def run_srv(files, mode):
+    d = os.path.join(stage, 'srv')
+    os.makedirs(d, exist_ok=True)
+    for rel in PHP_FILES:
+        open(os.path.join(d, rel), 'wb').write(files[rel][1].encode('utf-8', 'surrogateescape'))
+    # Mode o loads mbstring, as the server does (Round O, 2026-10-09): without it journalUpperKey falls back to
+    # ASCII. (Forward slashes: PHP will not load an extension from a backslash UNC path given with -d.)
+    ext = ['-d', 'extension_dir=' + os.path.join(os.path.dirname(PHP), 'ext').replace(chr(92), '/'), '-d', 'extension=mbstring'] if mode in ('o', 'p', 'q', 't', 'u', 'v') else []
+    r = subprocess.run([PHP, '-n'] + ext + [os.path.join(HERE, 'server_check.php'), d, mode], capture_output=True, timeout=120)
+    try: return json.loads(r.stdout.decode('utf-8', 'replace'))
+    except Exception: return {'fatal': 'server_check.php: ' + (r.stdout + r.stderr).decode('utf-8', 'replace')[:600]}
+
+def run_wire(files):
+    t = files['js/main.js'][1].replace('\r\n', '\n')
+    a = t.find("            newUrl.searchParams.set('id', response.new_id);")
+    z = t.find("            $('#saveStateLightbox').fadeOut();", a) if a >= 0 else -1
+    region = t[a:z] if (a >= 0 and z > a) else ''
+    call_ok = 'window.Penumbra.journalSwitchReport(response.new_id || shortId)' in region
+    old_gone = 'window.Penumbra.journalReportId = shortId;' not in region
+    return {'asserts': [{'id': 'W-save-switch', 'ok': bool(region) and call_ok and old_gone,
+                         'detail': ('save success region %d chars; switch call %s; copy-only re-point gone %s' % (len(region), call_ok, old_gone))}]}
+
+def run_wireg(files):
+    # Round G: a save makes the key it saved the one step 1 compares with (after the switch).
+    t = files['js/main.js'][1].replace('\r\n', '\n')
+    a = t.find("            newUrl.searchParams.set('id', response.new_id);")
+    z = t.find("            $('#saveStateLightbox').fadeOut();", a) if a >= 0 else -1
+    region = t[a:z] if (a >= 0 and z > a) else ''
+    sw = region.find('window.Penumbra.journalSwitchReport(response.new_id || shortId)')
+    mk = region.find('window.Penumbra.journalMarkLoadedKey(')   # (Round M hands it the saved toggles)
+    return {'asserts': [{'id': 'W-save-loadedkey', 'ok': sw >= 0 and mk > sw,
+                         'detail': 'save success region %d chars; the switch at %d, journalMarkLoadedKey() at %d' % (len(region), sw, mk)}]}
+
+def run_wirei(files):
+    # Round I: the who and when columns are kept through the API's reorder and the runner's.
+    idx = files['index.php'][1].replace('\r\n', '\n')
+    sr = files['schedule_runner.php'][1].replace('\r\n', '\n')
+    api = "$journal_toggle_cols = array_merge($jt['colNames'], isset($jt['whoNames']) ? $jt['whoNames'] : array());" in idx
+    pres = "$processed = apply_state_logic($flat_rows, $state, array_merge($journal_toggle_cols, $journal_who_cols));" in sr
+    ret = "'journalToggleCols' => array_merge($journal_toggle_cols, $journal_who_cols)," in sr
+    # 2026-10-14 (notescol5): the same lists, put in the page's order first (they now lead each row).
+    scr = "$journal_screen_cols = penumbra_sched_journal_screen_order($journal_toggle_resolver, array_merge($journal_toggle_cols, $journal_who_cols));" in sr
+    pres = pres or (scr and "$processed = apply_state_logic($flat_rows, $state, $journal_screen_cols);" in sr)
+    ret = ret or (scr and "'journalToggleCols' => $journal_screen_cols," in sr)
+    return {'asserts': [{'id': 'W-api-who', 'ok': api, 'detail': 'index.php keeps the who / when columns at the end: %s' % api},
+                        {'id': 'W-runner-who', 'ok': pres and ret, 'detail': 'runner: kept through the reorder %s, handed on %s' % (pres, ret)}]}
+
+def run_wireq(files):
+    # Round Q: the DB-dump picker (main.js) and the runner's custom-list strip leave every __JOURNAL_ column out;
+    # the API maps a saved sort and a grouping on a toggle onto its output column, and bands it Checked / Unchecked.
+    js = files['js/main.js'][1].replace('\r\n', '\n')
+    sr = files['schedule_runner.php'][1].replace('\r\n', '\n')
+    idx = files['index.php'][1].replace('\r\n', '\n')
+    pick = "if (up.indexOf('__JOURNAL_') === 0) return;" in js and "up.indexOf('__JOURNAL_TOGGLE__') === 0 || up === '__JOURNAL_NOTES'" not in js
+    strip = "if (penumbra_is_toggle_column($_ddc) || strpos($_ddc, '__JOURNAL_') === 0) $_dd_journal_stripped[] = $_ddc;" in sr
+    a = idx.find("$state['sortCriteria'] = journalExportMapSortCriteria($state['sortCriteria'], $journal_toggle_resolver);")
+    b = idx.find('// --- APPLY SAVED SORT ORDER')
+    grp = "$state['groupBy'] = journalExportToggleGroupBy($state['groupBy'], $journal_toggle_resolver);" in idx
+    lbl = "if (isset($toggle_group_names[strtoupper((string)$actual_group_key)])) $val = ((string)$val === '1') ? 'Checked' : 'Unchecked';" in idx
+    return {'asserts': [{'id': 'W-q-dbdump', 'ok': pick and strip, 'detail': 'the picker skips every __JOURNAL_ column: %s | the runner strips them: %s' % (pick, strip)},
+                        {'id': 'W-q-api', 'ok': a >= 0 and b > a and grp and lbl,
+                         'detail': 'the API maps a saved sort before sorting: %s | a grouping: %s | Checked / Unchecked bands: %s' % (a >= 0 and b > a, grp, lbl)}]}
+
+def run_wirem(files):
+    # Round M: the dashboard routing knows a renamed toggle's old names (the browser twin's list does); the
+    # save hands the toggles it saved to journalMarkLoadedKey (they are the saved names from then on).
+    idx = files['index.php'][1].replace('\r\n', '\n')
+    route = "$_dsRouted = penumbra_route_dash_search((string)$_GET['dsearch'], $_dsRouteCols);" in idx
+    names = "array_keys(journalExportAliasMapFor($journal_toggle_resolver, $_dsCols, true))" in idx
+    t = files['js/main.js'][1].replace('\r\n', '\n')
+    a = t.find("            newUrl.searchParams.set('id', response.new_id);")
+    z = t.find("            $('#saveStateLightbox').fadeOut();", a) if a >= 0 else -1
+    region = t[a:z] if (a >= 0 and z > a) else ''
+    sw = region.find('window.Penumbra.journalSwitchReport(response.new_id || shortId)')
+    mk = region.find('window.Penumbra.journalMarkLoadedKey((stateObject.viewOptions && stateObject.viewOptions.journalToggles) || [])')
+    return {'asserts': [{'id': 'W-dash-old', 'ok': route and names, 'detail': 'index.php routes &dsearch= with the old names: %s (their list %s)' % (route, names)},
+                        {'id': 'W-save-oldnames', 'ok': sw >= 0 and mk > sw,
+                         'detail': 'save success region %d chars; the switch at %d, journalMarkLoadedKey(<the saved toggles>) at %d' % (len(region), sw, mk)}]}
+
+def run_build(files, scns):
+    res = {}
+    if any(s in BROWSER_SCN for s in scns):
+        idx = files['index.php'][1]
+        page = harness.replace('<!--TF_VIEW_OPTIONS-->', lift_div(idx, '<div id="journalRowConfig"', '#journalRowConfig'))
+        page = page.replace('<!--TF_JOURNAL_PANEL-->', lift_div(idx, '<div id="journalLightbox"', '#journalLightbox'))
+        open(os.path.join(stage, 'harness.html'), 'w', encoding='utf-8').write(page)
+        open(os.path.join(stage, 'main_tf.js'), 'wb').write(hook(files['js/main.js'][1]).encode('utf-8', 'surrogateescape'))
+        open(os.path.join(stage, 'main.css'), 'wb').write(files['css/main.css'][1].encode('utf-8', 'surrogateescape'))
+        open(os.path.join(stage, 'penumbra_journal.js'), 'wb').write(files['js/penumbra_journal.js'][1].encode('utf-8', 'surrogateescape'))
+        open(os.path.join(stage, 'penumbra_journal.css'), 'wb').write(files['css/penumbra_journal.css'][1].encode('utf-8', 'surrogateescape'))
+        open(os.path.join(stage, 'search_builder.js'), 'wb').write(files['js/search_builder.js'][1].encode('utf-8', 'surrogateescape'))
+    for s in scns:
+        if s == 'srv': res[s] = run_srv(files, 'a')
+        elif s == 'srvb': res[s] = run_srv(files, 'b')
+        elif s == 'srvd': res[s] = run_srv(files, 'd')
+        elif s == 'srve': res[s] = run_srv(files, 'e')
+        elif s == 'srvf': res[s] = run_srv(files, 'f')
+        elif s == 'srvg': res[s] = run_srv(files, 'g')
+        elif s == 'wireg': res[s] = run_wireg(files)
+        elif s == 'srvi': res[s] = run_srv(files, 'i')
+        elif s == 'wirei': res[s] = run_wirei(files)
+        elif s == 'srvm': res[s] = run_srv(files, 'm')
+        elif s == 'srvn': res[s] = run_srv(files, 'n')
+        elif s == 'srvo': res[s] = run_srv(files, 'o')
+        elif s == 'srvp': res[s] = run_srv(files, 'p')
+        elif s == 'srvq': res[s] = run_srv(files, 'q')
+        elif s == 'srvt': res[s] = run_srv(files, 't')
+        elif s == 'srvu': res[s] = run_srv(files, 'u')
+        elif s == 'srvv': res[s] = run_srv(files, 'v')
+        elif s == 'wireq': res[s] = run_wireq(files)
+        elif s == 'wirem': res[s] = run_wirem(files)
+        elif s == 'wire': res[s] = run_wire(files)
+        else: res[s] = run_page(s)
+    return res
+
+def evaluate(res, scns):
+    out = []
+    for s in scns:
+        r = res.get(s, {})
+        got = {a['id']: a for a in (r.get('asserts') or [])}
+        for aid in EXPECT[s]:
+            if aid in got: out.append((aid, got[aid]['ok'], got[aid]['detail']))
+            else: out.append((aid, False, 'NOT RECORDED' + (' | fatal: ' + (r.get('fatal') or '')[:300] if r.get('fatal') else '')))
+        for aid, a in got.items():
+            if aid not in EXPECT[s]: out.append((aid, a['ok'], 'UNEXPECTED ID ' + a['detail']))
+        if s in BROWSER_SCN:
+            out.append(('E-' + s, not r.get('errors') and not r.get('hookErr') and not r.get('missing') and not r.get('fatal'),
+                        'errors %s hook %s missing %s fatal %s' % (r.get('errors'), r.get('hookErr'), r.get('missing'), (r.get('fatal') or '')[:200])))
+        elif r.get('fatal'):
+            out.append(('E-' + s, False, r['fatal'][:400]))
+    return out
+
+try:
+    files = build_files()
+    print('build under test:')
+    for rel in FILES: print('  %-24s %s' % (rel, files[rel][0]))
+    if control: print('  (CONTROL: the pre-fix build)')
+    if control_b: print('  (CONTROL-B: the Round A build)')
+    if control_c: print('  (CONTROL-C: the build with the visible who / when label)')
+    if control_d: print('  (CONTROL-D: the build before Round D)')
+    if control_e: print('  (CONTROL-E: the build before Round E)')
+    if control_f: print('  (CONTROL-F: the build before Round F)')
+    if control_g: print('  (CONTROL-G: the build before Round G)')
+    if control_h: print('  (CONTROL-H: the build before Round H)')
+    if control_i: print('  (CONTROL-I: the build before Round I)')
+    if control_m: print('  (CONTROL-M: the build before Round M)')
+    if control_n: print('  (CONTROL-N: the build before Round N)')
+    if control_o: print('  (CONTROL-O: the build before Round O)')
+    if control_p: print('  (CONTROL-P: the build before Round P)')
+    if control_q: print('  (CONTROL-Q: the build before Round Q)')
+    if control_r: print('  (CONTROL-R: the build before Round R)')
+    if control_s: print('  (CONTROL-S: the build before Round S)')
+    if control_t: print('  (CONTROL-T: the build before Round T)')
+    if control_u: print('  (CONTROL-U: the build before Round U)')
+    if control_v: print('  (CONTROL-V: the build before Round V)')
+    pool = ROUND_A_SCN if control else ((ROUND_A_SCN + ROUND_B_SCN) if (control_b or control_c)
+                                        else ((ROUND_A_SCN + ROUND_B_SCN + ROUND_D_SCN) if control_d
+                                              else ((ROUND_A_SCN + ROUND_B_SCN + ROUND_D_SCN + ROUND_E_SCN) if control_e
+                                                    else ((ROUND_A_SCN + ROUND_B_SCN + ROUND_D_SCN + ROUND_E_SCN + ROUND_F_SCN) if control_f
+                                                          else ((ROUND_A_SCN + ROUND_B_SCN + ROUND_D_SCN + ROUND_E_SCN + ROUND_F_SCN + ROUND_G_SCN) if control_g
+                                                                else ((ROUND_A_SCN + ROUND_B_SCN + ROUND_D_SCN + ROUND_E_SCN + ROUND_F_SCN + ROUND_G_SCN + ROUND_H_SCN) if control_h
+                                                                      else ((ROUND_A_SCN + ROUND_B_SCN + ROUND_D_SCN + ROUND_E_SCN + ROUND_F_SCN + ROUND_G_SCN + ROUND_H_SCN + ROUND_I_SCN) if control_i
+                                                                            else ((ROUND_A_SCN + ROUND_B_SCN + ROUND_D_SCN + ROUND_E_SCN + ROUND_F_SCN + ROUND_G_SCN + ROUND_H_SCN + ROUND_I_SCN + ROUND_M_SCN) if control_m
+                                                                                  else ((ROUND_A_SCN + ROUND_B_SCN + ROUND_D_SCN + ROUND_E_SCN + ROUND_F_SCN + ROUND_G_SCN + ROUND_H_SCN + ROUND_I_SCN + ROUND_M_SCN + ROUND_N_SCN) if control_n else ((ROUND_A_SCN + ROUND_B_SCN + ROUND_D_SCN + ROUND_E_SCN + ROUND_F_SCN + ROUND_G_SCN + ROUND_H_SCN + ROUND_I_SCN + ROUND_M_SCN + ROUND_N_SCN + ROUND_O_SCN) if control_o else ((ROUND_A_SCN + ROUND_B_SCN + ROUND_D_SCN + ROUND_E_SCN + ROUND_F_SCN + ROUND_G_SCN + ROUND_H_SCN + ROUND_I_SCN + ROUND_M_SCN + ROUND_N_SCN + ROUND_O_SCN + ROUND_P_SCN) if control_p else ((ROUND_A_SCN + ROUND_B_SCN + ROUND_D_SCN + ROUND_E_SCN + ROUND_F_SCN + ROUND_G_SCN + ROUND_H_SCN + ROUND_I_SCN + ROUND_M_SCN + ROUND_N_SCN + ROUND_O_SCN + ROUND_P_SCN + ROUND_Q_SCN) if control_q else ((ROUND_A_SCN + ROUND_B_SCN + ROUND_D_SCN + ROUND_E_SCN + ROUND_F_SCN + ROUND_G_SCN + ROUND_H_SCN + ROUND_I_SCN + ROUND_M_SCN + ROUND_N_SCN + ROUND_O_SCN + ROUND_P_SCN + ROUND_Q_SCN + ROUND_R_SCN) if control_r else ((ROUND_A_SCN + ROUND_B_SCN + ROUND_D_SCN + ROUND_E_SCN + ROUND_F_SCN + ROUND_G_SCN + ROUND_H_SCN + ROUND_I_SCN + ROUND_M_SCN + ROUND_N_SCN + ROUND_O_SCN + ROUND_P_SCN + ROUND_Q_SCN + ROUND_R_SCN + ROUND_S_SCN) if control_s else ((ROUND_A_SCN + ROUND_B_SCN + ROUND_D_SCN + ROUND_E_SCN + ROUND_F_SCN + ROUND_G_SCN + ROUND_H_SCN + ROUND_I_SCN + ROUND_M_SCN + ROUND_N_SCN + ROUND_O_SCN + ROUND_P_SCN + ROUND_Q_SCN + ROUND_R_SCN + ROUND_S_SCN + ROUND_T_SCN) if control_t else (ALL_SCN_U if control_u else ALL_SCN))))))))))))))))
+    names = [s for s in pool if not scn_arg or s in scn_arg.split(',')]
+    if all_mutants or one_mutant:
+        ok = bad = 0
+        for m in (one_mutant.split(',') if one_mutant else list(MUTANTS)):
+            edits, must, mscn = MUTANTS[m]
+            sc = [s for s in (mscn or names) if s in names]
+            res = evaluate(run_build(mutate(files, m), sc), sc)
+            red = [a for a, p, _ in res if not p]
+            if must is None:
+                print('  EXPLORE mutant %-18s red: %s' % (m, ' '.join(red) or '(nothing)'))
+                for a, p, d in res:
+                    if not p: print('        %-18s %s' % (a, d[:300]))
+                bad += 1
+                continue
+            good = sorted(red) == sorted(must)
+            ok += good; bad += (not good)
+            print('  %s  mutant %-18s turns %s red   [red: %s]' % ('PASS' if good else 'FAIL', m, ' '.join(must) or '(nothing)', ' '.join(red)))
+            if verbose or not good:
+                for a, p, d in res:
+                    if not p: print('        %-18s %s' % (a, d[:300]))
+        print('SUMMARY mutants ok=%d bad=%d' % (ok, bad))
+        print('RESULT: GREEN' if bad == 0 and ok > 0 else 'RESULT: RED')
+    else:
+        res = evaluate(run_build(files, names), names)
+        p = f = 0; failed = []
+        for a, passed, d in res:
+            print('  %s  %-18s %s' % ('PASS' if passed else 'FAIL', a, d[:420]))
+            if passed: p += 1
+            else: f += 1; failed.append(a)
+        print('TOTAL pass=%d fail=%d   failed: %s' % (p, f, ' '.join(failed)))
+        if control or control_b or control_c or control_d or control_e or control_f or control_g or control_h or control_i or control_m or control_n or control_o or control_p or control_q or control_r or control_s or control_t or control_u or control_v:
+            reds = CONTROL_RED if control else (CONTROL_RED_B if control_b else (CONTROL_RED_C if control_c else (CONTROL_RED_D if control_d else (CONTROL_RED_E if control_e else (CONTROL_RED_F if control_f else (CONTROL_RED_G if control_g else (CONTROL_RED_H if control_h else (CONTROL_RED_I if control_i else (CONTROL_RED_M if control_m else (CONTROL_RED_N if control_n else (CONTROL_RED_O if control_o else (CONTROL_RED_P if control_p else (CONTROL_RED_Q if control_q else (CONTROL_RED_R if control_r else (CONTROL_RED_S if control_s else (CONTROL_RED_T if control_t else (CONTROL_RED_U if control_u else CONTROL_RED_V)))))))))))))))))
+            if reds is None:
+                print('CONTROL: not frozen yet - red set: %s' % ' '.join(failed))
+                print('RESULT: RED')
+            else:
+                want = [a for a in reds if any(a in EXPECT[s] or a == 'E-' + s for s in names)]
+                print('CONTROL: %s (expected red: %s)' % ('as expected' if sorted(failed) == sorted(want) else 'NOT as expected', ' '.join(want)))
+                print('RESULT: GREEN' if sorted(failed) == sorted(want) else 'RESULT: RED')
+        else:
+            print('RESULT: GREEN' if f == 0 and p > 0 else 'RESULT: RED')
+finally:
+    try: edge.kill()
+    except Exception: pass
+    try: srv.kill()
+    except Exception: pass
+    time.sleep(1)
+    if keep: print('kept: ' + stage)
+    else: shutil.rmtree(stage, ignore_errors=True)

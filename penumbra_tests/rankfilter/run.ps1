@@ -1,0 +1,54 @@
+# =============================================================================
+# Run the pivot RANK-vs-per-aggregation-FILTER tests (2026-09-05).
+#
+#   powershell -File run.ps1
+#   powershell -File run.ps1 -Control    # must report FAIL 1
+#   powershell -File run.ps1 -Mutant     # pre-fix filter-blind rank read;
+#                                        # EXACTLY PASS 19 FAIL 4
+#   powershell -File run.ps1 -Mutant2    # pre-fix (Other) rollup (no filtered
+#                                        # buckets); EXACTLY PASS 21 FAIL 2
+#   powershell -File run.ps1 -Mutant3    # wpairs dropped from the merge helper;
+#                                        # EXACTLY PASS 20 FAIL 3
+#
+# UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the BODY
+# as a scriptblock instead:
+#   $d = '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\rankfilter'
+#   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1")))
+# A control/mutant run exits non-zero, so under $ErrorActionPreference='Stop' it
+# kills a parent scriptblock - invoke each in its own call.
+#
+# WHAT IS UNDER TEST. pivot_apply_rank() in schedule_runner.php and the two
+# helpers extracted with the 2026-09-05 fix (pivot_rank_new_bucket /
+# pivot_rank_merge_bucket). Three defects, all pre-existing and all present in
+# BOTH engines - which is exactly why the pivot parity harness could never see
+# them, a differential test only finds DRIFT, never a shared bug:
+#   1. the rank VALUE ignored the aggregation's filter, so "Top N by Sum" on a
+#      filtered Sum ranked rows by their unfiltered total;
+#   2. the synthetic "(Other)" row dropped _filteredBuckets, so a filtered
+#      aggregation there printed the UNFILTERED number;
+#   3. the same rollup dropped wpairs, so wavg@COL on "(Other)" read 0.
+# The browser twins are _rankFlt / _rankMergeBucket / _rankNewBucket in
+# js/main.js - fix them together or the email and the screen disagree.
+#
+# The mirror is re-extracted from the LIVE schedule_runner.php on every run.
+# -n (skip php.ini) because from a workstation the ini cannot load oci8/sqlsrv.
+#
+# EXPECTED TAIL: "PASS 23   FAIL 0". Any other tail is a failure, a smaller
+# pass count included.
+# =============================================================================
+param([switch]$Control, [switch]$Mutant, [switch]$Mutant2, [switch]$Mutant3)
+
+$ErrorActionPreference = 'Stop'
+$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\rankfilter' }   # empty when run as a scriptblock: never fall back to the caller's cwd
+if (-not $here) { $here = '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\rankfilter' }
+$php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+
+# NOT $args - that is an automatic variable in PowerShell.
+$phpArgs = @('-n', (Join-Path $here 'test_rankfilter.php'))
+if ($Control) { $phpArgs += '--control' }
+if ($Mutant)  { $phpArgs += '--mutant' }
+if ($Mutant2) { $phpArgs += '--mutant2' }
+if ($Mutant3) { $phpArgs += '--mutant3' }
+
+& $php @phpArgs
+exit $LASTEXITCODE

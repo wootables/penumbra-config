@@ -1,0 +1,305 @@
+<?php
+/**
+ * Emit fixtures.json - the SINGLE source of truth both engines consume.
+ *
+ * This generator produces INPUTS only. Every bucket is written out with literal
+ * numbers rather than derived by running PHP's collector, so no PHP semantics
+ * leak into the fixture and bias the comparison.
+ *
+ * Sentinels that cross the language boundary are encoded as strings and each
+ * driver materializes them natively:
+ *   "+INF" / "-INF"  ->  JS Infinity / -Infinity,  PHP 1e308 / -1e308
+ *
+ *   php gen_fixtures.php > fixtures.json
+ */
+
+$cases = array();
+$id = 0;
+function add(&$cases, &$id, $fn, $args, $note = '') {
+    $cases[] = array('id' => sprintf('%03d', ++$id) . '-' . $fn, 'fn' => $fn, 'args' => $args, 'note' => $note);
+}
+
+// ---------------------------------------------------------------- buckets ---
+// A bucket as the collector builds it. distinct is a list here; the JS driver
+// turns it into a Set, PHP keeps the array - that shape difference is exactly
+// what we want both sides to normalize away.
+function bucket($sum, $numericCount, $min, $max, $distinct, $values, $wpairs = null) {
+    $b = array('sum' => $sum, 'numericCount' => $numericCount, 'min' => $min, 'max' => $max,
+               'distinct' => $distinct, 'values' => $values);
+    $b['wpairs'] = $wpairs === null ? new stdClass() : $wpairs;
+    return $b;
+}
+function cell($count, $b, $extra = array()) {
+    $c = array_merge(array('count' => $count), $b);
+    foreach ($extra as $k => $v) { $c[$k] = $v; }
+    return $c;
+}
+
+$EMPTY   = bucket(0, 0, '+INF', '-INF', array(), array());
+$NUMS    = bucket(30, 2, 10, 20, array('10','20'), array('10','20'), array('WT' => array('w' => 4, 'wv' => 70)));
+$TEXT    = bucket(0, 0, '+INF', '-INF', array('a','b'), array('a','b','c'));
+$ZEROMIN = bucket(5, 2, 0, 5, array('0','5'), array('0','5'));
+$NEG     = bucket(-15, 3, -10, -2, array('-10','-3','-2'), array('-10','-3','-2'));
+$PROTO   = bucket(0, 0, '+INF', '-INF', array('__proto__','x'), array('__proto__','__proto__','__proto__','x'));
+$CTOR    = bucket(0, 0, '+INF', '-INF', array('constructor','y'), array('constructor','constructor','y'));
+$SPREAD  = bucket(31, 8, 2, 9, array('2','4','5','7','9'), array('2','4','4','4','5','5','7','9'));
+
+$AGGS = array('count','sum','avg','median','min','max','distinct','mode','stddev','range',
+              'count_filled','count_blank','antimode','p10','p25','p50','p75','p90','p99',
+              'wavg@WT','formula','bogus_agg');
+
+// extractAgg over every agg type x a spread of bucket shapes
+$shapes = array('empty' => $EMPTY, 'nums' => $NUMS, 'text' => $TEXT, 'zeromin' => $ZEROMIN,
+                'neg' => $NEG, 'proto' => $PROTO, 'ctor' => $CTOR, 'spread' => $SPREAD);
+foreach ($shapes as $sname => $b) {
+    $cnt = max(1, count($b['values']));
+    foreach ($AGGS as $agg) {
+        add($cases, $id, 'extractAgg', array(cell($cnt, $b), $agg, null, null), "$sname/$agg");
+    }
+}
+
+// null cellData - the "no data at all" path
+foreach ($AGGS as $agg) { add($cases, $id, 'extractAgg', array(null, $agg, null, null), "nullcell/$agg"); }
+
+// FILTERED buckets: PHP runs a second, duplicated switch for this branch
+foreach (array('empty' => $EMPTY, 'nums' => $NUMS, 'text' => $TEXT, 'spread' => $SPREAD) as $sname => $b) {
+    $c = cell(9, $EMPTY, array('_filteredBuckets' => array('0' => array('count' => count($b['values']), 'main' => $b))));
+    foreach ($AGGS as $agg) {
+        add($cases, $id, 'extractAgg', array($c, $agg, null, 0), "filtered-$sname/$agg");
+    }
+}
+// filtered + column override
+$cOv = cell(9, $EMPTY, array('_filteredBuckets' => array('0' => array(
+        'count' => 2, 'main' => $EMPTY, '_colData' => array('OTHER' => $NUMS)))));
+foreach ($AGGS as $agg) { add($cases, $id, 'extractAgg', array($cOv, $agg, 'OTHER', 0), "filt+override/$agg"); }
+// unfiltered + column override
+$cOv2 = cell(7, $EMPTY, array('_colData' => array('OTHER' => $NUMS)));
+foreach ($AGGS as $agg) { add($cases, $id, 'extractAgg', array($cOv2, $agg, 'OTHER', null), "override/$agg"); }
+// override naming a column that does NOT exist -> both should fall back to base
+foreach (array('sum','min','max','count_blank') as $agg) {
+    add($cases, $id, 'extractAgg', array($cOv2, $agg, 'MISSING', null), "override-missing/$agg");
+}
+
+// ------------------------------------------------------------ pure math ----
+$numSets = array(
+    array(), array(5), array(1,2,3,4), array(2,4,4,4,5,5,7,9),
+    array(-10,-3,-2), array(0,0,0), array(1.5,2.5,3.5), array(1000000,2,3),
+);
+foreach ($numSets as $k => $ns) {
+    add($cases, $id, 'stddev', array($ns), "set$k");
+    foreach (array(1,10,25,50,75,90,99) as $p) { add($cases, $id, 'percentileOf', array($ns, $p), "set$k/p$p"); }
+}
+foreach (array('p1','p10','p50','p99','p100','p0','p','pct_change','wavg@X','sum') as $t) {
+    add($cases, $id, 'percentileP', array($t), $t);
+    add($cases, $id, 'wavgCol', array($t), $t);
+}
+foreach (array(array('w'=>4,'wv'=>70), array('w'=>0,'wv'=>0), array('w'=>-2,'wv'=>10), null) as $k => $pair) {
+    add($cases, $id, 'wavgOf', array($pair), "pair$k");
+}
+foreach (array(array(), array('a'), array('a','a','b'), array('__proto__','__proto__','q'),
+               array('constructor','y','y'), array('1','1','2','3')) as $k => $vs) {
+    add($cases, $id, 'antimode', array($vs), "set$k");
+    add($cases, $id, 'parseNumericValues', array($vs), "set$k");
+}
+
+// -------------------------------------------------------- token grammar ----
+$tokens = array(
+    'AMOUNT', 'AWARD_DATE:fy', 'AWARD_DATE:fy:fill', 'AWARD_DATE:month', 'AWARD_DATE:quarter',
+    'AWARD_DATE:dow', 'AWARD_DATE:year', 'AMOUNT:bin', 'AMOUNT:bin50000', 'AMOUNT:binlog',
+    'AMOUNT:bins100000_250000', 'AMOUNT:bins', 'AMOUNT:bins0_1_2', 'AMOUNT:bogus',
+    'WEIRD:COLON:NAME', 'AMOUNT:fill', 'amount:FY', 'AMOUNT:bin0', 'AMOUNT:bin007',
+    'A:bins250000_100000', 'A:bins5_5_5', '', 'AMOUNT:bin50000:fill',
+);
+foreach ($tokens as $t) { add($cases, $id, 'parseFieldToken', array($t), $t); add($cases, $id, 'fieldDisplayLabel', array($t), $t); }
+
+// ------------------------------------------------------------ bin labels ---
+// Exponent forms are in here on purpose: is_numeric() accepts them and the
+// browser's regex does not, which is how the same cell aggregated differently
+// on screen vs in a scheduled email. \x02 is the infobox/subtitle guard char.
+$binVals = array('0','1','9','10','999','1000','1001','-5','-0.4','2500','$1,234.56','abc','', '0.5',
+                 '1e3','1E3','2.5e2','1e-3','1E+3','-1e3','1e','e3','2E7','1.5E+10',
+                 "\x02" . '1000' . "\x02", '(1,234.56)', '  42  ', '1,60', '+5', '5.', '.5',
+                 '0x10', '1_000', 'INF', 'NAN', '1.2.3', '50%', '$-40');
+foreach ($binVals as $v) {
+    foreach (array(1, 10, 50000) as $w) { add($cases, $id, 'binBucket', array('bin', $v, $w), "$v/w$w"); }
+    add($cases, $id, 'binBucket', array('binlog', $v, null), "$v/log");
+    add($cases, $id, 'binsBucket', array($v, array(100000, 250000)), "$v/edges");
+    add($cases, $id, 'binsBucket', array($v, array(0, 10, 1000)), "$v/edges2");
+    add($cases, $id, 'parseValue', array($v), $v);
+}
+foreach (array(array(0,100), array(0,1), array(5,5), array(-10,10), array(0,1000000), array(3,7)) as $k => $mm) {
+    add($cases, $id, 'autoBinWidth', array($mm[0], $mm[1]), "min{$mm[0]}max{$mm[1]}");
+}
+foreach (array(array(1,2,3), array('100000','250000'), array(3,1,2), array(5,5), array(-1,2),
+               array(), array('abc'), array('1,000','2,000')) as $k => $l) {
+    add($cases, $id, 'normalizeBinEdges', array($l), "list$k");
+}
+foreach (array(array(100000,250000), array(0,10,1000), array(5)) as $k => $e) {
+    add($cases, $id, 'binsLabels', array($e), "edges$k");
+}
+
+// ---------------------------------------------------------- date splits ----
+$dateVals = array('2025-03-15', '2025-07-01', '2024-12-31', 'Feb 2025', '2025', 'not a date',
+                  '', '2025-06-30', '2025-07-15 13:45:00', '03/15/2025');
+foreach ($dateVals as $d) {
+    foreach (array('fy','year','quarter','month','dow','day','hour') as $variant) {
+        add($cases, $id, 'splitBucket', array($variant, $d), "$variant/$d");
+    }
+}
+
+// NOTE: computeOverrideTotalFromCellValues() is NESTED inside
+// generatePivotTable() in js/main.js, so it cannot be exported to the harness.
+// Its PHP twin is covered by verify_q1q2.php instead; a parity case here would
+// only be testing the PHP side twice while looking like a two-engine check.
+
+// -------------------------------- time-intelligence / derived predicates ----
+// New surface (ytd / yoy / prioryear / roll<N> / rollsum<N> / index@LABEL).
+// The two engines answer "is this derived?" DIFFERENTLY BY CONSTRUCTION: JS
+// strips ':down' and re-tests the set, PHP lists the ':down' variants
+// explicitly. Any token where those two strategies disagree is a real bug, and
+// the ':down' forms of the pct_* family are exactly where they can.
+$derivedTokens = array(
+    // plain set members
+    'pct_change','diff','pct_row_total','pct_col_total','pct_parent_row','pct_parent_col',
+    'pct_cum','index','pct_grand_total','running_total','running_count','formula',
+    'ytd','yoy','prioryear',
+    // ':down' forms - listed in PHP, reached in JS via the strip
+    'pct_change:down','diff:down','index:down','pct_cum:down','running_total:down',
+    'running_count:down','ytd:down','yoy:down','prioryear:down',
+    // ':down' forms of types PHP does NOT list - the suspected gap
+    'pct_row_total:down','pct_col_total:down','pct_grand_total:down',
+    'pct_parent_row:down','pct_parent_col:down','formula:down',
+    // parameterized: rolling mean / rolling sum / chosen baseline
+    'roll3','roll12','roll3:down','rollsum3','rollsum12','rollsum3:down',
+    'roll','roll0','rollsum','roll1','rollsumx',
+    'index@2024','index@FY25','index@','index@ Q1',
+    // base aggs must NOT be derived
+    'sum','count','avg','min','max','median','mode','stddev','range','antimode',
+    'p50','wavg@AMOUNT','count_filled','count_blank','bogus',
+);
+foreach ($derivedTokens as $t) {
+    add($cases, $id, 'isDerivedAgg',   array($t), $t);
+    add($cases, $id, 'isRoll',         array($t), $t);
+    add($cases, $id, 'indexBaseLabel', array($t), $t);
+}
+
+// ------------------------------------ the shared "nothing to measure" rule --
+// penumbraEmptyAggValue() / pivot_empty_agg_value(). Both are module scope, so
+// unlike computeAggFromValues this rule CAN be checked across both engines.
+foreach ($AGGS as $a) { add($cases, $id, 'emptyAggValue', array($a), $a); }
+
+// --------------------------------------------------- AGG-FILTER semantics ---
+// The collector showed a filtered bucket differing (browser count=1, email
+// count=2 for "AMT > 5" over ['notanum','1,234.56']) - but BOTH engines read as
+// `bothNumeric ? numeric : string` in source, so the two should agree. Test the
+// filter directly instead of inferring it from a bucket dump.
+$filterVals = array('10','1','5','$1,234.56','(5)','notanum','','1e3','2024','ZZZ','0');
+$filterOps  = array('AMT > 5','AMT < 5','AMT >= 5','AMT <= 5','AMT = 5','AMT != 5',
+                    'AMT > 1000','AMT contains 5','AMT > A','AMT < ZZZ');
+foreach ($filterVals as $fv) {
+    foreach ($filterOps as $fo) {
+        add($cases, $id, 'filterRow', array($fv, $fo), "'$fv' vs $fo");
+    }
+}
+
+// The per-aggregation filter's GRAMMAR (2026-09-23). The runner used to split on ' OR ' /
+// ' AND ' and read "COL OP VALUE" with one regex: no {COLUMN} (the browser parses the filter
+// with parseAdvancedQuery), no quoted names, no /regex/, no eq/gt, split INSIDE quoted values,
+// and an unparseable condition passed EVERY row. It runs on engine C now; these pin it to the
+// browser over one richer row (upper-case keys, as main.js ingests them).
+$fr2Row = array('AMT' => '500', 'BUDGET' => '400', 'TITLE' => 'Grant AND Award', 'STATUS' => 'In Progress',
+                'DEPT' => 'Chemistry', 'AWARD AMOUNT' => '1,250');
+$fr2Filters = array(
+    '{AMT} > 5', '{ AMT } > 5', "{ 'AWARD AMOUNT' } > 1000", "'AWARD AMOUNT' > 1000", 'AWARD AMOUNT > 1000',
+    'AMT CONTAINS 5', 'TITLE contains grant', 'TITLE Contains AWARD', 'DEPT contains mist',
+    '{DEPT} Chem', '{ DEPT } Phys', 'DEPT Chem', 'DEPT = /^chem/', 'DEPT = /^CHEM/I', 'DEPT != /^phys/',
+    'DEPT = //Chemistry//', 'DEPT = //Chem//', 'AMT > {BUDGET}', 'AMT < { BUDGET }', 'AMT = { AMT }',
+    'AMT eq 500', 'AMT gt 499', 'AMT ne 500', 'AMT == 500',
+    'TITLE = "Grant AND Award"', 'TITLE = Grant AND Award', 'STATUS = "In Progress"', 'STATUS = In Progress',
+    'DEPT = Physics OR AMT > 5 AND STATUS = "In Progress"', 'DEPT = Physics OR AMT > 5 AND STATUS = Done',
+    'Chemistry', 'nonsense', 'contains', 'contains Chem', '!= Physics', '= Chemistry',
+    'AMT > 5 AND', 'OR AMT > 5', 'AMT', '{AMT}', 'DEPT = chemistry', 'DEPT != CHEMISTRY',
+    'AMT = 1-600', 'AMT >= 500', 'AMT <= 499.99', "'Chemistry' = DEPT",
+    'TITLE starts with Grant', 'TITLE = /^grant/',   // no "starts with" operator on either side (auditfixes)
+);
+foreach ($fr2Filters as $ff) {
+    add($cases, $id, 'filterRow2', array($fr2Row, $ff), $ff);
+}
+
+// The scheduled SEARCH FILTER's engine (penumbra_search.php) on the same two matrices
+// (2026-09-24): it is the other PHP twin of the same browser evaluator. Before its value
+// rules were aligned it differed on 5 of the 110 (accounting "(5)", numeric `contains`,
+// "'2024' > A" via strtotime).
+foreach ($filterVals as $fv) {
+    foreach ($filterOps as $fo) {
+        add($cases, $id, 'filterRowB', array($fv, $fo), "B: '$fv' vs $fo");
+    }
+}
+foreach ($fr2Filters as $ff) {
+    add($cases, $id, 'filterRow2B', array($fr2Row, $ff), 'B: ' . $ff);
+}
+
+// DATES through both PHP engines (C = the pivot filter, B = the Search Filter): the
+// browser's strict formats, granularity from the SEARCH value ("> 2024" = after the year),
+// keyword dates only (TODAY-N; an English phrase is not a date in search), Oracle
+// DD-MON-YY and timestamps. Fixture dates sit years away from today, so TODAY-based
+// answers cannot flip between the two engines' clocks during a run.
+$dateVals = array('2024-05-15', '15-MAY-24', '05/15/2024', '5/15/2024', '2024-05', 'May 2024', '2024',
+                  '2024-05-15 13:45:00', '15-MAY-24 01.02.03.000000 PM', '2023-12-31', '2025-01-01', '', 'notadate', 'A');
+$dateOps = array('D > 2024', 'D >= 2024', 'D = 2024', 'D < 2024', 'D = 2024-05', 'D != 2024-05', 'D < 2024-06-01',
+                 'D = May 2024', 'D > 05/01/2024', 'D = 15-MAY-24', 'D != 2024-05-15', 'D > A', 'D < TODAY',
+                 'D > TODAY-36500', 'D < "first day of this month"', 'D contains 2024', 'D = empty');
+foreach ($dateVals as $dv) {
+    foreach ($dateOps as $do) {
+        add($cases, $id, 'filterDate',  array(array('D' => $dv, 'OTHER' => 'x'), $do), "C: '$dv' vs $do");
+        add($cases, $id, 'filterDateB', array(array('D' => $dv, 'OTHER' => 'x'), $do), "B: '$dv' vs $do");
+    }
+}
+
+// ------------------------------------------------------ COLLECTOR parity ----
+// processPivotData() <-> pivot_process_data(): the function that turns raw rows
+// into the bucket grid every other check has been ASSUMING was correct. Both are
+// module/top-level scope, so both are reachable.
+//
+// NOTE the signatures are NOT positionally identical:
+//   JS  processPivotData(sourceData, rowFields, colFields, valField, aggType, extraValFields, aggFilters)
+//   PHP pivot_process_data($flatRows, $rowFields, $colFields, $valField, $extraValFields, $aggFilters, $aggTypes)
+// so each driver maps the named fixture fields itself rather than splatting.
+$collRows = array(
+    array('COLLEGE'=>'Eng',  'FY'=>'2024', 'AMT'=>'10',        'WT'=>'2',  'TXT'=>'a'),
+    array('COLLEGE'=>'Eng',  'FY'=>'2024', 'AMT'=>'$20.50',    'WT'=>'3',  'TXT'=>'b'),
+    array('COLLEGE'=>'Eng',  'FY'=>'2025', 'AMT'=>'(5)',       'WT'=>'1',  'TXT'=>'a'),
+    array('COLLEGE'=>'Sci',  'FY'=>'2024', 'AMT'=>'',          'WT'=>'4',  'TXT'=>''),
+    array('COLLEGE'=>'Sci',  'FY'=>'2025', 'AMT'=>'notanum',   'WT'=>'',   'TXT'=>'c'),
+    array('COLLEGE'=>'Sci',  'FY'=>'2025', 'AMT'=>'1,234.56',  'WT'=>'2',  'TXT'=>'a'),
+    array('COLLEGE'=>'',     'FY'=>'2025', 'AMT'=>'7',         'WT'=>'1',  'TXT'=>'b'),  // blank row key
+    array('COLLEGE'=>'Eng',  'FY'=>'',     'AMT'=>'3',         'WT'=>'1',  'TXT'=>'b'),  // blank col key
+);
+$collCases = array(
+    array('rows'=>array('COLLEGE'), 'cols'=>array('FY'), 'val'=>'AMT', 'extra'=>null,          'filters'=>null, 'aggs'=>array('sum')),
+    array('rows'=>array('COLLEGE'), 'cols'=>array('FY'), 'val'=>'AMT', 'extra'=>null,          'filters'=>null, 'aggs'=>array('wavg@WT')),
+    array('rows'=>array('COLLEGE'), 'cols'=>array('FY'), 'val'=>'TXT', 'extra'=>null,          'filters'=>null, 'aggs'=>array('mode')),
+    array('rows'=>array('COLLEGE'), 'cols'=>array(),     'val'=>'AMT', 'extra'=>null,          'filters'=>null, 'aggs'=>array('sum')),
+    array('rows'=>array('COLLEGE','FY'), 'cols'=>array(),'val'=>'AMT', 'extra'=>null,          'filters'=>null, 'aggs'=>array('sum')),
+    array('rows'=>array('COLLEGE'), 'cols'=>array('FY'), 'val'=>'AMT', 'extra'=>array('WT'),   'filters'=>null, 'aggs'=>array('sum')),
+    array('rows'=>array('COLLEGE'), 'cols'=>array('FY'), 'val'=>'AMT', 'extra'=>null,          'filters'=>array('AMT > 5'), 'aggs'=>array('sum')),
+    array('rows'=>array('FY'),      'cols'=>array('COLLEGE'), 'val'=>'AMT', 'extra'=>null,     'filters'=>null, 'aggs'=>array('sum')),
+);
+foreach ($collCases as $k => $cc) {
+    add($cases, $id, 'collect', array($collRows, $cc), 'case' . $k . ' ' . $cc['aggs'][0]);
+}
+
+// ------------------------------------------- large-array min/max (no apply) --
+// Math.min.apply(null, arr) throws RangeError in the six-figure range; PHP's
+// min()/max() never did. These sizes straddle the measured ceiling (100k ok,
+// 125k throws) so the JS side must be loop-based to agree with PHP at all.
+foreach (array(1000, 100000, 130000) as $n) {
+    add($cases, $id, 'minOfRange', array($n), "n=$n");
+    add($cases, $id, 'maxOfRange', array($n), "n=$n");
+}
+
+// ------------------------------------------------------------ agg labels ---
+foreach ($AGGS as $a) { add($cases, $id, 'aggLabel', array($a), $a); }
+
+echo json_encode(array('generated' => 'gen_fixtures.php', 'count' => count($cases), 'cases' => $cases),
+                 JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);

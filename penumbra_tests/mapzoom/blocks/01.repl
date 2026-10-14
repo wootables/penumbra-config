@@ -1,0 +1,15 @@
+        config.options.onClick = function (evt, elements, chart) {
+            // A chart type's own click handler answers first (2026-10-06, map
+            // click-to-zoom): `false` = it consumed the click, so no breakdown;
+            // `{ index }` = the element it actually meant, which on a map can
+            // differ from Chart.js's nearest pick. Anything else changes nothing.
+            var picked = (elements && elements.length) ? elements[0] : null;
+            if (prevOnClick) {
+                var said;
+                try { said = prevOnClick.call(this, evt, elements, chart); } catch (e) { said = undefined; }
+                if (said === false) return;
+                if (said && typeof said.index === 'number') {
+                    picked = { datasetIndex: (typeof said.datasetIndex === 'number') ? said.datasetIndex : 0, index: said.index };
+                }
+            }
+            if (!picked) return;

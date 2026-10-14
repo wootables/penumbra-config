@@ -1,0 +1,203 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>grouped summary preview and __ROW</title></head>
+<body>
+<!-- Minimal report DOM. rebuildGroupedView() reads the group column off
+     #resultsTable > thead > tr#tableHeader th[data-colname] and the cell values
+     off each row's td[data-column], so those two attributes must agree. The
+     grouping picker is deliberately EMPTY: getCustomSelectValue() then returns
+     '' and the rebuild falls back to currentGroupingColumn, which is what
+     __GM.setLevels() drives. -->
+<table id="resultsTable"><thead><tr id="tableHeader">
+  <th data-colname="#" data-column="#">#</th>
+  <th data-colname="COLLEGE" data-column="c1">COLLEGE</th>
+  <th data-colname="DEPT" data-column="c2">DEPT</th>
+  <th data-colname="AWARD_DATE" data-column="c3">AWARD_DATE</th>
+  <th data-colname="AMOUNT" data-column="c4">AMOUNT</th>
+  <th data-colname="ACTIVE" data-column="c5">ACTIVE</th>
+  <th data-colname="ITEMS" data-column="c6">ITEMS</th>
+</tr></thead><tbody></tbody></table>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="pnbNoSearchMatches" style="display:none"></div>
+<input id="tableSearch" value="">
+<div id="pivot-output-container" style="display:none"></div>
+<div id="snapshotComparisonContainer" style="display:none"></div>
+<div id="errorBox"></div>
+<div id="undo_text_container"></div>
+<!-- main.js initialises the CodeMirror editors during ready, unconditionally,
+     so these must exist even though group mode never uses them. Without them
+     init throws and the closure never assigns PENUMBRA_PIVOT_SPLITS. -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<select id="rowsPerPageSelector"><option value="100">100</option></select>
+<a href="#" id="expandAllGroups">Expand all</a><a href="#" id="collapseAllGroups">Collapse all</a>
+<!-- Copy Snippet writer surface. main.js binds #copyGroupSnippetBtn directly at
+     ready time, so it and the fields it reads must exist BEFORE main.js loads. -->
+<div id="groupingLightbox" style="display:none"></div>
+<input type="checkbox" id="groupAggCheckbox">
+<div id="groupAggOptions" style="display:none"></div>
+<select id="groupAggType"><option value="sum">sum</option><option value="avg">avg</option></select>
+<select id="groupSortSelect">
+  <option value="label|asc">label asc</option><option value="label|desc">label desc</option>
+  <option value="count|asc">count asc</option><option value="count|desc">count desc</option>
+</select>
+<button id="copyGroupSnippetBtn" type="button">Snippet</button>
+<div id="groupingColumnSelector" class="penumbra-custom-select">
+  <div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div>
+</div>
+<div id="groupLevel2Row" style="display:none">
+  <div id="groupingColumnSelector2" class="penumbra-custom-select">
+    <div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div>
+  </div>
+</div>
+<div id="groupLevel3Row" style="display:none">
+  <div id="groupingColumnSelector3" class="penumbra-custom-select">
+    <div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div>
+  </div>
+</div>
+<div id="groupAggColumn" class="penumbra-custom-select">
+  <div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div>
+</div>
+<!-- The rest of the grouping dialog's controls, and the Reset button that
+     clears them. main.js binds #resetGroupingBtn at ready time, so the button
+     has to exist BEFORE main.js loads or the handler is never wired and the
+     reset phase would silently assert against an inert click. -->
+<select id="groupStartDepth">
+  <option value="0">Collapsed</option><option value="1">Level 1</option>
+  <option value="2">Level 2</option><option value="3">All levels</option>
+</select>
+<select id="groupLimitDir"><option value="top">top</option><option value="bottom">bottom</option></select>
+<input type="text" id="groupLimitN"><input type="text" id="groupLimitMinRows">
+<input type="checkbox" id="groupLimitOther" checked>
+<div id="groupSummaryFilterHint" style="display:none"></div>
+<button id="resetGroupingBtn" type="button">Reset</button>
+<!-- The shared preset engine mounts its chip here. Must exist before main.js
+     runs _groupMountPresetChip() at ready, or the control is never created,
+     _groupPresetCtl stays null, and the reset handler's guarded call to
+     setLoaded(null) becomes a no-op that asserts nothing. -->
+<div id="groupPresetMount"></div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<!-- Before main.js, matching index.php's own order: main.js's ready handler
+     calls _groupMountPresetChip(), which needs window.PenumbraPresets to exist. -->
+<script src="penumbra_presets.js"></script>
+<script>
+  // Same boot stubs as the pivot_trigger / parity harnesses.
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  // Synchronous show/hide AND slide: the fx ticker's rAF never fires under
+  // --dump-dom, so an animated slideDown would leave .group-content at
+  // display:none and every :visible assertion below would read wrong.
+  // (Do NOT null requestAnimationFrame instead - main.js calls it during init
+  // and the ready closure would die before binding anything.)
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () {
+    this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {};
+  };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  // Clipboard capture for the Copy Snippet handler (same stub the pivot_trigger
+  // harness uses) - the writer's only observable output is what it writes here.
+  window.__clip = null;
+  if (!navigator.clipboard) { try { Object.defineProperty(navigator, 'clipboard', { value: {}, configurable: true }); } catch (e) {} }
+  try { navigator.clipboard.writeText = function (s) { window.__clip = s; return Promise.resolve(); }; } catch (e) {}
+  window.__errors = [];
+  window.onerror = function (m, src, line) {
+    window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line);
+    try { var o = document.getElementById('out'); if (o && o.textContent === 'running') o.textContent = 'PAGE_ERROR: ' + window.__errors[0]; } catch (x) {}
+    return true;
+  };
+</script>
+<script src="fixture.js"></script>
+<script src="main_patched.js"></script>
+<script>
+(function () {
+  // grouprow (2026-09-28): the grouped-summary preview (_previewGroupedAggMatch - the
+  // Visual Search Builder's count and the task form's hint) must read a leading __ROW
+  // the way the executed grouped search and the email do. Each case is checked four
+  // ways: preview, task-form (email) reading, the executed search, and (by run.ps1)
+  // the runner's grouped-summary filter.
+  function report(t) { document.getElementById('out').textContent = t; }
+  var results = [];
+  function t(name, cond, detail) { results.push({ name: name, pass: !!cond, detail: detail === undefined ? '' : String(detail) }); }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  // One fixture for both halves: run.ps1 writes fixture.js from fixture.json.
+  var FX = window.__GR_FIXTURE, COLS = FX.cols, DATA = FX.rows, CASES = FX.cases;
+
+  function buildTable() {
+    var tb = document.querySelector('#resultsTable tbody'); tb.innerHTML = '';
+    DATA.forEach(function (row) {
+      var tr = document.createElement('tr');
+      // '#' is marked '#', as the app marks it: the grouped search finds each row's
+      // number through td[data-column='#'] (groupmode's fixture says c0 there).
+      row.forEach(function (v, c) { var td = document.createElement('td'); td.setAttribute('data-column', c === 0 ? '#' : 'c' + c); td.textContent = v; tr.appendChild(td); });
+      tb.appendChild(tr);
+    });
+    window.__RV.setRows(DATA.map(function (row) { var m = new Map(); COLS.forEach(function (c, i) { m.set(c, row[i]); }); return m; }));
+  }
+  function regroup() {
+    window.__RV.setLevels(['COLLEGE']);
+    $('#groupingColumnSelector .pcs-selected').attr('data-value', '').text('-- None --');
+    window.__RV.rebuild();
+  }
+  function onScreen() {
+    var bands = Array.prototype.filter.call(document.querySelectorAll('#groupedResultsContainer .group-wrapper[data-group-depth="0"]'),
+      function (w) { return !w.classList.contains('search-hidden') && w.style.display !== 'none'; });
+    var rows = 0;
+    bands.forEach(function (w) { rows += Array.prototype.filter.call(w.querySelectorAll(':scope > .group-content > table > tbody > tr'), function (tr) { return !tr.classList.contains('search-hidden') && tr.style.display !== 'none'; }).length; });
+    return { groups: bands.length, rows: rows, names: bands.map(function (w) { return w.getAttribute('data-group-key') || ''; }).sort() };
+  }
+  async function execute(q) {
+    buildTable(); regroup();
+    $('#tableSearch').val(q); window.__RV_hides = 0;
+    window._penumbraSearchAPI.runTableSearch();
+    for (var i = 0; i < 400 && !(window.__RV_hides > 0); i++) await sleep(10);
+    await sleep(50);
+    return onScreen();
+  }
+  async function run() {
+    if (!window.__RV) { report('RESULTS_JSON:' + JSON.stringify({ fatal: 'hooks missing: ' + window.__RV_ERR })); return; }
+    window.__RV.wrapHide();
+    window.__RV.setAgg({ column: 'AMOUNT', type: 'sum' });
+    buildTable(); regroup();
+    t('G0 setup: the summary label is Sum of AMOUNT', window.__RV.label() === 'Sum of AMOUNT', window.__RV.label());
+    for (var i = 0; i < CASES.length; i++) {
+      var c = CASES[i], want = c.groups + 'g/' + c.rows + 'r';
+      buildTable(); $('#tableSearch').val(''); regroup();
+      var p = window._penumbraSearchAPI.countMatchingRows(c.q);
+      var e = window._penumbraSearchAPI.countMatchingRows(c.q, { email: true });
+      t('P' + c.id + ' builder preview: ' + c.q, p.groups === c.groups && p.matching === c.rows, 'want ' + want + ', got ' + p.groups + 'g/' + p.matching + 'r');
+      t('H' + c.id + ' task-form hint: ' + c.q, e.groups === c.groups && e.matching === c.rows, 'want ' + want + ', got ' + e.groups + 'g/' + e.matching + 'r');
+      var x = await execute(c.q);
+      t('X' + c.id + ' executed search: ' + c.q, x.groups === c.groups && x.rows === c.rows && x.names.join(',') === c.names,
+        'want ' + want + ' ' + c.names + ', got ' + x.groups + 'g/' + x.rows + 'r ' + x.names.join(','));
+      $('#tableSearch').val(''); window._penumbraSearchAPI.runTableSearch(); await sleep(120);
+    }
+    t('no page errors', window.__errors.length === 0, JSON.stringify(window.__errors.slice(0, 4)));
+    report('RESULTS_JSON:' + JSON.stringify({ results: results, pageErrors: window.__errors.slice(0, 6) }));
+  }
+  setTimeout(function () { run().catch(function (e) { report('RESULTS_JSON:' + JSON.stringify({ fatal: String(e && e.stack || e), results: results })); }); }, 400);
+})();
+</script>
+</body></html>

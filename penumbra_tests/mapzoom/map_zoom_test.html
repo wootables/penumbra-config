@@ -1,0 +1,479 @@
+<!doctype html><meta charset="utf-8"><title>running</title><pre id="out">running</pre><pre id="prog">no step yet</pre>
+<!--
+  MAP CLICK-TO-ZOOM + DRILL (2026-10-06)
+
+  Real Chart.js 4.5.1 and real dispatched mouse clicks on real outline maps,
+  with the outline builder (penumbra_charts.js) and main.js's click wrapper
+  (_attachChartDrillOptions) grabbed out of the code under test and chained the
+  way renderSnippetChart chains them. What is pinned:
+
+  Z  zoom: a click zooms onto the place under the pointer (its OUTLINE, not the
+     nearest anchor), the second click on it goes to the breakdown with that
+     place's index, blank map zooms out, the window maths (main body only: no
+     Aleutians, no French Guiana; a floor for specks), the Zoom out button, the
+     clip, off-view labels, destroy cleanup, the animation landing, and that an
+     UNZOOMED map's scales are exactly the old letterbox.
+  D  drill: a place with a pair runs penumbraActivateLayoutPosition(label,
+     canvas) after the zoom; a place without one does not.
+  C  the click contract in main.js: false = consumed, {index} = re-pick,
+     anything else = the old behaviour.
+  T  the builder box text <-> the options object.
+  R  main.js's _mapDrill resolution (keyed by the map's own resolver).
+  L  penumbraActivateLayoutPosition against a switch fixture.
+-->
+<div id="host" style="position:relative; width:900px; margin:0; padding:0"><canvas id="cv" width="900" height="500" style="width:900px; height:500px; display:block"></canvas></div>
+<div id="host2" style="position:relative; width:900px; margin:0; padding:0"><canvas id="cv2" width="900" height="500" style="width:900px; height:500px; display:block"></canvas></div>
+<div id="reportSnippetOutput"><div class="pnb-layout-switch" role="radiogroup">
+  <button class="pnb-ls-opt" role="radio" aria-checked="true">County</button>
+  <button class="pnb-ls-opt" role="radio" aria-checked="false">State</button>
+  <button class="pnb-ls-opt" role="radio" aria-checked="false"> Country </button>
+</div></div>
+<script>
+window.onerror = function (msg, src, line, col) {
+  var el = document.getElementById('out');
+  if (el && el.textContent === 'running') el.textContent = 'SCRIPT-ERROR: ' + msg + '  (line ' + line + ':' + col + ')';
+  return false;
+};
+// Headless --dump-dom stops delivering animation frames part-way through a run,
+// and Chart.js only handles a click on the next frame - so a real click could
+// land seconds late or never. Frames on a 16 ms timer keep both Chart.js and the
+// zoom animation honest under virtual time. Installed BEFORE Chart.js loads.
+window.requestAnimationFrame = function (cb) { return setTimeout(function () { cb(performance.now()); }, 16); };
+window.cancelAnimationFrame = function (id) { clearTimeout(id); };
+// Reduced motion ON unless a test turns it off: lands each zoom in one step.
+window.__reduce = true;
+window.matchMedia = function (q) { return { matches: !!window.__reduce && /reduced-motion/.test(String(q)) }; };
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="chart-4.5.1.min.js"></script>
+<script src="penumbra_geo_us.js"></script>
+<script src="SRC.js"></script>
+<script>
+var LOG = [], PASS = 0, FAIL = 0;
+function ok(n, c, x) { if (c) { PASS++; LOG.push('PASS  ' + n); } else { FAIL++; LOG.push('FAIL  ' + n + (x ? '   >> ' + x : '')); }
+  // Progress trace: if the page stalls, the dump shows the last step reached.
+  var pg = document.getElementById('prog'); if (pg) pg.textContent = 'last: ' + LOG[LOG.length - 1]; }
+function eq(n, g, w) { ok(n, JSON.stringify(g) === JSON.stringify(w), 'got=' + JSON.stringify(g) + ' want=' + JSON.stringify(w)); }
+function done() { document.getElementById('out').textContent = 'pass=' + PASS + ' fail=' + FAIL + '\n' + LOG.join('\n'); document.title = 'done'; }
+function frames(n) {
+  // rAF, with a timer fallback: a headless page does not always paint.
+  return Promise.race([
+    new Promise(function (res) { var k = 0; (function f() { if (++k > (n || 2)) setTimeout(res, 0); else requestAnimationFrame(f); })(); }),
+    new Promise(function (res) { setTimeout(function () { var pg = document.getElementById('prog'); if (pg) pg.textContent += ' | (frames timed out)'; res(); }, 400); })
+  ]);
+}
+function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+var code = String(window.__src).replace(/\r\n/g, '\n');
+function grab(decl) {
+  var start = code.indexOf(decl);
+  if (start === -1) throw new Error('anchor not found: ' + decl);
+  var i = code.indexOf('{', start), depth = 0, inStr = null, inLine = false, inBlk = false, inRe = false;
+  for (var j = i; j < code.length; j++) {
+    var c = code[j], n = code[j + 1];
+    if (inLine) { if (c === '\n') inLine = false; continue; }
+    if (inBlk) { if (c === '*' && n === '/') { inBlk = false; j++; } continue; }
+    if (inStr) { if (c === '\\') { j++; continue; } if (c === inStr) inStr = null; continue; }
+    if (inRe) { if (c === '\\') { j++; continue; } if (c === '/') inRe = false; continue; }
+    if (c === '/' && n === '/') { inLine = true; j++; continue; }
+    if (c === '/' && n === '*') { inBlk = true; j++; continue; }
+    if (c === '"' || c === "'" || c === '`') { inStr = c; continue; }
+    if (c === '/') {
+      var k = j - 1; while (k >= 0 && /\s/.test(code[k])) k--;
+      if (k < 0 || /[=(,:;!&|?{}[\n+\-*%~^<>]/.test(code[k])) { inRe = true; continue; }
+    }
+    if (c === '{') depth++;
+    else if (c === '}') { depth--; if (depth === 0) return code.slice(start, j + 1); }
+  }
+  throw new Error('unbalanced: ' + decl);
+}
+function grabVar(name) {
+  var m = code.match(new RegExp('\\n\\s*var ' + name + '\\b[^;]*;'));
+  if (!m) throw new Error('var not found: ' + name);
+  return m[0];
+}
+
+(async function main() {
+ try {
+  // The WHOLE of both files must still parse - a grab() only proves its slice.
+  (function () {
+    var why = '';
+    try { new Function(code); } catch (e) { why = e.name + ': ' + e.message; }
+    ok('P0 penumbra_charts.js + main.js parse as a whole', why === '', why);
+  })();
+  var ASSET = window.PenumbraGeoUS;
+  var G = new Function('PENUMBRA_US_GRID', 'global',
+    grabVar('GEO') + '\n' + grabVar('_geoStateByPostal') + '\n' + grabVar('_geoCountyByKey') + '\n' + grabVar('_geoById') + '\n' +
+    grab('function _vizCountyKey(') + '\n' + grab('function _geoCentroid(') + '\n' + grab('function initGeo(') + '\n' +
+    grab('function _vizResolveCounty(') + '\n' + grab('function _vizGeoLayer(') + '\n' +
+    'return { init:initGeo, layer:_vizGeoLayer };')(
+      (new Function(grabVar('PENUMBRA_US_GRID') + '\nreturn PENUMBRA_US_GRID;'))(), { console: { error: function () {} } });
+  ok('setup: geometry armed', G.init(ASSET) === true);
+
+  var R = new Function('getChartColor', 'getChartBorderColor', 'hexToRgba', 'penumbraPercentileOf',
+                       '_vizGeoLayer', 'penumbraFormatChartNumber', 'global',
+    grabVar('PENUMBRA_US_GRID_COLS') + '\n' + grab('function applyOutlineMapConfig(') + '\n' +
+    grab('function applyMapChartConfig(') + '\nreturn applyMapChartConfig;'
+  )(function () { return '#336699'; }, function (i) { return 'B' + i; },
+    function (c, a) { return 'rgba(51,102,153,' + a + ')'; },
+    function (s, p) { var n = s.length; if (!n) return 0; var r = (p / 100) * (n - 1);
+                      var lo = Math.floor(r), hi = Math.ceil(r); return lo === hi ? s[lo] : s[lo] + (s[hi] - s[lo]) * (r - lo); },
+    G.layer, function () { return null; }, window);
+
+  var HANDLED = [];
+  var attach = new Function('_handleChartElementClick', grab('function _attachChartDrillOptions(') + '\nreturn _attachChartDrillOptions;')(
+    function (ch, el) { HANDLED.push(el); });
+
+  var ACTIVATED = [];
+  window.penumbraActivateLayoutPosition = function (label, el) { ACTIVATED.push([label, el && el.id]); return true; };
+
+  function nullProto(o) { var m = Object.create(null); Object.keys(o).forEach(function (k) { m[k] = o[k]; }); return m; }
+
+  function build(canvasId, layerKind, layer, keyOf, values, drill) {
+    var tiles = layer.features.map(function (f) {
+      var k = keyOf(f), v = values.hasOwnProperty(k) ? values[k] : null;
+      return { st: f._st || '', name: f.name, id: f.id, r: 0, c: 0, _key: k, value: v, n: v == null ? 0 : 1 };
+    });
+    var nums = tiles.filter(function (t) { return t.value != null; }).map(function (t) { return t.value; });
+    var config = { type: 'bar', data: { labels: [], datasets: [] },
+                   options: { responsive: false, animation: false, devicePixelRatio: 1,
+                              plugins: { legend: { display: true }, tooltip: {}, datalabels: {},
+                                         title: { display: true, text: 'Map' } },
+                              scales: { x: {}, y: {} } } };
+    R(config, { _isMap: true, _mapOutline: layerKind, _mapTiles: tiles, _mapMin: Math.min.apply(null, nums),
+                _mapMax: Math.max.apply(null, nums), _mapBins: 'quantile', _mapShowLabels: true,
+                _mapDrill: drill ? nullProto(drill) : null },
+      { showValues: false, textColor: '#111', isDark: false, currencyPrefix: '$', fsBoost: 0 });
+    attach(config, canvasId);
+    var inner = config.options.onClick;
+    config.options.onClick = function (e, els, ch) {
+      trace('onClick in (els=' + (els ? els.length : '-') + ')');
+      try { return inner.apply(this, arguments); }
+      catch (err) { trace('onClick THREW ' + err.message); throw err; }
+      finally { trace('onClick out'); }
+    };
+    var ex = Chart.getChart(canvasId); if (ex) ex.destroy();
+    return new Chart(document.getElementById(canvasId), config);
+  }
+  function idxOf(layer, id) { for (var i = 0; i < layer.features.length; i++) if (layer.features[i].id === id) return i; return -1; }
+  function px(chart, bx, by) { return { x: chart.scales.x.getPixelForValue(bx), y: chart.scales.y.getPixelForValue(by) }; }
+  function trace(m) { var pg = document.getElementById('prog'); if (pg) pg.textContent += ' | ' + m; }
+  async function clickPx(chart, p) {
+    var r = chart.canvas.getBoundingClientRect();
+    trace('click@' + Math.round(p.x) + ',' + Math.round(p.y));
+    chart.canvas.dispatchEvent(new MouseEvent('click', { clientX: r.left + p.x, clientY: r.top + p.y, bubbles: true }));
+    trace('dispatched');
+    await frames(3);
+    trace('settled');
+  }
+  async function clickFeature(chart, layer, id) {
+    var f = layer.features[idxOf(layer, id)];
+    await clickPx(chart, px(chart, f._c.x, f._c.y));
+  }
+  // The test's OWN point-in-polygon, an independent oracle for "blank map".
+  function anyFeatureAt(layer, bx, by) {
+    return layer.features.some(function (f) {
+      var inside = false;
+      f.rings.forEach(function (r) {
+        for (var k = 0, m = r.length - 2; k + 1 < r.length; m = k, k += 2) {
+          if ((r[k + 1] > by) !== (r[m + 1] > by) && bx < (r[m] - r[k]) * (by - r[k + 1]) / (r[m + 1] - r[k + 1]) + r[k]) inside = !inside;
+        }
+      });
+      return inside;
+    });
+  }
+  function oceanPx(chart, layer) {
+    var ca = chart.chartArea;
+    for (var y = ca.top + 40; y < ca.bottom - 40; y += 7) {
+      for (var x = ca.left + 40; x < ca.right - 40; x += 7) {
+        var bx = chart.scales.x.getValueForPixel(x), by = chart.scales.y.getValueForPixel(y);
+        var clear = true;
+        for (var dy = -12; dy <= 12 && clear; dy += 6) for (var dx = -12; dx <= 12 && clear; dx += 6) {
+          if (anyFeatureAt(layer, chart.scales.x.getValueForPixel(x + dx), chart.scales.y.getValueForPixel(y + dy))) clear = false;
+        }
+        if (clear) return { x: x, y: y };
+      }
+    }
+    return null;
+  }
+  function viewBox(chart) { var v = chart.$pnbMapView; return v ? { w: v.x1 - v.x0, h: v.y1 - v.y0 } : null; }
+  function contains(v, x, y) { return v && x >= v.x0 && x <= v.x1 && y >= v.y0 && y <= v.y1; }
+  function btnOf(chart) { return chart.$pnbMapZoomBtn || null; }
+  function btnShown(chart) { var b = btnOf(chart); return !!(b && b.parentNode && b.style.display !== 'none'); }
+
+  // ══ Z. WORLD MAP, REAL CHART ══════════════════════════════════════════
+  var W = ASSET.world, box = W.box;
+  var VAL = { '840': 900, '076': 300, '032': 200, '250': 120, '710': 80, '426': 40, '643': 60, '124': 50 };
+  var chart = build('cv', 'world', W, function (f) { return f.id; }, VAL, { 'United States of America': 'IGNORED', '840': 'State' });
+  // (main.js resolves names before this point; the builder receives KEYS. The
+  //  non-key entry above must therefore simply never match anything.)
+  await frames(2);
+  var ca = chart.chartArea, xs = chart.scales.x, ys = chart.scales.y;
+  var caW = ca.right - ca.left, caH = ca.bottom - ca.top, s0 = Math.min(caW / box.w, caH / box.h);
+  var full = { xmin: box.w / 2 - (caW / s0) / 2, xmax: box.w / 2 + (caW / s0) / 2, ymin: box.h / 2 - (caH / s0) / 2, ymax: box.h / 2 + (caH / s0) / 2 };
+  ok('Z0 unzoomed: the scales are EXACTLY the old letterbox',
+     Math.abs(xs.min - full.xmin) < 1e-9 && Math.abs(xs.max - full.xmax) < 1e-9 && Math.abs(ys.min - full.ymin) < 1e-9 && Math.abs(ys.max - full.ymax) < 1e-9,
+     [xs.min, xs.max, ys.min, ys.max].join(',') + ' vs ' + [full.xmin, full.xmax, full.ymin, full.ymax].join(','));
+  ok('Z0 unzoomed: no view, no button', !chart.$pnbMapView && !btnOf(chart));
+
+  var brI = idxOf(W, '076'), br = W.features[brI];
+  HANDLED.length = 0;
+  await clickFeature(chart, W, '076');
+  var v1 = chart.$pnbMapView;
+  ok('Z1 click on Brazil zooms', !!v1, 'view=' + JSON.stringify(v1));
+  eq('Z1 the click is consumed - no breakdown popup', HANDLED.length, 0);
+  eq('Z1 zoom target is Brazil', chart.$pnbMapZoomIdx, brI);
+  ok('Z1 the view holds all of Brazil', v1 && contains(v1, br._fb ? br._fb.x0 : br._c.x, br._fb ? br._fb.y0 : br._c.y) && contains(v1, br._c.x, br._c.y));
+  ok('Z1 the view is much smaller than the world', v1 && viewBox(chart).w < box.w * 0.4, JSON.stringify(viewBox(chart)));
+  ok('Z1 the scales follow the view (x range narrowed)', (chart.scales.x.max - chart.scales.x.min) < (full.xmax - full.xmin) * 0.5);
+  ok('Z1 a Zoom out button is shown', btnShown(chart));
+  eq('Z1 the button says Zoom out', btnOf(chart) ? btnOf(chart).textContent : null, 'Zoom out');
+  ok('Z1 the button is a real <button type=button> with an accessible name',
+     btnOf(chart) && btnOf(chart).tagName === 'BUTTON' && btnOf(chart).type === 'button' && /zoom/i.test(btnOf(chart).getAttribute('aria-label') || ''));
+  ok('Z1 the button sits inside the canvas host, over the plot', btnOf(chart) && btnOf(chart).parentNode === document.getElementById('host'));
+  // Live 2026-10-06: absolutely placed at the host's right edge, the label had
+  // no room and wrapped to "Zoom / out". One line = 16px + 6px padding + 2px border.
+  ok('Z1 the button label stays on ONE line', btnOf(chart) && btnOf(chart).offsetHeight <= 26, 'h=' + (btnOf(chart) ? btnOf(chart).offsetHeight : '-'));
+  ok('Z1 ...and sits inside the plot, right edge in from the plot\'s right edge',
+     btnOf(chart) && (function () { var b = btnOf(chart), cv = chart.canvas; var right = b.offsetLeft + b.offsetWidth;
+       return right <= cv.offsetLeft + chart.chartArea.right && b.offsetLeft >= cv.offsetLeft + chart.chartArea.left; })());
+  eq('Z1 no drill for a place without a pair', ACTIVATED.length, 0);
+
+  // Labels off the view are suppressed; Brazil's own label still shows.
+  (function () {
+    var dl = chart.config.options.plugins.datalabels;
+    var ruI = idxOf(W, '643');
+    ok('Z2 a label far off the zoomed view is hidden', dl.display({ chart: chart, dataIndex: ruI }) === false);
+    ok('Z2 the zoomed place keeps its label', dl.display({ chart: chart, dataIndex: brI }) === true);
+  })();
+
+  // Clip while zoomed, never when not.
+  (function () {
+    var n = 0, orig = chart.ctx.clip;
+    chart.ctx.clip = function () { n++; return orig.apply(this, arguments); };
+    chart.draw();
+    ok('Z3 a zoomed draw clips to the plot area', n >= 1, 'clips=' + n);
+    chart.ctx.clip = orig;
+  })();
+
+  // Second click on Brazil = the breakdown, for Brazil.
+  await clickFeature(chart, W, '076');
+  eq('Z4 second click on the zoomed place reaches the breakdown', HANDLED.length, 1);
+  eq('Z4 ...for THAT place (the re-picked index)', HANDLED[0] ? HANDLED[0].index : null, brI);
+  ok('Z4 ...and the map stays zoomed', !!chart.$pnbMapView && chart.$pnbMapZoomIdx === brI);
+
+  // A neighbour while zoomed: re-zoom, still no popup.
+  var arI = idxOf(W, '032');
+  await clickFeature(chart, W, '032');
+  eq('Z5 a click on a neighbour re-zooms onto it', chart.$pnbMapZoomIdx, arI);
+  eq('Z5 ...without a popup', HANDLED.length, 1);
+
+  // Blank map while zoomed: back to the whole map, exactly.
+  var sea = oceanPx(chart, W);
+  ok('Z6 setup: found open sea on the zoomed map', !!sea);
+  if (sea) await clickPx(chart, sea);
+  ok('Z6 blank map zooms back out', !chart.$pnbMapView);
+  eq('Z6 ...without a popup', HANDLED.length, 1);
+  ok('Z6 ...and the button hides', !btnShown(chart));
+  ok('Z6 ...and the scales are the letterbox again, exactly',
+     Math.abs(chart.scales.x.min - full.xmin) < 1e-9 && Math.abs(chart.scales.x.max - full.xmax) < 1e-9 &&
+     Math.abs(chart.scales.y.min - full.ymin) < 1e-9 && Math.abs(chart.scales.y.max - full.ymax) < 1e-9);
+  var sea0 = oceanPx(chart, W);
+  if (sea0) await clickPx(chart, sea0);
+  ok('Z7 blank map while NOT zoomed: nothing happens, no popup', !chart.$pnbMapView && HANDLED.length === 1);
+
+  // Zoom out by the button.
+  await clickFeature(chart, W, '076');
+  ok('Z8 setup: zoomed again', !!chart.$pnbMapView);
+  btnOf(chart).click();
+  await frames(2);
+  ok('Z8 the Zoom out button returns to the whole map', !chart.$pnbMapView && !btnShown(chart));
+  eq('Z8 ...and is not itself a chart click', HANDLED.length, 1);
+
+  // ══ D. DRILL ══════════════════════════════════════════════════════════
+  var usI = idxOf(W, '840'), us = W.features[usI];
+  ACTIVATED.length = 0;
+  await clickFeature(chart, W, '840');
+  eq('D1 a place with a pair runs the switch position after the zoom', ACTIVATED, [['State', 'cv']]);
+  ok('D1 ...and the map zoomed onto it first', chart.$pnbMapZoomIdx === usI && !!chart.$pnbMapView);
+  eq('D1 the drill click is consumed too', HANDLED.length, 1);
+  // The zoom window is the MAIN body: the Aleutians cross the antimeridian.
+  ok('D2 the US zoom window is not the whole world wide (Aleutians left out)', viewBox(chart).w < box.w * 0.35, JSON.stringify(viewBox(chart)));
+  (function () {
+    // Alaska's mainland ring: the biggest ring north-west of the lower 48.
+    var big = null, ak = null;
+    us.rings.forEach(function (r) {
+      var x0 = Infinity, y0 = Infinity, n = 0;
+      for (var i = 0; i + 1 < r.length; i += 2) { if (r[i] < x0) x0 = r[i]; if (r[i + 1] < y0) y0 = r[i + 1]; n++; }
+      var e = { r: r, x0: x0, y0: y0, n: n };
+      if (!big || n > big.n) big = e;
+    });
+    us.rings.forEach(function (r) {
+      var x0 = Infinity, y0 = Infinity, n = 0;
+      for (var i = 0; i + 1 < r.length; i += 2) { if (r[i] < x0) x0 = r[i]; if (r[i + 1] < y0) y0 = r[i + 1]; n++; }
+      if (r !== big.r && x0 < big.x0 && y0 < big.y0 && (!ak || n > ak.n)) ak = { x0: x0, y0: y0, n: n };
+    });
+    ok('D2 ...but Alaska stays in it', ak && chart.$pnbMapView.x0 <= ak.x0 + 1e-9, JSON.stringify(ak) + ' view=' + JSON.stringify(chart.$pnbMapView));
+  })();
+  await clickPx(chart, oceanPx(chart, W) || { x: 1, y: 1 });
+
+  // France: French Guiana rides in the same feature.
+  ok('D3 setup: back on the whole map', !chart.$pnbMapView);
+  await clickFeature(chart, W, '250');
+  ok('D3 France zooms to France, not across the Atlantic to French Guiana', viewBox(chart) && viewBox(chart).w < box.w * 0.12, JSON.stringify(viewBox(chart)));
+  eq('D3 no drill for France', ACTIVATED.length, 1);
+
+  // Lesotho sits inside South Africa.
+  await clickPx(chart, oceanPx(chart, W) || { x: 1, y: 1 });
+  await clickFeature(chart, W, '426');
+  eq('D4 a click on Lesotho picks Lesotho, not the South Africa around it', chart.$pnbMapZoomIdx, idxOf(W, '426'));
+
+  // Destroy takes the button with it.
+  ok('D5 setup: button present before destroy', btnShown(chart));
+  var b5 = btnOf(chart);
+  chart.destroy();
+  ok('D5 destroying the chart removes the Zoom out button', !b5.parentNode);
+
+  // ══ A. THE ANIMATED PATH ══════════════════════════════════════════════
+  window.__reduce = false;
+  var c2 = build('cv2', 'world', W, function (f) { return f.id; }, VAL, null);
+  await frames(2);
+  var r2 = c2.canvas.getBoundingClientRect(), b2 = W.features[brI];
+  var p2 = px(c2, b2._c.x, b2._c.y);
+  c2.canvas.dispatchEvent(new MouseEvent('click', { clientX: r2.left + p2.x, clientY: r2.top + p2.y, bubbles: true }));
+  await frames(4);
+  var mid = viewBox(c2);
+  await sleep(900);
+  var end = viewBox(c2);
+  ok('A1 the animation passes through intermediate windows', mid && end && mid.w > end.w * 1.02, 'mid=' + JSON.stringify(mid) + ' end=' + JSON.stringify(end));
+  ok('A1 ...and lands on the target', c2.$pnbMapZoomIdx === brI && end && end.w < box.w * 0.4);
+  ok('A1 the button appears once it lands', btnShown(c2));
+  c2.destroy();
+  window.__reduce = true;
+
+  // ══ US OUTLINE: a speck (DC) and nesting ══════════════════════════════
+  var S = ASSET.states;
+  var c3 = build('cv2', 'us-outline', S, function (f) { return f._st || ''; }, { NC: 9, DC: 5, MD: 3, VA: 2, CA: 1 }, { 'NC': 'County' });
+  await frames(2);
+  var dcI = idxOf(S, '11');
+  await clickFeature(c3, S, '11');
+  eq('S1 DC - a few pixels across - is clickable and zooms', c3.$pnbMapZoomIdx, dcI);
+  ok('S1 a speck zooms to a readable neighbourhood, not to fill the plot (floor 1/14)',
+     viewBox(c3) && viewBox(c3).w >= S.box.w / 14 - 1e-9, JSON.stringify(viewBox(c3)));
+  await clickPx(c3, oceanPx(c3, S) || { x: 1, y: 1 });
+  ACTIVATED.length = 0;
+  await clickFeature(c3, S, '37');
+  eq('S2 on the US map, North Carolina drills to County (key = postal)', ACTIVATED, [['County', 'cv2']]);
+  c3.destroy();
+
+  // ══ N. NESTING WITHOUT A HOLE (synthetic) ═════════════════════════════
+  // The real layers carve holes (South Africa has one for Lesotho), so they
+  // cannot tell "smallest wins" from "first wins". A synthetic layer can: the
+  // outer square has NO hole and comes FIRST, so first-wins picks it.
+  (function () {
+    var SYN = { box: { w: 100, h: 60 }, features: [
+      { id: 'A', name: 'Outer', rings: [[0, 0, 100, 0, 100, 60, 0, 60]], _c: { x: 15, y: 15 } },
+      { id: 'B', name: 'Inner', rings: [[40, 20, 60, 20, 60, 40, 40, 40]], _c: { x: 50, y: 30 } }
+    ] };
+    window.__SYN = SYN;
+  })();
+  var RS = new Function('getChartColor', 'getChartBorderColor', 'hexToRgba', 'penumbraPercentileOf',
+                        '_vizGeoLayer', 'penumbraFormatChartNumber', 'global',
+    grabVar('PENUMBRA_US_GRID_COLS') + '\n' + grab('function applyOutlineMapConfig(') + '\n' +
+    grab('function applyMapChartConfig(') + '\nreturn applyMapChartConfig;'
+  )(function () { return '#336699'; }, function (i) { return 'B' + i; },
+    function (c, a) { return 'rgba(51,102,153,' + a + ')'; }, function (s) { return s[0] || 0; },
+    function () { return window.__SYN; }, function () { return null; }, window);
+  (function () {
+    var cfgN = { type: 'bar', data: { labels: [], datasets: [] },
+                 options: { responsive: false, animation: false, devicePixelRatio: 1,
+                            plugins: { legend: {}, tooltip: {}, datalabels: {} }, scales: { x: {}, y: {} } } };
+    RS(cfgN, { _isMap: true, _mapOutline: 'world', _mapBins: 'quantile', _mapShowLabels: false, _mapMin: 1, _mapMax: 2,
+               _mapTiles: [{ id: 'A', name: 'Outer', _key: 'A', value: 1, n: 1 }, { id: 'B', name: 'Inner', _key: 'B', value: 2, n: 1 }] },
+       { showValues: false, textColor: '#111', isDark: false, currencyPrefix: '', fsBoost: 0 });
+    attach(cfgN, 'cv2');
+    var ex = Chart.getChart('cv2'); if (ex) ex.destroy();
+    window.__cN = new Chart(document.getElementById('cv2'), cfgN);
+  })();
+  await frames(2);
+  // Outer first, while the whole map is in view (a zoomed view would put the
+  // outer-only corner off the plot, where Chart.js ignores clicks).
+  await clickPx(window.__cN, px(window.__cN, 10, 50));
+  eq('N2 the outer shape where only it is under the pointer', window.__cN.$pnbMapZoomIdx, 0);
+  await clickPx(window.__cN, px(window.__cN, 50, 30));
+  eq('N1 a shape inside a shape with no hole: the click picks the INNER one', window.__cN.$pnbMapZoomIdx, 1);
+  window.__cN.destroy();
+
+  // ══ C. THE CLICK CONTRACT (main.js) ═══════════════════════════════════
+  function fakeConfig(ret) { return { options: { onClick: function () { return ret; } } }; }
+  var el0 = { datasetIndex: 0, index: 7, element: {} };
+  var fc;
+  HANDLED.length = 0; fc = fakeConfig(false); attach(fc, 'x'); fc.options.onClick({ native: null }, [el0], {});
+  eq('C1 prev handler returns false -> no breakdown', HANDLED.length, 0);
+  HANDLED.length = 0; fc = fakeConfig({ index: 3 }); attach(fc, 'x'); fc.options.onClick({ native: null }, [el0], {});
+  eq('C2 prev handler returns {index} -> breakdown for THAT index', HANDLED.map(function (e) { return e.index + '/' + e.datasetIndex; }), ['3/0']);
+  HANDLED.length = 0; fc = fakeConfig({ index: 4 }); attach(fc, 'x'); fc.options.onClick({ native: null }, [], {});
+  eq('C3 {index} works even when Chart.js found no element', HANDLED.map(function (e) { return e.index; }), [4]);
+  HANDLED.length = 0; fc = fakeConfig(undefined); attach(fc, 'x'); fc.options.onClick({ native: null }, [el0], {});
+  ok('C4 undefined -> the old behaviour: Chart.js\'s own pick', HANDLED.length === 1 && HANDLED[0] === el0);
+  HANDLED.length = 0; fc = fakeConfig(undefined); attach(fc, 'x'); fc.options.onClick({ native: null }, [], {});
+  eq('C5 undefined and no element -> nothing', HANDLED.length, 0);
+  HANDLED.length = 0; fc = { options: { onClick: function () { throw new Error('x'); } } }; attach(fc, 'x'); fc.options.onClick({ native: null }, [el0], {});
+  ok('C6 a throwing prev handler is contained and the click still works', HANDLED.length === 1 && HANDLED[0] === el0);
+  HANDLED.length = 0; fc = { options: {} }; attach(fc, 'x'); fc.options.onClick({ native: null }, [el0], {});
+  ok('C7 no prev handler at all -> unchanged', HANDLED.length === 1 && HANDLED[0] === el0);
+
+  // ══ T. BUILDER TEXT <-> OPTIONS ═══════════════════════════════════════
+  // Both helpers are NESTED in their callers (harnesses lift those by name);
+  // grab() finds them by text all the same.
+  var TT = new Function(grab('function _vizMapDrillFromText(') + '\n' + grab('var _vizMapDrillToText = function') +
+                        ';\nreturn { from: _vizMapDrillFromText, to: _vizMapDrillToText };')();
+  eq('T1 two pairs', TT.from('United States = State; North Carolina = County'), { 'United States': 'State', 'North Carolina': 'County' });
+  eq('T2 new lines separate too, spacing is trimmed', TT.from(' USA=State \n  NC =  County '), { USA: 'State', NC: 'County' });
+  eq('T3 junk without = is ignored; empty -> null', [TT.from('nonsense; =x; y='), TT.from(''), TT.from(null)], [null, null, null]);
+  eq('T4 object -> text', TT.to({ 'United States': 'State', 'North Carolina': 'County' }), 'United States = State; North Carolina = County');
+  eq('T5 round trip', TT.from(TT.to({ USA: 'State' })), { USA: 'State' });
+  eq('T6 non-objects -> empty box', [TT.to(null), TT.to('x'), TT.to(['a'])], ['', '', '']);
+
+  // ══ R. main.js _mapDrill RESOLUTION ═══════════════════════════════════
+  (function () {
+    var body = grab('_mapDrill: (function () {').replace(/^_mapDrill:\s*/, '');
+    var RES = new Function('mpOpts', 'mpIsWorld', 'mpIsCounty', 'mpMatch', '_vizResolveCountry', '_vizResolveCounty', '_vizResolveState',
+                           'return ' + body + ')();');
+    var country = function (v) { return ({ 'United States': '840', USA: '840', France: '250' })[v] || null; };
+    var county = function (v) { return ({ 'Wake County': '37183' })[v] || null; };
+    var state = function (v, m) { return (m === 'name' || m === 'auto') ? (({ 'North Carolina': 'NC' })[v] || null) : null; };
+    var w = RES({ drill: { 'United States': 'State', Atlantis: 'X', France: '  ' } }, true, false, 'auto', country, county, state);
+    eq('R1 world: names resolve to feature keys; unresolvable and blank targets drop', w ? Object.keys(w).map(function (k) { return k + '>' + w[k]; }) : null, ['840>State']);
+    ok('R1 the map has no prototype (a place named constructor cannot shadow it)', w && Object.getPrototypeOf(w) === null);
+    var s = RES({ drill: { 'North Carolina': 'County' } }, false, false, 'name', country, county, state);
+    eq('R2 states resolve through the state resolver with the match mode', s ? s.NC : null, 'County');
+    var k = RES({ drill: { 'Wake County': 'Detail' } }, false, true, 'auto', country, county, state);
+    eq('R3 counties resolve through the county resolver', k ? k['37183'] : null, 'Detail');
+    eq('R4 no drill / a non-object -> null', [RES({}, true, false, 'auto', country, county, state),
+        RES({ drill: 'United States=State' }, true, false, 'auto', country, county, state),
+        RES({ drill: ['x'] }, true, false, 'auto', country, county, state)], [null, null, null]);
+  })();
+
+  // ══ L. penumbraActivateLayoutPosition ═════════════════════════════════
+  (function () {
+    var real = window.penumbraActivateLayoutPosition;
+    (new Function('$', grab('window.penumbraActivateLayoutPosition = function')))(jQuery);
+    var act = window.penumbraActivateLayoutPosition;
+    ok('L0 the helper is installed by main.js', typeof act === 'function' && act !== real);
+    var CLICKED = [];
+    $(document).on('click', '#reportSnippetOutput .pnb-ls-opt', function () { CLICKED.push($.trim($(this).text())); });
+    eq('L1 runs the matching position (case and spacing ignored)', [act('state'), CLICKED], [true, ['State']]);
+    CLICKED.length = 0;
+    eq('L2 a padded label still matches', [act('COUNTRY'), CLICKED], [true, ['Country']]);
+    CLICKED.length = 0;
+    eq('L3 the active position counts as found but is not clicked again', [act('County'), CLICKED], [true, []]);
+    eq('L4 an unknown label is false and clicks nothing', [act('Planet'), act(''), CLICKED], [false, false, []]);
+    window.penumbraActivateLayoutPosition = real;
+  })();
+ } catch (e) {
+  ok('harness ran to the end', false, (e && e.stack) ? e.stack.split('\n').slice(0, 3).join(' | ') : String(e));
+ }
+ done();
+})();
+</script>

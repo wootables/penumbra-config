@@ -1,0 +1,650 @@
+<!doctype html><html><head>
+<link rel="stylesheet" href="penumbra_tiles.css"><link rel="stylesheet" href="penumbra_dashboard.css">
+</head><body class="pnb-dash theme-default">
+<div id="dashApp"><header class="dash-head" id="dashHead">
+  <a class="dash-brand" href="#"><span>Dashboards</span></a>
+  <div class="dash-head-title" id="dashHeadTitle"></div>
+  <div class="dash-head-actions" id="dashHeadActions"></div>
+</header><main id="dashMain"></main></div>
+<pre id="out">running</pre>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="chart-4.5.1.min.js"></script>
+<script>
+var CALLS = [], ERRORS = [];
+window.onerror = function (m) { ERRORS.push('onerror: ' + m); };
+
+// Fixture data. AMOUNT values exercise entity decoding, $/comma stripping and
+// accounting negatives; DEPT exercises entity-encoded group labels; NAME carries
+// baked-in markup that must render as text.
+// DEPT values carry the @@HTML CELL-VALUE prefix (the real DB_DUMP shape found
+// live): aggregation/labels must strip it, so every DEPT-based assertion below
+// doubles as the regression test.
+var REP_A = [
+  { AMOUNT: '$1,000.50', DEPT: '@@HTMLR&amp;D', STATUS: 'Open' },
+  { AMOUNT: '2,499.50',  DEPT: '@@HTMLR&amp;D', STATUS: 'Closed' },
+  { AMOUNT: '(500)',     DEPT: '@@HTMLOps',     STATUS: 'Open' }
+];
+var REP_B = [
+  { NAME: '@@HTML<a href="x">Alice</a>', AMOUNT: '10', 'BTN@@HTML': '<b>Go</b>' },
+  { NAME: 'Bob &amp; Carol',              AMOUNT: '20', 'BTN@@HTML': '<b>Go</b>' },
+  { NAME: 'Dee',                           AMOUNT: '30', 'BTN@@HTML': '<b>Go</b>' }
+];
+
+function deferred(fn) {
+  var d = $.Deferred();
+  setTimeout(function () { fn(d); }, 10);
+  return d.promise();
+}
+
+// Snapshot history for trend tiles: repC has 3 snapshots with distinct ROW_COUNTs
+// (count trend must use these WITHOUT any load calls) and per-snapshot AMOUNT data
+// (sum trend must load each and aggregate).
+var SNAPS = [
+  { ID: 7, CREATED_AT: '2026-06-01 10:00:00', ROW_COUNT: 5 },
+  { ID: 8, CREATED_AT: '2026-06-15 10:00:00', ROW_COUNT: 8 },
+  { ID: 9, CREATED_AT: '2026-07-01 10:00:00', ROW_COUNT: 2 }
+];
+var SNAP_DATA = {
+  7: [{ AMOUNT: '10' }],
+  8: [{ AMOUNT: '20' }, { AMOUNT: '5' }],
+  9: [{ X: 1 }, { X: 2 }]
+};
+
+$.getJSON = function (url, params) {
+  CALLS.push(url + '?' + $.param(params || {}));
+  return deferred(function (d) {
+    if (url === 'index.php') {
+      if (params.id === 'repA') { d.resolve({ data: REP_A }); }
+      else if (params.id === 'repB') {
+        // Honor &limit= like the real json path now does: slice + total_rows.
+        if (params.limit && REP_B.length > params.limit) {
+          d.resolve({ data: REP_B.slice(0, params.limit), total_rows: REP_B.length });
+        } else { d.resolve({ data: REP_B }); }
+      }
+      else if (params.id === 'grouped') {
+        // A grouped report: the json API returns an OBJECT of group -> rows.
+        d.resolve({ viewMode: 'grouped', groupedBy: 'DEPT', data: {
+          'R&amp;D': [{ AMOUNT: '100', DEPT: 'R&amp;D' }, { AMOUNT: '200', DEPT: 'R&amp;D' }],
+          'Ops':     [{ AMOUNT: '50',  DEPT: 'Ops' }]
+        } });
+      }
+      else if (params.id === 'denied') { d.reject({ status: 403 }); }
+      else { d.resolve({ error: 'Unknown report' }); }
+    } else if (url === 'manage_snapshots.php') {
+      if (params.action === 'list') {
+        d.resolve({ status: 'success', data: SNAPS.slice().reverse() });   // newest-first like the endpoint
+      } else if (params.action === 'load') {
+        var sd = SNAP_DATA[params.snap_id];
+        if (sd) { d.resolve({ status: 'success', data: { SNAP_DATA: JSON.stringify(sd), CREATED_AT: (SNAPS.filter(function (s) { return s.ID === params.snap_id; })[0] || {}).CREATED_AT } }); }
+        else { d.resolve({ status: 'error', message: 'Snapshot not found.' }); }
+      }
+    } else if (url === 'manage_dashboard.php') {
+      if (params && params.action === 'report_prompts') {
+        if (params.report_id === 'repB') { d.resolve({ status: 'success', unnamed: 0, has_me: false, data: [] }); return; }
+        if (params.report_id === 'grouped') { d.resolve({ status: 'success', unnamed: 0, has_me: false, unknown: true, data: [] }); return; }
+        d.resolve({ status: 'success', unnamed: 1, has_me: true, data: [
+          { name: 'date', type: 'date', label: 'Start date', 'default': '01-JUL-25', forcedefault: null, options: [], autofill: false, hidden: false },
+          { name: 'status', type: 'select', label: 'Status', 'default': '', forcedefault: null,
+            options: [{ label: 'Open', value: 'O' }, { label: 'Closed', value: 'C' }], autofill: false, hidden: false },
+          { name: 'secret', type: 'text', label: 'Hidden one', 'default': '', forcedefault: null, options: [], autofill: false, hidden: true }
+        ] });
+      } else { d.resolve({ status: 'success', data: [] }); }
+    } else if (url === 'get_email_recipients.php') {
+      var trm = String((params && params.term) || '').toLowerCase();
+      if (trm.indexOf('@') > -1) {
+        d.resolve(trm === 'jdoe@ncsu.edu' ? [{ value: 'jdoe@ncsu.edu', name: 'Jane Doe', fname: 'Jane', lname: 'Doe', username: 'jdoe', dept: 'Testing', ouc: '120101' }] : []);
+      } else if (trm.indexOf('harv') > -1) {
+        d.resolve([{ value: 'hpots@ncsu.edu', name: 'Harvey Potts', fname: 'Harvey', lname: 'Potts', username: 'hpots', dept: 'Testing Dept', ouc: '120102' }]);
+      } else { d.resolve([]); }
+    } else if (url === 'get_ouc_info.php') {
+      d.resolve({ label: 'College of Testing', deptCount: 3 });
+    } else { d.reject({ status: 404 }); }
+  });
+};
+$.ajax = function () { CALLS.push('ajax'); return deferred(function (d) { d.resolve({ status: 'success' }); }); };
+
+const penumbra_dash_vars = {
+  currentUserKey: 'tester', isAdmin: true, canCreate: true, reportGrantPatterns: [],
+  shortId: 'demo', found: true, canEdit: true,
+  // 2026-09-05: URL parameters ride every tile (fy is a prompt answer, theme is a
+  // reserved view control and must NOT, nope applies to no report and is simply
+  // passed along); the viewer's identity feeds me() in tile labels.
+  // pi_name feeds the bare-name label test on t14 (no tile prompt there, so the
+  // repA tiles keep sharing one fetch); pi= is an EMPTY answer and must not replace.
+  urlSearchOverride: '?fy=2026&theme=theme-x&nope=1&pi_name=Jones%2C%20Jacob&pi=',
+  shibboleth: { name: 'Ada', fname: 'Ada', lname: 'Lovelace', email: 'ada@ncsu.edu', unity: 'alovela', ouc: '123456' },
+  // The title carries tokens too; data(FY) in upper case against the address's lower-case fy.
+  meta: { short_id: 'demo', title: 'Demo Dashboard for me(fname), year data(FY)', owner_id: 'tester', authorized: 'tester', updated_at: '' },
+  state: {
+    version: 1, theme: 'theme-default', refreshSeconds: 0, tiles: [
+      { id: 't1', type: 'stat',  report: 'repA', label: 'Total',   agg: 'sum', column: 'AMOUNT', format: 'currency', w: 3, h: 1, source: 'live' },
+      { id: 't2', type: 'chart', report: 'repA', label: 'By dept', chartType: 'bar', groupBy: 'DEPT', valueAgg: 'count', topN: 10, w: 6, h: 2, source: 'live' },
+      { id: 't3', type: 'table', report: 'repB', label: 'People',  columns: ['NAME', 'AMOUNT', 'BTN@@HTML'], rows: 2, w: 4, h: 1, source: 'live' },
+      { id: 't4', type: 'note',  label: '', text: '<b>hello</b> note', w: 12, h: 1 },
+      { id: 't5', type: 'stat',  report: 'denied', label: 'Blocked', agg: 'count', w: 3, h: 1, source: 'live' },
+      { id: 't6', type: 'stat',  report: 'repC', label: 'Snap count', agg: 'count', w: 3, h: 1, source: 'snapshot' },
+      { id: 't7', type: 'trend', report: 'repC', label: 'Rows over time', agg: 'count', points: 12, w: 6, h: 1 },
+      { id: 't8', type: 'trend', report: 'repC', label: 'Sum over time', agg: 'sum', column: 'AMOUNT', points: 2, chartType: 'bar', w: 6, h: 1 },
+      { id: 't9', type: 'stat',  report: 'grouped', label: 'Grouped src', agg: 'sum', column: 'AMOUNT', format: 'number', w: 3, h: 1, source: 'live' },
+      { id: 't10', type: 'embed', report: 'repA', label: 'Full table', search: 'DEPT = Ops', prompts: { date: '01-JUL-25' }, w: 12, h: 4, autoHeight: false },
+      { id: 't11', type: 'embed', report: 'repA', label: 'KPI strip', show: 'header', w: 12, h: 1 },
+      { id: 't12', type: 'note',  label: '', text: 'a < b\nnext', w: 12, h: 1 },
+      { id: 't13', type: 'stat',  report: 'repA', label: 'Top dept for me(fname) me(lname) in data(fy), me(unity)', agg: 'mode', column: 'DEPT', format: 'number', w: 3, h: 1, source: 'live', prompts: { fy: '1999' } },
+      { id: 't14', type: 'stat',  report: 'repA', label: 'Median amt for pi_name and PI_NAME, pi unit', agg: 'median', column: 'AMOUNT', format: 'number', w: 3, h: 1, source: 'live' },
+      { id: 't15', type: 'chart', report: 'repA', label: 'By dept/status', chartType: 'hbar', groupBy: 'DEPT',
+        valueAgg: 'sum', valueColumn: 'AMOUNT', splitBy: 'STATUS', topN: 10, w: 6, h: 2, source: 'live' },
+      { id: 't16', type: 'embed', report: 'repA', label: 'One chart', show: 'chart', chartN: 2, w: 6, h: 2 }
+    ]
+  },
+  themes: [{ id: 'theme-default', label: 'Default Light', isDark: false }]
+};
+</script>
+<script src="purify.min.js"></script><script src="penumbra_tiles.js"></script><script src="dash.js"></script>
+<script>
+var L = [];
+function ok(n, c, x) { L.push((c ? 'PASS ' : 'FAIL ') + n + (x ? '  [' + x + ']' : '')); }
+function tile(id) { return $('.dash-tile[data-tile-id="' + id + '"]'); }
+
+setTimeout(function () {
+  try {
+    ok('no exception escaped', ERRORS.length === 0, ERRORS.join(';') || 'none');
+    ok('sixteen tiles rendered', $('.dash-tile').length === 16, $('.dash-tile').length + '');
+    // Row flow, not dense: dense backfilled tiles into earlier holes, silently
+    // overriding the authored order (the "reorder did nothing" bug).
+    ok('grid flows in authored order (no dense backfill)',
+       getComputedStyle($('.dash-grid')[0]).gridAutoFlow === 'row', getComputedStyle($('.dash-grid')[0]).gridAutoFlow);
+
+    // Split-by chart: horizontal bar, one stacked dataset per STATUS value,
+    // groups ordered by total sum (R&D 3500 > Ops -500).
+    var c15 = Chart.getChart(tile('t15').find('canvas')[0]);
+    ok('hbar renders as bar with y index axis', c15 && c15.config.type === 'bar' && c15.options.indexAxis === 'y',
+       c15 ? c15.config.type + '/' + c15.options.indexAxis : 'no chart');
+    ok('split-by makes one dataset per split value', c15 && c15.data.datasets.length === 2 &&
+       c15.data.datasets[0].label === 'Open' && c15.data.datasets[1].label === 'Closed',
+       c15 ? c15.data.datasets.map(function (d) { return d.label; }).join(',') : '');
+    ok('split-by series aggregate per group', c15 &&
+       JSON.stringify(c15.data.datasets[0].data) === '[1000.5,-500]' &&
+       JSON.stringify(c15.data.datasets[1].data) === '[2499.5,0]',
+       c15 ? JSON.stringify(c15.data.datasets.map(function (d) { return d.data; })) : '');
+    ok('split-by bars are stacked', c15 && c15.options.scales.x.stacked === true && c15.options.scales.y.stacked === true);
+
+    // One-chart embed: the report's own carousel locked to one page via URL.
+    var $c16 = tile('t16').find('iframe.dash-embed');
+    var c16src = $c16.attr('src') || '';
+    ok('chart embed drives the carousel via URL', c16src.indexOf('&fullscreen=true&fspages=2') > -1, c16src);
+    ok('chart embed carries no eview', c16src.indexOf('eview=') === -1);
+    ok('chart embed skips auto-height', !($c16[0] && $c16[0].style.height), ($c16[0] && $c16[0].style.height) || '(none)');
+    // 2026-09-05: chart embeds keep their tile head (the frame's carousel band is
+    // hidden instead), so they are fixed-stage classed but NOT bare.
+    ok('chart embed keeps its head + fixed-stage classed', !tile('t16').hasClass('dash-tile-bare') &&
+       tile('t16').find('.dash-tile-head').length === 1 &&
+       tile('t16').hasClass('dash-tile-embed-chart'), tile('t16').attr('class'));
+
+    // Notes: HTML renders as markup; plain text stays escaped with <br> breaks.
+    ok('HTML note renders its markup', tile('t4').find('.dash-note b').length === 1, tile('t4').find('.dash-note').html());
+    ok('plain note stays escaped with line breaks', tile('t12').text().indexOf('a < b') > -1 &&
+       tile('t12').find('.dash-note br').length === 1 && tile('t12').find('.dash-note b').length === 0,
+       tile('t12').find('.dash-note').html());
+
+    // New aggregates (summary-engine vocabulary): mode returns the winning VALUE
+    // (entity-decoded string, no number formatting), median matches the summary
+    // engine's midpoint math over $/comma/(neg) values.
+    ok('mode stat shows the most common value', tile('t13').find('.dash-stat-value').text() === 'R&D',
+       tile('t13').find('.dash-stat-value').text());
+    ok('median stat computes the midpoint', tile('t14').find('.dash-stat-value').text() === '1,000.50',
+       tile('t14').find('.dash-stat-value').text());
+
+    // Sectional embed (header-only) with auto-height: eview on the URL, iframe
+    // sized to the framed stub's 500px content, tile row-span snapped to cover it.
+    var $k = tile('t11').find('iframe.dash-embed');
+    ok('header-only embed carries &eview=header', ($k.attr('src') || '').indexOf('&eview=header') > -1, $k.attr('src'));
+    // The stub is 300 lines, so it measures tall whether Edge renders the file as
+    // HTML or plain text. What matters: the iframe grew well past the tile's
+    // original 150px track, and the row-span matches the formula for that height.
+    var kH = parseInt(($k[0] && $k[0].style.height) || '0', 10);
+    ok('auto-height grows the iframe to its content', kH > 1000, kH + 'px');
+    // Chrome offset is MEASURED now (bare sectional embeds have no head -> 0).
+    var t11headH = tile('t11').find('.dash-tile-head').outerHeight() || 0;
+    // Row unit 68px + 14px gap = 82 per row, 80 rows max (2026-09-05; was 164 / 40).
+    var wantSpan = Math.max(1, Math.min(80, Math.ceil((kH + t11headH + 16) / 82)));
+    ok('auto-height snaps the tile row-span to the formula',
+       (tile('t11')[0].style.gridRow || '') === ('span ' + wantSpan),
+       tile('t11')[0].style.gridRow + ' vs span ' + wantSpan);
+    // Sectional embeds outside edit mode are BARE - no tile head at all, so the
+    // framed section reads as part of the dashboard, not a boxed widget.
+    ok('header-only embed is bare in view mode',
+       tile('t11').hasClass('dash-tile-bare') && tile('t11').find('.dash-tile-head').length === 0,
+       tile('t11').attr('class'));
+    ok('full embed keeps its head', tile('t10').find('.dash-tile-head').length === 1 && !tile('t10').hasClass('dash-tile-bare'));
+    // Auto-height cards hug their content (align-self start) so the row-span's
+    // quantization slack is page background, not dead card interior.
+    ok('auto-height card hugs its content', tile('t11').hasClass('dash-tile-autoh') &&
+       getComputedStyle(tile('t11')[0]).alignSelf === 'start', getComputedStyle(tile('t11')[0]).alignSelf);
+    // Fixed-height embed (autoHeight:false) keeps the CSS 100% height (no inline px).
+    ok('fixed embed keeps CSS height', !(tile('t10').find('iframe')[0].style.height), tile('t10').find('iframe')[0].style.height || '(none)');
+    ok('both-sections embed has no eview param', (tile('t10').find('iframe').attr('src') || '').indexOf('eview=') === -1);
+
+    // Embed tile: the real report page framed, lazy, chrome-trimmed, pre-filtered.
+    var $ifr = tile('t10').find('iframe.dash-embed');
+    var isrc = $ifr.attr('src') || '';
+    ok('embed renders an iframe', $ifr.length === 1);
+    // URL parameters -> every tile (2026-09-05): a prompt answer rides the embed
+    // src on top of the tile's own answers, an unknown name rides too (the report
+    // ignores it), and a reserved view control (theme) never becomes a prompt.
+    ok('url params: prompt answer rides the embed src', isrc.indexOf('&fy=2026') > -1 && isrc.indexOf('date=01-JUL-25') > -1, isrc);
+    ok('url params: unknown name passes through, reserved theme does not', isrc.indexOf('&nope=1') > -1 && isrc.indexOf('theme-x') === -1, isrc);
+    ok('url params: the open-link carries them too', (tile('t10').find('.dash-tile-open').attr('href') || '').indexOf('fy=2026') > -1);
+    ok('url params: the head says what is applied', $('#dashHeadTitle .dash-url-note').text().indexOf('fy = 2026') > -1, $('#dashHeadTitle .dash-url-note').text());
+    // Label tokens: me()/me(attr) from the identity block, data(NAME) from the
+    // effective prompts - the URL's fy beats the tile's own 1999.
+    ok('label tokens resolve: me(), data(NAME) with the URL winning',
+       tile('t13').find('.dash-tile-label').text() === 'Top dept for Ada Lovelace in 2026, alovela', tile('t13').find('.dash-tile-label').text());
+    ok('label tokens: the editor keeps the raw text', penumbra_dash_vars.state.tiles.filter(function (t) { return t.id === 't13'; })[0].label.indexOf('me(fname)') > -1);
+    ok('title tokens: the dashboard title resolves, data(NAME) case-insensitive', $('#dashHeadTitle h1').text() === 'Demo Dashboard for Ada, year 2026', $('#dashHeadTitle h1').text());
+    ok('title tokens: the tab title follows', document.title.indexOf('Demo Dashboard for Ada, year 2026') === 0, document.title);
+    // Bare names (2026-09-06): the parameter's own name, any case, whole word;
+    // an unanswered name stays; a shorter name never eats a longer one.
+    ok('bare names: a tile prompt name resolves in any case, an unanswered one stays',
+       tile('t14').find('.dash-tile-label').text() === 'Median amt for Jones, Jacob and Jones, Jacob, pi unit', tile('t14').find('.dash-tile-label').text());
+    // Help door (2026-09-05): the header carries a "?" linking to the Dashboards
+    // topic on the report page; the builder's panels carry the same link.
+    // 2026-09-06: the door opens a panel ON THIS PAGE (the fake transport cannot
+    // serve help_content.php, so the panel shows its fallback with the hub link).
+    ok('help: header Help button present', $('#dashHeadActions #dashHelpBtn.dash-btn').length === 1);
+    $('#dashHelpBtn').trigger('click');
+    ok('help: the panel opens on this page', $('#dashHelpOverlay .dash-panel-wide').length === 1);
+    ok('help: the panel links to the full Help Center at the Dashboards topic',
+       ($('#dashHelpOverlay .dash-help-full').attr('href') || '').indexOf('index.php#help=dashboardsHelpLightbox') === 0);
+    $(document).trigger($.Event('keydown', { key: 'Escape' }));
+    ok('help: Escape closes the panel', $('#dashHelpOverlay').length === 0);
+    ok('embed src targets the report', isrc.indexOf('index.php?id=repA') === 0, isrc);
+    ok('embed src forces noadm + embed chrome', isrc.indexOf('&noadm') > -1 && isrc.indexOf('&embed=1') > -1, isrc);
+    ok('embed src carries the search pre-filter', isrc.indexOf('&search=DEPT%20%3D%20Ops') > -1, isrc);
+    ok('embed src carries tile prompts', isrc.indexOf('&date=01-JUL-25') > -1, isrc);
+    // Audit attribution: the framed report (and the open-link) name this dashboard.
+    ok('embed src carries the via attribution', isrc.indexOf('via=dashboard%20demo') > -1, isrc);
+    ok('open-link carries the via attribution', (tile('t10').find('.dash-tile-open').attr('href') || '').indexOf('via=dashboard%20demo') > -1,
+       tile('t10').find('.dash-tile-open').attr('href'));
+    ok('embed src omits theme for theme-default', isrc.indexOf('&theme=') === -1, isrc);
+    ok('embed loads lazily', $ifr.attr('loading') === 'lazy');
+    ok('embed badge shown', tile('t10').find('.dash-src-badge').text() === 'embedded');
+    // The fixture state carries no rowH, so it is a pre-2026-09-05 layout in 150px
+    // rows: normalizeGridUnits doubles every h on load (h:4 -> span 8, h:1 -> span 2).
+    ok('embed spans Huge height (unstamped h:4 migrated to 8 x 68px rows)', (tile('t10').attr('style') || '').indexOf('span 8') > -1, tile('t10').attr('style'));
+    ok('unstamped layout: a stat h:1 migrated to span 2', (tile('t1').attr('style') || '').indexOf('span 2') > -1, tile('t1').attr('style'));
+    ok('embed open-link lands pre-filtered too', (tile('t10').find('.dash-tile-open').attr('href') || '').indexOf('search=') > -1,
+       tile('t10').find('.dash-tile-open').attr('href'));
+
+    // A GROUPED report as a tile source: the API's {group:[rows]} object is
+    // flattened back to rows, so aggregates cover every group (100+200+50).
+    ok('grouped report works as a tile source', tile('t9').find('.dash-stat-value').text() === '350',
+       tile('t9').find('.dash-stat-value').text() || tile('t9').find('.dash-tile-err').text());
+    ok('grouped tile shows total row count', tile('t9').find('.dash-tile-foot').text().indexOf('3 rows') > -1,
+       tile('t9').find('.dash-tile-foot').text());
+
+    // Table tile requested only its visible rows and learned the true total.
+    var limCalls = CALLS.filter(function (c) { return c.indexOf('id=repB') > -1; });
+    ok('table tile passes &limit=', limCalls.length === 1 && limCalls[0].indexOf('limit=2') > -1, limCalls.join(' | '));
+
+    // Trend (count): three points straight from list metadata - and ZERO extra
+    // snapshot loads beyond t6's (1) and t8's (2).
+    var t7chart = Chart.getChart(tile('t7').find('canvas')[0]);
+    ok('count trend plots ROW_COUNTs', t7chart && JSON.stringify(t7chart.data.datasets[0].data) === '[5,8,2]',
+       t7chart ? JSON.stringify(t7chart.data.datasets[0].data) : 'no chart');
+    ok('count trend labels oldest-first', t7chart && t7chart.data.labels.join(',') === '2026-06-01,2026-06-15,2026-07-01',
+       t7chart ? t7chart.data.labels.join(',') : '');
+    ok('trend foot shows range', tile('t7').find('.dash-tile-foot').text().indexOf('3 snapshots') > -1,
+       tile('t7').find('.dash-tile-foot').text());
+    var loadCalls = CALLS.filter(function (c) { return c.indexOf('action=load') > -1; });
+    ok('count trend needed NO snapshot loads (3 total: 1 stat + 2 sum-trend)', loadCalls.length === 3, loadCalls.length + ' loads');
+
+    // Trend (sum): newest 2 snapshots, loaded and aggregated ([20+5, no AMOUNT->0]).
+    var t8chart = Chart.getChart(tile('t8').find('canvas')[0]);
+    ok('sum trend aggregates each snapshot', t8chart && JSON.stringify(t8chart.data.datasets[0].data) === '[25,0]',
+       t8chart ? JSON.stringify(t8chart.data.datasets[0].data) : 'no chart');
+    ok('trend history badge shown', tile('t7').find('.dash-src-badge').text() === 'history');
+
+    // Stat: 1000.50 + 2499.50 - 500 = 3000 -> currency, >=1000 so 0 decimals.
+    ok('stat sums $/comma/(neg) values', tile('t1').find('.dash-stat-value').text() === '$3,000',
+       tile('t1').find('.dash-stat-value').text());
+
+    // Dedupe: t1 and t2 share repA -> exactly ONE index.php fetch for it.
+    var repACalls = CALLS.filter(function (c) { return c.indexOf('index.php') === 0 && c.indexOf('id=repA') > -1; });
+    ok('two tiles off one report share one fetch', repACalls.length === 1, repACalls.length + ' calls');
+
+    // Chart: canvas present and a Chart instance attached.
+    ok('chart canvas rendered', tile('t2').find('canvas').length === 1);
+
+    // Table: 2 rows shown, "+1 more", markup stripped, entities decoded.
+    var t3txt = tile('t3').find('tbody tr').first().text();
+    ok('table caps rows and notes the rest', tile('t3').find('tbody tr').length === 2 && tile('t3').text().indexOf('+ 1 more') > -1,
+       tile('t3').find('tbody tr').length + ' rows');
+    // @@HTML CELL-VALUE prefix renders its payload as HTML (main-renderer
+    // semantics, live-verified); unprefixed cells stay text.
+    ok('@@HTML cell prefix renders payload as markup', t3txt.indexOf('Alice') > -1 && tile('t3').find('td a[href="x"]').length === 1, t3txt);
+    ok('entities decoded in cells', tile('t3').text().indexOf('Bob & Carol') > -1);
+
+    // Table tile upgrades: @@HTML columns render markup (suffix off the header),
+    // and headers sort the excerpt (click asc/desc, shift-click secondary).
+    ok('@@HTML column renders markup, header drops suffix',
+       tile('t3').find('th').eq(2).text() === 'BTN' && tile('t3').find('td b').length === 2,
+       tile('t3').find('th').eq(2).text() + ' / ' + tile('t3').find('td b').length + ' b tags');
+    tile('t3').find('th[data-col="AMOUNT"]').click();
+    tile('t3').find('th[data-col="AMOUNT"]').click();   // asc -> desc
+    ok('header click sorts the excerpt (desc)', tile('t3').find('tbody tr').first().text().indexOf('Bob') > -1,
+       tile('t3').find('tbody tr').first().text());
+    tile('t3').find('th[data-col="NAME"]').trigger($.Event('click', { shiftKey: true }));
+    ok('shift-click adds a numbered secondary sort', tile('t3').find('.dash-sort-badge').length === 2,
+       tile('t3').find('thead').text());
+
+    // Note tile.
+    ok('note renders its text', tile('t4').text().indexOf('hello note') > -1);
+
+    // Denied tile fails CLOSED with the access message; others still rendered.
+    ok('denied tile shows access message', tile('t5').text().indexOf('do not have access') > -1,
+       tile('t5').find('.dash-tile-err').text());
+
+    // Snapshot tile: count of 2 via list->load, as-of in the foot.
+    ok('snapshot tile counts snapshot rows', tile('t6').find('.dash-stat-value').text() === '2',
+       tile('t6').find('.dash-stat-value').text());
+    ok('snapshot tile shows as-of', tile('t6').find('.dash-tile-foot').text().indexOf('as of 2026-07-01') > -1,
+       tile('t6').find('.dash-tile-foot').text());
+    ok('snapshot badge shown', tile('t6').find('.dash-src-badge').length === 1);
+
+    // Chart group labels decoded ("R&D" not "R&amp;D").
+    var chartLabels = (Chart.getChart(tile('t2').find('canvas')[0]) || { data: { labels: [] } }).data.labels;
+    ok('chart labels entity-decoded', chartLabels.join(',') === 'R&D,Ops', chartLabels.join(','));
+    ok('chart values grouped correctly', JSON.stringify(Chart.getChart(tile('t2').find('canvas')[0]).data.datasets[0].data) === '[2,1]',
+       JSON.stringify(Chart.getChart(tile('t2').find('canvas')[0]).data.datasets[0].data));
+
+    // Open-report deep link carries the report id.
+    ok('tiles deep-link to their source (with via attribution)',
+       (tile('t1').find('.dash-tile-open').attr('href') || '').indexOf('index.php?id=repA') === 0 &&
+       (tile('t1').find('.dash-tile-open').attr('href') || '').indexOf('via=dashboard%20demo') > -1,
+       tile('t1').find('.dash-tile-open').attr('href'));
+
+    if (/kiosk=1/.test(location.search)) {
+      // Kiosk run: chrome-free, view-only, self-refreshing.
+      ok('kiosk: body class stamped', document.body.className.indexOf('dash-kiosk') > -1, document.body.className);
+      ok('kiosk: header actions empty', $('#dashHeadActions').children().length === 0);
+      ok('kiosk: exit link present', $('.dash-kiosk-exit').length === 1);
+      ok('kiosk: no edit chrome anywhere', $('.dash-tt-btn').length === 0 && $('#dashEditBtn').length === 0);
+      ok('kiosk: auto-refresh defaulted on', penumbra_dash_vars.state.refreshSeconds >= 30, penumbra_dash_vars.state.refreshSeconds + 's');
+      // The header is hidden in kiosk, so the countdown line pins to the viewport top.
+      ok('kiosk: countdown bar fixed at viewport top', $('body > #dashCountdown.dash-cd-fixed').length === 1,
+         $('#dashCountdown').attr('class') || '(missing)');
+      var kcw = parseFloat((($('#dashCountdownFill')[0] || { style: {} }).style.width) || '0');
+      ok('kiosk: countdown starts near full', kcw > 90, kcw + '%');
+    } else {
+      ok('view mode offers a Kiosk link', $('#dashHeadActions a[href*="kiosk=1"]').length === 1);
+      ok('no resize handles in view mode', $('.dash-resize').length === 0);
+
+      // SSO expiry net: a status-0 death of a same-origin .php call raises ONE
+      // recovery dialog (mirrors main.js's triage).
+      var fakeXhr = { status: 0, statusText: 'error', getResponseHeader: function () { return null; } };
+      $(document).trigger('ajaxError', [fakeXhr, { url: 'index.php?id=x&json=1' }]);
+      ok('expired session raises the SSO dialog', $('#dashSsoLightbox').length === 1 &&
+         $('#dashSsoTitle').text().indexOf('expired') > -1, $('#dashSsoTitle').text());
+      $(document).trigger('ajaxError', [fakeXhr, { url: 'index.php?id=x&json=1' }]);
+      ok('burst failures dedupe to one dialog', $('#dashSsoLightbox').length === 1);
+      ok('aborted requests never raise it', (function () {
+        $('#dashSsoLightbox').remove();
+        $(document).trigger('ajaxError', [{ status: 0, statusText: 'abort', getResponseHeader: function () { return null; } }, { url: 'index.php?x' }]);
+        return $('#dashSsoLightbox').length === 0;
+      })());
+      // Focusing the dialog's button scrolled this tall page (t11 is ~4500px);
+      // the coordinate-driven drag sims below need the grid back in view.
+      window.scrollTo(0, 0);
+      // Countdown bar: absent while auto-refresh is off; arming refresh via the
+      // manual Refresh button (which re-schedules) creates it in the title band.
+      ok('no countdown bar when auto-refresh is off', $('#dashCountdown').length === 0);
+      penumbra_dash_vars.state.refreshSeconds = 60;   // DASH shares this reference
+      $('#dashRefreshBtn').click();
+      ok('countdown bar arms inside the title band', $('#dashHead > #dashCountdown').length === 1);
+      var cw = parseFloat((($('#dashCountdownFill')[0] || { style: {} }).style.width) || '0');
+      ok('countdown starts near full', cw > 90, cw + '%');
+      // Edit mode: toolbar buttons appear, header switches to builder actions.
+      $('#dashEditBtn').click();
+      ok('countdown hides in edit mode (refresh is paused there)',
+         ($('#dashCountdown')[0] || { style: {} }).style.visibility === 'hidden');
+      // Sectional embeds regain their head in edit mode - the tools live there -
+      // and carry the slim-grip class.
+      ok('sectional embed regains its head in edit mode',
+         tile('t11').find('.dash-tile-head').length === 1 && !tile('t11').hasClass('dash-tile-bare'));
+      ok('sectional embed flagged for the slim grip', tile('t11').hasClass('dash-tile-embed-sect') &&
+         !tile('t10').hasClass('dash-tile-embed-sect'));
+      ok('edit mode shows tile tools', $('.dash-tt-btn').length >= 5, $('.dash-tt-btn').length + ' tools');
+      ok('edit mode shows Save/Add tile', $('#dashSaveBtn').length === 1 && $('#dashAddTileBtn').length === 1);
+      ok('every tile grows a resize handle', $('.dash-resize').length === $('.dash-tile').length,
+         $('.dash-resize').length + ' of ' + $('.dash-tile').length);
+
+      // Drag-resize t1 (starts 3x1): +2 columns, +1 row, snapped live.
+      var $h1 = tile('t1').find('.dash-resize');
+      var grid = $('.dash-grid')[0];
+      var colUnit = (grid.clientWidth - 11 * 14) / 12 + 14;
+      $h1.trigger($.Event('mousedown', { button: 0, pageX: 500, pageY: 500 }));
+      $(document).trigger($.Event('mousemove', { pageX: 500 + Math.round(colUnit * 2), pageY: 500 + 170 }));
+      $(document).trigger($.Event('mouseup', {}));
+      ok('drag snaps width to grid spans', (tile('t1')[0].style.gridColumn || '').indexOf('span 5') > -1, tile('t1')[0].style.gridColumn);
+      // +170px / 82 per row = +2 rows on the migrated span 2 -> span 4 (2026-09-05).
+      ok('drag snaps height to grid rows', (tile('t1')[0].style.gridRow || '').indexOf('span 4') > -1, tile('t1')[0].style.gridRow);
+
+      // The MODEL must hold the new spans, not just the inline style: a re-render
+      // from state (Refresh) has to reproduce them.
+      $('#dashRefreshBtn').click();
+      setTimeout(function () {
+        ok('resize persisted to the layout model', (tile('t1').attr('style') || '').indexOf('span 5') > -1 &&
+           (tile('t1').attr('style') || '').indexOf('span 4') > -1, tile('t1').attr('style'));
+
+        // Drag-to-reorder: a plain click on a head (no movement past the 5px dead
+        // zone) must NOT move anything...
+        tile('t2').find('.dash-tile-head').trigger($.Event('mousedown', { button: 0, pageX: 10, pageY: 10 }));
+        $(document).trigger($.Event('mouseup', { clientX: 5, clientY: 5 }));
+        ok('plain click on a tile head does not reorder', $('.dash-tile').eq(1).attr('data-tile-id') === 't2',
+           $('.dash-tile').eq(1).attr('data-tile-id'));
+        // ...dragging t2 onto t3's RIGHT half inserts t2 AFTER t3.
+        var r3 = tile('t3')[0].getBoundingClientRect();
+        var cxAfter = Math.round(r3.left + r3.width * 0.75), cy3 = Math.round(r3.top + r3.height / 2);
+        tile('t2').find('.dash-tile-head').trigger($.Event('mousedown', { button: 0, pageX: 10, pageY: 10 }));
+        $(document).trigger($.Event('mousemove', { pageX: 60, pageY: 60, clientX: cxAfter, clientY: cy3 }));
+        var efp = document.elementFromPoint(cxAfter, cy3);
+        ok('right half shows the AFTER edge', tile('t3').hasClass('dash-drop-after') && !tile('t3').hasClass('dash-drop-before'),
+           tile('t3').attr('class') + ' | efp=' + (efp ? efp.tagName + '.' + efp.className : 'null') +
+           ' | r3=' + Math.round(r3.left) + ',' + Math.round(r3.top) + ' cx=' + cxAfter + ' cy=' + cy3 +
+           ' | scroll=' + window.scrollY);
+        ok('drag greys the source tile', tile('t2').hasClass('dash-drag-src'));
+        $(document).trigger($.Event('mouseup', { clientX: cxAfter, clientY: cy3 }));
+        var order = $('.dash-tile').map(function () { return $(this).attr('data-tile-id'); }).get();
+        ok('dropping on the right half inserts after', order[1] === 't3' && order[2] === 't2', order.join(','));
+        // ...and dragging t4 onto t1's LEFT half inserts t4 BEFORE t1 (front).
+        var r1 = tile('t1')[0].getBoundingClientRect();
+        var cxBefore = Math.round(r1.left + r1.width * 0.25), cy1 = Math.round(r1.top + r1.height / 2);
+        tile('t4').find('.dash-tile-head').trigger($.Event('mousedown', { button: 0, pageX: 10, pageY: 10 }));
+        $(document).trigger($.Event('mousemove', { pageX: 60, pageY: 60, clientX: cxBefore, clientY: cy1 }));
+        ok('left half shows the BEFORE edge', tile('t1').hasClass('dash-drop-before'), tile('t1').attr('class'));
+        $(document).trigger($.Event('mouseup', { clientX: cxBefore, clientY: cy1 }));
+        order = $('.dash-tile').map(function () { return $(this).attr('data-tile-id'); }).get();
+        ok('dropping on the left half inserts before', order[0] === 't4' && order[1] === 't1', order.join(','));
+        ok('drag chrome cleaned up after drop', $('.dash-drop-before, .dash-drop-after').length === 0 &&
+           $('.dash-drag-src').length === 0 && !$('body').hasClass('dash-dragging'));
+
+        // Size dropdowns are gone from the tile editor - the corner drag replaced them.
+        $('#dashAddTileBtn').click();
+        ok('size selects removed from the editor', $('#teW').length === 0 && $('#teH').length === 0);
+        ok('editor still opens fine', $('#dashOverlay').length === 1);
+        ok('help: the tile editor carries the "?" door too',
+           $('#dashOverlay button.dash-panel-help.tab-help-icon').length === 1 &&
+           $('#dashOverlay .dash-panel-close.penumbra-fs-dialog-close').length === 1);
+        // The help panel stacks over the editor and Escape takes it first - the editor stays.
+        $('#dashOverlay .dash-panel-help').trigger('click');
+        ok('help: opens over the editor without closing it', $('#dashHelpOverlay').length === 1 && $('#dashOverlay').length === 1);
+        $(document).trigger($.Event('keydown', { key: 'Escape' }));
+        ok('help: Escape closes only the help panel', $('#dashHelpOverlay').length === 0 && $('#dashOverlay').length === 1);
+        ok('Tile type sits above Source report',
+           $('#dashOverlay .dash-panel-body').children().first().find('#teType').length === 1,
+           $('#dashOverlay .dash-panel-body').children().first().text().substring(0, 30));
+        ok('stat aggregates mirror the summary set',
+           $('#teAgg option[value="median"]').length === 1 && $('#teAgg option[value="mode"]').length === 1 &&
+           $('#teAgg option[value="stddev"]').length === 1 && $('#teAgg option[value="count_blank"]').length === 1,
+           $('#teAgg option').length + ' options');
+
+        // Prompt convenience: picking a report loads its prompt metadata; named
+        // prompts become structured inputs, options become dropdowns, hidden
+        // prompts are skipped, and choices write through to the prompt map.
+        $('#teReportSearch').val('repA').trigger('change');
+        setTimeout(function () {
+          ok('prompt rows render from report metadata', $('#tePromptRows .dash-prompt-row').length === 2,
+             $('#tePromptRows .dash-prompt-row').length + ' rows');
+          ok('option prompts become dropdowns', $('#tePromptRows select[data-name="status"] option[value="C"]').length === 1);
+          ok('hidden prompts are skipped', $('#tePromptRows [data-name="secret"]').length === 0);
+          ok('raw prompt textarea folds away (no extras)', !$('#tePromptsField').is(':visible'));
+          ok('me() + unnamed hints shown', /me\(\)/.test($('#tePromptHints').text()) && /1 prompt/.test($('#tePromptHints').text()),
+             $('#tePromptHints').text());
+          $('#tePromptRows select[data-name="status"]').val('O').trigger('change');
+          ok('picking a value writes through to the prompt map', /status=O/.test($('#tePrompts').val()), $('#tePrompts').val());
+          var sniffCalls = CALLS.filter(function (c) { return c.indexOf('id=repA') > -1 && c.indexOf('limit=100') > -1; });
+          ok('editor sniff fetches a capped sample, not the rowset', sniffCalls.length >= 1, sniffCalls.length + ' calls');
+          ok('embed Show offers the one-chart mode', (function () {
+            $('#teType').val('embed').trigger('change');
+            return $('#teShow option[value="chart"]').length === 1;
+          })(), $('#teShow option').length + ' options');
+          $('#teShow').val('chart').trigger('change');
+          ok('chart mode swaps auto-height for a chart picker',
+             $('#teChartNField').is(':visible') && !$('#teAutoHField').is(':visible'));
+          ok('loading cover blankets the panel while reading', $('.dash-panel #dashPanelLoad').length === 1 &&
+             $('#dashPanelLoad').text().indexOf('Reading') > -1, $('#dashPanelLoad').text());
+          // Cancel keeps the manual number input and clears the cover...
+          $('#dashPanelLoadCancel').click();
+          ok('cancel clears the cover, keeps manual entry', $('#dashPanelLoad').length === 0 &&
+             $('iframe.dash-chart-probe').length === 0 && $('input#teChartN').length === 1 &&
+             $('#teChartPickStatus').text().indexOf('cancelled') > -1, $('#teChartPickStatus').text());
+          // ...and re-selecting the mode restarts the probe (cover included).
+          $('#teShow').val('both').trigger('change');
+          $('#teShow').val('chart').trigger('change');
+          ok('re-selecting chart mode restarts probe + cover', $('#dashPanelLoad').length === 1);
+          ok('chart probe frame launched', $('iframe.dash-chart-probe').length === 1,
+             $('iframe.dash-chart-probe').attr('src') || '(none)');
+          ok('probe frame targets the framed report', ($('iframe.dash-chart-probe').attr('src') || '').indexOf('index.php?id=repA&noadm&embed=1') === 0);
+
+          // Inject the canonical enumerator into the framed doc (same-origin
+          // file://) - the probe polls for it, exactly as it polls the real
+          // report for penumbraCollectCarouselEntries. Injected twice because a
+          // navigation swap can discard a property set on the early window.
+          function injectEntries() {
+            try {
+              var f = $('iframe.dash-chart-probe')[0];
+              if (!f) { return; }   // probe already succeeded and cleaned up
+              var w = f.contentWindow;
+              w.penumbraCollectCarouselEntries = function () {
+                return [
+                  { kind: 'chart', title: 'Revenue by dept' },
+                  { kind: 'slide', title: 'Slide 2', chartTitles: ['Quarterly trend'] },
+                  { kind: 'chart', title: 'Awards' }
+                ];
+              };
+            } catch (e) { L.push('HARNESS_ERROR probe inject: ' + e.message); }
+          }
+          setTimeout(injectEntries, 250);
+          setTimeout(injectEntries, 700);
+          setTimeout(function () {
+          ok('chart picker becomes a named dropdown', $('#teChartPick select#teChartN').length === 1,
+             $('#teChartPick').html());
+          ok('charts AND slides listed by name', $('#teChartN option').length === 3 &&
+             $('#teChartN option').eq(1).text() === '2. Slide 2 - Quarterly trend',
+             $('#teChartN option').map(function () { return $(this).text(); }).get().join(' | '));
+          ok('probe frame cleaned up after the list loads', $('iframe.dash-chart-probe').length === 0);
+          ok('loading cover cleared after the list loads', $('#dashPanelLoad').length === 0);
+          $('.dash-panel-close').click();
+
+          // Access-list pillbox in Settings: the same capsule classes as the
+          // report save dialog. Pill types become capsules; plain unityids stay
+          // as text in the input.
+          penumbra_dash_vars.meta.authorized = 'public, 12, jdoe, Jane Doe <jdoe@ncsu.edu>';
+          $('#dashSettingsBtn').click();
+          ok('settings shows the access pillbox', $('#dsAuthBox').length === 1);
+          ok('entries seed as typed pills', $('#dsAuthBox .access-capsule').length === 3 &&
+             $('#dsAuthBox .access-capsule.keyword-public').length === 1 &&
+             $('#dsAuthBox .access-capsule.ouc-code').length === 1 &&
+             $('#dsAuthBox .access-capsule.ncsu-user span:first').text() === 'Jane Doe',
+             $('#dsAuthBox .access-capsule').length + ' pills');
+          ok('plain unityids stay as input text', $('#dsAuthInput').val().indexOf('jdoe') > -1, $('#dsAuthInput').val());
+          setTimeout(function () {
+          // Lazy hover details from the same endpoints the report dialog uses.
+          ok('OUC pill resolves hover details', ($('#dsAuthBox .access-capsule.ouc-code').attr('title') || '').indexOf('College of Testing') > -1,
+             $('#dsAuthBox .access-capsule.ouc-code').attr('title'));
+          ok('person pill resolves hover details', ($('#dsAuthBox .access-capsule.ncsu-user').attr('title') || '').indexOf('Unity: jdoe') > -1,
+             $('#dsAuthBox .access-capsule.ncsu-user').attr('title'));
+          ok('keyword pill explains itself', ($('#dsAuthBox .access-capsule.keyword-public').attr('title') || '').toLowerCase().indexOf('anyone') > -1,
+             $('#dsAuthBox .access-capsule.keyword-public').attr('title'));
+          // Directory autocomplete on the pillbox input.
+          $('#dsAuthInput').val($('#dsAuthInput').val() + ', harv').trigger('input');
+          setTimeout(function () {
+          ok('directory autocomplete lists matches', $('.dash-access-results .dash-ac-item').length === 1,
+             $('.dash-access-results').length + ' box / ' + $('.dash-access-results .dash-ac-item').length + ' items');
+          $('.dash-access-results .dash-ac-item').first().trigger('mousedown');
+          ok('picking a match makes a person pill', $('#dsAuthBox .access-capsule.ncsu-user').length === 2,
+             $('#dsAuthBox .access-capsule.ncsu-user').length + ' ncsu pills');
+          ok('preceding text preserved on pick', $('#dsAuthInput').val().indexOf('jdoe') > -1 &&
+             $('#dsAuthInput').val().indexOf('harv') === -1, $('#dsAuthInput').val());
+          $('#dsAuthInput').val($('#dsAuthInput').val() + ', adminonly').trigger($.Event('keydown', { key: 'Enter' }));
+          ok('Enter commits a typed keyword as a pill', $('#dsAuthBox .access-capsule.keyword-adminonly').length === 1,
+             $('#dsAuthBox .access-capsule').length + ' pills');
+          $('#dsAuthBox .access-capsule.keyword-public .remove-access').click();
+          ok('pills are removable', $('#dsAuthBox .access-capsule').length === 4);
+          $('#dsApply').click();
+          var auth = penumbra_dash_vars.meta.authorized;
+          ok('apply joins pills + free text', auth.indexOf('12') > -1 && auth.indexOf('adminonly') > -1 &&
+             auth.indexOf('Jane Doe <jdoe@ncsu.edu>') > -1 && auth.indexOf('Harvey Potts <hpots@ncsu.edu>') > -1 &&
+             auth.indexOf('jdoe') > -1 && auth.indexOf('public') === -1,
+             auth);
+
+          // Fresh editor: a report declaring NO named prompts hides the raw
+          // name=value box entirely; an UNREADABLE (unknown) report keeps it.
+          $('#dashAddTileBtn').click();
+          $('#teReportSearch').val('repB').trigger('change');
+          setTimeout(function () {
+            ok('no-prompt report hides the prompt box', $('#tePromptRows .dash-prompt-row').length === 0 &&
+               !$('#tePromptsField').is(':visible'), $('#tePromptsField').css('display'));
+            $('#teReportSearch').val('grouped').trigger('change');
+            setTimeout(function () {
+              ok('unknown-prompt report keeps the manual box', $('#tePromptsField').is(':visible'));
+              $('.dash-panel-close').click();
+
+              // SSO signed-in flow: sso_refresh.html's broadcast flips the
+              // dialog to success; closing then reloads the tiles.
+              $(document).trigger('ajaxError', [{ status: 0, statusText: 'error', getResponseHeader: function () { return null; } }, { url: 'index.php?id=x&json=1' }]);
+              // Self-postMessage under file:// arrives with origin "null" (which
+              // the listener rightly rejects); a synthetic MessageEvent carries
+              // the matching origin the way a real sso_refresh.html post does.
+              window.dispatchEvent(new MessageEvent('message', { origin: window.location.origin, data: { type: 'pnb-sso-refreshed' } }));
+              setTimeout(function () {
+                ok('sign-in broadcast flips the dialog to success',
+                   $('#dashSsoLightbox .sso-status').text().indexOf('Signed back in') > -1 &&
+                   $('#dashSsoClose').text().indexOf('reload') > -1, $('#dashSsoLightbox .sso-status').text());
+                $('#dashSsoClose').click();
+                ok('closing after sign-in clears the dialog', $('#dashSsoLightbox').length === 0);
+                publish2();
+              }, 250);
+            }, 300);
+          }, 300);
+          }, 500);   // autocomplete debounce (300ms) + stub deferred
+          }, 350);   // lazy pill-title resolution
+          }, 1300);  // chart-picker wait (inject at 250/700ms, probe polls at 500ms)
+        }, 400);
+        return;   // publish happens in the inner timeout
+      }, 500);
+      return;   // publish happens in the nested timeout above
+    }
+    publish2();
+  } catch (e) { L.push('HARNESS_ERROR: ' + e.name + ': ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); publish2(); }
+}, 1900);
+
+function publish2() {
+  var A = 'RES' + 'ULT>>', B = '<' + '<FIN';
+  document.getElementById('out').textContent = A + L.join(' ;; ') + B;
+}
+// Lazy iframes only load near the viewport: sweep to the bottom early so every
+// embed starts loading well before the assertion pass.
+setTimeout(function () { window.scrollTo(0, document.body.scrollHeight); }, 250);
+setTimeout(function () { window.scrollTo(0, 0); }, 600);
+</script></body></html>

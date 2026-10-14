@@ -1,0 +1,331 @@
+# =============================================================================
+# SPLIT HEADER LAYOUT SUITE (2026-09-18)
+#
+# View Options > Header Layout > Split: the header slims to ONE row (the title
+# block, with the query prompts in the column the snippet vacated - CSS only)
+# and #reportSnippetOutput is re-hosted into #pnbSplitPane, the right half of
+# #pnbSplitStage, beside #table-view-container. Browser-only - the runner, email
+# and PDF engines never read headerLayout, so there is no PHP half.
+#
+#   static half   the index.php under test: the Split radio, and that the pane is
+#                 a SIBLING of #table-view-container inside the stage (Rows "None"
+#                 collapses that container; a pane inside it would vanish with it).
+#   browser half  the REAL js\main.js (ready closure unwrapped, window.__SL export
+#                 hook) against the REAL css\main.css, with the stage, pane, radio and
+#                 Bare header markup LIFTED from the index.php under test. Three passes:
+#                 wide (1400px: phases A G X S B E D), narrow (900px: phase N) - a media
+#                 query cannot be exercised by resizing inside --dump-dom - and load
+#                 (1400px, ?load=1: phase L, the page BOOTS from a saved state).
+#
+#   BARE HEADER (2026-09-25): View Options > End-User UI Options > Bare Header strips
+#   the header's chrome in every layout, for everyone. I4 (the box: the End-User
+#   grid's last card since the afternoon of 2026-09-25 - it sat under the Layout
+#   radios, then called Header Layout, before that; the lift below takes either),
+#   X0-X9 (wide), N5 (narrow), L1-L2 (load); 15 mutants from `nobarelive` on.
+#   Against the morning build (the box under the radios) exactly I4 fails: 71 / 1.
+#
+#   run.ps1                      live files             EXPECTED: static 4 / 0, wide 61 / 0, narrow 8 / 0, load 3 / 0 (TOTAL 76 / 0; 2026-10-03: K1 K2 B7 N6, the breadcrumb in the Split header's corner)
+#   run.ps1 -Control             the pre-SPLIT .baks    EXPECTED: RED, TOTAL 5 / 8 - static 0 / 4; wide 2 / 1 (the
+#                                fixture assert A0 and Z pass, A1 fails and the later phases never start);
+#                                narrow 2 / 1 (N0 and Z pass, N1 fails); load 1 / 2 (Z passes, L1 L2 fail).
+#                                Measured 2026-09-18, as were all 28 mutants then (re-measured that night for the
+#                                slim one-row header - G2, G2b, N3 - and for H1, the Default header without its two
+#                                dead timestamp rows; 2026-09-19: G2c-G2f, the Subscribe chip beside the title, and
+#                                B0-B6 + N4, the snapshot band - SPLIT ONLY: B0 and the `bandeverywhere` mutant pin
+#                                the scope; 2026-09-25: the Bare header, 43 mutants). Against the build just BEFORE
+#                                the Bare header (Split, no box) exactly I4 X0 N5 L1 L2 fail: TOTAL 58 / 5.
+#   run.ps1 -MainJs <p> -MainCss <p> -IndexPhp <p>      any other copies (a stage build)
+#   run.ps1 -Mutant <name>       ONE line of main.js / main.css broken, on the feature build
+#   run.ps1 -Mutants             every mutant in turn, each checked against the asserts it MUST turn
+#                                red (about 20 s apiece). A mutant that stays green = asserts that
+#                                do not bite.
+#   -Keep keeps the staging dirs.  -Here <dir> runs a copy of the suite from somewhere else.
+#
+# UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\splitlayout'
+#   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Mutants
+# Prints RESULT: GREEN/RED instead of exiting (an exit kills the caller).
+# Stages into %TEMP%; writes nothing to the webroot.
+#
+# NOT covered here (needs real frames, which --dump-dom never renders): that the
+# header / wrapper ResizeObservers re-run the sync on their own, and that a %
+# chart redraws when the snippet changes sides. The harness stubs RO and rAF; G5
+# proves the explicit call path and G9 the width such a redraw would resolve to.
+# =============================================================================
+param([string]$MainJs = '', [string]$MainCss = '', [string]$IndexPhp = '', [string]$Here = '',
+      [string]$Mutant = '', [switch]$Mutants, [switch]$Control, [switch]$Keep)
+$ErrorActionPreference = 'Stop'
+# $PSScriptRoot is empty when the BODY is run as a scriptblock (see the UNC note).
+$here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\splitlayout' }
+$app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+$js   = "$app\js"
+$edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+
+if ($Control) {
+  # The files the deploy of this feature replaced (byte-identical to the pre-feature build).
+  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
+  function LastBak($pattern) { Get-BakItem $pattern | Select-Object -Last 1 }
+  $bm = LastBak "$js\main.js.bak-*-splitlayout"; $bc = LastBak "$app\css\main.css.bak-*-splitlayout"; $bi = LastBak "$app\index.php.bak-*-splitlayout"
+  if (-not $MainJs)   { if (-not $bm) { throw '-Control needs js\main.js.bak-*-splitlayout (made by the deploy), or pass -MainJs' }; $MainJs = $bm.FullName }
+  if (-not $MainCss)  { if ($bc) { $MainCss = $bc.FullName } }
+  if (-not $IndexPhp) { if ($bi) { $IndexPhp = $bi.FullName } }
+}
+if (-not $MainJs)   { $MainJs   = "$js\main.js" }
+if (-not $MainCss)  { $MainCss  = "$app\css\main.css" }
+if (-not $IndexPhp) { $IndexPhp = "$app\index.php" }
+foreach ($p in @($MainJs, $MainCss, $IndexPhp)) { if (-not (Test-Path $p)) { throw "file under test not found: $p" } }
+
+$src0 = [IO.File]::ReadAllText($MainJs, $utf8)
+$css0 = [IO.File]::ReadAllText($MainCss, $utf8)
+$idx0 = [IO.File]::ReadAllText($IndexPhp, $utf8)
+$NL = "`r`n"
+
+# --- mutants -----------------------------------------------------------------
+# name = @{ target = js|css ; pass = wide|narrow ; edits = @( @(old, new), ... ) ; red = assert ids that MUST go red }
+# Every anchor must be found exactly once (the FEATURE build is required).
+$mutantDefs = [ordered]@{
+  'clonemove'    = @{ target = 'js';  pass = 'wide';   edits = @(,@("                pane.appendChild(snip);", "                pane.appendChild(snip.cloneNode(true)); snip.parentNode.removeChild(snip);")); red = @('A1','A4') }
+  'nohome'       = @{ target = 'js';  pass = 'wide';   edits = @(,@("                snip.parentNode.insertBefore(_splitHome, snip);", "")); red = @('A5','A6') }
+  'embedok'      = @{ target = 'js';  pass = 'wide';   edits = @(,@("        return !(cl.contains('embed-only-header') || cl.contains('embed-only-table'));", "        return true;")); red = @('E1','E2') }
+  'noemptyinit'  = @{ target = 'js';  pass = 'wide';   edits = @(,@("        document.body.classList.toggle('pnb-layout-split', on);$NL        _splitMarkEmpty();", "        document.body.classList.toggle('pnb-layout-split', on);")); red = @('G10') }
+  'noemptymo'    = @{ target = 'js';  pass = 'wide';   edits = @(,@("                _splitMO.observe(snip, { childList: true });", "")); red = @('G11') }
+  'rulesnotempty'= @{ target = 'js';  pass = 'wide';   edits = @(,@("                if (tag === 'style' || tag === 'script' || tag === 'br') continue;", "")); red = @('G11') }
+  'nosyncheight' = @{ target = 'js';  pass = 'wide';   edits = @(,@("        // wrapper, and the pane still needs its height there.$NL        penumbraSplitSync();", "        // wrapper, and the pane still needs its height there.")); red = @('G5') }
+  'nowrapcap'    = @{ target = 'js';  pass = 'wide';   edits = @(,@("            if (wrapCap > 0) h = wrapCap;", "")); red = @('G5') }
+  'nobarmargin'  = @{ target = 'js';  pass = 'wide';   edits = @(,@("        if (`$rh.length && `$rh.is(':visible')) top += parseFloat(`$rh.css('margin-bottom')) || 0;", "")); red = @('G6') }
+  'dashbranch'   = @{ target = 'js';  pass = 'wide';   edits = @(,@("        if (mode === 'dashboard') {$NL            `$hdr.addClass('layout-dashboard');", "        if (mode === 'dashboard' || mode === 'split') {$NL            `$hdr.addClass('layout-dashboard');")); red = @('A2','A8') }
+  'nopct'        = @{ target = 'css'; pass = 'wide';   edits = @(,@("#reportHeaderContainer.layout-split,$NL#reportHeaderContainer.layout-split.has-pct-snippet {$NL    grid-template-columns: minmax(40%, 1fr) minmax(0, auto) auto;", "#reportHeaderContainer.layout-split {$NL    grid-template-columns: minmax(40%, 1fr) minmax(0, auto) auto;")); red = @('G2b') }
+  'deadrows'     = @{ target = 'css'; pass = 'wide';   edits = @(,@("        `"title snippet`"$NL        `"prompts snippet`"", "        `"title snippet`"$NL        `"timestamp snippet`"$NL        `"imports snippet`"$NL        `"prompts snippet`"")); red = @('H1') }
+  'nosubgrid'    = @{ target = 'css'; pass = 'wide';   edits = @(,@("    display: grid !important;$NL    grid-template-columns: fit-content(", "    grid-template-columns: fit-content(")); red = @('G2c') }
+  'nosubimp'     = @{ target = 'css'; pass = 'wide';   edits = @(,@("    display: grid !important;$NL    grid-template-columns: fit-content(", "    display: grid;$NL    grid-template-columns: fit-content(")); red = @('G2c') }
+  'nosubguard'   = @{ target = 'css'; pass = 'wide';   edits = @(,@("#reportHeaderContainer.layout-split #reportInfoPanel:has(#pnbSubscribeBtn):not([style*=`"display: none`"]) {$NL    display: grid !important;", "#reportHeaderContainer.layout-split #reportInfoPanel:has(#pnbSubscribeBtn) {$NL    display: grid !important;")); red = @('G2e') }
+  'nosubcap'     = @{ target = 'css'; pass = 'wide';   edits = @(,@("    grid-template-columns: fit-content(max(40%, calc(100% - 320px))) auto minmax(0, 1fr);", "    grid-template-columns: auto auto minmax(0, 1fr);")); red = @('G2d') }
+  'bandeverywhere'= @{ target = 'css'; pass = 'wide';  edits = @(
+      @("    #reportHeaderContainer.layout-split #snapshotHeaderPanel.pnb-snap-header {$NL        display: grid;", "    #snapshotHeaderPanel.pnb-snap-header {$NL        display: grid;"),
+      @("    #reportHeaderContainer.layout-split #snapshotHeaderPanel.pnb-snap-header > .pnb-snaphdr-prompts {", "    #snapshotHeaderPanel.pnb-snap-header > .pnb-snaphdr-prompts {"),
+      @("    #reportHeaderContainer.layout-split #snapshotHeaderPanel.pnb-snap-header > .pnb-snaphdr-actions {", "    #snapshotHeaderPanel.pnb-snap-header > .pnb-snaphdr-actions {")
+    ); red = @('B0','B3') }
+  'nobandgrid'   = @{ target = 'css'; pass = 'wide';   edits = @(,@("        display: grid;$NL        grid-template-columns: minmax(40%, 1fr) minmax(0, auto);$NL        grid-template-rows: repeat(6, auto);", "        display: block;")); red = @('B1','B3') }
+  'nobandrow2'   = @{ target = 'css'; pass = 'wide';   edits = @(,@("        grid-row: 2 / -1;", "        grid-row: 3 / -1;")); red = @('B4') }
+  'nobandnopills'= @{ target = 'css'; pass = 'wide';   edits = @(,@("        grid-row: 1;$NL        align-self: center;$NL        margin-top: 0;", "        margin-top: 0;")); red = @('B5') }
+  'nobandleft'   = @{ target = 'css'; pass = 'wide';   edits = @(,@("    #reportHeaderContainer.layout-split #snapshotHeaderPanel.pnb-snap-header > * {$NL        grid-column: 1;$NL    }", "")); red = @('B5') }
+  'nobandstack'  = @{ target = 'css'; pass = 'narrow'; edits = @(,@("@media (min-width: 1001px) {$NL    #reportHeaderContainer.layout-split #snapshotHeaderPanel.pnb-snap-header {", "@media (min-width: 101px) {$NL    #reportHeaderContainer.layout-split #snapshotHeaderPanel.pnb-snap-header {")); red = @('N4') }
+  'noslimrow'    = @{ target = 'css'; pass = 'wide';   edits = @(,@("    grid-template-areas: `"title prompts breadcrumb`";", "    grid-template-areas: `"title title breadcrumb`" `"prompts prompts prompts`";")); red = @('G2') }
+  # 2026-10-03: the breadcrumb in the Split header's upper right corner (K1 K2 B7 N6).
+  'nocrumbmove'  = @{ target = 'js';  pass = 'wide';   edits = @(,@("        if (mode === 'dashboard' || wantSplit) {", "        if (mode === 'dashboard') {")); red = @('K1') }
+  'nocrumbback'  = @{ target = 'js';  pass = 'wide';   edits = @(,@("            `$breadcrumb.removeAttr('id');$NL            `$panel.prepend(`$breadcrumb);", "            `$breadcrumb.removeAttr('id');")); red = @('K2') }
+  'crumbleft'    = @{ target = 'css'; pass = 'wide';   edits = @(,@("    justify-self: end;$NL    align-self: start;$NL    margin: 0 0 0 24px !important;", "    justify-self: start;$NL    align-self: end;$NL    margin: 0 0 0 24px !important;")); red = @('K1') }
+  'snapcrumb'    = @{ target = 'css'; pass = 'wide';   edits = @(,@("#reportHeaderContainer.layout-split.has-snap-header #dashboardBreadcrumb {$NL    display: none;$NL}", "")); red = @('B7') }
+  'crumbbottom'  = @{ target = 'css'; pass = 'narrow'; edits = @(,@("        grid-template-rows: auto;$NL        grid-template-areas: `"breadcrumb`" `"title`" `"prompts`";$NL        gap: 8px 0;", "        grid-template-rows: auto;$NL        grid-template-areas: `"title`" `"prompts`" `"breadcrumb`";$NL        gap: 8px 0;")); red = @('N6') }
+  'stagescroll'  = @{ target = 'css'; pass = 'wide';   edits = @(,@("#pnbSplitStage.is-split {$NL    display: grid;$NL    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);$NL    gap: 0 18px;", "#pnbSplitStage.is-split {$NL    display: grid;$NL    overflow: auto;$NL    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);$NL    gap: 0 18px;")); red = @('G3','S1') }
+  'nogutter'     = @{ target = 'css'; pass = 'wide';   edits = @(,@("    overflow: auto;$NL    scrollbar-gutter: stable;", "    overflow: auto;")); red = @('G8') }
+  'norowsnone'   = @{ target = 'css'; pass = 'wide';   edits = @(,@("body.pnb-data-hidden:has(#resultsTable:not([style*=`"display: none`"])) #pnbSplitStage.is-split {$NL    grid-template-columns: minmax(0, 1fr);$NL}", "")); red = @('G12') }
+  'noemptycss'   = @{ target = 'css'; pass = 'wide';   edits = @(,@("#pnbSplitStage.is-split.is-split-empty > #pnbSplitPane {$NL    display: none;$NL}", "")); red = @('G10') }
+  'nonarrow'     = @{ target = 'css'; pass = 'narrow'; edits = @(,@("@media (max-width: 1000px) {$NL    /* ...and the slim header stacks with them", "@media (max-width: 10px) {$NL    /* ...and the slim header stacks with them")); red = @('N1','N2','N3') }
+  # --- Bare header (2026-09-25) ---
+  'nobarelive'   = @{ target = 'js';  pass = 'wide';   edits = @(,@("    `$(document).on('change', '#viewOptionBareHeader', function() {$NL        applyBareHeader(this.checked);$NL    });", "")); red = @('X1') }
+  'nobarestack'  = @{ target = 'js';  pass = 'wide';   edits = @(,@("        document.body.classList.toggle('pnb-bare-header', on);$NL        if (typeof window.stackHeaders === 'function') window.stackHeaders();", "        document.body.classList.toggle('pnb-bare-header', on);")); red = @('X3') }
+  'nobareupdate' = @{ target = 'js';  pass = 'wide';   edits = @(,@("        updateContainerHeight();   // ends in penumbraSplitSync()", "")); red = @('X3') }
+  'nobaresave'   = @{ target = 'js';  pass = 'wide';   edits = @(,@("        if (`$('#viewOptionBareHeader').is(':checked')) {$NL            viewOptions.bareHeader = true;$NL        }", "")); red = @('X8') }
+  'nobareload'   = @{ target = 'js';  pass = 'load';   edits = @(,@("                applyBareHeader(_bareOn);", "")); red = @('L1') }
+  'nobareviewer' = @{ target = 'js';  pass = 'wide';   edits = @(,@("                            applyBareHeader(optionsToApply && optionsToApply.bareHeader);", "")); red = @('X9') }
+  'baretransparent' = @{ target = 'css'; pass = 'wide'; edits = @(,@("    background: var(--bg-body) !important;$NL    border: 0 !important;", "    background: transparent !important;$NL    border: 0 !important;")); red = @('X1') }
+  'bareshadow'   = @{ target = 'css'; pass = 'wide';   edits = @(,@("    box-shadow: none !important;$NL    padding: 8px 0 !important;", "    padding: 8px 0 !important;")); red = @('X1') }
+  'barecollapse' = @{ target = 'css'; pass = 'wide';   edits = @(,@("body.pnb-bare-header #reportHeaderContainer:not(.is-collapsed) {", "body.pnb-bare-header #reportHeaderContainer {")); red = @('X7') }
+  'baretabnone'  = @{ target = 'css'; pass = 'wide';   edits = @(,@("body.pnb-bare-header #headerToggleHandle:not(.is-collapsed) {$NL    visibility: hidden;", "body.pnb-bare-header #headerToggleHandle:not(.is-collapsed) {$NL    display: none;")); red = @('X7') }
+  'baretabgone'  = @{ target = 'css'; pass = 'wide';   edits = @(,@("body.pnb-bare-header #headerToggleHandle:not(.is-collapsed) {", "body.pnb-bare-header #headerToggleHandle {")); red = @('X7') }
+  'barecrumb'    = @{ target = 'css'; pass = 'wide';   edits = @(,@("body.pnb-bare-header #reportInfoPanel > div:has(.safe-home-link),$NL", "")); red = @('X1') }
+  'barewatermark'= @{ target = 'css'; pass = 'wide';   edits = @(,@("body.pnb-bare-header #reportHeaderContainer::before,${NL}body.pnb-bare-header #reportHeaderContainer::after {$NL    content: none !important;$NL    display: none !important;$NL}", "")); red = @('X1') }
+  'baredashcrumb'= @{ target = 'css'; pass = 'wide';   edits = @(,@("body.pnb-bare-header #dashboardBreadcrumb,${NL}", "")); red = @('X5') }
+  'baresnapcrumb'= @{ target = 'css'; pass = 'wide';   edits = @(,@("body.pnb-bare-header #dashboardBreadcrumb,${NL}body.pnb-bare-header #snapshotHeaderPanel .pnb-snaphdr-crumb {", "body.pnb-bare-header #dashboardBreadcrumb {")); red = @('X6') }
+}
+
+function Apply-Mutant([string]$text, [string]$name) {
+  foreach ($e in $mutantDefs[$name].edits) {
+    $n = ([regex]::Matches($text, [regex]::Escape($e[0]))).Count
+    if ($n -ne 1) { throw "mutant '$name' anchor found $n times, expected 1 (needs the FEATURE build): $($e[0])" }
+    $text = $text.Replace($e[0], $e[1])
+  }
+  return $text
+}
+function Get-Mutated([string]$name) {
+  if (-not $mutantDefs.Contains($name)) { throw "unknown mutant '$name' (known: $(($mutantDefs.Keys) -join ', '))" }
+  $m = $mutantDefs[$name]
+  if ($m.target -eq 'css') { return @{ js = $src0; css = (Apply-Mutant $css0 $name) } }
+  return @{ js = (Apply-Mutant $src0 $name); css = $css0 }
+}
+
+# --- static half: the index.php under test -------------------------------------
+function Test-IndexPhp {
+  $out = @()
+  $radios = [regex]::Match($idx0, '(?s)<div class="header-layout-radios">.*?</div>')
+  $vals = @([regex]::Matches($radios.Value, 'name="headerLayout" value="([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
+  $out += [pscustomobject]@{ name = 'I1 the Header Layout picker offers default, dashboard, split - Default still the checked one'
+    pass = (($vals -join ',') -eq 'default,dashboard,split') -and ([regex]::Matches($radios.Value, '\bchecked\b').Count -eq 1) -and ($radios.Value -match 'value="default" checked')
+    detail = ($vals -join ',') }
+  $a = $idx0.IndexOf('<div id="pnbSplitStage">'); $b = $idx0.IndexOf('<div id="table-view-container"'); $c = $idx0.IndexOf('<aside id="pnbSplitPane"')
+  $okOrder = ($a -ge 0) -and ($b -gt $a) -and ($c -gt $b)
+  $depth = -1; $closes = $false
+  if ($okOrder) {
+    # <div> depth at the <aside>, PHP blocks and HTML comments stripped first:
+    # 1 = inside the stage ONLY, i.e. a sibling of #table-view-container.
+    $slice = $idx0.Substring($a, $c - $a)
+    $slice = [regex]::Replace($slice, '(?s)<\?php.*?\?>', '')
+    $slice = [regex]::Replace($slice, '(?s)<!--.*?-->', '')
+    $depth = ([regex]::Matches($slice, '<div\b')).Count - ([regex]::Matches($slice, '</div>')).Count
+    $closes = [regex]::IsMatch($idx0.Substring($c, [Math]::Min(200, $idx0.Length - $c)), '^<aside id="pnbSplitPane"[^>]*></aside>\s*</div>')
+  }
+  $out += [pscustomobject]@{ name = 'I2 the stage wraps #table-view-container and the pane is its SIBLING, not inside it (Rows "None" collapses the container)'
+    pass = $okOrder -and ($depth -eq 1) -and $closes; detail = "stage@$a table@$b pane@$c divDepthAtPane=$depth stageClosesAfterPane=$closes" }
+  $aside = [regex]::Match($idx0, '<aside id="pnbSplitPane"[^>]*>')
+  $out += [pscustomobject]@{ name = 'I3 the pane ships hidden and labelled'
+    pass = $aside.Success -and ($aside.Value -match '\bhidden\b') -and ($aside.Value -match 'aria-label="[^"]+"'); detail = $aside.Value }
+  # Bare Header (2026-09-25) MODIFIES any layout, so it is never inside the
+  # radio group (it would read as a fourth layout). Since the afternoon of
+  # 2026-09-25 it is the End-User UI Options grid's LAST card, right after
+  # Column Organization, and the old spot under the radios is gone.
+  $bare = [regex]::Match($idx0, '(?s)<div class="view-option-item"><label><input type="checkbox" id="viewOptionBareHeader">.*?</label></div>')
+  $last = [regex]::IsMatch($idx0, '(?s)id="viewOptionColumns"[^<]*>.*?</label></div>\s*<div class="view-option-item"><label><input type="checkbox" id="viewOptionBareHeader">.*?</label></div>\s*</div>')
+  $oldSpot = $idx0.Contains('header-bare-option')
+  $out += [pscustomobject]@{ name = 'I4 the Bare Header checkbox is the End-User grid''s last card (after Column Organization, not a layout radio), unchecked by default'
+    pass = $bare.Success -and ($bare.Value -notmatch '\bchecked\b') -and ($radios.Value -notmatch 'viewOptionBareHeader') -and $last -and (-not $oldSpot)
+    detail = $(if ($bare.Success) { $bare.Value.Substring(0, [Math]::Min(140, $bare.Value.Length)) + " lastCard=$last oldSpotLeft=$oldSpot" } else { "no Bare Header card; oldSpotLeft=$oldSpot" }) }
+  return ,$out
+}
+
+# --- one browser run ---------------------------------------------------------
+function Invoke-Browser([string]$mainText, [string]$cssText, [string]$tag, [string]$pass) {
+  $run = Join-Path $env:TEMP ('pnb_sl_' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+  New-Item -ItemType Directory -Force $run | Out-Null
+  $libs = @('jquery-3.7.1.min.js','jquery-ui.min.js','moment.min.js','pako.min.js',
+            'codemirror.min.js','sql.min.js','show-hint.js','foldcode.js','foldgutter.js',
+            'brace-fold.js','comment-fold.js','placeholder.js','penumbra_snippet_help.js',
+            'purify.min.js','penumbra_template.js','penumbra_userseg.js')
+  foreach ($f in $libs) { Copy-Item "$js\$f" "$run\$f" -Force }
+  [IO.File]::WriteAllText("$run\main.css", $cssText, $utf8)
+  Copy-Item "$here\driver.js" "$run\driver.js" -Force
+
+  # The stage, the pane and the radios come from the index.php UNDER TEST, so the
+  # harness cannot drift from the page. A pre-feature index.php has none of them:
+  # the placeholders stay comments and the harness page simply has no stage.
+  $harness = [IO.File]::ReadAllText("$here\harness.html", $utf8)
+  # The radios AND the Bare Header box, when the index.php under test has it -
+  # the X / L / N5 checks drive that real box. It sat right under the radios
+  # on the morning of 2026-09-25 and is the End-User grid's last card since;
+  # either is lifted, so the suite still runs against the morning's .bak.
+  $radios = [regex]::Match($idx0, '(?s)<div class="header-layout-radios">.*?</div>(\s*<label class="header-layout-option header-bare-option">.*?</label>)?')
+  $bareCard = [regex]::Match($idx0, '(?s)<div class="view-option-item"><label><input type="checkbox" id="viewOptionBareHeader">.*?</label></div>')
+  if ($radios.Success) {
+    $lift = $radios.Value
+    if ($bareCard.Success) { $lift += "`n" + $bareCard.Value }
+    if ($lift.Contains('<?php')) { throw 'the radio block or the Bare Header card contains PHP - the harness cannot lift it verbatim' }
+    $harness = [regex]::Replace($harness, '<!-- LAYOUT_RADIOS:.*?-->', [System.Text.RegularExpressions.MatchEvaluator]{ param($x) $lift })
+  }
+  $aside = [regex]::Match($idx0, '<aside id="pnbSplitPane"[^>]*></aside>')
+  if ($idx0.Contains('<div id="pnbSplitStage">') -and $aside.Success) {
+    $harness = [regex]::Replace($harness, '<!-- STAGE_OPEN:.*?-->', '<div id="pnbSplitStage">')
+    $harness = [regex]::Replace($harness, '<!-- STAGE_CLOSE:.*?-->', [System.Text.RegularExpressions.MatchEvaluator]{ param($x) ($aside.Value + '</div>') })
+  }
+  [IO.File]::WriteAllText("$run\harness.html", $harness, $utf8)
+
+  # closure exports
+  $anchor = '$(document).ready(function () {'
+  if (-not $mainText.Substring(0, 200).Contains($anchor)) { throw 'main.js closure anchor not found' }
+  $hook = @(
+    'try { window.__SL = { getEditor: function () { return editor; } }; } catch (e) { window.__SL_ERR = String(e); }',
+    'try { var _slF = { applyHeaderLayout: "applyHeaderLayout", applyRestrictions: "applyUserViewRestrictions", buildState: "buildStateObject",',
+    '  updateContainerHeight: "updateContainerHeight", updateStickyHeaderOffset: "updateStickyHeaderOffset",',
+    '  applyContainerization: "applyContainerization", removeContainerization: "removeContainerization",',
+    '  splitSync: "penumbraSplitSync", vizBaseWidth: "penumbraVizBaseWidth", groupSync: "_groupSyncStickyOffsets",',
+    '  renderSnapHeader: "_renderSnapshotHeader", hideSnapHeader: "_hideSnapshotHeader" }; } catch (e) {}'
+  ) -join $NL
+  # By NAME through eval, so a function an older build lacks costs only its own entry.
+  $hook2 = 'try { Object.keys(_slF).forEach(function (k) { try { window.__SL[k] = eval(_slF[k]); } catch (e) { (window.__SL_MISSING = window.__SL_MISSING || []).push(_slF[k]); } }); } catch (e) { window.__SL_ERR2 = String(e); }'
+  $i = $mainText.IndexOf($anchor)
+  $patched = $mainText.Substring(0, $i) + ';(function () {' + $NL + $hook + $NL + $hook2 + $NL + $mainText.Substring($i + $anchor.Length)
+  $j = $patched.LastIndexOf('});')
+  if ($j -lt 0) { throw 'closure tail not found' }
+  $patched = $patched.Substring(0, $j) + '})();' + $patched.Substring($j + 3)
+  [IO.File]::WriteAllText("$run\main_sl.js", $patched, $utf8)
+
+  $prof = Join-Path $run 'profile'
+  $dom  = Join-Path $run 'dom.txt'
+  $url  = 'file:///' + $run.Replace([char]92, [char]47) + '/harness.html' + $(if ($pass -eq 'narrow') { '?narrow=1' } elseif ($pass -eq 'load') { '?load=1' } else { '' })
+  $size = if ($pass -eq 'narrow') { '900,1000' } else { '1400,1000' }
+  $edgeArgs = @('--headless=new','--disable-gpu','--no-sandbox','--allow-file-access-from-files','--no-first-run',
+                '--no-default-browser-check','--disable-sync','--disable-extensions',"--window-size=$size",
+                "--user-data-dir=$prof",'--virtual-time-budget=60000','--dump-dom', $url)
+  $pr = Start-Process -FilePath $edge -PassThru -NoNewWindow -RedirectStandardOutput $dom -RedirectStandardError (Join-Path $run 'err.txt') -ArgumentList $edgeArgs
+  $pr.WaitForExit(300000) | Out-Null
+  if (-not $pr.HasExited) { try { $pr.Kill() } catch {} }
+  Get-CimInstance Win32_Process -Filter "Name = 'msedge.exe'" | Where-Object { $_.CommandLine -like "*$prof*" } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {} }
+  $d = ''
+  for ($t = 0; $t -lt 40; $t++) {
+    try {
+      $fs = New-Object IO.FileStream($dom, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+      $sr = New-Object IO.StreamReader($fs); $d = $sr.ReadToEnd(); $sr.Close()
+      if ($d.Contains('</pre>')) { break }
+    } catch {}
+    Start-Sleep -Milliseconds 500
+  }
+  $out = @()
+  $m = [regex]::Match($d, '(?s)<pre id="out"[^>]*>(.*?)</pre>')
+  if (-not $m.Success) { $out += [pscustomobject]@{ name = "[$tag] page produced a result block"; pass = $false; detail = "no dump ($($d.Length) bytes) - see $run" } }
+  else {
+    $txt = [System.Net.WebUtility]::HtmlDecode($m.Groups[1].Value)
+    if (-not $txt.StartsWith('RESULTS_JSON:')) { $out += [pscustomobject]@{ name = "[$tag] harness finished"; pass = $false; detail = $txt.Substring(0, [Math]::Min(400, $txt.Length)) } }
+    else {
+      $parsed = $txt.Substring(13) | ConvertFrom-Json
+      if ($parsed.fatal)   { $out += [pscustomobject]@{ name = "[$tag] driver ran to the end"; pass = $false; detail = [string]$parsed.fatal } }
+      if ($parsed.hookErr) { Write-Warning "[$tag] hook: $($parsed.hookErr)" }
+      if ($parsed.pageErrors -and $parsed.pageErrors.Count) { Write-Host "  [$tag] page errors: $($parsed.pageErrors -join ' | ')" -ForegroundColor DarkYellow }
+      foreach ($r in $parsed.results) { $out += [pscustomobject]@{ name = [string]$r.name; pass = [bool]$r.pass; detail = [string]$r.detail } }
+    }
+  }
+  if (-not $Keep) { try { [IO.Directory]::Delete($run, $true) } catch {} } else { Write-Host "kept: $run" }
+  return ,$out
+}
+
+if ($Mutants) {
+  Write-Host "[mutants] main.js: $MainJs"
+  Write-Host "          main.css: $MainCss"
+  $mOk = 0; $mBad = 0
+  foreach ($name in $mutantDefs.Keys) {
+    $mt = Get-Mutated $name
+    $res = Invoke-Browser $mt.js $mt.css $name $mutantDefs[$name].pass
+    $red = @($res | Where-Object { -not $_.pass } | ForEach-Object { ($_.name -split ' ')[0] })
+    $missing = @($mutantDefs[$name].red | Where-Object { $red -notcontains $_ })
+    if ($missing.Count -eq 0) { $mOk++; Write-Host ("  PASS  mutant {0,-14} turns {1} red   [red: {2}]" -f $name, ($mutantDefs[$name].red -join ' '), ($red -join ' ')) -ForegroundColor Green }
+    else { $mBad++; Write-Host ("  FAIL  mutant {0,-14} stayed green on {1}   [red: {2}]" -f $name, ($missing -join ' '), ($red -join ' ')) -ForegroundColor Red }
+  }
+  Write-Host ("SUMMARY mutants ok={0} bad={1}" -f $mOk, $mBad)
+  Write-Host $(if ($mBad -eq 0) { 'RESULT: GREEN' } else { 'RESULT: RED' })
+  return
+}
+
+# Returns @(pass, fail). NOT $script: counters - the body runs as a scriptblock
+# (see the UNC note), where $script: is the CALLER's scope, not this one.
+function Show-Results($res, [string]$label) {
+  $p = 0; $f = 0
+  foreach ($r in $res) {
+    if ($r.pass) { $p++; Write-Host ("  PASS  " + $r.name + "  [" + $r.detail + "]") -ForegroundColor Green }
+    else { $f++; Write-Host ("  FAIL  " + $r.name + "  [" + $r.detail + "]") -ForegroundColor Red }
+  }
+  Write-Host ("SUMMARY {0} pass={1} fail={2}" -f $label, $p, $f)
+  return @($p, $f)
+}
+
+Write-Host "main.js:   $MainJs$(if ($Mutant) { "   + MUTANT $Mutant" })"
+Write-Host "main.css:  $MainCss"
+Write-Host "index.php: $IndexPhp"
+$tPass = 0; $tFail = 0
+$text = $src0; $cssText = $css0; $passes = @('wide', 'narrow', 'load')
+if ($Mutant) { $mt = Get-Mutated $Mutant; $text = $mt.js; $cssText = $mt.css; $passes = @($mutantDefs[$Mutant].pass) }
+else { Write-Host '[static] the index.php under test'; $c = Show-Results (Test-IndexPhp) 'static'; $tPass += $c[0]; $tFail += $c[1] }
+foreach ($ps in $passes) {
+  Write-Host "[browser] $ps pass"
+  $c = Show-Results (Invoke-Browser $text $cssText $ps $ps) $ps; $tPass += $c[0]; $tFail += $c[1]
+}
+Write-Host ("TOTAL pass={0} fail={1}" -f $tPass, $tFail)
+Write-Host $(if ($tFail -eq 0 -and $tPass -gt 0) { 'RESULT: GREEN' } else { 'RESULT: RED' })

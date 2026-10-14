@@ -1,0 +1,112 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>date-range: Tag Generator</title></head>
+<body>
+<!-- Minimal DOM that boots the REAL js/main.js (its ready closure unwrapped by
+     run.ps1), modelled on the splitlayout harness, which is known to boot it.
+     The Tag Generator itself is NOT written here: run.ps1 lifts it out of the
+     index.php under test and puts it where the BUILDER_MARKUP comment is, so
+     this page cannot drift from the builder that ships. -->
+<div id="headerToggleHandle"></div>
+<div id="reportHeaderContainer" role="banner">
+  <div id="defaultTitleView" style="display:none"></div>
+  <div id="reportInfoPanel">
+    <h2 id="mainReportTitle">Tag Generator harness</h2>
+    <div id="mainReportSubtitle"></div>
+  </div>
+  <p id="dataLoadedTimestamp"></p>
+  <div id="importTimestamps"></div>
+  <div id="promptInfoContainer"><a href="#" id="resetAllPromptsLink"></a><ul id="promptInfoList"></ul></div>
+  <div id="reportSnippetOutput"></div>
+</div>
+<div id="admWrapper">
+  <input id="reportTitle" value=""><button id="toggleAdminViewBtn"></button>
+  <div id="editorTabs"><div id="sql-editor-tab" class="ui-tabs-panel"><span id="promptGeneratorIcon"></span></div></div>
+  <textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+  <button id="executeQuery">Run</button><button id="stopQueryBtn">Stop</button>
+</div>
+<div id="loadingOverlay" style="display:none"><p id="execution-timer"></p><p id="loadingMessage"></p></div>
+<div id="errorBox"></div>
+<div id="resultsHeader"><div class="header-left"><input id="tableSearch" value=""></div></div>
+<div id="table-view-container"><table id="resultsTable"><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table><div id="groupedResultsContainer"></div><div id="pivot-output-container"></div></div>
+<div id="undo_text_container"></div>
+<div id="settingsPanelOverlay"></div>
+<div id="settingsPanel" style="display:none">
+  <select id="spThemeSelector"><option value="report-default">Report Default</option><option value="theme-default">Default</option></select>
+  <select id="spDensitySelector"><option value="report-default">Report Default</option><option value="standard">Standard</option></select>
+</div>
+<div id="pnbStatusBar"><div class="sb-seg" id="sbColsSeg"><span id="sbCols"></span></div><div class="sb-seg" id="sbUserSeg"></div></div>
+
+<!-- BUILDER_MARKUP: run.ps1 replaces this line with #promptGeneratorLightbox lifted from the index.php under test -->
+
+<pre id="out" style="display:none">running</pre>
+
+<script>
+  (function () { try { localStorage.clear(); } catch (e) {} })();
+  window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' }, 'theme-dark': { label: 'Dark', dark: true } };
+  window.PENUMBRA_THEME_IDS = ['theme-default', 'theme-dark'];
+  window.PENUMBRA_THEME_ALIASES = {};
+  window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: [],
+    totalExemptions: ['AMOUNT']
+  };
+  window.__ajaxLog = [];
+  jQuery.ajax = function (a, b) {
+    var opts = (typeof a === 'string') ? jQuery.extend({ url: a }, b || {}) : (a || {});
+    window.__ajaxLog.push(String(opts.url || ''));
+    var d = jQuery.Deferred();
+    var resp = {};
+    setTimeout(function () {
+      try { if (opts.success) opts.success(resp, 'success', { status: 200 }); } catch (e) { window.__errors.push('ajax success threw: ' + String(e)); }
+      try { if (opts.complete) opts.complete({ status: 200 }, 'success'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }
+      d.resolve(resp, 'success', { status: 200 });
+    }, 0);
+    var p = d.promise(); p.abort = function () {}; return p;
+  };
+  jQuery.getJSON = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.post = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.get = jQuery.post;
+  jQuery.fx.off = true;
+  // --dump-dom renders no frames: a real ResizeObserver never calls back and rAF never fires.
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.IntersectionObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.requestAnimationFrame = function (cb) { return setTimeout(function () { cb(Date.now()); }, 0); };
+  window.cancelAnimationFrame = function (id) { clearTimeout(id); };
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  window.__errors = [];
+  window.__rejections = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    window.__rejections.push(String((r && r.message) || r));
+    e.preventDefault();
+  });
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  window.prompt = function () { return null; };
+</script>
+<script src="penumbra_userseg.js"></script>
+<script src="main_pg.js"></script>
+<script src="builder_tests.js"></script>
+</body></html>

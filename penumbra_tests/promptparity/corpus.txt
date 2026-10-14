@@ -1,0 +1,587 @@
+# =============================================================================
+# promptparity corpus - ONE tag, ONE position in the SQL, THREE engines.
+#
+# Read by test_promptparity.php (the scheduler and ?json=1 engines) and by
+# promptparity_browser_tests.js (the browser engine). Line based, no escaping:
+#
+#   group: <heading>
+#   case:  <what this case pins>
+#   sql:   the statement, tag(s) included   (\n = a line break)
+#   ans:   name=value&name=value            (empty = nothing answered)
+#   mode:  dialogs                          (browser only: run with dialogs ON -
+#                                            needed for forcedefault=, which the
+#                                            browser does not apply with them off)
+#   all:   what EVERY engine must emit
+#   browser: / runner: / json:              per-engine, where they rightly differ
+#
+# The browser sends binds (:p1, :p2) plus a parameter list; its half writes each
+# bind back in as the quoted literal the PHP engines emit, so one expected line
+# serves all three. The only place the engines are ALLOWED to differ is the
+# literal that stands for "no answer": NULL (browser bind, scheduler) vs ''
+# (?json=1).
+#
+# Only shapes with ONE right answer that all three engines GIVE live here. Known
+# gaps are listed in README section 6, not written down here as "expected" wrong
+# output. The one gap left in place ON PURPOSE - no answer + quotes around the
+# tag - is pinned per engine at the end of test_promptparity.php instead.
+# =============================================================================
+
+group: multi-select straight after IN - no parentheses written (the form the SQL help shows)
+
+case: IN, two picked
+sql:  SELECT 1 FROM t WHERE c IN [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE c IN ('A', 'B')
+
+case: NOT IN, two picked - the browser used to run this as c IN (...), the opposite filter
+sql:  SELECT 1 FROM t WHERE c NOT IN [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE c NOT IN ('A', 'B')
+
+case: alias.column
+sql:  SELECT 1 FROM t WHERE t.c IN [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE t.c IN ('A', 'B')
+
+case: quoted identifier with a space in it
+sql:  SELECT 1 FROM t WHERE "My Col" IN [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE "My Col" IN ('A', 'B')
+
+case: ONE picked is still a list (the scheduler used to send c IN 'A')
+sql:  SELECT 1 FROM t WHERE c IN [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A
+all:  SELECT 1 FROM t WHERE c IN ('A')
+
+case: logic=and has no say over IN
+sql:  SELECT 1 FROM t WHERE c IN [PROMPT;type=multi-select;name=m;options=A,B,C;logic=and]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE c IN ('A', 'B')
+
+case: lower-case in
+sql:  SELECT 1 FROM t WHERE c in [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE c IN ('A', 'B')
+
+case: a line break between IN and the tag
+sql:  SELECT 1 FROM t WHERE c IN\n[PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE c IN ('A', 'B')
+
+case: SQL carries on after the tag
+sql:  SELECT 1 FROM t WHERE c IN [PROMPT;type=multi-select;name=m;options=A,B,C] AND z = 1
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE c IN ('A', 'B') AND z = 1
+
+case: two tags in one statement (offsets survive the first replacement)
+sql:  SELECT 1 FROM t WHERE a IN [PROMPT;type=multi-select;name=m;options=A,B,C] AND b NOT IN [PROMPT;type=multi-select;name=n;options=X,Y,Z]
+ans:  m=A,B&n=X,Y
+all:  SELECT 1 FROM t WHERE a IN ('A', 'B') AND b NOT IN ('X', 'Y')
+
+case: the operand is an expression - browser and ?json=1 used to send UPPER(c) IN 'A', 'B'
+sql:  SELECT 1 FROM t WHERE UPPER(c) IN [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE UPPER(c) IN ('A', 'B')
+
+case: expression operand, NOT IN
+sql:  SELECT 1 FROM t WHERE UPPER(c) NOT IN [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE UPPER(c) NOT IN ('A', 'B')
+
+case: expression operand, ONE picked
+sql:  SELECT 1 FROM t WHERE UPPER(c) IN [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A
+all:  SELECT 1 FROM t WHERE UPPER(c) IN ('A')
+
+case: nothing picked - still a list
+sql:  SELECT 1 FROM t WHERE c IN [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:
+browser: SELECT 1 FROM t WHERE c IN (NULL)
+runner:  SELECT 1 FROM t WHERE c IN (NULL)
+json:    SELECT 1 FROM t WHERE c IN ('')
+
+case: an EMPTY selection (m= in the link: the browser's empty list, not "no answer") - still a list
+sql:  SELECT 1 FROM t WHERE c IN [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=
+browser: SELECT 1 FROM t WHERE c IN (NULL)
+runner:  SELECT 1 FROM t WHERE c IN (NULL)
+json:    SELECT 1 FROM t WHERE c IN ('')
+
+group: multi-select forms that always worked - they must not move
+
+case: IN with the author's own parentheses
+sql:  SELECT 1 FROM t WHERE c IN ([PROMPT;type=multi-select;name=m;options=A,B,C])
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE c IN ('A', 'B')
+
+case: NOT IN with the author's own parentheses
+sql:  SELECT 1 FROM t WHERE c NOT IN ([PROMPT;type=multi-select;name=m;options=A,B,C])
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE c NOT IN ('A', 'B')
+
+case: = expands per value
+sql:  SELECT 1 FROM t WHERE c = [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (c = 'A' OR c = 'B')
+
+case: LIKE expands per value
+sql:  SELECT 1 FROM t WHERE c LIKE [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (c LIKE 'A' OR c LIKE 'B')
+
+case: logic=and joins the expansion with AND
+sql:  SELECT 1 FROM t WHERE c = [PROMPT;type=multi-select;name=m;options=A,B,C;logic=and]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (c = 'A' AND c = 'B')
+
+case: template= with two picked
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=multi-select;name=m;options=A,B,C;template="AND c = :val"] AND z = 1
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE 1=1 AND (c = 'A' OR c = 'B') AND z = 1
+
+case: template= with ONE picked
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=multi-select;name=m;options=A,B,C;template="AND c = :val"] AND z = 1
+ans:  m=A
+all:  SELECT 1 FROM t WHERE 1=1 AND c = 'A' AND z = 1
+
+case: = with ONE picked (the scheduler has always left the parentheses off; harmless)
+sql:  SELECT 1 FROM t WHERE c = [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A
+browser: SELECT 1 FROM t WHERE (c = 'A')
+runner:  SELECT 1 FROM t WHERE c = 'A'
+json:    SELECT 1 FROM t WHERE (c = 'A')
+
+group: template="..." - the wrapping quotes are not part of the template
+
+case: double-quoted template
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=text;name=x;template="AND c = :val"] AND z = 1
+ans:  x=v
+all:  SELECT 1 FROM t WHERE 1=1 AND c = 'v' AND z = 1
+
+case: single-quoted template
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=text;name=x;template='AND c = :val'] AND z = 1
+ans:  x=v
+all:  SELECT 1 FROM t WHERE 1=1 AND c = 'v' AND z = 1
+
+case: bare template
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=text;name=x;template=AND c = :val] AND z = 1
+ans:  x=v
+all:  SELECT 1 FROM t WHERE 1=1 AND c = 'v' AND z = 1
+
+case: control prompt, template="" - emits nothing (?json=1 used to leave "" in the statement)
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=p;options=y,n;template=""] AND z = 1
+ans:  p=y
+all:  SELECT 1 FROM t WHERE 1=1  AND z = 1
+
+case: control prompt, template=''
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=p;options=y,n;template=''] AND z = 1
+ans:  p=y
+all:  SELECT 1 FROM t WHERE 1=1  AND z = 1
+
+case: control prompt, template= with nothing after it
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=p;options=y,n;template=] AND z = 1
+ans:  p=y
+all:  SELECT 1 FROM t WHERE 1=1  AND z = 1
+
+case: control prompt of type multi-select (?json=1 used to emit its list all the same)
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=multi-select;name=m;options=A,B,C;template=""] AND z = 1
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE 1=1  AND z = 1
+
+case: a control parent lets its resultif child through
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=p;options=y,n;template=""] [PROMPT;type=text;name=x;resultif=p:y;template="AND c = :val"] AND z = 1
+ans:  p=y&x=v
+all:  SELECT 1 FROM t WHERE 1=1  AND c = 'v' AND z = 1
+
+case: a control parent drops its resultif child
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=p;options=y,n;template=""] [PROMPT;type=text;name=x;resultif=p:y;template="AND c = :val"] AND z = 1
+ans:  p=n&x=v
+all:  SELECT 1 FROM t WHERE 1=1   AND z = 1
+
+group: quotes the author wrote AROUND a tag leave with it
+
+case: text
+sql:  SELECT 1 FROM t WHERE c = '[PROMPT;type=text;name=x]' AND z = 1
+ans:  x=v
+all:  SELECT 1 FROM t WHERE c = 'v' AND z = 1
+
+case: date inside TO_DATE - the PHP engines used to send TO_DATE(''01-JUL-22'', ...)
+sql:  SELECT 1 FROM t WHERE d >= TO_DATE('[PROMPT;type=date;name=d]', 'DD-MON-YY')
+ans:  d=01-JUL-22
+all:  SELECT 1 FROM t WHERE d >= TO_DATE('01-JUL-22', 'DD-MON-YY')
+
+case: select
+sql:  SELECT 1 FROM t WHERE c = '[PROMPT;type=select;name=s;options=a,b]' AND z = 1
+ans:  s=a
+all:  SELECT 1 FROM t WHERE c = 'a' AND z = 1
+
+case: a forced default, not an answer
+mode: dialogs
+sql:  SELECT 1 FROM t WHERE c = '[PROMPT;type=text;name=x;forcedefault=dv]' AND z = 1
+ans:
+all:  SELECT 1 FROM t WHERE c = 'dv' AND z = 1
+
+case: an apostrophe in the answer is doubled once, inside one pair
+sql:  SELECT 1 FROM t WHERE c = '[PROMPT;type=text;name=x]' AND z = 1
+ans:  x=O'Brien
+all:  SELECT 1 FROM t WHERE c = 'O''Brien' AND z = 1
+
+case: multi-select inside ('...') - the scheduler must not send 'A,B' as ONE value
+sql:  SELECT 1 FROM t WHERE c IN ('[PROMPT;type=multi-select;name=m;options=A,B,C]')
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE c IN ('A', 'B')
+
+case: multi-select in quotes straight after IN
+sql:  SELECT 1 FROM t WHERE c IN '[PROMPT;type=multi-select;name=m;options=A,B,C]'
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE c IN ('A', 'B')
+
+case: a noquote answer KEEPS the pair - they are the only quotes it gets
+sql:  SELECT 1 FROM t WHERE c = '[PROMPT;type=select;name=s;options=a,b;noquote]' AND z = 1
+ans:  s=a
+all:  SELECT 1 FROM t WHERE c = 'a' AND z = 1
+
+case: a noquote answer with no quotes around it
+sql:  SELECT 1 FROM t ORDER BY [PROMPT;type=select;name=s;options=a,b;noquote]
+ans:  s=a
+all:  SELECT 1 FROM t ORDER BY a
+
+case: a quote on ONE side only is not a pair
+sql:  SELECT 1 FROM t WHERE c = 'x' AND e = [PROMPT;type=text;name=x]
+ans:  x=v
+all:  SELECT 1 FROM t WHERE c = 'x' AND e = 'v'
+
+case: a resultif child that is dropped leaves the pair standing (as the browser does)
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=p;options=y,n;template=""] AND c = '[PROMPT;type=text;name=x;resultif=p:y]' AND z = 1
+ans:  p=n&x=v
+all:  SELECT 1 FROM t WHERE 1=1  AND c = '' AND z = 1
+
+group: section= is display only - no engine may emit anything different for it (2026-09-24)
+
+case: a text prompt with section= emits what it emits without one
+sql:  SELECT 1 FROM t WHERE c = [PROMPT;type=text;name=x;section=Dates]
+ans:  x=v
+all:  SELECT 1 FROM t WHERE c = 'v'
+
+case: section= between other keys, on a multi-select straight after IN
+sql:  SELECT 1 FROM t WHERE c IN [PROMPT;type=multi-select;section=Report period;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE c IN ('A', 'B')
+
+case: a control parent and its resultif child in DIFFERENT sections still pass the child through
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=p;options=y,n;template="";section=A] [PROMPT;type=text;name=x;resultif=p:y;section=B;template="AND c = :val"] AND z = 1
+ans:  p=y&x=v
+all:  SELECT 1 FROM t WHERE 1=1  AND c = 'v' AND z = 1
+
+case: ... and still drop it
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=p;options=y,n;template="";section=A] [PROMPT;type=text;name=x;resultif=p:y;section=B;template="AND c = :val"] AND z = 1
+ans:  p=n&x=v
+all:  SELECT 1 FROM t WHERE 1=1   AND z = 1
+
+group: a negated operator joins its list with AND - with OR it was true for every row, or a syntax error (2026-09-29)
+
+case: != , two picked (was (c != 'A' OR c != 'B'): every row)
+sql:  SELECT 1 FROM t WHERE c != [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (c != 'A' AND c != 'B')
+
+case: <>, two picked
+sql:  SELECT 1 FROM t WHERE c <> [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (c <> 'A' AND c <> 'B')
+
+case: NOT LIKE, two picked (was c (NOT LIKE 'A' OR NOT LIKE 'B'): NOT read as the column)
+sql:  SELECT 1 FROM t WHERE c NOT LIKE [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (c NOT LIKE 'A' AND c NOT LIKE 'B')
+
+case: NOT LIKE, ONE picked (the browser and ?json=1 sent c (NOT LIKE 'A'); the scheduler leaves the parentheses off, as for =)
+sql:  SELECT 1 FROM t WHERE c NOT LIKE [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A
+browser: SELECT 1 FROM t WHERE (c NOT LIKE 'A')
+runner:  SELECT 1 FROM t WHERE c NOT LIKE 'A'
+json:    SELECT 1 FROM t WHERE (c NOT LIKE 'A')
+
+case: != , ONE picked - unchanged
+sql:  SELECT 1 FROM t WHERE c != [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A
+browser: SELECT 1 FROM t WHERE (c != 'A')
+runner:  SELECT 1 FROM t WHERE c != 'A'
+json:    SELECT 1 FROM t WHERE (c != 'A')
+
+case: NOT LIKE, nothing picked - the no-answer literals stay as they were
+sql:  SELECT 1 FROM t WHERE c NOT LIKE [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:
+browser: SELECT 1 FROM t WHERE (c NOT LIKE NULL)
+runner:  SELECT 1 FROM t WHERE c NOT LIKE NULL
+json:    SELECT 1 FROM t WHERE c NOT LIKE ''
+
+case: logic=or wins over the negated default - "not both"
+sql:  SELECT 1 FROM t WHERE c NOT LIKE [PROMPT;type=multi-select;name=m;options=A,B,C;logic=or]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (c NOT LIKE 'A' OR c NOT LIKE 'B')
+
+case: logic=or with !=
+sql:  SELECT 1 FROM t WHERE c != [PROMPT;type=multi-select;name=m;options=A,B,C;logic=or]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (c != 'A' OR c != 'B')
+
+case: logic=AND in capitals is AND everywhere (the browser used to read it as OR)
+sql:  SELECT 1 FROM t WHERE c = [PROMPT;type=multi-select;name=m;options=A,B,C;logic=AND]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (c = 'A' AND c = 'B')
+
+case: logic=or with LIKE is the default it always was
+sql:  SELECT 1 FROM t WHERE c LIKE [PROMPT;type=multi-select;name=m;options=A,B,C;logic=or]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (c LIKE 'A' OR c LIKE 'B')
+
+case: not  like in lower case, across a line break
+sql:  SELECT 1 FROM t WHERE c not  like\n[PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (c NOT LIKE 'A' AND c NOT LIKE 'B')
+
+case: alias.column NOT LIKE
+sql:  SELECT 1 FROM t WHERE t.c NOT LIKE [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (t.c NOT LIKE 'A' AND t.c NOT LIKE 'B')
+
+case: an apostrophe in a value, !=
+sql:  SELECT 1 FROM t WHERE c != [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=O'Brien,B
+all:  SELECT 1 FROM t WHERE (c != 'O''Brien' AND c != 'B')
+
+group: the operand in front of the operator - more than a plain column name (2026-09-29)
+
+case: a quoted identifier with a space in it (was "My (Col" = 'A' OR Col" = 'B'))
+sql:  SELECT 1 FROM t WHERE "My Col" = [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE ("My Col" = 'A' OR "My Col" = 'B')
+
+case: a quoted identifier, ONE picked
+sql:  SELECT 1 FROM t WHERE "My Col" = [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A
+browser: SELECT 1 FROM t WHERE ("My Col" = 'A')
+runner:  SELECT 1 FROM t WHERE "My Col" = 'A'
+json:    SELECT 1 FROM t WHERE ("My Col" = 'A')
+
+case: alias."quoted identifier", NOT LIKE
+sql:  SELECT 1 FROM t WHERE t."My Col" NOT LIKE [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (t."My Col" NOT LIKE 'A' AND t."My Col" NOT LIKE 'B')
+
+case: an MS-SQL [bracketed] identifier
+sql:  SELECT 1 FROM t WHERE [My Col] = [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE ([My Col] = 'A' OR [My Col] = 'B')
+
+case: an expression (was UPPER(c) = 'A', 'B'; the scheduler sent UPPER(c) = 'A,B' - valid SQL, the wrong rows)
+sql:  SELECT 1 FROM t WHERE UPPER(c) = [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (UPPER(c) = 'A' OR UPPER(c) = 'B')
+
+case: nested functions, !=
+sql:  SELECT 1 FROM t WHERE TRIM(UPPER(c)) != [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (TRIM(UPPER(c)) != 'A' AND TRIM(UPPER(c)) != 'B')
+
+case: a literal holding a parenthesis and a comma inside the expression
+sql:  SELECT 1 FROM t WHERE NVL(c, 'x)') LIKE [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (NVL(c, 'x)') LIKE 'A' OR NVL(c, 'x)') LIKE 'B')
+
+case: a parenthesised expression
+sql:  SELECT 1 FROM t WHERE (a || b) = [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE ((a || b) = 'A' OR (a || b) = 'B')
+
+case: a keyword glued to a parenthesis is not a function name
+sql:  SELECT 1 FROM t WHERE x = 1 AND(c) = [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE x = 1 AND((c) = 'A' OR (c) = 'B')
+
+case: an expression, NOT LIKE
+sql:  SELECT 1 FROM t WHERE UPPER(c) NOT LIKE [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (UPPER(c) NOT LIKE 'A' AND UPPER(c) NOT LIKE 'B')
+
+case: no space before = (the scheduler sent c='A,B': one string, the wrong rows)
+sql:  SELECT 1 FROM t WHERE c=[PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (c = 'A' OR c = 'B')
+
+case: no space around !=
+sql:  SELECT 1 FROM t WHERE c!=[PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (c != 'A' AND c != 'B')
+
+case: an expression before IN - still one list
+sql:  SELECT 1 FROM t WHERE TRIM(c) IN [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE TRIM(c) IN ('A', 'B')
+
+case: an operand holding another tag is not read (its text is not what the engines hold by then) - ONE picked
+sql:  SELECT 1 FROM t WHERE UPPER([PROMPT;type=text;name=x]) = [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  x=v&m=A
+all:  SELECT 1 FROM t WHERE UPPER('v') = 'A'
+
+group: the optional-filter idiom - [PROMPT] IS NULL stands for ONE value, as in the browser (2026-09-29)
+
+case: penumbra_log's shape, two picked (?json=1 sent 'A', 'B' IS NULL; the scheduler 'A,B' IS NULL)
+sql:  SELECT 1 FROM t WHERE ( c = [PROMPT;type=multi-select;name=m;options=A,B,C] OR [PROMPT;type=multi-select;name=m;options=A,B,C] IS NULL )
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE ( (c = 'A' OR c = 'B') OR 'A' IS NULL )
+
+case: penumbra_log's shape, nothing picked - task #50's path, byte for byte as before
+sql:  SELECT 1 FROM t WHERE ( c = [PROMPT;type=multi-select;name=m;options=A,B,C] OR [PROMPT;type=multi-select;name=m;options=A,B,C] IS NULL )
+ans:
+browser: SELECT 1 FROM t WHERE ( (c = NULL) OR NULL IS NULL )
+runner:  SELECT 1 FROM t WHERE ( c = NULL OR NULL IS NULL )
+json:    SELECT 1 FROM t WHERE ( c = '' OR '' IS NULL )
+
+case: the tag first, behind a parenthesis (both PHP engines sent ('A', 'B' IS NULL OR ...))
+sql:  SELECT 1 FROM t WHERE ([PROMPT;type=multi-select;name=m;options=A,B,C] IS NULL OR c IN ([PROMPT;type=multi-select;name=m;options=A,B,C]))
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE ('A' IS NULL OR c IN ('A', 'B'))
+
+case: the tag first, ONE picked
+sql:  SELECT 1 FROM t WHERE ([PROMPT;type=multi-select;name=m;options=A,B,C] IS NULL OR c IN ([PROMPT;type=multi-select;name=m;options=A,B,C]))
+ans:  m=A
+all:  SELECT 1 FROM t WHERE ('A' IS NULL OR c IN ('A'))
+
+case: IS NOT NULL - the required-filter twin (a syntax error in all three)
+sql:  SELECT 1 FROM t WHERE ([PROMPT;type=multi-select;name=m;options=A,B,C] IS NOT NULL AND c IN ([PROMPT;type=multi-select;name=m;options=A,B,C]))
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE ('A' IS NOT NULL AND c IN ('A', 'B'))
+
+case: quotes around the tag in front of IS NULL leave with it
+sql:  SELECT 1 FROM t WHERE ('[PROMPT;type=multi-select;name=m;options=A,B,C]' IS NULL OR c IN ([PROMPT;type=multi-select;name=m;options=A,B,C]))
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE ('A' IS NULL OR c IN ('A', 'B'))
+
+case: a template on the tag in front of IS NULL is applied to that ONE value
+sql:  SELECT 1 FROM t WHERE ([PROMPT;type=multi-select;name=m;options=A,B,C;template="UPPER(:val)"] IS NULL OR c IN ([PROMPT;type=multi-select;name=m;options=A,B,C]))
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (UPPER('A') IS NULL OR c IN ('A', 'B'))
+
+case: is  null in lower case, the tag last
+sql:  SELECT 1 FROM t WHERE (c IN ([PROMPT;type=multi-select;name=m;options=A,B,C]) OR [PROMPT;type=multi-select;name=m;options=A,B,C] is  null)
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (c IN ('A', 'B') OR 'A' is  null)
+
+group: quotes around a multi-select after a comparison leave with it, as around every other tag (2026-09-29, second pass)
+
+case: = two picked (the scheduler sent c = 'A,B': one string, the wrong rows; the other two a syntax error)
+sql:  SELECT 1 FROM t WHERE c = '[PROMPT;type=multi-select;name=m;options=A,B,C]' AND z = 1
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (c = 'A' OR c = 'B') AND z = 1
+
+case: NOT LIKE two picked
+sql:  SELECT 1 FROM t WHERE c NOT LIKE '[PROMPT;type=multi-select;name=m;options=A,B,C]'
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (c NOT LIKE 'A' AND c NOT LIKE 'B')
+
+case: an expression operand, two picked
+sql:  SELECT 1 FROM t WHERE UPPER(c) = '[PROMPT;type=multi-select;name=m;options=A,B,C]' AND z = 1
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (UPPER(c) = 'A' OR UPPER(c) = 'B') AND z = 1
+
+case: = ONE picked (the scheduler leaves the parentheses off, as unquoted)
+sql:  SELECT 1 FROM t WHERE c = '[PROMPT;type=multi-select;name=m;options=A,B,C]' AND z = 1
+ans:  m=A
+browser: SELECT 1 FROM t WHERE (c = 'A') AND z = 1
+runner:  SELECT 1 FROM t WHERE c = 'A' AND z = 1
+json:    SELECT 1 FROM t WHERE (c = 'A') AND z = 1
+
+group: a function name a space away from its parenthesis (2026-09-29, second pass)
+
+case: UPPER (c) = two picked
+sql:  SELECT 1 FROM t WHERE UPPER (c) = [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (UPPER (c) = 'A' OR UPPER (c) = 'B')
+
+case: pkg.fn (c) != two picked
+sql:  SELECT 1 FROM t WHERE pkg.fn (c) != [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE (pkg.fn (c) != 'A' AND pkg.fn (c) != 'B')
+
+case: a KEYWORD a space away is still not a function name
+sql:  SELECT 1 FROM t WHERE x = 1 AND (c) = [PROMPT;type=multi-select;name=m;options=A,B,C]
+ans:  m=A,B
+all:  SELECT 1 FROM t WHERE x = 1 AND ((c) = 'A' OR (c) = 'B')
+
+group: per-option templates (options=Display:Value::Template) - ?json=1 had none at all (2026-09-29, second pass)
+
+case: a select whose picked option carries its own template (?json=1 sent AND c = 'All': no rows)
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=s;options=All::"AND 1=1",Open:O,Closed:C;template="AND c = :val"] AND z = 1
+ans:  s=All
+all:  SELECT 1 FROM t WHERE 1=1 AND 1=1 AND z = 1
+
+case: ... an option without one takes the prompt's template, as always
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=s;options=All::"AND 1=1",Open:O,Closed:C;template="AND c = :val"] AND z = 1
+ans:  s=O
+all:  SELECT 1 FROM t WHERE 1=1 AND c = 'O' AND z = 1
+
+case: a control prompt whose picked option carries a template emits it (?json=1 emitted nothing)
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=p;template="";options=Mine::"AND owner = 1",All] AND z = 1
+ans:  p=Mine
+all:  SELECT 1 FROM t WHERE 1=1 AND owner = 1 AND z = 1
+
+case: ... and nothing for an option without one
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=p;template="";options=Mine::"AND owner = 1",All] AND z = 1
+ans:  p=All
+all:  SELECT 1 FROM t WHERE 1=1  AND z = 1
+
+case: a noquote select: the option's template goes in bare (?json=1 sent the option's value, ORDER BY Name)
+sql:  SELECT 1 FROM t ORDER BY [PROMPT;type=select;name=s;noquote;options=Name::"last_name, first_name",Dept:dept]
+ans:  s=Name
+all:  SELECT 1 FROM t ORDER BY last_name, first_name
+
+case: a multi-select mixing an option that has a template with one that has not
+sql:  SELECT 1 FROM t WHERE [PROMPT;type=multi-select;name=m;options=All::"1=1",A,B;template="c = :val"] AND z = 1
+ans:  m=All,A
+all:  SELECT 1 FROM t WHERE (1=1 OR c = 'A') AND z = 1
+
+case: ... ONE picked that has none: the prompt's template
+sql:  SELECT 1 FROM t WHERE [PROMPT;type=multi-select;name=m;options=All::"1=1",A,B;template="c = :val"] AND z = 1
+ans:  m=A
+all:  SELECT 1 FROM t WHERE c = 'A' AND z = 1
+
+group: an UNANSWERED control prompt emits nothing - the scheduler emitted NULL, a syntax error (2026-09-29, second pass)
+
+case: nothing answered
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=p;options=y,n;template=""] AND z = 1
+ans:
+all:  SELECT 1 FROM t WHERE 1=1  AND z = 1
+
+case: nothing answered, with a resultif child: both go
+sql:  SELECT 1 FROM t WHERE 1=1 [PROMPT;type=select;name=p;options=y,n;template=""] [PROMPT;type=text;name=x;resultif=p:y;template="AND c = :val"] AND z = 1
+ans:
+all:  SELECT 1 FROM t WHERE 1=1   AND z = 1
+
+group: per-option templates, several picked - a leading AND / OR goes in front of the group, once (2026-09-29, third pass)
+
+case: fi-epa's shape - an option template with its own "and" picked with a value that takes the prompt's (was (and c like '%' OR c = 'Closed'): invalid)
+sql:  SELECT 1 FROM t WHERE x = 0 [PROMPT;type=multi-select;name=st;options=All::and c like '%';options=Open,Closed;template="AND c = :val"] AND z = 1
+ans:  st=All,Closed
+all:  SELECT 1 FROM t WHERE x = 0 AND (c like '%' OR c = 'Closed') AND z = 1
+
+case: ... ONE picked that has its own template goes out as it is
+sql:  SELECT 1 FROM t WHERE x = 0 [PROMPT;type=multi-select;name=st;options=All::and c like '%';options=Open,Closed;template="AND c = :val"] AND z = 1
+ans:  st=All
+all:  SELECT 1 FROM t WHERE x = 0 and c like '%' AND z = 1
+
+case: ... logic=and joins the group with AND
+sql:  SELECT 1 FROM t WHERE x = 0 [PROMPT;type=multi-select;name=st;options=All::and c like '%';options=Open,Closed;template="AND c = :val";logic=and] AND z = 1
+ans:  st=All,Closed
+all:  SELECT 1 FROM t WHERE x = 0 AND (c like '%' AND c = 'Closed') AND z = 1
+
+case: an EMPTY option template picked with a value that takes the prompt's - the one piece left keeps its AND (was x = 0 c = 'Open')
+sql:  SELECT 1 FROM t WHERE x = 0 [PROMPT;type=multi-select;name=st;options=None::"";options=Open,Closed;template="AND c = :val"] AND z = 1
+ans:  st=None,Open
+all:  SELECT 1 FROM t WHERE x = 0 AND c = 'Open' AND z = 1
+
+case: options that all carry their own "and", no prompt template - the group takes theirs
+sql:  SELECT 1 FROM t WHERE x = 0 [PROMPT;type=multi-select;name=st;options=Open::"and s = 'O'",Closed::"and s = 'C'"] AND z = 1
+ans:  st=Open,Closed
+all:  SELECT 1 FROM t WHERE x = 0 and (s = 'O' OR s = 'C') AND z = 1

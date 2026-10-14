@@ -1,0 +1,242 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>pivot row-label cell toggles its group</title></head>
+<body>
+<!-- Minimal DOM, same shape as ..\pivotzero\harness.html: main.js binds the
+     pivot-builder elements DIRECTLY at ready time, so they must exist before it loads. -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<table id="resultsTable"><thead id="tableHeader"><tr>
+  <th data-colname="#">#</th><th data-colname="COLLEGE">COLLEGE</th><th data-colname="DEPARTMENT">DEPARTMENT</th><th data-colname="AMOUNT">AMOUNT</th>
+</tr></thead><tbody></tbody></table>
+<div id="errorBox"></div>
+<input id="tableSearch" value="">
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="pivotLightbox" style="display:none">
+  <div id="pivot-source-columns"></div>
+  <div id="pivot-rows"></div><div id="pivot-cols"></div><div id="pivot-vals"></div>
+  <select id="pivot-aggregation-selector"><option value="">-</option><optgroup label="Basic"><option value="sum">Sum</option><option value="count">Count</option></optgroup></select>
+  <table><tbody id="pivot-agg-table-body"></tbody></table>
+  <select id="pivot-rows-layout-select"><option value="nested">nested</option><option value="nested-static">nested-static</option><option value="flat">flat</option></select>
+  <select id="pivot-cols-layout-select"><option value="nested">nested</option><option value="flat">flat</option></select>
+  <select id="pivot-sort-order"><option value="asc">asc</option><option value="desc">desc</option></select>
+  <input id="pivot-sticky-cols" value="3">
+  <input type="checkbox" id="pivot-row-total-override-toggle">
+  <div id="pivot-row-total-override-container" style="display:none"><div id="pivot-row-total-slots"></div><div id="pivot-row-total-tokens"></div></div>
+  <select id="pivot-rank-dir"><option value="none">none</option><option value="top">top</option><option value="bottom">bottom</option></select>
+  <input id="pivot-rank-n" value="10"><select id="pivot-rank-agg"><option value="sum">sum</option><option value="count">count</option></select>
+  <select id="pivot-rank-scope"><option value="">Overall</option></select>
+  <input type="checkbox" id="pivot-rank-other" checked><label id="pivot-rank-other-label"></label>
+  <input type="checkbox" id="pivot-no-breakdown"><input type="checkbox" id="pivot-start-expanded"><input type="checkbox" id="pivot-hide-empty">
+  <select id="pivotPresetSelect"><option value=""></option></select><button id="pivotDeletePresetBtn"></button><input type="checkbox" id="pivotAutoRunPreset">
+  <button id="generatePivotBtn">Generate</button>
+  <select id="pivotSnippetTargetSelect" style="display: none;"></select>
+  <button id="updatePivotSnippetBtn" type="button" style="display: none;">Update Snippet</button>
+  <button id="copyPivotSnippetBtn">Snippet</button>
+  <button id="pivotSavePresetBtn"></button>
+</div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); try { var o = document.getElementById('out'); if (o && o.textContent === 'running') o.textContent = 'PAGE_ERROR: ' + window.__errors[0]; } catch (x) {} return true; };
+</script>
+<script src="main_patched.js"></script>
+<script>
+(function () {
+  function report(txt) { document.getElementById('out').textContent = txt; }
+  var results = [];
+  function assert(name, cond, detail) { results.push({ name: name, pass: !!cond, detail: detail === undefined ? '' : String(detail) }); }
+  function eq(name, actual, expected) {
+    var a = JSON.stringify(actual), e = JSON.stringify(expected);
+    assert(name, a === e, 'expected ' + e + ' got ' + a);
+  }
+  function M(o) { var m = new Map(); Object.keys(o).forEach(function (k) { m.set(k, o[k]); }); return m; }
+
+  // Three colleges, two departments each. C2's label is a data-search link (the
+  // way a report links a value to a search), C3's a plain @@HTML anchor.
+  var K1 = 'C1';
+  var K2 = '@@HTML<a href="#lnk" data-search="COLLEGE:C2">C2</a>';
+  var K3 = '@@HTML<a href="#lnk3">C3</a>';
+  function r(c, d, amt) { return M({ COLLEGE: c, DEPARTMENT: d, AMOUNT: String(amt) }); }
+  var ROWS = [r(K1, 'D1', 10), r(K1, 'D2', 20), r(K2, 'D3', 30), r(K2, 'D4', 40), r(K3, 'D5', 50), r(K3, 'D6', 60)];
+
+  function run() {
+    var F = window.__CT;
+    if (!F || typeof F.pivotTable !== 'function') {
+      report('RESULTS_JSON:' + JSON.stringify({ fatal: 'hooks unavailable: ' + (window.__CT_ERR || 'n/a'), pageErrors: window.__errors.slice(0, 6) }));
+      return;
+    }
+    $('#generatePivotBtn').off('click');
+
+    // CSS under test with every :hover made drivable by a class
+    var x = new XMLHttpRequest(); x.open('GET', 'main_css_under_test.css', false); x.send();
+    var st = document.createElement('style'); st.textContent = x.responseText.replace(/:hover/g, '.pnbh'); document.head.appendChild(st);
+
+    var settings = {
+      v: 2, rows: ['COLLEGE', 'DEPARTMENT'], cols: [], vals: 'AMOUNT', agg: ['sum'], aggLabels: ['Amount'],
+      aggColOverrides: [null], aggFilters: null, aggFormulas: [null],
+      rowLayout: 'nested', colLayout: 'nested', sortOrder: 'asc', colSortOrder: 'asc', stickyColCount: 1,
+      totalColAggs: null, totalRowAggs: null, totalRowAggLabels: null, totalRowAggBaseIdx: null,
+      rankN: null, rankDir: null, rankAgg: null, rankOther: true, rankScope: null, noBreakdown: false,
+      startExpanded: true, hideEmpty: false
+    };
+    F.setPivotSettings(settings);
+    var pd = F.processPivot(ROWS, settings.rows, settings.cols, settings.vals, settings.agg, F.extraVals(settings.aggColOverrides, settings.vals), null);
+    var res = F.pivotTable(pd, settings.rows, settings.cols, settings.vals, settings.rowLayout, settings.colLayout,
+      settings.agg, 'asc', null, [false], null, null, 'asc', 1, null, null, settings.aggColOverrides, null, false);
+    var host = document.getElementById('pivot-output-container');
+    host.style.display = 'block'; host.style.width = '900px';
+    host.innerHTML = res.html;
+    var tbl = document.getElementById('pivotResultTable');
+    if (tbl) tbl.classList.add('is-nested-pivot');
+
+    function vis(el) { var tr = el.closest('tr'); return !!tr && tr.style.display !== 'none'; }
+    // The visible chevron of group `k` (summary row when collapsed, group row when expanded)
+    function chev(k) {
+      var all = tbl.querySelectorAll('.pivot-collapse-toggle');
+      for (var i = 0; i < all.length; i++) if (all[i].getAttribute('data-group-key') === k && vis(all[i])) return all[i];
+      return null;
+    }
+    function state(k) { var t = chev(k); return t ? (t.classList.contains('pivot-group-collapsed') ? 'collapsed' : 'expanded') : 'none'; }
+    function states() { return [state(K1), state(K2), state(K3)]; }
+    function cellOf(k) { var t = chev(k); return t ? t.closest('td') : null; }
+    function deptRowShown(d) {
+      var tds = tbl.querySelectorAll('tbody td[data-row-field="1"]');
+      for (var i = 0; i < tds.length; i++) if (tds[i].textContent.trim() === d) return vis(tds[i]);
+      return 'no ' + d;
+    }
+    function click(el, detail) {
+      var ev = new MouseEvent('click', { bubbles: true, cancelable: true, view: window, detail: detail === undefined ? 1 : detail });
+      el.dispatchEvent(ev);
+      return ev;
+    }
+
+    // ---------------- fixture ---------------------------------------------------
+    assert('F0 fixture: a collapsible 2-field pivot, all three colleges expanded with a chevron', !!tbl && states().join() === 'expanded,expanded,expanded', tbl ? states().join() : 'no table');
+    var a2 = cellOf(K2) && cellOf(K2).querySelector('a[data-search]');
+    var a3 = cellOf(K3) && cellOf(K3).querySelector('a[href="#lnk3"]');
+    assert('F1 fixture: C2 label holds its data-search link, C3 its plain anchor', !!a2 && !!a3, cellOf(K2) ? cellOf(K2).innerHTML.slice(0, 200) : 'no C2 cell');
+    if (!tbl || !a2 || !a3) { report('RESULTS_JSON:' + JSON.stringify({ pageErrors: window.__errors.slice(0, 6), results: results })); return; }
+
+    // ---------------- C: clicks --------------------------------------------------
+    click(chev(K1));
+    eq('C1 the chevron itself still toggles its group exactly once', [state(K1), deptRowShown('D1')], ['collapsed', false]);
+    click(cellOf(K1).querySelector('.pivot-row-sticky-text'));
+    eq('C2 a click on the label TEXT expands the group (collapsed summary row)', [state(K1), deptRowShown('D1')], ['expanded', true]);
+    if (state(K1) !== 'expanded') click(chev(K1));   // C3 starts expanded whatever C2 did
+    click(cellOf(K1));
+    eq('C3 a click on the label CELL (expanded group, rowspan cell) collapses it', [state(K1), deptRowShown('D1')], ['collapsed', false]);
+
+    var ev2 = click(a2);
+    eq('C4 a click on a data-search link in the label does NOT toggle', [state(K2), deptRowShown('D3')], ['expanded', true]);
+    eq('C5 ...and the link\'s own handler still took the click (it prevents the default)', ev2.defaultPrevented, true);
+    var ev3 = click(a3);
+    ev3.defaultPrevented || history.replaceState(null, '', location.pathname);
+    eq('C6 a click on a plain anchor in the label does NOT toggle', [state(K3), deptRowShown('D5')], ['expanded', true]);
+    click(cellOf(K2).querySelector('.pivot-row-sticky-text'));
+    eq('C7 ...while a click beside that link, in the same cell, toggles', state(K2), 'collapsed');
+    click(chev(K2)); // back to expanded
+
+    var tn = cellOf(K3).querySelector('.pivot-row-sticky-text');
+    var rng = document.createRange(); rng.selectNodeContents(a3);
+    var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rng);
+    click(tn);
+    eq('C8 a click that ends a text selection in the label does NOT toggle', state(K3), 'expanded');
+    sel.removeAllRanges();
+
+    click(cellOf(K3), 2);
+    eq('C9 the second click of a double-click does NOT toggle', state(K3), 'expanded');
+
+    var before = states().join();
+    var leaf = tbl.querySelector('tbody td[data-row-field="1"]');
+    var leafErr = '';
+    try { click(leaf); } catch (e) { leafErr = String(e); }
+    eq('C10 a label cell with no chevron (the leaf department) does nothing', [states().join(), leafErr], [before, '']);
+
+    // ---------------- H: the hover affordance ------------------------------------
+    // Fresh render, all expanded, nothing hovered
+    host.innerHTML = res.html; tbl = document.getElementById('pivotResultTable'); tbl.classList.add('is-nested-pivot');
+    var cell = cellOf(K2), tg = chev(K2), link = cell.querySelector('a'), row = cell.closest('tr');
+    var dataCell = row.querySelector('td:not([data-row-field])');
+    function alpha(c) {
+      if (!c || c === 'transparent') return 0;
+      var m = /\/\s*([\d.]+)\s*\)$/.exec(c) || /^rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)$/.exec(c);
+      if (m) return Math.round(parseFloat(m[1]) * 100) / 100;
+      return /^(rgb|color)\(/.test(c) ? 1 : -1;
+    }
+    function look() { var cs = getComputedStyle(tg); return [Math.round(parseFloat(cs.opacity) * 100) / 100, alpha(cs.backgroundColor)]; }
+    function hover(els) { [row, cell, link, tg].forEach(function (e) { e.classList.remove('pnbh'); }); els.forEach(function (e) { e.classList.add('pnbh'); }); }
+    function settle() { tg.style.transition = 'none'; void tg.offsetWidth; }
+    settle();
+
+    eq('H1 the cell holding a chevron shows a pointer', getComputedStyle(cell).cursor, 'pointer');
+    var leafCell = tbl.querySelector('tbody td[data-row-field="1"]');
+    assert('H2 a label cell WITHOUT a chevron keeps its normal cursor', getComputedStyle(leafCell).cursor !== 'pointer', getComputedStyle(leafCell).cursor);
+    hover([]);
+    eq('H3 at rest the chevron is dim with no chip', look(), [0.5, 0]);
+    var restBg = getComputedStyle(cell).backgroundColor;
+    hover([row, cell]);
+    var cellLook = look();
+    eq('H4 hovering the cell lifts the chevron to full opacity on a soft chip', [cellLook[0], cellLook[1] > 0.05 && cellLook[1] < 0.2], [1, true]);
+    var hoverBg = getComputedStyle(cell).backgroundColor;
+    eq('H5 ...and the cell keeps the row\'s normal hover highlight (same as a data cell in the row)', hoverBg, getComputedStyle(dataCell).backgroundColor);
+    assert('H5b ...which differs from the resting background', hoverBg !== restBg, restBg + ' -> ' + hoverBg);
+    hover([row, cell, tg]);
+    var tgLook = look();
+    assert('H6 hovering the chevron itself strengthens the chip a notch', tgLook[0] === 1 && tgLook[1] > cellLook[1], JSON.stringify(cellLook) + ' -> ' + JSON.stringify(tgLook));
+    hover([row, cell, link]);
+    eq('H7 hovering a LINK in the label leaves the chevron at rest', look(), [0.5, 0]);
+    hover([]);
+    host.innerHTML = '';
+
+    report('RESULTS_JSON:' + JSON.stringify({ pageErrors: window.__errors.slice(0, 6), results: results }));
+  }
+
+  // js/penumbra_snippet_help.js binds `P = window.Penumbra` ONCE, when it loads (see
+  // ..\pivotzero\harness.html). Once main.js is up, load it again the way the app does.
+  function reloadSnippetHelp(done) {
+    try { delete window.PenumbraSnippetHelp; } catch (e) { window.PenumbraSnippetHelp = undefined; }
+    var s = document.createElement('script');
+    s.src = 'penumbra_snippet_help.js?reload=' + Date.now();
+    s.onload = s.onerror = function () { done(); };
+    document.head.appendChild(s);
+  }
+  var tries = 0;
+  (function wait() {
+    tries++;
+    if (window.__CT && !wait.reloaded) { wait.reloaded = true; reloadSnippetHelp(wait); return; }
+    if (window.__CT || tries > 40) { setTimeout(function () { try { run(); } catch (e) { report('RESULTS_JSON:' + JSON.stringify({ fatal: 'run threw: ' + e + ' ' + (e.stack || '').split('\n').slice(0, 3).join(' | '), pageErrors: window.__errors.slice(0, 6), results: results })); } }, 300); }
+    else { setTimeout(wait, 100); }
+  })();
+})();
+</script>
+</body></html>

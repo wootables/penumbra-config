@@ -1,0 +1,214 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>multi-worksheet import</title>
+<link rel="stylesheet" href="main.css">
+</head>
+<body class="theme-default admin-view">
+<!-- msheet suite (2026-10-02), browser half: a workbook DROPPED on the page. The
+     REAL main.js boots an admin's report page (the console present, as index.php
+     renders it for an editor) through the real run path, then driver.js drops an
+     Excel-authored fixture from fixtures/ and follows it through the real import:
+     processImportFile -> parseXLSXToObjects -> importFileData -> the save ->
+     performClearAllAction -> #executeQuery -> the rendered (grouped) view.
+     The fake server below stands in for manage_imports.php (stores what was
+     saved under a new ID; refuses a save over 50,000 rows with a 400, as the real
+     one does, and refuses EVERY save while window.__saveFail is set) and
+     query.php (for SELECT * FROM [IMPORT; name=X]: the stored rows the request's
+     importRefs ID names, else its inline importData rows - the real resolver's
+     order; the base report's rows otherwise). -->
+<div id="reportHeaderContainer"><div id="defaultTitleView"></div><div id="reportInfoPanel" style="display:none"></div></div>
+<div id="admWrapper" class="admin-view"><div id="admin-flex-container" style="display: flex; align-items: stretch; height: auto;">
+  <div id="tableSelectorContent"></div>
+  <div id="editorTabs" style="flex-grow: 1;"><textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea>
+    <textarea id="reportTitle"></textarea><textarea id="reportSubtitle"></textarea><button id="executeQuery">Run</button>
+    <button id="toggleLimitBtn" class="toolbar-icon is-active"></button>
+    <div style="height:120px">console body</div></div></div></div>
+<div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div><div id="mainReportTitle"></div>
+<div id="loadingOverlay" style="display:none"><p id="execution-timer"></p><p id="loadingMessage"></p><div id="loadingTip"></div></div>
+<div id="importTimestamps"></div>
+<div id="errorBox" role="alert" aria-live="assertive"></div>
+<div id="snapAnalysisDock"></div>
+<div id="resultsHeader" style="height:20px">controls</div>
+<div id="tableSearchContainer"><input id="tableSearch" value=""></div>
+<div id="resultCount"></div>
+<div id="paginatorContainer" style="visibility:hidden">
+  <div id="paginationControls"><span id="pageInfo"></span><select id="rowsPerPageSelector"><option value="25">25</option><option value="50">50</option><option value="200">200</option><option value="all">All</option></select></div>
+  <div id="groupActionsContainer" style="display:none">
+    <a href="#" id="expandAllGroups">Expand All</a> <a href="#" id="collapseAllGroups">Collapse All</a>
+    <span id="removeGroupingSep">&bull;</span> <a href="#" id="configureGroupingBtn" role="button">Configure Grouping</a> <a href="#" id="removeGroupingLink">Remove Grouping</a>
+  </div>
+</div>
+<div id="table-view-container" role="main" tabindex="-1"><div id="container-parent"><div id="results-wrapper" style="width:1400px;height:700px;overflow:auto"><table id="resultsTable" class="data-grid-table"><caption class="sr-only">Report results table</caption><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table></div></div></div>
+<div id="undo_text_container"></div>
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="pnbNoSearchMatches" style="display:none"></div>
+<div id="customSortOrdersList"></div>
+<div id="pnbStatusBar"><div class="sb-seg" id="sbColsSeg"><span id="sbCols"></span></div><div class="sb-seg" id="sbUserSeg"></div></div>
+<div id='action_overlay' class='pnb-toast-dock'><span class="pnb-toast-more" hidden></span></div>
+<div id="importDragOverlay" style="display: none;"><div class="drag-overlay-content"><p>Drop file to import</p></div></div>
+<input type="file" id="importDataFileInput" style="display:none">
+<div id="floating-button-container" class="pnb-rail"><div id="floatingBtnDragHandle"></div>
+  <button id="toggleAdminViewBtn" title="(ESC) Currently showing admin controls. Click to hide."></button></div>
+<pre id="out">running</pre>
+
+<script>
+  window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' } };
+  window.PENUMBRA_THEME_IDS = ['theme-default'];
+  window.PENUMBRA_THEME_ALIASES = {};
+  window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  (function () {
+    var P = new URLSearchParams(location.search);
+    window.__SCN = P.get('scn') || 'parity';
+    try { localStorage.clear(); localStorage.setItem('penumbra_admin_open', 'true'); } catch (e) {}
+    // The report the page is on when the file is dropped: 6 rows, DEPT/NAME/AMOUNT.
+    var base = [];
+    var D = ['Arts', 'Arts', 'Arts', 'Bio', 'Bio', 'Chem'];
+    for (var i = 0; i < D.length; i++) base.push({ DEPT: D[i], NAME: 'Person ' + (i + 1), AMOUNT: String(100 * (i + 1)) });
+    window.__baseRows = base;
+    var st = {
+      name: 'msbase', query: 'SELECT * FROM MS_BASE', reportTitle: 'Multi-sheet import base report',
+      theme: 'theme-default', density: 'standard',
+      visibleColumns: ['#', 0, 1, 2], columnOrder: [0, 1, 2],
+      sortCriteria: [], noLimit: true, rowExpandDefault: false, resolverLinksDefault: true,
+      rowsPerPage: '200', reportSnippet: ''
+    };
+    window.penumbra_vars = {
+      isAdmin: true, isGlobalAdmin: true, canEditReport: true, noadm: false,
+      currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+      tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+      imports: [], reports: [], themes: {}, prompts: {}, grants: [],
+      totalExemptions: [],
+      journal: { installed: false, enabled: false, total: 0, unseen: 0 },
+      journalAccess: false,
+      preloadedState: st
+    };
+  })();
+  window.__queryDone = 0;
+  window.__ajaxLog = [];
+  window.__saves = [];       // every manage_imports.php save, parsed
+  window.__queries = [];     // every query.php call: { template, importRefs, importData, refs, inline }
+  window.__IMPORT_ROWS = Object.create(null);   // saved rows by import ID
+  window.__saveFail = null;  // { status, message }: every save is refused that way until cleared
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  var __IMPORT_MAX = 50000;   // db_connection.php PENUMBRA_IMPORT_MAX_ROWS (run.py checks the twin)
+  var __importSeq = 100;
+  function __fakeImports(opts) {
+    var body = {};
+    try { body = (typeof opts.data === 'string') ? JSON.parse(opts.data) : (opts.data || {}); } catch (e) { }
+    if (body.action === 'save') {
+      var rows = [];
+      try { rows = JSON.parse(body.import_data); } catch (e) { }
+      var sv = { name: body.import_name, filename: body.filename, row_count: body.row_count, rows: rows, failed: 0, id: null };
+      window.__saves.push(sv);
+      if (rows.length > __IMPORT_MAX) {
+        sv.failed = 400;
+        return { status: 400, body: { status: 'error', message: 'Import exceeds maximum of ' + __IMPORT_MAX + ' rows (' + rows.length + ' provided).' } };
+      }
+      // Any other refusal (a database error is a 500, an expired session a 403):
+      // nothing is stored, so an earlier import of the same name keeps its ID and rows.
+      if (window.__saveFail) {
+        sv.failed = window.__saveFail.status;
+        return { status: window.__saveFail.status, body: { status: 'error', message: window.__saveFail.message } };
+      }
+      sv.id = ++__importSeq;
+      window.__IMPORT_ROWS[sv.id] = rows;
+      return { status: 200, body: { status: 'success', id: sv.id } };
+    }
+    return { status: 200, body: { status: 'success', imports: [] } };
+  }
+  function __fakeQuery(opts) {
+    var d = opts.data || {};
+    var tpl = String(d.query_template || '');
+    var refs = {}, inline = {};
+    try { if (d.importRefs) refs = JSON.parse(d.importRefs); } catch (e) { }
+    try { if (d.importData) inline = JSON.parse(d.importData); } catch (e) { }
+    window.__queries.push({ template: tpl, importRefs: d.importRefs || null, importData: d.importData ? 'inline' : null, refs: refs, inline: inline });
+    var m = /\[\s*IMPORT\s*;\s*name\s*=\s*([^\]]+)\]/i.exec(tpl);
+    if (!m) return { data: JSON.parse(JSON.stringify(window.__baseRows)) };
+    // query.php's order: the stored import a ref's ID names, then the request's
+    // inline rows (its fallback for a save that failed). By ID, never by name: a
+    // name-keyed store answers with the newest SAVED upload whatever the page
+    // sent, which would hide the very bug the savefail scenario looks for.
+    var name = m[1].trim().toUpperCase(), rows = null;
+    if (refs[name] != null) rows = window.__IMPORT_ROWS[refs[name]] || null;
+    if (!rows && inline[name]) rows = inline[name];
+    // query.php derives the columns from the FIRST row and drops a '#' column.
+    rows = JSON.parse(JSON.stringify(rows || []));
+    var cols = rows.length ? Object.keys(rows[0]).filter(function (k) { return k !== '#'; }) : [];
+    return { data: rows.map(function (r) { var o = {}; cols.forEach(function (c) { o[c] = (r[c] == null) ? null : String(r[c]); }); return o; }) };
+  }
+  jQuery.ajax = function (a, b) {
+    var opts = (typeof a === 'string') ? jQuery.extend({ url: a }, b || {}) : (a || {});
+    var url = String(opts.url || '');
+    window.__ajaxLog.push(url);
+    var dfd = jQuery.Deferred();
+    var isQuery = /query\.php/.test(url);
+    var isImports = /manage_imports\.php/.test(url);
+    var r = isImports ? __fakeImports(opts) : { status: 200, body: isQuery ? __fakeQuery(opts) : {} };
+    setTimeout(function () {
+      var xhr = { status: r.status, responseJSON: r.body, responseText: JSON.stringify(r.body) };
+      if (r.status >= 400) {
+        try { if (opts.error) opts.error(xhr, 'error', 'Bad Request'); } catch (e) { window.__errors.push('ajax error threw: ' + String(e)); }
+        try { if (opts.complete) opts.complete(xhr, 'error'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }
+        dfd.reject(xhr, 'error', 'Bad Request');
+      } else {
+        try { if (opts.success) opts.success(r.body, 'success', xhr); } catch (e) { window.__errors.push('ajax success threw: ' + String(e)); }
+        try { if (opts.complete) opts.complete(xhr, 'success'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }
+        dfd.resolve(r.body, 'success', xhr);
+      }
+      if (isQuery) window.__queryDone++;
+    }, 0);
+    var p = dfd.promise(); p.abort = function () {}; return p;
+  };
+  jQuery.getJSON = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.post = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.get = jQuery.post;
+  jQuery.fx.off = true;
+  window.__errors = [];
+  window.__rejections = [];
+  window.addEventListener('error', function (e) {
+    if (!e || !e.message) return;
+    window.__errors.push(String(e.message) + ' @' + String(e.filename || '').split('/').pop() + ':' + e.lineno + ':' + e.colno);
+  });
+  window.onerror = function () { return true; };
+  // Errors main.js CATCHES and only logs (the spreadsheet branch wraps the parse
+  // and importFileData in a try/catch that shows "PARSE ERROR").
+  window.__consoleErrors = [];
+  (function () {
+    var ce = console.error;
+    console.error = function () {
+      try { window.__consoleErrors.push(Array.prototype.map.call(arguments, function (a) { return (a && a.message) ? String(a.message) : String(a); }).join(' ')); } catch (e) { }
+      return ce.apply(console, arguments);
+    };
+  })();
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    window.__rejections.push(String((r && r.message) || r));
+    e.preventDefault();
+  });
+  window.__confirms = [];
+  window.confirm = function (m) { window.__confirms.push(String(m)); return true; };
+  window.alert = function (m) { window.__errors.push('alert: ' + m); };
+  window.prompt = function () { return null; };
+  if (typeof window.stackHeaders !== 'function') window.stackHeaders = function () {};
+</script>
+<script src="penumbra_userseg.js"></script>
+<script src="main_ms.js"></script>
+<script src="driver.js"></script>
+</body></html>

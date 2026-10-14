@@ -1,0 +1,163 @@
+<!doctype html><meta charset="utf-8"><title>running</title><pre id="out">running</pre>
+<script src="SRC.js"></script>
+<script>
+// =============================================================================
+// Chart drill-down "(Other)" row filters  (added 2026-09-17)
+//
+// Clicking an Other slice/leaf has no excluded-key cache to consult, so
+// _buildChartClickCriteria derives one at click time from the labels still
+// VISIBLE on the chart and returns a rowFilter closure that keeps every row
+// whose category is not among them. Those two maps (visibleX for
+// bar/line/area/pie/radar/waterfall, visibleTmX for the treemap leaf) are keyed
+// by CHART LABEL, i.e. by user data, and were plain {}:
+//
+//   * a visible category literally named hasOwnProperty SHADOWED the method the
+//     filter calls, so the read became true(rv) -> TypeError and the whole
+//     drill-down died;
+//   * a visible category literally named __proto__ never recorded at all
+//     (assigning the primitive `true` to that key is a silent no-op), so every
+//     row of that visible slice was reported as having rolled up into Other.
+//
+// constructor / toString / valueOf are NOT affected here - the assignment
+// shadows them and the guarded read is correct - which is why the per-name
+// cases below are asserted one name per fixture instead of five at once.
+// Both maps are Object.create(null) now and both reads use
+// Object.prototype.hasOwnProperty.call.
+//
+// Every fixture pairs "a visible category is EXCLUDED" with "a genuine tail
+// value is KEPT": a filter that answered false to everything would satisfy the
+// first on its own.
+// =============================================================================
+var LOG = [], PASS = 0, FAIL = 0;
+function ok(n, c, x) { if (c) { PASS++; LOG.push('PASS  ' + n); } else { FAIL++; LOG.push('FAIL  ' + n + (x ? '   >> ' + x : '')); } }
+
+try {
+  // js/main.js is CRLF; every anchor below is written with \n.
+  var code = String(window.__src).replace(/\r\n/g, '\n');
+
+  function grab(decl) {
+    var start = code.indexOf(decl);
+    if (start === -1) throw new Error('anchor not found: ' + decl);
+    var i = code.indexOf('{', start), depth = 0, inStr = null, inLine = false, inBlk = false, inRe = false;
+    for (var j = i; j < code.length; j++) {
+      var c = code[j], n = code[j + 1];
+      if (inLine) { if (c === '\n') inLine = false; continue; }
+      if (inBlk) { if (c === '*' && n === '/') { inBlk = false; j++; } continue; }
+      if (inStr) { if (c === '\\') { j++; continue; } if (c === inStr) inStr = null; continue; }
+      if (inRe) { if (c === '\\') { j++; continue; } if (c === '/') inRe = false; continue; }
+      if (c === '/' && n === '/') { inLine = true; j++; continue; }
+      if (c === '/' && n === '*') { inBlk = true; j++; continue; }
+      if (c === '"' || c === "'" || c === '`') { inStr = c; continue; }
+      if (c === '/') { var k = j - 1; while (k >= 0 && /\s/.test(code[k])) k--;
+        if (k < 0 || /[=(,:;!&|?{}[\n+\-*%~^<>]/.test(code[k])) { inRe = true; continue; } }
+      if (c === '{') depth++; else if (c === '}') { depth--; if (depth === 0) return code.slice(start, j + 1); }
+    }
+    throw new Error('unbalanced: ' + decl);
+  }
+
+  // Only the label cleaner is real collaboration; the rest are here so the
+  // function's other branches resolve. The Other branches touch none of them.
+  var stubs = [
+    'function decodeHtmlEntities(s){ return String(s==null?"":s); }',
+    'function parseAccountingNumber(v){ if(v==null) return NaN; var s=String(v).replace(/[$,\\s]/g,""); if(s==="") return NaN; var n=Number(s); return isNaN(n)?NaN:n; }',
+    'function evaluateParsedQuery(){ return true; }',
+    'function parseAdvancedQuery(){ return null; }',
+    'function _vizParseVizOptions(){ return {}; }',
+    'function _vizResolveState(v){ return v; }',
+    'function _vizResolveCounty(v){ return v; }',
+    'function _vizResolveCountry(v){ return v; }'
+  ].join('\n');
+
+  var build = new Function(stubs + '\n' +
+    grab('function _chartDrillCleanLabel(') + '\n' +
+    grab('function _buildChartClickCriteria(') + '\n' + (code.indexOf('function _vizRowNum(')!==-1?grab('function _vizNoYCol(')+'\n'+grab('function _vizCountsRows(')+'\n'+grab('function _vizRowNum(')+'\n'+grab('function _vizOtherBucketLabel(')+'\n'+grab('function _vizIsBucketLabel(')+'\n':'')+
+    'return _buildChartClickCriteria;')();
+  ok('drill: _buildChartClickCriteria extracted from the shipped source', typeof build === 'function');
+
+  var PROTO = ['__proto__', 'constructor', 'toString', 'valueOf', 'hasOwnProperty'];
+  var TAIL = 'Tail_9';   // never a label, so it always belongs to Other
+
+  function rowOf(dept) { var m = new Map(); m.set('DEPT', dept); m.set('AMT', '1'); return m; }
+
+  // bar/pie: visibleX is filled from chart.data.labels; the clicked label is
+  // the Other one. otherSpelling covers the '(Other)' variant of that test.
+  function barOther(labels, otherSpelling) {
+    var all = labels.concat([otherSpelling || 'Other']);
+    var chart = { data: { labels: all, datasets: [{ label: 'AMT', data: all.map(function () { return 1; }) }] } };
+    return build(chart, { datasetIndex: 0, index: all.length - 1 }, { type: 'bar', xAxis: 'DEPT', yAxis: 'AMT', otherBucket: true });   // the bucket exists only with +Other Bucket (2026-10-13)
+  }
+  // treemap: visibleTmX is filled from ds.data[]._label; the clicked leaf is
+  // the one labelled exactly 'Other'.
+  function treeOther(labels) {
+    var all = labels.concat(['Other']);
+    var chart = { data: { labels: null, datasets: [{ label: 'AMT', data: all.map(function (l, i) { return i === all.length - 1 ? { _label: l, _isOther: true } : { _label: l }; }) }] } };   // the builder marks its bucket leaf (2026-10-13)
+    return build(chart, { datasetIndex: 0, index: all.length - 1 }, { type: 'treemap', xAxis: 'DEPT', yAxis: 'AMT', otherBucket: true });
+  }
+  function probe(res, dept) {
+    if (!res || typeof res.rowFilter !== 'function') return 'NO_FILTER';
+    try { return res.rowFilter(rowOf(dept)); } catch (e) { return 'THREW: ' + e.message; }
+  }
+
+  [['bar', barOther], ['treemap', treeOther]].forEach(function (pair) {
+    var kind = pair[0], make = pair[1];
+
+    // --- control: ordinary labels, establishing the contract ---------------
+    var ctl = make(['Alpha', 'Beta', 'Gamma']);
+    ok(kind + ' Other: control - a visible category is excluded',
+      probe(ctl, 'Beta') === false, 'got ' + probe(ctl, 'Beta'));
+    ok(kind + ' Other: control - a rolled-up tail value is kept',
+      probe(ctl, TAIL) === true, 'got ' + probe(ctl, TAIL));
+
+    // --- one prototype name per fixture ------------------------------------
+    // Isolated on purpose: with hasOwnProperty in the same fixture its throw
+    // hides whatever __proto__ did, which is how the 2026-08-30 sweep missed a
+    // whole family of these.
+    PROTO.forEach(function (p) {
+      var res = make(['Alpha', p, 'Gamma']);
+      var got = probe(res, p);
+      ok(kind + ' Other: a visible category named "' + p + '" is excluded',
+        got === false, 'expected false (it is a VISIBLE slice); got ' + got);
+    });
+    // Non-vacuity for the silent case: on the __proto__ fixture the filter must
+    // still be a real filter, not one that answers false to everything.
+    var pr = make(['Alpha', '__proto__', 'Gamma']);
+    ok(kind + ' Other: non-vacuous - the __proto__ fixture still keeps a tail value',
+      probe(pr, TAIL) === true, 'got ' + probe(pr, TAIL));
+
+    // --- all five names at once, the shape a real report would produce -----
+    var all5 = make(PROTO.concat(['Zeta']));
+    PROTO.forEach(function (p) {
+      var got = probe(all5, p);
+      ok(kind + ' Other: all five names present - visible "' + p + '" is excluded',
+        got === false, 'expected false; got ' + got);
+    });
+    ok(kind + ' Other: all five names present - a genuine tail value is kept',
+      probe(all5, TAIL) === true, 'got ' + probe(all5, TAIL));
+  });
+
+  // --- the '(Other)' spelling reaches the same branch ----------------------
+  // Ordinary labels here: this case asserts the branch is entered for both
+  // spellings, so it stays green under the per-map mutants and only a broken
+  // label match can fail it.
+  var paren = barOther(['Alpha', 'Beta', 'Gamma'], '(Other)');
+  ok('bar Other: the "(Other)" spelling takes the same branch - visible excluded',
+    probe(paren, 'Beta') === false, 'got ' + probe(paren, 'Beta'));
+  ok('bar Other: the "(Other)" spelling takes the same branch - tail kept',
+    probe(paren, TAIL) === true, 'got ' + probe(paren, TAIL));
+
+  // --- Object.prototype ----------------------------------------------------
+  // These maps store the primitive `true`, so a __proto__ key is a silent no-op
+  // rather than the prototype swap the pivot maps suffered. Asserted so a
+  // future change to what the maps store cannot quietly start polluting.
+  var polluted = [];
+  for (var pk in {}) polluted.push(pk);
+  ok('drill: Object.prototype is untouched (a for-in over {} stays empty)',
+    polluted.length === 0, 'for-in over {} yielded: ' + polluted.join(','));
+
+} catch (e) {
+  FAIL++;
+  LOG.push('FAIL  drill: harness threw   >> ' + (e && e.message ? e.message : String(e)));
+}
+document.getElementById('out').textContent =
+  'pass=' + PASS + ' fail=' + FAIL + '\n' + LOG.join('\n');
+</script>

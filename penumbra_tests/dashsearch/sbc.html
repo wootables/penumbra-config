@@ -1,0 +1,94 @@
+<div id="searchBuilderLightbox" class="help-lightbox">
+  <!-- Header migrated to the shared .pnb-dlg-head band (2026-08-30). This was
+       the last dialog still carrying a bespoke header (.sb-header/.sb-title
+       plus an absolutely-positioned close button); every other builder already
+       used this markup. Doing so gives the dialog the .pnb-dlg-action slot,
+       which is where the preset chip mounts. -->
+  <div class="lightbox-content sb-lightbox-content pnb-dlg">
+    <div class="pnb-dlg-head">
+      <span class="pnb-dlg-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#pnbi-search"/></svg></span>
+      <div class="pnb-dlg-tt">
+        <h3 class="pnb-dlg-title">Visual Search Builder <span class="tab-help-icon" data-target="#searchHelpLightbox" data-jump-to="search-builder" title="Help: Visual Search Builder">?</span></h3>
+        <p class="pnb-dlg-sub">Build a filter from conditions instead of typing a query</p>
+      </div>
+      <span class="pnb-dlg-action" id="sbPresetMount"></span>
+      <button type="button" class="close-lightbox" aria-label="Close" title="Close (Esc)">&times;</button>
+    </div>
+
+    <!-- The preset toolbar and its slide-out save panel used to sit here: a
+         select, a delete x, a "Default" checkbox, a "Save Preset" button, and a
+         second panel that replaced the whole bar just to type a name. All of it
+         is now one chip in the title bar above (#sbPresetMount), whose popover
+         carries save, rename, delete and the default on the rows.
+         The tip line survives because the behaviour it describes does: typing a
+         preset's name in the search bar still runs it. -->
+    <div class="sb-preset-tip sb-preset-tip-standalone">Tip: Type the preset name in the search bar to run it. Double-clicking the search bar also works.</div>
+
+    <!-- Logic Toggle -->
+    <!-- Each condition row carries its own and/or; these two radios set them all
+         at once. "Mixed" is a read-out, not a button: search_builder.js reveals and
+         checks it whenever the rows disagree, and hides it again as soon as they
+         don't. Clicking it is inert by design. -->
+    <div class="sb-logic-toggle">
+      <span class="sb-logic-label">Match:</span>
+      <label class="sb-radio-label" title="Set every condition to AND - all of them must be true for a row to match">
+        <input type="radio" name="sbLogic" value="and" checked> All conditions <span class="sb-hint">(AND)</span>
+      </label>
+      <label class="sb-radio-label" title="Set every condition to OR - any single one being true is enough for a row to match">
+        <input type="radio" name="sbLogic" value="or"> Any condition <span class="sb-hint">(OR)</span>
+      </label>
+      <label id="sbLogicCustomLabel" class="sb-radio-label sb-logic-custom-label" style="display:none" title="Conditions use a mix of and / or. Set each one on its own row; AND binds tighter than OR, and the preview brackets the groups.">
+        <input type="radio" name="sbLogic" value="custom"> Mixed <span class="sb-hint">(per row)</span>
+      </label>
+      <label id="sbAllColumnsLabel" class="sb-radio-label sb-all-columns-label" style="display:none" title="In pivot mode: require that aggregate conditions are satisfied in every column, not just any one column">
+        <input type="checkbox" id="sbAllColumnsCheck"> Require all pivot columns <span class="sb-hint">(__ALL)</span>
+      </label>
+      <!-- Shown only in pivot view when a pivot aggregate label shares a column's
+           name (search_builder.js open(), which also writes the title naming it). -->
+      <label id="sbSrcRowsLabel" class="sb-radio-label sb-src-rows-label" style="display:none" title="In pivot view: a column that shares its name with a pivot aggregate searches the column's source rows instead of the pivot">
+        <input type="checkbox" id="sbSrcRowsCheck"> Search source rows <span class="sb-hint">(__SRC)</span>
+      </label>
+      <label id="sbRowMatchLabel" class="sb-radio-label sb-row-match-label" style="display:none" title="Require conditions on nested sub-table columns to match within the same sub-table row">
+        <input type="checkbox" id="sbRowMatchCheck"> Same sub-table row <span class="sb-hint">(__ROW)</span>
+      </label>
+    </div>
+
+    <!-- Condition Rows Container -->
+    <div id="sbConditionsContainer">
+      <!-- Condition rows are inserted dynamically by search_builder.js -->
+    </div>
+
+    <!-- Add Condition -->
+    <div class="sb-controls-row">
+      <button type="button" id="sbAddConditionBtn" class="sb-btn sb-btn-secondary" title="Add another search condition">+ Add Condition</button>
+      <div class="sb-controls-right">
+        <!-- One hint for the whole builder rather than one per row: the paste
+             works on any empty value box, and repeating it beside every row's
+             action links only crowded them. search_builder.js shows it while at
+             least one row has an empty box on an operator where a value set
+             means something. -->
+        <span id="sbPasteTip" class="sb-paste-tip" style="display:none">Tip: paste a spreadsheet column into a value box to match any of its values.</span>
+        <a href="https://regex101.com/" target="_blank" rel="noopener" class="sb-regex-link" style="display:none" title="Open regex101.com to build and test patterns">regex help</a>
+      </div>
+    </div>
+
+    <!-- Generated Query Preview -->
+    <!-- The live row count sits inline right after the heading (before the colon):
+         "GENERATED SEARCH QUERY [count]:". On the left of the box it stays visible
+         while the value autocomplete dropdown overlays the right side of the form
+         during selection. The query itself keeps its own line below. -->
+    <div class="sb-preview">
+      <div class="sb-preview-header">
+        <label class="sb-preview-label">Generated Search Query<span id="sbQueryCount" class="sb-query-count" aria-live="polite" aria-atomic="true"></span>:</label>
+      </div>
+      <code id="sbQueryPreview" class="sb-query-code">(nothing entered)</code>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="sb-actions">
+      <button type="button" id="sbSubmitBtn" class="sb-btn sb-btn-primary" title="Apply this search to the table">Search</button>
+      <button type="button" id="sbClearBtn" class="sb-btn sb-btn-secondary" title="Remove all conditions and start fresh">Clear All</button>
+      <button type="button" class="sb-btn sb-btn-cancel close-lightbox">Cancel</button>
+    </div>
+  </div>
+</div>

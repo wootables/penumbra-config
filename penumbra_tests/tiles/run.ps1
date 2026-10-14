@@ -1,0 +1,97 @@
+# =============================================================================
+# Tiles suite (2026-08-23): the shared data->tile engine (js/penumbra_tiles.js),
+# the dashboard module over it, and the infobox tile|/embed| modes in js/main.js.
+#
+#   dashchk.html  - the dashboard regression harness (123 assertions: tiles,
+#                   editor, embeds, auto-height, drag, kiosk chrome, SSO net)
+#   tilechk.html  - the engine API (envelopes, Map rows, spec parsing, embed
+#                   URLs, snippet writer) + dashboard url/inline sources + the
+#                   editor's source switching and "Copy as infobox snippet"
+#   infochk.html  - main.js booted headlessly: engine B tile|/embed| links, the
+#                   registry, the depth guard, the carousel-harvest guard, the
+#                   dialog renderer (cards, charts, embeds, frame fit, errors)
+#                   and the same-origin refusal on jsontable URLs
+#
+# Run the BODY as a scriptblock (UNC scripts are GPO-blocked):
+#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\tiles\run.ps1')); & $sb
+# Never pipe the invocation (a lingering Edge child keeps stdout open).
+#
+# Mutation control: set $env:PNB_DASH_SRC / $env:PNB_TILES_SRC / $env:PNB_MAIN_SRC
+# to a .bak before running and the suite MUST go red.
+# =============================================================================
+$ErrorActionPreference = 'Stop'
+$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\tiles'
+$app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+$edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }
+
+$dashSrc  = if ($env:PNB_DASH_SRC)  { $env:PNB_DASH_SRC }  else { "$app\js\penumbra_dashboard.js" }
+$tilesSrc = if ($env:PNB_TILES_SRC) { $env:PNB_TILES_SRC } else { "$app\js\penumbra_tiles.js" }
+$mainSrc  = if ($env:PNB_MAIN_SRC)  { $env:PNB_MAIN_SRC }  else { "$app\js\main.js" }
+# main.js lazy-loads the chart module by path; it did not exist when this suite
+# was written, and the three dialog-card assertions silently went red the day it
+# was extracted. Staged like any other dependency so they bite again.
+$chartsSrc = if ($env:PNB_CHARTS_SRC) { $env:PNB_CHARTS_SRC } else { "$app\js\penumbra_charts.js" }
+
+Write-Host "[1/3] staging from the live app ..."
+$libs = @('jquery-3.7.1.min.js','jquery-ui.min.js','moment.min.js','pako.min.js','codemirror.min.js','sql.min.js',
+          'show-hint.js','foldcode.js','foldgutter.js','brace-fold.js','comment-fold.js','placeholder.js',
+          'penumbra_snippet_help.js','purify.min.js','penumbra_template.js','chart-4.5.1.min.js')
+foreach ($f in $libs) { Copy-Item "$app\js\$f" "$here\$f" -Force }
+New-Item -ItemType Directory -Force "$here\js" | Out-Null
+# Everything main.js / penumbra_charts.js fetch by the literal path 'js/<name>'.
+# Staging only chart-4.5.1 was enough until the chart module was extracted; the
+# rest are here so a future extraction fails loudly instead of silently.
+$lazy = @('chart-4.5.1.min.js','chartjs-chart-treemap-3.1.0.min.js','chartjs-chart-sankey-0.19.1.min.js','chartjs-plugin-datalabels-2.0.0.min.js',
+          'pako.min.js','penumbra_forms.js','penumbra_geo_us.js','sql-formatter.min.js')
+foreach ($f in $lazy) {
+    if (Test-Path "$app\js\$f") { Copy-Item "$app\js\$f" "$here\js\$f" -Force }
+    else { Write-Host "  WARN: lazy dep not found in app: js\$f" }
+}
+Copy-Item $chartsSrc "$here\js\penumbra_charts.js" -Force                     # main.js lazy-loads 'js/penumbra_charts.js'
+Copy-Item $tilesSrc "$here\penumbra_tiles.js" -Force
+Copy-Item $dashSrc  "$here\dash.js" -Force
+Copy-Item "$app\css\penumbra_tiles.css" "$here\penumbra_tiles.css" -Force
+Copy-Item "$app\css\penumbra_dashboard.css" "$here\penumbra_dashboard.css" -Force
+
+Write-Host "[2/3] patching main.js ($mainSrc) ..."
+# Hoisted hooks injected as the FIRST statement of the ready closure (the parity
+# harness recipe); consts are fetched lazily so a TDZ shows up as a test failure.
+$src = [IO.File]::ReadAllText($mainSrc, [System.Text.Encoding]::UTF8)
+$anchor = '$(document).ready(function () {'
+if (-not $src.Substring(0, 200).Contains($anchor)) { throw "main.js closure anchor not found" }
+$inject = $anchor + "`r`n    try { window.__TL = { showInfoboxDialog: showInfoboxDialog, resolveInfoboxSnippet: resolveInfoboxSnippet, penumbraInfoboxTileLink: penumbraInfoboxTileLink, penumbraRenderInfoboxTiles: penumbraRenderInfoboxTiles, isSameOriginUrl: penumbraIsSameOriginUrl, registry: function () { return _infoboxContentRegistry; } }; } catch (e) { window.__TL_ERR = String(e); }`r`n"
+$patched = $src.Substring(0, $src.IndexOf($anchor)) + $inject + $src.Substring($src.IndexOf($anchor) + $anchor.Length)
+[IO.File]::WriteAllText("$here\main_patched.js", $patched, (New-Object System.Text.UTF8Encoding($false)))
+
+Write-Host "[3/3] headless Edge ..."
+$summary = @{}
+foreach ($page in @('dashchk.html', 'tilechk.html', 'infochk.html')) {
+    $out = "$here\dom_" + ($page -replace '\.html$','') + ".txt"
+    # Short profile path: Edge's cache subfolders overflow MAX_PATH under long dirs.
+    $prof = Join-Path $env:TEMP ('pnbedge_' + [guid]::NewGuid().ToString('N').Substring(0,6))
+    $url = 'file:///' + ($here -replace '\\','/') + '/' + $page
+    # -Wait hung (2026-08-24) and a plain ReadAllText hit "file in use" (2026-09-08): a lingering
+    # Edge child on the same profile keeps the redirected stdout open. Bound the wait, stop only
+    # processes on THIS profile, and read the dump with a share-everything handle.
+    $pr = Start-Process -FilePath $edge -PassThru -NoNewWindow -RedirectStandardOutput $out -ArgumentList '--headless=new','--disable-gpu','--no-sandbox','--allow-file-access-from-files',"--user-data-dir=$prof",'--virtual-time-budget=40000','--window-size=1366,900','--dump-dom',$url
+    $pr.WaitForExit(180000) | Out-Null; if (-not $pr.HasExited) { $pr.Kill(); Start-Sleep -Seconds 2 }
+    Get-CimInstance Win32_Process -Filter "Name = 'msedge.exe'" | Where-Object { $_.CommandLine -like "*$prof*" } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } catch {} }; Start-Sleep -Milliseconds 500
+    $fs = New-Object IO.FileStream($out, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite); $sr = New-Object IO.StreamReader($fs); $dom = $sr.ReadToEnd(); $sr.Close(); $fs.Close()
+    $m = [regex]::Match($dom, 'RESULT(?:&gt;|>){2}(.*?)(?:&lt;|<){2}FIN', 'Singleline')
+    if (-not $m.Success) {
+        $i = $dom.IndexOf('<pre id="out">'); $j = $dom.IndexOf('</pre>', $i)
+        $peek = if ($i -ge 0) { [System.Net.WebUtility]::HtmlDecode($dom.Substring($i + 14, [Math]::Min(500, $j - $i - 14))) } else { '' }
+        Write-Host ("{0}: NO RESULT MARKER (dom {1} bytes) {2}" -f $page, $dom.Length, $peek)
+        $summary[$page] = 99
+        continue
+    }
+    $items = [System.Net.WebUtility]::HtmlDecode($m.Groups[1].Value) -split ' ;; '
+    $pass = @($items | Where-Object { $_ -like 'PASS *' }).Count
+    $fail = @($items | Where-Object { $_ -notlike 'PASS *' })
+    Write-Host ("{0}: {1} PASS, {2} FAIL" -f $page, $pass, $fail.Count)
+    $fail | ForEach-Object { Write-Host "  $_" }
+    $summary[$page] = $fail.Count
+    try { Remove-Item -LiteralPath $prof -Recurse -Force -ErrorAction SilentlyContinue } catch {}
+}
+Write-Host ("SUMMARY dashchk={0} tilechk={1} infochk={2}" -f $summary['dashchk.html'], $summary['tilechk.html'], $summary['infochk.html'])

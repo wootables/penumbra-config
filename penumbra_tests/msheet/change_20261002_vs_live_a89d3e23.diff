@@ -1,0 +1,577 @@
+--- a/shared_logic.php
++++ b/shared_logic.php
+@@ -3037,6 +3037,13 @@
+ //  IMPORT FILE AUTO-REFRESH - Server-side parsers for ./imports/ folder
+ // ============================================================================
+ 
++// The column a multi-worksheet import adds, holding each row's tab name.
++// TWIN: PENUMBRA_IMPORT_SHEET_COLUMN in js/main.js (parseXLSXToObjects, the
++// browser's drag-and-drop parser). The two must stack a workbook the same way -
++// same sheets, same order, same column - or this folder's auto-refresh rewrites
++// an import uploaded through the browser into a different shape.
++if (!defined('PENUMBRA_IMPORT_SHEET_COLUMN')) define('PENUMBRA_IMPORT_SHEET_COLUMN', 'WORKSHEET');
++
+ /**
+  * Scan the imports directory for a file matching the given import name.
+  * Checks extensions in priority order: csv, json, xlsx, tsv, txt.
+@@ -3209,9 +3216,64 @@
+ }
+ 
+ /**
++ * Stack a workbook's worksheets into the one row set an import stores.
++ * TWIN of the stacking in js/main.js parseXLSXToObjects().
++ *
++ * $sheets holds every VISIBLE sheet that has a header row and a data row, in
++ * tab order: array('name' => tab name, 'headers' => header list, 'rows' =>
++ * assoc rows). One sheet comes back untouched - exactly what the old
++ * first-sheet-only parsers returned. Two or more: the tab name in a WORKSHEET
++ * column first, then the union of the sheets' columns in first-seen order, and
++ * every row carries every column, blank where its own sheet has none -
++ * resolveImportDataTags() takes its column list from the FIRST row alone, so a
++ * column missing there would silently vanish. Columns match across sheets
++ * case-insensitively (the first spelling seen names the column), as the
++ * browser's uppercased headers match. A sheet with its own WORKSHEET column
++ * keeps it; ours takes the next free name (WORKSHEET_2, _3, ...).
++ *
++ * @param array $sheets
++ * @return array|false  Array of assoc arrays, or false when $sheets is empty
++ */
++function _importStackSheets($sheets) {
++    if (empty($sheets)) return false;
++    if (count($sheets) === 1) return $sheets[0]['rows'];
++
++    $columns = array();   // first spelling of each column, first-seen order
++    $known = array();     // UPPER(name) => true
++    foreach ($sheets as $s) {
++        foreach ($s['headers'] as $h) {
++            $u = strtoupper((string)$h);
++            if (!isset($known[$u])) { $known[$u] = true; $columns[] = (string)$h; }
++        }
++    }
++    $sheetCol = PENUMBRA_IMPORT_SHEET_COLUMN;
++    for ($n = 2; isset($known[strtoupper($sheetCol)]); $n++) {
++        $sheetCol = PENUMBRA_IMPORT_SHEET_COLUMN . '_' . $n;
++    }
++
++    $out = array();
++    foreach ($sheets as $s) {
++        $own = array();   // UPPER(name) => this sheet's own spelling
++        foreach ($s['headers'] as $h) $own[strtoupper((string)$h)] = (string)$h;
++        foreach ($s['rows'] as $r) {
++            $row = array($sheetCol => (string)$s['name']);
++            foreach ($columns as $c) {
++                $u = strtoupper($c);
++                $row[$c] = (isset($own[$u]) && array_key_exists($own[$u], $r)) ? $r[$own[$u]] : '';
++            }
++            $out[] = $row;
++        }
++    }
++    return $out;
++}
++
++/**
+  * Parse an XLSX file into an array of associative arrays.
+- * Reads only the first worksheet. First row is treated as header.
+- * Uses ZipArchive + SimpleXML (available in PHP 5.3).
++ * Every VISIBLE worksheet with a header row and a data row is read, in tab
++ * order, and stacked by _importStackSheets() - one such sheet imports exactly
++ * as the old first-sheet-only reader did. With none, it falls back to that
++ * reader outright: the first sheet, hidden or not. First row of a sheet is its
++ * header. Uses ZipArchive + SimpleXML (available in PHP 5.3).
+  *
+  * @param string $filePath  Absolute path to the .xlsx file
+  * @return array|false      Array of assoc arrays, or false on failure
+@@ -3244,8 +3306,11 @@
+         }
+     }
+ 
+-    // Find first sheet filename from workbook relationships
+-    $sheetFile = 'xl/worksheets/sheet1.xml';
++    // Worksheet parts by relationship id - workbook.xml names its sheets by r:id.
++    // The first one is the old reader's pick, kept for a workbook.xml that
++    // cannot be read.
++    $sheetFiles = array();
++    $firstSheetFile = 'xl/worksheets/sheet1.xml';
+     $wbRelsXml = $zip->getFromName('xl/_rels/workbook.xml.rels');
+     if ($wbRelsXml !== false) {
+         $rels = @simplexml_load_string($wbRelsXml);
+@@ -3254,21 +3319,72 @@
+                 $type = (string)$rel['Type'];
+                 if (strpos($type, '/worksheet') !== false) {
+                     $target = (string)$rel['Target'];
+-                    if (strpos($target, '/') === 0) {
+-                        $sheetFile = substr($target, 1);
+-                    } else {
+-                        $sheetFile = 'xl/' . $target;
+-                    }
+-                    break; // first sheet only
++                    $part = (strpos($target, '/') === 0) ? substr($target, 1) : 'xl/' . $target;
++                    if (empty($sheetFiles)) $firstSheetFile = $part;
++                    $sheetFiles[(string)$rel['Id']] = $part;
+                 }
+             }
+         }
+     }
+ 
+-    $sheetXml = $zip->getFromName($sheetFile);
++    // The tabs in TAB order, with their visibility. A sheet whose r:id is not a
++    // worksheet part (a chart sheet) is not a tab of data and is left out.
++    $tabs = array();
++    $wbXml = $zip->getFromName('xl/workbook.xml');
++    $wb = ($wbXml === false) ? false : @simplexml_load_string($wbXml);
++    if ($wb && isset($wb->sheets)) {
++        $nsUris = $wb->getNamespaces(true);
++        foreach ($wb->sheets->sheet as $sh) {
++            $rid = '';
++            foreach ($nsUris as $uri) {   // r:id - by namespace, not by prefix
++                $a = $sh->attributes($uri);
++                if (isset($a['id'])) { $rid = (string)$a['id']; break; }
++            }
++            if (!isset($sheetFiles[$rid])) continue;
++            $state = (string)$sh['state'];
++            $tabs[] = array(
++                'name'   => (string)$sh['name'],
++                'part'   => $sheetFiles[$rid],
++                'hidden' => ($state === 'hidden' || $state === 'veryHidden')
++            );
++        }
++    }
++
++    // Hidden tabs are lookup or scratch data their author chose not to show.
++    $sheets = array();
++    foreach ($tabs as $tab) {
++        if ($tab['hidden']) continue;
++        $sheetXml = $zip->getFromName($tab['part']);
++        $parsed = ($sheetXml === false) ? false : _importXlsxSheetRows($sheetXml, $sharedStrings);
++        if ($parsed !== false) {
++            $parsed['name'] = $tab['name'];
++            $sheets[] = $parsed;
++        }
++    }
++    if (!empty($sheets)) {
++        $zip->close();
++        return _importStackSheets($sheets);
++    }
++
++    // No visible sheet with data: the old reader exactly - the first sheet,
++    // hidden or not.
++    $sheetXml = $zip->getFromName(!empty($tabs) ? $tabs[0]['part'] : $firstSheetFile);
+     $zip->close();
+     if ($sheetXml === false) return false;
++    $parsed = _importXlsxSheetRows($sheetXml, $sharedStrings);
++    return ($parsed === false) ? false : $parsed['rows'];
++}
+ 
++/**
++ * One OOXML worksheet -> array('headers' => header list, 'rows' => assoc rows),
++ * or false when it has no header row or no non-empty data row. This is the
++ * body of the old first-sheet-only parseImportXlsx(), unchanged.
++ *
++ * @param string $sheetXml       The worksheet part's XML
++ * @param array  $sharedStrings  The workbook's shared string table
++ * @return array|false
++ */
++function _importXlsxSheetRows($sheetXml, $sharedStrings) {
+     $sheet = @simplexml_load_string($sheetXml);
+     if (!$sheet || !isset($sheet->sheetData)) return false;
+ 
+@@ -3339,7 +3455,7 @@
+         }
+     }
+ 
+-    return empty($result) ? false : $result;
++    return empty($result) ? false : array('headers' => array_values($headers), 'rows' => $result);
+ }
+ 
+ /**
+@@ -3359,7 +3475,9 @@
+ /**
+  * Parse an XML Spreadsheet 2003 file (.xls that is actually XML).
+  * These files start with <?xml and use the urn:schemas-microsoft-com:office:spreadsheet namespace.
+- * First row is treated as header. PHP 5.3 compatible.
++ * Every VISIBLE worksheet with data is read, in tab order, and stacked like an
++ * .xlsx (_importStackSheets); with none it falls back to the old reader - the
++ * first worksheet, hidden or not. First row of a sheet is its header. PHP 5.3 compatible.
+  *
+  * @param string $filePath  Absolute path to the file
+  * @return array|false      Array of assoc arrays, or false if not XML Spreadsheet format
+@@ -3385,7 +3503,7 @@
+     $ns = $xml->getNamespaces(true);
+     $ssNs = isset($ns['ss']) ? $ns['ss'] : 'urn:schemas-microsoft-com:office:spreadsheet';
+ 
+-    // Find the first Worksheet's Table
++    // Find the Worksheets
+     $worksheets = $xml->children($ssNs)->Worksheet;
+     if (!$worksheets || count($worksheets) === 0) {
+         // Try without namespace prefix (default namespace)
+@@ -3393,7 +3511,50 @@
+         if (!$worksheets || count($worksheets) === 0) return false;
+     }
+ 
+-    $table = $worksheets[0]->Table;
++    // Hidden tabs are lookup or scratch data their author chose not to show.
++    $sheets = array();
++    $i = 0;
++    foreach ($worksheets as $ws) {
++        $i++;
++        if (_importXmlssSheetHidden($ws)) continue;
++        $parsed = _importXmlssSheetRows($ws, $ssNs);
++        if ($parsed !== false) {
++            $wsAttrs = $ws->attributes($ssNs);
++            $parsed['name'] = isset($wsAttrs['Name']) ? (string)$wsAttrs['Name'] : 'Sheet' . $i;
++            $sheets[] = $parsed;
++        }
++    }
++    if (!empty($sheets)) return _importStackSheets($sheets);
++
++    $parsed = _importXmlssSheetRows($worksheets[0], $ssNs);
++    return ($parsed === false) ? false : $parsed['rows'];
++}
++
++/**
++ * True when an XML Spreadsheet 2003 worksheet is hidden or very hidden
++ * (<x:WorksheetOptions><x:Visible>SheetHidden|SheetVeryHidden).
++ *
++ * @param SimpleXMLElement $ws  A Worksheet element
++ * @return bool
++ */
++function _importXmlssSheetHidden($ws) {
++    $opts = $ws->children('urn:schemas-microsoft-com:office:excel')->WorksheetOptions;
++    if (!$opts || count($opts) === 0) return false;
++    $v = trim((string)$opts->Visible);
++    return ($v === 'SheetHidden' || $v === 'SheetVeryHidden');
++}
++
++/**
++ * One XML Spreadsheet 2003 worksheet -> array('headers' => header list, 'rows' =>
++ * assoc rows), or false when it has no rows or no non-empty data row. This is
++ * the body of the old first-worksheet-only parseImportXmlSpreadsheet(), unchanged.
++ *
++ * @param SimpleXMLElement $worksheet  A Worksheet element
++ * @param string           $ssNs       The spreadsheet namespace URI
++ * @return array|false
++ */
++function _importXmlssSheetRows($worksheet, $ssNs) {
++    $table = $worksheet->Table;
+     if (!$table) return false;
+ 
+     $rows = $table->Row;
+@@ -3469,7 +3630,7 @@
+         }
+     }
+ 
+-    return empty($result) ? false : $result;
++    return empty($result) ? false : array('headers' => array_values($headers), 'rows' => $result);
+ }
+ 
+ /**
+--- a/js/main.js
++++ b/js/main.js
+@@ -222,6 +222,10 @@
+     let _fsAutoloadDeferredLoading = false;
+     let pendingGroupByColumn = null;
+     let pendingGroupAgg = null;
++    // One-shot armed by a multi-worksheet file import (_importArmSheetGrouping):
++    // the next query start groups by this column in place of the view it would
++    // otherwise stash - see the stash in the #executeQuery handler.
++    let pendingImportSheetGroup = null;
+     // Column sort carried across a re-query (a changed prompt answer, or Run
+     // after an SQL edit). The view stash in the query handler already preserves
+     // grouping + pivot settings; sort is view state too, so it rides along -
+@@ -63803,6 +63807,21 @@
+             pendingGroupByColumn = currentGroupingColumn;
+             pendingGroupAgg = currentGroupAgg; // Preserve aggregation across re-query
+         }
++        // A workbook imported from several worksheets opens grouped by its sheet
++        // column (2026-10-02). That REPLACES whatever the stash above just kept -
++        // the previous table's pivot or grouping says nothing about the new file -
++        // and starts from a fresh grouping's defaults (label order, which the
++        // import's custom sort order makes tab order; all collapsed; no top-N),
++        // not from an earlier grouping's sort or limit still held in the globals.
++        if (pendingImportSheetGroup) {
++            pendingPivotSettings = null;
++            pendingGroupByColumn = pendingImportSheetGroup;
++            pendingGroupAgg = null;
++            currentGroupSort = { key: 'label', dir: 'asc' };
++            currentGroupStartDepth = 0;
++            currentGroupLimit = null;
++            pendingImportSheetGroup = null;
++        }
+ 
+         // --- FORCE-KILL ALL VIEWS ---
+ 
+@@ -86527,20 +86546,101 @@
+         document.head.appendChild(script);
+     }
+ 
++    // The column a multi-worksheet import adds, holding each row's tab name.
++    // TWIN: PENUMBRA_IMPORT_SHEET_COLUMN in shared_logic.php, whose imports/
++    // folder parser must stack a workbook exactly as this one does - otherwise
++    // the folder's auto-refresh rewrites a stacked import into another shape.
++    var PENUMBRA_IMPORT_SHEET_COLUMN = 'WORKSHEET';
++
+     /**
+-     * Parses a spreadsheet file (XLS/XLSX/ODS) ArrayBuffer into an array of plain objects with UPPERCASE keys.
++     * Parses a spreadsheet file (XLS/XLSX/ODS) ArrayBuffer into plain objects with UPPERCASE keys.
+      * Uses SheetJS (must be loaded first via ensureXLSXLoaded).
++     *
++     * Every VISIBLE worksheet holding a header row and a data row is read
++     * (2026-10-02). One such sheet comes back exactly as the first-sheet-only
++     * parser returned it; none falls back to that parser outright (first sheet,
++     * hidden or not, and its own error). Two or more are STACKED in tab order:
++     * the tab name in a WORKSHEET column first, then the union of the sheets'
++     * columns in first-seen order. Every row carries every column, blank where
++     * its own sheet has none - the [IMPORT] resolver takes its column list from
++     * the FIRST row alone, so a column missing there would silently vanish.
+      * @param {ArrayBuffer} arrayBuffer - Raw file content
+-     * @returns {Array<Object>} Array of {COL_NAME: "value", ...} objects
++     * @returns {{rows: Array<Object>, sheets: Array<{name: string, rows: number}>,
++     *            skipped: Array<{name: string, reason: string}>, sheetColumn: ?string}}
++     *          rows = {COL_NAME: "value", ...} objects; sheetColumn is null unless sheets were stacked.
+      */
+     function parseXLSXToObjects(arrayBuffer) {
+         var wb = XLSX.read(arrayBuffer, { type: 'array' });
+         if (!wb.SheetNames || wb.SheetNames.length === 0) {
+             throw new Error('Spreadsheet file contains no sheets.');
+         }
+-        var sheet = wb.Sheets[wb.SheetNames[0]];
+-        var rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
++        var sheetRows = function (name) {
++            return XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '' });
++        };
++
++        // Hidden: 1 = hidden, 2 = very hidden. A tab its author hid is lookup or
++        // scratch data, not a section of the table.
++        var props = (wb.Workbook && wb.Workbook.Sheets) || [];
++        var found = [], skipped = [];
++        for (var si = 0; si < wb.SheetNames.length; si++) {
++            var name = wb.SheetNames[si];
++            if (props[si] && props[si].Hidden) {
++                skipped.push({ name: name, reason: 'hidden' });
++                continue;
++            }
++            try {
++                if (!wb.Sheets[name]) throw new Error('no sheet data');   // e.g. a chart sheet
++                var parsed = _xlsxSheetToObjects(sheetRows(name));
++                found.push({ name: name, headers: parsed.headers, rows: parsed.rows });
++            } catch (e) {
++                skipped.push({ name: name, reason: 'no data' });
++            }
++        }
++        if (found.length === 0) {
++            var first = _xlsxSheetToObjects(sheetRows(wb.SheetNames[0]));   // throws its own message
++            return { rows: first.rows, sheets: [{ name: wb.SheetNames[0], rows: first.rows.length }], skipped: [], sheetColumn: null };
++        }
++        var sheets = found.map(function (s) { return { name: s.name, rows: s.rows.length }; });
++        if (found.length === 1) {
++            return { rows: found[0].rows, sheets: sheets, skipped: skipped, sheetColumn: null };
++        }
++
++        // Keys are UPPERCASE already, so "Amount" on one tab and "AMOUNT" on the
++        // next are the same column.
++        var columns = [];
++        var seen = Object.create(null);
++        found.forEach(function (s) {
++            s.headers.forEach(function (h) {
++                if (!(h in seen)) { seen[h] = true; columns.push(h); }
++            });
++        });
++        // A tab with its own WORKSHEET column keeps it; ours takes the next free
++        // name, the way a duplicate header would (WORKSHEET_2, _3, ...).
++        var sheetColumn = PENUMBRA_IMPORT_SHEET_COLUMN;
++        for (var n = 2; sheetColumn in seen; n++) sheetColumn = PENUMBRA_IMPORT_SHEET_COLUMN + '_' + n;
++
++        var rows = [];
++        found.forEach(function (s) {
++            s.rows.forEach(function (r) {
++                var obj = {};
++                obj[sheetColumn] = s.name;
++                for (var c = 0; c < columns.length; c++) {
++                    obj[columns[c]] = Object.prototype.hasOwnProperty.call(r, columns[c]) ? r[columns[c]] : '';
++                }
++                rows.push(obj);
++            });
++        });
++        return { rows: rows, sheets: sheets, skipped: skipped, sheetColumn: sheetColumn };
++    }
+ 
++    /**
++     * One worksheet's SheetJS rows (header:1 arrays) -> {headers, rows}, rows being
++     * plain objects with UPPERCASE keys. Throws for a sheet without a header row
++     * or a data row - the messages a one-sheet workbook has always reported.
++     * @param {Array<Array>} rawRows
++     * @returns {{headers: Array<string>, rows: Array<Object>}}
++     */
++    function _xlsxSheetToObjects(rawRows) {
+         if (!rawRows || rawRows.length < 2) {
+             throw new Error('Spreadsheet must have a header row and at least one data row.');
+         }
+@@ -86587,7 +86687,7 @@
+             throw new Error('Spreadsheet has headers but no data rows.');
+         }
+ 
+-        return dataRows.map(function (row) {
++        return { headers: headers, rows: dataRows.map(function (row) {
+             var obj = {};
+             headers.forEach(function (header, idx) {
+                 var val = (idx < row.length) ? row[idx] : '';
+@@ -86600,7 +86700,7 @@
+                 }
+             });
+             return obj;
+-        });
++        }) };
+     }
+ 
+     /**
+@@ -86608,13 +86708,27 @@
+      * Mirrors the snapshot loading flow: parse → masterRowData → rebuildTableFromMasterData.
+      * @param {Array<Object>} parsedData - Array of {COL: "val"} objects
+      * @param {string} fileName - Original file name for display
++     * @param {Object} [book] - parseXLSXToObjects() result, passed only when it stacked
++     *        several worksheets (book.sheetColumn set); the import then opens grouped by them.
+      */
+-    function importFileData(parsedData, fileName) {
++    function importFileData(parsedData, fileName, book) {
+         if (!parsedData || parsedData.length === 0) {
+             show_text("<p id='undo_text'><span style='color: var(--accent-danger, #cc0000)'>ERROR:</span> No data rows found in file.</p>");
+             return;
+         }
+ 
++        // Pre-flight the row cap, as the snapshot "Copy to imports" paths do. The
++        // server refuses an oversize save, and that refusal used to reach the user
++        // only as a console warning ahead of a second failure at query time - or,
++        // over an existing import of the same name, as the OLD rows. Stacked
++        // worksheets make the cap much easier to reach.
++        if (parsedData.length > PENUMBRA_IMPORT_MAX_ROWS) {
++            show_text("<p id='undo_text'><span style='color:var(--accent-danger,#cc0000)'>ERROR:</span> " + escapeHtml(fileName) + " has "
++                + parsedData.length.toLocaleString() + " rows" + (book ? " across " + book.sheets.length + " worksheets" : "")
++                + ", over the " + PENUMBRA_IMPORT_MAX_ROWS.toLocaleString() + "-row import limit.</p>", 11000);
++            return;
++        }
++
+         // Strip the '#' column if present - Penumbra exports include a synthetic
+         // row-number column named '#' which collides with the hardcoded '#' row-
+         // number column that the table renderer always creates.  Keeping it would
+@@ -86644,7 +86758,12 @@
+         if (alreadyExists) {
+             var existingMeta = window._penumbraImportMeta[safeName];
+             var existingRows = existingMeta ? (existingMeta.row_count || '?') : '?';
+-            if (!confirm('An import named "' + safeName + '" already exists (' + existingRows + ' rows).\n\nOverwrite with new data (' + parsedData.length + ' rows)?')) {
++            // Say when the new data is STACKED: re-uploading a workbook that used to
++            // import as its first sheet alone now brings every sheet plus a column.
++            var newDesc = parsedData.length + ' rows' + (book
++                ? ' from ' + book.sheets.length + ' worksheets, stacked with a ' + book.sheetColumn + ' column'
++                : '');
++            if (!confirm('An import named "' + safeName + '" already exists (' + existingRows + ' rows).\n\nOverwrite with new data (' + newDesc + ')?')) {
+                 return;
+             }
+         }
+@@ -86680,6 +86799,7 @@
+             },
+             complete: function () {
+                 // Auto-execute after save completes (success or failure - inline fallback still works)
++                if (book) _importArmSheetGrouping(book, fileName);
+                 performClearAllAction(safeName, 'SELECT * FROM [IMPORT; name=' + safeName + ']');
+             }
+         });
+@@ -86700,6 +86820,43 @@
+     }
+ 
+     /**
++     * Arms the view a stacked multi-worksheet import opens in: grouped by its
++     * sheet column, one band per tab, in TAB order. Group label sort reads the
++     * column's custom sort order (getCustomSortComparator), so the tab order is
++     * written there - where a reader's own order for the column would live, so
++     * it is saved with the report and editable like any other. The grouping is
++     * a one-shot the next query start consumes (pendingImportSheetGroup).
++     * @param {Object} book - parseXLSXToObjects() result with sheetColumn set
++     * @param {string} fileName - Original file name for the notice
++     */
++    function _importArmSheetGrouping(book, fileName) {
++        _csDeleteOrder(book.sheetColumn);
++        customSortOrders[book.sheetColumn] = {
++            values: book.sheets.map(function (s) { return s.name; }),
++            preset: null
++        };
++        _csInvalidateComparators();
++        renderCustomSortOrderCards();
++        pendingImportSheetGroup = book.sheetColumn;
++
++        var listOf = function (items, label) {
++            var MAX = 8;
++            var txt = items.slice(0, MAX).map(function (s) {
++                return escapeHtml(s.name) + ' (' + label(s) + ')';
++            }).join(', ');
++            return items.length > MAX ? txt + ' and ' + (items.length - MAX) + ' more' : txt;
++        };
++        var skippedTxt = book.skipped.length
++            ? ' Skipped: ' + listOf(book.skipped, function (s) { return s.reason; }) + '.'
++            : '';
++        show_text("<p id='undo_text'><span style='color: lightgreen'>IMPORTED:</span> " + book.sheets.length
++            + " worksheets from <strong>" + escapeHtml(fileName) + "</strong> as one table, grouped by <code>"
++            + escapeHtml(book.sheetColumn) + "</code> in tab order: "
++            + listOf(book.sheets, function (s) { return s.rows.toLocaleString() + (s.rows === 1 ? ' row' : ' rows'); })
++            + "." + skippedTxt + "</p>", 10000);
++    }
++
++    /**
+      * Reads a File object and routes to the appropriate parser.
+      * @param {File} file - The file from input or drop event
+      */
+@@ -86725,8 +86882,8 @@
+                 var reader = new FileReader();
+                 reader.onload = function (event) {
+                     try {
+-                        var parsedData = parseXLSXToObjects(event.target.result);
+-                        importFileData(parsedData, file.name);
++                        var book = parseXLSXToObjects(event.target.result);
++                        importFileData(book.rows, file.name, book.sheetColumn ? book : null);
+                     } catch (e) {
+                         console.error("Parse error:", e);
+                         show_text("<p id='undo_text'><span style='color: var(--accent-danger, #cc0000)'>PARSE ERROR:</span> " + escapeHtml(e.message) + "</p>");
+--- a/help_content.php
++++ b/help_content.php
+@@ -815,7 +815,7 @@
+     <strong style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6;">How It Works</strong>
+     <div style="margin: 6px 0 12px 0; font-size: 11px; line-height: 1.6;">
+         <div style="margin: 4px 0;">1. <strong>Upload a file</strong> - Drag-and-drop onto the page or use the sidebar prompt under <em>Imported Files</em>, or drop the file into imports/. Admins can also create one from a local or server snapshot with <em>Copy to imports</em> in the snapshot detail drawer (encrypted server snapshots excluded), which is how a frozen snapshot gets joined against live data.</div>
+-        <div style="margin: 4px 0;">2. <strong>File is parsed</strong> - Columns become the available fields; the first row is always treated as headers.</div>
++        <div style="margin: 4px 0;">2. <strong>File is parsed</strong> - Columns become the available fields; the first row is always treated as headers. A workbook with data on more than one worksheet becomes one table, with a <code>WORKSHEET</code> column naming each row's tab (see <em>Supported Formats</em>).</div>
+         <div style="margin: 4px 0;">3. <strong>Data is stored on the server</strong> - Persisted in the database as JSON. Available across page reloads and sessions.</div>
+         <div style="margin: 4px 0;">4. <strong>Reference in SQL</strong> - Use <code>[IMPORT; name=NAME]</code> anywhere you would use a table or subquery.</div>
+         <div style="margin: 4px 0;">5. <strong>Query executes</strong> - The tag is replaced with inline SQL containing the import data, then the full query runs.</div>
+@@ -934,17 +934,17 @@
+         <div style="display: flex; gap: 8px; padding: 2px 0; border-bottom: 1px solid rgba(0,0,0,0.04);">
+             <div style="flex: 0 0 70px; padding-left: 6px;"><code>.xlsx</code></div>
+             <div style="flex: 0 0 160px;">Excel (OOXML)</div>
+-            <div style="flex: 1; min-width: 0;">Reads the first worksheet. Parsed both client-side and server-side.</div>
++            <div style="flex: 1; min-width: 0;">Reads every visible worksheet that has a header row and data. One such sheet imports on its own, as it always has. Two or more are stacked into one table: a <code>WORKSHEET</code> column holding the tab name comes first, then every column found on any sheet (blank where a sheet lacks it). A dropped workbook opens grouped by <code>WORKSHEET</code>, one band per tab in tab order; that order is saved as the column's custom sort order. Hidden sheets are skipped. Parsed both client-side and server-side.</div>
+         </div>
+         <div style="display: flex; gap: 8px; padding: 2px 0; border-bottom: 1px solid rgba(0,0,0,0.04);">
+             <div style="flex: 0 0 70px; padding-left: 6px;"><code>.xls</code></div>
+             <div style="flex: 0 0 160px;">Legacy Excel</div>
+-            <div style="flex: 1; min-width: 0;">Auto-detects format: tries XML Spreadsheet 2003, then OOXML, then HTML table.</div>
++            <div style="flex: 1; min-width: 0;">Auto-detects format: tries XML Spreadsheet 2003, then OOXML, then HTML table. Worksheets are read as for <code>.xlsx</code>.</div>
+         </div>
+         <div style="display: flex; gap: 8px; padding: 2px 0;">
+             <div style="flex: 0 0 70px; padding-left: 6px;"><code>.ods</code></div>
+             <div style="flex: 0 0 160px;">LibreOffice Calc</div>
+-            <div style="flex: 1; min-width: 0;">Supported for browser uploads only (parsed client-side). Not available for server-side auto-refresh.</div>
++            <div style="flex: 1; min-width: 0;">Supported for browser uploads only (parsed client-side). Not available for server-side auto-refresh. Worksheets are read as for <code>.xlsx</code>, except that a hidden sheet is read like a visible one (the parser cannot see an <code>.ods</code> sheet's visibility).</div>
+         </div>
+     </div>
+ 
+--- a/ai_system_prompt.php
++++ b/ai_system_prompt.php
+@@ -215,8 +215,9 @@
+ - File-sourced cell values are strings - cast when doing numeric or date comparisons. Snapshot-sourced imports may hold real numbers (see above), so do not force TO_NUMBER() on them
+ - Snapshots of password-protected reports cannot be copied to imports (imports are stored unencrypted)
+ - Oracle cell limit: ~3990 bytes per value (longer values are truncated)
+-- Limits: 50 MB file size, 20,000 rows max, 30 imports per user
++- Limits: 50 MB file size, 50,000 rows per import (100,000 across all the imports one query uses), 30 imports per user
+ - Supported formats: CSV, TSV, TXT (tab or comma), JSON (array of objects), XLSX, XLS, ODS
++- A workbook (XLSX, XLS, ODS) with data on two or more visible worksheets imports as ONE table: a WORKSHEET column holding each row\'s tab name comes first, then every column found on any sheet (blank where a sheet lacks it). Hidden sheets are skipped (an ODS file\'s hidden sheets are read like visible ones). Filter or group on WORKSHEET to work with one sheet. A workbook with one such sheet imports exactly as before, with no WORKSHEET column
+ - The imports/ folder on the server auto-creates new imports and auto-refreshes existing ones when the query runs
+ - Works with the scheduler - scheduled reports auto-refresh imports from files before each run
+ 

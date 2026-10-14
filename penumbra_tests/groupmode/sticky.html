@@ -1,0 +1,507 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>nested group sticky offsets</title>
+<link rel="stylesheet" href="main.css">
+<link rel="stylesheet" href="density.css">
+</head>
+<body>
+<!-- #groupedResultsContainer is display:none in main.css; the app show()s it. -->
+<div id="groupedResultsContainer" style="display:block"></div>
+<pre id="out">running</pre>
+<script>
+(function () {
+  var results = [];
+  function assert(name, cond, detail) { results.push({ name: name, pass: !!cond, detail: detail === undefined ? '' : String(detail) }); }
+  function eq(name, got, want) { assert(name, got === want, 'got ' + JSON.stringify(got) + ' want ' + JSON.stringify(want)); }
+
+  // Build the same wrapper shape renderGroupNode() produces, by hand, so this
+  // page tests the STYLESHEET rather than main.js.
+  function band(depth, label, isLeaf) {
+    var w = document.createElement('div');
+    w.className = 'group-wrapper open ' + (isLeaf ? 'group-leaf' : 'group-branch');
+    w.setAttribute('data-group-depth', String(depth));
+    var h = document.createElement('div');
+    h.className = 'group-header';
+    h.innerHTML = '<span class="group-chevron">v</span><span class="group-name">' + label +
+                  '</span><span class="group-count">5</span>';
+    var c = document.createElement('div');
+    c.className = 'group-content';
+    c.style.display = 'block';           // the app slideDown()s this
+    w.appendChild(h); w.appendChild(c);
+    return { wrapper: w, header: h, content: c };
+  }
+  function leafTable() {
+    var t = document.createElement('table');
+    var rows = '';
+    for (var i = 0; i < 40; i++) rows += '<tr><td>row ' + i + '</td><td>b</td></tr>';
+    t.innerHTML = '<thead><tr><th>Name</th><th>Dept</th></tr></thead><tbody>' + rows + '</tbody>';
+    return t;
+  }
+
+  // Mirrors _groupSyncStickyOffsets() in main.js.
+  function syncOffsets() {
+    var root = document.getElementById('groupedResultsContainer');
+    var h = [0, 0, 0];
+    for (var d = 0; d < 3; d++) {
+      var el = root.querySelector('.group-wrapper[data-group-depth="' + d + '"] > .group-header');
+      h[d] = el ? Math.round(el.getBoundingClientRect().height) : 0;
+    }
+    root.style.setProperty('--pnb-grp-h0', h[0] + 'px');
+    root.style.setProperty('--pnb-grp-h01', (h[0] + h[1]) + 'px');
+    root.style.setProperty('--pnb-grp-h012', (h[0] + h[1] + h[2]) + 'px');
+    return h;
+  }
+  function topOf(el) {
+    var v = getComputedStyle(el).top;
+    return v === 'auto' ? null : Math.round(parseFloat(v));
+  }
+  function scrolls(el) {
+    var cs = getComputedStyle(el);
+    return (cs.overflowY === 'auto' || cs.overflowY === 'scroll' ||
+            cs.overflowX === 'auto' || cs.overflowX === 'scroll');
+  }
+
+  function build(depths) {
+    var root = document.getElementById('groupedResultsContainer');
+    root.innerHTML = '';
+    root.removeAttribute('style');
+    root.style.display = 'block';
+    var made = [], parent = root;
+    for (var i = 0; i < depths; i++) {
+      var b = band(i, 'Level ' + i + ' label', i === depths - 1);
+      parent.appendChild(b.wrapper);
+      made.push(b);
+      parent = b.content;
+    }
+    parent.appendChild(leafTable());
+    return { bands: made, thead: parent.querySelector('thead th') };
+  }
+
+  function run(densityClass, label) {
+    document.body.className = densityClass || '';
+    var b3 = build(3);
+    var h = syncOffsets();
+    var t0 = topOf(b3.bands[0].header), t1 = topOf(b3.bands[1].header), t2 = topOf(b3.bands[2].header);
+    assert(label + ' 3 levels: all bands measured a real height', h[0] > 0 && h[1] > 0 && h[2] > 0, h.join('/'));
+    eq(label + ' 3 levels: depth 0 parks at the top', t0, 0);
+    eq(label + ' 3 levels: depth 1 parks below depth 0', t1, h[0]);
+    eq(label + ' 3 levels: depth 2 parks below both', t2, h[0] + h[1]);
+    assert(label + ' 3 levels: band offsets strictly increase (no overlap)',
+      t0 < t1 && t1 < t2, [t0, t1, t2].join(' < '));
+    // THE FIX: a branch must not scroll, or its children stick inside IT
+    // instead of against the page and the offsets above become nonsense.
+    assert(label + ' 3 levels: depth-0 branch does not scroll', !scrolls(b3.bands[0].content), getComputedStyle(b3.bands[0].content).overflowY);
+    assert(label + ' 3 levels: depth-1 branch does not scroll', !scrolls(b3.bands[1].content), getComputedStyle(b3.bands[1].content).overflowY);
+    assert(label + ' 3 levels: the LEAF still scrolls its table', scrolls(b3.bands[2].content), getComputedStyle(b3.bands[2].content).overflowY);
+    eq(label + ' 3 levels: leaf keeps its own max-height',
+      getComputedStyle(b3.bands[2].content).maxHeight, '425px');
+    eq(label + ' 3 levels: a branch has no max-height',
+      getComputedStyle(b3.bands[0].content).maxHeight, 'none');
+    // The leaf's column header sticks inside the leaf's own scroller, so 0.
+    eq(label + ' 3 levels: the column header sticks at the top of its own box', topOf(b3.thead), 0);
+    // z-index DESCENDS with depth. This assertion used to demand the opposite -
+    // that all three SHARE one value - on the reasoning that different pin
+    // offsets meant they could never overlap. They can: a child band is pinned
+    // only while its own wrapper is in view, and once that wrapper scrolls past,
+    // sticky releases the child and it travels up THROUGH the parent's pinned
+    // band. With equal z-index the later-in-DOM child won and painted over its
+    // own parent (measured live: parent 149-198, child 163-212). The test was
+    // encoding the bug, which is why it never caught it.
+    var z = [b3.bands[0].header, b3.bands[1].header, b3.bands[2].header]
+      .map(function (e) { return parseInt(getComputedStyle(e).zIndex, 10) || 0; });
+    var thZ = parseInt(getComputedStyle(b3.thead).zIndex, 10) || 0;
+    assert(label + ' 3 levels: an outer band outranks its inner ones',
+      z[0] > z[1] && z[1] > z[2], z.join(','));
+    assert(label + ' 3 levels: bands sit above the leaf thead', z[2] > thZ, z[2] + ' > ' + thZ);
+    assert(label + ' 3 levels: bands sit below the controls bar (1004)', z[0] < 1004, z[0]);
+
+    // The app parks ~250px of its own sticky chrome at the viewport top, so the
+    // bands offset from --pnb-grp-base rather than from 0. Prove the whole stack
+    // shifts with it (the page itself has no chrome, hence the 0 default).
+    var root3 = document.getElementById('groupedResultsContainer');
+    root3.style.setProperty('--pnb-grp-base', '250px');
+    eq(label + ' base: depth 0 clears the chrome', topOf(b3.bands[0].header), 250);
+    eq(label + ' base: depth 1 clears chrome + one band', topOf(b3.bands[1].header), 250 + h[0]);
+    eq(label + ' base: depth 2 clears chrome + two bands', topOf(b3.bands[2].header), 250 + h[0] + h[1]);
+    root3.style.setProperty('--pnb-grp-base', '0px');
+    eq(label + ' base: resets cleanly to 0', topOf(b3.bands[0].header), 0);
+
+    var b2 = build(2);
+    var h2 = syncOffsets();
+    eq(label + ' 2 levels: depth 1 parks below depth 0', topOf(b2.bands[1].header), h2[0]);
+    assert(label + ' 2 levels: depth-0 branch does not scroll', !scrolls(b2.bands[0].content), '');
+    assert(label + ' 2 levels: the leaf scrolls', scrolls(b2.bands[1].content), '');
+
+    // ONE level: the pre-nesting shape, which must be untouched.
+    var b1 = build(1);
+    var h1 = syncOffsets();
+    eq(label + ' 1 level: the band parks at the top', topOf(b1.bands[0].header), 0);
+    eq(label + ' 1 level: the column header still sticks at 0', topOf(b1.thead), 0);
+    assert(label + ' 1 level: the single wrapper is a leaf and scrolls', scrolls(b1.bands[0].content), '');
+    eq(label + ' 1 level: and keeps the 425px box', getComputedStyle(b1.bands[0].content).maxHeight, '425px');
+    assert(label + ' 1 level: band height is plausible for this density', h1[0] > 10 && h1[0] < 90, h1[0]);
+    return h1[0];
+  }
+
+  try {
+    var standard = run('', 'standard:');
+    var compact = run('density-compact', 'compact:');
+    var easy = run('density-easy-read', 'easy-read:');
+    // NOT monotonic: standard's band is driven by the count PILL rather than by
+    // padding, so it lands within a pixel of easy-read. The claim that matters
+    // is only that the densities differ, which is what rules out a constant.
+    assert('density actually changes band height (so a constant could not work)',
+      !(compact === standard && standard === easy) && Math.abs(compact - standard) > 4,
+      'compact=' + compact + ' standard=' + standard + ' easy-read=' + easy);
+
+    // --- The bucket sub-items in the grouping picker (2026-08-30) ------------
+    // `.pcs-item-bucket` was authored as a BARE class, so it lost to the base
+    // `.pcs-dropdown .pcs-item` (two classes) and the entire block - indent,
+    // type size, muted colour - was silently dead: sub-items rendered exactly
+    // like their parent column. Invisible to harness.html, which loads no CSS,
+    // which is the whole reason this stylesheet pass exists. Asserted as a
+    // RELATIONSHIP (bucket is indented further than its parent) rather than
+    // against the literal 38px, so re-spacing the picker does not fail this.
+    (function () {
+      var dd = document.createElement('div');
+      dd.className = 'pcs-dropdown';
+      // Off-screen but LAID OUT: display:none would report empty strings for
+      // every computed value and the comparisons below would all be 0 === 0.
+      dd.style.cssText = 'position:absolute; left:-9999px; top:0; width:320px;';
+      var plain = document.createElement('div');
+      plain.className = 'pcs-item pcs-item-visible';
+      plain.textContent = 'AWARD_DATE';
+      var bucket = document.createElement('div');
+      bucket.className = 'pcs-item pcs-item-visible pcs-item-bucket';
+      bucket.textContent = '↳ AWARD_DATE by Fiscal Year';
+      var ex = document.createElement('span');
+      ex.className = 'pcs-item-ex';
+      ex.textContent = 'FY26';
+      bucket.appendChild(ex);
+      dd.appendChild(plain); dd.appendChild(bucket);
+      document.body.appendChild(dd);
+
+      var cp = getComputedStyle(plain), cb = getComputedStyle(bucket), ce = getComputedStyle(ex);
+      var pl = parseFloat(cp.paddingLeft), bl = parseFloat(cb.paddingLeft);
+      // Guard first: if the base rule stopped applying, everything below would
+      // compare 0 against 0 and pass while testing nothing.
+      assert('picker css: the base item rule applies at all', pl > 0, cp.paddingLeft);
+      assert('picker css: a bucket sub-item is indented past its parent column',
+        bl > pl, 'plain=' + cp.paddingLeft + ' bucket=' + cb.paddingLeft);
+      assert('picker css: the indent is visible, not sub-pixel',
+        (bl - pl) >= 8, 'indent=' + (bl - pl) + 'px');
+      assert('picker css: a bucket sub-item is set smaller than its parent',
+        parseFloat(cb.fontSize) < parseFloat(cp.fontSize),
+        'plain=' + cp.fontSize + ' bucket=' + cb.fontSize);
+      assert('picker css: and muted, so the parent column still leads',
+        cb.color !== cp.color, 'both ' + cb.color);
+      // The example chip rides along; it was the only part of the block that
+      // ever worked (its selector had a descendant combinator).
+      assert('picker css: the example chip keeps its own smaller size',
+        parseFloat(ce.fontSize) < parseFloat(cb.fontSize),
+        'bucket=' + cb.fontSize + ' ex=' + ce.fontSize);
+      dd.remove();
+    })();
+
+    // --- "Configure Grouping" and its two gates (2026-08-31) -----------------
+    // A second door into the grouping builder, sitting beside "Remove Grouping"
+    // on the grouped view. Both of its gates are CSS, so this pass is the only
+    // one that can see them:
+    //   restrict-grouping         - a viewer whose View Options hide Grouping.
+    //     applyUserViewRestrictions() only .hide()s the TOOLBAR icon and then
+    //     leans on this body class for every other entry point, so a control
+    //     left out of that rule stays clickable on an already-grouped report.
+    //   snapshot-comparison-active - a comparison groups by the synthetic
+    //     __SNAP_TYPE column; reconfiguring that makes no sense, and the sibling
+    //     Remove link is reworded to "Clear Snapshot Comparison" instead.
+    (function () {
+      var savedBodyClass = document.body.className;
+      var bar = document.createElement('div');
+      bar.innerHTML =
+        '<a href="#" class="themed-link-button" id="configureGroupingBtn">Configure Grouping</a>' +
+        '<a href="#" class="themed-link-button" id="removeGroupingLink">Remove Grouping</a>' +
+        '<span class="btn-group-sep" id="removeGroupingSep">&bull;</span>';
+      document.body.appendChild(bar);
+      var cfg = document.getElementById('configureGroupingBtn');
+      var rem = document.getElementById('removeGroupingLink');
+      var shown = function (el) { return getComputedStyle(el).display !== 'none'; };
+
+      document.body.className = '';
+      // Guard: if it were hidden by default every claim below would pass for
+      // the wrong reason.
+      assert('configure: the link shows on a normal grouped view', shown(cfg),
+        getComputedStyle(cfg).display);
+      assert('configure: so does Remove Grouping', shown(rem), '');
+
+      document.body.className = 'restrict-grouping';
+      assert('configure: restrict-grouping hides it (no side door into the builder)',
+        !shown(cfg), getComputedStyle(cfg).display);
+      assert('configure: restrict-grouping still hides Remove Grouping too',
+        !shown(rem), getComputedStyle(rem).display);
+
+      document.body.className = 'snapshot-comparison-active';
+      assert('configure: a snapshot comparison hides it', !shown(cfg),
+        getComputedStyle(cfg).display);
+      // Deliberately NOT hidden - compare mode renames this one rather than
+      // removing it, so a user can always leave the comparison.
+      assert('configure: but a comparison KEEPS the Remove link (it is the exit)',
+        shown(rem), getComputedStyle(rem).display);
+
+      document.body.className = '';
+      assert('configure: it comes back once neither class applies', shown(cfg), '');
+
+      bar.remove();
+      document.body.className = savedBodyClass;
+    })();
+
+    // --- The grand-total bar (2026-09-10) ------------------------------------
+    // _groupRenderGrandTotal() pins an "ALL GROUPS" bar to the bottom of the
+    // grouped view. It borrows .group-header for its layout, which is exactly
+    // why the block that dressed it back down never landed:
+    // `.group-grand-total > .group-header` is (0,2,0) and lost every
+    // declaration that `#groupedResultsContainer .group-header` (1,1,0) or a
+    // per-theme `.theme-x #groupedResultsContainer .group-header` (1,2,0) also
+    // sets. cursor, background and border-bottom were all dead, so the bar
+    // advertised a click it does not have and painted as just another band.
+    // Invisible to harness.html, which loads no CSS at all - hence this pass.
+    (function () {
+      var savedBodyClass = document.body.className;
+      var root = document.getElementById('groupedResultsContainer');
+      function paint(el) {
+        var c = getComputedStyle(el);
+        return c.backgroundColor + ' | ' + c.backgroundImage;
+      }
+      // The shape _groupRenderGrandTotal() appends, as the LAST child.
+      function withBar(densityClass) {
+        document.body.className = densityClass || '';
+        var b = build(1);
+        var bar = document.createElement('div');
+        bar.className = 'group-grand-total';
+        bar.innerHTML = '<div class="group-header ggt-header">' +
+                        '<span class="group-name">All groups</span>' +
+                        '<span class="group-count">6</span></div>';
+        root.appendChild(bar);
+        return {
+          bandHdr: b.bands[0].header,
+          bandName: b.bands[0].header.querySelector('.group-name'),
+          barBox: bar,
+          barHdr: bar.querySelector('.group-header'),
+          barName: bar.querySelector('.group-name')
+        };
+      }
+
+      try {
+        var g = withBar('');
+        var cBandH = getComputedStyle(g.bandHdr), cBarH = getComputedStyle(g.barHdr);
+        var cBandN = getComputedStyle(g.bandName), cBarN = getComputedStyle(g.barName);
+
+        // Guards. If the band's own rules stopped applying, every comparison
+        // below turns into two identical defaults agreeing with each other.
+        eq('ggt: the band header rule still applies at all', cBandH.cursor, 'pointer');
+        assert('ggt: the bar is laid out', g.barHdr.getBoundingClientRect().height > 0,
+          g.barHdr.getBoundingClientRect().height);
+
+        // --- it is a READOUT, not a control ---------------------------------
+        eq('ggt: the bar offers no pointer cursor', cBarH.cursor, 'default');
+        assert('ggt: a band header is unselectable (the control treatment)',
+          cBandH.userSelect === 'none', cBandH.userSelect);
+        assert('ggt: but the total IS selectable, so it can be copied',
+          cBarH.userSelect !== 'none', cBarH.userSelect);
+
+        // --- it has a surface of its own ------------------------------------
+        assert('ggt: the bar does not paint like a band',
+          paint(g.barHdr) !== paint(g.bandHdr), 'both ' + paint(g.barHdr));
+        // And it is the THEME's alt surface, not a hard-coded gradient: the
+        // fallback that used to sit here was a LIGHT gradient, which would have
+        // painted this bar near-white the moment a dark theme was selected.
+        var probe = document.createElement('div');
+        probe.style.cssText = 'position:absolute; left:-9999px; background: var(--bg-surface-alt);';
+        document.body.appendChild(probe);
+        var wantBg = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        assert('ggt: --bg-surface-alt resolves at all (guard)',
+          !!wantBg && wantBg !== 'rgba(0, 0, 0, 0)', wantBg);
+        eq('ggt: the bar takes that theme alt surface', cBarH.backgroundColor, wantBg);
+        eq('ggt: and carries no gradient of its own', cBarH.backgroundImage, 'none');
+        assert('ggt: a band still has the base gradient (so the two differ)',
+          cBandH.backgroundImage !== 'none', cBandH.backgroundImage);
+        eq('ggt: its bottom border is gone', cBarH.borderBottomWidth, '0px');
+        assert('ggt: a band still has one (so that claim discriminates)',
+          cBandH.borderBottomWidth !== '0px', cBandH.borderBottomWidth);
+        eq('ggt: it keeps the brand rule above it', cBarH.borderTopWidth, '2px');
+
+        // --- the geometry the containerization bug broke ---------------------
+        var cBox = getComputedStyle(g.barBox);
+        eq('ggt: the BAR is the sticky element', cBox.position, 'sticky');
+        assert('ggt: pinned to the bottom, not the top', cBox.bottom !== 'auto', cBox.bottom);
+        eq('ggt: and its header does not stick separately', cBarH.position, 'static');
+        assert('ggt: it outranks the bands it must never hide behind',
+          (parseInt(cBox.zIndex, 10) || 0) >= (parseInt(getComputedStyle(g.bandHdr).zIndex, 10) || 0),
+          cBox.zIndex + ' vs ' + getComputedStyle(g.bandHdr).zIndex);
+
+        // --- the label reads as a LABEL -------------------------------------
+        eq('ggt label: is upper-cased', cBarN.textTransform, 'uppercase');
+        assert('ggt label: a band name is not (so that discriminates)',
+          cBandN.textTransform !== 'uppercase', cBandN.textTransform);
+        assert('ggt label: is tracked out', parseFloat(cBarN.letterSpacing) > 0, cBarN.letterSpacing);
+        assert('ggt label: a band name is not', !(parseFloat(cBandN.letterSpacing) > 0), cBandN.letterSpacing);
+        assert('ggt label: both sizes resolve (guard)',
+          parseFloat(cBarN.fontSize) > 0 && parseFloat(cBandN.fontSize) > 0,
+          cBarN.fontSize + ' / ' + cBandN.fontSize);
+        assert('ggt label: is set a step smaller than a band name',
+          parseFloat(cBarN.fontSize) < parseFloat(cBandN.fontSize),
+          'bar=' + cBarN.fontSize + ' band=' + cBandN.fontSize);
+        assert('ggt label: but still legible', parseFloat(cBarN.fontSize) >= 10, cBarN.fontSize);
+
+        // The size must NOT track density. It was authored `0.92em`, and em
+        // resolves against the PARENT - density.css re-sizes .group-header to
+        // 10/12/14px while .group-name stays a flat 13px in all three, so the em
+        // form would shrink this label to 9.2px in compact: hardest exactly
+        // where there is least room, and a different relationship to the band
+        // name in each mode. Guarded by proving density really does re-size the
+        // header, or this passes against a build where density does nothing.
+        var sizes = ['', 'density-compact', 'density-easy-read'].map(function (d) {
+          var gg = withBar(d);
+          return {
+            density: d || 'standard',
+            hdr: parseFloat(getComputedStyle(gg.barHdr).fontSize),
+            label: parseFloat(getComputedStyle(gg.barName).fontSize),
+            band: parseFloat(getComputedStyle(gg.bandName).fontSize)
+          };
+        });
+        var hdrs = sizes.map(function (s) { return s.hdr; });
+        var labels = sizes.map(function (s) { return s.label; });
+        assert('ggt label: density really does re-size the header (guard)',
+          new Set(hdrs).size === 3, hdrs.join('/'));
+        eq('ggt label: but the label size is the same in every density',
+          new Set(labels).size, 1);
+        assert('ggt label: and stays below the band name in every density',
+          sizes.every(function (s) { return s.label < s.band; }),
+          sizes.map(function (s) { return s.density + ' ' + s.label + '<' + s.band; }).join(', '));
+
+        // --- per theme: its own surface, and no hover state -----------------
+        // Both claims are only testable with a THEME class on <body>, and the
+        // hover one is VACUOUS without it - which the C2 mutant proved before
+        // this loop existed:
+        //   surface  `.theme-x #groupedResultsContainer .group-header` is
+        //            (1,2,0) and repaints every band; the bar's own (1,3,0)
+        //            rule has to out-rank it, in dark themes as well as light -
+        //            the fallback this replaced was a hard-coded LIGHT gradient.
+        //   hover    its twin `.theme-x #groupedResultsContainer
+        //            .group-header:hover` is (1,3,0), the SAME weight as the
+        //            bar's rule and LATER in the file, so source order alone
+        //            hands the bar a hover state. That is what the
+        //            :not(.ggt-header) exclusion is for. Bare-bodied only the
+        //            (1,2,0) hover rule applies and the bar's rule already
+        //            beats it, so an unthemed probe passes with the exclusion
+        //            removed and asserts nothing.
+        // Headless cannot fake :hover, so each .group-header hover rule gets a
+        // TWIN inserted at its own index with :hover swapped for a marker class,
+        // and the browser resolves the real cascade. Insertion, not a
+        // selectorText rewrite: assigning selectorText silently no-ops on the
+        // `:not(.ggt-header)` selectors in Chromium (only the bare
+        // `.group-header:hover` rule took, which made the whole probe read as
+        // "no theme hover rule applies" and pass against the C2 mutant).
+        // Inserting at index+1 keeps both the specificity AND the source order,
+        // and order is exactly what decides these ties. Runs last in the phase,
+        // and the twins are stripped in a finally.
+        var hoverRules = [];
+        (function scan(sheets) {
+          for (var s = 0; s < sheets.length; s++) {
+            var rules; try { rules = sheets[s].cssRules; } catch (e) { continue; }
+            (function rec(parent, rs) {
+              for (var i = 0; i < rs.length; i++) {
+                var r = rs[i];
+                if (r.type === 1 && /:hover/.test(r.selectorText || '') && /\.group-header/.test(r.selectorText || '')) {
+                  hoverRules.push({ parent: parent, index: i, sel: r.selectorText, css: r.style.cssText });
+                } else if (r.cssRules) { rec(r, r.cssRules); }
+              }
+            })(sheets[s], rules);
+          }
+        })(document.styleSheets);
+        function stripFakes(parent, rs) {
+          for (var i = rs.length - 1; i >= 0; i--) {
+            var r = rs[i];
+            if (r.type === 1 && /\.pnb-fakehover/.test(r.selectorText || '')) { parent.deleteRule(i); }
+            else if (r.cssRules) { stripFakes(r, r.cssRules); }
+          }
+        }
+        assert('ggt hover: the stylesheet has .group-header hover rules to test',
+          hoverRules.length > 0, hoverRules.length);
+        // The five themes that carry a hover rule of their own. `.is-dark` has
+        // one too, but it sits ABOVE the bar's rule in the file, so the bar
+        // already wins on order - it is carried here on the dark themes only to
+        // keep the body classes faithful to what applyTheme() stamps.
+        var THEMED = ['theme-wolfpack', 'theme-light-sepia',
+                      'theme-dark-blue is-dark', 'theme-charcoal-gold is-dark',
+                      'theme-wolfpack-dark is-dark'];
+        // .group-header transitions background-color (0.15s), so a synchronous
+        // getComputedStyle straight after the class flip reports the value the
+        // transition STARTED from, not the one it is heading to. That is what
+        // made the first version of this probe read "no repaint" on every dark
+        // theme and pass against the C2 mutant: the light themes only appeared
+        // to work because their background-IMAGE is not in the transition list
+        // and flipped instantly. Kill the transition for the measurement.
+        var noTrans = document.createElement('style');
+        noTrans.textContent = '.group-header { transition: none !important; }';
+        document.head.appendChild(noTrans);
+        try {
+          // Back to front, so an earlier rule's index is still valid after a
+          // later one has had its twin spliced in.
+          var inserted = 0;
+          for (var hi = hoverRules.length - 1; hi >= 0; hi--) {
+            var x = hoverRules[hi];
+            try {
+              x.parent.insertRule(x.sel.replace(/:hover/g, '.pnb-fakehover') +
+                                  ' { ' + x.css + ' }', x.index + 1);
+              inserted++;
+            } catch (e) {}
+          }
+          eq('ggt hover: every hover rule got a testable twin', inserted, hoverRules.length);
+          THEMED.forEach(function (cls) {
+            var nm = cls.split(' ')[0].replace('theme-', '');
+            var t = withBar(cls);
+            var p = document.createElement('div');
+            p.style.cssText = 'position:absolute; left:-9999px; background: var(--bg-surface-alt);';
+            document.body.appendChild(p);
+            var alt = getComputedStyle(p).backgroundColor;
+            p.remove();
+            assert('ggt ' + nm + ': the theme defines an alt surface (guard)',
+              !!alt && alt !== 'rgba(0, 0, 0, 0)', alt);
+            eq('ggt ' + nm + ': the bar takes it', getComputedStyle(t.barHdr).backgroundColor, alt);
+            assert('ggt ' + nm + ': so it does not paint like a band',
+              paint(t.barHdr) !== paint(t.bandHdr), 'both ' + paint(t.barHdr));
+
+            // A CLOSED band, deliberately. `.theme-x #groupedResultsContainer
+            // .group-wrapper.open > .group-header` is (1,4,0) and out-ranks the
+            // (1,3,0) hover rule, so an OPEN band in a dark theme has never had
+            // a hover colour - guarding on one would be asserting that quirk,
+            // not that the probe works. A collapsed band is also what a reader
+            // actually hovers, to open it.
+            t.bandHdr.parentNode.classList.remove('open');
+            var bandBefore = paint(t.bandHdr), barBefore = paint(t.barHdr);
+            t.bandHdr.classList.add('pnb-fakehover');
+            t.barHdr.classList.add('pnb-fakehover');
+            assert('ggt ' + nm + ': hovering a band repaints it (so the probe works)',
+              paint(t.bandHdr) !== bandBefore, bandBefore + '  ->  ' + paint(t.bandHdr));
+            eq('ggt ' + nm + ': hovering the total bar changes nothing',
+              paint(t.barHdr), barBefore);
+          });
+        } finally {
+          if (noTrans.parentNode) { noTrans.parentNode.removeChild(noTrans); }
+          for (var si = 0; si < document.styleSheets.length; si++) {
+            try { stripFakes(document.styleSheets[si], document.styleSheets[si].cssRules); } catch (e) {}
+          }
+        }
+      } finally {
+        document.body.className = savedBodyClass;
+      }
+    })();
+
+    document.getElementById('out').textContent = 'RESULTS_JSON:' + JSON.stringify({ results: results });
+  } catch (e) {
+    document.getElementById('out').textContent = 'RESULTS_JSON:' + JSON.stringify({
+      fatal: String(e && e.stack ? e.stack : e), results: results });
+  }
+})();
+</script>
+</body></html>

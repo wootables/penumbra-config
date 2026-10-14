@@ -1,0 +1,227 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>dashboard search - report page half</title></head>
+<body>
+<!-- The REPORT PAGE half of dashboard search (main.js booted headlessly, hooks
+     window.__DSM), run INSIDE mainframe.html so its postMessage to the parent
+     dashboard is real. Loaded as main.html?dsearch=<fragment list>, so the URL
+     override is parsed exactly as on a framed tile. Scaffold = the filterstrip /
+     pivot_trigger harness DOM. -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<table id="resultsTable"><thead id="tableHeader"><tr>
+  <th data-colname="#">#</th><th data-colname="COLLEGE">COLLEGE</th><th data-colname="AMOUNT">AMOUNT</th>
+</tr></thead><tbody></tbody></table>
+<div id="loadingOverlay" style="display:none">
+  <div class="loader"></div>
+  <p>Executing Query, Please Wait...</p>
+  <div style="display: flex; align-items: center; gap: 20px;">
+    <p id="execution-timer" style="font-size: 1.5em; margin: 0; font-weight: bold;"></p>
+    <button id="stopQueryBtn">Stop</button>
+  </div>
+  <div id="loadingTip" aria-live="polite"></div>
+</div>
+<div id="errorBox"></div>
+<input id="tableSearch" value="">
+<span id="resultCount"></span>
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="snapshotComparisonContainer" style="display:none"></div>
+<div id="pivotLightbox" style="display:none">
+  <div id="pivot-source-columns"></div>
+  <div id="pivot-rows"></div><div id="pivot-cols"></div><div id="pivot-vals"></div>
+  <select id="pivot-aggregation-selector"><option value="">-</option><option value="sum">sum</option></select>
+  <table><tbody id="pivot-agg-table-body"></tbody></table>
+  <select id="pivot-rows-layout-select"><option value="nested">nested</option><option value="nested-static">nested-static</option><option value="flat">flat</option></select>
+  <select id="pivot-cols-layout-select"><option value="nested">nested</option><option value="flat">flat</option></select>
+  <select id="pivot-sort-order"><option value="asc">asc</option><option value="desc">desc</option></select>
+  <input id="pivot-sticky-cols" value="3">
+  <input type="checkbox" id="pivot-row-total-override-toggle">
+  <div id="pivot-row-total-override-container" style="display:none"><div id="pivot-row-total-slots"></div><div id="pivot-row-total-tokens"></div></div>
+  <select id="pivot-rank-dir"><option value="none">none</option><option value="top">top</option><option value="bottom">bottom</option></select>
+  <input id="pivot-rank-n" value="10"><select id="pivot-rank-agg"><option value="sum">sum</option><option value="count">count</option></select>
+  <select id="pivot-rank-scope"><option value="">Overall</option></select>
+  <input type="checkbox" id="pivot-rank-other" checked><label id="pivot-rank-other-label"></label>
+  <input type="checkbox" id="pivot-no-breakdown"><input type="checkbox" id="pivot-start-expanded">
+  <select id="pivotPresetSelect"><option value=""></option></select><button id="pivotDeletePresetBtn"></button><input type="checkbox" id="pivotAutoRunPreset">
+  <button id="generatePivotBtn">Generate</button>
+  <select id="pivotSnippetTargetSelect" style="display: none;"></select>
+  <button id="updatePivotSnippetBtn" type="button" style="display: none;">&#x27F3; Update Snippet</button>
+  <button id="copyPivotSnippetBtn">Snippet</button>
+  <button id="pivotSavePresetBtn"></button>
+</div>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); };
+</script>
+<script src="main_patched.js"></script>
+<script>
+(function () {
+  var L = [], EXPECT = [];
+  function ok(n, c, x) { L.push((c ? 'PASS ' : 'FAIL ') + n + (!c && x !== undefined ? '  [' + x + ']' : '')); }
+  function eq(n, got, want) { ok(n, JSON.stringify(got) === JSON.stringify(want), 'got ' + JSON.stringify(got) + ' want ' + JSON.stringify(want)); }
+  function send(type, extra) { var m = $.extend({ type: type }, extra || {}); try { parent.postMessage(m, '*'); } catch (e) { } }
+  function expectMsg(name, dsearch, skipped, applied) { EXPECT.push({ name: name, dsearch: dsearch, skipped: skipped, applied: applied }); }
+  var DS1 = '{"p":"","f":[["COLLEGE","COLLEGE = Eng"],["AMOUNT","AMOUNT > 5"]]}';
+
+  function run() {
+    var D = window.__DSM;
+    if (!D || typeof D.route !== 'function') { send('harness:fatal', { msg: 'hooks unavailable: ' + (window.__DSM_ERR || 'n/a') }); return; }
+    ok('the report page is framed (its messages reach this dashboard stand-in)', window.parent !== window);
+
+    // ---- 1. the shared corpus, the same one route.php runs through PHP. A
+    // "rows" case gives the report's ROWS: the column list then comes from this
+    // page's own derivations - the load path (_getOnLoadSearchQuery with the
+    // table builder's column names, masterRowData already set) and the in-place
+    // path (_pnbDashColumns off the built table) - and both must route the way
+    // index.php does. Each posts its routing to the dashboard, like a tile.
+    var ds0 = D.get().ds;
+    // A "journal" case: the page's journal config as a saved state restores it
+    // (the names come from CONFIG; index.php's rows carry the toggle columns).
+    var J0 = { h: window._penumbraJournalHidden, t: window._penumbraJournalToggles, k: window._penumbraJournalKeyColumns, n: window._penumbraJournalRowNotes };
+    function journalOn(j, notes) {
+      window._penumbraJournalHidden = false;
+      window._penumbraJournalToggles = j.toggles.map(function (t) { return { key: t.key, label: t.label }; });
+      window._penumbraJournalKeyColumns = j.keys.map(function (k) { return String(k).toUpperCase(); });
+      window._penumbraJournalRowNotes = !!notes;
+    }
+    function journalOff() {
+      window._penumbraJournalHidden = J0.h; window._penumbraJournalToggles = J0.t;
+      window._penumbraJournalKeyColumns = J0.k; window._penumbraJournalRowNotes = J0.n;
+    }
+    var x = new XMLHttpRequest(); x.open('GET', 'corpus.json', false); x.send(null);
+    JSON.parse(x.responseText).forEach(function (c) {
+      var want = { ok: c.ok, text: c.text, applied: c.applied, skipped: c.skipped };
+      var ds = c.raw !== undefined ? c.raw : JSON.stringify(c.dsearch);
+      if (!c.rows) {
+        var r = D.route(ds, c.cols);
+        eq('corpus: ' + c.name, { ok: r.ok, text: r.text, applied: r.applied, skipped: r.skipped }, want);
+        return;
+      }
+      if (c.journal) { journalOn(c.journal, false); }
+      var names = Object.keys(c.rows[0]);
+      D.rows(c.rows.map(function (row) {
+        var m = new Map();
+        for (var k in row) { m.set(k.toUpperCase(), row[k] === null ? '' : String(row[k])); }
+        return m;
+      }));
+      D.set({ dsearch: ds, search: '' });
+      D.onLoad(names);
+      var ra = D.get().routed || {};
+      eq('corpus (load path): ' + c.name, { ok: ra.ok, text: ra.text, applied: ra.applied, skipped: ra.skipped }, want);
+      expectMsg('corpus load path: ' + c.name, ds, c.skipped, c.applied);
+      var idx = {};
+      names.forEach(function (n, i) { idx[n] = i; });
+      $('#resultsTable').data('columnNameToOriginalIndex', idx);
+      D.set({ dsearch: ds, search: '' });
+      D.loadText(D.cols());
+      var rb = D.get().routed || {};
+      eq('corpus (in place): ' + c.name, { ok: rb.ok, text: rb.text, applied: rb.applied, skipped: rb.skipped }, want);
+      expectMsg('corpus in place: ' + c.name, ds, c.skipped, c.applied);
+      if (c.journal) { journalOff(); }
+    });
+    // The one INTENDED difference: row notes. The report page reads them, so it
+    // routes NOTES; index.php's rows never carry them (route.php: skipped there).
+    var DSN0 = '{"p":"","f":[["NOTES","Notes > 0"]]}';
+    journalOn({ toggles: [{ key: 'done', label: 'Done' }], keys: ['PROJ'] }, true);
+    D.rows([new Map([['PROJ', 'P1']])]);
+    D.set({ dsearch: DSN0, search: '' });
+    D.onLoad(['PROJ']);
+    var rn = D.get().routed || {};
+    eq('journal row notes count on the report page (NOTES routed)', { text: rn.text, applied: rn.applied, skipped: rn.skipped }, { text: 'Notes > 0', applied: ['NOTES'], skipped: [] });
+    expectMsg('journal notes', DSN0, [], ['NOTES']);
+    journalOff();
+    D.rows([]);
+    $('#resultsTable').removeData('columnNameToOriginalIndex');
+    D.set(ds0);
+
+    // ---- 2. the address and the on-load pre-filter
+    ok('?dsearch= is parsed from the address', D.overrides().dsearch === DS1, D.overrides().dsearch);
+    var g = D.get();
+    ok('the address payload is the starting state', g.ds && g.ds.dsearch === DS1 && g.ds.search === '', JSON.stringify(g.ds));
+    eq('on load: a report with both columns applies both', D.onLoad(['COLLEGE', 'AMOUNT', 'STATUS']), 'COLLEGE = Eng and AMOUNT > 5');
+    expectMsg('both applied', DS1, [], ['COLLEGE', 'AMOUNT']);
+    eq('a caller with no column list reuses the last routing (no new message)', D.onLoad(), 'COLLEGE = Eng and AMOUNT > 5');
+    D.set({ dsearch: DS1, search: '' });
+    eq('on load: a report WITHOUT COLLEGE keeps the AMOUNT condition', D.onLoad(['NAME', 'AMOUNT']), 'AMOUNT > 5');
+    expectMsg('COLLEGE skipped', DS1, ['COLLEGE'], ['AMOUNT']);
+
+    // ---- 3. tableless embeds (header KPIs, chart and slide tiles)
+    document.body.classList.add('embed-view', 'embed-only-header');
+    ok('the page reads as a tableless embed', D.tableless() === true);
+    D.set({ dsearch: DS1, search: '' });
+    eq('a dashboard filter applies in a tableless embed', D.onLoad(['COLLEGE', 'AMOUNT']), 'COLLEGE = Eng and AMOUNT > 5');
+    expectMsg('tableless', DS1, [], ['COLLEGE', 'AMOUNT']);
+    D.set(null);
+    eq('control: with no dashboard filter a tableless embed still skips the on-load search', D.onLoad(['COLLEGE']), '');
+    document.body.classList.remove('embed-view', 'embed-only-header');
+
+    // ---- 4. the columns routing counts, and a plain payload
+    var DSH = '{"p":"","f":[["#","# > 2"]]}';
+    D.set({ dsearch: DSH, search: '' });
+    eq("the row-number column '#' always counts", D.onLoad(['A']), '# > 2');
+    expectMsg('# applied', DSH, [], ['#']);
+    D.set({ dsearch: '', search: 'STATUS = Open' });
+    eq('a plain payload (a tile\'s own "or" filter) goes in as typed', D.onLoad(['A']), 'STATUS = Open');
+
+    // ---- 5. the in-place hook
+    ok('Penumbra.applyDashboardSearch exists', window.Penumbra && typeof window.Penumbra.applyDashboardSearch === 'function');
+    ok('a malformed call is refused', window.Penumbra.applyDashboardSearch(null) === false && window.Penumbra.applyDashboardSearch('x') === false);
+    D.set(null);
+    D.applied(null);   // the first load has not built its table yet
+    $('#resultsTable').data('columnNameToOriginalIndex', { '#': 0, COLLEGE: 1, AMOUNT: 2 });
+    $('#tableSearch').val('');
+    var took = window.Penumbra.applyDashboardSearch({ dsearch: DS1, search: '' });
+    ok('before the first load settles the payload is accepted and queued', took === true && $('#tableSearch').val() === '' && !!D.get().retry && D.get().ds.dsearch === DS1,
+       JSON.stringify({ took: took, box: $('#tableSearch').val(), retry: !!D.get().retry }));
+    D.applied('');     // the load has built its table; nothing is loading
+    setTimeout(function () {
+      ok('once settled the queued filter is applied through the search action', $('#tableSearch').val() === 'COLLEGE = Eng and AMOUNT > 5', $('#tableSearch').val());
+      expectMsg('in place', DS1, [], ['COLLEGE', 'AMOUNT']);
+      window.Penumbra.applyDashboardSearch({ dsearch: DS1, search: '' });
+      setTimeout(function () {
+        ok('the same payload again is not re-applied (no second message)', !D.get().retry, String(D.get().retry));
+        window.Penumbra.applyDashboardSearch({ dsearch: '', search: '' });
+        setTimeout(function () {
+          eq('an empty payload clears the box', $('#tableSearch').val(), '');
+          eq('dsearch is a reserved address parameter in both link builders', D.resv(), [1, 1]);
+          ok('main.js booted without page errors', window.__errors.length === 0, window.__errors.slice(0, 3).join(' | '));
+          send('harness:results', { lines: L, expect: EXPECT });
+        }, 700);
+      }, 400);
+    }, 900);
+  }
+  $(function () { setTimeout(function () {
+    try { run(); } catch (e) { send('harness:fatal', { msg: 'harness threw: ' + (e && e.message) + ' @ ' + String(e && e.stack || '').split('\n')[1] }); }
+  }, 60); });
+})();
+</script>
+</body></html>

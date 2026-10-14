@@ -1,0 +1,176 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="main.css"><link rel="stylesheet" href="penumbra_tiles.css"><link rel="stylesheet" href="penumbra_dashboard.css">
+</head><body class="pnb-dash theme-wolfpack-dark is-dark">
+<!-- SEARCH LINKS route to the dashboard filter (2026-10-01): a cell's data-search link
+     (the report's own click-to-search convention, @@HTML<a href="#" data-search="COL =
+     //value//">) in a TABLE TILE toggles its text in the dashboard filter like a cell
+     click - applied, routed, released by a second click; a text the AND-run cannot
+     take (an "or") replaces the filter, as the link does on its own page; and a framed
+     report posting its link's text (penumbra:xfilter with text, from a frame of ours)
+     is applied the same way. The table tile is filtered by the dashboard filter too,
+     so every click here is on a link whose row is still showing. Same stubbed server
+     as controls4.html, plus the exact //value// form the links write. -->
+<div id="dashApp" class="dash-app"><header class="dash-head" id="dashHead">
+  <div class="dash-head-title" id="dashHeadTitle"></div>
+  <div class="dash-head-actions" id="dashHeadActions"></div>
+</header><main id="dashMain"></main></div>
+<pre id="out">running</pre>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="chart-4.5.1.min.js"></script>
+<script>
+var CALLS = [], ERRORS = [], REPLACED = [], AJAX = [], ALERTS = [];
+window.onerror = function (m, src, line) { ERRORS.push('onerror: ' + m + ' @' + String(src).split('/').pop() + ':' + line); };
+history.replaceState = function (s, t, u) { REPLACED.push(String(u)); };
+window.alert = function (m) { ALERTS.push(String(m)); };
+window.confirm = function () { return true; };
+jQuery.fx.off = true;
+
+var REP = {
+  repA: [ { COLLEGE: 'Eng', AMOUNT: '10',  STATUS: 'Open',   LINK: '@@HTML<a href="#" data-search="COLLEGE = //Eng//">Eng</a>' },
+          { COLLEGE: 'Sci', AMOUNT: '20',  STATUS: 'Open',   LINK: '@@HTML<a href="#" data-search="COLLEGE = //Sci//">Sci</a>' },
+          { COLLEGE: 'Eng', AMOUNT: '3',   STATUS: 'Closed', LINK: '@@HTML<a href="#" data-search="STATUS = //Closed//">Closed</a>' },
+          { COLLEGE: 'Ag',  AMOUNT: '200', STATUS: 'Closed', LINK: '@@HTML<a href="#" data-search="COLLEGE = //Eng// or COLLEGE = //Sci//">Eng or Sci</a>' } ],
+  repB: [ { NAME: 'Ada', AMOUNT: '7' }, { NAME: 'Bob', AMOUNT: '2' }, { NAME: 'Cy', AMOUNT: '150' } ]
+};
+function num(v) { var t = String(v).trim(); return /^-?\d*\.?\d+$/.test(t) ? parseFloat(t) : null; }
+function cond(row, part) {
+  var m = part.match(/^\s*(\w+)\s*(>=|<=|!=|=|>|<)\s*(.+?)\s*$/);
+  if (!m) { return false; }
+  var v = row[m[1].toUpperCase()];
+  if (v === undefined) { return false; }
+  var ex = /^\/\/(.*)\/\/$/.exec(m[3]);
+  if (ex) { var same = String(v).toLowerCase() === ex[1].toLowerCase(); return m[2] === '!=' ? !same : same; }
+  var rx = /^\/(.*)\/i?$/.exec(m[3]);
+  if (rx) { var hit = new RegExp(rx[1], 'i').test(String(v)); return m[2] === '!=' ? !hit : hit; }
+  var a = num(v), b = num(m[3]);
+  if (a === null || b === null) { return m[2] === '=' ? String(v).toLowerCase() === m[3].toLowerCase() : false; }
+  switch (m[2]) { case '>=': return a >= b; case '<=': return a <= b; case '>': return a > b; case '<': return a < b; case '=': return a === b; default: return a !== b; }
+}
+function filt(rows, text) {
+  if (!text) { return rows; }
+  var ors = text.split(/\s+or\s+/i).map(function (s) { return s.split(/\s+and\s+/i); });
+  return rows.filter(function (r) { return ors.some(function (ands) { return ands.every(function (p) { return cond(r, p); }); }); });
+}
+function routeStub(ds, cols) {
+  var spec = JSON.parse(ds), keep = [], skipped = [];
+  spec.f.forEach(function (fr) {
+    var c = String(fr[0] || '').toUpperCase();
+    if (!c || cols.indexOf(c) > -1) { keep.push(fr[1]); } else if (skipped.indexOf(c) < 0) { skipped.push(c); }
+  });
+  return { text: keep.length ? (spec.p || '') + keep.join(' and ') : '', skipped: skipped };
+}
+$.getJSON = function (url, params) {
+  params = params || {};
+  CALLS.push({ url: url, p: $.extend({}, params) });
+  var d = $.Deferred();
+  setTimeout(function () {
+    if (url === 'index.php') {
+      var rows = REP[params.id];
+      if (!rows) { d.resolve({ data: [{ ERROR: 'Report Not Found (ID: ' + params.id + ')' }] }); return; }
+      var resp = { columns: Object.keys(REP[params.id][0]).concat(['#']) };
+      if (params.search) { rows = filt(rows, params.search); }
+      if (params.dsearch) { var r = routeStub(params.dsearch, Object.keys(REP[params.id][0])); rows = filt(rows, r.text); resp.search_skipped = r.skipped; }
+      if (params.limit && rows.length > params.limit) { resp.total_rows = rows.length; rows = rows.slice(0, params.limit); }
+      resp.data = rows;
+      d.resolve(resp);
+    } else if (url === 'manage_dashboard.php') {
+      d.resolve({ status: 'success', data: [] });
+    } else { d.reject({ status: 404 }); }
+  }, 10);
+  return d.promise();
+};
+$.ajax = function (o) { AJAX.push(o); var d = $.Deferred(); d.resolve({ status: 'success' }); return d.promise(); };
+
+const penumbra_dash_vars = {
+  currentUserKey: 'tester', isAdmin: true, canCreate: true, reportGrantPatterns: [],
+  shortId: 'xfl1', found: true, canEdit: true,
+  shibboleth: { name: 'Ada', fname: 'Ada' },
+  meta: { short_id: 'xfl1', title: 'Search links', owner_id: 'tester', authorized: 'tester', updated_at: '' },
+  state: { version: 1, theme: 'theme-default', refreshSeconds: 0, tiles: [
+    { id: 't1', type: 'table', report: 'repA', label: 'Awards', columns: ['COLLEGE', 'LINK', 'AMOUNT'], rows: 10, w: 6, h: 2, source: 'live' },
+    { id: 's1', type: 'stat', report: 'repA', label: 'A total', agg: 'sum', column: 'AMOUNT', format: 'number', w: 3, h: 1, source: 'live' },
+    { id: 's2', type: 'stat', report: 'repB', label: 'B total', agg: 'sum', column: 'AMOUNT', format: 'number', w: 3, h: 1, source: 'live' }
+  ] },
+  themes: [{ id: 'theme-default', label: 'Default Light', isDark: false }]
+};
+</script>
+<script src="purify.min.js"></script><script src="penumbra_tiles.js"></script>
+<script src="dash.js"></script>
+<script>
+var L = [];
+function ok(n, c, x) { L.push((c ? 'PASS ' : 'FAIL ') + n + (x !== undefined && !c ? '  [' + x + ']' : '')); }
+function eq(n, got, want) { ok(n, JSON.stringify(got) === JSON.stringify(want), 'got ' + JSON.stringify(got) + ' want ' + JSON.stringify(want)); }
+function tile(id) { return $('.dash-tile[data-tile-id="' + id + '"]'); }
+function stat(id) { return tile(id).find('.dash-stat-value').text(); }
+function box() { return String($('#dashSearchInput').val()); }
+function note() { return $('#dashFilterNote').text(); }
+function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+function until(fn, ms) {
+  var t0 = Date.now();
+  return new Promise(function (res) {
+    (function poll() { var v = false; try { v = fn(); } catch (e) { } if (v || Date.now() - t0 > ms) { res(!!v); } else { setTimeout(poll, 100); } })();
+  });
+}
+function link(text) { return tile('t1').find('td a[data-search]').filter(function () { return $(this).text() === text; }).first(); }
+function clickLink(text) { var l = link(text); if (!l.length) { throw new Error('no link on the page: ' + text); } l[0].click(); }
+function lastUrl() { return REPLACED.length ? REPLACED[REPLACED.length - 1] : ''; }
+function publish() {
+  var A = 'RES' + 'ULT>>', B2 = '<' + '<FIN';
+  document.getElementById('out').textContent = A + L.join(' ;; ') + B2;
+}
+
+until(function () { return stat('s1') === '233' && stat('s2') === '159' && tile('t1').find('td a[data-search]').length === 4; }, 12000).then(function (ready) {
+  ok('the tiles loaded; the table tile keeps the cells\' search links', ready, 'stat=' + stat('s1') + ' links=' + tile('t1').find('td a[data-search]').length);
+  // ══════ A. a search link in a table tile filters the dashboard ══════
+  clickLink('Eng');
+  return until(function () { return stat('s1') === '13'; }, 5000);
+}).then(function () {
+  eq('the link\'s text is the dashboard filter (10 + 3), and the table tile shows the Eng rows only', [box(), stat('s1'), tile('t1').find('tbody tr').length], ['COLLEGE = //Eng//', '13', 2]);
+  ok('... in the address, routed to the tiles that have the column, the other named', lastUrl().indexOf('search=COLLEGE%20%3D%20%2F%2FEng%2F%2F') > -1 && stat('s2') === '159' && note().indexOf('B total') > -1, lastUrl() + ' | ' + note());
+  ok('the hint says how to release it', $('body').text().indexOf('Click the same link again') > -1, '');
+  clickLink('Closed');   // on an Eng row, still showing
+  return until(function () { return stat('s1') === '3'; }, 5000);
+}).then(function () {
+  eq('a second link joins with and (Eng and Closed = 3)', [box(), stat('s1')], ['COLLEGE = //Eng// and STATUS = //Closed//', '3']);
+  clickLink('Closed');
+  return until(function () { return stat('s1') === '13'; }, 5000);
+}).then(function () {
+  eq('the same link again releases its condition only', [box(), stat('s1')], ['COLLEGE = //Eng//', '13']);
+  clickLink('Eng');
+  return until(function () { return stat('s1') === '233'; }, 5000);
+}).then(function () {
+  eq('... and the first link released leaves no filter', [box(), stat('s1')], ['', '233']);
+  // ══════ B. a text the AND-run cannot take replaces the filter ══════
+  clickLink('Eng or Sci');
+  return until(function () { return stat('s1') === '33'; }, 5000);
+}).then(function () {
+  eq('an "or" link replaces the filter, as it does on its own page (10 + 20 + 3)', [box(), stat('s1')], ['COLLEGE = //Eng// or COLLEGE = //Sci//', '33']);
+  clickLink('Eng');   // under an "or" filter nothing can be added to or released from: the link replaces it
+  return until(function () { return stat('s1') === '13'; }, 5000);
+}).then(function () {
+  eq('under an "or" filter a link replaces it again (one AND-run, never a branch)', [box(), stat('s1')], ['COLLEGE = //Eng//', '13']);
+  $('#dashSearchClear').trigger('click');
+  return until(function () { return box() === '' && stat('s1') === '233'; }, 5000);
+}).then(function () {
+  // ══════ C. a framed report's link posts its text here ══════
+  var fr = document.createElement('iframe'); fr.className = 'dash-embed'; fr.setAttribute('srcdoc', '<p>frame</p>');
+  document.getElementById('dashMain').appendChild(fr);
+  return until(function () { return fr.contentDocument && fr.contentDocument.body && fr.contentDocument.body.textContent === 'frame'; }, 4000);
+}).then(function () {
+  var fr = document.querySelector('#dashMain iframe.dash-embed');
+  // Posted from INSIDE the frame's realm: a postMessage run by this page's own script would carry this window as its source.
+  fr.contentWindow.eval("parent.postMessage({ type: 'penumbra:xfilter', text: 'COLLEGE = //Sci//' }, '*')");
+  return until(function () { return stat('s1') === '20'; }, 5000);
+}).then(function () {
+  eq('a frame of ours posting a search link\'s text filters the dashboard', [box(), stat('s1')], ['COLLEGE = //Sci//', '20']);
+  window.postMessage({ type: 'penumbra:xfilter', text: 'COLLEGE = //Ag//' }, '*');
+  return wait(400);
+}).then(function () {
+  eq('a message from anywhere else is ignored', box(), 'COLLEGE = //Sci//');
+  ok('no exception escaped', ERRORS.length === 0, ERRORS.join(' | '));
+  publish();
+}).catch(function (e) {
+  L.push('HARNESS_ERROR: ' + (e && e.message ? e.message : e) + ' @ ' + String(e && e.stack || '').split('\n')[1]);
+  publish();
+});
+</script></body></html>

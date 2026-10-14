@@ -1,0 +1,174 @@
+<!doctype html><html><head><meta charset="utf-8"><title>dash single keys</title>
+<link rel="stylesheet" href="penumbra_tiles.css"><link rel="stylesheet" href="penumbra_dashboard.css">
+</head><body class="pnb-dash theme-default">
+<!-- Single-key hints - dashboards (2026-09-25): the REAL penumbra_dashboard.js
+     over the REAL penumbra_tiles.js. ?mode=view (a dashboard, the editor on),
+     ?mode=list (the dashboards home), &keys=off (arrive switched off). The
+     help panel is fed the help_content.php under test (help_frag.js). -->
+<div id="dashApp"><header class="dash-head" id="dashHead">
+  <a class="dash-brand" href="#"><span>Dashboards</span></a>
+  <div class="dash-head-title" id="dashHeadTitle"></div>
+  <div class="dash-head-actions" id="dashHeadActions"></div>
+</header><main id="dashMain"></main></div>
+<pre id="out">running</pre>
+<script>
+(function () {
+  try {
+    localStorage.clear();
+    if (/[?&]keys=off/.test(location.search)) localStorage.setItem('pnb_single_keys', 'off');
+  } catch (e) {}
+})();
+var ERRORS = [];
+window.onerror = function (m, src, line) { ERRORS.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+window.confirm = function () { return true; };
+window.alert = function () {};
+window.prompt = function () { return null; };
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="help_frag.js"></script>
+<script>
+var MODE = (location.search.match(/[?&]mode=(\w+)/) || [])[1] || 'view';
+function deferred(fn) { var d = $.Deferred(); setTimeout(function () { fn(d); }, 10); return d.promise(); }
+$.getJSON = function () { return deferred(function (d) { d.resolve({ status: 'success', data: [] }); }); };
+$.ajax = function () { return deferred(function (d) { d.resolve({ status: 'success' }); }); };
+$.post = $.ajax;
+$.get = function (url, cb) {
+  var p = deferred(function (d) {
+    if (/help_content\.php/.test(url)) { if (cb) cb(window.__HELP || ''); d.resolve(window.__HELP || ''); }
+    else { d.reject({ status: 404 }); }
+  });
+  return p;
+};
+const penumbra_dash_vars = MODE === 'list'
+  ? { currentUserKey: 'tester', isAdmin: true, canCreate: true, reportGrantPatterns: [], shortId: '', found: false, canEdit: false,
+      urlSearchOverride: '', shibboleth: { name: 'Ada', fname: 'Ada', lname: 'Lovelace', email: 'ada@ncsu.edu', unity: 'alovela', ouc: '123456' },
+      meta: {}, state: null, list: [], themes: [{ id: 'theme-default', label: 'Default Light', isDark: false }] }
+  : { currentUserKey: 'tester', isAdmin: true, canCreate: true, reportGrantPatterns: [], shortId: 'demo', found: true, canEdit: true,
+      urlSearchOverride: '', shibboleth: { name: 'Ada', fname: 'Ada', lname: 'Lovelace', email: 'ada@ncsu.edu', unity: 'alovela', ouc: '123456' },
+      meta: { short_id: 'demo', title: 'Demo', owner_id: 'tester', authorized: 'tester', updated_at: '' },
+      state: { version: 1, theme: 'theme-default', refreshSeconds: 60, tiles: [ { id: 't1', type: 'note', label: 'Hello', text: 'hello', w: 12, h: 1 } ] },
+      themes: [{ id: 'theme-default', label: 'Default Light', isDark: false }] };
+</script>
+<script src="purify.min.js"></script><script src="penumbra_tiles.js"></script><script src="dash_under_test.js"></script>
+<script>
+(function () {
+  var R = [];
+  function rec(name, pass, detail) { R.push({ name: name, pass: !!pass, detail: detail === undefined ? '' : String(detail).slice(0, 700) }); }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function finish(fatal) {
+    var payload = { results: R, pageErrors: ERRORS.slice(0, 8) };
+    if (fatal) payload.fatal = fatal;
+    document.getElementById('out').textContent = 'RESULTS_JSON:' + JSON.stringify(payload);
+  }
+  function b(sel) { var $b = $(sel).first(); return { n: $b.length, title: $b.attr('title'), aks: $b.attr('aria-keyshortcuts') === undefined ? null : $b.attr('aria-keyshortcuts') }; }
+  function head() {
+    var o = {};
+    $('#dashHeadActions').find('button, a').each(function () {
+      o[this.id || (this.tagName + ':' + $(this).text().trim())] = { title: $(this).attr('title'), aks: $(this).attr('aria-keyshortcuts') === undefined ? null : $(this).attr('aria-keyshortcuts') };
+    });
+    return o;
+  }
+  function keyNames(h) { var bad = []; Object.keys(h).forEach(function (k) { if (/\([A-Z]\)/.test(h[k].title || '') || (h[k].aks !== null && h[k].aks !== 'Control+s')) bad.push(k + '=' + JSON.stringify(h[k])); }); return bad; }
+  function eq(x, title, aks) { return x.n === 1 && x.title === title && x.aks === aks; }
+  var KIOSK = 'a.dash-btn[href*="kiosk=1"]';
+  var DONE_TAIL = '. While editing: click a tile, then arrow keys resize it and Shift+Left/Right move it';
+  function key(k, mods) {
+    var init = { key: k, bubbles: true, cancelable: true };
+    if (mods) Object.keys(mods).forEach(function (m) { init[m] = mods[m]; });
+    var ev = new KeyboardEvent('keydown', init);
+    document.body.dispatchEvent(ev);
+    return ev.defaultPrevented;
+  }
+  async function helpPanel(open) {
+    if (open) {
+      $('#dashHelpBtn').trigger('click');
+      for (var i = 0; i < 100 && !$('#dashKeysToggle').length; i++) await sleep(30);
+      return $('#dashKeysToggle').length === 1;
+    }
+    $('.dash-help-close').trigger('click');
+    await sleep(20);
+    return $('#dashHelpOverlay').length === 0;
+  }
+
+  async function view() {
+    var on = true;
+    var r = b('#dashRefreshBtn'), k = b(KIOSK), p = b('#dashPauseBtn'), e = b('#dashEditBtn'), h = b('#dashHelpBtn');
+    rec('D1 a dashboard, switch on: every header button names its key - tooltip "(R)" and aria-keyshortcuts',
+        eq(r, 'Re-fetch every tile (R)', 'r') && eq(k, 'Chrome-free wall-display view of this dashboard, auto-refreshing (K)', 'k') &&
+        eq(p, 'Pause the automatic refresh so nothing changes while you read (P)', 'p') && eq(e, 'Rearrange, resize, add and edit tiles (E)', 'e') &&
+        eq(h, 'Help for dashboards: tiles, address parameters, title tokens, keyboard, kiosk (H)', 'h'), JSON.stringify([r, k, p, e, h]));
+
+    $('#dashEditBtn').trigger('click');
+    await sleep(50);
+    var s = b('#dashSettingsBtn'), a = b('#dashAddTileBtn'), d = b('#dashDoneBtn'), sv = b('#dashSaveBtn');
+    rec('D2 the editor, switch on: Settings (S), Add a tile (A), Done (E) with its arrow-key note, and Save keeps Ctrl+S',
+        eq(s, 'Title, access, theme, refresh and kiosk cycle (S)', 's') && eq(a, 'Add a tile (A)', 'a') &&
+        eq(d, 'Leave edit mode (E)' + DONE_TAIL, 'e') && eq(sv, 'Save the layout (Ctrl+S)', 'Control+s'), JSON.stringify([s, a, d, sv]));
+
+    var opened = await helpPanel(true);
+    var label = $('#dashKeysToggle').closest('label').text();
+    rec('D3 the help panel\'s switch reads right: the dashboard letters, "on a report press ? for its keys", r and 1 to 4 on Health',
+        opened && label.trim() === 'Single-key shortcuts (R, H, K, E, A, S, P here; on a report press ? for its keys; r and 1 to 4 on Health)', JSON.stringify(label));
+    var topic = $('#dashHelpOverlay .dash-help-body').text();
+    rec('D4 the Dashboards help topic (from the help_content.php under test) says the buttons name keys only while the switch is on',
+        /buttons name their keys only while single-key shortcuts are on/.test(topic), topic.length + ' chars');
+
+    $('#dashKeysToggle').prop('checked', false).trigger('change');
+    await sleep(30);
+    var hOff = head(), dOff = b('#dashDoneBtn'), svOff = b('#dashSaveBtn');
+    rec('D5 unticking it re-renders the header at once: no key in any tooltip, no aria-keyshortcuts - Save keeps Control+s, Done keeps its arrow-key note',
+        localStorage.getItem('pnb_single_keys') === 'off' && keyNames(hOff).length === 0 && eq(dOff, 'Leave edit mode' + DONE_TAIL, null) && eq(svOff, 'Save the layout (Ctrl+S)', 'Control+s') &&
+        eq(b('#dashAddTileBtn'), 'Add a tile', null) && eq(b('#dashSettingsBtn'), 'Title, access, theme, refresh and kiosk cycle', null) &&
+        eq(b('#dashHelpBtn'), 'Help for dashboards: tiles, address parameters, title tokens, keyboard, kiosk', null),
+        JSON.stringify(hOff).slice(0, 600));
+
+    await helpPanel(false);
+    $('#dashDoneBtn').trigger('click');
+    await sleep(50);
+    var r2 = b('#dashRefreshBtn'), k2 = b(KIOSK), p2 = b('#dashPauseBtn'), e2 = b('#dashEditBtn');
+    rec('D6 ...and the view-mode header stays plain while off (Refresh, Kiosk, Pause, Edit)',
+        eq(r2, 'Re-fetch every tile', null) && eq(k2, 'Chrome-free wall-display view of this dashboard, auto-refreshing', null) &&
+        eq(p2, 'Pause the automatic refresh so nothing changes while you read', null) && eq(e2, 'Rearrange, resize, add and edit tiles', null), JSON.stringify([r2, k2, p2, e2]));
+
+    var cnt = { r: 0 };
+    $(document).on('click.skt', '#dashRefreshBtn', function () { cnt.r++; });
+    key('r');
+    rec('D7 switched off, r does nothing (unchanged)', cnt.r === 0, 'count=' + cnt.r);
+
+    await helpPanel(true);
+    $('#dashKeysToggle').prop('checked', true).trigger('change');
+    await sleep(30);
+    var hOn = head();
+    await helpPanel(false);
+    rec('D8 ticking it again brings every letter back', eq(b('#dashRefreshBtn'), 'Re-fetch every tile (R)', 'r') && eq(b('#dashHelpBtn'), 'Help for dashboards: tiles, address parameters, title tokens, keyboard, kiosk (H)', 'h'),
+        JSON.stringify(hOn).slice(0, 400));
+    key('r');
+    await sleep(400);
+    key('R');
+    await sleep(100);
+    rec('D9 switched on: r and R (Caps Lock) both refresh (unchanged - the dashboard lowercases)', cnt.r === 2, 'count=' + cnt.r);
+  }
+
+  async function list() {
+    var h = b('#dashHelpBtn');
+    rec('D10 the dashboards home (no dashboard open, where no single key works): its Help button names no key even with the switch on',
+        h.n === 1 && h.aks === null && !/\(H\)/.test(h.title || '') && localStorage.getItem('pnb_single_keys') !== 'off', JSON.stringify(h));
+  }
+  async function viewOff() {
+    var hh = head();
+    rec('D11 a dashboard opened with the switch already off: the first render names no keys', keyNames(hh).length === 0 && Object.keys(hh).length >= 4, JSON.stringify(hh).slice(0, 500));
+  }
+
+  async function main() {
+    for (var i = 0; i < 200 && !$('#dashHeadActions').children().length; i++) await sleep(25);
+    await sleep(100);
+    if (MODE === 'list') await list();
+    else if (/[?&]keys=off/.test(location.search)) await viewOff();
+    else await view();
+    rec('Z2 no page errors (' + MODE + ')', ERRORS.length === 0, ERRORS.slice(0, 5).join(' | ') || 'none');
+    finish();
+  }
+  main().catch(function (e) { finish('driver threw: ' + (e && e.stack || e)); });
+})();
+</script>
+</body></html>

@@ -1,0 +1,153 @@
+<?php
+/**
+ * schedprune_child.php - runs ONE request against the patched manage_schedule.php
+ * core and writes what it did to a JSON file. Spawned once per scenario by
+ * test_schedprune.php: the core declares top-level functions, so a second
+ * include in the same process would fatal "Cannot redeclare" - one process per
+ * request is also what IIS gives the real endpoint.
+ *
+ *   php.exe -n schedprune_child.php <core.php> <scenario.json> <out.json>
+ *
+ * Everything the core needs from db_connection.php is stubbed below. The
+ * database is a fake that RECORDS every statement; a statement it does not
+ * recognise is recorded as unknown (and answers "no rows") so a new query on
+ * the save/restore path shows up in the parent's asserts instead of passing
+ * quietly.
+ */
+define('PNB_CORE', $argv[1]);
+define('PNB_OUT', $argv[3]);
+$GLOBALS['__pnb_scn'] = json_decode(file_get_contents($argv[2]), true);
+$GLOBALS['__pnb_rec'] = array('stmts' => array(), 'audits' => array(), 'unknown' => array(), 'warnings' => array());
+
+class PnbHarnessExit extends Error {}
+
+set_error_handler(function ($no, $str, $file, $line) {
+    $GLOBALS['__pnb_rec']['warnings'][] = "[$no] $str @" . basename($file) . ":$line";
+    return true;
+});
+
+// ---------------------------------------------------------------- fake DB
+function pnb_task($id) {
+    foreach ($GLOBALS['__pnb_scn']['tasks'] as $t) {
+        if ((int)$t['ID'] === (int)$id) return $t;
+    }
+    return null;
+}
+function pnb_fake_answer($sql, $b) {
+    $S = $GLOBALS['__pnb_scn'];
+    $rec = function ($kind) use ($sql, $b) {
+        $GLOBALS['__pnb_rec']['stmts'][] = array('kind' => $kind, 'sql' => $sql, 'binds' => $b);
+    };
+    if (strpos($sql, 'UPDATE NC_REPORTING.PENUMBRA_SCHEDULED_TASKS SET') === 0) { $rec('UPDATE_TASK'); return array(); }
+    if (strpos($sql, 'INSERT INTO NC_REPORTING.PENUMBRA_SCHEDULED_TASKS') === 0) { $rec('INSERT_TASK'); return array(); }
+    if (strpos($sql, 'UPDATE NC_REPORTING.PENUMBRA_REPORTS SET UPDATED_AT') === 0) { $rec('TOUCH'); return array(); }
+    if (strpos($sql, 'INSERT INTO NC_REPORTING.PENUMBRA_AUDIT') === 0) { $rec('SCHED_EVENT'); return array(); }
+    if (strpos($sql, 'SELECT ID FROM NC_REPORTING.PENUMBRA_REPORTS WHERE TRIM(SHORT_ID) = :sid') === 0) {
+        $sid = trim((string)$b[':sid']);
+        return isset($S['reports'][$sid]) ? array(array('ID' => $S['reports'][$sid])) : array();
+    }
+    if (strpos($sql, 'SELECT OPTIONS FROM NC_REPORTING.PENUMBRA_SCHEDULED_TASKS WHERE ID = :id') === 0) {
+        $t = pnb_task($b[':id']);
+        return $t ? array(array('OPTIONS' => $t['OPTIONS'])) : array();
+    }
+    if (strpos($sql, 'SELECT ID, REPORT_ID, TASK_TYPE, RECIPIENTS, SUBJECT, CRON_EXPRESSION, OPTIONS, OWNER_ID, IS_ACTIVE') === 0) {
+        $t = pnb_task($b[':id']);
+        return $t ? array($t) : array();
+    }
+    if (strpos($sql, "WHERE TASK_TYPE = 'DB_DUMP' AND IS_ACTIVE = 1") !== false) { $rec('COLLISION_CHECK'); return array(); }
+    if (strpos($sql, 'SELECT ID, TO_CHAR(CREATED_AT') === 0 && strpos($sql, '_test_run_transient') !== false) { $rec('DUP_TEST_CHECK'); return array(); }
+    if (strpos($sql, 'SELECT MAX(ID) AS NEW_ID') === 0) { return array(array('NEW_ID' => 777)); }
+    if (strpos($sql, 'SELECT ID, ACTION, REPORT_ID FROM NC_REPORTING.PENUMBRA_AUDIT WHERE ID = :aid') === 0) {
+        $aid = (int)$b[':aid'];
+        if (!isset($S['audits'][$aid])) return array();
+        $a = $S['audits'][$aid];
+        return array(array('ID' => $aid, 'ACTION' => $a['ACTION'], 'REPORT_ID' => $a['REPORT_ID']));
+    }
+    $GLOBALS['__pnb_rec']['unknown'][] = $sql;
+    return array();
+}
+class FakeStmt {
+    public $sql; public $binds = array(); private $rows = array(); private $i = 0;
+    public function __construct($sql) { $this->sql = preg_replace('/\s+/', ' ', trim($sql)); }
+    public function bindValue($k, $v, $t = null) { $this->binds[$k] = $v; return true; }
+    public function execute($params = null) {
+        if (is_array($params)) { foreach ($params as $k => $v) { $this->binds[$k] = $v; } }
+        $this->rows = pnb_fake_answer($this->sql, $this->binds);
+        $this->i = 0;
+        return true;
+    }
+    public function fetch($mode = null) { return ($this->i < count($this->rows)) ? $this->rows[$this->i++] : false; }
+    public function fetchColumn($c = 0) { $r = $this->fetch(); if (!$r) return false; $v = array_values($r); return $v[$c]; }
+    public function fetchAll($mode = null) { $o = array_slice($this->rows, $this->i); $this->i = count($this->rows); return $o; }
+    public function rowCount() { return 1; }
+}
+class FakeConn {
+    public function prepare($sql) { return new FakeStmt($sql); }
+    public function query($sql) { $s = new FakeStmt($sql); $s->execute(); return $s; }
+}
+
+// ------------------------------------------- stubs for db_connection.php & co.
+function getConnectionForTable($t) { return new FakeConn(); }
+function connectOracleWriter() { return null; }   // skips the foreign-table probe (its own try/catch path)
+function logPenumbraAudit($rid, $action, $before = null, $after = null, $x5 = null, $x6 = null) {
+    $GLOBALS['__pnb_rec']['audits'][] = array('report_id' => $rid, 'action' => $action, 'before' => $before, 'after' => $after);
+}
+function readClobViaOci8($tbl, $col, $whereCol, $whereVal) {
+    $S = $GLOBALS['__pnb_scn'];
+    if (!isset($S['audits'][(int)$whereVal])) return null;
+    $a = $S['audits'][(int)$whereVal];
+    return (trim($col, '"') === 'AFTER') ? $a['AFTER'] : $a['BEFORE'];
+}
+function penumbraParseSchedulerRecipients($s) {
+    $o = array();
+    foreach (preg_split('/[;,]/', (string)$s) as $p) { $p = trim($p); if ($p !== '') $o[] = array('raw' => $p, 'valid' => true); }
+    return $o;
+}
+function penumbraDropDestinationError($proto, $opts, $roots, $hosts) { return null; }
+// penumbra_template.php is NOT stubbed: it is pure declarations, so the child
+// loads the real file (4th argument) and the df_custom_* scenarios run the
+// shipped File Drop custom-template rule. Its require line in the core is
+// stripped like the other three, because 'penumbra_template.php' would resolve
+// against this temp directory, not the webroot.
+if (isset($argv[4]) && is_file($argv[4])) { require_once $argv[4]; }
+// penumbra_subscribe_condition.php (2026-09-23) likewise: pure, so the REAL save-time
+// validation of subscriptions_condition runs (5th argument; it pulls in the app's
+// penumbra_search.php + penumbra_directory.php beside it). A pre-feature app has no
+// such file, and its core never calls the validator - the stub only keeps it defined.
+if (isset($argv[5]) && is_file($argv[5])) { require_once $argv[5]; }
+if (!function_exists('penumbraSubCondValidate')) {
+    function penumbraSubCondValidate($condition) { return ''; }
+}
+if (!function_exists('penumbra_tpl_drop_options_error')) {
+    function penumbra_tpl_drop_options_error($options) { return null; }
+}
+function penumbraDenyUnauthenticated() {}
+function penumbraReportGrantAllowsScheduler($g, $s) { return true; }
+function penumbra_cron_human($c) { return ''; }
+function penumbra_dbdump_destinations_conflict($a, $b) { return $a === $b; }
+
+// ------------------------------------------------------ request + globals
+$config = array('scheduler_secret_key' => 'harness-key', 'file_drop_allowed_roots' => array(), 'file_drop_allowed_hosts' => array());
+$dbrw_user = 'PENUMBRA_RW';
+$currentUserKey = 'powner';
+$isAdmin = true;
+$userGrants = array();
+$_GET = array();
+$_POST = $GLOBALS['__pnb_scn']['post'];
+$_SERVER['REQUEST_METHOD'] = 'POST';
+
+ob_start();
+$GLOBALS['__pnb_err'] = null;
+try {
+    include PNB_CORE;
+} catch (PnbHarnessExit $__pnb_x) {
+    // the endpoint's own exit;
+} catch (Throwable $__pnb_x) {
+    $GLOBALS['__pnb_err'] = get_class($__pnb_x) . ': ' . $__pnb_x->getMessage() . ' @line ' . $__pnb_x->getLine();
+}
+$GLOBALS['__pnb_resp'] = ob_get_clean();
+file_put_contents(PNB_OUT, json_encode(array(
+    'response' => $GLOBALS['__pnb_resp'],
+    'rec'      => $GLOBALS['__pnb_rec'],
+    'error'    => $GLOBALS['__pnb_err'],
+)));

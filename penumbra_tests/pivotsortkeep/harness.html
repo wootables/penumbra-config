@@ -1,0 +1,151 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>pivot sort survives the snippet re-gen</title></head>
+<body>
+<!-- Same boot as ..\ibticks\harness.html plus the pivot container. -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<div id="reportHeaderContainer"></div>
+<input type="hidden" id="reportSubtitle" value="Harness">
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<!-- 2026-10-13: a TABLE, as index.php has it - the journal row watcher (0e8e581) reads its tBodies at boot. -->
+<table id="resultsTable"><thead></thead><tbody></tbody></table><div id="errorBox"></div>
+<div id="action_overlay" class="pnb-toast-dock"></div>
+<div id="pivot-output-container" style="display:none"></div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  if (!window._pnbModalHost) { window._pnbModalHost = function () { return jQuery(document.body); }; }
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (ev) { window.__errors.push('unhandledrejection: ' + (ev.reason && ev.reason.message ? ev.reason.message : String(ev.reason))); });
+</script>
+<script src="main_patched.js"></script>
+<script>
+(function () {
+  function report(txt) { document.getElementById('out').textContent = txt; }
+  var results = [];
+  function t(name, cond, detail) { results.push({ name: name, pass: !!cond, detail: detail === undefined ? '' : String(detail) }); }
+  function eq(name, actual, expected) { var a = JSON.stringify(actual), e = JSON.stringify(expected); t(name, a === e, 'expected ' + e + ' got ' + a); }
+  function M(o) { return new Map(Object.keys(o).map(function (k) { return [k, o[k]]; })); }
+  // Four funders x two years. Key order is Alpha, Bravo, Charlie, Delta.
+  // FY 2026 desc: Alpha and Charlie tie at 50 (a stable sort keeps Alpha first);
+  // FY 2025 desc as a tie-breaker puts Charlie (20) before Alpha (10).
+  var ROWS = [
+    ['Alpha', 'FY 2025', '10'], ['Alpha', 'FY 2026', '50'],
+    ['Bravo', 'FY 2025', '30'], ['Bravo', 'FY 2026', '20'],
+    ['Charlie', 'FY 2025', '20'], ['Charlie', 'FY 2026', '50'],
+    ['Delta', 'FY 2025', '40'], ['Delta', 'FY 2026', '10']
+  ].map(function (r) { return M({ FUNDER: r[0], FY: r[1], AMOUNT: r[2] }); });
+  function settings() {
+    return { v: 2, rows: ['FUNDER'], cols: ['FY'], vals: 'AMOUNT', agg: ['sum', 'count'], aggLabels: ['Amount', 'Count'],
+      aggColOverrides: ['AMOUNT', 'AMOUNT'], aggFilters: null, aggFormulas: null, rowLayout: 'flat', colLayout: 'nested',
+      sortOrder: 'asc', colSortOrder: 'asc', stickyColCount: 1, totalColAggs: null, totalRowAggs: null,
+      totalRowAggLabels: null, totalRowAggBaseIdx: null, rankN: null, rankDir: null, rankAgg: null, rankOther: true,
+      rankScope: null, noBreakdown: false, startExpanded: false, hideEmpty: false };
+  }
+  function order() { return Array.prototype.map.call(document.querySelectorAll('#pivotResultTable tbody tr'), function (tr) { return tr.cells[0].textContent.trim(); }); }
+  // Sub-headers in order: FY 2025 Amount, Count, FY 2026 Amount, Count, Grand Total Amount, Count.
+  function subTh(i) { return jQuery('#pivotResultTable thead tr:last th.pivot-sub-header').eq(i); }
+  function sortBy(i, dir, additive) { subTh(i).trigger('click.pivotSort', [dir, !!additive]); }
+  function redCells() { return Array.prototype.filter.call(document.querySelectorAll('#pivotResultTable tbody td'), function (td) { return td.style.color === 'red'; }).length; }
+  var RULE = "format(cell, Amount, 1=1, 'color: red')";
+
+  async function run() {
+    var P = window.__PS;
+    if (!P) { report('RESULTS_JSON:' + JSON.stringify({ fatal: 'hooks unavailable: ' + (window.__PS_ERR || 'n/a'), pageErrors: window.__errors.slice(0, 6) })); return; }
+
+    // ---- S: one sorted column survives the snippet re-gen ------------------
+    P.setPivot(settings(), ROWS);
+    eq('S0 setup: the pivot starts in key order', order(), ['Alpha', 'Bravo', 'Charlie', 'Delta']);
+    sortBy(2, 'desc', false);   // FY 2026 Amount, high to low
+    eq('S1 setup: sorted by FY 2026 Amount, high to low', order(), ['Alpha', 'Charlie', 'Bravo', 'Delta']);
+    await P.A(RULE, ROWS);
+    t('S2 guard: the format() rule re-generated the pivot (Amount cells are red)', redCells() === 12, 'red cells ' + redCells());
+    eq('S3 ...and the rows are still sorted (were back in key order)', order(), ['Alpha', 'Charlie', 'Bravo', 'Delta']);
+    var th = subTh(2);
+    t('S4 ...and the sorted header still says so (sorted, aria-sort descending)', th.hasClass('sorted') && th.attr('aria-sort') === 'descending',
+      'class=' + th.attr('class') + ' aria-sort=' + th.attr('aria-sort'));
+    eq('S5 ...and sortCriteria is the one criterion', P.getSort().map(function (c) { return c.colIdentifier + ' ' + c.direction; }), ['FY 2026::Amount desc']);
+
+    // ---- C: a two-column chain survives too --------------------------------
+    P.setPivot(settings(), ROWS);
+    sortBy(2, 'desc', false);
+    sortBy(0, 'desc', true);    // tie-break: FY 2025 Amount, high to low
+    eq('C1 setup: the chain puts Charlie before Alpha', order(), ['Charlie', 'Alpha', 'Bravo', 'Delta']);
+    await P.A(RULE, ROWS);
+    eq('C2 the re-gen keeps the whole chain', order(), ['Charlie', 'Alpha', 'Bravo', 'Delta']);
+    // The first year's header carries the column-collapse chevron, and the sort
+    // handler's parent text includes it ("▶FY 2025") - the same on save and
+    // on replay, so it is stripped here only to keep the check readable.
+    eq('C3 ...with both criteria, in order', P.getSort().map(function (c) { return String(c.colIdentifier).replace(/[▶◀]/g, '') + ' ' + c.direction; }), ['FY 2026::Amount desc', 'FY 2025::Amount desc']);
+
+    // ---- H: the column-sort arrow (2026-09-28) -------------------------------
+    // The arrow re-generates the pivot with the years reversed; it dropped the row
+    // sort, and the first year's header carries the arrow itself, so its sort id
+    // read "▶FY 2025::Amount" and stopped matching once the years were reversed.
+    function colSort() { jQuery('#pivotResultTable .col-sort-icon').first().trigger('click'); }
+    function firstYear() { var th = jQuery('#pivotResultTable thead tr:first th').not('[data-row-field]').first(); return th.clone().find('.sort-icon, .col-sort-icon').remove().end().text().trim(); }
+    P.setPivot(settings(), ROWS);
+    sortBy(2, 'desc', false);   // FY 2026 Amount, high to low
+    colSort();
+    t('H1 setup: the arrow reversed the years (FY 2026 first)', firstYear() === 'FY 2026', firstYear());
+    eq('H2 ...and the rows are still sorted by FY 2026 Amount (were back in key order)', order(), ['Alpha', 'Charlie', 'Bravo', 'Delta']);
+    P.setPivot(settings(), ROWS);
+    sortBy(0, 'desc', false);   // FY 2025 Amount - the column that carries the arrow
+    eq('H3 a sort on the arrow-carrying first year has a plain id', P.getSort().map(function (c) { return c.colIdentifier; }), ['FY 2025::Amount']);
+    colSort();
+    eq('H4 ...and survives the arrow, now that FY 2025 is the last year', order(), ['Delta', 'Bravo', 'Charlie', 'Alpha']);
+    // A sort saved before the fix still names the arrow: it must replay (re-gen path).
+    P.setPivot(settings(), ROWS);
+    P.setSort([{ colIdentifier: '▶FY 2025::Amount', colIndex: 1, direction: 'desc' }]);
+    await P.A(RULE, ROWS);
+    eq('H5 a saved id carrying the arrow still sorts the table', order(), ['Delta', 'Bravo', 'Charlie', 'Alpha']);
+    var th5 = subTh(0);
+    t('H6 ...and marks its header', th5.hasClass('sorted') && th5.attr('aria-sort') === 'descending', 'class=' + th5.attr('class') + ' aria-sort=' + th5.attr('aria-sort'));
+
+    // ---- G: guards ----------------------------------------------------------
+    P.setPivot(settings(), ROWS);
+    sortBy(2, 'asc', false);
+    await P.A('Plain text, no rules', ROWS);
+    eq('G1 no format() rule: no re-gen, the sort is simply untouched', order(), ['Delta', 'Bravo', 'Alpha', 'Charlie']);
+    P.setPivot(settings(), ROWS);
+    await P.A(RULE, ROWS);
+    eq('G2 no sort: the re-gen leaves key order', order(), ['Alpha', 'Bravo', 'Charlie', 'Delta']);
+    eq('G3 ...and adds no sort of its own', P.getSort().length, 0);
+
+    t('no page errors', window.__errors.length === 0, JSON.stringify(window.__errors.slice(0, 4)));
+    report('RESULTS_JSON:' + JSON.stringify({ results: results, pageErrors: window.__errors.slice(0, 6) }));
+  }
+  setTimeout(function () {
+    run().catch(function (e) { report('RESULTS_JSON:' + JSON.stringify({ fatal: 'run threw: ' + (e && e.stack ? e.stack : e), results: results, pageErrors: window.__errors.slice(0, 6) })); });
+  }, 300);
+})();
+</script>
+</body></html>

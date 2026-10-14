@@ -1,0 +1,2107 @@
+{
+    "pageErrors":  [
+
+                   ],
+    "results":  [
+                    {
+                        "name":  "parser: 3 rows (two filtered Sums survive the dedupe + formula)",
+                        "pass":  true,
+                        "detail":  "[{\"type\":\"sum\",\"col\":\"AMOUNT\",\"label\":\"Active Sum\",\"filter\":\"STATUS=Active\",\"formula\":null,\"shownLabel\":\"Active Sum\"},{\"type\":\"sum\",\"col\":\"AMOUNT\",\"label\":\"Closed Sum\",\"filter\":\"STATUS=Closed\",\"formula\":null,\"shownLabel\":\"Closed Sum\"},{\"type\":\"formula\",\"col\":null,\"label\":\"Variance\",\"filter\":null,\"formula\":\"{Active Sum} - {Closed Sum}\",\"shownLabel\":\"Variance\"}]"
+                    },
+                    {
+                        "name":  "parser: row1 = sum/AMOUNT/\"Active Sum\"/STATUS=Active",
+                        "pass":  true,
+                        "detail":  "{\"type\":\"sum\",\"col\":\"AMOUNT\",\"label\":\"Active Sum\",\"filter\":\"STATUS=Active\",\"formula\":null,\"shownLabel\":\"Active Sum\"}"
+                    },
+                    {
+                        "name":  "parser: row2 = sum/AMOUNT/\"Closed Sum\"/STATUS=Closed",
+                        "pass":  true,
+                        "detail":  "{\"type\":\"sum\",\"col\":\"AMOUNT\",\"label\":\"Closed Sum\",\"filter\":\"STATUS=Closed\",\"formula\":null,\"shownLabel\":\"Closed Sum\"}"
+                    },
+                    {
+                        "name":  "parser: row3 = formula \"Variance\" {Active Sum} - {Closed Sum}",
+                        "pass":  true,
+                        "detail":  "{\"type\":\"formula\",\"col\":null,\"label\":\"Variance\",\"filter\":null,\"formula\":\"{Active Sum} - {Closed Sum}\",\"shownLabel\":\"Variance\"}"
+                    },
+                    {
+                        "name":  "parser: label cells SHOW the custom labels",
+                        "pass":  true,
+                        "detail":  "[\"Active Sum\",\"Closed Sum\",\"Variance\"]"
+                    },
+                    {
+                        "name":  "parser: formula validates against the restored labels (no \"unknown/ambiguous label\")",
+                        "pass":  true,
+                        "detail":  "null"
+                    },
+                    {
+                        "name":  "parser: row/col chips keep their case",
+                        "pass":  true,
+                        "detail":  "COLLEGE×/FY×"
+                    },
+                    {
+                        "name":  "writer: Copy Snippet emits the labels and round-trips byte-for-byte",
+                        "pass":  true,
+                        "detail":  "got: action(trigger, \u0027View Pivot\u0027, \u0027pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT,sum:AMOUNT,formula|nested|nested|asc|3|none|none|none|none|none|none|STATUS=Active;;STATUS=Closed;;|;;;;{Active Sum} - {Closed Sum}|Active Sum;;Closed Sum;;Variance\u0027)"
+                    },
+                    {
+                        "name":  "legacy: sum,count -\u003e 2 rows, default labels",
+                        "pass":  true,
+                        "detail":  "[{\"type\":\"sum\",\"col\":\"AMOUNT\",\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Sum\"},{\"type\":\"count\",\"col\":\"AMOUNT\",\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Count\"}]"
+                    },
+                    {
+                        "name":  "writer: no custom labels -\u003e AggLabels field omitted",
+                        "pass":  true,
+                        "detail":  "got: action(trigger, \u0027View Pivot\u0027, \u0027pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT,count:AMOUNT\u0027)"
+                    },
+                    {
+                        "name":  "dedupe: sum,sum (identical) -\u003e 1 row",
+                        "pass":  true,
+                        "detail":  "[{\"type\":\"sum\",\"col\":\"AMOUNT\",\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Sum\"}]"
+                    },
+                    {
+                        "name":  "dedupe: sum,sum:AMOUNT with Value=AMOUNT -\u003e still 1 row",
+                        "pass":  true,
+                        "detail":  "[{\"type\":\"sum\",\"col\":\"AMOUNT\",\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Sum\"}]"
+                    },
+                    {
+                        "name":  "dedupe: same type+col, different LABELS -\u003e 2 rows",
+                        "pass":  true,
+                        "detail":  "[{\"type\":\"sum\",\"col\":\"AMOUNT\",\"label\":\"Gross\",\"filter\":null,\"formula\":null,\"shownLabel\":\"Gross\"},{\"type\":\"sum\",\"col\":\"AMOUNT\",\"label\":\"Net\",\"filter\":null,\"formula\":null,\"shownLabel\":\"Net\"}]"
+                    },
+                    {
+                        "name":  "dedupe: same type+col, different FILTERS (the help example shape) -\u003e 2 rows",
+                        "pass":  true,
+                        "detail":  "[{\"type\":\"sum\",\"col\":\"AMOUNT\",\"label\":null,\"filter\":\"STATUS=Active\",\"formula\":null,\"shownLabel\":\"Sum\"},{\"type\":\"sum\",\"col\":\"AMOUNT\",\"label\":null,\"filter\":\"STATUS=Closed\",\"formula\":null,\"shownLabel\":\"Sum\"}]"
+                    },
+                    {
+                        "name":  "dedupe: sum:AMOUNT,distinct:RECORD_ID,sum:AMOUNT -\u003e 2 rows",
+                        "pass":  true,
+                        "detail":  "[{\"type\":\"sum\",\"col\":\"AMOUNT\",\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Sum\"},{\"type\":\"distinct\",\"col\":\"RECORD_ID\",\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Distinct\"}]"
+                    },
+                    {
+                        "name":  "sum_count: expands to sum+count, label ignored",
+                        "pass":  true,
+                        "detail":  "[{\"type\":\"sum\",\"col\":\"AMOUNT\",\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Sum\"},{\"type\":\"count\",\"col\":\"AMOUNT\",\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Count\"}]"
+                    },
+                    {
+                        "name":  "expand: parser checks the box on \u0027expanded\u0027",
+                        "pass":  true,
+                        "detail":  "box unchecked after |expanded"
+                    },
+                    {
+                        "name":  "expand: writer round-trips |expanded byte-for-byte",
+                        "pass":  true,
+                        "detail":  "got: action(trigger, \u0027View Pivot\u0027, \u0027pivot|COLLEGE,DEPT|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|expanded\u0027)"
+                    },
+                    {
+                        "name":  "expand: legacy \u0027collapsed\u0027 keyword leaves the box unchecked (= the default)",
+                        "pass":  true,
+                        "detail":  "box checked after |collapsed"
+                    },
+                    {
+                        "name":  "expand: unchecked box emits no Expand arg (trailing default trimmed)",
+                        "pass":  true,
+                        "detail":  "got: action(trigger, \u0027View Pivot\u0027, \u0027pivot|COLLEGE,DEPT|FY|AMOUNT|sum:AMOUNT\u0027)"
+                    },
+                    {
+                        "name":  "newaggs: parser accepts all five types",
+                        "pass":  true,
+                        "detail":  "[{\"type\":\"stddev\",\"col\":\"AMOUNT\",\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Std Dev\"},{\"type\":\"range\",\"col\":\"AMOUNT\",\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Range\"},{\"type\":\"count_filled\",\"col\":\"AMOUNT\",\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Non-Blank\"},{\"type\":\"count_blank\",\"col\":\"AMOUNT\",\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Blank\"},{\"type\":\"antimode\",\"col\":\"AMOUNT\",\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Antimode\"}]"
+                    },
+                    {
+                        "name":  "newaggs: writer round-trips all five byte-for-byte",
+                        "pass":  true,
+                        "detail":  "got: action(trigger, \u0027View Pivot\u0027, \u0027pivot|COLLEGE|FY|AMOUNT|stddev:AMOUNT,range:AMOUNT,count_filled:AMOUNT,count_blank:AMOUNT,antimode:AMOUNT\u0027)"
+                    },
+                    {
+                        "name":  "newaggs: \u0027stdev\u0027 alias normalizes to stddev",
+                        "pass":  true,
+                        "detail":  "[{\"type\":\"stddev\",\"col\":\"AMOUNT\",\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Std Dev\"}]"
+                    },
+                    {
+                        "name":  "derived: parser accepts diff + the three :down twins",
+                        "pass":  true,
+                        "detail":  "[{\"type\":\"sum\",\"col\":\"AMOUNT\",\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Sum\"},{\"type\":\"diff\",\"col\":null,\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Change\"},{\"type\":\"pct_change:down\",\"col\":null,\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"% Change ↓\"},{\"type\":\"diff:down\",\"col\":null,\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Change ↓\"},{\"type\":\"index:down\",\"col\":null,\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Index ↓\"}]"
+                    },
+                    {
+                        "name":  "derived: writer round-trips them byte-for-byte",
+                        "pass":  true,
+                        "detail":  "got: action(trigger, \u0027View Pivot\u0027, \u0027pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT,diff,pct_change:down,diff:down,index:down\u0027)"
+                    },
+                    {
+                        "name":  "pctparent: parser accepts all four new derived types",
+                        "pass":  true,
+                        "detail":  "[{\"type\":\"sum\",\"col\":\"AMOUNT\",\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Sum\"},{\"type\":\"pct_parent_row\",\"col\":null,\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"% Parent Row\"},{\"type\":\"pct_parent_col\",\"col\":null,\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"% Parent Col\"},{\"type\":\"pct_cum\",\"col\":null,\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Cum % →\"},{\"type\":\"pct_cum:down\",\"col\":null,\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Cum % ↓\"}]"
+                    },
+                    {
+                        "name":  "pctparent: writer round-trips them byte-for-byte",
+                        "pass":  true,
+                        "detail":  "got: action(trigger, \u0027View Pivot\u0027, \u0027pivot|COLLEGE,DEPT|FY|AMOUNT|sum:AMOUNT,pct_parent_row,pct_parent_col,pct_cum,pct_cum:down\u0027)"
+                    },
+                    {
+                        "name":  "newaggs math: sample stddev of [10,20,30] = 10",
+                        "pass":  true,
+                        "detail":  "10"
+                    },
+                    {
+                        "name":  "newaggs math: stddev of a single value = 0",
+                        "pass":  true,
+                        "detail":  "0"
+                    },
+                    {
+                        "name":  "newaggs math: antimode least-common",
+                        "pass":  true,
+                        "detail":  "b"
+                    },
+                    {
+                        "name":  "newaggs math: antimode tie keeps first seen",
+                        "pass":  true,
+                        "detail":  "x"
+                    },
+                    {
+                        "name":  "newaggs extract: stddev ~7.0710678",
+                        "pass":  true,
+                        "detail":  "7.0710678118654755"
+                    },
+                    {
+                        "name":  "newaggs extract: range 10",
+                        "pass":  true,
+                        "detail":  "10"
+                    },
+                    {
+                        "name":  "newaggs extract: count_filled 2 / count_blank 1",
+                        "pass":  true,
+                        "detail":  "2/1"
+                    },
+                    {
+                        "name":  "newaggs extract: antimode tie -\u003e first seen",
+                        "pass":  true,
+                        "detail":  "10"
+                    },
+                    {
+                        "name":  "datesplit parse: base/split",
+                        "pass":  true,
+                        "detail":  "{\"base\":\"AWARD_DATE\",\"split\":\"fy\",\"fill\":false,\"binWidth\":null,\"binEdges\":null}"
+                    },
+                    {
+                        "name":  "datesplit parse: case-insensitive + fill",
+                        "pass":  true,
+                        "detail":  "{\"base\":\"AWARD_DATE\",\"split\":\"ym\",\"fill\":true,\"binWidth\":null,\"binEdges\":null}"
+                    },
+                    {
+                        "name":  "datesplit parse: unknown suffix stays plain",
+                        "pass":  true,
+                        "detail":  "{\"base\":\"WEIRD:COLUMN\",\"split\":null,\"fill\":false,\"binWidth\":null,\"binEdges\":null}"
+                    },
+                    {
+                        "name":  "datesplit compose: canonical form",
+                        "pass":  true,
+                        "detail":  "AWARD_DATE:fy:fill"
+                    },
+                    {
+                        "name":  "datesplit compose: cycle drops fill",
+                        "pass":  true,
+                        "detail":  "X:month"
+                    },
+                    {
+                        "name":  "datesplit display label",
+                        "pass":  true,
+                        "detail":  "AWARD_DATE (Fiscal Year)"
+                    },
+                    {
+                        "name":  "datesplit pill: data-field is base",
+                        "pass":  true,
+                        "detail":  "award_date/fy"
+                    },
+                    {
+                        "name":  "datesplit pill round-trip canonical",
+                        "pass":  true,
+                        "detail":  "AWARD_DATE:fy:fill"
+                    },
+                    {
+                        "name":  "datesplit bucket fy Mar",
+                        "pass":  true,
+                        "detail":  "FY25"
+                    },
+                    {
+                        "name":  "datesplit bucket fy Jul",
+                        "pass":  true,
+                        "detail":  "FY26"
+                    },
+                    {
+                        "name":  "datesplit bucket fyq Mar=FQ3",
+                        "pass":  true,
+                        "detail":  "FY25 Q3"
+                    },
+                    {
+                        "name":  "datesplit bucket ym",
+                        "pass":  true,
+                        "detail":  "Mar 2025"
+                    },
+                    {
+                        "name":  "datesplit bucket monthnum",
+                        "pass":  true,
+                        "detail":  "03"
+                    },
+                    {
+                        "name":  "datesplit bucket dow",
+                        "pass":  true,
+                        "detail":  "Fri"
+                    },
+                    {
+                        "name":  "datesplit bucket hour date-only",
+                        "pass":  true,
+                        "detail":  "00:00"
+                    },
+                    {
+                        "name":  "datesplit bucket hour timestamp",
+                        "pass":  true,
+                        "detail":  "15:00"
+                    },
+                    {
+                        "name":  "datesplit bucket unparsable keeps raw",
+                        "pass":  true,
+                        "detail":  "not a date"
+                    },
+                    {
+                        "name":  "datesplit bucket blank stays blank",
+                        "pass":  true,
+                        "detail":  "\"\""
+                    },
+                    {
+                        "name":  "datesplit bucket strips markers",
+                        "pass":  true,
+                        "detail":  "2025"
+                    },
+                    {
+                        "name":  "datesplit vcmp Jan\u003cFeb",
+                        "pass":  true,
+                        "detail":  "-1/1"
+                    },
+                    {
+                        "name":  "datesplit vcmp raw after real buckets",
+                        "pass":  true,
+                        "detail":  "1"
+                    },
+                    {
+                        "name":  "datesplit next fy century wrap",
+                        "pass":  true,
+                        "detail":  "FY00"
+                    },
+                    {
+                        "name":  "datesplit next ym wraps",
+                        "pass":  true,
+                        "detail":  "Jan 2026"
+                    },
+                    {
+                        "name":  "datesplit fillSpec accepts single period",
+                        "pass":  true,
+                        "detail":  "{\"base\":\"AWARD_DATE\",\"split\":\"ym\",\"fill\":true,\"binWidth\":null,\"binEdges\":null}"
+                    },
+                    {
+                        "name":  "datesplit fillSpec rejects cycle",
+                        "pass":  true,
+                        "detail":  "expected null"
+                    },
+                    {
+                        "name":  "datesplit expand inserts Feb+Mar",
+                        "pass":  true,
+                        "detail":  "Jan 2025|Feb 2025|Mar 2025|Apr 2025"
+                    },
+                    {
+                        "name":  "bin parse: base/split/width",
+                        "pass":  true,
+                        "detail":  "{\"base\":\"AMOUNT\",\"split\":\"bin\",\"fill\":false,\"binWidth\":50000,\"binEdges\":null}"
+                    },
+                    {
+                        "name":  "bin parse: auto has null width",
+                        "pass":  true,
+                        "detail":  "{\"base\":\"AMOUNT\",\"split\":\"bin\",\"fill\":false,\"binWidth\":null,\"binEdges\":null}"
+                    },
+                    {
+                        "name":  "bin parse: bin0 is a plain field",
+                        "pass":  true,
+                        "detail":  "{\"base\":\"AMOUNT:bin0\",\"split\":null,\"fill\":false,\"binWidth\":null,\"binEdges\":null}"
+                    },
+                    {
+                        "name":  "bin parse: binlog + fill",
+                        "pass":  true,
+                        "detail":  "{\"base\":\"AMT\",\"split\":\"binlog\",\"fill\":true,\"binWidth\":null,\"binEdges\":null}"
+                    },
+                    {
+                        "name":  "bin compose w width + fill",
+                        "pass":  true,
+                        "detail":  "AMT:bin1000:fill"
+                    },
+                    {
+                        "name":  "bin compose auto",
+                        "pass":  true,
+                        "detail":  "AMT:bin"
+                    },
+                    {
+                        "name":  "bin dispLabel fixed",
+                        "pass":  true,
+                        "detail":  "AMOUNT (Bins of 50,000)"
+                    },
+                    {
+                        "name":  "bin dispLabel auto",
+                        "pass":  true,
+                        "detail":  "AMOUNT (Bins)"
+                    },
+                    {
+                        "name":  "bin bucket 50000 w50000",
+                        "pass":  true,
+                        "detail":  "50,000 – 99,999"
+                    },
+                    {
+                        "name":  "bin bucket negative",
+                        "pass":  true,
+                        "detail":  "-2,000 – -1,001"
+                    },
+                    {
+                        "name":  "bin bucket currency",
+                        "pass":  true,
+                        "detail":  "1,000 – 1,999"
+                    },
+                    {
+                        "name":  "bin bucket raw fallback",
+                        "pass":  true,
+                        "detail":  "N/A"
+                    },
+                    {
+                        "name":  "binlog exact power 1000",
+                        "pass":  true,
+                        "detail":  "1,000 – 9,999"
+                    },
+                    {
+                        "name":  "binlog \u003c 1",
+                        "pass":  true,
+                        "detail":  "\u003c 1"
+                    },
+                    {
+                        "name":  "autoW 0..45000 = 5000",
+                        "pass":  true,
+                        "detail":  "5000"
+                    },
+                    {
+                        "name":  "autoW degenerate = 1",
+                        "pass":  true,
+                        "detail":  "1"
+                    },
+                    {
+                        "name":  "bin vcmp numeric order",
+                        "pass":  true,
+                        "detail":  "-1"
+                    },
+                    {
+                        "name":  "binlog vcmp: \u003c 1 first",
+                        "pass":  true,
+                        "detail":  "-1"
+                    },
+                    {
+                        "name":  "bin next label",
+                        "pass":  true,
+                        "detail":  "5,000 – 9,999"
+                    },
+                    {
+                        "name":  "binlog next label",
+                        "pass":  true,
+                        "detail":  "100 – 999"
+                    },
+                    {
+                        "name":  "bin fillSpec accepted",
+                        "pass":  true,
+                        "detail":  "{\"base\":\"AMT\",\"split\":\"bin\",\"fill\":true,\"binWidth\":1000,\"binEdges\":null}"
+                    },
+                    {
+                        "name":  "bin expand inserts middle buckets",
+                        "pass":  true,
+                        "detail":  "0 – 999|1,000 – 1,999|2,000 – 2,999|3,000 – 3,999"
+                    },
+                    {
+                        "name":  "bin pill carries data-bin-width",
+                        "pass":  true,
+                        "detail":  "bin/50000"
+                    },
+                    {
+                        "name":  "bin pill token round-trip",
+                        "pass":  true,
+                        "detail":  "AMOUNT:bin50000"
+                    },
+                    {
+                        "name":  "bin chip auto",
+                        "pass":  true,
+                        "detail":  "Bins"
+                    },
+                    {
+                        "name":  "bin chip 50K",
+                        "pass":  true,
+                        "detail":  "Bin 50K"
+                    },
+                    {
+                        "name":  "bin chip 2M",
+                        "pass":  true,
+                        "detail":  "Bin 2M"
+                    },
+                    {
+                        "name":  "bin chip 750",
+                        "pass":  true,
+                        "detail":  "Bin 750"
+                    },
+                    {
+                        "name":  "bins parse: split + edges",
+                        "pass":  true,
+                        "detail":  "[100000,250000,500000,750000,1000000,5000000]"
+                    },
+                    {
+                        "name":  "bins parse: sorted + de-duplicated",
+                        "pass":  true,
+                        "detail":  "[100000,500000]"
+                    },
+                    {
+                        "name":  "bins parse: bare :bins is a plain field",
+                        "pass":  true,
+                        "detail":  "{\"base\":\"AMOUNT:bins\",\"split\":null,\"fill\":false,\"binWidth\":null,\"binEdges\":null}"
+                    },
+                    {
+                        "name":  "bins parse: fill",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "bins compose round-trip",
+                        "pass":  true,
+                        "detail":  "AMOUNT:bins100000_250000_500000_750000_1000000_5000000"
+                    },
+                    {
+                        "name":  "bins compose w/ fill",
+                        "pass":  true,
+                        "detail":  "AMT:bins1000_2000:fill"
+                    },
+                    {
+                        "name":  "bins compose: no edges = plain column",
+                        "pass":  true,
+                        "detail":  "AMOUNT"
+                    },
+                    {
+                        "name":  "bins display label",
+                        "pass":  true,
+                        "detail":  "AMOUNT (Custom Ranges)"
+                    },
+                    {
+                        "name":  "compact 100K",
+                        "pass":  true,
+                        "detail":  "100K"
+                    },
+                    {
+                        "name":  "compact 1.5M",
+                        "pass":  true,
+                        "detail":  "1.5M"
+                    },
+                    {
+                        "name":  "compact 1,234,567 not faked",
+                        "pass":  true,
+                        "detail":  "1,234,567"
+                    },
+                    {
+                        "name":  "compact parse $1.5M",
+                        "pass":  true,
+                        "detail":  "1500000"
+                    },
+                    {
+                        "name":  "compact parse junk",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "bins bucket below",
+                        "pass":  true,
+                        "detail":  "below 100K"
+                    },
+                    {
+                        "name":  "bins bucket lower edge inclusive",
+                        "pass":  true,
+                        "detail":  "100K – 250K"
+                    },
+                    {
+                        "name":  "bins bucket upper edge goes above",
+                        "pass":  true,
+                        "detail":  "250K – 500K"
+                    },
+                    {
+                        "name":  "bins bucket 999,999.99",
+                        "pass":  true,
+                        "detail":  "750K – 1M"
+                    },
+                    {
+                        "name":  "bins bucket last edge open",
+                        "pass":  true,
+                        "detail":  "above 5M"
+                    },
+                    {
+                        "name":  "bins bucket raw fallback",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "bins bucket blank",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "bins labels match the chart",
+                        "pass":  true,
+                        "detail":  "below 100K|100K – 250K|250K – 500K|500K – 750K|750K – 1M|1M – 5M|above 5M"
+                    },
+                    {
+                        "name":  "bins vcmp orders below \u003c range \u003c above",
+                        "pass":  true,
+                        "detail":  "ordering"
+                    },
+                    {
+                        "name":  "bins vcmp raw sorts last",
+                        "pass":  true,
+                        "detail":  "1"
+                    },
+                    {
+                        "name":  "bins fillSpec accepted",
+                        "pass":  true,
+                        "detail":  "\"bins\""
+                    },
+                    {
+                        "name":  "bins fill rebuilds every bucket, raw last",
+                        "pass":  true,
+                        "detail":  "below 1K|1K – 2K|2K – 3K|above 3K|N/A"
+                    },
+                    {
+                        "name":  "bins normEdges rejects too many",
+                        "pass":  true,
+                        "detail":  "expected null"
+                    },
+                    {
+                        "name":  "bins normEdges rejects negatives",
+                        "pass":  true,
+                        "detail":  "expected null"
+                    },
+                    {
+                        "name":  "edge list: comma-separated compact",
+                        "pass":  true,
+                        "detail":  "{\"nums\":[100000,250000,500000,1000000]}"
+                    },
+                    {
+                        "name":  "edge list: grouped number stays whole",
+                        "pass":  true,
+                        "detail":  "{\"nums\":[50000]}"
+                    },
+                    {
+                        "name":  "edge list: mixed formats + spaces",
+                        "pass":  true,
+                        "detail":  "{\"nums\":[2500000,50000,1000000]}"
+                    },
+                    {
+                        "name":  "edge list: grouped numbers in a comma list",
+                        "pass":  true,
+                        "detail":  "{\"nums\":[100000,250000]}"
+                    },
+                    {
+                        "name":  "edge list: ungrouped comma list still splits",
+                        "pass":  true,
+                        "detail":  "{\"nums\":[100000,250000]}"
+                    },
+                    {
+                        "name":  "edge list: junk names the offender",
+                        "pass":  true,
+                        "detail":  "{\"bad\":\"abc\"}"
+                    },
+                    {
+                        "name":  "edge list: empty input",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "bins pill carries data-bin-edges",
+                        "pass":  true,
+                        "detail":  "100000_250000_500000_750000_1000000_5000000"
+                    },
+                    {
+                        "name":  "bins pill token round-trip",
+                        "pass":  true,
+                        "detail":  "AMOUNT:bins100000_250000_500000_750000_1000000_5000000"
+                    },
+                    {
+                        "name":  "pctile token p90",
+                        "pass":  true,
+                        "detail":  "90"
+                    },
+                    {
+                        "name":  "pctile bounds p1/p99",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "pctile rejects p0/p100",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "pctile never matches pct_ types",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "pctile rejects base types",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "pctile label is P90",
+                        "pass":  true,
+                        "detail":  "P90"
+                    },
+                    {
+                        "name":  "p50 of 1..10 = 5.5",
+                        "pass":  true,
+                        "detail":  "5.5"
+                    },
+                    {
+                        "name":  "p90 of 1..10 = 9.1",
+                        "pass":  true,
+                        "detail":  "9.1"
+                    },
+                    {
+                        "name":  "p25 of 1..10 = 3.25",
+                        "pass":  true,
+                        "detail":  "3.25"
+                    },
+                    {
+                        "name":  "pctile sorts unsorted input",
+                        "pass":  true,
+                        "detail":  "5"
+                    },
+                    {
+                        "name":  "pctile single value",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "pctile empty = 0",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "pctile defers to the snippet engine helper",
+                        "pass":  true,
+                        "detail":  "4.33 vs 4.33"
+                    },
+                    {
+                        "name":  "extract p50 = 25",
+                        "pass":  true,
+                        "detail":  "25"
+                    },
+                    {
+                        "name":  "extract p50 === extract median",
+                        "pass":  true,
+                        "detail":  "25 vs 25"
+                    },
+                    {
+                        "name":  "extract p90 = 37",
+                        "pass":  true,
+                        "detail":  "37"
+                    },
+                    {
+                        "name":  "extract p25 = 17.5",
+                        "pass":  true,
+                        "detail":  "17.5"
+                    },
+                    {
+                        "name":  "extract p50 odd count = 6",
+                        "pass":  true,
+                        "detail":  "6"
+                    },
+                    {
+                        "name":  "extract ignores non-numeric junk",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "wavg token",
+                        "pass":  true,
+                        "detail":  "AMOUNT"
+                    },
+                    {
+                        "name":  "wavg token uppercases",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "wavg rejects bare wavg",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "wavg rejects other types",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "wavg label names the weight",
+                        "pass":  true,
+                        "detail":  "Wtd Avg by AMOUNT"
+                    },
+                    {
+                        "name":  "bare wavg label",
+                        "pass":  true,
+                        "detail":  "Weighted Avg"
+                    },
+                    {
+                        "name":  "wavg of a pair",
+                        "pass":  true,
+                        "detail":  "17.5"
+                    },
+                    {
+                        "name":  "wavg of zero weight = 0",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "wavg merge is Sw / S(v*w), not an avg of avgs",
+                        "pass":  true,
+                        "detail":  "{\"w\":500,\"wv\":11000} -\u003e 22"
+                    },
+                    {
+                        "name":  "wavg merge ignores a missing pair",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "wavgPair reads the bucket by weight column",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "extract wavg@AMOUNT = 17.5",
+                        "pass":  true,
+                        "detail":  "17.5"
+                    },
+                    {
+                        "name":  "extract plain avg is still 15",
+                        "pass":  true,
+                        "detail":  "15"
+                    },
+                    {
+                        "name":  "extract wavg with an unknown weight column = 0",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "wavg cell shows Weighted Avg + a weight target",
+                        "pass":  true,
+                        "detail":  "\u003cspan class=\"pat-agg-dot\" data-type=\"wavg@AMOUNT\"\u003e\u003c/span\u003e\u003cspan class=\"pat-cell-text\"\u003eWeighted Avg\u003c/span\u003e\u003cspan class=\"pat-wavg-w\" title=\"Weight column - click to change\"\u003e× AMOUNT\u003c/span\u003e\u003cspan class=\"pat-edit-icon\" aria-hidden=\"true\"\u003e✎\u003c/span\u003e"
+                    },
+                    {
+                        "name":  "bare wavg cell prompts for the weight",
+                        "pass":  true,
+                        "detail":  "\u003cspan class=\"pat-agg-dot\" data-type=\"wavg\"\u003e\u003c/span\u003e\u003cspan class=\"pat-cell-text\"\u003eWeighted Avg\u003c/span\u003e\u003cspan class=\"pat-wavg-w pat-wavg-unset\" title=\"Pick the column to weight by\"\u003e× pick weight\u003c/span\u003e\u003cspan class=\"pat-edit-icon\" aria-hidden=\"true\"\u003e✎\u003c/span\u003e"
+                    },
+                    {
+                        "name":  "a normal agg cell has no weight target",
+                        "pass":  true,
+                        "detail":  "\u003cspan class=\"pat-agg-dot\" data-type=\"sum\"\u003e\u003c/span\u003e\u003cspan class=\"pat-cell-text\"\u003eSum\u003c/span\u003e\u003cspan class=\"pat-edit-icon\" aria-hidden=\"true\"\u003e✎\u003c/span\u003e"
+                    },
+                    {
+                        "name":  "ytd: the type is recognised",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "ytd: running_total is NOT ytd",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "ytd: joins the running-total family",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "ytd: down variant is a vertical running type",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "ytd: totDown covers ytd:down, not running_count:down",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "ytd: registered as a derived type",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "ytd: carries a label",
+                        "pass":  true,
+                        "detail":  "YTD →"
+                    },
+                    {
+                        "name":  "ytd: ym year + periods-per-year",
+                        "pass":  true,
+                        "detail":  "12"
+                    },
+                    {
+                        "name":  "ytd: yq year + periods-per-year",
+                        "pass":  true,
+                        "detail":  "4"
+                    },
+                    {
+                        "name":  "ytd: fy resolves the FISCAL year",
+                        "pass":  true,
+                        "detail":  "2025"
+                    },
+                    {
+                        "name":  "ytd: fyq year + periods-per-year",
+                        "pass":  true,
+                        "detail":  "2025"
+                    },
+                    {
+                        "name":  "ytd: plain year axis",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "ytd: the first column always resets",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "ytd: same year does not reset",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "ytd: a new calendar year resets",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "ytd: on a fiscal axis it resets at the FISCAL edge, not December",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "ytd: running_total is never reset by the same call",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "ytd: an unreadable label cannot fake a reset",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "ytd: a composite key reads the period segment, not the first",
+                        "pass":  true,
+                        "detail":  "idx=1"
+                    },
+                    {
+                        "name":  "ytd: an unsplit date label still yields a year",
+                        "pass":  true,
+                        "detail":  "2025"
+                    },
+                    {
+                        "name":  "ytd: a text axis yields no year",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "ytd: an axis with no year anywhere is REFUSED (renders N/A)",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "ytd: an axis that does carry years is accepted",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "yoy: the type is recognised",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "yoy: registered as a derived type",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "yoy: carries a label",
+                        "pass":  true,
+                        "detail":  "YoY %"
+                    },
+                    {
+                        "name":  "yoy: ym period key is the month",
+                        "pass":  true,
+                        "detail":  "Mar"
+                    },
+                    {
+                        "name":  "yoy: fyq period key is the quarter",
+                        "pass":  true,
+                        "detail":  "Q3"
+                    },
+                    {
+                        "name":  "yoy: whole-year variants have an empty period key",
+                        "pass":  true,
+                        "detail":  "\"\""
+                    },
+                    {
+                        "name":  "yoy: Jul 2023 pairs with Jul 2022, not 12 columns back",
+                        "pass":  true,
+                        "detail":  "Jul 2022"
+                    },
+                    {
+                        "name":  "yoy: Aug 2024 pairs with Aug 2023",
+                        "pass":  true,
+                        "detail":  "Aug 2023"
+                    },
+                    {
+                        "name":  "yoy: the FIRST year has no prior twin (renders N/A)",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "yoy: a month with no prior-year twin is null",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "yoy: FY26 Q1 pairs with FY25 Q1",
+                        "pass":  true,
+                        "detail":  "FY25 Q1"
+                    },
+                    {
+                        "name":  "yoy: FY26 Q2 pairs with FY25 Q2",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "yoy: FY25 Q2 has no prior twin",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "yoy: a composite key pairs within its own group",
+                        "pass":  true,
+                        "detail":  "Engineering|||Jul 2022"
+                    },
+                    {
+                        "name":  "yoy: it does NOT pair across to the other group",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "yoy: a __proto__ label cannot poison the index",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "yoy: an axis with no year yields no twin",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "roll: roll3 parses to 3",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "roll: roll12 parses to 12",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "roll: roll99 is the ceiling",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "roll: the :down variant keeps its N",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "roll: roll1 is refused (it IS the base value)",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "roll: roll0 refused",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "roll: roll100 refused",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "roll: bare \"roll\" refused",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "roll: \"rolling\" is not a roll token",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "roll: a base agg is not a roll token",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "roll: isRollDown separates the directions",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "roll: registered as a derived type",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "roll: label names the window and direction",
+                        "pass":  true,
+                        "detail":  "3-Period Avg → | 3-Period Avg ↓"
+                    },
+                    {
+                        "name":  "roll: mean of a full window",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "roll: uses the LAST n, not the whole history",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "roll: a filling window reads N/A, never a partial mean",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "roll: an empty window is null",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "roll: a gap INSIDE the window voids it",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "roll: a gap that has scrolled OUT does not",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "roll: a genuine zero mean is a value, not a blank",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "roll: negatives average correctly",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "roll: window longer than n still uses n",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "slot: a plain number passes through",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "slot: distinct keeps a Set, so read its size",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "slot: stddev keeps the raw array",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "slot: a percentile reads its array",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "slot: range keeps min/max",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "slot: an untouched range sentinel is null",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "slot: mode is string-valued, so no ratio",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "slot: null in, null out",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "slot: a non-finite number is null",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "pctchg totals: a distinct slot resolves to its cardinality",
+                        "pass":  true,
+                        "detail":  "4/5"
+                    },
+                    {
+                        "name":  "pctchg totals: the ratio is real, not NaN",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "pctchg totals: raw Set arithmetic WOULD have been NaN (the old bug)",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "pctchg totals: a percentile base resolves",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "pctchg totals: a stddev base resolves",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "pctchg totals: a range base resolves",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "pctchg totals: a string-valued base refuses rather than guessing",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "pctchg totals: an absent slot refuses",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "units: running_total reports in its base units",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "units: ytd and roll do too",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "units: diff does too",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "units: a PERCENT type does not (it never reaches the currency gate)",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "units: a base agg does not inherit from anything",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "units: the count-like set is exactly the old currency exemption list",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "units: measured aggregations are not count-like",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "rollsum: folds into the roll family",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "rollsum: the mode flag separates total from mean",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "rollsum: keeps its N and direction",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "rollsum: rollsum1 refused like roll1",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "rollsum: registered as derived",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "rollsum: the window TOTALS instead of averaging",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "rollsum: the mean path is untouched",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "rollsum: a filling window still reads N/A",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "rollsum: label says Total, not Avg",
+                        "pass":  true,
+                        "detail":  "3-Period Total →"
+                    },
+                    {
+                        "name":  "prioryear: recognised in both directions",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "prioryear: is NOT yoy (value, not movement)",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "prioryear: registered as derived",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "prioryear: reports in the BASE units, so it can be money",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "prioryear: carries a label",
+                        "pass":  true,
+                        "detail":  "Last Year"
+                    },
+                    {
+                        "name":  "baseline: index@LABEL yields the label",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "baseline: the :down twin keeps its label",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "baseline: plain index has no label (first column stays the default)",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "baseline: plain index is still an index agg",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "baseline: a non-index type is not",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "baseline: index@ is registered as derived",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "baseline: the label names the base column",
+                        "pass":  true,
+                        "detail":  "Index vs FY2023"
+                    },
+                    {
+                        "name":  "baseline: resolves an exact label",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "baseline: resolves case-insensitively",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "baseline: an unmatched label resolves to null, so cells read N/A",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "baseline: matches the PERIOD segment of a nested key",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "baseline: an empty label is not a match",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "chart map: no pivot = null",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "chart map: the builder agg list holds the static types (patterns are tested via canAgg)",
+                        "pass":  true,
+                        "detail":  "sum,count,avg,min,max,median,distinct,running_total,running_count,stddev,range"
+                    },
+                    {
+                        "name":  "chart map: rows -\u003e xAxis",
+                        "pass":  true,
+                        "detail":  "COLLEGE"
+                    },
+                    {
+                        "name":  "chart map: cols -\u003e groupBy",
+                        "pass":  true,
+                        "detail":  "FY"
+                    },
+                    {
+                        "name":  "chart map: value -\u003e yAxis",
+                        "pass":  true,
+                        "detail":  "AMOUNT"
+                    },
+                    {
+                        "name":  "chart map: agg carries",
+                        "pass":  true,
+                        "detail":  "sum"
+                    },
+                    {
+                        "name":  "chart map: a clean pivot warns about nothing",
+                        "pass":  true,
+                        "detail":  "[]"
+                    },
+                    {
+                        "name":  "chart map: no column field = groupBy none",
+                        "pass":  true,
+                        "detail":  "none"
+                    },
+                    {
+                        "name":  "chart map: nested rows keep the first and warn",
+                        "pass":  true,
+                        "detail":  "[\"A chart has one X axis, so COLLEGE became the X axis and the second row field, DEPT, became the series.\"]"
+                    },
+                    {
+                        "name":  "chart map: an unsupported agg falls back to Sum and says so",
+                        "pass":  true,
+                        "detail":  "[\"The chart builder cannot do Blank, so the chart is set to Sum - change it in the builder if that is not what you want.\"]"
+                    },
+                    {
+                        "name":  "chart map: picks the first agg the builder supports",
+                        "pass":  true,
+                        "detail":  "avg"
+                    },
+                    {
+                        "name":  "chart map: names the aggregations left behind",
+                        "pass":  true,
+                        "detail":  "[\"A chart plots one measure: using Avg. Not charted: Antimode, Sum.\"]"
+                    },
+                    {
+                        "name":  "chart map: a bucketed row field is passed through as a token",
+                        "pass":  true,
+                        "detail":  "AMOUNT:bins100000_250000"
+                    },
+                    {
+                        "name":  "chart map: bucketed rows no longer warn",
+                        "pass":  true,
+                        "detail":  "[]"
+                    },
+                    {
+                        "name":  "chart map: a bucketed column field is passed through as the series token",
+                        "pass":  true,
+                        "detail":  "{\"config\":{\"type\":\"bar\",\"xAxis\":\"COLLEGE\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"AWARD_DATE:fy\",\"agg\":\"sum\",\"stacked\":false,\"horizontal\":false,\"normalize\":false,\"title\":\"\",\"subtitle\":\"\",\"titlePos\":\"top\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\"},\"sortBy\":\"value\",\"sortDir\":\"desc\",\"warnings\":[]}"
+                    },
+                    {
+                        "name":  "chart map: bucketed columns no longer warn",
+                        "pass":  true,
+                        "detail":  "[]"
+                    },
+                    {
+                        "name":  "axis bucket: the comparator for a token is the variant order",
+                        "pass":  true,
+                        "detail":  "expected ascending by bucket"
+                    },
+                    {
+                        "name":  "axis bucket: a plain column keeps its normal comparator path",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "axis bucket: bins order below \u003c range \u003c above",
+                        "pass":  true,
+                        "detail":  "expected sequence order"
+                    },
+                    {
+                        "name":  "axis bucket: rows gain the bucket under the token key",
+                        "pass":  true,
+                        "detail":  "below 100K|100K – 250K|250K – 500K|above 500K"
+                    },
+                    {
+                        "name":  "axis bucket: auto width resolves from the data",
+                        "pass":  true,
+                        "detail":  "0 – 999,999"
+                    },
+                    {
+                        "name":  "axis bucket: a plain column returns the rows untouched",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "axis bucket: source rows are cloned, never mutated",
+                        "pass":  true,
+                        "detail":  "1"
+                    },
+                    {
+                        "name":  "chart agg: p90 matches the pivot percentile",
+                        "pass":  true,
+                        "detail":  "9.1"
+                    },
+                    {
+                        "name":  "chart agg: p25",
+                        "pass":  true,
+                        "detail":  "3.25"
+                    },
+                    {
+                        "name":  "chart agg: stddev of [10,20,30] = 10",
+                        "pass":  true,
+                        "detail":  "10"
+                    },
+                    {
+                        "name":  "chart agg: range",
+                        "pass":  true,
+                        "detail":  "35"
+                    },
+                    {
+                        "name":  "chart agg: an unrelated type returns undefined (site keeps its own default)",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "chart agg: empty values return undefined",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "chart agg: wavg pairs value with weight",
+                        "pass":  true,
+                        "detail":  "17.5"
+                    },
+                    {
+                        "name":  "chart agg: wavg skips rows with an unusable weight (NaN)",
+                        "pass":  true,
+                        "detail":  "25"
+                    },
+                    {
+                        "name":  "chart agg: wavg with zero total weight = 0",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "chart agg: wavg without weights returns undefined (unsupported chart types fall back)",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "chart agg: builder can do percentiles and wavg now",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "chart agg: builder still cannot do the pivot-only types",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "chart map: a percentile pivot keeps its aggregation",
+                        "pass":  true,
+                        "detail":  "{\"config\":{\"type\":\"bar\",\"xAxis\":\"COLLEGE\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"none\",\"agg\":\"p90\",\"stacked\":false,\"horizontal\":false,\"normalize\":false,\"title\":\"\",\"subtitle\":\"\",\"titlePos\":\"top\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\"},\"sortBy\":\"value\",\"sortDir\":\"desc\",\"warnings\":[]}"
+                    },
+                    {
+                        "name":  "chart map: a weighted-average pivot keeps its weight",
+                        "pass":  true,
+                        "detail":  "{\"config\":{\"type\":\"bar\",\"xAxis\":\"COLLEGE\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"none\",\"agg\":\"wavg@COUNT\",\"stacked\":false,\"horizontal\":false,\"normalize\":false,\"title\":\"\",\"subtitle\":\"\",\"titlePos\":\"top\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\"},\"sortBy\":\"value\",\"sortDir\":\"desc\",\"warnings\":[]}"
+                    },
+                    {
+                        "name":  "chart map: a text-only aggregation still falls back to Sum and says so",
+                        "pass":  true,
+                        "detail":  "{\"config\":{\"type\":\"bar\",\"xAxis\":\"COLLEGE\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"none\",\"agg\":\"sum\",\"stacked\":false,\"horizontal\":false,\"normalize\":false,\"title\":\"\",\"subtitle\":\"\",\"titlePos\":\"top\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\"},\"sortBy\":\"value\",\"sortDir\":\"desc\",\"warnings\":[\"The chart builder cannot do Antimode, so the chart is set to Sum - change it in the builder if that is not what you want.\"]}"
+                    },
+                    {
+                        "name":  "axis bucket: a text column offers no buckets",
+                        "pass":  true,
+                        "detail":  "[]"
+                    },
+                    {
+                        "name":  "axis bucket: a numeric column offers bin + binlog",
+                        "pass":  true,
+                        "detail":  "[{\"token\":\"AMOUNT:bin\",\"label\":\"Bins\"},{\"token\":\"AMOUNT:binlog\",\"label\":\"Order of Magnitude\"}]"
+                    },
+                    {
+                        "name":  "engine B: pivot| trigger keeps case (COLLEGE / Status = Active / Sponsor\u0027s Total) and un-escapes the apostrophe",
+                        "pass":  true,
+                        "detail":  "pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|none|none|Status = Active|none|Sponsor\u0027s Total"
+                    },
+                    {
+                        "name":  "engine B: other triggers still lowercased (sort|AMOUNT|DESC -\u003e sort|amount|desc)",
+                        "pass":  true,
+                        "detail":  "\u003ca href=\"#\" class=\"snippet-action\" data-action-name=\"trigger\" data-action-value=\"sort|amount|desc\"\u003eGo\u003c/a\u003e"
+                    },
+                    {
+                        "name":  "engine B link -\u003e parser: filter + label arrive with case intact",
+                        "pass":  true,
+                        "detail":  "[{\"type\":\"sum\",\"col\":\"AMOUNT\",\"label\":\"Sponsor\u0027s Total\",\"filter\":\"Status = Active\",\"formula\":null,\"shownLabel\":\"Sponsor\u0027s Total\"}]"
+                    },
+                    {
+                        "name":  "writer: apostrophe in a label is emitted as \\\u0027 inside the single-quoted arg",
+                        "pass":  true,
+                        "detail":  "got: action(trigger, \u0027View Pivot\u0027, \u0027pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|none|none|Status = Active|none|Sponsor\\\u0027s Total\u0027)"
+                    },
+                    {
+                        "name":  "engine A: rendered pivot| link keeps case (COLLEGE / Status = Active / Mixed Case Label)",
+                        "pass":  true,
+                        "detail":  "pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|none|none|Status = Active|none|Mixed Case Label"
+                    },
+                    {
+                        "name":  "engine A: other triggers still lowercased (sort|amount|desc)",
+                        "pass":  true,
+                        "detail":  "sort|amount|desc"
+                    },
+                    {
+                        "name":  "locate: click inside pivot trigger finds the call",
+                        "pass":  true,
+                        "detail":  "action(trigger, case(1=1,\u0027A\u0027,\u0027B\u0027), \u0027pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|none|none|Status = Active|none|Sponsor\\\u0027s Total\u0027, 1=1)"
+                    },
+                    {
+                        "name":  "locate: arg span covers the quoted trigger and label decodes",
+                        "pass":  true,
+                        "detail":  "{\"arg\":\"\u0027pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|none|none|Status = Active|none|Sponsor\\\\\u0027s Total\u0027\",\"trig\":\"pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|none|none|Status = Active|none|Sponsor\u0027s Total\"}"
+                    },
+                    {
+                        "name":  "locate: click inside a sort call returns null",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "locate: click in prose returns null",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "list: two pivot calls found with labels",
+                        "pass":  true,
+                        "detail":  "[\"View C1\",\"View C2\"]"
+                    },
+                    {
+                        "name":  "dblclick: whole action(...) call selected",
+                        "pass":  true,
+                        "detail":  "action(trigger, case(1=1,\u0027A\u0027,\u0027B\u0027), \u0027pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|none|none"
+                    },
+                    {
+                        "name":  "dblclick: builder loaded with label/filter case intact",
+                        "pass":  true,
+                        "detail":  "[{\"type\":\"sum\",\"col\":\"AMOUNT\",\"label\":\"Sponsor\u0027s Total\",\"filter\":\"Status = Active\",\"formula\":null,\"shownLabel\":\"Sponsor\u0027s Total\"}]"
+                    },
+                    {
+                        "name":  "dblclick: edit target armed + lightbox open + Update visible, picker hidden",
+                        "pass":  true,
+                        "detail":  "{\"tgt\":true,\"lb\":true,\"btn\":true,\"dd\":false}"
+                    },
+                    {
+                        "name":  "update: only the trigger arg replaced; label + condition preserved",
+                        "pass":  true,
+                        "detail":  "Intro prose action(trigger, \u0027Sort it\u0027, \u0027sort|AMOUNT|DESC\u0027) mid prose\naction(trigger, case(1=1,\u0027A\u0027,\u0027B\u0027), \u0027pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|none|none|Status = Active|none|Renamed \u0026 Co\\\u0027s\u0027, 1=1)\ntail prose"
+                    },
+                    {
+                        "name":  "update: repeat click is idempotent",
+                        "pass":  true,
+                        "detail":  "Intro prose action(trigger, \u0027Sort it\u0027, \u0027sort|AMOUNT|DESC\u0027) mid prose\naction(trigger, case(1=1,\u0027A\u0027,\u0027B\u0027), \u0027pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|none|none|Status = Active|none|Renamed \u0026 Co\\\u0027s\u0027, 1=1)\ntail prose"
+                    },
+                    {
+                        "name":  "update: marker tracks an upstream edit",
+                        "pass":  true,
+                        "detail":  "PREFIX! Intro prose action(trigger, \u0027Sort it\u0027, \u0027sort|AMOUNT|DESC\u0027) mid prose\naction(trigger, case(1=1,\u0027A\u0027,\u0027B\u0027), \u0027pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|none|none|Status = Active|none|Renamed \u0026 Co\\\u0027s\u0027, 1=1)\ntail prose"
+                    },
+                    {
+                        "name":  "setValue cleared the armed target",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "sole: Update visible, picker hidden",
+                        "pass":  true,
+                        "detail":  "{\"btn\":true,\"dd\":false}"
+                    },
+                    {
+                        "name":  "sole: the only pivot call was updated from the builder",
+                        "pass":  true,
+                        "detail":  "Solo header\naction(trigger, \u0027View C1\u0027, \u0027pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|none|none|none|none|Status = Active|none|Renamed \u0026 Co\\\u0027s\u0027)\nfooter"
+                    },
+                    {
+                        "name":  "multi: picker shown with one option per pivot call",
+                        "pass":  true,
+                        "detail":  "1. \"View C1\" - COLLEGE×none (AMOUNT) | 2. \"View C2\" - FY×none (AMOUNT)"
+                    },
+                    {
+                        "name":  "multi: selecting from the picker LOADS that command into the builder",
+                        "pass":  true,
+                        "detail":  "[{\"type\":\"count\",\"col\":\"AMOUNT\",\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Count\"}] rows=FY×"
+                    },
+                    {
+                        "name":  "multi: selection arms the target and the picker stays visible, preselected",
+                        "pass":  true,
+                        "detail":  "{\"tgt\":true,\"vis\":true,\"val\":\"1\"}"
+                    },
+                    {
+                        "name":  "multi: picked call (2nd) updated, 1st untouched",
+                        "pass":  true,
+                        "detail":  "action(trigger, \u0027View C1\u0027, \u0027pivot|COLLEGE|none|AMOUNT|sum\u0027)\naction(trigger, \u0027View C2\u0027, \u0027pivot|FY|none|AMOUNT|count:AMOUNT\u0027)"
+                    },
+                    {
+                        "name":  "multi: picker still offered on the next builder open (regression)",
+                        "pass":  true,
+                        "detail":  "{\"vis\":true,\"n\":2,\"val\":\"1\"}"
+                    },
+                    {
+                        "name":  "source list: \u0027#\u0027 offered on dropdown load, used columns excluded",
+                        "pass":  true,
+                        "detail":  "[\"#\",\"EXTRA_COL\",\"FY\"]"
+                    },
+                    {
+                        "name":  "none: Update + picker hidden",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "none: forced update click leaves the snippet untouched",
+                        "pass":  true,
+                        "detail":  "nothing here action(trigger, \u0027X\u0027, \u0027sort|AMOUNT|asc\u0027)"
+                    },
+                    {
+                        "name":  "admin gate: refresh hides Update + picker for non-admins",
+                        "pass":  true,
+                        "detail":  "{\"btn\":false,\"dd\":false}"
+                    },
+                    {
+                        "name":  "admin gate: double-click opener refuses for non-admins",
+                        "pass":  true,
+                        "detail":  "false"
+                    },
+                    {
+                        "name":  "row totals: trigger applies them, next trigger without them CLEARS them",
+                        "pass":  true,
+                        "detail":  "{\"rtOn\":true,\"tokOn\":1,\"rtOff\":false,\"tokOff\":0}"
+                    },
+                    {
+                        "name":  "sticky cols: explicit 7 applies, trimmed trigger resets to default 3",
+                        "pass":  true,
+                        "detail":  "7/3"
+                    },
+                    {
+                        "name":  "rank scope: parser applies @FIELD case-insensitively via the options rebuild",
+                        "pass":  true,
+                        "detail":  "COLLEGE opts=2"
+                    },
+                    {
+                        "name":  "rank scope: writer emits @COLLEGE",
+                        "pass":  true,
+                        "detail":  "action(trigger, \u0027View Pivot\u0027, \u0027pivot|COLLEGE,DEPT|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|top3_sum_other@COLLEGE\u0027)"
+                    },
+                    {
+                        "name":  "rank scope: trigger without @ resets to Overall",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "rank scope: Overall emits no @ suffix",
+                        "pass":  true,
+                        "detail":  "action(trigger, \u0027View Pivot\u0027, \u0027pivot|COLLEGE,DEPT|FY|AMOUNT|sum:AMOUNT|nested|nested|asc|3|none|none|top3_sum_other\u0027)"
+                    },
+                    {
+                        "name":  "rank scope: single row field locks to Overall (disabled)",
+                        "pass":  true,
+                        "detail":  "/true"
+                    },
+                    {
+                        "name":  "bin round-trip: pill carries split + width after decorate",
+                        "pass":  true,
+                        "detail":  "bin/20000"
+                    },
+                    {
+                        "name":  "bin round-trip: writer re-emits AMOUNT:bin20000",
+                        "pass":  true,
+                        "detail":  "action(trigger, \u0027View Pivot\u0027, \u0027pivot|AMOUNT:bin20000|FY|AMOUNT|count:AMOUNT\u0027)"
+                    },
+                    {
+                        "name":  "bins round-trip: pill keeps split + edges after decorate",
+                        "pass":  true,
+                        "detail":  "bins/100000_250000_500000_750000_1000000_5000000"
+                    },
+                    {
+                        "name":  "bins round-trip: chip reads Ranges",
+                        "pass":  true,
+                        "detail":  "Ranges"
+                    },
+                    {
+                        "name":  "bins round-trip: writer re-emits the full edge list",
+                        "pass":  true,
+                        "detail":  "action(trigger, \u0027View Pivot\u0027, \u0027pivot|AMOUNT:bins100000_250000_500000_750000_1000000_5000000|FY|AMOUNT|sum:AMOUNT\u0027)"
+                    },
+                    {
+                        "name":  "pctile round-trip: parser kept all three aggs",
+                        "pass":  true,
+                        "detail":  "[{\"type\":\"sum\",\"col\":\"AMOUNT\",\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Sum\"},{\"type\":\"p90\",\"col\":\"AMOUNT\",\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"P90\"},{\"type\":\"p25\",\"col\":\"AMOUNT\",\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"P25\"}]"
+                    },
+                    {
+                        "name":  "pctile round-trip: label cells SHOW P90 / P25 (no custom label needed)",
+                        "pass":  true,
+                        "detail":  "[\"P90\",\"P25\"]"
+                    },
+                    {
+                        "name":  "pctile round-trip: writer re-emits p90/p25 with their columns",
+                        "pass":  true,
+                        "detail":  "action(trigger, \u0027View Pivot\u0027, \u0027pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT,p90:AMOUNT,p25:AMOUNT\u0027)"
+                    },
+                    {
+                        "name":  "wavg round-trip: parser kept wavg@AMOUNT",
+                        "pass":  true,
+                        "detail":  "[{\"type\":\"sum\",\"col\":\"AMOUNT\",\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Sum\"},{\"type\":\"wavg@AMOUNT\",\"col\":\"AMOUNT\",\"label\":null,\"filter\":null,\"formula\":null,\"shownLabel\":\"Wtd Avg by AMOUNT\"}]"
+                    },
+                    {
+                        "name":  "wavg round-trip: label reads Wtd Avg by AMOUNT",
+                        "pass":  true,
+                        "detail":  "Wtd Avg by AMOUNT"
+                    },
+                    {
+                        "name":  "wavg round-trip: the cell carries a clickable weight target",
+                        "pass":  true,
+                        "detail":  "\u003cspan class=\"pat-agg-dot\" data-type=\"wavg@AMOUNT\"\u003e\u003c/span\u003e\u003cspan class=\"pat-cell-text\"\u003eWeighted Avg\u003c/span\u003e\u003cspan class=\"pat-wavg-w\" title=\"Weight column - click to change\"\u003e× AMOUNT\u003c/span\u003e\u003cspan class=\"pat-edit-icon\" aria-hidden=\"true\"\u003e✎\u003c/span\u003e"
+                    },
+                    {
+                        "name":  "wavg round-trip: writer re-emits wavg@AMOUNT",
+                        "pass":  true,
+                        "detail":  "action(trigger, \u0027View Pivot\u0027, \u0027pivot|COLLEGE|FY|AMOUNT|sum:AMOUNT,wavg@AMOUNT:AMOUNT\u0027)"
+                    },
+                    {
+                        "name":  "ls: renders 3 positions, horizontal by default",
+                        "pass":  true,
+                        "detail":  "{\"n\":3,\"o\":\"horizontal\",\"txt\":\"TableBy CollegeBy Year\"}"
+                    },
+                    {
+                        "name":  "ls: every position carries a title for the ellipsed label",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "ls: 6 positions stay HORIZONTAL (orientation is never inferred)",
+                        "pass":  true,
+                        "detail":  "{\"n\":6,\"o\":\"horizontal\"}"
+                    },
+                    {
+                        "name":  "ls: vertical keyword honoured; wide/small become classes",
+                        "pass":  true,
+                        "detail":  "{\"o\":\"vertical\",\"c\":\"pnb-layout-switch wide small\"}"
+                    },
+                    {
+                        "name":  "ls: unknown keyword errors and names itself",
+                        "pass":  true,
+                        "detail":  "[layout_switch: unknown keyword sideways - expected vertical, horizontal, wide, small, large or pill, or a pos"
+                    },
+                    {
+                        "name":  "ls: a single position is refused",
+                        "pass":  true,
+                        "detail":  "[layout_switch needs at least 2 positions]"
+                    },
+                    {
+                        "name":  "ls locate: both pivot positions listed, keyword + flat ignored",
+                        "pass":  true,
+                        "detail":  "[\"By College\",\"By Year\"]"
+                    },
+                    {
+                        "name":  "ls locate: arg span is the TRIGGER only - no quotes, no Label| prefix",
+                        "pass":  true,
+                        "detail":  "{\"q\":false,\"span\":\"pivot|COLLEGE|FY|AMOUNT|sum\"}"
+                    },
+                    {
+                        "name":  "ls locate: call span is ONE position, not the whole layout_switch call",
+                        "pass":  true,
+                        "detail":  "\u0027By College|pivot|COLLEGE|FY|AMOUNT|sum\u0027"
+                    },
+                    {
+                        "name":  "ls locate: a click inside a position resolves to that position",
+                        "pass":  true,
+                        "detail":  "By College"
+                    },
+                    {
+                        "name":  "ls locate: a click on the vertical keyword is not a target",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "ls update: picker offers both positions",
+                        "pass":  true,
+                        "detail":  "2"
+                    },
+                    {
+                        "name":  "ls update: position 2 rewritten with its Label| and quotes intact",
+                        "pass":  true,
+                        "detail":  "prose\nlayout_switch(\u0027vertical\u0027, \u0027Table|flat\u0027, \u0027By College|pivot|COLLEGE|FY|AMOUNT|sum\u0027, \u0027By Year|pivot|FY|none|AMOUNT|count:AMOUNT|nested|nested|asc|1\u0027)\ntail"
+                    },
+                    {
+                        "name":  "ls update: still one layout_switch call, position 1 untouched",
+                        "pass":  true,
+                        "detail":  "prose\nlayout_switch(\u0027vertical\u0027, \u0027Table|flat\u0027, \u0027By College|pivot|COLLEGE|FY|AMOUNT|sum\u0027, \u0027By Year|pivot|FY|none|AMOUNT|count:AMOUNT|nested|nested|asc|1\u0027)\ntail"
+                    },
+                    {
+                        "name":  "ts: renders with the settings pill, label and OFF baseline",
+                        "pass":  true,
+                        "detail":  "{\"n\":1,\"on\":\"0\",\"lbl\":\"Active only\"}"
+                    },
+                    {
+                        "name":  "ts: label position defaults to left",
+                        "pass":  true,
+                        "detail":  "left"
+                    },
+                    {
+                        "name":  "ts: label position keyword applied",
+                        "pass":  true,
+                        "detail":  "bottom"
+                    },
+                    {
+                        "name":  "ts: an ON side with no observable command REFUSES to render",
+                        "pass":  true,
+                        "detail":  "[toggle_switch cannot tell whether it is on: none of its on| commands leave observable state. Use filter, search, group_by, pivot,"
+                    },
+                    {
+                        "name":  "ts: a missing off| side is refused",
+                        "pass":  true,
+                        "detail":  "[toggle_switch needs at least one off|COMMAND - there is no way to invert an action automatically]"
+                    },
+                    {
+                        "name":  "ts: a label containing a pipe is refused",
+                        "pass":  true,
+                        "detail":  "[toggle_switch: the FIRST argument is the label - got Bad|Label]"
+                    },
+                    {
+                        "name":  "ts state: search is detectable, toast is not",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "ts state: search|TERM is inactive with an empty box",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "ts state: search| (clear) IS active with an empty box",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "ts state: search|TERM becomes active when the box matches",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "ts state: a different term does not match",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "ts state: a rendered switch reads ON from the live report, unclicked",
+                        "pass":  true,
+                        "detail":  "1"
+                    },
+                    {
+                        "name":  "ts state: clearing the search BY HAND turns the switch off",
+                        "pass":  true,
+                        "detail":  "0"
+                    },
+                    {
+                        "name":  "tsp: prompt|NAME|VALUE parses",
+                        "pass":  true,
+                        "detail":  "{\"name\":\"kind\",\"value\":\"Proposals\"}"
+                    },
+                    {
+                        "name":  "tsp: the value is everything after the SECOND pipe, trimmed",
+                        "pass":  true,
+                        "detail":  "{\"name\":\"kind\",\"value\":\"A|B\"}"
+                    },
+                    {
+                        "name":  "tsp: a step without a value, or without a name, is not a prompt step",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "tsp: prompt is detectable",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "tsp: inactive before any run has used the prompt",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "tsp: active only for the answer the report RAN with",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "tsp: an options= Display:Value answer matches by value OR by what the chip shows",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "tsp: a prompt toggle renders, and reads OFF while the report ran with the off answer",
+                        "pass":  true,
+                        "detail":  "{\"n\":1,\"on\":\"0\",\"out\":\"Proposals\"}"
+                    },
+                    {
+                        "name":  "tsp: a new ran-with answer moves the switch ON with no click",
+                        "pass":  true,
+                        "detail":  "1"
+                    },
+                    {
+                        "name":  "tsp: ...and back OFF",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "tsp: a prompt the report does not have cannot be set",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "tsp: a prompt| step with no value is refused at render",
+                        "pass":  true,
+                        "detail":  "[toggle_switch: prompt| needs a prompt name and a value, such as prompt|kind|Proposals - got prompt|kind]"
+                    },
+                    {
+                        "name":  "cc: an UPPER pivot field finds a mixed-case \"Amount\" alias and keeps its $",
+                        "pass":  true,
+                        "detail":  "[true]"
+                    },
+                    {
+                        "name":  "cc: ...in any case",
+                        "pass":  true,
+                        "detail":  "[true]"
+                    },
+                    {
+                        "name":  "cc: per-column overrides each judged by their own column through the mixed-case map",
+                        "pass":  true,
+                        "detail":  "[true,false]"
+                    },
+                    {
+                        "name":  "cc: the exact-case name still works",
+                        "pass":  true,
+                        "detail":  "[true]"
+                    },
+                    {
+                        "name":  "cc: an unknown column is not currency",
+                        "pass":  true,
+                        "detail":  "[false]"
+                    },
+                    {
+                        "name":  "cc: a prototype name is not a column",
+                        "pass":  true,
+                        "detail":  "[false]"
+                    },
+                    {
+                        "name":  "cc: a mixed-case name finds an upper-keyed (snapshot) map",
+                        "pass":  true,
+                        "detail":  "[true]"
+                    },
+                    {
+                        "name":  "cc: colId - the exact key wins over a case twin",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "cc: colId - upper case before the scan",
+                        "pass":  true,
+                        "detail":  "1"
+                    },
+                    {
+                        "name":  "cc: colId - the scan finds a mixed-case key from any case",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "cc: colId - works on a null-prototype map (the fresh-load path builds one)",
+                        "pass":  true,
+                        "detail":  "7"
+                    },
+                    {
+                        "name":  "cc: colId - missing name / missing map give undefined",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "perf control: count() sees the 20,000 synthetic rows",
+                        "pass":  true,
+                        "detail":  "Total: 20,000 [0ms]"
+                    },
+                    {
+                        "name":  "perf render: 1 bar (5 buttons)",
+                        "pass":  true,
+                        "detail":  "0ms"
+                    },
+                    {
+                        "name":  "perf render: 2 bars (10 buttons)",
+                        "pass":  true,
+                        "detail":  "0ms"
+                    },
+                    {
+                        "name":  "perf render: 4 bars (20 buttons)",
+                        "pass":  true,
+                        "detail":  "0ms"
+                    },
+                    {
+                        "name":  "perf scaling (2x content: ~2x = linear, ~4x = quadratic)",
+                        "pass":  true,
+                        "detail":  "r2/r1=? r4/r2=?"
+                    },
+                    {
+                        "name":  "perf dblclick handler on 2-bar doc",
+                        "pass":  true,
+                        "detail":  "0ms"
+                    },
+                    {
+                        "name":  "perf snippet-helper hint build",
+                        "pass":  true,
+                        "detail":  "10ms"
+                    }
+                ]
+}

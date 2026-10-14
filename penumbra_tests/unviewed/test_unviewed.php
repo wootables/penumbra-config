@@ -1,0 +1,74 @@
+<?php
+/**
+ * UNVIEWED REPORTS SUITE (2026-10-03): the "Dead Reports" list renamed
+ * "Unviewed Reports", and its selection strip's way on to the Repository's
+ * Manage Mode with the selection carried over.
+ *
+ *   A. analytics_all.php - the reader-facing wording (title, empty state,
+ *      select-all label, CSV name) says "unviewed", never "dead"; the strip has
+ *      the right-aligned tip, and its href follows the selection.
+ *   B. js/penumbra_repository.js - the ?manage=1 deep link: docked page only,
+ *      stripped from the address before anything else, armed once, after the
+ *      first load settles, global admins only, ticks live rows only, <= 500.
+ *
+ * The end-to-end flow (tick, follow the link, rows arrive ticked) is proven
+ * live in a browser; this pins the wiring so a refactor cannot quietly drop it.
+ *
+ *   php -n test_unviewed.php --app=<dir> [--control]
+ */
+$opt = array('app' => '', 'control' => false);
+foreach (array_slice($argv, 1) as $a) {
+    if (strpos($a, '--app=') === 0) $opt['app'] = rtrim(substr($a, 6), '/\\');
+    elseif ($a === '--control') $opt['control'] = true;
+}
+if ($opt['app'] === '') { fwrite(STDERR, "--app=<dir> is required\n"); exit(2); }
+$PASS = 0; $FAIL = 0;
+function ok($c, $l) { global $PASS, $FAIL; if ($c) { $PASS++; echo "  ok   $l\n"; } else { $FAIL++; echo "  FAIL $l\n"; } }
+function section($s) { echo "\n== $s\n"; }
+$all  = file_get_contents($opt['app'] . '/analytics_all.php');
+$repo = file_get_contents($opt['app'] . '/js/penumbra_repository.js');
+if ($all === false || $repo === false) { fwrite(STDERR, "cannot read the app files\n"); exit(2); }
+
+section('A. analytics_all.php: the list and its strip');
+ok(strpos($all, '<h3>Unviewed Reports<?php') !== false, 'the list is titled "Unviewed Reports"');
+ok(strpos($all, "'No unviewed reports match the current filter.'") !== false, 'the empty state says unviewed');
+ok(strpos($all, 'aria-label="Select every visible unviewed report"') !== false, 'the select-all label says unviewed');
+ok(strpos($all, "\$LIST_STEP, 'unviewed-reports');") !== false, 'the CSV downloads as unviewed-reports');
+// No reader-facing "dead" left: strip PHP comments, // and /* */ comments, then look in text and attributes.
+$visible = preg_replace(array('~<\?php\s*/\*.*?\*/\s*\?>~s', '~/\*.*?\*/~s', '~(?<![:\'"])//[^\n]*~'), '', $all);
+ok(preg_match('~>[^<]*\bDead Reports?\b|"[^"]*\bdead reports?\b[^"]*"(?!\s*\))~i', $visible) === 0, 'no reader-facing "dead report" wording left');
+ok(strpos($all, '<span class="bb-tip">To delete, reassign or rename them, <a id="deadRepoLink" href="repository.php?manage=1" target="_blank" rel="noopener"') !== false, 'the strip has the Repository tip, opening a new tab');
+ok(strpos($all, '.bulk-bar .bb-tip { margin-left: auto;') !== false, 'the tip is right-aligned');
+ok(strpos($all, "repoLink.href = 'repository.php?manage=1' + (ids.length ? '&select=' + encodeURIComponent(ids.join(',')) : '');") !== false, 'the link carries the selection (encoded)');
+ok(strpos($all, ".filter(Boolean).slice(0, 500);") !== false, '... at most 500 ids, the repository\'s own cap');
+ok(strpos($all, "const repoLink = document.getElementById('deadRepoLink');") !== false, 'the strip script finds the link');
+
+section('A2. when each WAS last viewed (2026-10-03): last viewed, views, viewers, size');
+$q = preg_replace('/\s+/', ' ', $all);
+ok(strpos($q, "SELECT r.ID AS RID, TRIM(r.SHORT_ID) AS SHORT_ID, r.TITLE, r.OWNER_ID,") !== false, 'the list query brings the numeric id to join on');
+ok(strpos($q, "SELECT REPORT_ID AS RID, TO_CHAR(MAX(TIMESTAMP), 'YYYY-MM-DD') AS LAST_VIEWED, COUNT(*) AS VIEWS, COUNT(DISTINCT USER_ID) AS VIEWERS, ROUND(MEDIAN(ROW_COUNT)) AS MED_ROWS, ROUND(MEDIAN(COL_COUNT)) AS MED_COLS FROM PENUMBRA_AUDIT WHERE ACTION='OPEN' AND (\" . implode(' OR ', \$ors) . \") \$exclSql GROUP BY REPORT_ID\", \$exclBinds") !== false,
+   'ONE grouped pass over the listed reports\' whole OPEN history, with the Hide toggles and exactly their binds');
+ok(strpos($q, "'REPORT_ID IN (' . implode(',', array_map('intval', \$chunk)) . ')'") !== false && strpos($q, "array_chunk(array_keys(\$deadIdx), 900)") !== false, 'ids cast to int and inlined, 900 per IN-list');
+ok(strpos($all, 'analytics_all unviewed last-viewed query failed') !== false, 'best-effort: a failure is logged, the list still renders');
+$h = strpos($all, '>Owner <span'); $c = strpos($all, '>Created <span', $h);
+$heads = substr($all, $h, $c - $h);
+ok(strpos($heads, '>Last viewed <span') !== false && strpos($heads, '>Views <span') !== false && strpos($heads, '>Viewers <span') !== false && strpos($heads, '>Size <span') !== false, 'four new columns between Owner and Created');
+ok(strpos($all, "data-sort=\"<?php echo htmlspecialchars(\$lv !== '' ? \$lv : '0000-00-00'); ?>\"") !== false && strpos($all, "'<span class=\"pnb-adm-muted\">never</span>'") !== false, 'never viewed reads "never" and sorts as the oldest');
+ok(strpos($all, "data-sort=\"<?php echo \$hasSize ? (int)\$r['medRows'] * (int)\$r['medCols'] : -1; ?>\"") !== false, 'size sorts by its cells, unmeasured last');
+ok(strpos($all, "const dtKey = c => !c ? '' : (c.hasAttribute('data-sort') ? c.getAttribute('data-sort') : c.innerText.trim());") !== false, 'the table sorter honours a cell\'s data-sort (text otherwise, as before; the standard sorter since 2026-10-03, suite dtsort)');
+
+section('B. js/penumbra_repository.js: the ?manage=1 deep link');
+ok(strpos($repo, "if (!REPO_PAGE || !window.URL || !window.history || !history.replaceState) { return; }") !== false, 'the docked page only (never the Ctrl+O lightbox)');
+$a = strpos($repo, "u.searchParams.delete('manage');"); $b = strpos($repo, '_srDeepManage = { ids: ids, armed: false, done: false };');
+ok($a !== false && $b !== false && $a < $b && strpos($repo, "history.replaceState(history.state, '', u.pathname + u.search + u.hash);") !== false, 'both parameters leave the address before it is acted on (a reload never re-arms)');
+ok(strpos($repo, '.slice(0, 500);') !== false, 'at most 500 ids');
+ok(strpos($repo, "if (!penumbra_vars || !penumbra_vars.isGlobalAdmin) { _srDeepManage = null; return; }") !== false, 'global admins only, like the toggle');
+ok(strpos($repo, "if (mode === 'initial' && _srDeepManage && !_srDeepManage.armed) { setTimeout(armDeepManage, 0); }") !== false, 'armed after the first load, on the next tick (after its overlay drops)');
+ok(strpos($repo, "if (!_srDeepManage || _srDeepManage.armed) { return; }") !== false && strpos($repo, '_srDeepManage.done = true;') !== false, 'armed once, ticked once');
+ok(strpos($repo, "        tickDeepManage();\n    }") !== false, 'the ticks wait for the arm\'s load to settle (srHideOverlay)');
+ok(strpos($repo, ".not('.sr-row-deleted').filter(function () {\n                return \$(this).attr('data-report-id') === id;") !== false, 'live rows only, matched exactly (no selector built from the id)');
+ok(strpos($repo, "setManage(false);\n        _srDeletedShown = 0;") !== false, 'every open still starts with Manage Mode OFF');
+
+if ($opt['control']) { section('control'); ok(false, 'control: a deliberately false assertion (must FAIL)'); }
+echo "\nSUMMARY  pass=$PASS  fail=$FAIL\n";
+exit($FAIL ? 1 : 0);

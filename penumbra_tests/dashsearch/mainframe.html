@@ -1,0 +1,67 @@
+<!doctype html><html><head><meta charset="utf-8"><title>dashboard search - frame host</title></head><body>
+<!-- Stands in for the dashboard: frames main.html (the real main.js) with a
+     ?dsearch= address, records every 'penumbra:dsearch' message main.js posts to
+     its parent, and checks them against the list main.html says it expects.
+     Then the same for mainload.html (2026-09-29 evening): REAL query loads of
+     rows with a nested @@JSON sub-table in a second framed report page. Lines
+     from mainload.html are tagged [real load]. -->
+<pre id="out">running</pre>
+<!-- A focused control on the HOST page: a framed report must not take focus from it
+     (main.js: the SQL editor autofocuses only at top level, 2026-09-29). -->
+<input id="hostBox" value="host">
+<iframe id="f" style="width:1000px;height:700px"></iframe>
+<iframe id="g" style="width:1000px;height:700px"></iframe>
+<script>
+var L = [], DONE = false, MSGS = [], cur = -1;
+var DS1 = '{"p":"","f":[["COLLEGE","COLLEGE = Eng"],["AMOUNT","AMOUNT > 5"]]}';
+var DSN = '{"p":"","f":[["SPECIES","SPECIES = Chicken"]]}';
+var PAGES = [
+  { frame: 'f', src: 'main.html?dsearch=' + encodeURIComponent(DS1), tag: '' },
+  { frame: 'g', src: 'mainload.html?dsearch=' + encodeURIComponent(DSN), tag: '[real load] ' },
+  // Hosted by a dashboard (via=dashboard <id>): a cell click posts penumbra:xfilter (2026-09-30).
+  { frame: 'f', src: 'mainxf.html?via=dashboard%20demo', tag: '[hosted] ' }
+];
+var XF = [];
+function ok(n, c, x) { L.push((c ? 'PASS ' : 'FAIL ') + n + (!c && x !== undefined ? '  [' + x + ']' : '')); }
+function publish() {
+  if (DONE) { return; }
+  DONE = true;
+  var A = 'RES' + 'ULT>>', B = '<' + '<FIN';
+  document.getElementById('out').textContent = A + L.join(' ;; ') + B;
+}
+function next() {
+  cur++;
+  if (cur >= PAGES.length) { publish(); return; }
+  MSGS = []; XF = [];
+  document.getElementById('hostBox').focus();
+  document.getElementById(PAGES[cur].frame).src = PAGES[cur].src;
+}
+function fromCurrent(ev) {
+  var p = PAGES[cur], fr = p ? document.getElementById(p.frame) : null;
+  return !!(fr && ev.source === fr.contentWindow);
+}
+window.addEventListener('message', function (ev) {
+  var d = ev.data || {};
+  if (!fromCurrent(ev)) { return; }
+  var tag = PAGES[cur].tag;
+  if (d.type === 'penumbra:dsearch') { MSGS.push({ dsearch: d.dsearch, skipped: d.skipped, applied: d.applied }); return; }
+  if (d.type === 'penumbra:xfilter') { var x = { col: d.col, value: d.value, pairs: d.pairs || null }; if (d.text) { x.text = d.text; } XF.push(x); return; }
+  if (d.type === 'harness:fatal') { L.push('FATAL ' + tag + d.msg); next(); return; }
+  if (d.type === 'harness:results') {
+    (d.lines || []).forEach(function (l) { L.push(l.replace(/^(PASS|FAIL) /, '$1 ' + tag)); });
+    var ae = document.activeElement;
+    ok(tag + 'the framed report page left the host page\x27s focus alone', ae && ae.id === 'hostBox', ae ? (ae.id || ae.tagName) : 'none');
+    var exp = d.expect || [];
+    ok(tag + 'the dashboard got one message per routing, in order', MSGS.length === exp.length, MSGS.length + ' vs ' + exp.length + ': ' + JSON.stringify(MSGS));
+    if (d.expectXf) { ok(tag + 'the dashboard got the cross-filter messages it expected', JSON.stringify(XF) === JSON.stringify(d.expectXf), JSON.stringify(XF)); }
+    exp.forEach(function (e, i) {
+      var m = MSGS[i] || {};
+      ok(tag + 'message ' + (i + 1) + ' (' + e.name + ')', m.dsearch === e.dsearch && JSON.stringify(m.skipped) === JSON.stringify(e.skipped) &&
+         JSON.stringify(m.applied) === JSON.stringify(e.applied), JSON.stringify(m));
+    });
+    next();
+  }
+});
+next();
+setTimeout(function () { if (!DONE) { L.push('FAIL harness timed out (no results from ' + (PAGES[cur] ? PAGES[cur].src.split('?')[0] : '?') + ')'); publish(); } }, 55000);
+</script></body></html>

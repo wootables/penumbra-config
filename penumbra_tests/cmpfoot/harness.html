@@ -1,0 +1,151 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>comparison footer</title>
+<link rel="stylesheet" href="main.css">
+</head>
+<body>
+<!-- Minimal DOM for the comparison-footer suite (2026-09-30). The page and the
+     run path are the savelayout harness's (a report preloaded through
+     penumbra_vars.preloadedState, run by the boot through the stubbed
+     query.php); added: what a snapshot comparison renders into (the snapshot
+     dialog it fades out, the analysis dock, the REAL analysis <template> -
+     run.py copies it out of index.php at staging time) and the settings
+     panel's badge SHOW toggle.
+     ?mode=live       compare-to-live, '#' shown
+     ?mode=numhidden  compare-to-live with the '#' column hidden (label relocated)
+     ?mode=ab         A-vs-B (the in-place search path) -->
+<div id="reportHeaderContainer"><div id="defaultTitleView"></div><div id="reportInfoPanel" style="display:none"></div></div>
+<div id="headerToggleHandle"></div>
+<input id="reportTitle" value=""><input id="reportSubtitle" value=""><div id="admWrapper"></div><button id="toggleAdminViewBtn"></button>
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div><div id="mainReportTitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<button id="executeQuery">Run</button><button id="stopQueryBtn">Stop</button>
+<div id="loadingOverlay" style="display:none"><p id="execution-timer"></p><p id="loadingMessage"></p></div>
+<div id="importTimestamps"></div><span id="dataLoadedTimestamp">Data loaded: 2026-09-30 09:00</span>
+<div id="snapAnalysisDock"></div>
+<div id="resultsHeader" style="height:20px">controls</div>
+<div id="table-view-container"><div id="container-parent"><div id="results-wrapper" style="width:900px;height:420px"><table id="resultsTable"><caption class="sr-only">Report results table</caption><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table></div></div></div>
+<div id="paginationControls"><select id="rowsPerPageSelector"><option value="25">25</option><option value="200">200</option><option value="all">All</option></select></div>
+<div id="errorBox"></div><div id="undo_text_container"></div>
+<input id="tableSearch" value="">
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="manageSnapshotsLightbox" style="display:none"><input type="checkbox" id="snapIncludeToggles"></div>
+<div id="settingsPanelOverlay"></div>
+<div id="settingsPanel">
+  <select id="spThemeSelector"><option value="report-default">Report Default</option><option value="theme-default">Default</option></select>
+  <select id="spDensitySelector"><option value="report-default">Report Default</option><option value="standard">Standard</option></select>
+  <input type="checkbox" id="spRowExpandToggle"><input type="checkbox" id="spResolverToggle">
+  <button type="button" id="spBadgeToggle">Hide badges</button>
+  <div class="sp-section sp-columns-section"><div class="sp-column-container"><div id="spColumnList" class="sp-column-list"></div></div></div>
+  <div class="sp-actions"><button id="spApply">Save Column Layout</button><button id="spReset">Reset</button><span id="spPendingCount"></span></div>
+</div>
+<div id="pnbStatusBar"><div class="sb-seg" id="sbColsSeg"><span id="sbCols"></span></div><div class="sb-seg" id="sbUserSeg"></div></div>
+<!--SNAP_TEMPLATE-->
+<pre id="out">running</pre>
+
+<script>
+  (function () {
+    try { localStorage.clear(); } catch (e) {}
+  })();
+  window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' } };
+  window.PENUMBRA_THEME_IDS = ['theme-default'];
+  window.PENUMBRA_THEME_ALIASES = {};
+  window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  window.__MODE = (/[?&]mode=(\w+)/.exec(location.search) || [])[1] || 'live';
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  // The live side. ID is the comparison key; AMOUNT and QTY are summarized by
+  // default (totalExemptions below is the app's name whitelist) and NAME sits
+  // between ID and AMOUNT, so a footer cell that reads its neighbour's header
+  // lands on a column that has NO summary.
+  window.__COLS = ['ID', 'NAME', 'AMOUNT', 'QTY', 'NOTE'];
+  window.__LIVE = [
+    { ID: '1', NAME: 'Alpha',   AMOUNT: '$100.00', QTY: '1', NOTE: 'x' },
+    { ID: '2', NAME: 'Bravo',   AMOUNT: '$200.00', QTY: '2', NOTE: 'y' },
+    { ID: '3', NAME: 'Charlie', AMOUNT: '$300.00', QTY: '3', NOTE: 'z' },
+    { ID: '4', NAME: 'Delta',   AMOUNT: '$400.00', QTY: '4', NOTE: 'w' },
+    { ID: '5', NAME: 'Echo',    AMOUNT: '$500.00', QTY: '5', NOTE: 'v' },
+    { ID: '6', NAME: 'Foxtrot', AMOUNT: '$600.00', QTY: '6', NOTE: 'u' }
+  ];
+  // The snapshot: 1-2 identical (Unchanged), 3 had another AMOUNT and 4 another
+  // QTY (Modified - one modified cell in each summarized column), 5-6 absent
+  // (New), 7-8 gone since (Removed).
+  window.__SNAP = [
+    { ID: '1', NAME: 'Alpha',   AMOUNT: '$100.00', QTY: '1',  NOTE: 'x' },
+    { ID: '2', NAME: 'Bravo',   AMOUNT: '$200.00', QTY: '2',  NOTE: 'y' },
+    { ID: '3', NAME: 'Charlie', AMOUNT: '$150.00', QTY: '3',  NOTE: 'z' },
+    { ID: '4', NAME: 'Delta',   AMOUNT: '$400.00', QTY: '40', NOTE: 'w' },
+    { ID: '7', NAME: 'Golf',    AMOUNT: '$700.00', QTY: '7',  NOTE: 't' },
+    { ID: '8', NAME: 'Hotel',   AMOUNT: '$800.00', QTY: '8',  NOTE: 's' }
+  ];
+  window.__QUERY = 'SELECT ID, NAME, AMOUNT, QTY, NOTE FROM CMPFOOT_FIXTURE';
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: [],
+    totalExemptions: ['AMOUNT', 'QTY']
+  };
+  window.penumbra_vars.preloadedState = {
+    name: 'cmpfoot', query: window.__QUERY, reportTitle: 'Comparison footer fixture',
+    theme: 'theme-default', density: 'standard', sortCriteria: [], noLimit: true,
+    rowExpandDefault: false, resolverLinksDefault: false, rowsPerPage: '200', reportSnippet: ''
+  };
+  // query.php answers with the live rows; nothing else is expected to be asked.
+  window.__queryDone = 0;
+  window.__ajaxLog = [];
+  jQuery.ajax = function (a, b) {
+    var opts = (typeof a === 'string') ? jQuery.extend({ url: a }, b || {}) : (a || {});
+    var url = String(opts.url || '');
+    window.__ajaxLog.push(url);
+    var d = jQuery.Deferred();
+    var isQuery = /query\.php/.test(url);
+    var resp = isQuery ? { data: JSON.parse(JSON.stringify(window.__LIVE)) } : {};
+    setTimeout(function () {
+      try { if (opts.success) opts.success(resp, 'success', { status: 200 }); } catch (e) { window.__errors.push('ajax success threw: ' + String(e)); }
+      try { if (opts.complete) opts.complete({ status: 200 }, 'success'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }
+      d.resolve(resp, 'success', { status: 200 });
+      if (isQuery) window.__queryDone++;
+    }, 0);
+    var p = d.promise(); p.abort = function () {}; return p;
+  };
+  jQuery.getJSON = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.post = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.get = jQuery.post;
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.IntersectionObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  // Uncaught errors are RECORDED (a real click's handler throwing lands here).
+  window.__errors = [];
+  window.__rejections = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    window.__rejections.push(String((r && r.message) || r) + ' @' + String((r && r.stack) || '').split('\n').slice(1, 2).join('').trim());
+    e.preventDefault();
+  });
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  window.prompt = function () { return null; };
+</script>
+<script src="penumbra_userseg.js"></script>
+<script src="main_cf.js"></script>
+<script src="driver.js"></script>
+</body></html>

@@ -1,0 +1,568 @@
+# savefail (2026-10-02, LIVE 16:48:42, stamp 20261002-1648-savefail, git 0ed7996 + README 88296a1): a dropped file whose save
+# the server refuses, over an existing import of the same name, no longer shows the previous upload. Kit = session dd9694a4
+# scratchpad savefail/. Base: live js/main.js ea0ae814, README.md 5030f26b (schedrowdump's; first staged on 8425c02c / c0a52554
+# and 3-way merged three times as schedrowwarn, subsettip and schedrowdump landed - change set identical each time).
+# main.js is CRLF: the hunks below carry the CRs.
+--- a/js/main.js
++++ b/js/main.js
+@@ -86808,8 +86808,25 @@
+                     };
+                 }
+             },
+-            error: function () {
++            error: function (xhr) {
++                // The query sends a name's STORED id ahead of the session's rows
++                // (#executeQuery: _penumbraImportIds, then _penumbraImportMeta's id,
++                // then _penumbraImportedData), so a refused save over an existing
++                // import ran on the PREVIOUS upload with no sign that anything had
++                // failed. Forget the id: the query then sends the rows just parsed,
++                // which query.php reads as its inline fallback.
++                delete window._penumbraImportIds[safeName];
++                if (window._penumbraImportMeta[safeName]) delete window._penumbraImportMeta[safeName].id;
++                var why = '';
++                try {
++                    var j = xhr && xhr.responseJSON;
++                    if (!j && xhr && xhr.responseText) j = JSON.parse(xhr.responseText);
++                    why = (j && (j.message || j.error)) || '';
++                } catch (e) { /* non-JSON error body: no reason to add */ }
+                 console.warn('Failed to persist import "' + safeName + '" to server. Data available in session only.');
++                show_text("<p id='undo_text'><span style='color: var(--accent-danger, #cc0000)'>ERROR:</span> <strong>" + escapeHtml(fileName)
++                    + "</strong> could not be saved as the import <code>" + escapeHtml(safeName) + "</code>, so it is available for this session only."
++                    + (why ? " " + escapeHtml(String(why)) : "") + "</p>", 11000);
+             },
+             complete: function () {
+                 // Auto-execute after save completes (success or failure - inline fallback still works)
+--- a/README.md
++++ b/README.md
+@@ -2076,12 +2076,17 @@
+ # on an admin's report page, a fixture DROPPED on it and followed through parse -> save -> query ->
+ # render (stubbed manage_imports.php, which refuses over the cap as the real one does, and
+ # query.php): parity J, stack G, single F, onto a GROUPED report V (its top-N, count sort, start
+-# depth and summary must not ride onto the import), onto a pivot W, overwrite O, XML 2003 L, cap Z.
++# depth and summary must not ride onto the import), onto a pivot W, overwrite O, XML 2003 L, cap Z,
++# and savefail S (added 2026-10-02 with its fix, see section 6 "Closed recently": a file whose save
++# the server refuses, over an import of the same name, shows ITS rows, sent inline, with an ERROR
++# toast; the fake query.php reads an import by the ID the page sends, as the real one does).
+ # Server: test_msheet.php lifts the imports/ folder parsers by tokenizer - a one-tab workbook comes
+ # back byte for byte as the old reader returned it, the TWIN column name, and B-* PARITY with the
+-# browser's table for the same eight files. Live 2026-10-02 (git 7333a11): 65 + 28 pass; --control
+-# (the newest *.bak-*-msheet) RED on exactly 29 browser + 16 server asserts; --mutants 11/11;
+-# --php-mutants 9/9 (with --scn parity, so the B-* rows are judged too). ~25 s; mutants ~6 min.
++# browser's table for the same eight files. Live 2026-10-02 (git 7333a11): 75 + 28 pass; --control
++# (the newest *.bak-*-msheet) RED on exactly 33 browser + 16 server asserts; --control-savefail
++# (the newest js\main.js.bak-*-savefail) RED on exactly the 4 S-* the fix turned green;
++# --mutants 16/16; --php-mutants 9/9 (with --scn parity, so the B-* rows are judged too).
++# ~30 s; mutants ~7 min.
+ py -3 \\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\msheet\run.py
+ py -3 \\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\msheet\run.py --mutants
+ 
+@@ -5538,6 +5543,12 @@
+   view stash and before its first `await`: anything that arms a view for the next query has to land
+   there too, or the stash's copy of the old pivot / grouping wins - and the group sort / limit /
+   start-depth GLOBALS carry a previous grouping's choices into a fresh one unless reset.
++- **An `[IMPORT; name=X]` query sends X's STORED id ahead of the session's rows (2026-10-02,
++  suite `msheet` S-*).** `#executeQuery` takes `_penumbraImportIds[X]`, then
++  `_penumbraImportMeta[X].id`, and only without either sends `_penumbraImportedData[X]` inline.
++  So whenever the session's rows for X stop matching what X's stored id holds (the case that bit:
++  a refused save in `importFileData()`), X's id has to go from BOTH maps, or every run shows the
++  previous upload - silently, because the stored rows are a perfectly good answer.
+ 
+ ## 6. Known open items
+ - ~~**Report metrics as Platform Metrics narrowed to one report**~~ **DONE 2026-10-02 - the
+@@ -5966,13 +5977,6 @@
+   too; the ownerview suite's P8 / J8 / F1-F2 moved with the rule). ~~(e) The pagination help says
+   the navigator sits below the table and lists other glyphs than the << < > >> the arrows render~~
+   (it sits in the bar above the table beside the search box, and the arrows read `<< < > >>`).
+-- **A dropped file whose SAVE fails, over an existing import of the same name, shows the OLD rows
+-  (found 2026-10-02 building `msheet`; pre-existing).** `importFileData()` runs the query from the
+-  save's `complete` whatever happened, and the query sends the import's STORED id
+-  (`_penumbraImportIds` / `_penumbraImportMeta`) ahead of the session's new rows, so a failed save
+-  leaves the report on the previous upload with only a console warning. The row cap is now refused
+-  before the save (`msheet` Z-*); any other save failure is not. Fix: on a save error, drop that
+-  name's stale id so the inline rows are sent, and say the save failed.
+ - **A hidden tab in an `.ods` file is imported like a visible one (2026-10-02, `msheet` J-ods).**
+   SheetJS 0.20.3 does not read an ODS sheet's visibility, so the browser cannot skip it (`.xlsx`
+   and `.xls` are fine; the folder reader never parses `.ods`). The help says so; J-ods pins the
+@@ -6002,6 +6006,7 @@
+ 
+ | Was | Closed by |
+ |---|---|
++| A dropped file whose SAVE the server refused (a database error, an expired session), over an existing import of the same name, showed the PREVIOUS upload with only a console warning: the query sent the name's stored id ahead of the rows just dropped. | 2026-10-02: the save's `error` forgets that name's id (`_penumbraImportIds` and `_penumbraImportMeta`), so the query sends the new rows inline, and an ERROR toast says the file could not be saved and is available for this session only, with the server's reason. Suite `msheet` S-* (`--control-savefail`). |
+ | A workbook dropped on the page imported its FIRST sheet only; every other tab was silently left out. | 2026-10-02 (git 7333a11): every visible tab with a header row and data is read - one imports exactly as before, two or more stack under a `WORKSHEET` column (the tab name) and open grouped by it in tab order, saved as the column's custom sort order. Suite `msheet`. |
+ | The `imports/` folder read a multi-tab Excel workbook from an ARBITRARY tab: `parseImportXlsx()` took the first worksheet relationship in `workbook.xml.rels`, which Excel writes in no particular order (`single.xlsx` read its empty Sheet3, i.e. nothing; the browser read the first tab). | 2026-10-02: tab order from `xl/workbook.xml`, stacked as the browser stacks (`_importStackSheets()`, XLSX and XML 2003). Suite `msheet` P-old-rels / P-old-single, B-* parity. |
+ | A dropped file over the 50,000-row cap only warned in the console and failed again at query time; over an existing import of the same name the query showed the OLD rows. | 2026-10-02: `importFileData()` refuses it before the save, naming the row count (and the worksheets). Suite `msheet` Z-*. |
+--- a/penumbra_tests/msheet/README.md
++++ b/penumbra_tests/msheet/README.md
+@@ -26,41 +26,69 @@
+ `single.xlsx`, the empty Sheet3: nothing at all). Tab order now comes from
+ `xl/workbook.xml`. `P-old-rels` / `P-old-single` prove the fixtures reach it.
+ 
++## A save that fails (`savefail`, added 2026-10-02)
++
++The same drop path had an older bug, closed with its own control: when the SAVE of a
++dropped file failed (any server error) over an existing import of the same name, the
++report showed the PREVIOUS upload with no visible error. `#executeQuery` sends a
++name's stored ID (`_penumbraImportIds`, then `_penumbraImportMeta[name].id`) ahead of
++the session's rows (`_penumbraImportedData`), and the save's `error` callback only
++logged to the console. Now it forgets that name's ID, so the query sends the rows just
++parsed (query.php's inline fallback), and shows an ERROR toast with the server's reason.
++
++The scenario drops `same_name.csv`, then a DIFFERENT `same_name.csv` while
++`window.__saveFail` makes the fake `manage_imports.php` refuse every save (500, as a
++database error does): S-rows (its rows render), S-inline (sent inline, no ID),
++S-toast, S-rerun (Run again: still its rows), S-recover (with saves working again the
++next upload is read back by its NEW ID). For this the fake `query.php` reads an import
++the way the real one does - the stored rows of the ID the page sends, else the page's
++inline rows. The old fake answered by NAME, i.e. with the last SAVED upload whatever
++the page sent, which hides exactly this bug.
++
+ ## Running
+ 
+ ```
+ py -3 run.py                              # the live webroot
+ py -3 run.py --app <kit>\stage            # a staged kit (js\main.js + shared_logic.php)
+ py -3 run.py --control                    # both halves on the newest *.bak-*-msheet
+-py -3 run.py --mutants                    # 11 JS mutants (mutants.json)
++py -3 run.py --control-savefail           # browser half on the newest js\main.js.bak-*-savefail
++py -3 run.py --mutants                    # 16 JS mutants (mutants.json)
+ py -3 run.py --php-mutants --scn parity   # the PHP half's 9 mutants, with parity rows
+ ```
+ 
+-Before the deploy there is no `.bak`: pass `--baseline-php <kit>\orig\shared_logic.php`
+-(and `--baseline-js <kit>\orig\js\main.js` for `--control`).
++Before a deploy there is no `.bak`: pass `--baseline-php <kit>\orig\shared_logic.php`
++(and `--baseline-js <kit>\orig\js\main.js` for `--control` / `--control-savefail`).
+ 
+-Calibrated 2026-10-02 (merged onto live `a89d3e23`):
++Calibrated 2026-10-02 (msheet merged onto live `a89d3e23`; savefail LIVE 16:48, merged onto
++live `ea0ae814`, its `.bak-20261002-1648-savefail`):
+ 
+ | run | expected |
+ |---|---|
+-| candidate | browser **65 pass, 0 fail**; PHP **28/28**; `RESULT: GREEN` |
+-| `--control` | browser red = exactly `CONTROL_RED` (29); PHP red = exactly its `CONTROL_RED` (16); `RESULT: GREEN` |
+-| `--mutants` | `SUMMARY JS mutants ok=11 bad=0` |
++| candidate | browser **75 pass, 0 fail**; PHP **28/28**; `RESULT: GREEN` |
++| `--control` | browser red = exactly `CONTROL_RED` (33: msheet's 29 + savefail's 4 - that build predates both); PHP red = exactly its `CONTROL_RED` (16); `RESULT: GREEN` |
++| `--control-savefail` | browser red = exactly `CONTROL_RED_SAVEFAIL` (S-rows S-inline S-toast S-rerun), the other 71 green; PHP half not run; `RESULT: GREEN` |
++| `--mutants` | `SUMMARY JS mutants ok=16 bad=0` |
+ | `--php-mutants --scn parity` | all 9 "as expected" |
+ 
++savefail's mutants: `keepstaleid` (the fix's two deletions removed, over EVERY scenario)
++turns exactly S-rows S-inline S-rerun red; `keepid` / `keepmetaid` remove one deletion
++each - the query falls back to the other map, same three red; `nofailtoast` and
++`noreason` (the server's reason dropped) turn S-toast red.
++
+ ## The two halves
+ 
+ **Browser** (`harness.html` + `driver.js`): the REAL `main.js` boots an admin's
+ report page, then a fixture is DROPPED on it and followed through
+ parse -> save -> query -> render. `harness.html` fakes `manage_imports.php`
+-(stores the save; refuses > the cap with a 400, like the real one - the cap is
+-read from main.js's `PENUMBRA_IMPORT_MAX_ROWS` twin) and `query.php` (the saved
+-rows for `[IMPORT; name=X]`, columns from the FIRST row as the real resolver
+-does). Scenarios: `parity` (J-, the parser on every fixture), `stack` (G-),
++(stores the save under a new ID; refuses > the cap with a 400, like the real one -
++the cap is read from main.js's `PENUMBRA_IMPORT_MAX_ROWS` twin - and refuses every
++save while `window.__saveFail` is set) and `query.php` (for `[IMPORT; name=X]` the
++stored rows of the ID in the request's `importRefs`, else its inline `importData`
++rows, columns from the FIRST row as the real resolver does). Scenarios: `parity` (J-, the parser on every fixture), `stack` (G-),
+ `single` (F-), `prevgroup` (V-: dropped onto a grouped report with a top-1
+ limit, count sort, depth 1 and a summary), `prevpivot` (W-), `overwrite` (O-),
+-`legacy` (L-, XML 2003), `cap` (Z-). Hooks ride on main.js line 1, so line
+-numbers in errors are the file's.
++`legacy` (L-, XML 2003), `cap` (Z-), `savefail` (S-, above). Hooks ride on main.js
++line 1, so line numbers in errors are the file's.
+ 
+ **Server** (`test_msheet.php`): lifts the parsers from `shared_logic.php` by
+ TOKENIZER (it cannot be `require`d alone) with a per-run prefix, the baseline's
+--- a/penumbra_tests/msheet/driver.js
++++ b/penumbra_tests/msheet/driver.js
+@@ -53,6 +53,23 @@
+   }
+   function grouped() { return $('#groupedResultsContainer').is(':visible') && bands().length > 0; }
+   function flatRows() { return $('#resultsTable').is(':visible') ? $('#resultsTable tbody tr').length : -1; }
++  // The flat table as rendered: the header's column names (data-colname; data-column
++  // is the column's INDEX) and each row's cells.
++  function grid() {
++    return {
++      cols: $('#tableHeader th').map(function () { return String(this.getAttribute('data-colname') || ''); }).get(),
++      rows: $('#resultsTable tbody tr').map(function () { return [$(this).children('td').map(function () { return $(this).text().trim(); }).get()]; }).get()
++    };
++  }
++  // One rendered column's cells, top to bottom ([] while the flat table is hidden).
++  function colShown(name) {
++    if (!$('#resultsTable').is(':visible')) return [];
++    var g = grid(), i = g.cols.indexOf(name);
++    return g.rows.map(function (r) { return (i >= 0 && i < r.length) ? r[i] : '?'; });
++  }
++  function errToasts() {
++    return $('#action_overlay .pnb-toast-card.pnbt-err .pnb-toast-msg').map(function () { return $(this).text().replace(/\s+/g, ' ').trim(); }).get();
++  }
+   function errsFrom(n0, c0, j0) {
+     return window.__errors.slice(n0).concat(window.__consoleErrors.slice(c0).map(function (m) { return 'console.error: ' + m; }))
+       .concat(window.__rejections.slice(j0).map(function (m) { return 'rejection: ' + m; }));
+@@ -298,6 +315,70 @@
+           'grouped ' + grouped() + ', flat rows ' + flatRows() + ', toasts "' + t2.slice(0, 300) + '"');
+       var e = errsFrom.apply(null, m);
+       rec('Z-err', !e.length, e.join(' | ') || 'no error');
++    },
++
++    // A save the server REFUSES, over an existing import of the same name (README
++    // section 6, closed 2026-10-02). The query sends a name's stored ID ahead of the
++    // page's own rows, so a failed save used to show the PREVIOUS upload with no
++    // sign of trouble. The rows just dropped must show, sent inline, with a toast
++    // saying they were not saved. (The cap is refused BEFORE the save: Z-*.)
++    savefail: async function () {
++      await boot();
++      var m = mark(), NAME = 'SAME_NAME';
++      var csv = function (head, rows) { return [head].concat(rows).join('\r\n') + '\r\n'; };
++      var lastImportQuery = function (q0) {
++        var qs = window.__queries.slice(q0).filter(function (q) { return /\[\s*IMPORT\s*;\s*name\s*=\s*SAME_NAME\s*\]/i.test(q.template); });
++        return qs.length ? qs[qs.length - 1] : null;
++      };
++      var has = function (o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); };
++      // 1. The first upload saves: from here the name points at its stored ID.
++      var q1 = window.__queries.length;
++      var r1 = await dropAndSettle(new File([csv('ID,NAME', ['1,Old-A', '2,Old-B'])], 'same_name.csv'),
++                                   function () { return same(colShown('NAME'), ['Old-A', 'Old-B']); });
++      var sv1 = window.__saves[window.__saves.length - 1] || {}, qa = lastImportQuery(q1);
++      R.obs.first = { save: { name: sv1.name, failed: sv1.failed, id: sv1.id }, query: qa && { refs: qa.refs, inline: Object.keys(qa.inline) }, grid: grid() };
++      rec('S-first', r1.saved && sv1.name === NAME && !sv1.failed && !!sv1.id && same(colShown('NAME'), ['Old-A', 'Old-B'])
++          && !!qa && qa.refs[NAME] === sv1.id && !errToasts().length,
++          'save ' + J(R.obs.first.save) + ', query ' + J(R.obs.first.query) + ', NAME column ' + J(colShown('NAME')) + ', error toasts ' + J(errToasts()));
++      // 2. A DIFFERENT file under the same name, whose save the server refuses.
++      window.__saveFail = { status: 500, message: 'Action=save: ORA-03113: end-of-file on communication channel' };
++      var c0 = window.__confirms.length, q2 = window.__queries.length;
++      var r2 = await dropAndSettle(new File([csv('ID,NAME,EXTRA', ['7,New-X,x', '8,New-Y,y', '9,New-Z,z'])], 'same_name.csv'),
++                                   function () { return same(colShown('NAME'), ['New-X', 'New-Y', 'New-Z']); });
++      var sv2 = window.__saves[window.__saves.length - 1] || {}, qb = lastImportQuery(q2);
++      var g2 = grid(), et = errToasts();
++      R.obs.refused = { save: { name: sv2.name, failed: sv2.failed, id: sv2.id, rows: sv2.rows }, query: qb, grid: g2, toasts: toasts(), errToasts: et };
++      rec('P-savefail-refused', r2.saved && r2.queried && sv2.name === NAME && sv2.failed === 500 && window.__confirms.length - c0 === 1,
++          'save ' + J({ name: sv2.name, failed: sv2.failed }) + ', queried ' + r2.queried + ', overwrite prompts ' + (window.__confirms.length - c0));
++      rec('S-rows', flatRows() === 3 && same(colShown('NAME'), ['New-X', 'New-Y', 'New-Z']) && same(colShown('ID'), ['7', '8', '9'])
++          && g2.cols.indexOf('EXTRA') !== -1,
++          'rows ' + flatRows() + ', NAME column ' + J(colShown('NAME')) + ', columns ' + J(g2.cols));
++      rec('S-inline', !!qb && !has(qb.refs, NAME) && Array.isArray(qb.inline[NAME]) && qb.inline[NAME].length === 3 && same(qb.inline[NAME], sv2.rows),
++          qb ? 'refs ' + J(qb.refs) + ', inline ' + J(qb.inline[NAME] || null) : 'no query for the import');
++      rec('S-toast', et.some(function (t) {
++        return t.indexOf('ERROR: same_name.csv could not be saved as the import SAME_NAME, so it is available for this session only. '
++          + 'Action=save: ORA-03113: end-of-file on communication channel') !== -1;
++      }), 'error toasts ' + J(et));
++      // 3. Run it again: still the rows just dropped (the stored ID stays forgotten).
++      var q3 = window.__queries.length, n3 = window.__queryDone;
++      $('#executeQuery').trigger('click');
++      await until(function () { return window.__queryDone > n3; }, 15000);
++      await until(function () { return same(colShown('NAME'), ['New-X', 'New-Y', 'New-Z']); }, 4000);
++      await sleep(500);
++      var qc = lastImportQuery(q3);
++      rec('S-rerun', same(colShown('NAME'), ['New-X', 'New-Y', 'New-Z']) && !!qc && !has(qc.refs, NAME) && has(qc.inline, NAME),
++          'NAME column ' + J(colShown('NAME')) + ', query ' + J(qc && { refs: qc.refs, inline: Object.keys(qc.inline) }));
++      // 4. The server takes saves again: the next upload under the name saves and
++      //    shows, read back by its NEW ID.
++      window.__saveFail = null;
++      var q4 = window.__queries.length;
++      var r4 = await dropAndSettle(new File([csv('ID,NAME', ['5,Newer-Q'])], 'same_name.csv'),
++                                   function () { return same(colShown('NAME'), ['Newer-Q']); });
++      var sv4 = window.__saves[window.__saves.length - 1] || {}, qd = lastImportQuery(q4);
++      rec('S-recover', r4.saved && !sv4.failed && !!sv4.id && same(colShown('NAME'), ['Newer-Q']) && !!qd && qd.refs[NAME] === sv4.id && !has(qd.inline, NAME),
++          'save ' + J({ failed: sv4.failed, id: sv4.id }) + ', NAME column ' + J(colShown('NAME')) + ', query ' + J(qd && { refs: qd.refs, inline: Object.keys(qd.inline) }));
++      var e = errsFrom.apply(null, m);
++      rec('S-err', !e.length, e.join(' | ') || 'no error');
+     }
+   };
+ 
+--- a/penumbra_tests/msheet/harness.html
++++ b/penumbra_tests/msheet/harness.html
+@@ -10,9 +10,11 @@
+      processImportFile -> parseXLSXToObjects -> importFileData -> the save ->
+      performClearAllAction -> #executeQuery -> the rendered (grouped) view.
+      The fake server below stands in for manage_imports.php (stores what was
+-     saved; refuses a save over 50,000 rows with a 400, as the real one does) and
+-     query.php (the import's stored rows for SELECT * FROM [IMPORT; name=X], the
+-     base report's rows otherwise). -->
++     saved under a new ID; refuses a save over 50,000 rows with a 400, as the real
++     one does, and refuses EVERY save while window.__saveFail is set) and
++     query.php (for SELECT * FROM [IMPORT; name=X]: the stored rows the request's
++     importRefs ID names, else its inline importData rows - the real resolver's
++     order; the base report's rows otherwise). -->
+ <div id="reportHeaderContainer"><div id="defaultTitleView"></div><div id="reportInfoPanel" style="display:none"></div></div>
+ <div id="admWrapper" class="admin-view"><div id="admin-flex-container" style="display: flex; align-items: stretch; height: auto;">
+   <div id="tableSelectorContent"></div>
+@@ -84,8 +86,9 @@
+   window.__queryDone = 0;
+   window.__ajaxLog = [];
+   window.__saves = [];       // every manage_imports.php save, parsed
+-  window.__queries = [];     // every query.php call: { template, importRefs, importData }
+-  window.__IMPORTS = Object.create(null);
++  window.__queries = [];     // every query.php call: { template, importRefs, importData, refs, inline }
++  window.__IMPORT_ROWS = Object.create(null);   // saved rows by import ID
++  window.__saveFail = null;  // { status, message }: every save is refused that way until cleared
+ </script>
+ <script src="jquery-3.7.1.min.js"></script>
+ <script src="jquery-ui.min.js"></script>
+@@ -111,23 +114,40 @@
+     if (body.action === 'save') {
+       var rows = [];
+       try { rows = JSON.parse(body.import_data); } catch (e) { }
+-      window.__saves.push({ name: body.import_name, filename: body.filename, row_count: body.row_count, rows: rows });
++      var sv = { name: body.import_name, filename: body.filename, row_count: body.row_count, rows: rows, failed: 0, id: null };
++      window.__saves.push(sv);
+       if (rows.length > __IMPORT_MAX) {
++        sv.failed = 400;
+         return { status: 400, body: { status: 'error', message: 'Import exceeds maximum of ' + __IMPORT_MAX + ' rows (' + rows.length + ' provided).' } };
+       }
+-      window.__IMPORTS[String(body.import_name).toUpperCase()] = rows;
+-      return { status: 200, body: { status: 'success', id: ++__importSeq } };
++      // Any other refusal (a database error is a 500, an expired session a 403):
++      // nothing is stored, so an earlier import of the same name keeps its ID and rows.
++      if (window.__saveFail) {
++        sv.failed = window.__saveFail.status;
++        return { status: window.__saveFail.status, body: { status: 'error', message: window.__saveFail.message } };
++      }
++      sv.id = ++__importSeq;
++      window.__IMPORT_ROWS[sv.id] = rows;
++      return { status: 200, body: { status: 'success', id: sv.id } };
+     }
+     return { status: 200, body: { status: 'success', imports: [] } };
+   }
+   function __fakeQuery(opts) {
+     var d = opts.data || {};
+     var tpl = String(d.query_template || '');
+-    window.__queries.push({ template: tpl, importRefs: d.importRefs || null, importData: d.importData ? 'inline' : null });
++    var refs = {}, inline = {};
++    try { if (d.importRefs) refs = JSON.parse(d.importRefs); } catch (e) { }
++    try { if (d.importData) inline = JSON.parse(d.importData); } catch (e) { }
++    window.__queries.push({ template: tpl, importRefs: d.importRefs || null, importData: d.importData ? 'inline' : null, refs: refs, inline: inline });
+     var m = /\[\s*IMPORT\s*;\s*name\s*=\s*([^\]]+)\]/i.exec(tpl);
+     if (!m) return { data: JSON.parse(JSON.stringify(window.__baseRows)) };
+-    var name = m[1].trim().toUpperCase(), rows = window.__IMPORTS[name];
+-    if (!rows && d.importData) { try { rows = JSON.parse(d.importData)[name]; } catch (e) { } }
++    // query.php's order: the stored import a ref's ID names, then the request's
++    // inline rows (its fallback for a save that failed). By ID, never by name: a
++    // name-keyed store answers with the newest SAVED upload whatever the page
++    // sent, which would hide the very bug the savefail scenario looks for.
++    var name = m[1].trim().toUpperCase(), rows = null;
++    if (refs[name] != null) rows = window.__IMPORT_ROWS[refs[name]] || null;
++    if (!rows && inline[name]) rows = inline[name];
+     // query.php derives the columns from the FIRST row and drops a '#' column.
+     rows = JSON.parse(JSON.stringify(rows || []));
+     var cols = rows.length ? Object.keys(rows[0]).filter(function (k) { return k !== '#'; }) : [];
+--- a/penumbra_tests/msheet/mutants.json
++++ b/penumbra_tests/msheet/mutants.json
+@@ -207,5 +207,84 @@
+    "G-toast"
+   ],
+   "scn": null
++ },
++ "keepstaleid": {
++  "why": "a refused save keeps the name's stored ID (both maps): the query reads the PREVIOUS upload - the bug itself",
++  "edits": [
++   [
++    "                delete window._penumbraImportIds[safeName];\r\n                if (window._penumbraImportMeta[safeName]) delete window._penumbraImportMeta[safeName].id;\r\n",
++    ""
++   ]
++  ],
++  "must": [
++   "S-rows",
++   "S-inline",
++   "S-rerun"
++  ],
++  "scn": null
++ },
++ "keepid": {
++  "why": "a refused save forgets the meta's ID but keeps _penumbraImportIds, which the query reads FIRST",
++  "edits": [
++   [
++    "                delete window._penumbraImportIds[safeName];\r\n                if (window._penumbraImportMeta[safeName]) delete window._penumbraImportMeta[safeName].id;\r\n",
++    "                if (window._penumbraImportMeta[safeName]) delete window._penumbraImportMeta[safeName].id;\r\n"
++   ]
++  ],
++  "must": [
++   "S-rows",
++   "S-inline",
++   "S-rerun"
++  ],
++  "scn": [
++   "savefail"
++  ]
++ },
++ "keepmetaid": {
++  "why": "a refused save forgets _penumbraImportIds but keeps the meta's ID, the query's second choice",
++  "edits": [
++   [
++    "                delete window._penumbraImportIds[safeName];\r\n                if (window._penumbraImportMeta[safeName]) delete window._penumbraImportMeta[safeName].id;\r\n",
++    "                delete window._penumbraImportIds[safeName];\r\n"
++   ]
++  ],
++  "must": [
++   "S-rows",
++   "S-inline",
++   "S-rerun"
++  ],
++  "scn": [
++   "savefail"
++  ]
++ },
++ "nofailtoast": {
++  "why": "a refused save is silent again (the rows are right, nothing says they were not saved)",
++  "edits": [
++   [
++    "                show_text(\"<p id='undo_text'><span style='color: var(--accent-danger, #cc0000)'>ERROR:</span> <strong>\" + escapeHtml(fileName)\r\n",
++    "                if (false) show_text(\"<p id='undo_text'><span style='color: var(--accent-danger, #cc0000)'>ERROR:</span> <strong>\" + escapeHtml(fileName)\r\n"
++   ]
++  ],
++  "must": [
++   "S-toast"
++  ],
++  "scn": [
++   "savefail"
++  ]
++ },
++ "noreason": {
++  "why": "the toast drops the server's own reason for refusing the save",
++  "edits": [
++   [
++    "                    + (why ? \" \" + escapeHtml(String(why)) : \"\") + \"</p>\", 11000);\r\n",
++    "                    + \"</p>\", 11000);\r\n"
++   ]
++  ],
++  "must": [
++   "S-toast"
++  ],
++  "scn": [
++   "savefail"
++  ]
+  }
+ }
+\ No newline at end of file
+--- a/penumbra_tests/msheet/run.py
++++ b/penumbra_tests/msheet/run.py
+@@ -15,7 +15,10 @@
+ # make_fixtures.ps1):
+ #   browser  the REAL main.js on an admin's report page, a fixture dropped on it,
+ #            followed through parse -> save -> query -> render (stubbed
+-#            manage_imports.php + query.php in harness.html). driver.js asserts:
++#            manage_imports.php + query.php in harness.html; the fake query reads
++#            an import as query.php does: the stored rows of the ID the page sends,
++#            else the page's inline rows - never "whatever was last saved under
++#            that name", which would hide the savefail bug). driver.js asserts:
+ #     parity     J-*  the parser on every fixture (+ the rows the PHP half compares)
+ #     stack      G-*  three tabs + a hidden one + two without data: saved rows, the
+ #                     grouped view, tab order, counts, the notice, the sort order
+@@ -27,6 +30,11 @@
+ #     legacy     L-*  XML Spreadsheet 2003 (.xls) through the same drop
+ #     cap        Z-*  two tabs over the 50,000-row cap together: refused up front,
+ #                     nothing saved, no grouping left armed for the next query
++#     savefail   S-*  (added 2026-10-02) a CSV saved, then a DIFFERENT file under the
++#                     same name whose save the server refuses (500): its own rows show,
++#                     sent inline (no stored ID), an ERROR toast says they were not saved
++#                     (with the server's reason), a re-run keeps them, and the next save
++#                     that works is read back by its new ID
+ #   server   test_msheet.php: the imports/ folder readers on the same fixtures,
+ #            the one-tab byte-for-byte identity with the old reader, the TWIN
+ #            column name, and B-* PARITY with the browser half's parsed rows.
+@@ -37,6 +45,9 @@
+ #   py -3 run.py --control              BOTH halves on the pre-change files (default: the
+ #                                       newest *.bak-*-msheet, or --baseline-js/--baseline-php):
+ #                                       exactly CONTROL_RED (and the PHP half's) must fail
++#   py -3 run.py --control-savefail     the browser half on the build before the save-failure
++#                                       fix (default: the newest js\main.js.bak-*-savefail, or
++#                                       --baseline-js): exactly CONTROL_RED_SAVEFAIL must fail
+ #   py -3 run.py --mutant NAME / --mutants      JS single-point edits (mutants.json)
+ #   py -3 run.py --php-mutants                  the PHP half's own mutants
+ #   --scn a,b   a subset;   --keep keeps the staging dir;   --dump prints raw results
+@@ -62,7 +73,7 @@
+ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js',
+         'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
+         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js']
+-ALL_SCN = ['parity', 'stack', 'single', 'prevgroup', 'prevpivot', 'overwrite', 'legacy', 'cap']
++ALL_SCN = ['parity', 'stack', 'single', 'prevgroup', 'prevpivot', 'overwrite', 'legacy', 'cap', 'savefail']
+ EXPECT = {
+     'parity': ['P-boot-parity', 'J-three', 'J-meta', 'J-single', 'J-onetab', 'J-collide', 'J-hiddenfirst', 'J-legacy', 'J-case', 'J-ods', 'J-errors'],
+     'stack': ['P-boot-stack', 'G-save', 'G-grouped', 'G-order', 'G-counts', 'G-collapsed', 'G-csort', 'G-toast', 'G-pending', 'G-err'],
+@@ -72,6 +83,7 @@
+     'overwrite': ['P-boot-overwrite', 'O-first', 'O-confirm', 'O-again', 'O-err'],
+     'legacy': ['P-boot-legacy', 'L-save', 'L-bands', 'L-err'],
+     'cap': ['P-boot-cap', 'Z-nosave', 'Z-noquery', 'Z-toast', 'Z-pending', 'Z-next', 'Z-err'],
++    'savefail': ['P-boot-savefail', 'S-first', 'P-savefail-refused', 'S-rows', 'S-inline', 'S-toast', 'S-rerun', 'S-recover', 'S-err'],
+ }
+ # What the pre-change build gets wrong (browser half), frozen from the first
+ # control run (live b9e08a2a, 2026-10-02). Every other assert must PASS on the old
+@@ -84,7 +96,16 @@
+ CONTROL_RED = ['J-three', 'J-meta', 'J-collide', 'J-legacy', 'J-case', 'J-ods',
+                'G-save', 'G-grouped', 'G-order', 'G-counts', 'G-collapsed', 'G-csort', 'G-toast', 'G-pending',
+                'V-grouped', 'V-bands', 'V-reset', 'V-collapsed', 'W-grouped', 'W-toast', 'O-confirm', 'O-again',
+-               'L-save', 'L-bands', 'Z-nosave', 'Z-noquery', 'Z-toast', 'Z-pending', 'Z-next']
++               'L-save', 'L-bands', 'Z-nosave', 'Z-noquery', 'Z-toast', 'Z-pending', 'Z-next',
++               # the savefail scenario (added 2026-10-02): that build predates the fix as well
++               'S-rows', 'S-inline', 'S-toast', 'S-rerun']
++# --control-savefail: the build the save-failure fix replaced (live 2026-10-02 16:45-16:48,
++# main.js ea0ae814 = schedrowdump's; js\main.js.bak-20261002-1648-savefail) on EVERY scenario:
++# exactly these fail - a refused save over an existing import of the same name showed the
++# PREVIOUS upload (the query sent its stored ID), silently - and the whole msheet change still
++# passes. Frozen from its first control run (on 8425c02c); identical on each build that landed
++# under the deploy (caf4bb5f, 0c86917f, ea0ae814).
++CONTROL_RED_SAVEFAIL = ['S-rows', 'S-inline', 'S-toast', 'S-rerun']
+ 
+ MUTANTS = {}
+ for _k, _v in json.load(open(os.path.join(HERE, 'mutants.json'), encoding='utf-8')).items():
+@@ -107,6 +128,7 @@
+ all_mutants = flag('--mutants')
+ php_mutants = flag('--php-mutants')
+ control = flag('--control')
++control_sf = flag('--control-savefail')
+ keep = flag('--keep')
+ verbose = flag('--verbose')
+ dump = flag('--dump')
+@@ -117,9 +139,11 @@
+     baks = sorted(glob.glob(os.path.join(APP, pattern)))
+     if not baks: raise SystemExit('no %s baseline: pass it explicitly (the deploy leaves %s)' % (what, pattern))
+     return baks[-1]
++if control and control_sf: raise SystemExit('--control and --control-savefail are separate runs')
+ if base_js is None and control: base_js = newest(os.path.join('js', 'main.js.bak-*-msheet'), 'main.js')
++if base_js is None and control_sf: base_js = newest(os.path.join('js', 'main.js.bak-*-savefail'), 'main.js')
+ if base_php is None: base_php = newest('shared_logic.php.bak-*-msheet', 'shared_logic.php')
+-cand_js = base_js if control else os.path.join(app_dir, 'js', 'main.js')
++cand_js = base_js if (control or control_sf) else os.path.join(app_dir, 'js', 'main.js')
+ 
+ def read_b(p): return open(p, 'rb').read().decode('utf-8', 'surrogateescape')
+ 
+@@ -255,7 +279,8 @@
+ 
+ overall_bad = 0
+ try:
+-    print('candidate main.js: %s%s' % (cand_js, '   (CONTROL: the pre-change build)' if control else ''))
++    print('candidate main.js: %s%s' % (cand_js, '   (CONTROL: the pre-change build)' if control
++          else ('   (CONTROL-SAVEFAIL: the build before the save-failure fix)' if control_sf else '')))
+     print('baseline shared_logic.php: %s' % base_php)
+     names = [s for s in ALL_SCN if not scn_arg or s in scn_arg.split(',')]
+     if all_mutants or one_mutant:
+@@ -297,6 +322,15 @@
+                 good = sorted(failed) == sorted(want)
+                 print('CONTROL (browser): %s (expected red: %s)' % ('as expected' if good else 'NOT as expected', ' '.join(want)))
+                 overall_bad += (not good)
++        elif control_sf:
++            if CONTROL_RED_SAVEFAIL is None:
++                print('CONTROL-SAVEFAIL: not frozen yet - red set: %s' % ' '.join(failed))
++                overall_bad += 1
++            else:
++                want = [a for a in CONTROL_RED_SAVEFAIL if any(a in EXPECT[s] for s in names)]
++                good = sorted(failed) == sorted(want)
++                print('CONTROL-SAVEFAIL (browser): %s (expected red: %s)' % ('as expected' if good else 'NOT as expected', ' '.join(want)))
++                overall_bad += (not good)
+         else:
+             overall_bad += f
+         # ---- the PHP half, with the browser's parsed rows for the parity check ----
+@@ -305,7 +339,9 @@
+         if par:
+             bj = os.path.join(stage, 'browser_parity.json')
+             json.dump(par, open(bj, 'w', encoding='utf-8'))
+-        if not no_php:
++        if control_sf:
++            print('PHP half: not run (the save-failure fix is main.js only; plain runs keep judging shared_logic.php)')
++        elif not no_php:
+             rc, out = run_php((['--control'] if control else []) + (['--mutants'] if php_mutants else []), bj)
+             print(out.rstrip())
+             overall_bad += (rc != 0)

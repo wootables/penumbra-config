@@ -1,0 +1,170 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>single-key hints</title>
+<!-- The REAL stylesheet: the "/" badges are hidden by a main.css rule. -->
+<link rel="stylesheet" href="main.css">
+</head>
+<body>
+<!-- Minimal DOM for the single-key hints suite (2026-09-25). The flatfreeze /
+     colwidths harness that boots main.js and runs a query through the real
+     render path, plus what this feature touches, LIFTED by run.ps1 from the
+     index.php under test so the harness cannot drift from the page: the
+     header handle, the Settings panel handle and its switches row, the AI
+     button, the whole results header (search bar with its "/" badge, the
+     pagination buttons, the export icons) and the home filter's badge. -->
+<div id="reportHeaderContainer"><div id="defaultTitleView"></div><div id="reportInfoPanel" style="display:none"></div></div>
+<input id="reportTitle" value=""><div id="admWrapper"></div><button id="toggleAdminViewBtn"></button>
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<button id="executeQuery">Run</button><button id="stopQueryBtn">Stop</button>
+<div id="loadingOverlay" style="display:none"><p id="execution-timer"></p><p id="loadingMessage"></p></div>
+<div id="importTimestamps"></div>
+<!-- LIFT:headerToggleHandle -->
+<div class="sql-toolbar"><!-- LIFT:toggleAiPanel --></div>
+<!-- LIFT:resultsHeader -->
+<div id="table-view-container"><div id="container-parent"><div id="results-wrapper" style="width:900px;height:420px"><table id="resultsTable"><caption class="sr-only">Report results table</caption><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table></div></div></div>
+<div id="errorBox"></div><div id="undo_text_container"></div>
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="pivotLightbox" style="display:none">
+  <div id="pivot-source-columns"></div>
+  <div id="pivot-rows"></div><div id="pivot-cols"></div><div id="pivot-vals"></div>
+  <select id="pivot-aggregation-selector"><option value="">-</option><option value="sum">sum</option></select>
+  <table><tbody id="pivot-agg-table-body"></tbody></table>
+  <button id="generatePivotBtn">Generate</button>
+  <button id="copyPivotSnippetBtn">Snippet</button>
+</div>
+<div id="settingsPanelOverlay"></div>
+<div id="settingsPanel">
+  <!-- LIFT:settingsPanelHandle -->
+  <select id="spThemeSelector">
+    <option value="report-default">Report Default</option>
+    <option value="theme-default">Default</option>
+    <option value="theme-dark">Dark</option>
+  </select>
+  <select id="spDensitySelector">
+    <option value="report-default">Report Default</option>
+    <option value="standard">Standard</option>
+    <option value="compact">Compact</option>
+  </select>
+  <!-- LIFT:spToggles -->
+  <div class="sp-section sp-columns-section">
+    <div class="sp-column-container"><div id="spColumnList" class="sp-column-list"></div></div>
+  </div>
+  <div class="sp-actions"><button id="spApply">Save Column Layout</button><button id="spReset">Reset</button><span id="spPendingCount"></span></div>
+</div>
+<!-- the home screen's filter bar: only its "/" badge matters here -->
+<div class="pnl-search" style="position:relative;width:300px;height:30px"><input type="text" id="sktHomeFilter" aria-label="home filter stand-in"><!-- LIFT:pnlFilterKey --></div>
+<!-- the repository's search box, as penumbra_repository.js builds it; the
+     inline display is what its keyup handler's .toggle() writes. The dialog
+     itself stays CLOSED: it is in PNB_LIGHTBOXES, and an open dialog makes
+     every single key stand down. (A computed display does not look at the
+     ancestors, so the badge is still measurable.) -->
+<div id="openReportListLightbox" style="display:none;position:relative;width:300px;height:30px"><input type="text" id="sktRepoFilter" aria-label="repository filter stand-in"><span id="repoSearchKey" class="repo-search-key" style="display: inline;">/</span></div>
+<!-- titles that must come through untouched: no key, markup in the text, no id -->
+<span id="sktPlain" title="a <b>bold</b> & c">plain</span>
+<span class="sktNoId" title="(Z) no id here">noid</span>
+<!-- status bar: just what the custom-layout pill touches -->
+<div id="pnbStatusBar">
+  <div class="sb-seg" id="sbColsSeg">
+    <span id="sbCols"></span>
+    <span class="sb-chip" id="sbCustomCols" style="display:none;">custom layout</span>
+    <div class="sb-pop" id="sbCustomColsPop"><div id="sbCustomColsDiff"></div>
+      <button id="sbCustomColsReset">Reset</button><button id="sbCustomColsSave" style="display:none;">Save</button></div>
+  </div>
+  <div class="sb-seg" id="sbUserSeg"></div>
+</div>
+<button id="saveQuery">Save</button>
+<input id="serverSaveTitleInput"><input id="serverSaveSubtitleInput">
+<select id="serverSaveTheme"><option value="theme-default">Default</option></select>
+<select id="serverSaveDensity"><option value="standard">Standard</option></select>
+<pre id="out">running</pre>
+
+<script>
+  // real_input.py keeps what it set across its own reloads; every other run
+  // starts clean. ?keys=off presets the switch BEFORE penumbra_a11y.js runs,
+  // the way a returning viewer who switched it off arrives.
+  window.__REAL = /[?&]real=1/.test(location.search);
+  (function () {
+    try {
+      if (!/[?&]keepls=1/.test(location.search)) localStorage.clear();
+      if (/[?&]keys=off/.test(location.search)) localStorage.setItem('pnb_single_keys', 'off');
+    } catch (e) {}
+  })();
+  window.PENUMBRA_THEMES = {
+    'theme-default':  { label: 'Default' },
+    'theme-dark':     { label: 'Dark', dark: true }
+  };
+  window.PENUMBRA_THEME_IDS = ['theme-default', 'theme-dark'];
+  window.PENUMBRA_THEME_ALIASES = {};
+  window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: [],
+    totalExemptions: ['AMOUNT']
+  };
+  window.__ajaxLog = [];
+  jQuery.ajax = function (a, b) {
+    var opts = (typeof a === 'string') ? jQuery.extend({ url: a }, b || {}) : (a || {});
+    var url = String(opts.url || '');
+    window.__ajaxLog.push(url);
+    var d = jQuery.Deferred();
+    var resp = {};
+    if (/query\.php/.test(url)) resp = window.__queryResponse || { data: [] };
+    setTimeout(function () {
+      try { if (opts.success) opts.success(resp, 'success', { status: 200 }); } catch (e) { window.__errors.push('ajax success threw: ' + String(e)); }
+      try { if (opts.complete) opts.complete({ status: 200 }, 'success'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }
+      d.resolve(resp, 'success', { status: 200 });
+    }, 0);
+    var p = d.promise(); p.abort = function () {}; return p;
+  };
+  jQuery.getJSON = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.post = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.get = jQuery.post;
+  jQuery.fx.off = true;
+  // --dump-dom renders no frames: stub ResizeObserver / rAF - except under
+  // real_input.py (?real=1), which drives real frames over CDP.
+  if (!window.__REAL) {
+    window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+    window.IntersectionObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+    window.requestAnimationFrame = function (cb) { return setTimeout(function () { cb(Date.now()); }, 0); };
+    window.cancelAnimationFrame = function (id) { clearTimeout(id); };
+  }
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  window.__errors = [];
+  window.__rejections = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    window.__rejections.push(String((r && r.message) || r) + ' @' + String((r && r.stack) || '').split('\n').slice(1, 2).join('').trim());
+    e.preventDefault();
+  });
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  window.prompt = function () { return null; };
+</script>
+<!-- index.php order: the a11y layer (it owns the switch) BEFORE main.js -->
+<script src="penumbra_a11y.js"></script>
+<script src="penumbra_userseg.js"></script>
+<script src="main_skt.js"></script>
+<script src="driver.js"></script>
+</body></html>

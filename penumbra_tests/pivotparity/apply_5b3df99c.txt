@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>apply-spread limit</title></head>
+<body><pre id="out">RESULTS_JSON:{"apply":[{"n":1000,"ok":true,"v":0},{"n":10000,"ok":true,"v":0},{"n":50000,"ok":true,"v":0},{"n":65535,"ok":true,"v":0},{"n":65536,"ok":true,"v":0},{"n":100000,"ok":true,"v":0},{"n":125000,"ok":false,"err":"RangeError: Maximum call stack size exceeded"},{"n":200000,"ok":false,"err":"RangeError: Maximum call stack size exceeded"},{"n":500000,"ok":false,"err":"RangeError: Maximum call stack size exceeded"}],"loop500k":{"ok":true,"min":0}}</pre>
+<script>
+// Find the real argument-count ceiling for Math.min.apply in THIS engine, and
+// confirm the loop form has none. main.js ~2330 already warns about this
+// ("Explicit loop, not Math.min.apply - a big flat table can push past the
+// argument-count limit and throw") but the pivot's group-summary path still
+// uses the apply form on an array bounded by ROW count.
+(function () {
+  var res = [];
+  function tryApply(n) {
+    var a = new Array(n);
+    for (var i = 0; i < n; i++) a[i] = i;
+    try { var v = Math.min.apply(null, a); return { n: n, ok: true, v: v }; }
+    catch (e) { return { n: n, ok: false, err: (e && e.name) + ': ' + (e && e.message) }; }
+  }
+  [1000, 10000, 50000, 65535, 65536, 100000, 125000, 200000, 500000].forEach(function (n) {
+    res.push(tryApply(n));
+  });
+  // the loop form the codebase already uses elsewhere
+  var big = new Array(500000);
+  for (var i = 0; i < 500000; i++) big[i] = i;
+  var loopOk, loopMin;
+  try {
+    loopMin = big[0];
+    for (var j = 1; j < big.length; j++) { if (big[j] < loopMin) loopMin = big[j]; }
+    loopOk = true;
+  } catch (e) { loopOk = false; loopMin = String(e); }
+  document.getElementById('out').textContent = 'RESULTS_JSON:' + JSON.stringify({
+    apply: res, loop500k: { ok: loopOk, min: loopMin }
+  });
+})();
+</script>
+</body></html>

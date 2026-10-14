@@ -1,0 +1,473 @@
+{
+ "skip": {
+  "edits": [
+   [
+    "        return !(window.Penumbra && window.Penumbra.journalNotesOut && window.Penumbra.journalNotesOut());\n    }",
+    "        return true;\n    }"
+   ]
+  ],
+  "must": [
+   "K-xlsx-on",
+   "X-skipfn",
+   "X-html"
+  ],
+  "scn": null
+ },
+ "cellnull": {
+  "edits": [
+   [
+    "                if (!notesOut()) return null;\n                var nb = el.querySelector('.journal-notes-btn');",
+    "                return null;\n                var nb = el.querySelector('.journal-notes-btn');"
+   ]
+  ],
+  "must": [
+   "K-xlsx-on",
+   "K-cell-on",
+   "X-cell",
+   "X-csv-cell",
+   "X-json",
+   "X-html",
+   "X-html-nobtn"
+  ],
+  "scn": null
+ },
+ "csvskip": {
+  "edits": [
+   [
+    "window.Penumbra.journalNotesSkip && window.Penumbra.journalNotesSkip(String(info.name))",
+    "window.Penumbra.journalIsNotesCol && window.Penumbra.journalIsNotesCol(String(info.name))"
+   ]
+  ],
+  "must": [
+   "X-csv-head",
+   "X-csv-cell",
+   "X-json",
+   "T-on-live"
+  ],
+  "scn": null
+ },
+ "preview": {
+  "edits": [
+   [
+    "                + (n && preview ? '<span class=\"journal-notes-preview\">' + escapeHtml(preview) + '</span>' : '')\n",
+    ""
+   ]
+  ],
+  "must": [
+   "P-row-preview",
+   "E-panel",
+   "K-cell-off",
+   "K-hover",
+   "E-hovercol",
+   "V-preview",
+   "V-preview-file",
+   "V-oneline",
+   "W-clip",
+   "W-ellipsis",
+   "W-icon",
+   "W-wide",
+   "E-resize",
+   "R-compact",
+   "R-hover",
+   "R-grow",
+   "R-grow-narrow",
+   "R-back",
+   "E-wrap",
+   "D-preview"
+  ],
+  "scn": null
+ },
+ "sigpv": {
+  "edits": [
+   [
+    "                            sig = n + '|' + rowKey + (keyDirty() ? '|d' : '') + '|' + pvw;",
+    "                            sig = n + '|' + rowKey + (keyDirty() ? '|d' : '');"
+   ]
+  ],
+  "must": [
+   "P-row-preview",
+   "R-compact",
+   "R-hover",
+   "R-grow",
+   "R-back",
+   "D-preview"
+  ],
+  "scn": null
+ },
+ "save": {
+  "edits": [
+   [
+    "            if (window._penumbraJournalNotesExport) viewOptions.journalNotesExport = true;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "T-on",
+   "T-rownotes-back"
+  ],
+  "scn": null
+ },
+ "restore": {
+  "edits": [
+   [
+    "                window._penumbraJournalNotesExport = !!_jvo.journalNotesExport;",
+    "                window._penumbraJournalNotesExport = false;"
+   ]
+  ],
+  "must": [
+   "K-xlsx-on",
+   "K-cell-on",
+   "C-on",
+   "X-out",
+   "X-skipfn",
+   "X-cell",
+   "X-csv-head",
+   "X-csv-cell",
+   "X-json",
+   "X-html",
+   "T-restore"
+  ],
+  "scn": null
+ },
+ "editbtn": {
+  "edits": [
+   [
+    "            var editId = (newest && me && String(newest.CREATED_BY || '').toLowerCase() === me) ? String(newest.ID) : null;",
+    "            var editId = null;"
+   ]
+  ],
+  "must": [
+   "U-hint",
+   "U-up",
+   "D-button",
+   "D-mode",
+   "D-post",
+   "D-after",
+   "D-preview",
+   "D-count",
+   "D-409",
+   "E-edit409",
+   "D-cancel",
+   "E-editcancel"
+  ],
+  "scn": null
+ },
+ "newest": {
+  "edits": [
+   [
+    "            var newest = notes[notes.length - 1];",
+    "            var newest = notes[0];"
+   ]
+  ],
+  "must": [
+   "U-hint",
+   "U-up",
+   "D-button",
+   "D-mode",
+   "D-post",
+   "D-after",
+   "D-preview",
+   "D-count",
+   "D-none",
+   "D-409",
+   "E-edit409",
+   "D-cancel",
+   "E-editcancel"
+  ],
+  "scn": null
+ },
+ "editpost": {
+  "edits": [
+   [
+    "            if ($panel.data('editId')) { saveCardEdit($panel, rowKey, kind, text, mentions); return; }   // edit mode (2026-10-14)\n",
+    ""
+   ]
+  ],
+  "must": [
+   "D-post",
+   "D-after",
+   "D-preview",
+   "D-count",
+   "D-409"
+  ],
+  "scn": null
+ },
+ "keep409": {
+  "edits": [
+   [
+    "                    if (resp && resp.code === 'not_latest') endCardEdit($panel, true);",
+    "                    if (resp && resp.code === 'not_latest') endCardEdit($panel, false);"
+   ]
+  ],
+  "must": [
+   "D-409"
+  ],
+  "scn": null
+ },
+ "stash": {
+  "edits": [
+   [
+    "            if (inEl && !keepText) { inEl.innerHTML = st.html || ''; $(inEl).toggleClass('is-empty', !$.trim(inEl.textContent || '')); }",
+    "            if (inEl && !keepText) { inEl.innerHTML = ''; }"
+   ]
+  ],
+  "must": [
+   "D-cancel"
+  ],
+  "scn": null
+ },
+ "htmlbr": {
+  "edits": [
+   [
+    "                    $tdClone.html(escapeHtml(_jtv).replace(/\\n/g, '<br>'));",
+    "                    $tdClone.text(_jtv);"
+   ]
+  ],
+  "must": [
+   "X-html"
+  ],
+  "scn": null
+ },
+ "flatreply": {
+  "edits": [
+   [
+    "                for (var j = 0; j < reps.length; j++) out.push('  ↳ ' + line(reps[j]));",
+    "                for (var j = 0; j < reps.length; j++) out.push(line(reps[j]));"
+   ]
+  ],
+  "must": [
+   "K-xlsx-on",
+   "K-cell-on",
+   "X-cell",
+   "X-csv-cell",
+   "X-json",
+   "X-html",
+   "X-parity"
+  ],
+  "scn": null
+ },
+ "swdisable": {
+  "edits": [
+   [
+    "                .prop('disabled', !window._penumbraJournalRowNotes);",
+    "                .prop('disabled', false);"
+   ]
+  ],
+  "must": [
+   "T-rownotes-off"
+  ],
+  "scn": null
+ },
+ "btnfit": {
+  "edits": [
+   [
+    "#resultsTable td.journal-notes-col .journal-notes-btn,\n#groupedResultsContainer td.journal-notes-col .journal-notes-btn {\n    max-width: 100%;",
+    "#resultsTable td.journal-notes-col .journal-notes-btn,\n#groupedResultsContainer td.journal-notes-col .journal-notes-btn {\n    max-width: none;",
+    "css"
+   ]
+  ],
+  "must": [
+   "W-clip",
+   "W-ellipsis",
+   "R-grow-narrow"
+  ],
+  "scn": [
+   "resize",
+   "wrap"
+  ]
+ },
+ "growwrap": {
+  "edits": [
+   [
+    "td.journal-notes-col.cell-to-expand .journal-notes-preview {\n    white-space: normal;",
+    "td.journal-notes-col.cell-to-expand .journal-notes-preview {\n    white-space: nowrap;",
+    "css"
+   ]
+  ],
+  "must": [
+   "R-hover",
+   "R-grow",
+   "R-grow-narrow"
+  ],
+  "scn": [
+   "wrap"
+  ]
+ },
+ "width16": {
+  "edits": [
+   [
+    "    word-break: normal;\n    width: 16em;\n    max-width: 100%;\n",
+    "    max-width: 100%;\n",
+    "css"
+   ]
+  ],
+  "must": [
+   "R-grow",
+   "R-grow-narrow"
+  ],
+  "scn": [
+   "wrap"
+  ]
+ },
+ "hoverpv": {
+  "edits": [
+   [
+    "                if (notePv && notePv.scrollWidth > notePv.clientWidth) hasOverflow = true;",
+    "                if (false) hasOverflow = true;"
+   ]
+  ],
+  "must": [
+   "R-hover"
+  ],
+  "scn": [
+   "wrap"
+  ]
+ },
+ "eq-clip": {
+  "edits": [
+   [
+    "    text-align: left;\n    overflow: hidden;   /* a column made narrower than its preview cuts it, never spills (2026-10-14) */\n",
+    "    text-align: left;\n",
+    "css"
+   ]
+  ],
+  "must": [],
+  "scn": [
+   "resize",
+   "wrap"
+  ]
+ },
+ "globalnotes": {
+  "edits": [
+   [
+    "                if (_pNotes && testCondition(condition.op === '=' ? 'contains' : condition.op, condition.value, _pNotes)) return true;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "S-word"
+  ],
+  "scn": [
+   "search"
+  ]
+ },
+ "colcount": {
+  "edits": [
+   [
+    "                    if (!_isCount && window.Penumbra.journalRowNotesSearchText) {",
+    "                    if (false) {"
+   ]
+  ],
+  "must": [
+   "S-col-text",
+   "S-col-not",
+   "S-col-regex"
+  ],
+  "scn": [
+   "search"
+  ]
+ },
+ "hiddencol": {
+  "edits": [
+   [
+    "            if (th && th.style.display === 'none') return null;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "S-hidden"
+  ],
+  "scn": [
+   "search"
+  ]
+ },
+ "copyskip": {
+  "edits": [
+   [
+    "                if (window.Penumbra && window.Penumbra.journalNotesSkip && window.Penumbra.journalNotesSkip(colName)) return;",
+    "                if (window.Penumbra && window.Penumbra.journalIsNotesCol && window.Penumbra.journalIsNotesCol(colName)) return;"
+   ]
+  ],
+  "must": [
+   "C-on"
+  ],
+  "scn": [
+   "copycol",
+   "copycolon"
+  ]
+ },
+ "notneg": {
+  "edits": [
+   [
+    "                    if (_nNotes && testCondition(positiveOp === '=' ? 'contains' : positiveOp, condition.value, _nNotes)) return false;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "S-word-not"
+  ],
+  "scn": [
+   "search"
+  ]
+ },
+ "hovercolor": {
+  "edits": [
+   [
+    ".journal-notes-btn:hover .journal-notes-preview,\n.journal-notes-btn.is-open .journal-notes-preview,\n.journal-notes-btn:focus-visible .journal-notes-preview { color: inherit; }\n",
+    "",
+    "css"
+   ]
+  ],
+  "must": [
+   "K-hover"
+  ],
+  "scn": [
+   "hovercol"
+  ]
+ },
+ "xlsxskip": {
+  "edits": [
+   [
+    "                if (penumbraNotesColSkipped(this)) return; // notes column excluded from exports (unless the report includes notes: 2026-10-14)\n                const rawTxt",
+    "                if ($(this).hasClass('journal-notes-col')) return;\n                const rawTxt"
+   ]
+  ],
+  "must": [
+   "K-xlsx-on"
+  ],
+  "scn": [
+   "xlsx"
+  ]
+ },
+ "upcard": {
+  "edits": [
+   [
+    "            if (!(mf ? mf.isEmpty() : !$.trim(this.textContent || ''))) return;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "U-typed"
+  ],
+  "scn": [
+   "cardup"
+  ]
+ },
+ "hintcss": {
+  "edits": [
+   [
+    "    content: attr(data-placeholder) \" (\\2191  edits your last note)\";   /* two spaces: an escape eats one */\n",
+    "",
+    "css"
+   ]
+  ],
+  "must": [
+   "P-hint",
+   "U-hint"
+  ],
+  "scn": [
+   "panel",
+   "cardup"
+  ]
+ }
+}

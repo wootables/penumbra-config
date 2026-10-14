@@ -1,0 +1,650 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>fy reports engine changes</title></head>
+<body>
+<!-- Minimal DOM, same shape as ..\pivot_trigger\harness.html: main.js binds the
+     pivot-builder elements DIRECTLY at ready time, so they must exist before it
+     loads. The trigger parser resolves the Value column against
+     #tableHeader th[data-colname]. -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<table id="resultsTable"><thead id="tableHeader"><tr>
+  <th data-colname="#">#</th><th data-colname="FY">FY</th><th data-colname="MONTH">MONTH</th>
+  <th data-colname="AMOUNT">AMOUNT</th><th data-colname="AWARDS">AWARDS</th><th data-colname="FY_AGO">FY_AGO</th>
+</tr></thead><tbody></tbody></table>
+<div id="errorBox"></div>
+<input id="tableSearch" value="">
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="pivotLightbox" style="display:none">
+  <div id="pivot-source-columns"></div>
+  <div id="pivot-rows"></div><div id="pivot-cols"></div><div id="pivot-vals"></div>
+  <select id="pivot-aggregation-selector"><option value="">-</option><optgroup label="Basic"><option value="sum">Sum</option><option value="count">Count</option><option value="avg">Average</option><option value="max">Max</option></optgroup></select>
+  <table><tbody id="pivot-agg-table-body"></tbody></table>
+  <select id="pivot-rows-layout-select"><option value="nested">nested</option><option value="nested-static">nested-static</option><option value="flat">flat</option></select>
+  <select id="pivot-cols-layout-select"><option value="nested">nested</option><option value="flat">flat</option></select>
+  <select id="pivot-sort-order"><option value="asc">asc</option><option value="desc">desc</option></select>
+  <input id="pivot-sticky-cols" value="3">
+  <input type="checkbox" id="pivot-row-total-override-toggle">
+  <div id="pivot-row-total-override-container" style="display:none"><div id="pivot-row-total-slots"></div><div id="pivot-row-total-tokens"></div></div>
+  <select id="pivot-rank-dir"><option value="none">none</option><option value="top">top</option><option value="bottom">bottom</option></select>
+  <input id="pivot-rank-n" value="10"><select id="pivot-rank-agg"><option value="sum">sum</option><option value="count">count</option></select>
+  <select id="pivot-rank-scope"><option value="">Overall</option></select>
+  <input type="checkbox" id="pivot-rank-other" checked><label id="pivot-rank-other-label"></label>
+  <input type="checkbox" id="pivot-no-breakdown"><input type="checkbox" id="pivot-start-expanded"><input type="checkbox" id="pivot-hide-empty">
+  <select id="pivotPresetSelect"><option value=""></option></select><button id="pivotDeletePresetBtn"></button><input type="checkbox" id="pivotAutoRunPreset">
+  <button id="generatePivotBtn">Generate</button>
+  <select id="pivotSnippetTargetSelect" style="display: none;"></select>
+  <button id="updatePivotSnippetBtn" type="button" style="display: none;">Update Snippet</button>
+  <button id="copyPivotSnippetBtn">Snippet</button>
+  <button id="pivotSavePresetBtn"></button>
+</div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); try { var o = document.getElementById('out'); if (o && o.textContent === 'running') o.textContent = 'PAGE_ERROR: ' + window.__errors[0]; } catch (x) {} return true; };
+</script>
+<script src="main_patched.js"></script>
+<script>
+(function () {
+  function report(txt) { document.getElementById('out').textContent = txt; }
+  var results = [];
+  function assert(name, cond, detail) { results.push({ name: name, pass: !!cond, detail: detail === undefined ? '' : String(detail) }); }
+  function eq(name, actual, expected) {
+    var a = JSON.stringify(actual), e = JSON.stringify(expected);
+    assert(name, a === e, 'expected ' + e + ' got ' + a);
+  }
+  function M(o) { var m = new Map(); Object.keys(o).forEach(function (k) { m.set(k, o[k]); }); return m; }
+
+  // Three fiscal years x three months. Month labels sort naturally so a plain
+  // label sort IS the fiscal order. FY 2026 has NO Aug row (a gap BETWEEN real
+  // points); FY 2027 (current) has only Jul (a TRAILING gap). The FY_ columns are
+  // the same on every row, the way the report SQL carries them.
+  function row(fy, ago, month, amt, awd) {
+    return M({ FY: fy, FY_AGO: String(ago), MONTH: month, AMOUNT: amt, AWARDS: String(awd),
+      FY_CURRENT: 'FY 2027', FY_PRIOR: 'FY 2026', FY_PRIOR2: 'FY 2025' });
+  }
+  var ROWS = [
+    row('FY 2025', 2, '01 Jul', '$100', 1), row('FY 2025', 2, '02 Aug', '$200', 2), row('FY 2025', 2, '03 Sep', '$300', 3),
+    row('FY 2026', 1, '01 Jul', '$110', 1),                                          row('FY 2026', 1, '03 Sep', '$330', 3),
+    row('FY 2027', 0, '01 Jul', '$120', 1)
+  ];
+  function combo(series, extras) {
+    return window.__FY.chartData(ROWS, 'MONTH', 'none', 'none', 'sum', 12, 'combo', 'label', 'asc', 'default',
+      false, false, series, '', extras || {});
+  }
+  function ser(type, agg, ago, label) {
+    var s = { col: 'AMOUNT', type: type, agg: agg, color: '#336699' };
+    if (ago !== null) s.filterExpression = 'FY_AGO = ' + ago;
+    if (label !== null) s.label = label;
+    return s;
+  }
+
+  function run() {
+    var F = window.__FY;
+    if (!F || typeof F.chartData !== 'function') {
+      report('RESULTS_JSON:' + JSON.stringify({ fatal: 'hooks unavailable: ' + (window.__FY_ERR || 'n/a'), pageErrors: window.__errors.slice(0, 6) }));
+      return;
+    }
+    $('#generatePivotBtn').off('click');   // no data table behind the builder; stay deterministic
+
+    // ---------------- T: {COLUMN} tokens in combo / butterfly labels --------
+    var d = combo([
+      ser('bar', 'sum', 0, '{FY_CURRENT}'),
+      ser('line', 'running_total', 0, '{FY_CURRENT} YTD'),
+      ser('line', 'running_total', 1, '{FY} YTD'),
+      ser('line', 'sum', 0, 'plain {NOPE}'),
+      ser('line', 'running_total', 9, '{FY} none'),
+      ser('bar', 'sum', 0, null),
+      ser('line', 'sum', null, '{fy_prior2} lower-case')
+    ]);
+    var lbl = d.datasets.map(function (ds) { return ds.label; });
+    eq('T1 a constant column resolves from the series rows', lbl[0], 'FY 2027');
+    eq('T2 token plus literal text', lbl[1], 'FY 2027 YTD');
+    eq('T3 a per-row column resolves from the rows the SERIES counts (FY_AGO = 1)', lbl[2], 'FY 2026 YTD');
+    eq('T4 an unknown column keeps its token as typed', lbl[3], 'plain {NOPE}');
+    eq('T5 a series with no rows falls back to the chart first row', lbl[4], 'FY 2025 none');
+    eq('T6 no label = the old generated default (never tokenised)', lbl[5], 'AMOUNT (sum) [FY_AGO = 0]');
+    eq('T7 token names are case-insensitive', lbl[6], 'FY 2025 lower-case');
+    var bf = window.__FY.chartData(ROWS, 'MONTH', 'none', 'none', 'sum', 12, 'butterfly', 'label', 'asc', 'default',
+      false, false, [ser('bar', 'sum', 1, '{FY} left'), ser('bar', 'sum', 0, '{FY_CURRENT} right')], '', {});
+    eq('T8 butterfly labels resolve too', bf.datasets.map(function (x) { return x.label; }), ['FY 2026 left', 'FY 2027 right']);
+
+    // ---------------- G: line gaps --------------------------------------------
+    eq('G1 labels are the three months in order', d.labels, ['01 Jul', '02 Aug', '03 Sep']);
+    eq('G2 current-FY running total ENDS at its last month (no flat run to the edge)', d.datasets[1].data, [120, null, null]);
+    eq('G3 a gap BETWEEN real points still holds level', d.datasets[2].data, [110, 110, 440]);
+    eq('G4 a plain-sum line ends too (no drop to the floor)', d.datasets[3].data, [120, null, null]);
+    eq('G5 a line with no rows is all gap', d.datasets[4].data, [null, null, null]);
+    eq('G6 bars are untouched (0, not null)', d.datasets[0].data, [120, 0, 0]);
+    var full = combo([ser('line', 'running_total', 2, 'FY2025')]);
+    eq('G7 a complete series is unchanged', full.datasets[0].data, [100, 300, 600]);
+    var par = combo([ser('bar', 'sum', null, 'bars'), ser('line', 'running_total', 0, 'cur')], { pareto: true });
+    var parLine = par.datasets[1].data;
+    assert('G8 pareto rescales against the last REAL point (100% at Jul, gaps after)',
+      parLine[0] === 100 && parLine[1] === null && parLine[2] === null, JSON.stringify(parLine));
+    var parAll = combo([ser('bar', 'sum', null, 'bars'), ser('line', 'running_total', null, 'all')], { pareto: true });
+    var pl = parAll.datasets[1].data;
+    assert('G9 a normal pareto line still ends at 100%', Math.abs(pl[pl.length - 1] - 100) < 1e-9 && pl.indexOf(null) === -1, JSON.stringify(pl));
+
+    // ---------------- pivot fixtures (B / H / C) -------------------------------
+    function pivot(opts) {
+      var settings = {
+        v: 2, rows: opts.rowFields || ['MONTH'], cols: ['FY'], vals: 'AMOUNT', agg: opts.agg || ['sum', 'sum'], aggLabels: opts.aggLabels || ['Amount', 'Awards'],
+        aggColOverrides: opts.aggColOverrides || ['AMOUNT', 'AWARDS'], aggFilters: null, aggFormulas: null, rowLayout: 'nested', colLayout: 'nested',
+        sortOrder: 'asc', colSortOrder: 'asc', stickyColCount: 1, totalColAggs: opts.totalColAggs || null,
+        totalRowAggs: (opts.totalRowAggs === undefined ? null : opts.totalRowAggs),
+        totalRowAggLabels: opts.totalRowAggLabels || null, totalRowAggBaseIdx: opts.totalRowAggBaseIdx || null,
+        rankN: null, rankDir: null, rankAgg: null, rankOther: true, rankScope: null, noBreakdown: false,
+        startExpanded: false, hideEmpty: false
+      };
+      F.setPivotSettings(settings);
+      var extra = F.extraVals(settings.aggColOverrides, settings.vals);
+      var pd = F.processPivot(opts.data || ROWS, settings.rows, settings.cols, settings.vals, settings.agg, extra, null);
+      var res = F.pivotTable(pd, settings.rows, settings.cols, settings.vals, settings.rowLayout, settings.colLayout,
+        settings.agg, 'asc', null, (opts.isCurrency || [true, false]), settings.totalColAggs, settings.totalRowAggs, 'asc', 1, null,
+        settings.totalRowAggLabels, settings.aggColOverrides, settings.totalRowAggBaseIdx, false);
+      var box = document.createElement('div');
+      box.innerHTML = (res && res.html) ? res.html : String(res);
+      return box;
+    }
+    function cell(box, rk, ck, ai) {
+      var c = box.querySelector('td[data-row-key="' + rk + '"][data-col-key="' + ck + '"][data-agg-idx="' + ai + '"]');
+      return c ? c.textContent.trim() : '(no cell)';
+    }
+    var p0 = pivot({});
+    eq('B1 a filled cell still formats ($)', cell(p0, '01 Jul', 'FY 2027', 0), '$120');
+    eq('B2 an EMPTY money cell is blank, not $0', cell(p0, '02 Aug', 'FY 2027', 0), '');
+    eq('B3 an EMPTY count cell is blank, not 0', cell(p0, '02 Aug', 'FY 2027', 1), '');
+    eq('B4 an empty cell in a past year is blank too', cell(p0, '02 Aug', 'FY 2026', 0), '');
+
+    // ---------------- H: no Grand Total column --------------------------------
+    var gtDefault = p0.querySelectorAll('.pivot-grand-total').length;
+    assert('H1 control: the default pivot HAS a Grand Total column', gtDefault > 0, 'cells=' + gtDefault);
+    var pHide = pivot({ totalRowAggs: [] });
+    eq('H2 an EMPTY override leaves no .pivot-grand-total cell anywhere', pHide.querySelectorAll('.pivot-grand-total').length, 0);
+    var hdrText = Array.prototype.map.call(pHide.querySelectorAll('thead th'), function (th) { return th.textContent.trim(); }).join('|');
+    assert('H3 no header reads "Grand Total"', hdrText.indexOf('Grand Total') === -1, hdrText);
+    var foot = pHide.querySelector('tfoot tr');
+    assert('H4 the footer ROW (column totals) stays', !!foot && foot.textContent.indexOf('Grand Total') !== -1, foot ? foot.textContent : 'no tfoot');
+    eq('H5 footer still totals FY 2025 amounts', cell(pHide, '01 Jul', 'FY 2025', 0), '$100');
+    var bodyRow = pHide.querySelector('tbody tr');
+    var hdrRows = pHide.querySelectorAll('thead tr');
+    var lastHdr = hdrRows[hdrRows.length - 1];
+    var span = function (tr) { return Array.prototype.reduce.call(tr.cells, function (a, c) { return a + (c.colSpan || 1); }, 0); };
+    // The last header row is the Amount/Awards sub-header row; MONTH sits above it
+    // with a rowspan, so a body row is exactly one cell wider.
+    assert('H6 body and header still line up', !!bodyRow && span(bodyRow) === span(lastHdr) + 1,
+      'body=' + (bodyRow ? span(bodyRow) : '?') + ' header=' + span(lastHdr));
+    eq('H7 7 body cells = MONTH + 3 FYs x 2 values, nothing on the right', bodyRow ? bodyRow.cells.length : -1, 7);
+    var pNull = pivot({ totalRowAggs: null });
+    assert('H8 null (no override) still renders the column', pNull.querySelectorAll('.pivot-grand-total').length === gtDefault, pNull.querySelectorAll('.pivot-grand-total').length);
+
+    // ---------------- C: override currency follows the value it totals -------
+    var pOv = pivot({ totalRowAggs: ['sum', 'sum'], totalRowAggBaseIdx: [0, 1], totalRowAggLabels: ['Amount', 'Awards'] });
+    var gtCells = Array.prototype.filter.call(pOv.querySelectorAll('tbody tr:first-child td.pivot-grand-total'), function () { return true; })
+      .map(function (td) { return td.textContent.trim(); });
+    eq('C1 override on the money value keeps $', gtCells[0], '$330');
+    eq('C2 override on the COUNT value has no $ (was $3)', gtCells[1], '3');
+    // C3-C6 (2026-09-26): a corner slot totals its OWN value. Both engines merged
+    // the main bucket (the first value's column) there, so Awards read 1,160.
+    function cornerCells(box) {
+      var tds = box.querySelectorAll('tfoot td.pivot-grand-total');
+      return Array.prototype.slice.call(tds, -2).map(function (td) { return td.textContent.trim(); });
+    }
+    var ovCorner = cornerCells(pOv);
+    eq('C3 override corner: the Amount slot', ovCorner[0], '$1,160');
+    eq('C4 override corner: the Awards slot totals Awards (was 1,160)', ovCorner[1], '11');
+    var colCorner = cornerCells(pivot({ totalColAggs: ['sum', 'sum'] }));
+    eq('C5 column-total override corner: the Amount slot', colCorner[0], '$1,160');
+    eq('C6 column-total override corner: the Awards slot totals Awards (was 1,160)', colCorner[1], '11');
+
+    // ---------------- F: format() can hide the -100% months not counted yet ----
+    // The owner's ask (2026-09-26): format(cell, % Change, % Change = -100,
+    // 'color: transparent'). Built the way the snippet parser builds it - in
+    // pivot mode it adds the aggregation DISPLAY labels to the known columns
+    // before parsing, so '% Change' reads as a column, not as free text. The
+    // email engine's half is checked by eng4\probe_format.php (same rule).
+    F.setFormatRules([{ type: 'cell', targetColumn: '% CHANGE', condition: '% Change = -100', style: 'color: transparent',
+      parsedCondition: F.parseQuery('% Change = -100', ['FY', 'MONTH', 'AMOUNT', 'Amount', '% Change']) }]);
+    var pPct = pivot({ agg: ['sum', 'pct_change'], aggLabels: ['Amount', '% Change'], aggColOverrides: ['AMOUNT', null], totalRowAggs: [] });
+    F.setFormatRules([]);
+    var pctCells = Array.prototype.filter.call(pPct.querySelectorAll('tbody td'), function (td) { return /%$/.test(td.textContent.trim()); })
+      .map(function (td) { return { t: td.textContent.trim(), hid: /color:\s*transparent/i.test(td.getAttribute('style') || '') }; });
+    var minus100 = pctCells.filter(function (c) { return c.t === '-100.0%'; });
+    assert('F1 the rule hides every -100.0% cell (two in the fixture)', minus100.length === 2 && minus100.every(function (c) { return c.hid; }), JSON.stringify(pctCells));
+    assert('F2 ...and no other % cell', pctCells.filter(function (c) { return c.t !== '-100.0%' && c.hid; }).length === 0, JSON.stringify(pctCells));
+
+    // ---------------- D: % Change (to date) (2026-09-26) --------------------------
+    // Same fixture and figures as test_todate.php (the email / CSV / XLSX half).
+    function rowCells(box, label) {
+      var trs = box.querySelectorAll('tbody tr');
+      for (var i = 0; i < trs.length; i++) {
+        var cs = trs[i].querySelectorAll('th, td');
+        if (cs.length && cs[0].textContent.trim() === label) return Array.prototype.map.call(cs, function (c) { return c.textContent.trim(); });
+      }
+      return null;
+    }
+    function footCells(box) {
+      var tr = box.querySelector('tfoot tr');
+      return tr ? Array.prototype.map.call(tr.querySelectorAll('th, td'), function (c) { return c.textContent.trim(); }) : null;
+    }
+    // Row cells: label, then per FY [Amount, %], then the Grand Total pair.
+    var pTd = pivot({ agg: ['sum', 'pct_change_td'], aggLabels: ['Amount', '% Change (to date)'], aggColOverrides: ['AMOUNT', null] });
+    var tdJul = rowCells(pTd, '01 Jul'), tdAug = rowCells(pTd, '02 Aug'), tdSep = rowCells(pTd, '03 Sep'), tdFt = footCells(pTd);
+    eq('D1 reached months compute as % Change (10.0%, 9.1%)', tdJul && [tdJul[4], tdJul[6]], ['10.0%', '9.1%']);
+    eq('D2 FY 2026 Aug (no rows) is blank, not -100.0%', tdAug && tdAug[4], '');
+    eq('D3 FY 2027 Sep (not reached) is blank, not -100.0%', tdSep && tdSep[6], '');
+    eq('D4 Grand Total row compares like for like: FY 2026 10.0%, FY 2027 9.1%', tdFt && [tdFt[4], tdFt[6]], ['10.0%', '9.1%']);
+    eq('D5 Grand Total column: Jul 20.0%, Sep blank', [tdJul && tdJul[tdJul.length - 1], tdSep && tdSep[tdSep.length - 1]], ['20.0%', '']);
+    eq('D6 corner: Jul vs Jul = 20.0%', tdFt && tdFt[tdFt.length - 1], '20.0%');
+    var pPc = pivot({ agg: ['sum', 'pct_change'], aggLabels: ['Amount', '% Change'], aggColOverrides: ['AMOUNT', null] });
+    var pcSep = rowCells(pPc, '03 Sep'), pcFt = footCells(pPc);
+    eq('D7 regression: plain % Change still -100.0%, footer -26.7%', [pcSep && pcSep[6], pcFt && pcFt[4]], ['-100.0%', '-26.7%']);
+
+    // ---------------- R: running totals stop at their last period with data -----
+    var pRd = pivot({ agg: ['sum', 'running_total:down'], aggLabels: ['Amount', 'Run'], aggColOverrides: ['AMOUNT', null], totalRowAggs: [], isCurrency: [true, true] });
+    var rJul = rowCells(pRd, '01 Jul'), rAug = rowCells(pRd, '02 Aug'), rSep = rowCells(pRd, '03 Sep');
+    eq('R1 FY 2027 runs $120, then Aug and Sep are blank (were $120)', [rJul && rJul[6], rAug && rAug[6], rSep && rSep[6]], ['$120', '', '']);
+    eq('R2 FY 2026 Aug still carries $110 (data resumes in Sep), Sep $440', [rAug && rAug[4], rSep && rSep[4]], ['$110', '$440']);
+    var pRh = pivot({ agg: ['sum', 'running_total'], aggLabels: ['Amount', 'Run'], aggColOverrides: ['AMOUNT', null], totalRowAggs: [], isCurrency: [true, true] });
+    var hAug = rowCells(pRh, '02 Aug'), hJul = rowCells(pRh, '01 Jul');
+    eq('R3 across: Aug blank after FY 2025, Jul runs to $330', [hAug && hAug[4], hAug && hAug[6], hJul && hJul[6]], ['', '', '$330']);
+    // Parity reference for test_rundown.php (2026-09-26): the Grand Total row of a DOWN
+    // running column is each year's final figure; the scheduled builders summed it.
+    var rdFt = footCells(pRd);
+    eq('R4 a Running Total ↓ Grand Total row is each year\'s final figure ($600, $440, $120)', rdFt && [rdFt[2], rdFt[4], rdFt[6]], ['$600', '$440', '$120']);
+    var pRc = pivot({ agg: ['sum', 'running_count:down'], aggLabels: ['Amount', 'Run#'], aggColOverrides: ['AMOUNT', null], totalRowAggs: [], isCurrency: [true, false] });
+    var rcFt = footCells(pRc);
+    eq('R5 ...and a Running Count ↓ one each year\'s final count (3, 2, 1)', rcFt && [rcFt[2], rcFt[4], rcFt[6]], ['3', '2', '1']);
+
+    // ---------------- L: label room follows the series that print labels ------
+    var _hadChart = !!window.Chart;
+    if (!_hadChart) window.Chart = { defaults: { font: { family: 'sans-serif' } } };   // the measure reads Chart.defaults.font
+    var lrData = function (vals) { return { datasets: vals.map(function (v, i) { return { type: i ? 'line' : 'bar', data: [1000000, 2000000], _comboValues: v }; }) }; };
+    var lrOpt = function (show, vals) { return { type: 'combo', indexAxis: 'x', showValues: show, valuePos: 'auto', fontSize: 10, data: lrData(vals), formatter: function (v) { return String(v); } }; };
+    eq('L1 every combo series "values":"none": no blank band above the chart', F.labelRoom(lrOpt(true, ['none', 'none'])).padding.top, 0);
+    assert('L2 control: a series that inherits the chart\'s values still gets room', F.labelRoom(lrOpt(true, ['', 'none'])).padding.top > 0, '');
+    assert('L3 a series that asks for labels gets room even with the chart\'s values off', F.labelRoom(lrOpt(false, ['none', 'end'])).padding.top > 0, '');
+    if (!_hadChart) delete window.Chart;
+
+    // ---------------- W: % widths leave room for a flex row's gaps ------------
+    var wrow = document.createElement('div');
+    wrow.style.cssText = 'display:flex;flex-wrap:wrap;gap:15px;width:1000px;padding:0;border:0;margin:0';
+    document.body.appendChild(wrow);
+    var w50 = F.vizDim('50%', { baseEl: wrow }).px, w33 = F.vizDim('33.33%', { baseEl: wrow }).px;
+    eq('W1 two 50% charts and the 15px gap fit a 1000px row', [w50, w50 * 2 + 15 <= 1000], [492, true]);
+    assert('W2 three 33.33% charts and two gaps fit', w33 * 3 + 30 <= 1000, 'w33=' + w33);
+    eq('W3 100% keeps the whole row', F.vizDim('100%', { baseEl: wrow }).px, 1000);
+    var wblock = document.createElement('div');
+    wblock.style.cssText = 'display:block;width:1000px;padding:0;border:0;margin:0';
+    document.body.appendChild(wblock);
+    eq('W4 no flex gap: 50% is exactly half, as before', F.vizDim('50%', { baseEl: wblock }).px, 500);
+    wrow.remove(); wblock.remove();
+
+    // ---------------- M: a derived value takes its BASE's currency (2026-09-26) --
+    // The flags come from the real penumbraPivotCurrencyFlags, which reads the
+    // results table's column properties: AMOUNT is money, AWARDS a plain count.
+    // A Running Total ↓ right after Sum(AWARDS) used to take the PRIMARY value
+    // field's '$' ("$6" awards) - the user's ?id=fycompawd running award count.
+    $('#resultsTable').data('columnProperties', { 3: { isCurrency: true }, 4: { isCurrency: false } })
+      .data('columnNameToOriginalIndex', { FY: 1, MONTH: 2, AMOUNT: 3, AWARDS: 4, FY_AGO: 5 });
+    var mAgg = ['sum', 'running_total:down', 'sum', 'running_total:down'];
+    var mFl = F.curFlags('AMOUNT', ['AMOUNT', null, 'AWARDS', null], mAgg);
+    eq('M1 flags: Amount, its Running Total, Awards, ITS Running Total', mFl, [true, true, false, false]);
+    eq('M2 mirror: a plain primary no longer strips a money Running Total of its $',
+      F.curFlags('AWARDS', ['AWARDS', null, 'AMOUNT', null], mAgg), [false, false, true, true]);
+    eq('M3 Change, YTD and prior year follow their base too',
+      F.curFlags('AMOUNT', ['AMOUNT', 'AWARDS', null, null, null], ['sum', 'sum', 'diff', 'ytd', 'prioryear']), [true, false, false, false, false]);
+    eq('M4 guard: % and formula slots keep the old rule; no overrides = one flag for all',
+      [F.curFlags('AMOUNT', ['AMOUNT', 'AWARDS', null, null], ['sum', 'sum', 'pct_change', 'formula']),
+       F.curFlags('AMOUNT', null, ['sum', 'running_total']), F.curFlags('AWARDS', null, ['sum', 'running_total'])],
+      [[true, false, true, true], [true, true], [false, false]]);
+    // Row cells: label, per FY [Amount, Run, Awards, Run awards], then the Grand Total four.
+    var pM = pivot({ agg: mAgg, aggLabels: ['Amount', 'Run', 'Awards', 'Run awards'], aggColOverrides: ['AMOUNT', null, 'AWARDS', null], isCurrency: mFl });
+    var mSep = rowCells(pM, '03 Sep'), mFt = footCells(pM);
+    eq('M5 the Running Total of Awards prints 6 and 4, not $6 and $4', mSep && [mSep[4], mSep[8]], ['6', '4']);
+    eq('M6 the Running Total of Amount keeps its $', mSep && [mSep[2], mSep[6]], ['$600', '$440']);
+    eq('M7 ...and the Grand Total row agrees', mFt && [mFt[2], mFt[4], mFt[6], mFt[8]], ['$600', '6', '$440', '4']);
+    assert('M8 the Grand Total column\'s Running Total of Awards has no $ (Sep and the corner)',
+      mSep && mFt && /^\d[\d,]*$/.test(mSep[mSep.length - 1]) && /^\d[\d,]*$/.test(mFt[mFt.length - 1]),
+      JSON.stringify([mSep && mSep.slice(-4), mFt && mFt.slice(-4)]));
+    $('#resultsTable').removeData('columnProperties').removeData('columnNameToOriginalIndex');
+
+    // ---------------- P: the search builder's live count knows % Change (to date) --
+    // _previewPivotAggMatch mirrors runTableSearch's derived precompute; it had
+    // no pct_change_td branch, so an aggregate criterion on that column matched
+    // nothing in the preview while the executed search matched (2026-09-26).
+    // Labels without spaces keep the query parse simple. The preview only visits
+    // cells that HAVE source rows, so the no-rows case is built with a filter on
+    // the base: Sum over FY_AGO > 0 leaves FY 2027's Jul cell present but empty.
+    F.setPivotSettings({ v: 2, rows: ['MONTH'], cols: ['FY'], vals: 'AMOUNT', agg: ['sum', 'pct_change_td', 'pct_change'],
+      aggLabels: ['Amount', 'ChgTD', 'Chg'], aggColOverrides: ['AMOUNT', null, null], aggFilters: ['FY_AGO > 0', null, null], rowLayout: 'nested',
+      colLayout: 'nested', sortOrder: 'asc', colSortOrder: 'asc', stickyColCount: 1, totalColAggs: null, totalRowAggs: null });
+    F.setPivotSource(ROWS);
+    $('#pivot-output-container').show();
+    var pCols = ['FY', 'MONTH', 'AMOUNT', 'AWARDS', 'FY_AGO', 'Amount', 'ChgTD', 'Chg'];
+    var pv = function (q) { var r = F.previewAgg ? F.previewAgg(q, pCols) : null; return r ? r.pivotMatching : r; };
+    eq('P1 ChgTD > 5 matches Jul and Sep (FY 2026 +10.0% each)', pv('ChgTD > 5'), 2);
+    eq('P2 ChgTD < -50 matches nothing: FY 2027 Jul has no rows for the base, so it is blank, not -100%', pv('ChgTD < -50'), 0);
+    eq('P3 guard: plain Chg < -50 still matches Jul (FY 2027 -100.0%)', pv('Chg < -50'), 1);
+    $('#pivot-output-container').hide();
+    F.setPivotSource(null);
+
+    // ---------------- A: "auto" series colours follow the chart Palette (2026-09-26) --
+    // A series saved with "color":"auto" takes the Palette's colour for its slot;
+    // auto series that share a filter share a slot (a year's bar and line match).
+    var palHex = F.palHex;
+    var aSer = function (type, agg, ago, color) { var s = ser(type, agg, ago, null); s.color = color; return s; };
+    var rgbaOf = function (hex, a) { var h = String(hex).replace('#', ''); return 'rgba(' + parseInt(h.slice(0, 2), 16) + ', ' + parseInt(h.slice(2, 4), 16) + ', ' + parseInt(h.slice(4, 6), 16) + ', ' + a + ')'; };
+    var dA = combo([aSer('bar', 'sum', 0, 'auto'), aSer('bar', 'sum', 1, 'auto'), aSer('line', 'running_total', 0, 'auto'),
+      aSer('line', 'running_total', 1, 'auto'), aSer('bar', 'sum', 2, '#123456')]);
+    var aCol = dA.datasets.map(function (ds) { return ds._comboColor; });
+    assert('A1 an auto bar and line with the same filter share one colour', aCol[0] === aCol[2] && aCol[1] === aCol[3], JSON.stringify(aCol));
+    assert('A2 different filters get different colours', aCol[0] !== aCol[1], JSON.stringify(aCol));
+    eq('A3 the auto colours are the Palette\'s slots 0 and 1', [aCol[0], aCol[1]], palHex ? [palHex(0, 'auto'), palHex(1, 'auto')] : ['no palHex hook']);
+    eq('A4 guard: a fixed colour is kept', aCol[4], '#123456');
+    // vizOptions (arg 41) is parsed by the lazily loaded chart module, which this page
+    // never loads - so the palette is put in force directly and the inner builder runs.
+    var dM = null;
+    if (F.setPalette && F.chartDataRaw) {
+      F.setPalette('mono');
+      dM = F.chartDataRaw(ROWS, 'MONTH', 'none', 'none', 'sum', 12, 'combo', 'label', 'asc', 'default', false, false,
+        [aSer('bar', 'sum', 0, 'auto'), aSer('bar', 'sum', 1, 'auto')], '', {});
+      F.setPalette('auto');
+    }
+    eq('A5 under palette mono the auto series take mono\'s slots', dM ? dM.datasets.map(function (ds) { return ds._comboColor; }) : 'no hooks',
+      palHex ? [palHex(0, 'mono'), palHex(1, 'mono')] : ['no palHex hook']);
+    var dN = combo([aSer('bar', 'sum', null, 'auto'), aSer('line', 'sum', null, 'auto')]);
+    assert('A6 auto series with no filter get a slot each', dN.datasets[0]._comboColor !== dN.datasets[1]._comboColor, JSON.stringify(dN.datasets.map(function (ds) { return ds._comboColor; })));
+    var bfA = window.__FY.chartData(ROWS, 'MONTH', 'none', 'none', 'sum', 12, 'butterfly', 'label', 'asc', 'default', false, false,
+      [aSer('bar', 'sum', 1, 'auto'), aSer('bar', 'sum', 0, 'auto')], '', {});
+    eq('A7 an auto butterfly takes the Palette\'s slots 0 and 1', bfA.datasets.map(function (ds) { return ds.backgroundColor; }),
+      palHex ? [rgbaOf(palHex(0, 'auto'), 0.75), rgbaOf(palHex(1, 'auto'), 0.75)] : ['no palHex hook']);
+    // The builder (lives in resetVisualizationForm, which the harness stands up with a stub strip).
+    $('body').append('<div id="aVizSandbox" style="display:none"><select id="vizPalette"><option value="auto">auto</option>' +
+      '<option value="mono">mono</option></select><select id="vizXAxis"><option value="AMOUNT">AMOUNT</option></select>' +
+      '<div id="vizComboSeriesList"></div><div id="vizButterflySeriesList"></div></div>');
+    var rvErr = null; try { if (F.resetViz) F.resetViz(); } catch (e) { rvErr = String(e); }
+    var hasB = typeof window.addComboSeriesRow === 'function' && typeof window.getComboSeriesConfig === 'function';
+    assert('A8 the chart builder stands up in the harness', hasB, rvErr || 'window.addComboSeriesRow missing');
+    if (hasB) {
+      var swatches = function () { return $('#vizComboSeriesList .viz-combo-series-row .viz-combo-color').map(function () { return this.value; }).get(); };
+      $('#vizComboSeriesList .viz-combo-series-row').remove();
+      window.addComboSeriesRow({ col: 'AMOUNT', type: 'bar', agg: 'sum', filterExpression: 'FY_AGO = 0' });
+      window.addComboSeriesRow({ col: 'AMOUNT', type: 'line', agg: 'running_total', filterExpression: 'FY_AGO = 0', color: 'auto' });
+      window.addComboSeriesRow({ col: 'AMOUNT', type: 'bar', agg: 'sum', filterExpression: 'FY_AGO = 1', color: '#123456' });
+      eq('A9 an untouched row and a saved "auto" save "auto"; a picked colour saves its hex',
+        window.getComboSeriesConfig().map(function (s) { return s.color; }), ['auto', 'auto', '#123456']);
+      eq('A10 both FY_AGO = 0 swatches show the colour the chart draws', swatches().slice(0, 2), palHex ? [palHex(0, 'auto'), palHex(0, 'auto')] : ['no palHex hook']);
+      $('#vizComboSeriesList .viz-combo-series-row').eq(2).find('.viz-combo-color-auto').trigger('click');
+      eq('A11 the corner arrow puts a fixed row back on the Palette (slot 1)', [window.getComboSeriesConfig()[2].color, swatches()[2]],
+        ['auto', palHex ? palHex(1, 'auto') : 'no palHex hook']);
+      $('#vizPalette').val('mono').trigger('change');
+      eq('A12 a Palette change re-colours every auto swatch', swatches(), palHex ? [palHex(0, 'mono'), palHex(0, 'mono'), palHex(1, 'mono')] : ['no palHex hook']);
+      $('#vizComboSeriesList .viz-combo-series-row').eq(0).find('.viz-combo-color').val('#abcdef').trigger('change');
+      eq('A13 picking a colour by hand fixes that row only', window.getComboSeriesConfig().map(function (s) { return s.color; }), ['#abcdef', 'auto', 'auto']);
+    }
+    $('#aVizSandbox').remove();
+
+    // ---------------- K: which pivot cells a format(cell / header) target selects (2026-09-26) --
+    // A target that is an aggregation's LABEL selects only those columns; the Values
+    // field (AMOUNT) selects every value cell only when no aggregation carries that
+    // name. ?id=fycompawd's "Amount" (the label of Sum(AMOUNT)) styled every column.
+    var kHas = function (el) { return !!el && /border-left:\s*5px/i.test(el.getAttribute('style') || ''); };
+    var kRow = function (box, label) {
+      var trs = box.querySelectorAll('tbody tr');
+      for (var i = 0; i < trs.length; i++) {
+        var cs = trs[i].querySelectorAll('th, td');
+        if (cs.length && cs[0].textContent.trim() === label) return Array.prototype.map.call(cs, kHas);
+      }
+      return null;
+    };
+    var kFoot = function (box) { var tr = box.querySelector('tfoot tr'); return tr ? Array.prototype.map.call(tr.querySelectorAll('th, td'), kHas) : null; };
+    var kRule = function (t) { return [{ type: 'cell', targetColumn: t, condition: null, style: 'border-left: 5px solid #ff0000' }]; };
+    // Row cells: label, per FY [a0, a1, a2], then the Grand Total three.
+    F.setFormatRules(kRule('AMOUNT'));
+    var pK = pivot({ agg: ['sum', 'pct_change', 'sum'], aggLabels: ['Amount', '%Δ', 'Awards'], aggColOverrides: ['AMOUNT', null, 'AWARDS'], isCurrency: [true, false, false] });
+    var kJul = kRow(pK, '01 Jul'), kF = kFoot(pK);
+    eq('K1 "Amount" (a label that is also the Values field) styles only the Amount columns', kJul,
+      [false, true, false, false, true, false, false, true, false, false, true, false, false]);
+    eq('K2 ...and only the Amount cells of the Grand Total row', kF,
+      [false, true, false, false, true, false, false, true, false, false, true, false, false]);
+    var pK2 = pivot({ agg: ['sum', 'pct_change', 'sum'], aggLabels: ['Amt', '%Δ', 'Awards'], aggColOverrides: ['AMOUNT', null, 'AWARDS'], isCurrency: [true, false, false] });
+    eq('K3 guard: a Values-field target no aggregation is named after still styles every value cell', kRow(pK2, '01 Jul'),
+      [false, true, true, true, true, true, true, true, true, true, true, true, true]);
+    F.setFormatRules(kRule('%Δ'));
+    var pK3 = pivot({ agg: ['sum', 'pct_change', 'sum', 'pct_change'], aggLabels: ['Amount', '%Δ', 'Count', '%Δ'], aggColOverrides: ['AMOUNT', null, 'AWARDS', null], isCurrency: [true, false, false, false] });
+    var k3Jul = kRow(pK3, '01 Jul');
+    eq('K4 two columns sharing the label "%Δ" are both styled', k3Jul && [k3Jul[2], k3Jul[4], k3Jul[6], k3Jul[8], k3Jul[1], k3Jul[3]], [true, true, true, true, false, false]);
+    F.setFormatRules([]);
+    // header rules: one-sided borders reach the pivot's header cells
+    F.setFormatRules([{ type: 'header', targetColumn: 'AMOUNT', condition: null, style: 'border-left: 5px solid #ff0000; border-right: none' }]);
+    var pK4 = pivot({ agg: ['sum', 'pct_change', 'sum'], aggLabels: ['Amount', '%Δ', 'Awards'], aggColOverrides: ['AMOUNT', null, 'AWARDS'], isCurrency: [true, false, false] });
+    $('#pivot-output-container').empty().append(pK4.firstElementChild).show();
+    if (F.headerFmt) F.headerFmt();
+    var kTh = Array.prototype.filter.call(document.querySelectorAll('#pivot-output-container thead th'), function (th) { return /^Amount/.test(th.textContent.trim()); });
+    assert('K5 format(header, Amount, \'border-left: ...; border-right: none\') reaches every Amount header cell',
+      kTh.length >= 3 && kTh.every(function (th) { return th.style.borderLeftWidth === '5px' && th.style.borderRightStyle === 'none'; }),
+      JSON.stringify(kTh.map(function (th) { return th.getAttribute('style') || ''; })));
+    $('#pivot-output-container').empty().hide();
+    F.setFormatRules([]);
+
+    // ---------------- V: format() CONDITIONS on a label two columns share (2026-09-26) --
+    // ?id=fycompawd labels Amount's and Count's % Change both "%Δ". Each %Δ cell was
+    // tested against the OTHER one's value (the per-cell loop let the last column
+    // win), so 135.6% showed red and -4.7% green. Same fixture and rules as
+    // test_condlabels.php (the email half). Amount and Count move in opposite
+    // directions: Jul Amount +50% / Count -50%, Aug Amount -50% / Count +400%.
+    var vRow = function (fy, month, amt, awd) { return M({ FY: fy, QTR: 'Q1', MONTH: month, AMOUNT: amt, AWARDS: String(awd) }); };
+    var V_ROWS = [vRow('FY 2025', '01 Jul', '$100', 4), vRow('FY 2025', '02 Aug', '$200', 1),
+                  vRow('FY 2026', '01 Jul', '$150', 2), vRow('FY 2026', '02 Aug', '$100', 5)];
+    var vCols = ['FY', 'QTR', 'MONTH', 'AMOUNT', 'AWARDS', 'Amount', '%Δ', 'Count'];
+    var vRule = function (target, cond, style) {
+      return { type: 'cell', targetColumn: target.toUpperCase(), condition: cond, style: style, parsedCondition: F.parseQuery(cond, vCols) };
+    };
+    // g(reen) / r(ed) / - for the text colour, B bold, U underline
+    var vTag = function (td) {
+      var c = td.style.color;
+      return (c === 'green' ? 'g' : c === 'red' ? 'r' : '-') + (td.style.fontWeight === 'bold' ? 'B' : '') + (/underline/.test(td.style.textDecoration) ? 'U' : '');
+    };
+    var vCells = function (box, label) {
+      var trs = box.querySelectorAll('tbody tr');
+      for (var i = 0; i < trs.length; i++) {
+        var cs = trs[i].querySelectorAll('td');
+        if (cs.length && cs[0].textContent.trim() === label) return Array.prototype.slice.call(cs, 1).map(vTag);
+      }
+      return null;
+    };
+    F.setFormatRules([
+      vRule('%Δ', '%Δ > 0', 'color: green'), vRule('%Δ', '%Δ < 0', 'color: red'),
+      vRule('Amount', '%Δ < 0', 'font-weight: bold'), vRule('Count', '%Δ < 0', 'text-decoration: underline')
+    ]);
+    var vOpts = { data: V_ROWS, agg: ['sum', 'pct_change', 'sum', 'pct_change'], aggLabels: ['Amount', '%Δ', 'Count', '%Δ'],
+      aggColOverrides: ['AMOUNT', null, 'AWARDS', null], isCurrency: [true, false, false, false], totalRowAggs: [] };
+    // Value cells: FY 2025 [Amount %Δ Count %Δ], FY 2026 [Amount %Δ Count %Δ].
+    var pV = pivot(vOpts), vJul = vCells(pV, '01 Jul'), vAug = vCells(pV, '02 Aug');
+    eq('V1 Jul FY 2026: Amount %Δ +50% green, Count %Δ -50% red (were red / green)', vJul && [vJul[5], vJul[7]], ['g', 'r']);
+    eq('V2 Aug FY 2026: Amount %Δ -50% red, Count %Δ +400% green', vAug && [vAug[5], vAug[7]], ['r', 'g']);
+    eq('V3 a shared label named from another column reads the one on ITS base: Amount bold where Amount\'s %Δ < 0, Count underlined where Count\'s is',
+      vJul && vAug && [vJul[4], vAug[4], vJul[6], vAug[6]], ['-', '-B', '-U', '-']);
+    // Group summary rows (QTR > MONTH): Q1 Amount 300 -> 250 (-16.7%), Count 5 -> 7 (+40.0%).
+    var pVs = pivot(Object.assign({}, vOpts, { rowFields: ['QTR', 'MONTH'] }));
+    var vSum = pVs.querySelector('tr.pivot-group-summary-row[data-pivot-group-summary="Q1"]');
+    var vSumTags = vSum ? Array.prototype.slice.call(vSum.querySelectorAll('td'), 2).map(vTag) : null;
+    eq('V4 group summary rows too: Amount %Δ -16.7% red, Count %Δ +40.0% green, Amount bold', vSumTags && [vSumTags[5], vSumTags[7], vSumTags[4]], ['r', 'g', '-B']);
+    F.setFormatRules([]);
+
+    // ---------------- J: every writer of the pivot re-applies format(header) (2026-09-26) --
+    // Header rules are applied to the DOM, not built into the HTML string, so each
+    // place that writes pivotResult.html must call applyPivotHeaderFormatting()
+    // afterwards. The snippet re-render (the path a saved report takes on load) and
+    // the on-load restore did not, so ?id=fycompawd's header rule never showed.
+    var jx = new XMLHttpRequest(); jx.open('GET', 'main_patched.js', false); jx.send();
+    var jsrc = jx.responseText.replace(/\r\n/g, '\n');
+    var jNeedle = "$('#pivot-output-container').html(pivotResult.html);";
+    var jSites = [], jPos = jsrc.indexOf(jNeedle);
+    while (jPos !== -1) {
+      var jAfter = jsrc.slice(jPos + jNeedle.length, jPos + 9000);
+      var jNext = jAfter.indexOf(jNeedle);
+      if (jNext !== -1) jAfter = jAfter.slice(0, jNext);
+      jSites.push({ line: jsrc.slice(0, jPos).split('\n').length, reapplies: jAfter.indexOf('applyPivotHeaderFormatting()') !== -1 });
+      jPos = jsrc.indexOf(jNeedle, jPos + jNeedle.length);
+    }
+    eq('J1 the pivot is written in three places (a new writer must be checked here)', jSites.length, 3);
+    assert('J2 every writer re-applies format(header) rules', jSites.length > 0 && jSites.every(function (s) { return s.reapplies; }), JSON.stringify(jSites));
+
+    // ---------------- Q: the Custom Code menu offers the pivot's columns (2026-09-26) --
+    // While a pivot is on screen its aggregation labels are targetable by format()
+    // and heatmap(pivot, ...): the double-click menu lists them FIRST inside those
+    // calls, never inside calls that read the source rows (sum, lookup, vis ...).
+    var SH = window.PenumbraSnippetHelp;
+    var qBridge = window.Penumbra && typeof window.Penumbra.getPivotColumnList === 'function';
+    F.setPivotSettings({ v: 2, rows: ['MONTH'], cols: ['FY'], vals: 'AMOUNT', agg: ['sum', 'pct_change', 'sum'],
+      aggLabels: ['Amount', '%Δ', 'Count'], aggColOverrides: ['AMOUNT', null, 'AWARDS'], rowLayout: 'nested', colLayout: 'nested',
+      sortOrder: 'asc', colSortOrder: 'asc', stickyColCount: 1, totalColAggs: null, totalRowAggs: null });
+    $('#pivot-output-container').empty().show();
+    eq('Q1 while a pivot is on screen the bridge lists its columns', qBridge ? window.Penumbra.getPivotColumnList() : 'no bridge', ['Amount', '%Δ', 'Count']);
+    var qta = document.createElement('textarea'); document.body.appendChild(qta);
+    var qcm = CodeMirror.fromTextArea(qta, { mode: 'text/plain' });
+    var qHint = function (text, word) {
+      qcm.setValue(text);
+      var at = text.indexOf(word);
+      qcm.setSelection(qcm.posFromIndex(at), qcm.posFromIndex(at + word.length));
+      var r = SH && SH.hint ? SH.hint(qcm) : null;
+      return r && r.list ? r.list.map(function (h) { return h.displayText || h.text; }) : [];
+    };
+    var qPiv = function (l) { return l.filter(function (d) { return / \(pivot\)$/.test(d); }); };
+    var q2 = qHint("format(cell, Amount, 1=1, 'color: red')", 'Amount');
+    eq('Q2 inside format(cell, TARGET, ...): the pivot columns come FIRST', q2.slice(0, 3), ['Amount (pivot)', '%Δ (pivot)', 'Count (pivot)']);
+    var q3 = qHint('heatmap(pivot, Amount)', 'Amount');
+    eq('Q3 inside heatmap(pivot, ...) too', q3.slice(0, 3), ['Amount (pivot)', '%Δ (pivot)', 'Count (pivot)']);
+    eq('Q4 inside sum(): none (it reads the source rows)', qPiv(qHint('sum(AMOUNT)', 'AMOUNT')), []);
+    $('#pivot-output-container').hide();
+    eq('Q5 no pivot on screen: the bridge lists nothing and format() offers none',
+      [qBridge ? window.Penumbra.getPivotColumnList() : 'no bridge', qPiv(qHint("format(cell, Amount, 1=1, 'color: red')", 'Amount'))], [[], []]);
+    qcm.toTextArea(); qta.remove();
+
+    // ---------------- U: the builder --------------------------------------------
+    F.setPivotSettings({ v: 2, rows: ['MONTH'], cols: ['FY'], vals: 'AMOUNT', agg: ['sum', 'sum'], aggLabels: ['Amount', 'Awards'],
+      aggColOverrides: ['AMOUNT', 'AWARDS'], rowLayout: 'nested', colLayout: 'nested', sortOrder: 'asc', stickyColCount: 1,
+      totalColAggs: null, totalRowAggs: null, totalRowAggLabels: null, totalRowAggBaseIdx: null });
+    F.repopulate();
+    eq('U0 builder repopulated: two aggregation rows', F.aggTokens().length, 2);
+    function fields() { var b = F.buildTrigger(); return (b && b.trigger) ? b.trigger.split('|') : []; }
+    $('#pivot-row-total-override-toggle').prop('checked', true).trigger('change');
+    var $slots = $('#pivot-row-total-slots');
+    eq('U1 ticking Override prefills one chip per value', $slots.find('.pivot-row-total-token').length, 2);
+    eq('U2 the prefilled set is pristine', $slots.attr('data-rt-pristine'), '1');
+    eq('U3 pristine = NO override (tokens null)', F.rtTokens(), null);
+    eq('U4 pristine writes RowTotals none (trimmed away)', fields()[10] === undefined || fields()[10] === 'none', true);
+    eq('U5 every box has an x', $slots.find('.pivot-row-total-slot .pivot-row-total-slot-clear').length, 2);
+    $slots.find('.pivot-row-total-slot[data-value-idx="1"] .pivot-row-total-slot-clear').trigger('click');
+    eq('U6 x on the Awards box: only the Amount total remains', F.rtTokens(), ['sum']);
+    eq('U7 ...tied to value 0', F.rtBase(), [0]);
+    // 2026-09-26: worded as the user's own choice (it read "Not in the Grand Total column").
+    assert('U8 the cleared box says so', /Removed from the Grand Total column by your override/.test($slots.find('.pivot-row-total-slot[data-value-idx="1"]').text()),
+      $slots.find('.pivot-row-total-slot[data-value-idx="1"]').text());
+    eq('U9 no longer pristine', $slots.attr('data-rt-pristine'), undefined);
+    eq('U10 trigger writes the one remaining total with its label', fields()[10], 'sum:Amount@0');
+    $slots.find('.pivot-row-total-slot[data-value-idx="0"] .pivot-row-total-slot-clear').trigger('click');
+    eq('U11 every box cleared = [] (no Grand Total column)', F.rtTokens(), []);
+    eq('U12 ...and the trigger writes hide', fields()[10], 'hide');
+    var $add = $slots.find('.pivot-row-total-slot[data-value-idx="1"] select.pivot-row-total-slot-select');
+    $add.val('sum').trigger('change');
+    eq('U13 + Add brings a value back', F.rtTokens(), ['sum']);
+    eq('U14 ...tied to the box it was added in', F.rtBase(), [1]);
+    $slots.find('.pivot-row-total-token .pivot-agg-token-remove').first().trigger('click');
+    eq('U15 chip x on the last chip = [] again', F.rtTokens(), []);
+    // untick / re-tick: pristine defaults again (nothing left to restore)
+    $('#pivot-row-total-override-toggle').prop('checked', false).trigger('change');
+    $('#pivot-row-total-override-toggle').prop('checked', true).trigger('change');
+    eq('U16 re-ticking an emptied override starts from pristine defaults', F.rtTokens(), null);
+    eq('U17 ...with both chips back', $slots.find('.pivot-row-total-token').length, 2);
+    // the trigger parser
+    var a = $('<a class="snippet-action" data-action-name="trigger"></a>')
+      .attr('data-action-value', 'pivot|MONTH|FY|AMOUNT|sum:AMOUNT,sum:AWARDS|nested|nested|asc|1|none|hide|none|none|none|none|none|none|Amount;;Awards');
+    $('#reportSnippetOutput').append(a); a.trigger('click'); a.remove();
+    eq('U18 parsing RowTotals hide ticks Override', $('#pivot-row-total-override-toggle').is(':checked'), true);
+    eq('U19 ...with the value boxes present and empty', [$slots.find('.pivot-row-total-slot').length, $slots.find('.pivot-row-total-token').length], [2, 0]);
+    eq('U20 ...so the builder reads [] back', F.rtTokens(), []);
+    eq('U21 ...and writes hide again (round trip)', fields()[10], 'hide');
+    // repopulating from saved settings with []
+    F.setPivotSettings({ v: 2, rows: ['MONTH'], cols: ['FY'], vals: 'AMOUNT', agg: ['sum', 'sum'], aggLabels: ['Amount', 'Awards'],
+      aggColOverrides: ['AMOUNT', 'AWARDS'], rowLayout: 'nested', colLayout: 'nested', sortOrder: 'asc', stickyColCount: 1,
+      totalColAggs: null, totalRowAggs: [], totalRowAggLabels: null, totalRowAggBaseIdx: null });
+    F.repopulate();
+    eq('U22 saved [] reopens with Override ticked', $('#pivot-row-total-override-toggle').is(':checked'), true);
+    eq('U23 ...and reads [] back', F.rtTokens(), []);
+    // a saved non-empty override is untouched by any of this
+    F.setPivotSettings({ v: 2, rows: ['MONTH'], cols: ['FY'], vals: 'AMOUNT', agg: ['sum', 'sum'], aggLabels: ['Amount', 'Awards'],
+      aggColOverrides: ['AMOUNT', 'AWARDS'], rowLayout: 'nested', colLayout: 'nested', sortOrder: 'asc', stickyColCount: 1,
+      totalColAggs: null, totalRowAggs: ['avg', 'count'], totalRowAggLabels: null, totalRowAggBaseIdx: [0, 1] });
+    F.repopulate();
+    eq('U24 a saved override repopulates exactly (not pristine)', [F.rtTokens(), F.rtBase(), $slots.attr('data-rt-pristine')], [['avg', 'count'], [0, 1], undefined]);
+
+    // ---------------- S: css ------------------------------------------------------
+    var x = new XMLHttpRequest(); x.open('GET', 'main_css_under_test.css', false); x.send();
+    var css = x.responseText.replace(/\r\n/g, '\n');
+    var armor = css.indexOf('.pnb-toggle .pnb-toggle-btn:hover:not(:disabled),\n.pnb-toggle .pnb-toggle-btn:active:not(:disabled) {');
+    assert('S1 toggle hover armor rule exists at (0,4,0)', armor !== -1, 'rule not found');
+    var armorBody = armor === -1 ? '' : css.substring(armor, css.indexOf('}', armor));
+    assert('S2 ...and keeps the switch transparent', /background-color:\s*transparent/.test(armorBody), armorBody);
+    assert('S3 the wolfpack blanket it must beat is (0,3,1)', css.indexOf('.theme-wolfpack button:hover:not(:disabled)') !== -1, 'blanket moved?');
+    assert('S4 box-x rule is ID-scoped (beats the button blankets)', css.indexOf('#pivot-row-total-slots .pivot-row-total-slot-clear {') !== -1, 'rule not found');
+    var hintRule = css.indexOf('#pivot-row-total-slots .token-help-text {');
+    assert('S5 an emptied row-total box shows its hint (beats the blanket display:none)', hintRule !== -1 && /display:\s*inline/.test(css.substring(hintRule, css.indexOf('}', hintRule))), 'rule not found');
+
+    report('RESULTS_JSON:' + JSON.stringify({ pageErrors: window.__errors.slice(0, 6), results: results }));
+  }
+
+  // js/penumbra_snippet_help.js binds `P = window.Penumbra` ONCE, when it loads. The app
+  // lazy-loads it long after main.js built that object; the static <script> above runs
+  // BEFORE main.js's ready code, so its P was an empty stand-in (harness Q, 2026-09-26).
+  // Once main.js is up, load it again the way the app does, then run.
+  function reloadSnippetHelp(done) {
+    // The module refuses to load twice (`if (w.PenumbraSnippetHelp) return;`).
+    try { delete window.PenumbraSnippetHelp; } catch (e) { window.PenumbraSnippetHelp = undefined; }
+    var s = document.createElement('script');
+    s.src = 'penumbra_snippet_help.js?reload=' + Date.now();
+    s.onload = s.onerror = function () { done(); };
+    document.head.appendChild(s);
+  }
+  var tries = 0;
+  (function wait() {
+    tries++;
+    if (window.__FY && !wait.reloaded) { wait.reloaded = true; reloadSnippetHelp(wait); return; }
+    if (window.__FY || tries > 40) { setTimeout(function () { try { run(); } catch (e) { report('RESULTS_JSON:' + JSON.stringify({ fatal: 'run threw: ' + e + ' ' + (e.stack || '').split('\n').slice(0, 3).join(' | '), pageErrors: window.__errors.slice(0, 6) })); } }, 300); }
+    else { setTimeout(wait, 100); }
+  })();
+})();
+</script>
+</body></html>

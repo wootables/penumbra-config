@@ -1,0 +1,304 @@
+<!doctype html><meta charset="utf-8"><title>running</title><pre id="out">running</pre>
+<script>
+window.onerror = function (msg, src, line, col) {
+  var el = document.getElementById('out');
+  if (el && el.textContent === 'running') {
+    el.textContent = 'SCRIPT-ERROR: ' + msg + '  (line ' + line + ':' + col + ')';
+  }
+  return false;
+};
+</script>
+<script src="SRC.js"></script>
+<script>
+var LOG = [], PASS = 0, FAIL = 0;
+function ok(n, c, x) { if (c) { PASS++; LOG.push('PASS  ' + n); } else { FAIL++; LOG.push('FAIL  ' + n + (x ? '   >> ' + x : '')); } }
+function eq(n, g, w) { ok(n, JSON.stringify(g) === JSON.stringify(w), 'got=' + JSON.stringify(g) + ' want=' + JSON.stringify(w)); }
+
+try {
+  var code = String(window.__src).replace(/\r\n/g, '\n');
+
+  function grab(decl) {
+    var start = code.indexOf(decl);
+    if (start === -1) throw new Error('anchor not found: ' + decl);
+    var i = code.indexOf('{', start), depth = 0, inStr = null, inLine = false, inBlk = false, inRe = false;
+    for (var j = i; j < code.length; j++) {
+      var c = code[j], n = code[j + 1];
+      if (inLine) { if (c === '\n') inLine = false; continue; }
+      if (inBlk) { if (c === '*' && n === '/') { inBlk = false; j++; } continue; }
+      if (inStr) { if (c === '\\') { j++; continue; } if (c === inStr) inStr = null; continue; }
+      if (inRe) { if (c === '\\') { j++; continue; } if (c === '/') inRe = false; continue; }
+      if (c === '/' && n === '/') { inLine = true; j++; continue; }
+      if (c === '/' && n === '*') { inBlk = true; j++; continue; }
+      if (c === '"' || c === "'" || c === '`') { inStr = c; continue; }
+      if (c === '/') {
+        var k = j - 1; while (k >= 0 && /\s/.test(code[k])) k--;
+        if (k < 0 || /[=(,:;!&|?{}[\n+\-*%~^<>]/.test(code[k])) { inRe = true; continue; }
+      }
+      if (c === '{') depth++;
+      else if (c === '}') { depth--; if (depth === 0) return code.slice(start, j + 1); }
+    }
+    throw new Error('unbalanced: ' + decl);
+  }
+
+  // ── format helpers, straight from the shipped module ────────────────────
+  var F = new Function(
+    grab('function _vizParseVizOptions(') + '\n' +
+    (/var PENUMBRA_PALETTE_NAMES = [^;]*;/.exec(code)||[''])[0]+'\n'+grab('function _vizParsePalette(')+'\n'+grab('function _vizParseFormat(') + '\n' +
+    grab('function penumbraFormatChartNumber(') + '\n' +
+    grab('function _vizParseUserNumber(')+'\n'+grab('function _vizParseRefMarker(') + '\n' +
+    grab('function _vizParseTarget(') + '\n' +
+    'return { parse:_vizParseFormat, fmt:penumbraFormatChartNumber,' +
+    '         marker:_vizParseRefMarker, target:_vizParseTarget };')();
+
+  // ══ 1. THE CONTRACT THAT PROTECTS EVERY EXISTING CHART ══════════════════
+  // No `format` set => parse returns null => the formatter returns null =>
+  // all fourteen call sites fall through to their original ladder. If this
+  // ever passes something non-null, existing charts silently change.
+  eq('legacy: no options at all', F.parse(''), null);
+  eq('legacy: options with no format key', F.parse('{"map":"us-grid"}'), null);
+  eq('legacy: format is not an object', F.parse('{"format":"compact"}'), null);
+  eq('legacy: format is an array', F.parse('{"format":[1,2]}'), null);
+  eq('legacy: malformed JSON', F.parse('{broken'), null);
+  var legacyInputs = [0, 1, -1, 999, 1000, 12345, 1e6, -1e9, 0.5, NaN, Infinity, null, 'x'];
+  ok('legacy: formatter returns null for EVERY input when fmt is null',
+     legacyInputs.every(function (v) { return F.fmt(v, null, '$') === null; }));
+
+  // ══ 2. PARSING + NORMALISATION ═════════════════════════════════════════
+  eq('parse: bare format object defaults to compact/1dp',
+     F.parse('{"format":{}}'),
+     { style: 'compact', decimals: 1, trim: true, prefix: null, suffix: '', thousands: true });
+  eq('parse: unknown style falls back to compact', F.parse('{"format":{"style":"martian"}}').style, 'compact');
+  eq('parse: style is case-insensitive', F.parse('{"format":{"style":"PLAIN"}}').style, 'plain');
+  eq('parse: plain defaults to 0dp', F.parse('{"format":{"style":"plain"}}').decimals, 0);
+  eq('parse: explicit decimals disables trimming',
+     [F.parse('{"format":{"decimals":2}}').decimals, F.parse('{"format":{"decimals":2}}').trim], [2, false]);
+  eq('parse: decimals capped at 6', F.parse('{"format":{"decimals":99}}').decimals, 6);
+  eq('parse: negative decimals fall back to the style default',
+     F.parse('{"format":{"style":"plain","decimals":-3}}').decimals, 0);
+  eq('parse: prefix null means INHERIT, empty string means suppress',
+     [F.parse('{"format":{}}').prefix, F.parse('{"format":{"prefix":""}}').prefix], [null, '']);
+  eq('parse: thousands opt-out', F.parse('{"format":{"style":"plain","thousands":false}}').thousands, false);
+
+  // ══ 3. COMPACT ═════════════════════════════════════════════════════════
+  var C = F.parse('{"format":{}}');
+  eq('compact: billions', F.fmt(2400000000, C, ''), '2.4B');
+  eq('compact: millions', F.fmt(2400000, C, ''), '2.4M');
+  eq('compact: thousands', F.fmt(2400, C, ''), '2.4K');
+  eq('compact: below 1K stays whole', F.fmt(999, C, ''), '999');
+  eq('compact: trailing .0 trimmed like the old ladder', F.fmt(2000000, C, ''), '2M');
+  eq('compact: inherits the detected currency', F.fmt(2400000, C, '$'), '$2.4M');
+  eq('compact: negative keeps the sign OUTSIDE the prefix', F.fmt(-2400000, C, '$'), '-$2.4M');
+  eq('compact: zero', F.fmt(0, C, '$'), '$0');
+  var C2 = F.parse('{"format":{"decimals":2}}');
+  eq('compact: explicit 2dp is NOT trimmed', F.fmt(2000000, C2, ''), '2.00M');
+  eq('compact: explicit 2dp keeps precision', F.fmt(2456000, C2, ''), '2.46M');
+  var C0 = F.parse('{"format":{"decimals":0}}');
+  eq('compact: 0dp rounds', F.fmt(2456000, C0, '$'), '$2M');
+
+  // ══ 4. PLAIN - the whole point of the feature ═══════════════════════════
+  var P = F.parse('{"format":{"style":"plain"}}');
+  eq('plain: full magnitude, grouped', F.fmt(2456789, P, '$'), '$2,456,789');
+  eq('plain: no abbreviation at any size', F.fmt(1234567890, P, ''), '1,234,567,890');
+  eq('plain: negative', F.fmt(-2456789, P, '$'), '-$2,456,789');
+  var P2 = F.parse('{"format":{"style":"plain","decimals":2}}');
+  eq('plain: 2dp', F.fmt(1234.5, P2, '$'), '$1,234.50');
+  var PN = F.parse('{"format":{"style":"plain","thousands":false}}');
+  eq('plain: grouping can be switched off', F.fmt(2456789, PN, ''), '2456789');
+
+  // ══ 5. PERCENT ═════════════════════════════════════════════════════════
+  var PC = F.parse('{"format":{"style":"percent"}}');
+  eq('percent: appends the unit', F.fmt(35.0182, PC, ''), '35%');
+  eq('percent: does NOT inherit the currency prefix', F.fmt(35, PC, '$'), '35%');
+  var PC1 = F.parse('{"format":{"style":"percent","decimals":1}}');
+  eq('percent: 1dp', F.fmt(35.0182, PC1, '$'), '35.0%');
+
+  // ══ 6. PREFIX / SUFFIX ═════════════════════════════════════════════════
+  var E = F.parse('{"format":{"prefix":"€"}}');
+  eq('prefix: explicit prefix beats the detected currency', F.fmt(2400000, E, '$'), '€2.4M');
+  var S = F.parse('{"format":{"style":"plain","suffix":" days"}}');
+  eq('suffix: appended after the number', F.fmt(45, S, ''), '45 days');
+  var NP = F.parse('{"format":{"prefix":""}}');
+  eq('prefix: empty string suppresses an inherited currency', F.fmt(2400000, NP, '$'), '2.4M');
+
+  // ══ 7. REFERENCE MARKERS: line vs band ═════════════════════════════════
+  eq('marker: empty is nothing', F.marker(''), null);
+  eq('marker: junk is nothing', F.marker('abc'), null);
+  eq('marker: plain value is a LINE', F.marker('50000'), { kind: 'line', value: 50000, label: '' });
+  eq('marker: value|label is a LINE', F.marker('50000|Budget'), { kind: 'line', value: 50000, label: 'Budget' });
+  eq('marker: a negative value stays a LINE', F.marker('-50'), { kind: 'line', value: -50, label: '' });
+  eq('marker: lo..hi is a BAND', F.marker('30..60'), { kind: 'band', lo: 30, hi: 60, label: '' });
+  eq('marker: lo..hi|label is a BAND', F.marker('30..60|Target'), { kind: 'band', lo: 30, hi: 60, label: 'Target' });
+  eq('marker: lo-hi is accepted, because that is what people type',
+     F.marker('30-60|OK'), { kind: 'band', lo: 30, hi: 60, label: 'OK' });
+  eq('marker: reversed bounds are swapped, not rejected', F.marker('60..30'), { kind: 'band', lo: 30, hi: 60, label: '' });
+  eq('marker: negative lo via ..', F.marker('-5..10'), { kind: 'band', lo: -5, hi: 10, label: '' });
+  eq('marker: negative lo via a single hyphen', F.marker('-5-10'), { kind: 'band', lo: -5, hi: 10, label: '' });
+  eq('marker: decimals survive', F.marker('1.5..2.5'), { kind: 'band', lo: 1.5, hi: 2.5, label: '' });
+  // Rejected, NOT truncated to the leading 1: an award number like 2014-0685
+  // must never quietly become a reference line at 2014.
+  eq('marker: ambiguous multi-hyphen is rejected, never truncated to its first number',
+     F.marker('1-2-3'), null);
+  eq('marker: a rejected marker is still never an invented range', F.marker('1-2-3'), null);
+  eq('marker: a zero-width band is still a band', F.marker('50..50'), { kind: 'band', lo: 50, hi: 50, label: '' });
+
+  // ══ 8. GAUGE/BULLET TARGETS STAY SINGLE-VALUED ═════════════════════════
+  // referenceLine is the TARGET for these two types. Now that the same field
+  // also accepts a range, a range must be refused rather than silently read as
+  // its low end - gauges express ranges through `bands`.
+  eq('target: plain value still works', F.target('80'), { value: 80, label: '' });
+  eq('target: value|label still works', F.target('80|Goal'), { value: 80, label: 'Goal' });
+  eq('target: a .. range is REFUSED, not read as its low end', F.target('30..60'), null);
+  eq('target: a hyphen range is REFUSED too', F.target('30-60'), null);
+  eq('target: a negative target is not mistaken for a range', F.target('-5'), { value: -5, label: '' });
+
+  // ══ 9. THE WRAPPER ATTACHES _fmt TO EVERY PAYLOAD ══════════════════════
+  // The builder has 23 exit points; the wrapper is what guarantees all of them
+  // carry the format. Drive it with a stub inner so this tests the WRAPPER,
+  // not the 1,000-line builder.
+  var wrapSrc = grab('function _vizParseUserNumber(')+'\n'+grab('function generateChartDataFromMaps(');
+  var W = new Function('_generateChartDataFromMaps', '_vizParseFormat', '_vizParsePalette',
+                       wrapSrc + '\nreturn generateChartDataFromMaps;');
+  var seen = null;
+  var wrapped = W(function () { return { labels: ['a'], datasets: [] }; },
+                  function (raw) { seen = raw; return { style: 'plain', decimals: 0 }; }, function () { return 'auto'; });
+  var r1 = wrapped([], 'X', 'Y', '', 'sum', 10, 'bar', 'value', 'desc', 'default',
+                   false, false, null, '', { vizOptions: '{"format":{"style":"plain"}}' });
+  eq('wrapper: _fmt attached from extras.vizOptions', r1._fmt, { style: 'plain', decimals: 0 });
+  eq('wrapper: the raw options string is what gets parsed', seen, '{"format":{"style":"plain"}}');
+
+  seen = 'UNTOUCHED';
+  var r2 = wrapped([], 'X', 'Y', '', 'sum', 10, 'bar', 'value', 'desc', 'default',
+                   false, false, null, '', { vizOptions: '' });
+  eq('wrapper: _fmt is null when no options were set', r2._fmt, null);
+  eq('wrapper: the parser is not even called on the common path', seen, 'UNTOUCHED');
+
+  var r3 = wrapped([], 'X', 'Y', '', 'sum', 10, 'bar');      // no extras at all
+  eq('wrapper: survives a short arg list', r3._fmt, null);
+
+  var nullInner = W(function () { return null; }, function () { return {}; }, function () { return 'auto'; });
+  eq('wrapper: a null payload is passed through untouched',
+     nullInner([], 'X', 'Y', '', 'sum', 10, 'bar', 'value', 'desc', 'default',
+               false, false, null, '', { vizOptions: '{"format":{}}' }), null);
+
+  // ══ 10. buildReferenceLinePlugin: line vs band ═════════════════════════
+  var B = new Function('_vizParseRefMarker',
+    grab('function buildReferenceLinePlugin(') + '\nreturn buildReferenceLinePlugin;')(F.marker);
+
+  eq('plugin: empty referenceLine builds nothing', B('', 'bar', false, false, null, 0), null);
+  eq('plugin: junk builds nothing', B('nope', 'bar', false, false, null, 0), null);
+  ok('plugin: a plain value builds the marker plugin',
+     (B('50000|Budget', 'bar', false, false, null, 0) || {}).id === 'penumbraReferenceLine');
+  ok('plugin: a BAND builds the same plugin id (one plugin, two modes)',
+     (B('30..60|Target', 'bar', false, false, null, 0) || {}).id === 'penumbraReferenceLine');
+  // Types whose value axis is not cartesian, or that use referenceLine as a
+  // target, must keep refusing it - a band cannot change that.
+  ['pie', 'doughnut', 'radar', 'treemap', 'waterfall', 'butterfly', 'funnel', 'gauge', 'bullet', 'gantt', 'map']
+    .forEach(function (t) {
+      eq('plugin: ' + t + ' still refuses a band', B('30..60', t, false, false, null, 0), null);
+    });
+
+  // The band must actually PAINT: drive the hook against a stub chart and check
+  // it fills a rectangle between the two pixel positions.
+  function stubChart(scaleVals) {
+    var calls = [];
+    return {
+      calls: calls,
+      chartArea: { left: 10, right: 210, top: 20, bottom: 120 },
+      scales: { y: { getPixelForValue: function (v) { return scaleVals[v]; } } },
+      ctx: {
+        save: function () { calls.push(['save']); }, restore: function () { calls.push(['restore']); },
+        beginPath: function () { calls.push(['beginPath']); }, stroke: function () { calls.push(['stroke']); },
+        moveTo: function (x, y) { calls.push(['moveTo', x, y]); }, lineTo: function (x, y) { calls.push(['lineTo', x, y]); },
+        fillRect: function (x, y, w, h) { calls.push(['fillRect', x, y, w, h]); },
+        fillText: function (t) { calls.push(['fillText', t]); },
+        setLineDash: function () { }, measureText: function () { return { width: 10 }; }
+      }
+    };
+  }
+  var bandPlugin = B('30..60|Target', 'bar', false, false, null, 0);
+  var ch = stubChart({ 30: 100, 60: 60 });
+  bandPlugin.afterDatasetsDraw(ch);
+  var fills = ch.calls.filter(function (c) { return c[0] === 'fillRect'; });
+  eq('band: paints exactly one wash', fills.length, 1);
+  eq('band: the wash spans the two values across the full plot width', fills[0], ['fillRect', 10, 60, 200, 40]);
+  eq('band: draws BOTH edges (4 moveTo/lineTo pairs -> 2 lines)',
+     ch.calls.filter(function (c) { return c[0] === 'moveTo'; }).length, 2);
+  ok('band: renders its label', ch.calls.some(function (c) { return c[0] === 'fillText' && c[1] === 'Target'; }));
+
+  var linePlugin = B('50|Budget', 'bar', false, false, null, 0);
+  var ch2 = stubChart({ 50: 80 });
+  linePlugin.afterDatasetsDraw(ch2);
+  eq('line: paints NO wash', ch2.calls.filter(function (c) { return c[0] === 'fillRect'; }).length, 0);
+  eq('line: draws exactly one line', ch2.calls.filter(function (c) { return c[0] === 'moveTo'; }).length, 1);
+
+  // Clipping: a band wider than the plotted range still shades what is visible.
+  var wide = B('0..999|All', 'bar', false, false, null, 0);
+  var ch3 = stubChart({ 0: 400, 999: -300 });   // both far outside top/bottom
+  wide.afterDatasetsDraw(ch3);
+  var f3 = ch3.calls.filter(function (c) { return c[0] === 'fillRect'; });
+  // fillRect args land at [1..4] = x, y, w, h (index 0 is the call name).
+  eq('band: an over-wide band is CLIPPED to the plot area, not skipped',
+     f3.length ? [f3[0][2], f3[0][4]] : null, [20, 100]);
+
+  // Entirely off-scale: nothing at all.
+  var off = B('900..999', 'bar', false, false, null, 0);
+  var ch4 = stubChart({ 900: -50, 999: -80 });
+  off.afterDatasetsDraw(ch4);
+  eq('band: a band entirely off-scale paints nothing',
+     ch4.calls.filter(function (c) { return c[0] === 'fillRect'; }).length, 0);
+
+  // ══ 11. THE BUILDER COLLECTOR ══════════════════════════════════════════
+  // _vizCollectVizOptions feeds BOTH the live preview and the emitted snippet.
+  // Its most important property is that an untouched form yields {} - that is
+  // what keeps every existing vis() call short and unchanged.
+  var DOM = {};
+  function $stub(sel) {
+    var id = sel.replace('#', '');
+    return {
+      val: function () { return DOM[id]; },
+      is: function (what) { return what === ':checked' ? !!DOM[id] : false; }
+    };
+  }
+  var collectSrc = grab('function _vizCollectVizOptions(');
+  var collect = new Function('$', collectSrc + '\nreturn _vizCollectVizOptions;')($stub);
+
+  function form(over) {
+    DOM = { vizNumStyle: 'auto', vizNumDecimals: 'auto', vizNumPrefix: '', vizNumSuffix: '',
+            vizMapKind: 'us-grid', vizMapMatch: 'auto', vizMapLabels: true, vizMapBins: 'quantile' };
+    for (var k in (over || {})) DOM[k] = over[k];
+  }
+
+  form(); eq('collect: an untouched bar form emits NOTHING', collect('bar'), {});
+  form(); eq('collect: an untouched map form still emits its map key', collect('map'), { map: 'us-grid' });
+  form({ vizNumStyle: 'plain' });
+  eq('collect: style only', collect('bar'), { format: { style: 'plain' } });
+  form({ vizNumDecimals: '2' });
+  eq('collect: decimals alone is emitted as a NUMBER, not a string',
+     collect('bar'), { format: { decimals: 2 } });
+  form({ vizNumDecimals: '0' });
+  eq('collect: decimals 0 is emitted, not treated as falsy',
+     collect('bar'), { format: { decimals: 0 } });
+  form({ vizNumPrefix: '€', vizNumSuffix: ' ea' });
+  eq('collect: prefix and suffix', collect('bar'), { format: { prefix: '€', suffix: ' ea' } });
+  form({ vizNumStyle: 'percent', vizNumDecimals: '1', vizNumSuffix: ' of goal' });
+  eq('collect: everything together',
+     collect('bar'), { format: { style: 'percent', decimals: 1, suffix: ' of goal' } });
+  form({ vizNumStyle: 'plain', vizMapBins: 'equal', vizMapLabels: false, vizMapMatch: 'postal' });
+  eq('collect: map keys and format keys coexist in one object',
+     collect('map'), { match: 'postal', map: 'us-grid', showLabels: false, bins: 'equal',
+                       format: { style: 'plain' } });
+
+  // The collector's output must survive the parser it is destined for.
+  form({ vizNumStyle: 'plain', vizNumDecimals: '2', vizNumPrefix: '€' });
+  var trip = F.parse(JSON.stringify(collect('bar')));
+  eq('collect: round-trips through _vizParseFormat',
+     [trip.style, trip.decimals, trip.trim, trip.prefix], ['plain', 2, false, '€']);
+  form();
+  eq('collect: an untouched form round-trips to the LEGACY null', F.parse(JSON.stringify(collect('bar'))), null);
+
+  document.getElementById('out').textContent =
+    'RESULT ' + (FAIL === 0 ? 'ALL-PASS' : 'HAS-FAILURES') + '  pass=' + PASS + ' fail=' + FAIL + '\n' + LOG.join('\n');
+} catch (e) {
+  document.getElementById('out').textContent = 'HARNESS-ERROR: ' + e.name + ': ' + e.message + '\n' + (e.stack || '');
+}
+</script>

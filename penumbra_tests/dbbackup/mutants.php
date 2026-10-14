@@ -1,0 +1,53 @@
+<?php
+/**
+ * dbbackup mutants: each reverts ONE decision; the suite must go RED, with the
+ * exact fail count named (a mutant that stays GREEN = the suite stopped pinning it).
+ *   php -n mutants.php <app folder> <test_dbbackup.php> <php.exe>
+ */
+$app = rtrim($argv[1], '/\\'); $test = $argv[2]; $php = $argv[3];
+$mutants = array(
+    array('deadline never checked (a run would hold the runner past its cycle)', 'db_backup_job.php',
+          'if ($rows % 200 === 0 && call_user_func($clock) >= $deadline) {', 'if (false) {', 18),
+    array('resume ignores the last key (rows duplicated across parts)', 'db_backup_lib.php',
+          "if (\$after !== null && \$after !== '') \$sql .=", "if (false) \$sql .=", 8),
+    array('keyed read not ordered (resume would skip / repeat rows)', 'db_backup_lib.php',
+          "\$sql .= ' ORDER BY ' . \$kq;", '', 6),
+    array('retention may delete the newest complete set', 'db_backup_lib.php',
+          'if ($i >= max(1, (int)$keep))', 'if ($i >= (int)$keep)', 1),
+    array('retention may delete any file', 'db_backup_lib.php',
+          "return (bool)preg_match('/^(PENUMBRA_[A-Z0-9_\$#]{1,118}\\.\\d{4}\\.jsonl\\.gz(\\.tmp)?|manifest\\.json(\\.tmp)?)\$/', (string)\$file);", "return true;", 3),
+    array('no self-request (a big set would wait a whole day per cycle)', 'db_backup_job.php',
+          "penumbra_maintenance_flag_set('db_backup', 'request', true, \$stateDir);", 'null;', 1),
+    array('a resumed table ignores a column change', 'db_backup_job.php',
+          "&& isset(\$t['sig']) && \$t['sig'] === \$sig", '', 1),
+    array('sliced CLOB: edge-window check removed (an emoji split by a slice edge is written corrupt)', 'db_backup_lib.php',
+          "if (\$split || db_backup_utf16_units(\$s) !== \$len)", "if (db_backup_utf16_units(\$s) !== \$len)", 4),
+    array('sliced CLOB: unit-count check removed (a short join is written as the value)', 'db_backup_lib.php',
+          "if (\$split || db_backup_utf16_units(\$s) !== \$len)", 'if ($split)', 1),
+    array('sliced CLOB: no fallback when the database refuses the statement', 'db_backup_job.php',
+          "if (\$rows > 0 || !\$fp['sliced']) throw \$e;", 'throw $e;', 2),
+    array('sliced CLOB: a value needing a whole fetch is never fetched', 'db_backup_job.php',
+          "\$db->value(sprintf(\$whole, '\"' . \$col . '\"'), array(':w' => (string)\$vals[\$keyIdx]))", 'null', 2),
+    array('stale never reported', 'db_backup_lib.php',
+          'if ($scheduled && $age > 36 * 3600)', 'if (false)', 1),
+);
+$red = 0; $bad = 0;
+foreach ($mutants as $mu) {
+    list($name, $file, $from, $to, $expect) = $mu;
+    $tmp = sys_get_temp_dir() . '/pnb_dbbak_mut_' . getmypid();
+    @mkdir($tmp);
+    foreach (array('db_backup_lib.php', 'db_backup_job.php', 'penumbra_maintenance.php') as $f) copy("$app/$f", "$tmp/$f");
+    $src = file_get_contents("$tmp/$file");
+    $n = substr_count($src, $from);
+    if ($n !== 1) { echo "  ?? $name: anchor found $n times\n"; $bad++; continue; }
+    file_put_contents("$tmp/$file", str_replace($from, $to, $src));
+    $out = shell_exec('"' . $php . '" -n "' . $test . '" "' . $tmp . '" 2>&1');
+    preg_match('/FAIL: (\d+)/', (string)$out, $m);
+    $fails = isset($m[1]) ? (int)$m[1] : -1;
+    $verdict = ($fails === $expect) ? 'ok  ' : 'BAD ';
+    if ($fails !== $expect) $bad++; else $red++;
+    echo "  $verdict $name: FAIL $fails (expect $expect)\n";
+    foreach (glob("$tmp/*") as $f) @unlink($f);
+    @rmdir($tmp);
+}
+echo "\nMUTANTS: $red as expected, $bad not\n";

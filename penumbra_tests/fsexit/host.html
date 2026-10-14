@@ -1,0 +1,76 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>fsexit - dashboard stand-in</title>
+<style>
+  body { margin: 0; background: #f4f5f7; font: 13px sans-serif; }
+  #kiosk { position: absolute; left: 10px; top: 10px; }
+  /* A chart tile's frame, at a typical half-width tile size. */
+  #tile { position: absolute; left: 40px; top: 60px; width: 690px; height: 420px; border: 0; }
+</style>
+</head>
+<body>
+<!-- fsexit suite (2026-10-01). Stands in for dashboard.php: one chart tile =
+     a same-origin iframe of the report page (tile.html), like
+     penumbra_dashboard.js's iframe.dash-embed (no allow attribute: fullscreen's
+     default allowlist 'self' covers a same-origin frame). #kiosk puts THIS
+     page fullscreen the way the dashboard's kiosk view does
+     (documentElement.requestFullscreen on a click). The probes below are what
+     run.py reads; it drives everything else with trusted CDP mouse/key events. -->
+<button id="kiosk" type="button">Kiosk</button>
+<iframe id="tile" class="dash-embed" src="tile.html" title="Awards by college"></iframe>
+<script>
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push('host: ' + String(m) + ' @' + String(src).split('/').pop() + ':' + line); };
+  window.__kiosk = '';
+  document.getElementById('kiosk').addEventListener('click', function () {
+    var p = document.documentElement.requestFullscreen();
+    p.then(function () { window.__kiosk = 'granted'; }, function (e) { window.__kiosk = 'refused: ' + ((e && e.message) || e); });
+  });
+  function fsName(d) {
+    var el = d && d.fullscreenElement;
+    return el ? (el.id || el.tagName) : null;
+  }
+  function tile() { return document.getElementById('tile'); }
+  // One element's state, in HOST viewport coordinates (what CDP's mouse uses).
+  // sel is looked up in the tile document unless top is true.
+  window.__probe = function (sel, top) {
+    var f = tile(), d = top ? document : (f && f.contentDocument);
+    if (!d) { return { exists: false }; }
+    var el = d.querySelector(sel);
+    if (!el) { return { exists: false }; }
+    var cs = d.defaultView.getComputedStyle(el), r = el.getBoundingClientRect();
+    var ox = 0, oy = 0;
+    if (!top) { var fr = f.getBoundingClientRect(); ox = fr.left + f.clientLeft; oy = fr.top + f.clientTop; }
+    var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    var hit = (r.width > 0 && r.height > 0) ? d.elementFromPoint(cx, cy) : null;
+    var de = d.documentElement;
+    return { exists: true, display: cs.display, opacity: cs.opacity, visibility: cs.visibility, pe: cs.pointerEvents,
+             w: r.width, h: r.height, x: ox + cx, y: oy + cy,
+             inView: r.width > 0 && r.left >= 0 && r.top >= 0 && r.right <= de.clientWidth && r.bottom <= de.clientHeight,
+             onTop: !!hit && (hit === el || el.contains(hit)), hitDesc: hit ? (hit.tagName + (hit.id ? "#" + hit.id : "") + (typeof hit.className === "string" && hit.className ? "." + hit.className.split(" ").join(".") : "")) : null,
+             title: el.getAttribute('title'), aria: el.getAttribute('aria-label') };
+  };
+  // fsfit: the tile's chart vs its stage's content box (see report.html __fit).
+  window.__tileFit = function () {
+    var f = tile(), d = f && f.contentDocument, w = f && f.contentWindow;
+    var ov = d && d.getElementById('chartCarouselOverlay');
+    if (!ov) { return { overlay: false }; }
+    var cv = ov.querySelector('.cc-canvas'), ch = cv && w.Chart && w.Chart.getChart(cv), st = ov.querySelector('.cc-stage'), cs = w.getComputedStyle(st);
+    return { overlay: true, fs: !!d.fullscreenElement, vw: w.innerWidth, vh: w.innerHeight, cw: ch ? ch.width : 0, ch: ch ? ch.height : 0,
+             sw: Math.round(st.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)),
+             sh: Math.round(st.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)) };
+  };
+  window.__state = function () {
+    var f = tile(), d = f && f.contentDocument, w = f && f.contentWindow;
+    var ov = d && d.getElementById('chartCarouselOverlay');
+    var cv = ov && ov.querySelector('.cc-canvas');
+    var errs = (window.__errors || []).concat((w && w.__errors) || []);
+    return { ready: !!(w && w.__READY), hostFs: fsName(document), tileFs: fsName(d),
+             overlay: !!ov, persistent: !!ov && ov.classList.contains('cc-persistent'),
+             denied: !!ov && ov.classList.contains('cc-fs-denied'),
+             chart: !!(cv && w.Chart && w.Chart.getChart(cv)), kiosk: window.__kiosk,
+             escSeen: (w && w.__escSeen) || 0,
+             vw: d ? d.documentElement.clientWidth : 0, vh: d ? d.documentElement.clientHeight : 0,
+             errors: errs };
+  };
+</script>
+</body></html>

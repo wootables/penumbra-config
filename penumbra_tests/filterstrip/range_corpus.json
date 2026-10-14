@@ -1,0 +1,28 @@
+{
+  "_about": "Range fields (2026-09-30): the texts a range box writes, run through BOTH search engines - main.js (parseAdvancedQuery + evaluateParsedQuery, in harness.html) and penumbra_search.php (php_apply_search_filter, by range_php.php). Four date formats and three number shapes (currency, thousands, accounting negative) in one column each, as real reports mix them. expect = the matching row count; both engines must give it. The (blank) chip's texts (2026-09-30, later) ride the same rows: an empty alternative against row 6's blank AMOUNT and OPENED.",
+  "columns": ["#", "AMOUNT", "OPENED", "STATUS", "COLLEGE"],
+  "rows": [
+    { "#": "1", "AMOUNT": "100",       "OPENED": "01/15/2024", "STATUS": "Active",  "COLLEGE": "Eng" },
+    { "#": "2", "AMOUNT": "$1,250.50", "OPENED": "02/01/2024", "STATUS": "Closed",  "COLLEGE": "Eng" },
+    { "#": "3", "AMOUNT": "(500)",     "OPENED": "12/31/2023", "STATUS": "Active",  "COLLEGE": "Sci" },
+    { "#": "4", "AMOUNT": "75",        "OPENED": "03/10/2024", "STATUS": "Active",  "COLLEGE": "Sci" },
+    { "#": "5", "AMOUNT": "2,000",     "OPENED": "2024-03-11", "STATUS": "Pending", "COLLEGE": "Ag" },
+    { "#": "6", "AMOUNT": "",          "OPENED": "",           "STATUS": "Active",  "COLLEGE": "Ag" },
+    { "#": "7", "AMOUNT": "300",       "OPENED": "15-JAN-24",  "STATUS": "Closed",  "COLLEGE": "Eng" }
+  ],
+  "queries": [
+    { "q": "AMOUNT >= 100", "expect": 4 },
+    { "q": "AMOUNT <= 1250.50", "expect": 5 },
+    { "q": "AMOUNT >= 100 and AMOUNT <= 1250.50", "expect": 3 },
+    { "q": "AMOUNT >= -500 and AMOUNT <= 0", "expect": 1 },
+    { "q": "OPENED >= 2024-01-15", "expect": 5 },
+    { "q": "OPENED <= 2024-01-15", "expect": 3 },
+    { "q": "OPENED >= 2024-01-15 and OPENED <= 2024-02-01", "expect": 3 },
+    { "q": "OPENED >= 2023-12-31 and OPENED <= 2023-12-31", "expect": 1 },
+    { "q": "AMOUNT >= 100 and OPENED <= 2024-02-01 and STATUS = /^(?:Closed)$/", "expect": 2 },
+    { "q": "AMOUNT = /^(?:)$/", "expect": 1 },
+    { "q": "AMOUNT != /^(?:)$/", "expect": 6 },
+    { "q": "AMOUNT = /^(?:100|)$/", "expect": 2 },
+    { "q": "OPENED = /^(?:)$/ and COLLEGE = /^(?:Ag)$/", "expect": 1 }
+  ]
+}

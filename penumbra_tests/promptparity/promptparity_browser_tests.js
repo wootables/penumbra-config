@@ -1,0 +1,144 @@
+/* promptparity - the BROWSER engine against the shared corpus.
+ *
+ * processPrompts() and what it calls are lifted out of main.js BY NAME (window.__src
+ * holds the file's text, baked in by run.ps1 - `new Function` on text reports a real
+ * SyntaxError where a file:// <script src> would only say "Script error."). Each
+ * corpus case is answered through the URL, exactly as a deep link would, and run in
+ * secure mode; the binds it returns are then written back in as the quoted literals
+ * the PHP engines emit, so one expected line serves all three engines.
+ *
+ * Heads-up for whoever edits this file: no doubled backslashes anywhere in it (a
+ * heredoc in the environment it was written in halves them) - hence BS below. */
+(function () {
+    var out = document.getElementById('out');
+    var BS = String.fromCharCode(92);
+    var pass = 0, fail = 0, lines = [], current = 'start-up';
+    function flush(done) { out.textContent = lines.join('\n') + '\n\nPASS: ' + pass + '   FAIL: ' + fail + '\n' + (done ? 'DONE' : 'STALLED in: ' + current); }
+    function check(label, got, want) {
+        if (got === want) { pass++; lines.push('  ok   ' + label); }
+        else { fail++; lines.push('  FAIL ' + label); lines.push('     got : ' + JSON.stringify(got)); lines.push('     want: ' + JSON.stringify(want)); }
+    }
+    function section(t) { current = t; lines.push(''); lines.push('--- ' + t); flush(false); }
+
+    // ---- the corpus (format: see its own header)
+    function loadCorpus(text) {
+        var cases = [], group = '', cur = null;
+        String(text).split(/\r?\n/).forEach(function (line) {
+            if (line.trim() === '' || line.charAt(0) === '#') return;
+            var m = /^([a-z]+):(.*)$/.exec(line);
+            if (!m) throw new Error('corpus: cannot read this line: ' + line);
+            var k = m[1], v = m[2].trim();
+            if (k === 'group') { group = v; return; }
+            if (k === 'case') { if (cur) cases.push(cur); cur = { group: group, label: v, sql: null, answers: [], mode: '', expect: {} }; return; }
+            if (!cur) throw new Error("corpus: '" + k + ":' before any case:");
+            if (k === 'sql') cur.sql = v.split(BS + 'n').join('\n');
+            else if (k === 'ans') { if (v !== '') v.split('&').forEach(function (p) { var eq = p.indexOf('='); cur.answers.push([p.substring(0, eq), p.substring(eq + 1)]); }); }
+            else if (k === 'mode') cur.mode = v;
+            else if (k === 'all') cur.expect = { browser: v, runner: v, json: v };
+            else if (k === 'browser' || k === 'runner' || k === 'json') cur.expect[k] = v;
+            else throw new Error("corpus: unknown key '" + k + ":'");
+        });
+        if (cur) cases.push(cur);
+        return cases;
+    }
+
+    // ---- the code under test
+    var code = String(window.__src || '').replace(/\r\n/g, '\n');
+    function fnRe(name) { return new RegExp(BS + 'n    (?:async )?function ' + name + BS + '('); }
+    function has(name) { return fnRe(name).test(code); }
+    function grabFn(name) {
+        var m = fnRe(name).exec(code);
+        if (!m) throw new Error('lift: function ' + name + ' not found in main.js');
+        var start = m.index + 1, end = code.indexOf('\n    }\n', start);
+        return code.substring(start, end + 7);
+    }
+    var env;
+    try {
+        var names = ['escapeHtml', 'decodeHtmlEntities', 'stripWrappingQuotePair', 'resolveDynamicValues', 'resolveKeywordDate', 'resolveDynamicDate',
+            'parsePrompt', 'parseMultiSelectDefault', 'splitValidateRules', 'validatePromptInput', 'penumbraSnippetQuoteState', 'penumbraEscapeSnippetValue',
+            'processPrompts', 'getPromptStorageKey'];
+        // type=date-range helpers: present from 2026-09-21 on; processPrompts calls them for every prompt.
+        ['penumbraIsDateRangeType', 'penumbraSplitDateRange', 'penumbraRangeHasKeywordEnd', 'penumbraResolveDateRange', 'penumbraResolveRangeEnd',
+         'penumbraParseRangeEnd', 'penumbraFormatRangeEnd', 'penumbraRangeKeywordDate', 'penumbraApplyDateRangeTemplate', 'penumbraDateRangeLabel',
+         'penumbraDateRangePresetFor', 'penumbraDateRangePresets', 'penumbraDateRangeRawDefault'].forEach(function (n) { if (has(n)) names.push(n); });
+        var kw = new RegExp(BS + 'n    const _isRangeKeyword = [^' + BS + 'n]+' + BS + 'n').exec(code);
+        var src = "var PNB_DATE_RANGE_SEP = '..';\n" + (kw ? kw[0] : '') +
+            'var _forceDefaultApplied = new Set(); var allResolvedPrompts = [];\n' +
+            names.map(grabFn).join('\n') +
+            '\nreturn { processPrompts: processPrompts, forced: _forceDefaultApplied };';
+        var dialogOpened = function () { return Promise.reject(new Error('a DIALOG opened - the case was not answered through the URL')); };
+        env = new Function('penumbra_vars', 'renderReportSnippet', 'resolvePromptDateRange', 'showPromptDialog', src)(
+            { shibboleth: {} }, function () { }, function () { return Promise.resolve(); }, dialogOpened);
+    } catch (e) { out.textContent = 'HARNESS: ' + e.message; return; }
+
+    // A bind written back in as the literal the PHP engines emit for the same answer.
+    function literal(v) { return (v === null || v === undefined) ? 'NULL' : "'" + String(v).split("'").join("''") + "'"; }
+    function asLiterals(r) {
+        return String(r.query_template).replace(/:p(\d+)\b/g, function (all, n) { return literal(r.params[parseInt(n, 10) - 1]); });
+    }
+    async function run(c) {
+        try { localStorage.clear(); } catch (e) { }
+        env.forced.clear();
+        var qs = c.answers.map(function (a) { return encodeURIComponent(a[0]) + '=' + encodeURIComponent(a[1]); }).join('&');
+        history.replaceState(null, '', location.pathname + (qs ? '?' + qs : ''));
+        try { return await env.processPrompts(c.sql, c.mode === 'dialogs', true); }
+        catch (e) { return { query_template: 'THREW: ' + e.message, params: [] }; }
+    }
+
+    (async function () {
+        try {
+            var cases = loadCorpus(window.__corpus);
+            var group = null;
+            for (var i = 0; i < cases.length; i++) {
+                var c = cases[i];
+                if (c.group !== group) { group = c.group; section('corpus: ' + group); }
+                if (c.sql === null || !('browser' in c.expect)) throw new Error("corpus: case '" + c.label + "' has no sql: or no browser expectation");
+                check('browser   | ' + c.label, asLiterals(await run(c)), c.expect.browser);
+            }
+
+            // The corpus compares LITERALS. These pin that the browser really sends BINDS -
+            // an engine that spliced quoted text into the template would pass every line above.
+            section('the browser sends binds, not text');
+            var M = '[PROMPT;type=multi-select;name=m;options=A,B,C]';
+            var r = await run({ sql: 'SELECT 1 FROM t WHERE c IN ' + M, answers: [['m', 'A,B']], mode: '' });
+            check('c IN [tag]: template', r.query_template, 'SELECT 1 FROM t WHERE c IN (:p1, :p2)');
+            check('c IN [tag]: params', JSON.stringify(r.params), '["A","B"]');
+            r = await run({ sql: 'SELECT 1 FROM t WHERE c NOT IN ' + M, answers: [['m', 'A,B']], mode: '' });
+            check('c NOT IN [tag]: template', r.query_template, 'SELECT 1 FROM t WHERE c NOT IN (:p1, :p2)');
+            r = await run({ sql: 'SELECT 1 FROM t WHERE UPPER(c) IN ' + M, answers: [['m', 'A,B']], mode: '' });
+            check('UPPER(c) IN [tag]: template', r.query_template, 'SELECT 1 FROM t WHERE UPPER(c) IN (:p1, :p2)');
+            r = await run({ sql: 'SELECT 1 FROM t WHERE c IN ' + M, answers: [], mode: '' });
+            check('nothing picked: template', r.query_template, 'SELECT 1 FROM t WHERE c IN (:p1)');
+            check('nothing picked: ONE null param', JSON.stringify(r.params), '[null]');
+            r = await run({ sql: "SELECT 1 FROM t WHERE c = '[PROMPT;type=text;name=x]'", answers: [['x', "O'Brien"]], mode: '' });
+            check("'[tag]': the bind stands OUTSIDE quotes", r.query_template, 'SELECT 1 FROM t WHERE c = :p1');
+            check("'[tag]': the apostrophe travels in the param, undoubled", JSON.stringify(r.params), '["O' + "'" + 'Brien"]');
+            // No answer + quotes around the tag: the browser strips the pair and binds a
+            // real NULL. The PHP engines do NOT match this yet, on purpose (see the pins
+            // at the end of test_promptparity.php) - which is why it is not a corpus case.
+            r = await run({ sql: "SELECT 1 FROM t WHERE c = '[PROMPT;type=text;name=x]' AND z = 1", answers: [], mode: '' });
+            check("no answer, '[tag]': a bare bind", r.query_template, 'SELECT 1 FROM t WHERE c = :p1 AND z = 1');
+            check("no answer, '[tag]': the param is a real null", JSON.stringify(r.params), '[null]');
+            // Two tags: the second bind numbers on from the first.
+            r = await run({ sql: 'SELECT 1 FROM t WHERE a IN ' + M + ' AND b NOT IN [PROMPT;type=multi-select;name=n;options=X,Y,Z]', answers: [['m', 'A,B'], ['n', 'X,Y']], mode: '' });
+            check('two tags: template', r.query_template, 'SELECT 1 FROM t WHERE a IN (:p1, :p2) AND b NOT IN (:p3, :p4)');
+            check('two tags: params', JSON.stringify(r.params), '["A","B","X","Y"]');
+            // 2026-09-29: a negated operator joins its binds with AND ...
+            r = await run({ sql: 'SELECT 1 FROM t WHERE c NOT LIKE ' + M, answers: [['m', 'A,B']], mode: '' });
+            check('c NOT LIKE [tag]: template', r.query_template, 'SELECT 1 FROM t WHERE (c NOT LIKE :p1 AND c NOT LIKE :p2)');
+            r = await run({ sql: 'SELECT 1 FROM t WHERE UPPER(c) != ' + M, answers: [['m', 'A,B']], mode: '' });
+            check('UPPER(c) != [tag]: template', r.query_template, 'SELECT 1 FROM t WHERE (UPPER(c) != :p1 AND UPPER(c) != :p2)');
+            // ... and a tag in front of IS NULL places ONE marker. Its other values are
+            // still pushed; query.php binds only the markers that survive (its ORA-01036 note).
+            r = await run({ sql: 'SELECT 1 FROM t WHERE ( c = ' + M + ' OR ' + M + ' IS NULL )', answers: [['m', 'A,B']], mode: '' });
+            check('[tag] IS NULL: one marker', r.query_template, 'SELECT 1 FROM t WHERE ( (c = :p1 OR c = :p2) OR :p3 IS NULL )');
+            check('[tag] IS NULL: params', JSON.stringify(r.params), '["A","B","A","B"]');
+
+            if (window.__control) { section('control'); check('CONTROL (deliberately false - must FAIL)', 'a', 'b'); }
+            flush(true);
+        } catch (e) {
+            lines.push('HARNESS: ' + (e && e.message ? e.message : e));
+            flush(false);
+        }
+    })();
+})();

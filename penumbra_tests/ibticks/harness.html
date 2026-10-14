@@ -1,0 +1,137 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>infobox backticks harness</title></head>
+<body>
+<!-- Same boot as ..\tiles\infochk.html (engine B + the dialog) plus the parity
+     suite's engine A shim (renderReportSnippet over a real CodeMirror). -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<div id="reportHeaderContainer"></div>
+<input type="hidden" id="reportSubtitle" value="Harness">
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<div id="resultsTable"></div><div id="errorBox"></div>
+<div id="action_overlay" class="pnb-toast-dock"></div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script src="penumbra_tiles.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  if (!window._pnbModalHost) { window._pnbModalHost = function () { return jQuery(document.body); }; }
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (ev) { window.__errors.push('unhandledrejection: ' + (ev.reason && ev.reason.message ? ev.reason.message : String(ev.reason))); });
+</script>
+<script src="main_patched.js"></script>
+<script>
+(function () {
+  function report(txt) { document.getElementById('out').textContent = txt; }
+  var results = [];
+  function t(name, cond, detail) { results.push({ name: name, pass: !!cond, detail: detail === undefined ? '' : String(detail) }); }
+  function M(o) { return new Map(Object.keys(o).map(function (k) { return [k, o[k]]; })); }
+  var rows = [M({ AMOUNT: '10', DEPT: 'A' }), M({ AMOUNT: '20', DEPT: 'B' })];
+  var cols = ['AMOUNT', 'DEPT'];
+  var TOKEN = '__PROTECTED_STRING_';
+  function lastEntry() { var reg = window.__IB.registry(); var ks = Object.keys(reg); return ks.length ? { key: ks[ks.length - 1], e: reg[ks[ks.length - 1]] } : null; }
+  function entryFor(html) {
+    var m = /data-action-name="infobox" data-action-value="([^"]+)"/.exec(html || '');
+    var reg = window.__IB.registry();
+    return m && reg[m[1]] ? { key: m[1], e: reg[m[1]] } : null;
+  }
+  // Open an entry through the real dialog and read its body text back.
+  function openText(title, ent) {
+    jQuery('.infobox-overlay').remove();
+    window.__IB.show({ title: title, content: ent.content !== undefined ? ent.content : ent.e.snippet, mode: ent.mode || (ent.e && ent.e.mode) || 'raw',
+      isUrl: false, rowData: ent.rowData || (ent.e && ent.e.rowData) || [], columns: ent.columns || (ent.e && ent.e.columns) || [] });
+    var body = document.querySelector('.infobox-overlay .infobox-body');
+    var txt = body ? body.textContent.replace(/\s+/g, ' ').trim() : '(no dialog)';
+    jQuery('.infobox-overlay').remove();
+    return txt;
+  }
+
+  async function run() {
+    var IB = window.__IB;
+    if (!IB) { report('RESULTS_JSON:' + JSON.stringify({ fatal: 'hooks unavailable: ' + (window.__IB_ERR || 'n/a'), pageErrors: window.__errors.slice(0, 6) })); return; }
+
+    // ---- A: engine A (the report's own snippet) ----------------------------
+    // The Things to Know case: backticks keep years from comma-formatting.
+    var htmlA = await IB.A('action(infobox, Box, raw|"FY `2027` runs July `2026`, total 12345.")', rows);
+    var a1 = entryFor(htmlA);
+    t('A1 engine A: the stored payload keeps its backticks, no __PROTECTED_STRING_ tokens',
+      a1 && a1.e.snippet.indexOf('`2027`') !== -1 && a1.e.snippet.indexOf('`2026`') !== -1 && a1.e.snippet.indexOf(TOKEN) === -1, a1 ? a1.e.snippet : htmlA);
+    var a2 = a1 ? openText('Box', a1) : '(no entry)';
+    t('A2 ...and the box reads "FY 2027 runs July 2026", while the bare 12345 is still formatted',
+      a2 === 'FY 2027 runs July 2026, total 12,345.', a2);
+    // The real click path: the link engine A wrote, through the delegated handler.
+    jQuery('.infobox-overlay').remove();
+    var link = document.querySelector('#reportSnippetOutput a.snippet-action[data-action-name="infobox"]');
+    if (link) link.click();
+    var clickBody = document.querySelector('.infobox-overlay .infobox-body');
+    var a2c = clickBody ? clickBody.textContent.replace(/\s+/g, ' ').trim() : '(no dialog)';
+    jQuery('.infobox-overlay').remove();
+    t('A3 clicking the link engine A wrote shows the same text', a2c === 'FY 2027 runs July 2026, total 12,345.', a2c);
+
+    var htmlT = await IB.A("action(infobox, Stats, 'tile|{\"type\":\"stat\",\"agg\":\"count\",\"sub\":\"FY `2027`\"}')", rows);
+    var a4 = entryFor(htmlT);
+    t('A4 engine A: a tile| spec is stored as plain text (the tile engine runs no snippet pass)',
+      a4 && a4.e.mode === 'tile' && a4.e.snippet === '{"type":"stat","agg":"count","sub":"FY 2027"}', a4 ? a4.e.snippet : htmlT);
+
+    var htmlG = await IB.A('Total `2027` and 12345', rows);
+    var g = document.getElementById('reportSnippetOutput').textContent.replace(/\s+/g, ' ').trim();
+    t('A5 guard: backticks in the snippet itself still restore (final pass), numbers still format', g.indexOf('Total 2027 and 12,345') !== -1, g);
+
+    // show_text() writes into #action_overlay (the toast dock) - read only that.
+    await IB.A('action(toast, Saved `2027` items)', rows);
+    var toasts = Array.prototype.map.call(document.querySelectorAll('#action_overlay .pnb-toast-msg'), function (m) { return m.textContent.trim(); });
+    t('A6 a toast shows "Saved 2027 items", not a token', toasts.indexOf('Saved 2027 items') !== -1, JSON.stringify(toasts));
+
+    // ---- B: engine B (subtitles and infobox content: a box inside a box) ---
+    var rB = IB.B('action(infobox, Inner, raw|"Year `2027` of 12345")', rows, cols);
+    var b1 = entryFor(rB.html);
+    t('B1 engine B: a nested payload keeps its backticks, no tokens',
+      b1 && b1.e.snippet.indexOf('`2027`') !== -1 && b1.e.snippet.indexOf(TOKEN) === -1, b1 ? b1.e.snippet : rB.html);
+    var b2 = b1 ? openText('Inner', b1) : '(no entry)';
+    t('B2 ...and it reads "Year 2027 of 12,345"', b2 === 'Year 2027 of 12,345', b2);
+    var rBt = IB.B("action(infobox, T2, 'tile|{\"type\":\"stat\",\"agg\":\"count\",\"sub\":\"FY `2027`\"}')", rows, cols);
+    var b3 = entryFor(rBt.html);
+    t('B3 engine B: a nested tile| spec is stored as plain text', b3 && b3.e.snippet === '{"type":"stat","agg":"count","sub":"FY 2027"}', b3 ? b3.e.snippet : rBt.html);
+
+    // ---- Z: a box with no rows and no calls skips engine B -----------------
+    var z1 = openText('Z', { content: 'Year `2027` and 12345', mode: 'raw', rowData: [], columns: [] });
+    t('Z1 no rows, no calls: the backticks are still consumed (and nothing is formatted)', z1 === 'Year 2027 and 12345', z1);
+    var z2 = openText('Z2', { content: 'Year 2027 and 12345', mode: 'raw', rowData: [], columns: [] });
+    t('Z2 guard: plain text with no rows is left exactly as written', z2 === 'Year 2027 and 12345', z2);
+
+    t('no page errors', window.__errors.length === 0, JSON.stringify(window.__errors.slice(0, 4)));
+    report('RESULTS_JSON:' + JSON.stringify({ results: results, pageErrors: window.__errors.slice(0, 6) }));
+  }
+  setTimeout(function () {
+    run().catch(function (e) { report('RESULTS_JSON:' + JSON.stringify({ fatal: 'run threw: ' + (e && e.stack ? e.stack : e), results: results, pageErrors: window.__errors.slice(0, 6) })); });
+  }, 300);
+})();
+</script>
+</body></html>

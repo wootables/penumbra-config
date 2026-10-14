@@ -1,0 +1,722 @@
+[
+    {
+        "id":  "sparkline_basic",
+        "snippet":  "sparkline(AMOUNT)",
+        "out":  "\u003cspan class=\"pnb-spark\" style=\"height:20px;width:160px;\"\u003e\u003ci class=\"pnb-spark-bar\" style=\"height:2px;width:24px;background-color:var(--brand-primary, #007bff);\"\u003e\u003c/i\u003e\u003ci class=\"pnb-spark-bar\" style=\"height:1px;width:24px;background-color:var(--brand-primary, #007bff);\"\u003e\u003c/i\u003e\u003ci class=\"pnb-spark-bar\" style=\"height:1px;width:24px;background-color:var(--brand-primary, #007bff);\"\u003e\u003c/i\u003e\u003ci class=\"pnb-spark-bar is-neg\" style=\"height:1px;width:24px;background-color:var(--brand-primary, #007bff);\"\u003e\u003c/i\u003e\u003ci class=\"pnb-spark-bar\" style=\"height:20px;width:24px;background-color:var(--brand-primary, #007bff);\"\u003e\u003c/i\u003e\u003ci class=\"pnb-spark-bar\" style=\"height:1px;width:24px;background-color:var(--brand-primary, #007bff);\"\u003e\u003c/i\u003e\u003c/span\u003e"
+    },
+    {
+        "id":  "sparkline_group",
+        "snippet":  "sparkline(AMOUNT, NAME)",
+        "out":  "\u003cspan class=\"pnb-spark\" style=\"height:20px;width:160px;\"\u003e\u003ci class=\"pnb-spark-bar\" style=\"height:20px;width:24px;background-color:var(--brand-primary, #007bff);\"\u003e\u003c/i\u003e\u003ci class=\"pnb-spark-bar\" style=\"height:5px;width:24px;background-color:var(--brand-primary, #007bff);\"\u003e\u003c/i\u003e\u003ci class=\"pnb-spark-bar\" style=\"height:1px;width:24px;background-color:var(--brand-primary, #007bff);\"\u003e\u003c/i\u003e\u003c/span\u003e"
+    },
+    {
+        "id":  "sparkline_color",
+        "snippet":  "sparkline(AMOUNT, NAME, #ff0000)",
+        "out":  "\u003cspan class=\"pnb-spark\" style=\"height:20px;width:160px;\"\u003e\u003ci class=\"pnb-spark-bar\" style=\"height:20px;width:24px;background-color:#ff0000;\"\u003e\u003c/i\u003e\u003ci class=\"pnb-spark-bar\" style=\"height:5px;width:24px;background-color:#ff0000;\"\u003e\u003c/i\u003e\u003ci class=\"pnb-spark-bar\" style=\"height:1px;width:24px;background-color:#ff0000;\"\u003e\u003c/i\u003e\u003c/span\u003e"
+    },
+    {
+        "id":  "sparkline_count_col",
+        "snippet":  "sparkline(N)",
+        "out":  "\u003cspan class=\"pnb-spark\" style=\"height:20px;width:160px;\"\u003e\u003ci class=\"pnb-spark-bar\" style=\"height:3px;width:24px;background-color:var(--brand-primary, #007bff);\"\u003e\u003c/i\u003e\u003ci class=\"pnb-spark-bar\" style=\"height:7px;width:24px;background-color:var(--brand-primary, #007bff);\"\u003e\u003c/i\u003e\u003ci class=\"pnb-spark-bar\" style=\"height:10px;width:24px;background-color:var(--brand-primary, #007bff);\"\u003e\u003c/i\u003e\u003ci class=\"pnb-spark-bar\" style=\"height:13px;width:24px;background-color:var(--brand-primary, #007bff);\"\u003e\u003c/i\u003e\u003ci class=\"pnb-spark-bar\" style=\"height:17px;width:24px;background-color:var(--brand-primary, #007bff);\"\u003e\u003c/i\u003e\u003ci class=\"pnb-spark-bar\" style=\"height:20px;width:24px;background-color:var(--brand-primary, #007bff);\"\u003e\u003c/i\u003e\u003c/span\u003e"
+    },
+    {
+        "id":  "sparkline_bad_col",
+        "snippet":  "sparkline(NOPE)",
+        "out":  "[No Sparkline Data]"
+    },
+    {
+        "id":  "sparkline_no_args",
+        "snippet":  "sparkline()",
+        "out":  "[No Sparkline Data]"
+    },
+    {
+        "id":  "plain_text",
+        "snippet":  "Just some prose with no functions.",
+        "out":  "Just some prose with no functions."
+    },
+    {
+        "id":  "literal_number",
+        "snippet":  "Fiscal year 2026 total",
+        "out":  "Fiscal year 2,026 total"
+    },
+    {
+        "id":  "literal_big_number",
+        "snippet":  "Value 12345.678 here",
+        "out":  "Value 12,345.68 here"
+    },
+    {
+        "id":  "backtick_literal",
+        "snippet":  "Label `FY 2026` end",
+        "out":  "Label FY 2026 end"
+    },
+    {
+        "id":  "count",
+        "snippet":  "count()",
+        "out":  "6"
+    },
+    {
+        "id":  "count_cond",
+        "snippet":  "count(N\u003e=2)",
+        "out":  "5"
+    },
+    {
+        "id":  "sum",
+        "snippet":  "sum(AMOUNT)",
+        "out":  "11,470.33"
+    },
+    {
+        "id":  "sum_scope_all",
+        "snippet":  "sum(AMOUNT, all)",
+        "out":  "0"
+    },
+    {
+        "id":  "avg",
+        "snippet":  "avg(AMOUNT)",
+        "out":  "1,911.72"
+    },
+    {
+        "id":  "min_num",
+        "snippet":  "min(AMOUNT)",
+        "out":  "-75.75"
+    },
+    {
+        "id":  "max_num",
+        "snippet":  "max(AMOUNT)",
+        "out":  "10,000"
+    },
+    {
+        "id":  "min_date",
+        "snippet":  "min(DT)",
+        "out":  "20-DEC-23"
+    },
+    {
+        "id":  "max_date",
+        "snippet":  "max(DT)",
+        "out":  "05-JUL-26"
+    },
+    {
+        "id":  "median",
+        "snippet":  "median(AMOUNT)",
+        "out":  "172.63"
+    },
+    {
+        "id":  "mode_text",
+        "snippet":  "mode(NAME)",
+        "out":  "Alpha"
+    },
+    {
+        "id":  "distinct_text",
+        "snippet":  "distinct(NAME)",
+        "out":  "3"
+    },
+    {
+        "id":  "round_3dp",
+        "snippet":  "round(1234.5678, 3)",
+        "out":  "1,234.568"
+    },
+    {
+        "id":  "round_trailing0",
+        "snippet":  "round(5, 2)",
+        "out":  "5.00"
+    },
+    {
+        "id":  "round_default",
+        "snippet":  "round(2.34567)",
+        "out":  "2"
+    },
+    {
+        "id":  "fixed_2dp",
+        "snippet":  "fixed(1234.5, 2)",
+        "out":  "1,234.50"
+    },
+    {
+        "id":  "abs",
+        "snippet":  "abs(-5.5)",
+        "out":  "5.5"
+    },
+    {
+        "id":  "floor",
+        "snippet":  "floor(2.7)",
+        "out":  "2"
+    },
+    {
+        "id":  "ceil",
+        "snippet":  "ceil(2.1)",
+        "out":  "3"
+    },
+    {
+        "id":  "mod_float",
+        "snippet":  "mod(10.5, 3)",
+        "out":  "1.5"
+    },
+    {
+        "id":  "calc_basic",
+        "snippet":  "calc(2+3*4)",
+        "out":  "14"
+    },
+    {
+        "id":  "calc_modulo",
+        "snippet":  "calc(10 % 3)",
+        "out":  "1"
+    },
+    {
+        "id":  "calc_div",
+        "snippet":  "calc(10/3)",
+        "out":  "3.33"
+    },
+    {
+        "id":  "case_cond",
+        "snippet":  "case(count()\u003e2, big, small)",
+        "out":  "big"
+    },
+    {
+        "id":  "string_upper",
+        "snippet":  "string(upper, hello world)",
+        "out":  "[Error: Invalid string type: upper]"
+    },
+    {
+        "id":  "string_regex",
+        "snippet":  "string(regex_replace, abc123, [0-9]+, #)",
+        "out":  "abc#"
+    },
+    {
+        "id":  "nested_round_avg",
+        "snippet":  "round(avg(AMOUNT),3)",
+        "out":  "1,911.722"
+    },
+    {
+        "id":  "nested_calc_count",
+        "snippet":  "calc(count()*2)",
+        "out":  "12"
+    },
+    {
+        "id":  "nested_case_sum",
+        "snippet":  "case(sum(AMOUNT)\u003e1000, over, under)",
+        "out":  "over"
+    },
+    {
+        "id":  "mixed_sentence",
+        "snippet":  "There are count() rows totalling sum(AMOUNT) dollars.",
+        "out":  "There are 6 rows totalling 11,470.33 dollars."
+    },
+    {
+        "id":  "progress_bar",
+        "snippet":  "progress_bar(30)",
+        "out":  "[Invalid Progress Bar Data]"
+    },
+    {
+        "id":  "unknown_fn",
+        "snippet":  "tabs(5) should stay literal",
+        "out":  "tabs(5) should stay literal"
+    },
+    {
+        "id":  "string_uppercase",
+        "snippet":  "string(uppercase, hello world)",
+        "out":  "HELLO WORLD"
+    },
+    {
+        "id":  "progress_bar_2arg",
+        "snippet":  "progress_bar(30, 100)",
+        "out":  "\u003cdiv class=\"progress-bar-container\"\u003e\u003cdiv class=\"progress-bar-fill\" style=\"width: 30%; background-color: var(--brand-primary, #007bff);\"\u003e\u003c/div\u003e\u003cdiv class=\"progress-bar-label\"\u003e30%\u003c/div\u003e\u003c/div\u003e"
+    },
+    {
+        "id":  "nest_round_avg4",
+        "snippet":  "round(avg(AMOUNT),4)",
+        "out":  "1,911.7222"
+    },
+    {
+        "id":  "nest_round_sum1",
+        "snippet":  "round(sum(AMOUNT),1)",
+        "out":  "11,470.3"
+    },
+    {
+        "id":  "nest_calc_avg",
+        "snippet":  "calc(avg(AMOUNT)*2)",
+        "out":  "3,823.44"
+    },
+    {
+        "id":  "nest_calc_sum",
+        "snippet":  "calc(sum(AMOUNT)+1)",
+        "out":  "11,471.33"
+    },
+    {
+        "id":  "nest_abs_avg",
+        "snippet":  "abs(avg(AMOUNT))",
+        "out":  "1,911.72"
+    },
+    {
+        "id":  "nest_fixed_avg",
+        "snippet":  "fixed(avg(AMOUNT),4)",
+        "out":  "1,911.7222"
+    },
+    {
+        "id":  "nest_case_avg",
+        "snippet":  "case(avg(AMOUNT)\u003e1911.5, over, under)",
+        "out":  "over"
+    },
+    {
+        "id":  "df_iso",
+        "snippet":  "date_format(01-JAN-24, \u0027YYYY-MM-DD\u0027)",
+        "out":  "2024-01-01"
+    },
+    {
+        "id":  "df_long",
+        "snippet":  "date_format(01-JAN-24, \u0027MMMM D, YYYY\u0027)",
+        "out":  "January 1, 2024"
+    },
+    {
+        "id":  "df_unquoted_comma",
+        "snippet":  "date_format(01-JAN-24, MMMM D, YYYY)",
+        "out":  "January 1, 2024"
+    },
+    {
+        "id":  "df_3char",
+        "snippet":  "date_format(15-MAR-24, \u0027ddd MMM DD\u0027)",
+        "out":  "Fri Mar 15"
+    },
+    {
+        "id":  "df_ordinal",
+        "snippet":  "date_format(15-MAR-24, \u0027Do\u0027)",
+        "out":  "15th"
+    },
+    {
+        "id":  "df_bracket_lit",
+        "snippet":  "date_format(15-MAR-24, \u0027[Week of] MMM D\u0027)",
+        "out":  "Week of Mar 15"
+    },
+    {
+        "id":  "df_1char",
+        "snippet":  "date_format(15-MAR-24, \u0027YY/M/D\u0027)",
+        "out":  "24/3/15"
+    },
+    {
+        "id":  "df_default_fmt",
+        "snippet":  "date_format(15-MAR-24)",
+        "out":  "03/15/2024"
+    },
+    {
+        "id":  "df_bad_subject",
+        "snippet":  "date_format(NOPE, \u0027YYYY\u0027)",
+        "out":  "Invalid Date"
+    },
+    {
+        "id":  "df_nested_min",
+        "snippet":  "date_format(min(DT), \u0027YYYY-MM-DD\u0027)",
+        "out":  "2023-12-20"
+    },
+    {
+        "id":  "df_nested_max",
+        "snippet":  "date_format(max(DT), \u0027YYYY-MM-DD\u0027)",
+        "out":  "2026-07-05"
+    },
+    {
+        "id":  "df_offset_days",
+        "snippet":  "date_format(01-JAN-24, \u0027YYYY-MM-DD\u0027, \u0027+30 days\u0027)",
+        "out":  "2024-01-31"
+    },
+    {
+        "id":  "df_offset_chain",
+        "snippet":  "date_format(01-JAN-24, \u0027YYYY-MM-DD\u0027, \u0027+1 month\u0027, \u0027+2 days\u0027)",
+        "out":  "2024-02-03"
+    },
+    {
+        "id":  "df_offset_negative",
+        "snippet":  "date_format(15-MAR-24, \u0027YYYY-MM-DD\u0027, \u0027-2 weeks\u0027)",
+        "out":  "2024-03-01"
+    },
+    {
+        "id":  "df_offset_quoted_fmt",
+        "snippet":  "date_format(01-JAN-24, \u0027MMMM D, YYYY\u0027, \u0027+45 days\u0027)",
+        "out":  "February 15, 2024"
+    },
+    {
+        "id":  "df_offset_only",
+        "snippet":  "date_format(01-JAN-24, \u0027+30 days\u0027)",
+        "out":  "01/31/2024"
+    },
+    {
+        "id":  "df_offset_hours",
+        "snippet":  "date_format(01-JAN-24, \u0027YYYY-MM-DD HH\u0027, \u0027+36 hours\u0027)",
+        "out":  "2024-01-02 12"
+    },
+    {
+        "id":  "df_offset_month_clamp",
+        "snippet":  "date_format(31-JAN-24, \u0027YYYY-MM-DD\u0027, \u0027+1 month\u0027)",
+        "out":  "2024-02-29"
+    },
+    {
+        "id":  "df_offset_nested_min",
+        "snippet":  "date_format(min(DT), \u0027YYYY-MM-DD\u0027, \u0027+1 year\u0027)",
+        "out":  "2024-12-20"
+    },
+    {
+        "id":  "df_offset_column",
+        "snippet":  "date_format(DT, \u0027YYYY-MM-DD\u0027, \u0027-10 days\u0027)",
+        "out":  "2023-12-22"
+    },
+    {
+        "id":  "df_offset_legacy_regression",
+        "snippet":  "date_format(20-DEC-23, dddd, MMMM D, YYYY)",
+        "out":  "Wednesday, December 20, 2023"
+    },
+    {
+        "id":  "df_offset_unquoted_mix",
+        "snippet":  "date_format(01-JAN-24, MMMM D, YYYY, +1 day)",
+        "out":  "January 2, 2024"
+    },
+    {
+        "id":  "dd_days_default",
+        "snippet":  "date_diff(15-MAR-24, 01-JAN-24)",
+        "out":  "75"
+    },
+    {
+        "id":  "dd_days_reversed",
+        "snippet":  "date_diff(01-JAN-24, 15-MAR-24)",
+        "out":  "75"
+    },
+    {
+        "id":  "dd_same_day",
+        "snippet":  "date_diff(01-JAN-24, 01-JAN-24, days)",
+        "out":  "1"
+    },
+    {
+        "id":  "dd_weeks",
+        "snippet":  "date_diff(15-MAR-24, 01-JAN-24, weeks)",
+        "out":  "10"
+    },
+    {
+        "id":  "dd_months",
+        "snippet":  "date_diff(15-MAR-24, 01-JAN-24, months)",
+        "out":  "2"
+    },
+    {
+        "id":  "dd_years",
+        "snippet":  "date_diff(05-JUL-26, 20-DEC-23, years)",
+        "out":  "2"
+    },
+    {
+        "id":  "dd_template",
+        "snippet":  "date_diff(05-JUL-26, 20-DEC-23, years, months and days)",
+        "out":  "2 years, 6 months and 13 days"
+    },
+    {
+        "id":  "dd_nested_minmax",
+        "snippet":  "date_diff(max(DT), min(DT), days)",
+        "out":  "929"
+    },
+    {
+        "id":  "dd_bad_subject",
+        "snippet":  "date_diff(NOPE, 01-JAN-24)",
+        "out":  "Invalid Date"
+    },
+    {
+        "id":  "dd_big_no_commas",
+        "snippet":  "date_diff(05-JUL-26, 20-DEC-23, days)",
+        "out":  "929"
+    },
+    {
+        "id":  "now_default",
+        "snippet":  "now()",
+        "out":  "10/14/2026"
+    },
+    {
+        "id":  "now_iso",
+        "snippet":  "now(\u0027YYYY-MM-DD\u0027)",
+        "out":  "2026-10-14"
+    },
+    {
+        "id":  "now_offset_1",
+        "snippet":  "now(\u0027YYYY-MM-DD\u0027, \u0027-1 year\u0027)",
+        "out":  "2025-10-14"
+    },
+    {
+        "id":  "now_offset_chain",
+        "snippet":  "now(\u0027YYYY-MM-DD\u0027, \u0027-1 year\u0027, \u0027+6 days\u0027)",
+        "out":  "2025-10-20"
+    },
+    {
+        "id":  "now_long",
+        "snippet":  "now(\u0027MMMM D, YYYY\u0027)",
+        "out":  "OCTOBER 14, 2026"
+    },
+    {
+        "id":  "now_unquoted",
+        "snippet":  "now(MM/DD/YYYY)",
+        "out":  "10/14/2026"
+    },
+    {
+        "id":  "now_bracket_lit",
+        "snippet":  "now(\u0027[Run on] MMM D\u0027)",
+        "out":  "RUN ON OCT 14"
+    },
+    {
+        "id":  "rank_top",
+        "snippet":  "rank(1, AMOUNT)",
+        "out":  "10,000"
+    },
+    {
+        "id":  "rank_second",
+        "snippet":  "rank(2, AMOUNT)",
+        "out":  "1,200.5"
+    },
+    {
+        "id":  "rank_bottom",
+        "snippet":  "rank(-1, AMOUNT)",
+        "out":  "-75.75"
+    },
+    {
+        "id":  "rank_cond",
+        "snippet":  "rank(1, AMOUNT, N\u003e=3)",
+        "out":  "10,000"
+    },
+    {
+        "id":  "rank_zero",
+        "snippet":  "rank(0, AMOUNT)",
+        "out":  "Invalid Rank"
+    },
+    {
+        "id":  "rank_bad_col",
+        "snippet":  "rank(1, NOPE)",
+        "out":  "N/A"
+    },
+    {
+        "id":  "rank_text_col",
+        "snippet":  "rank(1, NAME)",
+        "out":  "N/A"
+    },
+    {
+        "id":  "pct_50",
+        "snippet":  "percentile(50, AMOUNT)",
+        "out":  "172.63"
+    },
+    {
+        "id":  "pct_0",
+        "snippet":  "percentile(0, AMOUNT)",
+        "out":  "-75.75"
+    },
+    {
+        "id":  "pct_100",
+        "snippet":  "percentile(100, AMOUNT)",
+        "out":  "10,000"
+    },
+    {
+        "id":  "pct_90",
+        "snippet":  "percentile(90, AMOUNT)",
+        "out":  "5,600.25"
+    },
+    {
+        "id":  "pct_out_of_range",
+        "snippet":  "percentile(150, AMOUNT)",
+        "out":  "Invalid Percentile"
+    },
+    {
+        "id":  "pct_bad_col",
+        "snippet":  "percentile(50, NOPE)",
+        "out":  "0"
+    },
+    {
+        "id":  "stddev_amount",
+        "snippet":  "stddev(AMOUNT)",
+        "out":  "3,990.26"
+    },
+    {
+        "id":  "stddev_n",
+        "snippet":  "stddev(N)",
+        "out":  "1.87"
+    },
+    {
+        "id":  "stddev_cond",
+        "snippet":  "stddev(AMOUNT, N\u003e=3)",
+        "out":  "5,005.32"
+    },
+    {
+        "id":  "stddev_bad_col",
+        "snippet":  "stddev(NOPE)",
+        "out":  "NaN"
+    },
+    {
+        "id":  "lookup_by_n",
+        "snippet":  "lookup(NAME, N=1)",
+        "out":  "Alpha"
+    },
+    {
+        "id":  "lookup_first_match",
+        "snippet":  "lookup(AMOUNT, NAME=Alpha)",
+        "out":  "1200.50"
+    },
+    {
+        "id":  "lookup_no_match",
+        "snippet":  "lookup(NAME, N=99)",
+        "out":  "N/A"
+    },
+    {
+        "id":  "lookup_gte",
+        "snippet":  "lookup(AMOUNT, N\u003e=5)",
+        "out":  "10000"
+    },
+    {
+        "id":  "lookup_bad_col",
+        "snippet":  "lookup(NOPE, N=1)",
+        "out":  ""
+    },
+    {
+        "id":  "wb_embedded_names",
+        "snippet":  "metadata(1) and resume(2) and informal(3) stay literal",
+        "out":  "metadata(1) and resume(2) and informal(3) stay literal"
+    },
+    {
+        "id":  "wb_dateformat_fmt",
+        "snippet":  "date_format(01-JAN-24, \u0027YYYY\u0027) not format(...)",
+        "out":  "2024 not "
+    },
+    {
+        "id":  "num_fixed_0dp",
+        "snippet":  "fixed(1234.5, 0)",
+        "out":  "1,235"
+    },
+    {
+        "id":  "num_fixed_3dp",
+        "snippet":  "fixed(0.333, 3)",
+        "out":  "0.333"
+    },
+    {
+        "id":  "num_round_neg",
+        "snippet":  "round(-75.75, 1)",
+        "out":  "-75.8"
+    },
+    {
+        "id":  "num_calc_exponent",
+        "snippet":  "calc(1e3 + 1)",
+        "out":  "1,001"
+    },
+    {
+        "id":  "df_interior_year",
+        "snippet":  "date_format(01-JAN-24, \u0027DD-YYYY-MM\u0027)",
+        "out":  "01-2024-01"
+    },
+    {
+        "id":  "prose_iso_date",
+        "snippet":  "Report window 2024-01-01 to 2024-12-31",
+        "out":  "Report window 2,024-1-1 to 2,024-12-31"
+    },
+    {
+        "id":  "rank_dup_top",
+        "snippet":  "rank(1, DUP)",
+        "out":  "30"
+    },
+    {
+        "id":  "rank_dup_2nd",
+        "snippet":  "rank(2, DUP)",
+        "out":  "20"
+    },
+    {
+        "id":  "rank_dup_3rd",
+        "snippet":  "rank(3, DUP)",
+        "out":  "10"
+    },
+    {
+        "id":  "rank_dup_bottom",
+        "snippet":  "rank(-1, DUP)",
+        "out":  "10"
+    },
+    {
+        "id":  "rank_dup_bot2",
+        "snippet":  "rank(-2, DUP)",
+        "out":  "20"
+    },
+    {
+        "id":  "distinct_dup",
+        "snippet":  "distinct(DUP)",
+        "out":  "3"
+    },
+    {
+        "id":  "progress_bar_thirds",
+        "snippet":  "progress_bar(1, 3)",
+        "out":  "\u003cdiv class=\"progress-bar-container\"\u003e\u003cdiv class=\"progress-bar-fill\" style=\"width: 33.33333333333333%; background-color: var(--brand-primary, #007bff);\"\u003e\u003c/div\u003e\u003cdiv class=\"progress-bar-label\"\u003e33.3%\u003c/div\u003e\u003c/div\u003e"
+    },
+    {
+        "id":  "data_prompt1",
+        "snippet":  "data(prompt1)",
+        "out":  "Engineering"
+    },
+    {
+        "id":  "data_prompt2_year",
+        "snippet":  "data(prompt2)",
+        "out":  "2026"
+    },
+    {
+        "id":  "data_prompt3",
+        "snippet":  "data(prompt3)",
+        "out":  "ACTIVE"
+    },
+    {
+        "id":  "data_prompt_missing",
+        "snippet":  "data(prompt6)",
+        "out":  "undefined"
+    },
+    {
+        "id":  "data_prompt_sentence",
+        "snippet":  "Unit data(prompt1) for FY data(prompt2)",
+        "out":  "Unit Engineering for FY 2026"
+    },
+    {
+        "id":  "data_prompt_nested",
+        "snippet":  "string(uppercase, data(prompt1))",
+        "out":  "ENGINEERING"
+    },
+    {
+        "id":  "data_named_unit",
+        "snippet":  "data(unit)",
+        "out":  "Engineering"
+    },
+    {
+        "id":  "data_subtitle",
+        "snippet":  "data(subtitle)",
+        "out":  "Awards by unit"
+    },
+    {
+        "id":  "data_byline",
+        "snippet":  "data(byline)",
+        "out":  "Awards by unit"
+    },
+    {
+        "id":  "data_rowlimit",
+        "snippet":  "data(rowlimit)",
+        "out":  "false"
+    },
+    {
+        "id":  "data_unknown_key",
+        "snippet":  "data(nosuchkey)",
+        "out":  "undefined"
+    },
+    {
+        "id":  "me_fname",
+        "snippet":  "me(fname)",
+        "out":  "Bruce"
+    },
+    {
+        "id":  "me_lname",
+        "snippet":  "me(lname)",
+        "out":  "Limon"
+    },
+    {
+        "id":  "me_email",
+        "snippet":  "me(email)",
+        "out":  "bplimon@ncsu.edu"
+    },
+    {
+        "id":  "me_unityid",
+        "snippet":  "me(unityid)",
+        "out":  "bplimon"
+    },
+    {
+        "id":  "me_default",
+        "snippet":  "me()",
+        "out":  "Bruce"
+    },
+    {
+        "id":  "info_default",
+        "snippet":  "info()",
+        "out":  ""
+    }
+]

@@ -1,0 +1,26 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>repository opening order</title></head>
+<body>
+<!-- repoorder suite (2026-10-02), BROWSER HALF: the REAL penumbra_repository.js
+     (served as repo_cand.js) opens its lightbox against a stubbed
+     get_server_reports.php (driver.js mocks $.ajax). The opening list must show
+     the rows in the server's order, and clearing a column sort must put them back
+     that way - through a column change (rebuildTable), Load More, and a search
+     round trip. index.php supplies the lightbox shell and the penumbra_vars const;
+     both are reduced here to what the module reads. -->
+<div id="openReportListLightbox" style="display:none"><div class="lightbox-content"></div></div>
+<script>
+// index.php declares this as a top-level const (global lexical scope); the module
+// reads it by bare name.
+const penumbra_vars = { isAdmin: false, isGlobalAdmin: false, repoMode: false, currentUserKey: 'tester', shibboleth: { ouc: '' } };
+window.__ERR = [];
+window.addEventListener('error', function (e) { window.__ERR.push(String(e.message) + ' @' + (e.filename || '').split('/').pop() + ':' + e.lineno + ':' + e.colno); });
+window.addEventListener('unhandledrejection', function (e) { window.__ERR.push('rejection: ' + String(e.reason)); });
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="driver.js"></script>
+<script src="repo_cand.js"></script>
+<script>RO.start();</script>
+</body></html>

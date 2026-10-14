@@ -1,0 +1,55 @@
+# =============================================================================
+# Run the pivot "Hide empty rows and columns" scheduled-send tests (2026-09-05).
+#
+#   powershell -File run.ps1
+#   powershell -File run.ps1 -Control    # must report FAIL 1 - proves the
+#                                        # harness can actually fail
+#   powershell -File run.ps1 -Mutant     # neuters pivot_apply_hide_empty();
+#                                        # EXACTLY the 12 "option ON" assertions
+#                                        # must FAIL (PASS 53 FAIL 12) while the
+#                                        # predicate + key-set + OFF ones pass
+#   powershell -File run.ps1 -Mutant2    # removes the never-blank-the-grid
+#                                        # guard; EXACTLY the 2 all-zero
+#                                        # assertions must FAIL (PASS 63 FAIL 2).
+#                                        # It exists because -Mutant leaves those
+#                                        # two passing VACUOUSLY - with the
+#                                        # applier gutted the keys survive for
+#                                        # the wrong reason.
+#
+# A control/mutant run exits non-zero, so under $ErrorActionPreference='Stop'
+# it kills a parent scriptblock - invoke each in its own call.
+#
+# UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the BODY
+# as a scriptblock instead:
+#   $d = '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\hideempty'
+#   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1")))
+#
+# WHAT IS UNDER TEST. The engine-C half of the hide-empty pivot option:
+# pivot_agg_value_is_empty / pivot_empty_key_sets / pivot_apply_hide_empty in
+# schedule_runner.php, plus the four consumers (HTML, CSV, XLSX, row count).
+# The browser half lives in generatePivotTable(); the two must drop the SAME
+# rows and columns or the emailed pivot disagrees with the screen.
+#
+# The mirror is re-extracted from the LIVE schedule_runner.php on every run, so
+# a stale copy cannot green-light a broken runner.
+#
+# -n (skip php.ini) because from a workstation the ini cannot load oci8/sqlsrv.
+#
+# EXPECTED TAIL: "PASS 65   FAIL 0". Any other tail is a failure, a smaller
+# pass count included.
+# =============================================================================
+param([switch]$Control, [switch]$Mutant, [switch]$Mutant2)
+
+$ErrorActionPreference = 'Stop'
+$here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\hideempty' }   # empty when run as a scriptblock: never fall back to the caller's cwd
+if (-not $here) { $here = '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\hideempty' }
+$php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+
+# NOT $args - that is an automatic variable in PowerShell.
+$phpArgs = @('-n', (Join-Path $here 'test_hideempty.php'))
+if ($Control) { $phpArgs += '--control' }
+if ($Mutant)  { $phpArgs += '--mutant' }
+if ($Mutant2) { $phpArgs += '--mutant2' }
+
+& $php @phpArgs
+exit $LASTEXITCODE

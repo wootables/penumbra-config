@@ -1,0 +1,338 @@
+# =============================================================================
+# PIVOT SUMMARY-ROW PERF + "(N items)" LABEL SUITE (2026-09-16)
+#
+# A collapsible nested pivot with 10 row fields over ?id=int-col-mat's 3,242
+# rows took over 10 minutes to render. generatePivotTable's summary rows called
+# getChildGroupCount(), which scanned EVERY group key (split() per key) for
+# EVERY summary row: O(groups^2), ~26k groups there. The fix counts distinct
+# child groups while groupChildren is built. Measured in this harness on the
+# same shape: 201,327 ms -> 682 ms, byte-identical HTML across 14 configs.
+#
+# Drives the REAL generatePivotTable + processPivotData (closure export, main.js
+# initialised synchronously as an IIFE) in headless Edge on synthetic data.
+#
+# Added the same day:
+#  - applyConditionalFormatting() returns early while a pivot is on screen (pivot
+#    generate/sort/search used to restyle the HIDDEN flat table, ~3.3 s a call);
+#  - build caches: DOMPurify once per distinct label value, one Intl.NumberFormat
+#    per digit range (link-valued labels were 2.5 s of a 3.3 s nested build);
+#  - large Collapsible pivots build hidden rows on demand (_pivotLazy): the
+#    reported 10-field pivot builds 1,793 rows instead of 22,587. Checked by
+#    decomposition identity and by one fixed click script run eager vs on demand.
+#
+# Added 2026-09-17 (sections 8-9): the chevron double-click and .pivot-batch-toggle
+# fired a real click per group (16.5 s for 474 groups here). togglePivotLevel runs
+# the groups with one cleanup; each script runs the handlers AND the old
+# click-per-chevron loop on one page and compares visible rows after every step,
+# exports and the whole table. Section 9 replays four fuzzer-found tables: after a
+# header sort, and on demand with keys the HTML parser changes (&#92;, &amp; &lt;
+# &quot; - query.php htmlspecialchars every plain cell), the handlers must click
+# chevron by chevron; backslash keys no longer need to.
+#
+# Added 2026-09-17, last (section 11): expanding a deepest-level group in a 4+ row-field
+# pivot injects hidden label cells into the detail rows the rowspan render left without
+# one. They pasted the key part - already decoded by the HTML parser - straight into HTML,
+# so markup in the data RAN (query.php escapes every plain cell, so it comes back as
+# markup) and @@HTML values showed their literal prefix. Both go through the sanitizing
+# renderer now, and each script expands the branch holding the interesting value first.
+#
+# Added 2026-09-17, later still (section 6, two escaped-key cases): the on-demand plan
+# was keyed by the key as WRITTEN while every lookup passes the key an ATTRIBUTE reads
+# back, and query.php htmlspecialchars every plain cell - so a group whose key held
+# & ' " < > expanded to nothing, and an escaped TOP-level key failed the bind check and
+# built every row. The plan and the bind check go through _pivotKeyAsAttribute now.
+#
+# Added 2026-09-17, last of all (sections 12-13): the maps processPivotData and
+# generatePivotTable key by DATA were plain {}, so a row or column value literally called
+# constructor / __proto__ / hasOwnProperty / toString / valueOf found that INHERITED member
+# instead of its own bucket - the group vanished from the table, and a __proto__ value wrote
+# its cells onto Object.prototype itself, which breaks every for-in on the page (jQuery reads
+# its Expr.match table that way, so the page stops working at all). Section 12 compares a
+# prototype-named build against the plain-value twin it was renamed from, as rows AND as
+# columns, and checks Object.prototype is untouched. Section 13: the row sort keyed each
+# group by its rendered label TEXT, where a line break is a <br>, so those groups missed the
+# summary-value map and sorted as if they had no value - it reads the key off the row now.
+# That fix is also why the section-10 twins carry line breaks in the value-sort case again.
+#
+# Added 2026-09-17, after all of those (section 14): clicking a rank "(Other)" row
+# drills through a set of the excluded row keys built inside the click handler's
+# closure, and that set was a plain {} keyed by a |||-joined row key - by DATA.
+# A key called hasOwnProperty shadowed the method the filter calls, so the read became
+# true(compositeKey), the throw escaped the whole sourceData.filter and NO dialog
+# opened at all; a key called __proto__ never recorded (assigning the primitive true
+# to it is a silent no-op) and its rows vanished from a breakdown they belong in.
+# Section 14 clicks every rank row and the (Other) row for real, on a build whose
+# excluded set holds all five prototype names and again on one holding only
+# __proto__, and requires the four drills to account for every source row exactly
+# once - the same decomposition identity the on-demand work uses.
+#
+# Added 2026-09-17, later (section 10): every chevron lookup built its selector from
+# the group key escaping only the double quote, so a backslash or a line break in a
+# key matched nothing (reapplyChildSummaryRowspan added a chevron on every pass) or
+# threw. The six lookups use CSS.escape now. Each script runs on a special-key twin
+# (backslashes, quotes, tab, form feed, line breaks) and a plain-key twin: the tables
+# must match after every step, with no errors and no chevron twice in a cell.
+#
+#   run.ps1              live js/main.js                 EXPECTED: PASS 95  FAIL 0
+#                        (live before the prototype-key deploy, sha eebc24a5: PASS 75 FAIL 7 - sections 12-13 plus
+#                         the section-10 value-sort case; four of those blocks report "- threw", because one
+#                         __proto__ value poisons Object.prototype and jQuery stops working for the rest of the run.
+#                         Before the placeholder-label deploy, sha 079b11cf: also section 11; before the on-demand
+#                         escaped-key deploy, sha b4db6bf2: also the 2 escaped-key cases)
+#   run.ps1 -Control     pre-fix backup (none of it)     EXPECTED: PASS 46  FAIL 33 (~15 min; run it ALONE -
+#                        it needs more than the old 15-minute Edge cap, which is why that cap is now 30)
+#   run.ps1 -Mutant      counts child ROWS, not GROUPS   EXPECTED: PASS 83  FAIL 3 (the 3 label asserts)
+#   run.ps1 -Mutant2     pivot guard always returns      EXPECTED: PASS 84  FAIL 2 (the 2 flat-table asserts)
+#   run.ps1 -Mutant3     late rows skip toggle states    EXPECTED: PASS 81  FAIL 5 (3 interaction + 2 section-10 non-vacuous)
+#   run.ps1 -Mutant4     no DOMPurify label cache        EXPECTED: PASS 85  FAIL 1 (the sanitize-count assert)
+#   run.ps1 -Mutant5     level index skips summary rows  EXPECTED: PASS 73  FAIL 13 (level-toggle equivalence)
+#   run.ps1 -Mutant6     never click chevron by chevron  EXPECTED: PASS 85  FAIL 1 (the column-sorted table)
+#   run.ps1 -Mutant7     on-demand plan keyed as WRITTEN EXPECTED: PASS 82  FAIL 4 (2 escaped-key + the 2 reference-key tables)
+#   run.ps1 -Mutant8     only the bind check keyed so    EXPECTED: PASS 85  FAIL 1 (escaped top-level keys build every row)
+#   run.ps1 -Mutant9     placeholder label pasted raw    EXPECTED: PASS 83  FAIL 3 (section 11: markup runs + both fidelity)
+#   run.ps1 -Mutant10    pivot data map back to a {}     EXPECTED: PASS 76  FAIL 6 (section 12; section 13 then throws too)
+#   run.ps1 -Mutant11    summary lookup drops line breaks EXPECTED: PASS 83 FAIL 3 (section 13 + the section-10 value-sort case)
+#   run.ps1 -Mutant12    drill excluded set back to a {} EXPECTED: PASS 92  FAIL 3 (section 14; the read is still the .call
+#                        form, so nothing THROWS - only __proto__ loses its rows, which is the silent half of the bug)
+#   run.ps1 -Mutant13    that set's READ back to a method call EXPECTED: PASS 90  FAIL 5 (section 14; a null-prototype map has
+#                        no inherited hasOwnProperty, so EVERY (Other) drill throws - including the plain-value twin's, which
+#                        is why this fails one MORE than the pre-fix control and not the same 4. Read the details, not the count)
+#   run.ps1 -KeyMutant <site>  one lookup back to the quote-only escape; EXPECTED (all in section 10 unless noted):
+#                        click 77/9   reapply 83/3 (incl. section 9 backslash keys)   restoreexp 82/4
+#                        restorecol 81/5   colsort 84/2   sortrows 80/6
+#   Every count above is out of 95 asserts, all measured 2026-09-17 against the deployed build.
+#   (The pre-fix build for section 14 - live sha 17803533, which is every earlier line's "live js/main.js" -
+#    reads 91/4: the 4 section-14 asserts that need the fix. Its 5 fixture and non-vacuity asserts pass either way,
+#    which is what keeps the section from being vacuous.)
+#   -KeyMutant click gained one failure that day: the section-10 value-sort case got its line
+#   breaks back once the sort stopped keying groups by label text.
+#   run.ps1 -MainJs <p>  any other copy (e.g. a stage file before deploy); the -Mutant switches apply to it
+#   -Mutant5/6/7 need togglePivotLevel; -KeyMutant needs the key-safe lookups; -Mutant10 needs the
+#   null-prototype pivot maps, -Mutant11 the key-based summary lookup and -Mutant12/13 the
+#   null-prototype drill set (else "anchor not found").
+#
+# UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
+#   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivotperf'
+#   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Control
+# Prints RESULT: GREEN/RED instead of exiting (an exit kills the caller).
+# Writes nothing to the webroot.
+# =============================================================================
+param([string]$MainJs = '', [switch]$Control, [switch]$Mutant, [switch]$Mutant2, [switch]$Mutant3, [switch]$Mutant4, [switch]$Mutant5, [switch]$Mutant6, [switch]$Mutant7, [switch]$Mutant8, [switch]$Mutant9, [switch]$Mutant10, [switch]$Mutant11, [switch]$Mutant12, [switch]$Mutant13,
+      [ValidateSet('', 'click', 'reapply', 'restoreexp', 'restorecol', 'colsort', 'sortrows')][string]$KeyMutant = '', [string]$Matrix = '')
+$ErrorActionPreference = 'Stop'
+$here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\pivotperf'
+$app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+$js   = "$app\js"
+$controlBak = "$js\main.js.bak-20260916-pivotgroups"
+$edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+
+if ($Control) {
+  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
+  $MainJs = Resolve-Bak $controlBak; if (-not $MainJs) { throw "-Control: no $controlBak" }
+}
+if (-not $MainJs) { $MainJs = "$js\main.js" }
+if (-not (Test-Path $MainJs)) { throw "main.js under test not found: $MainJs" }
+Write-Host "[1/3] staging (main.js under test: $MainJs$(if ($Mutant) { ' + MUTANT' })$(if ($Mutant2) { ' + MUTANT2' })$(if ($Mutant3) { ' + MUTANT3' })$(if ($Mutant4) { ' + MUTANT4' })$(if ($Mutant5) { ' + MUTANT5' })$(if ($Mutant6) { ' + MUTANT6' })$(if ($Mutant7) { ' + MUTANT7' })$(if ($Mutant8) { ' + MUTANT8' })$(if ($Mutant9) { ' + MUTANT9' })$(if ($Mutant10) { ' + MUTANT10' })$(if ($Mutant11) { ' + MUTANT11' })$(if ($Mutant12) { ' + MUTANT12' })$(if ($Mutant13) { ' + MUTANT13' })$(if ($KeyMutant) { " + KEYMUTANT $KeyMutant" }))"
+
+# Stage into a LOCAL temp dir: Edge reads a 6 MB script over SMB slowly, and a
+# per-run dir + profile keeps concurrent runs from colliding.
+$run = Join-Path $env:TEMP ('pnb_pivotperf_' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+New-Item -ItemType Directory -Force $run | Out-Null
+$libs = @('jquery-3.7.1.min.js','jquery-ui.min.js','moment.min.js','pako.min.js',
+          'codemirror.min.js','sql.min.js','show-hint.js','foldcode.js','foldgutter.js',
+          'brace-fold.js','comment-fold.js','placeholder.js','penumbra_snippet_help.js',
+          'purify.min.js','penumbra_template.js')
+foreach ($f in $libs) { Copy-Item "$js\$f" "$run\$f" -Force }
+Copy-Item "$here\harness.html" "$run\harness.html" -Force
+Copy-Item "$here\perf_driver.js" "$run\perf_driver.js" -Force
+
+$src = [IO.File]::ReadAllText($MainJs, $utf8)
+$anchor = '$(document).ready(function () {'
+if (-not $src.Substring(0, 200).Contains($anchor)) { throw 'main.js closure anchor not found' }
+if ($Mutant) {
+  # Count a child ROW on every push after the first, instead of a new child GROUP.
+  $old = "                    groupChildren[groupKey].push(rowKey);`r`n                }`r`n            });"
+  $new = "                    groupChildren[groupKey].push(rowKey);`r`n                    if (level > 0 && groupChildren[groupKey].length > 1) { const pk2 = parts.slice(0, level).join('|||'); childGroupCounts[pk2] = (childGroupCounts[pk2] || 0) + 1; }`r`n                }`r`n            });"
+  if (([regex]::Matches($src, [regex]::Escape($old))).Count -ne 1) { throw 'mutant anchor not found exactly once - update run.ps1' }
+  if (-not $src.Contains('childGroupCounts')) { throw 'mutant needs the fixed main.js (childGroupCounts absent)' }
+  $src = $src.Replace($old, $new)
+}
+if ($Mutant2) {
+  # The pivot guard fires unconditionally, so the flat table never formats.
+  $old2 = "        if (`$('#pivot-output-container').is(':visible')) {`r`n            return;`r`n        }`r`n`r`n        // Scope to the ACTIVE container's live rows"
+  $new2 = "        if (true) {`r`n            return;`r`n        }`r`n`r`n        // Scope to the ACTIVE container's live rows"
+  if (([regex]::Matches($src, [regex]::Escape($old2))).Count -ne 1) { throw 'mutant2 anchor not found exactly once (needs the guarded main.js) - update run.ps1' }
+  $src = $src.Replace($old2, $new2)
+}
+if ($Mutant3) {
+  # Rows built late keep their render-time toggle state instead of their group's current one.
+  $old3 = '            if (key === null || !(key in states)) continue;'
+  $new3 = '            if (true) continue;'
+  if (([regex]::Matches($src, [regex]::Escape($old3))).Count -ne 1) { throw 'mutant3 anchor not found exactly once (needs on-demand rows) - update run.ps1' }
+  $src = $src.Replace($old3, $new3)
+}
+if ($Mutant4) {
+  # Label cache off: every label cell runs formatCellContent (DOMPurify) again.
+  $old4 = '            let out = _pivotCellContentCache.get(k);'
+  $new4 = '            let out = undefined;'
+  if (([regex]::Matches($src, [regex]::Escape($old4))).Count -ne 1) { throw 'mutant4 anchor not found exactly once (needs the build caches) - update run.ps1' }
+  $src = $src.Replace($old4, $new4)
+}
+if ($Mutant5) {
+  # Level-wide toggle index leaves out summary rows: a group's own summary row is
+  # never found, so a double-click collapse cannot show it again.
+  $old5 = '                        if (s !== null && s !== g) (byKey[s] || (byKey[s] = [])).push(rows[r]);'
+  $new5 = '                        if (false) (byKey[s] || (byKey[s] = [])).push(rows[r]);'
+  if (([regex]::Matches($src, [regex]::Escape($old5))).Count -ne 1) { throw 'mutant5 anchor not found exactly once (needs togglePivotLevel) - update run.ps1' }
+  $src = $src.Replace($old5, $new5)
+}
+if ($Mutant6) {
+  # Never fall back to a click per chevron: sorted tables and backslash keys take the one-cleanup path.
+  $old6 = '    function pivotLevelToggleNeedsClicks(table, numRowFields, toggles) {'
+  $new6 = '    function pivotLevelToggleNeedsClicks(table, numRowFields, toggles) { return false;'
+  if (([regex]::Matches($src, [regex]::Escape($old6))).Count -ne 1) { throw 'mutant6 anchor not found exactly once (needs pivotLevelToggleNeedsClicks) - update run.ps1' }
+  $src = $src.Replace($old6, $new6)
+}
+if ($Mutant7) {
+  # The on-demand plan keyed by the key as WRITTEN again: an escaped group expands to nothing,
+  # and one cleanup no longer matches a click per chevron on such tables.
+  $old7 = "        if (typeof key !== 'string' || !/[&\r\0]/.test(key)) return key;"
+  $new7 = '        return key;'
+  if (([regex]::Matches($src, [regex]::Escape($old7))).Count -ne 1) { throw 'mutant7 anchor not found exactly once (needs _pivotKeyAsAttribute) - update run.ps1' }
+  $src = $src.Replace($old7, $new7)
+}
+if ($Mutant8) {
+  # Only the bind check compares the key as written: escaped top-level keys send on-demand tables back to building every row.
+  $old8 = '!== _pivotKeyAsAttribute(e.key))) ok = false;'
+  $new8 = '!== e.key)) ok = false;'
+  if (([regex]::Matches($src, [regex]::Escape($old8))).Count -ne 1) { throw 'mutant8 anchor not found exactly once (needs _pivotKeyAsAttribute in penumbraPivotLazyBind) - update run.ps1' }
+  $src = $src.Replace($old8, $new8)
+}
+if ($Mutant9) {
+  # The injected placeholder label goes back to pasting the key part straight into HTML.
+  $old9 = "                                var labelHtml = (labelText.indexOf('@@HTML') !== -1 || labelText.indexOf('@@JSON') !== -1)`r`n" +
+          "                                    ? formatCellContent(labelText)`r`n" +
+          "                                    : formatCellContent(escapeHtml(labelText));"
+  $new9 = '                                var labelHtml = labelText;'
+  if (([regex]::Matches($src, [regex]::Escape($old9))).Count -ne 1) { throw 'mutant9 anchor not found exactly once (needs the sanitized placeholder label) - update run.ps1' }
+  $src = $src.Replace($old9, $new9)
+}
+if ($Mutant10) {
+  # The map processPivotData keys by data goes back to a plain {}: a row named
+  # __proto__ / constructor / toString finds that inherited member instead of its
+  # own bucket (the group disappears, and __proto__ writes onto Object.prototype).
+  $old10 = 'const data = Object.create(null);   // rowKey -> colKey -> cell; keyed by DATA (see below)'
+  $new10 = 'const data = {};'
+  if (([regex]::Matches($src, [regex]::Escape($old10))).Count -ne 1) { throw 'mutant10 anchor not found exactly once (needs the null-prototype pivot maps) - update run.ps1' }
+  $src = $src.Replace($old10, $new10)
+}
+if ($Mutant11) {
+  # The row sort looks its summary value up under a key with the line breaks
+  # dropped - what reading the key off the rendered label text (a <br>) used to give.
+  $old11 = "return (fullGroupKey && _summaryValueMap[fullGroupKey]) || '';"
+  $new11 = "return (fullGroupKey && _summaryValueMap[String(fullGroupKey).replace(/[\r\n]+/g, '')]) || '';"
+  if (([regex]::Matches($src, [regex]::Escape($old11))).Count -ne 1) { throw 'mutant11 anchor not found exactly once (needs the key-based summary lookup) - update run.ps1' }
+  $src = $src.Replace($old11, $new11)
+}
+if ($Mutant12) {
+  # The drill-down's excluded-key set back to a plain {}. Only __proto__ misfires
+  # on this one (its rows leave the (Other) breakdown silently); the read is still
+  # the .call form, so nothing throws.
+  $old12 = 'otherKeySet = Object.create(null);'
+  $new12 = 'otherKeySet = {};'
+  if (([regex]::Matches($src, [regex]::Escape($old12))).Count -ne 1) { throw 'mutant12 anchor not found exactly once (needs the null-prototype drill set) - update run.ps1' }
+  $src = $src.Replace($old12, $new12)
+}
+if ($Mutant13) {
+  # The same set's READ back to the method-call form. A null-prototype object has
+  # no inherited hasOwnProperty at all, so EVERY (Other) drill throws - it fails
+  # for the opposite reason to the pre-fix build, which threw only when a key was
+  # literally called hasOwnProperty.
+  $old13 = 'if (!Object.prototype.hasOwnProperty.call(otherKeySet, compositeKey)) return false;'
+  $new13 = 'if (!otherKeySet.hasOwnProperty(compositeKey)) return false;'
+  if (([regex]::Matches($src, [regex]::Escape($old13))).Count -ne 1) { throw 'mutant13 anchor not found exactly once (needs the .call read) - update run.ps1' }
+  $src = $src.Replace($old13, $new13)
+}
+if ($KeyMutant) {
+  # One chevron lookup goes back to escaping only the double quote (the code before 2026-09-17).
+  $q = "replace(/`"/g, '\\`"')"
+  $keyMutants = @{
+    'click'      = @("var escapedKey = CSS.escape(groupKey);", "var escapedKey = groupKey.$q;")
+    'reapply'    = @("var escapedGk = CSS.escape(gk);", "var escapedGk = gk.$q;")
+    'restoreexp' = @("            var escapedKey = CSS.escape(item.key);`r`n            // Find the collapsed right toggle", "            var escapedKey = item.key.$q;`r`n            // Find the collapsed right toggle")
+    'restorecol' = @("        collapsedGroups.forEach(function (item) {`r`n            var escapedKey = CSS.escape(item.key);", "        collapsedGroups.forEach(function (item) {`r`n            var escapedKey = item.key.$q;")
+    'colsort'    = @("            _collapsedGroups.forEach(function (item) {`r`n                var escapedKey = CSS.escape(item.key);", "            _collapsedGroups.forEach(function (item) {`r`n                var escapedKey = item.key.$q;")
+    'sortrows'   = @("summaryLevel + '=`"' + CSS.escape(groupKey) + '`"]');", "summaryLevel + '=`"' + groupKey.$q + '`"]');")
+  }
+  $km = $keyMutants[$KeyMutant]
+  if (([regex]::Matches($src, [regex]::Escape($km[0]))).Count -ne 1) { throw "key mutant '$KeyMutant' anchor not found exactly once (needs the key-safe main.js) - update run.ps1" }
+  $src = $src.Replace($km[0], $km[1])
+}
+$hook = @(
+  'try { window.__PP = { gen: generatePivotTable, collect: processPivotData, extraVals: getExtraValFields, rankCfg: buildRankConfig,',
+  '  cf: applyConditionalFormatting, parseQuery: parseAdvancedQuery, collapseBar: injectPivotCollapseBar,',
+  '  zebra: applyZebraStriping, sticky: updateStickyColumnLayout, pivotArray: getPivotDataAsArray, csvCopy: getPivotCsvForCopy,',
+  '  sortIcons: updatePivotRowFieldSortIcons, minim: updateRowFieldColumnMinimization, borders: syncPivotHeaderBorders,',
+  '  viewLevel: setPivotViewLevel, batchFlag: function () { return _batchCollapseInProgress; }, resetSort: function () { sortCriteria = []; },',
+  '  setSettings: function (s) { currentPivotSettings = s; }, setRules: function (r) { conditionalFormattingRules = r; },',
+  '  reportRules: function () { var c = "CONTRIB_COLLEGE = ''{LEAD_COLLEGE}'' and CONTRIB_COLLEGE != ''''";',
+  '    return [{ type: "cell", targetColumn: "AMOUNT_CROSS", condition: c, style: "background-color: var(--brand-primary) !important; color: var(--brand-primary)",',
+  '      parsedCondition: parseAdvancedQuery(c, ["RECORD_ID","CONTRIB_COLLEGE","LEAD_COLLEGE","AMOUNT_CROSS"]) }]; } };',
+  '} catch (e) { window.__PP_ERR = String(e); }',
+  'try { window.__PP.lazy = { get: function () { return _pivotLazy; }, bind: penumbraPivotLazyBind, ensureAll: penumbraPivotEnsureAllRows,',
+  '  count: penumbraPivotBodyRowCount }; window.__PP.setLazyMin = function (v) { _pivotLazyMinRows = (v === null ? _PIVOT_LAZY_MIN_ROWS_DEFAULT : v); };',
+  '} catch (e) { window.__PP_LAZY_ERR = String(e); }',
+  'try { window.__PP.setSource = function (d) { currentPivotSourceData = d; }; window.__PP.reapply = reapplyChildSummaryRowspan;',
+  '  window.__PP.captureCollapse = captureCollapseState; window.__PP.restoreCollapse = restoreCollapseState;',
+  '  window.__PP.captureExpanded = captureExpandedState; window.__PP.restoreExpanded = restoreExpandedState;',
+  '} catch (e) { window.__PP_KS_ERR = String(e); }'
+) -join ' '
+# Synchronous init: unwrap the ready closure into an IIFE so the driver (a later
+# <script>) runs against an initialised closure before the load event.
+$i = $src.IndexOf($anchor)
+$patched = $src.Substring(0, $i) + ';(function () {' + "`r`n    $hook`r`n" + $src.Substring($i + $anchor.Length)
+$j = $patched.LastIndexOf('});')
+if ($j -lt 0) { throw 'closure tail not found' }
+$patched = $patched.Substring(0, $j) + '})();' + $patched.Substring($j + 3)
+[IO.File]::WriteAllText("$run\main_perf.js", $patched, $utf8)
+
+Write-Host "[2/3] running headless Edge ..."
+$prof = Join-Path $run 'profile'
+$dom  = Join-Path $run 'dom.txt'
+$query = if ($Matrix) { '?perf=' + [Uri]::EscapeDataString($Matrix) } else { '?suite=1' }
+$url = 'file:///' + $run.Replace([char]92, [char]47) + '/harness.html' + $query
+$edgeArgs = @('--headless=new','--disable-gpu','--no-sandbox','--allow-file-access-from-files',"--user-data-dir=$prof",'--dump-dom', $url)
+$pr = Start-Process -FilePath $edge -PassThru -NoNewWindow -RedirectStandardOutput $dom -RedirectStandardError (Join-Path $run 'err.txt') -ArgumentList $edgeArgs
+$pr.WaitForExit(1800000) | Out-Null   # 30 min: -Control runs every section on a build with no on-demand rows
+if (-not $pr.HasExited) { $pr.Kill() }
+# A lingering child on the throw-away profile keeps the dump handle open: stop
+# ONLY processes on that profile (the user runs Edge), then read share-everything.
+Get-CimInstance Win32_Process -Filter "Name = 'msedge.exe'" | Where-Object { $_.CommandLine -like "*$prof*" } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {} }
+$d = ''
+for ($k = 0; $k -lt 40; $k++) {
+  try {
+    $fs = New-Object IO.FileStream($dom, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+    $sr = New-Object IO.StreamReader($fs); $d = $sr.ReadToEnd(); $sr.Close()
+    if ($d.Contains('</pre>')) { break }
+  } catch {}
+  Start-Sleep -Milliseconds 500
+}
+$a = $d.IndexOf('<pre id="out">'); $b = $d.IndexOf('</pre>', $a)
+if ($a -lt 0) { throw "no <pre id=out> in dump ($($d.Length) bytes) - see $run" }
+$txt = [System.Net.WebUtility]::HtmlDecode($d.Substring($a + 14, $b - $a - 14))
+if (-not $txt.StartsWith('RESULTS_JSON:')) { throw "harness did not finish: $($txt.Substring(0, [Math]::Min(400, $txt.Length)))" }
+$parsed = $txt.Substring(13) | ConvertFrom-Json
+
+Write-Host "[3/3] results"
+if ($parsed.fatal) { Write-Host "FATAL: $($parsed.fatal)" -ForegroundColor Red; Write-Host 'RESULT: RED'; return }
+if ($parsed.pageErrors -and $parsed.pageErrors.Count) { Write-Warning "main.js init errors (may invalidate results): $($parsed.pageErrors -join '; ')" }
+if ($Matrix) { $parsed.results | ForEach-Object { $_ | ConvertTo-Json -Compress }; return }
+$pass = 0; $fail = 0
+foreach ($r in $parsed.results) {
+  if ($r.pass) { $pass++; Write-Host ("  PASS  " + $r.name + "  [" + $r.detail + "]") -ForegroundColor Green }
+  else { $fail++; Write-Host ("  FAIL  " + $r.name) -ForegroundColor Red; Write-Host ("        " + $r.detail) -ForegroundColor DarkYellow }
+}
+Write-Host ("PASS {0}   FAIL {1}" -f $pass, $fail)
+Write-Host $(if ($fail -eq 0) { 'RESULT: GREEN' } else { 'RESULT: RED' })
+try { [IO.Directory]::Delete($run, $true) } catch {}

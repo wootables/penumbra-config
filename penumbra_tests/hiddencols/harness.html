@@ -1,0 +1,199 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>hidden columns</title>
+<link rel="stylesheet" href="main.css">
+</head>
+<body class="theme-default">
+<!-- Hidden-columns suite (2026-09-30). The REAL main.js booted through the REAL
+     run path (a stubbed query.php) on a 300-row fixture: 6 visible columns and
+     14 HIDDEN ones of every value shape the flat build renders differently -
+     plain text, numbers, money, dates, @@HTML resolver links, @@JSON nested
+     tables, HTML entities, multi-line text, nulls. ?scn=<name> picks the
+     preloaded report state; driver.js runs that scenario and writes a
+     FINGERPRINT (everything a user or export could observe) into #out.
+     run.py loads each scenario against the BASELINE build and the CANDIDATE
+     and requires identical fingerprints. -->
+<div id="reportHeaderContainer"><div id="defaultTitleView"></div><div id="reportInfoPanel" style="display:none"></div></div>
+<input id="reportTitle" value=""><input id="reportSubtitle" value=""><div id="admWrapper"></div><button id="toggleAdminViewBtn"></button>
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div><div id="mainReportTitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<button id="executeQuery">Run</button><button id="stopQueryBtn">Stop</button>
+<div id="loadingOverlay" style="display:none"><p id="execution-timer"></p><p id="loadingMessage"></p><div id="loadingTip"></div></div>
+<div id="importTimestamps"></div>
+<div id="resultsHeader" style="height:20px">controls</div>
+<div id="table-view-container"><div id="container-parent"><div id="results-wrapper" style="width:1400px;height:700px;overflow:auto"><table id="resultsTable" class="data-grid-table"><caption class="sr-only">Report results table</caption><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table></div></div></div>
+<div id="paginationControls"><select id="rowsPerPageSelector"><option value="25">25</option><option value="50">50</option><option value="200">200</option><option value="all">All</option></select><span id="pageInfo"></span></div>
+<div id="errorBox"></div><div id="undo_text_container"></div>
+<div id="tableSearchContainer"><input id="tableSearch" value=""></div>
+<div id="resultCount"></div>
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="settingsPanelOverlay"></div>
+<div id="settingsPanel">
+  <select id="spThemeSelector"><option value="report-default">Report Default</option><option value="theme-default">Default</option></select>
+  <select id="spDensitySelector"><option value="report-default">Report Default</option><option value="standard">Standard</option></select>
+  <input type="checkbox" id="spRowExpandToggle"><input type="checkbox" id="spResolverToggle">
+  <div class="sp-section sp-columns-section"><div class="sp-column-container"><div id="spColumnList" class="sp-column-list"></div></div></div>
+  <div class="sp-actions"><button id="spApply">Save Column Layout</button><button id="spReset">Reset</button><span id="spPendingCount"></span></div>
+</div>
+<div id="copyActionsLightbox" style="display:none">
+  <input type="radio" name="copyFormat" value="single_col" checked>
+  <select id="copyColumnSelector"></select>
+  <input id="copyDelimiterInput" value=";">
+  <input id="sqlTableNameInput" value=""><textarea id="customTemplateInput"></textarea>
+  <input type="checkbox" id="customTemplateNewline"><select id="apiSnippetLanguage"><option value="python">python</option></select>
+  <button id="confirmCopyBtn">Copy</button>
+</div>
+<div id="pnbStatusBar">
+  <div class="sb-seg" id="sbColsSeg"><span id="sbCols"></span>
+    <span class="sb-chip" id="sbCustomCols" style="display:none;">custom layout</span>
+    <div class="sb-pop" id="sbCustomColsPop"><div id="sbCustomColsDiff"></div><button id="sbCustomColsReset">Reset</button><button id="sbCustomColsSave" style="display:none;">Save</button></div>
+  </div>
+  <div class="sb-seg" id="sbUserSeg"></div>
+</div>
+<pre id="out">running</pre>
+
+<script>
+  (function () { try { localStorage.clear(); } catch (e) {} })();
+  window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' } };
+  window.PENUMBRA_THEME_IDS = ['theme-default'];
+  window.PENUMBRA_THEME_ALIASES = {};
+  window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  (function () {
+    var P = new URLSearchParams(location.search);
+    window.__SCN = P.get('scn') || 'boot';
+    // --- the fixture ------------------------------------------------------
+    var COLS = [
+      'V_ID', 'V_NAME', 'V_AMOUNT', 'V_DATE', 'V_LINK', 'V_STATUS',            // 0-5 visible
+      'H_TEXT', 'H_NUM', 'H_MONEY', 'H_DATE', 'H_HTML', 'H_JSON', 'H_ENT',     // 6-12 hidden
+      'H_NL', 'H_NULL', 'H_GROUP', 'H_GROUP2', 'H_AMT', 'H_FLAG', 'H_CODE'     // 13-19 hidden
+    ];
+    window.__COLS = COLS;
+    var seed = 20260930;
+    function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
+    function pick(a) { return a[Math.floor(rnd() * a.length)]; }
+    var W = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel', 'India', 'Juliet', 'Kilo', 'Lima'];
+    function money() { return '$' + (rnd() * 90000 + 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+    function date() { var d = new Date(2021, 0, 1 + Math.floor(rnd() * 1500)); return (d.getMonth() + 1) + '/' + d.getDate() + '/' + d.getFullYear(); }
+    function link() { var id = String(400000 + Math.floor(rnd() * 99999)); return '@@HTML<a href="https://oitras.oit.ncsu.edu/resolver/103?id=' + id + '" target="_new" title="View the project record (requires proper access)" class="resolver-link">' + id + '</a>'; }
+    var rows = [];
+    for (var i = 1; i <= 300; i++) {
+      var r = {};
+      r.V_ID = 'ID-' + String(1000 + i);
+      r.V_NAME = pick(W) + ' ' + pick(W);
+      r.V_AMOUNT = money();
+      r.V_DATE = date();
+      r.V_LINK = link();
+      r.V_STATUS = pick(['Open', 'Closed', 'Pending']);
+      r.H_TEXT = pick(W) + ' ' + pick(W) + ' ' + i;
+      r.H_NUM = String(Math.floor(rnd() * 1000));
+      r.H_MONEY = money();
+      r.H_DATE = date();
+      r.H_HTML = link();
+      var sub = []; for (var k = 0, n = 1 + Math.floor(rnd() * 3); k < n; k++) sub.push({ SUB_ID: 'S' + Math.floor(rnd() * 90), SUB_AMT: Math.floor(rnd() * 5000), SUB_NAME: pick(W) });
+      r.H_JSON = (i % 7 === 0) ? null : '@@JSON' + JSON.stringify(sub);
+      r.H_ENT = pick(['R&amp;D', 'O&#039;Brien', '&lt;tag&gt;', 'plain', 'A &amp; B &amp; C']);
+      r.H_NL = pick(W) + '\n' + pick(W);
+      r.H_NULL = (i % 3 === 0) ? null : ((i % 3 === 1) ? '' : pick(W));
+      r.H_GROUP = (i % 11 === 0) ? null : pick(['North', 'South', 'East', 'West', 'Central']);
+      r.H_GROUP2 = pick(['Tier 1', 'Tier 2', 'Tier 3']);
+      r.H_AMT = String(Math.floor(rnd() * 20000) / 100);
+      r.H_FLAG = rnd() < 0.3 ? 'Y' : 'N';
+      r.H_CODE = pick(['AB', 'CD', 'EF', 'GH']) + '-' + Math.floor(rnd() * 99);
+      rows.push(r);
+    }
+    window.__rowsFixture = rows;
+    // --- the scenario's stored report ------------------------------------
+    var order = []; for (var c = 0; c < COLS.length; c++) order.push(c);
+    var st = {
+      name: 'hcfix', query: 'SELECT * FROM HC_FIXTURE', reportTitle: 'Hidden columns fixture',
+      theme: 'theme-default', density: 'standard',
+      visibleColumns: ['#', 0, 1, 2, 3, 4, 5], columnOrder: order,
+      sortCriteria: [], noLimit: true, rowExpandDefault: false, resolverLinksDefault: true,
+      rowsPerPage: '200', reportSnippet: ''
+    };
+    var S = window.__SCN;
+    if (S === 'sortnum') st.sortCriteria = [{ colIdentifier: 'H_NUM', colIndex: 7, direction: 'desc' }];
+    if (S === 'sorttext') st.sortCriteria = [{ colIdentifier: 'H_ENT', colIndex: 12, direction: 'asc' }, { colIdentifier: 'H_TEXT', colIndex: 6, direction: 'desc' }];
+    if (S === 'group') { st.groupBy = 'H_GROUP'; st.groupAgg = { column: 'H_AMT', type: 'sum' }; }
+    if (S === 'group2') { st.groupBy = 'H_GROUP,H_GROUP2'; st.groupAgg = { column: 'H_MONEY', type: 'avg' }; st.groupSort = { key: 'summary', dir: 'desc' }; }
+    if (S === 'groupsort') { st.groupBy = 'V_STATUS'; st.sortCriteria = [{ colIdentifier: 'H_NUM', colIndex: 7, direction: 'asc' }]; }
+    if (S === 'fmt') st.reportSnippet = "format(row, H_FLAG = 'Y', 'background-color:#fff3cd')\nformat(cell, V_NAME, H_NUM > 500, 'font-weight:bold')\nformat(row, H_TEXT contains Alpha, 'color:#990000')\nformat(cell, V_AMOUNT, V_AMOUNT > {H_MONEY}, 'font-style:italic')";
+    if (S === 'heat') st.reportSnippet = "heatmap(row, H_AMT)\nheatmap(cell, H_NUM)";
+    if (S === 'rewrite') st.reportSnippet = "rewrite(H_CODE, '<b>{val}</b> ({V_ID})')\nrewrite(V_STATUS, H_FLAG='Y', '{val}*')";
+    if (S === 'default7') { st.visibleColumns = [0]; }
+    var offFlag = (S === 'killswitch2');   // what index.php prints when js/penumbra_lazycells.off exists
+    window.__STORED = st;
+    window.penumbra_vars = {
+      isAdmin: true, isGlobalAdmin: true, canEditReport: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+      tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+      imports: [], reports: [], themes: {}, prompts: {}, grants: [],
+      totalExemptions: ['AMOUNT', 'H_AMT', 'H_NUM'],
+      preloadedState: st
+    };
+    if (offFlag) window.penumbra_vars.lazyCellsOff = true;
+    window.__queryResponse = { data: rows };
+  })();
+  window.__T = {};
+  window.__queryDone = 0;
+  window.__ajaxLog = [];
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  jQuery.ajax = function (a, b) {
+    var opts = (typeof a === 'string') ? jQuery.extend({ url: a }, b || {}) : (a || {});
+    var url = String(opts.url || '');
+    window.__ajaxLog.push(url);
+    var d = jQuery.Deferred();
+    var isQuery = /query\.php/.test(url);
+    var resp = isQuery ? window.__queryResponse : {};
+    setTimeout(function () {
+      try { if (opts.success) opts.success(resp, 'success', { status: 200 }); } catch (e) { window.__errors.push('ajax success threw: ' + String(e)); }
+      try { if (opts.complete) opts.complete({ status: 200 }, 'success'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }
+      d.resolve(resp, 'success', { status: 200 });
+      if (isQuery) window.__queryDone++;
+    }, 0);
+    var p = d.promise(); p.abort = function () {}; return p;
+  };
+  jQuery.getJSON = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.post = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.get = jQuery.post;
+  jQuery.fx.off = true;
+  // Clipboard: capture what the copy paths write.
+  window.__clip = [];
+  try {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+      writeText: function (t) { window.__clip.push(String(t)); return Promise.resolve(); },
+      write: function () { window.__clip.push('[rich]'); return Promise.resolve(); }
+    } });
+  } catch (e) { window.__clipErr = String(e); }
+  window.__errors = [];
+  window.__rejections = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    window.__rejections.push(String((r && r.message) || r) + ' @' + String((r && r.stack) || '').split('\n').slice(1, 2).join('').trim());
+    e.preventDefault();
+  });
+  window.confirm = function () { return true; };
+  window.alert = function (m) { window.__errors.push('alert: ' + m); };
+  window.prompt = function () { return null; };
+  if (typeof window.stackHeaders !== 'function') window.stackHeaders = function () {};
+</script>
+<script src="penumbra_userseg.js"></script>
+<script src="main_hc.js"></script>
+<script src="driver.js"></script>
+</body></html>

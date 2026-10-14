@@ -1,0 +1,178 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>table fit</title>
+<link rel="stylesheet" href="main.css">
+<link rel="stylesheet" href="density.css">
+<script>
+  // The page's vertical scrollbar is PINNED (overflow-y: scroll) unless ?pin=0, so
+  // the page becoming scrollable never narrows the box. On the live page that
+  // width change fires the box's OWN observer and re-caps some growth by
+  // accident (never a shrink, and never with overlay scrollbars); the suite
+  // has to see what the page observer catches on its own.
+  if (!/[?&]pin=0/.test(location.search)) document.write('<style>html { overflow-y: scroll; }</style>');
+</script>
+</head>
+<body class="theme-default">
+<!-- tablefit suite (2026-10-03). The REAL main.js (ready closure unwrapped) and
+     the REAL main.css + density.css (linked in index.php's order), with the page
+     blocks in index.php's order: report header, docked admin console, error box,
+     snapshot dock, controls bar, split stage > table, fixed status bar. The report
+     boots through the real run path (a stubbed query.php) in Easy Read density
+     with a table wider than the window, so #results-wrapper - built by the real
+     applyContainerization() - owns a horizontal scrollbar. The console is a real
+     jQuery UI tabs widget whose three panels driver.js sizes: switching tabs is
+     what moves the table on the live page. -->
+<div id="reportHeaderContainer" role="banner">
+  <div id="defaultTitleView" style="display:none"></div>
+  <div id="reportInfoPanel"><div class="main-title"><h1 id="mainReportTitle">Table fit fixture</h1><div id="mainReportSubtitle"></div></div></div>
+  <div id="reportSnippetOutput"><div id="tfSnippetBlock" style="height:90px">snippet</div></div>
+</div>
+
+<div id="admWrapper" class="admin-view">
+  <div id="admin-flex-container" style="display: flex; align-items: stretch; height: auto;">
+    <div id="editorTabs" style="flex: 1 1 auto; min-width: 0;">
+      <ul>
+        <li><a href="#tf-tab-a">Tab A</a></li>
+        <li><a href="#tf-tab-b">Tab B</a></li>
+        <li><a href="#tf-tab-c">Tab C</a></li>
+      </ul>
+      <div id="tf-tab-a"><div class="tf-fill" style="height:200px"></div></div>
+      <div id="tf-tab-b"><div class="tf-fill" style="height:200px"></div></div>
+      <div id="tf-tab-c"><div class="tf-fill" style="height:200px"></div></div>
+    </div>
+  </div>
+</div>
+<button id="toggleAdminViewBtn" style="position:fixed;right:0;top:0">console</button>
+
+<div id="errorBox" role="alert" aria-live="assertive"></div>
+<div id="snapAnalysisDock"></div>
+
+<div id="resultsHeader">
+  <div class="header-left">
+    <div id="tableSearchContainer"><input type="text" id="tableSearch" value=""><span id="resultCount"></span></div>
+  </div>
+  <div id="paginationControls"><select id="rowsPerPageSelector"><option value="25">25</option><option value="200">200</option><option value="all">All</option><option value="none">None</option></select><span id="pageInfo"></span></div>
+</div>
+
+<div id="pnbSplitStage">
+  <div id="table-view-container" role="main" tabindex="-1">
+    <table id="resultsTable"><caption class="sr-only">Report results table</caption><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table>
+    <div id="groupedResultsContainer"></div>
+    <div id="pivot-output-container" style="margin-top: 20px;"></div>
+  </div>
+</div>
+
+<!-- main.js expects these; kept out of the flow so they add no height -->
+<div style="display:none">
+  <input id="reportTitle" value=""><input id="reportSubtitle" value="">
+  <textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+  <button id="executeQuery">Run</button><button id="stopQueryBtn">Stop</button>
+  <div id="importTimestamps"></div><div id="undo_text_container"></div>
+</div>
+<div id="loadingOverlay" style="display:none"><p id="execution-timer"></p><p id="loadingMessage"></p><div id="loadingTip"></div></div>
+<div id="settingsPanelOverlay"></div>
+<div id="settingsPanel">
+  <select id="spThemeSelector"><option value="report-default">Report Default</option><option value="theme-default">Default</option></select>
+  <select id="spDensitySelector"><option value="report-default">Report Default</option><option value="standard">Standard</option><option value="compact">Compact</option><option value="easy-read">Easy Read</option></select>
+  <input type="checkbox" id="spRowExpandToggle"><input type="checkbox" id="spResolverToggle">
+  <div class="sp-section sp-columns-section"><div class="sp-column-container"><div id="spColumnList" class="sp-column-list"></div></div></div>
+  <div class="sp-actions"><button id="spApply">Save Column Layout</button><button id="spReset">Reset</button><span id="spPendingCount"></span></div>
+</div>
+<div id="pnbStatusBar" role="status" aria-label="Report status bar">
+  <div class="sb-seg sb-lead"><span id="sbRows"></span></div>
+  <div class="sb-seg" id="sbColsSeg"><span id="sbCols"></span></div>
+  <div class="sb-spring"></div>
+  <div class="sb-seg" id="sbUserSeg"></div>
+</div>
+<pre id="out" style="position:fixed;left:0;top:0;width:1px;height:1px;overflow:hidden;margin:0">running</pre>
+
+<script>
+  (function () { try { localStorage.clear(); localStorage.setItem('penumbra_admin_open', 'false'); } catch (e) {} })();
+  window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' } };
+  window.PENUMBRA_THEME_IDS = ['theme-default'];
+  window.PENUMBRA_THEME_ALIASES = {};
+  window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  (function () {
+    // 120 rows x 24 columns of long-ish text: far wider than the 1500px window.
+    var COLS = [];
+    for (var c = 1; c <= 24; c++) COLS.push('COLUMN_' + (c < 10 ? '0' : '') + c);
+    window.__COLS = COLS;
+    var rows = [];
+    for (var i = 1; i <= 120; i++) {
+      var r = {};
+      for (var k = 0; k < COLS.length; k++) r[COLS[k]] = 'row ' + i + ' value ' + (k + 1) + ' wide text';
+      rows.push(r);
+    }
+    window.__rowsFixture = rows;
+    var vis = ['#']; var order = [];
+    for (var j = 0; j < COLS.length; j++) { vis.push(j); order.push(j); }
+    var st = {
+      name: 'tfix', query: 'SELECT * FROM TF_FIXTURE', reportTitle: 'Table fit fixture',
+      theme: 'theme-default', density: 'easy-read',
+      visibleColumns: vis, columnOrder: order,
+      sortCriteria: [], noLimit: true, rowExpandDefault: false, resolverLinksDefault: true,
+      rowsPerPage: 'all', reportSnippet: ''
+    };
+    window.__STORED = st;
+    window.penumbra_vars = {
+      isAdmin: true, isGlobalAdmin: true, canEditReport: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+      tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+      imports: [], reports: [], themes: {}, prompts: {}, grants: [],
+      totalExemptions: [],
+      preloadedState: st
+    };
+    window.__queryResponse = { data: rows };
+  })();
+  window.__queryDone = 0;
+  window.__ajaxLog = [];
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  jQuery.ajax = function (a, b) {
+    var opts = (typeof a === 'string') ? jQuery.extend({ url: a }, b || {}) : (a || {});
+    var url = String(opts.url || '');
+    window.__ajaxLog.push(url);
+    var d = jQuery.Deferred();
+    var isQuery = /query\.php/.test(url);
+    var resp = isQuery ? window.__queryResponse : {};
+    setTimeout(function () {
+      try { if (opts.success) opts.success(resp, 'success', { status: 200 }); } catch (e) { window.__errors.push('ajax success threw: ' + String(e)); }
+      try { if (opts.complete) opts.complete({ status: 200 }, 'success'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }
+      d.resolve(resp, 'success', { status: 200 });
+      if (isQuery) window.__queryDone++;
+    }, 0);
+    var p = d.promise(); p.abort = function () {}; return p;
+  };
+  jQuery.getJSON = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.post = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.get = jQuery.post;
+  jQuery.fx.off = true;
+  window.__errors = [];
+  window.__rejections = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    window.__rejections.push(String((r && r.message) || r) + ' @' + String((r && r.stack) || '').split('\n').slice(1, 2).join('').trim());
+    e.preventDefault();
+  });
+  window.confirm = function () { return true; };
+  window.alert = function (m) { window.__errors.push('alert: ' + m); };
+  window.prompt = function () { return null; };
+</script>
+<script src="penumbra_userseg.js"></script>
+<script src="main_tf.js"></script>
+<script src="driver.js"></script>
+</body></html>

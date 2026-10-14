@@ -1,0 +1,99 @@
+{
+ "js_datesort": {
+  "why": "the opening list re-sorted by Last Updated again (skipSort dropped from the list loader) = the old look",
+  "file": "js",
+  "edits": [
+   [
+    "renderReportRows(response.data, $tbody, isAppend, true);",
+    "renderReportRows(response.data, $tbody, isAppend);"
+   ]
+  ],
+  "must": [
+   "J-initial",
+   "J-reset",
+   "J-rebuild",
+   "J-loadmore",
+   "J-loadmore-reset",
+   "J-restore"
+  ]
+ },
+ "js_resetdate": {
+  "why": "clearing a sort falls back to newest-arrival first instead of the arrival order (J-initial stays green: the load itself is right; every later list inherits the reversed reset)",
+  "file": "js",
+  "edits": [
+   [
+    "            return dvA - dvB;\n        });",
+    "            return dvB - dvA;\n        });"
+   ]
+  ],
+  "must": [
+   "J-reset",
+   "J-rebuild",
+   "J-loadmore",
+   "J-loadmore-reset",
+   "J-restore"
+  ]
+ },
+ "js_reseq": {
+  "why": "the arrival stamp re-assigned on every render: a column change while sorted makes the SORTED order the new 'as loaded' order (J-reset stays green: it runs before the first column change)",
+  "file": "js",
+  "edits": [
+   [
+    "if (report.__pnbSeq == null) { report.__pnbSeq = ++_srArrivalSeq; }",
+    "report.__pnbSeq = ++_srArrivalSeq;"
+   ]
+  ],
+  "must": [
+   "J-rebuild",
+   "J-loadmore",
+   "J-loadmore-reset",
+   "J-restore"
+  ]
+ },
+ "php_a10": {
+  "why": "query A back to 10 (S-fewmine/S-nomine stay green: they have fewer than 10 of mine)",
+  "file": "php",
+  "edits": [
+   [
+    "                 ORDER BY a_my.LAST_ACCESS DESC\n                 FETCH FIRST 15 ROWS ONLY",
+    "                 ORDER BY a_my.LAST_ACCESS DESC\n                 FETCH FIRST 10 ROWS ONLY"
+   ]
+  ],
+  "must": [
+   "S-sqlA-15",
+   "S-mine15",
+   "S-order"
+  ]
+ },
+ "php_b10": {
+  "why": "query B back to 10",
+  "file": "php",
+  "edits": [
+   [
+    "                 ORDER BY a_all.LAST_ACCESS DESC NULLS LAST\n                 FETCH FIRST 15 ROWS ONLY",
+    "                 ORDER BY a_all.LAST_ACCESS DESC NULLS LAST\n                 FETCH FIRST 10 ROWS ONLY"
+   ]
+  ],
+  "must": [
+   "S-sqlB-15",
+   "S-oth15",
+   "S-order",
+   "S-fewmine",
+   "S-nomine"
+  ]
+ },
+ "php_swap": {
+  "why": "everyone else's opens ahead of mine (S-nomine stays green: it has none of mine)",
+  "file": "php",
+  "edits": [
+   [
+    "$allRows = array_merge($myRows, $othersRows);",
+    "$allRows = array_merge($othersRows, $myRows);"
+   ]
+  ],
+  "must": [
+   "S-order",
+   "S-fewmine"
+  ]
+ }
+}

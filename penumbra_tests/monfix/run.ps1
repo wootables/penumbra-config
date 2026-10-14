@@ -1,0 +1,41 @@
+# =============================================================================
+# Run the 2026-08-28 monitoring-fix unit tests.
+#
+#   powershell -File run.ps1
+#   powershell -File run.ps1 -Control     # must report FAIL 1 - proves the
+#                                         # harness can actually fail
+#
+# WHAT IS UNDER TEST. Four fixes made after InfoEd was intermittently down for
+# ~90 minutes on 2026-08-28 without producing a single alert:
+#   1. mon_flap_update()             - N-in-M alerting (penumbra_monitor.php)
+#   2. penumbra_db_health() degraded - a connection that only worked on a later
+#                                      fallback rung stops reading as 'ok'
+#   3. query.php toobig gate         - a DB_DUMP probe that RECOVERS is no
+#                                      longer filed as a failure (structural)
+#   4. penumbraCsrfGuard() exemption - read-only actions are not CSRF targets
+#
+# Every function is LIFTED FROM THE SHIPPED FILE by the tokenizer, never copied.
+# The only stubs are the five connectX() functions in group 10, because the
+# verdict is what is being tested, not the driver.
+#
+# -n (skip php.ini) because from a workstation the ini cannot load
+# oci8/sqlsrv/odbc - those client libraries exist only on the server. Nothing
+# under test needs them; the code paths here use json/preg/date/tokenizer only.
+#
+# EXPECTED TAIL: "PASS 82   FAIL 0". Any other tail is a failure.
+# UNC .ps1 files are GPO-blocked here - run the body as a scriptblock:
+#   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\monfix\run.ps1')); & $sb
+# =============================================================================
+param([switch]$Control)
+
+$ErrorActionPreference = 'Stop'
+$here   = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\monfix' }   # empty as a scriptblock
+$php    = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
+$app    = '\\oitras\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+$phpdir = '\\oitras\d$\Utilities\PHP_8.2-p'
+
+$args = @('-n', (Join-Path $here 'test_monfix.php'), "--app=$app", "--phpdir=$phpdir")
+if ($Control) { $args += '--control' }
+
+& $php @args
+exit $LASTEXITCODE

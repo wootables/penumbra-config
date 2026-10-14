@@ -1,0 +1,300 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>chart aggregation follow-ups</title></head>
+<body>
+<!-- CHART AGGREGATION FOLLOW-UPS (2026-10-06), after ..\chartdistinct:
+     S  map / bullet / funnel / waterfall / gauge: Median is the median and Running
+        Count a count (both used to fall to the default and SUM the values)
+     O  every "Other" bucket re-aggregates the folded categories' pooled values for
+        the non-additive aggregations (Average, Median, Min, Max, Distinct, ...) -
+        they used to ADD UP the per-category results; Sum stays as it was
+     P  a category or group literally named __proto__ / constructor / toString /
+        hasOwnProperty / valueOf charts like any other (plain {} maps keyed by the
+        data threw, dropped or mis-counted them)
+     K  (second round) label "a_b" in group "c" and label "a" in group "b_c" stay
+        two bars - label + '_' + group keyed both "a_b_c" and merged them
+     N  (second round) a Sum "Other" keeps its sign on bar / line / pie and the older
+        butterfly - it added up ABSOLUTE values, so -3 and -7 folded into +10
+     Same minimal boot as ..\chartdistinct\harness.html; run.ps1 patches main.js. -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<table id="resultsTable"><thead id="tableHeader"><tr>
+  <th data-colname="#">#</th><th data-colname="CAT">CAT</th><th data-colname="GRP">GRP</th><th data-colname="ID">ID</th>
+  <th data-colname="NUM">NUM</th><th data-colname="STAGE">STAGE</th>
+</tr></thead><tbody></tbody></table>
+<div id="errorBox"></div>
+<input id="tableSearch" value="">
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  window.alert = function () {}; window.confirm = function () { return true; };
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+</script>
+<script src="main_patched.js"></script>
+<script>
+(function () {
+  function report(txt) { document.getElementById('out').textContent = txt; }
+  var results = [];
+  function assert(name, cond, detail) { results.push({ name: name, pass: !!cond, detail: detail === undefined ? '' : String(detail) }); }
+  function eq(name, got, want) { var g = JSON.stringify(got), w = JSON.stringify(want); assert(name, g === w, 'got ' + g + ' | want ' + w); }
+  // Each check runs on its own: one throwing path must not hide the others.
+  function check(name, fn, want) {
+    var got;
+    try { got = fn(); } catch (e) { assert(name, false, 'THREW ' + String(e && e.message || e).slice(0, 160)); return; }
+    eq(name, got, want);
+  }
+  function M(o) { var m = new Map(); Object.keys(o).forEach(function (k) { m.set(k, o[k]); }); return m; }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  // "No Group By" goes in EMPTY, as the builder sends it (the snippet path sends
+  // null). The string 'none' would take a bar chart down the GROUPED branch with a
+  // single "default" group, and the ungrouped branch would go untested.
+  function cd(rows, x, y, g, agg, type, opts) {
+    opts = opts || {};
+    var grp = (g && g !== 'none') ? g : '';
+    return window.__CA.chartData(rows, x, y, grp, agg, opts.limit || 10, type, opts.sortBy || 'label', opts.sortDir || 'asc', 'default',
+      false, !!opts.other, opts.series ? clone(opts.series) : null, opts.funnel || '', opts.extras || {});
+  }
+  function rowsOf(d) { return (d && d._a11yRows && d._a11yRows.rows) ? d._a11yRows.rows : []; }
+  function pick(d, label) { var hit = rowsOf(d).filter(function (r) { return r[0] === label; })[0]; return hit ? hit[1] : 'missing'; }
+  function round(v) { return (typeof v === 'number') ? Math.round(v * 1000) / 1000 : v; }
+
+  // S: A = 1, 2, 9 (median 2, 3 rows) / B = 4, 6 (median 5) / C = 7.
+  var RS = [
+    M({ CAT: 'A', NUM: '1', ST: 'NC', STAGE: 'A' }), M({ CAT: 'A', NUM: '2', ST: 'NC', STAGE: 'A' }), M({ CAT: 'A', NUM: '9', ST: 'NC', STAGE: 'A' }),
+    M({ CAT: 'B', NUM: '4', ST: 'VA', STAGE: 'B' }), M({ CAT: 'B', NUM: '6', ST: 'VA', STAGE: 'B' }),
+    M({ CAT: 'C', NUM: '7', ST: 'SC', STAGE: 'C' })
+  ];
+  // O: top two by label = A, B; "Other" folds C, D, E. Pooled Other NUM = 1, 3, 5, 7, 9
+  // (avg 5, median 5, min 1, max 9); pooled ids {I-4, I-5, I-6} = 3. Adding the
+  // per-category results instead gives avg 17, median 17, max 19, min 15, distinct 5.
+  var RO = [
+    M({ CAT: 'A', GRP: 'G1', ID: 'I-1', NUM: '10' }), M({ CAT: 'A', GRP: 'G2', ID: 'I-2', NUM: '20' }),
+    M({ CAT: 'B', GRP: 'G1', ID: 'I-3', NUM: '30' }), M({ CAT: 'B', GRP: 'G2', ID: 'I-3', NUM: '40' }),
+    M({ CAT: 'C', GRP: 'G1', ID: 'I-4', NUM: '1' }), M({ CAT: 'C', GRP: 'G2', ID: 'I-5', NUM: '3' }),
+    M({ CAT: 'D', GRP: 'G1', ID: 'I-4', NUM: '5' }), M({ CAT: 'D', GRP: 'G1', ID: 'I-6', NUM: '7' }),
+    M({ CAT: 'E', GRP: 'G2', ID: 'I-5', NUM: '9' })
+  ];
+  // P: two rows per category; one group is itself named "constructor".
+  var PNAMES = ['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf', 'plain'];
+  var RP = [];
+  PNAMES.forEach(function (n) {
+    RP.push(M({ CAT: n, GRP: 'G1', ID: n + '-a', NUM: '1' }));
+    RP.push(M({ CAT: n, GRP: 'constructor', ID: n + '-b', NUM: '2' }));
+  });
+  var PSORTED = PNAMES.slice().sort(function (a, b) { return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }); });
+  function byLabel(labels, values) { var o = {}; (labels || []).forEach(function (l, i) { o['k:' + l] = values[i]; }); return PNAMES.map(function (n) { return o['k:' + n]; }); }
+
+  async function run() {
+    var F = window.__CA;
+    if (!F || typeof F.chartData !== 'function') {
+      report('RESULTS_JSON:' + JSON.stringify({ fatal: 'hooks unavailable: ' + (window.__CA_ERR || 'n/a'), pageErrors: window.__errors.slice(0, 6) }));
+      return;
+    }
+    try { await F.loadChartModule(); } catch (e) { assert('L0 chart module loads', false, String(e)); }
+    assert('L1 the chart module is up', !!(window.PenumbraCharts && window.PenumbraCharts.armed), typeof window.PenumbraCharts);
+
+    // ---------------- S: Median and Running Count on the specialty types -----------
+    check('S1 bullet Median = the median per category (A 2, B 5, C 7) - it used to SUM', function () {
+      return cd(RS, 'CAT', 'NUM', 'none', 'median', 'bullet')._bulletValues; }, [2, 5, 7]);
+    check('S2 bullet Running Count = rows per category (3, 2, 1), no cumulation - it used to SUM the values', function () {
+      return cd(RS, 'CAT', 'NUM', 'none', 'running_count', 'bullet')._bulletValues; }, [3, 2, 1]);
+    check('S3 funnel Median and Running Count', function () {
+      var a = cd(RS, 'STAGE', 'NUM', 'none', 'median', 'funnel', { funnel: 'conversion' });
+      var b = cd(RS, 'STAGE', 'NUM', 'none', 'running_count', 'funnel', { funnel: 'conversion' });
+      return [a._funnelValues, b._funnelValues]; }, [[2, 5, 7], [3, 2, 1]]);
+    check('S4 waterfall Median and Running Count', function () {
+      var a = cd(RS, 'CAT', 'NUM', 'none', 'median', 'waterfall');
+      var b = cd(RS, 'CAT', 'NUM', 'none', 'running_count', 'waterfall');
+      return [[pick(a, 'A'), pick(a, 'B'), pick(a, 'C')], [pick(b, 'A'), pick(b, 'B'), pick(b, 'C')]]; }, [[2, 5, 7], [3, 2, 1]]);
+    check('S5 map Median and Running Count per state (NC 1,2,9 / VA 4,6 / SC 7)', function () {
+      var o = { extras: { vizOptions: '{"map":"us-grid"}' } };
+      var a = rowsOf(cd(RS, 'ST', 'NUM', 'none', 'median', 'map', o)).filter(function (r) { return r[1] != null; }).map(function (r) { return r[1]; }).sort();
+      var b = rowsOf(cd(RS, 'ST', 'NUM', 'none', 'running_count', 'map', o)).filter(function (r) { return r[1] != null; }).map(function (r) { return r[1]; }).sort();
+      return [a, b]; }, [[2, 5, 7], [1, 2, 3]]);
+    check('S6 gauge Median = 5 over 1,2,4,6,7,9 and Running Count = 6 rows', function () {
+      return [cd(RS, 'none', 'NUM', 'none', 'median', 'gauge')._gaugeValue, cd(RS, 'none', 'NUM', 'none', 'running_count', 'gauge')._gaugeValue]; }, [5, 6]);
+    // A category whose running value hits 0 used to RESTART (`if (!agg[x])`):
+    // A = 0, 0, 6 averaged 6 and B = 0, 3 averaged 3; Min 0, 3 read 3.
+    var RZ = [M({ CAT: 'A', NUM: '0' }), M({ CAT: 'A', NUM: '0' }), M({ CAT: 'A', NUM: '6' }), M({ CAT: 'B', NUM: '0' }), M({ CAT: 'B', NUM: '3' })];
+    check('S8 a category whose running value is 0 keeps all its rows (Average 2 / 1.5, Min 0 / 0): bullet, funnel, waterfall', function () {
+      var w = cd(RZ, 'CAT', 'NUM', 'none', 'avg', 'waterfall'), wm = cd(RZ, 'CAT', 'NUM', 'none', 'min', 'waterfall');
+      return [cd(RZ, 'CAT', 'NUM', 'none', 'avg', 'bullet')._bulletValues, cd(RZ, 'CAT', 'NUM', 'none', 'min', 'bullet')._bulletValues,
+              cd(RZ, 'CAT', 'NUM', 'none', 'avg', 'funnel', { funnel: 'conversion' })._funnelValues, cd(RZ, 'CAT', 'NUM', 'none', 'min', 'funnel', { funnel: 'conversion' })._funnelValues,
+              [pick(w, 'A'), pick(w, 'B')], [pick(wm, 'A'), pick(wm, 'B')]]; },
+      [[2, 1.5], [0, 0], [2, 1.5], [0, 0], [2, 1.5], [0, 0]]);
+    check('S7 guard: specialty Sum and Average are untouched', function () {
+      return [cd(RS, 'CAT', 'NUM', 'none', 'sum', 'bullet')._bulletValues, cd(RS, 'CAT', 'NUM', 'none', 'avg', 'bullet')._bulletValues,
+              cd(RS, 'none', 'NUM', 'none', 'sum', 'gauge')._gaugeValue]; }, [[12, 10, 7], [4, 5, 7], 29]);
+
+    // ---------------- O: "Other" buckets re-aggregate their pooled values ------------
+    var oo = { limit: 2, other: true };
+    function otherOf(d) { var i = d.labels.indexOf('Other'); return i === -1 ? 'no Other' : round(d.datasets[0].data[i]); }
+    check('O1 bar Other: Average / Median / Min / Max / Distinct of the pooled rows (5, 5, 1, 9, 3)', function () {
+      return ['avg', 'median', 'min', 'max'].map(function (a) { return otherOf(cd(RO, 'CAT', 'NUM', 'none', a, 'bar', oo)); })
+        .concat([otherOf(cd(RO, 'CAT', 'ID', 'none', 'distinct', 'bar', oo))]); }, [5, 5, 1, 9, 3]);
+    check('O2 guard: bar Other Sum and Count are unchanged (25, 5)', function () {
+      return [otherOf(cd(RO, 'CAT', 'NUM', 'none', 'sum', 'bar', oo)), otherOf(cd(RO, 'CAT', 'NUM', 'none', 'count', 'bar', oo))]; }, [25, 5]);
+    check('O3 grouped bar Other per group: Distinct of each group\'s pooled ids (G1 2, G2 1)', function () {
+      var d = cd(RO, 'CAT', 'ID', 'GRP', 'distinct', 'bar', oo), i = d.labels.indexOf('Other'), o = {};
+      d.datasets.forEach(function (ds) { o[ds.label] = ds.data[i]; });
+      return [i !== -1, o.G1, o.G2]; }, [true, 2, 1]);
+    check('O4 grouped bar Other per group: Average (G1 1,5,7 = 4.333; G2 3,9 = 6)', function () {
+      var d = cd(RO, 'CAT', 'NUM', 'GRP', 'avg', 'bar', oo), i = d.labels.indexOf('Other'), o = {};
+      d.datasets.forEach(function (ds) { o[ds.label] = round(ds.data[i]); });
+      return [o.G1, o.G2]; }, [4.333, 6]);
+    check('O5 treemap Other tile: Average of the pooled rows (5)', function () {
+      return round(pick(cd(RO, 'CAT', 'NUM', 'none', 'avg', 'treemap', oo), 'Other')); }, 5);
+    check('O6 funnel Other stage: Average of the pooled rows (5)', function () {
+      var d = cd(RO, 'CAT', 'NUM', 'none', 'avg', 'funnel', { limit: 2, other: true, funnel: 'conversion' });
+      return round(d._funnelValues[d.labels.indexOf('Other')]); }, 5);
+    check('O7 waterfall Other step: Average of the pooled rows (5)', function () {
+      return round(pick(cd(RO, 'CAT', 'NUM', 'none', 'avg', 'waterfall', oo), 'Other')); }, 5);
+    check('O8 older butterfly Other per group: Average (G1 4.333, G2 6)', function () {
+      var d = cd(RO, 'CAT', 'NUM', 'GRP', 'avg', 'butterfly', oo), i = d.labels.indexOf('Other'), o = {};
+      d.datasets.forEach(function (ds) { o[ds.label] = round(Math.abs(ds.data[i])); });
+      return [i !== -1, o.G1, o.G2]; }, [true, 4.333, 6]);
+
+    // ---------------- P: categories / groups named like Object.prototype members -----
+    check('P1 bar: every category counts its own 2 rows', function () {
+      var d = cd(RP, 'CAT', 'NUM', 'none', 'count', 'bar'); return [d.labels.slice().sort(), byLabel(d.labels, d.datasets[0].data)]; },
+      [PNAMES.slice().sort(), [2, 2, 2, 2, 2, 2]]);
+    check('P2 grouped bar (one group is named "constructor"): 1 row per category and group', function () {
+      var d = cd(RP, 'CAT', 'NUM', 'GRP', 'count', 'bar'), o = {};
+      d.datasets.forEach(function (ds) { o['g:' + ds.label] = byLabel(d.labels, ds.data); });
+      return [d.datasets.length, o['g:G1'], o['g:constructor']]; }, [2, [1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1]]);
+    check('P3 bar with an Other bucket: the top categories are real ones', function () {
+      var d = cd(RP, 'CAT', 'NUM', 'none', 'sum', 'bar', { limit: 3, other: true });
+      return [d.labels, d.datasets[0].data]; }, [PSORTED.slice(0, 3).concat(['Other']), [3, 3, 3, 9]]);
+    check('P4 grouped bar with an Other bucket', function () {
+      var d = cd(RP, 'CAT', 'NUM', 'GRP', 'sum', 'bar', { limit: 3, other: true }), o = {};
+      d.datasets.forEach(function (ds) { o['g:' + ds.label] = ds.data; });
+      return [d.labels, o['g:G1'], o['g:constructor']]; }, [PSORTED.slice(0, 3).concat(['Other']), [1, 1, 1, 3], [2, 2, 2, 6]]);
+    check('P5 pie', function () { var d = cd(RP, 'CAT', 'NUM', 'none', 'sum', 'pie'); return byLabel(d.labels, d.datasets[0].data); }, [3, 3, 3, 3, 3, 3]);
+    check('P6 treemap', function () { var d = cd(RP, 'CAT', 'NUM', 'none', 'sum', 'treemap'); return PNAMES.map(function (n) { return pick(d, n); }); }, [3, 3, 3, 3, 3, 3]);
+    check('P7 bullet', function () { var d = cd(RP, 'CAT', 'NUM', 'none', 'sum', 'bullet'); return byLabel(rowsOf(d).map(function (r) { return r[0]; }), d._bulletValues); }, [3, 3, 3, 3, 3, 3]);
+    check('P8 funnel', function () { var d = cd(RP, 'CAT', 'NUM', 'none', 'sum', 'funnel', { funnel: 'conversion' }); return byLabel(d.labels, d._funnelValues); }, [3, 3, 3, 3, 3, 3]);
+    check('P9 waterfall', function () { var d = cd(RP, 'CAT', 'NUM', 'none', 'sum', 'waterfall'); return PNAMES.map(function (n) { return pick(d, n); }); }, [3, 3, 3, 3, 3, 3]);
+    check('P10 combo (sum + count series)', function () {
+      var d = cd(RP, 'CAT', 'none', 'none', 'sum', 'combo', { series: [{ col: 'NUM', type: 'bar', agg: 'sum', color: '#111111' }, { col: 'NUM', type: 'line', agg: 'count', color: '#222222' }] });
+      return [byLabel(d.labels, d.datasets[0].data), byLabel(d.labels, d.datasets[1].data)]; }, [[3, 3, 3, 3, 3, 3], [2, 2, 2, 2, 2, 2]]);
+    check('P11 combo with an Other bucket', function () {
+      var d = cd(RP, 'CAT', 'none', 'none', 'sum', 'combo', { limit: 3, other: true, series: [{ col: 'NUM', type: 'bar', agg: 'sum', color: '#111111' }, { col: 'NUM', type: 'bar', agg: 'count', color: '#222222' }] });
+      return [d.labels, d.datasets[0].data, d.datasets[1].data]; }, [PSORTED.slice(0, 3).concat(['Other']), [3, 3, 3, 9], [2, 2, 2, 6]]);
+    check('P12 butterfly (two filtered sides)', function () {
+      var d = cd(RP, 'CAT', 'none', 'none', 'sum', 'butterfly', { series: [{ col: 'NUM', type: 'bar', agg: 'sum', color: '#111111', filterExpression: 'GRP = G1' },
+                                                                       { col: 'NUM', type: 'bar', agg: 'sum', color: '#222222', filterExpression: 'GRP = constructor' }] });
+      return [byLabel(d.labels, d.datasets[0].data.map(Math.abs)), byLabel(d.labels, d.datasets[1].data)]; }, [[1, 1, 1, 1, 1, 1], [2, 2, 2, 2, 2, 2]]);
+    check('P13 older butterfly (Group By; one group is "constructor")', function () {
+      var d = cd(RP, 'CAT', 'NUM', 'GRP', 'sum', 'butterfly'), o = {};
+      d.datasets.forEach(function (ds) { o['g:' + ds.label] = byLabel(d.labels, ds.data.map(Math.abs)); });
+      return [o['g:G1'], o['g:constructor']]; }, [[1, 1, 1, 1, 1, 1], [2, 2, 2, 2, 2, 2]]);
+    check('P15 box: every category gets its median (1.5) and n (2)', function () {
+      var d = cd(RP, 'CAT', 'NUM', 'none', 'sum', 'box'), o = {};
+      rowsOf(d).forEach(function (r) { o['k:' + r[0]] = [r[3], r[6]]; });
+      return PNAMES.map(function (n) { return o['k:' + n] || 'missing'; }); }, PNAMES.map(function () { return [1.5, 2]; }));
+    check('P16 gantt: every task gets its bar (2 rows, Jan 1 - Jan 10)', function () {
+      var RG = PNAMES.map(function (n) { return M({ CAT: n, START: '2026-01-01', FIN: '2026-01-05' }); })
+        .concat(PNAMES.map(function (n) { return M({ CAT: n, START: '2026-01-03', FIN: '2026-01-10' }); }));
+      var d = cd(RG, 'CAT', 'START', 'FIN', 'sum', 'gantt'), o = {};
+      rowsOf(d).forEach(function (r) { o['k:' + r[0]] = r[1] + '..' + r[2]; });
+      return PNAMES.map(function (n) { return o['k:' + n] || 'missing'; }); }, PNAMES.map(function () { return '2026-01-01..2026-01-10'; }));
+    check('P17 butterfly sorted by value: a "__proto__" label takes its real place (it scored NaN)', function () {
+      var RV = PNAMES.map(function (n, i) { return M({ CAT: n, GRP: 'G1', NUM: String(i + 1) }); })
+        .concat(PNAMES.map(function (n) { return M({ CAT: n, GRP: 'G2', NUM: '1' }); }));
+      var d = cd(RV, 'CAT', 'none', 'none', 'sum', 'butterfly', { sortBy: 'value', sortDir: 'desc',
+        series: [{ col: 'NUM', type: 'bar', agg: 'sum', color: '#111111', filterExpression: 'GRP = G1' },
+                 { col: 'NUM', type: 'bar', agg: 'sum', color: '#222222', filterExpression: 'GRP = G2' }] });
+      return d.labels; }, PNAMES.slice().reverse());
+    check('P14 Distinct and Median per category', function () {
+      var a = cd(RP, 'CAT', 'ID', 'none', 'distinct', 'bar'), b = cd(RP, 'CAT', 'NUM', 'none', 'median', 'bar');
+      return [byLabel(a.labels, a.datasets[0].data), byLabel(b.labels, b.datasets[0].data)]; }, [[2, 2, 2, 2, 2, 2], [1.5, 1.5, 1.5, 1.5, 1.5, 1.5]]);
+
+    // ---------------- K: a label and its group never spell another pair's key ---------
+    // label + '_' + group keyed BOTH of these "a_b_c": one bar, one group.
+    var RK = [M({ CAT: 'a_b', GRP: 'c', NUM: '1' }), M({ CAT: 'a', GRP: 'b_c', NUM: '2' })];
+    check('K1 grouped bar: "a_b" in group "c" and "a" in group "b_c" stay two bars', function () {
+      var d = cd(RK, 'CAT', 'NUM', 'GRP', 'sum', 'bar'), o = {};
+      d.datasets.forEach(function (ds) { o['g:' + ds.label] = ds.data; });
+      return [d.labels, o['g:b_c'], o['g:c']]; }, [['a', 'a_b'], [2, 0], [0, 1]]);
+    check('K2 older butterfly: the same two pairs make two groups (it saw ONE group and refused)', function () {
+      var d = cd(RK, 'CAT', 'NUM', 'GRP', 'sum', 'butterfly');
+      return [d.labels, d.datasets.map(function (ds) { return [ds.label, ds.data.map(Math.abs)]; })]; },
+      [['a', 'a_b'], [['b_c', [2, 0]], ['c', [0, 1]]]]);
+    // A pie with a Group By takes the ungrouped branch: its Other finds each folded
+    // item's rows by the key the item kept (B 2, 4 and C 6: Average 4).
+    var RK3 = [M({ CAT: 'A', GRP: 'g1', NUM: '10' }), M({ CAT: 'A', GRP: 'g1', NUM: '20' }), M({ CAT: 'B', GRP: 'g1', NUM: '2' }),
+               M({ CAT: 'B', GRP: 'g1', NUM: '4' }), M({ CAT: 'C', GRP: 'g2', NUM: '6' })];
+    check('K3 guard: pie with a Group By, Other = Average of the folded rows (4)', function () {
+      var d = cd(RK3, 'CAT', 'NUM', 'GRP', 'avg', 'pie', { limit: 1, other: true });
+      return [d.labels, d.datasets[0].data]; }, [['A', 'Other'], [15, 4]]);
+
+    // ---------------- N: a Sum "Other" keeps its sign ---------------------------------
+    // C and D fold. By CAT they are -1 and -8 (Other -9, not +9); G1 -3, -7 (-10);
+    // G2 2, -1 (1, not 3).
+    var RN = [
+      M({ CAT: 'A', GRP: 'G1', NUM: '10' }), M({ CAT: 'A', GRP: 'G2', NUM: '5' }),
+      M({ CAT: 'B', GRP: 'G1', NUM: '8' }), M({ CAT: 'B', GRP: 'G2', NUM: '4' }),
+      M({ CAT: 'C', GRP: 'G1', NUM: '-3' }), M({ CAT: 'C', GRP: 'G2', NUM: '2' }),
+      M({ CAT: 'D', GRP: 'G1', NUM: '-7' }), M({ CAT: 'D', GRP: 'G2', NUM: '-1' })
+    ];
+    check('N1 bar Other Sum = -9 and Running Total 15, 27, 18 (it read +9 and 36)', function () {
+      var a = cd(RN, 'CAT', 'NUM', 'none', 'sum', 'bar', oo), b = cd(RN, 'CAT', 'NUM', 'none', 'running_total', 'bar', oo);
+      return [a.labels, a.datasets[0].data, b.datasets[0].data]; }, [['A', 'B', 'Other'], [15, 12, -9], [15, 27, 18]]);
+    check('N2 grouped bar Other Sum per group (G1 -10, G2 1)', function () {
+      var d = cd(RN, 'CAT', 'NUM', 'GRP', 'sum', 'bar', oo), i = d.labels.indexOf('Other'), o = {};
+      d.datasets.forEach(function (ds) { o[ds.label] = ds.data[i]; });
+      return [i !== -1, o.G1, o.G2]; }, [true, -10, 1]);
+    // The older butterfly draws its first group negated: undo that to read the value.
+    function bfOther(d) { var i = d.labels.indexOf('Other'); return i === -1 ? 'no Other' : [round(-d.datasets[0].data[i]), round(d.datasets[1].data[i])]; }
+    check('N3 older butterfly Other Sum per group (G1 -10, G2 1)', function () {
+      return bfOther(cd(RN, 'CAT', 'NUM', 'GRP', 'sum', 'butterfly', oo)); }, [-10, 1]);
+    check('N4 older butterfly Other Average per group (G1 -5, G2 0.5)', function () {
+      return bfOther(cd(RN, 'CAT', 'NUM', 'GRP', 'avg', 'butterfly', oo)); }, [-5, 0.5]);
+    check('N5 guard: a treemap Other tile is still a size (|-1| + |-8| = 9), like every tile', function () {
+      return pick(cd(RN, 'CAT', 'NUM', 'none', 'sum', 'treemap', oo), 'Other'); }, 9);
+
+    report('RESULTS_JSON:' + JSON.stringify({ pageErrors: window.__errors.slice(0, 8), results: results }));
+  }
+
+  var tries = 0;
+  (function wait() {
+    tries++;
+    if (window.__CA || tries > 60) {
+      setTimeout(function () {
+        run().catch(function (e) { report('RESULTS_JSON:' + JSON.stringify({ fatal: 'run threw: ' + e, pageErrors: window.__errors.slice(0, 6) })); });
+      }, 300);
+    } else { setTimeout(wait, 100); }
+  })();
+})();
+</script>
+</body></html>

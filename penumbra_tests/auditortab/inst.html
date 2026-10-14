@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>error installer harness</title></head>
+<body>
+<pre id="out"></pre>
+<script>
+  window.addEventListener('error', function (e) { if (!window.__voDone) { window.__vo = { asserts: [{ id: 'Z9', name: 'page error', pass: false, detail: (e.message || '') + ' @' + (e.lineno || 0) }] }; window.__voDone = true; } });
+</script>
+<script>
+/*
+ * The client-error INSTALLER, lifted verbatim from the index.php under test (the
+ * inline <script> right after its CLIENT ERROR TELEMETRY comment), run with
+ * navigator.sendBeacon stubbed, then fed real PromiseRejectionEvents:
+ *   the browser's own view-transition aborts must NOT be sent; everything else
+ *   (a plain Error, an unrelated AbortError, a string) must be.
+ * ?idx=<path> (default index.php). Result: window.__vo = { asserts: [...] }.
+ */
+(function () {
+  var q = new URLSearchParams(location.search), A = [];
+  function T(id, name, pass, detail) { A.push({ id: id, name: name, pass: !!pass, detail: String(detail === undefined ? '' : detail) }); }
+  function done() { window.__vo = { asserts: A }; document.getElementById('out').textContent = JSON.stringify(A, null, 1); window.__voDone = true; }
+  var sent = [];
+  try {
+    var x = new XMLHttpRequest(); x.open('GET', q.get('idx') || 'index.php', false); x.send(null);
+    var idx = x.responseText;
+    var a = idx.indexOf('CLIENT ERROR TELEMETRY');
+    // After the PHP comment's own "?>" - the comment's prose mentions "<script>".
+    var c = idx.indexOf('?>', a);
+    var s = idx.indexOf('<script>', c), e = idx.indexOf('<\/script>', s);   // <\/ : a literal close tag would end THIS script
+    if (a < 0 || c < 0 || s < 0 || e < 0) throw new Error('installer block not found');
+    var code = idx.slice(s + 8, e);
+    if (code.indexOf('<?') >= 0) throw new Error('installer contains PHP');
+    // ES5 guard, as the block's own comment demands: no const/let/arrow/template.
+    var es6 = /(^|[^\w.$])(const|let)\s|=>|`/.exec(code.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ''));
+    T('E0', 'the installer stays ES5 (no const / let / arrow / template literal)', !es6, es6 ? es6[0] : 'clean');
+    Object.defineProperty(navigator, 'sendBeacon', { configurable: true, value: function (url, blob) { sent.push({ url: url, size: blob && blob.size }); return true; } });
+    new Function(code)();
+  } catch (err) { T('Z0', 'the installer lifted and ran', false, err.message); done(); return; }
+
+  function fire(reason) {
+    var p = Promise.reject(reason); p.catch(function () {});
+    var before = sent.length;
+    window.dispatchEvent(new PromiseRejectionEvent('unhandledrejection', { promise: p, reason: reason, cancelable: true }));
+    return sent.length - before;
+  }
+  var n1 = fire(new DOMException('Transition was skipped', 'AbortError'));
+  var n2 = fire(new DOMException('Transition was aborted because of invalid state. ViewTransition opt-in disabled', 'InvalidStateError'));
+  var n3 = fire(new DOMException('Skipped ViewTransition due to another transition starting.', 'AbortError'));
+  T('C1', 'the browser\'s own view-transition aborts are NOT sent (skipped / invalid-state / superseded)', n1 === 0 && n2 === 0 && n3 === 0, [n1, n2, n3].join('/'));
+  var n4 = fire(new Error('boom from report code'));
+  var n5 = fire(new DOMException('The user aborted a request.', 'AbortError'));
+  var n6 = fire('plain string rejection');
+  var n7 = fire(new TypeError('Cannot read properties of undefined (reading \'transition\')'));
+  T('C2', 'every other rejection IS sent (Error, an unrelated AbortError, a string, a TypeError that mentions "transition")', n4 === 1 && n5 === 1 && n6 === 1 && n7 === 1, [n4, n5, n6, n7].join('/'));
+  T('C3', 'sends went to log_client_error.php', sent.length === 4 && sent.every(function (z) { return /log_client_error\.php$/.test(z.url); }), sent.map(function (z) { return z.url; }).join(','));
+  done();
+})();
+</script>
+</body>
+</html>

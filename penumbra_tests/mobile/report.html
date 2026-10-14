@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mobile suite - report page stand-in</title>
+<link rel="stylesheet" href="css/main.css">
+</head>
+<body class="is-dark theme-wolfpack-dark">
+<!-- Report banner (default layout): title column + snippet column. The snippet
+     column carries a vertical snippet button bar, 220px of no-wrap buttons -
+     the live shape that pushed ?id=rpt out to 614px on a 390px phone. -->
+<div id="reportHeaderContainer">
+  <div id="reportInfoPanel">
+    <div><span class="pnb-crumb"><a href="#">Penumbra</a><span class="pnb-crumb-sep">&rsaquo;</span><span class="pnb-crumb-step">Reports</span></span></div>
+    <h1 id="mainReportTitle">Rpt Sponsored Programs Report</h1>
+    <p id="mainReportSubtitle" style="display:block">Sponsored activity from 10/06/2017 to 06/27/2018 (0 years, 8 months).</p>
+  </div>
+  <div id="reportSnippetOutput">
+    <div class="penumbra-btn-bar vertical" style="display:inline-flex;flex-direction:column;gap:6px;">
+      <button type="button" style="white-space:nowrap;width:220px">Things to Know about this report</button>
+      <button type="button" style="white-space:nowrap;width:220px">Bar: Top 5 Selected Sponsors</button>
+      <button type="button" style="white-space:nowrap;width:220px">Switch over to proposals</button>
+    </div>
+  </div>
+  <div id="promptInfoContainer" style="display:block"><ul id="promptInfoList"><li>PI: Limon, Bruce (4095)</li></ul></div>
+</div>
+
+<!-- Pivot output with a grand-total row (print pass: dark themes paint it dark;
+     a heatmap cell keeps its INLINE fill on paper, a plain cell prints white). -->
+<div id="pivot-output-container">
+  <table id="pivotResultTable">
+    <thead><tr><th>Originating sponsor</th><th>Sum</th><th>Awards</th></tr></thead>
+    <tbody>
+      <tr><td class="pivot-sticky-col">National Science Foundation</td><td id="heatCell" style="background-color: rgb(200, 30, 30); color: rgb(255, 255, 255);">$40,935,135</td><td id="plainCell">91</td></tr>
+      <tr><td class="pivot-sticky-col">US Dept. of Energy</td><td>$5,256,633</td><td>29</td></tr>
+      <tr><td class="pivot-grand-total" id="totalCell">Grand Total</td><td class="pivot-grand-total">$48,856,630</td><td class="pivot-grand-total">141</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- A posted site notice (print pass: it is a theme tint on screen). -->
+<div class="pnb-notice" style="--pnb-nc:#8a5300"><span>Scheduled maintenance Saturday 6-8 am.</span></div>
+
+<!-- Footer status bar, as index.php emits it, with the long pivot lead and the
+     profile cell OPEN so its popover is laid out. -->
+<!-- sb-collapse-*: the state main.js _sbUpdateOverflow leaves the bar in at this
+     width (Data and Load already down to their icons) - the CSS fix starts there. -->
+<div id="pnbStatusBar" role="status" class="sb-collapse-data sb-collapse-load">
+  <div class="sb-seg sb-lead"><svg class="sb-ico" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg><span class="sb-val sb-b" id="sbRows">150 pivot rows (912 source transactions)</span></div>
+  <div class="sb-seg sb-click" id="sbDataSeg"><svg class="sb-ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg><span class="sb-lab">Data</span><span class="sb-val">Oct 2, 5:17 pm</span><span class="sb-chip">+2 sources</span><svg class="sb-caret" viewBox="0 0 24 24" width="11"><path d="M6 9l6 6 6-6"/></svg></div>
+  <div class="sb-seg sb-opt sb-click" id="sbLoadSeg"><span class="sb-lab">Queried in</span><span class="sb-val">0.5s</span></div>
+  <div class="sb-spring"></div>
+  <div class="sb-seg sb-user sb-click sb-open" id="sbUserSeg">
+    <button type="button" id="sbUserBtn" class="sb-user-btn"><span class="sb-ava">B</span><span class="sb-val">Bruce</span><svg class="sb-caret" viewBox="0 0 24 24" width="11"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div class="sb-pop" id="sbUserPop" role="dialog">
+      <div class="sb-uhead"><span class="sb-uava">BL</span><div><div>Bruce Limon</div><div>Director of Research Administration Information Systems</div></div></div>
+      <div style="white-space:nowrap">Last report: Awards by Selected Funders: Last 5 Fiscal Year-to-Date, by Originating Sponsor and College</div>
+      <div>eIRB: protocol type summary</div><div>Financial Interest &amp; External Professional Activities</div>
+    </div>
+  </div>
+</div>
+
+<!-- Settings panel, open. -->
+<div id="settingsPanel" class="is-open">
+  <div id="settingsPanelHandle"><span class="handle-inner">&#9664;</span></div>
+  <div class="sp-header"><span class="sp-title">Bruce's Settings</span><span class="sp-help-icon tab-help-icon">?</span><button type="button" id="settingsPanelClose">&times;</button></div>
+  <div class="sp-body"><div>Theme</div><div>Density</div></div>
+</div>
+
+<!-- Manage Data Snapshots, open: two panes + a 600px table + the footer bar. -->
+<div id="manageSnapshotsLightbox" class="help-lightbox" style="display:block">
+  <div class="lightbox-content pnb-dlg">
+    <div class="pnb-dlg-head"><span class="pnb-dlg-ico">S</span><div><div>Manage Data Snapshots</div><div>Freeze, load, and compare result sets</div></div></div>
+    <div class="snap-unified-container">
+      <div class="snap-left-pane">
+        <div class="snap-filter-bar">
+          <span class="snap-filter-seg"><button class="snap-filter-pill active">All <span class="snap-filter-cnt">2</span></button><button class="snap-filter-pill">Local <span class="snap-filter-cnt">2</span></button><button class="snap-filter-pill">S <span class="snap-filter-cnt">0</span></button></span>
+          <label><input type="checkbox"> Also show snapshots from all other reports I can access</label>
+          <span class="snap-sort-label">sorted by date</span>
+        </div>
+        <div class="snap-table-wrap">
+          <table class="snap-table" style="min-width:600px;width:600px">
+            <thead><tr><th></th><th></th><th>Name</th><th>Creator</th><th>Date</th><th class="num">Rows</th></tr></thead>
+            <tbody id="unifiedSnapshotTableBody"><tr><td><input type="checkbox"></td><td>&#9733;</td><td>IACUC RED Data Feed</td><td>bplimon</td><td>Jul 26, 3:22 PM</td><td class="num">1,204</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="snap-right-pane"><div>Columns</div><div>Select a snapshot to see columns.</div></div>
+    </div>
+    <div class="snap-bottom-bar-v2">
+      <button class="snap-btn-primary">+ Create New Snapshot</button>
+      <div class="snap-load-group"><button>Load As View</button><span class="tab-help-icon">?</span><label><input type="checkbox"> new tab</label></div>
+      <span class="snap-btn-help-pair"><button id="compareSnapshotBtn">Compare To Live</button><span class="tab-help-icon">?</span></span>
+    </div>
+  </div>
+</div>
+
+<!-- Repository dialog, open, with the saved divider position written INLINE
+     the way penumbra_repository.js does (flex: 0 0 400px on the list). -->
+<div id="openReportListLightbox" class="help-lightbox" style="display:flex">
+  <div class="lightbox-content">
+    <div class="pnb-dlg-head"><span class="pnb-dlg-ico">R</span><div><div>Server Reports</div></div></div>
+    <div id="serverReportLayout">
+      <div id="serverReportListPane" style="flex: 0 0 400px;">
+        <div class="sr-list-scroll">
+          <table id="serverReportListTable" style="width:974px;min-width:974px">
+            <thead><tr><th data-colkey="FAV">Fav</th><th>Edit</th><th>Snaps</th><th>Short ID</th><th>Report Description</th><th>Owner</th><th>Updated</th></tr></thead>
+            <tbody><tr><td data-col="FAV">&#9829;</td><td></td><td></td><td>awdspon</td><td>Awards by Selected Funders</td><td>bplimon</td><td>Oct 1</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div id="srSplitter" class="sr-splitter" role="separator"></div>
+      <div id="serverReportDetailsPane"><div class="sr-details-sticky-header">Select a report from the list</div><p>to view details, code, and schedules.</p></div>
+    </div>
+  </div>
+</div>
+
+<script>
+window.__state = function () {
+  var cw = document.documentElement.clientWidth;
+  var q = function (sel) { return document.querySelector(sel); };
+  var r = function (sel) { var e = q(sel); if (!e) return null; var b = e.getBoundingClientRect(); return {l: Math.round(b.left), r: Math.round(b.right), w: Math.round(b.width), t: Math.round(b.top), b: Math.round(b.bottom)}; };
+  var cs = function (sel, p) { var e = q(sel); return e ? getComputedStyle(e)[p] : null; };
+  var hdr = q('#reportHeaderContainer');
+  var snapC = q('#manageSnapshotsLightbox .lightbox-content');
+  var tw = q('#manageSnapshotsLightbox .snap-table-wrap');
+  var foot = q('#manageSnapshotsLightbox .snap-bottom-bar-v2');
+  var footKids = [].slice.call(foot.children).map(function (k) { return Math.round(k.getBoundingClientRect().right); });
+  var layout = q('#serverReportLayout');
+  return {
+    cw: cw, sw: document.documentElement.scrollWidth,
+    hdrTracks: getComputedStyle(hdr).gridTemplateColumns.trim().split(/\s+/).length,
+    title: r('#reportInfoPanel'), snippet: r('#reportSnippetOutput'),
+    userSeg: r('#sbUserSeg'), lead: r('.sb-lead'), rows: r('#sbRows'), pop: r('#sbUserPop'),
+    panel: r('#settingsPanel'), close: r('#settingsPanelClose'),
+    snapLeft: r('#manageSnapshotsLightbox .snap-left-pane'), snapRight: r('#manageSnapshotsLightbox .snap-right-pane'),
+    snapCsw: snapC.scrollWidth, snapCcw: snapC.clientWidth, twSw: tw.scrollWidth, twCw: tw.clientWidth, twOx: getComputedStyle(tw).overflowX,
+    footRights: footKids,
+    snapOver: (function () { var cr = snapC.getBoundingClientRect(); var out = []; snapC.querySelectorAll('*').forEach(function (el) { if (el.closest('.snap-table-wrap') && el !== tw) return; var b = el.getBoundingClientRect(); if (b.width && b.right > cr.right - 15 + 1) out.push((el.id || el.className || el.tagName) + ':' + Math.round(b.left) + '-' + Math.round(b.right)); }); return {cr: Math.round(cr.right), cl: Math.round(cr.left), over: out.slice(0, 6)}; })(),
+    list: r('#serverReportListPane'), details: r('#serverReportDetailsPane'), layoutW: Math.round(layout.getBoundingClientRect().width),
+    splitterDisplay: cs('#srSplitter', 'display'),
+    // print pass
+    sbDisplay: cs('#pnbStatusBar', 'display'),
+    heatBg: cs('#heatCell', 'backgroundColor'), heatColor: cs('#heatCell', 'color'),
+    plainBg: cs('#plainCell', 'backgroundColor'), plainColor: cs('#plainCell', 'color'),
+    thBg: cs('#pivotResultTable th', 'backgroundColor'),
+    totalBg: cs('#totalCell', 'backgroundColor'), totalColor: cs('#totalCell', 'color'),
+    noticeBg: cs('.pnb-notice', 'backgroundColor'), noticeColor: cs('.pnb-notice', 'color'),
+    crumbColor: cs('.pnb-crumb', 'color'),
+    bodyPadB: getComputedStyle(document.body).paddingBottom
+  };
+};
+</script>
+</body></html>

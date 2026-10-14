@@ -1,0 +1,1387 @@
+[
+    {
+        "name":  "LIB Chart.js, the plugins and the chart module are up",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C bar sum: every clicked element lists rows that add up to it (11 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C bar sum top 5 + Other: every clicked element lists rows that add up to it (6 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C bar count top 4 + Other: every clicked element lists rows that add up to it (5 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C bar avg: every clicked element lists rows that add up to it (11 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C bar min: every clicked element lists rows that add up to it (11 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C bar max: every clicked element lists rows that add up to it (11 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C bar median: every clicked element lists rows that add up to it (11 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C bar distinct ids: every clicked element lists rows that add up to it (11 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C bar grouped sum: every clicked element lists rows that add up to it (33 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C bar grouped stacked: every clicked element lists rows that add up to it (21 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C bar horizontal count: every clicked element lists rows that add up to it (8 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C bar by fiscal year (START_DATE:fy): every clicked element lists rows that add up to it (4 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C bar by N:bin: every clicked element lists rows that add up to it (11 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C bar grouped by FY: every clicked element lists rows that add up to it (12 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C line sum by FY: every clicked element lists rows that add up to it (4 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C line grouped count: every clicked element lists rows that add up to it (12 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C pie sum top 5 + Other: every clicked element lists rows that add up to it (6 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C pie count: every clicked element lists rows that add up to it (3 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C doughnut count + Other: every clicked element lists rows that add up to it (5 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C doughnut grouped (sunburst) sum: every clicked element lists rows that add up to it (18 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C doughnut grouped (sunburst) count: every clicked element lists rows that add up to it (36 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C radar count: every clicked element lists rows that add up to it (11 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C treemap sum: every clicked element lists rows that add up to it (11 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C treemap grouped count: every clicked element lists rows that add up to it (36 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C treemap top 4 + Other: every clicked element lists rows that add up to it (5 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C histogram of N: every clicked element lists rows that add up to it (10 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C histogram of AMOUNT: every clicked element lists rows that add up to it (8 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C treemap top 8 + Other keeps a real Other: every clicked element lists rows that add up to it (9 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C pie top 6 + Other keeps a real Other: every clicked element lists rows that add up to it (7 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C bar sum of a text column: every clicked element lists rows that add up to it (11 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C bar avg of a text column: every clicked element lists rows that add up to it (11 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C waterfall sum by FY: every clicked element lists rows that add up to it (5 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C funnel count: every clicked element lists rows that add up to it (3 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C bullet sum: every clicked element lists rows that add up to it (5 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C map sum: every clicked element lists rows that add up to it (55 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C map count: every clicked element lists rows that add up to it (55 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C sankey sum 3 stages: every clicked element lists rows that add up to it (27 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C sankey count: every clicked element lists rows that add up to it (12 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "C sankey bucketed stage: every clicked element lists rows that add up to it (16 checked, 0 unclickable, 0 no value)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "R bar: the builder emits a vis() call of its own type",
+        "pass":  true,
+        "detail":  "vis(\u0027bar\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027sum\u0027, 6, \u0027RT bar\u0027, true, true, \u0027100%\u0027, 4"
+    },
+    {
+        "name":  "R bar: vis() -\u003e parse -\u003e reopen -\u003e vis() is the same call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027bar\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027sum\u0027, 6, \u0027RT bar\u0027, true, true, \u0027100%\u0027, 455, \u0027bottom\u0027, \u0027auto\u0027, true, true, true, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, true, true, true, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027bar\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027sum\u0027, 6, \u0027RT bar\u0027, true, true, \u0027100%\u0027, 455, \u0027bottom\u0027, \u0027auto\u0027, true, true, true, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, true, true, true, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R bar: preset snapshot -\u003e apply -\u003e snapshot is the same",
+        "pass":  true,
+        "detail":  "got {\"type\":\"bar\",\"xAxis\":\"DEPT\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"STATUS\",\"agg\":\"sum\",\"limit\":6,\"title\":\"RT bar\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"455\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":true,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":true,\"filterXAxis\":true,\"filterGroup\":true,\"otherBucket\":true,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"} | want {\"type\":\"bar\",\"xAxis\":\"DEPT\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"STATUS\",\"agg\":\"sum\",\"limit\":6,\"title\":\"RT bar\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"455\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":true,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":true,\"filterXAxis\":true,\"filterGroup\":true,\"otherBucket\":true,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"}"
+    },
+    {
+        "name":  "R bar: a reapplied preset emits the same vis() call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027bar\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027sum\u0027, 6, \u0027RT bar\u0027, true, true, \u0027100%\u0027, 455, \u0027bottom\u0027, \u0027auto\u0027, true, true, true, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, true, true, true, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027bar\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027sum\u0027, 6, \u0027RT bar\u0027, true, true, \u0027100%\u0027, 455, \u0027bottom\u0027, \u0027auto\u0027, true, true, true, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, true, true, true, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R line: the builder emits a vis() call of its own type",
+        "pass":  true,
+        "detail":  "vis(\u0027area\u0027, \u0027FY\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027avg\u0027, 9999, \u0027RT line\u0027, true, true, \u0027100%\u0027"
+    },
+    {
+        "name":  "R line: vis() -\u003e parse -\u003e reopen -\u003e vis() is the same call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027area\u0027, \u0027FY\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027avg\u0027, 9999, \u0027RT line\u0027, true, true, \u0027100%\u0027, 455, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027label\u0027, \u0027asc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, true, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027regression\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027100000|Goal\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027area\u0027, \u0027FY\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027avg\u0027, 9999, \u0027RT line\u0027, true, true, \u0027100%\u0027, 455, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027label\u0027, \u0027asc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, true, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027regression\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027100000|Goal\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R line: preset snapshot -\u003e apply -\u003e snapshot is the same",
+        "pass":  true,
+        "detail":  "got {\"type\":\"area\",\"xAxis\":\"FY\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"STATUS\",\"agg\":\"avg\",\"limit\":9999,\"title\":\"RT line\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"455\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":true,\"otherBucket\":false,\"sortBy\":\"label\",\"sortDir\":\"asc\",\"trendLine\":\"regression\",\"referenceLine\":\"100000|Goal\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"} | want {\"type\":\"area\",\"xAxis\":\"FY\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"STATUS\",\"agg\":\"avg\",\"limit\":9999,\"title\":\"RT line\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"455\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":true,\"otherBucket\":false,\"sortBy\":\"label\",\"sortDir\":\"asc\",\"trendLine\":\"regression\",\"referenceLine\":\"100000|Goal\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"}"
+    },
+    {
+        "name":  "R line: a reapplied preset emits the same vis() call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027area\u0027, \u0027FY\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027avg\u0027, 9999, \u0027RT line\u0027, true, true, \u0027100%\u0027, 455, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027label\u0027, \u0027asc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, true, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027regression\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027100000|Goal\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027area\u0027, \u0027FY\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027avg\u0027, 9999, \u0027RT line\u0027, true, true, \u0027100%\u0027, 455, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027label\u0027, \u0027asc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, true, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027regression\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027100000|Goal\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R pie: the builder emits a vis() call of its own type",
+        "pass":  true,
+        "detail":  "vis(\u0027pie\u0027, \u0027DEPT\u0027, \u0027none\u0027, \u0027none\u0027, \u0027count\u0027, 5, \u0027RT pie\u0027, true, true, \u0027100%\u0027, 520"
+    },
+    {
+        "name":  "R pie: vis() -\u003e parse -\u003e reopen -\u003e vis() is the same call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027pie\u0027, \u0027DEPT\u0027, \u0027none\u0027, \u0027none\u0027, \u0027count\u0027, 5, \u0027RT pie\u0027, true, true, \u0027100%\u0027, 520, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, true, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027pie\u0027, \u0027DEPT\u0027, \u0027none\u0027, \u0027none\u0027, \u0027count\u0027, 5, \u0027RT pie\u0027, true, true, \u0027100%\u0027, 520, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, true, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R pie: preset snapshot -\u003e apply -\u003e snapshot is the same",
+        "pass":  true,
+        "detail":  "got {\"type\":\"pie\",\"xAxis\":\"DEPT\",\"yAxis\":\"\",\"groupBy\":\"\",\"agg\":\"count\",\"limit\":5,\"title\":\"RT pie\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"520\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":true,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"} | want {\"type\":\"pie\",\"xAxis\":\"DEPT\",\"yAxis\":\"\",\"groupBy\":\"\",\"agg\":\"count\",\"limit\":5,\"title\":\"RT pie\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"520\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":true,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"}"
+    },
+    {
+        "name":  "R pie: a reapplied preset emits the same vis() call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027pie\u0027, \u0027DEPT\u0027, \u0027none\u0027, \u0027none\u0027, \u0027count\u0027, 5, \u0027RT pie\u0027, true, true, \u0027100%\u0027, 520, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, true, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027pie\u0027, \u0027DEPT\u0027, \u0027none\u0027, \u0027none\u0027, \u0027count\u0027, 5, \u0027RT pie\u0027, true, true, \u0027100%\u0027, 520, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, true, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R doughnut: the builder emits a vis() call of its own type",
+        "pass":  true,
+        "detail":  "vis(\u0027doughnut\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027sum\u0027, 4, \u0027RT doughnut\u0027, true, true,"
+    },
+    {
+        "name":  "R doughnut: vis() -\u003e parse -\u003e reopen -\u003e vis() is the same call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027doughnut\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027sum\u0027, 4, \u0027RT doughnut\u0027, true, true, \u0027100%\u0027, 520, \u0027right\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, true, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027doughnut\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027sum\u0027, 4, \u0027RT doughnut\u0027, true, true, \u0027100%\u0027, 520, \u0027right\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, true, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R doughnut: preset snapshot -\u003e apply -\u003e snapshot is the same",
+        "pass":  true,
+        "detail":  "got {\"type\":\"doughnut\",\"xAxis\":\"DEPT\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"STATUS\",\"agg\":\"sum\",\"limit\":4,\"title\":\"RT doughnut\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"right\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"520\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":true,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"} | want {\"type\":\"doughnut\",\"xAxis\":\"DEPT\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"STATUS\",\"agg\":\"sum\",\"limit\":4,\"title\":\"RT doughnut\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"right\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"520\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":true,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"}"
+    },
+    {
+        "name":  "R doughnut: a reapplied preset emits the same vis() call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027doughnut\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027sum\u0027, 4, \u0027RT doughnut\u0027, true, true, \u0027100%\u0027, 520, \u0027right\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, true, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027doughnut\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027sum\u0027, 4, \u0027RT doughnut\u0027, true, true, \u0027100%\u0027, 520, \u0027right\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, true, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R scatter: the builder emits a vis() call of its own type",
+        "pass":  true,
+        "detail":  "vis(\u0027scatter\u0027, \u0027N\u0027, \u0027AMOUNT\u0027, \u0027N\u0027, \u0027sum\u0027, 1000, \u0027RT scatter\u0027, true, true, \u0027100%\u0027"
+    },
+    {
+        "name":  "R scatter: vis() -\u003e parse -\u003e reopen -\u003e vis() is the same call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027scatter\u0027, \u0027N\u0027, \u0027AMOUNT\u0027, \u0027N\u0027, \u0027sum\u0027, 1000, \u0027RT scatter\u0027, true, true, \u0027100%\u0027, 530, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, false, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027scatter\u0027, \u0027N\u0027, \u0027AMOUNT\u0027, \u0027N\u0027, \u0027sum\u0027, 1000, \u0027RT scatter\u0027, true, true, \u0027100%\u0027, 530, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, false, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R scatter: preset snapshot -\u003e apply -\u003e snapshot is the same",
+        "pass":  true,
+        "detail":  "got {\"type\":\"scatter\",\"xAxis\":\"N\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"N\",\"agg\":\"sum\",\"limit\":1000,\"title\":\"RT scatter\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"530\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":false,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"} | want {\"type\":\"scatter\",\"xAxis\":\"N\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"N\",\"agg\":\"sum\",\"limit\":1000,\"title\":\"RT scatter\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"530\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":false,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"}"
+    },
+    {
+        "name":  "R scatter: a reapplied preset emits the same vis() call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027scatter\u0027, \u0027N\u0027, \u0027AMOUNT\u0027, \u0027N\u0027, \u0027sum\u0027, 1000, \u0027RT scatter\u0027, true, true, \u0027100%\u0027, 530, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, false, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027scatter\u0027, \u0027N\u0027, \u0027AMOUNT\u0027, \u0027N\u0027, \u0027sum\u0027, 1000, \u0027RT scatter\u0027, true, true, \u0027100%\u0027, 530, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, false, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R radar: the builder emits a vis() call of its own type",
+        "pass":  true,
+        "detail":  "vis(\u0027radar\u0027, \u0027DEPT\u0027, \u0027none\u0027, \u0027none\u0027, \u0027count\u0027, 9999, \u0027RT radar\u0027, false, true, \u002710"
+    },
+    {
+        "name":  "R radar: vis() -\u003e parse -\u003e reopen -\u003e vis() is the same call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027radar\u0027, \u0027DEPT\u0027, \u0027none\u0027, \u0027none\u0027, \u0027count\u0027, 9999, \u0027RT radar\u0027, false, true, \u0027100%\u0027, 520, \u0027top\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027radar\u0027, \u0027DEPT\u0027, \u0027none\u0027, \u0027none\u0027, \u0027count\u0027, 9999, \u0027RT radar\u0027, false, true, \u0027100%\u0027, 520, \u0027top\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R radar: preset snapshot -\u003e apply -\u003e snapshot is the same",
+        "pass":  true,
+        "detail":  "got {\"type\":\"radar\",\"xAxis\":\"DEPT\",\"yAxis\":\"\",\"groupBy\":\"\",\"agg\":\"count\",\"limit\":9999,\"title\":\"RT radar\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"none\",\"legend\":false,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"520\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"} | want {\"type\":\"radar\",\"xAxis\":\"DEPT\",\"yAxis\":\"\",\"groupBy\":\"\",\"agg\":\"count\",\"limit\":9999,\"title\":\"RT radar\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"none\",\"legend\":false,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"520\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"}"
+    },
+    {
+        "name":  "R radar: a reapplied preset emits the same vis() call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027radar\u0027, \u0027DEPT\u0027, \u0027none\u0027, \u0027none\u0027, \u0027count\u0027, 9999, \u0027RT radar\u0027, false, true, \u0027100%\u0027, 520, \u0027top\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027radar\u0027, \u0027DEPT\u0027, \u0027none\u0027, \u0027none\u0027, \u0027count\u0027, 9999, \u0027RT radar\u0027, false, true, \u0027100%\u0027, 520, \u0027top\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R combo: the builder emits a vis() call of its own type",
+        "pass":  true,
+        "detail":  "vis(\u0027combo\u0027, \u0027FY\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT combo\u0027, true, true, \u0027100%\u0027"
+    },
+    {
+        "name":  "R combo: vis() -\u003e parse -\u003e reopen -\u003e vis() is the same call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027combo\u0027, \u0027FY\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT combo\u0027, true, true, \u0027100%\u0027, 455, \u0027bottom\u0027, \u0027auto\u0027, true, false, true, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, true, false, \u0027\u0027, \u0027\u0027, \u0027[{\\\"col\\\":\\\"AMOUNT\\\",\\\"type\\\":\\\"bar\\\",\\\"agg\\\":\\\"sum\\\",\\\"color\\\":\\\"auto\\\"},{\\\"col\\\":\\\"FY\\\",\\\"type\\\":\\\"line\\\",\\\"agg\\\":\\\"count\\\",\\\"color\\\":\\\"auto\\\"}]\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027combo\u0027, \u0027FY\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT combo\u0027, true, true, \u0027100%\u0027, 455, \u0027bottom\u0027, \u0027auto\u0027, true, false, true, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, true, false, \u0027\u0027, \u0027\u0027, \u0027[{\\\"col\\\":\\\"AMOUNT\\\",\\\"type\\\":\\\"bar\\\",\\\"agg\\\":\\\"sum\\\",\\\"color\\\":\\\"auto\\\"},{\\\"col\\\":\\\"FY\\\",\\\"type\\\":\\\"line\\\",\\\"agg\\\":\\\"count\\\",\\\"color\\\":\\\"auto\\\"}]\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R combo: preset snapshot -\u003e apply -\u003e snapshot is the same",
+        "pass":  true,
+        "detail":  "got {\"type\":\"combo\",\"xAxis\":\"FY\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"\",\"agg\":\"sum\",\"limit\":9999,\"title\":\"RT combo\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"455\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":true,\"filterXAxis\":true,\"filterGroup\":true,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"pareto\":false,\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\",\"comboSeries\":[{\"col\":\"AMOUNT\",\"type\":\"bar\",\"agg\":\"sum\",\"color\":\"auto\"},{\"col\":\"FY\",\"type\":\"line\",\"agg\":\"count\",\"color\":\"auto\"}],\"comboFill\":false} | want {\"type\":\"combo\",\"xAxis\":\"FY\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"\",\"agg\":\"sum\",\"limit\":9999,\"title\":\"RT combo\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"455\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":true,\"filterXAxis\":true,\"filterGroup\":true,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"pareto\":false,\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\",\"comboSeries\":[{\"col\":\"AMOUNT\",\"type\":\"bar\",\"agg\":\"sum\",\"color\":\"auto\"},{\"col\":\"FY\",\"type\":\"line\",\"agg\":\"count\",\"color\":\"auto\"}],\"comboFill\":false}"
+    },
+    {
+        "name":  "R combo: a reapplied preset emits the same vis() call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027combo\u0027, \u0027FY\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT combo\u0027, true, true, \u0027100%\u0027, 455, \u0027bottom\u0027, \u0027auto\u0027, true, false, true, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, true, false, \u0027\u0027, \u0027\u0027, \u0027[{\\\"col\\\":\\\"AMOUNT\\\",\\\"type\\\":\\\"bar\\\",\\\"agg\\\":\\\"sum\\\",\\\"color\\\":\\\"auto\\\"},{\\\"col\\\":\\\"FY\\\",\\\"type\\\":\\\"line\\\",\\\"agg\\\":\\\"count\\\",\\\"color\\\":\\\"auto\\\"}]\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027combo\u0027, \u0027FY\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT combo\u0027, true, true, \u0027100%\u0027, 455, \u0027bottom\u0027, \u0027auto\u0027, true, false, true, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, true, false, \u0027\u0027, \u0027\u0027, \u0027[{\\\"col\\\":\\\"AMOUNT\\\",\\\"type\\\":\\\"bar\\\",\\\"agg\\\":\\\"sum\\\",\\\"color\\\":\\\"auto\\\"},{\\\"col\\\":\\\"FY\\\",\\\"type\\\":\\\"line\\\",\\\"agg\\\":\\\"count\\\",\\\"color\\\":\\\"auto\\\"}]\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R butterfly: the builder emits a vis() call of its own type",
+        "pass":  true,
+        "detail":  "vis(\u0027butterfly\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT butterfly\u0027, true, tr"
+    },
+    {
+        "name":  "R butterfly: vis() -\u003e parse -\u003e reopen -\u003e vis() is the same call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027butterfly\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT butterfly\u0027, true, true, \u0027100%\u0027, 530, \u0027bottom\u0027, \u0027auto\u0027, true, false, true, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027[{\\\"col\\\":\\\"AMOUNT\\\",\\\"agg\\\":\\\"sum\\\",\\\"color\\\":\\\"auto\\\"},{\\\"col\\\":\\\"DEPT\\\",\\\"agg\\\":\\\"sum\\\",\\\"color\\\":\\\"auto\\\"}]\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027butterfly\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT butterfly\u0027, true, true, \u0027100%\u0027, 530, \u0027bottom\u0027, \u0027auto\u0027, true, false, true, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027[{\\\"col\\\":\\\"AMOUNT\\\",\\\"agg\\\":\\\"sum\\\",\\\"color\\\":\\\"auto\\\"},{\\\"col\\\":\\\"DEPT\\\",\\\"agg\\\":\\\"sum\\\",\\\"color\\\":\\\"auto\\\"}]\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R butterfly: preset snapshot -\u003e apply -\u003e snapshot is the same",
+        "pass":  true,
+        "detail":  "got {\"type\":\"butterfly\",\"xAxis\":\"DEPT\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"\",\"agg\":\"sum\",\"limit\":9999,\"title\":\"RT butterfly\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"530\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\",\"comboSeries\":[{\"col\":\"AMOUNT\",\"agg\":\"sum\",\"color\":\"auto\"},{\"col\":\"DEPT\",\"agg\":\"sum\",\"color\":\"auto\"}]} | want {\"type\":\"butterfly\",\"xAxis\":\"DEPT\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"\",\"agg\":\"sum\",\"limit\":9999,\"title\":\"RT butterfly\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"530\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\",\"comboSeries\":[{\"col\":\"AMOUNT\",\"agg\":\"sum\",\"color\":\"auto\"},{\"col\":\"DEPT\",\"agg\":\"sum\",\"color\":\"auto\"}]}"
+    },
+    {
+        "name":  "R butterfly: a reapplied preset emits the same vis() call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027butterfly\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT butterfly\u0027, true, true, \u0027100%\u0027, 530, \u0027bottom\u0027, \u0027auto\u0027, true, false, true, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027[{\\\"col\\\":\\\"AMOUNT\\\",\\\"agg\\\":\\\"sum\\\",\\\"color\\\":\\\"auto\\\"},{\\\"col\\\":\\\"DEPT\\\",\\\"agg\\\":\\\"sum\\\",\\\"color\\\":\\\"auto\\\"}]\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027butterfly\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT butterfly\u0027, true, true, \u0027100%\u0027, 530, \u0027bottom\u0027, \u0027auto\u0027, true, false, true, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027[{\\\"col\\\":\\\"AMOUNT\\\",\\\"agg\\\":\\\"sum\\\",\\\"color\\\":\\\"auto\\\"},{\\\"col\\\":\\\"DEPT\\\",\\\"agg\\\":\\\"sum\\\",\\\"color\\\":\\\"auto\\\"}]\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R treemap: the builder emits a vis() call of its own type",
+        "pass":  true,
+        "detail":  "vis(\u0027treemap\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027sum\u0027, 9999, \u0027RT treemap\u0027, false, tru"
+    },
+    {
+        "name":  "R treemap: vis() -\u003e parse -\u003e reopen -\u003e vis() is the same call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027treemap\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027sum\u0027, 9999, \u0027RT treemap\u0027, false, true, \u0027100%\u0027, 568, \u0027top\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, true, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027treemap\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027sum\u0027, 9999, \u0027RT treemap\u0027, false, true, \u0027100%\u0027, 568, \u0027top\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, true, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R treemap: preset snapshot -\u003e apply -\u003e snapshot is the same",
+        "pass":  true,
+        "detail":  "got {\"type\":\"treemap\",\"xAxis\":\"DEPT\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"STATUS\",\"agg\":\"sum\",\"limit\":9999,\"title\":\"RT treemap\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"none\",\"legend\":false,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"568\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":true,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"} | want {\"type\":\"treemap\",\"xAxis\":\"DEPT\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"STATUS\",\"agg\":\"sum\",\"limit\":9999,\"title\":\"RT treemap\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"none\",\"legend\":false,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"568\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":true,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"}"
+    },
+    {
+        "name":  "R treemap: a reapplied preset emits the same vis() call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027treemap\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027sum\u0027, 9999, \u0027RT treemap\u0027, false, true, \u0027100%\u0027, 568, \u0027top\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, true, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027treemap\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027sum\u0027, 9999, \u0027RT treemap\u0027, false, true, \u0027100%\u0027, 568, \u0027top\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, true, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R histogram: the builder emits a vis() call of its own type",
+        "pass":  true,
+        "detail":  "vis(\u0027histogram\u0027, \u0027N\u0027, \u0027none\u0027, \u0027none\u0027, \u0027sum\u0027, 8, \u0027RT histogram\u0027, false, true, \u002710"
+    },
+    {
+        "name":  "R histogram: vis() -\u003e parse -\u003e reopen -\u003e vis() is the same call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027histogram\u0027, \u0027N\u0027, \u0027none\u0027, \u0027none\u0027, \u0027sum\u0027, 8, \u0027RT histogram\u0027, false, true, \u0027100%\u0027, 455, \u0027top\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027histogram\u0027, \u0027N\u0027, \u0027none\u0027, \u0027none\u0027, \u0027sum\u0027, 8, \u0027RT histogram\u0027, false, true, \u0027100%\u0027, 455, \u0027top\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R histogram: preset snapshot -\u003e apply -\u003e snapshot is the same",
+        "pass":  true,
+        "detail":  "got {\"type\":\"histogram\",\"xAxis\":\"N\",\"yAxis\":\"\",\"groupBy\":\"\",\"agg\":\"sum\",\"limit\":8,\"title\":\"RT histogram\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"none\",\"legend\":false,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"455\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"} | want {\"type\":\"histogram\",\"xAxis\":\"N\",\"yAxis\":\"\",\"groupBy\":\"\",\"agg\":\"sum\",\"limit\":8,\"title\":\"RT histogram\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"none\",\"legend\":false,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"455\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"}"
+    },
+    {
+        "name":  "R histogram: a reapplied preset emits the same vis() call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027histogram\u0027, \u0027N\u0027, \u0027none\u0027, \u0027none\u0027, \u0027sum\u0027, 8, \u0027RT histogram\u0027, false, true, \u0027100%\u0027, 455, \u0027top\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027histogram\u0027, \u0027N\u0027, \u0027none\u0027, \u0027none\u0027, \u0027sum\u0027, 8, \u0027RT histogram\u0027, false, true, \u0027100%\u0027, 455, \u0027top\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R waterfall: the builder emits a vis() call of its own type",
+        "pass":  true,
+        "detail":  "vis(\u0027waterfall\u0027, \u0027FY\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT waterfall\u0027, true, true"
+    },
+    {
+        "name":  "R waterfall: vis() -\u003e parse -\u003e reopen -\u003e vis() is the same call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027waterfall\u0027, \u0027FY\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT waterfall\u0027, true, true, \u0027100%\u0027, 480, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027waterfall\u0027, \u0027FY\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT waterfall\u0027, true, true, \u0027100%\u0027, 480, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R waterfall: preset snapshot -\u003e apply -\u003e snapshot is the same",
+        "pass":  true,
+        "detail":  "got {\"type\":\"waterfall\",\"xAxis\":\"FY\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"\",\"agg\":\"sum\",\"limit\":9999,\"title\":\"RT waterfall\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"480\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"} | want {\"type\":\"waterfall\",\"xAxis\":\"FY\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"\",\"agg\":\"sum\",\"limit\":9999,\"title\":\"RT waterfall\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"480\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"}"
+    },
+    {
+        "name":  "R waterfall: a reapplied preset emits the same vis() call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027waterfall\u0027, \u0027FY\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT waterfall\u0027, true, true, \u0027100%\u0027, 480, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027waterfall\u0027, \u0027FY\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT waterfall\u0027, true, true, \u0027100%\u0027, 480, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R funnel: the builder emits a vis() call of its own type",
+        "pass":  true,
+        "detail":  "vis(\u0027funnel\u0027, \u0027STATUS\u0027, \u0027none\u0027, \u0027none\u0027, \u0027count\u0027, 9999, \u0027RT funnel\u0027, false, true,"
+    },
+    {
+        "name":  "R funnel: vis() -\u003e parse -\u003e reopen -\u003e vis() is the same call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027funnel\u0027, \u0027STATUS\u0027, \u0027none\u0027, \u0027none\u0027, \u0027count\u0027, 9999, \u0027RT funnel\u0027, false, true, \u0027100%\u0027, 530, \u0027top\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027conversion\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027funnel\u0027, \u0027STATUS\u0027, \u0027none\u0027, \u0027none\u0027, \u0027count\u0027, 9999, \u0027RT funnel\u0027, false, true, \u0027100%\u0027, 530, \u0027top\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027conversion\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R funnel: preset snapshot -\u003e apply -\u003e snapshot is the same",
+        "pass":  true,
+        "detail":  "got {\"type\":\"funnel\",\"xAxis\":\"STATUS\",\"yAxis\":\"\",\"groupBy\":\"\",\"agg\":\"count\",\"limit\":9999,\"title\":\"RT funnel\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"none\",\"legend\":false,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"530\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"funnelMode\":\"conversion\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"} | want {\"type\":\"funnel\",\"xAxis\":\"STATUS\",\"yAxis\":\"\",\"groupBy\":\"\",\"agg\":\"count\",\"limit\":9999,\"title\":\"RT funnel\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"none\",\"legend\":false,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"530\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"funnelMode\":\"conversion\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"}"
+    },
+    {
+        "name":  "R funnel: a reapplied preset emits the same vis() call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027funnel\u0027, \u0027STATUS\u0027, \u0027none\u0027, \u0027none\u0027, \u0027count\u0027, 9999, \u0027RT funnel\u0027, false, true, \u0027100%\u0027, 530, \u0027top\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027conversion\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027funnel\u0027, \u0027STATUS\u0027, \u0027none\u0027, \u0027none\u0027, \u0027count\u0027, 9999, \u0027RT funnel\u0027, false, true, \u0027100%\u0027, 530, \u0027top\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027conversion\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R gauge: the builder emits a vis() call of its own type",
+        "pass":  true,
+        "detail":  "vis(\u0027gauge\u0027, \u0027\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 10, \u0027RT gauge\u0027, true, true, \u0027100%\u0027, 30"
+    },
+    {
+        "name":  "R gauge: vis() -\u003e parse -\u003e reopen -\u003e vis() is the same call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027gauge\u0027, \u0027\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 10, \u0027RT gauge\u0027, true, true, \u0027100%\u0027, 303, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u00275000000|Goal\u0027, \u0027\u0027, \u00272000000|4000000\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027gauge\u0027, \u0027\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 10, \u0027RT gauge\u0027, true, true, \u0027100%\u0027, 303, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u00275000000|Goal\u0027, \u0027\u0027, \u00272000000|4000000\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R gauge: preset snapshot -\u003e apply -\u003e snapshot is the same",
+        "pass":  true,
+        "detail":  "got {\"type\":\"gauge\",\"xAxis\":\"\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"\",\"agg\":\"sum\",\"limit\":10,\"title\":\"RT gauge\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"303\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"5000000|Goal\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"bands\":\"2000000|4000000\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"} | want {\"type\":\"gauge\",\"xAxis\":\"\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"\",\"agg\":\"sum\",\"limit\":10,\"title\":\"RT gauge\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"303\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"5000000|Goal\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"bands\":\"2000000|4000000\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"}"
+    },
+    {
+        "name":  "R gauge: a reapplied preset emits the same vis() call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027gauge\u0027, \u0027\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 10, \u0027RT gauge\u0027, true, true, \u0027100%\u0027, 303, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u00275000000|Goal\u0027, \u0027\u0027, \u00272000000|4000000\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027gauge\u0027, \u0027\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 10, \u0027RT gauge\u0027, true, true, \u0027100%\u0027, 303, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u00275000000|Goal\u0027, \u0027\u0027, \u00272000000|4000000\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R bullet: the builder emits a vis() call of its own type",
+        "pass":  true,
+        "detail":  "vis(\u0027bullet\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 6, \u0027RT bullet\u0027, true, true, \u0027100%"
+    },
+    {
+        "name":  "R bullet: vis() -\u003e parse -\u003e reopen -\u003e vis() is the same call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027bullet\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 6, \u0027RT bullet\u0027, true, true, \u0027100%\u0027, 328, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u00271000000\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027bullet\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 6, \u0027RT bullet\u0027, true, true, \u0027100%\u0027, 328, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u00271000000\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R bullet: preset snapshot -\u003e apply -\u003e snapshot is the same",
+        "pass":  true,
+        "detail":  "got {\"type\":\"bullet\",\"xAxis\":\"DEPT\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"\",\"agg\":\"sum\",\"limit\":6,\"title\":\"RT bullet\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"328\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"1000000\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"bands\":\"\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"} | want {\"type\":\"bullet\",\"xAxis\":\"DEPT\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"\",\"agg\":\"sum\",\"limit\":6,\"title\":\"RT bullet\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"328\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"1000000\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"bands\":\"\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"}"
+    },
+    {
+        "name":  "R bullet: a reapplied preset emits the same vis() call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027bullet\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 6, \u0027RT bullet\u0027, true, true, \u0027100%\u0027, 328, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u00271000000\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027bullet\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 6, \u0027RT bullet\u0027, true, true, \u0027100%\u0027, 328, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u00271000000\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R box: the builder emits a vis() call of its own type",
+        "pass":  true,
+        "detail":  "vis(\u0027box\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT box\u0027, true, true, \u0027100%\u0027, "
+    },
+    {
+        "name":  "R box: vis() -\u003e parse -\u003e reopen -\u003e vis() is the same call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027box\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT box\u0027, true, true, \u0027100%\u0027, 480, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027minmax\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027box\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT box\u0027, true, true, \u0027100%\u0027, 480, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027minmax\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R box: preset snapshot -\u003e apply -\u003e snapshot is the same",
+        "pass":  true,
+        "detail":  "got {\"type\":\"box\",\"xAxis\":\"DEPT\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"\",\"agg\":\"sum\",\"limit\":9999,\"title\":\"RT box\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"480\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"boxWhiskers\":\"minmax\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"} | want {\"type\":\"box\",\"xAxis\":\"DEPT\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"\",\"agg\":\"sum\",\"limit\":9999,\"title\":\"RT box\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"480\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"boxWhiskers\":\"minmax\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"}"
+    },
+    {
+        "name":  "R box: a reapplied preset emits the same vis() call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027box\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT box\u0027, true, true, \u0027100%\u0027, 480, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027minmax\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027box\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT box\u0027, true, true, \u0027100%\u0027, 480, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027minmax\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R gantt: the builder emits a vis() call of its own type",
+        "pass":  true,
+        "detail":  "vis(\u0027gantt\u0027, \u0027AWARD_ID\u0027, \u0027START_DATE\u0027, \u0027END_DATE\u0027, \u0027sum\u0027, 16, \u0027RT gantt\u0027, true, "
+    },
+    {
+        "name":  "R gantt: vis() -\u003e parse -\u003e reopen -\u003e vis() is the same call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027gantt\u0027, \u0027AWARD_ID\u0027, \u0027START_DATE\u0027, \u0027END_DATE\u0027, \u0027sum\u0027, 16, \u0027RT gantt\u0027, true, true, \u0027100%\u0027, 530, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027duration\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027today\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027gantt\u0027, \u0027AWARD_ID\u0027, \u0027START_DATE\u0027, \u0027END_DATE\u0027, \u0027sum\u0027, 16, \u0027RT gantt\u0027, true, true, \u0027100%\u0027, 530, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027duration\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027today\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R gantt: preset snapshot -\u003e apply -\u003e snapshot is the same",
+        "pass":  true,
+        "detail":  "got {\"type\":\"gantt\",\"xAxis\":\"AWARD_ID\",\"yAxis\":\"START_DATE\",\"groupBy\":\"END_DATE\",\"agg\":\"sum\",\"limit\":16,\"title\":\"RT gantt\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"530\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"duration\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"today\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"} | want {\"type\":\"gantt\",\"xAxis\":\"AWARD_ID\",\"yAxis\":\"START_DATE\",\"groupBy\":\"END_DATE\",\"agg\":\"sum\",\"limit\":16,\"title\":\"RT gantt\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"530\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"duration\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"today\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"}"
+    },
+    {
+        "name":  "R gantt: a reapplied preset emits the same vis() call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027gantt\u0027, \u0027AWARD_ID\u0027, \u0027START_DATE\u0027, \u0027END_DATE\u0027, \u0027sum\u0027, 16, \u0027RT gantt\u0027, true, true, \u0027100%\u0027, 530, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027duration\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027today\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027gantt\u0027, \u0027AWARD_ID\u0027, \u0027START_DATE\u0027, \u0027END_DATE\u0027, \u0027sum\u0027, 16, \u0027RT gantt\u0027, true, true, \u0027100%\u0027, 530, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027duration\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027today\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R map: the builder emits a vis() call of its own type",
+        "pass":  true,
+        "detail":  "vis(\u0027map\u0027, \u0027STATE\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT map\u0027, true, true, \u0027100%\u0027,"
+    },
+    {
+        "name":  "R map: vis() -\u003e parse -\u003e reopen -\u003e vis() is the same call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027map\u0027, \u0027STATE\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT map\u0027, true, true, \u0027100%\u0027, 640, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"map\\\":\\\"us-grid\\\",\\\"showLabels\\\":false,\\\"bins\\\":\\\"equal\\\",\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027map\u0027, \u0027STATE\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT map\u0027, true, true, \u0027100%\u0027, 640, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"map\\\":\\\"us-grid\\\",\\\"showLabels\\\":false,\\\"bins\\\":\\\"equal\\\",\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R map: preset snapshot -\u003e apply -\u003e snapshot is the same",
+        "pass":  true,
+        "detail":  "got {\"type\":\"map\",\"xAxis\":\"STATE\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"\",\"agg\":\"sum\",\"limit\":9999,\"title\":\"RT map\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"640\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"map\\\":\\\"us-grid\\\",\\\"showLabels\\\":false,\\\"bins\\\":\\\"equal\\\",\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"} | want {\"type\":\"map\",\"xAxis\":\"STATE\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"\",\"agg\":\"sum\",\"limit\":9999,\"title\":\"RT map\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"640\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"map\\\":\\\"us-grid\\\",\\\"showLabels\\\":false,\\\"bins\\\":\\\"equal\\\",\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"}"
+    },
+    {
+        "name":  "R map: a reapplied preset emits the same vis() call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027map\u0027, \u0027STATE\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT map\u0027, true, true, \u0027100%\u0027, 640, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"map\\\":\\\"us-grid\\\",\\\"showLabels\\\":false,\\\"bins\\\":\\\"equal\\\",\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027map\u0027, \u0027STATE\u0027, \u0027AMOUNT\u0027, \u0027none\u0027, \u0027sum\u0027, 9999, \u0027RT map\u0027, true, true, \u0027100%\u0027, 640, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"map\\\":\\\"us-grid\\\",\\\"showLabels\\\":false,\\\"bins\\\":\\\"equal\\\",\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R sankey: the builder emits a vis() call of its own type",
+        "pass":  true,
+        "detail":  "vis(\u0027sankey\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027sum\u0027, 5, \u0027RT sankey\u0027, true, true, \u002710"
+    },
+    {
+        "name":  "R sankey: vis() -\u003e parse -\u003e reopen -\u003e vis() is the same call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027sankey\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027sum\u0027, 5, \u0027RT sankey\u0027, true, true, \u0027100%\u0027, 632, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"stages\\\":[\\\"FY\\\"],\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027sankey\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027sum\u0027, 5, \u0027RT sankey\u0027, true, true, \u0027100%\u0027, 632, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"stages\\\":[\\\"FY\\\"],\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "R sankey: preset snapshot -\u003e apply -\u003e snapshot is the same",
+        "pass":  true,
+        "detail":  "got {\"type\":\"sankey\",\"xAxis\":\"DEPT\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"STATUS\",\"agg\":\"sum\",\"limit\":5,\"title\":\"RT sankey\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"632\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"stages\\\":[\\\"FY\\\"],\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"} | want {\"type\":\"sankey\",\"xAxis\":\"DEPT\",\"yAxis\":\"AMOUNT\",\"groupBy\":\"STATUS\",\"agg\":\"sum\",\"limit\":5,\"title\":\"RT sankey\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"632\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"value\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"stages\\\":[\\\"FY\\\"],\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"}"
+    },
+    {
+        "name":  "R sankey: a reapplied preset emits the same vis() call",
+        "pass":  true,
+        "detail":  "got \"vis(\u0027sankey\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027sum\u0027, 5, \u0027RT sankey\u0027, true, true, \u0027100%\u0027, 632, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"stages\\\":[\\\"FY\\\"],\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027sankey\u0027, \u0027DEPT\u0027, \u0027AMOUNT\u0027, \u0027STATUS\u0027, \u0027sum\u0027, 5, \u0027RT sankey\u0027, true, true, \u0027100%\u0027, 632, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027value\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"stages\\\":[\\\"FY\\\"],\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+    },
+    {
+        "name":  "L the picker lists the types this suite knows",
+        "pass":  true,
+        "detail":  "bar,line,combo,butterfly,pie,doughnut,scatter,radar,treemap,histogram,waterfall,funnel,gauge,bullet,box,gantt,map,sankey"
+    },
+    {
+        "name":  "L -\u003e bar: no control depends on the type you came from",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L bar: reopening a saved chart shows the same controls as picking the type",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L -\u003e line: no control depends on the type you came from",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L line: reopening a saved chart shows the same controls as picking the type",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L -\u003e combo: no control depends on the type you came from",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L combo: reopening a saved chart shows the same controls as picking the type",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L -\u003e butterfly: no control depends on the type you came from",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L butterfly: reopening a saved chart shows the same controls as picking the type",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L -\u003e pie: no control depends on the type you came from",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L pie: reopening a saved chart shows the same controls as picking the type",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L -\u003e doughnut: no control depends on the type you came from",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L doughnut: reopening a saved chart shows the same controls as picking the type",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L -\u003e scatter: no control depends on the type you came from",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L scatter: reopening a saved chart shows the same controls as picking the type",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L -\u003e radar: no control depends on the type you came from",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L radar: reopening a saved chart shows the same controls as picking the type",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L -\u003e treemap: no control depends on the type you came from",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L treemap: reopening a saved chart shows the same controls as picking the type",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L -\u003e histogram: no control depends on the type you came from",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L histogram: reopening a saved chart shows the same controls as picking the type",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L -\u003e waterfall: no control depends on the type you came from",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L waterfall: reopening a saved chart shows the same controls as picking the type",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L -\u003e funnel: no control depends on the type you came from",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L funnel: reopening a saved chart shows the same controls as picking the type",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L -\u003e gauge: no control depends on the type you came from",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L gauge: reopening a saved chart shows the same controls as picking the type",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L -\u003e bullet: no control depends on the type you came from",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L bullet: reopening a saved chart shows the same controls as picking the type",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L -\u003e box: no control depends on the type you came from",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L box: reopening a saved chart shows the same controls as picking the type",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L -\u003e gantt: no control depends on the type you came from",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L gantt: reopening a saved chart shows the same controls as picking the type",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L -\u003e map: no control depends on the type you came from",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L map: reopening a saved chart shows the same controls as picking the type",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L -\u003e sankey: no control depends on the type you came from",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "L sankey: reopening a saved chart shows the same controls as picking the type",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P bar: the report renders the builder\u0027s chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P bar: the builder drew a preview",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P bar: the preview and the report draw the same chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "A bar: the canvas is labelled for screen readers",
+        "pass":  true,
+        "detail":  "Bar chart: RT bar. 2 data series, 7 categories; full data in the adjacent table."
+    },
+    {
+        "name":  "A bar: a data table sits beside the chart, with rows",
+        "pass":  true,
+        "detail":  "empty"
+    },
+    {
+        "name":  "A bar: one table row per category",
+        "pass":  true,
+        "detail":  "got 7 | want 7"
+    },
+    {
+        "name":  "A bar: every table cell is the value the chart drew",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P line: the report renders the builder\u0027s chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P line: the builder drew a preview",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P line: the preview and the report draw the same chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "A line: the canvas is labelled for screen readers",
+        "pass":  true,
+        "detail":  "Area chart: RT line. 3 data series, 4 categories; full data in the adjacent table."
+    },
+    {
+        "name":  "A line: a data table sits beside the chart, with rows",
+        "pass":  true,
+        "detail":  "empty"
+    },
+    {
+        "name":  "A line: one table row per category",
+        "pass":  true,
+        "detail":  "got 4 | want 4"
+    },
+    {
+        "name":  "A line: every table cell is the value the chart drew",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P pie: the report renders the builder\u0027s chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P pie: the builder drew a preview",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P pie: the preview and the report draw the same chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "A pie: the canvas is labelled for screen readers",
+        "pass":  true,
+        "detail":  "Pie chart: RT pie. 1 data series, 6 categories; full data in the adjacent table."
+    },
+    {
+        "name":  "A pie: a data table sits beside the chart, with rows",
+        "pass":  true,
+        "detail":  "empty"
+    },
+    {
+        "name":  "A pie: one table row per category",
+        "pass":  true,
+        "detail":  "got 6 | want 6"
+    },
+    {
+        "name":  "A pie: every table cell is the value the chart drew",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P doughnut: the report renders the builder\u0027s chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P doughnut: the builder drew a preview",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P doughnut: the preview and the report draw the same chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "A doughnut: the canvas is labelled for screen readers",
+        "pass":  true,
+        "detail":  "Doughnut chart: RT doughnut. 10 rows; full data in the adjacent table."
+    },
+    {
+        "name":  "A doughnut: a data table sits beside the chart, with rows",
+        "pass":  true,
+        "detail":  "empty"
+    },
+    {
+        "name":  "P scatter: the report renders the builder\u0027s chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P scatter: the builder drew a preview",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P scatter: the preview and the report draw the same chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "A scatter: the canvas is labelled for screen readers",
+        "pass":  true,
+        "detail":  "Bubble chart: RT scatter. 119 rows; full data in the adjacent table."
+    },
+    {
+        "name":  "A scatter: a data table sits beside the chart, with rows",
+        "pass":  true,
+        "detail":  "empty"
+    },
+    {
+        "name":  "P radar: the report renders the builder\u0027s chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P radar: the builder drew a preview",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P radar: the preview and the report draw the same chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "A radar: the canvas is labelled for screen readers",
+        "pass":  true,
+        "detail":  "Radar chart: RT radar. 1 data series, 11 categories; full data in the adjacent table."
+    },
+    {
+        "name":  "A radar: a data table sits beside the chart, with rows",
+        "pass":  true,
+        "detail":  "empty"
+    },
+    {
+        "name":  "A radar: one table row per category",
+        "pass":  true,
+        "detail":  "got 11 | want 11"
+    },
+    {
+        "name":  "A radar: every table cell is the value the chart drew",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P combo: the report renders the builder\u0027s chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P combo: the builder drew a preview",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P combo: the preview and the report draw the same chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "A combo: the canvas is labelled for screen readers",
+        "pass":  true,
+        "detail":  "Bar chart: RT combo. 2 data series, 4 categories; full data in the adjacent table."
+    },
+    {
+        "name":  "A combo: a data table sits beside the chart, with rows",
+        "pass":  true,
+        "detail":  "empty"
+    },
+    {
+        "name":  "A combo: one table row per category",
+        "pass":  true,
+        "detail":  "got 4 | want 4"
+    },
+    {
+        "name":  "A combo: every table cell is the value the chart drew",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P butterfly: the report renders the builder\u0027s chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P butterfly: the builder drew a preview",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P butterfly: the preview and the report draw the same chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "A butterfly: the canvas is labelled for screen readers",
+        "pass":  true,
+        "detail":  "Bar chart: RT butterfly. 2 data series, 11 categories; full data in the adjacent table."
+    },
+    {
+        "name":  "A butterfly: a data table sits beside the chart, with rows",
+        "pass":  true,
+        "detail":  "empty"
+    },
+    {
+        "name":  "A butterfly: one table row per category",
+        "pass":  true,
+        "detail":  "got 11 | want 11"
+    },
+    {
+        "name":  "A butterfly: every table cell is the value the chart drew",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P treemap: the report renders the builder\u0027s chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P treemap: the builder drew a preview",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P treemap: the preview and the report draw the same chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "A treemap: the canvas is labelled for screen readers",
+        "pass":  true,
+        "detail":  "Treemap chart: RT treemap. 22 rows; full data in the adjacent table."
+    },
+    {
+        "name":  "A treemap: a data table sits beside the chart, with rows",
+        "pass":  true,
+        "detail":  "empty"
+    },
+    {
+        "name":  "P histogram: the report renders the builder\u0027s chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P histogram: the builder drew a preview",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P histogram: the preview and the report draw the same chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "A histogram: the canvas is labelled for screen readers",
+        "pass":  true,
+        "detail":  "Histogram chart: RT histogram. 1 data series, 8 categories; full data in the adjacent table."
+    },
+    {
+        "name":  "A histogram: a data table sits beside the chart, with rows",
+        "pass":  true,
+        "detail":  "empty"
+    },
+    {
+        "name":  "A histogram: one table row per category",
+        "pass":  true,
+        "detail":  "got 8 | want 8"
+    },
+    {
+        "name":  "A histogram: every table cell is the value the chart drew",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P waterfall: the report renders the builder\u0027s chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P waterfall: the builder drew a preview",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P waterfall: the preview and the report draw the same chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "A waterfall: the canvas is labelled for screen readers",
+        "pass":  true,
+        "detail":  "Waterfall chart: RT waterfall. 5 rows; full data in the adjacent table."
+    },
+    {
+        "name":  "A waterfall: a data table sits beside the chart, with rows",
+        "pass":  true,
+        "detail":  "empty"
+    },
+    {
+        "name":  "P funnel: the report renders the builder\u0027s chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P funnel: the builder drew a preview",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P funnel: the preview and the report draw the same chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "A funnel: the canvas is labelled for screen readers",
+        "pass":  true,
+        "detail":  "Funnel chart: RT funnel. 1 data series, 2 categories; full data in the adjacent table."
+    },
+    {
+        "name":  "A funnel: a data table sits beside the chart, with rows",
+        "pass":  true,
+        "detail":  "empty"
+    },
+    {
+        "name":  "P gauge: the report renders the builder\u0027s chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P gauge: the builder drew a preview",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P gauge: the preview and the report draw the same chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "A gauge: the canvas is labelled for screen readers",
+        "pass":  true,
+        "detail":  "Gauge chart: RT gauge. 2 rows; full data in the adjacent table."
+    },
+    {
+        "name":  "A gauge: a data table sits beside the chart, with rows",
+        "pass":  true,
+        "detail":  "empty"
+    },
+    {
+        "name":  "P bullet: the report renders the builder\u0027s chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P bullet: the builder drew a preview",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P bullet: the preview and the report draw the same chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "A bullet: the canvas is labelled for screen readers",
+        "pass":  true,
+        "detail":  "Bullet chart: RT bullet. 6 rows; full data in the adjacent table."
+    },
+    {
+        "name":  "A bullet: a data table sits beside the chart, with rows",
+        "pass":  true,
+        "detail":  "empty"
+    },
+    {
+        "name":  "P box: the report renders the builder\u0027s chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P box: the builder drew a preview",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P box: the preview and the report draw the same chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "A box: the canvas is labelled for screen readers",
+        "pass":  true,
+        "detail":  "Box chart: RT box. 11 rows; full data in the adjacent table."
+    },
+    {
+        "name":  "A box: a data table sits beside the chart, with rows",
+        "pass":  true,
+        "detail":  "empty"
+    },
+    {
+        "name":  "P gantt: the report renders the builder\u0027s chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P gantt: the builder drew a preview",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P gantt: the preview and the report draw the same chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "A gantt: the canvas is labelled for screen readers",
+        "pass":  true,
+        "detail":  "Gantt chart: RT gantt. 16 rows; full data in the adjacent table."
+    },
+    {
+        "name":  "A gantt: a data table sits beside the chart, with rows",
+        "pass":  true,
+        "detail":  "empty"
+    },
+    {
+        "name":  "P map: the report renders the builder\u0027s chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P map: the builder drew a preview",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P map: the preview and the report draw the same chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "A map: the canvas is labelled for screen readers",
+        "pass":  true,
+        "detail":  "Map chart: RT map. 6 rows; full data in the adjacent table."
+    },
+    {
+        "name":  "A map: a data table sits beside the chart, with rows",
+        "pass":  true,
+        "detail":  "empty"
+    },
+    {
+        "name":  "P sankey: the report renders the builder\u0027s chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P sankey: the builder drew a preview",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "P sankey: the preview and the report draw the same chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "A sankey: the canvas is labelled for screen readers",
+        "pass":  true,
+        "detail":  "Sankey chart: RT sankey. 20 rows; full data in the adjacent table."
+    },
+    {
+        "name":  "A sankey: a data table sits beside the chart, with rows",
+        "pass":  true,
+        "detail":  "empty"
+    },
+    {
+        "name":  "F bar by DEPT, untick a category: the panel offers DEPT = Engineering",
+        "pass":  true,
+        "detail":  "DEPT=Agriculture, DEPT=Engineering, DEPT=Design, DEPT=Vet Med, DEPT=Other, DEPT=Management, DEPT=Unknown, DEPT=Sciences, DEPT=Textiles, DEPT=Humanities, DEPT=Education"
+    },
+    {
+        "name":  "F bar by DEPT, untick a category: the chart loses exactly that value\u0027s rows",
+        "pass":  true,
+        "detail":  "before 15659162 after 13349756 lost should be 2309406"
+    },
+    {
+        "name":  "F bar by DEPT, untick a category: Engineering is gone from the chart",
+        "pass":  true,
+        "detail":  "[[\"Agriculture\",\"Design\",\"Vet Med\",\"Other\",\"Management\",\"Unknown\",\"Sciences\",\"Textiles\",\"Humanities\",\"Education\"],[\"AMOUNT\"]]"
+    },
+    {
+        "name":  "F bar by DEPT, untick a category: after the cut, every element still drills to rows that add up to it",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "F grouped bar, untick a group: the panel offers STATUS = Pending",
+        "pass":  true,
+        "detail":  "DEPT=Agriculture, DEPT=Engineering, DEPT=Design, DEPT=Vet Med, DEPT=Other, DEPT=Management, DEPT=Unknown, DEPT=Sciences, DEPT=Textiles, DEPT=Humanities, DEPT=Education, STATUS=Awarded, STATUS=Declined, STATUS=Pending"
+    },
+    {
+        "name":  "F grouped bar, untick a group: the chart loses exactly that value\u0027s rows",
+        "pass":  true,
+        "detail":  "before 15659162 after 11593857 lost should be 4065305"
+    },
+    {
+        "name":  "F grouped bar, untick a group: Pending is gone from the chart",
+        "pass":  true,
+        "detail":  "[[\"Agriculture\",\"Engineering\",\"Vet Med\",\"Design\",\"Sciences\",\"Textiles\",\"Other\",\"Management\",\"Unknown\",\"Education\",\"Humanities\"],[\"Awarded\",\"Declined\"]]"
+    },
+    {
+        "name":  "F grouped bar, untick a group: after the cut, every element still drills to rows that add up to it",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "F pie by STATUS, untick a slice: the panel offers STATUS = Declined",
+        "pass":  true,
+        "detail":  "STATUS=Awarded, STATUS=Pending, STATUS=Declined"
+    },
+    {
+        "name":  "F pie by STATUS, untick a slice: the chart loses exactly that value\u0027s rows",
+        "pass":  true,
+        "detail":  "before 160 after 126 lost should be 34"
+    },
+    {
+        "name":  "F pie by STATUS, untick a slice: Declined is gone from the chart",
+        "pass":  true,
+        "detail":  "[[\"Awarded\",\"Pending\"],[\"Count\"]]"
+    },
+    {
+        "name":  "F pie by STATUS, untick a slice: after the cut, every element still drills to rows that add up to it",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "F sunburst, untick a group: the panel offers STATUS = Awarded",
+        "pass":  true,
+        "detail":  "DEPT=Agriculture, DEPT=Engineering, DEPT=Design, DEPT=Vet Med, DEPT=Other, DEPT=Unknown, DEPT=Management, DEPT=Sciences, DEPT=Textiles, DEPT=Humanities, DEPT=Education, STATUS=Awarded, STATUS=Pending, STATUS=Declined"
+    },
+    {
+        "name":  "F sunburst, untick a group: the chart loses exactly that value\u0027s rows",
+        "pass":  true,
+        "detail":  "before 31599288 after 15561282 lost should be 16038006"
+    },
+    {
+        "name":  "F sunburst, untick a group: Awarded is gone from the chart",
+        "pass":  true,
+        "detail":  "[[],[\"DEPT\",\"STATUS\"]]"
+    },
+    {
+        "name":  "F sunburst, untick a group: after the cut, every element still drills to rows that add up to it",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "D bar -\u003e STATUS: a drilled element\u0027s chart adds up to the element (4 drilled)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "D bar count -\u003e FY: a drilled element\u0027s chart adds up to the element (4 drilled)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "D grouped bar -\u003e FY: a drilled element\u0027s chart adds up to the element (4 drilled)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "D line -\u003e DEPT: a drilled element\u0027s chart adds up to the element (4 drilled)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "D pie -\u003e DEPT: a drilled element\u0027s chart adds up to the element (3 drilled)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "D treemap -\u003e FY: a drilled element\u0027s chart adds up to the element (4 drilled)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "D sunburst outer -\u003e FY: a drilled element\u0027s chart adds up to the element (4 drilled)",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "D sankey band -\u003e FY: a drilled element\u0027s chart adds up to the element (4 drilled)",
+        "pass":  true,
+        "detail":  ""
+    }
+]

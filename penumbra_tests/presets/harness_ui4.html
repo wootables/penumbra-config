@@ -1,0 +1,533 @@
+<html><body><pre id="out">running</pre><div id="stage"></div>
+<!--
+  DOM tests for the MOUNTED control - PenumbraPresets.create().
+  Companion to harness.html, which covers the store underneath it.
+
+  Live as of step 3: the two custom-template pickers (Copy Options and
+  Download) mount this with pin:false, so the "templates have no pin" and
+  "validate blocks the save" assertions below are load-bearing, not
+  hypothetical.
+
+  window.prompt / confirm are stubbed - headless Edge auto-dismisses both, so
+  every save/rename/delete path would otherwise silently no-op and read as a
+  pass.
+
+  CONTROL: __break=3 renders the preset NAME through innerHTML instead of
+  textContent. Only the XSS assertion catches it; every functional test still
+  passes, because a name without markup in it renders identically either way.
+
+  CONTROL: __break=4 makes create() fetch the SHARED list at mount - i.e. at
+  report load. Only "mounting makes NO request" and "refresh() makes NO
+  request" catch it (124/2): the open-time request is then deduplicated onto
+  the in-flight one, so every other shared assertion still passes. Those two
+  failures are the owner's rule 3.
+
+  The shared source is driven through PenumbraPresets.shared._setTransport():
+  the harness records every request and answers each one by hand, so the
+  order of requests, their bodies and the panel's state between them are all
+  asserted. No real XHR is ever made.
+-->
+<script src="SRC.js"></script><script>window.__break=4;</script>
+<script>
+(function () {
+  var out = document.getElementById('out');
+  var stage = document.getElementById('stage');
+  var log = [], pass = 0, fail = 0;
+
+  function sec(n) { log.push(''); log.push('-- ' + n); }
+  function eq(label, got, want) {
+    var g = JSON.stringify(got), wv = JSON.stringify(want);
+    if (g === wv) { pass++; log.push('  ok   ' + label); }
+    else { fail++; log.push('  FAIL ' + label + '\n         got:  ' + g + '\n         want: ' + wv); }
+  }
+
+  function makeStore() {
+    var mem = {};
+    return {
+      getItem: function (k) { return Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : null; },
+      setItem: function (k, v) { mem[k] = String(v); },
+      seed: function (k, o) { mem[k] = JSON.stringify(o); }
+    };
+  }
+
+  // ── dialog stubs ────────────────────────────────────────────────────────
+  var promptReply = null, confirmReply = true, promptSeen = [];
+  window.prompt = function (msg, dflt) { promptSeen.push([msg, dflt]); return promptReply; };
+  window.confirm = function () { return confirmReply; };
+
+  function click(node) {
+    node.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  }
+  function q(root, sel)  { return root.querySelector(sel); }
+  function qa(root, sel) { return Array.prototype.slice.call(root.querySelectorAll(sel)); }
+  function rowNames(el)  { return qa(el, '.pnb-preset-row .pnb-preset-rname').map(function (n) { return n.textContent; }); }
+  function chipText(el)  { return q(el, '.pnb-preset-name').textContent; }
+
+  var P;
+
+  try {
+    var code = String(window.__src).replace(/\r\n/g, '\n');
+
+    if (window.__break === 3) {
+      var before = code;
+      code = code.replace(
+        "pick.appendChild(el('span', 'pnb-preset-rname', entry.name));",
+        "pick.innerHTML += '<span class=\"pnb-preset-rname\">' + entry.name + '</span>';");
+      if (before === code) { throw new Error('break-3 anchor missed'); }
+    }
+
+    if (window.__break === 4) {
+      var b4 = code;
+      code = code.replace(
+        "mounted.push(api);\n        render();\n        return api;",
+        "mounted.push(api);\n        render();\n        if (sharedOn) { sharedFetch(idOf(), true); }\n        return api;");
+      if (b4 === code) { throw new Error('break-4 anchor missed'); }
+    }
+
+    new Function(code)();
+    P = window.PenumbraPresets;
+    if (!P || typeof P.create !== 'function') { throw new Error('create() not exposed'); }
+
+    // Each control gets its own host so the two can coexist on the stage.
+    function host() { var h = document.createElement('div'); stage.appendChild(h); return h; }
+
+    var applied, stateNow;
+    function mk(opts) {
+      opts = opts || {};
+      var h = host();
+      var c = P.create({
+        ns: opts.ns || 'tplcopy',
+        anchor: h,
+        mount: opts.mount || 'inline',
+        label: opts.label || 'none',
+        pin: opts.pin,
+        shared: opts.shared,
+        reportId: function () { return opts.reportId || 'r1'; },
+        getState: function () { return stateNow; },
+        applyState: function (dta, name) { applied = { data: dta, name: name }; },
+        validate: opts.validate,
+        onError: function (m) { errors.push(m); }
+      });
+      return { c: c, h: h };
+    }
+    var errors = [];
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('mounting');
+    P._setStorage(makeStore());
+    stateNow = { template: '{A}|{B}' };
+    var m = mk();
+    eq('control is in the anchor',   !!q(m.h, '.pnb-preset'), true);
+    eq('inline mount class',         q(m.h, '.pnb-preset').className.indexOf('pnb-preset-inline') !== -1, true);
+    eq('chip shows the empty label', chipText(m.h), 'none');
+    eq('popover starts hidden',      q(m.h, '.pnb-preset-pop').hidden, true);
+    eq('aria-expanded starts false', q(m.h, '.pnb-preset-chip').getAttribute('aria-expanded'), 'false');
+    eq('empty state message',        !!q(m.h, '.pnb-preset-empty'), true);
+    eq('save row is always offered', !!q(m.h, '.pnb-preset-save'), true);
+
+    var hdr = mk({ mount: 'header' });
+    eq('header mount class', q(hdr.h, '.pnb-preset').className.indexOf('pnb-preset-header') !== -1, true);
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('open / close');
+    click(q(m.h, '.pnb-preset-chip'));
+    eq('click opens',            q(m.h, '.pnb-preset-pop').hidden, false);
+    eq('aria-expanded flips',    q(m.h, '.pnb-preset-chip').getAttribute('aria-expanded'), 'true');
+    click(q(m.h, '.pnb-preset-chip'));
+    eq('click again closes',     q(m.h, '.pnb-preset-pop').hidden, true);
+
+    click(q(m.h, '.pnb-preset-chip'));
+    eq('handleEscape reports it consumed the key', P.handleEscape(), true);
+    eq('and it closed',          q(m.h, '.pnb-preset-pop').hidden, true);
+    eq('handleEscape is false with nothing open', P.handleEscape(), false);
+
+    // Only one panel open at a time, or two chips in one dialog would stack.
+    click(q(m.h, '.pnb-preset-chip'));
+    click(q(hdr.h, '.pnb-preset-chip'));
+    eq('opening the second closes the first', q(m.h, '.pnb-preset-pop').hidden, true);
+    eq('and the second is open',              q(hdr.h, '.pnb-preset-pop').hidden, false);
+    click(document.body);
+    eq('outside click dismisses',             q(hdr.h, '.pnb-preset-pop').hidden, true);
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('reading existing presets');
+    var S = makeStore();
+    S.seed('penumbra_template_presets', { r1: { Zeta: { template: 'z' }, alpha: { template: 'a' } } });
+    P._setStorage(S);
+    var r = mk();
+    click(q(r.h, '.pnb-preset-chip'));
+    eq('legacy presets render, name-sorted', rowNames(r.h), ['alpha', 'Zeta']);
+    eq('no empty-state now',                 !!q(r.h, '.pnb-preset-empty'), false);
+
+    applied = null;
+    click(qa(r.h, '.pnb-preset-pick')[0]);
+    eq('row click applies the data', applied.data, { template: 'a' });
+    eq('and passes the name',        applied.name, 'alpha');
+    eq('chip now names it',          chipText(r.h), 'alpha');
+    eq('picking closes the panel',   q(r.h, '.pnb-preset-pop').hidden, true);
+
+    click(q(r.h, '.pnb-preset-chip'));
+    eq('loaded row is ticked', qa(r.h, '.pnb-preset-row').filter(function (n) {
+      return n.className.indexOf('is-on') !== -1;
+    }).length, 1);
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('templates have no pin');   // the two live consumers pass pin:false
+    P._setStorage(makeStore());
+    stateNow = { template: 't' };
+    var np = mk({ ns: 'tplcopy', pin: false });
+    promptReply = 'One';
+    click(q(np.h, '.pnb-preset-save'));
+    click(q(np.h, '.pnb-preset-chip'));
+    eq('a row exists',            rowNames(np.h), ['One']);
+    eq('but carries no pin button',
+       qa(np.h, '.pnb-preset-row .pnb-preset-act').length, 2);   // rename + delete only
+
+    // The namespace default still grants a pin where one is meant to exist.
+    P._setStorage(makeStore());
+    var wp = mk({ ns: 'pivot' });
+    promptReply = 'One';
+    click(q(wp.h, '.pnb-preset-save'));
+    click(q(wp.h, '.pnb-preset-chip'));
+    eq('a view builder gets three actions',
+       qa(wp.h, '.pnb-preset-row .pnb-preset-act').length, 3);   // pin + rename + delete
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('save');
+    P._setStorage(makeStore());
+    stateNow = { template: '{PROJECT_ID}' };
+    var s = mk();
+    promptSeen = []; promptReply = 'My Template';
+    click(q(s.h, '.pnb-preset-save'));
+    eq('saved into the store',   P.get('tplcopy', 'r1', 'My Template'), { template: '{PROJECT_ID}' });
+    eq('chip names the new one', chipText(s.h), 'My Template');
+
+    // Cancelling the name prompt must not write anything.
+    promptReply = null;
+    click(q(s.h, '.pnb-preset-chip'));
+    click(q(s.h, '.pnb-preset-save'));
+    eq('cancelled save writes nothing', P.list('tplcopy', 'r1').length, 1);
+
+    // Re-saving defaults the prompt to the loaded name - "save my tweaks back".
+    promptSeen = []; promptReply = 'My Template';
+    stateNow = { template: 'edited' };
+    click(q(s.h, '.pnb-preset-chip'));
+    click(q(s.h, '.pnb-preset-save'));
+    eq('prompt defaults to the loaded name', promptSeen[0][1], 'My Template');
+    eq('overwrote in place',                 P.get('tplcopy', 'r1', 'My Template'), { template: 'edited' });
+    eq('still one preset',                   P.list('tplcopy', 'r1').length, 1);
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('validate blocks the save');   // "Enter a template before saving"
+    P._setStorage(makeStore());
+    errors = []; stateNow = { template: '   ' };
+    var v = mk({ validate: function () {
+      return String(stateNow.template || '').replace(/^\s+|\s+$/g, '')
+        ? null : 'Enter a template before saving a preset.';
+    } });
+    promptReply = 'Nope';
+    click(q(v.h, '.pnb-preset-save'));
+    eq('nothing was written', P.list('tplcopy', 'r1').length, 0);
+    eq('and it said why',     errors, ['Enter a template before saving a preset.']);
+
+    stateNow = { template: 'real' };
+    click(q(v.h, '.pnb-preset-chip'));
+    click(q(v.h, '.pnb-preset-save'));
+    eq('a valid template saves', P.list('tplcopy', 'r1').length, 1);
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('rename and delete');
+    P._setStorage(makeStore());
+    stateNow = { template: 'x' };
+    var rd = mk();
+    promptReply = 'First';
+    click(q(rd.h, '.pnb-preset-save'));
+
+    click(q(rd.h, '.pnb-preset-chip'));
+    promptReply = 'Renamed';
+    click(qa(rd.h, '.pnb-preset-row .pnb-preset-act')[0]);   // rename (no pin here)
+    eq('renamed in the store', P.list('tplcopy', 'r1').map(function (e) { return e.name; }), ['Renamed']);
+    eq('chip followed it',     chipText(rd.h), 'Renamed');
+
+    confirmReply = false;
+    click(qa(rd.h, '.pnb-preset-row .pnb-preset-act')[1]);   // delete, declined
+    eq('declining the confirm keeps it', P.list('tplcopy', 'r1').length, 1);
+
+    confirmReply = true;
+    click(qa(rd.h, '.pnb-preset-row .pnb-preset-act')[1]);   // delete, accepted
+    eq('deleted',              P.list('tplcopy', 'r1').length, 0);
+    eq('chip reset to label',  chipText(rd.h), 'none');
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('preset names are rendered as text');   // __break=3 lands here
+    P._setStorage(makeStore());
+    var nasty = '<img src=x onerror="window.__XSS=1">';
+    P.save('tplcopy', 'r1', nasty, { template: 'q' });
+    var x = mk();
+    click(q(x.h, '.pnb-preset-chip'));
+    eq('name survives verbatim as text', rowNames(x.h), [nasty]);
+    eq('no element was injected',        qa(x.h, '.pnb-preset-row img').length, 0);
+    eq('and no handler ran',             !!window.__XSS, false);
+
+    // Same guard on the chip, which shows the loaded name.
+    click(qa(x.h, '.pnb-preset-pick')[0]);
+    eq('chip renders it as text too', chipText(x.h), nasty);
+    eq('nothing injected into the chip', qa(x.h, '.pnb-preset-chip img').length, 0);
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('shared source - nothing at mount, fetch on open');   // __break=4 lands here
+    P._setStorage(makeStore());
+    P.shared._reset();
+    var calls = [], queue = [];
+    P.shared._setTransport(function (method, url, body, cb) {
+      calls.push({ method: method, url: url, body: body });
+      queue.push(cb);
+    });
+    function answer(status, json) {
+      var cb = queue.shift();
+      if (!cb) { throw new Error('answer(): no request is waiting'); }
+      cb(status, json);
+    }
+    function shRows(el) { return qa(el, '.pnb-preset-row.is-shared .pnb-preset-rname').map(function (n) { return n.textContent; }); }
+    function shRow(el, name) {
+      return qa(el, '.pnb-preset-row.is-shared').filter(function (r) { return q(r, '.pnb-preset-rname').textContent === name; })[0];
+    }
+    function localRow(el, name) {
+      return qa(el, '.pnb-preset-row:not(.is-shared)').filter(function (r) { return q(r, '.pnb-preset-rname').textContent === name; })[0];
+    }
+    function acts(row) { return qa(row, '.pnb-preset-act'); }
+    function noteText(el) { var n = q(el, '.pnb-preset-note'); return n ? n.textContent : null; }
+    function secs(el) { return qa(el, '.pnb-preset-sec').map(function (n) { return n.textContent; }); }
+    function last() { return calls[calls.length - 1]; }
+    var notified = 0, off = P.shared.onChange(function () { notified++; });
+
+    stateNow = { rows: ['COLLEGE'] };
+    P.save('pivot', 'r1', 'Mine', { rows: ['FY'] });
+    var sh = mk({ ns: 'pivot', shared: true });
+    eq('mounting makes NO request',  calls.length, 0);
+    sh.c.refresh();
+    eq('refresh() makes NO request', calls.length, 0);
+
+    click(q(sh.h, '.pnb-preset-chip'));
+    eq('opening makes exactly one request',      calls.length, 1);
+    eq('a GET of the list for this report',      calls[0].method + ' ' + calls[0].url, 'GET manage_presets.php?action=list&report_id=r1');
+    eq('two headings: Yours and Shared',         secs(sh.h), ['Yours', 'Shared']);
+    eq('local rows render before the answer',    rowNames(sh.h).indexOf('Mine') !== -1, true);
+    eq('the shared section says it is loading',  noteText(sh.h), 'Loading shared presets…');
+    eq('no Share row before the server answers', !!q(sh.h, '.pnb-preset-share'), false);
+
+    answer(200, { status: 'success', can_write: false, data: [
+      { ns: 'pivot', name: 'Team view', data: { rows: ['DEPT'] }, created_by: 'owner1', updated_at: '2026-09-05T10:00:00' },
+      { ns: 'pivot', name: 'alpha',     data: { rows: ['A'] },    created_by: 'owner1' },
+      { ns: 'viz',   name: 'Chart',     data: { type: 'bar' } },
+      { ns: 'bogus', name: 'Nope',      data: { x: 1 } },
+      { ns: 'pivot', name: 'broken',    data: 'not an object' }
+    ] });
+    eq('shared rows for THIS namespace only, name-sorted', shRows(sh.h), ['alpha', 'Team view']);
+    eq('local rows still there',                    rowNames(sh.h).indexOf('Mine') !== -1, true);
+    eq('panel stayed open through the repaint',     q(sh.h, '.pnb-preset-pop').hidden, false);
+    eq('shared.onChange subscribers were told',     notified >= 1, true);
+    eq('viewer: shared row = pin + copy only',      acts(shRow(sh.h, 'alpha')).length, 2);
+    eq('viewer: local row = pin + rename + delete', acts(localRow(sh.h, 'Mine')).length, 3);
+    eq('viewer: no Share footer row',               !!q(sh.h, '.pnb-preset-share'), false);
+    eq('shared row title names the author',         q(shRow(sh.h, 'Team view'), '.pnb-preset-pick').title.indexOf('owner1') !== -1, true);
+    eq('delete keeps its danger class on local rows', acts(localRow(sh.h, 'Mine'))[2].className.indexOf('is-danger') !== -1, true);
+
+    // copy to yours (the viewer's way to tweak a shared preset)
+    click(acts(shRow(sh.h, 'alpha'))[1]);
+    eq('copy saves a local preset of the same name', P.get('pivot', 'r1', 'alpha'), { rows: ['A'] });
+    eq('...without pinning it',                       P.isPinned('pivot', 'r1', 'alpha'), false);
+    eq('...and without any request',                  calls.length, 1);
+    eq('it now appears under Yours too',              !!localRow(sh.h, 'alpha'), true);
+
+    applied = null;
+    click(q(shRow(sh.h, 'Team view'), '.pnb-preset-pick'));
+    eq('picking a shared row applies its data',   applied, { data: { rows: ['DEPT'] }, name: 'Team view' });
+    eq('chip names it',                           chipText(sh.h), 'Team view');
+    eq('chip is marked as a shared load',         q(sh.h, '.pnb-preset').className.indexOf('is-shared-loaded') !== -1, true);
+    eq('loadedSource() says shared',              sh.c.loadedSource(), 'shared');
+    eq('picking closed the panel',                q(sh.h, '.pnb-preset-pop').hidden, true);
+
+    click(q(sh.h, '.pnb-preset-chip'));
+    eq('reopening inside the repeat guard makes NO new request', calls.length, 1);
+    eq('the loaded shared row is ticked', qa(sh.h, '.pnb-preset-row.is-shared.is-on .pnb-preset-rname').map(function (n) { return n.textContent; }), ['Team view']);
+    eq('and no local row is',             qa(sh.h, '.pnb-preset-row:not(.is-shared).is-on').length, 0);
+    click(q(sh.h, '.pnb-preset-chip'));
+
+    P.shared._setTtl(0);
+    click(q(sh.h, '.pnb-preset-chip'));
+    eq('with the guard expired, reopening fetches again', calls.length, 2);
+    P.shared._setTtl(30000);
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('shared source - an author shares, renames, deletes; pin materializes');
+    answer(200, { status: 'success', can_write: true, data: [
+      { ns: 'pivot', name: 'Team view', data: { rows: ['DEPT'] }, created_by: 'owner1' }
+    ] });
+    eq('author: the Share footer row appears once the server says can_write', !!q(sh.h, '.pnb-preset-share'), true);
+    eq('author: shared row = pin + copy + rename + delete',  acts(shRow(sh.h, 'Team view')).length, 4);
+    eq('author: local row = pin + share + rename + delete',  acts(localRow(sh.h, 'Mine')).length, 4);
+    eq('rows the server no longer lists are gone',           shRows(sh.h), ['Team view']);
+
+    promptSeen = []; promptReply = 'Everyone';
+    stateNow = { rows: ['COLLEGE'] };
+    click(q(sh.h, '.pnb-preset-share'));
+    eq('Share prompts, defaulting to the loaded name', promptSeen[0][1], 'Team view');
+    eq('Share POSTs a save',                           last().method, 'POST');
+    eq('with the endpoint\'s body shape',               last().body, { action: 'save', report_id: 'r1', ns: 'pivot', name: 'Everyone', data: { rows: ['COLLEGE'] } });
+    eq('the panel closed',                             q(sh.h, '.pnb-preset-pop').hidden, true);
+    var before = calls.length;
+    answer(200, { status: 'success', mode: 'create' });
+    eq('success refetches the list',                   calls.length === before + 1 && last().method === 'GET', true);
+    eq('chip names the shared preset',                 chipText(sh.h), 'Everyone');
+    eq('as a shared load',                             sh.c.loadedSource(), 'shared');
+    answer(200, { status: 'success', can_write: true, data: [
+      { ns: 'pivot', name: 'Team view', data: { rows: ['DEPT'] } },
+      { ns: 'pivot', name: 'Everyone',  data: { rows: ['COLLEGE'] } }
+    ] });
+    click(q(sh.h, '.pnb-preset-chip'));
+    eq('the new shared row is listed', shRows(sh.h), ['Everyone', 'Team view']);
+    eq('and ticked',                   qa(sh.h, '.pnb-preset-row.is-shared.is-on .pnb-preset-rname')[0].textContent, 'Everyone');
+
+    // a refused share reports and changes nothing
+    errors = []; promptReply = 'Bad';
+    click(q(sh.h, '.pnb-preset-share'));
+    before = calls.length;
+    answer(403, { status: 'error', message: 'Only the report\'s owner, an administrator, or a report-grant holder can change shared presets.' });
+    eq('a refused share is reported',             errors.length === 1 && errors[0].indexOf('Only the report') !== -1, true);
+    eq('the chip keeps the last good name',       chipText(sh.h), 'Everyone');
+    eq('and no refetch followed the failure',     calls.length, before);
+
+    // share an existing LOCAL preset from its row
+    click(q(sh.h, '.pnb-preset-chip'));
+    click(acts(localRow(sh.h, 'Mine'))[1]);   // pin, SHARE, rename, delete
+    eq('sharing a local row POSTs its data under its name', last().body, { action: 'save', report_id: 'r1', ns: 'pivot', name: 'Mine', data: { rows: ['FY'] } });
+    answer(200, { status: 'success' });
+    answer(200, { status: 'success', can_write: true, data: [
+      { ns: 'pivot', name: 'Team view', data: { rows: ['DEPT'] } },
+      { ns: 'pivot', name: 'Everyone',  data: { rows: ['COLLEGE'] } },
+      { ns: 'pivot', name: 'Mine',      data: { rows: ['FY'] } }
+    ] });
+    eq('it is now listed under Shared as well', shRows(sh.h), ['Everyone', 'Mine', 'Team view']);
+    eq('the panel stayed open',                  q(sh.h, '.pnb-preset-pop').hidden, false);
+
+    // delete for everyone
+    confirmReply = false;
+    before = calls.length;
+    click(acts(shRow(sh.h, 'Team view'))[3]);
+    eq('declining the confirm sends nothing', calls.length, before);
+    confirmReply = true;
+    click(acts(shRow(sh.h, 'Team view'))[3]);
+    eq('delete POSTs', last().body, { action: 'delete', report_id: 'r1', ns: 'pivot', name: 'Team view' });
+    answer(200, { status: 'success' });
+    answer(200, { status: 'success', can_write: true, data: [
+      { ns: 'pivot', name: 'Everyone', data: { rows: ['COLLEGE'] } },
+      { ns: 'pivot', name: 'Mine',     data: { rows: ['FY'] } }
+    ] });
+    eq('the row is gone', shRows(sh.h), ['Everyone', 'Mine']);
+
+    // deleting the LOADED shared preset resets the chip
+    click(acts(shRow(sh.h, 'Everyone'))[3]);
+    answer(200, { status: 'success' });
+    answer(200, { status: 'success', can_write: true, data: [ { ns: 'pivot', name: 'Mine', data: { rows: ['FY'] } } ] });
+    eq('chip reset after deleting the loaded shared preset', chipText(sh.h), 'none');
+    eq('and the shared mark is gone', q(sh.h, '.pnb-preset').className.indexOf('is-shared-loaded'), -1);
+
+    // rename for everyone = save new + delete old
+    promptReply = 'Mine2';
+    click(acts(shRow(sh.h, 'Mine'))[2]);
+    eq('rename saves under the new name first', last().body, { action: 'save', report_id: 'r1', ns: 'pivot', name: 'Mine2', data: { rows: ['FY'] } });
+    answer(200, { status: 'success' });
+    eq('then deletes the old one',              last().body, { action: 'delete', report_id: 'r1', ns: 'pivot', name: 'Mine' });
+    answer(200, { status: 'success' });
+    answer(200, { status: 'success', can_write: true, data: [ { ns: 'pivot', name: 'Mine2', data: { rows: ['FY'] } } ] });
+    eq('the list shows the new name', shRows(sh.h), ['Mine2']);
+
+    // pin a shared preset: copy to local, pin the copy, load it - no request
+    before = calls.length;
+    click(acts(shRow(sh.h, 'Mine2'))[0]);
+    eq('pinning a shared preset copies it into the local store', P.get('pivot', 'r1', 'Mine2'), { rows: ['FY'] });
+    eq('and pins the LOCAL copy',                                P.isPinned('pivot', 'r1', 'Mine2'), true);
+    eq('the chip shows a LOCAL load',                            sh.c.loadedSource(), 'local');
+    eq('named Mine2',                                            chipText(sh.h), 'Mine2');
+    eq('and no request was made for it',                         calls.length, before);
+    click(q(sh.h, '.pnb-preset-chip'));
+    eq('the local copy carries the pin, the shared row does not',
+       acts(localRow(sh.h, 'Mine2'))[0].className.indexOf('is-pinned') !== -1 &&
+       acts(shRow(sh.h, 'Mine2'))[0].className.indexOf('is-pinned') === -1, true);
+    click(q(sh.h, '.pnb-preset-chip'));
+    off();
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('shared source - degraded answers, ad-hoc pages, text safety');
+    P.shared._reset(); calls = []; queue = [];
+    var er = mk({ ns: 'pivot', shared: true });
+    click(q(er.h, '.pnb-preset-chip'));
+    answer(500, { status: 'error', message: 'Server error: ORA-12170' });
+    eq('an error shows a note, not an empty list', noteText(er.h), 'Shared presets unavailable.');
+    eq('with the reason in its title',              q(er.h, '.pnb-preset-note').title, 'Server error: ORA-12170');
+    eq('local rows are unaffected',                 rowNames(er.h).length >= 1, true);
+    click(q(er.h, '.pnb-preset-chip'));
+
+    P.shared._reset();
+    var ni = mk({ ns: 'pivot', shared: true });
+    click(q(ni.h, '.pnb-preset-chip'));
+    answer(200, { status: 'success', data: [], can_write: true, needs_install: true });
+    eq('needs_install reads as "not set up"',                    noteText(ni.h), 'Shared presets are not set up on this server.');
+    eq('an author still sees the Share row (server said can_write)', !!q(ni.h, '.pnb-preset-share'), true);
+    click(q(ni.h, '.pnb-preset-chip'));
+
+    P.shared._reset();
+    var ne = mk({ ns: 'pivot', shared: true });
+    click(q(ne.h, '.pnb-preset-chip'));
+    answer(200, { status: 'success', data: [], can_write: false });
+    eq('an empty answer reads as "no shared presets yet"', noteText(ne.h), 'No shared presets yet.');
+    click(q(ne.h, '.pnb-preset-chip'));
+
+    calls = []; queue = [];
+    var ad = mk({ ns: 'pivot', shared: true, reportId: '__adhoc__' });
+    click(q(ad.h, '.pnb-preset-chip'));
+    eq('an ad-hoc page never asks the server', calls.length, 0);
+    eq('and draws no headings at all',         secs(ad.h), []);
+    click(q(ad.h, '.pnb-preset-chip'));
+
+    var plain = mk({ ns: 'pivot' });
+    click(q(plain.h, '.pnb-preset-chip'));
+    eq('a control without cfg.shared is unchanged: no headings', secs(plain.h), []);
+    eq('...and no request',                                       calls.length, 0);
+    click(q(plain.h, '.pnb-preset-chip'));
+
+    P.shared._reset();
+    var sx = mk({ ns: 'pivot', shared: true });
+    click(q(sx.h, '.pnb-preset-chip'));
+    answer(200, { status: 'success', can_write: false, data: [ { ns: 'pivot', name: nasty, data: { a: 1 } } ] });
+    eq('a shared name survives verbatim as text', shRows(sx.h), [nasty]);
+    eq('nothing was injected',                    qa(sx.h, '.pnb-preset-row img').length, 0);
+    click(q(sx.h, '.pnb-preset-chip'));
+
+    P.shared._reset();
+    var hint = mk({ ns: 'pivot', shared: { canWrite: true, shareLabel: 'Share this chart…' } });
+    click(q(hint.h, '.pnb-preset-chip'));
+    eq('a client hint shows the Share row before the server answers', !!q(hint.h, '.pnb-preset-share'), true);
+    eq('with the caller\'s label',                                     q(hint.h, '.pnb-preset-share .pnb-preset-rname').textContent, 'Share this chart…');
+    answer(200, { status: 'success', can_write: false, data: [] });
+    eq('...and the server\'s answer overrides the hint',               !!q(hint.h, '.pnb-preset-share'), false);
+    click(q(hint.h, '.pnb-preset-chip'));
+    P.shared._setTransport(null);
+
+    // ══════════════════════════════════════════════════════════════════════
+    sec('destroy');
+    var dz = mk();
+    dz.c.destroy();
+    eq('control removed from the DOM', !!q(dz.h, '.pnb-preset'), false);
+    eq('and no longer counted open',   P.handleEscape(), false);
+
+    out.textContent = log.join('\n') + '\n\n' + pass + ' passed, ' + fail + ' failed'
+      + (window.__break ? '   [BREAK=' + window.__break + ' CONTROL: failures are REQUIRED]' : '');
+  } catch (e) {
+    out.textContent = 'HARNESS-ERROR' + (window.__break ? ' [BREAK=' + window.__break + ']' : '')
+      + ': ' + e.name + ': ' + e.message + '\n\n' + log.join('\n');
+  }
+})();
+</script>
+</body></html>

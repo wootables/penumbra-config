@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ownerview harness</title>
+<script src="jquery.js"></script>
+<style>
+  #out { white-space: pre-wrap; word-break: break-all; font: 11px/1.3 Consolas, monospace; margin: 12px 0 0; }
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+  .pnb-user-hidden { outline: 1px dashed orange; }
+</style>
+</head>
+<body>
+<!-- Stand-ins for the controls the View Options markers paint (main.js PNB_USER_HIDDEN_TARGETS). -->
+<div id="tableSearchContainer"><div class="search-wrapper" title="Search the table" aria-label="Search">search</div></div>
+<span id="emailTableBtn" role="button" title="(CTRL+SHIFT+E) Email" aria-label="Email the table">E</span>
+<span id="journalBtnWrap" class="journal-btn-wrap" style="display:none;"><span id="journalBtn" role="button" aria-label="Open the report journal">J</span><span id="journalBadge" style="display:none;"></span></span>
+<span id="sbFrozen" role="button" title="Frozen columns">F</span>
+<div class="sp-columns-section">columns</div>
+<div id="paginationControls">pages</div>
+<div id="chartMenu"><div data-action="editChart" title="Chart Configuration">Chart Configuration</div></div>
+<div id="hiddenOpts" style="position:absolute; left:-9999px;"><div class="view-options-grid"><input type="checkbox" id="viewOptionSearch" checked><input type="checkbox" id="viewOptionSnapshots" checked><input type="checkbox" id="viewOptionEmail" checked><input type="checkbox" id="viewOptionGrouping" checked><input type="checkbox" id="viewOptionClipboard" checked><input type="checkbox" id="viewOptionExport" checked><input type="checkbox" id="viewOptionPivot" checked><input type="checkbox" id="viewOptionViz" checked><input type="checkbox" id="viewOptionPagination" checked><input type="checkbox" id="viewOptionJournal"><input type="checkbox" id="viewOptionColumns" checked></div></div>
+<!-- The journal panel's skeleton, as far as js/penumbra_journal.js writes to it. -->
+<div id="journalLightbox" style="display:none;"><div id="journalDlgSub"></div><div id="journalStatusLine"></div><div class="journal-tabs"></div><div id="journalSearchBar"><input id="journalSearch"><span id="journalSearchClear"></span></div><div id="journalReplyBanner"></div><div id="journalNotesList"></div><div id="journalComposer"></div></div>
+<div id="presetAnchor"></div>
+<pre id="out"></pre>
+<script>
+// The page's globals, as index.php / main.js have them: penumbra_vars is a global
+// binding (a const in production), isNoAdmView is main.js's copy of its noadm.
+var penumbra_vars = {};
+var isNoAdmView = false;
+</script>
+<script>
+/*
+ * ownerview browser half. ?case=<name>&id=r1. Slices the code under test out of
+ * the files the runner staged next to this page (main.js, penumbra_journal.js,
+ * penumbra_presets.js) and evals it at GLOBAL scope, as the app runs it:
+ *   - main.js: the View Options markers (PNB_USER_HIDDEN_TARGETS ..
+ *     applyUserViewRestrictions) and the whole Report Journal IIFE (the peek,
+ *     the J button, the badge, the publish gate)
+ *   - penumbra_journal.js: the whole module (panel copy), or just its fallback
+ *     peek rule (reportId .. notesCache)
+ *   - penumbra_presets.js: the whole module (the shared list's can_write clamp)
+ * Result: window.__vo = { asserts: [...] }, window.__voDone = true.
+ */
+(function () {
+  var q = new URLSearchParams(location.search), A = [], G = eval;
+  function T(id, name, pass, detail) { A.push({ id: id, name: name, pass: !!pass, detail: String(detail === undefined ? '' : detail) }); }
+  function done() { window.__vo = { asserts: A }; document.getElementById('out').textContent = JSON.stringify(A, null, 1); window.__voDone = true; }
+  function fail(m) { T('Z0', 'the harness set up (' + (q.get('case') || '') + ')', false, m); done(); }
+  function get(u) {
+    var x = new XMLHttpRequest(); x.open('GET', u, false); x.overrideMimeType('text/plain; charset=utf-8'); x.send(null);
+    if (!x.responseText) throw new Error('could not read ' + u);
+    return x.responseText.replace(/\r\n/g, '\n');
+  }
+  function slice(code, a, b, max) {
+    var i = code.indexOf(a); if (i < 0) throw new Error('anchor missing: ' + a.slice(0, 70));
+    if (code.indexOf(a, i + 1) >= 0) throw new Error('anchor not unique: ' + a.slice(0, 70));
+    var j = code.indexOf(b, i + a.length); if (j < 0) throw new Error('end anchor missing after: ' + a.slice(0, 70));
+    if (max && j - i > max) throw new Error('slice too long (' + (j - i) + ') for: ' + a.slice(0, 70));
+    return code.slice(i, j);
+  }
+  function J(o) { return JSON.stringify(o); }
+
+  // The literal editors' wording (2026-10-01). Hard-coded, not read from main.js,
+  // so a reverted constant is caught.
+  var NOTE = "EDITORS ONLY: View Options hide this from this report's viewers.";
+  var ARIA = ' (hidden from viewers)';
+  var LIMITS = 'Journal OFF: report-level notes only';
+
+  // ---- stubs for what the sliced code calls outside itself ----
+  var rec = { shown: [], confirms: [], ajax: [], proceed: 0, cancel: 0 };
+  window.show_text = function (h) { rec.shown.push(String(h)); };
+  window.escapeHtml = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+  window.penumbraProbeAssetForExpiry = function () { return { then: function () {} }; };
+  var confirmAnswers = [];
+  window.confirm = function (m) { rec.confirms.push(String(m)); return confirmAnswers.length ? confirmAnswers.shift() : true; };
+  window.alert = function () {};
+  // $.ajax: answered synchronously from a plan keyed by action.
+  var plan = {};
+  $.ajax = function (opts) {
+    var url = String(opts.url || ''), body = null;
+    try { body = opts.data ? (typeof opts.data === 'string' ? JSON.parse(opts.data) : opts.data) : null; } catch (e) { body = null; }
+    var m = url.match(/[?&]action=([a-z_]+)/), action = m ? m[1] : (body && body.action) || '';
+    rec.ajax.push({ action: action, method: String(opts.method || opts.type || 'GET').toUpperCase(), url: url });
+    var d = $.Deferred(), fn = plan[action] || function () { return { ok: true, data: { status: 'success' } }; }, r = fn(body);
+    if (r.ok) d.resolve(r.data); else d.reject({ responseJSON: r.data, responseText: JSON.stringify(r.data || {}) });
+    return d.promise();
+  };
+
+  // Roles. isAdmin = index.php's $canEditLoadedReport (admin, owner, report-grant
+  // holder; false for everyone under &noadm since 2026-10-01). journalAccess =
+  // index.php's $pnbJrnAccess, manage_journal.php's own gate (admin, owner, a
+  // report grant since 2026-10-02, or the access list). Every role HAS it, so each
+  // is held back by its own term.
+  var ROLES = {
+    gadmin:      { isAdmin: true,  isGlobalAdmin: true,  noadm: false, journalAccess: true },
+    editor:      { isAdmin: true,  isGlobalAdmin: false, noadm: false, journalAccess: true },   // a non-admin owner, or a grant holder on the access list
+    grantonly:   { isAdmin: true,  isGlobalAdmin: false, noadm: false, journalAccess: true },   // a grant holder off the access list: the API accepts a grant since 2026-10-02
+    noadm:       { isAdmin: false, isGlobalAdmin: false, noadm: true,  journalAccess: true },   // anyone with &noadm, owners included
+    noadmeditor: { isAdmin: true,  isGlobalAdmin: false, noadm: true,  journalAccess: true },   // unreachable now; the client must hold on its own
+    viewer:      { isAdmin: false, isGlobalAdmin: false, noadm: false, journalAccess: true }
+  };
+  function role(r, journal) {
+    var k, R = ROLES[r];
+    for (k in penumbra_vars) delete penumbra_vars[k];
+    penumbra_vars.currentUserKey = 'ada';
+    for (k in R) penumbra_vars[k] = R[k];
+    penumbra_vars.journal = journal === undefined ? { installed: true, enabled: false, total: 2, unseen: 1 } : journal;
+    isNoAdmView = R.noadm;
+  }
+
+  var srcCache = {};
+  function src(f) { return srcCache[f] || (srcCache[f] = get(f)); }
+  function loadMarkers() {
+    G(slice(src('main.js'), '    var PNB_USER_HIDDEN_TARGETS = {', '    function applyUserViewRestrictions(viewOptions) {', 30000));
+  }
+  function loadJournalIife() {
+    G(slice(src('main.js'), '    (function () {\n        // Frozen at boot: data-exploration mode strips ?id= from the URL later,',
+            '    // ============================================================\n    // ===== Version History (report editors, not only admins) ====', 40000));
+  }
+  function loadModule(f) { G(src(f)); }
+  // The lazy journal module's own fallback peek rule, with no main.js rule to defer to.
+  function fallbackPeek() {
+    var code = slice(src('penumbra_journal.js'), '    function reportId() {', '    var notesCache = [];', 6000);
+    return new Function('P', code + '\nreturn adminPeek;')({});
+  }
+  function btn() {
+    var $b = $('#journalBtn');
+    return { shown: $('#journalBtnWrap').css('display') !== 'none', marked: $b.hasClass('pnb-user-hidden'), title: $b.attr('title') || '',
+             aria: $b.attr('aria-label') || '', badge: $('#journalBadge').css('display') !== 'none' ? $('#journalBadge').text() : '' };
+  }
+  function endsWith(s, t) { return s.length >= t.length && s.slice(-t.length) === t; }
+  function markedAll() { return $('.pnb-user-hidden').map(function () { return this.id || this.className; }).get(); }
+  function gate(answers) {
+    confirmAnswers = (answers || []).slice(); rec.confirms = []; rec.ajax = []; rec.proceed = 0; rec.cancel = 0; rec.shown = [];
+    window.Penumbra.journalPublishGate(function () { rec.proceed++; }, function () { rec.cancel++; });
+    return { confirms: rec.confirms.slice(), wipe: rec.ajax.filter(function (a) { return a.action === 'wipe_notes'; }).length,
+             proceed: rec.proceed, cancel: rec.cancel, shown: rec.shown.join(' ') };
+  }
+
+  var c = q.get('case') || '';
+  try {
+    if (c === 'parse') {
+      ['main.js', 'penumbra_journal.js', 'penumbra_presets.js'].forEach(function (f) {
+        var ok = true, err = '';
+        try { new Function(src(f)); } catch (e) { ok = false; err = e.message; }
+        T('Z1', f + ' parses', ok, err || (src(f).length + ' chars'));
+      });
+      done();
+
+    } else if (c === 'gadmin' || c === 'editor' || c === 'grantonly' || c === 'noadm' || c === 'noadmeditor' || c === 'viewer') {
+      // null = what index.php sends when it skips the preload (no peek, journal off).
+      role(c, (c === 'noadm' || c === 'viewer') ? null : undefined);
+      plan.summary = function () { return { ok: true, data: { status: 'success', installed: true, total: 2, unseen: 1 } }; };
+      plan.wipe_notes = function () { return { ok: true, data: { status: 'success', deleted: 2 } }; };
+      loadMarkers(); loadJournalIife();
+      var b = btn(), peek = window.Penumbra.journalAdminPeek();
+      var peekOk = b.shown && b.marked && b.title.indexOf(LIMITS) >= 0 && endsWith(b.title, ' -- ' + NOTE) && endsWith(b.aria, ARIA) && b.badge === '1';
+      var noPeek = !peek && !b.shown && !b.marked && b.title.indexOf(LIMITS) < 0 && b.title.indexOf(NOTE) < 0;
+      if (c === 'gadmin') {
+        T('J1', 'a global admin on a journal-OFF report: the J button shows, marked, with the peek limits, the editors\' note and its badge', peek && peekOk, J(b));
+        var g = gate([true, true]);
+        T('G2', 'publish gate, global admin: offered the wipe after the warning, and OK clears then publishes',
+          g.confirms.length === 2 && /^Delete those 2 notes first/.test(g.confirms[1]) && g.wipe === 1 && g.proceed === 1 && g.cancel === 0 && /Journal cleared: 2 notes deleted/.test(g.shown), J(g));
+        T('G4', 'publish gate, global admin: the warning names administrators AND the report\'s editors, with no "ask an administrator"',
+          g.confirms.length >= 1 && g.confirms[0].indexOf("Only administrators and this report's editors could reach them.") >= 0 && g.confirms[0].indexOf('ask an administrator') < 0, J(g.confirms));
+      } else if (c === 'editor') {
+        T('J2', 'a non-admin owner / report-grant editor on a journal-OFF report gets the same marked J button as an admin (badge included)', peek && peekOk, J(b));
+        rec.ajax = [];
+        window.Penumbra.refreshJournalBadge();
+        T('J7', '...and its badge refreshes live (a summary request) while peeking', rec.ajax.filter(function (a) { return a.action === 'summary'; }).length === 1, J(rec.ajax));
+        // View Options markers for the same editor.
+        $('#viewOptionSearch, #viewOptionEmail, #viewOptionViz, #viewOptionColumns').prop('checked', false);
+        penumbraRefreshUserHiddenMarkers();
+        penumbraMarkUserHiddenFor('viewOptionViz', $('#chartMenu [data-action="editChart"]'));
+        var sw = $('#tableSearchContainer .search-wrapper'), em = $('#emailTableBtn'), all = $('[title]').map(function () { return this.getAttribute('title'); }).get().join(' | ');
+        T('M1', 'markers for an editor carry the editors\' note (title) and "(hidden from viewers)" (aria) - never ADMIN ONLY',
+          sw.hasClass('pnb-user-hidden') && sw.attr('title') === 'Search the table -- ' + NOTE && sw.attr('aria-label') === 'Search' + ARIA
+          && em.attr('title') === '(CTRL+SHIFT+E) Email -- ' + NOTE && em.attr('aria-label') === 'Email the table' + ARIA && all.indexOf('ADMIN ONLY') < 0,
+          'search=[' + sw.attr('title') + '|' + sw.attr('aria-label') + '] email=[' + em.attr('title') + '|' + em.attr('aria-label') + ']');
+        penumbraRefreshUserHiddenMarkers(); penumbraRefreshUserHiddenMarkers();
+        // Counted against the module's own constant: M2 is the mechanics, M1 the wording.
+        var twice = sw.attr('title').split(window.PNB_USER_HIDDEN_NOTE).length - 1, chart = $('#chartMenu [data-action="editChart"]').hasClass('pnb-user-hidden');
+        var cols = $('.sp-columns-section').hasClass('pnb-user-hidden') && $('#sbFrozen').hasClass('pnb-user-hidden');
+        $('#viewOptionSearch, #viewOptionEmail, #viewOptionViz, #viewOptionColumns').prop('checked', true);
+        penumbraRefreshUserHiddenMarkers();
+        // The chart row is minted per menu open, so it is re-marked at its render site.
+        penumbraMarkUserHiddenFor('viewOptionViz', $('#chartMenu [data-action="editChart"]'));
+        T('M2', 'editor markers: idempotent, reach the chart row / Columns section / snowflake chip, and lift cleanly back to the base title and label',
+          twice === 1 && chart && cols && sw.attr('title') === 'Search the table' && sw.attr('aria-label') === 'Search' && em.attr('aria-label') === 'Email the table' && markedAll().filter(function (x) { return x !== 'journalBtn'; }).length === 0,
+          'noteCount=' + twice + ' chart=' + chart + ' cols=' + cols + ' after=[' + sw.attr('title') + '|' + sw.attr('aria-label') + '] marked=' + J(markedAll()));
+        var g1 = gate([true]);
+        T('G1', 'publish gate, owner / report-grant editor: ONE confirm naming administrators and the editors and pointing at an administrator for a clear-out; no wipe offered or sent; it publishes',
+          g1.confirms.length === 1 && g1.confirms[0].indexOf("Only administrators and this report's editors could reach them.") >= 0
+          && g1.confirms[0].indexOf('Cancel and ask an administrator to clear them first') >= 0 && g1.confirms.join('').indexOf('Delete ') < 0
+          && g1.wipe === 0 && g1.proceed === 1 && g1.cancel === 0, J(g1));
+        var g5 = gate([false]);
+        T('G5', 'publish gate, editor: Cancel on the warning leaves the journal off and clears nothing', g5.confirms.length === 1 && g5.cancel === 1 && g5.proceed === 0 && g5.wipe === 0, J(g5));
+      } else if (c === 'noadm') {
+        T('J3', '&noadm (owner or admin alike): no J button, no peek, no marker', noPeek && b.badge === '', J(b));
+        $('#viewOptionSearch, #viewOptionEmail, #viewOptionViz, #viewOptionColumns').prop('checked', false);
+        penumbraRefreshUserHiddenMarkers();
+        penumbraMarkUserHiddenFor('viewOptionViz', $('#chartMenu [data-action="editChart"]'));
+        T('M3', '&noadm: no View Options marker anywhere, titles untouched', markedAll().length === 0 && $('#tableSearchContainer .search-wrapper').attr('title') === 'Search the table', J(markedAll()));
+      } else if (c === 'grantonly') {
+        rec.ajax = [];
+        window.Penumbra.refreshJournalBadge();
+        var sumReq = rec.ajax.filter(function (a) { return a.action === 'summary'; }).length;
+        T('J8', 'a report-grant editor off the access list (the journal API accepts a grant since 2026-10-02): the same marked J button as an owner, its badge, and a live badge request',
+          peek && peekOk && sumReq === 1, J(b) + ' summaryRequests=' + sumReq);
+        // ...and if they tick Report Journal on, the gate's count comes back as a
+        // refusal (HTTP 200 + status:error), which is an unknown count, not zero.
+        plan.summary = function () { return { ok: true, data: { status: 'error', message: 'You do not have access to this report.' } }; };
+        var g6 = gate([true]), g6c = gate([false]);
+        T('G6', 'publish gate, the summary REFUSED: the "could not check" question is asked (OK publishes, Cancel leaves it off), never a silent publish, no wipe',
+          g6.confirms.length === 1 && g6.confirms[0].indexOf('Could not check whether this report already has notes written while the journal was off') === 0
+          && g6.proceed === 1 && g6.cancel === 0 && g6.wipe === 0
+          && g6c.confirms.length === 1 && g6c.proceed === 0 && g6c.cancel === 1 && g6c.wipe === 0, J({ ok: g6, cancel: g6c }));
+      } else if (c === 'noadmeditor') {
+        T('J4', '&noadm with the editor flag still set (the client\'s own guard): no peek, no J button', noPeek, J(b));
+      } else {
+        T('J5', 'a plain viewer on a journal-OFF report: no J button, no peek', noPeek, J(b));
+      }
+      done();
+
+    } else if (c === 'jon') {
+      role('viewer', { installed: true, enabled: true, total: 3, unseen: 0 });
+      loadMarkers(); loadJournalIife();
+      var bj = btn();
+      T('J6', 'journal ON: a viewer gets the plain J button - no marker, no peek limits', bj.shown && !bj.marked && bj.title.indexOf(LIMITS) < 0 && bj.title.indexOf('3 notes') >= 0 && !window.Penumbra.journalAdminPeek(), J(bj));
+      done();
+
+    } else if (c === 'gatefail') {
+      role('editor');
+      plan.summary = function () { return { ok: false, data: { status: 'error' } }; };
+      loadMarkers(); loadJournalIife();
+      var gf = gate([true]);
+      T('G3', 'publish gate, the note count unknown: the question names notes written while the journal was off (no "admin-only"), and OK publishes',
+        gf.confirms.length === 1 && gf.confirms[0].indexOf('notes written while the journal was off') >= 0 && gf.confirms[0].indexOf('admin-only') < 0 && gf.proceed === 1 && gf.wipe === 0, J(gf));
+      done();
+
+    } else if (c === 'panel' || c === 'panelfb') {
+      // The real lazy module, opened by an editor on a journal-OFF report with no
+      // notes yet: through main.js's rule ('panel') or its own fallback ('panelfb').
+      role('editor');
+      plan.list = function () { return { ok: true, data: { status: 'success', installed: true, data: [], report: { title: 'Report One' } } }; };
+      if (c === 'panel') { loadMarkers(); loadJournalIife(); }
+      else { window.Penumbra = { journalReportId: 'r1' }; window._penumbraJournalHidden = true; }
+      loadModule('penumbra_journal.js');
+      window.PenumbraJournal.open();
+      setTimeout(function () {
+        var sub = $('#journalDlgSub').text(), empty = $('#journalNotesList .journal-empty').text(), cls = $('#journalLightbox').hasClass('journal-admin-peek');
+        T(c === 'panel' ? 'U1' : 'U2', 'the journal panel tells an editor who can read a note posted while the journal is off' + (c === 'panel' ? '' : ' (module fallback rule)'),
+          cls && sub.indexOf("Visible to administrators and this report's editors only") >= 0 && empty.indexOf("reaches administrators and this report's editors only") >= 0
+          && (sub + empty).indexOf('administrators only') < 0,
+          'peekClass=' + cls + ' sub=[' + sub + '] empty=[' + empty.slice(0, 160) + ']');
+        if (c === 'panel') {
+          // manage_journal.php mails an @mention whatever the switch says; the
+          // e-mail's ?journal=1 link opens nothing for a viewer while it is off.
+          T('U3', 'the peek panel warns that an @mention is still e-mailed but cannot open the journal until it is switched on',
+            empty.indexOf('Anyone else you @mention still gets the note by email, but cannot open the journal until it is switched on.') >= 0, 'empty=[' + empty + ']');
+        }
+        done();
+      }, 50);
+
+    } else if (c === 'fallback') {
+      // main.js's rule and the module's fallback must agree, role by role.
+      role('editor');
+      loadMarkers(); loadJournalIife();
+      var fb = fallbackPeek(), rows = [], agree = true, f1 = null, f2 = [];
+      [['gadmin', true], ['editor', true], ['grantonly', true], ['noadm', true], ['noadmeditor', true], ['viewer', true], ['editor', false], ['gadmin', false]].forEach(function (r) {
+        role(r[0]); window._penumbraJournalHidden = r[1];
+        var a = !!window.Penumbra.journalAdminPeek(), b2 = !!fb();
+        rows.push(r[0] + (r[1] ? '/off' : '/on') + ' main=' + a + ' fallback=' + b2);
+        if (a !== b2) agree = false;
+        if ((r[0] === 'editor' || r[0] === 'grantonly') && r[1]) f1 = (f1 === null) ? b2 : (f1 && b2);
+        if (r[0] !== 'gadmin' && !((r[0] === 'editor' || r[0] === 'grantonly') && r[1])) f2.push(b2);
+      });
+      T('F1', 'penumbra_journal.js fallback rule: an editor (an owner or a grant holder, not a global admin) peeks at a journal-OFF report', f1 === true, rows.join('; '));
+      T('F2', '...and nobody else does: not under &noadm (editor flag or not), not a viewer, not with the journal on', f2.every(function (x) { return x === false; }), rows.join('; '));
+      T('F3', 'the fallback and main.js\'s journalAdminPeek agree for every role', agree, rows.join('; '));
+      done();
+
+    } else if (c === 'presets') {
+      loadModule('penumbra_presets.js');
+      var PP = window.PenumbraPresets, mem = {};
+      PP._setStorage({ getItem: function (k) { return Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : null; }, setItem: function (k, v) { mem[k] = String(v); }, removeItem: function (k) { delete mem[k]; } });
+      PP.shared._setTransport(function (method, url, body, cb) { cb(200, { status: 'success', data: [], can_write: true }); });
+      var ctl = PP.create({ ns: PP.NS.PIVOT, anchor: document.getElementById('presetAnchor'), shared: true, getState: function () { return { a: 1 }; }, applyState: function () {} });
+      var chip = document.querySelector('#presetAnchor .pnb-preset-chip');
+      function openRead() {
+        PP.shared._reset();
+        if (ctl.isOpen()) ctl.close();
+        chip.click();
+        var share = !!document.querySelector('#presetAnchor .pnb-preset-share'), st = PP.shared.state('r1');
+        ctl.close();
+        return { share: share, canWrite: st.canWrite, ts: !!st.ts };
+      }
+      role('editor', null);
+      var on = openRead();
+      T('R2', 'shared presets, an editor without &noadm: the server\'s can_write stands - "Share current..." is offered', on.ts && on.canWrite === true && on.share, J(on));
+      role('noadm', null);
+      var off = openRead();
+      T('R1', 'shared presets under &noadm: the server still says can_write (it never hears &noadm), the page clamps it - no "Share current..."', off.ts && off.canWrite === false && !off.share, J(off));
+      done();
+
+    } else { fail('unknown case ' + c); }
+  } catch (e) { fail(e.message + ' @ ' + (e.stack || '').split('\n').slice(0, 3).join(' / ')); }
+})();
+</script>
+</body>
+</html>
