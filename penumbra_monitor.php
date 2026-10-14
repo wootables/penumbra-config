@@ -575,6 +575,120 @@ if ($noticeOn && !$TESTMODE) {
     if ($noteResult !== '') { mon_log($noteResult); }
 }
 
+/* ---- config-repo backup watch (2026-10-14, the user's ask: "toss me an email") ----
+   The task "Penumbra config auto-commit" (07:00 daily, on bplimon's WORKSTATION) commits and
+   pushes penumbra_config.php, the grants file, php.ini, the server scripts and the test sources
+   to the private penumbra-config repo, one log line per outcome. From that workstation it can
+   tell nobody, and when it never runs it cannot tell anyone at all - so this box reads its log.
+   A refusal, a failed push, an error, or no run for $CB_STALE_HOURS is emailed to $RECIPIENTS:
+   once, a reminder at most every $CB_REMIND_HOURS, one RESOLVED note.
+   EMAIL ONLY, OWN STATE FILE: it never touches the outage state, the flap/correlated detectors
+   or the user banner - a backup that did not happen is the admin's business, not every
+   reader's. The whole block is fenced in try/catch: it must never cost the health check.
+   Stale = 96 h by default, so a weekend with the workstation off stays quiet.
+   One-shot pipe test: create SEND_TEST_EMAIL next to the log; the next tick sends a TEST
+   message (labelled so) and deletes the file. */
+function mon_cfgbak_eval($tail, $now, $staleHours) {
+    // $tail = the log's last lines, oldest first. The LAST outcome line decides; a note about
+    // the workstation notification or a manual test is not a run's outcome and is skipped.
+    $last = null; $lastTs = false;
+    for ($i = count($tail) - 1; $i >= 0; $i--) {
+        if (!preg_match('/^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] (.*)$/', rtrim((string)$tail[$i]), $m)) continue;
+        if (preg_match('/^\(notification failed|^notification test/i', $m[2])) continue;
+        $last = $m[2]; $lastTs = strtotime($m[1]); break;
+    }
+    if ($last === null || $lastTs === false) {
+        return array('status' => 'problem', 'kind' => 'empty', 'detail' => 'the backup log holds no run', 'last_run' => null);
+    }
+    $when = date('Y-m-d H:i', $lastTs);
+    $hours = (int)floor(($now - $lastTs) / 3600);
+    if ($hours >= $staleHours) {
+        return array('status' => 'problem', 'kind' => 'stale', 'last_run' => $when,
+                     'detail' => 'no backup run for ' . $hours . ' hours (last: ' . $when . ', "' . $last . '")');
+    }
+    if (preg_match('/^(REFUSED|push FAILED|ERROR)/', $last, $k)) {
+        return array('status' => 'problem', 'kind' => strtolower(strtok($k[1], ' ')), 'last_run' => $when, 'detail' => $when . ': ' . $last);
+    }
+    return array('status' => 'ok', 'kind' => 'ok', 'last_run' => $when, 'detail' => $when . ': ' . $last);
+}
+function mon_cfgbak_decide($prev, $eval, $now, $remindSecs) {
+    // -> array('send' => '' | 'alert' | 'reminder' | 'resolved', 'state' => what to persist)
+    $alerted = !empty($prev['alerted']);
+    $lastAlert = isset($prev['last_alert']) ? (int)$prev['last_alert'] : 0;
+    if ($eval['status'] === 'ok') {
+        return array('send' => $alerted ? 'resolved' : '', 'state' => array('alerted' => false, 'last_alert' => 0, 'detail' => ''));
+    }
+    if (!$alerted) {
+        return array('send' => 'alert', 'state' => array('alerted' => true, 'last_alert' => $now, 'detail' => $eval['detail']));
+    }
+    if ($now - $lastAlert >= $remindSecs) {
+        return array('send' => 'reminder', 'state' => array('alerted' => true, 'last_alert' => $now, 'detail' => $eval['detail']));
+    }
+    return array('send' => '', 'state' => array('alerted' => true, 'last_alert' => $lastAlert, 'detail' => $eval['detail']));
+}
+$CB_LOG          = isset($MON['cfgbak_log'])          ? (string)$MON['cfgbak_log']        : 'D:\\Utilities\\penumbra_config_git\\autocommit\\config_autocommit.log';
+$CB_STALE_HOURS  = isset($MON['cfgbak_stale_hours'])  ? (int)$MON['cfgbak_stale_hours']   : 96;
+$CB_REMIND_HOURS = isset($MON['cfgbak_remind_hours']) ? (int)$MON['cfgbak_remind_hours']  : 24;
+if ($CB_LOG !== '' && !$TESTMODE && !$SIMULATE) {
+    try {
+        $cbStateFile = 'D:\\Utilities\\PHP_8.2-p\\logs\\penumbra_monitor_cfgbak.json';
+        $cbFlag = dirname($CB_LOG) . DIRECTORY_SEPARATOR . 'SEND_TEST_EMAIL';
+        $cbPrev = json_decode((string)@file_get_contents($cbStateFile), true);
+        if (!is_array($cbPrev)) { $cbPrev = array(); }
+        $cbTail = null;
+        $cbFh = @fopen($CB_LOG, 'rb');
+        if ($cbFh) {
+            $cbSize = (int)@filesize($CB_LOG);
+            if ($cbSize > 8192) { fseek($cbFh, $cbSize - 8192); }
+            $cbTail = preg_split('/\r?\n/', (string)stream_get_contents($cbFh));
+            fclose($cbFh);
+        }
+        $cbEval = ($cbTail === null)
+            ? array('status' => 'problem', 'kind' => 'unreadable', 'last_run' => null, 'detail' => 'cannot read the backup log ' . $CB_LOG)
+            : mon_cfgbak_eval($cbTail, time(), $CB_STALE_HOURS);
+        $cbDo = mon_cfgbak_decide($cbPrev, $cbEval, time(), $CB_REMIND_HOURS * 3600);
+        @file_put_contents($cbStateFile, json_encode($cbDo['state']));
+        $cbSend = $cbDo['send'];
+        if ($cbSend === '' && is_file($cbFlag)) { $cbSend = 'test'; }
+        if ($cbSend !== '') {
+            $cbDetail = $cbEval['detail'];
+            if ($cbSend === 'resolved') {
+                $cbSubj = 'RESOLVED: Penumbra config backup is working again';
+                $cbHtml = penumbra_email_open('Config backup is working again', '#1a7f37', 'Penumbra Monitor', '&#10004;')
+                        . penumbra_email_intro('The daily config backup ran cleanly again, so the earlier warning is closed. No action is needed - this note is sent once.');
+            } elseif ($cbSend === 'test') {
+                $cbSubj = 'TEST: Penumbra config backup alert';
+                $cbHtml = penumbra_email_open('Config backup alert - test', '#336699', 'Penumbra Monitor', '&#9873;')
+                        . penumbra_email_intro('This is a test of the config-backup email, triggered by the SEND_TEST_EMAIL file (now removed). Nothing is wrong unless the line below says so; a real warning looks like this one in red.');
+            } else {
+                $cbSubj = ($cbSend === 'reminder' ? 'STILL NOT BACKED UP: ' : 'NOT BACKED UP: ') . 'Penumbra config - ' . $cbDetail;
+                $cbWhat = ($cbEval['kind'] === 'stale' || $cbEval['kind'] === 'empty')
+                    ? 'The daily backup task has not run. Is the workstation that runs it off, or the task disabled or blocked (antivirus)?'
+                    : (($cbEval['kind'] === 'push')
+                        ? 'The changes are committed on the server but did not reach GitHub - most often an expired GitHub sign-in on the workstation.'
+                        : (($cbEval['kind'] === 'refused')
+                            ? 'The task refused to commit on purpose (an unsealed credential, a token-looking line or a file over 5 MB) and will refuse again until it is looked at.'
+                            : 'The backup task failed with an error.'));
+                $cbHtml = penumbra_email_open('Config backup did not happen', '#a12a2a', 'Penumbra Monitor', '&#9888;')
+                        . penumbra_email_intro($cbWhat . ' Nothing in the app is affected; only its backup is behind.');
+            }
+            $cbHtml .= penumbra_email_callout('What the backup log says', penumbra_email_h($cbDetail))
+                     . penumbra_email_section('Where to look', penumbra_email_pre(
+                           "Backup log:  " . $CB_LOG . "\n"
+                         . "Task:        'Penumbra config auto-commit' on bplimon's workstation (Task Scheduler)\n"
+                         . "History:     https://github.com/wootables/penumbra-config/commits/main"))
+                     . penumbra_email_close('This is an automated message from the Penumbra watchdog (penumbra_monitor.php, config-backup watch, reason: '
+                         . penumbra_email_h($cbSend) . '). It warns once, reminds at most every ' . (int)$CB_REMIND_HOURS
+                         . ' hours and sends one note when the backup recovers. Replies are not monitored.');
+            $cbOk = penumbra_email_send($RECIPIENTS, $cbSubj, $cbHtml, 'Penumbra Monitor', $FROM);
+            if ($cbSend === 'test') { @unlink($cbFlag); }
+            mon_log('config backup: ' . $cbSend . ' (' . $cbDetail . ') - ' . ($cbOk ? 'emailed to ' . $RECIPIENTS : 'EMAIL FAILED'));
+        }
+    } catch (Throwable $cbE) {
+        mon_log('config backup watch: ' . get_class($cbE) . ': ' . $cbE->getMessage());
+    }
+}
+
 // ---- report ------------------------------------------------------------------
 $verdict = $healthy ? 'ok' : ('DEGRADED: ' . implode('; ', $problems));
 // Databases that answered only on a later fallback rung. Named in the log even
