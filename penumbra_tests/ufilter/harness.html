@@ -1,0 +1,44 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>profile popover list filter</title>
+<!-- The REAL stylesheet: a hidden row is hidden through main.css alone
+     (.sb-filtered-out), the card shows through its open class, and focus can
+     only land on what is rendered. -->
+<link rel="stylesheet" href="main.css">
+</head>
+<body>
+<!-- Profile-popover list filter suite (2026-10-14). The CHROME mount of the
+     status bar's profile card (penumbra_admin_chrome.php's twin, driven by
+     PenumbraUserSeg.wireChromeBar() - vanilla, no jQuery) with the real
+     main.css and the penumbra_userseg.js under test. The "Your reports"
+     header row is the REAL PHP helper's output: run.ps1 evaluates
+     penumbra_userseg_filter_html() with php.exe and splices it at FILTER_ROW
+     (a build without the helper gets the old plain header instead). The
+     pinned-snapshots list is index.php's (main.js renders that one) as static
+     rows in main.js's row shape, since the engine filters both lists. -->
+<div style="height:200px"></div>
+<div id="pnbStatusBar">
+  <div class="sb-seg sb-lead"><span class="sb-lab">Rows</span><span class="sb-val">0</span></div>
+  <div class="sb-spring"></div>
+  <div class="sb-seg sb-user sb-click" id="sbUserSeg">
+    <button type="button" class="sb-user-btn" id="sbUserBtn" aria-expanded="false" aria-controls="sbUserPop" aria-label="Profile and recent reports">
+      <span class="sb-ava">T</span><span class="sb-val">Test</span>
+    </button>
+    <div class="sb-pop" id="sbUserPop">
+      <div class="sb-uhead"><span class="sb-uava">TU</span><div class="sb-uid"><div class="sb-uname">Test User</div></div></div>
+      <!-- FILTER_ROW -->
+      <div id="sbReportsList"><div class="sb-recent-empty">No reports opened yet.</div></div>
+      <div id="sbSnapPinsSection">
+        <div class="sb-pop-h sb-mt">Pinned snapshots</div>
+        <div id="sbSnapPinsList">
+          <div class="sb-recent-row is-pinned"><span class="sb-recent-pin" style="pointer-events:none;" aria-hidden="true" title="Pinned snapshot">&#128204;</span><a class="sb-recent-main" href="?snap=11" title="Frozen snapshot of Alpha Budget (alpha1)"><span class="rt">&#128248; Q1 freeze</span></a></div>
+          <div class="sb-recent-row is-pinned"><span class="sb-recent-pin" style="pointer-events:none;" aria-hidden="true" title="Pinned snapshot">&#128204;</span><a class="sb-recent-main" href="?id=delta4&amp;snap=local%7C123" title="Browser-local snapshot (delta4) - this computer only"><span class="rt">&#128248; Local one</span></a></div>
+        </div>
+      </div>
+      <div class="sb-upop-foot"><a href="index.php" id="sbHomeLink">Home</a></div>
+    </div>
+  </div>
+</div>
+<pre id="out"></pre>
+<script src="penumbra_userseg.js"></script>
+<script src="driver.js"></script>
+</body></html>
