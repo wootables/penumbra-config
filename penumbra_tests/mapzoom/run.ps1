@@ -12,6 +12,8 @@
 #       labels    off-view labels not suppressed
 #
 # EXPECTED (2026-10-06, live after 20261006-mapzoom + -mapzoom2): 76 / 0.
+# 2026-10-15: + K (keyboard route: chart.data._pnbMapZoom + main.js _chartA11yPoints) = 82 / 0.
+#   Control: live pair -> 6 FAIL; live penumbra_charts.js + staged main.js -> 5 FAIL (no zoom).
 #   Control: -JsDir with the .bak-20261006-mapzoom pair copied into a folder -> RED (10 / 20 + harness stop).
 #   Mutants: contract 10 FAIL, floor 2, ring / clip / nest / labels 1 each.
 # Installed copy lives in penumbra_tests\mapzoom. The UNC share blocks .ps1 files,

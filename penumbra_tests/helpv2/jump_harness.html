@@ -1,0 +1,95 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>help jump harness</title>
+<style>
+  .help-topic { display: none; }
+  .help-topic.is-active { display: block; }
+  #helpCenterContent { height: 200px; overflow: auto; }
+</style>
+<script src="jquery-3.7.1.min.js"></script>
+</head>
+<body>
+<div id="helpCenterLightbox">
+  <nav id="helpCenterToc">
+    <button type="button" class="help-toc-item is-active" data-topic="topicA" data-extra="" data-keywords="">A</button>
+    <button type="button" class="help-toc-item" data-topic="topicB" data-extra="topicC" data-keywords="">B</button>
+    <button type="button" class="help-toc-item" data-topic="topicD" data-extra="" data-keywords="">D</button>
+  </nav>
+  <div id="helpCenterContent">
+    <div id="topicA" class="help-topic is-active"><div class="lightbox-content">
+      <h4 id="secA">A section</h4>
+      <a href="#" id="linkInTopic" data-jump-to="secA" class="help-jump-link">in-topic</a>
+      <a href="#" id="linkCross" data-jump-to="secB" class="help-jump-link">cross to B</a>
+      <a href="#" id="linkExtra" data-jump-to="secC" class="help-jump-link">cross to C (extra of B)</a>
+    </div></div>
+    <div id="topicB" class="help-topic"><div class="lightbox-content"><h4 id="secB">B section</h4></div></div>
+    <div id="topicC" class="help-topic"><div class="lightbox-content"><h4 id="secC">C section</h4></div></div>
+    <div id="topicD" class="help-topic"><div class="lightbox-content"><h4 id="secD">D section</h4></div></div>
+  </div>
+</div>
+<pre id="out">pending</pre>
+<script>
+  // Globals the lifted code expects from the rest of main.js.
+  var _helpSearchQuery = '', _helpMatchIndex = 0, _helpSearchTimer = null;
+</script>
+<script src="lifted.js"></script>
+<script>
+  // Spies: scrolling is replaced (headless, no layout to measure) and activateHelpTopic counted.
+  var scrollCalls = [];
+  _scrollHelpPaneTo = function ($el) { scrollCalls.push($el.attr('id') || '?'); };
+  var activateCalls = 0;
+  var realActivate = window.activateHelpTopic;
+  window.activateHelpTopic = function (a, b) { activateCalls++; return realActivate(a, b); };
+
+  function active() { return $('#helpCenterContent .help-topic.is-active').map(function () { return this.id; }).get().join(','); }
+  function tocActive() { return $('#helpCenterToc .help-toc-item.is-active').map(function () { return $(this).data('topic'); }).get().join(','); }
+  function reset() {
+    $('#helpCenterContent .help-topic').removeClass('is-active'); $('#topicA').addClass('is-active');
+    $('#helpCenterToc .help-toc-item').removeClass('is-active').first().addClass('is-active');
+    scrollCalls = []; activateCalls = 0;
+  }
+  var results = {};
+  function record(name, ok, detail) { results[name] = (ok ? 'PASS ' : 'FAIL ') + detail; }
+  try {
+    reset();
+    $('#linkInTopic').trigger('click');
+    // An in-topic jump scrolls the pane directly (jQuery animate), not through _scrollHelpPaneTo,
+    // so the spy stays silent; what matters is that nothing was re-activated.
+    record('T1 in-topic link stays put', active() === 'topicA' && activateCalls === 0 && tocActive() === 'topicA',
+      'active=' + active() + ' activate=' + activateCalls + ' toc=' + tocActive());
+
+    reset();
+    $('#linkCross').trigger('click');
+    // Activating B brings its folded extra C along (that is what data-extra means).
+    record('T2 cross link activates owner', active() === 'topicB,topicC' && tocActive() === 'topicB' && scrollCalls.join() === 'secB',
+      'active=' + active() + ' toc=' + tocActive() + ' scroll=' + scrollCalls.join('|'));
+
+    reset();
+    $('#linkExtra').trigger('click');
+    record('T3 cross link into an extra activates host+extra', active() === 'topicB,topicC' && tocActive() === 'topicB' && scrollCalls.join() === 'secC',
+      'active=' + active() + ' toc=' + tocActive() + ' scroll=' + scrollCalls.join('|'));
+
+    reset();
+    realActivate('topicA', 'secB');
+    record('T4 deep link re-resolves the anchor owner', active() === 'topicB,topicC' && scrollCalls.join() === 'secB',
+      'active=' + active() + ' scroll=' + scrollCalls.join('|'));
+
+    reset();
+    realActivate('topicC', '');
+    record('T5 folded topic opens at its own start', active() === 'topicB,topicC' && scrollCalls.join() === 'topicC',
+      'active=' + active() + ' scroll=' + scrollCalls.join('|'));
+
+    reset();
+    realActivate('topicD', '');
+    record('T6 plain topic open unchanged', active() === 'topicD' && scrollCalls.length === 0,
+      'active=' + active() + ' scroll=' + scrollCalls.join('|'));
+  } catch (err) {
+    results['EXC'] = 'FAIL ' + String(err && err.stack || err);
+  }
+  document.getElementById('out').textContent = JSON.stringify(results, null, 1);
+  document.title = 'HARNESS-DONE';
+</script>
+</body>
+</html>

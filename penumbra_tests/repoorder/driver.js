@@ -13,6 +13,8 @@
  *   J-loadmore-reset  sort + clear afterwards = opening rows then appended rows
  *   J-search       search results are still shown newest-updated first (unchanged)
  *   J-restore      clearing the search brings back the pre-search rows in order
+ *   K-cancel / K-escape / K-save (2026-10-15, WCAG 2.4.3)  the details pane's inline tag editor
+ *                  puts focus back on that report's Edit-tags pencil after its redraw
  *   E-errors       no page errors anywhere
  */
 (function () {
@@ -133,6 +135,37 @@
         $('#reportFilterInput').val('').trigger('keyup');
         ok = await waitFor(function () { return domIds().length === WANT_MORE.length; });
         t('J-restore', ok && same(domIds(), WANT_MORE), (ok ? '' : 'TIMEOUT ') + 'got ' + show(domIds()));
+
+        // ---- K-*: the details pane's inline tag editor hands focus back (WCAG 2.4.3, 2026-10-15) ----
+        // Cancel, Escape and Save redraw the pane; focus must land on THAT report's Edit-tags pencil, not <body>.
+        penumbra_vars.isGlobalAdmin = true; penumbra_vars.tagVocabulary = ['ALPHA', 'BETA'];
+        if (typeof window.show_text !== 'function') { window.show_text = function () {}; }   // main.js's toast, used by a Save
+        var $first = $('#serverReportListTable tbody > tr[data-numeric-id]').first();
+        var sid = String($first.data('report-id'));
+        $first.trigger('click');
+        function pencil() { return $('#serverReportDetailsPane .repo-tag-edit').filter(function () { return this.getAttribute('data-tag-short-id') === sid; })[0]; }
+        function where() { var a = document.activeElement; return a ? (a.tagName + '.' + (a.className || '') + (a === document.body ? ' (body)' : '')) : 'null'; }
+        async function openEd() {
+            var p = pencil(); if (!p) { return false; }
+            $(p).trigger('click');
+            return await waitFor(function () { return $('#serverReportDetailsPane .repo-tag-editor .repo-tag-input').length === 1; }, 3000);
+        }
+        var hasPencil = await waitFor(function () { return !!pencil(); }, 3000);
+        ok = hasPencil && await openEd();
+        if (ok) { $('#serverReportDetailsPane .repo-tag-cancel').trigger('click'); }
+        t('K-cancel', ok && pencil() && document.activeElement === pencil(), (hasPencil ? '' : 'NO PENCIL ') + 'focus on ' + where());
+        ok = hasPencil && await openEd();
+        if (ok) { $('#serverReportDetailsPane .repo-tag-input').trigger($.Event('keydown', { key: 'Escape' })); }
+        t('K-escape', ok && pencil() && document.activeElement === pencil(), 'focus on ' + where());
+        ok = hasPencil && await openEd();
+        if (ok) {
+            var $save = $('#serverReportDetailsPane .repo-tag-save');
+            $save[0].focus();
+            $save.trigger('click');
+            ok = await waitFor(function () { return $('#serverReportDetailsPane .repo-tag-editor').length === 0; }, 3000);
+            await sleep(30);
+        }
+        t('K-save', ok && pencil() && document.activeElement === pencil(), (ok ? '' : 'TIMEOUT ') + 'focus on ' + where());
     }
 
     window.RO = {

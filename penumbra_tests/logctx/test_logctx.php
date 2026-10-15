@@ -6,7 +6,7 @@
  * match on its own is often useless - a fatal without its stack trace, a task
  * failure without the run that produced it - so the filter now shows N lines
  * either side, marks the matching line, and prints a separator wherever it
- * skipped some. Default 5, 0 turns it off.
+ * skipped some. Default 2 (5 until 2026-10-14), 0 turns it off.
  *
  * NOT A UNIT TEST OF A COPY. penumbra_logs.php is self-contained (no database,
  * no requires), and penumbra_log_sources() takes the PHP-error path straight
@@ -80,21 +80,24 @@ ok($d['ctx'] === 0, 'no filter means no context, whatever ctx was asked for', $d
 ok(hits($d) === array(), 'nothing is marked as a hit with no filter', hits($d));
 
 // ===========================================================================
-group('2. The default is ON, at five either side');
+group('2. The default is ON, at two either side (five until 2026-10-14)');
 
 $d = tail($plain, array('lines' => 100, 'q' => 'NEEDLE'));   // ctx deliberately absent
-ok($d['ctx'] === 5, 'an absent ctx defaults to 5', $d['ctx']);
+ok($d['ctx'] === 2, 'an absent ctx defaults to 2', $d['ctx']);
 ok($d['matches'] === 2, 'two matches found', $d['matches']);
-// 5..15 and 20..30 -> 11 + 11 lines, plus one gap marker between them
-ok($d['shown'] === 23, '11 + 11 context rows and one separator', $d['shown']);
+// 8..12 and 23..27 -> 5 + 5 lines, plus one gap marker between them
+ok($d['shown'] === 11, '5 + 5 context rows and one separator', $d['shown']);
 ok(count(gaps($d)) === 1, 'exactly one gap marker', gaps($d));
-ok(gaps($d)[0] === '----- 4 lines not shown -----',
-   'and it names how many were skipped (16,17,18,19)', gaps($d));
+ok(gaps($d)[0] === '----- 10 lines not shown -----',
+   'and it names how many were skipped (13 to 22)', gaps($d));
 
 $t = texts($d);
-ok($t[0] === 'line 5 ordinary',  'window starts 5 lines before the first match', $t[0]);
-ok($t[10] === 'line 15 ordinary', 'and ends 5 lines after it', $t[10]);
-ok(end($t) === 'line 30 ordinary', 'last window runs to the end of the file', end($t));
+ok($t[0] === 'line 8 ordinary',  'window starts 2 lines before the first match', $t[0]);
+ok($t[4] === 'line 12 ordinary', 'and ends 2 lines after it', $t[4]);
+ok(end($t) === 'line 27 ordinary', 'last window ends 2 lines after the second match', end($t));
+// the old width is still there for the asking
+$d5 = tail($plain, array('lines' => 100, 'q' => 'NEEDLE', 'ctx' => 5));
+ok($d5['ctx'] === 5 && $d5['shown'] === 23 && end(texts($d5)) === 'line 30 ordinary', 'ctx=5 asked for explicitly: 11 + 11 rows and a window to the end of the file', $d5['shown']);
 
 // ===========================================================================
 group('3. Only the matching lines are marked');

@@ -1383,5 +1383,245 @@
         "name":  "D sankey band -\u003e FY: a drilled element\u0027s chart adds up to the element (4 drilled)",
         "pass":  true,
         "detail":  ""
+    },
+    {
+        "name":  "K sankey: the chart menu offers Drill (not \"Nothing to drill\")",
+        "pass":  true,
+        "detail":  "Other (6) (DEPT) → Pending (STATUS)▸Drill down…Show source rowsEngineering (DEPT) → Awarded (STATUS)▸Drill down…Show sou"
+    },
+    {
+        "name":  "K sankey: one Drill entry per screen-reader row",
+        "pass":  true,
+        "detail":  "got 18 | want 18"
+    },
+    {
+        "name":  "K sankey: every entry is a menu item the [role=menu] controller can rove",
+        "pass":  true,
+        "detail":  "0 without a role"
+    },
+    {
+        "name":  "K sankey: Enter opens a point\u0027s actions, placed like a hover places them",
+        "pass":  true,
+        "detail":  "open=true position=fixed"
+    },
+    {
+        "name":  "K sankey: \"Show source rows\" opens the row breakdown",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "K sankey: ...for that point (11 rows)",
+        "pass":  true,
+        "detail":  "DEPT = (Other), STATUS = Pending (11 rows)"
+    },
+    {
+        "name":  "K sankey: breakdown headers are tab stops with aria-sort",
+        "pass":  true,
+        "detail":  "tabindex=0 aria-sort=none"
+    },
+    {
+        "name":  "K sankey: Enter on a header sorts it (aria-sort)",
+        "pass":  true,
+        "detail":  "got \"descending\" | want \"descending\""
+    },
+    {
+        "name":  "K sankey: Space steps the same cycle",
+        "pass":  true,
+        "detail":  "got \"ascending\" | want \"ascending\""
+    },
+    {
+        "name":  "K sankey: \"Drill down\" opens what a click opens",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "K sankey: no notes offered on a chart type without point notes",
+        "pass":  true,
+        "detail":  "got 0 | want 0"
+    },
+    {
+        "name":  "K sunburst: the chart menu offers Drill (not \"Nothing to drill\")",
+        "pass":  true,
+        "detail":  "Awarded, Agriculture▸Drill down…Show source rowsAwarded, Engineering▸Drill down…Show source rowsAwarded, Vet Med▸Drill d"
+    },
+    {
+        "name":  "K sunburst: one Drill entry per screen-reader row",
+        "pass":  true,
+        "detail":  "got 15 | want 15"
+    },
+    {
+        "name":  "K sunburst: every entry is a menu item the [role=menu] controller can rove",
+        "pass":  true,
+        "detail":  "0 without a role"
+    },
+    {
+        "name":  "K sunburst: Enter opens a point\u0027s actions, placed like a hover places them",
+        "pass":  true,
+        "detail":  "open=true position=fixed"
+    },
+    {
+        "name":  "K sunburst: \"Show source rows\" opens the row breakdown",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "K sunburst: ...for that point (13 rows)",
+        "pass":  true,
+        "detail":  "STATUS = Awarded, DEPT = Agriculture (13 rows)"
+    },
+    {
+        "name":  "K sunburst: breakdown headers are tab stops with aria-sort",
+        "pass":  true,
+        "detail":  "tabindex=0 aria-sort=none"
+    },
+    {
+        "name":  "K sunburst: Enter on a header sorts it (aria-sort)",
+        "pass":  true,
+        "detail":  "got \"descending\" | want \"descending\""
+    },
+    {
+        "name":  "K sunburst: Space steps the same cycle",
+        "pass":  true,
+        "detail":  "got \"ascending\" | want \"ascending\""
+    },
+    {
+        "name":  "K sunburst: \"Drill down\" opens what a click opens",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "K sunburst: no notes offered on a chart type without point notes",
+        "pass":  true,
+        "detail":  "got 0 | want 0"
+    },
+    {
+        "name":  "K map: the chart menu offers Drill (not \"Nothing to drill\")",
+        "pass":  true,
+        "detail":  "California▸Drill down…Show source rowsGeorgia▸Drill down…Show source rowsNorth Carolina▸Drill down…Show source rowsSouth"
+    },
+    {
+        "name":  "K map: one Drill entry per screen-reader row",
+        "pass":  true,
+        "detail":  "got 6 | want 6"
+    },
+    {
+        "name":  "K map: every entry is a menu item the [role=menu] controller can rove",
+        "pass":  true,
+        "detail":  "0 without a role"
+    },
+    {
+        "name":  "K map: Enter opens a point\u0027s actions, placed like a hover places them",
+        "pass":  true,
+        "detail":  "open=true position=fixed"
+    },
+    {
+        "name":  "K map: \"Show source rows\" opens the row breakdown",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "K map: ...for that point (10 rows)",
+        "pass":  true,
+        "detail":  "STATE = California (10 rows)"
+    },
+    {
+        "name":  "K map: breakdown headers are tab stops with aria-sort",
+        "pass":  true,
+        "detail":  "tabindex=0 aria-sort=none"
+    },
+    {
+        "name":  "K map: Enter on a header sorts it (aria-sort)",
+        "pass":  true,
+        "detail":  "got \"descending\" | want \"descending\""
+    },
+    {
+        "name":  "K map: Space steps the same cycle",
+        "pass":  true,
+        "detail":  "got \"ascending\" | want \"ascending\""
+    },
+    {
+        "name":  "K map: \"Drill down\" opens what a click opens",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "K map: no notes offered on a chart type without point notes",
+        "pass":  true,
+        "detail":  "got 0 | want 0"
+    },
+    {
+        "name":  "K treemap grouped: the chart menu offers Drill (not \"Nothing to drill\")",
+        "pass":  true,
+        "detail":  "Agriculture (Awarded) (2 notes)▸Drill down…Show source rowsNotes (2)…Engineering (Awarded) (2 notes)▸Drill down…Show sou"
+    },
+    {
+        "name":  "K treemap grouped: one Drill entry per screen-reader row",
+        "pass":  true,
+        "detail":  "got 33 | want 33"
+    },
+    {
+        "name":  "K treemap grouped: every entry is a menu item the [role=menu] controller can rove",
+        "pass":  true,
+        "detail":  "0 without a role"
+    },
+    {
+        "name":  "K treemap grouped: Enter opens a point\u0027s actions, placed like a hover places them",
+        "pass":  true,
+        "detail":  "open=true position=fixed"
+    },
+    {
+        "name":  "K treemap grouped: \"Show source rows\" opens the row breakdown",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "K treemap grouped: breakdown headers are tab stops with aria-sort",
+        "pass":  true,
+        "detail":  "tabindex=0 aria-sort=none"
+    },
+    {
+        "name":  "K treemap grouped: Enter on a header sorts it (aria-sort)",
+        "pass":  true,
+        "detail":  "got \"descending\" | want \"descending\""
+    },
+    {
+        "name":  "K treemap grouped: Space steps the same cycle",
+        "pass":  true,
+        "detail":  "got \"ascending\" | want \"ascending\""
+    },
+    {
+        "name":  "K treemap grouped: \"Drill down\" opens what a click opens",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "K treemap: each tile offers its notes, with the count",
+        "pass":  true,
+        "detail":  "33 / Notes (2)…"
+    },
+    {
+        "name":  "K treemap: the entry itself says how many notes",
+        "pass":  true,
+        "detail":  "Agriculture (Awarded) (2 notes)"
+    },
+    {
+        "name":  "K treemap: the notes entry opens that point\u0027s thread",
+        "pass":  true,
+        "detail":  "[\"[[\\\"DEPT\\\",\\\"Agriculture\\\"],[\\\"STATUS\\\",\\\"Awarded\\\"]]\"]"
+    },
+    {
+        "name":  "K bar: the drill columns are still listed",
+        "pass":  true,
+        "detail":  "Agriculture (2 notes)▸🔤 STATUS🔤 FY💲 AMOUNT# AWARD_ID🔤 STATE🔤 N📅 START_DATE📅 END_DATEShow sour"
+    },
+    {
+        "name":  "K bar: a category offers its notes (count) from the menu",
+        "pass":  true,
+        "detail":  "Agriculture (2 notes) | Notes (2)…"
+    },
+    {
+        "name":  "K bar: ...and opens it",
+        "pass":  true,
+        "detail":  "[\"[[\\\"DEPT\\\",\\\"Agriculture\\\"]]\"]"
     }
 ]

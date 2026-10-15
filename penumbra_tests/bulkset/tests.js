@@ -287,6 +287,28 @@
         ok('D3b no Deep Link Vendor Codes row (set per column since 10-13)', !$d.find('.pbs-mode[data-field="resolverLinksDefault"]').length && !/Deep link/i.test($d.text()));
         ok('D4 protected selection shows the current-password row', !$d.find('.pbs-curpw-row').prop('hidden'));
 
+        // --- WCAG 2.5.3 / 4.1.2 / 1.3.1 / 3.3.2 (2026-10-15): every control's accessible name ---
+        // A simplified accname: aria-labelledby (ids' text) > aria-label > a wrapping <label>; a placeholder never counts.
+        function accName(el) {
+            var lb = el.getAttribute('aria-labelledby');
+            if (lb) { return lb.split(/\s+/).map(function (id) { var n = document.getElementById(id); return n ? n.textContent : ''; }).join(' ').replace(/\s+/g, ' ').trim(); }
+            var al = el.getAttribute('aria-label'); if (al && al.trim()) { return al.trim(); }
+            var w = el.closest('label'); return w ? w.textContent.replace(/\s+/g, ' ').trim() : '';
+        }
+        function rowLabel($row) { var $l = $row.find('> .pbs-label').clone(); $l.find('.pbs-hint').remove(); return $.trim($l.text()); }
+        var badMode = $d.find('.pbs-mode').toArray().filter(function (s) {
+            var vis = rowLabel($(s).closest('.pbs-row')), nm = accName(s);
+            return !vis || nm.indexOf(vis) !== 0;
+        }).map(function (s) { return s.getAttribute('data-field') + ' -> "' + accName(s) + '" vs "' + rowLabel($(s).closest('.pbs-row')) + '"'; });
+        eq('D22 each change select is named by its row\'s visible label', badMode, []);
+        var badVal = $d.find('.pbs-val select, .pbs-val input, .pbs-val textarea, .pbs-curpw').toArray().filter(function (el) { return !accName(el); })
+            .map(function (el) { return el.className; });
+        eq('D23 every value control has a name beyond its placeholder', badVal, []);
+        var nm = function (sel) { return accName($d.find(sel)[0] || document.createElement('i')); };
+        eq('D24 the value names carry their row', [nm('.pbs-row[data-row="theme"] .pbs-value'), nm('.pbs-row[data-row="density"] .pbs-value'), nm('.pbs-row[data-row="rowsPerPage"] .pbs-value'),
+            nm('.pbs-row[data-row="titleReplace"] .pbs-find'), nm('.pbs-row[data-row="titleReplace"] .pbs-repl'), nm('.pbs-pw1'), nm('.pbs-pw2'), nm('.pbs-curpw')],
+            ['Theme value', 'Density value', 'Rows / page value', 'Title find text', 'Title replace with', 'New password', 'Confirm new password', 'Current password']);
+
         $d.find('.pbs-preview-btn').trigger('click');
         ok('D5 Preview with nothing chosen says so', /Nothing to change/.test($d.find('.pbs-status').text()), $d.find('.pbs-status').text());
 

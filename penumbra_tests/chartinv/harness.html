@@ -561,6 +561,114 @@
     }
   }
 
+  // ---- K: the keyboard reaches every point (2026-10-15, WCAG 2.1.1) -----------------------
+  // The chart menu's Drill list on charts with no category labels (Sankey, sunburst,
+  // map, treemap) lists one entry per screen-reader row, and each runs what a canvas
+  // click on that point runs; point notes show (count) and open from the menu; the
+  // row breakdown's sortable headers are tab stops that Enter sorts.
+  async function runK() {
+    var F = window.__CI, P = window.Penumbra || {};
+    var saved = { active: P.chartNotesActive, count: P.chartNoteCount, open: P.openChartNote };
+    var OPENED = [];
+    P.chartNotesActive = function () { return true; };
+    P.chartNoteCount = function (k) { return k ? 2 : 0; };
+    P.openChartNote = function (k) { OPENED.push(k); };
+    var $menu = $('#chartContextMenu');
+    function openMenu(cv) {
+      $menu.hide();
+      $(cv).trigger($.Event('contextmenu', { clientX: 20, clientY: 20 }));
+      return $menu.find('.ctx-submenu-x');
+    }
+    function lastBreakdown() { var $o = $('.infobox-overlay').last(); return $o.length ? $o : null; }
+    var cases = [
+      ['sankey', function () { setv('#vizXAxis', 'DEPT'); clickType('sankey'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); setv('#vizSankeyTo', 'STATUS'); setv('#vizLimit', '5'); }],
+      ['sunburst', function () { setv('#vizXAxis', 'DEPT'); clickType('doughnut'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); setv('#vizGroupBy', 'STATUS'); setv('#vizLimit', '4'); }],
+      ['map', function () { setv('#vizXAxis', 'STATE'); clickType('map'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); }],
+      ['treemap grouped', function () { setv('#vizXAxis', 'DEPT'); clickType('treemap'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); setv('#vizGroupBy', 'STATUS'); }]
+    ];
+    for (var ci = 0; ci < cases.length; ci++) {
+      var cs = cases[ci];
+      await asection('K', async function () {
+        openBuilder(); cs[1]();
+        var rr = await renderReport(window.vizBuildCodeFromForm());
+        if (!rr.chart) { assert('K ' + cs[0] + ': renders', false, rr.text); return; }
+        var ch = rr.chart, d = ch.data, ds0 = d.datasets[0];
+        var want = (d._a11yRows && d._a11yRows.rows) ? d._a11yRows.rows.length : (ds0.tree || []).length;
+        var $sub = openMenu(rr.canvas);
+        assert('K ' + cs[0] + ': the chart menu offers Drill (not "Nothing to drill")', !$menu.find('.ctx-drill-root').hasClass('ctx-disabled'), $sub.text().slice(0, 120));
+        var $cats = $sub.children('li.ctx-drill-cat');
+        eq('K ' + cs[0] + ': one Drill entry per screen-reader row', $cats.length, want);
+        var bad = $sub.find('li').filter(function () { var r = this.getAttribute('role'); return r !== 'menuitem' && r !== 'none' && r !== 'separator'; }).length;
+        assert('K ' + cs[0] + ': every entry is a menu item the [role=menu] controller can rove', $cats.length > 0 && bad === 0, bad + ' without a role');
+        if (!$cats.length) return;
+        // Enter on a point opens its actions where they can be seen: the nested list sits in a
+        // scrolling box and is re-anchored to the viewport, as a hover does.
+        var cat0 = $cats.get(0);
+        cat0.focus();
+        $(cat0).trigger($.Event('keydown', { which: 13, keyCode: 13, key: 'Enter' }));
+        var nest = cat0.querySelector('ul.ctx-submenu');
+        assert('K ' + cs[0] + ': Enter opens a point\'s actions, placed like a hover places them', $(cat0).hasClass('ctx-kbd-open') && !!nest && nest.style.position === 'fixed',
+          'open=' + $(cat0).hasClass('ctx-kbd-open') + ' position=' + (nest ? nest.style.position : 'none'));
+        $sub = openMenu(rr.canvas); $cats = $sub.children('li.ctx-drill-cat');
+        // "Show source rows" on the first point = the breakdown a click on that point opens.
+        var el0 = { datasetIndex: 0, index: 0 };
+        if (d._chartType === 'map') { var k0 = d._a11yRows.keys[0]; ds0.data.forEach(function (p, pi) { if (p && p._key === k0 && el0.index === 0 && pi) el0.index = pi; }); }
+        var crit = (cs[0].indexOf('treemap') === 0) ? null : F.criteria(ch, el0, rr.cfg);
+        var nOver = $('.infobox-overlay').length;
+        $cats.first().find('.ctx-point-act[data-act="rows"]').trigger('click');
+        var $bd = lastBreakdown();
+        assert('K ' + cs[0] + ': "Show source rows" opens the row breakdown', $('.infobox-overlay').length === nOver + 1, '');
+        if (crit && $bd) {
+          var probe = F.probe(FIX, [rr.cfg.xAxis, rr.cfg.groupBy]);
+          var m = FIX.filter(function (r, ri) { return crit.rowFilter(probe[ri]); }).length;
+          assert('K ' + cs[0] + ': ...for that point (' + m + ' rows)', $bd.text().indexOf('(' + m + ' row') !== -1, $bd.find('.infobox-title, h3, h2').first().text().slice(0, 160));
+        }
+        // The breakdown's headers: tab stops, Enter sorts, aria-sort says so (item 3's shared template).
+        if ($bd) {
+          var $th = $bd.find('.infobox-drill-table thead th').eq(1);
+          assert('K ' + cs[0] + ': breakdown headers are tab stops with aria-sort', $th.attr('tabindex') === '0' && $th.attr('aria-sort') === 'none', 'tabindex=' + $th.attr('tabindex') + ' aria-sort=' + $th.attr('aria-sort'));
+          var kd = $.Event('keydown', { which: 13, keyCode: 13, key: 'Enter' }); $th.trigger(kd);
+          eq('K ' + cs[0] + ': Enter on a header sorts it (aria-sort)', $th.attr('aria-sort'), 'descending');
+          $th.trigger($.Event('keydown', { which: 32, keyCode: 32, key: ' ' }));
+          eq('K ' + cs[0] + ': Space steps the same cycle', $th.attr('aria-sort'), 'ascending');
+        }
+        $('.infobox-overlay').remove();
+        // "Drill down..." = the canvas click: the column popup (or the breakdown where it cannot drill).
+        $sub = openMenu(rr.canvas);
+        nOver = $('.infobox-overlay').length; $('.chart-drill-popup').remove();
+        $sub.children('li.ctx-drill-cat').first().find('.ctx-point-act[data-act="open"]').trigger('click');
+        assert('K ' + cs[0] + ': "Drill down" opens what a click opens', $('.chart-drill-popup').length === 1 || $('.infobox-overlay').length === nOver + 1, '');
+        $('.chart-drill-popup').remove(); $('.infobox-overlay').remove();
+        // Notes: treemap is a notes type; the others are not (and must not offer any).
+        $sub = openMenu(rr.canvas);
+        var $notes = $sub.find('.ctx-drill-notes');
+        if (cs[0].indexOf('treemap') === 0) {
+          assert('K treemap: each tile offers its notes, with the count', $notes.length === $sub.children('li.ctx-drill-cat').length && /Notes \(2\)/.test($notes.first().text()), $notes.length + ' / ' + $notes.first().text());
+          assert('K treemap: the entry itself says how many notes', /\(2 notes\)/.test($sub.children('li.ctx-drill-cat').first().children('.ctx-cat-label').text()), $sub.children('li.ctx-drill-cat').first().children('.ctx-cat-label').text());
+          OPENED.length = 0; $notes.first().trigger('click');
+          assert('K treemap: the notes entry opens that point\'s thread', OPENED.length === 1 && !!OPENED[0], JSON.stringify(OPENED));
+        } else {
+          eq('K ' + cs[0] + ': no notes offered on a chart type without point notes', $notes.length, 0);
+        }
+        $menu.hide();
+      });
+    }
+    // A plain bar: its labels list keeps the drill columns and gains each category's notes.
+    await asection('K', async function () {
+      openBuilder(); setv('#vizXAxis', 'DEPT'); clickType('bar'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); setv('#vizLimit', '9999');
+      var rr = await renderReport(window.vizBuildCodeFromForm());
+      if (!rr.chart) { assert('K bar: renders', false, rr.text); return; }
+      var $sub = openMenu(rr.canvas);
+      var $cat = $sub.children('li.ctx-drill-cat').first();
+      assert('K bar: the drill columns are still listed', $cat.find('.ctx-drill-leaf').length > 0, $cat.text().slice(0, 100));
+      assert('K bar: a category offers its notes (count) from the menu', /Notes \(2\)/.test($cat.find('.ctx-drill-notes').text()) && /\(2 notes\)/.test($cat.children('.ctx-cat-label').text()), $cat.children('.ctx-cat-label').text() + ' | ' + $cat.find('.ctx-drill-notes').text());
+      OPENED.length = 0; $cat.find('.ctx-drill-notes').first().trigger('click');
+      assert('K bar: ...and opens it', OPENED.length === 1, JSON.stringify(OPENED));
+      $menu.hide();
+    });
+    P.chartNotesActive = saved.active; P.chartNoteCount = saved.count; P.openChartNote = saved.open;
+  }
+
   async function run() {
     var F = window.__CI;
     if (!F || typeof F.chartData !== 'function') {
@@ -584,6 +692,7 @@
     if (!ONLY || ONLY === 'P' || ONLY === 'A') await runPA();
     if (!ONLY || ONLY === 'F') await runF();
     if (!ONLY || ONLY === 'D') await runD();
+    if (!ONLY || ONLY === 'K') await runK();
     // E (email / PDF) runs in the vischarts suite on these very calls and rows.
     Object.keys(EXPORT_CODES).forEach(function (t) { results.push({ name: 'EXPORT code ' + t, pass: true, detail: EXPORT_CODES[t], export: true }); });
     var cols = ['DEPT', 'STATUS', 'FY', 'AMOUNT', 'AWARD_ID', 'STATE', 'N', 'START_DATE', 'END_DATE'];

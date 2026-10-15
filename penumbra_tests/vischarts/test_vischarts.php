@@ -200,8 +200,12 @@ foreach (array(0 => array(800, 180, 'Awards (by college)'), 1 => array(400, 300,
     $img = isset($drawn[$TOK($k)]) ? $drawn[$TOK($k)] : null;
     ok("render: chart " . ($k + 1) . " is {$exp[0]}x{$exp[1]} CSS px, a 2x PNG, a JPEG copy, titled '{$exp[2]}'",
         $img && $img['width'] === $exp[0] && $img['height'] === $exp[1] && png_dims($img['png']) === ($exp[0] * 2) . 'x' . ($exp[1] * 2)
-        && substr($img['jpeg'], 0, 2) === "\xFF\xD8" && strlen($img['png']) > 3000 && $img['alt'] === $exp[2] && preg_match('/^pnbvis-[0-9a-f]{12}@penumbra$/', $img['cid']),
-        $img ? array('w' => $img['width'], 'h' => $img['height'], 'png' => png_dims($img['png']), 'pngBytes' => strlen($img['png']), 'jpegBytes' => strlen((string)$img['jpeg']), 'alt' => $img['alt']) : 'missing');
+        && substr($img['jpeg'], 0, 2) === "\xFF\xD8" && strlen($img['png']) > 3000 && $img['title'] === $exp[2] && preg_match('/^pnbvis-[0-9a-f]{12}@penumbra$/', $img['cid']),
+        $img ? array('w' => $img['width'], 'h' => $img['height'], 'png' => png_dims($img['png']), 'pngBytes' => strlen($img['png']), 'jpegBytes' => strlen((string)$img['jpeg']), 'title' => isset($img['title']) ? $img['title'] : null) : 'missing');
+    // WCAG 1.1.1 (2026-10-15): the alt describes the chart (type, title, counts), not the title alone.
+    ok("render: chart " . ($k + 1) . " alt names its type, its title and its counts",
+        $img && preg_match('/^[A-Z][a-z ]* chart: ' . preg_quote($exp[2], '/') . '\. \d+ (data series, \d+ categories|rows)\.$/', $img['alt']) === 1,
+        $img ? $img['alt'] : 'missing');
     if ($img) { file_put_contents($outDir . DIRECTORY_SEPARATOR . 'chart' . ($k + 1) . '.png', $img['png']); if ($img['jpeg']) file_put_contents($outDir . DIRECTORY_SEPARATOR . 'chart' . ($k + 1) . '.jpg', $img['jpeg']); }
 }
 // A drawn chart is never a tiny PNG: the blank canvases of 2026-09-29 19:57 came
@@ -215,7 +219,7 @@ $broken = isset($store[$TOK(3)]) ? $store[$TOK(3)] : 'absent';
 ok('render: the unknown chart type is either dropped with a logged reason or drawn - never a leftover token', array_key_exists($TOK(3), $store) && (is_array($broken) || strpos(logs_from($n0), 'chart 4 not drawn') !== false), is_array($broken) ? 'drawn ' . $broken['width'] . 'x' . $broken['height'] : logs_from($n0));
 $applied = penumbra_vis_apply_tokens($text);
 ok('apply: the body now carries an <img cid> per drawn chart and no token', strpos($applied, '__PENUMBRA_VISIMG_') === false && substr_count($applied, '<img src="cid:pnbvis-') === count($drawn)
-    && strpos($applied, '<img src="cid:' . $drawn[$TOK(0)]['cid'] . '" width="800" height="180" alt="Awards (by college)"') !== false, $applied);
+    && strpos($applied, '<img src="cid:' . $drawn[$TOK(0)]['cid'] . '" width="800" height="180" alt="' . htmlspecialchars($drawn[$TOK(0)]['alt'], ENT_QUOTES) . '"') !== false, $applied);
 $images = penumbra_vis_take_images();
 ok('take: the images list matches the drawn charts and the store is empty again', count($images) === count($drawn) && $GLOBALS['penumbra_vis_images'] === array(), count($images));
 $inline = penumbra_vis_inline_parts($images);
@@ -276,7 +280,7 @@ $k = 1;
 foreach (array($TOK(0) => 'Total proposed by month', $TOK(1) => 'Number of proposals by month') as $tok => $title) {
     $img = isset($fyDrawn[$tok]) ? $fyDrawn[$tok] : null;
     ok("fycomp: chart $k is 441x320 CSS px, a 2x PNG that is a real picture (> 15 KB), titled '$title'",
-        $img && $img['width'] === 441 && $img['height'] === 320 && png_dims($img['png']) === '882x640' && strlen($img['png']) > 15000 && $img['alt'] === $title,
+        $img && $img['width'] === 441 && $img['height'] === 320 && png_dims($img['png']) === '882x640' && strlen($img['png']) > 15000 && $img['title'] === $title && strpos($img['alt'], 'chart: ' . $title . '.') !== false,
         $img ? array('w' => $img['width'], 'h' => $img['height'], 'dims' => png_dims($img['png']), 'pngBytes' => strlen($img['png']), 'alt' => $img['alt']) : 'missing');
     if ($img) { file_put_contents($outDir . DIRECTORY_SEPARATOR . 'fycomp' . $k . '.png', $img['png']); }
     $k++;
@@ -438,7 +442,7 @@ $lLone = penumbra_vis_apply_tokens('x ' . $TOK(0) . ' y');
 $lHref = 'https://www3.example.test/p/index.php?id=rpt1&amp;FY=2025&amp;fullscreen=true&amp;fspages=2';
 $lExp = 'x <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="border-collapse:collapse; margin:4px 0;"><tr><td style="padding:0;">'
       . '<a href="' . $lHref . '" title="Open this chart in full view" style="text-decoration:none; border:0;">'
-      . '<img src="cid:pnbvis-l@penumbra" width="441" height="320" border="0" alt="Chart L" style="display:block; margin:0; max-width:100%; height:auto; border:0;"></a></td></tr>'
+      . '<img src="cid:pnbvis-l@penumbra" width="441" height="320" border="0" alt="Chart L. Opens the chart in full view." style="display:block; margin:0; max-width:100%; height:auto; border:0;"></a></td></tr>'
       . '<tr><td style="padding:3px 0 0; font-family:Verdana, Arial, sans-serif; font-size:12px; line-height:16px; font-weight:normal; text-align:left;">'
       . '<a href="' . $lHref . '" title="Open this chart in full view" style="color:#990000; text-decoration:underline;">Open to full view</a></td></tr></table> y';
 ok('markup: a linked lone chart is a two-row table - the picture is a link (block, border 0), "Open to full view" sits under it, ampersands escaped', $lLone === $lExp, $lLone);
@@ -458,6 +462,36 @@ $GLOBALS['penumbra_vis_images'] = array($TOK(0) => $lImg4, $TOK(1) => $lImg);
 $lMix = penumbra_vis_apply_tokens($TOK(0) . ' and ' . $TOK(1));
 ok('markup: a chart without a link keeps the plain inline image while its neighbour is linked',
     strpos($lMix, '<img src="cid:pnbvis-l@penumbra" width="441" height="320" alt="Chart L" style="display:inline-block; vertical-align:top; margin:4px 0; max-width:100%; height:auto; border:0;"> and <table') === 0, $lMix);
+$GLOBALS['penumbra_vis_images'] = array();
+
+// ══════ A. alt text never empty (WCAG 1.1.1 / 2.4.4, 2026-10-15) ══════
+// An untitled chart used to get alt="" (read as decorative) and, linked to its
+// full view, a link with no accessible name. Mutants: noaltfallback, nolinkname, noaltpage.
+$aImg = array('cid' => 'pnbvis-u@penumbra', 'png' => 'x', 'jpeg' => null, 'width' => 441, 'height' => 320, 'alt' => '', 'title' => '');
+$GLOBALS['penumbra_vis_images'] = array($TOK(0) => $aImg);
+$aPlain = penumbra_vis_apply_tokens($TOK(0));
+ok('alt: an untitled chart with no description is alt="Chart", never empty', strpos($aPlain, ' alt="Chart" ') !== false && strpos($aPlain, 'alt=""') === false, $aPlain);
+$aT = $aImg; $aT['title'] = 'Only a title';
+$GLOBALS['penumbra_vis_images'] = array($TOK(0) => $aT);
+$aTitled = penumbra_vis_apply_tokens($TOK(0));
+ok('alt: a title with no description reads "Chart: <title>"', strpos($aTitled, ' alt="Chart: Only a title" ') !== false, $aTitled);
+$aL = $aImg; $aL['href'] = 'https://x.test/?id=r&fullscreen=true';
+$GLOBALS['penumbra_vis_images'] = array($TOK(0) => $aL);
+$aLinked = penumbra_vis_apply_tokens($TOK(0));
+ok('alt: a linked untitled chart names its link (the picture is the link\'s only content)',
+    preg_match('#<a href="[^"]*"[^>]*><img [^>]*alt="Chart\. Opens the chart in full view\."[^>]*></a>#', $aLinked) === 1 && strpos($aLinked, 'alt=""') === false, $aLinked);
+$aF = $aImg; $aF['wpct'] = 49.0;
+$aFluid = penumbra_vis_fluid_img_tag($aF, true);
+ok('alt: the fluid ("%") picture follows the same rule (linked: named)', strpos($aFluid, ' alt="Chart. Opens the chart in full view." ') !== false, $aFluid);
+ok('alt: the helper collapses whitespace and caps the length', function_exists('penumbra_vis_alt_text') && penumbra_vis_alt_text("  a \n b  ") === 'a b' && strlen(penumbra_vis_alt_text(str_repeat('x', 400))) === 300, '');
+$GLOBALS['penumbra_vis_images'] = array();
+// A real untitled chart: the render page describes it (type and counts) from the chart itself.
+$nA = count($GLOBALS['LOGS']);
+$aText = penumbra_vis_render_snippet('vis(bar, COLLEGE, AMOUNT, none, sum, 10)', $rows, $cols);
+$aImgs = array(); foreach ($GLOBALS['penumbra_vis_images'] as $img) { if (is_array($img)) $aImgs[] = $img; }
+ok('alt: a real untitled vis() chart is described by the page ("Bar chart. 1 data series, N categories.")',
+    count($aImgs) === 1 && preg_match('/^[A-Z][a-z ]* chart\. \d+ data series, \d+ categories\.$/', $aImgs[0]['alt']) === 1 && $aImgs[0]['title'] === '',
+    count($aImgs) ? $aImgs[0]['alt'] : logs_from($nA));
 $GLOBALS['penumbra_vis_images'] = array();
 
 // ══════ O. the oracle: the plan against the app's OWN carousel list ══════

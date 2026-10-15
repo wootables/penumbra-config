@@ -30,6 +30,11 @@
 #   N*  the next-run badge (NEXT_RUN; active tasks only)
 #   L*  the controls line up under the app's global button rule
 #   A4  the agenda pages a week at a time; C1 dropping the scope keeps the calendar's URL filters; V1 600px viewport
+#   WCAG Serious fixes (2026-10-15): K2 "/" obeys penumbraSingleKeysOff (2.1.4); KB5 grid heads / empty
+#   days aria-hidden + "Today," (1.3.1); on side.html (the Metrics sidebar's lifted wiring):
+#   SB1-SB5 keyboard filter changes wait for Enter / Apply, pointer changes still run (3.2.2); SB6 names
+#   (1.3.1/4.1.2, text); HP1 heatmap picker (2.1.1); CB1-CB2 combobox (4.1.2); I6 pause-button ink (1.4.3, text)
+#   CONTROL for these: --stage <the 2026-10-15 pre-fix analytics_all.php> -> exactly those ids red
 #
 #   py -3 run.py                    the live analytics_all.php   EXPECTED: GREEN
 #   py -3 run.py --control          analytics_all.php.bak-20261008-calfilter
@@ -79,7 +84,12 @@ MUTANTS = {
     'nextrun':   ("        return !!n && n.getFullYear() === y && n.getMonth() === m0 && n.getDate() === d && (n.getHours() * 60 + n.getMinutes()) === minOfDay;", "        return false;", ['N1']),
     'nextpaused':("        t._next  = (t.active && t.next) ? parseSqlDate(t.next) : null;", "        t._next  = t.next ? parseSqlDate(t.next) : null;", ['N1']),
     'weekcap':   ("                for (var e = 0; e < evs.length; e++) cell.appendChild(buildChip(evs[e], cy, cm0, cdd));", "                for (var e = 0; e < Math.min(evs.length, MAX_CHIPS); e++) cell.appendChild(buildChip(evs[e], cy, cm0, cdd));", ['W1']),
-    'backmonth': ("    if (back) back.addEventListener('click', function () { setView(view); });", "    if (back) back.addEventListener('click', function () { setView('month'); });", ['A3', 'W3']),
+    'backmonth': ("    if (back) back.addEventListener('click', function () { setView(view); calRefocusLastDay(); });", "    if (back) back.addEventListener('click', function () { setView('month'); calRefocusLastDay(); });", ['A3', 'W3']),
+    # keyboard path into the day view (WCAG 2.1.1 Blocker, 2026-10-14 rescan)
+    'daykey':    ("            if (ev.key !== 'Enter' && ev.key !== ' ') return;", "            return;", ['KB1', 'KB3']),
+    'dayfocus':  ("        if (t) { t.setAttribute('tabindex', '-1'); try { t.focus({ preventScroll: true }); } catch (e) { t.focus(); } }", "", ['KB1']),
+    'backfocus': ("    if (back) back.addEventListener('click', function () { setView(view); calRefocusLastDay(); });", "    if (back) back.addEventListener('click', function () { setView(view); });", ['KB2']),
+    'agopen':    ("                    ob.textContent = 'Open day';", "                    return;", ['KB4']),
     'pausedinv': ("        if (hideChk) { hideChk.classList.toggle('on', hidePaused); hideChk.setAttribute('aria-pressed', hidePaused ? 'true' : 'false'); }", "        if (hideChk) { hideChk.classList.toggle('on', !hidePaused); hideChk.setAttribute('aria-pressed', hidePaused ? 'false' : 'true'); }", ['D1', 'H1']),
     'statuslead':("+ ((hideChk && !hidePaused) ? 1 : 0);", ";", ['H1', 'U2']),
     'resetactive':("        query = ''; ownerQ = ''; notMe = false; hidePaused = true;   // Active back on, like the types", "        query = ''; ownerQ = ''; notMe = false;", ['R1', 'U3']),
@@ -96,6 +106,21 @@ MUTANTS = {
     'pausedmem': ("        hidePaused = true;\n        try { localStorage.removeItem('penumbra_cal_hide_paused'); } catch (e) {}", "        try { hidePaused = localStorage.getItem('penumbra_cal_hide_paused') !== '0'; } catch (e) { hidePaused = true; }", ['H2']),
     'pausedclk': ("            hidePaused = !hidePaused;", "            hidePaused = hidePaused;", ['H1']),
     'vbradius':  ("border: none; border-radius: 0; margin: 0; min-height: 0;", "border: none; margin: 0; min-height: 0;", ['L2']),
+    # WCAG Serious fixes (2026-10-15): sidebar 3.2.2 / 1.3.1, heatmap picker 2.1.1, combobox 4.1.2,
+    # "/" off switch 2.1.4, pause-button ink 1.4.3, calendar grid 1.3.1
+    'slashoff':  ("        if (typeof window.penumbraSingleKeysOff === 'function' && window.penumbraSingleKeysOff()) return;\n", "", ['K2']),
+    'keyedsubmit': ("        if (!keyedChange()) { submitFilters(); return; }", "        { submitFilters(); return; }", ['SB2', 'SB3', 'SB5']),
+    'enterapply': ("                if (e.key !== 'Enter' || !filtersPending) return;", "                return;", ['SB2']),
+    'rangefocus': ("            if (!keyedChange()) fromIn.focus();", "            fromIn.focus();", ['SB4']),
+    'actlabel':  ('            <label for="fActions">Activity</label>', '            <label>Activity</label>', ['SB6']),
+    'grouplbl':  ('" role="group" aria-labelledby="fgVisLbl">', '">', ['SB6']),
+    'pickgo':    ("        dEl.value = dSel.value;", "        dEl.value = '';", ['HP1']),
+    'activedesc': ("            input.setAttribute('aria-activedescendant', items[active].el.id);\n", "", ['CB1']),
+    'nomatchsay': ("                say('No matches with recorded activity');", "", ['CB2']),
+    'pauseink':  ("background:var(--accent-danger, #dc3545); color:var(--bg-surface);", "background:var(--accent-danger, #dc3545); color:var(--on-brand, #fff);", ['I6']),
+    'dowhide':   ("            hd.setAttribute('aria-hidden', 'true');\n            GRID.appendChild(hd);", "            GRID.appendChild(hd);", ['KB5']),
+    'emptyhide': ("                cell.setAttribute('aria-hidden', 'true');   // see the column heads above\n", "", ['KB5']),
+    'todaylbl':  ("(isToday ? 'Today, ' : '') + ", "", ['KB5']),
 }
 
 R = []
@@ -164,6 +189,7 @@ class Page:
 
 class Browser:
     def __init__(self, root):
+        self.root = root
         self.hp, self.dp = pick_port(8840), pick_port(9380)
         self.srv = subprocess.Popen([sys.executable, '-m', 'http.server', str(self.hp), '--bind', '127.0.0.1', '--directory', root],
                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -279,7 +305,55 @@ def stage(src_text, mutant):
         if out.returncode != 0 or 'Warning:' in html or 'Fatal error' in html or 'Notice:' in html or 'Deprecated:' in html:
             raise RuntimeError('php render (%s): rc=%d\n%s\n%s' % (name, out.returncode, html[:1500], out.stderr.decode('utf-8', 'replace')[:500]))
         with open(os.path.join(run, name), 'wb') as f: f.write(html.encode('utf-8'))
+    stage_side(run, text)
     return run, text
+
+# ---- the Platform Metrics sidebar (WCAG Serious fixes, 2026-10-15) ----
+# side.html: the page's filter-submission block (submitFilters + the change->submit
+# wiring + the range / compare reveal), the click-to-filter block (heatmap picker)
+# and the sidebar autocomplete, all LIFTED from the file under test, over a fixture
+# sidebar shaped like the live one. The apply bar and the heatmap picker markup are
+# lifted too (absent before the fix: the S / H asserts then go red, which is the
+# control). submitFilters()'s navigation is the one line rewritten: it records the
+# URL in window.__navs instead of leaving the page.
+SUGGEST = [{'label': 'jdoe', 'value': 'jdoe', 'sub': 'Jane Doe'}, {'label': 'jdoe2', 'value': 'jdoe2'}]
+def lift_opt(text, start, end):
+    i = text.find(start)
+    if i < 0: return ''
+    j = text.find(end, i)
+    return text[i:j] if j >= 0 else ''
+def stage_side(run, text):
+    sub = cut(text, '    // ---- Filter submission', '    // ---- Filter chips: remove one', 'filter submission')
+    nav = "        window.location.href = form.getAttribute('action')"
+    if sub.count(nav) != 1: raise RuntimeError('anchor missing: submitFilters navigation')
+    sub = sub.replace(nav, "        window.__navs[window.__navs.length] = form.getAttribute('action')")
+    clickf = cut(text, '/* ===================== Click-to-filter (page-local)', '// The per-table reveal', 'click-to-filter')
+    ac = cut(text, '/* ========================= Sidebar autocomplete', '})();\n</script>', 'autocomplete') + '})();'
+    apply_bar = lift_opt(text, '        <div class="an-apply" id="anApplyBar" hidden>', '        <?php /* The page-local theme picker')
+    picker = lift_opt(text, '                        <div class="hm-pick"', '                    <?php endif; ?>')
+    tpl = ("<?php $dowParam = ''; $hourParam = ''; ?>"
+           '<!doctype html><html><head><meta charset="utf-8"><title>side</title></head><body>\n'
+           '<form class="console-shell" method="get" action="analytics_all.php"><input type="hidden" name="filter_submitted" value="1">\n'
+           '<input type="hidden" name="dow" id="fDow" value=""><input type="hidden" name="hour" id="fHour" value="">\n'
+           '<aside class="sidebar">\n'
+           '<label for="fRange">Date Range</label><select name="range" id="fRange" data-manual><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option><option value="all">All time</option><option value="custom">Custom range...</option></select>\n'
+           '<div class="custom-range" id="customRange" hidden><input type="date" id="fFrom" name="from" data-manual><input type="date" id="fTo" name="to" data-manual>'
+           '<div class="cr-quick"><button type="button" class="cr-q" data-from="2026-01-01" data-to="2026-01-31">January</button></div></div>\n'
+           '<label for="fActions">Activity</label><select name="actions_preset" id="fActions"><option value="all" selected>All activity</option><option value="view">Views</option><option value="export">Exports</option></select>\n'
+           '<label for="fUser">User</label><div class="ac-wrap"><input type="text" id="fUser" name="user" value="" data-applied="" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="fUserMenu">'
+           '<button type="button" class="ac-clear" data-for="fUser" aria-label="Clear the user filter" hidden>&times;</button><div class="ac-menu" id="fUserMenu" role="listbox" aria-label="Matching users"></div></div>\n'
+           '<label><input type="checkbox" name="excl_admins" value="1"> Hide admin activity</label>\n'
+           + apply_bar + '\n</aside>\n<main>\n' + picker + '\n<button type="button" id="elsewhere">elsewhere</button></main></form>\n'
+           "<script>window.__navs = []; document.querySelector('form.console-shell').addEventListener('submit', function (e) { e.preventDefault(); window.__navs.push('native submit'); });</script>\n"
+           '<script>(function () {\n' + sub + '\n})();</script>\n<script>\n' + clickf + '\n</script>\n<script>\n' + ac + '\n</script>\n</body></html>\n')
+    tpl_path = os.path.join(run, 'side.php')
+    with open(tpl_path, 'wb') as f: f.write(tpl.encode('utf-8'))
+    out = subprocess.run([PHP, '-n', '-d', 'display_errors=1', '-d', 'error_reporting=-1', tpl_path], capture_output=True)
+    html = out.stdout.decode('utf-8', 'replace')
+    if out.returncode != 0 or 'Warning:' in html or 'Fatal error' in html or 'Notice:' in html:
+        raise RuntimeError('php render (side.html): rc=%d\n%s' % (out.returncode, html[:1500]))
+    with open(os.path.join(run, 'side.html'), 'wb') as f: f.write(html.encode('utf-8'))
+    with open(os.path.join(run, 'analytics_suggest.php'), 'w', encoding='utf-8') as f: json.dump(SUGGEST, f)
 
 # --------------------------------------------------------------------- checks
 DAY_ROWS = "Array.from(document.querySelectorAll('#calDayView .cal-day-ev')).map(function(e){return e.className.match(/cal-type-\\w+/)[0].replace('cal-type-','') + ':' + e.querySelector('.cal-de-title').textContent;})"
@@ -707,6 +781,78 @@ def checks(br, text):
     rec('K1', '"/" from the page focuses the search without typing a slash; a slash typed INSIDE the box stays text',
         focused and val == '' and pg.ev("document.getElementById('calSearch').value") == 'a/b', 'focused=%s val=%r now=%r' % (focused, val, pg.ev("document.getElementById('calSearch').value")))
     pg.click_sel('#calSearchClear')
+    # K2 (WCAG 2.1.4, 2026-10-15): the app-wide single-key off switch silences "/".
+    br.load('cal.html')
+    pg.ev("window.penumbraSingleKeysOff = function () { return true; }; document.activeElement && document.activeElement.blur && document.activeElement.blur()")
+    pg.call('Input.dispatchKeyEvent', type='keyDown', key='/', code='Slash', text='/', unmodifiedText='/', windowsVirtualKeyCode=191)
+    pg.call('Input.dispatchKeyEvent', type='keyUp', key='/', code='Slash', windowsVirtualKeyCode=191)
+    time.sleep(0.2)
+    off_focus = pg.ev("document.activeElement === document.getElementById('calSearch')")
+    rec('K2', 'with window.penumbraSingleKeysOff() true, "/" does NOT move focus to the search (WCAG 2.1.4)', not off_focus, 'focused=%s' % off_focus)
+    pg.ev("delete window.penumbraSingleKeysOff")
+
+    # ---- KB: the day view is reachable from the keyboard (2026-10-14 rescan Blocker) ----
+    # Month and week cells with runs are named role=button cells (Enter / Space open
+    # the day), focus moves to the day title and Back returns it to the cell; days
+    # without runs stay out of the Tab order; agenda days get a real "Open day" button.
+    br.load('cal.html')
+    cell = pg.ev("(function(){var c=document.querySelector('#calMonthView .cal-cell.today'); if(!c) return null; return {role:c.getAttribute('role'), tab:c.getAttribute('tabindex'), name:c.getAttribute('aria-label')||'', key:c.getAttribute('data-cal-date')};})()")
+    empty_tab = pg.ev("Array.from(document.querySelectorAll('#calMonthView .cal-cell.no-runs')).filter(function(c){return c.hasAttribute('tabindex');}).length")
+    pg.ev("document.querySelector('#calMonthView .cal-cell.today').focus()")
+    pg.key('Enter', 13); time.sleep(0.3)
+    opened = pg.ev("document.getElementById('calDayView').style.display !== 'none' && document.getElementById('calMonthView').style.display === 'none'")
+    on_title = pg.ev("document.activeElement === document.getElementById('calDayTitle')")
+    rec('KB1', 'month: a day with runs is a named role=button cell in the Tab order; Enter opens its day and focus lands on the day title; days without runs are not tab stops',
+        bool(cell) and cell['role'] == 'button' and cell['tab'] == '0' and ('scheduled task' in cell['name']) and empty_tab == 0 and opened and on_title,
+        'cell=%s emptyTab=%s opened=%s onTitle=%s' % (cell, empty_tab, opened, on_title))
+    pg.ev("document.getElementById('calBack').focus()")
+    pg.key('Enter', 13); time.sleep(0.3)
+    back_ok = pg.ev("document.getElementById('calMonthView').style.display !== 'none'")
+    ret = pg.ev("(document.activeElement && document.activeElement.getAttribute('data-cal-date')) || ''")
+    rec('KB2', 'Back (from the keyboard) returns to the month and puts focus back on the day it opened',
+        back_ok and cell is not None and ret == cell['key'], 'back=%s focus=%r want=%r' % (back_ok, ret, cell and cell['key']))
+    pg.click_sel('.cal-view-btn[data-cal-view="week"]')
+    pg.ev("document.querySelector('#calWeekView .cal-cell.today').focus()")
+    pg.key(' ', 32); time.sleep(0.3)
+    rec('KB3', 'week: Space on a day cell opens its day',
+        pg.ev("document.getElementById('calDayView').style.display !== 'none'") and pg.ev("document.activeElement === document.getElementById('calDayTitle')"),
+        'day=%s' % pg.ev("document.getElementById('calDayView').style.display"))
+    pg.click_sel('#calBack')
+    pg.click_sel('.cal-view-btn[data-cal-view="agenda"]')
+    btn = pg.ev("(function(){var b=document.querySelector('#calAgendaView .cal-ag-day:first-child .cal-ag-open'); return b ? {tag:b.tagName, name:b.getAttribute('aria-label')||''} : null;})()")
+    pg.ev("document.querySelector('#calAgendaView .cal-ag-day:first-child .cal-ag-open').focus()") if btn else None
+    pg.key('Enter', 13); time.sleep(0.3)
+    rec('KB4', 'agenda: each day with runs has a real "Open day" button, named with the date; Enter opens that day',
+        bool(btn) and btn['tag'] == 'BUTTON' and btn['name'].startswith('Open ') and pg.ev("document.getElementById('calDayView').style.display !== 'none'"),
+        'btn=%s day=%s' % (btn, pg.ev("document.getElementById('calDayView').style.display")))
+    pg.click_sel('#calBack')
+    pg.click_sel('.cal-view-btn[data-cal-view="month"]')
+    br.load('cal.html')
+    # KB5 (WCAG 1.3.1, 2026-10-15): the grid's position-only information is not left
+    # to bare numerals: the weekday heads and the days without runs are hidden from AT
+    # (nothing hidden is focusable or a day button), and today's day button says so.
+    GRIDA11Y = ("(function(v){var h=document.getElementById(v); var d=h.querySelectorAll('.cal-dow'), e=h.querySelectorAll('.cal-cell.no-runs');"
+                "var hid=Array.from(h.querySelectorAll('[aria-hidden=\"true\"]'));"
+                "var t=h.querySelector('.cal-cell.today[role=\"button\"]');"
+                "return {dow:d.length, dowHid:Array.from(d).filter(function(x){return x.getAttribute('aria-hidden')==='true';}).length,"
+                "empty:e.length, emptyHid:Array.from(e).filter(function(x){return x.getAttribute('aria-hidden')==='true';}).length,"
+                "badHidden:hid.filter(function(x){return x.matches('[role=button],[tabindex],a,button') || x.querySelector('[role=button],[tabindex],a,button');}).length,"
+                "today:t ? t.getAttribute('aria-label') : null};})(%s)")
+    mg = pg.ev(GRIDA11Y % json.dumps('calMonthView'))
+    pg.click_sel('.cal-view-btn[data-cal-view="week"]')
+    wk = pg.ev(GRIDA11Y % json.dumps('calWeekView'))
+    # Every fixture task runs daily, so empty days only exist with every type chip off.
+    for ty in ('EMAIL', 'SNAPSHOT', 'DROP_FILE', 'DB_DUMP'): pg.click_sel('.cal-type-chip[data-cal-type="%s"]' % ty)
+    wk0 = pg.ev(GRIDA11Y % json.dumps('calWeekView'))
+    pg.click_sel('.cal-view-btn[data-cal-view="month"]')
+    mg0 = pg.ev(GRIDA11Y % json.dumps('calMonthView'))
+    def grid_ok(g, g0, n_cells):
+        return (bool(g) and bool(g0) and g['dow'] == 7 and g['dowHid'] == 7 and g['badHidden'] == 0 and (g['today'] or '').startswith('Today, ')
+                and g0['empty'] == n_cells and g0['emptyHid'] == n_cells and g0['badHidden'] == 0)
+    rec('KB5', 'month + week grids: weekday heads and days without runs are aria-hidden, nothing hidden is interactive, the today cell is named "Today, <date>..."',
+        grid_ok(mg, mg0, 42) and grid_ok(wk, wk0, 7), 'month=%s/%s week=%s/%s' % (mg, mg0, wk, wk0))
+    pg.ev("localStorage.clear()")
+    br.load('cal.html')
 
     # ---- M: month grid ---- (Active is selected again after R1)
     pg.click_sel('.cal-type-chip[data-cal-type="EMAIL"]')
@@ -720,6 +866,116 @@ def checks(br, text):
     more = pg.ev("(document.querySelector('.cal-cell.today .cal-more')||{}).textContent || ''")
     rec('M2', 'Email back on: 3 chips + "+1 more" (MAX_CHIPS unchanged)', len(cls) == 3 and more == '+1 more', 'cls=%s more=%r' % (cls, more))
     pg.ev("localStorage.clear()")
+    side_checks(br, text)
+
+# ---- WCAG Serious fixes on the Platform Metrics sidebar (2026-10-15) ----
+def load_side(br):
+    pg = br.pg
+    pg.call('Page.navigate', url='http://127.0.0.1:%d/side.html?t=%d' % (br.hp, int(time.time() * 1000)))
+    time.sleep(0.2)
+    if not pg.wait("document.readyState === 'complete' && !!document.getElementById('fActions')", 20000): raise RuntimeError('side page did not load')
+    time.sleep(0.15)
+
+NAVS = "window.__navs.slice()"
+BAR = "(function(){var b=document.getElementById('anApplyBar'), s=document.getElementById('anApplyStatus'); return {bar: b ? !b.hidden : null, status: s ? s.textContent : null};})()"
+
+def side_checks(br, text):
+    pg = br.pg
+    # S1 the mouse flow is unchanged: a click on a checkbox re-runs at once
+    load_side(br)
+    pg.click_sel('input[name="excl_admins"]'); time.sleep(0.2)
+    n1 = pg.ev(NAVS)
+    rec('SB1', 'pointer: clicking a sidebar checkbox re-runs the page at once (unchanged)', len(n1) == 1 and 'excl_admins=1' in n1[0], 'navs=%s' % n1)
+    # S2 keyboard on a CLOSED select: ArrowDown changes it but waits; Enter applies
+    load_side(br)
+    pg.ev("document.getElementById('fActions').focus()")
+    pg.key('ArrowDown', 40); time.sleep(0.25)
+    v = pg.ev("document.getElementById('fActions').value"); n_before = pg.ev(NAVS); bar = pg.ev(BAR)
+    pg.key('Enter', 13); time.sleep(0.25)
+    n_after = pg.ev(NAVS)
+    rec('SB2', 'keyboard: ArrowDown on the closed Activity select changes it WITHOUT reloading, shows Apply + a polite status; Enter in the select then applies (WCAG 3.2.2)',
+        v == 'view' and n_before == [] and bar['bar'] is True and 'Enter' in (bar['status'] or '') and len(n_after) == 1 and 'actions_preset=view' in n_after[0],
+        'value=%r before=%s bar=%s after=%s' % (v, n_before, bar, n_after))
+    # S3 keyboard Space on a checkbox waits; the Apply button applies
+    load_side(br)
+    pg.ev("document.querySelector('input[name=\"excl_admins\"]').focus()")
+    pg.key(' ', 32); time.sleep(0.25)
+    chk = pg.ev("document.querySelector('input[name=\"excl_admins\"]').checked"); n_before = pg.ev(NAVS)
+    try: pg.click_sel('#anApplyBtn'); time.sleep(0.2)
+    except Exception: pass
+    n_after = pg.ev(NAVS)
+    rec('SB3', 'keyboard: Space on a checkbox ticks it without reloading; the Apply button applies it',
+        chk is True and n_before == [] and len(n_after) == 1 and 'excl_admins=1' in n_after[0], 'checked=%s before=%s after=%s' % (chk, n_before, n_after))
+    # S4 arrowing onto "Custom range..." reveals the dates but keeps focus in the select
+    load_side(br)
+    pg.ev("var r=document.getElementById('fRange'); r.value='all'; r.focus()")
+    pg.key('ArrowDown', 40); time.sleep(0.25)
+    st = pg.ev("({v: document.getElementById('fRange').value, shown: !document.getElementById('customRange').hidden, focus: document.activeElement && document.activeElement.id})")
+    n4 = pg.ev(NAVS)
+    rec('SB4', 'keyboard: arrowing onto "Custom range..." reveals the dates, does not move focus out of the select, does not reload',
+        st['v'] == 'custom' and st['shown'] and st['focus'] == 'fRange' and n4 == [], 'state=%s navs=%s' % (st, n4))
+    # S5 a typed box left with Tab waits; left with a click still runs (the mouse flow)
+    load_side(br)
+    pg.ev("document.getElementById('fUser').focus()"); pg.call('Input.insertText', text='abc'); time.sleep(0.1)
+    pg.key('Tab', 9); time.sleep(0.3)
+    n_tab = pg.ev(NAVS); bar = pg.ev(BAR)
+    load_side(br)
+    pg.ev("document.getElementById('fUser').focus()"); pg.call('Input.insertText', text='abc'); time.sleep(0.1)
+    pg.click_sel('#elsewhere'); time.sleep(0.3)
+    n_click = pg.ev(NAVS)
+    rec('SB5', 'a typed User box left with Tab waits for Enter / Apply; left with a mouse click it still re-runs (unchanged)',
+        n_tab == [] and bar['bar'] is True and len(n_click) == 1 and 'user=abc' in n_click[0], 'tab=%s bar=%s click=%s' % (n_tab, bar, n_click))
+    # S6 the sidebar's names (static: the markup is PHP-heavy, so read as text)
+    import re as _re
+    vis = _re.search(r'role="group" aria-labelledby="fgVisLbl">\s*<span class="fg-label" id="fgVisLbl">Visibility</span>', text)
+    cmpg = _re.search(r'role="group" aria-labelledby="fgCompareLbl">\s*<span class="fg-label" id="fgCompareLbl">Compare</span>', text)
+    act = '<label for="fActions">Activity</label>\n            <select name="actions_preset" id="fActions">' in text
+    orphans = _re.findall(r'<label>(Activity|Compare|Visibility)</label>', text)
+    rec('SB6', 'Activity select is labelled (for/id); Compare and Visibility are role=group named by their heading; no orphan <label> left (WCAG 1.3.1 / 4.1.2)',
+        act and bool(vis) and bool(cmpg) and not orphans, 'act=%s vis=%s cmp=%s orphans=%s' % (act, bool(vis), bool(cmpg), orphans))
+    # H1 the heatmap's keyboard picker (WCAG 2.1.1)
+    load_side(br)
+    hp = pg.ev("(function(){var d=document.getElementById('hmPickDow'), h=document.getElementById('hmPickHour'), g=document.getElementById('hmPickGo'); return (d&&h&&g) ? {dl:d.labels.length, hl:h.labels.length, n:h.options.length, tag:g.tagName} : null;})()")
+    if hp:
+        pg.ev("document.getElementById('hmPickHour').focus()"); pg.key('ArrowDown', 40); time.sleep(0.2)
+        n_arrow = pg.ev(NAVS)
+        pg.ev("document.getElementById('hmPickDow').value='WED'; document.getElementById('hmPickHour').value='14'; document.getElementById('hmPickGo').focus()")
+        pg.key('Enter', 13); time.sleep(0.25)
+        n_go = pg.ev(NAVS)
+    else:
+        n_arrow = n_go = None
+    rec('HP1', 'heatmap picker: labelled weekday + hour selects (24 hours) and a Filter button; arrowing does not reload; Enter on Filter scopes the page to dow=WED&hour=14',
+        bool(hp) and hp['dl'] == 1 and hp['hl'] == 1 and hp['n'] == 24 and hp['tag'] == 'BUTTON' and n_arrow == [] and n_go and len(n_go) == 1 and 'dow=WED' in n_go[0] and 'hour=14' in n_go[0],
+        'picker=%s arrow=%s go=%s' % (hp, n_arrow, n_go))
+    # C1 / C2 the User autocomplete as an ARIA combobox (WCAG 4.1.2)
+    load_side(br)
+    pg.ev("document.getElementById('fUser').focus()"); pg.call('Input.insertText', text='jd')
+    opened = pg.wait("document.querySelectorAll('#fUserMenu .ac-item').length === 2", 4000)
+    ids = pg.ev("Array.from(document.querySelectorAll('#fUserMenu [role=option]')).map(function(o){return o.id;})")
+    status1 = pg.ev("(document.getElementById('fUserMenuStatus')||{}).textContent || ''")
+    pg.key('ArrowDown', 40); time.sleep(0.1)
+    ad1 = pg.ev("document.getElementById('fUser').getAttribute('aria-activedescendant')")
+    sel1 = pg.ev("(function(){var a=document.getElementById('fUser').getAttribute('aria-activedescendant'); var o=a&&document.getElementById(a); return o ? o.getAttribute('aria-selected') : null;})()")
+    pg.key('ArrowDown', 40); time.sleep(0.1)
+    ad2 = pg.ev("document.getElementById('fUser').getAttribute('aria-activedescendant')")
+    pg.key('Escape', 27); time.sleep(0.1)
+    ad3 = pg.ev("document.getElementById('fUser').getAttribute('aria-activedescendant')")
+    exp3 = pg.ev("document.getElementById('fUser').getAttribute('aria-expanded')")
+    rec('CB1', 'combobox: options carry ids, ArrowDown sets aria-activedescendant to the highlighted (aria-selected) option and follows it, Escape clears it; the count is announced',
+        opened and len(ids) == 2 and all(ids) and len(set(ids)) == 2 and ad1 == ids[0] and sel1 == 'true' and ad2 == ids[1] and ad3 is None and exp3 == 'false' and '2 suggestions' in status1,
+        'opened=%s ids=%s ad=%r/%r/%r sel=%r exp=%r status=%r' % (opened, ids, ad1, ad2, ad3, sel1, exp3, status1))
+    with open(os.path.join(br.root, 'analytics_suggest.php'), 'w', encoding='utf-8') as f: f.write('[]')
+    load_side(br)
+    pg.ev("document.getElementById('fUser').focus()"); pg.call('Input.insertText', text='zz')
+    empty = pg.wait("!!document.querySelector('#fUserMenu .ac-empty')", 4000)
+    st2 = pg.ev("({status: (document.getElementById('fUserMenuStatus')||{}).textContent || '', hid: (document.querySelector('#fUserMenu .ac-empty')||{getAttribute:function(){return null;}}).getAttribute('aria-hidden'), exp: document.getElementById('fUser').getAttribute('aria-expanded')})")
+    with open(os.path.join(br.root, 'analytics_suggest.php'), 'w', encoding='utf-8') as f: json.dump(SUGGEST, f)
+    rec('CB2', '"No matches" is spoken through a polite status (the visual note is aria-hidden, the listbox stays collapsed)',
+        empty and st2['status'] == 'No matches with recorded activity' and st2['hid'] == 'true' and st2['exp'] == 'false', 'shown=%s %s' % (empty, st2))
+    # I6 the pause dialog's confirm button: surface ink on the danger fill (WCAG 1.4.3; text - the
+    # banner script is not part of this harness)
+    i6 = _re.search(r'id="calPauseConfirm" style="background:var\(--accent-danger, #dc3545\); color:var\(--bg-surface\);', text)
+    rec('I6', '"Confirm pause" puts var(--bg-surface) ink on its --accent-danger fill (never white / on-brand)', bool(i6), 'found=%s' % bool(i6))
 
 # --------------------------------------------------------------------- main
 def run_build(label, src_text, mutant=None):

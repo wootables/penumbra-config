@@ -392,6 +392,67 @@ until(function () { return ['e1', 'e2', 'e3', 'e4', 'e5'].every(booted) && stat(
     $('#dashSearchClear').trigger('click');
     return until(function () { return stat('d1') === '233'; }, 4000);
   }).then(function () {
+    // ══════ K. cross-filtering from the keyboard (WCAG 2.1.1, 2026-10-15) ══════
+    // Mutants: xfkeys (no key handler), xfkeycells (cells not reachable), xffocus (focus not put back), xfmenu (no chart menu).
+    $('.pnb-toast-card').remove();
+    var $rows = tile('d2').find('tbody tr');
+    ok('K: every table-tile row is a tab stop', $rows.length === 3 && $rows.filter('[tabindex="0"]').length === 3, $rows.length + '/' + $rows.filter('[tabindex="0"]').length);
+    ok('K: each plain cell is reachable (tabindex -1), never a tab stop of its own', tile('d2').find('td[data-col][tabindex="-1"]').length === 6, String(tile('d2').find('td[data-col][tabindex="-1"]').length));
+    var ada = $rows.filter(function () { return $(this).children('td').first().text() === 'Ada'; })[0];
+    ada.focus(); $(ada).trigger('focusin');
+    var $hint = tile('d2').find('.dash-table-kbdhint');
+    ok('K: a hint under the table names the keys while a row has focus', $hint.length === 1 && !$hint.prop('hidden') && /Enter filters the dashboard/.test($hint.text())
+       && ($(ada).attr('aria-describedby') || '') === $hint.attr('id'), $hint.length + ' hidden=' + $hint.prop('hidden'));
+    $(ada).trigger($.Event('keydown', { key: 'ArrowRight' }));
+    ok('K: Right from a row moves to its first plain cell', document.activeElement && document.activeElement.tagName === 'TD' && $(document.activeElement).attr('data-col') === 'NAME', document.activeElement && document.activeElement.outerHTML);
+    $(document.activeElement).trigger($.Event('keydown', { key: 'ArrowRight' }));
+    ok('K: Right again moves to the next column', document.activeElement && $(document.activeElement).attr('data-col') === 'AMOUNT', document.activeElement && document.activeElement.outerHTML);
+    $(document.activeElement).trigger($.Event('keydown', { key: 'ArrowLeft' }));
+    ok('K: Left goes back', document.activeElement && $(document.activeElement).attr('data-col') === 'NAME' && $(document.activeElement).text() === 'Ada', document.activeElement && document.activeElement.outerHTML);
+    $(document.activeElement).trigger($.Event('keydown', { key: 'Enter' }));
+    return until(function () { return tile('d2').find('tbody tr').length === 1; }, 4000).then(function () { return wait(300); });
+  }).then(function () {
+    eq('K: Enter on a focused cell filters by its column and value, as a click does', $('#dashSearchInput').val(), 'NAME = /^(?:Ada)$/');
+    ok('K: the result is announced', /Filtered every tile by NAME = Ada/.test($('#dashLive').text()), $('#dashLive').text());
+    var ae = document.activeElement;
+    ok('K: focus is put back on the same value in the redrawn table', !!ae && ae.tagName === 'TD' && $(ae).attr('data-col') === 'NAME' && $(ae).text() === 'Ada' && $.contains(tile('d2')[0], ae), ae && ae.outerHTML);
+    $(ae).trigger($.Event('keydown', { key: 'Enter' }));
+    return until(function () { return tile('d2').find('tbody tr').length === 3; }, 4000).then(function () { return wait(300); });
+  }).then(function () {
+    eq('K: Enter on the same value again releases it', $('#dashSearchInput').val(), '');
+    ok('K: the release is announced', /Released NAME = Ada/.test($('#dashLive').text()), $('#dashLive').text());
+    var bob = tile('d2').find('tbody tr').filter(function () { return $(this).children('td').first().text() === 'Bob'; })[0];
+    bob.focus();
+    $(bob).trigger($.Event('keydown', { key: ' ' }));
+    return until(function () { return tile('d2').find('tbody tr').length === 1; }, 4000).then(function () { return wait(300); });
+  }).then(function () {
+    eq('K: Space on a row filters by its first plain value', $('#dashSearchInput').val(), 'NAME = /^(?:Bob)$/');
+    $('#dashSearchClear').trigger('click');
+    return until(function () { return stat('d1') === '233' && tile('d2').find('tbody tr').length === 3; }, 4000).then(function () { return wait(500); });
+  }).then(function () {
+    var $btn = tile('c1').find('.dash-xf-btn');
+    ok('K: a chart tile has a Filter button that opens a menu', $btn.length === 1 && $btn.attr('aria-haspopup') === 'menu' && $btn.attr('aria-expanded') === 'false', $btn.length ? $btn[0].outerHTML : 'none');
+    ok('K: tiles that are not charts get no Filter button', tile('d2').find('.dash-xf-btn').length === 0 && tile('d1').find('.dash-xf-btn').length === 0);
+    if (!$btn.length) { return wait(10); }
+    $btn[0].focus(); $btn.trigger('click');
+    var $m = $('#dashXfMenu'), $it = $m.find('[role="menuitemcheckbox"]');
+    ok('K: the menu lists the chart\'s categories, the first one focused', $m.attr('role') === 'menu' && $it.length === 3 && document.activeElement === $it[0] && $btn.attr('aria-expanded') === 'true',
+       $it.map(function () { return $(this).text(); }).get().join(',') + ' | ' + (document.activeElement && document.activeElement.outerHTML));
+    $it.filter(function () { return /Eng$/.test($(this).text()); }).trigger('click');
+    return until(function () { return stat('d1') === '13'; }, 4000).then(function () { return wait(300); });
+  }).then(function () {
+    var $btn = tile('c1').find('.dash-xf-btn');
+    eq('K: choosing a value in the chart menu writes the same condition a bar click does', $('#dashSearchInput').val(), 'COLLEGE = /^(?:Eng)$/');
+    ok('K: the menu closes, focus back on the Filter button, announced', $('#dashXfMenu').length === 0 && document.activeElement === $btn[0] && $btn.attr('aria-expanded') === 'false'
+       && /Filtered every tile by COLLEGE = Eng/.test($('#dashLive').text()), (document.activeElement && document.activeElement.outerHTML) + ' | ' + $('#dashLive').text());
+    $btn.trigger('click');
+    var on = $('#dashXfMenu [role="menuitemcheckbox"][aria-checked="true"]');
+    ok('K: the value in force reads checked when the menu opens again', on.length === 1 && /Eng$/.test(on.text()), on.length + ':' + on.text());
+    document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    ok('K: Escape closes the menu and returns focus to its button', $('#dashXfMenu').length === 0 && document.activeElement === $btn[0] && $btn.attr('aria-expanded') === 'false', document.activeElement && document.activeElement.outerHTML);
+    $('#dashSearchClear').trigger('click');
+    return until(function () { return stat('d1') === '233'; }, 4000);
+  }).then(function () {
     ok('no exception escaped', ERRORS.length === 0, ERRORS.join(' | '));
     publish();
   });

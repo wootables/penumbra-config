@@ -120,6 +120,9 @@ _penumbra_collect_formula_refs
 penumbra_resolve_summary_formula
 _penumbra_formula_var_type
 penumbra_group_agg_registry_type
+penumbra_sched_notes_col
+penumbra_notes_cell_html
+penumbra_sched_journal_screen_order
 penumbra_is_toggle_column
 penumbra_compute_summary
 penumbra_format_summary
@@ -256,6 +259,8 @@ _snippet_set_expanded_columns
 _snippet_journal_toggles
 _snippet_merge_journal_cols
 _snippet_condition_uses_notes
+_snippet_notes_available
+_snippet_notes_tree
 _snippet_normalize_toggle_tree
 _snippet_tree_reads_journal
 _snippet_tree_reads_names
@@ -393,6 +398,7 @@ _sr_recipient_auth_failure
 _sr_filter_subscribers_by_access
 _sr_persist_subscriber_removal
 execute_scheduled_report
+penumbra_split_change_columns
 generate_snapshot_signature
 penumbra_fetch_latest_scheduler_snapshot
 penumbra_first_run_baseline_unchanged

@@ -36,13 +36,14 @@ EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js']
 EXPECT_S = ['S-lift', 'S-sqlA-15', 'S-sqlB-15', 'S-mine15', 'S-oth15', 'S-order', 'S-excl', 'S-nulls', 'S-fewmine', 'S-nomine']
 EXPECT_J = ['P-loaded', 'P-fixture', 'J-initial', 'P-title-asc', 'J-reset', 'P-rebuild', 'J-rebuild', 'J-loadmore',
-            'J-loadmore-reset', 'J-search', 'J-restore', 'E-errors']
+            'J-loadmore-reset', 'J-search', 'J-restore', 'K-cancel', 'K-escape', 'K-save', 'E-errors']   # K-*: 2026-10-15 (tag editor focus)
 # What the pre-change pair gets wrong (frozen from the first control run against the
 # live files of 2026-10-02 16:30, php c8dcceba / js 4dd461d7). Green there on purpose:
 # the exclusion + NULLS LAST (unchanged), the title sort itself, the column rebuild,
 # and the search path (still newest-updated first) - proving fixture and read-out.
 CONTROL_RED = ['S-sqlA-15', 'S-sqlB-15', 'S-mine15', 'S-oth15', 'S-order', 'S-fewmine', 'S-nomine',
-               'J-initial', 'J-reset', 'J-rebuild', 'J-loadmore', 'J-loadmore-reset', 'J-restore']
+               'J-initial', 'J-reset', 'J-rebuild', 'J-loadmore', 'J-loadmore-reset', 'J-restore',
+               'K-cancel', 'K-escape', 'K-save']   # 2026-10-15: the 10-02 pair predates the tag editor (and its focus fix)
 
 MUTANTS = json.load(open(os.path.join(HERE, 'mutants.json'), encoding='utf-8'))
 

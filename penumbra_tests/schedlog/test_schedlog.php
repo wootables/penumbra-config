@@ -118,7 +118,7 @@ foreach (array('../../../../windows/win.ini', '2026-08-24/../../etc', '', 'not-a
 }
 
 echo "\n== filters still work across the span ==\n";
-/* ctx=0 EXPLICITLY. Context lines shipped on 2026-08-28 and default to 5, so a
+/* ctx=0 EXPLICITLY. Context lines shipped on 2026-08-28 and default to 2 (5 until 2026-10-14), so a
    plain filtered tail now returns non-matching neighbours ON PURPOSE - this
    assertion caught that change, correctly, the day it landed. The pure-match
    contract still exists and is still worth pinning; it just has to ask for it.
@@ -132,7 +132,7 @@ ok(count($f['rows']) > 0, 'and there are some', count($f['rows']));
 
 // ...and the default really is context-on, over the real spanning log.
 $fc = penumbra_log_tail('scheduler', array('lines' => 50, 'q' => 'Run Complete'), $cfg);
-ok($fc['ctx'] === 5, 'the default across a spanning source is 5', $fc['ctx']);
+ok($fc['ctx'] === 2, 'the default across a spanning source is 2 (5 until 2026-10-14)', $fc['ctx']);
 $neighbours = 0; $marked = 0;
 foreach ($fc['rows'] as $row) {
     if (!empty($row['m'])) { $marked++; }
@@ -224,6 +224,34 @@ ok(penumbra_log_severity('[28-Aug-2026 12:23:32 America/New_York] InfoEd MS-SQL 
    'a driver connect failure is still an error');
 ok(penumbra_log_severity('[28-Aug-2026 10:00:00 America/New_York] PENUMBRA Exception for user x: boom', 'php') === 'err',
    'plain exceptions still fall through to the generic rules');
+
+echo "\n== severity: the runner's own chatter is neutral (2026-10-14) ==\n";
+/* These were 131 of the 300 lines "problems only" showed on a quiet day: a passed
+   security check is SECURITY, a task title can hold SKIPPED, a column list can
+   hold SECURITY or FAILED. None is a problem. The real ones below keep their colour. */
+$chatter = array(
+    '[2026-10-14 12:47:16]   Security Check Passed: All recipients authorized. Enabling API bypass.',
+    '[2026-10-14 12:47:16]   Security Check Passed: report is public - all recipients authorized. Enabling API bypass.',
+    '[2026-10-14 10:02:15] Processing Task #731 (Grants Security Profiles ({ROW_COUNT}))...',
+    '[2026-10-14 12:37:16] Processing Task #1426 (Penumbra notes test 3a (should be SKIPPED) - jjornl)...',
+    '[2026-10-14 12:37:17] Task #1426 skipped: Custom condition met (count(Notes > 0) > 0).',
+    '[2026-10-14 07:52:18] Task #783 skipped: No row changes since last snapshot (change-analysis diff empty).',
+    '[2026-10-14 09:02:16]   WARNING: Prompt \'Audit Log Entries for Report\' has no value - substituting NULL.',
+    '[2026-10-14 09:02:16]   Prompt \'select_status\' skipped: resultif condition not met (parent \'filter_type\' = \'None (retrieve everything)\', expected \'STATUS\').',
+    '[2026-10-14 08:02:37]   Created NC_REPORTING.ALC_SRAR_X with 83 columns: {"ACADEMIC_YEAR":"VARCHAR2(50)","SECURITY_LEVEL":"VARCHAR2(50)"}',
+    '[2026-10-14 08:02:37]   First-row keys: ["ACADEMIC_YEAR","SECURITY_LEVEL","FAILED_FLAG"]',
+    '[2026-10-14 08:02:40]   Attachment: BME_Personnel_with_RED_Security_Profiles_2026-10-14.xlsx (41 KB)',
+    '[2026-10-14 08:02:35]   Raw OPTIONS keys: skip_empty, skip_no_change, on_failure, attach',
+);
+$allNeutral = true;
+foreach ($chatter as $c) { if (penumbra_log_severity($c, 'scheduler') !== '') { $allNeutral = false; echo "  --   still graded: " . substr($c, 0, 90) . "\n"; } }
+ok($allNeutral, 'a passed check, a task starting, a prompt with no value or skipped, a task skipped by its condition, a dump table created and its first-row keys are all neutral');
+ok(penumbra_log_severity('[2026-10-14 08:02:41]   Email sent to someone@ncsu.edu(OUC:123456), RED Security Profiles report', 'scheduler') === 'ok', 'a send that worked is green, whatever the report is called');
+ok(penumbra_log_severity('[2026-10-14 03:03:10] Task #12 failed: ORA-00942 table or view does not exist', 'scheduler') === 'err', 'a task that failed is still an error');
+ok(penumbra_log_severity('[2026-10-14 03:03:10] HEALTH: DEGRADED - database hr down, cached 4m ago', 'scheduler') === 'err', 'and a DEGRADED health line still is');
+ok(penumbra_log_severity('[2026-10-14 08:02:37]   PENUMBRA SECURITY: Non-SELECT query blocked for user x', 'scheduler') === 'err', 'a real SECURITY line in the scheduler log is still an error');
+ok(penumbra_log_severity('[2026-10-14 09:02:17] Warning: 50 scheduler-snapshot limit reached for report #49. Deleting 1 oldest (pinned excluded).', 'scheduler') === 'warn', 'the snapshot-limit warning keeps its amber');
+ok(penumbra_log_severity('Security Check Passed: All recipients authorized. Enabling API bypass.', 'php') === 'err', 'the same words in another log are not the runner\'s chatter and keep the generic grade');
 
 echo "\nSUMMARY  pass=$PASS  fail=$FAIL\n";
 exit($FAIL === 0 ? 0 : 1);

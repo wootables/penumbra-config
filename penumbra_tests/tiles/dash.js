@@ -95,6 +95,7 @@
              : { version: 1, theme: 'theme-default', refreshSeconds: 0, tiles: [] };
     if (!DASH.tiles) { DASH.tiles = []; }
     var META = V.meta || { short_id: '', title: '', authorized: V.currentUserKey, owner_id: V.currentUserKey };
+    META.tagsBase = Array.isArray(META.tags) ? META.tags.slice() : [];   // the list the page loaded (2026-10-09): a save posts it, so only this page's own changes move
 
     // -------------------------------------------------------------------------
     // URL parameters -> every tile (owner, 2026-09-05). Anything in the page's
@@ -373,6 +374,9 @@
             ' aria-describedby="dashFilterNote">' +
             '<button type="button" class="dash-filter-btn" id="dashSearchGo" title="Apply the filter (Enter)" aria-label="Apply the filter">&#9654;&#xFE0E;</button>' +
             '<button type="button" class="dash-filter-btn" id="dashSearchClear" title="Clear the filter" aria-label="Clear the filter">&times;</button>' +
+            // The column arrow (2026-10-06), as on a report's search bar: every column the tiles offer.
+            '<button type="button" class="dash-filter-btn dash-filter-cols" id="dashSearchCols" title="(Alt+Down) Show the columns" aria-label="Show the columns">' +
+            '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><polyline points="6 9 12 15 18 9"/></svg></button>' +
             '<button type="button" class="dash-filter-btn dash-filter-help" id="dashSearchHelp" title="Search help: the syntax the filter uses" aria-label="Search help">?</button>' +
             '</div>' +
             '<div class="dash-filter-note" id="dashFilterNote" aria-live="polite"></div>' +
@@ -386,8 +390,35 @@
         var val = String($in.val() || '').trim();
         $('#dashFilter').toggleClass('dash-filter-active', !!URL_SEARCH).toggleClass('dash-filter-dirty', val !== URL_SEARCH);
         $('#dashSearchClear').toggleClass('dash-filter-hide', !val && !URL_SEARCH);
+        // Apply, as the report bar's run: nothing to apply in an empty box with
+        // no filter on (2026-10-13). An applied filter emptied in the box keeps
+        // it - applying the empty box takes the filter off.
+        $('#dashSearchGo').toggleClass('dash-filter-hide', !val && !URL_SEARCH);
+        // The column arrow and the clear share the box's edge (2026-10-06): the
+        // arrow while there is no search, the clear once there is one.
+        syncDashArrow();
         controlsFollowBox();
     }
+    // Except while the search ENDS with a column that has a value list
+    // (2026-10-13): then the arrow lists that column's values (search_builder.js
+    // showColumnList) and shows beside the clear. Also run on a hover over the
+    // box and on focus: the engine and the tiles' columns load after the box.
+    var _dashArrowText = null;
+    function syncDashArrow(force) {
+        var $in = $('#dashSearchInput');
+        if (!$in.length) { return; }
+        var raw = String($in.val() || ''), val = raw.trim();
+        var key = raw + '\u0000' + URL_SEARCH;   // the hide also follows the applied filter
+        if (!force && key === _dashArrowText) { return; }
+        _dashArrowText = key;
+        var sb = window._penumbraSearchBuilder;
+        var trailCol = (val && sb && typeof sb.trailingColumn === 'function') ? sb.trailingColumn('#dashSearchInput') : '';
+        $('#dashSearchCols').toggleClass('dash-filter-hide', !!(val || URL_SEARCH) && !trailCol)
+            .attr('title', trailCol ? '(Alt+Down) Show the values of ' + trailCol : '(Alt+Down) Show the columns')
+            .attr('aria-label', trailCol ? 'Show the values of ' + trailCol : 'Show the columns');
+    }
+    $(document).on('mouseenter', '#dashFilter .dash-filter-box', function () { syncDashArrow(true); });
+    $(document).on('focus', '#dashSearchInput', function () { syncDashArrow(true); });
     function applyDashSearch(text) {
         text = resolveMeTokens(String(text == null ? '' : text)).trim();   // me(ouc) and the other me() words resolve for this viewer (2026-09-30)
         if (text === URL_SEARCH) { syncDashFilterBox(true); renderAllControls(); return; }
@@ -1023,6 +1054,36 @@
         var el = this;
         dashAutocomplete(function () { $(el).trigger('dblclick'); });
     });
+    // The column arrow (2026-10-06) and Alt+Down in the box: every column, as
+    // the double-click into the empty box lists them (search_builder.js
+    // showColumnList - a pick adds `and COLUMN ` after what is typed). The
+    // arrow toggles; its mousedown keeps the focus in the box, whose blur
+    // would close the list, and notes whether the list was open (the widget
+    // closes it on that mousedown, before the click).
+    function dashShowColumns() {
+        dashAutocomplete(function () {
+            var sb = window._penumbraSearchBuilder;
+            if (!sb || typeof sb.showColumnList !== 'function' || !sb.showColumnList('#dashSearchInput')) { $('#dashSearchInput').trigger('focus'); }
+        });
+    }
+    $(document).on('mousedown', '#dashSearchCols', function (e) {
+        if (e.button !== 0) { return; }
+        e.preventDefault();
+        var sb = window._penumbraSearchBuilder;
+        $(this).data('pnbWasOpen', !!(sb && typeof sb.columnListOpen === 'function' && sb.columnListOpen('#dashSearchInput')));
+    });
+    $(document).on('click', '#dashSearchCols', function (e) {
+        e.preventDefault();
+        var wasOpen = $(this).data('pnbWasOpen');
+        $(this).removeData('pnbWasOpen');
+        var sb = window._penumbraSearchBuilder;
+        if (wasOpen || (sb && typeof sb.columnListOpen === 'function' && sb.columnListOpen('#dashSearchInput'))) {
+            try { $('#dashSearchInput').autocomplete('close'); } catch (eC) { }
+            $('#dashSearchInput').trigger('focus');
+            return;
+        }
+        dashShowColumns();
+    });
     $(document).on('keydown', '#dashSearchInput', function (e) {
         // / in the EMPTY box opens the Visual Search Builder, as on a report's
         // search bar (the page-wide / is what focuses the box).
@@ -1035,6 +1096,13 @@
             e.preventDefault();
             var el = this;
             dashAutocomplete(function () { $(el).trigger($.Event('keydown', { key: ' ', keyCode: 32, which: 32, ctrlKey: true })); });
+            return;
+        }
+        // Alt+Down = the column arrow; once the engine is attached its own
+        // handler takes the key (and stops it before this one).
+        if ((e.key === 'ArrowDown' || e.keyCode === 40) && e.altKey && !e.ctrlKey && !e.metaKey && !_dashAcOn) {
+            e.preventDefault();
+            dashShowColumns();
             return;
         }
         // The suggestion list had it first: Enter picked the highlighted
@@ -2667,21 +2735,22 @@
                 var pb = pins.indexOf(b.short_id) > -1 ? 0 : 1;
                 return pa - pb;
             });
-            var html = '<div class="dash-home-grid">';
+            var html = '<div class="dash-home-tools"><input type="search" id="dashHomeFilter" placeholder="Filter: title, id, owner, or tag:NAME" aria-label="Filter dashboards" autocomplete="off"></div><div class="dash-home-grid">';
             rows.forEach(function (d) {
                 var pinned = pins.indexOf(d.short_id) > -1;
                 // The star is a SIBLING of the link, never a button inside it (WCAG
                 // 4.1.2); .dash-home-item positions it over the card. Pinned state is
                 // aria-pressed plus a filled vs hollow star, not colour alone (1.4.1).
-                html += '<div class="dash-home-item">' +
+                html += '<div class="dash-home-item" data-hay="' + escapeHtml(((d.title || '') + ' ' + d.short_id + ' ' + (d.owner_id || '')).toLowerCase()) + '" data-tags="' + escapeHtml('|' + (d.tags || []).join('|') + '|') + '">' +
                         '<a class="dash-home-card" href="dashboard.php?id=' + encodeURIComponent(d.short_id) + '">' +
                         '<div class="dash-home-title">' + escapeHtml(d.title || d.short_id) + '</div>' +
                         '<div class="dash-home-meta">' + escapeHtml(d.short_id) + ' &middot; ' + escapeHtml(d.owner_id || '') + '</div>' +
+                        ((d.tags && d.tags.length) ? '<div class="dash-home-tags">' + d.tags.map(function (t) { return '<span class="access-capsule report-tag dash-home-tag" data-tag="' + escapeHtml(t) + '" title="Show every dashboard tagged ' + escapeHtml(t) + '">' + escapeHtml(t) + '</span>'; }).join('') + '</div>' : '') +
                         // Footer row: updated stamp left, badge right, both IN FLOW so a long
                         // owner/date can never run under an absolutely placed badge (2026-09-22).
                         '<div class="dash-home-foot">' +
                         '<span class="dash-home-updated">' + (d.updated_at ? 'Updated ' + escapeHtml(d.updated_at) : '') + '</span>' +
-                        (d.can_edit ? '<span class="dash-home-badge">editable</span>' : '') +
+                        ((d.can_edit && !penumbra_dash_vars.noadm) ? '<span class="dash-home-badge">editable</span>' : '') +   // &noadm: a viewer's list (2026-10-02)
                         '</div>' +
                         '</a>' +
                         '<button type="button" class="dash-pin' + (pinned ? ' is-pinned' : '') + '" data-sid="' + escapeHtml(d.short_id) + '"' +
@@ -2692,6 +2761,19 @@
             });
             html += '</div>';
             $main.html(html);
+            // Filter (2026-10-09): title / id / owner text, or tag:NAME for exactly one tag;
+            // a pill click fills it; ?search= on the address runs it first (the Tags tool's link).
+            function applyHomeFilter() {
+                var q = $.trim($('#dashHomeFilter').val()).toLowerCase(), m = /^tag:\s*([a-z0-9_]+)$/i.exec(q);
+                $('.dash-home-item').each(function () {
+                    var ok = !q || (m ? String($(this).attr('data-tags')).indexOf('|' + m[1].toUpperCase() + '|') !== -1 : String($(this).attr('data-hay')).indexOf(q) !== -1);
+                    $(this).toggle(ok);
+                });
+            }
+            $('#dashHomeFilter').on('input', applyHomeFilter);
+            $main.off('click.dashTag').on('click.dashTag', '.dash-home-tag', function (e) { e.preventDefault(); e.stopPropagation(); $('#dashHomeFilter').val('tag:' + $(this).attr('data-tag')).trigger('input'); });
+            var deep = ''; try { deep = new URLSearchParams(window.location.search).get('search') || ''; } catch (eU) { }
+            if (deep) { $('#dashHomeFilter').val(deep).trigger('input'); }
         }).fail(function () {
             $main.html('<div class="dash-tile-err">Could not load dashboards.</div>');
         });
@@ -2979,6 +3061,58 @@
     // types render as capsules; plain unityids stay as free text in the input -
     // the same split the report dialog makes. Returns { value: fn } giving the
     // full comma-joined list.
+    // ---------------- Tags (2026-10-09) ----------------
+    // The dashboard's tags as pills: the closed vocabulary the page carries
+    // (penumbra_dash_vars.tagVocabulary, a datalist under the input); a non-admin
+    // may add or remove only tags they hold a grant on, the others sit as locked
+    // pills. The same capsule classes as the report dialog's tags (main.css).
+    function tagListHtml(id) {
+        return '<datalist id="' + (id || 'dsTagList') + '">' +
+               (V.tagVocabulary || []).map(function (t) { return '<option value="' + escapeHtml(String(t)) + '">'; }).join('') + '</datalist>';
+    }
+    function buildTagPillbox($box, initial) {
+        var $input = $box.find('input');
+        var vocab = (V.tagVocabulary || []).map(function (t) { return String(t).toUpperCase(); });
+        var held = (V.tagGrants || []).map(function (t) { return String(t).toUpperCase(); });
+        function normalize(raw) {
+            var t = String(raw || '').trim().toUpperCase().replace(/[\s\-.]+/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+            return /^[A-Z][A-Z0-9_]{0,59}$/.test(t) ? t : '';
+        }
+        function canTouch(t) { return !!V.isAdmin || held.indexOf(t) !== -1; }
+        function has(t) { var f = false; $box.find('.access-capsule').each(function () { if (String($(this).attr('data-value')) === t) { f = true; } }); return f; }
+        function addPill(t) {
+            if (!t || has(t)) { return; }
+            if ($box.find('.access-capsule').length >= 20) { say('A dashboard carries at most 20 tags.'); return; }   // the server's cap (2026-10-09), said here instead of dropped in silence
+            var locked = !canTouch(t);
+            $('<div class="access-capsule report-tag' + (locked ? ' locked' : '') + '" data-value="' + escapeHtml(t) + '" title="' +
+              (locked ? 'You do not hold a grant on this tag, so it stays as it is' : escapeHtml(t)) + '"><span>' + escapeHtml(t) + '</span>' +
+              (locked ? '' : '<button type="button" class="remove-access" aria-label="Remove ' + escapeHtml(t) + '">&times;</button>') + '</div>').insertBefore($input);
+        }
+        var $hint = $('<div class="dash-tag-hint" aria-live="polite"></div>').insertAfter($box);
+        function say(msg) { $hint.text(msg || ''); }
+        function commit() {
+            var parts = String($input.val()).split(/[,\s]+/), i, t;
+            for (i = 0; i < parts.length; i++) {
+                t = normalize(parts[i]);
+                if (!t) { continue; }
+                if (vocab.indexOf(t) === -1) { say(t + ' is not an existing tag. New tags start in Admin › Tags.'); continue; }
+                if (!canTouch(t)) { say('You do not hold a grant on ' + t + '.'); continue; }
+                addPill(t); say('');
+            }
+            $input.val('');
+        }
+        (initial || []).forEach(function (t) { addPill(normalize(t)); });
+        $box.on('keydown', 'input', function (ev) {
+            if (ev.key === 'Enter' || ev.key === ',') { ev.preventDefault(); commit(); }
+            else if (ev.key === 'Backspace' && !this.value) { $box.find('.access-capsule:not(.locked)').last().remove(); }
+        });
+        $box.on('change', 'input', commit);
+        $box.on('focusout', 'input', function () { setTimeout(commit, 150); });
+        $box.on('click', '.remove-access', function () { $(this).closest('.access-capsule').remove(); $input.trigger('focus'); });
+        $box.on('click', function (e) { if (e.target === this) { $input.trigger('focus'); } });
+        return { value: function () { return $box.find('.access-capsule').map(function () { return String($(this).attr('data-value')); }).get(); } };
+    }
+
     function buildAccessPillbox($box, initial) {
         var $input = $box.find('input');
         function addPill(entry, ud) {
@@ -3108,6 +3242,10 @@
                 '<input type="text" id="dsAuthInput" placeholder="Add a Unity ID, email, OUC number, or public&hellip;"></div>',
                 'Who may VIEW this dashboard. Enter or comma commits an entry; plain Unity IDs stay as text. ' +
                 'Tiles still load with each viewer&#39;s own rights, so sharing the dashboard never shares the data.') +
+            (V.tagsReady ? fieldRow('Tags', '<div class="dash-access-box" id="dsTagBox">' +
+                '<input type="text" id="dsTagInput" list="dsTagList" placeholder="Add an existing tag&hellip;" autocomplete="off"></div>' + tagListHtml('dsTagList'),
+                'How the dashboard home finds this dashboard (<code>tag:NAME</code> in its filter box), and what a tag grant opens: tagging a dashboard also shares its editing with the tag&#39;s grant holders. ' +
+                'Existing names only; new ones start in Admin &rsaquo; Tags.') : '') +
             fieldRow('Theme', '<select id="dsTheme">' + themeOpts + '</select>',
                 'Applies immediately: picking one repaints the page (and this panel) right away. ' +
                 'Apply also re-themes the tiles, and Save keeps it. Closing without Apply puts the old theme back.') +
@@ -3135,6 +3273,7 @@
 
         openPanel('Dashboard settings', body, function ($ov) {
             var authBox = buildAccessPillbox($('#dsAuthBox'), META.authorized || '');
+            var tagBox = (V.tagsReady && $('#dsTagBox').length) ? buildTagPillbox($('#dsTagBox'), META.tags || []) : null;
             // Live preview: the page chrome AND this panel are var-driven, so the
             // swap is visible through the translucent backdrop the moment a theme
             // is picked. Tiles are deliberately left alone until Apply - rebuilding
@@ -3150,6 +3289,7 @@
                 DASH.subtitle = $.trim($('#dsSubtitle').val());
                 DASH.filter = $.trim($('#dsFilter').val());
                 META.authorized = authBox.value();
+                if (tagBox) { META.tags = tagBox.value(); }
                 DASH.theme = $('#dsTheme').val();
                 DASH.refreshSeconds = parseInt($('#dsRefresh').val(), 10) || 0;
                 var cycIds = $.trim($('#dsCycleIds').val()).split(',')
@@ -3950,6 +4090,9 @@
                     short_id: sid,
                     title: title,
                     authorized: META.authorized || V.currentUserKey,
+                    // a copy carries only the tags its maker may apply (2026-10-09): the CREATE gate refused the others, so the
+                    // owner of a dashboard an admin had tagged could not copy it; a tag-only maker's copy needs one of theirs
+                    tags: (function () { var all = META.tags || []; if (V.isAdmin) { return all; } var held = V.tagGrants || []; var mine = all.filter(function (t) { return held.indexOf(String(t).toUpperCase()) !== -1; }); return (mine.length || !held.length) ? mine : [held[0]]; })(),
                     state_data: JSON.stringify(DASH)
                 };
                 $.ajax({
@@ -3987,9 +4130,14 @@
             fieldRow('Title', '<input type="text" id="dcTitle" maxlength="500" placeholder="e.g. Pre-award at a glance">') +
             fieldRow('Dashboard ID', '<input type="text" id="dcId" maxlength="100" value="' + escapeHtml(seedDashId()) + '">',
                 V.isAdmin ? 'Letters, numbers, hyphens, underscores. Becomes the permanent URL (<code>dashboard.php?id=&hellip;</code>).'
-                          : 'Must match one of your report-grant patterns (' + escapeHtml(V.reportGrantPatterns.join(', ')) + ').') +
+                          : (V.reportGrantPatterns.length ? 'Must match one of your report-grant patterns (' + escapeHtml(V.reportGrantPatterns.join(', ')) + '), or the dashboard must carry one of your tags.'
+                                                          : 'Letters, numbers, hyphens, underscores. The dashboard must carry one of your tags (below).')) +
+            (V.tagsReady && (V.isAdmin || (V.tagGrants || []).length) ? fieldRow('Tags', '<div class="dash-access-box" id="dcTagBox"><input type="text" id="dcTagInput" list="dcTagList" placeholder="Add an existing tag&hellip;" autocomplete="off"></div>' + tagListHtml('dcTagList'),
+                V.isAdmin ? 'Optional. How the dashboard home finds it (<code>tag:NAME</code>); a tag grant makes its holders editors of it.'
+                          : 'Pre-filled with the tags you hold a grant on; keep at least one unless the ID matches a pattern of yours.') : '') +
             '<div class="dash-panel-actions"><button type="button" class="dash-btn dash-btn-primary" id="dcGo">Create</button></div>';
         openPanel('New dashboard', body, function ($ov) {
+            var createTags = $('#dcTagBox').length ? buildTagPillbox($('#dcTagBox'), V.isAdmin ? [] : (V.tagGrants || [])) : null;
             $ov.on('click', '#dcGo', function () {
                 var title = $.trim($('#dcTitle').val());
                 var sid = $.trim($('#dcId').val());
@@ -3997,6 +4145,7 @@
                 if (!/^[A-Za-z0-9\-_]{1,100}$/.test(sid)) { alert('Invalid ID.'); return; }
                 var payload = {
                     short_id: sid, title: title, authorized: V.currentUserKey,
+                    tags: createTags ? createTags.value() : [],
                     state_data: JSON.stringify({ version: 1, theme: 'theme-default', refreshSeconds: 0, tiles: [] })
                 };
                 $.ajax({
@@ -4123,6 +4272,8 @@
             short_id: META.short_id || V.shortId,
             title: META.title || META.short_id || V.shortId,
             authorized: META.authorized || V.currentUserKey,
+            tags: META.tags || [],
+            tags_base: Array.isArray(META.tagsBase) ? META.tagsBase : (META.tags || []),   // what this page loaded (2026-10-09): only its own changes move
             state_data: JSON.stringify(DASH),
             overwrite: !IS_NEW
         };
@@ -4137,7 +4288,10 @@
                 IS_NEW = false;
                 $btn.text('Saved ✓');
                 setTimeout(function () { $btn.text('Save'); }, 1600);
-                dashShowText("<p id='undo_text'><span style='color: lightgreen'>SUCCESS:</span> Dashboard saved.</p>");
+                if (Array.isArray(r.tags)) { META.tags = r.tags.slice(); }   // the list as stored (2026-10-09): the next save starts from it
+                META.tagsBase = (META.tags || []).slice();
+                if (r.tags_failed) { dashShowText("<p id='undo_text'><span style='color: var(--accent-danger, #cc0000)'>WARNING:</span> " + escapeHtml(r.message || 'The layout is saved; its tags are not.') + "</p>"); }
+                else { dashShowText("<p id='undo_text'><span style='color: lightgreen'>SUCCESS:</span> Dashboard saved.</p>"); }
             } else {
                 dashShowText("<p id='undo_text'><span style='color: var(--accent-danger, #cc0000)'>ERROR:</span> Save failed: " + escapeHtml((r && r.message) || 'unknown error') + " - your changes are NOT stored yet.</p>", 15000);
             }
@@ -4467,10 +4621,14 @@
                 _tileLastRefresh = {};
                 DASH = normalizeGridUnits(st);
                 applyDefaultFilter();   // its own default, unless the address carried a filter (2026-09-30)
-                META = { short_id: r.short_id, title: r.title, authorized: r.authorized, owner_id: r.owner_id };
+                META = { short_id: r.short_id, title: r.title, authorized: r.authorized, owner_id: r.owner_id, tags: Array.isArray(r.tags) ? r.tags.slice() : [] };   // the tags too (2026-10-09): a Save after a hop used to post an empty list
+                META.tagsBase = META.tags.slice();
                 V.shortId = r.short_id;
                 V.found = true;
-                V.canEdit = !!r.can_edit;   // Edit/Save entry points after exit reflect THIS dashboard
+                // &noadm previews a viewer: manage_dashboard.php never hears it, so
+                // the fetched dashboard's can_edit (an admin's, an owner's) is clamped
+                // here - the page's own rule (dashboard.php's $canEdit). (2026-10-02)
+                V.canEdit = !!r.can_edit && !penumbra_dash_vars.noadm;   // Edit/Save entry points after exit reflect THIS dashboard
                 // Same kiosk default rule as entry - and the same STASH: exit
                 // must restore the fetched dashboard's own value, or the 300s
                 // default leaks into a later Save (it silently overwrote the

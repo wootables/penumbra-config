@@ -27,6 +27,11 @@
 #   run.ps1 -Mutant nosumpack    the rows pack without looking at the percentages (N packing red)
 #   run.ps1 -Mutant fluidall     every layout is fluid, not only Dashboard (F and N default-layout asserts red)
 #   run.ps1 -Mutant nowpct       the authored "%" is not remembered, so nothing is fluid (N real render red)
+# Alt text never empty (WCAG 1.1.1 / 2.4.4, 2026-10-15, section A):
+#   run.ps1 -Mutant noaltfallback  no "Chart" / "Chart: <title>" fallback (A untitled / titled red)
+#   run.ps1 -Mutant nolinkname     a linked picture's alt no longer names the link (A linked, fluid, L4 red)
+#   run.ps1 -Mutant noaltpage      the render page sends no description (render alt asserts, A real chart red)
+# Control: the pre-fix module (alt = the title only) fails section A and the render alt asserts.
 # Run the body as a scriptblock from the workstation (UNC .ps1 policy):
 #   $dir='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\vischarts'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$dir\run.ps1").Replace('$here = $PSScriptRoot',"`$here = '$dir'")))
@@ -74,6 +79,10 @@ $mutants = @{
   'nosumpack'   = @('if ($cur && $sum + $p > 100.0001) {', 'if ($cur && $sum + $p > 1000) {')
   'fluidall'    = @('$fluid = penumbra_vis_fluid_layout();', '$fluid = true;')
   'nowpct'      = @('$wpct = (float)$wm[1];', '$wpct = 0.0;')
+  # alt text (2026-10-15, section A of test_vischarts.php)
+  'noaltfallback' = @('$a = $t !== '''' ? ''Chart: '' . $t : ''Chart'';', '$a = $t;')
+  'nolinkname'    = @('if ($linked) $a = rtrim($a, ''. '') . ''. Opens the chart in full view.'';', '')
+  'noaltpage'     = @('rec.alt = chartAlt(cv, ch, rec.title);', 'rec.alt = "";')
 }
 if ($Mutant -and $Mutant -ne 'planweb') {
   if (-not $mutants.ContainsKey($Mutant)) { throw "unknown mutant '$Mutant'" }

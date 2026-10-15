@@ -76,7 +76,11 @@ CHK = {
     'fprows': ['oneRowEach', 'labelsCol', 'rightEdge', 'labelsOneLine', 'hintUnder', 'emptyHintNoRoom', 'notesPlaced', 'pivotAbove',
                'disabledUnder', 'freezeUnder', 'listFills', 'collapsedRow'],
     'fparity': ['units', 'specs', 'kinds', 'decText', 'ran'],
+    # (2026-10-15, WCAG) the sort lanes' names + state; the Theme / Density hint links by keyboard
+    'fspa11y': ['sortNameVisible', 'sortStates', 'otherLanesNot', 'themeHintBtn', 'themeEnter', 'themeFocusMoves', 'themeSpaceClears',
+                'densityHintBtn', 'densityEnter', 'densityFocusMoves', 'densitySpaceClears'],
 }
+SCN.append('fspa11y')
 N = '\r\n'   # main.js, schedule_runner.php and main.css are CRLF; the module and both calc files LF
 MUTANTS = {
     # --- the cell writer and the readers of a cell's VALUE (main.js)
@@ -284,6 +288,19 @@ MUTANTS = {
     'm-badgewords': ([('main', "w: 'Click a table cell to filter by that value' }", "w: 'Click a value to filter' }")], ['L-fform-badgeWords'], ['fform']),
     'h-tipfilter': ([('help', "<li><strong>Filter</strong> - click a table cell to filter by that value.</li>", "<li><strong>Filter</strong> - click a value to filter.</li>")],
                     ['S-helpFilterRow'], []),
+    # --- (2026-10-15, WCAG) the sort lanes' names + state; the hint links by keyboard
+    'm-lanename': ([('main', "        var a11yName = label ? (label + ', ' + tip.charAt(0).toLowerCase() + tip.slice(1)) : tip;",
+                     "        var a11yName = tip;")], ['L-fspa11y-sortNameVisible'], ['fspa11y']),
+    'm-lanestate': ([('main', "                $h.attr('aria-label', a11yName + (owns ? (spSortDir === 1 ? ', sorted ascending' : ', sorted descending') : ', not sorted'));",
+                      "                /* mutant: the name never follows the sort */")], ['L-fspa11y-sortStates', 'L-fspa11y-otherLanesNot'], ['fspa11y']),
+    'm-hintkey': ([('main', "    $(document).on('keydown', '.sp-hint-link[role=\"button\"]', function (e) {",
+                    "    $(document).on('keydown', '.sp-hint-link-mutant', function (e) {")],
+                  ['L-fspa11y-themeEnter', 'L-fspa11y-themeFocusMoves', 'L-fspa11y-densityEnter', 'L-fspa11y-densityFocusMoves'], ['fspa11y']),
+    'm-hintfocus': ([('main', "        refocus();" + N + "        setTimeout(refocus, 60);" + N + "        setTimeout(refocus, 400);",
+                      "        /* mutant: focus left on the removed node */")],
+                    ['L-fspa11y-themeFocusMoves', 'L-fspa11y-densityFocusMoves'], ['fspa11y']),
+    'm-hintrole': ([('main', 'id="spDensityMakeGlobal" role="button" tabindex="0"', 'id="spDensityMakeGlobal"')],
+                   ['L-fspa11y-densityHintBtn', 'L-fspa11y-densityEnter'], ['fspa11y']),
 }
 # (colopt f) checks on the files' text, beside the browser's
 def static_checks(texts):
@@ -317,7 +334,10 @@ NEW_F = {'L-frepdeep-' + c for c in CHK['frepdeep']} | {'S-noSaveDeepCell', 'S-h
 # the checks colopt g brings: Filter a row of its own, the new words (formRows / textCol
 # now name the filter row, so they are red on live too)
 NEW_G = {'L-fform-filterOwnRow', 'L-fform-badgeWords', 'L-fform-formRows', 'L-fform-textCol', 'S-helpFilterRow'}
-NEW = NEW_G
+# the checks the 2026-10-15 WCAG fixes bring (the sort lanes' names, the hint links' keys):
+# every one red on live
+NEW_H = {'L-fspa11y-' + c for c in CHK['fspa11y']}
+NEW = NEW_H
 
 args = sys.argv[1:]
 def opt(name, default=None):

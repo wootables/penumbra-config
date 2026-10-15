@@ -76,7 +76,7 @@
 # Rebuilds SRC.js from the LIVE app files each run, so it always tests what is
 # deployed. Writes nothing to the webroot. Exit code 1 when any assertion fails.
 # =============================================================================
-param([string]$MainJs = '',
+param([string]$MainJs = '', [string]$ChartsJs = '',
       [ValidateSet('', 'xdecl', 'xread', 'tmdecl', 'tmread')][string]$Mutant = '')
 $ErrorActionPreference = 'Stop'
 # $PSScriptRoot is empty when the BODY is run as a scriptblock (UNC .ps1 files are GPO-blocked).
@@ -84,6 +84,8 @@ $here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Ut
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 $js   = "$app\js"
 if (-not $MainJs) { $MainJs = "$js\main.js" }
+# -ChartsJs (2026-10-15): a staged penumbra_charts.js instead of the live one.
+if (-not $ChartsJs) { $ChartsJs = "$js\penumbra_charts.js" }
 
 # Chrome first: on this box headless EDGE emits nothing for these pages, and
 # cscript's JScript engine is ES3 so it cannot parse main.js at all.
@@ -95,7 +97,7 @@ if (-not (Test-Path $browser)) { throw 'no Chrome or Edge found' }
 
 Write-Host "[1/3] staging JS from the live app ..."
 Copy-Item "$js\moment.min.js"       "$here\moment.min.js"       -Force
-Copy-Item "$js\penumbra_charts.js"  "$here\penumbra_charts.js"  -Force
+Copy-Item $ChartsJs  "$here\penumbra_charts.js"  -Force
 # The geo asset is a LIVE APP FILE too, and outline_map_test asserts directly
 # against it (feature counts, projection landmarks, centroid arming). Without
 # this copy the suite happily tested whatever build_geo.pl last left here while
@@ -117,7 +119,7 @@ Copy-Item "$js\chartjs-chart-sankey-0.19.1.min.js"  "$here\chartjs-chart-sankey-
 # corrupts it. The harnesses normalise CRLF themselves.
 Write-Host "      main.js under test: $MainJs"
 $u8   = New-Object System.Text.UTF8Encoding($false)
-$mod  = $u8.GetString([IO.File]::ReadAllBytes("$js\penumbra_charts.js"))
+$mod  = $u8.GetString([IO.File]::ReadAllBytes($ChartsJs))
 $main = $u8.GetString([IO.File]::ReadAllBytes($MainJs))
 
 # --- drill "(Other)" map mutants (2026-09-17) --------------------------------

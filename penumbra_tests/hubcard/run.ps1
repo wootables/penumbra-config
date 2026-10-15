@@ -25,6 +25,10 @@
 #   powershell -File run.ps1 -Mutant6     # the left column back in its old
 #                                         # order: exactly the order
 #                                         # assertion RED (2026-10-01)
+#   powershell -File run.ps1 -Mutant7     # every "Worth a look" line loses
+#                                         # its home: exactly the two
+#                                         # warning-link assertions RED
+#                                         # (2026-10-14)
 #   powershell -File run.ps1 -App <dir>   # test a STAGED copy (health.php and
 #                                         # penumbra_health.php, with the
 #                                         # analytics_shared.php and
@@ -55,7 +59,7 @@
 # UNC .ps1 files are GPO-blocked here - run the body as a scriptblock:
 #   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\hubcard\run.ps1')); & $sb
 # =============================================================================
-param([switch]$Control, [switch]$Mutant, [switch]$Mutant2, [switch]$Mutant3, [switch]$Mutant4, [switch]$Mutant5, [switch]$Mutant6, [string]$Html, [string]$App)
+param([switch]$Control, [switch]$Mutant, [switch]$Mutant2, [switch]$Mutant3, [switch]$Mutant4, [switch]$Mutant5, [switch]$Mutant6, [switch]$Mutant7, [string]$Html, [string]$App)
 
 $ErrorActionPreference = 'Stop'
 $here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\hubcard' }
@@ -71,6 +75,7 @@ if ($Mutant3) { $args += '--mutant3' }
 if ($Mutant4) { $args += '--mutant4' }
 if ($Mutant5) { $args += '--mutant5' }
 if ($Mutant6) { $args += '--mutant6' }
+if ($Mutant7) { $args += '--mutant7' }
 if ($Html)    { $args += "--html=$Html" }
 
 & $php @args

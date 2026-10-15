@@ -22,12 +22,18 @@
 #   F  FILTER PANEL. Unticking one value loses exactly that value's rows (blank
 #      = "Unknown"), and the clicks still add up afterwards.
 #   D  DRILL-INTO. A drilled element's child chart totals the element.
+#   K  KEYBOARD (2026-10-15, WCAG 2.1.1). The chart menu's Drill list on a Sankey / sunburst /
+#      map / treemap lists one entry per screen-reader row and each runs the canvas click's
+#      own actions (rows, drill popup, notes with their count); a bar's categories gain their
+#      notes; the row breakdown's headers are tab stops Enter / Space sort (aria-sort).
+#      49 asserts. Live main.js (control): 14 FAIL; no item-4 code: 14 FAIL; no item-3 code: 12 FAIL;
+#      no keyboard placement of a point's submenu (_ctxPlaceSubmenu): 4 FAIL.
 #   E  (export) writes vischarts/fixture_alltypes_*; vischarts section T then
 #      renders every type in an email (run test_vischarts.php after this).
 #
 #   powershell -File run.ps1                              live files
 #   run.ps1 -MainJs <p> -ChartsJs <p> -Index <p>          staged copies
-#   run.ps1 -Only C|R|L|P|F|D                             one section
+#   run.ps1 -Only C|R|L|P|F|D|K                           one section
 #
 # UNC .ps1 files are GPO-blocked: run it as a scriptblock. Writes nothing to the
 # webroot. Exit 1 when any assertion fails.

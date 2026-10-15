@@ -1028,6 +1028,59 @@
       });
       R.info = { bad: bad, dtBad: dtBad, dates: out, calc: calc, decText: DT };
       R.chk.ran = out.length === RAW.length * PAT.length;
+    },
+    // (2026-10-15, WCAG) the sort lanes' names start with their words and end with their
+    // state (2.5.3 / 4.1.2); the Theme / Density hint links are keyboard buttons (2.1.1)
+    fspa11y: async function () {
+      openPanel();
+      await sleep(450);
+      var nm = document.querySelector('#spColumnList .sp-col-head .sph-name');
+      var lanes = Array.prototype.slice.call(document.querySelectorAll('#spColumnList .sp-col-head .sph'));
+      var words = nm ? nm.textContent.replace(/[▲▼]/g, '').trim() : '';
+      var l0 = nm ? (nm.getAttribute('aria-label') || '') : '';
+      R.chk.sortNameVisible = !!nm && words === 'Column' && l0.indexOf('Column, sort alphabetically') === 0;
+      var seq = [l0];
+      for (var i = 0; nm && i < 3; i++) { nm.click(); await sleep(60); seq.push(nm.getAttribute('aria-label') || ''); }
+      R.chk.sortStates = /, not sorted$/.test(seq[0]) && /, sorted ascending$/.test(seq[1]) && /, sorted descending$/.test(seq[2]) && /, not sorted$/.test(seq[3]);
+      if (nm) { nm.click(); await sleep(60); }
+      var others = lanes.filter(function (h) { return h !== nm; });
+      R.chk.otherLanesNot = others.length >= 1 && others.every(function (h) { return /, not sorted$/.test(h.getAttribute('aria-label') || ''); })
+        && /, sorted ascending$/.test(nm.getAttribute('aria-label') || '');
+      R.info = { seq: seq, lanes: lanes.map(function (h) { return h.getAttribute('aria-label'); }) };
+      if (nm) { nm.click(); nm.click(); await sleep(60); }   // back to rest
+      // the hint links: pick an explicit value, then Enter makes it the default and Space clears it
+      function press(el, k) { var c = k === ' ' ? 32 : 13; $(el).trigger($.Event('keydown', { which: c, keyCode: c, key: k })); }
+      async function hint(kind) {
+        var Kind = kind.charAt(0).toUpperCase() + kind.slice(1);
+        var sel = document.getElementById('sp' + Kind + 'Selector'), store = 'penumbra_user_' + kind;
+        localStorage.removeItem(store);
+        var opt = Array.prototype.filter.call(sel.options, function (o) { return o.value && o.value !== 'report-default' && o.value !== 'my-default' && o.style.display !== 'none'; })
+          .map(function (o) { return o.value; }).filter(function (v) { return v !== sel.value; })[0];
+        $(sel).val(opt).trigger('change');
+        await sleep(400);
+        var mk = document.getElementById('sp' + Kind + 'MakeGlobal');
+        var out = { opt: opt, mk: !!mk };
+        out.btn = !!mk && mk.getAttribute('role') === 'button' && mk.getAttribute('tabindex') === '0';
+        if (mk) { mk.focus(); press(mk, 'Enter'); }
+        await sleep(500);
+        out.stored = localStorage.getItem(store);
+        var ae = document.activeElement;
+        out.focus = ae ? ae.id : '';
+        out.enter = out.stored === opt;
+        var clr = document.getElementById('sp' + Kind + 'ClearGlobal');
+        out.focusMoved = !!clr && ae === clr && clr.getAttribute('role') === 'button' && /^Clear/.test(clr.getAttribute('aria-label') || '');
+        if (clr) press(clr, ' ');
+        await sleep(600);
+        out.space = localStorage.getItem(store) === null;
+        var ae2 = document.activeElement;
+        out.focus2 = ae2 ? ae2.id : '';
+        out.focusKept = !!ae2 && ae2 !== document.body && (ae2 === sel || /^sp/.test(ae2.id));
+        return out;
+      }
+      var th = await hint('theme'), de = await hint('density');
+      R.chk.themeHintBtn = th.btn; R.chk.themeEnter = th.enter; R.chk.themeFocusMoves = th.focusMoved; R.chk.themeSpaceClears = th.space && th.focusKept;
+      R.chk.densityHintBtn = de.btn; R.chk.densityEnter = de.enter; R.chk.densityFocusMoves = de.focusMoved; R.chk.densitySpaceClears = de.space && de.focusKept;
+      R.info.theme = th; R.info.density = de;
     }
   };
   function pivotCells(sc) {

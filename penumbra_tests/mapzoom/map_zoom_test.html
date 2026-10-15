@@ -334,6 +334,46 @@ function grabVar(name) {
   chart.destroy();
   ok('D5 destroying the chart removes the Zoom out button', !b5.parentNode);
 
+  // ══ K. KEYBOARD ROUTE (2026-10-15, WCAG 2.1.1) ════════════════════════
+  // The chart menu lists the map's places from its screen-reader rows
+  // (main.js _chartA11yPoints) and its "Zoom to" runs the builder's own zoom
+  // (chart.data._pnbMapZoom) - the same zoom + drill-to a click runs.
+  (function () {
+    var tilesK = W.features.map(function (f) { return { _key: f.id, name: f.name, value: VAL.hasOwnProperty(f.id) ? VAL[f.id] : null }; })
+      .filter(function (t) { return t.value != null; }).sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
+    window.__K_ROWS = { columns: ['Place', 'Value'], rows: tilesK.map(function (t) { return [t.name, t.value]; }), keys: tilesK.map(function (t) { return t._key; }) };
+  })();
+  var cK = (function () {
+    var tiles = W.features.map(function (f) { var v = VAL.hasOwnProperty(f.id) ? VAL[f.id] : null; return { st: '', name: f.name, id: f.id, r: 0, c: 0, _key: f.id, value: v, n: v == null ? 0 : 1 }; });
+    var config = { type: 'bar', data: { labels: [], datasets: [] },
+                   options: { responsive: false, animation: false, devicePixelRatio: 1,
+                              plugins: { legend: { display: true }, tooltip: {}, datalabels: {}, title: { display: true, text: 'Map' } },
+                              scales: { x: {}, y: {} } } };
+    R(config, { _isMap: true, _mapOutline: 'world', _mapTiles: tiles, _mapMin: 40, _mapMax: 900, _mapBins: 'quantile', _mapShowLabels: true,
+                _mapDrill: nullProto({ '840': 'State' }), _a11yRows: window.__K_ROWS, _chartType: 'map' },
+      { showValues: false, textColor: '#111', isDark: false, currencyPrefix: '$', fsBoost: 0 });
+    attach(config, 'cv2');
+    var ex = Chart.getChart('cv2'); if (ex) ex.destroy();
+    return new Chart(document.getElementById('cv2'), config);
+  })();
+  await frames(2);
+  ok('K1 an outline map carries its keyboard zoom (chart.data._pnbMapZoom)', typeof cK.data._pnbMapZoom === 'function');
+  var PTS = null;
+  try { PTS = (new Function(grab('function _chartA11yPoints(') + '\nreturn _chartA11yPoints;'))()(cK); } catch (eK) { PTS = 'threw ' + eK.message; }
+  ok('K2 the chart menu lists one place per screen-reader row', Array.isArray(PTS) && PTS.length === window.__K_ROWS.rows.length, JSON.stringify(PTS).slice(0, 200));
+  var kBr = Array.isArray(PTS) ? PTS.filter(function (p) { return p.label === br.name; })[0] : null;
+  ok('K2 ...each paired with ITS point (Brazil -> the Brazil feature) and a zoom', kBr && kBr.el.index === brI && kBr.zoom === brI, JSON.stringify(kBr));
+  HANDLED.length = 0; ACTIVATED.length = 0;
+  if (typeof cK.data._pnbMapZoom === 'function' && kBr) cK.data._pnbMapZoom(cK, kBr.zoom);
+  await frames(2);
+  ok('K3 "Zoom to Brazil" zooms onto Brazil', cK.$pnbMapZoomIdx === brI && !!cK.$pnbMapView, 'idx=' + cK.$pnbMapZoomIdx);
+  ok('K3 ...shows the Zoom out button, and opens no breakdown', btnShown(cK) && HANDLED.length === 0);
+  var kUs = Array.isArray(PTS) ? PTS.filter(function (p) { return p.el.index === usI; })[0] : null;
+  if (typeof cK.data._pnbMapZoom === 'function' && kUs) cK.data._pnbMapZoom(cK, kUs.zoom);
+  await frames(2);
+  eq('K4 "Zoom to" a place with a drill pair runs the switch position, as a click does', ACTIVATED, [['State', 'cv2']]);
+  cK.destroy();
+
   // ══ A. THE ANIMATED PATH ══════════════════════════════════════════════
   window.__reduce = false;
   var c2 = build('cv2', 'world', W, function (f) { return f.id; }, VAL, null);

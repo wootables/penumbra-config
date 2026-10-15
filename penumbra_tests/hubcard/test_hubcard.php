@@ -39,6 +39,22 @@
  *            outage history below delivery): every region still renders - the
  *            cuts follow the file's own order - and section 8 must go RED on
  *            exactly the order assertion.
+ * --mutant7  pnb_warn_target() answers null for every warning (2026-10-14):
+ *            the "Worth a look" lines render as plain text again, and section
+ *            1 must go RED on exactly the two warning-link assertions.
+ *
+ * THE DECLUTTER (2026-10-14, section 10): the chips are links to their cards in
+ * the cards' order and show each card's worst fact; every card folds to its
+ * heading with a summary (data-open / data-force); the outage card's
+ * availability is a line, its known windows fold, and the episode and run
+ * lists show three with a show-more; the PHP errors tab carries a count.
+ *
+ * WCAG SERIOUS FIXES (2026-10-15, section 11): focus survives the refresh swap
+ * and the job / bell / copy busy states (aria-disabled, never disabled); the
+ * pause button is named "Pause auto-refresh"; a chip jump focuses its card; a
+ * missing extension says so in words; every (i) is a role=button disclosure
+ * with aria-describedby on its tip, and Escape closes any open tip. Static
+ * checks: the JS behaviour itself was driven in headless Edge off --html.
  *
  * THE CARDS' WINDOWS (2026-10-01): the Failures and Outage history headings
  * carry a window control (?fail= / ?out=), the picker sits at the foot of the
@@ -60,7 +76,7 @@ if (!function_exists('mb_substr')) {
     function mb_strlen($s, $e = null) { return strlen($s); }
 }
 
-$HEALTH = ''; $PAGE = ''; $HTML = ''; $CONTROL = false; $MUTANT = false; $MUTANT2 = false; $MUTANT3 = false; $MUTANT4 = false; $MUTANT5 = false; $MUTANT6 = false;
+$HEALTH = ''; $PAGE = ''; $HTML = ''; $CONTROL = false; $MUTANT = false; $MUTANT2 = false; $MUTANT3 = false; $MUTANT4 = false; $MUTANT5 = false; $MUTANT6 = false; $MUTANT7 = false;
 foreach ($argv as $a) {
     if (strpos($a, '--health=') === 0)     $HEALTH = substr($a, 9);
     elseif (strpos($a, '--page=') === 0)   $PAGE = substr($a, 7);
@@ -72,6 +88,7 @@ foreach ($argv as $a) {
     elseif ($a === '--mutant4')            $MUTANT4 = true;
     elseif ($a === '--mutant5')            $MUTANT5 = true;
     elseif ($a === '--mutant6')            $MUTANT6 = true;
+    elseif ($a === '--mutant7')            $MUTANT7 = true;
 }
 if ($HEALTH === '' || $PAGE === '') { fwrite(STDERR, "usage: --health=<penumbra_health.php> --page=<health.php> [--html=<out>] [--control] [--mutant] [--mutant2] [--mutant3] [--mutant4] [--mutant5] [--mutant6]\n"); exit(2); }
 
@@ -168,7 +185,14 @@ file_put_contents($TMP . DIRECTORY_SEPARATOR . 'block.php', $stub . "\n<?php\n" 
 require $TMP . DIRECTORY_SEPARATOR . 'block.php';
 file_put_contents($TMP . DIRECTORY_SEPARATOR . 'packet.php', "<?php\n" . lift($src, array('penumbra_outage_packet')));
 require $TMP . DIRECTORY_SEPARATOR . 'packet.php';
-file_put_contents($TMP . DIRECTORY_SEPARATOR . 'helpers.php', "<?php\n" . lift($page, array('pnb_h', 'pnb_dot', 'pnb_ago', 'pnb_bytes', 'pnb_chip', 'pnb_dur', 'pnb_info', 'pnb_range_btn', 'pnb_cell_len', 'pnb_notice_line')));
+if ($MUTANT7) {
+    // Every "Worth a look" line loses its home: the routing helper answers null.
+    $needle = 'function pnb_warn_target($w, $jobLabels = array()) {';
+    if (substr_count($page, $needle) !== 1) { fwrite(STDERR, "mutant7: pnb_warn_target not found in health.php\n"); exit(2); }
+    $page = str_replace($needle, $needle . ' return null;', $page);
+    echo "MUTANT7: every warning line loses its home (pnb_warn_target returns null)\n";
+}
+file_put_contents($TMP . DIRECTORY_SEPARATOR . 'helpers.php', "<?php\n" . lift($page, array('pnb_h', 'pnb_dot', 'pnb_ago', 'pnb_bytes', 'pnb_chip', 'pnb_dur', 'pnb_info', 'pnb_range_btn', 'pnb_cell_len', 'pnb_notice_line', 'pnb_warn_target', 'pnb_fold_btn')));
 require $TMP . DIRECTORY_SEPARATOR . 'helpers.php';
 // The window picker's quick spans (2026-10-01) come from the analytics pages'
 // own function, lifted from the analytics_shared.php beside the page under test.
@@ -197,9 +221,14 @@ $T = time(); $DAY = 86400;
 $ev = array();
 $ev[] = array($T - 7 * $DAY, array(), array());
 $schedStarts = array();
+// The newest 03:03 window that has closed, then the two days before it. (Fixed
+// 2026-10-15: between midnight and 03:18 the old per-day shift moved today's
+// window onto yesterday's, so the ledger held two windows, not three, and 14
+// outage assertions went red on the clock alone.)
+$t3 = strtotime(date('Y-m-d', $T) . ' 03:03:10');
+if ($t3 > $T - 900) $t3 -= $DAY;               // a run before 03:18 keeps the window in the past
 for ($d = 2; $d >= 0; $d--) {
-    $t0 = strtotime(date('Y-m-d', $T - $d * $DAY) . ' 03:03:10');
-    if ($t0 > $T - 900) $t0 -= $DAY;           // a run before 03:18 keeps the window in the past
+    $t0 = $t3 - $d * $DAY;
     $schedStarts[] = $t0;
     $ev[] = array($t0,       array('scheduler heartbeat is 412s old'), array());
     $ev[] = array($t0 + 300, array('scheduler heartbeat is 712s old'), array());
@@ -317,7 +346,7 @@ if ($MUTANT6) {
     echo "MUTANT6: the left column in its old order (failures, then outage history, below delivery)\n";
 }
 $leftAnchors = array(
-    'r1a' => '  <div class="pnb-adm-card" id="pnbCardSched">',
+    'r1a' => '  <?php /* =========================== SCHEDULER',
     'r4'  => '  <?php /* =========================== OUTAGE HISTORY',
     'r3'  => '  <?php /* SAYING WHAT THIS CARD IS NOT',
     'r1b' => '  <?php /* THE EMPLOYEE DIRECTORY',
@@ -401,12 +430,13 @@ $h = $H['top'];
 ok(strpos($h, 'pnb-adm-status bad') !== false && strpos($h, 'Degraded: www3 delivery down') !== false, 'band is red and names the problem');
 ok(preg_match('/<a class="pnb-hub-status-link"[^>]*>[^<]*<\/a>\s*<span class="pnb-i"/', $h) === 1, 'the (i) sits right after the headline link');
 ok(strpos($h, 'aria-label="About the status"') !== false && strpos($h, 'warnings never page anyone') !== false, 'with its explanatory tip');
-ok(preg_match('/<div class="pnb-chip bad"[^>]*>\s*<span class="pnb-chip-v">DOWN<\/span><span class="pnb-chip-l">delivery \(www3\)<\/span>/', $h) === 1, 'delivery chip DOWN in red');
+ok(preg_match('/<a class="pnb-chip bad"[^>]*>\s*<span class="pnb-chip-v">DOWN<\/span><span class="pnb-chip-l">delivery \(www3\)<\/span>/', $h) === 1, 'delivery chip DOWN in red');
 $outNexp = (int)$outg['total'] + count($outg['open']);   // 4 closed + 1 open
-ok($outNexp === 5 && preg_match('/<div class="pnb-chip bad"[^>]*>\s*<span class="pnb-chip-v">5<\/span><span class="pnb-chip-l">outages 7d<\/span>/', $h) === 1, 'outages chip counts 4 closed + 1 open, in red because one is open', $outNexp);
+ok($outNexp === 5 && preg_match('/<a class="pnb-chip bad" href="#pnbOutages" data-card="pnbOutages"[^>]*>\s*<span class="pnb-chip-v">1 OPEN<\/span><span class="pnb-chip-l">outages 7d · 5 total<\/span>/', $h) === 1, 'outages chip: the open outage is its value, in red; 4 closed + 1 open in its label (2026-10-14)', $outNexp);
 ok(strpos($h, 'ONE IS STILL OPEN') !== false, 'and its tip says one is still open');
 ok(strpos($h, '2 near miss(es) recorded as well') !== false, 'and its tip counts the near misses separately');
-ok(strpos($h, '<li>INFOED near miss in progress') !== false, 'warnings list carries the near miss in progress');
+ok(strpos($h, '<li><a class="pnb-warn-link" href="#pnbOutages" data-card="pnbOutages" title="Open the card that explains this">INFOED near miss in progress') !== false, 'warnings list carries the near miss in progress, as a link to the outage card (2026-10-14)', $h);
+ok(strpos($h, '<li><a class="pnb-warn-link" href="#pnbDelivery" data-card="pnbDelivery" title="Open the card that explains this">www3 delivery: 4 stalled') !== false && strpos($h, ' <span aria-hidden="true">&#8599;</span></a></li>') !== false, 'and the delivery warning links to the delivery card');
 
 section('1b. The band counts what the last probe found down (2026-09-24)');
 /* The bug: 'ok' is the 503 contract and counts only a LIVE probe, and the band
@@ -466,74 +496,75 @@ ok(strpos($hLk, 'under last_known') !== false && strpos($hLk, 'answers 503 only 
 section('2. Scheduler card and the tiles');
 $h = $H['r1'];
 ok(strpos($h, 'id="pnbCardSched"') !== false && strpos($h, '<span class="k">Last heartbeat</span>') !== false, 'scheduler as a key/value list');
-ok(preg_match('/<h2>Scheduler <span class="pnb-i"/', $h) === 1, 'its footnote became an (i) in the heading');
+ok(preg_match('/<h2><button type="button" class="pnb-fold" aria-expanded="false"[^>]*>Scheduler<\/button> <span class="pnb-i"/', $h) === 1, 'its footnote became an (i) in the heading, after the fold toggle (2026-10-14)');
 ok(strpos($h, 'class="pnb-h2-r"') !== false && strpos($h, 'ONLINE') !== false, 'status pinned at the heading\'s right');
 ok(substr_count($h, '<div class="pnb-tile ') === 6, 'six tiles: five databases and the mail relay', substr_count($h, '<div class="pnb-tile '));
 ok(preg_match('/<div class="pnb-tile degraded">.*?<b>INFOED<\/b>/s', $h) === 1, 'INFOED tile carries the degraded tone');
 ok(preg_match('/<div class="pnb-tile degraded">.*?<span class="pnb-tile-s">degraded &middot; 1210 ms <span class="pnb-i"/s', $h) === 1, 'its detail is an (i) inside the tile');
 ok(preg_match('/<div class="pnb-tile ok">.*?<b>MAIL \(MTA\)<\/b>\s*<span class="pnb-tile-s">up &middot; 12 ms/s', $h) === 1, 'mail relay is the sixth tile, up');
 ok(strpos($h, 'never sends mail') !== false, 'with the handshake note in its (i)');
-ok(strpos($h, '(cached) &middot; <a href="?full=1"') !== false, 're-probe link rides the heading');
+ok(strpos($h, '(cached) &middot; <a href="?full=1"') !== false, 're-probe link is on the card (first in the body since 2026-10-14)');
 ok(strpos($h, '<table') === false, 'no table left in the databases card');
-section('2b. Employee directory card and chip (2026-09-23)');
+section('2b. Employee directory: folded into the Maintenance card (2026-10-14 evening), its chip kept');
 $h = $H['r1'];
-ok(strpos($h, 'id="pnbCardDir"') !== false && strpos($h, 'pnb-card-fold') === false, 'the card is present and unfolded once a probe exists');
-ok(preg_match('#<h2>Employee directory <span class="pnb-i"#', $h) === 1, 'its explanation is an (i) in the heading');
-ok(preg_match('#<span class="pnb-h2-r"><span class="pnb-adm-dot ok"></span>OK</span>#', $h) === 1, 'verdict pinned at the heading right, green');
-ok(strpos($h, '<span class="k">Last refreshed</span>') !== false && strpos($h, date('Y-m-d H:i:s', $T - 61200) . ' <span class="pnb-adm-muted">(17h ago)</span>') !== false, 'last refreshed, with its age', $h);
-ok(strpos($h, '71,887 &middot; 24,654 active &middot; 2,602 PI-eligible') !== false, 'people counts with thousands separators');
-ok(strpos($h, 'people_sync at 05:30 &middot; next: tomorrow &middot; last run ' . date('Y-m-d H:i:s', $T - 61140) . ' ok in 17.2 s &middot; <a href="#pnbCardMaint"') !== false, 'the job line: schedule, next, last result, a link to the Maintenance card', $h);
+ok(strpos($h, 'id="pnbCardDir"') === false && strpos($h, '>Employee directory</button>') === false, 'no directory card of its own any more');
+ok(preg_match('#<div class="pnb-kv pnb-maint-kv">\s*<span class="k">Employee directory</span>\s*<span class="v"><span class="pnb-adm-dot ok"></span>' . preg_quote(date('Y-m-d H:i:s', $T - 61200), '#') . ' <span class="pnb-adm-muted">\(17h ago\)</span> &middot; 71,887 people &middot; 24,654 active &middot; 2,602 PI-eligible</span>#', $h) === 1,
+   'the Maintenance card leads with the directory: a dot, the refresh stamp and its age, the counts', $h);
+ok(preg_match('#<span class="pnb-h2-r"><span class="pnb-adm-dot ok"></span>OK</span></h2>#', $h) === 1, 'verdict pinned at the heading right, green');
+ok(strpos($h, '<span class="pnb-sum">directory refreshed 17h ago &middot; people_sync ok in 17.2 s (') !== false, 'the summary leads with the directory', $h);
 ok(strpos($h, 'Lookups still answer') === false && strpos($h, 'refresh is paused') === false, 'no note while everything is fine');
-ok(substr_count($h, '<div class="pnb-tile ') === 6, 'the six tiles are untouched: a key/value card, not a seventh tile');
+ok(substr_count($h, '<div class="pnb-tile ') === 6, 'the six tiles are untouched');
+ok(strpos($h, 'PENUMBRA_PEOPLE</strong> is what the people picker') !== false && strpos($page, 'Run, pause or read the job in the Maintenance card below') === false, 'the (i) explains the directory line; the old pointer to a separate card is gone');
 $h = $H['top'];
-ok(preg_match('#<div class="pnb-chip ok" title="last refreshed [^"]* - 71,887 people, 24,654 active"><span class="pnb-chip-v">17h ago</span><span class="pnb-chip-l">directory</span>#', $h) === 1, 'directory chip: the age as its value, green, the counts in its tip', $h);
+ok(preg_match('#<a class="pnb-chip ok" href="\#pnbCardMaint" data-card="pnbCardMaint" title="last refreshed [^"]* - 71,887 people, 24,654 active - shown on the Maintenance card"><span class="pnb-chip-v">17h ago</span><span class="pnb-chip-l">directory</span>#', $h) === 1, 'directory chip: the age as its value, green, the counts in its tip, a link to the Maintenance card', $h);
 $keep = $snap;
-// stale: amber, the detail after the age, a note pointing at the Jobs tool
+// stale: amber, the detail after the age, a note under the line, the card open
 $snap['components']['directory']['status']   = 'stale';
 $snap['components']['directory']['age_secs'] = 31 * 3600;
 $snap['components']['directory']['detail']   = 'last refreshed 31h ago - the nightly people_sync did not land since';
 $h = render($TMP . DIRECTORY_SEPARATOR . 'r1.php');
-ok(preg_match('#<span class="pnb-h2-r"><span class="pnb-adm-dot warn"></span>STALE</span>#', $h) === 1, 'stale: amber verdict');
+ok(preg_match('#<span class="pnb-h2-r"><span class="pnb-adm-dot warn"></span>STALE</span></h2>#', $h) === 1, 'stale: amber verdict on the Maintenance card', $h);
 ok(strpos($h, '(1d ago)</span> <span class="pnb-adm-muted">&mdash; last refreshed 31h ago - the nightly people_sync did not land since</span>') !== false, 'the detail follows the age', $h);
-ok(strpos($h, 'Lookups still answer from the rows already loaded') !== false && substr_count($h, 'href="#pnbCardMaint"') === 2, 'and a note pointing at the Maintenance card (the job line links there too)');
+ok(strpos($h, 'Lookups still answer from the rows already loaded. The people_sync row below says') !== false && strpos($h, 'id="pnbCardMaint" data-open="1" data-force="1"') !== false, 'a note under the line, and the card opens itself', $h);
+ok(strpos($h, '<span class="pnb-sum"><span class="pnb-warn">directory stale (1d ago)</span> &middot; people_sync ok') !== false, 'the summary says stale, in amber', $h);
 $h = render($TMP . DIRECTORY_SEPARATOR . 'top.php');
-ok(preg_match('#<div class="pnb-chip warn"[^>]*><span class="pnb-chip-v">1d ago</span><span class="pnb-chip-l">directory</span>#', $h) === 1, 'the chip goes amber');
+ok(preg_match('#<a class="pnb-chip warn"[^>]*><span class="pnb-chip-v">1d ago</span><span class="pnb-chip-l">directory</span>#', $h) === 1, 'the chip goes amber');
 // down (an empty table), the job still known
 $snap = $keep;
 $snap['components']['directory'] = array('status' => 'down', 'total' => 0, 'active' => 0, 'pi_eligible' => 0, 'last_seen' => null, 'age_secs' => null, 'ms' => 4,
     'detail' => 'the directory is empty - the people_sync job has never loaded it', 'from_cache' => true, 'job' => $keep['components']['directory']['job']);
 $h = render($TMP . DIRECTORY_SEPARATOR . 'r1.php');
-ok(preg_match('#<span class="pnb-h2-r"><span class="pnb-adm-dot bad"></span>DOWN</span>#', $h) === 1, 'empty: red verdict');
+ok(preg_match('#<span class="pnb-h2-r"><span class="pnb-adm-dot bad"></span>DIRECTORY DOWN</span></h2>#', $h) === 1, 'empty: red verdict, and it says which thing is down', $h);
 ok(strpos($h, '<span class="pnb-adm-muted">never</span> <span class="pnb-adm-muted">&mdash; the directory is empty') !== false, 'never refreshed, with the reason', $h);
-ok(strpos($h, '<span class="k">People</span>') !== false && strpos($h, '0 &middot; 0 active &middot; 0 PI-eligible') !== false, 'the zero counts are shown, not hidden');
+ok(strpos($h, '0 people &middot; 0 active &middot; 0 PI-eligible') !== false, 'the zero counts are shown, not hidden');
 $h = render($TMP . DIRECTORY_SEPARATOR . 'top.php');
-ok(preg_match('#<div class="pnb-chip bad"[^>]*><span class="pnb-chip-v">DOWN</span><span class="pnb-chip-l">directory</span>#', $h) === 1, 'the chip goes red and says DOWN');
-// a paused job whose last run failed
+ok(preg_match('#<a class="pnb-chip bad"[^>]*><span class="pnb-chip-v">DOWN</span><span class="pnb-chip-l">directory</span>#', $h) === 1, 'the chip goes red and says DOWN');
+// a paused refresh: the note, the card open
 $snap = $keep;
 $snap['components']['directory']['job']['paused'] = true;
 $snap['components']['directory']['job']['next']   = 'paused';
-$snap['components']['directory']['job']['result'] = array('finished' => date('Y-m-d H:i:s', $T - 61140), 'exit' => 1, 'secs' => 3, 'error' => null, 'reason' => 'requested', 'label' => 'failed in 3 s');
 $h = render($TMP . DIRECTORY_SEPARATOR . 'r1.php');
-ok(strpos($h, 'people_sync at 05:30 &middot; <strong class="pnb-warn">paused</strong> &middot; last run ' . date('Y-m-d H:i:s', $T - 61140) . ' <strong class="pnb-bad">failed in 3 s</strong>') !== false, 'paused in amber, the failed result in red', $h);
-ok(strpos($h, 'The nightly refresh is paused') !== false, 'with the paused note');
-// a job that threw
-$snap['components']['directory']['job']['paused'] = false;
-$snap['components']['directory']['job']['next']   = 'tomorrow';
-$snap['components']['directory']['job']['result'] = array('finished' => date('Y-m-d H:i:s', $T - 61140), 'exit' => null, 'secs' => 0.2, 'error' => 'boom', 'reason' => 'scheduled 05:30', 'label' => 'threw - boom in 0.2 s');
-$h = render($TMP . DIRECTORY_SEPARATOR . 'r1.php');
-ok(strpos($h, '<strong class="pnb-bad">threw - boom in 0.2 s</strong>') !== false, 'an exception reads as threw, in red');
-// the cache predates this card (no directory in it) but the job is known
+ok(strpos($h, 'The nightly refresh is paused, so the directory reads stale from about 30 hours') !== false && strpos($h, 'id="pnbCardMaint" data-open="1" data-force="1"') !== false, 'a paused refresh: the note, and the card opens itself', $h);
+// the cache predates this line (no directory in it) but the job is known
 $snap = $keep;
 $snap['components']['directory'] = array('status' => 'unknown', 'detail' => 'not probed yet', 'from_cache' => true, 'job' => $keep['components']['directory']['job']);
 $h = render($TMP . DIRECTORY_SEPARATOR . 'r1.php');
-ok(strpos($h, 'pnb-card-fold') === false && strpos($h, '<span class="pnb-adm-muted">not probed yet</span> &middot; <a href="?full=1"') !== false && strpos($h, 'people_sync at 05:30') !== false, 'not probed yet, job known: unfolded, a probe-now link, the job line');
-ok(preg_match('#<span class="pnb-h2-r"><span class="pnb-adm-dot "></span>UNKNOWN</span>#', $h) === 1, 'toneless dot, UNKNOWN');
-// no component at all (a snapshot older than this card): one folded line
+ok(strpos($h, '<span class="pnb-adm-muted">not probed yet</span> &middot; <a href="?full=1"') !== false && preg_match('#<span class="pnb-h2-r"><span class="pnb-adm-dot "></span>NOT PROBED</span></h2>#', $h) === 1, 'not probed yet: a probe-now link on the line, a toneless NOT PROBED verdict', $h);
+// no component at all (a snapshot older than this line): the same line
 unset($snap['components']['directory']);
 $h = render($TMP . DIRECTORY_SEPARATOR . 'r1.php');
-ok(strpos($h, 'pnb-adm-card pnb-card-fold" id="pnbCardDir"') !== false && strpos($h, '<span class="pnb-h2-val">not probed yet</span>') !== false && strpos($h, 'href="?full=1"') !== false, 'no component: folded to one line with a probe-now link');
+ok(strpos($h, '<span class="k">Employee directory</span>') !== false && strpos($h, 'not probed yet</span> &middot; <a href="?full=1"') !== false, 'no component: the line still reads not probed yet with a probe-now link', $h);
 $h = render($TMP . DIRECTORY_SEPARATOR . 'top.php');
-ok(preg_match('#<div class="pnb-chip" title="PENUMBRA_PEOPLE has not been probed yet"><span class="pnb-chip-v">&mdash;</span><span class="pnb-chip-l">directory</span>#', $h) === 1, 'the chip is toneless with a dash');
+ok(preg_match('#<a class="pnb-chip" href="\#pnbCardMaint" data-card="pnbCardMaint" title="PENUMBRA_PEOPLE has not been probed yet - shown on the Maintenance card"><span class="pnb-chip-v">&mdash;</span><span class="pnb-chip-l">directory</span>#', $h) === 1, 'the chip is toneless with a dash');
+$snap = $keep;
+// the backup set, when the snapshot carries one, is the second line
+$snap['components']['backup'] = array('status' => 'ok', 'age_secs' => 61200, 'detail' => 'last complete 17h ago - 14 tables, 106,800 rows, 40.6 MB', 'latest' => array('dir' => 'D:\\Utilities\\PHP_8.2-p\\penumbra_backups\\2026-10-14_0132'));
+$h = render($TMP . DIRECTORY_SEPARATOR . 'r1.php');
+ok(preg_match('#<span class="k">Table backups</span>\s*<span class="v"><span class="pnb-adm-dot ok"></span>last complete 17h ago - 14 tables, 106,800 rows, 40.6 MB &middot; <span title="[^"]*">D:\\\\Utilities\\\\PHP_8.2-p\\\\penumbra_backups\\\\2026-10-14_0132</span></span>#', $h) === 1 && strpos($h, '<strong>Backups:</strong>') === false, 'the backup set is the second line, not a note under the job', $h);
+ok(strpos($h, '&middot; backups 17h ago</span>') !== false, 'and the summary carries its age');
+$snap['components']['backup']['status'] = 'stale';
+$h = render($TMP . DIRECTORY_SEPARATOR . 'r1.php');
+ok(preg_match('#<span class="pnb-h2-r"><span class="pnb-adm-dot warn"></span>BACKUP STALE</span></h2>#', $h) === 1 && preg_match('#Table backups</span>\s*<span class="v"><span class="pnb-adm-dot warn"></span>#', $h) === 1, 'a stale set: amber on its line and in the verdict', $h);
 $snap = $keep;
 
 section('2c. penumbra_directory_status() verdicts (the stale threshold is 30h)');
@@ -556,7 +587,7 @@ ok(strpos($src, "define('PENUMBRA_DIRECTORY_STALE_SECS', 30 * 3600)") !== false,
 section('2d. Maintenance card (2026-09-23, the folded-in Jobs tool)');
 $h = $H['r1'];
 ok(strpos($h, 'id="pnbCardMaint"') !== false && strpos($h, 'pnb-card-fold" id="pnbCardMaint"') === false, 'the card is present and unfolded with a job registered');
-ok(preg_match('#<h2>Maintenance <span class="pnb-i".*?<span class="pnb-h2-r">1 job</span></h2>#s', $h) === 1, 'heading: an (i) and the job count at the right');
+ok(preg_match('#<h2><button type="button" class="pnb-fold" aria-expanded="false"[^>]*>Maintenance</button> <span class="pnb-i".*?<span class="pnb-h2-r"><span class="pnb-adm-dot ok"></span>OK</span></h2>#s', $h) === 1, 'heading: the fold toggle, an (i), and a green dot with OK at the right (the job count moved into the summary 2026-10-14)');
 ok(preg_match('#<div class="pnb-row" data-job="people_sync">\s*<span class="t"[^>]*>05:30 daily</span>\s*<span class="c ">OK</span>\s*<span class="d"[^>]*>Employee directory refresh</span>#', $h) === 1, 'the job row: schedule, OK, label', $h);
 ok(strpos($h, '<span class="to" title="Last run">' . date('Y-m-d H:i:s', $T - 61140) . '</span>') !== false, 'last run timestamp');
 ok(strpos($h, '<span class="p">ok in 17.2 s &middot; next: tomorrow 05:30</span>') !== false, 'the detail: result and next run');
@@ -585,7 +616,7 @@ ok(strpos($h, 'Latest runs unavailable: ORA-12541 no listener') !== false, 'a fa
 $snap = $keep2;
 $snap['components']['maintenance'] = array();
 $h = render($TMP . DIRECTORY_SEPARATOR . 'r1.php');
-ok(strpos($h, 'pnb-adm-card pnb-card-fold" id="pnbCardMaint"') !== false && strpos($h, '<span class="pnb-h2-val">no jobs registered</span>') !== false && strpos($h, 'pnb-rows-jobs') === false, 'no jobs: folded to one line');
+ok(strpos($h, 'No maintenance jobs are registered') !== false && strpos($h, 'pnb-rows-jobs') === false && strpos($h, '<span class="k">Employee directory</span>') !== false && strpos($h, 'pnb-card-fold') === false, 'no jobs: the card keeps the directory line and says no job is registered (2026-10-14 evening)');
 $snap = $keep2;
 // a job's own findings (maint_<job>.checks, 2026-09-23): an amber note under its row
 ok(strpos($H['r1'], 'pnb-job-note') === false, 'control: no findings, no note under the job row');
@@ -621,7 +652,9 @@ section('4. Failures card folds when empty');
 $h = $H['r3'];
 ok(strpos($h, 'pnb-adm-card pnb-card-fold') !== false && strpos($h, '<span class="pnb-h2-val">none</span>') !== false, 'empty: one folded line saying none');
 ok(strpos($h, 'pnb-fail-list') === false && strpos($h, 'pnb-fail-counts') === false, 'and nothing else');
-ok(strpos($h, 'is <a href="#pnbOutages">outage history</a>') !== false, 'its (i) points at outage history');
+// 2026-10-15: the tip is inside a role=button (i) now, which may hold no link,
+// so it names the card in words.
+ok(strpos($h, 'that is the <strong>Outage history</strong> card.') !== false, 'its (i) points at outage history');
 $h = $H['r3b'];
 ok(strpos($h, 'pnb-card-fold') === false && substr_count($h, 'pnb-fail-pill') === 3 && substr_count($h, '<div class="pnb-fail-row">') === 3, 'with rows: unfolded, pills and rows', substr($h, 0, 400));
 ok(strpos($h, 'SMTP connect to mta:25 timed out') !== false, 'the message wraps whole', substr($h, 0, 400));
@@ -635,7 +668,7 @@ ok(strpos($h, 'id="pnbOutages"') !== false, 'card present');
 $ledgerN = array('total' => (int)$outg['total'], 'open' => count($outg['open']), 'near_total' => (int)$outg['near_total'], 'near_open' => count($outg['near_open']));
 echo "  info ledger: " . json_encode($ledgerN) . "\n";
 ok($ledgerN['total'] === 4 && $ledgerN['open'] === 1 && $ledgerN['near_open'] === 1 && $ledgerN['near_total'] === 1, 'ledger: 4 closed outages, one open, one open and one closed near miss', $ledgerN);
-preg_match('/<span class="pnb-h2-r">([^<]*)<\/span>/', $h, $hm);
+preg_match('/<span class="pnb-h2-r"><span class="pnb-adm-dot bad"><\/span>([^<]*)<\/span>/', $h, $hm);   // the dot is red: an outage is open (2026-10-14)
 $outN = $ledgerN['total'] + $ledgerN['open']; $nearN = $ledgerN['near_total'] + $ledgerN['near_open'];
 ok(isset($hm[1]) && $hm[1] === "$outN outage" . ($outN == 1 ? '' : 's') . " &middot; $nearN near miss" . ($nearN == 1 ? '' : 'es') . " &middot; coverage " . $outg['coverage_pct'] . '%', 'heading summary counts outages, near misses and coverage', isset($hm[1]) ? $hm[1] : null);
 ok(preg_match('/<div class="pnb-out-openrow">\s*<span class="pnb-adm-dot bad"><\/span>\s*<strong>www3 delivery<\/strong> has been down for/', $h) === 1, 'open outage row');
@@ -760,7 +793,7 @@ ok($got === $lad, 'cells: a day 96, a week 168 (a second late too), 30 days 120,
 // --- the headings carry the control -----------------------------------------
 ok(preg_match('#<h2>Failures <span class="pnb-h2-win">\(<button type="button" class="pnb-range" data-range-key="fail" data-range="24h" data-default="24h" data-card="Failures" data-from="[0-9-]{10}" data-to="' . date('Y-m-d') . '" aria-haspopup="dialog" aria-expanded="false" title="Last 24 hours\. Click to choose another window for this card\.">last 24h<span class="pnb-range-car" aria-hidden="true">&\#9662;</span></button>\)</span>#', $H['r3']) === 1,
    'Failures: "(last 24h)" is the window button', substr($H['r3'], 0, 600));
-ok(preg_match('#<h2>Outage history <span class="pnb-h2-win">\(<button type="button" class="pnb-range" data-range-key="out" data-range="7" data-default="7" data-card="Outage history"[^>]*>last 7d<span class="pnb-range-car"#', $H['r4']) === 1,
+ok(preg_match('#<h2><button type="button" class="pnb-fold" aria-expanded="true"[^>]*>Outage history</button> <span class="pnb-h2-win">\(<button type="button" class="pnb-range" data-range-key="out" data-range="7" data-default="7" data-card="Outage history"[^>]*>last 7d<span class="pnb-range-car"#', $H['r4']) === 1,
    'Outage history: "(last 7d)" is the window button');
 ok(strpos($H['r3b'], 'class="pnb-range" data-range-key="fail"') !== false, 'the unfolded failures card carries it too');
 
@@ -788,7 +821,7 @@ ok(strpos($hD, '>' . date('M j', $schedStarts[0]) . '<span class="pnb-range-car"
 ok(array_keys($sD) === array('Scheduler') && $sD['Scheduler']['cells'] === 96 && $sD['Scheduler']['b'] >= 1, 'the strip shows that day only: the scheduler window, nothing after', $sD);
 ok(count($tD) === 5 && $tD[4] === '23:59' && $tD[0] === date('D', $schedStarts[0]) . ' 00:00', 'its axis runs midnight to the last minute, not to now', $tD);
 ok($outg['total'] === 1 && $outg['open_in_window'] === 0 && count($outg['open']) === 1, 'one outage that day; today\'s open outage is not in it', array($outg['total'], $outg['open_in_window'], count($outg['open'])));
-ok(preg_match('/<span class="pnb-h2-r">1 outage &middot; 0 near misses &middot; coverage 100%<\/span>/', $hD) === 1, 'the heading counts only that day', preg_match('/<span class="pnb-h2-r">[^<]*<\/span>/', $hD, $mD) ? $mD[0] : null);
+ok(preg_match('/<span class="pnb-h2-r"><span class="pnb-adm-dot bad"><\/span>1 outage &middot; 0 near misses &middot; coverage 100%<\/span>/', $hD) === 1, 'the heading counts only that day (the dot stays red: the open outage is still shown)', preg_match('/<span class="pnb-h2-r">.*?<\/span><\/span>/', $hD, $mD) ? $mD[0] : null);
 ok(strpos($hD, '<strong>www3 delivery</strong> has been down for') !== false, 'but the open outage is still shown above it: a window never hides one');
 ok(isset($outg['by_component']['scheduler']) && $outg['by_component']['scheduler']['episodes'] === 1 && $outg['by_component']['scheduler']['downtime'] === 600 && !isset($outg['by_component']['delivery']),
    'availability charges that day\'s window and nothing of the open outage', $outg['by_component']);
@@ -820,8 +853,8 @@ $errs = $snap['components']['errors']; $fails = array(); $failWin = $failWinKeep
 $errs = array('total' => 99, 'window_hours' => 720, 'by_action' => array('EXPORT' => 99));
 $outg = penumbra_outage_history(array('hours' => 24, 'limit' => 25), $config);
 $hTop = render($TMP . DIRECTORY_SEPARATOR . 'top.php');
-ok(preg_match('/<div class="pnb-chip ok"[^>]*>\s*<span class="pnb-chip-v">0<\/span><span class="pnb-chip-l">failures 24h<\/span>/', $hTop) === 1, 'a card on 30 days leaves the failures 24h chip on the snapshot\'s count');
-ok(preg_match('/<span class="pnb-chip-v">' . $outNexp . '<\/span><span class="pnb-chip-l">outages 7d<\/span>/', $hTop) === 1, 'a card on 24 hours leaves the outages 7d chip on the week', $outNexp);
+ok(preg_match('/<a class="pnb-chip ok"[^>]*>\s*<span class="pnb-chip-v">0<\/span><span class="pnb-chip-l">failures 24h<\/span>/', $hTop) === 1, 'a card on 30 days leaves the failures 24h chip on the snapshot\'s count');
+ok(preg_match('/<span class="pnb-chip-v">1 OPEN<\/span><span class="pnb-chip-l">outages 7d · ' . $outNexp . ' total<\/span>/', $hTop) === 1, 'a card on 24 hours leaves the outages 7d chip on the week', $outNexp);
 $errs = $snap['components']['errors']; $outg = $outgKeep;
 
 // --- the picker, its script, and the refresh default ------------------------------
@@ -874,7 +907,7 @@ $h = $H['r5'];
 ok(strpos($h, 'id="pnbRuntime"') !== false && strpos($h, 'pnb-kv pnb-kv-2') !== false, 'runtime as a two-column key/value list');
 ok(strpos($h, '<span class="pnb-warn">security support ends 2026-12-31</span>') !== false, 'PHP end of support inline');
 ok(substr_count($h, '<span class="k">Disk ') === 2, 'both disks');
-ok(preg_match('/<h2>Runtime <span class="pnb-i"[^>]*><span class="pnb-i-tip">.*?IIS APPPOOL\\\\penumbra.*?<\/span><\/span><\/h2>/s', $h) === 1, 'the (i) names the web account');
+ok(preg_match('/<h2><button type="button" class="pnb-fold" aria-expanded="false"[^>]*>Runtime<\/button> <span class="pnb-i"[^>]*><span class="pnb-i-tip"[^>]*>.*?IIS APPPOOL\\\\penumbra.*?<\/span><\/span><span class="pnb-sum">.*?<\/span><\/h2>/s', $h) === 1, 'the (i) names the web account; the summary follows it');
 ok(strpos($h, '<span class="pnb-ext ok">oci8</span>') !== false && strpos($h, 'pdo_oci</span>') === false, 'extensions as pills, no pdo_oci');
 
 section('7. Log viewer');
@@ -887,7 +920,7 @@ ok(substr_count($h, '<label class="pnb-tg"') === 3 && substr_count($h, '<i class
 ok(strpos($h, 'id="logCtxWrap" hidden') !== false, 'context control hidden until a filter is typed');
 ok(strpos($h, 'id="logAuto"') === false && strpos($h, 'function schedule(') === false && strpos($h, 'penumbra_health_auto') === false, 'the per-log auto-refresh is gone');
 ok(preg_match('/<select id="logLines" hidden aria-hidden="true" tabindex="-1">/', $h) === 1, 'line count select kept hidden as the state holder');
-ok(preg_match('/<span class="pnb-log-lines" id="logLinesLinks">show <a href="#" data-lines="300">300<\/a> &middot; <a href="#" data-lines="1000">1000<\/a> &middot; <a href="#" data-lines="5000">5000<\/a><\/span>/', $h) === 1, 'the count is three links in the status line');
+ok(preg_match('/<span class="pnb-log-lines" id="logLinesLinks">show <a href="#" data-lines="300">300<\/a> &middot; <a href="#" data-lines="5000" title="[^"]*">all<\/a><\/span>/', $h) === 1, 'the count is two links in the status line: 300 or all (2026-10-14)');
 ok(preg_match('/<select id="logDay" aria-label="Day to show" hidden><\/select>/', $h) === 1, 'day picker sits inline in the status line');
 ok(preg_match('/<button type="button" class="pnb-link-btn" id="logKeys" aria-pressed="true"/', $h) === 1, 'keys switch is a link-button');
 ok(strpos($h, '<h2>Logs <span class="pnb-i"') !== false && strpos($h, '<b>5</b> pick a tab') !== false, 'the viewer (i) counts the tabs');
@@ -914,6 +947,125 @@ ok($LEFT_ORDER === array('r1a', 'r4', 'r3', 'r1b', 'r2', 'r5'),
    'left column: scheduler + databases & mail, OUTAGE HISTORY, FAILURES, then directory + maintenance, delivery, runtime', $LEFT_ORDER);
 preg_match_all('/<div class="pnb-adm-card[^"]*" id="(pnb[A-Za-z]+)"/', $LEFT['r1a'], $cardIds);
 ok($cardIds[1] === array('pnbCardSched', 'pnbCardDbs'), 'and nothing sits between the databases card and outage history', $cardIds[1]);
+
+section('8b. Declutter (2026-10-14): chips that navigate, cards that fold, lists that show more');
+$h = $H['top'];
+preg_match_all('/<a class="pnb-chip[^"]*" href="#(pnb[A-Za-z]+)"/', $h, $cm);
+ok($cm[1] === array('pnbCardSched', 'pnbCardDbs', 'pnbOutages', 'pnbFailures', 'pnbCardMaint', 'pnbCardMaint', 'pnbDelivery', 'pnbLog', 'pnbRuntime'),
+   'nine chips, each a link to its card, in the cards\' order (tasks, overdue, mail, queries and the disk folded into theirs; the directory chip leads to Maintenance since the evening)', $cm[1]);
+ok(preg_match('/<div class="pnb-chip[ "]/', $h) === 0 && strpos($h, '>mail (mta)</span>') === false && strpos($h, '>tasks armed</span>') === false
+   && strpos($h, '>overdue</span>') === false && strpos($h, '>queries running</span>') === false && strpos($h, '>log disk free</span>') === false, 'the five folded chips are gone');
+ok(preg_match('/<a class="pnb-chip ok" href="#pnbCardSched" data-card="pnbCardSched" title="[^"]*41 active task\(s\), 7 disabled[^"]*"><span class="pnb-chip-v">ONLINE<\/span><span class="pnb-chip-l">scheduler · 41 armed · 0 overdue<\/span>/', $h) === 1, 'scheduler chip: ONLINE, the tasks in its label and tip', $h);
+ok(preg_match('/<a class="pnb-chip warn" href="#pnbCardDbs" data-card="pnbCardDbs"[^>]*><span class="pnb-chip-v">4\/5<\/span><span class="pnb-chip-l">databases · mail up<\/span>/', $h) === 1, 'databases chip: 4/5 in amber for the degraded INFOED, the relay in its label', $h);
+ok(preg_match('/<a class="pnb-chip ok" href="#pnbCardMaint" data-card="pnbCardMaint"[^>]*><span class="pnb-chip-v">1\/1<\/span><span class="pnb-chip-l">jobs<\/span>/', $h) === 1, 'the maintenance card has a chip: jobs ok over jobs registered', $h);
+ok(preg_match('/<a class="pnb-chip warn" href="#pnbLog" data-card="pnbLog" data-log="php"[^>]*><span class="pnb-chip-v">3<\/span><span class="pnb-chip-l">php errors 60m<\/span>/', $h) === 1, 'the PHP errors chip leads to the log viewer\'s PHP tab', $h);
+ok(preg_match('/<a class="pnb-chip ok" href="#pnbRuntime" data-card="pnbRuntime"[^>]*><span class="pnb-chip-v">61%<\/span><span class="pnb-chip-l">log disk free · 0 queries<\/span>/', $h) === 1, 'runtime chip: the log disk as the value, the queries in the label', $h);
+// the worst fact is the value
+$keep3 = $snap; $tasksKeep = $tasks; $dbsKeep = $dbs; $rtKeep = $rt;
+$tasks['overdue'] = 2;
+$h = render($TMP . DIRECTORY_SEPARATOR . 'top.php');
+ok(preg_match('/<a class="pnb-chip bad" href="#pnbCardSched"[^>]*><span class="pnb-chip-v">2 OVERDUE<\/span><span class="pnb-chip-l">scheduler · online · 41 armed<\/span>/', $h) === 1, 'two overdue tasks: "2 OVERDUE" is the value, in red, and online moves to the label', $h);
+$tasks = $tasksKeep;
+$dbs['hr']['status'] = 'down'; $dbOk = 3; $dbBad = 1;
+$h = render($TMP . DIRECTORY_SEPARATOR . 'top.php');
+ok(preg_match('/<a class="pnb-chip bad" href="#pnbCardDbs"[^>]*><span class="pnb-chip-v">HR DOWN<\/span><span class="pnb-chip-l">databases 3\/5 · mail up<\/span>/', $h) === 1, 'HR down: "HR DOWN" is the value, the count moves to the label', $h);
+$dbs = $dbsKeep; $dbOk = 4; $dbBad = 0;
+$snap['components']['smtp']['status'] = 'down'; $snap['components']['smtp']['detail'] = 'connection refused';
+$h = render($TMP . DIRECTORY_SEPARATOR . 'top.php');
+ok(preg_match('/<a class="pnb-chip bad" href="#pnbCardDbs"[^>]*title="[^"]*connection refused[^"]*"><span class="pnb-chip-v">MAIL DOWN<\/span>/', $h) === 1, 'the relay down: "MAIL DOWN" is the value, the detail in the tip', $h);
+$snap = $keep3;
+$rt['inflight']['stale'] = 2;
+$h = render($TMP . DIRECTORY_SEPARATOR . 'top.php');
+ok(preg_match('/<a class="pnb-chip warn" href="#pnbRuntime"[^>]*><span class="pnb-chip-v">2 STALE<\/span><span class="pnb-chip-l">queries · log disk 61%<\/span>/', $h) === 1, 'stale query slots: "2 STALE" is the value, the disk moves to the label', $h);
+$rt = $rtKeep;
+// cards fold, and open themselves with something to report
+$h = $H['r1'];
+ok(strpos($h, '<div class="pnb-adm-card pnb-foldable" id="pnbCardSched" data-open="0">') !== false, 'the scheduler card, online with nothing overdue, starts folded and is not forced');
+ok(strpos($h, '<span class="pnb-sum">heartbeat 42s ago &middot; 41 armed, 7 disabled &middot; next due in 4m</span>') !== false, 'its summary: heartbeat age, tasks, next due', $h);
+ok(strpos($h, '<div class="pnb-adm-card pnb-foldable" id="pnbCardDbs" data-open="1" data-force="1">') !== false, 'the databases card opens itself for the degraded INFOED');
+ok(strpos($h, '<span class="pnb-sum"><span class="pnb-warn">INFOED degraded</span> &middot; 4 of 5 ok &middot; mail up</span>') !== false, 'its summary names the degraded database and the relay', $h);
+ok(strpos($h, '<div class="pnb-adm-card pnb-foldable" id="pnbCardMaint" data-open="0">') !== false && preg_match('/<span class="pnb-sum">directory refreshed 17h ago &middot; people_sync ok in 17\.2 s \(\d\d:\d\d\)<\/span>/', $h) === 1, 'the maintenance card: folded, the directory and the job\'s last result in its summary', $h);
+ok(strpos($H['r2'], '<div class="pnb-adm-card pnb-foldable" id="pnbDelivery" data-open="1" data-force="1">') !== false && strpos($H['r2'], '<span class="pnb-sum">1 delivered &middot; 4 stalled &middot; 1 cut off in the last 15 min</span>') !== false, 'the delivery card opens itself when down, summarised', $H['r2']);
+ok(strpos($H['r5'], '<div class="pnb-adm-card pnb-foldable" id="pnbRuntime" data-open="0">') !== false && strpos($H['r5'], '<span class="pnb-sum">PHP 8.2.29 &middot; opcache on &middot; 0 running, 0 stale &middot; D:\ 61% free &middot; C:\ 25% free &middot; <span class="pnb-warn">support ends 2026-12-31</span></span>') !== false, 'the runtime card: folded, summarised', $H['r5']);
+ok(strpos($H['r4'], '<div class="pnb-adm-card pnb-foldable" id="pnbOutages" data-open="1" data-force="1">') !== false && preg_match('/<span class="pnb-sum"><strong class="pnb-bad">1 open<\/strong> &middot; <span class="pnb-warn">1 near miss in progress<\/span> &middot; [A-Za-z0-9 ]+ [0-9.]+%, [0-9hm ]+ down/', $H['r4']) === 1, 'the outage card opens by default and is forced by the open outage; its summary leads with what is open', $H['r4']);
+ok(strpos($H['r3b'], '<div class="pnb-adm-card pnb-foldable" id="pnbFailures" data-open="1" data-force="1">') !== false && strpos($H['r3b'], '<span class="pnb-sum">3 in the window: 1 SCHEDULED_SEND, 1 EXPORT, 1 SCHEDULE_FAIL</span>') !== false, 'a failures card with rows opens itself, summarised by action', $H['r3b']);
+ok(strpos($H['r3'], 'pnb-foldable') === false && strpos($H['r3'], 'pnb-fold"') === false, 'the empty failures card keeps its one-line fold and gets no toggle');
+$keep4 = $snap; $snap['components']['maintenance'] = array();
+$hM = render($TMP . DIRECTORY_SEPARATOR . 'r1.php');
+ok(strpos($hM, '<div class="pnb-adm-card pnb-foldable" id="pnbCardMaint" data-open="0">') !== false && strpos($hM, 'No maintenance jobs are registered') !== false && strpos($hM, '<span class="pnb-sum">directory refreshed 17h ago</span>') !== false, 'with no jobs the maintenance card still folds, carrying the directory line (2026-10-14 evening)', $hM);
+$snap = $keep4;
+// the outage card: availability as a line, the known windows folded, three episodes then show more
+$h = $H['r4'];
+ok(strpos($h, '<div class="pnb-out-avline">') !== false && strpos($h, 'pnb-out-summary') === false && strpos($h, 'pnb-out-bar') === false, 'availability is one line; the bars are gone');
+ok(preg_match('/<div class="pnb-out-kw" data-key="kw">\s*<div class="pnb-out-kwline pnb-adm-muted"><b>1 known window<\/b> &middot; 1 muted &middot; Scheduler\s*<button type="button" class="pnb-link-btn pnb-kw-btn" aria-expanded="false" data-show="show them" data-hide="hide them"/', $h) === 1, 'the known windows fold to one line: count, muted count, components, show them', $h);
+ok(preg_match('/<div class="pnb-out-kw"[^>]*>.*?<div class="pnb-out-pat">\s*<span class="pnb-out-patpill"/s', $h) === 1, 'with the pills, bells and all, inside the fold');
+ok(substr_count($h, '<div class="pnb-rows-more">') === 1 && preg_match('/<div class="pnb-rows pnb-rows-out">\s*(<div class="pnb-row[^>]*>.*?<\/div>\s*){3}<div class="pnb-rows-more">/s', $h) === 1, 'three episodes listed, the other two behind the fold', $h);
+ok(preg_match('/<div class="pnb-more-line pnb-adm-muted" data-key="out"><button type="button" class="pnb-link-btn pnb-more-btn" aria-expanded="false"\s+data-more="show 2 more" data-less="show fewer"\s+data-some="3 of 5 listed" data-all="5 of 5 listed">show 2 more<\/button> &middot; <span class="pnb-more-n">3 of 5 listed<\/span>, near misses included &middot; the full record is the <strong>Watchdog<\/strong> log tab<\/div>/', $h) === 1, 'the count line: show 2 more, 3 of 5 listed, where the rest is', $h);
+ok(strpos($h, 'older in this window not listed') === false, 'the old "older not listed" note is gone');
+ok(strpos($h, 'the strip, the availability line and the list all follow it') !== false && strpos($h, 'the tiles and the list') === false, 'the outage (i) names the availability line, not the tiles');
+ok(strpos($hD, 'pnb-rows-more') === false && strpos($hD, '<span class="pnb-more-n">1 of 1 listed</span>') !== false && strpos($hD, 'pnb-more-btn') === false, 'one episode in the window: no fold, "1 of 1 listed"', $hD);
+// the maintenance runs: three, then show more
+ok(strpos($H['r1'], 'pnb-rows-more') === false && strpos($H['r1'], 'pnb-more-line') === false, 'three runs: no fold');
+$keep5 = $snap;
+$snap['components']['maintenance_runs']['rows'][] = array('id' => 879, 'ts' => date('m-d H:i', $T - 233940), 'user' => 'SCHEDULER', 'job' => 'people_sync', 'action' => 'PEOPLE_SYNC', 'kind' => 'ok', 'message' => 'people_sync: 71,850 staged', 'stats' => array('staged' => 71850));
+$snap['components']['maintenance_runs']['rows'][] = array('id' => 878, 'ts' => date('m-d H:i', $T - 320340), 'user' => 'SCHEDULER', 'job' => 'people_sync', 'action' => 'PEOPLE_SYNC', 'kind' => 'ok', 'message' => 'people_sync: 71,840 staged', 'stats' => array('staged' => 71840));
+$hR = render($TMP . DIRECTORY_SEPARATOR . 'r1.php');
+ok(clean($hR) && substr_count($hR, '<div class="pnb-rows-more">') === 1 && substr_count($hR, '<span class="c ">OK</span>') === 4
+   && preg_match('/<div class="pnb-more-line pnb-adm-muted" data-key="runs"><button type="button" class="pnb-link-btn pnb-more-btn" aria-expanded="false"\s+data-more="show 2 more runs" data-less="show fewer"\s+data-some="3 of 5" data-all="all 5">show 2 more runs<\/button> &middot; <span class="pnb-more-n">3 of 5<\/span> in the last 30 days/', $hR) === 1,
+   'five runs: three listed, two behind "show 2 more runs"', $hR);
+$snap = $keep5;
+// the log tab badge, the scripts, the stylesheet and the help
+$h = $H['r6'];
+ok(preg_match('/data-log="php"[^>]*>PHP errors<span class="pnb-log-n" title="3 PHP error line\(s\) in the last hour">3<\/span><\/button>/', $h) === 1, 'the PHP errors tab carries the hour\'s count as a badge', $h);
+ok(strpos($h, 'badge: badge,') !== false && strpos($h, "if (rows[pi].s === 'err' || rows[pi].s === 'warn') nProb++;") !== false, 'the console counts the problem lines it loads onto the open tab');
+ok(strpos($h, 'window.pnbFolds = { apply: apply, jump: jump };') !== false && strpos($h, "var PREF = 'penumbra_health_folds';") !== false && strpos($h, "closest('.pnb-chip[data-card], .pnb-warn-link[data-card]')") !== false
+   && strpos($h, "if (card.getAttribute('data-force') === '1') open = true;") !== false && strpos($h, "if (window.pnbFolds) window.pnbFolds.apply();") !== false,
+   'the fold script: remembered folds, forced cards, chip and warning jumps, re-applied after the refresh swap');
+ok(strpos($h, "history.replaceState(null, '', window.location.pathname + window.location.search + '#' + id)") !== false && strpos($h, "/^pnb[A-Za-z]+$/.test(hashId)") !== false, 'a jump writes the card\'s anchor into the address, and an address with one opens that card');
+$cssSrc = @file_get_contents(dirname($PAGE) . DIRECTORY_SEPARATOR . 'css' . DIRECTORY_SEPARATOR . 'main.css');
+if ($cssSrc === false) {
+    echo "  (skipped: css/main.css is not beside health.php)\n";
+} else {
+    ok(strpos($cssSrc, '.pnb-foldable[data-open="0"] > :not(h2) { display: none; }') !== false && strpos($cssSrc, '.pnb-rows-more:not(.on) { display: none; }') !== false
+       && strpos($cssSrc, '.pnb-out-kw .pnb-out-pat:not(.on) { display: none; }') !== false && strpos($cssSrc, 'a.pnb-chip { text-decoration: none;') !== false,
+       'the stylesheet folds a closed card, hides the folded rows and pills, and dresses the chips as links');
+}
+if ($helpSrc !== false) {
+    ok(strpos($helpSrc, 'Every chip is a link to its card') !== false && strpos($helpSrc, 'the folds you choose are remembered in your browser') !== false && strpos($helpSrc, 'the three newest with a <em>show more</em>') !== false,
+       'the help page describes the chips, the folds and the show-more');
+}
+// Evening follow-up (2026-10-14): a dot and a word end every heading, the
+// databases probe line moved into the body, the maintenance rows wrap, the
+// viewer defaults to 2 lines of context, offers 300 or all, and last 14 days.
+ok(strpos($H['r1'], '<span class="pnb-h2-r"><span class="pnb-adm-dot warn"></span>DEGRADED</span></h2>') !== false
+   && preg_match('#>Databases &amp; mail</button>.*?</h2>\s*<div class="pnb-hub-fine pnb-adm-muted" style="margin: 0 0 8px;">probed [^<]*\(cached\) &middot; <a href="\?full=1"#s', $H['r1']) === 1,
+   'databases: an amber dot and DEGRADED end the heading; the probe age and re-probe link sit first in the body', $H['r1']);
+ok(preg_match('#<span class="pnb-h2-r"><span class="pnb-adm-dot bad"></span>5 outages &middot; 2 near misses &middot; coverage #', $H['r4']) === 1, 'outage history: a red dot for the open outage before its counts', $H['r4']);
+ok(strpos($H['r3b'], '<span class="pnb-h2-r"><span class="pnb-adm-dot warn"></span>3 FAILURES</span></h2>') !== false, 'failures with rows: an amber dot and the count', $H['r3b']);
+ok(strpos($H['r3'], '<span class="pnb-h2-r"><span class="pnb-adm-dot ok"></span>NONE</span></h2>') !== false, 'the empty failures card: a green dot and NONE', $H['r3']);
+ok(substr_count($H['r1'], '<span class="pnb-adm-dot ok"></span>OK</span></h2>') === 1 && strpos($H['r1'], '<span class="pnb-adm-dot ok"></span>ONLINE</span></h2>') !== false, 'maintenance: a green dot and OK; the scheduler keeps ONLINE', $H['r1']);
+ok(strpos($H['r5'], '<span class="pnb-h2-r"><span class="pnb-adm-dot ok"></span>OK</span></h2>') !== false && strpos($H['r2'], '<span class="pnb-h2-r"><span class="pnb-adm-dot bad"></span>DOWN</span></h2>') !== false, 'runtime: a green dot and OK; delivery keeps its red DOWN', $H['r5']);
+$keep6 = $snap;
+$snap['components']['maintenance']['people_sync']['result'] = array('finished' => date('Y-m-d H:i:s', $T - 61140), 'exit' => 1, 'secs' => 3, 'error' => null, 'reason' => 'scheduled 05:30', 'label' => 'failed in 3 s');
+$hF2 = render($TMP . DIRECTORY_SEPARATOR . 'r1.php');
+ok(strpos($hF2, '<span class="pnb-h2-r"><span class="pnb-adm-dot bad"></span>FAILED</span></h2>') !== false, 'a failed job: a red dot and FAILED', $hF2);
+$snap = $keep6;
+$rtKeep2 = $rt; $rt['disks']['web']['pct_free'] = 8;
+$hR2 = render($TMP . DIRECTORY_SEPARATOR . 'r5.php');
+ok(strpos($hR2, '<span class="pnb-h2-r"><span class="pnb-adm-dot bad"></span>CHECK</span></h2>') !== false && strpos($hR2, 'id="pnbRuntime" data-open="1" data-force="1"') !== false, 'a disk under 10%: a red dot, CHECK, and the card opens itself', $hR2);
+$rt = $rtKeep2;
+$h = $H['r6'];
+ok(strpos($h, '<input type="number" id="logCtx" value="2"') !== false, 'context defaults to 2 lines either side (was 5)');
+ok(preg_match('/<select id="logLines" hidden aria-hidden="true" tabindex="-1">\s*<option value="300" selected>300 lines<\/option>\s*<option value="5000">all \(up to 5,000 lines\)<\/option>\s*<\/select>/', $h) === 1, 'the hidden count holder offers 300 and all', $h);
+ok(strpos($h, "if (def < 14) html.push('<option value=\"span:14\">day: last 14</option>');") !== false && strpos($h, "(dayVal ? '&day=' + encodeURIComponent(dayVal) : (spanPref ? '&span=' + spanPref : ''))") !== false && strpos($h, "pref('span', String(spanPref));") !== false,
+   'the day list offers last 14, sent as span, remembered per browser');
+ok(strpos($h, "if ((p = pref('lines')) && lines.querySelector('option[value=\"' + p + '\"]')) { lines.value = p; }") !== false, 'a remembered count the list no longer offers is ignored');
+ok(strpos($page, "'span'        => isset(\$_GET['span']) ? (int)\$_GET['span'] : 0,") !== false, 'the tail action passes span through');
+if ($cssSrc !== false) {
+    ok(strpos($cssSrc, '.pnb-rows-jobs .pnb-row, .pnb-rows-runs .pnb-row { white-space: normal; align-items: start; }') !== false, 'the maintenance rows wrap instead of clipping');
+}
+$logsLib2 = @file_get_contents(dirname($PAGE) . DIRECTORY_SEPARATOR . 'penumbra_logs.php');
+ok($logsLib2 !== false && strpos($logsLib2, "define('PENUMBRA_LOG_CTX_DEFAULT', 2)") !== false && strpos($logsLib2, "'span_default' =>") !== false, 'the log library defaults context to 2 and reports the span in force');
 
 section('9. The mute handler, for real');
 $mute = cut($page, '// --- known-window mute toggle (admin only, POST)', '// --- one-time metrics column provisioning', 'mute handler');
@@ -985,6 +1137,61 @@ if (!is_file($maintLib)) {
     list($code, $j) = run_job(array('action' => 'job', 'job' => 'people_sync', 'do' => 'pause'), false);
     ok($code === 403 && isset($j['error']) && count($GLOBALS['pnb_audits']) === 4, 'a non-admin is refused and nothing is written or audited');
 }
+section('11. WCAG serious fixes (2026-10-15)');
+// 11a. Focus survives the page refresh's swap (2.4.3).
+$h = $H['r6'];
+$iFk = strpos($h, 'var fk = focusKey(document.activeElement);');
+$iSw = strpos($h, "['pnbHubTop', 'pnbHubLeft'].forEach(function (id) {");
+$iAp = strpos($h, 'if (window.pnbFolds) window.pnbFolds.apply();');
+$iFb = preg_match('/\n[ \t]*focusBack\(fk\);/', $h, $fbm, PREG_OFFSET_CAPTURE) ? $fbm[0][1] : false;   // a live call: alone on its line, not commented out
+ok($iFk !== false && $iSw !== false && $iAp !== false && $iFb !== false && $iFk < $iSw && $iSw < $iAp && $iAp < $iFb,
+   'the refresh notes the focused control BEFORE the swap and focuses its replacement after the folds are re-applied');
+ok(strpos($h, "if (a && swapRegion(a) && kbdFocus(a)) return 'held while a card control has focus';") !== false
+   && strpos($h, "var SWAP = ['pnbHubTop', 'pnbHubLeft'];") !== false,
+   'auto-refresh holds while a control in the swapped regions has keyboard focus');
+ok(preg_match("/var KEY_ATTRS = \[[^\]]*'data-job'[^\]]*\];/", $h) === 1 && preg_match("/var KEY_ATTRS = \[[^\]]*data-job-act/", $h) === 0
+   && strpos($h, "t = scope.querySelector('h2 .pnb-fold');") !== false,
+   'the focus key names a job by its job, not its action (Run now becomes Withdraw), and falls back to the card\'s fold button');
+$cardActs = cut($h, '/* CARD ACTIONS (2026-09-12)', '/* FOLDS, JUMPS AND SHOW-MORE', 'card actions script');
+ok(preg_match('/\.disabled\s*=\s*true/', $cardActs) === 0 && strpos($cardActs, "function busy(btn, on) { if (on) btn.setAttribute('aria-disabled', 'true');") !== false
+   && substr_count($cardActs, 'if (isBusy(') === 3,
+   'Copy, the job buttons and the bell go busy with aria-disabled (focus stays), never disabled, and a busy one ignores clicks');
+// 11b. The pause button's name is fixed; aria-pressed carries the state (4.1.2).
+ok(preg_match('/<button type="button" id="hubRefreshPause" class="pnb-hub-refresh-p" aria-pressed="false" aria-label="Pause auto-refresh" [^>]*><span aria-hidden="true">&#10074;&#10074;<\/span><\/button>/', $page) === 1,
+   'the pause button is named "Pause auto-refresh" and its glyph is hidden from AT');
+ok(strpos($h, "pauseBtn.innerHTML = '<span aria-hidden=\"true\">' + (paused ? '&#9654;' : '&#10074;&#10074;') + '</span>';") !== false
+   && strpos($h, "pauseBtn.setAttribute('aria-pressed', paused ? 'true' : 'false');") !== false,
+   'pressing it swaps only the hidden glyph and aria-pressed');
+// 11c. A chip or a "Worth a look" line moves focus to the card it opens (2.4.3).
+$jumpFn = cut($h, '    function jump(id, log) {', '    document.addEventListener(\'click\', function (e) {' . "\n" . '        if (!e.target.closest) return;', 'jump()');
+$iScr = strpos($jumpFn, 'card.scrollIntoView(');
+$iFoc = strpos($jumpFn, 'ft.focus({ preventScroll: true });');
+ok($iScr !== false && $iFoc !== false && $iScr < $iFoc && strpos($jumpFn, "var ft = card.querySelector('h2 .pnb-fold') || card.querySelector('h2');") !== false,
+   'jump() focuses the card\'s fold button (else its heading) with preventScroll, after the scroll');
+// 11d. A missing extension says so in words, on the pill and in the summary (1.4.1).
+$rtKeep3 = $rt;
+$rt['extensions']['gd'] = false; $rt['pdo_oci_present'] = true;
+$hX = render($TMP . DIRECTORY_SEPARATOR . 'r5.php');
+$rt = $rtKeep3;
+ok(clean($hX) && strpos($hX, '<span class="pnb-ext bad">gd missing</span>') !== false && strpos($hX, '>pdo_oci loaded, must be off</span>') !== false
+   && strpos($hX, '<span class="pnb-ext ok">oci8</span>') !== false, 'a missing extension\'s pill says "missing"; pdo_oci says it is loaded', $hX);
+ok(strpos($hX, '<span class="pnb-sum"><span class="pnb-bad">missing: gd</span> &middot; <span class="pnb-bad">pdo_oci loaded</span> &middot; PHP 8.2.29') !== false,
+   'and the card\'s summary leads with them, in words', $hX);
+// 11e. The (i) tips are disclosures with their text exposed (1.3.1 / 4.1.2 / 1.4.13).
+$all = $H['top'] . $H['r1'] . $H['r2'] . $H['r3'] . $H['r4'] . $H['r5'] . $H['r6'];
+$nI = preg_match_all('/<span class="pnb-i"[^>]*>/', $all, $im);
+$nGood = preg_match_all('/<span class="pnb-i" tabindex="0" role="button" aria-expanded="false" aria-label="[^"]+" aria-describedby="(pnbTip[0-9a-f]{10}(?:-\d+)?)"><span class="pnb-i-tip" id="\1" role="tooltip">/', $all, $gm);
+ok($nI >= 10 && $nGood === $nI && count(array_unique($gm[1])) === $nI && strpos($all, 'role="note"') === false,
+   'every (i) is role=button with aria-expanded and aria-describedby naming its own tip (unique ids, no role=note)', array($nI, $nGood, count(array_unique($gm[1]))));
+preg_match_all('/<span class="pnb-i-tip"[^>]*>(.*?)<\/span><\/span>/s', $all, $tm);
+$tipLinks = 0; foreach ($tm[1] as $tt) { if (preg_match('/<(a|button|input|select)\b/i', $tt)) $tipLinks++; }
+ok(count($tm[1]) === $nI && $tipLinks === 0, 'no tip holds a link or a control (a button\'s content is not interactive)', $tipLinks);
+ok(strpos($cardActs, 'activeElement.blur()') === false && strpos($cardActs, "if (e.key !== 'Escape') return;") !== false
+   && strpos($cardActs, "document.querySelectorAll('.pnb-i'), function (t) {\n            if (tipShown(t)) { tipShut(t, true); closed = true; }") !== false
+   && strpos($cardActs, "if (i && e.target === i && (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar')) {") !== false
+   && strpos($cardActs, "i.setAttribute('aria-expanded', tipShown(i) ? 'true' : 'false');") !== false,
+   'Escape closes every open tip, hovered ones too, without blur(); Enter / Space toggle it; aria-expanded follows what shows');
+
 if ($CONTROL) { section('CONTROL'); ok(false, 'control: a deliberately false assertion (must FAIL)'); }
 
 // ---------------------------------------------------------------------------
@@ -994,7 +1201,7 @@ if ($CONTROL) { section('CONTROL'); ok(false, 'control: a deliberately false ass
 if ($HTML !== '') {
     $refresh = '<div class="pnb-hub-refresh" id="pnbHubRefresh" role="group" aria-label="Page auto-refresh"><span>&#8635; auto-refresh</span>'
              . '<select id="hubRefreshSel" aria-label="Auto-refresh interval"><option value="0" selected>off</option><option value="30">30s</option><option value="60">60s</option><option value="120">2 min</option><option value="300">5 min</option></select>'
-             . '<span id="hubRefreshNext">off</span><button type="button" id="hubRefreshPause" class="pnb-hub-refresh-p" aria-pressed="false" title="Pause auto-refresh">&#10074;&#10074;</button>'
+             . '<span id="hubRefreshNext">off</span><button type="button" id="hubRefreshPause" class="pnb-hub-refresh-p" aria-pressed="false" aria-label="Pause auto-refresh" title="Pause auto-refresh"><span aria-hidden="true">&#10074;&#10074;</span></button>'
              . '<span class="pnb-hub-refresh-bar" aria-hidden="true"><i id="hubRefreshBar"></i></span></div>';
     $mockRows = array(
         array('t' => date('Y-m-d H:i:s', $T - 60) . ' DEGRADED: www3 delivery down | delivery=down | near-miss OPEN infoed | correlated: none | SENDING (alert, 2nd consecutive)', 's' => 'err'),

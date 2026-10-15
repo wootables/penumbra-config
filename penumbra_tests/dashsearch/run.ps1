@@ -198,6 +198,11 @@
 #       xfhost       main.js filters the frame instead of posting to the dashboard (mainxf.html)
 #       xfhostchart  a hosted page's chart click opens its drill popup instead of posting (mainxf.html)
 #       xfpairs      the dashboard applies only the first criterion of a framed chart's click (dash.html)
+#     keyboard cross-filtering (WCAG 2.1.1, 2026-10-15; dash.html section K):
+#       xfkeys       Enter / Space / arrows on a table tile's rows and cells do nothing
+#       xfkeycells   a table tile's plain cells get no tabindex, so the arrows cannot reach them (penumbra_tiles.js)
+#       xffocus      focus is not put back on the value after the table redraws
+#       xfmenu       chart tiles get no Filter menu
 #     the default filter (2026-09-30 evening):
 #       defoff       a clean address never applies the default (dashdefault.html)
 #       defaddr      a cleared box on a dashboard with a default leaves the address bare (dashdefault.html)
@@ -382,6 +387,11 @@ $mutants = @{
   'ctlcountcap'    = @('dash', 'if (!seen || seen.score !== 7) { return null; }   // filtered, an excerpt or a capped read: not the whole report', 'if (!seen) { return null; }')
   'ctlcountcache'  = @('dash', ', had = _ctlCountRows[ck];', ', had = null;')
   'ctlnocounts'    = @('dash', 'if (!$(''#teCtlCounts'').is('':checked'')) { args.push(''nocounts''); }', '/* mutant: counts box ignored */')
+  # keyboard cross-filtering (WCAG 2.1.1, 2026-10-15; dash.html section K)
+  'xfkeys'       = @('dash', 'if (e.target !== this || editMode || e.ctrlKey || e.metaKey || e.altKey) { return; }', 'return;')
+  'xfkeycells'   = @('tiles', '+ (cellFilter ? '' tabindex="-1"'' : '''')', '')
+  'xffocus'      = @('dash', 'if (!f || f.tileId !== String(tile.id)) { return; }', 'return;')
+  'xfmenu'       = @('dash', '} else if (tile.type === ''chart'' && tile.groupBy) {', '} else if (false) {')
   'xflink'       = @('dash', 'crossFilterText($(this).attr(''data-search''));', '/* mutant: the link filters nothing */')
   'xflinkmsg'    = @('dash', 'if (mine) { if (d.text) { crossFilterText(d.text); } else if', 'if (mine) { if (false) { } else if')
   'xflinkhost'   = @('main', 'if (_pnbDashHosted() && _pnbDashPostSearch(resolvedQuery)) return;', '/* mutant: the frame searches itself */')

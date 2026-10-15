@@ -884,6 +884,186 @@
         if (sel && !sel.isCollapsed) { return; }   // the click that ends a text selection
         crossFilter($(this).attr('data-col'), $(this).text());
     });
+    // -------------------------------------------------------------------------
+    // Cross-filtering from the keyboard (WCAG 2.1.1, 2026-10-15). The clicks
+    // above are pointer-only; these reach the SAME crossFilter():
+    //   table tiles - every row is a tab stop (T.renderInto cellFilter). Enter
+    //     or Space on a row filters by its first plain value; Left / Right walk
+    //     the row's plain cells (tabindex -1) and Enter / Space on a cell filters
+    //     by that cell; Up / Down keep the column; Escape goes back to the row.
+    //     Chosen over a tab stop per cell (up to 200 rows x N columns of Tab
+    //     presses) and over a menu (the value is already on screen). A hint
+    //     under the table says so while a row or cell has focus.
+    //   chart tiles - a "Filter" button in the tile head opens a menu of the
+    //     chart's categories (and split values), each a menuitemcheckbox that
+    //     reads pressed while its condition is in the filter.
+    // The table re-renders after the filter applies, so the focused value is
+    // remembered and focus put back on it (else its row, else the tile's link).
+    // -------------------------------------------------------------------------
+    var _xfFocus = null;   // { tileId, col, value, at }
+    function xfAnnounce(col, value, wasOn) {
+        dashAnnounce((wasOn ? 'Released ' : 'Filtered every tile by ') + col + ' = ' + value + '.');
+    }
+    function xfIsOn(col, value) {
+        return T.strip.has(dashBoxText(), crossFilterCond(col, value));
+    }
+    function xfByCell(td) {
+        var $td = $(td), col = String($td.attr('data-col') || ''), value = $.trim($td.text());
+        if (!col || !value || editMode) { return false; }
+        var wasOn = xfIsOn(col, value);
+        var $tile = $td.closest('.dash-tile');
+        _xfFocus = { tileId: String($tile.attr('data-tile-id') || ''), col: col, value: value, at: Date.now() };
+        if (!crossFilter(col, value)) { _xfFocus = null; return false; }
+        xfAnnounce(col, value, wasOn);
+        return true;
+    }
+    function xfRestoreFocus($tile, tile) {
+        var f = _xfFocus;
+        if (!f || f.tileId !== String(tile.id)) { return; }
+        _xfFocus = null;
+        if (Date.now() - f.at > 30000) { return; }
+        // Only when focus fell to the page with the old table: never steal it back.
+        var ae = document.activeElement;
+        if (ae && ae !== document.body && document.documentElement.contains(ae)) { return; }
+        var $hit = $tile.find('td[data-col]').filter(function () {
+            return String($(this).attr('data-col')) === f.col && $.trim($(this).text()) === f.value;
+        }).first();
+        if (!$hit.length) { $hit = $tile.find('.dash-tile-body tbody tr[tabindex]').first(); }
+        if (!$hit.length) { $hit = $tile.find('.dash-tile-open, .dash-xf-btn').first(); }
+        if ($hit.length) { try { $hit[0].focus({ preventScroll: true }); } catch (e) { $hit[0].focus(); } }
+    }
+    function xfCellsOf(tr) { return $(tr).children('td[data-col]'); }
+    function xfIsKey(e, names) { return names.indexOf(e.key) > -1; }
+    $(document).on('keydown', '#dashMain .dash-tile-table tbody tr, #dashMain .dash-tile-table td[data-col]', function (e) {
+        if (e.target !== this || editMode || e.ctrlKey || e.metaKey || e.altKey) { return; }
+        var isRow = this.tagName === 'TR';
+        var tr = isRow ? this : $(this).closest('tr')[0];
+        var $cells = xfCellsOf(tr), i = isRow ? -1 : $cells.index(this);
+        var to = null;
+        if (xfIsKey(e, ['Enter', ' ', 'Spacebar'])) {
+            e.preventDefault();
+            e.stopPropagation();
+            var td = isRow ? $cells[0] : this;
+            if (td) { xfByCell(td); }
+            return;
+        }
+        if (xfIsKey(e, ['ArrowRight', 'Right'])) { to = isRow ? $cells[0] : $cells[i + 1]; }
+        else if (xfIsKey(e, ['ArrowLeft', 'Left'])) { to = isRow ? null : (i > 0 ? $cells[i - 1] : tr); }
+        else if (!isRow && xfIsKey(e, ['Escape', 'Esc'])) { to = tr; }
+        else if (!isRow && xfIsKey(e, ['ArrowDown', 'Down', 'ArrowUp', 'Up'])) {
+            var $rows = $(tr).parent().children('tr'), r = $rows.index(tr) + (/Down/.test(e.key) ? 1 : -1);
+            var col = String($(this).attr('data-col'));
+            to = (r >= 0 && r < $rows.length) ? xfCellsOf($rows[r]).filter(function () { return String($(this).attr('data-col')) === col; })[0] || null : null;
+        }
+        else { return; }
+        e.preventDefault();
+        if (to) { try { to.focus({ preventScroll: false }); } catch (e2) { to.focus(); } }
+    });
+    // The hint shows while a row or cell of that table has focus.
+    $(document).on('focusin', '#dashMain .dash-tile-table tbody tr, #dashMain .dash-tile-table td[data-col]', function () {
+        if (editMode) { return; }
+        $(this).closest('.dash-tile-body').find('.dash-table-kbdhint').prop('hidden', false);
+    });
+    $(document).on('focusout', '#dashMain .dash-tile-table .dash-table-wrap', function (e) {
+        var $b = $(this).closest('.dash-tile-body');
+        if (e.relatedTarget && $b[0] && $b[0].contains(e.relatedTarget) && $(e.relatedTarget).closest('tbody').length) { return; }
+        $b.find('.dash-table-kbdhint').prop('hidden', true);
+    });
+    // Chart tiles: the menu of the chart's values.
+    function xfChartItems(tile) {
+        var ch = chartInstances[tile.id], items = [], seen = {};
+        if (!ch || !ch.data || !tile.groupBy) { return items; }
+        function add(col, v) {
+            if (v == null) { return; }
+            v = String(v).trim();
+            if (!v || v === '(blank)' || v === '(other)') { return; }
+            var k = col + '\u0000' + v;
+            if (seen[k]) { return; }
+            seen[k] = 1;
+            items.push({ col: col, value: v });
+        }
+        (ch.data.labels || []).forEach(function (l) { add(tile.groupBy, l); });
+        if (tile.splitBy) { (ch.data.datasets || []).forEach(function (d) { add(tile.splitBy, d && d.label); }); }
+        return items;
+    }
+    function xfCloseMenu(focusBtn) {
+        var m = document.getElementById('dashXfMenu');
+        if (!m) { return; }
+        var btn = m.__pnbXfBtn;
+        if (m.contains(document.activeElement)) { focusBtn = true; }   // never drop focus to the page
+        if (m.parentNode) { m.parentNode.removeChild(m); }
+        if (btn) { btn.setAttribute('aria-expanded', 'false'); if (focusBtn && document.documentElement.contains(btn)) { btn.focus(); } }
+    }
+    function xfOpenMenu(btn) {
+        xfCloseMenu(false);
+        var $tile = $(btn).closest('.dash-tile'), i = tileIndexById($tile.attr('data-tile-id'));
+        var tile = i > -1 ? DASH.tiles[i] : null;
+        if (!tile || editMode) { return; }
+        var items = xfChartItems(tile);
+        var lbl = tileLabel(tile) || 'chart';
+        var m = document.createElement('div');
+        m.id = 'dashXfMenu';
+        m.className = 'dash-xf-menu';
+        m.setAttribute('role', 'menu');
+        m.setAttribute('aria-label', 'Filter the dashboard by a value in ' + lbl);
+        var r = btn.getBoundingClientRect();
+        // Layout inline (fixed to the button; the tile clips its overflow); colours are theme tokens.
+        m.style.cssText = 'position:fixed; z-index:10050; top:' + Math.round(r.bottom + 2) + 'px; right:' + Math.max(4, Math.round(document.documentElement.clientWidth - r.right)) + 'px;'
+            + ' max-height:' + Math.max(120, Math.round(window.innerHeight - r.bottom - 12)) + 'px; overflow:auto; min-width:160px; max-width:min(360px, calc(100vw - 16px));'
+            + ' padding:4px; background:var(--bg-surface); color:var(--text-main); border:1px solid var(--border-strong, var(--border-color)); border-radius:6px; box-shadow:0 4px 14px rgba(0,0,0,0.18);';
+        var html = '';
+        if (!items.length) {
+            html = '<div class="dash-xf-empty" style="padding:4px 6px; font-size:11px; color:var(--text-muted);">No values to filter by.</div>';
+        }
+        items.forEach(function (it, k) {
+            var on = xfIsOn(it.col, it.value);
+            html += '<button type="button" class="dash-xf-item" role="menuitemcheckbox" aria-checked="' + (on ? 'true' : 'false') + '"'
+                  + ' tabindex="' + (k === 0 ? '0' : '-1') + '" data-k="' + k + '"'
+                  + ' style="display:block; width:100%; text-align:left; font:inherit; font-size:11px; padding:3px 6px; margin:0; border:0; border-radius:3px; background:transparent; color:inherit; cursor:pointer;">'
+                  + '<span aria-hidden="true">' + (on ? '&#10003; ' : '') + '</span>'
+                  + (tile.splitBy ? escapeHtml(it.col) + ': ' : '') + escapeHtml(it.value) + '</button>';
+        });
+        m.innerHTML = html;
+        m.__pnbXfItems = items;
+        m.__pnbXfBtn = btn;
+        m.__pnbXfTile = tile;
+        document.body.appendChild(m);
+        btn.setAttribute('aria-expanded', 'true');
+        var first = m.querySelector('.dash-xf-item');
+        if (first) { first.focus(); }
+        else { btn.focus(); }
+    }
+    $(document).on('click', '#dashMain .dash-xf-btn', function (e) {
+        e.preventDefault();
+        if (document.getElementById('dashXfMenu') && document.getElementById('dashXfMenu').__pnbXfBtn === this) { xfCloseMenu(true); return; }
+        xfOpenMenu(this);
+    });
+    $(document).on('click', '#dashXfMenu .dash-xf-item', function (e) {
+        e.preventDefault();
+        var m = document.getElementById('dashXfMenu'), it = m && m.__pnbXfItems && m.__pnbXfItems[+$(this).attr('data-k')];
+        if (!it) { return; }
+        var wasOn = xfIsOn(it.col, it.value);
+        xfCloseMenu(true);
+        if (crossFilter(it.col, it.value)) { xfAnnounce(it.col, it.value, wasOn); }
+    });
+    // Capture phase on the window: the shared menu controller (penumbra_a11y.js)
+    // would otherwise remove the node on Escape itself and leave the button's
+    // aria-expanded at true. Arrow keys stay with that controller.
+    window.addEventListener('keydown', function (e) {
+        var m = document.getElementById('dashXfMenu');
+        if (!m || !m.contains(e.target)) { return; }
+        if (e.key === 'Escape' || e.key === 'Esc') { e.preventDefault(); e.stopPropagation(); xfCloseMenu(true); }
+        else if (e.key === 'Tab') { e.preventDefault(); xfCloseMenu(true); }
+    }, true);
+    $(document).on('mousedown', function (e) {
+        var m = document.getElementById('dashXfMenu');
+        if (m && !m.contains(e.target) && !$(e.target).closest('.dash-xf-btn').length) { xfCloseMenu(false); }
+    });
+    $(window).on('resize', function () { xfCloseMenu(false); });
+    document.addEventListener('scroll', function (e) {
+        var m = document.getElementById('dashXfMenu');
+        if (m && !(e.target && e.target.nodeType === 1 && m.contains(e.target))) { xfCloseMenu(false); }
+    }, true);
     $(document).on('click', '#dashMain .dash-controls .pnb-fs-chip', function (e) {
         e.preventDefault();
         var c = controlsTileOf(this), spec = c && controlsSpec(c.tile);
@@ -2240,6 +2420,14 @@
                 '<button type="button" class="dash-tt-btn" data-act="dupe" data-idx="' + idx + '" title="Duplicate tile" aria-label="Duplicate tile">&#10697;</button>' +
                 '<button type="button" class="dash-tt-btn dash-tt-danger" data-act="remove" data-idx="' + idx + '" title="Remove tile" aria-label="Remove tile">&#10005;</button>' +
                 '</span>';
+        } else if (false) {
+            // The keyboard way to a chart's cross-filter (WCAG 2.1.1, 2026-10-15):
+            // a menu of its values. In .dash-tile-tools so print hides it too.
+            editBar =
+                '<span class="dash-tile-tools">' +
+                '<button type="button" class="dash-tt-btn dash-xf-btn" aria-haspopup="menu" aria-expanded="false"' +
+                ' title="Filter the dashboard by a value in this chart" aria-label="Filter the dashboard by a value in ' + escapeHtml(label) + '">Filter</button>' +
+                '</span>';
         }
         var openLink = '';
         if (tile.type !== 'note' && tile.report) {
@@ -2592,8 +2780,9 @@
             // Stat / chart / table bodies are the engine's renderers (the same
             // markup an infobox tile shows). Chart instances stay tracked here so
             // re-renders and kiosk swaps can destroy them.
-            var res = T.renderInto($body, tile, { rows: rows, totalRows: totalRows, chartHooks: (tile.type === 'chart') ? chartCrossFilterHooks(tile) : null });
-            if (res.error) { renderTileError($tile, res.error); return; }
+            var res = T.renderInto($body, tile, { rows: rows, totalRows: totalRows, chartHooks: (tile.type === 'chart') ? chartCrossFilterHooks(tile) : null, cellFilter: tile.type === 'table' });
+            if (res.error) { renderTileError($tile, res.error); xfRestoreFocus($tile, tile); return; }
+            xfRestoreFocus($tile, tile);
             if (tile.type === 'chart') {
                 if (chartInstances[tile.id]) { try { chartInstances[tile.id].destroy(); } catch (e) {} }
                 chartInstances[tile.id] = res.chart;
@@ -2603,6 +2792,7 @@
         }).catch(function (entry) {
             if (_rGen !== _dashGen || _tileRenderTok[tile.id] !== _tok) { return; }
             tileFailed($tile, (entry && entry.error) || 'Could not load data.');
+            xfRestoreFocus($tile, tile);
         });
     }
 

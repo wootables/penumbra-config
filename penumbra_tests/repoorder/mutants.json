@@ -1,5 +1,31 @@
 {
- "js_datesort": {
+ "js_tagfocus_back": {
+  "why": "2026-10-15 WCAG 2.4.3: Cancel / Escape redraw the pane and leave focus on <body> again",
+  "file": "js",
+  "edits": [
+   [
+    "function back() { renderServerReportDetails(report); _repoFocusTagPencil(report, true); }",
+    "function back() { renderServerReportDetails(report); }"
+   ]
+  ],
+  "must": [
+   "K-cancel",
+   "K-escape"
+  ]
+ },
+ "js_tagfocus_save": {
+  "why": "2026-10-15 WCAG 2.4.3: a Save redraws the pane and leaves focus on <body> again",
+  "file": "js",
+  "edits": [
+   [
+    "                _repoFocusTagPencil(report, false);",
+    ""
+   ]
+  ],
+  "must": [
+   "K-save"
+  ]
+ }, "js_datesort": {
   "why": "the opening list re-sorted by Last Updated again (skipSort dropped from the list loader) = the old look",
   "file": "js",
   "edits": [

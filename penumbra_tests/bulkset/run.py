@@ -88,6 +88,15 @@ MUTANTS = {
                    ['B12', 'B13']),
     'noreplaceword': ([("            if (m === 'replace' && $.trim($r.find('.pbs-replace-word').val()) !== 'REPLACE') {", "            if (false) {")],
                       ['D6']),
+    # --- WCAG names 2026-10-15: each fix reverted must go red ---
+    'modekeyname': ([("'\" aria-labelledby=\"' + labelId(name) + '\"' +", "'\" aria-label=\"' + esc(name) + ' change\"' +")],
+                    ['D22']),
+    'novaluename': ([("var h = '<select class=\"' + cls + '\"' + (name ? ' aria-label=\"' + esc(name) + '\"' : '') + '>';", "var h = '<select class=\"' + cls + '\">';")],
+                    ['D23', 'D24']),
+    'curpwunlinked': ([('autocomplete="off" aria-labelledby="pbsLbl-curpw" aria-describedby="pbsHint-curpw" placeholder', 'autocomplete="off" placeholder')],
+                      ['D23', 'D24']),
+    'pwplaceholder': ([('autocomplete="new-password" aria-label="Confirm new password" placeholder', 'autocomplete="new-password" placeholder')],
+                      ['D23', 'D24']),
 }
 
 args = sys.argv[1:]
