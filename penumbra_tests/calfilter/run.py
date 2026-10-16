@@ -114,13 +114,29 @@ MUTANTS = {
     'rangefocus': ("            if (!keyedChange()) fromIn.focus();", "            fromIn.focus();", ['SB4']),
     'actlabel':  ('            <label for="fActions">Activity</label>', '            <label>Activity</label>', ['SB6']),
     'grouplbl':  ('" role="group" aria-labelledby="fgVisLbl">', '">', ['SB6']),
-    'pickgo':    ("        dEl.value = dSel.value;", "        dEl.value = '';", ['HP1']),
+    # Day and Hour in the sidebar (2026-10-15)
+    'pickany':   ("                    <option value=\"\"<?php echo $dowParam === '' ? ' selected' : ''; ?>>Any day</option>\n", "", ['HP1']),
+    'whenmanual':("                <select name=\"dow\" id=\"fDow\" aria-label=\"Day\">", "                <select name=\"dow\" id=\"fDow\" aria-label=\"Day\" data-manual>", ['HP2']),
+    'whennoname':("                <select name=\"hour\" id=\"fHour\" aria-label=\"Hour\">", "                <select name=\"hour\" id=\"fHour\">", ['HP1']),    'heatscope': ("    $run, \"1=1 $timeFilter $whenFilter $actionFilter $sysSql $trendExclSql $userFilter $reportFilter\",", "    $run, \"1=1 $timeFilter $actionFilter $sysSql $trendExclSql $userFilter $reportFilter\",", ['HM1']),
     'activedesc': ("            input.setAttribute('aria-activedescendant', items[active].el.id);\n", "", ['CB1']),
     'nomatchsay': ("                say('No matches with recorded activity');", "", ['CB2']),
     'pauseink':  ("background:var(--accent-danger, #dc3545); color:var(--bg-surface);", "background:var(--accent-danger, #dc3545); color:var(--on-brand, #fff);", ['I6']),
     'dowhide':   ("            hd.setAttribute('aria-hidden', 'true');\n            GRID.appendChild(hd);", "            GRID.appendChild(hd);", ['KB5']),
     'emptyhide': ("                cell.setAttribute('aria-hidden', 'true');   // see the column heads above\n", "", ['KB5']),
     'todaylbl':  ("(isToday ? 'Today, ' : '') + ", "", ['KB5']),
+    # WCAG Moderate fixes (2026-10-15): see mo_checks()
+    'mopaused':  ("    .cal-ev.paused { border-left-style: dotted; color: var(--text-muted); font-style: italic; background: transparent; }", "    .cal-ev.paused { opacity: 0.55; border-left-style: dotted; }", ['MO1']),
+    'mochipfade':("    .cal-type-chip:not(.on) { color: var(--text-muted); text-decoration: line-through;", "    .cal-type-chip:not(.on) { opacity: 0.55; text-decoration: line-through;", ['MO1']),
+    'mootherfade':("    .cal-cell.other-month, .cal-cell.other-month.no-runs:hover { background: var(--bg-surface-alt); }", "    .cal-cell.other-month { opacity: 0.45; }", ['MO1']),
+    'motypeletter':("        chip.appendChild(ty); chip.appendChild(tm); chip.appendChild(lb);", "        chip.appendChild(tm); chip.appendChild(lb);", ['MO2']),
+    'mopausedname':("scheduled task' + (nTasks === 1 ? '' : 's') + calPausedNote(evs) + '. Open", "scheduled task' + (nTasks === 1 ? '' : 's') + '. Open", ['MO2']),
+    'mocaltag':  ("color: color-mix(in srgb, var(--cal-ev-color, var(--brand-primary)) var(--an-badge-hue), var(--an-badge-ink)); }   /* ink-mixed like .act.*", "color: var(--cal-ev-color, var(--brand-primary)); }   /* ink-mixed like .act.*", ['MO3']),
+    'mopausedrow':("    .cal-day-ev.paused { border-left-style: dotted; background: transparent; }", "    .cal-day-ev.paused { opacity: 0.6; border-left-style: dotted; }", ['MO3']),
+    'moownerfocus':("setOwner(t.owner); calFocusOwner(); });", "setOwner(t.owner); });", ['MO4']),
+    'moxfocus':  ("setOwner(''); if (searchEl) searchEl.focus(); });", "setOwner(''); });", ['MO4']),
+    'moshownlive':("    function applyFilters() { rerender(); syncBar(); calAnnounceShown(); }", "    function applyFilters() { rerender(); syncBar(); }", ['MO5']),
+    'mobrand':   (".cal-more { font-size: 10px; color: var(--brand-text, var(--brand-primary));", ".cal-more { font-size: 10px; color: var(--brand-primary);", ['MO6']),
+    'moslow':    ("<?php if ($hClass): ?> <span class=\"heavy-tag\">(slow)</span><?php endif; ?>", "", ['MO7']),
 }
 
 R = []
@@ -247,7 +263,8 @@ $chips[] = array('k' => 'excl_automation', 'label' => 'Hiding', 'value' => 'auto
 ?>'''
 
 SHELL_HEAD = '''<!doctype html><html><head><meta charset="utf-8"><title>calfilter</title><style>
-:root { --bg-surface:#fff; --bg-surface-alt:#f3f3f3; --border-color:#ccc; --text-main:#222; --text-muted:#777; --brand-primary:#336699; --an-danger:#c00; }
+:root { --bg-surface:#fff; --bg-surface-alt:#f3f3f3; --border-color:#ccc; --text-main:#222; --text-muted:#777; --brand-primary:#336699; --an-danger:#c00; --an-badge-ink:#000; --an-badge-hue:40%; }
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }   /* main.css's */
 body { font-family: sans-serif; margin: 16px; }
 button { padding: 8px 15px; font-size: 12px; margin-top: 5px; border-radius: 10px; }
 input[type="text"], input[type="search"] { border: 1px solid #888; }   /* main.css's text-field rule */
@@ -330,12 +347,16 @@ def stage_side(run, text):
     clickf = cut(text, '/* ===================== Click-to-filter (page-local)', '// The per-table reveal', 'click-to-filter')
     ac = cut(text, '/* ========================= Sidebar autocomplete', '})();\n</script>', 'autocomplete') + '})();'
     apply_bar = lift_opt(text, '        <div class="an-apply" id="anApplyBar" hidden>', '        <?php /* The page-local theme picker')
-    picker = lift_opt(text, '                        <div class="hm-pick"', '                    <?php endif; ?>')
+    # Day and Hour (2026-10-15): a sidebar group under Date Range. Before it, dow /
+    # hour were hidden fields (the fallback below, which is what a control renders).
+    when = lift_opt(text, '        <div class="filter-group<?php echo ($dowParam !== \'\' || $hourParam !== \'\') ? \' on\' : \'\'; ?>" role="group" aria-label="Day and hour">',
+                    '\n        <div class="filter-group<?php echo $cmpOn')
+    hidden_when = '' if when else '<input type="hidden" name="dow" id="fDow" value=""><input type="hidden" name="hour" id="fHour" value="">\n'
     tpl = ("<?php $dowParam = ''; $hourParam = ''; ?>"
            '<!doctype html><html><head><meta charset="utf-8"><title>side</title></head><body>\n'
            '<form class="console-shell" method="get" action="analytics_all.php"><input type="hidden" name="filter_submitted" value="1">\n'
-           '<input type="hidden" name="dow" id="fDow" value=""><input type="hidden" name="hour" id="fHour" value="">\n'
-           '<aside class="sidebar">\n'
+           + hidden_when +
+           '<aside class="sidebar">\n' + when + '\n'
            '<label for="fRange">Date Range</label><select name="range" id="fRange" data-manual><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option><option value="all">All time</option><option value="custom">Custom range...</option></select>\n'
            '<div class="custom-range" id="customRange" hidden><input type="date" id="fFrom" name="from" data-manual><input type="date" id="fTo" name="to" data-manual>'
            '<div class="cr-quick"><button type="button" class="cr-q" data-from="2026-01-01" data-to="2026-01-31">January</button></div></div>\n'
@@ -343,7 +364,7 @@ def stage_side(run, text):
            '<label for="fUser">User</label><div class="ac-wrap"><input type="text" id="fUser" name="user" value="" data-applied="" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="fUserMenu">'
            '<button type="button" class="ac-clear" data-for="fUser" aria-label="Clear the user filter" hidden>&times;</button><div class="ac-menu" id="fUserMenu" role="listbox" aria-label="Matching users"></div></div>\n'
            '<label><input type="checkbox" name="excl_admins" value="1"> Hide admin activity</label>\n'
-           + apply_bar + '\n</aside>\n<main>\n' + picker + '\n<button type="button" id="elsewhere">elsewhere</button></main></form>\n'
+           + apply_bar + '\n</aside>\n<main>\n<button type="button" id="elsewhere">elsewhere</button></main></form>\n'
            "<script>window.__navs = []; document.querySelector('form.console-shell').addEventListener('submit', function (e) { e.preventDefault(); window.__navs.push('native submit'); });</script>\n"
            '<script>(function () {\n' + sub + '\n})();</script>\n<script>\n' + clickf + '\n</script>\n<script>\n' + ac + '\n</script>\n</body></html>\n')
     tpl_path = os.path.join(run, 'side.php')
@@ -866,7 +887,86 @@ def checks(br, text):
     more = pg.ev("(document.querySelector('.cal-cell.today .cal-more')||{}).textContent || ''")
     rec('M2', 'Email back on: 3 chips + "+1 more" (MAX_CHIPS unchanged)', len(cls) == 3 and more == '+1 more', 'cls=%s more=%r' % (cls, more))
     pg.ev("localStorage.clear()")
+    mo_checks(br, text)
     side_checks(br, text)
+
+# ---- WCAG Moderate fixes on the calendar (2026-10-15) ----
+# MO1 nothing is dimmed with opacity (paused chips, other-month days, a switched-off type
+# chip, paused day rows) - dotted / italic / muted ink instead (1.4.3); MO2 a month chip
+# carries its type as a letter and "paused" as a word, a day button names its paused tasks
+# (1.4.1); MO3 a day-view type tag is ink-mixed, >= 4.5:1 on its own tint (1.4.3); MO4 focus
+# follows "by X" to the Owner chip's x, and the x hands it to the search box (2.4.3); MO5 the
+# "N shown" count is said by a polite status once the filters settle (4.1.3); MO6/MO7 text:
+# no bare --brand-primary text, the status inks, "(slow)" spelled out (1.4.3 / 1.4.1).
+# CONTROL: --stage <the pre-fix analytics_all.php> -> MO1..MO7 red.
+CONTRAST_JS = r'''(function(sel){
+  function rgba(s){ var m=s.match(/[\d.]+(e-?\d+)?/g)||[0,0,0,0]; var k=/^color\(srgb/.test(s)?1:255;   // color-mix() computes to color(srgb r g b / a), 0..1
+    return [+m[0]/k,+m[1]/k,+m[2]/k,m.length>3?+m[3]:1]; }
+  function lin(c){ return c<=0.04045?c/12.92:Math.pow((c+0.055)/1.055,2.4); }
+  function L(c){ return 0.2126*lin(c[0])+0.7152*lin(c[1])+0.0722*lin(c[2]); }
+  var el=document.querySelector(sel); if(!el) return null;
+  var layers=[], n=el; while(n && n.nodeType===1){ layers.push(rgba(getComputedStyle(n).backgroundColor)); n=n.parentElement; }
+  var bg=[1,1,1]; for(var i=layers.length-1;i>=0;i--){ var a=layers[i][3]; bg=[0,1,2].map(function(k){return layers[i][k]*a+bg[k]*(1-a);}); }
+  var fg=rgba(getComputedStyle(el).color), la=L(fg), lb=L(bg);
+  return {color:getComputedStyle(el).color, ratio:(Math.max(la,lb)+0.05)/(Math.min(la,lb)+0.05)};
+})(%s)'''
+
+def mo_checks(br, text):
+    pg = br.pg
+    br.load('cal.html')
+    pg.click_sel('#calHidePaused')   # paused tasks shown too
+    st = pg.ev("""(function(){var p=document.querySelector('#calMonthView .cal-ev.paused'), o=document.querySelector('#calMonthView .cal-cell.other-month');
+        if(!p||!o) return null; var ps=getComputedStyle(p), os=getComputedStyle(o);
+        return {p:ps.opacity, pb:ps.borderLeftStyle, pi:ps.fontStyle, o:os.opacity};})()""")
+    pg.click_sel('.cal-type-chip[data-cal-type="EMAIL"]')
+    off = pg.ev("(function(){var b=document.querySelector('.cal-type-chip[data-cal-type=\"EMAIL\"]'), s=getComputedStyle(b); return {o:s.opacity, c:s.color, on:b.classList.contains('on')};})()")
+    pg.click_sel('.cal-type-chip[data-cal-type="EMAIL"]')
+    rec('MO1', 'no opacity dimming: a paused chip is opacity 1 + dotted edge + italic, an other-month day is opacity 1, a switched-off type chip is opacity 1 in muted ink',
+        bool(st) and st['p'] == '1' and st['pb'] == 'dotted' and st['pi'] == 'italic' and st['o'] == '1'
+        and bool(off) and not off['on'] and off['o'] == '1' and off['c'] == 'rgb(119, 119, 119)',
+        'month=%s chipOff=%s' % (st, off))
+    chips = pg.ev("""Array.from(document.querySelectorAll('#calMonthView .cal-ev')).map(function(e){
+        var ty=e.querySelector('.cal-ev-type'), f=e.querySelector('.cal-ev-flag');
+        return e.className.match(/cal-type-\\w+/)[0].replace('cal-type-','') + ':' + (ty?ty.textContent:'') + ':' + (e.classList.contains('paused')?'P':'A') + ':' + (f?f.textContent:'');})""") or []
+    want = {'email': 'E', 'snapshot': 'S', 'drop_file': 'F', 'db_dump': 'D'}
+    bad = [c for c in chips if c.split(':')[1] != want.get(c.split(':')[0]) or (c.split(':')[2] == 'P') != (c.split(':')[3] == 'paused')]
+    name = pg.ev("(document.querySelector('#calMonthView .cal-cell.today')||{getAttribute:function(){return ''}}).getAttribute('aria-label')") or ''
+    rec('MO2', 'month chips: every chip shows its type letter (E/S/F/D, the filter chips\' initials), paused chips (and only they) say "paused"; the day button names its paused count',
+        len(chips) > 0 and not bad and any(c.endswith(':P:paused') for c in chips) and ', 2 paused.' in name,
+        'chips=%d bad=%s name=%r' % (len(chips), bad[:4], name))
+    open_today(pg)
+    tag = pg.ev(CONTRAST_JS % json.dumps('#calDayView .cal-day-ev.cal-type-db_dump .cal-tag.cal-type-db_dump'))
+    prow = pg.ev("(function(){var p=document.querySelector('#calDayView .cal-day-ev.paused'); return p ? [getComputedStyle(p).opacity, getComputedStyle(p).borderLeftStyle, getComputedStyle(p.querySelector('.cal-de-title')).color] : null;})()")
+    rec('MO3', 'day view: the DB dump type tag is ink-mixed (not the raw amber) at >= 4.5:1 on its tint; a paused row is opacity 1, dotted, muted title',
+        bool(tag) and tag['color'] != 'rgb(245, 158, 11)' and tag['ratio'] >= 4.5 and bool(prow) and prow[0] == '1' and prow[1] == 'dotted' and prow[2] == 'rgb(119, 119, 119)',
+        'tag=%s pausedRow=%s' % (tag, prow))
+    pg.ev("(function(){var r=Array.from(document.querySelectorAll('#calDayView .cal-day-ev')).filter(function(e){return e.querySelector('.cal-de-title').textContent==='Beta Snapshot';})[0]; if(r) r.setAttribute('data-mo','1');})()")
+    pg.click_sel('#calDayView [data-mo] .cal-de-owner')
+    f1 = pg.ev("(function(){var a=document.activeElement; return a ? {x: a.matches('#calOwnerChip .chip-x'), label: a.getAttribute('aria-label')||''} : null;})()")
+    pg.key('Enter', 13); time.sleep(0.3)
+    f2 = pg.ev("(document.activeElement||{}).id || ''")
+    gone = pg.ev("!document.getElementById('calOwnerChip')")
+    rec('MO4', 'focus follows "by asmith" to the new Owner chip\'s x (named with the owner); Enter on it lifts the filter and focus lands on the search box',
+        bool(f1) and f1['x'] and 'asmith' in f1['label'] and gone and f2 == 'calSearch', 'after by=%s after x=%r gone=%s' % (f1, f2, gone))
+    live0 = pg.ev("(function(){var l=document.getElementById('calShownLive'); return l ? [l.getAttribute('role'), l.textContent] : null;})()")
+    pg.click_sel('.cal-type-chip[data-cal-type="EMAIL"]')
+    early = pg.ev("(document.getElementById('calShownLive')||{}).textContent || ''")
+    time.sleep(1.0)
+    live1 = pg.ev("(document.getElementById('calShownLive')||{}).textContent || ''")
+    pg.click_sel('.cal-type-chip[data-cal-type="EMAIL"]')
+    rec('MO5', 'a polite status says the filtered count once the filters settle ("4 of 6 tasks shown" with Email off, paused shown); it waits rather than speaking per change',
+        bool(live0) and live0[0] == 'status' and live1 == '4 of 6 tasks shown' and early != '4 of 6 tasks shown',
+        'live0=%s early=%r settled=%r' % (live0, early, live1))
+    import re as _re
+    bare = [m.group(0) for m in _re.finditer(r'(?:^|[^-\w])color:\s*var\(--brand-primary\)', text, _re.M)]
+    rec('MO6', 'text: no bare var(--brand-primary) as a text colour anywhere in the page; the status inks are ink-mixed tokens (.delta up/down, .kpi.warn)',
+        not bare and '.kpi .d .delta.up   { color: var(--an-ok-text); }' in text and '.kpi.warn .v { color: var(--an-danger-text); }' in text
+        and '--an-ok-text: color-mix(in srgb, var(--an-ok) var(--an-badge-hue), var(--an-badge-ink))' in text,
+        'bare=%d' % len(bare))
+    rec('MO7', 'text: "slow to display" is spelled out beside the count, which keeps its own sort / CSV key',
+        '<span class="heavy-tag">(slow)</span>' in text and 'data-sort="<?php echo (int)$h[\'cells\']; ?>" data-csv="<?php echo (int)$h[\'cells\']; ?>"' in text,
+        'tag=%s' % ('heavy-tag' in text))
+    pg.ev("localStorage.clear()")
 
 # ---- WCAG Serious fixes on the Platform Metrics sidebar (2026-10-15) ----
 def load_side(br):
@@ -933,20 +1033,41 @@ def side_checks(br, text):
     orphans = _re.findall(r'<label>(Activity|Compare|Visibility)</label>', text)
     rec('SB6', 'Activity select is labelled (for/id); Compare and Visibility are role=group named by their heading; no orphan <label> left (WCAG 1.3.1 / 4.1.2)',
         act and bool(vis) and bool(cmpg) and not orphans, 'act=%s vis=%s cmp=%s orphans=%s' % (act, bool(vis), bool(cmpg), orphans))
-    # H1 the heatmap's keyboard picker (WCAG 2.1.1)
+    import re as _re
+    def _q(n): return n[0] if n and len(n) == 1 else ''
+    # HP1 Day and Hour live in the SIDEBAR (2026-10-15, the user: "shouldn't day and hour
+    # filters be put in the date filter area"): a named group of two labelled, named
+    # selects, "Any" first and selected by default; the picker under the heatmap is gone.
     load_side(br)
-    hp = pg.ev("(function(){var d=document.getElementById('hmPickDow'), h=document.getElementById('hmPickHour'), g=document.getElementById('hmPickGo'); return (d&&h&&g) ? {dl:d.labels.length, hl:h.labels.length, n:h.options.length, tag:g.tagName} : null;})()")
-    if hp:
-        pg.ev("document.getElementById('hmPickHour').focus()"); pg.key('ArrowDown', 40); time.sleep(0.2)
-        n_arrow = pg.ev(NAVS)
-        pg.ev("document.getElementById('hmPickDow').value='WED'; document.getElementById('hmPickHour').value='14'; document.getElementById('hmPickGo').focus()")
-        pg.key('Enter', 13); time.sleep(0.25)
-        n_go = pg.ev(NAVS)
-    else:
-        n_arrow = n_go = None
-    rec('HP1', 'heatmap picker: labelled weekday + hour selects (24 hours) and a Filter button; arrowing does not reload; Enter on Filter scopes the page to dow=WED&hour=14',
-        bool(hp) and hp['dl'] == 1 and hp['hl'] == 1 and hp['n'] == 24 and hp['tag'] == 'BUTTON' and n_arrow == [] and n_go and len(n_go) == 1 and 'dow=WED' in n_go[0] and 'hour=14' in n_go[0],
-        'picker=%s arrow=%s go=%s' % (hp, n_arrow, n_go))
+    hp = pg.ev("(function(){var d=document.getElementById('fDow'), h=document.getElementById('fHour'); if(!d||!h||d.tagName!=='SELECT'||h.tagName!=='SELECT') return null;"
+               " var g=d.closest('[role=group]'), lb=g&&g.getAttribute('aria-labelledby')&&document.getElementById(g.getAttribute('aria-labelledby'));"
+               " return {inSide:!!d.closest('aside.sidebar')&&!!h.closest('aside.sidebar'), names:[d.name,h.name], an:[d.getAttribute('aria-label'),h.getAttribute('aria-label')], vis:d.labels.length+h.labels.length, oneRow:d.parentElement===h.parentElement, nd:d.options.length, nh:h.options.length,"
+               " first:[d.options[0].value, d.options[0].text, h.options[0].value, h.options[0].text], vals:[d.value,h.value], group:g?(g.getAttribute('aria-label')||''):'', heading:!!lb};})()")
+    # 2026-10-15 (the user): one line, no visible per-select labels - "Any day" / "Any hour"
+    # say what each is; each select is still NAMED for AT (aria-label "Day" / "Hour").
+    rec('HP1', 'Day and Hour is a sidebar group ("Day and Hour"): two selects on ONE row named dow / hour, no visible labels but aria-label Day / Hour, "Any day" / "Any hour" first and the default (Any + 7 days, Any + 24 hours); no picker under the heatmap',
+        bool(hp) and hp['inSide'] and hp['names'] == ['dow', 'hour'] and hp['an'] == ['Day', 'Hour'] and hp['vis'] == 0 and hp['oneRow'] and hp['nd'] == 8 and hp['nh'] == 25
+        and hp['first'] == ['', 'Any day', '', 'Any hour'] and hp['vals'] == ['', ''] and hp['group'] == 'Day and hour' and not hp['heading'] and 'hmPickGo' not in text,
+        'side=%s picker-left=%s' % (hp, 'hmPickGo' in text))
+    # HP2 either alone filters, like any sidebar filter: a mouse pick applies at once; a
+    # keyboard change waits for Enter (3.2.2)
+    load_side(br)
+    pg.ev("document.dispatchEvent(new MouseEvent('mousedown', {bubbles:true})); var d=document.getElementById('fDow'); if(d){ d.value='WED'; d.dispatchEvent(new Event('change', {bubbles:true})); }"); time.sleep(0.25)
+    n_dow = pg.ev(NAVS)
+    load_side(br)
+    pg.ev("document.getElementById('fHour') && document.getElementById('fHour').focus()")
+    pg.key('ArrowDown', 40); time.sleep(0.25)
+    n_hr_wait = pg.ev(NAVS)
+    pg.key('Enter', 13); time.sleep(0.25)
+    n_hr = pg.ev(NAVS)
+    rec('HP2', 'a weekday alone filters (dow=WED, no hour) on a mouse pick; an hour alone by keyboard waits on ArrowDown and applies on Enter (hour=0, no weekday)',
+        'dow=WED' in _q(n_dow) and not _re.search(r'hour=\d', _q(n_dow))
+        and n_hr_wait == [] and _re.search(r'hour=0', _q(n_hr)) and not _re.search(r'dow=[A-Z]', _q(n_hr)),
+        'dow=%s hr_wait=%s hr=%s' % (n_dow, n_hr_wait, n_hr))
+    # HM1 the heatmap honours the weekday/hour scope (static: the query's WHERE carries $whenFilter)
+    heat_call = text[text.find('list($heatRows, $heatTotal) = penumbra_an_heatmap('):][:200]
+    rec('HM1', 'the Activity heatmap query applies the weekday/hour scope ($whenFilter), so the filter filters the heatmap too',
+        '$whenFilter' in heat_call, heat_call[:160])
     # C1 / C2 the User autocomplete as an ARIA combobox (WCAG 4.1.2)
     load_side(br)
     pg.ev("document.getElementById('fUser').focus()"); pg.call('Input.insertText', text='jd')

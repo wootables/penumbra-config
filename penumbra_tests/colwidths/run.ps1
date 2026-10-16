@@ -246,6 +246,11 @@ $mutantDefs = [ordered]@{
   'mlabelgroup' = @{ file = 'module'; edits = @(,@("        else if (c.value === 'group') { note = ' (' + c.n + ' columns)'; }", "")); red = @('M2') }
   'mminvalue'   = @{ file = 'main'; edits = @(,@("            const lo = (name.indexOf('PIVOT:=') === 0 || name.indexOf('PIVOT:TOTAL=') === 0) ? PENUMBRA_COLW_MIN_VALUE : PENUMBRA_COLW_MIN;", "            const lo = PENUMBRA_COLW_MIN;")); red = @('M3','M12') }
   'mhostmin'    = @{ file = 'main'; edits = @(,@("        minValue: PENUMBRA_COLW_MIN_VALUE,", "")); red = @('M') }
+  # 2026-10-15 moderate (WCAG 4.1.2 / 3.3.2) - the + - 0 keys named on the headers (K5, V0b, E0b)
+  'keysflat'    = @{ file = 'module'; edits = @(,@(('        syncNote();' + $LF + '        stampFlatKeys();'), '        syncNote();')); red = @('K5') }
+  'keysfocus'   = @{ file = 'module'; edits = @(,@("        document.addEventListener('focusin', function (e) { var c = colOf(e.target); if (c && c.th === e.target) { stampKeys(c.th); } }, true);", "")); red = @('V0b') }
+  'keysdrill'   = @{ file = 'module'; edits = @(,@(("                stampKeys(row.cells[i]);" + $LF), "")); red = @('E0b') }
+  'keysattr'    = @{ file = 'module'; edits = @(,@("        if (th.getAttribute('aria-keyshortcuts') !== 'Plus - 0') { th.setAttribute('aria-keyshortcuts', 'Plus - 0'); }", "")); red = @('K5','V0b','E0b') }
 }
 
 function Apply-Mutant([string]$name) {

@@ -170,6 +170,17 @@ until(function () { return booted('e1') && stat('d1') !== '' && tile('d2').find(
   ok('nothing pressed on an empty filter', tile('c1').find('.pnb-fs-chip[aria-pressed="true"]').length === 0);
   ok('labels=left shows the group labels (computed: static)', $s.hasClass('labels-left') && cs(tile('c1').find('.pnb-fs-name')).position === 'static', cs(tile('c1').find('.pnb-fs-name')).position);
   ok('the exclude group says so', tile('c1').find('.pnb-fs-group[data-fs-col="STATUS"]').attr('data-fs-mode') === 'ex' && tile('c1').find('.pnb-fs-group[data-fs-col="STATUS"] .pnb-fs-not').length === 1);
+  // WCAG 1.3.1 (2026-10-15): each field's chips are a group named by the field,
+  // so a chip announces "College group, Eng, pressed" - not a bare "Eng".
+  (function () {
+    var names = tile('c1').find('.pnb-fs-group').map(function () {
+      var id = this.getAttribute('aria-labelledby') || '', lab = id ? document.getElementById(id) : null;
+      return (this.getAttribute('role') || '-') + '|' + (lab && this.contains(lab) && lab.classList.contains('pnb-fs-name') ? lab.textContent : '-');
+    }).get();
+    eq('each chip group is role=group, labelled by its own field name (an exclude field: "is not")', names, ['group|College', 'group|Status is not']);
+    var ids = $('[id^="pnbFsName"]').map(function () { return this.id; }).get();
+    ok('the field-name ids are unique on the page', ids.length >= 2 && ids.filter(function (x, i) { return ids.indexOf(x) !== i; }).length === 0, JSON.stringify(ids));
+  })();
   ok('a switch is drawn, OFF, with its label', sw('c1', 0).length === 1 && swOn('c1', 0) === '0' && sw('c1', 0).attr('aria-checked') === 'false' && sw('c1', 0).find('.pnb-toggle-label').text() === 'Big only');
   ok('the switch wears the report pill (computed: 40px wide)', cs(sw('c1', 0).find('.sp-switch')).width === '40px', cs(sw('c1', 0).find('.sp-switch')).width);
   ok('a chip is a pill under the dark theme button rules (computed: 999px radius)', cs(chip('c1', 'COLLEGE', 'Eng')).borderTopLeftRadius === '999px', cs(chip('c1', 'COLLEGE', 'Eng')).borderTopLeftRadius);

@@ -83,7 +83,8 @@ CHK = {
                'stripes', 'foldArrow', 'keysPass', 'enterSelects', 'backToLeaf', 'stripesBack', 'exitClean',
                'ptotal', 'ptAligned', 'ptPinned', 'ptNotTable', 'ptGone', 'boxKeep',   # gltot
                'hScroll', 'farCols',   # glhs
-               'iconsInCells'],   # glsweep: sort icons and grips stay in their header cell
+               'iconsInCells',   # glsweep: sort icons and grips stay in their header cell
+               'ariaOwns', 'ptNames', 'ownsGone'],   # moderate (2026-10-15): WCAG 1.3.1 for a merged branch
     'nmergejs': ['clickSelects', 'headStays'],
     # glmerge: with a branch selected the PDF and the exports are Stacked's with that branch open
     # (glmail, 2026-10-14: the email is not - it carries the branch as one card, see nmail)
@@ -508,6 +509,13 @@ MUTANTS = {
     # Reset clears the field but leaves the radio on List
     'noresetpaint': ([('main', "        $('#groupLayout').val('stacked');\r\n        _groupLayoutPaint();   // grplist3\r\n", "        $('#groupLayout').val('stacked');\r\n")],
                      ['L-radio-resetRepaints'], ['radio']),
+    # moderate (2026-10-15, WCAG 1.3.1): the first table no longer owns the later tables' rows
+    'a11yowns': ([('mod', "        ownMerged(mTables);\n", "")], ['L-nmerge-ariaOwns'], ['nmerge']),
+    # ... leaves its aria-owns behind when the branch is left
+    'a11yownsleft': ([('mod', "        if (ownsHost && (ownsHost !== host0 || !want)) { ownsHost.removeAttribute('aria-owns'); ownsHost = null; }\n", "")],
+                     ['L-nmerge-ownsGone'], ['nmerge']),
+    # the total's cells lose their column names
+    'a11yptname': ([('mod', "                cell.setAttribute('aria-label', colName);\n", "")], ['L-nmerge-ptNames'], ['nmerge']),
 }
 
 args = sys.argv[1:]

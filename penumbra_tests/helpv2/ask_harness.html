@@ -1,0 +1,109 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Ask harness</title>
+<!-- ask_harness.html - the Ask page's client (js/penumbra_help_ask.js) in headless Edge against a stubbed
+     help_ask.php: $.ajax is replaced before the module loads, so every request is answered from canned JSON
+     and recorded. The page body is the Ask fragment as the loader emits it (ask_harness.ps1 renders it in),
+     plus the hub's search box and empty-search element. Results land in the pre element with id out, as JSON (T1..T6). -->
+<script src="jquery-3.7.1.min.js"></script>
+<script>
+  // ---- the stub endpoint: records calls, answers like help_ask.php would
+  var calls = [];
+  var cardsPayload = { status: 'success', cards: [
+      { id: 'abcdefabcdef', q: 'How do I schedule an email?', a: 'Open the **Scheduler** tab. [Scheduler]', sources: [{ id: 'schedulerHelpLightbox', title: 'Scheduler' }], up: 2, down: 0, score: 2, asked: 5, mine: null, created: 1 },
+      { id: '123456789abc', q: 'How do I download?', a: 'Use `download=csv`. [Download]', sources: [{ id: 'downloadHelpLightbox', title: 'Download' }], up: 1, down: 0, score: 1, asked: 2, mine: null, created: 2 }
+    ], limits: { per_minute: 5, per_day: 300, max_question: 500 }, audience: 'viewer' };
+  var askPayload = { status: 'success', cached: false, model: true,
+      answer: 'Open the **Scheduler** tab, then:\n- set the cron to `0 8 * * 1`\n- add the recipients\nSee [Scheduler] and [Dynamic Values]. <img src=x onerror="window.__xss=1"> <b>not bold</b>',
+      sources: [{ id: 'schedulerHelpLightbox', title: 'Scheduler' }, { id: 'schedulerPromptHelpLightbox', title: 'Dynamic Values' }],
+      card: { id: 'fedcbafedcba', q: 'How do I schedule an email report every Monday?', up: 0, down: 0, score: 0, asked: 1, mine: null }, notice: 'This requires editor rights to the report. Ask your report owner to set that up for you.' };
+  var failNext = null;   // {status, message} -> the next POST rejects
+  function deferredReply(payload) { var d = $.Deferred(); setTimeout(function () { d.resolve(payload); }, 0); return d.promise(); }
+  function deferredFail(status, message) {
+    var d = $.Deferred(); var xhr = { status: status, responseJSON: { status: 'error', message: message }, responseText: JSON.stringify({ status: 'error', message: message }) };
+    setTimeout(function () { d.reject(xhr); }, 0); return d.promise();
+  }
+  $.ajax = function (opts) {
+    var body = null; try { body = opts.data ? JSON.parse(opts.data) : null; } catch (e) { body = null; }
+    calls.push({ url: opts.url, method: opts.method, body: body });
+    if (failNext) { var f = failNext; failNext = null; return deferredFail(f.status, f.message); }
+    if (opts.method === 'GET') return deferredReply(cardsPayload);
+    if (body && body.action === 'ask') return deferredReply(askPayload);
+    if (body && body.action === 'vote') return deferredReply({ status: 'success', card: { id: body.id, up: body.v === 'up' ? 1 : 0, down: body.v === 'down' ? 1 : 0, score: body.v === 'up' ? 1 : (body.v === 'down' ? -1 : 0), asked: 1, mine: body.v === 'none' ? null : body.v } });
+    return deferredReply({ status: 'error', message: 'unexpected' });
+  };
+  var activateCalls = [];
+  window.activateHelpTopic = function (id, jumpTo) { activateCalls.push(id); };
+</script>
+</head>
+<body>
+<div id="helpCenterLightbox"><div class="help-center-shell">
+  <aside><input type="text" id="helpCenterSearch"><button type="button" id="helpCenterSearchClear">x</button>
+    <nav id="helpCenterToc"><button type="button" class="help-toc-item" data-topic="askHelpLightbox">Ask a question</button></nav>
+    <div id="helpCenterNoResults" style="display:none;">No topics match your search.</div>
+  </aside>
+  <div id="helpCenterContent">
+<!--FRAGMENT-->
+  </div>
+</div></div>
+<pre id="out"></pre>
+<script>
+(function () {
+  var results = {};
+  function record(name, ok, detail) { results[name] = (ok ? 'PASS ' : 'FAIL ') + detail; }
+  function step(fn) { return new Promise(function (resolve) { setTimeout(function () { try { fn(); } catch (e) { results['EXC'] = 'FAIL ' + String(e && e.stack || e); } resolve(); }, 30); }); }
+  var p = Promise.resolve();
+  // T1 ask -> rendered as text + markdown-lite, no markup from the answer executes or survives
+  p = p.then(function () { return step(function () { $('#pnbAskQ').val('How do I schedule an email report every Monday?'); $('#pnbAskForm').trigger('submit'); }); })
+       .then(function () { return step(function () {
+          var html = $('#pnbAskBody').html(); var text = $('#pnbAskBody').text();
+          window.__noticeAfterAsk = { shown: $('#pnbAskNotice').is(':visible'), text: $('#pnbAskNotice').text() };
+          var askCalls = calls.filter(function (c) { return c.body && c.body.action === 'ask'; });
+          record('T1 ask renders text only', askCalls.length === 1 && askCalls[0].body.q.indexOf('schedule') >= 0 && $('#pnbAskBody img').length === 0 && !window.__xss
+              && text.indexOf('<img src=x') >= 0 && text.indexOf('<b>not bold</b>') >= 0 && $('#pnbAskBody b').length === 0 && $('#pnbAskAnswer').is(':visible'),
+              'ask POSTs=' + askCalls.length + ' img=' + $('#pnbAskBody img').length + ' xss=' + String(!!window.__xss) + ' text=' + JSON.stringify(text.slice(0, 90)));
+          record('T2 markdown-lite', $('#pnbAskBody strong').length === 1 && $('#pnbAskBody code').length === 1 && $('#pnbAskBody li').length === 2
+              && $('#pnbAskBody a.pnb-ask-source[data-topic="schedulerHelpLightbox"]').length === 1 && $('#pnbAskBody a.pnb-ask-source[data-topic="schedulerPromptHelpLightbox"]').length === 1
+              && $('#pnbAskSources a').length === 2,
+              'strong=' + $('#pnbAskBody strong').length + ' code=' + $('#pnbAskBody code').length + ' li=' + $('#pnbAskBody li').length + ' links=' + $('#pnbAskBody a.pnb-ask-source').length + ' sources=' + $('#pnbAskSources a').length);
+       }); })
+  // T3 vote: one POST, counts from the reply, the button marked as mine
+       .then(function () { return step(function () { $('#pnbAskAnswer .pnb-ask-vote[data-v="up"]').trigger('click'); }); })
+       .then(function () { return step(function () {
+          var v = calls.filter(function (c) { return c.body && c.body.action === 'vote'; });
+          record('T3 vote', v.length === 1 && v[0].body.id === 'fedcbafedcba' && v[0].body.v === 'up' && $('#pnbAskAnswer .pnb-ask-up').text() === '1' && $('#pnbAskAnswer .pnb-ask-vote[data-v="up"]').hasClass('is-mine'),
+              'vote POSTs=' + v.length + ' up=' + $('#pnbAskAnswer .pnb-ask-up').text());
+       }); })
+  // T4 cards: a click shows the card's answer without an ask POST, and a source link activates its topic
+       .then(function () { return step(function () { window.__pnbHelpAskApi.loadCards(true); }); })
+       .then(function () { return step(function () { $('.pnb-ask-card[data-id="123456789abc"]').trigger('click'); }); })
+       .then(function () { return step(function () {
+          var asks = calls.filter(function (c) { return c.body && c.body.action === 'ask'; }).length;
+          $('#pnbAskSources a.pnb-ask-source').first().trigger('click');
+          record('T7 editor-rights notice', !!(window.__noticeAfterAsk && window.__noticeAfterAsk.shown && window.__noticeAfterAsk.text.indexOf('report owner') >= 0) && !$('#pnbAskNotice').is(':visible'),
+              'afterAsk=' + JSON.stringify(window.__noticeAfterAsk) + ' afterCardWithoutNotice=' + $('#pnbAskNotice').is(':visible'));
+          record('T4 cards', $('.pnb-ask-card').length === 2 && asks === 1 && $('#pnbAskBody code').text() === 'download=csv' && $('#pnbAskEcho').text() === 'How do I download?'
+              && activateCalls.length === 1 && activateCalls[0] === 'downloadHelpLightbox' && $('#pnbAskLimitText').text().indexOf('5 new questions') === 0,
+              'cards=' + $('.pnb-ask-card').length + ' asks=' + asks + ' code=' + $('#pnbAskBody code').text() + ' activate=' + JSON.stringify(activateCalls) + ' limits=' + JSON.stringify($('#pnbAskLimitText').text().slice(0, 40)));
+       }); })
+  // T5 an empty search offers to ask the help the same words
+       .then(function () { return step(function () { $('#helpCenterSearch').val('frobnicate'); $('#helpCenterNoResults').css('display', 'block'); }); })
+       .then(function () { return step(function () { $('#pnbAskFromSearch').trigger('click'); }); })
+       .then(function () { return step(function () {
+          var asks = calls.filter(function (c) { return c.body && c.body.action === 'ask'; });
+          record('T5 empty search asks', $('#pnbAskFromSearch').length === 1 && asks.length === 2 && asks[1].body.q === 'frobnicate' && activateCalls.indexOf('askHelpLightbox') >= 0 && $('#pnbAskQ').val() === 'frobnicate',
+              'button=' + $('#pnbAskFromSearch').length + ' asks=' + asks.length + ' last=' + JSON.stringify(asks.length ? asks[asks.length - 1].body.q : null) + ' activate=' + JSON.stringify(activateCalls));
+       }); })
+  // T6 a 429 shows the server's message and the form is usable again
+       .then(function () { return step(function () { failNext = { status: 429, message: 'Ask takes up to 5 new questions a minute per person. Try again in 20 seconds.' }; $('#pnbAskQ').val('another question here'); $('#pnbAskForm').trigger('submit'); }); })
+       .then(function () { return step(function () {
+          record('T6 error shown', $('#pnbAskStatus').text().indexOf('Try again in 20 seconds') >= 0 && !$('#pnbAskGo').prop('disabled'),
+              'status=' + JSON.stringify($('#pnbAskStatus').text()) + ' disabled=' + $('#pnbAskGo').prop('disabled'));
+       }); })
+       .then(function () { document.getElementById('out').textContent = JSON.stringify(results, null, 1); document.title = 'HARNESS-DONE'; });
+})();
+</script>
+</body>
+</html>

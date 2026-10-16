@@ -80,6 +80,11 @@
       R.chk.rows = bodyTrs() === 303;
       var t = scratchTrs();
       R.chk.tinted = t.length === 3 && t[0].cells[0].textContent === '301' && t[2].cells[0].textContent === '303' && !rowByNum(300).classList.contains('pnb-scratch-row');
+      // (2026-10-15, WCAG 1.3.1) a hidden, TEXTLESS name in a pasted row's first cell; a report row has none
+      var sm = t.length === 3 ? t[0].cells[0].querySelector('.pnb-scratch-sr') : null;
+      R.chk.srMark = !!sm && sm.getAttribute('role') === 'img' && sm.getAttribute('aria-label') === 'pasted row' && sm.textContent === '' &&
+        t[0].cells[0].textContent === '301' && !rowByNum(300).querySelector('.pnb-scratch-sr') &&
+        Array.prototype.every.call(t, function (tr) { return tr.cells[0].querySelectorAll('.pnb-scratch-sr').length === 1; });
       var D = window.__HC_DATA || [];
       R.chk.values = D.length === 303 && D[300].V_ID === 'P-1' && D[300].V_NAME === 'Pasted One' && D[300].V_STATUS === '' && D[0].V_ID === 'ID-1001';
       R.chk.number = D.length === 303 && D[300].H_AMT === '1234.50' && D[301].H_AMT === '-12' && D[302].H_AMT === 'n/a';
@@ -160,6 +165,10 @@
       rb.click(); qb.click(); await sleep(50);
       R.chk.rowCtl = fired.rowBtn === 0 && /A pasted row is not in the database/.test(toast());
       R.chk.realRowOk = fired.realBtn === 1;
+      // (2026-10-15, WCAG 4.1.2) the blocked control - added AFTER the render, as journal toggles are - is announced disabled
+      await until(function () { return rb.getAttribute('aria-disabled') === 'true'; }, 1500);
+      R.chk.ariaDisabled = rb.getAttribute('aria-disabled') === 'true' && !qb.hasAttribute('aria-disabled');
+      R.info.ariaDis = [rb.getAttribute('aria-disabled'), qb.getAttribute('aria-disabled')];
       // taken out: everything works again
       $1('body').click(); await sleep(150);
       var rm = await cardButton('.pnb-scratch-remove');
@@ -289,6 +298,15 @@
       R.chk.rowEdge = !!tr && /North/.test(tr.getAttribute('data-pivot-row')) && document.querySelectorAll('#pivotResultTable tr[data-pnb-scratch]').length === 1;
       var foot = document.querySelectorAll('#pivotResultTable tfoot td[data-pnb-scratch]');
       R.chk.footMarked = foot.length >= 1 && Array.prototype.every.call(foot, function (td) { return td.getAttribute('data-col-key') === 'Open'; });
+      // (2026-10-15, WCAG 1.3.1) every marked cell - values and the footer - carries ONE hidden, textless name; no other cell does
+      var allMarked = document.querySelectorAll('#pivotResultTable td[data-pnb-scratch]');
+      var labelled = document.querySelectorAll('#pivotResultTable td .pnb-scratch-sr');
+      R.chk.cellLabel = allMarked.length >= 2 && labelled.length === allMarked.length &&
+        Array.prototype.every.call(allMarked, function (td) {
+          var m = td.querySelectorAll('.pnb-scratch-sr');
+          return m.length === 1 && m[0].getAttribute('role') === 'img' && m[0].getAttribute('aria-label') === 'includes pasted rows' && m[0].textContent === '';
+        });
+      R.info.labelled = [allMarked.length, labelled.length];
       R.info.marked = marked.map(function (td) { return td.getAttribute('data-row-key') + ' / ' + td.getAttribute('data-col-key'); });
       R.info.foot = foot.length;
       // taken out: the pivot is clean again

@@ -37,6 +37,9 @@
   var RED = !!window.__HOST_REDUCED;     // host reduced motion: CSS has no transitions to assert
 
   function J(x) { return JSON.stringify(x); }
+  // (2026-10-15) every announcement #pnbLoadStatus makes, in order
+  var SAY = [];
+  (function () { var el = document.getElementById('pnbLoadStatus'); if (el) new MutationObserver(function () { var x = el.textContent; if (x) SAY.push(x); }).observe(el, { childList: true, characterData: true, subtree: true }); })();
   function sw() { return document.querySelector('#reportSnippetOutput .pnb-layout-switch'); }
   function opts(s) { return (s || sw()).querySelectorAll('.pnb-ls-opt'); }
   function sel(s) { s = s || sw(); return s ? s.getAttribute('data-ls-selected') : 'NO SWITCH'; }
@@ -171,6 +174,9 @@
     rec('M5 clicks and arrow keys are dropped while the change is running (no second change starts, focus stays with the thumb)',
       m5 && m5.to === 1 && ev.defaultPrevented && sel() === '1' && document.activeElement === focusBefore && focusBefore === opts()[1],
       state() + ' prevented=' + ev.defaultPrevented + ' focusMoved=' + (document.activeElement !== focusBefore) + ' focusOnPos1=' + (focusBefore === opts()[1]));
+    await sleep(120);
+    rec('M5b a press dropped mid-change is SAID (#pnbLoadStatus: Still loading), not silent (WCAG 2.1.1 / 4.1.3, 2026-10-15)',
+      SAY.indexOf('Still loading. Try again in a moment.') !== -1, J(SAY));
     await idle();
     var s7 = sw();
     rec('M6 after the load: grouped by DEPT (the dropped click did NOT run), overlay gone and unscoped',
@@ -181,6 +187,9 @@
       state(s7));
     rec('M8 a snippet that reads data(group) is still re-rendered when the grouping is up',
       $('#viewState').text() === 'GROUPED', 'viewState=' + $('#viewState').text());
+    for (var sw9 = 0; sw9 < 75 && SAY[SAY.length - 1] !== 'Loaded'; sw9++) await sleep(20);
+    rec('M6b the end of the load is said (#pnbLoadStatus: Loaded, after the busy notice) (WCAG 4.1.3, 2026-10-15)',
+      SAY[SAY.length - 1] === 'Loaded' && SAY.lastIndexOf('Loaded') > SAY.indexOf('Still loading. Try again in a moment.'), J(SAY));
 
     // R - a re-render IN THE MIDDLE of the slide resumes it instead of snapping.
     var r0 = sw();

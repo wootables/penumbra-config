@@ -23,11 +23,11 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js']
 SCN = ['add', 'rerun', 'remove', 'more', 'guard', 'nomatch', 'xss', 'adminview', 'stale', 'drop', 'dropadmin', 'gview', 'pview']
 CHK = {
-    'add': ['cardButton', 'dialog', 'plan', 'goLabel', 'noRequery', 'rows', 'tinted', 'values', 'number', 'cellText', 'stamp', 'cardSection', 'filename'],
+    'add': ['cardButton', 'dialog', 'plan', 'goLabel', 'noRequery', 'rows', 'tinted', 'values', 'number', 'cellText', 'stamp', 'cardSection', 'filename', 'srMark'],
     'rerun': ['requeried', 'dropped', 'stampGone', 'fnameBack', 'offer', 'readded', 'readdNoQuery'],
     'remove': ['removed', 'noRequery', 'noOffer', 'stampGone'],
     'more': ['five', 'stamp5'],
-    'guard': ['emailBlocked', 'snapBlocked', 'rowCtl', 'realRowOk', 'afterRemove'],
+    'guard': ['emailBlocked', 'snapBlocked', 'rowCtl', 'realRowOk', 'afterRemove', 'ariaDisabled'],
     'nomatch': ['refused', 'oneLine', 'blankRows', 'escCloses'],
     'xss': ['noScript', 'noHtml', 'noJson'],
     'adminview': ['offered', 'nextLabel', 'planShown', 'added'],
@@ -35,7 +35,7 @@ CHK = {
     'drop': ['overlaySays', 'preview', 'noImport', 'added'],
     'dropadmin': ['overlayImport', 'imported'],
     'gview': ['rowsTinted', 'headerMarked', 'otherClean'],
-    'pview': ['cellMarked', 'otherClean', 'rowEdge', 'footMarked', 'cleanAfterRemove'],
+    'pview': ['cellMarked', 'otherClean', 'rowEdge', 'footMarked', 'cleanAfterRemove', 'cellLabel'],
 }
 MUTANTS = {
     'noreplay': ([('main', "        if (!fresh || !last || last.key !== _pnbScratchKey(post)) return $.ajax;\r\n", "        return $.ajax;\r\n")],
@@ -82,6 +82,10 @@ MUTANTS = {
     'noviewradio': ([('main', "            (_pnbScratchCanAdd() ? '<label style=\"display:flex; gap:8px; align-items:center; margin-top:8px;\"><input type=\"radio\" name=\"pnbPasteMode\" value=\"view\">",
                       "            (false ? '<label style=\"display:flex; gap:8px; align-items:center; margin-top:8px;\"><input type=\"radio\" name=\"pnbPasteMode\" value=\"view\">")],
                     ['L-adminview-offered'], ['adminview']),
+    # WCAG Moderate fixes (2026-10-15): the hidden names and aria-disabled
+    'nosrmark': ([('main', "                            if (rowIndex >= _pnbScratchFrom) tdRowNum.appendChild(_pnbScratchMark('pasted row'));\r\n", "")], ['L-add-srMark'], ['add']),
+    'nopvlabel': ([('main', "        if (_pnbScratchPv.any) html = _pnbScratchPvLabel(html);\r\n", "")], ['L-pview-cellLabel'], ['pview']),
+    'noinert': ([('main', "            if (_pnbScratch && !_pnbScratchInertT) _pnbScratchInertT = setTimeout(_pnbScratchInert, 60);\r\n", "")], ['L-guard-ariaDisabled'], ['guard']),
 }
 
 args = sys.argv[1:]

@@ -210,6 +210,24 @@
     R.chk.ptPinned = !!pr && c.scrollHeight > c.clientHeight + 40 && Math.abs(pr.bottom - cb) <= 1.5;
     R.chk.ptNotTable = t0.querySelectorAll('table').length === leavesOf(t0).length && !!pt && pt.querySelectorAll('table, tfoot, td, tr').length === 0;
     R.info.pt = { expect: expect, got: got, col: colId, mis: pmis.slice(0, 5), bottom: pr && pr.bottom, boxBottom: cb };
+    // WCAG 1.3.1 (2026-10-15, moderate): the later tables' headers are collapsed (out of the
+    // accessibility tree), so the first table OWNS every later table's row groups - a screen
+    // reader reads one table under the one header - and each total cell is a group named by
+    // its column's heading
+    var tbls0 = lv.map(function (w) { return w.querySelector(':scope > .group-content > table'); });
+    var wantOwn = []; tbls0.slice(1).forEach(function (t) { Array.prototype.forEach.call(t.querySelectorAll(':scope > tbody'), function (b) { wantOwn.push(b); }); });
+    var ownIds = String(tbls0[0].getAttribute('aria-owns') || '').split(/\s+/).filter(Boolean);
+    R.chk.ariaOwns = wantOwn.length >= 1 && ownIds.length === wantOwn.length && ownIds.every(function (id, i) { return document.getElementById(id) === wantOwn[i]; })
+      && tbls0.slice(1).every(function (t) { return !t.hasAttribute('aria-owns'); });
+    var hl = function (th) { return String(th.textContent || '').replace(/[\u25B2\u25BC\u2B06\u2B07\u2191\u2193]/g, '').replace(/\s+/g, ' ').trim(); };
+    var nmBad = [], nmN = 0;
+    cells.forEach(function (cl, i) {
+      if (!String(cl.textContent || '').trim()) { return; }
+      nmN++;
+      if (cl.getAttribute('role') !== 'group' || !ths[i] || cl.getAttribute('aria-label') !== hl(ths[i])) { nmBad.push(i + ':' + cl.getAttribute('aria-label')); }
+    });
+    R.chk.ptNames = nmN >= 2 && nmBad.length === 0;
+    R.info.a11y = { own: ownIds.length, want: wantOwn.length, named: nmN, bad: nmBad.slice(0, 4) };
     // its arrow only folds it: the selection stays
     itemOf(p0).querySelector('.pnb-gl-twisty').click(); await frames(3);
     R.chk.foldArrow = itemOf(p0).getAttribute('aria-expanded') === 'false' && selected() === t0;
@@ -223,6 +241,7 @@
     window.Penumbra.groupList.select(leaf0.getAttribute('data-group-path')); await frames(4);
     var openNow = leavesOf(t0).map(function (w) { return w.classList.contains('open'); });
     R.chk.ptGone = !document.querySelector('#groupedResultsContainer .pnb-gl-ptotal');
+    R.chk.ownsGone = !document.querySelector('#groupedResultsContainer table[aria-owns]');   // moderate 2026-10-15
     R.chk.backToLeaf = selected() === leaf0 && !document.querySelector('#groupedResultsContainer .pnb-gl-merge')
       && openNow.every(function (o, i) { return o === wasOpen[i] || leavesOf(t0)[i] === leaf0; });
     R.chk.stripesBack = leavesOf(t0).concat(leavesOf(t1)).every(function (w) { var tr = w.querySelector(':scope > .group-content > table > tbody > tr'); return !tr || zebraOf(tr) === 'l'; });

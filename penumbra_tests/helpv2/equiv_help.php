@@ -212,6 +212,12 @@ function hv_ids($html) { $ids = array(); if (preg_match_all('/\sid="([^"]+)"/', 
  */
 function hv_fact_tokens($html) {
     $html = hv_html_only($html);
+    // The scheduler topics print the live clock and live dates (date('g:i A'), SYSDATE rows); the v1 and v2
+    // renders are seconds apart, so a minute or day boundary would turn a live number into a "lost" token
+    // (it did once, 2026-10-15). Normalise them exactly as hv_normalise_lines does for the block comparison.
+    $html = preg_replace('/\b\d{1,2}:\d{2} [AP]M\b/', 'H:MM', $html);
+    $html = preg_replace('/\b\d{2}-[A-Z]{3}-\d{2}\b/', 'DD-MON-YY', $html);
+    $html = preg_replace('/\b(?:January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2}, \d{4}\b/', 'Month D, YYYY', $html);
     $toks = array();
     if (preg_match_all('/<(code|kbd)\b[^>]*>(.*?)<\/\1>/s', $html, $m)) {
         foreach ($m[2] as $x) {

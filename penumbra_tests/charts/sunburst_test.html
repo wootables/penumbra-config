@@ -114,6 +114,24 @@ try {
   ok('config: outer tooltip names group -> child, share of group and total', /Navy/.test(tipOuter[0]) && /Direct/.test(tipOuter[0]) && /of Navy/.test(tipOuter[1]) && /of the total/.test(tipOuter[1]), JSON.stringify(tipOuter));
   eq('config: inner datalabel = the group', cfg.options.plugins.datalabels.formatter(0, { dataset: cfg.data.datasets[1], dataIndex: 0 }), 'Navy');
   ok('config: a tiny slice gets no label', cfg.options.plugins.datalabels.display({ dataset: cfg.data.datasets[0], dataIndex: 5 }) === false);
+  // ---- inner-ring label ink (2026-10-15, WCAG 1.4.3): black or white per slice ----
+  (function () {
+    function rgbOf(s) { var m = String(s).match(/(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/); if (m) return [+m[1], +m[2], +m[3]];
+      var h = String(s).replace('#', ''); return [parseInt(h.substr(0, 2), 16), parseInt(h.substr(2, 2), 16), parseInt(h.substr(4, 2), 16)]; }
+    function lum(c) { return c.map(function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); })
+      .reduce(function (s, v, i) { return s + v * [0.2126, 0.7152, 0.0722][i]; }, 0); }
+    function ratio(a, b) { var x = lum(rgbOf(a)), y = lum(rgbOf(b)); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+    var DI = PC.buildSunburstData(rows(nGroups(10)), O({limit: 9999})); DI._fmt = null;
+    var ci = { type: 'doughnut', data: {}, options: { plugins: { datalabels: {} } }, plugins: [] };
+    PC.applySunburstChartConfig(ci, DI, { textColor: '#111', isDark: false, showValues: true });
+    var dl = ci.options.plugins.datalabels, inner = ci.data.datasets[1], bg = inner.backgroundColor;
+    var ink = bg.map(function (c, i) { return dl.color({ dataset: inner, dataIndex: i }); });
+    eq('ink: the yellow group slice (237,161,0) gets BLACK labels', ink[3], '#000000');
+    eq('ink: the dark violet slice (74,58,167) keeps WHITE labels', ink[6], '#ffffff');
+    var worst = bg.map(function (c, i) { return ratio(c, ink[i]); }).reduce(function (a, b) { return Math.min(a, b); }, 99);
+    ok('ink: every inner label reaches 4.5:1 on its own slice (incl. the grey Other)', worst >= 4.5, 'worst=' + worst.toFixed(2) + ' ink=' + JSON.stringify(ink));
+    eq('ink: the outer ring keeps the theme text colour', dl.color({ dataset: ci.data.datasets[0], dataIndex: 0 }), '#111');
+  })();
   var cfgNoVal = { options: { plugins: {} } };
   PC.applySunburstChartConfig(cfgNoVal, D, { showValues: false });
   ok('config: Values off = no labels', cfgNoVal.options.plugins.datalabels.display({ dataset: cfgNoVal.data.datasets[1], dataIndex: 0 }) === false);

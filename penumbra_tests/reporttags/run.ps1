@@ -24,7 +24,8 @@
 # side; the change summary naming "tags"; pins on Save As, the save endpoint's
 # narrow rule and create gate, and the delete / restore snapshots. Offline, php -n.
 #
-# EXPECTED TAIL: "PASS: N   FAIL: 0" then "RESULT: GREEN" (N = 442 as of 2026-10-09: section 23 + the named audit rows; sixty-eight mutants).
+# EXPECTED TAIL: "PASS: N   FAIL: 0" then "RESULT: GREEN" (N = 442 as of 2026-10-09: section 23 + the named audit rows; sixty-eight mutants;
+# 2026-10-15: section 24, the WCAG moderate fixes, +8 asserts and +8 mutants).
 #
 # UNC .ps1 files are GPO-blocked here ("not digitally signed") - run the body as
 # a scriptblock rather than with -File. Never add a bare `exit` for the same
@@ -220,7 +221,24 @@ $mutants = @(
     @{ File = 'ss'; Name = 'a Save As audit row stops naming the report (the Tags tool shows "tagged on save" and nothing else)';
        From = '"$t: tagged $label [Save As]"';   To = '"$t: tagged on save [Save As]"';   Expect = 1 },
     @{ File = 'ga';  Name = 'the validator gives an administrator grants (10-09: refused - they reach everything already)';
-       From = 'if (in_array(strtolower($uid), pnb_admin_ids(), true)) {';   To = 'if (false) {';   Expect = 3 }
+       From = 'if (in_array(strtolower($uid), pnb_admin_ids(), true)) {';   To = 'if (false) {';   Expect = 3 },
+    # section 24, WCAG moderate fixes (2026-10-15): one mutant per fix, each exactly one red
+    @{ File = 'pt'; Name = 'a pill box error is no longer an alert (written, never announced)';
+       From = "hint.setAttribute('role', 'alert');";   To = '';   Expect = 1 },
+    @{ File = 'pt'; Name = 'the New tag preview is not live (the will-be-saved-as line and its warning stay silent)';
+       From = '<div class="preview" id="newTagPreview" aria-live="polite">';   To = '<div class="preview" id="newTagPreview">';   Expect = 1 },
+    @{ File = 'pt'; Name = 'a failed New tag submit leaves focus on the button';
+       From = 'if (empty) empty.focus(); }';   To = '}';   Expect = 1 },
+    @{ File = 'pt'; Name = 'a tag-page list filter reports no count';
+       From = "fnote.setAttribute('role', 'status');";   To = '';   Expect = 1 },
+    @{ File = 'rep'; Name = 'a locked tag is opacity only again (no "(locked)" for a screen reader)';
+       From = '<span class="sr-only"> (locked)</span>';   To = '';   Expect = 1 },
+    @{ File = 'rep'; Name = 'the chooser grows a second reset button (Reset column widths) beside Reset to defaults again';
+       From = '<button type="button" id="repoColsReset" class="rc-reset">Reset to defaults</button>';   To = '<button type="button" id="repoColWidthsReset" class="rc-reset">Reset column widths</button><button type="button" id="repoColsReset" class="rc-reset">Reset to defaults</button>';   Expect = 1 },
+    @{ File = 'rcs'; Name = 'the pencils rest at .55 opacity again';
+       From = "    border-radius: 4px;`n}`n#serverReportDetailsPane .repo-owner-edit:hover";   To = "    border-radius: 4px;`n    opacity: 0.55;`n}`n#serverReportDetailsPane .repo-owner-edit:hover";   Expect = 1 },
+    @{ File = 'chr'; Name = 'the chrome bar is one live region round the popover again';
+       From = '<div id="pnbStatusBar" role="region" aria-label="Status bar">';   To = '<div id="pnbStatusBar" role="status" aria-label="Status bar">';   Expect = 1 }
 )
 $leaves = @{ lib = 'penumbra_report_tags.php'; dbc = 'db_connection.php'; ga = 'grants_admin.php'; pt = 'tags_admin.php'; ss = 'save_server_state.php'; del = 'delete_server_report.php'; res = 'restore_server_report.php'; idx = 'index.php'; mjs = 'main.js'; gsr = 'get_server_reports.php'; rep = 'penumbra_repository.js'; aa = 'analytics_all.php'; pin = 'pinned_reports.js'; chr = 'penumbra_admin_chrome.php'; mdb = 'manage_dashboard.php'; dsh = 'dashboard.php'; djs = 'penumbra_dashboard.js'; mrt = 'manage_report_tags.php'; mcs = 'main.css'; rcs = 'penumbra_repository.css'; lnd = 'landing.js' }
 $allGood = $true

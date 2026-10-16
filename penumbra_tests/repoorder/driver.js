@@ -15,6 +15,8 @@
  *   J-restore      clearing the search brings back the pre-search rows in order
  *   K-cancel / K-escape / K-save (2026-10-15, WCAG 2.4.3)  the details pane's inline tag editor
  *                  puts focus back on that report's Edit-tags pencil after its redraw
+ *   W-key / W-zero / W-reset (2026-10-15, WCAG 2.1.1)  column widths without a mouse: + / - on a focused
+ *                  header step its width, 0 drops it, the chooser's "Reset to defaults" clears them all (no second reset button)
  *   E-errors       no page errors anywhere
  */
 (function () {
@@ -135,6 +137,37 @@
         $('#reportFilterInput').val('').trigger('keyup');
         ok = await waitFor(function () { return domIds().length === WANT_MORE.length; });
         t('J-restore', ok && same(domIds(), WANT_MORE), (ok ? '' : 'TIMEOUT ') + 'got ' + show(domIds()));
+
+        // ---- W-*: column widths without a mouse (WCAG 2.1.1, 2026-10-15) ----
+        // A focused header takes the report grid's keys (+ / - step 20px, 0 drops its saved width);
+        // reset-all is the chooser's "Reset to defaults" (user 2026-10-15: no second reset button).
+        function savedWidths() { try { return (JSON.parse(localStorage.getItem('penumbra_repo_columns') || '{}') || {}).widths || {}; } catch (e) { return {}; } }
+        function key(el, k) { var ev = new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }); el.dispatchEvent(ev); return ev; }
+        var thT = $('#serverReportListTable thead th[data-colkey="TITLE"]')[0];
+        if (thT) {
+            thT.focus();
+            var w0 = thT.offsetWidth, ev1 = key(thT, '+'), w1 = savedWidths().TITLE;
+            var fixed = $('#serverReportListTable').hasClass('sr-colfixed');
+            key(thT, '-'); key(thT, '-');
+            var w2 = savedWidths().TITLE;
+            // w1 is the measured width + 20 (the measure can drift a few px from w0 between runs that share a
+            // browser profile, so it is held to +-10); the two presses of - then take exactly 40 off it.
+            t('W-key', ev1.defaultPrevented && typeof w1 === 'number' && Math.abs(w1 - (w0 + 20)) <= 10 && w2 === w1 - 40 && fixed && thT.style.width === w2 + 'px',
+              'w0=' + w0 + ' after + saved=' + w1 + ' after - - saved=' + w2 + ' style=' + thT.style.width + ' fixed=' + fixed + ' prevented=' + ev1.defaultPrevented);
+            key(thT, '0');
+            var sw = savedWidths();
+            t('W-zero', !Object.prototype.hasOwnProperty.call(sw, 'TITLE') && Object.keys(sw).length > 0, 'saved after 0: ' + JSON.stringify(sw));
+            key(thT, '+');   // a saved TITLE width again, so the reset has something to clear
+            $('#repoColsBtn').trigger('click');
+            await waitFor(function () { return $('#repoColsReset').length > 0; }, 3000);
+            var rb = $('#repoColsReset')[0], extra = $('#repoColWidthsReset').length;
+            if (rb) { rb.focus(); $(rb).trigger('click'); }
+            await waitFor(function () { return Object.keys(savedWidths()).length === 0; }, 3000);
+            var sw2 = savedWidths(), thT2 = $('#serverReportListTable thead th[data-colkey="TITLE"]')[0];
+            t('W-reset', !!rb && extra === 0 && Object.keys(sw2).length === 0 && !!thT2 && thT2.style.width === '' && !$('#serverReportListTable').hasClass('sr-colfixed'),
+              'button=' + !!rb + ' extra reset buttons=' + extra + ' saved after=' + JSON.stringify(sw2) + ' style="' + (thT2 ? thT2.style.width : 'no th') + '"');
+            if (!$('#repoColsPanel').attr('hidden')) { $('#repoColsBtn').trigger('click'); }
+        } else { t('W-key', false, 'no TITLE header'); t('W-zero', false, 'no TITLE header'); t('W-reset', false, 'no TITLE header'); }
 
         // ---- K-*: the details pane's inline tag editor hands focus back (WCAG 2.4.3, 2026-10-15) ----
         // Cancel, Escape and Save redraw the pane; focus must land on THAT report's Edit-tags pencil, not <body>.

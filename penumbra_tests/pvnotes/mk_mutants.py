@@ -365,6 +365,8 @@ M = {
     # the server: a chart thread's e-mails name no chart
     'cw4srvref': ('manage', [("    if ($scope === 'chart') return journalChartRefText($rowKey, $snapshot);", "    if (false) return journalChartRefText($rowKey, $snapshot);")], ['S-cw-ref']),
     # the server: add takes no chart scope (a pivot one still)
+    # (2026-10-15) the noted points are no longer put in words
+    'cnsrline': ('main', [('        try { _cnSrPaint(chart, cfg, want); } catch (eSr) { }' + CR, '')], ['V-ch-sr']),
     'cw4srvscope': ('manage', [("        $scope = ($scopeIn === 'row' || $scopeIn === 'pivot' || $scopeIn === 'chart') ? $scopeIn : 'report';", "        $scope = ($scopeIn === 'row' || $scopeIn === 'pivot') ? $scopeIn : 'report';")], ['S-cw-add']),
 }
 SCN = {'nhesc': ['nested'], 'nhdraft': ['nested'], 'nhmoved': ['nested'], 'nhunmove': ['nested'], 'nhontop': ['nested'],
@@ -392,7 +394,7 @@ SCN = {'nhesc': ['nested'], 'nhdraft': ['nested'], 'nhmoved': ['nested'], 'nhunm
        'cn2retry': ['chhidden'], 'cn2refind': ['ch2keep'], 'cn2slot': ['ch2keep'], 'cn2onecanvas': ['ch2keep'],
 'cnfooter': ['chbar', 'chpie'], 'cnmenu': ['chbar', 'chdrill'], 'cnbreak': ['chbar'], 'cnz': ['chbar', 'chsweep'], 'cnpath': ['chdrill'],
        'cnseries': ['chbar'], 'cnunknown': ['chblank'], 'cnambig': ['chblank'], 'cnother': ['chother'], 'cnrefresh': ['chbar'],
-       'cnclosepin': ['chbar'], 'cnactive': ['choff'], 'cnhost': ['chbar'], 'cntokcase': ['chpie'], 'cnlayerpos': ['chbar'],
+       'cnclosepin': ['chbar'], 'cnactive': ['choff'], 'cnhost': ['chbar'], 'cnsrline': ['chbar'], 'cntokcase': ['chpie'], 'cnlayerpos': ['chbar'],
        'sweepback': ['static7'], 'rcwide': ['rowcard'], 'rcclip': ['rowcard'], 'rcundrawn': ['rowcard', 'rowgrp'], 'rcnorowbox': ['rowcard'],
        'rcnoopen': ['rowcard'], 'rcnoreveal': ['rowcard'], 'rcgone': ['rowcard'], 'delbyval': ['server6'], 'delnochunk': ['server6'],
        'delparent': ['server6'], 'nobandpaint': ['bands'], 'bandgate': ['bands'], 'bandblank': ['bands'], 'bandfold': ['bands'], 'bandhost': ['bands'],

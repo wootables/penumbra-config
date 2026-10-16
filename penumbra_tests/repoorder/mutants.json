@@ -1,4 +1,44 @@
 {
+ "js_colw_keys": {
+  "why": "2026-10-15 WCAG 2.1.1: a focused header ignores + / - / 0 again (widths are mouse-only)",
+  "file": "js",
+  "edits": [
+   [
+    "        if (!key || (k !== '+' && k !== '=' && k !== '-' && k !== '_' && k !== '0')) { return; }",
+    "        if (true) { return; }"
+   ]
+  ],
+  "must": [
+   "W-key",
+   "W-zero"
+  ]
+ },
+ "js_colw_zero": {
+  "why": "2026-10-15 WCAG 2.1.1: 0 on a focused header no longer drops its saved width",
+  "file": "js",
+  "edits": [
+   [
+    "            delete saved[key];",
+    ""
+   ]
+  ],
+  "must": [
+   "W-zero"
+  ]
+ },
+ "js_colw_resetbtn": {
+  "why": "2026-10-15 user: a second reset button (Reset column widths) beside Reset to defaults again",
+  "file": "js",
+  "edits": [
+   [
+    "manageHtml + '<button type=\"button\" id=\"repoColsReset\"",
+    "manageHtml + '<button type=\"button\" id=\"repoColWidthsReset\" class=\"rc-reset\">Reset column widths</button><button type=\"button\" id=\"repoColsReset\""
+   ]
+  ],
+  "must": [
+   "W-reset"
+  ]
+ },
  "js_tagfocus_back": {
   "why": "2026-10-15 WCAG 2.4.3: Cancel / Escape redraw the pane and leave focus on <body> again",
   "file": "js",

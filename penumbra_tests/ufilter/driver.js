@@ -176,6 +176,24 @@
         return [isOpen() && !!b && document.activeElement === b, 'open=' + isOpen() + ' focus=' + focusName()];
       } finally { window.matchMedia = realMM; }
     });
+    // 2026-10-15 (WCAG 4.1.3): the filter's "N of M" lives in the box's own hidden
+    // role="status" span (#sbUserFilterCount, printed by the chrome helper), written
+    // while a filter is typed and emptied when it is not; the status bar itself is no
+    // longer the live region.
+    step('F20 a typed filter writes "N of M shown" into the hidden role=status count; an empty box empties it', function () {
+      var c = document.getElementById('sbUserFilterCount');
+      if (!c) { return [false, 'no #sbUserFilterCount']; }
+      type('alpha');
+      var total = $$('#sbReportsList .sb-recent-row').length + $$('#sbSnapPinsList .sb-recent-row').length;
+      var want = (vis('sbReportsList').length + vis('sbSnapPinsList').length) + ' of ' + total + ' shown';
+      var t1 = c.textContent;
+      type('zzz');
+      var t2 = c.textContent, want2 = '0 of ' + total + ' shown';
+      type('');
+      var t3 = c.textContent;
+      var ok = c.getAttribute('role') === 'status' && /\bsr-only\b/.test(c.className) && t1 === want && t2 === want2 && t3 === '';
+      return [ok, 'role=' + c.getAttribute('role') + ' class=' + c.className + ' alpha="' + t1 + '" (want "' + want + '") zzz="' + t2 + '" empty="' + t3 + '"'];
+    });
     rec('F19 no page errors', pageErrors.length === 0, pageErrors.join(' | '));
     finish();
   } catch (e) {

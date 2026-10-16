@@ -290,6 +290,34 @@ function grabVar(name) {
   ok('Z8 the Zoom out button returns to the whole map', !chart.$pnbMapView && !btnShown(chart));
   eq('Z8 ...and is not itself a chart click', HANDLED.length, 1);
 
+  // Focus when Zoom out hides itself (2026-10-15, WCAG 2.4.3): pressed from the
+  // keyboard, the button vanishes under the focus - focus goes to the chart's
+  // cog (main.js ensureChartSettingsCog puts it beside the canvas), else the canvas.
+  var hostZ = document.getElementById('host');
+  var cogZ = document.createElement('button'); cogZ.type = 'button'; cogZ.className = 'chart-settings-cog'; cogZ.textContent = 'cog';
+  hostZ.insertBefore(cogZ, chart.canvas);
+  await clickFeature(chart, W, '076');
+  btnOf(chart).focus();
+  ok('Z9 setup: zoomed, and Zoom out holds the focus', !!chart.$pnbMapView && document.activeElement === btnOf(chart));
+  btnOf(chart).click();
+  await frames(2);
+  ok('Z9 Zoom out from the keyboard hands focus to the chart cog, not the page', !chart.$pnbMapView && document.activeElement === cogZ,
+     'active=' + (document.activeElement ? document.activeElement.tagName + '.' + document.activeElement.className : '-'));
+  hostZ.removeChild(cogZ);
+  await clickFeature(chart, W, '076');
+  btnOf(chart).focus();
+  btnOf(chart).click();
+  await frames(2);
+  ok('Z10 with no cog, focus lands on the canvas', document.activeElement === chart.canvas,
+     'active=' + (document.activeElement ? document.activeElement.tagName + '#' + document.activeElement.id : '-'));
+  var elsewhere = document.createElement('input'); document.body.appendChild(elsewhere);
+  await clickFeature(chart, W, '076');
+  elsewhere.focus();
+  await clickPx(chart, oceanPx(chart, W) || { x: 1, y: 1 });
+  ok('Z11 a zoom-out the button did not have focus for leaves focus where it was', !chart.$pnbMapView && document.activeElement === elsewhere);
+  document.body.removeChild(elsewhere);
+  eq('Z11 ...and none of this was a chart click', HANDLED.length, 1);
+
   // ══ D. DRILL ══════════════════════════════════════════════════════════
   var usI = idxOf(W, '840'), us = W.features[usI];
   ACTIVATED.length = 0;

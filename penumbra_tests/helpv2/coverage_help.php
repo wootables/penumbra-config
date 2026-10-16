@@ -125,7 +125,8 @@ if ($index !== '' && preg_match('/<div id="view-options-tab">(.*?)<div id="(?:sc
         $t = trim(preg_replace('/\s+/', ' ', strtolower(html_entity_decode(strip_tags($lab[1]), ENT_QUOTES, 'UTF-8'))));
         if ($t === '') continue;
         $probe = substr(preg_replace('/\s*\(.*$/', '', $t), 0, 24);
-        if ($probe === '' || strpos($voHelp, $probe) === false) $rows[] = array($lab[0], $t, 'label text not found in the View Options topic');
+        $slash = function ($x) { return preg_replace('/\s*\/\s*/', '/', $x); };   // "Export/Download" (a <wbr> label) = "Export / Download"
+        if ($probe === '' || strpos($slash($voHelp), $slash($probe)) === false) $rows[] = array($lab[0], $t, 'label text not found in the View Options topic');
     }
     $md .= "## C5 View Options controls ($nvo labelled controls in #view-options-tab)\n\n" . tbl($rows, array('control id', 'label', 'finding'));
 } else {
@@ -142,6 +143,7 @@ if ($index !== '' && preg_match_all('/<label[^>]*for="(sched[A-Za-z_]+)"[^>]*>(.
         $nsl++;
         $t = trim(preg_replace('/\s+/', ' ', strtolower(html_entity_decode(strip_tags($lab[2]), ENT_QUOTES, 'UTF-8'))));
         $t = preg_replace('/[:*?]+$/', '', $t);
+        $t = rtrim(trim(preg_replace('/\s*\(.*$/', '', $t)), ' :*?');   // "Header line (optional; ...)" -> "header line"; "Subject Line: ?" -> "subject line"
         if (strlen($t) < 3) continue;
         if (strpos($schedHelp, substr($t, 0, 22)) === false) $rows[] = array($lab[1], $t, 'label text not found in the scheduler topics');
     }
@@ -201,12 +203,21 @@ if (isset($frag['promptsHelpLightbox'])) {
     $promptSec = preg_match('/<h4 id="prompts".*?(?=<h4 id="uservars")/s', $sqlHelp, $pm) ? $pm[0] : $sqlHelp;
 }
 $rows = array();
+// A tip's <h4> is the generator control's label; the topic that owns the generator (Query Prompts, or Cross-Database
+// Subqueries for the sq-* tips) must name that control. The bare key is accepted too (older tips are keyed by the parameter name).
+$sqSec = isset($frag['subqueriesHelpLightbox']) ? $frag['subqueriesHelpLightbox'] : $promptSec;
+$tipStore = isset($frag['builder-tips-storage']) ? $frag['builder-tips-storage'] : '';
 foreach ($pkeys as $k) {
-    $inPrompts = preg_match('/\b' . preg_quote($k, '/') . '\b/i', strip_tags($promptSec)) === 1;
-    if (!$inPrompts) $rows[] = array($k, 'tip exists; the Query Prompts section never uses this word');
+    $title = '';
+    if (preg_match('/data-tip="' . preg_quote($k, '/') . '"[^>]*>\s*<h4[^>]*>(.*?)<\/h4>/s', $tipStore, $tm)) $title = trim(preg_replace('/\s+/', ' ', html_entity_decode(strip_tags($tm[1]), ENT_QUOTES, 'UTF-8')));
+    $isSq = strpos($k, 'sq-') === 0;
+    $plain = html_entity_decode(strip_tags($isSq ? $sqSec : $promptSec), ENT_QUOTES, 'UTF-8');
+    $probe = $title !== '' ? trim(preg_replace('/\s*\(.*$/', '', $title)) : $k;
+    $hit = ($probe !== '' && stripos($plain, $probe) !== false) || preg_match('/\b' . preg_quote($k, '/') . '\b/i', $plain) === 1;
+    if (!$hit) $rows[] = array($k, $title, 'tip title not named in the ' . ($isSq ? 'Subqueries' : 'Query Prompts') . ' topic');
 }
-$md .= "## C9 Prompt builder tips (" . count($pkeys) . " keys in builder-tips-storage) vs the Query Prompts section\n\n" . tbl($rows, array('tip key', 'finding'));
-$summary['C9 prompt attributes'] = count($pkeys) . ' tip keys, ' . count($rows) . ' words absent from the Query Prompts section';
+$md .= "## C9 Prompt builder tips (" . count($pkeys) . " keys in builder-tips-storage) vs the Query Prompts and Subqueries topics\n\n" . tbl($rows, array('tip key', 'tip title', 'finding'));
+$summary['C9 prompt attributes'] = count($pkeys) . ' tip keys, ' . count($rows) . ' control labels absent from the topics';
 
 // ---------------------------------------------------------------- C10 tips
 $defs = array(); foreach ($tips as $id) if (isset($frag[$id]) && preg_match_all('/data-tip="([^"]+)"/', $frag[$id], $mm)) foreach ($mm[1] as $k) $defs[$k] = $id;

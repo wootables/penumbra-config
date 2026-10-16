@@ -83,6 +83,10 @@
     if (mods) Object.keys(mods).forEach(function (m) { init[m] = mods[m]; });
     return el.dispatchEvent(new KeyboardEvent('keydown', init));
   }
+  // moderate 2026-10-15: a header that tells AT about + - 0 (K5, V0b, E0b)
+  function hasKeysHint(th) {
+    return !!th && th.getAttribute('aria-keyshortcuts') === 'Plus - 0' && (' ' + (th.getAttribute('aria-describedby') || '') + ' ').indexOf(' pnbColwKeysHint ') !== -1;
+  }
   function edge(th) { var r = th.getBoundingClientRect(); return { x: r.right - 3, y: r.top + r.height / 2, r: r }; }
 
   // Show/hide one column the way applyColumnChanges() does: display on the <th>
@@ -457,6 +461,15 @@
     var n = thOf('NAME'), wn = Math.round(width(n)), notFocusedTarget = key(n.querySelector('.sort-icon') || n, '+');
     rec('K4 only a key pressed ON the header counts (not one bubbling up from inside it)',
       n.querySelector('.sort-icon') ? (notFocusedTarget && near(width(thOf('NAME')), wn, 1)) : true, 'fromIcon notPrevented=' + notFocusedTarget);
+    // moderate 2026-10-15 (WCAG 4.1.2 / 3.3.2): the keys are announced - aria-keyshortcuts on every
+    // resizable header, described by ONE shared hidden hint
+    var hint = document.getElementById('pnbColwKeysHint');
+    var flatThs = ths().filter(function (t) { return t.hasAttribute('data-colname'); });
+    var kBad = flatThs.filter(function (t) { return !hasKeysHint(t); }).map(function (t) { return t.getAttribute('data-colname'); });
+    rec('K5 every resizable flat header names its keys (aria-keyshortcuts "Plus - 0") and is described by the one hidden hint',
+      !!hint && hint.hidden && /Plus/.test(hint.textContent) && /\b0\b/.test(hint.textContent) && document.querySelectorAll('#pnbColwKeysHint').length === 1 &&
+      flatThs.length > 10 && kBad.length === 0,
+      'hint=' + (hint ? JSON.stringify(hint.textContent) + ' hidden=' + hint.hidden : 'none') + ' headers=' + flatThs.length + ' bad=' + kBad.slice(0, 5).join(','));
     host.clearUser(); apply();
   }
 
@@ -728,6 +741,15 @@
     rec('V0 fixture: grouped on C11 through the real rebuild - 3 fixed-layout tables, cloned headers with inline % widths, no rules while nothing has a width', ok0,
       'tables=' + ts.length + ' width=' + (t0 && gth(t0, 'TITLE') ? gth(t0, 'TITLE').style.width : '-') + ' style=' + !!document.getElementById('pnbColWidthGroupStyle') + ' errs=' + errs().slice(0, 2).join(' / '));
     if (!ok0) return;
+    // moderate 2026-10-15: a grouped header (hundreds of tables: stamped as it takes focus) names its keys
+    // (main.js clones the flat header into each group table, stamps included: wipe them first,
+    // so only the module's focus stamp can put them back)
+    var gk = gth(ts[1], 'NAME'), gkBefore = hasKeysHint(gk);
+    gk.removeAttribute('aria-keyshortcuts'); gk.removeAttribute('aria-describedby');
+    gk.setAttribute('tabindex', gk.getAttribute('tabindex') || '0'); gk.focus();
+    rec('V0b a grouped header takes focus: it names its keys (aria-keyshortcuts + the shared hint)', document.activeElement === gk && hasKeysHint(gk),
+      'before=' + gkBefore + ' focused=' + (document.activeElement === gk) + ' keys=' + gk.getAttribute('aria-keyshortcuts') + ' describedby=' + gk.getAttribute('aria-describedby'));
+    gk.blur();
     function fills(t) { var b = t.parentNode; return near(width(t), b.clientWidth, 2) && b.scrollWidth <= b.clientWidth + 1; }
 
     setReport({ TITLE: 120 });
@@ -1611,6 +1633,9 @@
     rec('E0 fixture: a breakdown through the real builder, its headers carrying the grip and a tab stop', ok0,
       t ? ('grip=' + (th0 ? grip(th0) : '-') + ' tabindex=' + (th0 ? th0.getAttribute('tabindex') : '-')) : 'no table; errs=' + errs().slice(0, 2).join(' / '));
     if (!ok0) return;
+    var bdThs = Array.prototype.slice.call(t.tHead.rows[0].cells);
+    rec('E0b moderate 2026-10-15: every breakdown header names its keys (aria-keyshortcuts + the shared hint)', bdThs.length > 5 && bdThs.every(hasKeysHint),
+      'bad=' + bdThs.filter(function (c) { return !hasKeysHint(c); }).map(function (c) { return c.textContent.trim().split(' ')[0]; }).slice(0, 5).join(','));
 
     var natTitle = Math.round(width(th0)), natName = Math.round(width(hth(t, 'NAME')));
     var stored0 = JSON.stringify(ls(KEY)), user0 = JSON.stringify(host.state().user);

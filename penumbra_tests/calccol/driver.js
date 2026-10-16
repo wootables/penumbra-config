@@ -88,15 +88,27 @@
       // edit it (no RATIO to edit = the add failed: the checks below stay unset, so red)
       var editBtn = document.querySelector('#pnbCalcList [data-calc-edit="RATIO"]');
       if (!editBtn) { R.info = { ta: R.info.ta, err: (document.getElementById('pnbCalcErr') || {}).textContent }; return; }
+      editBtn.focus();   // a keyboard user's Enter (moderate 2026-10-15: editFocus / removeFocus)
       editBtn.click();
       document.getElementById('pnbCalcFormula').value = '{H_NUM} * 0';
       var q1 = window.__queryDone;
       document.getElementById('pnbCalcGo').click();
       await until(function () { return window.__queryDone > q1; }, 15000); await sleep(400);
       R.chk.edited = cell('RATIO') === '0';
+      // WCAG 2.4.3: the list is rebuilt under the Edit button that opened the dialog; Save lands
+      // on that row's Edit button again, not on the page
+      var ae1 = document.activeElement;
+      R.chk.editFocus = !!ae1 && ae1.matches && ae1.matches('#pnbCalcList [data-calc-edit="RATIO"]');
+      R.info.focus1 = ae1 ? ae1.tagName + '#' + ae1.id + '.' + ae1.className + ' ' + (ae1.getAttribute('data-calc-edit') || '') : null;
       // remove it
       var q2 = window.__queryDone;
-      document.querySelector('#pnbCalcList [data-calc-del="RATIO"]').click();
+      var delBtn = document.querySelector('#pnbCalcList [data-calc-del="RATIO"]');
+      delBtn.focus();
+      delBtn.click();
+      // its row is gone: focus on + Add calculated column (no other row's Remove to land on)
+      var ae2 = document.activeElement;
+      R.chk.removeFocus = !!ae2 && ae2.id === 'pnbCalcAdd';
+      R.info.focus2 = ae2 ? ae2.tagName + '#' + ae2.id : null;
       await until(function () { return window.__queryDone > q2; }, 15000); await sleep(400);
       R.chk.removed = !th('RATIO');
       await until(function () { return !listed('RATIO'); }, 4000);

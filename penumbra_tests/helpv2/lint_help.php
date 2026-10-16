@@ -168,7 +168,7 @@ $R->check('L8', !$bad, $bad ? 'unbalanced: ' . implode(', ', array_slice($bad, 0
 // ---------------------------------------------------------------- L9 php -l
 $bad = array(); $nl = 0;
 $lintFiles = array_merge(
-    array("$app/help_content.php", "$app/help_manifest.php", "$app/help_retrieval.php", "$helpDir/loader.php", "$helpDir/manifest.php"),
+    array("$app/help_content.php", "$app/help_manifest.php", "$app/help_retrieval.php", "$helpDir/loader.php", "$helpDir/manifest.php", "$app/help_ask.php", "$helpDir/ask.php"),
     glob("$helpDir/topics/*.php"), glob("$helpDir/tips/*.php"));
 foreach ($lintFiles as $f) { if (!is_file($f)) continue; $nl++; $msg = hv_php_lint($php, $f); if ($msg !== '') $bad[] = basename($f) . ': ' . preg_replace('/\s+/', ' ', substr($msg, 0, 120)); }
 $R->check('L9', !$bad, $bad ? implode(' | ', array_slice($bad, 0, 5)) : "php -l clean on $nl files");
@@ -252,6 +252,71 @@ foreach ($standard as $id) {
     if (preg_match_all('/<td\b[^>]*>(.*?)<\/td>/s', $h, $m)) foreach ($m[1] as $x) { $w = hv_words($x); if ($w > 70) $bad[] = "$id: table cell of $w words"; }
 }
 $R->check('L16', !$bad, $bad ? implode(' | ', array_slice($bad, 0, 8)) : count($standard) . ' rewritten topics meet the tier standard (paragraphs <= 80 words, bullets <= 50, cells <= 70, no em-dashes, no emoji headings)');
+
+// ---------------------------------------------------------------- L17 / L18 the Custom Code reference (phase 4, 2026-10-15)
+// L17: help/topics/optionsHelpLightbox.php is the current render of help/snippets.php (the generator's --check
+//      re-renders in memory and compares). L18: the registry's function names are exactly the editor's list
+//      (PENUMBRA_SNIPPET_FN_NAMES in js/main.js); the hover cards and the AI prompt are reported, not failed.
+if (is_file($app . '/help/snippets.php')) {
+    $phpBin = isset($o['php']) ? $o['php'] : PHP_BINARY;
+    $gen = __DIR__ . '/gen_snippets_help.php';
+    $outp = (string)shell_exec(escapeshellarg($phpBin) . ' -n ' . escapeshellarg($gen) . ' --app ' . escapeshellarg($app) . ' --check 2>&1');
+    $fresh = (strpos($outp, 'FRESH:') === 0);
+    $R->check('L17', $fresh, $fresh ? 'help/topics/optionsHelpLightbox.php is the current render of help/snippets.php' : 'help/topics/optionsHelpLightbox.php is STALE or the generator refused: ' . trim(substr($outp, 0, 220)));
+    if (!defined('PNB_HELP_V2')) define('PNB_HELP_V2', 2);
+    $reg = include $app . '/help/snippets.php';
+    $regNames = array();
+    foreach ((array)$reg['functions'] as $rid => $rf) foreach ((array)$rf['names'] as $nm) $regNames[] = $nm;
+    $mjPath = is_file($app . '/js/main.js') ? $app . '/js/main.js' : $live . '/js/main.js';
+    $mj = (string)@file_get_contents($mjPath);
+    $edNames = array();
+    if (preg_match('/PENUMBRA_SNIPPET_FN_NAMES\s*=\s*\[(.*?)\];/s', $mj, $em) && preg_match_all("/'([a-z_]+)'/", $em[1], $en)) $edNames = $en[1];
+    $regOnly = array_values(array_diff($regNames, $edNames)); $edOnly = array_values(array_diff($edNames, $regNames));
+    $compNames = array(); foreach ((array)$reg['functions'] as $rid => $rf) if ($rf['category'] === 'components') foreach ((array)$rf['names'] as $nm) $compNames[] = $nm;
+    $regOnly = array_values(array_diff($regOnly, $compNames));   // components are not editor functions
+    $ok18 = $edNames && !$regOnly && !$edOnly;
+    $R->check('L18', $ok18, $ok18 ? count($edNames) . ' editor function names = the registry (' . count($reg['functions']) . ' entries, ' . count($compNames) . ' components)' : 'registry vs js/main.js names: only in registry [' . implode(' ', $regOnly) . '] only in main.js [' . implode(' ', $edOnly) . ']' . ($edNames ? '' : ' (PENUMBRA_SNIPPET_FN_NAMES not found in ' . $mjPath . ')'));
+    $sh = (string)@file_get_contents((is_file($app . '/js/penumbra_snippet_help.js') ? $app : $live) . '/js/penumbra_snippet_help.js');
+    $hover = preg_match_all("/^\s+'([a-z_]+)': _wrap\(/m", $sh, $hm) ? $hm[1] : array();
+    $ai = (string)@file_get_contents((is_file($app . '/ai_system_prompt.php') ? $app : $live) . '/ai_system_prompt.php');   // the stage may carry a staged copy
+    $aiNames = array();
+    if (preg_match_all('/^#{2,3} +(.+)$/m', $ai, $am)) foreach ($am[1] as $line) if (preg_match_all('/\b([a-z_]+)\(/', $line, $fn)) foreach ($fn[1] as $nm) $aiNames[] = $nm;
+    $aiNames = array_values(array_unique($aiNames));
+    $d1 = array_values(array_diff($edNames, $hover)); $d2 = array_values(array_diff($hover, $edNames));
+    $d3 = array_values(array_diff($edNames, $aiNames));
+    if ($d1 || $d2) $R->warn('W2h', 'hover cards (js/penumbra_snippet_help.js) vs the editor list: missing [' . implode(' ', $d1) . '] extra [' . implode(' ', $d2) . ']');
+    if ($d3) $R->warn('W2a', 'ai_system_prompt.php has no heading for: ' . implode(' ', $d3));
+    if (!$d1 && !$d2 && !$d3) echo "        info: hover cards and ai_system_prompt.php name every editor function\n";
+}
+
+// ---------------------------------------------------------------- L19 no flex-div pseudo-tables in standard topics (phase 4b, 2026-10-15)
+// A row built from <div style="display: flex ..."> cells is a table that escapes L16's cell budget and the
+// panel-safe cell style; the rewrites turned every one into a real <table>.
+$flexBad = array();
+foreach ($standard as $id) {
+    if (!isset($frag[$id])) continue;
+    $n = preg_match_all('/<div style="display: flex;[^"]*">\s*<div style="flex: 0 0 \d+px/', $frag[$id]['html']);
+    if ($n) $flexBad[] = "$id: $n flex-div row" . ($n > 1 ? 's' : '');
+}
+$R->check('L19', !$flexBad, $flexBad ? implode(' | ', $flexBad) : 'no flex-div pseudo-table rows in the ' . count($standard) . ' standard topics (every table is a <table>)');
+
+// ---------------------------------------------------------------- L20 the Ask page (phase 6, 2026-10-15)
+// The Ask fragment is the only fragment that carries a script, and that script is js/penumbra_help_ask.js (so the
+// behaviour rides in with Help Center v2 and nothing else executes out of the help content); the file must exist.
+if (isset($frag['askHelpLightbox'])) {
+    $bad20 = array();
+    foreach ($frag as $fid => $f) {
+        $n = preg_match_all('/<script\b/i', $f['raw']);
+        if ($fid === 'askHelpLightbox') {
+            if ($n !== 1 || !preg_match('#<script src="js/penumbra_help_ask\.js(\?[^"]*)?"></script>#', $f['raw'])) $bad20[] = "askHelpLightbox: expected exactly one script tag for js/penumbra_help_ask.js, found $n";
+        } elseif ($n > 0) $bad20[] = "$fid: $n script tag(s) in a help fragment";
+    }
+    $askJs = hv_locate('js/penumbra_help_ask.js', $app, $live);
+    if (!$askJs) $bad20[] = 'js/penumbra_help_ask.js not found under --app or --live';
+    if (!is_file("$app/help_ask.php")) $bad20[] = 'help_ask.php (the endpoint) not found under --app';
+    if (!is_file("$helpDir/ask.php")) $bad20[] = 'help/ask.php (the library) not found';
+    $R->check('L20', !$bad20, $bad20 ? implode(' | ', $bad20) : 'the Ask fragment alone carries a script, and it is js/penumbra_help_ask.js; endpoint and library present');
+}
 
 // ---------------------------------------------------------------- W1 budgets
 echo "  budgets (warnings for the rewrite phases):\n";

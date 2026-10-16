@@ -94,6 +94,9 @@ MUTANTS = {
     'casefold':  ('sb', ".replace(/^(['\"])(.*)\\1$/, '$2').toUpperCase();", ".replace(/^(['\"])(.*)\\1$/, '$2');", ['V3']),
     'needvals':  ('sb', "                if (!vals || !vals.length) found = '';", "                if (false) found = '';", ['V5']),
     'closekeep': ('sb', "                $input.removeData('sb-smart-sel').removeData('sb-smart-is-col');" + CR + "                _syncArrowMode();", '                _syncArrowMode();', ['V6']),
+    # (2026-10-15) the WCAG Moderate pass: tab stops + the named Alt+Down twin
+    'notabstop': ('index', 'id="tableSearchCols" role="button" tabindex="0"', 'id="tableSearchCols" role="button"', ['S4']),
+    'nokeysc':   ('index', 'aria-label="Search report table" aria-keyshortcuts="Alt+ArrowDown"', 'aria-label="Search report table"', ['S4']),
     'syncoff':   ('sb', "            $acBox.toggleClass('pnb-sbox-vals', !!col);", "            $acBox.toggleClass('pnb-sbox-vals', false);", ['H', 'V0']),
 }
 
@@ -211,6 +214,15 @@ def static_checks(t):
     rec('S2', 'main.css: the .pnb-sbox block is there and no #tableSearchKey rule is left', '.pnb-sbox > .pnb-sbox-seg {' in css and '#tableSearchKey' not in css,
         'block=%s key=%s' % ('.pnb-sbox > .pnb-sbox-seg {' in css, '#tableSearchKey' in css))
     rec('S3', 'help: the search help names the arrow and Alt+Down', 'pnb-help-arrow' in help_ and 'or <code>Alt+Down</code></td>' in help_, 'arrow=%s alt=%s' % ('pnb-help-arrow' in help_, 'or <code>Alt+Down</code></td>' in help_))
+    # (2026-10-15, WCAG 2.1.1 / 4.1.2) every role=button segment is a tab stop, and both fields name the arrow's Alt+Down twin
+    import re as _re
+    segs = ['searchHelpIcon', 'searchBuilderIcon', 'tableSearchCols', 'schedSearchBuilderIcon', 'schedSearchCols']
+    def _tag(i):
+        m = _re.search(r'<[a-z]+\b[^>]*\bid="' + i + r'"[^>]*>', idx)
+        return m.group(0) if m else ''
+    notab = [i for i in segs if 'role="button"' not in _tag(i) or 'tabindex="0"' not in _tag(i)]
+    nokey = [i for i in ('tableSearch', 'schedSearchFilter') if 'aria-keyshortcuts="Alt+ArrowDown"' not in _tag(i)]
+    rec('S4', 'index.php: the role=button segments are tab stops (tabindex=0); both fields carry aria-keyshortcuts=Alt+ArrowDown', not notab and not nokey, 'notab=%s nokey=%s' % (notab, nokey))
 
 def close(a, b, tol=0.6): return abs(a - b) <= tol
 

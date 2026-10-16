@@ -3,7 +3,10 @@
 #
 #   powershell -File run.ps1                 against LIVE
 #   powershell -File run.ps1 -App <dir>      against a staged app folder
-#                                            (analytics_all.php + css\main.css)
+#                                            (analytics_all.php + analytics_shared.php + css\main.css)
+#   Page 3 (reveal.html, 2026-10-15): the shared table controller's quick-filter
+#   status and keyboard cell reveal (WCAG 4.1.3 / 2.1.1). Its control is -App
+#   <a folder with the pre-fix analytics_shared.php>: R1-R3 red.
 #   The share refuses unsigned scripts (RemoteSigned, even with -ExecutionPolicy
 #   Bypass) - from there, run it as a script block in a CHILD process (it exits):
 #     powershell -NoProfile -Command "& ([scriptblock]::Create([IO.File]::ReadAllText('<this file>')))" [-Control]
@@ -65,8 +68,25 @@ file_put_contents($argv[3], substr($s, $c, $d - $c));
     & $php -n $lift2File (Join-Path $App 'analytics_shared.php') (Join-Path $work 'strips.css') (Join-Path $work 'strips.js')
     if ($LASTEXITCODE -ne 0) { throw 'strip lift failed' }
     if ($Control) { [IO.File]::WriteAllText((Join-Path $work 'strips.js'), '/* control: no strips script */') }
+    # Page 3 (WCAG Moderate fixes, 2026-10-15): the whole per-table controller,
+    # penumbra_an_shared_js() of the analytics_shared.php under test, rendered by
+    # the PHP CLI (the function is lifted between its own signature and its close
+    # and eval'd - nothing else of the file runs). See reveal.html for R1-R4.
+    Copy-Item (Join-Path $here 'reveal.html') (Join-Path $work 'reveal.html')
+    $lift3 = @'
+$s = file_get_contents($argv[1]);
+$a = strpos($s, "function penumbra_an_shared_js(");
+$e = ($a === false) ? false : strpos($s, "\n})();\n    <?php\n}\n", $a);
+if ($a === false || $e === false) { fwrite(STDERR, "shared js anchors not found\n"); exit(2); }
+eval(substr($s, $a, $e + strlen("\n})();\n    <?php\n}\n") - $a));
+ob_start(); penumbra_an_shared_js(array('listNext' => 0, 'listMax' => 0, 'atCap' => false));
+file_put_contents($argv[2], ob_get_clean());
+'@
+    $lift3File = Join-Path $work 'lift3.php'; [IO.File]::WriteAllText($lift3File, "<?php`n" + $lift3)
+    & $php -n $lift3File (Join-Path $App 'analytics_shared.php') (Join-Path $work 'reveal.js')
+    if ($LASTEXITCODE -ne 0) { throw 'shared js lift failed' }
     $all = ''
-    foreach ($page in 'test.html', 'strips.html') {
+    foreach ($page in 'test.html', 'strips.html', 'reveal.html') {
         $url = 'file:///' + ((Join-Path $work $page) -replace '\\', '/')
         # Chrome writes harmless noise to stderr; under 'Stop' PowerShell 5.1 turns
         # that into a terminating NativeCommandError, so relax it for this call only.
@@ -78,7 +98,7 @@ file_put_contents($argv[3], substr($s, $c, $d - $c));
         "== $page"; $out
         $all += $out
     }
-    if (([regex]::Matches($all, 'SUMMARY fails=0')).Count -eq 2) { exit 0 } else { exit 1 }
+    if (([regex]::Matches($all, 'SUMMARY fails=0')).Count -eq 3) { exit 0 } else { exit 1 }
 } finally {
     if ($work -like (Join-Path $env:TEMP 'pnb_dtsort_*')) { Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue }
 }

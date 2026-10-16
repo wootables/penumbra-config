@@ -145,12 +145,29 @@ function cut($hay, $from, $to, $label) {
     if ($b === false) { fwrite(STDERR, "anchor '$label' end not found\n"); exit(2); }
     return substr($hay, $a, $b - $a);
 }
-function render($file) {
+function render_raw($file) {
     extract($GLOBALS, EXTR_SKIP);
     ob_start();
     try { include $file; return ob_get_clean(); }
     catch (Throwable $e) { ob_end_clean(); return "TEMPLATE ERROR: " . $e->getMessage() . " at " . basename($e->getFile()) . ":" . $e->getLine(); }
 }
+/** The page's ARIA table and strip semantics (2026-10-15, WCAG moderate fixes)
+ *  taken back out, so the assertions written before them keep testing content
+ *  and layout markup exactly as they did. Section 12 tests the semantics on the
+ *  RAW render ($HR / render_raw()). Removes only: the sr-only header rows,
+ *  role=table + its aria-label / aria-colcount, role=rowgroup/row/cell,
+ *  aria-colindex / aria-colspan, the strip bar's role=img + aria-label and the
+ *  strip name's aria-hidden. */
+function a11y_plain($h) {
+    $h = preg_replace('#\n?[ \t]*<div class="sr-only" role="row">.*?</div>#s', '', $h);
+    $h = preg_replace('# role="table" aria-label="[^"]*"( aria-colcount="\d+")?#', '', $h);
+    $h = preg_replace('# role="(rowgroup|row|cell)"#', '', $h);
+    $h = preg_replace('# aria-col(index|span)="\d+"#', '', $h);
+    $h = str_replace('<span class="pnb-strip-n" aria-hidden="true">', '<span class="pnb-strip-n">', $h);
+    $h = preg_replace('# role="img" aria-label="[^"]*"#', '', $h);
+    return $h;
+}
+function render($file) { return a11y_plain(render_raw($file)); }
 /** No template exception, and no PHP diagnostic text (case-sensitive: the log
  *  script legitimately says `undefined` and the (i) copy says `warning`). */
 function clean($html) {
@@ -402,11 +419,12 @@ if ($MUTANT5) {
     $R['top'] = str_replace(array($n1, $n2), array('$errsChip = $errs;', '$outChip = $outg;'), $R['top']);
     echo "MUTANT5: the status chips read the cards' windowed \$errs / \$outg\n";
 }
-$H = array();
+$H = array(); $HR = array();   // $HR: the raw renders, for section 12
 foreach ($R as $k => $tpl) {
     $f = $TMP . DIRECTORY_SEPARATOR . $k . '.php';
     file_put_contents($f, $tpl);
-    $H[$k] = render($f);
+    $HR[$k] = render_raw($f);
+    $H[$k] = a11y_plain($HR[$k]);
 }
 // the failures card a second time, with rows
 $errs = array('total' => 3, 'window_hours' => 24, 'by_action' => array('SCHEDULED_SEND' => 1, 'EXPORT' => 1, 'SCHEDULE_FAIL' => 1));
@@ -418,7 +436,8 @@ $fails = array(
     array('ts' => date('Y-m-d H:i', $T - 9500), 'action' => 'SCHEDULE_FAIL', 'report' => 'awdunit', 'title' => 'Awards by Unit', 'user' => 'scheduler', 'message' => 'ORA-00942',
           'notice' => array('state' => 'sent', 'to' => 'owner@ncsu.edu, <b>x</b>@x.edu', 'bcc' => 'admin@ncsu.edu', 'confirmed' => true)),
 );
-$H['r3b'] = render($TMP . DIRECTORY_SEPARATOR . 'r3.php');
+$HR['r3b'] = render_raw($TMP . DIRECTORY_SEPARATOR . 'r3.php');
+$H['r3b'] = a11y_plain($HR['r3b']);
 $errs = $snap['components']['errors']; $fails = array();
 
 // ---------------------------------------------------------------------------
@@ -622,7 +641,9 @@ $snap = $keep2;
 ok(strpos($H['r1'], 'pnb-job-note') === false, 'control: no findings, no note under the job row');
 $snap['components']['maintenance']['people_sync']['checks'] = array('at' => '2026-09-24 05:31:07', 'warnings' => array('PI eligibility differs from PI_ELIGIBLE_PROFILES for 41 people (30 eligible only here, 11 only there) - the shared rule may have changed upstream; the directory keeps its own'));
 $h = render($TMP . DIRECTORY_SEPARATOR . 'r1.php');
-ok(strpos($h, '<div class="pnb-hub-note pnb-job-note"><strong>Employee directory refresh</strong> reported after its last run (2026-09-24 05:31:07):') !== false && strpos($h, '11 only there) - the shared rule may have changed upstream; the directory keeps its own</div>') !== false, 'the findings render as an amber note under the job row, stamped', $h);
+// (2026-10-15: the note is a table row now, its text in one spanning cell - the <span> a11y_plain() leaves)
+ok(preg_match('#<div class="pnb-hub-note pnb-job-note">(<span>)?<strong>Employee directory refresh</strong> reported after its last run \(2026-09-24 05:31:07\):#', $h) === 1 && preg_match('#11 only there\) - the shared rule may have changed upstream; the directory keeps its own(</span>)?</div>#', $h) === 1, 'the findings render as an amber note under the job row, stamped', $h);
+$hNoteRaw = render_raw($TMP . DIRECTORY_SEPARATOR . 'r1.php');   // for section 12
 ok(substr_count($h, 'pnb-job-note') === 1 && substr_count($h, '<div class="pnb-tile ') === 6, 'one note, the tiles untouched');
 $snap['components']['maintenance']['people_sync']['checks'] = array('at' => '2026-09-24 05:31:07', 'warnings' => array());
 $h = render($TMP . DIRECTORY_SEPARATOR . 'r1.php');
@@ -920,7 +941,9 @@ ok(substr_count($h, '<label class="pnb-tg"') === 3 && substr_count($h, '<i class
 ok(strpos($h, 'id="logCtxWrap" hidden') !== false, 'context control hidden until a filter is typed');
 ok(strpos($h, 'id="logAuto"') === false && strpos($h, 'function schedule(') === false && strpos($h, 'penumbra_health_auto') === false, 'the per-log auto-refresh is gone');
 ok(preg_match('/<select id="logLines" hidden aria-hidden="true" tabindex="-1">/', $h) === 1, 'line count select kept hidden as the state holder');
-ok(preg_match('/<span class="pnb-log-lines" id="logLinesLinks">show <a href="#" data-lines="300">300<\/a> &middot; <a href="#" data-lines="5000" title="[^"]*">all<\/a><\/span>/', $h) === 1, 'the count is two links in the status line: 300 or all (2026-10-14)');
+// 2026-10-15 (WCAG 4.1.2): two link-buttons with aria-pressed, in a named group; they were href="#" links acting as buttons
+ok(preg_match('/<span class="pnb-log-lines" id="logLinesLinks" role="group" aria-label="Log lines to show">show <button type="button" class="pnb-link-btn" data-lines="300" aria-pressed="false">300<\/button> &middot; <button type="button" class="pnb-link-btn" data-lines="5000" aria-pressed="false" title="[^"]*">all<\/button><\/span>/', $h) === 1 && strpos($h, 'href="#" data-lines') === false,
+   'the count is two buttons in the status line, 300 or all, each with aria-pressed (2026-10-14; buttons 2026-10-15)');
 ok(preg_match('/<select id="logDay" aria-label="Day to show" hidden><\/select>/', $h) === 1, 'day picker sits inline in the status line');
 ok(preg_match('/<button type="button" class="pnb-link-btn" id="logKeys" aria-pressed="true"/', $h) === 1, 'keys switch is a link-button');
 ok(strpos($h, '<h2>Logs <span class="pnb-i"') !== false && strpos($h, '<b>5</b> pick a tab') !== false, 'the viewer (i) counts the tabs');
@@ -1191,6 +1214,101 @@ ok(strpos($cardActs, 'activeElement.blur()') === false && strpos($cardActs, "if 
    && strpos($cardActs, "if (i && e.target === i && (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar')) {") !== false
    && strpos($cardActs, "i.setAttribute('aria-expanded', tipShown(i) ? 'true' : 'false');") !== false,
    'Escape closes every open tip, hovered ones too, without blur(); Enter / Space toggle it; aria-expanded follows what shows');
+
+section('12. WCAG moderate fixes (2026-10-15): live region, table roles, strip text, line buttons');
+// 12a. One polite live region outside the rebuilt areas (4.1.3).
+$iGrid = strpos($page, '</div><!-- /grid -->');
+$iSay  = strpos($page, '<div id="pnbHubSay" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>');
+ok($iSay !== false && $iGrid !== false && $iSay > $iGrid && substr_count($page, 'id="pnbHubSay"') === 1 && strpos($HR['r6'], 'id="pnbHubSay"') !== false
+   && strpos($HR['top'] . $HR['r1'] . $HR['r2'] . $HR['r3'] . $HR['r4'] . $HR['r5'], 'pnbHubSay') === false,
+   'one polite live region, after the grid: outside the two regions the refresh rebuilds');
+$h = $HR['r6'];
+ok(strpos($h, "var pnbSay = (function () {") !== false && strpos($h, "el.textContent = '';\n        t = setTimeout(function () { el.textContent = String(msg); t = null; }, 80);") !== false,
+   'pnbSay() empties the region, then writes a beat later (the same words twice are heard twice)');
+$iWas = strpos($h, 'var was = cardStates();');
+$iSw2 = strpos($h, "['pnbHubTop', 'pnbHubLeft'].forEach(function (id) {");
+$iNew = strpos($h, 'var news = statusNews(was, cardStates());');
+$iAp2 = strpos($h, 'if (window.pnbFolds) window.pnbFolds.apply();');
+ok($iWas !== false && $iSw2 !== false && $iNew !== false && $iWas < $iSw2 && $iAp2 < $iNew && strpos($h, 'if (news) pnbSay(news);') !== false,
+   'a refresh reads the cards\' statuses before the swap and says what changed after it');
+ok(strpos($h, "if (a ? a.tone === b.tone : (b.tone === 'ok' || b.tone === '' || b.tone === 'unknown')) return;") !== false
+   && strpos($h, "out[card.id] = { tone: dot ? (dot.className.replace('pnb-adm-dot', '').trim() || 'unknown') : '',") !== false,
+   'a card is said only when its heading dot changed colour (or it arrived not ok); a count changing stays quiet');
+ok(strpos($h, "if (!failed) pnbSay('Refresh failed: the status shown may be out of date.');") !== false && strpos($h, "if (failed) news = 'Auto-refresh is reading again. ' + news;") !== false,
+   'a failing refresh is said once, when it starts failing, and its recovery once');
+ok(strpos($h, "pnbSay(jname + ': ' + jsay);") !== false && strpos($h, "pnbSay(jname + ': not saved: ' + err.message);") !== false
+   && strpos($h, "pnbSay('Escalation packet copied');") !== false && strpos($h, "pnbSay('Copied the visible log lines');") !== false
+   && strpos($h, "pnbSay((bell.getAttribute('data-label') || 'This window')") !== false && strpos($h, "pnbSay('Mute not saved: ' + err.message);") !== false,
+   'job results (queued, not saved), Copied (packet and log), and the bell\'s result are said, named');
+
+// 12b. The row lists are tables to AT (1.3.1).
+$allRaw = $HR['r1'] . $HR['r2'] . $HR['r4'];
+preg_match_all('#<div class="pnb-row(?: near)?"([^>]*)>(.*?)</div>#s', $allRaw, $rm, PREG_SET_ORDER);
+$badRows = array();
+foreach ($rm as $r) { if (strpos($r[1], 'role="row"') === false || substr_count($r[2], ' role="cell"') !== 6) $badRows[] = substr($r[0], 0, 160); }
+ok(count($rm) >= 12 && !$badRows, 'every episode, job, run and delivery row is role=row with six role=cell', array(count($rm), $badRows));
+$tblOk = array();
+foreach (array('r4' => 'pnb-rows pnb-rows-out', 'r1' => 'pnb-rows pnb-rows-jobs', 'r1 ' => 'pnb-rows pnb-rows-runs', 'r2' => 'pnb-rows pnb-rows-dl') as $rk => $cls) {
+    $tblOk[$cls] = preg_match('#<div class="' . $cls . '" role="table" aria-label="[^"]+">\s*<div class="sr-only" role="row">(<span role="columnheader">[^<]+</span>){6}</div>#', $HR[trim($rk)]) === 1;
+}
+ok(!in_array(false, $tblOk, true), 'each list is role=table, named, with an sr-only header row of six column headers', $tblOk);
+ok(strpos($HR['r4'], '<div class="pnb-rows-more" role="rowgroup">') !== false && strpos($HR['r4'] . $HR['r1'], '<div class="pnb-rows-more">') === false,
+   'the rows behind "show more" are a rowgroup of the same table');
+ok(strpos($HR['r1'], '<span class="k" role="cell">staged 71887 updated 12 seconds 27.2</span>') !== false && preg_match('#<span class="k" title=#', $HR['r1']) === 0,
+   'a run shows every figure, not two with the rest in a tooltip');
+ok(isset($hNoteRaw) && strpos($hNoteRaw, '<div class="pnb-hub-note pnb-job-note" role="row"><span role="cell" aria-colspan="6"><strong>Employee directory refresh</strong>') !== false,
+   'a job\'s findings note is a row of the jobs table, one cell spanning it');
+$h = $HR['r3b'];
+$fOk = preg_match('#<div class="pnb-fail-list" role="table" aria-label="[^"]+" aria-colcount="6">\s*<div class="sr-only" role="row">(<span role="columnheader" aria-colindex="\d">[^<]+</span>){6}</div>#', $h) === 1;
+$fRows = explode('<div class="pnb-fail-row"', $h); array_shift($fRows);
+$fIdx = array();
+foreach ($fRows as $fr) { preg_match_all('# role="cell" aria-colindex="(\d)"#', $fr, $fx); $fIdx[] = implode(',', $fx[1]); $fOk = $fOk && strpos($fr, ' role="row">') === 0; }
+ok($fOk && $fIdx === array('1,2,3,4,5', '1,2,4', '1,2,3,4,5,6'), 'the failures are a table too: a row missing its report or message names each cell\'s column', $fIdx);
+ok(strpos($h, 'awdspon<span class="sr-only">, Awards by Selected Funders</span>') !== false, 'a failure\'s report title is read after its id, not only in a tooltip');
+
+// 12c. The strip in words (1.1.1 / 1.4.1).
+function strip_labels($html) {
+    preg_match_all('#<div class="pnb-strip-r"><span class="pnb-strip-n" aria-hidden="true">([^<]+)</span><div class="pnb-strip-bar(?: dense)?" role="img" aria-label="([^"]*)">(.*?)</div></div>#s', $html, $m, PREG_SET_ORDER);
+    $out = array();
+    foreach ($m as $row) {
+        preg_match_all('#<i(?: class="([ab])")?></i>#', $row[3], $cm);
+        $runs = array('b' => 0, 'a' => 0); $prev = '';
+        foreach ($cm[1] as $c) { if ($c !== '' && $c !== $prev) $runs[$c]++; $prev = $c; }
+        $out[html_entity_decode($row[1], ENT_QUOTES)] = array('label' => html_entity_decode($row[2], ENT_QUOTES), 'b' => $runs['b'], 'a' => $runs['a']);
+    }
+    return $out;
+}
+$sl = strip_labels($HR['r4']);
+$slOk = count($sl) === substr_count($HR['r4'], 'class="pnb-strip-bar') && count($sl) >= 4;
+foreach ($sl as $nm => $x) {
+    if (strpos($x['label'], $nm . ': ') !== 0 || substr_count($x['label'], 'down ') !== $x['b'] || substr_count($x['label'], 'near miss ') !== $x['a']) $slOk = false;
+}
+ok($slOk, 'every strip bar is role=img named "<component>: " and one phrase per red or amber run, read off its own cells', $sl);
+ok(isset($sl['www3 delivery']) && preg_match('/ to now$/', $sl['www3 delivery']['label']) === 1 && isset($sl['INFOED']) && strpos($sl['INFOED']['label'], 'INFOED: near miss ') === 0,
+   'the open outage runs "to now"; a near miss says so', $sl);
+ok(preg_match('#<div class="pnb-strip" title="[^"]*" role="group" aria-label="Outages by component, [A-Z][a-z]{2} \d\d [A-Z][a-z]{2} \d\d:\d\d to now">#', $HR['r4']) === 1, 'the strip is a group named by its span');
+$outgK12 = $outg; $outWinK12 = $outWin;
+$outWin = penumbra_health_window('24h', '7');
+$outg = penumbra_outage_history(array('hours' => 24, 'limit' => 25), $config);
+$sl24 = strip_labels(render_raw($TMP . DIRECTORY_SEPARATOR . 'r4.php'));
+$outg = $outgK12; $outWin = $outWinK12;
+ok(isset($sl24['HR']) && preg_match('/^HR: down (?:[A-Z][a-z]{2} )?\d\d:\d\d to (?:[A-Z][a-z]{2} )?\d\d:\d\d$/', $sl24['HR']['label']) === 1, 'over a day: "HR: down 02:00 to 02:30" in clock times (a weekday only off the window\'s last day)', $sl24);
+// 15-minute cells: an outage covers several, and adjacent red cells are ONE run, said once
+$sl24Ok = count($sl24) >= 2;
+foreach ($sl24 as $nm => $x) {
+    if (substr_count($x['label'], 'down ') !== $x['b'] || substr_count($x['label'], 'near miss ') !== $x['a']) $sl24Ok = false;
+}
+$outWin = penumbra_health_window('24h', '7');
+$outg = penumbra_outage_history(array('hours' => 24, 'limit' => 25), $config);
+preg_match_all('#role="img" aria-label="([^"]*)">((?:<i[^>]*></i>)*)</div>#', render_raw($TMP . DIRECTORY_SEPARATOR . 'r4.php'), $b24, PREG_SET_ORDER);
+$outg = $outgK12; $outWin = $outWinK12;
+$adj = 0; foreach ($b24 as $bb) { if (strpos($bb[2], '<i class="b"></i><i class="b"></i>') !== false) $adj++; }
+ok($sl24Ok && $adj >= 1, 'over a day, adjacent red cells read as one run: one phrase per run, never one per cell', array($adj, $sl24));
+
+// 12d. The line count: buttons with aria-pressed (4.1.2) - the markup is in section 7.
+$h = $HR['r6'];
+ok(strpos($h, "document.querySelectorAll('#logLinesLinks button[data-lines]')") !== false && strpos($h, "a.setAttribute('aria-pressed', on ? 'true' : 'false');") !== false,
+   'markLines() sets aria-pressed on the chosen count, not only a class');
 
 if ($CONTROL) { section('CONTROL'); ok(false, 'control: a deliberately false assertion (must FAIL)'); }
 

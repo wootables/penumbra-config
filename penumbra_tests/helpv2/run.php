@@ -51,6 +51,16 @@ function jumpHarness($mainJs, $outDir, $control) {
     return array(strpos($text, 'RESULT: GREEN') !== false, $text);
 }
 
+/** Run the Ask page's client harness through PowerShell; returns array(ok, text). */
+function askHarness($app, $outDir) {
+    $ps1 = str_replace('/', '\\', __DIR__ . '/ask_harness.ps1');
+    $here = str_replace('/', '\\', __DIR__);
+    $cmd = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create([IO.File]::ReadAllText(\'' . $ps1 . '\'))) -App \'' . str_replace('/', '\\', $app) . '\' -Here \'' . $here . '\' -Out \'' . str_replace('/', '\\', $outDir) . '\'" 2>&1';
+    exec($cmd, $lines, $code);
+    $text = implode("\n", $lines);
+    return array(strpos($text, 'RESULT: GREEN') !== false, $text);
+}
+
 echo "helpv2 suite (phase $phase): app=$app orig=$orig out=$out\n";
 $fails = 0;
 $lint = child($php, 'lint_help.php', '--app=' . escapeshellarg($app) . ' --live=' . escapeshellarg($live) . ' --php=' . escapeshellarg($php));
@@ -59,6 +69,17 @@ $eq = child($php, 'equiv_help.php', '--app=' . escapeshellarg($app) . ' --orig='
 echo $eq['out'] . "\n"; $fails += (int)$eq['code'];
 $rs = child($php, 'retrieval_smoke.php', '--app=' . escapeshellarg($app) . ' --orig=' . escapeshellarg($orig) . ' --out=' . escapeshellarg($out . '/retrieval'));
 echo $rs['out'] . "\n"; $fails += (int)$rs['code'];
+
+// Phase 6: the Ask page's pure half (A1-A10, a stub model) and its client (H1, headless Edge), when the tree carries it.
+if (is_file("$app/help/ask.php")) {
+    $as = child($php, 'ask_tests.php', '--app=' . escapeshellarg($app) . ' --orig=' . escapeshellarg($orig) . ' --out=' . escapeshellarg($out . '/ask'));
+    echo $as['out'] . "\n"; $fails += (int)$as['code'];
+    if (!isset($o['skip-jump'])) {
+        list($okH, $tH) = askHarness($app, "$out/askjs");
+        printf("  %-5s %-8s %s\n", $okH ? 'PASS' : 'FAIL', 'H1', 'Ask page client harness (T1-T6 in headless Edge)' . ($okH ? '' : ": \n" . $tH));
+        if (!$okH) $fails++;
+    }
+}
 
 // Jump harness: J1 on the tree under test (only meaningful once it carries the patch), J2 the control.
 if (!isset($o['skip-jump'])) {
@@ -109,9 +130,9 @@ if (isset($o['mutants'])) {
         // rewrite guards: P9 (a dropped fact token) and L16 (a paragraph over the budget).
         $anyP2 = array_merge($anyP, array('P9', 'L16'));
         $M = array(
-            'audience-mismatch' => array('edits' => array(array('help/topics/sqlHelpLightbox.php', 'class="help-topic" data-audience="writer"', 'class="help-topic" data-audience="viewer"', 1)), 'expect' => array('L3'), 'allow' => array()),
+            'audience-mismatch' => array('edits' => array(array('help/topics/sqlHelpLightbox.php', 'class="help-topic" data-audience="writer"', 'class="help-topic" data-audience="viewer"', 1)), 'expect' => array('L3'), 'allow' => array('A6')),
             'dangling-jump'     => array('edits' => array(array('help/topics/pivotBuilderHelpLightbox.php', 'data-jump-to="pvh-presets"', 'data-jump-to="pvh-presetz"', 1)), 'expect' => array('L5'), 'allow' => array()),
-            'missing-fragment'  => array('edits' => array(array('help/topics/saveIdHelpLightbox.php', null, null, 0)), 'expect' => array('L1', 'P1', 'E4a', 'E5'), 'allow' => array('P2', 'P5', 'P6', 'P7')),
+            'missing-fragment'  => array('edits' => array(array('help/topics/saveIdHelpLightbox.php', null, null, 0)), 'expect' => array('L1', 'P1', 'E4a', 'E5'), 'allow' => array('P2', 'P5', 'P6', 'P7', 'L16', 'P9')),
             'dup-id'            => array('edits' => array(array('help/topics/groupingHelpLightbox.php', 'id="grh-opening"', 'id="grh-overview"', 1)), 'expect' => array('L4', 'L5', 'P2'), 'allow' => array()),
             'unbalanced-div'    => array('edits' => array(array('help/topics/emailHelpLightbox.php', "    </div>\n</div>\n", "    </div>\n", 1)), 'expect' => array('L8'), 'allow' => array_merge($anyE, $anyP2)),
             'text-drift'        => array('edits' => array(array('help/topics/whatIsPenumbraLightbox.php', 'Democratized Analytics', 'Democratised Analytics', 1)), 'expect' => array('P7'), 'allow' => array()),
@@ -122,7 +143,32 @@ if (isset($o['mutants'])) {
             'php-error'         => array('edits' => array(array('help/topics/copyHelpLightbox.php', "<?php if (pnb_help_show('writer')):", "<?php if (pnb_help_show('writer'):", 2)), 'expect' => array('L9', 'E-php'), 'allow' => array_merge($anyE, $anyP2)),
             'fact-dropped'      => array('edits' => array(array('help/topics/dashboardsHelpLightbox.php', '<code>Data Feed for pi_name</code>', '<code>Data Feed for pi_nam</code>', 1)), 'expect' => array('P9'), 'allow' => array()),
             'long-paragraph'    => array('edits' => array(array('help/topics/dashboardsHelpLightbox.php', '<h4 id="dsh-notes"', '<p>' . trim(str_repeat('ninety words of filler ', 30)) . '</p><h4 id="dsh-notes"', 1)), 'expect' => array('L16'), 'allow' => array()),
+            // phase 3 (2026-10-15): the writer/admin rewrites. A cell over budget in the Scheduler book -> L16; the
+            // recipient-variables chart id (main.js clones #pnbRecipientVarsChart into two other topics) -> P2; an id an
+            // index.php help icon targets (dbDumpHelp-destination) -> P2 + L5.
+            'phase3-long-cell'  => array('edits' => array(array('help/topics/schedulerHelpLightbox.php', 'max-width: none;">1</td>', 'max-width: none;">1 ' . trim(str_repeat('eighty words of filler ', 27)) . '</td>', 1)), 'expect' => array('L16'), 'allow' => array()),
+            'phase3-chart-id'   => array('edits' => array(array('help/topics/schedulerPromptHelpLightbox.php', 'id="pnbRecipientVarsChart"', 'id="pnbRecipientVarsChartX"', 1)), 'expect' => array('P2'), 'allow' => array()),
+            'phase3-icon-anchor'=> array('edits' => array(array('help/topics/schedulerHelpLightbox.php', 'id="dbDumpHelp-destination"', 'id="dbDumpHelp-destinatio"', 1)), 'expect' => array('P2', 'L5'), 'allow' => array()),
+            // phase 4 (2026-10-15): the Custom Code reference is generated from help/snippets.php. A registry edit
+            // without a regeneration -> L17; a registry name that is not an editor function -> L18 (+ L17, stale).
+            'registry-stale'    => array('edits' => array(array('help/snippets.php', "'summary' => 'Counts rows matching", "'summary' => 'Counts the rows matching", 1)), 'expect' => array('L17'), 'allow' => array()),
+            'registry-name'     => array('edits' => array(array('help/snippets.php', "'names' => array('avg')", "'names' => array('avgx')", 1)), 'expect' => array('L17', 'L18'), 'allow' => array()),
+            // phase 4b (2026-10-15): a flex-div pseudo-table row in a standard topic -> L19.
+            'flex-table'        => array('edits' => array(array('help/topics/dashboardsHelpLightbox.php', '<h4 id="dsh-notes"', '<div style="display: flex; gap: 8px; padding: 2px 0;"><div style="flex: 0 0 100px; padding-left: 6px;">x</div><div style="flex: 1; min-width: 0;">y</div></div><h4 id="dsh-notes"', 1)), 'expect' => array('L19'), 'allow' => array()),
         );
+        if ($phase >= 6) {
+            // phase 6 (2026-10-15): the Ask page. Each mutant breaks one promise of help/ask.php (or the audience
+            // filter in help_retrieval.php) and must turn only its A-check red: the card cache, the no-passage
+            // gate, the text-only answer, the day budget, the audience filter, the card audience.
+            $M['ask-no-card-hit']   = array('edits' => array(array('help/ask.php', '$i = pnb_ask_find_card($data, $norm, $tokens, $allowedAud);', '$i = null;', 1)), 'expect' => array('A2'), 'allow' => array('A3', 'A8', 'A11'));   // A3 and A11 lean on the cache too
+            $M['ask-no-empty-gate'] = array('edits' => array(array('help/ask.php', '        if (!$chunks) {', '        if (false && !$chunks) {', 1)), 'expect' => array('A5'), 'allow' => array());
+            $M['ask-no-strip']      = array('edits' => array(array('help/ask.php', '    $t = strip_tags($t);', '    $t = (string)$t;', 1)), 'expect' => array('A7'), 'allow' => array());
+            $M['ask-no-daily']      = array('edits' => array(array('help/ask.php', "    if ((int)\$d['n'] >= \$limit) {", '    if (false) {', 1)), 'expect' => array('A4'), 'allow' => array());
+            $M['ask-no-audience']   = array('edits' => array(array('help_retrieval.php', "            if (\$allowedAud !== null && isset(\$c['a']) && !in_array(\$c['a'], \$allowedAud, true)) continue;   // not for this reader\n", '', 1)), 'expect' => array('A6'), 'allow' => array());
+            $M['ask-card-leak']     = array('edits' => array(array('help/ask.php', "        if (!empty(\$c['retired']) || !pnb_ask_card_visible(\$c, \$allowedAud)) continue;", "        if (!empty(\$c['retired'])) continue;", 1)), 'expect' => array('A6'), 'allow' => array());
+            $M['ask-no-notice']     = array('edits' => array(array('help/ask.php', "    if (pnb_ask_audience_rank(\$needAud) <= pnb_ask_audience_rank(\$role)) return '';", "    return '';", 1)), 'expect' => array('A11'), 'allow' => array());
+            $M['ask-no-recall']     = array('edits' => array(array('help_retrieval.php', '            $need = min(2, count($qTerms));', '            $need = 2;', 1)), 'expect' => array('R6'), 'allow' => array());
+        }
     } else {
         $M = array(
             'audience-mismatch' => array('edits' => array(array('help/topics/sqlHelpLightbox.php', 'class="help-topic" data-audience="writer"', 'class="help-topic" data-audience="viewer"', 1)), 'expect' => array('L3'), 'allow' => array()),
@@ -153,7 +199,9 @@ if (isset($o['mutants'])) {
         if (!$applied) { $mutantFails++; printf("  %-18s FAIL (could not apply)\n", $name); continue; }
         $l = child($php, 'lint_help.php', '--app=' . escapeshellarg($dir) . ' --live=' . escapeshellarg($live) . ' --php=' . escapeshellarg($php));
         $q = child($php, 'equiv_help.php', '--app=' . escapeshellarg($dir) . ' --orig=' . escapeshellarg($orig) . ' --php=' . escapeshellarg($php));
-        $red = array_values(array_unique(array_merge(redIds($l['out']), redIds($q['out']))));
+        $ak = is_file("$dir/help/ask.php") ? child($php, 'ask_tests.php', '--app=' . escapeshellarg($dir) . ' --orig=' . escapeshellarg($orig) . ' --out=' . escapeshellarg($out . '/ask_' . $name)) : array('out' => '', 'code' => 0);
+        $rk = is_file("$dir/help/ask.php") ? child($php, 'retrieval_smoke.php', '--app=' . escapeshellarg($dir) . ' --orig=' . escapeshellarg($orig) . ' --out=' . escapeshellarg($out . '/retrieval_' . $name)) : array('out' => '', 'code' => 0);
+        $red = array_values(array_unique(array_merge(redIds($l['out']), redIds($q['out']), redIds($ak['out']), redIds($rk['out']))));
         $missing = array_diff($spec['expect'], $red);
         $unexpected = array_diff($red, $spec['expect'], $spec['allow']);
         $ok = !$missing && !$unexpected;
@@ -173,7 +221,14 @@ function rcopy($src, $dst) {
     foreach (scandir($src) as $f) {
         if ($f === '.' || $f === '..') continue;
         $s = "$src/$f"; $d = "$dst/$f";
-        if (is_dir($s)) { if ($f === 'cache' || $f === 'js') continue; rcopy($s, $d); }   // js/ (7 MB) is not what mutants break
+        if (is_dir($s)) {
+            if ($f === 'cache') continue;
+            if ($f === 'js') {   // js/ (7 MB) is not what mutants break, but L20 looks for the Ask client (phase 6)
+                if (is_file("$s/penumbra_help_ask.js")) { if (!is_dir($d)) mkdir($d, 0777, true); copy("$s/penumbra_help_ask.js", "$d/penumbra_help_ask.js"); }
+                continue;
+            }
+            rcopy($s, $d);
+        }
         else copy($s, $d);
     }
 }

@@ -16,6 +16,8 @@
 #   Control: live pair -> 6 FAIL; live penumbra_charts.js + staged main.js -> 5 FAIL (no zoom).
 #   Control: -JsDir with the .bak-20261006-mapzoom pair copied into a folder -> RED (10 / 20 + harness stop).
 #   Mutants: contract 10 FAIL, floor 2, ring / clip / nest / labels 1 each.
+# 2026-10-15 (moderate a11y, dash): + Z9-Z11 focus when Zoom out hides itself (cog, else canvas) = 87 / 0
+#   on the staged penumbra_charts.js. Live (control) 2 FAIL (Z9, Z10); stage minus the focusAfterZoomOut call 2 FAIL.
 # Installed copy lives in penumbra_tests\mapzoom. The UNC share blocks .ps1 files,
 # so run it as a scriptblock with -Here:
 #   $d='\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\mapzoom'

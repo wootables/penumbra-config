@@ -27,7 +27,8 @@ SCN = ['curl', 'cadd', 'cstate', 'cclear']
 SCN_Q = {'curl': '&' + CALC_URL}
 CHK = {
     'curl': ['halfShown', 'dblCurrency', 'flagText', 'badLeftOut', 'atEnd', 'panelFromLink', 'summable'],
-    'cadd': ['addButton', 'dialog', 'layout', 'noEarlyError', 'chips', 'chipInserts', 'preview', 'reran', 'added', 'listAfterAdd', 'edited', 'removed', 'listAfterRemove'],
+    'cadd': ['addButton', 'dialog', 'layout', 'noEarlyError', 'chips', 'chipInserts', 'preview', 'reran', 'added', 'listAfterAdd', 'edited', 'removed', 'listAfterRemove',
+             'editFocus', 'removeFocus'],   # moderate 2026-10-15: WCAG 2.4.3
     'cclear': ['before', 'listed', 'cleared'],
     'cstate': ['stateShown', 'viewStateCarries', 'saveStrips'],
 }
@@ -85,6 +86,10 @@ MUTANTS = {
     'm-listrefresh': ([('main', "        if ($('#settingsPanel').hasClass('is-open')) populateSettingsColumns();\r\n", "")], ['L-cadd-listAfterAdd'], ['cadd']),
     'e-listwait': ([('calc', "            if (runs > start && (!!th === !!present)) {\n", "            if (false) {\n")], ['L-cadd-listAfterAdd'], ['cadd']),
     'm-strip': ([('main', "            window.PenumbraCalc.stripFromState(stateObject, $('#resultsTable').data('columnNameToOriginalIndex'));\r\n", "")], ['L-cstate-saveStrips'], ['cstate']),
+    # moderate (2026-10-15, WCAG 2.4.3): the rebuilt list no longer puts focus back
+    'e-nofocusback': ([('calc', "        if (key) restoreListFocus(key, list);\n", "")], ['L-cadd-editFocus', 'L-cadd-removeFocus'], ['cadd']),
+    # ... Save forgets the Edit button that opened the dialog
+    'e-noopener': ([('calc', "        var back = openerKey;\n", "        var back = null;\n")], ['L-cadd-editFocus'], ['cadd']),
 }
 
 args = sys.argv[1:]

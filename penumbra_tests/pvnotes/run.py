@@ -150,7 +150,7 @@ EXPECT = {
     'reveal': ['P-reveal-closed', 'R-reveal', 'R-reveal-other'],
     'off': ['V-off-none', 'K-off-panel', 'K-off-on', 'K-off-counts', 'K-off-status', 'K-off-noflat', 'K-off-saved', 'K-off-off'],
     'exports': ['V-exports-icons', 'X-exports-html', 'X-exports-array', 'X-exports-csv'],
-    'jpanel': ['J-chip-pivot', 'J-chip-row', 'J-chip-tip', 'J-chip-jump'],
+    'jpanel': ['J-chip-pivot', 'J-chip-row', 'J-chip-tip', 'J-chip-jump', 'J-filter-say', 'J-chip-esc'],   # +2 WCAG Moderate (2026-10-15): red on every build before it, so the older --control-* runs show these two red as well
     'wolfpack': ['P-wolf-hover', 'T-wolf-band'],
     'rerender': ['T-rr-race', 'T-rr-keep', 'T-rr-gone', 'T-rr-group'],
     'tooltip': ['P-tip-shown', 'T-tip-gone', 'T-tip-again', 'T-tip-back'],
@@ -167,7 +167,7 @@ EXPECT = {
     'rowgrp': ['P-rg-built', 'C-rg-open', 'C-rg-fold', 'C-rg-flat', 'C-rg-back', 'C-rg-nochild'],
     'server6': ['S-del-exact', 'S-del-order', 'S-del-reply', 'S-del-chunks', 'S-del-audit'],
     'static7': ['S-sweep-clean'],
-    'chbar': ['P-ch-chart', 'V-ch-keys', 'V-ch-pin', 'V-ch-pin-offset', 'V-ch-tip', 'C-ch-menu', 'C-ch-open', 'C-ch-post', 'C-ch-zero',
+    'chbar': ['P-ch-chart', 'V-ch-keys', 'V-ch-pin', 'V-ch-sr', 'V-ch-pin-offset', 'V-ch-tip', 'C-ch-menu', 'C-ch-open', 'C-ch-post', 'C-ch-zero',
               'C-ch-breakdown'],
     'chdrill': ['P-chd-chart', 'V-chd-group', 'V-chd-drilled', 'C-chd-menu', 'C-chd-open'],
     'chpie': ['P-chp-chart', 'V-chp-pin', 'V-chp-tip'],

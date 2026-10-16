@@ -27,7 +27,8 @@
 # plain header). Headless Edge --dump-dom; stages into %TEMP%\pnb_ufl_*; writes
 # nothing to the webroot.
 #
-#   run.ps1                              live files          EXPECTED: 19 / 0
+#   run.ps1                              live files          EXPECTED: 20 / 0 (F20, 2026-10-15: the filter's
+#                                        hidden role=status "N of M" count - red on a build before it)
 #   run.ps1 -UsersegJs <p> [-MainCss <p>] [-ChromePhp <p>]   other copies (a stage build)
 #   run.ps1 -Control [-ControlRev <rev>] the build BEFORE the feature, from git (default
 #                                        $ControlRev below = the commit that shipped it, ^):
@@ -55,7 +56,7 @@ $NL = "`n"   # penumbra_userseg.js is LF
 # The commit that shipped the feature; its parent is the control build.
 $SHIP_COMMIT = '2c6c79b'
 if (-not $ControlRev) { $ControlRev = if ($SHIP_COMMIT -eq 'HEAD') { 'HEAD' } else { "$SHIP_COMMIT^" } }
-$CONTROL_RED = @('F1','F2','F4','F5','F6','F7','F8','F9','F10','F11','F12','F13','F14','F15','F16','F17','F18')
+$CONTROL_RED = @('F1','F2','F4','F5','F6','F7','F8','F9','F10','F11','F12','F13','F14','F15','F16','F17','F18','F20')
 
 if (-not $UsersegJs) { $UsersegJs = "$app\js\penumbra_userseg.js" }
 if (-not $MainCss)   { $MainCss   = "$app\css\main.css" }
@@ -84,6 +85,8 @@ $mutantDefs = [ordered]@{
   # the autofocus guard (2026-10-14 follow-up, 2nd commit): phone = coarse pointer AND narrow viewport
   'noguard'     = @{ edits = @(,@(('        try { if (window.matchMedia && window.matchMedia(''(pointer: coarse) and (max-width: 768px)'').matches) { return; } } catch (e) {}' + $NL), '')); red = @('F17') }
   'pointeronly' = @{ edits = @(,@('window.matchMedia(''(pointer: coarse) and (max-width: 768px)'').matches', 'window.matchMedia(''(pointer: coarse)'').matches')); red = @('F17','F18') }
+  # the filter's "N of M" status count (2026-10-15, WCAG 4.1.3)
+  'nocount'     = @{ edits = @(,@('            if (count.textContent !== say) { count.textContent = say; }', '            if (false) { count.textContent = say; }')); red = @('F20') }
 }
 
 function Apply-Mutant([string]$text, [string]$name) {

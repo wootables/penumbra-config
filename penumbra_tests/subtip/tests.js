@@ -121,7 +121,8 @@
         $(c).trigger('click');
         await sleep(80);
         c = chip();
-        ok(window.__posts.length === 1 && window.__posts[0].action === 'subscribe' && $(c).text() === 'Subscribed', 'S10 the click still subscribes (chip reads Subscribed)', $(c).text());
+        ok(window.__posts.length === 1 && window.__posts[0].action === 'subscribe' && $(c).text() === 'Subscribed' && !c.hasAttribute('aria-pressed') && !c.hasAttribute('aria-expanded') && !c.hasAttribute('aria-label'),
+            'S10 the click still subscribes; one schedule: the words carry the state (Subscribed), no aria-pressed, the name IS the visible text (WCAG 4.1.2, 2026-10-15)', $(c).text() + ' pressed=' + c.getAttribute('aria-pressed') + ' label=' + c.getAttribute('aria-label'));
         enter(c);
         await sleep(450);
         ok(foot() === 'You are subscribed as jdoe@ncsu.edu. Click to unsubscribe.', 'S10 the card now says what the next click does', foot());
@@ -143,7 +144,7 @@
         ];
         window._pnbSubSyncFromTaskList(rows);
         c = chip();
-        ok($(c).text() === 'Subscribed (1/3)' && c.getAttribute('title') === 'This report has 3 email schedules (you receive 1). Click to see them, then hover one to see what it sends.',
+        ok($(c).text() === 'Subscribed (1/3)' && !c.hasAttribute('aria-pressed') && c.getAttribute('aria-expanded') === 'false' && c.getAttribute('title') === 'This report has 3 email schedules (you receive 1). Click to see them, then hover one to see what it sends.',
             'M1 three schedules: the chip counts them and its title says the list explains each', c.getAttribute('title'));
         enter(c);
         await sleep(450);
@@ -154,6 +155,7 @@
         var $rows = $('.pnb-sub-pop .pnb-sub-pop-item');
         ok($rows.length === 3 && $rows.eq(0).attr('data-task-id') === '1345' && $rows.eq(1).attr('data-task-id') === '1400',
             'M3 the list: one row per schedule, each carrying its task id', $rows.length);
+        ok(chip().getAttribute('aria-expanded') === 'true', 'M3 the chip says its list is open (aria-expanded, 2026-10-15)', chip().getAttribute('aria-expanded'));
         ok($rows.eq(0).find('.pnb-sub-pop-subj').text() === 'Proposal Hit Ratio (row count)' && $rows.eq(1).find('.pnb-sub-pop-subj').text() === 'Weekly changes - send date',
             'M3 the rows name {ROW_COUNT} / {SEND_DATE} in words too', $rows.eq(1).find('.pnb-sub-pop-subj').text());
 
@@ -210,7 +212,7 @@
         var e1 = keyOn(b3, 'Escape');
         ok(tip().length === 0 && $('.pnb-sub-pop').length === 1 && e1.defaultPrevented, 'M10 first Escape: the card only');
         var e2 = keyOn(b3, 'Escape');
-        ok($('.pnb-sub-pop').length === 0 && document.activeElement === chip() && e2.defaultPrevented && window.__centralEsc === before,
+        ok($('.pnb-sub-pop').length === 0 && document.activeElement === chip() && chip().getAttribute('aria-expanded') === 'false' && e2.defaultPrevented && window.__centralEsc === before,
             'M10 second Escape: the list closes and focus returns to the chip (the app never saw either)', 'pop=' + $('.pnb-sub-pop').length + ' active=' + (document.activeElement && document.activeElement.id) + ' central=' + (window.__centralEsc - before));
         chip().blur();
 

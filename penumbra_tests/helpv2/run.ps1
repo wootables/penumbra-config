@@ -3,11 +3,11 @@
 #
 #   run.ps1                          the LIVE webroot as both app and orig (after the deploy)
 #   run.ps1 -App <stage> -Orig <dir> a stage build against the v1 files in <dir>
-#   run.ps1 ... -Mutants             also run the nine mutants (the suite's control)
+#   run.ps1 ... -Mutants             also run the mutants (the suite's control; 27 in phase 6)
 #   run.ps1 ... -SkipCoverage        skip the coverage map (it is report-only anyway)
 #   -Out <dir>                       scratch dir (renders, caches, coverage_report.md)
 #
-# What it checks (see run.php for the ids): L1-L13 structural lint of help/ and its
+# What it checks (see run.php for the ids): L1-L20 structural lint of help/ and its
 # consumers, E0-E7 v1/v2 render equivalence + the audience gate matrix, R1-R5 the AI
 # help retrieval over the fragments; the coverage map is printed, never red.
 #

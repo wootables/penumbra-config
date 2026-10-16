@@ -330,6 +330,7 @@
         ok('D8 choosing Set shows the value control', !$d.find('.pbs-row[data-row="theme"] .pbs-val').prop('hidden'));
         $d.find('.pbs-row[data-row="theme"] .pbs-value').val('theme-dark-blue');
         $d.find('.pbs-mode[data-field="view:hideExport"]').val('hide').trigger('change');
+        $d.find('.pbs-preview-btn')[0].focus();   // a keyboard user presses it (moderate 2026-10-15: D25-D27)
         $d.find('.pbs-preview-btn').trigger('click');
         var pv = await wait(function () { return !$d.find('.pbs-step-preview').prop('hidden'); });
         ok('D9 preview shows', pv);
@@ -338,16 +339,33 @@
         ok('D11 the protected report says why it was skipped', /current password/.test(rows.eq(2).text()), rows.eq(2).text());
         ok('D12 the field summary shows a mixed selection', /Theme/.test($d.find('.pbs-fieldsum').text()), $d.find('.pbs-fieldsum').text());
         eq('D13 Apply names the count', $d.find('.pbs-apply-btn').text(), 'Apply to 2 reports');
+        // WCAG 2.4.3 (moderate 2026-10-15): the pressed button is hidden by the step change, so
+        // focus moves to the new step (the preview's summary line) instead of dropping to the page
+        var ae = document.activeElement;
+        ok('D25 Preview: focus lands on the preview summary', !!ae && $(ae).is('.pbs-step-preview .pbs-summary') && ae.getAttribute('tabindex') === '-1',
+            ae && (ae.tagName + '.' + ae.className));
 
         // Escape in the preview steps back, and the repository underneath never sees it.
+        $d.find('.pbs-apply-btn')[0].focus();
         var ev = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true });
         document.body.dispatchEvent(ev);
         ok('D14 Escape steps back to the form', !$d.find('.pbs-step-edit').prop('hidden') && $('.pbs-overlay').length === 1);
         eq('D15 Escape does not reach the page underneath', docEsc, 0);
+        ae = document.activeElement;
+        ok('D26 Escape from Apply: focus on the Preview button, not the page', !!ae && $(ae).is('.pbs-preview-btn'), ae && (ae.tagName + '.' + ae.className));
+        $d.find('.pbs-preview-btn').trigger('click');
+        await wait(function () { return !$d.find('.pbs-step-preview').prop('hidden'); });
+        $d.find('.pbs-back-btn')[0].focus();
+        $d.find('.pbs-back-btn').trigger('click');
+        ae = document.activeElement;
+        ok('D27 Back: focus on the Preview button, not the page', !$d.find('.pbs-step-edit').prop('hidden') && !!ae && $(ae).is('.pbs-preview-btn'), ae && (ae.tagName + '.' + ae.className));
         $d.find('.pbs-preview-btn').trigger('click');
         await wait(function () { return !$d.find('.pbs-step-preview').prop('hidden'); });
 
+        $d.find('.pbs-apply-btn')[0].focus();
         $d.find('.pbs-apply-btn').trigger('click');
+        ae = document.activeElement;
+        ok('D28 Apply: focus on the run\'s progress line', !!ae && $(ae).is('.pbs-step-run .pbs-progress'), ae && (ae.tagName + '.' + ae.className));
         var fin = await wait(function () { return !$d.find('.pbs-step-done').prop('hidden') && /saved/.test($d.find('.pbs-step-done').text()); }, 6000);
         ok('D16 the run finishes', fin);
         var saves = calls.filter(function (c) { return c.url === 'save_server_state.php'; });

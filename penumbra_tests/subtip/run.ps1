@@ -151,6 +151,10 @@ $jsMutants = @(
     @{ Name = 'list toggle leaves the card stale'; Part = 'subs'; Expect = 1; Edits = @(,@("if (`$subTip && subTipTask === t) `$subTip.html(subTipHtml(t));", "")) },
     @{ Name = 'card closes on any resize'; Part = 'subs'; Expect = 1; Edits = @(,@("`$(window).on('resize', subTipFollow);", "`$(window).on('resize', subTipHide);")) },
     @{ Name = 'multi chip keeps the old one-schedule title'; Part = 'subs'; Expect = 1; Edits = @(,@("            } else if (tasks.length > 1) {$nl                title = chipListTitle(n);$nl            }", "            }")) },
+    # WCAG 4.1.2 (2026-10-15): one schedule = words carry the state, no aria-pressed; the list chip says when it is open
+    @{ Name = 'toggle carries aria-pressed again'; Part = 'subs'; Expect = 2; Edits = @(,@(".attr('aria-expanded', listMode ? 'false' : null)", ".attr('aria-pressed', on ? 'true' : 'false').attr('aria-expanded', listMode ? 'false' : null)")) },
+    @{ Name = 'toggle label frozen (Subscribed never shown)'; Part = 'subs'; Expect = 1; Edits = @(,@("            var listMode = tasks.length > 1;", "            var listMode = tasks.length > 1; if (!listMode) label = 'Subscribe';")) },
+    @{ Name = 'list open not told (aria-expanded)'; Part = 'subs'; Expect = 1; Edits = @(,@("            `$('#pnbSubscribeBtn[aria-expanded]').attr('aria-expanded', 'true');$nl", "")) },
     @{ Name = 'tooltip left over the open popup'; Part = 'link'; Expect = 1; Edits = @(,@("        btn.removeAttribute('title');$nl", "")) },
     @{ Name = 'automatic text typed back is stored'; Part = 'link'; Expect = 1; Edits = @(,@("            if (v === _schedLinkTextAuto(kind)) v = '';$nl", "")) },
     @{ Name = 'line breaks kept'; Part = 'link'; Expect = 1; Edits = @(,@(".replace(/\s+/g, ' ').trim();", ".trim();")) },

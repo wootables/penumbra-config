@@ -1,0 +1,21 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="main.css"></head><body class="pnb-adm" style="padding:60px">
+<p><span class="pnb-i" tabindex="0" role="button" aria-expanded="false" aria-label="About x" aria-describedby="tp1" id="ti"><span class="pnb-i-tip" id="tp1" role="tooltip">Tip text</span></span></p>
+<p><button id="other">other</button></p><pre id="out">running</pre>
+<script>(function(){ %%TIPJS%% })();
+var i=document.getElementById('ti'), o=document.getElementById('other'), tip=document.getElementById('tp1'), out=[];
+function vis(){ return getComputedStyle(tip).display!=='none'; }
+function st(n){ out.push(n+': expanded='+i.getAttribute('aria-expanded')+' shown='+vis()); }
+function tick(){ return new Promise(function(r){ setTimeout(r,30); }); }
+function ev(t,type){ t.dispatchEvent(new MouseEvent(type,{bubbles:true,cancelable:true})); }
+(async function(){
+  i.focus(); await tick(); st('T1 focus (want true/true)');
+  o.focus(); await tick(); st('T2 focus moves away (want false/false)');
+  i.focus(); await tick(); st('T3 focus again (want true/true)');
+  document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true})); await tick(); st('T4 Escape (want false/false)');
+  o.focus(); await tick(); i.focus(); await tick(); st('T5 reopen after Escape (want true/true)');
+  ev(i,'mousedown'); ev(i,'click'); await tick(); st('T6 click focused (i) closes (want false/false)');
+  ev(i,'mousedown'); ev(i,'click'); await tick(); st('T7 click again opens (want true/true)');
+  ev(o,'mousedown'); o.focus(); ev(o,'click'); await tick(); st('T8 click elsewhere (want false/false)');
+  document.getElementById('out').textContent=out.join('\n');
+})();
+</script></body></html>

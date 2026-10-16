@@ -73,9 +73,12 @@ $mutantDefs = [ordered]@{
   # a replacement node lands at the end instead of resuming the slide
   'noresume'   = @{ edits = @(,@('        var resume = m.from >= 0 && spent < dur;', '        var resume = false;')); red = @('R1') }
   # the switch click is no longer dropped mid-change
-  'noguard'    = @{ edits = @(,@("        e.preventDefault();$NL        if (_pnbMotionBusy()) return;$NL        // WCAG 2.4.3: the re-render replaces this node", "        e.preventDefault();$NL        // WCAG 2.4.3: the re-render replaces this node")); red = @('M5','M6') }
+  'noguard'    = @{ edits = @(,@("        e.preventDefault();$NL        if (_pnbMotionBusy()) { _pnbBusyNotice(); return; }$NL        // WCAG 2.4.3: the re-render replaces this node", "        e.preventDefault();$NL        // WCAG 2.4.3: the re-render replaces this node")); red = @('M5','M6') }
   # the arrow keys are no longer dropped mid-change (focus walks away from the thumb)
-  'nokeyguard' = @{ edits = @(,@("        if (_pnbMotionBusy()) return;$NL        var `$sw = `$(this).closest('.pnb-layout-switch');", "        var `$sw = `$(this).closest('.pnb-layout-switch');")); red = @('M5') }
+  'nokeyguard' = @{ edits = @(,@("        if (_pnbMotionBusy()) { _pnbBusyNotice(); return; }$NL        var `$sw = `$(this).closest('.pnb-layout-switch');", "        var `$sw = `$(this).closest('.pnb-layout-switch');")); red = @('M5') }
+  # (2026-10-15) a dropped press is silent again / the end of a load is silent again
+  'nobusysay'  = @{ edits = @(,@("        _pnbStatusWrite('Still loading. Try again in a moment.');", '')); red = @('M5b') }
+  'noloadedsay' = @{ edits = @(,@("        if (_pnbWasLoading) _pnbLoadSay('Loaded', 300);", '')); red = @('M6b') }
   # every load is full screen again
   'noscope'    = @{ edits = @(,@('            _pnbLoadingScope(_pnbWantScope);', '            _pnbLoadingScope(false);')); red = @('M4','F2','P2','T2','V1','V6') }
   # only switch-driven loads are scoped: Remove Grouping / Restore / sorts go full screen again

@@ -120,6 +120,7 @@ $mutantDefs = [ordered]@{
   'dashlist'    = @{ file = 'dash'; edits = @(,@('        var on = !!V.shortId && !dashKeysOff();', '        var on = !dashKeysOff();')); red = @('D10') }
   'dashnorender'= @{ file = 'dash'; edits = @(,@("        renderHead();   // the header's key hints follow the switch at once", '')); red = @('D5') }
   # health.php
+  'segkeys'     = @{ file = 'main'; edits = @(,@("    `$(document).on('keydown', '#searchHelpIcon, .pnb-sbox > .pnb-sbox-seg[role=""button""]', function (e) {", "    `$(document).on('keydown', '#noSuchSegment', function (e) {")); red = @('G1') }   # (2026-10-15)
   'healthcaps'  = @{ file = 'health'; edits = @(,@("if (e.key === 'r' || e.key === 'R') {", "if (e.key === 'r') {")); red = @('H2') }
 }
 

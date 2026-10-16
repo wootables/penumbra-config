@@ -767,5 +767,34 @@ $s = $rd23($lnd23); if ($s !== '') { ok(strpos($s, "var tm = (q || '').match(/^t
 $s = $rd23($idx23); if ($s !== '') { ok(strpos($s, 'penumbraTagsVocabularyRead($pnbVocConn)') !== false && strpos($s, "fetchAll(PDO::FETCH_COLUMN), PHP_INT_MAX);   // uncapped, like the save") !== false, 'the report page: the three-kind vocabulary, the pills preloaded uncapped'); }
 
 
-echo "\nPASS: $PASS   FAIL: $FAIL\n";
-echo 'RESULT: ' . ($FAIL === 0 ? 'GREEN' : 'RED') . "\n";
+// ---------------------------------------------- 24. WCAG moderate fixes (2026-10-15): the Tags tool, the repository, the chrome bar
+echo "24. WCAG moderate fixes: errors and counts announced, a locked tag says so, keyboard column widths, the bar's live region\n";
+$pt24 = $rd23(isset($argv[4]) ? $argv[4] : ''); $rep24 = $rd23(isset($argv[11]) ? $argv[11] : ''); $chr24 = $rd23(isset($argv[14]) ? $argv[14] : ''); $rcs24 = $rd23(isset($argv[20]) ? $argv[20] : '');
+if ($pt24 !== '') {
+    ok(strpos($pt24, "hint.setAttribute('role', 'alert');") !== false && strpos($pt24, "db.push(hint.id); input.setAttribute('aria-describedby', db.join(' '));") !== false
+       && strpos($pt24, "if (msg) input.setAttribute('aria-invalid', 'true'); else input.removeAttribute('aria-invalid');") !== false, 'a pill box error is an alert tied to its input (aria-describedby), the input aria-invalid while it shows (3.3.1 / 4.1.3)');
+    ok(strpos($pt24, '<div class="preview" id="newTagPreview" aria-live="polite">') !== false && strpos($pt24, '<div class="box" id="renamePreview" aria-live="polite">') !== false
+       && strpos($pt24, 'aria-describedby="newTagPreview newTagWarnText"') !== false, 'the New tag and Rename previews are live, and the name box is described by the look-alike warning too (4.1.3)');
+    ok(strpos($pt24, "var empty = !n ? newName : (ta || f.querySelector('input[type=\"checkbox\"]') || f.querySelector('input[type=\"search\"]')); if (empty) empty.focus(); }") !== false
+       && strpos($pt24, "if (renameName && (!rn || rn === CURRENT)) { ev.preventDefault();") !== false, 'a failed New tag / Rename submit puts focus on the empty field, not the button (3.3.1)');
+    ok(strpos($pt24, 'id="tagsFindNote" role="status"') !== false && strpos($pt24, 'id="tagTableNote" role="status"') !== false && strpos($pt24, 'id="untaggedCount" role="status"') !== false
+       && strpos($pt24, 'id="untaggedDashCount" role="status"') !== false && strpos($pt24, "fnote.setAttribute('role', 'status');") !== false
+       && strpos($pt24, "fnote.textContent = q ? (shown + ' of ' + rows.length) : '';") !== false, 'every filtered list has one role=status count: the strip, the catalog, the ticked counts and each tag-page list filter (4.1.3)');
+}
+if ($rep24 !== '') {
+    ok(strpos($rep24, '<svg class="repo-tag-lock"') !== false && strpos($rep24, '<span class="sr-only"> (locked)</span>') !== false, 'a tag you cannot remove carries a lock glyph and hidden "(locked)" text, not opacity alone (1.4.1 / 1.3.1)');
+    ok(strpos($rep24, "if (!key || (k !== '+' && k !== '=' && k !== '-' && k !== '_' && k !== '0')) { return; }") !== false
+       && strpos($rep24, 'repoColWidthsReset') === false && strpos($rep24, '<button type="button" id="repoColsReset" class="rc-reset">Reset to defaults</button>') !== false,
+       'repository widths without a mouse: + / - / 0 on a focused header; reset-all is the chooser\'s Reset to defaults, no second reset button (user 2026-10-15) (2.1.1)');
+}
+if ($rcs24 !== '') {
+    $pb24 = preg_match('/#serverReportDetailsPane \.repo-owner-edit, #serverReportDetailsPane \.repo-tag-edit \{([^}]*)\}/', $rcs24, $m24) ? $m24[1] : null;
+    ok($pb24 !== null && strpos($pb24, 'opacity') === false, 'the Edit-tags and owner pencils rest at full opacity (1.4.11)');
+}
+if ($chr24 !== '') {
+    ok(strpos($chr24, '<div id="pnbStatusBar" role="region" aria-label="Status bar">') !== false && strpos($chr24, 'role="status" aria-label="Status bar"') === false
+       && strpos($chr24, "'<span class=\"sr-only\" id=\"sbUserFilterCount\" role=\"status\"></span>'") !== false, 'the chrome bar is a region, not one live region round the popover; the filter count has its own hidden status span (4.1.3)');
+}
+
+
+echo "\nPASS: $PASS   FAIL: $FAIL\n";echo 'RESULT: ' . ($FAIL === 0 ? 'GREEN' : 'RED') . "\n";

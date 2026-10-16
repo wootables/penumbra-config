@@ -290,6 +290,25 @@
   }
 
   // ------------------------------------------------------------------ O
+  // (2026-10-15, WCAG 2.1.1 / 4.1.2) the search box's role=button segments are tab stops and take Enter and Space as a click;
+  // the field names the column arrow's Alt+Down twin
+  async function phaseG() {
+    var out = {};
+    ['searchBuilderIcon', 'tableSearchCols'].forEach(function (id) {
+      var el = document.getElementById(id), n = 0, pv = [];
+      if (!el) { out[id] = 'missing'; return; }
+      $(el).on('click.sktG', function (e) { n++; e.stopImmediatePropagation(); return false; });
+      ['Enter', ' '].forEach(function (k) {
+        var ev = new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true });
+        el.dispatchEvent(ev); pv.push(ev.defaultPrevented);
+      });
+      $(el).off('click.sktG');
+      out[id] = { tab: el.tabIndex, clicks: n, prevented: pv.join(',') };
+    });
+    var ok = Object.keys(out).every(function (k) { var o = out[k]; return o.tab === 0 && o.clicks === 2 && o.prevented === 'true,true'; });
+    rec('G1 the search box segments are tab stops and Enter / Space press them', ok, JSON.stringify(out));
+    rec('G2 the search field names Alt+Down (aria-keyshortcuts)', $('#tableSearch').attr('aria-keyshortcuts') === 'Alt+ArrowDown', $('#tableSearch').attr('aria-keyshortcuts'));
+  }
   async function phaseO() {
     var b = badges();
     rec('O1 a page loaded with the switch already off: html.pnb-keys-off from the start, the badges hidden', b.cls && b.table === 'none' && b.home === 'none' && b.repo === 'none', JSON.stringify(b));
@@ -333,6 +352,7 @@
     await phaseK();
     await phaseS();
     await phaseB();
+    await phaseG();
     rec('Z1 no page errors', errs().length === 0, errs().slice(0, 5).join(' | ') || 'none');
     finish();
   }

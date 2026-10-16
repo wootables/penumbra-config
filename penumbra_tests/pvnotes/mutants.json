@@ -2931,5 +2931,20 @@
   "scn": [
    "bands"
   ]
+ },
+ "cnsrline": {
+  "file": "main",
+  "edits": [
+   [
+    "        try { _cnSrPaint(chart, cfg, want); } catch (eSr) { }\r\n",
+    ""
+   ]
+  ],
+  "must": [
+   "V-ch-sr"
+  ],
+  "scn": [
+   "chbar"
+  ]
  }
 }

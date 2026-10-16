@@ -35,7 +35,10 @@ function build($php, $app, $orig, $out, $v2) {
         . "\$titles = array(); foreach (\$c['chunks'] as \$ch) { \$titles[\$ch['t']] = isset(\$titles[\$ch['t']]) ? \$titles[\$ch['t']] + 1 : 1; }\n"
         . "\$q1 = pnb_help_retrieve('how do I schedule an email report to go out every monday');\n"
         . "\$q2 = pnb_help_retrieve(\"select award_id, amount\\nfrom awards where amount > 500000\");\n"
-        . "echo json_encode(array('n' => \$c['n'], 'sig' => \$c['src_mtime'], 'auds' => \$auds, 'titles' => count(\$titles), 'q1' => substr(\$q1, 0, 400), 'q1topic' => (preg_match('/\\\\[Topic: ([^\\\\]]+)\\\\]/', \$q1, \$m) ? \$m[1] : ''), 'q2len' => strlen(\$q2), 'files' => array_map('basename', pnb_help_src_files()), 'cache' => pnb_help_cache_paths()));\n";
+        . "\$q3 = function_exists('pnb_help_retrieve_chunks') ? pnb_help_retrieve_chunks('how do i hide a column', 5, null, 'ask') : array();\n"
+        . "\$q3ids = array(); foreach (\$q3 as \$ch) \$q3ids[] = isset(\$ch['id']) ? \$ch['id'] : \$ch['t'];\n"
+        . "\$q3a = pnb_help_retrieve('how do i hide a column');\n"
+        . "echo json_encode(array('n' => \$c['n'], 'sig' => \$c['src_mtime'], 'auds' => \$auds, 'titles' => count(\$titles), 'q1' => substr(\$q1, 0, 400), 'q1topic' => (preg_match('/\\\\[Topic: ([^\\\\]]+)\\\\]/', \$q1, \$m) ? \$m[1] : ''), 'q2len' => strlen(\$q2), 'q3ids' => \$q3ids, 'q3alen' => strlen(\$q3a), 'files' => array_map('basename', pnb_help_src_files()), 'cache' => pnb_help_cache_paths()));\n";
     file_put_contents($script, $code);
     $outp = (string)shell_exec(escapeshellarg($php) . ' -n ' . escapeshellarg($script) . ' 2>&1');
     $j = json_decode(trim($outp), true);
@@ -54,6 +57,11 @@ $R->check('R3', $v2 && stripos($v2['q1topic'], 'Scheduler') !== false, 'v2 retri
 $R->check('R4', $v2 && $v2['q2len'] === 0, 'a pasted SQL statement retrieves nothing (len ' . ($v2 ? $v2['q2len'] : '?') . ')');
 $R->check('R5', $v1 && $v2 && $v1['cache'][0] !== $v2['cache'][0] && is_file($v1['cache'][0]) && is_file($v2['cache'][0]) && $v1['sig'] != $v2['sig'],
     'separate caches: ' . ($v1 ? basename($v1['cache'][0]) : '?') . ' / ' . ($v2 ? basename($v2['cache'][0]) : '?') . ', signatures ' . ($v1 ? json_encode($v1['sig']) : '?') . ' / ' . ($v2 ? json_encode($v2['sig']) : '?'));
+
+// R6 / R7 (2026-10-15 evening): the Ask page's recall mode answers a one-term question; the assistant keeps its precision gate.
+$okCol = array('userSettingsHelpLightbox', 'viewoptionsHelpLightbox', 'columnSummariesHelpLightbox');
+$R->check('R6', $v2 && !empty($v2['q3ids']) && in_array($v2['q3ids'][0], $okCol, true), 'ask mode: "how do i hide a column" lands on ' . ($v2 ? json_encode(array_slice((array)$v2['q3ids'], 0, 3)) : '?'));
+$R->check('R7', $v2 && isset($v2['q3alen']) && (int)$v2['q3alen'] === 0, 'assist mode keeps its precision gate for the same words (len ' . ($v2 ? $v2['q3alen'] : '?') . ')');
 
 $failed = $R->failed();
 echo $failed ? ('retrieval RED: ' . implode(' ', $failed) . "\n") : "retrieval GREEN\n";

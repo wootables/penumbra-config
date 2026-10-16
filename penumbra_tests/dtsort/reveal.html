@@ -1,0 +1,56 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>table controller harness</title>
+<!-- Page 3 (WCAG Moderate fixes, 2026-10-15): the per-table controller from
+     analytics_shared.php (penumbra_an_shared_js(), rendered whole by run.ps1 into
+     reveal.js) over a card with a quick filter and NO footer, plus a clipped
+     cell holding a link.
+       R1/R2 4.1.3: the footer-less card says its filter count through a polite
+             status (debounced), and says when the filter is cleared
+       R3/R4 2.1.1: focus on a control in a clipped cell expands it like the
+             mouse does; focus leaving closes it
+     CONTROL: -App <a folder with the pre-fix analytics_shared.php> -> R1..R3 red (R4 guards the close: it goes red only when the focusout half is dropped). -->
+<style>
+  body { font: 13px sans-serif; margin: 16px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+  table.dt td { max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* main.css's td clip */
+  table.dt td.cell-to-expand { white-space: normal; }
+</style>
+</head><body>
+<div class="card" data-pnb-table id="c1">
+  <h3>Short list <span class="h3-right"><span class="tbl-tools" data-noun="reports"><input type="search" class="tt-filter" aria-label="Filter the list"></span></span></h3>
+  <table class="dt"><thead><tr><th>Report</th><th>N</th></tr></thead><tbody>
+    <tr><td><a href="#a" id="lnk">A very long report title that cannot fit in eighty pixels</a></td><td>1</td></tr>
+    <tr><td>beta</td><td>2</td></tr>
+    <tr><td>gamma</td><td>3</td></tr>
+    <tr><td>beta two</td><td>4</td></tr>
+    <tr><td>delta</td><td>5</td></tr>
+  </tbody></table>
+</div>
+<button type="button" id="elsewhere">elsewhere</button>
+<div id="out">running</div>
+<script src="reveal.js"></script>
+<script>
+var log = [], fails = 0;
+function ok(c, l) { log.push((c ? 'ok   ' : 'FAIL ') + l); if (!c) fails++; }
+var box = document.querySelector('#c1 .tt-filter');
+box.value = 'beta'; box.dispatchEvent(new Event('input'));
+setTimeout(function () {
+  var st = document.querySelector('#c1 .an-filter-status');
+  ok(!!st && st.getAttribute('role') === 'status' && st.textContent === '2 of 5 reports match',
+     'R1 a footer-less card says its filter count through a polite status (' + (st ? st.getAttribute('role') + ': ' + st.textContent : 'no status') + ')');
+  box.value = ''; box.dispatchEvent(new Event('input'));
+  setTimeout(function () {
+    ok(!!st && st.textContent === 'Filter cleared, 5 reports', 'R2 clearing the filter is said too (' + (st ? st.textContent : 'no status') + ')');
+    var a = document.getElementById('lnk'), td = a.closest('td');
+    a.focus();
+    ok(td.classList.contains('cell-to-expand'), 'R3 focus on a link in a clipped cell expands the cell, like the mouse');
+    a.blur();   // focus leaves for nothing focusable (a click on plain page): no focusin anywhere
+    var closedOnBlur = !td.classList.contains('cell-to-expand');
+    a.focus(); document.getElementById('elsewhere').focus();
+    ok(closedOnBlur && !td.classList.contains('cell-to-expand'), 'R4 focus leaving the cell closes it (blur to the page, and focus moving to another control)');
+    log.push('SUMMARY fails=' + fails);
+    document.getElementById('out').textContent = log.join('\n');
+  }, 800);
+}, 800);
+</script>
+</body></html>

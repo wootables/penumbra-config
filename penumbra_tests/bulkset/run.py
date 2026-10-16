@@ -97,6 +97,12 @@ MUTANTS = {
                       ['D23', 'D24']),
     'pwplaceholder': ([('autocomplete="new-password" aria-label="Confirm new password" placeholder', 'autocomplete="new-password" placeholder')],
                       ['D23', 'D24']),
+    # --- WCAG 2.4.3 moderate 2026-10-15: a step change hides the pressed button; focus must follow ---
+    'nostepfocus': ([("        $r.find('.pbs-body').scrollTop(0);\n        focusStep(step);\n", "        $r.find('.pbs-body').scrollTop(0);\n")],
+                    ['D25', 'D26', 'D27', 'D28']),
+    # only the preview's landing point lost: the summary is not made focusable
+    'nosumtabindex': ([("        if (!$t.is('button, input, select, textarea')) { $t.attr('tabindex', '-1'); }\n", "")],
+                      ['D25', 'D28']),
 }
 
 args = sys.argv[1:]

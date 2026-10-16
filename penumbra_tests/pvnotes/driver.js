@@ -156,8 +156,13 @@
     btns().forEach(function (b) { if (b.textContent !== '') badTxt.push('icon text "' + b.textContent + '"'); });
     leafRows().forEach(function (tr) { var p = partsOf(tr), td = cellOf(tr, 1); if (td && td.textContent.trim() !== p[1]) badTxt.push(p.join('/') + ' leaf text "' + td.textContent.trim() + '"'); });
     rec('V-nested-notext', btns().length > 0 && !badTxt.length, badTxt.slice(0, 3).join(' | ') || (btns().length + ' icons, no text'));
-    rec('V-nested-faint', !!bNone && !!bLeaf && parseFloat(getComputedStyle(bNone).opacity) < 0.5 && getComputedStyle(bLeaf).opacity === '1',
-        'empty ' + (bNone && getComputedStyle(bNone).opacity) + ' noted ' + (bLeaf && getComputedStyle(bLeaf).opacity));
+    // 2026-10-15 (WCAG 1.4.11): an empty note button used to rest at opacity .35 on
+    // #999 (~1.3:1 - invisible as a control). It now rests at FULL opacity in the
+    // per-theme 3:1 control ink (--border-strong): still quieter than a noted one,
+    // which keeps its accent colour. Same id, new contract.
+    rec('V-nested-faint', !!bNone && !!bLeaf && getComputedStyle(bNone).opacity === '1' && getComputedStyle(bLeaf).opacity === '1'
+        && getComputedStyle(bNone).color !== getComputedStyle(bLeaf).color,
+        'empty ' + (bNone && getComputedStyle(bNone).opacity + ' ' + getComputedStyle(bNone).color) + ' noted ' + (bLeaf && getComputedStyle(bLeaf).opacity + ' ' + getComputedStyle(bLeaf).color));
     // The icons never shift the sticky columns: #pivotResultTable is table-layout:
     // fixed (header cells set the widths), so the second sticky column's left
     // still meets the first column's edge. A regression guard - it holds on the
@@ -1040,10 +1045,25 @@
 
   // ---- the journal panel's tags --------------------------------------------
   S.jpanel = async function () {
-    if (!window.PenumbraJournal || !window.PenumbraJournal.open) { fail(['J-chip-pivot', 'J-chip-row', 'J-chip-tip', 'J-chip-jump'], 'no PenumbraJournal'); return; }
+    if (!window.PenumbraJournal || !window.PenumbraJournal.open) { fail(['J-chip-pivot', 'J-chip-row', 'J-chip-tip', 'J-chip-jump', 'J-filter-say', 'J-chip-esc'], 'no PenumbraJournal'); return; }
     window.PenumbraJournal.open();
     await until(function () { return document.querySelectorAll('#journalNotesList .journal-note').length >= 2; }, 4000);
     await sleep(200);
+    // J-filter-say (WCAG 4.1.3, 2026-10-15): the notes quick filter's result is said by a
+    // polite status once typing settles - the count, "No notes match", and the clear.
+    var nAll = document.querySelectorAll('#journalNotesList > .journal-note').length;
+    var sayTxt = function () { var a = document.getElementById('journalNotesAnnounce'); return a ? a.getAttribute('role') + ': ' + a.textContent : 'no status'; };
+    $('#journalSearch').val('Engineering').trigger('input');
+    await sleep(800);
+    var say1 = sayTxt(), vis1 = document.querySelectorAll('#journalNotesList > .journal-note:not(.journal-note-hidden)').length;
+    $('#journalSearch').val('zzqqxx').trigger('input');
+    await sleep(800);
+    var say2 = sayTxt();
+    $('#journalSearch').val('').trigger('input');
+    await sleep(800);
+    var say3 = sayTxt();
+    rec('J-filter-say', say1 === 'status: ' + vis1 + ' of ' + nAll + ' notes shown' && vis1 > 0 && vis1 < nAll + 1 && say2 === 'status: No notes match'
+        && say3 === 'status: Filter cleared, ' + nAll + ' notes', [say1, say2, say3].join(' | ') + ' (' + vis1 + '/' + nAll + ')');
     var pv = arr(document.querySelectorAll('#journalNotesList .journal-note-rowref-btn[data-pv-key]'));
     var rw = arr(document.querySelectorAll('#journalNotesList .journal-note-rowref-btn[data-row-key]'));
     var pvTxt = pv[0] ? pv[0].textContent : '';
@@ -1052,12 +1072,25 @@
         'pivot chips ' + pv.length + ' text "' + pvTxt + '" title "' + (pv[0] && (pv[0].getAttribute('title') || '').slice(0, 45)) + '"');
     rec('J-chip-row', rw.length === 1 && rw[0].getAttribute('data-row-key') === '1001' && !rw[0].hasAttribute('data-pv-key'),
         'row chips ' + rw.length + (rw[0] ? ' key ' + rw[0].getAttribute('data-row-key') : ''));
-    if (!pv.length) { fail(['J-chip-tip', 'J-chip-jump'], 'no pivot chip'); return; }
+    if (!pv.length) { fail(['J-chip-tip', 'J-chip-jump', 'J-chip-esc'], 'no pivot chip'); return; }
     $(pv[0]).trigger('mouseenter');
     await sleep(100);
     var pop = document.getElementById('pnbRowRefPop');
     rec('J-chip-tip', !!pop && /in the pivot/.test(pop.textContent) && /Engineering/.test(pop.textContent), 'tip "' + (pop ? pop.textContent.slice(0, 80) : '') + '"');
+    // J-chip-esc (WCAG 1.4.13, 2026-10-15): the tip is tied to its chip (aria-describedby),
+    // takes the pointer (it stays up while hovered after the chip is left), and Escape
+    // dismisses it without closing the journal dialog under it.
+    var jDesc = pv[0].getAttribute('aria-describedby'), jPe = pop ? getComputedStyle(pop).pointerEvents : '';
     $(pv[0]).trigger('mouseleave');
+    if (pop) $(pop).trigger('mouseenter');
+    await sleep(300);
+    var jStays = !!pop && $(pop).is(':visible') && pop.textContent !== '';
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true }));
+    await sleep(100);
+    var jGone = !!pop && !$(pop).is(':visible') && !pv[0].hasAttribute('aria-describedby');
+    rec('J-chip-esc', jDesc === 'pnbRowRefPop' && jPe !== 'none' && jStays && jGone && $('#journalLightbox').is(':visible'),
+        'describedby ' + jDesc + ', pointer-events ' + jPe + ', stays while hovered ' + jStays + ', Escape closed it ' + jGone + ', dialog still open ' + $('#journalLightbox').is(':visible'));
+    if (pop) $(pop).trigger('mouseleave');
     clickEl(pv[0]);
     await until(function () { return cards().length === 1; }, 3000);
     await sleep(300);
@@ -1176,6 +1209,10 @@
     rec('V-ch-pin', pinsOf(ch).length === 1 && !!pin && pin.getAttribute('data-count') === '2' && pin.classList.contains('has-notes') && at
         && !!lay && lay.getAttribute('aria-hidden') === 'true' && getComputedStyle(lay).pointerEvents === 'none' && after(pin) === '"2"',
         'pins ' + pinsOf(ch).length + (pin ? ' count ' + pin.getAttribute('data-count') : '') + ' ' + cornerTxt(ch, pL, pin) + ' layer ' + !!lay);
+    // (2026-10-15, WCAG 1.3.1) the noted points in WORDS beside the canvas - the marker layer stays aria-hidden
+    var srN = ch.canvas.parentNode ? ch.canvas.parentNode.querySelector('.journal-chartnote-sr') : null;
+    rec('V-ch-sr', !!srN && srN.classList.contains('sr-only') && !srN.closest('[aria-hidden="true"]')
+        && srN.textContent === 'Notes on this chart: Engineering, FY2026: 2 notes. The chart menu opens them.', srN ? srN.textContent : 'no line');
     // The layer follows its canvas wherever the canvas sits in its box: shifted 23px inside its parent and
     // redrawn, the marker is still in the segment's corner.
     var par = ch.canvas.parentNode, padWas = par.style.paddingLeft;
