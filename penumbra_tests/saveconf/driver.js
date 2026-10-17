@@ -126,6 +126,30 @@
       R.chk.notExploringKept = !!vd && vd.journalEnabled === true && vd.journalToggleWho === true;
       R.info = { a: va, c: vc && Object.keys(vc), d: vd && Object.keys(vd) };
     },
+    // schedsave (2026-10-16): a schedule change answers X-Penumbra-Report-Version
+    // "<id> <before> <after>"; the page moves on only when it still held <before>.
+    // (jQuery.ajax is stubbed here, so the global ajaxComplete is fired by hand.)
+    sched: async function () {
+      function fire(hdr) {
+        var x = { getResponseHeader: function (n) { return n === 'X-Penumbra-Report-Version' ? hdr : null; } };
+        $(document).trigger('ajaxComplete', [x, { url: 'manage_schedule.php' }]);
+      }
+      var enc = encodeURIComponent, MID = '2026-10-09 10:20:00.500000';
+      fire(null);
+      R.chk.noHeaderKept = penumbra_vars.reportVersion.at === LOADED;
+      fire('zzother ' + enc(LOADED) + ' ' + enc(MID));
+      R.chk.otherReportKept = penumbra_vars.reportVersion.at === LOADED;
+      fire('zzconf ' + enc('2026-10-09 10:10:00.000000') + ' ' + enc(MID));
+      R.chk.otherMovedKept = penumbra_vars.reportVersion.at === LOADED;
+      fire('zzconf ' + enc(LOADED) + ' ' + enc(MID));
+      R.chk.adopted = penumbra_vars.reportVersion.at === MID && penumbra_vars.reportVersion.id === 'zzconf';
+      window.__SAVE_ANSWER = ok(LATER);
+      var b = await save();
+      R.chk.saveSendsAdopted = !!b && b.base_updated_at === MID;
+      fire('zzconf%');   // malformed: ignored, no throw
+      R.chk.malformedKept = penumbra_vars.reportVersion.at === LATER;
+      R.info = { v: penumbra_vars.reportVersion, b: b && b.base_updated_at };
+    },
     // nothing loaded (no reportVersion): no version sent
     nover: async function () {
       window.__SAVE_ANSWER = ok(LATER);

@@ -354,7 +354,11 @@
             lines.push('A filter with "or" goes to every tile as typed; a tile whose report lacks one of its columns shows no rows.');
         }
         if (parts.length) { lines.push('Not filtered: ' + parts.join(' \u00b7 ') + '.'); }
-        $n.text(lines.join(' '));
+        // Every tile fetch (auto-refresh included) lands here: write only on a
+        // change (WCAG 4.1.3, 2026-10-15). The note is no longer a live region;
+        // the box's aria-describedby reads it, dashAnnounce speaks the events.
+        var txt = lines.join(' ');
+        if ($n.text() !== txt) { $n.text(txt); }
     }
 
     // The header box. Mounted once per page (renderHead rebuilds the title and
@@ -379,7 +383,7 @@
             '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><polyline points="6 9 12 15 18 9"/></svg></button>' +
             '<button type="button" class="dash-filter-btn dash-filter-help" id="dashSearchHelp" title="Search help: the syntax the filter uses" aria-label="Search help">?</button>' +
             '</div>' +
-            '<div class="dash-filter-note" id="dashFilterNote" aria-live="polite"></div>' +
+            '<div class="dash-filter-note" id="dashFilterNote"></div>' +
           '</div>').insertBefore('#dashHeadActions');
         syncDashFilterBox(true);
     }
@@ -1734,7 +1738,9 @@
             renderDashSearchNote();
             if (left) {
                 var $note = $('#dashFilterNote');
-                $note.text(($note.text() + ' ' + left + ' tile' + (left === 1 ? ' had' : 's had') + ' not loaded when the builder opened; reopen it for their columns.').trim());
+                var lateMsg = left + ' tile' + (left === 1 ? ' had' : 's had') + ' not loaded when the builder opened; reopen it for their columns.';
+                $note.text(($note.text() + ' ' + lateMsg).trim());
+                dashAnnounce(lateMsg);
             }
             _sbHadMods = (MOD_RUN.exec(String($('#dashSearchInput').val() || '')) || [''])[0];
             window.openSearchBuilder({
@@ -1759,7 +1765,9 @@
         }, builderFailed);
     }
     function builderFailed() {
-        $('#dashFilterNote').text('The Visual Search Builder could not be loaded; type the filter in the box instead (or reload the page if you have been away).');
+        var msg = 'The Visual Search Builder could not be loaded; type the filter in the box instead (or reload the page if you have been away).';
+        $('#dashFilterNote').text(msg);
+        dashAnnounce(msg);
     }
     $(document).on('click', '#dashSearchBuilder', function (e) { e.preventDefault(); openDashBuilder(); });
     // The builder's "?" opens the Search help topic in this page's help panel,
@@ -1770,7 +1778,7 @@
         e.stopPropagation();
         var tgt = String($(this).attr('data-target') || '').replace(/^#/, '') || 'searchHelpLightbox';
         if (LOCAL_HELP[tgt]) { openHelpPanel(tgt, $(this).attr('data-jump-to')); return; }
-        window.open('index.php#help=' + encodeURIComponent(tgt), '_blank', 'noopener');
+        window.open(helpHubHref(encodeURIComponent(tgt), $(this).attr('data-jump-to')), '_blank', 'noopener');
     });
     // Escape closes the builder (the report page's main.js does this there),
     // after its value list or date picker has had it - and after a help panel
@@ -2310,6 +2318,13 @@
     var LOCAL_HELP = { dashboardsHelpLightbox: 'Dashboards help', searchHelpLightbox: 'Search help' };
     var _helpHtml = null;
     function closeHelpPanel() { $('#dashHelpOverlay').remove(); }
+    // The Help Center's deep link, index.php#help=<topic>[:<anchor>] (main.js parses it,
+    // 2026-10-16): a heading id after the colon lands the topic on that section, so a hub
+    // link keeps its data-jump-to. The anchor is as strict as a topic id, else left off.
+    function helpHubHref(topic, jumpTo) {
+        jumpTo = String(jumpTo || '');
+        return 'index.php#help=' + topic + (/^[A-Za-z0-9_-]+$/.test(jumpTo) ? ':' + jumpTo : '');
+    }
     // A heading of the open topic, scrolled to the top of the panel.
     function helpJump(id) {
         var $body = $('#dashHelpOverlay .dash-help-body'), el = id ? document.getElementById(id) : null;
@@ -2320,7 +2335,7 @@
     function openHelpPanel(topic, jumpTo) {
         topic = (topic && LOCAL_HELP[topic]) ? topic : 'dashboardsHelpLightbox';
         closeHelpPanel();
-        var href = 'index.php#help=' + topic;
+        var href = helpHubHref(topic, jumpTo);
         var full = '<a class="dash-help-full" href="' + href + '" target="_blank" rel="noopener" ' +
                    'title="The whole Help Center - every topic and search - opens on the report page in a new tab">Full Help Center &#8599;</a>';
         $('body').append(
@@ -2342,11 +2357,11 @@
             $topic.find('.close-lightbox').remove();
             $topic.find('h3').first().remove();   // the panel head already names the topic
             // Cross-topic links are hub-only triggers on the report page: a topic
-            // this page shows opens in this panel, any other opens the hub there.
+            // this page shows opens in this panel, any other opens the hub there, at its section.
             $topic.find('a.pnb-help-open, a[data-target], .tab-help-icon').each(function () {
                 var tgt = String($(this).attr('data-target') || '').replace(/^#/, '');
                 if (LOCAL_HELP[tgt]) { $(this).attr({ href: '#', 'data-dash-help': tgt }).removeAttr('target'); }
-                else { $(this).attr({ href: 'index.php#help=' + (tgt || 'whatIsPenumbraLightbox'), target: '_blank', rel: 'noopener' }); }
+                else { $(this).attr({ href: helpHubHref(tgt || 'whatIsPenumbraLightbox', $(this).attr('data-jump-to')), target: '_blank', rel: 'noopener' }); }
             });
             $('#dashHelpOverlay .dash-help-body').html((topic === 'dashboardsHelpLightbox'
                 // WCAG 2.1.4: single-character shortcuts must be switchable off.
@@ -2364,7 +2379,9 @@
     $(document).on('click', '#dashHelpBtn, .dash-panel-help', function (e) { e.preventDefault(); openHelpPanel(); });
     $(document).on('click', '.dash-help-close', closeHelpPanel);
     // Inside the panel: the topic's own jump index, and links to the other local topic.
-    $(document).on('click', '#dashHelpOverlay a[data-jump-to]', function (e) { e.preventDefault(); helpJump($(this).attr('data-jump-to')); });
+    // A cross-topic link render() rewired to the Help Center carries target="_blank" and is the
+    // browser's to follow (2026-10-16): preventing it here left every such link dead.
+    $(document).on('click', '#dashHelpOverlay a[data-jump-to]:not([target])', function (e) { e.preventDefault(); helpJump($(this).attr('data-jump-to')); });
     $(document).on('click', '#dashHelpOverlay [data-dash-help]', function (e) {
         e.preventDefault();
         openHelpPanel($(this).attr('data-dash-help'), $(this).attr('data-jump-to'));
@@ -2420,7 +2437,7 @@
                 '<button type="button" class="dash-tt-btn" data-act="dupe" data-idx="' + idx + '" title="Duplicate tile" aria-label="Duplicate tile">&#10697;</button>' +
                 '<button type="button" class="dash-tt-btn dash-tt-danger" data-act="remove" data-idx="' + idx + '" title="Remove tile" aria-label="Remove tile">&#10005;</button>' +
                 '</span>';
-        } else if (false) {
+        } else if (tile.type === 'chart' && tile.groupBy) {
             // The keyboard way to a chart's cross-filter (WCAG 2.1.1, 2026-10-15):
             // a menu of its values. In .dash-tile-tools so print hides it too.
             editBar =
@@ -4457,7 +4474,43 @@
         _dashToastLoop();
     }
 
+    // Save conflict (2026-10-16, the report page's 2026-10-09 pattern): a save over
+    // the dashboard this page loaded sends the version it loaded (META.version, the
+    // server's UPDATED_AT token); manage_dashboard.php answers 409 {conflict, who,
+    // when} when someone saved since. "Save anyway" sets the one-shot force.
+    var _dashSaveForce = false;
+    function _dashCloseConflictNotes() {
+        _dashToastCards.slice().forEach(function (t) {
+            if (t.el && t.el.querySelector('.dash-save-conflict-acts')) { _dashToastClose(t); }
+        });
+    }
+    function _dashShowSaveConflict(c) {
+        var who = c.updated_by_name || c.updated_by || 'Someone';
+        var when = c.updated_when ? ' at ' + c.updated_when : '';
+        var lead = c.updated_by_self
+            ? 'You saved this dashboard' + when + ' in another tab or window, after this page opened it.'
+            : who + ' saved this dashboard' + when + ', after you opened it.';
+        _dashCloseConflictNotes();
+        dashShowText("<p id='undo_text'><span style='color: var(--accent-danger, #cc0000)'>NOT SAVED:</span> " + escapeHtml(lead) +
+            ' Your changes are still on this page. Saving now replaces theirs with yours.</p>' +
+            '<span class="dash-save-conflict-acts" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:6px;">' +
+            '<button type="button" class="dash-btn dash-save-conflict-force">Save anyway</button>' +
+            '<button type="button" class="dash-btn dash-save-conflict-open">Open the latest in a new tab</button></span>', 600000);
+    }
+    $(document).on('click', '.dash-save-conflict-force', function (e) {
+        e.preventDefault();
+        _dashCloseConflictNotes();
+        _dashSaveForce = true;
+        saveDashboard();
+    });
+    $(document).on('click', '.dash-save-conflict-open', function (e) {
+        e.preventDefault();
+        window.open('dashboard.php?id=' + encodeURIComponent(META.short_id || V.shortId), '_blank', 'noopener');
+    });
+
     function saveDashboard() {
+        var forceNow = _dashSaveForce;   // one save only: read and cleared before anything can stop this one
+        _dashSaveForce = false;
         var payload = {
             short_id: META.short_id || V.shortId,
             title: META.title || META.short_id || V.shortId,
@@ -4467,6 +4520,8 @@
             state_data: JSON.stringify(DASH),
             overwrite: !IS_NEW
         };
+        if (!IS_NEW && typeof META.version === 'string') { payload.base_updated_at = META.version; }   // the version this page holds (2026-10-16)
+        if (forceNow) { payload.force = true; }
         var $btn = $('#dashSaveBtn').prop('disabled', true).text('Saving…');
         $.ajax({
             url: 'manage_dashboard.php?action=save', type: 'POST', contentType: 'application/json',
@@ -4480,6 +4535,7 @@
                 setTimeout(function () { $btn.text('Save'); }, 1600);
                 if (Array.isArray(r.tags)) { META.tags = r.tags.slice(); }   // the list as stored (2026-10-09): the next save starts from it
                 META.tagsBase = (META.tags || []).slice();
+                if (typeof r.version === 'string') { META.version = r.version; }   // the row as this save left it (2026-10-16): saving twice is never a conflict
                 if (r.tags_failed) { dashShowText("<p id='undo_text'><span style='color: var(--accent-danger, #cc0000)'>WARNING:</span> " + escapeHtml(r.message || 'The layout is saved; its tags are not.') + "</p>"); }
                 else { dashShowText("<p id='undo_text'><span style='color: lightgreen'>SUCCESS:</span> Dashboard saved.</p>"); }
             } else {
@@ -4487,6 +4543,7 @@
             }
         }).fail(function (x) {
             $btn.prop('disabled', false).text('Save');
+            if (x && x.status === 409 && x.responseJSON && x.responseJSON.conflict) { _dashShowSaveConflict(x.responseJSON); return; }
             dashShowText("<p id='undo_text'><span style='color: var(--accent-danger, #cc0000)'>ERROR:</span> Save failed: " + escapeHtml((x.responseJSON && x.responseJSON.message) || 'network or server error') + " - your changes are NOT stored yet.</p>", 15000);
         });
     }
@@ -4813,6 +4870,7 @@
                 applyDefaultFilter();   // its own default, unless the address carried a filter (2026-09-30)
                 META = { short_id: r.short_id, title: r.title, authorized: r.authorized, owner_id: r.owner_id, tags: Array.isArray(r.tags) ? r.tags.slice() : [] };   // the tags too (2026-10-09): a Save after a hop used to post an empty list
                 META.tagsBase = META.tags.slice();
+                if (typeof r.version === 'string') { META.version = r.version; }   // its save-conflict token (2026-10-16): a Save after a hop checks against THIS dashboard
                 V.shortId = r.short_id;
                 V.found = true;
                 // &noadm previews a viewer: manage_dashboard.php never hears it, so

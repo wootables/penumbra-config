@@ -1,0 +1,106 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>dashboard help panel link harness</title>
+<style>
+  /* The panel body scrolls, as penumbra_dashboard.css makes it; the rest of the app CSS is not needed. */
+  #dashHelpOverlay .dash-help-body { height: 160px; overflow: auto; border: 1px solid #999; }
+  .spacer { height: 400px; }
+</style>
+<script>
+  // T0: the whole dashboard file must parse. Its IIFE returns at once without penumbra_dash_vars,
+  // so loading it registers nothing; a syntax error surfaces here as a window error.
+  var parseErrors = [];
+  window.addEventListener('error', function (ev) { parseErrors.push(String(ev.message || ev)); });
+</script>
+<script src="dash_full.js"></script>
+<script src="jquery-3.7.1.min.js"></script>
+<script>
+  // What the lifted block expects from the rest of penumbra_dashboard.js.
+  function dashKeysOff() { return false; }
+</script>
+<script src="lifted.js"></script>
+</head>
+<body>
+<pre id="out">pending</pre>
+<script>
+  // The topics as help_content.php serves them: the panel lifts ONE #<topic> .lightbox-content out of
+  // the whole document. The links copy the real markup of help/topics/dashboardsHelpLightbox.php:
+  // an in-topic jump (help-jump-link), two cross-topic links to topics the panel does not hold
+  // (pnb-help-open + data-target + data-jump-to) and one to the other local topic (Search).
+  _helpHtml = [
+    '<div id="dashboardsHelpLightbox" class="help-topic"><div class="lightbox-content">',
+    '<button type="button" class="close-lightbox">x</button><h3>Dashboards</h3>',
+    '<p><a href="#" data-jump-to="dsh-far" class="help-jump-link" id="lnkJump">Far section</a></p>',
+    '<p><a href="#" class="pnb-help-open" data-target="optionsHelpLightbox" data-jump-to="action" id="lnkHub">tile| and embed|</a></p>',
+    '<p><a href="#" class="pnb-help-open" data-target="accessListHelpLightbox" data-jump-to="acl-entries" data-canonical-ref="access-list-entries" id="lnkHub2">Access List</a></p>',
+    '<p><a href="#" class="pnb-help-open" data-target="searchHelpLightbox" data-jump-to="search-syntax" data-canonical-ref="search-syntax" id="lnkLocal">search grammar</a></p>',
+    '<div class="spacer"></div><h4 id="dsh-far">Far section</h4><div class="spacer"></div>',
+    '</div></div>',
+    '<div id="searchHelpLightbox" class="help-topic"><div class="lightbox-content">',
+    '<button type="button" class="close-lightbox">x</button><h3>Search</h3>',
+    '<div class="spacer"></div><h4 id="search-syntax">Search syntax</h4><div class="spacer"></div>',
+    '</div></div>'
+  ].join('');
+
+  // A real click (dispatchEvent, bubbling, cancelable) so jQuery's delegated handlers on the
+  // document run exactly as they do in the app. A listener on window runs AFTER them and reads
+  // what they left for the browser: defaultPrevented false = the browser would follow the link.
+  // It then prevents the default itself, so the harness page never navigates.
+  var lastPrevented = null;
+  window.addEventListener('click', function (ev) { lastPrevented = ev.defaultPrevented; ev.preventDefault(); });
+  function nativeClick(el) {
+    lastPrevented = null;
+    if (!el) { return 'no element'; }
+    el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+    return lastPrevented;
+  }
+  function body() { return $('#dashHelpOverlay .dash-help-body'); }
+  function topic() { return String($('#dashHelpOverlay').attr('data-topic') || ''); }
+
+  var results = {};
+  function record(name, ok, detail) { results[name] = (ok ? 'PASS ' : 'FAIL ') + detail; }
+  try {
+    record('T0 whole file parses', parseErrors.length === 0, parseErrors.length ? parseErrors.join(' | ') : 'no script errors, lifted block loaded=' + (typeof openHelpPanel === 'function'));
+
+    openHelpPanel('dashboardsHelpLightbox');
+    var hub = document.getElementById('lnkHub'), hub2 = document.getElementById('lnkHub2');
+    var loc = document.getElementById('lnkLocal'), jmp = document.getElementById('lnkJump');
+    // The href may carry the link's section after a colon (2026-10-16; penumbra_tests\helpanchor guards that part).
+    record('T1a render rewired the hub links',
+      !!hub && /^index\.php#help=optionsHelpLightbox(:action)?$/.test(hub.getAttribute('href') || '') && hub.getAttribute('target') === '_blank' && hub.getAttribute('rel') === 'noopener' &&
+      !!hub2 && /^index\.php#help=accessListHelpLightbox(:acl-entries)?$/.test(hub2.getAttribute('href') || '') && hub2.getAttribute('target') === '_blank',
+      hub ? 'href=' + hub.getAttribute('href') + ' target=' + hub.getAttribute('target') + ' rel=' + hub.getAttribute('rel') : 'no hub link in the panel');
+    record('T1b render rewired the local link',
+      !!loc && loc.getAttribute('data-dash-help') === 'searchHelpLightbox' && !loc.hasAttribute('target') && loc.getAttribute('href') === '#',
+      loc ? 'data-dash-help=' + loc.getAttribute('data-dash-help') + ' target=' + loc.getAttribute('target') + ' href=' + loc.getAttribute('href') : 'no local link in the panel');
+
+    // T2 THE BUG: a link rewired to the Help Center is the browser's. No handler may prevent it,
+    // and the panel must stay as it was (nothing re-opened or jumped).
+    var p1 = nativeClick(hub), p2 = nativeClick(hub2);
+    record('T2 hub link left to the browser', p1 === false && p2 === false && topic() === 'dashboardsHelpLightbox' && $('#dashHelpOverlay').length === 1,
+      'defaultPrevented=' + p1 + '/' + p2 + ' topic=' + topic());
+
+    // T3 an in-panel jump: handled by the panel (prevented) and scrolled to its heading.
+    body().scrollTop(0);
+    var p3 = nativeClick(jmp), st3 = body().scrollTop();
+    record('T3 in-panel jump is handled and scrolls', p3 === true && st3 > 100 && topic() === 'dashboardsHelpLightbox',
+      'defaultPrevented=' + p3 + ' scrollTop=' + st3 + ' topic=' + topic());
+
+    // T4 a link to the other local topic re-opens the panel there, at its anchor, one overlay only.
+    var p4 = nativeClick(loc), t4 = topic(), st4 = body().scrollTop(), n4 = $('#dashHelpOverlay').length;
+    record('T4 local topic link re-opens the panel at its anchor', p4 === true && t4 === 'searchHelpLightbox' && st4 > 100 && n4 === 1 && $('#dashHelpOverlay #search-syntax').length === 1,
+      'defaultPrevented=' + p4 + ' topic=' + t4 + ' scrollTop=' + st4 + ' overlays=' + n4);
+
+    // T5 harness sanity: a link no handler claims reads as not prevented (the Full Help Center link).
+    var p5 = nativeClick(document.querySelector('#dashHelpOverlay .dash-help-full'));
+    record('T5 unhandled link reads as not prevented', p5 === false, 'defaultPrevented=' + p5);
+  } catch (err) {
+    results['EXC'] = 'FAIL ' + String(err && err.stack || err);
+  }
+  document.getElementById('out').textContent = JSON.stringify(results, null, 1);
+  document.title = 'HARNESS-DONE';
+</script>
+</body>
+</html>

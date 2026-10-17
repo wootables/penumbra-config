@@ -54,5 +54,70 @@ ok(substr_count($s, $fmt) === 2, 'T1 save_server_state.php reads UPDATED_AT as '
 ok(strpos($i, $fmt . ' AS UPDATED_AT_TXT') !== false, 'T2 index.php reads it the SAME way');
 ok(strpos($i, '$preloaded_report_version = null;') !== false && strpos($i, "reportVersion: <?php echo json_encode(\$preloaded_report_version); ?>,") !== false, 'T3 index.php hands the page {id, at} as penumbra_vars.reportVersion (null when nothing is loaded)');
 
+// --- schedsave (2026-10-16): a schedule change hands the page the new version ---
+// manage_schedule.php's touch_report_updated_at() LIFTED and run against a fake
+// connection: a compare-and-set from the version it read, and the header main.js
+// reads ("<short id> <before> <after>", rawurlencoded). header() is captured.
+$ms = isset($argv[3]) ? $argv[3] : '';
+$m = is_file($ms) ? file_get_contents($ms) : '';
+ok($m !== '', 'M0 manage_schedule.php read');
+if (!class_exists('PDO')) { eval('class PDO { const FETCH_ASSOC = 2; }'); }
+class ScFakeStmt {
+    public $sql; public $binds = array(); private $c;
+    function __construct($c, $sql) { $this->c = $c; $this->sql = $sql; }
+    function bindValue($k, $v) { $this->binds[$k] = $v; }
+    function execute() { $this->c->ran[] = $this; if ($this->c->throw) throw new Exception('boom'); return true; }
+    function fetch($mode = null) { return $this->c->row; }
+    function rowCount() { return $this->c->hit; }
+}
+class ScFakeConn {
+    public $row; public $hit; public $throw = false; public $ran = array();
+    function __construct($row, $hit) { $this->row = $row; $this->hit = $hit; }
+    function prepare($sql) { return new ScFakeStmt($this, $sql); }
+}
+$GLOBALS['__sc_headers'] = array();
+function __sc_header($h) { $GLOBALS['__sc_headers'][] = $h; }
+if (preg_match('/function touch_report_updated_at\(\$conn, \$numeric_report_id\) \{.*?\n\}/s', $m, $mm)) {
+    $fn = str_replace(array('function touch_report_updated_at(', 'header(', 'headers_sent()'), array('function sc_touch(', '__sc_header(', 'false'), $mm[0]);
+    eval($fn);
+    $A = '2026-10-16 09:00:00.000000'; $B = '2026-10-16 09:05:00.123456';
+    $updates = function ($c) { return array_values(array_filter($c->ran, function ($s) { return stripos(ltrim($s->sql), 'UPDATE') === 0; })); };
+    // the page's version still the row's: compare-and-set lands, the header says so
+    $GLOBALS['__sc_headers'] = array();
+    $c = new ScFakeConn(array('SID' => 'zz conf', 'BEFORE_TXT' => $A, 'NOW_TXT' => $B), 1);
+    @sc_touch($c, 7);
+    $u = $updates($c);
+    ok(count($u) === 1 && isset($u[0]->binds[':before_ts']) && $u[0]->binds[':before_ts'] === $A && $u[0]->binds[':now_ts'] === $B
+        && strpos($u[0]->sql, "NVL(TO_CHAR(UPDATED_AT, 'YYYY-MM-DD HH24:MI:SS.FF6'), '-') = NVL(:before_ts, '-')") !== false,
+        'M1 the touch is ONE compare-and-set from the version it read, to the time it read');
+    ok($GLOBALS['__sc_headers'] === array('X-Penumbra-Report-Version: zz%20conf ' . rawurlencode($A) . ' ' . rawurlencode($B)),
+        'M2 and answers X-Penumbra-Report-Version "<short id> <before> <after>" (rawurlencoded)');
+    // the row moved under the touch (someone saved in between): a plain touch, NO header
+    $GLOBALS['__sc_headers'] = array();
+    $c = new ScFakeConn(array('SID' => 'zzconf', 'BEFORE_TXT' => $A, 'NOW_TXT' => $B), 0);
+    @sc_touch($c, 7);
+    $u = $updates($c);
+    ok(count($u) === 2 && strpos($u[1]->sql, 'SET UPDATED_AT = CURRENT_TIMESTAMP WHERE ID = :id') !== false && $GLOBALS['__sc_headers'] === array(),
+        'M3 the compare-and-set missed (the row moved): a plain touch and no header (the page keeps its version: still a conflict)');
+    // never updated: '' before (the page holds '' too)
+    $GLOBALS['__sc_headers'] = array();
+    $c = new ScFakeConn(array('SID' => 'zzconf', 'BEFORE_TXT' => null, 'NOW_TXT' => $B), 1);
+    @sc_touch($c, 7);
+    ok($GLOBALS['__sc_headers'] === array('X-Penumbra-Report-Version: zzconf  ' . rawurlencode($B)), 'M4 a report never updated: <before> is \'\'');
+    // no report id / no row / a DB error: nothing written, nothing said, nothing thrown
+    $GLOBALS['__sc_headers'] = array();
+    $c = new ScFakeConn(false, 1); @sc_touch($c, 7);
+    $c2 = new ScFakeConn(array(), 1); @sc_touch($c2, 0);
+    $c3 = new ScFakeConn(array('SID' => 'zzconf', 'BEFORE_TXT' => $A, 'NOW_TXT' => $B), 1); $c3->throw = true;
+    $threw = false; try { @sc_touch($c3, 7); } catch (Throwable $e) { $threw = true; }
+    ok(count($updates($c)) === 0 && count($c2->ran) === 0 && !$threw && $GLOBALS['__sc_headers'] === array(), 'M5 no row, no id or a DB error: no write, no header, no throw');
+} else {
+    ok(false, 'M1 touch_report_updated_at() found in ' . $ms);
+}
+ok(substr_count($m, 'touch_report_updated_at($conn, $numeric_report_id);') === 5, 'M6 the five schedule changes (edit, new, enable/disable, delete, restore) all go through it');
+ok(strpos($m, "TO_CHAR(UPDATED_AT, 'YYYY-MM-DD HH24:MI:SS.FF6') AS BEFORE_TXT") !== false && strpos($m, "TO_TIMESTAMP(:now_ts, 'YYYY-MM-DD HH24:MI:SS.FF6')") !== false,
+    'M7 the SAME token format as index.php / save_server_state.php');
+ok(strpos($m, ':uid') === false, 'M8 no :uid bind (ORA-01745)');
+
 echo "TOTAL pass=$pass fail=$fail\n";
 echo ($fail === 0 && $pass > 0) ? "RESULT: GREEN\n" : "RESULT: RED\n";

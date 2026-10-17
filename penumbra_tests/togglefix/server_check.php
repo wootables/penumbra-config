@@ -1564,6 +1564,20 @@ function nQuery($sql, $binds) {
         foreach ($NT as $r) if ($r['REPORT_ID'] === $rid && $r['ROW_KEY'] === $b[':rk'] && $r['TOGGLE_KEY'] === $b[':tk']) return array(array('STATE' => (string)$r['STATE'], 'UPDATED_BY' => $r['UPDATED_BY'], 'UPDATED_AT' => $r['UPDATED_AT']));
         return array();
     }
+    // notesfresh (2026-10-16): row_notes' version (journalRowNotesVersion) over the notes its WHERE reads -
+    // row / pivot / chart, a key, not a row's filed under an earlier key. ORA_HASH as crc32.
+    if (strpos($s, 'SELECT COUNT(*) AS CNT, MAX(ID) AS MX, SUM(ORA_HASH(ROW_KEY)) AS KH') === 0) {
+        $c = 0; $mx = null; $kh = 0; $tl = 0; $th = 0;
+        foreach ($NN as $r) {
+            if ($r['REPORT_ID'] !== $rid || !in_array($r['SCOPE'], array('row', 'pivot', 'chart'), true) || $r['ROW_KEY'] === null) continue;
+            if (strpos($s, "SCOPE = 'pivot' OR SUBSTR(ROW_KEY, 1, 1) <>") !== false && $r['SCOPE'] !== 'pivot' && strpos($r['ROW_KEY'], $P) === 0) continue;
+            $c++; $mx = $mx === null ? (int)$r['ID'] : max($mx, (int)$r['ID']);
+            $t = isset($r['NOTE_TEXT']) ? (string)$r['NOTE_TEXT'] : '';
+            $kh += crc32($r['ROW_KEY']); $tl += strlen($t); $th += crc32(substr($t, 0, 1000));
+        }
+        return array(array('CNT' => (string)$c, 'MX' => $mx === null ? null : (string)$mx, 'KH' => $c ? (string)$kh : null,
+                           'TL' => $c ? (string)$tl : null, 'TH' => $c ? (string)$th : null));
+    }
     if (strpos($s, 'SELECT ID, SCOPE, ROW_KEY, NOTE_TEXT, MENTIONS') === 0) {
         $out = array();
         foreach ($NN as $r) {
@@ -1663,7 +1677,9 @@ foreach (array('journalReportStateFlags', 'journalReportJournalEnabled', 'journa
                // Round U (2026-10-09): one person's share of the notes
                'journalAuthorCapRefusal',
                // Round V (2026-10-09): the install action's DDL
-               'journalInstallStatements') as $fn) {
+               'journalInstallStatements',
+               // notesfresh (2026-10-16): row_notes' one WHERE and its version
+               'journalRowNotesWhere', 'journalRowNotesVersion') as $fn) {
     if (!function_exists($fn)) defineLifted($mj, $fn);
 }
 if (preg_match_all("/define\('(JOURNAL_[A-Z_]+)', (\d+)\);/", $mj, $capM, PREG_SET_ORDER)) {

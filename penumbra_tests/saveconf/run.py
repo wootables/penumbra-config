@@ -14,6 +14,9 @@
 #   py -3 run.py                 candidate = LIVE (main.js, save_server_state.php, index.php)
 #   py -3 run.py --stage DIR     a stage in the app layout (each file from DIR when there, else live)
 #   py -3 run.py --control       live files, expecting RED on everything new (before the deploy)
+#                                (since 2026-10-16: exactly the schedsave checks, P-M* + L-sched-*)
+#   schedsave (2026-10-16): manage_schedule.php's touch hands the page the new version
+#                 (X-Penumbra-Report-Version) so a schedule change is not a save conflict  P-M*, L-sched-*
 #   py -3 run.py --mutants | --mutant NAME
 # Headless Edge over CDP; stages into %TEMP%\pnb_sc_*; writes nothing to the webroot.
 # =============================================================================
@@ -27,7 +30,7 @@ EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js',
         'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js']
-SCN = ['base', 'conflict', 'self', 'otherid', 'nover', 'validate', 'jsaveas']
+SCN = ['base', 'conflict', 'self', 'otherid', 'nover', 'validate', 'jsaveas', 'sched']
 CHK = {
     'base': ['sentBase', 'versionMoved', 'secondSendsNew'],
     'conflict': ['noticeWho', 'noticeButtons', 'dialogStays', 'buttonBack', 'versionKept', 'forceSent', 'forceSaved', 'forceOnce'],
@@ -36,8 +39,16 @@ CHK = {
     'nover': ['noVersionNoBase'],
     'jsaveas': ['otherIdDropped', 'otherKeepsRest', 'sameIdKept', 'notExploringKept'],
     'validate': ['saneStopped', 'forceNotCarried'],
+    'sched': ['noHeaderKept', 'otherReportKept', 'otherMovedKept', 'adopted', 'saveSendsAdopted', 'malformedKept'],   # schedsave 2026-10-16
 }
 MUTANTS = {
+    # schedsave (2026-10-16): a schedule change hands the page the new version
+    'sc-noadopt': ([('main', "        penumbra_vars.reportVersion = { id: ver.id, at: after };\r\n", "")], ['L-sched-adopted', 'L-sched-saveSendsAdopted'], ['sched']),
+    'sc-nobefore': ([('main', "        if (String(ver.at == null ? '' : ver.at) !== before) return;\r\n", "")], ['L-sched-otherMovedKept'], ['sched']),
+    'sc-anyid': ([('main', "        if (ver.id.trim() !== sid) return;\r\n", "")], ['L-sched-otherReportKept'], ['sched']),
+    'sc-nocas': ([('ms', "                                 WHERE ID = :id\n                                   AND NVL(TO_CHAR(UPDATED_AT, 'YYYY-MM-DD HH24:MI:SS.FF6'), '-') = NVL(:before_ts, '-')\");", "                                 WHERE ID = :id\");")], ['P-M1'], []),
+    'sc-noheader': ([('ms', "                header('X-Penumbra-Report-Version: '", "                if (0) header('X-Penumbra-Report-Version: '")], ['P-M2', 'P-M4'], []),
+    'sc-headeronmiss': ([('ms', "        if ($stmt->rowCount() === 1) {\n", "        if (true) {\n")], ['P-M3'], []),
     # jsaveas (2026-10-10): an explored table saved under another id leaves the journal out
     'js-nostrip': ([('main', "        if (window._penumbraJournalExploring && stateObject.viewOptions\r\n", "        if (false && stateObject.viewOptions\r\n")], ['L-jsaveas-otherIdDropped'], ['jsaveas']),
     'js-anyid': ([('main', "                && shortId !== String((window.Penumbra && window.Penumbra.journalReportId) || '')) {\r\n", "                && true) {\r\n")], ['L-jsaveas-sameIdKept'], ['jsaveas']),
@@ -73,8 +84,8 @@ src_root = stage_dir or APP
 def pick(rel):
     p = os.path.join(src_root, rel)
     return p if os.path.exists(p) else os.path.join(APP, rel)
-cand = {'main': pick(os.path.join('js', 'main.js')), 'ss': pick('save_server_state.php'), 'ix': pick('index.php')}
-if control: cand = {'main': os.path.join(APP, 'js', 'main.js'), 'ss': os.path.join(APP, 'save_server_state.php'), 'ix': os.path.join(APP, 'index.php')}
+cand = {'main': pick(os.path.join('js', 'main.js')), 'ss': pick('save_server_state.php'), 'ix': pick('index.php'), 'ms': pick('manage_schedule.php')}
+if control: cand = {'main': os.path.join(APP, 'js', 'main.js'), 'ss': os.path.join(APP, 'save_server_state.php'), 'ix': os.path.join(APP, 'index.php'), 'ms': os.path.join(APP, 'manage_schedule.php')}
 def read_b(p): return open(p, 'rb').read().decode('utf-8', 'surrogateescape')
 
 def hook(src):
@@ -143,15 +154,16 @@ def run_page(scn):
 def run_php(texts):
     d = tempfile.mkdtemp(prefix='pnb_scp_')
     try:
-        a, b = os.path.join(d, 'ss.php'), os.path.join(d, 'ix.php')
+        a, b, c = os.path.join(d, 'ss.php'), os.path.join(d, 'ix.php'), os.path.join(d, 'ms.php')
+        open(c, 'wb').write(texts['ms'].encode('utf-8', 'surrogateescape'))
         open(a, 'wb').write(texts['ss'].encode('utf-8', 'surrogateescape')); open(b, 'wb').write(texts['ix'].encode('utf-8', 'surrogateescape'))
-        out = subprocess.run([PHP, '-n', os.path.join(HERE, 'test_saveconf.php'), a, b], capture_output=True, text=True).stdout
+        out = subprocess.run([PHP, '-n', os.path.join(HERE, 'test_saveconf.php'), a, b, c], capture_output=True, text=True).stdout
         res = []
         for line in out.splitlines():
             m = re.match(r'\s+(PASS|FAIL)\s+(\S+)\s+(.*)', line)
             if m: res.append(('P-' + m.group(2), m.group(1) == 'PASS', m.group(3)))
-        for f in ('ss', 'ix'):
-            l = subprocess.run([PHP, '-n', '-l', a if f == 'ss' else b], capture_output=True, text=True).stdout
+        for f in ('ss', 'ix', 'ms'):
+            l = subprocess.run([PHP, '-n', '-l', {'ss': a, 'ix': b, 'ms': c}[f]], capture_output=True, text=True).stdout
             res.append(('P-lint-' + f, 'No syntax errors' in l, l.strip()[:200]))
         return res
     finally:
@@ -195,13 +207,13 @@ try:
             else: f += 1; failed.append(a)
         print('TOTAL pass=%d fail=%d   failed: %s' % (p, f, ' '.join(failed)))
         if control:
-            sane = [a for a in failed if a.startswith('E-') or a.startswith('F-') or a in ('P-S0', 'P-lint-ss', 'P-lint-ix')]
-            # absence checks (no version sent) hold before the change too; P-O7 likewise
-            absent = {'L-otherid-otherNoBase', 'L-otherid-noOverwriteNoBase', 'L-nover-noVersionNoBase', 'P-O7', 'P-S0', 'P-lint-ss', 'P-lint-ix',
-                      'L-conflict-dialogStays', 'L-conflict-buttonBack', 'L-conflict-versionKept'}   # any save error already did these
-            sane += [a for a, passed, _ in res if passed and not (a.startswith('E-') or a in absent)]
-            print('CONTROL: %d new checks red (expected); harness problems or checks that hold WITHOUT the change: %s' % (f, ' '.join(sane) or 'none'))
-            print('RESULT: GREEN' if not sane and f > 0 else 'RESULT: RED')
+            # Since schedsave (2026-10-16) the live files already carry the 10-09 save
+            # conflict: the control is "exactly the schedsave checks red, all else green".
+            # (The other schedsave checks are absence checks: they hold before the change.)
+            NEW = {'P-M1', 'P-M2', 'P-M3', 'P-M4', 'P-M5', 'P-M7', 'L-sched-adopted', 'L-sched-saveSendsAdopted'}
+            sane = [a for a in failed if a not in NEW] + [a for a, passed, _ in res if passed and a in NEW]
+            print('CONTROL: %d of %d schedsave checks red (expected all); off-target (red outside the set, or green in it): %s' % (len(NEW & set(failed)), len(NEW), ' '.join(sane) or 'none'))
+            print('RESULT: GREEN' if not sane and NEW <= set(failed) else 'RESULT: RED')
         else:
             print('RESULT: GREEN' if f == 0 and p > 0 else 'RESULT: RED')
 finally:

@@ -1,0 +1,145 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="main.css"><link rel="stylesheet" href="penumbra_tiles.css"><link rel="stylesheet" href="penumbra_dashboard.css">
+</head><body class="pnb-dash theme-default">
+<!-- dashsaveconf harness (2026-10-16): the REAL penumbra_dashboard.js save path
+     (saveDashboard via the delegated #dashSaveBtn click) against a stubbed
+     manage_dashboard.php. ?scn=<name> picks the scenario; the result lands in
+     window.__HCRESULT = {chk, info, errors}. -->
+<div id="dashApp" class="dash-app"><header class="dash-head" id="dashHead">
+  <div class="dash-head-title" id="dashHeadTitle"></div>
+  <div class="dash-head-actions" id="dashHeadActions"></div>
+</header><main id="dashMain"></main></div>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="chart-4.5.1.min.js"></script>
+<script>
+var SCN = (location.search.match(/scn=(\w+)/) || [])[1] || 'base';
+var ERRORS = [], POSTS = [], REPLIES = [], OPENED = [];
+window.onerror = function (m, src, line) { ERRORS.push('onerror: ' + m + ' @' + String(src).split('/').pop() + ':' + line); };
+history.replaceState = function () {};
+window.open = function (u, t, f) { OPENED.push([String(u), String(t), String(f)]); return null; };
+// The server double: each save POST takes the next queued reply.
+//   {ok: {...}}   -> done(json)        {err: status, json: {...}} -> fail(jqXHR-like)
+$.getJSON = function () { var d = $.Deferred(); setTimeout(function () { d.resolve({ status: 'success', data: [] }); }, 5); return d.promise(); };
+$.ajax = function (o) {
+  var d = $.Deferred();
+  if (String(o.url).indexOf('action=save') > -1) {
+    POSTS.push(JSON.parse(o.data));
+    var r = REPLIES.shift() || { ok: { status: 'success', message: 'Dashboard updated.', tags: [] } };
+    setTimeout(function () {
+      if (r.ok) { d.resolve(r.ok); }
+      else { d.reject({ status: r.err, responseJSON: r.json, responseText: JSON.stringify(r.json || {}) }); }
+    }, 10);
+  } else { setTimeout(function () { d.resolve({ status: 'success' }); }, 5); }
+  return d.promise();
+};
+var META0 = { short_id: 'demo', title: 'Demo', owner_id: 'tester', authorized: 'tester', updated_at: '2026-10-16 09:00', tags: [] };
+if (SCN !== 'nover') { META0.version = '2026-10-16 09:00:00.111111'; }
+const penumbra_dash_vars = {
+  currentUserKey: 'tester', isAdmin: true, canCreate: true, reportGrantPatterns: [],
+  shortId: 'demo', found: SCN !== 'isnew', canEdit: true, noadm: false,
+  shibboleth: { name: 'Ada', fname: 'Ada' },
+  tagVocabulary: [], tagGrants: [], tagsReady: false,
+  meta: SCN === 'isnew' ? null : META0,
+  state: { version: 1, theme: 'theme-default', refreshSeconds: 0, tiles: [
+    { id: 'n1', type: 'note', label: '', text: 'a note', w: 12, h: 1 }
+  ] },
+  builderAssets: { css: [], js: [] },
+  themes: [{ id: 'theme-default', label: 'Default Light', isDark: false }], themeAliases: {}
+};
+</script>
+<script src="purify.min.js"></script><script src="penumbra_tiles.js"></script>
+<script src="dash_hc.js"></script>
+<script>
+(function () {
+  var chk = {}, info = {};
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function cards() { return Array.prototype.slice.call(document.querySelectorAll('.pnb-toast-card')).filter(function (c) { return !c.classList.contains('pnbt-leave'); }); }
+  function conflictCard() { return cards().filter(function (c) { return c.querySelector('.dash-save-conflict-acts'); })[0] || null; }
+  function lastText() { var c = cards(); return c.length ? c[c.length - 1].textContent : ''; }
+  async function save() {
+    var n = POSTS.length;
+    if (!$('#dashSaveBtn').length) { $('#dashHeadActions').append('<button type="button" id="dashSaveBtn">Save</button>'); }
+    $('#dashSaveBtn').trigger('click');
+    for (var i = 0; i < 100 && POSTS.length === n; i++) { await wait(20); }
+    await wait(80);   // the reply lands (10 ms) and the page reacts
+    return POSTS[POSTS.length - 1];
+  }
+  var CONF = { status: 'error', conflict: true, message: 'This dashboard was saved by someone else after you opened it.',
+               version: '2026-10-16 10:00:00.222222', updated_by: 'jdoe', updated_by_name: 'Jane <b>Doe</b>', updated_by_self: false, updated_when: '2026-10-16 10:00' };
+  async function run() {
+    await wait(300);
+    var p, c;
+    if (SCN === 'base') {
+      REPLIES.push({ ok: { status: 'success', message: 'Dashboard updated.', tags: [], version: '2026-10-16 11:00:00.333333' } });
+      p = await save();
+      chk.sentBase = p.base_updated_at === '2026-10-16 09:00:00.111111' && p.overwrite === true;
+      chk.noForce = !('force' in p);
+      p = await save();
+      chk.versionMoved = p.base_updated_at === '2026-10-16 11:00:00.333333';
+      info.posts = POSTS;
+    } else if (SCN === 'conflict') {
+      REPLIES.push({ err: 409, json: CONF });
+      p = await save();
+      c = conflictCard();
+      var txt = c ? c.textContent : '';
+      chk.noticeWho = !!c && txt.indexOf('Jane <b>Doe</b> saved this dashboard at 2026-10-16 10:00') > -1;
+      chk.noticeEscaped = !!c && !c.querySelector('.pnb-toast-msg b');
+      chk.noticeButtons = !!c && !!c.querySelector('.dash-save-conflict-force') && !!c.querySelector('.dash-save-conflict-open');
+      chk.buttonBack = $('#dashSaveBtn').prop('disabled') === false;
+      $(c).find('.dash-save-conflict-open').trigger('click');
+      chk.openLatest = OPENED.length === 1 && OPENED[0][0] === 'dashboard.php?id=demo' && OPENED[0][1] === '_blank';
+      chk.openNoSave = POSTS.length === 1;
+      REPLIES.push({ ok: { status: 'success', message: 'Dashboard updated.', tags: [], version: '2026-10-16 10:05:00.444444' } });
+      var n = POSTS.length;
+      $(c).find('.dash-save-conflict-force').trigger('click');
+      for (var i = 0; i < 100 && POSTS.length === n; i++) { await wait(20); }
+      await wait(100);
+      p = POSTS[POSTS.length - 1];
+      chk.forceSent = POSTS.length === 2 && p.force === true && p.base_updated_at === '2026-10-16 09:00:00.111111';
+      chk.forceSaved = !conflictCard() && /SUCCESS/.test(lastText());
+      p = await save();
+      chk.forceOnce = !('force' in p);
+      chk.versionAdopted = p.base_updated_at === '2026-10-16 10:05:00.444444';
+      info.posts = POSTS; info.opened = OPENED; info.text = txt;
+    } else if (SCN === 'self') {
+      REPLIES.push({ err: 409, json: $.extend({}, CONF, { updated_by: 'tester', updated_by_name: 'Ada Lovelace', updated_by_self: true }) });
+      await save();
+      c = conflictCard();
+      chk.selfWords = !!c && c.textContent.indexOf('You saved this dashboard at 2026-10-16 10:00 in another tab or window') > -1;
+      REPLIES.push({ err: 409, json: $.extend({}, CONF, { updated_by: '', updated_by_name: '', updated_when: '' }) });
+      await save();
+      c = conflictCard();
+      chk.unknownWho = !!c && c.textContent.indexOf('Someone saved this dashboard, after you opened it.') > -1;
+      chk.oneNotice = cards().filter(function (x) { return x.querySelector('.dash-save-conflict-acts'); }).length === 1;
+      info.text = c ? c.textContent : '';
+    } else if (SCN === 'nover') {
+      p = await save();
+      chk.noVersionNoBase = !('base_updated_at' in p) && p.overwrite === true;
+    } else if (SCN === 'isnew') {
+      REPLIES.push({ ok: { status: 'success', message: 'Dashboard created.', is_new: true, tags: [], version: '' } });
+      p = await save();
+      chk.newNoBase = !('base_updated_at' in p) && p.overwrite === false;
+      p = await save();
+      chk.newAdopts = p.overwrite === true && p.base_updated_at === '';
+      info.posts = POSTS;
+    } else if (SCN === 'plainerr') {
+      REPLIES.push({ err: 500, json: { status: 'error', message: 'Too many tiles (max 60).' } });
+      await save();
+      chk.plainError = !conflictCard() && /Too many tiles/.test(lastText());
+      REPLIES.push({ err: 409, json: { status: 'error', message: 'not a conflict body' } });
+      await save();
+      chk.bare409Plain = !conflictCard();
+      p = await save();
+      chk.forceNotCarried = !('force' in p);
+    }
+  }
+  run().then(function () {
+    window.__HCRESULT = { chk: chk, info: info, errors: ERRORS, hookErr: window.__HC_ERR || null };
+    window.__HCDONE = true;
+  }, function (e) {
+    window.__HCRESULT = { chk: chk, info: info, errors: ERRORS.concat(['driver: ' + (e && e.stack || e)]) };
+    window.__HCDONE = true;
+  });
+})();
+</script>
+</body></html>

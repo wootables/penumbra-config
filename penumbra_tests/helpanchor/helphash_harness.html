@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>help deep-link anchor harness</title>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="lifted.js"></script>
+</head>
+<body>
+<!-- The TABLE OF CONTENTS as index.php renders it (server-side, so present at boot): the general
+     topic, a plain topic, and host topics with folded ids in data-extra (as the v2 manifest ships
+     them). The topic BODIES are not here - in the app they arrive by AJAX on the first open. -->
+<div id="helpCenterToc">
+  <div class="help-toc-item" data-topic="whatIsPenumbraLightbox">What is Penumbra</div>
+  <div class="help-toc-item" data-topic="optionsHelpLightbox">Custom Code</div>
+  <div class="help-toc-item" data-topic="saveSecurityHelpLightbox" data-extra="accessListHelpLightbox">Security</div>
+  <div class="help-toc-item" data-topic="schedulerHelpLightbox" data-extra="schedulerPromptHelpLightbox customConditionHelpLightbox">Scheduler</div>
+</div>
+<pre id="out">pending</pre>
+<script>
+  // openHelpCenter is what the block must call: record (topic, anchor, focusSearch).
+  var calls = [];
+  function openHelpCenter(fragId, jumpTo, focusSearch) { calls.push([fragId, jumpTo, focusSearch]); }
+  var realSetTimeout = window.setTimeout;
+  // Setting location.hash on a file: page does not navigate; the lifted block then reads
+  // window.location.hash exactly as the app does at boot.
+  function run(hash) {
+    calls = [];
+    location.hash = hash;
+    window.setTimeout = function (fn) { fn(); return 0; };   // the block defers the open by 250 ms
+    var err = null;
+    try { runHelpHash(); } catch (e) { err = String(e); }
+    window.setTimeout = realSetTimeout;
+    return { calls: calls.slice(), err: err };
+  }
+  var results = {};
+  function record(name, ok, detail) { results[name] = (ok ? 'PASS ' : 'FAIL ') + detail; }
+  // want = [topic, anchor, focusSearch] of the ONE expected call, or null for no call at all.
+  function expect(name, hash, want) {
+    var r = run(hash), got = r.calls.length ? r.calls[0] : null;
+    var ok = !r.err && r.calls.length === (want ? 1 : 0) &&
+             (!want || (got[0] === want[0] && got[1] === want[1] && got[2] === want[2]));
+    record(name, ok, 'hash=' + JSON.stringify(hash) + ' seen=' + location.hash + ' want=' + JSON.stringify(want) +
+           ' got=' + JSON.stringify(got) + (r.err ? ' threw=' + r.err : ''));
+  }
+  try {
+    record('H0 lifted block loaded', typeof runHelpHash === 'function' && typeof _helpTocItemFor === 'function',
+           'runHelpHash=' + typeof runHelpHash + ' _helpTocItemFor=' + typeof _helpTocItemFor);
+    expect('H1 topic only (as before)',                    '#help=optionsHelpLightbox',                ['optionsHelpLightbox', '', false]);
+    expect('H2 topic:anchor',                              '#help=optionsHelpLightbox:action',         ['optionsHelpLightbox', 'action', false]);
+    expect('H3 folded id:anchor (Access List)',            '#help=accessListHelpLightbox:acl-entries', ['accessListHelpLightbox', 'acl-entries', false]);
+    expect('H4 folded id alone opens its host topic',      '#help=accessListHelpLightbox',             ['accessListHelpLightbox', '', false]);
+    expect('H5 stray id, no anchor: general topic + search', '#help=noSuchTopic',                      ['whatIsPenumbraLightbox', '', true]);
+    expect('H6 stray id with an anchor: the anchor rides', '#help=noSuchTopic:acl-entries',            ['whatIsPenumbraLightbox', 'acl-entries', false]);
+    expect('H7 a bad anchor is dropped',                   '#help=optionsHelpLightbox:a.b',            ['optionsHelpLightbox', '', false]);
+    expect('H8 bare #help',                                '#help',                                    ['whatIsPenumbraLightbox', '', true]);
+    expect('H9 malformed escape does not throw',           '#help=%E0',                                ['whatIsPenumbraLightbox', '', true]);
+    expect('H10 encoded colon',                            '#help=optionsHelpLightbox%3Aaction',       ['optionsHelpLightbox', 'action', false]);
+    expect('H11 trailing colon',                           '#help=optionsHelpLightbox:',               ['optionsHelpLightbox', '', false]);
+    expect('H12 empty topic, anchor only',                 '#help=:acl-entries',                       ['whatIsPenumbraLightbox', 'acl-entries', false]);
+    expect('H13 another hash is ignored',                  '#other',                                   null);
+    expect('H14 the topic id stays strict',                '#help=options<b>HelpLightbox',             ['whatIsPenumbraLightbox', '', true]);
+  } catch (err) {
+    results['EXC'] = 'FAIL ' + String(err && err.stack || err);
+  }
+  document.getElementById('out').textContent = JSON.stringify(results, null, 1);
+  document.title = 'HARNESS-DONE';
+</script>
+</body>
+</html>

@@ -4,7 +4,11 @@
 <body>
 <div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
 <textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
-<div id="resultsTable"></div><div id="errorBox"></div>
+<!-- #resultsTable mirrors index.php (a TABLE with thead/tbody, then the grouped container): main.js
+     journalWatch() reads tbl.tBodies[0] at boot since 2026-10-02 (0e8e581); a <div> here threw
+     "Cannot read properties of undefined (reading '0')" and killed the ready closure. -->
+<table id="resultsTable"><caption class="sr-only">Report results table</caption><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table>
+<div id="groupedResultsContainer"></div><div id="errorBox"></div>
 <pre id="out">running</pre>
 
 <script src="jquery-3.7.1.min.js"></script>

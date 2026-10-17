@@ -1,0 +1,134 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>dashboard hub-link anchor harness</title>
+<style>
+  /* The panel body scrolls, as penumbra_dashboard.css makes it; the rest of the app CSS is not needed. */
+  #dashHelpOverlay .dash-help-body { height: 160px; overflow: auto; border: 1px solid #999; }
+  .spacer { height: 400px; }
+</style>
+<script>
+  // D0: the whole dashboard file must parse. Its IIFE returns at once without penumbra_dash_vars,
+  // so loading it registers nothing; a syntax error surfaces here as a window error.
+  var parseErrors = [];
+  window.addEventListener('error', function (ev) { parseErrors.push(String(ev.message || ev)); });
+</script>
+<script src="dash_full.js"></script>
+<script src="jquery-3.7.1.min.js"></script>
+<script>
+  // What the lifted block expects from the rest of penumbra_dashboard.js.
+  function dashKeysOff() { return false; }
+  // The builder's "?" opens the hub through window.open: record instead of opening.
+  var opened = [];
+  window.open = function (url, name, features) { opened.push([url, name, features]); return null; };
+</script>
+<script src="lifted.js"></script>
+</head>
+<body>
+<!-- The search builder with two "?" icons as its tabs carry them (data-target with and without the #). -->
+<div id="searchBuilderLightbox">
+  <a href="#" class="tab-help-icon" data-target="#optionsHelpLightbox" data-jump-to="action" id="bldHub">?</a>
+  <a href="#" class="tab-help-icon" data-target="searchHelpLightbox" data-jump-to="search-syntax" id="bldLocal">?</a>
+</div>
+<pre id="out">pending</pre>
+<script>
+  // The topics as help_content.php serves them. The links copy the real markup of
+  // help/topics/dashboardsHelpLightbox.php (pnb-help-open + data-target + data-jump-to) plus
+  // two edge cases: a hub link with no data-jump-to and one whose anchor is not a plain id.
+  _helpHtml = [
+    '<div id="dashboardsHelpLightbox" class="help-topic"><div class="lightbox-content">',
+    '<button type="button" class="close-lightbox">x</button><h3>Dashboards</h3>',
+    '<p><a href="#" data-jump-to="dsh-far" class="help-jump-link" id="lnkJump">Far section</a></p>',
+    '<p><a href="#" class="pnb-help-open" data-target="optionsHelpLightbox" data-jump-to="action" id="lnkHub">tile| and embed|</a></p>',
+    '<p><a href="#" class="pnb-help-open" data-target="accessListHelpLightbox" data-jump-to="acl-entries" data-canonical-ref="access-list-entries" id="lnkHub2">Access List</a></p>',
+    '<p><a href="#" class="pnb-help-open" data-target="userSettingsHelpLightbox" id="lnkHubNoJump">your settings</a></p>',
+    '<p><a href="#" class="pnb-help-open" data-target="schedulerPromptHelpLightbox" data-jump-to="a.b" id="lnkHubBadJump">the rest</a></p>',
+    '<p><a href="#" class="pnb-help-open" data-target="searchHelpLightbox" data-jump-to="search-syntax" data-canonical-ref="search-syntax" id="lnkLocal">search grammar</a></p>',
+    '<div class="spacer"></div><h4 id="dsh-far">Far section</h4><div class="spacer"></div>',
+    '</div></div>',
+    '<div id="searchHelpLightbox" class="help-topic"><div class="lightbox-content">',
+    '<button type="button" class="close-lightbox">x</button><h3>Search</h3>',
+    '<div class="spacer"></div><h4 id="search-syntax">Search syntax</h4><div class="spacer"></div>',
+    '</div></div>'
+  ].join('');
+
+  // A real click (dispatchEvent, bubbling, cancelable) so jQuery's delegated handlers on the
+  // document run exactly as they do in the app. What they left for the browser is read off the
+  // event itself after the dispatch (the builder's handler stops propagation, so a listener on
+  // window would not see it); a listener on window prevents the default of a click no handler
+  // claimed, so the page never navigates.
+  window.addEventListener('click', function (ev) { ev.preventDefault(); });
+  function nativeClick(el) {
+    if (!el) { return 'no element'; }
+    var ev = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
+    el.dispatchEvent(ev);
+    return ev.defaultPrevented;
+  }
+  function body() { return $('#dashHelpOverlay .dash-help-body'); }
+  function topic() { return String($('#dashHelpOverlay').attr('data-topic') || ''); }
+  function href(sel) { var el = document.querySelector(sel); return el ? el.getAttribute('href') : null; }
+
+  var results = {};
+  function record(name, ok, detail) { results[name] = (ok ? 'PASS ' : 'FAIL ') + detail; }
+  try {
+    record('D0 whole file parses', parseErrors.length === 0, parseErrors.length ? parseErrors.join(' | ') : 'no script errors, lifted block loaded=' + (typeof openHelpPanel === 'function'));
+
+    openHelpPanel('dashboardsHelpLightbox');
+    var hub = document.getElementById('lnkHub'), hub2 = document.getElementById('lnkHub2');
+    var noj = document.getElementById('lnkHubNoJump'), badj = document.getElementById('lnkHubBadJump'), loc = document.getElementById('lnkLocal');
+    record('D1 hub links carry their anchor',
+      !!hub && hub.getAttribute('href') === 'index.php#help=optionsHelpLightbox:action' && hub.getAttribute('target') === '_blank' && hub.getAttribute('rel') === 'noopener' &&
+      !!hub2 && hub2.getAttribute('href') === 'index.php#help=accessListHelpLightbox:acl-entries' && hub2.getAttribute('target') === '_blank',
+      'href=' + (hub && hub.getAttribute('href')) + ' / ' + (hub2 && hub2.getAttribute('href')) + ' target=' + (hub && hub.getAttribute('target')) + ' rel=' + (hub && hub.getAttribute('rel')));
+    record('D2 no data-jump-to: no colon',
+      !!noj && noj.getAttribute('href') === 'index.php#help=userSettingsHelpLightbox' && noj.getAttribute('target') === '_blank',
+      'href=' + (noj && noj.getAttribute('href')));
+    record('D3 an anchor that is not a plain id is left off',
+      !!badj && badj.getAttribute('href') === 'index.php#help=schedulerPromptHelpLightbox',
+      'href=' + (badj && badj.getAttribute('href')));
+    record('D4 the local link is still the panel\'s',
+      !!loc && loc.getAttribute('data-dash-help') === 'searchHelpLightbox' && !loc.hasAttribute('target') && loc.getAttribute('href') === '#',
+      loc ? 'data-dash-help=' + loc.getAttribute('data-dash-help') + ' target=' + loc.getAttribute('target') + ' href=' + loc.getAttribute('href') : 'no local link');
+
+    // D5 the panel's "Full Help Center" link: the panel's own anchor when it has one.
+    openHelpPanel('searchHelpLightbox', 'search-syntax');
+    var f1 = href('#dashHelpOverlay .dash-help-full');
+    openHelpPanel();
+    var f2 = href('#dashHelpOverlay .dash-help-full');
+    openHelpPanel('dashboardsHelpLightbox', 'a.b');
+    var f3 = href('#dashHelpOverlay .dash-help-full');
+    record('D5 Full Help Center link carries the panel anchor',
+      f1 === 'index.php#help=searchHelpLightbox:search-syntax' && f2 === 'index.php#help=dashboardsHelpLightbox' && f3 === 'index.php#help=dashboardsHelpLightbox',
+      'at an anchor=' + f1 + ' plain=' + f2 + ' bad anchor=' + f3);
+
+    // D6 the failure note's "Open the Help Center" link (the topic missing from the help html).
+    var keep = _helpHtml;
+    _helpHtml = '<div id="nothingHere"></div>';
+    openHelpPanel('dashboardsHelpLightbox', 'dsh-far');
+    var f4 = href('#dashHelpOverlay .dash-tile-err a');
+    _helpHtml = keep;
+    record('D6 failure note link carries the anchor', f4 === 'index.php#help=dashboardsHelpLightbox:dsh-far', 'href=' + f4);
+
+    // D7 the builder's "?" aimed at a hub topic: window.open with the anchor, no panel.
+    closeHelpPanel();
+    opened = [];
+    var p7 = nativeClick(document.getElementById('bldHub'));
+    record('D7 builder ? opens the hub at the anchor',
+      opened.length === 1 && opened[0][0] === 'index.php#help=optionsHelpLightbox:action' && opened[0][1] === '_blank' && opened[0][2] === 'noopener' && $('#dashHelpOverlay').length === 0 && p7 === true,
+      'opened=' + JSON.stringify(opened) + ' overlays=' + $('#dashHelpOverlay').length + ' prevented=' + p7);
+
+    // D8 the builder's "?" aimed at a local topic: the panel, at the anchor, nothing opened.
+    opened = [];
+    var p8 = nativeClick(document.getElementById('bldLocal'));
+    record('D8 builder ? to a local topic opens the panel there',
+      opened.length === 0 && p8 === true && topic() === 'searchHelpLightbox' && body().scrollTop() > 100 && $('#dashHelpOverlay #search-syntax').length === 1,
+      'opened=' + opened.length + ' prevented=' + p8 + ' topic=' + topic() + ' scrollTop=' + body().scrollTop());
+  } catch (err) {
+    results['EXC'] = 'FAIL ' + String(err && err.stack || err);
+  }
+  document.getElementById('out').textContent = JSON.stringify(results, null, 1);
+  document.title = 'HARNESS-DONE';
+</script>
+</body>
+</html>

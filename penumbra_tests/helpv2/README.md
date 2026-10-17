@@ -262,6 +262,28 @@ Not done, on purpose: no admin review page for the cards (the log and the store 
 the endpoint for an administrator); no streaming; the home topic does not link to Ask (it stays as it was); the
 model's answer quality is not tested (the stub stands in for it; the first live answers are the test).
 
+### Phase 7 (2026-10-15 evening): the claim-level accuracy audit against the code
+
+Every claim in the 33 topics, the 5 tip stores and the Custom Code registry was traced to the live code by nine
+read-only reviewers, one per book (Custom Code x2, pivot, charts + dashboards, share/track, scheduler, writer,
+find/shape, admin + misc): 2,213 claims; 1,913 confirmed, 54 wrong, 130 partly right, 116 not reachable from the
+code. Their tables are in `work/audit/*.md` of the session scratchpad; the summary is
+`ACCURACY_REPORT_2026-10-15.md` beside this README.
+
+Every wrong claim, and every partial one the reviewer could restate, was corrected on the stage with
+`work/audit/patch_all.pl` (195 exact-anchor edits, applied in memory and written only once every anchor held),
+plus three length passes for the tier lint (`patch_fix1/2/3.pl`): 29 topic fragments, the pivot, viz and builder
+tip stores, and the registry (`help/snippets.php`, regenerated). The big themes: the preset controls moved into a
+title-bar chip (pivot, charts, search), the email dialog's limits and options, the Search Filter's date engine, the
+IP Address List that nothing enforces, the Column Summaries total list, eighteen chart types and their
+availability lists, and the SFTP private key stored unencrypted (a code finding, documented as such).
+
+Suite changes: the three corrected tip stores joined `pnb_help_v2_touched()` (P7 now compares the 3 untouched
+blocks: the home topic and the settings and snapshot tip stores) and four tokens removed on purpose joined
+`pnb_help_v2_dropped_tokens()` (a formula dash, `=SUM()`, `strtotime()` twice). No check was weakened: P9 still
+guards 3,820 fact tokens, L16 holds every rewritten topic to the tier lengths. Code-side findings (the hover
+cards, a stale runner notice, the SSH key) are in the report and were not changed. The `php-error` mutant now breaks the one remaining writer gate of the Copy topic (its PHP-stub block is admin-gated), still red on L9 and E-php.
+
 ## Running
 
 ```

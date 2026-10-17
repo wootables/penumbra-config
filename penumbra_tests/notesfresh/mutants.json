@@ -1,0 +1,428 @@
+{
+ "nocall": {
+  "edits": [
+   [
+    "            refreshCardNotes(key, kind);   // that row's notes, read again (2026-10-16)\n",
+    ""
+   ]
+  ],
+  "must": [
+   "F-new",
+   "F-tint",
+   "F-status",
+   "F-rail",
+   "F-cell",
+   "F-one-call",
+   "F-same-call",
+   "F-edit-text",
+   "F-edit-cell",
+   "F-del",
+   "F-del-cell",
+   "F-gone",
+   "F-gone-cell",
+   "F-moved-count"
+  ],
+  "scn": [
+   "cardnew",
+   "cardsame",
+   "cardedit",
+   "carddel",
+   "cardgone",
+   "cardmoved"
+  ]
+ },
+ "nosig": {
+  "edits": [
+   [
+    "            if (rowNotesSig(had) === rowNotesSig(fresh)) return false;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "F-same-noredraw"
+  ],
+  "scn": [
+   "cardsame"
+  ]
+ },
+ "sigtext": {
+  "edits": [
+   [
+    "n.NOTE_TEXT || '', n.PARENT_ID == null",
+    "n.PARENT_ID == null"
+   ]
+  ],
+  "must": [
+   "F-edit-text",
+   "F-edit-cell"
+  ],
+  "scn": [
+   "cardedit"
+  ]
+ },
+ "counts": {
+  "edits": [
+   [
+    "            if (fresh.length) { store[key] = fresh; counts[key] = fresh.length; }",
+    "            if (fresh.length) { store[key] = fresh; }"
+   ]
+  ],
+  "must": [
+   "F-cell",
+   "F-del-cell",
+   "F-moved-count"
+  ],
+  "scn": [
+   "cardnew",
+   "carddel",
+   "cardmoved"
+  ]
+ },
+ "gonekeep": {
+  "edits": [
+   [
+    "            else { delete store[key]; delete counts[key]; }",
+    "            else { }"
+   ]
+  ],
+  "must": [
+   "F-gone",
+   "F-gone-cell"
+  ],
+  "scn": [
+   "cardgone"
+  ]
+ },
+ "tint": {
+  "edits": [
+   [
+    "                    it.classList.add('journal-rownote-new');\n",
+    ""
+   ]
+  ],
+  "must": [
+   "F-tint"
+  ],
+  "scn": [
+   "cardnew"
+  ]
+ },
+ "nofade": {
+  "edits": [
+   [
+    "                    setTimeout(function () { it.classList.remove('journal-rownote-new'); }, 2200);\n",
+    ""
+   ]
+  ],
+  "must": [
+   "F-tint-fades"
+  ],
+  "scn": [
+   "cardnew"
+  ]
+ },
+ "nostatus": {
+  "edits": [
+   [
+    "                if (added && !$.trim($st.text())) $st.attr",
+    "                if (false) $st.attr"
+   ]
+  ],
+  "must": [
+   "F-status"
+  ],
+  "scn": [
+   "cardnew"
+  ]
+ },
+ "anycard": {
+  "edits": [
+   [
+    "c.el && c.el.parentNode && c.key === key && c.kind === kind && ",
+    "c.el && c.el.parentNode && "
+   ]
+  ],
+  "must": [
+   "F-moved-card"
+  ],
+  "scn": [
+   "cardmoved"
+  ]
+ },
+ "noderived": {
+  "edits": [
+   [
+    "            refreshJournalDerivedViews();   // the table's Notes cells too (it schedules the apply)\n",
+    ""
+   ]
+  ],
+  "must": [
+   "F-cell",
+   "F-edit-cell",
+   "F-del-cell",
+   "F-gone-cell",
+   "F-moved-count"
+  ],
+  "scn": [
+   "cardnew",
+   "cardsame",
+   "cardedit",
+   "carddel",
+   "cardgone",
+   "cardmoved"
+  ]
+ },
+ "csstint": {
+  "edits": [
+   [
+    "/* A note that arrived in an open note card (2026-10-16): the same static tint, the fade gated likewise. */\n.journal-rownote-item.journal-rownote-new {\n    background-color: color-mix(in srgb, var(--accent-warning, gold) 24%, var(--bg-surface, #fff));\n}",
+    "/* A note that arrived in an open note card (2026-10-16): the same static tint, the fade gated likewise. */\n.journal-rownote-item.journal-rownote-new {\n}",
+    "css"
+   ]
+  ],
+  "must": [
+   "F-tint"
+  ],
+  "scn": [
+   "cardnew"
+  ]
+ },
+ "age": {
+  "edits": [
+   [
+    "            if (typeof at === 'number' && Date.now() - at >= JNOTES_STALE_MS) checkRowNotesVersion();",
+    "            checkRowNotesVersion();"
+   ]
+  ],
+  "must": [
+   "B-short",
+   "B-same",
+   "B-quiet",
+   "B-reload",
+   "B-rebase"
+  ],
+  "scn": [
+   "tabback"
+  ]
+ },
+ "noconfirm": {
+  "edits": [
+   [
+    "{ window._penumbraRowNotesAt = Date.now(); return; }   // still current",
+    "return;"
+   ]
+  ],
+  "must": [
+   "B-quiet",
+   "B-reload",
+   "B-rebase"
+  ],
+  "scn": [
+   "tabback"
+  ]
+ },
+ "noloadat": {
+  "edits": [
+   [
+    "                window._penumbraRowNotesAt = Date.now();   // ...and when they were last known current\n",
+    ""
+   ]
+  ],
+  "must": [
+   "B-same",
+   "B-quiet",
+   "B-reload",
+   "B-rebase",
+   "B-hidden",
+   "B-glance",
+   "B-card"
+  ],
+  "scn": [
+   "tabback",
+   "tabhidden",
+   "tabglance",
+   "tabcard"
+  ]
+ },
+ "vercmp": {
+  "edits": [
+   [
+    "if (resp.ver === window._penumbraRowNotesVer) { window._penumbraRowNotesAt",
+    "if (false) { window._penumbraRowNotesAt"
+   ]
+  ],
+  "must": [
+   "B-same",
+   "B-reload",
+   "B-rebase"
+  ],
+  "scn": [
+   "tabback"
+  ]
+ },
+ "verbase": {
+  "edits": [
+   [
+    "window._penumbraRowNotesVer = (resp && resp.status === 'success' && typeof resp.ver === 'string') ? resp.ver : null;",
+    "window._penumbraRowNotesVer = null;"
+   ]
+  ],
+  "must": [
+   "B-same",
+   "B-quiet",
+   "B-reload",
+   "B-rebase",
+   "B-hidden",
+   "B-glance",
+   "B-card"
+  ],
+  "scn": [
+   "tabback",
+   "tabhidden",
+   "tabglance",
+   "tabcard"
+  ]
+ },
+ "novis": {
+  "edits": [
+   [
+    "        document.addEventListener('visibilitychange', jNotesBack);\n",
+    ""
+   ]
+  ],
+  "must": [
+   "B-hidden"
+  ],
+  "scn": [
+   "tabhidden"
+  ]
+ },
+ "nofocus": {
+  "edits": [
+   [
+    "        window.addEventListener('focus', jNotesBack);\n",
+    ""
+   ]
+  ],
+  "must": [
+   "B-same",
+   "B-quiet",
+   "B-reload",
+   "B-rebase",
+   "B-glance",
+   "B-card"
+  ],
+  "scn": [
+   "tabback",
+   "tabglance",
+   "tabcard"
+  ]
+ },
+ "nocardfollow": {
+  "edits": [
+   [
+    "                window.Penumbra.journalRowNotesChanged();\n            }).always(function () { _jVerInFlight = false; });",
+    "                window.Penumbra.loadJournalRowNotes();\n            }).always(function () { _jVerInFlight = false; });"
+   ]
+  ],
+  "must": [
+   "B-card"
+  ],
+  "scn": [
+   "tabcard"
+  ]
+ },
+ "p-onewhere": {
+  "edits": [
+   [
+    "                  WHERE \" . journalRowNotesWhere() . \" AND SCOPE = :sc AND ROW_KEY = :rk",
+    "                  WHERE REPORT_ID = :rid AND SCOPE = :sc AND ROW_KEY = :rk",
+    "php"
+   ]
+  ],
+  "must": [
+   "S-where-uses",
+   "S-one-binds"
+  ],
+  "scn": []
+ },
+ "p-vernull": {
+  "edits": [
+   [
+    "            $ver = null;\n",
+    "",
+    "php"
+   ]
+  ],
+  "must": [
+   "S-ver-safe"
+  ],
+  "scn": []
+ },
+ "p-verkey": {
+  "edits": [
+   [
+    "                SUM(ORA_HASH(ROW_KEY)) AS KH,\n",
+    "",
+    "php"
+   ]
+  ],
+  "must": [
+   "S-ver-sql"
+  ],
+  "scn": []
+ },
+ "p-vertext": {
+  "edits": [
+   [
+    "                SUM(NVL(ORA_HASH(DBMS_LOB.SUBSTR(NOTE_TEXT, 1000, 1)), 0)) AS TH\n",
+    "                0 AS TH\n",
+    "php"
+   ]
+  ],
+  "must": [
+   "S-ver-sql"
+  ],
+  "scn": []
+ },
+ "p-nosent": {
+  "edits": [
+   [
+    ",\n                               'ver' => $ver));",
+    "));",
+    "php"
+   ]
+  ],
+  "must": [
+   "S-ver-sent"
+  ],
+  "scn": []
+ },
+ "p-nvgate": {
+  "edits": [
+   [
+    "        if (!journalCallerCanReadJournal($report, $currentUserKey, $isAdmin)) {\n            echo json_encode(array('status' => 'error', 'message' => 'The Report Journal is off for this report.'));\n            exit;\n        }\n        if (journalEnsureFiledFor($report) === 'error') {\n            echo json_encode(array('status' => 'error', 'message' => 'The journal could not be checked against the report\\'s key columns. Try again in a moment.'));\n            exit;\n        }\n        try {\n            $ver = journalRowNotesVersion($report['ID']);",
+    "        if (journalEnsureFiledFor($report) === 'error') {\n            echo json_encode(array('status' => 'error', 'message' => 'The journal could not be checked against the report\\'s key columns. Try again in a moment.'));\n            exit;\n        }\n        try {\n            $ver = journalRowNotesVersion($report['ID']);",
+    "php"
+   ]
+  ],
+  "must": [
+   "S-nv-gates"
+  ],
+  "scn": []
+ },
+ "p-onekind": {
+  "edits": [
+   [
+    " || !in_array($kind, array('row', 'pivot', 'chart'), true)",
+    "",
+    "php"
+   ]
+  ],
+  "must": [
+   "S-one-gates",
+   "S-one-kind"
+  ],
+  "scn": []
+ }
+}
