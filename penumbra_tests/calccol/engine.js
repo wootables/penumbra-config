@@ -184,6 +184,124 @@
       document.querySelector('#pnbCalcList [data-calc-del="MY_RATIO"]').click();
       try { store = JSON.parse(localStorage.getItem('penumbra_calc_columns') || '{}'); } catch (e) {}
       R.chk.removeDrops = !store.zzcalc.some(function (d) { return d.name === 'MY_RATIO'; }) && !C.active().some(function (d) { return d.name === 'MY_RATIO'; });
+      // --- adjustable values (2026-10-18, calcadj) -----------------------------------------
+      eq('inpToken', run('{A} * {@R}', { A: '10', '@R': 0.5 }), '5');
+      eq('inpMissing', run('{A} * {@R}', { A: '10' }), '');
+      eq('inpInText', run('"{@R}"', { '@R': 1 }, 'text'), '{@R}');
+      eq('inpErrEmpty', /Empty \{@\}/.test(err('{@} + 1')), true);
+      var ci = C.compile('{@RATE} + {A} - {@rate}');
+      eq('inpCompile', ci.ok && ci.inputs.join(',') === 'RATE' && ci.refs.join(',') === 'A', true);
+      var pui = C.parseUrlValue('X|{A}*{@R}|currency|@R=0.5,0,1,0.05');
+      eq('urlInput', JSON.stringify(pui), JSON.stringify({ name: 'X', formula: '{A}*{@R}', format: 'currency', input: { name: 'R', value: 0.5, min: 0, max: 1, step: 0.05 } }));
+      eq('urlInputRoundTrip', C.urlValue(pui), 'X|{A}*{@R}|currency|@R=0.5,0,1,0.05');
+      var pui2 = C.parseUrlValue('X|{A}*{@R}|@R=2');
+      eq('urlInputNoFmt', !!pui2 && pui2.format === 'number' && pui2.input.value === 2 && pui2.input.min === undefined && C.urlValue(pui2) === 'X|{A}*{@R}|@R=2', true);
+      C.fromState([{ name: 'X', formula: '{A}', input: { name: 'r', value: 5, min: 0, max: 1 } }, { name: 'Y', formula: '{A}', input: { name: 'B', value: 'abc' } }], 'state');
+      var ax = C.active().filter(function (d) { return d.name === 'X'; })[0], ay = C.active().filter(function (d) { return d.name === 'Y'; })[0];
+      eq('cleanInputClamp', !!ax && !!ax.input && ax.input.name === 'R' && ax.input.value === 1 && ax.input.min === 0 && ax.input.max === 1 && ax.input.step === undefined, true);
+      eq('cleanInputBad', !!ay && ay.input === undefined, true);
+      // one value, shared: X carries R, Y uses it; Z names a value no column carries
+      C.fromState([{ name: 'X', formula: '{A} * {@R}', input: { name: 'R', value: 2 } }, { name: 'Y', formula: '{X} + {@R}' }, { name: 'Z', formula: '{A} * {@Q}' }], 'state');
+      var ar = C.applyRows([{ A: '3' }]);
+      eq('applyInputs', ar[0].X + '/' + ar[0].Y, '6/8');
+      await sleep(1100);
+      eq('applyNoInput', !('Z' in ar[0]) && window.__toasts.some(function (t) { return /Z<\/strong> was left out: no column carries an adjustable value named \{@Q\}/.test(t); }), true);
+      // the viewer moves it: an override of their own, every knob follows, what leaves the page is at that value
+      eq('inputsListed', C.inputs().R.value === 2 && C.inputs().R.col === 'X' && C.inputs().R.def === 2, true);
+      eq('setInput', C.setInput('R', 4) === true && C.inputs().R.value === 4 && C.applyRows([{ A: '3' }])[0].X === '12'
+        && C.forState().filter(function (d) { return d.name === 'X'; })[0].input.value === 4, true);
+      var lsI = JSON.parse(localStorage.getItem('penumbra_calc_inputs') || '{}');
+      eq('setInputStored', !!lsI.zzcalc && lsI.zzcalc.R === 4, true);
+      eq('setInputBad', C.setInput('R', 'abc') === false && C.setInput('NOPE', 1) === false && C.inputs().R.value === 4, true);
+      eq('inputsFor', C.inputsFor('Y').map(function (x) { return x.name; }).join(',') === 'R' && C.inputsFor('X')[0].name === 'R' && C.inputsFor('Z').length === 0, true);
+      eq('knobHtml', /data-calc-input="R"/.test(C.knobHtml(C.inputs().R, 'x')) && !/type="range"/.test(C.knobHtml(C.inputs().R, 'x')), true);
+      C.fromState([{ name: 'X', formula: '{A} * {@R}', input: { name: 'R', value: 2, min: 0, max: 3, step: 0.5 } }], 'state');
+      eq('setInputClamp', C.setInput('R', 9) === true && C.inputs().R.value === 3 && /type="range"/.test(C.knobHtml(C.inputs().R, 'x')), true);
+      eq('setInputBackToDefault', C.setInput('R', 2) === true && !Object.prototype.hasOwnProperty.call(JSON.parse(localStorage.getItem('penumbra_calc_inputs') || '{}').zzcalc || {}, 'R'), true);
+      C.setInput('R', 1);
+      C.clearSaved();
+      eq('clearInputs', C.inputs().R.value === 2 && !JSON.parse(localStorage.getItem('penumbra_calc_inputs') || '{}').zzcalc, true);
+      // the panel's row carries the knob; a change in its box moves the value
+      C.applyRows([{ A: '3' }]);
+      var knob = document.querySelector('#pnbCalcList [data-calc-input="R"]');
+      eq('panelKnob', !!knob && knob.value === '2' && !!document.querySelector('#pnbCalcList [data-calc-range="R"]'), true);
+      if (knob) { knob.value = '2.5'; knob.dispatchEvent(new Event('change', { bubbles: true })); }
+      eq('panelKnobChange', C.inputs().R.value === 2.5 && (document.querySelector('#pnbCalcList [data-calc-range="R"]') || {}).value === '2.5', true);
+      // the dialog's Adjustable value row: closed by default, the other columns' values as chips;
+      // a value the formula names must exist; a bad default, bad bounds, a name another column has
+      C.openDialog(null);
+      var wrap = document.getElementById('pnbCalcAdjWrap');
+      eq('dialogAdjRow', !!wrap && !wrap.open && !!document.getElementById('pnbCalcAdjName') && /\{@R\}/.test((document.getElementById('pnbCalcCols') || {}).textContent || ''), true);
+      document.getElementById('pnbCalcName').value = 'ADJCOL';
+      document.getElementById('pnbCalcFormula').value = '{A} * {@K}';
+      document.getElementById('pnbCalcGo').click();
+      eq('dialogAdjMissing', !!document.getElementById('pnbCalcOverlay') && /adjustable value named \{@K\}/.test(document.getElementById('pnbCalcErr').textContent), true);
+      document.getElementById('pnbCalcAdjName').value = 'K';
+      document.getElementById('pnbCalcAdjVal').value = 'abc';
+      document.getElementById('pnbCalcGo').click();
+      eq('dialogAdjBadVal', /default/.test(document.getElementById('pnbCalcErr').textContent) && document.getElementById('pnbCalcAdjTok').textContent === '{@K}', true);
+      document.getElementById('pnbCalcAdjVal').value = '2';
+      document.getElementById('pnbCalcAdjMin').value = '5';
+      document.getElementById('pnbCalcAdjMax').value = '1';
+      document.getElementById('pnbCalcGo').click();
+      eq('dialogAdjBadBounds', /lowest/.test(document.getElementById('pnbCalcErr').textContent), true);
+      document.getElementById('pnbCalcAdjMin').value = '0';
+      document.getElementById('pnbCalcAdjMax').value = '10';
+      document.getElementById('pnbCalcAdjName').value = 'R';
+      document.getElementById('pnbCalcGo').click();
+      eq('dialogAdjClash', /already the adjustable value of X/.test(document.getElementById('pnbCalcErr').textContent), true);
+      document.getElementById('pnbCalcAdjName').value = 'K';
+      document.getElementById('pnbCalcFormula').dispatchEvent(new Event('input', { bubbles: true }));
+      await sleep(250);
+      eq('dialogAdjPreview', document.getElementById('pnbCalcErr').textContent === '' && document.querySelectorAll('#pnbCalcPrev tbody tr').length === 1
+        && (document.querySelector('#pnbCalcPrev tbody tr td.pnb-calc-res') || {}).textContent === '6', true);
+      document.getElementById('pnbCalcGo').click();
+      var st3 = JSON.parse(localStorage.getItem('penumbra_calc_columns') || '{}');
+      var sdef = (st3.zzcalc || []).filter(function (d) { return d.name === 'ADJCOL'; })[0];
+      eq('dialogAdjSaved', !document.getElementById('pnbCalcOverlay') && !!sdef && JSON.stringify(sdef.input) === JSON.stringify({ name: 'K', value: 2, min: 0, max: 10 }), true);
+      // an edit that leaves the value alone keeps the knob; one that changes it puts the knob back
+      C.applyRows([{ A: '3' }]);
+      C.setInput('K', 7);
+      C.openDialog('ADJCOL');
+      eq('dialogAdjEditOpen', document.getElementById('pnbCalcAdjWrap').open === true && document.getElementById('pnbCalcAdjVal').value === '2' && document.getElementById('pnbCalcAdjMax').value === '10', true);
+      document.getElementById('pnbCalcGo').click();
+      eq('dialogAdjEditKeepsKnob', (C.inputs().K || {}).value === 7, true);
+      C.openDialog('ADJCOL');
+      document.getElementById('pnbCalcAdjVal').value = '3';
+      document.getElementById('pnbCalcGo').click();
+      eq('dialogAdjEditResets', (C.inputs().K || {}).value === 3 && (C.inputs().K || {}).def === 3, true);
+      R.info.adj = { inputs: C.inputs(), active: C.active() };
+      // --- round 2 (2026-10-19) ---------------------------------------------------------
+      // the Save dialog's list: a ticked column using {@R} takes the column CARRYING R along
+      C.clearSaved();
+      C.fromState([{ name: 'CAR', formula: '{A} + 0', input: { name: 'R', value: 2 } }, { name: 'USER', formula: '{A} * {@R}' }], 'state');
+      C.applyRows([{ A: '3' }]);
+      var lsb = document.getElementById('lastStopCardBody'); if (!lsb) { lsb = document.createElement('div'); lsb.id = 'lastStopCardBody'; document.body.appendChild(lsb); }
+      C.renderSaveList();
+      document.querySelector('#pnbCalcSaveRow input[data-calc-save="CAR"]').checked = false;
+      var sst = { visibleColumns: ['#', 0, 1, 2], columnOrder: [0, 1, 2] };
+      C.stripFromState(sst, { A: 0, CAR: 1, USER: 2 });
+      eq('stripCarrier', !!sst.calcColumns && sst.calcColumns.map(function (d) { return d.name; }).join(',') === 'CAR,USER' && sst.calcColumns[0].input.value === 2, true);
+      lsb.innerHTML = '';
+      // two active columns carrying one value name: the later loses its own (one knob, one id)
+      C.fromState([{ name: 'C1', formula: '{A}', input: { name: 'R', value: 1 } }, { name: 'C2', formula: '{A}', input: { name: 'r', value: 9 } }], 'state');
+      var ac = C.active();
+      eq('dupInput', !!ac.filter(function (d) { return d.name === 'C1'; })[0].input && ac.filter(function (d) { return d.name === 'C2'; })[0].input === undefined && C.inputs().R.value === 1 && C.inputs().R.col === 'C1', true);
+      C.applyRows([{ A: '3' }]);
+      eq('applyBoxSame', (function () {
+        // Enter on an untouched box is not a move: no override, no reset button
+        var kb = document.querySelector('#pnbCalcList [data-calc-input="R"]');
+        kb.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+        var ov = JSON.parse(localStorage.getItem('penumbra_calc_inputs') || '{}');
+        return !(ov.zzcalc && Object.prototype.hasOwnProperty.call(ov.zzcalc, 'R')) && document.querySelector('#pnbCalcList [data-calc-inpreset="R"]').hidden === true;
+      })(), true);
+      // an error about the adjustable value opens its row
+      C.openDialog(null);
+      document.getElementById('pnbCalcName').value = 'ERRCOL';
+      document.getElementById('pnbCalcFormula').value = '{A} * {@NOPE}';
+      document.getElementById('pnbCalcGo').click();
+      eq('adjErrOpens', document.getElementById('pnbCalcAdjWrap').open === true && /\{@NOPE\}/.test(document.getElementById('pnbCalcErr').textContent), true);
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
       // --- the source: no eval / Function / innerHTML of a formula unescaped -------------
       var srcText = await fetch('penumbra_calc.js', { cache: 'no-store' }).then(function (r) { return r.text(); });
       R.chk.noEval = !/\beval\s*\(/.test(srcText) && !/new\s+Function\s*\(/.test(srcText) && !/\bFunction\s*\(\s*['"]/.test(srcText);

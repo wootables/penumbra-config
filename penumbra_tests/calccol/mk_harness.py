@@ -17,6 +17,14 @@ rep('<title>saveconf</title>', '<title>calccol</title>')
 # (index.php defers both, and main.js does its work at ready, after the module has run.
 # The harness's main_hc.js runs at once, so the module goes first here.)
 rep('<script src="main_hc.js"></script>', '<script src="penumbra_calc.js"></script>\n<script src="main_hc.js"></script>')
+# (2026-10-18, calcadj) the cadj scenario has the header menu too, in index.php's order: the
+# tile engine before main.js, the menu after it. Other scenarios unchanged.
+rep('<script src="penumbra_calc.js"></script>\n<script src="main_hc.js"></script>',
+    '<script src="penumbra_calc.js"></script>\n'
+    '<script>if (window.__SCN === "cadj") document.write(\'<link rel="stylesheet" href="penumbra_colmenu.css"><script src="penumbra_tiles.js"></scr\' + \'ipt>\');</script>\n'
+    '<script src="main_hc.js"></script>')
+rep('<script src="driver.js"></script>',
+    '<script>if (window.__SCN === "cadj") document.write(\'<script src="penumbra_colmenu.js"></scr\' + \'ipt>\');</script>\n<script src="driver.js"></script>')
 # (the saveconf harness already carries the Settings panel with its #spColumnList; calccol3: + the Clear button)
 rep('<div id="pnbStatusBar">', '<div id="action_overlay"></div>\n<div id="pnbStatusBar">')
 rep('<div class="sp-actions"><button id="spApply">', '<button id="spClearStorage">Clear All Custom Preferences For This Report</button>\n  <div class="sp-actions"><button id="spApply">')

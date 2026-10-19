@@ -1,0 +1,129 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>too many groups vs limit</title></head>
+<body>
+<!-- TOO MANY GROUPS vs LIMIT (2026-10-17): grouped bar / line / area keep only the
+     top `limit` X labels, so the 50-group check counts only the groups drawn there
+     when "Other" is off. With Other on (every group can sit in the Other bar) and
+     on every other chart type the count over all rows stays.
+     Same minimal boot as ..\chartagg\harness.html; run.ps1 patches main.js. -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<table id="resultsTable"><thead id="tableHeader"><tr>
+  <th data-colname="#">#</th><th data-colname="CAT">CAT</th><th data-colname="GRP">GRP</th><th data-colname="NUM">NUM</th>
+</tr></thead><tbody></tbody></table>
+<div id="errorBox"></div>
+<input id="tableSearch" value="">
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  window.alert = function () {}; window.confirm = function () { return true; };
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+</script>
+<script src="main_patched.js"></script>
+<script>
+(function () {
+  function report(txt) { document.getElementById('out').textContent = txt; }
+  var results = [];
+  function assert(name, cond, detail) { results.push({ name: name, pass: !!cond, detail: detail === undefined ? '' : String(detail) }); }
+  function eq(name, got, want) { var g = JSON.stringify(got), w = JSON.stringify(want); assert(name, g === w, 'got ' + g + ' | want ' + w); }
+  function check(name, fn, want) {
+    var got;
+    try { got = fn(); } catch (e) { assert(name, false, 'THREW ' + String(e && e.message || e).slice(0, 160)); return; }
+    eq(name, got, want);
+  }
+  function M(o) { var m = new Map(); Object.keys(o).forEach(function (k) { m.set(k, o[k]); }); return m; }
+  // Count of rows per CAT, ranked by value desc, like a builder "Count" chart.
+  function cd(rows, type, limit, other) {
+    return window.__CA.chartData(rows, 'CAT', 'NUM', 'GRP', 'count', limit, type, 'value', 'desc', 'default',
+      false, !!other, null, '', {});
+  }
+  function err(d) { return d && d._groupByError ? d._groupByError : ''; }
+
+  // R1: C1..C3 = 40 rows each over 4 groups apiece (12 groups in the top 3);
+  // C4..C6 = 20 rows each, one per group, 60 more groups -> 72 in all.
+  var R1 = [];
+  ['C1', 'C2', 'C3'].forEach(function (c) {
+    for (var g = 1; g <= 4; g++) for (var k = 0; k < 10; k++) R1.push(M({ CAT: c, GRP: c + '-G' + g, NUM: '1' }));
+  });
+  ['C4', 'C5', 'C6'].forEach(function (c) {
+    for (var g = 1; g <= 20; g++) R1.push(M({ CAT: c, GRP: c + '-T' + g, NUM: '1' }));
+  });
+  // R2: the top 3 alone hold 57 groups (19 each, 2 rows per group); C4 = 1 row.
+  var R2 = [];
+  ['C1', 'C2', 'C3'].forEach(function (c) {
+    for (var g = 1; g <= 19; g++) for (var k = 0; k < 2; k++) R2.push(M({ CAT: c, GRP: c + '-G' + g, NUM: '1' }));
+  });
+  R2.push(M({ CAT: 'C4', GRP: 'Z', NUM: '1' }));
+
+  async function run() {
+    var F = window.__CA;
+    if (!F || typeof F.chartData !== 'function') {
+      report('RESULTS_JSON:' + JSON.stringify({ fatal: 'hooks unavailable: ' + (window.__CA_ERR || 'n/a'), pageErrors: window.__errors.slice(0, 6) }));
+      return;
+    }
+    try { await F.loadChartModule(); } catch (e) { assert('L0 chart module loads', false, String(e)); }
+
+    check('T1 bar, Limit 3, Other off: draws the 12 groups of the top 3 (72 in all rows)', function () {
+      var d = cd(R1, 'bar', 3, false); return [err(d), d.labels, d.datasets.length]; }, ['', ['C1', 'C2', 'C3'], 12]);
+    check('T2 line, Limit 3, Other off: same, no warning', function () {
+      var d = cd(R1, 'line', 3, false); return [err(d), d.datasets.length]; }, ['', 12]);
+    check('T3 area, Limit 3, Other off: same, no warning', function () {
+      var d = cd(R1, 'area', 3, false); return [err(d), d.datasets.length]; }, ['', 12]);
+    check('T4 bar, Limit 3, Other ON: still warns (the Other bar holds every group) and says how to narrow it', function () {
+      var e = err(cd(R1, 'bar', 3, true)); return [e !== '', e.indexOf('turn Other off') !== -1, e.indexOf('top 3') !== -1]; }, [true, true, true]);
+    check('T5 bar, Limit 10 (all 6 labels): 72 groups drawn -> warns, naming the top 10', function () {
+      var e = err(cd(R1, 'bar', 10, false)); return [e !== '', e.indexOf('72 unique values within the top 10') !== -1]; }, [true, true]);
+    check('T6 bar, Limit 3 over R2: the top 3 alone hold 57 groups -> still warns', function () {
+      var d = cd(R2, 'bar', 3, false); return [err(d) !== '', d.labels[0]]; }, [true, 'Too many groups (57+)']);
+    check('T7 control: doughnut keeps the all-rows count (warns at Limit 3)', function () {
+      return err(cd(R1, 'doughnut', 3, false)).indexOf('more than 50 unique values') !== -1; }, true);
+    check('T8 control: bar with no Group By draws normally', function () {
+      var d = window.__CA.chartData(R1, 'CAT', 'NUM', '', 'count', 3, 'bar', 'value', 'desc', 'default', false, false, null, '', {});
+      return [err(d), d.labels]; }, ['', ['C1', 'C2', 'C3']]);
+
+    report('RESULTS_JSON:' + JSON.stringify({ pageErrors: window.__errors.slice(0, 8), results: results }));
+  }
+
+  var tries = 0;
+  (function wait() {
+    tries++;
+    if (window.__CA || tries > 60) {
+      setTimeout(function () {
+        run().catch(function (e) { report('RESULTS_JSON:' + JSON.stringify({ fatal: 'run threw: ' + e, pageErrors: window.__errors.slice(0, 6) })); });
+      }, 300);
+    } else { setTimeout(wait, 100); }
+  })();
+})();
+</script>
+</body></html>

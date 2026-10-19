@@ -4474,7 +4474,43 @@
         _dashToastLoop();
     }
 
+    // Save conflict (2026-10-16, the report page's 2026-10-09 pattern): a save over
+    // the dashboard this page loaded sends the version it loaded (META.version, the
+    // server's UPDATED_AT token); manage_dashboard.php answers 409 {conflict, who,
+    // when} when someone saved since. "Save anyway" sets the one-shot force.
+    var _dashSaveForce = false;
+    function _dashCloseConflictNotes() {
+        _dashToastCards.slice().forEach(function (t) {
+            if (t.el && t.el.querySelector('.dash-save-conflict-acts')) { _dashToastClose(t); }
+        });
+    }
+    function _dashShowSaveConflict(c) {
+        var who = c.updated_by_name || c.updated_by || 'Someone';
+        var when = c.updated_when ? ' at ' + c.updated_when : '';
+        var lead = c.updated_by_self
+            ? 'You saved this dashboard' + when + ' in another tab or window, after this page opened it.'
+            : who + ' saved this dashboard' + when + ', after you opened it.';
+        _dashCloseConflictNotes();
+        dashShowText("<p id='undo_text'><span style='color: var(--accent-danger, #cc0000)'>NOT SAVED:</span> " + escapeHtml(lead) +
+            ' Your changes are still on this page. Saving now replaces theirs with yours.</p>' +
+            '<span class="dash-save-conflict-acts" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:6px;">' +
+            '<button type="button" class="dash-btn dash-save-conflict-force">Save anyway</button>' +
+            '<button type="button" class="dash-btn dash-save-conflict-open">Open the latest in a new tab</button></span>', 600000);
+    }
+    $(document).on('click', '.dash-save-conflict-force', function (e) {
+        e.preventDefault();
+        _dashCloseConflictNotes();
+        _dashSaveForce = true;
+        saveDashboard();
+    });
+    $(document).on('click', '.dash-save-conflict-open', function (e) {
+        e.preventDefault();
+        window.open('dashboard.php?id=' + encodeURIComponent(META.short_id || V.shortId), '_blank', 'noopener');
+    });
+
     function saveDashboard() {
+        var forceNow = _dashSaveForce;   // one save only: read and cleared before anything can stop this one
+        _dashSaveForce = false;
         var payload = {
             short_id: META.short_id || V.shortId,
             title: META.title || META.short_id || V.shortId,
@@ -4484,6 +4520,8 @@
             state_data: JSON.stringify(DASH),
             overwrite: !IS_NEW
         };
+        if (!IS_NEW && typeof META.version === 'string') { payload.base_updated_at = META.version; }   // the version this page holds (2026-10-16)
+        if (forceNow) { payload.force = true; }
         var $btn = $('#dashSaveBtn').prop('disabled', true).text('Saving…');
         $.ajax({
             url: 'manage_dashboard.php?action=save', type: 'POST', contentType: 'application/json',
@@ -4497,6 +4535,7 @@
                 setTimeout(function () { $btn.text('Save'); }, 1600);
                 if (Array.isArray(r.tags)) { META.tags = r.tags.slice(); }   // the list as stored (2026-10-09): the next save starts from it
                 META.tagsBase = (META.tags || []).slice();
+                if (typeof r.version === 'string') { META.version = r.version; }   // the row as this save left it (2026-10-16): saving twice is never a conflict
                 if (r.tags_failed) { dashShowText("<p id='undo_text'><span style='color: var(--accent-danger, #cc0000)'>WARNING:</span> " + escapeHtml(r.message || 'The layout is saved; its tags are not.') + "</p>"); }
                 else { dashShowText("<p id='undo_text'><span style='color: lightgreen'>SUCCESS:</span> Dashboard saved.</p>"); }
             } else {
@@ -4504,6 +4543,7 @@
             }
         }).fail(function (x) {
             $btn.prop('disabled', false).text('Save');
+            if (x && x.status === 409 && x.responseJSON && x.responseJSON.conflict) { _dashShowSaveConflict(x.responseJSON); return; }
             dashShowText("<p id='undo_text'><span style='color: var(--accent-danger, #cc0000)'>ERROR:</span> Save failed: " + escapeHtml((x.responseJSON && x.responseJSON.message) || 'network or server error') + " - your changes are NOT stored yet.</p>", 15000);
         });
     }
@@ -4830,6 +4870,7 @@
                 applyDefaultFilter();   // its own default, unless the address carried a filter (2026-09-30)
                 META = { short_id: r.short_id, title: r.title, authorized: r.authorized, owner_id: r.owner_id, tags: Array.isArray(r.tags) ? r.tags.slice() : [] };   // the tags too (2026-10-09): a Save after a hop used to post an empty list
                 META.tagsBase = META.tags.slice();
+                if (typeof r.version === 'string') { META.version = r.version; }   // its save-conflict token (2026-10-16): a Save after a hop checks against THIS dashboard
                 V.shortId = r.short_id;
                 V.found = true;
                 // &noadm previews a viewer: manage_dashboard.php never hears it, so

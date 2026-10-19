@@ -15,7 +15,15 @@
 # implicit contains (penumbra_search.php had two global terms) and the `contains` word operator
 # (neither PHP engine had it) with the browser's WORD_OPS exclusions.
 #
-# EXPECTED TAIL: "PASS: 112   FAIL: 0" then "RESULT: GREEN"  (count as of 2026-09-23 night: 75 PHP + 37 browser)
+# EXPECTED TAIL: "PASS: 117   FAIL: 0" then "RESULT: GREEN"  (count as of 2026-10-16: 78 PHP + 39 browser)
+#
+# RED ON PAGE ERRORS (2026-10-17): an uncaught error while main.js boots in the harness
+# (window.onerror -> RESULTS_JSON pageErrors) is ONE extra FAIL under section A, so the tail
+# reads "PASS: 117   FAIL: 1" / "RESULT: RED" with the message on the FAIL line. It used to be a
+# parenthetical "(main.js init errors, may matter: ...)" note that counted nothing, which is how
+# the ready closure dying at journalWatch() (0e8e581, 2026-10-02) sat unnoticed until
+# 2026-10-16: the exports are hoisted declarations, so a half-booted main.js still answered
+# every case. Proof: -App <stage> whose js\main.js has tBodies -> tBodiez must go RED.
 #
 # UNC .ps1 files are GPO-blocked here - run the body as a scriptblock:
 #   $sb = [scriptblock]::Create((Get-Content -Raw '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\bracespace\run.ps1'))
@@ -88,7 +96,10 @@ function Invoke-BraceSuite([string]$appDir, [switch]$Quiet) {
         else {
             $res = $body.Substring(13) | ConvertFrom-Json
             $lines.Add('A. main.js (browser) parseAdvancedQuery / evaluateParsedQuery / _pnbCanonBraceTokens')
-            if ($res.pageErrors -and @($res.pageErrors).Count) { $lines.Add('  (main.js init errors, may matter: ' + (@($res.pageErrors) -join ' | ') + ')') }
+            # Uncaught errors while main.js booted = the ready closure died part-way. The exports
+            # still answer (hoisted declarations), so every case below can pass against a half-booted
+            # main.js; the boot itself is therefore ONE failure (2026-10-17 - a note before that).
+            if ($res.pageErrors -and @($res.pageErrors).Count) { $jf++; $lines.Add('  FAIL main.js boot: uncaught error(s) - the ready closure died, the cases below ran against a half-booted main.js: ' + (@($res.pageErrors) -join ' | ')) }
             foreach ($r in $res.results) {
                 if ($r.ok) { $jp++; $lines.Add('  ok   ' + $r.label) }
                 else { $jf++; $lines.Add('  FAIL ' + $r.label); $lines.Add('       want: ' + ($r.want | ConvertTo-Json -Compress)); $lines.Add('       got:  ' + ($r.got | ConvertTo-Json -Compress)) }

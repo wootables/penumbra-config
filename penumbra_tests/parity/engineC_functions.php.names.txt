@@ -5,6 +5,7 @@ encrypt_penumbra_state
 scheduler_snapshot_payload
 decrypt_scheduler_password
 scheduler_read_secret
+scheduler_read_sftp_key
 safe_json_decode
 get_next_run_date
 check_cron_part

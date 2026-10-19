@@ -31,4 +31,16 @@ def build(index_src):
     rep('<script src="main_hc.js"></script>\n', '<script src="penumbra_tiles.js"></script>\n<script src="main_hc.js"></script>\n')
     # index.php order: the menu loads after main.js and the column modules
     rep('<script src="driver.js"></script>\n', '<script src="penumbra_colmenu.js"></script>\n<script src="driver.js"></script>\n')
+    # (perf, 2026-10-17) mperf: a big report - ?rows=N (default 20000), every column shown -
+    # with penumbra_a11y.js (before main.js) and the grouping list / cell selection modules
+    # (after it), as index.php loads them. Other scenarios unchanged.
+    rep('    for (var i = 1; i <= 300; i++) {', '    for (var i = 1; i <= (/^mperf|^mrerun/.test(window.__SCN) ? (+P.get("rows") || 20000) : 300); i++) {')
+    rep("      visibleColumns: ['#', 0, 1, 2, 3, 4, 5], columnOrder: order,", "      visibleColumns: (/^mperf|^mrerun/.test(window.__SCN) ? ['#'].concat(order) : ['#', 0, 1, 2, 3, 4, 5]), columnOrder: order,")
+    rep('<script src="penumbra_tiles.js"></script>\n',
+        '<script src="penumbra_tiles.js"></script>\n'
+        '<script>if (/^mperf|^mrerun/.test(window.__SCN)) document.write(\'<script src="penumbra_a11y.js"></scr\' + \'ipt>\');</script>\n')
+    rep('<script src="penumbra_colmenu.js"></script>\n',
+        '<script>if (/^mperf|^mrerun/.test(window.__SCN)) document.write(\'<link rel="stylesheet" href="penumbra_grouplist.css"><link rel="stylesheet" href="penumbra_cellsel.css">\' +\n'
+        '  \'<script src="penumbra_grouplist.js"></scr\' + \'ipt><script src="penumbra_cellsel.js"></scr\' + \'ipt>\');</script>\n'
+        '<script src="penumbra_colmenu.js"></script>\n')
     return src

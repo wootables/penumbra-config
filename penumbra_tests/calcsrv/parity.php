@@ -58,6 +58,13 @@ $k = isset($by['loop']) ? $by['loop']['out'][0]['keys'] : '';
 ok(substr($k, -3) === '|L3' && strpos($k, 'L1') === false && strpos($k, 'L5') === false, 'P-loopLeftOut a loop (and what uses it) is left out', $k);
 $k = isset($by['many']) ? $by['many']['out'][0]['keys'] : '';
 ok(substr_count($k, '|N') === 20, 'P-max20 at most 20', $k);
+// (2026-10-18, calcadj) adjustable values: the ones named exist, one no column carries is left out
+$k = isset($by['inputs']) ? $by['inputs']['out'][0]['keys'] : '';
+ok(substr($k, -18) === '|I1|I2|I4|I5|I6|I7' && strpos($k, 'I3') === false, 'P-inputsLeftOut a value no column carries leaves its column out; the rest stay', $k);
+$d = pnb_calc_clean_def(array('name' => 'X', 'formula' => '{@K}', 'input' => array('name' => ' k ', 'value' => '7', 'min' => 0, 'max' => 5, 'step' => '0.5')));
+ok(isset($d['input']) && $d['input'] === array('name' => 'K', 'value' => 5.0, 'min' => 0.0, 'max' => 5.0, 'step' => 0.5), 'P-inputClean a definition\'s value: named, numbered, within its bounds', json_encode($d));
+$d = pnb_calc_clean_def(array('name' => 'X', 'formula' => '1', 'input' => array('name' => 'K', 'value' => '$5')));
+ok(!isset($d['input']), 'P-inputBad a value that is not a plain number is no value', json_encode($d));
 echo "  INFO  $cells cells compared, $totalBad differ\n";
 echo "TOTAL pass=$pass fail=$fail\n";
 echo ($fail === 0 && $pass > 0) ? "RESULT: GREEN\n" : "RESULT: RED\n";

@@ -30,6 +30,7 @@
  *      never prints a key (static)
  *
  * --control adds one deliberately false assertion (the harness can fail).
+ * C8 and R4 (a value read under the WRONG secret) never rest on one "=== false" sample: AES-CBC has no tag, ~1 wrong-secret decrypt in 256 returns garbage (flaked 2026-10-17), so C8 counts 32 fresh IVs and R4 draws a fixture the suite secret really rejects.
  * --mutant=<name> breaks ONE decision in memory before lifting, and the named
  * checks must go red (run.ps1 -Mutants runs all four with exact counts):
  *   plainsave   the save stores the posted key as it is      (P1 P6 P7 P8 P10 red = 5)
@@ -87,6 +88,30 @@ function mutate(&$text, $from, $to, $what) {
     if ($n !== 1) { echo "MUTANT NOT APPLICABLE ($what): anchor occurs $n times\n"; echo "RESULT: RED\n"; exit(3); }
     $text = str_replace($from, $to, $text);
     echo "mutant applied: $what\n";
+}
+/**
+ * Wrong-secret evidence. AES-256-CBC carries no integrity tag: a value read under the WRONG secret fails the PKCS7
+ * padding check 255 times in 256 (openssl_decrypt answers false) and the 256th time hands back garbage, and the IV is
+ * random per encrypt - so "=== false" on ONE sample was a coin that landed wrong about 1 run in 250 (C8 flaked on
+ * 2026-10-17; R4 drew the same coin). C8 therefore counts what matters over many fresh IVs (a wrong secret never yields
+ * the key), and R4 draws a fixture that the suite's secret really rejects.
+ */
+/** array(times the plaintext came back, times false, samples): $n fresh encryptions under $secretA, each read under $secretB. */
+function wrong_secret_outcome($plain, $secretA, $secretB, $n = 32) {
+    $back = 0; $false = 0;
+    for ($i = 0; $i < $n; $i++) {
+        $r = penumbraSchedulerSecretDecrypt(penumbraSchedulerSecretEncrypt($plain, $secretA), $secretB);
+        if ($r === $plain) $back++; elseif ($r === false) $false++;
+    }
+    return array($back, $false, $n);
+}
+/** A value stored under $secretA that $secretB really rejects: fresh IVs until openssl says false (null if all 64 slipped through, odds 2^-512). */
+function value_rejected_by($plain, $secretA, $secretB) {
+    for ($i = 0; $i < 64; $i++) {
+        $v = penumbraSchedulerSecretEncrypt($plain, $secretA);
+        if (penumbraSchedulerSecretDecrypt($v, $secretB) === false) return $v;
+    }
+    return null;
 }
 
 if (!function_exists('openssl_encrypt')) { echo "FATAL: openssl is not loaded (run with -d extension_dir=<php>/ext -d extension=openssl)\n"; echo "RESULT: RED\n"; exit(2); }
@@ -152,7 +177,8 @@ ok(penumbraSchedulerSecretDecrypt($encManage, SCHEDULER_SECRET_KEY) === $PEM_RSA
 ok(decrypt_scheduler_password($encManage) === $PEM_RSA, 'C5 the runner reads the password helper\'s output (the pre-existing pair still agrees)');
 ok(!penumbraSchedulerSecretIsStored($PEM_RSA) && !penumbraSchedulerSecretIsStored($PEM_OPENSSH) && !penumbraSchedulerSecretIsStored($PPK), 'C6 PEM (RSA, OpenSSH) and PuTTY texts are NOT in the stored shape');
 ok(!penumbraSchedulerSecretIsStored('') && !penumbraSchedulerSecretIsStored(null) && !penumbraSchedulerSecretIsStored(array('x')) && !penumbraSchedulerSecretIsStored(base64_encode('no separator here')), 'C7 empty, null, array and base64 without the separator are not stored');
-ok(penumbraSchedulerSecretDecrypt($encShared, $SECRET2) === false, 'C8 a stored value under another secret does not decrypt (false)');
+list($c8Back, $c8False, $c8N) = wrong_secret_outcome($PEM_RSA, SCHEDULER_SECRET_KEY, $SECRET2);   // not "=== false" on one sample: ~1 wrong-secret decrypt in 256 is padding-valid garbage
+ok($c8Back === 0 && $c8False >= $c8N / 2, 'C8 a stored value under another secret never decrypts to the key, and normally not at all (false), over 32 fresh IVs', "key came back $c8Back, false $c8False of $c8N");
 ok(penumbraSchedulerSecretDecrypt($PEM_RSA, SCHEDULER_SECRET_KEY) === false && decrypt_scheduler_password($PEM_RSA) === false, 'C9 a plaintext handed to either decrypt is false, never garbage');
 ok(penumbraSchedulerSecretEncrypt('', SCHEDULER_SECRET_KEY) === null && penumbraSchedulerSecretEncrypt(null, SCHEDULER_SECRET_KEY) === null, 'C10 nothing to encrypt is null');
 $enc2 = penumbraSchedulerSecretEncrypt($PEM_RSA, SCHEDULER_SECRET_KEY);
@@ -210,8 +236,9 @@ list($rk, $rerr, $rleg) = scheduler_read_sftp_key(array('drop_sftp_key' => $encS
 ok($rk === $PEM_RSA && $rerr === null && $rleg === false, 'R2 a stored key decrypts to the pasted text, not legacy', 'got ' . ($rk === $encShared ? 'the STORED value' : ($rk === $PEM_RSA ? 'the key' : var_export($rk === null, true))));
 list($rk3, $rerr3, $rleg3) = scheduler_read_sftp_key(array('drop_sftp_key' => $PPK));
 ok($rk3 === $PPK && $rerr3 === null && $rleg3 === true, 'R3 a key still stored as pasted is handed back as it is and flagged legacy (the runner notes it)');
-list($rk4, $rerr4, $rleg4) = scheduler_read_sftp_key(array('drop_sftp_key' => penumbraSchedulerSecretEncrypt($PEM_RSA, $SECRET2)));
-ok($rk4 === null && is_string($rerr4) && strpos($rerr4, 'SSH private key') !== false && $rleg4 === false, 'R4 a stored value under another secret: no key, an error naming the SSH private key');
+$foreign = value_rejected_by($PEM_RSA, $SECRET2, SCHEDULER_SECRET_KEY);   // the "does not read" branch needs a value the suite secret really rejects (the runner's own note: ~1 damaged value in 256 reads as garbage)
+list($rk4, $rerr4, $rleg4) = scheduler_read_sftp_key(array('drop_sftp_key' => $foreign));
+ok($foreign !== null && $rk4 === null && is_string($rerr4) && strpos($rerr4, 'SSH private key') !== false && $rleg4 === false, 'R4 a stored value under another secret: no key, an error naming the SSH private key');
 ok(scheduler_read_sftp_key(array('drop_sftp_key' => array('x'))) === array(null, null, false) && scheduler_read_sftp_key('not-an-array') === array(null, null, false), 'R5 a non-string value or non-array options: nothing');
 list($rs1, $rse1) = scheduler_read_secret(array('drop_password' => $encShared), 'drop_password', 'file drop password');
 ok($rs1 === $PEM_RSA && $rse1 === null, 'R6 scheduler_read_secret (the password reader) is unchanged');

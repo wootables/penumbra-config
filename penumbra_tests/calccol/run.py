@@ -23,12 +23,17 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js']
 CALC_URL = '&'.join('calc=' + urllib.parse.quote(v, safe='') for v in
                     ['HALF|{H_NUM} / 2', 'DBL|{V_AMOUNT} * 2|currency', 'FLAG|IF({V_STATUS} = "open", "yes", "no")|text', 'BAD|{NOPE} + 1'])
-SCN = ['curl', 'cadd', 'cstate', 'cclear']
+SCN = ['curl', 'cadd', 'cstate', 'cclear', 'cadj']
 SCN_Q = {'curl': '&' + CALC_URL}
 CHK = {
+    # (2026-10-18, calcadj) an adjustable value: the dialog's row, the panel's knob, Enter re-runs,
+    # the view state, the header menu's Adjust... panel, the reset
+    'cadj': ['row', 'preview', 'added', 'panelKnob', 'changed', 'stateCarries', 'menuItem', 'menuEditItem', 'menuPanel', 'menuPanelPlaced', 'menuChanged',
+             'boxSprings', 'typedKept', 'menuEditOpens', 'resetFocus', 'reset',   # round 2 (2026-10-19): Edit item, the panel placed, the box springs, typing survives a run, focus after reset
+             'noQuery'],   # round 3: a knob change replays the last answer, no query
     'curl': ['halfShown', 'dblCurrency', 'flagText', 'badLeftOut', 'atEnd', 'panelFromLink', 'summable'],
-    'cadd': ['addButton', 'dialog', 'layout', 'noEarlyError', 'chips', 'chipInserts', 'preview', 'reran', 'added', 'listAfterAdd', 'edited', 'removed', 'listAfterRemove',
-             'editFocus', 'removeFocus'],   # moderate 2026-10-15: WCAG 2.4.3
+    'cadd': ['addButton', 'dialog', 'layout', 'cheatPlain', 'adjOneLine', 'noEarlyError', 'chips', 'chipInserts', 'preview', 'reran', 'added', 'listAfterAdd', 'edited', 'removed', 'listAfterRemove',
+             'editFocus', 'removeFocus'],   # moderate 2026-10-15: WCAG 2.4.3; cheatPlain / adjOneLine 2026-10-19 (calcadj round 2)
     'cclear': ['before', 'listed', 'cleared'],
     'cstate': ['stateShown', 'viewStateCarries', 'saveStrips'],
 }
@@ -44,7 +49,14 @@ ENGINE = ['add', 'accounting', 'pctIn', 'divZero', 'textIsBlank', 'blankIsBlank'
           'removeDrops', 'noEval', 'urlWinsOverSaved',
           'catNames', 'catBlank', 'catNumber', 'catDate', 'catCompare', 'dIso', 'dUs', 'dOracle', 'dLong', 'dTime', 'dLeap', 'dBadDay',
           'dText', 'dMinus', 'dPlus', 'dPlusFirst', 'dMinusN', 'dCompare', 'dNumNotDate', 'dToday', 'dSince', 'dTodayCurrencyFmt',
-          'errDaysArgs', 'errTodayArgs', 'errUnknownLists', 'errAmpLink']
+          'errDaysArgs', 'errTodayArgs', 'errUnknownLists', 'errAmpLink',
+          # (2026-10-18, calcadj) adjustable values
+          'inpToken', 'inpMissing', 'inpInText', 'inpErrEmpty', 'inpCompile', 'urlInput', 'urlInputRoundTrip', 'urlInputNoFmt', 'cleanInputClamp', 'cleanInputBad',
+          'applyInputs', 'applyNoInput', 'inputsListed', 'setInput', 'setInputStored', 'setInputBad', 'inputsFor', 'knobHtml', 'setInputClamp', 'setInputBackToDefault',
+          'clearInputs', 'panelKnob', 'panelKnobChange', 'dialogAdjRow', 'dialogAdjMissing', 'dialogAdjBadVal', 'dialogAdjBadBounds', 'dialogAdjClash', 'dialogAdjPreview',
+          'dialogAdjSaved', 'dialogAdjEditOpen', 'dialogAdjEditKeepsKnob', 'dialogAdjEditResets',
+          # round 2 (2026-10-19)
+          'stripCarrier', 'dupInput', 'applyBoxSame', 'adjErrOpens']
 MUTANTS = {
     # the module (LF)
     'e-precedence': ([('calc', "while (isOp(tk[p], '+') || isOp(tk[p], '-')) { var op = tk[p++].v; a = { k: 'bin', op: op, a: a, b: mul() }; }",
@@ -69,7 +81,7 @@ MUTANTS = {
                   ['L-curl-halfShown', 'L-cstate-stateShown'], ['curl', 'cstate']),
     'm-state': ([('main', "                    window.PenumbraCalc.fromState(decodedState.calcColumns, penumbra_vars.preloadedState ? 'report' : 'state');\r\n", "")], ['L-cstate-stateShown'], ['cstate']),
     'm-bso': ([('main', "            if (_calc.length) state.calcColumns = _calc;\r\n", "")], ['L-cstate-viewStateCarries'], ['cstate']),
-    'e-chiprefresh': ([('calc', "        if (t.closest('#pnbCalcCols code')) { setTimeout(preview, 0); return; }   // main.js puts it at the cursor\n", "")], ['L-cadd-preview'], ['cadd']),
+    'e-chiprefresh': ([('calc', "        if (t.closest('#pnbCalcCols code, #pnbCalcAdjTok')) { setTimeout(preview, 0); return; }   // main.js puts it at the cursor\n", "")], ['L-cadd-preview'], ['cadd']),
     'e-chipfield': ([('calc', "<textarea id=\"pnbCalcFormula\" class=\"pnb-tpl-field\" spellcheck", "<textarea id=\"pnbCalcFormula\" spellcheck")], ['L-cadd-chips'], ['cadd']),
     # calcfn (2026-10-10): text & dates
     'e-catprec': ([('calc', "            while (isOp(tk[p], '&')) { p++; a = { k: 'cat', a: a, b: add() }; }\n",
@@ -89,7 +101,46 @@ MUTANTS = {
     # moderate (2026-10-15, WCAG 2.4.3): the rebuilt list no longer puts focus back
     'e-nofocusback': ([('calc', "        if (key) restoreListFocus(key, list);\n", "")], ['L-cadd-editFocus', 'L-cadd-removeFocus'], ['cadd']),
     # ... Save forgets the Edit button that opened the dialog
-    'e-noopener': ([('calc', "        var back = openerKey;\n", "        var back = null;\n")], ['L-cadd-editFocus'], ['cadd']),
+    # (anchor retargeted 2026-10-19: the colmenu round added `, after = ...` to the line on 10-16)
+    'e-noopener': ([('calc', "        var back = openerKey, after = editing ? null : afterAdd;\n", "        var back = null, after = editing ? null : afterAdd;\n")], ['L-cadd-editFocus'], ['cadd']),
+    # (2026-10-18, calcadj) adjustable values: {@NAME} not read as a value by the parser (the
+    # tokenizer mutant instead made {@R} a column named @R, which the engine page read from its
+    # row fixture all the same and then died on a missing value: a FATAL, not a red check)
+    'e-inptoken': ([('calc', "            if (t.t === 'inp') { p++; return { k: 'inp', n: t.v }; }\n", "            if (false) { p++; return { k: 'inp', n: t.v }; }\n")], ['N-inpCompile', 'N-inpToken'], []),
+    # ... a move not kept as the viewer's override
+    'e-inpoverride': ([('calc', "        if (n === inp.def) delete m[name]; else m[name] = n;\n", "        delete m[name];\n")], ['N-setInput', 'L-cadj-changed'], ['cadj']),
+    # ... the highest not enforced on a definition's value
+    'e-inpclamp': ([('calc', "        if (mx !== null) { o.max = mx; if (o.value > mx) o.value = mx; }\n", "        if (mx !== null) { o.max = mx; }\n")], ['N-cleanInputClamp'], []),
+    # ... a view link carrying the default, not the value the viewer sees
+    'e-inpeffective': ([('calc', "        return activeDefs().map(function (d) { return plain(d, true); });\n", "        return activeDefs().map(function (d) { return plain(d); });\n")],
+                       ['N-setInput', 'L-cadj-stateCarries'], ['cadj']),
+    # ... a formula naming a value no column carries kept (a blank column instead of left out)
+    'e-inpnoinput': ([('calc', "            if (!e.why && noInp.length) e.why = 'no column carries an adjustable value named ' + noInp.map(function (n) { return '{@' + n + '}'; }).join(', ');\n", "")],
+                     ['N-applyNoInput'], []),
+    # ... Enter in the knob's box does nothing
+    'e-knobenter': ([('calc', "            applyBox(e.target.getAttribute('data-calc-input'), e.target.value);\n            return;\n", "            return;\n")], ['L-cadj-changed'], ['cadj']),
+    # the header menu (LF): no Adjust... item
+    'n-adjitem': ([('menu', "        if (adj.length) {\n            body.push({ act: 'calcAdj',", "        if (false) {\n            body.push({ act: 'calcAdj',")],
+                  ['L-cadj-menuItem'], ['cadj']),
+    # round 2 (2026-10-19): the panel not placed (it sat at the page's end); no Edit item
+    'n-panelplace': ([('menu', "        place(el, lastAt.x, lastAt.y);\n        // Back returns to THIS menu's spot", "        // Back returns to THIS menu's spot")], ['L-cadj-menuPanelPlaced'], ['cadj']),
+    # (round 3: the items live in the Calculated column list)
+    'n-edititem': ([('menu', "            body.push({ act: 'calcEdit', label: 'Edit...',", "            if (false) body.push({ act: 'calcEdit', label: 'Edit...',")],
+                   ['L-cadj-menuEditItem', 'L-cadj-menuEditOpens'], ['cadj']),
+    # round 3: a knob change asks the database again (main.js: the arm never fresh / the module: never armed)
+    'm-replay': ([('main', "        _pnbScratchArmAt = Date.now();\r\n        return true;\r\n", "        return true;\r\n")], ['L-cadj-noQuery'], ['cadj']),
+    'e-noreplay': ([('calc', "            if (window.Penumbra && typeof window.Penumbra.replayNextRun === 'function') { try { window.Penumbra.replayNextRun(); } catch (e) { } }\n", "")],
+                   ['L-cadj-noQuery'], ['cadj']),
+    # ... the cheat sheet's labels as gradient headers again; the box not springing to the bound; a run wiping the typed box; the reset dropping focus
+    'e-cheatth': ([('calc', "background:none !important;border:0;cursor:default;height:auto;}' +", "}' +")], ['L-cadd-cheatPlain'], ['cadd']),
+    'e-boxspring': ([('calc', "        Array.prototype.forEach.call(document.querySelectorAll('[data-calc-input=\"' + name + '\"]'), function (el) { el.value = trimNum(inp.value, 10); });\n",
+                      "        Array.prototype.forEach.call(document.querySelectorAll('[data-calc-input=\"' + name + '\"]'), function (el) { if (el !== document.activeElement) el.value = trimNum(inp.value, 10); });\n")],
+                    ['L-cadj-boxSprings'], ['cadj']),
+    'e-typedlost': ([('calc', "                if (knobBack.typed !== null && knobBack.attr === 'data-calc-input') kb.value = knobBack.typed;\n", "")], ['L-cadj-typedKept'], ['cadj']),
+    'e-resetfocus': ([('calc', "            if (bx0) { try { bx0.focus(); } catch (err) { } }\n", "")], ['L-cadj-resetFocus'], ['cadj']),
+    # ... a ticked column's carrier not saved with it; two carriers of one name
+    'e-stripcarrier': ([('calc', "                    if (who && appliedBy[who] && !keep[who]) { keep[who] = true; added.push(who); grew = true; }\n", "")], ['N-stripCarrier'], []),
+    'e-dupinput': ([('calc', "            if (carried[e.input.name]) delete e.input; else carried[e.input.name] = e.name;\n", "            carried[e.input.name] = e.name;\n")], ['N-dupInput'], []),
 }
 
 args = sys.argv[1:]
@@ -111,7 +162,7 @@ src_root = stage_dir or APP
 def pick(rel):
     p = os.path.join(src_root, rel)
     return p if os.path.exists(p) else os.path.join(APP, rel)
-RELS = {'main': os.path.join('js', 'main.js'), 'calc': os.path.join('js', 'penumbra_calc.js')}
+RELS = {'main': os.path.join('js', 'main.js'), 'calc': os.path.join('js', 'penumbra_calc.js'), 'menu': os.path.join('js', 'penumbra_colmenu.js')}
 cand = {k: pick(v) for k, v in RELS.items()}
 if control: cand = {k: os.path.join(APP, v) for k, v in RELS.items()}
 def read_b(p):
@@ -139,7 +190,11 @@ stage = tempfile.mkdtemp(prefix='pnb_cc_')
 for f in LIBS: shutil.copyfile(os.path.join(APP, 'js', f), os.path.join(stage, f))
 for f in ('main.css', 'density.css', 'penumbra_colwidths.css'): shutil.copyfile(os.path.join(APP, 'css', f), os.path.join(stage, f))
 shutil.copyfile(os.path.join(APP, 'js', 'penumbra_colwidths.js'), os.path.join(stage, 'penumbra_colwidths.js'))
+# (calcadj) the cadj scenario's header menu: the tile engine it needs and the menu's css (the menu itself is a text under test)
+shutil.copyfile(os.path.join(APP, 'js', 'penumbra_tiles.js'), os.path.join(stage, 'penumbra_tiles.js'))
+shutil.copyfile(os.path.join(APP, 'css', 'penumbra_colmenu.css'), os.path.join(stage, 'penumbra_colmenu.css'))
 open(os.path.join(stage, 'help_stub.js'), 'wb').write(b'window.__HELP_STUB = "";\n')
+subprocess.run([sys.executable, os.path.join(HERE, 'mk_harness.py')], check=True, stdout=subprocess.DEVNULL)
 for f in ('harness.html', 'driver.js', 'engine.html', 'engine.js'): shutil.copyfile(os.path.join(HERE, f), os.path.join(stage, f))
 def free_port():
     s = socket.socket(); s.bind(('127.0.0.1', 0)); p = s.getsockname()[1]; s.close(); return p
@@ -183,6 +238,7 @@ def run_page(path):
 def write_stage(texts):
     open(os.path.join(stage, 'main_hc.js'), 'wb').write(hook(texts['main']).encode('utf-8', 'surrogateescape'))
     open(os.path.join(stage, 'penumbra_calc.js'), 'wb').write(texts['calc'].encode('utf-8', 'surrogateescape'))
+    open(os.path.join(stage, 'penumbra_colmenu.js'), 'wb').write(texts['menu'].encode('utf-8', 'surrogateescape'))
 
 def run_engine():
     r = run_page('engine.html?id=zzcalc&calc=' + urllib.parse.quote('URLCOL|{A}+{B}', safe=''))

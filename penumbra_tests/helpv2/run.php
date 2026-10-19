@@ -169,6 +169,10 @@ if (isset($o['mutants'])) {
             $M['ask-card-leak']     = array('edits' => array(array('help/ask.php', "        if (!empty(\$c['retired']) || !pnb_ask_card_visible(\$c, \$allowedAud)) continue;", "        if (!empty(\$c['retired'])) continue;", 1)), 'expect' => array('A6'), 'allow' => array());
             $M['ask-no-notice']     = array('edits' => array(array('help/ask.php', "    if (pnb_ask_audience_rank(\$needAud) <= pnb_ask_audience_rank(\$role)) return '';", "    return '';", 1)), 'expect' => array('A11'), 'allow' => array());
             $M['ask-no-recall']     = array('edits' => array(array('help_retrieval.php', '            $need = min(2, count($qTerms));', '            $need = 2;', 1)), 'expect' => array('R6'), 'allow' => array());
+            // 2026-10-17 (E2E_2026-10-17 D1): the two-letter allow-list. Dropped from the tokenizer -> R8 (the IP question finds no
+            // passage); the Ask-only tier let through to the assistant's question -> R9 (data questions naming PI / ID / FY pull help).
+            $M['short-tokens-dropped'] = array('edits' => array(array('help_retrieval.php', "        if (strlen(\$w) < 3 && !isset(\$GLOBALS['PNB_HELP_SHORT'][\$w])) continue;", '        if (strlen($w) < 3) continue;', 1)), 'expect' => array('R8'), 'allow' => array());
+            $M['assist-short-leak']    = array('edits' => array(array('help_retrieval.php', "        if (\$mode !== 'ask') {", '        if (false) {', 1)), 'expect' => array('R9'), 'allow' => array());
         }
     } else {
         $M = array(

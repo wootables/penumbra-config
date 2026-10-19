@@ -8,6 +8,44 @@ $c = Get-Content "$sp\result_c.json" -Raw | ConvertFrom-Json
 $a = $null
 if (Test-Path "$sp\result_a.json") { $a = Get-Content "$sp\result_a.json" -Raw | ConvertFrom-Json }
 
+# PAGE ERRORS (2026-10-17). Each harness page records every uncaught error raised while
+# main.js booted (window.onerror -> RESULTS_JSON pageErrors) in the dump run_parity.ps1
+# keeps as b.dom.txt / a.dom.txt. A non-empty list means the ready closure died part-way:
+# the engine answered the corpus half-initialised (its export is a hoisted declaration, so
+# it still answers), and nothing in the comparisons below can tell a right answer from a
+# lucky one. So it is a FAILURE, not a warning: counted in each summary as "page errors",
+# listed under PAGE ERRORS after the report, and the script then THROWS so a caller sees a
+# terminating error. A dump with no complete RESULTS_JSON (or no dump) is "boot not
+# recorded" and fails the same way - a stale or partial result set must never pass as green.
+# -CompareOnly re-reads the same dumps, so it repeats the last full run's verdict.
+function Get-PageErrors([string]$DomFile) {
+    # $null = not recorded; otherwise an object whose .errors is a (possibly empty) string[]
+    $p = Join-Path $sp $DomFile
+    if (-not (Test-Path -LiteralPath $p)) { return $null }
+    $d = [IO.File]::ReadAllText($p)
+    $i = $d.IndexOf('<pre id="out">'); if ($i -lt 0) { return $null }
+    $j = $d.IndexOf('</pre>', $i);     if ($j -lt 0) { return $null }
+    $txt = [System.Net.WebUtility]::HtmlDecode($d.Substring($i + 14, $j - $i - 14))
+    if (-not $txt.StartsWith('RESULTS_JSON:')) { return $null }
+    $parsed = $txt.Substring(13) | ConvertFrom-Json
+    $errs = @(); if ($null -ne $parsed.pageErrors) { $errs = @($parsed.pageErrors) }
+    return [pscustomobject]@{ errors = $errs }
+}
+$pageErrLines = @(); $pageErrCount = 0; $pageErrCountA = 0; $pageErrCountB = 0
+foreach ($bc in @(@{ engine = 'B'; dom = 'b.dom.txt' }, @{ engine = 'A'; dom = 'a.dom.txt' })) {
+    if ($bc.engine -eq 'A' -and $null -eq $a) { continue }   # A not compared at all: nothing to assert
+    $rec = Get-PageErrors $bc.dom
+    if ($null -eq $rec) {
+        $n = 1
+        $pageErrLines += ('  engine {0}: BOOT NOT RECORDED - {1} has no complete RESULTS_JSON (a run_parity.ps1 older than 2026-10-17, or its harness never finished): re-run the full suite' -f $bc.engine, $bc.dom)
+    } else {
+        $n = $rec.errors.Count
+        foreach ($m in $rec.errors) { $pageErrLines += ('  engine {0}: {1}' -f $bc.engine, $m) }
+    }
+    if ($bc.engine -eq 'A') { $pageErrCountA = $n } else { $pageErrCountB = $n }
+    $pageErrCount += $n
+}
+
 # Engine C wraps its output in the email's styled container; engine B returns the
 # bare fragment. Strip that wrapper so we compare like with like.
 function Strip-CWrapper([string]$s) {
@@ -164,6 +202,7 @@ foreach ($rb in $b) {
 "errors         : {0}" -f $errs.Count
 "plain-mode drift: {0}   <-- engine C plain vs HTML output (wrapper aside)" -f $plainDiff.Count
 "swallowed      : {0}   <-- an engine's own catch hid a Throwable; read these before trusting DIVERGENT" -f $swallowed.Count
+"page errors    : {0}   <-- uncaught errors while main.js booted (engine B); any = the run is RED" -f $pageErrCountB
 ""
 if ($swallowed.Count) {
   "---- SWALLOWED (an engine's own catch turned a Throwable into output) ----"
@@ -241,6 +280,7 @@ if ($null -ne $a) {
     "OPEN BUGS      : {0}   <-- triaged defects, pinned so they cannot mask a regression" -f $abBugs.Count
     "DIVERGENT      : {0}   <-- real findings" -f $abDiff.Count
     "errors         : {0}" -f $abErrs.Count
+    "page errors    : {0}   <-- uncaught errors while main.js booted (engine A); any = the run is RED" -f $pageErrCountA
     ""
     if ($abKnown.Count) { "---- known / accepted (not findings) ----"; $abKnown | ForEach-Object { "  [{0}] {1}" -f $_.id, $_.why }; "" }
     if ($abBugs.Count) {
@@ -265,4 +305,16 @@ if ($null -ne $a) {
 } else {
     ""
     "(engine A not compared - result_a.json absent; run run_parity.ps1 to generate it)"
+}
+
+# The page-error verdict comes LAST, after both reports, and ends in a throw: the counts
+# above are still printed (they are the diagnostic), but a caller - run_parity.ps1,
+# run_parity_local.ps1, a transcript - sees a terminating error, never a quiet green.
+if ($pageErrCount) {
+    ""
+    "---- PAGE ERRORS (main.js did not boot clean - the comparisons above are NOT trustworthy) ----"
+    $pageErrLines
+    ""
+    "RESULT: RED - main.js page errors: {0}   <-- fix the harness or main.js, then re-run" -f $pageErrCount
+    throw "PARITY RUN FAILED: main.js booted with uncaught errors ($pageErrCount, see PAGE ERRORS above) - the comparison proves nothing until the harness boots clean"
 }

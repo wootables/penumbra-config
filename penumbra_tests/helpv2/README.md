@@ -258,6 +258,25 @@ synonyms were added (hide, hidden, freeze, reorder, width, height, checkbox). R6
 Your Settings in ask mode, R7 that assist mode still answers nothing for it; the `ask-no-recall` mutant turns R6 red, and the
 mutant loop now runs the retrieval smoke as well.
 
+**Two-letter tokens (2026-10-17, E2E_2026-10-17 D1):** the Ask page answered "no passage" for *is the IP address list
+enforced*: `pnb_help_tokenize()` dropped every token shorter than three characters, so "IP" reached neither the index nor the
+question, and "list" is a stopword. `help_retrieval.php` now carries `$GLOBALS['PNB_HELP_SHORT']`, an allow-list the same
+tokenizer applies to the chunks and to the question, in two tiers: 1 = feature names the assistant and the Ask page both
+query on (`ip`, `s3`, `db`, `ui`, `ai`); 2 = data-domain abbreviations the Ask page queries on but the assistant never does
+(`pi`, `id`, `fy`; the stop list already stops "investigator", "fiscal" and "year" for the same reason). Measured on the
+stage: with `pi` and `id` on the assistant's side too, six of twelve data questions such as "list all awards for pi id 12345"
+pulled help into its prompt; with the tier split the assistant's output for a twenty-question battery is byte-identical to
+live. `PNB_HELP_VER` 5 -> 6, so both chunk caches rebuild. The survey behind the list (uses / fragments): `ip` 7/3, `s3` 14/2,
+`db` 35/10, `ui` 24/7, `ai` 2/1, `pi` 125/16, `id` 285/29, `fy` 92/13; every other two-letter token is a stopword, a number,
+a date-format letter pair or an example value. R8 proves the IP question lands on Security & Access with the IP Address List
+passage in ask mode, R9 that twelve data questions naming PI / ID / FY / DB still retrieve nothing in assist mode, R10 that a
+cache stamped with the previous VER is rejected and rebuilt; the `short-tokens-dropped` mutant turns R8 red and
+`assist-short-leak` turns R9 red (twenty-nine mutants). `patch_shorttok.php --from=<live> --to=<stage>` re-applies the four
+exact-anchor edits to a fresh copy of live. Side effect, by design: `pnb_ask_tokens()` (the Ask page's card matching, Jaccard
+0.8 over the question's tokens) uses the same tokenizer, so cards made from now on carry the two-letter tokens of their
+question; a card made before whose question held one would match a rephrase a little less well until it is asked afresh
+(the two cards on live at the time, pivot presets and attachment size, hold none, so nothing changes for them).
+
 Not done, on purpose: no admin review page for the cards (the log and the store are plain files; `remove` exists in
 the endpoint for an administrator); no streaming; the home topic does not link to Ask (it stays as it was); the
 model's answer quality is not tested (the stub stands in for it; the first live answers are the test).
@@ -300,12 +319,12 @@ harness needs Edge (`jump_harness.ps1`, called by run.php through PowerShell).
 | L1-L20 `lint_help.php` | manifest<->files, guard, audience attributes = manifest, unique ids, every jump link resolves (cross-topic ones listed as info), every `data-target` / `openHelpCenter` / `#help=` / `openHelpPanel` reference resolves, every consumed tip key is defined (index.php + js/*.js), tags balanced, `php -l`, line endings, manifest sanity, canonical keys unique (L12), shims present, every `data-canonical-ref` pointer resolves into its canonical's topic (L14), one h3 and one close button per topic shell (L15), the reading budget on every `pnb_help_v2_standard()` topic (L16: paragraphs <= 80 words, bullets <= 50, cells <= 70, no em-dashes, no emoji headings), the Custom Code topic is the current render of `help/snippets.php` (L17), the registry's names are exactly the editor's function list (L18), no flex-div pseudo-table row in a standard topic (L19), the Ask fragment alone carries a script and it is the Ask client (L20). Then the budget table for every fragment as warnings. |
 | E*/P* `equiv_help.php` | always: v2 body carries `data-audience`; blocks close; gate on: viewer / writer / admin see exactly their topic sets, inner "For Administrators" blocks hidden from viewers, TOC stars and legend follow; v2 forced off renders the v1 body (rollback). Phase 0: v1 == v2 block by block and TOC == TOC. Phase 1+: every v1 block, element id, tip key and TOC id survives (P1 P2 P3 P5), words within 85-105% (P6; floor 60% from phase 2), every topic the manifest does not list as touched is identical to v1 (P7), new topics are well-formed (P8). Phase 2+: every fact token of a touched v1 topic is still in v2 or listed as dropped (P9). |
 | `visual_harness.php` | report only: renders one topic as the hub shows it and as the dashboard's help panel shows it, scrolled by N px, into static HTML for a headless Edge `--screenshot`; a probe badge prints the pane's scrollWidth / clientWidth so a horizontal overflow is a number, not a guess. |
-| R1-R7 `retrieval_smoke.php` | chunks from the fragments with audiences; the v1 build still works and matches within 10%; a scheduling question lands on the Scheduler topic; a pasted SELECT retrieves nothing; the two versions use different cache files; in ask mode "how do i hide a column" lands on Your Settings while assist mode keeps its gate (R6, R7). |
+| R1-R10 `retrieval_smoke.php` | chunks from the fragments with audiences; the v1 build still works and matches within 10%; a scheduling question lands on the Scheduler topic; a pasted SELECT retrieves nothing; the two versions use different cache files; in ask mode "how do i hide a column" lands on Your Settings while assist mode keeps its gate (R6, R7); in ask mode "is the IP address list enforced" lands on Security & Access with the IP Address List passage (R8), twelve data questions naming PI / ID / FY / DB retrieve nothing in assist mode (R9), a cache stamped with the previous `PNB_HELP_VER` is rejected and rebuilt (R10). |
 | J1-J2 `jump_harness.ps1` | headless Edge over a mini hub with the navigation code LIFTED from the main.js under test (`lift_jump.php`): in-topic link stays put, cross link activates the owner (and its folded extras), link into an extra activates host + extra, deep link re-resolves the owner, folded topic opens at its own start, plain open unchanged. J2 runs the UNPATCHED main.js and must fail exactly T2-T5. |
 | A1-A10 `ask_tests.php` | the Ask page's pure half (help/ask.php) against a scratch state dir and a stub model: help-only prompt, card cache, votes and retirement, limits, no-passage gate, audience filter, text-only answers, store integrity, validation, log (phase 6). |
 | H1 `ask_harness.ps1` | the Ask client (js/penumbra_help_ask.js) in headless Edge against a stubbed endpoint: T1-T6 (phase 6). |
 | `coverage_help.php` | report only: snippet functions, action types, URL parameters, single keys, View Options controls, scheduler labels, chart types, pivot aggregations, prompt tips vs the Query Prompts topic, hover-tip keys, topics without a `?` icon, each against the help. Writes `coverage_report.md`. |
-| `-Mutants` | twenty-seven mutants in phases 2 to 6 (wrong audience, dangling jump, missing fragment, duplicate id, unbalanced div, text drift in an untouched topic, anchor removed, dangling canonical ref, gate leak, shim removed, PHP error, a dropped fact token -> P9, a 90-word paragraph in a standard topic -> L16; phase 3: a cell over budget in the Scheduler book -> L16, the recipient-variables chart id `pnbRecipientVarsChart` renamed -> P2, the id an index.php icon targets (`dbDumpHelp-destination`) renamed -> P2 + L5; phase 4: a registry edit without a regeneration -> L17, a registry name that is no editor function -> L17 + L18; phase 4b: a flex-div row planted in a standard topic -> L19; phase 6: the Ask page's card cache, no-passage gate, text-only answer, day budget, audience filter, card audience and editor-rights notice, each -> its A-check; the ask-mode recall -> R6): each must turn its own checks red and nothing else. The phase 1 table (eleven) stays in run.php for a phase 1 tree. |
+| `-Mutants` | twenty-nine mutants in phases 2 to 6 plus the 2026-10-17 allow-list (wrong audience, dangling jump, missing fragment, duplicate id, unbalanced div, text drift in an untouched topic, anchor removed, dangling canonical ref, gate leak, shim removed, PHP error, a dropped fact token -> P9, a 90-word paragraph in a standard topic -> L16; phase 3: a cell over budget in the Scheduler book -> L16, the recipient-variables chart id `pnbRecipientVarsChart` renamed -> P2, the id an index.php icon targets (`dbDumpHelp-destination`) renamed -> P2 + L5; phase 4: a registry edit without a regeneration -> L17, a registry name that is no editor function -> L17 + L18; phase 4b: a flex-div row planted in a standard topic -> L19; phase 6: the Ask page's card cache, no-passage gate, text-only answer, day budget, audience filter, card audience and editor-rights notice, each -> its A-check; the ask-mode recall -> R6; 2026-10-17: the two-letter allow-list dropped from the tokenizer -> R8, the Ask-only tier let through to the assistant's question -> R9): each must turn its own checks red and nothing else. The phase 1 table (eleven) stays in run.php for a phase 1 tree. |
 
 `split_help.php` is the phase 0 generator (`--src <help_content.php> --out <stage> --report-dir <dir> --verify`);
 it rebuilds the source from its own output and refuses to continue on a byte mismatch. `add_shims.php`
@@ -328,6 +347,20 @@ inserts the two shims, idempotently. `split_sql.php` and `patch_phase1.php` are 
    `help_content.php?helpv2=1` (cookie, that browser only; `?helpv2=0` reverts).
 6. Rollback = delete `help/v2.on` (no file swap needed). Full rollback = `git show HEAD~1:<file>`
    for the four changed files; the `help/` tree is inert without the shims.
+
+**Two-letter allow-list, deployed 2026-10-17 21:46 (commit b8540f3, pushed):** `help_retrieval.php` swapped by
+`deploy_shorttok.ps1` (one MoveFileEx; guards: git clean for the path, live sha = the staged-from sha the patch was applied to,
+set differs from live, no tmp file), then `prebuild_caches.php v1` and `v2` on live (VER 6, 1,242 and 1,309 chunks,
+`match: true`; the web tier cannot write `cache/`, so without the prebuild every request would rebuild into %TEMP%),
+`retrieval_smoke.php` against live R1-R10 green, the live module probed with the live caches (the IP question lands on
+Security & Access with the IP Address List passage; "list all awards for pi id 12345" retrieves nothing in assist mode), no
+new line in the PHP error log. Commit `--only help_retrieval.php cache/help_chunks.json` (the v2 cache is ignored; the v1
+cache thereby also caught up with the help text of e66544c, whose VER 5 rebuild was still uncommitted on live). The suite
+files (`retrieval_smoke.php`, `run.php`, `run.ps1`, `patch_shorttok.php`, this README) were installed on d$ the same minute.
+Rollback = `git show b8540f3~1:help_retrieval.php` and `:cache/help_chunks.json` back over live by the same swap, then
+`prebuild_caches.php v2` with the old module (a VER 5 module rejects a VER 6 cache and rebuilds into %TEMP% until then).
+Re-staging, should the file move again: `patch_shorttok.php --from=<live copy> --to=<stage>` re-applies the four
+exact-anchor edits.
 7. Changelog artifact entry; `git commit && git push`. Add `help/v2.on`, `help/v2.off`, `help/gate.on`
    to `.gitignore` (added by the deploy commit) so a marker is never deployed by a commit.
 

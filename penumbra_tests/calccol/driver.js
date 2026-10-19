@@ -57,6 +57,19 @@
         return a.bottom <= b.top + 1 && Math.abs(a.left - b.left) <= 2 && b.width > 120;
       }
       R.chk.layout = lab('pnbCalcName') && lab('pnbCalcFmt') && lab('pnbCalcFormula') && !document.getElementById('pnbCalcCol');
+      // (2026-10-19, calcadj round 2) the cheat sheet's row labels are plain, not the data grid's
+      // gradient headers, and its cells wrap instead of ending in an ellipsis
+      var cth = document.querySelector('#pnbCalcOverlay .pnb-calc-cheat th'), ctd = document.querySelector('#pnbCalcOverlay .pnb-calc-cheat td');
+      R.chk.cheatPlain = !!cth && getComputedStyle(cth).backgroundImage === 'none' && getComputedStyle(cth).cursor !== 'pointer'
+        && !!ctd && getComputedStyle(ctd).whiteSpace === 'normal' && getComputedStyle(ctd).textOverflow === 'clip';
+      R.info.cheat = { bg: cth && getComputedStyle(cth).backgroundImage.slice(0, 40), ws: ctd && getComputedStyle(ctd).whiteSpace };
+      // the adjustable value's five fields share one line; its token chip sits inline in its sentence
+      document.getElementById('pnbCalcAdjWrap').open = true;
+      var fy = ['pnbCalcAdjName', 'pnbCalcAdjVal', 'pnbCalcAdjMin', 'pnbCalcAdjMax', 'pnbCalcAdjStep'].map(function (id) { return Math.round(document.getElementById(id).getBoundingClientRect().top); });
+      var tok = document.getElementById('pnbCalcAdjTok'), tokP = tok.closest('.pnb-calc-adj-help');
+      R.chk.adjOneLine = fy.every(function (y) { return y === fy[0]; }) && Math.abs(tok.getBoundingClientRect().top - tokP.getBoundingClientRect().top) < 14;
+      R.info.adjRow = { ys: fy, tokTop: tok.getBoundingClientRect().top, helpTop: tokP.getBoundingClientRect().top };
+      document.getElementById('pnbCalcAdjWrap').open = false;
       R.chk.noEarlyError = document.getElementById('pnbCalcErr').textContent === '';
       // the columns: the copy templates' list - click one, it goes in at the cursor
       var chips = Array.prototype.slice.call(document.querySelectorAll('#pnbCalcCols.pnb-tpl-placeholders code'));
@@ -114,6 +127,120 @@
       await until(function () { return !listed('RATIO'); }, 4000);
       R.chk.listAfterRemove = !listed('RATIO') && listed('V_ID');
       R.info = { ratio: cell('RATIO'), want: want, q: [q0, q1, q2, window.__queryDone], act: window.PenumbraCalc.active(), applied: window.PenumbraCalc.applied() };
+    },
+    // (2026-10-18, calcadj) an adjustable value through the dialog: its knob in the panel's row
+    // and under the header menu's Adjust...; a change re-runs the query; the view state carries
+    // the moved value; the reset button puts the default back
+    cadj: async function () {
+      document.getElementById('settingsPanel').classList.add('is-open');
+      document.getElementById('pnbCalcAdd').click();
+      var wrap = document.getElementById('pnbCalcAdjWrap');
+      R.chk.row = !!wrap && !wrap.open;
+      if (wrap) wrap.open = true;
+      document.getElementById('pnbCalcName').value = 'FA';
+      document.getElementById('pnbCalcFormula').value = '{H_AMT} * {@RATE}';
+      document.getElementById('pnbCalcAdjName').value = 'rate';
+      document.getElementById('pnbCalcAdjVal').value = '0.5';
+      document.getElementById('pnbCalcAdjMin').value = '0';
+      document.getElementById('pnbCalcAdjMax').value = '1';
+      document.getElementById('pnbCalcAdjStep').value = '0.05';
+      document.getElementById('pnbCalcFormula').dispatchEvent(new Event('input', { bubbles: true }));
+      await sleep(250);
+      R.chk.preview = document.getElementById('pnbCalcErr').textContent === '' && document.querySelectorAll('#pnbCalcPrev tbody tr').length === 5;
+      var f = F(), q0 = window.__queryDone;
+      function want(rate) { return String(Number((num(f.H_AMT) * rate).toFixed(6))); }
+      document.getElementById('pnbCalcGo').click();
+      await until(function () { return window.__queryDone > q0 && !!th('FA'); }, 15000); await sleep(400);
+      R.chk.added = shown('FA') && cell('FA') === want(0.5);
+      // (round 3) from here on every change REPLAYS the last answer: the query counter must not move
+      var qBase = window.__queryDone;
+      await until(function () { return !!document.querySelector('#pnbCalcList [data-calc-input="RATE"]'); }, 4000);
+      var knob = document.querySelector('#pnbCalcList [data-calc-input="RATE"]'), range = document.querySelector('#pnbCalcList [data-calc-range="RATE"]');
+      var rst = document.querySelector('#pnbCalcList [data-calc-inpreset="RATE"]');
+      R.chk.panelKnob = !!knob && knob.value === '0.5' && !!range && range.min === '0' && range.max === '1' && range.step === '0.05' && !!rst && rst.hidden === true;
+      // Enter in the box applies it: the query runs again and the column follows
+      var q1 = window.__queryDone;
+      if (knob) { knob.value = '0.25'; knob.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); }
+      await until(function () { return cell('FA') === want(0.25); }, 15000); await sleep(300);
+      R.chk.changed = cell('FA') === want(0.25) && document.querySelector('#pnbCalcList [data-calc-input="RATE"]').value === '0.25'
+        && document.querySelector('#pnbCalcList [data-calc-inpreset="RATE"]').hidden === false;
+      var st = window.__HC.bso();
+      R.chk.stateCarries = !!st && Array.isArray(st.calcColumns) && st.calcColumns.some(function (d) {
+        return d.name === 'FA' && d.input && d.input.name === 'RATE' && d.input.value === 0.25 && d.input.min === 0 && d.input.max === 1 && d.input.step === 0.05;
+      });
+      // the header menu: Adjust RATE... opens a panel with the same knob; a change there re-runs too
+      var t = th('FA'), r = t.getBoundingClientRect();
+      t.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, clientX: Math.round(r.left + 6), clientY: Math.round(r.top + 6) }));
+      await sleep(300);
+      // (round 3) ONE Calculated column entry; its list holds Add (four placements), then Edit,
+      // Copy formula, Remove and Adjust for a calculated column
+      var mr = document.getElementById('pnbHeadMenu').getBoundingClientRect(), menuAt = { x: mr.left, y: mr.top };
+      var ce = document.querySelector('#pnbHeadMenu [data-act="calc"]');
+      var topActs = Array.prototype.map.call(document.querySelectorAll('#pnbHeadMenu .pnb-hm-item'), function (e) { return e.getAttribute('data-act'); });
+      if (ce) ce.click();
+      await sleep(300);
+      var subP = document.querySelector('.pnb-hm-sub');
+      var acts = subP ? Array.prototype.map.call(subP.querySelectorAll('.pnb-hm-item'), function (e) { return e.getAttribute('data-act'); }) : [];
+      var it = subP ? subP.querySelector('[data-act="calcAdj"]') : null;
+      R.chk.menuItem = !!it && /Adjust RATE/.test(it.textContent) && !!ce && /Calculated column/.test(ce.textContent)
+        && topActs.indexOf('calcEdit') < 0 && topActs.indexOf('calcRemove') < 0 && topActs.indexOf('calcAdj') < 0;
+      R.chk.menuEditItem = acts.indexOf('calc-left') === 0 && acts.indexOf('calcEdit') > acts.indexOf('calc-end') && acts.indexOf('calcCopy') > acts.indexOf('calcEdit')
+        && acts.indexOf('calcRemove') > acts.indexOf('calcCopy') && acts.indexOf('calcAdj') > acts.indexOf('calcRemove');
+      R.info.subActs = acts;
+      if (it) it.click();
+      await sleep(300);
+      var mk = document.querySelector('#pnbHeadPanel [data-calc-input="RATE"]');
+      R.chk.menuPanel = !!mk && mk.value === '0.25' && !!document.querySelector('#pnbHeadPanel [data-calc-range="RATE"]');
+      // (round 2) the panel is placed where the menu was and fits the viewport (it sat at the page's end before)
+      var pe = document.getElementById('pnbHeadPanel'), pr = pe ? pe.getBoundingClientRect() : null;
+      R.chk.menuPanelPlaced = !!pr && pr.bottom <= window.innerHeight && pr.right <= window.innerWidth && pr.top >= 0 && Math.abs(pr.left - Math.min(menuAt.x, window.innerWidth - pr.width - 4)) <= 2
+        && Math.abs(pr.top - Math.min(menuAt.y, window.innerHeight - pr.height - 4)) <= 2;
+      R.info.panelRect = pr ? { top: pr.top, left: pr.left, h: pr.height, menuAt: menuAt, vh: window.innerHeight } : null;
+      var q2 = window.__queryDone;
+      if (mk) { mk.value = '1'; mk.dispatchEvent(new Event('change', { bubbles: true })); }
+      await until(function () { return cell('FA') === want(1); }, 15000); await sleep(300);
+      R.chk.menuChanged = cell('FA') === want(1);
+      // (round 2) a value over the highest, applied with Enter: the box springs to the bound, as the value does
+      var q2b = window.__queryDone, kb2 = document.querySelector('#pnbCalcList [data-calc-input="RATE"]');
+      kb2.focus(); kb2.value = '5'; kb2.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+      R.chk.boxSprings = kb2.value === '1' && window.PenumbraCalc.inputs().RATE.value === 1;
+      await until(function () { return cell('FA') === want(1); }, 15000); await sleep(300);
+      // ...and a run returning while the box holds a half-typed value keeps it, with the caret
+      // (the move first - it syncs every box at once - then the typing, before the run it scheduled returns)
+      var q2c = window.__queryDone; window.PenumbraCalc.setInput('RATE', 0.5);
+      var kb3 = document.querySelector('#pnbCalcList [data-calc-input="RATE"]');
+      kb3.focus(); kb3.value = '0.7'; kb3.setSelectionRange(3, 3);
+      await until(function () { return cell('FA') === want(0.5); }, 15000); await sleep(300);
+      var kb4 = document.querySelector('#pnbCalcList [data-calc-input="RATE"]');
+      R.chk.typedKept = !!kb4 && kb4.value === '0.7' && document.activeElement === kb4 && kb4.selectionStart === 3;
+      R.info.typed = { v: kb4 && kb4.value, ae: document.activeElement && document.activeElement.tagName };
+      // Edit this calculated column... from the header menu opens the dialog on the column, its value row open
+      var t2 = th('FA'), r2 = t2.getBoundingClientRect();
+      t2.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, clientX: Math.round(r2.left + 6), clientY: Math.round(r2.top + 6) }));
+      await sleep(300);
+      var ce2 = document.querySelector('#pnbHeadMenu [data-act="calc"]'); if (ce2) ce2.click();
+      await sleep(300);
+      var ie = document.querySelector('.pnb-hm-sub [data-act="calcEdit"]');
+      if (ie) ie.click();
+      await sleep(300);
+      R.chk.menuEditOpens = !!document.getElementById('pnbCalcOverlay') && document.getElementById('pnbCalcName').value === 'FA'
+        && document.getElementById('pnbCalcAdjWrap').open === true && document.getElementById('pnbCalcAdjName').value === 'RATE';
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      await sleep(100);
+      // the reset puts the default back, and focus stays on the knob (the button hides itself)
+      window.PenumbraCalc.setInput('RATE', 0.25);
+      await until(function () { return cell('FA') === want(0.25); }, 15000); await sleep(300);
+      var q3 = window.__queryDone, rb = document.querySelector('#pnbCalcList [data-calc-inpreset="RATE"]');
+      if (rb) { rb.focus(); rb.click(); }
+      var aeR = document.activeElement;
+      R.chk.resetFocus = !!aeR && aeR.getAttribute && aeR.getAttribute('data-calc-input') === 'RATE';
+      await until(function () { return cell('FA') === want(0.5); }, 15000); await sleep(300);
+      R.chk.reset = cell('FA') === want(0.5) && window.PenumbraCalc.inputs().RATE.value === 0.5;
+      // (round 3) none of the changes above asked the database: the last answer was replayed
+      R.chk.noQuery = window.__queryDone === qBase;
+      R.info.queries = { base: qBase, now: window.__queryDone };
+      R.info = { fa: cell('FA'), want: [want(0.5), want(0.25), want(1)], q: [q0, q1, q2, q3, window.__queryDone], inputs: window.PenumbraCalc.inputs(),
+        menu: it ? it.textContent : null, state: st && st.calcColumns, err: document.getElementById('pnbCalcErr') ? document.getElementById('pnbCalcErr').textContent : null };
     },
     // Clear All Custom Preferences takes the calculated columns too (calccol3)
     cclear: async function () {

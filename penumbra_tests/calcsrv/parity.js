@@ -49,6 +49,17 @@
     sets.push({ id: 'many', defs: many });
     sets.push({ id: 'manyDupes', defs: [{ name: 'Q', formula: '1' }].concat(many.slice(0, 19)).concat([{ name: 'Q', formula: '2' }, { name: 'LATE', formula: '3' }]) });
     sets.push({ id: 'junk', defs: [null, 'str', 5, { formula: '1' }, { name: 'OK', formula: '{A}' }, { name: 'ARR', formula: ['x'] }] });
+    // (2026-10-18, calcadj) adjustable values: I1 carries R, I2 and I4 use it; I3 names one no
+    // column carries (left out); I5's value is over its highest (kept to it) and K is lowercase;
+    // I6's value is not a number (dropped, the column still uses I5's K)
+    sets.push({ id: 'inputs', defs: [
+      { name: 'I1', formula: '{A} * {@R}', input: { name: 'R', value: 0.55 } },
+      { name: 'I2', formula: 'ROUND({I1} + {@R}, 2)', format: 'currency' },
+      { name: 'I3', formula: '{A} * {@NOPE}' },
+      { name: 'I4', formula: '{@R} > 0.5', format: 'text' },
+      { name: 'I5', formula: '{B} / {@K}', input: { name: 'k', value: 7, min: 0, max: 5, step: 0.5 } },
+      { name: 'I6', formula: '{@K} & "x" & {@r}', format: 'text', input: { name: 'BAD', value: 'abc' } },
+      { name: 'I7', formula: '{A} + {@S}', format: 'percent', input: { name: 'S', value: '1e3', min: 9, max: 1 } }] });
     // ---- run them
     var C = window.PenumbraCalc;
     sets.forEach(function (set) {

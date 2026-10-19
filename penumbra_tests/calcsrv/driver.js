@@ -81,6 +81,21 @@
       R.chk.untickedKept = act.some(function (d) { return d.name === 'REP2' && d.src === 'saved'; }) && act.some(function (d) { return d.name === 'A' && d.src === 'url'; });
       R.info = { cc: cc, vis: vis, ord: ord && ord.slice(-6), toast: toast().slice(0, 300), act: act, before: m };
     },
+    radj: async function () {
+      var f = F(), C = window.PenumbraCalc;
+      R.chk.shown = shown('D') && cell('D') === String(num(f.H_NUM) * 3) && C.inputs().R.value === 3 && C.inputs().R.min === 1 && C.inputs().R.max === 9;
+      var q0 = window.__queryDone;
+      C.setInput('R', 4);
+      await until(function () { return window.__queryDone > q0 && cell('D') === String(num(f.H_NUM) * 4); }, 15000); await sleep(300);
+      R.chk.moved = cell('D') === String(num(f.H_NUM) * 4) && C.inputs().R.value === 4 && C.inputs().R.def === 3;
+      C.renderSaveList();
+      var sd = await save();
+      var dd = sd && sd.calcColumns ? sd.calcColumns.filter(function (d) { return d.name === 'D'; })[0] : null;
+      R.chk.kept = !!dd && JSON.stringify(dd.input) === JSON.stringify({ name: 'R', value: 4, min: 1, max: 9 });
+      await sleep(200);
+      R.chk.spent = C.inputs().R.value === 4 && C.inputs().R.def === 4 && C.active().some(function (d) { return d.name === 'D' && d.src === 'report'; });
+      R.info = { d: cell('D'), inputs: C.inputs(), dd: dd, act: C.active() };
+    },
     rnolist: async function () {
       var sd = await save();
       var cc = sd && sd.calcColumns ? sd.calcColumns.map(function (d) { return d.name; }).join(',') : '';

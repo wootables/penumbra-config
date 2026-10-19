@@ -20,30 +20,42 @@ APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js',
         'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
-        'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js', 'penumbra_tiles.js']
-SCN = ['mflat', 'mkbd', 'mopts', 'mcalc', 'mgroupby', 'gmenu', 'mrestr', 'mexcl', 'mcopy', 'mjournal', 'mmore', 'mfitnest']
+        'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js', 'penumbra_tiles.js',
+        'penumbra_a11y.js', 'penumbra_grouplist.js', 'penumbra_cellsel.js']
+SCN = ['mflat', 'mkbd', 'mopts', 'mcalc', 'mgroupby', 'gmenu', 'mrestr', 'mexcl', 'mcopy', 'mjournal', 'mmore', 'mfitnest', 'mcell', 'mload', 'mreset', 'msubs', 'mbucket', 'mnum']
 CHK = {
-    'mflat': ['opens', 'prevented', 'titleName', 'statsLine', 'statsAllUnique', 'statsEmpty', 'statsToggle', 'statsNotes', 'statsFiltered', 'itemsAll', 'sortAsc', 'sortChecked', 'sortDesc', 'sortClear', 'moveRight', 'cellsFollow', 'saved',
+    'mflat': ['opens', 'prevented', 'titleName', 'statsLine', 'statsAllUnique', 'statsTop', 'statsEmpty', 'statsToggle', 'statsNotes', 'statsFiltered', 'itemsAll', 'sortAsc', 'sortChecked', 'sortDesc', 'sortClear', 'moveRight', 'moveMinimal', 'cellsFollow', 'saved',
               'toastUndo', 'noSavedToast', 'undo', 'edgeDisabled', 'moveStart', 'moveEnd', 'tipNotEarly', 'tipThird', 'tipStored', 'tipOnce',
-              'tipOpens', 'hide', 'hideSaved', 'skipHidden', 'showList', 'showHere', 'showFilled', 'swapList', 'swapDone', 'lastNotHidable'],
+              'tipOpens', 'hide', 'hideSaved', 'skipHidden', 'showList', 'showHere', 'showFilled', 'swapList', 'swapDone', 'multiMove', 'lastNotHidable'],
     'mkbd': ['opensBelow', 'focusFirst', 'arrowMoves', 'enterRuns', 'focusBack', 'escCloses', 'escFocusBack', 'outsideCloses'],
     'mopts': ['optsPopover', 'optsTitle', 'optsNoFreeze', 'optsOpener', 'optsCloses', 'optsBack', 'freezeItem', 'freezes', 'unfreezeItem', 'unfreezes',
-              'noFreezePast5', 'fitItem', 'fits', 'resetItem', 'resets', 'fitsLong', 'fitsLongCut', 'fitCapped'],
-    'mcalc': ['dialog', 'seeded', 'placedRight', 'placeSaved', 'calcStart'],
-    'mgroupby': ['groupItem', 'grouped'],
-    'gmenu': ['opens', 'noFreeze', 'groupItems', 'sortsGroups', 'fitGroup', 'moveAll', 'groupsKept', 'hideAll', 'regroup', 'ungroup'],
+              'noFreezePast5', 'fitItem', 'fits', 'fitUndo', 'fitUndone', 'fitAll', 'fitAllUndo', 'resetItem', 'resets', 'fitsLong', 'fitsLongCut', 'fitCapped'],
+    'mcalc': ['dialog', 'seeded', 'placedRight', 'placeSaved', 'calcRemoveItem', 'calcRemoved', 'calcStart'],
+    'mgroupby': ['uniqueAsks', 'groupItem', 'grouped', 'uniqueQuiet'],   # uniqueAsks / uniqueQuiet 2026-10-19 (grpunique): an all-different column asks first
+    'gmenu': ['opens', 'noFreeze', 'cellGroup', 'groupItems', 'sortsGroups', 'fitGroup', 'moveAll', 'groupsKept', 'hideAll', 'regroup', 'ungroup'],
     'mrestr': ['sortOnly', 'noLayout'],
-    'mexcl': ['cellNative', 'numNative', 'compareNative'],
+    'mexcl': ['cellNative', 'numMenu', 'compareNative'],
+    'mcell': ['cellOpens', 'cellFilter', 'cellAdd', 'cellExclude', 'cellCopy', 'cellRaw', 'cellBlank', 'cellNatives', 'cellKbd'],
+    'msubs': ['topOrder', 'noChips', 'arrows', 'showLabel', 'moveList', 'flyPos', 'nested', 'hoverSwitch', 'showList', 'hoverCloses', 'hoverOpens', 'calcList',
+              'copyList', 'resetList', 'clearPanel', 'kbdOpens', 'kbdBack', 'escAll', 'outsideAll'],
+    'mreset': ['raItem', 'raOffClean', 'raOnCustom', 'raLayout', 'raCells', 'raPref', 'raFmt', 'raShade', 'raSum', 'raWidth', 'raFreeze', 'raToast',
+               'raOffAfter', 'unLayout', 'unCells', 'unFmt', 'unShade', 'unSum', 'unWidth', 'unFreeze', 'unFmtOnly'],
+    'mbucket': ['bkModes', 'bkList', 'bkValues', 'bkApply', 'bkReopen', 'bkGap', 'bkOpenEnd', 'bkClear', 'bkText', 'dtModes', 'dtList', 'dtUnits', 'dtApply', 'dtClear'],
+    'mnum': ['numOpens', 'numItems', 'numResets', 'numSort', 'numHide', 'numShowItem', 'numShown', 'numCell'],
+    'mload': ['idSame', 'idFast', 'idFallback', 'idDynamic', 'edExists', 'edHiddenSkip', 'edShownRefresh', 'edShownNow', 'edShownOnce'],
     'mfitnest': ['nestGrow', 'nestCompact', 'fitLines'],
-    'mjournal': ['jrnPainted', 'jrnMoves', 'jrnStaysUnsaved', 'jrnSwap', 'jrnSaved'],
+    'mjournal': ['jrnPainted', 'jrnNotesCell', 'jrnAddNote', 'jrnInNote', 'jrnMoves', 'jrnStaysUnsaved', 'jrnSwap', 'jrnSaved'],
     'mmore': ['thenItems', 'thenSort', 'filterList', 'filterApply', 'filterReopen', 'filterBack', 'filterEsc', 'filterClear', 'filterBlank',
-              'statsNum', 'statsDate', 'statsTop', 'only', 'showAll', 'resetCol', 'copyName', 'builders', 'toolHidden'],
+              'only', 'showAll', 'resetCol', 'copyName'],
     'mcopy': ['copyItem', 'copySubmenu', 'copyComma', 'copyNewline', 'copyTab', 'copyFiltered', 'copyKeeps', 'copyOther'],
     # (not in SCN) the menu left open for a picture: PNB_SHOT=<png> py -3 run.py --stage DIR --scn mshot
     'mshot': ['open'],
+    # (not in SCN) a big report's move, timed / profiled: --scn mperf [PNB_PROFILE=<json>] [PNB_ROWS=N]
+    'mperf': ['done'],
+    'mrerun': ['done'],
 }
 # what this change brings: everything but the checks of what live already does
-GUARDS = {'L-mexcl-cellNative', 'L-mexcl-numNative', 'L-mexcl-compareNative', 'L-mshot-open'}
+GUARDS = {'L-mexcl-cellNative', 'L-mexcl-numMenu', 'L-mexcl-compareNative', 'L-mshot-open', 'L-mperf-done', 'L-mrerun-done'}
 NEW_R1 = {'L-%s-%s' % (s, c) for s in CHK for c in CHK[s]} - GUARDS | {'S-indexLoads', 'S-helpNamed'}
 # round 2 (2026-10-16): the counts under the name, the measuring Fit
 NEW_R2 = {'L-mflat-statsLine', 'L-mflat-statsEmpty', 'L-mflat-statsFiltered', 'L-mopts-fitsLong', 'L-mopts-fitsLongCut', 'L-gmenu-fitGroup', 'S-helpFit'}
@@ -56,8 +68,42 @@ NEW_R5 = {'L-mopts-optsBack', 'S-helpBack'}
 # round 6 (2026-10-16): journal columns movable (mjournal rewritten), the eight new items
 NEW_R6 = {'S-helpBack', 'S-helpMore'} | {'L-mjournal-' + c for c in CHK['mjournal']} | {'L-mmore-' + c for c in CHK['mmore']}
 # round 7 (2026-10-16): Fit measures nested sub-tables and multi-line cells as they lay out
-NEW = {'L-mfitnest-' + c for c in CHK['mfitnest']}
+NEW_R7 = {'L-mfitnest-' + c for c in CHK['mfitnest']}
+# round 8 (2026-10-17): the cell menu
+NEW_R8 = {'L-mcell-' + c for c in CHK['mcell']} | {'L-gmenu-cellGroup', 'S-helpCells'}
+# round 9 (2026-10-17, perf): a move touches only the moved cells (multiMove is a guard: the
+# old full pass got it right too, just slowly)
+NEW_R9 = {'L-mflat-moveMinimal'}
+# round 10 (2026-10-17, load perf): id lists found by id; a hidden editor refreshed when shown
+# (idSame, idFallback, idDynamic, edExists, edShownNow are guards: live gets them right too)
+NEW_R10 = {'L-mload-idFast', 'L-mload-edHiddenSkip', 'L-mload-edShownRefresh', 'L-mload-edShownOnce'}
+# round 11 (2026-10-17): Reset all columns - every mreset check is new (live has no item),
+# plus the help rows
+NEW_R11 = {'L-mreset-' + c for c in CHK['mreset']} | {'S-helpResetAll'}
+# round 12 (2026-10-17): the menu reorganized (mockup B) - the lists under one item; the
+# checks of the old top level that changed shape come along (itemsAll, showList, copySubmenu)
+NEW_R12 = {'L-msubs-' + c for c in CHK['msubs']} | {'S-helpSubs', 'L-mflat-itemsAll', 'L-mflat-showList', 'L-mflat-showHere', 'L-mflat-showFilled', 'L-mcopy-copySubmenu',
+       'S-helpResetAll', 'S-helpMore', 'S-helpSwap', 'S-helpCopy'}
+# round 13 (2026-10-17): the lists open BESIDE their item (hover, click, ArrowRight), no Back;
+# Column stats and Pivot / Chart left out; Copy distinct values named again. The checks that
+# read a list (showList, swapList, copy*) and the top level (itemsAll) change shape with it.
+NEW_R13 = {'L-msubs-' + c for c in CHK['msubs']} | {'L-mflat-itemsAll', 'L-mflat-showList', 'L-mflat-swapList', 'L-mcopy-copyItem', 'L-mcopy-copySubmenu', 'L-mmore-copyName',
+       'S-helpMore', 'S-helpCopy', 'S-helpStats'}
+# round 16 (2026-10-17): Filter by value's Ranges for a number column (bkText is a guard: live has no modes either)
+NEW_R16 = {'L-mbucket-' + c for c in CHK['mbucket']} - {'L-mbucket-bkText'} | {'S-helpRanges'}
+# round 19 (2026-10-18): Fit's Undo, Fit all column widths, date Ranges
+NEW_R19 = {'L-mopts-fitUndo', 'L-mopts-fitUndone', 'L-mopts-fitAll', 'L-mopts-fitAllUndo', 'L-mbucket-dtModes', 'L-mbucket-dtList', 'L-mbucket-dtApply', 'L-mbucket-dtClear', 'S-helpFitAll'}
+# round 20 (2026-10-18): the '#' menu, journal cells, Add a note to this row, date units
+NEW_R20 = {'L-mnum-' + c for c in CHK['mnum']} | {'L-mjournal-jrnNotesCell', 'L-mjournal-jrnAddNote', 'L-mbucket-dtUnits', 'S-helpNum', 'L-mexcl-numMenu', 'L-mcell-cellNatives'}
+# round 21 (2026-10-18): Column stats as a list beside the item (the stats checks change shape), the
+# notes button's inside, Remove this calculated column
+NEW = {'L-mflat-statsLine', 'L-mflat-statsAllUnique', 'L-mflat-statsTop', 'L-mflat-statsToggle', 'L-mflat-statsNotes', 'L-mflat-statsFiltered',
+       'L-mjournal-jrnInNote', 'L-mcalc-calcRemoveItem', 'L-mcalc-calcRemoved', 'S-helpStats', 'L-msubs-topOrder',
+       'L-mgroupby-uniqueAsks'}   # (2026-10-19, grpunique) live groups an all-different column without asking; uniqueQuiet holds there too
 MUTANTS = {
+    # (2026-10-19, grpunique) main.js (CRLF): the all-different column no longer asks
+    'm-grpunique': ([('main', "            if (!window.confirm('Every row has a different ' + selectedColumn + ', so grouping by it makes one group per row and summarises nothing.\\n\\nGroup by it anyway?')) return;\r\n", "")],
+                    ['L-mgroupby-uniqueAsks'], ['mgroupby']),
     # --- the module
     'j-menu': ([('menu', "        if (!th || !api()) { return; }\n        e.preventDefault();", "        if (!th || !api() || true) { return; }\n        e.preventDefault();")],
                ['L-mflat-opens', 'L-mflat-prevented'], ['mflat']),
@@ -137,6 +183,79 @@ MUTANTS = {
                 ['L-mfitnest-fitLines'], ['mfitnest']),
     'j-fitfixed': ([('colw', "        if (st.tableLayout === 'fixed') { w = widest * n; }   // fixed: the columns share the width equally\n", "")],
                    ['L-mfitnest-nestCompact'], ['mfitnest']),
+    # --- (round 8) the cell menu
+    'j-cellof': ([('menu', "        if (!th) { cell = cellOf(e.target); th = cell ? cell.th : null; }\n", "")], ['L-mcell-cellOpens', 'L-gmenu-cellGroup'], ['mcell', 'gmenu']),
+    'j-celllink': ([('menu', "        if (target.closest('a, button, input, select, textarea, label, [contenteditable=\"true\"]')) { return null; }\n", "")],
+                   ['L-mcell-cellNatives'], ['mcell']),
+    'j-cellsel': ([('menu', "        if (sel && !sel.isCollapsed && sel.containsNode && sel.containsNode(td, true)) { return null; }\n", "")], ['L-mcell-cellNatives'], ['mcell']),
+    'm-cellraw': ([('main', "        return _pnbFsCellText(m.get(String(col || '').toUpperCase()));\n    }\n    // One value into", "        return String(td.textContent || '').trim();\n    }\n    // One value into")],
+                  ['L-mcell-cellRaw'], ['mcell']),
+    'm-celladd': ([('main', "        if (!cur.some(function (x) { return String(x).toLowerCase() === v.toLowerCase(); })) cur.push(v);", "        cur = [v];")],
+                  ['L-mcell-cellAdd'], ['mcell']),
+    'm-cellex': ([('main', "fields = [exclude ? { col: C, blank: true, mode: 'ex' } : { col: C, blank: true }];", "fields = [{ col: C, blank: true }];")],
+                 ['L-mcell-cellExclude'], ['mcell']),
+    'j-cellfocus': ([('menu', "            var t = (c.cell && document.contains(c.cell.td)) ? c.cell.td : (document.contains(c.th) ? c.th : null);",
+                      "            var t = document.contains(c.th) ? c.th : null;")], ['L-mcell-cellKbd'], ['mcell']),
+    # --- (round 9, perf) only the cells that change
+    'm-cellplan': ([('main', "            if (!_pnbApplyCellPlan(row, plan)) _pnbFullCellPass(row, desiredOrder, visibilityMap);",
+                     "            if (true) _pnbFullCellPass(row, desiredOrder, visibilityMap);")], ['L-mflat-moveMinimal'], ['mflat']),
+    'm-planlast': ([('main', "        for (i = ids.length - 1; i >= 0; i--) {\n            if (stay[ids[i]]) continue;",
+                     "        for (i = 0; i < ids.length; i++) {\n            if (stay[ids[i]]) continue;")], ['L-mflat-multiMove'], ['mflat']),
+    'm-planlis': ([('main', "        for (var t = tails.length ? tailIdx[tails.length - 1] : -1; t >= 0; t = prevIdx[t]) stay[ids[t]] = true;",
+                    "        for (var t = -1; t >= 0; t = prevIdx[t]) stay[ids[t]] = true;")], ['L-mflat-moveMinimal'], ['mflat']),
+    # --- (round 12) the lists under one item
+    'u-noshowall': ([('menu', "        body.push({ act: 'showAll', label: 'Show all columns', disabled: !hidden.length, why: 'Every column is shown', run: function () {\n            var l = copyLayout(api().layout());\n            l.cols.forEach(function (c) { c.visible = true; });\n            applyWithUndo(l, 'Showing all ' + l.cols.length + ' columns.', false);\n        } });\n", "")],
+                    ['L-msubs-showList'], ['msubs']),
+    'u-clear': ([('menu', "run: function () { var b = document.getElementById('spClearStorage'); if (b) { b.click(); } } });", "run: function () { } });")], ['L-msubs-clearPanel'], ['msubs']),
+    'u-arrow': ([('menu', "((it.sub && it.act !== 'back') ? '<span class=\"pnb-hm-arrow\" aria-hidden=\"true\">&#8250;</span>' : '')", "''")], ['L-msubs-arrows'], ['msubs']),
+    'u-copyname': ([('menu', "        use.push({ act: 'copyName', label: 'Copy column name', run: function () { copyName(col); } });\n", "")], ['L-msubs-topOrder'], ['msubs']),
+    # --- (round 21) Column stats, the notes button, Remove calculated column
+    's-noflyout': ([('menu', "            look.push({ act: 'stats', label: 'Column stats', sub: true, items: function () { return statsItems(col); } });\n", "")], ['L-mflat-statsLine'], ['mflat']),
+    's-topnofilter': ([('menu', "run: function () { A.filterAdd(col, t.v, false); } }); }", "run: function () { } }); }")], ['L-mflat-statsTop'], ['mflat']),
+    'c-noremove': ([('menu', "            if (typeof C.isCalc === 'function' && C.isCalc(col) && typeof C.remove === 'function') {", "            if (false) {")], ['L-mcalc-calcRemoveItem'], ['mcalc']),
+    'j-innote': ([('menu', "        var onNotes = target.closest('button.journal-notes-btn');", "        var onNotes = null;")], ['L-mjournal-jrnInNote'], ['mjournal']),
+    # --- (round 20) the '#' menu, Add a note, the fiscal year
+    'n-native': ([('menu', "        if (!th) { return null; }   // (round 20) the '#' heading has a short menu of its own", "        if (!th || th.getAttribute('data-column') === '#') { return null; }")], ['L-mnum-numOpens'], ['mnum']),
+    'j-nonote': ([('menu', "            if (nb && !nb.disabled) {   // (a row whose key is empty cannot take notes: its button is disabled)\n                items.push({ act: 'addNote',", "            if (false) {\n                items.push({ act: 'addNote',")], ['L-mjournal-jrnAddNote'], ['mjournal']),
+    'f-fy': ([('main', "var fy = m >= PNB_FY_START_MONTH ? y + 1 : y;", "var fy = y;")], ['L-mbucket-dtUnits'], ['mbucket']),
+    # --- (round 19) date Ranges, Fit all
+    'k-nodate': ([('main', "        if (days.length >= 2 && days.length === nonEmpty) {", "        if (false) {")], ['L-mbucket-dtModes'], ['mbucket']),
+    'w-nofitall': ([('menu', "            if (typeof W.fitAll === 'function') {", "            if (false) {")], ['L-mopts-fitAll'], ['mopts']),
+    # --- (round 16) Ranges
+    'k-contig': ([('menu', "                apply.disabled = sp.n === 0 || sp.gap || !!info.off;", "                apply.disabled = sp.n === 0 || !!info.off;")], ['L-mbucket-bkGap'], ['mbucket']),
+    # (the fixture's amounts are all distinct, so a wrong count per value cannot show: the cuts instead)
+    'k-step': ([('main', "        for (; c < hi && cuts.length < 12; c += step) cuts.push(+c.toFixed(6));", "        for (; c < hi && cuts.length < 1; c += step) cuts.push(+c.toFixed(6));")], ['L-mbucket-bkList'], ['mbucket']),
+    'k-range': ([('main', "max: (max === null || max === undefined) ? '' : String(max) };", "max: '' };")], ['L-mbucket-bkApply'], ['mbucket']),
+    'k-openend': ([('menu', "(clearR || sp.first === 0) ? null : bk.buckets[sp.first].min,", "clearR ? null : bk.buckets[sp.first].min,")], ['L-mbucket-bkOpenEnd'], ['mbucket']),
+    # --- (round 13) the lists beside their item
+    'v-hover': ([('menu', "            hoverTimer = setTimeout(function () { if (cur && document.contains(itemEl)) { openSub(itemEl, it); } }, 150);", "            hoverTimer = null;")], ['L-msubs-hoverOpens'], ['msubs']),
+    'v-hoverclose': ([('menu', "            hoverTimer = setTimeout(function () { if (cur) { closeSubs(level); } }, 250);", "            hoverTimer = null;")], ['L-msubs-hoverCloses'], ['msubs']),
+    'v-kbdright': ([('menu', "        else if (k === 'ArrowRight' && opens) { activate(it[i]); }\n", "")], ['L-msubs-kbdOpens'], ['msubs']),
+    'v-kbdleft': ([('menu', "        else if (k === 'ArrowLeft' && level > 0) { var from = cur.subs[level - 1].from; closeSubs(level - 1); try { from.focus({ preventScroll: true }); } catch (err) { from.focus(); } }\n", "")], ['L-msubs-kbdBack'], ['msubs']),
+    'v-side': ([('menu', "        var x = p.right - 2, y = r.top - 5;", "        var x = p.left, y = p.top;")], ['L-msubs-flyPos'], ['msubs']),
+    'v-close': ([('menu', "        c.subs.forEach(function (s) { if (s.el.parentNode) { s.el.parentNode.removeChild(s.el); } });\n", "")], ['L-msubs-escAll', 'L-msubs-outsideAll'], ['msubs']),
+    'u-resetwidths': ([('menu', "        if (W && typeof W.resized === 'function' && W.resized()) {\n            resets.push(", "        if (false) {\n            resets.push(")], ['L-msubs-resetList'], ['msubs']),
+    'u-seps': ([('menu', "        items = items.concat(look);\n", "        if (look.length) { items.push('-'); items = items.concat(look); }\n")], ['L-msubs-topOrder'], ['msubs']),
+    # --- (round 11) Reset all columns
+    'r-layout': ([('main', "        if (s.moved) penumbraApplyHeaderLayout(s.rep);\n        _pnbDropLayoutPref();",
+                   "        _pnbDropLayoutPref();")], ['L-mreset-raLayout'], ['mreset']),
+    'r-droppref': ([('main', "        if (s.moved) penumbraApplyHeaderLayout(s.rep);\n        _pnbDropLayoutPref();",
+                     "        if (s.moved) penumbraApplyHeaderLayout(s.rep);")], ['L-mreset-raPref'], ['mreset']),
+    'r-custom': ([('main', "        customized: function () { return !!_pnbColumnCustoms(); },", "        customized: function () { return true; },")],
+                 ['L-mreset-raOffClean', 'L-mreset-raOffAfter'], ['mreset']),
+    'r-undofmt': ([('main', "_pnbColOptWrite(C, { fmt: o.fmt || null,", "_pnbColOptWrite(C, { fmt: null,")], ['L-mreset-unFmt', 'L-mreset-unFmtOnly'], ['mreset']),
+    'r-undosum': ([('main', "                persistColumnSummaries(userColumnSummaries, userColumnSummaryFormulas);\n", "")], ['L-mreset-unSum'], ['mreset']),
+    'r-freezeorder': ([('main', "        if (s.frozen !== null) penumbraSetFrozenCols(reportFrozenCols);\n", "")], ['L-mreset-raFreeze'], ['mreset']),
+    # --- (round 10, load perf)
+    'p-idlist': ([('main', "            var fast = (typeof selector === 'string' && !context",
+                   "            var fast = (false && typeof selector === 'string' && !context")], ['L-mload-idFast'], ['mload']),
+    'p-idsort': ([('main', "            return jQuery.uniqueSort(out);", "            return out;")], ['L-mload-idSame'], ['mload']),
+    'p-idscope': ([('main', "found = el.querySelectorAll(m[2].charAt(0) === '>' ? ':scope ' + m[2] : m[2]);", "found = el.querySelectorAll(m[2]);")],
+                  ['L-mload-idFast'], ['mload']),
+    'p-edhidden': ([('main', "        if (shown || typeof IntersectionObserver !== 'function') {",
+                     "        if (true || typeof IntersectionObserver !== 'function') {")], ['L-mload-edHiddenSkip', 'L-mload-edShownRefresh'], ['mload']),
+    'p-edcancel': ([('main', "            if (w.__pnbRefreshIO) { w.__pnbRefreshIO.disconnect(); w.__pnbRefreshIO = null; }\n", "")], ['L-mload-edShownOnce'], ['mload']),
+    'p-edio': ([('main', "            w.__pnbRefreshIO = null;\n            cm.refresh();", "            w.__pnbRefreshIO = null;")], ['L-mload-edShownRefresh'], ['mload']),
     'j-fitgroup': ([('colw', "        var tables = c.view === 'group' ? document.querySelectorAll('#groupedResultsContainer table') : [c.th.closest('table')];",
                      "        var tables = [c.th.closest('table')];")], ['L-gmenu-fitGroup'], ['gmenu']),
     'm-statshidden': ([('main', "            if (rows[i].classList.contains('search-hidden')) continue;\n            var idx = _pnbLazyRowIndex(rows[i]), m = (idx >= 0) ? masterRowData[idx] : null;\n            if (!m) continue;\n            var v = m.get(name);",
@@ -199,7 +318,7 @@ def mutate(texts, name):
 
 stage = tempfile.mkdtemp(prefix='pnb_cm_')
 for f in LIBS: shutil.copyfile(os.path.join(APP, 'js', f), os.path.join(stage, f))
-for f in ('density.css', 'penumbra_colwidths.css'): shutil.copyfile(os.path.join(APP, 'css', f), os.path.join(stage, f))
+for f in ('density.css', 'penumbra_colwidths.css', 'penumbra_grouplist.css', 'penumbra_cellsel.css'): shutil.copyfile(os.path.join(APP, 'css', f), os.path.join(stage, f))
 open(os.path.join(stage, 'help_stub.js'), 'wb').write(b'window.__HELP_STUB = "";\n')
 shutil.copyfile(os.path.join(HERE, 'driver.js'), os.path.join(stage, 'driver.js'))
 def free_port():
@@ -228,12 +347,37 @@ def run_page(path):
     try:
         call('Network.enable'); call('Network.setCacheDisabled', {'cacheDisabled': True})
         call('Emulation.setFocusEmulationEnabled', {'enabled': True})
+        # (perf) PNB_PROFILE_BOOT=<json>: the CPU from navigation until the page is ready (mperf: the build)
+        booting = bool(os.environ.get('PNB_PROFILE_BOOT'))
+        if booting:
+            call('Profiler.enable'); call('Profiler.setSamplingInterval', {'interval': 500}); call('Profiler.start')
+        tnav = time.time()
         call('Page.navigate', {'url': 'http://127.0.0.1:%d/%s' % (hp, path)})
         t0 = time.time()
+        profiling = False
         while time.time() - t0 < 300:
             time.sleep(0.25)
+            if booting:
+                if call('Runtime.evaluate', {'expression': '!!window.__PERF_READY', 'returnByValue': True}).get('result', {}).get('value'):
+                    prof = call('Profiler.stop').get('profile')
+                    open(os.environ['PNB_PROFILE_BOOT'], 'w', encoding='utf-8').write(json.dumps(prof))
+                    print('BOOT wall %.1f s' % (time.time() - tnav))
+                    booting = False
+                    call('Runtime.evaluate', {'expression': 'window.__PERF_GO = true'})
+                continue
+            # (perf) PNB_PROFILE: once the page says it is ready, profile the move it then makes
+            if os.environ.get('PNB_PROFILE') and not profiling:
+                ready = call('Runtime.evaluate', {'expression': '!!window.__PERF_READY', 'returnByValue': True}).get('result', {}).get('value')
+                if ready:
+                    call('Profiler.enable'); call('Profiler.setSamplingInterval', {'interval': 200}); call('Profiler.start')
+                    call('Runtime.evaluate', {'expression': 'window.__PERF_GO = true'})
+                    profiling = True
+                    continue
             v = call('Runtime.evaluate', {'expression': 'window.__HCDONE ? JSON.stringify(window.__HCRESULT) : null', 'returnByValue': True}).get('result', {}).get('value')
             if v:
+                if profiling:
+                    prof = call('Profiler.stop').get('profile')
+                    open(os.environ['PNB_PROFILE'], 'w', encoding='utf-8').write(json.dumps(prof))
                 if os.environ.get('PNB_SHOT'):
                     import base64
                     shot = call('Page.captureScreenshot', {'format': 'png'}).get('data')
@@ -270,15 +414,25 @@ def static_checks(texts):
         # (round 5) the popover's Back, the journal block
         ('S-helpBack', 'with a Back button to this menu' in hlp and 'returns to this menu' in texts['topic']
          and 'journal columns move too' in hlp and 'move like any other and stay where you put them' in texts['topic'], ''),
+        # (round 8) the cell menu in both help files
+        ('S-helpNum', 'Hide the row numbers' in texts['topic'] and 'Add a note to this row' in hlp and 'fiscal year' in hlp and 'by fiscal year' in texts['topic'], ''),
+        ('S-helpFitAll', 'Fit all column widths' in texts['topic'] and '<em>Fit all column widths</em>' in hlp and 'date column by year' in texts['topic'], ''),
+        ('S-helpRanges', '<em>Ranges</em> groups the values into about six ranges' in texts['topic'] and '<em>Ranges</em> groups them into about six ranges' in hlp, ''),
+        ('S-helpSubs', '<strong>Move column</strong>' in texts['topic'] and 'Clear all custom preferences for this report' in texts['topic'] and '<em>Show column(s)</em>' in hlp and '<em>Move column</em>' in hlp, ''),
+        ('S-helpResetAll', '<em>All columns</em>, every column back to the report' in hlp and '<strong>Reset</strong>: All columns</td>' in texts['topic'], ''),
+        ('S-helpCells','data-colmenu-cells' in hlp and 'data-colmenu-cells' in texts['topic'] and 'Filter to "value"' in texts['topic'], ''),
         # (round 6) the new items in both help files
-        ('S-helpMore', all(x in texts['topic'] for x in ('Then sort ascending', 'Filter by value...', 'Column stats...', 'Show only this column',
-                                                           'Reset this column', 'Copy column name', 'Pivot by this column...'))
-         and all(x in hlp for x in ('Then sort ascending / descending', 'Filter by value...', 'Column stats...', 'Reset this column', 'Chart this column...')), ''),
+        ('S-helpMore', all(x in texts['topic'] for x in ('Then sort ascending', 'Filter by value...', 'Show only this column',
+                                                           '<strong>Reset</strong>: This column', '<strong>Copy column name</strong>', 'the lists open beside their item'))
+         and all(x in hlp for x in ('Then sort ascending / descending', 'Filter by value...', '<em>Reset</em> (<em>This column</em>', '<em>Copy column name</em>', 'opens on hover')), ''),
+        # (round 21) Column stats is back as a list beside the item; Pivot / Chart this column stay out
+        ('S-helpStats', '<strong>Column stats</strong>' in texts['topic'] and '<em>Column stats</em>' in hlp and 'Pivot by this column' not in texts['topic']
+         and 'Pivot by this column...</em> / <em>Chart this column' not in hlp and 'Remove this calculated column' in hlp
+         and '<em>all</em> when none repeats' in hlp and '<em>all</em> when none repeats' in texts['topic'] and 'all unique' not in texts['topic'], ''),
         # (round 4) Swap..., the quick read
-        ('S-helpSwap', '<em>Swap...</em>' in hlp and '<em>Swap...</em>' in texts['topic'] and '<em>all unique</em>' in texts['topic']
-         and 'all unique when none repeats' in hlp, ''),
+        ('S-helpSwap', '<em>Swap with...</em>' in hlp and '<em>Swap with...</em>' in texts['topic'], ''),   # (round 21: the "all unique" wording moved to S-helpStats)
         # (round 3) Copy distinct values, the cap, the journal counts
-        ('S-helpCopy', 'Copy distinct values...' in hlp and 'Copy distinct values...' in texts['topic'] and "60% of the table's visible width" in hlp
+        ('S-helpCopy', '<em>Copy distinct values</em> (delimited by' in hlp and '<strong>Copy distinct values</strong></td>' in texts['topic'] and "60% of the table's visible width" in hlp
          and "60% of the table's visible width" in texts['topic'] and 'checked and unchecked boxes' in texts['topic'], ''),
         # the v2 topic (the Help Center, help/v2.on) and the classic help both name it
         # (round 2) the help says Fit measures, and names the counts
@@ -291,7 +445,7 @@ def static_checks(texts):
 def run_browser(scns):
     out = []
     for s in scns:
-        r = run_page('harness.html?scn=%s' % s)
+        r = run_page('harness.html?scn=%s%s' % (s, ('&rows=' + os.environ['PNB_ROWS']) if (s in ('mperf', 'mrerun') and os.environ.get('PNB_ROWS')) else ''))
         if r.get('fatal'):
             out.append(('F-' + s, False, (r.get('fatal') or '')[:600])); continue
         out.append(('E-' + s, not r.get('errors'), 'errors %s' % r.get('errors')))

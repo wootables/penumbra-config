@@ -14,8 +14,13 @@
 #
 # -n (skip php.ini) because from a workstation the ini cannot load oci8/sqlsrv.
 #
-# EXPECTED TAIL: "PASS 52   FAIL 0". Any other tail is a failure, a smaller
-# pass count included.
+# EXPECTED TAIL: "PASS 52   FAIL 0" then "RESULT: GREEN" (-Control: "FAIL 1" then
+# "RESULT: RED"). RESULT follows php's exit code (0 only when FAIL is 0); any other
+# tail is a failure, a smaller pass count included (RESULT cannot see the count).
+#
+# UNC .ps1 files are GPO-blocked here, so -File fails: run the body as a scriptblock
+# (the runner prints its RESULT and never calls exit, which would kill the caller):
+#   & ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\dropdest\run.ps1'))) [-Control]
 # =============================================================================
 param([switch]$Control)
 
@@ -27,5 +32,9 @@ $php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
 $phpArgs = @('-n', (Join-Path $here 'test_dropdest.php'))
 if ($Control) { $phpArgs += '--control' }
 
-& $php @phpArgs
-exit $LASTEXITCODE
+$rc = 99   # stays 99 (RED) if php.exe cannot be started at all, e.g. the share is down
+try { & $php @phpArgs; $rc = $LASTEXITCODE } catch { Write-Output "could not run php: $($_.Exception.Message)" }
+if ($rc -ne 0) { Write-Output "php exit code: $rc" }
+# NO `exit` here: the body runs as a scriptblock (UNC .ps1 is GPO-blocked), where an exit ends the CALLING PowerShell and the tail never prints.
+# Write-Output, not Write-Host: the verdict then travels in the same stream as php's own PASS/FAIL lines, so `$out = & (scriptblock)` captures it too.
+Write-Output ('RESULT: ' + $(if ($rc -eq 0) { 'GREEN' } else { 'RED' }))

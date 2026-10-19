@@ -28,9 +28,13 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
         'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js']
 def q(*vals): return '&' + '&'.join('calc=' + urllib.parse.quote(v, safe='') for v in vals)
-SCN = ['rload', 'rsave', 'rnolist']
-SCN_Q = {'rload': q('MINE|{H_NUM} + 1'), 'rsave': q('A|{H_NUM} + 1', 'B|{H_NUM} * 2', 'C|{B} + 1'), 'rnolist': q('MINE|{H_NUM} + 1')}
+SCN = ['rload', 'rsave', 'rnolist', 'radj']
+SCN_Q = {'rload': q('MINE|{H_NUM} + 1'), 'rsave': q('A|{H_NUM} + 1', 'B|{H_NUM} * 2', 'C|{B} + 1'), 'rnolist': q('MINE|{H_NUM} + 1'),
+         'radj': q('D|{H_NUM} * {@R}|@R=3,1,9')}
 CHK = {
+    # (2026-10-18, calcadj) a link's column with an adjustable value: shown at it; moved, the query
+    # re-runs; the save carries the moved value as the report's default, and the override is spent
+    'radj': ['shown', 'moved', 'kept', 'spent'],
     'rload': ['shown', 'first', 'source', 'tag', 'notCalc', 'summable'],
     'rsave': ['before', 'listed', 'hint', 'hintFollows', 'kept', 'positions', 'depSaid', 'nowReport', 'untickedKept'],
     'rnolist': ['reportKept', 'mineGone'],
@@ -43,6 +47,9 @@ MUTANTS = {
     'p-listorder': ([('lib', "    $use = $order; sort($use);", "    $use = $order;")], ['P-depOrder'], []),
     'p-jslen': ([('lib', "_pnb_calc_js_len($formula) > PNB_CALC_MAX_FORMULA) return null;", "strlen($formula) > PNB_CALC_MAX_FORMULA) return null;")], ['P-names'], []),
     'p-first20': ([('lib', "        if (count($good) >= PNB_CALC_MAX_DEFS) break;\n", "")], ['P-manyDupes'], []),
+    # (2026-10-18, calcadj) an adjustable value read as blank; its highest not enforced
+    'p-inp': ([('lib', "        case 'inp': return _pnb_calc_to_num($get('@' . $node['n']));\n", "        case 'inp': return null;\n")], ['P-inputs'], []),
+    'p-inpclamp': ([('lib', "    if ($mx !== null) { $o['max'] = $mx; if ($o['value'] > $mx) $o['value'] = $mx; }\n", "    if ($mx !== null) { $o['max'] = $mx; }\n")], ['P-inputs', 'P-inputClean'], []),
     # the hooks (schedule_runner.php CRLF, index.php LF)
     'h-sched': ([('sr', "        $apiData['data'] = pnb_calc_apply_rows($apiData['data'], $state['calcColumns'], $calcProblems);\r\n", "")], ['H-sched-rows'], []),
     'h-stream': ([('sr', "            $stream_row_callback = function ($row) use ($calcMap, $calcInner) { return $calcInner($calcMap($row)); };\r\n", "")], ['H-stream-rows'], []),
@@ -58,7 +65,7 @@ MUTANTS = {
     'j-iscalc': ([('calc', "            return last.applied.some(function (d) { return d.name === n; }) && !isReport(n);\n",
                    "            return last.applied.some(function (d) { return d.name === n; });\n")], ['L-rload-notCalc'], ['rload']),
     'j-hint': ([('calc', "        if (e.target && e.target.matches && e.target.matches('#pnbCalcSaveRow input[data-calc-save]')) updateSaveHint();\n", "")], ['L-rsave-hintFollows'], ['rsave']),
-    'j-keepmine': ([('calc', "            if (!mine.some(function (x) { return x.name === d.name; })) mine.push({ name: d.name, formula: d.formula, format: d.format });\n", "")], ['L-rsave-untickedKept'], ['rsave']),
+    'j-keepmine': ([('calc', "            if (!mine.some(function (x) { return x.name === d.name; })) mine.push(plain(d));\n", "")], ['L-rsave-untickedKept'], ['rsave']),
     # main.js (CRLF)
     'm-src': ([('main', "window.PenumbraCalc.fromState(decodedState.calcColumns, penumbra_vars.preloadedState ? 'report' : 'state');", "window.PenumbraCalc.fromState(decodedState.calcColumns);")],
               ['L-rload-source'], ['rload']),

@@ -12,7 +12,7 @@ password. Staged and tested on 2026-10-16; **not deployed** until the user says 
 |---|---|
 | `patch.php` | THE CHANGE, as data: `php -n patch.php --from=<tree> --to=<stage>` copies each touched file and applies 29 exact-anchor edits (an anchor that is not found exactly once fails that file). Re-run it against a fresh copy of live at deploy time if live moved. Also copies the whole `help/` tree (the helpv2 lint wants every fragment; switch markers dropped) and installs the CLI from `files/`. |
 | `files/encrypt_sftp_keys_cli.php` | NEW, goes to the webroot root beside `purge_report_cli.php`: the one-off migration (dry run by default, `--commit` to write, `--task=<id>` for one). Row-locked, round trip proven before and after the write, one `SCHEDULE_UPDATE` audit row per task (ciphertext on both sides, never the key). |
-| `test_sftpkey.php` | 79 checks over the real code (lifted by tokenizer; the transport is require'd from a scratch copy). `--control`, `--mutant=<name>`. |
+| `test_sftpkey.php` | 79 checks over the real code (lifted by tokenizer; the transport is require'd from a scratch copy). `--control`, `--mutant=<name>`. C8 and R4 (a value read under the WRONG secret) are IV-proof since 2026-10-17: AES-CBC has no tag, so ~1 wrong-secret decrypt in 256 returns garbage and the old single-sample `=== false` checks went red about 1 run in 125 - C8 now counts 32 fresh IVs (the key never comes back, most are false), R4 draws a fixture the suite secret really rejects. |
 | `run.ps1` | lint (php -n -l + a broken-file control) then the test; `-Mutants` runs the four mutants with exact counts. |
 
 ## What changed (per file, all in `patch.php`)
@@ -75,9 +75,16 @@ Mutants and their exact counts (2026-10-16): `plainsave` 5, `rawkey` 3, `nostrip
    `help/topics/schedulerHelpLightbox.php` and `README.md` were dirty (another session's uncommitted swap,
    the help-accuracy patch) - wait for that commit, then re-stage those two from the then-current live
    (`patch.php` re-applies; its anchors are the post-audit sentences).
-4. After the swap: run this suite against live, then the migration:
-   `php.exe encrypt_sftp_keys_cli.php` (dry run, lists every task's key state), then `--commit`. Until it
-   runs, each Drop-a-File run with a key stored as pasted logs a Notice in `log/scheduler_<date>.log`.
+4. After the swap: run this suite against live, then the migration - ON THE SERVER, from an ELEVATED
+   prompt (the config's secrets are sealed with `C:\inetpub\penumbra_config.key`, readable by
+   Administrators / SYSTEM / IUSR only, and that key is server-local by design, so the CLI cannot run from
+   a workstation even with oci8 loaded from the share - proven 2026-10-17):
+   `D:\Utilities\PHP_8.2-p\php.exe C:\inetpub\wwwroot\sponsor_migration\penumbra\encrypt_sftp_keys_cli.php`
+   (dry run: every task's key state, never a value), then the same command with `--commit`. Until it runs,
+   each Drop-a-File run with a key stored as pasted logs a Notice in `log/scheduler_<date>.log`.
+   `work/probe_sftpkey_dryrun.php` is the fallback for a dry run without a server shell: copied into the
+   webroot for one call with its one-time token (X-Probe-Token header) through a signed-in browser session
+   on the proxy host (direct off-proxy HTTPS to oitras answers 403), then deleted. SELECT only.
 5. Browsers pick up the new `main.js` by its `?v=filemtime` query. An old tab saving a task is safe: the
    server keeps a stored key when the posted field is blank and encrypts a key posted inside `options`.
 

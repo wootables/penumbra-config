@@ -6,10 +6,26 @@
 # shared corpus, and prints every case where the two disagree.
 #
 #   powershell -File run_parity.ps1
+#   powershell -File run_parity.ps1 -MainSrc <path\to\main.js>   # a stage or mutant main.js in place of live's
 #
 # It rebuilds everything from the LIVE app files each run, so it always tests
 # what is deployed. Nothing is written to the webroot.
+#
+# RED ON PAGE ERRORS (2026-10-17): each harness page records every uncaught error
+# raised while main.js boots (window.onerror -> RESULTS_JSON pageErrors, kept in
+# a.dom.txt / b.dom.txt). Any such error FAILS the run: a FAIL line at step 4/5
+# here, and compare.ps1 counts them ("page errors" in each summary), lists them
+# under PAGE ERRORS and throws after its report. Both harnesses still run first,
+# so one run shows A's and B's boot errors together. Until 2026-10-16 this was
+# only a WARNING, which is how a ready closure dying at journalWatch() (0e8e581,
+# 2026-10-02) sat unnoticed for two weeks: the engines are hoisted declarations,
+# so a half-booted main.js still answered every case.
 # =============================================================================
+param(
+    # An alternative main.js (a stage copy, or a mutant such as tBodies -> tBodiez to prove
+    # the page-error check) in place of the live one. The vendor libs still come from live js\.
+    [string]$MainSrc
+)
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\parity' }   # empty when run as a scriptblock: never fall back to the caller's cwd
 $app  = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
@@ -44,7 +60,13 @@ foreach ($f in $libs) { Copy-Item "$js\$f" "$here\$f" -Force }
 # NOTE: chart-4.5.1.min.js is deliberately NOT loaded - it spins animation frames
 # under --virtual-time-budget and hangs the run. vis() is therefore not covered.
 
-$src = [IO.File]::ReadAllText("$js\main.js")
+$mainJs = "$js\main.js"
+if ($MainSrc) {
+    if (-not (Test-Path -LiteralPath $MainSrc)) { throw "-MainSrc not found: $MainSrc" }
+    $mainJs = $MainSrc
+    Write-Host "    main.js source OVERRIDDEN by -MainSrc (NOT the live file): $MainSrc"
+}
+$src = [IO.File]::ReadAllText($mainJs)
 $anchor = '$(document).ready(function () {'
 if (-not $src.Substring(0, 200).Contains($anchor)) { throw "main.js closure anchor not found - update run_parity.ps1" }
 # Export engine B as the closure's FIRST statement: function declarations hoist,
@@ -152,7 +174,13 @@ function Invoke-EdgeHarness {
     $txt = [System.Net.WebUtility]::HtmlDecode($d.Substring($i + 14, $j - $i - 14))
     if (-not $txt.StartsWith('RESULTS_JSON:')) { throw "engine $Label harness failed: $($txt.Substring(0,[Math]::Min(300,$txt.Length)))" }
     $parsed = $txt.Substring(13) | ConvertFrom-Json
-    if ($parsed.pageErrors) { Write-Warning "engine ${Label}: main.js init errors (may invalidate results): $($parsed.pageErrors -join '; ')" }
+    # Uncaught errors while main.js booted = the ready closure died part-way, so this engine
+    # answered the corpus half-initialised and its results prove nothing. Since 2026-10-17 that
+    # is a FAILURE, not a warning: compare.ps1 reads the same pageErrors back from the dump,
+    # counts them in its summary and throws after its report. This line only says so here,
+    # where it happened; the other harness still runs so both engines' boot errors show at once.
+    $pageErrors = @(); if ($null -ne $parsed.pageErrors) { $pageErrors = @($parsed.pageErrors) }
+    if ($pageErrors.Count) { Write-Host "FAIL engine ${Label}: main.js booted with $($pageErrors.Count) uncaught error(s) - the run is RED, compare.ps1 fails on them: $($pageErrors -join '; ')" }
     $swallowed = @($parsed.cases | Where-Object { $_.swallowed })
     if ($swallowed.Count) { Write-Warning "engine $Label swallowed errors (HARNESS PROBLEM, not divergence): $(($swallowed | ForEach-Object { $_.id }) -join ', ')" }
     $failed = @($parsed.cases | Where-Object { $_.error })

@@ -4,6 +4,8 @@
 #   $p = "$env:TEMP\run_parity_local.ps1"
 #   Copy-Item '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\parity\run_parity_local.ps1' $p -Force
 #   & $p                    # add -CompareOnly to skip to the comparison
+#   & $p -MainSrc <path\to\main.js>   # a stage or mutant main.js in place of live's (how the
+#                                     # page-error check is proved: tBodies -> tBodiez must go RED)
 #
 # Running it IN PLACE on the share is blocked by the very policy it works
 # around - copy it local first, as above.
@@ -23,6 +25,13 @@
 #                  result_a.json / result_b.json / result_c.json (under a
 #                  second). Use it after editing compare.ps1's $expected /
 #                  $openBugs.
+#   -MainSrc       handed to run_parity.ps1 unchanged (see its header).
+#
+# A RED run (2026-10-17): compare.ps1 ends in a throw when either harness recorded
+# an uncaught error while main.js booted (page errors), after printing its report;
+# this launcher does not catch it, so the error is the last thing on screen and the
+# exit code is non-zero. -CompareOnly repeats the last full run's verdict (it reads
+# the same a.dom.txt / b.dom.txt).
 #
 # Budget under a minute for a full run: 14-16 s on 2026-09-29 (24 s on
 # 2026-09-19) - both Edge steps run on virtual time. Each Edge step gives up
@@ -31,7 +40,7 @@
 # crbug.com/40528867 (and now and then get_updates_processor.cc) in steps 4 and
 # 5 are NOISE.
 # =============================================================================
-param([switch]$CompareOnly)
+param([switch]$CompareOnly, [string]$MainSrc)
 
 $ErrorActionPreference = 'Stop'
 $root = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\parity'
@@ -39,7 +48,8 @@ $root = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\parity'
 if (-not (Test-Path $root)) { throw "parity share not reachable: $root" }
 
 function Invoke-ShareScript {
-    param([string]$Name, [string]$StripFrom)
+    # ScriptArgs is a HASHTABLE (splatted by name): an array splat would bind positionally.
+    param([string]$Name, [string]$StripFrom, [hashtable]$ScriptArgs = @{})
     $path = Join-Path $root $Name
     if (-not (Test-Path $path)) { throw "missing on the share: $path" }
     $body = [IO.File]::ReadAllText($path)
@@ -51,12 +61,13 @@ function Invoke-ShareScript {
         # silently running the call would NOT be, so only trim when present.
         if ($i -ge 0) { $body = $body.Substring(0, $i) }
     }
-    & ([scriptblock]::Create($body))
+    & ([scriptblock]::Create($body)) @ScriptArgs
 }
 
 if (-not $CompareOnly) {
     # Drop run_parity.ps1's trailing compare.ps1 invocation - that nested call is
     # a UNC .ps1 too, and is blocked by the same policy.
-    Invoke-ShareScript -Name 'run_parity.ps1' -StripFrom '& "$here\compare.ps1"'
+    $runArgs = @{}; if ($MainSrc) { $runArgs['MainSrc'] = $MainSrc }
+    Invoke-ShareScript -Name 'run_parity.ps1' -StripFrom '& "$here\compare.ps1"' -ScriptArgs $runArgs
 }
 Invoke-ShareScript -Name 'compare.ps1'

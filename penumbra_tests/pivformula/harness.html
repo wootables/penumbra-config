@@ -1,0 +1,154 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>pivot search on formula columns</title></head>
+<body>
+<!-- Same boot as ..\pivotsortkeep\harness.html, plus the search box, the flat header the
+     builder reads its columns from, the builder's container and the task form's filter. -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<div id="reportHeaderContainer"></div>
+<input type="hidden" id="reportSubtitle" value="Harness">
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<div id="tableSearchContainer"><input type="text" id="tableSearch" autocomplete="off"></div>
+<div id="resultCount"></div>
+<div id="loadingOverlay" style="display:none"><p></p></div>
+<table id="resultsTable"><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table>
+<div id="errorBox"></div>
+<div id="action_overlay" class="pnb-toast-dock"></div>
+<div id="pivot-output-container" style="display:none"></div>
+<div id="searchBuilderContainer"></div>
+<select id="schedEventType"><option value="EMAIL" selected>EMAIL</option></select>
+<input type="text" id="schedSearchFilter"><div id="schedSearchFilterHint"></div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax;
+  // The builder lazy-loads its markup with $.get(url, callback): hand it the real file's HTML.
+  jQuery.get = function (url, a, b) {
+    var cb = typeof a === 'function' ? a : (typeof b === 'function' ? b : null);
+    var d = jQuery.Deferred();
+    if (String(url).indexOf('search_builder_content.php') === 0) { if (cb) cb(window.__SB_MARKUP); d.resolve(window.__SB_MARKUP); }
+    else { d.resolve({}); }
+    return d.promise();
+  };
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  if (!window._pnbModalHost) { window._pnbModalHost = function () { return jQuery(document.body); }; }
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (ev) { window.__errors.push('unhandledrejection: ' + (ev.reason && ev.reason.message ? ev.reason.message : String(ev.reason))); });
+</script>
+<script src="main_patched.js"></script>
+<script>
+(function () {
+  function report(txt) { document.getElementById('out').textContent = txt; }
+  var results = [];
+  function t(name, cond, detail) { results.push({ name: name, pass: !!cond, detail: detail === undefined ? '' : String(detail) }); }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function M(o) { return new Map(Object.keys(o).map(function (k) { return [k, o[k]]; })); }
+  // ?id=hitratio's shape. Per PI: proposals / awarded / still pending
+  //   Ann 4/2/1 -> Hit Ratio 50%, Decided 66.7%     Bob 2/0/0 -> 0%, 0%
+  //   Cy  5/1/0 -> 20%, 20%                         Di  1/0/1 -> 0%, '-' (0/0)
+  //   Ed  3/3/0 -> 100%, 100%
+  var SPEC = { Ann: ['D1', 4, 2, 1], Bob: ['D1', 2, 0, 0], Cy: ['D2', 5, 1, 0], Di: ['D2', 1, 0, 1], Ed: ['D3', 3, 3, 0] };
+  var PIS = Object.keys(SPEC);
+  function rows() {
+    var out = [], n = 0;
+    PIS.forEach(function (pi) {
+      var s = SPEC[pi];
+      for (var i = 0; i < s[1]; i++) {
+        n++;
+        out.push(M({ DEPT: s[0], PI: pi, PROPOSAL: 'P' + n, AMOUNT: String(100 * n),
+          AWARDED: i < s[2] ? '1' : '0', PENDING: (i >= s[2] && i < s[2] + s[3]) ? '1' : '0' }));
+      }
+    });
+    return out;
+  }
+  function S() {
+    return { v: 2, rows: ['DEPT', 'PI'], cols: [], vals: 'PROPOSAL',
+      agg: ['count', 'count', 'count', 'formula', 'formula'],
+      aggLabels: ['Proposals', 'Awarded', 'Still Pending', 'Hit Ratio', 'Hit Ratio (Decided)'],
+      aggColOverrides: ['PROPOSAL', 'PROPOSAL', 'PROPOSAL', null, null],
+      aggFilters: [null, 'AWARDED = 1', 'PENDING = 1', null, null],
+      aggFormulas: [null, null, null, '{Awarded} / {Proposals} %', '{Awarded} / ({Proposals} - {Still Pending}) %'],
+      rowLayout: 'flat', colLayout: 'nested', sortOrder: 'asc', colSortOrder: 'asc', stickyColCount: 1,
+      totalColAggs: null, totalRowAggs: null, totalRowAggLabels: null, totalRowAggBaseIdx: null,
+      rankN: null, rankDir: null, rankAgg: null, rankOther: true, rankScope: null,
+      noBreakdown: false, startExpanded: false, hideEmpty: false };
+  }
+  async function exec(q) {
+    window.__PF.search(q);
+    for (var i = 0; i < 500 && !(window.__PF_hides > 0); i++) { await sleep(10); }
+    await sleep(30);
+    var html = jQuery('#resultCount').html() || '';
+    var m = /with ([\d,]+) filtered results/.exec(html);
+    var $c = jQuery('#pivot-output-container');
+    var pis = [];
+    $c.find('tbody tr').each(function () {
+      var cells = Array.prototype.map.call(this.cells, function (td) { return td.textContent.trim(); });
+      PIS.forEach(function (pi) { if (cells.indexOf(pi) !== -1 && pis.indexOf(pi) === -1) pis.push(pi); });
+    });
+    return { pivotRows: m ? parseInt(m[1].replace(/,/g, ''), 10) : -1, pis: pis, text: html.replace(/<[^>]+>/g, '').trim(),
+             tables: $c.find('table').length, grand: $c.find('tr').filter(function () { return /grand total/i.test(jQuery(this).text()); }).length,
+             msg: $c.text().indexOf('No results found in pivot data.') !== -1 };
+  }
+  async function kase(id, q, want) {
+    window.__PF.setPivot(S(), rows());
+    var r = await exec(q);
+    t(id + ' ' + q + ' -> ' + (want.length ? want.join(',') : 'none'),
+      JSON.stringify(r.pis) === JSON.stringify(want) && r.pivotRows === want.length,
+      'got ' + JSON.stringify(r.pis) + ' (' + r.text + ')');
+    var p = window._penumbraSearchAPI.countMatchingRows(q);
+    t('V' + id.slice(1) + ' builder preview == executed: ' + q, p.pivotMatching === want.length,
+      'preview ' + p.pivotMatching + ' pivot rows, want ' + want.length);
+    return r;
+  }
+  async function run() {
+    var P = window.__PF;
+    if (!P) { report('RESULTS_JSON:' + JSON.stringify({ fatal: 'hooks unavailable: ' + (window.__PF_ERR || 'n/a'), pageErrors: window.__errors.slice(0, 6) })); return; }
+    P.wrapHide();
+    jQuery('#tableHeader').html(['#', 'DEPT', 'PI', 'PROPOSAL', 'AMOUNT', 'AWARDED', 'PENDING'].map(function (c) { return '<th data-colname="' + c + '">' + c + '</th>'; }).join(''));
+    P.setPivot(S(), rows());
+    for (var w = 0; w < 100 && !/Ann/.test(jQuery("#pivot-output-container tbody").text()); w++) { await sleep(20); }
+    var annRow = jQuery('#pivot-output-container tbody tr').filter(function () { return Array.prototype.some.call(this.cells, function (td) { return td.textContent.trim() === 'Ann'; }); }).first().text();
+    t('F0 setup: the rendered Ann row shows 50.0% and 66.7%', /50\.0%/.test(annRow) && /66.7%/.test(annRow), annRow + " | tbody: " + jQuery("#pivot-output-container tbody").text().slice(0, 300));
+    await kase('F1', 'Hit Ratio > 10', ['Ann', 'Cy', 'Ed']);
+    await kase('F2', 'Hit Ratio (Decided) > 10', ['Ann', 'Cy', 'Ed']);
+    await kase('F3', 'Hit Ratio (Decided) > 60%', ['Ann', 'Ed']);
+    await kase('F4', 'Hit Ratio (Decided) < 10', ['Bob']);
+    await kase('F5', 'Awarded > 0 and Hit Ratio < 60', ['Ann', 'Cy']);
+    await kase('F6', '{Hit Ratio} >= 100', ['Ed']);
+    var r7 = await kase('F7', 'Hit Ratio > 200', []);
+    t('F7b no match = the No results message, no hollow table / Grand Total', r7.msg && r7.tables === 0 && r7.grand === 0,
+      'msg ' + r7.msg + ', tables ' + r7.tables + ', grand rows ' + r7.grand);
+    t('F7c ...and the count says 0 filtered results', r7.pivotRows === 0, r7.text);
+    await kase('F8', 'Proposals > 3', ['Ann', 'Cy']);   // control: a base aggregate, unchanged
+    report('RESULTS_JSON:' + JSON.stringify({ results: results, pageErrors: window.__errors.slice(0, 6) }));
+  }
+  setTimeout(function () { run().catch(function (e) { report('RESULTS_JSON:' + JSON.stringify({ fatal: String(e && e.stack || e), results: results, pageErrors: window.__errors.slice(0, 6) })); }); }, 1500);
+})();
+</script>
+</body></html>

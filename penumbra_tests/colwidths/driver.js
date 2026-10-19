@@ -377,9 +377,9 @@
     rec('D5 the click that ends a drag is not a sort - and a real click a moment later sorts as usual',
       afterDrag === 'none' && later === 'ascending', 'rightAfter=' + afterDrag + ' later=' + later);
 
-    // Press twice (no movement) = EVERY viewer width of the table goes (2026-10-08;
-    // it used to fit only that column). No report widths, so the entry goes, and
-    // a second resized column goes with it. Undo in the toast puts both back.
+    // Press twice (no movement) = THIS column fits its content (2026-10-18; from
+    // 2026-10-08 to then it reset every width, which the column menu's Reset keeps).
+    // Another resized column keeps its width; the fit is a width of this browser's own.
     var other = Object.keys(NAT).filter(function (n) { return n !== 'TITLE'; })[0], otherW = Math.round(NAT[other]) + 40;
     host.setUser(other, otherW); cw.apply();
     // The harness has no toast dock: a stand-in show_text renders the notice
@@ -393,16 +393,43 @@
     ptr('pointerdown', thOf('TITLE'), e.x, e.y);
     var fitted = width(thOf('TITLE')), en6 = entry('rdrag');
     var otherBack = width(thOf(other));
-    rec('D6 a single press changes nothing; a second press resets EVERY column of the table (TITLE and ' + other + ') to its content width',
-      near(afterOne, want, 1) && near(fitted, NAT.TITLE, 1.5) && near(otherBack, NAT[other], 1.5) && !shield() && (!en6 || !en6.widths) && liveText() === 'Column widths reset. Undo is in the notice.',
+    rec('D6 a single press changes nothing; a second press sizes THIS column (TITLE) to its content and leaves ' + other + ' as it was',
+      near(afterOne, want, 1) && Math.abs(fitted - want) > 5 && near(otherBack, otherW, 1) && !shield() && !!(en6 && en6.widths && en6.widths[other] === otherW && typeof en6.widths.TITLE === 'number')
+        && liveText() !== 'Column widths reset. Undo is in the notice.',
       'afterOne=' + r1(afterOne) + ' fitted=' + r1(fitted) + ' natural=' + r1(NAT.TITLE) + ' stored=' + JSON.stringify(en6) + ' live="' + liveText() + '"' + ' ' + other + '=' + r1(otherBack) + '/' + r1(NAT[other]));
-    var undoBtn = document.querySelector('.pnb-colw-undo');
-    if (undoBtn) undoBtn.click();
+    // the same width the column menu's Fit gives: back to the dragged width, then the API's fit
+    host.setUser('TITLE', want); cw.apply();
+    var apiFit = cw.fit(thOf('TITLE')), viaMenu = width(thOf('TITLE'));
+    rec('D6b the double press is the menu\'s Fit: the API\'s fit lands on the same width, stored as this browser\'s own',
+      apiFit === true && near(viaMenu, fitted, 1) && host.widthFor('TITLE') !== null && near(host.widthFor('TITLE'), fitted, 1.5),
+      'api=' + apiFit + ' viaMenu=' + r1(viaMenu) + ' fitted=' + r1(fitted) + ' widthFor=' + host.widthFor('TITLE'));
+    // (2026-10-18) the fit's notice offers Undo: the dragged width comes back
+    var ubs = document.querySelectorAll('.cw-stub-toast .pnb-colw-undo'), ub6 = ubs[ubs.length - 1];
+    if (ub6) ub6.click();
     await sleep(30);
-    var en6b = entry('rdrag');
-    rec('D6b the toast Undo puts both widths back, stored again',
-      !!undoBtn && near(width(thOf('TITLE')), want, 1) && near(width(thOf(other)), otherW, 1) && en6b && en6b.widths && en6b.widths.TITLE === want && en6b.widths[other] === otherW,
-      'button=' + !!undoBtn + ' TITLE=' + r1(width(thOf('TITLE'))) + '/' + want + ' ' + other + '=' + r1(width(thOf(other))) + '/' + otherW + ' stored=' + JSON.stringify(en6b));
+    rec('D6c Undo in the fit\'s notice puts the width back as it was (the dragged ' + want + ')',
+      !!ub6 && near(width(thOf('TITLE')), want, 1) && host.widthFor('TITLE') === want,
+      'button=' + !!ub6 + ' TITLE=' + r1(width(thOf('TITLE'))) + '/' + want + ' widthFor=' + host.widthFor('TITLE'));
+    // Shift + a double press: every shown column fits (the # column keeps its width), Undo takes them back
+    function ptrS(type, target, x, y) {
+      return target.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, composed: true, view: window, clientX: x, clientY: y,
+        button: 0, buttons: 1, pointerId: 1, pointerType: 'mouse', isPrimary: true, shiftKey: true }));
+    }
+    var userBefore = Object.keys((host.state && host.state().user) || {}).length;
+    th = thOf('TITLE'); e = edge(th);
+    ptrS('pointerdown', th, e.x, e.y);
+    if (shield()) ptr('pointerup', shield(), e.x, e.y);
+    ptrS('pointerdown', thOf('TITLE'), e.x, e.y);
+    var userAfter = Object.keys((host.state && host.state().user) || {}).length, allToast = document.querySelector('.cw-stub-toast:last-child');
+    rec('D6d Shift with the double press fits every shown column: more widths of this browser\'s own than before, TITLE at its fit, the notice offers Undo',
+      userAfter > userBefore && userAfter >= 3 && near(width(thOf('TITLE')), fitted, 1) && near(width(thOf(other)), otherW, 1) && !!allToast && /column widths fitted to content/.test(allToast.textContent),
+      'before=' + userBefore + ' after=' + userAfter + ' TITLE=' + r1(width(thOf('TITLE'))) + ' toast="' + (allToast ? allToast.textContent.slice(0, 60) : '') + '"');
+    ubs = document.querySelectorAll('.cw-stub-toast .pnb-colw-undo'); var ub6d = ubs[ubs.length - 1];
+    if (ub6d) ub6d.click();
+    await sleep(30);
+    rec('D6e its Undo puts every width back (TITLE to the dragged ' + want + ', the others gone)',
+      !!ub6d && Object.keys((host.state && host.state().user) || {}).length === userBefore && host.widthFor('TITLE') === want,
+      'user=' + Object.keys((host.state && host.state().user) || {}).length + '/' + userBefore + ' widthFor=' + host.widthFor('TITLE'));
     window.show_text = realShow;
     Array.prototype.forEach.call(document.querySelectorAll('.cw-stub-toast'), function (n) { n.remove(); });
     host.clearUser(); cw.apply();
@@ -1511,8 +1538,9 @@
       var bt = document.querySelector('table.pnb-breakdown'), bth = bt ? bt.tHead.rows[0].cells[1] : null;
       var be = bth ? edge(bth) : null, bFree = be ? ptr('pointerdown', bth, be.x, be.y) : null, bSh = !!shield();
       if (bSh) ptr('pointerup', shield(), be.x, be.y);
-      rec('W5 a breakdown takes no width either: no grip, no tab stop, a press on its edge is left alone',
-        !!bth && getComputedStyle(bth, '::after').content === 'none' && !bth.hasAttribute('tabindex') && bFree === true && !bSh,
+      // (its tab stop is the sorter's own, WCAG 2.1.1 of 2026-10-15 - not a width's)
+      rec('W5 a breakdown takes no width either: no grip, a press on its edge is left alone',
+        !!bth && getComputedStyle(bth, '::after').content === 'none' && bFree === true && !bSh,
         bth ? ('grip=' + getComputedStyle(bth, '::after').content + ' tabindex=' + bth.getAttribute('tabindex') + ' shield=' + bSh) : 'no breakdown');
       $('.infobox-overlay').remove();
     } else {
@@ -1663,12 +1691,44 @@
     rec('E3b sorting the breakdown by that column keeps its width (filed by the column name, not the header\'s text)',
       hth(t, 'TITLE').classList.contains('sorted') && near(width(hth(t, 'TITLE')), want), 'sorted=' + hth(t, 'TITLE').classList.contains('sorted') + ' TITLE=' + r1(width(hth(t, 'TITLE'))) + ' header="' + hth(t, 'TITLE').textContent.trim() + '"');
 
+    // the harness has no toast dock: phase D's stand-in show_text, for the Undo in the notice
+    var realShowE = window.show_text;
+    window.show_text = function (html) { var d = document.createElement('div'); d.className = 'cw-stub-toast'; d.innerHTML = html; document.body.appendChild(d); };
     var e = edge(hth(t, 'TITLE'));
     ptr('pointerdown', hth(t, 'TITLE'), e.x, e.y); if (shield()) ptr('pointerup', shield(), e.x, e.y);
     ptr('pointerdown', hth(t, 'TITLE'), e.x, e.y); if (shield()) ptr('pointerup', shield(), e.x, e.y);
     await sleep(30);
-    rec('E4 a double press on the edge fits the column to its content again', !('TITLE' in cw.drillWidths()) && near(width(hth(t, 'TITLE')), natTitle, 2),
-      'session=' + JSON.stringify(cw.drillWidths()) + ' TITLE=' + r1(width(hth(t, 'TITLE'))) + ' natural ' + natTitle);
+    // (2026-10-18) the double press FITS this column, as the flat table's does (it used to reset
+    // every breakdown width): a session width of its own, the other columns left alone, an Undo;
+    // Shift fits every column but '#', with an Undo of its own
+    var fitT = cw.drillWidths().TITLE, toastE4 = document.querySelector('.cw-stub-toast:last-child');
+    rec('E4 a double press on the edge fits the column to its content: a session width of its own (not a reset), NAME untouched, the notice offers Undo',
+      typeof fitT === 'number' && fitT !== want && near(width(hth(t, 'TITLE')), fitT, 2) && !('NAME' in cw.drillWidths()) && !!toastE4 && /TITLE fitted to its content/.test(toastE4.textContent),
+      'session=' + JSON.stringify(cw.drillWidths()) + ' TITLE=' + r1(width(hth(t, 'TITLE'))) + ' dragged ' + want + ' toast="' + (toastE4 ? toastE4.textContent.slice(0, 60) : '') + '"');
+    var ubE = document.querySelectorAll('.cw-stub-toast .pnb-colw-undo'), ubE4 = ubE[ubE.length - 1];
+    if (ubE4) ubE4.click();
+    await sleep(30);
+    rec('E4b its Undo puts the dragged width back', !!ubE4 && cw.drillWidths().TITLE === want && near(width(hth(t, 'TITLE')), want, 2), 'session=' + JSON.stringify(cw.drillWidths()));
+    await sleep(700);
+    function ptrSE(type, target, x, y) {
+      return target.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, composed: true, view: window, clientX: x, clientY: y,
+        button: 0, buttons: 1, pointerId: 1, pointerType: 'mouse', isPrimary: true, shiftKey: true }));
+    }
+    var eS = edge(hth(t, 'TITLE'));
+    ptrSE('pointerdown', hth(t, 'TITLE'), eS.x, eS.y); if (shield()) ptr('pointerup', shield(), eS.x, eS.y);
+    ptrSE('pointerdown', hth(t, 'TITLE'), eS.x, eS.y); if (shield()) ptr('pointerup', shield(), eS.x, eS.y);
+    await sleep(30);
+    var dwS = cw.drillWidths(), nS = Object.keys(dwS).length, toastS = document.querySelector('.cw-stub-toast:last-child');
+    rec('E4c Shift with the double press fits every breakdown column but #: several session widths, TITLE at its fit, the notice offers Undo',
+      nS >= 3 && !('#' in dwS) && typeof dwS.TITLE === 'number' && near(dwS.TITLE, fitT, 2) && !!toastS && /breakdown column widths fitted to content/.test(toastS.textContent),
+      'session=' + JSON.stringify(dwS) + ' toast="' + (toastS ? toastS.textContent.slice(0, 70) : '') + '"');
+    ubE = document.querySelectorAll('.cw-stub-toast .pnb-colw-undo'); var ubE4c = ubE[ubE.length - 1];
+    if (ubE4c) ubE4c.click();
+    await sleep(30);
+    rec('E4d its Undo puts every breakdown width back (TITLE to the dragged ' + want + ', the others gone)',
+      !!ubE4c && Object.keys(cw.drillWidths()).length === 1 && cw.drillWidths().TITLE === want, 'session=' + JSON.stringify(cw.drillWidths()));
+    window.show_text = realShowE;
+    Array.prototype.forEach.call(document.querySelectorAll('.cw-stub-toast'), function (n) { n.remove(); });
     await sleep(700);
 
     var thN = hth(t, 'NAME');

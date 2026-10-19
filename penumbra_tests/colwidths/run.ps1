@@ -146,6 +146,14 @@ $mutantDefs = [ordered]@{
   'livedrag'    = @{ file = 'module'; edits = @(,@("            place(drag.w);$LF        });", "            place(drag.w);$LF            setWidth(drag.c, drag.w);$LF        });")); red = @('D3') }
   'nosuppress'  = @{ file = 'module'; edits = @(,@("        if (!suppressUntil) { return; }", "        return;")); red = @('D5') }
   'nodouble'    = @{ file = 'module'; edits = @(,@("if (lastPress && lastPress.key === c.key && t - lastPress.t < DOUBLE_MS) {", "if (false) {")); red = @('D6') }
+  # (2026-10-18) the double press back to a reset of every width: D6 red
+  'dblreset'    = @{ file = 'module'; edits = @(,@("if (c.view !== 'pivot') { if (e.shiftKey) { fitAll(c); } else { fitOne(c); } } else { resetAll(c); }", "resetAll(c);")); red = @('D6') }
+  # (2026-10-18, round 22) a breakdown's double press back to the reset of every width; Shift on a breakdown ignored
+  'drillreset'  = @{ file = 'module'; edits = @(,@("if (c.view !== 'pivot') { if (e.shiftKey) { fitAll(c); } else { fitOne(c); } } else { resetAll(c); }", "if (c.view === 'flat' || c.view === 'group') { if (e.shiftKey) { fitAll(c); } else { fitOne(c); } } else { resetAll(c); }")); red = @('E4') }
+  'drillshift'  = @{ file = 'module'; edits = @(,@("        if (c.view === 'drill') { return fitAllDrill(c); }", "")); red = @('E4c') }
+  # (2026-10-18) the fit without its Undo; Shift ignored on the double press
+  'nofitundo'   = @{ file = 'module'; edits = @(,@("            if (drill) { setWidth(c, had === null ? 'auto' : had); } else { host.setUser(c.key, had); apply(); }", "")); red = @('D6c') }
+  'noshift'     = @{ file = 'module'; edits = @(,@("if (e.shiftKey) { fitAll(c); } else { fitOne(c); }", "fitOne(c);")); red = @('D6d') }
   'noundo'      = @{ file = 'module'; edits = @(,@("Object.keys(before).forEach(function (k) { host.setUser(k, before[k]); });", "")); red = @('D6b') }
   'pivotscope'  = @{ file = 'module'; edits = @(,@("return (k.indexOf('PIVOT:') === 0) === pivot;", "return true;")); red = @('M6') }
   'noescape'    = @{ file = 'module'; edits = @(,@("if (e.key === 'Escape' || e.key === 'Esc') {", "if (false) {")); red = @('D7') }
