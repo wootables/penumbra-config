@@ -232,6 +232,14 @@ if ($missing) {
 } else {
     $src = array();
     foreach ($wired as $f => $what) { $src[$f] = file_get_contents($app . DIRECTORY_SEPARATOR . $f); }
+    // (2026-10-19) help_content.php is a shim over help/topics + help/tips: when the copy under test is the shim
+    // (no topic markup), the help text is every fragment, raw; a staged concatenation (the UI mutants) is read as is.
+    if (strpos($src['help_content.php'], '<div id="') === false) {
+        $frag = '';
+        foreach (array('help/topics', 'help/tips') as $sub) { foreach (glob($app . DIRECTORY_SEPARATOR . $sub . DIRECTORY_SEPARATOR . '*.php') as $pf) $frag .= file_get_contents($pf) . "
+"; }
+        if ($frag !== '') $src['help_content.php'] = $frag;
+    }
     foreach ($wired as $f => $what) {
         if ($f === 'get_email_recipients.php' || $f === 'manage_schedule.php') continue;   // keys / a regex, not brace tokens (checked below)
         if ($f === 'index.php') continue;   // lists no tokens since 2026-09-23 pm: its "?" icons open the help chart (checked below)

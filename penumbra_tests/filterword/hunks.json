@@ -1,0 +1,1318 @@
+{
+ "ai_system_prompt.php": [
+  [
+   "the search matches",
+   "the filter matches"
+  ],
+  [
+   "Building search links",
+   "Building filter links"
+  ],
+  [
+   "text search plus",
+   "text filter plus"
+  ],
+  [
+   "number search hijacks",
+   "number filter hijacks"
+  ],
+  [
+   "a search link",
+   "a filter link"
+  ],
+  [
+   "post-search/filter)",
+   "post-filter)"
+  ],
+  [
+   ". Search link",
+   ". Filter link"
+  ],
+  [
+   "\\'Find Active",
+   "\\'Show Active"
+  ],
+  [
+   "to run a search from",
+   "to apply a filter from"
+  ],
+  [
+   "the search and",
+   "the filter and"
+  ],
+  [
+   "NEVER searches. To run a search from",
+   "NEVER filters. To apply a filter from"
+  ],
+  [
+   "/pivot searches reference",
+   "/pivot-view filters reference"
+  ],
+  [
+   "normal search bar /",
+   "normal filter box /"
+  ],
+  [
+   "s Search Filter (",
+   "s Apply Filter field ("
+  ],
+  [
+   "current search has",
+   "current filter has"
+  ],
+  [
+   "the search has",
+   "the filter has"
+  ],
+  [
+   "time: search filter",
+   "time: filter"
+  ],
+  [
+   "is search-visible",
+   "is filter-visible"
+  ],
+  [
+   "in search bar).",
+   "in filter box)."
+  ],
+  [
+   "the search filter.",
+   "the filter."
+  ],
+  [
+   "when search is",
+   "when a filter is"
+  ],
+  [
+   " current search filter",
+   " current filter"
+  ],
+  [
+   "a search filter ",
+   "a filter "
+  ],
+  [
+   "clearing the search box by",
+   "clearing the filter box by"
+  ],
+  [
+   "Y into the search box (numbers ",
+   "Y into the filter box (numbers "
+  ],
+  [
+   "ordinary search syntax into the search box",
+   "ordinary filter syntax into the filter box"
+  ],
+  [
+   "clickable search links",
+   "clickable filter links"
+  ],
+  [
+   "the search bar -",
+   "the filter box -"
+  ],
+  [
+   "as the search box, ",
+   "as the filter box, "
+  ],
+  [
+   "the search value",
+   "the filter value"
+  ],
+  [
+   "the search fails",
+   "the filter fails"
+  ],
+  [
+   "a search CONDITION",
+   "a filter CONDITION"
+  ],
+  [
+   ": SEARCH BOX",
+   ": FILTER BOX"
+  ],
+  [
+   "Users can search with: simple text, field-specific queries (COLUMN operator value), combined with \\'and\\'/\\'or\\'.\n",
+   "The filter box was called the search box until October 2026; users may still say \"search\". Call it the filter box.\nUsers can filter with: simple text, field-specific queries (COLUMN operator value), combined with \\'and\\'/\\'or\\'.\n"
+  ],
+  [
+   "Search results become",
+   "The rows the filter keeps become"
+  ],
+  [
+   "(), search, and ",
+   "(), filter, and "
+  ]
+ ],
+ "help/tips/pivot-tips-storage.php": [
+  [
+   "main search bar, ",
+   "main filter box, "
+  ]
+ ],
+ "help/tips/settings-tips-storage.php": [
+  [
+   "the search box",
+   "the filter box"
+  ]
+ ],
+ "help/tips/snap-tips-storage.php": [
+  [
+   " different search filter",
+   " different filter"
+  ],
+  [
+   "run on search:<",
+   "run as you filter:<"
+  ],
+  [
+   "the search box",
+   "the filter box"
+  ],
+  [
+   "current filters/search state",
+   "current filter state"
+  ]
+ ],
+ "help/tips/viz-tips-storage.php": [
+  [
+   "main search bar.<",
+   "main filter box.<"
+  ]
+ ],
+ "help/topics/auditorHelpLightbox.php": [
+  [
+   "/ search context",
+   "/ filter context"
+  ],
+  [
+   "the search filter",
+   "the task's filter"
+  ]
+ ],
+ "help/topics/columnSummariesHelpLightbox.php": [
+  [
+   ">A search filter",
+   ">A filter"
+  ],
+  [
+   "you search.<",
+   "you filter.<"
+  ],
+  [
+   "The search and",
+   "The filtering and"
+  ]
+ ],
+ "help/topics/copyHelpLightbox.php": [
+  [
+   "rows your search keeps</",
+   "rows your filter keeps</"
+  ],
+  [
+   "row your search keeps</",
+   "row your filter keeps</"
+  ],
+  [
+   "your search shows and",
+   "your filter keeps and"
+  ]
+ ],
+ "help/topics/customConditionHelpLightbox.php": [
+  [
+   "s Search Filter is",
+   "s filter is"
+  ],
+  [
+   "s Search Filter),",
+   "s filter),"
+  ],
+  [
+   "s Search Filter</",
+   "s filter</"
+  ],
+  [
+   "interactive search box, and any saved search filter is",
+   "interactive filter box, and the task's filter, if any, is"
+  ],
+  [
+   "s Search Filter has",
+   "s filter has"
+  ]
+ ],
+ "help/topics/dashboardsHelpLightbox.php": [
+  [
+   ", search and",
+   ", filtering and"
+  ],
+  [
+   "-applied search filter",
+   "-applied filter"
+  ],
+  [
+   "the search, ",
+   "the filter, "
+  ],
+  [
+   "\">search grammar</",
+   "\">filter syntax</"
+  ],
+  [
+   "s search bar (",
+   "s filter box ("
+  ],
+  [
+   "own search filter ",
+   "own filter "
+  ],
+  [
+   "\">Search links",
+   "\">Filter links"
+  ],
+  [
+   "em>search link",
+   "em>filter link"
+  ],
+  [
+   "\">Visual Search Builder</",
+   "\">Visual Filter Builder</"
+  ],
+  [
+   "s search: ",
+   "s filter: "
+  ],
+  [
+   "the Visual Search Builder move",
+   "the Visual Filter Builder move"
+  ],
+  [
+   "the search has",
+   "the filter syntax has"
+  ],
+  [
+   "\">The search grammar, ",
+   "\">Written in the filter syntax, "
+  ],
+  [
+   "the Visual Search Builder.<",
+   "the Visual Filter Builder.<"
+  ]
+ ],
+ "help/topics/downloadHelpLightbox.php": [
+  [
+   "rows your search keeps</",
+   "rows your filter keeps</"
+  ],
+  [
+   ", search filter,",
+   ", filter,"
+  ],
+  [
+   "the search in",
+   "the filter in"
+  ],
+  [
+   "Visual Search Builder",
+   "Visual Filter Builder"
+  ],
+  [
+   "the search box",
+   "the filter box"
+  ],
+  [
+   "rows your search keeps. ",
+   "rows your filter keeps. "
+  ],
+  [
+   " current search filter",
+   " current filter"
+  ],
+  [
+   "a table search on",
+   "a filter applied on"
+  ],
+  [
+   "the search bar's",
+   "the filter box's"
+  ],
+  [
+   "default search preset",
+   "default filter preset"
+  ]
+ ],
+ "help/topics/emailHelpLightbox.php": [
+  [
+   "When a search filter is ",
+   "When a filter is "
+  ],
+  [
+   "active search filter ",
+   "active filter "
+  ],
+  [
+   ">A search filter",
+   ">A filter"
+  ],
+  [
+   " current search filter",
+   " current filter"
+  ],
+  [
+   "a search active",
+   "a filter active"
+  ],
+  [
+   "and search filter ",
+   "and filter "
+  ],
+  [
+   "active search filter,",
+   "active filter,"
+  ],
+  [
+   "your search (",
+   "your filter ("
+  ],
+  [
+   "and a search filter is ",
+   "and a filter is "
+  ],
+  [
+   " your search filter",
+   " your filter"
+  ]
+ ],
+ "help/topics/groupingHelpLightbox.php": [
+  [
+   "\">Search</",
+   "\">Filter</"
+  ],
+  [
+   "the search bar (",
+   "the filter box ("
+  ],
+  [
+   "re-runs the search: ",
+   "re-applies the filter: "
+  ],
+  [
+   "a search is",
+   "a filter is"
+  ],
+  [
+   "\">Search in",
+   "\">Filtering in"
+  ],
+  [
+   "The search bar works",
+   "The filter box works"
+  ],
+  [
+   "the search brings",
+   "the filter brings"
+  ],
+  [
+   "\">Search: filter groups",
+   "\">Filtering the Table: groups"
+  ],
+  [
+   "\">Search filter</",
+   "\">Filter</"
+  ],
+  [
+   "later search edits filter within",
+   "later filter edits apply within"
+  ],
+  [
+   "a search active",
+   "a filter active"
+  ],
+  [
+   " active search filter",
+   " active filter"
+  ],
+  [
+   "and search together",
+   "and filter together"
+  ],
+  [
+   "active search included",
+   "active filter included"
+  ],
+  [
+   "no search the",
+   "no filter the"
+  ],
+  [
+   "with a search, the search re",
+   "with one, the filter re"
+  ],
+  [
+   "strong>Searching recomputes",
+   "strong>Filtering recomputes"
+  ]
+ ],
+ "help/topics/importsHelpLightbox.php": [
+  [
+   ", search, ",
+   ", filtering, "
+  ]
+ ],
+ "help/topics/journalHelpLightbox.php": [
+  [
+   "be searched, ",
+   "be filtered on, "
+  ],
+  [
+   "\">Searching notes",
+   "\">Filtering on notes"
+  ],
+  [
+   "the search leaves",
+   "the filter leaves"
+  ],
+  [
+   "the search shows (",
+   "the filter keeps ("
+  ],
+  [
+   "strong>Search</",
+   "strong>Filter</"
+  ],
+  [
+   "the visual search builder both",
+   "the Visual Filter Builder both"
+  ],
+  [
+   "A search, ",
+   "A filter, "
+  ],
+  [
+   "-width: none;\">In a scheduled task's",
+   "-width: none;\">Set a scheduled task's"
+  ],
+  [
+   " search filter, filter",
+   " filter"
+  ],
+  [
+   ". Search them",
+   ". Filter on them"
+  ],
+  [
+   "li>A search or task filter",
+   "li>Your filter or a task's filter"
+  ],
+  [
+   "a search in the visual search builder rewrites",
+   "a filter in the Visual Filter Builder rewrites"
+  ],
+  [
+   "that searches and",
+   "that filters and"
+  ],
+  [
+   "current search has",
+   "current filter has"
+  ],
+  [
+   " out by a search, ",
+   " out, "
+  ],
+  [
+   "by a search in the",
+   "by a filter in the"
+  ],
+  [
+   "\">Searching Notes",
+   "\">Filtering on Notes"
+  ],
+  [
+   "\">Finds</",
+   "\">Matches</"
+  ],
+  [
+   " task's search filter (",
+   " task's filter ("
+  ],
+  [
+   "A Notes ",
+   "A filter ignores a Notes "
+  ],
+  [
+   " hidden is not searched. ",
+   " hidden. "
+  ],
+  [
+   "The search box",
+   "The filter box"
+  ]
+ ],
+ "help/topics/pivotBuilderHelpLightbox.php": [
+  [
+   "main search bar: ",
+   "main filter box: "
+  ],
+  [
+   "Visual Search Builder",
+   "Visual Filter Builder"
+  ],
+  [
+   " report <strong>search bar</",
+   " report's <strong>filter box</"
+  ],
+  [
+   "name searches the",
+   "name filters on the"
+  ],
+  [
+   "to search the",
+   "to filter the"
+  ],
+  [
+   "main search bar; ",
+   "main filter box; "
+  ],
+  [
+   "em>Advanced Search</",
+   "em>Filtering the Table</"
+  ],
+  [
+   "main search bar with",
+   "main filter box with"
+  ],
+  [
+   " pivot searches (",
+   " pivot-row filters ("
+  ]
+ ],
+ "help/topics/powerFeaturesHelpLightbox.php": [
+  [
+   ", run a search, ",
+   ", apply a filter, "
+  ],
+  [
+   "\">Run a search automatically",
+   "\">Apply a filter automatically"
+  ],
+  [
+   "the search bar (",
+   "the filter box ("
+  ],
+  [
+   "saved-search syntax",
+   "saved-filter syntax"
+  ],
+  [
+   "text search).",
+   "text filter)."
+  ],
+  [
+   "the search box",
+   "the filter box"
+  ],
+  [
+   " screen, to the report filter);",
+   " screen too);"
+  ],
+  [
+   "Visual Search Builder",
+   "Visual Filter Builder"
+  ]
+ ],
+ "help/topics/repositoryHelpLightbox.php": [
+  [
+   ", searches and",
+   ", filters and"
+  ]
+ ],
+ "help/topics/schedulerHelpLightbox.php": [
+  [
+   "-link\">Search Filter</",
+   "-link\">Apply Filter</"
+  ],
+  [
+   "><strong>Search Filter</",
+   "><strong>Apply Filter</"
+  ],
+  [
+   "the report search bar's",
+   "the filter box's"
+  ],
+  [
+   "-top\" class=\"help-jump-link\">Search Filter (scheduler)</a>.</td",
+   "-top\" class=\"help-jump-link\">Apply Filter (scheduler)</a>.</td"
+  ],
+  [
+   "pointer;\">Search Filter</",
+   "pointer;\">Apply Filter</"
+  ],
+  [
+   "12px;\">Search Filter</",
+   "12px;\">Apply Filter</"
+  ],
+  [
+   " optional search filter",
+   " optional filter"
+  ],
+  [
+   "the front-end search bar (",
+   "the report's filter box ("
+  ],
+  [
+   "-top\" class=\"help-jump-link\">Search Filter (scheduler)</a>.</p",
+   "-top\" class=\"help-jump-link\">Apply Filter (scheduler)</a>.</p"
+  ],
+  [
+   "and search.\"",
+   "and filtering.\""
+  ],
+  [
+   " (search links",
+   " (filter links"
+  ],
+  [
+   "or the search filter) ",
+   "or the task's filter) "
+  ],
+  [
+   "em>Search Filter",
+   "em>Apply Filter"
+  ],
+  [
+   "Visual Search Builder",
+   "Visual Filter Builder"
+  ],
+  [
+   "s search filter ",
+   "s filter "
+  ],
+  [
+   "or the search filter uses",
+   "or the task's filter uses"
+  ],
+  [
+   " <strong>Search Filter</",
+   " <strong>Apply Filter</"
+  ]
+ ],
+ "help/topics/schedulerPromptHelpLightbox.php": [
+  [
+   "strong>Search Filter",
+   "strong>Apply Filter"
+  ],
+  [
+   " the search filter",
+   " the filter"
+  ],
+  [
+   "a Search Filter regex",
+   "a filter regex"
+  ]
+ ],
+ "help/topics/searchFilterHelpLightbox.php": [
+  [
+   "\">Search Filter",
+   "\">Apply Filter"
+  ],
+  [
+   "the report search bar's syntax. ",
+   "the syntax of the report's filter box. "
+  ],
+  [
+   "strong>Search Filter",
+   "strong>Apply Filter"
+  ],
+  [
+   "The Search Filter applies a post-query filter to the report data before",
+   "The task's filter narrows the report data after the query and before"
+  ],
+  [
+   "the front-end search bar, ",
+   "the report's filter box, "
+  ],
+  [
+   "the Browser Search</",
+   "the Report's Filter Box</"
+  ],
+  [
+   "the Visual Search Builder).",
+   "the Visual Filter Builder)."
+  ],
+  [
+   "The Visual Search Builder still",
+   "The Visual Filter Builder still"
+  ],
+  [
+   "s Visual Search Builder counts",
+   "s Visual Filter Builder counts"
+  ],
+  [
+   "own search bar would",
+   "own filter box would"
+  ],
+  [
+   " report search box",
+   " report's filter box"
+  ],
+  [
+   "\">Advanced Search: ",
+   "\">Filtering the Table: "
+  ],
+  [
+   "\">Global text search (",
+   "\">Plain text match ("
+  ],
+  [
+   "\">Search Modifier",
+   "\">Filter Modifier"
+  ]
+ ],
+ "help/topics/searchHelpLightbox.php": [
+  [
+   "\">Advanced Search</",
+   "\">Filtering the Table</"
+  ],
+  [
+   "The search box filters the rows you see. Everything else then works on the filtered rows: email, download, copy, grouping, pivot and custom code. Searches are",
+   "The filter box keeps only the rows that match. It used to be called the search box. Totals, snippets, charts, calculations, exports and email follow the filter, as do copy, grouping and pivot. Filters are"
+  ],
+  [
+   "click the search box above",
+   "click the filter box above"
+  ],
+  [
+   "-jump-link\">Visual Search Builder</a><span",
+   "-jump-link\">Visual Filter Builder</a><span"
+  ],
+  [
+   "in the search box</",
+   "in the filter box</"
+  ],
+  [
+   "to the search box (",
+   "to the filter box ("
+  ],
+  [
+   "an empty search box</",
+   "an empty filter box</"
+  ],
+  [
+   "-jump-link\">Visual Search Builder</a>, ",
+   "-jump-link\">Visual Filter Builder</a>, "
+  ],
+  [
+   "s search bar, its saved searches, ",
+   "s filter box, its saved filters, "
+  ],
+  [
+   "a search</",
+   "a filter</"
+  ],
+  [
+   "the search ends",
+   "the filter ends"
+  ],
+  [
+   "s Search Filter and",
+   "s Apply Filter field and"
+  ],
+  [
+   "A search set",
+   "A filter set"
+  ],
+  [
+   "the Visual Search Builder applies",
+   "the Visual Filter Builder applies"
+  ],
+  [
+   "the search found</",
+   "the filter matched</"
+  ],
+  [
+   "\">The search box filters the rows. ",
+   "\">The filter box keeps only the matching rows. "
+  ],
+  [
+   "your search keeps",
+   "your filter keeps"
+  ],
+  [
+   "your search hides",
+   "your filter hides"
+  ],
+  [
+   "li>The search box's",
+   "li>The filter box's"
+  ],
+  [
+   "to the search box, ",
+   "to the filter box, "
+  ],
+  [
+   "the search's",
+   "the filter's"
+  ],
+  [
+   "the search also",
+   "the filter also"
+  ],
+  [
+   "a search is",
+   "a filter is"
+  ],
+  [
+   "A search that",
+   "A filter that"
+  ],
+  [
+   "from the search box.<",
+   "from the filter box.<"
+  ],
+  [
+   "\">Global search: the text anywhere",
+   "\">Plain text: anywhere"
+  ],
+  [
+   "The Visual Search Builder's",
+   "The Visual Filter Builder's"
+  ],
+  [
+   "regex the Visual Search Builder writes for",
+   "regex the Visual Filter Builder writes for"
+  ],
+  [
+   "form the Visual Search Builder writes.<",
+   "form the Visual Filter Builder writes.<"
+  ],
+  [
+   "a search can",
+   "a filter can"
+  ],
+  [
+   "when the search runs. ",
+   "when the filter runs. "
+  ],
+  [
+   "the search side is",
+   "the filter's value is"
+  ],
+  [
+   "the search bar splits",
+   "the filter box splits"
+  ],
+  [
+   "s Search Filter compares",
+   "s filter compares"
+  ],
+  [
+   "the Search Filter",
+   "the Apply Filter"
+  ],
+  [
+   "The Visual Search Builder writes",
+   "The Visual Filter Builder writes"
+  ],
+  [
+   "the Search Bar</",
+   "the Filter Box</"
+  ],
+  [
+   "10px;\">Visual Search Builder</h4>",
+   "10px;\">Visual Filter Builder</h4>"
+  ],
+  [
+   "the empty search box, ",
+   "the empty filter box, "
+  ],
+  [
+   "the search bar shows",
+   "the filter box shows"
+  ],
+  [
+   "name searches there",
+   "name means there"
+  ],
+  [
+   " Tick <em>Search source rows</",
+   " Tick <em>Filter source rows</"
+  ],
+  [
+   "and search the",
+   "and filter the"
+  ],
+  [
+   "Save current search&hellip;<",
+   "Save current filter&hellip;<"
+  ],
+  [
+   "the search under",
+   "the filter under"
+  ],
+  [
+   "Share current search&hellip;<",
+   "Share current filter&hellip;<"
+  ],
+  [
+   "the search bar offers",
+   "the filter box offers"
+  ],
+  [
+   "it runs that search.<",
+   "it applies that filter.<"
+  ],
+  [
+   "empty search bar. ",
+   "empty filter box. "
+  ],
+  [
+   "\">Search</",
+   "\">Filter</"
+  ],
+  [
+   "the search bar already",
+   "the filter box already"
+  ],
+  [
+   "that search; ",
+   "that filter; "
+  ],
+  [
+   "Generated Search Query</",
+   "Generated Filter</"
+  ],
+  [
+   "the search bar do",
+   "the filter box do"
+  ],
+  [
+   "the search (",
+   "the filter ("
+  ],
+  [
+   "you search.<",
+   "you filter.<"
+  ],
+  [
+   "> search for exactly",
+   "> match exactly"
+  ],
+  [
+   "To search for a",
+   "To filter on a"
+  ],
+  [
+   "of running a live search. ",
+   "of filtering the table live. "
+  ],
+  [
+   "\">Search Modifiers",
+   "\">Filter Modifiers"
+  ],
+  [
+   "The Visual Search Builder has",
+   "The Visual Filter Builder has"
+  ],
+  [
+   ": search the",
+   ": filter the"
+  ],
+  [
+   "the name searches the pivot",
+   "the name filters the pivot"
+  ],
+  [
+   " the <em>Search source rows</",
+   " the <em>Filter source rows</"
+  ],
+  [
+   "the Visual Search Builder offers",
+   "the Visual Filter Builder offers"
+  ],
+  [
+   "day the search runs. ",
+   "day the filter runs. "
+  ],
+  [
+   "columns are searchable; ",
+   "columns can be filtered on; "
+  ],
+  [
+   "unhide a column to filter on it.<",
+   "unhide one first.<"
+  ],
+  [
+   ") are searchable alongside",
+   ") can be filtered on alongside"
+  ],
+  [
+   "a Visual Search Builder convenience",
+   "a Visual Filter Builder convenience"
+  ]
+ ],
+ "help/topics/snapshotsHelpLightbox.php": [
+  [
+   "a search filter,",
+   "a filter,"
+  ],
+  [
+   "clear the search box first",
+   "clear the filter box first"
+  ],
+  [
+   "strong>Search filters differ",
+   "strong>Filters differ"
+  ],
+  [
+   "(the search filter",
+   "(the filter"
+  ],
+  [
+   "from the search box if",
+   "from the filter box if"
+  ],
+  [
+   "into the search box (",
+   "into the filter box ("
+  ],
+  [
+   "em>search filter<",
+   "em>filter<"
+  ],
+  [
+   "the table search bar gains",
+   "the filter box gains"
+  ],
+  [
+   "The visual search builder recognises",
+   "The Visual Filter Builder recognises"
+  ],
+  [
+   "em>Search Filter",
+   "em>Apply Filter"
+  ],
+  [
+   "the search bar to",
+   "the filter box to"
+  ],
+  [
+   "the search bar at",
+   "the filter box at"
+  ],
+  [
+   "then search, ",
+   "then filter, "
+  ],
+  [
+   "captured search filter ",
+   "captured filter "
+  ],
+  [
+   "that search already",
+   "that filter already"
+  ]
+ ],
+ "help/topics/sqlHelpLightbox.php": [
+  [
+   "Quick Search</",
+   "Quick Filter</"
+  ],
+  [
+   "the table search box",
+   "the filter box"
+  ],
+  [
+   "clear search).",
+   "clear the filter)."
+  ],
+  [
+   "HTML</code> search-link wrapper for",
+   "HTML</code> filter-link wrapper for"
+  ],
+  [
+   "; search, sort, ",
+   "; filtering, sorting, "
+  ],
+  [
+   "HTML</code> search-link wrapper. ",
+   "HTML</code> filter-link wrapper. "
+  ],
+  [
+   "Internal search filter ",
+   "Internal filter "
+  ]
+ ],
+ "help/topics/userSettingsHelpLightbox.php": [
+  [
+   "to the search box.<",
+   "to the filter box.<"
+  ],
+  [
+   "the search.<",
+   "the filter.<"
+  ],
+  [
+   "leave the search boxes.",
+   "leave the filter and search boxes."
+  ],
+  [
+   "of the search keeps (",
+   "of the filter keeps ("
+  ],
+  [
+   "column over the rows the search keeps: how many hold ",
+   "column over the rows the filter keeps: how many hold "
+  ],
+  [
+   ", over the rows the search keeps: how many hold ",
+   ", over the rows the filter keeps: how many hold "
+  ],
+  [
+   "the search, ",
+   "the filter, "
+  ],
+  [
+   "into the search box (",
+   "into the filter box ("
+  ],
+  [
+   "the search stay",
+   "the filter stay"
+  ],
+  [
+   "for a search, a ",
+   "for a filter, a "
+  ],
+  [
+   "rows the search keeps, ",
+   "rows the filter keeps, "
+  ],
+  [
+   "the search addresses",
+   "the filter addresses"
+  ],
+  [
+   "into the search box, ",
+   "into the filter box, "
+  ],
+  [
+   "; the search box gets",
+   "; the filter box gets"
+  ],
+  [
+   ", searching, ",
+   ", the filter box, "
+  ],
+  [
+   "a search hides",
+   "a filter hides"
+  ],
+  [
+   "or a search, sort ",
+   "or a filter, sort "
+  ],
+  [
+   ", search, ",
+   ", filter, "
+  ]
+ ],
+ "help/topics/viewoptionsHelpLightbox.php": [
+  [
+   "strong>Search Bar",
+   "strong>Filter Bar"
+  ],
+  [
+   "The search box",
+   "The filter box"
+  ],
+  [
+   "a search is",
+   "a filter is"
+  ],
+  [
+   "a search),",
+   "a filter),"
+  ],
+  [
+   "\">Search Bar",
+   "\">Filter Bar"
+  ],
+  [
+   "With Search Bar",
+   "With Filter Bar"
+  ],
+  [
+   "the search bar. ",
+   "the filter box. "
+  ],
+  [
+   "normal search, ",
+   "normal filter, "
+  ],
+  [
+   "the search bar, ",
+   "the filter box, "
+  ],
+  [
+   "the search box",
+   "the filter box"
+  ]
+ ],
+ "help/topics/visualizationBuilderHelpLightbox.php": [
+  [
+   "the main report search bar</",
+   "the report's filter box</"
+  ],
+  [
+   " report search bar (",
+   " report's filter box ("
+  ],
+  [
+   "the table search bar. The search bar flashes",
+   "the filter box. The filter box flashes"
+  ],
+  [
+   "a search was",
+   "a filter was"
+  ],
+  [
+   "the search bar's",
+   "the filter box's"
+  ],
+  [
+   "you search the",
+   "you filter the"
+  ],
+  [
+   "s search bar.<",
+   "s filter box.<"
+  ],
+  [
+   "table search.<",
+   "table filter.<"
+  ],
+  [
+   "Table search /",
+   "Table filter /"
+  ],
+  [
+   " (search, ",
+   " (table filter, "
+  ],
+  [
+   "table searches, ",
+   "table filtering, "
+  ],
+  [
+   "and search, ",
+   "and filter, "
+  ]
+ ],
+ "help/topics/whatIsPenumbraLightbox.php": [
+  [
+   "Visual Search Builder",
+   "Visual Filter Builder"
+  ]
+ ]
+}

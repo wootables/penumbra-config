@@ -1,0 +1,326 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>find</title>
+<link rel="stylesheet" href="main.css">
+<link rel="stylesheet" href="density.css">
+<!-- index.php order: the column-width tool, cell selection, then Find (an EMPTY file in --control). -->
+<link rel="stylesheet" href="penumbra_colwidths.css">
+<link rel="stylesheet" href="penumbra_grouplist.css">
+<link rel="stylesheet" href="penumbra_cellsel.css">
+<link rel="stylesheet" href="penumbra_find.css">
+</head>
+<body class="theme-default">
+<!-- bigperf (2026-10-19): a copy of the find kit's harness, plus what the real page loads
+     around main.js: js/penumbra_a11y.js BEFORE it (its body observer) and js/search_builder.js
+     after it (the search box's autocomplete), in index.php's order. prof\bprof.py drives it. -->
+<!-- find suite (2026-10-19) - Find in results on the FLAT table (js/penumbra_find.js).
+     Copied from the cellsel harness: the hiddencols fixture (300 rows, 6 visible columns,
+     14 hidden; rows past the first 200 are LAZY), the REAL main.js (with its findHost
+     patch in a stage), cell selection and the format engine through the REAL run path (a
+     stubbed query.php), stored UNGROUPED unless the scenario says so. Paging buttons as
+     index.php has them. --control loads the LIVE main.js and an EMPTY module. -->
+<div id="zzHarnessPlumbing" style="display:none">
+  <input id="reportTitle" value=""><input id="reportSubtitle" value=""><div id="admWrapper"></div><button id="toggleAdminViewBtn"></button>
+  <div id="editorTabs"></div><div id="mainReportSubtitle"></div><div id="mainReportTitle"></div>
+  <textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+  <button id="executeQuery">Run</button><button id="stopQueryBtn">Stop</button>
+  <div id="importTimestamps"></div>
+  <div id="errorBox"></div><div id="undo_text_container"></div>
+  <button id="groupTableBtn" type="button">Group</button>
+  <div id="helpContentContainer"></div>
+</div>
+<div id="loadingOverlay" style="display:none"><p id="execution-timer"></p><p id="loadingMessage"></p><div id="loadingTip"></div></div>
+<div id="reportHeaderContainer"><div id="defaultTitleView">find fixture</div><div id="reportInfoPanel" style="display:none"></div><div id="reportSnippetOutput"></div></div>
+<div id="resultsHeader">
+  <div id="tableSearchContainer"><form class="search-wrapper pnb-sbox" role="search" onsubmit="return false;"><input id="tableSearch" value=""><span class="search-clear pnb-sbox-seg" id="clearTableSearch" title="Clear search">&times;</span></form></div>
+  <span id="resultCount"></span>
+  <div id="paginatorContainer" style="visibility: hidden;">
+    <div id="paginationControls">
+      <button id="firstPageBtn" class="page-nav-btn">&lt;&lt;</button>
+      <button id="prevPageBtn" class="page-nav-btn">&lt;</button>
+      <span id="pageInfo" aria-live="polite" aria-atomic="true"></span>
+      <button id="nextPageBtn" class="page-nav-btn">&gt;</button>
+      <button id="lastPageBtn" class="page-nav-btn">&gt;&gt;</button>
+      <select id="rowsPerPageSelector"><option value="25">25</option><option value="50">50</option><option value="200">200</option><option value="all">All</option><option value="none">None</option></select>
+    </div>
+  </div>
+  <div id="groupActionsContainer">
+    <a href="#" class="themed-link-button" id="expandAllGroups">Expand All</a>
+    <a href="#" class="themed-link-button" id="collapseAllGroups">Collapse All</a>
+    <span class="btn-group-sep" id="removeGroupingSep">&bull;</span> <a href="#" class="themed-link-button" id="configureGroupingBtn">Configure Grouping</a>
+    <a href="#" class="themed-link-button" id="removeGroupingLink">Remove Grouping</a>
+    <button id="exitPivotModeBtn" type="button" style="display:none">Exit pivot</button>
+  </div>
+</div>
+<div id="table-view-container"><table id="resultsTable" class="data-grid-table"><caption class="sr-only">Report results table</caption><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table><div id="groupedResultsContainer" style="display:none"></div><div id="pivot-output-container" style="display:none"></div></div>
+<div id="groupingLightbox" style="display:none">
+  <div id="groupingColumnSelector" class="penumbra-custom-select"><div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div></div>
+  <div id="groupLevel2Row" style="display:none"><div id="groupingColumnSelector2" class="penumbra-custom-select"><div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div></div></div>
+  <div id="groupLevel3Row" style="display:none"><div id="groupingColumnSelector3" class="penumbra-custom-select"><div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div></div></div>
+  <input type="checkbox" id="groupAggCheckbox">
+  <div id="groupAggOptions" style="display:none"></div>
+  <div id="groupAggColumn" class="penumbra-custom-select"><div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div></div>
+  <select id="groupAggType"><option value="sum">sum</option><option value="avg">avg</option></select>
+  <select id="groupSortSelect">
+    <option value="label|asc">label asc</option><option value="label|desc">label desc</option>
+    <option value="count|asc">count asc</option><option value="count|desc">count desc</option>
+  </select>
+  <select id="groupLimitDir"><option value="top">top</option><option value="bottom">bottom</option></select>
+  <input type="text" id="groupLimitN"><input type="text" id="groupLimitMinRows">
+  <input type="checkbox" id="groupLimitOther" checked>
+  <div id="groupSummaryFilterHint" style="display:none"></div>
+  <div id="groupStartDepthRow"><select id="groupStartDepth">
+    <option value="0">Collapsed</option><option value="1">Level 1</option><option value="2">Level 2</option><option value="3">All levels</option>
+  </select></div>
+  <div id="groupLayoutRow" style="display: none;">
+    <div id="groupLayoutLbl">Layout</div>
+    <div class="grp-lb-inline grp-lb-radios" role="radiogroup" aria-labelledby="groupLayoutLbl">
+      <label><input type="radio" name="groupLayoutChoice" value="stacked" checked> Stacked</label>
+      <label><input type="radio" name="groupLayoutChoice" value="list"> List</label>
+    </div>
+    <input type="hidden" id="groupLayout" value="stacked">
+  </div>
+  <button id="resetGroupingBtn" type="button">Reset</button>
+  <button id="copyGroupSnippetBtn" type="button">Snippet</button>
+  <button id="confirmGroupingBtn" type="button">Apply Grouping</button>
+</div>
+<div id="settingsPanelOverlay"></div>
+<div id="settingsPanel">
+  <select id="spThemeSelector"><option value="report-default">Report Default</option><option value="theme-default">Default</option></select>
+  <select id="spDensitySelector"><option value="report-default">Report Default</option><option value="standard">Standard</option></select>
+  <input type="checkbox" id="spRowExpandToggle"><input type="checkbox" id="spResolverToggle">
+  <div class="sp-section sp-columns-section"><div class="sp-column-container"><div id="spColumnList" class="sp-column-list"></div></div></div>
+  <div class="sp-actions"><button id="spApply">Save Column Layout</button><button id="spReset">Reset</button><span id="spPendingCount"></span></div>
+</div>
+<div id="copyActionsLightbox" style="display:none">
+  <input type="radio" name="copyFormat" value="html">
+  <input type="radio" name="copyFormat" value="csv">
+  <input type="radio" name="copyFormat" value="tsv">
+  <input type="radio" name="copyFormat" value="json">
+  <input type="radio" name="copyFormat" value="sql">
+  <input type="radio" name="copyFormat" value="custom">
+  <input type="radio" name="copyFormat" value="single_col" checked>
+  <select id="copyColumnSelector"></select>
+  <input id="copyDelimiterInput" value=";">
+  <input id="sqlTableNameInput" value="LAZY_T"><textarea id="customTemplateInput"></textarea>
+  <input type="checkbox" id="customTemplateNewline" checked><select id="apiSnippetLanguage"><option value="python">python</option></select>
+  <button id="confirmCopyBtn">Copy</button>
+</div>
+<div id="pnbStatusBar">
+  <div class="sb-seg" id="sbColsSeg"><span id="sbCols"></span>
+    <span class="sb-chip" id="sbCustomCols" style="display:none;">custom layout</span>
+    <div class="sb-pop" id="sbCustomColsPop"><div id="sbCustomColsDiff"></div><button id="sbCustomColsReset">Reset</button><button id="sbCustomColsSave" style="display:none;">Save</button></div>
+  </div>
+  <div class="sb-seg" id="sbUserSeg"></div>
+</div>
+<pre id="out">running</pre>
+
+<script>
+  (function () { try { localStorage.clear(); } catch (e) {} })();
+  window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' } };
+  window.PENUMBRA_THEME_IDS = ['theme-default'];
+  window.PENUMBRA_THEME_ALIASES = {};
+  window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  (function () {
+    var P = new URLSearchParams(location.search);
+    window.__SCN = P.get('scn') || 'boot';
+    var S = window.__SCN;
+    // bigperf: &box=span = the search box as LIVE index.php has it today (a span, no
+    // form - find round 3 puts it in a form); the default is the form
+    if (P.get('box') === 'span') {
+      var fm = document.querySelector('#tableSearchContainer form'), sp = document.createElement('span');
+      sp.className = fm.className;
+      while (fm.firstChild) sp.appendChild(fm.firstChild);
+      fm.parentNode.replaceChild(sp, fm);
+    }
+    var COLS = [
+      'V_ID', 'V_NAME', 'V_AMOUNT', 'V_DATE', 'V_LINK', 'V_STATUS',            // 0-5 visible
+      'H_TEXT', 'H_NUM', 'H_MONEY', 'H_DATE', 'H_HTML', 'H_JSON', 'H_ENT',     // 6-12 hidden
+      'H_NL', 'H_NULL', 'H_GROUP', 'H_GROUP2', 'H_AMT', 'H_FLAG', 'H_CODE'     // 13-19 hidden
+    ];
+    window.__COLS = COLS;
+    var seed = 20260930;
+    function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
+    function pick(a) { return a[Math.floor(rnd() * a.length)]; }
+    var W = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel', 'India', 'Juliet', 'Kilo', 'Lima'];
+    function money() { return '$' + (rnd() * 90000 + 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+    function date() { var d = new Date(2021, 0, 1 + Math.floor(rnd() * 1500)); return (d.getMonth() + 1) + '/' + d.getDate() + '/' + d.getFullYear(); }
+    function link() { var id = String(400000 + Math.floor(rnd() * 99999)); return '@@HTML<a href="https://oitras.oit.ncsu.edu/resolver/103?id=' + id + '" target="_new" title="View the project record (requires proper access)" class="resolver-link">' + id + '</a>'; }
+    // prof (prof\prof.py, never in a suite run): a directory-sized table, ?n= rows (25,000)
+    // bigperf suite (bp_*): ?n= rows (3,000 by default), the 18 columns prof shows
+    var N = /^big/.test(S) ? 3000 : (S === 'prof' ? (+P.get('n') || 25000) : (/^bp_/.test(S) ? (+P.get('n') || 3000) : 300));
+    var rows = [];
+    for (var i = 1; i <= N; i++) {
+      var r = {};
+      r.V_ID = 'ID-' + String(1000 + i);
+      r.V_NAME = pick(W) + ' ' + pick(W);
+      r.V_AMOUNT = money();
+      r.V_DATE = date();
+      r.V_LINK = link();
+      r.V_STATUS = pick(['Open', 'Closed', 'Pending']);
+      r.H_TEXT = pick(W) + ' ' + pick(W) + ' ' + i;
+      r.H_NUM = String(Math.floor(rnd() * 1000));
+      r.H_MONEY = money();
+      r.H_DATE = date();
+      r.H_HTML = link();
+      var sub = []; for (var k = 0, n = 1 + Math.floor(rnd() * 3); k < n; k++) sub.push({ SUB_ID: 'S' + Math.floor(rnd() * 90), SUB_AMT: Math.floor(rnd() * 5000), SUB_NAME: pick(W) });
+      r.H_JSON = (i % 7 === 0) ? null : '@@JSON' + JSON.stringify(sub);
+      r.H_ENT = pick(['R&amp;D', 'O&#039;Brien', '&lt;tag&gt;', 'plain', 'A &amp; B &amp; C']);
+      r.H_NL = pick(W) + '\n' + pick(W);
+      r.H_NULL = (i % 3 === 0) ? null : ((i % 3 === 1) ? '' : pick(W));
+      r.H_GROUP = (i % 11 === 0) ? null : pick(['North', 'South', 'East', 'West', 'Central']);
+      r.H_GROUP2 = pick(['Tier 1', 'Tier 2', 'Tier 3']);
+      r.H_AMT = String(Math.floor(rnd() * 20000) / 100);
+      r.H_FLAG = rnd() < 0.3 ? 'Y' : 'N';
+      r.H_CODE = pick(['AB', 'CD', 'EF', 'GH']) + '-' + Math.floor(rnd() * 99);
+      // find: a name only one LAZY row has (page 2), and a name holding a status word
+      if (i === 250) r.V_NAME = 'Zulu Unique';
+      if (i === 3) r.V_NAME = 'Open House';
+      // cover: page 2's FIRST row, the right-hand column - where the bar sits
+      if (i === 201) r.V_STATUS = 'Topright Unique';
+      // fmt: two amounts the column format shows as currency - one drawn (row 3), one lazy (row 250)
+      if (S === 'fmt' && i === 3) r.H_AMT = '4321.5';
+      if (S === 'fmt' && i === 250) r.H_AMT = '1234.5';
+      // json: a nested value only a lazy row has, and one only a drawn row has
+      if (S === 'json' && i === 250) r.H_JSON = '@@JSON' + JSON.stringify([{ SUB_ID: 'S1', SUB_AMT: 1, SUB_NAME: 'Nestedonly' }]);
+      if (S === 'json' && i === 5) r.H_JSON = '@@JSON' + JSON.stringify([{ SUB_ID: 'S2', SUB_AMT: 2, SUB_NAME: 'Nestedfirst' }]);
+      // bp_epq: the value shapes the search's condition tests branch on - accounting
+      // negatives, range-looking codes, a cell holding the word empty, quotes, a placeholder target
+      // bp_a11y: a LAZY row's cell (page 2) holding a click-only icon the a11y layer stamps
+      if (S === 'bp_a11y' && i === 250) r.V_LINK = '@@HTML<span class="action-icon" data-action="row-tool" id="bpLazyIcon">t</span>';
+      if (S === 'bp_epq') {
+        if (i % 17 === 0) r.H_AMT = '(' + (i % 900) + '.00)';
+        if (i % 19 === 0) r.H_CODE = String(i % 7) + '-' + String(i % 5);
+        if (i % 23 === 0) r.H_TEXT = 'empty';
+        if (i % 29 === 0) r.H_TEXT = 'He said "Kilo" twice';
+        if (i % 31 === 0) r.H_NUM = String(i % 12);
+        if (i % 37 === 0) r.H_FLAG = r.H_NUM;
+      }
+      rows.push(r);
+    }
+    window.__rowsFixture = rows;
+    var order = []; for (var c = 0; c < COLS.length; c++) order.push(c);
+    var st = {
+      name: 'lrfix', query: 'SELECT * FROM LR_FIXTURE', reportTitle: 'Lazy rows fixture',
+      theme: 'theme-default', density: 'standard',
+      visibleColumns: ['#', 0, 1, 2, 3, 4, 5], columnOrder: order,
+      sortCriteria: [], noLimit: true, rowExpandDefault: false, resolverLinksDefault: true,
+      rowsPerPage: '200', reportSnippet: ''
+    };
+    if (S === 'hidcol') st.visibleColumns = ['#', 0, 1, 3, 4, 5];          // V_AMOUNT hidden
+    if (S === 'fmt') st.visibleColumns = ['#', 0, 1, 2, 3, 4, 5, 17];      // + H_AMT
+    if (S === 'json') st.visibleColumns = ['#', 0, 1, 2, 3, 4, 5, 11];     // + H_JSON
+    if (S === 'ent') st.visibleColumns = ['#', 0, 1, 2, 3, 4, 5, 12];      // + H_ENT
+    // prof: 18 columns shown like the directory report (no links / nested JSON)
+    if (S === 'prof' || /^bp_/.test(S)) st.visibleColumns = ['#', 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 13, 14, 15, 16, 17, 18, 19];
+    if (S === 'gview') { st.groupBy = 'H_GROUP'; st.groupStartDepth = 3; }
+    // round 2 (grp_*): the grouped view - by H_GROUP (nest: then H_GROUP2), every level open
+    // (closed: all collapsed), a group summary as saved reports carry; list: the List layout
+    if (/^grp_/.test(S)) {
+      st.groupBy = /nest/.test(S) ? 'H_GROUP,H_GROUP2' : 'H_GROUP';
+      st.groupStartDepth = /closed/.test(S) ? 0 : 3;
+      st.groupAgg = { column: 'H_AMT', type: 'sum' };
+      if (/list/.test(S)) st.groupLayout = 'list';
+    }
+    // round 3 (piv_*): a pivot, H_GROUP > H_GROUP2 down, V_STATUS across, sum of H_AMT
+    // (the cellsel suite's); closed: collapsed at the start
+    if (/^piv_/.test(S)) {
+      st.pivot = { v: 2, rows: ['H_GROUP', 'H_GROUP2'], cols: ['V_STATUS'], vals: 'H_AMT', agg: ['sum'], aggLabels: ['Amt'], aggColOverrides: ['H_AMT'],
+        aggFilters: null, aggFormulas: null, rowLayout: 'nested', colLayout: 'nested', sortOrder: 'asc', colSortOrder: 'asc',
+        stickyColCount: 2, totalColAggs: null, totalRowAggs: null, totalRowAggLabels: null, totalRowAggBaseIdx: null,
+        rankN: null, rankDir: null, rankAgg: null, rankOther: true, rankScope: null, noBreakdown: false, startExpanded: !/closed/.test(S), hideEmpty: false };
+    }
+    if (S === 'none') st.rowsPerPage = 'none';
+    if (S === 'all') st.rowsPerPage = 'all';
+    window.__STORED = st;
+    // fmt: the viewer's own column format (Column options), as the browser keeps it
+    if (S === 'fmt') {
+      try { localStorage.setItem('penumbra_column_prefs', JSON.stringify({ lrfix: { colopt: { H_AMT: { fmt: 'currency:2' } } } })); } catch (e) {}
+    }
+    window.penumbra_vars = {
+      isAdmin: true, isGlobalAdmin: true, canEditReport: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+      tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+      imports: [], reports: [], themes: {}, prompts: {}, grants: [],
+      totalExemptions: ['AMOUNT', 'H_AMT', 'H_NUM'],
+      preloadedState: st
+    };
+    window.__queryResponse = { data: rows };
+  })();
+  window.__T = {};
+  window.__queryDone = 0;
+  window.__ajaxLog = [];
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  jQuery.ajax = function (a, b) {
+    var opts = (typeof a === 'string') ? jQuery.extend({ url: a }, b || {}) : (a || {});
+    var url = String(opts.url || '');
+    window.__ajaxLog.push(url);
+    var d = jQuery.Deferred();
+    var isQuery = /query\.php/.test(url);
+    var resp = isQuery ? window.__queryResponse : (/help_content\.php/.test(url) ? (window.__HELP_STUB || '') : {});
+    setTimeout(function () {
+      try { if (opts.success) opts.success(resp, 'success', { status: 200 }); } catch (e) { window.__errors.push('ajax success threw: ' + String(e)); }
+      try { if (opts.complete) opts.complete({ status: 200 }, 'success'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }
+      d.resolve(resp, 'success', { status: 200 });
+      if (isQuery) window.__queryDone++;
+    }, 0);
+    var p = d.promise(); p.abort = function () {}; return p;
+  };
+  jQuery.getJSON = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.post = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.get = jQuery.post;
+  jQuery.fx.off = true;
+  window.__clip = [];
+  try {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+      writeText: function (t) { window.__clip.push(String(t)); return Promise.resolve(); },
+      write: function () { return Promise.resolve(); }
+    } });
+  } catch (e) { window.__clipErr = String(e); }
+  window.__errors = [];
+  window.__rejections = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    window.__rejections.push(String((r && r.message) || r) + ' @' + String((r && r.stack) || '').split('\n').slice(1, 2).join('').trim());
+    e.preventDefault();
+  });
+  window.confirm = function () { return true; };
+  window.alert = function (m) { window.__errors.push('alert: ' + m); };
+  window.prompt = function () { return null; };
+  if (typeof window.stackHeaders !== 'function') window.stackHeaders = function () {};
+</script>
+<script>
+  // Every Escape that reaches the DOCUMENT (counted before main.js's own Escape
+  // handler, a document capture listener, can swallow it): a key Find takes
+  // (window, capture) never gets here.
+  window.__docEsc = 0;
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' || e.key === 'Esc') window.__docEsc++; }, true);
+</script>
+<script src="penumbra_userseg.js"></script>
+<script src="help_stub.js"></script>
+<script src="penumbra_a11y.js"></script>
+<script src="main_hc.js"></script>
+<script src="search_builder.js"></script>
+<!-- index.php order: column widths, cell selection, the format engine, then Find -->
+<script src="penumbra_colwidths.js"></script>
+<script src="penumbra_grouplist.js"></script>
+<script src="penumbra_cellsel.js"></script>
+<script src="penumbra_colfmt.js"></script>
+<script src="penumbra_find.js"></script>
+<script src="driver.js"></script>
+</body></html>

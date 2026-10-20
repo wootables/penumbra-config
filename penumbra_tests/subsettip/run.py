@@ -62,7 +62,9 @@ MUTANTS = {
                                  "body.restrict-search .pnb-subset-tip {")], ALL('T8')),
     # untitled links: the a11y layer's open-time focus lands on the tip (email too here: main.js's
     # own #emailInputReal focus is not in the harness)
-    'notitle': ('index.php', [(' title="Close this dialog and open the Visual Search Builder"', '')], ALL('T2')),
+    # (the builder is "Visual Search Builder", or "Visual Filter Builder" since penumbra_tests\filterword
+    # 2026-10-19: the anchor stops before the name and the title attribute is renamed away)
+    'notitle': ('index.php', [(' title="Close this dialog and open the Visual ', ' data-was-title="')], ALL('T2')),
 }
 
 args = sys.argv[1:]
@@ -197,14 +199,15 @@ try:
     for d, (did, opener, verb) in DLG.items():
         click('#' + opener); time.sleep(1.0)
         s = dlg_state(did)
-        ok('T1-' + d, 'one visible tip naming the action', s['tips'] == 1 and s['tipVis'] and 'Visual Search Builder' in s['text'] and s['text'].endswith(verb), s['text'])
+        ok('T1-' + d, 'one visible tip naming the action', s['tips'] == 1 and s['tipVis'] and ('Visual Search Builder' in s['text'] or 'Visual Filter Builder' in s['text']) and s['text'].endswith(verb), s['text'])
         ok('T2-' + d, 'open-time focus is not on the tip link', not s['focusTip'], s['focus'])
         clicked = click('#%s .pnb-subset-tip-link' % did); time.sleep(0.25)
         s1 = dlg_state(did)
         time.sleep(1.5)
         s2 = dlg_state(did)
         ok('T3-' + d, 'the link hides the dialog', clicked and s2['disp'] == 'none', s2['disp'])
-        ok('T4-' + d, 'the builder opens on the search bar', s2['sbDisp'] != 'none' and s2['sbDisp'] != 'absent' and s2['sbLabel'] == 'Search', '%s/%s' % (s2['sbDisp'], s2['sbLabel']))
+        # the report mode's button: "Search", or "Filter" since penumbra_tests\filterword (2026-10-19)
+        ok('T4-' + d, 'the builder opens on the search bar', s2['sbDisp'] != 'none' and s2['sbDisp'] != 'absent' and s2['sbLabel'] in ('Search', 'Filter'), '%s/%s' % (s2['sbDisp'], s2['sbLabel']))
         ok('T5-' + d, 'the builder holds focus 1.5 s on', s2['sbFocus'], s2['focus'])
         if s2['sbDisp'] not in ('none', 'absent'):
             click('#searchBuilderLightbox .close-lightbox'); time.sleep(1.2)

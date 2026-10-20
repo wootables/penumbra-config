@@ -625,10 +625,10 @@ def run_page(scn, extra):
         try: urllib.request.urlopen('http://127.0.0.1:%d/json/close/%s' % (dp, t['id']), timeout=10).read()
         except Exception: pass
 
-# grplist3: the tip scenario's help_content.php = the candidate's group-layout tip block
+# grplist3: the tip scenario's help = the candidate's group-layout tip block (help/tips/pivot-tips-storage.php since the v1 help went, 2026-10-19)
 # behind the marker ensureHelpLoaded() checks for (the harness cannot run the PHP).
-help_src = os.path.join(src_root, 'help_content.php')
-if control or not os.path.exists(help_src): help_src = os.path.join(APP, 'help_content.php')
+help_src = os.path.join(src_root, 'help', 'tips', 'pivot-tips-storage.php')
+if control or not os.path.exists(help_src): help_src = os.path.join(APP, 'help', 'tips', 'pivot-tips-storage.php')
 def help_stub():
     h = read_b(help_src)
     i = h.find('<div data-tip="group-layout">')

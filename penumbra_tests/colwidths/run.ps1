@@ -116,7 +116,7 @@ if ($Control) {
 if (-not $MainJs)    { $MainJs    = "$js\main.js" }
 if (-not $MainCss)   { $MainCss   = "$app\css\main.css" }
 if (-not $IndexPhp)  { $IndexPhp  = "$app\index.php" }
-if (-not $HelpPhp)   { $HelpPhp   = "$app\help_content.php" }
+if (-not $HelpPhp)   { $HelpPhp   = "$app\help\topics\userSettingsHelpLightbox.php" }   # (2026-10-19) the v1 help is gone
 if (-not $ModuleJs)  { $ModuleJs  = "$js\penumbra_colwidths.js" }
 if (-not $ModuleCss) { $ModuleCss = "$app\css\penumbra_colwidths.css" }
 $need = @($MainJs, $MainCss, $IndexPhp, $HelpPhp)
@@ -408,7 +408,7 @@ function Invoke-IndexHalf {
     $res += [pscustomobject]@{ name = 'I4 php -l ' + (Split-Path $f -Leaf); pass = ($l -match 'No syntax errors'); detail = $l }
   }
   $help = [IO.File]::ReadAllText($HelpPhp, $utf8)
-  $res += [pscustomobject]@{ name = 'I5 the help entry exists beside Freeze (id="us-colwidths") and names the keys'; pass = ($help.Contains('<li id="us-colwidths">') -and $help.Contains('<kbd>+</kbd>') -and $help.Contains('<kbd>0</kbd>')); detail = '' }
+  $res += [pscustomobject]@{ name = 'I5 the help entry exists beside Freeze (id="us-colwidths") and names the keys'; pass = ($help.Contains('id="us-colwidths"') -and $help.Contains('<kbd>+</kbd>') -and $help.Contains('<kbd>0</kbd>')); detail = '' }
   return ,$res
 }
 

@@ -71,10 +71,10 @@ if ($UiMutant) {
            To   = 'Body Preamble:</span> <span class="tab-help-icon" data-target="#schedulerPromptHelpLightbox"';   Expect = 1 },
         # 4: the anchor, the rows, the source-table id and the non-recipient marks are all found through it
         @{ Name = 'the chart loses the anchor the "?" icons jump to'; File = 'help_content.php';
-           From = '<h4 id="schedDyn-recipientVars">';   To = '<h4>';   Expect = 4 },
+           From = '<h4 id="schedDyn-recipientVars" ';   To = '<h4 ';   Expect = 4 },
         @{ Name = 'a chart row loses its example ({JOBCODE_PREFIX})'; File = 'help_content.php';
-           From = '(the job family)</td><td style="padding:5px; border-bottom:1px solid #eee;">UP</td>';
-           To   = '(the job family)</td><td style="padding:5px; border-bottom:1px solid #eee;"></td>';   Expect = 1 },
+           From = '(the job family)</td><td style="padding: 5px; border-bottom: 1px solid #eee; vertical-align: top; white-space: normal; max-width: none;">UP</td>';
+           To   = '(the job family)</td><td style="padding: 5px; border-bottom: 1px solid #eee; vertical-align: top; white-space: normal; max-width: none;"></td>';   Expect = 1 },
         # --- 2026-09-23 evening: one help chart, the Recipients alert icon, "+ Configure" ---
         @{ Name = 'a hand-written variable table creeps back into the Search Filter help'; File = 'help_content.php';
            From = '<div data-pnb-rv-chart style="margin-bottom: 14px;"></div>';
@@ -82,8 +82,8 @@ if ($UiMutant) {
         @{ Name = 'the Search Filter help loses its chart placeholder'; File = 'help_content.php';
            From = '<div data-pnb-rv-chart style="margin-bottom: 14px;"></div>';   To = '';   Expect = 1 },
         @{ Name = '{ROW_COUNT} is no longer marked not-per-recipient (it would show in the filter help)'; File = 'help_content.php';
-           From = '<tr class="pnb-rv-nonrecip"><td style="padding:5px; border-bottom:1px solid #eee;"><code>{ROW_COUNT}</code>';
-           To   = '<tr><td style="padding:5px; border-bottom:1px solid #eee;"><code>{ROW_COUNT}</code>';   Expect = 1 },
+           From = '<tr class="pnb-rv-nonrecip"><td style="padding: 5px; border-bottom: 1px solid #eee; vertical-align: top; white-space: normal; max-width: none;"><code>{ROW_COUNT}</code>';
+           To   = '<tr><td style="padding: 5px; border-bottom: 1px solid #eee; vertical-align: top; white-space: normal; max-width: none;"><code>{ROW_COUNT}</code>';   Expect = 1 },
         @{ Name = 'help load stops filling the chart placeholders'; File = 'js\main.js';
            From = "_pnbFillRecipientVarCharts(`$('#helpContentContainer'));";   To = '';   Expect = 1 },
         @{ Name = 'the alert icon becomes a <button> inside the label'; File = 'index.php';
@@ -111,6 +111,12 @@ if ($UiMutant) {
         $dst = Join-Path $tmp $f
         New-Item -ItemType Directory -Force (Split-Path -Parent $dst) | Out-Null
         Copy-Item -LiteralPath (Join-Path $App $f) -Destination $dst -Force
+        # (2026-10-19) help_content.php is a shim over help/topics + help/tips: the copy under test is every fragment, raw
+        if ($f -eq 'help_content.php') {
+            $pnbHelpAll = New-Object System.Collections.Generic.List[byte]
+            foreach ($pf in @(Get-ChildItem -LiteralPath "$App\help\topics" -Filter *.php) + @(Get-ChildItem -LiteralPath "$App\help\tips" -Filter *.php)) { $pnbHelpAll.AddRange([IO.File]::ReadAllBytes($pf.FullName)); $pnbHelpAll.AddRange([byte[]](10)) }
+            [IO.File]::WriteAllBytes($dst, $pnbHelpAll.ToArray())
+        }
     }
     $lib = Join-Path $tmp 'penumbra_directory.php'
     $out = & $php -n $test $lib $tmp 2>&1 | Out-String

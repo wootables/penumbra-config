@@ -73,7 +73,7 @@ if (-not $MainCss)   { $MainCss   = "$app\css\main.css" }
 if (-not $A11yJs)    { $A11yJs    = "$js\penumbra_a11y.js" }
 if (-not $DashJs)    { $DashJs    = "$js\penumbra_dashboard.js" }
 if (-not $HealthPhp) { $HealthPhp = "$app\health.php" }
-if (-not $HelpPhp)   { $HelpPhp   = "$app\help_content.php" }
+if (-not $HelpPhp)   { $HelpPhp   = "$app\help\topics\userSettingsHelpLightbox.php" }   # (2026-10-19) the v1 help is gone; the dashboard harness gets every fragment
 if (-not $IndexPhp)  { $IndexPhp  = "$app\index.php" }
 foreach ($p in @($MainJs, $MainCss, $A11yJs, $DashJs, $HealthPhp, $HelpPhp, $IndexPhp)) { if (-not (Test-Path -LiteralPath $p)) { throw "file under test not found: $p" } }
 
@@ -240,7 +240,9 @@ function Stage-Dash([hashtable]$files, [string]$tag) {
   [IO.File]::WriteAllText("$run\dash_under_test.js", $files.dash, $utf8)
   # Base64 of the raw bytes, decoded as UTF-8 in the page: 1.4 MB is past
   # ConvertTo-Json's length cap, and bytes sidestep every escaping question.
-  $b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($HelpPhp))
+  $pnbHelpAll = New-Object System.Collections.Generic.List[byte]
+  foreach ($pf in @(Get-ChildItem -LiteralPath "$app\help\topics" -Filter *.php) + @(Get-ChildItem -LiteralPath "$app\help\tips" -Filter *.php)) { $pnbHelpAll.AddRange([IO.File]::ReadAllBytes($pf.FullName)); $pnbHelpAll.AddRange([byte[]](10)) }
+  $b64 = [Convert]::ToBase64String($pnbHelpAll.ToArray())
   [IO.File]::WriteAllText("$run\help_frag.js", "window.__HELP = new TextDecoder('utf-8').decode(Uint8Array.from(atob('" + $b64 + "'), function (c) { return c.charCodeAt(0); }));", $utf8)
   Copy-Item "$here\dash.html" "$run\dash.html" -Force
   return $run
@@ -289,7 +291,7 @@ function Invoke-Static {
   $res += [pscustomobject]@{ name = 'I2 User Settings help: the tooltips name the single keys while the switch is on, Caps Lock makes no difference'
     pass = $help.Contains('While the switch is on, each toolbar button names its single key in its tooltip') -and $help.Contains('Caps Lock makes no difference'); detail = '' }
   $res += [pscustomobject]@{ name = 'I3 ...and with it off, the tooltips and the "/" badges stop naming single keys'
-    pass = $help.Contains('With it off, tooltips stop naming single keys and the <kbd>/</kbd> badges leave the search boxes.'); detail = '' }
+    pass = ($help.Contains('With it off, tooltips stop naming single keys and the <kbd>/</kbd> badges leave the search boxes.') -or $help.Contains('With it off, tooltips stop naming single keys and the <kbd>/</kbd> badges leave the filter and search boxes.')); detail = '' }   # (filterword 2026-10-19)
   return ,$res
 }
 

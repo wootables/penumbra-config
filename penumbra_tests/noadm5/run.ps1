@@ -37,7 +37,7 @@ $here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utili
 $php = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
 $live = '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
 function Src($rel) { if ($App -and (Test-Path -LiteralPath (Join-Path $App $rel))) { return (Join-Path $App $rel) }; return (Join-Path $live $rel) }
-$names = @{ dash = 'dashboard.php'; journal = 'manage_journal.php'; index = 'index.php'; help = 'help_content.php'; an = 'analytics_shared.php'; dashjs = 'js\penumbra_dashboard.js'; jrnjs = 'js\penumbra_journal.js' }
+$names = @{ dash = 'dashboard.php'; journal = 'manage_journal.php'; index = 'index.php'; help = 'help\topics\viewoptionsHelpLightbox.php'; an = 'analytics_shared.php'; dashjs = 'js\penumbra_dashboard.js'; jrnjs = 'js\penumbra_journal.js' }
 
 $mutantDefs = @{
   'grantterm'  = @('journal', '    if (journalCallerHoldsGrant($report, $currentUserKey)) return true;', '    if (false) return true;', @('G3'))
@@ -48,7 +48,7 @@ $mutantDefs = @{
   'dashnoadm'  = @('dash',    '    noadm: <?php echo json_encode((bool)$noadm); ?>,', '', @('D1'))
   'hopclamp'   = @('dashjs',  'V.canEdit = !!r.can_edit && !penumbra_dash_vars.noadm;', 'V.canEdit = !!r.can_edit;', @('J1'))
   'badgeclamp' = @('dashjs',  '((d.can_edit && !penumbra_dash_vars.noadm) ?', '(d.can_edit ?', @('J2'))
-  'helpbelow'  = @('help',    'appear in the bar above the table, beside the search box.', 'appear below the table.', @('H1'))
+  'helpbelow'  = @('help',    'appear in the bar above the table, beside the', 'appear below the table.', @('H1'))   # "...the search box." or (filterword) "...the filter box."
   'helpglyph'  = @('help',    '<strong>First</strong> (&lt;&lt;)', '<strong>First</strong> (&laquo;)', @('H2'))
   'toastoff'   = @('jrnjs',   '            if (offj) msg +=', '            if (false) msg +=', @('T1'))
   'scopeoff'   = @('an',      '$editorRolesOn && ($out[''is_owner''] || $out[''is_editor''])', '($out[''is_owner''] || $out[''is_editor''])', @('A1'))
@@ -67,7 +67,7 @@ function Run-Once([string]$mut) {
   }
   $appDir = Join-Path $here 'app'
   if (Test-Path -LiteralPath $appDir) { Remove-Item -LiteralPath $appDir -Recurse -Force }
-  New-Item -ItemType Directory -Path (Join-Path $appDir 'js') | Out-Null
+  New-Item -ItemType Directory -Path (Join-Path $appDir 'js'), (Join-Path $appDir 'help\topics') | Out-Null
   $utf8 = New-Object System.Text.UTF8Encoding($false)
   foreach ($k in $names.Keys) { [IO.File]::WriteAllText((Join-Path $appDir $names[$k]), $txt[$k], $utf8) }
   # Through cmd so php.exe's stderr never reaches PowerShell (a terminating

@@ -435,10 +435,11 @@ $sbcText = [IO.File]::ReadAllText($files.sbc, $utf8)
 $sbcAt = $sbcText.IndexOf('?>')
 if ($sbcAt -lt 0 -or $sbcText.IndexOf('searchBuilderLightbox', $sbcAt) -lt 0) { throw "search_builder_content.php: no markup after the PHP header - update run.ps1" }
 [IO.File]::WriteAllText("$here\sbc.html", $sbcText.Substring($sbcAt + 2).TrimStart("`r", "`n"), $utf8)
-# The help fragments the dashboard's help panel fetches (help_content.php), raw:
-# its PHP tags parse as comments and every topic's markup is there (as the
-# singlekeytips suite feeds it).
-[IO.File]::WriteAllBytes("$here\help.html", [IO.File]::ReadAllBytes($files.help))
+# The help the dashboard's help panel fetches (help_content.php): since 2026-10-19 that URL is a shim over
+# help/topics + help/tips, so the raw fragments are concatenated here (their PHP guard parses as a comment).
+$pnbHelpAll = New-Object System.Collections.Generic.List[byte]
+foreach ($pf in @(Get-ChildItem -LiteralPath "$app\help\topics" -Filter *.php) + @(Get-ChildItem -LiteralPath "$app\help\tips" -Filter *.php)) { $pnbHelpAll.AddRange([IO.File]::ReadAllBytes($pf.FullName)); $pnbHelpAll.AddRange([byte[]](10)) }
+[IO.File]::WriteAllBytes("$here\help.html", $pnbHelpAll.ToArray())
 
 $anchor = '$(document).ready(function () {'
 if (-not $txt.main.Substring(0, 200).Contains($anchor)) { throw "main.js closure anchor not found - update run.ps1" }

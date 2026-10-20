@@ -71,7 +71,7 @@ if args: raise SystemExit('unknown arguments: %s' % ' '.join(args))
 RELS = {'main': os.path.join('js', 'main.js'), 'mod': os.path.join('js', 'penumbra_colfmt.js'), 'calc': os.path.join('js', 'penumbra_calc.js'),
         'colw': os.path.join('js', 'penumbra_colwidths.js'), 'menu': os.path.join('js', 'penumbra_colmenu.js'),
         'mcss': os.path.join('css', 'penumbra_colmenu.css'), 'css': os.path.join('css', 'main.css'),
-        'index': 'index.php', 'help': 'help_content.php'}
+        'index': 'index.php', 'help': os.path.join('help', 'tips', 'settings-tips-storage.php')}
 cand = {k: os.path.join(APP, v) for k, v in RELS.items()}
 if main_path and not control: cand['main'] = main_path
 sys.path.insert(0, HERE)

@@ -12,7 +12,9 @@
 #   R3  Enter and Space on "Open the pivot builder..." (pivot card) click it
 #   R4  Enter on a sort button in the grouping card presses it
 #   R5  Enter on the custom-layout chip opens its card and not the panel
-#   R6  Enter on the Cols count opens the panel (the openers still work)
+#   R6  Enter on the Cols count opens its Columns card, not the panel; Enter on the
+#       card's "Open the Column & Settings panel..." opens the panel (2026-10-19,
+#       colscard: the count opened the panel itself until then, and so did a gear)
 #   R7  Escape on a focused button in the pivot card closes the card and puts
 #       focus back on the pivot chip; the key never reaches the document
 #   R8  Escape in the Data popover closes it, focus on its segment
@@ -71,7 +73,7 @@ class Cdp:
 # the app's own handlers do with it) and a reset between checks.
 SETUP = r'''(function () {
   window.__clicks = {};
-  ['sbCustomColsSave', 'saveQuery', 'sbPivotOpenBuilder'].forEach(function (id) {
+  ['sbCustomColsSave', 'saveQuery', 'sbPivotOpenBuilder', 'sbColsSettings'].forEach(function (id) {
     var el = document.getElementById(id);
     if (el) el.addEventListener('click', function () { window.__clicks[id] = (window.__clicks[id] || 0) + 1; }, true);
   });
@@ -82,6 +84,7 @@ SETUP = r'''(function () {
     return { panel: __drv.panelOpen(), clicks: JSON.parse(JSON.stringify(window.__clicks)), focus: a ? (a.id || a.className || a.tagName) : 'none',
              cc: __drv.colsCard('sb-cc-open', 'sbCustomColsPop'), pp: __drv.colsCard('sb-pp-open', 'sbPivotPop'),
              grp: __drv.colsCard('sb-grp-open', 'sbGroupPop'), snap: __drv.colsCard('sb-snap-open', 'sbSnapshotPop'),
+             cl: __drv.colsCard('sb-cl-open', 'sbColsPop'),
              data: __drv.segCard('sbDataSeg', 'sbDataPop'), docEsc: window.__docEsc };
   };
   return true;
@@ -197,13 +200,18 @@ def main():
         s5 = st()
         rec('R5 a REAL Enter on the custom-layout chip opens its card and not the panel', s5['cc'] and not s5['panel'], json.dumps(s5))
 
-        # ---- R6: the Cols count still opens the panel --------------------------
+        # ---- R6: the Cols count opens its Columns card; the card's button the panel
         reset()
         c.ev('document.getElementById("sbColsOpen").focus(); true')
         c.press('Enter')
-        s6 = st()
+        s6a = st()
+        c.ev('document.getElementById("sbColsSettings").focus(); true')
+        c.press('Enter')
+        s6b = st()
         c.ev('$("#settingsPanel").removeClass("is-open"); $("#settingsPanelOverlay").removeClass("is-open"); true')
-        rec('R6 a REAL Enter on the Cols count opens the Column & Settings panel', s6['panel'], json.dumps(s6))
+        rec('R6 a REAL Enter on the Cols count opens its Columns card, not the panel; a REAL Enter on the card\'s "Open the Column & Settings panel..." clicks it and opens the panel, the card shut',
+            s6a['cl'] and not s6a['panel'] and s6b['clicks'].get('sbColsSettings') == 1 and s6b['panel'] and not s6b['cl'],
+            'count=%s button=%s' % (json.dumps(s6a), json.dumps(s6b)))
 
         # ---- R7: Escape in the pivot card ---------------------------------------
         reset()

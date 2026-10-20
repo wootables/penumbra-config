@@ -140,7 +140,8 @@ def write_stage(texts):
 def run_source(texts):
     idx, m = texts['idx'], texts['main']
     out = []
-    out.append(('S-printOption', '<input type="radio" name="downloadFormat" value="print">' in idx and '<code># 1-200</code> in the search box for the first 200 rows' in idx, ''))
+    # the box: "search box", or "filter box" since penumbra_tests\filterword (2026-10-19), which pins the word
+    out.append(('S-printOption', '<input type="radio" name="downloadFormat" value="print">' in idx and any(('<code># 1-200</code> in the %s box for the first 200 rows' % w) in idx for w in ('filter', 'search')), ''))
     out.append(('S-stampEl', '<div id="pnbPrintStamp" aria-hidden="true"></div>' in idx and idx.index('id="pnbPrintStamp"') < idx.index('<div id="reportHeaderContainer"'), ''))
     out.append(('S-printCase', "case 'print':" in m and "setTimeout(function () { window.print(); }, 150);" in m, ''))
     return out

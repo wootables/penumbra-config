@@ -1,9 +1,9 @@
 // Status-bar keys - browser half (2026-10-01). Drives the REAL main.js (ready
 // closure unwrapped, window.__SBK export hook) with the status bar's Data,
 // query-time and Cols segments LIFTED from the index.php under test (run.ps1).
-//   E  Enter / Space in the Cols segment: the Column & Settings panel opens from
-//      its two openers only (the Cols count, the gear); every chip and every
-//      control inside a chip's card keeps its own keys
+//   E  Enter / Space in the Cols segment: the Cols count opens its Columns card
+//      (2026-10-19, colscard: the gear is gone, the card's button opens the panel);
+//      every chip and every control inside a card keeps its own keys
 //   X  Escape closes the open card - every card of the bar - hands focus back to
 //      its trigger and goes no further; it stands aside with no card open, for a
 //      modifier'd Escape, and for the pop-out console's replay onto the document
@@ -45,7 +45,7 @@
   // then by hand for anything that click leaves (no card handler is under test here).
   function closeAll() {
     $(document.body).trigger('click');
-    $('#sbColsSeg').removeClass('sb-cc-open sb-pp-open sb-grp-open sb-frz-open sb-snap-open sb-asof-open');
+    $('#sbColsSeg').removeClass('sb-cc-open sb-pp-open sb-grp-open sb-frz-open sb-snap-open sb-asof-open sb-cl-open');
     $('#sbDataSeg, #sbLoadSeg, #sbUserSeg').removeClass('sb-open');
     $('#pnbStatusBar').removeClass('sb-pop-open');
     document.body.classList.remove('sb-tips-suppressed');
@@ -54,10 +54,12 @@
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   }
   // The chips that only show in states this page does not build (a grouped
-  // view, a custom layout, a snapshot, a version preview, Rows = None) are put
-  // on screen by hand: their keys are what is under test, not when they show.
+  // view, a custom layout, a snapshot, a version preview, Rows = None - and,
+  // since 2026-10-19 (colscard), "no pivot", which shows only where a pivot
+  // means something) are put on screen by hand: their keys are what is under
+  // test, not when they show.
   function forceChips() {
-    $('#sbGroup, #sbCustomCols, #sbSnapshot, #sbAsOf, #sbTableHidden').css('display', 'inline-flex');
+    $('#sbGroup, #sbCustomCols, #sbSnapshot, #sbAsOf, #sbTableHidden, #sbPivot').css('display', 'inline-flex');
     $('#sbCustomColsSave').show();
   }
   // Counts the keys that get past their target all the way to the document
@@ -100,24 +102,29 @@
   // ------------------------------------------------------------------------
   // E. Enter / Space in the Cols segment.
   async function phaseE() {
-    var seg = $1('#sbColsSeg'), opener = $1('#sbColsOpen'), gear = $1('#sbColsSeg .sb-cols-gear-wrap');
-    if (!seg || !opener || !gear || !$1('#sbCustomColsPop')) { rec('E0 the Cols segment, its two openers and its cards are on the page', false, 'lift found no Cols segment'); return; }
+    var seg = $1('#sbColsSeg'), opener = $1('#sbColsOpen');
+    if (!seg || !opener || !$1('#sbColsPop') || !$1('#sbCustomColsPop')) { rec('E0 the Cols segment, its count, the Columns card and the chips\' cards are on the page', false, 'lift found no Cols segment / Columns card'); return; }
 
-    // E1 - the panel's own openers keep working from the keyboard.
+    // E1 - the count opens and closes its Columns card from the keyboard (2026-10-19,
+    // colscard: the gear is gone); the card's button is left its own keys.
     closeAll();
-    var a = key(opener, 'Enter'), o1 = panelOpen();
-    var b = key(opener, 'Enter'), o2 = panelOpen();
-    var c = key(gear, ' '), o3 = panelOpen();
-    var d = key(gear, 'Enter'), o4 = panelOpen();
-    rec('E1 Enter and Space on the panel\'s two openers - the Cols count and the gear - open and close the Column & Settings panel',
-      a.defaultPrevented && o1 && b.defaultPrevented && !o2 && c.defaultPrevented && o3 && d.defaultPrevented && !o4,
-      'cols Enter ' + a.defaultPrevented + '/' + o1 + ', again ' + b.defaultPrevented + '/' + o2 + '; gear Space ' + c.defaultPrevented + '/' + o3 + ', Enter ' + d.defaultPrevented + '/' + o4);
+    var a = key(opener, 'Enter'), o1 = colsCard('sb-cl-open', 'sbColsPop'), p1 = panelOpen();
+    var b = key(opener, ' '), o2 = colsCard('sb-cl-open', 'sbColsPop'), p2 = panelOpen();
+    var gone = !$1('#sbColsSeg .sb-cols-gear-wrap');
+    closeAll();
+    $('#sbColsOpen').trigger('click');
+    var c = key($1('#sbColsSettings'), 'Enter'), p3 = panelOpen();
+    closeAll();
+    rec('E1 Enter and Space on the Cols count open and close its Columns card, never the panel; Enter on the card\'s "Open the Column & Settings panel..." is left to the button; no gear',
+      a.defaultPrevented && o1 && !p1 && b.defaultPrevented && !o2 && !p2 && !c.defaultPrevented && !p3 && gone,
+      'count Enter ' + a.defaultPrevented + '/card ' + o1 + '/panel ' + p1 + ', Space ' + b.defaultPrevented + '/card ' + o2 + '/panel ' + p2 + '; card button Enter prevented=' + c.defaultPrevented + ' panel=' + p3 + '; gear gone=' + gone);
 
     // E2 - every button inside every card keeps its keys. Each card is opened
     // the way its chip opens it, so lists the chip renders (the grouping card's
     // columns) are there too; the pivot card by its class (with no presets, the
     // chip goes straight to the pivot builder instead).
     var cards = [
+      ['columns', 'sbColsPop', function () { $('#sbColsOpen').trigger('click'); }],
       ['frozen', 'sbFrozenPop', function () { $('#sbFrozen').trigger('click'); }],
       ['pivot', 'sbPivotPop', function () { $('#sbColsSeg').addClass('sb-pp-open'); }],
       ['grouping', 'sbGroupPop', function () { $('#sbGroup').trigger('click'); }],
@@ -222,6 +229,22 @@
         'opened=' + opened + ' focusedIn=' + focused + ' -> open=' + still + ' prevented=' + ev.defaultPrevented + ' heardBelow=' + heard +
         ' focus=' + focusId() + ' expanded=' + exp + ' barLift=' + lift + ' tipsOff=' + tips);
     }
+
+    // X15 (2026-10-19, colscard) - the Columns card the Cols count opens. Its own id
+    // (not X10): the ids after X9 already name the checks below.
+    closeAll(); forceChips();
+    $('#sbColsOpen').trigger('click');
+    var clOpened = colsCard('sb-cl-open', 'sbColsPop');
+    var clBtn = $1('#sbColsSettings');
+    if (clBtn) clBtn.focus();
+    var clFocused = !!clBtn && document.activeElement === clBtn;
+    var clEsc0 = window.__docEsc, clEv = key(document.activeElement || document.body, 'Escape');
+    var clStill = colsCard('sb-cl-open', 'sbColsPop');
+    rec('X15 Escape closes the Columns card, hands focus back to the Cols count, and goes no further',
+      clOpened && clFocused && !clStill && clEv.defaultPrevented && window.__docEsc - clEsc0 === 0 && document.activeElement === $1('#sbColsOpen') &&
+      $('#sbColsOpen').attr('aria-expanded') === 'false' && !$('#pnbStatusBar').hasClass('sb-pop-open') && !document.body.classList.contains('sb-tips-suppressed'),
+      'opened=' + clOpened + ' focusedIn=' + clFocused + ' -> open=' + clStill + ' prevented=' + clEv.defaultPrevented + ' heardBelow=' + (window.__docEsc - clEsc0) +
+      ' focus=' + focusId() + ' expanded=' + $('#sbColsOpen').attr('aria-expanded'));
 
     // Focus elsewhere: the card closes, focus stays where it is.
     closeAll(); forceChips();

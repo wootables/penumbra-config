@@ -10,7 +10,7 @@
  *   --live  where index.php / main.js / the dashboard files are read when --app lacks them
  *   --out   scratch dir for renders, caches and the coverage report (default: %TEMP%\helpv2_<stamp>)
  *
- * Runs lint_help (L*), equiv_help (E* / P*), retrieval_smoke (R*), the jump harness (J1 on
+ * Runs lint_help (L*), equiv_help (E*), retrieval_smoke (R*), the jump harness (J1 on
  * --app's js/main.js when it carries the 2026-10-14 patch, J2 the control on --orig's main.js)
  * and the coverage map (report only), then prints RESULT: GREEN or RED. With --mutants every
  * mutant copies --app, breaks one thing and must turn its own checks red and nothing else: the
@@ -51,6 +51,16 @@ function jumpHarness($mainJs, $outDir, $control) {
     return array(strpos($text, 'RESULT: GREEN') !== false, $text);
 }
 
+/** Run the hover-tip harness (2026-10-19, helptip) through PowerShell; returns array(ok, text). */
+function tipHarness($mainJs, $outDir, $control) {
+    $ps1 = str_replace('/', '\\', __DIR__ . '/tip_harness.ps1');
+    $here = str_replace('/', '\\', __DIR__);
+    $cmd = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create([IO.File]::ReadAllText(\'' . $ps1 . '\'))) -MainJs \'' . str_replace('/', '\\', $mainJs) . '\' -Here \'' . $here . '\' -Out \'' . str_replace('/', '\\', $outDir) . '\'' . ($control ? ' -ExpectControl' : '') . '" 2>&1';
+    exec($cmd, $lines, $code);
+    $text = implode("\n", $lines);
+    return array(strpos($text, 'RESULT: GREEN') !== false, $text);
+}
+
 /** Run the Ask page's client harness through PowerShell; returns array(ok, text). */
 function askHarness($app, $outDir) {
     $ps1 = str_replace('/', '\\', __DIR__ . '/ask_harness.ps1');
@@ -61,7 +71,7 @@ function askHarness($app, $outDir) {
     return array(strpos($text, 'RESULT: GREEN') !== false, $text);
 }
 
-echo "helpv2 suite (phase $phase): app=$app orig=$orig out=$out\n";
+echo "helpv2 suite (phase $phase): app=$app out=$out (orig=$orig, unused since the v1 help went, 2026-10-19)\n";
 $fails = 0;
 $lint = child($php, 'lint_help.php', '--app=' . escapeshellarg($app) . ' --live=' . escapeshellarg($live) . ' --php=' . escapeshellarg($php));
 echo $lint['out'] . "\n"; $fails += (int)$lint['code'];
@@ -101,6 +111,26 @@ if (!isset($o['skip-jump'])) {
     }
 }
 
+// Tip harness (2026-10-19, helptip): K1 on the tree under test, K2 the control (the unpatched main.js must fail exactly T1).
+if (!isset($o['skip-jump'])) {
+    $mj = hv_locate('js/main.js', $app, '');
+    if ($mj && strpos(hv_read($mj), '(2026-10-19, helptip)') !== false) {
+        list($ok1, $t1) = tipHarness($mj, "$out/tip_patched", false);
+        printf("  %-5s %-8s %s\n", $ok1 ? 'PASS' : 'FAIL', 'K1', 'tip harness on ' . $mj . ($ok1 ? ' (T1-T4 green)' : ": \n" . $t1));
+        if (!$ok1) $fails++;
+        $origJs = hv_locate('js/main.js', $orig, $live);
+        if ($origJs && strpos(hv_read($origJs), '(2026-10-19, helptip)') === false) {
+            list($ok2, $t2) = tipHarness($origJs, "$out/tip_control", true);
+            printf("  %-5s %-8s %s\n", $ok2 ? 'PASS' : 'FAIL', 'K2', 'control: the unpatched main.js fails exactly T1' . ($ok2 ? '' : ": \n" . $t2));
+            if (!$ok2) $fails++;
+        } else {
+            echo "  INFO  K2       no unpatched main.js to run as the control\n";
+        }
+    } else {
+        echo "  INFO  K1       js/main.js under --app has no helptip patch: harness skipped\n";
+    }
+}
+
 if (!isset($o['skip-coverage'])) {
     $cv = child($php, 'coverage_help.php', '--app=' . escapeshellarg($app) . ' --live=' . escapeshellarg($live) . ' --out=' . escapeshellarg($out . '/coverage_report.md'));
     echo $cv['out'] . "\n";
@@ -125,31 +155,29 @@ if (isset($o['mutants'])) {
             'php-error'         => array('edits' => array(array('help/topics/copyHelpLightbox.php', "<?php if (pnb_help_show('writer')):", "<?php if (pnb_help_show('writer'):", 2)), 'expect' => array('L9', 'E-php'), 'allow' => $anyE),
         );
     } elseif ($phase >= 2) {
-        // Phase 2 rewrote the viewer topics (LF, tier standard): the anchors below live in rewritten
-        // files, P7 no longer fires for them (they are "touched"), and two new mutants prove the
-        // rewrite guards: P9 (a dropped fact token) and L16 (a paragraph over the budget).
+        // Phase 2 rewrote the viewer topics (LF, tier standard). The v1 comparison (P1-P9, E7) retired on
+        // 2026-10-19 with the v1 help body: text-drift, fact-dropped and phase3-chart-id went with it, and
+        // the P* ids below survive only in allow lists.
         $anyP2 = array_merge($anyP, array('P9', 'L16'));
         $M = array(
             'audience-mismatch' => array('edits' => array(array('help/topics/sqlHelpLightbox.php', 'class="help-topic" data-audience="writer"', 'class="help-topic" data-audience="viewer"', 1)), 'expect' => array('L3'), 'allow' => array('A6')),
             'dangling-jump'     => array('edits' => array(array('help/topics/pivotBuilderHelpLightbox.php', 'data-jump-to="pvh-presets"', 'data-jump-to="pvh-presetz"', 1)), 'expect' => array('L5'), 'allow' => array()),
-            'missing-fragment'  => array('edits' => array(array('help/topics/saveIdHelpLightbox.php', null, null, 0)), 'expect' => array('L1', 'P1', 'E4a', 'E5'), 'allow' => array('P2', 'P5', 'P6', 'P7', 'L16', 'P9')),
-            'dup-id'            => array('edits' => array(array('help/topics/groupingHelpLightbox.php', 'id="grh-opening"', 'id="grh-overview"', 1)), 'expect' => array('L4', 'L5', 'P2'), 'allow' => array()),
+            'missing-fragment'  => array('edits' => array(array('help/topics/saveIdHelpLightbox.php', null, null, 0)), 'expect' => array('L1', 'E4a', 'E5'), 'allow' => array('L16')),
+            'dup-id'            => array('edits' => array(array('help/topics/groupingHelpLightbox.php', 'id="grh-opening"', 'id="grh-overview"', 1)), 'expect' => array('L4', 'L5'), 'allow' => array()),
             'unbalanced-div'    => array('edits' => array(array('help/topics/emailHelpLightbox.php', "    </div>\n</div>\n", "    </div>\n", 1)), 'expect' => array('L8'), 'allow' => array_merge($anyE, $anyP2)),
-            'text-drift'        => array('edits' => array(array('help/topics/whatIsPenumbraLightbox.php', 'Democratized Analytics', 'Democratised Analytics', 1)), 'expect' => array('P7'), 'allow' => array()),
-            'anchor-removed'    => array('edits' => array(array('help/topics/groupingHelpLightbox.php', ' id="grh-opening"', '', 1)), 'expect' => array('P2', 'L5'), 'allow' => array()),
+            'anchor-removed'    => array('edits' => array(array('help/topics/groupingHelpLightbox.php', ' id="grh-opening"', '', 1)), 'expect' => array('L5'), 'allow' => array()),
             'canonical-dangling'=> array('edits' => array(array('help/topics/saveSecurityHelpLightbox.php', 'data-canonical-ref="access-list-entries"', 'data-canonical-ref="access-list-entriez"', 1)), 'expect' => array('L14'), 'allow' => array()),
             'gate-leak'         => array('edits' => array(array('help/topics/pivotBuilderHelpLightbox.php', "pnb_help_show('writer')", 'true', 2)), 'expect' => array('E3c'), 'allow' => array()),
-            'shim-missing'      => array('edits' => array(array('help_content.php', "if (pnb_help_v2_active()) { require __DIR__ . '/help/loader.php'; return; }\r\n", '', 1)), 'expect' => array('L13', 'E0', 'E3a', 'E3c', 'E4b'), 'allow' => array_merge($anyE, $anyP2)),
+            // 2026-10-19: the shim is all help_content.php is; without its loader line the body is empty (L13, and every gate render sees no topic)
+            'shim-missing'      => array('edits' => array(array('help_content.php', "require __DIR__ . '/help/loader.php';\r\n", '', 1)), 'expect' => array('L13', 'E0', 'E3a', 'E3b', 'E4a', 'E4b', 'E5'), 'allow' => array_merge($anyE, $anyP2)),
             // phase 7 (2026-10-15): the Copy topic's PHP-stub block became admin-gated, so one writer gate remains to break
             'php-error'         => array('edits' => array(array('help/topics/copyHelpLightbox.php', "<?php if (pnb_help_show('writer')):", "<?php if (pnb_help_show('writer'):", 1)), 'expect' => array('L9', 'E-php'), 'allow' => array_merge($anyE, $anyP2)),
-            'fact-dropped'      => array('edits' => array(array('help/topics/dashboardsHelpLightbox.php', '<code>Data Feed for pi_name</code>', '<code>Data Feed for pi_nam</code>', 1)), 'expect' => array('P9'), 'allow' => array()),
             'long-paragraph'    => array('edits' => array(array('help/topics/dashboardsHelpLightbox.php', '<h4 id="dsh-notes"', '<p>' . trim(str_repeat('ninety words of filler ', 30)) . '</p><h4 id="dsh-notes"', 1)), 'expect' => array('L16'), 'allow' => array()),
             // phase 3 (2026-10-15): the writer/admin rewrites. A cell over budget in the Scheduler book -> L16; the
             // recipient-variables chart id (main.js clones #pnbRecipientVarsChart into two other topics) -> P2; an id an
             // index.php help icon targets (dbDumpHelp-destination) -> P2 + L5.
             'phase3-long-cell'  => array('edits' => array(array('help/topics/schedulerHelpLightbox.php', 'max-width: none;">1</td>', 'max-width: none;">1 ' . trim(str_repeat('eighty words of filler ', 27)) . '</td>', 1)), 'expect' => array('L16'), 'allow' => array()),
-            'phase3-chart-id'   => array('edits' => array(array('help/topics/schedulerPromptHelpLightbox.php', 'id="pnbRecipientVarsChart"', 'id="pnbRecipientVarsChartX"', 1)), 'expect' => array('P2'), 'allow' => array()),
-            'phase3-icon-anchor'=> array('edits' => array(array('help/topics/schedulerHelpLightbox.php', 'id="dbDumpHelp-destination"', 'id="dbDumpHelp-destinatio"', 1)), 'expect' => array('P2', 'L5'), 'allow' => array()),
+            'phase3-icon-anchor'=> array('edits' => array(array('help/topics/schedulerHelpLightbox.php', 'id="dbDumpHelp-destination"', 'id="dbDumpHelp-destinatio"', 1)), 'expect' => array('L5'), 'allow' => array()),
             // phase 4 (2026-10-15): the Custom Code reference is generated from help/snippets.php. A registry edit
             // without a regeneration -> L17; a registry name that is not an editor function -> L18 (+ L17, stale).
             'registry-stale'    => array('edits' => array(array('help/snippets.php', "'summary' => 'Counts rows matching", "'summary' => 'Counts the rows matching", 1)), 'expect' => array('L17'), 'allow' => array()),

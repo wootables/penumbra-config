@@ -60,6 +60,15 @@
       { name: 'I5', formula: '{B} / {@K}', input: { name: 'k', value: 7, min: 0, max: 5, step: 0.5 } },
       { name: 'I6', formula: '{@K} & "x" & {@r}', format: 'text', input: { name: 'BAD', value: 'abc' } },
       { name: 'I7', formula: '{A} + {@S}', format: 'percent', input: { name: 'S', value: '1e3', min: 9, max: 1 } }] });
+    // (2026-10-19, round 5) a DATE value: J1 carries ASOF (read as a date from its value), J2 a
+    // bounded CUT in US spelling, J3 / J4 use them, J5 multiplies a date (blank), J6's value is
+    // neither a number nor a date (dropped, J6 left out), J7's is over its highest (kept to it)
+    sets.push({ id: 'dateInputs', defs: [
+      { name: 'J1', formula: 'DAYS({@ASOF}, {D1})', input: { name: 'ASOF', value: '2026-10-31' } },
+      { name: 'J2', formula: 'IF({D1} < {@CUT}, "before", "after")', format: 'text', input: { name: 'cut', kind: 'date', value: '10/15/2026', min: '2026-01-01', max: '2026-12-31', step: 7 } },
+      { name: 'J3', formula: '{@ASOF} + 30' }, { name: 'J4', formula: '{@CUT} & ""', format: 'text' }, { name: 'J5', formula: '{A} * {@ASOF}' },
+      { name: 'J6', formula: '{A} + {@NOPE}', input: { name: 'NOPE', value: '2026-13-45' } },
+      { name: 'J7', formula: 'DAYS({@LATE}, {D2})', input: { name: 'LATE', kind: 'date', value: '2027-06-01', max: '2026-12-31' } }] });
     // ---- run them
     var C = window.PenumbraCalc;
     sets.forEach(function (set) {

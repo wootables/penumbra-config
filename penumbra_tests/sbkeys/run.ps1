@@ -6,16 +6,17 @@
 # test (the profile segment is server-rendered PHP: harness.html carries a stub
 # with its structure, the admin-tools split menu included).
 #
-#   Enter / Space  the Column & Settings panel opens from its two openers only
-#                  (the Cols count, the gear); a chip or a control inside a card
-#                  keeps its keys. Until 2026-10-01 the segment's keydown handler
+#   Enter / Space  the Cols count opens its Columns card (2026-10-19, colscard: until
+#                  then the count and a gear opened the Column & Settings panel; the
+#                  gear is gone, the card's button opens the panel); a chip or a
+#                  control inside a card keeps its keys. Until 2026-10-01 the segment's keydown handler
 #                  took every key it did not have on a skip list: Enter on "Save
 #                  my customizations..." opened the panel and never saved, Enter
 #                  on the custom-layout chip opened its card AND the panel, the
 #                  snapshot chip had no keys at all.
-#   Escape         closes the open card - all nine: Data, query time, profile,
+#   Escape         closes the open card - all ten: Data, query time, profile,
 #                  and the frozen / pivot / grouping / custom-layout / snapshot /
-#                  as-of cards - hands focus back to its trigger and goes no
+#                  as-of cards, and the Columns card (X15) - hands focus back to its trigger and goes no
 #                  further. main.js's Escape chain eats the key at document
 #                  capture, so the bar's listener is on WINDOW, capture phase;
 #                  until 2026-10-01 only the frozen card had one.
@@ -25,7 +26,8 @@
 #   real half     real_keys.py over CDP: REAL key presses (Input.dispatchKeyEvent),
 #                 which is what shows a button's own click really fires.
 #
-#   run.ps1                      live files     EXPECTED: browser 22 / 0, real 10 / 0
+#   run.ps1                      live files     EXPECTED: browser 23 / 0, real 10 / 0 (since colscard, 2026-10-19;
+#                                22 / 0 before it - the CONTROL below is from the build before 10-01)
 #   run.ps1 -MainJs <p> [-IndexPhp <p>] [-MainCss <p>]    other copies (a stage build)
 #   CONTROL: -MainJs js\main.js.bak-20261001-sbkeys (the build before the fix) = browser 7 / 15,
 #                                real 2 / 8 - only S1 E1 E6 X4 X11 X14 Z1 and R6 R10 pass: the
@@ -68,22 +70,26 @@ $NL = "`r`n"
 # 'a' + $NL + 'b', 'c' is 'a' + $NL + ('b', 'c') - one mangled string, not a pair.
 $mutantDefs = [ordered]@{
   # Enter / Space
-  'wl'        = @{ edits = @(,@(('            if (!$(e.target).closest(''#sbColsOpen, .sb-cols-gear-wrap'').length) return;' + $NL), '')); red = @('E2','R1','R2','R3','R4') }
-  'wlgear'    = @{ edits = @(,@('closest(''#sbColsOpen, .sb-cols-gear-wrap'').length) return;', 'closest(''#sbColsOpen'').length) return;')); red = @('E1') }
+  # (colscard, 2026-10-19) the whitelist names the count alone - the gear is gone
+  'wl'        = @{ edits = @(,@(('            if (!$(e.target).closest(''#sbColsOpen'').length) return;' + $NL), '')); red = @('E2','R1','R2','R3','R4') }
+  # ...and its keys open the Columns card, not the panel (the card's button opens that)
+  'wlcard'    = @{ edits = @(,@('            if ($(this).hasClass(''sb-cl-ready'')) _sbColsToggle();', '            if (false) _sbColsToggle();')); red = @('E1','R6') }
   'ccstop'    = @{ edits = @(,@(('        $(''#sbCustomCols'').on(''keydown'', function (e) {' + $NL + '            if (e.which === 13 || e.which === 32) { e.preventDefault(); e.stopPropagation(); $(this).trigger(''click''); }'),
                                  ('        $(''#sbCustomCols'').on(''keydown'', function (e) {' + $NL + '            if (e.which === 13 || e.which === 32) { e.preventDefault(); $(this).trigger(''click''); }'))); red = @('E3') }
   'thstop'    = @{ edits = @(,@(('        $(''#sbTableHidden'').on(''keydown'', function (e) {' + $NL + '            if (e.which === 13 || e.which === 32) { e.preventDefault(); e.stopPropagation(); $(this).trigger(''click''); }'),
                                  ('        $(''#sbTableHidden'').on(''keydown'', function (e) {' + $NL + '            if (e.which === 13 || e.which === 32) { e.preventDefault(); $(this).trigger(''click''); }'))); red = @('E4') }
   'snapkey'   = @{ edits = @(,@('    $(document).on(''keydown'', ''#sbSnapshot'', function (e) {', '    $(document).on(''keydown'', ''#sbSnapshotX'', function (e) {')); red = @('E5','R9') }
   # Escape
-  'escdoc'    = @{ edits = @(,@(('        window.addEventListener(''keydown'', function (e) {' + $NL + '            if (e.key !== ''Escape'''), ('        document.addEventListener(''keydown'', function (e) {' + $NL + '            if (e.key !== ''Escape'''))); red = @('X1','X2','X3','X4','X5','X6','X7','X8','X9','X10','X13','R7','R8') }
+  # (2026-10-19) three lines: since 10-07 the Subscribe tip has a window Escape listener whose first two lines read the same
+  'escdoc'    = @{ edits = @(,@(('        window.addEventListener(''keydown'', function (e) {' + $NL + '            if (e.key !== ''Escape'' || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;' + $NL + '            // The popped-out console'), ('        document.addEventListener(''keydown'', function (e) {' + $NL + '            if (e.key !== ''Escape'' || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;' + $NL + '            // The popped-out console'))); red = @('X1','X2','X3','X4','X5','X6','X7','X8','X9','X10','X13','X15','R7','R8') }
   'escsegs'   = @{ edits = @(,@('            $(POP_SEGS).filter(''.sb-open'').each(function () {', '            $([]).each(function () {')); red = @('X1','X2','X3','X13','R8') }
   'escgrp'    = @{ edits = @(,@(('            [''sb-grp-open'', ''#sbGroup'', ''#sbGroupPop''],' + $NL), '')); red = @('X6') }
   'escfrz'    = @{ edits = @(,@(('            [''sb-frz-open'', ''#sbFrozen'', ''#sbFrozenPop''],' + $NL), '')); red = @('X4') }
+  'esccl'     = @{ edits = @(,@(('            [''sb-cl-open'', ''#sbColsOpen'', ''#sbColsPop''],' + $NL), '')); red = @('X15') }
   'escsnap'   = @{ edits = @(,@(('            $cols.removeClass(''sb-snap-open sb-asof-open'');' + $NL), '')); red = @('X8','X9') }
   # (Not X1 / X2: the Data and query-time popovers hold nothing focusable, so focus
   # in them is always on the segment - their trigger - and stays there anyway.)
-  'escfocus'  = @{ edits = @(,@('                if (open[i].inside && open[i].trigger) { $(open[i].trigger).trigger(''focus''); break; }', '')); red = @('X3','X4','X5','X6','X7','X8','X9','X13','R7') }
+  'escfocus'  = @{ edits = @(,@('                if (open[i].inside && open[i].trigger) { $(open[i].trigger).trigger(''focus''); break; }', '')); red = @('X3','X4','X5','X6','X7','X8','X9','X13','X15','R7') }
   'escmod'    = @{ edits = @(,@(('            if (e.key !== ''Escape'' || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;' + $NL + '            // The popped-out console'), ('            if (e.key !== ''Escape'') return;' + $NL + '            // The popped-out console'))); red = @('X12') }
   'escreplay' = @{ edits = @(,@(('            if (e.target === document) return;' + $NL), '')); red = @('X14') }
   'escmenu'   = @{ edits = @(,@(('            if (menu) {' + $NL + '                var caret'), ('            if (false) {' + $NL + '                var caret'))); red = @('X13') }

@@ -90,11 +90,11 @@
       ['nextPageBtn', '(J or Alt+Page Down) Next Page'],
       ['headerToggleHandle', '(H or F2) Toggle Header Visibility'],
       ['settingsPanelHandle', '(S or CTRL+,) Column & Settings Panel'],
-      ['clearTableSearch', '(X) Clear search'],
+      ['clearTableSearch', ['(X) Clear search', '(X) Clear the filter']],   // the filter's words: penumbra_tests\filterword (2026-10-19)
       ['toggleAiPanel', '(A or Ctrl+Shift+A) Ask AI Assistant']
     ];
     var bad = [];
-    ex.forEach(function (p) { var t = openTip(byId(p[0])); if (t.text !== p[1]) bad.push(p[0] + '=' + JSON.stringify(t.text)); });
+    ex.forEach(function (p) { var t = openTip(byId(p[0])); if ([].concat(p[1]).indexOf(t.text) < 0) bad.push(p[0] + '=' + JSON.stringify(t.text)); });
     rec('T1 switch on: the tooltip names the key inside the title\'s own prefix - "(P or CTRL+SHIFT+P) Create a Pivot Table", "(X) Clear search"', bad.length === 0, bad.join(' | ') || 'all 6 exact');
 
     var bad2 = [], written = [];
@@ -258,7 +258,7 @@
     var kb = byId('tableSearchKey');
     if (kb) return getComputedStyle(kb).display;
     var sb = byId('tableSearch');
-    return (sb && /Type \/ to search/.test(sb.getAttribute('placeholder') || '')) ? 'shown' : 'none';
+    return (sb && /Type \/ to (?:search|filter)/.test(sb.getAttribute('placeholder') || '')) ? 'shown' : 'none';   // filter: filterword (2026-10-19)
   }
   function badges() {
     var h = byId('pnlFilterKey');
@@ -339,7 +339,8 @@
     var r = sb.getAttribute('placeholder');
     if (wasHidden) $box.hide();
     rec('L2 focused, it names the "/" that opens the builder from the empty box; left, the resting words come back',
-        f === 'Type to search, or press / for the Visual Search Builder' && /Type \/ to search/.test(r || ''), JSON.stringify([f, r]));
+        // the old words or the filter's (penumbra_tests\filterword 2026-10-19 pins those)
+        (f === 'Type to search, or press / for the Visual Search Builder' || f === 'Type to filter, or press / for the Visual Filter Builder') && /Type \/ to (?:search|filter)/.test(r || ''), JSON.stringify([f, r]));
   }
 
   async function main() {

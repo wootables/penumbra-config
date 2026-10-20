@@ -14,8 +14,9 @@
 #  R. repository: Theme, Density, Single-Key Shortcuts shown; Consistent Row
 #     Height, Deep Link Vendor Codes, the Columns section, Save Column Layout /
 #     Reset and "Clear All Custom Preferences For This Report" hidden; the bar's
-#     settings opener + gear shown, every report chip (frozen, nesting, pivot,
-#     group, earlier version, snapshot) hidden even when main.js shows it; Data and
+#     settings opener shown (its gear went 2026-10-19, colscard), every report chip
+#     (frozen, nesting, pivot, group, earlier version, snapshot) and the Columns card
+#     hidden even when main.js shows them, the count's caret too; Data and
 #     Queried are not buttons (no role/tabindex), take no clicks, show no caret.
 #  P. a report page: everything above is exactly as before (all shown, buttons).
 #  J. main.js names the default option "(the app default)" on the repository page.
@@ -40,10 +41,11 @@ F = {'idx': rd('index.php'), 'css': rd('css/main.css'), 'main': rd('js/main.js')
 
 MUTANTS = {
     'nocss':      ('css', 'body.pnb-repo-mode #settingsPanel :is(.sp-columns-section, .sp-actions, .sp-danger-zone),', ''),
-    'nochips':    ('css', 'body.pnb-repo-mode #sbColsSeg > :not(#sbColsOpen):not(.sb-cols-gear-wrap),', ''),
+    'nochips':    ('css', 'body.pnb-repo-mode #sbColsSeg > :not(#sbColsOpen),', ''),
+    'nocaret':    ('css', 'body.pnb-repo-mode #sbColsOpen .sb-cl-caret,', ''),
     'notoggles':  ('css', 'body.pnb-repo-mode .sp-toggle-with-help:has(#spResolverToggle),', ''),
     'databtn':    ('main', ".removeClass('sb-click').removeAttr('role tabindex aria-haspopup aria-expanded');", ";"),
-    'notitle':    ('main', "$('#sbColsOpen, #sbColsSeg .sb-cols-gear-wrap').attr('title', 'Open the Settings panel (theme & density)');", ""),
+    'notitle':    ('main', "$('#sbColsOpen').attr('title', 'Open the Settings panel (theme & density)');", ""),
     'label':      ('main', "' (the app default)'", "\" (this report's default)\""),
 }
 if MUTANT:
@@ -85,8 +87,10 @@ try:
     open(os.path.join(work, 'repo.js'), 'wb').write(('jQuery(function ($) {\n' + REPOJS + '\nwindow.ready = true;\n});').encode('utf-8', 'surrogateescape'))
     script = '''<script>
 window.vis = function (sel) { var e = document.querySelector(sel); if (!e) return null; if (!e.getClientRects().length) return false; for (var p = e; p; p = p.parentElement) { var cs = getComputedStyle(p); if (cs.display === 'none' || cs.visibility === 'hidden') return false; } return true; };
-// what main.js does at runtime: show the chips it manages
-['#sbFrozen', '#sbGroup', '#sbAsOf', '#sbSnapshot'].forEach(function (s) { var e = document.querySelector(s); if (e) e.style.display = ''; });
+// what main.js does at runtime: show the chips it manages (nesting and pivot are
+// hidden in the markup too since colscard), and an open Columns card with its caret
+['#sbFrozen', '#sbGroup', '#sbAsOf', '#sbSnapshot', '#sbNested', '#sbPivot'].forEach(function (s) { var e = document.querySelector(s); if (e) e.style.display = ''; });
+(function () { var s = document.getElementById('sbColsSeg'); if (s) s.classList.add('sb-cl-ready', 'sb-cl-open'); })();
 </script><script src="jquery.js"></script><script src="repo.js"></script>'''
     for name, repo in (('repo.html', True), ('report.html', False)):
         body_cls = 'pnb-repo-mode theme-wolfpack' if repo else 'theme-wolfpack'
@@ -95,29 +99,29 @@ window.vis = function (sel) { var e = document.querySelector(sel); if (!e) retur
         open(os.path.join(work, name), 'wb').write(html.encode('utf-8', 'surrogateescape'))
     SHOW = ['#spThemeSelector', '#spDensitySelector', '#spSingleKeysToggle + .sp-switch']
     REPORT_ONLY = ['#spRowExpandToggle + .sp-switch', '#spResolverToggle + .sp-switch', '.sp-columns-section', '#spApply', '#spReset', '#spClearStorage']
-    CHIPS = ['#sbFrozen', '#sbNested', '#sbPivot', '#sbGroup', '#sbAsOf', '#sbSnapshot']
+    CHIPS = ['#sbFrozen', '#sbNested', '#sbPivot', '#sbGroup', '#sbAsOf', '#sbSnapshot', '#sbColsPop']
     b = Browser(work, port=9300 + os.getpid() % 400)
     try:
         print('== R. repository page')
         b.load('repo.html')
-        v = {s: b.ev('vis(%s)' % json.dumps(s)) for s in SHOW + REPORT_ONLY + CHIPS + ['#sbColsOpen', '.sb-cols-gear-wrap', '#sbDataSeg', '#sbLoadSeg', '#sbDataSeg .sb-caret']}
+        v = {s: b.ev('vis(%s)' % json.dumps(s)) for s in SHOW + REPORT_ONLY + CHIPS + ['#sbColsOpen', '#sbColsOpen .sb-cl-caret', '.sb-cols-gear-wrap', '#sbDataSeg', '#sbLoadSeg', '#sbDataSeg .sb-caret']}
         ok(all(v[s] for s in SHOW), 'R Theme, Density and Single-Key Shortcuts are offered  %s' % [v[s] for s in SHOW])
         bad = [s for s in REPORT_ONLY if v[s]]
         ok(not bad, 'R row height, vendor links, Columns, Save Column Layout, Reset, Clear All ... For This Report are gone  %s' % (bad or ''))
         bad = [s for s in CHIPS if v[s]]
-        ok(not bad, 'R no frozen / nesting / pivot / group / earlier-version / snapshot chip, even when main.js shows one  %s' % (bad or ''))
-        ok(v['#sbColsOpen'] and v['.sb-cols-gear-wrap'], 'R the bar keeps its settings opener and gear')
+        ok(not bad, 'R no frozen / nesting / pivot / group / earlier-version / snapshot chip and no Columns card, even when main.js shows them  %s' % (bad or ''))
+        ok(v['#sbColsOpen'] and v['.sb-cols-gear-wrap'] is None and not v['#sbColsOpen .sb-cl-caret'], 'R the bar keeps its settings opener, with no caret; the gear is gone (2026-10-19)  [%s]' % v['#sbColsOpen .sb-cl-caret'])
         t = b.ev("document.getElementById('sbColsOpen').title")
-        ht = b.ev("document.getElementById('settingsPanelHandle').title"); gt = b.ev("document.querySelector('#sbColsSeg .sb-cols-gear-wrap').title")
-        ok(t == gt == 'Open the Settings panel (theme & density)' and ht == '(CTRL+,) Settings Panel', 'R the opener, gear and handle say what the panel holds  [%s | %s]' % (t, ht))
+        ht = b.ev("document.getElementById('settingsPanelHandle').title")
+        ok(t == 'Open the Settings panel (theme & density)' and ht == '(CTRL+,) Settings Panel', 'R the opener and handle say what the panel holds  [%s | %s]' % (t, ht))
         attrs = b.ev("JSON.stringify(['sbDataSeg','sbLoadSeg'].map(function(i){var e=document.getElementById(i);return [e.getAttribute('role'), e.getAttribute('tabindex'), getComputedStyle(e).pointerEvents, e.title]}))")
         attrs = json.loads(attrs)
         ok(v['#sbDataSeg'] and v['#sbLoadSeg'] and all(x[0] is None and x[1] is None and x[2] == 'none' for x in attrs) and not v['#sbDataSeg .sb-caret'],
            'R Data and Queried stay as dummies: no button role, not focusable, no clicks, no caret  %s' % attrs)
         print('== P. a report page (unchanged)')
         b.load('report.html')
-        v = {s: b.ev('vis(%s)' % json.dumps(s)) for s in SHOW + REPORT_ONLY + ['#sbFrozen', '#sbNested', '#sbPivot', '#sbColsOpen', '#sbDataSeg .sb-caret']}
-        bad = [s for s in SHOW + REPORT_ONLY + ['#sbFrozen', '#sbNested', '#sbPivot', '#sbColsOpen', '#sbDataSeg .sb-caret'] if not v[s]]
+        v = {s: b.ev('vis(%s)' % json.dumps(s)) for s in SHOW + REPORT_ONLY + ['#sbFrozen', '#sbNested', '#sbPivot', '#sbColsOpen', '#sbColsOpen .sb-cl-caret', '#sbColsPop', '#sbDataSeg .sb-caret']}
+        bad = [s for s in SHOW + REPORT_ONLY + ['#sbFrozen', '#sbNested', '#sbPivot', '#sbColsOpen', '#sbColsOpen .sb-cl-caret', '#sbColsPop', '#sbDataSeg .sb-caret'] if not v[s]]
         ok(not bad, 'P every panel control and bar chip is still there on a report  %s' % (bad or ''))
         attrs = json.loads(b.ev("JSON.stringify(['sbDataSeg','sbLoadSeg'].map(function(i){var e=document.getElementById(i);return [e.getAttribute('role'), e.getAttribute('tabindex'), getComputedStyle(e).pointerEvents]}))"))
         ht = b.ev("document.getElementById('settingsPanelHandle').title")

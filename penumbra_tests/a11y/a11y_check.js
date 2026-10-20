@@ -29,13 +29,16 @@
  * Opt-ins for page code:
  *   [data-pnb-modal]   put on any dialog container that is toggled hidden/shown
  *                      to get the full modal contract without the lightbox class
- *   PenumbraA11y.sweep()  force an immediate re-sweep after a large render
+ *   PenumbraA11y.sweep()  force an immediate re-sweep after a large render - and
+ *                      after making a node ALREADY on the page one of the targets
+ *                      below (a class or role added to it): since 2026-10-19 the
+ *                      body observer sweeps only the nodes that were added
  */
 (function (window, document) {
     'use strict';
     if (!window || !document || window.PenumbraA11y) { return; }
 
-    var A11y = { version: '2026-09-09' };
+    var A11y = { version: '2026-10-19' };
 
     // WCAG 2.1.4: one app-wide off switch for single printable-key shortcuts
     // ("/" and the PNB_SINGLE_KEYS letters on the report page, "/" in the
@@ -107,17 +110,59 @@
     A11y.stealsHostFocus = stealsHostFocus;
 
     // One debounced body observer drives every sweep below (the sweeps are
-    // idempotent, so running them together costs nothing extra).
-    var sweeps = [], sweepPending = false;
+    // idempotent, so running them together costs nothing extra). It sweeps only
+    // what was ADDED since the last sweep (2026-10-19): a whole-document sweep
+    // walks every element five times - 0.2 s on a 25,000-row report (480,000
+    // elements) - and ran 400 ms after ANY node came or went: a page turn, a
+    // search, the search box's suggestions, a tooltip. Nodes added while the
+    // observers are paused (main.js: a build, a lazy fill, a theme switch) wait
+    // for the sweep its resume nudge starts. Past SWEEP_ROOTS_MAX added roots, one
+    // whole-document sweep is the cheaper (a report's build). jQuery UI's live
+    // regions and tooltips hold plain text: skipped. A11y.sweep() = the whole document.
+    var sweeps = [], sweepPending = false, sweepRoots = [], sweepAll = false, sweepSeq = 0;
+    var SWEEP_ROOTS_MAX = 5000;
+    var SWEEP_SKIP = '.ui-helper-hidden-accessible, .ui-tooltip';
     function runSweeps(root) { for (var i = 0; i < sweeps.length; i++) { try { sweeps[i](root); } catch (e) { } } }
     A11y.sweep = function () { runSweeps(); };
+    // Every element matching sel AT root and under it (the whole document when no root).
+    function inAndUnder(root, sel) {
+        if (!root) { return document.querySelectorAll(sel); }
+        var out = root.firstElementChild ? Array.prototype.slice.call(root.querySelectorAll(sel)) : [];
+        if (root.matches && root.matches(sel)) { out.unshift(root); }
+        return out;
+    }
+    function sweepAdded() {
+        sweepPending = false;
+        var roots = sweepRoots, all = sweepAll;
+        sweepRoots = []; sweepAll = false;
+        if (all) { runSweeps(); return; }
+        var stamp = ++sweepSeq, i;
+        for (i = 0; i < roots.length; i++) { roots[i].__pnbA11yRoot = stamp; }
+        for (i = 0; i < roots.length; i++) {
+            var n = roots[i];
+            if (!n.isConnected) { continue; }
+            // a root inside another one is swept with it
+            var p = n.parentNode, inner = false;
+            while (p && p !== document.body) { if (p.__pnbA11yRoot === stamp) { inner = true; break; } p = p.parentNode; }
+            if (!inner) { runSweeps(n); }
+        }
+    }
     function startObserver() {
         if (!hasMO || !document.body) { return; }
-        new MutationObserver(function () {
-            if (window.__pnbA11ySuspended) { return; } // paused while a theme switch repaints (main.js _spThemeSwitchTail)
-            if (sweepPending) { return; }
+        new MutationObserver(function (muts) {
+            for (var m = 0; m < muts.length && !sweepAll; m++) {
+                var ad = muts[m].addedNodes;
+                for (var a = 0; a < ad.length; a++) {
+                    var n = ad[a];
+                    if (n.nodeType !== 1 || (n.closest && n.closest(SWEEP_SKIP))) { continue; }
+                    if (sweepRoots.length >= SWEEP_ROOTS_MAX) { sweepAll = true; sweepRoots = []; break; }
+                    sweepRoots.push(n);
+                }
+            }
+            if (window.__pnbA11ySuspended) { return; } // paused (main.js: a build, a lazy fill, a theme switch); its nudge resumes
+            if (sweepPending || (!sweepAll && !sweepRoots.length)) { return; }
             sweepPending = true;
-            setTimeout(function () { sweepPending = false; runSweeps(); }, 400);
+            setTimeout(sweepAdded, 400);
         }).observe(document.body, { childList: true, subtree: true });
     }
 
@@ -145,7 +190,7 @@
     // every svg that has no semantic role="img", no aria-label(ledby), and no
     // <title> child as aria-hidden + focusable=false; labelled svgs are left alone.
     function sweepSvgs(root) {
-        var svgs = (root || document).querySelectorAll('svg:not([aria-hidden="true"])');
+        var svgs = inAndUnder(root, 'svg:not([aria-hidden="true"])');
         for (var i = 0; i < svgs.length; i++) {
             var s = svgs[i];
             if (s.getAttribute('role') === 'img') { continue; }
@@ -162,7 +207,7 @@
     // carries aria-sort - so keep screen readers from reading "up-pointing
     // triangle" on every header (2026-09-09).
     function sweepSortIcons(root) {
-        var els = (root || document).querySelectorAll('.sort-icon:not([aria-hidden])');
+        var els = inAndUnder(root, '.sort-icon:not([aria-hidden])');
         for (var i = 0; i < els.length; i++) { els[i].setAttribute('aria-hidden', 'true'); }
     }
     sweeps.push(sweepSortIcons);
@@ -177,7 +222,7 @@
     // .pivot-collapse-toggle keys - keep those OUT of this list.)
     var SELK = '.action-icon, .item-icon[data-action], .remove-access, .group-hide, .sp-sort-item, .chart-drill-popup-item, .chart-drill-popup-secondary, .favorite-icon, .delete-report-btn, .task-status-toggle, .tab-help-icon';
     function enhanceIcons(root) {
-        var els = (root || document).querySelectorAll(SELK);
+        var els = inAndUnder(root, SELK);
         for (var i = 0; i < els.length; i++) {
             var el = els[i];
             if (!el.getAttribute('role')) { el.setAttribute('role', 'button'); }
@@ -386,7 +431,7 @@
             for (var i = 0; i < muts.length; i++) { check(muts[i].target); }
         });
         function watchDialogs(root) {
-            var all = (root || document).querySelectorAll(SEL);
+            var all = inAndUnder(root, SEL);
             for (var j = 0; j < all.length; j++) {
                 var d = all[j];
                 if (d.__pnbWatched) { continue; }
@@ -549,7 +594,7 @@
         var attrObs = hasMO ? new MutationObserver(attrChanged) : null;
         function watchMenus(root) {
             if (!attrObs) { return; }
-            var all = (root || document).querySelectorAll('[role="menu"]');
+            var all = inAndUnder(root, '[role="menu"]');
             for (var i = 0; i < all.length; i++) {
                 var m = all[i];
                 if (m.__pnbMenuWatched) { continue; }

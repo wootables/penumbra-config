@@ -523,8 +523,10 @@ M = {
                    ['H-hdr-mark', 'H-grp-mark'], ['hdrall', 'hdrgroup']),
     'h-hdr-pages': ([('js/main.js', "                if (drawn < total) where += ', on every page';\n", "")],
                     ['H-hdr-pages'], ['hdrpage']),
-    'h-hdr-ingroup': ([('js/main.js', "            var inGroup = !!(tbl && tbl.closest('#groupedResultsContainer')), where = inGroup ? ' in this group' : ' the search shows';\n",
-                        "            var inGroup = false, where = ' the search shows';\n")],
+    # (the non-group words are "the search shows", or "the filter keeps" since penumbra_tests\filterword
+    # 2026-10-19: the anchor stops before them; the mutant is the same - never in a group)
+    'h-hdr-ingroup': ([('js/main.js', "            var inGroup = !!(tbl && tbl.closest('#groupedResultsContainer')), where = inGroup ? ' in this group' : '",
+                        "            var inGroup = false, where = false ? ' in this group' : '")],
                       ['H-grp-mark'], ['hdrgroup']),
     'h-hdr-theirs': ([('js/main.js', "            if (ask || theirs) {\n", "            if (ask) {\n")],
                      ['H-shift-theirs'], ['shiftrange']),
@@ -652,7 +654,9 @@ M = {
     'm-js-alias-first': ([('js/main.js', "                            out.push(al[e]);\n", "                            out.unshift(al[e]);\n")], ['M-old-names'], ['renamed', 'renameprec']),
     'm-js-warn': ([('js/main.js', "                    msgs.push('“' + escapeHtml(kl) + '” was the name of “'", "                    void ('“' + escapeHtml(kl) + '” was the name of “'")],
                   ['M-prec-warn'], ['renameprec']),
-    'm-js-commit-msg': ([('js/main.js', "                keeps = 'Searches, snippets, buttons and scheduled tasks that say <strong>' + escapeHtml(was) + '</strong> keep working. ';\n", "")],
+    # (the sentence starts "Searches, ..." or, since filterword 2026-10-19, "Filters, ...": the anchor
+    # starts after that word and the mutant cuts the rest, so the status loses "... keep working.")
+    'm-js-commit-msg': ([('js/main.js', ", snippets, buttons and scheduled tasks that say <strong>' + escapeHtml(was) + '</strong> keep working. ';\n", "';\n")],
                         ['M-live-status'], ['renamelive']),
     # ---- the browser: what reads a toggle by name
     'm-js-keyfor': ([('js/main.js', "                if (cols[j].alias && cols[j].kind === 'toggle' && String(cols[j].name).toUpperCase() === want) return cols[j].key;\n", "")],

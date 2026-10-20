@@ -20,7 +20,7 @@
  *   L10 line endings consistent within each fragment (CRLF files keep every CR)
  *   L11 manifest sanity: unique ids, aliases never collide with ids, extras exist
  *   L12 data-canonical keys unique (one canonical section per concept)
- *   L13 shims present in help_content.php and help_manifest.php, loader reachable
+ *   L13 the two shims (help_content.php, help_manifest.php) hand over to help/, loader reachable
  *   W1  budgets (warnings only, for the rewrite phases): paragraphs over 80 words,
  *       bullets over 50 words, em-dashes, emoji headings; tip definitions nobody consumes
  * Exit code = number of failed checks.
@@ -207,12 +207,12 @@ $R->check('L12', !$dupc, $dupc ? 'canonical key claimed twice: ' . implode(', ',
 // ---------------------------------------------------------------- L13 shims
 $hc = is_file("$app/help_content.php") ? hv_read("$app/help_content.php") : '';
 $hm = is_file("$app/help_manifest.php") ? hv_read("$app/help_manifest.php") : '';
-$okShim = strpos($hc, "require __DIR__ . '/help/loader.php'; return;") !== false && strpos($hc, "require_once __DIR__ . '/help/manifest.php';") !== false
-       && strpos($hm, "require_once __DIR__ . '/help/manifest.php';") !== false && strpos($hm, "if (!function_exists('penumbra_help_manifest')) {") !== false
-       && strpos($hm, "require_once __DIR__ . '/help/manifest.php';") < strpos($hm, "if (!function_exists('penumbra_help_manifest')) {")
+// Since 2026-10-19 the two files are shims only (the v1 body is gone): help_content.php requires help/manifest.php
+// and then help/loader.php; help_manifest.php requires help/manifest.php. No v1 guard, no switch marker.
+$okShim = strpos($hc, "require __DIR__ . '/help/loader.php';") !== false && strpos($hc, "require_once __DIR__ . '/help/manifest.php';") !== false
+       && strpos($hm, "require_once __DIR__ . '/help/manifest.php';") !== false
        && is_file("$helpDir/loader.php");
-$R->check('L13', $okShim, $okShim ? 'both shims in place, loader present' : 'shim missing or out of order in help_content.php / help_manifest.php');
-if (!is_file("$helpDir/v2.on")) $R->warn('L13w', 'help/v2.on is absent: this stage renders v1 unless forced');
+$R->check('L13', $okShim, $okShim ? 'both shims in place, loader present' : 'shim missing in help_content.php / help_manifest.php');
 
 // ---------------------------------------------------------------- L14 canonical references
 $refs = array(); $badRef = array();

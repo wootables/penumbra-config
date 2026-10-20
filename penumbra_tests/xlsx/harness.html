@@ -344,7 +344,9 @@
       ok(tsRow > 0 && tsRow < thead, 'flat/header: timestamp row present', tsRow);
       ok(tsRow > 0 && rowText(ws, tsRow).join(' ').indexOf('42 rows') !== -1, 'flat/header: row count sits with the timestamp', rowText(ws, tsRow).join(' | '));
       ok(tsRow > 0 && !/^[^A-Za-z0-9]/.test(String(rowText(ws, tsRow)[0])), 'flat/header: timestamp has no leading icon glyph', JSON.stringify(rowText(ws, tsRow)[0]));
-      ok(findRow(ws, 'Engineering') > 0 && findRow(ws, 'Search filter') > 0 && findRow(ws, 'Search filter') < thead, 'flat/header: active search filter recorded', findRow(ws, 'Search filter'));
+      // "Search filter: X", or "Filter: X" since penumbra_tests\filterword (2026-10-19)
+      var sfRow = findRow(ws, 'Filter: ') || findRow(ws, 'Search filter');
+      ok(findRow(ws, 'Engineering') > 0 && sfRow > 0 && sfRow < thead, 'flat/header: active search filter recorded', sfRow);
       ok(findRow(ws, 'awards.csv') > 0 && findRow(ws, 'awards.csv') < thead, 'flat/header: import timestamp line present');
       var fy = findRow(ws, 'Fiscal Year');
       ok(fy > 0 && fy < thead, 'flat/header: prompt present', fy);

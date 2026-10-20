@@ -356,7 +356,7 @@ def index_half():
     import re
     out = []
     add = lambda aid, ok, d='': out.append((aid, bool(ok), d))
-    idx_p, help_p = pick('index.php'), pick('help_content.php')
+    idx_p, help_p = pick('index.php'), pick(os.path.join('help', 'topics', 'userSettingsHelpLightbox.php'))   # (2026-10-19) the v1 help is gone
     idx = read_b(idx_p)
     m = re.search(r'(?s)<\?php /\* AFTER main\.js: cell selection on the flat table.*?<\?php endif; \?>', idx)
     add('I-block', m is not None, idx_p)
@@ -377,7 +377,7 @@ def index_half():
         # after main.js and after the column-width tool, as the module expects
         add('I-order', idx.find('js/penumbra_cellsel.js') > idx.find('js/main.js?v=') > 0 and idx.find('js/penumbra_cellsel.js') > idx.find('js/penumbra_colwidths.js'), '')
     hp = read_b(help_p)
-    add('I-help', '<li id="us-cellsel">' in hp and '<kbd>Ctrl</kbd>+<kbd>C</kbd>' in hp and hp.find('id="us-cellsel"') > hp.find('id="us-colwidths"'), help_p)
+    add('I-help', 'id="us-cellsel"' in hp and '<kbd>Ctrl</kbd>+<kbd>C</kbd>' in hp and hp.find('id="us-cellsel"') > hp.find('id="us-colwidths"'), help_p)
     for f in (idx_p, help_p):
         r = subprocess.run([PHP, '-n', '-l', f], capture_output=True, text=True).stdout
         add('I-lint-' + os.path.basename(f), 'No syntax errors' in r, r.strip())

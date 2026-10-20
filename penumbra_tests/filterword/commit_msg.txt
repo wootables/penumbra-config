@@ -1,0 +1,23 @@
+Filter wording: the report's search box is the filter box in every user-facing word
+
+The box above the table keeps only the rows that match, and totals, snippets, charts,
+calculations, exports and email follow it. Three words now: FILTER is that box, FIND is
+Ctrl+F (highlights only), SEARCH is finding something to go to (help, fields, reports, people).
+
+- index.php: the box's label, run / clear titles, the builder icons, the arrow's saved filters,
+  the Filter Bar view option, the empty state, the mismatch dialog; the scheduler's field is
+  labelled "Apply Filter:" (its own run / clear and the dashboard's filter box keep their words)
+- main.js: placeholders, the / and x keys, notices, the Rows card (and its count-text regex,
+  which now reads "showing N filtered results"), the email / export / print / feedback lines
+- the Visual Filter Builder (search_builder.js, search_builder_content.php, and where the
+  dashboard names it), Find's words for the filter, the column menu, group list, tiles, bulk settings
+- schedule_runner.php, manage_journal.php: the email's Filter line, the pivot link text, the
+  bulk message (twins of main.js)
+- help: 24 topics and 4 tip stores; the topic is "Filtering the Table" and its keywords keep the
+  old words; the scheduler's field is "Apply Filter" there too; the Custom Code reference keeps
+  its API word with "(the filter box)"; the AI prompt
+
+Kept: data(search), action(search, ...), search|, &search=, data-search, ids, classes, anchors.
+Kit and proofs: penumbra_tests\filterword (README.md).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

@@ -37,7 +37,7 @@ function lift($text, $start, $end) {
 $journal = src('manage_journal.php');
 $index   = src('index.php');
 $dash    = src('dashboard.php');
-$help    = src('help_content.php');
+$help    = src('help/topics/viewoptionsHelpLightbox.php');   // (2026-10-19) the v1 help is gone
 $an      = src('analytics_shared.php');
 $dashjs  = src('js/penumbra_dashboard.js');
 $jrnjs   = src('js/penumbra_journal.js');
@@ -135,7 +135,8 @@ T('J1', 'the kiosk hop clamps the fetched can_edit with noadm', strpos($dashjs, 
 T('J2', 'the home list badge is clamped with noadm', strpos($dashjs, "((d.can_edit && !penumbra_dash_vars.noadm) ? '<span class=\"dash-home-badge\">editable</span>' : '')") !== false);
 
 // H: the pagination help
-T('H1', 'help: the navigator sits in the bar above the table', strpos($help, 'appear in the bar above the table, beside the search box.') !== false && strpos($help, 'appear below the table.') === false);
+// (the box is the filter box since penumbra_tests\filterword, 2026-10-19: either word passes here, that suite pins it)
+T('H1', 'help: the navigator sits in the bar above the table', (strpos($help, 'appear in the bar above the table, beside the search box.') !== false || strpos($help, 'appear in the bar above the table, beside the filter box.') !== false) && strpos($help, 'appear below the table.') === false);
 T('H2', 'help: the arrows read << < > >>', strpos($help, '<strong>First</strong> (&lt;&lt;), <strong>Previous</strong> (&lt;), <strong>Next</strong> (&gt;), <strong>Last</strong> (&gt;&gt;)') !== false
     && strpos($help, '(&laquo;)') === false && strpos($help, '(&rsaquo;)') === false);
 

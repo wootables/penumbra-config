@@ -65,9 +65,9 @@ $work = Join-Path $env:TEMP ('pnb_promptsection_' + $PID)
 New-Item -ItemType Directory -Force -Path $work | Out-Null
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
-$appFiles = 'index.php', 'js\main.js', 'css\main.css', 'help_content.php', 'ai_system_prompt.php'
+$appFiles = 'index.php', 'js\main.js', 'css\main.css', 'help\tips\builder-tips-storage.php', 'help\topics\promptsHelpLightbox.php', 'ai_system_prompt.php'   # (2026-10-19) the v1 help is gone
 function Copy-AppInto([string]$dest) {
-    New-Item -ItemType Directory -Force -Path (Join-Path $dest 'js'), (Join-Path $dest 'css') | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $dest 'js'), (Join-Path $dest 'css'), (Join-Path $dest 'help\tips'), (Join-Path $dest 'help\topics') | Out-Null
     $fromLive = @()
     foreach ($f in $appFiles) {
         $src = Join-Path $App $f
@@ -194,8 +194,8 @@ function Invoke-SectionSuite([string]$AppDir, [bool]$AsControl, [string]$RefMain
 
     # ---- half 3: pins - the words that describe it are still there
     $pins = @(
-        @{ file = 'help_content.php';     what = 'the builder tip for the Section field';            needle = '<div data-tip="section">' },
-        @{ file = 'help_content.php';     what = 'the prompt reference row';                        needle = '<div style="flex: 0 0 120px; padding-left: 6px;"><code>section=</code></div>' },
+        @{ file = 'help\tips\builder-tips-storage.php'; what = 'the builder tip for the Section field';   needle = '<div data-tip="section">' },
+        @{ file = 'help\topics\promptsHelpLightbox.php'; what = 'the prompt reference row';              needle = '<code>section=</code></td>' },
         @{ file = 'ai_system_prompt.php'; what = 'the AI grammar line';                             needle = '- section=NAME - display only' },
         @{ file = 'index.php';            what = 'Name and Section share one .bld-row in the builder'; regex = '(?s)<div class="bld-row">\s*<div class="bld-field">\s*<label for="promptName">.{0,600}?<label for="promptSection">' }
     )

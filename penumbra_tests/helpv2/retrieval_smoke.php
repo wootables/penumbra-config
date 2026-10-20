@@ -5,10 +5,10 @@
  *   php -n retrieval_smoke.php --app=<stage dir> --orig=<dir with v1 help_content.php> --out=<scratch dir>
  *
  *   R1 v2 build: chunks > 900, every chunk carries an audience, writer and admin chunks exist
- *   R2 v1 build from the original file still works and lands within 10% of the v2 chunk count
+ *   R2 retired 2026-10-19 with the v1 help (the v1 build)
  *   R3 "how do I schedule an email report" retrieves the Scheduler topic first (v2 index)
  *   R4 a pure SQL question retrieves nothing (the precision gate still holds)
- *   R5 the two builds write to DIFFERENT cache files (switching versions never serves the other index)
+ *   R5 retired 2026-10-19 with the v1 help (the two caches); --orig is accepted and ignored
  *   R6 ask mode: "how do i hide a column" lands on a column-management topic; R7 assist mode keeps its gate for it
  *   R8 ask mode: "is the IP address list enforced" lands on Security & Access with the IP Address List passage
  *      (two-letter tokens on PNB_HELP_SHORT reach the index and the question; E2E_2026-10-17 D1)
@@ -67,17 +67,11 @@ function build($php, $app, $orig, $out, $v2) {
 }
 
 $v2 = build($php, $app, $orig, $out, true);
-$v1 = build($php, $app, $orig, $out, false);
 
 $R->check('R1', $v2 && $v2['n'] > 900 && !isset($v2['auds']['(none)']) && !empty($v2['auds']['writer']) && !empty($v2['auds']['admin']),
     $v2 ? ('v2: ' . $v2['n'] . ' chunks from ' . count($v2['files']) . ' files, audiences ' . json_encode($v2['auds']) . ', ' . $v2['titles'] . ' titles') : 'v2 build failed');
-$R->check('R2', $v1 && $v2 && $v1['n'] > 900 && abs($v1['n'] - $v2['n']) <= 0.10 * $v2['n'],
-    ($v1 ? ('v1: ' . $v1['n'] . ' chunks from ' . implode(',', $v1['files'])) : 'v1 build failed') . ($v2 ? (' vs v2 ' . $v2['n']) : ''));
 $R->check('R3', $v2 && stripos($v2['q1topic'], 'Scheduler') !== false, 'v2 retrieval for a scheduling question lands on: ' . ($v2 ? json_encode($v2['q1topic']) : '?'));
 $R->check('R4', $v2 && $v2['q2len'] === 0, 'a pasted SQL statement retrieves nothing (len ' . ($v2 ? $v2['q2len'] : '?') . ')');
-$R->check('R5', $v1 && $v2 && $v1['cache'][0] !== $v2['cache'][0] && is_file($v1['cache'][0]) && is_file($v2['cache'][0]) && $v1['sig'] != $v2['sig'],
-    'separate caches: ' . ($v1 ? basename($v1['cache'][0]) : '?') . ' / ' . ($v2 ? basename($v2['cache'][0]) : '?') . ', signatures ' . ($v1 ? json_encode($v1['sig']) : '?') . ' / ' . ($v2 ? json_encode($v2['sig']) : '?'));
-
 // R6 / R7 (2026-10-15 evening): the Ask page's recall mode answers a one-term question; the assistant keeps its precision gate.
 $okCol = array('userSettingsHelpLightbox', 'viewoptionsHelpLightbox', 'columnSummariesHelpLightbox');
 $R->check('R6', $v2 && !empty($v2['q3ids']) && in_array($v2['q3ids'][0], $okCol, true), 'ask mode: "how do i hide a column" lands on ' . ($v2 ? json_encode(array_slice((array)$v2['q3ids'], 0, 3)) : '?'));

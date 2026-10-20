@@ -1,0 +1,41 @@
+﻿files: {"index": "\\\\oitras.oit.ncsu.edu\\d$\\Utilities\\PHP_8.2-p\\penumbra_tests\\filterword\\stage\\index.php", "css": "\\\\oitras.oit.ncsu.edu\\d$\\Utilities\\PHP_8.2-p\\penumbra_tests\\filterword\\stage\\css\\main.css", "density": "\\\\oitras.oit.ncsu.edu\\d$\\Utilities\\PHP_8.2-p\\penumbra_tests\\filterword\\stage\\css\\density.css", "sbcss": "\\\\oitras.oit.ncsu.edu\\d$\\Utilities\\PHP_8.2-p\\penumbra_tests\\filterword\\stage\\css\\search_builder.css", "sb": "\\\\oitras.oit.ncsu.edu\\d$\\Utilities\\PHP_8.2-p\\penumbra_tests\\filterword\\stage\\js\\search_builder.js", "help": "\\\\oitras.oit.n
+  PASS  S1 index.php: both boxes are .pnb-sbox with a column arrow; the "/" badge is gone
+  PASS  S2 main.css: the .pnb-sbox block is there and no #tableSearchKey rule is left
+  PASS  S3 help: the search help names the arrow and Alt+Down
+  PASS  S4 index.php: the role=button segments are tab stops (tabindex=0); both fields carry aria-keyshortcuts=Alt+ArrowDown
+  PASS  S5 index.php: both boxes' own words say filter (label, run, clear, builder, the arrow's saved filters, the scheduler's Filter); the old words gone
+  PASS  K1 the column arrow: role=button, a name, an "(Alt+Down)" title, at the right edge of the EMPTY box and gone once it holds a search; no "/" badge - every theme x density, empty and with text, both boxes
+  PASS  K10 the magnifier reads as a button: a brand glyph on a 10% brand tint - every theme x density, empty and with text, both boxes
+  PASS  K2 every segment spans the field's inner height (1px in from top and bottom) - every theme x density, empty and with text, both boxes
+  PASS  K3 flat segments: transparent, no top/bottom border, a 1px solid divider on the inner side - every theme x density, empty and with text, both boxes
+  PASS  K4 the text never runs under a segment (the padding covers them) - every theme x density, empty and with text, both boxes
+  PASS  K5 empty: the arrow alone at the edge; with text: clear in the arrow's place at the edge, then run - every theme x density, empty and with text, both boxes
+  PASS  K6 the field keeps the theme's own fill and boundary (as a plain text field) - every theme x density, empty and with text, both boxes
+  PASS  K7 the right-hand segment glyphs in the theme's --text-muted - every theme x density, empty and with text, both boxes
+  PASS  K8 a REAL mouse hover turns the arrow the theme's brand colour and deepens the magnifier's tint (light + dark themes)
+  PASS  K9 REAL focus: the field's border takes the brand colour, with a glow
+  PASS  A the arrow lists every column (Saved Filters first on the report box) and puts the focus in the box - report bar and scheduler
+  PASS  B1 a second click on the arrow closes the list - report bar and scheduler
+  PASS  B2 ...and the focus stays in the box - report bar and scheduler
+  PASS  B3 clicking the arrow never blurs the box (its mousedown keeps the focus) - report bar and scheduler
+  PASS  C a column picked in the empty box is written as "COL " and its values open next - report bar and scheduler
+  PASS  H ...and, the box ending with that column, the arrow stays at the edge for its values (title names it), clear beside it - report bar and scheduler
+  PASS  D1 with text in the box (the arrow gone) Alt+Down still lists every column, unfiltered - report bar and scheduler
+  PASS  D2 a pick from it ADDS a condition: "<text> and COL " - nothing typed is lost - report bar and scheduler
+  PASS  D3 ...its values open next and a value completes the condition - report bar and scheduler
+  PASS  E1 after a trailing "or" the column joins it (no extra "and") - report bar and scheduler
+  PASS  F1 Alt+Down opens the same full list - report bar and scheduler
+  PASS  F2 ...with its FIRST item highlighted (the widget's own Down does not run as well) - report bar and scheduler
+  PASS  F3 Enter picks the highlighted item (a saved search replaces the report box and runs; a column is added) - report bar and scheduler
+  PASS  G typing afterwards is the ordinary type-ahead again (filtered; its pick replaces the typed word) - report bar and scheduler
+  PASS  H2 a value after the column: the arrow gives way to the clear, at the box's edge - report bar and scheduler
+  PASS  V0 typed text that ends with a column shows the arrow at the edge, clear beside it - report bar and scheduler
+  PASS  V1 a click on it lists THAT column's values (a space goes after the name), focus kept - report bar and scheduler
+  PASS  V2 ...a value picked completes the condition - report bar and scheduler
+  PASS  V3 Alt+Down does the same after an "or", the name in any case - report bar and scheduler
+  PASS  V4 with the name SELECTED the arrow lists the columns and the pick replaces the selection - report bar and scheduler
+  PASS  V5 a column with no value list is not a values arrow: clear at the edge, Alt+Down lists the columns, nothing appended - report bar and scheduler
+  PASS  V6 the column list for a selection, closed unused, leaves nothing behind: Ctrl+Space after the column then lists its values - report bar and scheduler
+  PASS  V7 (guard) a double-click on a value inside a regex alternation still replaces just that value - report bar and scheduler
+TOTAL pass=38 fail=0
+RESULT: GREEN

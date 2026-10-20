@@ -247,7 +247,7 @@ def flag(name):
 given = dict((k, k in args) for k in ('--js', '--css', '--help-php'))
 js_path = opt('--js', os.path.join(APP, 'js', 'search_builder.js'))
 css_path = opt('--css', os.path.join(APP, 'css', 'search_builder.css'))
-help_path = opt('--help-php', os.path.join(APP, 'help_content.php'))
+help_path = opt('--help-php', os.path.join(APP, 'help', 'topics', 'searchHelpLightbox.php'))   # (2026-10-19) the v1 help is gone
 control = flag('--control')
 control5 = flag('--control5')
 mutants = flag('--mutants')
@@ -283,8 +283,8 @@ HELP0 = read_b(help_path)
 DBL_GUARD = ('            if (e.detail > 1 && pt && (pressed === pt.v ||' + CRLF +
              '                    (Math.abs(e.clientX - pt.x) <= 8 && Math.abs(e.clientY - pt.y) <= 8))) return;' + CRLF)
 # Round 5: the help's bullet on picking the column again (one whole line of the list).
-HELP5_TEXT = "Picking the row's column again reopens its value list with your ticks intact"
-HELP5_BULLET = ("            <li>" + HELP5_TEXT + ", for example after clicking away from the list by accident.</li>" + CRLF)
+HELP5_TEXT = "Reopens its value list with your ticks intact"   # (2026-10-19) the v2 Search topic's row
+HELP5_BULLET = ('            <tr><td style="padding: 5px; border-bottom: 1px solid #eee; vertical-align: top; white-space: normal; max-width: none;">Pick the row\'s column again</td><td style="padding: 5px; border-bottom: 1px solid #eee; vertical-align: top; white-space: normal; max-width: none;">' + HELP5_TEXT + ', for example after clicking away by accident.</td></tr>\n')
 MUTANTS = {
     # the old fork: a row press toggles only once the row already holds a set; before
     # that the label single-picks and closes
@@ -493,7 +493,7 @@ MUTANTS = {
     'noterm': ([('js', '        if (term) return [];' + CRLF, '')],
                ['T-typed']),
     # the help's click bullet back to the old split ("legacy behavior")
-    'helpold': ([('help', "<li>Clicking anywhere on a value's row, on its checkbox or on its text, ticks or unticks it, and the list stays open so you can pick more. Click outside the list, or press <kbd>Tab</kbd> or <kbd>Esc</kbd>, to close it.",
+    'helpold': ([('help', "Ticks or unticks it; the list stays open. Click outside the list, or press <kbd>Tab</kbd> or <kbd>Esc</kbd>, to close it.",
                   "<li>Clicking an item's label and clicking its checkbox both add to the set once you're in multi-value mode; clicking the label of a value in single-value mode picks just that one (legacy behavior).")],
                 ['H-doc']),
     # --- round 5 ---
@@ -1749,19 +1749,12 @@ def evaluate(O):
 
 # The Search help's 'Multi-value selection (checkboxes)' list says what the list does now.
 def help_doc(help_text):
-    a = help_text.find('<strong>Multi-value selection (checkboxes)</strong>')
-    b = help_text.find('</ul>', a) if a >= 0 else -1
+    # (2026-10-19) the v1 help is gone: the Search topic's "Picking several values (checkboxes)" table says it
+    a = help_text.find('<strong>Picking several values (checkboxes)</strong>')
+    b = help_text.find('</table>', a) if a >= 0 else -1
     sec = help_text[a:b] if a >= 0 and b > a else ''
-    need = ["Clicking anywhere on a value's row", 'ticks or unticks it, and the list stays open',
-            'press <kbd>Tab</kbd> or <kbd>Esc</kbd>, to close it',
-            'highlight a value with the arrow keys: <kbd>Space</kbd> ticks or unticks it',
-            '<kbd>Enter</kbd> ticks it, closes the list and runs the search',
-            'Right after <kbd>Space</kbd>, or with no arrow-key highlight, <kbd>Enter</kbd> closes the list and runs the search with what is ticked',
-            'When nothing is ticked yet, <kbd>Enter</kbd> picks the value highlighted with the mouse',
-            'highlighted with the mouse instead, unless you have just unticked it.',   # round 4
-            'states of a journal toggle column',
-            'one ticked value shows in the value field as a normal entry', 'The typed text is never added to the set',
-            'Once a value is ticked it offers', '<strong>Clear selection</strong> (unticks everything and keeps the list open)']
+    need = ["Click a value's row, checkbox or text", 'Ticks or unticks it; the list stays open', 'press <kbd>Tab</kbd> or <kbd>Esc</kbd>, to close it', 'Arrow keys, then <kbd>Space</kbd>', 'Ticks or unticks the highlighted value', 'Ticks the highlighted value, closes the list and runs the ', 'Right after <kbd>Space</kbd>, or with no arrow-key highlight, it closes the list and runs with what is ticked', 'it picks the value under the mouse instead, unless you have just unticked it', 'states of a journal toggle column', 'One ticked value shows as a normal entry', 'The typed text is never added to the set', 'Once a value is ticked it offers', '<strong>Clear selection</strong> (unticks everything and keeps the list open)']
+    # ("...runs the " + search, or filter since penumbra_tests\filterword 2026-10-19, which pins that word)
     gone = ['read-only chip', 'legacy behavior', chr(0x2014), '&mdash;']   # no em-dash (user copy rule)
     missing = [n for n in need if n not in sec]
     left = [x for x in gone if x in sec]
@@ -1769,10 +1762,10 @@ def help_doc(help_text):
 
 # Round 5: ...and one bullet of it says the column picked again reopens the list.
 def help_doc5(help_text):
-    a = help_text.find('<strong>Multi-value selection (checkboxes)</strong>')
-    b = help_text.find('</ul>', a) if a >= 0 else -1
+    a = help_text.find('<strong>Picking several values (checkboxes)</strong>')
+    b = help_text.find('</table>', a) if a >= 0 else -1
     sec = help_text[a:b] if a >= 0 and b > a else ''
-    li = [x for x in sec.split('<li>') if HELP5_TEXT in x]
+    li = [x for x in sec.split('<tr>') if HELP5_TEXT in x]
     bad = [x for x in (chr(0x2014), '&mdash;') if li and x in li[0]]
     return (len(li) == 1 and not bad), {'bullets': len(li), 'emdash': bad, 'text': li[0][:300] if li else None}
 

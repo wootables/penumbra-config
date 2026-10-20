@@ -310,8 +310,8 @@ def static_checks(texts):
         ('S-helpNoDeepDefault', 'Defaults: Row Height, Deep Links' not in hlp and "can set the report's default under <em>Last Stop Changes</em>" not in hlp
          and 'Deep Link Vendor Codes</strong> - when on, recognized vendor codes' not in hlp, ''),
         # (colopt g) the help names the option as the popover does, in a Filter row of its own
-        ('S-helpFilterRow', '<li><strong>Filter</strong> - click a table cell to filter by that value.</li>' in hlp
-         and '<em>Click a table cell to filter by that value</em>' in hlp and 'Click a value to filter the table' not in hlp
+        ('S-helpFilterRow', '<li><strong>Filter</strong> - click a table cell to filter by that value.</li>' in hlp   # (2026-10-19) the tip store; the topic's <em> wording no longer read here
+         and 'Click a value to filter the table' not in hlp
          and 'click a value to filter; vendor code links' not in hlp, ''),
     ]
 # the checks colopt b brought (live since 16:22) - kept for the record
@@ -363,7 +363,7 @@ RELS = {'main': os.path.join('js', 'main.js'), 'mod': os.path.join('js', 'penumb
         'sr': 'schedule_runner.php', 'cphp': 'penumbra_calc.php', 'css': os.path.join('css', 'main.css'),
         # (colopt c) the harness lifts its Settings / status bar bits from this index.php,
         # and serves this help_content.php - raw, as a static file - for the hover tips
-        'index': 'index.php', 'help': 'help_content.php'}
+        'index': 'index.php', 'help': os.path.join('help', 'tips', 'settings-tips-storage.php')}
 sys.path.insert(0, HERE)
 import mk_harness
 cand = {k: pick(v) for k, v in RELS.items()}

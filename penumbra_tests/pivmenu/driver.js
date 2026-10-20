@@ -80,6 +80,16 @@
     pmhead: async function () {
       var th = head('Open');
       R.chk.opens = !!th && rclick(th) && !!menu();
+      // (colmenu round 25) the browser's own menu: Shift with the right-click is not intercepted;
+      // a second right-click on the same heading while ours is open steps aside
+      closeMenu();
+      var rS = th.getBoundingClientRect();
+      R.chk.nativeShift = !th.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, shiftKey: true, clientX: Math.round(rS.left + 6), clientY: Math.round(rS.top + 6) })) === false && !menu();
+      var o1 = rclick(th) && !!menu();
+      th.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 2, buttons: 2, clientX: Math.round(rS.left + 6), clientY: Math.round(rS.top + 6) }));
+      R.chk.nativeSecond = o1 && !rclick(th) && !menu();
+      R.info.native = { o1: o1 };
+      rclick(th);   // the checks below read the open menu
       R.chk.headItems = has(['pvSortAsc', 'pvSortDesc', 'pvColOnly', 'pvColExclude', 'pvCopyCol', 'pvShade', 'pvEdit']) && acts().indexOf('sortAsc') < 0;
       R.info.acts = acts();
       closeMenu();
@@ -234,6 +244,8 @@
       function cmp(a, b) { var x = num(a), y = num(b); if (x !== null && y !== null) return x - y; return String(a).localeCompare(String(b)); }
       function ordered(arr, dir) { return arr.length > 1 && arr.every(function (v, k) { return k === 0 || (dir === 'asc' ? cmp(arr[k - 1], v) <= 0 : cmp(arr[k - 1], v) >= 0); }); }
       R.chk.bdNumNative = !rclick(ths[0]) && !menu();
+      var rB = th.getBoundingClientRect();
+      R.chk.bdNativeShift = !th.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, shiftKey: true, clientX: Math.round(rB.left + 6), clientY: Math.round(rB.top + 6) })) === false && !menu();
       R.chk.bdHeadOpens = rclick(th) && !!menu() && menu().querySelector('.pnb-hm-name').textContent === txt(th) && /rows?, /.test((menu().querySelector('.pnb-hm-stats') || {}).textContent || '');
       R.chk.bdHeadItems = has(['bdSortAsc', 'bdSortDesc', 'bdCopyCol', 'bdCopyDistinct', 'bdCopyName']) && !item('bdCopy') && !item('bdThenAsc') && !item('bdSortClear');
       R.info.bdActs = acts();
@@ -279,6 +291,27 @@
       R.chk.bdKbd = !!mr && Math.abs(mr.top - r.bottom) <= 2 && Math.abs(mr.left - r.left) <= 2 && document.activeElement === m.querySelector('.pnb-hm-item');
       closeMenu();
       R.info.bdCopies = { vals: vals.length, distinct: distinct.length, dupCol: dup ? txt(dup) : null, clip: String(lastClip()).slice(0, 60) };
+      // (colmenu round 27) the width items, on the module's session widths for a breakdown:
+      // Fit this column, Fit all, Reset (with Undo); none in a pivot's menu
+      var CW = window.Penumbra && window.Penumbra.colWidths, bdt = th.closest('table');
+      function bdW(h) { return Math.round(h.getBoundingClientRect().width); }
+      rclick(th);
+      R.chk.bdWidthItems = !!CW && !!item('bdFit') && !!item('bdFitAll') && !!item('bdResetWidths') && acts().indexOf('bdFit') < acts().indexOf('bdCopyCol');
+      closeMenu();
+      var w0 = bdW(th);
+      var ranFit = await choose(th, 'bdFit');
+      var dw1 = CW ? CW.drillWidths() : {};
+      R.chk.bdFit = ranFit && Object.keys(dw1).length === 1 && Math.abs(bdW(th) - dw1[Object.keys(dw1)[0]]) <= 2 && /fitted to its content/.test(lastToast());
+      var ranAll = await choose(th, 'bdFitAll');
+      var dw2 = CW ? CW.drillWidths() : {}, cells = bdt.tHead.rows[0].cells.length;
+      R.chk.bdFitAll = ranAll && Object.keys(dw2).length >= Math.min(3, cells - 1) && /breakdown column widths fitted to content/.test(lastToast());
+      var ranReset = await choose(th, 'bdResetWidths');
+      var dw3 = CW ? CW.drillWidths() : {};
+      R.chk.bdResetWidths = ranReset && Object.keys(dw3).length === 0 && /Breakdown column widths reset/.test(lastToast());
+      R.info.bdWidths = { w0: w0, dw1: dw1, n2: Object.keys(dw2).length, n3: Object.keys(dw3).length, toast: String(lastToast()).slice(0, 60) };
+      // a pivot heading's menu has none of them
+      var pvh = document.querySelector('#pivotResultTable thead th[data-row-field]');
+      if (pvh) { rclick(pvh); R.chk.bdWidthsNotPivot = !!menu() && !item('bdFit') && !item('bdFitAll') && !item('bdResetWidths'); closeMenu(); } else { R.chk.bdWidthsNotPivot = true; }
     },
     pmmulti: async function () {
       // (colmenu round 17) no column fields, several values, groups collapsed: every value

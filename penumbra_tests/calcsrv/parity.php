@@ -65,6 +65,13 @@ $d = pnb_calc_clean_def(array('name' => 'X', 'formula' => '{@K}', 'input' => arr
 ok(isset($d['input']) && $d['input'] === array('name' => 'K', 'value' => 5.0, 'min' => 0.0, 'max' => 5.0, 'step' => 0.5), 'P-inputClean a definition\'s value: named, numbered, within its bounds', json_encode($d));
 $d = pnb_calc_clean_def(array('name' => 'X', 'formula' => '1', 'input' => array('name' => 'K', 'value' => '$5')));
 ok(!isset($d['input']), 'P-inputBad a value that is not a plain number is no value', json_encode($d));
+// (2026-10-19, round 5) a date value: read from a US spelling, kept as YYYY-MM-DD, bounded as text, the step in days
+$k = isset($by['dateInputs']) ? $by['dateInputs']['out'][0]['keys'] : '';
+ok(strpos($k, 'J6') === false && substr($k, -18) === '|J1|J2|J3|J4|J5|J7', 'P-dateInputsLeftOut a value that is neither a number nor a date leaves its column out', $k);
+$d = pnb_calc_clean_def(array('name' => 'X', 'formula' => '{@K}', 'input' => array('name' => ' k ', 'value' => '10/15/2026', 'min' => '2026-01-01', 'max' => '2026-12-31', 'step' => '7')));
+ok(isset($d['input']) && $d['input'] === array('name' => 'K', 'value' => '2026-10-15', 'kind' => 'date', 'min' => '2026-01-01', 'max' => '2026-12-31', 'step' => 7.0), 'P-inputDateClean a date value: named, dated, within its bounds', json_encode($d));
+$d = pnb_calc_clean_def(array('name' => 'X', 'formula' => '{@K}', 'input' => array('name' => 'K', 'kind' => 'date', 'value' => '2027-06-01', 'max' => '2026-12-31')));
+ok(isset($d['input']) && $d['input']['value'] === '2026-12-31', 'P-inputDateClamp a date over its highest is kept to it', json_encode($d));
 echo "  INFO  $cells cells compared, $totalBad differ\n";
 echo "TOTAL pass=$pass fail=$fail\n";
 echo ($fail === 0 && $pass > 0) ? "RESULT: GREEN\n" : "RESULT: RED\n";

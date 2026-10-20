@@ -1198,7 +1198,8 @@
   S.hdrall = async function () {
     var b = allBox(tb().tHead);
     var dash = b ? getComputedStyle(b.querySelector('.tg-dash')).display : '-', chk = b ? getComputedStyle(b.querySelector('.tg-check')).display : '-';
-    rec('H-hdr-state', !!b && b.getAttribute('aria-checked') === 'mixed' && b.title === 'Mark Reviewed on the other 34 rows the search shows'
+    // "...rows the search shows", or "...rows the filter keeps" since penumbra_tests\filterword (2026-10-19)
+    rec('H-hdr-state', !!b && b.getAttribute('aria-checked') === 'mixed' && /^Mark Reviewed on the other 34 rows the (?:search shows|filter keeps)$/.test(b.title)
         && dash !== 'none' && chk === 'none',
         'box ' + !!b + ', aria-checked ' + (b && b.getAttribute('aria-checked')) + ', title "' + (b && b.title) + '", dash ' + dash + ', check ' + chk);
     var c0 = window.__confirms.length, p0 = window.__J.posts.length;
@@ -1208,7 +1209,7 @@
     b = allBox(tb().tHead);
     var on1 = tb().querySelectorAll('.journal-toggle-box.is-on').length;
     rec('H-hdr-mark', !!post && post.state === true && post.row_keys.length === 34 && post.row_keys.indexOf(window.__MARKED[0]) < 0
-        && /^Mark .Reviewed. on 34 rows the search shows\?/.test(conf) && /2 rows already marked keep their marks/.test(conf)
+        && /^Mark .Reviewed. on 34 rows the (?:search shows|filter keeps)\?/.test(conf) && /2 rows already marked keep their marks/.test(conf)
         && on1 === 36 && !!b && b.getAttribute('aria-checked') === 'true' && /Undo/.test(toast()),
         'confirm "' + oneLine(conf).slice(0, 170) + '" | post ' + (post ? post.row_keys.length + ' keys, state ' + post.state : 'none')
         + ' | ticked ' + on1 + ', box ' + (b && b.getAttribute('aria-checked')));
@@ -1219,7 +1220,7 @@
     await sleep(900);
     var post2 = bulkPosts(p1)[0], conf2 = window.__confirms[c1] || '';
     b = allBox(tb().tHead);
-    rec('H-hdr-clear', !!post2 && post2.state === false && post2.row_keys.length === 36 && /^Clear .Reviewed. on 36 rows the search shows\?/.test(conf2)
+    rec('H-hdr-clear', !!post2 && post2.state === false && post2.row_keys.length === 36 && /^Clear .Reviewed. on 36 rows the (?:search shows|filter keeps)\?/.test(conf2)
         && /2 of them were marked by someone else \((pat, lee|lee, pat)\)/.test(conf2) && tb().querySelectorAll('.journal-toggle-box.is-on').length === 0
         && !!b && b.getAttribute('aria-checked') === 'false',
         'confirm "' + oneLine(conf2).slice(0, 200) + '" | post ' + (post2 ? post2.row_keys.length + ' keys, state ' + post2.state : 'none') + ' | box ' + (b && b.getAttribute('aria-checked')));
@@ -1233,7 +1234,7 @@
     await sleep(900);
     var post3 = bulkPosts(p2)[0];
     var closed = FX.filter(function (r) { return r['STATUS'] === 'Closed'; }).map(window.__keyOf);
-    rec('H-hdr-search', t3 === 'Mark Reviewed on all 9 rows the search shows' && !!post3 && post3.row_keys.length === 9
+    rec('H-hdr-search', /^Mark Reviewed on all 9 rows the (?:search shows|filter keeps)$/.test(t3) && !!post3 && post3.row_keys.length === 9
         && post3.row_keys.every(function (k) { return closed.indexOf(k) >= 0; }),
         'title "' + t3 + '" | post ' + (post3 ? post3.row_keys.length + ' keys' : 'none') + ' (Closed rows: ' + closed.length + ')');
   };
@@ -1244,7 +1245,7 @@
     await sleep(400);
     var conf = window.__confirms[c0] || '';
     window.__confirmAnswer = true;
-    rec('H-hdr-pages', /^Mark .Reviewed. on 34 rows the search shows, on every page\?/.test(conf) && bulkPosts(p0).length === 0,
+    rec('H-hdr-pages', /^Mark .Reviewed. on 34 rows the (?:search shows|filter keeps), on every page\?/.test(conf) && bulkPosts(p0).length === 0,
         'confirm "' + oneLine(conf).slice(0, 160) + '", writes ' + bulkPosts(p0).length);
   };
   S.hdrfail = async function () {
@@ -1628,7 +1629,8 @@
     var s1 = await searchFor('Reviewed = ☑'), s2 = await searchFor('Complete = ☑');
     await searchFor('');
     rec('M-live-search', typed && s1.length === 2 && s2.length === 2, 'renamed ' + typed + ' | "Reviewed = ☑" ' + s1.length + ', "Complete = ☑" ' + s2.length);
-    rec('M-live-status', /Named it Complete\. Searches, snippets, buttons and scheduled tasks that say Reviewed keep working\./.test(status), 'status "' + status.slice(0, 200) + '"');
+    // "Searches, ..." or, since penumbra_tests\filterword (2026-10-19), "Filters, ..."
+    rec('M-live-status', /Named it Complete\. (?:Searches|Filters), snippets, buttons and scheduled tasks that say Reviewed keep working\./.test(status), 'status "' + status.slice(0, 200) + '"');
     var list = P.journalOldNameList ? P.journalOldNameList().map(function (o) { return o.name + '>' + o.current; }) : [];
     var comp = P.journalCurrentNameOf ? P.journalCurrentNameOf('Comp') : 'x';
     rec('M-live-typed', list.join('|') === 'Reviewed>Complete' && comp === null, 'old names ' + JSON.stringify(list) + ', "Comp" stands for ' + comp);
@@ -1684,7 +1686,7 @@
         '"Sent = ☑" ' + JSON.stringify(sSent) + ' (Sent marks row 7), "Sent" listed as an old name of ' + sentNow);
     await cfgOpen();
     var warn = document.getElementById('journalToggleWarn'), w = warn ? warn.textContent : '';
-    rec('M-prec-warn', /“Sent” was the name of “Complete” before it was renamed\. Searches, snippets and scheduled tasks that say “Sent” now read this column/.test(w) && $(warn).is(':visible'),
+    rec('M-prec-warn', /“Sent” was the name of “Complete” before it was renamed\. (?:Searches|Filters), snippets and scheduled tasks that say “Sent” now read this column/.test(w) && $(warn).is(':visible'),   // Filters: filterword (2026-10-19)
         'warning "' + w.slice(0, 240) + '"');
     var t = savedToggles(), t1 = t ? t.filter(function (d) { return d.key === 'toggle1'; })[0] : null, t2 = t ? t.filter(function (d) { return d.key === 'toggle2'; })[0] : null;
     rec('M-prec-save', !!t1 && JSON.stringify(t1.oldLabels) === '["Reviewed","Status"]' && !!t2 && !('oldLabels' in t2), 'saved ' + JSON.stringify(t));

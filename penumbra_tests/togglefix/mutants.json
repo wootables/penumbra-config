@@ -2651,8 +2651,8 @@
   "edits": [
    [
     "js/main.js",
-    "            var inGroup = !!(tbl && tbl.closest('#groupedResultsContainer')), where = inGroup ? ' in this group' : ' the search shows';\n",
-    "            var inGroup = false, where = ' the search shows';\n"
+    "            var inGroup = !!(tbl && tbl.closest('#groupedResultsContainer')), where = inGroup ? ' in this group' : '",
+    "            var inGroup = false, where = false ? ' in this group' : '"
    ]
   ],
   "must": [
@@ -3558,8 +3558,8 @@
   "edits": [
    [
     "js/main.js",
-    "                keeps = 'Searches, snippets, buttons and scheduled tasks that say <strong>' + escapeHtml(was) + '</strong> keep working. ';\n",
-    ""
+    ", snippets, buttons and scheduled tasks that say <strong>' + escapeHtml(was) + '</strong> keep working. ';\n",
+    "';\n"
    ]
   ],
   "must": [

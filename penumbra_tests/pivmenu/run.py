@@ -16,11 +16,12 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js', 'penumbra_tiles.js', 'penumbra_colwidths.js']
 SCN = ['pmhead', 'pmfield', 'pmcell', 'pmbreak', 'pmmulti', 'pmnotool']
 CHK = {
-    'pmhead': ['opens', 'headItems', 'sortDesc', 'thenOffered', 'thenSort', 'sortClear', 'copyCol', 'shadeList', 'shadeBar', 'shadeUndo', 'shadeHover', 'fmtList', 'fmtCurrency', 'fmtDp', 'fmtUndo', 'fmtAuto', 'colsItems', 'colsDesc', 'colsAsc', 'colExclude'],
+    'pmhead': ['opens', 'nativeShift', 'nativeSecond', 'headItems', 'sortDesc', 'thenOffered', 'thenSort', 'sortClear', 'copyCol', 'shadeList', 'shadeBar', 'shadeUndo', 'shadeHover', 'fmtList', 'fmtCurrency', 'fmtDp', 'fmtUndo', 'fmtAuto', 'colsItems', 'colsDesc', 'colsAsc', 'colExclude'],
     'pmfield': ['fieldItems', 'sortAZ', 'collapseAll', 'expandAll', 'fieldUp', 'fieldUndo', 'fieldRemove', 'removeLastOff', 'swap'],
     'pmcell': ['cellOpens', 'cellItems', 'drillLabel', 'drill', 'labelItems', 'toggle', 'copyLabel', 'labelExclude', 'cellFilter'],
     # (colmenu round 14) the breakdown table's menu: sort and copy
-    'pmbreak': ['bdTable', 'bdNumNative', 'bdHeadOpens', 'bdHeadItems', 'bdSortAsc', 'bdSortDesc', 'bdThen', 'bdClear', 'bdCopyCol', 'bdCopyDistinct', 'bdCell', 'bdCopyValue', 'bdCopyName', 'bdKbd'],
+    'pmbreak': ['bdTable', 'bdNumNative', 'bdNativeShift', 'bdHeadOpens', 'bdHeadItems', 'bdSortAsc', 'bdSortDesc', 'bdThen', 'bdClear', 'bdCopyCol', 'bdCopyDistinct', 'bdCell', 'bdCopyValue', 'bdCopyName', 'bdKbd',
+                'bdWidthItems', 'bdFit', 'bdFitAll', 'bdResetWidths', 'bdWidthsNotPivot'],
     # (colmenu round 17) several values, no column fields, collapsed groups: the cells by position
     'pmmulti': ['multiBuilt', 'multiItems', 'multiCollapsed', 'multiCopy', 'multiSlot', 'multiFmtKind'],
     'pmnotool': ['noToolField', 'noToolHead'],
@@ -40,8 +41,17 @@ NEW_R18 = {'L-pmhead-colsItems', 'L-pmhead-colsDesc', 'L-pmhead-colsAsc', 'L-pmc
 # (colmenu round 19) the pivot menu's lists open on hover
 NEW_R19 = {'L-pmhead-shadeHover'}
 # (colmenu round 22) a count's Format list: no types, the decimals alone, a line that says why
-NEW = {'L-pmmulti-multiFmtKind'}
+NEW_R22 = {'L-pmmulti-multiFmtKind'}   # live a57a250
+# (colmenu round 25) the way to the browser's menu from the pivot's and the breakdown's menus
+NEW_R25 = {'L-pmhead-nativeShift', 'L-pmhead-nativeSecond', 'L-pmbreak-bdNativeShift'}   # live a04520b
+# (colmenu round 27) the breakdown menu's width items
+NEW = {'L-pmbreak-bdWidthItems', 'L-pmbreak-bdFit', 'L-pmbreak-bdFitAll', 'L-pmbreak-bdResetWidths'}
 MUTANTS = {
+    # --- (colmenu round 27) the breakdown's width items: never offered; the API gate back to flat/group
+    'w-bditems': ([('menu', "        if (W && typeof W.canFit === 'function' && W.canFit(th)) {\n            items.push('-');\n            items.push({ act: 'bdFit'", "        if (false) {\n            items.push('-');\n            items.push({ act: 'bdFit'")], ['L-pmbreak-bdWidthItems', 'L-pmbreak-bdFit', 'L-pmbreak-bdFitAll', 'L-pmbreak-bdResetWidths'], ['pmbreak']),
+    'w-apigate': ([('colw', "            if (!c || c.view === 'pivot') { return false; }   // (round 27) a breakdown's too", "            if (!c || (c.view !== 'flat' && c.view !== 'group')) { return false; }")], ['L-pmbreak-bdFitAll'], ['pmbreak']),
+    # --- (colmenu round 25) Shift with the right-click intercepted all the same
+    'p-shift': ([('menu', "        if (e.shiftKey && e.button === 2) { if (cur) { close(false); } lastClosed = null; return; }\n", "")], ['L-pmhead-nativeShift', 'L-pmbreak-bdNativeShift'], ['pmhead', 'pmbreak']),
     # --- (colmenu round 22) the Format list ignores what kind of value it is
     'f-kind': ([('menu', "        var kind = typeof P.fmtKind === 'function' ? P.fmtKind(ai) : 'number';", "        var kind = 'number';")], ['L-pmmulti-multiFmtKind'], ['pmmulti']),
     # --- (colmenu round 19) no hover listener on the pivot menu's root
@@ -102,7 +112,7 @@ src_root = stage_dir or APP
 def pick(rel):
     p = os.path.join(src_root, rel)
     return p if os.path.exists(p) else os.path.join(APP, rel)
-RELS = {'main': os.path.join('js', 'main.js'), 'menu': os.path.join('js', 'penumbra_colmenu.js'), 'mcss': os.path.join('css', 'penumbra_colmenu.css'),
+RELS = {'main': os.path.join('js', 'main.js'), 'menu': os.path.join('js', 'penumbra_colmenu.js'), 'mcss': os.path.join('css', 'penumbra_colmenu.css'), 'colw': os.path.join('js', 'penumbra_colwidths.js'),
         'css': os.path.join('css', 'main.css'), 'index': 'index.php'}
 cand = {k: pick(v) for k, v in RELS.items()}
 if control: cand = {k: os.path.join(APP, v) for k, v in RELS.items()}
@@ -186,6 +196,7 @@ def write_stage(texts):
     w('main.css', texts['css'])
     w('penumbra_colmenu.js', texts['menu'])
     w('penumbra_colmenu.css', texts['mcss'])
+    w('penumbra_colwidths.js', texts['colw'])   # (colmenu round 27) the staged width module, not LIBS' live copy
 
 def run_browser(scns):
     out = []

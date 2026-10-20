@@ -9,6 +9,10 @@
 #   static      the button in the lead segment, the lift, the help                     S-*
 # --control runs LIVE: every NEW check red there, every other one green (the guards say what
 # live already does: the row-limit icon at exactly 200 rows, none at 150, the live status).
+# ROUND 2 (2026-10-19, rfx): each search line's x at the end of its own text, in the search's
+# chip; every count in one column; the card as wide as its own lines (up to 600px, never past
+# the window), not the row count's width under it; the boxes never widen it. NEW is now that
+# round's checks (round 1's are guards: all green on live since 2026-10-17).
 #
 #   py -3 run.py [--stage DIR] [--control] [--mutants | --mutant NAME] [--scn S]
 # Headless Edge over CDP; stages into %TEMP%\pnb_rf_*; writes nothing to the webroot.
@@ -24,35 +28,42 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js', 'penumbra_tiles.js',
         'penumbra_a11y.js', 'penumbra_grouplist.js', 'penumbra_cellsel.js']
 SCN = ['fbase', 'fsearch', 'for', 'fmismatch', 'fpending', 'gsearch', 'pbase', 'rcap', 'rcapv', 'rcapurl', 'rsaved', 'r150',
-       'rkbd', 'rrepo', 'rnarrow', 'rbig']
+       'rkbd', 'rrepo', 'rnarrow', 'rbig', 'fwide']
 CHK = {
     'fbase': ['btnHiddenAtFirst', 'btnShown', 'opens', 'expanded', 'heading', 'srcLine', 'pageLine', 'noBox', 'liveStatus', 'allLine', 'closes'],
-    'fsearch': ['oracleNarrows', 'opens', 'threeLines', 'counts', 'drops', 'eachX', 'clearAll', 'xRewrites', 'xStaysOpen', 'xRecounts',
-                'xFocus', 'clearDone', 'clearFocus'],
+    'fsearch': ['oracleNarrows', 'opens', 'threeLines', 'counts', 'drops', 'eachX', 'clearAll', 'xInChip', 'xAtTextEnd', 'numsAligned',
+                'xRewrites', 'xStaysOpen', 'xRecounts', 'xFocus', 'clearDone', 'clearFocus'],
     'for': ['opens', 'oneLine', 'noClearAll', 'xClears'],
     'fmismatch': ['opens', 'oneLine'],
     'fpending': ['opens', 'applied'],
     'gsearch': ['opens', 'groupsLine', 'opens2', 'counts', 'groupsOf'],
     'pbase': ['opens', 'pivotLine', 'srcLine', 'opens2', 'searchLine'],
-    'rcap': ['iconShows', 'opens', 'warnBox', 'savedSentence', 'switchBtn', 'saveFoot', 'limitOff', 'reran', 'closedAfter'],
+    'rcap': ['iconShows', 'opens', 'warnBox', 'savedSentence', 'switchBtn', 'saveFoot', 'boxNoWiden', 'limitOff', 'reran', 'closedAfter'],
     'rcapv': ['opens', 'warnBox', 'noSwitch', 'whoCan'],
     'rcapurl': ['iconShows', 'opens', 'urlLink', 'noSavedSentence'],
     'rsaved': ['limitOffHere', 'opens', 'infoBox', 'saveOpens'],
     'r150': ['noIcon', 'opens', 'noBox', 'srcLine'],
     'rkbd': ['btnOpens', 'insideKeeps', 'escCloses', 'escFocus', 'outsideCloses'],
     'rrepo': ['btnHidden', 'notClickable', 'staysShut'],
-    'rnarrow': ['narrow', 'opens', 'cardVisible'],
+    'rnarrow': ['narrow', 'opens', 'cardVisible', 'fitsNarrow'],
     'rbig': ['threeLines', 'fast'],
+    'fwide': ['opens', 'oneLine', 'wider', 'notByCount', 'longWraps', 'kwBeside', 'xInsideCard'],
     # (not in SCN) the card left open for a picture: PNB_SHOT=<png> [PNB_SHOT_SCN=rcapshot] py -3 run.py --stage DIR --scn rcapshot
     'rcapshot': ['opens'],
+    'rxshot': ['opens'],
+    'rxshot2': ['opens'],
 }
 URLX = {'rcapurl': '&rowlimit=true', 'rsaved': '&rowlimit=false'}
 NARROW = {'rnarrow': 480}
 # what live already does (green there too); everything else is new
 GUARDS = {'L-fsearch-oracleNarrows', 'L-rcap-iconShows', 'L-rcapurl-iconShows', 'L-r150-noIcon', 'L-fbase-liveStatus',
           'L-rsaved-limitOffHere', 'L-rnarrow-narrow', 'L-rrepo-notClickable', 'L-rrepo-staysShut', 'S-liveStatus'}
-STATIC = ['S-btn', 'S-lift', 'S-help1', 'S-help2', 'S-help2words', 'S-liveStatus']
-NEW = ({'L-%s-%s' % (s, c) for s in CHK for c in CHK[s]} | set(STATIC)) - GUARDS
+STATIC = ['S-btn', 'S-lift', 'S-help2', 'S-help2words', 'S-liveStatus']   # S-help1 (the v1 Rows entry) retired 2026-10-19 with the v1 help
+NEW1 = ({'L-%s-%s' % (s, c) for s in CHK for c in CHK[s]} | set(STATIC)) - GUARDS   # round 1 (2026-10-17)
+# round 2 (2026-10-19, rfx): red on live; its guards (green there too) are L-fwide-opens, -longWraps,
+# -xInsideCard, L-rcap-boxNoWiden and L-rnarrow-fitsNarrow (each held up by a mutant below)
+NEW = {'L-fsearch-xInChip', 'L-fsearch-xAtTextEnd', 'L-fsearch-numsAligned', 'L-fwide-oneLine', 'L-fwide-wider',
+       'L-fwide-notByCount', 'L-fwide-kwBeside'}
 MUTANTS = {
     # the bar never tells the segment there is a count: no button, no card
     'm-nosync': ([('main', "            _sbRowsSync(txt);   // the Rows card: opens while there is a count, repaints while open\n", "")],
@@ -102,6 +113,24 @@ MUTANTS = {
     # the button not hidden until there is a count
     'i-hidden': ([('index', ' aria-label="Where these rows come from" hidden>', ' aria-label="Where these rows come from">')],
                  ['S-btn', 'L-fbase-btnHiddenAtFirst'], ['fbase']),
+    # ---- round 2 (2026-10-19, rfx) ----
+    # the x back out past the count, at the line's end
+    'm-xout': ([('main', "'</code>' + x + '</span>'", "'</code></span>'"),
+                ('main', "+ (val ? '<span class=\"sb-rf-val\">' + val + '</span>' : '') + '</li>';",
+                 "+ (val ? '<span class=\"sb-rf-val\">' + val + '</span>' : '') + x + '</li>';")],
+               ['L-fsearch-xInChip', 'L-fsearch-xAtTextEnd', 'L-fsearch-numsAligned'], ['fsearch']),
+    # the card shrink-to-fit again: as wide as the count under it allows
+    'c-width': ([('css', "#pnbStatusBar .sb-rows-pop { width: max-content; ", "#pnbStatusBar .sb-rows-pop { ")],
+                ['L-fwide-oneLine', 'L-fwide-wider', 'L-fwide-notByCount'], ['fwide']),
+    # the old 420px cap
+    'c-max': ([('css', "max-width: min(600px, calc(100vw - 48px)); }", "max-width: 420px; }")], ['L-fwide-oneLine', 'L-fwide-wider'], ['fwide']),
+    # the cap without the window: off the edge of a narrow one
+    'c-vwclamp': ([('css', "max-width: min(600px, calc(100vw - 48px)); }", "max-width: 600px; }")], ['L-rnarrow-fitsNarrow'], ['rnarrow']),
+    # the boxes' paragraphs set the card's width
+    'c-contain': ([('css', "    contain: inline-size;   /* takes the card's width, never sets it */\n", "")], ['L-rcap-boxNoWiden'], ['rcap']),
+    # the keyword and the chip as plain inline boxes: a long chip drops under the keyword
+    'c-chipflex': ([('css', "#pnbStatusBar .sb-rf-search .sb-rf-lab { display: flex; align-items: baseline; gap: 5px; }\n", "")],
+                   ['L-fwide-kwBeside'], ['fwide']),
 }
 
 args = sys.argv[1:]
@@ -122,7 +151,7 @@ if args: raise SystemExit('unknown arguments: %s' % ' '.join(args))
 RELS = {'main': os.path.join('js', 'main.js'), 'mod': os.path.join('js', 'penumbra_colfmt.js'), 'calc': os.path.join('js', 'penumbra_calc.js'),
         'colw': os.path.join('js', 'penumbra_colwidths.js'), 'menu': os.path.join('js', 'penumbra_colmenu.js'),
         'mcss': os.path.join('css', 'penumbra_colmenu.css'), 'css': os.path.join('css', 'main.css'),
-        'index': 'index.php', 'help': 'help_content.php', 'help2': os.path.join('help', 'topics', 'userSettingsHelpLightbox.php')}
+        'index': 'index.php', 'help': os.path.join('help', 'tips', 'settings-tips-storage.php'), 'help2': os.path.join('help', 'topics', 'userSettingsHelpLightbox.php')}
 cand = {k: os.path.join(APP, v) for k, v in RELS.items()}
 if stage_dir and not control:
     for k, v in RELS.items():
@@ -172,9 +201,7 @@ def static_checks(texts):
     out.append(('S-lift', all(x in leadseg for x in ('id="sbRows"', 'id="sbRowLimitWarn"', 'id="sbRowsBtn"')) and '<div' not in leadseg[5:],
                 'lead segment %d chars' % len(leadseg)))
     out.append(('S-liveStatus', bool(re.search(r'<span[^>]*id="sbRows"[^>]*role="status"[^>]*aria-live="polite"', leadseg)), 'the live row count'))
-    h1 = texts['help']
-    out.append(('S-help1', '<li><strong>Rows</strong> - the visible / total row count. Click it for where the rows come from' in h1
-                and 'run the query again from it' in h1, 'help_content.php Rows entry'))
+    # (2026-10-19) S-help1 pinned the v1 help's Rows entry; the v1 help is gone and S-help2 pins the topic
     h2 = texts['help2']
     m2 = re.search(r'<td[^>]*><strong>Rows</strong></td><td[^>]*>(.*?)</td>', h2)
     cell = m2.group(1) if m2 else ''

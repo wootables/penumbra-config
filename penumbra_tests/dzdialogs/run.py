@@ -45,7 +45,7 @@ def rd(rel):
     p = os.path.join(APP, rel)
     if not os.path.exists(p): p = os.path.join(LIVE, rel)
     return open(p, 'rb').read().decode('utf-8', 'surrogateescape')
-F = {'help': rd('help_content.php'), 'dcss': rd('css/density.css'), 'main': rd('js/main.js'), 'sb': rd('js/search_builder.js'),
+F = {'help': rd('help/topics/userSettingsHelpLightbox.php'), 'dcss': rd('css/density.css'), 'main': rd('js/main.js'), 'sb': rd('js/search_builder.js'),
      'pre': rd('js/penumbra_presets.js'), 'repo': rd('js/penumbra_repository.js')}
 
 MUTANTS = {

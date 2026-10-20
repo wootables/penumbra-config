@@ -50,6 +50,9 @@ MUTANTS = {
     # (2026-10-18, calcadj) an adjustable value read as blank; its highest not enforced
     'p-inp': ([('lib', "        case 'inp': return _pnb_calc_to_num($get('@' . $node['n']));\n", "        case 'inp': return null;\n")], ['P-inputs'], []),
     'p-inpclamp': ([('lib', "    if ($mx !== null) { $o['max'] = $mx; if ($o['value'] > $mx) $o['value'] = $mx; }\n", "    if ($mx !== null) { $o['max'] = $mx; }\n")], ['P-inputs', 'P-inputClean'], []),
+    # (2026-10-19, round 5) a date value read as a number only (blank)
+    'p-datekind': ([('lib', "        case 'inp': $iv = $get('@' . $node['n']); $inn = _pnb_calc_to_num($iv); return $inn !== null ? $inn : _pnb_calc_to_date($iv);\n",
+                     "        case 'inp': return _pnb_calc_to_num($get('@' . $node['n']));\n")], ['P-dateInputs'], []),
     # the hooks (schedule_runner.php CRLF, index.php LF)
     'h-sched': ([('sr', "        $apiData['data'] = pnb_calc_apply_rows($apiData['data'], $state['calcColumns'], $calcProblems);\r\n", "")], ['H-sched-rows'], []),
     'h-stream': ([('sr', "            $stream_row_callback = function ($row) use ($calcMap, $calcInner) { return $calcInner($calcMap($row)); };\r\n", "")], ['H-stream-rows'], []),

@@ -15,8 +15,8 @@ reading budget, and that the AI help retrieval still indexes everything.
 
 | file | what changed |
 | --- | --- |
-| `help_content.php` | 4-line shim after `require_once 'db_connection.php';`: with v2 active it hands the request to `help/loader.php` and returns. Otherwise byte-identical to v1. CRLF. |
-| `help_manifest.php` | 4-line shim before the v1 `function_exists` guard: requires `help/manifest.php`, which defines the TOC functions first while v2 is active. LF. |
+| `help_content.php` | Since 2026-10-19 a shim and nothing else: `require_once 'db_connection.php';`, `help/manifest.php`, then `help/loader.php`. The v1 body (12,000 lines) is in git history up to bcbf7da. CRLF. |
+| `help_manifest.php` | Since 2026-10-19 a shim: requires `help/manifest.php`, which defines the TOC functions. The v1 registry went with the v1 body. LF. |
 | `help_retrieval.php` | v2-aware: builds the AI help chunks from the fragments (manifest order) into `cache/help_chunks_v2.json`, keyed on a count+mtime+size signature; tip stores index under their own headings; every chunk carries its block's audience (`a`). `PNB_HELP_VER` 3 -> 4. |
 | `js/main.js` | ONE behaviour (two hunks, `patch_mainjs.php`): a `.help-jump-link` whose anchor lives in a topic that is not active activates that topic; `activateHelpTopic()` re-resolves the owning topic from a jump anchor (so `?` icons and `openHelpCenter()` aimed at a moved section keep landing on it), opens a folded topic at its own start when no anchor is given, and accepts a topic div itself as an anchor. CRLF. |
 | `help/manifest.php` | NEW. The switch (`pnb_help_v2_active`), the gate (`pnb_help_gate_on`, `pnb_help_show`, `pnb_help_is_writer`), the registry (`pnb_help_v2_manifest`: categories; per topic id, title, audience, aliases, keywords, extra, new), the phase (`pnb_help_v2_phase` = 5) and the list of topics the phase touched (`pnb_help_v2_touched`), the v2 `penumbra_help_manifest()` / `penumbra_render_help_toc()`. |
@@ -25,7 +25,7 @@ reading budget, and that the AI help retrieval still indexes everything.
 | `help/snippets.php` | NEW (phase 4). The Custom Code registry: data only, 41 entries; `help/topics/optionsHelpLightbox.php` is GENERATED from it by `tests/gen_snippets_help.php` (see Phase 4). |
 | `ai_system_prompt.php` | STAGED copy (phase 5): one added heading, `### avg(COLUMN, CONDITION?)`; a deploy of it must be followed by `php renew_ai_cache.php`. |
 | `help/ask.php`, `help_ask.php`, `help/topics/askHelpLightbox.php`, `js/penumbra_help_ask.js` | NEW (phase 6). The Ask page: library, endpoint, topic, client. Inert without the marker. |
-| `help/v2.on` | NEW marker. Present = v2 serves. Delete = v1. NOT tracked in git; the deploy creates it on live only when the user says so. |
+| `help/v2.on` | RETIRED 2026-10-19 with the v1 help (deleted on live): `pnb_help_v2_active()` always answers true. `help/gate.on` and the Ask markers remain hand-made, untracked markers. |
 
 Not touched: index.php, the dashboard, CSS. Topic ids, anchor ids and `data-tip` keys are a contract
 (42 `?` icons, `#help=` links, 40+ suites); former ids go into the manifest's `aliases`, which ride
@@ -317,10 +317,11 @@ harness needs Edge (`jump_harness.ps1`, called by run.php through PowerShell).
 | check | what |
 | --- | --- |
 | L1-L20 `lint_help.php` | manifest<->files, guard, audience attributes = manifest, unique ids, every jump link resolves (cross-topic ones listed as info), every `data-target` / `openHelpCenter` / `#help=` / `openHelpPanel` reference resolves, every consumed tip key is defined (index.php + js/*.js), tags balanced, `php -l`, line endings, manifest sanity, canonical keys unique (L12), shims present, every `data-canonical-ref` pointer resolves into its canonical's topic (L14), one h3 and one close button per topic shell (L15), the reading budget on every `pnb_help_v2_standard()` topic (L16: paragraphs <= 80 words, bullets <= 50, cells <= 70, no em-dashes, no emoji headings), the Custom Code topic is the current render of `help/snippets.php` (L17), the registry's names are exactly the editor's function list (L18), no flex-div pseudo-table row in a standard topic (L19), the Ask fragment alone carries a script and it is the Ask client (L20). Then the budget table for every fragment as warnings. |
-| E*/P* `equiv_help.php` | always: v2 body carries `data-audience`; blocks close; gate on: viewer / writer / admin see exactly their topic sets, inner "For Administrators" blocks hidden from viewers, TOC stars and legend follow; v2 forced off renders the v1 body (rollback). Phase 0: v1 == v2 block by block and TOC == TOC. Phase 1+: every v1 block, element id, tip key and TOC id survives (P1 P2 P3 P5), words within 85-105% (P6; floor 60% from phase 2), every topic the manifest does not list as touched is identical to v1 (P7), new topics are well-formed (P8). Phase 2+: every fact token of a touched v1 topic is still in v2 or listed as dropped (P9). |
+| E0/E1c/E3-E6 `equiv_help.php` (E7 and P1-P9 retired 2026-10-19 with the v1 help) | v2 body carries `data-audience`; blocks close; gate on: viewer / writer / admin see exactly their topic sets, inner "For Administrators" blocks hidden from viewers, TOC stars and legend follow; v2 forced off renders the v1 body (rollback). Phase 0: v1 == v2 block by block and TOC == TOC. Phase 1+: every v1 block, element id, tip key and TOC id survives (P1 P2 P3 P5), words within 85-105% (P6; floor 60% from phase 2), every topic the manifest does not list as touched is identical to v1 (P7), new topics are well-formed (P8). Phase 2+: every fact token of a touched v1 topic is still in v2 or listed as dropped (P9). |
 | `visual_harness.php` | report only: renders one topic as the hub shows it and as the dashboard's help panel shows it, scrolled by N px, into static HTML for a headless Edge `--screenshot`; a probe badge prints the pane's scrollWidth / clientWidth so a horizontal overflow is a number, not a guess. |
-| R1-R10 `retrieval_smoke.php` | chunks from the fragments with audiences; the v1 build still works and matches within 10%; a scheduling question lands on the Scheduler topic; a pasted SELECT retrieves nothing; the two versions use different cache files; in ask mode "how do i hide a column" lands on Your Settings while assist mode keeps its gate (R6, R7); in ask mode "is the IP address list enforced" lands on Security & Access with the IP Address List passage (R8), twelve data questions naming PI / ID / FY / DB retrieve nothing in assist mode (R9), a cache stamped with the previous `PNB_HELP_VER` is rejected and rebuilt (R10). |
+| R1/R3/R4/R6-R10 `retrieval_smoke.php` | chunks from the fragments with audiences (R2 and R5, the v1 build and the two caches, retired 2026-10-19); a scheduling question lands on the Scheduler topic; a pasted SELECT retrieves nothing; the two versions use different cache files; in ask mode "how do i hide a column" lands on Your Settings while assist mode keeps its gate (R6, R7); in ask mode "is the IP address list enforced" lands on Security & Access with the IP Address List passage (R8), twelve data questions naming PI / ID / FY / DB retrieve nothing in assist mode (R9), a cache stamped with the previous `PNB_HELP_VER` is rejected and rebuilt (R10). |
 | J1-J2 `jump_harness.ps1` | headless Edge over a mini hub with the navigation code LIFTED from the main.js under test (`lift_jump.php`): in-topic link stays put, cross link activates the owner (and its folded extras), link into an extra activates host + extra, deep link re-resolves the owner, folded topic opens at its own start, plain open unchanged. J2 runs the UNPATCHED main.js and must fail exactly T2-T5. |
+| K1-K2 `tip_harness.ps1` | headless Edge over a mini generator dialog with the hover-popover code LIFTED from the main.js under test (`lift_tip.php`): the first hover of a ? icon in a dialog no open path wired pops its tip, the explicit initHelpPopover path still works and stays idempotent, an inline-text tip renders as text, leaving closes it. K2 runs the UNPATCHED main.js and must fail exactly T1 (2026-10-19, helptip). |
 | A1-A10 `ask_tests.php` | the Ask page's pure half (help/ask.php) against a scratch state dir and a stub model: help-only prompt, card cache, votes and retirement, limits, no-passage gate, audience filter, text-only answers, store integrity, validation, log (phase 6). |
 | H1 `ask_harness.ps1` | the Ask client (js/penumbra_help_ask.js) in headless Edge against a stubbed endpoint: T1-T6 (phase 6). |
 | `coverage_help.php` | report only: snippet functions, action types, URL parameters, single keys, View Options controls, scheduler labels, chart types, pivot aggregations, prompt tips vs the Query Prompts topic, hover-tip keys, topics without a `?` icon, each against the help. Writes `coverage_report.md`. |
@@ -388,3 +389,28 @@ place, both caches rebuilt (v1 1240 chunks, v2 1274, VER 5, signatures matched),
 79205b5 pushed (my 17 paths only; `.gitignore` gained the three Ask markers). `renew_ai_cache.php` was NOT run: it needs
 the server's local D: config path, it would re-snapshot the DDL from the databases and create a billed explicit Gemini
 cache, and ai_assist.php sends the prompt inline (implicit caching), so the avg() heading is live at the next request.
+
+## The v1 help removed (2026-10-19)
+
+`help_content.php` and `help_manifest.php` are shims only (their URLs unchanged, so index.php, main.js and the
+dashboard are untouched); `help/manifest.php` lost the switch (`help/v2.on` / `v2.off`, the admin preview cookie,
+`PNB_HELP_V2_DEFAULT`), `pnb_help_v2_touched()` and `pnb_help_v2_dropped_tokens()`; `pnb_help_v2_active()` stays
+for its callers and always answers true. `help_retrieval.php` VER 7 builds the one cache, `cache/help_chunks.json`,
+from the fragments (`help_chunks_v2.json` deleted on live; `prebuild_caches.php` takes no argument). The Ask page
+is on unless `help/ask.off` exists.
+
+Suite: L13 checks the two shims; `equiv_help.php` keeps E0, E1c, E3-E6 and E-php (the audience-gate matrix) and
+drops E1a/E1b/E2/E7 and P1-P9 (they compared against the v1 file; `--orig` is accepted and ignored);
+`retrieval_smoke.php` drops R2 and R5; the mutants that needed P* (text-drift, fact-dropped, phase3-chart-id)
+retired, shim-missing now removes the shim's loader line (L13 + an empty body in every gate render).
+
+The other suites that read the v1 file: colmenu / rowfunnel / colopt / snaplayout lift the Settings hover tips from
+`help/tips/settings-tips-storage.php`; grplist the group-layout tip from `help/tips/pivot-tips-storage.php`; cellsel,
+dzdialogs, colwidths and singlekeytips read `help/topics/userSettingsHelpLightbox.php`; searchbox and acrow the Search
+topic (acrow's H-doc / H-repick pin the "Picking several values" table); combostack the viz tip store + the Custom
+Code topic; noadm5 and searchbar View Options; schedrowwarn the SQL Editor (S2) and Scheduler (S3) topics;
+promptsection the builder tip store + Query Prompts. dashsearch, singlekeytips (the dashboard harness), ownerview
+and peopledir feed a concatenation of every fragment where they fed the raw v1 file. Dropped as v1-only: the `hlp`
+halves of colmenu's S-help* pins, rowfunnel S-help1, colopt's `<em>` wording pin, ownerview S8 (v1 `$isAdmin`
+gating; the v2 gate is off) with its three help mutants and the S9 badges pin. Backups of the runners as they were:
+the deploying session's scratchpad `helptier/suites_orig/`.

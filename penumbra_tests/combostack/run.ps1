@@ -38,7 +38,7 @@ $js   = "$app\js"
 if (-not $MainJs) { $MainJs = "$js\main.js" }
 if (-not $Css)    { $Css = "$app\css\main.css" }
 if (-not $Index)  { $Index = "$app\index.php" }
-if (-not $Help)   { $Help = "$app\help_content.php" }
+if (-not $Help)   { $Help = "$app\help\tips\viz-tips-storage.php" }   # (2026-10-19) the v1 help is gone; S3 reads the Custom Code topic too
 $browser = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
 if (-not (Test-Path $browser)) { $browser = 'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe' }
 if (-not (Test-Path $browser)) { $browser = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe' }
@@ -64,7 +64,7 @@ Write-Host "      help:     $Help"
 $src     = $u8.GetString([IO.File]::ReadAllBytes($MainJs))
 $cssText = $u8.GetString([IO.File]::ReadAllBytes($Css))
 $idxText = $u8.GetString([IO.File]::ReadAllBytes($Index))
-$helpText = $u8.GetString([IO.File]::ReadAllBytes($Help))
+$helpText = $u8.GetString([IO.File]::ReadAllBytes($Help)) + $u8.GetString([IO.File]::ReadAllBytes("$app\help\topics\optionsHelpLightbox.php"))
 $anchor = '$(document).ready(function () {'
 if (-not $src.Substring(0, 200).Contains($anchor)) { throw "main.js closure anchor not found - update run.ps1" }
 

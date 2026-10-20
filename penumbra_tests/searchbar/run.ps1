@@ -60,7 +60,7 @@ if ($Control) {
   foreach ($p in @($MainCss, $MainJs, $IndexPhp, $HelpPhp)) { if (-not $p) { throw "-Control: a .bak-20260925-searchbar file is missing" } }
 }
 $paths = @{ css = $(if ($MainCss) { $MainCss } else { "$app\css\main.css" }); js = $(if ($MainJs) { $MainJs } else { "$app\js\main.js" })
-            idx = $(if ($IndexPhp) { $IndexPhp } else { "$app\index.php" }); help = $(if ($HelpPhp) { $HelpPhp } else { "$app\help_content.php" }) }
+            idx = $(if ($IndexPhp) { $IndexPhp } else { "$app\index.php" }); help = $(if ($HelpPhp) { $HelpPhp } else { "$app\help\topics\viewoptionsHelpLightbox.php" }) }
 $src0 = @{}; foreach ($k in @($paths.Keys)) { $src0[$k] = [IO.File]::ReadAllText($paths[$k], $utf8) }
 
 # --- mutants. main.css / main.js / help CRLF, index.php LF.
@@ -85,7 +85,8 @@ $mRing    = '#tableSearchContainer .search-wrapper.pnb-user-hidden {' + $C + '  
 $mPreview  = '                if (isNoAdmView) penumbraPreviewViewerOption(optionId, isChecked);' + $C + '                else penumbraMarkUserHidden'
 $mPreview0 = '                penumbraMarkUserHidden'
 $mLiveFlags = "        if (isNoAdmView && document.getElementById('viewOptionSearch')) _pnbBarAllOff = _pnbBarFlagsFromCheckboxes();" + $C
-$mCard    = '                <div class="view-option-item"><label><input type="checkbox" id="viewOptionSearch" checked><div class="view-option-text"><strong>Search Bar</strong><small>Show the search box above the table.</small></div></label></div>' + $L
+# (the card reads "Search Bar", or "Filter Bar" since penumbra_tests\filterword 2026-10-19: the anchor stops before the name)
+$mCard    = '                <div class="view-option-item"><label><input type="checkbox" id="viewOptionSearch" checked><div class="view-option-text"><strong>'
 $mPageBtn  = '.page-nav-btn {' + $C + '    padding: 5px 10px;' + $C + '    font-size: 11px;' + $C + '    margin-top: 0;' + $C + '    cursor: pointer;' + $C + '}' + $C
 $mPageBtn0 = '.page-nav-btn {' + $C + '    padding: 5px 10px;' + $C + '    font-size: 11px;' + $C + '    margin-top: 0;' + $C + '}' + $C
 $mutantDefs = [ordered]@{
@@ -125,7 +126,7 @@ function Get-Static($s) {
   $idx = $s.idx; $js = $s.js; $css = $s.css; $help = $s.help
   $g = $idx.IndexOf('<div class="view-options-grid">', [Math]::Max(0, $idx.IndexOf('<div class="view-options-eu">')))
   $first = if ($g -ge 0) { [regex]::Match($idx.Substring($g), 'id="viewOption(\w+)"( checked)?') } else { $null }
-  $out += [pscustomobject]@{ id = 'S1'; name = 'the Search Bar card is the End-User grid''s first, checked by default'; pass = ($null -ne $first) -and $first.Success -and ($first.Groups[1].Value -eq 'Search') -and ($first.Groups[2].Value -ne '') -and $idx.Contains('<strong>Search Bar</strong>'); detail = $(if ($first) { "first=$($first.Value)" } else { 'no grid' }) }
+  $out += [pscustomobject]@{ id = 'S1'; name = 'the Search Bar card is the End-User grid''s first, checked by default'; pass = ($null -ne $first) -and $first.Success -and ($first.Groups[1].Value -eq 'Search') -and ($first.Groups[2].Value -ne '') -and ($idx.Contains('<strong>Search Bar</strong>') -or $idx.Contains('<strong>Filter Bar</strong>')); detail = $(if ($first) { "first=$($first.Value)" } else { 'no grid' }) }
   $sv = $js.Contains("if (!`$('#viewOptionSearch').is(':checked')) {" + $C + '            viewOptions.hideSearch = true;')
   $ld = $js.Contains("`$('#viewOptionSearch').prop('checked', !vo.hideSearch);")
   $out += [pscustomobject]@{ id = 'S2'; name = 'saved as viewOptions.hideSearch (absent = on) and restored from it'; pass = $sv -and $ld; detail = "save=$sv load=$ld" }
@@ -138,7 +139,7 @@ function Get-Static($s) {
   $c2 = $css.Contains('body.pnb-no-controlbar #resultsHeader {' + $C + '    display: none !important;')
   $c3 = $css.Contains('@container pnb-vo-eu (max-width: 1623px) {')
   $out += [pscustomobject]@{ id = 'S5'; name = 'CSS: an active search keeps its box, the empty bar goes, the grid''s 12-card step (1623px)'; pass = $c1 -and $c2 -and $c3; detail = "restrict-search=$c1 no-controlbar=$c2 step1623=$c3" }
-  $hp = $help.Contains('<strong>Search Bar</strong></div>') -and $help.Contains('viewers get the table without the control bar at all')
+  $hp = ($help.Contains('<strong>Search Bar</strong></td>') -or $help.Contains('<strong>Filter Bar</strong></td>')) -and $help.Contains('viewers get the table without the control bar at all')
   $out += [pscustomobject]@{ id = 'S6'; name = 'the help documents the option and the reclaimed bar'; pass = $hp; detail = "help=$hp" }
   return ,$out
 }

@@ -22,20 +22,23 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
         'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js', 'penumbra_tiles.js',
         'penumbra_a11y.js', 'penumbra_grouplist.js', 'penumbra_cellsel.js']
-SCN = ['mflat', 'mkbd', 'mopts', 'mcalc', 'mgroupby', 'gmenu', 'mrestr', 'mexcl', 'mcopy', 'mjournal', 'mmore', 'mfitnest', 'mcell', 'mload', 'mreset', 'msubs', 'mbucket', 'mnum']
+SCN = ['mflat', 'mkbd', 'mopts', 'mcalc', 'mgroupby', 'gmenu', 'mrestr', 'mexcl', 'mcopy', 'mjournal', 'mmore', 'mfitnest', 'mcell', 'mnest', 'mload', 'mreset', 'msubs', 'mbucket', 'mnum']
 CHK = {
-    'mflat': ['opens', 'prevented', 'titleName', 'statsLine', 'statsAllUnique', 'statsTop', 'statsEmpty', 'statsToggle', 'statsNotes', 'statsFiltered', 'itemsAll', 'sortAsc', 'sortChecked', 'sortDesc', 'sortClear', 'moveRight', 'moveMinimal', 'cellsFollow', 'saved',
+    'mflat': ['opens', 'prevented', 'titleName', 'statsLine', 'statsAllUnique', 'statsDup', 'statsTop', 'statsEmpty', 'statsToggle', 'statsNotes', 'statsFiltered', 'itemsAll', 'sortAsc', 'sortChecked', 'sortDesc', 'sortClear', 'moveRight', 'moveMinimal', 'cellsFollow', 'saved',
               'toastUndo', 'noSavedToast', 'undo', 'edgeDisabled', 'moveStart', 'moveEnd', 'tipNotEarly', 'tipThird', 'tipStored', 'tipOnce',
               'tipOpens', 'hide', 'hideSaved', 'skipHidden', 'showList', 'showHere', 'showFilled', 'swapList', 'swapDone', 'multiMove', 'lastNotHidable'],
     'mkbd': ['opensBelow', 'focusFirst', 'arrowMoves', 'enterRuns', 'focusBack', 'escCloses', 'escFocusBack', 'outsideCloses'],
     'mopts': ['optsPopover', 'optsTitle', 'optsNoFreeze', 'optsOpener', 'optsCloses', 'optsBack', 'freezeItem', 'freezes', 'unfreezeItem', 'unfreezes',
               'noFreezePast5', 'fitItem', 'fits', 'fitUndo', 'fitUndone', 'fitAll', 'fitAllUndo', 'resetItem', 'resets', 'fitsLong', 'fitsLongCut', 'fitCapped'],
     'mcalc': ['dialog', 'seeded', 'placedRight', 'placeSaved', 'calcRemoveItem', 'calcRemoved', 'calcStart'],
-    'mgroupby': ['uniqueAsks', 'groupItem', 'grouped', 'uniqueQuiet'],   # uniqueAsks / uniqueQuiet 2026-10-19 (grpunique): an all-different column asks first
+    'mgroupby': ['uniqueAsks', 'groupItem', 'grouped', 'uniqueQuiet', 'stalePickQuiet'],   # uniqueAsks / uniqueQuiet 2026-10-19 (grpunique): an all-different column asks first
     'gmenu': ['opens', 'noFreeze', 'cellGroup', 'groupItems', 'sortsGroups', 'fitGroup', 'moveAll', 'groupsKept', 'hideAll', 'regroup', 'ungroup'],
     'mrestr': ['sortOnly', 'noLayout'],
     'mexcl': ['cellNative', 'numMenu', 'compareNative'],
     'mcell': ['cellOpens', 'cellFilter', 'cellAdd', 'cellExclude', 'cellCopy', 'cellRaw', 'cellBlank', 'cellNatives', 'cellKbd'],
+    # (round 23) a nested-table (@@JSON) column
+    'mnest': ['nestOpens', 'nestNoFilter', 'nestStats', 'nestSubOpens', 'nestSubFilter', 'nestPadOpens', 'nestLinkOpens', 'nestLinkFoot', 'nestNoFoot', 'nestLinkFilter',
+              'nativeShift', 'nativeSecond', 'nativeOther', 'nativeSecondCell'],
     'msubs': ['topOrder', 'noChips', 'arrows', 'showLabel', 'moveList', 'flyPos', 'nested', 'hoverSwitch', 'showList', 'hoverCloses', 'hoverOpens', 'calcList',
               'copyList', 'resetList', 'clearPanel', 'kbdOpens', 'kbdBack', 'escAll', 'outsideAll'],
     'mreset': ['raItem', 'raOffClean', 'raOnCustom', 'raLayout', 'raCells', 'raPref', 'raFmt', 'raShade', 'raSum', 'raWidth', 'raFreeze', 'raToast',
@@ -44,7 +47,7 @@ CHK = {
     'mnum': ['numOpens', 'numItems', 'numResets', 'numSort', 'numHide', 'numShowItem', 'numShown', 'numCell'],
     'mload': ['idSame', 'idFast', 'idFallback', 'idDynamic', 'edExists', 'edHiddenSkip', 'edShownRefresh', 'edShownNow', 'edShownOnce'],
     'mfitnest': ['nestGrow', 'nestCompact', 'fitLines'],
-    'mjournal': ['jrnPainted', 'jrnNotesCell', 'jrnAddNote', 'jrnInNote', 'jrnMoves', 'jrnStaysUnsaved', 'jrnSwap', 'jrnSaved'],
+    'mjournal': ['jrnPainted', 'jrnNoGroup', 'jrnNotesCell', 'jrnAddNote', 'jrnInNote', 'jrnMoves', 'jrnStaysUnsaved', 'jrnSwap', 'jrnSaved'],
     'mmore': ['thenItems', 'thenSort', 'filterList', 'filterApply', 'filterReopen', 'filterBack', 'filterEsc', 'filterClear', 'filterBlank',
               'only', 'showAll', 'resetCol', 'copyName'],
     'mcopy': ['copyItem', 'copySubmenu', 'copyComma', 'copyNewline', 'copyTab', 'copyFiltered', 'copyKeeps', 'copyOther'],
@@ -97,10 +100,27 @@ NEW_R19 = {'L-mopts-fitUndo', 'L-mopts-fitUndone', 'L-mopts-fitAll', 'L-mopts-fi
 NEW_R20 = {'L-mnum-' + c for c in CHK['mnum']} | {'L-mjournal-jrnNotesCell', 'L-mjournal-jrnAddNote', 'L-mbucket-dtUnits', 'S-helpNum', 'L-mexcl-numMenu', 'L-mcell-cellNatives'}
 # round 21 (2026-10-18): Column stats as a list beside the item (the stats checks change shape), the
 # notes button's inside, Remove this calculated column
-NEW = {'L-mflat-statsLine', 'L-mflat-statsAllUnique', 'L-mflat-statsTop', 'L-mflat-statsToggle', 'L-mflat-statsNotes', 'L-mflat-statsFiltered',
-       'L-mjournal-jrnInNote', 'L-mcalc-calcRemoveItem', 'L-mcalc-calcRemoved', 'S-helpStats', 'L-msubs-topOrder',
-       'L-mgroupby-uniqueAsks'}   # (2026-10-19, grpunique) live groups an all-different column without asking; uniqueQuiet holds there too
+NEW_R21 = {'L-mflat-statsLine', 'L-mflat-statsAllUnique', 'L-mflat-statsTop', 'L-mflat-statsToggle', 'L-mflat-statsNotes', 'L-mflat-statsFiltered',
+           'L-mjournal-jrnInNote', 'L-mcalc-calcRemoveItem', 'L-mcalc-calcRemoved', 'S-helpStats', 'L-msubs-topOrder'}   # live fe02e8c
+NEW_GRPU = {'L-mgroupby-uniqueAsks'}   # (2026-10-19, grpunique) live 72b3f9d
+# round 23 (2026-10-19): nested-table (@@JSON) columns - no checklist filter, stats count the tables, a sub-cell
+# filters in its sub-column, the cell around the table offers no value (live offers Filter to "@@JSON[{...")
+NEW_R23 = {'L-mnest-nestNoFilter', 'L-mnest-nestStats', 'L-mnest-nestSubOpens', 'L-mnest-nestSubFilter', 'L-mnest-nestPadOpens', 'S-helpStats'}   # live e44fe71
+# round 24 (2026-10-19): a linked sub-cell (fi-epa-c) opens the menu and filters by its text
+NEW_R24 = {'L-mnest-nestLinkOpens', 'L-mnest-nestLinkFilter'}   # live a34b30e
+# round 25 (2026-10-19): the way to the browser's menu (Shift, a second right-click), the link items gone, a footer
+NEW_R25 = {'L-mnest-nestLinkOpens', 'L-mnest-nestLinkFoot', 'L-mnest-nativeShift', 'L-mnest-nativeSecond', 'L-mnest-nativeSecondCell'}   # live a04520b
+# round 26 (2026-10-19): the Duplicates line (statsAllUnique reads it too)
+NEW_R26 = {'L-mflat-statsDup', 'L-mflat-statsAllUnique'}   # live 04e78f3
+# (round 27 touched the breakdown menu only: pivmenu owns its checks)
+NEW = set()
 MUTANTS = {
+    # (2026-10-19, calcadj round 8) main.js: the all-different question left behind by a pick the dialog could not
+    # select; the menu: Group by on a journal column
+    'm-askstale': ([('main', "        var _askNext = _pnbGroupAskNext; _pnbGroupAskNext = false;   // (round 8) taken here, before any early return\r\n", "        var _askNext = _pnbGroupAskNext;\r\n"),
+                    ('main', "        var _askUnique = !_pnbPrepared && (!!e.originalEvent || _askNext);\r\n", "        var _askUnique = !_pnbPrepared && (!!e.originalEvent || _askNext);\r\n        _pnbGroupAskNext = false;\r\n")],
+                   ['L-mgroupby-stalePickQuiet'], ['mgroupby']),
+    'n-journalgroup': ([('menu', "canGroup = !isNum && !isJournal(col) && typeof", "canGroup = !isNum && typeof")], ['L-mjournal-jrnNoGroup'], ['mjournal']),
     # (2026-10-19, grpunique) main.js (CRLF): the all-different column no longer asks
     'm-grpunique': ([('main', "            if (!window.confirm('Every row has a different ' + selectedColumn + ', so grouping by it makes one group per row and summarises nothing.\\n\\nGroup by it anyway?')) return;\r\n", "")],
                     ['L-mgroupby-uniqueAsks'], ['mgroupby']),
@@ -209,6 +229,20 @@ MUTANTS = {
     'u-clear': ([('menu', "run: function () { var b = document.getElementById('spClearStorage'); if (b) { b.click(); } } });", "run: function () { } });")], ['L-msubs-clearPanel'], ['msubs']),
     'u-arrow': ([('menu', "((it.sub && it.act !== 'back') ? '<span class=\"pnb-hm-arrow\" aria-hidden=\"true\">&#8250;</span>' : '')", "''")], ['L-msubs-arrows'], ['msubs']),
     'u-copyname': ([('menu', "        use.push({ act: 'copyName', label: 'Copy column name', run: function () { copyName(col); } });\n", "")], ['L-msubs-topOrder'], ['msubs']),
+    # --- (round 26) the Duplicates line: the extra copies miscounted
+    'd-extra': ([('main', "        freq.forEach(function (c) { if (c > 1) { dupRows += c; dupExtra += c - 1; dupValues++; } });", "        freq.forEach(function (c) { if (c > 1) { dupRows += c; dupExtra += c; dupValues++; } });")], ['L-mflat-statsDup'], ['mflat']),
+    'd-noline': ([('menu', "        if (p.dup) {\n            items.push({ info: 'Duplicates',", "        if (false) {\n            items.push({ info: 'Duplicates',")], ['L-mflat-statsDup', 'L-mflat-statsAllUnique'], ['mflat']),
+    # --- (round 25) the way to the browser's menu
+    's-shift': ([('menu', "        if (e.shiftKey && e.button === 2) { if (cur) { close(false); } lastClosed = null; return; }\n", "")], ['L-mnest-nativeShift'], ['mnest']),
+    's-second': ([('menu', "            lastClosed = (e.button === 2 && cur.spot && cur.spot === spotOf(e.target)) ? { spot: cur.spot, t: Date.now() } : null;", "            lastClosed = null;")], ['L-mnest-nativeSecond', 'L-mnest-nativeSecondCell'], ['mnest']),
+    'f-foot': ([('menu', "        footNote = !!(e.target && e.target.closest && e.target.closest('a[href]'));", "        footNote = false;")], ['L-mnest-nestLinkFoot'], ['mnest']),
+    # --- (round 24) a linked sub-cell
+    'n-link': ([('menu', "        if (!onNotes && !onNestLink && target.closest('a, button", "        if (!onNotes && target.closest('a, button")], ['L-mnest-nestLinkOpens'], ['mnest']),
+    'n-linkval': ([('main', "        nestedCellQuery: function (td, target) { return _nestedCellFilterQuery(td, target, true); },", "        nestedCellQuery: function (td, target) { return _nestedCellFilterQuery(td, target, false); },")], ['L-mnest-nestLinkOpens', 'L-mnest-nestLinkFilter'], ['mnest']),
+    # --- (round 23) nested-table columns
+    'n-filter': ([('menu', "if (!isJournal(col) && !isNum && !nested && typeof A.filterInfo === 'function'", "if (!isJournal(col) && !isNum && typeof A.filterInfo === 'function'")], ['L-mnest-nestNoFilter'], ['mnest']),
+    'n-top': ([('main', "            if (rawV != null && String(rawV).indexOf('@@JSON') === 0) {", "            if (false) {")], ['L-mnest-nestStats'], ['mnest']),
+    'n-sub': ([('menu', "        if (cell && cell.nested && typeof A.nestedCellQuery === 'function') {", "        if (false) {")], ['L-mnest-nestSubOpens', 'L-mnest-nestSubFilter'], ['mnest']),
     # --- (round 21) Column stats, the notes button, Remove calculated column
     's-noflyout': ([('menu', "            look.push({ act: 'stats', label: 'Column stats', sub: true, items: function () { return statsItems(col); } });\n", "")], ['L-mflat-statsLine'], ['mflat']),
     's-topnofilter': ([('menu', "run: function () { A.filterAdd(col, t.v, false); } }); }", "run: function () { } }); }")], ['L-mflat-statsTop'], ['mflat']),
@@ -286,7 +320,7 @@ def pick(rel):
 RELS = {'main': os.path.join('js', 'main.js'), 'mod': os.path.join('js', 'penumbra_colfmt.js'), 'calc': os.path.join('js', 'penumbra_calc.js'),
         'colw': os.path.join('js', 'penumbra_colwidths.js'), 'menu': os.path.join('js', 'penumbra_colmenu.js'),
         'mcss': os.path.join('css', 'penumbra_colmenu.css'), 'css': os.path.join('css', 'main.css'),
-        'index': 'index.php', 'help': 'help_content.php', 'topic': os.path.join('help', 'topics', 'userSettingsHelpLightbox.php')}
+        'index': 'index.php', 'help': os.path.join('help', 'tips', 'settings-tips-storage.php'), 'topic': os.path.join('help', 'topics', 'userSettingsHelpLightbox.php')}
 sys.path.insert(0, HERE)
 import mk_harness
 cand = {k: pick(v) for k, v in RELS.items()}
@@ -407,38 +441,33 @@ def write_stage(texts):
     w('main.css', texts['css'])
 
 def static_checks(texts):
-    idx, hlp = texts['index'], texts['help']
+    idx = texts['index']   # (2026-10-19) the v1 help is gone: the settings topic alone carries the wording the S-help* checks pin
     return [
         ('S-indexLoads', "file_exists(__DIR__ . '/js/penumbra_colmenu.off')" in idx and 'src="js/penumbra_colmenu.js?v=' in idx
          and 'href="css/penumbra_colmenu.css?v=' in idx, ''),
         # (round 5) the popover's Back, the journal block
-        ('S-helpBack', 'with a Back button to this menu' in hlp and 'returns to this menu' in texts['topic']
-         and 'journal columns move too' in hlp and 'move like any other and stay where you put them' in texts['topic'], ''),
+        ('S-helpBack', 'returns to this menu' in texts['topic'] and 'move like any other and stay where you put them' in texts['topic'], ''),
         # (round 8) the cell menu in both help files
-        ('S-helpNum', 'Hide the row numbers' in texts['topic'] and 'Add a note to this row' in hlp and 'fiscal year' in hlp and 'by fiscal year' in texts['topic'], ''),
-        ('S-helpFitAll', 'Fit all column widths' in texts['topic'] and '<em>Fit all column widths</em>' in hlp and 'date column by year' in texts['topic'], ''),
-        ('S-helpRanges', '<em>Ranges</em> groups the values into about six ranges' in texts['topic'] and '<em>Ranges</em> groups them into about six ranges' in hlp, ''),
-        ('S-helpSubs', '<strong>Move column</strong>' in texts['topic'] and 'Clear all custom preferences for this report' in texts['topic'] and '<em>Show column(s)</em>' in hlp and '<em>Move column</em>' in hlp, ''),
-        ('S-helpResetAll', '<em>All columns</em>, every column back to the report' in hlp and '<strong>Reset</strong>: All columns</td>' in texts['topic'], ''),
-        ('S-helpCells','data-colmenu-cells' in hlp and 'data-colmenu-cells' in texts['topic'] and 'Filter to "value"' in texts['topic'], ''),
+        ('S-helpNum', 'Hide the row numbers' in texts['topic'] and 'Add a note to this row' in texts['topic'] and 'by fiscal year' in texts['topic'], ''),
+        ('S-helpFitAll', 'Fit all column widths' in texts['topic'] and 'date column by year' in texts['topic'], ''),
+        ('S-helpRanges', '<em>Ranges</em> groups the values into about six ranges' in texts['topic'], ''),
+        ('S-helpSubs', '<strong>Move column</strong>' in texts['topic'] and 'Clear all custom preferences for this report' in texts['topic'], ''),
+        ('S-helpResetAll', '<strong>Reset</strong>: All columns</td>' in texts['topic'], ''),
+        ('S-helpCells', 'data-colmenu-cells' in texts['topic'] and 'Filter to "value"' in texts['topic'], ''),
         # (round 6) the new items in both help files
         ('S-helpMore', all(x in texts['topic'] for x in ('Then sort ascending', 'Filter by value...', 'Show only this column',
-                                                           '<strong>Reset</strong>: This column', '<strong>Copy column name</strong>', 'the lists open beside their item'))
-         and all(x in hlp for x in ('Then sort ascending / descending', 'Filter by value...', '<em>Reset</em> (<em>This column</em>', '<em>Copy column name</em>', 'opens on hover')), ''),
+                                                           '<strong>Reset</strong>: This column', '<strong>Copy column name</strong>', 'the lists open beside their item')), ''),
         # (round 21) Column stats is back as a list beside the item; Pivot / Chart this column stay out
-        ('S-helpStats', '<strong>Column stats</strong>' in texts['topic'] and '<em>Column stats</em>' in hlp and 'Pivot by this column' not in texts['topic']
-         and 'Pivot by this column...</em> / <em>Chart this column' not in hlp and 'Remove this calculated column' in hlp
-         and '<em>all</em> when none repeats' in hlp and '<em>all</em> when none repeats' in texts['topic'] and 'all unique' not in texts['topic'], ''),
+        ('S-helpStats', '<strong>Column stats</strong>' in texts['topic'] and 'A nested-table column counts its tables' in texts['topic'] and 'Pivot by this column' not in texts['topic']
+         and '<em>all</em> when none repeats' in texts['topic'] and 'all unique' not in texts['topic'], ''),
         # (round 4) Swap..., the quick read
-        ('S-helpSwap', '<em>Swap with...</em>' in hlp and '<em>Swap with...</em>' in texts['topic'], ''),   # (round 21: the "all unique" wording moved to S-helpStats)
+        ('S-helpSwap', '<em>Swap with...</em>' in texts['topic'], ''),   # (round 21: the "all unique" wording moved to S-helpStats)
         # (round 3) Copy distinct values, the cap, the journal counts
-        ('S-helpCopy', '<em>Copy distinct values</em> (delimited by' in hlp and '<strong>Copy distinct values</strong></td>' in texts['topic'] and "60% of the table's visible width" in hlp
+        ('S-helpCopy', '<strong>Copy distinct values</strong></td>' in texts['topic']
          and "60% of the table's visible width" in texts['topic'] and 'checked and unchecked boxes' in texts['topic'], ''),
-        # the v2 topic (the Help Center, help/v2.on) and the classic help both name it
         # (round 2) the help says Fit measures, and names the counts
-        ('S-helpFit', 'widest value on screen' in hlp and 'widest value on screen' in texts['topic']
-         and 'how many different values' in texts['topic'] and 'and empty cells' in hlp, ''),
-        ('S-helpNamed', 'data-colmenu-help' in hlp and 'id="us-colmenu" data-colmenu-help' in texts['topic']
+        ('S-helpFit', 'widest value on screen' in texts['topic'] and 'how many different values' in texts['topic'], ''),
+        ('S-helpNamed', 'id="us-colmenu" data-colmenu-help' in texts['topic']
          and 'data-jump-to="us-colmenu"' in texts['topic'], ''),
     ]
 

@@ -36,6 +36,23 @@
   function brief(ls) { return ls.map(function (l) { return l.kind + ':' + (l.code !== null ? '[' + l.code + ']' : l.lab) + '=' + l.n + (l.d ? '(' + l.d + ')' : '') + (l.x ? 'x' : ''); }); }
   function searchLines() { return lines().filter(function (l) { return l.kind === 'search'; }); }
   function box() { return pop() ? pop().querySelector('.sb-rf-box') : null; }
+  // (2026-10-19, rfx) where each search line's x sits: in the search's chip, right after its
+  // text (gap = the x's left minus the text's right), and each line's count, by its right edge
+  function xPlace() {
+    var p = pop();
+    if (!p) return [];
+    return Array.prototype.map.call(p.querySelectorAll('.sb-rf-step.sb-rf-search'), function (li) {
+      var x = li.querySelector('.sb-rf-x'), q = li.querySelector('.sb-rf-q'), chip = li.querySelector('.sb-rf-chip');
+      if (!x || !q) return { missing: true };
+      var xr = x.getBoundingClientRect(), qr = q.getBoundingClientRect(), mid = (xr.top + xr.bottom) / 2;
+      return { inChip: !!chip && x.parentNode === chip && q.parentNode === chip && x.previousElementSibling === q,
+               gap: Math.round(xr.left - qr.right), level: mid >= qr.top - 1 && mid <= qr.bottom + 1, toEdge: Math.round(li.getBoundingClientRect().right - xr.right) };
+    });
+  }
+  function valRights() {
+    var p = pop();
+    return p ? Array.prototype.map.call(p.querySelectorAll('.sb-rf-step .sb-rf-val'), function (v) { return Math.round(v.getBoundingClientRect().right); }) : [];
+  }
 
   async function boot() {
     if (!(await until(function () { return window.__queryDone >= 1 && (window.__HC_HIDES || 0) >= 1 && $('#sbRows').text().trim() !== ''; }, 200000)))
@@ -67,6 +84,9 @@
   function sameNums(ls, want) { return ls.length === want.length && ls.every(function (l, i) { return num(l.n) === want[i]; }); }
 
   var A = 'V_STATUS = Open', B = "H_GROUP2 = 'Tier 1'", C = 'H_FLAG = Y';
+  // (rfx) 59 characters, one line in the card now; 141, two lines inside its chip
+  var MID = "V_STATUS = Open or V_STATUS = Closed or H_GROUP2 = 'Tier 1'";
+  var LONG = MID + " or H_GROUP2 = 'Tier 2' or H_FLAG = Y or V_STATUS = Pending or H_GROUP2 = 'Tier 3'";
 
   var S = {
     // 300 rows, no search, 200 a page: the button shows, the card opens on a click of the count
@@ -105,8 +125,15 @@
       R.chk.threeLines = ls.length === 3 && ls[0].code === A && ls[1].code === B && ls[2].code === C;
       R.chk.counts = sameNums(ls, want);
       R.chk.drops = ls.length === 3 && num(ls[0].d) === 300 - want[0] && num(ls[1].d) === want[0] - want[1] && num(ls[2].d) === want[1] - want[2];
-      R.chk.eachX = ls.length === 3 && ls.every(function (l) { return !!l.x; }) && /Remove .*V_STATUS = Open.* from the search/.test(ls[0].x.getAttribute('aria-label') || '');
+      // "...from the search", or "...from the filter" since penumbra_tests\filterword (2026-10-19)
+      R.chk.eachX = ls.length === 3 && ls.every(function (l) { return !!l.x; }) && /Remove .*V_STATUS = Open.* from the (?:search|filter)/.test(ls[0].x.getAttribute('aria-label') || '');
       R.chk.clearAll = !!document.getElementById('sbRfClear');
+      // (rfx) each x in its search's chip at the end of the text, level with it; every count in one column
+      var xp = xPlace(), vr = valRights();
+      R.info.xPlace = xp; R.info.valRights = vr;
+      R.chk.xInChip = xp.length === 3 && xp.every(function (p) { return p.inChip === true; });
+      R.chk.xAtTextEnd = xp.length === 3 && xp.every(function (p) { return !p.missing && p.gap >= 0 && p.gap <= 6 && p.level; });
+      R.chk.numsAligned = vr.length >= 5 && vr.every(function (v) { return Math.abs(v - vr[0]) <= 1; });
       if (ls.length !== 3) return;   // no card here (the control): the rest cannot run
       // the x on the first part: the search becomes the other two, exactly as typed
       var h = window.__HC_HIDES;
@@ -219,6 +246,15 @@
       R.chk.savedSentence = !!b && /saved with the limit on, so everyone who opens it gets at most 200 rows/.test(b.textContent);
       R.chk.switchBtn = !!document.getElementById('sbRfLimitOff');
       R.chk.saveFoot = !!b && /Then save the report/.test(b.textContent);
+      // (rfx) the box takes the card's width and never sets it: the card is as wide with it as without
+      if (b) {
+        var wA = pop().offsetWidth;
+        b.style.display = 'none';
+        var wB = pop().offsetWidth;
+        b.style.display = '';
+        R.info.boxWiden = [wA, wB];
+        R.chk.boxNoWiden = wA === wB;
+      }
       var q = window.__queryDone;
       $('#sbRfLimitOff').trigger('click');
       await until(function () { return window.__queryDone > q; }, 60000);
@@ -313,6 +349,61 @@
       var el = document.elementFromPoint(r.left + Math.min(40, r.width / 2), r.top + Math.min(30, r.height / 2));
       R.info.rect = { l: Math.round(r.left), t: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), hit: el ? (el.id || el.className) : null };
       R.chk.cardVisible = !!el && pop().contains(el) && r.width >= 280 && r.right <= window.innerWidth + 1;
+      // (rfx) a long search: the wider card still stops short of the window's edge
+      await search(LONG);
+      await openCard();
+      var r2 = pop().getBoundingClientRect();
+      R.info.rectLong = { l: Math.round(r2.left), r: Math.round(r2.right), w: Math.round(r2.width), vw: window.innerWidth };
+      R.chk.fitsNarrow = isOpen() && r2.left >= 0 && r2.right <= window.innerWidth - 8;
+    },
+    // (2026-10-19, rfx) the card is as wide as its own lines, not the count under it: a
+    // 59-character search on one line behind the harness's short count, the same width when the
+    // count under it grows or shrinks, past the old 420px cap and within the new 600px one; a
+    // 141-character search wraps inside its chip, the keyword beside its first line
+    fwide: async function () {
+      await boot();
+      $('#saveStateLightbox').hide();   // harness furniture: its backdrop covers the page's foot
+      await search(MID);
+      R.chk.opens = await openCard();
+      if (!R.chk.opens) return;
+      var q = pop().querySelector('.sb-rf-search .sb-rf-q');
+      var lh = q ? parseFloat(getComputedStyle(q).lineHeight) || 16 : 16;
+      var w1 = pop().offsetWidth;
+      R.info.lines = brief(lines());
+      R.info.mid = { card: w1, codeH: q ? Math.round(q.getBoundingClientRect().height) : null, lh: lh, seg: seg().offsetWidth };
+      R.chk.oneLine = searchLines().length === 1 && !!q && q.textContent === MID && q.getBoundingClientRect().height <= lh * 1.5;
+      R.chk.wider = w1 > 450 && w1 <= 630;   // the old cap: 420 + padding and border; the new: 600 + the same
+      var rows = document.getElementById('sbRows'), was = rows.textContent;
+      rows.textContent = '3,778 total rows, with 614 filtered results in 1 of 19 groups, 509 innermost';
+      var w2 = pop().offsetWidth;
+      rows.textContent = '9';
+      var w3 = pop().offsetWidth;
+      rows.textContent = was;
+      R.info.byCount = [w1, w2, w3];
+      R.chk.notByCount = w1 === w2 && w1 === w3;
+      await search(LONG);
+      await openCard();
+      var q2 = pop().querySelector('.sb-rf-search .sb-rf-q'), kw = pop().querySelector('.sb-rf-search .sb-rf-kw'), x = pop().querySelector('.sb-rf-search .sb-rf-x');
+      if (!q2 || !kw || !x) { R.info.long = 'no search line'; return; }
+      var pr = pop().getBoundingClientRect(), qr = q2.getBoundingClientRect(), kr = kw.getBoundingClientRect(), xr = x.getBoundingClientRect();
+      R.info.long = { card: Math.round(pr.width), codeH: Math.round(qr.height), kwTop: Math.round(kr.top), codeTop: Math.round(qr.top), kwRight: Math.round(kr.right), codeLeft: Math.round(qr.left), xRight: Math.round(xr.right), cardRight: Math.round(pr.right) };
+      R.chk.longWraps = q2.textContent === LONG && qr.height > lh * 1.5 && pr.width <= 631 && pr.right <= window.innerWidth;
+      R.chk.kwBeside = Math.abs(kr.top - qr.top) <= 6 && kr.right <= qr.left;
+      R.chk.xInsideCard = xr.right <= pr.right - 8;
+    },
+    // (not in SCN) a picture: PNB_SHOT=<png> PNB_SHOT_SCN=rxshot py -3 run.py --stage DIR --scn rxshot
+    // (two AND parts) or rxshot2 (the 59-character search, one line)
+    rxshot: async function () {
+      await boot();
+      $('#saveStateLightbox').hide();
+      await search(A + ' and ' + B);
+      R.chk.opens = await openCard();
+    },
+    rxshot2: async function () {
+      await boot();
+      $('#saveStateLightbox').hide();
+      await search(MID);
+      R.chk.opens = await openCard();
     },
     // (for a picture) 200 rows, the limit saved on, an editor, a two-part search, the card open
     rcapshot: async function () {

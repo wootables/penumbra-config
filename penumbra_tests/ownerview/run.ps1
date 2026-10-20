@@ -71,8 +71,11 @@ $paths = [ordered]@{
 }
 $outName = @{ idx = 'index.php'; dash = 'dashboard.php'; qry = 'query.php'; help = 'help_content.php'; js = 'main.js'; jrn = 'penumbra_journal.js'; pre = 'penumbra_presets.js' }
 $src0 = @{}; foreach ($k in @($paths.Keys)) { $src0[$k] = [IO.File]::ReadAllText($paths[$k], $utf8) }
+# (2026-10-19) help_content.php is a shim over help/topics + help/tips: the help text under test is every fragment, raw
+if (-not $HelpPhp) { $src0['help'] = (@(Get-ChildItem -LiteralPath "$live\help\topics" -Filter *.php) + @(Get-ChildItem -LiteralPath "$live\help\tips" -Filter *.php) | ForEach-Object { [IO.File]::ReadAllText($_.FullName, $utf8) }) -join "`n" }
 
 # --- mutants: ONE single-point edit each, exact-once in the FEATURE build. main.js
+# (2026-10-19) helpvo / helpjrn / helpbadges retired with the v1 help (S8's $isAdmin gating and the badges wording were v1's).
 # is CRLF; index.php, dashboard.php, query.php and the two modules are LF.
 $C = "`r`n"
 $mPeek = '            return !!penumbra_vars.isAdmin' + $C + '                && !!penumbra_vars.journalAccess' + $C + '                && !isNoAdmView' + $C + '                && !!window._penumbraJournalHidden'
@@ -100,9 +103,6 @@ $mutantDefs = [ordered]@{
   'fbaccess'     = @{ t = 'jrn';  red = @('F2', 'F3'); edits = @(,@($mFb, 'return !!pVars().isAdmin && !pVars().noadm && !!window._penumbraJournalHidden && !!reportId();')) }
   'mailcopy'     = @{ t = 'jrn';  red = @('U3'); edits = @(,@($mMail, '')) }
   'presetclamp'  = @{ t = 'pre';  red = @('R1'); edits = @(,@('e.canWrite = !!json.can_write && !(typeof penumbra_vars !== ''undefined'' && penumbra_vars && penumbra_vars.noadm);', 'e.canWrite = !!json.can_write;')) }
-  'helpvo'       = @{ t = 'help'; red = @('S8'); edits = @(,@('<?php if (true): /* the View Options tab renders', '<?php if ($isAdmin): /* the View Options tab renders')) }
-  'helpjrn'      = @{ t = 'help'; red = @('S8'); edits = @(,@('<?php if (true): /* every viewer of a journal-enabled report', '<?php if ($isAdmin): /* every viewer of a journal-enabled report')) }
-  'helpbadges'   = @{ t = 'help'; red = @('S9'); edits = @(,@('Badges are also hidden automatically for viewers who cannot edit the report when its author', 'Badges are also hidden automatically for non-admin viewers when the report''s author')) }
 }
 function Apply-Mutant([string]$text, [string]$name) {
   foreach ($e in $mutantDefs[$name].edits) {

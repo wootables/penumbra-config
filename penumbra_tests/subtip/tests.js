@@ -315,7 +315,8 @@
         window._schedLinkTextEscape();
         $('#schedChangesOnly').prop('checked', false); $('#pivot-output-container').show();
         pen.click();
-        ok(document.getElementById('schedLinkTextInput').placeholder === 'View this report for the interactive pivot view with sorting and search.', 'L13 a pivot report: the pivot sentence');
+        // "...with sorting and search." or, since penumbra_tests\filterword (2026-10-19), "...and filtering."
+        ok(/^View this report for the interactive pivot view with sorting and (?:search|filtering)\.$/.test(document.getElementById('schedLinkTextInput').placeholder), 'L13 a pivot report: the pivot sentence');
         window._schedLinkTextEscape();
         $('#pivot-output-container').hide();
 

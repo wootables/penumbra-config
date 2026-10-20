@@ -53,7 +53,7 @@
   // (round 12) the lists under one item: an act inside one is reached through its parent
   var SUBS = { 'move-left': 'move', 'move-right': 'move', 'move-start': 'move', 'move-end': 'move', 'move-swap': 'move',
     only: 'show', showAll: 'show', 'calc-left': 'calc', 'calc-right': 'calc', 'calc-start': 'calc', 'calc-end': 'calc',
-    calcEdit: 'calc', calcCopy: 'calc', calcRemove: 'calc', calcAdj: 'calc',   // (2026-10-19, calcadj round 3) one Calculated column entry
+    calcEdit: 'calc', calcDup: 'calc', calcRemove: 'calc', calcAdj: 'calc',   // (2026-10-19, calcadj round 3) one Calculated column entry; round 5: Duplicate
     reset: 'resets', resetAll: 'resets', resetWidths: 'resets', clearPrefs: 'resets' };
   function sub(act) { var it = item(act); if (!it || it.getAttribute('aria-disabled') === 'true') return false; it.click(); return true; }
   function reach(act) { if (!item(act) && SUBS[act]) sub(SUBS[act]); return item(act); }
@@ -117,13 +117,19 @@
       sub('stats');
       var inf = infoMap(), stHead = anyHead();
       R.chk.statsLine = noLine && !!subPanel() && inf['With a value'] === '300' && inf['Unique'] === String(Object.keys(uniq).length) && inf['Empty'] === '0'
-        && !!stHead && /300 rows the search keeps/.test(stHead.textContent) && !!inf['Shortest'] && !!inf['Longest'];
+        && !!stHead && /300 rows the (?:search|filter) keeps/.test(stHead.textContent) && !!inf['Shortest'] && !!inf['Longest'];   // filter: penumbra_tests\filterword (2026-10-19)
       R.info.stats = inf;
+      // (round 26) Duplicates: the extra copies (Unique + Duplicates = With a value), the rows sharing a value, the values shared
+      var cntN = {}; names.forEach(function (x) { cntN[x] = (cntN[x] || 0) + 1; });
+      var dRows = 0, dExtra = 0, dVals = 0; Object.keys(cntN).forEach(function (k) { if (cntN[k] > 1) { dRows += cntN[k]; dExtra += cntN[k] - 1; dVals++; } });
+      var dupWant = dExtra ? dExtra.toLocaleString() + ' (' + dRows.toLocaleString() + ' rows share ' + dVals.toLocaleString() + ' values)' : 'none';
+      R.chk.statsDup = inf['Duplicates'] === dupWant && dExtra + Object.keys(uniq).length === 300;
+      R.info.statsDup = { got: inf['Duplicates'], want: dupWant };
       // (round 4) no value repeats: "all"
       closeMenu();
       rclick(fth('V_ID')); sub('stats');
       var infU = infoMap();
-      R.chk.statsAllUnique = infU['Unique'] === 'all' && infU['With a value'] === '300';
+      R.chk.statsAllUnique = infU['Unique'] === 'all' && infU['With a value'] === '300' && infU['Duplicates'] === 'none';
       R.info.statsU = infU;
       closeMenu();
       // the five most common values, each a filter: V_STATUS's top value filters the table to it
@@ -509,6 +515,17 @@
       R.chk.grouped = !!A() && A().groupingColumn() === 'V_STATUS' && document.querySelectorAll('#groupedResultsContainer .group-wrapper').length === 3;
       // ...and a column with repeats is grouped without a question
       R.chk.uniqueQuiet = asked.length === 0;
+      // (round 8, calcadj closing sweep) a pick the dialog cannot select (nothing to select: the picker shows
+      // its placeholder) must not leave its question behind for the next preset-style grouping (no pointer: no question)
+      var alerts = 0; window.alert = function () { alerts++; };
+      asked.length = 0;
+      window.Penumbra.groupByColumn('');
+      await sleep(300);
+      $('#groupingColumnSelector .pcs-selected').attr('data-value', 'V_ID');
+      $('#confirmGroupingBtn').trigger('click');
+      await sleep(800);
+      R.chk.stalePickQuiet = alerts === 1 && asked.length === 0;
+      R.info.stale = { alerts: alerts, asked: asked.slice(), gcol: A() && A().groupingColumn() };
     },
     gmenu: async function () {
       R.chk.opens = rclick(gth('V_NAME')) && !!menu();
@@ -643,6 +660,11 @@
       await sleep(200);
       var h0 = heads();
       R.chk.jrnPainted = h0[1] === J && h0[2] === N && aligned(20);
+      // (round 8, calcadj closing sweep) a journal column has no "Group by this column": the grouping picker leaves those out
+      var nth = fth(N);
+      R.chk.jrnNoGroup = !!nth && rclick(nth) && !!menu() && !item('groupBy') && acts().indexOf('sortAsc') >= 0;
+      R.info.jrnNoGroupActs = acts();
+      closeMenu();
       // (round 20) a Notes cell (not its button) opens the Notes column's menu, and every
       // cell of a row with a notes button offers the row's notes
       var ntd = document.querySelector('#resultsTable tbody tr td.journal-notes-col'), nbtn = ntd && ntd.querySelector('button.journal-notes-btn');
@@ -844,6 +866,87 @@
       var w2 = fth('H_NL').getBoundingClientRect().width;
       R.chk.fitLines = nl.length > 10 && nl.every(function (td) { return lines(td) === 2; }) && w2 < concatNl + pad - 10;
       R.info.fitnest = { grow: g, compact: c, nl: { w: w2, concat: concatNl, pad: pad, lines: nl.slice(0, 5).map(function (td) { return lines(td); }) } };
+    },
+    mnest: async function () {
+      // (round 23) a nested-table column (H_JSON, @@JSON): no Filter by value, Column stats counts the
+      // tables and the rows inside them and lists no values; a right-click on a sub-cell filters to that
+      // value in its SUB-column; the cell around the sub-table offers no value items
+      var l = A().layout();
+      l.cols.forEach(function (c) { if (c.colName === 'H_JSON') c.visible = true; });
+      A().applyLayout(l);
+      await sleep(500);
+      var th = fth('H_JSON');
+      R.chk.nestOpens = !!th && rclick(th) && !!menu();
+      var a0 = acts();
+      R.chk.nestNoFilter = a0.indexOf('filter') < 0 && a0.indexOf('stats') >= 0 && a0.indexOf('sortAsc') >= 0;
+      sub('stats');
+      var inf = infoMap(), withT = window.__rowsFixture.filter(function (r) { return r.H_JSON; }).length;
+      var subRows = window.__rowsFixture.reduce(function (t, r) { return t + (r.H_JSON ? JSON.parse(r.H_JSON.substring(6)).length : 0); }, 0);
+      R.chk.nestStats = inf['With a table'] === String(withT) && inf['Empty'] === String(300 - withT) && inf['Rows inside the tables'] === subRows.toLocaleString() && !item('stats-top-0') && !inf['Unique'];
+      R.info.nest = { acts: a0, inf: inf, withT: withT, subRows: subRows };
+      closeMenu();
+      // a sub-cell: SUB_NAME in the first nested row of the first row that has a table
+      var k = hdrIndex('H_JSON'), td = null, trs = document.querySelectorAll('#resultsTable tbody tr');
+      for (var i = 0; i < trs.length && !td; i++) { var c = trs[i].children[k]; if (c && c.querySelector('.nested-json-row .nested-json-cell')) td = c; }
+      var hdrCells = td ? td.querySelectorAll('.nested-json-header > *') : [], nameIdx = -1;
+      for (var h = 0; h < hdrCells.length; h++) { if (hdrCells[h].textContent.replace(/[▲▼]/g, '').replace(/\s+/g, ' ').trim() === 'SUB_NAME') nameIdx = h; }
+      var row0 = td ? td.querySelector('.nested-json-row') : null, subCell = (row0 && nameIdx >= 0) ? row0.children[nameIdx] : null, v = subCell ? subCell.textContent.trim() : '';
+      R.chk.nestSubOpens = !!subCell && rclick(subCell) && !!menu() && !!item('cellFilter') && item('cellFilter').textContent.indexOf('"' + v + '"') >= 0 && !item('cellExclude') && !!item('cellCopy');
+      R.info.nestSub = { v: v, acts: acts(), nameIdx: nameIdx, hdr: Array.prototype.map.call(hdrCells, function (x) { return x.textContent.trim().slice(0, 12); }) };
+      if (item('cellFilter')) item('cellFilter').click();
+      await sleep(900);
+      var want = window.__rowsFixture.filter(function (r) { return r.H_JSON && JSON.parse(r.H_JSON.substring(6)).some(function (x) { return String(x.SUB_NAME) === v; }); }).length;
+      var vis = Array.prototype.filter.call(document.querySelectorAll('#resultsTable tbody tr'), function (tr) { return !tr.classList.contains('search-hidden'); }).length;
+      R.chk.nestSubFilter = v !== '' && searchVal() === 'SUB_NAME = //' + v + '//' && vis === want && want > 0;
+      R.info.nestFilter = { search: searchVal(), vis: vis, want: want };
+      (function (t) { var a = document.createElement('a'); a.className = 'snippet-action'; a.setAttribute('data-action-name', 'search'); a.setAttribute('data-action-value', t); document.getElementById('reportSnippetOutput').appendChild(a); $(a).trigger('click'); a.remove(); })('');
+      await sleep(900);
+      // the cell around the sub-table: the column's menu, no value items
+      R.chk.nestPadOpens = !!td && rclick(td) && !!menu() && !item('cellFilter') && !item('cellCopy') && acts().indexOf('sortAsc') >= 0;
+      closeMenu();
+      // (round 24) a sub-cell that is a LINK (fi-epa-c's resolver links): a right-click on the link
+      // opens the menu, Filter to its text, Copy this value; (round 25) no link items of our own,
+      // a footer names the way to the browser's menu; a header's menu has no footer
+      var subId = (row0 && hdrCells.length) ? row0.children[0] : null, idText = subId ? subId.textContent.trim() : '';
+      if (subId) { subId.innerHTML = '<a href="https://example.test/x?id=' + encodeURIComponent(idText) + '">' + idText + '</a>'; }
+      var lnk = subId ? subId.querySelector('a') : null;
+      R.chk.nestLinkOpens = !!lnk && rclick(lnk) && !!menu() && !!item('cellFilter') && item('cellFilter').textContent.indexOf('"' + idText + '"') >= 0
+        && !!item('cellCopy') && !item('cellOpenLink') && !item('cellCopyLink');
+      var foot = menu() && menu().querySelector('.pnb-hm-foot');
+      R.chk.nestLinkFoot = !!foot && /Shift\+right-click/.test(foot.textContent);
+      R.info.nestLink = { idText: idText, acts: acts(), foot: foot && foot.textContent };
+      closeMenu();
+      rclick(fth('V_NAME'));
+      R.chk.nestNoFoot = !!menu() && !menu().querySelector('.pnb-hm-foot');
+      closeMenu();
+      // (round 25) the browser's own menu: Shift with the right-click is not intercepted; a second
+      // right-click on the same spot while ours is open (the right button's mousedown closes it)
+      // is not either; a right-click on ANOTHER heading while ours is open opens ours there
+      function rclickS(el) { var r = el.getBoundingClientRect(); return !el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, shiftKey: true, clientX: Math.round(r.left + 6), clientY: Math.round(r.top + 6) })); }
+      function mdown(el) { var r = el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 2, buttons: 2, clientX: Math.round(r.left + 6), clientY: Math.round(r.top + 6) })); }
+      var thN = fth('V_NAME'), thS = fth('V_STATUS');
+      R.chk.nativeShift = !rclickS(thN) && !menu();
+      var open1 = rclick(thN) && !!menu();
+      mdown(thN); var second = rclick(thN);
+      R.chk.nativeSecond = open1 && !second && !menu();
+      var open2 = rclick(thN) && !!menu();
+      mdown(thS); var other = rclick(thS);
+      R.chk.nativeOther = open2 && other && !!menu() && menu().querySelector('.pnb-hm-name').textContent === 'V_STATUS';
+      R.info.native = { open1: open1, second: second, open2: open2, other: other };
+      closeMenu();
+      // a cell too: the second right-click on the same cell steps aside
+      var c0 = document.querySelector('#resultsTable tbody tr td[data-column]:not([data-column="#"])');
+      var copen = !!c0 && rclick(c0) && !!menu(); if (c0) { mdown(c0); }
+      R.chk.nativeSecondCell = copen && !!c0 && !rclick(c0) && !menu();
+      closeMenu();
+      rclick(lnk); if (item('cellFilter')) item('cellFilter').click();
+      await sleep(900);
+      var vis2 = Array.prototype.filter.call(document.querySelectorAll('#resultsTable tbody tr'), function (tr) { return !tr.classList.contains('search-hidden'); }).length;
+      var want2 = window.__rowsFixture.filter(function (r) { return r.H_JSON && JSON.parse(r.H_JSON.substring(6)).some(function (x) { return String(x.SUB_ID) === idText; }); }).length;
+      R.chk.nestLinkFilter = searchVal() === 'SUB_ID = //' + idText + '//' && vis2 === want2 && want2 > 0;
+      R.info.nestLinkFilter = { search: searchVal(), vis: vis2, want: want2 };
+      (function (t) { var a = document.createElement('a'); a.className = 'snippet-action'; a.setAttribute('data-action-name', 'search'); a.setAttribute('data-action-value', t); document.getElementById('reportSnippetOutput').appendChild(a); $(a).trigger('click'); a.remove(); })('');
+      await sleep(900);
     },
     mcell: async function () {
       // (round 8) the cell menu

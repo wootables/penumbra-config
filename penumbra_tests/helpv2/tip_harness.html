@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>help tip harness</title>
+<style>
+  .bld-help-pop { position: fixed; opacity: 0; visibility: hidden; }
+  .bld-help-pop.open { opacity: 1; visibility: visible; }
+</style>
+<script src="jquery-3.7.1.min.js"></script>
+</head>
+<body>
+<!-- The help document, as ensureHelpLoaded() leaves it: the tip stores stay in the container. -->
+<div id="helpContentContainer">
+  <div id="builder-tips-storage" hidden>
+    <div data-tip="type"><h4>Type tip</h4><p>What the type does.</p></div>
+    <div data-tip="name"><h4>Name tip</h4><p>What the name does.</p></div>
+  </div>
+</div>
+<!-- A dialog opened by a path that never called initHelpPopover(): the Query Prompts
+     topic's "Query Prompt Generator" link opens the generator exactly like this. -->
+<div id="promptGeneratorLightbox" style="display:flex">
+  <label>Type <span class="bld-help-icon" id="icType" data-tip="type"></span></label>
+  <label>Name <span class="tab-help-icon" id="icName" data-target="#promptsHelpLightbox" data-tip="name"></span></label>
+  <span class="bld-help-icon" id="icText" data-tip="A plain sentence shown as text"></span>
+</div>
+<pre id="out">pending</pre>
+<script>
+  // Globals the lifted code expects from the rest of main.js: the help is already loaded.
+  function ensureHelpLoaded(cb) { cb(); }
+</script>
+<script src="lifted.js"></script>
+<script>
+  var results = {};
+  function record(name, ok, detail) { results[name] = (ok ? 'PASS ' : 'FAIL ') + detail; }
+  // jQuery's delegated mouseenter listens for mouseover; a null relatedTarget means "came from outside".
+  function over(el) { el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, relatedTarget: null })); }
+  function leave(el) { el.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body })); }
+  function pop() { var p = $('.bld-help-pop'); return { n: p.length, open: p.hasClass('open'), text: $.trim(p.text()) }; }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  (async function () {
+    try {
+      // T1: nothing has asked for the popover yet. The first hover must wire it and replay itself.
+      over(document.getElementById('icType')); await wait(30);
+      var p1 = pop();
+      record('T1 first hover wires the popover (no dialog asked)', p1.open && p1.text.indexOf('Type tip') === 0, JSON.stringify(p1));
+      leave(document.getElementById('icType')); await wait(250);
+
+      // T2: the explicit path every builder's open uses still works, and stays idempotent (one popover element).
+      initHelpPopover();
+      over(document.getElementById('icName')); await wait(30);
+      var p2 = pop();
+      record('T2 explicit initHelpPopover then a tab-help-icon hover', p2.n === 1 && p2.open && p2.text.indexOf('Name tip') === 0, JSON.stringify(p2));
+      leave(document.getElementById('icName')); await wait(250);
+
+      // T3: a data-tip that is a sentence, not a key, renders as plain text.
+      over(document.getElementById('icText')); await wait(30);
+      var p3 = pop();
+      record('T3 inline text tip', p3.open && p3.text === 'A plain sentence shown as text', JSON.stringify(p3));
+      leave(document.getElementById('icText')); await wait(250);
+
+      // T4: leaving the icon closes the popover (140 ms grace).
+      record('T4 popover closes on leave', !pop().open, JSON.stringify(pop()));
+    } catch (err) {
+      results['EXC'] = 'FAIL ' + String(err && err.stack || err);
+    }
+    document.getElementById('out').textContent = JSON.stringify(results, null, 1);
+    document.title = 'HARNESS-DONE';
+  })();
+</script>
+</body>
+</html>

@@ -114,7 +114,7 @@ $mutantDefs = [ordered]@{
   'chipwriter'  = @{ edits = @(,@('            penumbraSetFrozenCols(parseInt($(this).attr(''data-n''), 10));', '            userFrozenCols = parseInt($(this).attr(''data-n''), 10);')); red = @('B4') }
   # chipkeys / chipesc re-anchored 2026-10-01 (sbkeys): the Cols segment's keys open the
   # panel from its two openers only, and every card's Escape is the bar's one listener.
-  'chipkeys'    = @{ edits = @(,@(('            if (!$(e.target).closest(''#sbColsOpen, .sb-cols-gear-wrap'').length) return;' + $NL), '')); red = @('B11') }
+  'chipkeys'    = @{ edits = @(,@(('            if (!$(e.target).closest(''#sbColsOpen'').length) return;' + $NL), '')); red = @('B11') }   # (the gear left the whitelist 2026-10-19, colscard)
   'chipesc'     = @{ edits = @(,@(('            [''sb-frz-open'', ''#sbFrozen'', ''#sbFrozenPop''],' + $NL), '')); red = @('B12') }
   'chipclose'   = @{ edits = @(,@('removeClass(''sb-cc-open sb-pp-open sb-grp-open sb-frz-open'')', 'removeClass(''sb-cc-open sb-pp-open sb-grp-open'')')); red = @('B8','B12','B13') }
   'chipfocus'   = @{ edits = @(,@('                    if (hadFocus) $(''#sbColsOpen'').trigger(''focus'');', '')); red = @('B8') }

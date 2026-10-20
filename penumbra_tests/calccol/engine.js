@@ -295,6 +295,53 @@
         var ov = JSON.parse(localStorage.getItem('penumbra_calc_inputs') || '{}');
         return !(ov.zzcalc && Object.prototype.hasOwnProperty.call(ov.zzcalc, 'R')) && document.querySelector('#pnbCalcList [data-calc-inpreset="R"]').hidden === true;
       })(), true);
+      // --- round 5 (2026-10-19): a date value ------------------------------------------------
+      C.fromState([{ name: 'DX', formula: 'DAYS({@ASOF}, {D})', input: { name: 'asof', kind: 'date', value: '10/31/2026', min: '2026-01-01', max: '2026-12-31', step: 7 } },
+        { name: 'DY', formula: '{@ASOF} + 30' }, { name: 'DZ', formula: '{A} * {@ASOF}' }], 'state');
+      var dd = C.active().filter(function (d) { return d.name === 'DX'; })[0];
+      eq('cleanInputDate', !!dd.input && dd.input.kind === 'date' && dd.input.value === '2026-10-31' && dd.input.min === '2026-01-01' && dd.input.max === '2026-12-31' && dd.input.step === 7, true);
+      var dr = C.applyRows([{ A: '3', D: '2026-10-01' }]);
+      eq('inpDateEval', dr[0].DX + '/' + dr[0].DY + '/' + dr[0].DZ, '30/2026-11-30/');
+      var pud = C.parseUrlValue('X|{A}|@ASOF=2026-12-31,2026-01-01,2026-12-31,7');
+      eq('inpDateInferred', !!pud && (pud.input || {}).kind === 'date' && C.urlValue(pud) === 'X|{A}|@ASOF=2026-12-31,2026-01-01,2026-12-31,7', true);
+      // (null-safe below: a mutant that drops the date kind must turn these red, not kill the page)
+      var ia = function () { return C.inputs().ASOF || {}; };
+      eq('setInputDate', C.setInput('ASOF', '2027-06-01') === true && ia().value === '2026-12-31' && C.setInput('ASOF', '11/15/2026') === true && ia().value === '2026-11-15'
+        && C.applyRows([{ A: '3', D: '2026-10-01' }])[0].DX === '45', true);
+      eq('setInputDateBad', C.setInput('ASOF', '12') === false && C.setInput('ASOF', 'soon') === false && ia().value === '2026-11-15', true);
+      var kd = C.inputs().ASOF ? C.knobHtml(C.inputs().ASOF, 'x') : '';
+      eq('knobDate', /type="date"/.test(kd) && /min="2026-01-01"/.test(kd) && /step="7"/.test(kd) && !/type="range"/.test(kd), true);
+      eq('stateDateEffective', ((C.forState().filter(function (d) { return d.name === 'DX'; })[0] || {}).input || {}).value === '2026-11-15', true);
+      // (round 7) the date's knob in the panel is wide enough for a date, not a number's 62px
+      var dk = document.querySelector('#pnbCalcList [data-calc-input="ASOF"]');
+      eq('knobDateWide', !!dk && dk.type === 'date' && dk.getBoundingClientRect().width >= 120, true);
+      R.info.dateKnob = dk ? dk.getBoundingClientRect().width : null;
+      // (round 8) a date typed segment by segment: the browser fires change with 0002-11-15 for the year's
+      // first digit - the box keeps what was typed and nothing applies; leaving the box springs it back;
+      // a whole date typed applies while the box still has focus
+      if (dk) {
+        dk.focus(); dk.value = '0002-11-15'; dk.dispatchEvent(new Event('change', { bubbles: true }));
+        eq('dateTypingKept', dk.value === '0002-11-15' && ia().value === '2026-11-15' && document.activeElement === dk, true);
+        dk.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+        eq('dateLeaveSprings', dk.value === '2026-11-15' && ia().value === '2026-11-15', true);
+        dk.focus(); dk.value = '2026-11-20'; dk.dispatchEvent(new Event('change', { bubbles: true }));
+        eq('dateTypedApplies', ia().value === '2026-11-20', true);
+        await sleep(400);
+      }
+      C.setInput('ASOF', '2026-10-31');
+      // the dialog's Kind: Date turns the value boxes into date pickers and reads dates
+      C.openDialog(null);
+      document.getElementById('pnbCalcName').value = 'DCOL';
+      document.getElementById('pnbCalcFormula').value = 'DAYS({@CUT}, {D})';
+      document.getElementById('pnbCalcAdjName').value = 'CUT';
+      var ks = document.getElementById('pnbCalcAdjKind'); ks.value = 'date'; ks.dispatchEvent(new Event('change', { bubbles: true }));
+      eq('dialogKindDate', document.getElementById('pnbCalcAdjVal').type === 'date' && /Step \(days\)/.test(document.querySelector('#pnbCalcOverlay label[for="pnbCalcAdjStep"]').textContent), true);
+      document.getElementById('pnbCalcGo').click();
+      eq('dialogKindDateErr', /a date, e\.g\./.test(document.getElementById('pnbCalcErr').textContent), true);
+      document.getElementById('pnbCalcAdjVal').value = '2026-12-31';
+      document.getElementById('pnbCalcGo').click();
+      var sd2 = (JSON.parse(localStorage.getItem('penumbra_calc_columns') || '{}').zzcalc || []).filter(function (d) { return d.name === 'DCOL'; })[0];
+      eq('dialogKindDateSaved', !document.getElementById('pnbCalcOverlay') && !!sd2 && !!sd2.input && sd2.input.kind === 'date' && sd2.input.value === '2026-12-31', true);
       // an error about the adjustable value opens its row
       C.openDialog(null);
       document.getElementById('pnbCalcName').value = 'ERRCOL';
@@ -302,6 +349,62 @@
       document.getElementById('pnbCalcGo').click();
       eq('adjErrOpens', document.getElementById('pnbCalcAdjWrap').open === true && /\{@NOPE\}/.test(document.getElementById('pnbCalcErr').textContent), true);
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      // --- round 8 (2026-10-19, closing sweep) ----------------------------------------------
+      // a stored override of the other kind (a number kept for a value that is a date now) is not one in a view link / Keep / Save
+      localStorage.setItem('penumbra_calc_inputs', JSON.stringify({ zzcalc: { ASOFK: 0.9 } }));
+      C.fromState([{ name: 'DK', formula: '{D}', input: { name: 'ASOFK', kind: 'date', value: '2026-10-31' } }], 'state');
+      var fsDK = ((C.forState().filter(function (d) { return d.name === 'DK'; })[0] || {}).input) || {};
+      eq('plainKindGuard', fsDK.value === '2026-10-31' && fsDK.kind === 'date', true);
+      localStorage.removeItem('penumbra_calc_inputs');
+      // removing the column that carries a value forgets the value's override
+      C.fromState([{ name: 'RM', formula: '{A}', input: { name: 'RV', value: 1 } }], 'state');
+      C.setInput('RV', 5);
+      var ovBefore = ((JSON.parse(localStorage.getItem('penumbra_calc_inputs') || '{}').zzcalc) || {}).RV === 5;
+      C.remove('RM');
+      var ovAfter = (JSON.parse(localStorage.getItem('penumbra_calc_inputs') || '{}').zzcalc) || {};
+      eq('removeForgets', ovBefore && !Object.prototype.hasOwnProperty.call(ovAfter, 'RV'), true);
+      // a ticked column's carrier is saved with it even when this run left the carrier out (its formula
+      // names a column this table lacks): its value still fed the ticked column
+      C.clearSaved();
+      C.fromState([{ name: 'CARX', formula: '{NOPE} + 0', input: { name: 'RX', value: 2 } }, { name: 'USERX', formula: '{A} * {@RX}' }], 'state');
+      var rx = C.applyRows([{ A: '3' }]);
+      C.renderSaveList();
+      var sstx = { visibleColumns: ['#', 0, 1], columnOrder: [0, 1] };
+      C.stripFromState(sstx, { A: 0, USERX: 1 });
+      var carx = sstx.calcColumns ? sstx.calcColumns.filter(function (d) { return d.name === 'CARX'; })[0] : null;
+      eq('stripCarrierLeftOut', rx[0].USERX === '6' && !!sstx.calcColumns && sstx.calcColumns.map(function (d) { return d.name; }).sort().join(',') === 'CARX,USERX' && !!carx && !!carx.input && carx.input.value === 2, true);
+      lsb.innerHTML = '';
+      // a column left out is noticed; working again, then left out again, it is noticed again (not once per page)
+      window.__toasts.length = 0;
+      C.fromState([{ name: 'ORPH', formula: '{A} * {@RQ}' }], 'state'); C.applyRows([{ A: '3' }]);
+      await sleep(1100);
+      var n1 = window.__toasts.filter(function (h) { return /ORPH/.test(h); }).length;
+      C.fromState([{ name: 'CARQ', formula: '{A}', input: { name: 'RQ', value: 2 } }, { name: 'ORPH', formula: '{A} * {@RQ}' }], 'state'); C.applyRows([{ A: '3' }]);
+      C.fromState([{ name: 'ORPH', formula: '{A} * {@RQ}' }], 'state'); C.applyRows([{ A: '3' }]);
+      await sleep(1100);
+      var n2 = window.__toasts.filter(function (h) { return /ORPH/.test(h); }).length;
+      eq('noticedAgain', n1 + '/' + n2, '1/2');
+      // the chip's popover: every id once (two rows of one value shared the knob's id); the chip again closes
+      // it; Tab out of it closes it, focus moving inside or nowhere does not
+      C.fromState([{ name: 'CAR', formula: '{A} + 0', input: { name: 'R', value: 2 } }, { name: 'USER', formula: '{A} * {@R}' }], 'state');
+      C.applyRows([{ A: '3' }]);
+      var anc = document.createElement('button'); anc.id = 'fakeChip'; anc.textContent = 'chip'; document.body.appendChild(anc);
+      C.openChipMenu(anc);
+      var popIds = Array.prototype.map.call(document.querySelectorAll('#pnbCalcPop [id]'), function (x) { return x.id; });
+      var knobIds = popIds.filter(function (i) { return /pnbCalcInp_/.test(i); });
+      eq('popKnobIds', knobIds.length === 2 && popIds.length === popIds.filter(function (i, k) { return popIds.indexOf(i) === k; }).length, true);
+      C.openChipMenu(anc);
+      eq('popToggle', !document.getElementById('pnbCalcPop'), true);
+      C.openChipMenu(anc);
+      var pb = document.querySelectorAll('#pnbCalcPop button');
+      pb[0].dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: pb[1] }));
+      var stayIn = !!document.getElementById('pnbCalcPop');
+      pb[0].dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }));
+      var stayNone = !!document.getElementById('pnbCalcPop');
+      pb[0].dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: document.getElementById('pnbCalcAdd') }));
+      eq('popTabOut', stayIn && stayNone && !document.getElementById('pnbCalcPop'), true);
+      C.closeChipMenu(false);
+      anc.remove();
       // --- the source: no eval / Function / innerHTML of a formula unescaped -------------
       var srcText = await fetch('penumbra_calc.js', { cache: 'no-store' }).then(function (r) { return r.text(); });
       R.chk.noEval = !/\beval\s*\(/.test(srcText) && !/new\s+Function\s*\(/.test(srcText) && !/\bFunction\s*\(\s*['"]/.test(srcText);

@@ -229,7 +229,8 @@ until(function () { return ['b3', 'b4'].every(booted) && stat('b1') !== '' && st
   var $sb = $('#dashSearchBuilder');
   ok('the opener is the first control in the filter box', $sb.length === 1 && $('#dashFilter .dash-filter-box').children().first().is('#dashSearchBuilder'),
      $('#dashFilter .dash-filter-box').children().map(function () { return this.id; }).get().join(','));
-  ok('the opener is named for assistive tech; its icon is decorative', $sb.attr('aria-label') === 'Open the Visual Search Builder' && $sb.find('svg[aria-hidden="true"]').length === 1);
+  // the builder's name: Search, or Filter since penumbra_tests\filterword (2026-10-19), which pins it
+  ok('the opener is named for assistive tech; its icon is decorative', /^Open the Visual (?:Search|Filter) Builder$/.test($sb.attr('aria-label') || '') && $sb.find('svg[aria-hidden="true"]').length === 1);
   if ($sb.length) {
     var cs = getComputedStyle($sb[0]);
     // A button, not a landmark (2026-10-06): a 10% brand tint behind a brand glyph, whatever
@@ -242,11 +243,11 @@ until(function () { return ['b3', 'b4'].every(booted) && stat('b1') !== '' && st
     ok('the opener draws a stroked magnifier', ic.width === '13px' && ic.fill === 'none' && ic.stroke !== 'none', ic.width + ' ' + ic.fill + ' ' + ic.stroke);
   }
   $('#dashSearchInput').trigger('focus');
-  ok('the empty box, focused, teaches / for the builder', /press \/ for the Visual Search Builder/.test($('#dashSearchInput').attr('placeholder') || ''), $('#dashSearchInput').attr('placeholder'));
+  ok('the empty box, focused, teaches / for the builder', /press \/ for the Visual (?:Search|Filter) Builder/.test($('#dashSearchInput').attr('placeholder') || ''), $('#dashSearchInput').attr('placeholder'));
   $('#dashSearchInput').trigger('blur');
   eq('leaving the box puts its example back', $('#dashSearchInput').attr('placeholder'), 'Filter every tile, e.g. COLLEGE = Engineering');
   ok('the box names double-click / Ctrl+Space in its title', /Double-click or Ctrl\+Space for suggestions/.test($('#dashSearchInput').attr('title') || ''), $('#dashSearchInput').attr('title'));
-  ok('the box has its own Search help button', $('#dashSearchHelp').length === 1 && $('#dashSearchHelp').attr('aria-label') === 'Search help');
+  ok('the box has its own Search help button', $('#dashSearchHelp').length === 1 && /^(?:Search|Filter) help$/.test($('#dashSearchHelp').attr('aria-label') || ''));   // Filter: filterword (2026-10-19)
 
   // ══════ A1. the column arrow (2026-10-06), as on a report's search bar ══════
   var $ca = $('#dashSearchCols');
@@ -563,7 +564,7 @@ until(function () { return ['b3', 'b4'].every(booted) && stat('b1') !== '' && st
 }).then(function (opened) {
   ok('its ? opens Search help in this page\'s help panel - no new tab', opened && OPENED.length === 0 && $('#dashHelpOverlay').attr('data-topic') === 'searchHelpLightbox',
      opened + ' ' + JSON.stringify(OPENED) + ' ' + $('#dashHelpOverlay').attr('data-topic'));
-  ok('the panel is headed Search help and holds the search topic', $('#dashHelpOverlay .dash-panel-head h2').text() === 'Search help' &&
+  ok('the panel is headed Search help and holds the search topic', /^(?:Search|Filter) help$/.test($('#dashHelpOverlay .dash-panel-head h2').text()) &&
      $('#dashHelpOverlay .dash-help-body #search-quicktips').length === 1 && !$('#dashHelpOverlay .dash-keys-toggle').length,
      $('#dashHelpOverlay .dash-panel-head h2').text());
   var top = helpTop('search-builder');

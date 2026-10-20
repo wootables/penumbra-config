@@ -1,0 +1,385 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>find</title>
+<link rel="stylesheet" href="main.css">
+<link rel="stylesheet" href="density.css">
+<!-- index.php order: the column-width tool, cell selection, then Find (an EMPTY file in --control). -->
+<link rel="stylesheet" href="penumbra_colwidths.css">
+<link rel="stylesheet" href="penumbra_grouplist.css">
+<link rel="stylesheet" href="penumbra_cellsel.css">
+<link rel="stylesheet" href="penumbra_find.css">
+</head>
+<body class="theme-default">
+<!-- find suite (2026-10-19) - Find in results on the FLAT table (js/penumbra_find.js).
+     Copied from the cellsel harness: the hiddencols fixture (300 rows, 6 visible columns,
+     14 hidden; rows past the first 200 are LAZY), the REAL main.js (with its findHost
+     patch in a stage), cell selection and the format engine through the REAL run path (a
+     stubbed query.php), stored UNGROUPED unless the scenario says so. Paging buttons as
+     index.php has them. --control loads the LIVE main.js and an EMPTY module. -->
+<div id="zzHarnessPlumbing" style="display:none">
+  <input id="reportTitle" value=""><input id="reportSubtitle" value=""><div id="admWrapper"></div><button id="toggleAdminViewBtn"></button>
+  <div id="editorTabs"></div><div id="mainReportSubtitle"></div><div id="mainReportTitle"></div>
+  <textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+  <button id="executeQuery">Run</button><button id="stopQueryBtn">Stop</button>
+  <div id="importTimestamps"></div>
+  <div id="errorBox"></div><div id="undo_text_container"></div>
+  <button id="groupTableBtn" type="button">Group</button>
+  <div id="helpContentContainer"></div>
+</div>
+<div id="loadingOverlay" style="display:none"><p id="execution-timer"></p><p id="loadingMessage"></p><div id="loadingTip"></div></div>
+<div id="reportHeaderContainer"><div id="defaultTitleView">find fixture</div><div id="reportInfoPanel" style="display:none"></div><div id="reportSnippetOutput"></div></div>
+<div id="resultsHeader">
+  <div id="tableSearchContainer"><form class="search-wrapper pnb-sbox" role="search" onsubmit="return false;"><input id="tableSearch" value=""><span class="search-clear pnb-sbox-seg" id="clearTableSearch" title="Clear search">&times;</span></form></div>
+  <span id="resultCount"></span>
+  <div id="paginatorContainer" style="visibility: hidden;">
+    <div id="paginationControls">
+      <button id="firstPageBtn" class="page-nav-btn">&lt;&lt;</button>
+      <button id="prevPageBtn" class="page-nav-btn">&lt;</button>
+      <span id="pageInfo" aria-live="polite" aria-atomic="true"></span>
+      <button id="nextPageBtn" class="page-nav-btn">&gt;</button>
+      <button id="lastPageBtn" class="page-nav-btn">&gt;&gt;</button>
+      <select id="rowsPerPageSelector"><option value="25">25</option><option value="50">50</option><option value="200">200</option><option value="all">All</option><option value="none">None</option></select>
+    </div>
+  </div>
+  <div id="groupActionsContainer">
+    <a href="#" class="themed-link-button" id="expandAllGroups">Expand All</a>
+    <a href="#" class="themed-link-button" id="collapseAllGroups">Collapse All</a>
+    <span class="btn-group-sep" id="removeGroupingSep">&bull;</span> <a href="#" class="themed-link-button" id="configureGroupingBtn">Configure Grouping</a>
+    <a href="#" class="themed-link-button" id="removeGroupingLink">Remove Grouping</a>
+    <button id="exitPivotModeBtn" type="button" style="display:none">Exit pivot</button>
+  </div>
+</div>
+<div id="table-view-container"><table id="resultsTable" class="data-grid-table"><caption class="sr-only">Report results table</caption><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table><div id="groupedResultsContainer" style="display:none"></div><div id="pivot-output-container" style="display:none"></div></div>
+<div id="groupingLightbox" style="display:none">
+  <div id="groupingColumnSelector" class="penumbra-custom-select"><div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div></div>
+  <div id="groupLevel2Row" style="display:none"><div id="groupingColumnSelector2" class="penumbra-custom-select"><div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div></div></div>
+  <div id="groupLevel3Row" style="display:none"><div id="groupingColumnSelector3" class="penumbra-custom-select"><div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div></div></div>
+  <input type="checkbox" id="groupAggCheckbox">
+  <div id="groupAggOptions" style="display:none"></div>
+  <div id="groupAggColumn" class="penumbra-custom-select"><div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div></div>
+  <select id="groupAggType"><option value="sum">sum</option><option value="avg">avg</option></select>
+  <select id="groupSortSelect">
+    <option value="label|asc">label asc</option><option value="label|desc">label desc</option>
+    <option value="count|asc">count asc</option><option value="count|desc">count desc</option>
+  </select>
+  <select id="groupLimitDir"><option value="top">top</option><option value="bottom">bottom</option></select>
+  <input type="text" id="groupLimitN"><input type="text" id="groupLimitMinRows">
+  <input type="checkbox" id="groupLimitOther" checked>
+  <div id="groupSummaryFilterHint" style="display:none"></div>
+  <div id="groupStartDepthRow"><select id="groupStartDepth">
+    <option value="0">Collapsed</option><option value="1">Level 1</option><option value="2">Level 2</option><option value="3">All levels</option>
+  </select></div>
+  <div id="groupLayoutRow" style="display: none;">
+    <div id="groupLayoutLbl">Layout</div>
+    <div class="grp-lb-inline grp-lb-radios" role="radiogroup" aria-labelledby="groupLayoutLbl">
+      <label><input type="radio" name="groupLayoutChoice" value="stacked" checked> Stacked</label>
+      <label><input type="radio" name="groupLayoutChoice" value="list"> List</label>
+    </div>
+    <input type="hidden" id="groupLayout" value="stacked">
+  </div>
+  <button id="resetGroupingBtn" type="button">Reset</button>
+  <button id="copyGroupSnippetBtn" type="button">Snippet</button>
+  <button id="confirmGroupingBtn" type="button">Apply Grouping</button>
+</div>
+<div id="settingsPanelOverlay"></div>
+<!-- round 5: a snapshot comparison draws in this lightbox's fadeOut callback (none = no callback) -->
+<div id="manageSnapshotsLightbox" style="display:none"></div>
+<!-- round 5: index.php's snapshot analysis card (a comparison clones it), copied verbatim -->
+<template id="snapshotAnalysisTemplate">
+    <div class="snapshot-info-panel">
+        <!-- Accented banner band (2026-07-24): mirrors the app's dialog-band
+             language - brand-tinted strip with the title left and an × right
+             that clears the comparison (routes through the control-bar link's
+             full teardown via a delegated handler in js/main.js). -->
+        <div class="snap-card-banner">
+            <!-- The "?" rides the title because a comparison collapses the report
+                 header (and with it the breadcrumb's help icon), so this card is
+                 the only chrome on screen - including in a ?snapcmp= / ?snapab=
+                 tab opened straight from a shared link. Lands on the Comparing
+                 topic, same as the dialog's Compare buttons. -->
+            <h4><span>📊</span> Snapshot Comparison Analysis <span class="tab-help-icon" data-target="#snapshotsHelpLightbox" data-jump-to="snh-comparing" title="Open help: Comparing Snapshots">?</span></h4>
+            <!-- Copy link: builds the same ?snapcmp= deep link the scheduler's
+                 change-analysis emails carry, so a recipient boots straight into
+                 this live-vs-baseline diff. Hidden for A-vs-B (no URL form) -
+                 toggled per render by _syncCompareShareLink(). -->
+            <button type="button" class="snap-banner-link" style="display:none;" title="Copy a link to this comparison. Anyone who can open this report will land on this same comparison analysis." aria-label="Copy a link to this comparison">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                <span>Copy link</span>
+            </button>
+            <!-- Evergreen variant (2026-08-20): the same ?snapcmp= deep link but
+                 with a SELECTOR token (latest / latest-scheduler) in place of the
+                 snapshot id, so the bookmark re-resolves its baseline - and
+                 re-diffs - every time it's opened. Shown only for vs-live
+                 compares against a server snapshot; _syncCompareShareLink()
+                 owns the toggle per render. -->
+            <button type="button" class="snap-banner-link-evergreen" style="display:none;" title="Copy an evergreen comparison link: instead of this exact snapshot, it re-resolves the baseline (the report's latest / latest scheduler snapshot) every time it's opened - a bookmark that always shows current drift and never goes stale." aria-label="Copy an evergreen comparison link">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.5 2v6h-6"/><path d="M2.5 22v-6h6"/><path d="M2 11.5a10 10 0 0 1 18.8-4.3"/><path d="M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+                <span>Copy evergreen link</span>
+            </button>
+            <button type="button" class="snap-banner-close" title="Clear Snapshot Comparison" aria-label="Clear snapshot comparison">&times;</button>
+        </div>
+        <!-- Layout (2026-07-24): criteria | SOURCES+CONTEXT (centerpiece) | legend.
+             The paired context grid carries the datasets AND all their context
+             checks (filter / prompts / tables / columns), so it owns the wide
+             center column; criteria and legend flank it at roughly equal width. -->
+        <div class="snap-analysis-row">
+            <div class="snap-col-criteria">
+                <div class="snap-criteria-line">
+                    <strong>Match Criteria:</strong>
+                    <!-- The criteria value is set into .snap-criteria-text (NOT the
+                         chip itself - .text() would wipe the pencil). The pencil is
+                         the old "modify" link, kept on the same class so the
+                         existing delegated handler reopens the dialog preloaded. -->
+                    <span class="snap-criteria"><span class="snap-criteria-text"></span><a href="#" class="snap-modify-link" role="button" aria-label="Modify comparison settings" title="Modify this comparison - reopens the snapshot dialog with these settings already in place."><svg class="snap-modify-pencil" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></a></span>
+                </div>
+                <div class="snap-summary"></div>
+            </div>
+            <div class="snap-col-sources">
+                <!-- Paired context grid: row 1 = the two dataset headers with the
+                     arrow (and time-gap note) between them; the compare renderers
+                     append one row per DIFFERING context attribute (filter, each
+                     prompt, tables, columns) so the two sides' values sit in the
+                     same row under their respective dataset, plus a full-width
+                     footnote listing what matches. -->
+                <div class="snap-pair-grid">
+                    <span class="snap-pair-corner" aria-hidden="true"></span>
+                    <div class="snap-pair-head">
+                        <div class="snap-source-label">COMPARING (CURRENT - <span class="snap-current-rowcount"></span>x<span class="snap-current-colcount"></span> ROWS):</div>
+                        <div class="snap-current-title snap-source-title"></div>
+                        <div class="snap-current-meta snap-source-meta"></div>
+                    </div>
+                    <div class="snap-arrow"><span class="snap-arrow-glyph">➔</span><small class="snap-gap-note" style="display:none;"></small></div>
+                    <div class="snap-pair-head">
+                        <div class="snap-source-label">AGAINST (SNAPSHOT - <span class="snap-baseline-rowcount"></span>x<span class="snap-baseline-colcount"></span> ROWS):</div>
+                        <div class="snap-baseline-title snap-source-title"></div>
+                        <div class="snap-baseline-meta snap-source-meta"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="snap-col-legend">
+                <div>Legend <small>(click a group header below to expand)</small>:</div>
+                <ul>
+                    <li><strong>New Rows:</strong> <span class="snap-legend-desc">Present in Current,<br>missing in Snapshot.</span></li>
+                    <li><strong>Removed Rows:</strong> <span class="snap-legend-desc">Missing in Current,<br>present in Snapshot.</span></li>
+                    <li><strong>Unchanged Rows:</strong> <span class="snap-legend-desc">Exact match on criteria.</span></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</template>
+<div id="settingsPanel">
+  <select id="spThemeSelector"><option value="report-default">Report Default</option><option value="theme-default">Default</option></select>
+  <select id="spDensitySelector"><option value="report-default">Report Default</option><option value="standard">Standard</option></select>
+  <input type="checkbox" id="spRowExpandToggle"><input type="checkbox" id="spResolverToggle">
+  <div class="sp-section sp-columns-section"><div class="sp-column-container"><div id="spColumnList" class="sp-column-list"></div></div></div>
+  <div class="sp-actions"><button id="spApply">Save Column Layout</button><button id="spReset">Reset</button><span id="spPendingCount"></span></div>
+</div>
+<div id="copyActionsLightbox" style="display:none">
+  <input type="radio" name="copyFormat" value="html">
+  <input type="radio" name="copyFormat" value="csv">
+  <input type="radio" name="copyFormat" value="tsv">
+  <input type="radio" name="copyFormat" value="json">
+  <input type="radio" name="copyFormat" value="sql">
+  <input type="radio" name="copyFormat" value="custom">
+  <input type="radio" name="copyFormat" value="single_col" checked>
+  <select id="copyColumnSelector"></select>
+  <input id="copyDelimiterInput" value=";">
+  <input id="sqlTableNameInput" value="LAZY_T"><textarea id="customTemplateInput"></textarea>
+  <input type="checkbox" id="customTemplateNewline" checked><select id="apiSnippetLanguage"><option value="python">python</option></select>
+  <button id="confirmCopyBtn">Copy</button>
+</div>
+<div id="pnbStatusBar">
+  <div class="sb-seg" id="sbColsSeg"><span id="sbCols"></span>
+    <span class="sb-chip" id="sbCustomCols" style="display:none;">custom layout</span>
+    <div class="sb-pop" id="sbCustomColsPop"><div id="sbCustomColsDiff"></div><button id="sbCustomColsReset">Reset</button><button id="sbCustomColsSave" style="display:none;">Save</button></div>
+  </div>
+  <div class="sb-seg" id="sbUserSeg"></div>
+</div>
+<pre id="out">running</pre>
+
+<script>
+  (function () { try { localStorage.clear(); } catch (e) {} })();
+  window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' } };
+  window.PENUMBRA_THEME_IDS = ['theme-default'];
+  window.PENUMBRA_THEME_ALIASES = {};
+  window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  (function () {
+    var P = new URLSearchParams(location.search);
+    window.__SCN = P.get('scn') || 'boot';
+    var S = window.__SCN;
+    var COLS = [
+      'V_ID', 'V_NAME', 'V_AMOUNT', 'V_DATE', 'V_LINK', 'V_STATUS',            // 0-5 visible
+      'H_TEXT', 'H_NUM', 'H_MONEY', 'H_DATE', 'H_HTML', 'H_JSON', 'H_ENT',     // 6-12 hidden
+      'H_NL', 'H_NULL', 'H_GROUP', 'H_GROUP2', 'H_AMT', 'H_FLAG', 'H_CODE'     // 13-19 hidden
+    ];
+    window.__COLS = COLS;
+    var seed = 20260930;
+    function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
+    function pick(a) { return a[Math.floor(rnd() * a.length)]; }
+    var W = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel', 'India', 'Juliet', 'Kilo', 'Lima'];
+    function money() { return '$' + (rnd() * 90000 + 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+    function date() { var d = new Date(2021, 0, 1 + Math.floor(rnd() * 1500)); return (d.getMonth() + 1) + '/' + d.getDate() + '/' + d.getFullYear(); }
+    function link() { var id = String(400000 + Math.floor(rnd() * 99999)); return '@@HTML<a href="https://oitras.oit.ncsu.edu/resolver/103?id=' + id + '" target="_new" title="View the project record (requires proper access)" class="resolver-link">' + id + '</a>'; }
+    // prof (prof\prof.py, never in a suite run): a directory-sized table, ?n= rows (25,000)
+    var N = /^big/.test(S) ? 3000 : (S === 'prof' ? (+P.get('n') || 25000) : 300);
+    var rows = [];
+    for (var i = 1; i <= N; i++) {
+      var r = {};
+      r.V_ID = 'ID-' + String(1000 + i);
+      r.V_NAME = pick(W) + ' ' + pick(W);
+      r.V_AMOUNT = money();
+      r.V_DATE = date();
+      r.V_LINK = link();
+      r.V_STATUS = pick(['Open', 'Closed', 'Pending']);
+      r.H_TEXT = pick(W) + ' ' + pick(W) + ' ' + i;
+      r.H_NUM = String(Math.floor(rnd() * 1000));
+      r.H_MONEY = money();
+      r.H_DATE = date();
+      r.H_HTML = link();
+      var sub = []; for (var k = 0, n = 1 + Math.floor(rnd() * 3); k < n; k++) sub.push({ SUB_ID: 'S' + Math.floor(rnd() * 90), SUB_AMT: Math.floor(rnd() * 5000), SUB_NAME: pick(W) });
+      r.H_JSON = (i % 7 === 0) ? null : '@@JSON' + JSON.stringify(sub);
+      r.H_ENT = pick(['R&amp;D', 'O&#039;Brien', '&lt;tag&gt;', 'plain', 'A &amp; B &amp; C']);
+      r.H_NL = pick(W) + '\n' + pick(W);
+      r.H_NULL = (i % 3 === 0) ? null : ((i % 3 === 1) ? '' : pick(W));
+      r.H_GROUP = (i % 11 === 0) ? null : pick(['North', 'South', 'East', 'West', 'Central']);
+      r.H_GROUP2 = pick(['Tier 1', 'Tier 2', 'Tier 3']);
+      r.H_AMT = String(Math.floor(rnd() * 20000) / 100);
+      r.H_FLAG = rnd() < 0.3 ? 'Y' : 'N';
+      r.H_CODE = pick(['AB', 'CD', 'EF', 'GH']) + '-' + Math.floor(rnd() * 99);
+      // find: a name only one LAZY row has (page 2), and a name holding a status word
+      if (i === 250) r.V_NAME = 'Zulu Unique';
+      if (i === 3) r.V_NAME = 'Open House';
+      // cover: page 2's FIRST row, the right-hand column - where the bar sits
+      if (i === 201) r.V_STATUS = 'Topright Unique';
+      // fmt: two amounts the column format shows as currency - one drawn (row 3), one lazy (row 250)
+      if (S === 'fmt' && i === 3) r.H_AMT = '4321.5';
+      if (S === 'fmt' && i === 250) r.H_AMT = '1234.5';
+      // json: a nested value only a lazy row has, and one only a drawn row has
+      if (S === 'json' && i === 250) r.H_JSON = '@@JSON' + JSON.stringify([{ SUB_ID: 'S1', SUB_AMT: 1, SUB_NAME: 'Nestedonly' }]);
+      if (S === 'json' && i === 5) r.H_JSON = '@@JSON' + JSON.stringify([{ SUB_ID: 'S2', SUB_AMT: 2, SUB_NAME: 'Nestedfirst' }]);
+      rows.push(r);
+    }
+    window.__rowsFixture = rows;
+    var order = []; for (var c = 0; c < COLS.length; c++) order.push(c);
+    var st = {
+      name: 'lrfix', query: 'SELECT * FROM LR_FIXTURE', reportTitle: 'Lazy rows fixture',
+      theme: 'theme-default', density: 'standard',
+      visibleColumns: ['#', 0, 1, 2, 3, 4, 5], columnOrder: order,
+      sortCriteria: [], noLimit: true, rowExpandDefault: false, resolverLinksDefault: true,
+      rowsPerPage: '200', reportSnippet: ''
+    };
+    if (S === 'hidcol') st.visibleColumns = ['#', 0, 1, 3, 4, 5];          // V_AMOUNT hidden
+    if (S === 'fmt') st.visibleColumns = ['#', 0, 1, 2, 3, 4, 5, 17];      // + H_AMT
+    if (S === 'json') st.visibleColumns = ['#', 0, 1, 2, 3, 4, 5, 11];     // + H_JSON
+    if (S === 'ent') st.visibleColumns = ['#', 0, 1, 2, 3, 4, 5, 12];      // + H_ENT
+    // prof: 18 columns shown like the directory report (no links / nested JSON)
+    if (S === 'prof') st.visibleColumns = ['#', 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 13, 14, 15, 16, 17, 18, 19];
+    if (S === 'gview') { st.groupBy = 'H_GROUP'; st.groupStartDepth = 3; }
+    // round 2 (grp_*): the grouped view - by H_GROUP (nest: then H_GROUP2), every level open
+    // (closed: all collapsed), a group summary as saved reports carry; list: the List layout
+    if (/^grp_/.test(S)) {
+      st.groupBy = /nest/.test(S) ? 'H_GROUP,H_GROUP2' : 'H_GROUP';
+      st.groupStartDepth = /closed/.test(S) ? 0 : 3;
+      st.groupAgg = { column: 'H_AMT', type: 'sum' };
+      if (/list/.test(S)) st.groupLayout = 'list';
+    }
+    // round 3 (piv_*): a pivot, H_GROUP > H_GROUP2 down, V_STATUS across, sum of H_AMT
+    // (the cellsel suite's); closed: collapsed at the start
+    if (/^piv_/.test(S)) {
+      st.pivot = { v: 2, rows: ['H_GROUP', 'H_GROUP2'], cols: ['V_STATUS'], vals: 'H_AMT', agg: ['sum'], aggLabels: ['Amt'], aggColOverrides: ['H_AMT'],
+        aggFilters: null, aggFormulas: null, rowLayout: 'nested', colLayout: 'nested', sortOrder: 'asc', colSortOrder: 'asc',
+        stickyColCount: 2, totalColAggs: null, totalRowAggs: null, totalRowAggLabels: null, totalRowAggBaseIdx: null,
+        rankN: null, rankDir: null, rankAgg: null, rankOther: true, rankScope: null, noBreakdown: false, startExpanded: !/closed/.test(S), hideEmpty: false };
+    }
+    if (S === 'none') st.rowsPerPage = 'none';
+    if (S === 'all') st.rowsPerPage = 'all';
+    window.__STORED = st;
+    // fmt: the viewer's own column format (Column options), as the browser keeps it
+    if (S === 'fmt') {
+      try { localStorage.setItem('penumbra_column_prefs', JSON.stringify({ lrfix: { colopt: { H_AMT: { fmt: 'currency:2' } } } })); } catch (e) {}
+    }
+    window.penumbra_vars = {
+      isAdmin: true, isGlobalAdmin: true, canEditReport: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+      tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+      imports: [], reports: [], themes: {}, prompts: {}, grants: [],
+      totalExemptions: ['AMOUNT', 'H_AMT', 'H_NUM'],
+      preloadedState: st
+    };
+    window.__queryResponse = { data: rows };
+  })();
+  window.__T = {};
+  window.__queryDone = 0;
+  window.__ajaxLog = [];
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  jQuery.ajax = function (a, b) {
+    var opts = (typeof a === 'string') ? jQuery.extend({ url: a }, b || {}) : (a || {});
+    var url = String(opts.url || '');
+    window.__ajaxLog.push(url);
+    var d = jQuery.Deferred();
+    var isQuery = /query\.php/.test(url);
+    var resp = isQuery ? window.__queryResponse : (/help_content\.php/.test(url) ? (window.__HELP_STUB || '') : {});
+    setTimeout(function () {
+      try { if (opts.success) opts.success(resp, 'success', { status: 200 }); } catch (e) { window.__errors.push('ajax success threw: ' + String(e)); }
+      try { if (opts.complete) opts.complete({ status: 200 }, 'success'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }
+      d.resolve(resp, 'success', { status: 200 });
+      if (isQuery) window.__queryDone++;
+    }, 0);
+    var p = d.promise(); p.abort = function () {}; return p;
+  };
+  jQuery.getJSON = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.post = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.get = jQuery.post;
+  jQuery.fx.off = true;
+  window.__clip = [];
+  try {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+      writeText: function (t) { window.__clip.push(String(t)); return Promise.resolve(); },
+      write: function () { return Promise.resolve(); }
+    } });
+  } catch (e) { window.__clipErr = String(e); }
+  window.__errors = [];
+  window.__rejections = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    window.__rejections.push(String((r && r.message) || r) + ' @' + String((r && r.stack) || '').split('\n').slice(1, 2).join('').trim());
+    e.preventDefault();
+  });
+  window.confirm = function () { return true; };
+  window.alert = function (m) { window.__errors.push('alert: ' + m); };
+  window.prompt = function () { return null; };
+  if (typeof window.stackHeaders !== 'function') window.stackHeaders = function () {};
+</script>
+<script>
+  // Every Escape that reaches the DOCUMENT (counted before main.js's own Escape
+  // handler, a document capture listener, can swallow it): a key Find takes
+  // (window, capture) never gets here.
+  window.__docEsc = 0;
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' || e.key === 'Esc') window.__docEsc++; }, true);
+</script>
+<script src="penumbra_userseg.js"></script>
+<script src="help_stub.js"></script>
+<script src="main_hc.js"></script>
+<!-- index.php order: column widths, cell selection, the format engine, then Find -->
+<script src="penumbra_colwidths.js"></script>
+<script src="penumbra_grouplist.js"></script>
+<script src="penumbra_cellsel.js"></script>
+<script src="penumbra_colfmt.js"></script>
+<script src="penumbra_find.js"></script>
+<script src="driver.js"></script>
+</body></html>

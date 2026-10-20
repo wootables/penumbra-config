@@ -1,0 +1,6 @@
+Help cache: the filter wording (b25ef2d)
+
+cache/help_chunks.json rebuilt on live by penumbra_tests\helpv2\prebuild_caches.php after the
+filter-wording deploy: 1316 chunks, VER 7, the stored signature equals the live one.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

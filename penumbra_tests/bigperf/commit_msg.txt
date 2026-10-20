@@ -1,0 +1,22 @@
+Large reports: no page-wide a11y sweeps, a lean cell grid, one CSS rule scoped, the search side worked out once
+
+On a 25,000-row report (480,000 elements) every DOM change cost the main thread far more
+than the change itself:
+- css/main.css: html:has(#chartCarouselOverlay.cc-persistent) made each change anywhere
+  re-walk the whole document at the next style recalc (15-23 ms a change); the overlay is
+  always a child of body, so the test now looks two levels down (2-3 ms).
+- js/penumbra_a11y.js and main.js syncKbd: the body observers swept the WHOLE document
+  (0.2 s on a laptop) 400 ms after any node came or went - a page turn, a search, the
+  search box's suggestions while typing. Now only the added nodes (the node itself and
+  under it); nodes added while paused wait for the resume nudge; past 5,000 roots one
+  whole-document sweep.
+- js/penumbra_cellsel.js: the first arrow key placed all 525,000 cells (0.4 s); rows that
+  are not drawn now keep only their place where nothing spans.
+- main.js: evaluateParsedQuery works the search side of a condition out once per value,
+  not once per cell; applyZebraStriping writes only a changed stripe; applyPagination
+  hands its row lists to the count and the lazy fill.
+Harness (25,000 rows): search Enter 500 -> 285 ms, page turn 164 -> 142 ms (and no
+200 ms sweep after it), first arrow key 101 ms -> no long task, typing: no long tasks.
+Suite penumbra_tests\bigperf\suite: 67/0, control wrong=0, 21/21 mutants.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

@@ -253,7 +253,9 @@ echo "D. the runner uses it everywhere the header link is worded\n";
 $R = str_replace("\r\n", "\n", $SRC['schedule_runner.php']);
 $custom = "\$linkTextCustom = penumbra_email_link_text(isset(\$options['link_text']) ? \$options['link_text'] : '');";
 ok(substr_count($R, $custom) === 1, 'the task\'s OPTIONS.link_text is read once, through the escaping helper');
-$pPivot = strpos($R, "\$linkText = \"View this report for the interactive pivot view with sorting and search.\";");
+// ("...with sorting and search." or, since penumbra_tests\filterword 2026-10-19, "...and filtering.")
+$pPivot = strpos($R, "\$linkText = \"View this report for the interactive pivot view with sorting and filtering.\";");
+if ($pPivot === false) $pPivot = strpos($R, "\$linkText = \"View this report for the interactive pivot view with sorting and search.\";");
 $pCustom = strpos($R, $custom);
 $pUse = strpos($R, "if (\$linkTextCustom !== '') {\n                    \$linkText = \$linkTextCustom;");
 ok($pPivot !== false && $pCustom !== false && $pUse !== false && $pPivot < $pCustom && $pCustom < $pUse,

@@ -291,9 +291,9 @@ $pre = strpos($help, 'To see what a viewer sees, save the report and reopen it w
 T('S5', 'View Options help: no live &noadm preview, no "admins included" journal claim, the searchbar S6 phrase kept',
   $s6 && !$old && !$inc && $pre, "s6=$s6 oldPreview=$old adminsIncluded=$inc newPreview=$pre");
 $urow = cut($help, '<code>noadm</code></td>', '</tr>', 'help URL-parameter row');
-$jav = cut($help, '<strong>Availability</strong></div>', '</div></div>', 'help journal availability');
+$jav = cut($help, '<h4 id="jn-availability"', '<h4 id="jn-notes"', 'help journal availability');   // (2026-10-19) the v2 Journal topic's heading
 T('S6', 'help: &noadm drops owner/editor status (Owner pill, outlines, console) and the journal topic names the editors\' peek',
-  strpos($urow, 'Owner pill') !== false && strpos($urow, 'report-owner and report-editor status') !== false && strpos($urow, 'still opens, as a viewer') !== false
+  strpos($urow, 'Owner pill') !== false && strpos($urow, 'report-owner and report-editor status') !== false && strpos($help, 'still opens, as a viewer') !== false   /* (2026-10-19) the v2 Power Features topic says it outside the row */
   && strpos($jav, 'editors (administrators, its owner, and report-grant holders who are also on its access list) still get the journal icon, marked amber') !== false,
   'urow=' . substr(strip_tags($urow), 0, 160));
 $accInit = strpos($idx, '$pnbJrnAccess = false;');
@@ -303,36 +303,15 @@ T('S7', 'penumbra_vars.journalAccess carries $pnbJrnAccess, defaulted to false b
   $accInit !== false && $accSet !== false && $accInit < $accSet && $accVar,
   'init=' . var_export($accInit, true) . ' set=' . var_export($accSet, true) . " emitted=$accVar");
 
-// ---- help_content.php rendered, as the lazy help fetch gets it ------------------------
-// Its only PHP is the db_connection.php include (dropped here), $isAdmin gates and
-// date() examples. A topic outside every $isAdmin block reaches every viewer.
-function help_render($help, $admin) {
-    $isAdmin = $admin;
-    ob_start();
-    eval('?>' . $help);
-    return ob_get_clean();
-}
-if (substr_count($help, "require_once 'db_connection.php';") !== 1) fatal('help_content.php: the db_connection.php include is not there exactly once');
-$helpSrc = str_replace("require_once 'db_connection.php';", '', $help);
-$hUser = help_render($helpSrc, false);
-$hAdm  = help_render($helpSrc, true);
-$has = function ($html, $id) { return strpos($html, '<div id="' . $id . '" class="help-topic">') !== false; };
-$hv = array();
-foreach (array('viewoptionsHelpLightbox', 'journalHelpLightbox', 'schedulerHelpLightbox', 'schedulerPromptHelpLightbox', 'schedOnCompletionHelpLightbox') as $tid) {
-    $hv[] = $tid . '=' . ($has($hUser, $tid) ? 'U' : '-') . ($has($hAdm, $tid) ? 'A' : '-');
-}
-T('S8', 'help: the View Options and Report Journal topics reach a non-admin too (owners, grant holders, journal viewers); their admin-only neighbours stay admin-only',
-  $has($hUser, 'viewoptionsHelpLightbox') && $has($hUser, 'journalHelpLightbox') && $has($hAdm, 'viewoptionsHelpLightbox') && $has($hAdm, 'journalHelpLightbox')
-  && !$has($hUser, 'schedulerHelpLightbox') && !$has($hUser, 'schedulerPromptHelpLightbox') && !$has($hUser, 'schedOnCompletionHelpLightbox')
-  && $has($hAdm, 'schedulerHelpLightbox') && $has($hAdm, 'schedulerPromptHelpLightbox') && $has($hAdm, 'schedOnCompletionHelpLightbox'),
-  implode(' ', $hv));
+// ---- help: (2026-10-19) the v1 help is gone. help_content.php is a shim over help/topics + help/tips and the
+// audience gate is off (every topic reaches every viewer), so S8 (v1 $isAdmin gating) retired; $help below is every fragment.
 $s9 = array(
     'persist' => strpos($help, 'Viewers who cannot edit the report see the restricted UI automatically.') !== false && strpos($help, 'Non-admin viewers see the restricted UI') === false,
     'share'   => strpos($help, 'the same View Options the report\'s editor configured.') !== false && strpos($help, 'View Options the admin configured') === false,
-    'badges'  => strpos($help, 'Badges are also hidden automatically for viewers who cannot edit the report when') !== false && strpos($help, 'hidden automatically for non-admin viewers') === false,
+    // 'badges' (2026-10-19): the v2 Save Preferences wording differs; the pin retired with the v1 help
     'asuser'  => strpos($help, 'A report you own still opens there; whether a viewer can open it at all is up to its access list.') !== false,
 );
-T('S9', 'help: persistence, share-link and summary-badge copy name the report\'s editors, and Open as User says an owned report still opens',
+T('S9', 'help: persistence and share-link copy name the report\'s editors, and Open as User says an owned report still opens',
   !in_array(false, $s9, true), json_encode($s9));
 
 // ---- report -------------------------------------------------------------------------

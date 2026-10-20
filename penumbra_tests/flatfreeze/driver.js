@@ -510,10 +510,13 @@
       'hidden0=' + hidden0 + ' shown=' + shown() + ' txt=' + txt() + ' off=' + $chip.hasClass('sb-off') + ' title=' + $chip.attr('title'));
 
     var ico = $chip.find('svg.sb-frz-ico');
+    // (2026-10-19, colscard) The count's own Columns card follows the count in the DOM
+    // (a card, hidden until opened): the first CHIP after the count is what counts here.
+    var afterCols = $('#sbColsOpen').nextAll(':not(.sb-pop)').first()[0] === $chip[0];
     rec('B2 it sits right after the Cols count, its card right after it, the snowflake decorative and the chip a labelled popup button',
-      $('#sbColsOpen').next()[0] === $chip[0] && $chip.next()[0] === $pop[0] && ico.length === 1 && ico.attr('aria-hidden') === 'true' &&
+      afterCols && $chip.next()[0] === $pop[0] && ico.length === 1 && ico.attr('aria-hidden') === 'true' &&
       $chip.attr('role') === 'button' && $chip.attr('tabindex') === '0' && $chip.attr('aria-haspopup') === 'true' && $chip.attr('aria-expanded') === 'false',
-      'afterCols=' + ($('#sbColsOpen').next()[0] === $chip[0]) + ' cardNext=' + ($chip.next()[0] === $pop[0]) + ' ico=' + ico.length + '/' + ico.attr('aria-hidden') +
+      'afterCols=' + afterCols + ' cardNext=' + ($chip.next()[0] === $pop[0]) + ' ico=' + ico.length + '/' + ico.attr('aria-hidden') +
       ' role=' + $chip.attr('role') + ' haspopup=' + $chip.attr('aria-haspopup') + ' expanded=' + $chip.attr('aria-expanded'));
 
     $chip.trigger('click');

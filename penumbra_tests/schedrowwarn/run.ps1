@@ -60,7 +60,7 @@ if ($Control -or $Control2) {
 if (-not $MainJs)   { $MainJs   = "$js\main.js" }
 if (-not $MainCss)  { $MainCss  = "$app\css\main.css" }
 if (-not $IndexPhp) { $IndexPhp = "$app\index.php" }
-if (-not $HelpPhp)  { $HelpPhp  = "$app\help_content.php" }
+if (-not $HelpPhp)  { $HelpPhp  = "$app\help\topics\sqlHelpLightbox.php" }   # (2026-10-19) the v1 help is gone; S3 reads the Scheduler topic
 foreach ($p in @($MainJs, $MainCss, $IndexPhp, $HelpPhp)) { if (-not (Test-Path $p)) { throw "file under test not found: $p" } }
 
 $src0  = [IO.File]::ReadAllText($MainJs, $utf8)
@@ -114,11 +114,12 @@ function Test-Static {
   $out += [pscustomobject]@{ name = 'S1 index.php: the banner ships hidden, in the unknown-count wording ("may not always deliver the full result set"), with no em dash'
     pass = ($w -ne '') -and ($w -match 'style="display:none') -and ($words -match 'Row limit is on \(max 200 rows\)') -and ($words -match 'may not always deliver the full result set') -and -not ($w -match '&mdash;|&ndash;|\u2014|\u2013')
     detail = $(if ($w) { ([regex]::Replace($words, '\s+', ' ')).Trim() } else { 'no #schedRowLimitWarning in index.php' }) }
-  $m = [regex]::Match($help0, '(?s)<strong style="font-size: 11px;">Automatic Row Limiter</strong>.*?</div>')
+  $m = [regex]::Match($help0, '(?s)<h4 id="sql-rowlimiter"[^>]*>Automatic Row Limiter</h4>.*?<h4 ')
   $out += [pscustomobject]@{ name = 'S2 help_content.php: the Automatic Row Limiter help names the scheduler banner and its 150-row threshold'
     pass = $m.Success -and ($m.Value -match 'Scheduler form warns') -and ($m.Value -match '150 rows')
     detail = $(if ($m.Success) { 'block ' + $m.Value.Length + ' chars' } else { 'no Automatic Row Limiter block' }) }
-  $d = [regex]::Match($help0, '<p[^>]*><strong>This choice replaces the report''s own limiter</strong>.*?</p>')
+  $helpSched = [IO.File]::ReadAllText((Join-Path (Split-Path -Parent $HelpPhp) 'schedulerHelpLightbox.php'), $utf8)
+  $d = [regex]::Match($helpSched, '(?s)<strong>This choice replaces the report''s own limiter</strong>.*?</table>')
   $out += [pscustomobject]@{ name = 'S3 help_content.php: the DB Dump row-limit help says the warning stays silent under 75% of the dump''s cap'
     pass = $d.Success -and ($d.Value -match 'under 75% of it') -and ($d.Value -match 'may not always load the full result set')
     detail = $(if ($d.Success) { 'paragraph ' + $d.Value.Length + ' chars' } else { 'no DB Dump limiter paragraph' }) }

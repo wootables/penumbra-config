@@ -8,7 +8,7 @@
     <div class="pnb-dlg-head">
       <span class="pnb-dlg-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#pnbi-search"/></svg></span>
       <div class="pnb-dlg-tt">
-        <h3 class="pnb-dlg-title">Visual Search Builder <span class="tab-help-icon" data-target="#searchHelpLightbox" data-jump-to="search-builder" title="Help: Visual Search Builder">?</span></h3>
+        <h3 class="pnb-dlg-title">Visual Filter Builder <span class="tab-help-icon" data-target="#searchHelpLightbox" data-jump-to="search-builder" title="Help: Visual Filter Builder">?</span></h3>
         <p class="pnb-dlg-sub">Build a filter from conditions instead of typing a query</p>
       </div>
       <span class="pnb-dlg-action" id="sbPresetMount"></span>
@@ -22,7 +22,7 @@
          carries save, rename, delete and the default on the rows.
          The tip line survives because the behaviour it describes does: typing a
          preset's name in the search bar still runs it. -->
-    <div class="sb-preset-tip sb-preset-tip-standalone">Tip: Type the preset name in the search bar to run it. Double-clicking the search bar also works.</div>
+    <div class="sb-preset-tip sb-preset-tip-standalone">Tip: Type the preset name in the filter box to run it. Double-clicking the filter box also works.</div>
 
     <!-- Logic Toggle -->
     <!-- Each condition row carries its own and/or; these two radios set them all
@@ -45,8 +45,8 @@
       </label>
       <!-- Shown only in pivot view when a pivot aggregate label shares a column's
            name (search_builder.js open(), which also writes the title naming it). -->
-      <label id="sbSrcRowsLabel" class="sb-radio-label sb-src-rows-label" style="display:none" title="In pivot view: a column that shares its name with a pivot aggregate searches the column's source rows instead of the pivot">
-        <input type="checkbox" id="sbSrcRowsCheck"> Search source rows <span class="sb-hint">(__SRC)</span>
+      <label id="sbSrcRowsLabel" class="sb-radio-label sb-src-rows-label" style="display:none" title="In pivot view: a column that shares its name with a pivot aggregate filters on the column's source rows instead of the pivot">
+        <input type="checkbox" id="sbSrcRowsCheck"> Filter source rows <span class="sb-hint">(__SRC)</span>
       </label>
       <label id="sbRowMatchLabel" class="sb-radio-label sb-row-match-label" style="display:none" title="Require conditions on nested sub-table columns to match within the same sub-table row">
         <input type="checkbox" id="sbRowMatchCheck"> Same sub-table row <span class="sb-hint">(__ROW)</span>
@@ -60,7 +60,7 @@
 
     <!-- Add Condition -->
     <div class="sb-controls-row">
-      <button type="button" id="sbAddConditionBtn" class="sb-btn sb-btn-secondary" title="Add another search condition">+ Add Condition</button>
+      <button type="button" id="sbAddConditionBtn" class="sb-btn sb-btn-secondary" title="Add another condition">+ Add Condition</button>
       <div class="sb-controls-right">
         <!-- One hint for the whole builder rather than one per row: the paste
              works on any empty value box, and repeating it beside every row's
@@ -79,14 +79,14 @@
          during selection. The query itself keeps its own line below. -->
     <div class="sb-preview">
       <div class="sb-preview-header">
-        <label class="sb-preview-label">Generated Search Query<span id="sbQueryCount" class="sb-query-count" aria-live="polite" aria-atomic="true"></span>:</label>
+        <label class="sb-preview-label">Generated Filter<span id="sbQueryCount" class="sb-query-count" aria-live="polite" aria-atomic="true"></span>:</label>
       </div>
       <code id="sbQueryPreview" class="sb-query-code">(nothing entered)</code>
     </div>
 
     <!-- Action Buttons -->
     <div class="sb-actions">
-      <button type="button" id="sbSubmitBtn" class="sb-btn sb-btn-primary" title="Apply this search to the table">Search</button>
+      <button type="button" id="sbSubmitBtn" class="sb-btn sb-btn-primary" title="Apply this filter to the table">Filter</button>
       <button type="button" id="sbClearBtn" class="sb-btn sb-btn-secondary" title="Remove all conditions and start fresh">Clear All</button>
       <button type="button" class="sb-btn sb-btn-cancel close-lightbox">Cancel</button>
     </div>

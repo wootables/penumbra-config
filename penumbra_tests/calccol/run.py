@@ -30,9 +30,12 @@ CHK = {
     # the view state, the header menu's Adjust... panel, the reset
     'cadj': ['row', 'preview', 'added', 'panelKnob', 'changed', 'stateCarries', 'menuItem', 'menuEditItem', 'menuPanel', 'menuPanelPlaced', 'menuChanged',
              'boxSprings', 'typedKept', 'menuEditOpens', 'resetFocus', 'reset',   # round 2 (2026-10-19): Edit item, the panel placed, the box springs, typing survives a run, focus after reset
-             'noQuery'],   # round 3: a knob change replays the last answer, no query
+             'noQuery',   # round 3: a knob change replays the last answer, no query
+             'menuDupOpens', 'chipCalc',   # round 5: Duplicate..., the "+N calculated" chip
+             'chipPop',   # round 6: the chip's popover
+             'escOneSurface', 'realColNoAdjust', 'armDropped'],   # round 8 (closing sweep): one Escape one surface, no Adjust on a real column, a dropped replay arm
     'curl': ['halfShown', 'dblCurrency', 'flagText', 'badLeftOut', 'atEnd', 'panelFromLink', 'summable'],
-    'cadd': ['addButton', 'dialog', 'layout', 'cheatPlain', 'adjOneLine', 'noEarlyError', 'chips', 'chipInserts', 'preview', 'reran', 'added', 'listAfterAdd', 'edited', 'removed', 'listAfterRemove',
+    'cadd': ['addButton', 'dialog', 'layout', 'cheatPlain', 'adjOneLine', 'kindNoOverlap', 'errInFooter', 'noEarlyError', 'chips', 'chipInserts', 'preview', 'reran', 'added', 'listAfterAdd', 'edited', 'removed', 'listAfterRemove',
              'editFocus', 'removeFocus'],   # moderate 2026-10-15: WCAG 2.4.3; cheatPlain / adjOneLine 2026-10-19 (calcadj round 2)
     'cclear': ['before', 'listed', 'cleared'],
     'cstate': ['stateShown', 'viewStateCarries', 'saveStrips'],
@@ -56,7 +59,13 @@ ENGINE = ['add', 'accounting', 'pctIn', 'divZero', 'textIsBlank', 'blankIsBlank'
           'clearInputs', 'panelKnob', 'panelKnobChange', 'dialogAdjRow', 'dialogAdjMissing', 'dialogAdjBadVal', 'dialogAdjBadBounds', 'dialogAdjClash', 'dialogAdjPreview',
           'dialogAdjSaved', 'dialogAdjEditOpen', 'dialogAdjEditKeepsKnob', 'dialogAdjEditResets',
           # round 2 (2026-10-19)
-          'stripCarrier', 'dupInput', 'applyBoxSame', 'adjErrOpens']
+          'stripCarrier', 'dupInput', 'applyBoxSame', 'adjErrOpens',
+          # round 5 (2026-10-19): a date value
+          'cleanInputDate', 'inpDateEval', 'inpDateInferred', 'setInputDate', 'setInputDateBad', 'knobDate', 'stateDateEffective',
+          'dialogKindDate', 'dialogKindDateErr', 'dialogKindDateSaved',
+          'knobDateWide',   # round 7
+          # round 8 (2026-10-19, closing sweep)
+          'dateTypingKept', 'dateLeaveSprings', 'dateTypedApplies', 'plainKindGuard', 'removeForgets', 'stripCarrierLeftOut', 'noticedAgain', 'popKnobIds', 'popToggle', 'popTabOut']
 MUTANTS = {
     # the module (LF)
     'e-precedence': ([('calc', "while (isOp(tk[p], '+') || isOp(tk[p], '-')) { var op = tk[p++].v; a = { k: 'bin', op: op, a: a, b: mul() }; }",
@@ -129,6 +138,22 @@ MUTANTS = {
                    ['L-cadj-menuEditItem', 'L-cadj-menuEditOpens'], ['cadj']),
     # round 3: a knob change asks the database again (main.js: the arm never fresh / the module: never armed)
     'm-replay': ([('main', "        _pnbScratchArmAt = Date.now();\r\n        return true;\r\n", "        return true;\r\n")], ['L-cadj-noQuery'], ['cadj']),
+    # round 5: a date value read as a number (none); no Duplicate item; the calculated columns counted as the query's
+    'e-datekind': ([('calc', "        var date = String(x.kind || '').toLowerCase() === 'date' || (numOrNull(x.value) === null && dateOrNull(x.value) !== null);\n", "        var date = false;\n")],
+                   ['N-cleanInputDate'], []),
+    'n-dupitem': ([('menu', "            body.push({ act: 'calcDup', label: 'Duplicate...',", "            if (false) body.push({ act: 'calcDup', label: 'Duplicate...',")], ['L-cadj-menuDupOpens'], ['cadj']),
+    'm-calcchip': ([('main', "                if (_calcNames.indexOf(String(cn)) !== -1) return false;\r\n", "")], ['L-cadj-chipCalc'], ['cadj']),
+    # round 6: the chip opens the Settings panel instead of the popover; the popover's Duplicate does nothing; the Kind pick as wide as the Format select
+    'm-chippop': ([('main', "                    if (window.PenumbraCalc && typeof window.PenumbraCalc.openChipMenu === 'function') { window.PenumbraCalc.openChipMenu(this); return; }\r\n", "")], ['L-cadj-chipPop'], ['cadj']),
+    'e-popdup': ([('calc', "            if (bd) { e.preventDefault(); closeChipMenu(false); dupCalc(bd.getAttribute('data-calc-dup')); return; }\n", "            if (bd) { e.preventDefault(); return; }\n")], ['L-cadj-chipPop'], ['cadj']),
+    'e-kindwide': ([('calc', "        '#pnbCalcOverlay #pnbCalcAdjKind{min-width:0;width:100%;box-sizing:border-box;padding:4px 2px;}' +\n", "")], ['L-cadd-kindNoOverlap'], ['cadd']),
+    # round 7: the date knob at a number's width; the error line back inside the scrolling content
+    'e-dateknobnarrow': ([('calc', "        '.pnb-calc-knob .pnb-calc-knob-v.pnb-calc-knob-d{width:138px;min-width:138px;text-align:left;}' +\n", "")], ['N-knobDateWide'], []),
+    'e-errinside': ([('calc', "            '<div class=\"pnb-calc-err\" id=\"pnbCalcErr\" role=\"status\" aria-live=\"polite\"></div>' +\n            '<span style=\"display:flex; gap:8px; flex:0 0 auto;\">",
+                      "            '<span style=\"display:flex; gap:8px; flex:0 0 auto;\">"),
+                     ('calc', "            '<div class=\"pnb-calc-prev\" id=\"pnbCalcPrev\"></div>' +\n            '</div>' +\n            '<div class=\"modal-prompt-buttons\"",
+                      "            '<div class=\"pnb-calc-err\" id=\"pnbCalcErr\" role=\"status\" aria-live=\"polite\"></div>' +\n            '<div class=\"pnb-calc-prev\" id=\"pnbCalcPrev\"></div>' +\n            '</div>' +\n            '<div class=\"modal-prompt-buttons\"")],
+                    ['L-cadd-errInFooter'], ['cadd']),
     'e-noreplay': ([('calc', "            if (window.Penumbra && typeof window.Penumbra.replayNextRun === 'function') { try { window.Penumbra.replayNextRun(); } catch (e) { } }\n", "")],
                    ['L-cadj-noQuery'], ['cadj']),
     # ... the cheat sheet's labels as gradient headers again; the box not springing to the bound; a run wiping the typed box; the reset dropping focus
@@ -141,6 +166,20 @@ MUTANTS = {
     # ... a ticked column's carrier not saved with it; two carriers of one name
     'e-stripcarrier': ([('calc', "                    if (who && appliedBy[who] && !keep[who]) { keep[who] = true; added.push(who); grew = true; }\n", "")], ['N-stripCarrier'], []),
     'e-dupinput': ([('calc', "            if (carried[e.input.name]) delete e.input; else carried[e.input.name] = e.name;\n", "            carried[e.input.name] = e.name;\n")], ['N-dupInput'], []),
+    # round 8 (2026-10-19, closing sweep): the override kind guard in plain(); Remove keeping the override; the left-out
+    # carrier not saved; a notice once per page; the popover's shared ids / no toggle / staying on Tab out; the date box
+    # springing while typed; Escape closing two surfaces; a replay arm outliving a run that stopped short; Adjust on a real column
+    'e-plainkind': ([('calc', "if (ov !== null && (typeof ov === 'string') === isDateInput(d.input)) o.input.value = clampTo(ov, d.input); }\n", "if (ov !== null) o.input.value = clampTo(ov, d.input); }\n")], ['N-plainKindGuard'], []),
+    'e-removekeeps': ([('calc', "        if (gone && gone.input) forgetInputs([gone.input.name]);\n", "")], ['N-removeForgets'], []),
+    'e-stripleftout': ([('calc', "if (who && (appliedBy[who] || activeBy[who]) && !keep[who])", "if (who && appliedBy[who] && !keep[who])")], ['N-stripCarrierLeftOut'], []),
+    'e-noticeonce': ([('calc', "        order.forEach(function (e) { Object.keys(noticed).forEach(function (k) { if (k.indexOf(e.def.name + '|') === 0) delete noticed[k]; }); });\n", "")], ['N-noticedAgain'], []),
+    'e-popdupid': ([('calc', "knobHtml(x, 'pop' + di)", "knobHtml(x, 'pop')")], ['N-popKnobIds'], []),
+    'e-popnotoggle': ([('calc', "        if (chipPop && chipPop.anchor === anchor) { closeChipMenu(true); return; }   // (round 8) the chip again: closed\n", "")], ['N-popToggle'], []),
+    'e-popstays': ([('calc', "            if (chipPop && chipPop.el === pop && to && !pop.contains(to) && to !== anchor) closeChipMenu(false);\n", "")], ['N-popTabOut'], []),
+    'e-datespring': ([('calc', "            if (t.type === 'date' && t === document.activeElement) { var cur = inputValues()[nm]; if (cur && readInputValue(cur, t.value) === null) return; }\n", "")], ['N-dateTypingKept'], []),
+    'e-escboth': ([('calc', "e.stopPropagation(); e.stopImmediatePropagation(); closeChipMenu(true); return; }", "e.stopPropagation(); closeChipMenu(true); return; }")], ['L-cadj-escOneSurface'], ['cadj']),
+    'm-armstays': ([('main', "        var _pnbRunArm = _pnbScratchArm; _pnbScratchArm = null;\r\n", "        var _pnbRunArm = _pnbScratchArm;\r\n")], ['L-cadj-armDropped'], ['cadj']),
+    'n-adjreal': ([('menu', "var adj = (def && typeof C.inputsFor === 'function'", "var adj = (typeof C.inputsFor === 'function'")], ['L-cadj-realColNoAdjust'], ['cadj']),
 }
 
 args = sys.argv[1:]

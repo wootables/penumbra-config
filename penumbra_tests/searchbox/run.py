@@ -7,9 +7,17 @@
 # into the empty box shows it; a pick adds `and COLUMN ` after what is typed.
 # (The dashboard box's arrow: dashsearch builder.html section A1b.)
 #
+# FILTER WORDING (2026-10-19, penumbra_tests\filterword): the report box is the FILTER
+# box in every user-facing word (its label, titles, Saved Filters in the arrow's list);
+# the scheduler's box is labelled "Apply Filter:" and keeps its own run / clear words;
+# ids and classes keep "search". S5 + A pin it.
+#
 #   static   S1 index.php: both boxes are .pnb-sbox with an arrow, no "/" badge
 #            S2 main.css: the .pnb-sbox block, no #tableSearchKey rule left
 #            S3 help_content.php: the arrow and Alt+Down in the search help
+#            S5 index.php: the report box's own words say filter (label, run,
+#               clear, builder, the arrow's "saved filters"); the scheduler's is
+#               labelled "Apply Filter:" and keeps its own run / clear words
 #   look     sbox.html (index.php markup LIFTED, the css under test), EVERY
 #            registry theme x standard / compact / easy-read, empty and with
 #            text, both boxes: K1 the arrow (role, name, Alt+Down title, right
@@ -56,7 +64,7 @@ PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
 EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 STAMP = '20261006-searchbox'
 FILES = {'index': 'index.php', 'css': r'css\main.css', 'density': r'css\density.css', 'sbcss': r'css\search_builder.css',
-         'sb': r'js\search_builder.js', 'help': 'help_content.php'}
+         'sb': r'js\search_builder.js', 'help': r'help\topics\searchHelpLightbox.php'}
 CR = '\r\n'
 
 # name: (file, old, new, asserts that MUST go red). Each old must occur exactly once in the FEATURE build.
@@ -96,8 +104,12 @@ MUTANTS = {
     'closekeep': ('sb', "                $input.removeData('sb-smart-sel').removeData('sb-smart-is-col');" + CR + "                _syncArrowMode();", '                _syncArrowMode();', ['V6']),
     # (2026-10-15) the WCAG Moderate pass: tab stops + the named Alt+Down twin
     'notabstop': ('index', 'id="tableSearchCols" role="button" tabindex="0"', 'id="tableSearchCols" role="button"', ['S4']),
-    'nokeysc':   ('index', 'aria-label="Search report table" aria-keyshortcuts="Alt+ArrowDown"', 'aria-label="Search report table"', ['S4']),
+    'nokeysc':   ('index', 'aria-label="Filter report table" aria-keyshortcuts="Alt+ArrowDown"', 'aria-label="Filter report table"', ['S4']),
     'syncoff':   ('sb', "            $acBox.toggleClass('pnb-sbox-vals', !!col);", "            $acBox.toggleClass('pnb-sbox-vals', false);", ['H', 'V0']),
+    # (2026-10-19, filterword) the box's words: the old label back / the arrow's list header back
+    'oldlabel':  ('index', 'placeholder="Double click here or begin typing to filter" aria-label="Filter report table"',
+                  'placeholder="Double click here or begin typing to search" aria-label="Search report table"', ['S5']),
+    'savedhdr':  ('sb', "'preset':    'Saved Filters',", "'preset':    'Saved Searches',", ['A']),
 }
 
 R = []
@@ -208,12 +220,14 @@ def stage(files_src, mutant):
 def static_checks(t):
     idx, css, help_ = t['index'], t['css'], t['help']
     has = lambda s: s in idx
+    # (find round 3, 2026-10-19: the report box's wrapper is a <form> - a browser's autofill
+    # walks the whole page for a focused field outside any form - the same classes)
     rec('S1', 'index.php: both boxes are .pnb-sbox with a column arrow; the "/" badge is gone',
-        has('<span class="search-wrapper pnb-sbox">') and has('<div class="pnb-sbox" style="width: 100%;">') and has('id="tableSearchCols"') and has('id="schedSearchCols"') and 'tableSearchKey' not in idx,
+        (has('<span class="search-wrapper pnb-sbox">') or has('<form class="search-wrapper pnb-sbox" ')) and has('<div class="pnb-sbox" style="width: 100%;">') and has('id="tableSearchCols"') and has('id="schedSearchCols"') and 'tableSearchKey' not in idx,
         'arrow=%s/%s badge=%s' % (has('id="tableSearchCols"'), has('id="schedSearchCols"'), 'tableSearchKey' in idx))
     rec('S2', 'main.css: the .pnb-sbox block is there and no #tableSearchKey rule is left', '.pnb-sbox > .pnb-sbox-seg {' in css and '#tableSearchKey' not in css,
         'block=%s key=%s' % ('.pnb-sbox > .pnb-sbox-seg {' in css, '#tableSearchKey' in css))
-    rec('S3', 'help: the search help names the arrow and Alt+Down', 'pnb-help-arrow' in help_ and 'or <code>Alt+Down</code></td>' in help_, 'arrow=%s alt=%s' % ('pnb-help-arrow' in help_, 'or <code>Alt+Down</code></td>' in help_))
+    rec('S3', 'help: the search help names the arrow and Alt+Down', 'pnb-help-arrow' in help_ and 'or <kbd>Alt+Down</kbd>' in help_, 'arrow=%s alt=%s' % ('pnb-help-arrow' in help_, 'or <kbd>Alt+Down</kbd>' in help_))
     # (2026-10-15, WCAG 2.1.1 / 4.1.2) every role=button segment is a tab stop, and both fields name the arrow's Alt+Down twin
     import re as _re
     segs = ['searchHelpIcon', 'searchBuilderIcon', 'tableSearchCols', 'schedSearchBuilderIcon', 'schedSearchCols']
@@ -223,6 +237,20 @@ def static_checks(t):
     notab = [i for i in segs if 'role="button"' not in _tag(i) or 'tabindex="0"' not in _tag(i)]
     nokey = [i for i in ('tableSearch', 'schedSearchFilter') if 'aria-keyshortcuts="Alt+ArrowDown"' not in _tag(i)]
     rec('S4', 'index.php: the role=button segments are tab stops (tabindex=0); both fields carry aria-keyshortcuts=Alt+ArrowDown', not notab and not nokey, 'notab=%s nokey=%s' % (notab, nokey))
+    # (2026-10-19, filterword) the report box's own words say FILTER: its label and its form's, run,
+    # clear, the builder icon, the arrow's saved filters. The scheduler's box keeps its own run / clear
+    # words (the user: the other filter boxes "dont need correcting") and is labelled "Apply Filter:";
+    # its builder icon names the one shared builder, the Visual Filter Builder.
+    want = {'tableSearch': 'aria-label="Filter report table"', 'tableSearchPlay': 'title="(Enter) Apply the filter"',
+            'clearTableSearch': 'title="Clear the filter"', 'searchBuilderIcon': 'title="Visual Filter Builder (/)"',
+            'tableSearchCols': 'title="(Alt+Down) Show the columns and saved filters"',
+            'schedSearchBuilderIcon': 'aria-label="Open the Visual Filter Builder"'}
+    wrong = [i for i, w in want.items() if w not in _tag(i)]
+    extra = [w for w in ('<form class="search-wrapper pnb-sbox" role="search" aria-label="Filter the report"',
+                         '>Apply Filter: <span class="tab-help-icon" data-target="#searchFilterHelpLightbox" title="Help: Apply Filter Syntax">') if not has(w)]
+    old = [w for w in ('Search report table', 'Visual Search Builder', 'saved searches', 'Search Filter Syntax') if has(w)]
+    rec('S5', "index.php: the report box's own words say filter (label, run, clear, builder, the arrow's saved filters); the scheduler's is labelled Apply Filter; the old words gone",
+        not wrong and not extra and not old, 'wrong=%s missing=%s old=%s' % (wrong, extra, old))
 
 def close(a, b, tol=0.6): return abs(a - b) <= tol
 
@@ -329,7 +357,8 @@ def behave_checks(br):
             continue
         pg.click(c[0], c[1]); pg.wait("$('ul.ui-autocomplete:visible').length > 0", 3000); time.sleep(0.1)
         it = items(); foc = pg.ev("document.activeElement === $(%s)[0]" % json.dumps(inp))
-        r('A', box, all(x in it for x in COLS) and foc and (box != 'report' or it[:2] == ['Saved Searches', '\u2605 Big awards']), json.dumps(it)[:200] + ' focus=%s' % foc)
+        # (2026-10-19, filterword) the presets' heading says Saved Filters
+        r('A', box, all(x in it for x in COLS) and foc and (box != 'report' or it[:2] == ['Saved Filters', '\u2605 Big awards']), json.dumps(it)[:200] + ' focus=%s' % foc)
         pg.ev("window.__blurs = 0; $(%s).on('blur.sbxprobe', function(){ window.__blurs++; }); true" % json.dumps(inp))
         pg.click(c[0], c[1]); time.sleep(0.3)
         r('B1', box, not is_open(), json.dumps(items())[:120])
@@ -371,7 +400,7 @@ def behave_checks(br):
         it = items()
         r('F1', box, all(x in it for x in COLS), json.dumps(it)[:200])
         act = pg.ev("$('ul.ui-autocomplete:visible .ui-state-active').text().trim()")
-        first = [x for x in it if x not in ('Saved Searches', 'Visible Columns', 'Hidden Columns')][:1]
+        first = [x for x in it if x not in ('Saved Filters', 'Saved Searches', 'Visible Columns', 'Hidden Columns')][:1]
         r('F2', box, bool(first) and act == first[0], (act, first))
         ex0 = pg.ev('window.__exec')
         pg.key('Enter', 13); time.sleep(0.4)
@@ -448,7 +477,7 @@ def behave_checks(br):
         it7 = items(); pick('Sciences'); time.sleep(0.4)
         r('V7', box, val(inp) == 'COLLEGE /(?:Agriculture|Sciences)/', json.dumps(it7)[:120] + ' ' + repr(val(inp)))
         pg.key('Escape', 27)
-    names = {'A': 'the arrow lists every column (saved searches first on the report box) and puts the focus in the box',
+    names = {'A': 'the arrow lists every column (Saved Filters first on the report box) and puts the focus in the box',
              'B1': 'a second click on the arrow closes the list', 'B2': '...and the focus stays in the box',
              'B3': 'clicking the arrow never blurs the box (its mousedown keeps the focus)',
              'C': 'a column picked in the empty box is written as "COL " and its values open next',
