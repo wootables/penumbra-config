@@ -77,7 +77,7 @@ return [
 				"PS_NC_PROJ_ATTR_VW", "PS_NC_PROJECT", "PS_NC_PROJECT_GR", "PS_NC_PROJECT_PI"
 			],
     ],
-	'anthropic_api_key' => $dec('enc:v1:avFON8Sw/awQ9gyPL3fvpEFrvzFY0tHDJXtYMVx9I8/qo00NMGM2C0MaB5GJhqLsWtmOS3EUbRtHXWSA7ejoCakdTIzkiIMQWgq8KLsmNZXGEA6ZVzmyeaxSFg7zwREVDKw54vSfXMHOnQpbok1z73ttiln6NBL8KXv5ioQctVPdYNWBppLZjw=='),
+	'anthropic_api_key' => $dec('enc:v1:pyNPMi0UG1AXflKlOcW6U4ZPREeEoLsGjb9OP6cES/E+ipVaT6zUzDGsAlr20HsjUmC+/38qz9Fnshn1JcYFqIiOlbIRP/sjwrlGQLwf6GfFbLs4G1riodEJwPXvwiBMopJqovGl0lmDSGLBO5hTUPESJkTItJQ8iWbPWIapBpQUZ8x6Img='),
 	'google_api_key' => $dec('enc:v1:dc7l4DKzUUo3IMXgfx/i/dSuxnzLPJGn8ux9FECJPAiV5BiEqBUrZBe6Ziu0WtjFMXli0uHRLytKF6yMQJO3BO3ezU8vP6dpDJtTHDH7Xr8e'),
     // Aggregates allowed for total rows (rows that are currency types or cast as currency or 2 decimal places will automatically total)
     'total_exemptions' => [
