@@ -292,3 +292,57 @@ Filter): 265 samples, all 640x36. The only console errors came from a browser ex
 
 Found by the live check: "/[" is plain text (a pattern needs its closing slash), so `steady`'s bad
 pattern step had been a second No matches; it types "/[/" now and asserts the words showed.
+
+## Round 5 deployed 2026-10-20 07:44:19 EDT (git 3f1d47d + help cache b89a589 + README 25e565a, pushed)
+
+The user: "Do Find round 5 here: Ctrl+F inside dialogs like the breakdown, group names in a snapshot
+comparison, and the bar on narrow windows. Stage and test it, then ask me before deploying."
+
+What changed (module, css and the help topic; `orig11` = the 06:44 cut, `stage11` = the build):
+- A dialog that shows a table is Find's: `topDialog()` = the last `.infobox-overlay` on screen whose
+  `.infobox-body` holds a table cell and that nothing covers (`document.elementsFromPoint` at its box's
+  top, past Find's own bar). Find keeps it (`dlg`): units = its top-level tables' body and footer cells,
+  the '#' column out (`numCol`), tables not on screen out (Table Info's tabs); signature = the rows'
+  order (a WeakMap row id) and which tables show. Bar: the window's top right, z-index = overlay + 1.
+  No Filter, no "N more". F3 / Ctrl+G step despite main.js's busy(). The watcher observes the dialog
+  subtree and its parent's children: a sort re-reads, its removal or a dialog over it ends Find
+  (`scopeAlive`). Ctrl+F somewhere else restarts Find there with the term kept (`enter`).
+- A snapshot comparison's heading `<span class="group-hide">x</span><span>NAME <span class="group-count">N
+  </span></span>`: `bandLabel` takes the span that is none of the heading's parts (`BAND_PARTS`; never
+  "the span with no class" - a painted match adds one) and `.group-count` joined SKIP.
+- 720 px and less: the bar spans the window as a two-row grid with fixed 24 px rows.
+- Help: the dialog line (`I-help-round5`); help cache rebuilt on live (1,316 chunks, signature match).
+
+Tests: `dlg_find` / `dlg_notable` / `dlg_switch` / `dlg_ontop` (a REAL breakdown through the hooked
+`_showChartDrillBreakdown`, a plain infobox through `showInfoboxDialog`), `cmp_names` (a REAL
+`runComparisonTwoSnapshots` - the harness now carries index.php's `snapshotAnalysisTemplate` and a hidden
+`#manageSnapshotsLightbox`; the comparison logs a failure with console.error into a toast the harness
+has no dock for, so the scenario records console.error), `narrow` / `narrow_mid` / `wide_edge` (run.py
+sets `Emulation.setDeviceMetricsOverride` from a scenario's `&vw=&vh=`; the "spans" check uses
+`documentElement.clientWidth`: innerWidth includes the scrollbar), pictures `shot_dlg`, `shot_narrow`,
+`shot_narrow_mid`, `shot_cmp`. 15 new mutants; `grabtyping`, `noguard`, `pivfilter`, `roomlate`
+re-anchored on round 5's lines; `nobandoutline` was equivalent until the comparison outline rule
+excluded `.group-name`; `nodialog` crashed `dlg_find` until it returned early when Find is not taken.
+CONTROL_OK += the three round-5 absences. On stage11: 318/0 (58 scenarios; one `narrow` timeout in one
+full run under load, 6-7 s alone twice, then green in the final full run), control exact, 89/89.
+`deploy7.ps1` swapped css, module, help; then prebuild_caches.php; after: 318/0 against LIVE.
+
+**Live check** (the user's Chrome; the window minimized: a 0x0 viewport, screenshots time out, and this
+time REAL KEYS REACHED NEITHER the top page nor a frame - a keydown recorder on both stayed empty, even
+after a screenshot attempt): hitratio in a 1500x900 iframe, a real pivot drill (a "47" cell, 47 rows),
+synthetic keys (the module never reads isTrusted): Ctrl+F taken in the dialog, "kenan" 1 of 50 = 50
+counted independently, Enter x2 = the third match visible in the dialog's scroll box, the bar on top of
+the overlay, no Filter, no "more", a PI header sort re-read (50), Esc closed Find and left the dialog.
+At 420 px: two rows spanning 8..402 of 410, nothing outside, 394x64 through open / kenan / no matches /
+Not a valid pattern (not clipped). The dialog's own close could not finish: no animation frames run in a
+minimized window (jQuery's fadeOut stays `:animated` at opacity 1) - covered by the suite. Real typing
+went nowhere (no lightbox, no Find, no filter on either page).
+
+## The (i) words reworded 2026-10-20 23:31:27 EDT (git 704aff9, pushed)
+
+The owner: start with "Highlights" (the first "Find" gone) and add that Find reaches other pages. Their
+first draft also said "and hidden columns"; Find reads the columns on screen only (`hidcol` pins it), so
+that part was left out at their word. ABOUT = "Highlights what you type and steps from match to match
+(even across other pages); every row stays in the table. ..." - the (i) title, the line under the box and
+#pnbFindAbout. `info3` gained `aboutWords`; mutant `oldabout` (the old words) turns it red. stage12 (cut
+23:25): 319/0, control exact; `deploy8.ps1` (the module only); after: 319/0 against LIVE.

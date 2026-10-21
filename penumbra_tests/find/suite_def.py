@@ -60,7 +60,7 @@ CHK = {
     'big_dirty': ['noRestart', 'dirtyRight'],
     'guards3': ['noKeyword', 'wordOffered'],
     'grp_applied': ['appliedOnly'],
-    'info3': ['aboutText', 'tipOpens', 'tipCloses', 'formNoSubmit'],
+    'info3': ['aboutText', 'aboutWords', 'tipOpens', 'tipCloses', 'formNoSubmit'],
     'xfix': ['hasText', 'xShown', 'deleteClears'],
     'xsync': ['syncHasText', 'syncDeleteClears'],
     'busymain': ['busySame', 'noSlowSelector'],
@@ -99,7 +99,10 @@ CONTROL_OK = {'L-boot-noBarYet', 'L-open-typingFree', 'L-open-busyFree', 'L-esc-
               'L-grp_marks_closed-closedUnmarked',
               # round 3 is LIVE (2026-10-19 evening): the live main.js keeps the box's state in step
               # (_pnbSyncSearchBoxState) and asks busy() without :visible - with no module too
-              'L-xsync-syncHasText', 'L-xsync-syncDeleteClears', 'L-busymain-noSlowSelector'}
+              'L-xsync-syncHasText', 'L-xsync-syncDeleteClears', 'L-busymain-noSlowSelector',
+              # round 5 absences: a dialog of words left to the browser, no bar once the dialog
+              # closed, no heading found by a count
+              'L-dlg_notable-notableBrowser', 'L-dlg_switch-swClosed', 'L-cmp_names-cmpNoCount'}
 
 # name: ([(file, old, new)], checks that must go red, scenarios to run). file = mod | css | main | cellsel
 MUTANTS = {
@@ -130,10 +133,11 @@ MUTANTS = {
     'markbg': ([('mod', "            if (k === cur) { td.classList.add('pnb-find-cur');", "            if (k === cur) { td.style.backgroundColor = 'rgb(255, 230, 0)'; td.classList.add('pnb-find-cur');")],
                ['L-export-htmlSame'], ['export']),
     # Ctrl+F taken from a text field - Find's own box too (Ctrl+F again = the browser's own find)
-    'grabtyping': ([('mod', "            if (!h || h.typing(e.target) || !activeView() || h.busy()) { return; }\n", "            if (!h || !activeView() || h.busy()) { return; }\n")],
+    # (round 5 split the guard: the text field first, then a dialog with a table or the view)
+    'grabtyping': ([('mod', "            if (!h || h.typing(e.target)) { return; }\n            var d = topDialog();\n", "            if (!h) { return; }\n            var d = topDialog();\n")],
                    ['L-open-typingFree', 'L-open-secondPasses'], ['open']),
-    # Ctrl+F taken under a dialog
-    'noguard': ([('mod', "            if (!h || h.typing(e.target) || !activeView() || h.busy()) { return; }\n", "            if (!h || h.typing(e.target) || !activeView()) { return; }\n")],
+    # Ctrl+F taken under a dialog (one with no table: main.js's busy())
+    'noguard': ([('mod', "            if (!d && (!activeView() || h.busy())) { return; }\n", "            if (!d && !activeView()) { return; }\n")],
                 ['L-open-busyFree'], ['open']),
     # Esc reaches main.js's own Escape handler (the admin console toggle)
     'escleak': ([('mod', "            e.preventDefault();\n            e.stopPropagation();\n            close(true);\n", "            e.preventDefault();\n            close(true);\n")],
@@ -228,7 +232,8 @@ MUTANTS = {
     'nofollow': ([('mod', "                    else { onMove(); }\n", "")],
                  ['L-grp_list-barFollows'], ['grp_list']),
     # Filter to N rows offered in a pivot
-    'pivfilter': ([('mod', "        if (scanned && scanned.view === 'pivot') { return null; }\n", "")],
+    'pivfilter': ([('mod', "        if (scanned && (scanned.view === 'pivot' || scanned.view === 'dialog')) { return null; }\n",
+                    "        if (scanned && scanned.view === 'dialog') { return null; }\n")],
                   ['L-piv_open-noFilter'], ['piv_open']),
     # the bar stays put over a match in the top row of a right-hand column
     'nocoverflip': ([('mod', "                top = (c.bottom + 6 + b.height <= window.innerHeight) ? Math.round(c.bottom + 6) : Math.max(0, Math.round(c.top - b.height - 6));\n", "")],
@@ -270,6 +275,10 @@ MUTANTS = {
               ['L-info3-tipOpens'], ['info3']),
     'nosubmitstop': ([('mod', "        bar.addEventListener('submit', function (e) { e.preventDefault(); });\n", "")],
                      ['L-info3-formNoSubmit'], ['info3']),
+    # the tip's old first words (2026-10-20: the owner's "Highlights ... (even across other pages)")
+    'oldabout': ([('mod', "    var ABOUT = 'Highlights what you type and steps from match to match (even across other pages); every row stays in the table. ' +\n",
+                   "    var ABOUT = 'Find highlights what you type and steps from match to match; every row stays in the table. ' +\n")],
+                 ['L-info3-aboutWords'], ['info3']),
     # main.js runSearch: the box's clear x left hidden / deleting the term no longer clears the search
     # (both layers: runSearch's own lines and the sync at the end of applyPagination - each alone
     # is the other's backstop in the flat view)
@@ -321,7 +330,7 @@ MUTANTS = {
                ['L-steady-steadyHeight'], ['steady']),
     'roomcss': ([('css', ".pnb-find-bar.pnb-find-room .pnb-find-hides[hidden] { display: block; visibility: hidden; }", "")],
                 ['L-steady-steadyHeight'], ['steady']),
-    'roomlate': ([('mod', "        var v = (moreEl && !moreEl.hidden) ? 'shown' : activeView();\n", "        var v = (moreEl && !moreEl.hidden) ? 'shown' : null;\n")],
+    'roomlate': ([('mod', "        var v = (moreEl && !moreEl.hidden) ? 'shown' : scopeView();\n", "        var v = (moreEl && !moreEl.hidden) ? 'shown' : null;\n")],
                  ['L-steady-steadyHeight', 'L-grp_steady-gSteady'], ['steady', 'grp_steady']),
     # the grouped view's search not seen at open (the flat table's only)
     'roomflatonly': ([('mod', "        if (v === 'shown' || ((v === 'flat' || v === 'grouped') && markQuery(v))) { bar.classList.add('pnb-find-room'); }\n",
@@ -366,7 +375,7 @@ MUTANTS = {
                  ['L-cmp_names-cmpBand'], ['cmp_names']),
     'cmpcount': ([('mod', ".journal-pvnote-btn, .group-count, script", ".journal-pvnote-btn, script")],
                  ['L-cmp_names-cmpNoCount'], ['cmp_names']),
-    'cmpoutline': ([('css', "#groupedResultsContainer .group-header > span.pnb-find-cur { outline: 2px solid currentColor; outline-offset: 2px; }", "")],
+    'cmpoutline': ([('css', "#groupedResultsContainer .group-header > span:not(.group-name).pnb-find-cur { outline: 2px solid currentColor; outline-offset: 2px; }", "")],
                    ['L-cmp_names-cmpOutline'], ['cmp_names']),
     # no narrow layout / its line at the old phone width / past the one-row bar's own room
     'narrowgone': ([('css', "@media (max-width: 720px) {", "@media (max-width: 1px) {")],

@@ -22,9 +22,22 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
         'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js', 'penumbra_tiles.js',
         'penumbra_a11y.js', 'penumbra_grouplist.js', 'penumbra_cellsel.js']
-SCN = ['mflat', 'mkbd', 'mopts', 'mcalc', 'mgroupby', 'gmenu', 'mrestr', 'mexcl', 'mcopy', 'mjournal', 'mmore', 'mfitnest', 'mcell', 'mnest', 'mload', 'mreset', 'msubs', 'mbucket', 'mnum']
+SCN = ['mflat', 'mkbd', 'mopts', 'mcalc', 'mgroupby', 'gmenu', 'mrestr', 'mexcl', 'mcopy', 'mjournal', 'mmore', 'mfitnest', 'mfitnote', 'mcell', 'mnest', 'mload', 'mreset', 'msubs', 'mbucket', 'mnum',
+       'mauto', 'mauto2', 'ggmenu', 'gglist', 'ggfmt', 'mautostale']
 CHK = {
-    'mflat': ['opens', 'prevented', 'titleName', 'statsLine', 'statsAllUnique', 'statsDup', 'statsTop', 'statsEmpty', 'statsToggle', 'statsNotes', 'statsFiltered', 'itemsAll', 'sortAsc', 'sortChecked', 'sortDesc', 'sortClear', 'moveRight', 'moveMinimal', 'cellsFollow', 'saved',
+    # (2026-10-20, grpsweep 2) a formatted column's group; a List choice left behind by a saved view
+    'ggfmt': ['fmtOnlyAll'],
+    'mautostale': ['staleChoice'],
+    # (2026-10-20, grpauto) the grouped view's layout from the group count, when none is named
+    'mauto': ['autoFew', 'sameAgain', 'autoMany', 'tipShown', 'redecides', 'tipOnce', 'chosenSticks', 'ungroupResets', 'boundary8', 'filterNoFlip', 'boundary9', 'staleForm'],
+    'mauto2': ['dialogKeepsAuto', 'radioPickSticks', 'triggerBare', 'triggerNamedSticks', 'cancelledPick', 'narrowStacked', 'implicitStacked'],
+    # (2026-10-20, grpmenu) a group's own menu: on a band (Stacked), in the List layout
+    'ggmenu': ['gmOpens', 'gmTitle', 'gmItems', 'gmMarked', 'gmUnmarked', 'gmToggle', 'gmToggleBack', 'gmCopy', 'gmOnly', 'gmOnlyReplaces', 'gmOnlyBlank', 'gmHide',
+               'gmSort', 'gmSortList', 'gmBarLast', 'gmSortSumm', 'gmOtherLast', 'gmByList', 'gmGroupBy', 'gmTick', 'gmUndo', 'gmAdd', 'gmLevelMenu', 'gmAddUsed',
+               'gmRemoveLevel', 'gmRemoveUndo', 'gmUniqueNo', 'gmCollapseAll', 'gmKbd', 'gmKbdBack', 'gmNativeSecond', 'gmExpandAll', 'gmRestricted', 'gmHdrRestricted',
+               'gmCompareNative', 'gmTotalNative', 'gmConfigure', 'gmUngroup', 'gmUndoStale'],
+    'gglist': ['glSwitch', 'glRowOpens', 'glRowItems', 'glRowMarked', 'glBandOpens', 'glKbd', 'glKbdBack', 'glNoteDrawn', 'glKbdStackFocus', 'glToStacked'],
+    'mflat': ['opens', 'prevented', 'titleName', 'statsLine', 'statsAllUnique', 'statsDup', 'statsNum', 'statsDate', 'statsTop', 'statsEmpty', 'statsToggle', 'statsNotes', 'statsJournalFiltered', 'statsFiltered', 'itemsAll', 'sortAsc', 'sortChecked', 'sortDesc', 'sortClear', 'moveRight', 'moveMinimal', 'cellsFollow', 'saved',
               'toastUndo', 'noSavedToast', 'undo', 'edgeDisabled', 'moveStart', 'moveEnd', 'tipNotEarly', 'tipThird', 'tipStored', 'tipOnce',
               'tipOpens', 'hide', 'hideSaved', 'skipHidden', 'showList', 'showHere', 'showFilled', 'swapList', 'swapDone', 'multiMove', 'lastNotHidable'],
     'mkbd': ['opensBelow', 'focusFirst', 'arrowMoves', 'enterRuns', 'focusBack', 'escCloses', 'escFocusBack', 'outsideCloses'],
@@ -38,7 +51,7 @@ CHK = {
     'mcell': ['cellOpens', 'cellFilter', 'cellAdd', 'cellExclude', 'cellCopy', 'cellRaw', 'cellBlank', 'cellNatives', 'cellKbd'],
     # (round 23) a nested-table (@@JSON) column
     'mnest': ['nestOpens', 'nestNoFilter', 'nestStats', 'nestSubOpens', 'nestSubFilter', 'nestPadOpens', 'nestLinkOpens', 'nestLinkFoot', 'nestNoFoot', 'nestLinkFilter',
-              'nativeShift', 'nativeSecond', 'nativeOther', 'nativeSecondCell'],
+              'nativeShift', 'nativeSecond', 'nativeOther', 'nativeSecondCell', 'nestRowHeight', 'nestRowHeightPlain', 'nestRowHeightFlips'],
     'msubs': ['topOrder', 'noChips', 'arrows', 'showLabel', 'moveList', 'flyPos', 'nested', 'hoverSwitch', 'showList', 'hoverCloses', 'hoverOpens', 'calcList',
               'copyList', 'resetList', 'clearPanel', 'kbdOpens', 'kbdBack', 'escAll', 'outsideAll'],
     'mreset': ['raItem', 'raOffClean', 'raOnCustom', 'raLayout', 'raCells', 'raPref', 'raFmt', 'raShade', 'raSum', 'raWidth', 'raFreeze', 'raToast',
@@ -47,6 +60,8 @@ CHK = {
     'mnum': ['numOpens', 'numItems', 'numResets', 'numSort', 'numHide', 'numShowItem', 'numShown', 'numCell'],
     'mload': ['idSame', 'idFast', 'idFallback', 'idDynamic', 'edExists', 'edHiddenSkip', 'edShownRefresh', 'edShownNow', 'edShownOnce'],
     'mfitnest': ['nestGrow', 'nestCompact', 'fitLines'],
+    # (2026-10-20, notefit) Fit on the Notes column: the note's own box (16em growing / 22em one line), the button's row
+    'mfitnote': ['noteGrow', 'noteCompact', 'noteShort', 'noteSpill'],
     'mjournal': ['jrnPainted', 'jrnNoGroup', 'jrnNotesCell', 'jrnAddNote', 'jrnInNote', 'jrnMoves', 'jrnStaysUnsaved', 'jrnSwap', 'jrnSaved'],
     'mmore': ['thenItems', 'thenSort', 'filterList', 'filterApply', 'filterReopen', 'filterBack', 'filterEsc', 'filterClear', 'filterBlank',
               'only', 'showAll', 'resetCol', 'copyName'],
@@ -112,9 +127,113 @@ NEW_R24 = {'L-mnest-nestLinkOpens', 'L-mnest-nestLinkFilter'}   # live a34b30e
 NEW_R25 = {'L-mnest-nestLinkOpens', 'L-mnest-nestLinkFoot', 'L-mnest-nativeShift', 'L-mnest-nativeSecond', 'L-mnest-nativeSecondCell'}   # live a04520b
 # round 26 (2026-10-19): the Duplicates line (statsAllUnique reads it too)
 NEW_R26 = {'L-mflat-statsDup', 'L-mflat-statsAllUnique'}   # live 04e78f3
-# (round 27 touched the breakdown menu only: pivmenu owns its checks)
+NEW_R30 = {'L-mnest-nestRowHeight', 'L-mnest-nestRowHeightFlips'}   # live 7482049
+# (round 31) the item reads the state in force, not a stale checkbox (both checks start from a stale one)
+NEW_R31 = {'L-mnest-nestRowHeight', 'L-mnest-nestRowHeightFlips'}
+# (2026-10-20, grpauto + grpmenu) the layout from the group count; a group's own menu. The guards describe
+# what live already does: few groups Stacked (and still Stacked at exactly 8), a snippet's bare group_by
+# keeps the layout, a comparison's groups and the All groups bar keep the browser's menu.
+GRP_GUARDS = {'L-mauto-autoFew', 'L-mauto-boundary8', 'L-mauto2-triggerBare', 'L-ggmenu-gmCompareNative', 'L-ggmenu-gmTotalNative'}
+NEW_GRP = {'L-%s-%s' % (s, c) for s in ('mauto', 'mauto2', 'ggmenu', 'gglist') for c in CHK[s]} - GRP_GUARDS | {'S-helpGroups'}   # live 4662e17
+# (2026-10-20, grpsweep) the final sweep: no auto List where List cannot be drawn (a narrow window), a radio
+# picked in a cancelled dialog is not a later trigger's choice. (Text selected in a band was dropped: bands are
+# user-select: none, so there is never any.)
+NEW_SWEEP1 = {'L-mauto2-cancelledPick', 'L-mauto2-narrowStacked', 'S-helpGroupsSweep'}   # live fbf79b7
+# (2026-10-20, grpsweep 2, after an independent review) Show only keeps every value of the group, an auto
+# grouping clears a choice left behind, a layout set without a pick is a choice only when List, a stale Undo
+# does nothing, a List row's notes select the group first, the keyboard's switch to Stacked keeps a focus
+NEW_SWEEP2 = {'L-ggfmt-fmtOnlyAll', 'L-mautostale-staleChoice', 'L-mauto2-implicitStacked', 'L-ggmenu-gmUndoStale',
+              'L-gglist-glNoteDrawn', 'L-gglist-glKbdStackFocus', 'S-helpOnlyValues'}   # live f4342ec
+# (2026-10-20, notefit; user on jjornl) Fit on the Notes column measures the note's own box and the button's row:
+# live measures the note as one line of text (grow / compact / spill far too wide or cut) and the button's icon,
+# count and note as lines of their own (short notes cut)
+NEW_NOTEFIT = {'L-mfitnote-' + c for c in CHK['mfitnote']}   # live 96b8f66
+# (2026-10-20, mutfix) nothing is staged: every round above is live, so --control holds live to every check
+# (NEW = NEW_NOTEFIT left it red on exactly those 4 since their deploy). The next round names its own NEW.
 NEW = set()
 MUTANTS = {
+    # --- (2026-10-20, notefit) the width module: a box's own width / max-width, a flex row's items side by side
+    'j-notewidth': ([('colw', "            if (v && v.unit === 'px') { w = bb ? Math.max(v.value, e) : v.value + e; need = held ? w : Math.max(w, need); }\n", "")],
+                    ['L-mfitnote-noteGrow'], ['mfitnote']),
+    'j-notemax': ([('colw', "        if (held && LEN.test(st.maxWidth)) { w = px(st.maxWidth); need = Math.min(need, bb ? Math.max(w, e) : w + e); }\n", "")],
+                  ['L-mfitnote-noteCompact'], ['mfitnote']),
+    'j-noterow': ([('colw', "        var row = /flex$/.test(es.display) && !/column/.test(es.flexDirection), items = 0;", "        var row = false, items = 0;")],
+                  ['L-mfitnote-noteShort', 'L-mfitnote-noteGrow'], ['mfitnote']),
+    'j-noteheld': ([('colw', "        var held = !/^(nowrap|pre)$/.test(st.whiteSpace) || st.overflowX !== 'visible';", "        var held = true;")],
+                   ['L-mfitnote-noteSpill'], ['mfitnote']),
+    'j-noteown': ([('colw', "        if (/^table/.test(st.display)) { return need; }", "        return need;")],
+                  ['L-mfitnote-noteGrow', 'L-mfitnote-noteCompact'], ['mfitnote']),
+    # --- (2026-10-20, grpauto) main.js: the layout from the group count
+    'm-autocount': ([('main', "        var want = (n > PENUMBRA_GROUP_AUTO_STACKED_MAX && canList) ? 'list' : 'stacked';", "        var want = (n >= PENUMBRA_GROUP_AUTO_STACKED_MAX && canList) ? 'list' : 'stacked';")], ['L-mauto-boundary8'], ['mauto']),
+    # (sweep) List where it cannot be drawn: a narrow window keeps the count's List nobody sees
+    'm-canlist': ([('main', "        var want = (n > PENUMBRA_GROUP_AUTO_STACKED_MAX && canList) ? 'list' : 'stacked';", "        var want = (n > PENUMBRA_GROUP_AUTO_STACKED_MAX) ? 'list' : 'stacked';")], ['L-mauto2-narrowStacked'], ['mauto2']),
+    'm-autooff': ([('main', "        if (!n) return;\n        var canList", "        return;\n        var canList")], ['L-mauto-autoMany', 'L-mauto-boundary9'], ['mauto']),   # (re-anchored, sweep 2)
+    # the count decided again by every grouped search: the narrowed filter flips List back to Stacked
+    'm-autosearch': ([('main', "                _groupLayoutNotify('groupedSearched');   // the List layout follows the search (2026-10-03, grplist)\n",
+                       "                _groupLayoutNotify('groupedSearched');   // the List layout follows the search (2026-10-03, grplist)\n                _groupApplyAutoLayout();\n")],
+                     ['L-mauto-filterNoFlip'], ['mauto']),
+    'm-chosenon': ([('main', "                !(_groupLayoutChosen && $('body').hasClass('group-mode-active')), true);", "                true, true);")], ['L-mauto-chosenSticks'], ['mauto']),
+    'm-chosenoff': ([('main', "                !(_groupLayoutChosen && $('body').hasClass('group-mode-active')), true);", "                false, true);")], ['L-mauto-autoMany', 'L-mauto-redecides'], ['mauto']),
+    'm-ungroupkeep': ([('main', "        _groupLayoutChosen = false;   // (grpauto) the next grouping starts unchosen\n        currentGroupLimit = null;\n        $('body').removeClass('group-mode-active');\n        // applyPagination()",
+                        "        currentGroupLimit = null;\n        $('body').removeClass('group-mode-active');\n        // applyPagination()")], ['L-mauto-ungroupResets'], ['mauto']),
+    'm-samecol': ([('main', "            if ($('body').hasClass('group-mode-active') && actualCol === String(currentGroupingColumn)) return;", "            if (actualCol === String(currentGroupingColumn)) return;")], ['L-mauto-sameAgain'], ['mauto']),
+    'm-staleform': ([('main', "                limit: currentGroupLimit || null,\n",
+                      "                limit: _groupNormalizeLimit({ n: $('#groupLimitN').val(), dir: $('#groupLimitDir').val(), other: $('#groupLimitOther').is(':checked'), minRows: $('#groupLimitMinRows').val() }),\n")],
+                    ['L-mauto-staleForm'], ['mauto']),
+    'm-gmchosen': ([('main', "            layout = (layout === 'list') ? 'list' : 'stacked';\n            _groupLayoutChosen = true;\n", "            layout = (layout === 'list') ? 'list' : 'stacked';\n")], ['L-mauto-chosenSticks'], ['mauto']),
+    # (re-anchored, sweep 2) every dialog Apply chooses
+    'm-dialogchooses': ([('main', "        else if (_groupLayoutPicked) _groupLayoutChosen = true;\n        else if (currentGroupLayout !== _layoutWas) _groupLayoutChosen = (currentGroupLayout === 'list');\n",
+                          "        else _groupLayoutChosen = true;\n")], ['L-mauto2-dialogKeepsAuto'], ['mauto2']),
+    # --- (2026-10-20, grpsweep 2)
+    'm-autoreset': ([('main', "        if (_auto) _groupLayoutChosen = false;\n", "        if (_auto) { }\n")], ['L-mautostale-staleChoice'], ['mautostale']),
+    'm-implicit': ([('main', "            _groupLayoutChosen = _groupLayoutPicked || currentGroupLayout === 'list'; _groupLayoutPicked = false;", "            _groupLayoutChosen = true; _groupLayoutPicked = false;")],
+                   ['L-mauto2-implicitStacked'], ['mauto2']),
+    'm-onlyfirst': ([('main', "            for (var i = 0; i < trs.length; i++) {\n                var idx = _pnbLazyRowIndex(trs[i]), m = (idx >= 0 && masterRowData) ? masterRowData[idx] : null;",
+                      "            for (var i = 0; i < trs.length && i < 1; i++) {\n                var idx = _pnbLazyRowIndex(trs[i]), m = (idx >= 0 && masterRowData) ? masterRowData[idx] : null;")],
+                    ['L-ggfmt-fmtOnlyAll'], ['ggfmt']),
+    'm-undostale': ([('main', "                if (!_gmLive() || _gmLevels().join(',') !== made) return;\n", "")], ['L-ggmenu-gmUndoStale'], ['ggmenu']),
+    'j-gmnotesel': ([('menu', "                    if (listOn() && L && typeof L.selectGroup === 'function') { L.selectGroup(w); }\n", "")], ['L-gglist-glNoteDrawn'], ['gglist']),
+    'j-gmkbdfocus': ([('menu', "                    if (nm) { try { nm.focus({ preventScroll: true }); } catch (e) { nm.focus(); } }\n", "")], ['L-gglist-glKbdStackFocus'], ['gglist']),
+    'm-radiopick': ([('main', "        if (this.checked) _groupLayoutPicked = true;   // (grpauto) a person's pick: the layout becomes theirs at Apply\n", "")], ['L-mauto2-radioPickSticks'], ['mauto2']),
+    'm-trigpick': ([('main', "                                _groupLayoutPicked = !!_gbOpts.layout;\n", "                                _groupLayoutPicked = false;\n")], ['L-mauto2-triggerNamedSticks'], ['mauto2']),
+    'm-trigauto': ([('main', "                                _groupLayoutPicked = !!_gbOpts.layout;\n",
+                     "                                _groupLayoutPicked = !!_gbOpts.layout;\n                                _pnbGroupAutoNext = !_gbOpts.layout;\n")], ['L-mauto2-triggerBare'], ['mauto2']),
+    # (sweep) the round-1 line: a bare trigger left a cancelled dialog's radio pick standing
+    'm-trigstale': ([('main', "                                _groupLayoutPicked = !!_gbOpts.layout;\n", "                                if (_gbOpts.layout) _groupLayoutPicked = true;\n")], ['L-mauto2-cancelledPick'], ['mauto2']),
+    # --- (2026-10-20, grpmenu) main.js: what the group menu runs
+    'm-barlast': ([('main', "            sorted.forEach(function (el) { $c[0].insertBefore(el, after); });", "            sorted.forEach(function (el) { $c.append(el); });")], ['L-ggmenu-gmBarLast'], ['ggmenu']),
+    'm-otherlast': ([('main', "                return (oa !== ob) ? (oa ? 1 : -1) : cmp(a, b);", "                return cmp(a, b);")], ['L-ggmenu-gmOtherLast'], ['ggmenu']),
+    'm-onlyadds': ([('main', "            p.cols.forEach(function (c, k) { st.sel[c] = p.vals[k]; });", "            p.cols.forEach(function (c, k) { st.sel[c] = (st.sel[c] || []).concat(p.vals[k]); });")], ['L-ggmenu-gmOnlyReplaces'], ['ggmenu']),   # (re-anchored, sweep 2)
+    'm-gmask': ([('main', "            if (outer !== String(before.levels[0]) && outer.indexOf(':') === -1 && _pnbGroupAllUnique(outer)", "            if (false && outer !== String(before.levels[0]) && outer.indexOf(':') === -1 && _pnbGroupAllUnique(outer)"),
+                 ('main', "            _gmApply($.extend({}, before, { levels: levels }), !_groupLayoutChosen, false);", "            _gmApply($.extend({}, before, { levels: levels }), !_groupLayoutChosen, true);")], ['L-ggmenu-gmUniqueNo'], ['ggmenu']),
+    'm-gmrestrict': ([('main', "                restricted: $('body').hasClass('restrict-grouping')\n", "                restricted: false\n")], ['L-ggmenu-gmRestricted'], ['ggmenu']),
+    'm-gmreveal': ([('main', "                else _gmReveal(w);", "                else { }")], ['L-gglist-glToStacked'], ['gglist']),
+    'm-gmselect': ([('main', "                if (layout === 'list') { if (GL && typeof GL.selectGroup === 'function') GL.selectGroup(w); }", "                if (layout === 'list') { }")], ['L-gglist-glSwitch'], ['gglist']),
+    'm-gmtoggle': ([('main', "                $(w).children('.group-header').trigger('click');\n                return true;", "                return true;")], ['L-ggmenu-gmToggle'], ['ggmenu']),
+    # the band's LABEL in place of the row's value: [Blank] would filter to a literal "[Blank]" no row holds
+    'm-onlylabel': ([('main', "                    var v = _pnbFsCellText(m.get(cols[k]));",
+                      "                    var v = path[k].getAttribute('data-group-key');")], ['L-ggmenu-gmOnlyBlank'], ['ggmenu']),   # (re-anchored, sweep 2)
+    'm-gmsort': ([('main', "                currentGroupSort = { key: key, dir: dir };\n                _sbSortGroups(key, dir);\n                return true;", "                currentGroupSort = { key: key, dir: dir };\n                return true;")], ['L-ggmenu-gmSort'], ['ggmenu']),
+    # --- (2026-10-20, grpmenu) the module
+    'j-gmband': ([('menu', "        var gb = bandOf(e.target);\n", "        var gb = null;\n")], ['L-ggmenu-gmOpens'], ['ggmenu']),
+    'j-gmrow': ([('menu', "            var row = target.closest('.pnb-gl-item') || (target === list", "            var row = null || (target === list")], ['L-gglist-glRowOpens'], ['gglist']),
+    'j-gmkbdlist': ([('menu', "(target === list ? list.querySelector('.pnb-gl-item.is-active') : null)", "(null)")], ['L-gglist-glKbd'], ['gglist']),
+    'j-gmtoggle': ([('menu', "        if (!lo) { items.push({ act: 'gToggle'", "        if (true) { items.push({ act: 'gToggle'")], ['L-gglist-glRowItems'], ['gglist']),
+    'j-gmrestricted': ([('menu', "        if (!info.restricted && A) {", "        if (A) {")], ['L-ggmenu-gmRestricted'], ['ggmenu']),
+    'j-hdrrestrict': ([('menu', "        if (grpRestricted()) { gi = []; }\n", "")], ['L-ggmenu-gmHdrRestricted'], ['ggmenu']),
+    'j-gmused': ([('menu', "if (!shown(t) || c === '#' || isJournal(c) || used.indexOf(String(c).toUpperCase()) >= 0) { continue; }", "if (!shown(t) || c === '#' || isJournal(c)) { continue; }")], ['L-ggmenu-gmAddUsed'], ['ggmenu']),
+    'j-gmtick': ([('menu', "        return { act: 'gby:' + c, label: nm, checked: mine,", "        return { act: 'gby:' + c, label: nm, checked: false,")], ['L-ggmenu-gmTick'], ['ggmenu']),
+    'j-gmlevel': ([('menu', "colLabel(info.col) + (info.levels.length > 1 ? ', level ' + (info.depth + 1) + ' of ' + info.levels.length : '')", "colLabel(info.col)")], ['L-ggmenu-gmLevelMenu'], ['ggmenu']),
+    'j-gmtip': ([('menu', "            if (!d || d.layout !== 'list' || gmTipSeen()) { return; }", "            if (!d || d.layout !== 'list') { return; }"),
+                 ('menu', "                    if (!listOn() || gmTipSeen()) { return; }", "                    if (!listOn()) { return; }")], ['L-mauto-tipOnce'], ['mauto']),
+    'j-gmspot': ([('menu', "    function spotOf(target) { return (target && target.closest) ? (target.closest('th, td, .group-header, .pnb-gl-item') || target) : target; }",
+                   "    function spotOf(target) { return (target && target.closest) ? (target.closest('th, td') || target) : target; }")], ['L-ggmenu-gmNativeSecond'], ['ggmenu']),
+    'j-gmfocus': ([('menu', "            var t = (c.focusEl && document.contains(c.focusEl)) ? c.focusEl\n", "            var t = (false) ? c.focusEl\n")], ['L-ggmenu-gmKbdBack', 'L-gglist-glKbdBack'], ['ggmenu', 'gglist']),
+    'c-gmmark': ([('mcss', "#groupedResultsContainer .group-header.pnb-hm-for,\n", "")], ['L-ggmenu-gmMarked'], ['ggmenu']),
+    'j-gmundo': ([('menu', "        if (undo) { toast('<p>' + msg + offerUndo(undo) + '</p>', UNDO_MS); }", "        if (undo) { toast('<p>' + msg + offerUndo(function () { }) + '</p>', UNDO_MS); }")], ['L-ggmenu-gmUndo', 'L-ggmenu-gmRemoveUndo'], ['ggmenu']),
+    'j-gmkbd': ([('menu', "        if (kbd) { var r = b.el.getBoundingClientRect(); x = r.left; y = r.bottom; }", "        if (kbd) { var r = b.el.getBoundingClientRect(); x = r.left; y = r.top - 400; }")], ['L-ggmenu-gmKbd'], ['ggmenu']),
+    'j-gmnotip': ([('menu', "            if (!d || d.layout !== 'list' || gmTipSeen()) { return; }", "            return;")], ['L-mauto-tipShown'], ['mauto']),
+    'j-gmclick': ([('menu', "    function clickId(id) { var b = document.getElementById(id); if (b) { b.click(); } }", "    function clickId(id) { }")], ['L-ggmenu-gmCollapseAll', 'L-ggmenu-gmConfigure'], ['ggmenu']),
     # (2026-10-19, calcadj round 8) main.js: the all-different question left behind by a pick the dialog could not
     # select; the menu: Group by on a journal column
     'm-askstale': ([('main', "        var _askNext = _pnbGroupAskNext; _pnbGroupAskNext = false;   // (round 8) taken here, before any early return\r\n", "        var _askNext = _pnbGroupAskNext;\r\n"),
@@ -125,8 +244,8 @@ MUTANTS = {
     'm-grpunique': ([('main', "            if (!window.confirm('Every row has a different ' + selectedColumn + ', so grouping by it makes one group per row and summarises nothing.\\n\\nGroup by it anyway?')) return;\r\n", "")],
                     ['L-mgroupby-uniqueAsks'], ['mgroupby']),
     # --- the module
-    'j-menu': ([('menu', "        if (!th || !api()) { return; }\n        e.preventDefault();", "        if (!th || !api() || true) { return; }\n        e.preventDefault();")],
-               ['L-mflat-opens', 'L-mflat-prevented'], ['mflat']),
+    'j-menu': ([('menu', "        if (!th || !api()) { footNote = false; return; }\n        e.preventDefault();", "        if (!th || !api() || true) { footNote = false; return; }\n        e.preventDefault();")],
+               ['L-mflat-opens', 'L-mflat-prevented'], ['mflat']),   # (re-anchored 2026-10-20: round 25's early return clears footNote)
     'j-skiphidden': ([('menu', "            for (j = i - 1; j >= 0; j--) { if (movable(cols[j])) { return j; } }", "            if (i > 0) { return i - 1; }")],
                      ['L-mflat-skipHidden'], ['mflat']),
     'j-tiponce': ([('menu', "        if (isMove && moves > 2 && !tipSeen()) {\n            markTipSeen();", "        if (isMove && moves > 2) {")],
@@ -148,11 +267,12 @@ MUTANTS = {
     # --- the calculated column module, the width module
     'j-calcafter': ([('calc', "                    if (after) { try { after(name); } catch (e) { } }\n", "")], ['L-mcalc-placedRight', 'L-mcalc-calcStart'], ['mcalc']),
     'j-calcseed': ([('calc', "esc(d ? d.formula : (opts.seed || ''))", "esc(d ? d.formula : '')")], ['L-mcalc-seeded'], ['mcalc']),
-    'j-fit': ([('colw', "            setWidth(c, clampW(Math.min(w, fitCap(c)), c));\n            return true;", "            return true;")], ['L-mopts-fits', 'L-mopts-fitsLong', 'L-mopts-fitsLongCut'], ['mopts']),
+    # (re-anchored 2026-10-20 d, jrnhidden: fitOne gained the dn line before offerUndo; the setWidth line alone)
+    'j-fit': ([('colw', "        setWidth(c, clampW(Math.min(w, fitCap(c)), c));\n", "")], ['L-mopts-fits', 'L-mopts-fitsLong', 'L-mopts-fitsLongCut'], ['mopts']),
     # --- (round 2) the measuring Fit, the counts
-    'j-fitauto': ([('colw', "            setWidth(c, clampW(Math.min(w, fitCap(c)), c));", "            setWidth(c, 'auto');")], ['L-mopts-fitsLong', 'L-mopts-fitsLongCut', 'L-gmenu-fitGroup'], ['mopts', 'gmenu']),
+    'j-fitauto': ([('colw', "        setWidth(c, clampW(Math.min(w, fitCap(c)), c));", "        setWidth(c, 'auto');")], ['L-mopts-fitsLong', 'L-mopts-fitsLongCut', 'L-gmenu-fitGroup'], ['mopts', 'gmenu']),
     # --- (round 3) Fit's cap, journal counts, Copy distinct values
-    'j-fitcap': ([('colw', "            setWidth(c, clampW(Math.min(w, fitCap(c)), c));", "            setWidth(c, clampW(w, c));")], ['L-mopts-fitCapped'], ['mopts']),
+    'j-fitcap': ([('colw', "        setWidth(c, clampW(Math.min(w, fitCap(c)), c));", "        setWidth(c, clampW(w, c));")], ['L-mopts-fitCapped'], ['mopts']),
     'm-statsjournal': ([('main', "        var jrn = !!(P.journalFriendlyCol && P.journalSearchColumnValue && P.journalFriendlyCol(String(col)));",
                          "        var jrn = false;")], ['L-mflat-statsToggle', 'L-mflat-statsNotes'], ['mflat']),
     'm-quickdelim': ([('main', "                const delimiter = (_pnbQuick && typeof _pnbQuick.delim === 'string') ? _pnbQuick.delim : ($('#copyDelimiterInput').val() || ';');",
@@ -161,10 +281,11 @@ MUTANTS = {
     'j-copyother': ([('menu', "            run: function () { A.copyDistinct(col, null); } });", "            run: function () { A.copyDistinct(col, ';'); } });")],
                     ['L-mcopy-copyOther'], ['mcopy']),
     # --- (round 4) the quick read, Swap...
-    'j-allunique': ([('menu', "        var uq = (s.values > 1 && s.unique === s.values) ? 'all unique' : n(s.unique) + ' unique';",
-                      "        var uq = n(s.unique) + ' unique';")], ['L-mflat-statsAllUnique'], ['mflat']),
-    'j-noneempty': ([('menu', "(s.empty === 0 ? 'none empty' : n(s.empty) + ' empty')", "(n(s.empty) + ' empty')")],
-                    ['L-mflat-statsLine', 'L-mflat-statsFiltered', 'L-mflat-statsAllUnique'], ['mflat']),
+    # (re-anchored 2026-10-20: since round 21 the quick read's "all unique" is Column stats' Unique "all")
+    'j-allunique': ([('menu', "            { info: 'Unique', value: (p.values > 1 && p.unique === p.values) ? 'all' : n(p.unique) });",
+                      "            { info: 'Unique', value: n(p.unique) });")], ['L-mflat-statsAllUnique'], ['mflat']),
+    # (j-noneempty dropped 2026-10-20: round 21's Column stats list shows Empty as a number, "0", so the
+    # "none empty" wording it broke is gone; m-statsempty still bites the empty count)
     'j-swaphalf': ([('menu', "                l.cols[i] = l.cols[j];\n                l.cols[j] = a;", "                l.cols[i] = l.cols[j];")],
                    ['L-mflat-swapDone'], ['mflat']),
     'j-swapself': ([('menu', "            if (!movable(c) || c.colName === col) { return; }", "            if (!movable(c)) { return; }")],
@@ -172,7 +293,9 @@ MUTANTS = {
     # --- (round 5) the journal block, Back
     'm-back': ([('main', "            back: (hdr && typeof hdr.back === 'function') ? { label: 'Back to the column menu', run: hdr.back } : null", "            back: null")],
                ['L-mopts-optsBack'], ['mopts']),
-    'j-backrun': ([('mod', "            e.preventDefault();\n            cfg.back.run();", "            e.preventDefault();")], ['L-mopts-optsBack'], ['mopts']),
+    # (re-anchored 2026-10-21, backrun: pvfix2's Back hands a paused rule over first, so edFlush() now sits between
+    # e.preventDefault() and cfg.back.run(); the run line alone)
+    'j-backrun': ([('mod', "            cfg.back.run();\n", "")], ['L-mopts-optsBack'], ['mopts']),
     # --- (round 6) journal columns movable; the new items
     'm-jplace': ([('main', "        function placeHead(headRow, prev, th) {\n            if (th.parentNode === headRow) return th;", "        function placeHead(headRow, prev, th) {")],
                  ['L-mjournal-jrnStaysUnsaved'], ['mjournal']),
@@ -184,38 +307,41 @@ MUTANTS = {
     'm-filterkeep': ([('main', "        if (values && values.length) st.sel[C] = values.slice();", "        if (false) st.sel[C] = values.slice();")], ['L-mmore-filterApply'], ['mmore']),
     'j-filterinit': ([('menu', "        var on = vals.map(function (v) { return any ? !!v.on : true; });", "        var on = vals.map(function (v) { return true; });")],
                      ['L-mmore-filterReopen'], ['mmore']),
-    'j-panelesc': ([('menu', "        if (panel && (e.key === 'Escape' || e.key === 'Esc')) { e.preventDefault(); e.stopPropagation(); closePanel(true); return; }\n", "")],
-                   ['L-mmore-filterEsc'], ['mmore']),
-    'm-statsnum': ([('main', "            out.num = { min: nums[0], max: nums[nums.length - 1],", "            out.num = { min: nums[nums.length - 1], max: nums[0],")], ['L-mmore-statsNum'], ['mmore']),
-    'm-statsdate': ([('main', "                    if (!dMin || k < dMin.k) dMin = { k: k, t: t };", "                    if (!dMin) dMin = { k: k, t: t };")], ['L-mmore-statsDate'], ['mmore']),
+    'j-panelesc': ([('menu', "        if (panel && (e.key === 'Escape' || e.key === 'Esc')) { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); closePanel(true); return; }\n", "")],
+                   ['L-mmore-filterEsc'], ['mmore']),   # (re-anchored 2026-10-20: the line stops the other window listeners too)
+    # (re-aimed 2026-10-20, mutfix: round 13 took statsNum / statsDate out of mmore; round 21's Column stats list
+    # shows the spread and the span again, and mflat's statsNum / statsDate read them)
+    'm-statsnum': ([('main', "            out.num = { min: nums[0], max: nums[nums.length - 1],", "            out.num = { min: nums[nums.length - 1], max: nums[0],")], ['L-mflat-statsNum'], ['mflat']),
+    'm-statsdate': ([('main', "                    if (!dMin || k < dMin.k) dMin = { k: k, t: t };", "                    if (!dMin) dMin = { k: k, t: t };")], ['L-mflat-statsDate'], ['mflat']),
     'j-only': ([('menu', "                l.cols.forEach(function (c) { c.visible = c.colName === col; });", "                l.cols.forEach(function (c) { c.visible = true; });")],
                ['L-mmore-only'], ['mmore']),
     'm-resetpos': ([('main', "        if (to !== i) penumbraApplyHeaderLayout(lay);\n", "")], ['L-mmore-resetCol'], ['mmore']),
     'j-copyname': ([('menu', "            navigator.clipboard.writeText(name).then(", "            navigator.clipboard.writeText(String(name).toLowerCase()).then(")],
                    ['L-mmore-copyName'], ['mmore']),
-    'j-toolon': ([('menu', "    function toolOn(id) { var b = document.getElementById(id); return !!b && b.getClientRects().length > 0; }",
-                   "    function toolOn(id) { return !!document.getElementById(id); }")], ['L-mmore-toolHidden'], ['mmore']),
+    # (j-toolon dropped 2026-10-20, mutfix: toolOn() has had no caller since round 13 took Pivot by / Chart out of the menu)
     'm-blankoffer': ([('main', "return e.v !== '' || e.all > 0 || e.on;", "return true;")], ['L-mmore-filterList', 'L-mmore-filterApply'], ['mmore']),
     # --- (round 7) Fit as the cell lays out
     'j-fittable': ([('colw', "            if (st.display === 'table' || st.display === 'inline-table') {", "            if (false) {")],
                    ['L-mfitnest-nestGrow', 'L-mfitnest-nestCompact'], ['mfitnest']),
-    'j-fitbr': ([('colw', "            if (n.tagName === 'BR') { flushLine(acc); continue; }", "            if (n.tagName === 'BR') { continue; }")],
+    'j-fitbr': ([('colw', "            if (n.tagName === 'BR') { if (!row) { flushLine(acc); } continue; }", "            if (n.tagName === 'BR') { continue; }")],
                 ['L-mfitnest-fitLines'], ['mfitnest']),
     'j-fitfixed': ([('colw', "        if (st.tableLayout === 'fixed') { w = widest * n; }   // fixed: the columns share the width equally\n", "")],
                    ['L-mfitnest-nestCompact'], ['mfitnest']),
     # --- (round 8) the cell menu
     'j-cellof': ([('menu', "        if (!th) { cell = cellOf(e.target); th = cell ? cell.th : null; }\n", "")], ['L-mcell-cellOpens', 'L-gmenu-cellGroup'], ['mcell', 'gmenu']),
-    'j-celllink': ([('menu', "        if (target.closest('a, button, input, select, textarea, label, [contenteditable=\"true\"]')) { return null; }\n", "")],
-                   ['L-mcell-cellNatives'], ['mcell']),
+    'j-celllink': ([('menu', "        if (!onNotes && !onNestLink && target.closest('a, button, input, select, textarea, label, [contenteditable=\"true\"]')) { return null; }\n", "")],
+                   ['L-mcell-cellNatives'], ['mcell']),   # (re-anchored 2026-10-20: cellOf's line; the bare one is the pivot's and the breakdown's)
     'j-cellsel': ([('menu', "        if (sel && !sel.isCollapsed && sel.containsNode && sel.containsNode(td, true)) { return null; }\n", "")], ['L-mcell-cellNatives'], ['mcell']),
     'm-cellraw': ([('main', "        return _pnbFsCellText(m.get(String(col || '').toUpperCase()));\n    }\n    // One value into", "        return String(td.textContent || '').trim();\n    }\n    // One value into")],
                   ['L-mcell-cellRaw'], ['mcell']),
-    'm-celladd': ([('main', "        if (!cur.some(function (x) { return String(x).toLowerCase() === v.toLowerCase(); })) cur.push(v);", "        cur = [v];")],
-                  ['L-mcell-cellAdd'], ['mcell']),
+    'm-celladd': ([('main', "        var v = String(value == null ? '' : value), cur = (st.sel[C] || []).slice();\n        if (!cur.some(function (x) { return String(x).toLowerCase() === v.toLowerCase(); })) cur.push(v);",
+                    "        var v = String(value == null ? '' : value), cur = (st.sel[C] || []).slice();\n        cur = [v];")],
+                  ['L-mcell-cellAdd'], ['mcell']),   # (re-anchored 2026-10-20: penumbraPivotMenuFilter has the same line; penumbraHeaderFilterAdd's is the one)
     'm-cellex': ([('main', "fields = [exclude ? { col: C, blank: true, mode: 'ex' } : { col: C, blank: true }];", "fields = [{ col: C, blank: true }];")],
                  ['L-mcell-cellExclude'], ['mcell']),
-    'j-cellfocus': ([('menu', "            var t = (c.cell && document.contains(c.cell.td)) ? c.cell.td : (document.contains(c.th) ? c.th : null);",
-                      "            var t = document.contains(c.th) ? c.th : null;")], ['L-mcell-cellKbd'], ['mcell']),
+    # (2026-10-20, grpmenu) re-anchored: the line now starts with a group band's focus
+    'j-cellfocus': ([('menu', "                : (c.cell && document.contains(c.cell.td)) ? c.cell.td : (document.contains(c.th) ? c.th : null);",
+                      "                : document.contains(c.th) ? c.th : null;")], ['L-mcell-cellKbd'], ['mcell']),
     # --- (round 9, perf) only the cells that change
     'm-cellplan': ([('main', "            if (!_pnbApplyCellPlan(row, plan)) _pnbFullCellPass(row, desiredOrder, visibilityMap);",
                      "            if (true) _pnbFullCellPass(row, desiredOrder, visibilityMap);")], ['L-mflat-moveMinimal'], ['mflat']),
@@ -228,7 +354,12 @@ MUTANTS = {
                     ['L-msubs-showList'], ['msubs']),
     'u-clear': ([('menu', "run: function () { var b = document.getElementById('spClearStorage'); if (b) { b.click(); } } });", "run: function () { } });")], ['L-msubs-clearPanel'], ['msubs']),
     'u-arrow': ([('menu', "((it.sub && it.act !== 'back') ? '<span class=\"pnb-hm-arrow\" aria-hidden=\"true\">&#8250;</span>' : '')", "''")], ['L-msubs-arrows'], ['msubs']),
-    'u-copyname': ([('menu', "        use.push({ act: 'copyName', label: 'Copy column name', run: function () { copyName(col); } });\n", "")], ['L-msubs-topOrder'], ['msubs']),
+    'u-copyname': ([('menu', "        if (!isNum) { use.push({ act: 'copyName', label: 'Copy column name', run: function () { copyName(col); } }); }\n", "")], ['L-msubs-topOrder'], ['msubs']),   # (re-anchored 2026-10-20: not on round 20's '#' menu)
+    # --- (round 31) the item trusts the panel's checkbox
+    'h-stale': ([('menu', "        var on = !document.body.classList.contains('disable-auto-expand');\n        if (tg.checked !== on) { tg.checked = on; }\n", "        var on = tg.checked;\n")], ['L-mnest-nestRowHeight'], ['mnest']),
+    # --- (round 30) the row height item never offered; the pick flips nothing
+    'h-noitem': ([('menu', "        if (nested) { var rh = rowHeightItem(); if (rh) { look.push(rh); } }", "")], ['L-mnest-nestRowHeight', 'L-mnest-nestRowHeightFlips'], ['mnest']),
+    'h-noflip': ([('menu', "                tg.checked = !tg.checked;\n", "")], ['L-mnest-nestRowHeightFlips'], ['mnest']),
     # --- (round 26) the Duplicates line: the extra copies miscounted
     'd-extra': ([('main', "        freq.forEach(function (c) { if (c > 1) { dupRows += c; dupExtra += c - 1; dupValues++; } });", "        freq.forEach(function (c) { if (c > 1) { dupRows += c; dupExtra += c; dupValues++; } });")], ['L-mflat-statsDup'], ['mflat']),
     'd-noline': ([('menu', "        if (p.dup) {\n            items.push({ info: 'Duplicates',", "        if (false) {\n            items.push({ info: 'Duplicates',")], ['L-mflat-statsDup', 'L-mflat-statsAllUnique'], ['mflat']),
@@ -292,10 +423,17 @@ MUTANTS = {
     'p-edio': ([('main', "            w.__pnbRefreshIO = null;\n            cm.refresh();", "            w.__pnbRefreshIO = null;")], ['L-mload-edShownRefresh'], ['mload']),
     'j-fitgroup': ([('colw', "        var tables = c.view === 'group' ? document.querySelectorAll('#groupedResultsContainer table') : [c.th.closest('table')];",
                      "        var tables = [c.th.closest('table')];")], ['L-gmenu-fitGroup'], ['gmenu']),
-    'm-statshidden': ([('main', "            if (rows[i].classList.contains('search-hidden')) continue;\n            var idx = _pnbLazyRowIndex(rows[i]), m = (idx >= 0) ? masterRowData[idx] : null;\n            if (!m) continue;\n            var v = m.get(name);",
-                        "            var idx = _pnbLazyRowIndex(rows[i]), m = (idx >= 0) ? masterRowData[idx] : null;\n            if (!m) continue;\n            var v = m.get(name);")], ['L-mflat-statsFiltered'], ['mflat']),
+    # (re-anchored 2026-10-20, mutfix: since round 21 statsFiltered reads the Column stats list, which
+    # penumbraHeaderColProfile counts; the penumbraHeaderColStats line it hit feeds only a journal column's counts now)
+    'm-statshidden': ([('main', "            if (rows[i].classList.contains('search-hidden')) continue;\n            var idx = _pnbLazyRowIndex(rows[i]), m = (idx >= 0) ? masterRowData[idx] : null;\n            if (!m) continue;\n            n++;\n            var rawV = m.get(name);",
+                        "            var idx = _pnbLazyRowIndex(rows[i]), m = (idx >= 0) ? masterRowData[idx] : null;\n            if (!m) continue;\n            n++;\n            var rawV = m.get(name);")], ['L-mflat-statsFiltered'], ['mflat']),
+    # (2026-10-20, jrnhidden) its twin in penumbraHeaderColStats, which since round 21 feeds only a journal column's
+    # counts (a toggle's Checked / Unchecked, Notes' rows): statsJournalFiltered reads them with rows hidden
+    'm-jrnhidden': ([('main', "            if (rows[i].classList.contains('search-hidden')) continue;\n            var idx = _pnbLazyRowIndex(rows[i]), m = (idx >= 0) ? masterRowData[idx] : null;\n            if (!m) continue;\n            var v = m.get(name);",
+                      "            var idx = _pnbLazyRowIndex(rows[i]), m = (idx >= 0) ? masterRowData[idx] : null;\n            if (!m) continue;\n            var v = m.get(name);")], ['L-mflat-statsJournalFiltered'], ['mflat']),
     'm-statsempty': ([('main', "            else seen.add(t);", "            seen.add(t);")], ['L-mflat-statsEmpty'], ['mflat']),
-    'j-statsline': ([('menu', "        if (!A || typeof A.colStats !== 'function') { return ''; }", "        if (true) { return ''; }")], ['L-mflat-statsLine'], ['mflat']),
+    # (j-statsline dropped 2026-10-20: round 21 removed the counts line under the title, statsLine, that it blanked;
+    # the Column stats list beside the item has s-noflyout, s-topnofilter and d-noline)
 }
 
 args = sys.argv[1:]
@@ -320,7 +458,8 @@ def pick(rel):
 RELS = {'main': os.path.join('js', 'main.js'), 'mod': os.path.join('js', 'penumbra_colfmt.js'), 'calc': os.path.join('js', 'penumbra_calc.js'),
         'colw': os.path.join('js', 'penumbra_colwidths.js'), 'menu': os.path.join('js', 'penumbra_colmenu.js'),
         'mcss': os.path.join('css', 'penumbra_colmenu.css'), 'css': os.path.join('css', 'main.css'),
-        'index': 'index.php', 'help': os.path.join('help', 'tips', 'settings-tips-storage.php'), 'topic': os.path.join('help', 'topics', 'userSettingsHelpLightbox.php')}
+        'index': 'index.php', 'help': os.path.join('help', 'tips', 'settings-tips-storage.php'), 'topic': os.path.join('help', 'topics', 'userSettingsHelpLightbox.php'),
+        'ptips': os.path.join('help', 'tips', 'pivot-tips-storage.php')}   # (2026-10-20) the grouping dialog's Layout tip
 sys.path.insert(0, HERE)
 import mk_harness
 cand = {k: pick(v) for k, v in RELS.items()}
@@ -469,6 +608,14 @@ def static_checks(texts):
         ('S-helpFit', 'widest value on screen' in texts['topic'] and 'how many different values' in texts['topic'], ''),
         ('S-helpNamed', 'id="us-colmenu" data-colmenu-help' in texts['topic']
          and 'data-jump-to="us-colmenu"' in texts['topic'], ''),
+        # (2026-10-20, grpmenu / grpauto) a group's own menu; the layout no one chose (the topic and the Layout tip)
+        ('S-helpGroups', 'data-colmenu-groups' in texts['topic'] and '<strong>Switch to List view</strong>' in texts['topic']
+         and 'The layout no one chose' in texts['topic'] and '8 or fewer open <em>Stacked</em>' in texts['topic']
+         and 'stays until the grouping is removed' in texts['ptips'] and chr(0x2014) not in texts['topic'] + texts['ptips'], ''),   # no em dash in the served help
+        # (2026-10-20, grpsweep) a narrow window stays Stacked
+        ('S-helpGroupsSweep', 'which always shows Stacked, they stay Stacked' in texts['topic'], ''),
+        # (2026-10-20, grpsweep 2) Show only keeps every value of the group
+        ('S-helpOnlyValues', 'keeps every row it shows' in texts['topic'] and 'more than 200 different values' in texts['topic'], ''),
     ]
 
 def run_browser(scns):
@@ -496,10 +643,13 @@ try:
             write_stage(t)
             res = run_browser(scns)
             red = [a for a, p, _ in res if not p]
-            dead = [a[2:] for a in red if a.startswith('F-')]
-            good = not [x for x in must if x not in red and not [d for d in dead if x.startswith('L-' + d + '-')]]
+            # (2026-10-20, mutfix) a dead scenario (F-) is no kill: its checks never ran, so its must-checks
+            # count as missed; the fatal text is printed (it names the driver line that needs a guard)
+            good = not [x for x in must if x not in red]
             okc += good; bad += (not good)
             print('  %s  mutant %-14s turns %s red   [red: %s]' % ('PASS' if good else 'FAIL', m, ' '.join(must), ' '.join(red)))
+            for a, p, d in res:
+                if a.startswith('F-') and not p: print('      %s  %s' % (a, ' '.join(d.split())))
         print('SUMMARY mutants ok=%d bad=%d' % (okc, bad))
         print('RESULT: GREEN' if bad == 0 else 'RESULT: RED')
     else:

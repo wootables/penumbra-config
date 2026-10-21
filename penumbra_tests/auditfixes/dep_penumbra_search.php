@@ -508,6 +508,12 @@ function _php_evaluate_search_row_with_virtual($row, $parsedQuery, $columns, $vi
                         }
                     }
                 }
+                // ...nor the row's notes (2026-10-14).
+                $_sn = _search_notes_col();
+                if (!$anyMatched && $_sn && isset($rowUpper[$_sn['name']]) && (string)$rowUpper[$_sn['name']] !== ''
+                        && php_test_search_condition($positiveOp === '=' ? 'contains' : $positiveOp, $part['value'], (string)$rowUpper[$_sn['name']], $row, $columns)) {
+                    $anyMatched = true;
+                }
                 $matched = !$anyMatched;
             } else {
                 // Positive: row matches if ANY column matches
@@ -530,6 +536,12 @@ function _php_evaluate_search_row_with_virtual($row, $parsedQuery, $columns, $vi
                         }
                     }
                 }
+                // ...and the row's notes (2026-10-14): a word anywhere in them ("=" is "contains" there).
+                $_sn = _search_notes_col();
+                if (!$matched && $_sn && isset($rowUpper[$_sn['name']]) && (string)$rowUpper[$_sn['name']] !== ''
+                        && php_test_search_condition($part['op'] === '=' ? 'contains' : $part['op'], $part['value'], (string)$rowUpper[$_sn['name']], $row, $columns)) {
+                    $matched = true;
+                }
             }
         }
         // --- Column-specific condition ---
@@ -546,6 +558,9 @@ function _php_evaluate_search_row_with_virtual($row, $parsedQuery, $columns, $vi
                         break;
                     }
                 }
+            } elseif (($_snc = _search_notes_col()) && $upperCol === $_snc['name']) {
+                // The journal's Notes (2026-10-14): the count or the text, as on the page.
+                $matched = _search_notes_condition($part, $rowUpper, $row, $columns);
             } else {
                 // Fall back to main column
                 $cellText = _search_get_cell_value($colName, $rowUpper);
@@ -1091,6 +1106,44 @@ function _search_journal_skip($set = null) {
 }
 }
 
+if (!function_exists('_search_notes_col')) {
+function _search_notes_col($set = null) {
+    static $c = null;
+    if ($set !== null) $c = ($set === false) ? null : $set;
+    return $c;
+}
+}
+
+if (!function_exists('_search_notes_register')) {
+function _search_notes_register($resolver, &$columns, &$journalNames) {
+    _search_notes_col(false);
+    if (!is_array($resolver) || empty($resolver['notesSearch'])) return null;
+    $n = (string)$resolver['notesSearch'];
+    if (!in_array(strtoupper($n), array_map('strtoupper', $columns), true)) $columns[] = $n;
+    $journalNames[strtoupper($n)] = true;
+    _search_notes_col(array('name' => strtoupper($n), 'count' => strtoupper(JOURNAL_NOTES_COUNT_KEY)));
+    return $n;
+}
+}
+
+if (!function_exists('_search_notes_condition')) {
+function _search_notes_condition($part, $rowUpper, $row, $columns) {
+    $sn = _search_notes_col();
+    $text = isset($rowUpper[$sn['name']]) ? (string)$rowUpper[$sn['name']] : '';
+    $count = isset($rowUpper[$sn['count']]) ? (int)$rowUpper[$sn['count']] : 0;
+    $op = (string)$part['op'];
+    $raw = isset($part['value']) ? (string)$part['value'] : '';
+    $nv = strtolower(preg_replace('/^[\'"]|[\'"]$/', '', trim($raw)));
+    if ($nv === 'empty') return ($op === '=') ? $count === 0 : $count !== 0;
+    if (preg_match('/^-?\d+(\.\d+)?$/', $nv) && substr(trim($raw), 0, 1) !== '/') {
+        return php_test_search_condition($op, $raw, (string)$count, $row, $columns);
+    }
+    if ($op === '=' || $op === '==') return php_test_search_condition('contains', $raw, $text, $row, $columns);
+    if ($op === '!=' || $op === '<>' || $op === "\xE2\x89\xA0") return !php_test_search_condition('contains', $raw, $text, $row, $columns);
+    return php_test_search_condition($op, $raw, $text, $row, $columns);
+}
+}
+
 if (!function_exists('_journal_alias_toggle_conditions')) {
 function _journal_alias_toggle_conditions($parsedQuery, $aliasCols) {
     if (empty($parsedQuery) || empty($aliasCols)) return $parsedQuery;
@@ -1283,6 +1336,10 @@ function php_apply_search_filter($data, $viewMode, $searchFilter, $recipientVars
         }
     }
 
+    // ...and the Notes column (2026-10-14): searched as on the page, whether or not the
+    // output carries it (the resolver reads the notes whenever row notes are on).
+    $notesSearch = function_exists('journalExportNotesSearchValues') ? _search_notes_register($toggleResolver, $columns, $journalNames) : null;
+
     // __SRC (a browser pivot-view modifier) means nothing here: every name is a column.
     $resolvedFilter = penumbraStripSrcModifier($resolvedFilter);
 
@@ -1332,6 +1389,9 @@ function php_apply_search_filter($data, $viewMode, $searchFilter, $recipientVars
                 if ($toggleResolver) {
                     foreach (journalExportToggleRowValues($toggleResolver, $row) as $tn => $tv) $evalRow[$tn] = $tv;
                 }
+                if ($notesSearch !== null) {
+                    foreach (journalExportNotesSearchValues($toggleResolver, $row) as $tn => $tv) $evalRow[$tn] = $tv;
+                }
                 if (php_evaluate_search_row($evalRow, $parsedQuery, $columns, $requireRowMatch)) {
                     $filteredRows[] = $row; // Keep original row without injected # / toggles
                 }
@@ -1349,6 +1409,7 @@ function php_apply_search_filter($data, $viewMode, $searchFilter, $recipientVars
             }
         }
         _search_journal_skip(array());
+        _search_notes_col(false);
         return $filtered;
     } else {
         // Standard or pivot: filter flat array of rows
@@ -1363,12 +1424,16 @@ function php_apply_search_filter($data, $viewMode, $searchFilter, $recipientVars
                 if ($toggleResolver) {
                     foreach (journalExportToggleRowValues($toggleResolver, $row) as $tn => $tv) $evalRow[$tn] = $tv;
                 }
+                if ($notesSearch !== null) {
+                    foreach (journalExportNotesSearchValues($toggleResolver, $row) as $tn => $tv) $evalRow[$tn] = $tv;
+                }
                 if (php_evaluate_search_row($evalRow, $parsedQuery, $columns, $requireRowMatch)) {
                     $filtered[] = $row; // Keep original row without injected # / toggles
                 }
             }
         }
         _search_journal_skip(array());
+        _search_notes_col(false);
         return array_values($filtered);
     }
 }
@@ -1469,5 +1534,48 @@ function penumbra_search_columns_from_meta($meta) {
     }
     $cols[] = '#';
     return $cols;
+}
+}
+
+if (!function_exists('penumbra_nested_row_count')) {
+function penumbra_nested_row_count($value) {
+    if ($value === null) return 0;
+    $s = (string)$value;
+    $p = strpos($s, '@@JSON');
+    if ($p === false) return 0;
+    $d = json_decode(substr($s, $p + 6));
+    if (json_last_error() === JSON_ERROR_NONE) {
+        if (is_array($d)) return count($d);
+        return is_object($d) ? 1 : 0;
+    }
+    return _penumbra_json_rows($s, $p + 6);
+}
+}
+
+if (!function_exists('_penumbra_json_rows')) {
+function _penumbra_json_rows($s, $i) {
+    $n = strlen($s);
+    while ($i < $n && (($o = ord($s[$i])) === 32 || $o === 9 || $o === 10 || $o === 13)) $i++;
+    if ($i >= $n) return 0;
+    $o = ord($s[$i]);
+    if ($o === 123) return 1;                                  // {
+    if ($o !== 91) return 0;                                   // not [
+    $depth = 0; $inStr = false; $esc = false; $want = false; $count = 0;
+    for (; $i < $n; $i++) {
+        $o = ord($s[$i]);
+        if ($inStr) {
+            if ($esc) $esc = false;
+            elseif ($o === 92) $esc = true;                    // a backslash
+            elseif ($o === 34) $inStr = false;                 // "
+            continue;
+        }
+        if ($o === 32 || $o === 9 || $o === 10 || $o === 13) continue;
+        if ($want && $depth === 1 && $o !== 93) { $count++; $want = false; }   // an item starts
+        if ($o === 34) $inStr = true;
+        elseif ($o === 91 || $o === 123) { if (++$depth === 1) $want = true; }
+        elseif ($o === 93 || $o === 125) { if (--$depth === 0) break; }
+        elseif ($o === 44 && $depth === 1) $want = true;       // ,
+    }
+    return $count;
 }
 }

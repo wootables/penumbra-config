@@ -1,3 +1,4 @@
+journalNotesFlatten
 journalCleanKeyValueExport
 journalUpperKey
 journalToggleWantExport
@@ -18,6 +19,8 @@ journalExportToggleResolver
 journalExportCanonicalCol
 journalExportAliasMapFor
 journalExportToggleRowValues
+journalExportNotesSearchValues
+journalExportRowKey
 journalDecorateRowsWithToggles
 journalStripWhoCols
 journalExportMapSortCriteria

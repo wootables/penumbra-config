@@ -86,7 +86,7 @@ if (is_file("$app/help/ask.php")) {
     echo $as['out'] . "\n"; $fails += (int)$as['code'];
     if (!isset($o['skip-jump'])) {
         list($okH, $tH) = askHarness($app, "$out/askjs");
-        printf("  %-5s %-8s %s\n", $okH ? 'PASS' : 'FAIL', 'H1', 'Ask page client harness (T1-T6 in headless Edge)' . ($okH ? '' : ": \n" . $tH));
+        printf("  %-5s %-8s %s\n", $okH ? 'PASS' : 'FAIL', 'H1', 'Ask page client harness (T1-T8 in headless Edge)' . ($okH ? '' : ": \n" . $tH));
         if (!$okH) $fails++;
     }
 }
@@ -201,6 +201,8 @@ if (isset($o['mutants'])) {
             // passage); the Ask-only tier let through to the assistant's question -> R9 (data questions naming PI / ID / FY pull help).
             $M['short-tokens-dropped'] = array('edits' => array(array('help_retrieval.php', "        if (strlen(\$w) < 3 && !isset(\$GLOBALS['PNB_HELP_SHORT'][\$w])) continue;", '        if (strlen($w) < 3) continue;', 1)), 'expect' => array('R8'), 'allow' => array());
             $M['assist-short-leak']    = array('edits' => array(array('help_retrieval.php', "        if (\$mode !== 'ask') {", '        if (false) {', 1)), 'expect' => array('R9'), 'allow' => array());
+            // 2026-10-20: the in-flight indicator. Without busyOn() the harness's T8 sees no dots, no busy mark, no dimmed answer -> H1.
+            $M['ask-no-busy']          = array('edits' => array(array('js/penumbra_help_ask.js', '        busyOn();', '        /* ask-no-busy */', 1)), 'expect' => array('H1'), 'allow' => array());
         }
     } else {
         $M = array(
@@ -234,7 +236,9 @@ if (isset($o['mutants'])) {
         $q = child($php, 'equiv_help.php', '--app=' . escapeshellarg($dir) . ' --orig=' . escapeshellarg($orig) . ' --php=' . escapeshellarg($php));
         $ak = is_file("$dir/help/ask.php") ? child($php, 'ask_tests.php', '--app=' . escapeshellarg($dir) . ' --orig=' . escapeshellarg($orig) . ' --out=' . escapeshellarg($out . '/ask_' . $name)) : array('out' => '', 'code' => 0);
         $rk = is_file("$dir/help/ask.php") ? child($php, 'retrieval_smoke.php', '--app=' . escapeshellarg($dir) . ' --orig=' . escapeshellarg($orig) . ' --out=' . escapeshellarg($out . '/retrieval_' . $name)) : array('out' => '', 'code' => 0);
-        $red = array_values(array_unique(array_merge(redIds($l['out']), redIds($q['out']), redIds($ak['out']), redIds($rk['out']))));
+        // the client harness (headless Edge) only for a mutant that names H1: the other mutants never touch the client
+        $hk = (in_array('H1', $spec['expect'], true) || in_array('H1', $spec['allow'], true)) ? askHarness($dir, "$out/askjs_$name") : null;
+        $red = array_values(array_unique(array_merge(redIds($l['out']), redIds($q['out']), redIds($ak['out']), redIds($rk['out']), ($hk !== null && !$hk[0]) ? array('H1') : array())));
         $missing = array_diff($spec['expect'], $red);
         $unexpected = array_diff($red, $spec['expect'], $spec['allow']);
         $ok = !$missing && !$unexpected;

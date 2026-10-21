@@ -70,11 +70,13 @@ def shot(query, name, clip=None):
     try:
         call('Network.enable'); call('Network.setCacheDisabled', {'cacheDisabled': True})
         call('Emulation.setDeviceMetricsOverride', {'width': 1280, 'height': 860, 'deviceScaleFactor': 1, 'mobile': False})
-        call('Page.navigate', {'url': 'http://127.0.0.1:%d/harness.html?%s' % (hp, query)})
+        # (2026-10-20 b) 'page:FILE' - a plain page of the stage dir (the email), ready once loaded
+        plain = query.startswith('page:')
+        call('Page.navigate', {'url': 'http://127.0.0.1:%d/%s' % (hp, query[5:]) if plain else 'http://127.0.0.1:%d/harness.html?%s' % (hp, query)})
         t0 = time.time()
         while time.time() - t0 < 120:
             time.sleep(0.25)
-            v = call('Runtime.evaluate', {'expression': '!!window.__SHOTREADY', 'returnByValue': True}).get('result', {}).get('value')
+            v = call('Runtime.evaluate', {'expression': 'document.readyState === "complete"' if plain else '!!window.__SHOTREADY', 'returnByValue': True}).get('result', {}).get('value')
             if v: break
         time.sleep(0.4)
         if clip == 'pop':   # (colopt d) a close-up: the open popover and a margin round it
@@ -90,6 +92,36 @@ def shot(query, name, clip=None):
     finally:
         ws.close()
 try:
+    # (2026-10-20, hl) Highlight rules: the list, a rule's view (Basic, Advanced), a new
+    # rule, the table they draw; light and dark
+    # (2026-10-20 b, hl phase 2) the report's rules: the list (their own rule over the report's,
+    # one of the report's off), a report rule opened by an editor, a viewer's list, the Save
+    # dialog's Last Stop Changes list, the table; the email as the runner writes it
+    # (PNB_EMAIL_HTML: test_colopt.php hl's PNB_EMAIL_OUT, and its .dark.html)
+    if os.environ.get('PNB_SHOTS') == 'hl2':
+        shot('scn=hrshot&view=list', 'hr_list.png', 'pop')
+        shot('scn=hrshot&view=list&col=V_STATUS', 'hr_list_off.png', 'pop')
+        shot('scn=hrshot&view=rule', 'hr_rule_report.png', 'pop')
+        shot('scn=hrviewshot', 'hr_list_viewer.png', 'pop')
+        shot('scn=hrshot&view=list&dark=1', 'hr_list_dark.png', 'pop')
+        shot('scn=hrshot&view=save', 'hr_save_list.png', 'pop')
+        shot('scn=hrshot&view=table', 'hr_table.png', {'x': 0, 'y': 0, 'width': 1280, 'height': 860})
+        eh = os.environ.get('PNB_EMAIL_HTML')
+        if eh:
+            shutil.copyfile(eh, os.path.join(stage, 'email.html'))
+            shutil.copyfile(eh + '.dark.html', os.path.join(stage, 'email_dark.html'))
+            shot('page:email.html', 'hr_email.png', {'x': 0, 'y': 0, 'width': 1280, 'height': 860})
+            shot('page:email_dark.html', 'hr_email_dark.png', {'x': 0, 'y': 0, 'width': 1280, 'height': 860})
+        raise SystemExit(0)
+    if os.environ.get('PNB_SHOTS') == 'hl':
+        shot('scn=shothl', 'hl_list.png', 'pop')
+        shot('scn=shothl&ed=0', 'hl_rule.png', 'pop')
+        shot('scn=shothl&ed=1&adv=1', 'hl_rule_adv.png', 'pop')
+        shot('scn=shothl&ed=new', 'hl_new.png', 'pop')
+        shot('scn=shothl&ed=0&dark=1', 'hl_rule_dark.png', 'pop')
+        shot('scn=shothl&open=NONE', 'hl_table.png', {'x': 0, 'y': 0, 'width': 1280, 'height': 860})
+        shot('scn=shothl&open=NONE&dark=1', 'hl_table_dark.png', {'x': 0, 'y': 0, 'width': 1280, 'height': 860})
+        raise SystemExit(0)
     # (colopt g) Filter a row of its own: a vendor-code column (Filter + Links), a number column
     shot('scn=shotpanel&open=V_LINK', 'colopt_g_vendor.png', 'pop')
     shot('scn=shotpanel&open=V_AMOUNT&frz=4', 'colopt_g_amount.png', 'pop')

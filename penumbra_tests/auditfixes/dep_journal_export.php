@@ -1,5 +1,36 @@
 <?php
 // AUTO-EXTRACTED from journal_export.php - do not edit.
+if (!function_exists('journalNotesFlatten')) {
+function journalNotesFlatten($notes) {
+        if (!is_array($notes) || !$notes) return '';
+        $has = array();
+        foreach ($notes as $n) { if (is_array($n) && isset($n['ID'])) $has[(string)$n['ID']] = true; }
+        $top = array(); $replies = array();
+        foreach ($notes as $n) {
+            if (!is_array($n)) continue;
+            $pid = isset($n['PARENT_ID']) ? (string)$n['PARENT_ID'] : '';
+            if ($pid !== '' && $pid !== '0' && isset($has[$pid])) $replies[$pid][] = $n;
+            else $top[] = $n;
+        }
+        $line = function ($n) {
+            $t = preg_replace('/\r\n|\r|\n/', ' ', isset($n['NOTE_TEXT']) ? (string)$n['NOTE_TEXT'] : '');
+            $t = preg_replace('/^[ \t]+|[ \t]+$/', '', $t);
+            $f = isset($n['ATTACH_NAME']) ? (string)$n['ATTACH_NAME'] : '';
+            if ($f !== '') $t .= ($t !== '' ? ' ' : '') . '[file: ' . $f . ']';
+            $who = (isset($n['AUTHOR_NAME']) && (string)$n['AUTHOR_NAME'] !== '') ? (string)$n['AUTHOR_NAME']
+                 : (isset($n['CREATED_BY']) ? (string)$n['CREATED_BY'] : '');
+            return substr(isset($n['CREATED_AT']) ? (string)$n['CREATED_AT'] : '', 0, 10) . ' ' . $who . ': ' . $t;
+        };
+        $out = array();
+        foreach ($top as $n) {
+            $out[] = $line($n);
+            $id = isset($n['ID']) ? (string)$n['ID'] : '';
+            if ($id !== '' && isset($replies[$id])) { foreach ($replies[$id] as $r) $out[] = "  \xE2\x86\xB3 " . $line($r); }
+        }
+        return implode("\n", $out);
+    }
+}
+
 if (!function_exists('journalCleanKeyValueExport')) {
 function journalCleanKeyValueExport($v) {
         if ($v === null) return '';
@@ -306,7 +337,15 @@ function journalExportToggleResolver($shortId, $state, $existingCols = array()) 
                 'label' => (is_array($jt) && isset($jt['label']) && is_scalar($jt['label']) && (string)$jt['label'] !== '') ? (string)$jt['label'] : 'Done'));
         }
         $keyCols = (isset($vo['journalKeyColumns']) && is_array($vo['journalKeyColumns'])) ? $vo['journalKeyColumns'] : array();
-        if (empty($toggles) || empty($keyCols)) return null;
+        // Row notes as a column of text (2026-10-14): only when the report's editors ask for it
+        // ("Include notes in downloads and emails"; off by default) - the notes are the viewers'
+        // own words, and an email goes to people who may never open the journal.
+        $notesOut = !empty($vo['journalRowNotes']) && !empty($vo['journalNotesExport']);
+        // ...and read whenever row notes are on (2026-10-14, notescol7), so a task's search filter
+        // can find rows by their notes ("Notes = budget", a bare word, "Notes > 2") as the page's
+        // search does - whether or not the output carries the column.
+        $notesRead = !empty($vo['journalRowNotes']);
+        if ((empty($toggles) && !$notesRead) || empty($keyCols)) return null;
         // The toggles as the page reads them (2026-10-09; main.js, manage_journal.php's
         // journalSanitizeToggleKey): a key lower-cased with anything but a-z 0-9 _ - taken out, 'done'
         // when that leaves nothing, at most 100 characters; a missing label "Done". The raw key ("Done")
@@ -368,8 +407,9 @@ function journalExportToggleResolver($shortId, $state, $existingCols = array()) 
         if ($filing === 'error' || $filing === 'stale') return null;
 
         // Only checked rows are stored (STATE=1); presence == checked. The who and when
-        // of each mark are read only when the report shows them.
-        try {
+        // of each mark are read only when the report shows them. No toggle: nothing to read.
+        if (empty($toggles)) $tr = array();
+        else try {
             $tr = queryViaOci8(
                 $who
                     ? "SELECT TOGGLE_KEY, ROW_KEY, UPDATED_BY, TO_CHAR(UPDATED_AT, 'YYYY-MM-DD') AS UPDATED_ON FROM PENUMBRA_JOURNAL_TOGGLE WHERE REPORT_ID = :rid AND STATE = 1"
@@ -446,7 +486,47 @@ function journalExportToggleResolver($shortId, $state, $existingCols = array()) 
                 }
             }
         }
-        if (empty($colMeta)) return null;
+        // The Notes column (2026-10-14): named "NOTES" as the page names it, or NOTES_2... beside a
+        // data column of that name; each row's notes flattened as the page's copy does.
+        $notesName = null;     // the output column: only with "Include notes in downloads and emails"
+        $notesSearch = null;   // the name a search reads them by: whenever row notes are on
+        $notesMap = array();
+        $notesCount = array(); // row key => number of notes (replies too), as the page counts them
+        if ($notesRead) {
+            $nr = null;
+            foreach (array(true, false) as $withParent) {   // a table from before threads or attachments has no PARENT_ID / ATTACH_NAME
+                try {
+                    $nr = queryViaOci8(
+                        "SELECT ID, ROW_KEY, NOTE_TEXT, CREATED_BY, AUTHOR_NAME" . ($withParent ? ', PARENT_ID, ATTACH_NAME' : '') . ",
+                                TO_CHAR(CREATED_AT, 'YYYY-MM-DD HH24:MI:SS') AS CREATED_AT
+                           FROM PENUMBRA_JOURNAL
+                          WHERE REPORT_ID = :rid AND SCOPE = 'row' AND ROW_KEY IS NOT NULL
+                          ORDER BY CREATED_AT ASC, ID ASC",
+                        array(':rid' => $reportId));
+                    break;
+                } catch (Exception $e) {
+                    $nr = null;
+                    if ($withParent && stripos($e->getMessage(), 'ORA-00904') !== false) continue;
+                    $m = 'journal row notes not read - the Notes column is left out this run. ' . $e->getMessage();
+                    if (function_exists('log_scheduler')) log_scheduler('  WARNING: ' . $m); else error_log('[penumbra] ' . $m);
+                    break;
+                }
+            }
+            if (is_array($nr)) {
+                $byKey = array();
+                foreach ($nr as $n) {
+                    $rk = isset($n['ROW_KEY']) ? (string)$n['ROW_KEY'] : '';
+                    if ($rk === '' || (defined('JOURNAL_PARK_OPEN') && strpos($rk, JOURNAL_PARK_OPEN) === 0)) continue;   // filed under another key
+                    $byKey[$rk][] = $n;
+                }
+                foreach ($byKey as $rk => $list) { $notesMap[(string)$rk] = journalNotesFlatten($list); $notesCount[(string)$rk] = count($list); }
+                $notesSearch = 'NOTES'; $nn = 2;
+                while (isset($existing[$notesSearch])) { $notesSearch = 'NOTES_' . $nn; $nn++; }
+                $existing[$notesSearch] = true;
+                if ($notesOut) $notesName = $notesSearch;
+            }
+        }
+        if (empty($colMeta) && $notesSearch === null) return null;
 
         // A renamed toggle keeps answering to its OLD names (2026-10-08): the browser saves
         // them (viewOptions.journalToggles[].oldLabels) when a renamed toggle is saved, and
@@ -505,7 +585,12 @@ function journalExportToggleResolver($shortId, $state, $existingCols = array()) 
         }
 
         $built = array('colNames' => $colNames, 'colMeta' => $colMeta, 'keyUpper' => $keyUpper, 'stateMap' => $stateMap,
-                       'whoMeta' => $whoMeta, 'whoNames' => $whoNames, 'whoMap' => $whoMap, 'aliasMap' => $aliasMap);
+                       'whoMeta' => $whoMeta, 'whoNames' => $whoNames, 'whoMap' => $whoMap, 'aliasMap' => $aliasMap,
+                       // Kept apart from whoNames: a search or a snippet never reads it (the page's
+                       // "Notes" there is a COUNT of notes).
+                       'notesName' => $notesName, 'notesMap' => $notesMap,
+                       // The search's (2026-10-14): read by journalExportNotesSearchValues().
+                       'notesSearch' => $notesSearch, 'notesCount' => $notesCount);
         if ($memoOn) $GLOBALS['penumbra_jt_resolver_memo'][$memoKey] = $built;
         return $built;
     }
@@ -543,6 +628,41 @@ if (!function_exists('journalExportToggleRowValues')) {
 function journalExportToggleRowValues($resolver, $row, $withWho = true) {
         $out = array();
         if (!$resolver || !is_array($resolver) || !is_array($row)) return $out;
+        $rk = journalExportRowKey($resolver, $row);
+        foreach ($resolver['colMeta'] as $cm) {
+            $on = isset($resolver['stateMap'][$cm['key']]) && isset($resolver['stateMap'][$cm['key']][$rk]);
+            $out[$cm['name']] = $on ? '1' : '0';
+        }
+        // The who and when values (2026-10-08): who marked the row, and the day ('' when
+        // unmarked). A snapshot takes none ($withWho false): the comparisons know a toggle
+        // column, not these.
+        if ($withWho && !empty($resolver['whoMeta'])) {
+            foreach ($resolver['whoMeta'] as $wm) {
+                $w = (isset($resolver['whoMap'][$wm['key']]) && isset($resolver['whoMap'][$wm['key']][$rk])) ? $resolver['whoMap'][$wm['key']][$rk] : null;
+                $out[$wm['name']] = ($w && isset($w[$wm['kind']])) ? (string)$w[$wm['kind']] : '';
+            }
+        }
+        // The row's notes as text (2026-10-14), with the who / when values: a snapshot takes none.
+        if ($withWho && !empty($resolver['notesName'])) {
+            $out[$resolver['notesName']] = isset($resolver['notesMap'][$rk]) ? (string)$resolver['notesMap'][$rk] : '';
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('journalExportNotesSearchValues')) {
+function journalExportNotesSearchValues($resolver, $row) {
+        if (!is_array($resolver) || empty($resolver['notesSearch']) || !is_array($row)) return array();
+        $rk = journalExportRowKey($resolver, $row);
+        return array(
+            (string)$resolver['notesSearch'] => isset($resolver['notesMap'][$rk]) ? (string)$resolver['notesMap'][$rk] : '',
+            JOURNAL_NOTES_COUNT_KEY => (string)(isset($resolver['notesCount'][$rk]) ? (int)$resolver['notesCount'][$rk] : 0),
+        );
+    }
+}
+
+if (!function_exists('journalExportRowKey')) {
+function journalExportRowKey($resolver, $row) {
         $sep = "\xE2\x90\x9F"; // KEY_SEP = U+241F (UNIT SEPARATOR)
         // The key columns by the row's own names upper-cased, as the browser keys
         // the data (2026-10-07). Server rows keep the SQL's casing, so a key column
@@ -563,21 +683,7 @@ function journalExportToggleRowValues($resolver, $row, $withWho = true) {
         foreach ($resolver['keyUpper'] as $col) {
             $parts[] = journalCleanKeyValueExport(isset($vals[$col]) ? $vals[$col] : null);
         }
-        $rk = implode($sep, $parts);
-        foreach ($resolver['colMeta'] as $cm) {
-            $on = isset($resolver['stateMap'][$cm['key']]) && isset($resolver['stateMap'][$cm['key']][$rk]);
-            $out[$cm['name']] = $on ? '1' : '0';
-        }
-        // The who and when values (2026-10-08): who marked the row, and the day ('' when
-        // unmarked). A snapshot takes none ($withWho false): the comparisons know a toggle
-        // column, not these.
-        if ($withWho && !empty($resolver['whoMeta'])) {
-            foreach ($resolver['whoMeta'] as $wm) {
-                $w = (isset($resolver['whoMap'][$wm['key']]) && isset($resolver['whoMap'][$wm['key']][$rk])) ? $resolver['whoMap'][$wm['key']][$rk] : null;
-                $out[$wm['name']] = ($w && isset($w[$wm['kind']])) ? (string)$w[$wm['kind']] : '';
-            }
-        }
-        return $out;
+        return implode($sep, $parts);
     }
 }
 
@@ -598,9 +704,12 @@ function journalDecorateRowsWithToggles($rows, $apiResult) {
 if (!function_exists('journalStripWhoCols')) {
 function journalStripWhoCols($rows, $from) {
         $res = (is_array($from) && isset($from['journalToggleResolver'])) ? $from['journalToggleResolver'] : $from;
-        if (!is_array($rows) || !is_array($res) || empty($res['whoNames']) || !is_array($res['whoNames'])) return $rows;
+        if (!is_array($rows) || !is_array($res)) return $rows;
         $drop = array();
-        foreach ($res['whoNames'] as $n) $drop[strtoupper((string)$n)] = true;
+        if (!empty($res['whoNames']) && is_array($res['whoNames'])) { foreach ($res['whoNames'] as $n) $drop[strtoupper((string)$n)] = true; }
+        // The Notes column too (2026-10-14): a new note is not a change in the data.
+        if (!empty($res['notesName'])) $drop[strtoupper((string)$res['notesName'])] = true;
+        if (!$drop) return $rows;
         $strip = function ($row) use ($drop) {
             if (!is_array($row)) return $row;
             foreach (array_keys($row) as $k) { if (isset($drop[strtoupper((string)$k)])) unset($row[$k]); }
@@ -684,6 +793,9 @@ function journalExportToggleColumns($shortId, $state, &$rows) {
         if (!$resolver) return $out;
         $out['colNames'] = $resolver['colNames'];
         $out['whoNames'] = isset($resolver['whoNames']) ? $resolver['whoNames'] : array();
+        // The Notes column (2026-10-14) rides with the who / when columns: kept at the end through
+        // a reorder or a re-filter, and stripped from a DB dump - the callers' lists are these.
+        if (!empty($resolver['notesName'])) $out['whoNames'][] = $resolver['notesName'];
         $out['resolver'] = $resolver;
 
         foreach ($rows as &$row) {

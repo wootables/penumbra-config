@@ -20,6 +20,8 @@
 #   py -3 run.py --mutant NAME                one hook taken out of the candidate
 #   py -3 run.py --mutants                    every mutant, each checked against the asserts it MUST turn red
 #   --scn a,b                                 a subset of scenarios; --keep keeps the staging dir
+#   Both builds load alike (2026-10-20): lazy rows off, the same URL per scenario - so the
+#   live js\main.js as candidate AND baseline is GREEN (it was 46/10 RED: see lazy_rows_off).
 #
 # Headless Edge over CDP (real time, real frames); stages into %TEMP%; writes
 # nothing to the webroot. Needs Python 3 + websocket-client (py -3 -m pip install websocket-client).
@@ -73,13 +75,14 @@ MUTANTS = {
     'nowidthprobe':   ([("var _cProbe = $sCell[0].hasAttribute('data-pnb-lazy') ? _pnbLazyCellProbe($sCell[0], _cwNameById) : null;", "var _cProbe = null;")], ['D-group']),
     'nolazyskip':     ([("                    if (cell.hasAttribute('data-pnb-lazy')) {", "                    if (false) {")], ['L-fmt']),
     # B1 (2026-09-30): the show-a-column nets are applyPagination's fill of the rows on
-    # screen and penumbraFillForView's whole-column fill of a column hidden at build
-    'noshowfill':     ([("        _pnbFillDisplayedRows();\r\n\r\n        // AFTER the page loop", "\r\n        // AFTER the page loop"),
+    # screen and penumbraFillForView's whole-column fill of a column hidden at build.
+    # applyPagination hands both calls its row lists since 3a9ac0b (2026-10-19, bigperf).
+    'noshowfill':     ([("        _pnbFillDisplayedRows(_pnbPageRows);\r\n\r\n        // AFTER the page loop", "\r\n        // AFTER the page loop"),
                         ("        var n = shownHidden.length ? penumbraFillLazyColumns(shownHidden) : 0;\r\n", "        var n = 0;\r\n")], ['D-show']),
-    'nodefault7fill': ([("        _pnbFillDisplayedRows();\r\n\r\n        // AFTER the page loop", "\r\n        // AFTER the page loop"),
+    'nodefault7fill': ([("        _pnbFillDisplayedRows(_pnbPageRows);\r\n\r\n        // AFTER the page loop", "\r\n        // AFTER the page loop"),
                         ("        if ($('#groupedResultsContainer').is(':visible')) return penumbraFillVisibleLazyColumns();\r\n        var shownHidden = [];\r\n",
                          "        if ($('#groupedResultsContainer').is(':visible')) return penumbraFillVisibleLazyColumns();\r\n        return 0;\r\n        var shownHidden = [];\r\n")], ['D-default7']),
-    'nocount':        ([("        // columns included, ~0.4 s); after it, one page.\r\n        updateFilteredResultCount();\r\n", "        // columns included, ~0.4 s); after it, one page.\r\n")], ['D-search']),
+    'nocount':        ([("        // columns included, ~0.4 s); after it, one page.\r\n        updateFilteredResultCount(allRows);\r\n", "        // columns included, ~0.4 s); after it, one page.\r\n")], ['D-search']),
     'noswitch':       ([("        if (/[?&]lazycells=off(?:&|$)/i.test(window.location.search)) return false;", "")], ['L-killswitch']),
     'noflag':         ([("        try { if (penumbra_vars && penumbra_vars.lazyCellsOff) return false; } catch (e) { }", "")], ['L-killswitch2']),
     'oldtip':         ([("or hide columns nobody needs.')", "Hiding columns does not help.')")], ['N-notice']),
@@ -293,24 +296,78 @@ _SP_NEW = ("                                updateHeaderIcons();\r\n"
 # the first OUTER band, so each nested footer had one cell per column per inner group.
 _GL_OLD = '        // Hoisted out of the per-group loop: this is a document-scoped :first\r\n        // query whose result is identical for every group (headers are uniform),\r\n        // and it was re-run once per wrapper. 2026-08-01\r\n        const visibleColumnOrder = $("#groupedResultsContainer .group-wrapper:first th[data-colname]:not([style*=\'display: none\'])").map(function () {\r\n'
 _GL_NEW = '        // Hoisted out of the per-group loop: this is a document-scoped :first\r\n        // query whose result is identical for every group (headers are uniform),\r\n        // and it was re-run once per wrapper. 2026-08-01\r\n        // The first INNERMOST group\'s OWN heading row (2026-10-03, grplist): with\r\n        // nesting, .group-wrapper:first is an outer band, and every th below it -\r\n        // each of its inner groups\' headings - came back, so each footer got one\r\n        // cell per column PER inner group (3 groups x 7 columns = 21 cells), and\r\n        // the fixed-layout table made room for all 21: the real columns shrank\r\n        // into about half the width, the rest an empty footer.\r\n        const visibleColumnOrder = $("#groupedResultsContainer .group-wrapper.group-leaf:first > .group-content > table > thead > tr > th[data-colname]:not([style*=\'display: none\'])").map(function () {\r\n'
-BASELINE_FIXES = [('sortpage', _SP_OLD, _SP_NEW), ('grplist-footer', _GL_OLD, _GL_NEW)]
+# tn1 (2026-10-10, 3a14daa): a custom template keeps a multi-line cell's line breaks
+# (each <br> the cell shows is a \n; the old reader glued "Delta\nLima" into "DeltaLima").
+# The template scenario fills H_NL, so D-template went red on every run from then on.
+_TN_FN_OLD = ("        return (cellNode.textContent || '').trim();\r\n    }\r\n\r\n"
+              "    // Strips machine-generated __SNAP_TYPE group clauses (the comparison\r\n")
+_TN_FN_NEW = ("        return (cellNode.textContent || '').trim();\r\n    }\r\n\r\n" + r"""    // A cell's text for a custom template (2026-10-10, the user: "do it as-shown with a real newline if a newline is in
+    // the cell (not wrapping)"): each <br> the cell shows is a line break - the screen draws a plain cell's \n as one -
+    // where textContent alone glued "line1\nline2" into "line1line2". A newline right before a <br> is the \r of the
+    // \r\n it ended (only the \n becomes a <br>; the parser turns the \r into \n) and goes. Wrapping adds nothing. The
+    // twin of penumbra_tpl_cell_text (penumbra_template.php) - tplparity pins the two. A template puts a field back on
+    // one line with string(regex_replace, {COL}, '\s*\n\s*', ' ').
+    function _readTemplateCellText(cellNode) {
+        if (!cellNode) return '';
+        var src = (cellNode.querySelector && cellNode.querySelector('.snap-ba-now-only')) || cellNode;
+        if (!src.querySelector || !src.querySelector('br')) return (src.textContent || '').trim();
+        var copy = src.cloneNode(true), brs = copy.querySelectorAll('br');
+        for (var i = brs.length - 1; i >= 0; i--) {   // last first: each <br>'s previous sibling is still the cell's own
+            var br = brs[i], prev = br.previousSibling;
+            if (prev && prev.nodeType === 3 && prev.nodeValue.slice(-1) === '\n') prev.nodeValue = prev.nodeValue.slice(0, -1);
+            br.parentNode.replaceChild(document.createTextNode('\n'), br);
+        }
+        return (copy.textContent || '').trim();
+    }
+
+    // Strips machine-generated __SNAP_TYPE group clauses (the comparison
+""".replace('\n', '\r\n'))
+_TN_CALL_OLD = ("                    // .text() rendered both dual views glued into the template.\r\n"
+                "                    plainSubs[upperName] = _readComparisonCellText($row.find(`td[data-column='${h.id}']`)[0]);\r\n")
+_TN_CALL_NEW = ("                    // .text() rendered both dual views glued into the template.\r\n"
+                "                    // Its line breaks as the cell shows them (2026-10-10; they were glued together).\r\n"
+                "                    plainSubs[upperName] = _readTemplateCellText($row.find(`td[data-column='${h.id}']`)[0]);\r\n")
+BASELINE_FIXES = [('sortpage', _SP_OLD, _SP_NEW), ('grplist-footer', _GL_OLD, _GL_NEW),
+                  ('tn1-template-newlines', _TN_FN_OLD, _TN_FN_NEW), ('tn1-template-newlines-call', _TN_CALL_OLD, _TN_CALL_NEW)]
 def fix_baseline(base_text, cand_text):
     for name, old, new in BASELINE_FIXES:
-        if new in cand_text and base_text.count(old) == 1:
+        # ...and not when the baseline has it already (a later build as the baseline).
+        if new in cand_text and new not in base_text and base_text.count(old) == 1:
             base_text = base_text.replace(old, new)
             print('  baseline carries the later fix: %s' % name)
     return base_text
 
+# Lazy ROWS (2026-09-30) are the lazyrows suite's to test. This suite compares hidden-
+# column cells in EVERY row, off-page ones included, so BOTH builds build every row in
+# full - the hidden COLUMNS stay lazy, which is what this suite is about. Both, not just
+# the candidate (2026-10-20): a baseline WITH lazy rows (any build since 2026-09-30, e.g.
+# the live copy a stage is compared against) built rows 201-300 as EMPTY shells, so every
+# flat fingerprint differed from row 201 on - 10 D-* red with the same main.js on both
+# sides. A build that has lazy rows but not this switch line stops the run.
+_LR_ON = "                        const _lazyRowsOn = _lazyBuild && _rppAtBuild !== 'all';\r\n"
+_LR_OFF = "                        const _lazyRowsOn = false;   // hiddencols suite: lazy rows off\r\n"
+def lazy_rows_off(src, who):
+    n = src.count(_LR_ON)
+    if n == 1:
+        print('  %s: lazy rows off (the lazyrows suite covers them)' % who)
+        return src.replace(_LR_ON, _LR_OFF)
+    if 'const _lazyRowsOn' in src:
+        raise SystemExit('%s: this build has lazy rows, but its switch line was found %d times - update _LR_ON' % (who, n))
+    return src   # from before lazy rows: every row is built in full
+
 BASE_CACHE = {}   # the baseline never changes within a run - load each scenario once
 def run_suite(cand_text, scns, label):
     if not BASE_CACHE:
-        write_build('base', hook(fix_baseline(read_b(base_path), cand_text)))
+        write_build('base', hook(lazy_rows_off(fix_baseline(read_b(base_path), cand_text), 'baseline')))
     write_build('cand', cand_text)
     results = []
     for s in scns:
+        # The same URL for BOTH builds (2026-10-20): killswitch's &lazycells=off is what
+        # makes it compare every cell, and a baseline with lazy cells built its hidden
+        # ones EMPTY without it. A build from before lazy cells ignores the flag.
         extra = '&lazycells=off' if s == 'killswitch' else ''
         if s in DIFF_SCN and s not in BASE_CACHE:
-            BASE_CACHE[s] = run_page('base', s)
+            BASE_CACHE[s] = run_page('base', s, extra)
         b = BASE_CACHE.get(s, {'fp': {}})
         c = run_page('cand', s, extra)
         results.extend(check(s, b, c))
@@ -318,14 +375,7 @@ def run_suite(cand_text, scns, label):
 
 try:
     scns = scn_arg.split(',') if scn_arg else ALL_SCN
-    cand_src = read_b(cand_path)
-    # Lazy ROWS (2026-09-30) are the lazyrows suite's to test. This suite compares hidden-
-    # column cells in EVERY row, off-page ones included, so its candidate builds every row
-    # in full - the hidden COLUMNS stay lazy, which is what this suite is about.
-    _LR_ON = "                        const _lazyRowsOn = _lazyBuild && _rppAtBuild !== 'all';\r\n"
-    if cand_src.count(_LR_ON) == 1:
-        cand_src = cand_src.replace(_LR_ON, "                        const _lazyRowsOn = false;   // hiddencols suite: lazy rows off\r\n")
-        print('  candidate: lazy rows off (the lazyrows suite covers them)')
+    cand_src = lazy_rows_off(read_b(cand_path), 'candidate')   # the baseline's: run_suite
     print('candidate: %s%s\nbaseline:  %s' % (cand_path, '   (CONTROL: candidate = baseline)' if control else '', base_path))
     if all_mutants or one_mutant:
         names = [one_mutant] if one_mutant else list(MUTANTS.keys())

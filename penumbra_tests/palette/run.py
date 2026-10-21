@@ -1,0 +1,860 @@
+# =============================================================================
+# PALETTE SUITE (2026-10-20) - the command palette (Ctrl+K)
+# (js/penumbra_palette_boot.js = the always-loaded stub, js/penumbra_palette.js + css/penumbra_palette.css
+# = the module, index.php's stub tag, main.js's "?" sheet row + Clear all custom preferences hook,
+# js/penumbra_colmenu.js colMenu.items, the help topic + tip).
+#   page half   harness.html (mk_harness.py, from colmenu's) + driver.js: the REAL main.js and the
+#               header menu / column modules; scenarios pcold pfail pmain ppick pview prow
+#                                                                   L-<scn>-<check>, E-<scn>
+#   static      index.php emits the stub behind its .off switch; main.js's row + hook; the menu's
+#               items export; the help topic, manifest entries and tip; every id / function the
+#               registry names exists in index.php / main.js / the modules; no em-dash   S-*
+# --control runs LIVE (no stub, no module: EMPTY files): every NEW check red there, every other
+# one green.
+#
+#   py -3 run.py [--stage DIR] [--control] [--mutants | --mutant NAME] [--scn S]
+# Headless Edge over CDP; stages into %TEMP%\pnb_pal_*; writes nothing to the webroot.
+# One headless-Edge suite at a time (four at once gave false reds, 2026-10-19).
+# =============================================================================
+import json, os, re, shutil, socket, subprocess, sys, tempfile, time, urllib.request
+import websocket
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+APP = r'\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra'
+EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js',
+        'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
+        'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js', 'penumbra_tiles.js',
+        'penumbra_a11y.js', 'penumbra_grouplist.js', 'penumbra_cellsel.js', 'penumbra_presets.js', 'penumbra_forms.js', 'penumbra_find.js']   # (round 14) Find, as index.php loads it
+SCN = ['pcold', 'pfail', 'pmain', 'ppick', 'pview', 'prow', 'pshot', 'pcombo', 'pkeys', 'pdash', 'pdasha', 'pshot6', 'pfn', 'pshot7f', 'pshot7t', 'pfeed', 'pshot8', 'prank', 'pshot9', 'pshot10', 'pshot11', 'ptools', 'ptoolsv', 'padmin', 'pshot12', 'pdsec', 'pmetr', 'phand', 'pshot14a', 'pshot14b', 'pvo', 'pshot15', 'pjar', 'pshot16', 'pchip', 'pshot17']
+CHK = {
+    'pcold': ['shellAtOnce', 'keysKept', 'handOver', 'renders'],
+    'pfail': ['shellAtOnce', 'failLine', 'escCloses', 'noHang', 'escChipCloses'],
+    'pmain': ['sheetRow', 'emptyRecent', 'emptyCommon', 'commonAvailOnly', 'hiddenUntilTyped', 'rankTop', 'marks', 'greyWhenTyped', 'greyReason',
+              'columnsSec', 'reportsLocal', 'helpSec', 'askLast', 'questionFirst', 'askOpens', 'askSubmits',
+              'trapTab', 'trapShiftTab', 'trapFocusin', 'arrows', 'escFocus', 'recentsStored', 'recentsShown', 'clearPrefs', 'coverage', 'registryNeeds', 'iconsTwin', 'groupIcon', 'iconsRendered', 'windowKey', 'reportsGate', 'noEmdashUi'],
+    'ppick': ['pickMode', 'pickOrder', 'pickFreezeOff', 'pickFreezeRuns', 'pickFrozenPill', 'unfreezeOr', 'unfreezeRuns', 'sortRuns', 'hideRuns',
+              'colMode', 'colItems', 'colRun', 'backspaceBack', 'themePick', 'themeRuns'],
+    'pview': ['saveHidden', 'saveGreyExact', 'vhHidden', 'consoleHidden', 'editorSave', 'editorVh'],
+    'prow': ['noRowItemsIdle', 'rowItems', 'rowFilterRuns'],
+    # (round 4) the box open beside the toolbar in Wolfpack Red; the runner adds inkPalette / inkMatch from a screenshot
+    'pshot': ['open', 'inkPalette', 'inkMatch'],
+    # (round 4b) the combinations: each opens its dialog with the choice made, applies nothing; the cap
+    'pcombo': ['comboGroupRow', 'comboGroupOpens', 'comboGroupLayout', 'comboGroupNotApplied', 'comboPivot', 'comboChart', 'comboCopyOpens',
+               'comboPresetRow', 'comboPresetLoads', 'comboRows', 'comboDensity', 'comboCap', 'comboMore'],
+    # (round 6) the key from the fields and editors (Esc returns focus + cursor), the platform rule and its
+    # labels, the breadcrumb's magnifier, the profile card's row
+    'pkeys': ['fieldOpens', 'fieldFocusBack', 'taOpens', 'taFocusBack', 'ceOpens', 'ceFocusBack', 'cmOpens', 'cmCursorBack',
+              'macCtrlIgnored', 'macCmdOpens', 'labelMac', 'winMetaIgnored', 'labelWin',
+              'crumbIcon', 'crumbSameSize', 'crumbOpens', 'crumbEscFocus', 'crumbEnterOpens', 'plainNoHelpFirst',
+              'popBtn', 'popBtnStyle', 'popNoWrap', 'popBtnOpens', 'popEscFocus', 'rowGone',   # (round 10) the bar's button, the row gone
+              'quickLabel', 'boltEverywhere', 'escClick', 'escNotInTab', 'backdropClose', 'insideClickStays'],   # (round 11) the name, the bolt, the Esc button, the backdrop
+    # (round 6) dashboard.php's stand-in (dash.html): a viewer, then a global admin
+    'pdash': ['dashOpens', 'dashRows', 'dashPlaceholder', 'dashNoTools', 'dashRefreshRuns', 'dashFilterRuns', 'dashHelpRow', 'dashGateViewer', 'dashNoFeedback', 'dashRecentWrite', 'dashNoMetricsRow'],
+    'pdasha': ['dashGateAdmin', 'dashRecentWrite', 'dashNoMetricsRow'],
+    # (round 6) the photograph: the magnifier in the breadcrumb and the card's row, both in the viewport
+    'pshot6': ['crumbShown', 'footShown'],
+    'pshot10': ['open'],   # (round 10) the card in the dark theme
+    'pshot11': ['open'],   # (round 11) the box's top row
+    # (round 7) the functions and tags section: fetched once on the first open (never before), the loading row,
+    # the rows and their ranking, options, the cap, the anchors, the inserts in the right editor only
+    'pfn': ['lazyIndex', 'loadingRow', 'fnRow', 'fetchedOnce', 'cachedInMemory', 'paramQuery', 'namesFirst', 'tagOption', 'tagRows', 'fnMinChars',
+            'fnCap', 'fnMore', 'anchorFn', 'anchorTag', 'anchorOption', 'insertSnippet', 'insertCursor', 'insertSql', 'insertOnlySnippet', 'insertOnlySql', 'noInsertFromBody', 'editorFirst'],
+    'pshot7f': ['open'], 'pshot7t': ['open'],
+    # (round 8) the feedback entry: absent without a saved report, the author's first rendered call reused (the
+    # commented-out one ignored), the default spec with the freeze box, nothing sent on open, greyed for the owner
+    'pfeed': ['absentWithoutId', 'entryShown', 'authoredSpec', 'authoredNotCommented', 'nothingSent', 'defaultSpec', 'defaultFreeze', 'ownerGreyed'],
+    'pshot8': ['open'],
+    # (round 9) the rankings on real labels (bug / feedback / fr / grp / exp), the marks inside one word, the box
+    # 760px wide with 5px more padding, the one-line footer, the owner's capped reason
+    'prank': ['rankBug', 'rankFeedback', 'rankFr', 'rankGrp', 'marksWord', 'rankExp', 'boxWide', 'footerOneLine', 'padding', 'ownerLabelFits'],
+    'pshot9': ['open'],
+    # (round 12) the admin tools rows: an admin's page (the menu rendered by the real chrome), a viewer's page (no
+    # menu), an admin tool page (adm.html = the real status bar)
+    'ptools': ['toolsMatchMenu', 'toolsDesc', 'toolsTyped', 'toolOpens', 'toolsAfterReport'],
+    'ptoolsv': ['viewerNoTools'],
+    'padmin': ['adminStub', 'adminOpens', 'adminRows', 'adminSettings', 'adminPlaceholder', 'adminNoReportTools', 'adminToolOpens', 'adminCardBtn', 'adminEscBack', 'adminNoReportMetrics'],
+    'pshot12': ['open'],
+    # (round 13) the Dashboards section: the fixture list (what the server returns this caller), matched on title and id,
+    # never the owner or a tag for a non-admin (an admin's term reaches both), after Reports, a row's link, one fetch per
+    # open from two letters, absent on an empty list, the browser's own history row
+    'pdsec': ['dashNoFetchShort', 'dashSection', 'dashHref', 'dashAfterReports', 'dashById', 'dashNotByOwner', 'dashNoTagViewer', 'dashFetchedOnce',
+                 'dashByOwnerAdmin', 'dashByTagAdmin', 'dashRefetchNewOpen', 'dashAbsentEmpty', 'dashLocalRow'],
+    # (round 13, the round-12 addition) "Metrics for this report (ID)": absent without ?id=, shown to the admin, the owner
+    # and the plain viewer (the metrics page's own rule: anyone who can open the report), above the all-reports tool row,
+    # opens analytics.php?id= in a new tab
+    'pmetr': ['absentWithoutId', 'adminSees', 'aboveAllReports', 'opensRight', 'ownerSees', 'viewerSees'],
+    # (round 14) the hand-offs: the two rows for a two-word text leading the empty state (no "nothing matches" note), Find opens with
+    # the box untouched, the filter row writes the phrase quoted the grammar's way, a condition row in the grammar's syntax merged
+    # into the current filter, < > greyed on a text column and not on a number column, after Actions when actions match, "Filter
+    # by COLUMN..." opens the header menu's value list, a hidden column gets neither row
+    'phand': ['handRows', 'handLeadsEmpty', 'findNoFilter', 'filterQuoted', 'condRow', 'condMerges', 'typesHonoured', 'handAfterActions', 'filterByOpens', 'hiddenNoRow'],
+    'pshot14a': ['open'], 'pshot14b': ['open'],
+    # (round 15) the dialogs' own words (wysiwyg -> Copy, cross-tab -> Pivot, collapse -> Group, recipients -> Email; Freeze's label hit
+    # above Snapshots' word hit), the View Options rows (the panel's own count, the state notes, selecting opens the editor on the
+    # option, focused, unchanged), the console's tabs as rows, the scheduler's own Add once with EMAIL and nothing saved, a viewer: none
+    'pvo': ['wysiwyg', 'uiWordsMore', 'uiBelowLabel', 'voCount', 'voState', 'optionOpens', 'optionFocused', 'optionUnchanged', 'tabRows', 'schedRow', 'manageRow', 'viewerNoRows'],
+    'pshot15': ['open'],
+    # (round 16) Ask Jarvis: the row for an admin and for a grant holder (the server's flag), not for a viewer; a question or SQL puts
+    # it first with Ask help second; plain text keeps both at the bottom; the no-match state lists it with the hand-offs; nothing is
+    # sent by listing; Enter opens the console on the panel and the panel's own send runs once with the text; the summary box is
+    # untouched; the popped-out console takes the text and sends, the main console stays shut
+    'pjar': ['rowForAdmin', 'rankQuestion', 'rowForGrant', 'rankSql', 'rankPlain', 'emptyState', 'nothingSentOnOpen', 'noRowViewer', 'sendsOnce', 'panelOpens', 'summaryUntouched', 'popOut'],
+    'pshot16': ['open'],
+    # (round 17) a canned reply with valid + invented + hidden-column + gated suggestions: only the valid ones render, four at most, the
+    # block never shows as text, the Group chip opens the dialog with V_STATUS and List chosen and applies nothing, a viewer loses the gated
+    'pchip': ['validRender', 'unknownDropped', 'hiddenColDropped', 'blockNeverRaw', 'maxFour', 'chipOpensPreselected', 'chipOpensNotApplies', 'viewerGatedDropped'],
+    'pshot17': ['open'],
+}
+# what this change brings: every browser check (live has no palette) and every static check but the
+# guards (what live already gets right: a viewer's Save / Version history / admin controls are absent
+# because the palette itself is; the empty-state and idle checks pass for the same reason)
+GUARDS = {'L-pview-saveHidden', 'L-pview-vhHidden', 'L-pview-consoleHidden', 'L-prow-noRowItemsIdle', 'L-pmain-emptyRecent', 'L-pmain-hiddenUntilTyped', 'L-pmain-commonAvailOnly'}
+NEW_R1 = {'L-%s-%s' % (s, c) for s in CHK for c in CHK[s]} - GUARDS | {'S-indexLoads', 'S-sheetRow', 'S-clearHook', 'S-menuItems', 'S-help', 'S-registry', 'S-stubSmall'}   # round 1, live 4bf277a
+# round 2 (2026-10-20): the icons are the toolbar's own (live has the unicode glyphs)
+NEW_R5 = {'L-pmain-reportsGate', 'S-serverGate', 'S-clientGate'}   # round 5 (live 0736423 searches the repository for everyone)
+# round 6: the key everywhere + the platform rule, dashboard.php, the card's row, the magnifier, the bare
+# penumbra_vars read. Guards = what live's stub / module already get right on these pages (the key from
+# the body opens on dash.html, a viewer's search never leaves the page, the empty state from the key never
+# leads with Help; live GREYS the report tools on a dashboard, this round hides them: a new check). The pview editor checks and the round-5 gate
+# check are red on live for the real reason the round fixes: the harness now declares penumbra_vars as
+# index.php does (a top-level const) and live's module reads window.penumbra_vars, always empty.
+GUARDS_R6 = {'L-pdash-dashOpens', 'L-pdash-dashGateViewer', 'L-pkeys-plainNoHelpFirst'}
+NEW = ({'L-pkeys-%s' % c for c in CHK['pkeys']} | {'L-pdash-%s' % c for c in CHK['pdash']} | {'L-pdasha-%s' % c for c in CHK['pdasha']} | {'L-pshot6-%s' % c for c in CHK['pshot6']}) - GUARDS_R6
+NEW |= {'S-dashStub', 'S-crumbIcon', 'S-popBtn', 'S-cssIcon', 'S-sheetRow', 'S-varsBare', 'S-reportHref', 'S-keyRule', 'S-helpCopy',
+        'L-pview-editorSave', 'L-pview-editorVh', 'L-pmain-reportsGate'}
+# round 7 (live a453c4e has no functions and tags section): every pfn check (each reads the section or the
+# index's state, so none holds on live by accident), the shots, the statics
+NEW = {'L-pfn-%s' % c for c in CHK['pfn']} | {'L-pshot7f-open', 'L-pshot7t-open', 'S-fnIndex', 'S-fnLazy', 'S-fnHelp', 'S-fnVer', 'S-fnCss'}
+# round 8 (live b2a8751 has no feedback entry): the pfeed checks that read the entry or the form, the shot, the
+# statics; absentWithoutId and the dashboard's dashNoFeedback hold on live for want of the entry (guards)
+NEW = ({'L-pfeed-%s' % c for c in CHK['pfeed']} - {'L-pfeed-absentWithoutId'}) | {'L-pshot8-open', 'S-feedbackExport', 'S-feedbackHelp', 'S-ownerVar', 'S-feedbackSpec'}
+# round 9 (live cc193ad: the 560px box, scattered letters across words still match): every prank check but the
+# rankings live already gets right by score (fr: Freeze first; grp: Group first), the shot, the statics
+GUARDS_R9 = {'L-prank-rankFr', 'L-prank-marksWord', 'L-prank-rankFeedback', 'L-prank-rankExp', 'L-pshot9-open'}   # (live: Freeze / Download first already; the shot's row is there)
+NEW = ({'L-prank-%s' % c for c in CHK['prank']} - GUARDS_R9) | {'L-pfeed-ownerGreyed', 'S-boxWide', 'S-fuzzyWord', 'S-ownerReason'}   # (the owner's reason changed: its check is new again)
+# round 10 (live 5eae01f: the card's list row, no bar button): the button checks, the row gone, the photos' footers;
+# popNoWrap holds on live (three buttons never wrapped) and is a guard
+NEW = ({'L-pkeys-%s' % c for c in ('popBtn', 'popBtnStyle', 'popBtnOpens', 'popEscFocus', 'rowGone', 'labelMac', 'labelWin')}) | {'L-pshot6-footShown', 'L-pshot10-open', 'S-popBtn', 'S-rowGone', 'S-cssIcon', 'S-helpCopy'}   # (the two statics now name the bar's icon rule and the help's Search button)
+# round 11 (live 01894ba: "Search", the magnifier, an Esc span): the name on every surface, the bolt, the Esc button,
+# the backdrop; insideClickStays and backdropClose hold on live (guards); the statics the names changed
+GUARDS_R11 = {'L-pkeys-insideClickStays', 'L-pkeys-backdropClose'}   # (live's backdrop click and its inside click hold; its Esc chip is a span: escNotInTab is new)
+NEW = ({'L-pkeys-%s' % c for c in ('quickLabel', 'boltEverywhere', 'escClick', 'escNotInTab', 'popBtn', 'crumbIcon')} | {'L-pfail-escChipCloses', 'L-pshot11-open', 'S-quickName', 'S-bolt', 'S-escButton', 'S-popBtn', 'S-clearHook', 'S-helpCopy'})
+# round 12 (live 40ac3bb: no tools rows, no stub on the admin pages): every ptools / padmin check and the statics;
+# the viewer's check holds on live for want of the rows (a guard); on live the admin page's box never opens
+GUARDS_R12 = {'L-ptoolsv-viewerNoTools'}   # (S-chromePages holds on live too: every tool page mounted the bar before; it guards the structure)
+NEW = ({'L-ptools-%s' % c for c in CHK['ptools']} | {'L-padmin-%s' % c for c in CHK['padmin']} | {'L-pshot12-open', 'S-toolsSource', 'S-adminStub'})
+# round 13 (live c41bd70: no Dashboards section, the gate inside get_server_reports.php, the list plain can-view): every
+# pdsec check, the recents write on the dashboard page, the statics
+GUARDS_R13 = {'L-pdsec-dashAbsentEmpty', 'L-pdsec-dashNoFetchShort', 'L-pdsec-dashNoTagViewer', 'L-pdsec-dashNotByOwner',   # (no section on live: nothing to show or fetch)
+              'L-pdash-dashNoMetricsRow', 'L-pdasha-dashNoMetricsRow', 'L-padmin-adminNoReportMetrics', 'L-pmetr-absentWithoutId'}   # (no such row on live)
+NEW = ({'L-pdsec-%s' % c for c in CHK['pdsec']} | {'L-pmetr-%s' % c for c in CHK['pmetr']}
+       | {'L-pdash-dashRecentWrite', 'L-pdasha-dashRecentWrite', 'S-dashGate', 'S-gateFile', 'S-dashClient', 'S-dashRecents', 'S-dashHelp', 'S-metricsRow'}) - GUARDS_R13
+# round 14 (live e22c1e0: no hand-offs, no grammar exports): every phand check but the vacuous hidden-column one, the shots, the statics
+GUARDS_R14 = {'L-phand-hiddenNoRow'}   # (no rows at all on live)
+NEW = ({'L-phand-%s' % c for c in CHK['phand']} | {'L-pshot14a-open', 'L-pshot14b-open', 'S-grammarExports', 'S-handoffs'}) - GUARDS_R14
+# round 15 (live: no dialog words, no View Options rows, no tab rows): every pvo check but the viewer's (vacuous on live), the shot, the statics
+GUARDS_R15 = {'L-pvo-viewerNoRows'}
+NEW = ({'L-pvo-%s' % c for c in CHK['pvo']} | {'L-pshot15-open', 'S-uiWords', 'S-voSource', 'S-tabsSource'}) - GUARDS_R15
+# round 16 (live: no Ask Jarvis row, no aiAllowed flag): every pjar check but the vacuous ones (no row = nothing sent, no row for a viewer), the shot, the statics
+GUARDS_R16 = {'L-pjar-noRowViewer', 'L-pjar-nothingSentOnOpen'}
+NEW = ({'L-pjar-%s' % c for c in CHK['pjar']} | {'L-pshot16-open', 'S-jarvisGate', 'S-jarvisOnce'}) - GUARDS_R16
+# round 17 (live: no contract, no chips, no prompt section): every pchip check (each needs chips to exist: none is vacuous on live),
+# the shot, the statics
+GUARDS_R17 = set()   # (every pchip check needs chips to exist: none is vacuous on live)
+NEW = ({'L-pchip-%s' % c for c in CHK['pchip']} | {'L-pshot17-open', 'S-contract', 'S-chipsSafe'}) - GUARDS_R17
+# (round 3) the group-mode icon: candidate C, and the old drawing's signature (its first line)
+GROUP_C_SYMBOL = '<symbol id="pnbi-group" viewBox="0 0 24 24"><path d="m4 4 2.5 2.5L9 4"/><line x1="12" y1="5" x2="20" y2="5"/><line x1="8" y1="9.5" x2="20" y2="9.5"/><line x1="8" y1="13" x2="20" y2="13"/><path d="m6.25 15.25 2.5 2.5-2.5 2.5"/><line x1="12" y1="18" x2="20" y2="18"/></symbol>'
+OLD_GROUP_SIG = '<line x1="5" y1="9" x2="19" y2="9"/><line x1="5" y1="15" x2="19" y2="15"/>'
+def served_files():
+    import glob
+    out = glob.glob(os.path.join(APP, '*.php')) + glob.glob(os.path.join(APP, 'js', '*.js')) + glob.glob(os.path.join(APP, 'css', '*.css'))
+    out += glob.glob(os.path.join(APP, 'help', '*.php')) + glob.glob(os.path.join(APP, 'help', 'topics', '*.php')) + glob.glob(os.path.join(APP, 'help', 'tips', '*.php'))
+    return out
+
+MUTANTS = {
+    # --- the module: availability never read (every entry available)
+    'b-noavail': ([('pal', "availNow[e.id] = e.pick === 'column' ? (headers().length ? true : 'No table is loaded') : e.avail();", "availNow[e.id] = true;")],
+                  ['L-pmain-greyReason', 'L-pmain-greyWhenTyped'], ['pmain']),
+    # Tab leaves the box (no section step, no focusin guard)
+    'b-tabout': ([('pal', "        if (k === 'Tab') { e.preventDefault(); e.stopImmediatePropagation(); sectionStep(e.shiftKey ? -1 : 1); return; }\n", ""),
+                  ('pal', "        document.addEventListener('focusin', trap, true);\n", "")],
+                 ['L-pmain-trapTab', 'L-pmain-trapFocusin'], ['pmain']),
+    # --- the stub: a failed script load hangs on "Loading..."
+    'b-hang': ([('stub', "        s.onerror = fail;\n", "        s.onerror = null;\n")], ['L-pfail-failLine'], ['pfail']),
+    # the authoring gate removed
+    'b-nogate': ([('pal', "    function gated(e) { return (e.gate === 'admin' && !isAdmin()) || (e.gate === 'global' && !isGlobal()); }",
+                   "    function gated(e) { return false; }")], ['L-pview-saveHidden', 'L-pview-vhHidden', 'L-pview-saveGreyExact'], ['pview']),
+    # the picker offers what the menu refuses
+    'b-nofreeze': ([('pal', "            var off = !found || found.disabled, why = found ? (found.why || '') : absentWhy(e.act, th, pos, n);",
+                     "            var off = false, why = found ? (found.why || '') : absentWhy(e.act, th, pos, n);")], ['L-ppick-pickFreezeOff'], ['ppick']),
+    # recents never kept
+    'b-norecent': ([('pal', "            var v = readRecent().filter(function (x) { return x !== id; });\n            v.unshift(id);\n", "            var v = [];\n")],
+                   ['L-pmain-recentsStored', 'L-pmain-recentsShown'], ['pmain']),
+    # the keys typed before the module arrived are dropped
+    'b-nobuffer': ([('pal', "        var text = shell && shell.input ? shell.input.value : '', opener = shell ? shell.opener : null;",
+                     "        var text = '', opener = shell ? shell.opener : null;")], ['L-pcold-keysKept'], ['pcold']),
+    # Esc leaves the focus where the box was
+    'b-escfocus': ([('pal', "        if (restore && u.opener && u.opener.isConnected && u.opener !== document.body) {", "        if (false) {")], ['L-pmain-escFocus'], ['pmain']),
+    # a question is never promoted
+    'b-noquestion': ([('pal', "    function isQuestion(q) { return /\\?\\s*$/.test(q) || q.trim().split(/\\s+/).length >= 3; }", "    function isQuestion(q) { return false; }")],
+                     ['L-pmain-questionFirst'], ['pmain']),
+    # the Ask page gets an empty question
+    'b-askdrop': ([('pal', "                box.value = q;\n", "                box.value = '';\n")], ['L-pmain-askSubmits'], ['pmain']),
+    # row-level items never listed
+    'b-norow': ([('pal', "        var cell = activeCell(), out = [];\n        if (!cell) { return out; }", "        var cell = activeCell(), out = [];\n        if (true) { return out; }")],
+                ['L-prow-rowItems'], ['prow']),
+    # --- the header menu: no items for the palette
+    'j-noitems': ([('menu', "        items: function (th, cell) { return (th && api()) ? flatItems(buildItems(th, false, cell || null)) : []; },",
+                    "        items: function (th, cell) { return []; },")], ['L-ppick-colItems', 'L-ppick-pickFreezeOff'], ['ppick']),
+    # --- main.js (CRLF): the "?" sheet row gone; the clear hook gone
+    'm-nosheet': ([('main', "            window.PenumbraPalette ? row([window.PenumbraPalette.keyLabel ? window.PenumbraPalette.keyLabel() : 'Ctrl+K'], 'Quick actions: run an action, a column\\'s actions, a report or a help topic') : ''\n", "            ''\n")],
+                  ['L-pmain-sheetRow'], ['pmain']),
+    # --- (round 2) the icons: a toolbar entry without its twin; a twin that is another control's; twins drawn as nothing
+    'i-notwin': ([('pal', "{ id: 'download', label: 'Download the report data', sub: 'Excel, PDF, CSV, TSV, JSON', keys: ['Ctrl', 'Shift', 'D'], icon: { twin: 'downloadBtn', use: 'pnbi-download' },", "{ id: 'download', label: 'Download the report data', sub: 'Excel, PDF, CSV, TSV, JSON', keys: ['Ctrl', 'Shift', 'D'], icon: { use: 'pnbi-download' },")], ['S-iconsTwin'], []),
+    'i-othertwin': ([('pal', "{ id: 'pivot', label: 'Pivot table builder', keys: ['Ctrl', 'Shift', 'P'], icon: { twin: 'pivotBtn', use: 'pnbi-pivot' },", "{ id: 'pivot', label: 'Pivot table builder', keys: ['Ctrl', 'Shift', 'P'], icon: { twin: 'visualizeBtn', use: 'pnbi-visualize' },")], ['S-iconsTwin', 'L-pmain-iconsTwin'], ['pmain']),
+    'i-nodraw': ([('pal', "        if (ic.twin) { var t = twinSvg(ic.twin); if (t) { return t; } }\n", "")], ['L-pmain-iconsTwin'], ['pmain']),
+    # --- (round 2b) a key dispatched on the window throws in the handler
+    'w-winkey': ([('pal', "var k = e.key, inBox = (e.target && typeof e.target === 'object' && e.target.nodeType === 1) ? ui.box.contains(e.target) : false;", "var k = e.key, inBox = ui.box.contains(e.target);")], ['L-pmain-windowKey'], ['pmain']),
+    # --- (round 3) the old group drawing back in the sprite; a copy of it left in a served file
+    'g-old': ([('index', GROUP_C_SYMBOL, '<symbol id="pnbi-group" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>' + OLD_GROUP_SIG + '</symbol>')], ['S-groupIcon', 'L-pmain-groupIcon'], ['pmain']),
+    'g-copy': ([('pal', "    P.EXEMPT = {", "    // (old) <rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\" ry=\"2\"/>" + OLD_GROUP_SIG + "\n    P.EXEMPT = {")], ['S-groupIcon'], []),
+    # --- (round 4) the box's icons without the toolbar's stroke rule: black blobs again
+    'i-nostyle': ([('pcss', ".pnb-pal-svg:not(.pnb-pal-twin) { stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }\n", "")], ['L-pmain-iconsRendered', 'L-pshot-inkPalette'], ['pmain', 'pshot']),
+    # --- (round 4b) the combinations: Group applies instead of opening; the column pick dropped; the pivot
+    # opener given no column; Rows per page a no-op; the preset row never picked; the cap gone
+    'c-applies': ([('pal', "            if (layout) {\n                var r = document.querySelector('#groupLayoutRow input[name=\"groupLayoutChoice\"][value=\"' + layout + '\"]');",
+                   "            click(el('confirmGroupingBtn'));\n            if (layout) {\n                var r = document.querySelector('#groupLayoutRow input[name=\"groupLayoutChoice\"][value=\"' + layout + '\"]');")],
+                  ['L-pcombo-comboGroupNotApplied'], ['pcombo']),
+    'c-nopre': ([('pal', "            if (it) { click(it); }\n", "")], ['L-pcombo-comboGroupOpens'], ['pcombo']),
+    'c-pivotcol': ([('pal', "run: function () { a.pivotColumn(col); } }); }", "run: function () { a.pivotColumn(''); } }); }")], ['L-pcombo-comboPivot'], ['pcombo']),
+    'c-rows': ([('pal', "                    run: function () { rs.value = o.value; if (hasJQ)", "                    run: function () { if (hasJQ)")], ['L-pcombo-comboRows'], ['pcombo']),
+    'c-preset': ([('pal', "            }, function (row) { click(row); }, 4000);", "            }, function (row) { }, 4000);")], ['L-pcombo-comboPresetLoads'], ['pcombo']),
+    'c-nocap': ([('pal', "        if (acts.length > cap) {", "        if (false) {")], ['L-pcombo-comboCap'], ['pcombo']),
+    # --- (round 5) the report discovery gate: the client gate gone (every user's text goes to the server);
+    # the server gate lifted; the STATE_DATA / recipients surfaces back for non-admins
+    'b-noclientgate': ([('pal', "        if (!reportDiscoveryAllowed()) { return; }\n", "")], ['L-pmain-reportsGate', 'S-clientGate'], ['pmain']),
+    's-nogate': ([('disc', "        return (bool)$isAdmin;\n", "        return true;\n")], ['S-serverGate', 'S-dashGate'], []),   # (round 13: the gate moved; lifting it opens both lists)
+    's-deepback': ([('gsr', "function penumbraReportTextMatchSql($isAdmin, $p, $searchPattern, $matchTerm) {\n    if (!penumbraReportDiscoveryAllowed($isAdmin)) {", "function penumbraReportTextMatchSql($isAdmin, $p, $searchPattern, $matchTerm) {\n    if (false) {")], ['S-serverGate'], []),
+    'm-noclear': ([('main', "        try { if (window.PenumbraPalette && typeof window.PenumbraPalette.clearRecent === 'function') window.PenumbraPalette.clearRecent(); } catch(e) {}\n", "")],
+                  ['L-pmain-clearPrefs'], ['pmain']),
+    # --- (round 6) the stub: Ctrl+K taken on a Mac (and the Windows key on Windows); the CodeMirror case
+    # missed (the key stands down inside an editor); no focus back at all
+    'k-mac': ([('stub', "        return mac() ? (e.metaKey && !e.ctrlKey) : (e.ctrlKey && !e.metaKey);\n", "        return e.ctrlKey || e.metaKey;\n")],
+              ['L-pkeys-macCtrlIgnored', 'L-pkeys-winMetaIgnored', 'S-keyRule'], ['pkeys']),
+    'k-nocm': ([('stub', "        if (!hot(e)) { return; }\n", "        if (!hot(e) || (e.target && e.target.closest && e.target.closest('.CodeMirror'))) { return; }\n")],
+               ['L-pkeys-cmOpens'], ['pkeys']),
+    'k-norefocus': ([('stub', "            if (w && w.CodeMirror && typeof w.CodeMirror.focus === 'function') { w.CodeMirror.focus(); return; }\n            el.focus({ preventScroll: true });\n", "")],
+                    ['L-pkeys-fieldFocusBack', 'L-pkeys-cmCursorBack'], ['pkeys']),
+    # the module: window.penumbra_vars again (empty on live); the Help Center never leads; no dashboard rows;
+    # a report row opens dashboard.php?id=
+    'b-winvars': ([('pal', "        try { if (typeof penumbra_vars !== 'undefined' && penumbra_vars) { return penumbra_vars; } } catch (e0) { }\n", "")],
+                  ['L-pview-editorSave', 'L-pmain-reportsGate', 'S-varsBare'], ['pview', 'pmain']),
+    'b-nohelpfirst': ([('pal', "            if (ui.from === 'crumb' && hc && availNow[hc.id] === true) {", "            if (false) {")], ['L-pkeys-crumbOpens'], ['pkeys']),
+    'b-dashrows': ([('pal', "        dashActs = onDashboard() ? dashEntries() : [];\n", "        dashActs = [];\n")], ['L-pdash-dashRows'], ['pdash']),
+    'd-reporthref': ([('pal', "window.location.assign('index.php?id=' + encodeURIComponent(h.r.id));", "window.location.assign('?id=' + encodeURIComponent(h.r.id));")], ['S-reportHref'], []),
+    # the pages: no stub on dashboard.php; no magnifier; no card row; the sheet row with a fixed label
+    'd-nostub': ([('dash', "<script defer src=\"js/penumbra_palette_boot.js?v=<?php echo filemtime(__DIR__ . '/js/penumbra_palette_boot.js'); ?>\"", "<script defer src=\"js/zz_gone.js?v=<?php echo filemtime(__DIR__ . '/js/penumbra_palette_boot.js'); ?>\"")],
+                 ['S-dashStub'], []),
+    'x-noicon': ([('index', "$pnbPaletteIconHtml = $pnbPaletteOn ? '<span id=\"searchPaletteIcon\"", "$pnbPaletteIconHtml = ''; $pnbZz = $pnbPaletteOn ? '<span id=\"zzNoIcon\"")],
+                 ['L-pkeys-crumbIcon', 'S-crumbIcon'], ['pkeys']),
+    # (round 10) no bar button; the list row back; a label too long for the bar
+    'x-nobtn': ([('index', "<a href=\"#\" id=\"sbPaletteBtn\" data-pnb-palette=\"open\" role=\"button\"", "<a href=\"#\" id=\"zzNoBtn\" data-zz=\"open\" role=\"button\"")],
+                ['L-pkeys-popBtn', 'S-popBtn'], ['pkeys']),
+    'x-rowback': ([('index', "            <div id=\"sbCurrentSection\" style=\"display:none;\">",
+                    "            <a href=\"#\" class=\"sb-recent-row sb-pal-row\" id=\"sbPaletteRow\" data-pnb-palette=\"open\" role=\"button\"><span class=\"sb-recent-main\"><span class=\"rt\">Search actions and reports</span></span></a>\n            <div id=\"sbCurrentSection\" style=\"display:none;\">")],
+                  ['L-pkeys-rowGone', 'S-rowGone'], ['pkeys']),
+    'x-longlabel': ([('index', "</svg> Quick actions</a>", "</svg> Quick actions, columns, reports and help</a>")], ['L-pkeys-popNoWrap'], ['pkeys']),
+    # --- (round 11) an old "Search" label left; the Esc chip not clickable; the backdrop click ignored; a magnifier left
+    'n-oldlabel': ([('index', "</svg> Quick actions</a>", "</svg> Search</a>")], ['L-pkeys-quickLabel', 'S-quickName'], ['pkeys']),
+    'n-escspan': ([('pal', "        ui.esc.addEventListener('click', function (e) { e.preventDefault(); close(true); });", "        // (no click on the chip)")], ['L-pkeys-escClick'], ['pkeys']),
+    'n-nobackdrop': ([('pal', "        veil.addEventListener('mousedown', function (e) { if (e.target === veil) { e.preventDefault(); close(true); } });", "        // (no backdrop click)")], ['L-pkeys-backdropClose'], ['pkeys']),
+    # --- (round 12) a hand-copied list missing a tool; the card's admin gate gone (a viewer's page carries the
+    # menu, so the viewer sees the rows); the stub missing from the admin pages' bar
+    't-handlist': ([('chrome', "    echo '<script>window.PENUMBRA_ADMIN_TOOLS = ' . json_encode($rows, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES) . ';</script>';",
+                     "    echo '<script>window.PENUMBRA_ADMIN_TOOLS = ' . json_encode(array_slice($rows, 0, 6), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES) . ';</script>';")],
+                   ['L-ptools-toolsMatchMenu', 'S-toolsSource'], ['ptools']),
+    't-nogate': ([('index', "                <?php if ($sb_is_admin): ?>\n                <span class=\"pnb-admsplit\">", "                <?php if (true): ?>\n                <span class=\"pnb-admsplit\">")],
+                 ['L-ptoolsv-viewerNoTools'], ['ptoolsv']),
+    't-nostub': ([('chrome', "<script defer src=\"js/penumbra_palette_boot.js?v=<?php echo filemtime(__DIR__ . '/js/penumbra_palette_boot.js'); ?>\"", "<script defer src=\"js/zz_gone.js?v=<?php echo filemtime(__DIR__ . '/js/penumbra_palette_boot.js'); ?>\"")],
+                 ['L-padmin-adminStub', 'S-adminStub'], ['padmin']),
+    'n-magnifier': ([('index', '<svg class="pnb-foot-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#pnbi-quick"/></svg> Quick actions</a>',
+                      '<svg class="pnb-foot-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6"/><line x1="15" y1="15" x2="20" y2="20"/></svg> Quick actions</a>')],
+                    ['L-pkeys-boltEverywhere', 'S-bolt'], ['pkeys']),
+    'm-nolabel': ([('main', "row([window.PenumbraPalette.keyLabel ? window.PenumbraPalette.keyLabel() : 'Ctrl+K'], 'Quick actions:", "row(['Ctrl+K'], 'Quick actions:")],
+                  ['L-pkeys-labelMac', 'S-sheetRow'], ['pkeys']),
+    # --- (round 7) the index missing a function; a wrong anchor; the insert in the wrong editor; the index
+    # fetched at module load; fetched by the idle prefetch; no cap; a one-letter search
+    'f-missing': ([('fni', "    foreach ((array)$R['functions'] as $id => $f) {\n", "    foreach ((array)$R['functions'] as $id => $f) {\n        if ($id === 'sum') { continue; }\n")],
+                  ['S-fnIndex', 'L-pfn-fnRow'], ['pfn']),
+    'f-anchor': ([('fni', "'params' => $params, 'topic' => 'optionsHelpLightbox', 'anchor' => (string)$id,", "'params' => $params, 'topic' => 'optionsHelpLightbox', 'anchor' => 'fn-' . $id,")],
+                 ['S-fnIndex', 'L-pfn-anchorFn'], ['pfn']),
+    'f-wrongeditor': ([('pal', "            var can = ed.kind === 'snippet';\n", "            var can = !!ed.cm;\n")], ['L-pfn-insertOnlySnippet'], ['pfn']),
+    'f-eager': ([('pal', "    function editorKind() {\n", "    loadFnIndex();\n    function editorKind() {\n")], ['S-fnLazy', 'L-pfn-lazyIndex'], ['pfn']),
+    'f-prefetch': ([('stub', "            state = 'ready';\n", "            state = 'ready';\n            if (typeof P.loadFnIndex === 'function') { P.loadFnIndex(); }\n"),
+                    ('pal', "    P.fnState = function () { return fnState; };   // (round 7)\n", "    P.fnState = function () { return fnState; };   // (round 7)\n    P.loadFnIndex = loadFnIndex;\n")],
+                   ['S-fnLazy', 'L-pfn-lazyIndex'], ['pfn']),
+    'f-nocap': ([('pal', "        if (out.length > cap) {\n", "        if (false) {\n")], ['L-pfn-fnCap'], ['pfn']),
+    'f-short': ([('pal', "        if (q.length < 2) { return []; }\n        if (fnState === 'loading')", "        if (q.length < 1) { return []; }\n        if (fnState === 'loading')")], ['L-pfn-fnMinChars'], ['pfn']),
+    # --- (round 8) the export missing; the owner check skipped; a send on open; the authored spec ignored
+    'e-noexport': ([('main', "    window.penumbraOpenFeedbackDialog = penumbraOpenFeedbackDialog;", "    // (gone)")], ['S-feedbackExport', 'L-pfeed-entryShown'], ['pfeed']),
+    'e-noowner': ([('pal', "              return vars().isReportOwner ? 'You own this report, so feedback would come to you' : true;\n", "              return true;\n")], ['L-pfeed-ownerGreyed'], ['pfeed']),
+    'e-sendonopen': ([('pal', "          run: function () { var a = authoredFeedback(); window.penumbraOpenFeedbackDialog(a ? a.spec : FEEDBACK_DEFAULT_SPEC, a ? a.label : 'Send feedback to the report owner'); },",
+                      "          run: function () { var a = authoredFeedback(); window.penumbraOpenFeedbackDialog(a ? a.spec : FEEDBACK_DEFAULT_SPEC, a ? a.label : 'Send feedback to the report owner'); setTimeout(function () { var f = document.querySelector('.pf-modal form'); if (f) { var t = f.querySelector('textarea'); if (t) { t.value = 'sent on open'; } f.requestSubmit(); } }, 400); },")],
+                     ['L-pfeed-nothingSent'], ['pfeed']),
+    'e-noauthored': ([('pal', "        var a = document.querySelector('#reportSnippetOutput a.snippet-action[data-action-name=\"feedback\"], #mainReportSubtitle a.snippet-action[data-action-name=\"feedback\"]');\n", "        var a = null;\n")],
+                     ['L-pfeed-authoredSpec'], ['pfeed']),
+    # --- (round 9) the loose scoring back: letters picked across words match again
+    'b-loosefuzzy': ([('pal', "        if (q.length >= 3) {\n            var first = idx[0], span = t.slice(first, idx[idx.length - 1] + 1);", "        if (false) {\n            var first = idx[0], span = t.slice(first, idx[idx.length - 1] + 1);")],
+                     ['L-prank-rankBug', 'S-fuzzyWord'], ['prank']),
+    # --- (round 13) the dashboard sibling opened on its own; the list's cut removed; the owner reached by a non-admin's term;
+    # the list fetched on every keystroke
+    'd-nogate': ([('disc', "        return penumbraReportDiscoveryAllowed($isAdmin);\n", "        return true;\n")], ['S-dashGate'], []),
+    'd-listungated': ([('mdash', "            if (!dashListVisible($row, $isAdmin, $currentUserKey, $opened)) { continue; }   // (round 13) the discovery gate: a non-admin lists owned / opened only\n", "")], ['S-dashGate'], []),
+    'd-deftext': ([('pal', "match(q, d.title, d.id + (admin ? ' ' + d.owner : ''))", "match(q, d.title, d.id + ' ' + d.owner)")], ['L-pdsec-dashNotByOwner', 'S-dashClient'], ['pdsec']),
+    'd-eachkey': ([('pal', "        if (dashFetched || q.length < 2) { return; }\n        dashFetched = true;\n", "        if (q.length < 2) { return; }\n")], ['L-pdsec-dashFetchedOnce', 'S-dashClient'], ['pdsec']),
+    # --- (round 13, the metrics row) shown without a report and on a dashboard; hidden from everyone but an admin
+    'x-metricseverywhere': ([('pal', "          hide: function () { return !reportId() || onDashboard() || onAdminPage(); }, needs: function () { return !onDashboard() && !onAdminPage(); },\n",
+                             "          hide: function () { return false; }, needs: function () { return true; },\n")],
+                            ['L-pmetr-absentWithoutId', 'L-pdash-dashNoMetricsRow', 'S-metricsRow'], ['pmetr', 'pdash']),
+    'x-metricsadminonly': ([('pal', "          avail: function () { return reportId() ? true : 'The report is not saved on the server yet'; },\n          hide: function () { return !reportId() || onDashboard() || onAdminPage(); },",
+                            "          avail: function () { return reportId() ? (vars().isAdmin ? true : 'Admins only') : 'The report is not saved on the server yet'; },\n          hide: function () { return !reportId() || !vars().isAdmin || onDashboard() || onAdminPage(); },")],
+                           ['L-pmetr-ownerSees', 'L-pmetr-viewerSees'], ['pmetr']),
+    # --- (round 14) the text pasted into the box as typed; the Find row filtering instead; a hidden column's rows
+    'h-raw': ([('pal', "            var term = g ? g.formatValue(t) : t, merged2 = addCond(term);", "            var term = t, merged2 = addCond(term);")], ['L-phand-filterQuoted', 'S-handoffs'], ['phand']),
+    'h-findfilters': ([('pal', "                       run: function () { close(true); setTimeout(function () { F.open(t); }, 0); } });", "                       run: function () { close(true); applySearch(g ? g.formatValue(t) : t); } });")], ['L-phand-findNoFilter'], ['phand']),
+    'h-hiddencol': ([('pal', "        var hs = headers(), byName = {};\n        hs.forEach(function (th) { byName[", "        var hs = Array.prototype.slice.call(document.querySelectorAll('#tableHeader th[data-colname]')), byName = {};\n        hs.forEach(function (th) { byName[")], ['L-phand-hiddenNoRow'], ['phand']),
+    # --- (round 15) the dialog words hand-copied (no wysiwyg); the option toggled on select; the rows for a viewer; a hand list missing one
+    'u-handlist': ([('pal', "        if (root) { var ns = root.querySelectorAll(UI_SEL); for (i = 0; i < ns.length; i++) { txt.push(ns[i].textContent); } }\n", "        if (root) { txt.push('copy options clipboard csv tsv tab-delimited google sheets'); }\n")], ['L-pvo-wysiwyg', 'S-uiWords'], ['pvo']),
+    'v-toggles': ([('pal', "                       run: function () { openTab('#view-options-tab', function () { spotlight(target, focusEl); }); } });", "                       run: function () { openTab('#view-options-tab', function () { spotlight(target, focusEl); if (focusEl && focusEl.type === 'checkbox') { focusEl.click(); } }); } });")], ['L-pvo-optionUnchanged'], ['pvo']),
+    'v-viewer': ([('pal', "                       icon: { pal: 'settings' }, kw: 'view options editor ' + (small || ''), gate: 'admin', live: true,", "                       icon: { pal: 'settings' }, kw: 'view options editor ' + (small || ''), live: true,")], ['L-pvo-viewerNoRows'], ['pvo']),
+    'v-handlist': ([('pal', "tab.querySelectorAll('.view-option-item input[type=\"checkbox\"]')", "tab.querySelectorAll('#viewOptionClickFilter, #viewOptionSearch, #viewOptionSnapshots, #viewOptionEmail, #viewOptionGrouping, #viewOptionClipboard, #viewOptionExport, #viewOptionPivot, #viewOptionViz, #viewOptionPagination, #viewOptionJournal, #viewOptionColumns')")], ['L-pvo-voCount', 'S-voSource'], ['pvo']),
+    # --- (round 16) the row for a viewer; the text sent twice; placed but not sent; the summary box flipped
+    'j-viewer': ([('pal', "    function jarvisOn() { return !!vars().aiAllowed && !!el('toggleAiPanel')", "    function jarvisOn() { return !!el('toggleAiPanel')")], ['L-pjar-noRowViewer', 'S-jarvisGate'], ['pjar']),
+    'j-double': ([('pal', "            var sb = byId('aiSendBtn'); if (sb) { click(sb); } else { input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); }   // the panel's own send (its Send button, else its Enter handler), once\n",
+                          "            var sb = byId('aiSendBtn'); if (sb) { click(sb); }\n            setTimeout(function () { input.value = text; var sb2 = byId('aiSendBtn'); if (sb2) { click(sb2); } }, 500);\n")],
+                 ['L-pjar-sendsOnce', 'S-jarvisOnce'], ['pjar']),
+    'j-nosend': ([('pal', "            var sb = byId('aiSendBtn'); if (sb) { click(sb); } else { input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); }   // the panel's own send (its Send button, else its Enter handler), once\n", "")], ['L-pjar-sendsOnce', 'S-jarvisOnce'], ['pjar']),
+    'j-summary': ([('pal', "            input.value = text;\n            input.dispatchEvent(new Event('input', { bubbles: true }));\n", "            input.value = text;\n            var cS = byId('aiProfileOn'); if (cS) { cS.checked = !cS.checked; }\n            input.dispatchEvent(new Event('input', { bubbles: true }));\n")], ['L-pjar-summaryUntouched', 'S-jarvisOnce'], ['pjar']),
+    # --- (round 17) an unknown id rendered as a chip; a chip that applies the grouping itself; the block shown raw; the gate skipped
+    'c-unknown': ([('pal', "            e = comboEntries().filter(function (x) { return x.id === cid; })[0] || null;\n", "            e = comboEntries().filter(function (x) { return x.id === cid; })[0] || { id: cid, label: cid, icon: { pal: 'ask' }, avail: true, run: function () { } };\n")], ['L-pchip-unknownDropped'], ['pchip']),
+    'c-applies': ([('pal', "if (!r) { return false; } try { r.run(); } catch (e2) { toast('That action could not run.'); return false; } return true; };", "if (!r) { return false; } try { r.run(); setTimeout(function () { var b = el('confirmGroupingBtn'); if (b) { click(b); } }, 300); } catch (e2) { toast('That action could not run.'); return false; } return true; };")], ['L-pchip-chipOpensNotApplies'], ['pchip']),
+    'c-raw': ([('main', "            $msg.html(renderAiMarkdown(split.text));\n", "            $msg.html(renderAiMarkdown(text));\n")], ['L-pchip-blockNeverRaw', 'S-chipsSafe'], ['pchip']),
+    'c-nogate': ([('pal', "        if (!visible(e, '') || dashHidden(e) || (typeof e.hide === 'function' && e.hide())) { return false; }   // the gates a row has (authoring, the page)\n", "        if (dashHidden(e) || (typeof e.hide === 'function' && e.hide())) { return false; }\n")], ['L-pchip-viewerGatedDropped', 'S-chipsSafe'], ['pchip']),
+}
+CHIPS_REPLY = json.dumps({'status': 'success', 'reply': 'Group the rows by their status and look at the open ones.\n\n```penumbra-actions\n' + json.dumps([
+    {'id': 'combo:group', 'args': {'column': 'V_STATUS', 'layout': 'list'}}, {'id': 'filter', 'args': {'condition': 'V_STATUS = Open'}},
+    {'id': 'combo:teleport', 'args': {'column': 'V_STATUS'}}, {'id': 'col:sortAsc', 'args': {'column': 'V_AMOUNT'}}, {'id': 'action', 'args': {'id': 'zzz'}},
+    {'id': 'combo:group', 'args': {'column': 'V_LINK'}}, {'id': 'action', 'args': {'id': 'save'}}, {'id': 'vo', 'args': {'option': 'Custom Sort Orders'}}]) + '\n```'})
+# (round 17) the canned reply: valid (group, filter, sort, save, vo) + invented (teleport, zzz) + a hidden column (V_LINK) suggestions
+DASH_LIST_FIXTURE = json.dumps({"status": "success", "data": [
+    {"short_id": "dshA", "title": "Awards overview", "owner_id": "ownerx", "authorized": "vone", "created_at": "2026-10-01", "updated_at": "2026-10-19", "can_edit": False, "tags": ["awards"]},
+    {"short_id": "dshB", "title": "Budget burn", "owner_id": "vone", "authorized": "", "created_at": "2026-10-02", "updated_at": "2026-10-18", "can_edit": True, "tags": ["finance"]},
+    {"short_id": "dshC", "title": "Sponsor spend", "owner_id": "other", "authorized": "vone", "created_at": "2026-10-03", "updated_at": "2026-10-17", "can_edit": False, "tags": []}]})
+# (the list as the server returns it to THIS caller: the cut itself is dash_gate_tests.php's to prove)
+
+args = sys.argv[1:]
+def opt(name, default=None):
+    if name in args:
+        i = args.index(name); v = args[i + 1]; del args[i:i + 2]; return v
+    return default
+def flag(name):
+    if name in args: args.remove(name); return True
+    return False
+stage_dir = opt('--stage', None)
+one_mutant = opt('--mutant', None)
+all_mutants = flag('--mutants')
+control = flag('--control')
+scn_only = opt('--scn', None)
+if scn_only: SCN = scn_only.split(',')
+if args: raise SystemExit('unknown arguments: %s' % ' '.join(args))
+src_root = stage_dir or APP
+def pick(rel):
+    p = os.path.join(src_root, rel)
+    return p if os.path.exists(p) else os.path.join(APP, rel)
+RELS = {'main': os.path.join('js', 'main.js'), 'mod': os.path.join('js', 'penumbra_colfmt.js'), 'calc': os.path.join('js', 'penumbra_calc.js'),
+        'colw': os.path.join('js', 'penumbra_colwidths.js'), 'menu': os.path.join('js', 'penumbra_colmenu.js'),
+        'mcss': os.path.join('css', 'penumbra_colmenu.css'), 'css': os.path.join('css', 'main.css'),
+        'stub': os.path.join('js', 'penumbra_palette_boot.js'), 'pal': os.path.join('js', 'penumbra_palette.js'), 'pcss': os.path.join('css', 'penumbra_palette.css'),
+        'index': 'index.php', 'help': os.path.join('help', 'tips', 'settings-tips-storage.php'), 'topic': os.path.join('help', 'topics', 'commandPaletteHelpLightbox.php'),
+        'manifest': os.path.join('help', 'manifest.php'),
+        'gsr': 'get_server_reports.php',   # (round 5) the report discovery gate
+        'dash': 'dashboard.php',   # (round 6) the stub on the dashboard page
+        'fni': os.path.join('help', 'functions_index.php'), 'fnep': 'help_functions.php',   # (round 7) the functions and tags index
+        'chrome': 'penumbra_admin_chrome.php',   # (round 12) the admin tools registry + the admin pages' bar
+        'disc': 'penumbra_discovery.php', 'mdash': 'manage_dashboard.php',   # (round 13) the discovery gates + the dashboards list
+        'sb': os.path.join('js', 'search_builder.js'),   # (round 14) the search grammar's exports
+        'prompt': 'ai_system_prompt.php'}   # (round 17) the Jarvis system prompt (the contract section)
+sys.path.insert(0, HERE)
+import mk_harness, mk_dash_harness, mk_adm_harness
+cand = {k: pick(v) for k, v in RELS.items()}
+if control: cand = {k: os.path.join(APP, v) for k, v in RELS.items()}
+def read_b(p):
+    if not os.path.exists(p): return ''   # the control has no palette: EMPTY files
+    return open(p, 'rb').read().decode('utf-8', 'surrogateescape')
+
+def hook(src):
+    anchor = '$(document).ready(function () {'
+    i = src.find(anchor)
+    if i < 0 or i > 400: raise SystemExit('closure anchor not found')
+    out = src[:i] + ';(function () {\r\n' + src[i + len(anchor):]
+    j = out.rfind('});')
+    out = out[:j] + '})();' + out[j + 3:]
+    hl = '    function hideLoading() {'
+    if out.count(hl) != 1: raise SystemExit('hideLoading anchor count %d' % out.count(hl))
+    return out.replace(hl, hl + '\n        window.__HC_HIDES = (window.__HC_HIDES || 0) + 1;')
+def mutate(texts, name):
+    t = dict(texts)
+    for f, old, new in MUTANTS[name][0]:
+        crlf = lambda x: x.replace('\n', '\r\n')
+        if t[f].count(old) != 1 and t[f].count(crlf(old)) == 1:
+            old, new = crlf(old), crlf(new)
+        if t[f].count(old) != 1: raise SystemExit("mutant '%s': %s anchor found %d times: %r" % (name, f, t[f].count(old), old[:90]))
+        t[f] = t[f].replace(old, new)
+    return t
+
+stage = tempfile.mkdtemp(prefix='pnb_pal_')
+for f in LIBS: shutil.copyfile(os.path.join(APP, 'js', f), os.path.join(stage, f))
+for f in ('density.css', 'penumbra_colwidths.css', 'penumbra_grouplist.css', 'penumbra_cellsel.css', 'penumbra_forms.css', 'penumbra_find.css'): shutil.copyfile(os.path.join(APP, 'css', f), os.path.join(stage, f))
+open(os.path.join(stage, 'help_stub.js'), 'wb').write(b'window.__HELP_STUB = "";\n')
+shutil.copyfile(os.path.join(HERE, 'driver.js'), os.path.join(stage, 'driver.js'))
+def free_port():
+    s = socket.socket(); s.bind(('127.0.0.1', 0)); p = s.getsockname()[1]; s.close(); return p
+hp, dp = free_port(), free_port()
+srv = subprocess.Popen([sys.executable, '-m', 'http.server', str(hp), '--bind', '127.0.0.1', '--directory', stage], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+edge = subprocess.Popen([EDGE, '--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run', '--no-default-browser-check', '--disable-sync',
+                         '--disable-extensions', '--user-data-dir=' + os.path.join(stage, 'p'), '--window-size=1500,900',
+                         '--remote-debugging-port=%d' % dp, '--remote-allow-origins=*', 'about:blank'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+def jget(p, m='GET'):
+    return json.loads(urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:%d%s' % (dp, p), method=m), timeout=15).read().decode())
+for _ in range(150):
+    try: jget('/json/version'); break
+    except Exception: time.sleep(0.2)
+
+def run_page(path, shot_path=None):
+    t = jget('/json/new?about:blank', 'PUT')
+    ws = websocket.create_connection(t['webSocketDebuggerUrl'], timeout=300, suppress_origin=True)
+    n = [0]; navs = []   # every navigation the page makes (a mid-scenario reload restarts the driver from the top)
+    def call(m, p=None):
+        n[0] += 1; mid = n[0]
+        ws.send(json.dumps({'id': mid, 'method': m, 'params': p or {}}))
+        while True:
+            r = json.loads(ws.recv())
+            if r.get('method') == 'Network.requestWillBeSent' and r.get('params', {}).get('type') == 'Document':
+                ini = r['params'].get('initiator', {}); cf = (ini.get('stack') or {}).get('callFrames') or []
+                navs.append('%s DOC %s initiator %s %s' % (round(time.time() - t00[0], 1), r['params'].get('documentURL', ''), ini.get('type'),
+                            ' <- '.join('%s@%s:%s' % (c.get('functionName') or '?', (c.get('url') or '').split('/')[-1], c.get('lineNumber')) for c in cf[:8])))
+            if r.get('method') in ('Page.frameRequestedNavigation', 'Page.frameScheduledNavigation', 'Page.frameNavigated'):
+                pr = r.get('params', {}); fr = pr.get('frame', {})
+                navs.append('%s %s %s %s' % (round(time.time() - t00[0], 1), r['method'].split('.')[1], pr.get('reason', fr.get('url', '')), pr.get('url', '')))
+            if r.get('id') == mid: return r.get('result', {})
+    t00 = [time.time()]
+    try:
+        call('Page.enable'); call('Network.enable'); call('Network.setCacheDisabled', {'cacheDisabled': True})
+        if 'scn=pshot9' in path: call('Emulation.setDeviceMetricsOverride', {'width': 1440, 'height': 900, 'deviceScaleFactor': 1, 'mobile': False})   # (round 9) the photo at 1440px
+        call('Emulation.setFocusEmulationEnabled', {'enabled': True})
+        call('Page.navigate', {'url': 'http://127.0.0.1:%d/%s' % (hp, path)})
+        t0 = time.time()
+        budget = float(os.environ.get('PNB_TIMEOUT') or 300)
+        while time.time() - t0 < budget:
+            time.sleep(0.25)
+            v = call('Runtime.evaluate', {'expression': 'window.__HCDONE ? JSON.stringify(window.__HCRESULT) : null', 'returnByValue': True}).get('result', {}).get('value')
+            if v:
+                shot_to = shot_path or os.environ.get('PNB_SHOT')
+                if shot_to:
+                    import base64
+                    shot = call('Page.captureScreenshot', {'format': 'png'}).get('data')
+                    if shot: open(shot_to, 'wb').write(base64.b64decode(shot))
+                return json.loads(v)
+        # the driver's step trace (window.__TRACE) says where a scenario stalled
+        tr = call('Runtime.evaluate', {'expression': 'JSON.stringify({trace: (window.__TRACE || []).slice(-16), errors: (window.__R && window.__R.errors) || [], done: !!window.__HCDONE, q: window.__queryDone, h: window.__HC_HIDES})', 'returnByValue': True}).get('result', {}).get('value')
+        # a 100 ms timer's real wait: a throttled (hidden) page answers in seconds
+        tm = call('Runtime.evaluate', {'expression': '(async function () { var t = performance.now(); await new Promise(function (r) { setTimeout(r, 100); }); return Math.round(performance.now() - t) + " ms for a 100 ms timer; visibility " + document.visibilityState + "; hasFocus " + document.hasFocus(); })()', 'awaitPromise': True, 'returnByValue': True}).get('result', {}).get('value')
+        st = call('Runtime.evaluate', {'expression': 'JSON.stringify({box: !!document.getElementById("pnbPalette"), open: !!(window.PenumbraPalette && window.PenumbraPalette.isOpen && window.PenumbraPalette.isOpen()), mode: window.PenumbraPalette && window.PenumbraPalette.mode ? window.PenumbraPalette.mode() : null, ae: document.activeElement ? document.activeElement.tagName + "#" + document.activeElement.id : null, state: window.PenumbraPalette && window.PenumbraPalette.boot ? window.PenumbraPalette.boot.state() : null})', 'returnByValue': True}).get('result', {}).get('value')
+        tr = str(tr) + ' | timer: ' + str(tm) + ' | state: ' + str(st) + ' | navs: ' + json.dumps(navs[-12:])
+        return {'fatal': 'timeout (%d s); trace %s' % (budget, tr)}
+    finally:
+        try: ws.close()
+        except Exception: pass
+        try: urllib.request.urlopen('http://127.0.0.1:%d/json/close/%s' % (dp, t['id']), timeout=10).read()
+        except Exception: pass
+
+def help_stub(help_src):
+    m = re.search(r'<div id="settings-tips-storage" hidden>.*?\n</div>', help_src, re.S)
+    return 'window.__HELP_STUB = ' + json.dumps('<div id="searchHelpLightbox"></div>' + (m.group(0) if m else '')) + ';\n'
+
+def write_stage(texts):
+    def w(name, s): open(os.path.join(stage, name), 'wb').write(s.encode('utf-8', 'surrogateescape'))
+    w('penumbra_admin_chrome.php', texts['chrome'])
+    for sub, key in (('js', 'stub'), ('js', 'pal'), ('css', 'pcss')):
+        os.makedirs(os.path.join(stage, sub), exist_ok=True)
+        w(os.path.join(sub, {'stub': 'penumbra_palette_boot.js', 'pal': 'penumbra_palette.js', 'pcss': 'penumbra_palette.css'}[key]), texts[key])
+    os.makedirs(os.path.join(stage, 'help'), exist_ok=True)
+    w(os.path.join('help', 'functions_index.php'), texts['fni'])   # (the chrome's stub tag needs pnb_help_functions_ver())
+    menu_html = render_chrome('menu') if texts['chrome'] else ''
+    w('harness.html', mk_harness.build(texts['index'], menu_html))
+    w('adm.html', mk_adm_harness.build(render_chrome('bar') if texts['chrome'] else ''))   # (round 12) an admin tool page
+    w('dash.html', mk_dash_harness.build())   # (round 6) dashboard.php's stand-in
+    w('help_stub.js', help_stub(texts['help']))
+    w('main_hc.js', hook(texts['main']))
+    w('penumbra_colfmt.js', texts['mod'])
+    w('penumbra_calc.js', texts['calc'])
+    w('penumbra_colwidths.js', texts['colw'])
+    w('penumbra_colmenu.js', texts['menu'])
+    w('penumbra_colmenu.css', texts['mcss'])
+    w('main.css', texts['css'])
+    w('penumbra_palette_boot.js', texts['stub'])
+    w('penumbra_palette.js', texts['pal'])
+    w('penumbra_palette.css', texts['pcss'])
+    w('get_server_reports.php', texts['gsr'])   # (the gate tests read it from here)
+    w('penumbra_discovery.php', texts['disc'])   # (round 13) the discovery gates (empty on the control: the gate tests then lift it from the endpoint)
+    w('search_builder.js', texts['sb'])   # (round 14) the search builder under test (the harness loads it after main.js, as index.php does)
+    w('ai_assist_stub.json', '{"status": "success", "reply": "A stub answer."}')   # (round 16) what the panel's send gets back (penumbra_vars.aiProxyUrl in the scenario)
+    w('ai_assist_chips.json', CHIPS_REPLY)   # (round 17) the canned reply with a penumbra-actions block
+    os.makedirs(os.path.join(stage, '_src'), exist_ok=True)
+    w(os.path.join('_src', 'manage_dashboard.php'), texts['mdash'])   # (round 13) dash_gate_tests.php reads it here; the browser gets the fixture list
+    w('manage_dashboard.php', DASH_LIST_FIXTURE)
+    w('manage_dashboard_none.json', '{"status": "success", "data": []}')
+    # (round 7) the functions and tags index as the harness serves it (help_functions.json), built by PHP from the
+    # staged builder over the live help sources; the control (no builder on live) gets an empty object
+    os.makedirs(os.path.join(stage, 'help'), exist_ok=True)
+    w(os.path.join('help', 'functions_index.php'), texts['fni'])
+    w('help_functions.json', fn_index_json() if texts['fni'] else '{}')
+
+PHP = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
+def fn_index_run(check):
+    """(round 7) fn_index_build.php over the staged builder: the JSON, or (ok, the last line) with --check."""
+    argv = [PHP, '-n', os.path.join(HERE, 'fn_index_build.php'), '--index', os.path.join(stage, 'help', 'functions_index.php'), '--help', os.path.join(APP, 'help'),
+            '--main', os.path.join(stage, 'main_hc.js')] + (['--check'] if check else [])
+    try:
+        r = subprocess.run(argv, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=120, cwd=tempfile.gettempdir())
+    except Exception as e:
+        return (False, 'fn_index_build.php: %s' % e) if check else '{}'
+    if not check: return r.stdout if r.returncode == 0 and r.stdout.strip().startswith('{') else '{}'
+    lines = [x for x in (r.stdout or '').splitlines() if x.strip()]
+    return (r.returncode == 0 and bool(lines) and lines[-1].startswith('FNIDX: GREEN'), (lines[-1] if lines else (r.stderr or 'no output'))[:300])
+def fn_index_json(): return fn_index_run(False)
+def render_chrome(what):
+    """(round 12) render_chrome.php over the staged chrome, from the app folder (its helpers), as an admin."""
+    try:
+        r = subprocess.run([PHP, '-n', '-f', os.path.join(HERE, 'render_chrome.php'), '--', '--chrome', os.path.join(stage, 'penumbra_admin_chrome.php'), '--what', what, '--admin', '1'],
+                           capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=120, cwd=APP)
+        if r.returncode != 0 or 'Fatal error' in (r.stdout or ''): print('    render_chrome %s: %s' % (what, (r.stdout or r.stderr)[:300])); return ''
+        return r.stdout
+    except Exception as e:
+        print('    render_chrome %s: %s' % (what, e)); return ''
+def gate_tests():
+    """(round 5) gate_tests.php over the staged get_server_reports.php: (ok, the last line)."""
+    try:
+        r = subprocess.run([PHP, '-n', os.path.join(HERE, 'gate_tests.php'), '--file', os.path.join(stage, 'get_server_reports.php'), '--gate', os.path.join(stage, 'penumbra_discovery.php')],
+                           capture_output=True, text=True, timeout=120, cwd=tempfile.gettempdir())
+        lines = [x for x in (r.stdout or '').splitlines() if x.strip()]
+        return (r.returncode == 0 and bool(lines) and lines[-1].startswith('GATE: GREEN'), (lines[-1] if lines else (r.stderr or 'no output'))[:300])
+    except Exception as e:
+        return (False, 'gate_tests.php: %s' % e)
+
+def dash_gate_tests():
+    """(round 13) dash_gate_tests.php over the staged manage_dashboard.php + penumbra_discovery.php: (ok, the last line)."""
+    try:
+        r = subprocess.run([PHP, '-n', os.path.join(HERE, 'dash_gate_tests.php'), '--file', os.path.join(stage, '_src', 'manage_dashboard.php'), '--gate', os.path.join(stage, 'penumbra_discovery.php')],
+                           capture_output=True, text=True, timeout=120, cwd=tempfile.gettempdir())
+        lines = [x for x in (r.stdout or '').splitlines() if x.strip()]
+        return (r.returncode == 0 and bool(lines) and lines[-1].startswith('DGATE: GREEN'), (lines[-1] if lines else (r.stderr or 'no output'))[:300])
+    except Exception as e:
+        return (False, 'dash_gate_tests.php: %s' % e)
+
+def contract_check(pal, prompt):
+    """(round 17) the prompt's kinds and action ids agree with the module's KINDS and registry: (ok, note)."""
+    try:
+        kinds = re.findall(r"\{ id: '([a-z:A-Z]+)', label:", pal.split('var KINDS = [')[1].split('];')[0])
+        sec = prompt.split('SECTION 6: SUGGESTED QUICK ACTIONS')[1]
+        pk = set(re.findall(r'^- ([a-z:A-Z]+(?:, [a-z:A-Z]+)*) ', sec, re.M))
+        pkinds = set()
+        for k in pk:
+            for x in k.split(', '): pkinds.add(x.split(' ')[0])
+        pkinds |= set(re.findall(r'^- (col:[A-Za-z]+) \{column\}', sec, re.M))
+        for x in re.findall(r'(col:[A-Za-z]+) \{column\}', sec): pkinds.add(x)
+        acts = re.search(r'id one of: ([a-z, -]+)', sec).group(1).split(', ')
+        reg = set(re.findall(r"\{ id: '([a-zA-Z:_-]+)'", pal))
+        missing = sorted(set(kinds) - pkinds); extra = sorted(pkinds - set(kinds)); badacts = [a for a in acts if a.strip() not in reg]
+        short = len(sec) < 3500 and 'penumbra-actions' in sec
+        return (not missing and not extra and not badacts and short, 'kinds %d, missing %s, extra %s, bad action ids %s, section %d chars' % (len(kinds), missing, extra, badacts, len(sec)))
+    except Exception as e:
+        return (False, 'contract_check: %s' % e)
+
+def chrome_pages():
+    """(round 12) every admin tool the registry names mounts the chrome's status bar, or IS index.php / analytics_all.php."""
+    tools = re.findall(r"'href' => '([a-z_]+\.php)'", read_b(os.path.join(APP, 'penumbra_admin_chrome.php')))
+    bad = []
+    for page in tools:
+        src = read_b(os.path.join(APP, page))
+        if not src: bad.append(page + ':missing'); continue
+        if 'penumbra_admin_statusbar()' in src or 'penumbra_admin_close(' in src: continue
+        if re.search(r"require __DIR__ \. '/(index|analytics_all)\.php';", src): continue   # a wrapper: the engine page carries the bar / the stub
+        bad.append(page + ':no bar')
+    return (len(tools) >= 7 and not bad, 'tools %s bad %s' % (tools, bad))
+
+def static_checks(texts):
+    idx, main, pal, stub, menu = texts['index'], texts['main'], texts['pal'], texts['stub'], texts['menu']
+    # every control id the registry names is in index.php (pnbSubscribeBtn is built by main.js; the
+    # palette's own ids and the Ask page's live in the module / the help topic)
+    ids = set(re.findall(r"(?:tool|toolRun|has|el)\('([A-Za-z]+)'\)", pal)) - {'pnbPalette', 'pnbPaletteInput', 'pnbPaletteList', 'pnbPaletteIcons', 'pnbAskQ', 'pnbAskForm'}
+    # (round 6) the dashboard page's controls live in dashboard.php / penumbra_dashboard.js
+    dash_src = texts.get('dash', '') + read_b(os.path.join(APP, 'js', 'penumbra_dashboard.js'))
+    missing_ids = sorted(i for i in ids if ('id="%s"' % i) not in idx and ("id=\"%s\"" % i) not in main and ("id: '%s'" % i) not in main and ("id='%s'" % i) not in main and ('#%s' % i) not in main
+                         and ('id="%s"' % i) not in dash_src and ("id=\"%s\"" % i) not in dash_src)
+    fns = [('openVersionHistory', main), ('penumbraOpenRepo', main), ('openSearchBuilder', main), ('penumbraToggleShortcutSheet', main), ('openHelpCenter', main),
+           ('show_text', main), ('window.Penumbra.find', texts['main']), ('openDialog', texts['calc']), ('ungroup:', main), ('resetAll:', main), ('setFrozen:', main),
+           ('frozen:', main), ('customized:', main), ('restricted:', main), ('groupingColumn:', main), ('fitAll', texts['colw']), ('resetAll', texts['colw']),
+           ('resized', texts['colw']), ('canFit', texts['colw']), ('items: function (th, cell)', menu), ('active: function', read_b(os.path.join(APP, 'js', 'penumbra_cellsel.js'))),
+           ('groupByColumn', main), ('spThemeSelector', idx), ('PENUMBRA_FROZEN_COLS_MAX', main)]
+    missing_fns = [name for name, src in fns if name not in src]
+    emd = [k for k in ('stub', 'pal', 'pcss', 'topic', 'help') if '\u2014' in texts[k]]
+    # (round 2) every entry driven by a toolbar control (tool('X') / toolRun('X')) names that control as its
+    # icon's twin, and the twin named is that control, so the box draws the toolbar's own icon
+    under_test = {v.replace(os.sep, '/') for v in RELS.values()}
+    old_group = [k for k in texts if OLD_GROUP_SIG in texts[k]]
+    for rel in served_files():
+        if os.path.relpath(rel, APP).replace(os.sep, '/') in under_test: continue   # (a text under test stands in for its live file)
+        try: t = open(rel, 'rb').read().decode('utf-8', 'surrogateescape')
+        except Exception: continue
+        if OLD_GROUP_SIG in t: old_group.append(os.path.relpath(rel, APP))
+    icon_bad, icon_n = [], 0
+    for line in pal.splitlines():
+        m = re.search(r"\{ id: '([^']+)'.*?(?:tool|toolRun)\('([A-Za-z]+)'\)", line)
+        if not m: continue
+        icon_n += 1
+        t = re.search(r"icon: \{ twin: '([A-Za-z]+)'", line)
+        if not t or t.group(1) != m.group(2): icon_bad.append(m.group(1))
+    return [
+        ('S-indexLoads', "file_exists(__DIR__ . '/js/penumbra_palette.off')" in idx and 'src="js/penumbra_palette_boot.js?v=' in idx
+         and 'data-js="js/penumbra_palette.js?v=' in idx and 'data-css="css/penumbra_palette.css?v=' in idx, ''),
+        ('S-sheetRow', "row([window.PenumbraPalette.keyLabel ? window.PenumbraPalette.keyLabel() : 'Ctrl+K']" in main and 'window.PenumbraPalette ?' in main, ''),
+        ('S-clearHook', 'window.PenumbraPalette.clearRecent' in main and 'Quick actions: recent picks' in main, ''),
+        ('S-menuItems', 'items: function (th, cell)' in menu and 'flatItems(buildItems(th, false, cell || null))' in menu, ''),
+        ('S-help', 'id="commandPaletteHelpLightbox" class="help-topic" data-audience="viewer"' in texts['topic'] and texts['manifest'].count("'commandPaletteHelpLightbox'") >= 2
+         and 'data-tip="us-tip-palette"' in texts['help'] and 'data-tip="us-tip-palette"' in pal and 'data-jump-to="cp-keys"' in texts['topic'], ''),
+        ('S-registry', not missing_ids and not missing_fns, 'ids %s fns %s' % (missing_ids, missing_fns)),
+        ('S-stubSmall', 0 < len(stub.splitlines()) <= 150, '%d lines' % len(stub.splitlines())),
+        ('S-noEmdash', not emd, str(emd)),
+        ('S-iconsTwin', icon_n >= 12 and not icon_bad, 'toolbar entries %d, without their twin: %s' % (icon_n, icon_bad)),
+        # (round 3) the sprite's #pnbi-group is candidate C, and no copy of the old drawing (the framed table)
+        # remains in any served file: the texts under test plus the live tree's PHP / JS / CSS / help
+        ('S-groupIcon', GROUP_C_SYMBOL in idx and not old_group, 'old drawing in: %s' % old_group),
+        # (round 5) the report discovery gate, server side: gate_tests.php G1-G9 over the staged endpoint
+        ('S-serverGate',) + gate_tests(),
+        # (round 13) the dashboards: ONE gate file holds both gates and both endpoints require it (the one place to lift); the
+        # list's cut (dash_gate_tests.php D1-D7); the module fetches the list once per open from two letters, matches the title
+        # and the id (the owner and tag:NAME for an admin only), keeps the browser's history; the help names the section
+        ('S-dashGate',) + dash_gate_tests(),
+        ('S-gateFile', 'function penumbraReportDiscoveryAllowed($isAdmin)' in texts['disc'] and 'function penumbraDashboardDiscoveryAllowed($isAdmin)' in texts['disc']
+         and 'return penumbraReportDiscoveryAllowed($isAdmin);' in texts['disc'] and texts['disc'].count('function penumbra') == 2
+         and "require_once 'penumbra_discovery.php';" in texts['gsr'] and 'function penumbraReportDiscoveryAllowed' not in texts['gsr']
+         and "require_once 'penumbra_discovery.php';" in texts['mdash'], ''),
+        ('S-dashClient', "x.open('GET', 'manage_dashboard.php?action=list', true);" in pal and 'if (dashFetched || q.length < 2) { return; }' in pal
+         and "match(q, d.title, d.id + (admin ? ' ' + d.owner : ''))" in pal and 'if (tag) { if (admin && ' in pal and "secD = { title: 'Dashboards'" in pal
+         and "window.location.assign('dashboard.php?id=' + encodeURIComponent(h.d.id))" in pal, ''),
+        ('S-dashRecents', "localStorage.setItem('pnb_recent_dashboards'" in pal and 'if (onDashboard()) { try { var dv = (typeof penumbra_dash_vars !== ' in pal and 'dv.shortId && dv.found' in pal, ''),
+        ('S-dashHelp', texts['topic'].count('Dashboards</td>') == 1 and 'the dashboards you own or have opened' in texts['topic'] and 'tag:NAME' in texts['topic'], ''),
+        # (round 13) the metrics row: one entry, the report's own page in a new tab, hidden off a saved report's page
+        # (round 14) the grammar's own exports (the builder's parser, serializer and quoting) and the hand-offs that use them:
+        # the condition parsed and re-serialized, the phrase quoted, the box written through the search action, never assigned
+        ('S-grammarExports', 'parseCondition: reverseParseCondition,' in texts['sb'] and 'conditionToSyntax: conditionToSyntax,' in texts['sb']
+         and 'formatValue: formatValue,' in texts['sb'] and 'resolveColumn: resolveColumnName,' in texts['sb'], ''),
+        ('S-handoffs', 'p = g.parseCondition(t);' in pal and 'g.conditionToSyntax(p.column, p.operator,' in pal and 'var term = g ? g.formatValue(t) : t, merged2 = addCond(term);' in pal
+         and "a.setAttribute('data-action-name', 'search');" in pal and "setTimeout(function () { F.open(t); }, 0);" in pal
+         and "el('tableSearch').value =" not in pal and "getElementById('tableSearch').value =" not in pal and 'var hs = headers(), byName = {};' in pal, ''),
+        # (round 15) the dialog words read from the markup (no hand copy: 'wysiwyg' never appears in the module), every dialog
+        # action names its dialog; the View Options rows from the panel's own checkboxes (no option id in the module); the
+        # tab rows from the console's tab list
+        ('S-uiWords', "var UI_SEL = '.pnb-dlg-title, .pnb-dlg-sub, label, small, h4, legend, button, option, .pnb-subset-tip';" in pal and 'root.querySelectorAll(UI_SEL)' in pal
+         and 'wysiwyg' not in pal.lower() and pal.count("dlg: '#") >= 8 and '|| (question ? null : uiMatch(q, e))' in pal, ''),
+        ('S-voSource', "tab.querySelectorAll('.view-option-item input[type=\"checkbox\"]')" in pal and 'viewOptionClickFilter' not in pal and 'viewOptionBareHeader' not in pal
+         and "spotlight(target, focusEl); }); } });" in pal and 'focusEl.click()' not in pal, ''),
+        ('S-tabsSource', "document.querySelectorAll('#editorTabs > ul > li > a[href^=\"#\"]')" in pal and "click(el('addNewTaskBtn'))" in pal and "s.value = 'EMAIL';" in pal, ''),
+        # (round 16) the gate is the server's own, read by index.php into penumbra_vars.aiAllowed and read bare by the module; the
+        # send is the panel's own Enter handler, dispatched once, the summary box and the send button untouched by the module;
+        # main.js reads the panel PiP-aware in its send and its message append
+        ('S-jarvisGate', 'aiAllowed: <?php echo json_encode((bool)penumbraIsConsoleAudience($isAdmin, $userGrants, $currentUserKey)); ?>,' in idx
+         and "function jarvisOn() { return !!vars().aiAllowed && !!el('toggleAiPanel') && !!reportId() && !onDashboard() && !onAdminPage(); }" in pal
+         and "var $input = $(window._pnbById ? window._pnbById('aiChatInput') : '#aiChatInput');" in main and "var $container = $(window._pnbById ? window._pnbById('aiChatMessages') : '#aiChatMessages');" in main, ''),
+        ('S-jarvisOnce', pal.count("var sb = byId('aiSendBtn'); if (sb) { click(sb); }") == 1 and pal.count("byId('aiSendBtn')") == 1 and 'aiProfileOn' not in pal
+         and "typeof window._pnbById === 'function'" in pal, ''),
+        # (round 17) the contract: the prompt's kinds and action ids agree with the module's (static per deploy); the chips are safe: the
+        # block cut out before rendering, the label escaped, the arguments kept as data (never attributes), the gates in resolve
+        ('S-contract',) + contract_check(pal, texts.get('prompt', '')),
+        ('S-chipsSafe', '$msg.html(renderAiMarkdown(split.text));' in main and "$chip.data('pnbAction', { id: a.id, args: a.args });" in main and '_pnbAiEsc(r.label)' in main
+         and 'eval(' not in main.split('function _pnbAiActionsSplit')[1].split('function appendAiMessage')[0]
+         and "if (!visible(e, '') || dashHidden(e) || (typeof e.hide === 'function' && e.hide())) { return false; }" in pal and 'P.describe = function' in pal and 'P.resolve = function' in pal and 'P.run = function' in pal, ''),
+        ('S-metricsRow', pal.count("id: 'metrics-report'") == 1 and "window.open('analytics.php?id=' + encodeURIComponent(reportId()), '_blank', 'noopener')" in pal
+         and 'hide: function () { return !reportId() || onDashboard() || onAdminPage(); }, needs: function () { return !onDashboard() && !onAdminPage(); },' in pal
+         and 'metrics: ' in pal.split('var PAL_SYMBOLS = {')[1][:2000], ''),
+        ('S-clientGate', "if (!reportDiscoveryAllowed()) { return; }" in pal and "function reportDiscoveryAllowed() { return isGlobal(); }" in pal, ''),
+        # (round 6) the stub on dashboard.php (the same tag, the same switch); the magnifier and the card's row in
+        # index.php; the stylesheet names the magnifier where it names the "?"; the module reads the top-level const
+        # and sends a report row to index.php; the key rule (the one .CodeMirror mention in the stub is refocus's);
+        # the help names the Mac key and the two new ways in
+        ('S-dashStub', 'src="js/penumbra_palette_boot.js?v=' in texts['dash'] and 'data-js="js/penumbra_palette.js?v=' in texts['dash']
+         and "file_exists(__DIR__ . '/js/penumbra_palette.off')" in texts['dash'], ''),
+        ('S-crumbIcon', 'id="searchPaletteIcon" data-pnb-palette="open" data-pnb-from="crumb"' in idx and '(Ctrl+K)"' in idx
+         and "isset($pnbPaletteIconHtml) ? $pnbPaletteIconHtml : ''" in idx, ''),
+        # (round 10) the bar's Search button right after Help in index.php's footer, on the palette switch; the row gone
+        ('S-popBtn', idx.count('id="sbPaletteBtn" data-pnb-palette="open" role="button" title="Quick actions: run an action, jump to a column, report or help (Ctrl+K)"') == 1
+         and '? Help</a>\n                <?php if (!empty($pnbPaletteOn)):' in idx and '</svg> Quick actions</a>' in idx and '.pnb-foot-ico {' in texts['css'], ''),
+        # (round 11) the name wherever a user sees it (markup, not comments), the bolt on every surface, the Esc button
+        ('S-quickName', 'aria-label="Quick actions"' in pal and 'aria-label="Quick actions"' in stub and "'Quick actions: run an action, a column" in main
+         and '<h3 style="margin: 0 0 4px;">Quick actions</h3>' in texts['topic'] and '<h4>Quick actions</h4>' in texts['help'] and "'title' => 'Quick actions'" in texts['manifest']
+         and not [l for l in (idx + pal + stub).splitlines() if ('Command palette' in l or 'Search actions' in l or 'Search</a>' in l) and not l.strip().startswith(('//', '*', '/*', '<?php /*', 'if (!file_exists'))]
+         and 'Command Palette' not in texts['topic'] and 'Command Palette' not in texts['help'], ''),
+        ('S-bolt', '<symbol id="pnbi-quick" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></symbol>' in idx
+         and idx.count('<use href="#pnbi-quick"/>') == 2 and "quick: '<polygon points=\"13 2 3 14 12 14 11 22 21 10 12 10 13 2\"/>'" in pal and '<use href="#pnbpal-quick"/>' in pal
+         and 'points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"' in stub and '&#128269;' not in pal and 'circle cx="10.5"' not in idx, ''),
+        # (round 12) the tools JSON comes from the menu's own loop over the registry (no second list anywhere: the module
+        # names no tool); the chrome's bar carries the stub on the switch + the admin flag + the card button; every admin
+        # tool page mounts that bar (or IS index.php / analytics_all.php)
+        ('S-toolsSource', "echo '<script>window.PENUMBRA_ADMIN_TOOLS = ' . json_encode($rows, JSON_HEX_TAG" in texts['chrome'] and "$rows[] = array('id' => (string)$key, 'label' => (string)$t['label'], 'href' => (string)$t['href']," in texts['chrome']
+         and 'window.PENUMBRA_ADMIN_TOOLS' in pal and not re.search(r"(grants_admin|tags_admin|health|system_notice|analytics_all|repository|calendar)\.php", pal)
+         and texts['chrome'].count("'desc' =>") >= 7, ''),
+        ('S-adminStub', "file_exists(__DIR__ . '/js/penumbra_palette.off')" in texts['chrome'] and 'src="js/penumbra_palette_boot.js?v=' in texts['chrome'] and 'data-fn="help_functions.php?v=<?php echo pnb_help_functions_ver(); ?>"' in texts['chrome']
+         and "window.PENUMBRA_ADMIN_VARS = { isAdmin: <?php echo !empty($isAdmin) ? 'true' : 'false'; ?>, page: 'admin' }" in texts['chrome']
+         and 'id="sbPaletteBtn" data-pnb-palette="open" role="button"' in texts['chrome'], ''),
+        ('S-chromePages',) + chrome_pages(),
+        ('S-escButton', '<button type="button" class="pnb-pal-kbd pnb-pal-esc" aria-label="Close quick actions" tabindex="-1"' in pal
+         and '<button type="button" class="pnb-pal-kbd pnb-pal-esc" aria-label="Close quick actions" tabindex="-1"' in stub and '.pnb-pal-esc:hover, .pnb-pal-esc:focus-visible' in texts['pcss'], ''),
+        ('S-rowGone', 'sbPaletteRow' not in idx and 'sb-pal-row' not in idx and 'sb-pal-row' not in texts['css'] and 'sb-pal-key' not in texts['css'], ''),
+        ('S-cssIcon', texts['css'].count('#searchPaletteIcon') >= 10 and '#searchPaletteIcon {' in texts['css'] and '.pnb-crumb #searchPaletteIcon' in texts['css']
+         and '#pnbStatusBar .sb-upop-foot .pnb-foot-ico' in texts['css'], '%d mentions' % texts['css'].count('#searchPaletteIcon')),   # (round 10: the bar's icon rule, the row's gone)
+        ('S-varsBare', "typeof penumbra_vars !== 'undefined' && penumbra_vars" in pal and "typeof penumbra_dash_vars !== 'undefined'" in pal, ''),
+        ('S-reportHref', "window.location.assign('index.php?id=' + encodeURIComponent(h.r.id));" in pal and "assign('?id='" not in pal, ''),
+        ('S-keyRule', "return mac() ? (e.metaKey && !e.ctrlKey) : (e.ctrlKey && !e.metaKey);" in stub and stub.count("closest('.CodeMirror')") == 1
+         and "closest('.CodeMirror')" in stub.split('function refocus')[-1].split('function relabel')[0], ''),
+        ('S-helpCopy', 'on a Mac <kbd>Cmd</kbd>+<kbd>K</kbd>' in texts['topic'] and 'lightning bolt' in texts['topic'] and "profile card's <em>Quick actions</em> button" in texts['topic']
+         and 'on a Mac <kbd>Cmd</kbd>+<kbd>K</kbd>' in texts['help'] and 'lightning bolt' in texts['help'], ''),
+        # (round 7) the index's integrity (fn_index_build.php --check over the staged builder and the live sources); the
+        # index fetched from open() only (one call site, none in the stub); the help; the pages' ?v= and the endpoint's
+        # cache header; the signature style
+        ('S-fnIndex',) + ((fn_index_run(True)) if texts['fni'] else (False, 'no help/functions_index.php')),
+        ('S-fnLazy', pal.count('loadFnIndex();') == 1 and "        if (fnState === 'idle') { loadFnIndex(); }" in pal and 'loadFnIndex' not in stub and 'P.loadFnIndex' not in pal, ''),
+        ('S-fnHelp', 'Functions and tags</td>' in texts['topic'] and '<kbd>Shift</kbd>+<kbd>Enter</kbd>' in texts['topic'] and 'SQL bracket tags' in texts['help'], ''),
+        ('S-fnVer', idx.count('data-fn="help_functions.php?v=<?php echo pnb_help_functions_ver(); ?>"') == 1 and texts['dash'].count('data-fn="help_functions.php?v=<?php echo pnb_help_functions_ver(); ?>"') == 1
+         and "require_once __DIR__ . '/help/functions_index.php'" in idx and "require_once __DIR__ . '/help/functions_index.php'" in texts['dash']
+         and "Cache-Control: private, max-age=604800" in texts['fnep'] and "require_once 'db_connection.php';" in texts['fnep'], ''),
+        ('S-fnCss', '.pnb-pal-sig {' in texts['pcss'] and 'monospace' in texts['pcss'].split('.pnb-pal-sig {')[1].split('}')[0], ''),
+        # (round 8) the one main.js line; the help; the page's owner flag; the default spec as main.js's grammar has it
+        ('S-feedbackExport', main.count('window.penumbraOpenFeedbackDialog = penumbraOpenFeedbackDialog;') == 1, ''),
+        ('S-feedbackHelp', 'Send feedback to the report owner...' in texts['topic'] and 'Freeze a copy of this dataset for review' in texts['topic'], ''),
+        ('S-ownerVar', 'isReportOwner: <?php echo json_encode(isset($owner_id) && isset($currentUserKey) && penumbraIsReportOwner($owner_id, $currentUserKey)); ?>' in idx, ''),
+        ('S-feedbackSpec', "var FEEDBACK_DEFAULT_SPEC = 'freeze ; Bug|What happened?* ; Suggestion|What would help? ; Question|What would you like to know?';" in pal
+         and "label: 'Send feedback to the report owner...'" in pal and "'You own this report" in pal, ''),
+        # (round 9) the width and paddings in the stylesheet; the one-word rule in the matcher; the owner's reason
+        ('S-boxWide', '.pnb-pal {\n    width: min(760px, 100%);' in texts['pcss'].replace('\r\n', '\n') and 'padding: 13px 15px;' in texts['pcss'] and 'padding: 9px 5px;' in texts['pcss']
+         and 'padding: 11px 17px;' in texts['pcss'] and 'flex-wrap: nowrap;' in texts['pcss'] and 'max-width: 50%;' in texts['pcss'], ''),
+        ('S-fuzzyWord', "if (q.length >= 3) {" in pal and "/[^a-z0-9]/.test(span)" in pal, ''),
+        ('S-ownerReason', "'You own this report, so feedback would come to you'" in pal, ''),
+    ]
+
+# (round 4) the ink of an icon's crop: the share of pixels that differ from the crop's corner (the
+# background). An outlined 24-box icon inks 10-40% of its box; a filled blob 50% and more, or a few dots.
+def ink_ratio(im, rect):
+    x, y, w, h = rect
+    px = list(im.crop((x, y, x + w, y + h)).getdata())
+    bg = px[0]
+    return sum(1 for q in px if abs(q[0] - bg[0]) + abs(q[1] - bg[1]) + abs(q[2] - bg[2]) > 90) / float(len(px))
+def ink_checks(png, info):
+    try:
+        from PIL import Image
+        im = Image.open(png).convert('RGB')
+    except Exception as e:
+        return {'inkPalette': False, 'inkMatch': False}, 'PIL/screenshot: %s' % e
+    rects = (info or {}).get('rects') or {}
+    rs, bad_p, bad_m = {}, [], []
+    for k, v in rects.items():
+        if not v or not v.get('pal') or not v.get('tb'): bad_p.append(k + ':missing'); continue
+        a, b = ink_ratio(im, v['pal']), ink_ratio(im, v['tb'])
+        rs[k] = (round(a, 3), round(b, 3))
+        # (measured: the fixed 16px icons ink 0.30-0.46, live's filled blobs 0.56 / 0.64 and the "two dots" group 0.04)
+        if not (0.08 <= a <= 0.52): bad_p.append('%s:%.2f' % (k, a))
+        if abs(a - b) >= 0.15: bad_m.append('%s:%.2f vs %.2f' % (k, a, b))
+    return {'inkPalette': len(rs) >= 3 and not bad_p, 'inkMatch': len(rs) >= 3 and not bad_m}, 'ink %s bad %s %s' % (rs, bad_p, bad_m)
+SHOT_PATH = os.environ.get('PNB_SHOT') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot.png')
+SHOT6_PATH = os.environ.get('PNB_SHOT6') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot6.png')   # (round 6) the breadcrumb + the card
+SHOT7 = {'pshot7f': os.environ.get('PNB_SHOT7F') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot7f.png'), 'pshot7t': os.environ.get('PNB_SHOT7T') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot7t.png'),
+         'pshot8': os.environ.get('PNB_SHOT8') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot8.png'),
+         'pshot9': os.environ.get('PNB_SHOT9') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot9.png'),
+         'pshot10': os.environ.get('PNB_SHOT10') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot10.png'),
+         'pshot11': os.environ.get('PNB_SHOT11') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot11.png'),
+         'pshot12': os.environ.get('PNB_SHOT12') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot12.png'),
+         'pshot14a': os.environ.get('PNB_SHOT14A') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot14a.png'),   # (round 14) "sponsor nih"
+         'pshot14b': os.environ.get('PNB_SHOT14B') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot14b.png'),   # (round 14) a no-match text
+         'pshot15': os.environ.get('PNB_SHOT15') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot15.png'),   # (round 15) "view options" as an admin
+         'pshot16': os.environ.get('PNB_SHOT16') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot16.png'),   # (round 16) a question, Ask Jarvis first
+         'pshot17': os.environ.get('PNB_SHOT17') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot17.png')}   # (round 17) a reply with chips
+
+def run_browser(scns):
+    out = []
+    for s in scns:
+        r = run_page(('dash.html?scn=%s' if s.startswith('pdash') else ('adm.html?scn=%s' if s in ('padmin', 'pshot12') else 'harness.html?scn=%s')) % s, SHOT_PATH if s == 'pshot' else (SHOT6_PATH if s == 'pshot6' else SHOT7.get(s)))
+        if r.get('fatal'):
+            out.append(('F-' + s, False, (r.get('fatal') or '')[:4000])); continue
+        out.append(('E-' + s, not r.get('errors'), 'errors %s' % r.get('errors')))
+        chk = r.get('chk') or {}
+        if s == 'pshot':
+            ink, note = ink_checks(SHOT_PATH, r.get('info'))
+            chk.update(ink); r.setdefault('info', {})['ink'] = note; print('    screenshot: %s' % SHOT_PATH)
+        if s == 'pshot6': print('    screenshot: %s rects %s' % (SHOT6_PATH, json.dumps((r.get('info') or {}).get('rects'))))
+        full = bool(os.environ.get('PNB_INFO'))
+        for c in CHK[s]:
+            v = chk.get(c)
+            out.append(('L-%s-%s' % (s, c), v is True, '%s%s' % (v, ('   info %s' % json.dumps(r.get('info'))[:None if full else 700]) if (v is not True or full) else '')))
+    return out
+
+try:
+    texts = {k: read_b(v) for k, v in cand.items()}
+    print('under test: %s' % json.dumps(cand))
+    if all_mutants or one_mutant:
+        okc = bad = 0
+        for m in ([one_mutant] if one_mutant else list(MUTANTS)):
+            edits, must, scns = MUTANTS[m]
+            t = mutate(texts, m)
+            write_stage(t)
+            res = run_browser(scns) + static_checks(t)   # (the static checks too: a static-only mutant must show its kill)
+            red = [a for a, p, _ in res if not p]
+            # a dead page is NOT a kill: the must-checks have to go red on a page that still runs (a mutant
+            # that crashes the scenario is a harness problem to fix, and would hide a survivor)
+            dead = [(a[2:], dd) for a, p, dd in res if a.startswith('F-') and not p]
+            good = not dead and not [x for x in must if x not in red]
+            for d, dd in dead: print('    DEAD %s: %s' % (d, dd[:1500]))
+            okc += good; bad += (not good)
+            print('  %s  mutant %-14s turns %s red   [red: %s]' % ('PASS' if good else 'FAIL', m, ' '.join(must), ' '.join(red)))
+        print('SUMMARY mutants ok=%d bad=%d' % (okc, bad))
+        print('RESULT: GREEN' if bad == 0 else 'RESULT: RED')
+    else:
+        write_stage(texts)
+        res = run_browser(SCN)
+        if scn_only is None: res += static_checks(texts)
+        p = f = 0; failed = []
+        for a, passed, dd in res:
+            print('  %s  %-28s %s' % ('PASS' if passed else 'FAIL', a, dd if os.environ.get('PNB_INFO') else dd[:700]))
+            if passed: p += 1
+            else: f += 1; failed.append(a)
+        print('TOTAL pass=%d fail=%d   failed: %s' % (p, f, ' '.join(failed)))
+        if control:
+            dead = {a[2:] for a, passed, _ in res if a.startswith('F-') and not passed}
+            red = {a for a, passed, _ in res if not passed} | {'L-%s-%s' % (s, c) for s in dead for c in CHK[s]}
+            seen = {a for a, _, _ in res} | {'L-%s-%s' % (s, c) for s in dead for c in CHK[s]}
+            new_green = sorted(a for a in NEW if a in seen and a not in red)
+            new_unseen = sorted(a for a in NEW if a not in seen)
+            old_red = sorted(a for a in red if a not in NEW and not a.startswith('F-'))
+            print('CONTROL: new checks green on live (unexpected): %s' % (' '.join(new_green) or 'none'))
+            print('CONTROL: new checks never run: %s' % (' '.join(new_unseen) or 'none'))
+            print('CONTROL: old checks red on live (unexpected): %s' % (' '.join(old_red) or 'none'))
+            print('RESULT: GREEN' if not new_green and not new_unseen and not old_red else 'RESULT: RED')
+        else:
+            print('RESULT: GREEN' if f == 0 and p > 0 else 'RESULT: RED')
+finally:
+    try: edge.kill()
+    except Exception: pass
+    try: srv.kill()
+    except Exception: pass
+    time.sleep(1)
+    shutil.rmtree(stage, ignore_errors=True)

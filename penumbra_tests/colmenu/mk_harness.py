@@ -39,8 +39,17 @@ def build(index_src):
     rep('<script src="penumbra_tiles.js"></script>\n',
         '<script src="penumbra_tiles.js"></script>\n'
         '<script>if (/^mperf|^mrerun/.test(window.__SCN)) document.write(\'<script src="penumbra_a11y.js"></scr\' + \'ipt>\');</script>\n')
+    # (2026-10-20, grpsweep 2) ggfmt: the report saves V_DATE shown as a year (one band holds many
+    # days); mautostale: a report saved grouped as List by a column the query no longer has (it opens
+    # flat, the List choice left behind)
+    rep('    window.__STORED = st;\n',
+        '    if (S === "ggfmt") st.columnFormats = { V_DATE: "date:YYYY" };\n'
+        '    if (S === "mautostale") { st.groupBy = "NO_SUCH_COL"; st.groupLayout = "list"; }\n'
+        '    window.__STORED = st;\n')
+    # (2026-10-20, grpmenu) the group menu (gg*) and the layout's auto choice (mauto*) need
+    # the List layout too
     rep('<script src="penumbra_colmenu.js"></script>\n',
-        '<script>if (/^mperf|^mrerun/.test(window.__SCN)) document.write(\'<link rel="stylesheet" href="penumbra_grouplist.css"><link rel="stylesheet" href="penumbra_cellsel.css">\' +\n'
+        '<script>if (/^mperf|^mrerun|^gg|^mauto/.test(window.__SCN)) document.write(\'<link rel="stylesheet" href="penumbra_grouplist.css"><link rel="stylesheet" href="penumbra_cellsel.css">\' +\n'
         '  \'<script src="penumbra_grouplist.js"></scr\' + \'ipt><script src="penumbra_cellsel.js"></scr\' + \'ipt>\');</script>\n'
         '<script src="penumbra_colmenu.js"></script>\n')
     return src

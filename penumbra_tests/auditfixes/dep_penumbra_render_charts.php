@@ -189,7 +189,7 @@ function penumbra_vis_asset_list() {
         'js/brace-fold.js', 'js/comment-fold.js', 'js/placeholder.js', 'js/penumbra_snippet_help.js',
         'js/purify.min.js', 'js/penumbra_template.js',
         // lazy chart set (main.js loadScript()s these by their literal js/ paths)
-        'js/chart-4.5.1.min.js', 'js/chartjs-plugin-datalabels-2.0.0.min.js', 'js/chartjs-chart-treemap-3.1.0.min.js',
+        'js/chart-4.5.1.min.js', 'js/chartjs-plugin-datalabels-2.0.0.min.js', 'js/chartjs-chart-treemap-3.1.0.min.js', 'js/chartjs-chart-sankey-0.19.1.min.js',
         'js/penumbra_charts.js', 'js/penumbra_geo_us.js',
         // the theme variables
         'css/main.css'
@@ -442,6 +442,33 @@ html,body{margin:0 !important;padding:0 !important;background:#ffffff !important
       })();
     });
   }
+  // The image text of an emailed / PDF chart (WCAG 1.1.1, 2026-10-15): never
+  // empty, since an empty alt reads as decorative and leaves a linked chart with
+  // a nameless link. The aria-label enhanceChartA11y wrote, when it ran here,
+  // else the same shape from the chart itself: type, title, axis titles, counts.
+  // The email has no data table beside the picture, so that clause is dropped.
+  function chartAlt(cv, ch, title) {
+    var lbl = "";
+    try { lbl = String(cv.getAttribute("aria-label") || "").replace(/;\s*full data in the adjacent table\.?\s*$/, ".").trim(); } catch (e) {}
+    if (lbl) return lbl;
+    try {
+      var cfg = (ch && ch.config) || {}, data = cfg.data || {}, opts = cfg.options || {};
+      var typeName = String(data._chartType || cfg.type || "").replace(/[-_]+/g, " ").trim();
+      if (!title) { try { var tt = opts.plugins && opts.plugins.title && opts.plugins.title.text; if (tt) title = Array.isArray(tt) ? tt.join(" ") : String(tt); } catch (e) {} }
+      lbl = (typeName ? typeName.charAt(0).toUpperCase() + typeName.slice(1) + " chart" : "Chart") + (title ? ": " + title : "");
+      var axes = [];
+      try {
+        var sc = opts.scales || {};
+        ["x", "y"].forEach(function (k) { var t = sc[k] && sc[k].title; if (t && t.display !== false && t.text) axes.push((k === "x" ? "x axis " : "y axis ") + (Array.isArray(t.text) ? t.text.join(" ") : String(t.text))); });
+      } catch (e) {}
+      if (axes.length) lbl += "; " + axes.join(", ");
+      var a11y = data._a11yRows, ds = data.datasets || [], labels = data.labels || [];
+      if (a11y && a11y.rows && a11y.rows.length) lbl += ". " + a11y.rows.length + " rows.";
+      else if (ds.length) lbl += ". " + ds.length + " data series, " + labels.length + " categories.";
+      else lbl += ".";
+    } catch (e) {}
+    return lbl || (title ? "Chart: " + title : "Chart");
+  }
   function collect() {
     var charts = [];
     $("#reportSnippetOutput .pnb-vis-slot").each(function () {
@@ -458,6 +485,7 @@ html,body{margin:0 !important;padding:0 !important;background:#ffffff !important
           var ctx = c2.getContext("2d"); ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, c2.width, c2.height); ctx.drawImage(cv, 0, 0);
           rec.w = Math.round(ch && ch.width ? ch.width : cv.width); rec.h = Math.round(ch && ch.height ? ch.height : cv.height);
           rec.title = String(cfg.title || "");
+          rec.alt = chartAlt(cv, ch, rec.title);
           rec.wspec = String(cfg.width == null ? "" : cfg.width);
           rec.labels = (ch && ch.data && ch.data.labels) ? ch.data.labels.slice(0, 40).map(String) : [];
           rec.colors = (ch && ch.data && ch.data.datasets) ? ch.data.datasets.slice(0, 6).map(function (d) { var b = d.borderColor; return typeof b === "string" ? b : (Array.isArray(b) ? String(b[0]) : String(typeof b)); }) : [];
@@ -600,7 +628,10 @@ function penumbra_vis_render_calls($calls, $data, $columns, $webroot = null, $pa
             'width'  => max(1, (int)(isset($c['w']) ? $c['w'] : 0)),
             'height' => max(1, (int)(isset($c['h']) ? $c['h'] : 0)),
             'wpct'   => $wpct,
-            'alt'    => isset($c['title']) ? (string)$c['title'] : '',
+            // alt = the page's description (type, title, axes, counts), never empty;
+            // title = the author's own title (the PDF list keeps it).
+            'alt'    => penumbra_vis_alt_text(isset($c['alt']) ? $c['alt'] : '', isset($c['title']) ? $c['title'] : ''),
+            'title'  => isset($c['title']) ? (string)$c['title'] : '',
             // what the page drew (for the suite and the log; never mailed)
             'labels' => (isset($c['labels']) && is_array($c['labels'])) ? array_slice($c['labels'], 0, 40) : array(),
             'colors' => (isset($c['colors']) && is_array($c['colors'])) ? array_slice($c['colors'], 0, 6) : array()
@@ -705,6 +736,26 @@ function penumbra_vis_render_snippet($text, $data, $columns, $reportMeta = array
 }
 }
 
+if (!function_exists('penumbra_vis_alt_text')) {
+function penumbra_vis_alt_text($alt, $title = '') {
+    $a = trim(preg_replace('/\s+/u', ' ', (string)$alt));
+    if ($a === '') {
+        $t = trim(preg_replace('/\s+/u', ' ', (string)$title));
+        $a = $t !== '' ? 'Chart: ' . $t : 'Chart';
+    }
+    if (strlen($a) > 300) $a = (function_exists('mb_substr') ? mb_substr($a, 0, 297, 'UTF-8') : substr($a, 0, 297)) . '...';
+    return $a;
+}
+}
+
+if (!function_exists('penumbra_vis_alt_attr')) {
+function penumbra_vis_alt_attr($img, $linked) {
+    $a = penumbra_vis_alt_text(isset($img['alt']) ? $img['alt'] : '', isset($img['title']) ? $img['title'] : '');
+    if ($linked) $a = rtrim($a, '. ') . '. Opens the chart in full view.';
+    return htmlspecialchars($a, ENT_QUOTES, 'UTF-8');
+}
+}
+
 if (!function_exists('penumbra_vis_img_tag')) {
 function penumbra_vis_img_tag($img, $inCell = false) {
     $linked = !empty($img['href']);
@@ -712,7 +763,7 @@ function penumbra_vis_img_tag($img, $inCell = false) {
     $block = $inCell || $linked;
     $tag = '<img src="cid:' . htmlspecialchars($img['cid'], ENT_QUOTES) . '" width="' . (int)$img['width'] . '" height="' . (int)$img['height'] . '"'
          . ($linked ? ' border="0"' : '')
-         . ' alt="' . htmlspecialchars($img['alt'], ENT_QUOTES) . '"'
+         . ' alt="' . penumbra_vis_alt_attr($img, $linked) . '"'
          . ' style="' . ($block ? 'display:block; margin:0;' : 'display:inline-block; vertical-align:top; margin:4px 0;') . ' max-width:100%; height:auto; border:0;">';
     return $linked ? penumbra_vis_linked_chart($img, $tag, $inCell) : $tag;
 }
@@ -759,7 +810,7 @@ function penumbra_vis_fluid_img_tag($img, $linked) {
     if ($nat < 1) $nat = 2 * $w;
     return '<img src="cid:' . htmlspecialchars($img['cid'], ENT_QUOTES) . '" width="' . $aw . '" height="' . $ah . '"'
          . ($linked ? ' border="0"' : '')
-         . ' alt="' . htmlspecialchars($img['alt'], ENT_QUOTES) . '"'
+         . ' alt="' . penumbra_vis_alt_attr($img, $linked) . '"'
          . ' style="display:block; margin:0; width:100%; max-width:' . $nat . 'px; height:auto; border:0;">';
 }
 }
@@ -924,7 +975,7 @@ function penumbra_vis_pdf_charts($images) {
             'type'   => $usePng ? 'PNG' : 'JPEG',
             'width'  => (int)$img['width'],
             'height' => (int)$img['height'],
-            'title'  => (string)$img['alt']
+            'title'  => isset($img['title']) ? (string)$img['title'] : (string)$img['alt']
         );
     }
     return $out;

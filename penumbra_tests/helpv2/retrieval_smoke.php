@@ -15,6 +15,8 @@
  *   R9 assist mode: data questions naming PI / ID / FY / DB still retrieve nothing (the Ask-only tier of the
  *      allow-list never reaches the assistant's question)
  *   R10 a cache stamped with the previous PNB_HELP_VER is rejected and rebuilt (a bump rebuilds both caches)
+ *   R11 ask mode: "can you unpivot this current dataset" puts the Restore Transaction List passage first (a question
+ *      word the help never uses is stood in for by its synonyms, 2026-10-20)
  * Exit = failures.
  */
 require_once __DIR__ . '/lib.php';
@@ -55,10 +57,12 @@ function build($php, $app, $orig, $out, $v2) {
         // R8-R10 (2026-10-17): the two-letter allow-list, the assistant's data-question battery, the VER mechanism.
         . "\$q4 = function_exists('pnb_help_retrieve_chunks') ? pnb_help_retrieve_chunks('is the IP address list enforced', 5, null, 'ask') : array();\n"
         . "\$q4ids = array(); \$q4ip = false; foreach (\$q4 as \$ch) { \$q4ids[] = isset(\$ch['id']) ? \$ch['id'] : \$ch['t']; if (stripos(\$ch['x'], 'IP Address List') !== false) \$q4ip = true; }\n"
+        . "\$q5 = function_exists('pnb_help_retrieve_chunks') ? pnb_help_retrieve_chunks('can you unpivot this current dataset', 6, null, 'ask') : array();\n"
+        . "\$q5first = (\$q5 && stripos(\$q5[0]['x'], 'Restore Transaction List') !== false) ? 1 : 0;\n"
         . "\$short = array(); foreach (array('ip', 's3', 'db', 'ui', 'ai', 'pi', 'id', 'fy') as \$t) \$short[\$t] = isset(\$c['df'][\$t]) ? \$c['df'][\$t] : 0;\n"
         . "\$leak = array(); foreach (" . var_export($GLOBALS['DATA_BATTERY'], true) . " as \$q) { \$l = strlen(pnb_help_retrieve(\$q)); if (\$l) \$leak[\$q] = \$l; }\n"
         . "\$stale = \$c; \$stale['ver'] = PNB_HELP_VER - 1; \$cp = pnb_help_cache_paths(); file_put_contents(\$cp[0], json_encode(\$stale)); \$re = pnb_help_cache(); \$reVer = \$re ? \$re['ver'] : null; \$reN = (\$re && !empty(\$re['chunks'])) ? count(\$re['chunks']) : 0;\n"
-        . "echo json_encode(array('n' => \$c['n'], 'sig' => \$c['src_mtime'], 'auds' => \$auds, 'titles' => count(\$titles), 'q1' => substr(\$q1, 0, 400), 'q1topic' => (preg_match('/\\\\[Topic: ([^\\\\]]+)\\\\]/', \$q1, \$m) ? \$m[1] : ''), 'q2len' => strlen(\$q2), 'q3ids' => \$q3ids, 'q3alen' => strlen(\$q3a), 'q4ids' => \$q4ids, 'q4ip' => \$q4ip, 'short' => \$short, 'leak' => \$leak, 'ver' => PNB_HELP_VER, 'reVer' => \$reVer, 'reN' => \$reN, 'files' => array_map('basename', pnb_help_src_files()), 'cache' => pnb_help_cache_paths()));\n";
+        . "echo json_encode(array('n' => \$c['n'], 'sig' => \$c['src_mtime'], 'auds' => \$auds, 'titles' => count(\$titles), 'q1' => substr(\$q1, 0, 400), 'q1topic' => (preg_match('/\\\\[Topic: ([^\\\\]]+)\\\\]/', \$q1, \$m) ? \$m[1] : ''), 'q2len' => strlen(\$q2), 'q3ids' => \$q3ids, 'q3alen' => strlen(\$q3a), 'q4ids' => \$q4ids, 'q4ip' => \$q4ip, 'q5first' => \$q5first, 'short' => \$short, 'leak' => \$leak, 'ver' => PNB_HELP_VER, 'reVer' => \$reVer, 'reN' => \$reN, 'files' => array_map('basename', pnb_help_src_files()), 'cache' => pnb_help_cache_paths()));\n";
     file_put_contents($script, $code);
     $outp = (string)shell_exec(escapeshellarg($php) . ' -n ' . escapeshellarg($script) . ' 2>&1');
     $j = json_decode(trim($outp), true);
@@ -84,6 +88,7 @@ $R->check('R8', $v2 && !empty($v2['q4ids']) && $v2['q4ids'][0] === 'saveSecurity
     . (($v2 && !empty($v2['q4ip'])) ? ' with the IP Address List passage' : ' WITHOUT the IP Address List passage') . '; short-token df ' . ($v2 ? json_encode($v2['short']) : '?'));
 $R->check('R9', $v2 && isset($v2['leak']) && count($v2['leak']) === 0,
     'assist mode: ' . count($DATA_BATTERY) . ' data questions naming PI / ID / FY / DB retrieve nothing' . (($v2 && !empty($v2['leak'])) ? ' - LEAK ' . json_encode($v2['leak']) : ''));
+$R->check('R11', $v2 && !empty($v2['q5first']), 'ask mode: "can you unpivot this current dataset" puts the Restore Transaction List passage first');
 $R->check('R10', $v2 && isset($v2['reVer']) && (int)$v2['reVer'] === (int)$v2['ver'] && (int)$v2['reN'] > 900,
     'a cache stamped with the previous PNB_HELP_VER is rejected and rebuilt (ver ' . ($v2 ? $v2['reVer'] . ' = ' . $v2['ver'] : '?') . ', ' . ($v2 ? $v2['reN'] : '?') . ' chunks)');
 

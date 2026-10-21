@@ -9,6 +9,19 @@ penumbra_tpl_parse
 penumbra_tpl_has_calls
 penumbra_tpl_collect_refs
 penumbra_tpl_eval_node
+penumbra_tpl_calc_num
+penumbra_tpl_calc_char_name
+penumbra_tpl_calc_parse
+penumbra_tpl_calc_is_op
+penumbra_tpl_calc_primary
+penumbra_tpl_calc_unary
+penumbra_tpl_calc_mul
+penumbra_tpl_calc_add
+penumbra_tpl_calc_value
+penumbra_tpl_calc_digits
+penumbra_tpl_calc_increment
+penumbra_tpl_calc_format
+penumbra_tpl_calc_eval_call
 penumbra_tpl_resolve_data
 penumbra_tpl_cell_text
 penumbra_tpl_nested_raw
@@ -21,5 +34,6 @@ penumbra_tpl_pivot_source
 penumbra_tpl_build_source
 penumbra_tpl_subst
 penumbra_tpl_render_body
+penumbra_tpl_unescape
 penumbra_tpl_render_header
 generate_custom_template_string

@@ -16,6 +16,8 @@ penumbra_vis_page_html
 penumbra_vis_parse_dom
 penumbra_vis_render_calls
 penumbra_vis_render_snippet
+penumbra_vis_alt_text
+penumbra_vis_alt_attr
 penumbra_vis_img_tag
 penumbra_vis_linked_chart
 penumbra_vis_fluid_layout

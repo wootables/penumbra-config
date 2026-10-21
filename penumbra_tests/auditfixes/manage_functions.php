@@ -162,6 +162,30 @@ function encrypt_scheduler_password($plaintext) {
 }
 }
 
+if (!function_exists('penumbra_sched_apply_sftp_key')) {
+function penumbra_sched_apply_sftp_key($options, $posted_key, $remove, $existing_opts) {
+    if (!is_array($options)) $options = array();
+    $posted_key = is_string($posted_key) ? trim($posted_key) : '';
+    if ($posted_key === '' && isset($options['drop_sftp_key']) && is_string($options['drop_sftp_key'])
+            && trim($options['drop_sftp_key']) !== '' && !penumbraSchedulerSecretIsStored($options['drop_sftp_key'])) {
+        $posted_key = trim($options['drop_sftp_key']);
+    }
+    unset($options['drop_sftp_key']);
+    if ($posted_key !== '') {
+        $options['drop_sftp_key'] = encrypt_scheduler_password($posted_key);
+        return array($options, 'new');
+    }
+    if ($remove) return array($options, 'removed');
+    if (is_array($existing_opts) && isset($existing_opts['drop_sftp_key']) && is_string($existing_opts['drop_sftp_key'])
+            && trim($existing_opts['drop_sftp_key']) !== '') {
+        $options['drop_sftp_key'] = $existing_opts['drop_sftp_key'];
+        list($options, $migrated) = penumbraSchedulerEncryptPlainSftpKey($options, SCHEDULER_SECRET_KEY);
+        return array($options, $migrated ? 'migrated' : 'kept');
+    }
+    return array($options, 'none');
+}
+}
+
 if (!function_exists('get_next_run_date_calc')) {
 function get_next_run_date_calc($cron_expr) {
     $parts = preg_split('/\s+/', trim($cron_expr));
@@ -183,7 +207,18 @@ function get_next_run_date_calc($cron_expr) {
             return date('Y-m-d H:i:s', $check_ts);
         }
     }
-    return date('Y-m-d H:i:s', strtotime('+1 hour')); 
+    // No minute in the next year matches (2026-10-11, "cronnever"): the schedule
+    // never comes round - 31 February, 30 February, a day-of-month that month
+    // never has. This used to fall back to "+1 hour", and the runner then re-armed
+    // it an hour on after every run: a "never" schedule ran HOURLY. Now false, so
+    // a save / enable refuses it (a Test Run still works: its placeholder cron).
+    return false;
+}
+}
+
+if (!function_exists('cron_never_comes_round')) {
+function cron_never_comes_round($cron_expr) {
+    return count(preg_split('/\s+/', trim((string)$cron_expr))) === 5 && get_next_run_date_calc($cron_expr) === false;
 }
 }
 
@@ -215,9 +250,33 @@ if (!function_exists('touch_report_updated_at')) {
 function touch_report_updated_at($conn, $numeric_report_id) {
     if (!$numeric_report_id) return;
     try {
-        $stmt = $conn->prepare("UPDATE NC_REPORTING.PENUMBRA_REPORTS SET UPDATED_AT = CURRENT_TIMESTAMP WHERE ID = :id");
+        $st = $conn->prepare("SELECT TRIM(SHORT_ID) AS SID,
+                                     TO_CHAR(UPDATED_AT, 'YYYY-MM-DD HH24:MI:SS.FF6') AS BEFORE_TXT,
+                                     TO_CHAR(CURRENT_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS.FF6') AS NOW_TXT
+                                FROM NC_REPORTING.PENUMBRA_REPORTS WHERE ID = :id");
+        $st->bindValue(':id', $numeric_report_id);
+        $st->execute();
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return;
+        $before = (string)$row['BEFORE_TXT'];
+        $after  = (string)$row['NOW_TXT'];
+        $stmt = $conn->prepare("UPDATE NC_REPORTING.PENUMBRA_REPORTS
+                                   SET UPDATED_AT = TO_TIMESTAMP(:now_ts, 'YYYY-MM-DD HH24:MI:SS.FF6')
+                                 WHERE ID = :id
+                                   AND NVL(TO_CHAR(UPDATED_AT, 'YYYY-MM-DD HH24:MI:SS.FF6'), '-') = NVL(:before_ts, '-')");
+        $stmt->bindValue(':now_ts', $after);
         $stmt->bindValue(':id', $numeric_report_id);
+        $stmt->bindValue(':before_ts', $before);
         $stmt->execute();
+        if ($stmt->rowCount() === 1) {
+            if (!headers_sent()) {
+                header('X-Penumbra-Report-Version: ' . rawurlencode((string)$row['SID']) . ' ' . rawurlencode($before) . ' ' . rawurlencode($after));
+            }
+        } else {
+            $stmt = $conn->prepare("UPDATE NC_REPORTING.PENUMBRA_REPORTS SET UPDATED_AT = CURRENT_TIMESTAMP WHERE ID = :id");
+            $stmt->bindValue(':id', $numeric_report_id);
+            $stmt->execute();
+        }
     } catch (Exception $e) {
         error_log("touch_report_updated_at failed: " . $e->getMessage());
     }

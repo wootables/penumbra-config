@@ -24,6 +24,9 @@ _search_num_in_range_list
 _journal_normalize_toggle_conditions
 _journal_toggle_dual_test
 _search_journal_skip
+_search_notes_col
+_search_notes_register
+_search_notes_condition
 _journal_alias_toggle_conditions
 penumbraRecipientListRegex
 penumbraRecipientListSqlIn
@@ -33,3 +36,5 @@ php_apply_search_filter
 penumbra_route_dash_search
 penumbra_search_known_columns
 penumbra_search_columns_from_meta
+penumbra_nested_row_count
+_penumbra_json_rows

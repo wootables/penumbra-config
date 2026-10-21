@@ -1,0 +1,86 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>engine A format() aggregate conditions</title></head>
+<body>
+<!-- Minimal DOM, as the parity harness's harness_b.html: evaluateAggregateCondition reads the
+     visible rows from #resultsTable tbody (td[data-column='#'] = master-row index + 1), or from
+     #groupedResultsContainer when that is VISIBLE - so the grouped container is hidden here. -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<input type="hidden" id="reportSubtitle" value="Awards by unit">
+<table id="resultsTable"><caption class="sr-only">Report results table</caption><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table>
+<div id="groupedResultsContainer" style="display:none"></div><div id="errorBox"></div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  window.penumbra_vars = {
+    isAdmin: true, currentUserKey: 'harness', shibboleth: { fname: 'Test', lname: 'Harness', email: 'harness@example.invalid', unityid: 'harness', ouc: '000000', dept: 'TEST' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  window.ResizeObserver = function () {
+    this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {};
+  };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  window.__errors = [];
+  window.onerror = function (m) { window.__errors.push(String(m)); return true; };
+</script>
+<script src="main_cfagg.js"></script>
+<script src="corpus_inline.js"></script>
+<script>
+(function () {
+  function report(txt) { document.getElementById('out').textContent = txt; }
+  function run() {
+    var E = window.__EAC;
+    if (typeof E !== 'function') {
+      report('EAC_UNAVAILABLE err=' + (window.__EAC_ERR || 'n/a') + ' pageErrors=' + JSON.stringify(window.__errors.slice(0, 3)));
+      return;
+    }
+    var corpus = window.__CORPUS;
+    // main.js ingestion (~69922): keys upper-cased, NULL stored as '', every other value String()ed.
+    var maps = corpus.rows.map(function (r) {
+      var m = new Map();
+      Object.keys(r).forEach(function (k) { m.set(k.toUpperCase(), r[k] === null ? '' : String(r[k])); });
+      return m;
+    });
+    var results = corpus.cases.map(function (c) {
+      var entry = { id: c.id };
+      try {
+        var res = E(c.cond, maps);
+        entry.result = !!res.result;
+        entry.final = res.final;
+      } catch (e) {
+        entry.error = String(e && e.message ? e.message : e);
+      }
+      return entry;
+    });
+    report('RESULTS_JSON:' + JSON.stringify({ pageErrors: window.__errors.slice(0, 6), cases: results }));
+  }
+  var tries = 0;
+  (function wait() {
+    tries++;
+    if (typeof window.__EAC === 'function' || tries > 40) { setTimeout(run, 250); }
+    else { setTimeout(wait, 100); }
+  })();
+})();
+</script>
+</body></html>

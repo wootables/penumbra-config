@@ -6,6 +6,7 @@
 #   & $p                    # add -CompareOnly to skip to the comparison
 #   & $p -MainSrc <path\to\main.js>   # a stage or mutant main.js in place of live's (how the
 #                                     # page-error check is proved: tBodies -> tBodiez must go RED)
+#   & $p -RunnerSrc <path\to\schedule_runner.php>   # the same for engine C (2026-10-20)
 #
 # Running it IN PLACE on the share is blocked by the very policy it works
 # around - copy it local first, as above.
@@ -26,6 +27,7 @@
 #                  second). Use it after editing compare.ps1's $expected /
 #                  $openBugs.
 #   -MainSrc       handed to run_parity.ps1 unchanged (see its header).
+#   -RunnerSrc     the same (see its header).
 #
 # A RED run (2026-10-17): compare.ps1 ends in a throw when either harness recorded
 # an uncaught error while main.js booted (page errors), after printing its report;
@@ -40,7 +42,7 @@
 # crbug.com/40528867 (and now and then get_updates_processor.cc) in steps 4 and
 # 5 are NOISE.
 # =============================================================================
-param([switch]$CompareOnly, [string]$MainSrc)
+param([switch]$CompareOnly, [string]$MainSrc, [string]$RunnerSrc)
 
 $ErrorActionPreference = 'Stop'
 $root = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\parity'
@@ -68,6 +70,7 @@ if (-not $CompareOnly) {
     # Drop run_parity.ps1's trailing compare.ps1 invocation - that nested call is
     # a UNC .ps1 too, and is blocked by the same policy.
     $runArgs = @{}; if ($MainSrc) { $runArgs['MainSrc'] = $MainSrc }
+    if ($RunnerSrc) { $runArgs['RunnerSrc'] = $RunnerSrc }
     Invoke-ShareScript -Name 'run_parity.ps1' -StripFrom '& "$here\compare.ps1"' -ScriptArgs $runArgs
 }
 Invoke-ShareScript -Name 'compare.ps1'

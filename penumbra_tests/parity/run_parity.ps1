@@ -7,6 +7,7 @@
 #
 #   powershell -File run_parity.ps1
 #   powershell -File run_parity.ps1 -MainSrc <path\to\main.js>   # a stage or mutant main.js in place of live's
+#   powershell -File run_parity.ps1 -RunnerSrc <path\to\schedule_runner.php>   # the same for engine C
 #
 # It rebuilds everything from the LIVE app files each run, so it always tests
 # what is deployed. Nothing is written to the webroot.
@@ -24,7 +25,12 @@
 param(
     # An alternative main.js (a stage copy, or a mutant such as tBodies -> tBodiez to prove
     # the page-error check) in place of the live one. The vendor libs still come from live js\.
-    [string]$MainSrc
+    [string]$MainSrc,
+    # An alternative schedule_runner.php for engine C (2026-10-20): a stage copy or a mutant.
+    # Only the extract reads it - run_engine_c.php still requires penumbra_search.php and
+    # penumbra_render_charts.php from the live $app, so a change that also touches those
+    # two needs a stage tree, not this switch.
+    [string]$RunnerSrc
 )
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot; if (-not $here) { $here = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\parity' }   # empty when run as a scriptblock: never fall back to the caller's cwd
@@ -34,8 +40,14 @@ $php  = '\\oitras\d$\Utilities\PHP_8.2-p\php.exe'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }
 
+$runnerPhp = "$app\schedule_runner.php"
+if ($RunnerSrc) {
+    if (-not (Test-Path -LiteralPath $RunnerSrc)) { throw "-RunnerSrc not found: $RunnerSrc" }
+    $runnerPhp = $RunnerSrc
+}
 Write-Host "[1/6] extracting engine C functions from schedule_runner.php ..."
-& $php -n "$here\extract_engine_c.php" "$app\schedule_runner.php" "$here\engineC_functions.php" | Out-Host
+if ($RunnerSrc) { Write-Host "    schedule_runner.php source OVERRIDDEN by -RunnerSrc (NOT the live file): $RunnerSrc" }
+& $php -n "$here\extract_engine_c.php" "$runnerPhp" "$here\engineC_functions.php" | Out-Host
 # A native exit code does not trip $ErrorActionPreference, so check it: a failed
 # step would otherwise leave the PREVIOUS run's result_c.json for step 6 to compare.
 if ($LASTEXITCODE -ne 0) { throw "engine C extraction failed (exit $LASTEXITCODE)" }
@@ -71,10 +83,17 @@ $anchor = '$(document).ready(function () {'
 if (-not $src.Substring(0, 200).Contains($anchor)) { throw "main.js closure anchor not found - update run_parity.ps1" }
 # Export engine B as the closure's FIRST statement: function declarations hoist,
 # so this captures it (with all its real dependencies) even if later init throws.
+# Both wrappers also SEED masterRowData with the case rows (2026-10-20): the
+# all/total/unfiltered scope reads that module-level `let`, which is empty with no
+# report loaded, so every `all` case answered over ZERO rows in A and B (why
+# sum_scope_all sat in $expected as "not harness-verifiable"). The fixture has no
+# filter, so the full set and the visible set are the same rows, exactly what engine
+# C (which drops the word) computes over.
 $inject = ''
 $inject += "`r`n    try {"
 $inject += "`r`n      window.__ENGINE_B = function (text, maps, cols) {"
 $inject += "`r`n        allResolvedPrompts = (window.__CORPUS && window.__CORPUS.promptValues) || [];"
+$inject += "`r`n        masterRowData = maps;"
 $inject += "`r`n        return resolveInfoboxSnippet(text, maps, cols);"
 $inject += "`r`n      };"
 $inject += "`r`n    } catch (e) { window.__ENGINE_B_ERR = String(e); }"
@@ -97,6 +116,7 @@ $injectA += "`r`n          snippetEditor = CodeMirror.fromTextArea(document.getE
 $injectA += "`r`n        }"
 $injectA += "`r`n        snippetEditor.setValue(text);"
 $injectA += "`r`n        allResolvedPrompts = (window.__CORPUS && window.__CORPUS.promptValues) || [];"
+$injectA += "`r`n        masterRowData = maps;"
 $injectA += "`r`n        pendingPivotSettings = null;"
 $injectA += "`r`n        pendingGroupByColumn = null;"
 $injectA += "`r`n        window._penumbraAutoloadFired = true;"

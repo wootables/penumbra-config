@@ -4,7 +4,13 @@ window.__CORPUS = {
         "N",
         "AMOUNT",
         "DT",
-        "DUP"
+        "DUP",
+        "MB",
+        "MT",
+        "MW",
+        "MH",
+        "ME",
+        "TERM"
     ],
     "rows": [
         {
@@ -12,42 +18,78 @@ window.__CORPUS = {
             "N": "1",
             "AMOUNT": "1200.50",
             "DT": "01-JAN-24",
-            "DUP": "10"
+            "DUP": "10",
+            "MB": "",
+            "MT": "P",
+            "MW": "  ",
+            "MH": "@@HTML<b>Hi</b>",
+            "ME": "",
+            "TERM": "Fall term"
         },
         {
             "NAME": "Beta",
             "N": "2",
             "AMOUNT": "300.25",
             "DT": "15-MAR-24",
-            "DUP": "20"
+            "DUP": "20",
+            "MB": "X",
+            "MT": "Q",
+            "MW": "X",
+            "MH": "@@HTML<b>Hi</b>",
+            "ME": "",
+            "TERM": "Spring"
         },
         {
             "NAME": "Alpha",
             "N": "3",
             "AMOUNT": "45.00",
             "DT": "09-FEB-25",
-            "DUP": "20"
+            "DUP": "20",
+            "MB": "",
+            "MT": "Q",
+            "MW": "  ",
+            "MH": "Z",
+            "ME": "",
+            "TERM": "Fall"
         },
         {
             "NAME": "",
             "N": "4",
             "AMOUNT": "-75.75",
             "DT": "20-DEC-23",
-            "DUP": "30"
+            "DUP": "30",
+            "MB": "Y",
+            "MT": "P",
+            "MW": "  ",
+            "MH": "Z",
+            "ME": "",
+            "TERM": "Summer"
         },
         {
             "NAME": "  ",
             "N": "5",
             "AMOUNT": "10000",
             "DT": "05-JUL-26",
-            "DUP": "30"
+            "DUP": "30",
+            "MB": "X",
+            "MT": "R",
+            "MW": "X",
+            "MH": "@@HTML<b>Hi</b>",
+            "ME": "",
+            "TERM": "Spring"
         },
         {
             "NAME": "Gamma ",
             "N": "6",
             "AMOUNT": "0.333",
             "DT": "28-FEB-24",
-            "DUP": "30"
+            "DUP": "30",
+            "MB": "",
+            "MT": "R",
+            "MW": "Y",
+            "MH": "W",
+            "ME": "",
+            "TERM": "Winter"
         }
     ],
     "cases": [
@@ -105,7 +147,8 @@ window.__CORPUS = {
         },
         {
             "id": "sum_scope_all",
-            "snippet": "sum(AMOUNT, all)"
+            "snippet": "sum(AMOUNT, all)",
+            "expect": "11,470.33"
         },
         {
             "id": "avg",
@@ -575,7 +618,8 @@ window.__CORPUS = {
         },
         {
             "id": "data_prompt_missing",
-            "snippet": "data(prompt6)"
+            "snippet": "data(prompt12)",
+            "expect": "undefined"
         },
         {
             "id": "data_prompt_sentence",
@@ -628,12 +672,86 @@ window.__CORPUS = {
         {
             "id": "info_default",
             "snippet": "info()"
+        },
+
+        {
+            "id": "mode_blank_majority",
+            "snippet": "mode(MB)",
+            "expect": "X"
+        },
+        {
+            "id": "mode_tie_first_seen",
+            "snippet": "mode(MT)",
+            "expect": "P"
+        },
+        {
+            "id": "mode_whitespace_is_blank",
+            "snippet": "mode(MW)",
+            "expect": "X"
+        },
+        {
+            "id": "mode_html_marker",
+            "snippet": "mode(MH)",
+            "expect": "<b>Hi</b>"
+        },
+        {
+            "id": "mode_all_blank",
+            "snippet": "[mode(ME)]",
+            "expect": "[N/A]"
+        },
+        {
+            "id": "mode_empty_set",
+            "snippet": "[mode(NAME, N > 99)]",
+            "expect": "[N/A]"
+        },
+        {
+            "id": "data_prompt7",
+            "snippet": "data(prompt7)",
+            "expect": "seventh"
+        },
+        {
+            "id": "data_prompt10",
+            "snippet": "data(prompt10)",
+            "expect": "tenth"
+        },
+        {
+            "id": "rank_scope_all",
+            "snippet": "rank(1, AMOUNT, all)",
+            "expect": "10,000"
+        },
+        {
+            "id": "rank_scope_bottom_all",
+            "snippet": "rank(-1, AMOUNT, all)",
+            "expect": "-75.75"
+        },
+        {
+            "id": "rank_scope_total",
+            "snippet": "rank(1, AMOUNT, total)",
+            "expect": "10,000"
+        },
+        {
+            "id": "rank_scope_cond_all",
+            "snippet": "rank(1, AMOUNT, N <= 3, all)",
+            "expect": "1,200.5"
+        },
+        {
+            "id": "count_bare_all_is_condition",
+            "snippet": "count(all)",
+            "expect": "2"
         }
     ],
     "promptValues": [
         "Engineering",
         "2026",
-        "ACTIVE"
+        "ACTIVE",
+        "p4",
+        "p5",
+        "p6",
+        "seventh",
+        "eighth",
+        "ninth",
+        "tenth",
+        "eleventh"
     ],
     "promptNamed": {
         "unit": "Engineering"

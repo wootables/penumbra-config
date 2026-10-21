@@ -101,6 +101,42 @@
   function sorted(a, dir) {
     return a.length > 20 && a.every(function (v, j) { if (j === 0) return true; var c = a[j - 1].localeCompare(v); return dir === 'asc' ? c <= 0 : c >= 0; });
   }
+  // (2026-10-20, grpmenu / grpauto) the group menu and the layout's auto choice
+  function L() { var H = window.Penumbra && window.Penumbra.groupLayoutHost; return H ? H.get() : null; }
+  function glOn() { var G = window.Penumbra && window.Penumbra.groupList; return !!(G && G.state().on); }
+  function GM() { return (window.Penumbra && window.Penumbra.groupMenu) || null; }
+  function grouped() { return document.body.classList.contains('group-mode-active'); }
+  function tops() { return Array.prototype.slice.call(document.querySelectorAll('#groupedResultsContainer > .group-wrapper')); }
+  function topKeys() { return tops().filter(function (w) { return !w.classList.contains('search-hidden'); }).map(function (w) { return w.getAttribute('data-group-key'); }); }
+  function gw(key) { return tops().filter(function (w) { return w.getAttribute('data-group-key') === key; })[0] || null; }
+  function bandEl(key) { var w = gw(key); return w ? w.querySelector(':scope > .group-header') : null; }
+  function listRow(name) { return Array.prototype.filter.call(document.querySelectorAll('#pnbGroupList .pnb-gl-item'), function (r) { var n = r.querySelector('.pnb-gl-name'); return !!n && n.textContent === name; })[0] || null; }
+  function levelsNow() { var G = GM(), w = tops()[0], i = (G && w) ? G.info(w) : null; return i ? i.levels.join() : ''; }
+  async function groupedBy(col, n) {
+    return await until(function () { return grouped() && !!A() && A().groupingColumn() === col && (n == null || tops().length === n); }, 15000);
+  }
+  async function flat() { if (A() && grouped()) A().ungroup(); return await until(function () { return !grouped(); }, 15000); }
+  // the status bar chip's / the header menu's one-click Group by (penumbraGroupByColumn)
+  async function oneClick(col, n) { window.Penumbra.groupByColumn(col); var ok = await groupedBy(col, n); await sleep(350); return ok; }
+  function snipAction(name, value) { var a = $('<a class="snippet-action"></a>').attr('data-action-name', name).attr('data-action-value', value); $('#reportSnippetOutput').append(a); a.trigger('click'); a.remove(); }
+  // a submenu's item: the menu on el, the list beside `parent`, then `act`
+  async function chooseIn(el, parent, act) {
+    closeMenu();
+    rclick(el);
+    if (!sub(parent)) { closeMenu(); return false; }
+    var it = item(act);
+    if (!it || it.getAttribute('aria-disabled') === 'true') { closeMenu(); return false; }
+    it.click();
+    await sleep(450);
+    return true;
+  }
+  // the Undo button of the newest notice whose text matches re
+  function undoBtn(re) {
+    var ts = Array.prototype.slice.call(document.querySelectorAll('.zz-toast')).filter(function (t) { return re.test(t.textContent); });
+    return ts.length ? ts[ts.length - 1].querySelector('.pnb-hm-undo') : null;
+  }
+  function rdown(el) { var r = el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 2, buttons: 2, clientX: Math.round(r.left + 6), clientY: Math.round(r.top + 6) })); }
+  function keyOn(k) { (document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })); }
 
   var S = {
     mflat: async function () {
@@ -109,6 +145,7 @@
       R.chk.opens = !!menu();
       var t = menu() && menu().querySelector('.pnb-hm-title');
       R.chk.titleName = !!t && t.textContent.indexOf('V_NAME') >= 0;
+      if (!menu()) return;   // (2026-10-20, stalemut) no menu (mutant j-menu): the checks below need one - red, not a crash
       // (round 2) the counts under the name: the rows the search keeps, from the data
       var names = window.__rowsFixture.map(function (r) { return r.V_NAME; });
       var uniq = {}; names.forEach(function (x) { uniq[x] = 1; });
@@ -131,6 +168,23 @@
       var infU = infoMap();
       R.chk.statsAllUnique = infU['Unique'] === 'all' && infU['With a value'] === '300' && infU['Duplicates'] === 'none';
       R.info.statsU = infU;
+      closeMenu();
+      // (2026-10-20, mutfix) round 21's list: a number column's spread, a date column's span, from the data
+      var amts = window.__rowsFixture.map(function (r) { return parseFloat(String(r.V_AMOUNT).replace(/[$,]/g, '')); }).sort(function (x, y) { return x - y; });
+      var aSum = 0, aMid = amts.length >> 1; amts.forEach(function (v) { aSum += v; });
+      var nf = function (x) { return Number(x).toLocaleString(undefined, { maximumFractionDigits: 2 }); };
+      var numWant = { Smallest: nf(amts[0]), Largest: nf(amts[amts.length - 1]), Total: nf(aSum), Average: nf(aSum / amts.length), Median: nf((amts[aMid - 1] + amts[aMid]) / 2) };
+      rclick(fth('V_AMOUNT')); sub('stats');
+      var infA = infoMap();
+      R.chk.statsNum = amts.length === 300 && amts[0] < amts[amts.length - 1] && Object.keys(numWant).every(function (k) { return infA[k] === numWant[k]; });
+      R.info.statsNum = { got: infA, want: numWant };
+      closeMenu();
+      var dk = function (s) { var p = String(s).split('/'); return (+p[2] * 100 + +p[0]) * 100 + +p[1]; };
+      var days = window.__rowsFixture.map(function (r) { return r.V_DATE; }).sort(function (x, y) { return dk(x) - dk(y); });
+      rclick(fth('V_DATE')); sub('stats');
+      var infD = infoMap();
+      R.chk.statsDate = dk(days[0]) < dk(days[days.length - 1]) && infD['Earliest'] === days[0] && infD['Latest'] === days[days.length - 1];
+      R.info.statsDate = { got: infD, want: [days[0], days[days.length - 1]] };
       closeMenu();
       // the five most common values, each a filter: V_STATUS's top value filters the table to it
       var cntS = {};
@@ -182,6 +236,20 @@
       R.chk.statsNotes = stN['Rows with notes'] === String(wantNotesRows) && stN['Notes'] === String(wantNotes) && stN['Without notes'] === String(300 - wantNotesRows);
       R.info.statsJournal = { toggle: stT, notes: stN, want: [wantOn, wantNotesRows, wantNotes] };
       closeMenu();
+      // (2026-10-20, jrnhidden) a journal column counts the rows the filter keeps too: all but the Open rows
+      // hidden (as statsFiltered hides them below), the toggle's boxes on the rows left, from the data
+      var jVis = 0, jOn = 0;
+      Array.prototype.forEach.call(document.querySelectorAll('#resultsTable tbody tr'), function (tr) {
+        var r = window.__rowsFixture[parseInt(tr.cells[0].textContent, 10) - 1];
+        if (r && r.V_STATUS !== 'Open') tr.classList.add('search-hidden');
+        else if (r) { jVis++; if ((parseInt(String(r.V_ID).slice(3), 10) - 1001) % 3 === 0) jOn++; }
+      });
+      rclick(fth('V_STATUS')); sub('stats');
+      var stJ = infoMap();
+      R.chk.statsJournalFiltered = jVis > 0 && jVis < 300 && stJ['Checked'] === String(jOn) && stJ['Unchecked'] === String(jVis - jOn);
+      R.info.statsJournalFiltered = { got: stJ, want: [jOn, jVis - jOn] };
+      closeMenu();
+      Array.prototype.forEach.call(document.querySelectorAll('#resultsTable tbody tr.search-hidden'), function (tr) { tr.classList.remove('search-hidden'); });
       P.journalFriendlyCol = keepF; P.journalSearchColumnValue = keepV;
       // the search: rows it hides do not count (marked as the search marks them)
       var openN = 0;
@@ -767,9 +835,10 @@
       rclick(fth('V_STATUS'));
       if (item('filter')) item('filter').click();
       await sleep(300);
-      if (panelEl()) panelEl().querySelector('[data-hp="clear"]').click();
+      var clr = panelEl() && panelEl().querySelector('[data-hp="clear"]');   // (2026-10-20, mutfix) no Clear (m-filterkeep: no filter kept): red, not a crash
+      if (clr) clr.click();
       await sleep(900);
-      R.chk.filterClear = searchVal() === '' && visRows() === 300;
+      R.chk.filterClear = !!clr && searchVal() === '' && visRows() === 300;
       // (Blank) is offered where cells are empty: H_GROUP is null on every 11th row
       var nulls = window.__rowsFixture.filter(function (r) { return r.H_GROUP === null || r.H_GROUP === undefined || String(r.H_GROUP).trim() === ''; }).length;
       var fb = A() && A().filterInfo ? A().filterInfo('H_GROUP') : null, lastV = fb && fb.values[fb.values.length - 1];
@@ -867,6 +936,82 @@
       R.chk.fitLines = nl.length > 10 && nl.every(function (td) { return lines(td) === 2; }) && w2 < concatNl + pad - 10;
       R.info.fitnest = { grow: g, compact: c, nl: { w: w2, concat: concatNl, pad: pad, lines: nl.slice(0, 5).map(function (td) { return lines(td); }) } };
     },
+    mfitnote: async function () {
+      // (2026-10-20, notefit; user on jjornl: a double press on the Notes column's edge made it "extra
+      // long") The newest note in a Notes cell is a box of its own - 16em and wrapping while rows grow,
+      // one line cut at 22em while they do not - and its button sets the icon, the count and the note
+      // side by side. Fit gives the column what the button takes laid out, never the note's text on one
+      // line; a note let out of its box (overflow visible) spills and shows, so it is measured whole.
+      var N = '__JOURNAL_NOTES', P = window.Penumbra, H = P.colWidthsHost, W = P.colWidths;
+      if (typeof P.journalPaintFor !== 'function' || typeof P.journalMarkLoadedKey !== 'function') { R.info.fitnote = 'no journal hooks'; return; }
+      var LONG = 'ok that sounds good to me -- ok that sounds good to me -- ok that sounds good to me -- ok that sounds good to me';
+      var SHORT = ['Call the sponsor back', 'Done', 'Budget sent to the PI'];
+      window._penumbraJournalKeyColumns = ['V_ID'];
+      P.journalMarkLoadedKey();   // the key the report is saved with: the buttons take notes
+      window._penumbraToggleState = {};
+      window._penumbraRowNoteCounts = {}; window._penumbraRowNotes = {};
+      P.journalPaintFor([], true);
+      await sleep(200);
+      function btns() { return Array.prototype.slice.call(document.querySelectorAll('#resultsTable tbody td.journal-notes-col .journal-notes-btn')).filter(function (b) { return b.offsetParent; }); }
+      function pvs() { return Array.prototype.slice.call(document.querySelectorAll('#resultsTable tbody td.journal-notes-col .journal-notes-preview')).filter(function (p) { return p.offsetParent; }); }
+      var keys = btns().slice(0, 3).map(function (b) { return b.getAttribute('data-row-key'); });
+      function notes(texts) {
+        window._penumbraRowNoteCounts = {}; window._penumbraRowNotes = {};
+        texts.forEach(function (t, i) { window._penumbraRowNoteCounts[keys[i]] = i + 1; window._penumbraRowNotes[keys[i]] = [{ ID: 900 + i, NOTE_TEXT: t }]; });
+        P.journalPaintFor([], true);
+      }
+      function edgeOf(el) { var c = getComputedStyle(el); return parseFloat(c.paddingLeft) + parseFloat(c.paddingRight) + parseFloat(c.borderLeftWidth) + parseFloat(c.borderRightWidth); }
+      var cv = document.createElement('canvas').getContext('2d');
+      function tw(t, font) { cv.font = font; return cv.measureText(t).width; }
+      function r1(x) { return Math.round(x * 10) / 10; }
+      // what the widest notes cell takes laid out: the column made far wider than any button
+      async function natural() {
+        H.setUser(N, 1100); W.apply(); await sleep(250);
+        var w = 0;
+        pvs().forEach(function (p) { w = Math.max(w, p.closest('.journal-notes-btn').getBoundingClientRect().width + edgeOf(p.closest('td'))); });
+        return w;
+      }
+      // the double press's Fit (the API that and the menu's item both run)
+      async function fitNow() {
+        H.setUser(N, null); W.apply(); await sleep(200);
+        var ok = W.fit(fth(N)); await sleep(400);
+        return ok ? fth(N).getBoundingClientRect().width : 0;
+      }
+      // 1. rows that grow: every note wraps in its 16em box - the column fits the button, the box whole
+      notes([LONG, SHORT[0], SHORT[1]]);
+      document.body.classList.add('disable-auto-expand');
+      await sleep(200);
+      var p0 = pvs()[0], font = p0 ? getComputedStyle(p0).font : '', fs = p0 ? parseFloat(getComputedStyle(p0).fontSize) : 0;
+      var oneLine = tw(LONG, font);
+      var natG = await natural(), wG = await fitNow();
+      var pvG = pvs().map(function (p) { return r1(p.getBoundingClientRect().width); });
+      R.chk.noteGrow = pvs().length === 3 && natG > 100 && oneLine > natG + 150 && wG >= natG - 0.5 && wG <= natG + 6 && pvG.every(function (x) { return Math.abs(x - 16 * fs) < 1; });
+      // 2. consistent height: one line, the long note cut at its 22em, the short ones whole
+      document.body.classList.remove('disable-auto-expand');
+      await sleep(200);
+      var natC = await natural(), wC = await fitNow();
+      var pc = pvs(), longC = pc[0] ? pc[0].clientWidth : 0, cutC = pc.slice(1).filter(function (p) { return p.scrollWidth > p.clientWidth + 1; }).length;
+      R.chk.noteCompact = pc.length === 3 && natC > 100 && oneLine > natC + 150 && wC >= natC - 0.5 && wC <= natC + 6 && Math.abs(longC - 22 * fs) < 1.5 && !cutC;
+      // 3. short notes only: the icon, the count and the note side by side - none cut
+      notes(SHORT);
+      await sleep(200);
+      var natS = await natural(), wS = await fitNow();
+      var cutS = pvs().filter(function (p) { return p.scrollWidth > p.clientWidth + 1; }).map(function (p) { return p.textContent + ' ' + p.clientWidth + '/' + p.scrollWidth; });
+      R.chk.noteShort = pvs().length === 3 && natS > 60 && wS >= natS - 0.5 && wS <= natS + 6 && !cutS.length;
+      // 4. a note let out of its box (overflow visible): it spills past its 22em and shows - measured whole
+      notes([LONG, SHORT[0], SHORT[1]]);
+      var sp = document.head.appendChild(document.createElement('style'));
+      sp.textContent = '#resultsTable td.journal-notes-col .journal-notes-preview { overflow: visible !important; text-overflow: clip !important; }';
+      await sleep(200);
+      var wP = await fitNow(), q = pvs()[0], tdq = q ? q.closest('td') : null, rg = document.createRange();
+      if (q) rg.selectNodeContents(q);
+      var textEnd = q ? rg.getBoundingClientRect().right : 0, room = tdq ? tdq.getBoundingClientRect().right - parseFloat(getComputedStyle(tdq).paddingRight) : 0;
+      var capP = Math.max(400, Math.min(1200, Math.round((fth(N).closest('#results-wrapper') || document.documentElement).clientWidth * 0.6)));
+      R.chk.noteSpill = !!q && wP > 0 && oneLine + 60 < capP && textEnd <= room + 1;
+      sp.remove();
+      R.info.fitnote = { fs: fs, oneLine: r1(oneLine), grow: { nat: r1(natG), w: r1(wG), pv: pvG }, compact: { nat: r1(natC), w: r1(wC), long: longC, cut: cutC },
+        short: { nat: r1(natS), w: r1(wS), cut: cutS }, spill: { w: r1(wP), end: r1(textEnd), room: r1(room), cap: capP }, keys: keys };
+    },
     mnest: async function () {
       // (round 23) a nested-table column (H_JSON, @@JSON): no Filter by value, Column stats counts the
       // tables and the rows inside them and lists no values; a right-click on a sub-cell filters to that
@@ -904,6 +1049,24 @@
       // the cell around the sub-table: the column's menu, no value items
       R.chk.nestPadOpens = !!td && rclick(td) && !!menu() && !item('cellFilter') && !item('cellCopy') && acts().indexOf('sortAsc') >= 0;
       closeMenu();
+      // (round 30) Consistent row height: the panel's switch as a checked item on the nested column
+      // (not on a plain one); a pick flips the switch and the body class, the preference with it
+      var tg = document.getElementById('spRowExpandToggle'), was = !document.body.classList.contains('disable-auto-expand');
+      // (round 31) the panel syncs its checkbox only when it opens: a stale checkbox must not mislead the item
+      if (tg) { tg.checked = !was; }
+      rclick(th);
+      var rhItem = item('rowHeight');
+      R.chk.nestRowHeight = !!tg && !!rhItem && rhItem.getAttribute('aria-checked') === String(was) && tg.checked === was;
+      closeMenu();
+      rclick(fth('V_NAME'));
+      R.chk.nestRowHeightPlain = !!menu() && !item('rowHeight');
+      closeMenu();
+      var flipped = await choose(th, 'rowHeight');
+      R.chk.nestRowHeightFlips = flipped && !!tg && tg.checked === !was && document.body.classList.contains('disable-auto-expand') === was
+        && rclick(th) && item('rowHeight').getAttribute('aria-checked') === String(!was);
+      R.info.rowHeight = { was: was, now: tg && tg.checked, cls: document.body.classList.contains('disable-auto-expand') };
+      closeMenu();
+      if (tg && tg.checked !== was) { await choose(th, 'rowHeight'); }
       // (round 24) a sub-cell that is a LINK (fi-epa-c's resolver links): a right-click on the link
       // opens the menu, Filter to its text, Copy this value; (round 25) no link items of our own,
       // a footer names the way to the browser's menu; a header's menu has no footer
@@ -1070,7 +1233,7 @@
       R.chk.noChips = !menu().querySelector('.pnb-hm-row');
       var subs = ['move', 'show', 'copy', 'calc', 'resets'];
       R.chk.arrows = subs.every(function (x) { return !!item(x) && !!item(x).querySelector('.pnb-hm-arrow') && item(x).getAttribute('aria-haspopup') === 'menu' && item(x).getAttribute('aria-expanded') === 'false'; })
-        && !item('copyName').querySelector('.pnb-hm-arrow');
+        && !!item('copyName') && !item('copyName').querySelector('.pnb-hm-arrow');   // (stalemut) no item (u-copyname): red, not a crash
       var showNote = item('show').querySelector('.pnb-hm-note');
       R.chk.showLabel = item('show').querySelector('.pnb-hm-label').textContent === 'Show column(s)' && !!showNote && /^\d+ hidden$/.test(showNote.textContent)
         && item('move').querySelector('.pnb-hm-label').textContent === 'Move column' && item('copy').querySelector('.pnb-hm-label').textContent === 'Copy distinct values';
@@ -1281,6 +1444,7 @@
       R.chk.bkReopen = !!pnl && pnl.querySelector('[data-hp="mode-ranges"]').getAttribute('aria-selected') === 'true'
         && rp.map(function (r) { return r.querySelector('input').checked; }).join() === rp.map(function (r, i) { return i === 1 || i === 2; }).join() && !!pnl.querySelector('[data-hp="clear"]');
       // a gap (the 2nd and 4th): Apply off, the note says so
+      if (rp.length < 4) return;   // (2026-10-20, mutfix) fewer than four ranges (mutant k-step): the checks below need them - red, not a crash
       rp[2].querySelector('input').click();
       rp[3].querySelector('input').click();
       await sleep(50);
@@ -1469,6 +1633,459 @@
       await new Promise(function (r) { requestAnimationFrame(function () { setTimeout(r, 0); }); });
       R.info.perf = { rerun: Math.round(t1 - t0), toFrame: Math.round(performance.now() - t0), rows: document.querySelectorAll('#resultsTable tbody tr').length };
       R.chk.done = document.querySelectorAll('#resultsTable tbody tr').length > 1000;
+    },
+    // (2026-10-20, grpauto) a grouping that names no layout takes one from its size: up to 8
+    // groups at the top level Stacked, more List - decided once, at the click; a chosen
+    // layout sticks until the grouping ends. (The grouping list module is loaded: mauto*.)
+    mauto: async function () {
+      var rows = window.__rowsFixture, cnt = {};
+      rows.forEach(function (r) { cnt[r.V_NAME] = (cnt[r.V_NAME] || 0) + 1; });
+      var names = Object.keys(cnt).sort(function (a, b) { return cnt[b] - cnt[a] || (a < b ? -1 : 1); });
+      // 1. few groups (V_STATUS: 3) from the header menu: Stacked
+      await choose(fth('V_STATUS'), 'groupBy');
+      var ok1 = await groupedBy('V_STATUS', 3);
+      await sleep(300);
+      R.chk.autoFew = ok1 && L() === 'stacked' && !glOn();
+      // 2. ungrouped, the same column again groups (the old guard read a variable an ungroup leaves behind)
+      await flat();
+      await choose(fth('V_STATUS'), 'groupBy');
+      R.chk.sameAgain = await groupedBy('V_STATUS', 3);
+      await flat();
+      // 3. many groups (V_NAME): List, the List layer on, and the notice saying so
+      try { localStorage.removeItem('penumbra_grpauto_tip'); } catch (e) { }
+      window.__toasts.length = 0;
+      await choose(fth('V_NAME'), 'groupBy');
+      var ok3 = await groupedBy('V_NAME', names.length);
+      await sleep(500);
+      R.chk.autoMany = ok3 && names.length > 8 && L() === 'list' && glOn();
+      function tips() { return window.__toasts.filter(function (t) { return t.indexOf('groups, so they are listed on the left') >= 0; }); }
+      var t1 = tips();
+      R.chk.tipShown = t1.length === 1 && t1[0].indexOf(names.length.toLocaleString() + ' groups') >= 0 && localStorage.getItem('penumbra_grpauto_tip') === '1';
+      // 4. no one chose List: a one-click regroup decides again (V_STATUS: Stacked)
+      var wasList = L() === 'list';
+      var okr = await oneClick('V_STATUS', 3);
+      R.chk.redecides = wasList && okr && L() === 'stacked' && !glOn();
+      // ...and many again: List, without a second notice
+      var okm = await oneClick('V_NAME', names.length);
+      await sleep(300);
+      R.chk.tipOnce = okm && L() === 'list' && glOn() && tips().length === 1;
+      // 5. a layout chosen from the group menu sticks through a one-click regroup...
+      await oneClick('V_STATUS', 3);
+      var sw = !!bandEl('Open') && await choose(bandEl('Open'), 'gList');
+      await sleep(300);
+      var listed = sw && L() === 'list' && glOn();
+      var okc = await oneClick('H_GROUP', 6);
+      R.chk.chosenSticks = listed && okc && L() === 'list' && glOn();
+      // ...until the grouping is removed: grouped again from the dialog (its Layout left alone - a
+      // one-click grouping from flat decides anyway), a one-click regroup decides again
+      await flat();
+      $('#groupTableBtn').trigger('click'); await sleep(400);
+      $('#confirmGroupingBtn').trigger('click');
+      var okd = await groupedBy('H_GROUP', 6); await sleep(300);
+      // (H_CODE, not V_NAME: on live the next step's V_NAME grouping, right after an ungroup of
+      // V_NAME, would meet the old "already grouped by it" bug and keep the guard below from guarding)
+      var codes = {}; rows.forEach(function (r) { codes[r.H_CODE] = 1; });
+      var oku = await oneClick('H_CODE', Object.keys(codes).length);
+      R.chk.ungroupResets = R.chk.chosenSticks && okd && oku && Object.keys(codes).length > 8 && L() === 'list' && glOn();
+      $('#groupingLightbox').hide();
+      await flat();
+      // 6. what is DRAWN decides: the filter leaves 8 names - Stacked; 9 - List
+      function only(n) { return 'V_NAME = /^(?:' + names.slice(0, n).join('|') + ')$/'; }
+      function rowsOf(n) { return names.slice(0, n).reduce(function (s, k) { return s + cnt[k]; }, 0); }
+      function flatShown() { return document.querySelectorAll('#resultsTable tbody tr:not(.search-hidden)').length; }
+      snipAction('search', only(8));
+      await until(function () { return flatShown() === rowsOf(8); }, 10000);
+      var ok8 = await oneClick('V_NAME', 8);
+      R.chk.boundary8 = ok8 && L() === 'stacked';
+      await flat();
+      snipAction('search', only(9));
+      await until(function () { return flatShown() === rowsOf(9); }, 10000);
+      var ok9 = await oneClick('V_NAME', 9);
+      R.chk.boundary9 = ok9 && L() === 'list';
+      // ...decided once: the filter narrowed to 8 groups while grouped does not switch it back
+      // (the grouped search only hides groups: one filtered out before grouping is never built)
+      snipAction('search', only(8));
+      await until(function () { return topKeys().length === 8; }, 10000);
+      await sleep(400);
+      R.chk.filterNoFlip = ok9 && topKeys().length === 8 && L() === 'list';
+      await flat();
+      snipAction('search', '');
+      await until(function () { return flatShown() === 300; }, 10000);
+      // 7. a limit left in the form (a cancelled dialog, a grouping since removed) is not applied
+      $('#groupLimitN').val('2'); $('#groupLimitOther').prop('checked', true);
+      var oks = await oneClick('H_GROUP', 6);
+      R.chk.staleForm = oks && topKeys().length === 6 && !document.querySelector('#groupedResultsContainer > .group-wrapper[data-group-other]');
+      R.info.auto = { names: names.length, L: L(), tops: topKeys().length, levels: levelsNow(), tips: tips().length, ok: [ok1, ok3, okr, okm, sw, okc, oku, ok8, ok9, oks] };
+    },
+    // (2026-10-20, grpauto) the dialog and the snippet triggers: what counts as a choice
+    mauto2: async function () {
+      var seen = {}; window.__rowsFixture.forEach(function (r) { seen[r.V_NAME] = 1; });
+      var nN = Object.keys(seen).length;
+      // 1. a dialog Apply that leaves the Layout radio alone chooses nothing: the count still decides
+      await choose(fth('V_NAME'), 'groupBy');
+      await groupedBy('V_NAME', nN); await sleep(300);
+      var wasList = L() === 'list';
+      $('#groupTableBtn').trigger('click'); await sleep(400);
+      $('#confirmGroupingBtn').trigger('click'); await sleep(900);
+      var okd = await oneClick('H_GROUP', 6);
+      R.chk.dialogKeepsAuto = wasList && okd && L() === 'stacked';
+      $('#groupingLightbox').hide();
+      // 2. ...a pick on the radio is a choice, even of the layout already on screen
+      await oneClick('V_NAME', nN);
+      var wasList2 = L() === 'list';
+      $('#groupTableBtn').trigger('click'); await sleep(400);
+      var rS = document.querySelector('#groupLayoutRow input[value="stacked"]'), rL = document.querySelector('#groupLayoutRow input[value="list"]');
+      if (rS) rS.click();
+      if (rL) rL.click();
+      $('#confirmGroupingBtn').trigger('click'); await sleep(900);
+      var okp = await oneClick('H_GROUP', 6);
+      R.chk.radioPickSticks = wasList2 && okp && L() === 'list';
+      $('#groupingLightbox').hide();
+      await flat();
+      // 3. a snippet's bare group_by names no layout: the layout on screen stays (Stacked from flat)
+      snipAction('trigger', 'group_by|V_NAME');
+      var okt = await groupedBy('V_NAME', nN); await sleep(300);
+      R.chk.triggerBare = okt && L() === 'stacked';
+      await flat();
+      // 4. a trigger naming the layout on screen makes it a choice: a one-click regroup keeps it
+      await oneClick('V_NAME', nN);
+      var wasAuto = L() === 'list';
+      snipAction('trigger', 'group_by|V_NAME|layout=list');
+      await sleep(900);
+      var okn = await oneClick('H_GROUP', 6);
+      R.chk.triggerNamedSticks = wasAuto && okn && L() === 'list';
+      // 5. (sweep) a radio picked in a dialog closed without Apply is not a later trigger's choice
+      await flat();
+      $('#groupTableBtn').trigger('click'); await sleep(400);
+      var rL2 = document.querySelector('#groupLayoutRow input[value="list"]');
+      if (rL2) rL2.click();
+      $('#groupingLightbox').hide();
+      snipAction('trigger', 'group_by|V_STATUS');
+      var okc2 = await groupedBy('V_STATUS', 3); await sleep(300);
+      var okc3 = await oneClick('V_NAME', nN);
+      R.chk.cancelledPick = !!rL2 && okc2 && okc3 && L() === 'list';
+      // 6. (sweep) a window too narrow for List: the count says List, the reader sees Stacked - Stacked is kept
+      await flat();
+      // (innerWidth is the window's OWN property: deleting the stand-in leaves none at all - put the real one back)
+      var iw0 = Object.getOwnPropertyDescriptor(window, 'innerWidth');
+      Object.defineProperty(window, 'innerWidth', { configurable: true, get: function () { return 800; } });
+      var okw = await oneClick('V_NAME', nN);
+      R.chk.narrowStacked = okw && L() === 'stacked' && !glOn();
+      if (iw0) { Object.defineProperty(window, 'innerWidth', iw0); } else { delete window.innerWidth; }
+      // 7. (sweep 2) a layout set without a pick (a preset, a restore - here the field, then Apply):
+      // List is a choice, the default Stacked is not, as a saved view's layout reads
+      await flat();
+      var okv = await oneClick('V_NAME', nN);
+      var wasL = L() === 'list';
+      $('#groupLayout').val('stacked');
+      $('#confirmGroupingBtn').trigger('click');
+      await sleep(700);
+      var wasS = L() === 'stacked';
+      var codes = {}; window.__rowsFixture.forEach(function (r) { codes[r.H_CODE] = 1; });
+      var okk = await oneClick('H_CODE', Object.keys(codes).length);
+      R.chk.implicitStacked = okv && wasL && wasS && okk && L() === 'list';
+      R.info.auto2 = { L: L(), chosen: !!GM() && GM().chosen(), ok: [wasList, okd, wasList2, okp, okt, wasAuto, okn, okc2, okc3, okw, okv, wasL, wasS, okk], w: window.innerWidth };
+    },
+    // (2026-10-20, grpmenu) a group's own menu on its band, Stacked (g*: grouped by H_GROUP, every level open)
+    ggmenu: async function () {
+      var G = GM();
+      var hd = bandEl('North');
+      R.chk.gmOpens = !!hd && rclick(hd) && !!menu();
+      var nm = menu() && menu().querySelector('.pnb-hm-name'), st = menu() && menu().querySelector('.pnb-hm-stats');
+      R.chk.gmTitle = !!nm && nm.textContent === 'North' && !!st && st.textContent === 'H_GROUP';
+      var a = acts();
+      R.chk.gmItems = ['gToggle', 'gOnly', 'gHide', 'gCopyName', 'gBy', 'gAdd', 'gSort', 'gConfigure', 'gUngroup', 'gList', 'gExpandAll', 'gCollapseAll'].every(function (x) { return a.indexOf(x) >= 0; })
+        && a.indexOf('gRemoveLevel') < 0 && a.indexOf('gStacked') < 0 && !!item('gBy') && item('gBy').textContent.indexOf('Group by') >= 0;
+      R.chk.gmMarked = !!hd && getComputedStyle(hd).outlineStyle === 'solid';
+      R.info.gmActs = a;
+      closeMenu();
+      R.chk.gmUnmarked = R.chk.gmMarked && !hd.classList.contains('pnb-hm-for');
+      // open / close the group
+      var w = gw('North');
+      await choose(bandEl('North'), 'gToggle');
+      R.chk.gmToggle = !!w && !w.classList.contains('open');
+      await choose(bandEl('North'), 'gToggle');
+      R.chk.gmToggleBack = R.chk.gmToggle && w.classList.contains('open');
+      // copy its name
+      await choose(bandEl('East'), 'gCopyName');
+      await sleep(100);
+      R.chk.gmCopy = window.__clip[window.__clip.length - 1] === 'East';
+      // show only this group: its condition in the filter box, the others gone
+      await choose(bandEl('North'), 'gOnly');
+      await until(function () { return topKeys().length === 1; }, 10000);
+      R.chk.gmOnly = searchVal().indexOf('H_GROUP = /^(?:North)$/') >= 0 && topKeys().join() === 'North';
+      // ...in place of the column's values already in the box
+      snipAction('search', 'H_GROUP = /^(?:North|South)$/');
+      await until(function () { return topKeys().length === 2; }, 10000);
+      await choose(bandEl('South'), 'gOnly');
+      await until(function () { return topKeys().length === 1; }, 10000);
+      R.chk.gmOnlyReplaces = topKeys().join() === 'South' && searchVal().indexOf('North') < 0;
+      // ...and [Blank], the empty value
+      snipAction('search', '');
+      await until(function () { return topKeys().length === 6; }, 10000);
+      await choose(bandEl('[Blank]'), 'gOnly');
+      await until(function () { return topKeys().length === 1; }, 10000);
+      R.chk.gmOnlyBlank = topKeys().join() === '[Blank]' && searchVal().indexOf('H_GROUP = /^(?:)$/') >= 0;
+      snipAction('search', '');
+      await until(function () { return topKeys().length === 6; }, 10000);
+      // hide it: the band's x
+      await choose(bandEl('South'), 'gHide');
+      await until(function () { return topKeys().indexOf('South') < 0; }, 10000);
+      R.chk.gmHide = topKeys().length === 5 && topKeys().indexOf('South') < 0 && /H_GROUP != ["']South["']/.test(searchVal());
+      snipAction('search', '');
+      await until(function () { return topKeys().length === 6; }, 10000);
+      // sort the groups: most items first; the order in force is the grouping's
+      function size(k) { var x = gw(k); return x ? x.querySelectorAll('tbody tr:not(.search-hidden)').length : -1; }
+      await chooseIn(bandEl('North'), 'gSort', 'gsort-count-desc');
+      var ks = topKeys(), sz = ks.map(size), i0 = (G && gw(ks[0])) ? G.info(gw(ks[0])) : null;
+      R.chk.gmSort = ks.length === 6 && sz.every(function (s, i) { return i === 0 || sz[i - 1] >= s; }) && !!i0 && i0.sort.key === 'count' && i0.sort.dir === 'desc';
+      // the list ticks the order in force; the summary orders only with a summary
+      rclick(bandEl('North')); sub('gSort');
+      var on = document.querySelector('.pnb-hm-sub [data-act="gsort-count-desc"]');
+      R.chk.gmSortList = subActs().join() === 'gsort-label-asc,gsort-label-desc,gsort-count-asc,gsort-count-desc' && !!on && on.getAttribute('aria-checked') === 'true';
+      closeMenu();
+      // with a summary, the All groups bar stays AFTER the groups (the in-place sort sent it to the top)
+      snipAction('trigger', 'group_by|H_GROUP|H_AMT|sum');
+      await until(function () { return !!document.querySelector('#groupedResultsContainer > .group-grand-total') && tops().length === 6; }, 15000);
+      await sleep(400);
+      await chooseIn(bandEl('North'), 'gSort', 'gsort-label-desc');
+      var gc = document.getElementById('groupedResultsContainer'), bar = gc.querySelector(':scope > .group-grand-total');
+      R.chk.gmBarLast = !!bar && gc.lastElementChild === bar && topKeys()[0] === 'West';
+      rclick(bandEl('North')); sub('gSort');
+      R.chk.gmSortSumm = subActs().indexOf('gsort-summary-desc') >= 0 && subActs().indexOf('gsort-summary-asc') >= 0;
+      closeMenu();
+      // (Other) stays last whatever the order
+      $('#groupTableBtn').trigger('click'); await sleep(300);
+      $('#groupLimitN').val('2'); $('#groupLimitOther').prop('checked', true);
+      $('#confirmGroupingBtn').trigger('click');
+      await until(function () { return !!document.querySelector('#groupedResultsContainer > .group-wrapper[data-group-other]') && tops().length === 3; }, 15000);
+      await sleep(300);
+      var fh = tops()[0] && tops()[0].querySelector(':scope > .group-header');
+      if (fh) await chooseIn(fh, 'gSort', 'gsort-label-asc');
+      // (the render draws (Other) last too: the check needs the sort to have run - label A-Z puts "(" first)
+      var tw = tops(), io = (G && tw[0]) ? G.info(tw[0]) : null;
+      R.chk.gmOtherLast = tw.length === 3 && tw[2].hasAttribute('data-group-other') && !!io && io.sort.key === 'label' && io.sort.dir === 'asc'
+        && tw[0].getAttribute('data-group-key').localeCompare(tw[1].getAttribute('data-group-key')) < 0;
+      R.info.other = tw.map(function (x) { return x.getAttribute('data-group-key'); });
+      $('#groupTableBtn').trigger('click'); await sleep(300);
+      $('#groupLimitN').val('');
+      $('#confirmGroupingBtn').trigger('click');
+      await until(function () { return tops().length === 6; }, 15000);
+      $('#groupingLightbox').hide();
+      await sleep(300);
+      // Group by > another shown column for this level; its notice's Undo puts the grouping back
+      window.__toasts.length = 0;
+      rclick(bandEl('North')); sub('gBy');
+      var by = subActs();
+      R.chk.gmByList = by.indexOf('gby:V_STATUS') >= 0 && by.indexOf('gby:V_NAME') >= 0 && by.indexOf('gby:H_GROUP') < 0 && by.indexOf('gby-other') >= 0;
+      R.info.byList = by;
+      closeMenu();
+      await chooseIn(bandEl('North'), 'gBy', 'gby:V_STATUS');
+      var okb = await groupedBy('V_STATUS', 3);
+      await sleep(300);
+      var ub = undoBtn(/Grouped by V_STATUS/);
+      R.chk.gmGroupBy = okb && !!ub && !!G && !!tops()[0] && G.info(tops()[0]).summary === true;
+      // the column grouped by now is ticked in the list
+      rclick(bandEl('Open')); sub('gBy');
+      var tick = document.querySelector('.pnb-hm-sub [data-act="gby:V_STATUS"]');
+      R.chk.gmTick = !!tick && tick.getAttribute('aria-checked') === 'true';
+      closeMenu();
+      if (ub) ub.click();
+      R.chk.gmUndo = R.chk.gmGroupBy && (await groupedBy('H_GROUP', 6));
+      if (!R.chk.gmUndo && grouped() && A() && A().groupingColumn() !== 'H_GROUP') await oneClick('H_GROUP', 6);   // (a broken Undo must not kill the rest)
+      await sleep(300);
+      // Add a level below: nested; the inner band's menu names its level
+      await chooseIn(bandEl('North'), 'gAdd', 'gadd:V_STATUS');
+      await until(function () { return levelsNow() === 'H_GROUP,V_STATUS'; }, 15000);
+      await sleep(400);
+      function inner() { var o = gw('North'); return o ? o.querySelector('.group-wrapper[data-group-depth="1"] > .group-header') : null; }
+      R.chk.gmAdd = levelsNow() === 'H_GROUP,V_STATUS' && !!inner() && !!undoBtn(/Added a V_STATUS level/);
+      var ia = [];
+      if (inner() && rclick(inner())) {
+        ia = acts();
+        var st2 = menu().querySelector('.pnb-hm-stats');
+        R.chk.gmLevelMenu = !!st2 && st2.textContent === 'V_STATUS, level 2 of 2' && ia.indexOf('gRemoveLevel') >= 0 && ia.indexOf('gAdd') >= 0
+          && item('gBy').textContent.indexOf('Group this level by') >= 0 && ia.indexOf('gHide') < 0;
+        sub('gAdd');
+        R.chk.gmAddUsed = subActs().indexOf('gadd:V_STATUS') < 0 && subActs().indexOf('gadd:V_NAME') >= 0;
+        closeMenu();
+      }
+      R.info.levelActs = ia;
+      // Remove this level (the inner one): one level again; its Undo puts the level back
+      await choose(inner(), 'gRemoveLevel');
+      await until(function () { return levelsNow() === 'H_GROUP'; }, 15000);
+      var ur = undoBtn(/Removed the V_STATUS level/);
+      R.chk.gmRemoveLevel = levelsNow() === 'H_GROUP' && !!ur;
+      if (ur) ur.click();
+      await until(function () { return levelsNow() === 'H_GROUP,V_STATUS'; }, 15000);
+      R.chk.gmRemoveUndo = R.chk.gmRemoveLevel && levelsNow() === 'H_GROUP,V_STATUS';
+      await sleep(300);
+      if (inner()) await choose(inner(), 'gRemoveLevel');
+      await until(function () { return levelsNow() === 'H_GROUP'; }, 15000);
+      await sleep(300);
+      // a column whose every row differs asks first; No: nothing changes, and no notice offers an Undo
+      var asked = [];
+      window.confirm = function (m) { asked.push(String(m)); return false; };
+      window.__toasts.length = 0;
+      await chooseIn(bandEl('North'), 'gBy', 'gby:V_ID');
+      await sleep(600);
+      R.chk.gmUniqueNo = asked.length === 1 && /different V_ID/.test(asked[0]) && !!A() && A().groupingColumn() === 'H_GROUP' && !window.__toasts.some(function (t) { return t.indexOf('Grouped by') >= 0; });
+      R.info.asked = asked.slice();
+      window.confirm = function () { return true; };
+      // every group closed, from the menu (open first: a regroup may have left them closed)
+      $('#expandAllGroups').trigger('click');
+      await sleep(250);
+      var anyOpen = tops().some(function (x) { return x.classList.contains('open'); });
+      await choose(bandEl('North'), 'gCollapseAll');
+      R.chk.gmCollapseAll = anyOpen && tops().length === 6 && tops().every(function (x) { return !x.classList.contains('open'); });
+      // from the keyboard: the band's name focused, Shift+F10 - under the band, the first item focused; Escape - back
+      var bN = bandEl('North'), nmEl = bN ? bN.querySelector('.group-name') : null;
+      if (nmEl) { nmEl.focus(); rclick(nmEl, true); }
+      var m2 = menu(), br = bN ? bN.getBoundingClientRect() : null, mr = m2 ? m2.getBoundingClientRect() : null;
+      R.chk.gmKbd = !!mr && !!br && Math.abs(mr.top - br.bottom) <= 2 && Math.abs(mr.left - br.left) <= 2 && document.activeElement === m2.querySelector('.pnb-hm-item');
+      R.info.kbd = { band: br && [br.left, br.bottom], menu: mr && [mr.left, mr.top] };
+      keyOn('Escape');
+      R.chk.gmKbdBack = R.chk.gmKbd && !menu() && document.activeElement === nmEl;
+      // a second right-click on the band (another part of it) is the browser's menu
+      var cntEl = bN ? bN.querySelector('.group-count') : null;
+      var o1 = !!nmEl && rclick(nmEl) && !!menu();
+      var second = true;
+      if (cntEl) { rdown(cntEl); second = rclick(cntEl); }
+      R.chk.gmNativeSecond = o1 && !second && !menu();
+      closeMenu();
+      // every group open again
+      await choose(bandEl('North'), 'gExpandAll');
+      R.chk.gmExpandAll = R.chk.gmCollapseAll && tops().every(function (x) { return x.classList.contains('open'); });
+      // a viewer kept from grouping: the group's items and the view, nothing that regroups - and no
+      // regrouping from a column's header either
+      document.body.classList.add('restrict-grouping');
+      rclick(bandEl('North'));
+      var ra = acts();
+      R.chk.gmRestricted = !!menu() && ra.indexOf('gBy') < 0 && ra.indexOf('gAdd') < 0 && ra.indexOf('gSort') < 0 && ra.indexOf('gConfigure') < 0 && ra.indexOf('gUngroup') < 0
+        && ra.indexOf('gOnly') >= 0 && ra.indexOf('gList') >= 0;
+      closeMenu();
+      rclick(gth('V_NAME'));
+      var ha = acts();
+      R.chk.gmHdrRestricted = !!menu() && ha.indexOf('groupBy') < 0 && ha.indexOf('ungroup') < 0 && ha.indexOf('sortAsc') >= 0;
+      closeMenu();
+      document.body.classList.remove('restrict-grouping');
+      // a snapshot comparison's groups and the All groups bar keep the browser's menu (guards)
+      document.body.classList.add('snapshot-comparison-active');
+      R.chk.gmCompareNative = !rclick(bandEl('North')) && !menu();
+      document.body.classList.remove('snapshot-comparison-active');
+      var gt = document.querySelector('#groupedResultsContainer > .group-grand-total > .group-header');
+      R.chk.gmTotalNative = !!gt && !rclick(gt) && !menu();
+      closeMenu();
+      // the dialog; no grouping
+      await choose(bandEl('North'), 'gConfigure');
+      await sleep(400);
+      R.chk.gmConfigure = $('#groupingLightbox').is(':visible');
+      $('#groupingLightbox').hide();
+      await choose(bandEl('North'), 'gUngroup');
+      R.chk.gmUngroup = await until(function () { return !grouped(); }, 15000);
+      // (sweep 2) a regroup's Undo after its grouping has gone does nothing (it regrouped the flat table)
+      var okg = await oneClick('H_GROUP', 6);
+      window.__toasts.length = 0;
+      if (bandEl('North')) await chooseIn(bandEl('North'), 'gBy', 'gby:V_STATUS');
+      var okv2 = await groupedBy('V_STATUS', 3);
+      var ub2 = undoBtn(/Grouped by V_STATUS/);
+      await flat();
+      if (ub2) ub2.click();
+      await sleep(1500);
+      R.chk.gmUndoStale = okg && okv2 && !!ub2 && !grouped();
+    },
+    // (2026-10-20, grpsweep 2) a group of a formatted column: V_DATE shown as a year (the saved report's
+    // format) holds many days - Show only this group keeps every one of them (it kept the first day's)
+    ggfmt: async function () {
+      var years = {};
+      window.__rowsFixture.forEach(function (r) { var y = String(r.V_DATE).split('/')[2]; years[y] = (years[y] || 0) + 1; });
+      var ny = Object.keys(years).length, y0 = Object.keys(years).sort(function (a, b) { return years[b] - years[a]; })[0];
+      var ok = await oneClick('V_DATE', ny);
+      var shown = topKeys();
+      if (bandEl(y0)) await choose(bandEl(y0), 'gOnly');
+      await until(function () { return topKeys().length === 1; }, 10000);
+      await sleep(300);
+      var w = gw(y0), n = w ? w.querySelectorAll('tbody tr:not(.search-hidden)').length : -1;
+      R.chk.fmtOnlyAll = ok && shown.indexOf(y0) >= 0 && topKeys().join() === y0 && n === years[y0];
+      R.info.fmt = { ok: ok, shown: shown, y0: y0, want: years[y0], got: n, search: searchVal().slice(0, 160) };
+    },
+    // (2026-10-20, grpsweep 2) a report saved grouped as List by a column the query no longer has: it opens
+    // flat with the List choice left behind - a one-click grouping is the count's and clears it, so the
+    // group menu's regroup decides again (it kept Stacked)
+    mautostale: async function () {
+      var flatAtLoad = !grouped();
+      await choose(fth('V_STATUS'), 'groupBy');
+      var ok1 = await groupedBy('V_STATUS', 3); await sleep(300);
+      var wasS = L() === 'stacked';
+      var seen = {}; window.__rowsFixture.forEach(function (r) { seen[r.V_NAME] = 1; });
+      var nN = Object.keys(seen).length;
+      if (bandEl('Open')) await chooseIn(bandEl('Open'), 'gBy', 'gby:V_NAME');
+      var ok2 = await groupedBy('V_NAME', nN); await sleep(400);
+      R.chk.staleChoice = flatAtLoad && ok1 && wasS && ok2 && L() === 'list' && glOn();
+      R.info.stale = { flatAtLoad: flatAtLoad, ok1: ok1, wasS: wasS, ok2: ok2, L: L(), chosen: !!GM() && GM().chosen() };
+    },
+    // (2026-10-20, grpmenu) the List layout: switched from a band, a row's menu, back from a row
+    gglist: async function () {
+      $('#collapseAllGroups').trigger('click');
+      await sleep(250);
+      await choose(bandEl('South'), 'gList');
+      await sleep(400);
+      var GLs = window.Penumbra.groupList ? window.Penumbra.groupList.state() : {};
+      R.chk.glSwitch = glOn() && L() === 'list' && GLs.selPath === 'South' && !!GM() && GM().chosen() === true;
+      var row = listRow('East');
+      R.chk.glRowOpens = !!row && rclick(row) && !!menu() && menu().querySelector('.pnb-hm-name').textContent === 'East';
+      var a = acts();
+      R.chk.glRowItems = R.chk.glRowOpens && a.indexOf('gToggle') < 0 && a.indexOf('gStacked') >= 0 && a.indexOf('gList') < 0 && a.indexOf('gExpandAll') < 0
+        && a.indexOf('gOnly') >= 0 && a.indexOf('gBy') >= 0;
+      R.chk.glRowMarked = !!row && row.classList.contains('pnb-hm-for');
+      R.info.rowActs = a;
+      closeMenu();
+      // the selected band opens it too
+      var sb = document.querySelector('#groupedResultsContainer .group-wrapper.pnb-gl-sel > .group-header');
+      R.chk.glBandOpens = !!sb && rclick(sb) && !!menu() && menu().querySelector('.pnb-hm-name').textContent === 'South';
+      closeMenu();
+      // the list focused (the keyboard's way in): Shift+F10 opens the active row's menu; Escape - back to the list
+      var lst = document.getElementById('pnbGroupList');
+      if (lst) lst.focus();
+      var actRow = lst ? lst.querySelector('.pnb-gl-item.is-active') : null, actName = actRow ? actRow.querySelector('.pnb-gl-name').textContent : null;
+      R.chk.glKbd = !!lst && !!actName && rclick(lst, true) && !!menu() && menu().querySelector('.pnb-hm-name').textContent === actName;
+      keyOn('Escape');
+      R.chk.glKbdBack = R.chk.glKbd && !menu() && document.activeElement === lst;
+      // (sweep 2) a row's notes in List: its group is selected first, so the notes card has a drawn button to
+      // sit by (it opened invisible). A stand-in note button records whether it was drawn when clicked.
+      var cw = gw('Central'), drawnAtClick = null;
+      if (cw) {
+        var fake = document.createElement('button');
+        fake.type = 'button'; fake.className = 'journal-pvnote-btn'; fake.setAttribute('data-count', '');
+        fake.addEventListener('click', function (ev) { ev.stopPropagation(); drawnAtClick = fake.getClientRects().length > 0; });
+        cw.querySelector(':scope > .group-header').appendChild(fake);
+      }
+      var cr = listRow('Central');
+      if (cr) await choose(cr, 'gNote');
+      R.chk.glNoteDrawn = drawnAtClick === true;
+      R.info.note = { drawn: drawnAtClick, sel: window.Penumbra.groupList ? window.Penumbra.groupList.state().selPath : null };
+      // (sweep 2) from the keyboard, Switch to Stacked view: the focus goes to that group's band (the list it
+      // was in is gone; it fell to the page)
+      if (lst && document.contains(lst)) lst.focus();
+      var act2 = (lst && document.contains(lst)) ? lst.querySelector('.pnb-gl-item.is-active') : null, act2Name = act2 ? act2.querySelector('.pnb-gl-name').textContent : null;
+      if (act2Name && rclick(lst, true)) {
+        for (var kk = 0; kk < 20 && document.activeElement && document.activeElement.getAttribute('data-act') !== 'gStacked'; kk++) keyOn('ArrowDown');
+        keyOn('Enter');
+      }
+      await sleep(600);
+      var aw = act2Name ? gw(act2Name) : null, fnm = aw ? aw.querySelector(':scope > .group-header .group-name') : null;
+      R.chk.glKbdStackFocus = !!act2Name && !glOn() && L() === 'stacked' && !!fnm && document.activeElement === fnm;
+      R.info.kbdFocus = { act: act2Name, focus: document.activeElement ? (document.activeElement.className || document.activeElement.tagName) : null };
+      // back to List for a row's own switch below
+      if (bandEl('South')) await choose(bandEl('South'), 'gList');
+      await sleep(400);
+      // Switch to Stacked view from a row: Stacked, that group opened (the others as they were)
+      var er = listRow('East');
+      if (er) await choose(er, 'gStacked');
+      await sleep(400);
+      var ew = gw('East'), nw = gw('North');
+      R.chk.glToStacked = !glOn() && L() === 'stacked' && !!ew && ew.classList.contains('open') && !!nw && !nw.classList.contains('open');
+      R.info.gl = { L: L(), on: glOn(), sel: GLs.selPath, act: actName };
     },
     mshot: async function () {
       await choose(fth('V_NAME'), 'sortAsc');

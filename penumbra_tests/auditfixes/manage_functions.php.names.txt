@@ -3,7 +3,9 @@ penumbra_schedule_target_short_id
 resolve_report_id
 log_scheduler_event
 encrypt_scheduler_password
+penumbra_sched_apply_sftp_key
 get_next_run_date_calc
+cron_never_comes_round
 check_cron_part_calc
 touch_report_updated_at
 penumbra_sched_prune_email_only

@@ -107,7 +107,9 @@ $expected = @{
   # documented as empty, and an email reading ''undefined'' where the screen shows a
   # theme would be worse than a blank.
   'data_unknown_key' = 'BY DESIGN: A and B both say ''undefined'' (the browser engines agree); C stays empty because a key it does not recognise is usually a browser-only one it is documented to blank.'
-  'sum_scope_all'     = 'NOT HARNESS-VERIFIABLE: B''s `all` scope reads module-level masterRowData, empty with no report loaded. LIVE-VERIFIED OK 2026-08-18 on ?id=epa-perm (subtitle count(, all) = 778 = full row count, matching C''s full-rowset value).'
+  # 'sum_scope_all' left this list 2026-10-20: run_parity.ps1 now seeds masterRowData with the
+  # case rows in both browser wrappers, so the `all` scope is harness-verifiable (and pinned by
+  # an "expect" in corpus.json). It was live-verified on ?id=epa-perm on 2026-08-18.
   # 'string_upper' left this list 2026-09-18: _snippet_string() now names an unknown op the way
   # PenumbraTemplate.stringOp does ([Error: Invalid string type: upper]) instead of handing the
   # text back, so B and C agree on malformed input too. Every string() op is diffed directly,
@@ -307,6 +309,41 @@ if ($null -ne $a) {
     "(engine A not compared - result_a.json absent; run run_parity.ps1 to generate it)"
 }
 
+# ============================================================================
+# EXPECTED VALUES (2026-10-20). Parity proves the engines AGREE, not that they are
+# RIGHT: rank(1, AMOUNT, all) read `all` as a filter CONDITION in all three engines
+# and printed the same wrong 1,200.5 everywhere - identical, so it passed. A case may
+# carry "expect" in corpus.json: every engine's output (A, B, and C's HTML with its
+# wrapper stripped, under the same Norm as the parity checks) must then equal it. A
+# miss is an engine giving the wrong answer, so it fails the run below, after the
+# report, the way page errors do.
+# ============================================================================
+$corpusForExpect = Get-Content "$sp\corpus.json" -Raw | ConvertFrom-Json
+$expFail = @(); $expChecked = 0
+$aById = @{}; if ($null -ne $a) { foreach ($r in $a) { $aById[$r.id] = $r } }
+$bById = @{}; foreach ($r in $b) { $bById[$r.id] = $r }
+foreach ($case in $corpusForExpect.cases) {
+    if ($null -eq $case.PSObject.Properties['expect']) { continue }
+    $want = Norm ([string]$case.expect)
+    $expChecked++
+    $got = [ordered]@{}
+    if ($null -ne $a) { $got['A'] = $(if ($aById.ContainsKey($case.id)) { Norm $aById[$case.id].out } else { '<no result>' }) }
+    $got['B'] = $(if ($bById.ContainsKey($case.id)) { Norm $bById[$case.id].out } else { '<no result>' })
+    $got['C'] = $(if ($cMap.ContainsKey($case.id)) { Norm (Strip-CWrapper $cMap[$case.id].out) } else { '<no result>' })
+    foreach ($eng in @($got.Keys)) {
+        if ($got[$eng] -ne $want) { $expFail += [pscustomobject]@{ id=$case.id; snippet=$case.snippet; engine=$eng; got=$got[$eng]; want=$want } }
+    }
+}
+""
+"==== EXPECTED VALUES (cases carrying ""expect"": every engine must give exactly that) ===="
+"cases checked  : {0}" -f $expChecked
+"EXPECT FAILED  : {0}   <-- an engine gave the WRONG answer (engines can agree and still be wrong); any = the run is RED" -f $expFail.Count
+if ($expFail.Count) {
+    ""
+    "---- EXPECT FAILED ----"
+    $expFail | ForEach-Object { "  [{0}]  {1}`n      engine {2}: got '{3}', want '{4}'" -f $_.id, $_.snippet, $_.engine, $_.got, $_.want }
+}
+
 # The page-error verdict comes LAST, after both reports, and ends in a throw: the counts
 # above are still printed (they are the diagnostic), but a caller - run_parity.ps1,
 # run_parity_local.ps1, a transcript - sees a terminating error, never a quiet green.
@@ -317,4 +354,9 @@ if ($pageErrCount) {
     ""
     "RESULT: RED - main.js page errors: {0}   <-- fix the harness or main.js, then re-run" -f $pageErrCount
     throw "PARITY RUN FAILED: main.js booted with uncaught errors ($pageErrCount, see PAGE ERRORS above) - the comparison proves nothing until the harness boots clean"
+}
+if ($expFail.Count) {
+    ""
+    "RESULT: RED - expect failures: {0}   <-- see EXPECT FAILED above" -f $expFail.Count
+    throw "PARITY RUN FAILED: $($expFail.Count) expect failure(s) - an engine gives the wrong answer for a case whose value is pinned"
 }

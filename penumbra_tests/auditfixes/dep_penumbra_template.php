@@ -81,6 +81,16 @@ function penumbra_tpl_parse_call($str, $start, $fn = 'string') {
             if ($depth === 0) {
                 $rawArgs[] = $current;
                 $i++;
+                // calc(): the first arg is an EXPRESSION, parsed once here; args holds the rest.
+                if ($fn === 'calc') {
+                    $args = array();
+                    foreach (array_slice($rawArgs, 1) as $ra) $args[] = penumbra_tpl_classify_arg($ra);
+                    return array(
+                        'node' => array('type' => 'call', 'fn' => $fn, 'expr' => penumbra_tpl_calc_parse($rawArgs[0]),
+                                        'args' => $args, 'raw' => substr($str, $start, $i - $start)),
+                        'end'  => $i
+                    );
+                }
                 $args = array();
                 foreach ($rawArgs as $ra) $args[] = penumbra_tpl_classify_arg($ra);
                 return array(
@@ -112,7 +122,7 @@ function penumbra_tpl_classify_arg($raw) {
     if (preg_match('/^\{[^}]+\}\z/', $t)) {
         return array('type' => 'ref', 'name' => substr($t, 1, -1), 'raw' => $t);
     }
-    if (preg_match('/^(string|data)\(/', $t, $m)) {
+    if (preg_match('/^(string|data|calc)\(/', $t, $m)) {
         $sub = penumbra_tpl_parse_call($t, 0, $m[1]);
         if ($sub && $sub['end'] === $n) return $sub['node'];
         return array('type' => 'literal', 'value' => $t, 'raw' => $t);
@@ -128,7 +138,7 @@ if (!function_exists('penumbra_tpl_next_call_token')) {
 function penumbra_tpl_next_call_token($str, $from) {
     if ($from > strlen($str)) return null;
     $best = null;
-    foreach (array('string', 'data') as $fn) {
+    foreach (array('string', 'data', 'calc') as $fn) {
         $tok = $fn . '(';
         $i = strpos($str, $tok, $from);
         while ($i !== false) {
@@ -181,9 +191,22 @@ function penumbra_tpl_has_calls($segments) {
 if (!function_exists('penumbra_tpl_collect_refs')) {
 function penumbra_tpl_collect_refs($segments) {
     $out = array();
-    $walk = function ($node, $isOpName) use (&$walk, &$out) {
+    $walk = null;
+    $walkCalc = function ($ast) use (&$walk, &$walkCalc, &$out) {
+        if (!$ast) return;
+        if ($ast['k'] === 'col') $out[] = penumbra_tpl_upper($ast['n']);
+        elseif ($ast['k'] === 'call') $walk($ast['node'], false);
+        $walkCalc(isset($ast['a']) ? $ast['a'] : null);
+        $walkCalc(isset($ast['b']) ? $ast['b'] : null);
+    };
+    $walk = function ($node, $isOpName) use (&$walk, &$walkCalc, &$out) {
         if (!$node) return;
         if ($node['type'] === 'ref' && !$isOpName) $out[] = penumbra_tpl_upper($node['name']);
+        if ($node['type'] === 'call' && $node['fn'] === 'calc') {
+            if (isset($node['expr']['ast'])) $walkCalc($node['expr']['ast']);
+            foreach ($node['args'] as $a) $walk($a, false);
+            return;
+        }
         if ($node['type'] === 'call' && !empty($node['args'])) {
             if ($node['fn'] === 'data') return; // data() args are keys, not column refs
             foreach ($node['args'] as $idx => $a) $walk($a, $idx === 0);
@@ -202,6 +225,7 @@ function penumbra_tpl_eval_node($node, $resolveRef, $resolveData) {
         $v = $resolveRef ? call_user_func($resolveRef, $node['name']) : null;
         return ($v === null) ? $node['raw'] : (string)$v;
     }
+    if ($node['fn'] === 'calc') return penumbra_tpl_calc_eval_call($node, $resolveRef, $resolveData);
     $args = isset($node['args']) ? $node['args'] : array();
     if ($node['fn'] === 'data') {
         if (!$resolveData) return $node['raw'];
@@ -238,6 +262,231 @@ function penumbra_tpl_eval_node($node, $resolveRef, $resolveData) {
 }
 }
 
+if (!function_exists('penumbra_tpl_calc_num')) {
+function penumbra_tpl_calc_num($v) {
+    if ($v === null) return null;
+    $s = penumbra_tpl_js_trim((string)$v);
+    if ($s === '') return null;
+    $neg = ($s[0] === '(' && substr($s, -1) === ')');
+    $c = penumbra_tpl_js_trim(preg_replace('/[$,()%\x02]/', '', $s));
+    if (!preg_match('/^[-+]?(\d+(\.\d*)?|\.\d+)\z/', $c)) return null;
+    $n = (float)$c;
+    if (!is_finite($n)) return null;
+    return $neg ? -$n : $n;
+}
+}
+
+if (!function_exists('penumbra_tpl_calc_char_name')) {
+function penumbra_tpl_calc_char_name($ch) {
+    return preg_match('/^[\x21-\x7e]\z/', $ch) ? '"' . $ch . '"' : 'a character';
+}
+}
+
+if (!function_exists('penumbra_tpl_calc_parse')) {
+function penumbra_tpl_calc_parse($src) {
+    $s = (string)$src;
+    $n = strlen($s);
+    $tk = array();
+    $i = 0;
+    while ($i < $n) {
+        $ch = $s[$i];
+        if ($ch === ' ' || $ch === "\t" || $ch === "\n" || $ch === "\r") { $i++; continue; }
+        if ($ch === '{') {
+            $j = strpos($s, '}', $i + 1);
+            if ($j === false) return array('error' => 'a column name is missing its closing }');
+            $nm = substr($s, $i + 1, $j - $i - 1);
+            if (penumbra_tpl_js_trim($nm) === '') return array('error' => 'empty braces {} - put a column name inside');
+            $tk[] = array('t' => 'col', 'v' => $nm, 'raw' => substr($s, $i, $j - $i + 1)); $i = $j + 1; continue;
+        }
+        if ($ch === "'" || $ch === '"') {
+            $k = strpos($s, $ch, $i + 1);
+            if ($k === false) return array('error' => 'quoted text is missing its closing ' . $ch);
+            $tk[] = array('t' => 'str', 'v' => substr($s, $i + 1, $k - $i - 1), 'raw' => substr($s, $i, $k - $i + 1)); $i = $k + 1; continue;
+        }
+        if (preg_match('/\G(\d+(\.\d*)?|\.\d+)/', $s, $m, 0, $i)) {
+            $tk[] = array('t' => 'num', 'v' => $m[0], 'raw' => $m[0]); $i += strlen($m[0]); continue;
+        }
+        if (preg_match('/\G[A-Za-z_][A-Za-z0-9_]*/', $s, $m, 0, $i)) {
+            $w = $m[0];
+            if (($w === 'string' || $w === 'data' || $w === 'calc') && $i + strlen($w) < $n && $s[$i + strlen($w)] === '(') {
+                $sub = penumbra_tpl_parse_call($s, $i, $w);
+                if (!$sub) return array('error' => $w . '( is missing its closing )');
+                $tk[] = array('t' => 'call', 'node' => $sub['node'], 'raw' => $sub['node']['raw']); $i = $sub['end']; continue;
+            }
+            return array('error' => 'unknown word "' . $w . '" - write a column in braces: {' . $w . '}');
+        }
+        if (strpos('+-*/()', $ch) !== false) { $tk[] = array('t' => 'op', 'v' => $ch, 'raw' => $ch); $i++; continue; }
+        return array('error' => penumbra_tpl_calc_char_name($ch) . ' is not part of a calculation');
+    }
+    if (!count($tk)) return array('error' => 'nothing to work out - e.g. calc({A} - {B})');
+    $st = array('tk' => $tk, 'p' => 0, 'depth' => 0);
+    try {
+        $ast = penumbra_tpl_calc_add($st);
+        if ($st['p'] < count($tk)) {
+            $r = $tk[$st['p']];
+            if ($r['t'] === 'op') throw new \DomainException('unexpected ' . $r['raw']);
+            throw new \DomainException('an operator is missing before ' . $r['raw']);
+        }
+        return array('ast' => $ast);
+    } catch (\DomainException $e) {
+        return array('error' => $e->getMessage());
+    }
+}
+}
+
+if (!function_exists('penumbra_tpl_calc_is_op')) {
+function penumbra_tpl_calc_is_op($st, $v) {
+    $t = isset($st['tk'][$st['p']]) ? $st['tk'][$st['p']] : null;
+    return $t !== null && $t['t'] === 'op' && $t['v'] === $v;
+}
+}
+
+if (!function_exists('penumbra_tpl_calc_primary')) {
+function penumbra_tpl_calc_primary(&$st) {
+    $t = isset($st['tk'][$st['p']]) ? $st['tk'][$st['p']] : null;
+    if ($t === null) throw new \DomainException('it ends too soon - a value is missing at the end');
+    if ($t['t'] === 'num')  { $st['p']++; return array('k' => 'num', 'v' => $t['v']); }
+    if ($t['t'] === 'col')  { $st['p']++; return array('k' => 'col', 'n' => $t['v']); }
+    if ($t['t'] === 'str')  { $st['p']++; return array('k' => 'str', 'v' => $t['v']); }
+    if ($t['t'] === 'call') { $st['p']++; return array('k' => 'call', 'node' => $t['node']); }
+    if (penumbra_tpl_calc_is_op($st, '(')) {
+        $st['p']++;
+        $e = penumbra_tpl_calc_add($st);
+        if (!penumbra_tpl_calc_is_op($st, ')')) throw new \DomainException('a ( is missing its closing )');
+        $st['p']++;
+        return $e;
+    }
+    throw new \DomainException('unexpected ' . $t['raw']);
+}
+}
+
+if (!function_exists('penumbra_tpl_calc_unary')) {
+function penumbra_tpl_calc_unary(&$st) {
+    if (++$st['depth'] > 100) throw new \DomainException('more than 100 ( or signs nested');
+    try {
+        if (penumbra_tpl_calc_is_op($st, '-')) { $st['p']++; return array('k' => 'neg', 'a' => penumbra_tpl_calc_unary($st)); }
+        if (penumbra_tpl_calc_is_op($st, '+')) { $st['p']++; return penumbra_tpl_calc_unary($st); }
+        return penumbra_tpl_calc_primary($st);
+    } finally { $st['depth']--; }
+}
+}
+
+if (!function_exists('penumbra_tpl_calc_mul')) {
+function penumbra_tpl_calc_mul(&$st) {
+    $a = penumbra_tpl_calc_unary($st);
+    while (penumbra_tpl_calc_is_op($st, '*') || penumbra_tpl_calc_is_op($st, '/')) {
+        $op = $st['tk'][$st['p']++]['v'];
+        $a = array('k' => 'bin', 'op' => $op, 'a' => $a, 'b' => penumbra_tpl_calc_unary($st));
+    }
+    return $a;
+}
+}
+
+if (!function_exists('penumbra_tpl_calc_add')) {
+function penumbra_tpl_calc_add(&$st) {
+    $a = penumbra_tpl_calc_mul($st);
+    while (penumbra_tpl_calc_is_op($st, '+') || penumbra_tpl_calc_is_op($st, '-')) {
+        $op = $st['tk'][$st['p']++]['v'];
+        $a = array('k' => 'bin', 'op' => $op, 'a' => $a, 'b' => penumbra_tpl_calc_mul($st));
+    }
+    return $a;
+}
+}
+
+if (!function_exists('penumbra_tpl_calc_value')) {
+function penumbra_tpl_calc_value($ast, $resolveRef, $resolveData) {
+    switch ($ast['k']) {
+        case 'num': return (float)$ast['v'];
+        case 'str': return penumbra_tpl_calc_num($ast['v']);
+        case 'col':
+            $v = $resolveRef ? call_user_func($resolveRef, $ast['n']) : null;
+            if ($v === null) throw new \UnexpectedValueException('[Error: calc: unknown column {' . $ast['n'] . '}]');
+            return penumbra_tpl_calc_num($v);
+        case 'call':
+            $t = (string)penumbra_tpl_eval_node($ast['node'], $resolveRef, $resolveData);
+            if (strpos($t, '[Error: ') === 0) throw new \UnexpectedValueException($t);
+            return penumbra_tpl_calc_num($t);
+        case 'neg':
+            $x = penumbra_tpl_calc_value($ast['a'], $resolveRef, $resolveData);
+            return ($x === null) ? null : -$x;
+    }
+    // bin - both sides are worked out, so an error on either side shows
+    $a = penumbra_tpl_calc_value($ast['a'], $resolveRef, $resolveData);
+    $b = penumbra_tpl_calc_value($ast['b'], $resolveRef, $resolveData);
+    if ($a === null || $b === null) return null;
+    if ($ast['op'] === '+') $r = $a + $b;
+    elseif ($ast['op'] === '-') $r = $a - $b;
+    elseif ($ast['op'] === '*') $r = $a * $b;
+    else { if ($b == 0) return null; $r = $a / $b; }
+    return is_finite($r) ? (float)$r : null;
+}
+}
+
+if (!function_exists('penumbra_tpl_calc_digits')) {
+function penumbra_tpl_calc_digits($a) {
+    $s = '0e+0';
+    for ($p = 0; $p <= 16; $p++) {
+        $s = str_replace(',', '.', sprintf('%.' . $p . 'e', $a));
+        if ((float)$s === $a) break;
+    }
+    preg_match('/^(\d)(?:\.(\d+))?e([+-]?\d+)\z/', $s, $m);
+    $d = rtrim($m[1] . (isset($m[2]) ? $m[2] : ''), '0');
+    return array($d === '' ? '0' : $d, (int)$m[3]);
+}
+}
+
+if (!function_exists('penumbra_tpl_calc_increment')) {
+function penumbra_tpl_calc_increment($s) {
+    $i = strlen($s) - 1;
+    while ($i >= 0) {
+        if ($s[$i] === '9') { $s[$i] = '0'; $i--; } else { $s[$i] = chr(ord($s[$i]) + 1); return $s; }
+    }
+    return '1' . $s;
+}
+}
+
+if (!function_exists('penumbra_tpl_calc_format')) {
+function penumbra_tpl_calc_format($v, $places) {
+    if ($v === null) return '';
+    list($d, $e) = penumbra_tpl_calc_digits(abs($v));
+    $q = ($places === null) ? 6 : $places;
+    if ($d !== '0' && $e >= 0) $q = max(0, min($q, 15 - ($e + 1)));
+    $k = $e + $q + 1;
+    $up = false;
+    if ($k >= strlen($d)) $sc = $d . str_repeat('0', $k - strlen($d));
+    elseif ($k <= 0) { $sc = '0'; $up = ($k === 0 && $d[0] >= '5'); }
+    else { $sc = substr($d, 0, $k); $up = ($d[$k] >= '5'); }
+    if ($up) $sc = penumbra_tpl_calc_increment($sc);
+    $sc = preg_replace('/^0+(?=\d)/', '', $sc);
+    while (strlen($sc) < $q + 1) $sc = '0' . $sc;
+    $ip = substr($sc, 0, strlen($sc) - $q);
+    $fp = (string)substr($sc, strlen($sc) - $q);
+    if ($places === null) $fp = rtrim($fp, '0');
+    else while (strlen($fp) < $places) $fp .= '0';
+    $out = $ip . ($fp !== '' ? '.' . $fp : '');
+    return ($v < 0 && preg_match('/[1-9]/', $out)) ? '-' . $out : $out;
+}
+}
+
+if (!function_exists('penumbra_tpl_calc_eval_call')) {
+function penumbra_tpl_calc_eval_call($node, $resolveRef, $resolveData) {
+    if (isset($node['expr']['error'])) return '[Error: calc: ' . $node['expr']['error'] . ']';
+    $args = isset($node['args']) ? $node['args'] : array();
+    if (count($args) > 1) return '[Error: calc takes an expression and, optionally, the decimal places]';
+    $places = null;
+    if (count($args) === 1) {
+        $pt = penumbra_tpl_js_trim((string)penumbra_tpl_eval_node($args[0], $resolveRef, $resolveData));
+        if (!preg_match('/^\d+\z/', $pt) || (int)$pt > 10) return '[Error: calc: decimal places must be a whole number from 0 to 10]';
+        $places = (int)$pt;
+    }
+    try {
+        return penumbra_tpl_calc_format(penumbra_tpl_calc_value($node['expr']['ast'], $resolveRef, $resolveData), $places);
+    } catch (\UnexpectedValueException $e) {
+        return $e->getMessage();
+    }
+}
+}
+
 if (!function_exists('penumbra_tpl_resolve_data')) {
 function penumbra_tpl_resolve_data($argVals, $ctx) {
     $key = isset($argVals[0]) ? (string)$argVals[0] : '';
@@ -264,18 +513,15 @@ function penumbra_tpl_cell_text($cell) {
     if (is_bool($cell)) return $cell ? 'true' : 'false';
     if (!is_string($cell)) return is_scalar($cell) ? (string)$cell : '';
     if ($cell === '') return '';
-    // Line ends, as the browser's cell ends up holding them. A plain cell's \n
-    // becomes a <br> on screen (formatCellContent), and a <br> adds NOTHING to the
-    // cell text the template reads - "line1\nline2" reaches a browser template as
-    // "line1line2". What is left of a \r\n is a lone \r, which the HTML parser
-    // turns into \n; an @@HTML cell goes through the same parser. Mirrored as it
-    // stands: tplparity pins both sides, so changing one means changing both.
-    if (strpos($cell, "\n") !== false || strpos($cell, "\r") !== false) {
-        if (strpos($cell, '@@HTML') === 0) {
-            $cell = str_replace(array("\r\n", "\r"), "\n", $cell);
-        } else {
-            $cell = str_replace("\r", "\n", str_replace("\n", '', $cell));
-        }
+    // Line ends, as the browser's template reads the cell (_readTemplateCellText, main.js): a cell keeps its line
+    // breaks (2026-10-10, the user: "do it as-shown with a real newline if a newline is in the cell (not wrapping)" -
+    // they reached a template glued, "line1\nline2" as "line1line2"). \r\n and a lone \r are \n, as the HTML parser
+    // makes them; an @@HTML cell's <br> (and </br>, which the parser reads as one) is a line break, and a \n right
+    // before it is the \r\n it ended. tplparity pins both sides, so changing one means changing both. A template puts
+    // a field back on one line with string(regex_replace, {COL}, '\s*\n\s*', ' ').
+    if (strpos($cell, "\r") !== false) $cell = str_replace(array("\r\n", "\r"), "\n", $cell);
+    if (strpos($cell, '@@HTML') === 0 && stripos($cell, 'br') !== false) {
+        $cell = preg_replace('~\n?</?br\b[^>]*>~i', "\n", $cell);
     }
     if (function_exists('db_dump_clean_value')) {
         $v = db_dump_clean_value($cell);
@@ -656,6 +902,14 @@ function penumbra_tpl_render_body($template, $source, $resolveData, $budgetSecon
 }
 }
 
+if (!function_exists('penumbra_tpl_unescape')) {
+function penumbra_tpl_unescape($s) {
+    return preg_replace_callback('/\\\\([\\\\tn])/', function ($m) {
+        return ($m[1] === 't') ? "\t" : (($m[1] === 'n') ? "\n" : $m[0]);
+    }, (string)$s);
+}
+}
+
 if (!function_exists('penumbra_tpl_render_header')) {
 function penumbra_tpl_render_header($headerStr, $source, $resolveData) {
     $headerStr = (string)$headerStr;
@@ -692,11 +946,11 @@ function generate_custom_template_string($apiResult, $options, $ctx = array()) {
     $ctx['count'] = $source['count'];
     $resolveData = function ($argVals) use ($ctx) { return penumbra_tpl_resolve_data($argVals, $ctx); };
 
-    // \t escapes become real tabs BEFORE parsing, as in the browser.
-    $lines = penumbra_tpl_render_body(str_replace('\\t', "\t", $body), $source, $resolveData,
+    // \t / \n escapes become real tabs / line breaks BEFORE parsing, as in the browser.
+    $lines = penumbra_tpl_render_body(penumbra_tpl_unescape($body), $source, $resolveData,
         isset($ctx['budget']) ? (int)$ctx['budget'] : 180);
     if (count($lines) === 0) return '';
-    $headerLine = penumbra_tpl_render_header(str_replace('\\t', "\t", $header), $source, $resolveData);
+    $headerLine = penumbra_tpl_render_header(penumbra_tpl_unescape($header), $source, $resolveData);
 
     $text = implode($newline ? "\n" : '', $lines);
     if ($headerLine !== '') $text = $headerLine . "\n" . $text;

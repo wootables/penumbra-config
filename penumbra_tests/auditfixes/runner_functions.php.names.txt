@@ -5,6 +5,7 @@ encrypt_penumbra_state
 scheduler_snapshot_payload
 decrypt_scheduler_password
 scheduler_read_secret
+scheduler_read_sftp_key
 safe_json_decode
 get_next_run_date
 check_cron_part
@@ -102,6 +103,15 @@ pivot_cols_fill_spec
 pivot_expand_colkeys_with_gaps
 pivot_build_field_comparators
 custom_sort_pivot_keys
+penumbra_hl_clean_css
+penumbra_state_highlight_rules
+penumbra_hl_theme_fills
+penumbra_pv_hl_rules
+penumbra_pv_hl_style
+penumbra_state_column_formats
+penumbra_email_cell_format
+penumbra_email_footer_formats
+penumbra_num_text
 apply_state_logic
 _cf_group_rows
 _cf_sort_groups
@@ -120,6 +130,9 @@ _penumbra_collect_formula_refs
 penumbra_resolve_summary_formula
 _penumbra_formula_var_type
 penumbra_group_agg_registry_type
+penumbra_sched_notes_col
+penumbra_notes_cell_html
+penumbra_sched_journal_screen_order
 penumbra_is_toggle_column
 penumbra_compute_summary
 penumbra_format_summary
@@ -171,6 +184,9 @@ pivot_cond_label_sources
 pivot_parse_formula
 pivot_eval_formula
 pivot_parse_all_formulas
+pivot_shortest_text
+pivot_dec_text
+pivot_set_agg_formats
 pivot_detect_currency
 pivot_currency_flags
 pivot_format_number
@@ -189,6 +205,9 @@ pivot_resolve_row_total_base_indices
 pivot_count_leaves
 pivot_apply_value_sort
 pivot_process_data
+pivot_shade_lopsided
+pivot_shade_rank_floor
+pivot_gt_heat_num
 generate_pivot_html
 pivot_render_hierarchy_level
 generate_pivot_csv_string
@@ -250,6 +269,8 @@ _snippet_set_expanded_columns
 _snippet_journal_toggles
 _snippet_merge_journal_cols
 _snippet_condition_uses_notes
+_snippet_notes_available
+_snippet_notes_tree
 _snippet_normalize_toggle_tree
 _snippet_tree_reads_journal
 _snippet_tree_reads_names
@@ -357,6 +378,8 @@ generate_xlsx_string
 _xlsx_pick_data_style
 _xlsx_pick_footer_style
 _xlsx_leading_zero_text
+_xlsx_plain_int
+_xlsx_number_shape
 _xlsx_try_numeric
 _xlsx_html_to_text
 _xlsx_format_json
@@ -385,6 +408,7 @@ _sr_recipient_auth_failure
 _sr_filter_subscribers_by_access
 _sr_persist_subscriber_removal
 execute_scheduled_report
+penumbra_split_change_columns
 generate_snapshot_signature
 penumbra_fetch_latest_scheduler_snapshot
 penumbra_first_run_baseline_unchanged

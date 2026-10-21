@@ -18,10 +18,10 @@ SCN = ['pmhead', 'pmfield', 'pmcell', 'pmbreak', 'pmmulti', 'pmnotool']
 CHK = {
     'pmhead': ['opens', 'nativeShift', 'nativeSecond', 'headItems', 'sortDesc', 'thenOffered', 'thenSort', 'sortClear', 'copyCol', 'shadeList', 'shadeBar', 'shadeUndo', 'shadeHover', 'fmtList', 'fmtCurrency', 'fmtDp', 'fmtUndo', 'fmtAuto', 'colsItems', 'colsDesc', 'colsAsc', 'colExclude'],
     'pmfield': ['fieldItems', 'sortAZ', 'collapseAll', 'expandAll', 'fieldUp', 'fieldUndo', 'fieldRemove', 'removeLastOff', 'swap'],
-    'pmcell': ['cellOpens', 'cellItems', 'drillLabel', 'drill', 'labelItems', 'toggle', 'copyLabel', 'labelExclude', 'cellFilter'],
+    'pmcell': ['cellOpens', 'cellItems', 'drillLabel', 'cellTitleDecoded', 'labelDecoded', 'drill', 'labelItems', 'toggle', 'copyLabel', 'labelExclude', 'cellFilter'],
     # (colmenu round 14) the breakdown table's menu: sort and copy
-    'pmbreak': ['bdTable', 'bdNumNative', 'bdNativeShift', 'bdHeadOpens', 'bdHeadItems', 'bdSortAsc', 'bdSortDesc', 'bdThen', 'bdClear', 'bdCopyCol', 'bdCopyDistinct', 'bdCell', 'bdCopyValue', 'bdCopyName', 'bdKbd',
-                'bdWidthItems', 'bdFit', 'bdFitAll', 'bdResetWidths', 'bdWidthsNotPivot'],
+    'pmbreak': ['bdTable', 'bdNumNative', 'bdNativeShift', 'bdHeadOpens', 'bdHeadItems', 'bdSortAsc', 'bdSortDesc', 'bdThen', 'bdClear', 'bdCopyCol', 'bdCopyDistinct', 'bdStats', 'bdCell', 'bdCopyValue', 'bdCopyName', 'bdKbd',
+                'bdWidthItems', 'bdFit', 'bdFitAll', 'bdResetWidths', 'bdWidthsNotPivot', 'bdRowHeight'],
     # (colmenu round 17) several values, no column fields, collapsed groups: the cells by position
     'pmmulti': ['multiBuilt', 'multiItems', 'multiCollapsed', 'multiCopy', 'multiSlot', 'multiFmtKind'],
     'pmnotool': ['noToolField', 'noToolHead'],
@@ -45,7 +45,13 @@ NEW_R22 = {'L-pmmulti-multiFmtKind'}   # live a57a250
 # (colmenu round 25) the way to the browser's menu from the pivot's and the breakdown's menus
 NEW_R25 = {'L-pmhead-nativeShift', 'L-pmhead-nativeSecond', 'L-pmbreak-bdNativeShift'}   # live a04520b
 # (colmenu round 27) the breakdown menu's width items
-NEW = {'L-pmbreak-bdWidthItems', 'L-pmbreak-bdFit', 'L-pmbreak-bdFitAll', 'L-pmbreak-bdResetWidths'}
+NEW_R27 = {'L-pmbreak-bdWidthItems', 'L-pmbreak-bdFit', 'L-pmbreak-bdFitAll', 'L-pmbreak-bdResetWidths'}   # live fd50235
+# (colmenu round 28) the breakdown's Copy distinct values list, Column stats, no counts line (these reshape)
+NEW_R28 = {'L-pmbreak-bdHeadOpens', 'L-pmbreak-bdHeadItems', 'L-pmbreak-bdCopyCol', 'L-pmbreak-bdCopyDistinct', 'L-pmbreak-bdStats'}   # live 34c2b77
+# (colmenu round 29) the pivot's escaped keys read decoded in the menu
+NEW_R29 = {'L-pmcell-cellTitleDecoded', 'L-pmcell-labelDecoded'}   # live ab29ada
+# (colmenu round 32) the row height item on every breakdown
+NEW = {'L-pmbreak-bdRowHeight'}
 MUTANTS = {
     # --- (colmenu round 27) the breakdown's width items: never offered; the API gate back to flat/group
     'w-bditems': ([('menu', "        if (W && typeof W.canFit === 'function' && W.canFit(th)) {\n            items.push('-');\n            items.push({ act: 'bdFit'", "        if (false) {\n            items.push('-');\n            items.push({ act: 'bdFit'")], ['L-pmbreak-bdWidthItems', 'L-pmbreak-bdFit', 'L-pmbreak-bdFitAll', 'L-pmbreak-bdResetWidths'], ['pmbreak']),
@@ -69,8 +75,15 @@ MUTANTS = {
                    "            for (var i = 0; i < 0; i++) {\n                if (want ? $th.attr('aria-sort') === want : !$th.hasClass('sorted')) return true;")],
                  ['L-pmbreak-bdSortAsc', 'L-pmbreak-bdSortDesc'], ['pmbreak']),
     'b-native': ([('menu', "        if (!th || i === 0 || labelOf(th) === '#') { return null; }", "        if (!th) { return null; }")], ['L-pmbreak-bdNumNative'], ['pmbreak']),
-    'b-distinct': ([('menu', "bdColumnTexts(t).filter(function (x) { if (x === '' || seen[x]) { return false; } seen[x] = 1; return true; });",
-                     "bdColumnTexts(t).filter(function (x) { return x !== ''; });")], ['L-pmbreak-bdCopyDistinct'], ['pmbreak']),
+    'b-distinct': ([('menu', "        return bdColumnTexts(t).filter(function (x) { if (x === '' || seen[x]) { return false; } seen[x] = 1; return true; });",
+                     "        return bdColumnTexts(t).filter(function (x) { return x !== ''; });")], ['L-pmbreak-bdCopyDistinct'], ['pmbreak']),
+    # --- (colmenu round 32) the breakdown's row height item gone
+    'b-norow': ([('menu', "        var rhb = rowHeightItem();   // (round 32) on every breakdown, nested tables or not\n        if (rhb) { items.push('-'); items.push(rhb); }\n", "")], ['L-pmbreak-bdRowHeight'], ['pmbreak']),
+    # --- (colmenu round 29) no decoding of the pivot's keys
+    'k-raw': ([('menu', "        if (s == null || s.indexOf('&') < 0) { return String(s == null ? '' : s); }", "        return String(s == null ? '' : s);")], ['L-pmcell-cellTitleDecoded', 'L-pmcell-labelDecoded'], ['pmcell']),
+    # --- (colmenu round 28) the delimiter ignored; the duplicates miscounted in a breakdown's stats
+    'b-delim': ([('menu', "                pvCopy(v.join(d[2]), 'Copied ' + v.length + (v.length === 1 ? ' distinct value.' : ' distinct values.'));", "                pvCopy(v.join('\\n'), 'Copied ' + v.length + (v.length === 1 ? ' distinct value.' : ' distinct values.'));")], ['L-pmbreak-bdCopyDistinct'], ['pmbreak']),
+    'b-stats': ([('menu', "        freq.forEach(function (c) { if (c > 1) { dRows += c; dExtra += c - 1; dVals++; } });", "        freq.forEach(function (c) { if (c > 1) { dRows += c; dExtra += c; dVals++; } });")], ['L-pmbreak-bdStats'], ['pmbreak']),
     'b-then': ([('menu', "        if (sortedOther) {\n            items.push({ act: 'bdThenAsc'", "        if (false) {\n            items.push({ act: 'bdThenAsc'")], ['L-pmbreak-bdThen'], ['pmbreak']),
     'b-cell': ([('menu', "        if (t.td) {\n            items.push({ act: 'bdCopy',", "        if (false) {\n            items.push({ act: 'bdCopy',")], ['L-pmbreak-bdCell', 'L-pmbreak-bdCopyValue'], ['pmbreak']),
     # Clear sort: no Shift+click, so the heading stays sorted

@@ -22,6 +22,20 @@
 //   pvcog    the pivot builder's cog: the same popover, Format + Shading
 //   fnomod   &nomod=1 - no module: the old Shading chip, nothing formatted
 //   fparity  the engine: unit cases, and its date answers for the PHP twin
+//   (2026-10-20, hl) Highlight rules:
+//   fhlunit  the module's rule text: Basic's forms both ways, the CSS gate, the words
+//   fhl      authored through the popover: a rule's view, Basic, Advanced, the list,
+//            the badge, the top rule wins, delete, Escape, Reset; text and date columns
+//   fhlseed  rules saved before the report opens (+ shading): drawn at once, over the
+//            heat, row and other-column rules, kept by a sort and a search, the dark
+//            tints, a value that stops matching
+//   ghl      the grouped view: drawn there, and a change drawn again in both tables
+//   (2026-10-20 b) formats and rules SAVED WITH THE REPORT (mk_harness: hr* reports):
+//   hrep     drawn at once and outlined, Off for me, Automatic over the report's format and
+//            Reset, a report rule changed into the viewer's copy and back, a view link, a save
+//            without the dialog's list; the email's fixtures (test_colopt.php hl)
+//   hrview   a viewer: no changing the report's rules, Off for me, their own on top
+//   hrsave   the Save dialog's Last Stop Changes list, the save, the report after it
 (function () {
   var SCN = window.__SCN;
   var R = { scn: SCN, chk: {}, info: {}, notes: [] };
@@ -70,6 +84,169 @@
     return Array.prototype.slice.call(document.querySelectorAll('#resultsTable tfoot tr.total-row-data td[data-sum-col]')).filter(function (td) { return td.getAttribute('data-sum-col') === n; })[0] || null;
   }
   function searchVal() { return document.getElementById('tableSearch').value; }
+  // ---- (2026-10-20, hl) Highlight rules
+  function hlEd() { var p = popover(); return p ? p.querySelector('.pnb-hl-ed') : null; }
+  function hlQ(sel) { var e = hlEd(); return e ? e.querySelector(sel) : null; }
+  function setInput(el, v) { el.value = v; fire(el, 'input'); }
+  function setSel(el, v) { el.value = v; fire(el, 'change'); }
+  function hlRules(col) { var c = colopt(); return (c && c[col] && c[col].hl) ? c[col].hl : null; }
+  function isShown(el) { return !!el && el.offsetParent !== null; }
+  // what a CSS text computes to here (the theme's variables live on <body>)
+  function probe(css, prop) {
+    var d = document.createElement('span');
+    d.style.cssText = css;
+    document.body.appendChild(d);
+    var v = getComputedStyle(d)[prop];
+    d.parentNode.removeChild(d);
+    return v;
+  }
+  function amtOf(r) { return cents(r.V_AMOUNT) / 100; }
+  function ymd(r) { var o = mdy(r.V_DATE); return o.y * 10000 + o.m * 100 + o.d; }
+  function closeAll() { document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); }
+  // ---- (2026-10-20 c) the pivot's cells of one value: body (a row of data), group summary rows,
+  // Grand Totals; the same cell's other value; "painted exactly where the test holds"; Generate
+  function pvKit() {
+    var K = {};
+    function q(sel) { return Array.prototype.slice.call(document.querySelectorAll(sel)); }
+    // a body or summary cell has its column's key; a row's Grand Total column has none, the
+    // Grand Total row is data-grand-total
+    K.body = function (idx) { return q('#pivotResultTable tbody tr[data-pivot-row] > td[data-agg-idx="' + idx + '"][data-col-key]').filter(function (td) { return !td.hasAttribute('data-grand-total'); }); };
+    K.sum = function (idx) { return q('#pivotResultTable tbody tr.pivot-group-summary-row > td[data-agg-idx="' + idx + '"][data-col-key]').filter(function (td) { return !td.hasAttribute('data-grand-total'); }); };
+    K.grand = function (idx) {
+      return q('#pivotResultTable td[data-agg-idx="' + idx + '"]').filter(function (td) { return td.hasAttribute('data-grand-total') || !td.hasAttribute('data-col-key'); });
+    };
+    K.num = function (td) { var t = td.textContent.replace(/[$,%\s]/g, ''); return (t === '' || t === '-') ? NaN : parseFloat(t); };
+    K.sib = function (td, idx) {
+      var ck = td.getAttribute('data-col-key');
+      return Array.prototype.filter.call(td.parentNode.children, function (c) {
+        return c.getAttribute('data-agg-idx') === String(idx) && c.getAttribute('data-col-key') === ck && !c.hasAttribute('data-grand-total');
+      })[0] || null;
+    };
+    K.iff = function (cells, test, painted) {
+      var on = 0, off = 0, bad = [];
+      cells.forEach(function (td) {
+        var t = !!test(td), pt = !!painted(td);
+        if (t) on++; else off++;
+        if (t !== pt) bad.push(td.textContent.trim() + ' [' + td.getAttribute('data-col-key') + '|' + (td.parentNode.getAttribute('data-pivot-row') || td.parentNode.className) + '] ' + (td.getAttribute('style') || '').slice(0, 140));
+      });
+      return { ok: cells.length > 0 && bad.length === 0, on: on, off: off, bad: bad.slice(0, 5), n: cells.length };
+    };
+    K.generate = async function () {
+      var old = document.getElementById('pivotResultTable');
+      document.getElementById('generatePivotBtn').click();
+      await until(function () { var t = document.getElementById('pivotResultTable'); return !!t && t !== old && !!t.querySelector('tbody td'); }, 15000);
+      await sleep(400);
+    };
+    return K;
+  }
+  // ---- (2026-10-20 b) the REPORT's formats and rules (hr*): what the table shows, cell by cell
+  function hrKit() {
+    var K = {
+      amber: probe('background-color: var(--pnb-hl-amber, #fbe8a6)', 'backgroundColor'),
+      green: probe('background-color: var(--pnb-hl-green, #d3eedb)', 'backgroundColor'),
+      blue: probe('background-color: var(--pnb-hl-blue, #d6e5fa)', 'backgroundColor'),
+      red: probe('color: var(--accent-danger, #c62828)', 'color')
+    };
+    K.amt = function (td) { return amtOf(rowOf(td)); };
+    // V_AMOUNT over 50,000 in that fill, and no other cell
+    K.painted = function (fill) {
+      var c = colCells('V_AMOUNT', true);
+      return c.length === 300 && c.every(function (td) { return (K.amt(td) > 50000) === (getComputedStyle(td).backgroundColor === fill); });
+    };
+    K.none = function (fill) { var c = colCells('V_AMOUNT', true); return c.length === 300 && c.every(function (td) { return getComputedStyle(td).backgroundColor !== fill; }); };
+    // the Closed rows struck (on), or none (off)
+    K.strikes = function (on) {
+      var c = colCells('V_STATUS', true);
+      return c.length === 300 && c.every(function (td) { return (on && rowOf(td).V_STATUS === 'Closed') === /line-through/.test(td.parentNode.style.textDecoration || ''); });
+    };
+    K.bold = function (over) { var c = colCells('V_AMOUNT', true); return c.length === 300 && c.every(function (td) { return (K.amt(td) > over) === (getComputedStyle(td).fontWeight === '700'); }); };
+    // r3 (V_NAME = /Alpha/) italic; with o1, the Pending rows' too
+    K.italicNames = function (pending) {
+      var c = colCells('V_NAME', true);
+      return c.length === 300 && c.every(function (td) { var r = rowOf(td); return (/Alpha/.test(r.V_NAME) || (pending && r.V_STATUS === 'Pending')) === (getComputedStyle(td).fontStyle === 'italic'); });
+    };
+    K.amtText = function (how) {
+      var c = colCells('V_AMOUNT', true);
+      return c.length === 300 && c.every(function (td) {
+        var r = rowOf(td), ct = cents(r.V_AMOUNT), t = td.textContent.trim();
+        return how === 'cur0' ? t === dollars0(ct) : how === 'num2' ? t === group(Math.floor(ct / 100)) + '.' + pad2(ct % 100) : t === r.V_AMOUNT;
+      });
+    };
+    K.dateIso = function () {
+      window.__HC.fillByName(['V_DATE']);   // no rule reads it: past the first page its cells are still lazy
+      var c = colCells('V_DATE', true);
+      return c.length === 300 && c.every(function (td) { var o = mdy(rowOf(td).V_DATE); return td.textContent.trim() === o.y + '-' + pad2(o.m) + '-' + pad2(o.d); });
+    };
+    K.foot = function () { var f = footCell('V_AMOUNT'), s = f && (f.querySelector('strong') || f); return s ? s.textContent.trim() : null; };
+    // test_colopt.php hl: the email of these rows (the report's state) must draw what the page drew
+    K.emailFix = function () {
+      var cols = ['V_ID', 'V_NAME', 'V_AMOUNT', 'V_DATE', 'V_STATUS'], rows = [], page = [];
+      colCells('V_AMOUNT', true).forEach(function (td) {
+        var r = rowOf(td), tr = td.parentNode, o = {};
+        cols.forEach(function (c) { o[c] = r[c]; });
+        rows.push(o);
+        page.push({ id: r.V_ID, amt: td.textContent.trim(), fill: getComputedStyle(td).backgroundColor === K.amber,
+          strike: /line-through/.test(tr.style.textDecoration || ''), italic: getComputedStyle(tr.children[hdrIndex('V_NAME')]).fontStyle === 'italic' });
+      });
+      var st = window.__STORED;
+      return { rows: rows, state: { columnFormats: st.columnFormats, columnHighlights: st.columnHighlights }, page: page, foot: K.foot() };
+    };
+    // ...and the engine itself: Basic's forms (and a few typed ones), the rows each matches here
+    // (the paint pass's own reading: the cells' values, a hidden column filled first)
+    K.whenFix = function () {
+      var F = window.PenumbraColFmt, HC = window.__HC, r0 = window.__rowsFixture[0], o0 = mdy(r0.V_DATE);
+      var picks = [['V_AMOUNT', 'gt', '50000'], ['V_AMOUNT', 'gte', '45,000'], ['V_AMOUNT', 'lt', '1000'], ['V_AMOUNT', 'lte', '20000.5'],
+        ['V_AMOUNT', 'eq', r0.V_AMOUNT], ['V_AMOUNT', 'ne', r0.V_AMOUNT], ['V_AMOUNT', 'between', '20000', '40000'], ['V_AMOUNT', 'empty'], ['V_AMOUNT', 'notempty'],
+        ['V_DATE', 'before', '2023-01-01'], ['V_DATE', 'after', '6/30/2024'], ['V_DATE', 'onbefore', '2022-03-15'], ['V_DATE', 'onafter', '2024-12-31'],
+        ['V_DATE', 'on', o0.y + '-' + pad2(o0.m) + '-' + pad2(o0.d)], ['V_DATE', 'between', '2022-01-01', '2022-12-31'], ['V_DATE', 'last', '30'], ['V_DATE', 'next', '30'],
+        ['V_STATUS', 'is', 'Closed'], ['V_STATUS', 'is', 'closed'], ['V_STATUS', 'isnot', 'Closed'], ['V_STATUS', 'contains', 'en'], ['V_STATUS', 'notcontains', 'os'],
+        ['V_STATUS', 'starts', 'Pe'], ['V_NAME', 'contains', 'Alpha'], ['V_NAME', 'contains', 'a B'], ['V_NAME', 'is', 'Alpha Bravo'], ['V_NAME', 'starts', 'Echo'],
+        ['V_NAME', 'contains', 'ha.B'], ['H_NULL', 'empty'], ['H_NULL', 'notempty'], ['H_FLAG', 'is', 'Y'], ['H_NUM', 'gt', '500'], ['H_CODE', 'contains', 'AB-1'],
+        ['H_GROUP', 'isnot', 'North'], ['H_ENT', 'contains', 'Brien'], ['V_AMOUNT', 'always']];
+      var kind = function (c) { return /^(V_AMOUNT|H_NUM)$/.test(c) ? 'num' : c === 'V_DATE' ? 'date' : 'text'; };
+      var ws = picks.map(function (p) { return F.hlWhen({ col: p[0], op: p[1], v: p[2], v2: p[3], kind: kind(p[0]) }); });
+      ws = ws.concat(['V_AMOUNT > 50000 and V_STATUS = //Open//', 'V_STATUS = //Open// or V_STATUS = //Pending//', 'V_NAME = /Alpha/', 'Alpha']);
+      var ths = Array.prototype.slice.call(document.querySelectorAll('#resultsTable thead th'));
+      var names = ths.map(function (t) { return t.getAttribute('data-colname'); });
+      var vis = ths.filter(function (t) { return t.style.display !== 'none' && t.getAttribute('data-colname'); }).map(function (t) { return t.getAttribute('data-colname'); });
+      // every column (a page's rows past the first keep a column no rule reads lazy - empty - until shown)
+      HC.fillByName(names.filter(Boolean));
+      var trs = Array.prototype.slice.call(document.querySelectorAll('#resultsTable tbody tr'));
+      var maps = trs.map(function (tr) {
+        var m = new Map();
+        names.forEach(function (n, i) { if (n) m.set(n, HC.cmpText(tr.cells[i])); });
+        return { id: rowOf(tr.cells[0]).V_ID, m: m };
+      });
+      var cols = names.filter(Boolean);
+      return ws.map(function (w) {
+        if (w === null) return [null, null];
+        var p = w ? HC.paq(w, cols) : null;
+        return [w, maps.filter(function (x) { return !w || HC.epq(x.m, p, vis); }).map(function (x) { return x.id; })];
+      });
+    };
+    // the format engine and its PHP twin (_pnb_colfmt_value), value for value; a footer's number
+    // as the page hands it over (_pnbNumText); the CSS gate and penumbra_hl_clean_css
+    K.unitFix = function () {
+      var F = window.PenumbraColFmt, HC = window.__HC, fmt = [], num = [], css = [];
+      var vals = ['$45,123.45', '45123.45', '-1234.5', '(1,234.50)', '0', '0.005', '1.005', '2.675', '1e3', '12%', 'abc', '', ' 42 ', '1,234,567.891', '-0.004',
+        '999.995', '100', '$0.50', '-$12.00', '12.5%', '1/2/2026', '2026-10-05', '2026-10-05 14:30', 'Oct 5, 2026', '10/5/26', '0.125', '-0.5',
+        '1234567890123.456', '.5', '5.', '+7', '1,23', '12,345,678.9', '-0', '0.0005', '99.5', '-99.5'];
+      var specs = ['number', 'number:0', 'number:2', 'number:4', 'currency', 'currency:0', 'currency:2', 'percent', 'percent:0', 'percent:1',
+        'date:YYYY-MM-DD', 'date:MMM D, YYYY', 'date:ddd, MMM D, YYYY', 'date:MM/DD/YYYY h:mm A'];
+      vals.forEach(function (v) { specs.forEach(function (s) { fmt.push([v, s, F.formatValue(v, s)]); }); });
+      window.__rowsFixture.forEach(function (r) { ['currency:0', 'number:2', 'percent:1', 'currency'].forEach(function (s) { fmt.push([r.V_AMOUNT, s, F.formatValue(r.V_AMOUNT, s)]); }); });
+      [13456789.12, 12345.499999999998, 12345.5, 99999999.995, 1.005, 0.125, 2.5, -2.5, 1e-7, 0.1 + 0.2, 123.45678901234568, -0.0000001, 4.35 * 100, 1 / 3, 7]
+        .forEach(function (f) { ['number:2', 'number:0', 'currency:0', 'currency', 'percent:1', 'number:4'].forEach(function (s) { num.push([f, s, F.formatValue(HC.numText(f), s)]); }); });
+      ['color: red', 'COLOR : Red ;; background-color:#fff', 'color: red; color: blue', 'font-weight: bold; foo: bar', 'background-color: url(x)', 'color: rgb(1, 2, 3)',
+        'color: rgb(1, 2, 3', 'color: )(', "font-family: 'Courier New', monospace", 'color: expression(alert(1))',
+        'border: 1px solid #ccc; border-left: 4px solid var(--accent-danger, #c62828)', 'text-decoration: line-through underline', 'transform: rotate(2deg)',
+        'font-size: 120%', 'color: "red"', 'color: red /* x */', 'color: javascript:1', 'color: a@b', 'width: 10px', ':color red', 'color:', 'color: ' + new Array(125).join('a'),
+        'background-color: var(--pnb-hl-amber, #fbe8a6); color: var(--accent-danger, #c62828); font-weight: bold; font-style: italic; text-decoration: line-through']
+        .forEach(function (s) { css.push([s, F.cleanCss(s).css]); });
+      return { fmt: fmt, num: num, css: css };
+    };
+    return K;
+  }
 
   var S = {
     fbuild: async function () {
@@ -502,7 +679,8 @@
       window.Penumbra.setColOpt('V_AMOUNT', 'format', 'currency:0');   // both of Format's lists on show
       cogOf('V_AMOUNT').click();
       var pop = popover(), g = pop ? geo(pop) : [];
-      R.chk.formRows = even(g, 5) && g.map(function (x) { return x.sec; }).join() === 'summary,format,shade,filter,freeze';
+      // (2026-10-20, hl) Highlight after Shading
+      R.chk.formRows = even(g, 6) && g.map(function (x) { return x.sec; }).join() === 'summary,format,shade,highlight,filter,freeze';
       // a long name wraps in the head, not cut short: its title tooltip is held while open
       var tt = pop && pop.querySelector('.pnb-colopt-title'), tw = null;
       if (tt) {
@@ -537,7 +715,7 @@
       cogOf('V_NAME').click();
       var pn = popover(), gn = pn ? geo(pn) : [];
       // the same label and control columns as the number column's popover
-      R.chk.textCol = even(gn, 3) && gn.map(function (x) { return x.sec; }).join() === 'summary,filter,freeze' && g.length > 0
+      R.chk.textCol = even(gn, 4) && gn.map(function (x) { return x.sec; }).join() === 'summary,highlight,filter,freeze' && g.length > 0
         && gn[0].lblLeft === g[0].lblLeft && gn[0].ctlLeft === g[0].ctlLeft;
       document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
       await sleep(60);
@@ -563,7 +741,8 @@
       var pcog = document.querySelector('#pivot-agg-table-body tr .pat-cell-opt');
       if (pcog) $(pcog).trigger('click');
       var pp = popover(), gp = pp ? geo(pp) : [];
-      R.chk.pivotForm = even(gp, 2) && gp.map(function (x) { return x.sec; }).join() === 'format,shade' && oneLine(pp ? tops(pp, '.pnb-colopt-radios label') : [], 3)
+      // (2026-10-20 c) ...and a value's Highlight rules
+      R.chk.pivotForm = even(gp, 3) && gp.map(function (x) { return x.sec; }).join() === 'format,shade,highlight' && oneLine(pp ? tops(pp, '.pnb-colopt-radios label') : [], 3)
         && getComputedStyle(tip).display === 'none';
       document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
       await sleep(60);
@@ -819,7 +998,8 @@
       var hasSet = typeof window.Penumbra.setColSummary === 'function';
       if (hasSet) window.Penumbra.setColSummary('V_NAME', 'mode');
       var items = window.__HC.clearItems('lrfix');
-      R.chk.listed = items.some(function (t) { return /^Shading \(1 column\)$/.test(t); }) && items.some(function (t) { return /^Column options: formats and links \(1 column\)$/.test(t); });
+      // (2026-10-20, hl) the column options hold highlight rules too
+      R.chk.listed = items.some(function (t) { return /^Shading \(1 column\)$/.test(t); }) && items.some(function (t) { return /^Column options: formats, highlights and links \(1 column\)$/.test(t); });
       R.chk.listsSummary = hasSet && items.some(function (t) { return /^Column summaries \(1 column\)$/.test(t); });
       window.confirm = function () { return true; };
       document.getElementById('spClearStorage').click();
@@ -891,6 +1071,165 @@
     pvfmt2: async function () { pivotCells('pvfmt2'); },
     // values that land on rounding TIES (1.005, 2.675 ...): the page and the email must agree
     pvtie: async function () { pivotCells('pvtie'); R.chk.ran = R.info.texts.length > 20; },
+    // ---- (2026-10-20 c) a pivot value's Highlight rules, through the REAL pivot builder (pvhl*)
+    // pvhl: authored in a value's cog (Basic), Generate, re-edited, a rule on a column field, the
+    // saved state
+    pvhl: async function () {
+      var P = pvKit();
+      var amber = probe('background-color: var(--pnb-hl-amber, #fbe8a6)', 'backgroundColor'), red = probe('color: var(--accent-danger, #c62828)', 'color');
+      // each step guarded: a missing control fails its own checks, never the page (a dead page
+      // is no mutant kill)
+      async function step(name, fn) { try { await fn(); } catch (e) { R.notes.push(name + ': ' + String((e && e.message) || e)); } }
+      function rowAt(i) { return document.querySelectorAll('#pivot-agg-table-body tr')[i] || null; }
+      function openCog(i) { var tr = rowAt(i), c = tr && tr.querySelector('.pat-cell-opt'); if (c) c.click(); return tr; }
+      function q2(sel) { var p = popover(); return p ? p.querySelector(sel) : null; }
+      async function done() { var d = hlQ('[data-co="hl-done"]'); if (d) d.click(); await sleep(60); closeAll(); await sleep(40); }
+      var cols = [], cnt = '', want = -1, stored = null, gen = null, gen2 = null, fld = null, op = '', nStored = null, ah = null, was = '', items = 0;
+      await step('author', async function () {
+        window.__HC.repop();
+        document.getElementById('pivotLightbox').style.display = 'block';
+        await sleep(150);
+        var amtTr = openCog(0);
+        await sleep(120);
+        R.chk.popHasHl = !!q2('[data-sec="highlight"] [data-co="hl-add"]') && !!q2('[data-sec="format"]') && !!q2('[data-sec="shade"]');
+        var add = q2('[data-co="hl-add"]');
+        if (!add) return;
+        add.click();
+        await sleep(100);
+        var cs = hlQ('[data-co="hl-col"]'), os = hlQ('[data-co="hl-op"]'), v = hlQ('[data-co="hl-v"]');
+        cols = cs ? Array.prototype.map.call(cs.options, function (o) { return o.value; }) : [];
+        R.chk.editorPivot = !!hlEd() && !hlEd().querySelector('[data-sec="hl-to"]') && !!cs && cs.value === 'Amt'
+          && cols.join() === 'Amt,N,Mean,H_GROUP,H_GROUP2,V_STATUS' && !!os && os.value === 'gt';
+        if (!v) return;
+        setInput(v, '900');
+        await sleep(600);
+        var ch = hlQ('[data-hint="hl-count"]');
+        cnt = ch ? ch.textContent : '';
+        want = P.body(0).filter(function (td) { return P.num(td) > 900; }).length;
+        stored = JSON.parse((amtTr && amtTr.getAttribute('data-agg-hl')) || 'null');
+        var oc = amtTr && amtTr.querySelector('.pat-cell-opt');
+        R.chk.ruleStored = !!stored && stored.length === 1 && stored[0].w === 'Amt > 900' && stored[0].css === 'background-color: var(--pnb-hl-amber, #fbe8a6)'
+          && !!oc && /RULE/.test(oc.textContent) && /a highlight rule/.test(oc.getAttribute('aria-label') || '');
+        R.chk.editorCount = cnt === 'Matches ' + want + ' of ' + P.body(0).length + ' cells.' && want > 0;
+        await done();
+      });
+      await step('generate', async function () {
+        await P.generate();
+        gen = P.iff(P.body(0), function (td) { return P.num(td) > 900; }, function (td) { return getComputedStyle(td).backgroundColor === amber; });
+        R.chk.generated = gen.ok && gen.on > 0 && gen.off > 0;
+      });
+      // re-edited: the rule comes back with the pivot, changed, generated again
+      await step('reedit', async function () {
+        window.__HC.repop();
+        await sleep(150);
+        openCog(0);
+        await sleep(120);
+        var p = popover();
+        items = p ? p.querySelectorAll('.pnb-hl-item').length : 0;
+        var ed = q2('[data-co="hl-edit"]');
+        if (!ed) return;
+        ed.click();
+        await sleep(120);
+        var v = hlQ('[data-co="hl-v"]');
+        if (!v) return;
+        was = v.value;
+        setInput(v, '1100');
+        await sleep(600);
+        await done();
+        await P.generate();
+        gen2 = P.iff(P.body(0), function (td) { return P.num(td) > 1100; }, function (td) { return getComputedStyle(td).backgroundColor === amber; });
+        R.chk.reedit = items === 1 && was === '900' && gen2.ok && gen2.on > 0 && gen2.off > 0;
+      });
+      // a rule on N reading a COLUMN field: red text in the Open column
+      await step('field', async function () {
+        window.__HC.repop();
+        await sleep(150);
+        var nTr = openCog(1);
+        await sleep(120);
+        var add = q2('[data-co="hl-add"]');
+        if (!add) return;
+        add.click();
+        await sleep(100);
+        var cs = hlQ('[data-co="hl-col"]');
+        if (!cs) return;
+        setSel(cs, 'V_STATUS');
+        await sleep(60);
+        op = hlQ('[data-co="hl-op"]') ? hlQ('[data-co="hl-op"]').value : '';
+        setInput(hlQ('[data-co="hl-v"]'), 'Open');
+        await sleep(550);
+        hlQ('[data-co="hl-tx"][data-k="red"]').click();
+        hlQ('[data-co="hl-fl"][data-k=""]').click();
+        await sleep(100);
+        nStored = JSON.parse((nTr && nTr.getAttribute('data-agg-hl')) || 'null');
+        await done();
+        await P.generate();
+        fld = P.iff(P.body(1), function (td) { return td.getAttribute('data-col-key') === 'Open'; }, function (td) { return getComputedStyle(td).color === red; });
+        R.chk.fieldRule = op === 'is' && !!nStored && nStored[0].w === 'V_STATUS = //Open//' && nStored[0].css === 'color: var(--accent-danger, #c62828)'
+          && fld.ok && fld.on > 0 && fld.off > 0;
+      });
+      // the pivot saved with them (a view link, a save, a preset all take the settings)
+      await step('state', async function () {
+        var st = window.__HC.bso();
+        ah = st && st.pivot && st.pivot.aggHighlight;
+        R.chk.stateCarries = Array.isArray(ah) && ah.length === 3 && !!ah[0] && ah[0][0].w === 'Amt > 1100' && !!ah[1] && ah[1][0].w === 'V_STATUS = //Open//' && ah[2] === null;
+      });
+      R.info = { notes: R.notes, cols: cols, cnt: cnt, want: want, stored: stored, gen: gen, gen2: gen2, fld: fld, op: op, nStored: nStored, ah: ah, was: was, items: items };
+    },
+    // pvhlseed: rules saved with the pivot - its cells, its group rows, never a Grand Total, the top
+    // rule wins, a rule reading another value, a dark theme; the email's fixture
+    pvhlseed: async function () {
+      var P = pvKit();
+      var amber = probe('background-color: var(--pnb-hl-amber, #fbe8a6)', 'backgroundColor'), blue = probe('background-color: var(--pnb-hl-blue, #d6e5fa)', 'backgroundColor');
+      var red = probe('color: var(--accent-danger, #c62828)', 'color'), info = probe('color: var(--accent-info, #0b5cad)', 'color');
+      var body = P.iff(P.body(0), function (td) { return P.num(td) > 900; }, function (td) { return getComputedStyle(td).backgroundColor === amber; });
+      var top = P.body(0).filter(function (td) { return P.num(td) > 900; }).every(function (td) {
+        return getComputedStyle(td).color === (P.num(td) > 1200 ? red : info);
+      }) && P.body(0).some(function (td) { return P.num(td) > 1200; }) && P.body(0).some(function (td) { var v = P.num(td); return v > 900 && v <= 1200; });
+      R.chk.seedBody = body.ok && body.on > 0 && body.off > 0;
+      R.chk.seedTopWins = top;
+      var sum = P.iff(P.sum(0), function (td) { return P.num(td) > 900; }, function (td) { return getComputedStyle(td).backgroundColor === amber; });
+      R.chk.seedSummary = sum.ok && sum.on > 0;
+      R.chk.seedGrand = body.ok && body.on > 0 && P.grand(0).length > 0 && P.grand(0).every(function (td) { return getComputedStyle(td).backgroundColor !== amber; })
+        && P.grand(1).every(function (td) { return getComputedStyle(td).textDecorationLine.indexOf('underline') === -1; }) && P.grand(2).every(function (td) { return getComputedStyle(td).backgroundColor !== blue; });
+      var fld = P.iff(P.body(1), function (td) { return td.getAttribute('data-col-key') === 'Open'; }, function (td) { return getComputedStyle(td).textDecorationLine.indexOf('underline') !== -1; });
+      R.chk.seedField = fld.ok && fld.on > 0 && fld.off > 0;
+      var oth = P.iff(P.body(2), function (td) { var a = P.sib(td, 0); return !!a && P.num(a) > 900; }, function (td) { return getComputedStyle(td).backgroundColor === blue; });
+      R.chk.seedOther = oth.ok && oth.on > 0 && oth.off > 0;
+      var st = window.__HC.bso();
+      R.chk.seedState = !!st && !!st.pivot && JSON.stringify(st.pivot.aggHighlight) === JSON.stringify(window.__STORED.pivot.aggHighlight);
+      // the email's fixture (test_colopt.php pivot): the texts each rule painted on the page's body cells
+      function texts(list, test) { return list.filter(test).map(function (td) { return td.textContent.trim(); }).sort(); }
+      R.info = {
+        n: [P.body(0).length, P.sum(0).length, P.grand(0).length], body: body, sum: sum, fld: fld, oth: oth,
+        rows: window.__rowsFixture.map(function (r) { return { H_GROUP: r.H_GROUP, H_GROUP2: r.H_GROUP2, V_STATUS: r.V_STATUS, H_AMT: r.H_AMT }; }),
+        settings: window.__STORED.pivot,
+        amber: texts(P.body(0), function (td) { return getComputedStyle(td).backgroundColor === amber; }),
+        red: texts(P.body(0), function (td) { return getComputedStyle(td).color === red; }),
+        under: texts(P.body(1), function (td) { return getComputedStyle(td).textDecorationLine.indexOf('underline') !== -1; }),
+        blue: texts(P.body(2), function (td) { return getComputedStyle(td).backgroundColor === blue; })
+      };
+      // a dark theme: the fills are its own tints
+      document.body.classList.add('is-dark');
+      var darkAmber = probe('background-color: var(--pnb-hl-amber, #fbe8a6)', 'backgroundColor');
+      var hot = P.body(0).filter(function (td) { return P.num(td) > 900; })[0];
+      R.chk.seedDark = darkAmber === 'rgb(77, 63, 18)' && !!hot && getComputedStyle(hot).backgroundColor === darkAmber;
+      document.body.classList.remove('is-dark');
+    },
+    // pvhlnomod: the column options off (no module) - none drawn, none lost
+    pvhlnomod: async function () {
+      var P = pvKit(), amber = probe('background-color: var(--pnb-hl-amber, #fbe8a6)', 'backgroundColor');
+      var st = window.__HC.bso();
+      R.chk.offNotDrawn = !window.PenumbraColFmt && P.body(0).length > 0 && P.body(0).every(function (td) { return getComputedStyle(td).backgroundColor !== amber; });
+      R.chk.offKept = !!st && !!st.pivot && JSON.stringify(st.pivot.aggHighlight) === JSON.stringify(window.__STORED.pivot.aggHighlight);
+      // ...and through the builder: opened (its rows from the settings) and generated again
+      window.__HC.repop();
+      await sleep(150);
+      await P.generate();
+      var st2 = window.__HC.bso();
+      R.chk.offRoundTrip = !!st2 && !!st2.pivot && JSON.stringify(st2.pivot.aggHighlight) === JSON.stringify(window.__STORED.pivot.aggHighlight)
+        && P.body(0).length > 0 && P.body(0).every(function (td) { return getComputedStyle(td).backgroundColor !== amber; });
+      R.info = { ah: st2 && st2.pivot && st2.pivot.aggHighlight };
+    },
     pvcog: async function () {
       window.__HC.addAgg('sum', 'H_AMT', 'Amt', null, null, null, null);
       var tr = document.querySelector('#pivot-agg-table-body tr');
@@ -968,6 +1307,87 @@
       await sleep(200);
       window.__SHOTREADY = true;
     },
+    // (2026-10-20, hl) screenshots: three rules on V_AMOUNT, its popover's Highlight list;
+    // &ed=N a rule's view (&ed=new a new one), &adv=1 its Advanced, &dark=1, &open=NONE the table
+    shothl: async function () {
+      ['saveStateLightbox', 'copyActionsLightbox', 'groupingLightbox'].forEach(function (id) { var e = document.getElementById(id); if (e) e.style.display = 'none'; });
+      if (/[?&]dark=1/.test(location.search)) document.body.classList.add('is-dark', 'theme-dark-blue');
+      window.Penumbra.setColOpt('V_AMOUNT', 'format', 'currency:0');
+      window.Penumbra.setColOpt('V_AMOUNT', 'highlight', [
+        { id: 'a1', w: 'V_AMOUNT > 80000', css: 'color: var(--accent-danger, #c62828); font-weight: bold', row: false },
+        { id: 'a2', w: 'V_AMOUNT >= 40000 and V_AMOUNT <= 80000', css: 'background-color: var(--pnb-hl-amber, #fbe8a6)', row: false },
+        { id: 'a3', w: 'V_STATUS = //Closed//', css: 'color: var(--text-muted, #6b6b6b); text-decoration: line-through', row: true }
+      ]);
+      await sleep(200);
+      if (!/[?&]open=NONE/.test(location.search)) {
+        openPanel();
+        await sleep(300);
+        chipOf('V_AMOUNT').click();
+        await sleep(150);
+        var ed = /[?&]ed=(new|\d)/.exec(location.search);
+        if (ed) {
+          if (ed[1] === 'new') popover().querySelector('[data-co="hl-add"]').click();
+          else popover().querySelector('[data-co="hl-edit"][data-i="' + ed[1] + '"]').click();
+          await sleep(250);
+        }
+        if (/[?&]adv=1/.test(location.search)) { hlQ('[data-co="hl-adv"]').click(); await sleep(150); }
+      }
+      await sleep(400);
+      window.__SHOTREADY = true;
+    },
+    // hrnomod: the column options off (no module: the rollback switch, a failed load) - a save and a
+    // view link carry the report's formats and rules on as it stores them
+    hrnomod: async function () {
+      var st = window.__STORED, n = window.__saves.length;
+      $('#serverSaveIdInput').val('lrfix');
+      $('#confirmServerSaveBtn').prop('disabled', false).trigger('click');
+      await until(function () { return window.__saves.length > n; }, 8000);
+      await sleep(300);
+      var sd = null;
+      try { sd = JSON.parse(window.__saves[window.__saves.length - 1].state_data); } catch (e) { }
+      R.chk.saveKeeps = !window.PenumbraColFmt && !!sd && JSON.stringify(sd.columnFormats) === JSON.stringify(st.columnFormats)
+        && JSON.stringify(sd.columnHighlights) === JSON.stringify(st.columnHighlights);
+      var sv = window.__HC.bso();
+      R.chk.linkKeeps = !!sv && JSON.stringify(sv.columnFormats) === JSON.stringify(st.columnFormats) && JSON.stringify(sv.columnHighlights) === JSON.stringify(st.columnHighlights);
+      R.info = { sd: sd && { f: sd.columnFormats, h: sd.columnHighlights }, sv: sv && { f: sv.columnFormats, h: sv.columnHighlights } };
+    },
+    // (2026-10-20 b) the report's rules (an hr* report): their own rule over the report's, one of
+    // the report's off; a report rule opened by an editor; the Save dialog's list
+    hrshot: async function () {
+      ['copyActionsLightbox', 'groupingLightbox'].forEach(function (id) { var e = document.getElementById(id); if (e) e.style.display = 'none'; });
+      var Q = location.search, sl = document.getElementById('saveStateLightbox');
+      if (!/[?&]view=save/.test(Q) && sl) sl.style.display = 'none';
+      if (/[?&]dark=1/.test(Q)) document.body.classList.add('is-dark', 'theme-dark-blue');
+      window.Penumbra.setColOpt('V_AMOUNT', 'highlight', [{ id: 'n1', w: 'V_AMOUNT > 80000', css: 'color: var(--accent-danger, #c62828); font-weight: bold', row: false }]);
+      if (!/[?&]view=save/.test(Q)) window.Penumbra.setColOpt('V_STATUS', 'highlightOff', ['r2']);
+      if (/[?&]view=save/.test(Q)) {
+        window.Penumbra.setColOpt('V_DATE', 'format', 'date:MMM D, YYYY');
+        window.Penumbra.setColOpt('V_STATUS', 'highlightOff', ['r2']);
+        document.getElementById('saveQuery').click();
+        await sleep(400);
+        sl.style.cssText = 'display:block; position:fixed; left:40px; top:40px; width:640px; background:var(--bg-surface, #fff); padding:12px;';
+        Array.prototype.forEach.call(sl.children, function (c) { if (c.id !== 'lastStopCard') c.style.display = 'none'; });
+        var card = document.getElementById('lastStopCard');
+        card.classList.remove('collapsed');
+        card.classList.add('sp-sumtype-menu');   // shots.py's close-up finds it by this class
+      } else if (/[?&]view=(list|rule)/.test(Q)) {
+        openPanel();
+        await sleep(300);
+        cogOf(/[?&]col=V_STATUS/.test(Q) ? 'V_STATUS' : 'V_AMOUNT').click();
+        await sleep(150);
+        if (/[?&]view=rule/.test(Q)) { popover().querySelector('[data-co="hl-redit"]').click(); await sleep(250); }
+      }
+      await sleep(400);
+      window.__SHOTREADY = true;
+    },
+    hrviewshot: async function () {
+      ['saveStateLightbox', 'copyActionsLightbox', 'groupingLightbox'].forEach(function (id) { var e = document.getElementById(id); if (e) e.style.display = 'none'; });
+      openPanel();
+      await sleep(300);
+      cogOf('V_AMOUNT').click();
+      await sleep(400);
+      window.__SHOTREADY = true;
+    },
     shotpivot: async function () {
       ['saveStateLightbox', 'copyActionsLightbox', 'groupingLightbox'].forEach(function (id) { var e = document.getElementById(id); if (e) e.style.display = 'none'; });
       window.__HC.addAgg('sum', 'H_AMT', 'Amt', null, null, 'bar', 'currency:0');
@@ -1031,6 +1451,690 @@
     },
     // (2026-10-15, WCAG) the sort lanes' names start with their words and end with their
     // state (2.5.3 / 4.1.2); the Theme / Density hint links are keyboard buttons (2.1.1)
+    // (2026-10-20, hl) the module's rule text: Basic's forms written and read back, what
+    // is not Basic (Custom), the CSS gate, Basic's style picks, the words, a stored list
+    fhlunit: async function () {
+      var F = window.PenumbraColFmt;
+      var kind = function (c) { return c === 'V_DATE' ? 'date' : (c === 'V_AMOUNT' || c === 'MY COL' || c === 'AND') ? 'num' : 'text'; };
+      var cases = [
+        [{ col: 'V_AMOUNT', op: 'gt', v: '1000' }, 'V_AMOUNT > 1000'],
+        [{ col: 'V_AMOUNT', op: 'gte', v: '$1,000.50' }, 'V_AMOUNT >= 1000.50', { v: '1000.50' }],
+        [{ col: 'V_AMOUNT', op: 'lt', v: '-.5' }, 'V_AMOUNT < -0.5', { v: '-0.5' }],
+        [{ col: 'V_AMOUNT', op: 'ne', v: '0' }, 'V_AMOUNT != 0'],
+        [{ col: 'V_AMOUNT', op: 'between', v: '10', v2: '20' }, 'V_AMOUNT >= 10 and V_AMOUNT <= 20'],
+        [{ col: 'V_DATE', op: 'before', v: '10/5/2026' }, 'V_DATE < 2026-10-05', { v: '2026-10-05' }],
+        [{ col: 'V_DATE', op: 'onafter', v: 'today-30' }, 'V_DATE >= TODAY-30', { v: 'TODAY-30' }],
+        [{ col: 'V_DATE', op: 'between', v: '2026-01-01', v2: 'TODAY' }, 'V_DATE >= 2026-01-01 and V_DATE <= TODAY'],
+        [{ col: 'V_DATE', op: 'last', v: '30' }, 'V_DATE >= TODAY-30 and V_DATE <= TODAY'],
+        [{ col: 'V_DATE', op: 'next', v: '7' }, 'V_DATE >= TODAY and V_DATE <= TODAY+7'],
+        [{ col: 'V_STATUS', op: 'is', v: 'In Progress' }, 'V_STATUS = //In Progress//'],
+        [{ col: 'V_STATUS', op: 'isnot', v: 'a//b' }, 'V_STATUS != /^a\\x2F\\x2Fb$/'],
+        [{ col: 'V_STATUS', op: 'contains', v: 'Pend' }, 'V_STATUS contains Pend'],
+        [{ col: 'V_STATUS', op: 'contains', v: 'empty' }, 'V_STATUS = /empty/'],
+        [{ col: 'V_STATUS', op: 'contains', v: "O'Brien (x)" }, "V_STATUS = /O'Brien \\(x\\)/"],
+        [{ col: 'V_STATUS', op: 'notcontains', v: 'x/y' }, 'V_STATUS != /x\\x2Fy/'],
+        [{ col: 'V_STATUS', op: 'starts', v: 'Op' }, 'V_STATUS = /^Op/'],
+        [{ col: 'V_STATUS', op: 'empty' }, 'V_STATUS = empty'],
+        [{ col: 'V_STATUS', op: 'notempty' }, 'V_STATUS != empty'],
+        [{ col: 'V_STATUS', op: 'always' }, ''],
+        [{ col: 'MY COL', op: 'gt', v: '5' }, '{MY COL} > 5'],
+        [{ col: 'AND', op: 'gt', v: '5' }, '{AND} > 5']
+      ];
+      var badW = [], badR = [];
+      cases.forEach(function (c) {
+        var p = c[0], w = F.hlWhen({ col: p.col, op: p.op, v: p.v, v2: p.v2, kind: kind(p.col) });
+        if (w !== c[1]) badW.push([c[1], w]);
+        var want = p.op === 'always' ? { col: '', op: 'always', v: '', v2: '' } : Object.assign({ col: p.col, op: p.op, v: p.v || '', v2: p.v2 || '' }, c[2] || {});
+        var back = F.hlWhenPicks(w, kind);
+        if (JSON.stringify(back) !== JSON.stringify(want)) badR.push([w, back, want]);
+      });
+      R.chk.whenForms = badW.length === 0;
+      R.chk.whenRound = badR.length === 0;
+      var nulls = [
+        F.hlWhen({ col: 'V_AMOUNT', op: 'gt', v: 'abc', kind: 'num' }),
+        F.hlWhen({ col: 'V_AMOUNT', op: 'between', v: '1', v2: '', kind: 'num' }),
+        F.hlWhen({ col: 'V_DATE', op: 'before', v: '2/30/2026', kind: 'date' }),
+        F.hlWhen({ col: 'V_DATE', op: 'last', v: '0', kind: 'date' }),
+        F.hlWhen({ col: 'V_STATUS', op: 'is', v: '  ', kind: 'text' }),
+        F.hlWhen({ col: 'A=B', op: 'gt', v: '1', kind: 'num' })
+      ];
+      var customs = ['V_AMOUNT > 5 and V_STATUS = //Open//', '{V_AMOUNT} > 5', 'V_STATUS = /^Op.*/', 'V_AMOUNT > 5 or V_AMOUNT < 1', 'Open',
+        'V_AMOUNT > TODAY', 'V_DATE != 2026-01-01', 'V_STATUS = //a//b//'];
+      var custBad = customs.filter(function (w) { return F.hlWhenPicks(w, kind) !== null; });
+      R.chk.whenNull = nulls.every(function (x) { return x === null; }) && custBad.length === 0;
+      var c1 = F.cleanCss("color: red; padding: 4px; background-color: url(x.png); font-family: 'Segoe UI', Arial; COLOR: blue; border: 1px solid var(--x, #fff); bold");
+      R.chk.cssGate = c1.css === "color: blue; font-family: 'Segoe UI', Arial; border: 1px solid var(--x, #fff)" && c1.dropped.join() === 'padding,bold' && c1.bad.join() === 'background-color'
+        && F.cleanCss('color: red" onmouseover="x').css === '' && F.cleanCss('color: expression(alert(1))').css === '' && F.cleanCss('transform: rotate(3deg').css === ''
+        && F.cleanCss('color: rgb(1, 2, 3) !important').css === 'color: rgb(1, 2, 3) !important' && F.cleanCss('font-size: 12px; /* x */').css === 'font-size: 12px'
+        && F.cleanCss('border-left: 2px solid red; text-transform: uppercase').css === 'border-left: 2px solid red; text-transform: uppercase';
+      var css = F.hlCss({ tx: 'red', fl: 'amber', b: true, s: true });
+      var pk = F.hlCssPicks(css), pk2 = F.hlCssPicks('color: #123456; font-weight: 700; border: 1px solid red');
+      R.chk.cssPicks = css === 'color: var(--accent-danger, #c62828); background-color: var(--pnb-hl-amber, #fbe8a6); font-weight: bold; text-decoration: line-through'
+        && pk.tx === 'red' && pk.fl === 'amber' && pk.b && !pk.i && pk.s && pk.other === 0
+        && pk2.tx === '*' && pk2.fl === '' && pk2.b && pk2.other === 2;
+      var d = [
+        F.hlDescribe({ w: 'V_AMOUNT > 1000000', css: 'color: red', row: false }, kind, 'V_AMOUNT'),
+        F.hlDescribe({ w: 'V_STATUS = //Closed//', css: 'color: red', row: true }, kind, 'V_AMOUNT'),
+        F.hlDescribe({ w: 'V_DATE >= TODAY-30 and V_DATE <= TODAY', css: 'color: red', row: false }, kind, 'V_DATE'),
+        F.hlDescribe({ w: 'V_AMOUNT >= 10 and V_AMOUNT <= 2000', css: 'color: red', row: false }, kind, 'V_AMOUNT'),
+        F.hlDescribe({ w: '', css: 'color: red', row: true }, kind, 'V_AMOUNT'),
+        F.hlDescribe({ w: 'V_AMOUNT > 5 and V_STATUS = //Open//', css: 'color: red', row: false }, kind, 'V_AMOUNT')
+      ];
+      R.chk.describe = d.join('|') === 'Is greater than 1,000,000|V_STATUS is Closed, whole row|Is in the last 30 days|Is between 10 and 2,000|Every row|V_AMOUNT > 5 and V_STATUS = //Open//';
+      var many = [];
+      for (var i = 0; i < 12; i++) many.push({ id: 'z' + i, w: '', css: 'color: blue' });
+      var cl = F.hlClean([{ id: 'a1', w: 'X > 1', css: 'color: red', row: true }, { id: 'a1', w: 'X > 2', css: 'padding: 3px' }, null,
+        { w: 7, css: 'font-weight: bold', row: 'yes' }].concat(many));
+      R.chk.cleanList = cl.length === 10 && cl[0].id === 'a1' && cl[0].row === true && cl[1].w === '' && cl[1].row === false && cl[1].css === 'font-weight: bold'
+        && cl[1].id !== 'a1' && /^[a-z0-9]{1,16}$/.test(cl[1].id) && cl[9].id === 'z7';
+      R.info = { badW: badW, badR: badR, custBad: custBad, c1: c1, css: css, pk: pk, pk2: pk2, d: d, cl: cl.slice(0, 3) };
+    },
+    // (2026-10-20, hl) authored through the popover, the way a viewer does it
+    fhl: async function () {
+      openPanel();
+      await sleep(450);
+      cogOf('V_AMOUNT').click();
+      var pop = popover();
+      var secs = pop ? Array.prototype.filter.call(pop.children, function (n) { return n.classList.contains('pnb-colopt-sec'); }).map(function (s) { return s.getAttribute('data-sec'); }).join() : '';
+      var hsec = pop && pop.querySelector('[data-sec="highlight"]'), add = hsec && hsec.querySelector('[data-co="hl-add"]');
+      R.chk.popHasHl = secs === 'summary,format,shade,highlight,filter,freeze' && !!add && /^\+ Add a rule$/.test(add.textContent)
+        && hsec.querySelector('.pnb-colopt-lbl').textContent.trim() === 'Highlight' && hsec.querySelectorAll('.pnb-hl-item').length === 0;
+      // Add a rule: its own view in the popover's place; nothing stored until it reads
+      add.click();
+      await sleep(80);
+      var ed = hlEd(), opSel = hlQ('[data-co="hl-op"]');
+      var mainHidden = !!ed && Array.prototype.every.call(pop.children, function (n) { return n === ed || n.style.display === 'none'; });
+      R.chk.addOpens = isShown(ed) && mainHidden && document.activeElement === opSel && /^New highlight rule$/.test(ed.querySelector('.pnb-colopt-title').textContent)
+        && !hlRules('V_AMOUNT') && /^Type a number\.$/.test(hlQ('.pnb-hl-msg').textContent) && !hlQ('.pnb-hl-msg').classList.contains('is-bad')
+        && hlQ('[data-co="hl-col"]').value === 'V_AMOUNT' && /\(this column\)$/.test(hlQ('[data-co="hl-col"]').options[0].textContent);
+      var ops = opSel ? Array.prototype.map.call(opSel.options, function (o) { return o.value; }).join() : '';
+      R.chk.opsNum = ops === 'gt,gte,lt,lte,eq,ne,between,empty,notempty,always';
+      // a value: the rule is stored and drawn - the new rule's style is the amber fill
+      setInput(hlQ('[data-co="hl-v"]'), '50,000');
+      await sleep(550);
+      var want = window.__rowsFixture.filter(function (r) { return amtOf(r) > 50000; }).length;
+      var rs = hlRules('V_AMOUNT'), cnt = hlQ('[data-hint="hl-count"]').textContent;
+      R.chk.typeValue = !!rs && rs.length === 1 && rs[0].w === 'V_AMOUNT > 50000' && rs[0].css === 'background-color: var(--pnb-hl-amber, #fbe8a6)' && rs[0].row === false
+        && cnt === 'Matches ' + want + ' of 300 rows.' && hlQ('.pnb-hl-msg').textContent === '';
+      var amber = probe('background-color: var(--pnb-hl-amber, #fbe8a6)', 'backgroundColor');
+      var cells = colCells('V_AMOUNT', true);
+      var badP = cells.filter(function (td) { return (amtOf(rowOf(td)) > 50000) !== (getComputedStyle(td).backgroundColor === amber); });
+      R.chk.cellsPainted = cells.length === 300 && badP.length === 0 && want > 20 && want < 280;
+      // Basic's style: Text red, Font bold - each in its place in the rule's CSS
+      hlQ('[data-co="hl-tx"][data-k="red"]').click();
+      hlQ('[data-co="hl-b"]').click();
+      await sleep(80);
+      rs = hlRules('V_AMOUNT');
+      var red = probe('color: var(--accent-danger, #c62828)', 'color');
+      var on1 = cells.filter(function (td) { return amtOf(rowOf(td)) > 50000; })[0], off1 = cells.filter(function (td) { return amtOf(rowOf(td)) <= 50000; })[0];
+      R.chk.swatchFont = rs[0].css === 'background-color: var(--pnb-hl-amber, #fbe8a6); color: var(--accent-danger, #c62828); font-weight: bold'
+        && getComputedStyle(on1).color === red && getComputedStyle(on1).fontWeight === '700' && getComputedStyle(off1).color !== red && getComputedStyle(off1).fontWeight !== '700'
+        && hlQ('[data-co="hl-tx"][data-k="red"]').getAttribute('aria-checked') === 'true' && hlQ('[data-co="hl-b"]').getAttribute('aria-pressed') === 'true'
+        && getComputedStyle(hlQ('.pnb-hl-prev')).color === red;
+      // a swatch row is one Tab stop; the arrows move the pick
+      var txs = Array.prototype.slice.call(hlEd().querySelectorAll('[data-co="hl-tx"]'));
+      var stops = txs.filter(function (b) { return b.tabIndex === 0; });
+      var redB = hlQ('[data-co="hl-tx"][data-k="red"]');
+      redB.focus();
+      redB.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+      await sleep(80);
+      var amberB = hlQ('[data-co="hl-tx"][data-k="amber"]');
+      R.chk.swatchKeys = stops.length === 1 && stops[0] === redB && document.activeElement === amberB && amberB.getAttribute('aria-checked') === 'true'
+        && /color: var\(--accent-warning/.test(hlRules('V_AMOUNT')[0].css) && amberB.tabIndex === 0 && redB.tabIndex === -1;
+      redB.click();
+      await sleep(60);
+      // Tab leaves the row: the next stop is the Fill row's picked swatch
+      redB.focus();
+      redB.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
+      await sleep(40);
+      var fillStop = Array.prototype.filter.call(hlEd().querySelectorAll('[data-co="hl-fl"]'), function (b) { return b.tabIndex === 0; });
+      R.chk.tabStops = fillStop.length === 1 && document.activeElement === fillStop[0] && fillStop[0].getAttribute('data-k') === 'amber';
+      // Advanced: the rule as text
+      hlQ('[data-co="hl-adv"]').click();
+      await sleep(40);
+      var wIn = hlQ('[data-co="hl-w"]'), cIn = hlQ('[data-co="hl-css"]');
+      R.chk.advShows = isShown(wIn) && wIn.value === 'V_AMOUNT > 50000' && cIn.value === hlRules('V_AMOUNT')[0].css && hlQ('[data-co="hl-adv"]').getAttribute('aria-expanded') === 'true';
+      // CSS of your own: what the format pass would not apply is named, and left out
+      cIn.focus();
+      setInput(cIn, 'color: #123456; padding: 4px');
+      await sleep(550);
+      rs = hlRules('V_AMOUNT');
+      R.chk.advCss = rs[0].css === 'color: #123456' && /Not applied: padding/.test(hlQ('.pnb-hl-msg').textContent) && hlQ('.pnb-hl-msg').classList.contains('is-bad')
+        && getComputedStyle(on1).color === 'rgb(18, 52, 86)' && getComputedStyle(on1).backgroundColor !== amber
+        && txs.every(function (b) { return b.getAttribute('aria-checked') === 'false'; }) && /Plus CSS of your own/.test(hlQ('[data-hint="hl-other"]').textContent);
+      // a value that could break out of the style attribute is refused; the rule as it was
+      setInput(cIn, 'color: red" onmouseover="window.__pwned=1');
+      await sleep(550);
+      R.chk.cssRefused = hlRules('V_AMOUNT')[0].css === 'color: #123456' && /Not a value it takes: color/.test(hlQ('.pnb-hl-msg').textContent)
+        && !window.__pwned && getComputedStyle(on1).color === 'rgb(18, 52, 86)';
+      // a property the rule stops setting comes off the cells (the format pass's reset
+      // takes every property a rule may set)
+      setInput(cIn, 'color: #123456; text-transform: uppercase');
+      await sleep(550);
+      var upOn = getComputedStyle(on1).textTransform === 'uppercase';
+      setInput(cIn, 'color: #123456');
+      await sleep(550);
+      R.chk.cssClears = upOn && getComputedStyle(on1).textTransform === 'none' && on1.style.textTransform === '' && hlRules('V_AMOUNT')[0].css === 'color: #123456';
+      // a condition of your own (filter box syntax): Basic says Custom
+      wIn.focus();
+      setInput(wIn, 'V_AMOUNT > 50000 and V_STATUS = //Open//');
+      await sleep(550);
+      rs = hlRules('V_AMOUNT');
+      var badC = cells.filter(function (td) { var r = rowOf(td); return (amtOf(r) > 50000 && r.V_STATUS === 'Open') !== (getComputedStyle(td).color === 'rgb(18, 52, 86)'); });
+      R.chk.advCond = rs[0].w === 'V_AMOUNT > 50000 and V_STATUS = //Open//' && opSel.value === 'custom' && badC.length === 0
+        && hlQ('[data-co="hl-col"]').disabled && hlQ('[data-show="hl-v"]').style.display === 'none';
+      // a pattern that cannot be read: said in red, the rule as it was
+      setInput(wIn, 'V_STATUS = /([/');
+      await sleep(550);
+      R.chk.badCond = hlRules('V_AMOUNT')[0].w === 'V_AMOUNT > 50000 and V_STATUS = //Open//' && hlQ('.pnb-hl-msg').classList.contains('is-bad')
+        && /pattern/.test(hlQ('.pnb-hl-msg').textContent);
+      // back to a form Basic writes: Basic shows it again
+      setInput(wIn, 'V_AMOUNT > 50000');
+      await sleep(550);
+      R.chk.backToBasic = opSel.value === 'gt' && hlQ('[data-co="hl-v"]').value === '50000' && !hlQ('[data-co="hl-col"]').disabled
+        && !opSel.querySelector('option[value="custom"]') && hlRules('V_AMOUNT')[0].w === 'V_AMOUNT > 50000';
+      // Apply to: Whole row
+      var rowR = hlQ('[data-co="hl-to"][value="row"]');
+      rowR.checked = true;
+      fire(rowR, 'change');
+      await sleep(80);
+      rs = hlRules('V_AMOUNT');
+      var badR = cells.filter(function (td) { return (amtOf(rowOf(td)) > 50000) !== (td.parentNode.style.color !== ''); });
+      R.chk.rowApply = rs[0].row === true && badR.length === 0 && cells.every(function (td) { return td.style.color === ''; });
+      // Done: the list, the rule in words; the badge
+      hlQ('[data-co="hl-done"]').click();
+      await sleep(80);
+      var items = pop.querySelectorAll('[data-sec="highlight"] .pnb-hl-item'), ib = items[0] && items[0].querySelector('[data-co="hl-edit"]');
+      R.chk.doneBack = !hlEd() && items.length === 1 && !!ib && ib.textContent === 'Is greater than 50,000, whole row' && document.activeElement === ib
+        && Array.prototype.every.call(pop.children, function (n) { return n.style.display !== 'none'; });
+      var bv = badgesOf('V_AMOUNT');
+      R.chk.badge = bv.some(function (b) { return b.t === 'RULE' && b.own; }) && cogOf('V_AMOUNT').classList.contains('is-custom')
+        && /Highlight: Is greater than 50,000, whole row/.test(item('V_AMOUNT').querySelector('.sp-col-badges').getAttribute('title') || '');
+      // back to a cell rule, then a second rule, green text on 40,000 to 60,000: it goes on
+      // top, and where both match it wins
+      ib.click();
+      await sleep(80);
+      var cellR = hlQ('[data-co="hl-to"][value="cell"]');
+      cellR.checked = true;
+      fire(cellR, 'change');
+      await sleep(60);
+      hlQ('[data-co="hl-done"]').click();
+      await sleep(60);
+      pop.querySelector('[data-co="hl-add"]').click();
+      await sleep(80);
+      setSel(hlQ('[data-co="hl-op"]'), 'between');
+      var bothShown = isShown(hlQ('[data-co="hl-v2"]')) && isShown(hlQ('.pnb-hl-and'));
+      setInput(hlQ('[data-co="hl-v"]'), '40000');
+      setInput(hlQ('[data-co="hl-v2"]'), '60000');
+      await sleep(550);
+      hlQ('[data-co="hl-tx"][data-k="green"]').click();
+      hlQ('[data-co="hl-fl"][data-k=""]').click();
+      await sleep(80);
+      rs = hlRules('V_AMOUNT');
+      var green = probe('color: var(--accent-success, #1a7f37)', 'color');
+      var badT = cells.filter(function (td) {
+        var a = amtOf(rowOf(td)), c = getComputedStyle(td).color;
+        if (a >= 40000 && a <= 60000) return c !== green;
+        if (a > 50000) return c !== 'rgb(18, 52, 86)';
+        return c === green || c === 'rgb(18, 52, 86)';
+      });
+      R.chk.topWins = bothShown && rs.length === 2 && rs[0].w === 'V_AMOUNT >= 40000 and V_AMOUNT <= 60000' && rs[0].css === 'color: var(--accent-success, #1a7f37)'
+        && rs[1].w === 'V_AMOUNT > 50000' && rs[1].row === false && badT.length === 0;
+      // opened again, Basic reads the rule back
+      hlQ('[data-co="hl-done"]').click();
+      await sleep(60);
+      pop.querySelector('[data-co="hl-edit"][data-i="0"]').click();
+      await sleep(80);
+      R.chk.reopen = hlQ('[data-co="hl-op"]').value === 'between' && hlQ('[data-co="hl-v"]').value === '40000' && hlQ('[data-co="hl-v2"]').value === '60000'
+        && hlQ('[data-co="hl-tx"][data-k="green"]').getAttribute('aria-checked') === 'true' && hlQ('[data-co="hl-fl"][data-k=""]').getAttribute('aria-checked') === 'true'
+        && hlQ('.pnb-hl-advbox').style.display === 'none' && /^Highlight rule$/.test(hlQ('.pnb-colopt-title').textContent) && hlQ('[data-co="hl-delete"]').textContent === 'Delete rule';
+      // Delete rule: gone from the cells and the list
+      hlQ('[data-co="hl-delete"]').click();
+      await sleep(100);
+      rs = hlRules('V_AMOUNT');
+      R.chk.deleteRule = !hlEd() && !!rs && rs.length === 1 && rs[0].w === 'V_AMOUNT > 50000' && cells.every(function (td) { return getComputedStyle(td).color !== green; })
+        && pop.querySelectorAll('[data-sec="highlight"] .pnb-hl-item').length === 1;
+      // Escape from a rule's view closes the popover; the rule stays
+      pop.querySelector('[data-co="hl-edit"][data-i="0"]').click();
+      await sleep(80);
+      var t = hlQ('[data-co="hl-op"]');
+      t.focus();
+      t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      await sleep(100);
+      R.chk.escCloses = !popover() && !!hlRules('V_AMOUNT') && hlRules('V_AMOUNT').length === 1 && cells.some(function (td) { return td.style.color !== ''; });
+      // Reset: the rules go with the rest, and their styles off every cell
+      cogOf('V_AMOUNT').click();
+      await sleep(80);
+      popover().querySelector('[data-co="reset"]').click();
+      await sleep(100);
+      R.chk.resetClears = !hlRules('V_AMOUNT') && popover().querySelectorAll('.pnb-hl-item').length === 0
+        && cells.every(function (td) { return td.style.color === '' && td.parentNode.style.color === ''; }) && !badgesOf('V_AMOUNT').some(function (b) { return b.t === 'RULE'; });
+      // a text column: its operators; "is" writes the filter box's exact match (any case)
+      closeAll();
+      await sleep(60);
+      cogOf('V_STATUS').click();
+      await sleep(80);
+      popover().querySelector('[data-co="hl-add"]').click();
+      await sleep(80);
+      var ops2 = Array.prototype.map.call(hlQ('[data-co="hl-op"]').options, function (o) { return o.value; }).join();
+      setInput(hlQ('[data-co="hl-v"]'), 'closed');
+      await sleep(550);
+      rs = hlRules('V_STATUS');
+      var stc = colCells('V_STATUS', true);
+      R.chk.textIs = ops2 === 'is,isnot,contains,notcontains,starts,empty,notempty,always' && !!rs && rs[0].w === 'V_STATUS = //closed//'
+        && stc.length === 300 && stc.every(function (td) { return (rowOf(td).V_STATUS === 'Closed') === (getComputedStyle(td).backgroundColor === amber); });
+      // a date column: before a date typed the US way
+      closeAll();
+      await sleep(60);
+      cogOf('V_DATE').click();
+      await sleep(80);
+      popover().querySelector('[data-co="hl-add"]').click();
+      await sleep(80);
+      var ops3 = Array.prototype.map.call(hlQ('[data-co="hl-op"]').options, function (o) { return o.value; }).join();
+      var ph = hlQ('[data-co="hl-v"]').getAttribute('placeholder');
+      setInput(hlQ('[data-co="hl-v"]'), '1/1/2023');
+      await sleep(550);
+      rs = hlRules('V_DATE');
+      var dtc = colCells('V_DATE', true);
+      R.chk.dateBefore = ops3 === 'before,after,onbefore,onafter,on,between,last,next,empty,notempty,always' && /TODAY/.test(ph || '') && !!rs && rs[0].w === 'V_DATE < 2023-01-01'
+        && dtc.length === 300 && dtc.every(function (td) { return (ymd(rowOf(td)) < 20230101) === (getComputedStyle(td).backgroundColor === amber); });
+      closeAll();
+      R.info = { secs: secs, ops: ops, ops2: ops2, ops3: ops3, rs: rs, cnt: cnt, want: want, badP: badP.length, badC: badC.length, badR: badR.length, badT: badT.length,
+        prefs: colopt(), msg: hlEd() ? hlQ('.pnb-hl-msg').textContent : null };
+    },
+    // (2026-10-20, hl) rules saved before the report opens (mk_harness SEED), with the
+    // column's shading on (a color scale)
+    fhlseed: async function () {
+      var amber = probe('background-color: var(--pnb-hl-amber, #fbe8a6)', 'backgroundColor');
+      function cellAmt(td) { return cents(td.getAttribute('data-pnb-raw') || td.textContent) / 100; }
+      function rowStatus(tr) { return tr.children[hdrIndex('V_STATUS')].textContent.trim(); }
+      function amtOk() {
+        var cells = colCells('V_AMOUNT', true);
+        return cells.length === 300 && cells.every(function (td) {
+          var a = cellAmt(td), cs = getComputedStyle(td);
+          if (a > 80000) return cs.color === 'rgb(0, 0, 255)' && cs.backgroundColor === amber;
+          if (a > 50000) return cs.color === 'rgb(255, 0, 0)' && cs.backgroundColor === amber;
+          return cs.color !== 'rgb(0, 0, 255)' && cs.color !== 'rgb(255, 0, 0)' && cs.backgroundColor !== amber;
+        });
+      }
+      function rowsOk() {
+        var cells = colCells('V_STATUS', true);
+        return cells.length === 300 && cells.every(function (td) { return (rowStatus(td.parentNode) === 'Closed') === /line-through/.test(td.parentNode.style.textDecoration || ''); });
+      }
+      function namesOk() {
+        var cells = colCells('V_NAME', true);
+        return cells.length === 300 && cells.every(function (td) { return (rowStatus(td.parentNode) === 'Pending') === (getComputedStyle(td).fontStyle === 'italic'); });
+      }
+      // drawn at once; the top rule wins where both set the color
+      R.chk.drawnAtBoot = amtOk();
+      // over the shading: the heat pass ran on the rest of the column
+      var cells = colCells('V_AMOUNT', true);
+      var heatOn = cells.filter(function (td) { return cellAmt(td) <= 50000 && !!td.style.backgroundColor; }).length;
+      R.chk.overShade = heatOn > 50 && cells.filter(function (td) { return cellAmt(td) > 50000; }).every(function (td) { return /pnb-hl-amber/.test(td.style.backgroundColor); });
+      R.chk.rowRule = rowsOk();
+      R.chk.otherCol = namesOk();
+      openPanel();
+      await sleep(400);
+      var bv = badgesOf('V_AMOUNT');
+      R.chk.badges = bv.some(function (b) { return b.t === 'HEAT' && b.own; }) && bv.some(function (b) { return b.t === 'RULE' && b.own; })
+        && /Highlight: 2 rules/.test(item('V_AMOUNT').querySelector('.sp-col-badges').getAttribute('title') || '')
+        && badgesOf('V_NAME').some(function (b) { return b.t === 'RULE'; });
+      // a sort and a search draw them again
+      document.querySelector('#tableHeader th[data-colname="V_DATE"]').click();
+      await sleep(800);
+      var sortOk = amtOk() && rowsOk() && namesOk();
+      $('#tableSearch').val('Pending');
+      await window.__HC.runSearch();
+      await sleep(600);
+      var vis = colCells('V_NAME').filter(function (td) { return !td.parentNode.classList.contains('search-hidden'); });
+      var searchOk = vis.length > 20 && vis.every(function (td) { return getComputedStyle(td).fontStyle === 'italic'; });
+      $('#tableSearch').val('');
+      await window.__HC.runSearch();
+      await sleep(600);
+      R.chk.sortSearch = sortOk && searchOk && amtOk();
+      // a dark theme: the fills are its own tints
+      document.body.classList.add('is-dark');
+      var darkAmber = probe('background-color: var(--pnb-hl-amber, #fbe8a6)', 'backgroundColor');
+      var hot = colCells('V_AMOUNT', true).filter(function (td) { return cellAmt(td) > 50000; })[0];
+      R.chk.darkTint = darkAmber === 'rgb(77, 63, 18)' && !!hot && getComputedStyle(hot).backgroundColor === darkAmber;
+      document.body.classList.remove('is-dark');
+      // a value that stops matching: drawn again, its old style gone (the format pass
+      // takes the styles off even when only highlight rules are left to draw)
+      var ctd = colCells('V_STATUS', true).filter(function (td) { return td.textContent.trim() === 'Closed'; })[0];
+      var ctr = ctd && ctd.parentNode, before = ctr ? /line-through/.test(ctr.style.textDecoration || '') : false;
+      if (ctd) { ctd.textContent = 'Open'; if (ctd.hasAttribute('data-pnb-raw')) ctd.setAttribute('data-pnb-raw', 'Open'); }
+      window.__HC.acf(true);
+      await sleep(100);
+      R.chk.stopsMatching = before && !!ctr && !/line-through/.test(ctr.style.textDecoration || '');
+      var hot0 = colCells('V_AMOUNT', true).filter(function (td) { return cellAmt(td) > 50000; });
+      R.info = { heatOn: heatOn, bv: bv, darkAmber: darkAmber, before: before, sortOk: sortOk, searchOk: searchOk, vis: vis.length,
+        hot: hot0.slice(0, 3).map(function (td) { return td.style.cssText; }), hotN: hot0.length,
+        hotBad: hot0.filter(function (td) { return !/pnb-hl-amber/.test(td.style.backgroundColor); }).slice(0, 3).map(function (td) { return td.outerHTML.slice(0, 200); }) };
+    },
+    // (2026-10-20, hl) the grouped view
+    ghl: async function () {
+      var amber = probe('background-color: var(--pnb-hl-amber, #fbe8a6)', 'backgroundColor');
+      function gCells(col) {
+        var out = [];
+        Array.prototype.forEach.call(document.querySelectorAll('#groupedResultsContainer table'), function (tb) {
+          var ths = Array.prototype.slice.call(tb.querySelectorAll(':scope > thead th')), i = ths.findIndex(function (t) { return t.getAttribute('data-colname') === col; });
+          if (i < 0) return;
+          Array.prototype.forEach.call(tb.querySelectorAll(':scope > tbody > tr'), function (tr) { if (tr.children[i] && tr.children.length === ths.length) out.push(tr.children[i]); });
+        });
+        return out;
+      }
+      function amt(td) { return cents(td.getAttribute('data-pnb-raw') || td.textContent) / 100; }
+      var gc = gCells('V_AMOUNT');
+      R.chk.groupedPainted = gc.length > 100 && gc.every(function (td) { return (amt(td) > 50000) === (getComputedStyle(td).backgroundColor === amber); });
+      // a rule made with the grouped view on: drawn there; deleted: gone from both tables
+      openPanel();
+      await sleep(450);
+      cogOf('V_STATUS').click();
+      await sleep(80);
+      popover().querySelector('[data-co="hl-add"]').click();
+      await sleep(80);
+      setInput(hlQ('[data-co="hl-v"]'), 'Closed');
+      await sleep(550);
+      hlQ('[data-co="hl-tx"][data-k="red"]').click();
+      hlQ('[data-co="hl-fl"][data-k=""]').click();
+      await sleep(100);
+      var red = probe('color: var(--accent-danger, #c62828)', 'color');
+      var gs = gCells('V_STATUS');
+      var drawn = gs.length > 100 && gs.every(function (td) { return (td.textContent.trim() === 'Closed') === (getComputedStyle(td).color === red); });
+      hlQ('[data-co="hl-delete"]').click();
+      await sleep(120);
+      var gone = gCells('V_STATUS').every(function (td) { return getComputedStyle(td).color !== red && td.style.color === ''; })
+        && colCells('V_STATUS', true).every(function (td) { return td.style.color === ''; });
+      R.chk.groupedLive = drawn && gone && !hlRules('V_STATUS');
+      closeAll();
+      R.info = { n: gc.length, gs: gs.length, drawn: drawn, gone: gone };
+    },
+    // ---- (2026-10-20 b) formats and highlight rules SAVED WITH THE REPORT. hr*: the report holds
+    // columnFormats { V_AMOUNT: currency:0 } and columnHighlights { V_AMOUNT: [r1 amber over 50,000],
+    // V_STATUS: [r2 Closed, the whole row struck], V_NAME: [r3 V_NAME = /Alpha/ italic] } (mk_harness)
+    // hrep: someone who may save it - drawn at once and outlined, Off for me, Automatic over the
+    // report's format and Reset back, a report rule changed into a copy (and back), a view link,
+    // a save made without the dialog's list; and the PHP half's fixtures
+    hrep: async function () {
+      var K = hrKit();
+      R.chk.repFmt = K.amtText('cur0') && colCells('V_AMOUNT', true).every(function (td) { return td.getAttribute('data-pnb-raw') === rowOf(td).V_AMOUNT; });
+      R.chk.repDrawn = K.painted(K.amber) && K.strikes(true) && K.italicNames(false);
+      R.info.email = K.emailFix();
+      R.info.when = K.whenFix();
+      R.info.unit = K.unitFix();
+      R.info.rowsAll = window.__rowsFixture.map(function (r) {
+        var o = {};
+        Object.keys(r).forEach(function (k) { if (!/^(V_LINK|H_HTML|H_JSON)$/.test(k)) o[k] = r[k]; });
+        return o;
+      });
+      openPanel();
+      await sleep(450);
+      var bv = badgesOf('V_AMOUNT'), bt = item('V_AMOUNT').querySelector('.sp-col-badges').getAttribute('title') || '';
+      R.chk.repBadges = bv.some(function (b) { return b.t === '$' && !b.own; }) && bv.some(function (b) { return b.t === 'RULE' && !b.own; })
+        && bt.indexOf("Format: Currency, 0 decimals (the report's)") !== -1 && /Highlight: [^\n]*\(the report's\)/.test(bt)
+        && badgesOf('V_STATUS').some(function (b) { return b.t === 'RULE' && !b.own; });
+      cogOf('V_AMOUNT').click();
+      await sleep(80);
+      var pop = popover(), reps = pop.querySelectorAll('.pnb-hl-item.is-report'), rr = reps[0];
+      var offCb = rr && rr.querySelector('[data-co="hl-off"]');
+      R.chk.popRepRow = reps.length === 1 && pop.querySelectorAll('.pnb-hl-item:not(.is-report)').length === 0
+        && rr.querySelector('.pnb-hl-tag').textContent === 'report' && !!rr.querySelector('[data-co="hl-redit"]') && !rr.querySelector('.pnb-hl-text')
+        && !!offCb && !offCb.checked && /Off for me/.test(rr.querySelector('.pnb-hl-offl').textContent)
+        && pop.querySelector('[data-co="reset"]').disabled && pop.querySelector('[data-co="type"]').value === 'currency'
+        && pop.querySelector('[data-co="dp"]').value === '0' && pop.querySelector('[data-hint="fmt"]').textContent === '';
+      // Off for me: off for this viewer alone, at once; the view link carries what they see
+      offCb.click();
+      await sleep(150);
+      var co = colopt() || {};
+      R.chk.offForMe = K.none(K.amber) && !!co.V_AMOUNT && JSON.stringify(co.V_AMOUNT.hlOff) === '["r1"]' && !co.V_AMOUNT.hl
+        && rr.classList.contains('is-off') && !pop.querySelector('[data-co="reset"]').disabled && K.strikes(true)
+        && getComputedStyle(rr.querySelector('.pnb-hl-open')).opacity === '0.55' && /line-through/.test(getComputedStyle(rr.querySelector('.pnb-hl-open')).textDecorationLine);
+      bv = badgesOf('V_AMOUNT');
+      R.chk.offBadge = bv.some(function (b) { return b.t === 'NO RULE' && b.own; }) && !bv.some(function (b) { return b.t === 'RULE'; });
+      var sv = window.__HC.bso();
+      var svOff = !!sv && !!sv.columnHighlights && !sv.columnHighlights.V_AMOUNT && !!sv.columnHighlights.V_STATUS && sv.columnHighlights.V_STATUS[0].id === 'r2'
+        && !!sv.columnFormats && sv.columnFormats.V_AMOUNT === 'currency:0';
+      offCb.click();
+      await sleep(150);
+      co = colopt() || {};
+      R.chk.offBack = K.painted(K.amber) && !rr.classList.contains('is-off') && !(co.V_AMOUNT && co.V_AMOUNT.hlOff);
+      sv = window.__HC.bso();
+      R.chk.viewLink = svOff && !!sv && !!sv.columnHighlights && !!sv.columnHighlights.V_AMOUNT && sv.columnHighlights.V_AMOUNT.length === 1
+        && sv.columnHighlights.V_AMOUNT[0].id === 'r1' && sv.columnHighlights.V_AMOUNT[0].css === 'background-color: var(--pnb-hl-amber, #fbe8a6)'
+        && sv.columnHighlights.V_STATUS[0].row === true && sv.columnFormats.V_AMOUNT === 'currency:0';
+      // Automatic over the report's format: the values as they are, for this viewer (NO $)
+      setSel(pop.querySelector('[data-co="type"]'), '');
+      await sleep(250);
+      co = colopt() || {};
+      bv = badgesOf('V_AMOUNT');
+      R.chk.autoOverRep = K.amtText('raw') && !!co.V_AMOUNT && co.V_AMOUNT.fmt === 'none'
+        && pop.querySelector('[data-hint="fmt"]').textContent === "The report's: Currency, 0 decimals. Reset goes back to it."
+        && /without the report's format/.test(pop.querySelector('.pnb-colopt-prev').textContent)
+        && bv.some(function (b) { return b.t === 'NO $' && b.own; }) && !pop.querySelector('[data-co="reset"]').disabled;
+      // Reset: the report's format, every report rule on
+      offCb = pop.querySelector('.pnb-hl-item.is-report [data-co="hl-off"]');
+      offCb.click();
+      await sleep(150);
+      pop.querySelector('[data-co="reset"]').click();
+      await sleep(300);
+      co = colopt() || {};
+      var pop2 = popover();
+      R.chk.resetBack = K.amtText('cur0') && K.painted(K.amber) && !(co.V_AMOUNT && (co.V_AMOUNT.fmt || co.V_AMOUNT.hl || co.V_AMOUNT.hlOff))
+        && !!pop2 && pop2.querySelector('[data-co="type"]').value === 'currency' && pop2.querySelector('[data-co="dp"]').value === '0'
+        && pop2.querySelector('[data-hint="fmt"]').textContent === '' && pop2.querySelector('[data-co="reset"]').disabled
+        && !pop2.querySelector('.pnb-hl-item.is-report [data-co="hl-off"]').checked;
+      // opened and left: still the report's, nothing stored
+      pop2.querySelector('.pnb-hl-item.is-report [data-co="hl-redit"]').click();
+      await sleep(120);
+      var ttl = hlEd() ? hlEd().querySelector('.pnb-colopt-title').textContent : '', note = hlQ('.pnb-hl-note'), del0 = hlQ('[data-co="hl-delete"]').textContent;
+      var stored0 = hlRules('V_AMOUNT');
+      hlQ('[data-co="hl-back"]').click();
+      await sleep(100);
+      R.chk.openNoCopy = ttl === "The report's rule" && !!note && /Save dialog offers it to the report/.test(note.textContent) && del0 === 'Discard'
+        && !stored0 && !hlRules('V_AMOUNT') && popover().querySelectorAll('.pnb-hl-item.is-report').length === 1;
+      // a change: the viewer's copy (the same id), drawn in the report's rule's place, marked changed
+      popover().querySelector('.pnb-hl-item.is-report [data-co="hl-redit"]').click();
+      await sleep(120);
+      hlQ('[data-co="hl-fl"][data-k="green"]').click();
+      await sleep(150);
+      var rs = hlRules('V_AMOUNT'), delTxt = hlQ('[data-co="hl-delete"]').textContent;
+      hlQ('[data-co="hl-done"]').click();
+      await sleep(100);
+      pop = popover();
+      var own = pop.querySelectorAll('.pnb-hl-item:not(.is-report)');
+      R.chk.editCopy = !!rs && rs.length === 1 && rs[0].id === 'r1' && rs[0].w === 'V_AMOUNT > 50000' && rs[0].css === 'background-color: var(--pnb-hl-green, #d3eedb)'
+        && delTxt === 'Delete my change' && K.painted(K.green) && own.length === 1 && !!own[0].querySelector('.pnb-hl-tag')
+        && own[0].querySelector('.pnb-hl-tag').textContent === 'changed' && pop.querySelectorAll('.pnb-hl-item.is-report').length === 0
+        && /^Delete your change to the report's rule/.test(own[0].querySelector('[data-co="hl-del"]').getAttribute('aria-label'))
+        && badgesOf('V_AMOUNT').some(function (b) { return b.t === 'RULE' && b.own; })
+        && !/\d rules/.test(item('V_AMOUNT').querySelector('.sp-col-badges').getAttribute('title') || '');
+      // changed back to the report's: the copy goes
+      own[0].querySelector('[data-co="hl-edit"]').click();
+      await sleep(120);
+      hlQ('[data-co="hl-fl"][data-k="amber"]').click();
+      await sleep(150);
+      var backTxt = hlQ('[data-co="hl-delete"]').textContent, rsBack = hlRules('V_AMOUNT');
+      hlQ('[data-co="hl-done"]').click();
+      await sleep(100);
+      R.chk.changeBack = !rsBack && !hlRules('V_AMOUNT') && backTxt === 'Discard' && K.painted(K.amber)
+        && popover().querySelectorAll('.pnb-hl-item.is-report').length === 1 && popover().querySelectorAll('.pnb-hl-item:not(.is-report)').length === 0;
+      // Delete my change: the report's rule again
+      popover().querySelector('.pnb-hl-item.is-report [data-co="hl-redit"]').click();
+      await sleep(120);
+      hlQ('[data-co="hl-tx"][data-k="red"]').click();
+      await sleep(150);
+      var made = hlRules('V_AMOUNT'), redOn = colCells('V_AMOUNT', true).some(function (td) { return getComputedStyle(td).color === K.red; });
+      hlQ('[data-co="hl-delete"]').click();
+      await sleep(150);
+      R.chk.copyDelete = !!made && made.length === 1 && made[0].id === 'r1' && redOn && !hlRules('V_AMOUNT') && K.painted(K.amber)
+        && colCells('V_AMOUNT', true).every(function (td) { return getComputedStyle(td).color !== K.red; });
+      // a rule typed in a form Basic writes another way (V_NAME = /Alpha/): opened and left, still the report's
+      closeAll();
+      await sleep(60);
+      cogOf('V_NAME').click();
+      await sleep(100);
+      popover().querySelector('.pnb-hl-item.is-report [data-co="hl-redit"]').click();
+      await sleep(150);
+      var r3op = hlQ('[data-co="hl-op"]').value, r3v = hlQ('[data-co="hl-v"]').value, r3stored = hlRules('V_NAME');
+      hlQ('[data-co="hl-back"]').click();
+      await sleep(100);
+      R.chk.openCanon = r3op === 'contains' && r3v === 'Alpha' && !r3stored && !hlRules('V_NAME') && popover().querySelectorAll('.pnb-hl-item.is-report').length === 1
+        && K.italicNames(false);
+      closeAll();
+      await sleep(60);
+      // a save made without the dialog's list: the report's stay as they are, the viewer's own stay theirs
+      cogOf('V_AMOUNT').click();
+      await sleep(100);
+      setSel(popover().querySelector('[data-co="type"]'), 'number');
+      setSel(popover().querySelector('[data-co="dp"]'), '2');
+      await sleep(250);
+      closeAll();
+      $('#serverSaveIdInput').val('lrfix');
+      var n0 = window.__saves.length;
+      $('#confirmServerSaveBtn').prop('disabled', false).trigger('click');
+      await until(function () { return window.__saves.length > n0; }, 8000);
+      await sleep(400);
+      var sd0 = null;
+      try { sd0 = JSON.parse(window.__saves[window.__saves.length - 1].state_data); } catch (e) { }
+      co = colopt() || {};
+      R.chk.noListKeeps = !!sd0 && JSON.stringify(sd0.columnFormats) === '{"V_AMOUNT":"currency:0"}' && !!sd0.columnHighlights
+        && Object.keys(sd0.columnHighlights).sort().join() === 'V_AMOUNT,V_NAME,V_STATUS' && sd0.columnHighlights.V_AMOUNT[0].css === 'background-color: var(--pnb-hl-amber, #fbe8a6)'
+        && !!co.V_AMOUNT && co.V_AMOUNT.fmt === 'number:2' && K.amtText('num2');
+      R.info.chk = { bt: bt, sv: sv, sd0: sd0 && { f: sd0.columnFormats, h: sd0.columnHighlights }, co: co, ttl: ttl, delTxt: delTxt, backTxt: backTxt, r3: [r3op, r3v] };
+    },
+    // hrview: a viewer (canEditReport off) - the report's drawn; its rules cannot be opened, only
+    // turned off for themself; their own rule on top (its fill over the report's); their own format
+    hrview: async function () {
+      var K = hrKit();
+      R.chk.viewDrawn = K.painted(K.amber) && K.strikes(true) && K.amtText('cur0') && K.italicNames(false);
+      openPanel();
+      await sleep(450);
+      cogOf('V_AMOUNT').click();
+      await sleep(80);
+      var pop = popover(), rr = pop.querySelector('.pnb-hl-item.is-report');
+      R.chk.viewNoEdit = !!rr && !rr.querySelector('[data-co="hl-redit"]') && !!rr.querySelector('.pnb-hl-text') && !!rr.querySelector('[data-co="hl-off"]')
+        && pop.querySelectorAll('[data-co="hl-redit"]').length === 0;
+      rr.querySelector('[data-co="hl-off"]').click();
+      await sleep(150);
+      var co = colopt() || {};
+      var offOk = K.none(K.amber) && !!co.V_AMOUNT && JSON.stringify(co.V_AMOUNT.hlOff) === '["r1"]';
+      rr.querySelector('[data-co="hl-off"]').click();
+      await sleep(150);
+      R.chk.viewOff = offOk && K.painted(K.amber);
+      // their own rule: drawn over the report's (whose fill stays where theirs sets none)
+      pop.querySelector('[data-co="hl-add"]').click();
+      await sleep(100);
+      setInput(hlQ('[data-co="hl-v"]'), '80000');
+      await sleep(550);
+      hlQ('[data-co="hl-tx"][data-k="red"]').click();
+      hlQ('[data-co="hl-fl"][data-k="blue"]').click();
+      await sleep(150);
+      hlQ('[data-co="hl-done"]').click();
+      await sleep(100);
+      var rs = hlRules('V_AMOUNT'), cells = colCells('V_AMOUNT', true);
+      R.chk.viewOwnOnTop = !!rs && rs.length === 1 && rs[0].w === 'V_AMOUNT > 80000' && rs[0].css === 'background-color: var(--pnb-hl-blue, #d6e5fa); color: var(--accent-danger, #c62828)'
+        && cells.length === 300 && cells.every(function (td) {
+          var a = K.amt(td), cs = getComputedStyle(td);
+          return (a > 80000) === (cs.color === K.red) && (a > 80000 ? cs.backgroundColor === K.blue : (a > 50000) === (cs.backgroundColor === K.amber));
+        })
+        && popover().querySelectorAll('.pnb-hl-item.is-report').length === 1 && popover().querySelectorAll('.pnb-hl-item:not(.is-report)').length === 1
+        && !popover().querySelector('.pnb-hl-item:not(.is-report) .pnb-hl-tag');
+      // their own format over the report's
+      setSel(popover().querySelector('[data-co="type"]'), 'number');
+      setSel(popover().querySelector('[data-co="dp"]'), '2');
+      await sleep(300);
+      var bv = badgesOf('V_AMOUNT');
+      co = colopt() || {};
+      R.chk.viewFmtOwn = !!co.V_AMOUNT && co.V_AMOUNT.fmt === 'number:2' && K.amtText('num2') && bv.some(function (b) { return b.t === 'NUM' && b.own; })
+        && !bv.some(function (b) { return b.t === '$'; }) && popover().querySelector('[data-hint="fmt"]').textContent === "The report's: Currency, 0 decimals. Reset goes back to it.";
+      closeAll();
+      // the Run button (the report's own query): still the report's; an edited query (an
+      // ad-hoc run) is another table - the report's rules and format go, the viewer's stay
+      var cmEl = document.querySelector('.CodeMirror'), cm = cmEl && cmEl.CodeMirror, ta = document.getElementById('sqlQuery');
+      var qText = cm ? cm.getValue() : ta.value, q0 = window.__queryDone;
+      $('#executeQuery').click();
+      await until(function () { return window.__queryDone > q0; }, 15000);
+      await sleep(800);
+      var mid = function (fill) {
+        return colCells('V_AMOUNT', true).every(function (td) { var a = K.amt(td), bg = getComputedStyle(td).backgroundColor; return a > 80000 ? bg === K.blue : (a > 50000) === (bg === fill); });
+      };
+      R.chk.rerunKeeps = window.__queryDone === q0 + 1 && mid(K.amber) && K.strikes(true) && K.italicNames(false) && K.amtText('num2');
+      if (cm) cm.setValue(qText + ' WHERE 1 = 1'); else ta.value = qText + ' WHERE 1 = 1';
+      var q1 = window.__queryDone;
+      $('#executeQuery').click();
+      await until(function () { return window.__queryDone > q1; }, 15000);
+      await sleep(800);
+      var ownOnly = colCells('V_AMOUNT', true).every(function (td) { var bg = getComputedStyle(td).backgroundColor; return K.amt(td) > 80000 ? bg === K.blue : bg !== K.amber; });
+      R.chk.adhocDrops = window.__queryDone === q1 + 1 && ownOnly && K.none(K.amber) && K.strikes(false)
+        && colCells('V_NAME', true).every(function (td) { return getComputedStyle(td).fontStyle !== 'italic'; }) && K.amtText('num2');
+      R.info = { co: co, bv: bv, rs: rs, q: [q0, q1, window.__queryDone], cm: !!cm };
+    },
+    // hrsave: the Save dialog - Last Stop Changes lists the saver's own (each ticked); the ticked go
+    // into the report, an unticked off rule comes out of it; after the save the report's own copies
+    // go; a save under another id leaves this report's own settings be
+    hrsave: async function () {
+      var K = hrKit();
+      window.alert = function (m) { R.notes.push('alert: ' + m); };
+      // at boot: their copy of r1 (green) in its place, o2 (bold over 80,000) on top, r2 off for them, o1 theirs
+      var seed = { painted: K.painted(K.green), bold: K.bold(80000), strikes: K.strikes(false), italic: K.italicNames(true), date: K.dateIso() };
+      R.chk.seedDrawn = seed.painted && seed.bold && seed.strikes && seed.italic && seed.date;
+      document.getElementById('saveQuery').click();
+      await sleep(500);
+      var items = Array.prototype.map.call(document.querySelectorAll('#pnbHlSaveRow input[data-hl-save]'), function (cb) {
+        return { k: cb.getAttribute('data-hl-save'), on: cb.checked, t: cb.parentNode.textContent.trim() };
+      });
+      var lbl = function (k) { var x = items.filter(function (y) { return y.k === k; })[0]; return x ? x.t : ''; };
+      R.chk.listItems = items.map(function (x) { return x.k; }).join() === 'hl|V_NAME|o1,hl|V_AMOUNT|o2,hl|V_AMOUNT|r1,fmt|V_DATE,off|V_STATUS|r2'
+        && items.every(function (x) { return x.on; }) && /\(your change to the report's rule\)$/.test(lbl('hl|V_AMOUNT|r1'))
+        && /\(the report's rule, off for you\)$/.test(lbl('off|V_STATUS|r2')) && /^V_DATE: format Date, /.test(lbl('fmt|V_DATE'))
+        && !!document.querySelector('#lastStopCardBody #pnbHlSaveRow') && document.getElementById('pnbHlSaveLbl').textContent === 'Column formats and highlight rules'
+        && !!document.querySelector('#pnbHlSaveRow .pnb-hl-save-note');
+      var hint = document.getElementById('pnbHlSaveHint');
+      R.chk.listHint = !!hint && hint.textContent === ' Saves 5 column formats and highlight rules with the report.';
+      var cb = function (k) { return document.querySelector('#pnbHlSaveRow input[data-hl-save="' + k + '"]'); };
+      cb('hl|V_NAME|o1').checked = false;
+      cb('off|V_STATUS|r2').checked = false;
+      $('#serverSaveIdInput').val('lrfix');
+      var n = window.__saves.length;
+      $('#confirmServerSaveBtn').prop('disabled', false).trigger('click');
+      await until(function () { return window.__saves.length > n; }, 8000);
+      await sleep(500);
+      var sd = null;
+      try { sd = JSON.parse(window.__saves[window.__saves.length - 1].state_data); } catch (e) { }
+      var ch = sd && sd.columnHighlights, cf = sd && sd.columnFormats;
+      R.chk.savedState = !!sd && JSON.stringify(cf) === JSON.stringify({ V_AMOUNT: 'currency:0', V_DATE: 'date:YYYY-MM-DD' })
+        && !!ch && Object.keys(ch).sort().join() === 'V_AMOUNT,V_NAME' && ch.V_AMOUNT.map(function (r) { return r.id; }).join() === 'o2,r1'
+        && ch.V_AMOUNT[0].css === 'font-weight: bold' && ch.V_AMOUNT[1].css === 'background-color: var(--pnb-hl-green, #d3eedb)'
+        && ch.V_NAME.map(function (r) { return r.id; }).join() === 'r3';
+      var co = colopt() || {};
+      R.chk.afterOwn = !!co.V_NAME && !!co.V_NAME.hl && co.V_NAME.hl.map(function (r) { return r.id; }).join() === 'o1'
+        && !(co.V_AMOUNT && (co.V_AMOUNT.hl || co.V_AMOUNT.fmt)) && !(co.V_DATE && co.V_DATE.fmt) && !(co.V_STATUS && co.V_STATUS.hlOff);
+      var after = { painted: K.painted(K.green), bold: K.bold(80000), strikes: K.strikes(false), italic: K.italicNames(true), date: K.dateIso() };
+      R.chk.afterDrawn = after.painted && after.bold && after.strikes && after.italic && after.date;
+      openPanel();
+      await sleep(450);
+      var bD = badgesOf('V_DATE'), bA = badgesOf('V_AMOUNT'), bN = badgesOf('V_NAME'), bS = badgesOf('V_STATUS');
+      R.chk.afterBadges = bD.some(function (b) { return b.t === 'DATE' && !b.own; }) && bA.some(function (b) { return b.t === 'RULE' && !b.own; })
+        && bN.some(function (b) { return b.t === 'RULE' && b.own; }) && !bS.some(function (b) { return /RULE/.test(b.t); });
+      // the dialog again: only what is still theirs
+      document.getElementById('saveQuery').click();
+      await sleep(500);
+      var keys2 = Array.prototype.map.call(document.querySelectorAll('#pnbHlSaveRow input[data-hl-save]'), function (x) { return x.getAttribute('data-hl-save'); });
+      R.chk.relist = keys2.join() === 'hl|V_NAME|o1' && document.getElementById('pnbHlSaveHint').textContent === ' Saves 1 column format or highlight rule with the report.';
+      // a save under another id (a copy): the copy gets o1, this report's own settings stay
+      $('#serverSaveIdInput').val('zzcopy');
+      n = window.__saves.length;
+      $('#confirmServerSaveBtn').prop('disabled', false).trigger('click');
+      await until(function () { return window.__saves.length > n; }, 8000);
+      await sleep(500);
+      var sd2 = null;
+      try { sd2 = JSON.parse(window.__saves[window.__saves.length - 1].state_data); } catch (e) { }
+      co = colopt() || {};
+      R.chk.copyKeepsOwn = !!sd2 && !!sd2.columnHighlights && !!sd2.columnHighlights.V_NAME
+        && sd2.columnHighlights.V_NAME.map(function (r) { return r.id; }).join() === 'o1,r3' && !!co.V_NAME && !!co.V_NAME.hl
+        && co.V_NAME.hl.map(function (r) { return r.id; }).join() === 'o1';
+      R.info = { seed: seed, after: after, d0: colCells('V_DATE', true).slice(0, 2).map(function (td) { return td.textContent; }), items: items, keys2: keys2, cf: cf, ch: ch, co: co, sd2: sd2 && sd2.columnHighlights, bD: bD, bA: bA, bN: bN, bS: bS, notes: R.notes };
+    },
     fspa11y: async function () {
       openPanel();
       await sleep(450);

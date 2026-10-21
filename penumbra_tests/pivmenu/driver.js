@@ -246,8 +246,8 @@
       R.chk.bdNumNative = !rclick(ths[0]) && !menu();
       var rB = th.getBoundingClientRect();
       R.chk.bdNativeShift = !th.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, shiftKey: true, clientX: Math.round(rB.left + 6), clientY: Math.round(rB.top + 6) })) === false && !menu();
-      R.chk.bdHeadOpens = rclick(th) && !!menu() && menu().querySelector('.pnb-hm-name').textContent === txt(th) && /rows?, /.test((menu().querySelector('.pnb-hm-stats') || {}).textContent || '');
-      R.chk.bdHeadItems = has(['bdSortAsc', 'bdSortDesc', 'bdCopyCol', 'bdCopyDistinct', 'bdCopyName']) && !item('bdCopy') && !item('bdThenAsc') && !item('bdSortClear');
+      R.chk.bdHeadOpens = rclick(th) && !!menu() && menu().querySelector('.pnb-hm-name').textContent === txt(th) && !menu().querySelector('.pnb-hm-stats');   // (round 28) the counts moved into Column stats
+      R.chk.bdHeadItems = has(['bdSortAsc', 'bdSortDesc', 'bdStats', 'bdCopyDistinct', 'bdCopyName']) && !item('bdCopyCol') && !item('bdCopy') && !item('bdThenAsc') && !item('bdSortClear');
       R.info.bdActs = acts();
       closeMenu();
       await choose(th, 'bdSortAsc');
@@ -273,10 +273,36 @@
       var dup = ths.filter(function (h) { var v = colVals(h.cellIndex); return h.cellIndex > 0 && v.some(function (x, k) { return x !== '' && v.indexOf(x) < k; }); })[0];
       var ic = dup ? dup.cellIndex : i2, thc = dup || th2;
       var vals = colVals(ic), seen = {}, distinct = vals.filter(function (v) { if (v === '' || seen[v]) return false; seen[v] = 1; return true; });
-      await choose(thc, 'bdCopyCol');
-      R.chk.bdCopyCol = lastClip() === vals.join('\n') && /Copied \d+ values?\./.test(lastToast());
-      await choose(thc, 'bdCopyDistinct');
-      R.chk.bdCopyDistinct = lastClip() === distinct.join('\n') && !!dup && distinct.length < vals.length;
+      // (round 28) Copy distinct values is a list: delimited as picked; All values in row order is its last entry
+      closeMenu(); rclick(thc); if (item('bdCopyDistinct')) { item('bdCopyDistinct').click(); await sleep(200); }
+      var copyActs = subActs();
+      if (item('bdCopyCol')) item('bdCopyCol').click();
+      await sleep(300);
+      R.chk.bdCopyCol = copyActs.indexOf('bdCopy-newline') >= 0 && copyActs.indexOf('bdCopy-comma') >= 0 && copyActs[copyActs.length - 1] === 'bdCopyCol'
+        && lastClip() === vals.join('\n') && /Copied \d+ values?\./.test(lastToast());
+      closeMenu(); rclick(thc); if (item('bdCopyDistinct')) { item('bdCopyDistinct').click(); await sleep(200); }
+      if (item('bdCopy-newline')) item('bdCopy-newline').click();
+      await sleep(300);
+      var clipNl = lastClip();
+      // the delimiter on th2 (two distinct values: a 2-row breakdown's duplicate column has one)
+      var vals2 = colVals(i2), seen2 = {}, distinct2 = vals2.filter(function (v) { if (v === '' || seen2[v]) return false; seen2[v] = 1; return true; });
+      closeMenu(); rclick(th2); if (item('bdCopyDistinct')) { item('bdCopyDistinct').click(); await sleep(200); }
+      if (item('bdCopy-comma')) item('bdCopy-comma').click();
+      await sleep(300);
+      R.chk.bdCopyDistinct = clipNl === distinct.join('\n') && distinct2.length >= 2 && lastClip() === distinct2.join(',') && !!dup && distinct.length < vals.length;
+      R.info.bdDelim = { d2: distinct2, clip: String(lastClip()).slice(0, 60) };
+      // Column stats, from the table's shown text: the counts, the duplicates, the most common (no filter)
+      closeMenu(); rclick(thc); if (item('bdStats')) { item('bdStats').click(); await sleep(200); }
+      var sp = subPanel(), inf = {}; if (sp) Array.prototype.forEach.call(sp.querySelectorAll('.pnb-hm-info'), function (d) { inf[d.querySelector('.pnb-hm-info-k').textContent] = d.querySelector('.pnb-hm-info-v').textContent; });
+      var cnt = {}; vals.forEach(function (v) { if (v !== '') cnt[v] = (cnt[v] || 0) + 1; });
+      var ex = 0, shareR = 0, shareV = 0; Object.keys(cnt).forEach(function (k) { if (cnt[k] > 1) { ex += cnt[k] - 1; shareR += cnt[k]; shareV++; } });
+      var best = Object.keys(cnt).sort(function (a, b) { return (cnt[b] - cnt[a]) || a.localeCompare(b); })[0];
+      var tops = sp ? Array.prototype.map.call(sp.querySelectorAll('.pnb-hm-info'), function (d) { return d.querySelector('.pnb-hm-info-k').textContent; }) : [];
+      R.chk.bdStats = !!sp && inf['With a value'] === String(vals.filter(function (v) { return v !== ''; }).length) && inf['Unique'] === String(distinct.length)
+        && inf['Duplicates'] === (ex ? ex.toLocaleString() + ' (' + shareR.toLocaleString() + ' rows share ' + shareV.toLocaleString() + (shareV === 1 ? ' value)' : ' values)') : 'none')
+        && tops.indexOf(best) >= 0 && !sp.querySelector('[data-act^="stats-top-"]');
+      R.info.bdStats = { inf: inf, ex: ex, best: best, tops: tops.slice(-5) };
+      closeMenu();
       var td = bt.tBodies[0].rows[0].cells[i2];
       R.chk.bdCell = rclick(td) && !!menu() && acts()[0] === 'bdCopy' && menu().querySelector('.pnb-hm-name').textContent === txt(th2) && td.classList.contains('pnb-hm-cell');
       closeMenu();
@@ -296,7 +322,7 @@
       var CW = window.Penumbra && window.Penumbra.colWidths, bdt = th.closest('table');
       function bdW(h) { return Math.round(h.getBoundingClientRect().width); }
       rclick(th);
-      R.chk.bdWidthItems = !!CW && !!item('bdFit') && !!item('bdFitAll') && !!item('bdResetWidths') && acts().indexOf('bdFit') < acts().indexOf('bdCopyCol');
+      R.chk.bdWidthItems = !!CW && !!item('bdFit') && !!item('bdFitAll') && !!item('bdResetWidths') && acts().indexOf('bdFit') < acts().indexOf('bdCopyDistinct');
       closeMenu();
       var w0 = bdW(th);
       var ranFit = await choose(th, 'bdFit');
@@ -309,6 +335,11 @@
       var dw3 = CW ? CW.drillWidths() : {};
       R.chk.bdResetWidths = ranReset && Object.keys(dw3).length === 0 && /Breakdown column widths reset/.test(lastToast());
       R.info.bdWidths = { w0: w0, dw1: dw1, n2: Object.keys(dw2).length, n3: Object.keys(dw3).length, toast: String(lastToast()).slice(0, 60) };
+      // (colmenu round 30) Consistent row height only where the breakdown holds nested tables
+      rclick(th);
+      R.chk.bdRowHeight = !!menu() && !!item('rowHeight');   // (round 32) on every breakdown
+      R.info.bdRowHeight = { nested: !!bdt.querySelector('.nested-json-container'), item: !!item('rowHeight') };
+      closeMenu();
       // a pivot heading's menu has none of them
       var pvh = document.querySelector('#pivotResultTable thead th[data-row-field]');
       if (pvh) { rclick(pvh); R.chk.bdWidthsNotPivot = !!menu() && !item('bdFit') && !item('bdFitAll') && !item('bdResetWidths'); closeMenu(); } else { R.chk.bdWidthsNotPivot = true; }
@@ -377,6 +408,20 @@
       // (colmenu round 18) the drill item's name
       R.chk.drillLabel = !!item('pvDrill') && item('pvDrill').querySelector('.pnb-hm-label').textContent === 'Show the breakdown';
       R.info.cellActs = acts();
+      // (colmenu round 29) a pivot key holds its values HTML-escaped: the title and the label's Filter to
+      // read decoded (the filter keeps the raw key)
+      closeMenu();
+      var rawKey = td.getAttribute('data-row-key'), parts0 = rawKey.split('|||');
+      parts0[0] = 'R&amp;D &#039;Lab&#039;';
+      td.setAttribute('data-row-key', parts0.join('|||'));
+      rclick(td);
+      var ttl = menu() ? menu().querySelector('.pnb-hm-name').textContent : '';
+      R.chk.cellTitleDecoded = ttl.indexOf("R&D 'Lab'") === 0 && ttl.indexOf('&amp;') < 0 && ttl.indexOf('&#039;') < 0;
+      closeMenu();
+      var lbl0 = td.parentNode.querySelector('td[data-row-field="0"]');
+      if (lbl0) { rclick(lbl0); var fl = item('pvLabelOnly'); R.chk.labelDecoded = !!fl && fl.querySelector('.pnb-hm-label').textContent.indexOf("R&D 'Lab'") >= 0 && fl.getAttribute('title').indexOf('&amp;') < 0; closeMenu(); } else { R.chk.labelDecoded = true; }
+      R.info.decoded = { ttl: ttl.slice(0, 60) };
+      td.setAttribute('data-row-key', rawKey);
       closeMenu();
       await choose(td, 'pvDrill');
       R.chk.drill = drills === 1;

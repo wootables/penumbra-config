@@ -500,44 +500,44 @@
     {
         "id": "now_default",
         "snippet": "now()",
-        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">10/17/2026</div>",
-        "out_plain": "10/17/2026"
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">10/20/2026</div>",
+        "out_plain": "10/20/2026"
     },
     {
         "id": "now_iso",
         "snippet": "now('YYYY-MM-DD')",
-        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2026-10-17</div>",
-        "out_plain": "2026-10-17"
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2026-10-20</div>",
+        "out_plain": "2026-10-20"
     },
     {
         "id": "now_offset_1",
         "snippet": "now('YYYY-MM-DD', '-1 year')",
-        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2025-10-17</div>",
-        "out_plain": "2025-10-17"
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2025-10-20</div>",
+        "out_plain": "2025-10-20"
     },
     {
         "id": "now_offset_chain",
         "snippet": "now('YYYY-MM-DD', '-1 year', '+6 days')",
-        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2025-10-23</div>",
-        "out_plain": "2025-10-23"
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2025-10-26</div>",
+        "out_plain": "2025-10-26"
     },
     {
         "id": "now_long",
         "snippet": "now('MMMM D, YYYY')",
-        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">OCTOBER 17, 2026</div>",
-        "out_plain": "OCTOBER 17, 2026"
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">OCTOBER 20, 2026</div>",
+        "out_plain": "OCTOBER 20, 2026"
     },
     {
         "id": "now_unquoted",
         "snippet": "now(MM/DD/YYYY)",
-        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">10/17/2026</div>",
-        "out_plain": "10/17/2026"
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">10/20/2026</div>",
+        "out_plain": "10/20/2026"
     },
     {
         "id": "now_bracket_lit",
         "snippet": "now('[Run on] MMM D')",
-        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">RUN ON OCT 17</div>",
-        "out_plain": "RUN ON OCT 17"
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">RUN ON OCT 20</div>",
+        "out_plain": "RUN ON OCT 20"
     },
     {
         "id": "rank_top",
@@ -781,7 +781,7 @@
     },
     {
         "id": "data_prompt_missing",
-        "snippet": "data(prompt6)",
+        "snippet": "data(prompt12)",
         "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">undefined</div>",
         "out_plain": "undefined"
     },
@@ -862,5 +862,83 @@
         "snippet": "info()",
         "out": "",
         "out_plain": ""
+    },
+    {
+        "id": "mode_blank_majority",
+        "snippet": "mode(MB)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">X</div>",
+        "out_plain": "X"
+    },
+    {
+        "id": "mode_tie_first_seen",
+        "snippet": "mode(MT)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">P</div>",
+        "out_plain": "P"
+    },
+    {
+        "id": "mode_whitespace_is_blank",
+        "snippet": "mode(MW)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">X</div>",
+        "out_plain": "X"
+    },
+    {
+        "id": "mode_html_marker",
+        "snippet": "mode(MH)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\"><b>Hi</b></div>",
+        "out_plain": "<b>Hi</b>"
+    },
+    {
+        "id": "mode_all_blank",
+        "snippet": "[mode(ME)]",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">[N/A]</div>",
+        "out_plain": "[N/A]"
+    },
+    {
+        "id": "mode_empty_set",
+        "snippet": "[mode(NAME, N > 99)]",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">[N/A]</div>",
+        "out_plain": "[N/A]"
+    },
+    {
+        "id": "data_prompt7",
+        "snippet": "data(prompt7)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">seventh</div>",
+        "out_plain": "seventh"
+    },
+    {
+        "id": "data_prompt10",
+        "snippet": "data(prompt10)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">tenth</div>",
+        "out_plain": "tenth"
+    },
+    {
+        "id": "rank_scope_all",
+        "snippet": "rank(1, AMOUNT, all)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">10,000</div>",
+        "out_plain": "10,000"
+    },
+    {
+        "id": "rank_scope_bottom_all",
+        "snippet": "rank(-1, AMOUNT, all)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">-75.75</div>",
+        "out_plain": "-75.75"
+    },
+    {
+        "id": "rank_scope_total",
+        "snippet": "rank(1, AMOUNT, total)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">10,000</div>",
+        "out_plain": "10,000"
+    },
+    {
+        "id": "rank_scope_cond_all",
+        "snippet": "rank(1, AMOUNT, N <= 3, all)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">1,200.5</div>",
+        "out_plain": "1,200.5"
+    },
+    {
+        "id": "count_bare_all_is_condition",
+        "snippet": "count(all)",
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2</div>",
+        "out_plain": "2"
     }
 ]

@@ -3,7 +3,7 @@
 #
 #   run.ps1                          the LIVE webroot as both app and orig (after the deploy)
 #   run.ps1 -App <stage> -Orig <dir> a stage build against the v1 files in <dir>
-#   run.ps1 ... -Mutants             also run the mutants (the suite's control; 29 since 2026-10-17)
+#   run.ps1 ... -Mutants             also run the mutants (the suite's control; 30 since 2026-10-20)
 #   run.ps1 ... -SkipCoverage        skip the coverage map (it is report-only anyway)
 #   -Out <dir>                       scratch dir (renders, caches, coverage_report.md)
 #   -Here <dir>                      the suite dir to run from (a staged copy of these files)

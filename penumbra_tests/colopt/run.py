@@ -16,6 +16,14 @@
 # colopt c (2026-10-12): Freeze in the popover (ffreeze), the ? icons alike + hover
 # tips (ftips) - the harness lifts its Settings / status bar bits from the index.php
 # under test. NEW = the checks the change under test brought (now NEW_C).
+# (2026-10-20, hl) Highlight rules in the popover: fhlunit (the module's rule text), fhl
+# (authored through the popover), fhlseed (rules saved before the report opens, with
+# shading), ghl (the grouped view), S-helpHl. NEW = NEW_HL.
+# (2026-10-20 b, hl phase 2) formats and highlight rules SAVED WITH THE REPORT: hrep (the
+# report's drawn, Off for me, Automatic / Reset, a report rule changed into a copy, a view
+# link, a save without the dialog's list), hrview (a viewer), hrsave (the Save dialog's Last
+# Stop Changes list, the save, after it), P-hl-* (test_colopt.php hl: the scheduled email's
+# twins and its table against the page's answers), S-helpHl2. NEW = NEW_HL2.
 # --control runs LIVE: every NEW check red there, every other one green.
 #   page half   harness.html (mk_harness.py, from calccol's) + driver.js: the REAL
 #               main.js + module + calc module                 L-<scn>-<check>, E-<scn>
@@ -45,6 +53,8 @@ SCN_Q = {
     'fxss': '&calc=' + q('X|"<img src=x onerror=window.__pwned=1>"|text') + '&calc=' + q('Q|IF({H_ENT} = "O\'Brien", "yes", "no")|text'),
     'fnomod': '&nomod=1',
     'furldeep': '&deeplink=0',
+    'hrnomod': '&nomod=1',
+    'pvhlnomod': '&nomod=1',
 }
 CHK = {
     'fbuild': ['amtShown', 'noOrigHtml', 'dateShown', 'filterClass', 'plainUntouched', 'linksKept', 'lazyFormatted', 'footerFmt', 'readersRaw'],
@@ -79,8 +89,29 @@ CHK = {
     # (2026-10-15, WCAG) the sort lanes' names + state; the Theme / Density hint links by keyboard
     'fspa11y': ['sortNameVisible', 'sortStates', 'otherLanesNot', 'themeHintBtn', 'themeEnter', 'themeFocusMoves', 'themeSpaceClears',
                 'densityHintBtn', 'densityEnter', 'densityFocusMoves', 'densitySpaceClears'],
+    # (2026-10-20, hl) highlight rules in the column options
+    'fhlunit': ['whenForms', 'whenRound', 'whenNull', 'cssGate', 'cssPicks', 'describe', 'cleanList'],
+    'fhl': ['popHasHl', 'addOpens', 'opsNum', 'typeValue', 'cellsPainted', 'swatchFont', 'swatchKeys', 'tabStops', 'advShows', 'advCss', 'cssRefused', 'cssClears',
+            'advCond', 'badCond', 'backToBasic', 'rowApply', 'doneBack', 'badge', 'topWins', 'reopen', 'deleteRule', 'escCloses', 'resetClears', 'textIs', 'dateBefore'],
+    'fhlseed': ['drawnAtBoot', 'overShade', 'rowRule', 'otherCol', 'badges', 'sortSearch', 'darkTint', 'stopsMatching'],
+    'ghl': ['groupedPainted', 'groupedLive'],
+    # (2026-10-20 b) formats and highlight rules saved with the report
+    'hrep': ['repFmt', 'repDrawn', 'repBadges', 'popRepRow', 'offForMe', 'offBadge', 'offBack', 'viewLink', 'autoOverRep', 'resetBack', 'openNoCopy',
+             'editCopy', 'changeBack', 'copyDelete', 'openCanon', 'noListKeeps'],
+    'hrview': ['viewDrawn', 'viewNoEdit', 'viewOff', 'viewOwnOnTop', 'viewFmtOwn', 'rerunKeeps', 'adhocDrops'],
+    'hrsave': ['seedDrawn', 'listItems', 'listHint', 'savedState', 'afterOwn', 'afterDrawn', 'afterBadges', 'relist', 'copyKeepsOwn'],
+    'hrnomod': ['saveKeeps', 'linkKeeps'],
+    # (2026-10-20 c) a pivot value's Highlight rules, through the real pivot builder
+    'pvhl': ['popHasHl', 'editorPivot', 'ruleStored', 'editorCount', 'generated', 'reedit', 'fieldRule', 'stateCarries'],
+    'pvhlseed': ['seedBody', 'seedTopWins', 'seedSummary', 'seedGrand', 'seedField', 'seedOther', 'seedState', 'seedDark'],
+    'pvhlnomod': ['offNotDrawn', 'offKept', 'offRoundTrip'],
 }
 SCN.append('fspa11y')
+SCN.extend(['fhlunit', 'fhl', 'fhlseed', 'ghl'])
+SCN.extend(['hrep', 'hrview', 'hrsave', 'hrnomod'])
+SCN.extend(['pvhl', 'pvhlseed', 'pvhlnomod'])
+# the PHP half's hl mode (the email): its checks, by name
+PHP_HL = ['fmtParity', 'numParity', 'cssParity', 'whenParity', 'stateRules', 'emailPaints', 'emailFmt', 'emailFooter', 'pdfPlain', 'darkFill', 'groupedEmail', 'noLeak']
 N = '\r\n'   # main.js, schedule_runner.php and main.css are CRLF; the module and both calc files LF
 MUTANTS = {
     # --- the cell writer and the readers of a cell's VALUE (main.js)
@@ -107,7 +138,7 @@ MUTANTS = {
     'm-footcol': ([('main', "                    col: th.getAttribute('data-colname')   // the viewer's format (colopt)" + N, "")], ['L-fbuild-footerFmt'], ['fbuild']),
     'm-groupfeet': ([('main', "        else try { updateTotalRow(); _pnbRefreshGroupedFooters(col); }", "        else try { updateTotalRow(); }")], ['L-gfmt-footChanged'], ['gfmt']),
     'm-savecarry': ([('main', "                if (!Object.prototype.hasOwnProperty.call(savedData, k)) savedData[k] = existing[k];", "")], ['L-fsave-keepsBoth'], ['fsave']),
-    'm-clearlist': ([('main', "                    items.push('Column options: formats and links (' + plural(Object.keys(cp.colopt).length, 'column') + ')');" + N, "")],
+    'm-clearlist': ([('main', "                    items.push('Column options: formats, highlights and links (' + plural(Object.keys(cp.colopt).length, 'column') + ')');" + N, "")],
                     ['L-fclear-listed'], ['fclear']),
     # --- the panel, the popover, the rollback
     'm-cog': ([('main', "        var cogSt = (!isFixed && _pnbColOptOn()) ? _pnbColState(colName || displayName) : null;", "        var cogSt = null;")],
@@ -124,7 +155,7 @@ MUTANTS = {
     'j-ampm': ([('mod', "            if (ap === 'A' && H === 12) H = 0;", "            if (false) H = 0;")], ['L-fparity-units', 'P-C-dates'], ['fparity']),
     'j-tie': ([('mod', "        var up = f.charAt(dp) >= '5';\n", "        var up = f.charAt(dp) > '5';\n")], ['L-fparity-units'], ['fparity']),
     # --- calculated columns (both engines)
-    'm-calcdate': ([('main', "        var fmt = o.fmt || _pnbCalcDateFmt(col);", "        var fmt = o.fmt;")], ['L-fcalc-shown'], ['fcalc']),
+    'm-calcdate': ([('main', "return o.fmt || reportColumnFormats[col] || _pnbCalcDateFmt(col);", "return o.fmt || reportColumnFormats[col];")], ['L-fcalc-shown'], ['fcalc']),   # (anchor: _pnbColFmtIn since 2026-10-20 b)
     'j-calcesc': ([('calc', "            case 'str': return escLit(node.v);", "            case 'str': return node.v;")],
                   ['L-fxss-noElement', 'L-fxss-shownAsText', 'L-fxss-quoteEquals', 'P-C-calc'], ['fxss', 'fparity']),
     'j-calcsum': ([('calc', "            if (x.def.format !== 'text' && !isDateFormat(x.def.format)) summableNames[x.def.name] = true;",
@@ -301,11 +332,177 @@ MUTANTS = {
                     ['L-fspa11y-themeFocusMoves', 'L-fspa11y-densityFocusMoves'], ['fspa11y']),
     'm-hintrole': ([('main', 'id="spDensityMakeGlobal" role="button" tabindex="0"', 'id="spDensityMakeGlobal"')],
                    ['L-fspa11y-densityHintBtn', 'L-fspa11y-densityEnter'], ['fspa11y']),
+    # --- (2026-10-20, hl) highlight rules: the page (main.js)
+    'm-hlpass': ([('main', "            if (hlRules.length > 0) runFormatPass(hlRules, true);" + N, "")],
+                 ['L-fhl-cellsPainted', 'L-fhlseed-drawnAtBoot', 'L-ghl-groupedPainted'], ['fhl', 'fhlseed', 'ghl']),
+    'm-hlorder': ([('main', "                for (var i = l.length - 1; i >= 0; i--) {   // bottom first: the top rule is drawn last and wins",
+                    "                for (var i = 0; i < l.length; i++) {")], ['L-fhl-topWins', 'L-fhlseed-drawnAtBoot'], ['fhl', 'fhlseed']),
+    'm-hlheat': ([('main', "            if (heatRules.length > 0) runHeatPass();" + N + "            if (hlRules.length > 0) runFormatPass(hlRules, true);",
+                   "            if (hlRules.length > 0) runFormatPass(hlRules, true);" + N + "            if (heatRules.length > 0) runHeatPass();")],
+                 ['L-fhlseed-overShade'], ['fhlseed']),
+    'm-hlfirst': ([('main', "            if (cfRules.length > 0 || (hlRules.length > 0 && !heatOnly)) runFormatPass(cfRules, false);",
+                    "            if (cfRules.length > 0) runFormatPass(cfRules, false);")], ['L-fhlseed-stopsMatching'], ['fhlseed']),
+    'm-hlclear': ([('main', "        ['#resultsTable > tbody > tr', '#groupedResultsContainer tbody > tr'].forEach(function (sel) {" + N +
+                    "            Array.prototype.forEach.call(document.querySelectorAll(sel), _pnbCfResetRow);" + N + "        });" + N, "")],
+                  ['L-fhl-resetClears'], ['fhl']),
+    'm-hlresetrow': ([('main', "        'background-image': '', 'background-repeat': '', 'font-family': '', 'font-size': '', 'text-transform': '', 'transform': '' };",
+                       "        'background-image': '', 'background-repeat': '' };")], ['L-fhl-cssClears'], ['fhl']),
+    'm-hlreapply': ([('main', "            _pnbColOptWrite(col, { hl: hl.length ? hl : null });" + N + "            _pnbHlApplyNow();" + N + "            _pnbColOptChipRefresh(col);",
+                      "            _pnbColOptWrite(col, { hl: hl.length ? hl : null });" + N + "            _pnbColOptChipRefresh(col);")], ['L-fhl-cellsPainted'], ['fhl']),
+    'm-hlbadge': ([('main', "            if (hv.own.length || hv.report.length) bits.push({ t: 'RULE',", "            if (false) bits.push({ t: 'RULE',")],
+                  ['L-fhl-badge', 'L-fhlseed-badges'], ['fhl', 'fhlseed']),
+    'm-hlstore': ([('main', "            _pnbColOptWrite(col, { hl: hl.length ? hl : null });", "            void hl;")], ['L-fhl-typeValue'], ['fhl']),
+    'm-hlget': ([('main', "            if (hl.length) out.hl = hl;", "            if (false) out.hl = hl;")], ['L-fhlseed-drawnAtBoot', 'L-fhlseed-rowRule'], ['fhlseed']),
+    # through jQuery a highlight's var() came out as its light fallback (jQuery UI's color hooks)
+    'm-hlnative': ([('main', "                                    if (applyOnly) _pnbCfSetCss(rowEl.cells[cellPos], safeCss);",
+                     "                                    if (applyOnly) $(rowEl.cells[cellPos]).css(safeCss);")], ['L-fhlseed-darkTint'], ['fhlseed']),
+    'm-hlpopcfg': ([('main', "            highlight: isData && window.PenumbraColFmt.hlColOk && window.PenumbraColFmt.hlColOk(col) ? _pnbHlPopCfg(col) : null,",
+                     "            highlight: null,")], ['L-fhl-popHasHl', 'L-fform-formRows'], ['fhl', 'fform']),
+    # --- (2026-10-20, hl) the rules' engine and editor (the module)
+    'j-hlis': ([('mod', "            return c + (op === 'is' ? ' = ' : ' != ') + (plain ? '//' + v + '//' : '/^' + hlLit(v) + '$/');",
+                 "            return c + (op === 'is' ? ' = ' : ' != ') + (plain ? v : '/^' + hlLit(v) + '$/');")], ['L-fhlunit-whenForms', 'L-fhl-textIs'], ['fhlunit', 'fhl']),
+    'j-hlbetween': ([('mod', "            if (bn && kf(bn.col) !== 'date') return bn;", "            if (bn && kf(bn.col) === 'date') return bn;")],
+                    ['L-fhlunit-whenRound', 'L-fhl-reopen'], ['fhlunit', 'fhl']),
+    'j-hlprops': ([('mod', "            if (HL_PROPS.indexOf(p) === -1) { dropped.push(p); return; }", "            if (false) { dropped.push(p); return; }")],
+                  ['L-fhlunit-cssGate', 'L-fhl-advCss'], ['fhlunit', 'fhl']),
+    'j-hlbad': ([('mod', "            if (!v || v.length > 120 || HL_BAD_VALUE.test(v) || !parensOk(v)) { bad.push(p); return; }", "            if (!v) { bad.push(p); return; }")],
+                ['L-fhlunit-cssGate', 'L-fhl-cssRefused'], ['fhlunit', 'fhl']),
+    'j-hlcommit': ([('mod', "            if (ok) hlCommit();", "            if (false) hlCommit();")], ['L-fhl-typeValue'], ['fhl']),
+    'j-hltop': ([('mod', "                hs.rules.unshift(rule);   // a new rule goes on top: it wins where it overlaps the others", "                hs.rules.push(rule);")],
+                ['L-fhl-topWins'], ['fhl']),
+    'j-hlroving': ([('mod', "                    b.tabIndex = on ? 0 : -1;", "                    b.tabIndex = 0;")], ['L-fhl-swatchKeys'], ['fhl']),
+    'j-hltab': ([('mod', "                return !n.disabled && n.offsetParent !== null && n.tabIndex >= 0 && !(n.type === 'radio'",
+                  "                return !n.disabled && n.offsetParent !== null && !(n.type === 'radio'")], ['L-fhl-tabStops'], ['fhl']),
+    'j-hlcustom': ([('mod', "            if (p === 'color') { r.tx = hlColorOf(v, 'text') || '*'; if (r.tx === '*') r.other++; }",
+                     "            if (p === 'color') { r.tx = hlColorOf(v, 'text'); if (!r.tx) r.other++; }")], ['L-fhlunit-cssPicks', 'L-fhl-advCss'], ['fhlunit', 'fhl']),
+    'j-hlprompt': ([('mod', "                wBad = !!(String(eq('[data-co=\"hl-v\"]').value).trim() || String(eq('[data-co=\"hl-v2\"]').value).trim());",
+                     "                wBad = true;")], ['L-fhl-addOpens'], ['fhl']),
+    'c-hldark': ([('css', "body.is-dark { --pnb-hl-red: #5c2523; --pnb-hl-amber: #4d3f12; --pnb-hl-green: #1f4429; --pnb-hl-blue: #1e3a61; --pnb-hl-grey: #3c3c3c; }" + N, "")],
+                 ['L-fhlseed-darkTint'], ['fhlseed']),
+    'h-hltip': ([('help', "<li><strong>Highlight</strong> - color the cells, or whole rows, that meet a condition.</li>", "")], ['S-helpHl'], []),
+    't-hltopic': ([('topic', '<h4 id="us-highlight"', '<h4 id="us-highlights"')], ['S-helpHl'], []),
+    # ---- (2026-10-20 b, phase 2) the report's formats and rules
+    # main.js: the report's layer read at boot; a column's format in effect; Automatic over the
+    # report's; the rules a viewer sees (Off for me, a copy standing for its rule, the order:
+    # the report's, then the viewer's own over them); who may change one
+    # (the state loader's own call stands in for it at boot: what this one alone does is the ad-hoc run's reset)
+    'm-repload': ([('main', '_pnbReportColOptsFrom(_pnbSettingsState);', '')], ['L-hrview-adhocDrops'], ['hrview']),
+    'm-fmtin': ([('main', 'return o.fmt || reportColumnFormats[col] || _pnbCalcDateFmt(col);', 'return o.fmt || _pnbCalcDateFmt(col);')], ['L-hrep-repFmt'], ['hrep']),
+    'm-fmtnone': ([('main', "if (o.fmt === 'none') return '';", "if (o.fmt === 'none') return reportColumnFormats[col] || '';")], ['L-hrep-autoOverRep'], ['hrep']),
+    'm-setfmt': ([('main', "_pnbColOptWrite(col, { fmt: _fv === _rf ? null : (_fv || (_rf ? 'none' : null)) });", '_pnbColOptWrite(col, { fmt: _fv || null });')],
+                 ['L-hrep-autoOverRep'], ['hrep']),
+    'm-hloff': ([('main', '(off.indexOf(r.id) !== -1 ? offList : on).push(r);', 'on.push(r);')], ['L-hrep-offForMe', 'L-hrep-offBadge', 'L-hrview-viewOff'], ['hrep', 'hrview']),
+    'm-hlcopy': ([('main', 'if (mine.indexOf(r.id) !== -1) return;   // the viewer\'s copy stands for it', '')], ['L-hrep-editCopy'], ['hrep']),
+    'm-hlorder2': ([('main', '[1, 2].forEach(function (part) {', '[2, 1].forEach(function (part) {')], ['L-hrview-viewOwnOnTop'], ['hrview']),
+    'm-canedit': ([('main', 'try { return !!(currentLoadedStateName && penumbra_vars && penumbra_vars.canEditReport); } catch (e) { return false; }',
+                    'try { return true; } catch (e) { return false; }')], ['L-hrview-viewNoEdit'], ['hrview']),
+    'm-repbadge': ([('main', "else if (rf) bits.push({ t: F.badge(rf), own: false,", "else if (rf) bits.push({ t: F.badge(rf), own: true,")],
+                   ['L-hrep-repBadges', 'L-hrsave-afterBadges'], ['hrep', 'hrsave']),
+    'm-norule': ([('main', "else if (hv.off.length) bits.push({ t: 'NO RULE', own: true, w: _pnbHlWords(name, hv) });", '')], ['L-hrep-offBadge'], ['hrep']),
+    'm-resetoff': ([('main', '_pnbColOptWrite(col, { fmt: null, filter: null, deep: null, hl: null, hlOff: null });', '_pnbColOptWrite(col, { fmt: null, filter: null, deep: null, hl: null });')],
+                   ['L-hrep-resetBack'], ['hrep']),
+    'm-viewlink': ([('main', 'if (Object.keys(_colOpts.highlights).length) state.columnHighlights = _colOpts.highlights;', '')], ['L-hrep-viewLink'], ['hrep']),
+    # main.js: the Save dialog's list, what a save takes into the report, after it
+    'm-savelist': ([('main', "try { penumbraHlRenderSaveList(); } catch (e) { console.warn('highlight save list:', e); }", '')], ['L-hrsave-listItems'], ['hrsave']),
+    'm-strip': ([('main', '        _pnbHlStripFromState(stateObject);' + N, '')], ['L-hrsave-savedState', 'L-hrep-noListKeeps'], ['hrep', 'hrsave']),
+    'm-stripoff': ([('main', "if (listed && !copy && off.indexOf(r.id) !== -1 && !ticked['off|' + c + '|' + r.id]) return;", '')], ['L-hrsave-savedState'], ['hrsave']),
+    'm-stripnew': ([('main', "if (ticked['hl|' + c + '|' + r.id] && !rep.some(function (x) { return x.id === r.id; })) out.push(r);",
+                     'if (!rep.some(function (x) { return x.id === r.id; })) out.push(r);')], ['L-hrsave-savedState'], ['hrsave']),
+    'm-saved': ([('main', "try { _pnbHlSavedToReport(stateObject, response.new_id || shortId); } catch (e) { console.warn('highlight save:', e); }", '')],
+                ['L-hrsave-afterOwn', 'L-hrsave-afterBadges'], ['hrsave']),
+    'm-rawkeep': ([('main', '            if (Object.keys(raw.highlights).length) state.columnHighlights = raw.highlights;' + N, '')], ['L-hrnomod-saveKeeps'], ['hrnomod']),
+    'm-rawlink': ([('main', 'if (!_pnbColOptOn()) return _pnbColOptsRawCopy();', 'if (!_pnbColOptOn()) return { formats: fm, highlights: hm };')], ['L-hrnomod-linkKeeps'], ['hrnomod']),
+    'm-savedsame': ([('main', "if (String(savedId || '') === String(currentLoadedStateName || '')) {", 'if (true) {')], ['L-hrsave-copyKeepsOwn'], ['hrsave']),
+    # the module: Off for me, opening a report rule, unchanged = the report's (and changed back),
+    # the report's format named, Reset's controls, the report's rows, a copy's tag and place
+    'j-repoff': ([('mod', 'if (t.checked) hs.off.push(r.id);', '')], ['L-hrep-offForMe', 'L-hrview-viewOff'], ['hrep', 'hrview']),
+    'j-redit': ([('mod', "if (k === 'hl-redit') { e.preventDefault(); if (hl.canEdit) hlOpen(-1, +t.getAttribute('data-r')); return; }",
+                  "if (k === 'hl-redit') { e.preventDefault(); if (hl.canEdit) hlOpen(-1); return; }")], ['L-hrep-openNoCopy', 'L-hrep-editCopy'], ['hrep']),
+    'j-canon': ([('mod', 'base: repR ? hlCanon(repR) : null };', 'base: repR ? JSON.stringify(hlCopy(repR)) : null };')], ['L-hrep-openCanon'], ['hrep']),
+    'j-changeback': ([('mod', 'if (cur) {\n                    hs.rules.splice(ed.i, 1);', 'if (false) {\n                    hs.rules.splice(ed.i, 1);')], ['L-hrep-changeBack'], ['hrep']),
+    'j-fmthint': ([('mod', 'if (fh) fh.textContent = (fd && st.fmt !== fd) ?', 'if (fh) fh.textContent = (false && st.fmt !== fd) ?')],
+                  ['L-hrep-autoOverRep', 'L-hrview-viewFmtOwn'], ['hrep', 'hrview']),
+    'j-resetui': ([('mod', '                fmtToUi(fd);\n                syncFormatUi();', '                syncFormatUi();')], ['L-hrep-resetBack'], ['hrep']),
+    'j-replist': ([('mod', 'hs.report.forEach(function (r, ri) {', '[].forEach(function (r, ri) {')], ['L-hrep-popRepRow', 'L-hrview-viewNoEdit'], ['hrep', 'hrview']),
+    'j-copytag': ([('mod', "(copy ? '<span class=\"pnb-hl-tag\">changed</span>' : '') +", "'' +")], ['L-hrep-editCopy'], ['hrep']),
+    'j-copyhide': ([('mod', 'if (hs.rules.some(function (x) { return x.id === r.id; })) return;', '')], ['L-hrep-editCopy'], ['hrep']),
+    'c-offdim': ([('css', '.pnb-hl-item.is-off .pnb-hl-text { opacity: .55; text-decoration: line-through; }', '.pnb-hl-item.is-off .pnb-hl-text { }')], ['L-hrep-offForMe'], ['hrep']),
+    # the scheduled email (schedule_runner.php, penumbra_calc.php): drawn in the body only, its
+    # cells and totals formatted, the rules' order, a dark table's tints, the CSS gate, the
+    # footer's number text, nothing left over between reports
+    's-hlmerge': ([('sr', "if ($hlEmail && !empty($GLOBALS['penumbra_highlight_rules'])) {", 'if (false) {')],
+                  ['P-hl-emailPaints', 'P-hl-darkFill', 'P-hl-groupedEmail'], ['hrep']),
+    's-hlpdf': ([('sr', "$hlEmail = $isEmail && $viewMode !== 'pivot';", "$hlEmail = $viewMode !== 'pivot';")], ['P-hl-pdfPlain'], ['hrep']),
+    's-cellfmt': ([('sr', '\n                    $cellValue = isset($rwMap[$colUpper]) ? $rwMap[$colUpper] : ($hlEmail ? penumbra_email_cell_format($colUpper, $cell) : $cell);',
+                    '\n                    $cellValue = isset($rwMap[$colUpper]) ? $rwMap[$colUpper] : $cell;')], ['P-hl-emailFmt'], ['hrep']),
+    's-gcellfmt': ([('sr', '\n                        $cellValue = isset($rwMap[$colUpper]) ? $rwMap[$colUpper] : ($hlEmail ? penumbra_email_cell_format($colUpper, $cell) : $cell);',
+                     '\n                        $cellValue = isset($rwMap[$colUpper]) ? $rwMap[$colUpper] : $cell;')], ['P-hl-groupedEmail'], ['hrep']),
+    's-order': ([('sr', 'foreach (array_reverse($rules) as $rr) $out[] = $rr;', 'foreach ($rules as $rr) $out[] = $rr;')], ['P-hl-stateRules'], ['hrep']),
+    's-dark': ([('sr', "if (!is_string($themeName) || empty($themes[$themeName]['isDark'])) return $rules;", 'return $rules;')], ['P-hl-darkFill'], ['hrep']),
+    's-parens': ([('sr', '        if ($depth !== 0) continue;' + N + "        $keep[$p] = $p . ': ' . str_replace(\"'\", '\"', $v);",
+                   "        $keep[$p] = $p . ': ' . str_replace(\"'\", '\"', $v);")], ['P-hl-cssParity'], ['hrep']),
+    's-quote': ([('sr', "$keep[$p] = $p . ': ' . str_replace(\"'\", '\"', $v);", "$keep[$p] = $p . ': ' . $v;")], ['P-hl-stateRules', 'P-hl-cssParity'], ['hrep']),
+    's-foot': ([('sr', 'renderTotalRow($data, $headers, $totalRowStyle, null, penumbra_email_footer_formats($hlEmail));', 'renderTotalRow($data, $headers, $totalRowStyle);')],
+               ['P-hl-emailFooter'], ['hrep']),
+    # (no s-numtext: number_format($v, 12) prints what sprintf('%.12F') does on PHP 8.2, near-ties included - an equivalent mutant)
+    's-leak': ([('sr', "    $GLOBALS['penumbra_highlight_rules'] = penumbra_state_highlight_rules($state);",
+                 "    if (!empty($state['columnHighlights'])) $GLOBALS['penumbra_highlight_rules'] = penumbra_state_highlight_rules($state);")], ['P-hl-noLeak'], ['hrep']),
+    'c-round': ([('cphp', "$up = ord($f[$dp]) >= ord('5');", "$up = ord($f[$dp]) > ord('5');")], ['P-hl-fmtParity'], ['hrep']),
+    # ---- (2026-10-20 c, phase 3) a pivot value's Highlight rules
+    # main.js: the builder's settings and its rows, the cog, the renderer (body, summary rows and
+    # their fill class, the order, the context), the count
+    'm-pvhlbuild': ([('main', '                    aggHighlight: getAggregationHighlights(),' + N + '                    rowLayout: rowLayout,', '                    rowLayout: rowLayout,')],
+                    ['L-pvhl-generated', 'L-pvhl-stateCarries'], ['pvhl']),
+    'm-pvhlrepop': ([('main', "var hlr = (settings.aggHighlight && settings.aggHighlight[i]) ? settings.aggHighlight[i] : null;", 'var hlr = null;')],
+                    ['L-pvhl-reedit'], ['pvhl']),
+    'm-pvhlattr': ([('main', "        if (_hlInit.length) $tr.attr('data-agg-hl', JSON.stringify(_hlInit));" + N, '')], ['L-pvhl-reedit', 'L-pvhlnomod-offRoundTrip'], ['pvhl', 'pvhlnomod']),
+    'm-pvhlpop': ([('main', 'highlight: window.PenumbraColFmt.hlColOk ? _pnbPvHlPopCfg($tr) : null,', 'highlight: null,')], ['L-pvhl-popHasHl'], ['pvhl']),
+    'm-pvhlbody': ([('main', 'if (_pvHl && _pvHl[idx]) cellStyle += _pnbPvHlStyle(_pvHl[idx], cellContext, allFieldNames);', '')], ['L-pvhlseed-seedBody', 'L-pvhl-generated'], ['pvhl', 'pvhlseed']),
+    'm-pvhlsum': ([('main', 'if (_pvHl && _pvHl[idx]) { _sHl = _pnbPvHlStyle(_pvHl[idx], _sCtx, _summaryFieldNames); _sCellStyle += _sHl; }', '')], ['L-pvhlseed-seedSummary'], ['pvhlseed']),
+    'm-pvhlsumcls': ([('main', "((_sHeat + _sHl).indexOf('background-color') !== -1 ? ' class=\"pnb-heat-fill\"' : '')", "(_sHeat.indexOf('background-color') !== -1 ? ' class=\"pnb-heat-fill\"' : '')")],
+                     ['L-pvhlseed-seedSummary'], ['pvhlseed']),
+    'm-pvhlorder': ([('main', '            for (var k = rs.length - 1; k >= 0; k--) {' + N + '                var r = rs[k], pc = null;', '            for (var k = 0; k < rs.length; k++) {' + N + '                var r = rs[k], pc = null;')],
+                    ['L-pvhlseed-seedTopWins'], ['pvhlseed']),
+    'm-pvhlhas': ([('main', 'const hasRules = conditionalFormattingRules.length > 0 || !!_pvHl;', 'const hasRules = conditionalFormattingRules.length > 0;')], ['L-pvhlseed-seedBody'], ['pvhlseed']),
+    'm-pvhlcount': ([('main', 'count: same ? function (w) { return _pnbPvHlCount(G, idx, w); } : null', 'count: null')], ['L-pvhl-editorCount'], ['pvhl']),
+    'm-pvhlctx': ([('main', "(G.labelSrc[idx] || []).forEach(function (q) { var v = vals[q[1]]; ctx.set(q[0], String(typeof v === 'number' ? v : 0)); });", '')], ['L-pvhl-editorCount'], ['pvhl']),
+    # the module: no Apply to, a count in cells
+    'j-pvhlto': ([('mod', "(hl.pivot ? '' : '<div class=\"pnb-colopt-sec\" data-sec=\"hl-to\"", "(false ? '' : '<div class=\"pnb-colopt-sec\" data-sec=\"hl-to\"")], ['L-pvhl-editorPivot'], ['pvhl']),
+    'j-pvhlunit': ([('mod', "var cu = (c && c.unit === 'cells') ? ['cell', 'cells'] : ['row', 'rows'];", "var cu = ['row', 'rows'];")], ['L-pvhl-editorCount'], ['pvhl']),
+    # the scheduled email's pivot (schedule_runner.php)
+    's-pvhlemail': ([('sr', '$pvHl = $isEmail ? penumbra_pv_hl_rules(', '$pvHl = true ? penumbra_pv_hl_rules(')], ['P-H-pvhlPdf'], ['pvhlseed']),
+    's-pvhlcell': ([('sr', '                    $cellStyle .= penumbra_pv_hl_style($pvHl[$idx], $_hctx);' + N, '')], ['P-H-pvhlEmail'], ['pvhlseed']),
+    's-pvhlorder': ([('sr', 'foreach (penumbra_hl_theme_fills(array_reverse($rules), $themeName) as $r) {', 'foreach (penumbra_hl_theme_fills($rules, $themeName) as $r) {')], ['P-H-pvhlEmail'], ['pvhlseed']),
+    's-pvhlsrc': ([('sr', "foreach ($pvHlSrc[$idx] as $_hlu => $_hsi) $_hctx[$_hlu] = (isset($values[$_hsi]) && is_numeric($values[$_hsi])) ? $values[$_hsi] : 0;", '')],
+                  ['P-H-pvhlEmail'], ['pvhlseed']),
+    # the help
+    't-pvhltip': ([('ptip', 'its <strong>Highlight</strong> rules', 'its highlight rules')], ['S-helpPvHl'], []),
+    't-pvhltopic': ([('ptopic', 'never the Grand Total row or column', 'not the Grand Total row or column')], ['S-helpPvHl'], []),
+    # the help
+    't-lsc': ([('stopic', '<h4 id="lsc-colopts"', '<h4 id="lsc-colopt"')], ['S-helpHl2'], []),
+    't-hidden': ([('topic', 'reads only the columns it shows', 'reads the columns it shows')], ['S-helpHl2'], []),
 }
 # (colopt f) checks on the files' text, beside the browser's
 def static_checks(texts):
-    idx, hlp = texts['index'], texts['help']
+    idx, hlp, top, stp = texts['index'], texts['help'], texts['topic'], texts['stopic']
+    ptp, pti = texts['ptopic'], texts['ptip']
     return [
+        # (2026-10-20 c) the pivot builder's topic has its Highlight rules (and says where they draw),
+        # its value tip names them, Your Settings sends a pivot there; no em-dash
+        ('S-helpPvHl', '<strong>Highlight rules</strong></p>' in ptp and 'never the Grand Total row or column' in ptp
+         and 'Format, shading and highlight rules' in ptp and 'its <strong>Highlight</strong> rules' in pti
+         and 'data-jump-to="pvh-value-options"' in top and chr(0x2014) not in ptp and '&mdash;' not in ptp and chr(0x2014) not in pti, ''),
+        # (2026-10-20 b) the Save dialog's topic has its section (and its link); Your Settings tells
+        # Off for me, NO RULE, the report's rules and the email - and what the email cannot read -
+        # and links there; no em-dash in either
+        ('S-helpHl2', '<h4 id="lsc-colopts"' in stp and stp.count('data-jump-to="lsc-colopts"') == 1 and 'data-jump-to="lsc-colopts"' in top
+         and '<code>NO RULE</code>' in top and '<code>NO $</code>' in top and '<em>Off for me</em>' in top and 'reads only the columns it shows' in top
+         and 'a PDF attachment does not yet' in stp and chr(0x2014) not in stp and '&mdash;' not in stp and chr(0x2014) not in top and '&mdash;' not in top, ''),
+        # (2026-10-20, hl) the tip and the topic name the Highlight rules - the topic's own
+        # section, its link, the RULE badge, the options' list - and carry no em-dash
+        ('S-helpHl', '<li><strong>Highlight</strong> - color the cells, or whole rows, that meet a condition.</li>' in hlp
+         and '<h4 id="us-highlight"' in top and 'data-jump-to="us-highlight"' in top and '<code>RULE</code>' in top
+         and 'shading, highlight rules, filter and links' in top and chr(0x2014) not in top and '&mdash;' not in top and chr(0x2014) not in hlp, ''),
         ('S-noSaveDeepCell', 'serverSaveResolver' not in idx, 'index.php: serverSaveResolver x%d' % idx.count('serverSaveResolver')),
         ('S-helpNoDeepDefault', 'Defaults: Row Height, Deep Links' not in hlp and "can set the report's default under <em>Last Stop Changes</em>" not in hlp
          and 'Deep Link Vendor Codes</strong> - when on, recognized vendor codes' not in hlp, ''),
@@ -337,7 +534,24 @@ NEW_G = {'L-fform-filterOwnRow', 'L-fform-badgeWords', 'L-fform-formRows', 'L-ff
 # the checks the 2026-10-15 WCAG fixes bring (the sort lanes' names, the hint links' keys):
 # every one red on live
 NEW_H = {'L-fspa11y-' + c for c in CHK['fspa11y']}
-NEW = NEW_H
+# (2026-10-20, hl) the checks the highlight rules bring: every check of the four new
+# scenarios (and the E- of those that die on live), the popover's form listing Highlight,
+# Clear All's words, the help
+NEW_HL = {'L-%s-%s' % (s, c) for s in ('fhlunit', 'fhl', 'fhlseed', 'ghl') for c in CHK[s]} | \
+         {'E-fhlunit', 'E-fhl', 'E-ghl', 'L-fform-formRows', 'L-fform-textCol', 'L-fclear-listed', 'S-helpHl'}
+# (2026-10-20 b) the checks phase 2 brings (the report's formats and rules, the Save dialog's
+# list, the email): every check of the three new scenarios (and their E- where they die on
+# live), the email's (P-hl-*), the help's
+NEW_HL2 = {'L-%s-%s' % (s, c) for s in ('hrep', 'hrview', 'hrsave', 'hrnomod') for c in CHK[s]} | {'E-hrep', 'E-hrview', 'E-hrsave'} | \
+          {'P-hl-' + c for c in PHP_HL} | {'S-helpHl2'}
+# (2026-10-20 c, phase 3) a pivot value's Highlight rules: every check of pvhl / pvhlseed (and
+# pvhl's E-: it dies on live), pvhlnomod's offKept (nothing is drawn on live either), the email's
+# (P-H-pvhl*), the help's
+# (seedState and offKept are guards: live passes a pivot's settings through as they came - what it
+# loses is the builder's round trip, offRoundTrip)
+NEW_HL3 = {'L-%s-%s' % (s, c) for s in ('pvhl', 'pvhlseed') for c in CHK[s] if c != 'seedState'} | \
+          {'L-pvhlnomod-offRoundTrip', 'P-H-pvhlEmail', 'P-H-pvhlPdf', 'S-helpPvHl', 'L-fform-pivotForm'}
+NEW = NEW_HL3
 
 args = sys.argv[1:]
 def opt(name, default=None):
@@ -363,7 +577,13 @@ RELS = {'main': os.path.join('js', 'main.js'), 'mod': os.path.join('js', 'penumb
         'sr': 'schedule_runner.php', 'cphp': 'penumbra_calc.php', 'css': os.path.join('css', 'main.css'),
         # (colopt c) the harness lifts its Settings / status bar bits from this index.php,
         # and serves this help_content.php - raw, as a static file - for the hover tips
-        'index': 'index.php', 'help': os.path.join('help', 'tips', 'settings-tips-storage.php')}
+        'index': 'index.php', 'help': os.path.join('help', 'tips', 'settings-tips-storage.php'),
+        # (2026-10-20, hl) the Your Settings topic, for S-helpHl
+        'topic': os.path.join('help', 'topics', 'userSettingsHelpLightbox.php'),
+        # (2026-10-20 b) the Save dialog's Last Stop Changes topic, for S-helpHl2
+        'stopic': os.path.join('help', 'topics', 'savePrefsHelpLightbox.php'),
+        # (2026-10-20 c) the pivot builder's topic and tip store, for S-helpPvHl
+        'ptopic': os.path.join('help', 'topics', 'pivotBuilderHelpLightbox.php'), 'ptip': os.path.join('help', 'tips', 'pivot-tips-storage.php')}
 sys.path.insert(0, HERE)
 import mk_harness
 cand = {k: pick(v) for k, v in RELS.items()}
@@ -379,7 +599,11 @@ def hook(src):
     names = {'fillByName': 'penumbraFillLazyColumnsByName', 'kinds': '_pnbColKinds', 'saveCols': 'saveColumnPrefs', 'clearItems': '_spClearItems',
              'addAgg': 'addAggregationRow', 'fmts': 'getAggregationFormats', 'runSearch': 'runTableSearch', 'decText': '_pnbDecText',
              'cmpText': '_readComparisonCellText', 'sumText': 'penumbraReadCellForSummary', 'exportData': 'getExportData',
-             'bso': 'buildStateObject'}
+             'bso': 'buildStateObject', 'acf': 'applyConditionalFormatting',
+             # (2026-10-20 b) the condition engine and a footer's number text, for the email's parity
+             'paq': 'parseAdvancedQuery', 'epq': 'evaluateParsedQuery', 'numText': '_pnbNumText',
+             # (2026-10-20 c) the pivot builder filled from the pivot's settings
+             'repop': 'repopulatePivotLightboxFromCurrentState'}
     h = '\r\n;try { window.__HC = {' + ', '.join("%s: (typeof %s === 'function' ? %s : null)" % (k, v, v) for k, v in names.items()) + \
         '}; } catch (e) { window.__HC_ERR = String(e); }\r\n'
     out = src[:i] + ';(function () {' + h + src[i + len(anchor):]
@@ -489,14 +713,23 @@ def run_php(texts):
         for tag, p in (('sr', srp), ('calc', cp)):
             l = subprocess.run([PHP, '-n', '-l', p], capture_output=True, text=True).stdout
             out.append(('P-lint-' + tag, 'No syntax errors' in l, l.strip()[:200]))
-        open(fx, 'w', encoding='utf-8').write(json.dumps({'parity': INFO.get('fparity'), 'pvfmt': INFO.get('pvfmt'), 'pvfmt2': INFO.get('pvfmt2'), 'pvtie': INFO.get('pvtie')}))
+        open(fx, 'w', encoding='utf-8').write(json.dumps({'parity': INFO.get('fparity'), 'pvfmt': INFO.get('pvfmt'), 'pvfmt2': INFO.get('pvfmt2'), 'pvtie': INFO.get('pvtie'),
+                                                          'hrep': INFO.get('hrep'), 'pvhlseed': INFO.get('pvhlseed')}))
+        if os.environ.get('PNB_FX'): shutil.copyfile(fx, os.environ['PNB_FX'])   # PNB_FX=path: keep the page's answers
         res = subprocess.run([PHP, '-n', '-d', 'extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/ext', '-d', 'extension=mbstring',
                               '-d', 'date.timezone=America/New_York', os.path.join(HERE, 'test_colopt.php'), 'calc', cp, fx], capture_output=True, text=True)
         out += php_lines(res, 'P-')
         subprocess.run([PHP, '-n', os.path.join(HERE, '..', 'pivotparity', 'extract_mirror.php'), srp, mir], capture_output=True, text=True)
-        res = subprocess.run([PHP, '-n', '-d', 'memory_limit=512M', os.path.join(HERE, 'test_colopt.php'), 'pivot', mir, os.path.join(APP, 'themes_config.php'), fx],
+        res = subprocess.run([PHP, '-n', '-d', 'memory_limit=512M', os.path.join(HERE, 'test_colopt.php'), 'pivot', mir, os.path.join(APP, 'themes_config.php'), fx,
+                              os.path.join(APP, 'penumbra_search.php')],
                              capture_output=True, text=True)
         out += php_lines(res, 'P-')
+        # (2026-10-20 b) the email: the report's formats and highlight rules (hrep's answers)
+        res = subprocess.run([PHP, '-n', '-d', 'memory_limit=1024M', '-d', 'extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/ext', '-d', 'extension=mbstring',
+                              '-d', 'date.timezone=America/New_York', os.path.join(HERE, 'test_colopt.php'), 'hl', mir, cp, os.path.join(APP, 'themes_config.php'), fx,
+                              os.path.join(APP, 'penumbra_search.php')],
+                             capture_output=True, text=True)
+        out += php_lines(res, 'P-hl-')
         return out
     finally:
         shutil.rmtree(d, ignore_errors=True)
@@ -533,7 +766,7 @@ try:
     else:
         write_stage(texts)
         res = run_browser(SCN)
-        if scn_only is None or [x for x in SCN if x in ('fparity', 'pvfmt', 'pvfmt2', 'pvtie')]: res += run_php(texts)
+        if scn_only is None or [x for x in SCN if x in ('fparity', 'pvfmt', 'pvfmt2', 'pvtie', 'hrep', 'pvhlseed')]: res += run_php(texts)
         if scn_only is None: res += static_checks(texts)
         p = f = 0; failed = []
         for a, passed, dd in res:

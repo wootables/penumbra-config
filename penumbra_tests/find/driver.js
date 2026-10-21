@@ -940,6 +940,11 @@
       // the tip names the filter: "The filter box ..." (filterword, 2026-10-19) or the old "...box filters instead"
       R.chk.aboutText = !!info && /filter/.test(info.getAttribute('title') || '') && !!document.getElementById('pnbFindAbout') &&
         !!inp() && inp().getAttribute('aria-describedby') === 'pnbFindAbout' && inp().getAttribute('placeholder') === 'Find without filtering';
+      // the owner's words (2026-10-20): it starts with "Highlights", reaches other pages, and the
+      // hover title, the line under the box and the screen readers' description say the same
+      var t = info ? (info.getAttribute('title') || '') : '', ab = document.getElementById('pnbFindAbout');
+      R.chk.aboutWords = /^Highlights what you type and steps from match to match \(even across other pages\); every row stays in the table\. /.test(t) &&
+        !/hidden col/i.test(t) && !!tip && tip.textContent === t && !!ab && ab.textContent === t;
       if (info) info.click();
       await sleep(30);
       R.chk.tipOpens = !!tip && !tip.hidden && info.getAttribute('aria-expanded') === 'true' && document.activeElement === inp();
@@ -1100,6 +1105,10 @@
       var oz = parseInt(getComputedStyle(ov).zIndex, 10) || 0, bz = b ? (parseInt(getComputedStyle(b).zIndex, 10) || 0) : 0;
       var br = b ? b.getBoundingClientRect() : null, atBar = br ? document.elementFromPoint(br.left + 20, br.top + br.height / 2) : null;
       R.chk.dlgAbove = !!b && bz > oz && !!atBar && b.contains(atBar);
+      if (!R.chk.dlgTaken || !inp()) {   // not Find's: the rest cannot be asked
+        ['dlgCount', 'dlgStep', 'dlgNoFilter', 'dlgNoRowNo', 'dlgSort', 'dlgEscFind', 'dlgCloses'].forEach(function (k) { R.chk[k] = false; });
+        return;
+      }
       await find('kilo');
       var want = inDialog(ov, 'kilo'), s1 = st();
       R.chk.dlgCount = want > 3 && s1.n === want && s1.view === 'dialog' && hits().every(function (h) { return ov.contains(h.el); });
@@ -1147,7 +1156,7 @@
       var still = st().open === true && st().dialog === false;
       blurAll(); await ctrlF(); await settle();
       var want = inDialog(ov, 'kilo');
-      R.chk.swDialog = still && st().dialog === true && inp().value === 'kilo' && want > 0 && st().n === want;
+      R.chk.swDialog = still && st().dialog === true && !!inp() && inp().value === 'kilo' && want > 0 && st().n === want;
       var ok = ov.querySelector('.modal-btn-primary');
       if (ok) ok.click();
       await until(function () { return !ov.isConnected; }, 3000); await sleep(200);
@@ -1221,7 +1230,9 @@
     // ...and just past the line (760 px): the one-row bar, whole on screen.
     wide_edge: async function () {
       blurAll(); await ctrlF(); await find('kilo'); await until(function () { return btnShown(); }, 5000);
-      var b = barEl(), r = b.getBoundingClientRect(), i = inp().getBoundingClientRect(), c = b.querySelector('.pnb-find-count').getBoundingClientRect();
+      var b = barEl();
+      if (!b || !inp()) { R.chk.wOneRow = R.chk.wInView = false; return; }
+      var r = b.getBoundingClientRect(), i = inp().getBoundingClientRect(), c = b.querySelector('.pnb-find-count').getBoundingClientRect();
       R.chk.wOneRow = Math.abs(c.top - i.top) < 8 && r.height < 45;
       R.chk.wInView = r.left >= 0 && r.right <= window.innerWidth;
       R.info.wide = { vw: window.innerWidth, bar: [Math.round(r.left), Math.round(r.right), Math.round(r.height)] };

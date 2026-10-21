@@ -6,7 +6,7 @@
 <!-- ask_harness.html - the Ask page's client (js/penumbra_help_ask.js) in headless Edge against a stubbed
      help_ask.php: $.ajax is replaced before the module loads, so every request is answered from canned JSON
      and recorded. The page body is the Ask fragment as the loader emits it (ask_harness.ps1 renders it in),
-     plus the hub's search box and empty-search element. Results land in the pre element with id out, as JSON (T1..T6). -->
+     plus the hub's search box and empty-search element. Results land in the pre element with id out, as JSON (T1..T8). -->
 <script src="jquery-3.7.1.min.js"></script>
 <script>
   // ---- the stub endpoint: records calls, answers like help_ask.php would
@@ -101,6 +101,22 @@
        .then(function () { return step(function () {
           record('T6 error shown', $('#pnbAskStatus').text().indexOf('Try again in 20 seconds') >= 0 && !$('#pnbAskGo').prop('disabled'),
               'status=' + JSON.stringify($('#pnbAskStatus').text()) + ' disabled=' + $('#pnbAskGo').prop('disabled'));
+       }); })
+  // T8 the in-flight indicator (2026-10-20): while the ask is out, dots and a text in the status span, the button disabled and
+  // marked busy, the previous answer dimmed; after the reply all of it is gone and the form is usable again
+       .then(function () { return step(function () {
+          $('#pnbAskQ').val('Where are pivot presets saved?'); $('#pnbAskForm').trigger('submit');
+          var cssEl = document.getElementById('pnbHelpAskCss');
+          window.__busy = { el: $('#pnbAskStatus .pnb-ask-busy').length, dots: $('#pnbAskStatus .pnb-ask-dots i').length, text: $('#pnbAskStatus').text(),
+              disabled: $('#pnbAskGo').prop('disabled'), aria: $('#pnbAskGo').attr('aria-busy'), stale: $('#pnbAskAnswer').hasClass('is-stale'), ansBusy: $('#pnbAskAnswer').attr('aria-busy'),
+              css: !!cssEl && cssEl.textContent.indexOf('@keyframes pnbAskPulse') >= 0 && cssEl.textContent.indexOf('prefers-reduced-motion') >= 0 };
+       }); })
+       .then(function () { return step(function () {
+          var b = window.__busy || {};
+          record('T8 busy indicator', b.el === 1 && b.dots === 3 && String(b.text).indexOf('Asking the help') >= 0 && b.disabled === true && b.aria === 'true' && b.stale === true && b.ansBusy === 'true' && b.css === true
+              && $('#pnbAskStatus .pnb-ask-busy').length === 0 && !$('#pnbAskGo').prop('disabled') && !$('#pnbAskGo').attr('aria-busy') && !$('#pnbAskAnswer').hasClass('is-stale') && !$('#pnbAskAnswer').attr('aria-busy')
+              && $('#pnbAskEcho').text() === 'Where are pivot presets saved?',
+              'during=' + JSON.stringify(b) + ' after: busy=' + $('#pnbAskStatus .pnb-ask-busy').length + ' disabled=' + $('#pnbAskGo').prop('disabled') + ' stale=' + $('#pnbAskAnswer').hasClass('is-stale') + ' echo=' + JSON.stringify($('#pnbAskEcho').text()));
        }); })
        .then(function () { document.getElementById('out').textContent = JSON.stringify(results, null, 1); document.title = 'HARNESS-DONE'; });
 })();
