@@ -103,6 +103,19 @@ MUTANTS = {
     # only the preview's landing point lost: the summary is not made focusable
     'nosumtabindex': ([("        if (!$t.is('button, input, select, textarea')) { $t.attr('tabindex', '-1'); }\n", "")],
                       ['D25', 'D28']),
+    # (2026-10-21) the read failing: the sign-in dialog looked up where main.js never puts it
+    'expirywrongname': ([("            var onExpired = window.Penumbra && window.Penumbra.handleSessionExpiredError;",
+                          "            var onExpired = window.handleSessionExpiredError;")],
+                        ['E1', 'E2']),
+    # ...expiry told from the 403 alone: an admin-only denial would ask the user to sign in again
+    'expiryany403': ([("if ((authHdr === 'expired' || (xhr.status === 0", "if ((xhr.status === 403 || (xhr.status === 0")],
+                     ['E3']),
+    # ...the header ignored: an expired sign-in (its 403 carries a message) gets an alert again
+    'expirynohdr': ([("if ((authHdr === 'expired' || (xhr.status === 0", "if (((xhr.status === 0")],
+                    ['E1']),
+    # ...an aborted read treated as an expired sign-in
+    'abortexpired': ([("            if (xhr.statusText === 'abort' || xhr.statusText === 'canceled') { return; }\n", "")],
+                     ['E5']),
 }
 
 args = sys.argv[1:]

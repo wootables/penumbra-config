@@ -242,7 +242,8 @@ ok(strpos($dt, 'REFERENCES NC_REPORTING.PENUMBRA_DASHBOARDS (ID) ON DELETE CASCA
 ok(preg_match('/\bVAL\b/', $dt) === 0 && strpos($dt, 'SOURCE') === false, 'DASHBOARD_TAGS carries no value and no source');
 ok(strpos($byName['INDEX:IX_DASH_TAGS_TAG'], 'ON NC_REPORTING.PENUMBRA_DASHBOARD_TAGS (TAG, DASHBOARD_ID)') !== false, 'dashboard tags indexed by tag (the grant map and the home filter)');
 eq($byName['GRANT:PENUMBRA_DASHBOARD_TAGS'], 'GRANT SELECT, INSERT, UPDATE, DELETE ON NC_REPORTING.PENUMBRA_DASHBOARD_TAGS TO ORIED_RO', 'dashboard tags: DML to the app (the Tags tool and the dashboard settings write it)');
-eq(count(array_filter($ddl, function ($o) { return $o['type'] === 'INDEX'; })), 8, 'eight indexes (the dashboard tags index since 2026-10-09)');
+eq(count(array_filter($ddl, function ($o) { return $o['type'] === 'INDEX'; })), 9, 'nine indexes (the dashboard tags index since 2026-10-09, the Quick actions misses log CREATED_AT index since 2026-10-21)');
+eq($byName['GRANT:PENUMBRA_PALETTE_MISSES'], 'GRANT SELECT, INSERT, DELETE ON NC_REPORTING.PENUMBRA_PALETTE_MISSES TO ORIED_RO', 'palette misses: insert + purge to the app, no UPDATE (2026-10-21)');
 ok(isset($byName['INDEX:IX_PEOPLE_EMAIL']) && isset($byName['INDEX:IX_PEOPLE_UNITY']) && isset($byName['INDEX:IX_PEOPLE_OUC']), 'email, unity, ouc indexed (the lookups the app does)');
 ok(strpos($byName['INDEX:IX_PEOPLE_LNAME'], 'UPPER(LAST_NAME), UPPER(FIRST_NAME)') !== false, 'name index is function-based on UPPER');
 $v = $byName['VIEW:PENUMBRA_PEOPLE_V'];

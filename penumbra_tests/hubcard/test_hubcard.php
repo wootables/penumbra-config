@@ -42,6 +42,12 @@
  * --mutant7  pnb_warn_target() answers null for every warning (2026-10-14):
  *            the "Worth a look" lines render as plain text again, and section
  *            1 must go RED on exactly the two warning-link assertions.
+ * --mutant8  the help drifts back toward the old hub (2026-10-21): the single-
+ *            key line names the Health page's 1 to 4 again, the Refresh row
+ *            loses "it starts off." and the outage row its show-more, and the
+ *            suite must go RED on exactly the three help assertions (5d, 8b).
+ *            The help is help/topics + help/tips since 2026-10-19 (the Health
+ *            table is the Auditor topic's); help_content.php is a shim.
  *
  * THE DECLUTTER (2026-10-14, section 10): the chips are links to their cards in
  * the cards' order and show each card's worst fact; every card folds to its
@@ -76,7 +82,7 @@ if (!function_exists('mb_substr')) {
     function mb_strlen($s, $e = null) { return strlen($s); }
 }
 
-$HEALTH = ''; $PAGE = ''; $HTML = ''; $CONTROL = false; $MUTANT = false; $MUTANT2 = false; $MUTANT3 = false; $MUTANT4 = false; $MUTANT5 = false; $MUTANT6 = false; $MUTANT7 = false;
+$HEALTH = ''; $PAGE = ''; $HTML = ''; $CONTROL = false; $MUTANT = false; $MUTANT2 = false; $MUTANT3 = false; $MUTANT4 = false; $MUTANT5 = false; $MUTANT6 = false; $MUTANT7 = false; $MUTANT8 = false;
 foreach ($argv as $a) {
     if (strpos($a, '--health=') === 0)     $HEALTH = substr($a, 9);
     elseif (strpos($a, '--page=') === 0)   $PAGE = substr($a, 7);
@@ -89,8 +95,9 @@ foreach ($argv as $a) {
     elseif ($a === '--mutant5')            $MUTANT5 = true;
     elseif ($a === '--mutant6')            $MUTANT6 = true;
     elseif ($a === '--mutant7')            $MUTANT7 = true;
+    elseif ($a === '--mutant8')            $MUTANT8 = true;
 }
-if ($HEALTH === '' || $PAGE === '') { fwrite(STDERR, "usage: --health=<penumbra_health.php> --page=<health.php> [--html=<out>] [--control] [--mutant] [--mutant2] [--mutant3] [--mutant4] [--mutant5] [--mutant6]\n"); exit(2); }
+if ($HEALTH === '' || $PAGE === '') { fwrite(STDERR, "usage: --health=<penumbra_health.php> --page=<health.php> [--html=<out>] [--control] [--mutant] [--mutant2] [--mutant3] [--mutant4] [--mutant5] [--mutant6] [--mutant7] [--mutant8]\n"); exit(2); }
 
 $TMP = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'pnb_hubcard_' . getmypid();
 if (!@mkdir($TMP, 0777, true) && !is_dir($TMP)) { fwrite(STDERR, "cannot create $TMP\n"); exit(2); }
@@ -913,12 +920,29 @@ ok(strpos($H['r6'], 'Auto-refresh is off unless you pick an interval in the head
 ok(strpos($H['r6'], 'title="Single-key shortcuts: r re-reads the log, 1 to ') !== false && strpos($page, 'Single-key shortcuts: r refreshes') === false, 'the keys switch says the same');
 ok(strpos($H['r6'], "(auto ? ' - refreshes with the page' : ' - click the tab to re-read')") !== false && strpos($H['r6'], "var auto = !!(rs && rs.value !== '0');") !== false,
    'the log status line promises a refresh only while an interval is set');
-$helpSrc = @file_get_contents(dirname($PAGE) . DIRECTORY_SEPARATOR . 'help_content.php');
+// (2026-10-21) the v1 help is gone (2026-10-19): help_content.php is a shim, the body is help/topics + help/tips.
+// The Health table is the Auditor topic's (help/manifest.php: auditorHelpLightbox, #audit-admintools); the old
+// hub's keys were named in the Single-key shortcuts passage (now userSettingsHelpLightbox), so the "no longer"
+// pin reads every fragment, the stand-in for the v1 body, once it has seen both topics (an empty read passes it).
+$helpDir = dirname($PAGE) . DIRECTORY_SEPARATOR . 'help' . DIRECTORY_SEPARATOR;
+$helpSrc = @file_get_contents($helpDir . 'topics' . DIRECTORY_SEPARATOR . 'auditorHelpLightbox.php');
+$helpAll = '';
+foreach (array('topics', 'tips') as $sub) { foreach (glob($helpDir . $sub . DIRECTORY_SEPARATOR . '*.php') ?: array() as $pf) $helpAll .= file_get_contents($pf) . "\n"; }
+if ($MUTANT8) {
+    // The help drifts back toward the old hub: the single-key line names 1 to 4 again, the Refresh row loses
+    // "it starts off." and the outage row its show-more. Exactly the three help assertions must go RED.
+    $n1 = "the Health page's r and number keys"; $n2 = 'it starts off.'; $n3 = 'the three newest with a <em>show more</em>';
+    if ($helpSrc === false || substr_count($helpAll, $n1) !== 1 || substr_count($helpSrc, $n2) !== 1 || substr_count($helpSrc, $n3) !== 1) { fwrite(STDERR, "mutant8: the help anchors not found\n"); exit(2); }
+    $helpAll = str_replace($n1, "the Health page's r and 1 to 4 keys", $helpAll);
+    $helpSrc = str_replace(array($n2, $n3), array('it refreshes every minute.', 'the three newest'), $helpSrc);
+    echo "MUTANT8: the help names the old hub's keys again and drops auto-refresh off and the show-more\n";
+}
 if ($helpSrc === false) {
-    echo "  (skipped: help_content.php is not beside health.php)\n";
+    echo "  (skipped: help/topics/auditorHelpLightbox.php is not beside health.php)\n";
 } else {
-    ok(strpos($helpSrc, 'failures in the last 24 hours with the last twelve listed') === false && strpos($helpSrc, '<kbd>1</kbd>-<kbd>4</kbd> switch logs') === false
-       && strpos($helpSrc, 'the Health page\'s r and 1 to 4') === false, 'the help page no longer describes the old hub (24h failures only, four logs, a per-log auto-refresh)');
+    ok(strpos($helpAll, '<div id="auditorHelpLightbox"') !== false && strpos($helpAll, '<div id="userSettingsHelpLightbox"') !== false
+       && strpos($helpAll, 'failures in the last 24 hours with the last twelve listed') === false && strpos($helpAll, '<kbd>1</kbd>-<kbd>4</kbd> switch logs') === false
+       && strpos($helpAll, 'the Health page\'s r and 1 to 4') === false, 'the help page no longer describes the old hub (24h failures only, four logs, a per-log auto-refresh)');
     ok(strpos($helpSrc, 'Each of those two cards reads the window named in its heading') !== false && strpos($helpSrc, 'it starts off.') !== false
        && strpos($helpSrc, 'internal-jobs logs') !== false, 'and describes the windows, auto-refresh off and the six logs');
 }

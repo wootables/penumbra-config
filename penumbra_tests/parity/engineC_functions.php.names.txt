@@ -103,6 +103,17 @@ pivot_cols_fill_spec
 pivot_expand_colkeys_with_gaps
 pivot_build_field_comparators
 custom_sort_pivot_keys
+penumbra_hl_clean_css
+penumbra_state_highlight_rules
+penumbra_hl_journal_rules
+penumbra_hl_reads_column
+penumbra_hl_theme_fills
+penumbra_pv_hl_rules
+penumbra_pv_hl_style
+penumbra_state_column_formats
+penumbra_email_cell_format
+penumbra_email_footer_formats
+penumbra_num_text
 apply_state_logic
 _cf_group_rows
 _cf_sort_groups
@@ -198,6 +209,7 @@ pivot_apply_value_sort
 pivot_process_data
 pivot_shade_lopsided
 pivot_shade_rank_floor
+pivot_shade_lopsided_two
 pivot_gt_heat_num
 generate_pivot_html
 pivot_render_hierarchy_level
@@ -232,6 +244,7 @@ _pnb_heat_shape
 _pnb_heat_rank_t
 _pnb_heat_pc
 _pnb_heat_bar_css
+_pnb_heat_side_rank
 pnb_heat_css_for
 pnb_heat_parse_args
 parse_heatmap_rules

@@ -3,19 +3,22 @@
 #
 #   run.ps1                          the LIVE webroot as both app and orig (after the deploy)
 #   run.ps1 -App <stage> -Orig <dir> a stage build against the v1 files in <dir>
-#   run.ps1 ... -Mutants             also run the mutants (the suite's control; 30 since 2026-10-20)
+#   run.ps1 ... -Mutants             also run the mutants (the suite's control; 28 since 2026-10-21)
 #   run.ps1 ... -SkipCoverage        skip the coverage map (it is report-only anyway)
 #   -Out <dir>                       scratch dir (renders, caches, coverage_report.md)
 #   -Here <dir>                      the suite dir to run from (a staged copy of these files)
 #
 # What it checks (see run.php for the ids): L1-L20 structural lint of help/ and its
-# consumers, E0-E7 v1/v2 render equivalence + the audience gate matrix, R1-R10 the AI
-# help retrieval over the fragments (R8-R10: the two-letter allow-list, 2026-10-17),
-# A1-A11 + H1 the Ask page; the coverage map is printed, never red.
+# consumers, E0-E7 v1/v2 render equivalence + the audience gate matrix, R1-R12 the AI
+# help retrieval over the fragments (R8-R10: the two-letter allow-list, 2026-10-17; R12: R9
+# at other help sizes, 2026-10-21), A1-A11 + H1 the Ask page; the coverage map is printed, never red.
 #
 # UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
 #   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\helpv2'
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Mutants
+# from a LOCAL current directory (Set-Location $env:TEMP first): from a UNC cwd php's exec()
+# starts cmd.exe, whose "UNC paths are not supported" line on stderr stopped this script under
+# 'Stop' when the call carried 2>&1 (2026-10-21).
 # Prints RESULT: GREEN/RED instead of exiting (an exit kills the caller).
 # Writes nothing to the webroot.
 # =============================================================================

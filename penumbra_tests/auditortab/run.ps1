@@ -40,15 +40,39 @@
 #          Security & errors
 #   E0 C1-C3  the installer: still ES5; the browser's own view-transition
 #          aborts are NOT sent, everything else is
-#   L1     log_client_error.php drops the same aborts (PHP, 9 cases) - through the
-#          SHARED rule in db_connection.php since 2026-09-25 evening (suite errbenign)
+#   C4-C7  (2026-10-21, inst.html?part=ro, a fresh page) its ResizeObserver
+#          notice is NOT sent - dispatched (both wordings, no Error object) AND a
+#          REAL one this Edge raises from an observer resizing what it watches -
+#          while the same words thrown by a script and an error event without an
+#          Error object saying anything else still are
+#   L1     log_client_error.php drops the same notices (PHP, 14 cases) - through the
+#          SHARED rule in db_connection.php since 2026-09-25 evening (suite errbenign);
+#          its gate admits error events as well as rejections since 2026-10-21
 #   G1     get_audit_log.php: ATT_QUERY in 72 h, ATT_LAST over the alarm set
 #          (no CLIENT_ERROR), ERR_LAST -> err_last, the per-kind counts -> errkinds
+#   N1-N3  (2026-10-21, ev.html) the Events list as the REAL loadAuditLog paints it
+#          (the whole audit module sliced from main.js, as chgfoot does; only $.ajax
+#          is faked): a CLIENT_ERROR row the server flags BENIGN (the ResizeObserver
+#          notice, an old "Transition was skipped") wears the NEUTRAL badge and its
+#          tooltip says why, while a real browser error and a denial stay red (N1);
+#          that badge IS the plain neutral one (RENAME's), not the red one, its text
+#          >= 4.5:1, on all 18 themes (N2); an older get_audit_log.php (no BENIGN)
+#          leaves every CLIENT_ERROR red, and a plain viewer's scrubbed rows (no
+#          message) still go neutral by the flag (N3)
+#   G2     get_audit_log.php: the list query selects BENIGN through the SAME SQL
+#          twin (penumbraBenignClientErrorSql()), as a number 0 / 1, never unset
+#   G3     (2026-10-21) get_audit_log.php: Pulse's action mix leaves the browser's
+#          harmless notices out, through the same twin (errbenign S1 pins what it
+#          matches: the notices only, so a real browser error still counts)
 #
-#   run.ps1                  live files           EXPECTED: GREEN 32 / 0
+#   run.ps1                  live files           EXPECTED: GREEN 41 / 0
 #   run.ps1 -Control         the build before the Auditor tab work (per file,
 #                            its .bak-20260925-auditortab, else -auditerrors,
 #                            else -auditbenign)              EXPECTED: RED
+#   run.ps1 -ControlBn       main.js + get_audit_log.php at 705b22d, the build
+#                            before the neutral badge   EXPECTED: RED on exactly N1 N2 N3 G2 G3
+#   run.ps1 -ControlMix      get_audit_log.php at 528f6d0, the build before the
+#                            action-mix change          EXPECTED: RED on exactly G3
 #   run.ps1 -MainCss <p> -MainJs <p> -IndexPhp <p> -LogPhp <p> -AuditPhp <p> -DbPhp <p>
 #   run.ps1 -Mutant <name> / -Mutants   anchors checked first (-CheckAnchors)
 #   -Keep keeps the staging dir.  -Here <dir> runs a copy.
@@ -61,7 +85,7 @@
 # =============================================================================
 param([string]$MainCss = '', [string]$MainJs = '', [string]$IndexPhp = '', [string]$LogPhp = '', [string]$AuditPhp = '', [string]$DbPhp = '',
       [string]$App = '', [string]$Here = '',
-      [string]$Mutant = '', [switch]$Mutants, [switch]$CheckAnchors, [switch]$Control, [switch]$Keep)
+      [string]$Mutant = '', [switch]$Mutants, [switch]$CheckAnchors, [switch]$Control, [switch]$ControlBn, [switch]$ControlMix, [switch]$Keep)
 $ErrorActionPreference = 'Stop'
 $here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\auditortab' }
 $app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
@@ -77,6 +101,16 @@ if ($Control) {
   }
   $MainCss = Get-ControlFile 'css\main.css'; $MainJs = Get-ControlFile 'js\main.js'; $IndexPhp = Get-ControlFile 'index.php'
   $LogPhp = Get-ControlFile 'log_client_error.php'; $AuditPhp = Get-ControlFile 'get_audit_log.php'; $DbPhp = Get-ControlFile 'db_connection.php'
+}
+if ($ControlBn) {
+  # The build before the neutral badge for the browser's harmless notices (2026-10-21).
+  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver\oldver.ps1')))
+  $MainJs = Get-GitVersion '705b22d' 'js/main.js'; $AuditPhp = Get-GitVersion '705b22d' 'get_audit_log.php'
+}
+if ($ControlMix) {
+  # The build before Pulse's action mix left the harmless notices out (2026-10-21).
+  . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver\oldver.ps1')))
+  $AuditPhp = Get-GitVersion '528f6d0' 'get_audit_log.php'
 }
 $cssPath = if ($MainCss) { $MainCss } else { "$app\css\main.css" }
 $jsPath  = if ($MainJs) { $MainJs } else { "$app\js\main.js" }
@@ -140,8 +174,33 @@ $mUpd  = "'Report state edits, all time. Click to see them in Changes.', 'data-a
 $mUpd0 = "'Report state edits, all time. Click to see them in Changes.', 'data-audit-goto-events=`"change`"');"
 $mBenignPhp  = 'return penumbraClientErrorIsBenign($message);   // the ONE rule (db_connection.php)'
 $mBenignPhp0 = 'return false;'
+# --- the ResizeObserver notice (2026-10-21) ---
+$mNotice    = '            if (benignNotice(ev)) { return; }' + $L
+$mNoticeErr  = 'return !!ev && !ev.error' + $L
+$mNoticeErr0 = 'return !!ev' + $L
+$mNoticeMsg  = '            && /^ResizeObserver loop (completed with undelivered notifications|limit exceeded)/i.test(String(ev.message || ''''));'
+$mNoticeMsg0 = '            && true;'
+$mGate  = "if (`$kind !== 'unhandledrejection' && `$kind !== 'error') return false;"
+$mGate0 = "if (`$kind !== 'unhandledrejection') return false;"
 $mAlarm  = 'ACTION IN ($alarmList) THEN TIMESTAMP END), ''YYYYMMDDHH24MISS'') AS ATT_LAST'
 $mAlarm0 = 'ACTION IN ($badList) THEN TIMESTAMP END), ''YYYYMMDDHH24MISS'') AS ATT_LAST'
+# --- the neutral badge for the browser's harmless notices (2026-10-21) ---
+$mBnFlag  = 'const benign = Number(log.BENIGN) === 1;'
+$mBnFlag0 = 'const benign = false;'
+$mBnAll0  = "const benign = log.ACTION === 'CLIENT_ERROR';"
+$mBnMsg0  = "const benign = !!(log.SOURCE_DATA && /^(ResizeObserver loop|Transition was)/i.test(String(log.SOURCE_DATA.message || '')));"
+$mBnCls   = "const badgeClass = benign ? 'action-default' : actionBadgeClass(log.ACTION);"
+$mBnCls0  = "const badgeClass = benign ? 'action-danger' : actionBadgeClass(log.ACTION);"
+$mBnTip   = "(benign ? 'A harmless browser notice, not counted as an error. ' : '') +"
+$mBnTip0  = "'' +"
+$mBnTd    = 'title="${escapeHtml(actionTitle)}"><span class="audit-action-badge ${badgeClass}">'
+$mBnTd0   = 'title="Click to filter the log to ${escapeHtml(log.ACTION)} events"><span class="audit-action-badge ${badgeClass}">'
+$mBnCol   = '                        {$benignCol}' + $L
+$mBnSql   = '$benignCol = "CASE WHEN " . penumbraBenignClientErrorSql() . " THEN 1 ELSE 0 END AS BENIGN,";'
+$mBnSql0  = "`$benignCol = `"CASE WHEN ACTION = 'CLIENT_ERROR' THEN 1 ELSE 0 END AS BENIGN,`";"
+$mBnCast  = "        `$row['BENIGN'] = (isset(`$row['BENIGN']) && (int)`$row['BENIGN'] === 1) ? 1 : 0;" + $L
+$mMix     = 'WHERE REPORT_ID = :report_id AND NOT " . penumbraBenignClientErrorSql() . "'
+$mMix0    = 'WHERE REPORT_ID = :report_id'
 $mutantDefs = [ordered]@{
   'nohealth'     = @{ t = 'css'; edits = @(,@($mShared, $mAlone)); red = @('A1', 'A2', 'A3') }
   'floor270'     = @{ t = 'css'; edits = @(,@($mFloor, $mFloor270)); red = @('A1', 'A2') }
@@ -168,7 +227,21 @@ $mutantDefs = [ordered]@{
   'viewsplain'   = @{ t = 'js';  edits = @(,@($mViews, $mViews0)); red = @('P3', 'P4') }
   'updatesevents' = @{ t = 'js'; edits = @(,@($mUpd, $mUpd0)); red = @('P3', 'P4') }
   'benignphp'    = @{ t = 'log'; edits = @(,@($mBenignPhp, $mBenignPhp0)); red = @('L1') }
+  'noticeoff'    = @{ t = 'idx'; edits = @(,@($mNotice, '')); red = @('C4', 'C6', 'C7') }
+  'noticeerrobj' = @{ t = 'idx'; edits = @(,@($mNoticeErr, $mNoticeErr0)); red = @('C5', 'C7') }
+  'noticeany'    = @{ t = 'idx'; edits = @(,@($mNoticeMsg, $mNoticeMsg0)); red = @('C5', 'C7') }
+  'gaterej'      = @{ t = 'log'; edits = @(,@($mGate, $mGate0)); red = @('L1') }
   'alarmclient'  = @{ t = 'aud'; edits = @(,@($mAlarm, $mAlarm0)); red = @('G1') }
+  'bnoff'        = @{ t = 'js';  edits = @(,@($mBnFlag, $mBnFlag0)); red = @('N1', 'N2', 'N3') }
+  'bnall'        = @{ t = 'js';  edits = @(,@($mBnFlag, $mBnAll0)); red = @('N1', 'N2', 'N3') }
+  'bnmsg'        = @{ t = 'js';  edits = @(,@($mBnFlag, $mBnMsg0)); red = @('N3') }
+  'bnred'        = @{ t = 'js';  edits = @(,@($mBnCls, $mBnCls0)); red = @('N1', 'N2', 'N3') }
+  'bnnotip'      = @{ t = 'js';  edits = @(,@($mBnTip, $mBnTip0)); red = @('N1') }
+  'bntdtitle'    = @{ t = 'js';  edits = @(,@($mBnTd, $mBnTd0)); red = @('N1') }
+  'bnnocol'      = @{ t = 'aud'; edits = @(,@($mBnCol, '')); red = @('G2') }
+  'bnsqlown'     = @{ t = 'aud'; edits = @(,@($mBnSql, $mBnSql0)); red = @('G2') }
+  'bnnocast'     = @{ t = 'aud'; edits = @(,@($mBnCast, '')); red = @('G2') }
+  'mixall'       = @{ t = 'aud'; edits = @(,@($mMix, $mMix0)); red = @('G3') }
 }
 function Apply-Mutant([string]$text, [string]$name) {
   foreach ($e in $mutantDefs[$name].edits) {
@@ -183,13 +256,13 @@ function Invoke-Cases($s) {
   $run = Join-Path $env:TEMP ('pnb_at_' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
   New-Item -ItemType Directory -Force "$run\css", "$run\js" | Out-Null
   foreach ($f in @('jquery-ui.css', 'penumbra_tiles.css', 'density.css', 'search_builder.css', 'penumbra_presets.css', 'penumbra_colwidths.css')) { Copy-Item "$app\css\$f" "$run\css\$f" -Force }
-  foreach ($f in @('jquery-3.7.1.min.js', 'moment.min.js')) { Copy-Item "$app\js\$f" "$run\js\$f" -Force }
+  foreach ($f in @('jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js')) { Copy-Item "$app\js\$f" "$run\js\$f" -Force }
   [IO.File]::WriteAllText("$run\main.css", $s.css, $utf8)
   [IO.File]::WriteAllText("$run\main.js", $s.js, $utf8)
   [IO.File]::WriteAllText("$run\index.php", $s.idx, $utf8)
   [IO.File]::WriteAllText("$run\log_client_error.php", $s.log, $utf8)
   [IO.File]::WriteAllText("$run\db_connection.php", $s.db, $utf8)
-  foreach ($f in @('ah.html', 'inst.html', 'cdp.py', 'gen.php', 'benign_test.php')) { Copy-Item "$here\$f" "$run\$f" -Force }
+  foreach ($f in @('ah.html', 'inst.html', 'ev.html', 'cdp.py', 'gen.php', 'benign_test.php')) { Copy-Item "$here\$f" "$run\$f" -Force }
   $gen = & $php -n "$run\gen.php" $run $app 2>&1
   if (-not (Test-Path "$run\themes.js")) { throw "gen.php wrote no themes.js: $gen" }
   $tj = [IO.File]::ReadAllText("$run\themes.js")
@@ -209,14 +282,23 @@ function Invoke-Cases($s) {
   foreach ($th in $themes) { foreach ($sg in @('health', 'events', 'pulse')) { [void]$cases.Add(@{ name = "k|$th|$sg"; query = "$p&seg=$sg&admin=1&w=1708&theme=$th" }) } }
   $base = 'file:///' + ($run -replace '\\', '/')
   [IO.File]::WriteAllText("$run\jobs.json", (@{ base = "$base/ah.html"; viewport = @(2400, 1000); cases = $cases } | ConvertTo-Json -Depth 5), $utf8)
-  [IO.File]::WriteAllText("$run\jobs_inst.json", (@{ base = "$base/inst.html"; viewport = @(1200, 800); cases = @(@{ name = 'inst'; query = 'idx=index.php' }) } | ConvertTo-Json -Depth 5), $utf8)
+  [IO.File]::WriteAllText("$run\jobs_inst.json", (@{ base = "$base/inst.html"; viewport = @(1200, 800); cases = @(@{ name = 'inst'; query = 'idx=index.php' }, @{ name = 'instro'; query = 'idx=index.php&part=ro' }) } | ConvertTo-Json -Depth 5), $utf8)
   $pyOut = & py -3 "$run\cdp.py" "$run\jobs.json" "$run\results.json" 2>&1
   if (-not (Test-Path "$run\results.json")) { throw "cdp.py wrote no results: $pyOut" }
   $pyOut2 = & py -3 "$run\cdp.py" "$run\jobs_inst.json" "$run\results_inst.json" 2>&1
   if (-not (Test-Path "$run\results_inst.json")) { throw "cdp.py (installer) wrote no results: $pyOut2" }
+  # The Events list (2026-10-21): the REAL loadAuditLog, rows with the server's BENIGN flag.
+  $pe = 'idx=index.php&js=main.js&css=main.css&id=hitratio&w=1708'
+  $evCases = New-Object System.Collections.ArrayList
+  foreach ($cs0 in @(@('ev', ''), @('evold', '&srv=old'), @('evviewer', '&viewer=1'))) { [void]$evCases.Add(@{ name = $cs0[0]; query = "$pe$($cs0[1])&theme=theme-hello-kitty" }) }
+  foreach ($th in $themes) { [void]$evCases.Add(@{ name = "ev|$th"; query = "$pe&theme=$th" }) }
+  [IO.File]::WriteAllText("$run\jobs_ev.json", (@{ base = "$base/ev.html"; viewport = @(2400, 1000); cases = $evCases } | ConvertTo-Json -Depth 5), $utf8)
+  $pyOut3 = & py -3 "$run\cdp.py" "$run\jobs_ev.json" "$run\results_ev.json" 2>&1
+  if (-not (Test-Path "$run\results_ev.json")) { throw "cdp.py (Events) wrote no results: $pyOut3" }
   $res = @{}
   foreach ($rec in ([IO.File]::ReadAllText("$run\results.json", $utf8) | ConvertFrom-Json)) { $res[$rec.name] = $rec.result }
-  foreach ($rec in ([IO.File]::ReadAllText("$run\results_inst.json", $utf8) | ConvertFrom-Json)) { $res['__inst'] = $rec.result }
+  foreach ($rec in ([IO.File]::ReadAllText("$run\results_inst.json", $utf8) | ConvertFrom-Json)) { if ($rec.name -eq 'instro') { $res['__instro'] = $rec.result } else { $res['__inst'] = $rec.result } }
+  foreach ($rec in ([IO.File]::ReadAllText("$run\results_ev.json", $utf8) | ConvertFrom-Json)) { $res[$rec.name] = $rec.result }
   $res['__benign'] = (& $php -n "$run\benign_test.php" "$run\log_client_error.php" "$run\db_connection.php" 2>&1 | Out-String)
   $res['__themes'] = $themes
   if (-not $Keep) { try { [IO.Directory]::Delete($run, $true) } catch { } } else { Write-Host "kept: $run" }
@@ -291,8 +373,15 @@ function Get-Asserts($m, $s) {
     if ($null -eq $x) { $z = @($ia | Where-Object { $_.id -like 'Z*' })[0]; $out += [pscustomobject]@{ id = $id; name = "installer check $id ran"; pass = $false; detail = $(if ($z) { $z.detail } else { 'missing' }) } }
     else { $out += [pscustomobject]@{ id = $id; name = $x.name; pass = [bool]$x.pass; detail = $x.detail } }
   }
+  # The ResizeObserver notice (2026-10-21): inst.html?part=ro, its own page load.
+  $ir = @(); if ($m['__instro'] -and $m['__instro'].asserts) { $ir = @($m['__instro'].asserts) }
+  foreach ($id in @('C4', 'C5', 'C6', 'C7')) {
+    $x = @($ir | Where-Object { $_.id -eq $id })[0]
+    if ($null -eq $x) { $z = @($ir | Where-Object { $_.id -like 'Z*' })[0]; $out += [pscustomobject]@{ id = $id; name = "installer check $id ran"; pass = $false; detail = $(if ($z) { $z.detail } elseif ($m['__instro'] -and $m['__instro'].error) { $m['__instro'].error } else { 'missing' }) } }
+    else { $out += [pscustomobject]@{ id = $id; name = $x.name; pass = [bool]$x.pass; detail = $x.detail } }
+  }
   $bt = [string]$m['__benign']
-  $out += [pscustomobject]@{ id = 'L1'; name = 'log_client_error.php drops the browser''s own view-transition aborts, keeps everything else (9 cases)'; pass = ($bt -match 'RESULT: GREEN') -and (([regex]::Matches($bt, '(?m)^PASS')).Count -eq 9); detail = (($bt -split "`n" | Where-Object { $_ -cmatch '^(FAIL|RESULT|LIFT)' }) -join ' ').Trim() }
+  $out += [pscustomobject]@{ id = 'L1'; name = 'log_client_error.php drops the browser''s own notices (view-transition aborts, the ResizeObserver notice), keeps everything else (14 cases)'; pass = ($bt -match 'RESULT: GREEN') -and (([regex]::Matches($bt, '(?m)^PASS')).Count -eq 14); detail = (($bt -split "`n" | Where-Object { $_ -cmatch '^(FAIL|RESULT|LIFT)' }) -join ' ').Trim() }
   $a = $s.aud
   $g = @()
   if ($a -notmatch "COUNT\(CASE WHEN ACTION IN \('QUERY_TIMEOUT','QUERY_TOOBIG'\) AND TIMESTAMP >= SYSDATE - 3 THEN 1 END\) AS ATT_QUERY") { $g += 'no ATT_QUERY' }
@@ -303,6 +392,49 @@ function Get-Asserts($m, $s) {
   foreach ($col in @('ERR_QTO', 'ERR_QBIG', 'ERR_QLAST', 'ERR_BROWSER', 'ERR_BLAST')) { if ($a -notmatch "AS $col,") { $g += "no $col" } }
   if ($a -notmatch "\`$kpis\['errkinds'\] = array\(") { $g += 'errkinds missing' }
   $out += [pscustomobject]@{ id = 'G1'; name = 'get_audit_log.php: ATT_QUERY in 72 h, ATT_LAST over the alarm set (no CLIENT_ERROR), ERR_LAST -> err_last, per-kind counts -> errkinds'; pass = ($g.Count -eq 0); detail = $(if ($g.Count) { $g -join '; ' } else { 'all present' }) }
+  # --- the neutral badge for the browser's harmless notices (2026-10-21, ev.html) ---
+  function EvRow($r, $k) { if ($r -and $r.rows) { return @($r.rows | Where-Object { $_.k -eq $k })[0] } return $null }
+  function EvErr($r) { if ($null -eq $r) { return 'no result' } if ($r.error) { return [string]$r.error } if ($r.errs -and @($r.errs).Count) { return 'script errors: ' + (@($r.errs) -join ' / ') } return '' }
+  $tipB = 'A harmless browser notice, not counted as an error. Click to filter the log to CLIENT_ERROR events'
+  $tipR = 'Click to filter the log to CLIENT_ERROR events'
+  $neutral = 'audit-action-badge action-default'; $red = 'audit-action-badge action-danger'
+  $ev = $m['ev']; $e1 = EvErr $ev
+  $ro = EvRow $ev 'ro'; $vt = EvRow $ev 'vt'; $re = EvRow $ev 'real'; $dn = EvRow $ev 'denied'
+  $n1 = ($e1 -eq '') -and ($ev.n -eq 7) -and ($null -ne $ro) -and ($null -ne $vt) -and ($null -ne $re) -and ($null -ne $dn) -and
+        ($ro.cls -eq $neutral) -and ($ro.title -eq $tipB) -and ($vt.cls -eq $neutral) -and ($vt.title -eq $tipB) -and
+        ($re.cls -eq $red) -and ($re.title -eq $tipR) -and ($dn.cls -eq $red) -and
+        (@(@($ro, $vt, $re) | Where-Object { $_.label -eq 'CLIENT ERROR' -and $_.q -eq 'CLIENT_ERROR' -and $_.action -eq 'CLIENT_ERROR' }).Count -eq 3)
+  $out += [pscustomobject]@{ id = 'N1'; name = 'Events (the REAL loadAuditLog): the ResizeObserver notice and an old "Transition was skipped" (BENIGN) wear the neutral badge, the tooltip says why; a real browser error and a denial stay red; label + click-to-filter unchanged'; pass = $n1; detail = $(if ($e1) { $e1 } else { "rows=$($ev.n) ro=$($ro.cls -replace 'audit-action-badge ', '') [$($ro.title)] vt=$($vt.cls -replace 'audit-action-badge ', '') real=$($re.cls -replace 'audit-action-badge ', '') [$($re.title)] denied=$($dn.cls -replace 'audit-action-badge ', '')" }) }
+  $n2bad = @(); $n2cnt = 0; $n2min = 99.0
+  foreach ($th in $m['__themes']) {
+    $r = $m["ev|$th"]; $er = EvErr $r
+    if ($er) { $n2bad += "$th=$er"; continue }
+    $a1 = EvRow $r 'ro'; $rn = EvRow $r 'rename'; $rr = EvRow $r 'real'
+    if ($null -eq $a1 -or $null -eq $rn -or $null -eq $rr) { $n2bad += "$th=rows missing"; continue }
+    $n2cnt++
+    if ($a1.cls -ne $neutral -or $a1.color -ne $rn.color -or $a1.bg -ne $rn.bg -or $a1.border -ne $rn.border) { $n2bad += "$th=not the plain neutral badge ($($a1.cls) $($a1.bg) vs $($rn.bg))" }
+    if ($a1.color -eq $rr.color -and $a1.bg -eq $rr.bg) { $n2bad += "$th=same as the red badge" }
+    if ([double]$a1.ratio -lt $n2min) { $n2min = [double]$a1.ratio }
+    if ([double]$a1.ratio -lt 4.5) { $n2bad += "$th=text $($a1.ratio):1" }
+  }
+  $nTh = @($m['__themes']).Count
+  $out += [pscustomobject]@{ id = 'N2'; name = "the harmless notice's badge IS the plain neutral one (RENAME's), not the red one, text >= 4.5:1 on its fill, on all $nTh themes"; pass = ($n2bad.Count -eq 0) -and ($n2cnt -gt 0) -and ($n2cnt -eq $nTh); detail = "themes=$n2cnt/$nTh min=$($n2min):1 $(if ($n2bad.Count) { 'fails: ' + ($n2bad -join ' | ') })" }
+  $eo = $m['evold']; $ew = $m['evviewer']; $e3 = (@((EvErr $eo), (EvErr $ew)) | Where-Object { $_ }) -join ' | '
+  $o3 = @('ro', 'vt', 'real' | ForEach-Object { EvRow $eo $_ }); $w3 = @('ro', 'vt', 'real' | ForEach-Object { EvRow $ew $_ })
+  $n3 = ($e3 -eq '') -and (@($o3 | Where-Object { $_ -and $_.cls -eq $red -and $_.title -eq $tipR }).Count -eq 3) -and
+        ($o3.Count -eq 3) -and ($w3.Count -eq 3) -and ($w3[0].cls -eq $neutral) -and ($w3[1].cls -eq $neutral) -and ($w3[2].cls -eq $red) -and
+        ($w3[0].msg -notlike '*ResizeObserver*') -and ($w3[0].title -eq $tipB)
+  $out += [pscustomobject]@{ id = 'N3'; name = 'an older get_audit_log.php (no BENIGN) leaves every CLIENT_ERROR red; a plain viewer''s scrubbed rows (no message) still go neutral by the server''s flag'; pass = $n3; detail = $(if ($e3) { $e3 } else { "old: $((@($o3) | ForEach-Object { $_.k + '=' + ($_.cls -replace 'audit-action-badge ', '') }) -join ' ') | viewer: $((@($w3) | ForEach-Object { $_.k + '=' + ($_.cls -replace 'audit-action-badge ', '') }) -join ' ') msg=[$($w3[0].msg)]" }) }
+  $g2 = @()
+  if (-not $a.Contains('$benignCol = "CASE WHEN " . penumbraBenignClientErrorSql() . " THEN 1 ELSE 0 END AS BENIGN,";')) { $g2 += 'BENIGN not through penumbraBenignClientErrorSql()' }
+  $sel = [regex]::Match($a, '(?s)\$log_sql = "SELECT(.*?)FROM PENUMBRA_AUDIT')
+  if (-not $sel.Success -or -not $sel.Groups[1].Value.Contains('{$benignCol}')) { $g2 += 'the list query does not select it' }
+  if (-not $a.Contains("`$row['BENIGN'] = (isset(`$row['BENIGN']) && (int)`$row['BENIGN'] === 1) ? 1 : 0;")) { $g2 += 'not a number 0 / 1' }
+  if ($a -match "unset\([^)]*\['BENIGN'\]") { $g2 += 'unset somewhere' }
+  $out += [pscustomobject]@{ id = 'G2'; name = 'get_audit_log.php: the Events list query selects BENIGN through the SAME SQL twin (penumbraBenignClientErrorSql()), a number 0 / 1, never unset'; pass = ($g2.Count -eq 0); detail = $(if ($g2.Count) { $g2 -join '; ' } else { 'all present' }) }
+  $mixQ = [regex]::Match($a, '(?s)\$mix_stmt = \$oracleConn->prepare\((.*?)\);')
+  $g3 = $mixQ.Success -and $mixQ.Groups[1].Value.Contains('GROUP BY ACTION') -and $mixQ.Groups[1].Value.Contains('WHERE REPORT_ID = :report_id AND NOT " . penumbraBenignClientErrorSql() . "')
+  $out += [pscustomobject]@{ id = 'G3'; name = 'get_audit_log.php: Pulse''s action mix leaves the browser''s harmless notices out, through the SAME SQL twin (penumbraBenignClientErrorSql())'; pass = $g3; detail = $(if ($g3) { 'present' } elseif (-not $mixQ.Success) { 'the action mix query not found' } else { 'the mix counts every CLIENT_ERROR row' }) }
   return ,$out
 }
 

@@ -4,19 +4,28 @@
 <body>
 <pre id="out"></pre>
 <script>
-  window.addEventListener('error', function (e) { if (!window.__voDone) { window.__vo = { asserts: [{ id: 'Z9', name: 'page error', pass: false, detail: (e.message || '') + ' @' + (e.lineno || 0) }] }; window.__voDone = true; } });
+  // A page error fails the run - except the events ?part=ro raises on purpose (window.__voExpectErr).
+  window.addEventListener('error', function (e) { if (window.__voExpectErr && window.__voExpectErr.test(String(e.message || ''))) return; if (!window.__voDone) { window.__vo = { asserts: [{ id: 'Z9', name: 'page error', pass: false, detail: (e.message || '') + ' @' + (e.lineno || 0) }] }; window.__voDone = true; } });
 </script>
 <script>
 /*
  * The client-error INSTALLER, lifted verbatim from the index.php under test (the
  * inline <script> right after its CLIENT ERROR TELEMETRY comment), run with
- * navigator.sendBeacon stubbed, then fed real PromiseRejectionEvents:
- *   the browser's own view-transition aborts must NOT be sent; everything else
- *   (a plain Error, an unrelated AbortError, a string) must be.
+ * navigator.sendBeacon stubbed, then:
+ *   (default)  fed real PromiseRejectionEvents: the browser's own view-transition
+ *              aborts must NOT be sent; everything else (a plain Error, an
+ *              unrelated AbortError, a string) must be.
+ *   ?part=ro   (2026-10-21) the browser's own ResizeObserver notice must NOT be
+ *              sent - as dispatched ErrorEvents (both wordings, no Error object)
+ *              AND a REAL one, raised by this browser from an observer that
+ *              resizes what it watches - while the same words thrown by a script
+ *              (an Error object) and an error event without one that says
+ *              anything else still are. A fresh page load, so the installer's
+ *              5-per-page budget is the part's own.
  * ?idx=<path> (default index.php). Result: window.__vo = { asserts: [...] }.
  */
 (function () {
-  var q = new URLSearchParams(location.search), A = [];
+  var q = new URLSearchParams(location.search), A = [], part = q.get('part') || '';
   function T(id, name, pass, detail) { A.push({ id: id, name: name, pass: !!pass, detail: String(detail === undefined ? '' : detail) }); }
   function done() { window.__vo = { asserts: A }; document.getElementById('out').textContent = JSON.stringify(A, null, 1); window.__voDone = true; }
   var sent = [];
@@ -37,6 +46,8 @@
     new Function(code)();
   } catch (err) { T('Z0', 'the installer lifted and ran', false, err.message); done(); return; }
 
+  if (part === 'ro') { runRo(); return; }
+
   function fire(reason) {
     var p = Promise.reject(reason); p.catch(function () {});
     var before = sent.length;
@@ -54,6 +65,48 @@
   T('C2', 'every other rejection IS sent (Error, an unrelated AbortError, a string, a TypeError that mentions "transition")', n4 === 1 && n5 === 1 && n6 === 1 && n7 === 1, [n4, n5, n6, n7].join('/'));
   T('C3', 'sends went to log_client_error.php', sent.length === 4 && sent.every(function (z) { return /log_client_error\.php$/.test(z.url); }), sent.map(function (z) { return z.url; }).join(','));
   done();
+
+  function runRo() {
+    window.__voExpectErr = /^(ResizeObserver loop |Script error\.)/;
+    var href = location.href;
+    function fireErr(init) {
+      var before = sent.length;
+      window.dispatchEvent(new ErrorEvent('error', init));
+      return sent.length - before;
+    }
+    // The notice as the browser raises it: no Error object, the page itself at 0:0. (A
+    // '#synthetic' file, so a broken filter cannot dedupe the REAL one below away.)
+    var r1 = fireErr({ message: 'ResizeObserver loop completed with undelivered notifications.', filename: href + '#synthetic', lineno: 0, colno: 0 });
+    var r2 = fireErr({ message: 'ResizeObserver loop limit exceeded', filename: href + '#synthetic', lineno: 0, colno: 0 });
+    T('C4', 'the browser\'s own ResizeObserver notice is NOT sent (both wordings, no Error object)', r1 === 0 && r2 === 0, [r1, r2].join('/'));
+    var r3 = fireErr({ message: 'ResizeObserver loop completed with undelivered notifications.', filename: href + '#thrown', lineno: 7, colno: 3,
+                       error: new Error('ResizeObserver loop completed with undelivered notifications.') });
+    var r4 = fireErr({ message: 'Script error.', filename: '', lineno: 0, colno: 0 });
+    // (A real throw also reads "Uncaught Error: ...", which the server rule never matches; this
+    // pins the reporter's own half: an Error object is never skipped.)
+    T('C5', 'still sent: the same words with an Error object (a script\'s throw), and an error event without one that says anything else', r3 === 1 && r4 === 1, [r3, r4].join('/'));
+    // A REAL notice from this browser: an observer that resizes the box it observes
+    // makes the browser defer that box's next notification and raise the event.
+    var fired = 0, errObj = 'none seen', before = sent.length, t0 = Date.now();
+    window.addEventListener('error', function (ev) { if (/^ResizeObserver loop /.test(String(ev.message || ''))) { fired++; errObj = String(ev.error); } });
+    var box = document.createElement('div');
+    box.style.cssText = 'width:120px;height:10px;background:#ccc';
+    document.body.appendChild(box);
+    var grows = 0;
+    var ro = new ResizeObserver(function () { if (grows < 6) { grows++; box.style.height = (10 + grows * 10) + 'px'; } });
+    ro.observe(box);
+    (function wait() {
+      if ((fired > 0 && Date.now() - t0 > 400) || Date.now() - t0 > 5000) {
+        ro.disconnect();
+        var r5 = sent.length - before;
+        T('C6', 'a REAL ResizeObserver notice raised by this browser (an observer resizing what it watches) is NOT sent', fired > 0 && r5 === 0, 'fired=' + fired + ' sent=' + r5 + ' error=' + errObj);
+        T('C7', 'the two that must report went to log_client_error.php, nothing else was sent', sent.length === 2 && sent.every(function (z) { return /log_client_error\.php$/.test(z.url); }), sent.length + ': ' + sent.map(function (z) { return z.url; }).join(','));
+        done();
+        return;
+      }
+      setTimeout(wait, 50);
+    })();
+  }
 })();
 </script>
 </body>

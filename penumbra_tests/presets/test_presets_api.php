@@ -26,10 +26,14 @@
  * right clause. A harness that has never been seen to fail has not been seen
  * to work.
  *
- * EXPECTED TAIL: "PASS 151   FAIL 0". A smaller pass count is a failure too.
+ * EXPECTED TAIL: "PASS 222   FAIL 0" (151 before Preset Sharing, 2026-10-22, which added the
+ * reader scenarios and a second mutant: a reader overwriting someone else's preset). A smaller
+ * pass count is a failure too.
  */
 $CONTROL = in_array('--control', $argv, true);
 $MUTANT  = in_array('--mutant',  $argv, true);
+// --mutant2 (Preset Sharing, 2026-10-22): a reader's save forgets that a name someone else shared is theirs.
+$MUTANT2 = in_array('--mutant2', $argv, true);
 $APP = null;
 foreach ($argv as $a) { if (strpos($a, '--app=') === 0) $APP = substr($a, 6); }
 if ($APP === null) $APP = '\\\\oitras.oit.ncsu.edu\\c$\\inetpub\\wwwroot\\sponsor_migration\\penumbra';
@@ -104,10 +108,10 @@ ok(strpos($SRC_SNAP, "if (!function_exists('userCanAccessReport'))") !== false,
 // ---------------------------------------------------------------------------
 class PnbHarnessExit extends Error {}
 
-function pnb_build_core($src, $destFile, $mutant) {
+function pnb_build_core($src, $destFile, $mutant, $mutant2 = false) {
     $lines = preg_split('/(?<=\n)/', $src);
     $out = array();
-    $hit = array('require' => 0, 'csrf' => 0, 'header' => 0, 'input' => 0, 'exit' => 0, 'httpcode' => 0, 'mutant' => 0);
+    $hit = array('require' => 0, 'csrf' => 0, 'header' => 0, 'input' => 0, 'exit' => 0, 'httpcode' => 0, 'mutant' => 0, 'mutant2' => 0);
     foreach ($lines as $ln) {
         $t = trim($ln);
         if (strpos($t, "require_once 'db_connection.php';") === 0 || strpos($t, "require_once 'report_auth.php';") === 0) {
@@ -136,14 +140,19 @@ function pnb_build_core($src, $destFile, $mutant) {
             $hit['mutant']++;
             $ln = str_replace('if (penumbraIsReportOwner($ownerId, $userKey)) return true;', 'if (false) return true;', $ln);
         }
+        if ($mutant2 && strpos($ln, 'if ($existing !== null && !penumbraPresetsSameUser($existing[\'CREATED_BY\'], $currentUserKey)) {') !== false) {
+            // THE SECOND MUTANT: a reader may overwrite a preset someone else shared.
+            $hit['mutant2']++;
+            $ln = str_replace('if ($existing !== null && !penumbraPresetsSameUser($existing[\'CREATED_BY\'], $currentUserKey)) {', 'if (false) {', $ln);
+        }
         $out[] = $ln;
     }
     file_put_contents($destFile, implode('', $out));
     return $hit;
 }
 
-$CORE = sys_get_temp_dir() . '/pnb_presets_core_' . getmypid() . ($MUTANT ? '_mut' : '') . '.php';
-$hit  = pnb_build_core($SRC_EP, $CORE, $MUTANT);
+$CORE = sys_get_temp_dir() . '/pnb_presets_core_' . getmypid() . ($MUTANT ? '_mut' : '') . ($MUTANT2 ? '_mut2' : '') . '.php';
+$hit  = pnb_build_core($SRC_EP, $CORE, $MUTANT, $MUTANT2);
 
 echo "Patched manage_presets.php\n";
 eq($hit['require'], 2, 'harness: both require lines stripped');
@@ -153,6 +162,7 @@ eq($hit['input'],   1, 'harness: php://input read redirected exactly once');
 eq($hit['exit'],    2, 'harness: both bare exit; became throws (unauthenticated branch + tail)');
 eq($hit['httpcode'], 2, 'harness: both http_response_code() calls recorded (the respond helper + the tail catch)');
 if ($MUTANT) eq($hit['mutant'], 1, 'harness: mutant applied to the write gate exactly once');
+if ($MUTANT2) eq($hit['mutant2'], 1, 'harness: mutant2 applied to the reader overwrite check exactly once');
 
 $cwdWas = getcwd(); @chdir(sys_get_temp_dir());
 $lintOut = array(); $lintRc = 0;
@@ -173,6 +183,9 @@ class FakeDb {
     public static $ddl = array();
     public static $nextId = 9001;
     public static $httpCode = 200;
+    const SHARING_OFF = '{}';
+    const SHARING_ON  = '{"viewOptions":{"presetSharing":true}}';
+    public static function setState($rid, $raw) { foreach (self::$reports as $i => $r) if ((int)$r['ID'] === (int)$rid) self::$reports[$i]['STATE_DATA'] = $raw; }
 
     public static function reset() {
         // SHORT_ID is CHAR: fixture rows carry the padding the column does.
@@ -181,6 +194,10 @@ class FakeDb {
             array('ID' => 202, 'SHORT_ID' => 'private1       ', 'OWNER_ID' => 'owner2', 'AUTHORIZED' => 'owner2,viewer9'),
             array('ID' => 303, 'SHORT_ID' => 'noown          ', 'OWNER_ID' => '',       'AUTHORIZED' => 'public'),
         );
+        // STATE_DATA (Preset Sharing, 2026-10-22): every fixture starts with the card
+        // OFF, so the author-only scenarios written before it keep their meaning; the
+        // "preset sharing" section switches it on per report.
+        foreach (self::$reports as $i => $r) self::$reports[$i]['STATE_DATA'] = self::SHARING_OFF;
         self::$presets = array();
         self::$tableExists = true; self::$ddlFail = null;
         self::$effects = array(); self::$audits = array(); self::$ddl = array();
@@ -229,6 +246,13 @@ class FakeStmt {
         return true;
     }
     public function fetch($m = null) {
+        if (strpos($this->sql, 'SELECT ID, CREATED_BY FROM PENUMBRA_PRESETS') !== false) {
+            foreach (FakeDb::$presets as $p) {
+                if ((int)$p['REPORT_ID'] === (int)$this->binds[':rid'] && $p['NS'] === $this->binds[':ns'] && $p['NAME'] === $this->binds[':name'])
+                    return array('ID' => $p['ID'], 'CREATED_BY' => isset($p['CREATED_BY']) ? $p['CREATED_BY'] : null);
+            }
+            return false;
+        }
         if (strpos($this->sql, 'FROM PENUMBRA_REPORTS WHERE TRIM(SHORT_ID) = :sid') !== false) {
             $r = FakeDb::reportBySid($this->binds[':sid']);
             if (!$r) return false;
@@ -242,6 +266,14 @@ class FakeStmt {
         return false;
     }
     public function fetchColumn() {
+        if (strpos($this->sql, 'SELECT COUNT(*) FROM PENUMBRA_PRESETS WHERE REPORT_ID = :rid AND NS = :ns AND LOWER(TRIM(CREATED_BY)) = :usr') !== false) {
+            $n = 0;
+            foreach (FakeDb::$presets as $p) {
+                if ((int)$p['REPORT_ID'] === (int)$this->binds[':rid'] && $p['NS'] === $this->binds[':ns']
+                    && strtolower(trim((string)$p['CREATED_BY'])) === $this->binds[':usr']) $n++;
+            }
+            return $n;
+        }
         if (strpos($this->sql, 'SELECT COUNT(*) FROM PENUMBRA_PRESETS') !== false) {
             return count(FakeDb::presetNames($this->binds[':rid'], $this->binds[':ns']));
         }
@@ -274,6 +306,11 @@ class FakeConn {
 function getConnectionForTable($t) { return new FakeConn(); }
 function getOci8Connection() { throw new Exception('harness: oci8 must never be reached - penumbraPresetsFetchRows is faked'); }
 function readClobViaOci8($tbl, $col, $whereCol, $whereVal) {
+    if ($tbl === 'PENUMBRA_REPORTS') {   // the Preset Sharing flag read (STATE_DATA by ID)
+        $r = FakeDb::reportById($whereVal);
+        if ($r && $r['STATE_DATA'] === 'THROW') throw new Exception('ORA-03113: end-of-file on communication channel');
+        return $r ? $r['STATE_DATA'] : null;
+    }
     foreach (FakeDb::$presets as $p) if ((int)$p['ID'] === (int)$whereVal) return $p['DATA'];
     return null;
 }
@@ -583,6 +620,165 @@ list($c, $r) = run('delete', 'owner1', false, array(), array(), array_merge($del
 eq($c, 400, 'delete: unknown namespace -> 400');
 
 // ===========================================================================
+// PRESET SHARING (2026-10-22): View Options > End-User UI Options > Preset
+// Sharing, OPT-IN like the journal, saved as viewOptions.presetSharing only when
+// ON. While it is on, anyone who can open the report may share; a reader's rights
+// are creator-only (the snapshot rule). Read from the SAVED state.
+echo "preset sharing - the flag\n";
+FakeDb::reset();
+list($c, $r) = run('list', 'reader1', false, array(), array('report_id' => 'awdspon'));
+eq(dig($r, 'sharing'), false, 'sharing: a state without the flag -> off (the default: opt-in)');
+eq(dig($r, 'can_write'), false, 'sharing: ...and a reader cannot add');
+eq(dig($r, 'can_manage'), false, 'sharing: ...nor manage');
+eq(dig($r, 'me'), 'reader1', 'sharing: list names the caller (me) so the client can tell their own rows');
+FakeDb::setState(101, '{"viewOptions":{"hideEmail":true,"presetSharing":true}}');
+list($c, $r) = run('list', 'reader1', false, array(), array('report_id' => 'awdspon'));
+eq(dig($r, 'sharing'), true, 'sharing: presetSharing:true in the saved state -> on');
+eq(dig($r, 'can_write'), true, 'sharing: ...a reader may add');
+eq(dig($r, 'can_manage'), false, 'sharing: ...but manages only their own (can_manage stays author-only)');
+FakeDb::setState(101, '{"viewOptions":{"presetSharing":false}}');
+list($c, $r) = run('list', 'reader1', false, array(), array('report_id' => 'awdspon'));
+eq(dig($r, 'sharing'), false, 'sharing: presetSharing:false -> off');
+FakeDb::setState(101, '{"name":"x","presetSharing":true}');
+list($c, $r) = run('list', 'reader1', false, array(), array('report_id' => 'awdspon'));
+eq(dig($r, 'sharing'), false, 'sharing: the flag only counts INSIDE viewOptions');
+FakeDb::setState(101, '');
+list($c, $r) = run('list', 'reader1', false, array(), array('report_id' => 'awdspon'));
+eq(dig($r, 'sharing'), false, 'sharing: an empty state -> off');
+FakeDb::setState(101, '{"encrypted":true,"content":"abc"}');
+list($c, $r) = run('list', 'reader1', false, array(), array('report_id' => 'awdspon'));
+eq(dig($r, 'sharing'), false, 'sharing: an ENCRYPTED state is opaque -> authors only');
+FakeDb::setState(101, '{not json');
+list($c, $r) = run('list', 'reader1', false, array(), array('report_id' => 'awdspon'));
+eq(dig($r, 'sharing'), false, 'sharing: a state that will not decode fails CLOSED');
+FakeDb::setState(101, 'THROW');
+list($c, $r) = run('list', 'reader1', false, array(), array('report_id' => 'awdspon'));
+eq($c, 200, 'sharing: a failed state read does not fail the list');
+eq(dig($r, 'sharing'), false, 'sharing: ...and fails CLOSED');
+FakeDb::setState(101, FakeDb::SHARING_ON);
+list($c, $r) = run('list', 'owner1', false, array(), array('report_id' => 'awdspon'));
+eq(dig($r, 'can_manage'), true, 'sharing: the owner manages every shared preset');
+FakeDb::setState(101, FakeDb::SHARING_OFF);
+list($c, $r) = run('list', 'owner1', false, array(), array('report_id' => 'awdspon'));
+eq(dig($r, 'can_write'), true, 'sharing: with the card OFF an author still writes');
+eq(dig($r, 'sharing'), false, 'sharing: ...and sharing is reported false (what an &noadm preview shows)');
+FakeDb::reset(); FakeDb::$tableExists = false; FakeDb::setState(101, FakeDb::SHARING_ON);
+list($c, $r) = run('list', 'reader1', false, array(), array('report_id' => 'awdspon'));
+eq(dig($r, 'needs_install'), true, 'sharing: table missing -> needs_install...');
+eq(dig($r, 'sharing'), true, 'sharing: ...still carries the gate fields');
+
+echo "preset sharing - reader saves\n";
+FakeDb::reset(); FakeDb::setState(101, FakeDb::SHARING_ON);
+list($c, $r) = run('save', 'reader1', false, array(), array(), $body);
+eq($c, 200, 'reader save: a READER shares while the card is on');
+eq(dig($r, 'mode'), 'create', 'reader save: ...as a create');
+eq(dig(FakeDb::effectsOf('INSERT'), 0, 'data', 'cols', 'CREATED_BY'), 'reader1', 'reader save: ...recorded as theirs');
+eq(dig(lastAudit(), 'after', 'as'), 'reader', 'reader save: audited as:reader');
+list($c, $r) = run('save', 'Reader1', false, array(), array(), array_merge($body, array('data' => array('v' => 2, 'rows' => array('FY')))));
+eq($c, 200, 'reader save: ...overwrites their OWN preset (key compared case-blind)');
+eq(dig($r, 'mode'), 'update', 'reader save: ...as an update');
+list($c, $r) = run('save', 'reader2', false, array(), array(), $body);
+eq($c, 403, 'reader save: ANOTHER reader cannot overwrite it');
+eq(count(FakeDb::effectsOf('UPDATE')), 1, 'reader save: ...nothing written by the refusal');
+eq(dig(lastAudit(), 'after', 'reason'), 'reader_not_creator', 'reader save: ...refusal audited reader_not_creator');
+FakeDb::seedPreset(101, 'pivot', 'Official', array('v' => 2), 'owner1');
+list($c, $r) = run('save', 'reader1', false, array(), array(), array_merge($body, array('name' => 'Official')));
+eq($c, 403, 'reader save: a reader cannot overwrite an AUTHOR\'s preset either');
+list($c, $r) = run('save', 'owner1', false, array(), array(), $body);
+eq($c, 200, 'reader save: an AUTHOR may still overwrite a reader\'s preset (authors manage every one)');
+eq(dig(lastAudit(), 'after', 'as'), 'author', 'reader save: ...audited as:author');
+list($c, $r) = run('save', 'viewer9', false, array(), array(), array_merge($body, array('report_id' => 'private1')));
+eq($c, 403, 'reader save: on a report whose card is OFF a reader is refused');
+eq(dig(lastAudit(), 'after', 'reason'), 'preset_sharing_off', 'reader save: ...refusal audited preset_sharing_off');
+ok(strpos((string)dig($r, 'message'), 'turned off') !== false, 'reader save: ...and told sharing is turned off');
+FakeDb::setState(202, FakeDb::SHARING_ON);
+list($c, $r) = run('save', 'nobody', false, array(), array(), array_merge($body, array('report_id' => 'private1')));
+eq($c, 403, 'reader save: someone who cannot OPEN the report is refused even with the card on');
+eq(dig(lastAudit(), 'after', 'reason'), 'not_owner_no_report_grant', 'reader save: ...as not an author, not as sharing-off');
+list($c, $r) = run('save', 'viewer9', false, array(), array(), array_merge($body, array('report_id' => 'private1')));
+eq($c, 200, 'reader save: an authorized reader of a PRIVATE report shares once its card is on');
+FakeDb::setState(101, '{"encrypted":true,"content":"abc"}');
+list($c, $r) = run('save', 'reader1', false, array(), array(), array_merge($body, array('name' => 'Enc')));
+eq($c, 403, 'reader save: an ENCRYPTED report keeps the authors-only rule');
+
+echo "preset sharing - reader cap\n";
+FakeDb::reset(); FakeDb::setState(101, FakeDb::SHARING_ON);
+for ($i = 1; $i <= 10; $i++) FakeDb::seedPreset(101, 'pivot', "r$i", array('i' => $i), 'reader1');
+list($c, $r) = run('save', 'reader1', false, array(), array(), array_merge($body, array('name' => 'r11')));
+eq($c, 409, 'reader cap: an 11th preset of one type from one reader is refused');
+list($c, $r) = run('save', 'reader1', false, array(), array(), array_merge($body, array('name' => 'r3')));
+eq($c, 200, 'reader cap: ...overwriting one of their ten is fine');
+list($c, $r) = run('save', 'reader2', false, array(), array(), array_merge($body, array('name' => 'theirs')));
+eq($c, 200, 'reader cap: ...and the cap is PER READER');
+list($c, $r) = run('save', 'reader1', false, array(), array(), array_merge($body, array('ns' => 'viz', 'name' => 'c1', 'data' => array('type' => 'bar'))));
+eq($c, 200, 'reader cap: ...and per namespace');
+list($c, $r) = run('save', 'owner1', false, array(), array(), array_merge($body, array('name' => 'auth')));
+eq($c, 200, 'reader cap: an author is not bound by the reader cap');
+
+echo "preset sharing - reader deletes\n";
+FakeDb::reset(); FakeDb::setState(101, FakeDb::SHARING_ON);
+FakeDb::seedPreset(101, 'pivot', 'R1', array('v' => 2), 'reader1');
+FakeDb::seedPreset(101, 'pivot', 'O1', array('v' => 2), 'owner1');
+list($c, $r) = run('delete', 'reader2', false, array(), array(), array('report_id' => 'awdspon', 'ns' => 'pivot', 'name' => 'R1'));
+eq($c, 403, 'reader delete: another reader cannot delete it');
+eq(count(FakeDb::presetNames(101, 'pivot')), 2, 'reader delete: ...the row survives');
+list($c, $r) = run('delete', 'reader1', false, array(), array(), array('report_id' => 'awdspon', 'ns' => 'pivot', 'name' => 'O1'));
+eq($c, 403, 'reader delete: a reader cannot delete an author\'s preset');
+list($c, $r) = run('delete', 'reader1', false, array(), array(), array('report_id' => 'awdspon', 'ns' => 'pivot', 'name' => 'Nope'));
+eq($c, 404, 'reader delete: a name that is not there -> 404');
+FakeDb::setState(101, FakeDb::SHARING_OFF);
+list($c, $r) = run('delete', 'reader1', false, array(), array(), array('report_id' => 'awdspon', 'ns' => 'pivot', 'name' => 'R1'));
+eq($c, 200, 'reader delete: a reader deletes THEIR OWN - even after the card went off (retracting is never blocked)');
+eq(FakeDb::presetNames(101, 'pivot'), array('O1'), 'reader delete: ...only that row went');
+eq(dig(lastAudit(), 'after', 'as'), 'reader', 'reader delete: audited as:reader');
+FakeDb::seedPreset(101, 'pivot', 'R2', array('v' => 2), 'reader1');
+list($c, $r) = run('delete', 'nobody2', false, array(), array(), array('report_id' => 'private1', 'ns' => 'pivot', 'name' => 'R2'));
+eq($c, 403, 'reader delete: someone who cannot open the report is refused');
+list($c, $r) = run('delete', 'owner1', false, array(), array(), array('report_id' => 'awdspon', 'ns' => 'pivot', 'name' => 'R2'));
+eq($c, 200, 'reader delete: an author deletes a reader\'s preset');
+
+echo "preset sharing - bug sweep (takeover, rename at the cap, reader namespaces)\n";
+FakeDb::reset(); FakeDb::setState(101, FakeDb::SHARING_ON);
+FakeDb::seedPreset(101, 'pivot', 'Budget', array('v' => 2), 'reader1');
+list($c, $r) = run('save', 'owner1', false, array(), array(), array('report_id' => 'awdspon', 'ns' => 'pivot', 'name' => 'Budget', 'data' => array('v' => 3)));
+eq($c, 200, 'takeover: an author overwrites a reader\'s preset');
+eq(dig(FakeDb::effectsOf('UPDATE'), 0, 'data', 'set', 'CREATED_BY'), 'owner1', 'takeover: ...and the row becomes the author\'s (CREATED_BY)');
+eq(dig(lastAudit(), 'after', 'takeover'), true, 'takeover: ...audited takeover:true');
+list($c, $r) = run('save', 'reader1', false, array(), array(), array('report_id' => 'awdspon', 'ns' => 'pivot', 'name' => 'Budget', 'data' => array('v' => 4)));
+eq($c, 403, 'takeover: the reader can no longer overwrite the official version');
+list($c, $r) = run('delete', 'reader1', false, array(), array(), array('report_id' => 'awdspon', 'ns' => 'pivot', 'name' => 'Budget'));
+eq($c, 403, 'takeover: ...nor delete it');
+FakeDb::seedPreset(101, 'pivot', 'Own', array('v' => 2), 'owner1');
+list($c, $r) = run('save', 'owner1', false, array(), array(), array('report_id' => 'awdspon', 'ns' => 'pivot', 'name' => 'Own', 'data' => array('v' => 5)));
+eq(dig(lastAudit(), 'after', 'takeover'), false, 'takeover: an author overwriting their OWN row is no takeover');
+
+FakeDb::reset(); FakeDb::setState(101, FakeDb::SHARING_ON);
+for ($i = 1; $i <= 10; $i++) FakeDb::seedPreset(101, 'pivot', "r$i", array('i' => $i), 'reader1');
+FakeDb::seedPreset(101, 'pivot', 'theirs', array('i' => 0), 'reader2');
+$rb = array('report_id' => 'awdspon', 'ns' => 'pivot', 'data' => array('v' => 2));
+list($c, $r) = run('save', 'reader1', false, array(), array(), array_merge($rb, array('name' => 'r1-renamed', 'replaces' => 'r1')));
+eq($c, 200, 'rename at the cap: replaces = their own row lets the new name in');
+list($c, $r) = run('save', 'reader1', false, array(), array(), array_merge($rb, array('name' => 'sneak', 'replaces' => 'theirs')));
+eq($c, 409, 'rename at the cap: replaces naming SOMEONE ELSE\'s row does not lift the cap');
+list($c, $r) = run('save', 'reader1', false, array(), array(), array_merge($rb, array('name' => 'sneak2', 'replaces' => 'no-such-row')));
+eq($c, 409, 'rename at the cap: replaces naming a row that is not there does not lift the cap');
+list($c, $r) = run('save', 'reader1', false, array(), array(), array_merge($rb, array('name' => 'sneak3', 'replaces' => 'sneak3')));
+eq($c, 409, 'rename at the cap: replaces naming the NEW name itself does not lift the cap');
+
+FakeDb::reset(); FakeDb::setState(101, FakeDb::SHARING_ON);
+list($c, $r) = run('save', 'reader1', false, array(), array(), array('report_id' => 'awdspon', 'ns' => 'search', 'name' => 'Mine', 'data' => array('q' => 'x')));
+eq($c, 200, 'reader namespaces: a reader shares a SEARCH preset (the search builder shows a Shared section)');
+list($c, $r) = run('save', 'reader1', false, array(), array(), array('report_id' => 'awdspon', 'ns' => 'tplcopy', 'name' => 'Tpl', 'data' => array('template' => 'x')));
+eq($c, 403, 'reader namespaces: a reader cannot write a copy template (no shared consumer)');
+list($c, $r) = run('save', 'reader1', false, array(), array(), array('report_id' => 'awdspon', 'ns' => 'tpldownload', 'name' => 'Tpl', 'data' => array('template' => 'x')));
+eq($c, 403, 'reader namespaces: ...nor a download template');
+list($c, $r) = run('save', 'owner1', false, array(), array(), array('report_id' => 'awdspon', 'ns' => 'tplcopy', 'name' => 'Tpl', 'data' => array('template' => 'x')));
+eq($c, 200, 'reader namespaces: an author still may');
+FakeDb::seedPreset(101, 'tplcopy', 'Old', array('template' => 'x'), 'reader1');
+list($c, $r) = run('delete', 'reader1', false, array(), array(), array('report_id' => 'awdspon', 'ns' => 'tplcopy', 'name' => 'Old'));
+eq($c, 200, 'reader namespaces: a reader can still DELETE their own row in any namespace');
+
+// ===========================================================================
 echo "misc\n";
 FakeDb::reset();
 list($c, $r) = run('frobnicate', 'adm', true, array(), array(), array());
@@ -595,7 +791,7 @@ ok(strpos($SRC_EP, "if (!function_exists('penumbraPresetsFetchRows'))") !== fals
 if ($CONTROL) { echo "control\n"; ok(false, 'CONTROL: this assertion is deliberately false and must be reported'); }
 
 // The mutant runs in a child process: the include-once core cannot be redefined.
-if (!$MUTANT) {
+if (!$MUTANT && !$MUTANT2) {
     echo "mutant (child process: write gate without its owner clause)\n";
     $cmd = '"' . PHP_BINARY . '" -n ' . escapeshellarg(__FILE__) . ' --mutant ' . escapeshellarg('--app=' . $APP);
     $mo = array(); $mrc = 0;
@@ -611,6 +807,21 @@ if (!$MUTANT) {
     ok(strpos($mtxt, 'FAIL  save: ADMIN saves') === false, 'mutant: ...and admin still passed');
 }
 
+// The second mutant (Preset Sharing, 2026-10-22): a reader's overwrite check removed.
+if (!$MUTANT && !$MUTANT2) {
+    echo "mutant2 (child process: a reader may overwrite a preset someone else shared)\n";
+    $cmd = '"' . PHP_BINARY . '" -n ' . escapeshellarg(__FILE__) . ' --mutant2 ' . escapeshellarg('--app=' . $APP);
+    $mo = array(); $mrc = 0;
+    $cwdWas = getcwd(); @chdir(sys_get_temp_dir());
+    exec($cmd . ' 2>&1', $mo, $mrc);
+    @chdir($cwdWas);
+    $mtxt = implode("\n", $mo);
+    ok(preg_match('/PASS (\d+)\s+FAIL (\d+)/', $mtxt, $mm) === 1, 'mutant2: child produced a tally');
+    ok(strpos($mtxt, 'FAIL  reader save: ANOTHER reader cannot overwrite it') !== false, 'mutant2: the other-reader overwrite assertion failed');
+    ok(strpos($mtxt, 'FAIL  reader save: a READER shares while the card is on') === false, 'mutant2: ...while a reader\'s own save still passed');
+    ok(strpos($mtxt, 'FAIL  reader delete:') === false, 'mutant2: ...and the delete rules (a separate check) still passed');
+}
+
 @unlink($CORE);
-echo "\nPASS $pass   FAIL $fail" . ($MUTANT ? "   [MUTANT: failures are REQUIRED]" : '') . "\n";
+echo "\nPASS $pass   FAIL $fail" . (($MUTANT || $MUTANT2) ? "   [MUTANT: failures are REQUIRED]" : '') . "\n";
 exit($fail === 0 ? 0 : 1);

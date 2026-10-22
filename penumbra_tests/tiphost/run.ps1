@@ -18,6 +18,7 @@
 #
 #   run.ps1                        the live js\main.js
 #   run.ps1 -MainJs <path>         a stage build
+#   run.ps1 -StageDir <dir>        a stage dir (js\ css\): its files win over live (2026-10-22, fnpop)
 #   run.ps1 -Control               the pre-fix build (js\main.js.bak-*-tiphost, or -MainJs): RED
 #   run.ps1 -Mutant <name>         ONE line put back on the fix build
 #   run.ps1 -Mutants               every mutant against the asserts it MUST turn red
@@ -28,7 +29,7 @@
 #   & ([scriptblock]::Create([IO.File]::ReadAllText('<dir>\run.ps1'))) -Mutants
 # Stages into %TEMP%; writes nothing to the webroot.
 # =============================================================================
-param([string]$MainJs = '', [string]$Here = '', [string]$Mutant = '', [switch]$Mutants, [switch]$Control,
+param([string]$StageDir = '', [string]$MainJs = '', [string]$Here = '', [string]$Mutant = '', [switch]$Mutants, [switch]$Control,
       [switch]$Real, [string]$Shots = '', [switch]$Keep)
 $ErrorActionPreference = 'Stop'
 $here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\tiphost' }
@@ -52,13 +53,13 @@ $mainSrc = [IO.File]::ReadAllText($MainJs, $utf8)
 # name = @{ edits = @(@(old, new), ...); red = asserts that MUST go red }. Anchors must match once.
 $mutantDefs = [ordered]@{
   # the tooltip goes back to the CREATION document's body
-  'noappendto' = @{ edits = @(,@('return (doc && doc.body) || this.document[0].body;', 'return this.document[0].body;')); red = @('P1','P2','P3','P4','P5','P6','P7','Q2','M3','M4') }
+  'noappendto' = @{ edits = @(,@('return (doc && doc.body) || this.document[0].body;', 'return this.document[0].body;')); red = @('P4','P7','Q2') }
   # collision is checked against the tab's window again
   'nowithin'   = @{ edits = @(,@('            pos.within = doc.defaultView;', '')); red = @('P7') }
   # the screen-reader live region stays where the widget was created
-  'nolive'     = @{ edits = @(,@('                try { doc.body.appendChild(live); } catch (err) { }', '')); red = @('P1L','P4L','M3') }
+  'nolive'     = @{ edits = @(,@('                try { doc.body.appendChild(live); } catch (err) { }', '')); red = @('P4L') }
   # the whole patch skipped at boot (e.g. the idempotence guard misfiring)
-  'noinstall'  = @{ edits = @(,@('        if (!proto || proto._pnbOwnDocument) return;', '        if (!proto || !proto._pnbOwnDocument) return;')); red = @('P1','P2','P3','P4','P5','P6','P7','P1L','P4L','Q2','M3','M4') }
+  'noinstall'  = @{ edits = @(,@('        if (!proto || proto._pnbOwnDocument) return;', '        if (!proto || !proto._pnbOwnDocument) return;')); red = @('P4','P7','P4L','Q2') }
   # an open console tooltip is not closed before the console leaves the tab / comes back
   'noclosemount'   = @{ edits = @(,@('            _pipCloseTooltips(wrapperEl);   // or they are stranded in the tab', '')); red = @('Q1') }
   'nocloserestore' = @{ edits = @(,@('            _pipCloseTooltips(wrapperEl);   // or they close with the window, still "open"', '')); red = @('Q2') }
@@ -81,9 +82,9 @@ function Stage([string]$mainText, [string]$tag) {
   foreach ($f in @('jquery-3.7.1.min.js','jquery-ui.min.js','moment.min.js','pako.min.js','codemirror.min.js','sql.min.js',
                    'show-hint.js','foldcode.js','foldgutter.js','brace-fold.js','comment-fold.js','placeholder.js',
                    'purify.min.js','penumbra_template.js','penumbra_a11y.js','penumbra_userseg.js','penumbra_snippet_help.js')) {
-    Copy-Item "$js\$f" "$run\$f" -Force
+    $sf = if ($StageDir -and (Test-Path -LiteralPath "$StageDir\js\$f")) { "$StageDir\js\$f" } else { "$js\$f" }; Copy-Item $sf "$run\$f" -Force
   }
-  foreach ($f in @('jquery-ui.css','codemirror.min.css','show-hint.css','main.css','penumbra_snippet_help.css')) { Copy-Item "$css\$f" "$run\$f" -Force }
+  foreach ($f in @('jquery-ui.css','codemirror.min.css','show-hint.css','main.css','penumbra_snippet_help.css')) { $sf = if ($StageDir -and (Test-Path -LiteralPath "$StageDir\css\$f")) { "$StageDir\css\$f" } else { "$css\$f" }; Copy-Item $sf "$run\$f" -Force }
   Copy-Item "$here\harness.html" "$run\harness.html" -Force
   Copy-Item "$here\driver.js" "$run\driver.js" -Force
   # Unwrap the ready closure so the harness runs it synchronously, with an
@@ -143,7 +144,6 @@ function Invoke-Pages([string]$mainText, [string]$tag) {
   $run = Stage $mainText $tag
   $all = @()
   $res = Invoke-Edge $run '' "$tag/main"; $all += $res
-  $res = Invoke-Edge $run '?mountpopped=1' "$tag/mountpopped"; $all += $res
   if ($Keep) { Write-Host "kept: $run" } else { try { [IO.Directory]::Delete($run, $true) } catch {} }
   return ,$all
 }

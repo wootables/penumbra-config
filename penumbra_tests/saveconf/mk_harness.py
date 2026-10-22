@@ -30,6 +30,7 @@ rep('<div id="pnbStatusBar">', '''<!-- saveconf: the Save to Server dialog's fie
   <input type="checkbox" id="serverSaveRowHeight"><input type="checkbox" id="serverSaveResolver" checked><input type="checkbox" id="serverSaveSortNone">
   <div id="serverSaveStatus" class="save-status-message" style="display:none" aria-live="polite"></div>
   <button id="confirmServerSaveBtn" class="pnb-btn pnb-btn-primary">Save to Server</button>
+  <button id="saveQuery" type="button" style="display:none">Save</button><!-- (encsave 2026-10-21) the dialog's real opener -->
 </div>
 <div id="pnbStatusBar">''')
 # the loaded report's version (index.php penumbra_vars.reportVersion)

@@ -198,7 +198,8 @@
 
       if (phase === 'wide' || phase === 'compact' || phase === 'dark') {
         var P = phase === 'wide' ? 'W' : phase === 'compact' ? 'C' : 'D';
-        T(P + '1', 'the ' + cards.length + ' End-User cards share ONE row at ' + W + 'px' + (compact ? ' (compact)' : ''), cards.length === 12 && rows.length === 1, 'rows=' + rows.join('+') + ' cards=' + cards.length);
+        // Thirteen cards since Preset Sharing (2026-10-22): below 1760px of grid they sit 7 + 6.
+        T(P + '1', 'the ' + cards.length + ' End-User cards sit in 7 + 6 at ' + W + 'px' + (compact ? ' (compact)' : ''), cards.length === 13 && rows.join('+') === '7+6', 'rows=' + rows.join('+') + ' cards=' + cards.length);
         T(P + '2', 'every checkbox sits IN LINE with its title (left of it, centred on its first line within 1px)', bad(function (c) { return c.cbBeforeTitle && Math.abs(c.cbDy) <= 1; }).length === 0, 'off: ' + bad(function (c) { return c.cbBeforeTitle && Math.abs(c.cbDy) <= 1; }).join(',') + ' dy=' + cards.map(function (c) { return c.cbDy; }).join('/'));
         T(P + '3', 'every description runs UNDER both, from the edge the checkbox starts at, at the card\'s full width', bad(function (c) { return Math.abs(c.smallLeftDx) <= 1 && c.smallFull && c.smallBelow; }).length === 0, 'off: ' + bad(function (c) { return Math.abs(c.smallLeftDx) <= 1 && c.smallFull && c.smallBelow; }).join(',') + ' dx=' + cards.map(function (c) { return c.smallLeftDx; }).join('/'));
         T(P + '4', 'nothing overflows or leaves its card', bad(function (c) { return !c.overflowX && c.inside; }).length === 0, 'off: ' + bad(function (c) { return !c.overflowX && c.inside; }).join(','));
@@ -231,13 +232,15 @@
         res.splitCols = cols;
         // The twelfth card (Search Bar) costs one title line in the narrower cards:
         // grid 79 -> 93px, tab 420 -> 435px at 1677px (591 before the morning's pass).
-        T('W9', 'the tab is short: the Layout column <= 170px, the grid <= 95px, the whole tab <= 436px (231 / 173 / 591 before any of this)', r(layoutCol).h <= 170 && r(g).h <= 95 && r(tab).h <= 436, 'layout=' + r(layoutCol).h + ' grid=' + r(g).h + ' tab=' + r(tab).h);
+        // Thirteen cards (Preset Sharing, 2026-10-22) = two rows at 1677px: grid 93 -> 134px, tab 435 -> 475px.
+        T('W9', 'the tab is short: the Layout column <= 170px, the grid <= 135px (two rows of cards), the whole tab <= 476px (231 / 173 / 591 before any of this)', r(layoutCol).h <= 170 && r(g).h <= 135 && r(tab).h <= 476, 'layout=' + r(layoutCol).h + ' grid=' + r(g).h + ' tab=' + r(tab).h);
         var ctf = document.getElementById('viewOptionClickFilter').closest('.view-option-item');
         var ci = cardInfo(ctf);
         T('W10', 'Table Behavior\'s Click-to-Filter card has the same in-line layout', ci.cbBeforeTitle && Math.abs(ci.cbDy) <= 1 && Math.abs(ci.smallLeftDx) <= 1 && ci.smallFull && !ci.overflowX, 'dy=' + ci.cbDy + ' dx=' + ci.smallLeftDx + ' full=' + ci.smallFull);
       }
       if (phase === 'compact') {
-        T('C6', 'compact mode: the tab <= 345px (417 before any of this; the Custom Sort column is the tallest here now)', r(tab).h <= 345, 'tab=' + r(tab).h);
+        // Two rows of cards since Preset Sharing (2026-10-22): 345 -> 376px.
+        T('C6', 'compact mode: the tab <= 377px (417 before any of this; two rows of cards since the thirteenth)', r(tab).h <= 377, 'tab=' + r(tab).h);
       }
       if (phase === 'dark') {
         var c0 = cards[0];
@@ -245,7 +248,16 @@
       }
       if (phase === 'width') {
         var want = (q.get('rows') || '').split(',').map(Number).join('+');
-        T('N' + W, W + 'px: ' + want + ' (balanced, never one card alone on a row), nothing overflowing', rows.join('+') === want && bad(function (c) { return !c.overflowX && c.inside; }).length === 0, 'rows=' + rows.join('+') + ' overflow: ' + bad(function (c) { return !c.overflowX && c.inside; }).join(','));
+        // (2026-10-22) thirteen divides by nothing: at 4 / 3 / 2 columns the card left over SPANS its row.
+        var real = cards.filter(function (c) { return c.id !== 'voFixtureBox'; }), lastC = real[real.length - 1];
+        var spanOk = rows[rows.length - 1] !== 1 || (lastC && lastC.card.w >= r(g).w - 1);
+        T('N' + W, W + 'px: ' + want + ' (balanced; a card left over spans its row), nothing overflowing', rows.join('+') === want && spanOk && bad(function (c) { return !c.overflowX && c.inside; }).length === 0, 'rows=' + rows.join('+') + ' lastW=' + (lastC ? lastC.card.w : '?') + '/' + r(g).w + ' overflow: ' + bad(function (c) { return !c.overflowX && c.inside; }).join(','));
+        if (q.get('cb') === '1') {
+          // (2026-10-22) 7 + 6 cards are wide enough that every title is one line at 1677px, where
+          // W2 / C2 / D2 measure - so the in-line checkbox is pinned here too, where titles wrap.
+          var wrapped = real.filter(function (c) { return c.titleLines >= 2; }).length;
+          T('NC' + W, W + 'px: with titles wrapped (' + wrapped + ' on two lines) every checkbox still sits on its title\'s FIRST line', wrapped > 0 && bad(function (c) { return c.cbBeforeTitle && Math.abs(c.cbDy) <= 1; }).length === 0, 'wrapped=' + wrapped + ' dy=' + cards.map(function (c) { return c.cbDy; }).join('/'));
+        }
         if (q.get('lrows')) {
           // One row from 376px of Layout column (a 1168px tab), Split under the
           // other two from 248px, one per row below that; no card overflowing.

@@ -26,7 +26,7 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
         'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js', 'penumbra_tiles.js',
         'penumbra_a11y.js', 'penumbra_grouplist.js', 'penumbra_cellsel.js', 'penumbra_presets.js', 'penumbra_forms.js', 'penumbra_find.js']   # (round 14) Find, as index.php loads it
-SCN = ['pcold', 'pfail', 'pmain', 'ppick', 'pview', 'prow', 'pshot', 'pcombo', 'pkeys', 'pdash', 'pdasha', 'pshot6', 'pfn', 'pshot7f', 'pshot7t', 'pfeed', 'pshot8', 'prank', 'pshot9', 'pshot10', 'pshot11', 'ptools', 'ptoolsv', 'padmin', 'pshot12', 'pdsec', 'pmetr', 'phand', 'pshot14a', 'pshot14b', 'pvo', 'pshot15', 'pjar', 'pshot16', 'pchip', 'pshot17']
+SCN = ['pcold', 'pfail', 'pmain', 'ppick', 'pview', 'prow', 'pshot', 'pcombo', 'pkeys', 'pdash', 'pdasha', 'pshot6', 'pfn', 'pshot7f', 'pshot7t', 'pfeed', 'pshot8', 'prank', 'pshot9', 'pshot10', 'pshot11', 'ptools', 'ptoolsv', 'padmin', 'pshot12', 'pdsec', 'pmetr', 'phand', 'pshot14a', 'pshot14b', 'pvo', 'pshot15', 'pjar', 'pshot16', 'pchip', 'pshot17', 'pthm', 'pjip', 'pshot19', 'pshow', 'pjump', 'pverb', 'pshot20', 'pnote', 'pmail', 'pmiss', 'pshot21', 'ptop', 'pr23', 'psweep', 'psrank', 'pperf']
 CHK = {
     'pcold': ['shellAtOnce', 'keysKept', 'handOver', 'renders'],
     'pfail': ['shellAtOnce', 'failLine', 'escCloses', 'noHang', 'escChipCloses'],
@@ -99,12 +99,46 @@ CHK = {
     # it first with Ask help second; plain text keeps both at the bottom; the no-match state lists it with the hand-offs; nothing is
     # sent by listing; Enter opens the console on the panel and the panel's own send runs once with the text; the summary box is
     # untouched; the popped-out console takes the text and sends, the main console stays shut
-    'pjar': ['rowForAdmin', 'rankQuestion', 'rowForGrant', 'rankSql', 'rankPlain', 'emptyState', 'nothingSentOnOpen', 'noRowViewer', 'sendsOnce', 'panelOpens', 'summaryUntouched', 'popOut'],
+    'pjar': ['rowForAdmin', 'rankQuestion', 'rowForGrant', 'rankSql', 'rankPlain', 'emptyState', 'nothingSentOnOpen', 'noRowViewer', 'noRowNonEditor', 'sendsOnce', 'panelOpens', 'summaryUntouched', 'popOut'],
     'pshot16': ['open'],
     # (round 17) a canned reply with valid + invented + hidden-column + gated suggestions: only the valid ones render, four at most, the
     # block never shows as text, the Group chip opens the dialog with V_STATUS and List chosen and applies nothing, a viewer loses the gated
     'pchip': ['validRender', 'unknownDropped', 'hiddenColDropped', 'blockNeverRaw', 'maxFour', 'chipOpensPreselected', 'chipOpensNotApplies', 'viewerGatedDropped'],
     'pshot17': ['open'],
+    # (round 18b) every theme of the page's own select has a row, the Theme... action stays first, the current one marked, a name finds
+    # its theme, 'density' lists exactly the three densities, 'compact' finds its row, selecting applies the theme through the select's change
+    'pthm': ['everyTheme', 'themeActionKept', 'themeCurrentMarked', 'themeByName', 'densityThree', 'densityByName', 'themeApplies'],
+    # (round 19b) the answer in the box: Enter on the row keeps the box open on a waiting line (the console stays shut), the answer
+    # renders with chips, a script in the reply is text, Continue shows the Q and the A in the panel, Esc while waiting aborts and
+    # records nothing, a close that is not Esc leaves the request alive and its answer lands in the panel, a chip closes the box
+    'pjip': ['nothingSentUntilEnter', 'inPlace', 'answerRenders', 'answerChips', 'sanitized', 'continueCarries', 'cancelAborts', 'lateLands', 'chipClosesBox'],
+    'pshot19': ['open'],
+    # (round 20) hidden columns as rows (the menu's own Show items; none when Column Organization is closed), row / page jumps
+    # (the page turned through findHost.showRow, the row marked and selected, a bare number lower, out of range greyed, the
+    # filter's order, Rows = All fills the row itself), a leading verb routed to the hand-off rows (not mid-text, not a column's name)
+    'pshow': ['showAllRow', 'showOneRows', 'showOneRuns', 'showAllRuns', 'allShownGreyed', 'rowNumbers', 'restrictedNone'],
+    'pjump': ['rowLabel', 'rowJump', 'hashForm', 'bareLower', 'pageJump', 'lastPage', 'top', 'bottom', 'outOfRange', 'filterOrder', 'lazyFill', 'noPagesWhenAll'],
+    'pverb': ['verbFilterCond', 'verbSearchFor', 'verbFind', 'verbLookFor', 'verbWhere', 'verbFilterBy', 'midTextKept', 'colNameKept', 'runsOnEnter'],
+    'pshot20': ['open'],
+    # (round 21) notes: the journal's composer with the draft (nothing posted), the chart's notes, the selected row's own item;
+    # email: the dialog opened with the chips through its tokenizer, the name left for its directory list (a pick there),
+    # your view ticked, nothing sent, an address the dialog rejects greyed, several addresses, the Email action's own gate;
+    # the misses log: addresses and typed notes redacted in the event and in the beacon
+    'pnote': ['journalRow', 'journalPrefilled', 'notPosted', 'chartRow', 'chartPrefill', 'rowRow', 'rowPrefill', 'lazyJournal', 'noSurfaceGreyed'],   # (final sweep) the lazy module, the greyed no-surface row
+    'pmail': ['rowValid', 'opensPrefilled', 'directoryList', 'viewLinkTicked', 'nothingSent', 'invalidGreyed', 'multiAddresses', 'nothingSentMulti', 'verbAlone', 'verbAloneOpens', 'partialName', 'partialNameOpens', 'partialAddress', 'partialAddressOpens', 'verbAlwaysLeads', 'gateHidden'],   # (round 22) the row from the first word
+    'pmiss': ['emailRedacted', 'noteRedacted', 'plainKept', 'beaconClean', 'partialRedacted'],
+    'pshot21': ['open'],
+    'pperf': ['wideTyping'],   # (the final sweep) a keystroke on a 315-column header stays fast
+    # (2026-10-21, the searchrank follow-up) the Reports section keeps the server's relevance order: live's "EPA" list in its
+    # order, the id hits over the mid-word title hits, the browser's own rows merged by the same tiers (a listed row ranked
+    # from the server's copy), a viewer's too, a word start never after an accented letter, tag:NAME as before
+    'psrank': ['serverOrder', 'idOverMidword', 'mergeOrder', 'viewerTiers', 'accentWord', 'tagLocalFirst'],
+    # (round 22) the Top match slot: one row first and preselected for a clear intent, not repeated below; none for a partial word
+    'ptop': ['topSend', 'topFilter', 'topFind', 'topRow', 'topNote', 'topUnhide', 'topTheme', 'topDensity', 'topReportId', 'topQuestion', 'noTopAmbiguous', 'fixedOrder', 'topGroupBy', 'topGroupPartial', 'noTopGroupBare'],   # (final sweep) the combination verbs
+    # (round 23) the inventory rows open their controls as the buttons do; hidden controls grey with their reason; Table info rows from the
+    # server's list through the exported opener, the console's audience only; the end-to-end sweep of the registry (the visible end state)
+    'pr23': ['tagGenerator', 'manageData', 'formatSql', 'rowLimit', 'wordWrap', 'tableList', 'popOut', 'shareState', 'profileCard', 'hiddenGreyed', 'tableInfoRows', 'tableInfoByName', 'tableInfoNone', 'tableInfoViewer', 'consoleRowsViewer'],
+    'psweep': ['pivotOpens', 'groupOpens', 'downloadOpens', 'copyOpens', 'emailOpens', 'snapshotsOpen', 'saveOpens', 'downloadFormat', 'aiPanel', 'consoleToggles', 'filterFocus', 'findOpens', 'rowHeight', 'helpCenter', 'shortcutSheet', 'versionHistory', 'reportList', 'calcDialog', 'viewLink', 'metricsTab', 'colOptions', 'colFit', 'colReset', 'colMoveEnd'],
 }
 # what this change brings: every browser check (live has no palette) and every static check but the
 # guards (what live already gets right: a viewer's Save / Version history / admin controls are absent
@@ -163,6 +197,44 @@ NEW = ({'L-pjar-%s' % c for c in CHK['pjar']} | {'L-pshot16-open', 'S-jarvisGate
 # the shot, the statics
 GUARDS_R17 = set()   # (every pchip check needs chips to exist: none is vacuous on live)
 NEW = ({'L-pchip-%s' % c for c in CHK['pchip']} | {'L-pshot17-open', 'S-contract', 'S-chipsSafe'}) - GUARDS_R17
+# round 18a (live: no time budget in ai_assist.php): the static
+NEW = {'S-aiTimeBudget'}
+# round 18b (live: no theme rows; the density rows include Report Default): the theme checks and the density count; the action-first
+# and compact checks hold on live (no theme rows to sort below; Density: Compact was a row already)
+GUARDS_R18B = {'L-pthm-themeActionKept', 'L-pthm-densityByName'}
+NEW = ({'L-pthm-%s' % c for c in CHK['pthm']} | {'S-themeSource'}) - GUARDS_R18B
+# round 19a (live: the Claude call not streamed, no SSE consumer): the statics
+NEW = {'S-aiStream', 'S-aiStreamParse'}
+# round 19b (live: the row forwards to the panel; no penumbraAi export): every pjip check but the vacuous one, the shot, the static
+GUARDS_R19B = {'L-pjip-nothingSentUntilEnter', 'L-pjip-lateLands'}   # lateLands: live forwards to the panel, so a late answer lands there vacuously
+NEW = ({'L-pjip-%s' % c for c in CHK['pjip']} | {'L-pshot19-open', 'S-inPlace', 'S-jarvisGate'}) - GUARDS_R19B   # S-jarvisGate: its text changed this round
+# round 20 (live: no Show rows, no jumps, no verb): every check but the vacuous ones (live never strips a verb: a mid-text verb and a
+# column's name stay by default), the shot, the static
+GUARDS_R20 = {'L-pverb-midTextKept', 'L-pverb-colNameKept'}
+NEW = ({'L-pshow-%s' % c for c in CHK['pshow']} | {'L-pjump-%s' % c for c in CHK['pjump']} | {'L-pverb-%s' % c for c in CHK['pverb']} | {'L-pshot20-open', 'S-r20'}) - GUARDS_R20
+# round 21 (2026-10-21; live 7857e04 shows the Ask Jarvis row to a viewer who may not edit the report - no console on the
+# page - and the row sends that report's SQL and Custom Code): the non-editor check, and the gate's static (its text changed)
+NEW = {'L-pjar-noRowNonEditor', 'S-jarvisGate'}   # (live bf5bb8f: superseded by the round below)
+# round 21 (live: no note / email rows, no redaction): every check but the vacuous ones (nothing sent when no row ran; the
+# gate's absence; a plain text kept as it is), the shot, the static (notPosted / nothingSent want the row to have run: red on live)
+GUARDS_R21 = {'L-pmail-nothingSentMulti', 'L-pmail-gateHidden', 'L-pmiss-plainKept'}
+NEW = ({'L-pnote-%s' % c for c in CHK['pnote']} | {'L-pmail-%s' % c for c in CHK['pmail']} | {'L-pmiss-%s' % c for c in CHK['pmiss']} | {'L-pshot21-open', 'S-r21'}) - GUARDS_R21
+# round 22 (live: the Email row only once a complete address is typed; [email] redaction only): the verb-alone and partial rows, the
+# always-lead, the partial's redaction; invalidGreyed and emailRedacted changed their text (new again)
+NEW = {'L-pmail-verbAlone', 'L-pmail-verbAloneOpens', 'L-pmail-partialName', 'L-pmail-partialAddress', 'L-pmail-partialAddressOpens', 'L-pmail-verbAlwaysLeads', 'L-pmiss-emailRedacted', 'L-pmiss-partialRedacted', 'S-r22'}   # (partialNameOpens and invalidGreyed hold on live too: a name was left in the input, a finished bad address greyed)
+# round 22 too: the slot (live reorders sections per verb instead), and the View Options / console-tab rows on the REAL nesting (live:
+# "#editorTabs > ul" finds nothing, the console opens and stops, no tab rows list) - the round-15 checks are new again on this harness
+# (manageRow holds on live: the console opens; its tab never switched, which optionOpens / schedRow catch); the statics whose text changed
+NEW = NEW | {'L-ptop-%s' % c for c in CHK['ptop']} - {'L-ptop-noTopAmbiguous'} | {'L-pvo-optionOpens', 'L-pvo-optionFocused', 'L-pvo-tabRows', 'L-pvo-schedRow', 'L-pjar-rankQuestion', 'L-pjar-rankSql', 'L-pverb-verbFilterCond', 'S-r21', 'S-tabsSource', 'S-voSource'}
+# round 23 (live: none of the inventory rows, no Table info rows, no exported opener, no reportTables): the new rows and the inventory static;
+# the sweep's checks hold on live (the rows it drives are older) but for the ones the harness never had an end state for
+GUARDS_R23 = {'L-pr23-tableInfoNone', 'L-pr23-tableInfoViewer', 'L-pr23-consoleRowsViewer', 'L-pr23-profileCard'}   # (hiddenGreyed wants the rows: red on live)
+NEW = ({'L-pr23-%s' % c for c in CHK['pr23']} | {'S-entryPoints', 'S-r23'}) - GUARDS_R23
+# another session's round (psrank, the server's report order) may sit in this suite before its change is live: its checks stay new
+GUARDS_SR = {'L-psrank-tagLocalFirst'}   # (2026-10-21, the searchrank follow-up) the tag order: live keeps it already
+NEW = NEW - {'L-psrank-%s' % c for c in CHK.get('psrank', [])}   # (psrank is LIVE since 43c1e25: its checks are old ones, green on live)
+# the final sweep (live: the journal row needs the module already loaded; no greyed no-surface row; greyed text at 45%)
+NEW = {'S-final'}   # (round 24b over live a03b153: r24's checks are old ones now; the static's text changed)
 # (round 3) the group-mode icon: candidate C, and the old drawing's signature (its first line)
 GROUP_C_SYMBOL = '<symbol id="pnbi-group" viewBox="0 0 24 24"><path d="m4 4 2.5 2.5L9 4"/><line x1="12" y1="5" x2="20" y2="5"/><line x1="8" y1="9.5" x2="20" y2="9.5"/><line x1="8" y1="13" x2="20" y2="13"/><path d="m6.25 15.25 2.5 2.5-2.5 2.5"/><line x1="12" y1="18" x2="20" y2="18"/></symbol>'
 OLD_GROUP_SIG = '<line x1="5" y1="9" x2="19" y2="9"/><line x1="5" y1="15" x2="19" y2="15"/>'
@@ -173,6 +245,17 @@ def served_files():
     return out
 
 MUTANTS = {
+    # --- (2026-10-21, the searchrank follow-up) the Reports order: live's title-weighted score alone; no server place (the
+    # tier, then the score); no tier (the place, then the score); no word-start tier; tag:NAME ranked by tier and place; a
+    # listed row ranked from the browser's copy (its stale title); an accented letter read as a word boundary
+    'q-scoreonly': ([('pal', "        out.sort(function (a, b) { return (a.tier - b.tier) || (a.place - b.place) || (b.m.score - a.m.score); });\n", "        out.sort(function (a, b) { return b.m.score - a.m.score; });\n")],
+                    ['L-psrank-serverOrder', 'L-psrank-idOverMidword', 'L-psrank-mergeOrder', 'L-psrank-viewerTiers', 'L-psrank-accentWord'], ['psrank']),
+    'q-noplace': ([('pal', "return (a.tier - b.tier) || (a.place - b.place) || (b.m.score - a.m.score);", "return (a.tier - b.tier) || (b.m.score - a.m.score);")], ['L-psrank-serverOrder', 'L-psrank-mergeOrder'], ['psrank']),
+    'q-notier': ([('pal', "return (a.tier - b.tier) || (a.place - b.place) || (b.m.score - a.m.score);", "return (a.place - b.place) || (b.m.score - a.m.score);")], ['L-psrank-mergeOrder', 'L-psrank-viewerTiers', 'L-psrank-accentWord'], ['psrank']),
+    'q-wordstart': ([('pal', "        if (wordAt(id, t) || wordAt(title, t)) { return 2; }\n", "")], ['L-psrank-viewerTiers', 'L-psrank-accentWord'], ['psrank']),
+    'q-tagtier': ([('pal', "h.tier = tag ? 0 : reportTier(q, s ? s.r : h.r); h.place = (s && !tag) ? s.at : reportHits.length;", "h.tier = reportTier(q, s ? s.r : h.r); h.place = s ? s.at : reportHits.length;")], ['L-psrank-tagLocalFirst'], ['psrank']),
+    'q-localtier': ([('pal', "reportTier(q, s ? s.r : h.r)", "reportTier(q, h.r)")], ['L-psrank-mergeOrder'], ['psrank']),
+    'q-asciiword': ([('pal', "return /[0-9]/.test(c) || c.toLowerCase() !== c.toUpperCase();", "return /[a-z0-9]/.test(c);")], ['L-psrank-accentWord'], ['psrank']),
     # --- the module: availability never read (every entry available)
     'b-noavail': ([('pal', "availNow[e.id] = e.pick === 'column' ? (headers().length ? true : 'No table is loaded') : e.avail();", "availNow[e.id] = true;")],
                   ['L-pmain-greyReason', 'L-pmain-greyWhenTyped'], ['pmain']),
@@ -268,7 +351,7 @@ MUTANTS = {
     # --- (round 11) an old "Search" label left; the Esc chip not clickable; the backdrop click ignored; a magnifier left
     'n-oldlabel': ([('index', "</svg> Quick actions</a>", "</svg> Search</a>")], ['L-pkeys-quickLabel', 'S-quickName'], ['pkeys']),
     'n-escspan': ([('pal', "        ui.esc.addEventListener('click', function (e) { e.preventDefault(); close(true); });", "        // (no click on the chip)")], ['L-pkeys-escClick'], ['pkeys']),
-    'n-nobackdrop': ([('pal', "        veil.addEventListener('mousedown', function (e) { if (e.target === veil) { e.preventDefault(); close(true); } });", "        // (no backdrop click)")], ['L-pkeys-backdropClose'], ['pkeys']),
+    'n-nobackdrop': ([('pal', "        veil.addEventListener('mousedown', function (e) { if (e.target === veil) { e.preventDefault(); jarvisCancel(); close(true); } });", "        // (no backdrop click)")], ['L-pkeys-backdropClose'], ['pkeys']),
     # --- (round 12) a hand-copied list missing a tool; the card's admin gate gone (a viewer's page carries the
     # menu, so the viewer sees the rows); the stub missing from the admin pages' bar
     't-handlist': ([('chrome', "    echo '<script>window.PENUMBRA_ADMIN_TOOLS = ' . json_encode($rows, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES) . ';</script>';",
@@ -326,11 +409,13 @@ MUTANTS = {
     'h-hiddencol': ([('pal', "        var hs = headers(), byName = {};\n        hs.forEach(function (th) { byName[", "        var hs = Array.prototype.slice.call(document.querySelectorAll('#tableHeader th[data-colname]')), byName = {};\n        hs.forEach(function (th) { byName[")], ['L-phand-hiddenNoRow'], ['phand']),
     # --- (round 15) the dialog words hand-copied (no wysiwyg); the option toggled on select; the rows for a viewer; a hand list missing one
     'u-handlist': ([('pal', "        if (root) { var ns = root.querySelectorAll(UI_SEL); for (i = 0; i < ns.length; i++) { txt.push(ns[i].textContent); } }\n", "        if (root) { txt.push('copy options clipboard csv tsv tab-delimited google sheets'); }\n")], ['L-pvo-wysiwyg', 'S-uiWords'], ['pvo']),
-    'v-toggles': ([('pal', "                       run: function () { openTab('#view-options-tab', function () { spotlight(target, focusEl); }); } });", "                       run: function () { openTab('#view-options-tab', function () { spotlight(target, focusEl); if (focusEl && focusEl.type === 'checkbox') { focusEl.click(); } }); } });")], ['L-pvo-optionUnchanged'], ['pvo']),
+    'v-toggles': ([('pal', "                           spotlight(t, f); }); } });\n", "                           spotlight(t, f); if (f && f.type === 'checkbox') { f.click(); } }); } });\n")], ['L-pvo-optionUnchanged'], ['pvo']),
     'v-viewer': ([('pal', "                       icon: { pal: 'settings' }, kw: 'view options editor ' + (small || ''), gate: 'admin', live: true,", "                       icon: { pal: 'settings' }, kw: 'view options editor ' + (small || ''), live: true,")], ['L-pvo-viewerNoRows'], ['pvo']),
     'v-handlist': ([('pal', "tab.querySelectorAll('.view-option-item input[type=\"checkbox\"]')", "tab.querySelectorAll('#viewOptionClickFilter, #viewOptionSearch, #viewOptionSnapshots, #viewOptionEmail, #viewOptionGrouping, #viewOptionClipboard, #viewOptionExport, #viewOptionPivot, #viewOptionViz, #viewOptionPagination, #viewOptionJournal, #viewOptionColumns')")], ['L-pvo-voCount', 'S-voSource'], ['pvo']),
     # --- (round 16) the row for a viewer; the text sent twice; placed but not sent; the summary box flipped
-    'j-viewer': ([('pal', "    function jarvisOn() { return !!vars().aiAllowed && !!el('toggleAiPanel')", "    function jarvisOn() { return !!el('toggleAiPanel')")], ['L-pjar-noRowViewer', 'S-jarvisGate'], ['pjar']),
+    'j-viewer': ([('pal', "    function jarvisOn() { return !!vars().aiAllowed && !!vars().canEditReport && !!(window.penumbraAi || el('toggleAiPanel'))", "    function jarvisOn() { return !!(window.penumbraAi || el('toggleAiPanel'))")], ['L-pjar-noRowViewer', 'L-pjar-noRowNonEditor', 'S-jarvisGate'], ['pjar']),
+    # (round 21) the editor gate dropped: a viewer who may not edit the report gets the row again (7857e04's state)
+    'j-noneditor': ([('pal', " && !!vars().canEditReport && !!(window.penumbraAi || el('toggleAiPanel'))", " && !!(window.penumbraAi || el('toggleAiPanel'))")], ['L-pjar-noRowNonEditor', 'S-jarvisGate'], ['pjar']),
     'j-double': ([('pal', "            var sb = byId('aiSendBtn'); if (sb) { click(sb); } else { input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); }   // the panel's own send (its Send button, else its Enter handler), once\n",
                           "            var sb = byId('aiSendBtn'); if (sb) { click(sb); }\n            setTimeout(function () { input.value = text; var sb2 = byId('aiSendBtn'); if (sb2) { click(sb2); } }, 500);\n")],
                  ['L-pjar-sendsOnce', 'S-jarvisOnce'], ['pjar']),
@@ -340,6 +425,59 @@ MUTANTS = {
     'c-unknown': ([('pal', "            e = comboEntries().filter(function (x) { return x.id === cid; })[0] || null;\n", "            e = comboEntries().filter(function (x) { return x.id === cid; })[0] || { id: cid, label: cid, icon: { pal: 'ask' }, avail: true, run: function () { } };\n")], ['L-pchip-unknownDropped'], ['pchip']),
     'c-applies': ([('pal', "if (!r) { return false; } try { r.run(); } catch (e2) { toast('That action could not run.'); return false; } return true; };", "if (!r) { return false; } try { r.run(); setTimeout(function () { var b = el('confirmGroupingBtn'); if (b) { click(b); } }, 300); } catch (e2) { toast('That action could not run.'); return false; } return true; };")], ['L-pchip-chipOpensNotApplies'], ['pchip']),
     'c-raw': ([('main', "            $msg.html(renderAiMarkdown(split.text));\n", "            $msg.html(renderAiMarkdown(text));\n")], ['L-pchip-blockNeverRaw', 'S-chipsSafe'], ['pchip']),
+    # --- (round 18a) the time budget gone: PHP's 90-s limit kills a slow provider call mid-flight again
+    'a-notime': ([('aia', "set_time_limit(360);\n$response = curl_exec($ch);\n", "$response = curl_exec($ch);\n")], ['S-aiTimeBudget'], []),   # (round 19a: the budget grew with the stream)
+    # --- (round 18b) a hand list of themes missing most of them; Report Default counted as a density again
+    'h-themelist': ([('pal', "        themeOptions().forEach(function (t) {\n            out.push({ id: 'combo:theme:'", "        [{ value: 'theme-default', label: 'Default Light' }, { value: 'theme-dark-blue', label: 'Dark Blue' }].forEach(function (t) {\n            out.push({ id: 'combo:theme:'")], ['L-pthm-everyTheme', 'S-themeSource'], ['pthm']),
+    'h-density': ([('pal', "                if (o.value === 'report-default') { return; }   // (round 18b) a choice, not a density: the three densities are rows\n", "")], ['L-pthm-densityThree'], ['pthm']),
+    # --- (round 19a) a partial SSE line dropped at a chunk boundary; the stream not requested
+    'a-nobuffer': ([('aia', "    $st['buf'] .= $chunk;\n", "    $st['buf'] = $chunk;\n")], ['S-aiStreamParse'], []),
+    'a-nostream': ([('aia', "        'stream' => true,       // (round 19a) the answer streams: bytes from the first token, never an idle connection\n", "")], ['S-aiStream'], []),
+    # --- (round 19b) the row forwards to the panel again; the answer put in raw; Esc does not abort; the answer not recorded as history
+    'j-forward': ([('pal', "                  run: function () { if (window.penumbraAi && typeof window.penumbraAi.ask === 'function') { askJarvis(t); } else { close(true); setTimeout(function () { askJarvisInPanel(t); }, 0); } } }];\n",
+                          "                  run: function () { close(true); setTimeout(function () { askJarvisInPanel(t); }, 0); } }];\n")], ['L-pjip-inPlace'], ['pjip']),
+    'j-rawhtml': ([('pal', "            ans.innerHTML = AI.render(split.text);   // the panel's own renderer: its markdown, its escaping\n", "            ans.innerHTML = split.text;\n")], ['L-pjip-sanitized', 'S-inPlace'], ['pjip']),
+    'j-noabort': ([('pal', "        if (jarvisReq && typeof jarvisReq.abort === 'function') { try { jarvisReq.abort(); } catch (e) { } }\n", "")], ['L-pjip-cancelAborts'], ['pjip']),
+    'j-nohistory': ([('main', "                    appendAiMessage('user', text);\n                    appendAiMessage('assistant', resp.reply);\n                    if (handlers.done) handlers.done(resp.reply);\n", "                    if (handlers.done) handlers.done(resp.reply);\n")], ['L-pjip-continueCarries', 'L-pjip-lateLands'], ['pjip']),
+    # --- (round 20) the Show rows not listed; the restricted gate dropped; the wrong hidden column shown; the row off by one; the page
+    # count floored; the Rows = All fill dropped; past the end not greyed; the verb left in; find routed to the filter; a FILTER column stripped
+    's-noshow': ([('pal', ".concat(voEntries()).concat(tabEntries()).concat(showEntries()).concat(tableEntries()).forEach(function (e) {", ".concat(voEntries()).concat(tabEntries()).concat(tableEntries()).forEach(function (e) {")], ['L-pshow-showAllRow'], ['pshow']),
+    's-norestrict': ([('pal', "        try { if (typeof a.restricted === 'function' && a.restricted()) { return out; } } catch (eR) { return out; }   // the menu's own gate\n", "")], ['L-pshow-restrictedNone'], ['pshow']),
+    's-wrongk': ([('pal', "avail: true, run: menuRun(anchor, 'show-' + k) });", "avail: true, run: menuRun(anchor, 'show-' + (k + 1)) });")], ['L-pshow-showOneRuns'], ['pshow']),
+    'g-offbyone': ([('pal', "            else { target = v.rows[n - 1]; }   // the Nth row shown\n", "            else { target = v.rows[n]; }   // the Nth row shown\n")], ['L-pjump-rowJump'], ['pjump']),
+    'g-pagemath': ([('pal', "                pages = Math.ceil(total / rpp);\n", "                pages = Math.floor(total / rpp);\n")], ['L-pjump-pageJump'], ['pjump']),
+    'g-nofill': ([('pal', "        if (FH && typeof FH.fillRow === 'function' && tr.closest('#resultsTable')) { try { FH.fillRow(tr); } catch (e2) { } }   // Rows = All: no page turn, the row's own fill\n", "")], ['L-pjump-lazyFill'], ['pjump']),
+    'g-norange': ([('pal', "            else if (n > total) { off = true; why = v.what + ' ' + nLabel(total) + ' rows'; }\n", "")], ['L-pjump-outOfRange'], ['pjump']),
+    'v-left': ([('pal', "            rest = t.slice(v.length).trim();\n", "            rest = t;\n")], ['L-pverb-verbFilterCond'], ['pverb']),
+    'v-findfilter': ([('pal', "kind: (v === 'find' || v === 'find in' || v === 'look for') ? 'find' : (v === 'filter by' ? 'by' : 'filter') };", "kind: (v === 'filter by' ? 'by' : 'filter') };")], ['L-pverb-verbFind'], ['pverb']),
+    'v-colstrip': ([('pal', "            if (thByName(v) || thByName(v.split(' ')[0])) { return null; }   // a column named FILTER / SEARCH / FIND / WHERE: its name, not a verb\n", "")], ['L-pverb-colNameKept'], ['pverb']),
+    # --- (round 21) the draft posted; the draft dropped; the dialog's Send pressed; the dialog's check dropped; chips put in
+    # past the dialog's tokenizer; your view not ticked; the address reaching the misses log
+    'n-autopost': ([('journal', "        compose: function (text) { open(); if (mentionMf && typeof mentionMf.setText === 'function') { mentionMf.setText(text || ''); } },\n", "        compose: function (text) { open(); if (mentionMf && typeof mentionMf.setText === 'function') { mentionMf.setText(text || ''); } setTimeout(postNote, 300); },\n")], ['L-pnote-notPosted'], ['pnote']),
+    'n-noprefill': ([('pal', "run: function () { close(true); setTimeout(function () { journalCompose(text); }, 0); } });", "run: function () { close(true); setTimeout(function () { journalCompose(''); }, 0); } });")], ['L-pnote-journalPrefilled'], ['pnote']),
+    'p-eager': ([('pal', "            if (lazy) { availNow[e.id] = true; }\n", "            if (lazy) { try { availNow[e.id] = e.avail(); } catch (err) { availNow[e.id] = 'Not available right now'; } }\n"),
+                 ('pal', "                avail: true, run: function () { var k = act('copy-other'); if (k && k.run && !k.disabled) { k.run(); } else { toast('Copy is not offered for this column'); } } });   // (round 24b) no menu build per keystroke\n",
+                  "                avail: function () { var k = act('copy-other'); return (k && !k.disabled) ? true : 'Not offered for this column'; }, run: function () { var k = act('copy-other'); if (k && k.run) { k.run(); } } });\n")], ['L-pperf-wideTyping'], ['pperf']),
+    'p-comboverb': ([('pal', "        else if ((cm = /^(group by|pivot by|chart|copy distinct values of|column options of)\\s+\\S/.exec(t))) {", "        else if (false && (cm = /^(group by|pivot by|chart|copy distinct values of|column options of)\\s+\\S/.exec(t))) {")], ['L-ptop-topGroupBy', 'L-ptop-topGroupPartial'], ['ptop']),
+    'm-autosend': ([('pal', "            try { input.focus(); var n = input.value.length; input.setSelectionRange(n, n); } catch (e2) { }\n        }, 4000);\n", "            try { input.focus(); var n = input.value.length; input.setSelectionRange(n, n); } catch (e2) { }\n            click(el('sendEmailBtn'));\n        }, 4000);\n")], ['L-pmail-nothingSent'], ['pmail']),
+    'm-novalidate': ([('pal', "            if (x.indexOf('@') >= 0) { (addressOk(x) ? emails : bad).push(x); }\n", "            if (x.indexOf('@') >= 0) { emails.push(x); }\n")], ['L-pmail-invalidGreyed'], ['pmail']),
+    'm-direct': ([('pal', "            if (emails.length) {\n                input.value = emails.join('; ');\n                if (typeof window.commitPendingRecipients === 'function') { window.commitPendingRecipients('#emailInputReal', '#emailRecipientContainer'); }   // the dialog's own tokenizer: chips\n            }\n", "            emails.concat(names).forEach(function (a) { var c = document.createElement('span'); c.className = 'email-capsule'; c.setAttribute('data-email', a); c.textContent = a; el('emailRecipientContainer').insertBefore(c, input); });\n")], ['L-pmail-opensPrefilled'], ['pmail']),
+    'm-noview': ([('pal', "            if (asv && shown(el('emailViewLinkRow')) && !asv.disabled && !asv.checked) { asv.checked = true; asv.dispatchEvent(new Event('change', { bubbles: true })); }   // your view, the dialog's own option\n", "")], ['L-pmail-viewLinkTicked'], ['pmail']),
+    'm-emaillog': ([('pal', "        text = missRedact(text);\n", "")], ['L-pmiss-emailRedacted', 'L-pmiss-beaconClean'], ['pmiss']),
+    # --- (round 22) a partial treated as a bad address (the row greyed); the partial committed as a chip; the verb rule gone from the redaction
+    'e-hidepartial': ([('pal', "            if (!done) { partial = x; return; }\n", "            if (!done) { bad.push(x); return; }\n")], ['L-pmail-partialName', 'L-pmail-partialAddress'], ['pmail']),
+    'e-commitpartial': ([('pal', "            if (partial) { rest.push(partial); }   // (round 22) a half-typed recipient: left in the input, uncommitted - the dialog's own autocomplete and validation take over\n", "            if (partial) { input.value = partial; if (typeof window.commitPendingRecipients === 'function') { window.commitPendingRecipients('#emailInputReal', '#emailRecipientContainer'); } }\n")], ['L-pmail-partialAddressOpens'], ['pmail']),
+    'm-redactpartial': ([('pal', "        if (e && e[2].trim()) { t = e[1] + ' [recipients]'; }\n", "")], ['L-pmiss-partialRedacted'], ['pmiss']),
+    # --- (round 22) a top match on a partial word (the exact-name rule relaxed); the top row repeated in its section
+    't-ambiguous': ([('pal', "        return (cands.length === 1 && starts === 1 && !cands[0].off) ? cands[0] : null;\n", "        return (cands.length >= 1 && !cands[0].off) ? cands[0] : null;\n")], ['L-ptop-noTopAmbiguous'], ['ptop']),
+    't-duplicate': ([('pal', "            sections.forEach(function (s) { var k = s.items.indexOf(top); if (k >= 0) { s.items.splice(k, 1); } });   // once: in the slot, not again below\n", "")], ['L-ptop-topSend'], ['ptop']),
+    # (round 22) the tab strip read as "#editorTabs > ul" again (the live bug)
+    'v-strip': ([('pal', "        return Array.prototype.filter.call(t.querySelectorAll('li > a[href^=\"#\"]'), function (a) { var h = a.getAttribute('href'); return h.length > 1 && !!t.querySelector(h); });\n", "        return Array.prototype.slice.call(t.querySelectorAll(':scope > ul > li > a[href^=\"#\"]'));\n")], ['L-pvo-optionOpens', 'L-pvo-tabRows'], ['pvo']),
+    # --- (round 23) the Table info rows for everyone (the console's gate dropped); an inventory row dropped (the static must catch the control)
+    'i-tablegate': ([('pal', "icon: { pal: 'column' }, kw: 'table stats info columns schema rows used in', gate: 'admin', live: true,", "icon: { pal: 'column' }, kw: 'table stats info columns schema rows used in', live: true,")], ['L-pr23-tableInfoViewer'], ['pr23']),
+    'i-norow': ([('pal', "        { id: 'managedata', label: 'Manage local data',", "        { id: 'managedata', label: 'Manage local data', hide: function () { return true; },")], ['L-pr23-manageData'], ['pr23']),
+    # --- (final sweep) the journal row back on the module's presence (the live bug)
+    'f-journalgate': ([('pal', "        var jb = el('journalBtn'), journalOn = !!(jb && shown(jb));\n", "        var jb = el('journalBtn'), journalOn = !!(jb && shown(jb) && window.PenumbraJournal);\n")], ['L-pnote-lazyJournal'], ['pnote']),
     'c-nogate': ([('pal', "        if (!visible(e, '') || dashHidden(e) || (typeof e.hide === 'function' && e.hide())) { return false; }   // the gates a row has (authoring, the page)\n", "        if (dashHidden(e) || (typeof e.hide === 'function' && e.hide())) { return false; }\n")], ['L-pchip-viewerGatedDropped', 'S-chipsSafe'], ['pchip']),
 }
 CHIPS_REPLY = json.dumps({'status': 'success', 'reply': 'Group the rows by their status and look at the open ones.\n\n```penumbra-actions\n' + json.dumps([
@@ -353,6 +491,18 @@ DASH_LIST_FIXTURE = json.dumps({"status": "success", "data": [
     {"short_id": "dshC", "title": "Sponsor spend", "owner_id": "other", "authorized": "vone", "created_at": "2026-10-03", "updated_at": "2026-10-17", "can_edit": False, "tags": []}]})
 # (the list as the server returns it to THIS caller: the cut itself is dash_gate_tests.php's to prove)
 
+# (2026-10-21, the searchrank follow-up) get_server_reports.php?mode=quicksearch&limit=8&search=EPA as live answered it on
+# 2026-10-21 (faaae25's tiers: the id starts with it, an id word starts with it, then four mid-word "Department" titles;
+# newest within each). ID and OWNER_ID are placeholders: the box reads SHORT_ID and TITLE.
+QS_EPA_FIXTURE = json.dumps({"status": "success", "data": [dict(zip(("ID", "SHORT_ID", "TITLE", "OWNER_ID", "UPDATED_AT"), r)) for r in (
+    (901, "epa-perm", "External Professional Activity (EPA) Permission Levels", "ownerx", "2026-08-11 21:19:23"),
+    (902, "fi-epa-c", "Financial Interest & External Professional Activities", "ownerx", "2026-10-21 15:25:17"),
+    (903, "fi-epa", "Financial Interest & External Professional Activities", "ownerx", "2026-10-20 22:13:40"),
+    (904, "fi-epa-c-spoofer", "Financial Interest & External Professional Activities (spoofer)", "ownerx", "2026-10-20 22:07:29"),
+    (905, "cdprop", "Proposals by Department and College Over the Past 5 Fiscal Years-to-Date", "ownerx", "2026-10-05 20:59:24"),
+    (906, "cdawd", "Awards by Department and College Over the Past 5 Fiscal Years-to-Date", "ownerx", "2026-10-05 20:55:11"),
+    (907, "hitratio", "Proposal Hit Ratio by College, Department and PI", "ownerx", "2026-10-05 11:21:24"),
+    (908, "award_compare_monthdeptprimespon", "Compare month to month, year to year, awards by sponsor and department.", "ownerx", "2026-08-20 16:26:14"))]})
 args = sys.argv[1:]
 def opt(name, default=None):
     if name in args:
@@ -384,7 +534,10 @@ RELS = {'main': os.path.join('js', 'main.js'), 'mod': os.path.join('js', 'penumb
         'chrome': 'penumbra_admin_chrome.php',   # (round 12) the admin tools registry + the admin pages' bar
         'disc': 'penumbra_discovery.php', 'mdash': 'manage_dashboard.php',   # (round 13) the discovery gates + the dashboards list
         'sb': os.path.join('js', 'search_builder.js'),   # (round 14) the search grammar's exports
-        'prompt': 'ai_system_prompt.php'}   # (round 17) the Jarvis system prompt (the contract section)
+        'prompt': 'ai_system_prompt.php',   # (round 17) the Jarvis system prompt (the contract section)
+        'aia': 'ai_assist.php',   # (round 18a) the proxy's time budget
+        'journal': os.path.join('js', 'penumbra_journal.js'),   # (round 21) the journal's compose
+        'chrome2': 'penumbra_admin_chrome.php'}   # (round 23) the inventory reads the chrome's markup too
 sys.path.insert(0, HERE)
 import mk_harness, mk_dash_harness, mk_adm_harness
 cand = {k: pick(v) for k, v in RELS.items()}
@@ -483,6 +636,78 @@ def help_stub(help_src):
     m = re.search(r'<div id="settings-tips-storage" hidden>.*?\n</div>', help_src, re.S)
     return 'window.__HELP_STUB = ' + json.dumps('<div id="searchHelpLightbox"></div>' + (m.group(0) if m else '')) + ';\n'
 
+RECIPIENTS_STUB = '[{"label": "Smith, Bob (bob)", "value": "bob@ncsu.edu", "fname": "Bob", "lname": "Smith", "username": "bob", "empl_id": "", "ouc": "", "ouc2d": "", "ouc4d": "", "dept": "", "jobcode": "", "jobcode_prefix": "", "empl_class": "", "empl_status": "", "pi_eligible": ""}]'
+JOURNAL_STUB = '{"status": "success", "installed": true, "data": [], "report": {"title": "A recent report"}}'
+
+# ---------------------------------------------------------------- (round 23) the entry-point inventory
+# Every clickable control with an id (a <button>, role="button", an <a href="#...">, a button-type input) in the page markup,
+# plus every id a JS click handler is bound to, must be an entry point the box offers (the module references the id:
+# tool / toolRun / has / el('id') or '#id') or sit in ENTRY_SKIP with the reason it is not a row. Recomputed on every run
+# from the files under test: a new button without a row (or a reason) is red.
+ENTRY_SKIP_RULES = [
+    # (regex over the id, reason) - the first rule that matches wins
+    (r'^(aiClearChat|aiClosePanel|aiSendBtn)$', 'the AI panel\'s own controls (the panel is a row)'),
+    (r'^audit|^refreshAuditLogBtn$', 'the Auditor tab\'s own controls (the tab is a row)'),
+    (r'^(cs[A-Z]|csClear|csLoad|csSave|csCancel|csAdd)', 'the custom sort dialog\'s own steps (a View Options row opens it)'),
+    (r'^(confirm|delete(All|Selected)|export|import|saveJsonStateBtn|saveAsCopyBtn|lastStopToggle|autoTitleBtn|reportTagsContainer|generateRandomIdBtn|resetUserPrefsBtn)', 'a step inside the Save / Manage local data dialogs (each dialog is a row)'),
+    (r'^(generatePrompt|testPrompt|resetPromptForm|generateSubquery|formatSubquerySql|resetSubqueryForm|promptSwapBoolean|linkToPromptGenerator|retryPromptLink|resetAllPromptsLink|selectDefaultsFromAutofill|sidebarImportPrompt)', 'the Tag Generator / prompt form\'s own steps (the generator is a row)'),
+    (r'^(viz|copyChartImage|downloadChart|injectVizInfoboxBtn|removeVizSnippetBtn|updateVizSnippetBtn|copyViz)', 'the chart builder\'s own tabs and steps (the builder is a row)'),
+    (r'^(copy(Copy|Group|Pivot)SnippetBtn|updatePivotSnippetBtn|downloadCopySnippetBtn|confirmCopyBtn|createDownloadLinkBtn|dlLink|pnbDlManual)', 'a step inside the Copy / Download dialogs (each is a row)'),
+    (r'^(generatePivotBtn|modifyPivotBtn|resetPivotBtn|pivotTransposeBtn|closePivotBtn|pivot-agg-table)$', 'the pivot builder\'s own steps (the builder, Exit the pivot view and the pivot rows cover it)'),
+    (r'^(resetGroupingBtn|configureGroupingBtn|removeGroupingLink|ungroupBtn)$', 'the Group dialog\'s own steps (Group, Ungroup, Expand / Collapse all groups are rows)'),
+    (r'^(snap|dm|pnbSnapHdr|createSnap|compareSnapshot|loadSnapshotBtn|linkToSchedulerFromSnapshot|unifiedSnapshotTableBody|schedOpenSnapshots|createNewSnapshotBtnV2)', 'a step inside the Snapshots dialog (the dialog is a row; a snapshot is created there)'),
+    (r'^(sched|clearSchedSearch|refreshSchedulerBtn|refreshCronPreview|testRun|addNewTaskBtn|cancelTaskBtn|saveTaskBtn|deleteTaskBtn|runner)', 'the Scheduler tab\'s own steps (the tab, a new email task and Manage schedules are rows; the global pause is an admin-only switch)'),
+    (r'^(journal|jHist)', 'the Report journal panel\'s own controls (the journal and Add a note are rows)'),
+    (r'^(helpCenter|helpMatch|pnbAsk)', 'the Help Center\'s own controls (the Help Center and Ask help are rows)'),
+    (r'^(sendEmailBtn|resetEmailSettingsBtn)$', 'the Email dialog\'s own buttons (the dialog is a row; Send is the person\'s)'),
+    (r'^(sbColsPop|sbCustomCols|sbFrozen|sbGroup$|sbGroupPop|sbGroupPresetList|sbGroupSharedList|sbGrp|sbPivot$|sbPivotPop|sbPivotPresetList|sbPivotSharedList|sbPivotOpenBuilder|sbSnap|sbSnapshot|sbRf|sbTableHidden|sbAsOf$|sbAsOfHistory|sbColsSeg|sbColsOpen|sbColsSettings)', 'a status-bar indicator or its popover\'s own buttons (the state they show has its row: Group, Pivot, Snapshots, Freeze, Version history, Settings)'),
+    (r'^(sbPaletteBtn|searchPaletteIcon)$', 'the box itself'),
+    (r'^copyViewLinkBtn$', 'Copy a link to this view (a row, through PenumbraViewLink.copy)'),
+    (r'^(scrollTopBtn|scrollBottomBtn)$', 'Scroll to the top / bottom (rows, through scrollEdge)'),
+    (r'^searchHelpIcon$', 'the Help Center (a row)'),
+    (r'^(searchBuilderIcon|schedSearchBuilderIcon|sbAddConditionBtn|sbClearBtn|sbSubmitBtn|searchBuilderLightbox)$', 'the Visual filter builder (a row) and its own steps'),
+    (r'^(tableSearchCols|tableSearchPlay|activeFilterIcon)$', 'the filter box\'s own controls (Jump to the filter box, Clear the filter are rows)'),
+    (r'^(sp[A-Z]|settingsPanelClose|settingsPanelOverlay)', 'the Settings panel\'s own controls (the panel, Clear preferences, Keyboard shortcuts, themes and densities are rows)'),
+    (r'^(repo|sr[A-Z]|openReport|reportFilterInput)', 'repository.php\'s own page (Open the report list is a row)'),
+    (r'^dash', 'dashboard.php\'s own controls (dashEntries reads them on that page)'),
+    (r'^(pnbPaste|pnbScratch)', 'the paste / scratch overlays (mid-flow)'),
+    (r'^(importCautionIcon|snapshotCautionIcon)$', 'a dismiss icon on a caution banner'),
+    (r'^(authAccessContainer|helpCenterLightbox|dlLinkOptionsLightbox|toggleDockBtn|btnDecrypt|confirmPauseBtn|manualApplySnippetBtn|copyServerUrlLink|undeleteReportBtn|viewLastPageLink|clearSelectorSearch|clearSnipHelperSearch|schedSaveReportLink|testRunCancelLink|exportStatesToFileBtn)', 'a container, a confirm step, or a link inside another flow'),
+]
+def entry_inventory(texts):
+    import re as _re
+    markup = {'index': texts.get('index', ''), 'dash': texts.get('dash', ''), 'chrome': texts.get('chrome', '')}
+    jss = {'main': texts.get('main', ''), 'journal': texts.get('journal', ''), 'sb': texts.get('sb', '')}
+    for f in os.listdir(os.path.join(APP, 'js')):
+        if f.endswith('.js') and not f.endswith('.min.js') and f not in ('main.js', 'penumbra_journal.js', 'search_builder.js', 'penumbra_palette.js', 'penumbra_palette_boot.js'):
+            jss[f] = read_b(os.path.join(APP, 'js', f))
+    handled = set()
+    for t in jss.values():
+        for p in (r"\$\(['\"]#([A-Za-z0-9_-]+)['\"]\)\s*\.(?:on|one)\(\s*['\"]click", r"\$\(['\"]#([A-Za-z0-9_-]+)['\"]\)\s*\.click\(\s*function",
+                  r"\$\(document\)\.on\(\s*['\"]click[^'\"]*['\"]\s*,\s*['\"]#([A-Za-z0-9_-]+)['\"]", r"getElementById\(['\"]([A-Za-z0-9_-]+)['\"]\)\s*\.addEventListener\(\s*['\"]click",
+                  r"\$\(['\"]#([A-Za-z0-9_-]+)['\"]\)\s*\.off\([^)]*\)\s*\.on\(\s*['\"]click"):
+            handled |= set(_re.findall(p, t))
+    ids = set()
+    for t in markup.values():
+        for m in _re.finditer(r'<(button|a|svg|span|div|input|label|li)\b([^>]*)>', t, _re.S):
+            tag, attrs = m.group(1), m.group(2)
+            idm = _re.search(r'\bid="([A-Za-z0-9_-]+)"', attrs)
+            if not idm: continue
+            isbtn = tag == 'button' or 'role="button"' in attrs or (tag == 'a' and _re.search(r'href="(#|javascript)', attrs)) or (tag == 'input' and _re.search(r'type="(button|submit)"', attrs))
+            if isbtn or idm.group(1) in handled: ids.add(idm.group(1))
+    return sorted(ids | handled)
+def entry_points_check(texts):
+    import re as _re
+    pal = texts['pal']
+    refs = set(_re.findall(r"(?:tool|toolRun|has|el)\(['\"]([A-Za-z0-9_-]+)['\"]\)", pal)) | set(_re.findall(r"['\"]#([A-Za-z0-9_-]+)['\"]", pal)) | set(_re.findall(r"getElementById\(['\"]([A-Za-z0-9_-]+)['\"]\)", pal))
+    inv = entry_inventory(texts)
+    bad = []
+    for i in inv:
+        if i in refs: continue
+        if any(_re.search(rx, i) for rx, _ in ENTRY_SKIP_RULES): continue
+        bad.append(i)
+    return inv, bad
+
 def write_stage(texts):
     def w(name, s): open(os.path.join(stage, name), 'wb').write(s.encode('utf-8', 'surrogateescape'))
     w('penumbra_admin_chrome.php', texts['chrome'])
@@ -492,7 +717,7 @@ def write_stage(texts):
     os.makedirs(os.path.join(stage, 'help'), exist_ok=True)
     w(os.path.join('help', 'functions_index.php'), texts['fni'])   # (the chrome's stub tag needs pnb_help_functions_ver())
     menu_html = render_chrome('menu') if texts['chrome'] else ''
-    w('harness.html', mk_harness.build(texts['index'], menu_html))
+    w('harness.html', mk_harness.build(texts['index'], menu_html, render_themes()))   # (round 18b) the registry's theme options
     w('adm.html', mk_adm_harness.build(render_chrome('bar') if texts['chrome'] else ''))   # (round 12) an admin tool page
     w('dash.html', mk_dash_harness.build())   # (round 6) dashboard.php's stand-in
     w('help_stub.js', help_stub(texts['help']))
@@ -511,10 +736,15 @@ def write_stage(texts):
     w('search_builder.js', texts['sb'])   # (round 14) the search builder under test (the harness loads it after main.js, as index.php does)
     w('ai_assist_stub.json', '{"status": "success", "reply": "A stub answer."}')   # (round 16) what the panel's send gets back (penumbra_vars.aiProxyUrl in the scenario)
     w('ai_assist_chips.json', CHIPS_REPLY)   # (round 17) the canned reply with a penumbra-actions block
+    w('penumbra_journal.js', texts.get('journal', ''))   # (round 21) the journal module under test (pnote loads it)
+    w('get_email_recipients.php', RECIPIENTS_STUB)   # (round 21) the dialog's directory list, answered for any term
+    w('manage_journal.php', JOURNAL_STUB)   # (round 21) the journal's list (and any POST), answered
     os.makedirs(os.path.join(stage, '_src'), exist_ok=True)
     w(os.path.join('_src', 'manage_dashboard.php'), texts['mdash'])   # (round 13) dash_gate_tests.php reads it here; the browser gets the fixture list
+    w(os.path.join('_src', 'ai_assist.php'), texts.get('aia', ''))   # (round 19a) ai_stream_tests.php reads it here
     w('manage_dashboard.php', DASH_LIST_FIXTURE)
     w('manage_dashboard_none.json', '{"status": "success", "data": []}')
+    w('quicksearch_epa.json', QS_EPA_FIXTURE)   # (2026-10-21) the quicksearch's answer for psrank (the driver points the box's call here)
     # (round 7) the functions and tags index as the harness serves it (help_functions.json), built by PHP from the
     # staged builder over the live help sources; the control (no builder on live) gets an empty object
     os.makedirs(os.path.join(stage, 'help'), exist_ok=True)
@@ -581,6 +811,31 @@ def contract_check(pal, prompt):
         return (not missing and not extra and not badacts and short, 'kinds %d, missing %s, extra %s, bad action ids %s, section %d chars' % (len(kinds), missing, extra, badacts, len(sec)))
     except Exception as e:
         return (False, 'contract_check: %s' % e)
+
+def time_budget_check(aia):
+    """(round 18a) set_time_limit(N) sits right before the provider's curl_exec, with N above every CURLOPT_TIMEOUT in the file."""
+    m = re.search(r'set_time_limit\((\d+)\);\s*\n\$response = curl_exec\(\$ch\);', aia)
+    if not m: return False
+    n = int(m.group(1)); tos = [int(x) for x in re.findall(r'CURLOPT_TIMEOUT, (\d+)\)', aia)]
+    return bool(tos) and n > max(tos) and n <= 600   # (round 19a: a streamed answer may take minutes)
+
+def render_themes():
+    """(round 18b) the Settings panel's theme options as index.php renders them (themes_config.php via php -n); '' on failure."""
+    try:
+        r = subprocess.run([PHP, '-n', os.path.join(HERE, 'render_themes.php'), os.path.join(APP, 'themes_config.php')], capture_output=True, text=True, timeout=60, cwd=tempfile.gettempdir())
+        return r.stdout if (r.returncode == 0 and '<option' in (r.stdout or '')) else ''
+    except Exception as e:
+        print('    render_themes: %s' % e); return ''
+
+def sse_tests():
+    """(round 19a) ai_stream_tests.php over the staged ai_assist.php: (ok, the last line)."""
+    try:
+        r = subprocess.run([PHP, '-n', os.path.join(HERE, 'ai_stream_tests.php'), '--file', os.path.join(stage, '_src', 'ai_assist.php')],
+                           capture_output=True, text=True, timeout=120, cwd=tempfile.gettempdir())
+        lines = [x for x in (r.stdout or '').splitlines() if x.strip()]
+        return (r.returncode == 0 and bool(lines) and lines[-1].startswith('SSE: GREEN'), (lines[-1] if lines else (r.stderr or 'no output'))[:300])
+    except Exception as e:
+        return (False, 'ai_stream_tests.php: %s' % e)
 
 def chrome_pages():
     """(round 12) every admin tool the registry names mounts the chrome's status bar, or IS index.php / analytics_all.php."""
@@ -670,19 +925,52 @@ def static_checks(texts):
         ('S-uiWords', "var UI_SEL = '.pnb-dlg-title, .pnb-dlg-sub, label, small, h4, legend, button, option, .pnb-subset-tip';" in pal and 'root.querySelectorAll(UI_SEL)' in pal
          and 'wysiwyg' not in pal.lower() and pal.count("dlg: '#") >= 8 and '|| (question ? null : uiMatch(q, e))' in pal, ''),
         ('S-voSource', "tab.querySelectorAll('.view-option-item input[type=\"checkbox\"]')" in pal and 'viewOptionClickFilter' not in pal and 'viewOptionBareHeader' not in pal
-         and "spotlight(target, focusEl); }); } });" in pal and 'focusEl.click()' not in pal, ''),
-        ('S-tabsSource', "document.querySelectorAll('#editorTabs > ul > li > a[href^=\"#\"]')" in pal and "click(el('addNewTaskBtn'))" in pal and "s.value = 'EMAIL';" in pal, ''),
+         and "spotlight(t, f); }); } });" in pal and 'f.click()' not in pal, ''),   # (round 22) the option looked up again at run time
+        ('S-tabsSource', "var out = [], as = tabLinks();" in pal and "t.querySelectorAll('li > a[href^=\"#\"]')" in pal and "click(el('addNewTaskBtn'))" in pal and "s.value = 'EMAIL';" in pal, ''),
         # (round 16) the gate is the server's own, read by index.php into penumbra_vars.aiAllowed and read bare by the module; the
         # send is the panel's own Enter handler, dispatched once, the summary box and the send button untouched by the module;
         # main.js reads the panel PiP-aware in its send and its message append
         ('S-jarvisGate', 'aiAllowed: <?php echo json_encode((bool)penumbraIsConsoleAudience($isAdmin, $userGrants, $currentUserKey)); ?>,' in idx
-         and "function jarvisOn() { return !!vars().aiAllowed && !!el('toggleAiPanel') && !!reportId() && !onDashboard() && !onAdminPage(); }" in pal
+         and "function jarvisOn() { return !!vars().aiAllowed && !!vars().canEditReport && !!(window.penumbraAi || el('toggleAiPanel')) && !!reportId() && !onDashboard() && !onAdminPage(); }" in pal
          and "var $input = $(window._pnbById ? window._pnbById('aiChatInput') : '#aiChatInput');" in main and "var $container = $(window._pnbById ? window._pnbById('aiChatMessages') : '#aiChatMessages');" in main, ''),
         ('S-jarvisOnce', pal.count("var sb = byId('aiSendBtn'); if (sb) { click(sb); }") == 1 and pal.count("byId('aiSendBtn')") == 1 and 'aiProfileOn' not in pal
          and "typeof window._pnbById === 'function'" in pal, ''),
         # (round 17) the contract: the prompt's kinds and action ids agree with the module's (static per deploy); the chips are safe: the
         # block cut out before rendering, the label escaped, the arguments kept as data (never attributes), the gates in resolve
         ('S-contract',) + contract_check(pal, texts.get('prompt', '')),
+        # (round 18a) the proxy's time budget covers the provider call: set right before curl_exec and above every CURLOPT_TIMEOUT
+        ('S-aiTimeBudget', time_budget_check(texts.get('aia', '')), ''),
+        # (round 19b) the box renders the answer with the panel's own renderer, through the panel's own request
+        ('S-inPlace', 'window.penumbraAi = {' in main and 'function penumbraAiContextParts(dbType) {' in main and 'var contextParts = penumbraAiContextParts(dbType);' in main
+         and "ans.innerHTML = AI.render(split.text);" in pal and "setMode({ kind: 'jarvis', q: text, state: 'waiting' }, true);" in pal and 'jarvisCancel(); close(true);' in pal, ''),
+        # (round 19a) the streamed call: requested, consumed by the write function, budgeted (330 s, a 60-s stall), the client waits 340 s
+        ('S-aiStream', "'stream' => true," in texts.get('aia', '') and 'curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($c, $chunk) use (&$sse, &$raw) { $raw .= $chunk; penumbra_ai_sse_consume($chunk, $sse); return strlen($chunk); });' in texts.get('aia', '')
+         and 'curl_setopt($ch, CURLOPT_TIMEOUT, 330);' in texts.get('aia', '') and 'curl_setopt($ch, CURLOPT_LOW_SPEED_TIME, 60);' in texts.get('aia', '') and "'max_tokens' => 8000," in texts.get('aia', '')
+         and 'timeout: 340000,' in main and "if ($ai_provider === 'anthropic') { $response = $raw; }" in texts.get('aia', ''), ''),
+        ('S-aiStreamParse',) + sse_tests(),
+        # (the final sweep) the journal row follows the button; greyed rows at an AA-friendly opacity; the tip names the slot
+        ('S-final', 'function journalCompose(draft) {' in pal and "var jb = el('journalBtn'), journalOn = !!(jb && shown(jb));" in pal and '.pnb-pal-it.is-off .pnb-pal-lab, .pnb-pal-it.is-off .pnb-pal-pos { color: var(--text-muted, #666); }' in texts['pcss'] and '.pnb-pal-it.is-sel .pnb-pal-lab { color: color-mix(in srgb, var(--brand-text, var(--brand-primary, #336699)) 60%, var(--text-main, #222));' in texts['pcss'] and 'var(--text-muted, #666) 65%, var(--text-main, #222)' in texts['pcss'] and 'border: 1px solid color-mix(in srgb, var(--accent-success, #1a7f37) 55%, transparent);' in texts['pcss'] and 'function rowText(r) {' in pal and 'rowText(r).replace' in pal and 'uiWordsCache[key] = e.ui;' in pal
+         and 'add a note, unhide, group by, ask)' in texts['help'] and 'add a note, unhide, group by, ask)' in texts['topic'] and "'copy distinct values of': 'copydistinct', 'column options of': 'colopts' }[cm[1]];" in pal, ''),
+        # (round 23) the inventory: every control an entry point or a listed reason; the Table info rows from the server's list through the exported opener
+        ('S-entryPoints',) + (lambda r: (not r[1], 'inventory %d, without a row or a reason: %s' % (len(r[0]), r[1])))(entry_points_check(texts)),
+        ('S-r23', 'function tableEntries()' in pal and 'vars().reportTables' in pal and 'window.penumbraShowTableInfo(name)' in pal and 'window.penumbraShowTableInfo = function (t, tab) { showTableInfoDialog(String(t || \'\'), tab); };' in main
+         and 'reportTables: <?php echo json_encode(array_values(array_map(\'strval\', is_array($reportTables) ? $reportTables : array())));' in idx and 'Table info: TABLE' in texts['topic'], ''),
+        # (round 22) the row from the first word: the rest optional, the partial handed to the dialog uncommitted, the verb rule in the redaction
+        ('S-r22', 'function topMatch(q, c)' in pal and "sections.unshift({ title: 'Top match', items: [top] });" in pal and 'function tabLinks()' in pal and "'#editorTabs > ul" not in pal
+         and "(?:\\s+to\\b)?(?:\\s+(.*))?$/i;" in pal and "if (!done) { partial = x; return; }" in pal and "if (partial) { rest.push(partial); }" in pal
+         and "t = e[1] + ' [recipients]';" in pal and 'keep typing, or press Enter to finish the address in the dialog' in pal and 'a half-typed recipient is left in the input' in texts['topic'], ''),
+        # (round 21) the notes and the email go through the editors' and the dialog's own paths; the redaction sits before the beacon
+        ('S-r21', 'function noteRows(q)' in pal and 'function mailRows(q)' in pal and "window.commitPendingRecipients('#emailInputReal', '#emailRecipientContainer')" in pal
+         and "autocomplete('search', lastTok)" in pal and 'function missRedact(text)' in pal and '        text = missRedact(text);' in pal
+         and 'window.penumbraLooksLikeEmail = penumbraLooksLikeEmail;' in main and 'setText: setText,' in main and 'window.Penumbra.noteCardPrefill = function (text) {' in main
+         and 'compose: function (text) { open();' in texts.get('journal', '') and 'Add a note to the Report journal' in texts['topic'] and 'Email this report to' in texts['topic'], ''),
+        # (round 20) the Show rows run the menu's own items, the jumps go through findHost, the verb router exists, the help and the stylesheet carry the round
+        ('S-r20', "showAll: 'a top-level entry (Show all hidden columns)'" in pal and 'function showEntries()' in pal and 'function jumpRows(q)' in pal and 'function verbRoute(q)' in pal
+         and 'FH.showRow(tr)' in pal and 'FH.fillRow(tr)' in pal and 'pnb-pal-rowspot' in pal and 'pnb-pal-rowspot' in texts['pcss']
+         and 'Show all hidden columns' in texts['topic'] and 'Go to a row or a page' in texts['topic'] and 'a verb first' in texts['topic'], ''),
+        # (round 18b) the theme rows come from the page's own select (themeOptions), no theme name is written in the module
+        ('S-themeSource', "themeOptions().forEach(function (t) {\n            out.push({ id: 'combo:theme:' + t.value, label: 'Theme: ' + t.label," in pal
+         and 'Default Light' not in pal and 'Dark Blue' not in pal and "if (o.value === 'report-default') { return; }" in pal, ''),
         ('S-chipsSafe', '$msg.html(renderAiMarkdown(split.text));' in main and "$chip.data('pnbAction', { id: a.id, args: a.args });" in main and '_pnbAiEsc(r.label)' in main
          and 'eval(' not in main.split('function _pnbAiActionsSplit')[1].split('function appendAiMessage')[0]
          and "if (!visible(e, '') || dashHidden(e) || (typeof e.hide === 'function' && e.hide())) { return false; }" in pal and 'P.describe = function' in pal and 'P.resolve = function' in pal and 'P.run = function' in pal, ''),
@@ -788,7 +1076,10 @@ SHOT7 = {'pshot7f': os.environ.get('PNB_SHOT7F') or os.path.join(tempfile.gettem
          'pshot14b': os.environ.get('PNB_SHOT14B') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot14b.png'),   # (round 14) a no-match text
          'pshot15': os.environ.get('PNB_SHOT15') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot15.png'),   # (round 15) "view options" as an admin
          'pshot16': os.environ.get('PNB_SHOT16') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot16.png'),   # (round 16) a question, Ask Jarvis first
-         'pshot17': os.environ.get('PNB_SHOT17') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot17.png')}   # (round 17) a reply with chips
+         'pshot17': os.environ.get('PNB_SHOT17') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot17.png'),   # (round 17) a reply with chips
+         'pshot19': os.environ.get('PNB_SHOT19') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot19.png'),   # (round 19b) an answer in the box
+         'pshot20': os.environ.get('PNB_SHOT20') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot20.png'),   # (round 20) "row 250": Go to first
+         'pshot21': os.environ.get('PNB_SHOT21') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot21.png')}   # (round 21) an email row first
 
 def run_browser(scns):
     out = []

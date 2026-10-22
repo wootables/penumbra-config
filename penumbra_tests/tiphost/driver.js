@@ -15,9 +15,10 @@
 //      Window", focus on "Return to Tab") is closed by the move - not left
 //      behind in the window the console leaves, not stale on the button
 //   R  Return to Tab: the same tooltips open in the tab again
-//   M  (?mountpopped=1, a page of its own) the Custom Code panel first built
-//      INSIDE the console window: its tooltips open there, then in the tab
-//      after Return to Tab
+//   (2026-10-22, fnpop) the Custom Code helpers and function underlines are no
+//   longer jQuery UI tooltips: P1-P3, R2 and the ?mountpopped=1 page (M) moved
+//   to the fnpop suite; real_input.py X2-X4/X7 now check their cards. Then the File Drop
+//   string() help and the cron help (fnpop 2): P5, P6, D2, P8 to fnpop phase T; X5 a card.
 (function () {
   var R = [];
   function rec(name, pass, detail) { R.push({ name: name, pass: !!pass, detail: detail === undefined ? '' : String(detail).slice(0, 900) }); }
@@ -30,7 +31,6 @@
     document.getElementById('out').textContent = 'RESULTS_JSON:' + JSON.stringify(payload);
   }
   var H = window.__TTH || {};
-  var MOUNT_POPPED = /[?&]mountpopped=1/.test(location.search);
 
   function popWin() { var p = window._admPip; return (p && p.active && p.win && !p.win.closed) ? p.win : null; }
   // Wherever the element lives right now - the console moves between documents.
@@ -127,7 +127,7 @@
     await sleep(150);
     if (id === 'report-options-tab') {
       for (var k = 0; k < 100; k++) {
-        var ico = el('#snipHelperList .snip-ico[title]');
+        var ico = el('#snipHelperList .snip-ico[data-card]');
         var fn = el('#report-options-tab .CodeMirror .cm-function-underline[data-fn="sum"]');
         if (ico && fn && hittable(ico) && hittable(fn)) break;
         await sleep(50);
@@ -156,18 +156,16 @@
   // A tooltip that opened where it should, for a target a pointer could reach.
   function okIn(x, w) { return x.hit && x.where === w && x.visible && x.descOk && x.closed; }
 
-  function snipIco(group) { return el('#snipHelperList .snip-group[data-group="' + group + '"] .snip-ico[title]'); }
   // The console's tooltips: what each is opened on, the widget that owns it,
   // and the console tab that has to be in front for a pointer to reach it.
   function cases() {
-    var panel = el('#snippetHelperPanel'), rot = el('#report-options-tab'), cc = 'report-options-tab', sch = 'scheduler-tab';
+    var cc = 'report-options-tab';
     return [
-      { key: 'shortcuts', tab: cc, what: 'a Custom Code Shortcuts helper', t: function () { return snipIco('shortcuts'); }, host: panel },
-      { key: 'functions', tab: cc, what: 'a Custom Code Functions helper', t: function () { return snipIco('functions'); }, host: panel },
-      { key: 'underline', tab: cc, what: 'a function underline in the snippet editor', t: function () { return el('#report-options-tab .CodeMirror .cm-function-underline[data-fn="sum"]'); }, host: rot },
-      { key: 'focus', tab: cc, what: 'a console button\'s title tooltip opened by keyboard focus', t: function () { return el('#tthConsoleBtn'); }, host: document, how: 'focus' },
-      { key: 'filedrop', tab: sch, what: 'the scheduler File Drop string() help', t: function () { return el('#schedDropTplStringHelp'); }, host: el('#schedDropTplStringHelp') },
-      { key: 'cron', tab: sch, what: 'the scheduler cron help', t: function () { return el('#cronExprHelp'); }, host: el('#cronExprHelp') }
+      // (2026-10-22, fnpop) the Custom Code helpers and the function underlines left jQuery UI:
+      // their cards are a popover of the lazy module, suite fnpop. P1-P3 retired with them.
+      { key: 'focus', id: 'P4', tab: cc, what: 'a console button\'s title tooltip opened by keyboard focus', t: function () { return el('#tthConsoleBtn'); }, host: document, how: 'focus' }
+      // (2026-10-22, fnpop 2) the File Drop string() help and the cron help left jQuery UI too:
+      // a hover card of main.js (_pnbHoverCard), suite fnpop phase T. P5, P6, D2, P8 retired.
     ];
   }
   async function probeCase(c) {
@@ -196,7 +194,8 @@
   function phaseS() {
     var ran = typeof window._pnbBodyFor === 'function' && !!window._admPip && !!document.getElementById('popOutWindowBtn');
     // (The Custom Code panel builds its widget when the tab first opens - D1 / M0.)
-    var hosts = ['#report-options-tab', '#schedDropTplStringHelp', '#cronExprHelp'].filter(function (s) { return !inst(el(s)); });
+    // (#report-options-tab's widget is gone since 2026-10-22: its function cards are fnpop's.)
+    var hosts = ['#tthFnEdge'].filter(function (s) { return !inst(el(s)); });
     if (!inst(document)) hosts.push('document');
     var patched = !!($.ui && $.ui.tooltip && $.ui.tooltip.prototype._pnbOwnDocument);
     rec('S1 main.js ran to its end (the pop-out engine and the WINDOW TOOLS bar exist) and every tooltip host carries its widget',
@@ -210,10 +209,8 @@
       det.push(c.key + ': ' + fmt(x));
       if (!(okIn(x, 'tab') && x.liveWhere === 'tab')) bad.push(c.key);
     }
-    rec('D1 docked: all six console tooltips open in the tab - target hittable, visible, described-by resolving, live region there - and close (stock behaviour)',
+    rec('D1 docked: the console\'s focus tooltip opens in the tab - target hittable, visible, described-by resolving, live region there - and close (stock behaviour)',
         bad.length === 0, (bad.length ? 'BAD ' + bad.join(',') + ' | ' : '') + det.join(' | '));
-    var rep = await probe(el('#templateStringHelp'), el('#templateStringHelp'));
-    rec('D2 docked: the report-side copy-dialog string() help opens in the tab', okIn(rep, 'tab'), fmt(rep));
   }
 
   async function phaseP() {
@@ -221,24 +218,20 @@
     rec('P0 "Open in Window" moved the console into a real window.open() window, narrower than the tab (so a wrong-window flip/fit shows)',
         !!(pw && pw.document.getElementById('admWrapper') && !document.getElementById('admWrapper') && pw.innerWidth + 300 <= window.innerWidth),
         'console window ' + (pw ? pw.innerWidth + 'x' + pw.innerHeight : '-') + ', tab ' + window.innerWidth + 'x' + window.innerHeight);
-    var n = 1;
     for (var c of cases()) {
       var x = await probeCase(c);
-      rec('P' + n + ' popped out: ' + c.what + ' opens its tooltip IN THE CONSOLE WINDOW, visible, described-by resolving there, and closes',
+      rec(c.id + ' popped out: ' + c.what + ' opens its tooltip IN THE CONSOLE WINDOW, visible, described-by resolving there, and closes',
           okIn(x, 'console window'), fmt(x));
-      if (c.key === 'shortcuts' || c.key === 'focus') {
-        rec('P' + n + 'L ...and jQuery UI\'s screen-reader live region moved to the console window with the tooltip\'s text (' + c.key + ')',
+      if (c.key === 'focus') {
+        rec(c.id + 'L ...and jQuery UI\'s screen-reader live region moved to the console window with the tooltip\'s text (' + c.key + ')',
             x.liveWhere === 'console window' && x.liveHasText, 'live region: ' + x.liveWhere + (x.liveHasText ? ', has the text' : ', text missing'));
       }
-      n++;
     }
     await tab('report-options-tab');
-    var edge = await probe(el('#tthFnEdge'), el('#report-options-tab'));
+    var edge = await probe(el('#tthFnEdge'), el('#tthFnEdge'));
     var inside = !!edge.node && edge.rect.left >= -0.5 && edge.rect.right <= edge.viewW + 0.5;
-    rec('P7 popped out: a function underline at the console window\'s right edge flips/fits its tooltip INSIDE that window (not against the wider tab)',
+    rec('P7 popped out: a console tooltip at the console window\'s right edge flips/fits INSIDE that window (not against the wider tab)',
         okIn(edge, 'console window') && inside, fmt(edge) + '; tab is ' + window.innerWidth + ' wide');
-    var rep = await probe(el('#templateStringHelp'), el('#templateStringHelp'));
-    rec('P8 popped out: the report-side copy-dialog string() help still opens in the TAB', okIn(rep, 'tab'), fmt(rep));
     var fb = await probe(el('#tthReportBtn'), document, 'focus');
     rec('P9 popped out: a report-side title tooltip opened by focus still opens in the TAB, live region with it', okIn(fb, 'tab') && fb.liveWhere === 'tab', fmt(fb));
   }
@@ -250,11 +243,8 @@
       det.push(c.key + ': ' + fmt(x));
       if (!okIn(x, 'tab')) bad.push(c.key);
     }
-    rec('R1 back in the tab: all six console tooltips open in the tab again - target hittable, visible, described-by resolving - and close',
+    rec('R1 back in the tab: the console\'s focus tooltip opens in the tab again - target hittable, visible, described-by resolving - and close',
         bad.length === 0, (bad.length ? 'BAD ' + bad.join(',') + ' | ' : '') + det.join(' | '));
-    await tab('report-options-tab');
-    var s = await probe(snipIco('shortcuts'), el('#snippetHelperPanel'));
-    rec('R2 back in the tab: the Custom Code panel\'s live region followed its tooltip home', okIn(s, 'tab') && s.liveWhere === 'tab' && s.liveHasText, 'live region: ' + s.liveWhere);
   }
 
   // Open a tooltip and leave it open (the pointer / focus stays put).
@@ -271,7 +261,14 @@
     }).length;
   }
 
+  // P7's target: a console tooltip hard against the right edge. Its widget is made here, DOCKED,
+  // as main.js makes its own (the function underline it used to be left jQuery UI, fnpop).
+  function edgeWidget() {
+    $('#tthFnEdge').attr('title', 'An edge tooltip: long enough that a flip/fit against the wrong window would push it outside the console window.')
+      .tooltip({ items: '#tthFnEdge', content: function () { return $(this).prop('title'); }, show: { delay: 100 } });
+  }
   async function pageMain() {
+    edgeWidget();
     phaseS();
     await tab('report-options-tab');   // first reveal: loads + mounts the Custom Code panel, docked
     await phaseD();
@@ -298,34 +295,6 @@
     await phaseR();
   }
 
-  // Pop out FIRST (from the SQL Editor tab), then open Custom Code inside the
-  // console window: the panel's first reveal - and its tooltip widget - happen
-  // in that document.
-  async function pageMountPopped() {
-    phaseS();
-    await tab('sql-editor-tab');
-    var e = await popOut();
-    if (e) { rec('M0 the Custom Code panel first built inside the console window', false, e); return; }
-    await tab('report-options-tab');
-    var pw = popWin(), ico = snipIco('shortcuts'), pin = inst(el('#snippetHelperPanel'));
-    rec('M0 the Custom Code panel was first built INSIDE the console window (its widget captured that document)',
-        !!(pw && ico && ico.ownerDocument === pw.document && pin && pin.document[0] === pw.document),
-        ico ? 'helper icons in the ' + where(ico) + '; widget document: ' + (pin ? where(pin.document[0].body) : 'no widget') : 'no helper icons rendered');
-    var a = await probe(snipIco('shortcuts'), el('#snippetHelperPanel'));
-    rec('M1 its Shortcuts helper tooltip opens in the console window', okIn(a, 'console window'), fmt(a));
-    var f = await probe(snipIco('functions'), el('#snippetHelperPanel'));
-    rec('M2 its Functions helper tooltip flips/fits against the console window it lives in',
-        okIn(f, 'console window') && f.rect.right <= f.viewW + 0.5 && f.rect.left >= -0.5, fmt(f));
-    e = await returnToTab();
-    if (e) { rec('M3 Return to Tab', false, e); return; }
-    await tab('report-options-tab');
-    var b = await probe(snipIco('shortcuts'), el('#snippetHelperPanel'));
-    rec('M3 after Return to Tab its Shortcuts helper tooltip opens in the TAB - not in the closed console window',
-        okIn(b, 'tab') && b.liveWhere === 'tab', fmt(b));
-    var c = await probe(snipIco('functions'), el('#snippetHelperPanel'));
-    rec('M4 ...and so does its Functions helper tooltip', okIn(c, 'tab'), fmt(c));
-  }
-
   // ?real=1: real_input.py drives the page over CDP with REAL pointer input in
   // both windows and only reads state through these.
   if (window.__REAL) {
@@ -347,6 +316,16 @@
                  view: [x.viewW, x.viewH], live: x.live ? where(x.live) : 'none' };
       },
       tabTooltips: function () { return document.querySelectorAll('.ui-tooltip').length; },
+      // The function-card popover (fnpop): where it is, open, inside its window's view.
+      card: function (popSel) {
+        var n = el(popSel || '#snipCardPop'); if (!n) return { missing: true };
+        var r = n.getBoundingClientRect(), vw = n.ownerDocument.defaultView;
+        var a = n.querySelector('a[data-help-anchor]');
+        return { where: where(n), open: n.classList.contains('open'), visible: n.classList.contains('open') && r.width > 0 && vw.getComputedStyle(n).visibility === 'visible',
+                 inside: r.left >= 0 && r.top >= 0 && r.right <= vw.innerWidth && r.bottom <= vw.innerHeight,
+                 anchor: a ? a.getAttribute('data-help-anchor') : '', text: String(n.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60),
+                 rect: [r.left, r.top, r.right, r.bottom].map(Math.round), view: [vw.innerWidth, vw.innerHeight] };
+      },
       errors: errs
     };
     document.getElementById('out').textContent = 'READY';
@@ -354,7 +333,7 @@
   }
 
   setTimeout(function () {
-    (MOUNT_POPPED ? pageMountPopped() : pageMain()).then(function () { finish(); },
+    pageMain().then(function () { finish(); },
       function (e) { finish('driver threw: ' + String((e && e.stack) || e).slice(0, 600)); });
   }, 300);
 })();

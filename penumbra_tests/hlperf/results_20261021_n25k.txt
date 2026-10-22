@@ -1,0 +1,422 @@
+hperf 2026-10-21 08:01:57  n=25000  runs=3  main.js mtime 2026-10-21 06:46:19
+
+##### F0 run 1: flat, no rules   boot 1.9 s  info={"prof": {"rows": 25000, "cols": 21}} errors=[] fatal= missing=[] rules={"cf":0,"hl":0,"pvhl":false}
+  LOAD  applyConditionalFormatting 1x 0ms [0]  applyPagination 1x 55ms [55]  applyRewriteRules 1x 0ms [0]  renderReportSnippet 2x 12ms [8, 4]  resetCellStates 2x 0ms [0, 0]
+  styled          wall    108  long tasks 0 sum 0 max 0  -> {"styledCells": 0, "kinds": {"body": 0, "summary": 0, "gt": 0, "foot": 0, "flat": 0}}
+  page_next       wall    958  long tasks 1 sum 143 max 143  -> {"syncMs": 142, "page": "Page 2 of 125"}
+                  applyConditionalFormatting 1x 0ms [0]  applyPagination 1x 113ms [113]  applyRewriteRules 1x 0ms [0]
+  page_next2      wall   1044  long tasks 1 sum 234 max 234  -> {"syncMs": 232, "page": "Page 3 of 125"}
+                  applyConditionalFormatting 1x 0ms [0]  applyPagination 1x 196ms [196]  applyRewriteRules 1x 0ms [0]
+  page_first      wall    948  long tasks 1 sum 137 max 137  -> {"syncMs": 137, "page": "Page 1 of 125"}
+                  applyConditionalFormatting 1x 0ms [0]  applyPagination 1x 106ms [106]  applyRewriteRules 1x 0ms [0]
+  acf_direct_x5   wall      1  long tasks 0 sum 0 max 0  -> {"med": 0, "all": [0, 0, 0, 0, 0]}
+                  applyConditionalFormatting 5x 0ms [0, 0, 0, 0, 0]
+  search_kilo     wall   1264  long tasks 1 sum 384 max 384  -> {"doneMs": 441, "count": "25,000 total rows, with 12,430 filtered results"}
+                  applyConditionalFormatting 1x 0ms [0]  applyPagination 1x 134ms [134]  applyRewriteRules 1x 0ms [0]  renderReportSnippet 1x 5ms [5]  resetCellStates 1x 0ms [0]
+  search_clear    wall   1066  long tasks 1 sum 210 max 210  -> {"doneMs": 247, "count": "25,000 total rows"}
+                  applyConditionalFormatting 1x 0ms [0]  applyPagination 1x 96ms [96]  applyRewriteRules 1x 0ms [0]  renderReportSnippet 1x 5ms [5]  resetCellStates 1x 0ms [0]
+
+##### F1 run 1: flat, format() in custom code   boot 6.2 s  info={"prof": {"rows": 25000, "cols": 21}} errors=[] fatal= missing=[] rules={"cf":1,"hl":0,"pvhl":false}
+  LOAD  applyConditionalFormatting 2x 43ms [28, 15]  applyPagination 1x 79ms [79]  applyRewriteRules 2x 0ms [0, 0]  renderReportSnippet 2x 2712ms [2667, 44]  resetCellStates 1x 2518ms [2518]
+  styled          wall    118  long tasks 0 sum 0 max 0  -> {"styledCells": 12164, "kinds": {"body": 0, "summary": 0, "gt": 0, "foot": 0, "flat": 12164}}
+  page_next       wall   1004  long tasks 2 sum 800 max 614  -> {"syncMs": 185, "page": "Page 2 of 125"}
+                  applyConditionalFormatting 1x 11ms [11]  applyPagination 1x 150ms [150]  applyRewriteRules 1x 0ms [0]
+  page_next2      wall    949  long tasks 2 sum 716 max 576  -> {"syncMs": 139, "page": "Page 3 of 125"}
+                  applyConditionalFormatting 1x 8ms [8]  applyPagination 1x 112ms [112]  applyRewriteRules 1x 0ms [0]
+  page_first      wall    948  long tasks 2 sum 710 max 582  -> {"syncMs": 129, "page": "Page 1 of 125"}
+                  applyConditionalFormatting 1x 12ms [12]  applyPagination 1x 104ms [104]  applyRewriteRules 1x 0ms [0]
+  acf_direct_x5   wall   2939  long tasks 0 sum 0 max 0  -> {"med": 591, "all": [573, 588, 591, 593, 593]}
+                  applyConditionalFormatting 5x 2938ms [593, 588, 591, 593, 573]
+  search_kilo     wall   3944  long tasks 3 sum 3851 max 3005  -> {"doneMs": 3060, "count": "25,000 total rows, with 12,430 filtered results"}
+                  applyConditionalFormatting 2x 64ms [52, 13]  applyPagination 1x 80ms [80]  applyRewriteRules 2x 0ms [0, 0]  renderReportSnippet 1x 2770ms [2770]  resetCellStates 1x 2599ms [2599]
+  search_clear    wall   6492  long tasks 3 sum 6414 max 4720  -> {"doneMs": 4764, "count": "25,000 total rows"}
+                  applyConditionalFormatting 2x 65ms [49, 16]  applyPagination 1x 83ms [83]  applyRewriteRules 2x 0ms [0, 0]  renderReportSnippet 1x 4525ms [4525]  resetCellStates 1x 4305ms [4305]
+
+##### F2 run 1: flat, report highlight (column cog)   boot 2.8 s  info={"prof": {"rows": 25000, "cols": 21}} errors=[] fatal= missing=[] rules={"cf":0,"hl":1,"pvhl":false}
+  LOAD  applyConditionalFormatting 1x 15ms [15]  applyPagination 1x 77ms [77]  applyRewriteRules 1x 0ms [0]  renderReportSnippet 2x 12ms [8, 4]  resetCellStates 2x 0ms [0, 0]
+  styled          wall    129  long tasks 0 sum 0 max 0  -> {"styledCells": 12164, "kinds": {"body": 0, "summary": 0, "gt": 0, "foot": 0, "flat": 12164}}
+  page_next       wall    991  long tasks 2 sum 895 max 731  -> {"syncMs": 163, "page": "Page 2 of 125"}
+                  applyConditionalFormatting 1x 11ms [11]  applyPagination 1x 134ms [134]  applyRewriteRules 1x 0ms [0]
+  page_next2      wall    946  long tasks 2 sum 853 max 712  -> {"syncMs": 140, "page": "Page 3 of 125"}
+                  applyConditionalFormatting 1x 8ms [8]  applyPagination 1x 117ms [117]  applyRewriteRules 1x 0ms [0]
+  page_first      wall    933  long tasks 2 sum 860 max 753  -> {"syncMs": 107, "page": "Page 1 of 125"}
+                  applyConditionalFormatting 1x 9ms [9]  applyPagination 1x 85ms [85]  applyRewriteRules 1x 0ms [0]
+  acf_direct_x5   wall   3484  long tasks 0 sum 0 max 0  -> {"med": 690, "all": [651, 680, 690, 712, 750]}
+                  applyConditionalFormatting 5x 3484ms [712, 750, 690, 651, 680]
+  search_kilo     wall   1101  long tasks 2 sum 601 max 350  -> {"doneMs": 295, "count": "25,000 total rows, with 12,430 filtered results"}
+                  applyConditionalFormatting 1x 10ms [10]  applyPagination 1x 99ms [99]  applyRewriteRules 1x 0ms [0]  renderReportSnippet 1x 4ms [4]  resetCellStates 1x 0ms [0]
+  search_clear    wall   1015  long tasks 2 sum 877 max 707  -> {"doneMs": 203, "count": "25,000 total rows"}
+                  applyConditionalFormatting 1x 10ms [11]  applyPagination 1x 91ms [91]  applyRewriteRules 1x 0ms [0]  renderReportSnippet 1x 4ms [4]  resetCellStates 1x 0ms [0]
+
+##### P0 run 1: pivot, no rules   boot 3.3 s  info={"prof": {"pivotCells": 11010}} errors=[] fatal= missing=[] rules={"cf":0,"hl":0,"pvhl":false}
+  LOAD  applyPivotHeaderFormatting 1x 0ms [0]  generatePivotTable 1x 123ms [123]  processPivotData 1x 14ms [14]  renderReportSnippet 3x 17ms [5, 12, 1]  resetCellStates 2x 0ms [0, 0]
+  styled          wall    125  long tasks 0 sum 0 max 0  -> {"styledCells": 0, "kinds": {"body": 0, "summary": 0, "gt": 0, "foot": 0, "flat": 0}}
+  pv_search_open  wall   1305  long tasks 2 sum 427 max 258  -> {"doneMs": 480, "count": "1,827 pivot rows, with 992 filtered results *"}
+                  applyConditionalFormatting 1x 0ms [0]  applyPivotHeaderFormatting 1x 0ms [0]  applyRewriteRules 1x 0ms [0]  generatePivotTable 1x 54ms [54]  processPivotData 1x 6ms [6]  renderReportSnippet 1x 4ms [4]  resetCellStates 1x 0ms [0]
+  pv_search_clear wall   1427  long tasks 2 sum 576 max 496  -> {"doneMs": 603, "count": "1,827 pivot rows *"}
+                  applyConditionalFormatting 1x 0ms [0]  applyPivotHeaderFormatting 1x 0ms [0]  applyRewriteRules 1x 0ms [0]  generatePivotTable 1x 113ms [113]  processPivotData 1x 12ms [13]  renderReportSnippet 1x 0ms [0]  resetCellStates 1x 0ms [0]
+
+##### P1 run 1: pivot, format() in custom code   boot 4.0 s  info={"prof": {"pivotCells": 11010}} errors=[] fatal= missing=[] rules={"cf":1,"hl":0,"pvhl":false}
+  LOAD  applyPivotHeaderFormatting 2x 0ms [0, 0]  generatePivotTable 2x 255ms [136, 119]  processPivotData 2x 28ms [15, 13]  renderReportSnippet 3x 658ms [4, 139, 515]
+  styled          wall    120  long tasks 0 sum 0 max 0  -> {"styledCells": 3802, "kinds": {"body": 2224, "summary": 18, "gt": 1556, "foot": 4, "flat": 0}}
+  pv_search_open  wall   1694  long tasks 2 sum 821 max 689  -> {"doneMs": 871, "count": "1,827 pivot rows, with 992 filtered results *"}
+                  applyConditionalFormatting 1x 5ms [5]  applyPivotHeaderFormatting 2x 0ms [0, 0]  applyRewriteRules 1x 0ms [0]  generatePivotTable 2x 187ms [125, 62]  processPivotData 2x 19ms [14, 5]  renderReportSnippet 1x 428ms [428]
+  pv_search_clear wall   1661  long tasks 2 sum 818 max 735  -> {"doneMs": 840, "count": "1,827 pivot rows *"}
+                  applyConditionalFormatting 1x 15ms [15]  applyPivotHeaderFormatting 2x 0ms [0, 0]  applyRewriteRules 1x 0ms [0]  generatePivotTable 2x 186ms [63, 123]  processPivotData 2x 17ms [5, 12]  renderReportSnippet 1x 216ms [217]
+
+##### P2 run 1: pivot, highlight (Values cog)   boot 3.2 s  info={"prof": {"pivotCells": 11010}} errors=[] fatal= missing=[] rules={"cf":0,"hl":0,"pvhl":true}
+  LOAD  applyPivotHeaderFormatting 1x 0ms [0]  generatePivotTable 1x 150ms [150]  processPivotData 1x 28ms [28]  renderReportSnippet 3x 13ms [5, 7, 1]  resetCellStates 2x 0ms [0, 0]
+  styled          wall    140  long tasks 0 sum 0 max 0  -> {"styledCells": 2242, "kinds": {"body": 2224, "summary": 18, "gt": 0, "foot": 0, "flat": 0}}
+  pv_search_open  wall   1335  long tasks 2 sum 471 max 291  -> {"doneMs": 527, "count": "1,827 pivot rows, with 992 filtered results *"}
+                  applyConditionalFormatting 1x 0ms [1]  applyPivotHeaderFormatting 1x 0ms [0]  applyRewriteRules 1x 0ms [0]  generatePivotTable 1x 62ms [62]  processPivotData 1x 6ms [6]  renderReportSnippet 1x 4ms [5]  resetCellStates 1x 0ms [0]
+  pv_search_clear wall   1432  long tasks 2 sum 587 max 511  -> {"doneMs": 612, "count": "1,827 pivot rows *"}
+                  applyConditionalFormatting 1x 0ms [0]  applyPivotHeaderFormatting 1x 0ms [0]  applyRewriteRules 1x 0ms [0]  generatePivotTable 1x 133ms [133]  processPivotData 1x 13ms [13]  renderReportSnippet 1x 0ms [0]  resetCellStates 1x 0ms [0]
+
+##### F0 run 2: flat, no rules   boot 1.9 s  info={"prof": {"rows": 25000, "cols": 21}} errors=[] fatal= missing=[] rules={"cf":0,"hl":0,"pvhl":false}
+  LOAD  applyConditionalFormatting 1x 0ms [1]  applyPagination 1x 58ms [58]  applyRewriteRules 1x 0ms [0]  renderReportSnippet 2x 12ms [8, 4]  resetCellStates 2x 0ms [0, 0]
+  styled          wall    111  long tasks 0 sum 0 max 0  -> {"styledCells": 0, "kinds": {"body": 0, "summary": 0, "gt": 0, "foot": 0, "flat": 0}}
+  page_next       wall    936  long tasks 1 sum 134 max 134  -> {"syncMs": 133, "page": "Page 2 of 125"}
+                  applyConditionalFormatting 1x 0ms [0]  applyPagination 1x 109ms [109]  applyRewriteRules 1x 0ms [0]
+  page_next2      wall    965  long tasks 1 sum 143 max 143  -> {"syncMs": 142, "page": "Page 3 of 125"}
+                  applyConditionalFormatting 1x 0ms [0]  applyPagination 1x 113ms [113]  applyRewriteRules 1x 0ms [0]
+  page_first      wall    932  long tasks 1 sum 115 max 115  -> {"syncMs": 115, "page": "Page 1 of 125"}
+                  applyConditionalFormatting 1x 0ms [0]  applyPagination 1x 92ms [92]  applyRewriteRules 1x 0ms [0]
+  acf_direct_x5   wall      1  long tasks 0 sum 0 max 0  -> {"med": 0, "all": [0, 0, 0, 0, 0]}
+                  applyConditionalFormatting 5x 0ms [0, 0, 0, 0, 0]
+  search_kilo     wall   1130  long tasks 1 sum 255 max 255  -> {"doneMs": 305, "count": "25,000 total rows, with 12,430 filtered results"}
+                  applyConditionalFormatting 1x 0ms [0]  applyPagination 1x 80ms [80]  applyRewriteRules 1x 0ms [0]  renderReportSnippet 1x 5ms [5]  resetCellStates 1x 0ms [0]
+  search_clear    wall    998  long tasks 1 sum 148 max 148  -> {"doneMs": 180, "count": "25,000 total rows"}
+                  applyConditionalFormatting 1x 0ms [0]  applyPagination 1x 75ms [75]  applyRewriteRules 1x 0ms [0]  renderReportSnippet 1x 4ms [4]  resetCellStates 1x 0ms [0]
+
+##### F1 run 2: flat, format() in custom code   boot 6.6 s  info={"prof": {"rows": 25000, "cols": 21}} errors=[] fatal= missing=[] rules={"cf":1,"hl":0,"pvhl":false}
+  LOAD  applyConditionalFormatting 2x 48ms [32, 17]  applyPagination 1x 87ms [87]  applyRewriteRules 2x 0ms [0, 0]  renderReportSnippet 2x 2660ms [2609, 52]  resetCellStates 1x 2448ms [2449]
+  styled          wall    158  long tasks 0 sum 0 max 0  -> {"styledCells": 12164, "kinds": {"body": 0, "summary": 0, "gt": 0, "foot": 0, "flat": 12164}}
+  page_next       wall   1028  long tasks 2 sum 972 max 780  -> {"syncMs": 191, "page": "Page 2 of 125"}
+                  applyConditionalFormatting 1x 10ms [10]  applyPagination 1x 158ms [158]  applyRewriteRules 1x 0ms [0]
+  page_next2      wall    981  long tasks 2 sum 802 max 652  -> {"syncMs": 148, "page": "Page 3 of 125"}
+                  applyConditionalFormatting 1x 9ms [9]  applyPagination 1x 125ms [125]  applyRewriteRules 1x 0ms [0]
+  page_first      wall    933  long tasks 2 sum 750 max 635  -> {"syncMs": 115, "page": "Page 1 of 125"}
+                  applyConditionalFormatting 1x 10ms [10]  applyPagination 1x 91ms [91]  applyRewriteRules 1x 0ms [0]
+  acf_direct_x5   wall   3775  long tasks 0 sum 0 max 0  -> {"med": 754, "all": [671, 690, 754, 800, 861]}
+                  applyConditionalFormatting 5x 3775ms [754, 671, 690, 800, 861]
+  search_kilo     wall   3984  long tasks 3 sum 3813 max 3117  -> {"doneMs": 3173, "count": "25,000 total rows, with 12,430 filtered results"}
+                  applyConditionalFormatting 2x 69ms [52, 18]  applyPagination 1x 82ms [82]  applyRewriteRules 2x 0ms [0, 0]  renderReportSnippet 1x 2891ms [2891]  resetCellStates 1x 2736ms [2736]
+  search_clear    wall   4281  long tasks 3 sum 4221 max 2946  -> {"doneMs": 2979, "count": "25,000 total rows"}
+                  applyConditionalFormatting 2x 46ms [34, 12]  applyPagination 1x 59ms [59]  applyRewriteRules 2x 0ms [0, 0]  renderReportSnippet 1x 2808ms [2808]  resetCellStates 1x 2656ms [2656]
+
+##### F2 run 2: flat, report highlight (column cog)   boot 2.9 s  info={"prof": {"rows": 25000, "cols": 21}} errors=[] fatal= missing=[] rules={"cf":0,"hl":1,"pvhl":false}
+  LOAD  applyConditionalFormatting 1x 18ms [18]  applyPagination 1x 86ms [86]  applyRewriteRules 1x 0ms [0]  renderReportSnippet 2x 12ms [8, 4]  resetCellStates 2x 0ms [0, 0]
+  styled          wall    149  long tasks 0 sum 0 max 0  -> {"styledCells": 12164, "kinds": {"body": 0, "summary": 0, "gt": 0, "foot": 0, "flat": 12164}}
+  page_next       wall   1032  long tasks 2 sum 988 max 809  -> {"syncMs": 178, "page": "Page 2 of 125"}
+                  applyConditionalFormatting 1x 10ms [10]  applyPagination 1x 147ms [147]  applyRewriteRules 1x 0ms [0]
+  page_next2      wall    983  long tasks 2 sum 829 max 678  -> {"syncMs": 151, "page": "Page 3 of 125"}
+                  applyConditionalFormatting 1x 9ms [9]  applyPagination 1x 124ms [124]  applyRewriteRules 1x 0ms [0]
+  page_first      wall    915  long tasks 2 sum 774 max 668  -> {"syncMs": 106, "page": "Page 1 of 125"}
+                  applyConditionalFormatting 1x 9ms [9]  applyPagination 1x 83ms [83]  applyRewriteRules 1x 0ms [0]
+  acf_direct_x5   wall   3386  long tasks 0 sum 0 max 0  -> {"med": 676, "all": [664, 669, 676, 687, 689]}
+                  applyConditionalFormatting 5x 3385ms [669, 689, 676, 687, 663]
+  search_kilo     wall   1114  long tasks 2 sum 635 max 384  -> {"doneMs": 298, "count": "25,000 total rows, with 12,430 filtered results"}
+                  applyConditionalFormatting 1x 10ms [10]  applyPagination 1x 95ms [95]  applyRewriteRules 1x 0ms [0]  renderReportSnippet 1x 4ms [4]  resetCellStates 1x 0ms [0]
+  search_clear    wall   1016  long tasks 2 sum 843 max 678  -> {"doneMs": 201, "count": "25,000 total rows"}
+                  applyConditionalFormatting 1x 10ms [10]  applyPagination 1x 88ms [88]  applyRewriteRules 1x 0ms [0]  renderReportSnippet 1x 4ms [5]  resetCellStates 1x 0ms [0]
+
+##### P0 run 2: pivot, no rules   boot 3.3 s  info={"prof": {"pivotCells": 11010}} errors=[] fatal= missing=[] rules={"cf":0,"hl":0,"pvhl":false}
+  LOAD  applyPivotHeaderFormatting 1x 0ms [0]  generatePivotTable 1x 122ms [123]  processPivotData 1x 28ms [28]  renderReportSnippet 3x 12ms [4, 7, 1]  resetCellStates 2x 0ms [0, 0]
+  styled          wall    122  long tasks 0 sum 0 max 0  -> {"styledCells": 0, "kinds": {"body": 0, "summary": 0, "gt": 0, "foot": 0, "flat": 0}}
+  pv_search_open  wall   1291  long tasks 2 sum 415 max 245  -> {"doneMs": 463, "count": "1,827 pivot rows, with 992 filtered results *"}
+                  applyConditionalFormatting 1x 0ms [0]  applyPivotHeaderFormatting 1x 0ms [0]  applyRewriteRules 1x 0ms [0]  generatePivotTable 1x 54ms [54]  processPivotData 1x 5ms [5]  renderReportSnippet 1x 4ms [4]  resetCellStates 1x 0ms [0]
+  pv_search_clear wall   1432  long tasks 2 sum 581 max 500  -> {"doneMs": 606, "count": "1,827 pivot rows *"}
+                  applyConditionalFormatting 1x 0ms [0]  applyPivotHeaderFormatting 1x 0ms [0]  applyRewriteRules 1x 0ms [0]  generatePivotTable 1x 113ms [113]  processPivotData 1x 14ms [14]  renderReportSnippet 1x 0ms [0]  resetCellStates 1x 0ms [0]
+
+##### P1 run 2: pivot, format() in custom code   boot 4.0 s  info={"prof": {"pivotCells": 11010}} errors=[] fatal= missing=[] rules={"cf":1,"hl":0,"pvhl":false}
+  LOAD  applyPivotHeaderFormatting 2x 0ms [0, 0]  generatePivotTable 2x 259ms [127, 132]  processPivotData 2x 43ms [29, 14]  renderReportSnippet 3x 667ms [4, 95, 569]
+  styled          wall    117  long tasks 0 sum 0 max 0  -> {"styledCells": 3802, "kinds": {"body": 2224, "summary": 18, "gt": 1556, "foot": 4, "flat": 0}}
+  pv_search_open  wall   1748  long tasks 2 sum 876 max 746  -> {"doneMs": 928, "count": "1,827 pivot rows, with 992 filtered results *"}
+                  applyConditionalFormatting 1x 6ms [6]  applyPivotHeaderFormatting 2x 0ms [0, 0]  applyRewriteRules 1x 0ms [0]  generatePivotTable 2x 204ms [143, 61]  processPivotData 2x 18ms [13, 6]  renderReportSnippet 1x 469ms [469]
+  pv_search_clear wall   1638  long tasks 2 sum 802 max 730  -> {"doneMs": 824, "count": "1,827 pivot rows *"}
+                  applyConditionalFormatting 1x 9ms [9]  applyPivotHeaderFormatting 2x 0ms [0, 0]  applyRewriteRules 1x 0ms [0]  generatePivotTable 2x 202ms [61, 141]  processPivotData 2x 18ms [6, 13]  renderReportSnippet 1x 219ms [219]
+
+##### P2 run 2: pivot, highlight (Values cog)   boot 3.3 s  info={"prof": {"pivotCells": 11010}} errors=[] fatal= missing=[] rules={"cf":0,"hl":0,"pvhl":true}
+  LOAD  applyPivotHeaderFormatting 1x 0ms [0]  generatePivotTable 1x 138ms [138]  processPivotData 1x 14ms [14]  renderReportSnippet 3x 11ms [4, 7, 1]  resetCellStates 2x 0ms [0, 0]
+  styled          wall    125  long tasks 0 sum 0 max 0  -> {"styledCells": 2242, "kinds": {"body": 2224, "summary": 18, "gt": 0, "foot": 0, "flat": 0}}
+  pv_search_open  wall   1289  long tasks 2 sum 420 max 256  -> {"doneMs": 466, "count": "1,827 pivot rows, with 992 filtered results *"}
+                  applyConditionalFormatting 1x 0ms [1]  applyPivotHeaderFormatting 1x 0ms [0]  applyRewriteRules 1x 0ms [0]  generatePivotTable 1x 57ms [57]  processPivotData 1x 6ms [7]  renderReportSnippet 1x 4ms [4]  resetCellStates 1x 0ms [0]
+  pv_search_clear wall   1426  long tasks 2 sum 582 max 508  -> {"doneMs": 607, "count": "1,827 pivot rows *"}
+                  applyConditionalFormatting 1x 0ms [0]  applyPivotHeaderFormatting 1x 0ms [0]  applyRewriteRules 1x 0ms [0]  generatePivotTable 1x 125ms [125]  processPivotData 1x 13ms [13]  renderReportSnippet 1x 0ms [0]  resetCellStates 1x 0ms [0]
+
+##### F0 run 3: flat, no rules   boot 1.8 s  info={"prof": {"rows": 25000, "cols": 21}} errors=[] fatal= missing=[] rules={"cf":0,"hl":0,"pvhl":false}
+  LOAD  applyConditionalFormatting 1x 0ms [0]  applyPagination 1x 68ms [68]  applyRewriteRules 1x 0ms [0]  renderReportSnippet 2x 14ms [10, 4]  resetCellStates 2x 0ms [0, 0]
+  styled          wall    109  long tasks 0 sum 0 max 0  -> {"styledCells": 0, "kinds": {"body": 0, "summary": 0, "gt": 0, "foot": 0, "flat": 0}}
+  page_next       wall    949  long tasks 1 sum 143 max 143  -> {"syncMs": 142, "page": "Page 2 of 125"}
+                  applyConditionalFormatting 1x 0ms [0]  applyPagination 1x 118ms [119]  applyRewriteRules 1x 0ms [0]
+  page_next2      wall    966  long tasks 1 sum 147 max 147  -> {"syncMs": 147, "page": "Page 3 of 125"}
+                  applyConditionalFormatting 1x 0ms [0]  applyPagination 1x 120ms [120]  applyRewriteRules 1x 0ms [0]
+  page_first      wall    931  long tasks 1 sum 113 max 113  -> {"syncMs": 113, "page": "Page 1 of 125"}
+                  applyConditionalFormatting 1x 0ms [0]  applyPagination 1x 89ms [89]  applyRewriteRules 1x 0ms [0]
+  acf_direct_x5   wall      1  long tasks 0 sum 0 max 0  -> {"med": 0, "all": [0, 0, 0, 0, 0]}
+                  applyConditionalFormatting 5x 0ms [0, 0, 0, 0, 0]
+  search_kilo     wall   1113  long tasks 1 sum 249 max 249  -> {"doneMs": 299, "count": "25,000 total rows, with 12,430 filtered results"}
+                  applyConditionalFormatting 1x 0ms [0]  applyPagination 1x 86ms [86]  applyRewriteRules 1x 0ms [0]  renderReportSnippet 1x 4ms [4]  resetCellStates 1x 0ms [0]
+  search_clear    wall   1016  long tasks 1 sum 163 max 163  -> {"doneMs": 195, "count": "25,000 total rows"}
+                  applyConditionalFormatting 1x 0ms [0]  applyPagination 1x 82ms [82]  applyRewriteRules 1x 0ms [0]  renderReportSnippet 1x 4ms [4]  resetCellStates 1x 0ms [0]
+
+##### F1 run 3: flat, format() in custom code   boot 5.8 s  info={"prof": {"rows": 25000, "cols": 21}} errors=[] fatal= missing=[] rules={"cf":1,"hl":0,"pvhl":false}
+  LOAD  applyConditionalFormatting 2x 40ms [27, 13]  applyPagination 1x 68ms [68]  applyRewriteRules 2x 0ms [0, 0]  renderReportSnippet 2x 2528ms [2479, 49]  resetCellStates 1x 2334ms [2334]
+  styled          wall    121  long tasks 0 sum 0 max 0  -> {"styledCells": 12164, "kinds": {"body": 0, "summary": 0, "gt": 0, "foot": 0, "flat": 12164}}
+  page_next       wall    997  long tasks 2 sum 811 max 647  -> {"syncMs": 163, "page": "Page 2 of 125"}
+                  applyConditionalFormatting 1x 8ms [9]  applyPagination 1x 137ms [137]  applyRewriteRules 1x 0ms [0]
+  page_next2      wall    948  long tasks 2 sum 710 max 570  -> {"syncMs": 138, "page": "Page 3 of 125"}
+                  applyConditionalFormatting 1x 9ms [9]  applyPagination 1x 115ms [115]  applyRewriteRules 1x 0ms [0]
+  page_first      wall    949  long tasks 2 sum 699 max 569  -> {"syncMs": 131, "page": "Page 1 of 125"}
+                  applyConditionalFormatting 1x 12ms [12]  applyPagination 1x 110ms [110]  applyRewriteRules 1x 0ms [0]
+  acf_direct_x5   wall   2866  long tasks 0 sum 0 max 0  -> {"med": 571, "all": [563, 570, 571, 576, 586]}
+                  applyConditionalFormatting 5x 2865ms [563, 586, 576, 571, 570]
+  search_kilo     wall   3630  long tasks 3 sum 3316 max 2765  -> {"doneMs": 2814, "count": "25,000 total rows, with 12,430 filtered results"}
+                  applyConditionalFormatting 2x 53ms [43, 11]  applyPagination 1x 60ms [61]  applyRewriteRules 2x 0ms [0, 0]  renderReportSnippet 1x 2577ms [2577]  resetCellStates 1x 2442ms [2442]
+  search_clear    wall   3686  long tasks 3 sum 3633 max 2592  -> {"doneMs": 2625, "count": "25,000 total rows"}
+                  applyConditionalFormatting 2x 45ms [35, 10]  applyPagination 1x 54ms [54]  applyRewriteRules 2x 0ms [0, 0]  renderReportSnippet 1x 2460ms [2460]  resetCellStates 1x 2306ms [2306]
+
+##### F2 run 3: flat, report highlight (column cog)   boot 3.0 s  info={"prof": {"rows": 25000, "cols": 21}} errors=[] fatal= missing=[] rules={"cf":0,"hl":1,"pvhl":false}
+  LOAD  applyConditionalFormatting 1x 15ms [15]  applyPagination 1x 75ms [75]  applyRewriteRules 1x 0ms [0]  renderReportSnippet 2x 12ms [8, 4]  resetCellStates 2x 0ms [0, 0]
+  styled          wall    149  long tasks 0 sum 0 max 0  -> {"styledCells": 12164, "kinds": {"body": 0, "summary": 0, "gt": 0, "foot": 0, "flat": 12164}}
+  page_next       wall   1004  long tasks 2 sum 963 max 782  -> {"syncMs": 180, "page": "Page 2 of 125"}
+                  applyConditionalFormatting 1x 11ms [11]  applyPagination 1x 150ms [150]  applyRewriteRules 1x 0ms [0]
+  page_next2      wall    980  long tasks 2 sum 865 max 708  -> {"syncMs": 156, "page": "Page 3 of 125"}
+                  applyConditionalFormatting 1x 11ms [11]  applyPagination 1x 133ms [133]  applyRewriteRules 1x 0ms [0]
+  page_first      wall    948  long tasks 2 sum 887 max 770  -> {"syncMs": 118, "page": "Page 1 of 125"}
+                  applyConditionalFormatting 1x 9ms [9]  applyPagination 1x 93ms [93]  applyRewriteRules 1x 0ms [0]
+  acf_direct_x5   wall   3940  long tasks 0 sum 0 max 0  -> {"med": 751, "all": [715, 739, 751, 763, 971]}
+                  applyConditionalFormatting 5x 3939ms [739, 715, 751, 763, 971]
+  search_kilo     wall   1111  long tasks 2 sum 625 max 369  -> {"doneMs": 302, "count": "25,000 total rows, with 12,430 filtered results"}
+                  applyConditionalFormatting 1x 10ms [10]  applyPagination 1x 96ms [96]  applyRewriteRules 1x 0ms [0]  renderReportSnippet 1x 4ms [4]  resetCellStates 1x 0ms [0]
+  search_clear    wall   1065  long tasks 2 sum 926 max 728  -> {"doneMs": 238, "count": "25,000 total rows"}
+                  applyConditionalFormatting 1x 11ms [11]  applyPagination 1x 101ms [101]  applyRewriteRules 1x 0ms [0]  renderReportSnippet 1x 5ms [5]  resetCellStates 1x 0ms [0]
+
+##### P0 run 3: pivot, no rules   boot 3.3 s  info={"prof": {"pivotCells": 11010}} errors=[] fatal= missing=[] rules={"cf":0,"hl":0,"pvhl":false}
+  LOAD  applyPivotHeaderFormatting 1x 0ms [0]  generatePivotTable 1x 125ms [125]  processPivotData 1x 14ms [14]  renderReportSnippet 3x 17ms [4, 12, 1]  resetCellStates 2x 0ms [0, 0]
+  styled          wall    121  long tasks 0 sum 0 max 0  -> {"styledCells": 0, "kinds": {"body": 0, "summary": 0, "gt": 0, "foot": 0, "flat": 0}}
+  pv_search_open  wall   1290  long tasks 2 sum 419 max 254  -> {"doneMs": 467, "count": "1,827 pivot rows, with 992 filtered results *"}
+                  applyConditionalFormatting 1x 0ms [1]  applyPivotHeaderFormatting 1x 0ms [0]  applyRewriteRules 1x 0ms [0]  generatePivotTable 1x 57ms [57]  processPivotData 1x 6ms [6]  renderReportSnippet 1x 4ms [4]  resetCellStates 1x 0ms [0]
+  pv_search_clear wall   1442  long tasks 2 sum 588 max 507  -> {"doneMs": 613, "count": "1,827 pivot rows *"}
+                  applyConditionalFormatting 1x 0ms [0]  applyPivotHeaderFormatting 1x 0ms [0]  applyRewriteRules 1x 0ms [0]  generatePivotTable 1x 122ms [122]  processPivotData 1x 14ms [14]  renderReportSnippet 1x 0ms [0]  resetCellStates 1x 0ms [0]
+
+##### P1 run 3: pivot, format() in custom code   boot 3.9 s  info={"prof": {"pivotCells": 11010}} errors=[] fatal= missing=[] rules={"cf":1,"hl":0,"pvhl":false}
+  LOAD  applyPivotHeaderFormatting 2x 0ms [0, 0]  generatePivotTable 2x 246ms [124, 121]  processPivotData 2x 44ms [31, 13]  renderReportSnippet 3x 637ms [5, 96, 536]
+  styled          wall    111  long tasks 0 sum 0 max 0  -> {"styledCells": 3802, "kinds": {"body": 2224, "summary": 18, "gt": 1556, "foot": 4, "flat": 0}}
+  pv_search_open  wall   1750  long tasks 2 sum 872 max 735  -> {"doneMs": 919, "count": "1,827 pivot rows, with 992 filtered results *"}
+                  applyConditionalFormatting 1x 6ms [6]  applyPivotHeaderFormatting 2x 0ms [0, 0]  applyRewriteRules 1x 0ms [0]  generatePivotTable 2x 204ms [144, 60]  processPivotData 2x 18ms [13, 6]  renderReportSnippet 1x 466ms [466]
+  pv_search_clear wall   1670  long tasks 2 sum 818 max 738  -> {"doneMs": 841, "count": "1,827 pivot rows *"}
+                  applyConditionalFormatting 1x 9ms [9]  applyPivotHeaderFormatting 2x 0ms [0, 0]  applyRewriteRules 1x 0ms [0]  generatePivotTable 2x 205ms [64, 141]  processPivotData 2x 18ms [6, 13]  renderReportSnippet 1x 212ms [212]
+
+##### P2 run 3: pivot, highlight (Values cog)   boot 3.3 s  info={"prof": {"pivotCells": 11010}} errors=[] fatal= missing=[] rules={"cf":0,"hl":0,"pvhl":true}
+  LOAD  applyPivotHeaderFormatting 1x 0ms [0]  generatePivotTable 1x 146ms [146]  processPivotData 1x 14ms [14]  renderReportSnippet 3x 12ms [5, 7, 1]  resetCellStates 2x 0ms [0, 0]
+  styled          wall    119  long tasks 0 sum 0 max 0  -> {"styledCells": 2242, "kinds": {"body": 2224, "summary": 18, "gt": 0, "foot": 0, "flat": 0}}
+  pv_search_open  wall   1290  long tasks 2 sum 418 max 251  -> {"doneMs": 467, "count": "1,827 pivot rows, with 992 filtered results *"}
+                  applyConditionalFormatting 1x 1ms [1]  applyPivotHeaderFormatting 1x 0ms [0]  applyRewriteRules 1x 0ms [0]  generatePivotTable 1x 56ms [56]  processPivotData 1x 5ms [5]  renderReportSnippet 1x 4ms [4]  resetCellStates 1x 0ms [0]
+  pv_search_clear wall   1432  long tasks 2 sum 594 max 512  -> {"doneMs": 617, "count": "1,827 pivot rows *"}
+                  applyConditionalFormatting 1x 0ms [0]  applyPivotHeaderFormatting 1x 0ms [0]  applyRewriteRules 1x 0ms [0]  generatePivotTable 1x 127ms [127]  processPivotData 1x 13ms [13]  renderReportSnippet 1x 0ms [0]  resetCellStates 1x 0ms [0]
+
+=== MEDIANS over 3 runs
+F0  flat, no rules
+    load: boot wall ms                               1859   runs: 1859 | 1932 | 1841
+    load: resetCellStates ms (calls=2)                  0   runs: 0 | 0 | 0
+    load: renderReportSnippet ms (calls=2)             12   runs: 12 | 12 | 14
+    load: applyConditionalFormatting ms (calls=1)        0   runs: 0 | 0 | 0
+    load: applyRewriteRules ms (calls=1)                0   runs: 0 | 0 | 0
+    load: applyPagination ms (calls=1)                 58   runs: 55 | 58 | 68
+    styled cells                                        0   runs: 0 | 0 | 0
+    page_next: long tasks sum ms                      143   runs: 143 | 134 | 143
+    page_next: sync ms                                142   runs: 142 | 133 | 142
+    page_next: applyConditionalFormatting ms (calls=1)        0   runs: 0 | 0 | 0
+    page_next: applyRewriteRules ms (calls=1)           0   runs: 0 | 0 | 0
+    page_next: applyPagination ms (calls=1)           113   runs: 113 | 109 | 118
+    page_next2: long tasks sum ms                     147   runs: 234 | 143 | 147
+    page_next2: sync ms                               147   runs: 232 | 142 | 147
+    page_next2: applyConditionalFormatting ms (calls=1)        0   runs: 0 | 0 | 0
+    page_next2: applyRewriteRules ms (calls=1)          0   runs: 0 | 0 | 0
+    page_next2: applyPagination ms (calls=1)          120   runs: 196 | 113 | 120
+    page_first: long tasks sum ms                     115   runs: 137 | 115 | 113
+    page_first: sync ms                               115   runs: 137 | 115 | 113
+    page_first: applyConditionalFormatting ms (calls=1)        0   runs: 0 | 0 | 0
+    page_first: applyRewriteRules ms (calls=1)          0   runs: 0 | 0 | 0
+    page_first: applyPagination ms (calls=1)           92   runs: 106 | 92 | 89
+    acf_direct_x5: long tasks sum ms                    0   runs: 0 | 0 | 0
+    acf_direct_x5: median ms                            0   runs: 0 | 0 | 0
+    acf_direct_x5: applyConditionalFormatting ms (calls=5)        0   runs: 0 | 0 | 0
+    search_kilo: long tasks sum ms                    255   runs: 384 | 255 | 249
+    search_kilo: done ms                              305   runs: 441 | 305 | 299
+    search_kilo: resetCellStates ms (calls=1)           0   runs: 0 | 0 | 0
+    search_kilo: renderReportSnippet ms (calls=1)        5   runs: 5 | 5 | 4
+    search_kilo: applyConditionalFormatting ms (calls=1)        0   runs: 0 | 0 | 0
+    search_kilo: applyRewriteRules ms (calls=1)         0   runs: 0 | 0 | 0
+    search_kilo: applyPagination ms (calls=1)          86   runs: 134 | 80 | 86
+    search_clear: long tasks sum ms                   163   runs: 210 | 148 | 163
+    search_clear: done ms                             195   runs: 247 | 180 | 195
+    search_clear: resetCellStates ms (calls=1)          0   runs: 0 | 0 | 0
+    search_clear: renderReportSnippet ms (calls=1)        4   runs: 5 | 4 | 4
+    search_clear: applyConditionalFormatting ms (calls=1)        0   runs: 0 | 0 | 0
+    search_clear: applyRewriteRules ms (calls=1)        0   runs: 0 | 0 | 0
+    search_clear: applyPagination ms (calls=1)         82   runs: 96 | 75 | 82
+F1  flat, format() in custom code
+    load: boot wall ms                               6179   runs: 6179 | 6640 | 5830
+    load: resetCellStates ms (calls=1)               2448   runs: 2518 | 2448 | 2334
+    load: applyRewriteRules ms (calls=2)                0   runs: 0 | 0 | 0
+    load: applyConditionalFormatting ms (calls=2)       43   runs: 43 | 48 | 40
+    load: renderReportSnippet ms (calls=2)           2660   runs: 2712 | 2660 | 2528
+    load: applyPagination ms (calls=1)                 79   runs: 79 | 87 | 68
+    styled cells                                    12164   runs: 12164 | 12164 | 12164
+    styled cells: flat                              12164   runs: 12164 | 12164 | 12164
+    page_next: long tasks sum ms                      811   runs: 800 | 972 | 811
+    page_next: sync ms                                185   runs: 185 | 191 | 163
+    page_next: applyConditionalFormatting ms (calls=1)       10   runs: 11 | 10 | 8
+    page_next: applyRewriteRules ms (calls=1)           0   runs: 0 | 0 | 0
+    page_next: applyPagination ms (calls=1)           150   runs: 150 | 158 | 137
+    page_next2: long tasks sum ms                     716   runs: 716 | 802 | 710
+    page_next2: sync ms                               139   runs: 139 | 148 | 138
+    page_next2: applyConditionalFormatting ms (calls=1)        9   runs: 8 | 9 | 9
+    page_next2: applyRewriteRules ms (calls=1)          0   runs: 0 | 0 | 0
+    page_next2: applyPagination ms (calls=1)          115   runs: 112 | 125 | 115
+    page_first: long tasks sum ms                     710   runs: 710 | 750 | 699
+    page_first: sync ms                               129   runs: 129 | 115 | 131
+    page_first: applyConditionalFormatting ms (calls=1)       12   runs: 12 | 10 | 12
+    page_first: applyRewriteRules ms (calls=1)          0   runs: 0 | 0 | 0
+    page_first: applyPagination ms (calls=1)          104   runs: 104 | 91 | 110
+    acf_direct_x5: long tasks sum ms                    0   runs: 0 | 0 | 0
+    acf_direct_x5: median ms                          591   runs: 591 | 754 | 571
+    acf_direct_x5: applyConditionalFormatting ms (calls=5)     2938   runs: 2938 | 3775 | 2865
+    search_kilo: long tasks sum ms                   3813   runs: 3851 | 3813 | 3316
+    search_kilo: done ms                             3060   runs: 3060 | 3173 | 2814
+    search_kilo: resetCellStates ms (calls=1)        2599   runs: 2599 | 2736 | 2442
+    search_kilo: applyRewriteRules ms (calls=2)         0   runs: 0 | 0 | 0
+    search_kilo: applyConditionalFormatting ms (calls=2)       64   runs: 64 | 69 | 53
+    search_kilo: renderReportSnippet ms (calls=1)     2770   runs: 2770 | 2891 | 2577
+    search_kilo: applyPagination ms (calls=1)          80   runs: 80 | 82 | 60
+    search_clear: long tasks sum ms                  4221   runs: 6414 | 4221 | 3633
+    search_clear: done ms                            2979   runs: 4764 | 2979 | 2625
+    search_clear: resetCellStates ms (calls=1)       2656   runs: 4305 | 2656 | 2306
+    search_clear: applyRewriteRules ms (calls=2)        0   runs: 0 | 0 | 0
+    search_clear: applyConditionalFormatting ms (calls=2)       46   runs: 65 | 46 | 45
+    search_clear: renderReportSnippet ms (calls=1)     2808   runs: 4525 | 2808 | 2460
+    search_clear: applyPagination ms (calls=1)         59   runs: 83 | 59 | 54
+F2  flat, report highlight (column cog)
+    load: boot wall ms                               2890   runs: 2795 | 2890 | 3015
+    load: resetCellStates ms (calls=2)                  0   runs: 0 | 0 | 0
+    load: renderReportSnippet ms (calls=2)             12   runs: 12 | 12 | 12
+    load: applyConditionalFormatting ms (calls=1)       15   runs: 15 | 18 | 15
+    load: applyRewriteRules ms (calls=1)                0   runs: 0 | 0 | 0
+    load: applyPagination ms (calls=1)                 77   runs: 77 | 86 | 75
+    styled cells                                    12164   runs: 12164 | 12164 | 12164
+    styled cells: flat                              12164   runs: 12164 | 12164 | 12164
+    page_next: long tasks sum ms                      963   runs: 895 | 988 | 963
+    page_next: sync ms                                178   runs: 163 | 178 | 180
+    page_next: applyConditionalFormatting ms (calls=1)       11   runs: 11 | 10 | 11
+    page_next: applyRewriteRules ms (calls=1)           0   runs: 0 | 0 | 0
+    page_next: applyPagination ms (calls=1)           147   runs: 134 | 147 | 150
+    page_next2: long tasks sum ms                     853   runs: 853 | 829 | 865
+    page_next2: sync ms                               151   runs: 140 | 151 | 156
+    page_next2: applyConditionalFormatting ms (calls=1)        9   runs: 8 | 9 | 11
+    page_next2: applyRewriteRules ms (calls=1)          0   runs: 0 | 0 | 0
+    page_next2: applyPagination ms (calls=1)          124   runs: 117 | 124 | 133
+    page_first: long tasks sum ms                     860   runs: 860 | 774 | 887
+    page_first: sync ms                               107   runs: 107 | 106 | 118
+    page_first: applyConditionalFormatting ms (calls=1)        9   runs: 9 | 9 | 9
+    page_first: applyRewriteRules ms (calls=1)          0   runs: 0 | 0 | 0
+    page_first: applyPagination ms (calls=1)           85   runs: 85 | 83 | 93
+    acf_direct_x5: long tasks sum ms                    0   runs: 0 | 0 | 0
+    acf_direct_x5: median ms                          690   runs: 690 | 676 | 751
+    acf_direct_x5: applyConditionalFormatting ms (calls=5)     3484   runs: 3484 | 3385 | 3939
+    search_kilo: long tasks sum ms                    625   runs: 601 | 635 | 625
+    search_kilo: done ms                              298   runs: 295 | 298 | 302
+    search_kilo: resetCellStates ms (calls=1)           0   runs: 0 | 0 | 0
+    search_kilo: renderReportSnippet ms (calls=1)        4   runs: 4 | 4 | 4
+    search_kilo: applyConditionalFormatting ms (calls=1)       10   runs: 10 | 10 | 10
+    search_kilo: applyRewriteRules ms (calls=1)         0   runs: 0 | 0 | 0
+    search_kilo: applyPagination ms (calls=1)          96   runs: 99 | 95 | 96
+    search_clear: long tasks sum ms                   877   runs: 877 | 843 | 926
+    search_clear: done ms                             203   runs: 203 | 201 | 238
+    search_clear: resetCellStates ms (calls=1)          0   runs: 0 | 0 | 0
+    search_clear: renderReportSnippet ms (calls=1)        4   runs: 4 | 4 | 5
+    search_clear: applyConditionalFormatting ms (calls=1)       10   runs: 10 | 10 | 11
+    search_clear: applyRewriteRules ms (calls=1)        0   runs: 0 | 0 | 0
+    search_clear: applyPagination ms (calls=1)         91   runs: 91 | 88 | 101
+P0  pivot, no rules
+    load: boot wall ms                               3284   runs: 3298 | 3284 | 3257
+    load: renderReportSnippet ms (calls=3)             17   runs: 17 | 12 | 17
+    load: processPivotData ms (calls=1)                14   runs: 14 | 28 | 14
+    load: generatePivotTable ms (calls=1)             123   runs: 123 | 122 | 125
+    load: resetCellStates ms (calls=2)                  0   runs: 0 | 0 | 0
+    load: applyPivotHeaderFormatting ms (calls=1)        0   runs: 0 | 0 | 0
+    styled cells                                        0   runs: 0 | 0 | 0
+    pv_search_open: long tasks sum ms                 419   runs: 427 | 415 | 419
+    pv_search_open: done ms                           467   runs: 480 | 463 | 467
+    pv_search_open: resetCellStates ms (calls=1)        0   runs: 0 | 0 | 0
+    pv_search_open: renderReportSnippet ms (calls=1)        4   runs: 4 | 4 | 4
+    pv_search_open: processPivotData ms (calls=1)        6   runs: 6 | 5 | 6
+    pv_search_open: generatePivotTable ms (calls=1)       54   runs: 54 | 54 | 57
+    pv_search_open: applyConditionalFormatting ms (calls=1)        0   runs: 0 | 0 | 0
+    pv_search_open: applyRewriteRules ms (calls=1)        0   runs: 0 | 0 | 0
+    pv_search_open: applyPivotHeaderFormatting ms (calls=1)        0   runs: 0 | 0 | 0
+    pv_search_clear: long tasks sum ms                581   runs: 576 | 581 | 588
+    pv_search_clear: done ms                          606   runs: 603 | 606 | 613
+    pv_search_clear: resetCellStates ms (calls=1)        0   runs: 0 | 0 | 0
+    pv_search_clear: renderReportSnippet ms (calls=1)        0   runs: 0 | 0 | 0
+    pv_search_clear: processPivotData ms (calls=1)       14   runs: 12 | 14 | 14
+    pv_search_clear: generatePivotTable ms (calls=1)      113   runs: 113 | 113 | 122
+    pv_search_clear: applyConditionalFormatting ms (calls=1)        0   runs: 0 | 0 | 0
+    pv_search_clear: applyRewriteRules ms (calls=1)        0   runs: 0 | 0 | 0
+    pv_search_clear: applyPivotHeaderFormatting ms (calls=1)        0   runs: 0 | 0 | 0
+P1  pivot, format() in custom code
+    load: boot wall ms                               4000   runs: 4000 | 4025 | 3942
+    load: renderReportSnippet ms (calls=3)            658   runs: 658 | 667 | 637
+    load: processPivotData ms (calls=2)                43   runs: 28 | 43 | 44
+    load: generatePivotTable ms (calls=2)             255   runs: 255 | 259 | 246
+    load: applyPivotHeaderFormatting ms (calls=2)        0   runs: 0 | 0 | 0
+    styled cells                                     3802   runs: 3802 | 3802 | 3802
+    styled cells: body                               2224   runs: 2224 | 2224 | 2224
+    styled cells: summary                              18   runs: 18 | 18 | 18
+    styled cells: gt                                 1556   runs: 1556 | 1556 | 1556
+    styled cells: foot                                  4   runs: 4 | 4 | 4
+    pv_search_open: long tasks sum ms                 872   runs: 821 | 876 | 872
+    pv_search_open: done ms                           919   runs: 871 | 928 | 919
+    pv_search_open: processPivotData ms (calls=2)       18   runs: 19 | 18 | 18
+    pv_search_open: generatePivotTable ms (calls=2)      204   runs: 187 | 204 | 204
+    pv_search_open: applyPivotHeaderFormatting ms (calls=2)        0   runs: 0 | 0 | 0
+    pv_search_open: renderReportSnippet ms (calls=1)      466   runs: 428 | 469 | 466
+    pv_search_open: applyConditionalFormatting ms (calls=1)        6   runs: 5 | 6 | 6
+    pv_search_open: applyRewriteRules ms (calls=1)        0   runs: 0 | 0 | 0
+    pv_search_clear: long tasks sum ms                818   runs: 818 | 802 | 818
+    pv_search_clear: done ms                          840   runs: 840 | 824 | 841
+    pv_search_clear: processPivotData ms (calls=2)       18   runs: 17 | 18 | 18
+    pv_search_clear: generatePivotTable ms (calls=2)      202   runs: 186 | 202 | 205
+    pv_search_clear: applyPivotHeaderFormatting ms (calls=2)        0   runs: 0 | 0 | 0
+    pv_search_clear: renderReportSnippet ms (calls=1)      216   runs: 216 | 219 | 212
+    pv_search_clear: applyConditionalFormatting ms (calls=1)        9   runs: 15 | 9 | 9
+    pv_search_clear: applyRewriteRules ms (calls=1)        0   runs: 0 | 0 | 0
+P2  pivot, highlight (Values cog)
+    load: boot wall ms                               3255   runs: 3241 | 3255 | 3259
+    load: renderReportSnippet ms (calls=3)             12   runs: 13 | 11 | 12
+    load: processPivotData ms (calls=1)                14   runs: 28 | 14 | 14
+    load: generatePivotTable ms (calls=1)             146   runs: 150 | 138 | 146
+    load: resetCellStates ms (calls=2)                  0   runs: 0 | 0 | 0
+    load: applyPivotHeaderFormatting ms (calls=1)        0   runs: 0 | 0 | 0
+    styled cells                                     2242   runs: 2242 | 2242 | 2242
+    styled cells: body                               2224   runs: 2224 | 2224 | 2224
+    styled cells: summary                              18   runs: 18 | 18 | 18
+    pv_search_open: long tasks sum ms                 420   runs: 471 | 420 | 418
+    pv_search_open: done ms                           467   runs: 527 | 466 | 467
+    pv_search_open: resetCellStates ms (calls=1)        0   runs: 0 | 0 | 0
+    pv_search_open: renderReportSnippet ms (calls=1)        4   runs: 4 | 4 | 4
+    pv_search_open: processPivotData ms (calls=1)        6   runs: 6 | 6 | 5
+    pv_search_open: generatePivotTable ms (calls=1)       57   runs: 62 | 57 | 56
+    pv_search_open: applyConditionalFormatting ms (calls=1)        0   runs: 0 | 0 | 1
+    pv_search_open: applyRewriteRules ms (calls=1)        0   runs: 0 | 0 | 0
+    pv_search_open: applyPivotHeaderFormatting ms (calls=1)        0   runs: 0 | 0 | 0
+    pv_search_clear: long tasks sum ms                587   runs: 587 | 582 | 594
+    pv_search_clear: done ms                          612   runs: 612 | 607 | 617
+    pv_search_clear: resetCellStates ms (calls=1)        0   runs: 0 | 0 | 0
+    pv_search_clear: renderReportSnippet ms (calls=1)        0   runs: 0 | 0 | 0
+    pv_search_clear: processPivotData ms (calls=1)       13   runs: 13 | 13 | 13
+    pv_search_clear: generatePivotTable ms (calls=1)      127   runs: 133 | 125 | 127
+    pv_search_clear: applyConditionalFormatting ms (calls=1)        0   runs: 0 | 0 | 0
+    pv_search_clear: applyRewriteRules ms (calls=1)        0   runs: 0 | 0 | 0
+    pv_search_clear: applyPivotHeaderFormatting ms (calls=1)        0   runs: 0 | 0 | 0

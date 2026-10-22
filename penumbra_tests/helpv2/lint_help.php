@@ -250,8 +250,13 @@ foreach ($standard as $id) {
     if (preg_match('/&mdash;|\xE2\x80\x94/', $h)) $bad[] = "$id: em-dash";
     if (preg_match_all('/<h[34]\b[^>]*>(.*?)<\/h[34]>/s', $h, $m)) foreach ($m[1] as $x) if (preg_match('/&#1[2-9]\d{4};|[\x{1F000}-\x{1FAFF}\x{2600}-\x{27BF}]/u', $x)) $bad[] = "$id: emoji heading (" . substr(trim(strip_tags($x)), 0, 30) . ")";
     if (preg_match_all('/<td\b[^>]*>(.*?)<\/td>/s', $h, $m)) foreach ($m[1] as $x) { $w = hv_words($x); if ($w > 70) $bad[] = "$id: table cell of $w words"; }
+    // Every prose run, a <div> callout's included (2026-10-22, fnpop 5): the rules above read only <p>, <li>
+    // and <td>, and the Custom Code reference had 100-350 word runs inside div callouts that passed.
+    $pr = preg_replace('#<pre\b[^>]*>.*?</pre>#s', "\x01", $h);
+    $pr = preg_replace('#</?(p|div|li|td|th|h[1-6]|ul|ol|table|tr|thead|tbody|br|hr)\b[^>]*>#i', "\x01", $pr);
+    foreach (explode("\x01", $pr) as $x) { $w = hv_words($x); if ($w > 80) $bad[] = "$id: prose run of $w words (" . substr(trim(preg_replace('/\s+/', ' ', strip_tags($x))), 0, 40) . "...)"; }
 }
-$R->check('L16', !$bad, $bad ? implode(' | ', array_slice($bad, 0, 8)) : count($standard) . ' rewritten topics meet the tier standard (paragraphs <= 80 words, bullets <= 50, cells <= 70, no em-dashes, no emoji headings)');
+$R->check('L16', !$bad, $bad ? implode(' | ', array_slice($bad, 0, 8)) : count($standard) . ' rewritten topics meet the tier standard (paragraphs and every other prose run, div callouts included, <= 80 words, bullets <= 50, cells <= 70, no em-dashes, no emoji headings)');
 
 // ---------------------------------------------------------------- L17 / L18 the Custom Code reference (phase 4, 2026-10-15)
 // L17: help/topics/optionsHelpLightbox.php is the current render of help/snippets.php (the generator's --check

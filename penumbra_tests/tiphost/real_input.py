@@ -118,8 +118,8 @@ try:
         time.sleep(0.2)
     else:
         raise RuntimeError('harness never reported READY')
-    SHORTCUT = "#snipHelperList .snip-group[data-group=\\'shortcuts\\'] .snip-ico[title]"
-    FUNCTION = "#snipHelperList .snip-group[data-group=\\'functions\\'] .snip-ico[title]"
+    SHORTCUT = "#snipHelperList .snip-group[data-group=\\'shortcuts\\'] .snip-ico[data-card]"
+    FUNCTION = "#snipHelperList .snip-group[data-group=\\'functions\\'] .snip-ico[data-card]"
     UNDERLINE = "#report-options-tab .CodeMirror .cm-function-underline[data-fn=\\'sum\\']"
 
     def real_click(sel):
@@ -193,13 +193,39 @@ try:
             fmt(t) + '; .ui-tooltip in the tab: %s' % in_tab)
         park()
 
+    # (2026-10-22, fnpop) the Custom Code helpers and the function underlines open a CARD - the
+    # lazy module's popover (#snipCardPop) - not a jQuery UI tooltip. Real pointer, real timers.
+    def card_in(conn, label, sel, want, shots=None, link=None, pop_sel='#snipCardPop'):
+        c = main.ev("__drv.center('%s')" % sel)
+        if not c or c.get('where') != want:
+            rec(label, False, 'target not in the %s: %s' % (want, c))
+            return
+        conn.move(c['x'] - 2, c['y'])
+        time.sleep(0.05)
+        conn.move(c['x'], c['y'])
+        k = None
+        for _ in range(40):                      # the 250 / 350 ms hover delay + the fade
+            time.sleep(0.05)
+            k = main.ev("__drv.card('%s')" % pop_sel)
+            if k and k.get('visible'):
+                break
+        time.sleep(0.25)
+        k = main.ev("__drv.card('%s')" % pop_sel)
+        if shots and SHOTS:
+            conn.shot(os.path.join(SHOTS, shots + '.png'))
+        rec(label, bool(k and k.get('where') == want and k.get('visible') and k.get('inside') and (link is None or k.get('anchor') == link)),
+            '%s' % k)
+
     park()
-    hover_in_console('X2 a real hover on a Custom Code Shortcuts helper opens its tooltip IN the console window',
-                     SHORTCUT, '#snippetHelperPanel', 'x2_shortcuts')
-    hover_in_console('X3 a real hover on a Custom Code Functions helper opens its tooltip IN the console window',
-                     FUNCTION, '#snippetHelperPanel')
-    hover_in_console('X4 a real hover on a function underline in the snippet editor opens its tooltip IN the console window',
-                     UNDERLINE, '#report-options-tab', 'x4_underline')
+    card_in(pop, 'X2 a real hover on a Custom Code Shortcuts helper opens its card IN the console window',
+            SHORTCUT, 'console window', 'x2_shortcuts')
+    park()
+    card_in(pop, 'X3 a real hover on a Custom Code Functions helper opens its card IN the console window',
+            FUNCTION, 'console window')
+    park()
+    card_in(pop, 'X4 a real hover on a function underline in the snippet editor opens its card IN the console window, linked to sum',
+            UNDERLINE, 'console window', 'x4_underline', link='sum')
+    park()
 
     # X6 - a real click focuses a titled console button; the tooltip rides the forwarded focusin.
     c = main.ev("__drv.center('#tthConsoleBtn')")
@@ -222,8 +248,9 @@ try:
     real_click("#editorTabs a[href=\\'#scheduler-tab\\']")
     wait_shown('#cronExprHelp')
     park()
-    hover_in_console('X5 a real hover on the scheduler cron help opens its tooltip IN the console window',
-                     '#cronExprHelp', '#cronExprHelp', 'x5_cron')
+    card_in(pop, 'X5 a real hover on the scheduler cron help opens its card IN the console window, linked to the cron help',
+            '#cronExprHelp', 'console window', 'x5_cron', link='schedHelp-cron', pop_sel='#pnbHoverCard')
+    park()
     real_click("#editorTabs a[href=\\'#report-options-tab\\']")
     wait_shown(SHORTCUT)
     time.sleep(0.3)
@@ -237,18 +264,11 @@ try:
             break
     time.sleep(0.6)
     back = main.ev("!__drv.popped() && !!document.getElementById('admWrapper')")
-    c = main.ev("__drv.center('%s')" % SHORTCUT)
-    t = None
-    if back and c:
-        main.move(c['x'], c['y'])
-        for _ in range(40):
-            time.sleep(0.05)
-            t = main.ev("__drv.tip('%s', '#snippetHelperPanel')" % SHORTCUT)
-            if t and t.get('visible'):
-                break
-    rec('X7 a real click on "Return to Tab", then a real hover on the Shortcuts helper: its tooltip opens in the tab',
-        back and t and t.get('where') == 'tab' and t.get('visible') and t.get('descOk'),
-        ('console home' if back else 'console NOT home') + '; ' + fmt(t))
+    if back:
+        card_in(main, 'X7 a real click on "Return to Tab", then a real hover on a function underline: its card opens in the tab',
+                UNDERLINE, 'tab', 'x7_tab', link='sum')
+    else:
+        rec('X7 a real click on "Return to Tab"', False, 'console NOT home')
     errs = main.ev("__drv.errors()") or []
     if errs:
         print('  page errors: ' + ' | '.join(str(e) for e in errs[:6]))

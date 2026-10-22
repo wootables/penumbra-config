@@ -1,0 +1,11 @@
+hlperf A/B after the cfperf deploy (2026-10-21 ~11:05-11:20): ONE format() pass, flat, 25,000 rows
+(F1 = format(cell, H_AMT, H_AMT > 100, ...)), before = cfperf cut_1021_104728\orig (live 69077b7),
+after = live 0367d51. hperf.py --only F1 --runs 1 --nowait [--main <orig>], alternating.
+
+Without GC control (5 passes each):   before [596 600 662 669 678] [590 611 639 649 692]
+                                      after  [628 661 670 685 723] [643 709 728 757 796]   -> pooled medians 644 vs 697
+With Edge --js-flags=--expose-gc and gc() before each of 9 passes (medians):
+                                      before 652 / 643 / 638      after 633 / 681 / 637   -> no difference
+Conclusion: the apparent +8% was collector timing (the old load did 2.4 s of extra work, the new one leaves
+different garbage behind). No changed code runs inside that pass.
+Same runs, search "kilo" main-thread long tasks: before 3,542 / 3,324 ms, after 1,117 / 1,140 ms.

@@ -30,8 +30,9 @@ EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js',
         'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js']
-SCN = ['base', 'conflict', 'self', 'otherid', 'nover', 'validate', 'jsaveas', 'sched']
+SCN = ['base', 'conflict', 'self', 'otherid', 'nover', 'validate', 'jsaveas', 'sched', 'encsave']
 CHK = {
+    'encsave': ['bootUnticked', 'firstEncrypted', 'openerRan', 'tickedAfterEncSave', 'secondSaveNotPlain', 'passwordAsked', 'plainSaved', 'untickedAfterPlainSave'],   # 2026-10-21
     'base': ['sentBase', 'versionMoved', 'secondSendsNew'],
     'conflict': ['noticeWho', 'noticeButtons', 'dialogStays', 'buttonBack', 'versionKept', 'forceSent', 'forceSaved', 'forceOnce'],
     'self': ['selfWords', 'rollbackWords'],
@@ -42,6 +43,12 @@ CHK = {
     'sched': ['noHeaderKept', 'otherReportKept', 'otherMovedKept', 'adopted', 'saveSendsAdopted', 'malformedKept'],   # schedsave 2026-10-16
 }
 MUTANTS = {
+    # encsave (2026-10-21): the save does not record how it sealed the report / the opener ignores that record
+    'enc-norecord': ([('main', "            _pnbSavedEncrypted = savedPassword !== null;\r\n", "")],
+                     ['L-encsave-tickedAfterEncSave', 'L-encsave-secondSaveNotPlain', 'L-encsave-passwordAsked'], ['encsave']),
+    'enc-tickload': ([('main', "        if (_pnbSavedEncrypted !== null ? _pnbSavedEncrypted : (penumbra_vars.preloadedState && penumbra_vars.preloadedState.encrypted === true)) {\r\n",
+                               "        if (penumbra_vars.preloadedState && penumbra_vars.preloadedState.encrypted === true) {\r\n")],
+                     ['L-encsave-tickedAfterEncSave', 'L-encsave-secondSaveNotPlain', 'L-encsave-passwordAsked'], ['encsave']),
     # schedsave (2026-10-16): a schedule change hands the page the new version
     'sc-noadopt': ([('main', "        penumbra_vars.reportVersion = { id: ver.id, at: after };\r\n", "")], ['L-sched-adopted', 'L-sched-saveSendsAdopted'], ['sched']),
     'sc-nobefore': ([('main', "        if (String(ver.at == null ? '' : ver.at) !== before) return;\r\n", "")], ['L-sched-otherMovedKept'], ['sched']),
@@ -207,12 +214,12 @@ try:
             else: f += 1; failed.append(a)
         print('TOTAL pass=%d fail=%d   failed: %s' % (p, f, ' '.join(failed)))
         if control:
-            # Since schedsave (2026-10-16) the live files already carry the 10-09 save
-            # conflict: the control is "exactly the schedsave checks red, all else green".
-            # (The other schedsave checks are absence checks: they hold before the change.)
-            NEW = {'P-M1', 'P-M2', 'P-M3', 'P-M4', 'P-M5', 'P-M7', 'L-sched-adopted', 'L-sched-saveSendsAdopted'}
+            # Since encsave (2026-10-21) the live files already carry schedsave: the control is
+            # "exactly the encsave checks that need the fix red, all else green" (bootUnticked,
+            # firstEncrypted, plainSaved and untickedAfterPlainSave hold before the change).
+            NEW = {'L-encsave-tickedAfterEncSave', 'L-encsave-secondSaveNotPlain', 'L-encsave-passwordAsked'}
             sane = [a for a in failed if a not in NEW] + [a for a, passed, _ in res if passed and a in NEW]
-            print('CONTROL: %d of %d schedsave checks red (expected all); off-target (red outside the set, or green in it): %s' % (len(NEW & set(failed)), len(NEW), ' '.join(sane) or 'none'))
+            print('CONTROL: %d of %d encsave checks red (expected all); off-target (red outside the set, or green in it): %s' % (len(NEW & set(failed)), len(NEW), ' '.join(sane) or 'none'))
             print('RESULT: GREEN' if not sane and NEW <= set(failed) else 'RESULT: RED')
         else:
             print('RESULT: GREEN' if f == 0 and p > 0 else 'RESULT: RED')

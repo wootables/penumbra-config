@@ -128,8 +128,14 @@ ok('log_client_error.php files under the report only through userCanAccessReport
 $snaps = rd($APP . '/manage_snapshots.php');
 if (!function_exists('queryViaOci8')) { function queryViaOci8($sql, $binds = array()) { return array(array('OWNER_ID' => 'OWNER1')); } }
 if (!function_exists('penumbraIsReportOwner')) { function penumbraIsReportOwner($ownerId, $userKey) { $u = strtoupper(trim((string)$userKey)); return $u !== '' && strtoupper(trim((string)$ownerId)) === $u; } }
-eval(between($snaps, "/** Pinning is the snapshot creator's, the report owner's or an admin's call (2026-10-01). */", "function userCanAccessReport(", "the pin helpers'"));
+// (2026-10-21) The helpers sat INSIDE `if (!function_exists('userCanAccessReport')) {`, which db_connection.php
+// always makes false - never defined at runtime, every non-admin pin a fatal - while this lift ran them anyway.
+// They are top level now: lifted up to the section after them, and asserted to precede that block.
+$pinDoc = "/** Pinning is the snapshot creator's, the report owner's or an admin's call (2026-10-01). */";
+eval(between($snaps, $pinDoc, "// --- HELPER: Check if user has access to a report ---", "the pin helpers'"));
 ok('the pin helpers lifted', function_exists('penumbra_snap_is_creator') && function_exists('penumbra_snap_report_owned'));
+$pDoc = strpos($snaps, $pinDoc); $pLegacy = strpos($snaps, "if (!function_exists('userCanAccessReport')) {");
+ok('the pin helpers are top level, before (never inside) the skipped legacy userCanAccessReport block', $pDoc !== false && $pLegacy !== false && $pDoc < $pLegacy, json_encode(array($pDoc, $pLegacy)));
 ok('the creator comparison folds case and padding, and an empty user never matches', penumbra_snap_is_creator(' Ada ', 'ada') && !penumbra_snap_is_creator('Bob', 'ada') && !penumbra_snap_is_creator('', '') && !penumbra_snap_is_creator('x', ''));
 ok('the owner check reads the report owner through the oci8 lookup', penumbra_snap_report_owned(5, 'owner1') === true && penumbra_snap_report_owned(5, 'other') === false);
 $pRule = strpos($snaps, "if (!\$isAdmin && !penumbra_snap_is_creator(\$snap['CREATED_BY'], \$currentUserKey)");

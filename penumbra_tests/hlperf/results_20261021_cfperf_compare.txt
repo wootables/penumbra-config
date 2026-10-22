@@ -1,0 +1,109 @@
+cfperf before (live 136ab7d) -> after (stage = 136ab7d + cfperf), hperf2.py --n 25000 --runs 3, medians
+
+F0  acf_direct_x5: long tasks sum ms                               0 -> 0          before 0 | 0 | 0              after 0 | 0 | 0
+F0  acf_direct_x5: median ms                                       0 -> 0          before 0 | 0 | 0              after 0 | 0 | 0
+F0  load: boot wall ms                                          1838 -> 2085       before 1834 | 1838 | 1859     after 1839 | 2085 | 2148
+F0  load: renderReportSnippet ms (calls=2)                        12 -> 12         before 12 | 11 | 12           after 12 | 12 | 12
+F0  load: resetCellStates ms (calls=2)                             0 -> 0          before 0 | 0 | 0              after 0 | 0 | 0
+F0  page_first: long tasks sum ms                                126 -> 112        before 126 | 137 | 115        after 112 | 112 | 102
+F0  page_next2: long tasks sum ms                                226 -> 129        before 236 | 226 | 167        after 143 | 125 | 129
+F0  page_next: long tasks sum ms                                 134 -> 146        before 125 | 134 | 145        after 134 | 146 | 157
+F0  search_clear: done ms                                        254 -> 206        before 191 | 270 | 254        after 257 | 206 | 187
+F0  search_clear: long tasks sum ms                              220 -> 173        before 158 | 231 | 220        after 217 | 173 | 154
+F0  search_clear: renderReportSnippet ms (calls=1)                 4 -> 4          before 4 | 5 | 4              after 4 | 4 | 4
+F0  search_clear: resetCellStates ms (calls=1)                     0 -> 0          before 0 | 0 | 0              after 0 | 0 | 0
+F0  search_kilo: done ms                                         407 -> 387        before 407 | 362 | 448        after 422 | 387 | 302
+F0  search_kilo: long tasks sum ms                               346 -> 331        before 346 | 315 | 397        after 366 | 331 | 257
+F0  search_kilo: renderReportSnippet ms (calls=1)                  6 -> 5          before 6 | 5 | 6              after 5 | 5 | 4
+F0  search_kilo: resetCellStates ms (calls=1)                      0 -> 0          before 0 | 0 | 0              after 0 | 0 | 0
+F0  styled cells                                                   0 -> 0          before 0 | 0 | 0              after 0 | 0 | 0
+F1  acf_direct_x5: long tasks sum ms                               0 -> 0          before 0 | 0 | 0              after 0 | 0 | 0
+F1  acf_direct_x5: median ms                                     727 -> 726        before 707 | 727 | 853        after 850 | 726 | 689
+F1  load: boot wall ms                                          7159 -> 4053       before 7049 | 7934 | 7159     after 4053 | 4438 | 3910
+F1  load: renderReportSnippet ms (calls=2)                      3238 -> 306        before 3238 | 3395 | 3199     after 306 | 313 | 294
+F1  load: resetCellStates ms (calls=1)                          3021 -> 114        before 3021 | 3166 | 2972     after 121 | 114 | 110
+F1  page_first: long tasks sum ms                               1311 -> 945        before 1311 | 1508 | 865      after 1057 | 945 | 718
+F1  page_next2: long tasks sum ms                                875 -> 1046       before 870 | 1370 | 875       after 1046 | 1150 | 751
+F1  page_next: long tasks sum ms                                 949 -> 1049       before 902 | 1540 | 949       after 1300 | 1049 | 855
+F1  search_clear: done ms                                       3517 -> 434        before 3517 | 3450 | 4438     after 535 | 417 | 434
+F1  search_clear: long tasks sum ms                             4858 -> 1693       before 4745 | 4858 | 6075     after 2094 | 1693 | 1524
+F1  search_clear: renderReportSnippet ms (calls=1)              3339 -> 248        before 3339 | 3255 | 4184     after 318 | 248 | 246
+F1  search_clear: resetCellStates ms (calls=1)                  3189 -> 145        before 3189 | 3098 | 3956     after 186 | 143 | 145
+F1  search_kilo: done ms                                        3924 -> 548        before 3700 | 3924 | 4405     after 630 | 548 | 540
+F1  search_kilo: long tasks sum ms                              4876 -> 1106       before 4237 | 4876 | 5524     after 1370 | 1102 | 1106
+F1  search_kilo: renderReportSnippet ms (calls=1)               3605 -> 292        before 3376 | 3605 | 4033     after 322 | 287 | 292
+F1  search_kilo: resetCellStates ms (calls=1)                   3430 -> 200        before 3214 | 3430 | 3841     after 225 | 186 | 200
+F1  styled cells                                               12164 -> 12164      before 12164 | 12164 | 12164  after 12164 | 12164 | 12164
+F1  styled cells: flat                                         12164 -> 12164      before 12164 | 12164 | 12164  after 12164 | 12164 | 12164
+F2  acf_direct_x5: long tasks sum ms                               0 -> 0          before 0 | 0 | 0              after 0 | 0 | 0
+F2  acf_direct_x5: median ms                                     970 -> 655        before 970 | 1045 | 879       after 880 | 625 | 655
+F2  load: boot wall ms                                          2725 -> 2733       before 2725 | 3262 | 2721     after 2655 | 2787 | 2733
+F2  load: renderReportSnippet ms (calls=2)                        13 -> 14         before 16 | 12 | 13           after 14 | 14 | 12
+F2  load: resetCellStates ms (calls=2)                             0 -> 0          before 0 | 0 | 0              after 0 | 0 | 0
+F2  page_first: long tasks sum ms                               1110 -> 781        before 1005 | 1347 | 1110     after 869 | 781 | 772
+F2  page_next2: long tasks sum ms                               1263 -> 776        before 1263 | 1506 | 1140     after 903 | 776 | 774
+F2  page_next: long tasks sum ms                                1362 -> 838        before 1289 | 1618 | 1362     after 1136 | 799 | 838
+F2  search_clear: done ms                                        251 -> 211        before 251 | 280 | 232        after 235 | 210 | 211
+F2  search_clear: long tasks sum ms                             1171 -> 786        before 1136 | 1196 | 1171     after 943 | 778 | 786
+F2  search_clear: renderReportSnippet ms (calls=1)                 5 -> 4          before 4 | 5 | 5              after 6 | 4 | 4
+F2  search_clear: resetCellStates ms (calls=1)                     0 -> 0          before 0 | 0 | 0              after 0 | 0 | 0
+F2  search_kilo: done ms                                         378 -> 360        before 378 | 437 | 353        after 360 | 295 | 369
+F2  search_kilo: long tasks sum ms                               934 -> 697        before 724 | 934 | 955        after 697 | 577 | 747
+F2  search_kilo: renderReportSnippet ms (calls=1)                  4 -> 4          before 4 | 5 | 4              after 4 | 4 | 5
+F2  search_kilo: resetCellStates ms (calls=1)                      0 -> 0          before 0 | 0 | 0              after 0 | 0 | 0
+F2  styled cells                                               12164 -> 12164      before 12164 | 12164 | 12164  after 12164 | 12164 | 12164
+F2  styled cells: flat                                         12164 -> 12164      before 12164 | 12164 | 12164  after 12164 | 12164 | 12164
+P0  load: boot wall ms                                          3234 -> 3349       before 3234 | 3375 | 3227     after 3428 | 3349 | 3055
+P0  load: generatePivotTable ms (calls=1)                        125 -> 135        before 125 | 126 | 118        after 142 | 127 | 135
+P0  load: renderReportSnippet ms (calls=3)                        14 -> 17         before 14 | 17 | 13           after 17 | 16 | 20
+P0  load: resetCellStates ms (calls=2)                             0 -> 0          before 0 | 0 | 0              after 0 | 0 | 0
+P0  pv_search_clear: done ms                                     881 -> 677        before 881 | 866 | 972        after 948 | 677 | 615
+P0  pv_search_clear: generatePivotTable ms (calls=1)             197 -> 130        before 191 | 231 | 197        after 228 | 130 | 121
+P0  pv_search_clear: long tasks sum ms                           855 -> 654        before 855 | 840 | 947        after 923 | 654 | 589
+P0  pv_search_clear: renderReportSnippet ms (calls=1)              0 -> 0          before 0 | 0 | 0              after 0 | 0 | 0
+P0  pv_search_clear: resetCellStates ms (calls=1)                  0 -> 0          before 0 | 0 | 0              after 0 | 0 | 0
+P0  pv_search_open: done ms                                      608 -> 506        before 644 | 604 | 608        after 831 | 506 | 506
+P0  pv_search_open: generatePivotTable ms (calls=1)               70 -> 70         before 95 | 53 | 70           after 105 | 65 | 70
+P0  pv_search_open: long tasks sum ms                            556 -> 463        before 585 | 547 | 556        after 820 | 451 | 463
+P0  pv_search_open: renderReportSnippet ms (calls=1)               6 -> 5          before 6 | 6 | 6              after 5 | 5 | 10
+P0  pv_search_open: resetCellStates ms (calls=1)                   0 -> 0          before 0 | 0 | 0              after 0 | 0 | 0
+P0  snipout: long tasks sum ms                                     0 -> 0          before 0 | 0 | 0              after 0 | 0 | 0
+P0  styled cells                                                   0 -> 0          before 0 | 0 | 0              after 0 | 0 | 0
+P1  load: boot wall ms                                          4042 -> 3581       before 4042 | 3953 | 4050     after 3581 | 3612 | 3503
+P1  load: generatePivotTable ms (calls=1)                       None -> 156        before                        after 156 | 160 | 142
+P1  load: generatePivotTable ms (calls=2)                        256 -> None       before 268 | 243 | 256        after 
+P1  load: renderReportSnippet ms (calls=3)                       771 -> 220        before 879 | 771 | 729        after 222 | 220 | 204
+P1  pv_search_clear: done ms                                    1120 -> 645        before 1088 | 1120 | 1175     after 1243 | 629 | 645
+P1  pv_search_clear: generatePivotTable ms (calls=1)            None -> 141        before                        after 259 | 141 | 137
+P1  pv_search_clear: generatePivotTable ms (calls=2)             341 -> None       before 254 | 342 | 341        after 
+P1  pv_search_clear: long tasks sum ms                          1098 -> 622        before 1063 | 1098 | 1147     after 1217 | 608 | 622
+P1  pv_search_clear: renderReportSnippet ms (calls=1)            342 -> 0          before 290 | 342 | 352        after 1 | 0 | 0
+P1  pv_search_open: done ms                                     1145 -> 454        before 1108 | 1145 | 1261     after 645 | 426 | 454
+P1  pv_search_open: generatePivotTable ms (calls=1)             None -> 62         before                        after 110 | 57 | 62
+P1  pv_search_open: generatePivotTable ms (calls=2)              239 -> None       before 239 | 215 | 321        after 
+P1  pv_search_open: long tasks sum ms                           1133 -> 410        before 1045 | 1133 | 1250     after 634 | 380 | 410
+P1  pv_search_open: renderReportSnippet ms (calls=1)             523 -> 5          before 523 | 523 | 622        after 7 | 5 | 5
+P1  snipout: long tasks sum ms                                     0 -> 0          before 0 | 0 | 0              after 0 | 0 | 0
+P1  styled cells                                                3802 -> 3802       before 3802 | 3802 | 3802     after 3802 | 3802 | 3802
+P1  styled cells: body                                          2224 -> 2224       before 2224 | 2224 | 2224     after 2224 | 2224 | 2224
+P1  styled cells: foot                                             4 -> 4          before 4 | 4 | 4              after 4 | 4 | 4
+P1  styled cells: gt                                            1556 -> 1556       before 1556 | 1556 | 1556     after 1556 | 1556 | 1556
+P1  styled cells: summary                                         18 -> 18         before 18 | 18 | 18           after 18 | 18 | 18
+P2  load: boot wall ms                                          2985 -> 3450       before 2995 | 2985 | 2979     after 3450 | 3542 | 3265
+P2  load: generatePivotTable ms (calls=1)                        145 -> 159        before 145 | 150 | 139        after 159 | 160 | 142
+P2  load: renderReportSnippet ms (calls=3)                        12 -> 15         before 12 | 12 | 12           after 16 | 15 | 12
+P2  load: resetCellStates ms (calls=2)                             0 -> 0          before 0 | 0 | 0              after 0 | 0 | 0
+P2  pv_search_clear: done ms                                     868 -> 629        before 926 | 836 | 868        after 629 | 638 | 610
+P2  pv_search_clear: generatePivotTable ms (calls=1)             222 -> 133        before 222 | 168 | 226        after 133 | 136 | 128
+P2  pv_search_clear: long tasks sum ms                           845 -> 606        before 900 | 809 | 845        after 606 | 615 | 585
+P2  pv_search_clear: renderReportSnippet ms (calls=1)              0 -> 0          before 0 | 0 | 0              after 0 | 0 | 0
+P2  pv_search_clear: resetCellStates ms (calls=1)                  0 -> 0          before 0 | 0 | 0              after 0 | 0 | 0
+P2  pv_search_open: done ms                                      706 -> 476        before 839 | 706 | 660        after 515 | 476 | 468
+P2  pv_search_open: generatePivotTable ms (calls=1)              104 -> 58         before 104 | 113 | 69         after 66 | 58 | 56
+P2  pv_search_open: long tasks sum ms                            657 -> 429        before 830 | 657 | 612        after 459 | 429 | 417
+P2  pv_search_open: renderReportSnippet ms (calls=1)               6 -> 4          before 6 | 6 | 4              after 4 | 4 | 4
+P2  pv_search_open: resetCellStates ms (calls=1)                   0 -> 0          before 0 | 0 | 0              after 0 | 0 | 0
+P2  snipout: long tasks sum ms                                     0 -> 0          before 0 | 0 | 0              after 0 | 0 | 0
+P2  styled cells                                                2242 -> 2242       before 2242 | 2242 | 2242     after 2242 | 2242 | 2242
+P2  styled cells: body                                          2224 -> 2224       before 2224 | 2224 | 2224     after 2224 | 2224 | 2224
+P2  styled cells: summary                                         18 -> 18         before 18 | 18 | 18           after 18 | 18 | 18

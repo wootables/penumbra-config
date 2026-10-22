@@ -1,0 +1,81 @@
+{
+ "notext": {
+  "edits": [
+   [
+    "if (!txt && journalAttachPasted(el, cd)) return;",
+    "if (journalAttachPasted(el, cd)) return;"
+   ]
+  ],
+  "must": [
+   "P-mixed-text",
+   "P-mixed-nofile"
+  ],
+  "scn": [
+   "mixed",
+   "text"
+  ]
+ },
+ "norename": {
+  "edits": [
+   [
+    "if (/^image\\.(png|jpe?g|gif|webp)$/i.test(f.name || '') || !f.name) {",
+    "if (false) {"
+   ]
+  ],
+  "must": [
+   "P-shot-file",
+   "P-jpeg"
+  ],
+  "scn": [
+   "shot",
+   "jpeg",
+   "named"
+  ]
+ },
+ "jpegext": {
+  "edits": [
+   [
+    ".toLowerCase().replace('jpeg', 'jpg');",
+    ".toLowerCase();"
+   ]
+  ],
+  "must": [
+   "P-jpeg"
+  ],
+  "scn": [
+   "shot",
+   "jpeg"
+  ]
+ },
+ "editgate": {
+  "edits": [
+   [
+    "if (!input || !$wrap.find('.journal-attach-btn').is(':visible')) {",
+    "if (!input) {"
+   ]
+  ],
+  "must": [
+   "P-edit"
+  ],
+  "scn": [
+   "edit",
+   "shot"
+  ]
+ },
+ "popsize": {
+  "edits": [
+   [
+    "    max-width: min(900px, 70vw);\n    max-height: min(700px, 70vh);",
+    "    max-width: 340px;\n    max-height: 340px;",
+    "css"
+   ]
+  ],
+  "must": [
+   "C-pop-tall",
+   "C-pop-wide"
+  ],
+  "scn": [
+   "pop"
+  ]
+ }
+}

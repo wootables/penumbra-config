@@ -194,7 +194,10 @@ eq(penumbraSubCondScanDirectory($c, $p['parsed'])['ok'], false, 'a failed scan s
 
 // ---------------------------------------------------------------- 10. wiring
 echo "10. the four consumers (text pins)\n";
-$files = array('index.php', 'manage_subscription.php', 'manage_schedule.php', 'schedule_runner.php', 'js/main.js', 'help_content.php');
+// (2026-10-21) the v1 help is gone (2026-10-19): help_content.php is a shim, the body is help/topics + help/tips.
+// The help pins read the two topics that the card's "?" and the chart's link open.
+$files = array('index.php', 'manage_subscription.php', 'manage_schedule.php', 'schedule_runner.php', 'js/main.js',
+               'help/topics/schedulerHelpLightbox.php', 'help/topics/schedulerPromptHelpLightbox.php');
 $missing = array();
 foreach ($files as $f) { if (!is_file($app . DIRECTORY_SEPARATOR . $f)) $missing[] = $f; }
 if ($missing) {
@@ -226,26 +229,33 @@ if ($missing) {
     ok(strpos($mj, "if (taskType === 'EMAIL' && !_schedSubsCondSaveGuard(showError)) return;") !== false && strpos($mj, "action: 'sub_condition_check'") !== false, 'main.js: the save guard and the live check');
     // The card's ONE "?" sits after the Subscriptions label and opens the whole Subscriptions help
     // (2026-09-23 night: it used to sit after "Allow only on custom condition").
-    $hp = $src['help_content.php'];
+    // (2026-10-21) $hp is the Scheduler topic, the one that "?" (and the chart's link) opens, so a section that
+    // moved to another topic goes red: its jump would land on the topic top, silently. $hpChart is the topic
+    // that holds the Recipient Variables chart. The 10-15 tier rewrite gave the headings a style attribute.
+    $hp = $src['help/topics/schedulerHelpLightbox.php'];
+    $hpChart = $src['help/topics/schedulerPromptHelpLightbox.php'];
     ok(strpos($ix, '<label style="padding-top: 6px;">Subscriptions: <span class="tab-help-icon" data-target="#schedulerHelpLightbox" data-jump-to="schedHelp-subscriptions"') !== false
-        && strpos($hp, '<h4 id="schedHelp-subscriptions">Subscriptions (self-service recipients)</h4>') !== false,
+        && preg_match('~<h4 id="schedHelp-subscriptions"[^>]*>' . preg_quote('Subscriptions (self-service recipients)</h4>', '~') . '~', $hp) === 1,
         'help: the Subscriptions label\'s "?" lands on the Subscriptions section');
     $opt = strpos($ix, '<span id="schedSubsCondOpt"');
     $optEnd = ($opt === false) ? false : strpos($ix, '</span>', strpos($ix, '</label>', $opt));
     ok($opt !== false && $optEnd !== false && strpos(substr($ix, $opt, $optEnd - $opt), 'tab-help-icon') === false
-        && strpos($ix, 'data-jump-to="schedHelp-subsCondition"') === false && strpos($hp, '<li id="schedHelp-subsCondition">') !== false,
+        && strpos($ix, 'data-jump-to="schedHelp-subsCondition"') === false && strpos($hp, '<h4 id="schedHelp-subsCondition"') !== false,
         'the condition option carries no "?" of its own (its section is still a jump target from the chart)');
     ok(strpos($ix, 'title="Only people whose employee-directory record matches the condition see the Subscribe option for this schedule.') !== false
         && strpos($ix, 'matches a condition can subscribe') === false, 'the option\'s tooltip says who SEES the Subscribe option (not "can subscribe")');
     ok(strpos($ix, 'placeholder="e.g. {OUC2D} = 14 AND {PI_ELIGIBLE} = 1   or   {TAGS} = CALS_PREAWARD"') !== false, 'the input\'s placeholder uses braces');
     ok(strpos($mj, '<code>{OUC2D} = 14 AND {PI_ELIGIBLE} = 1</code> or <code>{TAGS} = CALS_PREAWARD</code>') !== false, 'main.js: the empty-condition prompt uses braces');
-    $li = strpos($hp, '<li id="schedHelp-subsCondition">');
-    $liText = ($li === false) ? '' : substr($hp, $li, strpos($hp, '</li>', $li) - $li);
-    ok(strpos($liText, 'Examples: <code>{OUC2D} = 14 AND {PI_ELIGIBLE} = 1</code> &middot; <code>{TAGS} = CALS_PREAWARD OR {TAGS} = OSP_LEADS</code> &middot; <code>{EMPL_STATUS} = A AND {JOBCODE_PREFIX} != UP</code>.') !== false
-        && strpos($liText, 'The braces are optional (<code>OUC2D = 14</code> reads the same)') !== false
-        && preg_match_all('/<code>[A-Z_0-9]+ (=|!=)/', $liText) === 1,
+    // The condition item became a section in the tier rewrite (a heading, an intro, a Rule / Detail table):
+    // it runs from its heading to the next one, and "Examples:" is the table's Examples row.
+    $sec = strpos($hp, '<h4 id="schedHelp-subsCondition"');
+    $secEnd = ($sec === false) ? false : strpos($hp, '<h4', $sec + 1);
+    $secText = ($sec === false) ? '' : substr($hp, $sec, ($secEnd === false ? strlen($hp) : $secEnd) - $sec);
+    ok(preg_match('~>Examples</td><td[^>]*>' . preg_quote('<code>{OUC2D} = 14 AND {PI_ELIGIBLE} = 1</code> &middot; <code>{TAGS} = CALS_PREAWARD OR {TAGS} = OSP_LEADS</code> &middot; <code>{EMPL_STATUS} = A AND {JOBCODE_PREFIX} != UP</code></td>', '~') . '~', $secText) === 1
+        && strpos($secText, 'The braces are optional (<code>OUC2D = 14</code> reads the same)') !== false
+        && preg_match_all('/<code>[A-Z_0-9]+ (=|!=)/', $secText) === 1,
         'help: braced examples (the suite matches each one above); the ONE bare example is the "braces are optional" note');
-    ok(strpos($hp, 'Subscriptions custom condition</a> uses them too (plus <code>{TAGS}</code>') !== false, 'help: the Recipient Variables chart intro lists the subscription condition');
+    ok(strpos($hpChart, 'Subscriptions custom condition</a> uses them too (plus <code>{TAGS}</code>') !== false, 'help: the Recipient Variables chart intro lists the subscription condition');
 }
 
 echo "\nPASS: $PASS   FAIL: $FAIL\n";

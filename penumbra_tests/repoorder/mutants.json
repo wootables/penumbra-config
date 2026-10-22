@@ -148,6 +148,32 @@
    "S-nomine"
   ]
  },
+ "js_searchsort": {
+  "why": "2026-10-21 searchrank: the repository re-sorts search results by date again, burying the server's best matches",
+  "file": "js",
+  "edits": [
+   [
+    "renderReportRows(response.data, $searchTbody, false, true);",
+    "renderReportRows(response.data, $searchTbody, false);"
+   ]
+  ],
+  "must": [
+   "J-search"
+  ]
+ },
+ "js_pillcap": {
+  "why": "2026-10-21: a capped search's pill says '50 results found' again, hiding that more matched",
+  "file": "js",
+  "edits": [
+   [
+    "var searchCapped = !!_srCurrentSearch && _srTotalCount > _srLoadedCount;",
+    "var searchCapped = false;"
+   ]
+  ],
+  "must": [
+   "J-cap"
+  ]
+ },
  "php_swap": {
   "why": "everyone else's opens ahead of mine (S-nomine stays green: it has none of mine)",
   "file": "php",
@@ -160,6 +186,19 @@
   "must": [
    "S-order",
    "S-fewmine"
+  ]
+ },
+ "js_colw_resetkeep": {
+  "why": "2026-10-21: Reset to defaults puts order + visibility back but keeps the saved column widths (W-reset's 'clears widths too' half, which no mutant broke before; kept LAST: it leaves a width in the shared browser profile)",
+  "file": "js",
+  "edits": [
+   [
+    "$(document).on('click', '#repoColsReset', function () {\n            resetColPrefs();",
+    "$(document).on('click', '#repoColsReset', function () {\n            var keepW = loadColPrefs().widths; resetColPrefs(); saveColPrefs($.extend(loadColPrefs(), { widths: keepW }));"
+   ]
+  ],
+  "must": [
+   "W-reset"
   ]
  }
 }

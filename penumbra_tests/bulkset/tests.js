@@ -78,7 +78,7 @@
         eq('S11 subtitle find/replace + title -> reportTitle', [s5.reportSubtitle, s5.reportTitle], ['By Sponsored Programs', 'New title']);
         eq('S12 replaceAll is literal (no regex)', C.replaceAll('a.b.c', '.', '-'), 'a-b-c');
         eq('S13 every View Options key buildStateObject writes is editable here', C.VIEW_OPTS.map(function (o) { return o.key; }).sort(),
-            ['bareHeader', 'clickToFilter', 'hideClipboard', 'hideColumns', 'hideEmail', 'hideExport', 'hideGrouping', 'hidePagination', 'hidePivot', 'hideSearch', 'hideSnapshots', 'hideViz']);
+            ['bareHeader', 'clickToFilter', 'hideClipboard', 'hideColumns', 'hideEmail', 'hideExport', 'hideGrouping', 'hidePagination', 'hidePivot', 'hideSearch', 'hideSnapshots', 'hideViz', 'presetSharing']);   // presetSharing: Preset Sharing, 2026-10-22
 
         // ---------------- G: password gates
         var scanOk = { snaps: true, tasks: true };
@@ -228,7 +228,54 @@
         // ---------------- D: the dialog, driven
         await dialogTests();
         await dialogSweepTests();
+        // ---------------- E: the read failing (2026-10-21)
+        await readFailTests();
         return R;
+    }
+
+    // The read failing: an expired sign-in opens main.js's sign-in dialog
+    // (window.Penumbra.handleSessionExpiredError) with no alert on top; a real denial or error keeps
+    // its alert; an aborted read says nothing. Each case opens the dialog afresh, so it also proves
+    // a failed read leaves the dialog free to open again.
+    async function readFailTests() {
+        var B = window.PenumbraBulkSet;
+        var realAjax = $.ajax, realAlert = window.alert, hadP = ('Penumbra' in window), realP = window.Penumbra;
+        var alerts = [], expiredCalls = 0;
+        window.alert = function (m) { alerts.push(String(m)); };
+        window.Penumbra = $.extend({}, realP || {}, { handleSessionExpiredError: function () { expiredCalls++; } });
+        function hdr(v) { return function (n) { return String(n).toLowerCase() === 'x-penumbra-auth' ? v : null; }; }
+        var cases = [
+            { id: 'E1', what: 'an expired sign-in (403 + X-Penumbra-Auth: expired, with a message) opens the sign-in dialog, no alert',
+              xhr: { status: 403, statusText: 'error', responseJSON: { status: 'error', message: 'Access Denied. You must be logged in.' }, getResponseHeader: hdr('expired') },
+              want: { expired: 1, alerts: 0 } },
+            { id: 'E2', what: 'the SSO redirect cut off (status 0) opens the sign-in dialog, no alert',
+              xhr: { status: 0, statusText: 'error', getResponseHeader: hdr(null) }, want: { expired: 1, alerts: 0 } },
+            { id: 'E3', what: 'an admin-only denial (403, no header) keeps its alert with the server message',
+              xhr: { status: 403, statusText: 'error', responseJSON: { status: 'error', message: 'Permission denied: Bulk settings is for administrators.' }, getResponseHeader: hdr(null) },
+              want: { expired: 0, alerts: 1, text: /for administrators/ } },
+            { id: 'E4', what: 'a server error keeps its alert',
+              xhr: { status: 500, statusText: 'error', getResponseHeader: hdr(null) }, want: { expired: 0, alerts: 1, text: /HTTP 500/ } },
+            { id: 'E5', what: 'an aborted read is silent',
+              xhr: { status: 0, statusText: 'abort', getResponseHeader: hdr(null) }, want: { expired: 0, alerts: 0 } }
+        ];
+        try {
+            for (var i = 0; i < cases.length; i++) {
+                var c = cases[i];
+                alerts = []; expiredCalls = 0;
+                $.ajax = (function (x) {
+                    return function () { var d = $.Deferred(); setTimeout(function () { d.reject(x); }, 5); return d.promise(); };
+                })(c.xhr);
+                B.open({ targets: [{ numericId: 11, shortId: 'awards26' }], onDone: function () { } });
+                await wait(function () { return !$('.pbs-overlay').length && expiredCalls + alerts.length > 0; }, 600);
+                await new Promise(function (r) { setTimeout(r, 50); });
+                var good = expiredCalls === c.want.expired && alerts.length === c.want.alerts
+                    && (!c.want.text || c.want.text.test(alerts[0] || '')) && !$('.pbs-overlay').length;
+                ok(c.id + ' ' + c.what, good, { expired: expiredCalls, alerts: alerts, overlay: $('.pbs-overlay').length });
+            }
+        } finally {
+            $.ajax = realAjax; window.alert = realAlert;
+            if (hadP) { window.Penumbra = realP; } else { try { delete window.Penumbra; } catch (e) { window.Penumbra = undefined; } }
+        }
     }
 
     // Mock $.ajax: bulk_settings_read.php returns fixtures, save_server_state.php records.

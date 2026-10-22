@@ -1,12 +1,13 @@
 <?php
 /*
- * errbenign - the browser's harmless page-animation aborts are NOT errors, anywhere.
+ * errbenign - the browser's harmless notices are NOT errors, anywhere: its
+ * page-animation aborts (2026-09-25) and its ResizeObserver loop notice (2026-10-21).
  * Offline (no database): lifts the real functions out of the files under test and
  * checks the rule, its SQL twin, and that every consumer counts through it.
  *   php -n check.php <dir> [<app dir>]
  *       <dir>      holds the files under test: db_connection.php, get_audit_log.php,
  *                  analytics.php, analytics_all.php, penumbra_health.php,
- *                  log_client_error.php
+ *                  log_client_error.php, analytics_shared.php, penumbra_logs.php
  *       <app dir>  every OTHER app PHP file (top level + plugins/includes/lib/api)
  *                  is swept for bare error counts too; the files under test win
  * Prints PASS/FAIL lines and RESULT: GREEN|RED.
@@ -25,6 +26,7 @@ $all = src($dir, 'analytics_all.php');
 $hl  = src($dir, 'penumbra_health.php');
 $log = src($dir, 'log_client_error.php');
 $sh  = src($dir, 'analytics_shared.php');   // the metrics counter catalog (2026-10-01)
+$lgs = src($dir, 'penumbra_logs.php');      // the health hub's log console (2026-10-21)
 
 // ---- the rule, lifted -------------------------------------------------------
 $fnNames = array('penumbraErrorActions', 'penumbraErrorActionsSql', 'penumbraBenignClientErrorPattern',
@@ -44,41 +46,58 @@ $cases = array(
     array('The user aborted a request.', false),
     array("Cannot read properties of undefined (reading 'transition')", false),
     array('Failed to fetch', false),
-    array('ResizeObserver loop completed with undelivered notifications.', false),
+    // The ResizeObserver notice (2026-10-21): harmless in both wordings; anything
+    // else that merely names ResizeObserver is not.
+    array('ResizeObserver loop completed with undelivered notifications.', true),
+    array('ResizeObserver loop limit exceeded', true),
+    array('  resizeobserver loop COMPLETED with undelivered notifications', true),
+    array('ResizeObserver loop', false),
+    array('Uncaught ReferenceError: ResizeObserver is not defined', false),
+    array('Uncaught Error: ResizeObserver loop limit exceeded', false),
     array('', false),
     array(null, false),
 );
+$nCases = count($cases);
+$r1Name = "the rule: the three abort forms and the ResizeObserver notice (both wordings) are harmless (any case, trimmed), nothing else is ($nCases messages)";
 if ($haveRule) {
     $bad = array();
     foreach ($cases as $c) { $got = penumbraClientErrorIsBenign($c[0]); if ($got !== $c[1]) $bad[] = var_export($c[0], true) . '=>' . var_export($got, true); }
-    T('R1', 'the rule: the three abort forms are harmless (any case, trimmed), nothing else is (12 messages)', !$bad, $bad ? implode('; ', $bad) : '12/12');
+    T('R1', $r1Name, !$bad, $bad ? implode('; ', $bad) : "$nCases/$nCases");
 } else {
-    T('R1', 'the rule: the three abort forms are harmless (any case, trimmed), nothing else is (12 messages)', false, 'missing in db_connection.php: ' . implode(', ', $missing));
+    T('R1', $r1Name, false, 'missing in db_connection.php: ' . implode(', ', $missing));
 }
 
 // ---- the collector uses the SAME rule, behind its kind gate --------------------
+// Since 2026-10-21 the gate admits error events as well as rejections (the
+// ResizeObserver notice arrives as an error event): the message decides, as in
+// every count. A resource failure (a file that did not load) never matches.
 $col = lift_fn($log, 'penumbra_client_error_is_benign');
 if ($col === null && preg_match('/function penumbra_client_error_is_benign\(.*?\n\}\n/s', $log, $mm)) $col = $mm[0];
+$r2Name = 'the collector drops exactly those (error events and unhandled rejections, never a resource failure) through the SHARED rule, no regex of its own';
 if ($col !== null && $haveRule) {
     eval($col);
     $kc = array(
         array('unhandledrejection', 'Transition was skipped', true),
         array('unhandledrejection', 'Skipped ViewTransition due to another transition starting.', true),
         array('unhandledrejection', 'Transition was aborted because of invalid state.', true),
-        array('error', 'Transition was skipped', false),
+        array('error', 'ResizeObserver loop completed with undelivered notifications.', true),
+        array('error', 'ResizeObserver loop limit exceeded', true),
+        array('error', 'Transition was skipped', true),
         array('resource', 'Transition was skipped', false),
+        array('resource', 'ResizeObserver loop completed with undelivered notifications.', false),
         array('unhandledrejection', 'Failed to fetch', false),
+        array('error', "Uncaught TypeError: Cannot read properties of null (reading 'isConnected')", false),
     );
     $bad = array();
     foreach ($kc as $c) { $got = penumbra_client_error_is_benign($c[0], $c[1]); if ($got !== $c[2]) $bad[] = $c[0] . '/' . $c[1] . '=>' . var_export($got, true); }
     $usesShared = (bool)preg_match('/return\s+penumbraClientErrorIsBenign\(\$message\)/', $col) && !preg_match('/preg_match\(/', $col);
-    T('R2', 'the collector drops exactly those (unhandled rejections only) through the SHARED rule, no regex of its own', !$bad && $usesShared, ($bad ? implode('; ', $bad) : '6/6') . ' shared=' . var_export($usesShared, true));
+    T('R2', $r2Name, !$bad && $usesShared, ($bad ? implode('; ', $bad) : count($kc) . '/' . count($kc)) . ' shared=' . var_export($usesShared, true));
 } else {
-    T('R2', 'the collector drops exactly those (unhandled rejections only) through the SHARED rule, no regex of its own', false, $col === null ? 'collector function not found' : 'no shared rule to call');
+    T('R2', $r2Name, false, $col === null ? 'collector function not found' : 'no shared rule to call');
 }
 
 // ---- the SQL twin -------------------------------------------------------------
-$pat = '^(Transition was (skipped|aborted)|Skipped ViewTransition)';
+$pat = '^(Transition was (skipped|aborted)|Skipped ViewTransition|ResizeObserver loop (completed with undelivered notifications|limit exceeded))';
 if ($haveRule) {
     $want  = "(CASE WHEN ACTION <> 'CLIENT_ERROR' THEN 0 WHEN REGEXP_LIKE(TRIM(JSON_VALUE(SOURCE_DATA, '$.message')), '" . $pat . "', 'i') THEN 1 ELSE 0 END) = 1";
     $wantA = str_replace(array('ACTION <>', 'JSON_VALUE(SOURCE_DATA'), array('a.ACTION <>', 'JSON_VALUE(a.SOURCE_DATA'), $want);
@@ -158,9 +177,12 @@ $m3 = array(); $ok3 = has_all($all, array(
     'Errors preset'  => "'errors'  => array('label' => 'Errors',       'sql' => \"AND \$errorCondSql\"),",
     'browser bucket' => "'CLIENT_ERR_COUNT' => 'client_errors',",
     'error total'    => "'ERR_TOTAL_COUNT'  => 'errors',",
-    'Errors list'    => 'WHERE $errorCondSqlA $timeFilterA $whenFilterA $userFilterA $reportFilterA',
+    // Both carry the same WHERE line since the per-report count joined (seen
+    // 2026-10-21), so each is pinned by the line after it.
+    'Errors list'    => "WHERE \$errorCondSqlA \$timeFilterA \$whenFilterA \$userFilterA \$reportFilterA\n          ORDER BY a.TIMESTAMP DESC",
+    'per-report count' => "WHERE \$errorCondSqlA \$timeFilterA \$whenFilterA \$userFilterA \$reportFilterA\n              GROUP BY a.REPORT_ID",
 ), $m3) && $okc;
-T('C3', 'Platform Metrics (analytics_all.php + the shared counter catalog): the Errors preset, browser bucket, Errors total and the Errors tab list', $ok3, $ok3 ? 'all 8' : 'missing: ' . implode(', ', array_merge($m3, $mc)));
+T('C3', 'Platform Metrics (analytics_all.php + the shared counter catalog): the Errors preset, browser bucket, Errors total, the Errors tab list and its per-report count', $ok3, $ok3 ? 'all 9' : 'missing: ' . implode(', ', array_merge($m3, $mc)));
 // Since 2026-10-01 (the hub's window picker) the count and the list take their
 // time predicate from penumbra_health_window_sql(), whose default is still the
 // last N hours on the database clock - so C4 pins the condition, the shared
@@ -229,6 +251,40 @@ $m6 = array(); $ok6 = has_all($feedSrc, array(
     'call'     => "'fam'    => $famCall((string)\$r['ACTION'], \$famMsg),",
 ), $m6);
 T('F2', 'the feed hands each row\'s message (decoded, or salvaged from a truncated preview) to the chip classifier', $ok6, $ok6 ? 'all 4' : 'missing: ' . implode(', ', $m6));
+
+// ---- the health hub's log console (2026-10-21) ---------------------------------
+// penumbra_log_severity() (penumbra_logs.php) leaves a harmless CLIENT-ERROR line
+// uncoloured - the same rule judges the message - and keeps a real one red. The
+// lines are log_client_error.php's error_log() one-liner, whose shape the parser
+// relies on: pinned too, so the two cannot drift apart.
+$l1Name = 'the log console: a harmless browser notice\'s CLIENT-ERROR line is uncoloured (not in "problems only"), a real one stays red; the collector still writes the line shape it parses';
+$sevFn = lift_fn($lgs, 'penumbra_log_severity');
+if ($sevFn !== null && $haveRule) {
+    eval($sevFn);
+    $pfx = '[19-Oct-2026 14:49:23 America/New_York] PENUMBRA CLIENT-ERROR: user=bplimon ';
+    $lc = array(
+        array($pfx . 'report=hitratio kind=error | ResizeObserver loop completed with undelivered notifications. | https://www3.acs.ncsu.edu/sponsor_migration/penumbra/index.php?id=hitratio:0:0', ''),
+        array($pfx . 'report=- kind=error | ResizeObserver loop limit exceeded | https://www3.acs.ncsu.edu/sponsor_migration/penumbra/index.php:0:0', ''),
+        array($pfx . 'report=- kind=unhandledrejection | Transition was aborted because of invalid state. ViewTransition opt-in disabled | :0:0', ''),
+        array($pfx . "report=pipins kind=error | Uncaught TypeError: Cannot read properties of null (reading 'isConnected') | https://www3.acs.ncsu.edu/sponsor_migration/penumbra/js/penumbra_find.js?v=1792435688:1026:33", 'err'),
+        // The words in the SOURCE, not the message, change nothing.
+        array($pfx . 'report=- kind=error | Uncaught Error: boom | https://www3.acs.ncsu.edu/x/index.php?q=ResizeObserver loop limit exceeded:1:1', 'err'),
+        // A report id the collector wrote as one token (spaces -> _) cannot fake the marker.
+        array($pfx . 'report=x_kind=error_|_ResizeObserver_loop_limit_exceeded kind=error | Uncaught TypeError: x is undefined | https://www3.acs.ncsu.edu/x/js/main.js?v=1:2:3', 'err'),
+        array('[19-Oct-2026 14:49:23 America/New_York] PENUMBRA CLIENT-ERROR: audit write failed: ORA-12170: TNS:Connect timeout occurred', 'err'),
+    );
+    $bad = array();
+    foreach ($lc as $c) { $got = penumbra_log_severity($c[0], 'php'); if ($got !== $c[1]) $bad[] = substr($c[0], 40, 100) . '=>' . var_export($got, true); }
+    $shape = has_all($log, array(
+        'prefix' => "error_log('PENUMBRA CLIENT-ERROR: user=' . \$currentUserKey",
+        'report' => "    . ' report=' . (\$shortId !== '' ? str_replace(' ', '_', \$shortId) : '-')",   // one token: an id cannot fake "kind=... | "
+        'kind'   => "    . ' kind=' . \$kind",
+        'msg'    => "    . ' | ' . mb_substr(\$message, 0, 200, 'UTF-8')",
+    ), $mShape);
+    T('L1', $l1Name, !$bad && $shape, ($bad ? implode('; ', $bad) : count($lc) . '/' . count($lc)) . ($shape ? ' shape ok' : ' shape missing: ' . implode(', ', $mShape)));
+} else {
+    T('L1', $l1Name, false, $sevFn === null ? 'penumbra_log_severity not found in penumbra_logs.php' : 'no rule');
+}
 
 $fail = 0;
 foreach ($R as $r) { if (!$r[2]) $fail++; printf("%s  %s %s  [%s]\n", $r[2] ? 'PASS' : 'FAIL', $r[0], $r[1], $r[3]); }

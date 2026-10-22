@@ -40,8 +40,8 @@
       <div id="report-options-tab" style="position: relative;">
         <!-- CodeMirror takes this over; main.js underlines sum( and lookup( on tab activate -->
         <textarea id="reportSnippet">sum(AMOUNT) and lookup(NAME, ID == 1)</textarea>
-        <!-- an underline hard against the tab's right edge: the flip/fit case -->
-        <span class="cm-function-underline" data-fn="lookup" id="tthFnEdge" style="position: absolute; right: 2px; top: 150px;">lookup</span>
+        <!-- a tooltip target hard against the tab's right edge: the flip/fit case (P7) -->
+        <span id="tthFnEdge" style="position: absolute; right: 2px; top: 150px;">lookup</span>
         <button type="button" id="tthConsoleBtn" title="A console button's plain title">console button</button>
       </div>
       <div id="view-options-tab"></div>

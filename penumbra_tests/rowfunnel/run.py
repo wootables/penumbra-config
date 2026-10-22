@@ -64,6 +64,11 @@ NEW1 = ({'L-%s-%s' % (s, c) for s in CHK for c in CHK[s]} | set(STATIC)) - GUARD
 # -xInsideCard, L-rcap-boxNoWiden and L-rnarrow-fitsNarrow (each held up by a mutant below)
 NEW = {'L-fsearch-xInChip', 'L-fsearch-xAtTextEnd', 'L-fsearch-numsAligned', 'L-fwide-oneLine', 'L-fwide-wider',
        'L-fwide-notByCount', 'L-fwide-kwBeside'}
+# round 3 (2026-10-21, pvfix): the harness now has penumbra_vars as index.php does (a CONST: window.penumbra_vars
+# undefined). Live read it through window, so an editor got the viewer's text and a report saved with the limit
+# never said so - the editor and saved-limit checks, red on live, which the old window property hid.
+NEW = {'L-rcap-savedSentence', 'L-rcap-switchBtn', 'L-rcap-saveFoot', 'L-rcap-limitOff', 'L-rcap-reran', 'L-rcap-closedAfter',
+       'L-rsaved-infoBox', 'L-rsaved-saveOpens'}
 MUTANTS = {
     # the bar never tells the segment there is a count: no button, no card
     'm-nosync': ([('main', "            _sbRowsSync(txt);   // the Rows card: opens while there is a count, repaints while open\n", "")],

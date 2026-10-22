@@ -214,7 +214,8 @@
         R.info.backBtn = { asked: asked, rebuilt: document.getElementById('pivotResultTable') !== tb0, menu: menu() ? menu().getAttribute('aria-label') : null, hl: hl, onHead: !!h && h.classList.contains('pnb-hm-for') };
         closeMenu();
       });
-      // (pvfix 2) a % change cell's menu: copy and filter (its row and its column's data-pv-ck), no breakdown
+      // (pvfix 2) a % change cell's menu: copy and filter (its row and its column's data-pv-ck). (2026-10-21, brk)
+      // and its breakdown since - the cells it is computed from: the pvdrv suite's checks
       await step('chgCell', async function () {
         var cells = cellsOf('Chg').filter(function (td) { return td.hasAttribute('data-pv-ck'); });
         var td = cells[cells.length > 3 ? 3 : 0];
@@ -222,7 +223,7 @@
         closeMenu(); rclick(td);
         var a = acts(), ttl = menu() ? menu().getAttribute('aria-label') : '';
         var rk = td.parentNode.getAttribute('data-pivot-row'), ck = td.getAttribute('data-pv-ck');
-        R.chk.chgCellMenu = !!menu() && a.indexOf('pvCopy') >= 0 && a.indexOf('pvCellFilter') >= 0 && a.indexOf('pvDrill') < 0
+        R.chk.chgCellMenu = !!menu() && a.indexOf('pvCopy') >= 0 && a.indexOf('pvCellFilter') >= 0
           && /row and column/.test((item('pvCellFilter') || {}).textContent || '') && !!rk && !!ck && ttl.indexOf(' / ') > 0;
         R.info.chgCell = { acts: a, title: ttl, rk: rk, ck: ck };
         var f = item('pvCellFilter');

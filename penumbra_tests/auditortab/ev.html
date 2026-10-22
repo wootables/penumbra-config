@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Auditor Events harness</title>
+<script src="themes.js"></script>
+<script src="js/jquery-3.7.1.min.js"></script>
+<script src="js/jquery-ui.min.js"></script>
+<script src="js/moment.min.js"></script>
+<style>
+  #out { white-space: pre-wrap; word-break: break-all; font: 11px/1.3 Consolas, monospace; margin: 12px 0 0; }
+  /* settled layout only (stylesheets load after the markup) */
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+  .navstub { height: 40px; flex: 0 0 auto; }
+</style>
+</head>
+<body class="admin-view">
+<div id="admWrapper" class="admin-view">
+  <div id="admin-flex-container" style="display: flex; align-items: stretch; height: auto;">
+    <div id="editorTabs" class="ui-tabs ui-corner-all ui-widget ui-widget-content" style="flex-grow: 1;">
+      <div class="ui-tabs-nav-wrapper navstub"></div>
+      <div id="tabSlot"></div>
+    </div>
+  </div>
+</div>
+<pre id="out"></pre>
+<script>
+/*
+ * Auditor > Events (the All list), painted by the REAL loadAuditLog: the audit
+ * module of the main.js under test (everything from `var _auditLogLimit` to the
+ * audit-log sorting handler, the slice chgfoot\chg.html renders) inside the REAL
+ * #auditor-tab lifted from the index.php under test, under index.php's
+ * stylesheet set with the css/main.css under test. $.ajax is the only fake:
+ * get_audit_log.php answers with rows shaped like the live payload (since
+ * 2026-10-21 each row carries BENIGN, 1 on a CLIENT_ERROR row that is one of the
+ * browser's harmless notices), and every request is recorded.
+ *
+ *   ?idx= &js= &css=        files under test     &id=hitratio (read by loadAuditLog)
+ *   &w=<#auditor-tab width> &theme=
+ *   &srv=old    a get_audit_log.php from before BENIGN: no row has the key
+ *   &viewer=1   a plain viewer: the server's person-level scrub (USER_ID only when
+ *               it is the viewer; SOURCE_DATA cut to its non-identifying keys, so
+ *               no message) - BENIGN is a column of its own and stays
+ *
+ * window.__vo = { n, errs, ajax, rows: [{ k, action, q, title, cls, label,
+ *                 color, bg, border, ratio, msg }] } in fixture order.
+ */
+(function () {
+  var q = new URLSearchParams(location.search);
+  var W = parseFloat(q.get('w') || '1708');
+  var theme = q.get('theme') || 'theme-hello-kitty';
+  var srvOld = q.get('srv') === 'old';
+  var viewer = q.get('viewer') === '1';
+  var out = document.getElementById('out');
+  function fail(m) { window.__vo = { error: String(m) }; out.textContent = 'ERROR ' + m; window.__voDone = true; }
+  function get(u) { var x = new XMLHttpRequest(); x.open('GET', u, false); x.send(null); return x.responseText; }
+  function slice(code, a, b, max) {
+    var i = code.indexOf(a); if (i < 0) throw new Error('anchor missing: ' + a);
+    var j = code.indexOf(b, i + a.length); if (j < 0) throw new Error('end anchor missing after: ' + a);
+    if (max && j - i > max) throw new Error('slice too long (' + (j - i) + ') for: ' + a);
+    return code.slice(i, j);
+  }
+  function lift(idx, open) {
+    var a = idx.indexOf(open);
+    if (a < 0) throw new Error('no ' + open);
+    // Walk <div>/</div> from the open tag to its own close.
+    var re = /<\/?div\b[^>]*>/g, depth = 0, end = -1, m;
+    re.lastIndex = a;
+    while ((m = re.exec(idx))) { depth += (m[0][1] === '/') ? -1 : 1; if (depth === 0) { end = m.index + m[0].length; break; } }
+    if (end < 0) throw new Error('unbalanced ' + open);
+    var html = idx.slice(a, end);
+    if (html.indexOf('<?') >= 0) throw new Error('lifted block contains PHP: ' + open);
+    return html;
+  }
+
+  // ---- fixtures: a hitratio-like trail, newest first -------------------------
+  var UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0';
+  var PAGE = 'https://www3.acs.ncsu.edu/sponsor_migration/penumbra/index.php?id=hitratio';
+  // logPenumbraAudit()'s own keys, plus the caller's.
+  function sd(x) { var o = { ip_address: '10.40.3.27', hostname: null, referrer: PAGE, browser: UA }; for (var k in x) o[k] = x[k]; return o; }
+  // A CLIENT_ERROR payload as log_client_error.php writes it.
+  function ce(kind, msg, src, line, col, stack) {
+    return sd({ message: msg, kind: kind, source: src, line: line, col: col, stack: stack, page: '/sponsor_migration/penumbra/index.php', report_short_id: 'hitratio', ua: UA });
+  }
+  var KEYS = ['ro', 'open', 'real', 'denied', 'rename', 'update', 'vt'];
+  var ROWS = [
+    // The browser's ResizeObserver notice (18 such rows on report pages, 10-10..10-19).
+    { ID: 913377, ACTION: 'CLIENT_ERROR', AUDIT_TIME: '19-OCT-2026 02:49:23 PM', USER_ID: 'bplimon', BENIGN: 1,
+      SOURCE_DATA: ce('error', 'ResizeObserver loop completed with undelivered notifications.', PAGE, 0, 0, '') },
+    { ID: 913370, ACTION: 'OPEN', AUDIT_TIME: '19-OCT-2026 02:49:11 PM', USER_ID: 'bplimon', ROW_COUNT: '1250', COL_COUNT: '14', QUERY_MS: '842', BENIGN: 0,
+      SOURCE_DATA: sd({}) },
+    // A real script error - stays red.
+    { ID: 913102, ACTION: 'CLIENT_ERROR', AUDIT_TIME: '17-OCT-2026 10:05:42 AM', USER_ID: 'jsmith4', BENIGN: 0,
+      SOURCE_DATA: ce('error', "Uncaught TypeError: Cannot read properties of null (reading 'isConnected')",
+        'https://www3.acs.ncsu.edu/sponsor_migration/penumbra/js/penumbra_find.js?v=1792435688', 1026, 33,
+        "TypeError: Cannot read properties of null (reading 'isConnected') at HTMLDivElement.<anonymous> (penumbra_find.js:1026:33)") },
+    { ID: 912601, ACTION: 'DENIED_SCOPE', AUDIT_TIME: '30-SEP-2026 04:12:09 PM', USER_ID: 'DEV_API', BENIGN: 0,
+      SOURCE_DATA: sd({ message: 'Scope check refused the request.' }) },
+    // The plain neutral badge (an action _auditBadgeClass has no family for).
+    { ID: 912400, ACTION: 'RENAME', AUDIT_TIME: '28-SEP-2026 09:31:55 AM', USER_ID: 'bplimon', BENIGN: 0,
+      SOURCE_DATA: sd({ message: 'Renamed hitratio_v1 to hitratio' }) },
+    { ID: 912390, ACTION: 'UPDATE', AUDIT_TIME: '25-SEP-2026 11:02:40 AM', USER_ID: 'bplimon', BENIGN: 0,
+      SOURCE_DATA: sd({ message: 'Changed: query', changed: { cats: ['sql'], state: 0, keys: ['query'] } }) },
+    // An old view-transition abort (recorded before 2026-09-25 15:36).
+    { ID: 912100, ACTION: 'CLIENT_ERROR', AUDIT_TIME: '13-SEP-2026 05:56:00 PM', USER_ID: 'bplimon', BENIGN: 1,
+      SOURCE_DATA: ce('unhandledrejection', 'Transition was skipped', '', 0, 0, '') }
+  ];
+  if (srvOld) ROWS.forEach(function (r) { delete r.BENIGN; });
+  if (viewer) {
+    // get_audit_log.php's scrub for a viewer who is not admin, owner or editor.
+    var KEEP = { rows: 1, cols: 1, row_count: 1, col_count: 1, query_ms: 1, changed: 1, task_id: 1, task_type: 1, cron: 1, format: 1 };
+    ROWS.forEach(function (r) {
+      if (r.USER_ID !== 'jsmith4') r.USER_ID = null;
+      var o = {}, n = 0;
+      for (var k in r.SOURCE_DATA) if (KEEP[k]) { o[k] = r.SOURCE_DATA[k]; n++; }
+      r.SOURCE_DATA = n ? o : [];   // PHP's empty array_intersect_key() encodes as []
+    });
+  }
+  var KPIS = {
+    total_views: 1, total_views_today: 0, unique_viewers: 1, unique_viewers_today: 0, depts: 0, depts_today: 0,
+    exports: 0, exports_today: 0, exp_last: '', updates: 1, updates_today: 0, upd_last: 'Sep 25',
+    errors: 2, errors_today: 0, err_last: 'Oct 17',
+    errkinds: { qto: 0, qbig: 0, qlast: '', browser: 1, blast: 'Oct 17' },
+    attention: { badpass: 0, denied: 0, email_fail: 0, sched_fail: 0, query: 0, last: '20260930161209' }, ack_last: ''
+  };
+  // What famCase files these rows under: the two harmless notices are 'other'.
+  var COUNTS = { total: 7, view: 1, change: 2, share: 0, sched: 0, journal: 0, bad: 2, other: 2 };
+
+  window.__ajax = [];
+  var H = {
+    noop: function () { },
+    shown: [],
+    show_text: function (h) { H.shown.push(String(h)); },
+    vars: { isAdmin: !viewer, isGlobalAdmin: !viewer, currentUserKey: viewer ? 'jsmith4' : 'bplimon' }
+  };
+  $.fx.off = true;
+  $.ajax = function (o) {
+    var url = String(o.url || ''), data = o.data || {};
+    window.__ajax.push({ url: url, data: JSON.parse(JSON.stringify(data)) });
+    var d = $.Deferred();
+    setTimeout(function () {
+      var resp;
+      if (url.indexOf('get_audit_log.php') === 0 && String(data.lite || '') !== '1') {
+        resp = { status: 'success', data: JSON.parse(JSON.stringify(ROWS)), kpis: KPIS, counts: COUNTS };
+      } else if (url.indexOf('get_audit_log.php') === 0) {
+        resp = { status: 'success', data: [] };   // a lazy sub-view's slice - not under test
+      } else {
+        resp = { status: 'error', message: 'unmocked ' + url };
+      }
+      try { if (o.success) o.success(resp, 'success', { status: 200 }); } catch (e) { (window.__errs = window.__errs || []).push('success threw: ' + e.message); }
+      try { if (o.complete) o.complete({ status: 200 }, 'success'); } catch (e) { }
+      d.resolve(resp);
+    }, 0);
+    var p = d.promise(); p.abort = function () { }; return p;
+  };
+  window._pnbHostDialog = function () { };
+  window.onerror = function (m, src, line) { (window.__errs = window.__errs || []).push(String(m) + ' @' + line); return true; };
+
+  var api;
+  try {
+    var idx = get(q.get('idx') || 'index.php');
+    document.getElementById('tabSlot').outerHTML = lift(idx, '<div id="auditor-tab">');
+    document.getElementById('auditor-tab').className = 'ui-tabs-panel ui-corner-bottom ui-widget-content';
+    var js = get(q.get('js') || 'main.js').replace(/\r\n/g, '\n');   // main.js is CRLF
+    var code = 'var show_text = H.show_text, handleSessionExpiredError = H.noop, penumbra_vars = H.vars;\n' +
+               'function _pnbSingleKeyTip(el, t) { return t; }\n' +
+               'function syncAuditLogHeight() { }\n' +
+               slice(js, 'function escapeHtml(text) {', '\n    }\n', 800) + '\n    }\n' +
+               slice(js, '    var _auditLogLimit = 50;', '    // --- Audit Log Sorting Handler ---', 600000) +
+               '\nreturn { load: loadAuditLog };';
+    api = new Function('$', 'moment', 'H', code)($, moment, H);
+  } catch (e) { fail(e.message); return; }
+
+  var row = (window.PNB_THEMES || []).filter(function (t) { return t.id === theme; })[0] || { isDark: false, modern: false };
+  if (theme !== 'theme-default') document.body.classList.add(theme);
+  document.body.setAttribute('data-theme', theme);
+  document.body.classList.toggle('is-dark', !!row.isDark);
+  document.body.classList.toggle('registry-theme', !!row.modern);
+
+  var sheets = ['css/jquery-ui.css', q.get('css') || 'main.css', 'css/penumbra_tiles.css', 'css/density.css', 'css/search_builder.css', 'css/penumbra_presets.css', 'css/penumbra_colwidths.css', 'themevars.css'];
+  var pending = sheets.length;
+  sheets.forEach(function (href) {
+    var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = href;
+    l.onload = l.onerror = function () { if (--pending === 0) go(); };
+    document.head.appendChild(l);
+  });
+
+  function settle(cb, n) { setTimeout(function () { requestAnimationFrame(function () { requestAnimationFrame(cb); }); }, n || 30); }
+  function go() {
+    try {
+      var wrap = document.getElementById('admWrapper');
+      wrap.style.width = (W + 40) + 'px';
+      var off = wrap.getBoundingClientRect().width - document.getElementById('auditor-tab').getBoundingClientRect().width;
+      wrap.style.width = (W + off) + 'px';
+      try { localStorage.removeItem('penumbra_audit_seg::hitratio'); } catch (e) { }
+      api.load();
+    } catch (e) { fail('paint: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); return; }
+    settle(function () { window.__vo = measure(); window.__voDone = true; out.textContent = JSON.stringify(window.__vo); }, 60);
+  }
+
+  // ---- what the driver reads -------------------------------------------------
+  function measure() {
+    var trs = Array.prototype.slice.call(document.querySelectorAll('#auditLogContainer table.audit-log-table tbody tr'));
+    var ev = document.getElementById('auditSegEvents');
+    return {
+      n: trs.length, errs: window.__errs || [], ajax: window.__ajax.slice(), shown: H.shown.slice(),
+      eventsOn: !!ev && ev.classList.contains('on'),
+      rows: trs.map(function (tr, i) {
+        var tds = tr.children, act = tds[1], b = act ? act.querySelector('.audit-action-badge') : null;
+        var cs = b ? getComputedStyle(b) : null, fill = b ? opaqueBg(b) : null;
+        return {
+          k: KEYS[i] || ('row' + i),
+          action: act ? act.getAttribute('data-sort-val') : '', q: act ? act.getAttribute('data-audit-filter-q') : '', title: act ? (act.getAttribute('title') || '') : '',
+          cls: b ? b.className : '', label: b ? b.textContent : '',
+          color: cs ? cs.color : '', bg: cs ? cs.backgroundColor : '', border: cs ? cs.borderTopColor : '',
+          // WCAG ratio of the badge's text over its own (composited) fill
+          ratio: b ? +ratio(over(rgba(cs.color), fill), fill).toFixed(2) : 0,
+          msg: tds[3] ? tds[3].textContent.replace(/\s+/g, ' ').trim().slice(0, 140) : ''
+        };
+      })
+    };
+  }
+  function rgba(s) {
+    var m = String(s).match(/rgba?\(([^)]+)\)/), c;
+    if (m) { c = m[1].split(/[\s,\/]+/).filter(Boolean).map(parseFloat); return [c[0], c[1], c[2], c.length > 3 ? c[3] : 1]; }
+    m = String(s).match(/color\(srgb ([^)]+)\)/);
+    if (m) { c = m[1].split(/[\s\/]+/).filter(Boolean).map(parseFloat); return [c[0] * 255, c[1] * 255, c[2] * 255, c.length > 3 ? c[3] : 1]; }
+    return [0, 0, 0, 1];
+  }
+  function over(fg, bg) { var a = fg[3]; return [fg[0] * a + bg[0] * (1 - a), fg[1] * a + bg[1] * (1 - a), fg[2] * a + bg[2] * (1 - a), 1]; }
+  function lum(c) { var v = c.slice(0, 3).map(function (x) { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; }
+  function ratio(a, b) { var l1 = lum(a), l2 = lum(b); return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05); }
+  function opaqueBg(el) {
+    var stack = [], n = el;
+    while (n && n.nodeType === 1) { var c = rgba(getComputedStyle(n).backgroundColor); if (c && c[3] > 0) stack.push(c); if (c && c[3] >= 1) break; n = n.parentElement; }
+    var base = [255, 255, 255, 1]; for (var i = stack.length - 1; i >= 0; i--) base = over(stack[i], base); return base;
+  }
+})();
+</script>
+</body>
+</html>

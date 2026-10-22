@@ -29,7 +29,7 @@
 #                 stylesheets load after the markup, and the Custom Sort button's
 #                 `transition: all` would otherwise be measured mid-flight.
 #
-#   run.ps1                      live files          EXPECTED: GREEN 71 / 0
+#   run.ps1                      live files          EXPECTED: GREEN 81 / 0 (71 before Preset Sharing, 2026-10-22)
 #   run.ps1 -Control             the .bak-20260925-voptions files (the build
 #                                before any of it)   EXPECTED: RED - see CONTROL below
 #   run.ps1 -IndexPhp <p> -MainCss <p>   any other copies (a stage build)
@@ -50,7 +50,10 @@
 # (the old box is not a card). The .bak-20260925-voradios build (the morning's
 # cards with the old radios and subtitle label) fails EXACTLY the 18 radio /
 # subtitle asserts: S5 WL1 WL2 W9 CL1 CL2 C6 DL1 DL2 NS1293 and NL1600..NL807.
-# 24 mutants, all bite (-Mutants).
+# 24 mutants, all bite (-Mutants). PRESET SHARING (2026-10-22) made it 13 cards: 7 + 6 below 1760px, 5 + 5 + 3
+# below 944px, the card left over spanning its row at 4 / 3 / 2 columns; S6 (the card is opt-in), NC944
+# (checkbox in line with WRAPPED titles - at 1677px every title is one line now, so cbcenter bites there),
+# grid-auto-rows: 1fr (C5) and the W9 / C6 budgets for two rows. 28 mutants, all bite.
 #
 # UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
 #   $d = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\voptions'
@@ -113,9 +116,12 @@ $mRdCompact = '.compact-admin-mode .header-layout-option input[type="radio"] {' 
 $mSubLabel  = 'html and snippet functions allowed):</label>'
 $mSubLabel0 = 'html and snippet functions allowed -- see Custom Code help for snippet functions):</label>'
 $mFloor    = '.view-options-grid {' + $C + '    display: grid;' + $C + '    grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));'
+$mAutoRows = '    grid-auto-rows: 1fr;' + $C
 $mFloor190 = '.view-options-grid {' + $C + '    display: grid;' + $C + '    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));'
 $mContainer = '    container: pnb-vo-eu / inline-size;' + $C
-$m6col     = '    .view-options-eu > .view-options-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }' + $C
+$m7col     = '    .view-options-eu > .view-options-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }' + $C
+$m5col     = '    .view-options-eu > .view-options-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }' + $C
+$mSpan4    = '    .view-options-eu > .view-options-grid > .view-option-item:last-child:nth-child(4n+1) { grid-column: 1 / -1; }' + $C
 $m4col     = '    .view-options-eu > .view-options-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }' + $C
 $m3col     = '    .view-options-eu > .view-options-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }' + $C
 $m2col     = '    .view-options-eu > .view-options-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }' + $C
@@ -123,28 +129,34 @@ $mLayoutH  = $L + '                        Layout' + $L + '                    <
 $mHeaderH  = $L + '                        Header Layout' + $L + '                    </h4>'
 $mutantDefs = [ordered]@{
   'nocontents'      = @{ target = 'css'; edits = @(,@($mContents, $mBlock)); red = @('W3', 'C3', 'D3', 'W10') }
-  'floor190'        = @{ target = 'css'; edits = @(,@($mFloor, $mFloor190)); red = @('W1', 'C1', 'D1', 'N2317', 'N1624') }
+  # (13 cards) below 1760px the container rules decide the columns, so the floor shows only where auto-fit rules.
+  'floor190'        = @{ target = 'css'; edits = @(,@($mFloor, $mFloor190)); red = @('N2317', 'N1760') }
   # With NO container rules, plain auto-fit happens to give the same balanced
   # rows at 535 / 400 / 399px (3, 3, 2 columns), so those widths stay green
   # there - an equivalent case, not a gap: no3col / no2col pin those two rules,
   # which exist because the <=807px 4-column rule would otherwise hold all the
   # way down.
-  'nocontainer'     = @{ target = 'css'; edits = @(,@($mContainer, '')); red = @('N1623', 'N1293', 'N807') }
-  'no6col'          = @{ target = 'css'; edits = @(,@($m6col, '')); red = @('N1623', 'N1293') }
-  'no4col'          = @{ target = 'css'; edits = @(,@($m4col, '')); red = @('N807', 'N536') }
+  'nocontainer'     = @{ target = 'css'; edits = @(,@($mContainer, '')); red = @('N1759', 'N1293', 'N943') }
+  'no7col'          = @{ target = 'css'; edits = @(,@($m7col, '')); red = @('N1759', 'N1293') }
+  'noautorows'      = @{ target = 'css'; edits = @(,@($mAutoRows, '')); red = @('C5') }
+  'no5col'          = @{ target = 'css'; edits = @(,@($m5col, '')); red = @('N943', 'N808') }
+  'nospan4'         = @{ target = 'css'; edits = @(,@($mSpan4, '')); red = @('N671', 'N536') }
+  'no4col'          = @{ target = 'css'; edits = @(,@($m4col, '')); red = @('N671', 'N536') }
   'no3col'          = @{ target = 'css'; edits = @(,@($m3col, '')); red = @('N535', 'N400') }
   'no2col'          = @{ target = 'css'; edits = @(,@($m2col, '')); red = @('N399') }
   # Twelve cards (2026-09-25): every title may take two lines now, so a bigger
   # title shows as HEIGHT - the grid's budget (W9) - not as a third line (W6).
   'title11'         = @{ target = 'css'; edits = @(,@($mTitle, $mTitle11)); red = @('W9') }
   'cbnudge'         = @{ target = 'css'; edits = @(,@($mCbNudge, $mCbNudge5)); red = @('W2', 'D2') }
-  'cbcenter'        = @{ target = 'css'; edits = @(,@($mAlign, $mCenter)); red = @('W2', 'D2', 'C2') }
+  # (13 cards) every title is one line at 1677px, so centring is invisible there: NC944 holds it.
+  'cbcenter'        = @{ target = 'css'; edits = @(,@($mAlign, $mCenter)); red = @('NC944') }
   'compactcols'     = @{ target = 'css'; edits = @(,@($mCompact, $mCompact2)); red = @('C1') }
   'nooverflowwrap'  = @{ target = 'css'; edits = @(,@($mAlign, $mNoWrap)); red = @('F1') }
   'nowbr'           = @{ target = 'idx'; edits = @(,@('<strong>Export/<wbr>Download</strong>', '<strong>Export/Download</strong>')); red = @('S4', 'NW') }
   'headerlayout'    = @{ target = 'idx'; edits = @(,@($mLayoutH, $mHeaderH)); red = @('S1', 'W8') }
-  'nowrapper'       = @{ target = 'idx'; edits = @(@($mEuOpen, ''), @($mEuClose, $mEuClose1)); red = @('S2', 'N1623', 'N1293', 'N807') }
+  'nowrapper'       = @{ target = 'idx'; edits = @(@($mEuOpen, ''), @($mEuClose, $mEuClose1)); red = @('S2', 'N1759', 'N1293', 'N943') }
   'bareunderradios' = @{ target = 'idx'; edits = @(@($mBareCard, ''), @($mSplitEnd, $mOldBare)); red = @('S2', 'S3', 'W1', 'W7', 'W8', 'W9') }
+  'presetsharingon' = @{ target = 'idx'; edits = @(,@('<input type="checkbox" id="viewOptionPresetSharing">', '<input type="checkbox" id="viewOptionPresetSharing" checked>')); red = @('S6') }
   'nolabel'         = @{ target = 'idx'; edits = @(,@($mBareCard, $mBareSpan)); red = @('R1', 'R3', 'R5') }
   # --- the Layout radios + the subtitle label (2026-09-25 pm) ---
   'radioflex'       = @{ target = 'css'; edits = @(,@($mRdGrid, $mRdFlex)); red = @('WL2', 'CL2', 'DL2') }
@@ -178,8 +190,8 @@ function Test-Static([string]$idx) {
     $ids = @([regex]::Matches($blk, 'id="viewOption(\w+)"') | ForEach-Object { $_.Groups[1].Value })
     $gridFirst = [regex]::IsMatch($blk, '^<div class="view-options-eu">\s*<div class="view-options-grid">')
   }
-  $want = 'Search,Snapshots,Email,Grouping,Clipboard,Export,Pivot,Viz,Pagination,Journal,Columns,BareHeader'
-  $out += [pscustomobject]@{ id = 'S2'; name = 'the End-User grid sits in .view-options-eu (the container its columns query) with the 12 cards in order (Search Bar first)'; pass = $gridFirst -and (($ids -join ',') -eq $want); detail = "wrapper@$eu gridFirst=$gridFirst ids=$($ids -join ',')" }
+  $want = 'Search,Snapshots,Email,Grouping,Clipboard,Export,Pivot,Viz,Pagination,Journal,PresetSharing,Columns,BareHeader'
+  $out += [pscustomobject]@{ id = 'S2'; name = 'the End-User grid sits in .view-options-eu (the container its columns query) with the 13 cards in order (Search Bar first, Preset Sharing after Report Journal)'; pass = $gridFirst -and (($ids -join ',') -eq $want); detail = "wrapper@$eu gridFirst=$gridFirst ids=$($ids -join ',')" }
   $card = [regex]::Match($idx, '(?s)<div class="view-option-item"><label><input type="checkbox" id="viewOptionBareHeader">.*?</label></div>')
   $oldSpot = $idx.Contains('header-bare-option')
   $lastOk = ($ids.Count -gt 0) -and ($ids[$ids.Count - 1] -eq 'BareHeader')
@@ -192,6 +204,9 @@ function Test-Static([string]$idx) {
   $sPh = [regex]::Match($idx, '<textarea id="reportSubtitle" placeholder="([^"]*)"')
   $sOk = $sLab.Success -and $sPh.Success -and ($sLab.Groups[1].Value -notmatch 'Custom Code help') -and ($sPh.Groups[1].Value -match 'see Custom Code help for snippet functions')
   $out += [pscustomobject]@{ id = 'S5'; name = 'the subtitle''s "see Custom Code help" pointer lives in its placeholder, not its label'; pass = $sOk; detail = "label=[$($sLab.Groups[1].Value)] placeholder=[$($sPh.Groups[1].Value)]" }
+  # (2026-10-22) Preset Sharing is OPT-IN like the journal: unchecked in the markup.
+  $ps = [regex]::Match($idx, '<input type="checkbox" id="viewOptionPresetSharing"([^>]*)>')
+  $out += [pscustomobject]@{ id = 'S6'; name = 'the Preset Sharing card is opt-in (unchecked by default)'; pass = $ps.Success -and ($ps.Groups[1].Value -notmatch '\bchecked\b'); detail = "found=$($ps.Success) attrs=[$($ps.Groups[1].Value)]" }
   return ,$out
 }
 
@@ -215,12 +230,15 @@ function Invoke-Browser([string]$idxText, [string]$cssText, [bool]$shot) {
   # column = a 1168px tab; Split under the other two from 248px = 784px).
   # Twelve cards (Search Bar, 2026-09-25): one row from 1624px, then 6 + 6 /
   # 4 + 4 + 4 / 3 x 4 / 2 x 6 - twelve divides evenly at every step.
-  $widths = [ordered]@{ '2317' = '12|1'; '1624' = '12|1'; '1623' = '6,6|1'; '1600' = '6,6|1'; '1293' = '6,6|1'; '1168' = '6,6|1'; '1167' = '6,6|2'; '808' = '6,6|2'; '807' = '4,4,4|2'; '536' = '4,4,4|3'; '535' = '3,3,3,3|3'; '400' = '3,3,3,3|3'; '399' = '2,2,2,2,2,2|3' }
+  # Thirteen (Preset Sharing, 2026-10-22): one row from 1760px, 7 + 6 down to 944px, 5 + 5 + 3 down to
+  # 672px, then 4 / 3 / 2 columns with the card left over spanning its row (the trailing 1).
+  $widths = [ordered]@{ '2317' = '13|1'; '1760' = '13|1'; '1759' = '7,6|1'; '1600' = '7,6|1'; '1293' = '7,6|1'; '1168' = '7,6|1'; '1167' = '7,6|2'; '944' = '7,6|2'; '943' = '5,5,3|2'; '808' = '5,5,3|2'; '807' = '5,5,3|2'; '672' = '5,5,3|3'; '671' = '4,4,4,1|3'; '536' = '4,4,4,1|3'; '535' = '3,3,3,3,1|3'; '400' = '3,3,3,3,1|3'; '399' = '2,2,2,2,2,2,1|3' }
   foreach ($w in $widths.Keys) {
     $parts = $widths[$w].Split('|')
     $q = "phase=width&w=$w&rows=$($parts[0])&lrows=$($parts[1])&theme=theme-hello-kitty"
-    if ($w -eq '1624') { $q += '&wbr=1' }   # the narrowest one-row cards: Export/Download wraps there
+    if ($w -eq '1760') { $q += '&wbr=1' }   # the narrowest one-row cards: Export/Download wraps there
     if ($w -eq '1293') { $q += '&sub1=1' }
+    if ($w -eq '944') { $q += '&cb=1' }   # the narrowest 7-column cards: titles wrap there
     [void]$cases.Add(@{ name = "w$w"; query = $q })
   }
   [void]$cases.Add(@{ name = 'input'; query = 'phase=input&w=1677&theme=theme-hello-kitty' })

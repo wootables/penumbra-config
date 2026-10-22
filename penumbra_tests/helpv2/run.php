@@ -162,6 +162,9 @@ if (isset($o['mutants'])) {
         $M = array(
             'audience-mismatch' => array('edits' => array(array('help/topics/sqlHelpLightbox.php', 'class="help-topic" data-audience="writer"', 'class="help-topic" data-audience="viewer"', 1)), 'expect' => array('L3'), 'allow' => array('A6')),
             'dangling-jump'     => array('edits' => array(array('help/topics/pivotBuilderHelpLightbox.php', 'data-jump-to="pvh-presets"', 'data-jump-to="pvh-presetz"', 1)), 'expect' => array('L5'), 'allow' => array()),
+            // Until 2026-10-21 this one also turned R9 red. Not an artifact of the missing file: R9's "lead pi vs co-pi counts"
+            // passed by a 0.003 near-tie that any change in the help's size flips (1% more help did too). Fixed in
+            // help_retrieval.php (the Ask-only "lead"), not allowed here; R12 now checks R9 at other help sizes.
             'missing-fragment'  => array('edits' => array(array('help/topics/saveIdHelpLightbox.php', null, null, 0)), 'expect' => array('L1', 'E4a', 'E5'), 'allow' => array('L16')),
             'dup-id'            => array('edits' => array(array('help/topics/groupingHelpLightbox.php', 'id="grh-opening"', 'id="grh-overview"', 1)), 'expect' => array('L4', 'L5'), 'allow' => array()),
             'unbalanced-div'    => array('edits' => array(array('help/topics/emailHelpLightbox.php', "    </div>\n</div>\n", "    </div>\n", 1)), 'expect' => array('L8'), 'allow' => array_merge($anyE, $anyP2)),
@@ -200,7 +203,10 @@ if (isset($o['mutants'])) {
             // 2026-10-17 (E2E_2026-10-17 D1): the two-letter allow-list. Dropped from the tokenizer -> R8 (the IP question finds no
             // passage); the Ask-only tier let through to the assistant's question -> R9 (data questions naming PI / ID / FY pull help).
             $M['short-tokens-dropped'] = array('edits' => array(array('help_retrieval.php', "        if (strlen(\$w) < 3 && !isset(\$GLOBALS['PNB_HELP_SHORT'][\$w])) continue;", '        if (strlen($w) < 3) continue;', 1)), 'expect' => array('R8'), 'allow' => array());
-            $M['assist-short-leak']    = array('edits' => array(array('help_retrieval.php', "        if (\$mode !== 'ask') {", '        if (false) {', 1)), 'expect' => array('R9'), 'allow' => array());
+            $M['assist-short-leak']    = array('edits' => array(array('help_retrieval.php', "        if (\$mode !== 'ask') {", '        if (false) {', 1)), 'expect' => array('R9', 'R12'), 'allow' => array());   // R12 since 2026-10-21: the same battery at other help sizes
+            // 2026-10-21: the Ask-only word list ("lead") let through to the assistant's question -> R12 ("lead pi vs co-pi counts"
+            // leaks once the help grows). R9 is allowed: on the 10-21 help it still passes, by the 0.003 tie, until the help grows.
+            $M['assist-askonly-leak']  = array('edits' => array(array('help_retrieval.php', " && !isset(\$GLOBALS['PNB_HELP_ASK_ONLY'][\$t])", '', 1)), 'expect' => array('R12'), 'allow' => array('R9'));
             // 2026-10-20: the in-flight indicator. Without busyOn() the harness's T8 sees no dots, no busy mark, no dimmed answer -> H1.
             $M['ask-no-busy']          = array('edits' => array(array('js/penumbra_help_ask.js', '        busyOn();', '        /* ask-no-busy */', 1)), 'expect' => array('H1'), 'allow' => array());
         }

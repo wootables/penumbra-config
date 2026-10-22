@@ -53,11 +53,11 @@ MUTANTS = {
                   ['L-pfmenu-backBtn'], ['pfmenu']),
     'b-edflush': ([('colfmt', "            edFlush();   // (2026-10-21) a rule still in its pause is handed over before the view goes\n", "")],
                   ['L-pfmenu-backBtn'], ['pfmenu']),
-    # --- (pvfix 2) a % change cell: no menu; no column key; a breakdown offered
+    # --- (pvfix 2) a % change cell: no menu; no column key. (Its breakdown, since brk 2026-10-21, and a formula's
+    # none - the old v-drill - are the pvdrv suite's: menuDrv, formulaNone, mutants m-drv / m-all.)
     'v-target': ([('menu', "|| cell.hasAttribute('data-grand-total') || cell.hasAttribute('data-pv-ai')) { return { kind: 'value', el: cell }; }", "|| cell.hasAttribute('data-grand-total')) { return { kind: 'value', el: cell }; }")],
                  ['L-pfmenu-chgCellMenu'], ['pfmenu']),
     'v-ck': ([('main', "                    if (!drillAttr) drillAttr = ` data-pv-ck=", "                    if (false) drillAttr = ` data-pv-ck=")], ['L-pfmenu-chgCellMenu', 'L-pfmenu-chgCellFilter'], ['pfmenu']),
-    'v-drill': ([('menu', "            if (P.canDrill() && drillable) {", "            if (P.canDrill()) {")], ['L-pfmenu-chgCellMenu'], ['pfmenu']),
     # Reset takes nothing off
     'h-reset': ([('main', "            onReset: function () { _pnbPvMenuHlSet(ai, []); }", "            onReset: function () { }")], ['L-pfmenu-hlReset'], ['pfmenu']),
     # the two-sided lopsided test never says yes

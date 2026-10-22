@@ -9,18 +9,25 @@
 # test (no database, nothing executed against Oracle - the SQL is checked by
 # shape; the deploy verifies it live).
 #
-#   R1 the rule (12 messages)            R2 the collector uses it (kind gate)
+#   R1 the rule (17 messages)            R2 the collector uses it (kind gate, 10)
 #   S1 the SQL twin, exact (+ alias)     S2 the pattern stays dialect-safe
 #   C1 Auditor   C2 report metrics   C3 Platform Metrics   C4 health hub/page
 #   C5 no app file counts/lists errors with the bare set (a sweep)
 #   F1 report metrics feed chips         F2 the feed passes each row's message
+#   L1 the health hub's log console: a harmless CLIENT-ERROR line is uncoloured
 #   (Since 2026-10-01 the two metrics pages take their KPI error counters from
 #   the counter catalog in analytics_shared.php - the seventh file under test;
 #   C2/C3 pin the catalog's definitions AND each page's request for them.)
+#   (2026-10-21, "robenign": the browser's ResizeObserver loop notice joined the
+#   rule - R1/R2/S1 carry it - the collector's gate admits error events too, and
+#   penumbra_logs.php is the eighth file under test, for L1.)
 #
-#   run.ps1                live files                EXPECTED: GREEN 11 / 0
+#   run.ps1                live files                EXPECTED: GREEN 12 / 0
 #   run.ps1 -Control       each file's .bak-20260925-auditbenign  EXPECTED: RED
-#   run.ps1 -DbPhp <p> -AuditPhp <p> -AnPhp <p> -AllPhp <p> -HealthPhp <p> -LogPhp <p> -ShPhp <p>
+#   run.ps1 -ControlRo     every file at a5c842f, the build before the
+#                          ResizeObserver notice joined the rule
+#                          EXPECTED: RED on exactly R1 R2 S1 L1
+#   run.ps1 -DbPhp <p> -AuditPhp <p> -AnPhp <p> -AllPhp <p> -HealthPhp <p> -LogPhp <p> -ShPhp <p> -LogsPhp <p>
 #   run.ps1 -Mutant <name> / -Mutants    anchors checked first (-CheckAnchors)
 #
 # UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
@@ -28,27 +35,33 @@
 #   & ([scriptblock]::Create([IO.File]::ReadAllText("$d\run.ps1"))) -Mutants
 # Prints RESULT: GREEN/RED instead of exiting. Writes nothing to the webroot.
 # =============================================================================
-param([string]$DbPhp = '', [string]$AuditPhp = '', [string]$AnPhp = '', [string]$AllPhp = '', [string]$HealthPhp = '', [string]$LogPhp = '', [string]$ShPhp = '',
+param([string]$DbPhp = '', [string]$AuditPhp = '', [string]$AnPhp = '', [string]$AllPhp = '', [string]$HealthPhp = '', [string]$LogPhp = '', [string]$ShPhp = '', [string]$LogsPhp = '',
       [string]$App = '', [string]$Here = '',
-      [string]$Mutant = '', [switch]$Mutants, [switch]$CheckAnchors, [switch]$Control)
+      [string]$Mutant = '', [switch]$Mutants, [switch]$CheckAnchors, [switch]$Control, [switch]$ControlRo)
 $ErrorActionPreference = 'Stop'
 $here = if ($Here) { $Here } elseif ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\errbenign' }
 $app  = if ($App) { $App } else { '\\oitras.oit.ncsu.edu\c$\inetpub\wwwroot\sponsor_migration\penumbra' }
 $php  = '\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\php.exe'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
-$map = [ordered]@{ db = 'db_connection.php'; aud = 'get_audit_log.php'; an = 'analytics.php'; all = 'analytics_all.php'; hl = 'penumbra_health.php'; log = 'log_client_error.php'; sh = 'analytics_shared.php' }
-$over = @{ db = $DbPhp; aud = $AuditPhp; an = $AnPhp; all = $AllPhp; hl = $HealthPhp; log = $LogPhp; sh = $ShPhp }
-if ($Control) {
+$map = [ordered]@{ db = 'db_connection.php'; aud = 'get_audit_log.php'; an = 'analytics.php'; all = 'analytics_all.php'; hl = 'penumbra_health.php'; log = 'log_client_error.php'; sh = 'analytics_shared.php'; lg = 'penumbra_logs.php' }
+$over = @{ db = $DbPhp; aud = $AuditPhp; an = $AnPhp; all = $AllPhp; hl = $HealthPhp; log = $LogPhp; sh = $ShPhp; lg = $LogsPhp }
+if ($Control -or $ControlRo) {
   . ([scriptblock]::Create([IO.File]::ReadAllText('\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver\oldver.ps1')))   # .bak copies come from git since 2026-10-14
+}
+if ($Control) {
   foreach ($k in @($map.Keys)) {
     $b = Resolve-Bak "$app\$($map[$k]).bak-20260925-auditbenign"
     if (-not $b) {
-      if ($k -eq 'sh') { continue }   # the counter catalog came later (2026-10-01): no such build
+      if ($k -eq 'sh' -or $k -eq 'lg') { continue }   # the counter catalog came later (2026-10-01), the log console's part later still (2026-10-21): no such build
       throw "-Control: no $($map[$k]).bak-20260925-auditbenign (the build before the harmless-abort exclusion)"
     }
     $over[$k] = $b
   }
+}
+if ($ControlRo) {
+  # The build before the ResizeObserver notice joined the rule (2026-10-21): every file at that commit.
+  foreach ($k in @($map.Keys)) { $over[$k] = Get-GitVersion 'a5c842f' $map[$k] }
 }
 $paths = @{}; $src0 = @{}
 foreach ($k in @($map.Keys)) {
@@ -62,7 +75,15 @@ $mutantDefs = [ordered]@{
   'benignall'    = @{ t = 'db';  edits = @(,@(("return `"(CASE WHEN {`$p}ACTION <> 'CLIENT_ERROR' THEN 0`"" + $L + "         . `" WHEN REGEXP_LIKE("), ("return `"(CASE`"" + $L + "         . `" WHEN REGEXP_LIKE("))); red = @('S1') }
   'condbare'     = @{ t = 'db';  edits = @(,@("return `"({`$p}ACTION IN (`" . penumbraErrorActionsSql() . `") AND NOT `" . penumbraBenignClientErrorSql(`$alias) . `")`";", "return `"({`$p}ACTION IN (`" . penumbraErrorActionsSql() . `"))`";")); red = @('S1') }
   'ownregex'     = @{ t = 'db';  edits = @(,@("return (bool)preg_match('/' . penumbraBenignClientErrorPattern() . '/i', trim((string)`$message));", "return (bool)preg_match('/^(Transition was skipped|Skipped ViewTransition)/i', trim((string)`$message));")); red = @('R1', 'S1') }
-  'pcreonly'     = @{ t = 'db';  edits = @(,@("return '^(Transition was (skipped|aborted)|Skipped ViewTransition)';", "return '^(Transition\swas (skipped|aborted)|Skipped ViewTransition)';")); red = @('S2') }
+  'pcreonly'     = @{ t = 'db';  edits = @(,@("return '^(Transition was (skipped|aborted)|Skipped ViewTransition|ResizeObserver loop (completed with undelivered notifications|limit exceeded))';", "return '^(Transition\swas (skipped|aborted)|Skipped ViewTransition|ResizeObserver loop (completed with undelivered notifications|limit exceeded))';")); red = @('S2') }
+  # 2026-10-21 (robenign): the ResizeObserver notice in the rule, the collector's
+  # gate, and the log console.
+  'nonotice'     = @{ t = 'db';  edits = @(,@("|Skipped ViewTransition|ResizeObserver loop (completed with undelivered notifications|limit exceeded))';", "|Skipped ViewTransition)';")); red = @('R1', 'R2', 'S1', 'L1') }
+  'gaterej'      = @{ t = 'log'; edits = @(,@("if (`$kind !== 'unhandledrejection' && `$kind !== 'error') return false;", "if (`$kind !== 'unhandledrejection') return false;")); red = @('R2') }
+  'gateany'      = @{ t = 'log'; edits = @(,@(("    if (`$kind !== 'unhandledrejection' && `$kind !== 'error') return false;" + $L), '')); red = @('R2') }
+  'lognotice'    = @{ t = 'lg';  edits = @(,@("        if (strpos(`$line, 'PENUMBRA CLIENT-ERROR: user=') !== false", "        if (false && strpos(`$line, 'PENUMBRA CLIENT-ERROR: user=') !== false")); red = @('L1') }
+  'loganywhere'  = @{ t = 'lg';  edits = @(,@("&& penumbraClientErrorIsBenign(`$cem[1])) return '';", "&& (stripos(`$line, 'ResizeObserver loop') !== false || penumbraClientErrorIsBenign(`$cem[1]))) return '';")); red = @('L1') }
+  'idspaces'     = @{ t = 'log'; edits = @(,@("(`$shortId !== '' ? str_replace(' ', '_', `$shortId) : '-')", "(`$shortId !== '' ? `$shortId : '-')")); red = @('L1') }
   'kpibare'      = @{ t = 'aud'; edits = @(,@('COUNT(CASE WHEN $errCond THEN 1 END) AS ERRORS,', 'COUNT(CASE WHEN ACTION IN ($badList) THEN 1 END) AS ERRORS,')); red = @('C1', 'C5') }
   'badfambare'   = @{ t = 'aud'; edits = @(,@("'bad'     => `"(`" . penumbraErrorCondSql() . `" OR ACTION = 'AUDIT_ACK')`"", "'bad'     => `"(ACTION IN (`$badList) OR ACTION = 'AUDIT_ACK')`"")); red = @('C1', 'C5') }
   'browserall'   = @{ t = 'aud'; edits = @(,@("COUNT(CASE WHEN ACTION = 'CLIENT_ERROR' AND NOT `$benign THEN 1 END) AS ERR_BROWSER,", "COUNT(CASE WHEN ACTION = 'CLIENT_ERROR' THEN 1 END) AS ERR_BROWSER,")); red = @('C1') }
@@ -75,7 +96,9 @@ $mutantDefs = [ordered]@{
   # analytics_shared.php (penumbra_an_feed_family / penumbra_an_report_feed).
   'feedbenign'   = @{ t = 'sh';  edits = @(,@(("    if (`$a === 'CLIENT_ERROR' && `$msg !== null && penumbraClientErrorIsBenign(`$msg)) return 'other';" + $L), '')); red = @('F1') }
   'feedmsg'      = @{ t = 'sh';  edits = @(,@("'fam'    => penumbra_an_feed_family((string)`$r['ACTION'], `$famMsg),", "'fam'    => penumbra_an_feed_family((string)`$r['ACTION']),")); red = @('F2') }
-  'allbare'      = @{ t = 'all'; edits = @(,@('WHERE $errorCondSqlA $timeFilterA', 'WHERE a.ACTION IN ($errorActionsSql) $timeFilterA')); red = @('C3', 'C5') }
+  # Re-anchored 2026-10-21: a per-report error count (GROUP BY a.REPORT_ID) now
+  # shares the WHERE line, so the anchor carries the list's ORDER BY.
+  'allbare'      = @{ t = 'all'; edits = @(,@(('WHERE $errorCondSqlA $timeFilterA $whenFilterA $userFilterA $reportFilterA' + $L + '          ORDER BY a.TIMESTAMP DESC'), ('WHERE a.ACTION IN ($errorActionsSql) $timeFilterA $whenFilterA $userFilterA $reportFilterA' + $L + '          ORDER BY a.TIMESTAMP DESC'))); red = @('C3', 'C5') }
   'healthbare'   = @{ t = 'hl';  edits = @(,@("WHERE `" . penumbraErrorCondSql() . `$tSql . `"", "WHERE ACTION IN (`" . penumbraErrorActionsSql() . `")`" . `$tSql . `"")); red = @('C4', 'C5') }
   'collectorown' = @{ t = 'log'; edits = @(,@('return penumbraClientErrorIsBenign($message);   // the ONE rule (db_connection.php)', "return (bool)preg_match('/^(Transition was (skipped|aborted))/i', trim((string)`$message));")); red = @('R2') }
 }

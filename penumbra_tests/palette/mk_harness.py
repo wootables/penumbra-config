@@ -71,7 +71,7 @@ AI_PANEL = ('<div id="tableSelector"></div><button type="button" id="toggleAiPan
             '<div id="aiProfileBar"><label class="ai-profile-toggle"><input type="checkbox" id="aiProfileOn"> Include a summary of my results</label></div></div></div></div>')   # (round 16) the panel's ids, as index.php has them
 
 
-def build(index_src, menu_html=''):
+def build(index_src, menu_html='', theme_opts=''):
     src = colmenu_harness.build(index_src)
     sprite, toolbar, buttons = _lift(index_src)
 
@@ -127,13 +127,13 @@ def build(index_src, menu_html=''):
         + '</div></div>\n'
         '<script>document.getElementById("zzUserBtn").addEventListener("click", function () { var seg = this.parentNode, open = seg.classList.toggle("sb-open"); this.setAttribute("aria-expanded", open ? "true" : "false"); });</script>\n')
     # (round 4b) the preset engine, EAGER before main.js as index.php loads it: the "Apply ... preset" rows
-    rep('<script src="main_hc.js"></script>\n', '<script src="penumbra_presets.js"></script>\n<script src="main_hc.js"></script>\n<script src="search_builder.js"></script>\n')   # (round 14) the builder after main.js, as index.php orders them
+    rep('<script src="main_hc.js"></script>\n', '<script src="penumbra_presets.js"></script>\n<script src="main_hc.js"></script>\n<script src="search_builder.js"></script>\n<script>if (/[?&]scn=(pnote|pshot21|ptop|psweep)\\b/.test(location.search)) document.write(\'<script src="penumbra_journal.js"></scr\' + \'ipt>\');</script>\n')   # (round 14) the builder after main.js, as index.php orders them
     # the stub AFTER the header menu, as index.php orders them; the cold scenarios never prefetch
     rep('<script src="penumbra_colmenu.js"></script>\n',
         '<script src="penumbra_colmenu.js"></script>\n'
         '<link rel="stylesheet" href="penumbra_find.css"><script src="penumbra_find.js"></script>\n'   # (round 14) Find, as index.php loads it
         '<script>if (/^pcold|^pfail/.test(window.__SCN)) { window.requestIdleCallback = function () {}; }\n'
-        '  if (/^prow/.test(window.__SCN)) document.write(\'<link rel="stylesheet" href="penumbra_cellsel.css"><script src="penumbra_cellsel.js"></scr\' + \'ipt>\');\n'
+        '  if (/^prow|^pjump|^pnote|^ptop/.test(window.__SCN)) document.write(\'<link rel="stylesheet" href="penumbra_cellsel.css"><script src="penumbra_cellsel.js"></scr\' + \'ipt>\');\n'
         '  document.write(\'<script src="penumbra_palette_boot.js" data-js="\' + (window.__SCN === "pfail" ? "penumbra_palette_missing.js" : "penumbra_palette.js") + \'?v=1" data-css="penumbra_palette.css?v=1" data-fn="help_functions.json?v=1"></scr\' + \'ipt>\');</script>\n')
     # (round 15) the editor console: its tab list and the REAL View Options panel from index.php (PHP stripped), stub
     # panels for the other tabs, a scheduler stub with the new-task controls main.js binds, all inside #admWrapper
@@ -144,7 +144,7 @@ def build(index_src, menu_html=''):
     ul = re.sub(r'<\?php.*?\?>', '', ul, flags=re.S)
     vo = index_src[index_src.index('<div id="view-options-tab">'):index_src.index('<div id="scheduler-tab">')]
     vo = re.sub(r'<\?php.*?\?>', '', vo, flags=re.S)
-    tabs = ('<div id="editorTabs">' + ul + '<div id="sql-editor-tab"></div><div id="report-options-tab"></div>' + vo
+    tabs = ('<div id="editorTabs"><div class="ui-tabs-nav-wrapper">' + ul + '</div><div id="sql-editor-tab"></div><div id="report-options-tab"></div>' + vo   # (round 22) the strip inside its wrapper, as index.php nests it
             + '<div id="scheduler-tab"><div id="schedulerPlaceholder">No task selected</div><div class="scheduler-config-panel" style="display:none"></div>'
               '<select id="schedNewEventType" aria-label="Type of event to add"><option value="EMAIL">Email</option><option value="SFTP">SFTP</option></select>'
               '<button type="button" id="addNewTaskBtn">+ Add</button></div>'
@@ -157,6 +157,18 @@ def build(index_src, menu_html=''):
     # the dialogs' own words: each real dialog's visible text (title, subtitle, labels, small print, headings, buttons,
     # options) from index.php, put INSIDE the harness's stand-in of that dialog (hidden), or as a hidden stand-in when
     # the harness has none - what the module reads at the first match
+    # (round 21) the REAL Email and Journal dialogs for the round's scenarios (a template, swapped in for the stand-ins
+    # before main.js binds), and the journal module (its own file in the stage) for the note scenarios
+    r21 = ''
+    for lid in ('emailLightbox', 'journalLightbox', 'downloadActionsLightbox', 'manageSnapshotsLightbox'):   # (round 23) the sweep asserts their end state
+        i = index_src.find('<div id="' + lid + '"'); j = index_src.find('\n</div>\n', i)
+        if i < 0 or j < 0: raise SystemExit('lift: the ' + lid + ' block not found in index.php')
+        r21 += index_src[i:j + 7].replace('<div id="' + lid + '"', '<div id="' + lid + '" style="display:none"', 1)
+    r21 = re.sub(r'<\?php.*?\?>', '', r21, flags=re.S)
+    rep('<div id="loadingOverlay" style="display:none">',
+        '<template id="zzR21">' + r21 + '</template>\n'
+        '<script>if (/[?&]scn=(pnote|pmail|pmiss|pshot21|ptop|psweep)\\b/.test(location.search)) { var zzT = document.getElementById("zzR21"); ["emailLightbox", "journalLightbox", "downloadActionsLightbox", "manageSnapshotsLightbox"].forEach(function (id) { var o = document.getElementById(id); if (o) o.remove(); }); document.body.appendChild(zzT.content.cloneNode(true)); }</script>\n'
+        '<div id="loadingOverlay" style="display:none">')
     heads = ''
     for lid in ('pivotLightbox', 'visualizationLightbox', 'groupingLightbox', 'downloadActionsLightbox', 'copyActionsLightbox', 'emailLightbox', 'manageSnapshotsLightbox', 'journalLightbox'):
         m = re.search(r'^<div id="' + lid + r'"[^\n]*\n(.*?)(?=^<(?:div|\?php|script)\b)', index_src, re.S | re.M)
@@ -165,14 +177,20 @@ def build(index_src, menu_html=''):
         words = ' '.join(re.sub(r'<[^>]+>', ' ', t) for t in texts)
         words = re.sub(r'<\?php.*?\?>', '', words, flags=re.S)
         block = '<div class="zz-dlg-words" hidden><p class="pnb-dlg-sub">' + words + '</p></div>'
-        if re.search(r'<div id="' + lid + r'"[^>]*>', src):
-            src = re.sub(r'(<div id="' + lid + r'"[^>]*>)', lambda mm: mm.group(1) + block, src, count=1)
+        tpl_end = src.find('</template>')   # (round 23) the real dialogs' template sits first: the words belong to the stand-in after it
+        head_part, body_part = (src[:tpl_end], src[tpl_end:]) if tpl_end >= 0 else ('', src)
+        if re.search(r'<div id="' + lid + r'"[^>]*>', body_part):
+            src = head_part + re.sub(r'(<div id="' + lid + r'"[^>]*>)', lambda mm: mm.group(1) + block, body_part, count=1)
         else:
             heads += '<div id="' + lid + '" class="help-lightbox" style="display:none">' + block + '</div>\n'
     rep('<div id="loadingOverlay" style="display:none">', '<div id="zzDlgHeads" style="display:none">' + heads + '</div>\n<div id="loadingOverlay" style="display:none">')
     # the real pivot builder (the colopt harness keeps it in a template, swapped in for pvhl*): in for pvo / pshot15 too,
     # so the Pivot action's dialog words are there to read
-    rep('if (/[?&]scn=pvhl/.test(location.search))', 'if (/[?&]scn=(pvhl|pvo|pshot15)/.test(location.search))')
+    rep('if (/[?&]scn=pvhl/.test(location.search))', 'if (/[?&]scn=(pvhl|pvo|pshot15|psweep)/.test(location.search))')   # (round 23) the sweep opens the real pivot builder
+    # (round 18b) the Settings panel's theme select carries the registry's REAL options (rendered by PHP from themes_config.php),
+    # not the colmenu harness's two-theme stub: the theme rows are tested against the page's own list, which is the registry's
+    if theme_opts:
+        rep('<option value="theme-default">Default Light</option>\n<option value="theme-dark-blue">Dark Blue</option>\n', theme_opts)
     return src
 
 

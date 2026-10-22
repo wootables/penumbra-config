@@ -170,6 +170,50 @@
       $('#serverSaveTitleInput').val('Conflict fixture');
       var b = await save();
       R.chk.forceNotCarried = !!b && b.force === false;
+    },
+    // (encsave 2026-10-21) Encrypt as the page last SAVED it. The opener used to re-tick Encrypt only from
+    // how the page LOADED, so after a save that added a password the next save came up unticked and went
+    // out in plaintext. Driven through the real opener (#saveQuery) and the real save button.
+    encsave: async function () {
+      window.__SAVE_ANSWER = ok(LATER);
+      var opens = [], alerts = [], aWas = window.alert;
+      window.alert = function (m) { alerts.push(String(m).slice(0, 140)); };
+      var ev = $._data($('#saveQuery')[0], 'events');
+      var cmEl = document.querySelector('.CodeMirror');
+      R.info.diag = { bound: !!(ev && ev.click && ev.click.length), edLen: cmEl && cmEl.CodeMirror ? cmEl.CodeMirror.getValue().length : -1, alerts: alerts };
+      // the opener ran when it emptied the password fields (it resets them before deciding the tick)
+      async function openDlg() {
+        $('#serverSavePassword').val('left-over'); $('#serverSavePasswordConfirm').val('left-over');
+        $('#saveQuery').trigger('click'); await sleep(900);
+        var o = { pw: $('#serverSavePassword').val(), ticked: $('#enableReportPassword').prop('checked') };
+        opens.push(o); return o;
+      }
+      function sealed(b) { return !!b && /^\{"encrypted":true,"content":"PENUMBRA_GCM::/.test(String(b.state_data || '')); }
+      var o1 = await openDlg();
+      R.chk.bootUnticked = o1.pw === '' && o1.ticked === false;   // a plaintext report: unticked, as before (and the opener ran)
+      $('#enableReportPassword').prop('checked', true).trigger('change');
+      $('#serverSavePassword').val('pw-encsave-21'); $('#serverSavePasswordConfirm').val('pw-encsave-21');
+      var b1 = await save();
+      R.chk.firstEncrypted = sealed(b1);
+      var o2 = await openDlg();
+      R.chk.openerRan = o2.pw === '';
+      R.chk.tickedAfterEncSave = o2.pw === '' && o2.ticked === true;
+      // straight to Save with nothing typed: refused for the password - never a plaintext save of it
+      var n = window.__saves.length;
+      $('#confirmServerSaveBtn').prop('disabled', false).trigger('click');
+      await sleep(1500);
+      var b2 = window.__saves.length > n ? last() : null;
+      R.chk.secondSaveNotPlain = !b2 || sealed(b2);
+      R.chk.passwordAsked = !b2 && /Password is required/.test(status().textContent || '');
+      // unticked on purpose: saved in plaintext, and the next open is unticked
+      $('#enableReportPassword').prop('checked', false).trigger('change');
+      var b3 = await save();
+      R.chk.plainSaved = !!b3 && !sealed(b3) && /^\{/.test(String(b3.state_data || '')) && !/"encrypted":true/.test(String(b3.state_data || ''));
+      var o3 = await openDlg();
+      R.chk.untickedAfterPlainSave = o3.pw === '' && o3.ticked === false;
+      window.alert = aWas;
+      R.info.diag.opens = opens;
+      R.info.r = { b1: b1 && String(b1.state_data).slice(0, 44), b2: b2 && String(b2.state_data).slice(0, 44), status: (status().textContent || '').slice(0, 90) };
     }
   };
   (async function () {

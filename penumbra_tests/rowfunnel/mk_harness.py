@@ -59,5 +59,10 @@ def build(index_src):
         '  if (window.__SCN === "rrepo") document.body.classList.add("pnb-repo-mode");\n'
         '  window.__BTN_HIDDEN_AT_BOOT = (function () { var b = document.getElementById("sbRowsBtn"); return b ? b.hidden : null; })();\n'
         '</script>\n'
+        # (2026-10-21) penumbra_vars as index.php has it: a top-level CONST, so window.penumbra_vars is
+        # undefined. The inherited harness sets a window property, which hid the Rows card's reads through
+        # window (73deb32: an editor got the viewer's text, a report saved with the limit never said so).
+        '<script>window.__pvProd = window.penumbra_vars; delete window.penumbra_vars;</script>\n'
+        '<script>const penumbra_vars = window.__pvProd;</script>\n'
         '<script src="jquery-3.7.1.min.js"></script>\n')
     return src

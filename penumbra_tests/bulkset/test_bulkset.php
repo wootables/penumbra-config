@@ -86,7 +86,7 @@ ok(strpos($j, "if (!manageOn()) { return; }\n        var targets = [];") !== fal
 // E2E 2026-10-13: a skipped report outside the default list stayed unticked - the refetch had dropped the search.
 ok(strpos($j, '_srSearchAfterLoad = term.length >= 3 ? term : null;') !== false
    && strpos($j, "$('#reportFilterInput').val(_srTerm).trigger('keyup');") !== false
-   && strpos($j, "renderReportRows(response.data, \$searchTbody, false);\n                                if (_srRetickAfterLoad) { retickAfterLoad(); }") !== false,
+   && strpos($j, "renderReportRows(response.data, \$searchTbody, false, true);\n                                if (_srRetickAfterLoad) { retickAfterLoad(); }") !== false,   // skipSort since 2026-10-21 (searchrank)
    'J7 the post-run refetch runs the search again and its results are re-ticked');
 ok(strpos($j, 'if (found < total) {') !== false && strpos($j, ' not in the list shown. Search for ') !== false,
    'J8 a failed / skipped report the list does not show is named as such, not silently left unticked');

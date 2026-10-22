@@ -1,0 +1,62 @@
+{
+ "m_q_norank": {
+  "why": "quicksearch sorts by date again but still binds the rank: the binds are unused = ORA-01036 (the trap of an ORDER BY dropped without its binds)",
+  "edits": [["ORDER BY \" . ($rankQ['sql'] !== '' ? $rankQ['sql'] . \", \" : '') . \"r.UPDATED_AT DESC","ORDER BY r.UPDATED_AT DESC"]],
+  "must": ["B-list","Q-epa8","Q-escape-paren","Q-ownername","Q-tiers"]
+ },
+ "m_s_norank": {
+  "why": "MODE search sorts by date alone again (rank and its binds both gone): the repository's 50 = the newest 50",
+  "edits": [["ORDER BY \" . ($rankS['sql'] !== '' ? $rankS['sql'] . \", \" : '') . \"r.UPDATED_AT DESC","ORDER BY r.UPDATED_AT DESC"],["        foreach ($rankS['binds'] as $k => $v) {   // the list only: the count below has no rank\n            $stmtS->bindValue($k, $v, PDO::PARAM_STR);\n        }\n",""]],
+  "must": ["S-epa50","S-escape-dot","S-literal","S-nonadmin","S-ownername","S-tiers"]
+ },
+ "m_countbind": {
+  "why": "the rank binds also go on the search COUNT, which reuses the WHERE: ORA-01036 on every repository search (the brief's named trap)",
+  "edits": [["        foreach ($auth2['binds'] as $k => $v) {\n            $countStmtS->bindValue($k, $v, PDO::PARAM_STR);\n        }","        foreach ($auth2['binds'] as $k => $v) {\n            $countStmtS->bindValue($k, $v, PDO::PARAM_STR);\n        }\n        foreach ($rankS['binds'] as $k => $v) {\n            $countStmtS->bindValue($k, $v, PDO::PARAM_STR);\n        }"]],
+  "must": ["B-count","R-long","S-epa50","S-escape-dot","S-literal","S-nonadmin","S-ownername","S-tiers"]
+ },
+ "m_noescape": {
+  "why": "the term goes into the word-start regex unescaped: a.b matches AXB, an open paren is ORA-12725",
+  "edits": [["$rx = strtr($matchTerm, array(","$rx = $matchTerm . strtr('', array("]],
+  "must": ["Q-escape-paren","R-escape","R-long","S-escape-dot"]
+ },
+ "m_noword": {
+  "why": "no word-start tier: a word hit (fi-epa, Annual Budget Review) ranks with a mid-word one (DEPARTMENT, Overbudget)",
+  "edits": [["    if (strlen($rx) <= 400) {","    if (false) {"]],
+  "must": ["Q-tiers","R-escape","R-fold","R-long","S-nonadmin","S-tiers"]
+ },
+ "m_tierswap": {
+  "why": "a tag / owner / access-list hit ranks as tier 1, above the word and contains tiers",
+  "edits": [["                      WHEN \" . $other . \" THEN 4","                      WHEN \" . $other . \" THEN 1"]],
+  "must": ["Q-ownername","Q-tiers","R-helper","S-nonadmin","S-tiers"]
+ },
+ "m_gate": {
+  "why": "under the discovery gate a non-admin's rank reaches the owner and the access list again",
+  "edits": [["    if (penumbraReportDiscoveryAllowed($isAdmin)) {   // under the gate","    if (true) {   // under the gate"]],
+  "must": ["R-gate"]
+ },
+ "m_tagrank": {
+  "why": "tag:NAME (exact) gets ranked against its own text instead of newest first",
+  "edits": [["        $rankS = array('sql' => '', 'binds' => array());\n        if ($tagExact !== '' || $tagNone) {","        $rankS = penumbraReportSearchRankSql($isAdmin, 's', $matchTerm, $tagsJoin !== '');\n        if ($tagExact !== '' || $tagNone) {"]],
+  "must": ["S-tag"]
+ },
+ "m_long": {
+  "why": "no length guard: a long term's regex passes Oracle's 512-byte pattern limit (ORA-12733)",
+  "edits": [["    if (strlen($rx) <= 400) {","    if (strlen($rx) <= 400000) {"]],
+  "must": ["R-long"]
+ },
+ "m_phpfold": {
+  "why": "the term is folded in PHP (strtoupper is byte-wise: cafe-accent never matches) instead of by Oracle",
+  "edits": [["$binds = array($k . '0' => $matchTerm,","$binds = array($k . '0' => strtoupper($matchTerm),"]],
+  "must": ["R-fold"]
+ },
+ "m_ownername": {
+  "why": "quicksearch's rank forgets the owner-by-name ids: a report found by its owner's name sorts with the SQL hits",
+  "edits": [["$rankQ = penumbraReportSearchRankSql($isAdmin, 'q', $matchTerm, $tagsJoin !== '', $ownerIdsByName);","$rankQ = penumbraReportSearchRankSql($isAdmin, 'q', $matchTerm, $tagsJoin !== '');"]],
+  "must": ["Q-ownername"]
+ },
+ "m_notags": {
+  "why": "a tag hit is not tier 4: it sorts with the SQL hits",
+  "edits": [["    if ($tagsOn) {","    if (false) {"]],
+  "must": ["Q-tiers","R-fold","S-tiers"]
+ }
+}

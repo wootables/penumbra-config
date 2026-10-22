@@ -500,44 +500,44 @@
     {
         "id": "now_default",
         "snippet": "now()",
-        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">10/20/2026</div>",
-        "out_plain": "10/20/2026"
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">10/21/2026</div>",
+        "out_plain": "10/21/2026"
     },
     {
         "id": "now_iso",
         "snippet": "now('YYYY-MM-DD')",
-        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2026-10-20</div>",
-        "out_plain": "2026-10-20"
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2026-10-21</div>",
+        "out_plain": "2026-10-21"
     },
     {
         "id": "now_offset_1",
         "snippet": "now('YYYY-MM-DD', '-1 year')",
-        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2025-10-20</div>",
-        "out_plain": "2025-10-20"
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2025-10-21</div>",
+        "out_plain": "2025-10-21"
     },
     {
         "id": "now_offset_chain",
         "snippet": "now('YYYY-MM-DD', '-1 year', '+6 days')",
-        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2025-10-26</div>",
-        "out_plain": "2025-10-26"
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">2025-10-27</div>",
+        "out_plain": "2025-10-27"
     },
     {
         "id": "now_long",
         "snippet": "now('MMMM D, YYYY')",
-        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">OCTOBER 20, 2026</div>",
-        "out_plain": "OCTOBER 20, 2026"
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">OCTOBER 21, 2026</div>",
+        "out_plain": "OCTOBER 21, 2026"
     },
     {
         "id": "now_unquoted",
         "snippet": "now(MM/DD/YYYY)",
-        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">10/20/2026</div>",
-        "out_plain": "10/20/2026"
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">10/21/2026</div>",
+        "out_plain": "10/21/2026"
     },
     {
         "id": "now_bracket_lit",
         "snippet": "now('[Run on] MMM D')",
-        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">RUN ON OCT 20</div>",
-        "out_plain": "RUN ON OCT 20"
+        "out": "<div style=\"font-size: 12px; color: inherit; line-height: 1.6; font-weight: bold;\">RUN ON OCT 21</div>",
+        "out_plain": "RUN ON OCT 21"
     },
     {
         "id": "rank_top",

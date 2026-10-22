@@ -27,7 +27,7 @@
 # -n (skip php.ini) because from a workstation the ini cannot load oci8/sqlsrv.
 # Nothing here needs them - the one oci8-touching function is faked.
 #
-# EXPECTED TAIL: "PASS 151   FAIL 0". Any other tail is a failure, a smaller
+# EXPECTED TAIL: "PASS 222   FAIL 0" (151 before Preset Sharing, 207 before its bug sweep, 2026-10-22). Any other tail is a failure, a smaller
 # pass count included.
 # =============================================================================
 param([switch]$Control)

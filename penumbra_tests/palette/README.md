@@ -47,3 +47,11 @@ deploy was cut from; commit_msg.txt). Rollback: an empty `js\penumbra_palette.of
 `git show <rev>:<path>` per changed file by the same swap.
 
 Round 4 (2026-10-20): 4a the icons RENDER as the toolbar's (L-pmain-iconsRendered in three themes + pshot: a screenshot crop's ink via PIL; mutant i-nostyle); 4b the combinations (scenario pcombo; the harness loads penumbra_presets.js and gives the Group dialog its preset chip slot; mutants c-applies, c-nopre, c-pivotcol, c-rows, c-preset, c-nocap). deploy_set.ps1 -From <dir> deploys a tested module/stylesheet set; deploy_r4b.ps1 cuts README at run time.
+
+2026-10-21 (the searchrank follow-up): `psrank` - the Reports section keeps the server's relevance order. The driver
+points the box's quicksearch call at `quicksearch_epa.json` (run.py QS_EPA_FIXTURE = live's answer for "EPA"):
+serverOrder, idOverMidword (fi-epa / fi-epa-c over the mid-word "Department" titles), mergeOrder (a recent row the
+server listed takes its place and is ranked from the server's copy; one it did not list, by tier), viewerTiers (no
+server list), accentWord (no word start right after an accented letter, as Oracle's [:alnum:]), tagLocalFirst
+(tag:NAME as before; a guard). Mutants q-scoreonly (live's sort), q-noplace, q-notier, q-wordstart, q-tagtier,
+q-localtier, q-asciiword.

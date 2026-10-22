@@ -4,9 +4,14 @@
 #   powershell -File run.ps1                 # against live
 #   powershell -File run.ps1 -App <path>     # against a stage (a stage needs the library,
 #                                            # penumbra_search.php, penumbra_directory.php
-#                                            # and the six consumer files)
+#                                            # and the seven consumer files: index.php,
+#                                            # manage_subscription.php, manage_schedule.php,
+#                                            # schedule_runner.php, js\main.js and the help
+#                                            # topics help\topics\schedulerHelpLightbox.php +
+#                                            # schedulerPromptHelpLightbox.php)
 #   powershell -File run.ps1 -Mutant         # eight library mutants + two wiring mutants + two
-#                                            # form mutants; each MUST go red by exactly its count
+#                                            # form mutants + four help mutants; each MUST go
+#                                            # red by exactly its count
 #
 # WHAT IS UNDER TEST. penumbra_subscribe_condition.php is the ONE evaluator behind the
 # header Subscribe chip (index.php), the subscribe endpoint (manage_subscription.php), the
@@ -19,6 +24,7 @@
 #
 # EXPECTED TAIL: "PASS: 78   FAIL: 0" then "RESULT: GREEN"  (count as of 2026-09-23 late night:
 # + braces as the documented spelling, the Subscriptions "?" and the option's tooltip)
+# The four help pins read help\topics since 2026-10-21 (help_content.php is a shim since 2026-10-19).
 #
 # UNC .ps1 files are GPO-blocked here ("not digitally signed") - run the body as a
 # scriptblock: & ([scriptblock]::Create((Get-Content -Raw '<this file>'))) [-App ..] [-Mutant]
@@ -46,7 +52,8 @@ function Get-FailCount([string]$out) { if ($out -match 'FAIL:\s+(\d+)') { return
 $latin1 = [Text.Encoding]::GetEncoding(28591)
 $tmp = Join-Path $env:TEMP ('pnb_subcond_mut_' + $PID)
 $files = @('penumbra_subscribe_condition.php', 'penumbra_search.php', 'penumbra_directory.php', 'index.php',
-           'manage_subscription.php', 'manage_schedule.php', 'schedule_runner.php', 'help_content.php', 'js\main.js')
+           'manage_subscription.php', 'manage_schedule.php', 'schedule_runner.php', 'js\main.js',
+           'help\topics\schedulerHelpLightbox.php', 'help\topics\schedulerPromptHelpLightbox.php')
 foreach ($f in $files) {
     $dst = Join-Path $tmp $f
     New-Item -ItemType Directory -Force (Split-Path -Parent $dst) | Out-Null
@@ -92,7 +99,18 @@ $mutants = @(
     @{ Name = 'the card''s "?" jumps back to the narrow condition item'; File = 'index.php';
        From = 'data-jump-to="schedHelp-subscriptions" title=';   To = 'data-jump-to="schedHelp-subsCondition" title=';   Expect = 2 },
     @{ Name = 'the option''s tooltip says "can subscribe" again'; File = 'index.php';
-       From = 'matches the condition see the Subscribe option for this schedule.';   To = 'matches a condition can subscribe.';   Expect = 1 }
+       From = 'matches the condition see the Subscribe option for this schedule.';   To = 'matches a condition can subscribe.';   Expect = 1 },
+    # Help mutants (2026-10-21): the four help pins were retargeted from the help_content.php shim to
+    # help\topics, and each one must still be able to fail.
+    @{ Name = 'the help''s Subscriptions heading loses the id the card''s "?" jumps to'; File = 'help\topics\schedulerHelpLightbox.php';
+       From = '<h4 id="schedHelp-subscriptions" ';   To = '<h4 ';   Expect = 1 },
+    # 2: the "jump target" pin, and the examples pin, which reads the section that id starts.
+    @{ Name = 'the help''s condition section loses the id the chart''s link jumps to'; File = 'help\topics\schedulerHelpLightbox.php';
+       From = '<h4 id="schedHelp-subsCondition" ';   To = '<h4 ';   Expect = 2 },
+    @{ Name = 'a help example goes back to bare names'; File = 'help\topics\schedulerHelpLightbox.php';
+       From = '<code>{TAGS} = CALS_PREAWARD OR {TAGS} = OSP_LEADS</code>';   To = '<code>TAGS = CALS_PREAWARD OR TAGS = OSP_LEADS</code>';   Expect = 1 },
+    @{ Name = 'the Recipient Variables chart intro stops naming the Subscriptions condition'; File = 'help\topics\schedulerPromptHelpLightbox.php';
+       From = 'Subscriptions custom condition</a> uses them too';   To = 'custom condition</a> uses them too';   Expect = 1 }
 )
 foreach ($m in $mutants) {
     $target = Join-Path $tmp $m.File

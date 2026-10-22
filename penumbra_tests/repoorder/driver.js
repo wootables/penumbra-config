@@ -11,12 +11,16 @@
  *   J-rebuild      ...and clearing the sort afterwards still restores the payload order
  *   J-loadmore     Load More appends its rows (server order, duplicates skipped)
  *   J-loadmore-reset  sort + clear afterwards = opening rows then appended rows
- *   J-search       search results are still shown newest-updated first (unchanged)
+ *   J-search       search results keep the server's order (2026-10-21, searchrank: the server ranks them by
+ *                  relevance, then newest; until then the client re-sorted them newest-updated first)
+ *   J-pill / J-cap (2026-10-21)  the count pill: "6 results found (100 total)" when every match is shown;
+ *                  "3 of 62 matches, best first" (+ the order in its title) when the server capped the search
  *   J-restore      clearing the search brings back the pre-search rows in order
  *   K-cancel / K-escape / K-save (2026-10-15, WCAG 2.4.3)  the details pane's inline tag editor
  *                  puts focus back on that report's Edit-tags pencil after its redraw
  *   W-key / W-zero / W-reset (2026-10-15, WCAG 2.1.1)  column widths without a mouse: + / - on a focused
- *                  header step its width, 0 drops it, the chooser's "Reset to defaults" clears them all (no second reset button)
+ *                  header step its width, 0 drops it, the chooser's "Reset to defaults" clears them all (no second reset button);
+ *                  since 2026-10-21 W-reset first proves a seeded width was saved and showing, so it cannot pass with nothing to reset
  *   E-errors       no page errors anywhere
  */
 (function () {
@@ -47,11 +51,14 @@
         var r = rep(2000 + k, 'rb' + pad(k), 'Older ' + String.fromCharCode(90 - k) + pad(k), ora(25 - k, 'AUG'));
         MORE.push(r); MORE_NEW.push(2000 + k); k++;
     }
-    // Search: deliberately NOT date ordered; the client sorts these newest first.
+    // Search: deliberately NOT date ordered - the server's relevance order, which the list keeps
+    // (2026-10-21; the date re-sort it replaced would show 3005,3001,3003,3004,3000,3002).
     var SEARCH = [[3000, 5], [3001, 20], [3002, 1], [3003, 15], [3004, 10], [3005, 25]].map(function (p) {
         return rep(p[0], 'rs' + p[0], 'Found ' + p[0], ora(p[1], 'JUL'));
     });
-    var SEARCH_WANT = [3005, 3001, 3003, 3004, 3000, 3002];
+    var SEARCH_WANT = [3000, 3001, 3002, 3003, 3004, 3005];
+    // A capped search: 3 rows of 62 matches (the server sends at most `limit`, total_count says how many matched).
+    var CAP = [4000, 4001, 4002].map(function (id) { return rep(id, 'rc' + id, 'Capped ' + id, ora(3, 'JUL')); });
     var INIT_IDS = INITIAL.map(function (r) { return +r.ID; });
 
     function clone(x) { return JSON.parse(JSON.stringify(x)); }
@@ -64,7 +71,7 @@
         if (o && o.url === 'get_server_reports.php') {
             if (d.mode === 'initial') { resp = { status: 'success', data: clone(INITIAL), total_count: 100 }; }
             else if (d.mode === 'loadmore') { resp = { status: 'success', data: clone(MORE), total_count: 100 }; }
-            else if (d.mode === 'search') { resp = { status: 'success', data: clone(SEARCH), total_count: 6 }; }
+            else if (d.mode === 'search') { resp = d.search === 'zzcap' ? { status: 'success', data: clone(CAP), total_count: 62 } : { status: 'success', data: clone(SEARCH), total_count: 6 }; }
         }
         var dfd = $.Deferred(), aborted = false;
         var xhr = dfd.promise({ abort: function () { aborted = true; }, readyState: 1, status: 200 });
@@ -133,6 +140,15 @@
         $('#reportFilterInput').val('zzq').trigger('keyup');
         ok = await waitFor(function () { var d = domIds(); return d.length === 6 && d[0] >= 3000; });
         t('J-search', ok && same(domIds(), SEARCH_WANT), (ok ? '' : 'TIMEOUT ') + 'got ' + show(domIds()) + ' | want ' + SEARCH_WANT.join(','));
+        // The count pill (2026-10-21): every match shown = "N results found (T total)"; the server's
+        // total_count above the rows it sent (a search answers at most 50) = "N of M matches, best first".
+        var pill = function () { return $.trim($('#reportCountDisplay').text()); };
+        t('J-pill', pill() === '6 results found (100 total)', 'pill "' + pill() + '"');
+        $('#reportFilterInput').val('zzcap').trigger('keyup');
+        ok = await waitFor(function () { var d = domIds(); return d.length === 3 && d[0] >= 4000; });
+        var capTip = String($('#reportCountDisplay').attr('title') || '');
+        t('J-cap', ok && pill() === '3 of 62 matches, best first' && /^The 3 best of 62 matches: /.test(capTip),
+          (ok ? '' : 'TIMEOUT ') + 'pill "' + pill() + '", title "' + capTip.slice(0, 50) + '"');
 
         $('#reportFilterInput').val('').trigger('keyup');
         ok = await waitFor(function () { return domIds().length === WANT_MORE.length; });
@@ -157,15 +173,28 @@
             key(thT, '0');
             var sw = savedWidths();
             t('W-zero', !Object.prototype.hasOwnProperty.call(sw, 'TITLE') && Object.keys(sw).length > 0, 'saved after 0: ' + JSON.stringify(sw));
-            key(thT, '+');   // a saved TITLE width again, so the reset has something to clear
+            // The reset needs a saved AND applied width to clear, and W-reset now proves there was one
+            // (2026-10-21). Until then a '+' press here seeded it, and wherever that press saved nothing
+            // W-reset passed with nothing to reset: the 10-02 control pair (no column widths at all, so
+            // its CONTROL_RED entry never held) and the js_colw_keys mutant. The seed goes in through
+            // the stored prefs plus a column re-render instead (the .rc-check change runs rebuildTable,
+            // which re-applies saved widths), so it does not lean on the keys W-key / W-zero cover.
             $('#repoColsBtn').trigger('click');
             await waitFor(function () { return $('#repoColsReset').length > 0; }, 3000);
+            var SEED_W = 333, pref = {};
+            try { pref = JSON.parse(localStorage.getItem('penumbra_repo_columns') || '{}') || {}; } catch (e) { pref = {}; }
+            pref.widths = { TITLE: SEED_W };
+            try { localStorage.setItem('penumbra_repo_columns', JSON.stringify(pref)); } catch (e) { }
+            $('.rc-check[data-key="OWNER_ID"]').prop('checked', true).trigger('change');   // OWNER_ID is already on (P-rebuild): a re-render, same columns
+            var thS = $('#serverReportListTable thead th[data-colkey="TITLE"]')[0];
+            var seeded = savedWidths().TITLE === SEED_W && !!thS && thS.style.width === SEED_W + 'px' && $('#serverReportListTable').hasClass('sr-colfixed');
             var rb = $('#repoColsReset')[0], extra = $('#repoColWidthsReset').length;
             if (rb) { rb.focus(); $(rb).trigger('click'); }
             await waitFor(function () { return Object.keys(savedWidths()).length === 0; }, 3000);
             var sw2 = savedWidths(), thT2 = $('#serverReportListTable thead th[data-colkey="TITLE"]')[0];
-            t('W-reset', !!rb && extra === 0 && Object.keys(sw2).length === 0 && !!thT2 && thT2.style.width === '' && !$('#serverReportListTable').hasClass('sr-colfixed'),
-              'button=' + !!rb + ' extra reset buttons=' + extra + ' saved after=' + JSON.stringify(sw2) + ' style="' + (thT2 ? thT2.style.width : 'no th') + '"');
+            t('W-reset', seeded && !!rb && extra === 0 && Object.keys(sw2).length === 0 && !!thT2 && thT2.style.width === '' && !$('#serverReportListTable').hasClass('sr-colfixed'),
+              'seeded TITLE ' + SEED_W + 'px=' + seeded + ' (style "' + (thS ? thS.style.width : 'no th') + '") button=' + !!rb + ' extra reset buttons=' + extra +
+              ' saved after=' + JSON.stringify(sw2) + ' style="' + (thT2 ? thT2.style.width : 'no th') + '"');
             if (!$('#repoColsPanel').attr('hidden')) { $('#repoColsBtn').trigger('click'); }
         } else { t('W-key', false, 'no TITLE header'); t('W-zero', false, 'no TITLE header'); t('W-reset', false, 'no TITLE header'); }
 

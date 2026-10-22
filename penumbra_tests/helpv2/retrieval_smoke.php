@@ -17,6 +17,10 @@
  *   R10 a cache stamped with the previous PNB_HELP_VER is rejected and rebuilt (a bump rebuilds both caches)
  *   R11 ask mode: "can you unpivot this current dataset" puts the Restore Transaction List passage first (a question
  *      word the help never uses is stood in for by its synonyms, 2026-10-20)
+ *   R12 assist mode: R9's battery still retrieves nothing with the help half its size and half as big again (the cache's
+ *      n x0.5 / x1.5: idf moves, nothing else does). 2026-10-21: "lead pi vs co-pi counts" passed R9 only because a
+ *      one-word chunk outranked a two-word one by 0.003; 1% more help, or one fragment fewer (run.php's missing-fragment
+ *      mutant), flipped them and 4 KB of help went into the assistant's prompt. Fixed by the Ask-only "lead" in help_retrieval.php.
  * Exit = failures.
  */
 require_once __DIR__ . '/lib.php';
@@ -61,8 +65,10 @@ function build($php, $app, $orig, $out, $v2) {
         . "\$q5first = (\$q5 && stripos(\$q5[0]['x'], 'Restore Transaction List') !== false) ? 1 : 0;\n"
         . "\$short = array(); foreach (array('ip', 's3', 'db', 'ui', 'ai', 'pi', 'id', 'fy') as \$t) \$short[\$t] = isset(\$c['df'][\$t]) ? \$c['df'][\$t] : 0;\n"
         . "\$leak = array(); foreach (" . var_export($GLOBALS['DATA_BATTERY'], true) . " as \$q) { \$l = strlen(pnb_help_retrieve(\$q)); if (\$l) \$leak[\$q] = \$l; }\n"
+        // R12 (2026-10-21): the same battery on the same chunks with n scaled; runs before R10 below rewrites the cache.
+        . "\$grow = array(); \$cpG = pnb_help_cache_paths(); foreach (array(0.5, 1.5) as \$f) { \$sc = \$c; \$sc['n'] = (int)round(\$c['n'] * \$f); file_put_contents(\$cpG[0], json_encode(\$sc)); foreach (" . var_export($GLOBALS['DATA_BATTERY'], true) . " as \$q) { \$l = strlen(pnb_help_retrieve(\$q)); if (\$l) \$grow['x' . \$f . ': ' . \$q] = \$l; } }\n"
         . "\$stale = \$c; \$stale['ver'] = PNB_HELP_VER - 1; \$cp = pnb_help_cache_paths(); file_put_contents(\$cp[0], json_encode(\$stale)); \$re = pnb_help_cache(); \$reVer = \$re ? \$re['ver'] : null; \$reN = (\$re && !empty(\$re['chunks'])) ? count(\$re['chunks']) : 0;\n"
-        . "echo json_encode(array('n' => \$c['n'], 'sig' => \$c['src_mtime'], 'auds' => \$auds, 'titles' => count(\$titles), 'q1' => substr(\$q1, 0, 400), 'q1topic' => (preg_match('/\\\\[Topic: ([^\\\\]]+)\\\\]/', \$q1, \$m) ? \$m[1] : ''), 'q2len' => strlen(\$q2), 'q3ids' => \$q3ids, 'q3alen' => strlen(\$q3a), 'q4ids' => \$q4ids, 'q4ip' => \$q4ip, 'q5first' => \$q5first, 'short' => \$short, 'leak' => \$leak, 'ver' => PNB_HELP_VER, 'reVer' => \$reVer, 'reN' => \$reN, 'files' => array_map('basename', pnb_help_src_files()), 'cache' => pnb_help_cache_paths()));\n";
+        . "echo json_encode(array('n' => \$c['n'], 'sig' => \$c['src_mtime'], 'auds' => \$auds, 'titles' => count(\$titles), 'q1' => substr(\$q1, 0, 400), 'q1topic' => (preg_match('/\\\\[Topic: ([^\\\\]]+)\\\\]/', \$q1, \$m) ? \$m[1] : ''), 'q2len' => strlen(\$q2), 'q3ids' => \$q3ids, 'q3alen' => strlen(\$q3a), 'q4ids' => \$q4ids, 'q4ip' => \$q4ip, 'q5first' => \$q5first, 'short' => \$short, 'leak' => \$leak, 'grow' => \$grow, 'ver' => PNB_HELP_VER, 'reVer' => \$reVer, 'reN' => \$reN, 'files' => array_map('basename', pnb_help_src_files()), 'cache' => pnb_help_cache_paths()));\n";
     file_put_contents($script, $code);
     $outp = (string)shell_exec(escapeshellarg($php) . ' -n ' . escapeshellarg($script) . ' 2>&1');
     $j = json_decode(trim($outp), true);
@@ -88,6 +94,9 @@ $R->check('R8', $v2 && !empty($v2['q4ids']) && $v2['q4ids'][0] === 'saveSecurity
     . (($v2 && !empty($v2['q4ip'])) ? ' with the IP Address List passage' : ' WITHOUT the IP Address List passage') . '; short-token df ' . ($v2 ? json_encode($v2['short']) : '?'));
 $R->check('R9', $v2 && isset($v2['leak']) && count($v2['leak']) === 0,
     'assist mode: ' . count($DATA_BATTERY) . ' data questions naming PI / ID / FY / DB retrieve nothing' . (($v2 && !empty($v2['leak'])) ? ' - LEAK ' . json_encode($v2['leak']) : ''));
+// R12 (2026-10-21): R9 must not hang on a near-tie between two chunks (see the header).
+$R->check('R12', $v2 && isset($v2['grow']) && count($v2['grow']) === 0,
+    'assist mode: the same ' . count($DATA_BATTERY) . ' questions retrieve nothing with the help half its size or half as big again (n x0.5, x1.5)' . (($v2 && !empty($v2['grow'])) ? ' - LEAK ' . json_encode($v2['grow']) : ''));
 $R->check('R11', $v2 && !empty($v2['q5first']), 'ask mode: "can you unpivot this current dataset" puts the Restore Transaction List passage first');
 $R->check('R10', $v2 && isset($v2['reVer']) && (int)$v2['reVer'] === (int)$v2['ver'] && (int)$v2['reN'] > 900,
     'a cache stamped with the previous PNB_HELP_VER is rejected and rebuilt (ver ' . ($v2 ? $v2['reVer'] . ' = ' . $v2['ver'] : '?') . ', ' . ($v2 ? $v2['reN'] : '?') . ' chunks)');
