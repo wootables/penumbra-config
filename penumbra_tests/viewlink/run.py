@@ -21,7 +21,7 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js', 'penumbra_tiles.js',
         'penumbra_a11y.js', 'penumbra_grouplist.js', 'penumbra_cellsel.js', 'penumbra_colfmt.js', 'penumbra_calc.js',
         'penumbra_colwidths.js', 'penumbra_colmenu.js']
-CSS = ['main.css', 'density.css', 'penumbra_colwidths.css', 'penumbra_grouplist.css', 'penumbra_cellsel.css', 'penumbra_colmenu.css']
+CSS = ['penumbra_find.css', 'main.css', 'density.css', 'penumbra_colwidths.css', 'penumbra_grouplist.css', 'penumbra_cellsel.css', 'penumbra_colmenu.css']
 
 args = sys.argv[1:]
 def opt(name, default=None):
@@ -41,7 +41,7 @@ src_root = APP if control else (stage_dir or APP)
 def pick(rel):
     p = os.path.join(src_root, rel)
     return p if os.path.exists(p) else os.path.join(APP, rel)
-RELS = {'calc': os.path.join('js', 'penumbra_calc.js'), 'main': os.path.join('js', 'main.js'), 'index': 'index.php', 'pal': os.path.join('js', 'penumbra_palette.js'),
+RELS = {'find': os.path.join('js', 'penumbra_find.js'), 'prompt': 'ai_system_prompt.php', 'calc': os.path.join('js', 'penumbra_calc.js'), 'main': os.path.join('js', 'main.js'), 'index': 'index.php', 'pal': os.path.join('js', 'penumbra_palette.js'),
         'form': 'submit_home_form.php', 'topic': os.path.join('help', 'topics', 'viewLinkHelpLightbox.php'),
         'tip': os.path.join('help', 'tips', 'settings-tips-storage.php'), 'manifest': os.path.join('help', 'manifest.php')}
 def read_b(p):
@@ -57,47 +57,76 @@ T_STALE = tok({'v': 1, 'm': 'flat', 'o': 'GONE_C|desc', 'c': {'o': ['V_ID', 'GON
                'w': {'OLD_B': 200}, 'fm': {'V_NAME': 'text'}})
 BAD_S = '<img src=x onerror="window.__pwn=1">'
 BAD = {'v': 1, 'm': 'flat', 's': BAD_S, 'o': 'V_NAME|desc',
-       'c': {'o': ['V_ID', '<img src=x onerror="window.__pwn=2">'], 'v': ['V_ID', '<img src=x onerror="window.__pwn=2">'], 'n': True},
+       'c': {'o': ['V_ID', '<img src=x onerror="window.__pwn=2">', 'GONE_&amp;X'], 'v': ['V_ID', '<img src=x onerror="window.__pwn=2">', 'GONE_&amp;X'], 'n': True},
        'fm': {'V_NAME': '<img src=x onerror="window.__pwn=3">'},
        'hl': {'V_NAME': [{'id': 'x', 'w': '<img src=x onerror=window.__pwn=4>', 'css': '</style><img src=x onerror=window.__pwn=5>'}]},
        'cso': {'V_STATUS': ['<img src=x onerror=window.__pwn=7>', 'Open']},
        'query': 'DROP TABLE X', 'reportSnippet': '<script>window.__pwn=6</script>', 'viewOptions': {'hideSearch': True, 'hideExport': True},
-       'th': 'theme-<img src=x onerror=window.__pwn=9>', 'dn': 'huge', 'noadm': 1, 'rowlimit': False, 'console': 1, 'download': 'csv', 'g': {'by': '<img src=x onerror=window.__pwn=8>'}}
+       'th': 'theme-not-in-the-registry', 'dn': 'huge', 'noadm': 1, 'rowlimit': False, 'console': 1, 'download': 'csv', 'g': {'by': '<img src=x onerror=window.__pwn=8>'}}
 T_BAD = base64.urlsafe_b64encode(zlib.compress(json.dumps(BAD).replace('"query"', '"__proto__": {"polluted": 1}, "query"', 1).encode(), 9)).decode().rstrip('=')
 T_SQL = tok({'v': 1, 'm': 'flat', 's': "V_NAME = 'x' OR 1=1 --"})
 T_BOMB = tok({'v': 1, 'm': 'flat', 's': ' ' * 300000})
 T_OK = tok({'v': 1, 'm': 'flat', 's': 'Alpha'})
 T_MAIL = tok({'v': 1, 'm': 'flat', 's': 'Alpha', 'o': 'V_AMOUNT|desc', 'c': {'o': ALL20, 'v': ['V_ID', 'V_NAME', 'V_AMOUNT'], 'n': True}, 'fz': 1, 'r': '25', 'pg': 2})
+PIV = {'v': 2, 'rows': ['H_GROUP'], 'cols': ['V_STATUS'], 'vals': 'H_AMT', 'agg': ['sum', 'formula'], 'aggLabels': ['<img src=x onerror=window.__pwn=11>', '<b onmouseover=window.__pwn=15>F</b>'],
+       'aggColOverrides': ['H_AMT', 'H_AMT'], 'aggFilters': None, 'aggFormulas': [None, 'window.__pwn=14 + constructor.constructor("window.__pwn=16")()'],
+       'rowLayout': 'nested', 'colLayout': 'nested', 'sortOrder': 'asc', 'colSortOrder': 'asc', 'stickyColCount': 1, 'totalColAggs': None, 'totalRowAggs': ['sum'],
+       'totalRowAggLabels': ['<img src=x onerror=window.__pwn=12>'], 'totalRowAggBaseIdx': None, 'rankN': None, 'rankDir': None, 'rankAgg': None, 'rankOther': True,
+       'rankScope': None, 'noBreakdown': False, 'startExpanded': True, 'hideEmpty': False}
+T_BADPIV = tok({'v': 1, 'm': 'pivot', 'p': PIV})
+T_BADPIV2 = tok({'v': 1, 'm': 'pivot', 'p': dict(PIV, rows=['<img src=x onerror=window.__pwn=13>'], cols=['"><img src=x onerror=window.__pwn=17>'], vals='<svg onload=window.__pwn=18>')})
+T_BADGRP = tok({'v': 1, 'm': 'group', 'g': {'by': 'H_GROUP', 'agg': {'column': 'H_AMT', 'type': 'sum'}, 'sort': {'key': '<img src=x onerror=window.__pwn=19>', 'dir': 'asc'}, 'layout': 'list'}})
+T_BADGRP2 = tok({'v': 1, 'm': 'group', 'g': {'by': '<img src=x onerror=window.__pwn=20>,H_GROUP', 'agg': {'column': '<img src=x onerror=window.__pwn=21>', 'type': 'sum'}}})
+Q1, Q2 = '" onmouseover="window.__pwn=30" x="', "' onmouseover='window.__pwn=31' x='"
+T_BADPIV3 = tok({'v': 1, 'm': 'pivot', 'p': dict(PIV, aggLabels=[Q1, Q2], totalRowAggLabels=['" autofocus onfocus="window.__pwn=32" x="'], aggFormulas=None, agg=['sum', 'count'])})
+T_BADGRP3 = tok({'v': 1, 'm': 'group', 'g': {'by': 'H_GROUP', 'agg': {'column': 'H_AMT', 'type': 'sum'}, 'sort': {'key': Q1, 'dir': 'asc'}, 'layout': 'list'}, 'cso': {'H_GROUP': [Q2, 'North']}})
+T_FMSAVE = tok({'v': 1, 'm': 'flat', 'fm': {'V_AMOUNT': 'number:1'}, 'cso': {'V_STATUS': {'values': ['Pending', 'Open', 'Closed'], 'preset': None}}})
+T_BADPIV4 = tok({'v': 1, 'm': 'pivot', 'p': {'rows': 5, 'cols': {}, 'vals': ['x']}})
 T_PGSTALE = tok({'v': 1, 'm': 'flat', 'o': 'none', 'r': '25', 'pg': 999})
 from urllib.parse import quote
 def url_for(s, token=None):
     base = 'harness.html?scn=%s' % s
     if s == 'vnoid': return base + '&view=' + T_OK
+    if s == 'vsharenoid': return base
     if s == 'vstate': return base + '&id=lrfix&state=x&view=' + T_OK
     base += '&id=lrfix'
     return base + ('&view=' + token if token else '')
-STATIC_TOK = {'vwins': T_WINS, 'vstale': T_STALE, 'vbad': T_BAD, 'vsql': T_SQL, 'vhuge': 'A' * 7000, 'vbomb': T_BOMB, 'vpgstale': T_PGSTALE, 'vmail': T_MAIL}
+# (2026-10-22) a link naming the journal's columns: Notes after V_ID and hidden (not in the visible list), the Done
+# toggle after V_AMOUNT, shown, 90px
+JRN_O = ['V_ID', '__JOURNAL_NOTES', 'V_NAME', 'V_AMOUNT', '__JOURNAL_TOGGLE__done', 'V_DATE', 'V_LINK', 'V_STATUS'] + [n for n in ALL20 if n.startswith('H_')]
+T_JRN = tok({'v': 1, 'm': 'flat', 'o': 'none', 'c': {'o': JRN_O, 'v': ['V_ID', 'V_NAME', 'V_AMOUNT', '__JOURNAL_TOGGLE__done', 'V_DATE', 'V_LINK', 'V_STATUS'], 'n': True},
+             'w': {'__JOURNAL_TOGGLE__done': 90}})
+STATIC_TOK = {'vwins': T_WINS, 'vstale': T_STALE, 'vbad': T_BAD, 'vsql': T_SQL, 'vhuge': 'A' * 7000, 'vbomb': T_BOMB, 'vpgstale': T_PGSTALE, 'vbadpiv4': T_BADPIV4, 'vfmsave': T_FMSAVE, 'vbadpiv': T_BADPIV, 'vbadpiv2': T_BADPIV2, 'vbadgrp': T_BADGRP, 'vbadgrp2': T_BADGRP2, 'vbadpiv3': T_BADPIV3, 'vbadgrp3': T_BADGRP3, 'vmail': T_MAIL}
+STATIC_TOK['vjrn'] = T_JRN
 
-SCN = ['vcapA', 'vcapB', 'gvA', 'vgrpB', 'pvA', 'vpivB', 'pflatB', 'vwins', 'vwinsc', 'vstale', 'vbad', 'vsql', 'vhuge', 'vbomb', 'vnoid', 'vstate', 'vprompt', 'vlimit', 'vpgA', 'vpgB', 'vpgstale', 'vccA', 'vccB', 'vcchB', 'vmail', 'vthA', 'vthB']
+SCN = ['vcapA', 'vcapB', 'gvA', 'vgrpB', 'pvA', 'vpivB', 'pflatB', 'vwins', 'vwinsc', 'vstale', 'vbad', 'vsql', 'vhuge', 'vbomb', 'vnoid', 'vstate', 'vprompt', 'vlimit', 'vpgA', 'vpgB', 'vpgstale', 'vccA', 'vccB', 'vcchB', 'vmail', 'vthA', 'vthB', 'vshare', 'vsharenoid', 'vscrA', 'vscrB', 'vfindA', 'vfindB', 'vbadpiv', 'vbadpiv2', 'vbadpiv3', 'vbadgrp', 'vbadgrp2', 'vbadgrp3', 'vfmsave', 'vbadpiv4', 'vfitA', 'vfitB', 'vjrn']
 CHK = {
     'vcapA': ['api', 'filtered', 'sorted', 'hidden', 'frozen', 'width', 'format', 'built', 'carries', 'urlShape', 'copied', 'toast', 'noNoteWithoutLink'],
     'vcapB': ['note', 'active', 'oneQuery', 'rtSearch', 'rtShown', 'rtRows', 'rtView', 'rtSort', 'rtFrozen', 'rtWidths', 'rtFormats', 'rtLayout'],
     'gvA': ['built', 'mode'], 'vgrpB': ['note', 'active', 'rtGrouped', 'rtView'],
-    'pvA': ['built', 'mode'], 'vpivB': ['note', 'active', 'rtPivot', 'rtView'],
+    'pvA': ['built', 'mode'], 'vpivB': ['note', 'active', 'rtPivot', 'rtView', 'defaultIsReports'],
     'pflatB': ['note', 'active', 'flatOverPivot'],
     'vwins': ['note', 'linkWins', 'linkFrozen', 'linkWidth', 'untouchedOnLoad', 'sessionHolds', 'savedUntouched'],
     'vwinsc': ['seedApplies'],
     'vstale': ['note', 'staleListed', 'restApplied'],
-    'vbad': ['noScript', 'noPollution', 'searchLiteral', 'noViewOptions', 'noAdminOverrides', 'queryUnchanged', 'unknownDropped', 'namesUnchanged', 'staleNameAsText'],
+    'vbad': ['noScript', 'noPollution', 'tagTextRefused', 'noViewOptions', 'noAdminOverrides', 'queryUnchanged', 'unknownDropped', 'namesUnchanged', 'staleNameAsText'],
     'vsql': ['searchAsText', 'oneQuery'],
     'vhuge': ['ignored', 'defaultView'], 'vbomb': ['ignored', 'defaultView'], 'vnoid': ['ignored', 'defaultView'], 'vstate': ['ignored', 'defaultView'],
     'vprompt': ['promptRides', 'multiGrammar', 'forcedHiddenSkipped', 'reservedSkipped', 'includesPrompts'],
     'vlimit': ['fits', 'droppedNamed'],
     'vccA': ['calcShown', 'carriesCalc', 'reportNotRepeated', 'calcDialogViewLink'], 'vccB': ['note', 'calcApplied', 'calcValue', 'calcNotSaved', 'rtView'],
     'vcchB': ['note', 'calcApplied', 'calcValue', 'calcNotSaved'],
-    'vmail': ['rowShown', 'disabledUntilLink', 'enabledWithLink', 'noListUnticked', 'listsCustomizations', 'disabledAgain'],
+    'vmail': ['copyWithoutSending', 'labelsReworded', 'rowShown', 'disabledUntilLink', 'enabledWithLink', 'noListUnticked', 'listsCustomizations', 'disabledAgain'],
     'vthA': ['carriesTheme', 'describedTheme'], 'vthB': ['note', 'themeApplied', 'prefsNotSaved', 'rtView'],
+    'vshare': ['shareIsViewLink', 'shareOpened', 'shareToast'], 'vsharenoid': ['shareKeepsState'],
+    'vscrA': ['carriesScroll'], 'vscrB': ['note', 'rtTopRow', 'rtLeftCol'],
+    'vfindA': ['findStepped', 'carriesFind', 'describedFind'], 'vfindB': ['note', 'findOpen', 'cellOnScreen', 'rtMatch', 'rtCell', 'rtTopRow'],
+    'vbadpiv': ['noScript', 'pageAlive', 'pivotShown'], 'vbadpiv3': ['noScript', 'pageAlive', 'pivotShown'], 'vbadgrp3': ['noScript', 'pageAlive', 'grouped'], 'vbadpiv2': ['noScript', 'pageAlive'], 'vbadgrp': ['noScript', 'pageAlive', 'grouped'], 'vbadgrp2': ['noScript', 'pageAlive'],
+    'vfmsave': ['note', 'wysiwygFormats', 'csoRoundTrip', 'savedReportFormats', 'urlDropsView'],
+    'vbadpiv4': ['noScript', 'pageAlive'],
     'vpgA': ['turned', 'carriesPage'], 'vpgB': ['note', 'rtPage'], 'vpgstale': ['note', 'clamped'],
+    'vfitA': ['fitShares', 'carriesShares'], 'vfitB': ['note', 'sharesApplied', 'rtShares'],   # (2026-10-22)
+    'vjrn': ['note', 'jrnNotMissing', 'jrnNoSkipNote', 'jrnPlaced', 'jrnCellsFollow', 'jrnHidden', 'jrnShown', 'jrnWidth'],
 }
 # what live already gets right with no view links at all (the link is simply ignored)
 GUARDS = {'L-vwinsc-seedApplies', 'L-vbad-noScript', 'L-vbad-noPollution', 'L-vbad-noViewOptions', 'L-vbad-noAdminOverrides', 'L-vbad-queryUnchanged',
@@ -106,7 +135,18 @@ GUARDS = {'L-vwinsc-seedApplies', 'L-vbad-noScript', 'L-vbad-noPollution', 'L-vb
           # the capture page's setup steps (the real controls work on live too) and a vacuous check on live
           'L-vcapA-filtered', 'L-vcapA-sorted', 'L-vcapA-hidden', 'L-vcapA-frozen', 'L-vcapA-width', 'L-vcapA-format', 'S-noEmdash'}
 
+# (2026-10-22) view links are LIVE: a control judges this round's checks (NEW: red on live) and every other
+# check (green on live). The round-1 rule (all but GUARDS new) no longer fits a live feature.
+NEW = {'L-vfitA-carriesShares', 'L-vfitB-sharesApplied', 'L-vfitB-rtShares', 'L-vjrn-jrnNotMissing', 'L-vjrn-jrnNoSkipNote',
+       'L-vjrn-jrnPlaced', 'L-vjrn-jrnCellsFollow', 'L-vjrn-jrnHidden'}
 MUTANTS = {
+    # --- (2026-10-22) a share refused again; the journal's columns counted gone again; the journal ignoring the
+    # link's order; the journal ignoring the link's visible list
+    'm-noshare': ([('main', "var wp = Math.round(parseFloat(x) * 100) / 100; return (wp > 0 && wp <= 100) ? wp + '%' : undefined; }", "return undefined; }")],
+                  ['L-vfitA-carriesShares', 'L-vfitB-sharesApplied', 'L-vfitB-rtShares'], ['vfitA', 'vfitB']),
+    'm-jrnmissing': ([('main', "n.indexOf('__JOURNAL') !== 0 && idx[n] === undefined", 'idx[n] === undefined')], ['L-vjrn-jrnNotMissing', 'L-vjrn-jrnNoSkipNote'], ['vjrn']),
+    'm-jrnorder': ([('main', 'if (_pnbViewLink && _pnbViewLink.c && _pnbViewLink.c.o.indexOf(col) >= 0) order = _pnbViewLink.c.o;', '')], ['L-vjrn-jrnPlaced', 'L-vjrn-jrnCellsFollow'], ['vjrn']),
+    'm-jrnhide': ([('main', "_pnbViewLink.c.v.indexOf(col) < 0) th.style.display = 'none';", '_pnbViewLink.c.v.indexOf(col) < 0) th.title = th.title;')], ['L-vjrn-jrnHidden'], ['vjrn']),
     # the state applied without validation (decode hands back the raw JSON)
     'm-novalidate': ([('main', "            return _pnbViewLinkClean(JSON.parse(txt));", "            return JSON.parse(txt);")],
                      ['L-vbad-unknownDropped'], ['vbad']),
@@ -128,6 +168,13 @@ MUTANTS = {
     'm-noescape': ([('main', "escapeHtml(miss.slice(0, 12).join(', '))", "miss.slice(0, 12).join(', ')")], ['L-vbad-staleNameAsText'], ['vbad']),
     # a forced default (maybe me()) carried to the recipient
     'm-forced': ([('main', "if (source !== 'url' && source !== 'stored' && source !== 'interactive')", "if (false)")], ['L-vprompt-forcedHiddenSkipped'], ['vprompt']),
+    # (sweep) text that opens an HTML tag let through again
+    'm-tagrule': ([('main', "if (t === 'string') return /<[A-Za-z!\/?]/.test(x) ? undefined : (x.length <= 4000 ? x : x.slice(0, 4000));", "if (t === 'string') return x.length <= 4000 ? x : x.slice(0, 4000);")],
+                  ['L-vbadpiv-noScript', 'L-vbadgrp2-noScript', 'L-vbad-tagTextRefused'], ['vbad', 'vbadpiv', 'vbadgrp2']),
+    # (sweep) the link's formats laid into the REPORT's layer again (an editor's save writes them)
+    'm-fmreport': ([('main', "        _pnbViewSessEntry = _pnbViewLinkColOpts(st, v);\n", "        slot('columnFormats', v.fm);\n        slot('columnHighlights', v.hl);\n")], ['L-vfmsave-savedReportFormats'], ['vfmsave']),
+    # custom sort orders read as bare lists only (their real shape is {values, preset})
+    'm-csoshape': ([('main', "var vals = Array.isArray(x) ? x : (x && typeof x === 'object' && Array.isArray(x.values) ? x.values : null);", "var vals = Array.isArray(x) ? x : null;")], ['L-vfmsave-csoRoundTrip'], ['vfmsave']),
     # (round 3) a link's calculated columns never handed to the calc module
     'm-noccapply': ([('main', "                    window.PenumbraCalc.fromState(_pnbViewLink.cc, 'state');\n", "")], ['L-vccB-calcApplied'], ['vccA', 'vccB']),
     # the report's own calculated columns repeated in the link
@@ -144,6 +191,19 @@ MUTANTS = {
     # any theme text let through, unchecked against the registry
     'm-themenoval': ([('main', "if (typeof d.th === 'string' && window.PENUMBRA_THEME_IDS && PENUMBRA_THEME_IDS.indexOf(d.th) !== -1) v.th = d.th;",
                       "if (typeof d.th === 'string') v.th = d.th;")], ['L-vbad-noAdminOverrides'], ['vbad']),
+    # (round 5) the Share button keeps the ?state= link on a saved report
+    'm-shareold': ([('main', "        if (_pnbViewLinkAvailable() === true) {\n            const vs = _pnbViewLinkBuild();", "        if (false) {\n            const vs = _pnbViewLinkBuild();")],
+                   ['L-vshare-shareIsViewLink', 'L-vshare-shareToast'], ['vshare']),
+    # Jarvis never told it may offer the view link
+    'm-nochip': ([('prompt', ", viewlink (viewlink copies", " (viewlink copies")], ['S-jarvisChip'], []),
+    # (round 6) the scroll never restored
+    'm-noscroll': ([('main', "                if (vlk.m === 'flat') _pnbViewLinkScrollTo(vlk);\n", "")], ['L-vscrB-rtTopRow', 'L-vscrB-rtLeftCol'], ['vscrA', 'vscrB']),
+    # Find reopened at its first match, not the sender's
+    'm-findat': ([('find', "go(at >= 0 ? Math.min(at, hits.length - 1) : startIndex())", "go(startIndex())")], ['L-vfindB-rtMatch', 'L-vfindB-rtCell'], ['vfindA', 'vfindB']),
+    # an open Find never captured
+    'm-nofindcap': ([('main', "if (fcur && fcur.q) {", "if (false) {")], ['L-vfindA-carriesFind'], ['vfindA']),
+    # (round 7) the Email dialog's Copy link does nothing
+    'm-emailcopy': ([('main', "    $(document).on('click', '#emailCopyViewLink', function (e) {", "    $(document).on('click', '#emailCopyViewLinkX', function (e) {")], ['L-vmail-copyWithoutSending'], ['vmail']),
     'm-nopage': ([('main', "            currentPage = _pnbViewLink.pg;\n", "")], ['L-vpgB-rtPage', 'L-vpgstale-clamped'], ['vpgA', 'vpgB', 'vpgstale']),
     # the URL limit ignored
     'm-nolimit': ([('main', "            if (len <= LOCAL_STATE_URL_LIMIT || i >= PNB_VIEW_DROP_ORDER.length) break;", "            break;")], ['L-vlimit-fits'], ['vlimit']),
@@ -160,7 +220,12 @@ def static_checks(t):
     out.append(('S-feedbackLink', "preg_match('/^[A-Za-z0-9_-]+$/', $viewTok)" in form and "rawurlencode(trim((string)$reportRow['SHORT_ID']))\n            . '&view=' . $viewTok" in form
                 and "htmlspecialchars($viewLink, ENT_QUOTES)" in form and "viewlink: ctx.id ? _pnbViewLinkToken() : ''" in main, 'the feedback email builds the link on the report id, token checked'))
     out.append(('S-emailOption', 'id="emailLinkAsView"' in idx and 'id="emailViewLinkRow"' in idx and "if ($('#emailLinkAsView').is(':checked')) {" in main
-                and '#emailIncludeLink, #emailLinkAsView, #emailShowRecipients' in main, 'the Email dialog option and its link'))
+                and '#emailIncludeLink, #emailLinkAsView, #emailShowRecipients' in main and 'id="emailCopyViewLink"' in idx
+                and "$(document).on('click', '#emailCopyViewLink', function (e) {" in main and 'Prepend link' not in idx, 'the Email dialog option, its link, its Copy link'))
+    # (round 5) Jarvis may offer the view link as a chip: the prompt's action ids name it, the palette has the row
+    sec = t['prompt'].split('SECTION 6: SUGGESTED QUICK ACTIONS')[1] if 'SECTION 6: SUGGESTED QUICK ACTIONS' in t['prompt'] else ''
+    acts = re.search(r'id one of: ([a-z, -]+)', sec)
+    out.append(('S-jarvisChip', bool(acts) and 'viewlink' in [a.strip() for a in acts.group(1).split(',')] and "{ id: 'viewlink'," in pal, 'viewlink in the prompt action ids and the palette registry'))
     out.append(('S-help', 'viewLinkHelpLightbox' in t['manifest'] and 'Copy a link to this view' in t['topic'] and 'data-tip="us-tip-viewlink"' in t['tip'] and 'data-tip="us-tip-viewlink"' in idx, 'help topic + tip (defined + consumed) + manifest'))
     ui = re.findall(r'(?:Link copied|Opened a shared view|Copy a link to this view|Skipped, no longer|Left out to fit)[^"\n]*', main + idx + pal + t['topic'] + t['tip'])
     out.append(('S-noEmdash', bool(ui) and not any('\u2014' in x or '&mdash;' in x for x in ui) and '\u2014' not in t['topic'] + t['tip'], '%d UI strings' % len(ui)))
@@ -241,12 +306,13 @@ def write_stage(texts):
     def w(name, s): open(os.path.join(stage, name), 'wb').write(s.encode('utf-8', 'surrogateescape'))
     w('harness.html', mk_harness.build(texts['index']))
     w('main_hc.js', hook(texts['main']))
-    w('penumbra_calc.js', texts['calc'])   # (round 3) the calc module under test (its Copy link)
+    w('penumbra_calc.js', texts['calc'])
+    w('penumbra_find.js', texts['find'])   # (round 6) Find under test   # (round 3) the calc module under test (its Copy link)
 
 def same(a, b): return json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True)
 def run_browser(scns):
     out, res = [], {}
-    pairs = {'vthB': 'vthA', 'vccB': 'vccA', 'vpgB': 'vpgA', 'vcapB': 'vcapA', 'vgrpB': 'gvA', 'vpivB': 'pvA', 'pflatB': 'vcapA'}
+    pairs = {'vfitB': 'vfitA', 'vscrB': 'vscrA', 'vfindB': 'vfindA', 'vthB': 'vthA', 'vccB': 'vccA', 'vpgB': 'vpgA', 'vcapB': 'vcapA', 'vgrpB': 'gvA', 'vpivB': 'pvA', 'pflatB': 'vcapA'}
     for s in scns:
         token = STATIC_TOK.get(s)
         if s in pairs:
@@ -273,7 +339,16 @@ def run_browser(scns):
             if s == 'vgrpB': chk['rtGrouped'] = bd.get('grouped') is True and bv.get('m') == 'group' and (bv.get('g') or {}).get('by') == (av.get('g') or {}).get('by') == 'H_GROUP'
             if s == 'vpivB': chk['rtPivot'] = bd.get('pivot') is True and bv.get('m') == 'pivot'
             if s == 'pflatB': chk['flatOverPivot'] = bd.get('pivot') is False and bd.get('flat') is True and bv.get('m') == 'flat'
+            if s in ('vscrB', 'vfindB'):
+                aw, bw = ai.get('where') or {}, info.get('where') or {}
+                chk['rtTopRow'] = bool(aw.get('row')) and aw.get('row') == bw.get('row')
+                chk['rtLeftCol'] = bool(aw.get('col')) and aw.get('col') == bw.get('col')
+            if s == 'vfindB':
+                chk['rtMatch'] = ai.get('fcur') is not None and ai.get('fcur') == info.get('fcur')
+                ac, bc = ai.get('cell') or {}, info.get('cell') or {}
+                chk['rtCell'] = bool(ac.get('id')) and ac.get('id') == bc.get('id') and ac.get('col') == bc.get('col')
             if s == 'vpgB': chk['rtPage'] = bool(ad.get('page')) and ad.get('page') == bd.get('page') and ad.get('rows') == bd.get('rows')
+            if s == 'vfitB': chk['rtShares'] = bool(av.get('w')) and same(av.get('w'), bv.get('w'))
             if s in ('vcapB', 'vgrpB', 'vpivB', 'vccB', 'vthB'): chk['rtView'] = bool(av) and same(av, bv)
             if not same(av, bv) and s != 'pflatB': info['diff'] = {k: [av.get(k), bv.get(k)] for k in set(av) | set(bv) if not same(av.get(k), bv.get(k))}
         for c in CHK[s]:
@@ -311,12 +386,14 @@ try:
         print('TOTAL pass=%d fail=%d   failed: %s' % (p, f, ' '.join(failed)))
         if control:
             red = {a for a, passed, _ in res if not passed}
-            new = {a for a, _, _ in res if not a.startswith('E-') and not a.startswith('F-')} - GUARDS
-            new_green = sorted(a for a in new if a not in red)
-            guard_red = sorted(a for a in GUARDS if a in red)
+            seen = {a for a, _, _ in res}
+            new_green = sorted(a for a in NEW if a in seen and a not in red)
+            new_unseen = sorted(a for a in NEW if a not in seen)
+            old_red = sorted(a for a in red if a not in NEW)
             print('CONTROL: new checks green on live (unexpected): %s' % (' '.join(new_green) or 'none'))
-            print('CONTROL: guards red on live (unexpected): %s' % (' '.join(guard_red) or 'none'))
-            print('RESULT: GREEN' if not new_green and not guard_red else 'RESULT: RED')
+            print('CONTROL: new checks never run: %s' % (' '.join(new_unseen) or 'none'))
+            print('CONTROL: old checks red on live (unexpected): %s' % (' '.join(old_red) or 'none'))
+            print('RESULT: GREEN' if not new_green and not new_unseen and not old_red else 'RESULT: RED')
         else:
             print('RESULT: GREEN' if f == 0 and p > 0 else 'RESULT: RED')
 finally:

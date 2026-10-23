@@ -109,15 +109,21 @@
       var f = F();
       var want = Math.round(num(f.H_NUM) / num(f.H_AMT) * 100 * (1 + 1e-12)) / 100;
       R.chk.reran = window.__queryDone > q0;
-      R.chk.added = shown('RATIO') && Number(cell('RATIO')) === want;
+      // (2026-10-22) the name keeps the case it was typed in: the heading reads Ratio (its data-colname, the
+      // key every heading has, stays RATIO)
+      var hadRatio = !!th('RATIO'), headRatio = hadRatio ? th('RATIO').textContent.replace(/[\u25b2\u25bc]/g, '').trim() : null;
+      R.info.headRatio = headRatio;
+      R.chk.added = shown('RATIO') && Number(cell('RATIO')) === want && headRatio === 'Ratio';
       function listed(n) { return Array.prototype.some.call(document.querySelectorAll('#spColumnList .sp-col-item'), function (el) { return el.textContent.indexOf(n) !== -1; }); }
       await until(function () { return listed('RATIO'); }, 4000);
       R.chk.listAfterAdd = listed('RATIO') && listed('V_ID');
+      R.chk.panelLabel = Array.prototype.some.call(document.querySelectorAll('#pnbCalcList .pnb-calc-n'), function (e) { return e.textContent === 'Ratio'; });
       // edit it (no RATIO to edit = the add failed: the checks below stay unset, so red)
       var editBtn = document.querySelector('#pnbCalcList [data-calc-edit="RATIO"]');
       if (!editBtn) { R.info = { ta: R.info.ta, err: (document.getElementById('pnbCalcErr') || {}).textContent }; return; }
       editBtn.focus();   // a keyboard user's Enter (moderate 2026-10-15: editFocus / removeFocus)
       editBtn.click();
+      R.chk.editShowsLabel = (document.getElementById('pnbCalcName') || {}).value === 'Ratio';
       document.getElementById('pnbCalcFormula').value = '{H_NUM} * 0';
       var q1 = window.__queryDone;
       document.getElementById('pnbCalcGo').click();
@@ -138,10 +144,10 @@
       R.chk.removeFocus = !!ae2 && ae2.id === 'pnbCalcAdd';
       R.info.focus2 = ae2 ? ae2.tagName + '#' + ae2.id : null;
       await until(function () { return window.__queryDone > q2; }, 15000); await sleep(400);
-      R.chk.removed = !th('RATIO');
+      R.chk.removed = hadRatio && !th('RATIO');
       await until(function () { return !listed('RATIO'); }, 4000);
       R.chk.listAfterRemove = !listed('RATIO') && listed('V_ID');
-      R.info = { ratio: cell('RATIO'), want: want, q: [q0, q1, q2, window.__queryDone], act: window.PenumbraCalc.active(), applied: window.PenumbraCalc.applied() };
+      R.info = { head: R.info.headRatio, ratio: cell('RATIO'), want: want, q: [q0, q1, q2, window.__queryDone], act: window.PenumbraCalc.active(), applied: window.PenumbraCalc.applied() };
     },
     // (2026-10-18, calcadj) an adjustable value through the dialog: its knob in the panel's row
     // and under the header menu's Adjust...; a change re-runs the query; the view state carries

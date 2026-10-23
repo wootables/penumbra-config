@@ -1784,6 +1784,183 @@
     return;
   }
 
+  // ------------------------------------------------------------------------
+  // F. Fit to page (2026-10-22, colmenu round 33): every shown column sized to fill the flat
+  // table's box with no sideways scroll - short columns at their content, the long ones sharing
+  // the rest - kept as SHARES of that box ("n%"): main.js keeps a share as written (and a save
+  // carries it), the module turns it into pixels each time it applies, and a narrower box
+  // narrows every share in step.
+  async function phaseF() {
+    var host = HOST(), cw = CW();
+    if (!host || !cw || !cw.fitPage || !cw.pageLayout || !cw.roomOf) { rec('F0 Fit to page in this build', false, 'no fitPage / pageLayout / roomOf'); return; }
+    $('.infobox-overlay').remove(); $('#cwFakeInfo').remove();
+    // the harness has no toast dock: the phase's own stand-in show_text (as D and E), for the Undo
+    var realShowF = window.show_text;
+    window.show_text = function (html) { var d = document.createElement('div'); d.className = 'cw-stub-toast'; d.innerHTML = html; document.body.appendChild(d); };
+    await runQuery(makeRows(20));
+    localStorage.removeItem(KEY);
+    H.setName('rpage'); H.hydrate();
+    setReport({}); host.clearUser();
+    $('#table-view-container').show();
+    if (gbox()) gbox().style.display = 'none';
+    $('#pivot-output-container').empty().hide();
+    apply();
+    await sleep(80);
+    var w = wrap();
+    function shownCols() { return ths().filter(function (t) { var n = t.getAttribute('data-colname'); return t.style.display !== 'none' && n && n !== '#'; }); }
+    function nm(t) { return t.getAttribute('data-colname').toUpperCase(); }
+    // the clean: a share kept, a bad one dropped, never a pivot key's
+    var cl = H.clean ? H.clean({ A: '12.5%', B: '12.50 %', C: '0%', D: '150%', E: 'x%', 'PIVOT:F': '10%', G: 120 }, true) : {};
+    rec('F1 main.js keeps a share ("12.5%") as written, drops 0%, over 100%, a non-number and a pivot key\'s share, and still keeps whole pixels',
+      cl.A === '12.5%' && cl.B === '12.5%' && !('C' in cl) && !('D' in cl) && !('E' in cl) && !('PIVOT:F' in cl) && cl.G === 120, JSON.stringify(cl));
+    // pure: short columns at their content, the long ones sharing the rest in proportion
+    var pl = cw.pageLayout([80, 90, 1200, 600], [80, 90, 100, 100], 1000), plSum = pl.reduce(function (a, b) { return a + b; }, 0);
+    rec('F2 the layout: one-word columns (narrowest = content) keep it, the two long ones share the rest by how much more they take (1100:500), the total the room',
+      pl[0] === 80 && pl[1] === 90 && Math.abs((pl[2] - 100) / (pl[3] - 100) - 2.2) < 0.03 && plSum <= 1000 && plSum >= 996, JSON.stringify(pl));
+    var pl2 = cw.pageLayout([80, 90, 100], [80, 60, 50], 1000), pl3 = cw.pageLayout([30, 2000], [40, 40], 100);
+    var pl4 = cw.pageLayout([300, 300], [200, 200], 300), pl5 = cw.pageLayout([300, 300], [200, 200], 300, [40, 40]), pl6 = cw.pageLayout([300, 300], [200, 200], 60, [40, 40]);
+    rec('F3 everything fits: the spare goes to the column with the most to show, the others stay at their content; longest words too wide: toward the floors (150, 150), not a scroll; not even the floors: the floors',
+      pl2[0] === 80 && pl2[1] === 90 && pl2[2] === 830 && pl3[0] === 40 && pl3[1] === 60 && pl4[0] === 200 && pl4[1] === 200
+        && pl5[0] === 150 && pl5[1] === 150 && pl6[0] === 40 && pl6[1] === 40, JSON.stringify([pl2, pl3, pl4, pl5, pl6]));
+
+    // the natural widths (Fit all, then Undo-free: clear) to compare against
+    cw.fitAll(thOf('NAME'));
+    await sleep(40);
+    var natural = {};
+    shownCols().forEach(function (t) { natural[nm(t)] = Math.round(width(t)); });
+    host.clearUser(); apply();
+    // a table that scrolls sideways first: TITLE held at 900
+    host.setUser('TITLE', 900); apply();
+    await sleep(60);
+    var scrolledBefore = w.scrollWidth > w.clientWidth + 1;
+    var ok = cw.fitPage(thOf('NAME'));
+    await sleep(120);
+    var user = host.state().user, cols = shownCols();
+    var allShares = cols.length > 4 && cols.every(function (t) { return /%$/.test(String(user[nm(t)])); });
+    var sum = cols.reduce(function (a, t) { return a + (parseFloat(user[nm(t)]) || 0); }, 0);
+    rec('F4 Fit to page: every shown column a share of the page (the shares sum to 95..100%), and the table that scrolled sideways no longer does',
+      ok && scrolledBefore && allShares && sum <= 100.01 && sum >= 95 && w.scrollWidth <= w.clientWidth + 1,
+      'ok=' + ok + ' before=' + scrolledBefore + ' shares=' + allShares + ' sum=' + r1(sum) + ' scroll=' + w.scrollWidth + '/' + w.clientWidth + ' DIAG ' + (function () {
+        var t = document.getElementById('resultsTable'), num = ths()[0], ts = getComputedStyle(t), ns = getComputedStyle(num), td0 = body().rows[0].children[0], ds = getComputedStyle(td0);
+        var sumAll = ths().reduce(function (a2, h) { return a2 + (h.style.display === 'none' ? 0 : width(h)); }, 0);
+        var ic = num.querySelector('.sort-icon'), is = ic ? getComputedStyle(ic) : null, kids = Array.prototype.map.call(num.childNodes, function (n) { return n.nodeType + ':' + (n.nodeType === 3 ? n.nodeValue : n.className); }).join('|');
+        return JSON.stringify({ cwNum: cw.contentWidth ? cw.contentWidth(num) : null, icon: is ? [is.display, is.position, is.font, is.visibility, r1(ic.getBoundingClientRect().width)].join(',') : null, kids: kids, nfont: ns.font, room: cw.roomOf('flat'), tableW: r1(width(t)), sumThs: r1(sumAll), numW: r1(width(num)), numTxt: num.textContent.slice(0, 12), numMin: ns.minWidth, numW2: ns.width, numPad: ns.paddingLeft + '/' + ns.paddingRight,
+          numBorder: ns.borderLeftWidth + '/' + ns.borderRightWidth, tdMin: ds.minWidth, tdPad: ds.paddingLeft + '/' + ds.paddingRight, tdTxt: td0.textContent.slice(0, 8), tb: ts.borderLeftWidth + '/' + ts.borderRightWidth, tpad: ts.paddingLeft,
+          tmin: ts.minWidth, tlayout: ts.tableLayout, bs: ts.boxSizing, wPad: getComputedStyle(w).paddingLeft });
+      })());
+    // a wider page, where the longest words all fit: a column of one-word values keeps its content,
+    // the long text gives up the most room; then back to the box as it was, and fitted again there
+    var styleW0 = w.style.width;
+    w.style.width = '1300px'; apply();
+    host.clearUser(); apply();
+    cw.fitPage(thOf('NAME'));
+    await sleep(80);
+    var most = null, gave = {}, detail = [];
+    shownCols().forEach(function (t) { var k = nm(t), now = Math.round(width(t)); gave[k] = natural[k] - now; detail.push(k + ':' + natural[k] + '>' + now); if (!most || gave[k] > gave[most]) most = k; });
+    function whole(n) { var i = idxOf(n) - 1; return Array.prototype.every.call(body().rows, function (r) { var c = r.children[i]; return !c || !c.offsetParent || c.scrollWidth <= c.clientWidth + 1; }); }
+    rec('F5 on a 1300px page, the one-word values (ID, AMOUNT) all show whole and ID keeps its content width, none goes past its content, the long text (TITLE) gives up the most room',
+      Math.abs(gave.ID) <= 3 && whole('ID') && whole('AMOUNT') && most === 'TITLE' && w.scrollWidth <= w.clientWidth + 1
+        && shownCols().every(function (t) { return gave[nm(t)] >= -3; }), detail.join(' ') + ' whole=' + whole('ID') + '/' + whole('AMOUNT') + ' scroll=' + w.scrollWidth + '/' + w.clientWidth);
+    w.style.width = styleW0; apply();
+    host.clearUser(); apply();
+    cw.fitPage(thOf('NAME'));
+    await sleep(80);
+    // the same shares on a narrower page: every column narrower in step, still no sideways scroll
+    var room0 = cw.roomOf('flat'), wTitle0 = width(thOf('TITLE')), wName0 = width(thOf('NAME'));
+    w.style.width = Math.round(w.clientWidth * 0.8) + 'px';
+    apply();   // (the page's own ResizeObserver does this; the harness may not render frames to run it)
+    await sleep(120);
+    var room1 = cw.roomOf('flat'), ratio = room1 / room0, wTitle1 = width(thOf('TITLE')), wName1 = width(thOf('NAME'));
+    rec('F6 the box 20% narrower: the shares narrow in step (TITLE and NAME by the same ratio, a floor aside) and nothing scrolls sideways',
+      room1 < room0 && near(wTitle1, Math.max(40, wTitle0 * ratio), 3) && near(wName1, Math.max(40, wName0 * ratio), 3) && w.scrollWidth <= w.clientWidth + 1,
+      'room ' + room0 + '>' + room1 + ' TITLE ' + r1(wTitle0) + '>' + r1(wTitle1) + ' NAME ' + r1(wName0) + '>' + r1(wName1) + ' scroll=' + w.scrollWidth + '/' + w.clientWidth);
+    w.style.width = styleW0;
+    apply();
+    await sleep(120);
+    // no drift: applying again and again leaves every width where it is
+    var w1 = cols.map(function (t) { return Math.round(width(t)); }).join();
+    for (var i = 0; i < 5; i++) { apply(); await sleep(30); }
+    var w2 = cols.map(function (t) { return Math.round(width(t)); }).join();
+    rec('F7 no drift: five more passes leave every width where it was', w1 === w2, w1 + ' | ' + w2);
+    // a save carries the shares (another viewer gets the proportions, not this screen's pixels)
+    var st = H.buildState ? H.buildState() : null, saved = (st && st.columnWidths) || {};
+    rec('F8 a save carries the shares as written', cols.every(function (t) { return saved[nm(t)] === user[nm(t)]; }), JSON.stringify(saved).slice(0, 300));
+    // a report's share: the module draws it at its share of the room
+    host.clearUser(); setReport({ AMOUNT: '10%' });
+    await sleep(60);
+    var room2 = cw.roomOf('flat');
+    rec('F9 a share the report sets is drawn as that share of the room', near(width(thOf('AMOUNT')), Math.floor(room2 * 0.1), 2), 'w=' + r1(width(thOf('AMOUNT'))) + ' room=' + room2);
+    // + on a share column steps from its pixels and leaves it a pixel width
+    host.setUser('NAME', '20%'); apply();
+    await sleep(40);
+    var px0 = Math.floor(cw.roomOf('flat') * 0.2), th = thOf('NAME');
+    th.focus();
+    key(th, '+');
+    var after = host.widthFor('NAME');
+    rec('F10 + on a share column steps from its pixels (a share of the room) and stores pixels', typeof after === 'number' && near(after, px0 + 20, 1), 'px0=' + px0 + ' after=' + after);
+    // Undo of a Fit to page puts the widths back as they were
+    host.clearUser(); setReport({});
+    host.setUser('TITLE', 333); apply();
+    cw.fitPage(thOf('NAME'));
+    await sleep(60);
+    var ubs = document.querySelectorAll('.cw-stub-toast .pnb-colw-undo'), ub = ubs[ubs.length - 1];
+    if (ub) ub.click();
+    await sleep(60);
+    var back = host.state().user;
+    rec('F11 its Undo puts every width back (TITLE to 333, no shares left)', !!ub && back.TITLE === 333 && Object.keys(back).length === 1, JSON.stringify(back));
+    // F12-F14 (2026-10-22, fit39; the user: "fit to page seems to do nothing") the grouped view with its FIRST
+    // group closed, as a person has it (main.css hides a closed group's box: 0px wide, and every group of a
+    // snapshot comparison starts closed). Fit to page from an open group's heading sizes every column against
+    // THAT group's box; the shares hold while the first stays closed; after a pass with every group closed,
+    // opening one draws them again (the container's ResizeObserver: a new row to read). F13 / F14 count only
+    // after F12 (never vacuous on a build where the fit did nothing).
+    host.clearUser(); setReport({});
+    $('#table-view-container').hide();
+    gbox().style.display = 'block'; gbox().style.width = '1000px';
+    await buildGroups(['C11']);
+    var gts = groupTables(), gLast = gts[gts.length - 1];
+    function shutAllBut(keep) {
+      $('#groupedResultsContainer .group-wrapper').removeClass('open');
+      $('#groupedResultsContainer .group-content').css('display', '');   // back to the stylesheet's display:none
+      if (keep) { keep.closest('.group-wrapper').classList.add('open'); keep.parentNode.style.display = 'block'; }
+    }
+    function colWs(t) { return gVisible(t).map(function (h) { return Math.round(width(h)); }).join(','); }
+    function fillsBox(t) { var b = t.parentNode; return near(width(t), b.clientWidth, 6) && b.scrollWidth <= b.clientWidth + 1; }
+    shutAllBut(gLast);
+    apply();
+    await sleep(80);
+    var firstShut = gts.length === 3 && getComputedStyle(gts[0].parentNode).display === 'none' && getComputedStyle(gLast.parentNode).display !== 'none';
+    var g12a = colWs(gLast), ok12 = cw.fitPage(gth(gLast, 'NAME'));
+    await sleep(120);
+    var gu = host.state().user, gcols = gVisible(gLast).filter(function (h) { var n = h.getAttribute('data-colname'); return n && n !== '#'; });
+    var gShares = gcols.length > 4 && gcols.every(function (h) { return /%$/.test(String(gu[String(h.getAttribute('data-colname')).toUpperCase()])); });
+    var g12b = colWs(gLast), f12 = firstShut && ok12 && gShares && g12b !== g12a && fillsBox(gLast);
+    rec('F12 the grouped view, its first group closed: Fit to page from an open group\'s heading sizes every shown column (a share each) against that group\'s box, which the table then fills',
+      f12, 'firstClosed=' + firstShut + ' ok=' + ok12 + ' shares=' + gShares + ' widths ' + g12a + ' > ' + g12b + ' table=' + r1(width(gLast)) + ' box=' + gLast.parentNode.clientWidth);
+    for (var gi = 0; gi < 3; gi++) { apply(); await sleep(30); }
+    rec('F13 ...and the shares hold while the first group stays closed (three more passes)', f12 && colWs(gLast) === g12b && fillsBox(gLast), colWs(gLast) + ' | ' + g12b);
+    // every group closed, a pass in between (a sort, a re-render: anything), then one opened again - the
+    // observer told of each size change, as a real one is
+    window.__roFire(gbox());
+    shutAllBut(null);
+    apply();
+    await sleep(60);
+    window.__roFire(gbox());
+    await sleep(60);
+    var shutCss = ((document.getElementById('pnbColWidthGroupStyle') || {}).textContent || '').length;
+    shutAllBut(gLast);
+    window.__roFire(gbox());
+    await sleep(120);
+    rec('F14 after a pass with every group closed, opening one draws the shares again (the container\'s observer: a new row to read)',
+      f12 && colWs(gLast) === g12b && fillsBox(gLast), 'cssWhileClosed=' + shutCss + ' ' + colWs(gLast) + ' | ' + g12b);
+    host.clearUser(); apply();
+    $('#table-view-container').show(); gbox().style.display = 'none';
+    host.clearUser(); setReport({});
+    localStorage.removeItem(KEY);
+    window.show_text = realShowF;
+    Array.prototype.forEach.call(document.querySelectorAll('.cw-stub-toast'), function (n) { n.remove(); });
+  }
+
   var FLATONLY = /[?&]colwidths=flat/.test(location.search);
   (async function () {
     try {
@@ -1793,7 +1970,7 @@
       if (FLATONLY) { await phaseW(); finish(); return; }
       phaseU();
       var ok = await phaseG();
-      if (ok) { await phaseD(); await phaseK(); phaseP(); phaseR(); phaseC(); phaseS(); await phaseV(); await phaseQ(); await phaseY(); await phaseZ(); await phaseM(); await phaseL(); await phaseE(); }
+      if (ok) { await phaseD(); await phaseK(); phaseP(); phaseR(); phaseC(); phaseS(); await phaseV(); await phaseQ(); await phaseY(); await phaseZ(); await phaseM(); await phaseL(); await phaseE(); await phaseF(); }
       finish();
     } catch (e) { finish('driver threw: ' + ((e && e.stack) || e)); }
   })();

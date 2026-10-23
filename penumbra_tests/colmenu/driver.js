@@ -54,7 +54,7 @@
   var SUBS = { 'move-left': 'move', 'move-right': 'move', 'move-start': 'move', 'move-end': 'move', 'move-swap': 'move',
     only: 'show', showAll: 'show', 'calc-left': 'calc', 'calc-right': 'calc', 'calc-start': 'calc', 'calc-end': 'calc',
     calcEdit: 'calc', calcDup: 'calc', calcRemove: 'calc', calcAdj: 'calc',   // (2026-10-19, calcadj round 3) one Calculated column entry; round 5: Duplicate
-    reset: 'resets', resetAll: 'resets', resetWidths: 'resets', clearPrefs: 'resets' };
+    fit: 'width', fitAll: 'width', fitPage: 'width', resetWidth: 'width', resetWidths: 'width' };   // (round 33) the Reset list went
   function sub(act) { var it = item(act); if (!it || it.getAttribute('aria-disabled') === 'true') return false; it.click(); return true; }
   function reach(act) { if (!item(act) && SUBS[act]) sub(SUBS[act]); return item(act); }
   async function choose(el, act) {
@@ -205,7 +205,7 @@
       rclick(fth('V_NAME'));
       var a = acts();
       // (round 12) the top level: sort, filter, stats; options, move, show, hide, fit, freeze; copy, calc, group; reset
-      R.chk.itemsAll = ['sortAsc', 'sortDesc', 'filter', 'options', 'move', 'show', 'hide', 'freeze', 'copy', 'copyName', 'calc', 'groupBy', 'resets'].every(function (x) { return a.indexOf(x) >= 0; });
+      R.chk.itemsAll = ['sortAsc', 'sortDesc', 'filter', 'width', 'rowHeight', 'options', 'move', 'show', 'hide', 'freeze', 'copy', 'copyName', 'calc', 'groupBy', 'clearPrefs'].every(function (x) { return a.indexOf(x) >= 0; });
       R.info.acts = a;
       closeMenu();
       // a column with empties (H_GROUP: null on every 11th row), counted by main.js
@@ -449,10 +449,10 @@
       await sleep(300);
       var w0 = fth('V_AMOUNT').getBoundingClientRect().width;
       rclick(fth('V_AMOUNT'));
-      var fitIt = !!item('fit'); sub('resets');
+      var fitIt = !!reach('fit');   // (round 33) in Column widths, with its resets
       R.chk.fitItem = fitIt && !!item('resetWidths');
       closeMenu(); rclick(fth('V_AMOUNT'));
-      if (item('fit')) item('fit').click();
+      if (reach('fit')) item('fit').click();
       await sleep(400);
       var w1 = fth('V_AMOUNT').getBoundingClientRect().width;
       R.chk.fits = w0 >= 320 && w1 < w0 - 40 && H.widthFor('V_AMOUNT') !== 330;
@@ -474,14 +474,31 @@
       if (fub.length) fub[fub.length - 1].click();
       await sleep(300);
       R.chk.fitAllUndo = ranAll && H.userDiff().slice().sort().join() === before.slice().sort().join();
+      // (round 33) Fit to page: every shown column a SHARE of the page ("n%"), the table no wider than
+      // its box (no sideways scroll), the notice offers Undo, which puts the widths back
+      var wrapB = fth('V_NAME').closest('#results-wrapper');
+      var ranPage = await choose(fth('V_NAME'), 'fitPage');
+      await sleep(500);
+      var uPage = H.state().user, shares = Object.keys(uPage).filter(function (k) { return /%$/.test(String(uPage[k])); });
+      R.chk.fitPage = ranPage && shares.length >= Math.min(shownN, 4) && !!wrapB && wrapB.scrollWidth <= wrapB.clientWidth + 1
+        && /fitted to the page/.test(lastToast()) && /pnb-colw-undo/.test(lastToast());
+      R.info = Object.assign({ fitPage: { ran: ranPage, shares: shares.length, shown: shownN, scroll: wrapB && wrapB.scrollWidth, client: wrapB && wrapB.clientWidth,
+        sample: shares.slice(0, 3).map(function (k) { return k + '=' + uPage[k]; }), toast: String(lastToast()).slice(0, 90) } }, R.info);
+      fub = document.querySelectorAll('.zz-toast .pnb-colw-undo');
+      if (fub.length) fub[fub.length - 1].click();
+      await sleep(300);
+      R.chk.fitPageUndo = ranPage && H.userDiff().slice().sort().join() === before.slice().sort().join();
       H.setUser('V_NAME', 300); H.setUser('V_DATE', 280); W.apply();
       await sleep(300);
       rclick(fth('V_NAME'));
-      sub('resets');
-      R.chk.resetItem = !!item('resetWidths');
+      sub('width');
+      R.chk.resetItem = !!item('resetWidths') && item('resetWidths').getAttribute('aria-disabled') !== 'true';
       if (item('resetWidths')) item('resetWidths').click();
       await sleep(400);
       R.chk.resets = H.userDiff().length === 0 && /widths reset/.test(lastToast());
+      // (round 33) a clean slate either way (on a build without the list the reset never ran)
+      closeMenu(); H.clearUser(); W.apply();
+      await sleep(200);
       // (round 2) Fit MEASURES: a long value shows on ONE line, in full - with rows that
       // grow (the harness's body.disable-auto-expand: the value wraps) and with rows that
       // do not (the base max-width cuts it off)
@@ -497,7 +514,7 @@
         await sleep(150);
         var before = { lines: lines(cell), cut: cell.scrollWidth > cell.clientWidth + 1, w: fth('V_NAME').getBoundingClientRect().width };
         rclick(fth('V_NAME'));
-        if (item('fit')) item('fit').click();
+        if (reach('fit')) item('fit').click();
         await sleep(500);
         var after = { lines: lines(cell), cut: cell.scrollWidth > cell.clientWidth + 1, w: fth('V_NAME').getBoundingClientRect().width };
         // (round 3) under the cap: rows that grow lay the value out on one line already and
@@ -515,7 +532,7 @@
       if (capTr && capTr.children[capNi]) capTr.children[capNi].textContent = new Array(31).join('Long value that runs on and on ');
       await sleep(150);
       rclick(fth('V_NAME'));
-      if (item('fit')) item('fit').click();
+      if (reach('fit')) item('fit').click();
       await sleep(500);
       var box = fth('V_NAME').closest('#results-wrapper');
       var cap = Math.max(400, Math.min(1200, Math.round((box ? box.clientWidth : window.innerWidth) * 0.6)));
@@ -623,7 +640,7 @@
       await sleep(100);
       var gl = gcell ? lines(gcell) : 0, gcut = !!gcell && (gl > 1 || gcell.scrollWidth > gcell.clientWidth + 1);
       rclick(gth('V_NAME'));
-      if (item('fit')) item('fit').click();
+      if (reach('fit')) item('fit').click();
       await sleep(600);
       R.chk.fitGroup = gcut && !!gcell && lines(gcell) === 1 && gcell.scrollWidth <= gcell.clientWidth + 1;
       R.info.fitGroup = { linesBefore: gl, linesAfter: gcell && lines(gcell), sw: gcell && gcell.scrollWidth, cw: gcell && gcell.clientWidth };
@@ -850,17 +867,18 @@
       closeMenu();
       await choose(fth('V_NAME'), 'showAll');
       R.chk.showAll = onlyDis && shownNames().length === 20;
-      // Reset this column: its place (the report's order), width and format
-      window.Penumbra.setColOpt('V_AMOUNT', 'format', 'number:1');
+      // (round 33) the Reset list went: one column's width comes back from Column widths' Reset this
+      // column's width, with Undo (greyed out on a column with no width of the viewer's own)
+      window.Penumbra.colWidthsHost.setUser('V_NAME', null);
       window.Penumbra.colWidthsHost.setUser('V_AMOUNT', 300); window.Penumbra.colWidths.apply();
-      await choose(fth('V_AMOUNT'), 'move-end');
-      var movedEnd = shownNames().slice(-1)[0] === 'V_AMOUNT';
-      await choose(fth('V_AMOUNT'), 'reset');
+      await sleep(200);
+      rclick(fth('V_NAME')); sub('width');
+      var oneOff = !!item('resetWidth') && item('resetWidth').getAttribute('aria-disabled') === 'true';
+      closeMenu();
+      await choose(fth('V_AMOUNT'), 'resetWidth');
       await sleep(300);
-      var s3 = shownNames(), co = prefs().colopt || {};
-      R.chk.resetCol = movedEnd && s3.indexOf('V_AMOUNT') === s3.indexOf('V_NAME') + 1 && !(co.V_AMOUNT && co.V_AMOUNT.fmt)
-        && window.Penumbra.colWidthsHost.widthFor('V_AMOUNT') !== 300 && /Reset/.test(lastToast());
-      R.info.reset = { s3: s3.slice(0, 5), co: co.V_AMOUNT || null, w: window.Penumbra.colWidthsHost.widthFor('V_AMOUNT') };
+      R.chk.resetCol = oneOff && window.Penumbra.colWidthsHost.widthFor('V_AMOUNT') !== 300 && /width reset/.test(lastToast()) && /pnb-colw-undo/.test(lastToast());
+      R.info.reset = { oneOff: oneOff, w: window.Penumbra.colWidthsHost.widthFor('V_AMOUNT'), toast: String(lastToast()).slice(0, 80) };
       // Copy column name
       await choose(fth('V_NAME'), 'copyName');
       await sleep(200);
@@ -892,7 +910,7 @@
         var concat = 0;
         cells.forEach(function (td) { concat = Math.max(concat, tw(td.textContent, getComputedStyle(td).font)); });
         rclick(fth('H_JSON'));
-        if (item('fit')) item('fit').click();
+        if (reach('fit')) item('fit').click();
         await sleep(500);
         var w = fth('H_JSON').getBoundingClientRect().width, vis = [];
         cells.forEach(function (td) { Array.prototype.forEach.call(td.querySelectorAll('.nested-json-row > .nested-json-cell'), function (c) { if (c.offsetParent) vis.push(c); }); });
@@ -930,7 +948,7 @@
       nl.forEach(function (td) { concatNl = Math.max(concatNl, tw(td.textContent, getComputedStyle(td).font)); });
       var cs0 = nl[0] ? getComputedStyle(nl[0]) : null, pad = cs0 ? parseFloat(cs0.paddingLeft) + parseFloat(cs0.paddingRight) : 0;
       rclick(fth('H_NL'));
-      if (item('fit')) item('fit').click();
+      if (reach('fit')) item('fit').click();
       await sleep(500);
       var w2 = fth('H_NL').getBoundingClientRect().width;
       R.chk.fitLines = nl.length > 10 && nl.every(function (td) { return lines(td) === 2; }) && w2 < concatNl + pad - 10;
@@ -1059,7 +1077,7 @@
       R.chk.nestRowHeight = !!tg && !!rhItem && rhItem.getAttribute('aria-checked') === String(was) && tg.checked === was;
       closeMenu();
       rclick(fth('V_NAME'));
-      R.chk.nestRowHeightPlain = !!menu() && !item('rowHeight');
+      R.chk.nestRowHeightPlain = !!menu() && !!item('rowHeight');   // (round 33) every column's menu carries it
       closeMenu();
       var flipped = await choose(th, 'rowHeight');
       R.chk.nestRowHeightFlips = flipped && !!tg && tg.checked === !was && document.body.classList.contains('disable-auto-expand') === was
@@ -1226,12 +1244,12 @@
       function key(k) { document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })); }
       function over(el) { if (el) el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true })); }
       rclick(fth('V_NAME'));
-      var a = acts(), want = ['sortAsc', 'sortDesc', 'filter', 'stats', 'options', 'move', 'show', 'hide', 'fit', 'freeze', 'copy', 'copyName', 'calc', 'groupBy', 'resets'];   // (round 21) stats is back, a list
+      var a = acts(), want = ['sortAsc', 'sortDesc', 'filter', 'stats', 'width', 'rowHeight', 'options', 'move', 'show', 'hide', 'freeze', 'copy', 'copyName', 'calc', 'groupBy', 'clearPrefs'];   // (round 33) the sizes up the menu, one clear-all item at its foot
       var pos = want.map(function (x) { return a.indexOf(x); });
       R.chk.topOrder = pos.every(function (p, i) { return p >= 0 && (i === 0 || p > pos[i - 1]); })
-        && menu().querySelectorAll('.pnb-hm-sep').length === 3 && ['move-left', 'only', 'reset', 'stats-top-0', 'pivot', 'chart', 'copy-comma'].every(function (x) { return a.indexOf(x) < 0; });
+        && menu().querySelectorAll('.pnb-hm-sep').length === 4 && ['move-left', 'only', 'reset', 'resetAll', 'resets', 'fit', 'fitAll', 'stats-top-0', 'pivot', 'chart', 'copy-comma'].every(function (x) { return a.indexOf(x) < 0; });
       R.chk.noChips = !menu().querySelector('.pnb-hm-row');
-      var subs = ['move', 'show', 'copy', 'calc', 'resets'];
+      var subs = ['move', 'show', 'copy', 'calc', 'width'];
       R.chk.arrows = subs.every(function (x) { return !!item(x) && !!item(x).querySelector('.pnb-hm-arrow') && item(x).getAttribute('aria-haspopup') === 'menu' && item(x).getAttribute('aria-expanded') === 'false'; })
         && !!item('copyName') && !item('copyName').querySelector('.pnb-hm-arrow');   // (stalemut) no item (u-copyname): red, not a crash
       var showNote = item('show').querySelector('.pnb-hm-note');
@@ -1272,10 +1290,13 @@
       var pa = subActs();
       R.chk.copyList = pa.indexOf('back') < 0 && pa.indexOf('copyName') < 0 && ['copy-space', 'copy-comma', 'copy-newline', 'copy-other'].every(function (x) { return pa.indexOf(x) >= 0; })
         && !!anyHead() && anyHead().textContent === 'Delimited by' && menu().querySelector('.pnb-hm-name').textContent === 'V_NAME';
-      closeMenu(); rclick(fth('V_NAME')); sub('resets');
-      var ra = subActs(), rl = subLabels();
-      R.chk.resetList = ra.indexOf('back') < 0 && ['reset', 'resetAll', 'resetWidths', 'clearPrefs'].every(function (x) { return ra.indexOf(x) >= 0; })
-        && rl.indexOf('This column') >= 0 && rl.indexOf('All columns') >= 0 && rl.indexOf('All column widths') >= 0 && rl.indexOf('Clear all custom preferences for this report...') >= 0;
+      // (round 33) Column widths: one list (this column, every column, the page, the resets); the Reset
+      // list became one item at the foot, Clear all personal customizations...
+      closeMenu(); rclick(fth('V_NAME')); sub('width');
+      var ra = subActs(), rl = subLabels(), clearIt = item('clearPrefs');
+      R.chk.resetList = ra.indexOf('back') < 0 && ['fit', 'fitAll', 'fitPage', 'resetWidth', 'resetWidths'].every(function (x) { return ra.indexOf(x) >= 0; })
+        && rl.indexOf('Fit width to contents') >= 0 && rl.indexOf('Fit to page') >= 0 && rl.indexOf("Reset this column's width") >= 0 && rl.indexOf('Reset all column widths') >= 0
+        && !!clearIt && clearIt.querySelector('.pnb-hm-label').textContent === 'Clear all personal customizations...' && !clearIt.querySelector('.pnb-hm-arrow');
       R.info.lists = { move: ma, show: sa, calc: ca, copy: pa, reset: ra };
       // Clear all custom preferences: the Settings panel's button, clicked - its confirm
       // lists what is saved (the format set above), and a No leaves it all in place
@@ -1527,12 +1548,13 @@
       var th = document.querySelector('#tableHeader th[data-column="#"]');
       R.chk.numOpens = !!th && rclick(th) && !!menu() && menu().querySelector('.pnb-hm-name').textContent === '# (Row Number)' && !menu().querySelector('.pnb-hm-stats');
       var a = acts();
-      R.chk.numItems = ['sortAsc', 'sortDesc', 'hide', 'freeze', 'show', 'fitAll', 'resets'].every(function (x) { return a.indexOf(x) >= 0; })
-        && ['move', 'options', 'copy', 'copyName', 'calc', 'groupBy', 'filter', 'fit', 'cellCopy', 'cellFilter'].every(function (x) { return a.indexOf(x) < 0; })
+      R.chk.numItems = ['sortAsc', 'sortDesc', 'hide', 'freeze', 'show', 'width', 'rowHeight', 'clearPrefs'].every(function (x) { return a.indexOf(x) >= 0; })
+        && ['move', 'options', 'copy', 'copyName', 'calc', 'groupBy', 'filter', 'fit', 'fitAll', 'resets', 'cellCopy', 'cellFilter'].every(function (x) { return a.indexOf(x) < 0; })
         && item('hide').querySelector('.pnb-hm-label').textContent === 'Hide the row numbers';
       R.info.numActs = a;
-      sub('resets');
-      R.chk.numResets = !item('reset') && !!item('resetAll') && !!item('clearPrefs');
+      sub('width');
+      var nw = subActs();
+      R.chk.numResets = ['fitAll', 'fitPage', 'resetWidths'].every(function (x) { return nw.indexOf(x) >= 0; }) && nw.indexOf('fit') < 0 && nw.indexOf('resetWidth') < 0 && !!item('clearPrefs');
       closeMenu();
       var n0 = firstNum();
       await choose(th, 'sortDesc');
@@ -1969,7 +1991,8 @@
       R.chk.gmHdrRestricted = !!menu() && ha.indexOf('groupBy') < 0 && ha.indexOf('ungroup') < 0 && ha.indexOf('sortAsc') >= 0;
       closeMenu();
       document.body.classList.remove('restrict-grouping');
-      // a snapshot comparison's groups and the All groups bar keep the browser's menu (guards)
+      // the comparison class over a grouped view that is no comparison (no #snapshotComparisonContainer) and the All groups
+      // bar keep the browser's menu (guards); a real comparison's bands open its own menu (2026-10-22: the cmpmenu suite)
       document.body.classList.add('snapshot-comparison-active');
       R.chk.gmCompareNative = !rclick(bandEl('North')) && !menu();
       document.body.classList.remove('snapshot-comparison-active');

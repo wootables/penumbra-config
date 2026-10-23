@@ -39,6 +39,10 @@
     sets.push({ id: 'loop', defs: [{ name: 'L1', formula: '{L2} + 1' }, { name: 'L2', formula: '{L1} + 1' }, { name: 'L3', formula: '{A} + 1' }, { name: 'L4', formula: '{L1} * 2' }, { name: 'L5', formula: '{L5} + 1' }] });
     sets.push({ id: 'clash', defs: [{ name: 'A', formula: '{B} + 1' }, { name: 'MIXEDCASE', formula: '1' }, { name: 'OK1', formula: '{A} * 2' }, { name: 'USESA', formula: '{A} + {OK1}' }] });
     sets.push({ id: 'missing', defs: [{ name: 'M1', formula: '{NOPE} + 1' }, { name: 'M2', formula: '{M1} + 1' }, { name: 'M3', formula: '{A} +' }, { name: 'M4', formula: 'FOO({A})' }, { name: 'M5', formula: '{A} + 1' }] });
+    // (2026-10-22) names as typed: the label is the row's key in both engines (a label that is not the name
+    // in another case is dropped)
+    sets.push({ id: 'labels', defs: [{ name: 'Net Amount', formula: '{A} + 1' }, { name: 'twice', formula: '{net_amount} * 2', format: 'currency' },
+      { name: 'X1', label: 'Elsewhere', formula: '{A}' }, { name: 'lowerOnly', formula: '{A} * 3' }] });   // (the rows have a real mixedCase)
     sets.push({ id: 'dupes', defs: [{ name: 'D', formula: '{A} + 1' }, { name: 'E', formula: '{A} + 2' }, { name: 'd', formula: '{A} + 3', format: 'currency' }] });
     sets.push({ id: 'names', defs: [{ name: '1BAD', formula: '1' }, { name: 'has space', formula: '{A} + 1' }, { name: 'nb sp', formula: '2' }, { name: '', formula: '3' },
       { name: 'NOFORMULA', formula: '' }, { name: 'BADFMT', formula: '{A}', format: 'Weird' }, { name: 'UPFMT', formula: '{A}', format: ' CURRENCY ' }, { name: 'X'.repeat(61), formula: '1' },

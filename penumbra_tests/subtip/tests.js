@@ -78,10 +78,24 @@
         var cr = c.getBoundingClientRect(), tr = tip()[0].getBoundingClientRect();
         ok(getComputedStyle(tip()[0]).position === 'fixed' && tr.top >= cr.bottom && tr.left >= 7 && tr.right <= window.innerWidth - 7,
             'S4 placed under the chip, inside the viewport (position fixed)', 'chip ' + Math.round(cr.bottom) + ' card ' + Math.round(tr.top) + '/' + Math.round(tr.left) + '/' + Math.round(tr.right));
-        ok(getComputedStyle(tip()[0]).backgroundColor === 'rgb(26, 26, 46)', 'S4 the shared dark rich-tooltip look (main.css .pill-rich-tooltip family)', getComputedStyle(tip()[0]).backgroundColor);
+        // (2026-10-22, fnpop 6) a hover card: the shared popover look, not the dark tooltip it had
+        var tcs = getComputedStyle(tip()[0]);
+        ok(tip().hasClass('bld-help-pop') && tcs.backgroundColor !== 'rgb(26, 26, 46)' && tcs.overflowY === 'auto' && parseFloat(tcs.maxHeight) > 0 && parseFloat(tcs.maxHeight) <= 480,
+            'S4 a hover card in the shared popover look (.bld-help-pop, the theme surface - not the old dark tooltip), scrolling past its cap', tcs.backgroundColor + ' / overflow ' + tcs.overflowY + ' / max ' + tcs.maxHeight);
+        var hl = tip().find('a.pnb-sub-tip-help');
+        ok(hl.length === 1 && hl.attr('data-help-topic') === 'schedulerHelpLightbox' && hl.attr('data-help-anchor') === 'schedHelp-subsViewers',
+            'S4 its last line links to the Subscriptions help for viewers', hl.length ? hl.attr('data-help-topic') + '#' + hl.attr('data-help-anchor') : 'no link');
         $(window).trigger('resize');
         ok(tip().length === 1 && Math.abs(tip()[0].getBoundingClientRect().top - tr.top) <= 1,
             'S4 a resize (main.js fires synthetic ones after layout changes) leaves the card by its button');
+        // the link's click, on a card of its own (a card lost above must not cascade into it)
+        if (!tip().length) { enter(c); await sleep(450); }
+        var helpCalls = [], keepHelp = window.openHelpCenter;
+        window.openHelpCenter = function (t, a) { helpCalls.push(t + '#' + a); };
+        var hl2 = tip().find('a.pnb-sub-tip-help');
+        if (hl2.length) hl2[0].click();
+        ok(helpCalls.join() === 'schedulerHelpLightbox#schedHelp-subsViewers' && !tip().length, 'S4 the link opens that help and closes the card', helpCalls.join() + ' / card ' + (tip().length ? 'OPEN' : 'closed'));
+        window.openHelpCenter = keepHelp;
 
         // hoverable: pointer moves from the chip onto the card and it stays
         if (!tip().length) { enter(c); await sleep(450); }   // (a card lost above must not cascade into S5)

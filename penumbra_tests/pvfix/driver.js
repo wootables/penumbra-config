@@ -214,6 +214,55 @@
         R.info.backBtn = { asked: asked, rebuilt: document.getElementById('pivotResultTable') !== tb0, menu: menu() ? menu().getAttribute('aria-label') : null, hl: hl, onHead: !!h && h.classList.contains('pnb-hm-for') };
         closeMenu();
       });
+      // (2026-10-22) a value cell's own Shading, Format and Highlight, as its heading's (Amt, and a % change);
+      // Highlight from a cell opens its value's card and Back reopens the menu on that cell; Shading from a
+      // % change cell sets the % change's, not the first value's
+      await step('cellTools', async function () {
+        var amt = cellsOf('Amt')[2], chg = cellsOf('Chg').filter(function (td) { return num(td) !== null; })[1];
+        closeMenu(); if (amt) rclick(amt);
+        var a1 = acts();
+        closeMenu(); if (chg) rclick(chg);
+        var a2 = acts();
+        R.chk.cellTools = !!amt && !!chg && ['pvShade', 'pvFormat', 'pvHighlight'].every(function (x) { return a1.indexOf(x) > a1.indexOf('pvCopy') && a2.indexOf(x) >= 0; });
+        R.info.cellTools = { amt: a1, chg: a2 };
+        closeMenu();
+      });
+      await step('cellBack', async function () {
+        var amt = cellsOf('Amt')[2];
+        if (!amt) return;
+        document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        closeMenu(); rclick(amt);
+        var lbl0 = menu() ? menu().getAttribute('aria-label') : null, it = item('pvHighlight');
+        if (!it) return;
+        it.click();
+        await until(function () { return !!popover(); }, 2000);
+        var p = popover(), ttl = p ? ((p.querySelector('.pnb-colopt-title') || {}).textContent || '') : '';
+        var bk = q2('[data-co="back"]');
+        if (!bk) return;
+        bk.click();
+        await until(function () { return !!menu(); }, 3000);
+        var again = cellsOf('Amt')[2];
+        R.chk.cellBack = /Amt/.test(ttl) && !popover() && !!menu() && !!lbl0 && menu().getAttribute('aria-label') === lbl0 && !!again && again.classList.contains('pnb-hm-for');
+        R.info.cellBack = { ttl: ttl, lbl0: lbl0, now: menu() ? menu().getAttribute('aria-label') : null, onCell: !!again && again.classList.contains('pnb-hm-for') };
+        closeMenu();
+      });
+      await step('chgCellShade', async function () {
+        var chg = cellsOf('Chg').filter(function (td) { return num(td) !== null; })[1];
+        if (!chg) return;
+        closeMenu(); rclick(chg);
+        var sh = item('pvShade');
+        if (sh) { sh.click(); await sleep(200); }
+        var bar = item('pvShade-bar');
+        if (!bar) return;
+        var tb0 = document.getElementById('pivotResultTable');
+        bar.click();
+        await until(function () { return document.getElementById('pivotResultTable') !== tb0; }, 10000);
+        await sleep(300);
+        var s = P().settings();
+        R.chk.chgCellShade = !!s && Array.isArray(s.aggShade) && s.aggShade[1] === 'bar' && s.aggShade[0] !== 'bar';
+        R.info.chgCellShade = s && s.aggShade;
+        closeMenu();
+      });
       // (pvfix 2) a % change cell's menu: copy and filter (its row and its column's data-pv-ck). (2026-10-21, brk)
       // and its breakdown since - the cells it is computed from: the pvdrv suite's checks
       await step('chgCell', async function () {

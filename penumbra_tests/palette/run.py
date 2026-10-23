@@ -26,7 +26,7 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
         'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js', 'penumbra_tiles.js',
         'penumbra_a11y.js', 'penumbra_grouplist.js', 'penumbra_cellsel.js', 'penumbra_presets.js', 'penumbra_forms.js', 'penumbra_find.js']   # (round 14) Find, as index.php loads it
-SCN = ['pcold', 'pfail', 'pmain', 'ppick', 'pview', 'prow', 'pshot', 'pcombo', 'pkeys', 'pdash', 'pdasha', 'pshot6', 'pfn', 'pshot7f', 'pshot7t', 'pfeed', 'pshot8', 'prank', 'pshot9', 'pshot10', 'pshot11', 'ptools', 'ptoolsv', 'padmin', 'pshot12', 'pdsec', 'pmetr', 'phand', 'pshot14a', 'pshot14b', 'pvo', 'pshot15', 'pjar', 'pshot16', 'pchip', 'pshot17', 'pthm', 'pjip', 'pshot19', 'pshow', 'pjump', 'pverb', 'pshot20', 'pnote', 'pmail', 'pmiss', 'pshot21', 'ptop', 'pr23', 'psweep', 'psrank', 'pperf']
+SCN = ['pcold', 'pfail', 'pmain', 'ppick', 'pview', 'prow', 'pshot', 'pcombo', 'pkeys', 'pdash', 'pdasha', 'pshot6', 'pfn', 'pshot7f', 'pshot7t', 'pfeed', 'pshot8', 'prank', 'pshot9', 'pshot10', 'pshot11', 'ptools', 'ptoolsv', 'padmin', 'pshot12', 'pdsec', 'pmetr', 'phand', 'pshot14a', 'pshot14b', 'pvo', 'pshot15', 'pjar', 'pshot16', 'pchip', 'pshot17', 'pthm', 'pjip', 'pshot19', 'pshow', 'pjump', 'pverb', 'pshot20', 'pnote', 'pmail', 'pmiss', 'pshot21', 'ptop', 'pr23', 'psweep', 'psrank', 'pperf', 'pwidth']
 CHK = {
     'pcold': ['shellAtOnce', 'keysKept', 'handOver', 'renders'],
     'pfail': ['shellAtOnce', 'failLine', 'escCloses', 'noHang', 'escChipCloses'],
@@ -35,6 +35,7 @@ CHK = {
               'trapTab', 'trapShiftTab', 'trapFocusin', 'arrows', 'escFocus', 'recentsStored', 'recentsShown', 'clearPrefs', 'coverage', 'registryNeeds', 'iconsTwin', 'groupIcon', 'iconsRendered', 'windowKey', 'reportsGate', 'noEmdashUi'],
     'ppick': ['pickMode', 'pickOrder', 'pickFreezeOff', 'pickFreezeRuns', 'pickFrozenPill', 'unfreezeOr', 'unfreezeRuns', 'sortRuns', 'hideRuns',
               'colMode', 'colItems', 'colRun', 'backspaceBack', 'themePick', 'themeRuns'],
+    'pwidth': ['noDeadColRows', 'widthCoverage', 'fitPageRow', 'fitPageRuns', 'resetWidthPick', 'resetWidthRuns'],   # (colmenu round 33)
     'pview': ['saveHidden', 'saveGreyExact', 'vhHidden', 'consoleHidden', 'editorSave', 'editorVh'],
     'prow': ['noRowItemsIdle', 'rowItems', 'rowFilterRuns'],
     # (round 4) the box open beside the toolbar in Wolfpack Red; the runner adds inkPalette / inkMatch from a screenshot
@@ -99,7 +100,8 @@ CHK = {
     # it first with Ask help second; plain text keeps both at the bottom; the no-match state lists it with the hand-offs; nothing is
     # sent by listing; Enter opens the console on the panel and the panel's own send runs once with the text; the summary box is
     # untouched; the popped-out console takes the text and sends, the main console stays shut
-    'pjar': ['rowForAdmin', 'rankQuestion', 'rowForGrant', 'rankSql', 'rankPlain', 'emptyState', 'nothingSentOnOpen', 'noRowViewer', 'noRowNonEditor', 'sendsOnce', 'panelOpens', 'summaryUntouched', 'popOut'],
+    'pjar': ['rowForAdmin', 'rankQuestion', 'rowForGrant', 'rankSql', 'rankPlain', 'emptyState', 'nothingSentOnOpen', 'noRowViewer', 'noRowNonEditor', 'sendsOnce', 'panelOpens', 'summaryUntouched', 'popOut',
+             'askSecond', 'askSecondCode', 'subPaid', 'subHelpOnly', 'viewerAskFirst', 'noPanelAskFirst'],   # (jarvispal, 2026-10-22) the two ask rows together, the paid / free sub-lines; a viewer or no panel: Ask help first
     'pshot16': ['open'],
     # (round 17) a canned reply with valid + invented + hidden-column + gated suggestions: only the valid ones render, four at most, the
     # block never shows as text, the Group chip opens the dialog with V_STATUS and List chosen and applies nothing, a viewer loses the gated
@@ -235,6 +237,15 @@ GUARDS_SR = {'L-psrank-tagLocalFirst'}   # (2026-10-21, the searchrank follow-up
 NEW = NEW - {'L-psrank-%s' % c for c in CHK.get('psrank', [])}   # (psrank is LIVE since 43c1e25: its checks are old ones, green on live)
 # the final sweep (live: the journal row needs the module already loaded; no greyed no-surface row; greyed text at 45%)
 NEW = {'S-final'}   # (round 24b over live a03b153: r24's checks are old ones now; the static's text changed)
+# jarvispal (2026-10-22, live 9ba8017: Ask help at the bottom under a leading Ask Jarvis, the old sub-lines): the two ask rows together,
+# the sub-lines, the static; viewerAskFirst / noPanelAskFirst hold on live already (a viewer's question puts Ask help first there too)
+GUARDS_JP = {'L-pjar-viewerAskFirst', 'L-pjar-noPanelAskFirst'}
+NEW = {'L-pjar-askSecond', 'L-pjar-askSecondCode', 'L-pjar-subPaid', 'L-pjar-subHelpOnly', 'S-askRows'}
+# colmenu round 33 (2026-10-22, live ebaabab: the menu's Column widths list and Fit to page live, the palette still on the old menu: no
+# Fit to page row, "Reset this column..." pointing at an act the menu dropped). Both rounds are undeployed here: the union is what
+# live must show red. Once round 33's palette half is live, drop NEW_W33 from the union (its checks are old ones then).
+NEW_W33 = {'L-pwidth-%s' % c for c in CHK['pwidth']} | {'L-psweep-colReset', 'S-widthRows'}
+NEW = NEW   # (round 33's palette half is LIVE since 08c66aa, 2026-10-22 14:10: NEW_W33's checks are old ones now, green on live)
 # (round 3) the group-mode icon: candidate C, and the old drawing's signature (its first line)
 GROUP_C_SYMBOL = '<symbol id="pnbi-group" viewBox="0 0 24 24"><path d="m4 4 2.5 2.5L9 4"/><line x1="12" y1="5" x2="20" y2="5"/><line x1="8" y1="9.5" x2="20" y2="9.5"/><line x1="8" y1="13" x2="20" y2="13"/><path d="m6.25 15.25 2.5 2.5-2.5 2.5"/><line x1="12" y1="18" x2="20" y2="18"/></symbol>'
 OLD_GROUP_SIG = '<line x1="5" y1="9" x2="19" y2="9"/><line x1="5" y1="15" x2="19" y2="15"/>'
@@ -245,6 +256,16 @@ def served_files():
     return out
 
 MUTANTS = {
+    # --- (colmenu round 33) the width rows: no Fit columns to the page row; the row running Fit all; the column row back on
+    # the act the menu dropped; Fit to page neither an entry nor an exemption
+    'w-nofitpage': ([('pal', "        { id: 'fitpage', label: 'Fit columns to the page',", "        { id: 'zzfitpage', hide: function () { return true; }, label: 'Zz',")],
+                    ['L-pwidth-fitPageRow', 'L-pwidth-fitPageRuns', 'S-widthRows'], ['pwidth']),
+    'w-fitall': ([('pal', "          run: function () { W().fitPage(firstTh()); }, needs: function () { return !!(W() && W().fitPage); } },",
+                          "          run: function () { W().fitAll(firstTh()); }, needs: function () { return !!(W() && W().fitPage); } },")],
+                 ['L-pwidth-fitPageRuns', 'L-pwidth-resetWidthRuns'], ['pwidth']),
+    'w-deadreset': ([('pal', "act: 'resetWidth', icon: { pal: 'width' }", "act: 'reset', icon: { pal: 'width' }")],
+                    ['L-pwidth-noDeadColRows', 'L-pwidth-widthCoverage', 'L-pwidth-resetWidthPick'], ['pwidth']),
+    'w-noexempt': ([('pal', "fitPage: 'a top-level entry (Fit columns to the page)', ", '')], ['L-pwidth-widthCoverage'], ['pwidth']),
     # --- (2026-10-21, the searchrank follow-up) the Reports order: live's title-weighted score alone; no server place (the
     # tier, then the score); no tier (the place, then the score); no word-start tier; tag:NAME ranked by tier and place; a
     # listed row ranked from the browser's copy (its stale title); an accented letter read as a word boundary
@@ -413,7 +434,13 @@ MUTANTS = {
     'v-viewer': ([('pal', "                       icon: { pal: 'settings' }, kw: 'view options editor ' + (small || ''), gate: 'admin', live: true,", "                       icon: { pal: 'settings' }, kw: 'view options editor ' + (small || ''), live: true,")], ['L-pvo-viewerNoRows'], ['pvo']),
     'v-handlist': ([('pal', "tab.querySelectorAll('.view-option-item input[type=\"checkbox\"]')", "tab.querySelectorAll('#viewOptionClickFilter, #viewOptionSearch, #viewOptionSnapshots, #viewOptionEmail, #viewOptionGrouping, #viewOptionClipboard, #viewOptionExport, #viewOptionPivot, #viewOptionViz, #viewOptionPagination, #viewOptionJournal, #viewOptionColumns')")], ['L-pvo-voCount', 'S-voSource'], ['pvo']),
     # --- (round 16) the row for a viewer; the text sent twice; placed but not sent; the summary box flipped
-    'j-viewer': ([('pal', "    function jarvisOn() { return !!vars().aiAllowed && !!vars().canEditReport && !!(window.penumbraAi || el('toggleAiPanel'))", "    function jarvisOn() { return !!(window.penumbraAi || el('toggleAiPanel'))")], ['L-pjar-noRowViewer', 'L-pjar-noRowNonEditor', 'S-jarvisGate'], ['pjar']),
+    'j-viewer': ([('pal', "    function jarvisOn() { return !!vars().aiAllowed && !!vars().canEditReport && !!(window.penumbraAi || el('toggleAiPanel'))", "    function jarvisOn() { return !!(window.penumbraAi || el('toggleAiPanel'))")], ['L-pjar-noRowViewer', 'L-pjar-noRowNonEditor', 'L-pjar-viewerAskFirst', 'S-jarvisGate'], ['pjar']),
+    # --- (jarvispal, 2026-10-22) Ask help left at the bottom under a leading Ask Jarvis; the Jarvis sub-line back to the old text; the
+    # Ask help sub-line back to the old one (nothing for a non-question)
+    'j-asklast': ([('pal', "            if (jarLeads && ask.length) { var askRow = ask[0]; secQ.items.splice(secQ.items.indexOf(askRow), 1); sections[0].items.push(askRow); }\n", "")], ['L-pjar-askSecond', 'L-pjar-askSecondCode', 'S-askRows'], ['pjar']),
+    'j-subpaid': ([('pal', "sub: 'the paid AI assistant: help, SQL, custom code and data', icon: { pal: 'ask' }, keys: null, arrow: 'asks and answers in this box',", "sub: 'the editor\\'s AI assistant answers here', icon: { pal: 'ask' }, keys: null, arrow: 'asks and answers in this box',")], ['L-pjar-subPaid', 'S-askRows'], ['pjar']),
+    'j-subhelp': ([('pal', "sub: question ? 'answers from the help text only, with the pages it used' : 'answers from the help text only', icon: { pal: 'ask' }, ask: true,", "sub: question ? 'answers from the Help Center, with the pages it used' : '', icon: { pal: 'ask' }, ask: true,")], ['L-pjar-subHelpOnly', 'S-askRows'], ['pjar']),
+    't-askpara': ([('topic', " Without the panel, Ask help stays first.</p>\n", "</p>\n")], ['S-askRows'], []),   # the topic's no-panel rule dropped (static only)
     # (round 21) the editor gate dropped: a viewer who may not edit the report gets the row again (7857e04's state)
     'j-noneditor': ([('pal', " && !!vars().canEditReport && !!(window.penumbraAi || el('toggleAiPanel'))", " && !!(window.penumbraAi || el('toggleAiPanel'))")], ['L-pjar-noRowNonEditor', 'S-jarvisGate'], ['pjar']),
     'j-double': ([('pal', "            var sb = byId('aiSendBtn'); if (sb) { click(sb); } else { input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); }   // the panel's own send (its Send button, else its Enter handler), once\n",
@@ -662,7 +689,7 @@ ENTRY_SKIP_RULES = [
     (r'^(sendEmailBtn|resetEmailSettingsBtn)$', 'the Email dialog\'s own buttons (the dialog is a row; Send is the person\'s)'),
     (r'^(sbColsPop|sbCustomCols|sbFrozen|sbGroup$|sbGroupPop|sbGroupPresetList|sbGroupSharedList|sbGrp|sbPivot$|sbPivotPop|sbPivotPresetList|sbPivotSharedList|sbPivotOpenBuilder|sbSnap|sbSnapshot|sbRf|sbTableHidden|sbAsOf$|sbAsOfHistory|sbColsSeg|sbColsOpen|sbColsSettings)', 'a status-bar indicator or its popover\'s own buttons (the state they show has its row: Group, Pivot, Snapshots, Freeze, Version history, Settings)'),
     (r'^(sbPaletteBtn|searchPaletteIcon)$', 'the box itself'),
-    (r'^copyViewLinkBtn$', 'Copy a link to this view (a row, through PenumbraViewLink.copy)'),
+    (r'^(copyViewLinkBtn|emailCopyViewLink)$', 'Copy a link to this view (a row, through PenumbraViewLink.copy; the Email dialog\'s Copy link is the same)'),
     (r'^(scrollTopBtn|scrollBottomBtn)$', 'Scroll to the top / bottom (rows, through scrollEdge)'),
     (r'^searchHelpIcon$', 'the Help Center (a row)'),
     (r'^(searchBuilderIcon|schedSearchBuilderIcon|sbAddConditionBtn|sbClearBtn|sbSubmitBtn|searchBuilderLightbox)$', 'the Visual filter builder (a row) and its own steps'),
@@ -890,6 +917,11 @@ def static_checks(texts):
         ('S-help', 'id="commandPaletteHelpLightbox" class="help-topic" data-audience="viewer"' in texts['topic'] and texts['manifest'].count("'commandPaletteHelpLightbox'") >= 2
          and 'data-tip="us-tip-palette"' in texts['help'] and 'data-tip="us-tip-palette"' in pal and 'data-jump-to="cp-keys"' in texts['topic'], ''),
         ('S-registry', not missing_ids and not missing_fns, 'ids %s fns %s' % (missing_ids, missing_fns)),
+        # (colmenu round 33) the width rows: Fit columns to the page runs the module's own fit; the per-column reset the menu
+        # still has (its width), never the dropped act; the new list and act exempted, the old ones gone; the topic names the row
+        ('S-widthRows', "{ id: 'fitpage', label: 'Fit columns to the page'" in pal and 'run: function () { W().fitPage(firstTh()); }' in pal
+         and "act: 'resetWidth'" in pal and "act: 'reset'," not in pal and "fitPage: 'a top-level entry" in pal and "resets: 'the list'" not in pal
+         and 'fitPage: function (th)' in texts['colw'] and 'Fit columns to the page' in texts['topic'], ''),
         ('S-stubSmall', 0 < len(stub.splitlines()) <= 150, '%d lines' % len(stub.splitlines())),
         ('S-noEmdash', not emd, str(emd)),
         ('S-iconsTwin', icon_n >= 12 and not icon_bad, 'toolbar entries %d, without their twin: %s' % (icon_n, icon_bad)),
@@ -933,6 +965,12 @@ def static_checks(texts):
         ('S-jarvisGate', 'aiAllowed: <?php echo json_encode((bool)penumbraIsConsoleAudience($isAdmin, $userGrants, $currentUserKey)); ?>,' in idx
          and "function jarvisOn() { return !!vars().aiAllowed && !!vars().canEditReport && !!(window.penumbraAi || el('toggleAiPanel')) && !!reportId() && !onDashboard() && !onAdminPage(); }" in pal
          and "var $input = $(window._pnbById ? window._pnbById('aiChatInput') : '#aiChatInput');" in main and "var $container = $(window._pnbById ? window._pnbById('aiChatMessages') : '#aiChatMessages');" in main, ''),
+        # (jarvispal, 2026-10-22) the two ask rows: Ask Jarvis in the slot puts Ask help right under it; the sub-lines name the paid
+        # assistant and the help text; the header comment and the topic say the same (the topic: the writers' rule, the no-panel rule)
+        ('S-askRows', "if (jarLeads && ask.length) { var askRow = ask[0]; secQ.items.splice(secQ.items.indexOf(askRow), 1); sections[0].items.push(askRow); }" in pal
+         and "sub: 'the paid AI assistant: help, SQL, custom code and data'" in pal and "sub: question ? 'answers from the help text only, with the pages it used' : 'answers from the help text only'" in pal
+         and ' *   Jarvis    "Ask Jarvis: ..."' in pal and 'the paid assistant (help, SQL, custom code and data)' in texts['topic'] and '<em>Ask help: ...</em> right under it' in texts['topic']
+         and 'answers from the help text only' in texts['topic'] and 'Without the panel, Ask help stays first' in texts['topic'], ''),
         ('S-jarvisOnce', pal.count("var sb = byId('aiSendBtn'); if (sb) { click(sb); }") == 1 and pal.count("byId('aiSendBtn')") == 1 and 'aiProfileOn' not in pal
          and "typeof window._pnbById === 'function'" in pal, ''),
         # (round 17) the contract: the prompt's kinds and action ids agree with the module's (static per deploy); the chips are safe: the

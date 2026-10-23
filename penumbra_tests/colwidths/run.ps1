@@ -145,6 +145,15 @@ $mutantDefs = [ordered]@{
   # module: the drag
   'livedrag'    = @{ file = 'module'; edits = @(,@("            place(drag.w);$LF        });", "            place(drag.w);$LF            setWidth(drag.c, drag.w);$LF        });")); red = @('D3') }
   'nosuppress'  = @{ file = 'module'; edits = @(,@("        if (!suppressUntil) { return; }", "        return;")); red = @('D5') }
+  # (2026-10-22, colmenu round 33) Fit to page, widths as shares of the page
+  'pageclean'   = @{ file = 'main'; edits = @(,@("                if (p > 0 && p <= 100 && name.indexOf('PIVOT:') !== 0) out[name] = p + '%';", "")); red = @('F1', 'F4') }
+  'pageresolve' = @{ file = 'module'; edits = @(,@("        if (!isShare(v)) { return v; }", "        return isShare(v) ? null : v;")); red = @('F4') }
+  'pagedrawn'   = @{ file = 'module'; edits = @(,@("        pageCols(view, row).fixed.forEach(function (f) { fixed += contentWidth(f.th); });", "        pageCols(view, row).fixed.forEach(function (f) { fixed += f.th.getBoundingClientRect().width; });")); red = @('F7') }
+  'pagespare'   = @{ file = 'module'; edits = @(,@("            big.forEach(function (q) { w[q] += bsum > 0 ? spare * w[q] / bsum : spare / big.length; });", "")); red = @('F3') }
+  'pageprop'    = @{ file = 'module'; edits = @(,@("            w = lo.map(function (x, q) { return x + (hi[q] - x) * f; });", "            w = lo.map(function (x, q) { return x + (room - sumLo) / n; });")); red = @('F2', 'F5') }
+  'pagefloor'   = @{ file = 'module'; edits = @(,@("        } else if (sumFl < room && sumLo > sumFl) {", "        } else if (false) {")); red = @('F3') }
+  'pagemin'     = @{ file = 'module'; edits = @(,@("            mins.push(minWidth(s.c));", "            mins.push(minFor(s.c));")); red = @('F5') }
+  'pagenoundo'  = @{ file = 'module'; edits = @(,@("                else { host.setUser(k, before[k]); }", "                else { }")); red = @('F11') }
   'nodouble'    = @{ file = 'module'; edits = @(,@("if (lastPress && lastPress.key === c.key && t - lastPress.t < DOUBLE_MS) {", "if (false) {")); red = @('D6') }
   # (2026-10-18) the double press back to a reset of every width: D6 red
   'dblreset'    = @{ file = 'module'; edits = @(,@("if (c.view !== 'pivot') { if (e.shiftKey) { fitAll(c); } else { fitOne(c); } } else { resetAll(c); }", "resetAll(c);")); red = @('D6') }
@@ -259,6 +268,10 @@ $mutantDefs = [ordered]@{
   'keysfocus'   = @{ file = 'module'; edits = @(,@("        document.addEventListener('focusin', function (e) { var c = colOf(e.target); if (c && c.th === e.target) { stampKeys(c.th); } }, true);", "")); red = @('V0b') }
   'keysdrill'   = @{ file = 'module'; edits = @(,@(("                stampKeys(row.cells[i]);" + $LF), "")); red = @('E0b') }
   'keysattr'    = @{ file = 'module'; edits = @(,@("        if (th.getAttribute('aria-keyshortcuts') !== 'Plus - 0') { th.setAttribute('aria-keyshortcuts', 'Plus - 0'); }", "")); red = @('K5','V0b','E0b') }
+  # 2026-10-22 (fit39) - the grouped view read by its FIRST group's row although that group is closed (0px: Fit
+  # to page does nothing), and the container's observer blind to a new row to read (a group opening)
+  'grefvis'     = @{ file = 'module'; edits = @(,@("        for (var i = 0; i < rows.length; i++) { if (rows[i].getClientRects().length) { return rows[i]; } }", "")); red = @('F12') }
+  'grefro'      = @{ file = 'module'; edits = @(,@("                    if (w !== lastW || ref !== lastRef) { lastW = w; lastRef = ref; schedule(); }", "                    if (w !== lastW) { lastW = w; lastRef = ref; schedule(); }")); red = @('F14') }
 }
 
 function Apply-Mutant([string]$name) {

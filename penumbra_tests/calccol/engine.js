@@ -405,6 +405,30 @@
       eq('popTabOut', stayIn && stayNone && !document.getElementById('pnbCalcPop'), true);
       C.closeChipMenu(false);
       anc.remove();
+      // --- (2026-10-22) a name keeps the case it was typed in: its LABEL is the row's key (the heading's text);
+      // the upper-case name stays the key every match, formula reference, store and heading's data-colname uses
+      var pl = C.parseUrlValue('Net Amount|{A} + {B}');
+      eq('labelDef', pl ? pl.name + '/' + pl.label : null, 'NET_AMOUNT/Net_Amount');
+      var pn = C.parseUrlValue('NET|{A}');
+      eq('labelNoneUpper', pn ? pn.name + '/' + (pn.label === undefined ? 'none' : pn.label) : null, 'NET/none');
+      eq('labelUrl', pl ? C.urlValue(pl) : null, 'Net_Amount|{A} + {B}');
+      C.fromState([{ name: 'Net Amount', formula: '{A} + {B}' }, { name: 'twice', formula: '{net_amount} * 2' }, { name: 'X1', label: 'Elsewhere', formula: '{A}' }], 'state');
+      var lr = C.applyRows([{ A: '1', B: '2' }]);
+      eq('labelRowKey', JSON.stringify(Object.keys(lr[0]).filter(function (k) { return k !== 'URLCOL'; })), '["A","B","Net_Amount","twice","X1"]');
+      eq('labelRef', lr[0].twice, '6');
+      R.chk.labelBadDropped = !('Elsewhere' in lr[0]) && lr[0].X1 === '1';
+      R.chk.labelApplied = C.applied().some(function (d) { return d.name === 'NET_AMOUNT' && d.label === 'Net_Amount'; })
+        && C.active().some(function (d) { return d.name === 'TWICE' && d.label === 'twice' && d.src === 'state'; });
+      R.chk.labelSummable = C.isSummable('Net_Amount') && C.isSummable('NET_AMOUNT');
+      R.chk.labelState = C.forState().some(function (d) { return d.name === 'NET_AMOUNT' && d.label === 'Net_Amount'; });
+      // a column named by its label (as typed, any case): Edit opens it, Remove takes it out
+      C.openDialog('Net_Amount');
+      R.chk.labelOpenEdit = !!document.getElementById('pnbCalcOverlay') && (document.getElementById('pnbCalcName') || {}).value === 'Net_Amount';
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      C.remove('Net_Amount');
+      R.chk.labelRemove = !C.active().some(function (d) { return d.name === 'NET_AMOUNT'; }) && C.active().some(function (d) { return d.name === 'TWICE'; });
+      C.fromState([], 'state');
+      C.applyRows([{ A: '1', B: '2' }]);
       // --- the source: no eval / Function / innerHTML of a formula unescaped -------------
       var srcText = await fetch('penumbra_calc.js', { cache: 'no-store' }).then(function (r) { return r.text(); });
       R.chk.noEval = !/\beval\s*\(/.test(srcText) && !/new\s+Function\s*\(/.test(srcText) && !/\bFunction\s*\(\s*['"]/.test(srcText);

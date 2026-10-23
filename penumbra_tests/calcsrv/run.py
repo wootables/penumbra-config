@@ -39,7 +39,13 @@ CHK = {
     'rsave': ['before', 'listed', 'hint', 'hintFollows', 'kept', 'positions', 'depSaid', 'nowReport', 'untickedKept'],
     'rnolist': ['reportKept', 'mineGone'],
 }
+# (2026-10-22) the checks this round adds: red on live (its names forced to upper case)
+NEW = {'P-labelKeys', 'P-labelClean', 'H-sched-label'}
 MUTANTS = {
+    # --- (2026-10-22) the twin's label: never kept; the row keyed by the name; the scheduler's totals check on the name
+    'p-label': ([('lib', "    if ($lb !== $name) $out['label'] = $lb;\n", "")], ['P-labelClean', 'P-labels', 'H-sched-label'], []),
+    'p-rowkey': ([('lib', "$key[$kd['name']] = isset($kd['label']) ? $kd['label'] : $kd['name'];", "$key[$kd['name']] = $kd['name'];")], ['P-labels', 'H-sched-label'], []),
+    'p-sumkey': ([('sr', "array_key_exists(isset($calcDef['label']) ? $calcDef['label'] : $calcDef['name'], $calcFirst)", "array_key_exists($calcDef['name'], $calcFirst)")], ['H-sched-label'], []),
     # penumbra_calc.php (LF) - the twin
     'p-tie': ([('lib', "    $up = isset($frac[$f]) && $frac[$f] >= '5';", "    $up = isset($frac[$f]) && $frac[$f] > '5';")], ['P-corpus*'], []),
     'p-shortest': ([('lib', "    for ($p = 1; $p <= 17; $p++) {", "    for ($p = 17; $p <= 17; $p++) {")], ['P-corpus*'], []),
@@ -256,12 +262,17 @@ try:
             else: f += 1; failed.append(a)
         print('TOTAL pass=%d fail=%d   failed: %s' % (p, f, ' '.join(failed)))
         if control:
-            # live has no penumbra_calc.php and strips every calculated column on save:
-            # only lint and the plainly unchanged may pass
-            absent = {'P-lint-sr', 'P-lint-ix', 'S0', 'H-total-found', 'H-sched-found'}
-            sane = [a for a, passed, _ in res if passed and not a.startswith('E-') and a not in absent]
-            print('CONTROL: %d checks red (expected); checks that hold WITHOUT the change: %s' % (f, ' '.join(sane) or 'none'))
-            print('RESULT: GREEN' if f > 0 else 'RESULT: RED')
+            # (2026-10-22) calculated columns are LIVE: a control judges this round's checks (NEW: red on live)
+            # and every other check (green on live)
+            red = {a for a, passed, _ in res if not passed}
+            seen = {a for a, _, _ in res}
+            new_green = sorted(a for a in NEW if a in seen and a not in red)
+            new_unseen = sorted(a for a in NEW if a not in seen)
+            old_red = sorted(a for a in red if a not in NEW)
+            print('CONTROL: new checks green on live (unexpected): %s' % (' '.join(new_green) or 'none'))
+            print('CONTROL: new checks never run: %s' % (' '.join(new_unseen) or 'none'))
+            print('CONTROL: old checks red on live (unexpected): %s' % (' '.join(old_red) or 'none'))
+            print('RESULT: GREEN' if not new_green and not new_unseen and not old_red else 'RESULT: RED')
         else:
             print('RESULT: GREEN' if f == 0 and p > 0 else 'RESULT: RED')
 finally:

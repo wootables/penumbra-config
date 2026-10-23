@@ -17,11 +17,12 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
 SCN = ['pmhead', 'pmfield', 'pmcell', 'pmbreak', 'pmmulti', 'pmnotool']
 CHK = {
     'pmhead': ['opens', 'nativeShift', 'nativeSecond', 'headItems', 'sortDesc', 'thenOffered', 'thenSort', 'sortClear', 'copyCol', 'shadeList', 'shadeBar', 'shadeUndo', 'shadeHover', 'fmtList', 'fmtCurrency', 'fmtDp', 'fmtUndo', 'fmtAuto', 'colsItems', 'colsDesc', 'colsAsc', 'colExclude'],
-    'pmfield': ['fieldItems', 'sortAZ', 'collapseAll', 'expandAll', 'fieldUp', 'fieldUndo', 'fieldRemove', 'removeLastOff', 'swap'],
-    'pmcell': ['cellOpens', 'cellItems', 'drillLabel', 'cellTitleDecoded', 'labelDecoded', 'drill', 'labelItems', 'toggle', 'copyLabel', 'labelExclude', 'cellFilter'],
+    'pmfield': ['fieldItems', 'sortAZ', 'layoutItems', 'layoutFlat', 'layoutUndo', 'freezeOne', 'freezeUndo', 'collapseAll', 'expandAll', 'fieldUp', 'fieldUndo', 'fieldRemove', 'removeLastOff', 'swap'],
+    'pmcell': ['cellOpens', 'cellItems', 'drillLabel', 'cellTitleDecoded', 'labelDecoded', 'drill', 'labelItems', 'toggle', 'copyLabel', 'labelExclude', 'cellFilter',
+               'cellTools', 'cellToolsNotTotal', 'cellShade', 'cellShadeUndo'],   # (2026-10-22) a value cell's Shading / Format
     # (colmenu round 14) the breakdown table's menu: sort and copy
     'pmbreak': ['bdTable', 'bdNumNative', 'bdNativeShift', 'bdHeadOpens', 'bdHeadItems', 'bdSortAsc', 'bdSortDesc', 'bdThen', 'bdClear', 'bdCopyCol', 'bdCopyDistinct', 'bdStats', 'bdCell', 'bdCopyValue', 'bdCopyName', 'bdKbd',
-                'bdWidthItems', 'bdFit', 'bdFitAll', 'bdResetWidths', 'bdWidthsNotPivot', 'bdRowHeight'],
+                'bdWidthItems', 'bdFit', 'bdResetOne', 'bdFitAll', 'bdFitPage', 'bdResetWidths', 'bdWidthsNotPivot', 'bdRowHeight'],
     # (colmenu round 17) several values, no column fields, collapsed groups: the cells by position
     'pmmulti': ['multiBuilt', 'multiItems', 'multiCollapsed', 'multiCopy', 'multiSlot', 'multiFmtKind'],
     'pmnotool': ['noToolField', 'noToolHead'],
@@ -50,11 +51,23 @@ NEW_R27 = {'L-pmbreak-bdWidthItems', 'L-pmbreak-bdFit', 'L-pmbreak-bdFitAll', 'L
 NEW_R28 = {'L-pmbreak-bdHeadOpens', 'L-pmbreak-bdHeadItems', 'L-pmbreak-bdCopyCol', 'L-pmbreak-bdCopyDistinct', 'L-pmbreak-bdStats'}   # live 34c2b77
 # (colmenu round 29) the pivot's escaped keys read decoded in the menu
 NEW_R29 = {'L-pmcell-cellTitleDecoded', 'L-pmcell-labelDecoded'}   # live ab29ada
-# (colmenu round 32) the row height item on every breakdown
-NEW = {'L-pmbreak-bdRowHeight'}
+NEW_R32 = {'L-pmbreak-bdRowHeight'}   # live 375202d
+# (colmenu round 33) Layout and Freeze row labels; the breakdown's Column widths list, Fit to page, Reset this column's width
+NEW = {'L-pmbreak-bdWidthItems', 'L-pmbreak-bdResetOne', 'L-pmbreak-bdFitPage', 'L-pmfield-layoutItems', 'L-pmfield-layoutFlat',
+       'L-pmfield-layoutUndo', 'L-pmfield-freezeOne', 'L-pmfield-freezeUndo'}
+# (2026-10-22, round 33 is live: its checks are old ones now) a value cell's Shading and Format, as its heading's
+NEW = {'L-pmcell-cellTools', 'L-pmcell-cellShade', 'L-pmcell-cellShadeUndo'}
 MUTANTS = {
+    # --- (2026-10-22) a value cell's tools: none; offered under a Grand Total column too
+    'c-notools': ([('menu', '            if (vinfo && !vinfo.total && vinfo.aggs.length === 1) {', '            if (false) {')], ['L-pmcell-cellTools', 'L-pmcell-cellShade'], ['pmcell']),
+    'c-total': ([('menu', '            if (vinfo && !vinfo.total && vinfo.aggs.length === 1) {', '            if (vinfo && vinfo.aggs.length >= 1) {')], ['L-pmcell-cellToolsNotTotal'], ['pmcell']),
     # --- (colmenu round 27) the breakdown's width items: never offered; the API gate back to flat/group
-    'w-bditems': ([('menu', "        if (W && typeof W.canFit === 'function' && W.canFit(th)) {\n            items.push('-');\n            items.push({ act: 'bdFit'", "        if (false) {\n            items.push('-');\n            items.push({ act: 'bdFit'")], ['L-pmbreak-bdWidthItems', 'L-pmbreak-bdFit', 'L-pmbreak-bdFitAll', 'L-pmbreak-bdResetWidths'], ['pmbreak']),
+    'w-bditems': ([('menu', "            size.push({ act: 'bdWidth', label: 'Column widths', sub: true, items: function () { return widthItems(th, false, true); } });", "")],
+                  ['L-pmbreak-bdWidthItems', 'L-pmbreak-bdFit', 'L-pmbreak-bdResetOne', 'L-pmbreak-bdFitAll', 'L-pmbreak-bdFitPage', 'L-pmbreak-bdResetWidths'], ['pmbreak']),
+    # (colmenu round 33) a breakdown's Fit to page sets nothing; no Layout list; a Freeze pick changes nothing
+    'w-pagebd': ([('colw', "            if (drill) { before[cc.name] = drillW[cc.name] || null; drillW[cc.name] = w; }", "            if (drill) { before[cc.name] = drillW[cc.name] || null; }")], ['L-pmbreak-bdFitPage'], ['pmbreak']),
+    'l-nolayout': ([('menu', "            if (pvLayoutItems().length) { items.push({ act: 'pvLayout', label: 'Layout', sub: true, items: pvLayoutItems }); }", "")], ['L-pmfield-layoutItems', 'L-pmfield-layoutFlat', 'L-pmfield-layoutUndo'], ['pmfield']),
+    'l-freezenoop': ([('menu', "                    x.stickyColCount = k;", "                    x.stickyColCount = x.stickyColCount;")], ['L-pmfield-freezeOne'], ['pmfield']),
     'w-apigate': ([('colw', "            if (!c || c.view === 'pivot') { return false; }   // (round 27) a breakdown's too", "            if (!c || (c.view !== 'flat' && c.view !== 'group')) { return false; }")], ['L-pmbreak-bdFitAll'], ['pmbreak']),
     # --- (colmenu round 25) Shift with the right-click intercepted all the same
     'p-shift': ([('menu', "        if (e.shiftKey && e.button === 2) { if (cur) { close(false); } lastClosed = null; return; }\n", "")], ['L-pmhead-nativeShift', 'L-pmbreak-bdNativeShift'], ['pmhead', 'pmbreak']),
@@ -78,7 +91,7 @@ MUTANTS = {
     'b-distinct': ([('menu', "        return bdColumnTexts(t).filter(function (x) { if (x === '' || seen[x]) { return false; } seen[x] = 1; return true; });",
                      "        return bdColumnTexts(t).filter(function (x) { return x !== ''; });")], ['L-pmbreak-bdCopyDistinct'], ['pmbreak']),
     # --- (colmenu round 32) the breakdown's row height item gone
-    'b-norow': ([('menu', "        var rhb = rowHeightItem();   // (round 32) on every breakdown, nested tables or not\n        if (rhb) { items.push('-'); items.push(rhb); }\n", "")], ['L-pmbreak-bdRowHeight'], ['pmbreak']),
+    'b-norow': ([('menu', "        if (rhb) { size.push(rhb); }\n", "")], ['L-pmbreak-bdRowHeight'], ['pmbreak']),
     # --- (colmenu round 29) no decoding of the pivot's keys
     'k-raw': ([('menu', "        if (s == null || s.indexOf('&') < 0) { return String(s == null ? '' : s); }", "        return String(s == null ? '' : s);")], ['L-pmcell-cellTitleDecoded', 'L-pmcell-labelDecoded'], ['pmcell']),
     # --- (colmenu round 28) the delimiter ignored; the duplicates miscounted in a breakdown's stats

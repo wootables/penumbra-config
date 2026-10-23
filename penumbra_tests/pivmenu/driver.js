@@ -40,10 +40,18 @@
     var ev = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, clientX: Math.round(r.left + 6), clientY: Math.round(r.top + 6) });
     return !el.dispatchEvent(ev);
   }
+  // (colmenu round 33) an item in a list beside its parent: open the parent first
+  var PSUBS = [['bdWidth', /^bd(Fit|FitAll|FitPage|ResetWidth|ResetWidths)$/], ['pvLayout', /^(pvRows-|pvCols-|pvStartExpanded$)/], ['pvFreeze', /^pvFreeze-/]];
+  function reachP(act) {
+    var it = item(act);
+    if (it) return it;
+    for (var i = 0; i < PSUBS.length; i++) { if (PSUBS[i][1].test(act) && item(PSUBS[i][0])) { item(PSUBS[i][0]).click(); return item(act); } }
+    return null;
+  }
   async function choose(el, act) {
     closeMenu();
     rclick(el);
-    var it = item(act);
+    var it = reachP(act);
     if (!it || it.getAttribute('aria-disabled') === 'true') { closeMenu(); return false; }
     it.click();
     await sleep(500);
@@ -194,6 +202,29 @@
       R.chk.sortAZ = !!item('pvSortAsc') && /A to Z/.test(item('pvSortAsc').textContent);
       R.info.acts = acts();
       closeMenu();
+      // (colmenu round 33) Layout and Freeze row labels: the builder's own choices, each pick a rebuild with Undo
+      rclick(field(0));
+      var lfActs = acts(), hasLF = lfActs.indexOf('pvLayout') >= 0 && lfActs.indexOf('pvFreeze') >= 0 && lfActs.indexOf('pvLayout') < lfActs.indexOf('pvEdit');
+      if (item('pvLayout')) { item('pvLayout').click(); await sleep(200); }
+      var lay = subActs();
+      closeMenu(); rclick(field(0));
+      if (item('pvFreeze')) { item('pvFreeze').click(); await sleep(200); }
+      var frz = subActs();
+      closeMenu();
+      var s0 = P().settings(), sticky0 = typeof s0.stickyColCount === 'number' ? s0.stickyColCount : 3;
+      R.chk.layoutItems = hasLF && ['pvRows-nested', 'pvRows-nested-static', 'pvRows-flat', 'pvStartExpanded'].every(function (x) { return lay.indexOf(x) >= 0; }) && lay.indexOf('pvCols-flat') < 0
+        && ['pvFreeze-0', 'pvFreeze-1', 'pvFreeze-2'].every(function (x) { return frz.indexOf(x) >= 0; }) && frz.indexOf('pvFreeze-3') < 0;
+      R.info.layout = { top: lfActs, lay: lay, frz: frz, rows: s0.rows, rl: s0.rowLayout, sticky: s0.stickyColCount };
+      var hL = window.__HC_HIDES || 0;
+      var ranFlat = await choose(field(0), 'pvRows-flat');
+      if (ranFlat) await rebuilt(hL);
+      R.chk.layoutFlat = ranFlat && P().settings().rowLayout === 'flat' && /Undo/.test(lastToast());
+      R.chk.layoutUndo = ranFlat && (await undo()) && P().settings().rowLayout !== 'flat';
+      hL = window.__HC_HIDES || 0;
+      var ranFrz = await choose(field(0), 'pvFreeze-1');
+      if (ranFrz) await rebuilt(hL);
+      R.chk.freezeOne = ranFrz && P().settings().stickyColCount === 1 && /Undo/.test(lastToast());
+      R.chk.freezeUndo = ranFrz && (await undo()) && P().settings().stickyColCount === sticky0;
       await choose(field(0), 'pvCollapseAll');
       var v = visRows();
       R.chk.collapseAll = v.length > 0 && v.every(function (tr) { return tr.classList.contains('pivot-group-summary-row'); });
@@ -321,16 +352,33 @@
       // Fit this column, Fit all, Reset (with Undo); none in a pivot's menu
       var CW = window.Penumbra && window.Penumbra.colWidths, bdt = th.closest('table');
       function bdW(h) { return Math.round(h.getBoundingClientRect().width); }
+      // (colmenu round 33) the widths are one list beside the item: Fit width to contents, Fit all, Fit to page, the resets
       rclick(th);
-      R.chk.bdWidthItems = !!CW && !!item('bdFit') && !!item('bdFitAll') && !!item('bdResetWidths') && acts().indexOf('bdFit') < acts().indexOf('bdCopyDistinct');
+      var topBd = acts();
+      if (item('bdWidth')) { item('bdWidth').click(); await sleep(200); }
+      var bwl = subActs();
+      R.chk.bdWidthItems = !!CW && topBd.indexOf('bdWidth') >= 0 && topBd.indexOf('bdWidth') < topBd.indexOf('bdCopyDistinct') && topBd.indexOf('bdFit') < 0
+        && ['bdFit', 'bdFitAll', 'bdFitPage', 'bdResetWidth', 'bdResetWidths'].every(function (x) { return bwl.indexOf(x) >= 0; });
+      R.info.bdWidthList = { top: topBd, list: bwl };
       closeMenu();
       var w0 = bdW(th);
       var ranFit = await choose(th, 'bdFit');
       var dw1 = CW ? CW.drillWidths() : {};
       R.chk.bdFit = ranFit && Object.keys(dw1).length === 1 && Math.abs(bdW(th) - dw1[Object.keys(dw1)[0]]) <= 2 && /fitted to its content/.test(lastToast());
+      // (round 33) this column's width back (its natural width), with Undo
+      var ranOne = await choose(th, 'bdResetWidth');
+      R.chk.bdResetOne = ranOne && Object.keys(CW ? CW.drillWidths() : {}).length === 0 && /width reset/.test(lastToast());
       var ranAll = await choose(th, 'bdFitAll');
       var dw2 = CW ? CW.drillWidths() : {}, cells = bdt.tHead.rows[0].cells.length;
       R.chk.bdFitAll = ranAll && Object.keys(dw2).length >= Math.min(3, cells - 1) && /breakdown column widths fitted to content/.test(lastToast());
+      // (round 33) Fit to page: every column a width that fills the breakdown with no sideways scroll
+      // (when even the floors do not fit, its notice says the table still scrolls)
+      var ranPage = await choose(th, 'bdFitPage');
+      var dwP = CW ? CW.drillWidths() : {}, pbox = bdt.closest('.infobox-content') || bdt.parentNode;
+      var sumP = Object.keys(dwP).reduce(function (a, k) { return a + dwP[k]; }, 0), changed = Object.keys(dwP).some(function (k) { return dwP[k] !== dw2[k]; });
+      R.chk.bdFitPage = ranPage && changed && Object.keys(dwP).length >= Math.min(3, cells - 1) && /fitted to the page/.test(lastToast())
+        && ((pbox.scrollWidth <= pbox.clientWidth + 1 && sumP <= pbox.clientWidth && sumP >= pbox.clientWidth * 0.7) || /still scrolls sideways/.test(lastToast()));
+      R.info.bdFitPage = { n: Object.keys(dwP).length, changed: changed, sum: sumP, scroll: pbox.scrollWidth, client: pbox.clientWidth, toast: String(lastToast()).slice(0, 120) };
       var ranReset = await choose(th, 'bdResetWidths');
       var dw3 = CW ? CW.drillWidths() : {};
       R.chk.bdResetWidths = ranReset && Object.keys(dw3).length === 0 && /Breakdown column widths reset/.test(lastToast());
@@ -342,7 +390,7 @@
       closeMenu();
       // a pivot heading's menu has none of them
       var pvh = document.querySelector('#pivotResultTable thead th[data-row-field]');
-      if (pvh) { rclick(pvh); R.chk.bdWidthsNotPivot = !!menu() && !item('bdFit') && !item('bdFitAll') && !item('bdResetWidths'); closeMenu(); } else { R.chk.bdWidthsNotPivot = true; }
+      if (pvh) { rclick(pvh); R.chk.bdWidthsNotPivot = !!menu() && !item('bdFit') && !item('bdFitAll') && !item('bdResetWidths') && !item('bdWidth'); closeMenu(); } else { R.chk.bdWidthsNotPivot = true; }
     },
     pmmulti: async function () {
       // (colmenu round 17) no column fields, several values, groups collapsed: every value
@@ -426,6 +474,40 @@
       await choose(td, 'pvDrill');
       R.chk.drill = drills === 1;
       $('.help-lightbox:visible, .infobox-overlay:visible').hide();
+      // (2026-10-22) its value's Shading and Format, after its own items, as the value's heading offers them;
+      // none on a Grand Total column's cell (its heading offers none); a pick from a cell's list sets its value's
+      // shading, with Undo
+      td = leaf();
+      closeMenu(); rclick(td);
+      var ca = acts();
+      R.chk.cellTools = ca.indexOf('pvCellFilter') > 0 && ca.indexOf('pvShade') > ca.indexOf('pvCellFilter') && ca.indexOf('pvFormat') > ca.indexOf('pvShade');
+      R.info.cellTools = ca;
+      closeMenu();
+      var gtCell = null;
+      (function () {
+        var tb = document.getElementById('pivotResultTable'), hr = tb.tHead.rows, last = hr[hr.length - 1];
+        var vh = Array.prototype.filter.call(last.cells, function (c) { return !c.hasAttribute('data-row-field'); }), K = vh.length, g = -1;
+        vh.forEach(function (h, i) { if (h.classList.contains('pivot-grand-total')) g = i; });
+        if (g < 0) return;
+        var tr = Array.prototype.filter.call(tb.tBodies[0].rows, function (r) { return r.style.display !== 'none' && !r.classList.contains('pivot-group-summary-row'); })[0];
+        if (tr) gtCell = tr.cells[tr.cells.length - K + g];
+      })();
+      R.info.gtCell = gtCell ? [gtCell.textContent.trim(), gtCell.getAttribute('data-agg-idx'), gtCell.getAttribute('data-pv-ai')] : null;
+      if (gtCell) rclick(gtCell);
+      var ga = acts();
+      R.chk.cellToolsNotTotal = !!gtCell && !!menu() && ga.indexOf('pvCopy') >= 0 && ga.indexOf('pvShade') < 0 && ga.indexOf('pvFormat') < 0;
+      R.info.gtActs = ga;
+      closeMenu();
+      rclick(td);
+      var csh = item('pvShade');
+      if (csh) { csh.click(); await sleep(200); }
+      var ch0 = window.__HC_HIDES || 0, cbar = item('pvShade-bar');
+      if (cbar) { cbar.click(); await rebuilt(ch0); }
+      var cs1 = P() ? P().settings() : {};
+      R.chk.cellShade = !!cbar && !!cs1.aggShade && cs1.aggShade[0] === 'bar' && document.querySelectorAll('#pivotResultTable tbody td[style*="linear-gradient"]').length > 0 && /Undo/.test(lastToast());
+      R.chk.cellShadeUndo = R.chk.cellShade === true && (await undo()) && !(P().settings().aggShade && P().settings().aggShade[0]);
+      R.info.cellShade = { after: cs1.aggShade, undone: P() && P().settings().aggShade };
+      closeMenu();
       // a row label: its group's toggle, copy, filter / exclude
       var lt = Array.prototype.filter.call(document.querySelectorAll('#pivotResultTable tbody td[data-row-field="0"]'), function (x) {
         return x.parentNode.style.display !== 'none' && x.querySelector('.pivot-collapse-toggle');

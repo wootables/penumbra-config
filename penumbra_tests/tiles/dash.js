@@ -369,8 +369,8 @@
         $('<div class="dash-filter" id="dashFilter" role="search" aria-label="Filter the dashboard">' +
             '<div class="dash-filter-box">' +
             '<button type="button" class="dash-filter-btn dash-filter-sb" id="dashSearchBuilder" ' +
-            'title="Visual Search Builder: compose the filter from conditions' + (kh.tip('/') ? ' (/ in the empty box)' : '') + '" ' +
-            'aria-label="Open the Visual Search Builder"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+            'title="Visual Filter Builder: compose the filter from conditions' + (kh.tip('/') ? ' (/ in the empty box)' : '') + '" ' +
+            'aria-label="Open the Visual Filter Builder"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
             '<circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16.2" y2="16.2"/></svg></button>' +
             '<input type="text" id="dashSearchInput" autocomplete="off" spellcheck="false" ' +
             'placeholder="Filter every tile, e.g. COLLEGE = Engineering" ' +
@@ -1313,7 +1313,7 @@
     });
     $(document).on('focus', '#dashSearchInput', function () {
         if (!this.value && !dashKeysOff() && !$(this).attr('data-ph')) {
-            $(this).attr('data-ph', $(this).attr('placeholder') || '').attr('placeholder', 'Type a filter (double-click for suggestions), or press / for the Visual Search Builder');
+            $(this).attr('data-ph', $(this).attr('placeholder') || '').attr('placeholder', 'Type a filter (double-click for suggestions), or press / for the Visual Filter Builder');
         }
     });
     $(document).on('blur', '#dashSearchInput', function () {
@@ -1765,7 +1765,7 @@
         }, builderFailed);
     }
     function builderFailed() {
-        var msg = 'The Visual Search Builder could not be loaded; type the filter in the box instead (or reload the page if you have been away).';
+        var msg = 'The Visual Filter Builder could not be loaded; type the filter in the box instead (or reload the page if you have been away).';
         $('#dashFilterNote').text(msg);
         dashAnnounce(msg);
     }

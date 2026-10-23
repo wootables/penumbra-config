@@ -58,6 +58,13 @@ $k = isset($by['loop']) ? $by['loop']['out'][0]['keys'] : '';
 ok(substr($k, -3) === '|L3' && strpos($k, 'L1') === false && strpos($k, 'L5') === false, 'P-loopLeftOut a loop (and what uses it) is left out', $k);
 $k = isset($by['many']) ? $by['many']['out'][0]['keys'] : '';
 ok(substr_count($k, '|N') === 20, 'P-max20 at most 20', $k);
+// (2026-10-22) a name keeps the case it was typed in: its label is the row's key, the name the key every match uses
+$k = isset($by['labels']) ? $by['labels']['out'][0]['keys'] : ''; $want = '|Net_Amount|twice|X1|lowerOnly';
+ok(substr($k, -strlen($want)) === $want, 'P-labelKeys the names as typed are the row keys', $k);
+$d = pnb_calc_clean_def(array('name' => ' Net Amount ', 'formula' => '1'));
+ok($d === array('name' => 'NET_AMOUNT', 'formula' => '1', 'format' => 'number', 'label' => 'Net_Amount'), 'P-labelClean a definition keeps the name as typed as its label', json_encode($d));
+$d = pnb_calc_clean_def(array('name' => 'X1', 'label' => 'Elsewhere', 'formula' => '1'));
+ok($d === array('name' => 'X1', 'formula' => '1', 'format' => 'number'), 'P-labelBad a label that is not the name in another case is dropped', json_encode($d));
 // (2026-10-18, calcadj) adjustable values: the ones named exist, one no column carries is left out
 $k = isset($by['inputs']) ? $by['inputs']['out'][0]['keys'] : '';
 ok(substr($k, -18) === '|I1|I2|I4|I5|I6|I7' && strpos($k, 'I3') === false, 'P-inputsLeftOut a value no column carries leaves its column out; the rest stay', $k);

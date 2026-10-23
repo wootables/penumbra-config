@@ -173,9 +173,14 @@
   // rAF never fires. Stub both (rAF on a timer) - except under real_input.py
   // (?real=1), which drives real frames over CDP and needs the real ones.
   window.__roObserved = [];
+  // (2026-10-22, fit39) the stub keeps each callback by the element it watches: __roFire(el) calls them as a
+  // real observer would once el's size changed (the driver says when - no frames here to tell)
+  window.__roCalls = [];
+  window.__roFire = function (el) { window.__roCalls.forEach(function (o) { if (o.el === el) { try { o.cb([{ target: el }], o.ro); } catch (e) { window.__errors.push('roFire: ' + e); } } }); };
   if (!window.__REAL) {
-    window.ResizeObserver = function () {
-      this.observe = function (el) { window.__roObserved.push(el); };
+    window.ResizeObserver = function (cb) {
+      var ro = this;
+      this.observe = function (el) { window.__roObserved.push(el); window.__roCalls.push({ el: el, cb: cb, ro: ro }); };
       this.unobserve = function (el) { var i = window.__roObserved.indexOf(el); if (i !== -1) window.__roObserved.splice(i, 1); };
       this.disconnect = function () {};
     };

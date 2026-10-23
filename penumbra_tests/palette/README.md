@@ -55,3 +55,30 @@ server listed takes its place and is ranked from the server's copy; one it did n
 server list), accentWord (no word start right after an accented letter, as Oracle's [:alnum:]), tagLocalFirst
 (tag:NAME as before; a guard). Mutants q-scoreonly (live's sort), q-noplace, q-notier, q-wordstart, q-tagtier,
 q-localtier, q-asciiword.
+
+2026-10-22 (jarvispal, "Ask Jarvis from the palette"): the two ask rows together. When Ask Jarvis takes the Top match slot
+(a question or code-like text from the console's audience on a report they may edit, the panel on the page), the free
+Ask help row sits right under it instead of at the bottom; the Jarvis sub-line names the paid assistant (help, SQL,
+custom code and data), the Ask help sub-line says it answers from the help text only; a viewer or a page without the
+panel keeps Ask help first. pjar + askSecond, askSecondCode, subPaid, subHelpOnly, viewerAskFirst (a guard: live already
+puts a viewer's Ask help first), noPanelAskFirst (a guard; the toggle's id renamed and penumbraAi cleared for one open);
+static S-askRows (the module's lines, the header comment, the topic's writers' rule and no-panel rule). Mutants j-asklast
+(Ask help left at the bottom), j-subpaid, j-subhelp (the old sub-lines back), t-askpara (the topic's no-panel sentence dropped:
+S-askRows alone, static only); j-viewer's must list gained viewerAskFirst.
+The help topic's Ask Jarvis cell is 68 words (L16's cell budget is 70; the first cut was 73 and red). Kit:
+patch_jarvis.py (the app edits, re-appliable to a fresh copy of live), patch_suite.py (these suite edits),
+deploy_jarvispal.ps1 (hash-guarded, MoveFileEx, then prebuild_caches.php) in the session's scratchpad `jarvis\`, copied with
+the stage, orig, logs and DEPLOY.md to `stage_20261020\jarvispal\`. Stage: 520/520, control on live ddc0476 exactly the five new
+checks red, 11 targeted mutants kill as declared; helpv2 on a full stage tree with -Mutants GREEN (28/28).
+
+2026-10-22 (colmenu round 33, the palette half: the header menu's Column widths list and Fit to page went live in ebaabab while the
+palette still knew the old menu): `pwidth`. This harness lifts `#results-wrapper` apart from the flat table and hides the table, and
+the width module fits a flat table only inside it, so pmain's coverage never sees a width act; the scenario puts the table back in
+its wrapper first. noDeadColRows (every column row's act is offered on some column: live's "Reset this column..." still pointed at
+the dropped `reset`), widthCoverage (every act, fit / fitAll / fitPage / resetWidth included, an entry or an exemption), fitPageRow +
+fitPageRuns (Fit columns to the page: a share for every shown column, no sideways scroll, the module's toast), resetWidthPick +
+resetWidthRuns (Reset this column's width...: `#` greyed with the menu's reason, then one column's share gone). ppick colItems wants
+"Clear all personal customizations..." where it wanted the Reset list's "This column"; psweep colReset runs the width reset or shows
+the menu's reason (this scenario's widths are not fit-able). Static S-widthRows. Mutants w-nofitpage, w-fitall, w-deadreset,
+w-noexempt. NEW = jarvispal's set | NEW_W33 while both rounds are undeployed (drop NEW_W33 once the palette half is live). Kit: the
+session scratchpad's pal33/ (patch_pal33.py, orig/ + orig.sha256, deploy_pal33.ps1), copied to stage_20261020/pal33/.

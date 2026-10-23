@@ -244,7 +244,8 @@
     R.chk.coverage = Object.keys(acts).length >= 15 && missing.length === 0 && !!M && typeof M.items === 'function';
     // every entry's control or function exists here (or is a control this harness has not got)
     var ABSENT = ['pivot', 'viz', 'download', 'dl-xls', 'dl-pdf', 'dl-print', 'dl-csv', 'dl-tsv', 'dl-json', 'email', 'snapshots', 'journal', 'subscribe', 'settings', 'header', 'find', 'nextpage', 'prevpage', 'clearfilter', 'builder',
-                  'taggen', 'managedata', 'formatsql', 'rowlimit', 'wordwrap', 'editorheight', 'tablelist', 'sharestate', 'popout', 'stopquery', 'firstpage', 'lastpage', 'scrollleft', 'scrollright', 'exitpivot', 'expandgroups', 'collapsegroups', 'restoregroup', 'restorepivot', 'asofexit', 'profile', 'rowscard', 'datacard', 'loadcard'];   // (round 23) index.php's own controls this harness has not got
+                  'taggen', 'managedata', 'formatsql', 'rowlimit', 'wordwrap', 'editorheight', 'tablelist', 'sharestate', 'popout', 'stopquery', 'firstpage', 'lastpage', 'scrollleft', 'scrollright', 'exitpivot', 'expandgroups', 'collapsegroups', 'restoregroup', 'restorepivot', 'asofexit', 'profile', 'rowscard', 'datacard', 'loadcard',
+                  'dictionary', 'gendict'];   // (round 23) index.php's own controls this harness has not got; (2026-10-22) js/penumbra_dict.js is not loaded here (the dict suite tests both rows)
     var reg = pal('registry')(), bad = reg.filter(function (e) { return !e.needs && ABSENT.indexOf(e.id) < 0; }).map(function (e) { return e.id; });
     R.info.regBad = bad; R.info.regN = reg.length;
     R.chk.registryNeeds = reg.length >= 40 && bad.length === 0;
@@ -383,7 +384,7 @@
     R.chk.colMode = !!box() && modeOf() === 'col';
     t = texts();
     R.info.col = t;
-    R.chk.colItems = t.indexOf('Sort ascending') >= 0 && t.indexOf('Hide this column') >= 0 && t.indexOf('Move column: Left') >= 0 && t.indexOf('Show column(s): Show all columns') >= 0 && t.indexOf('Reset: This column') >= 0;
+    R.chk.colItems = t.indexOf('Sort ascending') >= 0 && t.indexOf('Hide this column') >= 0 && t.indexOf('Move column: Left') >= 0 && t.indexOf('Show column(s): Show all columns') >= 0 && t.indexOf('Clear all personal customizations...') >= 0;   // (colmenu round 33: the Reset list became one item)
     await pickRow('Show column(s): Show all columns'); await enter();
     await sleep(100);
     R.chk.colRun = hid && !box() && fth('V_STATUS').style.display !== 'none';   // (hidden first, then shown again)
@@ -397,6 +398,59 @@
     R.chk.themePick = !!box() && modeOf() === 'theme' && !!row('Dark Blue') && !!row('Default Light');
     await pickRow('Dark Blue'); await enter();
     R.chk.themeRuns = await until(function () { return document.body.classList.contains('theme-dark-blue'); }, 2000);
+  };
+  // ---------------------------------------------------------------- pwidth (2026-10-22, colmenu round 33)
+  // Fit columns to the page from the box (the width module's own fit: shares of the page, no sideways scroll); every
+  // column row's act one the header menu still offers on some column, and every width act an entry or an exemption;
+  // Reset this column's width through "Which column?". This harness lifts #results-wrapper apart from the flat table
+  // (and hides the table), and the width module fits a flat table only inside it: the scenario puts the table back in.
+  S.pwidth = async function () {
+    await boot(); await ready();
+    var W = window.Penumbra.colWidths, H = window.Penumbra.colWidthsHost;
+    var tbl = document.getElementById('resultsTable'), wrap = document.getElementById('results-wrapper');
+    if (tbl && wrap && !tbl.closest('#results-wrapper')) { tbl.parentNode.insertBefore(wrap, tbl); wrap.appendChild(tbl); }
+    $('#resultsTable').parents().filter(function () { return $(this).css('display') === 'none'; }).show(); $('#resultsTable').show();
+    await sleep(300);
+    var hs = pal('headers')(), names = ['V_ID', 'V_NAME', 'V_AMOUNT', 'V_DATE', 'V_LINK', 'V_STATUS', '#'];
+    R.info.pre = { hs: hs, inWrap: !!(fth('V_NAME') && fth('V_NAME').closest('#results-wrapper')), canFit: !!(W && W.canFit && W.canFit(fth('V_NAME'))),
+      wrapW: wrap ? Math.round(wrap.getBoundingClientRect().width) : null, user: (H && H.state) ? JSON.stringify(H.state().user) : null };
+    // every column row's act is offered on some column; every act of the menus an entry or a recorded exemption
+    var offered = {};
+    names.forEach(function (n) { var t = fth(n); if (t) pal('menuActs')(t).forEach(function (a) { offered[a] = 1; }); });
+    var cacts = pal('columnActs')(), dead = cacts.filter(function (a) { return !offered[a]; });
+    var missing = Object.keys(offered).filter(function (a) { return cacts.indexOf(a) < 0 && !((P() && P().exempt) ? P().exempt(a) : false); });
+    R.info.dead = dead; R.info.missing = missing; R.info.offered = Object.keys(offered).filter(function (a) { return !/^(swap|show|copy)-\d+$/.test(a); });
+    R.chk.noDeadColRows = cacts.length >= 10 && dead.length === 0;
+    R.chk.widthCoverage = !!offered.fitPage && !!offered.resetWidth && !!offered.fitAll && missing.length === 0;
+    // Fit columns to the page
+    await open('fit to page');
+    var fr = row('Fit columns to the page');   // (Actions, or Top match when it ranks first)
+    R.info.fitRows = rows().slice(0, 4).map(function (r) { return [r.section, r.text, r.off, r.why]; });
+    R.chk.fitPageRow = !!fr && !fr.off;
+    var picked = !!fr && !fr.off && await pickRow('Fit columns to the page');
+    if (picked) { await enter(); }
+    await sleep(600);
+    var u = (H && H.state) ? H.state().user : {}, shares = Object.keys(u).filter(function (k) { return /%$/.test(String(u[k])); });
+    var shown = hs.filter(function (n) { return n !== '#'; }).length;
+    R.info.fit = { picked: picked, box: !!box(), shares: shares.map(function (k) { return k + ' ' + u[k]; }), shown: shown, scroll: wrap ? wrap.scrollWidth : null, client: wrap ? wrap.clientWidth : null, toast: (window.__toasts || []).slice(-1)[0] || '' };
+    R.chk.fitPageRuns = picked && !box() && shown >= 5 && shares.length === shown && !!wrap && wrap.clientWidth > 300 && wrap.scrollWidth <= wrap.clientWidth + 1
+      && /fitted to the page/.test((window.__toasts || []).slice(-1)[0] || '');
+    if (box()) { key('Escape', { target: input() }); await sleep(30); }
+    // Reset this column's width: the shown columns with the menu's own reason, then one column back
+    await open("reset this column's width");
+    var rr = row("Reset this column's width...");
+    R.info.resetRow = rr ? [rr.section, rr.text, rr.off, rr.why] : null;
+    var pk = !!rr && !rr.off && await pickRow("Reset this column's width...");
+    if (pk) { await enter(); }
+    var list = rows().map(function (r) { return [r.text, r.off, r.why]; }), by = {};
+    list.forEach(function (x) { by[x[0]] = x; });
+    R.info.resetPick = { mode: modeOf(), list: list };
+    R.chk.resetWidthPick = pk && modeOf() === 'pick' && !!by.V_NAME && !by.V_NAME[1] && !!by['#'] && by['#'][1] && !!by['#'][2];
+    if (pk) { type('v_name'); await sleep(60); await enter(); await sleep(500); }
+    var u2 = (H && H.state) ? H.state().user : {}, left = Object.keys(u2).filter(function (k) { return /%$/.test(String(u2[k])); });
+    R.info.after = JSON.stringify(u2);
+    R.chk.resetWidthRuns = !!R.chk.fitPageRuns && !!R.chk.resetWidthPick && !box() && u2.V_NAME === undefined && left.length === shown - 1;
+    if (box()) { key('Escape', { target: input() }); await sleep(30); }
   };
   // ---------------------------------------------------------------- pview
   S.pview = async function () {
@@ -1031,16 +1085,24 @@
     var r1 = jrow(); R.info.admin = [r1, texts().slice(0, 3), selIdx()];
     R.chk.rowForAdmin = ok && !!r1 && !r1.off;
     R.chk.rankQuestion = ok && !!rows()[0] && rows()[0].text.indexOf('Ask Jarvis:') === 0 && rows()[0].section === 'Top match' && !!row('Ask help:') && selIdx() === 0;   // (round 22) the slot; Ask help in its own place
+    // (jarvispal, 2026-10-22) the two ask rows together: Ask help right under the slot's Ask Jarvis, not selected; the paid / free sub-lines
+    var rh1 = row('Ask help:'); R.info.askSecond = rows().slice(0, 3).map(function (r) { return r.section + ': ' + r.text + ' | ' + r.sub; });
+    R.chk.askSecond = ok && !!rows()[1] && rows()[1].text.indexOf('Ask help:') === 0 && rows()[1].section === 'Top match' && !rows()[1].off && rows().filter(function (r) { return r.text.indexOf('Ask help:') === 0; }).length === 1 && selIdx() === 0;
+    R.chk.subPaid = ok && !!r1 && r1.sub === 'the paid AI assistant: help, SQL, custom code and data';
+    var subQ = !!rh1 && rh1.sub === 'answers from the help text only, with the pages it used';
     key('Escape', { target: input() }); await sleep(30);
     penumbra_vars.isAdmin = false; penumbra_vars.isGlobalAdmin = false; penumbra_vars.aiAllowed = true;   // a grant holder or an owner: the server's flag says yes
     await open('select * from awards'); await sleep(200);
     var r2 = jrow(); R.info.grant = [r2, texts().slice(0, 3)];
     R.chk.rowForGrant = ok && !!r2 && !r2.off;
     R.chk.rankSql = !!rows()[0] && rows()[0].text.indexOf('Ask Jarvis:') === 0 && rows()[0].section === 'Top match' && !!row('Ask help:');
+    R.chk.askSecondCode = !!rows()[1] && rows()[1].text.indexOf('Ask help:') === 0 && rows()[1].section === 'Top match';   // (jarvispal) code-like text: the same pair
     key('Escape', { target: input() }); await sleep(30);
     await open('fr'); await sleep(200); var idxJ = rowIndex('Ask Jarvis:'), idxH = rowIndex('Ask help:'), n = rows().length;
     R.info.plain = [idxJ, idxH, n];
     R.chk.rankPlain = idxJ === n - 1 && idxH === n - 2 && idxH > 0;
+    var rh2 = row('Ask help:'); R.info.subs = [r1 ? r1.sub : null, rh1 ? rh1.sub : null, rh2 ? rh2.sub : null];
+    R.chk.subHelpOnly = subQ && !!rh2 && rh2.sub === 'answers from the help text only';   // (jarvispal) for a question with the pages clause, plain text without
     await open('zzqx'); await sleep(250);
     var jz = jrow(); R.info.empty = [jz, rows().map(function (r) { return r.section + ': ' + r.text; })];
     R.chk.emptyState = !!jz && !!rows()[0] && rows()[0].section === 'Filter and find';   // (round 22) the hand-offs lead by the fixed order; Ask Jarvis keeps its own place
@@ -1049,6 +1111,7 @@
     penumbra_vars.aiAllowed = false;
     await open('how do I sum a column'); await sleep(200);
     R.chk.noRowViewer = ok && !jrow() && !!row('Ask help:');
+    R.chk.viewerAskFirst = ok && !jrow() && !!rows()[0] && rows()[0].text.indexOf('Ask help:') === 0 && rows()[0].section === 'Top match' && selIdx() === 0;   // (jarvispal) the viewer: Ask help first
     key('Escape', { target: input() }); await sleep(30);
     penumbra_vars.aiAllowed = true;
     // (round 21, 2026-10-21) the server's flag says yes (a grant elsewhere, the owner of another report) but this viewer
@@ -1058,6 +1121,14 @@
     R.chk.noRowNonEditor = ok && !jrow() && !!row('Ask help:');
     key('Escape', { target: input() }); await sleep(30);
     penumbra_vars.canEditReport = ceWas;
+    // (jarvispal, 2026-10-22) the panel not on the page at all (neither the toggle nor the penumbraAi export): no row, Ask help first
+    var tgls = Array.prototype.slice.call(document.querySelectorAll('[id="toggleAiPanel"]')), aiWas0 = window.penumbraAi;   // (the harness carries the id twice: the toolbar's and the panel block's)
+    tgls.forEach(function (t) { t.id = 'zzToggleAiPanelOff'; }); window.penumbraAi = undefined;
+    await open('how do I sum a column'); await sleep(200);
+    R.info.nopanel = [!!jrow(), rows().slice(0, 2).map(function (r) { return r.section + ': ' + r.text; })];
+    R.chk.noPanelAskFirst = ok && !jrow() && !!rows()[0] && rows()[0].text.indexOf('Ask help:') === 0 && rows()[0].section === 'Top match' && selIdx() === 0;
+    key('Escape', { target: input() }); await sleep(30);
+    tgls.forEach(function (t) { t.id = 'toggleAiPanel'; }); window.penumbraAi = aiWas0;
     // (round 19b) the send checks cover the FALLBACK: without the penumbraAi export the row forwards to the panel (pjip covers the answer in the box)
     var aiWas = window.penumbraAi; window.penumbraAi = undefined;
     var sum = document.getElementById('aiProfileOn'), sumBefore = sum ? sum.checked : null;
@@ -1822,13 +1893,16 @@
     undo.forEach(function (u) { u(); });
     // column acts through the picker: the header menu's own item reached (Column options, Fit width, Move, Reset: spies on the page's own API)
     var A2 = window.Penumbra.headerMenu, W2 = window.Penumbra.colWidths, spy2 = {};
-    var u2 = [spyOn(A2, 'openColOpts', 'opts'), spyOn(A2, 'resetColumn', 'reset'), spyOn(W2, 'fit', 'fit')];
+    var u2 = [spyOn(A2, 'openColOpts', 'opts'), spyOn(A2, 'resetColumn', 'reset'), spyOn(W2, 'fit', 'fit'), spyOn(W2, 'resetOne', 'resetOne')];
     function spyOn2(obj, name, key) { var was = obj[name]; obj[name] = function () { spy2[key] = (spy2[key] || 0) + 1; return was.apply(this, arguments); }; return function () { obj[name] = was; }; }
     async function colAct(q, label, colTyped) { await open(q); await sleep(200); var pk = await pickRow(label); if (!pk) { return false; } await enter(); await sleep(150); type(colTyped); await sleep(100); await enter(); await sleep(600); return true; }
     await colAct('column options', 'Column options...', 'v_am'); R.chk.colOptions = spy.opts === 1;
     await colAct('fit width to contents', 'Fit width to contents...', 'v_am'); var fitRow = (rows() || [])[0]; R.info.fit = [spy.fit, modeOf(), fitRow, texts().slice(0, 3)]; R.chk.colFit = spy.fit === 1 || (modeOf() === 'pick' && !!fitRow && fitRow.off && !!fitRow.why);
     if (box()) { key('Escape', { target: input() }); await sleep(30); }
-    await colAct('reset this column', 'Reset this column...', 'v_am'); R.chk.colReset = spy.reset === 1;
+    // (colmenu round 33) the menu's per-column reset is its width's now: run, or greyed with the menu's reason (this view's widths)
+    await colAct("reset this column's width", "Reset this column's width...", 'v_am'); var rsRow = (rows() || [])[0]; R.info.reset = [spy.resetOne, modeOf(), rsRow];
+    R.chk.colReset = spy.resetOne === 1 || (modeOf() === 'pick' && !!rsRow && rsRow.off && !!rsRow.why);
+    if (box()) { key('Escape', { target: input() }); await sleep(30); }
     u2.forEach(function (u) { u(); });
     var orderBefore = A2.layout().cols.filter(function (c) { return c.visible; }).map(function (c) { return c.colName; });
     await colAct('move column to the end', 'Move column to the end...', 'v_id'); await sleep(400);

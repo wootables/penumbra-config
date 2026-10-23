@@ -79,7 +79,7 @@
     window.show_text = function (html) { window.__toasts.push(String(html)); };
   }
   function queryCalls() { return (window.__ajaxLog || []).filter(function (u) { return /query\.php/.test(u); }).length; }
-  var ALLOWED = ['v', 'm', 's', 'o', 'r', 'c', 'g', 'p', 'fz', 'w', 'fm', 'hl', 'cs', 'sb', 'cso', 'pg', 'cc', 'th', 'dn'];
+  var ALLOWED = ['v', 'm', 's', 'o', 'r', 'c', 'g', 'p', 'fz', 'w', 'fm', 'hl', 'cs', 'sb', 'cso', 'pg', 'cc', 'th', 'dn', 'tr', 'lc', 'f', 'fi'];
 
   async function main() {
     await boot();
@@ -124,6 +124,7 @@
       var b2 = capture();
       R.info.view = b2.token ? V().decode(b2.token) : null; R.info.dom = dom();
       R.chk.active = V().active();
+      if (SCN === 'vpivB') R.chk.defaultIsReports = !window._reportDefaultPivot;   // a flat report: no pivot of its own to restore
       if (SCN === 'vcapB') R.info.fx = [113, 34].map(function (i) { var r = window.__rowsFixture[i]; return Object.keys(r).filter(function (k) { return /alpha/i.test(String(r[k])); }).join(','); });
       R.chk.oneQuery = queryCalls() === 1;
     } else if (SCN === 'gvA' || SCN === 'pvA') {
@@ -164,9 +165,9 @@
       await sleep(2500);
       R.chk.noScript = window.__pwn === undefined && document.querySelectorAll('img[onerror]').length === 0;
       R.chk.noPollution = ({}).polluted === undefined;
-      R.chk.searchLiteral = document.getElementById('tableSearch').value === u.get('expect_s');
+      R.chk.tagTextRefused = document.getElementById('tableSearch').value === '';
       R.chk.noViewOptions = $('#viewOptionSearch').length === 1 && $('#viewOptionSearch').is(':checked') && $('#viewOptionExport').is(':checked');
-      R.chk.staleNameAsText = bodyText().indexOf('<img src=x onerror="window.__pwn=2">') >= 0;
+      R.chk.staleNameAsText = bodyText().indexOf('GONE_&amp;X') >= 0;
       R.chk.noAdminOverrides = window._penumbraUrlOverrides.rowlimit === null && window._penumbraUrlOverrides.download === null
         && window._penumbraUrlOverrides.theme === null && window._penumbraUrlOverrides.density === null;
       R.chk.queryUnchanged = queryCalls() === 1 && (window.__lastQueryText === undefined || /LR_FIXTURE/.test(window.__lastQueryText));
@@ -237,8 +238,17 @@
       $('#emailLightbox').show();
       function wtext() { return ($('#emailWarnings').text() || '').replace(/\s+/g, ' '); }
       $('#emailIncludeLink').prop('checked', false).trigger('change'); await sleep(200);
+      // (round 7) Copy link: the view link, copied with nothing ticked and nothing sent
+      window.__clip = []; var ajaxBefore = (window.__ajaxLog || []).length;
+      var cpl = document.getElementById('emailCopyViewLink'); if (cpl) cpl.click();
+      await until(function () { return window.__clip.length > 0; }, 3000);
+      var cpu = window.__clip[0] || '', cpt = (cpu.match(/[?&]view=([A-Za-z0-9_-]+)/) || [])[1];
+      R.info.copy = { url: cpu.slice(0, 120), s: cpt ? (V().decode(cpt) || {}).s : null, ajax: (window.__ajaxLog || []).slice(-8) };
+      R.chk.copyWithoutSending = !!cpt && (V().decode(cpt) || {}).s === 'Alpha' && !$('#emailIncludeLink').is(':checked') && (window.__ajaxLog || []).length === ajaxBefore;
+      R.chk.labelsReworded = /Include a link to the live report/.test($('#emailIncludeLink').parent().text()) && /^\s*As you see it now: filter, sort, columns, layout and display\s*$/.test($('#emailLinkAsView').parent().text());
       R.chk.rowShown = $('#emailViewLinkRow').length === 1 && $('#emailViewLinkRow').css('display') === 'block';
-      R.chk.disabledUntilLink = $('#emailLinkAsView').prop('disabled') === true && $('#emailViewLinkRow label').hasClass('option-disabled');
+      R.chk.disabledUntilLink = $('#emailLinkAsView').prop('disabled') === true && $('#emailViewLinkRow label').hasClass('option-disabled')
+        && $('#emailViewLinkRow label').attr('title') === 'Tick "Include a link to the live report" first';
       $('#emailIncludeLink').prop('checked', true).trigger('change'); await sleep(200);
       R.chk.enabledWithLink = $('#emailLinkAsView').prop('disabled') === false && !$('#emailViewLinkRow label').hasClass('option-disabled');
       R.chk.noListUnticked = wtext().indexOf('opens your view') < 0;
@@ -266,6 +276,98 @@
       R.chk.prefsNotSaved = localStorage.getItem('penumbra_pref_theme') === null && localStorage.getItem('penumbra_pref_density') === null
         && localStorage.getItem('penumbra_user_theme') === null && localStorage.getItem('penumbra_user_density') === null;
       var btb = capture(); R.info.view = btb.token ? V().decode(btb.token) : null;
+    } else if (SCN === 'vshare' || SCN === 'vsharenoid') {
+      // the console's Share button: a view link on a saved report, the ?state= link on unsaved work
+      window.__clip = [];
+      // keep the synthetic modifier-click from opening a tab: record it instead
+      window.__opened = [];
+      var _disp = HTMLAnchorElement.prototype.dispatchEvent;
+      HTMLAnchorElement.prototype.dispatchEvent = function (ev) { if (ev && ev.type === 'click') { window.__opened.push(this.href); return false; } return _disp.call(this, ev); };
+      if (SCN === 'vshare') { var ts2 = document.getElementById('tableSearch'); ts2.value = 'Alpha'; }
+      $('#shareQuery').trigger('click');
+      await until(function () { return window.__clip.length > 0; }, 4000); await sleep(400);
+      HTMLAnchorElement.prototype.dispatchEvent = _disp;
+      var su = window.__clip[window.__clip.length - 1] || '';
+      R.info.share = su.slice(0, 160); R.info.opened = (window.__opened[0] || '').slice(0, 160);
+      if (SCN === 'vshare') {
+        var sv = (su.match(/[?&]view=([A-Za-z0-9_-]+)/) || [])[1];
+        R.chk.shareIsViewLink = /[?&]id=lrfix/.test(su) && !!sv && !/[?&]state=/.test(su) && (V().decode(sv) || {}).s === 'Alpha';
+        R.chk.shareOpened = window.__opened[0] === su;
+        R.chk.shareToast = bodyText().indexOf('A link to this view: it opens this report with your filter') >= 0;
+      } else {
+        R.chk.shareKeepsState = /[?&]state=/.test(su) && !/[?&]view=/.test(su);
+      }
+    } else if (SCN === 'vscrA' || SCN === 'vscrB' || SCN === 'vfindA' || SCN === 'vfindB') {
+      // (round 6) where the table is scrolled, and an open Find on its match
+      var FH6 = window.Penumbra.findHost, wr6 = FH6 && FH6.wrapper();
+      function headBottom() { var h = document.querySelector('#resultsTable thead'); return wr6.getBoundingClientRect().top + (h ? h.getBoundingClientRect().height : 0); }
+      function stickyRight() { var r = wr6.getBoundingClientRect().left; Array.prototype.forEach.call(document.querySelectorAll('#tableHeader th'), function (th) { if (th.style.display !== 'none' && getComputedStyle(th).position === 'sticky' && getComputedStyle(th).left !== 'auto') r = Math.max(r, th.getBoundingClientRect().right); }); return r; }
+      function idOf(tr) { var t = tr && tr.querySelector('td[data-column="' + fth('V_ID').getAttribute('data-column') + '"]'); return t ? t.textContent.trim() : null; }
+      function where() {
+        var top = headBottom(), row = null, col = null, edge = stickyRight();
+        Array.prototype.some.call(document.querySelectorAll('#resultsTable tbody tr'), function (tr) { if (tr.classList.contains('search-hidden') || tr.style.display === 'none') return false; if (tr.getBoundingClientRect().bottom > top + 1) { row = idOf(tr); return true; } return false; });
+        Array.prototype.some.call(document.querySelectorAll('#tableHeader th[data-colname]'), function (th) { if (th.style.display === 'none' || (getComputedStyle(th).position === 'sticky' && getComputedStyle(th).left !== 'auto') || th.getAttribute('data-colname') === '#') return false; if (th.getBoundingClientRect().right > edge + 2) { col = th.getAttribute('data-colname'); return true; } return false; });
+        return { row: row, col: col, st: wr6.scrollTop, sl: wr6.scrollLeft };
+      }
+      function curCell() {
+        var td = document.querySelector('#resultsTable td.pnb-find-cur'); if (!td) return null;
+        var th = document.querySelector('#tableHeader th[data-column="' + td.getAttribute('data-column') + '"]'), b = wr6.getBoundingClientRect(), r = td.getBoundingClientRect();
+        return { id: idOf(td.parentNode), col: th ? th.getAttribute('data-colname') : null, onScreen: r.bottom > headBottom() && r.top < b.bottom && r.right > b.left && r.left < b.right, text: td.textContent.trim().slice(0, 40) };
+      }
+      var FN6 = window.Penumbra.find;
+      if (SCN === 'vscrA' || SCN === 'vfindA') {
+        // wide columns, so the table scrolls sideways too
+        ['V_NAME', 'V_AMOUNT', 'V_DATE'].forEach(function (c) { window.Penumbra.colWidthsHost.setUser(c, 600); });
+        window.Penumbra.colWidths.apply(); await sleep(400);
+        wr6.scrollTop = 1400; wr6.scrollLeft = 700; await sleep(400);
+        R.info.where = where();
+      }
+      if (SCN === 'vfindA') {
+        FN6.open('Alpha');
+        await until(function () { var s6 = FN6._state(); return !s6.scanning && s6.cur >= 0; }, 8000);
+        var inp6 = document.querySelector('.pnb-find-input');
+        for (var k6 = 0; k6 < 3; k6++) { inp6.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); await sleep(250); }
+        R.info.fcur = FN6._state().cur; R.info.cell = curCell(); R.info.where = where();
+        R.chk.findStepped = R.info.fcur >= 3 && !!R.info.cell;
+      }
+      if (SCN === 'vscrB' || SCN === 'vfindB') {
+        R.chk.note = await noteShown();
+        if (SCN === 'vfindB') await until(function () { return FN6.isOpen() && FN6._state().cur >= 0 && !!curCell(); }, 10000);
+        await sleep(800);
+        R.info.where = where();
+        if (SCN === 'vfindB') { R.info.fcur = FN6._state().cur; R.info.cell = curCell(); R.chk.findOpen = FN6.isOpen() && document.querySelector('.pnb-find-input').value === 'Alpha'; R.chk.cellOnScreen = !!R.info.cell && R.info.cell.onScreen; }
+      }
+      var b6 = capture(); R.info.token = b6.token; R.info.view = b6.token ? V().decode(b6.token) : null;
+      if (SCN === 'vscrA') { R.chk.carriesScroll = !!R.info.view && R.info.view.tr > 0 && R.info.view.lc === R.info.where.col && (b6.included || []).indexOf('scroll position') >= 0; }
+      if (SCN === 'vfindA') {
+        R.chk.carriesFind = !!R.info.view && R.info.view.f === 'Alpha' && R.info.view.fi === R.info.fcur && (b6.included || []).indexOf('Find') >= 0;
+        R.chk.describedFind = (V().describe(b6) || []).indexOf('Find "Alpha" on match ' + (R.info.fcur + 1)) >= 0;
+      }
+    } else if (SCN === 'vbadpiv' || SCN === 'vbadpiv2' || SCN === 'vbadpiv3' || SCN === 'vbadpiv4' || SCN === 'vbadgrp' || SCN === 'vbadgrp2' || SCN === 'vbadgrp3') {
+      // (sweep) a crafted pivot / grouping in a link: labels, field names, a formula, an aggregate - as text, never code
+      await sleep(3500);
+      var onAt = []; Array.prototype.forEach.call(document.querySelectorAll('#pivot-output-container *, #groupedResultsContainer *, #resultsTable *, #undo_text, #undo_text *, .zz-toast *'), function (e) { for (var i = 0; i < e.attributes.length; i++) if (/^on/i.test(e.attributes[i].name)) onAt.push(e.tagName + '.' + e.attributes[i].name); });
+      R.info.onAttrs = onAt.slice(0, 8);
+      R.chk.noScript = window.__pwn === undefined && onAt.length === 0;
+      R.chk.pageAlive = vis('#resultsTable') || vis('#pivot-output-container') || vis('#groupedResultsContainer');
+      R.info.dom = { pivot: vis('#pivot-output-container'), grouped: vis('#groupedResultsContainer'), flat: vis('#resultsTable'), pwn: window.__pwn };
+      if (SCN === 'vbadpiv' || SCN === 'vbadpiv3') R.chk.pivotShown = vis('#pivot-output-container') && !!document.querySelector('#pivot-output-container td');
+      if (SCN === 'vbadgrp' || SCN === 'vbadgrp3') R.chk.grouped = vis('#groupedResultsContainer');
+    } else if (SCN === 'vfmsave') {
+      // (sweep) the link's formats are this page's own, the report's stay the report's: an editor's save keeps them
+      R.chk.note = await noteShown(); await sleep(500);
+      var bf = capture(), vf = bf.token ? (V().decode(bf.token) || {}) : {};
+      R.info.view = vf;
+      R.chk.wysiwygFormats = JSON.stringify(vf.fm || {}) === JSON.stringify({ V_AMOUNT: 'number:1' });
+      R.chk.csoRoundTrip = !!(vf.cso && vf.cso.V_STATUS && JSON.stringify(vf.cso.V_STATUS.values) === JSON.stringify(['Pending', 'Open', 'Closed']));
+      window.__SAVE_ANSWER = function (b) { return { ok: true, json: { success: true, new_id: b.short_id, numeric_id: 7, is_new: false, updated_at: '2026-10-22 10:00:00.000000' } }; };
+      var n9 = window.__saves.length;
+      $('#confirmServerSaveBtn').prop('disabled', false).trigger('click');
+      await until(function () { return window.__saves.length > n9; }, 8000); await sleep(300);
+      var sd9 = null; try { sd9 = JSON.parse(window.__saves[window.__saves.length - 1].state_data); } catch (e) { }
+      R.info.saved = sd9 ? { fm: sd9.columnFormats, cso: sd9.customSortOrders } : null;
+      R.chk.savedReportFormats = !!sd9 && JSON.stringify(sd9.columnFormats || {}) === JSON.stringify({ V_AMOUNT: 'currency:0', V_DATE: 'date:YYYY' });
+      R.chk.urlDropsView = !new URLSearchParams(location.search).has('view');
     } else if (SCN === 'vpgA') {
       // 300 rows at 25 a page, turned to page 3 through the pager's own buttons
       $('#rowsPerPageSelector').val('25').trigger('change'); await sleep(600);
@@ -279,8 +381,64 @@
       R.chk.note = await noteShown(); await sleep(400);
       R.info.dom = { page: $('#pageInfo').text(), rows: rowsText(3) };
       if (SCN === 'vpgstale') R.chk.clamped = R.info.dom.page === 'Page 12 of 12' && /^ID-1276 /.test(R.info.dom.rows[0] || '');
+    } else if (SCN === 'vfitA' || SCN === 'vfitB') {
+      // (2026-10-22) Fit to page through a link: the shares of the page ride it, and the screen that opens it
+      // sizes each column as that share of its own box, with no sideways scroll
+      var W7 = window.Penumbra.colWidths, H7 = window.Penumbra.colWidthsHost, wrap7 = document.getElementById('results-wrapper'), tbl7 = document.getElementById('resultsTable');
+      R.info.inWrap = !!(tbl7 && tbl7.closest('#results-wrapper'));
+      if (SCN === 'vfitA') {
+        W7.fitPage(fth('V_NAME')); await sleep(400);
+        var u7 = H7.state().user, sk7 = Object.keys(u7).filter(function (k) { return /%$/.test(String(u7[k])); });
+        R.info.user = u7;
+        R.chk.fitShares = sk7.length === shownNames().length && sk7.length >= 5;
+        var b7 = capture(), v7 = b7.token ? (V().decode(b7.token) || {}) : {};
+        R.info.token = b7.token; R.info.view = v7; R.info.dom = dom();
+        var w7 = v7.w || {}, ks7 = Object.keys(w7);
+        R.chk.carriesShares = ks7.length === sk7.length && ks7.length >= 5 && ks7.every(function (k) { return /%$/.test(String(w7[k])); })
+          && Math.abs(ks7.reduce(function (a, k) { return a + parseFloat(w7[k]); }, 0) - 100) < 1 && (b7.included || []).indexOf('widths') >= 0;
+      } else {
+        R.chk.note = await noteShown();
+        await sleep(600);
+        var rep7 = H7.state().report || {}, rk7 = Object.keys(rep7).filter(function (k) { return /%$/.test(String(rep7[k])); });
+        var room7 = W7.roomOf('flat'), off7 = [];
+        rk7.forEach(function (k) {
+          var th7 = fth(k), want7 = parseFloat(rep7[k]) / 100 * room7, got7 = th7 ? th7.getBoundingClientRect().width : -1;
+          if (Math.abs(got7 - want7) > 2) off7.push(k + ' ' + Math.round(got7) + ' vs ' + Math.round(want7));
+        });
+        R.info.report = rep7; R.info.room = room7; R.info.off = off7; R.info.scroll = [wrap7.scrollWidth, wrap7.clientWidth];
+        R.chk.sharesApplied = rk7.length >= 5 && off7.length === 0 && wrap7.scrollWidth <= wrap7.clientWidth + 1;
+        var b7b = capture(); R.info.view = b7b.token ? V().decode(b7b.token) : null; R.info.dom = dom();
+      }
+    } else if (SCN === 'vjrn') {
+      // (2026-10-22) a link naming the journal's columns: none listed as gone; the journal places them by the
+      // link's order (Notes after V_ID, Done after V_AMOUNT) and keeps the one the sender had hidden hidden
+      R.chk.note = await noteShown();
+      await sleep(400);
+      var miss8 = V().missing(), bt8 = bodyText(), at8 = bt8.indexOf('Opened a shared view');
+      R.info.missing = miss8; R.info.noteText = at8 >= 0 ? bt8.slice(at8, at8 + 300) : '';
+      R.chk.jrnNotMissing = miss8.every(function (n) { return String(n).toUpperCase().indexOf('__JOURNAL') !== 0; });
+      R.chk.jrnNoSkipNote = R.chk.note === true && bt8.indexOf('no longer in this report') < 0;
+      window._penumbraToggleState = window._penumbraToggleState || {};
+      window._penumbraJournalKeyColumns = ['V_ID'];   // (the harness has no journal: a key column gives its rows cells)
+      window.Penumbra.journalPaintFor([{ key: 'done', label: 'Done' }], true);
+      await sleep(500);
+      var heads8 = Array.prototype.map.call(document.querySelectorAll('#tableHeader > th'), function (t) { return t.getAttribute('data-column'); });
+      var hn8 = document.querySelector('#tableHeader > th[data-column="__JOURNAL_NOTES"]'), ht8 = document.querySelector('#tableHeader > th[data-column="__JOURNAL_TOGGLE__done"]');
+      var idOf8 = function (n) { var t = fth(n); return t ? t.getAttribute('data-column') : null; };
+      var iId8 = heads8.indexOf(idOf8('V_ID')), iAmt8 = heads8.indexOf(idOf8('V_AMOUNT'));
+      R.info.heads = heads8;
+      R.chk.jrnPlaced = iId8 >= 0 && heads8[iId8 + 1] === '__JOURNAL_NOTES' && iAmt8 >= 0 && heads8[iAmt8 + 1] === '__JOURNAL_TOGGLE__done';
+      var tr8 = document.querySelector('#resultsTable tbody tr'), cells8 = tr8 ? Array.prototype.map.call(tr8.children, function (c) { return c.getAttribute('data-column'); }) : [];
+      var cId8 = cells8.indexOf(idOf8('V_ID')), cAmt8 = cells8.indexOf(idOf8('V_AMOUNT'));
+      R.info.cells = cells8;
+      R.chk.jrnCellsFollow = cId8 >= 0 && cells8[cId8 + 1] === '__JOURNAL_NOTES' && cAmt8 >= 0 && cells8[cAmt8 + 1] === '__JOURNAL_TOGGLE__done';
+      var nCell8 = tr8 ? tr8.querySelector('[data-column="__JOURNAL_NOTES"]') : null;
+      R.chk.jrnHidden = !!hn8 && hn8.style.display === 'none' && !!nCell8 && nCell8.style.display === 'none';
+      R.chk.jrnShown = !!ht8 && ht8.style.display !== 'none';
+      R.info.toggleW = ht8 ? Math.round(ht8.getBoundingClientRect().width) : null;
+      R.chk.jrnWidth = !!ht8 && Math.abs(ht8.getBoundingClientRect().width - 90) <= 2;
     } else if (SCN === 'vlimit') {
-      var junk = '', sd = 12345; for (var i = 0; i < 1900; i++) { sd = (sd * 1103515245 + 12345) & 0x7fffffff; junk += String.fromCharCode(48 + (sd >> 8) % 75); }
+      var junk = '', sd = 12345; for (var i = 0; i < 1900; i++) { sd = (sd * 1103515245 + 12345) & 0x7fffffff; var ch = 48 + (sd >> 8) % 75; junk += String.fromCharCode(ch === 60 ? 61 : ch); }   // (no '<': a tag-shaped text is refused)
       $('#tableSearch').val(junk.replace(/[|,]/g, 'x'));
       var bl = capture();
       var L = bl.url ? (new URL(bl.url).pathname + new URL(bl.url).search).length : 99999;

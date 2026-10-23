@@ -36,7 +36,7 @@ CHK = {
              'escOneSurface', 'realColNoAdjust', 'armDropped'],   # round 8 (closing sweep): one Escape one surface, no Adjust on a real column, a dropped replay arm
     'curl': ['halfShown', 'dblCurrency', 'flagText', 'badLeftOut', 'atEnd', 'panelFromLink', 'summable'],
     'cadd': ['addButton', 'dialog', 'layout', 'cheatPlain', 'adjOneLine', 'kindNoOverlap', 'errInFooter', 'noEarlyError', 'chips', 'chipInserts', 'preview', 'reran', 'added', 'listAfterAdd', 'edited', 'removed', 'listAfterRemove',
-             'editFocus', 'removeFocus'],   # moderate 2026-10-15: WCAG 2.4.3; cheatPlain / adjOneLine 2026-10-19 (calcadj round 2)
+             'editFocus', 'removeFocus', 'panelLabel', 'editShowsLabel'],   # moderate 2026-10-15: WCAG 2.4.3; cheatPlain / adjOneLine 2026-10-19 (calcadj round 2)
     'cclear': ['before', 'listed', 'cleared'],
     'cstate': ['stateShown', 'viewStateCarries', 'saveStrips'],
 }
@@ -65,8 +65,23 @@ ENGINE = ['add', 'accounting', 'pctIn', 'divZero', 'textIsBlank', 'blankIsBlank'
           'dialogKindDate', 'dialogKindDateErr', 'dialogKindDateSaved',
           'knobDateWide',   # round 7
           # round 8 (2026-10-19, closing sweep)
-          'dateTypingKept', 'dateLeaveSprings', 'dateTypedApplies', 'plainKindGuard', 'removeForgets', 'stripCarrierLeftOut', 'noticedAgain', 'popKnobIds', 'popToggle', 'popTabOut']
+          'dateTypingKept', 'dateLeaveSprings', 'dateTypedApplies', 'plainKindGuard', 'removeForgets', 'stripCarrierLeftOut', 'noticedAgain', 'popKnobIds', 'popToggle', 'popTabOut',
+          # (2026-10-22) a name keeps the case it was typed in (its label)
+          'labelDef', 'labelNoneUpper', 'labelUrl', 'labelRowKey', 'labelRef', 'labelBadDropped', 'labelApplied', 'labelSummable', 'labelState',
+          'labelOpenEdit', 'labelRemove']
+# (2026-10-22) the checks this round adds or changes: red on live (its names forced to upper case)
+NEW = {'N-labelDef', 'N-labelUrl', 'N-labelRowKey', 'N-labelRef', 'N-labelApplied', 'N-labelState', 'N-labelOpenEdit', 'N-labelRemove',
+       'L-cadd-added', 'L-cadd-panelLabel', 'L-cadd-editShowsLabel'}
 MUTANTS = {
+    # --- (2026-10-22) the label: never kept; dropped by plain(); the row keyed by the upper-case name; a reference
+    # not following the label; the dialog and Remove matching a name exactly
+    'l-nolabel': ([('calc', "        if (lb !== name) out.label = lb;\n", "")], ['N-labelDef', 'N-labelRowKey', 'L-cadd-added'], ['cadd']),
+    'l-plain': ([('calc', "        if (d.label) o.label = d.label;\n", "")], ['N-labelApplied', 'N-labelState', 'N-labelRowKey'], []),
+    'l-rowkey': ([('calc', "order.forEach(function (e) { keyOf[e.def.name] = shown(e.def); });", "order.forEach(function (e) { keyOf[e.def.name] = e.def.name; });")], ['N-labelRowKey'], []),
+    'l-getkey': ([('calc', "var c = keyOf[n]; return r[c !== undefined ? c : n];", "return r[n];")], ['N-labelRef'], []),
+    'l-open': ([('calc', "if (name) { var nk = cleanName(name);", "if (name) { var nk = name;")], ['N-labelOpenEdit'], []),
+    'l-remove': ([('calc', "        name = cleanName(name);   // (2026-10-22) a label names it too\n", "")], ['N-labelRemove'], []),
+    'l-panel': ([('calc', '<li class="pnb-calc-item"><span class="pnb-calc-f" aria-hidden="true">&fnof;</span><span class="pnb-calc-n">\' + esc(shown(d)) + \'</span>', '<li class="pnb-calc-item"><span class="pnb-calc-f" aria-hidden="true">&fnof;</span><span class="pnb-calc-n">\' + esc(d.name) + \'</span>')], ['L-cadd-panelLabel'], ['cadd']),
     # the module (LF)
     'e-precedence': ([('calc', "while (isOp(tk[p], '+') || isOp(tk[p], '-')) { var op = tk[p++].v; a = { k: 'bin', op: op, a: a, b: mul() }; }",
                        "while (isOp(tk[p], '+') || isOp(tk[p], '-')) { var op = tk[p++].v; a = { k: 'bin', op: op, a: a, b: unary() }; }")], ['N-precedence'], []),
@@ -328,14 +343,17 @@ try:
             else: f += 1; failed.append(a)
         print('TOTAL pass=%d fail=%d   failed: %s' % (p, f, ' '.join(failed)))
         if control:
-            # live has no module: the engine page cannot run at all, and the page
-            # scenarios find nothing to add; only a page that boots cleanly may pass
-            absent = {'L-cstate-saveStrips'}   # nothing to strip without the module: holds trivially
-            # (since calccol is LIVE, --control-v1 tests the live round-1 module: only the
-            # round-2 dialog checks may be red)
-            sane = [a for a, passed, _ in res if passed and not a.startswith('E-') and a not in absent]
-            print('CONTROL: %d checks red (expected); checks that hold WITHOUT the change: %s' % (f, ' '.join(sane) or 'none'))
-            print('RESULT: GREEN' if not sane and f > 0 else 'RESULT: RED')
+            # (2026-10-22) calculated columns are LIVE: a control judges this round's checks (NEW: red on live)
+            # and every other check (green on live)
+            red = {a for a, passed, _ in res if not passed}
+            seen = {a for a, _, _ in res}
+            new_green = sorted(a for a in NEW if a in seen and a not in red)
+            new_unseen = sorted(a for a in NEW if a not in seen)
+            old_red = sorted(a for a in red if a not in NEW)
+            print('CONTROL: new checks green on live (unexpected): %s' % (' '.join(new_green) or 'none'))
+            print('CONTROL: new checks never run: %s' % (' '.join(new_unseen) or 'none'))
+            print('CONTROL: old checks red on live (unexpected): %s' % (' '.join(old_red) or 'none'))
+            print('RESULT: GREEN' if not new_green and not new_unseen and not old_red else 'RESULT: RED')
         else:
             print('RESULT: GREEN' if f == 0 and p > 0 else 'RESULT: RED')
 finally:

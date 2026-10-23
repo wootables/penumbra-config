@@ -33,13 +33,19 @@ def build(index_src):
     m = re.search(r'<div id="emailViewLinkRow".*?</div>', index_src)
     rep('<div id="pnbStatusBar">', '<div id="emailLightbox" style="display:none"><div id="emailWarnings"></div>'
         '<label><input type="checkbox" id="emailInsertData" checked> Insert</label><label><input type="checkbox" id="emailIncludeSnippet"> Header</label>'
-        '<label><input type="checkbox" id="emailIncludeLink"> Prepend link for recipients to access live report</label><br>'
+        '<label><input type="checkbox" id="emailIncludeLink"> Include a link to the live report</label><br>'
         + (m.group(0) if m else '') +
         '<label><input type="checkbox" id="emailShowRecipients"> Show</label><label><input type="checkbox" id="emailAttachPDF"> PDF</label>'
         '<div id="emailRecipientContainer"></div></div>\n<div id="pnbStatusBar">')
     # (round 4) a second theme in the registry, so a theme other than the default can ride
     rep("  window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' } };\n  window.PENUMBRA_THEME_IDS = ['theme-default'];",
         "  window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' }, 'theme-dark-blue': { label: 'Dark Blue' } };\n  window.PENUMBRA_THEME_IDS = ['theme-default', 'theme-dark-blue'];")
+    # (round 5) the console's Share button (main.js binds it at boot)
+    rep('<div id="pnbStatusBar">', '<button id="shareQuery" type="button">Share</button>\n<div id="pnbStatusBar">')
+    # (round 6) Find, after main.js as index.php loads it (the candidate's, written by run.py)
+    rep('<script src="driver.js"></script>\n', '<link rel="stylesheet" href="penumbra_find.css">\n<script src="penumbra_find.js"></script>\n<script src="driver.js"></script>\n')
+    # (sweep) vfmsave: the REPORT formats V_AMOUNT itself
+    rep('    window.__STORED = st;\n', '    if (S === "vfmsave") st.columnFormats = { V_AMOUNT: "currency:0", V_DATE: "date:YYYY" };\n    window.__STORED = st;\n')
     # (page round) the pager buttons, so a scenario turns pages through main.js's own handlers
     rep('<span id="pageInfo"></span>', '<span id="pageInfo"></span><button id="firstPageBtn">|&lt;</button><button id="prevPageBtn">&lt;</button>'
         '<button id="nextPageBtn">&gt;</button><button id="lastPageBtn">&gt;|</button>')

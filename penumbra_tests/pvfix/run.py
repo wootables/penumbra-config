@@ -22,7 +22,8 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
 SCN = ['pfmenu', 'pfneg']
 CHK = {
     'pfmenu': ['pvAi', 'chgItems', 'spanItems', 'amtItems', 'hlOpens', 'hlStored', 'hlDebounced', 'hlDrawn', 'hlStaysOpen', 'hlReset', 'chgShade',
-               'backPlain', 'backBtn', 'chgCellMenu', 'chgCellFilter'],
+               'backPlain', 'backBtn', 'chgCellMenu', 'chgCellFilter',
+               'cellTools', 'cellBack', 'chgCellShade'],   # (2026-10-22) a value cell's Shading / Format / Highlight
     'pfneg': ['negBuilt', 'negFar', 'posSpread', 'topFull', 'posOrder', 'engRank', 'engNoFlag'],
 }
 PHP_CHK = ['V-twin', 'L-two', 'E-cells', 'E-neg', 'E-top', 'E-spread']
@@ -32,9 +33,14 @@ NEW_PVFIX = {'L-pfmenu-' + c for c in ['pvAi', 'chgItems', 'spanItems', 'amtItem
     | {'P-' + c for c in ['L-two', 'E-neg', 'E-spread']}   # live 56837df
 # (pvfix 2, 2026-10-21) Back from the Highlight card; a % change cell's menu
 NEW = {'L-pfmenu-backPlain', 'L-pfmenu-backBtn', 'L-pfmenu-chgCellMenu', 'L-pfmenu-chgCellFilter'}
+# (2026-10-22, pvfix 2 is live: its checks are old ones now) a value cell's Shading, Format and Highlight
+NEW = {'L-pfmenu-cellTools', 'L-pfmenu-cellBack', 'L-pfmenu-chgCellShade'}
 # (P-V-twin: the page against the email value by value - green on live too, where neither reads
 # rankSides; it is the twins' guard, for the mutants)
 MUTANTS = {
+    # --- (2026-10-22) a cell's Back reopening the first heading; a cell's tools for the first value
+    'c-backhead': ([('menu', 'function (kbd) { pvBackCell(vpos, vat, kbd); }', 'function (kbd) { pvBack(0, vat, kbd); }')], ['L-pfmenu-cellBack'], ['pfmenu']),
+    'c-agg0': ([('menu', 'items = items.concat(pvValueTools(P, parseInt(vinfo.aggs[0], 10), el,', 'items = items.concat(pvValueTools(P, 0, el,')], ['L-pfmenu-chgCellShade'], ['pfmenu']),
     # every value cell's index: the body's line gone
     'a-noai': ([('main', "                    drillAttr += ' data-pv-ai=\"' + idx + '\"';\n", "")], ['L-pfmenu-pvAi', 'L-pfmenu-chgItems'], ['pfmenu']),
     # the menu reads the drill's index only

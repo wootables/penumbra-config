@@ -59,6 +59,10 @@ if ($blk !== null) {
     ok($api2['data'] === $ROWS && $summ2 === array(), 'H-sched-none no saved columns: the rows untouched, the summable list reset', json_encode($summ2));
     list($api3, ) = $run(array('calcColumns' => $DEFS), array('data' => array()));
     ok($api3['data'] === array(), 'H-sched-empty no rows: nothing to do');
+    // (2026-10-22) a name typed in mixed case: its label is the row's key, and it is still totalled (by its name)
+    list($api4, $summ4) = $run(array('calcColumns' => array(array('name' => 'Net Margin', 'formula' => '{AMOUNT} - {COST}', 'format' => 'currency'))), array('data' => $ROWS));
+    ok(array_keys($api4['data'][0]) === array('ID', 'AMOUNT', 'COST', 'Net_Margin') && $api4['data'][0]['Net_Margin'] === '$60.00' && $summ4 === array('NET_MARGIN' => true),
+       'H-sched-label a column named as typed keeps its case on the row and is still totalled', json_encode(array(array_keys($api4['data'][0]), $summ4)));
 }
 
 // ---- the streamed table dump

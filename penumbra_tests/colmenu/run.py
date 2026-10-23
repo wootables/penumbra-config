@@ -22,7 +22,7 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
         'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js', 'penumbra_tiles.js',
         'penumbra_a11y.js', 'penumbra_grouplist.js', 'penumbra_cellsel.js']
-SCN = ['mflat', 'mkbd', 'mopts', 'mcalc', 'mgroupby', 'gmenu', 'mrestr', 'mexcl', 'mcopy', 'mjournal', 'mmore', 'mfitnest', 'mfitnote', 'mcell', 'mnest', 'mload', 'mreset', 'msubs', 'mbucket', 'mnum',
+SCN = ['mflat', 'mkbd', 'mopts', 'mcalc', 'mgroupby', 'gmenu', 'mrestr', 'mexcl', 'mcopy', 'mjournal', 'mmore', 'mfitnest', 'mfitnote', 'mcell', 'mnest', 'mload', 'msubs', 'mbucket', 'mnum',   # (round 33) mreset retired: Reset all columns left the menu
        'mauto', 'mauto2', 'ggmenu', 'gglist', 'ggfmt', 'mautostale']
 CHK = {
     # (2026-10-20, grpsweep 2) a formatted column's group; a List choice left behind by a saved view
@@ -42,7 +42,7 @@ CHK = {
               'tipOpens', 'hide', 'hideSaved', 'skipHidden', 'showList', 'showHere', 'showFilled', 'swapList', 'swapDone', 'multiMove', 'lastNotHidable'],
     'mkbd': ['opensBelow', 'focusFirst', 'arrowMoves', 'enterRuns', 'focusBack', 'escCloses', 'escFocusBack', 'outsideCloses'],
     'mopts': ['optsPopover', 'optsTitle', 'optsNoFreeze', 'optsOpener', 'optsCloses', 'optsBack', 'freezeItem', 'freezes', 'unfreezeItem', 'unfreezes',
-              'noFreezePast5', 'fitItem', 'fits', 'fitUndo', 'fitUndone', 'fitAll', 'fitAllUndo', 'resetItem', 'resets', 'fitsLong', 'fitsLongCut', 'fitCapped'],
+              'noFreezePast5', 'fitItem', 'fits', 'fitUndo', 'fitUndone', 'fitAll', 'fitAllUndo', 'fitPage', 'fitPageUndo', 'resetItem', 'resets', 'fitsLong', 'fitsLongCut', 'fitCapped'],
     'mcalc': ['dialog', 'seeded', 'placedRight', 'placeSaved', 'calcRemoveItem', 'calcRemoved', 'calcStart'],
     'mgroupby': ['uniqueAsks', 'groupItem', 'grouped', 'uniqueQuiet', 'stalePickQuiet'],   # uniqueAsks / uniqueQuiet 2026-10-19 (grpunique): an all-different column asks first
     'gmenu': ['opens', 'noFreeze', 'cellGroup', 'groupItems', 'sortsGroups', 'fitGroup', 'moveAll', 'groupsKept', 'hideAll', 'regroup', 'ungroup'],
@@ -97,7 +97,7 @@ NEW_R9 = {'L-mflat-moveMinimal'}
 NEW_R10 = {'L-mload-idFast', 'L-mload-edHiddenSkip', 'L-mload-edShownRefresh', 'L-mload-edShownOnce'}
 # round 11 (2026-10-17): Reset all columns - every mreset check is new (live has no item),
 # plus the help rows
-NEW_R11 = {'L-mreset-' + c for c in CHK['mreset']} | {'S-helpResetAll'}
+NEW_R11 = {'L-mreset-' + c for c in CHK['mreset']} | {'S-helpResetAll', 'S-helpRowHeight'}
 # round 12 (2026-10-17): the menu reorganized (mockup B) - the lists under one item; the
 # checks of the old top level that changed shape come along (itemsAll, showList, copySubmenu)
 NEW_R12 = {'L-msubs-' + c for c in CHK['msubs']} | {'S-helpSubs', 'L-mflat-itemsAll', 'L-mflat-showList', 'L-mflat-showHere', 'L-mflat-showFilled', 'L-mcopy-copySubmenu',
@@ -150,7 +150,12 @@ NEW_SWEEP2 = {'L-ggfmt-fmtOnlyAll', 'L-mautostale-staleChoice', 'L-mauto2-implic
 NEW_NOTEFIT = {'L-mfitnote-' + c for c in CHK['mfitnote']}   # live 96b8f66
 # (2026-10-20, mutfix) nothing is staged: every round above is live, so --control holds live to every check
 # (NEW = NEW_NOTEFIT left it red on exactly those 4 since their deploy). The next round names its own NEW.
-NEW = set()
+NEW_SET_R33_BASE = set()
+# (round 33) Column widths list (fit, Fit to page, resets) up the menu, row height on every column, the
+# Reset list one Clear all personal customizations item; reshaped checks fail on live too
+NEW = {'L-mopts-fitItem', 'L-mopts-resetItem', 'L-mopts-resets', 'L-mopts-fitPage', 'L-mopts-fitPageUndo', 'L-mmore-resetCol',
+       'L-msubs-topOrder', 'L-msubs-arrows', 'L-msubs-resetList', 'L-msubs-clearPanel', 'L-mnum-numItems', 'L-mnum-numResets',
+       'L-mflat-itemsAll', 'L-mnest-nestRowHeightPlain', 'S-helpSubs', 'S-helpResetAll', 'S-helpRowHeight', 'S-helpMore'}
 MUTANTS = {
     # --- (2026-10-20, notefit) the width module: a box's own width / max-width, a flex row's items side by side
     'j-notewidth': ([('colw', "            if (v && v.unit === 'px') { w = bb ? Math.max(v.value, e) : v.value + e; need = held ? w : Math.max(w, need); }\n", "")],
@@ -358,7 +363,9 @@ MUTANTS = {
     # --- (round 31) the item trusts the panel's checkbox
     'h-stale': ([('menu', "        var on = !document.body.classList.contains('disable-auto-expand');\n        if (tg.checked !== on) { tg.checked = on; }\n", "        var on = tg.checked;\n")], ['L-mnest-nestRowHeight'], ['mnest']),
     # --- (round 30) the row height item never offered; the pick flips nothing
-    'h-noitem': ([('menu', "        if (nested) { var rh = rowHeightItem(); if (rh) { look.push(rh); } }", "")], ['L-mnest-nestRowHeight', 'L-mnest-nestRowHeightFlips'], ['mnest']),
+    'h-noitem': ([('menu', "        var rh = rowHeightItem();\n        if (rh) { size.push(rh); }\n", "")], ['L-mnest-nestRowHeight', 'L-mnest-nestRowHeightFlips', 'L-mnest-nestRowHeightPlain'], ['mnest']),
+    # (round 33) the row height item back on nested-table columns only
+    'h-nestonly': ([('menu', "        var rh = rowHeightItem();\n        if (rh) { size.push(rh); }", "        var rh = nested ? rowHeightItem() : null;\n        if (rh) { size.push(rh); }")], ['L-mnest-nestRowHeightPlain'], ['mnest']),
     'h-noflip': ([('menu', "                tg.checked = !tg.checked;\n", "")], ['L-mnest-nestRowHeightFlips'], ['mnest']),
     # --- (round 26) the Duplicates line: the extra copies miscounted
     'd-extra': ([('main', "        freq.forEach(function (c) { if (c > 1) { dupRows += c; dupExtra += c - 1; dupValues++; } });", "        freq.forEach(function (c) { if (c > 1) { dupRows += c; dupExtra += c; dupValues++; } });")], ['L-mflat-statsDup'], ['mflat']),
@@ -385,7 +392,11 @@ MUTANTS = {
     'f-fy': ([('main', "var fy = m >= PNB_FY_START_MONTH ? y + 1 : y;", "var fy = y;")], ['L-mbucket-dtUnits'], ['mbucket']),
     # --- (round 19) date Ranges, Fit all
     'k-nodate': ([('main', "        if (days.length >= 2 && days.length === nonEmpty) {", "        if (false) {")], ['L-mbucket-dtModes'], ['mbucket']),
-    'w-nofitall': ([('menu', "            if (typeof W.fitAll === 'function') {", "            if (false) {")], ['L-mopts-fitAll'], ['mopts']),
+    'w-nofitall': ([('menu', "        if (typeof W.fitAll === 'function') {\n            items.push({ act: act('fitAll')", "        if (false) {\n            items.push({ act: act('fitAll')")], ['L-mopts-fitAll'], ['mopts']),
+    # (round 33) no Fit to page in the list; a share dropped by main.js; the clear item back in a list
+    'w-nopage': ([('menu', "        if (typeof W.fitPage === 'function') {\n            items.push({ act: act('fitPage')", "        if (false) {\n            items.push({ act: act('fitPage')")], ['L-mopts-fitPage', 'L-msubs-resetList'], ['mopts', 'msubs']),
+    'w-share': ([('main', "                if (p > 0 && p <= 100 && name.indexOf('PIVOT:') !== 0) out[name] = p + '%';", "")], ['L-mopts-fitPage'], ['mopts']),
+    'c-flyout': ([('menu', "        if (clear.length) { items.push('-'); items = items.concat(clear); }", "        if (clear.length) { items.push('-'); items.push({ act: 'resets', label: 'Reset', sub: true, items: function () { return clear; } }); }")], ['L-msubs-topOrder', 'L-msubs-resetList'], ['msubs']),
     # --- (round 16) Ranges
     'k-contig': ([('menu', "                apply.disabled = sp.n === 0 || sp.gap || !!info.off;", "                apply.disabled = sp.n === 0 || !!info.off;")], ['L-mbucket-bkGap'], ['mbucket']),
     # (the fixture's amounts are all distinct, so a wrong count per value cannot show: the cuts instead)
@@ -399,7 +410,7 @@ MUTANTS = {
     'v-kbdleft': ([('menu', "        else if (k === 'ArrowLeft' && level > 0) { var from = cur.subs[level - 1].from; closeSubs(level - 1); try { from.focus({ preventScroll: true }); } catch (err) { from.focus(); } }\n", "")], ['L-msubs-kbdBack'], ['msubs']),
     'v-side': ([('menu', "        var x = p.right - 2, y = r.top - 5;", "        var x = p.left, y = p.top;")], ['L-msubs-flyPos'], ['msubs']),
     'v-close': ([('menu', "        c.subs.forEach(function (s) { if (s.el.parentNode) { s.el.parentNode.removeChild(s.el); } });\n", "")], ['L-msubs-escAll', 'L-msubs-outsideAll'], ['msubs']),
-    'u-resetwidths': ([('menu', "        if (W && typeof W.resized === 'function' && W.resized()) {\n            resets.push(", "        if (false) {\n            resets.push(")], ['L-msubs-resetList'], ['msubs']),
+    'u-resetwidths': ([('menu', "        if (all) {\n            items.push({ act: act('resetWidths')", "        if (false) {\n            items.push({ act: act('resetWidths')")], ['L-msubs-resetList', 'L-mopts-resetItem'], ['msubs', 'mopts']),
     'u-seps': ([('menu', "        items = items.concat(look);\n", "        if (look.length) { items.push('-'); items = items.concat(look); }\n")], ['L-msubs-topOrder'], ['msubs']),
     # --- (round 11) Reset all columns
     'r-layout': ([('main', "        if (s.moved) penumbraApplyHeaderLayout(s.rep);\n        _pnbDropLayoutPref();",
@@ -435,6 +446,8 @@ MUTANTS = {
     # (j-statsline dropped 2026-10-20: round 21 removed the counts line under the title, statsLine, that it blanked;
     # the Column stats list beside the item has s-noflyout, s-topnofilter and d-noline)
 }
+# (round 33) mreset retired with Reset all columns: its mutants have nothing to turn red
+MUTANTS = {k: v for k, v in MUTANTS.items() if set(v[2]) != {'mreset'}}
 
 args = sys.argv[1:]
 def opt(name, default=None):
@@ -590,12 +603,13 @@ def static_checks(texts):
         ('S-helpNum', 'Hide the row numbers' in texts['topic'] and 'Add a note to this row' in texts['topic'] and 'by fiscal year' in texts['topic'], ''),
         ('S-helpFitAll', 'Fit all column widths' in texts['topic'] and 'date column by year' in texts['topic'], ''),
         ('S-helpRanges', '<em>Ranges</em> groups the values into about six ranges' in texts['topic'], ''),
-        ('S-helpSubs', '<strong>Move column</strong>' in texts['topic'] and 'Clear all custom preferences for this report' in texts['topic'], ''),
-        ('S-helpResetAll', '<strong>Reset</strong>: All columns</td>' in texts['topic'], ''),
+        ('S-helpSubs', '<strong>Move column</strong>' in texts['topic'] and 'Clear all personal customizations' in texts['topic'], ''),
+        ('S-helpResetAll', '<strong>Column widths</strong>: Fit to page' in texts['topic'] and 'shares of the page' in texts['topic'] and '<strong>Reset</strong>: All columns</td>' not in texts['topic'], ''),   # (round 33) reshaped
+        ('S-helpRowHeight', 'every row keeps one compact height' in texts['topic'] and 'nested-table cells alone' not in texts['topic'] and 'every nested row shows in full' not in texts['topic'] and '<strong>Freeze row labels</strong>' in texts['topic'], ''),
         ('S-helpCells', 'data-colmenu-cells' in texts['topic'] and 'Filter to "value"' in texts['topic'], ''),
         # (round 6) the new items in both help files
         ('S-helpMore', all(x in texts['topic'] for x in ('Then sort ascending', 'Filter by value...', 'Show only this column',
-                                                           '<strong>Reset</strong>: This column', '<strong>Copy column name</strong>', 'the lists open beside their item')), ''),
+                                                           "Reset this column's width", '<strong>Copy column name</strong>', 'the lists open beside their item')), ''),   # (round 33) the Reset list's row went
         # (round 21) Column stats is back as a list beside the item; Pivot / Chart this column stay out
         ('S-helpStats', '<strong>Column stats</strong>' in texts['topic'] and 'A nested-table column counts its tables' in texts['topic'] and 'Pivot by this column' not in texts['topic']
          and '<em>all</em> when none repeats' in texts['topic'] and 'all unique' not in texts['topic'], ''),
