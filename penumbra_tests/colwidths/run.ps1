@@ -272,6 +272,9 @@ $mutantDefs = [ordered]@{
   # to page does nothing), and the container's observer blind to a new row to read (a group opening)
   'grefvis'     = @{ file = 'module'; edits = @(,@("        for (var i = 0; i < rows.length; i++) { if (rows[i].getClientRects().length) { return rows[i]; } }", "")); red = @('F12') }
   'grefro'      = @{ file = 'module'; edits = @(,@("                    if (w !== lastW || ref !== lastRef) { lastW = w; lastRef = ref; schedule(); }", "                    if (w !== lastW) { lastW = w; lastRef = ref; schedule(); }")); red = @('F14') }
+  # 2026-10-23 (lnk40) - no scrollbar's width kept back: a taller open group, or a flat table whose rows outgrow its box,
+  # scrolls sideways after Fit to page
+  'barres'      = @{ file = 'module'; edits = @(,@("        return Math.max(PAGE_BUFFER_MIN, barW);", "        return 0;")); red = @('F15') }
 }
 
 function Apply-Mutant([string]$name) {

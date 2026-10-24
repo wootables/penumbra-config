@@ -17,9 +17,44 @@
 #   py -3 run.py --control [--baseline F]
 #                                       the build before (newest js\main.js.bak-*-grplist, or F) and NO module:
 #                                       the List checks go RED, the Stacked ones stay green
-#   py -3 run.py --mutant NAME / --mutants
+#   py -3 run.py --mutant NAME / --mutant A,B,C / --mutants
 #   --scn a,b                           a subset of scenarios
+#   py -3 run.py --live-control         the LIVE build: the NEW checks (cmpgsort, rgsort, rgpaths - below) red, every other check
+#                                       green; a fix already in live main.js has its checks expected GREEN instead
 # Headless Edge over CDP; stages into %TEMP%; writes nothing to the webroot.
+#
+# RGSORT (2026-10-23): the same lost sort on the other paths - a regular regroup (the dialog's Apply, and with it the
+# status-bar chip / header menu's group-by and a group_by trigger: rgapply, rglist (List), nrgapply (nested), rgprep
+# (the Apply waiting for its rows), rgpivot (a pivot's sort left behind; the Apply's pivot branch; a throw)) and
+# Remove Grouping (the flat rows in the page's sort, the user's choice 10-23 over dropping it: rgremove, rgremoff (no
+# sort on: the report's own order), rgremlist (List, two levels), rgremsearch (a search typed), rgremguard (a pivot's
+# sort, a throw)). rgsort re-sorts on EVERY Apply, so cmpgsort's "next" flag went: the mutants that edit it
+# (cg-noresort, cg-noask, cg-reentry, cg-noconsume) are reported as superseded on a build without it, and cmpsort's
+# 'consumed' reads the hook's 'missing' as spent. rgpivot's harness page has an #exitPivotModeBtn (that scenario only).
+# Kit: penumbra_tests\rgsort\stage_20261023.
+#
+# RGPATHS (2026-10-23): the rest of the paths that redrew a view in an order the page's sort did not have. Grouped,
+# rebuilt from the flat rows and never re-sorted: a search typed in the grouped view and cleared (rpsearch Stacked,
+# rpsearchlist List), _pnbApplyColumnLayout - the header menu's move / hide, Settings > Columns, a hide of the sorted
+# column (rplayout) -, a Custom Sort Order saved for the grouping column (rpcso), the journal's rebuild when the groups
+# lack a configured column (rpjournal: the report journal on - run.py opens it with &id=, the harness answers
+# manage_journal.php). Flat: a pivot's exit (rppivot: the flat rows in the page's sort before the paging - both of its
+# branches -, the pivot's own sort gone unless it names a report column by number and name) and a comparison's Clear
+# that leaves the flat table (rpcmpflat: the grouping's column gone from the result set - the hook hands out the
+# comparison's record, getPreCmp; a pivot's sort through either renderer - runComparisonTwoSnapshots exported -;
+# GUARD: a flat sort kept). The review's finds: the exit button with no pivot on screen ("View in table" from any
+# view) drops no sort (rppivot noPivotKeeps, GUARD); a rebuild with no sort on clears the marks it cloned from the
+# flat headings (rpmarksoff). rgsort's marker is 'function _pnbResortFlatView(' now (rgpaths gives it a parameter);
+# cg-nogate / rg-nogate take the gate line as either build has it (a mutant's old text may be a tuple).
+# Kit: penumbra_tests\rgpaths\stage_20261023.
+#
+# CMPGSORT (2026-10-23): a sort made in the grouped view orders the group tables, never the flat rows; a snapshot
+# comparison's Clear regroups the flat rows (_restorePreCompareGrouping -> the dialog's Apply), and the groups came
+# back unsorted and unmarked while the page's sort still held it. Scenarios cmpsort, ncmpsort, cmpsortprep, cmpsortpivot
+# (Stacked) and cmpsortlist (List); the hook also exports updateHeaderIcons, getSort, setSort, getResortNext, records
+# the tbodies each rebuild drew (window.__RGV_TB), with window.__FORCE_PREP makes the Apply wait for its rows as a big
+# fill does, and with window.__THROW_SORT makes penumbraSortTbodyInPlace throw.
+# Kit: penumbra_tests\cmpgsort\stage_20261023.
 #
 # ROUND 2 ("grplist2", 2026-10-03): the harness also loads density.css and the
 # column-width tool (js/penumbra_colwidths.js + css, LIVE copies) as index.php does.
@@ -45,7 +80,12 @@ SCN = [('boot', ''), ('many', ''), ('click', ''), ('keys', ''), ('search', ''), 
        ('exports', ''), ('save', ''), ('layoutonly', ''), ('wide', ''), ('widestacked', ''), ('nested', ''),
        ('nstick', ''), ('narrow', ''), ('kill', '&grouplist=off'), ('tallabove', ''), ('broken', ''), ('exit', ''),
        ('longtext', ''), ('pinnarrow', ''), ('pinhash', ''), ('density', ''), ('listwidth', ''), ('trigger', ''), ('switch', ''),
-       ('copysnip', ''), ('pinflat', '&colwidths=flat'), ('radio', ''), ('tip', ''), ('compare', ''), ('fitstacked', ''), ('wideresize', ''), ('widecmp', ''), ('n3crumb', ''), ('nmerge', ''), ('nmergejs', ''), ('nmergeexp', ''), ('nsweep', ''), ('n3hidden', ''), ('npdf', ''), ('n3pdf', ''), ('pdf1', ''), ('nmail', ''), ('n3mail', ''), ('npath', '')]
+       ('copysnip', ''), ('pinflat', '&colwidths=flat'), ('radio', ''), ('tip', ''), ('compare', ''), ('fitstacked', ''), ('wideresize', ''), ('widecmp', ''), ('n3crumb', ''), ('nmerge', ''), ('nmergejs', ''), ('nmergeexp', ''), ('nsweep', ''), ('n3hidden', ''), ('npdf', ''), ('n3pdf', ''), ('pdf1', ''), ('nmail', ''), ('n3mail', ''), ('npath', ''),
+       ('cmpsort', ''), ('cmpsortlist', ''), ('ncmpsort', ''), ('cmpsortprep', ''), ('cmpsortpivot', ''),
+       ('rgapply', ''), ('rglist', ''), ('nrgapply', ''), ('rgprep', ''), ('rgpivot', ''),
+       ('rgremove', ''), ('rgremoff', ''), ('rgremlist', ''), ('rgremsearch', ''), ('rgremguard', ''),
+       ('rpsearch', ''), ('rpsearchlist', ''), ('rplayout', ''), ('rpcso', ''), ('rpjournal', '&id=gljr'), ('rppivot', ''), ('rpcmpflat', ''),
+       ('rpmarksoff', '')]
 # every check a scenario must publish (a missing one fails)
 CHK = {
     'boot': ['on', 'items', 'oneGroup', 'open', 'fit', 'listFit', 'row', 'linksHidden', 'grid', 'count', 'selectedAria',
@@ -130,7 +170,78 @@ CHK = {
     # grplistcmp (2026-10-13): a snapshot comparison is listed too
     'compare': ['cmpOn', 'cmpItems', 'cmpOne', 'cmpPane', 'cmpFit', 'cmpDivider', 'cmpVisible', 'cmpCount', 'cmpClick',
                 'cmpApplyStacked', 'cmpApplyList', 'cmpNotice', 'cmpRerun', 'cmpClear'],
+    # cmpgsort (2026-10-23): a sort made in the grouped view (every group's table, never the flat rows), a snapshot
+    # comparison, its Clear - the grouping comes back through the dialog's Apply, from the flat rows - and its sort
+    # with it: rows, marks, stripes (Stacked: cmpsort, the nested ncmpsort, cmpsortprep - the Apply waiting for its
+    # rows first; List: cmpsortlist)
+    'cmpsort': ['sorted0', 'flatKept0', 'cleared', 'rowsBack', 'marksBack', 'sortKept', 'stripes', 'flatAfter', 'repaint',
+                'consumed', 'nextDesc', 'cmpPutBack'],
+    'cmpsortlist': ['noSortSame', 'multiBack', 'multiMarks', 'shownSorted'],
+    'ncmpsort': ['nestBack', 'nestMarks'],
+    'cmpsortprep': ['prepRan', 'prepBack', 'prepMarks'],
+    # the review: a pivot's sort left behind is not applied to the restored groups; a re-sort that throws still lets
+    # the Apply end (both GUARDS: green on the build before too)
+    'cmpsortpivot': ['pivotLeft', 'throwContained'],
+    # rgsort (2026-10-23): a sort made in the grouped view and a regular regroup - the dialog's Apply, the menu's
+    # group-by, a group_by trigger (rgapply, Stacked), List with two levels (rglist), nested (nrgapply), the Apply
+    # waiting for its rows (rgprep), a pivot's sort left behind / the Apply's pivot branch / a throw (rgpivot); then
+    # Remove Grouping: the flat rows in the page's sort (rgremove), no sort on (rgremoff), List with two levels
+    # (rgremlist), a search typed (rgremsearch), a pivot's sort left behind / a throw (rgremguard, GUARDS)
+    'rgapply': ['sorted0', 'applyRan', 'rowsBack', 'marksBack', 'sortKept', 'stripes', 'flatKept', 'repaint', 'nextDesc',
+                'menuSorted', 'menuMarks', 'triggerSorted', 'triggerMarks'],
+    'rglist': ['noSortSame', 'multiBack', 'multiMarks', 'shownSorted'],
+    'nrgapply': ['nestBack', 'nestMarks'],
+    'rgprep': ['prepRan', 'prepBack', 'prepMarks'],
+    'rgpivot': ['pivotLeft', 'pivotBranch', 'throwContained'],
+    'rgremove': ['removed', 'flatSorted', 'flatMarks', 'flatSortKept', 'pageSorted', 'flatRepaint', 'flatNextDesc',
+                 'regroupFromFlat', 'staleGone'],
+    'rgremoff': ['offNatural', 'offUnmarked', 'offNextAsc'],
+    'rgremlist': ['listGone', 'multiFlat', 'multiFlatMarks'],
+    'rgremsearch': ['searchSorted', 'searchMarks'],
+    'rgremguard': ['pivotLeftFlat', 'throwFlat'],
+    # rgpaths (2026-10-23): the grouped rebuilds - a search cleared (rpsearch, rpsearchlist List), the column layout
+    # (rplayout: the header menu's move and hide, Settings > Columns, the sorted column hidden), a Custom Sort Order on
+    # the grouping column (rpcso), the journal (rpjournal); the flat views - a pivot's exit (rppivot), a comparison's
+    # Clear that leaves the flat table (rpcmpflat)
+    'rpsearch': ['noSortSame', 'cleared', 'clearSorted', 'clearMarks', 'clearStripes', 'clearSortKept', 'clearNextDesc'],
+    'rpsearchlist': ['listBack', 'listMarks', 'listShown'],
+    'rplayout': ['moveRan', 'moveSorted', 'moveMarks', 'hideSorted', 'hideMarks', 'panelSorted', 'panelMarks', 'hiddenSortKept'],
+    'rpcso': ['bandsOrdered', 'csoSorted', 'csoMarks', 'csoSortKept'],
+    'rpjournal': ['jrnRebuilt', 'jrnSorted', 'jrnMarks', 'jrnStripes'],
+    'rppivot': ['exitNatural', 'exitUnmarked', 'exitPage', 'pivotSortGone', 'pivotRepaint', 'pivotShiftClick', 'rowFieldKept', 'exitSearch',
+                'noPivotKeeps'],
+    'rpcmpflat': ['goneFlat', 'goneSorted', 'goneMarks', 'goneSortKept', 'pivotCmpGone', 'pivotCmpRepaint', 'abPivotGone', 'flatKept'],
+    # (the review) a flat sort's marks cloned into the groups by a rebuild with no sort on; the exit button with no
+    # pivot on screen ("View in table" from any view) drops no sort (rppivot noPivotKeeps, GUARD)
+    'rpmarksoff': ['offSearchUnmarked', 'offApplyUnmarked'],
 }
+# the checks the build before each fix fails (--live-control: these red, every other check green) - cmpgsort's, then
+# rgsort's. A fix already in the LIVE main.js (its marker below) has its checks expected green there instead.
+NEW_CMPGSORT = ['L-cmpsort-rowsBack', 'L-cmpsort-marksBack', 'L-cmpsort-stripes', 'L-cmpsort-repaint', 'L-cmpsort-consumed',
+                'L-cmpsort-cmpPutBack', 'L-cmpsortlist-multiBack', 'L-cmpsortlist-multiMarks', 'L-cmpsortlist-shownSorted',
+                'L-ncmpsort-nestBack', 'L-ncmpsort-nestMarks', 'L-cmpsortprep-prepBack', 'L-cmpsortprep-prepMarks']
+NEW_RGSORT = ['L-rgapply-rowsBack', 'L-rgapply-marksBack', 'L-rgapply-stripes', 'L-rgapply-repaint', 'L-rgapply-menuSorted',
+              'L-rgapply-menuMarks', 'L-rgapply-triggerSorted', 'L-rgapply-triggerMarks',
+              'L-rglist-multiBack', 'L-rglist-multiMarks', 'L-rglist-shownSorted', 'L-nrgapply-nestBack', 'L-nrgapply-nestMarks',
+              'L-rgprep-prepBack', 'L-rgprep-prepMarks', 'L-rgpivot-pivotBranch',
+              'L-rgremove-flatSorted', 'L-rgremove-flatMarks', 'L-rgremove-pageSorted', 'L-rgremove-flatRepaint', 'L-rgremove-staleGone',
+              'L-rgremoff-offNatural', 'L-rgremoff-offUnmarked', 'L-rgremlist-multiFlat', 'L-rgremlist-multiFlatMarks',
+              'L-rgremsearch-searchSorted', 'L-rgremsearch-searchMarks']
+NEW_RGPATHS = ['L-rpsearch-clearSorted', 'L-rpsearch-clearMarks', 'L-rpsearchlist-listBack', 'L-rpsearchlist-listMarks', 'L-rpsearchlist-listShown',
+               'L-rplayout-moveSorted', 'L-rplayout-moveMarks', 'L-rplayout-hideSorted', 'L-rplayout-hideMarks', 'L-rplayout-panelSorted',
+               'L-rplayout-panelMarks', 'L-rplayout-hiddenSortKept', 'L-rpcso-csoSorted', 'L-rpcso-csoMarks', 'L-rpjournal-jrnSorted',
+               'L-rpjournal-jrnStripes', 'L-rppivot-exitNatural', 'L-rppivot-exitPage', 'L-rppivot-pivotSortGone', 'L-rppivot-pivotRepaint', 'L-rppivot-pivotShiftClick',
+               'L-rppivot-rowFieldKept', 'L-rppivot-exitSearch', 'L-rpcmpflat-goneSorted', 'L-rpcmpflat-goneMarks', 'L-rpcmpflat-pivotCmpGone',
+               'L-rpcmpflat-pivotCmpRepaint', 'L-rpcmpflat-abPivotGone', 'L-rpmarksoff-offSearchUnmarked', 'L-rpmarksoff-offApplyUnmarked']
+NEW_SETS = [('cmpgsort', 'function _pnbResortGroupedView()', NEW_CMPGSORT), ('rgsort', 'function _pnbResortFlatView(', NEW_RGSORT),
+            ('rgpaths', 'function _pnbPreCompareGroupingBack(', NEW_RGPATHS)]
+# rgsort re-sorts on every Apply, so cmpgsort's "next" flag went with it: these mutants edit the flag and are
+# reported as superseded on a build without it (the marker), not run
+FLAG_MUTANTS = ('cg-noresort', 'cg-noask', 'cg-reentry', 'cg-noconsume')
+FLAG_MARKER = '_pnbGroupResortNext'
+# rgpaths sorts the flat rows as a pivot is left (its exit), so the Apply's pivot branch draws its groups from rows
+# already in the sort: removing that branch's own re-sort changes nothing there - rp-pivotboth removes both
+SUPERSEDED = {'rg-nopivot': ('function _pnbPreCompareGroupingBack(', 'rgpaths sorts the flat rows as the pivot is left (rp-pivotboth removes both)')}
 
 # (file, old, new): file is 'main' (main.js), 'mod' (the module) or 'css' (its stylesheet)
 MUTANTS = {
@@ -516,6 +627,118 @@ MUTANTS = {
                      ['L-nmerge-ownsGone'], ['nmerge']),
     # the total's cells lose their column names
     'a11yptname': ([('mod', "                cell.setAttribute('aria-label', colName);\n", "")], ['L-nmerge-ptNames'], ['nmerge']),
+    # ---- cmpgsort (2026-10-23): a comparison's Clear hands a sorted grouped view back sorted ----
+    # the Apply's regroup is not re-sorted (the bug)
+    'cg-noresort': ([('main', "                if (_resort) _pnbResortGroupedView();\r\n", "")],
+                    ['L-cmpsort-rowsBack', 'L-cmpsort-marksBack', 'L-cmpsort-repaint', 'L-cmpsort-cmpPutBack'], ['cmpsort']),
+    # the restore does not ask its Apply for the re-sort
+    'cg-noask': ([('main', "        _pnbGroupResortNext = true;\r\n", "")],
+                 ['L-cmpsort-rowsBack', 'L-cmpsortlist-multiBack', 'L-ncmpsort-nestBack'], ['cmpsort', 'cmpsortlist', 'ncmpsort']),
+    # the lazy-row re-entry (a big fill: the Apply waits for its rows, then runs again) drops the request
+    'cg-reentry': ([('main', "_pnbConfirmGrouping.call(_self, e, true, _auto, _resort); });", "_pnbConfirmGrouping.call(_self, e, true, _auto); });")],
+                   ['L-cmpsortprep-prepBack', 'L-cmpsortprep-prepMarks'], ['cmpsortprep']),
+    # the request outlives its Apply: every later Apply would re-sort
+    'cg-noconsume': ([('main', " : _pnbGroupResortNext; _pnbGroupResortNext = false;\r\n", " : _pnbGroupResortNext;\r\n")],
+                     ['L-cmpsort-consumed'], ['cmpsort']),
+    # the re-sorted groups keep the cloned headings' (missing) marks
+    'cg-nomarks': ([('main', "            // Every group carries its own clone of the thead: this marks all of them.\r\n            updateHeaderIcons();\r\n", "")],
+                   ['L-cmpsort-marksBack', 'L-cmpsortlist-multiMarks'], ['cmpsort', 'cmpsortlist']),
+    # the re-sorted rows keep the stripes of their old places
+    'cg-nozebra': ([('main', "this marks all of them.\r\n            updateHeaderIcons();\r\n            applyZebraStriping();\r\n", "this marks all of them.\r\n            updateHeaderIcons();\r\n")],
+                   ['L-cmpsort-stripes'], ['cmpsort']),
+    # no sort on: the restore re-sorts (redraws every group's tbody) anyway
+    'cg-nogate': ([('main', ("    function _pnbResortGroupedView() {\r\n        if (!sortCriteria || !sortCriteria.length) return;\r\n",
+                    "    function _pnbResortGroupedView() {\r\n        // (2026-10-23, rgpaths) No sort on: the marks only - the rebuild cloned the flat table's\r\n        // headings, which keep a flat sort's marks after the grouped view turned that sort off\r\n        // (repainted only when one shows: most rebuilds clone none).\r\n        if (!sortCriteria || !sortCriteria.length) { if (document.querySelector('#groupedResultsContainer th.sorted')) { try { updateHeaderIcons(); } catch (e) { } } return; }\r\n"), "    function _pnbResortGroupedView() {\r\n")],
+                  ['L-cmpsortlist-noSortSame'], ['cmpsortlist']),
+    # a level that names no heading of the group tables (a pivot's sort left behind) is applied anyway
+    'cg-nopivot': ([('main', "            if (!sortCriteria.every(function (c) {\r\n", "            if (false && !sortCriteria.every(function (c) {\r\n")],
+                   ['L-cmpsortpivot-pivotLeft'], ['cmpsortpivot']),
+    # a throw in the re-sort escapes: the Apply's own steps after it never run
+    'cg-nocatch': ([('main', "            try { console.warn('[cmpgsort] re-sort skipped:', e); } catch (x) { }\r\n", "            throw e;\r\n")],
+                   ['L-cmpsortpivot-throwContained'], ['cmpsortpivot']),
+    # ---- rgsort (2026-10-23): a sort made in the grouped view survives a regular regroup and Remove Grouping ----
+    # the Apply's regroup is not re-sorted (the bug - a comparison's Clear is an Apply too)
+    'rg-noapply': ([('main', "                // never orders\r\n                _pnbResortGroupedView();\r\n", "                // never orders\r\n")],
+                   ['L-rgapply-rowsBack', 'L-rgapply-marksBack', 'L-rgapply-menuSorted', 'L-rgapply-triggerSorted', 'L-rglist-multiBack',
+                    'L-nrgapply-nestBack', 'L-rgprep-prepBack', 'L-cmpsort-rowsBack'], ['rgapply', 'rglist', 'nrgapply', 'rgprep', 'cmpsort']),
+    # the pivot branch (a pivot on screen is left first, then the grouping drawn) is not re-sorted
+    'rg-nopivot': ([('main', "                _pnbResortGroupedView();   // (2026-10-23, rgsort) the page's sort on the groups drawn, as below\r\n", "")],
+                   ['L-rgpivot-pivotBranch'], ['rgpivot']),
+    # no sort on: a regular Apply re-sorts (redraws every group's tbody) anyway
+    'rg-nogate': ([('main', ("    function _pnbResortGroupedView() {\r\n        if (!sortCriteria || !sortCriteria.length) return;\r\n",
+                    "    function _pnbResortGroupedView() {\r\n        // (2026-10-23, rgpaths) No sort on: the marks only - the rebuild cloned the flat table's\r\n        // headings, which keep a flat sort's marks after the grouped view turned that sort off\r\n        // (repainted only when one shows: most rebuilds clone none).\r\n        if (!sortCriteria || !sortCriteria.length) { if (document.querySelector('#groupedResultsContainer th.sorted')) { try { updateHeaderIcons(); } catch (e) { } } return; }\r\n"), "    function _pnbResortGroupedView() {\r\n")],
+                  ['L-rglist-noSortSame'], ['rglist']),
+    # Remove Grouping leaves the flat rows as they were (the bug)
+    'rg-noflat': ([('main', "            _pnbResortFlatView();\r\n", "")],
+                  ['L-rgremove-flatSorted', 'L-rgremove-flatMarks', 'L-rgremove-pageSorted', 'L-rgremove-staleGone', 'L-rgremoff-offNatural',
+                   'L-rgremoff-offUnmarked', 'L-rgremlist-multiFlat', 'L-rgremsearch-searchSorted'], ['rgremove', 'rgremoff', 'rgremlist', 'rgremsearch']),
+    # the flat rows sorted, their headings left as they were
+    'rg-flatmarks': ([('main', "            penumbraSortTbodyInPlace($tb);\r\n            updateHeaderIcons();\r\n        } catch (e) {\r\n", "            penumbraSortTbodyInPlace($tb);\r\n        } catch (e) {\r\n")],
+                     ['L-rgremove-flatMarks', 'L-rgremove-staleGone', 'L-rgremlist-multiFlatMarks', 'L-rgremsearch-searchMarks'], ['rgremove', 'rgremlist', 'rgremsearch']),
+    # no sort on: the rows a flat sort moved stay where it put them
+    'rg-flatoff': ([('main', "                if (moved) penumbraSortTbodyInPlace($tb);\r\n", "")],
+                   ['L-rgremoff-offNatural'], ['rgremoff']),
+    # no sort on: the old sort's marks stay
+    'rg-flatoffmarks': ([('main', "                if (moved) penumbraSortTbodyInPlace($tb);\r\n                updateHeaderIcons();\r\n", "                if (moved) penumbraSortTbodyInPlace($tb);\r\n")],
+                        ['L-rgremoff-offUnmarked'], ['rgremoff']),
+    # a level that names no flat heading (a pivot's sort left behind) is applied to the flat rows anyway
+    'rg-flatgate': ([('main', "            if (!ours) return;\r\n", "")],
+                    ['L-rgremguard-pivotLeftFlat'], ['rgremguard']),
+    # a throw in the flat re-sort escapes: Remove Grouping's own steps after it never run
+    'rg-flatcatch': ([('main', "            try { console.warn('[rgsort] flat re-sort skipped:', e); } catch (x) { }\r\n", "            throw e;\r\n")],
+                     ['L-rgremguard-throwFlat'], ['rgremguard']),
+    # the flat re-sort after the paging: page 1 keeps the rows the old order put there
+    'rg-flatlate': ([('main', "            _pnbResortFlatView();\r\n", ""),
+                     ('main', "            updateTableBorders();\r\n            // FORCE containerization when returning to main view\r\n",
+                      "            _pnbResortFlatView();\r\n            updateTableBorders();\r\n            // FORCE containerization when returning to main view\r\n")],
+                    ['L-rgremove-pageSorted'], ['rgremove']),
+    # ---- rgpaths (2026-10-23): the rest of the paths that redraw a view ----
+    # a search cleared in the grouped view: its rebuild not re-sorted (the bug)
+    'rp-nosearch': ([('main', "                    // rows, which a sort made in the grouped view never orders\r\n                    _pnbResortGroupedView();\r\n", "                    // rows, which a sort made in the grouped view never orders\r\n")],
+                    ['L-rpsearch-clearSorted', 'L-rpsearch-clearMarks', 'L-rpsearchlist-listBack', 'L-rpsearchlist-listShown'], ['rpsearch', 'rpsearchlist']),
+    # _pnbApplyColumnLayout's rebuild (Settings > Columns, the header menu) not re-sorted
+    'rp-nolayout': ([('main', "                    // (2026-10-23, rgpaths) the page's sort on the groups just drawn from the flat rows\r\n                    _pnbResortGroupedView();\r\n", "")],
+                    ['L-rplayout-moveSorted', 'L-rplayout-moveMarks', 'L-rplayout-hideSorted', 'L-rplayout-panelSorted', 'L-rplayout-hiddenSortKept'], ['rplayout']),
+    # a Custom Sort Order's rebuild not re-sorted
+    'rp-nocso': ([('main', "            // rebuild draws them from the flat rows\r\n            _pnbResortGroupedView();\r\n", "            // rebuild draws them from the flat rows\r\n")],
+                 ['L-rpcso-csoSorted', 'L-rpcso-csoMarks'], ['rpcso']),
+    # the journal's rebuild not re-sorted
+    'rp-nojournal': ([('main', "                // search below only hides rows in place)\r\n                _pnbResortGroupedView();\r\n", "                // search below only hides rows in place)\r\n")],
+                     ['L-rpjournal-jrnSorted', 'L-rpjournal-jrnStripes'], ['rpjournal']),
+    # a pivot's exit leaves the flat rows as they were (the bug)
+    'rp-noexit': ([('main', "                if (_pnbPivotOn) _pnbResortFlatView(true);\r\n", "")],
+                  ['L-rppivot-exitNatural', 'L-rppivot-exitPage', 'L-rppivot-pivotSortGone', 'L-rppivot-rowFieldKept', 'L-rppivot-exitSearch'], ['rppivot']),
+    # ...re-sorts them, but keeps the pivot's own sort
+    'rp-exitkeep': ([('main', "                if (_pnbPivotOn) _pnbResortFlatView(true);\r\n", "                if (_pnbPivotOn) _pnbResortFlatView();\r\n")],
+                    ['L-rppivot-pivotSortGone', 'L-rppivot-pivotRepaint', 'L-rppivot-pivotShiftClick'], ['rppivot']),
+    # the flat helper never drops a sort that is not the flat table's
+    'rp-nodrop': ([('main', "            if (!ours && dropForeign) { sortCriteria = []; return _pnbResortFlatView(); }\r\n", "")],
+                  ['L-rppivot-pivotSortGone', 'L-rppivot-pivotRepaint', 'L-rpcmpflat-pivotCmpGone', 'L-rpcmpflat-pivotCmpRepaint', 'L-rpcmpflat-abPivotGone'],
+                  ['rppivot', 'rpcmpflat']),
+    # ...drops it, but leaves the rows where the old flat sort put them
+    'rp-droprows': ([('main', "{ sortCriteria = []; return _pnbResortFlatView(); }", "{ sortCriteria = []; return; }")],
+                    ['L-rppivot-pivotSortGone'], ['rppivot']),
+    # ...drops a sort that is not the flat table's with no pivot on screen too ("View in table" from any view)
+    'rp-exitalways': ([('main', "                if (_pnbPivotOn) _pnbResortFlatView(true);\r\n", "                _pnbResortFlatView(true);\r\n")],
+                      ['L-rppivot-noPivotKeeps'], ['rppivot']),
+    # a rebuild with no sort on keeps the marks it cloned from the flat headings
+    'rp-nomarksoff': ([('main', "if (!sortCriteria || !sortCriteria.length) { if (document.querySelector('#groupedResultsContainer th.sorted')) { try { updateHeaderIcons(); } catch (e) { } } return; }", "if (!sortCriteria || !sortCriteria.length) return;")],
+                      ['L-rpmarksoff-offSearchUnmarked', 'L-rpmarksoff-offApplyUnmarked'], ['rpmarksoff']),
+    # the Apply's pivot branch with neither the exit's flat re-sort nor its own: its groups in the flat order
+    'rp-pivotboth': ([('main', "                if (_pnbPivotOn) _pnbResortFlatView(true);\r\n", ""),
+                      ('main', "                _pnbResortGroupedView();   // (2026-10-23, rgsort) the page's sort on the groups drawn, as below\r\n", "")],
+                     ['L-rgpivot-pivotBranch'], ['rgpivot']),
+    # a comparison taking over from a pivot keeps the pivot's sort (compare-to-live; A-vs-B)
+    'rp-noentry': ([('main', "                        _pnbResortFlatView(true);\r\n                    }\r\n\r\n                    let decompressed", "                    }\r\n\r\n                    let decompressed")],
+                   ['L-rpcmpflat-pivotCmpGone', 'L-rpcmpflat-pivotCmpRepaint'], ['rpcmpflat']),
+    'rp-noentryab': ([('main', "                        _pnbResortFlatView(true);\r\n                    }\r\n\r\n                    // Both A and B", "                    }\r\n\r\n                    // Both A and B")],
+                     ['L-rpcmpflat-abPivotGone'], ['rpcmpflat']),
+    # a comparison's Clear that leaves the flat table pages them as they were (the bug)
+    'rp-noclear': ([('main', "            if (!_pnbPreCompareGroupingBack(_preCompareGrouping)) _pnbResortFlatView();\r\n", "")],
+                   ['L-rpcmpflat-goneSorted', 'L-rpcmpflat-goneMarks'], ['rpcmpflat']),
+    # ...re-sorts the flat rows even when the grouping comes back (they stay as they were then: cmpsort's GUARD)
+    'rp-clearall': ([('main', "            if (!_pnbPreCompareGroupingBack(_preCompareGrouping)) _pnbResortFlatView();\r\n", "            _pnbResortFlatView();\r\n")],
+                    ['L-cmpsort-flatAfter'], ['cmpsort']),
 }
 
 args = sys.argv[1:]
@@ -533,6 +756,9 @@ one_mutant = opt('--mutant', None)
 all_mutants = flag('--mutants')
 control = flag('--control')
 verbose = flag('--verbose')
+# cmpgsort: the LIVE build as the control - the NEW checks red, every other check green
+live_control = flag('--live-control')
+if live_control and (stage_dir or control or all_mutants or one_mutant): raise SystemExit('--live-control runs the live build alone')
 src_root = stage_dir or APP
 cand = {'main': os.path.join(src_root, 'js', 'main.js'),
         'mod': os.path.join(src_root, 'js', 'penumbra_grouplist.js'),
@@ -555,13 +781,24 @@ def hook(src):
     names = ['runTableSearch', 'getExportData', 'generatePdfContent', 'loadScript', 'updateGroupedResultCount',
              'buildStateObject', 'removeGrouping', 'applyDensity', 'executeChainStep', 'penumbraSyncActiveLayout',
              'runComparisonAndDisplayGrouped', 'compressString', 'updateComparisonResultCount',   # grplistcmp
-             'rebuildGroupedView', 'recalculateGroupTotals', 'applyZebraStriping']   # glsweep
+             'rebuildGroupedView', 'recalculateGroupTotals', 'applyZebraStriping',   # glsweep
+             'updateHeaderIcons',   # cmpgsort: the repaint with no table (the journal's)
+             'runComparisonTwoSnapshots']   # rgpaths: the A-vs-B renderer
+    # cmpgsort: the page's sort, and the restore's re-sort request (a ReferenceError on a build without it: 'missing');
+    # every rebuild leaves the group tbodies it drew in window.__RGV_TB; with window.__FORCE_PREP the grouping Apply's
+    # penumbraPrepareRows({allRows}) answers with a promise, as a big fill does (the handler then runs again)
     h = ('\r\n;try { window.__HC = {'
          ' setLayout: function (v) { try { currentGroupLayout = v; } catch (e) { } },'
          ' getLayout: function () { try { return currentGroupLayout; } catch (e) { return null; } },'
+         ' getSort: function () { try { return JSON.parse(JSON.stringify(sortCriteria)); } catch (e) { return null; } },'
+         ' setSort: function (v) { try { sortCriteria = v; } catch (e) { } },'
+         ' getResortNext: function () { try { return _pnbGroupResortNext; } catch (e) { return "missing"; } },'
+         ' getPreCmp: function () { try { return _preCompareGrouping; } catch (e) { return "missing"; } },'   # rgpaths
          ' getMaster: function () { try { return masterRowData; } catch (e) { return null; } } }; } catch (e) { window.__HC_ERR = String(e); }\r\n'
          'try { [' + ','.join('"%s"' % n for n in names) + '].forEach(function (k) { try { window.__HC[k] = eval(k); } catch (e) { (window.__HC_MISSING = window.__HC_MISSING || []).push(k); } }); } catch (e) { window.__HC_ERR2 = String(e); }\r\n'
-         'try { var __pnbRGV = rebuildGroupedView; rebuildGroupedView = function () { window.__REBUILDS = (window.__REBUILDS || 0) + 1; return __pnbRGV.apply(this, arguments); }; } catch (e) { window.__HC_ERR3 = String(e); }\r\n')
+         'try { var __pnbRGV = rebuildGroupedView; rebuildGroupedView = function () { window.__REBUILDS = (window.__REBUILDS || 0) + 1; var r = __pnbRGV.apply(this, arguments); window.__RGV_TB = Array.prototype.slice.call(document.querySelectorAll("#groupedResultsContainer table > tbody")); return r; }; } catch (e) { window.__HC_ERR3 = String(e); }\r\n'
+         'try { var __pnbPPR = penumbraPrepareRows; penumbraPrepareRows = function (o) { if (window.__FORCE_PREP && o && o.allRows) { window.__PREPS = (window.__PREPS || 0) + 1; return new Promise(function (r) { setTimeout(r, 60); }); } return __pnbPPR.apply(this, arguments); }; } catch (e) { window.__HC_ERR4 = String(e); }\r\n'
+         'try { var __pnbSTI = penumbraSortTbodyInPlace; penumbraSortTbodyInPlace = function () { if (window.__THROW_SORT) { window.__THROWN = (window.__THROWN || 0) + 1; throw new Error("cmpgsort: a forced throw"); } return __pnbSTI.apply(this, arguments); }; } catch (e) { window.__HC_ERR5 = String(e); }\r\n')
     out = src[:i] + ';(function () {' + h + src[i + len(anchor):]
     j = out.rfind('});')
     out = out[:j] + '})();' + out[j + 3:]
@@ -571,6 +808,8 @@ def hook(src):
 def mutate(texts, name):
     t = dict(texts)
     for f, old, new in MUTANTS[name][0]:
+        # (rgpaths) alternatives: the anchor as one build or another has it
+        if isinstance(old, tuple): old = ([o for o in old if t[f].count(o) == 1] + [old[0]])[0]
         if t[f].count(old) != 1: raise SystemExit("mutant '%s': %s anchor found %d times: %r" % (name, f, t[f].count(old), old[:90]))
         t[f] = t[f].replace(old, new)
     return t
@@ -618,7 +857,9 @@ def run_page(scn, extra):
             time.sleep(0.25)
             v = call('Runtime.evaluate', {'expression': 'window.__HCDONE ? JSON.stringify(window.__HCRESULT) : null', 'returnByValue': True}).get('result', {}).get('value')
             if v: return json.loads(v)
-        return {'fatal': 'timeout (300 s)'}
+        # (rgpaths) where the page stands: the driver's step, its errors, the overlay hides and rebuilds so far
+        st = call('Runtime.evaluate', {'expression': 'JSON.stringify({step: window.__STEP || null, errs: (window.__errors || []).concat(window.__rejections || []).slice(0, 3), hides: window.__HC_HIDES || 0, rebuilds: window.__REBUILDS || 0, hidden: document.hidden})', 'returnByValue': True}).get('result', {}).get('value')
+        return {'fatal': 'timeout (300 s) at %s' % st}
     finally:
         try: ws.close()
         except Exception: pass
@@ -683,8 +924,16 @@ try:
         texts = {k: read_b(v) for k, v in cand.items()}
         print('candidate: %s' % src_root)
     if all_mutants or one_mutant:
-        ok = bad = 0
-        for m in ([one_mutant] if one_mutant else list(MUTANTS)):
+        ok = bad = gone = 0
+        for m in (one_mutant.split(',') if one_mutant else list(MUTANTS)):   # cmpgsort: --mutant a,b,c runs those
+            if m in SUPERSEDED and SUPERSEDED[m][0] in texts['main']:
+                gone += 1
+                print('  SKIP  mutant %-15s superseded: %s' % (m, SUPERSEDED[m][1]))
+                continue
+            if m in FLAG_MUTANTS and FLAG_MARKER not in texts['main']:
+                gone += 1
+                print('  SKIP  mutant %-15s superseded: rgsort re-sorts on every Apply (no %s in this build)' % (m, FLAG_MARKER))
+                continue
             edits, must, scns = MUTANTS[m]
             res = evaluate(run_build(mutate(texts, m), scns), scns)
             red = [a for a, p, _ in res if not p]
@@ -694,8 +943,8 @@ try:
             if verbose:
                 for a, p, d in res:
                     if not p: print('        %-30s %s' % (a, d[:300]))
-        print('SUMMARY mutants ok=%d bad=%d' % (ok, bad))
-        print('RESULT: GREEN' if bad == 0 else 'RESULT: RED')
+        print('SUMMARY mutants ok=%d bad=%d superseded=%d' % (ok, bad, gone))
+        print('RESULT: GREEN' if bad == 0 and ok > 0 else 'RESULT: RED')
     else:
         res = evaluate(run_build(texts, names), names)
         p = f = 0; failed = []
@@ -704,7 +953,26 @@ try:
             if passed: p += 1
             else: f += 1; failed.append(a)
         print('TOTAL pass=%d fail=%d   failed: %s' % (p, f, ' '.join(failed)))
-        print('RESULT: GREEN' if f == 0 and p > 0 else 'RESULT: RED')
+        if live_control:
+            NEW = []
+            for nm, marker, ids in NEW_SETS:
+                if marker in texts['main']: print('CONTROL: %s is in live main.js already - its checks are expected GREEN' % nm)
+                else: NEW += ids; print('CONTROL: %s is not in live main.js - its %d checks are expected RED' % (nm, len(ids)))
+            seen = [a for a, _, _ in res]
+            new_green = [a for a in NEW if a in seen and a not in failed]
+            new_unseen = [a for a in NEW if a not in seen and (a.split('-')[1] in names)]
+            old_red = [a for a in failed if a not in NEW]
+            print('CONTROL: new checks green on live (unexpected): %s' % (' '.join(new_green) or 'none'))
+            print('CONTROL: new checks never run: %s' % (' '.join(new_unseen) or 'none'))
+            print('CONTROL: old checks red on live (unexpected): %s' % (' '.join(old_red) or 'none'))
+            print('RESULT: GREEN' if not new_green and not new_unseen and not old_red else 'RESULT: RED')
+        else:
+            # a build without a fix (live before its deploy, another session's stage) fails that fix's checks: say so
+            for nm, marker, ids in NEW_SETS:
+                red = [a for a in ids if a in failed]
+                if red and marker not in texts['main']:
+                    print('NOTE: %s is not in this build: %d of its checks are red as on the build before it (expected until it is in): %s' % (nm, len(red), ' '.join(red)))
+            print('RESULT: GREEN' if f == 0 and p > 0 else 'RESULT: RED')
 finally:
     try: edge.kill()
     except Exception: pass

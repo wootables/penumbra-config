@@ -1953,8 +1953,35 @@
     await sleep(120);
     rec('F14 after a pass with every group closed, opening one draws the shares again (the container\'s observer: a new row to read)',
       f12 && colWs(gLast) === g12b && fillsBox(gLast), 'cssWhileClosed=' + shutCss + ' ' + colWs(gLast) + ' | ' + g12b);
+    // F15 (2026-10-23, lnk40; the user: "fit to page leaves a horizontal scrollbar behind (I think it doesnt calculate the
+    // width of the vertical scrollbar when fitting to page, so just give it a buffer for this)"). The room Fit to page fills
+    // keeps a buffer the width of a vertical scrollbar (12px at the least), with the bar there or not. (A spill itself does
+    // not show in this harness: its grouped tables are capped at the box's width, and the flat box keeps its width when
+    // its bar comes - the buffer is pinned here as the room it leaves.) The flat view first, as the phase starts it.
     host.clearUser(); apply();
+    if (H.setLevels) H.setLevels([]);
+    await runQuery(makeRows(20));
     $('#table-view-container').show(); gbox().style.display = 'none';
+    apply();
+    await sleep(80);
+    w = wrap();
+    function boxH(h) { if (h) { w.style.setProperty('max-height', 'none', 'important'); w.style.setProperty('height', h, 'important'); } else { w.style.removeProperty('height'); w.style.removeProperty('max-height'); } }
+    var fh0 = w.style.height, fm0 = w.style.maxHeight;
+    var barPx = (function () { var d = document.createElement('div'); d.style.cssText = 'position:absolute;left:-9999px;top:0;width:100px;height:50px;overflow-y:scroll'; document.body.appendChild(d); var x = d.offsetWidth - d.clientWidth; d.remove(); return Math.max(12, x); })();
+    function freeRoom() {
+      var cs = getComputedStyle(w), num = ths()[0], fixedW = (num && num.style.display !== 'none' && num.getAttribute('data-colname') === '#') ? cw.contentWidth(num) : 0;
+      return Math.floor(w.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - fixedW - 4) - cw.roomOf('flat');
+    }
+    boxH('1600px'); apply();
+    await sleep(60);
+    var noBar15 = w.scrollHeight <= w.clientHeight + 1, free15a = freeRoom();
+    boxH('160px');
+    await sleep(60);
+    var bar15 = w.scrollHeight > w.clientHeight + 1, free15b = freeRoom();
+    rec('F15 the room Fit to page fills keeps a vertical scrollbar\'s width free (12px at the least), with the bar there or not',
+      noBar15 && bar15 && free15a >= barPx - 1 && free15b >= barPx - 1, 'bar=' + barPx + ' free without/with a bar=' + free15a + '/' + free15b);
+    boxH(null); w.style.height = fh0; w.style.maxHeight = fm0;
+    host.clearUser(); apply();
     host.clearUser(); setReport({});
     localStorage.removeItem(KEY);
     window.show_text = realShowF;

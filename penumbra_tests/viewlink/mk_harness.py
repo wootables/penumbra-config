@@ -46,6 +46,24 @@ def build(index_src):
     rep('<script src="driver.js"></script>\n', '<link rel="stylesheet" href="penumbra_find.css">\n<script src="penumbra_find.js"></script>\n<script src="driver.js"></script>\n')
     # (sweep) vfmsave: the REPORT formats V_AMOUNT itself
     rep('    window.__STORED = st;\n', '    if (S === "vfmsave") st.columnFormats = { V_AMOUNT: "currency:0", V_DATE: "date:YYYY" };\n    window.__STORED = st;\n')
+    # (10-23) a snapshot comparison: manage_snapshots.php?action=load answers with a baseline (the fixture's
+    # first 280 rows, every 25th row's V_STATUS changed), and the analysis banner's Copy link button
+    rep("    var resp = isQuery ? window.__queryResponse :",
+        "    if (/manage_snapshots\\.php/.test(url) && /action=load/.test(url)) {\n"
+        "      var snapRows = window.__rowsFixture.slice(0, 280).map(function (r, i) { var c = {}; for (var k in r) c[k] = r[k]; if (i % 25 === 0) c.V_STATUS = 'Archived'; return c; });\n"
+        "      var snapJs = { status: 'success', data: { SNAP_DATA: JSON.stringify(snapRows.map(function (r) { return { rowData: r }; })), SNAP_NAME: 'Baseline', CREATED_AT: '2026-10-01 10:00:00', CREATED_BY: 'harness',\n"
+        "        ROW_COUNT: 280, COLUMN_COUNT: window.__COLS.length, COLUMN_NAMES: window.__COLS.join(','), PROMPTS: [], TABLES_USED: '', NOTES: '' } };\n"
+        "      setTimeout(function () { try { if (opts.success) opts.success(snapJs, 'success', { status: 200 }); } catch (e) { window.__errors.push('snap success threw: ' + String(e)); } d.resolve(snapJs, 'success', { status: 200 }); }, 0);\n"
+        "      var sp9 = d.promise(); sp9.abort = function () {}; return sp9;\n"
+        "    }\n"
+        "    var resp = isQuery ? window.__queryResponse :")
+    # the analysis banner's template, LIFTED from the index.php under test (its Copy link buttons included)
+    import re as _re
+    tm = _re.search(r'<template id="snapshotAnalysisTemplate">.*?</template>', index_src, _re.S)
+    rep('<div id="pnbStatusBar">', '<div id="snapAnalysisDock"></div>\n' + (tm.group(0) if tm else '') + '\n'
+        '<div id="manageSnapshotsLightbox" style="display:none"><input type="checkbox" id="snapIncludeToggles"></div>\n<div id="pnbStatusBar">')
+    # (10-23 b) ggc*: a report grouped as a LIST, so its snapshot comparison is listed too (grplistcmp)
+    rep('    window.__STORED = st;\n', '    if (/^ggc/.test(S)) st.groupLayout = "list";\n    window.__STORED = st;\n')
     # (page round) the pager buttons, so a scenario turns pages through main.js's own handlers
     rep('<span id="pageInfo"></span>', '<span id="pageInfo"></span><button id="firstPageBtn">|&lt;</button><button id="prevPageBtn">&lt;</button>'
         '<button id="nextPageBtn">&gt;</button><button id="lastPageBtn">&gt;|</button>')

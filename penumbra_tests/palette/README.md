@@ -82,3 +82,39 @@ resetWidthRuns (Reset this column's width...: `#` greyed with the menu's reason,
 the menu's reason (this scenario's widths are not fit-able). Static S-widthRows. Mutants w-nofitpage, w-fitall, w-deadreset,
 w-noexempt. NEW = jarvispal's set | NEW_W33 while both rounds are undeployed (drop NEW_W33 once the palette half is live). Kit: the
 session scratchpad's pal33/ (patch_pal33.py, orig/ + orig.sha256, deploy_pal33.ps1), copied to stage_20261020/pal33/.
+
+2026-10-23 (jarbusy, the user: "when the command palette is asking Jarvis/AI there should be a visible loading animation that grabs the
+users attention"): while the box asks Jarvis, the plain muted "Thinking..." line (a live region of its own) is a busy card where the
+answer will land: a bar sliding along its top edge, three dots bouncing beside "Jarvis is thinking", lines shimmering in the answer's
+place, "Esc cancels"; all CSS (the card goes with its render: the answer or the error replaces it, Esc / the backdrop / any close removes
+the box); said once through the footer's status span (the box's one live region), the answer's place aria-busy; under reduced motion a
+full hatched bar, solid dots, plain lines. The error line's colour was `var(--danger, #b00020)` (a token no theme defines: about 2:1 on
+the dark themes): now `--accent-danger`. Scenarios `pjbusy` (run on a 1280x600 window: a long pasted question pushes the card under
+the fold) busyShown, busyInView, busyMoves, busySaidOnce (two keys typed while it waits write nothing to the status span), busyMarked,
+busyEndsOnAnswer, busyEndsOnError, errorReadable, busyEndsOnCancel, busyEndsOnClose (the Esc chip: the request lives on), busyThemes
+(every theme of the registry: words 4.5:1 on the card, the moving marks 3:1), busyNoFade; `pjbusyrm` (prefers-reduced-motion emulated)
+rmStill, rmObvious, rmThemes; `pjbusyhc` (forced colours emulated, as Windows High Contrast: author fills drop, so the dots and the
+bar take Highlight, main.css's forced-colors rule) hcMarks; `pshotjb` the photograph (PNB_JBTHEME=theme-x, PNB_JBRM=1, PNB_JBHC=1;
+PNB_SHOTJB names the file). Edge reads Windows' "Animation effects" (off = prefers-reduced-motion: reduce; it is off on this
+workstation): run_page sets the preference for these scenarios either way, so the motion checks never depend on the machine. The contrast
+checks read the registry through `theme_reg.php` (theme_reg.json beside the harness: the ids, isDark and the variable blocks
+index.php emits for the twelve registry themes). Static S-jarBusy. Mutants jb-plainline, jb-still, jb-norm, jb-rmnobar, jb-twolive,
+jb-nosay, jb-resay, jb-nobusyattr, jb-stays, jb-errstays, jb-noview, jb-faded, jb-faintdots, jb-hintfade, jb-oldred, jb-nohc. NEW = the union
+with the other undeployed rounds' sets (NEW_JB). Kit: `stage_20261020\jarbusy\` (patch_jarbusy.py re-applies the app edits to a fresh
+copy of live and commutes with jarvispal's patch_jarvis.py; patch_suite_jarbusy.py these suite edits; deploy_jarbusy.ps1; DEPLOY.md).
+LIVE since d6da5bc (2026-10-23 15:08, on the user's OK: the still reduced-motion form as specified); NEW_JB retired from NEW the same day.
+
+2026-10-23 (jaredge, three edges of the Ask Jarvis waiting state found during jarbusy): the Esc chip (the button labelled Esc) only
+closed the box, so the question ran on and its answer landed in the panel later although the card says "Esc cancels": it cancels as
+the Esc key and the backdrop do. Backspace on the emptied input went back to the list with the question still running, and a new Ask
+Jarvis then ran a second request beside it (overwriting the one Esc would cancel; the first one's answer could later replace the
+second's in the box): Backspace back from the Jarvis view drops a waiting question (from another mode it leaves one left running by
+Ctrl+K alone), and one question at a time: asked again while one is on its way, the box shows that one waiting, the status says
+"Jarvis is still answering your last question. Esc cancels it.", nothing is sent beside it. The Jarvis view left the input's
+aria-activedescendant naming an option the list swap removed: cleared. pjip checks noStaleActive, escChipCancels, backCancels,
+backKeepsOther (guard), oneAtATime, stillSaid, stillLands, syncFailAsksAgain (guard: a failure the stand-in hands back inside the
+call, `window.__jipSyncFail`, settles the ask); pjbusy's busyEndsOnClose closes with Ctrl+K now. Static S-jarEdge. Mutants
+je-chipkeeps, je-backkeeps, je-backany, je-twoasks, je-nostill, je-settled, je-qkept, je-staleactive; n-escspan matches the start of
+the chip's line. NEW = the union with the undeployed rounds' sets (NEW_JE). Kit: `stage_20261020\jaredge\` (patch_jaredge.py,
+patch_suite_jaredge.py, deploy_jaredge.ps1, DEPLOY.md).
+LIVE since 9120044 (2026-10-23 20:22, on the user's OK: the Esc chip cancels like the key); NEW_JE retired from NEW the same day.

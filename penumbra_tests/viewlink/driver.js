@@ -70,7 +70,7 @@
   }
   async function noteShown() { return until(function () { return bodyText().indexOf('Opened a shared view') >= 0; }, 6000); }
   async function boot() {
-    if (!(await until(function () { return window.__queryDone >= 1 && (window.__HC_HIDES || 0) >= 1; }, 150000))) throw new Error('boot: never loaded');
+    if (!(await until(function () { return window.__queryDone >= 1 && (window.__HC_HIDES || 0) >= 1; }, 150000))) throw new Error('boot: never loaded ' + JSON.stringify({ q: window.__queryDone, h: window.__HC_HIDES, ajax: (window.__ajaxLog || []).slice(-6), errs: (window.__errors || []).slice(-4), cerr: (window.__cerr || []).slice(-4), rej: (window.__rejections || []).slice(-4), cmp: !!document.getElementById('snapshotComparisonContainer'), bodyCls: document.body.className, body: (document.body.innerText || '').replace(/\s+/g, ' ').slice(0, 400) }));
     if (/^g/.test(SCN) && !(await until(function () { return document.querySelectorAll('#groupedResultsContainer tbody tr td').length > 0; }, 20000))) throw new Error('no grouped view');
     await sleep(800);
   }
@@ -368,6 +368,176 @@
       R.info.saved = sd9 ? { fm: sd9.columnFormats, cso: sd9.customSortOrders } : null;
       R.chk.savedReportFormats = !!sd9 && JSON.stringify(sd9.columnFormats || {}) === JSON.stringify({ V_AMOUNT: 'currency:0', V_DATE: 'date:YYYY' });
       R.chk.urlDropsView = !new URLSearchParams(location.search).has('view');
+    } else if (SCN === 'vcmpF') {
+      // (10-23) a filter during a comparison: typed, then a group hidden with its X - what the banner's link carries
+      var snapRowsF = window.__rowsFixture.slice(0, 280).map(function (r, i) { var c = {}; for (var k in r) c[k] = r[k]; if (i % 25 === 0) c.V_STATUS = 'Archived'; return { rowData: c }; });
+      window.__VL.runComparisonAndDisplayGrouped({ name: 'Baseline (server)', displayName: 'Baseline', timestamp: Date.now() - 86400000, searchTerm: '', prompts: [], tables: '', notes: '',
+        columnNames: window.__COLS.slice(), kind: 'server', serverId: '55', creator: 'harness', compressedData: window.__VL.compressString(JSON.stringify(snapRowsF)) }, ['V_ID']);
+      R.chk.compared = await until(function () { return vis('#snapshotComparisonContainer') && document.querySelectorAll('#snapshotComparisonContainer tbody tr').length > 0; }, 25000);
+      await sleep(600);
+      function groups() { return Array.prototype.map.call(document.querySelectorAll('#snapshotComparisonContainer .group-wrapper'), function (w) { return w.getAttribute('data-group-key') + ':' + (w.style.display === 'none' ? 'hidden' : 'shown'); }); }
+      async function bannerLink() { window.__clip = []; $('#snapAnalysisDock .snap-banner-link').first().trigger('click'); await until(function () { return window.__clip.length > 0; }, 4000); return window.__clip[0] || ''; }
+      function params(u) { try { var q = new URL(u).searchParams, o = {}; q.forEach(function (v, k) { if (k !== 'view') o[k] = v; }); var t = q.get('view'); if (t) { var dv = V().decode(t) || {}; o.view_s = dv.s; o.view_sx = dv.sx; } return o; } catch (e) { return { err: String(e) }; } }
+      // 1. a typed filter, applied with Enter (the comparison re-runs through it)
+      var h0 = window.__HC_HIDES || 0, ts = document.getElementById('tableSearch');
+      ts.value = 'Alpha'; $(ts).trigger($.Event('keydown', { key: 'Enter', keyCode: 13, which: 13 }));
+      await until(function () { return (window.__HC_HIDES || 0) > h0; }, 15000); await sleep(800);
+      R.info.typed = { box: ts.value, groups: groups(), link: params(await bannerLink()) };
+      // 2. the Unchanged group hidden with its X
+      var h1 = window.__HC_HIDES || 0;
+      var x = document.querySelector('#snapshotComparisonContainer .group-wrapper[data-group-key="Unchanged Rows"] .group-hide');
+      if (x) x.click();
+      await until(function () { return (window.__HC_HIDES || 0) > h1; }, 15000); await sleep(800);
+      R.info.hidden = { box: ts.value, groups: groups(), link: params(await bannerLink()) };
+      R.chk.typedCarried = R.info.typed.link.search === 'Alpha';
+      R.chk.hiddenCarried = R.info.hidden.link.search === 'Alpha' && JSON.stringify(R.info.hidden.link.view_sx || []) === JSON.stringify(['Unchanged Rows']);
+      var hl = await bannerLink(); try { var hu = new URL(hl); R.info.path = hu.pathname.replace(/^\//, '') + hu.search; } catch (e) { }
+      // 3. the box cleared but not re-run: the diff on screen is still the filtered one, and so is the link
+      ts.value = '';
+      R.info.cleared = params(await bannerLink());
+      R.chk.appliedFallback = R.info.cleared.search === 'Alpha';
+    } else if (SCN === 'vcmpG') {
+      // (10-23 d) how many times the comparison is drawn: the link's hidden groups must not cost a second diff
+      window.__cmpDraws = 0;
+      new MutationObserver(function (ms) { ms.forEach(function (m) { Array.prototype.forEach.call(m.addedNodes, function (n) { if (n.id === 'snapshotComparisonContainer') window.__cmpDraws++; }); }); })
+        .observe(document.getElementById('groupedResultsContainer'), { childList: true, subtree: true });
+      var snapRowsG = window.__rowsFixture.slice(0, 280).map(function (r, i) { var c = {}; for (var k in r) c[k] = r[k]; if (i % 25 === 0) c.V_STATUS = 'Archived'; return { rowData: c }; });
+      window.__VL.runComparisonAndDisplayGrouped({ name: 'Baseline (server)', displayName: 'Baseline', timestamp: Date.now() - 86400000, searchTerm: '', prompts: [], tables: '', notes: '',
+        columnNames: window.__COLS.slice(), kind: 'server', serverId: '55', creator: 'harness', compressedData: window.__VL.compressString(JSON.stringify(snapRowsG)) }, ['V_ID']);
+      R.chk.compared = await until(function () { return vis('#snapshotComparisonContainer') && document.querySelectorAll('#snapshotComparisonContainer tbody tr').length > 0; }, 25000);
+      R.chk.hiddenAgain = await until(function () {
+        var w = document.querySelector('#snapshotComparisonContainer .group-wrapper[data-group-key="Unchanged Rows"]');
+        return (!w || w.classList.contains('search-hidden') || !w.getClientRects().length) && /__SNAP_TYPE != 'Unchanged Rows'/.test(document.getElementById('tableSearch').value);
+      }, 15000);
+      R.info.box = document.getElementById('tableSearch').value;
+      R.chk.filterKept = /^Alpha\b/.test(R.info.box);
+      await sleep(2500);
+      R.info.draws = window.__cmpDraws;
+      R.chk.oneRun = window.__cmpDraws === 1;
+    } else if (SCN === 'ggvA' || SCN === 'ggvB') {
+      // (10-23) the List layout's open group and where its box is scrolled
+      var GLs = function () { return (window.Penumbra.groupList && window.Penumbra.groupList.state()) || {}; };
+      R.chk.listOn = await until(function () { return GLs().on && document.querySelectorAll('#groupedResultsContainer .group-wrapper.group-leaf').length >= 3; }, 20000);
+      function topId(box) {
+        var top = box.getBoundingClientRect().top + ((box.querySelector('thead') || { getBoundingClientRect: function () { return { height: 0 }; } }).getBoundingClientRect().height), id = null;
+        Array.prototype.some.call(box.querySelectorAll('tbody tr'), function (tr) { if (!tr.getClientRects().length || tr.getBoundingClientRect().bottom <= top + 1) return false; var t = tr.querySelector('td[data-column="' + fth('V_ID').getAttribute('data-column') + '"]'); id = t ? t.textContent.trim() : null; return true; });
+        return id;
+      }
+      if (SCN === 'ggvA') {
+        var lw = document.querySelectorAll('#groupedResultsContainer .group-wrapper.group-leaf')[2];
+        window.Penumbra.groupList.selectGroup(lw); await sleep(500);
+        var bx = lw.querySelector(':scope > .group-content'); bx.scrollTop = 300; await sleep(400);
+        R.info.sel = GLs().selPath; R.info.top = topId(bx);
+        var bg = capture(); R.info.token = bg.token; R.info.view = bg.token ? V().decode(bg.token) : null;
+        R.chk.carriesGroup = !!R.info.view && R.info.view.gp === R.info.sel && R.info.view.gr > 0 && (bg.included || []).indexOf('the open group') >= 0;
+      } else {
+        R.chk.note = await noteShown();
+        await until(function () { return GLs().selPath != null && GLs().selPath !== '' ; }, 8000); await sleep(1200);
+        R.info.sel = GLs().selPath;
+        var w2 = null; Array.prototype.some.call(document.querySelectorAll('#groupedResultsContainer .group-wrapper'), function (w) { if ((w.getAttribute('data-group-path') || w.getAttribute('data-group-key')) === R.info.sel) { w2 = w; return true; } return false; });
+        R.info.top = w2 ? topId(w2.querySelector(':scope > .group-content')) : null;
+      }
+    } else if (SCN === 'ggcA' || SCN === 'ggcB') {
+      // (10-23 b) a comparison drawn as a List (the live app's way): its open group and where it is scrolled
+      var snapRowsL = window.__rowsFixture.slice(0, 280).map(function (r, i) { var c = {}; for (var k in r) c[k] = r[k]; if (i % 4 === 0) c.V_STATUS = 'Archived'; return { rowData: c }; });
+      window.__VL.runComparisonAndDisplayGrouped({ name: 'Baseline (server)', displayName: 'Baseline', timestamp: Date.now() - 86400000, searchTerm: '', prompts: [], tables: '', notes: '',
+        columnNames: window.__COLS.slice(), kind: 'server', serverId: '55', creator: 'harness', compressedData: window.__VL.compressString(JSON.stringify(snapRowsL)) }, ['V_ID']);
+      R.chk.compared = await until(function () { return vis('#snapshotComparisonContainer') && document.querySelectorAll('#snapshotComparisonContainer tbody tr').length > 0; }, 25000);
+      var GLc = function () { return (window.Penumbra.groupList && window.Penumbra.groupList.state()) || {}; };
+      R.chk.listOn = await until(function () { return !!GLc().on; }, 10000);
+      function cTop(box) {
+        var top = box.getBoundingClientRect().top + ((box.querySelector('thead') || { getBoundingClientRect: function () { return { height: 0 }; } }).getBoundingClientRect().height), id = null;
+        Array.prototype.some.call(box.querySelectorAll('tbody tr'), function (tr) { if (!tr.getClientRects().length || tr.getBoundingClientRect().bottom <= top + 1) return false; var tds = tr.querySelectorAll('td'); id = Array.prototype.map.call(tds, function (t) { return t.textContent.trim(); }).filter(function (x) { return /^ID-\d+$/.test(x); })[0] || null; return true; });
+        return id;
+      }
+      var mw = function () { return document.querySelector('#snapshotComparisonContainer .group-wrapper[data-group-key="Modified Rows"]'); };
+      if (SCN === 'ggcA') {
+        window.Penumbra.groupList.selectGroup(mw()); await sleep(500);
+        var cb = mw().querySelector(':scope > .group-content'); cb.scrollTop = 250; await sleep(400);
+        R.info.sel = GLc().selPath; R.info.top = cTop(cb);
+        var bl = capture(); R.info.view = bl.token ? V().decode(bl.token) : null;
+        if (bl.url) { var ul = new URL(bl.url); R.info.path = ul.pathname.replace(/^\//, '') + ul.search; }
+        R.chk.carriesCmpGroup = !!R.info.view && R.info.view.m === 'keep' && R.info.view.gp === 'Modified Rows' && R.info.view.gr > 0;
+      } else {
+        await until(function () { return GLc().selPath === 'Modified Rows'; }, 10000); await sleep(1200);
+        R.info.sel = GLc().selPath; R.info.top = mw() ? cTop(mw().querySelector(':scope > .group-content')) : null;
+      }
+    } else if (SCN === 'ggsA' || SCN === 'ggsB' || SCN === 'vcmpS' || SCN === 'vcmpT') {
+      // (10-23 c) STACKED groups: which are open, where each open box and the page are scrolled
+      var isCmp = SCN === 'vcmpS' || SCN === 'vcmpT';
+      if (isCmp) {
+        var snapRowsS = window.__rowsFixture.slice(0, 280).map(function (r, i) { var c = {}; for (var k in r) c[k] = r[k]; if (i % 4 === 0) c.V_STATUS = 'Archived'; return { rowData: c }; });
+        window.__VL.runComparisonAndDisplayGrouped({ name: 'Baseline (server)', displayName: 'Baseline', timestamp: Date.now() - 86400000, searchTerm: '', prompts: [], tables: '', notes: '',
+          columnNames: window.__COLS.slice(), kind: 'server', serverId: '55', creator: 'harness', compressedData: window.__VL.compressString(JSON.stringify(snapRowsS)) }, ['V_ID']);
+        R.chk.compared = await until(function () { return vis('#snapshotComparisonContainer') && document.querySelectorAll('#snapshotComparisonContainer tbody tr').length > 0; }, 25000);
+        await sleep(600);
+      }
+      function wpath(w) { return w.getAttribute('data-group-path') || w.getAttribute('data-group-key') || ''; }
+      function wraps() { return Array.prototype.filter.call(document.querySelectorAll('#groupedResultsContainer .group-wrapper'), function (w) { return !!wpath(w) && !w.closest('.group-grand-total'); }); }
+      function openSet() { return wraps().filter(function (w) { return w.classList.contains('open'); }).map(wpath).sort(); }
+      function boxTop(w) {
+        var box = w && w.querySelector(':scope > .group-content'); if (!box) return null;
+        var th = box.querySelector('thead'), top = box.getBoundingClientRect().top + (th ? th.getBoundingClientRect().height : 0), id = null;
+        Array.prototype.some.call(box.querySelectorAll('tbody tr'), function (tr) { if (!tr.getClientRects().length || tr.getBoundingClientRect().bottom <= top + 1) return false; var tds = tr.querySelectorAll('td'); id = Array.prototype.map.call(tds, function (t) { return t.textContent.trim(); }).filter(function (x) { return /^ID-\d+$/.test(x); })[0] || null; return true; });
+        return id;
+      }
+      function topGroup() { var hit = null; wraps().some(function (w) { var h = w.querySelector(':scope > .group-header'); if (h && h.getClientRects().length && w.getBoundingClientRect().bottom > 1 && h.getBoundingClientRect().bottom > -1) { hit = wpath(w); return true; } return false; }); return hit; }
+      var keep = isCmp ? ['Modified Rows'] : null;
+      if (SCN === 'ggsA' || SCN === 'vcmpS') {
+        var ws = wraps();
+        R.chk.stacked = ws.length >= 3 && !(window.Penumbra.groupList && window.Penumbra.groupList.state().on);
+        if (!keep) keep = [wpath(ws[1]), wpath(ws[3] || ws[2])];
+        // open exactly `keep` with the bands' own clicks
+        ws.forEach(function (w) { var want = keep.indexOf(wpath(w)) >= 0; if (w.classList.contains('open') !== want) { var h = w.querySelector(':scope > .group-header'); if (h) h.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })); } });
+        await sleep(600);
+        var tw = ws.filter(function (w) { return wpath(w) === keep[keep.length - 1]; })[0];
+        var tb = tw && tw.querySelector(':scope > .group-content'); if (tb) tb.scrollTop = 200;
+        if (!isCmp) { window.scrollTo(0, 0); window.scrollBy(0, Math.round(tw.getBoundingClientRect().top)); }
+        await sleep(500);
+        R.info.open = openSet(); R.info.top = boxTop(tw); R.info.page = topGroup(); R.info.keep = keep;
+        var bs = capture(); R.info.view = bs.token ? V().decode(bs.token) : null; R.info.token = bs.token;
+        if (bs.url) { var us = new URL(bs.url); R.info.path = us.pathname.replace(/^\//, '') + us.search; }
+        var vs = R.info.view || {};
+        R.chk.carriesOpen = JSON.stringify((vs.go || []).slice().sort()) === JSON.stringify(R.info.open) && !vs.ga && Array.isArray(vs.gb) && vs.gb.length === 1;
+      } else {
+        R.chk.note = await noteShown();
+        if (!keep) keep = [];
+        await sleep(1800);
+        R.info.open = openSet();
+        var tw2 = wraps().filter(function (w) { return R.info.open.length && wpath(w) === R.info.open[R.info.open.length - 1]; })[0];
+        R.info.top = tw2 ? boxTop(tw2) : null; R.info.page = topGroup();
+      }
+    } else if (SCN === 'vcmpA' || SCN === 'vcmpB') {
+      // (10-23) a snapshot comparison on screen: the link = the comparison's own + the view
+      // a server snapshot (id 55): the fixture's first 280 rows, every 25th row's V_STATUS changed
+      var snapRowsC = window.__rowsFixture.slice(0, 280).map(function (r, i) { var c = {}; for (var k in r) c[k] = r[k]; if (i % 25 === 0) c.V_STATUS = 'Archived'; return { rowData: c }; });
+      window.__VL.runComparisonAndDisplayGrouped({ name: 'Baseline (server)', displayName: 'Baseline', timestamp: Date.now() - 86400000, searchTerm: '', prompts: [], tables: '', notes: '',
+        columnNames: window.__COLS.slice(), kind: 'server', serverId: '55', creator: 'harness', compressedData: window.__VL.compressString(JSON.stringify(snapRowsC)) }, ['V_ID']);
+      R.info.vl = Object.keys(window.__VL || {});
+      R.chk.compared = await until(function () { return vis('#snapshotComparisonContainer') && document.querySelectorAll('#snapshotComparisonContainer tbody tr').length > 0; }, 25000);
+      await sleep(600);
+      if (SCN === 'vcmpA') {
+        try { window.Penumbra.setColOpt('V_AMOUNT', 'format', 'currency:0'); } catch (e) { }
+        await sleep(400);
+      }
+      var bm = capture(), dm = bm.token ? (V().decode(bm.token) || {}) : null;
+      R.info.url = bm.url || null; R.info.view = dm; R.info.err = bm.error || null;
+      if (bm.url) { var um = new URL(bm.url); R.info.path = um.pathname.replace(/^\//, '') + um.search; }
+      R.chk.cmpLink = !!bm.url && /[?&]snapcmp=55(&|$)/.test(bm.url) && /[?&]id=lrfix(&|$)/.test(bm.url) && /&view=[A-Za-z0-9_-]+$/.test(bm.url)
+        && !!dm && dm.m === 'keep' && !dm.g && !dm.s && JSON.stringify(dm).indexOf('__SNAP_TYPE') < 0 && (bm.included || [])[0] === 'the comparison';
+      R.chk.cmpCarriesView = !!dm && !!dm.fm && dm.fm.V_AMOUNT === 'currency:0';
+      if (SCN === 'vcmpA') {
+        R.info.describe = V().describe(bm);
+        R.chk.cmpDescribed = (R.info.describe || [])[0] === 'the snapshot comparison (rows paired on V_ID)';
+        window.__clip = [];
+        $('#snapAnalysisDock .snap-banner-link').first().trigger('click');
+        await until(function () { return window.__clip.length > 0; }, 4000);
+        R.info.banner = (window.__clip[0] || '').slice(0, 200);
+        R.chk.bannerCarriesView = !!window.__clip[0] && window.__clip[0] === bm.url;
+      } else {
+        R.chk.note = bodyText().indexOf('Opened a shared view') >= 0 || await noteShown();
+        R.chk.noStale = V().active() && V().missing().length === 0;
+      }
     } else if (SCN === 'vpgA') {
       // 300 rows at 25 a page, turned to page 3 through the pager's own buttons
       $('#rowsPerPageSelector').val('25').trigger('change'); await sleep(600);

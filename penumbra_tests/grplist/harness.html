@@ -198,7 +198,15 @@
     // crumbclick: three levels, so the crumb has two names
     if (S === 'n3crumb' || S === 'n3hidden' || S === 'n3pdf' || S === 'n3mail') st.groupBy = 'H_GROUP,H_GROUP2,V_STATUS';
     st.groupAgg = { column: 'H_AMT', type: 'sum' };
-    if (!/^(layoutonly|widestacked|fitstacked|wideresize|widecmp|nstick|nstack|trigger|npdf|n3pdf|pdf1)$/.test(S)) st.groupLayout = 'list';   // nstack: probes only
+    if (!/^(layoutonly|widestacked|fitstacked|wideresize|widecmp|nstick|nstack|trigger|npdf|n3pdf|pdf1|cmpsort|ncmpsort|cmpsortprep|cmpsortpivot|rgapply|nrgapply|rgprep|rgpivot|rgremove|rgremoff|rgremsearch|rgremguard|rpsearch|rplayout|rpcso|rpjournal|rppivot|rpcmpflat|rpmarksoff)$/.test(S)) st.groupLayout = 'list';   // nstack: probes only
+    // rgsort (2026-10-23): rgpivot leaves a pivot through its exit button (the grouping Apply's pivot branch clicks
+    // it); main.js binds it at ready, so it is written here, before main.js, and only for that scenario
+    // rgpaths (2026-10-23): rppivot too
+    if (S === 'rgpivot' || S === 'rppivot') document.write('<button id="exitPivotModeBtn" type="button" style="display:none">Exit pivot</button>');
+    // rgpaths: rpjournal turns the report journal on - a toggle column keyed by V_ID (V_ID is unique), as View
+    // Options saves it; run.py opens the page with &id= (the journal needs a saved report) and the fake server below
+    // answers manage_journal.php for this scenario only (no marks, no notes)
+    if (S === 'rpjournal') st.viewOptions = { journalEnabled: true, journalKeyColumns: ['V_ID'], journalToggles: [{ key: 'toggle1', label: 'Reviewed' }] };
     // The wide scenarios show all 20 columns: more text than the box is wide.
     if (/^wide|^pinnarrow$|^pinhash$|^nmerge|^nsweep/.test(S)) { st.visibleColumns = ['#']; for (var v = 0; v < COLS.length; v++) st.visibleColumns.push(v); }
     // switch: two layout_switch() controls and a toggle_switch() that name a layout
@@ -222,6 +230,7 @@
       totalExemptions: ['AMOUNT', 'H_AMT', 'H_NUM'],
       preloadedState: st
     };
+    if (S === 'rpjournal') { window.penumbra_vars.journal = { installed: true, enabled: true, total: 0, unseen: 0 }; window.penumbra_vars.journalAccess = true; }
     window.__queryResponse = { data: rows };
   })();
   window.__T = {};
@@ -253,6 +262,14 @@
     // grplist3: help_content.php = the candidate's group-layout tip block (run.py lifts
     // it into help_stub.js) behind the marker ensureHelpLoaded() checks for
     var resp = isQuery ? window.__queryResponse : (/help_content\.php/.test(url) ? (window.__HELP_STUB || '') : {});
+    // rgpaths (2026-10-23): rpjournal's journal server - the toggles (no marks), no row notes, an empty summary
+    if (window.__SCN === 'rpjournal' && /manage_journal\.php/.test(url)) {
+      var _jm = /[?&]action=([a-z_]+)/.exec(url), _ja = _jm ? _jm[1] : null;
+      if (!_ja && opts.data) { try { _ja = JSON.parse(opts.data).action; } catch (e) { } }
+      resp = _ja === 'toggles' ? { status: 'success', installed: true, toggles: { toggle1: {}, toggle2: {} } }
+        : (_ja === 'row_notes' ? { status: 'success', counts: {}, notes: {} }
+        : (_ja === 'summary' ? { status: 'success', installed: true, total: 0, unseen: 0 } : { status: 'success' }));
+    }
     setTimeout(function () {
       try { if (opts.success) opts.success(resp, 'success', { status: 200 }); } catch (e) { window.__errors.push('ajax success threw: ' + String(e)); }
       try { if (opts.complete) opts.complete({ status: 200 }, 'success'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }

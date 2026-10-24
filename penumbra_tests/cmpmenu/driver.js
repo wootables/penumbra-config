@@ -156,7 +156,7 @@
     var opened = rclick(th);
     var a1 = acts();
     rec('C1 a heading opens the comparison menu: Sort, Column widths, Consistent row height, Copy column name, Show before & after, Edit match criteria..., Clear snapshot comparison (no Then sort under the report table\'s sort)',
-      opened && !!menu() && title() === 'AMOUNT' && J(a1) === J(['sortAsc', 'sortDesc', 'width', 'rowHeight', 'cmpCopyName', 'cmpBeforeAfter', 'cmpEditMatch', 'cmpClear']) && /Snapshot comparison/.test(subLine()),
+      opened && !!menu() && title() === 'AMOUNT' && J(a1) === J(['sortAsc', 'sortDesc', 'width', 'rowHeight', 'cmpCopyName', 'cmpBeforeAfter', 'cmpEditMatch', 'cmpCopyLink', 'cmpClear']) && /Snapshot comparison/.test(subLine()),
       'opened=' + opened + ' title=' + title() + ' acts=' + J(a1) + ' sub=' + subLine());
     closeMenu();
 
@@ -166,7 +166,7 @@
     rclick(td3);
     var a2 = acts();
     rec('C2 a changed cell offers Copy this value and Copy the earlier value (no Filter to / Exclude), then the column\'s tools; its group under the name',
-      !!td3 && td3.classList.contains('snap-cell-modified') && J(a2) === J(['cmpCopy', 'cmpCopyWas', 'sortAsc', 'sortDesc', 'width', 'rowHeight', 'cmpCopyName', 'cmpBeforeAfter', 'cmpEditMatch', 'cmpClear'])
+      !!td3 && td3.classList.contains('snap-cell-modified') && J(a2) === J(['cmpCopy', 'cmpCopyWas', 'sortAsc', 'sortDesc', 'width', 'rowHeight', 'cmpCopyName', 'cmpBeforeAfter', 'cmpEditMatch', 'cmpCopyLink', 'cmpClear'])
         && /Modified Rows/.test(subLine()),
       'cell=' + (td3 ? td3.className : null) + ' acts=' + J(a2) + ' sub=' + subLine());
     closeMenu();
@@ -234,7 +234,7 @@
     rclick(hd);
     var a5 = acts();
     rec('C5 a group\'s band opens the comparison menu under the group\'s name: Expand, Show only, Hide this group, then the comparison\'s items',
-      !!menu() && title() === 'Modified Rows' && J(a5) === J(['cmpGroupToggle', 'cmpGroupOnly', 'cmpGroupHide', 'cmpBeforeAfter', 'cmpEditMatch', 'cmpClear']),
+      !!menu() && title() === 'Modified Rows' && J(a5) === J(['cmpGroupToggle', 'cmpGroupOnly', 'cmpGroupHide', 'cmpBeforeAfter', 'cmpEditMatch', 'cmpCopyLink', 'cmpClear']),
       'title=' + title() + ' acts=' + J(a5));
     closeMenu();
 
@@ -250,7 +250,7 @@
     await sleep(100);
     var c6 = lastClip();
     rec('C6 an unchanged cell offers its value (filter, copy) and the column\'s tools, in a changed row too, never an earlier value',
-      J(a6a) === J(['cellFilter', 'cellExclude', 'cmpCopy', 'sortAsc', 'sortDesc', 'width', 'rowHeight', 'cmpCopyName', 'cmpBeforeAfter', 'cmpEditMatch', 'cmpClear']) && J(a6b) === J(a6a)
+      J(a6a) === J(['cellFilter', 'cellExclude', 'cmpCopy', 'sortAsc', 'sortDesc', 'width', 'rowHeight', 'cmpCopyName', 'cmpBeforeAfter', 'cmpEditMatch', 'cmpCopyLink', 'cmpClear']) && J(a6b) === J(a6a)
         && c6 === 'Alpha' && /Unchanged Rows/.test(String(nm1 ? nm1.parentNode.textContent : '')),
       'changedRow=' + J(a6a) + ' unchangedRow=' + J(a6b) + ' clip=' + J(c6));
 
@@ -272,7 +272,7 @@
     closeMenu();
     ba.style.display = '';
     rec('C8 Show before & after is left out where the control bar has no toggle',
-      J(a8) === J(['sortAsc', 'sortDesc', 'width', 'rowHeight', 'cmpCopyName', 'cmpEditMatch', 'cmpClear']), 'acts=' + J(a8));
+      J(a8) === J(['sortAsc', 'sortDesc', 'width', 'rowHeight', 'cmpCopyName', 'cmpEditMatch', 'cmpCopyLink', 'cmpClear']), 'acts=' + J(a8));
 
     // C9 Edit match criteria...: the banner's pencil (its own handler reopens the snapshot dialog)
     var spy = 0;
@@ -283,6 +283,38 @@
     document.removeEventListener('click', spyFn, true);
     rec('C9 Edit match criteria... runs the comparison banner\'s Modify comparison control', spy === 1,
       'spy=' + spy + ' links=' + document.querySelectorAll('.snap-modify-link').length);
+
+    // C32 (lnk40; the user: "copy link / copy evergreen link can be in the right click menu while in a snapshot comparison")
+    // the banner's Copy link and Copy evergreen link, each where the banner shows it, each run through the banner's own
+    // button (the spy stops the click there: the link builders want a saved report)
+    var lkB = document.querySelector('#snapAnalysisDock .snap-banner-link'), evB = document.querySelector('#snapAnalysisDock .snap-banner-link-evergreen');
+    var lkShown = !!lkB && lkB.style.display !== 'none', evShown0 = !!evB && evB.style.display !== 'none';
+    var hits = { lk: 0, ev: 0 };
+    function spy32(e) {
+      var t = e.target;
+      if (!t || !t.closest) return;
+      if (t.closest('.snap-banner-link')) { hits.lk++; e.stopImmediatePropagation(); e.preventDefault(); }
+      else if (t.closest('.snap-banner-link-evergreen')) { hits.ev++; e.stopImmediatePropagation(); e.preventDefault(); }
+    }
+    document.addEventListener('click', spy32, true);
+    closeMenu(); rclick(th);
+    var a32a = acts();
+    closeMenu();
+    var ranLk = await choose(th, 'cmpCopyLink');
+    if (evB) evB.style.display = '';
+    closeMenu(); rclick(td3);
+    var a32b = acts();
+    closeMenu();
+    var ranEv = await choose(td3, 'cmpCopyEvergreen');
+    if (evB) evB.style.display = 'none';
+    closeMenu(); rclick(th);
+    var a32c = acts();
+    closeMenu();
+    document.removeEventListener('click', spy32, true);
+    rec('C32 the banner\'s Copy link and Copy evergreen link, each where the banner shows it, each running the banner\'s own button',
+      lkShown && !evShown0 && a32a.indexOf('cmpCopyLink') > a32a.indexOf('cmpEditMatch') && a32a.indexOf('cmpCopyEvergreen') < 0 && ranLk && hits.lk === 1
+        && a32b.indexOf('cmpCopyLink') > 0 && a32b.indexOf('cmpCopyEvergreen') === a32b.indexOf('cmpCopyLink') + 1 && ranEv && hits.ev === 1 && a32c.indexOf('cmpCopyEvergreen') < 0,
+      'shown=' + [lkShown, evShown0].join('/') + ' acts=' + J(a32a.slice(-4)) + ' withEver=' + J(a32b.slice(-4)) + ' hits=' + J(hits) + ' after=' + J(a32c.slice(-3)));
 
     // C10 from the keyboard (Shift+F10 / the Menu key on a focused heading): the menu takes the focus; Esc gives it back
     closeMenu();
@@ -305,7 +337,7 @@
     var s23 = subActs();
     closeMenu();
     rec('C23 the # heading: Sort, Column widths (Fit all, Fit to page, Reset all), Consistent row height, the comparison\'s items',
-      !!numTh && J(a23) === J(['sortAsc', 'sortDesc', 'width', 'rowHeight', 'cmpBeforeAfter', 'cmpEditMatch', 'cmpClear']) && J(s23) === J(['fitAll', 'fitPage', 'resetWidths']),
+      !!numTh && J(a23) === J(['sortAsc', 'sortDesc', 'width', 'rowHeight', 'cmpBeforeAfter', 'cmpEditMatch', 'cmpCopyLink', 'cmpClear']) && J(s23) === J(['fitAll', 'fitPage', 'resetWidths']),
       'acts=' + J(a23) + ' widths=' + J(s23));
 
     // C13 the sort: every group's table, as a click on a heading sorts them; the choice ticked, Clear sort offered

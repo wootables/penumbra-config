@@ -26,8 +26,19 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
         'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js', 'penumbra_tiles.js',
         'penumbra_a11y.js', 'penumbra_grouplist.js', 'penumbra_cellsel.js', 'penumbra_presets.js', 'penumbra_forms.js', 'penumbra_find.js']   # (round 14) Find, as index.php loads it
-SCN = ['pcold', 'pfail', 'pmain', 'ppick', 'pview', 'prow', 'pshot', 'pcombo', 'pkeys', 'pdash', 'pdasha', 'pshot6', 'pfn', 'pshot7f', 'pshot7t', 'pfeed', 'pshot8', 'prank', 'pshot9', 'pshot10', 'pshot11', 'ptools', 'ptoolsv', 'padmin', 'pshot12', 'pdsec', 'pmetr', 'phand', 'pshot14a', 'pshot14b', 'pvo', 'pshot15', 'pjar', 'pshot16', 'pchip', 'pshot17', 'pthm', 'pjip', 'pshot19', 'pshow', 'pjump', 'pverb', 'pshot20', 'pnote', 'pmail', 'pmiss', 'pshot21', 'ptop', 'pr23', 'psweep', 'psrank', 'pperf', 'pwidth']
+SCN = ['pcold', 'pfail', 'pmain', 'ppick', 'pview', 'prow', 'pshot', 'pcombo', 'pkeys', 'pdash', 'pdasha', 'pshot6', 'pfn', 'pshot7f', 'pshot7t', 'pfeed', 'pshot8', 'prank', 'pshot9', 'pshot10', 'pshot11', 'ptools', 'ptoolsv', 'padmin', 'pshot12', 'pdsec', 'pmetr', 'phand', 'pshot14a', 'pshot14b', 'pvo', 'pshot15', 'pjar', 'pshot16', 'pchip', 'pshot17', 'pthm', 'pjip', 'pshot19', 'pshow', 'pjump', 'pverb', 'pshot20', 'pnote', 'pmail', 'pmiss', 'pshot21', 'ptop', 'pr23', 'psweep', 'psrank', 'pperf', 'pwidth', 'pcmplink']
+SCN = SCN + ['pjbusy', 'pjbusyrm', 'pjbusyhc', 'pshotjb']   # (jarbusy, 2026-10-23) the busy card while Jarvis thinks
 CHK = {
+    # (jarbusy, 2026-10-23) "a visible loading animation that grabs the users attention" while the box asks Jarvis: the busy card at
+    # once, large, where the answer lands and in view (a long pasted question, a 600px-tall window), moving (bar, dots, shimmer), said
+    # once through the box's one live region (two keys typed while it waits say nothing again), aria-busy on the answer's place;
+    # ended by the answer, an error (whose line reads AA in every theme), Esc (aborted) and a close that is not Esc (left alive);
+    # every theme of the registry AA (words 4.5:1, moving marks 3:1), no text faded by opacity
+    'pjbusy': ['busyShown', 'busyInView', 'busyMoves', 'busySaidOnce', 'busyMarked', 'busyEndsOnAnswer', 'busyEndsOnError', 'errorReadable', 'busyEndsOnCancel', 'busyEndsOnClose', 'busyThemes', 'busyNoFade'],
+    # (jarbusy) under prefers-reduced-motion: nothing moves, still plainly busy (the words, a full bar, solid dots), AA in every theme
+    'pjbusyrm': ['rmStill', 'rmObvious', 'rmThemes'],
+    'pjbusyhc': ['hcMarks'],   # (jarbusy) forced colours (High Contrast): the dots and the bar in Highlight, 3:1; the words 4.5:1
+    'pshotjb': ['open'],   # (jarbusy) the photograph: the busy card mid-animation (PNB_JBTHEME, PNB_JBRM=1, PNB_JBHC=1)
     'pcold': ['shellAtOnce', 'keysKept', 'handOver', 'renders'],
     'pfail': ['shellAtOnce', 'failLine', 'escCloses', 'noHang', 'escChipCloses'],
     'pmain': ['sheetRow', 'emptyRecent', 'emptyCommon', 'commonAvailOnly', 'hiddenUntilTyped', 'rankTop', 'marks', 'greyWhenTyped', 'greyReason',
@@ -36,6 +47,7 @@ CHK = {
     'ppick': ['pickMode', 'pickOrder', 'pickFreezeOff', 'pickFreezeRuns', 'pickFrozenPill', 'unfreezeOr', 'unfreezeRuns', 'sortRuns', 'hideRuns',
               'colMode', 'colItems', 'colRun', 'backspaceBack', 'themePick', 'themeRuns'],
     'pwidth': ['noDeadColRows', 'widthCoverage', 'fitPageRow', 'fitPageRuns', 'resetWidthPick', 'resetWidthRuns'],   # (colmenu round 33)
+    'pcmplink': ['everOff', 'everOn', 'everRuns'],   # (2026-10-23, lnk40) the comparison banner's evergreen link as a row
     'pview': ['saveHidden', 'saveGreyExact', 'vhHidden', 'consoleHidden', 'editorSave', 'editorVh'],
     'prow': ['noRowItemsIdle', 'rowItems', 'rowFilterRuns'],
     # (round 4) the box open beside the toolbar in Wolfpack Red; the runner adds inkPalette / inkMatch from a screenshot
@@ -142,6 +154,11 @@ CHK = {
     'pr23': ['tagGenerator', 'manageData', 'formatSql', 'rowLimit', 'wordWrap', 'tableList', 'popOut', 'shareState', 'profileCard', 'hiddenGreyed', 'tableInfoRows', 'tableInfoByName', 'tableInfoNone', 'tableInfoViewer', 'consoleRowsViewer'],
     'psweep': ['pivotOpens', 'groupOpens', 'downloadOpens', 'copyOpens', 'emailOpens', 'snapshotsOpen', 'saveOpens', 'downloadFormat', 'aiPanel', 'consoleToggles', 'filterFocus', 'findOpens', 'rowHeight', 'helpCenter', 'shortcutSheet', 'versionHistory', 'reportList', 'calcDialog', 'viewLink', 'metricsTab', 'colOptions', 'colFit', 'colReset', 'colMoveEnd'],
 }
+# (jaredge, 2026-10-23) pjip, the waiting state's edges: the input names no removed option in the Jarvis view; the Esc chip cancels
+# as the key does; Backspace back to the list drops a waiting question, another mode's Backspace leaves one left running alone; one
+# question at a time (asked again while one is on its way: nothing sent beside it, that one shown waiting and said so, its answer
+# landing in the box and once in the panel); a failure handed back inside the call settles it (the next question is sent)
+CHK['pjip'] = CHK['pjip'] + ['noStaleActive', 'escChipCancels', 'backCancels', 'backKeepsOther', 'oneAtATime', 'stillSaid', 'stillLands', 'syncFailAsksAgain']
 # what this change brings: every browser check (live has no palette) and every static check but the
 # guards (what live already gets right: a viewer's Save / Version history / admin controls are absent
 # because the palette itself is; the empty-state and idle checks pass for the same reason)
@@ -246,6 +263,18 @@ NEW = {'L-pjar-askSecond', 'L-pjar-askSecondCode', 'L-pjar-subPaid', 'L-pjar-sub
 # live must show red. Once round 33's palette half is live, drop NEW_W33 from the union (its checks are old ones then).
 NEW_W33 = {'L-pwidth-%s' % c for c in CHK['pwidth']} | {'L-psweep-colReset', 'S-widthRows'}
 NEW = NEW   # (round 33's palette half is LIVE since 08c66aa, 2026-10-22 14:10: NEW_W33's checks are old ones now, green on live)
+# (2026-10-23, lnk40) the comparison banner's evergreen link as a row; jarvispal's set above is still undeployed (red on live)
+NEW = NEW | {'L-pcmplink-everOff', 'L-pcmplink-everOn', 'L-pcmplink-everRuns'}
+# jarbusy (2026-10-23; live: a plain muted "Thinking..." line carrying a live region of its own, the error in #b00020 on every theme):
+# every pjbusy / pjbusyrm check, the shot, the static. The sets above that are still undeployed stay in the union (red on live too).
+NEW_JB = {'L-pjbusy-%s' % c for c in CHK['pjbusy']} | {'L-pjbusyrm-%s' % c for c in CHK['pjbusyrm']} | {'L-pjbusyhc-hcMarks', 'L-pshotjb-open', 'S-jarBusy'}
+NEW = NEW - {'L-pcmplink-everOff', 'L-pcmplink-everOn', 'L-pcmplink-everRuns'}   # (lnk40's row is LIVE since 425d199, 2026-10-23: its pcmplink checks are old ones now, green on live)
+# (jarbusy is LIVE since d6da5bc, 2026-10-23 15:08: NEW_JB's checks are old ones now, green on live; jarvispal's set above is still undeployed)
+# jaredge (2026-10-23; live d6da5bc: the Esc chip only closes the box and the answer lands later, Backspace back to the list leaves a
+# waiting question running, a second ask runs beside the first, the input names a removed option in the Jarvis view): the pjip checks
+# and the static. backKeepsOther and syncFailAsksAgain hold on live already (guards). pjbusy's busyEndsOnClose closes with Ctrl+K now.
+NEW_JE = {'L-pjip-%s' % c for c in ('noStaleActive', 'escChipCancels', 'backCancels', 'oneAtATime', 'stillSaid', 'stillLands')} | {'S-jarEdge'}
+NEW = NEW   # (jaredge is LIVE since 9120044, 2026-10-23 20:22: NEW_JE's checks are old ones now, green on live; jarvispal's set above is still undeployed)
 # (round 3) the group-mode icon: candidate C, and the old drawing's signature (its first line)
 GROUP_C_SYMBOL = '<symbol id="pnbi-group" viewBox="0 0 24 24"><path d="m4 4 2.5 2.5L9 4"/><line x1="12" y1="5" x2="20" y2="5"/><line x1="8" y1="9.5" x2="20" y2="9.5"/><line x1="8" y1="13" x2="20" y2="13"/><path d="m6.25 15.25 2.5 2.5-2.5 2.5"/><line x1="12" y1="18" x2="20" y2="18"/></symbol>'
 OLD_GROUP_SIG = '<line x1="5" y1="9" x2="19" y2="9"/><line x1="5" y1="15" x2="19" y2="15"/>'
@@ -256,6 +285,48 @@ def served_files():
     return out
 
 MUTANTS = {
+    # --- (jaredge, 2026-10-23) the Esc chip closing without the cancel; Backspace back leaving a waiting question running; Backspace back
+    # cancelling from any mode; the one-at-a-time guard gone; the "still answering" status gone; a handler that ran at once not
+    # settling the ask; Esc not forgetting the question it cancelled; the stale aria-activedescendant left on the input
+    'je-chipkeeps': ([('pal', "function (e) { e.preventDefault(); jarvisCancel(); close(true); });   // (round 11) the Esc chip is a button", "function (e) { e.preventDefault(); close(true); });   // (round 11) the Esc chip is a button")],
+                     ['L-pjip-escChipCancels', 'S-jarEdge'], ['pjip']),
+    'je-backkeeps': ([('pal', "        if (mode.kind === 'jarvis') { jarvisCancel(); }   // (jaredge) back to the list from a waiting question drops it, as Esc does (nothing recorded)\n", "")],
+                     ['L-pjip-backCancels', 'S-jarEdge'], ['pjip']),
+    'je-backany': ([('pal', "        if (mode.kind === 'jarvis') { jarvisCancel(); }   // (jaredge) back", "        { jarvisCancel(); }   // (jaredge) back")], ['L-pjip-backKeepsOther', 'S-jarEdge'], ['pjip']),
+    'je-twoasks': ([('pal', "        if (jarvisQ !== null) { setMode({ kind: 'jarvis', q: jarvisQ, state: 'waiting', still: true }, true); return; }", "        if (false) { }")],
+                   ['L-pjip-oneAtATime', 'L-pjip-stillSaid', 'L-pjip-stillLands', 'S-jarEdge'], ['pjip']),
+    'je-nostill': ([('pal', "        if (waiting && mode.still) { st = JARVIS_STILL; }", "        if (false) { }")], ['L-pjip-stillSaid', 'S-jarEdge'], ['pjip']),
+    'je-settled': ([('pal', "        if (!settled) { jarvisReq = req; jarvisQ = text; }", "        { jarvisReq = req; jarvisQ = text; }")], ['L-pjip-syncFailAsksAgain', 'S-jarEdge'], ['pjip']),
+    'je-qkept': ([('pal', "        jarvisReq = null; jarvisQ = null;\n    }\n", "        jarvisReq = null;\n    }\n")], ['L-pjip-lateLands'], ['pjip']),
+    'je-staleactive': ([('pal', "        ui.input.removeAttribute('aria-activedescendant');   // (jaredge) the option it named went with the list\n", "")], ['L-pjip-noStaleActive', 'S-jarEdge'], ['pjip']),
+    # --- (jarbusy, 2026-10-23) the busy card: the old plain line back; nothing animated; no reduced-motion form; a reduced-motion form
+    # with no bar; a live region of its own; nothing said; said again on every render; no aria-busy; the card left on after the answer /
+    # in place of the error; the card not brought into view; the words faded by opacity; the dots in a faint tint; the hint's old
+    # opacity; the error's old colour; the marks lost in High Contrast (forced colours)
+    'jb-plainline': ([('pal', "        if (waiting) { html += jarvisBusyHtml(); }\n", "        if (waiting) { html += '<div class=\"pnb-pal-ai-wait\" aria-live=\"polite\">Thinking&hellip; <span class=\"pnb-pal-ai-hint\">Esc cancels</span></div>'; }\n")],
+                     ['L-pjbusy-busyShown', 'L-pjbusy-busyMoves', 'L-pjbusy-busySaidOnce', 'L-pjbusy-busyEndsOnAnswer', 'L-pjbusy-busyEndsOnCancel', 'L-pjbusy-busyThemes', 'L-pjbusyrm-rmStill', 'L-pjbusyrm-rmObvious', 'S-jarBusy'], ['pjbusy', 'pjbusyrm']),
+    'jb-still': ([('pcss', " animation: pnbPalAiBar 1.3s ease-in-out infinite;", ""), ('pcss', " animation: pnbPalAiDot 1.1s ease-in-out infinite;", ""), ('pcss', "    animation: pnbPalAiShimmer 1.6s linear infinite;\n", "")],
+                 ['L-pjbusy-busyMoves'], ['pjbusy']),
+    'jb-norm': ([('pcss', "@media (prefers-reduced-motion: reduce) {\n    .pnb-pal-ai-bar i {", "@media (prefers-reduced-motion: no-preference) and (max-width: 1px) {\n    .pnb-pal-ai-bar i {")],
+                ['L-pjbusyrm-rmStill', 'L-pjbusyrm-rmObvious', 'S-jarBusy'], ['pjbusyrm']),
+    'jb-rmnobar': ([('pcss', "    .pnb-pal-ai-bar i { animation: none; width: 100%;", "    .pnb-pal-ai-bar i { animation: none; width: 0;")], ['L-pjbusyrm-rmObvious', 'S-jarBusy'], ['pjbusyrm']),
+    'jb-twolive': ([('pal', "<div class=\"pnb-pal-ai-wait is-busy\">", "<div class=\"pnb-pal-ai-wait is-busy\" aria-live=\"polite\">")], ['L-pjbusy-busySaidOnce'], ['pjbusy']),
+    'jb-nosay': ([('pal', "        var st = mode.state === 'done' ? 'answered' : (waiting ? JARVIS_BUSY : '');\n", "        var st = mode.state === 'done' ? 'answered' : '';\n")], ['L-pjbusy-busySaidOnce'], ['pjbusy']),
+    'jb-resay': ([('pal', "        if (ui.status.textContent !== st) { status(st); }", "        status(st);")], ['L-pjbusy-busySaidOnce', 'S-jarBusy'], ['pjbusy']),
+    'jb-nobusyattr': ([('pal', "html = '<div class=\"pnb-pal-ai\"' + (waiting ? ' aria-busy=\"true\"' : '') + '>", "html = '<div class=\"pnb-pal-ai\"' + '>")], ['L-pjbusy-busyMarked'], ['pjbusy']),
+    'jb-stays': ([('pal', "        if (waiting) { html += jarvisBusyHtml(); }\n", "        if (waiting || mode.state === 'done') { html += jarvisBusyHtml(); }\n")], ['L-pjbusy-busyEndsOnAnswer'], ['pjbusy']),
+    'jb-errstays': ([('pal', "        if (waiting) { html += jarvisBusyHtml(); }\n", "        if (waiting || mode.state === 'failed') { html += jarvisBusyHtml(); }\n")], ['L-pjbusy-busyEndsOnError', 'L-pjbusy-errorReadable'], ['pjbusy']),
+    'jb-noview': ([('pal', "        if (waiting) { var card = ui.body.querySelector('.pnb-pal-ai-busy'); if (card && typeof card.scrollIntoView === 'function') { card.scrollIntoView({ block: 'nearest' }); } }", "")], ['L-pjbusy-busyInView'], ['pjbusy']),
+    'jb-faded': ([('pcss', ".pnb-pal-ai-busytext { font-size: 13px; font-weight: 600; }", ".pnb-pal-ai-busytext { font-size: 13px; font-weight: 600; opacity: 0.6; }")], ['L-pjbusy-busyNoFade'], ['pjbusy']),
+    'jb-faintdots': ([('pcss', "border-radius: 50%; background: var(--brand-text, var(--brand-primary, #336699));", "border-radius: 50%; background: color-mix(in srgb, var(--brand-primary, #336699) 30%, transparent);")], ['L-pjbusy-busyThemes', 'L-pjbusyrm-rmThemes'], ['pjbusy', 'pjbusyrm']),
+    'jb-hintfade': ([('pcss', ".pnb-pal-ai-hint { margin-left: auto; font-size: 11px; white-space: nowrap; color: color-mix(in srgb, var(--text-muted, #666) 65%, var(--text-main, #222)); }",
+                              ".pnb-pal-ai-hint { margin-left: auto; font-size: 11px; white-space: nowrap; color: var(--text-muted, #666); opacity: .8; }")], ['L-pjbusy-busyNoFade', 'S-jarBusy'], ['pjbusy']),
+    'jb-oldred': ([('pcss', ".pnb-pal-ai-wait.pnb-pal-ai-err { color: var(--accent-danger, #c62828); }", ".pnb-pal-ai-wait.pnb-pal-ai-err { color: var(--danger, #b00020); }")], ['L-pjbusy-errorReadable', 'S-jarBusy'], ['pjbusy']),
+    'jb-nohc': ([('pcss', "    .pnb-pal-ai-bar i, .pnb-pal-ai-dots i { forced-color-adjust: none; background-color: Highlight; }\n", "")], ['L-pjbusyhc-hcMarks', 'S-jarBusy'], ['pjbusyhc']),
+    # --- (2026-10-23, lnk40) the evergreen row: none; offered with no evergreen button on the banner; a row that clicks nothing
+    'e-noever': ([('pal', "        { id: 'cmpevergreen', label:", "        { id: 'cmpevergreen', hide: function () { return true; }, label:")], ['L-pcmplink-everOff', 'L-pcmplink-everOn', 'L-pcmplink-everRuns'], ['pcmplink']),
+    'e-always': ([('pal', "return bannerBtn('.snap-banner-link-evergreen') ? true : 'Only in a comparison", "return true || bannerBtn('.snap-banner-link-evergreen') ? true : 'Only in a comparison")], ['L-pcmplink-everOff'], ['pcmplink']),
+    'e-norun': ([('pal', "          run: function () { click(bannerBtn('.snap-banner-link-evergreen')); }, needs: has('snapshotBtn') },", "          run: function () { }, needs: has('snapshotBtn') },")], ['L-pcmplink-everRuns'], ['pcmplink']),
     # --- (colmenu round 33) the width rows: no Fit columns to the page row; the row running Fit all; the column row back on
     # the act the menu dropped; Fit to page neither an entry nor an exemption
     'w-nofitpage': ([('pal', "        { id: 'fitpage', label: 'Fit columns to the page',", "        { id: 'zzfitpage', hide: function () { return true; }, label: 'Zz',")],
@@ -371,7 +442,7 @@ MUTANTS = {
     'x-longlabel': ([('index', "</svg> Quick actions</a>", "</svg> Quick actions, columns, reports and help</a>")], ['L-pkeys-popNoWrap'], ['pkeys']),
     # --- (round 11) an old "Search" label left; the Esc chip not clickable; the backdrop click ignored; a magnifier left
     'n-oldlabel': ([('index', "</svg> Quick actions</a>", "</svg> Search</a>")], ['L-pkeys-quickLabel', 'S-quickName'], ['pkeys']),
-    'n-escspan': ([('pal', "        ui.esc.addEventListener('click', function (e) { e.preventDefault(); close(true); });", "        // (no click on the chip)")], ['L-pkeys-escClick'], ['pkeys']),
+    'n-escspan': ([('pal', "        ui.esc.addEventListener('click', function (e) { e.preventDefault();", "        if (0) ui.esc.addEventListener('click', function (e) { e.preventDefault();")], ['L-pkeys-escClick'], ['pkeys']),   # (jaredge: the line's start, before and after the chip's cancel)
     'n-nobackdrop': ([('pal', "        veil.addEventListener('mousedown', function (e) { if (e.target === veil) { e.preventDefault(); jarvisCancel(); close(true); } });", "        // (no backdrop click)")], ['L-pkeys-backdropClose'], ['pkeys']),
     # --- (round 12) a hand-copied list missing a tool; the card's admin gate gone (a viewer's page carries the
     # menu, so the viewer sees the rows); the stub missing from the admin pages' bar
@@ -633,6 +704,12 @@ def run_page(path, shot_path=None):
         call('Page.enable'); call('Network.enable'); call('Network.setCacheDisabled', {'cacheDisabled': True})
         if 'scn=pshot9' in path: call('Emulation.setDeviceMetricsOverride', {'width': 1440, 'height': 900, 'deviceScaleFactor': 1, 'mobile': False})   # (round 9) the photo at 1440px
         call('Emulation.setFocusEmulationEnabled', {'enabled': True})
+        if path.endswith('scn=pjbusy'): call('Emulation.setDeviceMetricsOverride', {'width': 1280, 'height': 600, 'deviceScaleFactor': 1, 'mobile': False})   # (jarbusy) a short window
+        if 'scn=pjbusy' in path or 'scn=pshotjb' in path:   # (jarbusy) the motion preference set either way: Edge reads Windows' "Animation effects" (off = reduce)
+            rm = 'scn=pjbusyrm' in path or ('scn=pshotjb' in path and os.environ.get('PNB_JBRM'))
+            hc = 'scn=pjbusyhc' in path or ('scn=pshotjb' in path and os.environ.get('PNB_JBHC'))   # forced colours, as Windows High Contrast
+            call('Emulation.setEmulatedMedia', {'features': [{'name': 'prefers-reduced-motion', 'value': 'reduce' if rm else 'no-preference'}] + ([{'name': 'forced-colors', 'value': 'active'}] if hc else [])})
+        if 'scn=pshotjb' in path and os.environ.get('PNB_JBTHEME'): path = path + '&theme=' + os.environ['PNB_JBTHEME']   # (jarbusy) the photograph's theme
         call('Page.navigate', {'url': 'http://127.0.0.1:%d/%s' % (hp, path)})
         t0 = time.time()
         budget = float(os.environ.get('PNB_TIMEOUT') or 300)
@@ -763,6 +840,7 @@ def write_stage(texts):
     w('search_builder.js', texts['sb'])   # (round 14) the search builder under test (the harness loads it after main.js, as index.php does)
     w('ai_assist_stub.json', '{"status": "success", "reply": "A stub answer."}')   # (round 16) what the panel's send gets back (penumbra_vars.aiProxyUrl in the scenario)
     w('ai_assist_chips.json', CHIPS_REPLY)   # (round 17) the canned reply with a penumbra-actions block
+    w('theme_reg.json', theme_reg_json())   # (jarbusy) every theme of the registry + the variable blocks index.php emits (the contrast checks)
     w('penumbra_journal.js', texts.get('journal', ''))   # (round 21) the journal module under test (pnote loads it)
     w('get_email_recipients.php', RECIPIENTS_STUB)   # (round 21) the dialog's directory list, answered for any term
     w('manage_journal.php', JOURNAL_STUB)   # (round 21) the journal's list (and any POST), answered
@@ -846,6 +924,15 @@ def time_budget_check(aia):
     n = int(m.group(1)); tos = [int(x) for x in re.findall(r'CURLOPT_TIMEOUT, (\d+)\)', aia)]
     return bool(tos) and n > max(tos) and n <= 600   # (round 19a: a streamed answer may take minutes)
 
+def theme_reg_json():
+    """(jarbusy) theme_reg.php over the live registry: {css: the generated variable blocks, themes: [{id, label, isDark}]}."""
+    try:
+        r = subprocess.run([PHP, '-n', os.path.join(HERE, 'theme_reg.php'), os.path.join(APP, 'themes_config.php')], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=60, cwd=tempfile.gettempdir())
+        if r.returncode == 0 and r.stdout.strip().startswith('{'): return r.stdout
+        print('    theme_reg: %s' % (r.stdout or r.stderr)[:300])
+    except Exception as e:
+        print('    theme_reg: %s' % e)
+    return '{"css": "", "themes": []}'
 def render_themes():
     """(round 18b) the Settings panel's theme options as index.php renders them (themes_config.php via php -n); '' on failure."""
     try:
@@ -986,6 +1073,26 @@ def static_checks(texts):
          and 'curl_setopt($ch, CURLOPT_TIMEOUT, 330);' in texts.get('aia', '') and 'curl_setopt($ch, CURLOPT_LOW_SPEED_TIME, 60);' in texts.get('aia', '') and "'max_tokens' => 8000," in texts.get('aia', '')
          and 'timeout: 340000,' in main and "if ($ai_provider === 'anthropic') { $response = $raw; }" in texts.get('aia', ''), ''),
         ('S-aiStreamParse',) + sse_tests(),
+        # (jarbusy, 2026-10-23) the busy card while Jarvis thinks: drawn by the module (no live region of its own, the status said once,
+        # brought into view), animated in the stylesheet by three keyframes and held still under reduced motion (a full bar, solid dots,
+        # plain lines); the hint never faded by opacity; the error in the themes' danger token
+        ('S-jarBusy', "if (waiting) { html += jarvisBusyHtml(); }" in pal and "var JARVIS_BUSY = 'Jarvis is thinking. Esc cancels.';" in pal
+         and "if (ui.status.textContent !== st) { status(st); }" in pal and 'aria-live="polite">Thinking' not in pal and "card.scrollIntoView({ block: 'nearest' })" in pal
+         and all(('@keyframes %s ' % k) in texts['pcss'] for k in ('pnbPalAiBar', 'pnbPalAiDot', 'pnbPalAiShimmer'))
+         and '@media (prefers-reduced-motion: reduce) {\n    .pnb-pal-ai-bar i { animation: none; width: 100%;' in texts['pcss'].replace('\r\n', '\n')
+         and '    .pnb-pal-ai-dots i { animation: none; opacity: 1; transform: none; }' in texts['pcss'] and '    .pnb-pal-ai-skel i { animation: none;' in texts['pcss']
+         and ('opacity' not in texts['pcss'].split('.pnb-pal-ai-hint {')[1].split('}')[0] if '.pnb-pal-ai-hint {' in texts['pcss'] else False)
+         and 'var(--danger, #b00020)' not in texts['pcss'] and '.pnb-pal-ai-wait.pnb-pal-ai-err { color: var(--accent-danger, #c62828); }' in texts['pcss']
+         and '    .pnb-pal-ai-bar i, .pnb-pal-ai-dots i { forced-color-adjust: none; background-color: Highlight; }' in texts['pcss'], ''),
+        # (jaredge, 2026-10-23) the waiting state's edges: the Esc chip cancels as the key does; Backspace back from the Jarvis view (and only
+        # from it) drops a waiting question; one question at a time (the one on its way shown again, said so; a handler that ran at once
+        # settles the ask); the Jarvis view clears the input's aria-activedescendant
+        ('S-jarEdge', "ui.esc.addEventListener('click', function (e) { e.preventDefault(); jarvisCancel(); close(true); });" in pal
+         and "if (mode.kind === 'jarvis') { jarvisCancel(); }" in pal
+         and "if (jarvisQ !== null) { setMode({ kind: 'jarvis', q: jarvisQ, state: 'waiting', still: true }, true); return; }" in pal
+         and "if (!settled) { jarvisReq = req; jarvisQ = text; }" in pal and "if (waiting && mode.still) { st = JARVIS_STILL; }" in pal
+         and "var JARVIS_STILL = 'Jarvis is still answering your last question. Esc cancels it.';" in pal
+         and "ui.input.removeAttribute('aria-activedescendant');   // (jaredge)" in pal, ''),
         # (the final sweep) the journal row follows the button; greyed rows at an AA-friendly opacity; the tip names the slot
         ('S-final', 'function journalCompose(draft) {' in pal and "var jb = el('journalBtn'), journalOn = !!(jb && shown(jb));" in pal and '.pnb-pal-it.is-off .pnb-pal-lab, .pnb-pal-it.is-off .pnb-pal-pos { color: var(--text-muted, #666); }' in texts['pcss'] and '.pnb-pal-it.is-sel .pnb-pal-lab { color: color-mix(in srgb, var(--brand-text, var(--brand-primary, #336699)) 60%, var(--text-main, #222));' in texts['pcss'] and 'var(--text-muted, #666) 65%, var(--text-main, #222)' in texts['pcss'] and 'border: 1px solid color-mix(in srgb, var(--accent-success, #1a7f37) 55%, transparent);' in texts['pcss'] and 'function rowText(r) {' in pal and 'rowText(r).replace' in pal and 'uiWordsCache[key] = e.ui;' in pal
          and 'add a note, unhide, group by, ask)' in texts['help'] and 'add a note, unhide, group by, ask)' in texts['topic'] and "'copy distinct values of': 'copydistinct', 'column options of': 'colopts' }[cm[1]];" in pal, ''),
@@ -1119,6 +1226,7 @@ SHOT7 = {'pshot7f': os.environ.get('PNB_SHOT7F') or os.path.join(tempfile.gettem
          'pshot20': os.environ.get('PNB_SHOT20') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot20.png'),   # (round 20) "row 250": Go to first
          'pshot21': os.environ.get('PNB_SHOT21') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot21.png')}   # (round 21) an email row first
 
+SHOT7['pshotjb'] = os.environ.get('PNB_SHOTJB') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shotjb.png')   # (jarbusy) the busy card
 def run_browser(scns):
     out = []
     for s in scns:

@@ -46,10 +46,18 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
 # NEW = ['C1', 'C2', 'C5', 'C6', 'C8', 'C13', 'C14', 'C15', 'C16', 'C17', 'C18', 'C19', 'C20', 'C21', 'C22', 'C23', 'C24', 'C25', 'C26', 'C27', 'C28', 'C29', 'C30']
 # (fit39, round 2 is live 2d6c232: its checks are old ones now) Fit to page with only the right-clicked group open -
 # a fix in js/penumbra_colwidths.js: --stage DIR takes DIR\js\penumbra_colwidths.js too when it is there
-NEW = ['C31']
+# NEW = ['C31']   (b33aad7 is live: C31 is an old check now)
+# (2026-10-23, lnk40) the banner's Copy link in every comparison menu (the exact lists), the two link items, and Fit to
+# page's scrollbar buffer (js/penumbra_colwidths.js, through --stage)
+NEW = ['C1', 'C2', 'C5', 'C6', 'C8', 'C23', 'C32']   # (C33, the scrollbar buffer in a comparison, went to colwidths F15-F17: a comparison's tables give way here)
 
 # --- mutants: name -> (edits on the candidate colmenu.js, assert ids that MUST go red) ---------------
 MUTANTS = {
+    # --- (2026-10-23, lnk40) the banner's links: none; offered whether the banner shows them or not; the evergreen item
+    # running the plain link
+    'k-nolink': ([("        if (lk) { items.push({ act: 'cmpCopyLink'", "        if (false) { items.push({ act: 'cmpCopyLink'")], ['C1', 'C32']),
+    'k-linkshown': ([("        return (b && b.style.display !== 'none') ? b : null;\n    }\n    function cmpEditMatch() {", "        return b;\n    }\n    function cmpEditMatch() {")], ['C1', 'C32']),
+    'k-everlink': ([("run: function () { ev.click(); } }); }", "run: function () { lk.click(); } }); }")], ['C32']),
     # no comparison menu at all (the dispatcher's branch gone)
     'k-nocmp': ([("        var ct = cmpTarget(e.target);\n", "        var ct = null;\n")], ['C1', 'C2', 'C5']),
     # a changed cell never offers its earlier value

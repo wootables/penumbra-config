@@ -38,6 +38,10 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
         'penumbra_tiles.js', 'penumbra_colwidths.js']
 # every check but S0 (the report table's own click sort, as it always was) is red on the live main.js
 NEW = ['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8', 'S9', 'S10', 'S11', 'S12']
+# (2026-10-23, cmprq) S8 expects what the build under test does with a new query run during a comparison (the report
+# table's own sort handed back with cmprq, the comparison's before it); S13 (a table opened from the console) green on
+# both, m-noentry's target since
+CMPRQ_MARK = 'function _pnbCmpStashReportGrouping('
 
 # --- mutants: name -> (edits on the candidate main.js, assert ids that MUST go red) ------------------
 MUTANTS = {
@@ -67,8 +71,9 @@ MUTANTS = {
     # takes nothing over
     'm-reportmark': ([("        else { $('#snapshotComparisonContainer').removeData('pnbPageSort'); _pnbCmpReportSort = null; }\n",
                        "        else { _pnbCmpReportSort = null; }\n")], ['S7']),
-    # a comparison's entry keeps a report sort that a comparison a new query left had kept
-    'm-noentry': ([("        if (currentGroupingColumn !== '__SNAP_TYPE') { _pnbCmpReportSort = null; }\n", "")], ['S8']),
+    # a comparison's entry keeps a report sort that an earlier comparison left kept (a table opened from the console
+    # ends one so; a plain new query did too until cmprq, S8's case then)
+    'm-noentry': ([("        if (currentGroupingColumn !== '__SNAP_TYPE') { _pnbCmpReportSort = null; }\n", "")], ['S13']),
     # a Custom Sort Order saved during a comparison drives its clicks on a render the page's sort is not on
     'm-csapply': ([("        if ($cmpBox.length && !_pnbCmpSortIsOn($cmpBox[0])) return;\n", "")], ['S12']),
 }
@@ -102,9 +107,12 @@ def hook(src):
     i = src.find(anchor)
     if i < 0 or i > 400: raise SystemExit('closure anchor not found')
     h = ('\r\n;try { window.__CF = {}; } catch (e) { window.__CF_ERR = String(e); }\r\n'
-         'try { var _cfF = { runCmp: "runComparisonAndDisplayGrouped", runAb: "runComparisonTwoSnapshots", compress: "compressString", uhi: "updateHeaderIcons", teardown: "_teardownComparisonState", csApply: "_csApplyToCurrentView" };\r\n'
+         'try { var _cfF = { runCmp: "runComparisonAndDisplayGrouped", runAb: "runComparisonTwoSnapshots", compress: "compressString", uhi: "updateHeaderIcons", teardown: "_teardownComparisonState", csApply: "_csApplyToCurrentView",'
+         ' clearAll: "performClearAllAction" };\r\n'
          '  Object.keys(_cfF).forEach(function (k) { try { window.__CF[k] = eval(_cfF[k]); } catch (e) { (window.__CF_MISSING = window.__CF_MISSING || []).push(_cfF[k]); } }); } catch (e) { window.__CF_ERR2 = String(e); }\r\n'
-         'window.__CF.sc = function () { return JSON.parse(JSON.stringify(sortCriteria)); };\r\n')
+         'window.__CF.sc = function () { return JSON.parse(JSON.stringify(sortCriteria)); };\r\n'
+         # (2026-10-23, cmprq) whether this main.js holds cmprq: S8 expects what the build does
+         'window.__CF_CMPRQ = ' + ('true' if CMPRQ_MARK in src else 'false') + ';\r\n')
     out = src[:i] + ';(function () {' + h + src[i + len(anchor):]
     j = out.rfind('});')
     out = out[:j] + '})();' + out[j + 3:]

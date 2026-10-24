@@ -315,6 +315,187 @@
     $('#groupLimitOther').prop('checked', true); $('#groupStartDepth').val('0');
   }
 
+  // ---- cmpgsort (2026-10-23): a sorted grouped view, a snapshot comparison, its Clear ----------------
+  function J(x) { return JSON.stringify(x); }
+  function leaves() { return Array.prototype.slice.call(document.querySelectorAll('#groupedResultsContainer .group-wrapper.group-leaf')); }
+  function leafTbody(w) { var t = w.querySelector(':scope > .group-content > table'); return t ? (t.tBodies[0] || null) : null; }
+  // a leaf's rows' V_ID (column 0), in the order its table holds them
+  function idsIn(w) {
+    var tb = leafTbody(w);
+    return tb ? Array.prototype.map.call(tb.rows, function (r) { var td = r.querySelector(':scope > td[data-column="0"]'); return td ? String(td.textContent).trim() : '?'; }) : null;
+  }
+  // every leaf's V_IDs, by its path
+  function leafIds() { var o = {}; leaves().forEach(function (w) { o[w.getAttribute('data-group-path') || keyOf(w)] = idsIn(w); }); return o; }
+  // a leaf's V_AMOUNT (column 2) in order: ascending (dir 1) or descending (-1)
+  function amountsSorted(w, dir) {
+    var tb = leafTbody(w); if (!tb) return false;
+    var v = Array.prototype.map.call(tb.rows, function (r) { var td = r.querySelector(':scope > td[data-column="2"]'); return td ? parseFloat(String(td.textContent).replace(/[$,\s]/g, '')) : NaN; });
+    for (var i = 1; i < v.length; i++) { if (isNaN(v[i]) || isNaN(v[i - 1]) || (v[i] - v[i - 1]) * dir < 0) return false; }
+    return v.length > 0;
+  }
+  // the grouped view's sort marks: column:aria-sort[:rank] of every marked heading, in page order
+  function gMarks() {
+    return Array.prototype.map.call(document.querySelectorAll('#groupedResultsContainer th.sorted'), function (t) {
+      var r = t.querySelector('.sort-rank');
+      return t.getAttribute('data-colname') + ':' + t.getAttribute('aria-sort') + (r ? ':' + r.textContent : '');
+    });
+  }
+  // a heading of the first group's table (a click there sorts every group's table)
+  function gTh(name) { var w = leaves()[0]; return w ? w.querySelector(':scope > .group-content > table > thead th[data-colname="' + name + '"]') : null; }
+  function clickTh(th, shift) { if (!th) return false; th.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, shiftKey: !!shift })); return true; }
+  function sortNow() { return J((HC.getSort() || []).map(function (c) { return [String(c.colIdentifier), String(c.colIndex), c.direction]; })); }
+  function flatIds() { return Array.prototype.map.call(document.querySelectorAll('#resultsTable > tbody > tr'), function (r) { var td = r.querySelector(':scope > td[data-column="0"]'); return td ? String(td.textContent).trim() : '?'; }); }
+  // every leaf table's shown rows alternate light / dark from its first (applyZebraStriping)
+  function stripesOk() {
+    return leaves().every(function (w) {
+      var tb = leafTbody(w), n = 0; if (!tb) return false;
+      return Array.prototype.every.call(tb.rows, function (r) {
+        if (r.style.display === 'none') return true;
+        var want = (n++ % 2 === 0) ? 'zebra-light' : 'zebra-dark';
+        return r.classList.contains(want) && !r.classList.contains(want === 'zebra-light' ? 'zebra-dark' : 'zebra-light');
+      });
+    });
+  }
+  function cmpOn() { return document.body.classList.contains('snapshot-comparison-active'); }
+  // the real compare engine (as the compare scenario runs it) against a snapshot of the live rows: two dropped
+  // (New Rows) and one invented (Removed Rows)
+  async function cmpOpen() {
+    if (!document.getElementById('snapshotAnalysisTemplate') && window.__SNAPTPL) { $('body').append(window.__SNAPTPL); }
+    if (!document.getElementById('action_overlay')) { $('body').append('<div id="action_overlay"></div>'); }
+    if (!document.getElementById('manageSnapshotsLightbox')) { $('body').append('<div id="manageSnapshotsLightbox"></div>'); }
+    var rows = HC.getMaster().slice(2).map(function (m) { var o = {}; m.forEach(function (v, k) { if (k !== '#') o[k] = v; }); return { rowData: o }; });
+    var fake = {}; Object.keys(rows[0].rowData).forEach(function (k) { fake[k] = 'zz-gone'; });
+    rows.push({ rowData: fake });
+    HC.runComparisonAndDisplayGrouped({ compressedData: HC.compressString(JSON.stringify(rows)), name: 'harness' });
+    var ok = await until(function () { return cmpOn() && document.querySelectorAll('#snapshotComparisonContainer > .group-wrapper').length === 3; }, 20000);
+    await sleep(400); await frames(3);
+    return ok;
+  }
+  // the comparison's Clear (the control bar's link): done when the Apply it runs has regrouped
+  async function cmpClear() {
+    var n0 = window.__REBUILDS || 0;
+    $('#removeGroupingLink').trigger('click');
+    var ok = await until(function () { return !cmpOn() && (window.__REBUILDS || 0) > n0 && top().length === 6 && !document.getElementById('snapshotComparisonContainer'); }, 20000);
+    await sleep(400); await frames(4);
+    return ok;
+  }
+
+  // ---- rgsort (2026-10-23): a sort made in the grouped view, then a regular regroup or Remove Grouping ----------
+  function fTh(name) { return document.querySelector('#tableHeader > th[data-colname="' + name + '"]'); }
+  // the flat table's sort marks: column:aria-sort[:rank] of every marked heading, in page order
+  function fMarks() {
+    return Array.prototype.map.call(document.querySelectorAll('#tableHeader > th.sorted'), function (t) {
+      var r = t.querySelector('.sort-rank');
+      return t.getAttribute('data-colname') + ':' + t.getAttribute('aria-sort') + (r ? ':' + r.textContent : '');
+    });
+  }
+  function cellOf(r, col) { var td = r.querySelector(':scope > td[data-column="' + col + '"]'); return td ? String(td.textContent).trim() : ''; }
+  function amt(r) { return parseFloat(cellOf(r, '2').replace(/[$,\s]/g, '')); }
+  function flatRows() { return Array.prototype.slice.call(document.querySelectorAll('#resultsTable > tbody > tr')); }
+  // the flat rows on screen: the page applyPagination shows, the ones the search keeps
+  function flatShown() { return flatRows().filter(function (r) { return r.style.display !== 'none' && !r.classList.contains('search-hidden'); }); }
+  // rows in order by a chain of [key(row), dir] levels (dir 1 ascending, -1 descending); text compares as the sort does
+  function inOrder(rows, levels) {
+    for (var i = 1; i < rows.length; i++) {
+      for (var k = 0; k < levels.length; k++) {
+        var a = levels[k][0](rows[i - 1]), b = levels[k][0](rows[i]);
+        var c = (typeof a === 'number' && typeof b === 'number') ? (a - b) : String(a).localeCompare(String(b), undefined, { sensitivity: 'base' });
+        if (c * levels[k][1] > 0) return false;   // the earlier row sorts after the later one
+        if (c !== 0) break;
+      }
+    }
+    return rows.length > 1;
+  }
+  // the grouping dialog's Apply of the grouping on screen (its layout kept: a regroup, never the layout-only switch)
+  async function applyGrp(levels) {
+    seedDialog();
+    if (levels && levels[1]) setPcs('groupingColumnSelector2', levels[1]);
+    $('#groupLayout').val(HC.getLayout() === 'list' ? 'list' : 'stacked');
+    $('#groupingLightbox').show();
+    var n0 = window.__REBUILDS || 0, h0 = hides();
+    $('#confirmGroupingBtn').trigger('click');
+    var ok = await until(function () { return (window.__REBUILDS || 0) > n0 && hides() > h0; }, 20000);
+    await sleep(300); await frames(4);
+    return ok;
+  }
+  // Remove Grouping (the control bar's link): done when its restore has put the loading overlay down
+  async function removeGrp() {
+    var h0 = hides();
+    $('#removeGroupingLink').trigger('click');
+    var ok = await until(function () { return !$('#groupedResultsContainer').is(':visible') && $('#resultsTable').is(':visible') && hides() > h0; }, 20000);
+    await sleep(300); await frames(4);
+    return ok;
+  }
+
+  // ---- rgpaths (2026-10-23): the rest of the paths that redraw a view ------------------------------------------
+  // a search typed in the grouped view and run (runTableSearch's grouped branch): done when it has ended - a cleared
+  // one rebuilds the groups first
+  async function searchGrouped(q) {
+    var fired = 0, n0 = window.__REBUILDS || 0;
+    $(document).on('penumbra:groupedSearched.rpx', function () { fired++; });
+    $('#tableSearch').val(q);
+    HC.runTableSearch();
+    var ok = await until(function () { return fired > 0 && (q !== '' || (window.__REBUILDS || 0) > n0); }, 15000);
+    $(document).off('penumbra:groupedSearched.rpx');
+    await sleep(300); await frames(3);
+    return ok;
+  }
+  // the first group's visible headings, in order
+  function gHeadNames() {
+    var w = leaves()[0], t = w ? w.querySelector(':scope > .group-content > table') : null;
+    return t ? visHeads(t).map(function (h) { return h.getAttribute('data-colname'); }) : [];
+  }
+  // a pivot taking the page from the flat table, as generating one does: the page's sort set aside (sortCriteria = []
+  // and the flat headings' marks cleared, the flat table still up), the flat table hidden, a pivot table shown with
+  // its exit button; then the pivot's own sort, when given (a click on one of its headings sets these: its levels
+  // count the pivot's cells)
+  async function fakePivot(sort) {
+    HC.setSort([]); HC.updateHeaderIcons();
+    $('#resultsTable').hide(); $('#paginationControls').hide();
+    $('#pivot-output-container').html('<table id="pivotResultTable"><thead><tr><th data-row-field="V_ID">V_ID</th><th>North</th></tr></thead>'
+      + '<tbody><tr><td>x</td><td>1</td></tr></tbody></table>').show();
+    $('#exitPivotModeBtn').show();
+    if (sort) HC.setSort(sort);
+    await frames(2);
+  }
+  // the pivot's exit button: done when the flat table is back and the overlay down
+  async function exitPivot() {
+    var h0 = hides();
+    $('#exitPivotModeBtn').trigger('click');
+    var ok = await until(function () { return hides() > h0 && $('#resultsTable').is(':visible') && !$('#pivot-output-container').is(':visible'); }, 20000);
+    await sleep(300); await frames(4);
+    return ok;
+  }
+  // a comparison's Clear that leaves the flat table (no grouping comes back): done when the overlay is down
+  async function cmpClearFlat() {
+    var h0 = hides();
+    $('#removeGroupingLink').trigger('click');
+    var ok = await until(function () {
+      return !cmpOn() && $('#resultsTable').is(':visible') && !document.getElementById('snapshotComparisonContainer') && hides() > h0;
+    }, 20000);
+    await sleep(400); await frames(4);
+    return ok;
+  }
+  // the A-vs-B renderer (runComparisonTwoSnapshots: two stored snapshots, neither side live) on the live rows as B and,
+  // as A, the same rows without the first two and with one row B lacks
+  async function cmpOpenAb() {
+    if (!document.getElementById('snapshotAnalysisTemplate') && window.__SNAPTPL) { $('body').append(window.__SNAPTPL); }
+    if (!document.getElementById('action_overlay')) { $('body').append('<div id="action_overlay"></div>'); }
+    if (!document.getElementById('manageSnapshotsLightbox')) { $('body').append('<div id="manageSnapshotsLightbox"></div>'); }
+    var all = HC.getMaster().map(function (m) { var o = {}; m.forEach(function (v, k) { if (k !== '#') o[k] = v; }); return o; });
+    var fake = {}; Object.keys(all[0]).forEach(function (k) { fake[k] = 'zz-gone'; });
+    var snap = function (rows, name, age) {
+      return { name: name, timestamp: Date.now() - age * 86400000, searchTerm: '', prompts: [], tables: '', notes: '', columnNames: Object.keys(all[0]),
+               compressedData: HC.compressString(JSON.stringify(rows.map(function (r) { return { rowData: r }; }))) };
+    };
+    HC.runComparisonTwoSnapshots(snap(all.slice(2).concat([fake]), 'A', 5), snap(all, 'B', 1), ['V_ID']);
+    var ok = await until(function () { return cmpOn() && document.querySelectorAll('#snapshotComparisonContainer > .group-wrapper').length >= 2; }, 20000);
+    await sleep(400); await frames(3);
+    return ok;
+  }
+  function idOf(r) { return cellOf(r, '0'); }
+  function nameOf(r) { return cellOf(r, '1'); }
+
   async function boot() {
     if (!(await until(function () {
       return window.__queryDone >= 1 && hides() >= 1 && top().length >= 6 && $('#groupedResultsContainer').is(':visible');
@@ -1440,6 +1621,607 @@
                  rebuilds: (window.__REBUILDS || 0) - n0, fitB: br ? [Math.round(br.bottom), Math.round(want), bc && bc.style.maxHeight] : null,
                  toast: (toasts.match(/NOTICE[^\n]{0,120}/g) || []).slice(0, 3), cmpAfter: document.body.classList.contains('snapshot-comparison-active') };
     },
+    // cmpgsort (2026-10-23): a sort made in the grouped view orders every group's table, never the flat rows. A
+    // comparison's Clear puts the grouping back through the dialog's Apply - a regroup of the flat rows - and the
+    // groups came back unsorted and unmarked while the page's sort still held it (the next click went straight to
+    // descending, a repaint with no table marked an order the rows did not have). Stacked here.
+    cmpsort: async function () {
+      var flat0 = J(flatIds()), n0 = leaves().length;
+      // a click on V_AMOUNT in the grouped view: every group's table ascending, every group's heading marked
+      clickTh(gTh('V_AMOUNT')); await sleep(200);
+      var s0 = sortNow(), ids0 = J(leafIds()), m0 = gMarks();
+      R.chk.sorted0 = s0 === J([['V_AMOUNT', '2', 'asc']]) && leaves().every(function (w) { return amountsSorted(w, 1); })
+        && m0.length >= n0 && m0.every(function (x) { return x === 'V_AMOUNT:ascending'; });
+      R.chk.flatKept0 = J(flatIds()) === flat0;
+      var on1 = await cmpOpen(), cl1 = await cmpClear();
+      var ids1 = J(leafIds()), m1 = gMarks(), s1 = sortNow(), st1 = stripesOk(), rn1 = HC.getResortNext();
+      R.chk.cleared = on1 && cl1 && leaves().length === n0;
+      R.chk.rowsBack = ids1 === ids0;
+      R.chk.marksBack = J(m1) === J(m0);
+      R.chk.sortKept = s1 === s0;
+      R.chk.stripes = st1;
+      R.chk.flatAfter = J(flatIds()) === flat0;
+      // the restore's request is spent by its own Apply (rgsort, 2026-10-23: or there is none - every Apply re-sorts,
+      // and the flag went: the hook answers 'missing')
+      R.chk.consumed = rn1 === false || rn1 === 'missing';
+      // a repaint with no table (the journal's, after a render) marks the page's sort: the rows must have it
+      HC.updateHeaderIcons();
+      R.chk.repaint = J(gMarks()) === J(m0) && J(leafIds()) === ids0;
+      // the next click on the sorted column: descending, every group
+      clickTh(gTh('V_AMOUNT')); await sleep(200);
+      var s2 = sortNow(), m2 = gMarks();
+      R.chk.nextDesc = s2 === J([['V_AMOUNT', '2', 'desc']]) && leaves().every(function (w) { return amountsSorted(w, -1); })
+        && m2.length === m0.length && m2.every(function (x) { return x === 'V_AMOUNT:descending'; });
+      // the grouped view sorted by V_NAME descending; a comparison sorted by a heading of its own (cmpsort keeps the
+      // report's sort for its end); Clear: the grouped view's own sort back - on its rows and headings too
+      clickTh(gTh('V_NAME')); await sleep(200);
+      clickTh(gTh('V_NAME')); await sleep(200);
+      var s3 = sortNow(), ids3 = J(leafIds()), m3 = gMarks();
+      var on3 = await cmpOpen();
+      var cth = document.querySelector('#snapshotComparisonContainer > .group-wrapper thead th[data-colname="V_STATUS"]');
+      clickTh(cth); await sleep(250);
+      var s3c = sortNow();
+      var cl3 = await cmpClear();
+      R.chk.cmpPutBack = s3 === J([['V_NAME', '1', 'desc']]) && m3.length >= n0 && on3 && !!cth && s3c !== s3 && cl3
+        && sortNow() === s3 && J(leafIds()) === ids3 && J(gMarks()) === J(m3);
+      R.info = { s0: s0, s1: s1, s2: s2, s3: s3, s3c: s3c, after3: sortNow(), leaves: n0, m0n: m0.length, m1: m1.slice(0, 2), m1n: m1.length,
+                 m3n: m3.length, stripes: st1, resortNext: rn1, same1: ids1 === ids0 };
+    },
+    // cmpgsort: the List layout - with no sort on, the Clear's regroup is drawn as it always was; a two-level sort
+    // comes back with both levels, ranked in every group, and the group the list shows is drawn by it
+    cmpsortlist: async function () {
+      var on0 = await cmpOpen(), cl0 = await cmpClear();
+      var tb0 = window.__RGV_TB || [], now0 = document.querySelectorAll('#groupedResultsContainer table > tbody');
+      R.chk.noSortSame = on0 && cl0 && sortNow() === '[]' && tb0.length > 0 && tb0.length === now0.length
+        && Array.prototype.every.call(now0, function (tb, i) { return tb === tb0[i]; }) && gMarks().length === 0;
+      clickTh(gTh('V_STATUS')); await sleep(200);
+      clickTh(gTh('V_AMOUNT'), true); await sleep(200);
+      var s1 = sortNow(), ids1 = leafIds(), m1 = gMarks();
+      var on1 = await cmpOpen(), cl1 = await cmpClear();
+      var sel = selected(), path = sel ? (sel.getAttribute('data-group-path') || keyOf(sel)) : null;
+      var shown = sel ? rowsOf(sel).map(function (r) { var td = r.querySelector(':scope > td[data-column="0"]'); return td ? String(td.textContent).trim() : '?'; }) : [];
+      R.chk.multiBack = s1 === J([['V_STATUS', '5', 'asc'], ['V_AMOUNT', '2', 'asc']]) && on1 && cl1 && sortNow() === s1 && J(leafIds()) === J(ids1);
+      R.chk.multiMarks = m1.length > 0 && J(gMarks()) === J(m1) && m1.some(function (x) { return /:1$/.test(x); }) && m1.some(function (x) { return /:2$/.test(x); });
+      R.chk.shownSorted = isOn() && !!path && !!ids1[path] && shown.length > 1 && J(shown) === J(ids1[path]);
+      R.info = { noSort: [on0, cl0, tb0.length, now0.length, gMarks().length], s1: s1, now: sortNow(), m1: m1.slice(0, 2), m1n: m1.length,
+                 marksNow: gMarks().length, path: path, shown: shown.slice(0, 4), want: path && ids1[path] ? ids1[path].slice(0, 4) : null };
+    },
+    // cmpgsort: nested (H_GROUP, H_GROUP2), Stacked - every innermost group's table comes back sorted
+    ncmpsort: async function () {
+      clickTh(gTh('V_AMOUNT')); await sleep(200);
+      clickTh(gTh('V_AMOUNT')); await sleep(200);
+      var s0 = sortNow(), ids0 = J(leafIds()), m0 = gMarks(), n0 = leaves().length;
+      var desc0 = leaves().every(function (w) { return amountsSorted(w, -1); });
+      var on = await cmpOpen(), cl = await cmpClear();
+      R.chk.nestBack = s0 === J([['V_AMOUNT', '2', 'desc']]) && desc0 && on && cl && n0 > 6 && leaves().length === n0 && J(leafIds()) === ids0;
+      R.chk.nestMarks = m0.length >= n0 && J(gMarks()) === J(m0);
+      R.info = { s0: s0, now: sortNow(), desc0: desc0, leaves: [n0, leaves().length], m0n: m0.length, marksNow: gMarks().length };
+    },
+    // cmpgsort: the Apply first waits for its rows (a big fill: penumbraPrepareRows answers with a promise and the
+    // handler runs again) - the request survives the wait
+    cmpsortprep: async function () {
+      clickTh(gTh('V_AMOUNT')); await sleep(200);
+      var s0 = sortNow(), ids0 = J(leafIds()), m0 = gMarks();
+      var on = await cmpOpen();
+      window.__PREPS = 0; window.__FORCE_PREP = true;
+      var cl = await cmpClear();
+      window.__FORCE_PREP = false;
+      R.chk.prepRan = on && cl && (window.__PREPS || 0) >= 1;
+      R.chk.prepBack = s0 === J([['V_AMOUNT', '2', 'asc']]) && sortNow() === s0 && J(leafIds()) === ids0;
+      R.chk.prepMarks = m0.length > 0 && J(gMarks()) === J(m0);
+      R.info = { s0: s0, now: sortNow(), preps: window.__PREPS || 0, m0n: m0.length, marksNow: gMarks().length };
+    },
+    // cmpgsort, the review: (1) a pivot's sort left behind - a comparison opened from a pivot keeps it, and its levels
+    // count the pivot's cells ('North::Sum' at cell 2, which is V_AMOUNT's number here) - is not applied to the restored
+    // groups: they stand as the regroup draws them (the flat order: every group's IDs ascending), unmarked. (2) A re-sort
+    // that throws leaves the Apply's own steps to run: the group actions shown, the step complete, no page error.
+    // Both GUARDS: the build before never re-sorts.
+    cmpsortpivot: async function () {
+      HC.setSort([{ colIdentifier: 'North::Sum', colIndex: 2, direction: 'asc' }]);
+      var on = await cmpOpen(), cl = await cmpClear();
+      var flatOrder = leaves().length > 0 && leaves().every(function (w) { var a = idsIn(w); return !!a && a.every(function (x, i) { return i === 0 || x > a[i - 1]; }); });
+      R.chk.pivotLeft = on && cl && flatOrder && gMarks().length === 0;
+      HC.setSort([]);
+      clickTh(gTh('V_AMOUNT')); await sleep(200);
+      var s2 = sortNow(), on2 = await cmpOpen();
+      var steps = 0, e0 = window.__errors.length;
+      $(document).on('penumbra:stepComplete.cgx', function () { steps++; });
+      window.__THROWN = 0; window.__THROW_SORT = true;
+      var cl2 = await cmpClear();
+      window.__THROW_SORT = false;
+      $(document).off('penumbra:stepComplete.cgx');
+      R.chk.throwContained = s2 === J([['V_AMOUNT', '2', 'asc']]) && on2 && cl2 && steps >= 1 && $('#groupActionsContainer').is(':visible')
+        && window.__errors.length === e0;
+      R.info = { on: on, cl: cl, flatOrder: flatOrder, marks: gMarks().length, s2: s2, on2: on2, cl2: cl2, steps: steps, thrown: window.__THROWN || 0,
+                 actions: $('#groupActionsContainer').is(':visible'), errs: window.__errors.slice(e0, e0 + 2) };
+    },
+    // rgsort (2026-10-23): a sort made in the grouped view orders every group's table, never the flat rows. A regular
+    // regroup - the grouping dialog's Apply, which the status-bar chip, the header menu's group-by and a group_by
+    // trigger all go through - draws the groups from the flat rows: they came back unsorted and unmarked while the
+    // page's sort still held it (the next click went straight to descending, a repaint with no table marked an order
+    // the rows did not have). Stacked: the dialog's Apply, then the menu's group-by (another column), then a trigger.
+    rgapply: async function () {
+      var flat0 = J(flatIds()), n0 = leaves().length;
+      clickTh(gTh('V_AMOUNT')); await sleep(200);
+      var s0 = sortNow(), ids0 = J(leafIds()), m0 = gMarks();
+      R.chk.sorted0 = s0 === J([['V_AMOUNT', '2', 'asc']]) && leaves().every(function (w) { return amountsSorted(w, 1); })
+        && m0.length >= n0 && m0.every(function (x) { return x === 'V_AMOUNT:ascending'; });
+      var ap = await applyGrp();
+      var ids1 = J(leafIds()), m1 = gMarks();
+      R.chk.applyRan = ap && leaves().length === n0;
+      R.chk.rowsBack = ids1 === ids0;
+      R.chk.marksBack = J(m1) === J(m0);
+      R.chk.sortKept = sortNow() === s0;
+      R.chk.stripes = stripesOk();
+      R.chk.flatKept = J(flatIds()) === flat0;
+      // a repaint with no table (the journal's, after a render) marks the page's sort: the rows must have it
+      HC.updateHeaderIcons();
+      R.chk.repaint = J(gMarks()) === J(m0) && J(leafIds()) === ids0;
+      clickTh(gTh('V_AMOUNT')); await sleep(200);
+      var s2 = sortNow(), m2 = gMarks();
+      R.chk.nextDesc = s2 === J([['V_AMOUNT', '2', 'desc']]) && leaves().every(function (w) { return amountsSorted(w, -1); })
+        && m2.length === m0.length && m2.every(function (x) { return x === 'V_AMOUNT:descending'; });
+      // the header menu's group-by (the status-bar chip's too): another column, its groups drawn by the sort
+      if (!window.Penumbra || typeof window.Penumbra.groupByColumn !== 'function') throw new Error('rgapply: window.Penumbra.groupByColumn is missing');
+      var n3 = window.__REBUILDS || 0, h3 = hides();
+      window.Penumbra.groupByColumn('V_STATUS');
+      var gb = await until(function () { return (window.__REBUILDS || 0) > n3 && hides() > h3; }, 20000); await sleep(300); await frames(4);
+      var lv3 = leaves(), m3 = gMarks();
+      R.chk.menuSorted = gb && lv3.length === 3 && lv3.every(function (w) { return amountsSorted(w, -1); }) && sortNow() === s2;
+      R.chk.menuMarks = m3.length >= lv3.length && m3.every(function (x) { return x === 'V_AMOUNT:descending'; });
+      // a group_by trigger (a snippet's action, a chain step): back to H_GROUP, still sorted
+      var steps = 0; $(document).on('penumbra:stepComplete.rgx', function () { steps++; });
+      var n4 = window.__REBUILDS || 0;
+      HC.executeChainStep('group_by|H_GROUP|H_AMT|sum');
+      var tg = await until(function () { return steps > 0 && (window.__REBUILDS || 0) > n4; }, 20000); await sleep(300); await frames(4);
+      $(document).off('penumbra:stepComplete.rgx');
+      var lv4 = leaves(), m4 = gMarks();
+      R.chk.triggerSorted = tg && lv4.length === n0 && lv4.every(function (w) { return amountsSorted(w, -1); }) && sortNow() === s2;
+      R.chk.triggerMarks = m4.length >= lv4.length && m4.every(function (x) { return x === 'V_AMOUNT:descending'; });
+      R.info = { s0: s0, s2: s2, now: sortNow(), leaves: [n0, lv3.length, lv4.length], m0n: m0.length, m1: m1.slice(0, 2), m1n: m1.length,
+                 m3: m3.slice(0, 2), m3n: m3.length, m4n: m4.length, same1: ids1 === ids0, stripes: R.chk.stripes, gb: gb, tg: tg, steps: steps, layout: HC.getLayout() };
+    },
+    // rgsort: the List layout - with no sort on, the Apply's regroup is drawn as it always was (GUARD); a two-level
+    // sort comes back with both levels, ranked in every group, and the group the list shows is drawn by it
+    rglist: async function () {
+      var ap0 = await applyGrp();
+      var tb0 = window.__RGV_TB || [], now0 = document.querySelectorAll('#groupedResultsContainer table > tbody');
+      R.chk.noSortSame = ap0 && sortNow() === '[]' && tb0.length > 0 && tb0.length === now0.length
+        && Array.prototype.every.call(now0, function (tb, i) { return tb === tb0[i]; }) && gMarks().length === 0;
+      clickTh(gTh('V_STATUS')); await sleep(200);
+      clickTh(gTh('V_AMOUNT'), true); await sleep(200);
+      var s1 = sortNow(), ids1 = leafIds(), m1 = gMarks();
+      var ap1 = await applyGrp();
+      var sel = selected(), path = sel ? (sel.getAttribute('data-group-path') || keyOf(sel)) : null;
+      var shown = sel ? rowsOf(sel).map(function (r) { return cellOf(r, '0'); }) : [];
+      R.chk.multiBack = s1 === J([['V_STATUS', '5', 'asc'], ['V_AMOUNT', '2', 'asc']]) && ap1 && isOn() && sortNow() === s1 && J(leafIds()) === J(ids1);
+      R.chk.multiMarks = m1.length > 0 && J(gMarks()) === J(m1) && m1.some(function (x) { return /:1$/.test(x); }) && m1.some(function (x) { return /:2$/.test(x); });
+      R.chk.shownSorted = !!path && !!ids1[path] && shown.length > 1 && J(shown) === J(ids1[path]);
+      R.info = { noSort: [ap0, tb0.length, now0.length], s1: s1, now: sortNow(), m1: m1.slice(0, 2), m1n: m1.length, marksNow: gMarks().length,
+                 path: path, shown: shown.slice(0, 4), want: path && ids1[path] ? ids1[path].slice(0, 4) : null, layout: HC.getLayout() };
+    },
+    // rgsort: nested (H_GROUP, H_GROUP2), Stacked - every innermost group's table comes back sorted
+    nrgapply: async function () {
+      clickTh(gTh('V_AMOUNT')); await sleep(200);
+      clickTh(gTh('V_AMOUNT')); await sleep(200);
+      var s0 = sortNow(), ids0 = J(leafIds()), m0 = gMarks(), n0 = leaves().length;
+      var desc0 = leaves().every(function (w) { return amountsSorted(w, -1); });
+      var ap = await applyGrp(['H_GROUP', 'H_GROUP2']);
+      R.chk.nestBack = s0 === J([['V_AMOUNT', '2', 'desc']]) && desc0 && ap && n0 > 6 && leaves().length === n0 && sortNow() === s0 && J(leafIds()) === ids0;
+      R.chk.nestMarks = m0.length >= n0 && J(gMarks()) === J(m0);
+      R.info = { s0: s0, now: sortNow(), desc0: desc0, leaves: [n0, leaves().length], m0n: m0.length, marksNow: gMarks().length, groupBy: (HC.buildStateObject() || {}).groupBy };
+    },
+    // rgsort: the Apply first waits for its rows (a big fill: penumbraPrepareRows answers with a promise and the
+    // handler runs again) - the sort comes back on the groups the second run draws
+    rgprep: async function () {
+      clickTh(gTh('V_AMOUNT')); await sleep(200);
+      var s0 = sortNow(), ids0 = J(leafIds()), m0 = gMarks();
+      window.__PREPS = 0; window.__FORCE_PREP = true;
+      var ap = await applyGrp();
+      window.__FORCE_PREP = false;
+      R.chk.prepRan = ap && (window.__PREPS || 0) >= 1;
+      R.chk.prepBack = s0 === J([['V_AMOUNT', '2', 'asc']]) && sortNow() === s0 && J(leafIds()) === ids0;
+      R.chk.prepMarks = m0.length > 0 && J(gMarks()) === J(m0);
+      R.info = { s0: s0, now: sortNow(), preps: window.__PREPS || 0, m0n: m0.length, marksNow: gMarks().length };
+    },
+    // rgsort: (1) a pivot's sort left behind - its levels count the pivot's cells ('North::Sum' at cell 2, V_AMOUNT's
+    // number here) - is not applied to the regrouped groups: they stand in the flat order, unmarked (GUARD). (2) With a
+    // pivot on screen the Apply leaves it first and then groups (its other branch): a sort that names a report column
+    // by its number and name - a pivot sorted by its V_ID rows, cell 0 - comes back on the groups. (3) A re-sort that
+    // throws leaves the Apply's own steps to run (GUARD).
+    rgpivot: async function () {
+      HC.setSort([{ colIdentifier: 'North::Sum', colIndex: 2, direction: 'asc' }]);
+      var ap1 = await applyGrp();
+      var flatOrder = leaves().length > 0 && leaves().every(function (w) { var a = idsIn(w); return !!a && a.every(function (x, i) { return i === 0 || x > a[i - 1]; }); });
+      R.chk.pivotLeft = ap1 && flatOrder && gMarks().length === 0;
+      // a pivot on screen, as a pivot leaves the page (the grouped view gone), sorted by its first cell's column
+      if (!document.getElementById('exitPivotModeBtn')) throw new Error('rgpivot: the harness has no #exitPivotModeBtn');
+      $('body').removeClass('group-mode-active');
+      $('#groupedResultsContainer').empty().hide(); $('#resultsTable').hide();
+      $('#pivot-output-container').html('<table id="pivotResultTable"><thead><tr><th data-row-field="V_ID">V_ID</th></tr></thead><tbody><tr><td>x</td></tr></tbody></table>').show();
+      HC.setSort([{ colIdentifier: 'V_ID', colIndex: 0, direction: 'desc' }]);
+      var ap2 = await applyGrp();
+      var lv = leaves(), m2 = gMarks();
+      R.chk.pivotBranch = ap2 && !$('#pivot-output-container').is(':visible') && lv.length === 6
+        && lv.every(function (w) { var a = idsIn(w); return !!a && a.length > 1 && a.every(function (x, i) { return i === 0 || x < a[i - 1]; }); })
+        && m2.length >= lv.length && m2.every(function (x) { return x === 'V_ID:descending'; });
+      HC.setSort([]);
+      clickTh(gTh('V_AMOUNT')); await sleep(200);
+      var s3 = sortNow(), steps = 0, e0 = window.__errors.length;
+      $(document).on('penumbra:stepComplete.rgx', function () { steps++; });
+      window.__THROWN = 0; window.__THROW_SORT = true;
+      var ap3 = await applyGrp();
+      window.__THROW_SORT = false;
+      $(document).off('penumbra:stepComplete.rgx');
+      R.chk.throwContained = s3 === J([['V_AMOUNT', '2', 'asc']]) && ap3 && steps >= 1 && $('#groupActionsContainer').is(':visible') && window.__errors.length === e0;
+      R.info = { ap: [ap1, ap2, ap3], flatOrder: flatOrder, pivotShown: $('#pivot-output-container').is(':visible'), leaves: lv.length, m2: m2.slice(0, 2), m2n: m2.length,
+                 ids: lv[0] ? (idsIn(lv[0]) || []).slice(0, 4) : null, s3: s3, steps: steps, thrown: window.__THROWN || 0, errs: window.__errors.slice(e0, e0 + 2) };
+    },
+    // rgsort: Remove Grouping after a sort made in the grouped view. The flat rows never had it: they came back in
+    // their own order, unmarked, while the page's sort still held it. Now: every row in the sort, page 1 its first
+    // rows, the heading marked, the sort kept, and the next click on the column descends. Then a flat sort carried
+    // into a grouping (GUARD: the groups are drawn from the sorted rows) and replaced there: Remove Grouping draws the
+    // flat rows by the new sort, the old one's mark gone.
+    rgremove: async function () {
+      clickTh(gTh('V_AMOUNT')); await sleep(200);
+      var s0 = sortNow();
+      var rm = await removeGrp();
+      var rows = flatRows(), shown = flatShown();
+      var want = rows.slice().sort(function (a, b) { return amt(a) - amt(b); }).slice(0, 200);
+      R.chk.removed = rm && rows.length === 300 && !document.body.classList.contains('group-mode-active');
+      R.chk.flatSorted = inOrder(rows, [[amt, 1]]);
+      R.chk.flatMarks = J(fMarks()) === J(['V_AMOUNT:ascending']);
+      R.chk.flatSortKept = s0 === J([['V_AMOUNT', '2', 'asc']]) && sortNow() === s0;
+      // 200 rows a page: page 1 is the sort's first 200
+      R.chk.pageSorted = shown.length === 200 && shown.every(function (r, i) { return r === want[i]; });
+      HC.updateHeaderIcons();
+      R.chk.flatRepaint = J(fMarks()) === J(['V_AMOUNT:ascending']) && inOrder(flatRows(), [[amt, 1]]);
+      clickTh(fTh('V_AMOUNT')); await sleep(250);
+      R.chk.flatNextDesc = sortNow() === J([['V_AMOUNT', '2', 'desc']]) && inOrder(flatRows(), [[amt, -1]]) && J(fMarks()) === J(['V_AMOUNT:descending']);
+      var ap = await applyGrp();
+      var lv = leaves(), m1 = gMarks();
+      R.chk.regroupFromFlat = ap && lv.length === 6 && lv.every(function (w) { return amountsSorted(w, -1); }) && m1.length >= 6 && m1.every(function (x) { return x === 'V_AMOUNT:descending'; });
+      clickTh(gTh('V_NAME')); await sleep(200);
+      var rm2 = await removeGrp();
+      var nm = function (r) { return cellOf(r, '1'); };
+      R.chk.staleGone = rm2 && sortNow() === J([['V_NAME', '1', 'asc']]) && inOrder(flatRows(), [[nm, 1]]) && J(fMarks()) === J(['V_NAME:ascending']);
+      R.info = { s0: s0, now: sortNow(), rows: rows.length, first: rows.slice(0, 5).map(amt), shown: shown.length, marks: fMarks(), m1: m1.slice(0, 2), m1n: m1.length,
+                 names: flatRows().slice(0, 4).map(nm) };
+    },
+    // rgsort: no sort on at Remove Grouping - a flat sort carried into the grouping and cleared there (a heading's
+    // third click): the flat rows come back in the report's own order, unmarked (they kept the flat sort's order and
+    // marks while the page had no sort); the next click on the column sorts it ascending (GUARD)
+    rgremoff: async function () {
+      var rm0 = await removeGrp();
+      var flat0 = J(flatIds());
+      clickTh(fTh('V_NAME')); await sleep(250);
+      var ap = await applyGrp();
+      clickTh(gTh('V_NAME')); await sleep(200);
+      clickTh(gTh('V_NAME')); await sleep(200);
+      var s1 = sortNow();
+      var rm = await removeGrp();
+      R.chk.offNatural = rm0 && ap && s1 === '[]' && rm && sortNow() === '[]' && J(flatIds()) === flat0;
+      R.chk.offUnmarked = fMarks().length === 0;
+      var marks1 = fMarks();
+      clickTh(fTh('V_NAME')); await sleep(250);
+      var nm = function (r) { return cellOf(r, '1'); };
+      R.chk.offNextAsc = sortNow() === J([['V_NAME', '1', 'asc']]) && inOrder(flatRows(), [[nm, 1]]) && J(fMarks()) === J(['V_NAME:ascending']);
+      R.info = { s1: s1, now: sortNow(), marks1: marks1, marks: fMarks(), first: flatIds().slice(0, 4) };
+    },
+    // rgsort: the List layout, a two-level sort (V_STATUS ascending, then V_AMOUNT descending): Remove Grouping draws
+    // the flat rows by both levels, ranked
+    rgremlist: async function () {
+      clickTh(gTh('V_STATUS')); await sleep(200);
+      clickTh(gTh('V_AMOUNT'), true); await sleep(200);
+      clickTh(gTh('V_AMOUNT'), true); await sleep(200);
+      var s1 = sortNow(), on1 = isOn();
+      var rm = await removeGrp();
+      var st = function (r) { return cellOf(r, '5'); };
+      R.chk.listGone = on1 && rm && !isOn();
+      R.chk.multiFlat = s1 === J([['V_STATUS', '5', 'asc'], ['V_AMOUNT', '2', 'desc']]) && sortNow() === s1 && inOrder(flatRows(), [[st, 1], [amt, -1]]);
+      R.chk.multiFlatMarks = J(fMarks()) === J(['V_AMOUNT:descending:2', 'V_STATUS:ascending:1']);
+      R.info = { s1: s1, now: sortNow(), marks: fMarks(), first: flatRows().slice(0, 4).map(function (r) { return st(r) + ' ' + amt(r); }) };
+    },
+    // rgsort: a search typed in the grouped view, then Remove Grouping (which runs it over the flat rows): the rows it
+    // keeps are in the sort, and page 1 shows its first ones
+    rgremsearch: async function () {
+      var fired = 0; $(document).on('penumbra:groupedSearched.rgx', function () { fired++; });
+      $('#tableSearch').val("V_STATUS = 'Open'");
+      HC.runTableSearch();
+      var sr = await until(function () { return fired > 0; }, 15000); await sleep(300); await frames(3);
+      $(document).off('penumbra:groupedSearched.rgx');
+      clickTh(gTh('V_AMOUNT')); await sleep(200);
+      var s0 = sortNow();
+      var rm = await removeGrp();
+      var fs = await until(function () { return !!document.querySelector('#resultsTable > tbody > tr.search-hidden'); }, 15000); await sleep(600); await frames(3);
+      var kept = flatRows().filter(function (r) { return !r.classList.contains('search-hidden'); }), shown = flatShown();
+      var want = kept.slice().sort(function (a, b) { return amt(a) - amt(b); });
+      R.chk.searchSorted = sr && rm && fs && s0 === J([['V_AMOUNT', '2', 'asc']]) && kept.length > 20 && kept.length < 300
+        && kept.every(function (r) { return cellOf(r, '5') === 'Open'; }) && inOrder(kept, [[amt, 1]])
+        && shown.length === Math.min(200, kept.length) && shown.every(function (r, i) { return r === want[i]; });
+      R.chk.searchMarks = J(fMarks()) === J(['V_AMOUNT:ascending']) && sortNow() === s0;
+      R.info = { sr: sr, rm: rm, fs: fs, kept: kept.length, shown: shown.length, search: $('#tableSearch').val(), marks: fMarks(), first: kept.slice(0, 4).map(amt) };
+    },
+    // rgsort GUARDS (green on the build before too): (1) a pivot's sort left behind is not applied to the flat rows -
+    // they come back in the report's own order, unmarked; (2) a flat re-sort that throws leaves Remove Grouping's own
+    // steps to run: the flat table shown and paged, the group actions hidden, the overlay down, no page error
+    rgremguard: async function () {
+      var flat0 = J(flatIds());
+      HC.setSort([{ colIdentifier: 'North::Sum', colIndex: 2, direction: 'asc' }]);
+      var rm1 = await removeGrp();
+      R.chk.pivotLeftFlat = rm1 && J(flatIds()) === flat0 && fMarks().length === 0;
+      HC.setSort([]);
+      var ap = await applyGrp();
+      clickTh(gTh('V_AMOUNT')); await sleep(200);
+      var s2 = sortNow(), e0 = window.__errors.length + window.__rejections.length;
+      window.__THROWN = 0; window.__THROW_SORT = true;
+      var rm2 = await removeGrp();
+      window.__THROW_SORT = false;
+      R.chk.throwFlat = ap && s2 === J([['V_AMOUNT', '2', 'asc']]) && rm2 && !$('#groupActionsContainer').is(':visible')
+        && $('#paginationControls').is(':visible') && flatShown().length === 200 && (window.__errors.length + window.__rejections.length) === e0;
+      R.info = { rm: [rm1, rm2], ap: ap, flat: J(flatIds()) === flat0, marks: fMarks(), s2: s2, thrown: window.__THROWN || 0,
+                 errs: window.__errors.concat(window.__rejections).slice(e0, e0 + 2) };
+    },
+    // rgpaths (2026-10-23): a search typed in the grouped view and cleared. The clear rebuilds the groups from the flat
+    // rows, which a sort made in the grouped view never orders: they came back unsorted and unmarked while the page's
+    // sort still held it. With no sort on, the groups stand as the rebuild draws them (GUARD). Stacked.
+    rpsearch: async function () {
+      var n0 = leaves().length;
+      var c0 = await searchGrouped("V_STATUS = 'Open'"), z0 = await searchGrouped('');
+      var tb0 = window.__RGV_TB || [], now0 = document.querySelectorAll('#groupedResultsContainer table > tbody');
+      R.chk.noSortSame = c0 && z0 && sortNow() === '[]' && tb0.length > 0 && tb0.length === now0.length
+        && Array.prototype.every.call(now0, function (tb, i) { return tb === tb0[i]; }) && gMarks().length === 0;
+      clickTh(gTh('V_AMOUNT')); await sleep(200);
+      var s0 = sortNow(), ids0 = J(leafIds()), m0 = gMarks();
+      var c1 = await searchGrouped("V_STATUS = 'Open'");
+      var hid = document.querySelectorAll('#groupedResultsContainer tbody tr.search-hidden').length;
+      var z1 = await searchGrouped('');
+      var ids1 = J(leafIds()), m1 = gMarks();
+      R.chk.cleared = c1 && z1 && hid > 0 && leaves().length === n0 && !document.querySelector('#groupedResultsContainer tbody tr.search-hidden');
+      R.chk.clearSorted = s0 === J([['V_AMOUNT', '2', 'asc']]) && ids1 === ids0 && leaves().every(function (w) { return amountsSorted(w, 1); });
+      R.chk.clearMarks = m0.length >= n0 && J(m1) === J(m0);
+      R.chk.clearStripes = stripesOk();
+      R.chk.clearSortKept = sortNow() === s0;
+      clickTh(gTh('V_AMOUNT')); await sleep(200);
+      var m2 = gMarks();
+      R.chk.clearNextDesc = sortNow() === J([['V_AMOUNT', '2', 'desc']]) && leaves().every(function (w) { return amountsSorted(w, -1); })
+        && m2.length === m0.length && m2.every(function (x) { return x === 'V_AMOUNT:descending'; });
+      R.info = { s0: s0, now: sortNow(), leaves: n0, hid: hid, c: [c0, z0, c1, z1], noSort: [tb0.length, now0.length], m0n: m0.length, m1: m1.slice(0, 2),
+                 m1n: m1.length, same: ids1 === ids0, first: leaves()[0] ? (idsIn(leaves()[0]) || []).slice(0, 4) : null };
+    },
+    // rgpaths: the List layout, a two-level sort, a search typed and cleared: both levels back, ranked, and the group
+    // the list shows drawn by them
+    rpsearchlist: async function () {
+      clickTh(gTh('V_STATUS')); await sleep(200);
+      clickTh(gTh('V_AMOUNT'), true); await sleep(200);
+      var s1 = sortNow(), ids1 = leafIds(), m1 = gMarks();
+      var c = await searchGrouped("V_STATUS = 'Open'"), z = await searchGrouped('');
+      var sel = selected(), path = sel ? (sel.getAttribute('data-group-path') || keyOf(sel)) : null;
+      var shown = sel ? rowsOf(sel).map(idOf) : [];
+      R.chk.listBack = s1 === J([['V_STATUS', '5', 'asc'], ['V_AMOUNT', '2', 'asc']]) && c && z && isOn() && sortNow() === s1 && J(leafIds()) === J(ids1);
+      R.chk.listMarks = m1.length > 0 && J(gMarks()) === J(m1) && m1.some(function (x) { return /:1$/.test(x); }) && m1.some(function (x) { return /:2$/.test(x); });
+      R.chk.listShown = !!path && !!ids1[path] && shown.length > 1 && J(shown) === J(ids1[path]);
+      R.info = { s1: s1, now: sortNow(), c: [c, z], m1: m1.slice(0, 2), m1n: m1.length, marksNow: gMarks().length, path: path,
+                 shown: shown.slice(0, 4), want: path && ids1[path] ? ids1[path].slice(0, 4) : null, layout: HC.getLayout() };
+    },
+    // rgpaths: _pnbApplyColumnLayout's grouped rebuild - the header menu's move and hide (window.Penumbra.headerMenu, as
+    // the menu runs them), Settings > Columns (its Apply), and a hide of the sorted column itself: every time, the
+    // groups come back in the page's sort, marked. Stacked.
+    rplayout: async function () {
+      var hm = window.Penumbra && window.Penumbra.headerMenu;
+      if (!hm || typeof hm.layout !== 'function' || typeof hm.applyLayout !== 'function') throw new Error('rplayout: window.Penumbra.headerMenu is missing');
+      clickTh(gTh('V_AMOUNT')); await sleep(200);
+      var s0 = sortNow(), ids0 = J(leafIds()), m0 = gMarks(), n0 = leaves().length;
+      var asc = function () { return J(leafIds()) === ids0 && leaves().every(function (w) { return amountsSorted(w, 1); }); };
+      var place = function (lay, col, after) {
+        var i = -1; lay.cols.forEach(function (c, k) { if (c.colName === col) i = k; });
+        var me = lay.cols.splice(i, 1)[0], j = -1;
+        lay.cols.forEach(function (c, k) { if (c.colName === after) j = k; });
+        lay.cols.splice(j + 1, 0, me);
+        return lay;
+      };
+      var shownOff = function (lay, col) { lay.cols.forEach(function (c) { if (c.colName === col) c.visible = false; }); return lay; };
+      // the header menu's move: V_NAME after V_STATUS
+      var r1 = window.__REBUILDS || 0;
+      var mv = hm.applyLayout(place(hm.layout(), 'V_NAME', 'V_STATUS')); await sleep(300); await frames(4);
+      var hn = gHeadNames();
+      R.chk.moveRan = mv && (window.__REBUILDS || 0) > r1 && hn.indexOf('V_NAME') > hn.indexOf('V_STATUS') && leaves().length === n0;
+      R.chk.moveSorted = asc();
+      R.chk.moveMarks = m0.length >= n0 && J(gMarks()) === J(m0);
+      // ...its hide: V_DATE
+      var r2 = window.__REBUILDS || 0;
+      var hd = hm.applyLayout(shownOff(hm.layout(), 'V_DATE')); await sleep(300); await frames(4);
+      R.chk.hideSorted = hd && (window.__REBUILDS || 0) > r2 && gHeadNames().indexOf('V_DATE') < 0 && asc();
+      R.chk.hideMarks = J(gMarks()) === J(m0);
+      // Settings > Columns: V_LINK unticked, Apply
+      $('#settingsPanel').addClass('is-open');
+      window.Penumbra.refreshSettingsColumns();
+      var box = $('#spColumnList .sp-col-item[data-colname="V_LINK"] .sp-col-check');
+      box.prop('checked', false).trigger('change');
+      var r3 = window.__REBUILDS || 0, h3 = hides();
+      $('#spApply').prop('disabled', false).trigger('click');
+      var ap = await until(function () { return (window.__REBUILDS || 0) > r3 && hides() > h3; }, 20000); await sleep(300); await frames(4);
+      R.chk.panelSorted = box.length === 1 && ap && gHeadNames().indexOf('V_LINK') < 0 && asc();
+      R.chk.panelMarks = J(gMarks()) === J(m0);
+      // the sorted column itself hidden: the rows keep its order, its (hidden) heading its mark, the page its sort
+      var r4 = window.__REBUILDS || 0;
+      var ha = hm.applyLayout(shownOff(hm.layout(), 'V_AMOUNT')); await sleep(300); await frames(4);
+      var hth = gTh('V_AMOUNT');
+      R.chk.hiddenSortKept = ha && (window.__REBUILDS || 0) > r4 && gHeadNames().indexOf('V_AMOUNT') < 0 && asc() && sortNow() === s0
+        && !!hth && hth.getAttribute('aria-sort') === 'ascending';
+      R.info = { s0: s0, now: sortNow(), leaves: n0, heads: gHeadNames(), m0n: m0.length, marksNow: gMarks().length, box: box.length, ap: ap,
+                 rebuilds: window.__REBUILDS || 0, first: leaves()[0] ? (idsIn(leaves()[0]) || []).slice(0, 4) : null };
+    },
+    // rgpaths: a Custom Sort Order saved for the grouping column (its editor's Save) rebuilds the groups to put the
+    // bands in that order: each group's rows came back in the flat order, unmarked. Stacked.
+    rpcso: async function () {
+      clickTh(gTh('V_AMOUNT')); await sleep(200);
+      var s0 = sortNow(), ids0 = leafIds(), m0 = gMarks(), n0 = leaves().length;
+      var want = ['West', 'Central', 'East', 'South', 'North'];
+      // the editor's fields (index.php builds them; the harness has none): the column, its values in order, Save
+      $('#rpCsoFixture').remove();
+      $('body').append('<div id="rpCsoFixture" style="display:none"><select id="csColumnSelect"><option value="H_GROUP">H_GROUP</option></select>'
+        + '<select id="csPresetSelect"><option value="">Custom</option></select><ul id="csValuesList">'
+        + want.map(function (v) { return '<li><span class="cs-val-text">' + v + '</span></li>'; }).join('')
+        + '</ul><button id="csSaveBtn" type="button">Save</button></div>');
+      $('#csColumnSelect').val('H_GROUP');
+      var r0 = window.__REBUILDS || 0;
+      $('#csSaveBtn').trigger('click'); await sleep(300); await frames(4);
+      var keys = top().map(keyOf).filter(function (k) { return k !== '[Blank]'; });
+      R.chk.bandsOrdered = (window.__REBUILDS || 0) > r0 && J(keys) === J(want) && leaves().length === n0;
+      // each group's rows as before the rebuild (by its path: the bands themselves moved)
+      var ids1 = leafIds(), same = Object.keys(ids0).length === Object.keys(ids1).length
+        && Object.keys(ids0).every(function (k) { return J(ids1[k]) === J(ids0[k]); });
+      R.chk.csoSorted = s0 === J([['V_AMOUNT', '2', 'asc']]) && same && leaves().every(function (w) { return amountsSorted(w, 1); });
+      R.chk.csoMarks = m0.length >= n0 && J(gMarks()) === J(m0);
+      R.chk.csoSortKept = sortNow() === s0;
+      R.info = { s0: s0, now: sortNow(), keys: top().map(keyOf), leaves: [n0, leaves().length], m0n: m0.length, marksNow: gMarks().length,
+                 first: leaves()[0] ? (idsIn(leaves()[0]) || []).slice(0, 4) : null };
+    },
+    // rgpaths: the report journal on (a toggle column keyed by V_ID); a second toggle column configured: the group
+    // tables lack it, so the journal's pass rebuilds them from the flat rows (paintGroupedJournal) - and its repaint
+    // marked the page's sort on groups drawn in the flat order. Stacked.
+    rpjournal: async function () {
+      var jcol = function () {
+        var w = leaves()[0], t = w ? w.querySelector(':scope > .group-content > table > thead') : null;
+        return t ? t.querySelectorAll('th[data-column^="__JOURNAL_TOGGLE__"]').length : -1;
+      };
+      if (!window.Penumbra || typeof window.Penumbra.applyJournalToggles !== 'function') throw new Error('rpjournal: window.Penumbra.applyJournalToggles is missing');
+      window.__STEP = 'rpjournal: the journal column in the groups';
+      var j0 = await until(function () { return jcol() === 1; }, 15000); await sleep(400);
+      window.__STEP = 'rpjournal: frames after the column'; await frames(3);
+      clickTh(gTh('V_AMOUNT')); await sleep(200);
+      var s0 = sortNow(), ids0 = J(leafIds()), m0 = gMarks(), n0 = leaves().length;
+      var r0 = window.__REBUILDS || 0;
+      window._penumbraJournalToggles.push({ key: 'toggle2', label: 'Checked' });
+      window.Penumbra.applyJournalToggles();
+      window.__STEP = 'rpjournal: the rebuild';
+      var rb = await until(function () { return (window.__REBUILDS || 0) > r0 && jcol() === 2; }, 15000); await sleep(500);
+      window.__STEP = 'rpjournal: frames after the rebuild'; await frames(4);
+      window.__STEP = 'rpjournal: checks';
+      R.chk.jrnRebuilt = j0 && rb && leaves().length === n0;
+      R.chk.jrnSorted = s0 === J([['V_AMOUNT', '2', 'asc']]) && J(leafIds()) === ids0 && leaves().every(function (w) { return amountsSorted(w, 1); });
+      R.chk.jrnMarks = m0.length >= n0 && J(gMarks()) === J(m0);
+      R.chk.jrnStripes = stripesOk();
+      R.info = { j0: j0, rb: rb, jcol: jcol(), s0: s0, now: sortNow(), leaves: [n0, leaves().length], m0n: m0.length, marksNow: gMarks().length,
+                 rebuilds: [r0, window.__REBUILDS || 0], first: leaves()[0] ? (idsIn(leaves()[0]) || []).slice(0, 4) : null };
+    },
+    // rgpaths (the review): a flat sort carried into a grouping, then turned off in the grouped view (a click there
+    // marks only the group tables, so the flat headings keep its marks). Every rebuild clones the flat headings: the
+    // groups came back marked with no sort on - after the search cleared, and after the grouping dialog's Apply.
+    rpmarksoff: async function () {
+      var rm = await removeGrp();
+      clickTh(fTh('V_AMOUNT')); await sleep(250);
+      var fm = J(fMarks()) === J(['V_AMOUNT:ascending']);
+      var ap = await applyGrp();
+      var m1 = gMarks();
+      clickTh(gTh('V_AMOUNT')); await sleep(200);
+      clickTh(gTh('V_AMOUNT')); await sleep(200);
+      var off = sortNow() === '[]' && gMarks().length === 0 && J(fMarks()) === J(['V_AMOUNT:ascending']);
+      var c = await searchGrouped("V_STATUS = 'Open'"), z = await searchGrouped('');
+      var m2 = gMarks();
+      R.chk.offSearchUnmarked = rm && fm && ap && m1.length >= 6 && off && c && z && sortNow() === '[]' && m2.length === 0;
+      var ap2 = await applyGrp();
+      var m3 = gMarks();
+      R.chk.offApplyUnmarked = ap2 && sortNow() === '[]' && m3.length === 0;
+      R.info = { rm: rm, fm: fm, ap: [ap, ap2], m1n: m1.length, off: off, c: [c, z], m2: m2.slice(0, 2), m2n: m2.length, m3n: m3.length, now: sortNow() };
+    },
+    // rgpaths: a pivot's exit. Generating a pivot sets the page's sort aside (sortCriteria = [], the flat marks
+    // cleared) while the flat rows keep the order a flat sort put them in; a sort made on the pivot stayed in
+    // sortCriteria with the pivot's cells' numbers. Now the flat rows come back in the page's sort (none: the
+    // report's own order), page 1 its first rows; the pivot's own sort goes with it (a repaint marks nothing, a
+    // Shift+click starts the sort afresh) unless it names a report column by number and name (a row field: carries on).
+    rppivot: async function () {
+      if (!document.getElementById('exitPivotModeBtn')) throw new Error('rppivot: the harness has no #exitPivotModeBtn');
+      var rm = await removeGrp();
+      var flat0 = flatIds();
+      // 1. a flat sort, a pivot with no sort of its own, its exit
+      clickTh(fTh('V_NAME')); await sleep(250);
+      var named = inOrder(flatRows(), [[nameOf, 1]]) && J(fMarks()) === J(['V_NAME:ascending']);
+      await fakePivot(null);
+      var ex1 = await exitPivot();
+      var shown1 = flatShown().map(idOf);
+      R.chk.exitNatural = rm && named && ex1 && sortNow() === '[]' && J(flatIds()) === J(flat0);
+      R.chk.exitUnmarked = fMarks().length === 0;
+      R.chk.exitPage = shown1.length === 200 && J(shown1) === J(flat0.slice(0, 200));
+      // 2. a flat sort, a pivot sorted by one of its own cells ('North::Sum' at cell 2: V_AMOUNT's number here), its exit
+      clickTh(fTh('V_NAME')); await sleep(250);
+      await fakePivot([{ colIdentifier: 'North::Sum', colIndex: 2, direction: 'asc' }]);
+      var ex2 = await exitPivot();
+      var after2 = sortNow();
+      R.chk.pivotSortGone = ex2 && after2 === '[]' && J(flatIds()) === J(flat0) && fMarks().length === 0;
+      HC.updateHeaderIcons();
+      var rep2 = fMarks();
+      R.chk.pivotRepaint = rep2.length === 0;
+      clickTh(fTh('V_AMOUNT'), true); await sleep(250);
+      R.chk.pivotShiftClick = sortNow() === J([['V_AMOUNT', '2', 'asc']]) && inOrder(flatRows(), [[amt, 1]]) && J(fMarks()) === J(['V_AMOUNT:ascending']);
+      // 3. a pivot sorted by a row field that is a report column (V_ID, cell 0): the flat rows sorted by it, marked
+      await fakePivot([{ colIdentifier: 'V_ID', colIndex: 0, direction: 'desc' }]);
+      var ex3 = await exitPivot();
+      R.chk.rowFieldKept = ex3 && sortNow() === J([['V_ID', '0', 'desc']]) && inOrder(flatRows(), [[idOf, -1]]) && J(fMarks()) === J(['V_ID:descending']);
+      // 4. a search typed: the exit's other branch runs it - the rows it keeps are in the report's own order, paged
+      await fakePivot(null);
+      $('#tableSearch').val("V_STATUS = 'Open'");
+      var ex4 = await exitPivot();
+      var fs = await until(function () { return !!document.querySelector('#resultsTable > tbody > tr.search-hidden'); }, 15000); await sleep(600); await frames(3);
+      var kept = flatRows().filter(function (r) { return !r.classList.contains('search-hidden'); }).map(idOf);
+      var keptWant = flat0.filter(function (x) { return kept.indexOf(x) >= 0; });
+      var shown4 = flatShown().map(idOf);
+      R.chk.exitSearch = ex4 && fs && sortNow() === '[]' && kept.length > 20 && kept.length < 300 && J(kept) === J(keptWant)
+        && shown4.length === Math.min(200, kept.length) && J(shown4) === J(keptWant.slice(0, shown4.length)) && fMarks().length === 0;
+      // 5. GUARD: the exit button with no pivot on screen - a chart breakdown's "View in table" clicks it from any
+      //    view - drops no sort, here a saved one whose number no longer names its column (V_NAME saved at 5)
+      $('#tableSearch').val('');
+      HC.setSort([{ colIdentifier: 'V_NAME', colIndex: 5, direction: 'asc' }]);
+      var ex5 = await exitPivot();
+      R.chk.noPivotKeeps = ex5 && sortNow() === J([['V_NAME', '5', 'asc']]);
+      R.info = { rm: rm, ex: [ex1, ex2, ex3, ex4, ex5], named: named, after2: after2, rep2: rep2, now: sortNow(), marks: fMarks(), first: flatIds().slice(0, 4),
+                 shown1: shown1.slice(0, 3), kept: kept.length, fs: fs };
+    },
+    // rgpaths: a comparison's Clear that leaves the flat table. (1) A sort made in the grouped view, a comparison, and
+    // the grouping cannot come back (its column gone from the result set: the record is pointed at one): the flat rows
+    // never had the sort - now they do, page 1 its first rows, marked. (2) A pivot sorted by one of its own cells, a
+    // comparison taking over from it, Clear: the pivot's sort went with it - the report's own order, unmarked, and a
+    // repaint marks nothing. (3) GUARD: a flat sort through a comparison and its Clear stays. Stacked.
+    rpcmpflat: async function () {
+      var flat0 = flatIds();
+      clickTh(gTh('V_AMOUNT')); await sleep(200);
+      var s0 = sortNow();
+      var on1 = await cmpOpen();
+      var rec = HC.getPreCmp();
+      if (rec && typeof rec === 'object') rec.column = 'ZZ_GONE';
+      var cl1 = await cmpClearFlat();
+      var rows = flatRows(), shown = flatShown();
+      var want = rows.slice().sort(function (a, b) { return amt(a) - amt(b); }).slice(0, 200);
+      R.chk.goneFlat = on1 && !!rec && rec.column === 'ZZ_GONE' && cl1 && !document.body.classList.contains('group-mode-active') && rows.length === 300;
+      R.chk.goneSorted = inOrder(rows, [[amt, 1]]) && shown.length === 200 && shown.every(function (r, i) { return r === want[i]; });
+      R.chk.goneMarks = J(fMarks()) === J(['V_AMOUNT:ascending']);
+      R.chk.goneSortKept = s0 === J([['V_AMOUNT', '2', 'asc']]) && sortNow() === s0;
+      var marks1 = fMarks(), first1 = rows.slice(0, 4).map(amt);
+      clickTh(fTh('V_NAME')); await sleep(250);
+      var named = sortNow() === J([['V_NAME', '1', 'asc']]) && inOrder(flatRows(), [[nameOf, 1]]);
+      await fakePivot([{ colIdentifier: 'North::Sum', colIndex: 2, direction: 'asc' }]);
+      var on2 = await cmpOpen(), cl2 = await cmpClearFlat();
+      var after2 = sortNow();
+      R.chk.pivotCmpGone = named && on2 && cl2 && after2 === '[]' && J(flatIds()) === J(flat0) && fMarks().length === 0;
+      HC.updateHeaderIcons();
+      var rep2 = fMarks();
+      R.chk.pivotCmpRepaint = rep2.length === 0;
+      // ...and the A-vs-B renderer, which tears a pivot down the same way
+      clickTh(fTh('V_NAME')); await sleep(250);
+      var named2 = sortNow() === J([['V_NAME', '1', 'asc']]) && inOrder(flatRows(), [[nameOf, 1]]);
+      await fakePivot([{ colIdentifier: 'North::Sum', colIndex: 2, direction: 'asc' }]);
+      var onAb = await cmpOpenAb(), clAb = await cmpClearFlat();
+      var afterAb = sortNow();
+      HC.updateHeaderIcons();
+      R.chk.abPivotGone = named2 && onAb && clAb && afterAb === '[]' && J(flatIds()) === J(flat0) && fMarks().length === 0;
+      clickTh(fTh('V_NAME')); await sleep(250);
+      var on3 = await cmpOpen(), cl3 = await cmpClearFlat();
+      R.chk.flatKept = on3 && cl3 && sortNow() === J([['V_NAME', '1', 'asc']]) && inOrder(flatRows(), [[nameOf, 1]]) && J(fMarks()) === J(['V_NAME:ascending']);
+      R.info = { on: [on1, on2, onAb, on3], cl: [cl1, cl2, clAb, cl3], rec: rec && rec.column, s0: s0, marks1: marks1, first1: first1, named: [named, named2],
+                 after2: after2, afterAb: afterAb,
+                 rep2: rep2, now: sortNow(), marks: fMarks(), first: flatIds().slice(0, 4) };
+    },
     // grplist3: the Layout ? tip shows its text. The shared popover was wired only by
     // the pivot / viz / snapshot / Tag Generator dialogs - this one showed nothing.
     tip: async function () {
@@ -1503,7 +2285,9 @@
 
   (async function () {
     try {
+      window.__STEP = 'boot';
       await boot();
+      window.__STEP = 'scenario';
       if (!S[SCN]) throw new Error('unknown scenario ' + SCN);
       R.info0 = { groups: top().length, on: isOn() };
       await S[SCN]();
@@ -1512,7 +2296,7 @@
       R.fatal = String((e && e.stack) || e);
     }
     R.errors = window.__errors.concat(window.__rejections).slice(0, 10);
-    R.hookErr = [window.__HC_ERR, window.__HC_ERR2].filter(Boolean).join('; ');
+    R.hookErr = [window.__HC_ERR, window.__HC_ERR2, window.__HC_ERR3, window.__HC_ERR4, window.__HC_ERR5].filter(Boolean).join('; ');
     R.missing = window.__HC_MISSING || [];
     window.__HCRESULT = R;
     window.__HCDONE = true;

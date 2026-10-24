@@ -1,0 +1,341 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>ldlayout</title>
+<link rel="stylesheet" href="main.css">
+<link rel="stylesheet" href="density.css">
+<link rel="stylesheet" href="penumbra_colwidths.css">
+<link rel="stylesheet" href="penumbra_grouplist.css">
+</head>
+<body class="theme-default">
+<!-- ldlayout suite (2026-10-23) - a report's SAVED column order and visibility at load, by name.
+     A save keeps each column's PLACE in the result (its heading's data-column) in columnOrder / visibleColumns. After
+     the report's SQL put a column in front of others, moved one or dropped one, those places hold other columns. Each
+     scenario boots the REAL main.js (+ the REAL calc and grouping modules) through the REAL run path (a stubbed
+     query.php) from a stored report saved against the 20-column fixture below (V_AMOUNT moved first; the six V_
+     columns shown, the H_ ones hidden), over a result whose columns have moved since; the driver reads the headings
+     back, drives Save / Reset / the custom-layout chip / ?state= links. The plumbing is the ldsort harness's (main.js
+     binds the grouping dialog's fields at ready, so they come first) + the savelayout harness's Save dialog fields. -->
+<div id="zzHarnessPlumbing" style="display:none">
+  <input id="reportTitle" value=""><input id="reportSubtitle" value=""><div id="admWrapper"></div><button id="toggleAdminViewBtn"></button>
+  <div id="editorTabs"></div><div id="mainReportSubtitle"></div><div id="mainReportTitle"></div>
+  <textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+  <button id="executeQuery">Run</button><button id="stopQueryBtn">Stop</button>
+  <div id="importTimestamps"></div>
+  <div id="errorBox"></div><div id="undo_text_container"></div>
+  <button id="groupTableBtn" type="button">Group</button><button id="shareQuery" type="button">Share</button>
+  <div id="helpContentContainer"></div>
+</div>
+<div id="loadingOverlay" style="display:none"><p id="execution-timer"></p><p id="loadingMessage"></p><div id="loadingTip"></div></div>
+<div id="reportHeaderContainer"><div id="defaultTitleView">ldlayout fixture</div><div id="reportInfoPanel" style="display:none"></div><div id="reportSnippetOutput"></div></div>
+<div id="resultsHeader">
+  <div id="tableSearchContainer"><input id="tableSearch" value=""></div>
+  <span id="resultCount"></span>
+  <div id="paginationControls"><select id="rowsPerPageSelector"><option value="25">25</option><option value="50">50</option><option value="200">200</option><option value="all">All</option><option value="none">None</option></select><span id="pageInfo"></span></div>
+  <div id="groupActionsContainer">
+    <a href="#" class="themed-link-button" id="expandAllGroups">Expand All</a>
+    <a href="#" class="themed-link-button" id="collapseAllGroups">Collapse All</a>
+    <span class="btn-group-sep" id="removeGroupingSep">&bull;</span> <a href="#" class="themed-link-button" id="configureGroupingBtn">Configure Grouping</a>
+    <a href="#" class="themed-link-button" id="removeGroupingLink">Remove Grouping</a>
+  </div>
+  <button id="exitPivotModeBtn" type="button" style="display:none">Exit pivot</button>
+  <button id="modifyPivotBtn" type="button" style="display:none">Modify pivot</button>
+</div>
+<div id="table-view-container"><table id="resultsTable" class="data-grid-table"><caption class="sr-only">Report results table</caption><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table><div id="groupedResultsContainer" style="display:none"></div><div id="pivot-output-container" style="display:none"></div></div>
+<div id="groupingLightbox" style="display:none">
+  <div id="groupingColumnSelector" class="penumbra-custom-select"><div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div></div>
+  <div id="groupLevel2Row" style="display:none"><div id="groupingColumnSelector2" class="penumbra-custom-select"><div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div></div></div>
+  <div id="groupLevel3Row" style="display:none"><div id="groupingColumnSelector3" class="penumbra-custom-select"><div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div></div></div>
+  <input type="checkbox" id="groupAggCheckbox">
+  <div id="groupAggOptions" style="display:none"></div>
+  <div id="groupAggColumn" class="penumbra-custom-select"><div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div></div>
+  <select id="groupAggType"><option value="sum">sum</option><option value="avg">avg</option></select>
+  <select id="groupSortSelect">
+    <option value="label|asc">label asc</option><option value="label|desc">label desc</option>
+    <option value="count|asc">count asc</option><option value="count|desc">count desc</option>
+  </select>
+  <select id="groupLimitDir"><option value="top">top</option><option value="bottom">bottom</option></select>
+  <input type="text" id="groupLimitN"><input type="text" id="groupLimitMinRows">
+  <input type="checkbox" id="groupLimitOther" checked>
+  <div id="groupSummaryFilterHint" style="display:none"></div>
+  <div id="groupStartDepthRow"><select id="groupStartDepth">
+    <option value="0">Collapsed</option><option value="1">Level 1</option><option value="2">Level 2</option><option value="3">All levels</option>
+  </select></div>
+  <div id="groupLayoutRow" style="display: none;">
+    <div id="groupLayoutLbl">Layout <span class="bld-help-icon" data-tip="group-layout"></span></div>
+    <div class="grp-lb-inline grp-lb-radios" role="radiogroup" aria-labelledby="groupLayoutLbl">
+      <label><input type="radio" name="groupLayoutChoice" value="stacked" checked> Stacked</label>
+      <label><input type="radio" name="groupLayoutChoice" value="list"> List</label>
+    </div>
+    <input type="hidden" id="groupLayout" value="stacked">
+  </div>
+  <button id="resetGroupingBtn" type="button">Reset</button>
+  <button id="copyGroupSnippetBtn" type="button">Snippet</button>
+  <button id="confirmGroupingBtn" type="button">Apply Grouping</button>
+</div>
+<div id="settingsPanelOverlay"></div>
+<div id="settingsPanel">
+  <select id="spThemeSelector"><option value="report-default">Report Default</option><option value="theme-default">Default</option></select>
+  <select id="spDensitySelector"><option value="report-default">Report Default</option><option value="standard">Standard</option></select>
+  <input type="checkbox" id="spRowExpandToggle"><input type="checkbox" id="spResolverToggle">
+  <div class="sp-section sp-columns-section"><div class="sp-column-container"><div id="spColumnList" class="sp-column-list"></div></div></div>
+  <div class="sp-actions"><button id="spApply">Save Column Layout</button><button id="spReset">Reset</button><span id="spPendingCount"></span></div>
+</div>
+<div id="pnbStatusBar">
+  <div class="sb-seg" id="sbColsSeg"><span id="sbCols"></span>
+    <span class="sb-chip" id="sbCustomCols" style="display:none;">custom layout</span>
+    <div class="sb-pop" id="sbCustomColsPop"><div id="sbCustomColsDiff"></div><button id="sbCustomColsReset">Reset</button><button id="sbCustomColsSave" style="display:none;">Save</button></div>
+  </div>
+  <div class="sb-seg" id="sbUserSeg"></div>
+</div>
+<!-- The Save dialog (the savelayout harness's): every field the two confirm handlers read. -->
+<button id="saveQuery">Save</button>
+<div id="saveStateLightbox" style="display:none">
+  <input id="localSaveNameInput" value=""><div id="localSaveStatus"></div><div id="localSaveSizeWarning"></div>
+  <div id="localSaveOverwriteContainer"></div><input type="checkbox" id="localSaveOverwriteCheckbox">
+  <input type="checkbox" id="enableLocalReportPassword"><input id="localSavePassword"><input id="localSavePasswordConfirm">
+  <button id="confirmLocalSaveBtn">Save locally</button>
+  <input id="serverSaveIdInput" value=""><input id="serverSaveTitleInput" value=""><input id="serverSaveSubtitleInput" value="">
+  <input type="checkbox" id="serverSaveOverwriteCheckbox" checked>
+  <div id="authAccessContainer"></div><input id="authAccessInput" value=""><input type="hidden" id="serverSaveAuthorized" value="">
+  <select id="serverSaveTheme"><option value="theme-default">Default</option></select>
+  <select id="serverSaveDensity"><option value="standard">Standard</option></select>
+  <input type="checkbox" id="serverSaveRowHeight"><input type="checkbox" id="serverSaveResolver">
+  <select id="serverSaveRowsPerPage"><option value="25">25</option><option value="200" selected>200</option></select>
+  <input type="checkbox" id="serverSaveSortNone">
+  <input type="checkbox" id="enableReportPassword"><input id="serverSavePassword"><input id="serverSavePasswordConfirm">
+  <div id="serverSaveStatus"></div>
+  <button id="confirmServerSaveBtn">Save to server</button>
+</div>
+<pre id="out">running</pre>
+
+<script>
+  (function () { try { localStorage.clear(); } catch (e) {} })();
+  window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' } };
+  window.PENUMBRA_THEME_IDS = ['theme-default'];
+  window.PENUMBRA_THEME_ALIASES = {};
+  window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  (function () {
+    var P = new URLSearchParams(location.search);
+    var S = window.__SCN = P.get('scn') || 'front';
+    // --- the fixture: the grplist / hiddencols one (300 rows, 20 columns) - the result the report was SAVED against --
+    var BASE = window.__BASE = [
+      'V_ID', 'V_NAME', 'V_AMOUNT', 'V_DATE', 'V_LINK', 'V_STATUS',            // 0-5 shown
+      'H_TEXT', 'H_NUM', 'H_MONEY', 'H_DATE', 'H_HTML', 'H_JSON', 'H_ENT',     // 6-12 hidden
+      'H_NL', 'H_NULL', 'H_GROUP', 'H_GROUP2', 'H_AMT', 'H_FLAG', 'H_CODE'     // 13-19 hidden
+    ];
+    var H = BASE.slice(6);
+    function places(n) { var o = []; for (var c = 0; c < n; c++) o.push(c); return o; }
+    function without(a, x) { return a.filter(function (n) { return x.indexOf(n) < 0; }); }
+    function renamed(a, from, to) { return a.map(function (n) { return n === from ? to : n; }); }
+    // casedup: saved against a result with a second column named v_amount (place 3): two headings read V_AMOUNT
+    var CASE21 = BASE.slice(0, 3).concat(['v_amount'], BASE.slice(3));
+    // The saved layout: V_AMOUNT moved first, the six V_ columns shown, the H_ ones hidden (and the row numbers shown)
+    var ORD = [2, 0, 1].concat(places(20).slice(3)), VIS = ['#', 2, 0, 1, 3, 4, 5];
+    // cols: the result's columns NOW, in the SQL's order (a row's keys put a number-like name first, as JS does);
+    // names: the layoutColumnNames the save wrote (false: a state saved before them)
+    var C = {
+      front:      { cols: ['V_NEW'].concat(BASE) },                      // the SQL put a column in front
+      oldfront:   { cols: ['V_NEW'].concat(BASE), names: false },        // ...under a state saved before the names
+      moved:      { cols: ['V_STATUS', 'V_ID', 'H_GROUP', 'V_NAME', 'V_AMOUNT', 'V_DATE', 'V_LINK'].concat(without(H, ['H_GROUP'])) },
+      gone:       { cols: without(BASE, ['V_NAME']) },                   // the SQL dropped V_NAME
+      gonenew:    { cols: without(BASE, ['V_NAME']).concat(['V_NEW']) }, // ...and added V_NEW at the end: as many as then
+      renamed:    { cols: renamed(BASE, 'V_AMOUNT', 'V_AMT') },          // V_AMOUNT's alias renamed in place
+      numname:    { cols: BASE.concat(['2021']) },                       // a column named 2021 added LAST: its key is FIRST
+      same:       { cols: BASE },
+      oldsame:    { cols: BASE, names: false },
+      // names that do not cover the lists (a hand-edited state): read by place - a place past the names, a column
+      // order that lists only some places, a missing name
+      badnames:   { cols: ['V_NEW'].concat(BASE), order: [2, 0, 1].concat(places(19).slice(3), [20]), vis: ['#', 2, 0, 1, 3, 4, 5, 20] },
+      partial:    { cols: ['V_NEW'].concat(BASE), order: [2, 0, 1], vis: ['#', 2, 0] },
+      holey:      { cols: ['V_NEW'].concat(BASE), names: BASE.map(function (n, i) { return i === 5 ? '' : n; }) },
+      // the by-name read failing (here: the calc module's isCalc throws): read by place, the table still built
+      netthrow:   { cols: ['V_NEW'].concat(BASE) },
+      allgone:    { cols: ['V_NEW'].concat(without(BASE, ['V_ID', 'V_NAME'])), vis: ['#', 0, 1] },   // every shown one gone
+      hashoff:    { cols: ['V_NEW'].concat(BASE), vis: [2, 0, 1, 3, 4, 5] },   // the row numbers hidden
+      casedup:    { cols: ['V_NEW'].concat(CASE21), saved: CASE21, order: [2, 0, 1].concat(places(21).slice(3)), vis: ['#', 2, 0, 1, 4, 5, 6] },
+      jrnentry:   { cols: ['V_NEW'].concat(BASE), order: [2, 0, '__JOURNAL_NOTES', 1].concat(places(20).slice(3)) },
+      group:      { cols: ['V_NEW'].concat(BASE), group: true },
+      save:       { cols: BASE, names: false },                          // an old report, saved again (Save dialog)
+      saveload:   { cols: ['V_NEW'].concat(BASE) },                      // the state 'save' posted (run.py injects it)
+      carry:      { cols: BASE },                                        // a 0-row run, then Save: the stored layout
+      mycalc:     { cols: BASE },                                        // this viewer's own MYCALC (&id=ldcalc), then Save
+      mycalcload: { cols: renamed(BASE, 'V_AMOUNT', 'V_AMT') },          // renamed in place, with MYCALC (&id=ldcalc)
+      // &view= with its own column layout (by name), over a result as wide as the saved names - so the saved names,
+      // were they kept, would be trusted and read the link's places as other columns
+      viewlink:   { cols: ['V_STATUS', 'V_ID', 'H_GROUP', 'V_NAME', 'V_AMOUNT', 'V_DATE', 'V_LINK'].concat(without(H, ['H_GROUP'])) },
+      viewnolay:  { cols: ['V_NEW'].concat(BASE) },                      // &view= without one
+      reset:      { cols: ['V_NEW'].concat(BASE) },
+      resetcol:   { cols: ['V_NEW'].concat(BASE) },
+      pill:       { cols: ['V_STATUS', 'V_ID', 'H_GROUP', 'V_NAME', 'V_AMOUNT', 'V_DATE', 'V_LINK'].concat(without(H, ['H_GROUP'])) },
+      prefs:      { cols: ['V_NEW'].concat(BASE) },
+      urlfit:     { cols: BASE },
+      sharefit:   { cols: BASE },                                        // the Share button's ?state= link
+      // a ?state= link (no report: the page boots from the link) whose lists and names carry the sender's own
+      // calculated column KCALC (a link is never stripped): it loads as this viewer's own; V_AMOUNT renamed in place
+      statecalc:  { cols: renamed(BASE, 'V_AMOUNT', 'V_AMT'), saved: BASE.concat(['KCALC']), order: ORD.concat([20]), vis: VIS.concat([20]), url: true },
+      requery:    { cols: ['V_NEW'].concat(BASE) }
+    };
+    var K = C[S] || C.front;
+    var seed = 20260930;
+    function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
+    function pick(a) { return a[Math.floor(rnd() * a.length)]; }
+    var W = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel', 'India', 'Juliet', 'Kilo', 'Lima'];
+    function money() { return '$' + (rnd() * 90000 + 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+    function date() { var d = new Date(2021, 0, 1 + Math.floor(rnd() * 1500)); return (d.getMonth() + 1) + '/' + d.getDate() + '/' + d.getFullYear(); }
+    function link() { var id = String(400000 + Math.floor(rnd() * 99999)); return '@@HTML<a href="https://oitras.oit.ncsu.edu/resolver/103?id=' + id + '" target="_new" class="resolver-link">' + id + '</a>'; }
+    var rows = [];
+    for (var i = 1; i <= 300; i++) {
+      var b = {};
+      b.V_ID = 'ID-' + String(1000 + i);
+      b.V_NAME = pick(W) + ' ' + pick(W);
+      b.V_AMOUNT = money();
+      b.v_amount = money();
+      b.V_DATE = date();
+      b.V_LINK = link();
+      b.V_STATUS = pick(['Open', 'Closed', 'Pending']);
+      b.H_TEXT = pick(W) + ' ' + pick(W) + ' ' + i;
+      b.H_NUM = String(Math.floor(rnd() * 1000));
+      b.H_MONEY = money();
+      b.H_DATE = date();
+      b.H_HTML = link();
+      var sub = []; for (var k = 0, n = 1 + Math.floor(rnd() * 3); k < n; k++) sub.push({ SUB_ID: 'S' + Math.floor(rnd() * 90), SUB_AMT: Math.floor(rnd() * 5000), SUB_NAME: pick(W) });
+      b.H_JSON = (i % 7 === 0) ? null : '@@JSON' + JSON.stringify(sub);
+      b.H_ENT = pick(['R&amp;D', 'plain', 'A &amp; B']);
+      b.H_NL = pick(W) + '\n' + pick(W);
+      b.H_NULL = (i % 3 === 0) ? null : ((i % 3 === 1) ? '' : pick(W));
+      b.H_GROUP = (i % 11 === 0) ? null : pick(['North', 'South', 'East', 'West', 'Central']);
+      b.H_GROUP2 = pick(['Tier 1', 'Tier 2', 'Tier 3']);
+      b.H_AMT = String(Math.floor(rnd() * 20000) / 100);
+      b.H_FLAG = rnd() < 0.3 ? 'Y' : 'N';
+      b.H_CODE = pick(['AB', 'CD', 'EF', 'GH']) + '-' + Math.floor(rnd() * 99);
+      b.V_NEW = 'N' + i;
+      b.V_AMT = b.V_AMOUNT;
+      b['2021'] = String(Math.floor(rnd() * 5000));
+      var r = {};
+      K.cols.forEach(function (c) { r[c] = b[c]; });
+      rows.push(r);
+    }
+    window.__rowsFixture = rows;
+    window.__colsNow = Object.keys(rows[0]);   // the result's columns by place, as the page will read them
+    // --- the stored report: saved against BASE (casedup: CASE21) ----------------------------------------------------
+    var savedCols = K.saved || BASE;
+    var st = {
+      name: 'ldfix', query: 'SELECT * FROM LD_FIXTURE', reportTitle: 'Saved layout fixture',
+      theme: 'theme-default', density: 'standard',
+      visibleColumns: (K.vis || VIS).slice(), columnOrder: (K.order || ORD).slice(),
+      sortCriteria: [], noLimit: true, rowExpandDefault: false, resolverLinksDefault: true,
+      rowsPerPage: '200', reportSnippet: ''
+    };
+    if (K.names !== false) st.layoutColumnNames = (K.names || savedCols).map(function (n) { return n === null ? null : String(n).toUpperCase(); });
+    if (K.group) { st.groupBy = 'H_GROUP'; st.groupAgg = { column: 'H_AMT', type: 'sum' }; }
+    if (S === 'statecalc') st.calcColumns = [{ name: 'KCALC', formula: '{H_NUM} * 3' }];
+    // saveload: the state the 'save' scenario's Save posted (run.py puts it here before the page loads)
+    if (window.__INJECT) st = window.__INJECT;
+    window.__STORED = st;
+    // statecalc: no report - the state rides in the page's own ?state= (put there once pako is loaded, below)
+    window.__STATE_FOR_URL = K.url ? st : null;
+    window.penumbra_vars = {
+      isAdmin: true, isGlobalAdmin: true, canEditReport: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+      tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+      imports: [], reports: [], themes: {}, prompts: {}, grants: [],
+      totalExemptions: ['AMOUNT', 'H_AMT', 'H_NUM'],
+      preloadedState: K.url ? null : st
+    };
+    window.__queryResponse = { data: rows };
+  })();
+  window.__T = {};
+  window.__queryDone = 0;
+  window.__ajaxLog = [];
+  window.__savePosts = [];
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script>
+  // statecalc: the page's URL becomes ?scn=statecalc&state=<the state as main.js's compressString writes it>
+  if (window.__STATE_FOR_URL) {
+    (function () {
+      var bytes = pako.deflate(JSON.stringify(window.__STATE_FOR_URL)), bin = '';
+      for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      history.replaceState(null, '', location.pathname + '?scn=' + window.__SCN + '&state=' + encodeURIComponent(btoa(bin)));
+    })();
+  }
+</script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  jQuery.ajax = function (a, b) {
+    var opts = (typeof a === 'string') ? jQuery.extend({ url: a }, b || {}) : (a || {});
+    var url = String(opts.url || '');
+    window.__ajaxLog.push(url);
+    var d = jQuery.Deferred();
+    var isQuery = /query\.php/.test(url);
+    var resp = isQuery ? window.__queryResponse : (/help_content\.php/.test(url) ? '' : {});
+    if (/save_server_state\.php/.test(url)) {
+      var body = {}; try { body = JSON.parse(opts.data); } catch (e) {}
+      window.__savePosts.push(body);
+      resp = { success: true, message: 'Report saved successfully!', new_id: body.short_id, numeric_id: 1522, is_new: false };
+    }
+    setTimeout(function () {
+      try { if (opts.success) opts.success(resp, 'success', { status: 200 }); } catch (e) { window.__errors.push('ajax success threw: ' + String(e)); }
+      try { if (opts.complete) opts.complete({ status: 200 }, 'success'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }
+      d.resolve(resp, 'success', { status: 200 });
+      if (isQuery) window.__queryDone++;
+    }, 0);
+    var p = d.promise(); p.abort = function () {}; return p;
+  };
+  jQuery.getJSON = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.post = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.get = jQuery.post;
+  jQuery.fx.off = true;
+  window.__errors = [];
+  window.__rejections = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    window.__rejections.push(String((r && r.message) || r) + ' @' + String((r && r.stack) || '').split('\n').slice(1, 2).join('').trim());
+    e.preventDefault();
+  });
+  window.confirm = function () { return true; };
+  window.alert = function (m) { window.__errors.push('alert: ' + m); };
+  window.prompt = function () { return null; };
+  if (typeof window.stackHeaders !== 'function') window.stackHeaders = function () {};
+</script>
+<script src="penumbra_userseg.js"></script>
+<!-- index.php loads the presets before main.js and the calculated columns after it - both before main.js's ready code,
+     which main_hc.js runs at once: so both here, before it -->
+<script src="penumbra_presets.js"></script>
+<script src="penumbra_calc.js"></script>
+<script>
+  if (window.__SCN === 'netthrow' && window.PenumbraCalc) window.PenumbraCalc.isCalc = function () { throw new Error('netthrow: isCalc fails'); };
+  // mycalc / mycalcload (run.py opens them with &id=ldcalc): the viewer's own calculated column, as the calc dialog saves it
+  if (window.__SCN === 'mycalc' || window.__SCN === 'mycalcload') localStorage.setItem('penumbra_calc_columns', JSON.stringify({ ldcalc: [{ name: 'MYCALC', formula: '{H_NUM} * 2' }] }));
+  // pill / prefs (&id=ldfix): this viewer's own column layout for the report, as Save Column Layout writes it (by NAME)
+  (function () {
+    var lay = null;
+    if (window.__SCN === 'pill') {
+      // the report's own layout, by name, over the moved result: no divergence
+      lay = { order: ['V_AMOUNT', 'V_ID', 'V_NAME', 'V_DATE', 'V_LINK', 'V_STATUS', 'H_TEXT', 'H_NUM', 'H_MONEY', 'H_DATE', 'H_HTML', 'H_JSON', 'H_ENT', 'H_NL', 'H_NULL', 'H_GROUP', 'H_GROUP2', 'H_AMT', 'H_FLAG', 'H_CODE'],
+              visible: ['V_AMOUNT', 'V_ID', 'V_NAME', 'V_DATE', 'V_LINK', 'V_STATUS'], isNumVisible: true };
+    }
+    if (window.__SCN === 'prefs') {
+      lay = { order: ['V_STATUS', 'V_ID', 'V_NEW', 'V_NAME', 'V_AMOUNT', 'V_DATE', 'V_LINK', 'H_TEXT', 'H_NUM', 'H_MONEY', 'H_DATE', 'H_HTML', 'H_JSON', 'H_ENT', 'H_NL', 'H_NULL', 'H_GROUP', 'H_GROUP2', 'H_AMT', 'H_FLAG', 'H_CODE'],
+              visible: ['V_STATUS', 'V_ID', 'V_NEW'], isNumVisible: false };
+    }
+    if (lay) localStorage.setItem('penumbra_column_prefs', JSON.stringify({ ldfix: lay }));
+  })();
+</script>
+<script src="main_hc.js"></script>
+<script src="penumbra_colwidths.js"></script>
+<script src="penumbra_grouplist.js"></script>
+<script src="driver.js"></script>
+</body></html>

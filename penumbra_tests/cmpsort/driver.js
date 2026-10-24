@@ -18,6 +18,9 @@
   }
   if (typeof window.stackHeaders !== 'function') window.stackHeaders = function () {};
   var H = window.__CF || {};
+  // (2026-10-23, cmprq) does the main.js under test hold cmprq (a new query run during a comparison hands the report
+  // table's own sort back)? run.py reads it from the file: S8 expects what that build does
+  var CMPRQ = !!window.__CF_CMPRQ;
   var COLS = window.__COLS, LIVE = window.__LIVE, SNAP = window.__SNAP;
   function J(x) { return JSON.stringify(x); }
   async function waitFor(fn, ms) {
@@ -240,8 +243,11 @@
       on7 && c7a === J([['QTY', '3', 'asc']]) && m7 === '[]' && c7b === J([['NAME', '2', 'asc']]) && cl7 && c7 === J([['QTY', '3', 'asc']]) && r7 === R_ID,
       'reportSort=' + c7a + ' marks=' + m7 + ' cmpSort=' + c7b + ' cleared=' + cl7 + ' back=' + c7 + ' ' + r7);
 
-    // S8 a comparison a new query ends (no Clear) had kept the report's sort for its end: the next comparison does not
-    // put that one back - its Clear leaves the sort the new query left (none)
+    // S8 a new query ends a sorted comparison (no Clear). Since cmprq (2026-10-23) the run hands the report table's own
+    // sort back first - QTY, as S7 left it - and carries it, keeping no sort for the comparison's end; the next
+    // comparison's Clear puts that one back. Before cmprq it carried the comparison's own (none: its heading clicked
+    // three times) and left the kept sort stale, which the next comparison's entry dropped - S13 holds that case now
+    // (a table opened from the console still leaves one)
     var on8 = await openCmp();
     clickTh(cmpTh('NOTE')); await sleep(150);
     clickTh(cmpTh('NOTE')); await sleep(150);
@@ -257,9 +263,10 @@
     var c8b = crit();
     var cl8 = await clearCmp();
     var c8 = crit(), r8 = reportIds();
-    rec('S8 a new query ends a sorted comparison: the next comparison\'s Clear leaves the new query\'s sort (none), not the report sort kept before it',
-      on8 && c8z === '[]' && ran8 && c8a === '[]' && r8a === R_ID && on8b && c8b === J([['NOTE', '5', 'asc']]) && cl8 && c8 === '[]' && r8 === R_ID,
-      'cmp=' + on8 + ' ' + c8z + ' query=' + ran8 + ' ' + c8a + ' ' + r8a + ' | next=' + on8b + ' ' + c8b + ' cleared=' + cl8 + ' back=' + c8 + ' ' + r8);
+    var back8 = CMPRQ ? J([['QTY', '3', 'asc']]) : '[]';
+    rec('S8 a new query ends a sorted comparison: it comes back in the report table\'s own sort (QTY; none before cmprq), and the next comparison\'s Clear leaves that sort',
+      on8 && c8z === '[]' && ran8 && c8a === back8 && r8a === R_ID && on8b && c8b === J([['NOTE', '5', 'asc']]) && cl8 && c8 === back8 && r8 === R_ID,
+      'cmprq=' + CMPRQ + ' cmp=' + on8 + ' ' + c8z + ' query=' + ran8 + ' ' + c8a + ' ' + r8a + ' | next=' + on8b + ' ' + c8b + ' cleared=' + cl8 + ' back=' + c8 + ' ' + r8);
 
     // S9 another view taking over from a comparison (Apply Grouping, a pivot, Load As View: their shared teardown)
     // puts the report table's own sort back
@@ -341,11 +348,34 @@
         && cl12 && c12 === J([['NOTE', '4', 'desc']]) && r12 === R_NOTE_DESC,
       'report=' + ok12 + ' cmp=' + on12 + ' ' + c12z + ' rows=' + o12a + ' | apply=' + o12b + ' ' + c12a + ' ' + m12a
         + ' | sorted=' + c12b + ' apply=' + o12c + ' ' + c12c + ' ' + m12c + ' cleared=' + cl12 + ' back=' + c12 + ' ' + r12);
+
+    // S13 (2026-10-23, cmprq) a table opened from the console (performClearAllAction: a new query from no sort that keeps
+    // nothing of the report's view) ends a comparison whose heading took the sort over: the report sort it kept for its
+    // end stays behind - the next comparison does not put that one back, its Clear leaves the sort the new table
+    // started with (none). (S8's case until cmprq: a plain new query hands the kept sort back itself since.)
+    var ok13 = await reportSort('QTY', 'asc');
+    var on13 = await openCmp();
+    clickTh(cmpTh('NOTE'));
+    await sleep(200);
+    var c13z = crit(), q13 = window.__queryDone;
+    H.clearAll('CMPFOOT_FIXTURE', window.__QUERY);
+    var ran13 = await waitFor(function () { return window.__queryDone > q13 && !cmpOn() && flatRows() === LIVE.length; }, 30000);
+    await sleep(600);
+    var c13a = crit(), r13a = reportIds();
+    var on13b = await openCmp();
+    clickTh(cmpTh('NOTE'));
+    await sleep(200);
+    var c13b = crit();
+    var cl13 = await clearCmp();
+    var c13 = crit(), r13 = reportIds();
+    rec('S13 a table opened from the console ends a sorted comparison: the next comparison\'s Clear leaves the new table\'s sort (none), not the report sort kept before it',
+      ok13 && on13 && c13z === J([['NOTE', '5', 'asc']]) && ran13 && c13a === '[]' && r13a === R_ID && on13b && c13b === J([['NOTE', '5', 'asc']]) && cl13 && c13 === '[]' && r13 === R_ID,
+      'report=' + ok13 + ' cmp=' + on13 + ' ' + c13z + ' query=' + ran13 + ' ' + c13a + ' ' + r13a + ' | next=' + on13b + ' ' + c13b + ' cleared=' + cl13 + ' back=' + c13 + ' ' + r13);
   }
 
   (async function () {
     try {
-      if (!H.runCmp || !H.runAb || !H.compress || !H.uhi || !H.teardown || !H.csApply || !H.sc) { finish('hook: an entry point is not exported'); return; }
+      if (!H.runCmp || !H.runAb || !H.compress || !H.uhi || !H.teardown || !H.csApply || !H.sc || !H.clearAll) { finish('hook: an entry point is not exported'); return; }
       await main();
       finish();
     } catch (e) { finish('driver threw: ' + ((e && e.stack) || e)); }

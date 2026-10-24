@@ -82,12 +82,14 @@ T_BADPIV3 = tok({'v': 1, 'm': 'pivot', 'p': dict(PIV, aggLabels=[Q1, Q2], totalR
 T_BADGRP3 = tok({'v': 1, 'm': 'group', 'g': {'by': 'H_GROUP', 'agg': {'column': 'H_AMT', 'type': 'sum'}, 'sort': {'key': Q1, 'dir': 'asc'}, 'layout': 'list'}, 'cso': {'H_GROUP': [Q2, 'North']}})
 T_FMSAVE = tok({'v': 1, 'm': 'flat', 'fm': {'V_AMOUNT': 'number:1'}, 'cso': {'V_STATUS': {'values': ['Pending', 'Open', 'Closed'], 'preset': None}}})
 T_BADPIV4 = tok({'v': 1, 'm': 'pivot', 'p': {'rows': 5, 'cols': {}, 'vals': ['x']}})
+T_GLIST = tok({'v': 1, 'm': 'group', 'g': {'by': 'H_GROUP', 'layout': 'list'}})
 T_PGSTALE = tok({'v': 1, 'm': 'flat', 'o': 'none', 'r': '25', 'pg': 999})
 from urllib.parse import quote
 def url_for(s, token=None):
     base = 'harness.html?scn=%s' % s
     if s == 'vnoid': return base + '&view=' + T_OK
     if s == 'vsharenoid': return base
+    if s in ('vcmpA', 'vcmpF', 'ggcA', 'vcmpS'): return base + '&id=lrfix'
     if s == 'vstate': return base + '&id=lrfix&state=x&view=' + T_OK
     base += '&id=lrfix'
     return base + ('&view=' + token if token else '')
@@ -96,10 +98,10 @@ def url_for(s, token=None):
 JRN_O = ['V_ID', '__JOURNAL_NOTES', 'V_NAME', 'V_AMOUNT', '__JOURNAL_TOGGLE__done', 'V_DATE', 'V_LINK', 'V_STATUS'] + [n for n in ALL20 if n.startswith('H_')]
 T_JRN = tok({'v': 1, 'm': 'flat', 'o': 'none', 'c': {'o': JRN_O, 'v': ['V_ID', 'V_NAME', 'V_AMOUNT', '__JOURNAL_TOGGLE__done', 'V_DATE', 'V_LINK', 'V_STATUS'], 'n': True},
              'w': {'__JOURNAL_TOGGLE__done': 90}})
-STATIC_TOK = {'vwins': T_WINS, 'vstale': T_STALE, 'vbad': T_BAD, 'vsql': T_SQL, 'vhuge': 'A' * 7000, 'vbomb': T_BOMB, 'vpgstale': T_PGSTALE, 'vbadpiv4': T_BADPIV4, 'vfmsave': T_FMSAVE, 'vbadpiv': T_BADPIV, 'vbadpiv2': T_BADPIV2, 'vbadgrp': T_BADGRP, 'vbadgrp2': T_BADGRP2, 'vbadpiv3': T_BADPIV3, 'vbadgrp3': T_BADGRP3, 'vmail': T_MAIL}
+STATIC_TOK = {'vwins': T_WINS, 'vstale': T_STALE, 'vbad': T_BAD, 'vsql': T_SQL, 'vhuge': 'A' * 7000, 'vbomb': T_BOMB, 'vpgstale': T_PGSTALE, 'ggvA': T_GLIST, 'vbadpiv4': T_BADPIV4, 'vfmsave': T_FMSAVE, 'vbadpiv': T_BADPIV, 'vbadpiv2': T_BADPIV2, 'vbadgrp': T_BADGRP, 'vbadgrp2': T_BADGRP2, 'vbadpiv3': T_BADPIV3, 'vbadgrp3': T_BADGRP3, 'vmail': T_MAIL}
 STATIC_TOK['vjrn'] = T_JRN
 
-SCN = ['vcapA', 'vcapB', 'gvA', 'vgrpB', 'pvA', 'vpivB', 'pflatB', 'vwins', 'vwinsc', 'vstale', 'vbad', 'vsql', 'vhuge', 'vbomb', 'vnoid', 'vstate', 'vprompt', 'vlimit', 'vpgA', 'vpgB', 'vpgstale', 'vccA', 'vccB', 'vcchB', 'vmail', 'vthA', 'vthB', 'vshare', 'vsharenoid', 'vscrA', 'vscrB', 'vfindA', 'vfindB', 'vbadpiv', 'vbadpiv2', 'vbadpiv3', 'vbadgrp', 'vbadgrp2', 'vbadgrp3', 'vfmsave', 'vbadpiv4', 'vfitA', 'vfitB', 'vjrn']
+SCN = ['vcapA', 'vcapB', 'gvA', 'vgrpB', 'pvA', 'vpivB', 'pflatB', 'vwins', 'vwinsc', 'vstale', 'vbad', 'vsql', 'vhuge', 'vbomb', 'vnoid', 'vstate', 'vprompt', 'vlimit', 'vpgA', 'vpgB', 'vpgstale', 'vccA', 'vccB', 'vcchB', 'vmail', 'vthA', 'vthB', 'vshare', 'vsharenoid', 'vscrA', 'vscrB', 'vfindA', 'vfindB', 'vbadpiv', 'vbadpiv2', 'vbadpiv3', 'vbadgrp', 'vbadgrp2', 'vbadgrp3', 'vfmsave', 'vbadpiv4', 'vfitA', 'vfitB', 'vjrn', 'vcmpA', 'vcmpB', 'vcmpF', 'vcmpG', 'ggvA', 'ggvB', 'ggcA', 'ggcB', 'ggsA', 'ggsB', 'vcmpS', 'vcmpT']
 CHK = {
     'vcapA': ['api', 'filtered', 'sorted', 'hidden', 'frozen', 'width', 'format', 'built', 'carries', 'urlShape', 'copied', 'toast', 'noNoteWithoutLink'],
     'vcapB': ['note', 'active', 'oneQuery', 'rtSearch', 'rtShown', 'rtRows', 'rtView', 'rtSort', 'rtFrozen', 'rtWidths', 'rtFormats', 'rtLayout'],
@@ -124,6 +126,12 @@ CHK = {
     'vbadpiv': ['noScript', 'pageAlive', 'pivotShown'], 'vbadpiv3': ['noScript', 'pageAlive', 'pivotShown'], 'vbadgrp3': ['noScript', 'pageAlive', 'grouped'], 'vbadpiv2': ['noScript', 'pageAlive'], 'vbadgrp': ['noScript', 'pageAlive', 'grouped'], 'vbadgrp2': ['noScript', 'pageAlive'],
     'vfmsave': ['note', 'wysiwygFormats', 'csoRoundTrip', 'savedReportFormats', 'urlDropsView'],
     'vbadpiv4': ['noScript', 'pageAlive'],
+    'vcmpA': ['compared', 'cmpLink', 'cmpCarriesView', 'cmpDescribed', 'bannerCarriesView'], 'vcmpB': ['compared', 'cmpLink', 'cmpCarriesView', 'note', 'noStale'],
+    'vcmpF': ['compared', 'typedCarried', 'hiddenCarried', 'appliedFallback'], 'vcmpG': ['compared', 'hiddenAgain', 'filterKept', 'oneRun'],
+    'ggcA': ['compared', 'listOn', 'carriesCmpGroup'], 'ggcB': ['compared', 'listOn', 'rtGroup', 'rtGroupTop'],
+    'ggsA': ['stacked', 'carriesOpen'], 'ggsB': ['note', 'rtOpen', 'rtBoxTop', 'rtPageTop'],
+    'vcmpS': ['compared', 'stacked', 'carriesOpen'], 'vcmpT': ['compared', 'rtOpen', 'rtBoxTop'],
+    'ggvA': ['listOn', 'carriesGroup'], 'ggvB': ['listOn', 'note', 'rtGroup', 'rtGroupTop'],
     'vpgA': ['turned', 'carriesPage'], 'vpgB': ['note', 'rtPage'], 'vpgstale': ['note', 'clamped'],
     'vfitA': ['fitShares', 'carriesShares'], 'vfitB': ['note', 'sharesApplied', 'rtShares'],   # (2026-10-22)
     'vjrn': ['note', 'jrnNotMissing', 'jrnNoSkipNote', 'jrnPlaced', 'jrnCellsFollow', 'jrnHidden', 'jrnShown', 'jrnWidth'],
@@ -170,11 +178,24 @@ MUTANTS = {
     'm-forced': ([('main', "if (source !== 'url' && source !== 'stored' && source !== 'interactive')", "if (false)")], ['L-vprompt-forcedHiddenSkipped'], ['vprompt']),
     # (sweep) text that opens an HTML tag let through again
     'm-tagrule': ([('main', "if (t === 'string') return /<[A-Za-z!\/?]/.test(x) ? undefined : (x.length <= 4000 ? x : x.slice(0, 4000));", "if (t === 'string') return x.length <= 4000 ? x : x.slice(0, 4000);")],
-                  ['L-vbadpiv-noScript', 'L-vbadgrp2-noScript', 'L-vbad-tagTextRefused'], ['vbad', 'vbadpiv', 'vbadgrp2']),
+                  ['L-vbadgrp2-noScript', 'L-vbad-tagTextRefused'], ['vbad', 'vbadpiv', 'vbadgrp2']),   # (10-23: the pivot renderer escapes its labels itself since a04f658, so vbadpiv stays safe without the rule - defence in depth)
     # (sweep) the link's formats laid into the REPORT's layer again (an editor's save writes them)
     'm-fmreport': ([('main', "        _pnbViewSessEntry = _pnbViewLinkColOpts(st, v);\n", "        slot('columnFormats', v.fm);\n        slot('columnHighlights', v.hl);\n")], ['L-vfmsave-savedReportFormats'], ['vfmsave']),
     # custom sort orders read as bare lists only (their real shape is {values, preset})
     'm-csoshape': ([('main', "var vals = Array.isArray(x) ? x : (x && typeof x === 'object' && Array.isArray(x.values) ? x.values : null);", "var vals = Array.isArray(x) ? x : null;")], ['L-vfmsave-csoRoundTrip'], ['vfmsave']),
+    # (10-23) the comparison not recognised: the link captures its __SNAP_TYPE grouping and drops the comparison
+    'm-cmpbase': ([('main', "        return !!((_activeCompareSnapshot || _activeCompareAb) && $('#snapshotComparisonContainer').is(':visible'));", "        return false;")], ['L-vcmpA-cmpLink'], ['vcmpA']),
+    # the banner's Copy link without the view
+    'm-bannerview': ([('main', "        if (_bvl && _bvl.url && _bvl.cmp) built.url = _bvl.url;\n", "")], ['L-vcmpA-bannerCarriesView'], ['vcmpA']),
+    # (10-23 b) a comparison's hidden groups never captured / never re-applied; the List layout's group never restored;
+    # the comparison link reading the box only
+    'm-nosx': ([('main', "            if (sxs.length) v.sx = sxs;\n", "")], ['L-vcmpF-hiddenCarried'], ['vcmpF']),
+    'm-nosxapply': ([('main', "    function runComparisonAndDisplayGrouped(snapshot, customKeyColumns = null) {\n        _pnbViewLinkSxIntoBox();", "    function runComparisonAndDisplayGrouped(snapshot, customKeyColumns = null) {\n")], ['L-vcmpG-hiddenAgain'], ['vcmpF', 'vcmpG']),
+    'm-nogp': ([('main', "                if (vlg.gp) setTimeout(function () { _pnbViewLinkGroupTo(vlg); }, 300);\n", "")], ['L-ggvB-rtGroup'], ['ggvA', 'ggvB']),
+    'm-nofallback': ([('main', "        return _stripSnapTypeClauses(String(_flatSearchAppliedFor || '').trim());\n", "        return '';\n")], ['L-vcmpF-appliedFallback'], ['vcmpF']),
+    # (10-23 c) Stacked groups: the open set never captured / never restored
+    'm-nogo': ([('main', "            if (gst) { v.go = gst.go; if (gst.ga) v.ga = true; if (gst.gb) v.gb = gst.gb; if (gst.gt) v.gt = gst.gt; }", "            if (gst) { }")], ['L-ggsA-carriesOpen', 'L-ggsB-rtOpen'], ['ggsA', 'ggsB']),
+    'm-nostackapply': ([('main', "                else if (vlg.go || vlg.ga || vlg.gb || vlg.gt) setTimeout(function () { _pnbViewLinkStackTo(vlg); }, 300);\n", "")], ['L-vcmpT-rtOpen'], ['vcmpS', 'vcmpT']),
     # (round 3) a link's calculated columns never handed to the calc module
     'm-noccapply': ([('main', "                    window.PenumbraCalc.fromState(_pnbViewLink.cc, 'state');\n", "")], ['L-vccB-calcApplied'], ['vccA', 'vccB']),
     # the report's own calculated columns repeated in the link
@@ -201,7 +222,7 @@ MUTANTS = {
     # Find reopened at its first match, not the sender's
     'm-findat': ([('find', "go(at >= 0 ? Math.min(at, hits.length - 1) : startIndex())", "go(startIndex())")], ['L-vfindB-rtMatch', 'L-vfindB-rtCell'], ['vfindA', 'vfindB']),
     # an open Find never captured
-    'm-nofindcap': ([('main', "if (fcur && fcur.q) {", "if (false) {")], ['L-vfindA-carriesFind'], ['vfindA']),
+    'm-nofindcap': ([('main', "if (fcur && fcur.q && !cmp) {", "if (false) {")], ['L-vfindA-carriesFind'], ['vfindA']),
     # (round 7) the Email dialog's Copy link does nothing
     'm-emailcopy': ([('main', "    $(document).on('click', '#emailCopyViewLink', function (e) {", "    $(document).on('click', '#emailCopyViewLinkX', function (e) {")], ['L-vmail-copyWithoutSending'], ['vmail']),
     'm-nopage': ([('main', "            currentPage = _pnbViewLink.pg;\n", "")], ['L-vpgB-rtPage', 'L-vpgstale-clamped'], ['vpgA', 'vpgB', 'vpgstale']),
@@ -235,7 +256,9 @@ def hook(src):
     anchor = '$(document).ready(function () {'
     i = src.find(anchor)
     if i < 0 or i > 400: raise SystemExit('closure anchor not found')
-    out = src[:i] + ';(function () {\r\n' + src[i + len(anchor):]
+    # (10-23) the comparison entry point and the compressor, for the vcmp* scenarios (cmpfoot's way)
+    exp = ('try { window.__VL = {}; ["runComparisonAndDisplayGrouped", "compressString"].forEach(function (n) { try { window.__VL[n] = eval(n); } catch (e) { } }); } catch (e) { }\r\n')
+    out = src[:i] + ';(function () {\r\n' + exp + src[i + len(anchor):]
     j = out.rfind('});')
     out = out[:j] + '})();' + out[j + 3:]
     hl = '    function hideLoading() {'
@@ -312,7 +335,7 @@ def write_stage(texts):
 def same(a, b): return json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True)
 def run_browser(scns):
     out, res = [], {}
-    pairs = {'vfitB': 'vfitA', 'vscrB': 'vscrA', 'vfindB': 'vfindA', 'vthB': 'vthA', 'vccB': 'vccA', 'vpgB': 'vpgA', 'vcapB': 'vcapA', 'vgrpB': 'gvA', 'vpivB': 'pvA', 'pflatB': 'vcapA'}
+    pairs = {'vcmpT': 'vcmpS', 'ggsB': 'ggsA', 'ggcB': 'ggcA', 'ggvB': 'ggvA', 'vfitB': 'vfitA', 'vscrB': 'vscrA', 'vfindB': 'vfindA', 'vthB': 'vthA', 'vccB': 'vccA', 'vpgB': 'vpgA', 'vcapB': 'vcapA', 'vgrpB': 'gvA', 'vpivB': 'pvA', 'pflatB': 'vcapA'}
     for s in scns:
         token = STATIC_TOK.get(s)
         if s in pairs:
@@ -320,6 +343,21 @@ def run_browser(scns):
             token = (a.get('info') or {}).get('token') or 'none'
         if s == 'vcchB': token = ((res.get('vccA') or {}).get('info') or {}).get('halfToken') or 'none'
         path = url_for(s, token)
+        if s == 'vcmpG':   # vcmpF's link after the group was hidden (its snapcmp= stripped: the comparison is run directly)
+            pg_ = re.sub(r'&snapcmp=[^&]*', '', ((res.get('vcmpF') or {}).get('info') or {}).get('path') or '')
+            path = pg_.replace('harness.html?', 'harness.html?scn=vcmpG&', 1) if pg_ else url_for(s, None)
+        if s == 'vcmpT':
+            pt_ = re.sub(r'&snapcmp=[^&]*', '', ((res.get('vcmpS') or {}).get('info') or {}).get('path') or '')
+            path = pt_.replace('harness.html?', 'harness.html?scn=vcmpT&', 1) if pt_ else url_for(s, None)
+        if s == 'ggcB':
+            pc_ = re.sub(r'&snapcmp=[^&]*', '', ((res.get('ggcA') or {}).get('info') or {}).get('path') or '')
+            path = pc_.replace('harness.html?', 'harness.html?scn=ggcB&', 1) if pc_ else url_for(s, None)
+        if s == 'vcmpB':   # the link the comparison page built, opened as it is (its own snapcmp= and view=)
+            pa = ((res.get('vcmpA') or {}).get('info') or {}).get('path') or ''
+            # (the harness cannot boot a ?snapcmp= page - the comparison is run directly, as on A - so the
+            # link opens without its snapcmp= and the page then runs the same comparison)
+            pa = re.sub(r'&snapcmp=[^&]*', '', pa)
+            path = (pa.replace('harness.html?', 'harness.html?scn=vcmpB&', 1) if pa else url_for(s, None))
         if s == 'vbad': path += '&expect_s=' + quote(BAD_S, safe='')
         r = run_page(path); res[s] = r
         if r.get('fatal'):
@@ -347,6 +385,13 @@ def run_browser(scns):
                 chk['rtMatch'] = ai.get('fcur') is not None and ai.get('fcur') == info.get('fcur')
                 ac, bc = ai.get('cell') or {}, info.get('cell') or {}
                 chk['rtCell'] = bool(ac.get('id')) and ac.get('id') == bc.get('id') and ac.get('col') == bc.get('col')
+            if s in ('ggsB', 'vcmpT'):
+                chk['rtOpen'] = bool(ai.get('open')) and ai.get('open') == info.get('open')
+                chk['rtBoxTop'] = bool(ai.get('top')) and ai.get('top') == info.get('top')
+                if s == 'ggsB': chk['rtPageTop'] = bool(ai.get('page')) and ai.get('page') == info.get('page')
+            if s == 'ggcB' or s == 'ggvB':
+                chk['rtGroup'] = bool(ai.get('sel')) and ai.get('sel') == info.get('sel')
+                chk['rtGroupTop'] = bool(ai.get('top')) and ai.get('top') == info.get('top')
             if s == 'vpgB': chk['rtPage'] = bool(ad.get('page')) and ad.get('page') == bd.get('page') and ad.get('rows') == bd.get('rows')
             if s == 'vfitB': chk['rtShares'] = bool(av.get('w')) and same(av.get('w'), bv.get('w'))
             if s in ('vcapB', 'vgrpB', 'vpivB', 'vccB', 'vthB'): chk['rtView'] = bool(av) and same(av, bv)

@@ -245,7 +245,7 @@
     // every entry's control or function exists here (or is a control this harness has not got)
     var ABSENT = ['pivot', 'viz', 'download', 'dl-xls', 'dl-pdf', 'dl-print', 'dl-csv', 'dl-tsv', 'dl-json', 'email', 'snapshots', 'journal', 'subscribe', 'settings', 'header', 'find', 'nextpage', 'prevpage', 'clearfilter', 'builder',
                   'taggen', 'managedata', 'formatsql', 'rowlimit', 'wordwrap', 'editorheight', 'tablelist', 'sharestate', 'popout', 'stopquery', 'firstpage', 'lastpage', 'scrollleft', 'scrollright', 'exitpivot', 'expandgroups', 'collapsegroups', 'restoregroup', 'restorepivot', 'asofexit', 'profile', 'rowscard', 'datacard', 'loadcard',
-                  'dictionary', 'gendict'];   // (round 23) index.php's own controls this harness has not got; (2026-10-22) js/penumbra_dict.js is not loaded here (the dict suite tests both rows)
+                  'dictionary', 'gendict', 'cmpevergreen'];   /* (2026-10-23) cmpevergreen: no Snapshots button here (pcmplink puts one in) */   // (round 23) index.php's own controls this harness has not got; (2026-10-22) js/penumbra_dict.js is not loaded here (the dict suite tests both rows)
     var reg = pal('registry')(), bad = reg.filter(function (e) { return !e.needs && ABSENT.indexOf(e.id) < 0; }).map(function (e) { return e.id; });
     R.info.regBad = bad; R.info.regN = reg.length;
     R.chk.registryNeeds = reg.length >= 40 && bad.length === 0;
@@ -451,6 +451,41 @@
     R.info.after = JSON.stringify(u2);
     R.chk.resetWidthRuns = !!R.chk.fitPageRuns && !!R.chk.resetWidthPick && !box() && u2.V_NAME === undefined && left.length === shown - 1;
     if (box()) { key('Escape', { target: input() }); await sleep(30); }
+  };
+  // ---------------------------------------------------------------- pcmplink (2026-10-23, lnk40; the user: "copy evergreen link is not in the command palette")
+  // The comparison banner's Copy evergreen link as a row: greyed with the banner's own rule while the banner does not
+  // show the button (a comparison with live data against a server snapshot), available when it does, and picking it
+  // clicks the button. This harness has no Snapshots button and no comparison banner: the scenario puts a stand-in of each.
+  S.pcmplink = async function () {
+    await boot(); await ready();
+    if (!document.getElementById('snapshotBtn')) { var sb = document.createElement('button'); sb.id = 'snapshotBtn'; sb.type = 'button'; sb.textContent = 'Snapshots'; document.body.appendChild(sb); }
+    var dock = document.getElementById('snapAnalysisDock');
+    if (!dock) { dock = document.createElement('div'); dock.id = 'snapAnalysisDock'; document.body.appendChild(dock); }
+    var ev = document.createElement('button'); ev.type = 'button'; ev.className = 'snap-banner-link-evergreen'; ev.style.display = 'none'; ev.textContent = 'Copy evergreen link';
+    // the page's own handler is a jQuery one delegated on the document (main.js), and the palette clicks through jQuery's
+    // trigger: counted the same way (a native listener on the button does not see that click here)
+    var clicks = 0, onEver = function () { clicks++; }; if (window.jQuery) window.jQuery(document).on('click', '.snap-banner-link-evergreen', onEver);
+    dock.appendChild(ev);
+    var LABEL = 'Copy an evergreen link to this comparison';
+    await open('copy evergreen link');
+    var r0 = row(LABEL);
+    R.info.off = r0 ? [r0.section, r0.off, r0.why] : rows().slice(0, 4).map(function (r) { return [r.section, r.text]; });
+    R.chk.everOff = !!r0 && !!r0.off && /server snapshot/.test(String(r0.why || ''));
+    if (box()) { key('Escape', { target: input() }); await sleep(30); }
+    ev.style.display = '';
+    await open('copy evergreen link');
+    var r1 = row(LABEL);
+    R.info.on = r1 ? [r1.section, r1.off, r1.why] : null;
+    R.chk.everOn = !!r1 && !r1.off;
+    var picked = !!r1 && !r1.off && await pickRow(LABEL);
+    R.info.picked = picked; R.info.sel = selRow().text || null;
+    if (picked) { await enter(); }
+    await sleep(200);
+    R.info.clicks = clicks;
+    R.chk.everRuns = picked && clicks === 1 && !box();
+    if (box()) { key('Escape', { target: input() }); await sleep(30); }
+    if (window.jQuery) window.jQuery(document).off('click', '.snap-banner-link-evergreen', onEver);
+    ev.remove();
   };
   // ---------------------------------------------------------------- pview
   S.pview = async function () {
@@ -1285,6 +1320,7 @@
       if (o && String(o.url || '').indexOf('ai_assist') >= 0) {
         var req = { aborted: false, done: false, abort: function () { this.aborted = true; }, body: o.data };
         jipReqs.push(req);
+        if (window.__jipSyncFail) { req.done = true; if (o.error) { o.error({ status: 500, responseText: '{"message":"The AI service refused at once"}' }, 'error'); } return req; }   // (jaredge) a failure handed back inside the call
         setTimeout(function () { if (req.aborted) { return; } req.done = true; if (o.success) { o.success(window.__jipReplyOverride || jipReply); } }, jipDelay);
         req.done = false; req.fail = function () { return req; }; req.always = function () { return req; };
         return req;
@@ -1309,11 +1345,17 @@
     var waiting = aiBox() && aiBox().querySelector('.pnb-pal-ai-wait');
     R.info.inplace = [picked, !!box(), !!waiting, adminBefore, document.body.classList.contains('admin-view'), panelBefore, $('#aiAssistPanel').is(':visible'), jipReqs.length];
     R.chk.inPlace = picked && !!box() && !!waiting && document.body.classList.contains('admin-view') === adminBefore && $('#aiAssistPanel').is(':visible') === panelBefore && jipReqs.length === 1;
+    // (jaredge) the Jarvis view: the input names no option the list swap removed (absent, or an element in the box)
+    var jeActive = function () { var a = input() ? input().getAttribute('aria-activedescendant') : 'no input'; return [a, a === null || !!(box() && box().querySelector('[id="' + a + '"]'))]; };
+    var activeWait = jeActive();
     await until(function () { return !!(aiBox() && aiBox().querySelector('.pnb-pal-ai-answer')); }, 4000); await sleep(400);
     var ans = aiBox() ? aiBox().querySelector('.pnb-pal-ai-answer') : null, chips = ans ? ans.querySelectorAll('.ai-action-chip') : [];
     R.info.answer = [ans ? ans.textContent.replace(/\s+/g, ' ').slice(0, 120) : null, chips.length, !!(aiBox() && aiBox().querySelector('[data-ai="continue"]')), !!(aiBox() && aiBox().querySelector('[data-ai="copy"]'))];
     R.chk.answerRenders = !!ans && /Group the rows by their status/.test(ans.textContent) && ans.textContent.indexOf('penumbra-actions') < 0 && !!aiBox().querySelector('[data-ai="continue"]') && !!aiBox().querySelector('[data-ai="copy"]');
     R.chk.answerChips = chips.length >= 3 && chips.length <= 4 && Array.prototype.some.call(chips, function (c) { return /^Group by V_STATUS as List/.test(c.textContent.trim()); });
+    var activeDone = jeActive();
+    R.info.active = [activeWait, activeDone];
+    R.chk.noStaleActive = picked && !!waiting && activeWait[1] && !!ans && activeDone[1];
     // 2. a chip runs its action and closes the box
     var gc = Array.prototype.filter.call(chips, function (c) { return /^Group by V_STATUS as List/.test(c.textContent.trim()); })[0];
     if (gc) { gc.click(); } await sleep(700);
@@ -1352,6 +1394,57 @@
     var usersNow = Array.prototype.map.call(document.querySelectorAll('#aiChatMessages .ai-msg.user'), function (m) { return m.textContent.trim(); });
     R.info.late = [jipReqs.length, jipReqs[0] ? jipReqs[0].aborted : null, usersNow.slice(-2)];
     R.chk.lateLands = picked && jipReqs.length === 1 && jipReqs[0].aborted === false && usersNow.indexOf('a late answer') >= 0 && document.querySelectorAll('#aiChatMessages .ai-msg.user').length === before + 1;
+    // (jaredge, 2026-10-23) 7. the Esc chip while waiting cancels as the Esc key does: aborted, nothing recorded, the box gone
+    var jeUsers = function (t) { return Array.prototype.filter.call(document.querySelectorAll('#aiChatMessages .ai-msg.user'), function (m) { return t === undefined || m.textContent.trim() === t; }).length; };
+    before = jeUsers(); jipReqs.length = 0;
+    await open('a question for the chip'); picked = await pickRow('Ask Jarvis:'); if (picked) { await enter(); } await sleep(150);
+    var escChip = box() ? box().querySelector('.pnb-pal-esc') : null, chipWaited = !!(aiBox() && aiBox().querySelector('.pnb-pal-ai-wait'));
+    if (escChip) { escChip.click(); } await sleep(1300);
+    R.info.chip = [picked, chipWaited, !!escChip, !!box(), jipReqs.length, jipReqs[0] ? jipReqs[0].aborted : null, jeUsers() - before];
+    R.chk.escChipCancels = picked && chipWaited && !!escChip && !box() && jipReqs.length === 1 && jipReqs[0].aborted === true && jeUsers() === before;
+    // 8. Backspace on the emptied input while waiting: back to the list, the question dropped (aborted, nothing recorded)
+    before = jeUsers(); jipReqs.length = 0;
+    await open('a question to back out of'); picked = await pickRow('Ask Jarvis:'); if (picked) { await enter(); } await sleep(150);
+    var backFrom = modeOf();
+    type(''); await sleep(40); key('Backspace', { target: input() }); await sleep(1300);
+    R.info.back = [picked, backFrom, modeOf(), !!box(), rows().length, jipReqs.length, jipReqs[0] ? jipReqs[0].aborted : null, jeUsers() - before];
+    R.chk.backCancels = picked && backFrom === 'jarvis' && !!box() && modeOf() === 'root' && rows().length > 0 && jipReqs.length === 1 && jipReqs[0].aborted === true && jeUsers() === before;
+    key('Escape', { target: input() }); await sleep(100);
+    // 9. one question at a time: a question left running by a close that is not Esc (Ctrl+K again), the box opened again; another
+    // mode's Backspace leaves it running; asked again, nothing is sent beside it: the box shows that one waiting and says so, then
+    // its answer lands in the box, once in the panel, the second question never
+    var Q1 = 'the first of two questions', Q2 = 'and a second question';
+    jipReqs.length = 0; jipDelay = 2500;
+    await open(Q1); picked = await pickRow('Ask Jarvis:'); if (picked) { await enter(); } await sleep(100);
+    ctrlK(); await sleep(100);
+    var leftRunning = !box() && jipReqs.length === 1 && jipReqs[0].aborted === false;
+    await open('v_name'); var colPicked = await pickRow('V_NAME', 'Columns'); if (colPicked) { await enter(); }
+    var inCol = modeOf() === 'col';
+    key('Backspace', { target: input() }); await sleep(30);
+    R.info.other = [picked, leftRunning, colPicked, inCol, modeOf(), jipReqs.length, jipReqs[0] ? jipReqs[0].aborted : null];
+    R.chk.backKeepsOther = picked && leftRunning && inCol && modeOf() === 'root' && jipReqs.length === 1 && jipReqs[0].aborted === false;
+    type(Q2); await sleep(60); var picked2 = await pickRow('Ask Jarvis:'); if (picked2) { await enter(); } await sleep(100);
+    var qEl = aiBox() ? aiBox().querySelector('.pnb-pal-ai-q') : null, stillWait = !!(aiBox() && aiBox().querySelector('.pnb-pal-ai-wait'));
+    R.info.one = [picked2, modeOf(), jipReqs.length, qEl ? qEl.textContent : null, stillWait, statusText()];
+    R.chk.oneAtATime = leftRunning && picked2 && modeOf() === 'jarvis' && jipReqs.length === 1 && !!qEl && qEl.textContent === Q1 && stillWait;
+    R.chk.stillSaid = R.chk.oneAtATime && statusText() === 'Jarvis is still answering your last question. Esc cancels it.';
+    await until(function () { return !!(aiBox() && aiBox().querySelector('.pnb-pal-ai-answer')); }, 6000); await sleep(1500);
+    qEl = aiBox() ? aiBox().querySelector('.pnb-pal-ai-q') : null;
+    R.info.stillLands = [!!box(), qEl ? qEl.textContent : null, !!(aiBox() && aiBox().querySelector('.pnb-pal-ai-answer')), jeUsers(Q1), jeUsers(Q2), jipReqs.length];
+    R.chk.stillLands = R.chk.oneAtATime && !!qEl && qEl.textContent === Q1 && !!aiBox().querySelector('.pnb-pal-ai-answer') && jeUsers(Q1) === 1 && jeUsers(Q2) === 0;
+    key('Escape', { target: input() }); await sleep(100);
+    // 10. a failure handed back inside the call (the request never left) settles the ask: the box closed by Ctrl+K and asked again,
+    // the next question is sent (not held behind the failed one)
+    jipReqs.length = 0; jipDelay = 700; window.__jipSyncFail = true;
+    await open('a question that fails at once'); picked = await pickRow('Ask Jarvis:'); if (picked) { await enter(); } await sleep(100);
+    var syncErr = aiBox() ? aiBox().querySelector('.pnb-pal-ai-err') : null, syncErrText = syncErr ? syncErr.textContent : null;
+    window.__jipSyncFail = false; ctrlK(); await sleep(100);
+    await open('and asked again'); var picked3 = await pickRow('Ask Jarvis:'); if (picked3) { await enter(); } await sleep(100);
+    var q3 = aiBox() ? aiBox().querySelector('.pnb-pal-ai-q') : null;
+    R.info.syncFail = [picked, syncErrText, picked3, jipReqs.length, q3 ? q3.textContent : null, modeOf()];
+    R.chk.syncFailAsksAgain = picked && !!syncErr && picked3 && jipReqs.length === 2 && !!q3 && q3.textContent === 'and asked again';
+    await until(function () { return !!(aiBox() && aiBox().querySelector('.pnb-pal-ai-answer')); }, 4000);
+    key('Escape', { target: input() }); await sleep(100);
     thL.style.display = ''; jipAjaxOff();
     penumbra_vars.isAdmin = was.a; penumbra_vars.isGlobalAdmin = was.g; penumbra_vars.aiAllowed = was.ai; penumbra_vars.aiProxyUrl = was.u;
     history.replaceState(null, '', window.location.pathname + '?scn=pjip');
@@ -1368,6 +1461,245 @@
     var ok = await open('How should I look at the open ones?'); var picked = await pickRow('Ask Jarvis:'); if (picked) { await enter(); }
     await until(function () { return !!(aiBox() && aiBox().querySelector('.pnb-pal-ai-answer')); }, 4000); await sleep(400);
     R.chk.open = ok && picked && !!box() && !!(aiBox() && aiBox().querySelector('.ai-action-chip'));
+  };
+
+  // ---------------------------------------------------------------- pjbusy / pjbusyrm / pshotjb (jarbusy, 2026-10-23)
+  // the user: "when the command palette is asking Jarvis/AI there should be a visible loading animation that grabs the users
+  // attention". Asked through pjip's stand-in (an abortable $.ajax answering after jipDelay): the busy card stands where the
+  // answer will land, in view (a long pasted question on a 600px-tall window: run.py emulates it), and moves (the bar slides,
+  // the dots bounce, the lines shimmer); it is said once, through the footer's status span (the box's one live region), the
+  // answer's place aria-busy meanwhile; an answer, an error, Esc (aborted) and a close that is not Esc (the request left
+  // alive) each end it; its words and marks read AA in every theme of the registry (text 4.5:1, the moving marks 3:1), no text
+  // faded by opacity; the error line that can replace it too. pjbusyrm: the same card under prefers-reduced-motion (run.py
+  // emulates it): nothing moves, and it is still plainly busy (the words, a full bar, solid dots) in every theme.
+  var JB_SAID = 'Jarvis is thinking. Esc cancels.';
+  function busyCard() { var a = aiBox(); return a ? a.querySelector('.pnb-pal-ai-busy') : null; }
+  function busyAnims() {   // the busy card's running CSS animations (an element taken out of the page loses its own)
+    if (typeof document.getAnimations !== 'function') { return []; }
+    return document.getAnimations().filter(function (an) {
+      var t = an.effect && an.effect.target;
+      return !!(t && t.isConnected && t.closest && t.closest('.pnb-pal-ai-busy')) && an.playState === 'running';
+    });
+  }
+  function jbAnimsAlive() {   // any animation of the card's keyframes still alive anywhere in the page
+    if (typeof document.getAnimations !== 'function') { return 0; }
+    return document.getAnimations().filter(function (an) { return /^pnbPalAi/.test(an.animationName || '') && an.playState !== 'finished' && an.playState !== 'idle'; }).length;
+  }
+  function liveRegions(root) { return root ? root.querySelectorAll('[aria-live], [role="status"], [role="alert"], [role="log"]').length : -1; }
+  function statusText() { var s = box() ? box().querySelector('.pnb-pal-status') : null; return s ? s.textContent : null; }
+  function rgbaOf(s) {   // rgb() / rgba() / color(srgb r g b / a), as getComputedStyle gives them -> [r, g, b (0-255), a (0-1)]
+    s = String(s || '').trim();
+    var m = /^rgba?\(\s*([^)]*)\)$/.exec(s);
+    if (m) { var p = m[1].split(/[\s,\/]+/).filter(Boolean).map(parseFloat); return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1]; }
+    m = /^color\(srgb\s+([^)]*)\)$/.exec(s);
+    if (m) { var q = m[1].split(/[\s\/]+/).filter(Boolean).map(parseFloat); return [q[0] * 255, q[1] * 255, q[2] * 255, q.length > 3 ? q[3] : 1]; }
+    return null;
+  }
+  function over(top, under) { var a = top[3]; return [0, 1, 2].map(function (k) { return top[k] * a + under[k] * (1 - a); }).concat([1]); }
+  function bgUnder(el) {   // the opaque colour behind el: its own background and its ancestors', blended down from the first opaque one
+    var layers = [], n;
+    for (n = el; n && n.nodeType === 1; n = n.parentElement) {
+      var c = rgbaOf(getComputedStyle(n).backgroundColor);
+      if (c && c[3] > 0) { layers.push(c); if (c[3] >= 1) { break; } }
+    }
+    var out = [255, 255, 255, 1], i;
+    for (i = layers.length - 1; i >= 0; i--) { out = over(layers[i], out); }
+    return out;
+  }
+  function lum(c) { var f = function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); }
+  function ratio(a, b) { var x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+  function textRatio(el) { if (!el) { return 0; } var bg = bgUnder(el), fg = rgbaOf(getComputedStyle(el).color); return fg ? ratio(over(fg, bg), bg) : 0; }
+  function fillRatio(el, behind) { if (!el || !behind) { return 0; } var fg = rgbaOf(getComputedStyle(el).backgroundColor), bg = bgUnder(behind); return fg ? ratio(over(fg, bg), bg) : 0; }
+  function faded(el, stop) { for (var n = el; n && n !== stop; n = n.parentElement) { if (parseFloat(getComputedStyle(n).opacity) < 1) { return true; } } return !el; }
+  var jbReg = null;
+  function themeRegistry() {   // run.py's theme_reg.json: every theme (id, isDark) and the variable blocks index.php emits after the stylesheets
+    if (!jbReg) {
+      try { var x = new XMLHttpRequest(); x.open('GET', 'theme_reg.json', false); x.send(); jbReg = JSON.parse(x.responseText); } catch (e) { jbReg = { css: '', themes: [] }; }
+      if (jbReg.css && !document.getElementById('penumbra-theme-vars')) { var st = document.createElement('style'); st.id = 'penumbra-theme-vars'; st.textContent = jbReg.css; document.head.appendChild(st); }
+    }
+    return jbReg;
+  }
+  function jbTheme(t) {   // main.js applyTheme's classes: the theme's own (none for Default Light), data-theme, is-dark
+    Array.prototype.slice.call(document.body.classList).forEach(function (c) { if (/^theme-/.test(c)) { document.body.classList.remove(c); } });
+    if (t.id !== 'theme-default') { document.body.classList.add(t.id); }
+    document.body.setAttribute('data-theme', t.id);
+    document.body.classList.toggle('is-dark', !!t.isDark);
+  }
+  function jbSetup() {
+    var was = { a: penumbra_vars.isAdmin, g: penumbra_vars.isGlobalAdmin, ai: penumbra_vars.aiAllowed, u: penumbra_vars.aiProxyUrl, d: jipDelay, cls: document.body.className, dt: document.body.getAttribute('data-theme') };
+    penumbra_vars.aiProxyUrl = 'ai_assist_chips.json'; penumbra_vars.aiAllowed = true; penumbra_vars.isAdmin = true; penumbra_vars.isGlobalAdmin = true;
+    jipAjaxOn(); jipReqs.length = 0;
+    return was;
+  }
+  function jbRestore(was) {
+    window.__jipReplyOverride = null; jipDelay = was.d; jipAjaxOff();
+    penumbra_vars.isAdmin = was.a; penumbra_vars.isGlobalAdmin = was.g; penumbra_vars.aiAllowed = was.ai; penumbra_vars.aiProxyUrl = was.u;
+    document.body.className = was.cls; if (was.dt === null) { document.body.removeAttribute('data-theme'); } else { document.body.setAttribute('data-theme', was.dt); }
+  }
+  async function jbAsk(text) {   // open, the Ask Jarvis row, Enter: true when the row ran
+    var ok = await open(text); var picked = ok && await pickRow('Ask Jarvis:');
+    if (picked) { key('Enter', { target: input() }); }
+    await sleep(60);
+    return !!picked;
+  }
+  function jbThemes(measure) {   // measure(theme) in every theme of the registry -> { n, bad: [...], worst: {...} }
+    var reg = themeRegistry(), out = { n: 0, bad: [], worst: {} };
+    reg.themes.forEach(function (t) {
+      jbTheme(t);
+      var r = measure(t);
+      Object.keys(r).forEach(function (k) {
+        var need = r[k][1], v = r[k][0];
+        if (!(v >= need)) { out.bad.push(t.id + ' ' + k + ' ' + (Math.round(v * 100) / 100)); }
+        if (!(k in out.worst) || v < out.worst[k][0]) { out.worst[k] = [Math.round(v * 100) / 100, t.id]; }
+      });
+      out.n++;
+    });
+    return out;
+  }
+  S.pjbusy = async function () {
+    await boot(); await ready();
+    history.replaceState(null, '', window.location.pathname + '?scn=pjbusy&id=zzconf');
+    var was = jbSetup(); jipDelay = 1500;
+    // 1. a long pasted question (the card pushed under the fold of a 600px-tall window): Enter shows the busy card at once, where
+    // the answer will land and in view, large, with its words and the cancel hint; it moves; it is said once (a key typed while it
+    // waits says nothing again) through the box's one live region; the answer's place is aria-busy
+    var LONG = 'explain this query and why it is slow: SELECT ' + new Array(70).join('a.award_amount_to_date, a.sponsor_name, ') + 'a.fy FROM awards a WHERE a.fy = 2026';
+    var picked = await jbAsk(LONG);
+    var c = busyCard(), body = box() ? box().querySelector('.pnb-pal-body') : null, cr = c ? c.getBoundingClientRect() : null, br = body ? body.getBoundingClientRect() : null;
+    var lab = c ? c.querySelector('.pnb-pal-ai-busytext') : null, hint = c ? c.querySelector('.pnb-pal-ai-hint') : null, dots = c ? c.querySelectorAll('.pnb-pal-ai-dots i') : [];
+    var bar = c ? c.querySelector('.pnb-pal-ai-bar') : null, run = bar ? bar.querySelector('i') : null, skel = c ? c.querySelectorAll('.pnb-pal-ai-skel i') : [];
+    R.info.shown = [picked, !!c, cr && [Math.round(cr.top), Math.round(cr.bottom), Math.round(cr.width), Math.round(cr.height)], br && [Math.round(br.top), Math.round(br.bottom), Math.round(br.width)], body ? [body.scrollTop, body.scrollHeight, body.clientHeight] : null,
+                    lab ? lab.textContent : null, hint ? hint.textContent : null, dots.length, bar ? bar.getBoundingClientRect().height : null, window.innerHeight];
+    R.chk.busyShown = picked && !!c && !!c.closest('.pnb-pal-ai-wait') && !!lab && lab.textContent === 'Jarvis is thinking' && !!hint && hint.textContent.replace(/\s+/g, ' ').trim() === 'Esc cancels'
+      && cr.height >= 60 && cr.width >= 0.6 * br.width && dots.length === 3 && dots[0].offsetWidth >= 7 && !!bar && bar.getBoundingClientRect().height >= 3
+      && Math.abs(bar.getBoundingClientRect().width - cr.width) <= 2 && skel.length >= 2 && parseInt(getComputedStyle(lab).fontWeight, 10) >= 600;
+    R.chk.busyInView = !!c && !!br && body.scrollHeight > body.clientHeight && cr.top >= br.top - 1 && cr.bottom <= br.bottom + 1;
+    var names = busyAnims().map(function (a) { return a.animationName; });
+    var x0 = run ? run.getBoundingClientRect().left : null, tf0 = run ? getComputedStyle(run).transform : null;
+    await sleep(260);
+    var x1 = run ? run.getBoundingClientRect().left : null, tf1 = run ? getComputedStyle(run).transform : null;
+    function count(nm) { return names.filter(function (n) { return n === nm; }).length; }
+    R.info.moves = [names, x0, x1, tf0, tf1, !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches)];
+    R.chk.busyMoves = !!c && count('pnbPalAiBar') === 1 && count('pnbPalAiDot') === 3 && count('pnbPalAiShimmer') === skel.length && (x0 !== x1 || tf0 !== tf1);
+    var said = statusText(), regBox = liveRegions(box()), regAi = liveRegions(aiBox()), stEl = box() ? box().querySelector('.pnb-pal-status') : null, muts = 0;
+    var mo = new MutationObserver(function (l) { muts += l.length; }); if (stEl) { mo.observe(stEl, { childList: true, characterData: true, subtree: true }); }
+    type(LONG + ' '); await sleep(40); type(LONG); await sleep(40);   // two keys typed while it waits: the box renders again
+    mo.disconnect();
+    R.info.said = [said, stEl ? stEl.getAttribute('aria-live') : null, regBox, regAi, muts, !!busyCard()];
+    R.chk.busySaidOnce = said === JB_SAID && !!stEl && stEl.getAttribute('aria-live') === 'polite' && regBox === 1 && regAi === 0 && muts === 0 && !!busyCard();
+    R.chk.busyMarked = !!aiBox() && aiBox().getAttribute('aria-busy') === 'true' && !!busyCard();
+    var shown1 = !!c;
+    await until(function () { return !!(aiBox() && aiBox().querySelector('.pnb-pal-ai-answer')); }, 6000); await sleep(120);
+    R.info.answer = [shown1, !!busyCard(), busyAnims().length, jbAnimsAlive(), aiBox() ? aiBox().getAttribute('aria-busy') : 'no box', statusText()];
+    R.chk.busyEndsOnAnswer = shown1 && !!(aiBox() && aiBox().querySelector('.pnb-pal-ai-answer')) && !busyCard() && jbAnimsAlive() === 0 && aiBox().getAttribute('aria-busy') === null && statusText() === 'answered';
+    // 2. an error ends it: the error line in its place (a live alert, as before), nothing left moving, not busy any more
+    window.__jipReplyOverride = { status: 'error', message: 'Too many requests right now' }; jipDelay = 700;
+    picked = await jbAsk('why does this report run slowly?'); var shown2 = !!busyCard() && busyAnims().length > 0;
+    await until(function () { return !!(aiBox() && aiBox().querySelector('.pnb-pal-ai-err')); }, 5000); await sleep(120);
+    var err = aiBox() ? aiBox().querySelector('.pnb-pal-ai-err') : null;
+    R.info.error = [picked, shown2, err ? err.textContent : null, !!busyCard(), jbAnimsAlive(), aiBox() ? aiBox().getAttribute('aria-busy') : 'no box', statusText()];
+    R.chk.busyEndsOnError = shown2 && !!err && /Too many requests right now/.test(err.textContent) && !busyCard() && jbAnimsAlive() === 0 && aiBox().getAttribute('aria-busy') === null && statusText() !== JB_SAID;
+    // the error line that replaced it reads 4.5:1 in every theme (its colour was a token no theme defines: a dark red on the dark themes)
+    var ev = err ? jbThemes(function () { return { error: [textRatio(aiBox().querySelector('.pnb-pal-ai-err')), 4.5] }; }) : { n: 0, bad: ['no error line'], worst: {} };
+    document.body.className = was.cls;
+    R.info.errorThemes = [ev.n, ev.bad.slice(0, 8), ev.worst];
+    R.chk.errorReadable = shown2 && ev.n >= 18 && !ev.bad.length;
+    window.__jipReplyOverride = null;
+    // 3. Esc while it waits: the request aborted, the box gone and nothing of the card left running
+    jipReqs.length = 0; jipDelay = 5000;
+    picked = await jbAsk('a question to cancel?'); var shown3 = !!busyCard() && busyAnims().length > 0;
+    key('Escape', { target: input() }); await sleep(150);
+    R.info.cancel = [picked, shown3, !!box(), !!document.querySelector('.pnb-pal-ai-busy'), jbAnimsAlive(), jipReqs.length, jipReqs[0] ? jipReqs[0].aborted : null];
+    R.chk.busyEndsOnCancel = shown3 && !box() && !document.querySelector('.pnb-pal-ai-busy') && jbAnimsAlive() === 0 && jipReqs.length === 1 && jipReqs[0].aborted === true;
+    // 4. a close that is not Esc (Ctrl+K again; the Esc chip cancels as the key does since jaredge): the box goes and the card with it;
+    // the request lives on (its answer lands in the panel)
+    jipReqs.length = 0; jipDelay = 900;
+    picked = await jbAsk('a question to leave running?'); var shown4 = !!busyCard() && busyAnims().length > 0;
+    var toggled = ctrlK(); await sleep(150);
+    R.info.close = [picked, shown4, toggled, !!box(), !!document.querySelector('.pnb-pal-ai-busy'), jbAnimsAlive(), jipReqs.length, jipReqs[0] ? jipReqs[0].aborted : null];
+    R.chk.busyEndsOnClose = shown4 && !box() && !document.querySelector('.pnb-pal-ai-busy') && jbAnimsAlive() === 0 && jipReqs.length === 1 && jipReqs[0].aborted === false;
+    await sleep(1100);   // (the late answer lands in the panel's history, nothing in the page)
+    // 5. every theme of the registry while it waits: the words 4.5:1 on the card, the hint and its Esc key 4.5:1, the dots and the
+    // bar's runner 3:1 on what is behind them; no text faded by opacity
+    jipDelay = 60000; jipReqs.length = 0;
+    picked = await jbAsk('how do I total the awards by sponsor?');
+    var tv = busyCard() ? jbThemes(function () {
+      var cc = busyCard(), h = cc.querySelector('.pnb-pal-ai-hint'), b = cc.querySelector('.pnb-pal-ai-bar');
+      return { label: [textRatio(cc.querySelector('.pnb-pal-ai-busytext')), 4.5], hint: [textRatio(h), 4.5], escKey: [textRatio(h && h.querySelector('.pnb-pal-kbd')), 4.5],
+               dot: [fillRatio(cc.querySelector('.pnb-pal-ai-dots i'), cc), 3], bar: [fillRatio(b && b.querySelector('i'), b), 3] };
+    }) : { n: 0, bad: ['no card'], worst: {} };
+    document.body.className = was.cls;
+    R.info.themes = [picked, tv.n, tv.bad.slice(0, 12), tv.worst];
+    R.chk.busyThemes = picked && tv.n >= 18 && !tv.bad.length;
+    var cf = busyCard(), fadedOnes = cf ? ['.pnb-pal-ai-busytext', '.pnb-pal-ai-hint', '.pnb-pal-ai-hint .pnb-pal-kbd'].filter(function (s) { return faded(cf.querySelector(s), box()); }) : ['no card'];
+    R.info.faded = fadedOnes;
+    R.chk.busyNoFade = !!cf && !fadedOnes.length;
+    key('Escape', { target: input() }); await sleep(100);
+    jbRestore(was);
+    history.replaceState(null, '', window.location.pathname + '?scn=pjbusy');
+  };
+  S.pjbusyrm = async function () {
+    await boot(); await ready();
+    history.replaceState(null, '', window.location.pathname + '?scn=pjbusyrm&id=zzconf');
+    var was = jbSetup(); jipDelay = 60000;
+    var rm = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    var picked = await jbAsk('how do I total the awards by sponsor?'); await sleep(100);
+    var c = busyCard(), bar = c ? c.querySelector('.pnb-pal-ai-bar') : null, run = bar ? bar.querySelector('i') : null, dots = c ? c.querySelectorAll('.pnb-pal-ai-dots i') : [], skel = c ? c.querySelectorAll('.pnb-pal-ai-skel i') : [];
+    var lab = c ? c.querySelector('.pnb-pal-ai-busytext') : null;
+    var r0 = run ? run.getBoundingClientRect() : null, tf0 = run ? getComputedStyle(run).transform : null, op0 = dots.length ? getComputedStyle(dots[0]).opacity : null;
+    await sleep(400);
+    var r1 = run ? run.getBoundingClientRect() : null, tf1 = run ? getComputedStyle(run).transform : null, op1 = dots.length ? getComputedStyle(dots[0]).opacity : null;
+    var stillNames = [run].concat(Array.prototype.slice.call(dots)).concat(Array.prototype.slice.call(skel)).filter(Boolean).map(function (e) { return getComputedStyle(e).animationName; });
+    R.info.still = [rm, picked, !!c, busyAnims().length, jbAnimsAlive(), stillNames, r0 && r1 ? [r0.left, r1.left, r0.width, r1.width] : null, tf0, tf1, op0, op1];
+    R.chk.rmStill = rm && picked && !!c && busyAnims().length === 0 && jbAnimsAlive() === 0 && stillNames.length >= 6 && stillNames.every(function (n) { return n === 'none'; })
+      && r0.left === r1.left && tf0 === tf1 && op0 === op1;
+    var cr = c ? c.getBoundingClientRect() : null, rr = run ? run.getBoundingClientRect() : null;
+    R.info.obvious = [lab ? lab.textContent : null, cr ? [Math.round(cr.width), Math.round(cr.height)] : null, rr ? [Math.round(rr.width), Math.round(rr.height)] : null,
+                      Array.prototype.map.call(dots, function (d) { return [getComputedStyle(d).opacity, d.offsetWidth]; }),
+                      Array.prototype.map.call(skel, function (s) { return [Math.round(s.getBoundingClientRect().height), getComputedStyle(s).backgroundColor]; })];
+    R.chk.rmObvious = rm && !!c && !!lab && lab.textContent === 'Jarvis is thinking' && cr.height >= 60 && !!rr && rr.width >= 0.9 * cr.width && rr.height >= 3
+      && dots.length === 3 && Array.prototype.every.call(dots, function (d) { return getComputedStyle(d).opacity === '1' && d.offsetWidth >= 7; })
+      && skel.length >= 2 && Array.prototype.every.call(skel, function (s) { var bc = rgbaOf(getComputedStyle(s).backgroundColor); return s.getBoundingClientRect().height >= 6 && !!bc && bc[3] > 0; });
+    var tv = c ? jbThemes(function () {
+      var cc = busyCard(), b = cc.querySelector('.pnb-pal-ai-bar');
+      return { label: [textRatio(cc.querySelector('.pnb-pal-ai-busytext')), 4.5], dot: [fillRatio(cc.querySelector('.pnb-pal-ai-dots i'), cc), 3], bar: [fillRatio(b && b.querySelector('i'), b), 3] };
+    }) : { n: 0, bad: ['no card'], worst: {} };
+    document.body.className = was.cls;
+    R.info.themes = [tv.n, tv.bad.slice(0, 12), tv.worst];
+    R.chk.rmThemes = rm && tv.n >= 18 && !tv.bad.length;
+    key('Escape', { target: input() }); await sleep(100);
+    jbRestore(was);
+    history.replaceState(null, '', window.location.pathname + '?scn=pjbusyrm');
+  };
+  // pjbusyhc: forced colours (Windows High Contrast; run.py emulates it): the browser drops author fills, so the dots and the bar
+  // would vanish into the card; they take the Highlight colour (main.css's forced-colors rule: a fill that carries meaning gets
+  // the Highlight pair), the words stay readable
+  S.pjbusyhc = async function () {
+    await boot(); await ready();
+    history.replaceState(null, '', window.location.pathname + '?scn=pjbusyhc&id=zzconf');
+    var was = jbSetup(); jipDelay = 60000;
+    var fc = !!(window.matchMedia && window.matchMedia('(forced-colors: active)').matches);
+    var picked = await jbAsk('how do I total the awards by sponsor?'); await sleep(100);
+    var c = busyCard(), bar = c ? c.querySelector('.pnb-pal-ai-bar') : null, run = bar ? bar.querySelector('i') : null, dots = c ? c.querySelectorAll('.pnb-pal-ai-dots i') : [];
+    var lab = c ? c.querySelector('.pnb-pal-ai-busytext') : null, rd = dots.length ? fillRatio(dots[0], c) : 0, rb = fillRatio(run, bar), rl = textRatio(lab);
+    R.info.hc = [fc, picked, !!c, c ? getComputedStyle(c).backgroundColor : null, dots.length ? getComputedStyle(dots[0]).backgroundColor : null, run ? getComputedStyle(run).backgroundColor : null,
+                 lab ? getComputedStyle(lab).color : null, Math.round(rd * 100) / 100, Math.round(rb * 100) / 100, Math.round(rl * 100) / 100];
+    R.chk.hcMarks = fc && picked && !!c && dots.length === 3 && rd >= 3 && rb >= 3 && rl >= 4.5;
+    key('Escape', { target: input() }); await sleep(100);
+    jbRestore(was);
+    history.replaceState(null, '', window.location.pathname + '?scn=pjbusyhc');
+  };
+  // the photograph: the busy card mid-animation (run.py: PNB_JBTHEME picks the theme, PNB_JBRM=1 the reduced-motion form, PNB_JBHC=1 forced colours)
+  S.pshotjb = async function () {
+    var th = (/[?&]theme=([a-z-]+)/.exec(location.search) || [])[1] || 'theme-default';
+    await boot(); await ready();
+    history.replaceState(null, '', window.location.pathname + '?scn=pshotjb&id=zzconf');
+    Array.prototype.forEach.call(document.querySelectorAll('.help-lightbox'), function (l) { l.style.display = 'none'; });
+    var reg = themeRegistry(), t = reg.themes.filter(function (x) { return x.id === th; })[0] || { id: th, isDark: false };
+    jbTheme(t); await sleep(150);
+    jbSetup(); jipDelay = 60000;
+    var picked = await jbAsk('How do I total the awards by sponsor?'); await sleep(450);
+    R.chk.open = picked && !!box() && !!busyCard();
   };
 
   // ---------------------------------------------------------------- pshow (round 20)
