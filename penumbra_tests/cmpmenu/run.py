@@ -49,10 +49,16 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
 # NEW = ['C31']   (b33aad7 is live: C31 is an old check now)
 # (2026-10-23, lnk40) the banner's Copy link in every comparison menu (the exact lists), the two link items, and Fit to
 # page's scrollbar buffer (js/penumbra_colwidths.js, through --stage)
-NEW = ['C1', 'C2', 'C5', 'C6', 'C8', 'C23', 'C32']   # (C33, the scrollbar buffer in a comparison, went to colwidths F15-F17: a comparison's tables give way here)
+# NEW = ['C1', 'C2', 'C5', 'C6', 'C8', 'C23', 'C32']   (lnk40 is live 425d199: old checks now)
+# (2026-10-24, dictstat) What this column means in the comparison menu
+NEW = ['C34']
+# (C33, the scrollbar buffer in a comparison, went to colwidths F15-F17: a comparison's tables give way here)
 
 # --- mutants: name -> (edits on the candidate colmenu.js, assert ids that MUST go red) ---------------
 MUTANTS = {
+    # --- (2026-10-24, dictstat) What this column means: none in a comparison; after the column's name rather than the sorts
+    'd-nocmpabout': ([("            if (ent) { sorts.push(aboutItem(ent)); }", "            if (false) { sorts.push(aboutItem(ent)); }")], ['C34']),
+    'd-cmpaboutlast': ([("            if (ent) { sorts.push(aboutItem(ent)); }", "            if (ent) { name.push(aboutItem(ent)); }")], ['C34']),
     # --- (2026-10-23, lnk40) the banner's links: none; offered whether the banner shows them or not; the evergreen item
     # running the plain link
     'k-nolink': ([("        if (lk) { items.push({ act: 'cmpCopyLink'", "        if (false) { items.push({ act: 'cmpCopyLink'")], ['C1', 'C32']),

@@ -24,13 +24,17 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
         'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
         'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js', 'penumbra_tiles.js',
         'penumbra_a11y.js', 'penumbra_grouplist.js', 'penumbra_cellsel.js']
-SCN = ['dlazy', 'dedit', 'pdict', 'dunit', 'dlink', 'dmenu', 'dopts', 'dview', 'dblank', 'dsub', 'dnone', 'dgen', 'dgenerr']
+SCN = ['desc', 'dgen2', 'dlazy', 'dedit', 'pdict', 'dunit', 'dlink', 'dmenu', 'dstats', 'dopts', 'dview', 'dblank', 'dsub', 'dnone', 'dgen', 'dgenerr']
 CHK = {
     'dunit': ['loaded', 'notes', 'entries', 'flags', 'laterWins', 'source', 'pipeInText', 'keySpace', 'roundTrip', 'clean', 'blocks', 'replace', 'append', 'bare', 'multi',
               'mergeKept', 'mergeReplaced', 'mergeAdded', 'mergeGone', 'mergeStats', 'mergeNote', 'escapes', 'renderTags', 'renderGone', 'renderViewer', 'renderNone',
-              'pvParse', 'pvLegacy', 'pvSerialize', 'pvRoundTrip', 'pvMulti', 'pvMerge', 'pvMergeNoPivot', 'pvRenderOrder', 'pvRenderFocus', 'pvRenderMissing', 'pvRenderPlain'],
-    'dlink': ['linkRendered', 'snippetIntact', 'has', 'dialogTitle', 'rows', 'note', 'draftTag', 'avoidTag', 'source', 'escaped', 'filter', 'filterEmpty', 'missingLine', 'goneTag', 'authorBar', 'wraps'],
+              'pvParse', 'pvLegacy', 'pvSerialize', 'pvRoundTrip', 'pvMulti', 'pvMerge', 'pvMergeNoPivot', 'pvRenderOrder', 'pvRenderFocus', 'pvRenderMissing', 'pvRenderPlain',
+              'labelScan', 'noNesting', 'deadBlocks', 'multiReplace', 'commentsKept', 'litEscapes'],
+    'dlink': ['linkRendered', 'commentStripped', 'snippetIntact', 'has', 'dialogTitle', 'rows', 'note', 'draftTag', 'avoidTag', 'source', 'escaped', 'filter', 'filterEmpty', 'missingLine', 'goneTag', 'authorBar', 'wraps'],
     'dmenu': ['aboutItem', 'aboutBeforeFilter', 'focusRow', 'noItemWithoutEntry', 'cellMenuItem'],
+    # (2026-10-24, dictstat) Column stats starts with the column's meaning; the dialog opens at the entry's name
+    'dstats': ['meanShown', 'meanEscaped', 'meanFirst', 'meanAria', 'meanFocused', 'meanOpens', 'draftTag', 'noMeanWithoutEntry', 'longCut', 'meanWraps',
+               'avoidBlank', 'hardCut', 'cutTidy', 'byLabel', 'opensAtEntry', 'keyboard'],
     'dopts': ['aboutLink', 'linkOpens', 'popoverClosed', 'noLinkWithoutEntry'],
     'dview': ['viewerRows', 'noMissing', 'noGoneTag', 'noAuthorBar', 'draftStillShown', 'cannotGenerate', 'noEditViewer'],
     'dblank': ['noLink', 'stillHas', 'menuItem', 'defaultTitle'],
@@ -39,6 +43,9 @@ CHK = {
     'dgen': ['sidebarButton', 'dialogOpens', 'existingSaid', 'noRequestOnOpen', 'requestShape', 'requestColumns', 'keptChecked', 'draftReplaced', 'added', 'staleKept', 'noteKept',
              'summary', 'noFence', 'gridShown', 'textBack', 'inserted', 'toastSaysSave', 'currentFollows', 'reopenCounts', 'encBlocks', 'errInFooter', 'encSendsWhenTicked', 'escCloses'],
     'dgenerr': ['errorShown', 'noInsert', 'snippetUntouched'],
+    # (2026-10-24 sweep) Esc / X in Edit; Generate's close and Generate again
+    'desc': ['escCleanCancels', 'escDiscards', 'reAddRemoved', 'xAsks', 'closedClean'],
+    'dgen2': ['genAsks', 'againKeepsChecked', 'genClosesOnYes'],
     # (2026-10-22 c) the core / lazy split; the editor (the dialog's Edit, Generate's grid)
     'dlazy': ['notLoadedYet', 'coreAnswers', 'menuWithoutUi', 'loadedOnOpen', 'uiCssApplied', 'loadedOnce'],
     'dedit': ['editButton', 'editorRows', 'editorValues', 'footSwapped', 'todoCount', 'cleanCancel', 'checkedTag', 'removeMarks', 'addOffersMissing', 'addedRow',
@@ -49,7 +56,7 @@ CHK = {
 }
 # what live already does (no module): nothing anywhere
 GUARDS = {'L-dnone-noLink', 'L-dnone-hasFalse', 'L-dnone-noMenuItem', 'L-dblank-noLink', 'L-dopts-noLinkWithoutEntry', 'L-dmenu-noItemWithoutEntry'}
-STATIC = ['S-indexLoads', 'S-indexLazy', 'S-paletteRows', 'S-sidebar', 'S-php', 'S-phpLint', 'S-seed', 'S-help', 'S-aiPrompt', 'S-noEmdash']
+STATIC = ['S-indexLoads', 'S-indexLazy', 'S-paletteRows', 'S-sidebar', 'S-php', 'S-phpLint', 'S-seed', 'S-help', 'S-aiPrompt', 'S-noEmdash', 'S-helpStats']
 # S-email is a GUARD: engine C (unchanged) already drops the block - green on live too
 GUARDS.add('S-email')
 GUARDS |= {'L-dgen-noRequestOnOpen', 'S-noEmdash'}   # true of a page without the module, too
@@ -63,6 +70,19 @@ NEW = {"L-%s-%s" % (s, c) for s in ("dlazy", "dedit") for c in CHK[s]} | {"L-dge
 # true of live too (it has the core lookups, the menu item, the wrap, no Edit): guards, not new
 NEW -= {"L-dlazy-coreAnswers", "L-dlazy-menuWithoutUi", "L-dlazy-uiCssApplied", "L-dview-noEditViewer"}
 GUARDS |= {"L-dlazy-coreAnswers", "L-dlazy-menuWithoutUi", "L-dlazy-uiCssApplied", "L-dview-noEditViewer"}
+# (2026-10-24, dictstat) the editor round is live (04f7faf); this round: Column stats' meaning, What this column means opening
+# at the entry's name, the help. A column with no entry keeps its counts as they were: a guard, green on live too.
+NEW = {"L-dstats-%s" % c for c in CHK["dstats"]} | {"S-helpStats"}
+NEW -= {"L-dstats-noMeanWithoutEntry"}
+GUARDS |= {"L-dstats-noMeanWithoutEntry"}
+# (2026-10-24 sweep) the final bug sweep: Esc never applies, the label scan, dead / several blocks,
+# comments and escapes kept, the comment strippers (JS + the email's PHP: S-email is NEW now - live
+# applies a commented-out rule after a block with an apostrophe), Generate's close and Generate again
+NEW = ({"L-%s-%s" % (s, c) for s in ("desc", "dgen2") for c in CHK[s]} | {"L-dunit-" + c for c in ("labelScan", "noNesting", "deadBlocks", "multiReplace", "commentsKept", "litEscapes")}
+       | {"L-dlink-commentStripped", "S-email", "S-php"})
+GUARDS.discard("S-email")
+NEW -= {"L-desc-xAsks"}
+GUARDS |= {"L-desc-xAsks"}   # live asks before the X drops changes too
 
 MUTANTS = {
     'd-noflags': ([('dict', "var text2 = rest.join('|').trim(), m = /^([?!]{1,2})\\s*/.exec(text2)", "var text2 = rest.join('|').trim(), m = null && /^([?!]{1,2})\\s*/.exec(text2)")],
@@ -74,7 +94,7 @@ MUTANTS = {
     'd-encbypass': ([('dui', "if (enc && !enc.checked) {", "if (false) {")], ['L-dgen-encBlocks'], ['dgen']),
     'd-noclean': ([('dict', ".replace(/\\/\\*/g, '/ *').replace(/\\*\\//g, '* /')", "")], ['L-dunit-clean'], ['dunit']),
     'd-firstwins': ([('dict', "if (Object.prototype.hasOwnProperty.call(sn, e.key)) { sec.entries[sn[e.key]] = e; }", "if (Object.prototype.hasOwnProperty.call(sn, e.key)) { }")], ['L-dunit-laterWins'], ['dunit']),
-    'd-replaceappend': ([('dict', "if (bl.length) { return s.slice(0, bl[0].start) + block + s.slice(bl[0].end); }", "")], ['L-dunit-replace', 'L-dgen-inserted'], ['dunit', 'dgen']),
+    'd-replaceappend': ([('dict', "        return s.slice(0, bl[0].start) + block + s.slice(bl[0].end);\n    }", "        return s.replace(/\\s*$/, '') + '\\n\\n' + block + '\\n';\n    }")], ['L-dunit-replace', 'L-dgen-inserted'], ['dunit', 'dgen']),
     # (the dict branch itself only shapes a blank label and the payload - m-blanklink / m-payload; without
     # it the generic path still draws a working link, so the mode list is what decides a link exists)
     'm-enginea': ([('main', "mode !== 'tile' && mode !== 'embed' && mode !== 'dict')", "mode !== 'tile' && mode !== 'embed')")],
@@ -88,8 +108,10 @@ MUTANTS = {
     'm-payload': ([('dui', "            var d = current() || o.own;", "            var d = current();")], ['L-dsub-subPayload'], ['dsub']),
     'm-noabout': ([('main', "            about: (window.PenumbraDict && window.PenumbraDict.entryFor(", "            about: (false && window.PenumbraDict.entryFor(")], ['L-dopts-aboutLink'], ['dopts']),
     'm-author': ([('main', "        return !!document.getElementById('admWrapper') && !/[?&]noadm\\b/.test(window.location.search);", "        return true;")], ['L-dview-noMissing', 'L-dview-noAuthorBar'], ['dview']),
-    'j-nomenu': ([('menu', "            look.push({ act: 'about',", "            if (false) look.push({ act: 'about',")], ['L-dmenu-aboutItem', 'L-dblank-menuItem'], ['dmenu', 'dblank']),
-    'j-menuany': ([('menu', "D.entryFor(col, name) && window.Penumbra", "window.Penumbra")], ['L-dmenu-noItemWithoutEntry'], ['dmenu']),
+    # (2026-10-24, dictstat) the header's item now goes through dictEntry / aboutItem
+    'j-nomenu': ([('menu', "        if (ent) { look.push(aboutItem(ent)); }\n", "")], ['L-dmenu-aboutItem', 'L-dblank-menuItem'], ['dmenu', 'dblank']),
+    'j-menuany': ([('menu', "        return D.entryFor(col, label) || null;\n", "        return D.entryFor(col, label) || { name: col, key: col, text: '', source: '' };\n")],
+                  ['L-dmenu-noItemWithoutEntry', 'L-dstats-noMeanWithoutEntry'], ['dmenu', 'dstats']),
     'c-nolink': ([('mod', "        if (cfg.about) {\n            html +=", "        if (false) {\n            html +=")], ['L-dopts-aboutLink'], ['dopts']),
     'c-noclick': ([('mod', "            cfg.about.run();\n", "")], ['L-dopts-linkOpens'], ['dopts']),
     # --- (2026-10-22 b) the pivot's part
@@ -112,14 +134,49 @@ MUTANTS = {
     'u-editsub': ([('dui', "(current() ? '<button type=\"button\" class=\"pnb-btn pnb-btn-sm pnb-btn-primary\" data-dd=\"edit\">Edit</button> ' : '')", "('<button type=\"button\" class=\"pnb-btn pnb-btn-sm pnb-btn-primary\" data-dd=\"edit\">Edit</button> ')")], ['L-dsub-subNoEdit'], ['dsub']),
     'u-nocheck': ([('dui', "        function check(tr) { tr.classList.remove('is-draft');", "        function check(tr) { tr.classList.add('was-checked');")], ['L-dedit-checkedTag', 'L-dedit-appliedValues'], ['dedit']),
     'u-removekept': ([('dui', "                if (tr.classList.contains('is-removed')) { return; }\n", "")], ['L-dedit-appliedValues'], ['dedit']),
-    'u-noguard': ([('dui', "            guard(window, 'keydown', function (e) { if (e.key === 'Escape') { ask(e); } });\n", "")], ['L-dedit-escAsks'], ['dedit']),
+    # (re-anchored 2026-10-24: the Esc guard is Cancel now) no Esc guard: main.js's Escape clicks Apply
+    'u-noguard': ([('dui', "            guard(window, 'keydown', function (e) {\n                if (e.key !== 'Escape') { return; }", "            guard(null, 'keydown', function (e) {\n                if (e.key !== 'Escape') { return; }")],
+                  ['L-dedit-escAsks', 'L-desc-escCleanCancels', 'L-desc-escDiscards'], ['dedit', 'desc']),
     # the guard on document again: main.js's earlier capture listener closes the dialog first
-    'u-guarddoc': ([('dui', "            guard(window, 'keydown', function (e) { if (e.key === 'Escape') { ask(e); } });", "            guard(document, 'keydown', function (e) { if (e.key === 'Escape') { ask(e); } });")], ['L-dedit-escAsks'], ['dedit']),
+    'u-guarddoc': ([('dui', "            guard(window, 'keydown', function (e) {\n                if (e.key !== 'Escape') { return; }", "            guard(document, 'keydown', function (e) {\n                if (e.key !== 'Escape') { return; }")],
+                   ['L-dedit-escAsks', 'L-desc-escDiscards'], ['dedit', 'desc']),
     'u-nofoot': ([('dui', "            if (footer && saved) { footer.innerHTML = ''; saved.forEach(function (n) { footer.appendChild(n); }); saved = null; }\n", "")], ['L-dedit-cleanCancel', 'L-dedit-backToView'], ['dedit']),
     'u-nogen': ([('dui', ", _gen: e ? 'rewritten' : 'new' });", " });")], ['L-dgen-gridShown'], ['dgen']),
     'u-textignored': ([('dui', "            var d = D.fromSnippet(txt.value);", "            var d = ed.get();")], ['L-dgen-textBack'], ['dgen']),
     'u-nogrow': ([('dui', "        function grow(ta) { ta.style.height = 'auto'; ta.style.height = (ta.scrollHeight + 2) + 'px'; }", "        function grow(ta) { }")], ['L-dedit-grows'], ['dedit']),
+    # --- (2026-10-24 sweep)
+    'w-escapply': ([('dui', "                e.stopImmediatePropagation(); e.preventDefault();\n                if (!ed.dirty() || window.confirm('Discard your changes to the data dictionary?')) { leave(); }",
+                     "                if (!ed.dirty()) { return; }\n                if (!window.confirm('Discard your changes to the data dictionary?')) { e.stopImmediatePropagation(); e.preventDefault(); } else { unguard(); }")],
+                   ['L-desc-escCleanCancels', 'L-desc-escDiscards'], ['desc']),
+    'w-labelscan': ([('dict', "pre = s.slice(from, at), hm = CALL.exec(pre);", "pre = s.slice(from, at), hm = /^action\\s*\\(\\s*infobox\\s*,\\s*([^,]*?)\\s*,/i.exec(s.slice(s.lastIndexOf('action', at), at));")], ['L-dunit-labelScan'], ['dunit']),
+    'w-deadread': ([('dict', "    function liveBlocks(s) { return blocks(s).filter(function (b) { return !b.dead; }); }", "    function liveBlocks(s) { return blocks(s); }")], ['L-dunit-deadBlocks'], ['dunit']),
+    'w-multikeep': ([('dict', "        for (i = bl.length - 1; i >= 1; i--) {", "        for (i = bl.length - 1; i >= 99; i--) {")], ['L-dunit-multiReplace'], ['dunit']),
+    'w-nocomments': ([('dict', "            if (!lit && line.charAt(0) === '#') { sec.comments.push(line); return; }", "            if (!lit && line.charAt(0) === '#') { return; }")], ['L-dunit-commentsKept'], ['dunit']),
+    'w-noescape': ([('dict', "    function literal(t) { return (/^[#\\\\]/.test(t) || MARKER.test(t)) ? '\\\\' + t : t; }", "    function literal(t) { return t; }")], ['L-dunit-litEscapes'], ['dunit']),
+    'w-stripjs': ([('main', "        snippetText = snippetText.replace(/((?:`[^`]+`|'[^']*'|\"[^\"]*\"|\\/\\/[^\\/\\n]*\\/\\/))|\\/\\/.*$/gm, (match, quoted) => quoted ? quoted : '');\r\n\r\n",
+                    "        snippetText = snippetText.replace(/((?:'[^']*'|\"[^\"]*\"|\\/\\/[^\\/\\n]*\\/\\/))|\\/\\/.*$/gm, (match, quoted) => quoted ? quoted : '');\r\n\r\n")], ['L-dlink-commentStripped'], ['dlink']),
+    'w-noreadd': ([('dui', "            } else if (there.classList.contains('is-removed')) {", "            } else if (false) {")], ['L-desc-reAddRemoved'], ['desc']),
+    'w-genclose': ([('dui', "        q('[data-dg=\"cancel\"]').addEventListener('click', userClose);", "        q('[data-dg=\"cancel\"]').addEventListener('click', close);")], ['L-dgen2-genAsks'], ['dgen2']),
+    'w-againbase': ([('dui', "            var base = review() || existing;", "            var base = existing;")], ['L-dgen2-againKeepsChecked'], ['dgen2']),
     's-nobutton': ([('snip', "(w.PenumbraDict ? '<div class=\"snip-panel-tools\">", "(false ? '<div class=\"snip-panel-tools\">")], ['L-dgen-sidebarButton'], ['dgen']),
+    # --- (2026-10-24, dictstat) Column stats' meaning
+    'x-nomean': ([('menu', "        if (!e) { return body; }\n", "        return body;\n")], ['L-dstats-meanShown', 'L-dstats-meanFirst', 'L-dstats-keyboard'], ['dstats']),
+    'x-rawtext': ([('menu', "(t ? esc(cut) : '<span class=\"pnb-hm-mean-blank\">", "(t ? cut : '<span class=\"pnb-hm-mean-blank\">")], ['L-dstats-meanEscaped'], ['dstats']),
+    'x-nocut': ([('menu', "        if (t.length > MEAN_MAX) {\n", "        if (false) {\n")], ['L-dstats-longCut'], ['dstats']),
+    # the wrap rule gone: the long meaning's unbroken name runs out of the list sideways
+    'x-nowrapcss': ([('mcss', ".pnb-hm-mean .pnb-hm-label { white-space: normal; overflow-wrap: anywhere; }\n", "")], ['L-dstats-meanWraps'], ['dstats']),
+    'x-noaria': ([('menu', "'\" title=\"' + esc(it.title) + '\" aria-label=\"' + esc(said) + '\">' +", "'\" title=\"' + esc(it.title) + '\">' +")], ['L-dstats-meanAria'], ['dstats']),
+    # not an item: the keyboard never lands on it
+    'x-notitem': ([('menu', "'<div class=\"pnb-hm-item pnb-hm-mean\" role=\"menuitem\"", "'<div class=\"pnb-hm-mean\" role=\"menuitem\"")], ['L-dstats-meanFocused', 'L-dstats-keyboard'], ['dstats']),
+    # the dialog opened at the column again (an entry found by the heading's label not focused): the meaning; the header's item
+    'x-meancol': ([('menu', "run: function () { window.Penumbra.openDataDictionary(e.name); } },\n            '-'].concat(body);", "run: function () { window.Penumbra.openDataDictionary(col); } },\n            '-'].concat(body);")], ['L-dstats-opensAtEntry'], ['dstats']),
+    'x-aboutcol': ([('menu', "        if (ent) { look.push(aboutItem(ent)); }\n", "        if (ent) { look.push({ act: 'about', label: 'What this column means', run: function () { window.Penumbra.openDataDictionary(col); } }); }\n")], ['L-dstats-opensAtEntry'], ['dstats']),
+    'x-nodraft': ([('menu', "(e.draft ? ' <span class=\"pnb-hm-tag pnb-hm-tag-draft\"", "(false ? ' <span class=\"pnb-hm-tag pnb-hm-tag-draft\"")], ['L-dstats-draftTag'], ['dstats']),
+    'x-noavoid': ([('menu', "(e.avoid ? '<span class=\"pnb-hm-tag pnb-hm-tag-avoid\">Do not use</span> ' : '')", "''")], ['L-dstats-avoidBlank'], ['dstats']),
+    # (the review) the hard cut splitting an emoji; the dots after an opening bracket; the heading's label never asked
+    'x-halfemoji': ([('menu', "            if (hi >= 0xD800 && hi <= 0xDBFF) { at--; }\n", "")], ['L-dstats-hardCut'], ['dstats']),
+    'x-tidy': ([('menu', ".replace(/[\\s.,;:(\\[\\/-]+$/, '') + '...';", ".replace(/[\\s.,;:]+$/, '') + '...';")], ['L-dstats-cutTidy'], ['dstats']),
+    'x-nolabel': ([('menu', "dictEntry(col, th ? labelOf(th) : col)", "dictEntry(col, col)")], ['L-dstats-byLabel'], ['dstats']),
 }
 
 args = sys.argv[1:]
@@ -149,7 +206,8 @@ RELS = {'main': os.path.join('js', 'main.js'), 'mod': os.path.join('js', 'penumb
         'pal': os.path.join('js', 'penumbra_palette.js'), 'snip': os.path.join('js', 'penumbra_snippet_help.js'),
         'gen': 'generate_dictionary.php', 'seed': os.path.join('dictseeds', 'STATS_COMBINED_V2.txt'), 'seedcfg': os.path.join('dictseeds', 'web.config'),
         'index': 'index.php', 'help': os.path.join('help', 'tips', 'settings-tips-storage.php'),
-        'topic': os.path.join('help', 'topics', 'optionsHelpLightbox.php'), 'ai': 'ai_system_prompt.php'}
+        'topic': os.path.join('help', 'topics', 'optionsHelpLightbox.php'), 'ai': 'ai_system_prompt.php',
+        'utopic': os.path.join('help', 'topics', 'userSettingsHelpLightbox.php')}
 sys.path.insert(0, HERE)
 import mk_harness
 cand = {k: pick(v) for k, v in RELS.items()}
@@ -267,6 +325,18 @@ def php_checks(texts):
             ('S-php', bool(m) and int(m.group(2)) == 0 and int(m.group(1)) > 0, ' '.join(l for l in out.splitlines() if l.startswith('FAIL') or l.startswith('SUMMARY'))[:600]),
             ('S-email', bool(em) and int(em.group(2)) == 0 and int(em.group(1)) >= 6, ' '.join(l for l in eout.splitlines() if l.startswith('FAIL') or l.startswith('SUMMARY'))[:600])]
 
+# (2026-10-24, dictstat) the help names Column stats' meaning (the ways in, the menu's table, Column stats' paragraph) and the
+# comparison's item; the new cell and the comparison's list item stay within 70 words (help L16)
+def _words(h): return len(re.sub(r'<[^>]+>', ' ', h).split())
+def help_stats(topic, ut):
+    m1 = re.search(r'<strong>What this column means</strong></td><td[^>]*>(.*?)</td>', ut, re.S)
+    m2 = re.search(r'<li>(In a snapshot comparison,.*?)</li>', ut, re.S)
+    n1, n2 = (_words(m1.group(1)) if m1 else None), (_words(m2.group(1)) if m2 else None)
+    good = (bool(m1 and m2) and '<em>Column stats</em> starts with the meaning' in topic
+            and 'the list starts with its meaning; a click on it opens the dictionary' in ut and 'offers <em>What this column means</em>' in m2.group(1)
+            and n1 <= 70 and n2 <= 70)
+    return ('S-helpStats', good, 'cell=%s li=%s words' % (n1, n2))
+
 def static_checks(texts):
     idx, pal, snip, seed, topic, ai = texts['index'], texts['pal'], texts['snip'], texts['seed'], texts['topic'], texts['ai']
     di, mi = idx.find('src="js/penumbra_dict.js?v='), idx.find('src="js/main.js?v=')
@@ -288,6 +358,7 @@ def static_checks(texts):
         ('S-seed', seed_ok and 'allowUnlisted="false"' in texts['seedcfg'], ''),
         ('S-help', 'id="dict-mode"' in topic and 'dict|' in topic and 'source:' in topic and 'Generate data dictionary' in topic and 'What this column means' in topic and '[pivot]' in topic and 'What this value means' in topic, ''),
         ('S-aiPrompt', 'dict|' in ai and '[pivot]' in ai, ''),
+        help_stats(topic, texts['utopic']),
         ('S-noEmdash', chr(0x2014) not in new_ui and chr(0x2013) not in new_ui, ''),
     ] + php_checks(texts)
 

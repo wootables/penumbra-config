@@ -280,6 +280,86 @@ if ($mode === 'hl') {
         ok($a === '3/1' && $GLOBALS['penumbra_highlight_rules'] === array() && $GLOBALS['penumbra_column_formats'] === array(), 'noLeak', $a);
     }
 }
+if ($mode === 'hlhd') {
+    // (2026-10-24, hlhead) a report's HEADER rules in the scheduled email:
+    //   php test_colopt.php hlhd <mirror.php> <penumbra_calc.php> <themes_config.php> <penumbra_search.php>
+    // STATE_DATA.columnHighlights' header rules (hd) as format(header) rules: always; an aggregate decided over the
+    // email's rows (as format(header) is); a row condition lit while a row of the email matches (the row rules' own
+    // test); the header's properties only; a cell rule beside them still paints its cells; the grouped email's tables
+    require_once $argv[3];
+    require_once $argv[5];
+    require_once $argv[2];
+    require_once $argv[4];
+    if (function_exists('penumbra_build_theme_styles')) { $theme_styles = penumbra_build_theme_styles(); }
+    set_error_handler(function () { return true; }, E_ALL);
+    $names = array('stateHd', 'stateAnyFlag', 'emailAlways', 'emailAggOn', 'emailAggOff', 'emailAnyOn', 'emailAnyOff', 'emailHeadCss', 'emailCellsStill', 'groupedHeads', 'emailFillShows', 'emailInk', 'emailBadFill', 'emailImpFill', 'pdfUntouched');
+    $need = array('penumbra_state_highlight_rules', 'penumbra_hl_any_row_headers', 'generate_report_html');
+    $missing = array_values(array_filter($need, function ($f) { return !function_exists($f); }));
+    if ($missing) {
+        foreach ($names as $n) ok(false, $n, 'missing: ' . implode(' ', $missing));
+    } else {
+        $sts = array('Open', 'Closed', 'Pending');
+        $rows = array();
+        for ($i = 1; $i <= 12; $i++) $rows[] = array('V_ID' => (string)$i, 'V_NAME' => $i === 3 ? 'Alpha Co' : 'Vendor ' . $i,
+                                                   'V_AMOUNT' => (string)($i * 1000), 'V_STATUS' => $sts[$i % 3], 'V_DATE' => '1/' . $i . '/2026');
+        $state = array('columnHighlights' => array(
+            'V_ID' => array(array('id' => 'a', 'w' => '', 'css' => 'background-color: #fbe8a6', 'row' => false, 'hd' => true)),
+            'V_NAME' => array(array('id' => 'b', 'w' => 'V_NAME = //Alpha Co//', 'css' => 'color: #c62828', 'row' => false, 'hd' => true)),
+            'V_STATUS' => array(array('id' => 'c', 'w' => 'V_STATUS = //Nope//', 'css' => 'color: #2e7d32', 'row' => false, 'hd' => true),
+                                array('id' => 'h', 'w' => '', 'css' => 'background-color: #fde68a !important', 'row' => false, 'hd' => true)),
+            'V_AMOUNT' => array(array('id' => 'd', 'w' => 'sum(V_AMOUNT) > 1', 'css' => 'font-weight: bold; font-size: 20px', 'row' => false, 'hd' => true),
+                                array('id' => 'e', 'w' => 'V_AMOUNT > 6000', 'css' => 'font-style: italic', 'row' => false)),
+            'V_DATE' => array(array('id' => 'f', 'w' => 'sum(V_AMOUNT) < 0', 'css' => 'color: #1565c0', 'row' => false, 'hd' => true),
+                              array('id' => 'g', 'w' => '', 'css' => 'background-color: lightyelow', 'row' => false, 'hd' => true))));
+        $rr = penumbra_state_highlight_rules($state);
+        $by = array();
+        foreach ($rr as $r) $by[$r['style']] = $r;
+        $a = isset($by['background-color: #fbe8a6']) ? $by['background-color: #fbe8a6'] : null;
+        ok($a && $a['type'] === 'header' && $a['targetColumn'] === 'V_ID' && $a['condition'] === null
+           && isset($by['font-style: italic']) && $by['font-style: italic']['type'] === 'cell' && $by['font-style: italic']['targetColumn'] === 'V_AMOUNT', 'stateHd', json_encode($rr));
+        ok(!empty($by['color: #c62828']['hlAnyRow']) && !empty($by['color: #2e7d32']['hlAnyRow']) && empty($by['font-weight: bold; font-size: 20px']['hlAnyRow'])
+           && empty($a['hlAnyRow']) && empty($by['font-style: italic']['hlAnyRow']), 'stateAnyFlag', json_encode($rr));
+        $GLOBALS['penumbra_highlight_rules'] = $rr;
+        $GLOBALS['penumbra_column_formats'] = array();
+        $GLOBALS['penumbra_column_summaries'] = array();
+        $html = generate_report_html($rows, 'standard', 'theme-default', 'Header rules in the email', false, '', true);
+        $th = hd_ths($html);
+        $g = function ($n) use ($th) { return isset($th[$n]) ? $th[$n] : null; };
+        ok($g('V_ID') !== null && strpos($g('V_ID'), 'background-color: #fbe8a6') !== false, 'emailAlways', show($g('V_ID')));
+        ok($g('V_AMOUNT') !== null && strpos($g('V_AMOUNT'), 'font-weight: bold') !== false, 'emailAggOn', show($g('V_AMOUNT')));
+        ok($g('V_DATE') !== null && strpos($g('V_DATE'), '#1565c0') === false, 'emailAggOff', show($g('V_DATE')));
+        ok($g('V_NAME') !== null && strpos($g('V_NAME'), 'color: #c62828') !== false, 'emailAnyOn', show($g('V_NAME')));
+        ok($g('V_STATUS') !== null && strpos($g('V_STATUS'), '#2e7d32') === false, 'emailAnyOff', show($g('V_STATUS')));
+        ok($g('V_AMOUNT') !== null && strpos($g('V_AMOUNT'), 'font-size: 20px') === false, 'emailHeadCss', show($g('V_AMOUNT')));
+        ok(substr_count($html, 'font-style: italic') === 6, 'emailCellsStill', substr_count($html, 'font-style: italic'));
+        // (the review) a fill turns the theme's gradient off; a highlight rule's fill with no text color of its own gives the
+        // header the table's text color (dataFont) - one more than a header without a fill has
+        $df = isset($theme_styles['theme-default']['dataFont']) ? (string)$theme_styles['theme-default']['dataFont'] : '';
+        ok($g('V_ID') !== null && strpos($g('V_ID'), 'background-image: none;') !== false && strpos((string)$g('V_AMOUNT'), 'background-image') === false, 'emailFillShows', show($g('V_ID')));
+        ok($df !== '' && $g('V_ID') !== null && substr_count($g('V_ID'), ' color: ' . $df . ';') === substr_count((string)$g('V_AMOUNT'), ' color: ' . $df . ';') + 1,
+           'emailInk', show($g('V_ID')) . ' / ' . $df);
+        // (the second review) a fill a client throws away (a typo) leaves the gradient on and gives no text color; a typed
+        // !important is a color still
+        ok($g('V_DATE') !== null && strpos($g('V_DATE'), 'background-image') === false
+           && substr_count($g('V_DATE'), ' color: ' . $df . ';') === substr_count((string)$g('V_AMOUNT'), ' color: ' . $df . ';'), 'emailBadFill', show($g('V_DATE')));
+        ok($g('V_STATUS') !== null && strpos($g('V_STATUS'), 'background-image: none;') !== false, 'emailImpFill', show($g('V_STATUS')));
+        // the PDF's table (generate_report_html with $isEmail false - the per-recipient PDFs): a format(header) fill as it
+        // was, no header extras; the same rule in the email takes the gradient off
+        $fhd = array(array('type' => 'header', 'targetColumn' => 'V_ID', 'condition' => null, 'style' => 'background-color: #fbe8a6'));
+        $pdfTh = hd_ths(generate_report_html($rows, 'standard', 'theme-default', 'T', false, '', false, null, '', '', '', null, array(), null, $fhd));
+        $emTh = hd_ths(generate_report_html($rows, 'standard', 'theme-default', 'T', false, '', true, null, '', '', '', null, array(), null, $fhd));
+        $pv = isset($pdfTh['V_ID']) ? $pdfTh['V_ID'] : null;
+        $ev = isset($emTh['V_ID']) ? $emTh['V_ID'] : null;
+        ok($pv !== null && strpos($pv, 'background-color: #fbe8a6') !== false && strpos($pv, 'background-image') === false
+           && $ev !== null && strpos($ev, 'background-image: none;') !== false, 'pdfUntouched', show($pv) . ' / ' . show($ev));
+        $grp = array();
+        foreach ($rows as $r) $grp[$r['V_STATUS']][] = $r;
+        $gh = generate_report_html($grp, 'grouped', 'theme-default', 'T', false, '', true, null, '', '', '', null, array(), null);
+        preg_match_all("/<th style='([^']*)'>V_ID<\/th>/", $gh, $gm);
+        $gLit = count(array_filter($gm[1], function ($s) { return strpos($s, 'background-color: #fbe8a6') !== false; }));
+        ok(count($gm[1]) === 3 && $gLit === 3, 'groupedHeads', count($gm[1]) . ' headers, ' . $gLit . ' lit');
+    }
+}
 /** The email's data table (the one headed V_ID): each body row's tr style, its cells' styles and
  *  texts; the footer's cells' texts (the summary badge and the label left out). */
 function hl_email_rows($html) {
@@ -301,6 +381,14 @@ function hl_email_rows($html) {
     if (preg_match('/<tfoot>(.*?)<\/tfoot>/s', $tb, $f)) {
         preg_match_all('/<td style="[^"]*">(.*?)<\/td>/s', $f[1], $fts);
         foreach ($fts[1] as $t) $out['foot'][] = trim(html_entity_decode(strip_tags(preg_replace('/<span\b[^>]*>.*?<\/span>/s', '', $t)), ENT_QUOTES, 'UTF-8'));
+    }
+    return $out;
+}
+/** (2026-10-24, hlhead) The email's header cells: each column's first <th>'s style, by its name. */
+function hd_ths($html) {
+    $out = array();
+    if (preg_match_all("/<th style='([^']*)'>([^<]*)<\/th>/", $html, $m, PREG_SET_ORDER)) {
+        foreach ($m as $x) { $n = html_entity_decode($x[2], ENT_QUOTES, 'UTF-8'); if (!isset($out[$n])) $out[$n] = $x[1]; }
     }
     return $out;
 }

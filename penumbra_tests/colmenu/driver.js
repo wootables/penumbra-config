@@ -54,7 +54,8 @@
   var SUBS = { 'move-left': 'move', 'move-right': 'move', 'move-start': 'move', 'move-end': 'move', 'move-swap': 'move',
     only: 'show', showAll: 'show', 'calc-left': 'calc', 'calc-right': 'calc', 'calc-start': 'calc', 'calc-end': 'calc',
     calcEdit: 'calc', calcDup: 'calc', calcRemove: 'calc', calcAdj: 'calc',   // (2026-10-19, calcadj round 3) one Calculated column entry; round 5: Duplicate
-    fit: 'width', fitAll: 'width', fitPage: 'width', resetWidth: 'width', resetWidths: 'width' };   // (round 33) the Reset list went
+    fit: 'width', fitAll: 'width', fitPage: 'width', resetWidth: 'width', resetWidths: 'width',
+    groupBy: 'groupByList' };   // (2026-10-26, delimgroup) a column with buckets: Group by is a list, As is in it   // (round 33) the Reset list went
   function sub(act) { var it = item(act); if (!it || it.getAttribute('aria-disabled') === 'true') return false; it.click(); return true; }
   function reach(act) { if (!item(act) && SUBS[act]) sub(SUBS[act]); return item(act); }
   async function choose(el, act) {
@@ -138,6 +139,53 @@
   function rdown(el) { var r = el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 2, buttons: 2, clientX: Math.round(r.left + 6), clientY: Math.round(r.top + 6) })); }
   function keyOn(k) { (document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })); }
 
+  // (2026-10-25, nestgb2) gnnestbd / gchipnest: the nested-table columns (mk_harness: H_TEXT's tables from row 7, H_JSON's,
+  // H_ENT's sharing SUB_NAME with H_JSON's, H_NULL's empty) and their tables' columns as the band menu and the chip list them
+  // (the header menu's and Quick actions' order): by the column's place in the table, each one's tables' in their own order,
+  // a name two tables share once - the grouping dialog's Nested Table Columns holds the same names, in the order its rows show them
+  var NB_COLS = ['H_TEXT', 'H_JSON', 'H_ENT', 'H_NULL'];
+  var NB_OWN = { H_TEXT: ['NOTE_KIND', 'NOTE_DAYS'], H_JSON: ['SUB_ID', 'SUB_AMT', 'SUB_NAME'], H_ENT: ['ENT_KIND', 'SUB_NAME'], H_NULL: [] };
+  function nbWant(cols) {
+    var hdr = allNames(), out = [];
+    cols.slice().sort(function (a, b) { return hdr.indexOf(a) - hdr.indexOf(b); }).forEach(function (c) { NB_OWN[c].forEach(function (s) { if (out.indexOf(s) < 0) out.push(s); }); });
+    return out;
+  }
+  // the groups on screen: each top group's key, its rows (its own table's, never a nested table's) and the groups below it
+  function nbRows(w) { return Array.prototype.filter.call(w.querySelectorAll('tbody > tr'), function (tr) { return !tr.closest('.nested-json-container'); }).length; }
+  function nbShape() {
+    return tops().map(function (w) {
+      var kids = Array.prototype.map.call(w.querySelectorAll('.group-wrapper[data-group-depth="1"]'), function (x) { return x.getAttribute('data-group-key') + '=' + nbRows(x); }).sort();
+      return w.getAttribute('data-group-key') + '=' + nbRows(w) + '[' + kids.join(';') + ']';
+    }).sort().join('|');
+  }
+  // the same levels through the grouping dialog, from the flat table: each level from its own picker (a nested field from
+  // level 1's Nested Table Columns), none below them, Stacked picked - the groups it makes ('' when a pick is not there)
+  async function nbDialog(levels) {
+    await flat();
+    $('#groupTableBtn').trigger('click');
+    await sleep(400);
+    var ids = ['groupingColumnSelector', 'groupingColumnSelector2', 'groupingColumnSelector3'], ok = true;
+    for (var k = 0; k < ids.length && ok; k++) {
+      var it = document.querySelector('#' + ids[k] + ' .pcs-dropdown ' + (k < levels.length ? '.pcs-item[data-value="' + levels[k] + '"]' : '.pcs-item-none'));
+      if (it) { $(it).trigger('click'); await sleep(150); } else if (k < levels.length) { ok = false; }
+    }
+    var st = document.querySelector('#groupLayoutRow input[value="stacked"]');
+    if (st) st.click();
+    if (!ok) { $('#groupingLightbox').hide(); return ''; }
+    $('#confirmGroupingBtn').trigger('click');
+    var g = await until(function () { return levelsNow() === levels.join(); }, 15000);
+    await sleep(500);
+    $('#groupingLightbox').hide();
+    return g ? nbShape() : '';
+  }
+  // an open list's entries in order: items by their act, headings by their text, separators '-'
+  function nbSeq() {
+    var p = subPanel();
+    return p ? Array.prototype.map.call(p.querySelectorAll('.pnb-hm-sep, .pnb-hm-head, .pnb-hm-item'), function (e) {
+      return e.classList.contains('pnb-hm-sep') ? '-' : (e.classList.contains('pnb-hm-head') ? 'H:' + e.textContent : e.getAttribute('data-act'));
+    }) : [];
+  }
+
   var S = {
     mflat: async function () {
       var BASE = shownNames();
@@ -205,7 +253,7 @@
       rclick(fth('V_NAME'));
       var a = acts();
       // (round 12) the top level: sort, filter, stats; options, move, show, hide, fit, freeze; copy, calc, group; reset
-      R.chk.itemsAll = ['sortAsc', 'sortDesc', 'filter', 'width', 'rowHeight', 'options', 'move', 'show', 'hide', 'freeze', 'copy', 'copyName', 'calc', 'groupBy', 'clearPrefs'].every(function (x) { return a.indexOf(x) >= 0; });
+      R.chk.itemsAll = ['sortAsc', 'sortDesc', 'filter', 'width', 'rowHeight', 'options', 'move', 'show', 'hide', 'freeze', 'copy', 'copyName', 'calc', 'groupBy', 'clearPrefs'].every(function (x) { return a.indexOf(x) >= 0 || (x === 'groupBy' && a.indexOf('groupByList') >= 0); });   // (delimgroup) or its list
       R.info.acts = a;
       closeMenu();
       // a column with empties (H_GROUP: null on every 11th row), counted by main.js
@@ -621,7 +669,8 @@
       R.chk.cellGroup = !!gtd && rclick(gtd) && acts()[0] === 'cellFilter' && item('cellFilter').textContent.indexOf('"' + gtd.textContent.trim() + '"') >= 0;
       closeMenu();
       rclick(gth('V_NAME'));
-      R.chk.groupItems = !!item('groupBy') && /instead/.test(item('groupBy').textContent) && !!item('ungroup');
+      var _gbI = item('groupBy') || item('groupByList');   // (2026-10-26, delimgroup) or its list, on a column with buckets
+      R.chk.groupItems = !!_gbI && /instead/.test(_gbI.textContent) && !!item('ungroup');
       closeMenu();
       function gtables() { return Array.prototype.slice.call(document.querySelectorAll('#groupedResultsContainer table')).filter(function (t) { return t.querySelector('thead th[data-colname]') && t.querySelector('tbody tr'); }); }
       function tNames(t) { return Array.prototype.filter.call(t.querySelectorAll('thead th[data-colname]'), function (h) { return h.style.display !== 'none' && h.getAttribute('data-column') !== '#'; }).map(function (h) { return h.getAttribute('data-colname'); }); }
@@ -1245,7 +1294,7 @@
       function over(el) { if (el) el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true })); }
       rclick(fth('V_NAME'));
       var a = acts(), want = ['sortAsc', 'sortDesc', 'filter', 'stats', 'width', 'rowHeight', 'options', 'move', 'show', 'hide', 'freeze', 'copy', 'copyName', 'calc', 'groupBy', 'clearPrefs'];   // (round 33) the sizes up the menu, one clear-all item at its foot
-      var pos = want.map(function (x) { return a.indexOf(x); });
+      var pos = want.map(function (x) { return (x === 'groupBy' && a.indexOf(x) < 0) ? a.indexOf('groupByList') : a.indexOf(x); });   // (delimgroup) or its list
       R.chk.topOrder = pos.every(function (p, i) { return p >= 0 && (i === 0 || p > pos[i - 1]); })
         && menu().querySelectorAll('.pnb-hm-sep').length === 4 && ['move-left', 'only', 'reset', 'resetAll', 'resets', 'fit', 'fitAll', 'stats-top-0', 'pivot', 'chart', 'copy-comma'].every(function (x) { return a.indexOf(x) < 0; });
       R.chk.noChips = !menu().querySelector('.pnb-hm-row');
@@ -2114,6 +2163,670 @@
       await choose(fth('V_NAME'), 'sortAsc');
       rclick(fth('V_NAME'));
       R.chk.open = !!menu();
+    },
+    // (2026-10-24, hlhead; the user: "shouldnt column header right clicks also have a highlight menu") Highlight... right
+    // after Column options: the column's highlight rules alone in the popover (no other section), Header among a rule's
+    // Apply to; Back (the rule's, then the popover's) to the menu; none on '#'; none where Column Organization is closed
+    mhl: async function () {
+      document.getElementById('settingsPanel').classList.add('is-open'); window.Penumbra.refreshSettingsColumns();
+      await sleep(200);
+      var th = fth('V_AMOUNT');
+      rclick(th);
+      var a = acts();
+      R.info.acts = a;
+      R.chk.hlItem = a.indexOf('options') >= 0 && a.indexOf('highlight') === a.indexOf('options') + 1 && !!item('highlight')
+        && item('highlight').querySelector('.pnb-hm-label').textContent === 'Highlight...';
+      closeMenu();
+      await choose(th, 'highlight');
+      var pop = document.querySelector('.sp-sumtype-menu.pnb-colopt');
+      var secs = pop ? Array.prototype.filter.call(pop.children, function (n) { return n.classList.contains('pnb-colopt-sec'); }).map(function (s) { return s.getAttribute('data-sec'); }).join() : '';
+      R.info.secs = secs;
+      R.chk.hlAlone = !!pop && secs === 'highlight' && !!pop.querySelector('[data-co="hl-add"]') && pop.textContent.indexOf('V_AMOUNT') >= 0;
+      if (pop) { pop.querySelector('[data-co="hl-add"]').click(); await sleep(80); }
+      R.chk.hlHeaderOption = !!document.querySelector('.sp-sumtype-menu.pnb-colopt .pnb-hl-ed [data-co="hl-to"][value="header"]');
+      var hb = document.querySelector('.sp-sumtype-menu.pnb-colopt [data-co="hl-back"]');
+      if (hb) { hb.click(); await sleep(80); }
+      var bkb = document.querySelector('.sp-sumtype-menu.pnb-colopt [data-co="back"]');
+      if (bkb) bkb.click();
+      await sleep(200);
+      var bt = menu() && menu().querySelector('.pnb-hm-name');
+      R.chk.hlBack = !!bkb && !document.querySelector('.sp-sumtype-menu.pnb-colopt') && !!bt && bt.textContent === 'V_AMOUNT';
+      closeMenu();
+      // (the review) from the keyboard: Highlight... puts the focus in the popover (its first button - the column has no
+      // rule, so no Reset to land on)
+      var kth = fth('V_AMOUNT');
+      if (!kth.hasAttribute('tabindex')) kth.setAttribute('tabindex', '0');
+      kth.focus();
+      rclick(kth, true);
+      var hi = item('highlight');
+      if (hi) { hi.focus(); hi.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); }
+      await sleep(450);
+      var kp = document.querySelector('.sp-sumtype-menu.pnb-colopt'), ae = document.activeElement;
+      R.info.kbdFocus = ae ? [ae.tagName, ae.getAttribute('data-co'), (ae.textContent || '').trim().slice(0, 30), !!kp] : null;
+      R.chk.hlKbdFocus = !!kp && !!ae && kp.contains(ae) && ae.tagName === 'BUTTON';
+      if (ae) ae.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      await sleep(200);
+      if (document.querySelector('.sp-sumtype-menu.pnb-colopt') && window.Penumbra.headerMenu && window.Penumbra.headerMenu.closeColOpts) window.Penumbra.headerMenu.closeColOpts();
+      closeMenu();
+      // (the second review) with a rule of the viewer's own (Reset on): from the keyboard the focus is on the rules' first
+      // button, never Reset - Enter there took every rule of theirs off at once; Reset: the focus stays in the rules
+      function popClose() {
+        var x = document.querySelector('.sp-sumtype-menu.pnb-colopt');
+        if (x && window.Penumbra.headerMenu && window.Penumbra.headerMenu.closeColOpts) window.Penumbra.headerMenu.closeColOpts();
+        closeMenu();
+      }
+      await choose(fth('V_AMOUNT'), 'highlight');
+      var p2 = document.querySelector('.sp-sumtype-menu.pnb-colopt');
+      if (p2 && p2.querySelector('[data-co="hl-add"]')) { p2.querySelector('[data-co="hl-add"]').click(); await sleep(80); }
+      var hv = document.querySelector('.sp-sumtype-menu.pnb-colopt .pnb-hl-ed [data-co="hl-v"]');
+      if (hv) { hv.focus(); hv.value = '50,000'; hv.dispatchEvent(new Event('input', { bubbles: true })); await sleep(600); }
+      var hdn = document.querySelector('.sp-sumtype-menu.pnb-colopt [data-co="hl-done"]');
+      if (hdn) { hdn.click(); await sleep(200); }
+      popClose();
+      await sleep(150);
+      kth.focus();
+      rclick(kth, true);
+      var hi2 = item('highlight');
+      if (hi2) { hi2.focus(); hi2.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); }
+      await sleep(450);
+      var kp2 = document.querySelector('.sp-sumtype-menu.pnb-colopt'), ae2 = document.activeElement, rb = kp2 && kp2.querySelector('button.pnb-colopt-reset');
+      R.info.kbd2 = ae2 ? [ae2.tagName, ae2.className, ae2.getAttribute('data-co'), (ae2.textContent || '').trim().slice(0, 30), !!rb && !rb.disabled] : null;
+      R.chk.hlKbdNotReset = !!kp2 && !!rb && !rb.disabled && !!ae2 && kp2.contains(ae2) && ae2 !== rb && !!ae2.closest('[data-sec="highlight"]');
+      if (rb) { rb.click(); await sleep(250); }
+      var ae3 = document.activeElement;
+      R.info.reset = ae3 ? [ae3.tagName, ae3.className, ae3.getAttribute('data-co'), (ae3.textContent || '').trim().slice(0, 30)] : null;
+      R.chk.hlResetFocus = !!rb && !!ae3 && !!kp2 && kp2.contains(ae3) && ae3.tagName === 'BUTTON' && !ae3.disabled && !!ae3.closest('[data-sec="highlight"]');
+      popClose();
+      await sleep(150);
+      var num = document.querySelector('#tableHeader th[data-column="#"]');
+      rclick(num);
+      R.chk.hlNotNum = !!menu() && acts().indexOf('highlight') < 0 && acts().indexOf('sortAsc') >= 0;
+      closeMenu();
+      window.penumbra_vars.isAdmin = false;
+      window._penumbraHideColumns = true;
+      rclick(fth('V_NAME'));
+      R.chk.hlNotRestricted = !!menu() && acts().indexOf('highlight') < 0 && acts().indexOf('sortAsc') >= 0;
+      closeMenu();
+    },
+    // (2026-10-25, nestgb; the user: "When right clicking on a column that uses JSON, the group by option should become a
+    // flyout that shows the group by each nested subrow"; nestcopy: "this process should be repeated for the copy distinct
+    // values ... their own menu section, with their own static header stating the nested sub-column" - they chose one
+    // section, a list per column) H_JSON shown (and H_TEXT: a nested table of its own from row 7; H_NULL: empty tables):
+    // its menu has no Group by and no Copy distinct values of its own; it ends with a Nested columns section, one item per
+    // column of its tables, each opening its own list with its name on top - Group by it (a row joins the group of each
+    // value its table holds: the bands checked against the fixture; "instead" in a grouped view, the one grouped by now
+    // ticked) and Copy distinct values (the clipboard checked against the fixture; Other... opens Copy on its own option);
+    // from the keyboard. A plain column keeps its own items (nsPlain); a column named in digits keeps the menu (nsDigitSafe).
+    // (the review, v2) nothing drawn to name them (a hidden column's lazy cells stay empty); "Nested column X" to a screen
+    // reader; the tables' own case in the labels; no whole-column copy while it holds nested tables; none of it where the
+    // report hides Clipboard; a tall menu scrolls to the keyboard's item.
+    mnestgb: async function () {
+      var l = A().layout();
+      l.cols.forEach(function (c) { if (c.colName === 'H_JSON') c.visible = true; });
+      A().applyLayout(l);
+      await sleep(500);
+      // H_TEXT hidden: its cells are left empty (lazy) until something needs them - H_JSON's menu and a column's list do not
+      function cellsOf(name) {
+        var t = fth(name), id = t ? t.getAttribute('data-column') : null, tds = id === null ? [] : document.querySelectorAll('#resultsTable tbody td[data-column="' + id + '"]');
+        return { n: tds.length, lazy: Array.prototype.filter.call(tds, function (td) { return td.hasAttribute('data-pnb-lazy'); }).length,
+          drawn: Array.prototype.filter.call(tds, function (td) { return !!td.querySelector('.raw-json-data'); }).length };
+      }
+      var c0 = cellsOf('H_TEXT');
+      rclick(fth('H_JSON'));
+      if (item('nestcol-2') && item('nestcol-2').getAttribute('aria-haspopup') === 'menu') sub('nestcol-2');
+      var nd1 = !!item('nestcopy-2');
+      closeMenu();
+      var c1 = cellsOf('H_TEXT');
+      R.info.noDraw = [c0, c1, nd1];
+      R.chk.nsNoDraw = nd1 && c0.lazy > 0 && c0.drawn === 0 && c1.lazy === c0.lazy && c1.drawn === 0;
+      l = A().layout();
+      l.cols.forEach(function (c) { if (c.colName === 'H_TEXT' || c.colName === 'H_NULL') c.visible = true; });
+      A().applyLayout(l);
+      await sleep(500);
+      var FX = window.__rowsFixture;
+      function subsOf(r, key) { return r.H_JSON ? JSON.parse(r.H_JSON.substring(6)).map(function (x) { return String(x[key]); }) : []; }
+      function want(key) {
+        var w = Object.create(null);
+        FX.forEach(function (r) {
+          var vs = subsOf(r, key);
+          if (!vs.length) { w['[Blank]'] = (w['[Blank]'] || 0) + 1; return; }
+          vs.filter(function (v, i) { return vs.indexOf(v) === i; }).forEach(function (v) { w[v] = (w[v] || 0) + 1; });
+        });
+        return w;
+      }
+      function bandsMatch(key) {
+        var w = want(key), ks = Object.keys(w), got = Object.create(null);
+        tops().forEach(function (wr) { got[wr.getAttribute('data-group-key')] = wr.querySelectorAll('tbody tr').length; });
+        var gk = Object.keys(got);
+        var bad = ks.filter(function (k) { return got[k] !== w[k]; }).concat(gk.filter(function (k) { return !(k in w); }));
+        R.info['bands_' + key] = { want: ks.length, got: gk.length, bad: bad.slice(0, 5).map(function (k) { return [k, w[k], got[k]]; }) };
+        return ks.length > 2 && gk.length === ks.length && bad.length === 0;
+      }
+      // the distinct values a copy of H_JSON's key gives: the flat rows the filter keeps, in their order, each table's rows in order
+      function distinctSub(key) {
+        var seen = Object.create(null), out = [];
+        Array.prototype.forEach.call(document.querySelectorAll('#resultsTable tbody tr'), function (tr) {
+          if (tr.classList.contains('search-hidden')) return;
+          var r = FX[parseInt(tr.cells[0].textContent, 10) - 1];
+          if (r) subsOf(r, key).forEach(function (v) { if (v && !seen[v]) { seen[v] = 1; out.push(v); } });
+        });
+        return out;
+      }
+      function lastClip() { return window.__clip && window.__clip.length ? window.__clip[window.__clip.length - 1] : null; }
+      function isList(el) { return !!el && el.getAttribute('aria-haspopup') === 'menu'; }
+      function lab(el) { var x = el && el.querySelector('.pnb-hm-label'); return x ? x.textContent : ''; }
+      function heads(p) { return p ? Array.prototype.map.call(p.querySelectorAll('.pnb-hm-head'), function (h) { return h.textContent; }) : []; }
+      function nestActs() { return acts().filter(function (a) { return /^nestcol-/.test(a); }); }
+      function nestLabels() { return nestActs().map(function (a) { return lab(item(a)); }); }
+      // the Nested columns heading sits after the column's tools (Calculated column) and before the menu's foot
+      function sectionPlaced() {
+        var m = menu(); if (!m) return false;
+        var kids = Array.prototype.slice.call(m.children), h = kids.filter(function (k) { return k.classList.contains('pnb-hm-head') && k.textContent === 'Nested columns'; })[0];
+        var calc = item('calc'), clr = item('clearPrefs');
+        return !!h && (!calc || kids.indexOf(calc) < kids.indexOf(h)) && (!clr || kids.indexOf(h) < kids.indexOf(clr));
+      }
+      var th = fth('H_JSON');
+      rclick(th);
+      R.info.acts = acts();
+      R.chk.nsSection = !!menu() && acts().indexOf('groupBy') < 0 && acts().indexOf('copy') < 0 && acts().indexOf('copyName') >= 0 && sectionPlaced()
+        && nestActs().join() === 'nestcol-0,nestcol-1,nestcol-2' && nestLabels().join() === 'SUB_ID,SUB_AMT,SUB_NAME' && nestActs().every(function (a) { return isList(item(a)); });
+      // a screen reader hears each one as a nested column (the heading is no stop for it)
+      R.info.aria = nestActs().map(function (a) { return item(a).getAttribute('aria-label'); });
+      R.chk.nsAria = nestActs().length === 3 && nestActs().every(function (a) { return item(a).getAttribute('aria-label') === 'Nested column ' + lab(item(a)); });
+      if (isList(item('nestcol-2'))) sub('nestcol-2');
+      var p2 = subPanel();
+      R.info.list = [heads(p2), subActs(), subLabels()];
+      R.chk.nsColList = !!p2 && heads(p2).join() === 'SUB_NAME' && subActs().join() === 'groupBy-2,nestcopy-2,neststats-2' && lab(item('groupBy-2')) === 'Group by SUB_NAME'
+        && item('groupBy-2').getAttribute('aria-checked') === 'false' && isList(item('nestcopy-2'));
+      closeMenu();
+      // another nested table's columns are its own column's, never H_JSON's; its tables start at row 7 (both engines see it)
+      rclick(fth('H_TEXT'));
+      R.info.listText = nestLabels();
+      var ownOk = nestLabels().join() === 'NOTE_KIND,NOTE_DAYS';
+      if (isList(item('nestcol-0'))) sub('nestcol-0');
+      R.chk.nsOwnOnly = ownOk && lab(item('groupBy-0')) === 'Group by NOTE_KIND' && isList(item('nestcopy-0'));
+      closeMenu();
+      // (guard) a plain column keeps its own items
+      rclick(fth('V_STATUS'));
+      R.chk.nsPlain = !!item('groupBy') && !item('groupBy').hasAttribute('aria-haspopup') && lab(item('groupBy')) === 'Group by this column'
+        && isList(item('copy')) && !nestActs().length && heads(menu()).indexOf('Nested columns') < 0;
+      closeMenu();
+      // a nested-table column whose tables hold no column: one greyed line with the reason
+      rclick(fth('H_NULL'));
+      var nn = item('nestnone');
+      R.info.none = nn ? [lab(nn), nn.getAttribute('aria-disabled'), nn.getAttribute('title'), acts()] : acts();
+      R.chk.nsNone = !!nn && nn.getAttribute('aria-disabled') === 'true' && nn.getAttribute('title') === 'Its nested tables have no columns'
+        && heads(menu()).indexOf('Nested columns') >= 0 && acts().indexOf('groupBy') < 0 && acts().indexOf('copy') < 0;
+      closeMenu();
+      // (guard) a column named in digits (jQuery's data() hands it back as a number, and the grouping picker's own list throws
+      // on it): the nested column's menu still opens
+      $(fth('V_ID')).data('colname', 2021);
+      var dOpen = false;
+      try { dOpen = rclick(th) && !!menu() && acts().indexOf('sortAsc') >= 0; } catch (eD) { R.info.digit = String(eD); }
+      $(fth('V_ID')).removeData('colname');
+      R.chk.nsDigitSafe = dOpen;
+      closeMenu();
+      // (guard; 2026-10-25, digitcol) the grouping picker's list throwing for any reason (a stub - a column named in digits
+      // throws no more): the nested column's menu still opens (main.js's catch in penumbraHeaderNestedFields)
+      var sbWas = window._penumbraSearchBuilder, tOpen = false;
+      window._penumbraSearchBuilder = { getAvailableColumns: function () { throw new Error('the grouping list threw (stub)'); } };
+      try { tOpen = rclick(th) && !!menu() && acts().indexOf('sortAsc') >= 0; } catch (eT) { R.info.listThrows = String(eT); }
+      if (sbWas === undefined) { delete window._penumbraSearchBuilder; } else { window._penumbraSearchBuilder = sbWas; }
+      R.chk.nsListThrows = tOpen;
+      closeMenu();
+      // the tables' own case: a key Copy reads as "Sub_Name" (group mode's SUB_NAME) is named so on the item, its list's
+      // heading and its Group by (the copy's names stubbed for the menu's build)
+      var realCF = A().nestedCopyFields;
+      A().nestedCopyFields = function (c) { var r = realCF.apply(this, arguments); return (r && String(c) === 'H_JSON') ? r.map(function (s) { return s === 'SUB_NAME' ? 'Sub_Name' : s; }) : r; };
+      try {
+        rclick(th);
+        var caseLab = lab(item('nestcol-2'));
+        if (isList(item('nestcol-2'))) sub('nestcol-2');
+        R.info.caseLab = [caseLab, heads(subPanel()), subLabels()];
+        R.chk.nsCase = caseLab === 'Sub_Name' && heads(subPanel()).join() === 'Sub_Name' && lab(item('groupBy-2')) === 'Group by Sub_Name';
+      } finally { A().nestedCopyFields = realCF; }
+      closeMenu();
+      // the whole column's Copy distinct values never comes back while it holds nested tables: with neither engine naming a
+      // column of them (the grouping picker throwing, no row shown holding one) the section says so
+      var realNF = A().nestedFields, realCF2 = A().nestedCopyFields;
+      A().nestedFields = function () { return null; };
+      A().nestedCopyFields = function () { return null; };
+      try {
+        rclick(th);
+        R.info.noRaw = acts();
+        R.chk.nsNoRaw = !!menu() && acts().indexOf('copy') < 0 && acts().indexOf('nestnone') >= 0 && heads(menu()).indexOf('Nested columns') >= 0;
+      } finally { A().nestedFields = realNF; A().nestedCopyFields = realCF2; }
+      closeMenu();
+      // the report hides Clipboard (body.restrict-clipboard, as its View Option does): no Copy distinct values - the nested
+      // tables' or a plain column's - and the copy itself refused
+      window.__clip = window.__clip || [];
+      var clipActs = [], plainCopy = true, refused = false, clipsB = window.__clip.length;
+      document.body.classList.add('restrict-clipboard');
+      try {
+        rclick(th);
+        if (isList(item('nestcol-2'))) sub('nestcol-2');
+        clipActs = subActs();
+        closeMenu();
+        rclick(fth('V_STATUS'));
+        plainCopy = !!item('copy');
+        closeMenu();
+        refused = typeof A().copyNested === 'function' && A().copyNested('H_JSON', 'SUB_NAME', ',') === false;
+        await sleep(300);
+      } finally { document.body.classList.remove('restrict-clipboard'); }
+      R.info.clipOff = { acts: clipActs, plainCopy: plainCopy, refused: refused, clips: window.__clip.length - clipsB };
+      R.chk.nsClipOff = clipActs.join() === 'groupBy-2,neststats-2' && !plainCopy && refused && window.__clip.length === clipsB;
+      // Copy distinct values of SUB_NAME: the delimiter list, then a comma copy of the fixture's values
+      rclick(th);
+      if (isList(item('nestcol-2'))) sub('nestcol-2');
+      if (isList(item('nestcopy-2'))) sub('nestcopy-2');
+      var pc = subPanel();
+      R.info.copyList = [heads(pc), subActs()];
+      var listOk = !!pc && heads(pc).join() === 'Delimited by'
+        && ['space', 'comma', 'semicolon', 'tab', 'newline', 'other'].every(function (d) { return subActs().indexOf('nestcopy-2-' + d) >= 0; });
+      var cc = item('nestcopy-2-comma');
+      if (cc) cc.click();
+      await sleep(700);
+      var wantN = distinctSub('SUB_NAME');
+      R.info.copy = { got: lastClip() && lastClip().slice(0, 120), want: wantN.join(',').slice(0, 120) };
+      R.chk.nsCopy = listOk && !!cc && wantN.length > 5 && lastClip() === wantN.join(',');
+      // Other...: Copy on Single Column (Distinct), its own option for H_JSON's SUB_NAME chosen, the delimiter box focused
+      rclick(th);
+      if (isList(item('nestcol-2'))) sub('nestcol-2');
+      if (isList(item('nestcopy-2'))) sub('nestcopy-2');
+      var co = item('nestcopy-2-other');
+      if (co) co.click();
+      await sleep(600);
+      R.info.other = { vis: $('#copyActionsLightbox').is(':visible'), sel: $('#copyColumnSelector').val(), act: document.activeElement && document.activeElement.id };
+      R.chk.nsCopyOther = !!co && $('#copyActionsLightbox').is(':visible') && $('input[name="copyFormat"][value="single_col"]').is(':checked')
+        && $('#copyColumnSelector').val() === 'H_JSON-SUB_NAME' && document.activeElement === document.getElementById('copyDelimiterInput');
+      $('#copyActionsLightbox').hide();
+      // (the review, v3) a snapshot comparison numbers its rows afresh and keys its cells by place: no nested names from it
+      var cmpN = 'n/a', cmpP = 'n/a';
+      document.body.classList.add('snapshot-comparison-active');
+      try { if (typeof A().nestedCopyFields === 'function') { cmpN = A().nestedCopyFields('H_JSON'); cmpP = A().nestedCopyPlan(); } }
+      finally { document.body.classList.remove('snapshot-comparison-active'); }
+      R.info.cmp = [cmpN, cmpP];
+      R.chk.nsCmpNone = cmpN === null && Array.isArray(cmpP) && cmpP.length === 0;
+      // a @@JSON value inside a nested table renders its own hidden copy INSIDE the table, ahead of the cell's: the copy and
+      // Copy's own list read the cell's own copy (the nested sort's rule), never the inner one (stand-ins in every row here)
+      var hid = fth('H_JSON').getAttribute('data-column'), fakes = [], innClip = null, innOpts = [];
+      Array.prototype.forEach.call(document.querySelectorAll('#resultsTable tbody td[data-column="' + hid + '"]'), function (td) {
+        var box = td.firstElementChild;
+        if (!box || box.classList.contains('raw-json-data') || !td.querySelector('.raw-json-data')) return;
+        var f = document.createElement('div'); f.className = 'raw-json-data'; f.style.display = 'none'; f.textContent = '[{"INNER_X":"zzz"}]';
+        box.insertBefore(f, box.firstChild); fakes.push(f);
+      });
+      var innB = window.__clip.length;
+      try {
+        rclick(th);
+        if (isList(item('nestcol-2'))) sub('nestcol-2');
+        if (isList(item('nestcopy-2'))) sub('nestcopy-2');
+        var ic = item('nestcopy-2-comma');
+        if (ic) ic.click();
+        await sleep(700);
+        innClip = window.__clip.length > innB ? lastClip() : null;
+        rclick(th);
+        if (isList(item('nestcol-2'))) sub('nestcol-2');
+        if (isList(item('nestcopy-2'))) sub('nestcopy-2');
+        var io = item('nestcopy-2-other');
+        if (io) io.click();
+        await sleep(600);
+        innOpts = $('#copyColumnSelector option').map(function () { return this.value; }).get();
+        $('#copyActionsLightbox').hide();
+      } finally { fakes.forEach(function (f) { f.remove(); }); }
+      R.info.inner = { fakes: fakes.length, clip: innClip && innClip.slice(0, 80), opts: innOpts.filter(function (v) { return /^H_JSON-/.test(v); }) };
+      R.chk.nsInnerOwn = fakes.length > 5 && innClip === distinctSub('SUB_NAME').join(',') && innOpts.indexOf('H_JSON-SUB_NAME') >= 0 && innOpts.indexOf('H_JSON-INNER_X') < 0;
+      // (2026-10-25, neststats; the user: "Should subcolumns have their own column stats in the flyout menu? If its cheap we
+      // should add it") each column's list ends with Column stats over its tables' values in the rows the filter keeps:
+      // SUB_AMT's row count, total and range, SUB_NAME's unique count (the fixture's); a filter on V_STATUS keeps fewer
+      function statInfo(p) { var o = {}; if (p) Array.prototype.forEach.call(p.querySelectorAll('.pnb-hm-info'), function (r) { var k = r.querySelector('.pnb-hm-info-k'), v = r.querySelector('.pnb-hm-info-v'); if (k && v) o[k.textContent] = v.textContent; }); return o; }
+      function keptSubs(key) {
+        var out = [];
+        Array.prototype.forEach.call(document.querySelectorAll('#resultsTable > tbody > tr'), function (tr) {
+          if (tr.classList.contains('search-hidden')) return;
+          var r = FX[parseInt(tr.cells[0].textContent, 10) - 1];
+          if (r && r.H_JSON) JSON.parse(r.H_JSON.substring(6)).forEach(function (x) { out.push(x[key] == null ? '' : String(x[key])); });
+        });
+        return out;
+      }
+      function fmtN(x) { return Number(x).toLocaleString(undefined, { maximumFractionDigits: 2 }); }
+      function statsOf(k) {
+        rclick(fth('H_JSON'));
+        if (isList(item('nestcol-' + k))) sub('nestcol-' + k);
+        if (isList(item('neststats-' + k))) sub('neststats-' + k);
+        var p = subPanel(), o = { head: heads(p).join('|'), info: statInfo(p) };
+        closeMenu();
+        return o;
+      }
+      function setSearchNs(t) { var a = document.createElement('a'); a.className = 'snippet-action'; a.setAttribute('data-action-name', 'search'); a.setAttribute('data-action-value', t); document.getElementById('reportSnippetOutput').appendChild(a); $(a).trigger('click'); a.remove(); }
+      var amt = keptSubs('SUB_AMT'), amtN = amt.filter(function (v) { return v !== ''; }).map(Number), amtSum = amtN.reduce(function (a, b) { return a + b; }, 0);
+      var sA = statsOf(1);
+      var nms = keptSubs('SUB_NAME').filter(function (v) { return v !== ''; }), nmU = Object.keys(nms.reduce(function (o, v) { o[v] = 1; return o; }, {})).length;
+      var sN = statsOf(2);
+      R.info.stats = { amt: sA, name: sN, want: [amt.length, amtSum, nmU] };
+      R.chk.nsStats = amt.length > 50 && sA.head.indexOf('Over the ' + fmtN(amt.length) + ' rows of its tables in the rows the filter keeps') === 0
+        && sA.info['Total'] === fmtN(amtSum) && sA.info['Smallest'] === fmtN(Math.min.apply(null, amtN)) && sA.info['Largest'] === fmtN(Math.max.apply(null, amtN))
+        && sN.info['Unique'] === (nms.length > 1 && nmU === nms.length ? 'all' : fmtN(nmU));
+      A().filterAdd('V_STATUS', 'Open', false);
+      await sleep(900);
+      var amtF = keptSubs('SUB_AMT'), sF = statsOf(1);
+      setSearchNs('');
+      await sleep(900);
+      R.info.statsF = { want: amtF.length, all: amt.length, head: sF.head };
+      R.chk.nsStatsFilter = amtF.length > 0 && amtF.length < amt.length && sF.head.indexOf('Over the ' + fmtN(amtF.length) + ' rows of its tables in the rows the filter keeps') === 0;
+      // (the review) a value that is a table of its own (an object, a list, @@JSON) is no value: counted apart, With a table
+      // (the values stubbed for the menu: 5 and 7, a blank, two tables)
+      var nvReal = A().nestedValues, tblInfo = null;
+      A().nestedValues = function () { var a = ['5', '7', '']; a.tables = 2; return a; };
+      try { var sT = statsOf(1); tblInfo = sT; } finally { A().nestedValues = nvReal; }
+      R.info.statsT = tblInfo;
+      R.chk.nsStatsTables = !!tblInfo && tblInfo.head.indexOf('Over the 5 rows of its tables in the rows the filter keeps') === 0 && tblInfo.info['With a table'] === '2'
+        && tblInfo.info['Total'] === '12' && tblInfo.info['Empty'] === '1';
+      // (guard) a main.js without nestedValues (a stale cache) where the report hides Clipboard and Grouping: no section of
+      // lists with nothing in them, and the whole column's Copy distinct values still left out
+      var nvKeep = A().nestedValues, staleActs = null;
+      delete A().nestedValues;
+      document.body.classList.add('restrict-clipboard'); document.body.classList.add('restrict-grouping');
+      try { rclick(th); staleActs = acts(); closeMenu(); }
+      finally { document.body.classList.remove('restrict-clipboard'); document.body.classList.remove('restrict-grouping'); if (nvKeep) A().nestedValues = nvKeep; }
+      R.info.stale = staleActs;
+      R.chk.nsStaleNoEmpty = !!staleActs && staleActs.indexOf('sortAsc') >= 0 && !staleActs.some(function (a) { return /^nestcol-/.test(a); }) && staleActs.indexOf('copy') < 0;
+      // the mouse, flat: Group by SUB_NAME
+      var asked = [];
+      window.confirm = function (m) { asked.push(String(m)); return true; };
+      rclick(th);
+      if (isList(item('nestcol-2'))) sub('nestcol-2');
+      var pickN = item('groupBy-2');
+      if (pickN) pickN.click();
+      var g1 = !!pickN && await groupedBy('SUB_NAME');
+      await sleep(400);
+      R.chk.nsGroups = g1 && bandsMatch('SUB_NAME') && asked.length === 0;
+      // the mouse, grouped: Ungroup before the section; SUB_NAME ticked, SUB_ID "instead"; SUB_ID picked
+      var gt = g1 ? gth('H_JSON') : null;
+      if (gt) rclick(gt);
+      var ugFirst = !!gt && acts().indexOf('ungroup') >= 0 && sectionPlaced();
+      if (gt && isList(item('nestcol-2'))) sub('nestcol-2');
+      var t2 = item('groupBy-2'), tick2 = t2 ? [lab(t2), t2.getAttribute('aria-checked')].join('|') : '';
+      if (gt && isList(item('nestcol-0'))) sub('nestcol-0');
+      var t0 = item('groupBy-0'), tick0 = t0 ? [lab(t0), t0.getAttribute('aria-checked')].join('|') : '';
+      R.info.grouped = { ugFirst: ugFirst, tick2: tick2, tick0: tick0 };
+      R.chk.nsGroupedTick = ugFirst && tick2 === 'Group by SUB_NAME|true' && tick0 === 'Group by SUB_ID instead|false';
+      if (t0 && tick0) t0.click();
+      var g2 = !!t0 && !!tick0 && await groupedBy('SUB_ID');
+      await sleep(400);
+      R.chk.nsRegroup = g2 && bandsMatch('SUB_ID');
+      closeMenu();
+      // the keyboard, flat: the menu from the heading, ArrowDown to SUB_NAME, ArrowRight opens its list on Group by (the
+      // heading is no stop), Enter groups; then the copy: ArrowDown to Copy distinct values, ArrowRight, comma, Enter
+      async function kbdTo(el, act) {
+        if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0');
+        el.focus(); rclick(el, true);
+        for (var n = 0; n < 40 && menu() && (document.activeElement && document.activeElement.getAttribute('data-act')) !== act; n++) keyOn('ArrowDown');
+        return !!document.activeElement && document.activeElement.getAttribute('data-act') === act;
+      }
+      await flat();
+      await sleep(300);
+      var kth = fth('H_JSON');
+      var onN = await kbdTo(kth, 'nestcol-2');
+      if (onN) keyOn('ArrowRight');
+      await sleep(100);
+      var ae = document.activeElement;
+      R.info.kbd = { onN: onN, ae: ae ? ae.getAttribute('data-act') : null, sub: !!subPanel() };
+      R.chk.nsKbdOpens = onN && !!subPanel() && !!ae && ae.getAttribute('data-act') === 'groupBy-2' && subPanel().contains(ae);
+      if (R.chk.nsKbdOpens) keyOn('Enter');
+      var g3 = R.chk.nsKbdOpens && await groupedBy('SUB_NAME');
+      await sleep(400);
+      R.chk.nsKbdPick = !!g3 && !menu() && bandsMatch('SUB_NAME');
+      await flat();
+      await sleep(300);
+      var clipsBefore = (window.__clip || []).length;
+      var onN2 = await kbdTo(fth('H_JSON'), 'nestcol-2');
+      if (onN2) { keyOn('ArrowRight'); await sleep(80); keyOn('ArrowDown'); }
+      var onCopy = !!document.activeElement && document.activeElement.getAttribute('data-act') === 'nestcopy-2';
+      if (onCopy) { keyOn('ArrowRight'); await sleep(80); }
+      var onSpace = !!document.activeElement && document.activeElement.getAttribute('data-act') === 'nestcopy-2-space';
+      if (onSpace) { keyOn('ArrowDown'); keyOn('Enter'); }
+      await sleep(700);
+      R.info.kbdCopy = { onN2: onN2, onCopy: onCopy, onSpace: onSpace, clips: (window.__clip || []).length - clipsBefore };
+      R.chk.nsKbdCopy = onCopy && onSpace && (window.__clip || []).length > clipsBefore && lastClip() === distinctSub('SUB_NAME').join(',');
+      closeMenu();
+      // a menu taller than the window scrolls (held to 150px here): End, then Home, keeps the keyboard's item in sight - the
+      // menu's own scroll, never the page's
+      var sth = fth('H_JSON');
+      if (!sth.hasAttribute('tabindex')) sth.setAttribute('tabindex', '0');
+      sth.focus(); rclick(sth, true);
+      var mEl = menu(), y0 = window.scrollY;
+      function inSight() { var ae = document.activeElement; if (!mEl || !ae || !mEl.contains(ae)) return false; var r = ae.getBoundingClientRect(), mr = mEl.getBoundingClientRect(); return r.top >= mr.top - 1 && r.bottom <= mr.bottom + 1; }
+      if (mEl) mEl.style.maxHeight = '150px';
+      keyOn('End'); await sleep(80);
+      var endOk = !!mEl && inSight() && mEl.scrollTop > 0;
+      keyOn('Home'); await sleep(80);
+      var homeOk = !!mEl && inSight() && mEl.scrollTop === 0;
+      R.info.kbdScroll = { endOk: endOk, homeOk: homeOk, top: mEl ? mEl.scrollTop : null, y: [y0, window.scrollY], ae: document.activeElement && document.activeElement.getAttribute('data-act') };
+      R.chk.nsKbdScroll = endOk && homeOk && window.scrollY === y0;
+      closeMenu();
+    },
+    // (2026-10-25, nestgb / nestcopy) the grouped view a report opens in (by H_GROUP; the List layout's module loaded, as index.php
+    // has it): H_JSON's heading has Ungroup and the Nested columns section, its items "instead", nothing ticked; from the keyboard
+    // SUB_NAME regroups (13 groups); there SUB_NAME is ticked and picking it again changes nothing; Copy distinct values in the
+    // grouped view copies every group's rows' values
+    ggnest: async function () {
+      var l = A().layout();
+      l.cols.forEach(function (c) { if (c.colName === 'H_JSON') c.visible = true; });
+      A().applyLayout(l);
+      await sleep(700);
+      function isList(el) { return !!el && el.getAttribute('aria-haspopup') === 'menu'; }
+      function lab(el) { var x = el && el.querySelector('.pnb-hm-label'); return x ? x.textContent : ''; }
+      function nestActs() { return acts().filter(function (a) { return /^nestcol-/.test(a); }); }
+      var names = Object.create(null), blank = false;
+      window.__rowsFixture.forEach(function (r) { if (!r.H_JSON) { blank = true; return; } JSON.parse(r.H_JSON.substring(6)).forEach(function (x) { names[String(x.SUB_NAME)] = 1; }); });
+      var wantN = Object.keys(names).length + (blank ? 1 : 0);
+      var th = gth('H_JSON');
+      if (th) rclick(th);
+      R.info.section = th ? { acts: acts(), labels: nestActs().map(function (a) { return lab(item(a)); }) } : null;
+      var secOk = !!th && acts().indexOf('ungroup') >= 0 && acts().indexOf('groupBy') < 0 && acts().indexOf('copy') < 0
+        && nestActs().map(function (a) { return lab(item(a)); }).join() === 'SUB_ID,SUB_AMT,SUB_NAME';
+      if (secOk && isList(item('nestcol-1'))) sub('nestcol-1');
+      var g1 = item('groupBy-1');
+      R.chk.gnSection = secOk && !!g1 && lab(g1) === 'Group by SUB_AMT instead' && g1.getAttribute('aria-checked') === 'false';
+      closeMenu();
+      // the keyboard: from the heading, ArrowDown to SUB_NAME, ArrowRight (onto Group by), Enter
+      var kth = gth('H_JSON');
+      if (kth && !kth.hasAttribute('tabindex')) kth.setAttribute('tabindex', '0');
+      if (kth) { kth.focus(); rclick(kth, true); }
+      for (var n = 0; n < 40 && menu() && (document.activeElement && document.activeElement.getAttribute('data-act')) !== 'nestcol-2'; n++) keyOn('ArrowDown');
+      var onN = !!document.activeElement && document.activeElement.getAttribute('data-act') === 'nestcol-2';
+      if (onN) keyOn('ArrowRight');
+      await sleep(100);
+      var ae = document.activeElement;
+      R.info.kbd = { onN: onN, ae: ae ? ae.getAttribute('data-act') : null, label: lab(ae) };
+      R.chk.gnKbdOpens = onN && !!subPanel() && !!ae && ae.getAttribute('data-act') === 'groupBy-2' && lab(ae) === 'Group by SUB_NAME instead';
+      if (R.chk.gnKbdOpens) keyOn('Enter');
+      var g = R.chk.gnKbdOpens && await groupedBy('SUB_NAME');
+      await sleep(700);
+      R.info.after = { gcol: A() && A().groupingColumn(), groups: tops().length, want: wantN, list: glOn() };
+      R.chk.gnKbdPick = !!g && !menu() && tops().length === wantN && wantN > 5;
+      // ticked now; picked again, nothing changes (the same group boxes)
+      var t2 = g ? gth('H_JSON') : null, before = tops()[0] || null;
+      if (t2) rclick(t2);
+      if (t2 && isList(item('nestcol-2'))) sub('nestcol-2');
+      var tk = item('groupBy-2');
+      R.info.tick = tk ? [lab(tk), tk.getAttribute('aria-checked')] : null;
+      R.chk.gnTick = !!tk && lab(tk) === 'Group by SUB_NAME' && tk.getAttribute('aria-checked') === 'true';
+      if (tk && R.chk.gnTick) tk.click();
+      await sleep(900);
+      R.chk.gnTickNoop = !!tk && R.chk.gnTick && !!before && tops()[0] === before && document.contains(before) && A().groupingColumn() === 'SUB_NAME';
+      closeMenu();
+      // Copy distinct values in the grouped view: every group's rows (a newline between values)
+      window.__clip = window.__clip || [];
+      var t3 = gth('H_JSON');
+      if (t3) rclick(t3);
+      if (t3 && isList(item('nestcol-2'))) sub('nestcol-2');
+      if (isList(item('nestcopy-2'))) sub('nestcopy-2');
+      var cn = item('nestcopy-2-newline');
+      if (cn) cn.click();
+      await sleep(700);
+      var got = (window.__clip.length ? window.__clip[window.__clip.length - 1] : '') || '';
+      R.info.copy = got.slice(0, 120);
+      R.chk.gnCopyGrouped = !!cn && got.split('\n').sort().join() === Object.keys(names).sort().join();
+      closeMenu();
+      // (2026-10-25, neststats, the review) grouped, with a search typed there (it marks the grouped rows alone): a column's
+      // Column stats count the rows it keeps, each row once though it sits in several groups
+      function setSearchGg(t) { var a = document.createElement('a'); a.className = 'snippet-action'; a.setAttribute('data-action-name', 'search'); a.setAttribute('data-action-value', t); document.getElementById('reportSnippetOutput').appendChild(a); $(a).trigger('click'); a.remove(); }
+      A().filterAdd('V_STATUS', 'Open', false);
+      await sleep(900);
+      var seenIx = Object.create(null), wantG = 0, headG = '';
+      Array.prototype.forEach.call(document.querySelectorAll('#groupedResultsContainer table tbody tr:not(.search-hidden)'), function (tr) {
+        var ix = tr.getAttribute('data-row-index');
+        if (ix === null) { var hc = tr.querySelector("td[data-column='#']"); ix = hc ? parseInt(hc.textContent, 10) - 1 : NaN; } else { ix = parseInt(ix, 10); }
+        if (isNaN(ix) || ix < 0 || seenIx[ix]) return;
+        seenIx[ix] = 1;
+        var r = window.__rowsFixture[ix];
+        if (r && r.H_JSON) wantG += JSON.parse(r.H_JSON.substring(6)).length;
+      });
+      var tg = gth('H_JSON');
+      if (tg) {
+        rclick(tg);
+        if (isList(item('nestcol-1'))) sub('nestcol-1');
+        if (isList(item('neststats-1'))) sub('neststats-1');
+        var pg = subPanel(), hg = pg ? pg.querySelector('.pnb-hm-head') : null;
+        headG = hg ? hg.textContent : '';
+        closeMenu();
+      }
+      setSearchGg('');
+      await sleep(900);
+      R.info.statsG = { want: wantG, head: headG, rows: Object.keys(seenIx).length };
+      R.chk.gnStatsGrouped = wantG > 0 && Object.keys(seenIx).length < 300 && headG.indexOf('Over the ' + wantG.toLocaleString() + ' rows of its tables') === 0;
+    },
+    // (2026-10-25, nestgb2; the user: "@@JSON column names shouldn't appear in the command palette's group by, but the
+    // nested columns should (just like in group mode UI)") a group's band menu, grouped by H_GROUP then H_GROUP2 with the
+    // nested-table columns shown: no list names one; the top level's list ends with their tables' columns, under Nested
+    // table columns, one item for a name two tables share; a level below and Add a level below list none (the dialog offers
+    // them at level 1 alone) and their Other column... names no nested fields; a pick regroups as the dialog does with the
+    // same levels (the groups compared), ticked after, with its Undo; from the keyboard; a hidden one's tables are not read.
+    gnnestbd: async function () {
+      var G = GM();
+      var l = A().layout();
+      l.cols.forEach(function (c) { if (NB_COLS.indexOf(c.colName) >= 0) c.visible = true; });
+      A().applyLayout(l);
+      await sleep(700);
+      if (G && tops()[0]) G.layout('stacked', tops()[0]);   // chosen: a regroup keeps it
+      await sleep(300);
+      var want = nbWant(NB_COLS), wantActs = want.map(function (s) { return 'gby:' + s; });
+      function topBand() { var w = tops()[0]; return w ? w.querySelector(':scope > .group-header') : null; }
+      function inner() { var w = tops()[0]; return w ? w.querySelector('.group-wrapper[data-group-depth="1"] > .group-header') : null; }
+      function listOf(el, parent) { closeMenu(); if (!el || !rclick(el) || !sub(parent)) { closeMenu(); return []; } return nbSeq(); }
+      function titleOf(act) { var x = item(act); return x ? (x.getAttribute('title') || '') : null; }
+      function noParent(s) { return NB_COLS.every(function (c) { return s.indexOf('gby:' + c) < 0 && s.indexOf('gadd:' + c) < 0; }); }
+      function noNest(s) { return s.indexOf('H:Nested table columns') < 0 && want.every(function (n) { return s.indexOf('gby:' + n) < 0 && s.indexOf('gadd:' + n) < 0; }); }
+      function plainToo(s) { return s.indexOf('gby:V_STATUS') >= 0 || s.indexOf('gadd:V_STATUS') >= 0; }
+      // the four lists: the top band's Group this level by and Add a level below, the inner band's two
+      var tBy = listOf(topBand(), 'gBy'), tByOther = titleOf('gby-other');
+      var tAdd = listOf(topBand(), 'gAdd');
+      var iBy = listOf(inner(), 'gBy'), iByOther = titleOf('gby-other');
+      var iAdd = listOf(inner(), 'gAdd'), iAddOther = titleOf('gadd-other');
+      closeMenu();
+      R.info.lists = { want: want, tBy: tBy, tAdd: tAdd, iBy: iBy, iAdd: iAdd, titles: [tByOther, iByOther, iAddOther], levels: levelsNow() };
+      var hi = tBy.indexOf('H:Nested table columns');
+      R.chk.nbTopList = levelsNow() === 'H_GROUP,H_GROUP2' && hi > 1 && tBy[hi - 1] === '-' && tBy.slice(0, hi - 1).every(function (a) { return /^gby:V_/.test(a); })
+        && tBy.indexOf('gby:V_STATUS') >= 0 && tBy.slice(hi + 1, hi + 1 + want.length).join() === wantActs.join()
+        && tBy[hi + 1 + want.length] === '-' && tBy[hi + 2 + want.length] === 'gby-other' && tBy.length === hi + 3 + want.length;
+      R.chk.nbDedupe = tBy.filter(function (a) { return a === 'gby:SUB_NAME'; }).length === 1 && tBy.indexOf('gby:ENT_KIND') >= 0 && tBy.indexOf('gby:NOTE_KIND') >= 0;
+      R.chk.nbNoParent = [tBy, tAdd, iBy, iAdd].every(function (s) { return plainToo(s) && noParent(s); });
+      R.chk.nbInnerNone = [tAdd, iBy, iAdd].every(function (s) { return plainToo(s) && noNest(s); });
+      R.chk.nbOtherTitle = /nested fields/.test(tByOther || '') && iByOther !== null && !/nested/.test(iByOther) && iAddOther !== null && !/nested/.test(iAddOther);
+      // the mouse: SUB_NAME for the top level - the notice with its Undo, the pick ticked after
+      var asked = [];
+      window.confirm = function (m) { asked.push(String(m)); return true; };
+      window.__toasts.length = 0;
+      var picked = await chooseIn(topBand(), 'gBy', 'gby:SUB_NAME');
+      var g1 = picked && await until(function () { return levelsNow() === 'SUB_NAME,H_GROUP2'; }, 15000);
+      await sleep(500);
+      var s1 = g1 ? nbShape() : '', ub = undoBtn(/Grouped level 1 by SUB_NAME/);
+      var tk = null;
+      if (g1) { var sb = listOf(topBand(), 'gBy'), x = item('gby:SUB_NAME'); tk = (x && sb.length) ? x.getAttribute('aria-checked') : null; }
+      closeMenu();
+      R.info.pick = { picked: picked, levels: levelsNow(), groups: tops().length, asked: asked.slice(), toasts: window.__toasts.slice(-2), tick: tk };
+      R.chk.nbPickTick = !!g1 && tk === 'true';
+      if (ub) ub.click();
+      R.chk.nbUndo = !!ub && await until(function () { return levelsNow() === 'H_GROUP,H_GROUP2'; }, 15000);
+      await sleep(400);
+      // the same levels from the dialog: the same groups
+      var s2 = await nbDialog(['SUB_NAME', 'H_GROUP2']);
+      R.info.shapes = { n: [s1.split('|').length, s2.split('|').length], s1: s1.slice(0, 240), s2: s2.slice(0, 240) };
+      R.chk.nbPick = !!g1 && !!ub && asked.length === 0 && !!s1 && s1 === s2 && tops().length > 5;
+      // the keyboard: a top band's name, Shift+F10, down to Group this level by, ArrowRight, down to SUB_ID, Enter
+      var bN = topBand(), nmEl = bN ? bN.querySelector('.group-name') : null;
+      if (nmEl) { nmEl.focus(); rclick(nmEl, true); }
+      for (var n = 0; n < 40 && menu() && (document.activeElement && document.activeElement.getAttribute('data-act')) !== 'gBy'; n++) keyOn('ArrowDown');
+      var onBy = !!document.activeElement && document.activeElement.getAttribute('data-act') === 'gBy';
+      if (onBy) keyOn('ArrowRight');
+      await sleep(100);
+      for (var n2 = 0; n2 < 40 && subPanel() && (document.activeElement && document.activeElement.getAttribute('data-act')) !== 'gby:SUB_ID'; n2++) keyOn('ArrowDown');
+      var onSub = !!document.activeElement && document.activeElement.getAttribute('data-act') === 'gby:SUB_ID' && !!subPanel() && subPanel().contains(document.activeElement);
+      if (onSub) keyOn('Enter');
+      var g3 = onSub && await until(function () { return levelsNow() === 'SUB_ID,H_GROUP2'; }, 15000);
+      await sleep(400);
+      R.info.kbd = { onBy: onBy, onSub: onSub, levels: levelsNow() };
+      R.chk.nbKbd = !!g3 && !menu();
+      closeMenu();
+      // (a guard) a hidden nested-table column's tables are not read: H_ENT hidden, ENT_KIND goes (SUB_NAME stays H_JSON's)
+      var l2 = A().layout();
+      l2.cols.forEach(function (c) { if (c.colName === 'H_ENT') c.visible = false; });
+      A().applyLayout(l2);
+      await sleep(700);
+      var hBy = listOf(topBand(), 'gBy');
+      closeMenu();
+      R.info.hidden = hBy;
+      R.chk.nbHiddenNot = plainToo(hBy) && hBy.indexOf('gby:ENT_KIND') < 0 && hBy.indexOf('gby:H_ENT') < 0;
+      // ...the list: the shown ones' tables' columns alone, SUB_NAME kept (H_JSON's tables, shown, hold it too)
+      var hi2 = hBy.indexOf('H:Nested table columns'), wantH = nbWant(['H_TEXT', 'H_JSON', 'H_NULL']);
+      R.chk.nbHiddenList = hi2 > 0 && hBy.slice(hi2 + 1, hi2 + 1 + wantH.length).join() === wantH.map(function (s) { return 'gby:' + s; }).join()
+        && hBy[hi2 + 1 + wantH.length] === '-' && wantH.indexOf('SUB_NAME') >= 0;
+    },
+    // (2026-10-25, nestgb2) the status bar's grouping chip (index.php's, lifted for this scenario), grouped by H_GROUP with
+    // every nested-table column hidden (the chip lists every column): no button for one; their tables' columns after the
+    // others, under Nested table columns, one button for a shared name; SUB_NAME groups as the dialog does (the groups
+    // compared) and is the one lit after; the plain columns keep their buttons, the one grouped by lit (a guard)
+    gchipnest: async function () {
+      var G = GM();
+      if (G && tops()[0]) G.layout('stacked', tops()[0]);   // chosen: the chip's regroup keeps it
+      await sleep(300);
+      var want = nbWant(NB_COLS);
+      function open() { if (!$('#sbColsSeg').hasClass('sb-grp-open')) $('#sbGroup').trigger('click'); }
+      function shut() { if ($('#sbColsSeg').hasClass('sb-grp-open')) $('#sbGroup').trigger('click'); }
+      function cseq() {
+        return Array.prototype.map.call(document.querySelectorAll('#sbGrpCols > *'), function (e) {
+          if (e.classList.contains('sb-grp-col')) return 'B:' + e.getAttribute('data-col') + (e.classList.contains('sb-grp-active') ? '*' : '');
+          return e.classList.contains('sb-pop-h') ? 'H:' + e.textContent + (e.classList.contains('sb-mt') ? '^' : '') : '?' + e.tagName;
+        });
+      }
+      open();
+      await sleep(200);
+      var s = cseq();
+      R.info.chip = { s: s, want: want, open: $('#sbColsSeg').hasClass('sb-grp-open'), lifted: !!document.getElementById('sbGrpCols') };
+      var bi = s.indexOf('H:Nested table columns^');
+      R.chk.ncNoParent = s.length > 5 && NB_COLS.every(function (c) { return s.indexOf('B:' + c) < 0 && s.indexOf('B:' + c + '*') < 0; });
+      R.chk.ncPlain = s.indexOf('B:V_STATUS') >= 0 && s.indexOf('B:H_GROUP2') >= 0 && s.indexOf('B:H_GROUP*') >= 0;
+      R.chk.ncNestList = bi > 0 && s.slice(0, bi).every(function (x) { return /^B:/.test(x); })
+        && s.slice(bi + 1).join() === want.map(function (x) { return 'B:' + x; }).join();
+      // SUB_NAME: grouped by it, as the dialog groups by it; lit when the chip opens again
+      var asked = [];
+      window.confirm = function (m) { asked.push(String(m)); return true; };
+      var bt = document.querySelector('#sbGrpCols .sb-grp-col[data-col="SUB_NAME"]');
+      if (bt) bt.click();
+      var g1 = !!bt && await groupedBy('SUB_NAME');
+      await sleep(500);
+      var s1 = g1 ? nbShape() : '';
+      open();
+      await sleep(200);
+      var sa = cseq();
+      shut();
+      R.info.after = { s: sa, levels: levelsNow(), groups: tops().length, asked: asked.slice() };
+      R.chk.ncActive = !!g1 && sa.indexOf('B:SUB_NAME*') >= 0 && sa.filter(function (x) { return /\*$/.test(x); }).length === 1;
+      var s2 = await nbDialog(['SUB_NAME']);
+      R.info.shapes = { n: [s1.split('|').length, s2.split('|').length], s1: s1.slice(0, 240), s2: s2.slice(0, 240) };
+      R.chk.ncPick = !!g1 && asked.length === 0 && !!s1 && s1 === s2 && tops().length > 5;
     },
     mexcl: async function () {
       var td = document.querySelector('#resultsTable tbody tr td a');

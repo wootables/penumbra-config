@@ -32,3 +32,23 @@ into the run's temp dir, never the auditfixes mirror) - a GUARD, green on live t
 Found by the suite (2026-10-22): main.js's `penumbraSnippetQuoteState` ignored backticks, so an apostrophe
 or a paren INSIDE backtick text in a call silently stopped the whole snippet rendering (pre-existing; it
 would have hit every dictionary). Fixed in the scan: backtick spans are masked first, as the engines do.
+
+(2026-10-24, dictstat41) `dstats`: Column stats starts with the column's meaning where the dictionary names it (the
+user: "could be in the stats submenu even"). One item under a "What it means" heading: the text escaped, cut past 280
+characters at a word, an AI draft / Do not use tag, the source, the whole of it in its aria-label; a click or Enter
+(ArrowRight on Column stats lands ON it) opens the dialog at the ENTRY's name, as the header's What this column means
+now does. Stand-in entries (D().entryFor swapped for V_AMOUNT) give the long, avoid/blank and found-by-label cases;
+a spy on window.Penumbra.openDataDictionary reads the name the dialog is opened at. `S-helpStats`: the help names it,
+and the touched bullet and cell stay within L16. 10 x- mutants; j-nomenu / j-menuany follow `dictEntry`. The
+comparison menu's What this column means is cmpmenu's C34.
+
+## Later rounds (all live)
+
+- 2026-10-22 b `4d15f3b` the pivot's part (`[pivot]` / `[columns]`): scenario `pdict`, `pv*` unit checks.
+- 2026-10-22 `af4e9c2` long meanings wrap (`L-dlink-wraps`).
+- 2026-10-22 c `04f7faf` the eager core / lazy UI split (`dlazy`) and the editor (`dedit`; Generate's grid in `dgen`).
+- 2026-10-24 `ca5b46f` the final bug sweep from an independent review (`desc`, `dgen2`, `labelScan`, `noNesting`,
+  `deadBlocks`, `multiReplace`, `commentsKept`, `litEscapes`, `commentStripped`; `email_tests.php` now also holds the
+  schedule_runner.php comment strippers to backtick text). Traps: main.js's global Escape is a CAPTURE listener on
+  document that clicks a dialog's first `.modal-btn-primary` - a dialog's own Escape guard must capture on WINDOW and
+  must never leave Apply as that button's job; the lazy half runs in promises (the driver records unhandled rejections).

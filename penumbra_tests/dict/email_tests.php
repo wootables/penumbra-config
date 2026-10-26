@@ -22,6 +22,14 @@ t('plainBlockGone', strpos($plain, 'V_ID |') === false && strpos($plain, 'dict|'
 // a blank label too
 $out2 = execute_email_snippet("A\naction(infobox, , dict|`X | y`)\nB", $data, $cols, 'flat', array(), array('renderCharts' => false));
 t('blankLabel', strpos($out2, 'X | y') === false && strpos($out2, 'A') !== false && strpos($out2, 'B') !== false, $out2);
+// (2026-10-24 sweep) an apostrophe inside the block must not pair with one after it and shield a
+// commented-out rule from the // stripper (parse_format_rules / _heatmap_ / _rewrite_)
+$dead = "action(infobox, D, dict|`\nV_ID | The vendor's id\n`)\n// format(cell, V_AMOUNT, V_AMOUNT > 0, 'color:red')\nDon't worry.";
+$live = str_replace('// format(', 'format(', $dead);
+t('commentedRuleStaysDead', count(parse_format_rules($dead)) === 0, json_encode(parse_format_rules($dead)));
+t('liveRuleStillRead', count(parse_format_rules($live)) >= 1, json_encode(parse_format_rules($live)));
+$deadRw = "action(infobox, D, dict|`\nV_ID | The vendor's id\n`)\n// rewrite(V_ID, 'x{val}')\nDon't.";
+t('commentedRewriteStaysDead', count(parse_rewrite_rules($deadRw)) === 0, json_encode(parse_rewrite_rules($deadRw)));
 // positive control: a bare block (no action() around it) DOES reach the mail - the searches above can see a leak
 $leak = execute_email_snippet("dict|`X | y`", $data, $cols, 'flat', array(), array('renderCharts' => false));
 t('controlLeakVisible', strpos($leak, 'X | y') !== false, $leak);

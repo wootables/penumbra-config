@@ -3,6 +3,7 @@
 //   dunit   the module's own functions: parse, serialize, blocks, replace, merge, render, clean
 //   dlink   engine A draws the link; the dialog: note, rows, tags, source, filter, editor lines
 //   dmenu   the header menu's "What this column means": only for a column with an entry; focus
+//   dstats  (2026-10-24) Column stats starts with the column's meaning; a click / Enter opens the dictionary at the entry
 //   dopts   Column options' link: only for a column with an entry; opens the dialog on it
 //   dview   a viewer (no admin console): no editor lines, no Generate button
 //   dblank  a blank label: no link drawn, the dictionary still found (menu item, has())
@@ -120,6 +121,34 @@
     ok('pvRenderMissing', /these pivot values<\/strong>[^<]*: Other/.test(ph), ph);
     var nh = d.renderHtml(legacy, {});
     ok('pvRenderPlain', nh.indexOf('pnb-dict-sec-pivot') === -1 && nh.indexOf('<h4') === -1);
+    // --- (2026-10-24 sweep) the call found backwards from dict|, whatever the label holds
+    function oneCall(s) { var b = d.blocks(s); return b.length === 1 && b[0].start === 0 && b[0].end === s.length; }   // every case starts with its call
+    var nb = d.blockText({ note: [], entries: [{ name: 'A', key: 'A', text: 'x', source: '', draft: false, avoid: false }], pivot: { note: [], entries: [] } }, 'L');
+    var cases = ['action(infobox, Transaction dictionary, dict|`A | a`)', 'action(infobox, Data dictionary (FY26), dict|`A | a`)', 'Action( infobox , "Data, dict", dict|`A | a`)',
+                 'action(infobox, D, count() > 0, dict|`A | a`)', "action(infobox, 'Ann''s list', dict|`A | a`)"];
+    ok('labelScan', cases.every(oneCall) && d.blocks(cases[0])[0].label === 'Transaction dictionary' && d.blocks(cases[1])[0].label === 'Data dictionary (FY26)' && d.blocks(cases[2])[0].label === 'Data, dict',
+       cases.map(function (c) { return JSON.stringify(d.blocks(c)); }));
+    ok('noNesting', cases.every(function (c) { var r = d.replaceInSnippet(c, nb); return r === nb && (r.match(/action\s*\(/gi) || []).length === 1; }), cases.map(function (c) { return d.replaceInSnippet(c, nb); }));
+    // a commented-out block is read by nothing and written by nothing
+    var withDead = '/* action(infobox, Old, dict|`A | old`) */\naction(infobox, New, dict|`A | new`)\n// action(infobox, Older, dict|`A | older`)';
+    var wd = d.fromSnippet(withDead), wr = d.replaceInSnippet(withDead, nb);
+    ok('deadBlocks', wd && wd.entries[0].text === 'new' && wd.label === 'New' && wr.indexOf('/* action(infobox, Old, dict|`A | old`) */') === 0 && wr.indexOf('// action(infobox, Older') !== -1
+       && wr.indexOf('action(infobox, New') === -1 && wr.indexOf(nb) !== -1, [wd, wr]);
+    // several live blocks: the whole dictionary goes into the first, the others go
+    var two = 'x\naction(infobox, D1, dict|`A | one\nN1`)\nmid\naction(infobox, D2, dict|`B | two\nN2`)\nend';
+    var td = d.fromSnippet(two); td.entries.forEach(function (e) { if (e.key === 'B') { e.text = 'edited'; } });
+    var tr = d.replaceInSnippet(two, d.blockText(td, td.label)), back = d.fromSnippet(tr);
+    ok('multiReplace', d.blocks(tr).length === 1 && /^x\n/.test(tr) && /\nmid\nend$/.test(tr) && back.entries.filter(function (e) { return e.key === 'B'; })[0].text === 'edited'
+       && back.note.join('|') === 'N1|N2', [tr, back]);
+    // # comments survive a round trip; text that would read as a comment, a marker or a flag is escaped
+    var cm = d.parse('# kept comment\nA | a\n[pivot]\n# pivot comment\nV | v');
+    var cs = d.serialize(cm);
+    ok('commentsKept', /^# kept comment\n/.test(cs.split('[columns]\n')[1] || '') && cs.indexOf('[pivot]\n# pivot comment\n') === 0 && d.parse(cs).comments.join() === '# kept comment', cs);
+    var tricky = { note: ['# of PIs per row', '[pivot]', '\\ backslash'], entries: [{ name: '#ID', key: '#ID', text: '? unknown here', source: '', draft: false, avoid: false },
+        { name: 'B', key: 'B', text: '! not a flag', source: '', draft: true, avoid: false }], pivot: { note: [], entries: [] } };
+    var tp = d.parse(d.serialize(tricky)), tb = tp.entries.filter(function (e) { return e.key === 'B'; })[0], ti = tp.entries.filter(function (e) { return e.key === '#ID'; })[0];
+    ok('litEscapes', tp.note.join('|') === '# of PIs per row|[pivot]|\\ backslash' && !d.hasPivot(tp) && !!ti && ti.text === '? unknown here' && !ti.draft && !ti.avoid
+       && !!tb && tb.text === '! not a flag' && tb.draft && !tb.avoid, [d.serialize(tricky), tp]);
   }
 
   // ------------------------------------------------------------------ dlazy (2026-10-22 c)
@@ -194,7 +223,7 @@
     await until(function () { return !dlgBody().querySelector('.pnb-dicted'); }, 3000);
     var snip = window.Penumbra.snippetText(), d2 = D().fromSnippet(snip), by = {};
     d2.entries.forEach(function (e) { by[e.key] = e; });
-    ok('applied', D().blocks(snip).length === 1 && /^Before the block\./.test(snip) && /\nAfter the block\.$/.test(snip) && snip !== before, snip.slice(0, 200));
+    ok('applied', D().blocks(snip).length === 1 && /^Before the block\./.test(snip) && /\nAfter the block\. Don't worry\.$/.test(snip) && snip !== before, snip.slice(0, 200));
     ok('appliedValues', by.V_NAME && by.V_NAME.text === 'The vendor\'s legal name, / as on the invoice.' && !by.V_NAME.draft && by.V_ID.avoid && !by.H_OLD && by.V_DATE && by.V_DATE.text === 'When it was paid.'
        && d2.note.join() === 'One row per payment.' && by.H_ZZ.avoid && by.V_AMOUNT.source === 'LR_FIXTURE.AMT', d2);
     ok('backToView', rows().length > 0 && !!rowOf('V_DATE') && !rowOf('H_OLD') && !!foot().querySelector('[id$="_ok"]') && !foot().querySelector('[data-dd="apply"]'));
@@ -204,6 +233,68 @@
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
     await until(function () { return !document.querySelector('.infobox-overlay'); }, 3000);
     ok('escAfterApply', asked === 0 && !document.querySelector('.infobox-overlay'));
+  }
+
+  // ------------------------------------------------------------------ desc (2026-10-24 sweep)
+  // Esc in Edit = Cancel, never Apply (main.js's Escape clicks the first .modal-btn-primary,
+  // which in Edit was "Apply to Custom Code"); a removed row asked for again comes back
+  async function desc() {
+    var before = window.Penumbra.snippetText(), asked = 0;
+    window.confirm = function () { asked++; return true; };
+    function esc() { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); }
+    async function edit() { dlgBody().querySelector('[data-dd="edit"]').click(); await until(function () { return !!edRow('V_ID'); }, 3000); }
+    link('dict').click();
+    await until(function () { return rows().length > 0; }, 4000);
+    await edit();
+    esc(); await sleep(250);
+    ok('escCleanCancels', !!dialog() && !dlgBody().querySelector('.pnb-dicted') && rows().length > 0 && asked === 0 && window.Penumbra.snippetText() === before);
+    await edit();
+    type(edRow('V_NAME').querySelector('[data-ed="text"]'), 'Changed, then discarded.');
+    esc(); await sleep(250);
+    ok('escDiscards', asked === 1 && !!dialog() && !dlgBody().querySelector('.pnb-dicted') && window.Penumbra.snippetText() === before, window.Penumbra.snippetText() === before);
+    // a removed row asked for again (Another name...) is kept again, not ignored
+    await edit();
+    edRow('H_OLD').querySelector('[data-ed="remove"]').click();
+    window.prompt = function () { return 'H_OLD'; };
+    var sel = dlgBody().querySelector('.pnb-dicted-sec[data-sec="columns"] [data-ed="add"]');
+    sel.value = '__other'; sel.dispatchEvent(new Event('change', { bubbles: true }));
+    ok('reAddRemoved', !!edRow('H_OLD') && !edRow('H_OLD').classList.contains('is-removed') && !edRow('H_OLD').querySelector('textarea').disabled);
+    // the X with changes, answered No: still editing; with no changes the dialog just closes
+    type(edRow('V_NAME').querySelector('[data-ed="text"]'), 'Changed again.');
+    window.confirm = function () { asked++; return false; };
+    dialog().querySelector('.close-lightbox').click(); await sleep(250);
+    ok('xAsks', !!dialog() && !!edRow('V_NAME'));
+    window.confirm = function () { asked++; return true; };
+    foot().querySelector('[data-dd="cancel"]').click();
+    await closeDialog();
+    ok('closedClean', !document.querySelector('.infobox-overlay') && window.Penumbra.snippetText() === before);
+  }
+
+  // ------------------------------------------------------------------ dgen2 (2026-10-24 sweep)
+  // Generate again builds on what is under review: a row checked in the grid stays as edited
+  async function dgen2() {
+    var log = [];
+    fakeXhr(200, { status: 'ok', dictionary: 'V_ID | Gen id.\nV_NAME | Gen vendor name.\nV_DATE | Gen date.', sources: 'x' }, log);
+    D().openGenerator();
+    await until(function () { return !!gen(); }, 3000);
+    gq('[data-dg="go"]').click();
+    await until(function () { return gq('[data-dg="insert"]') && !gq('[data-dg="insert"]').hidden; }, 4000);
+    var row = gq('.pnb-dicted tr[data-key="V_NAME"]');
+    var ta = row.querySelector('textarea'); ta.value = 'Reviewed vendor name.'; ta.dispatchEvent(new Event('input', { bubbles: true }));
+    row.querySelector('[data-ed="check"]').click();
+    // closing now would drop the review: asked, and a No keeps it
+    var asked = 0; window.confirm = function () { asked++; return false; };
+    gq('[data-dg="cancel"]').click(); await sleep(150);
+    ok('genAsks', asked === 1 && !!gen());
+    gq('[data-dg="go"]').click();
+    await until(function () { return log.length === 2 && gq('[data-dg="go"]') && !gq('[data-dg="go"]').disabled; }, 4000);
+    var req2 = JSON.parse(log[1].body);
+    var vn = gq('.pnb-dicted tr[data-key="V_NAME"]');
+    ok('againKeepsChecked', /V_NAME \| Reviewed vendor name\./.test(req2.existing) && !!vn && vn.querySelector('textarea').value === 'Reviewed vendor name.' && !vn.classList.contains('is-draft'), [req2.existing, vn && vn.querySelector('textarea').value]);
+    window.confirm = function () { return true; };
+    gq('[data-dg="cancel"]').click();
+    await until(function () { return !gen(); }, 3000);
+    ok('genClosesOnYes', !gen());
   }
 
   // ------------------------------------------------------------------ pdict (2026-10-22 b)
@@ -261,6 +352,8 @@
   async function dlink() {
     var a = link('dict');
     ok('linkRendered', !!a && a.textContent === 'Data dictionary', document.getElementById('reportSnippetOutput').innerHTML.slice(0, 400));
+    // (2026-10-24 sweep) the commented-out line after the block stays out
+    ok('commentStripped', document.getElementById('reportSnippetOutput').textContent.indexOf('HIDDEN_COMMENT') === -1, document.getElementById('reportSnippetOutput').textContent.slice(-200));
     ok('snippetIntact', /Before the block/.test(document.getElementById('reportSnippetOutput').textContent) && /After the block/.test(document.getElementById('reportSnippetOutput').textContent)
        && document.getElementById('reportSnippetOutput').textContent.indexOf('V_AMOUNT |') === -1, document.getElementById('reportSnippetOutput').textContent.slice(0, 300));
     ok('has', D() && D().has() === true);
@@ -458,7 +551,7 @@
     gq('[data-dg="insert"]').click();
     await until(function () { return !gen(); }, 3000);
     var snip = window.Penumbra.snippetText();
-    ok('inserted', D().blocks(snip).length === 1 && /^Before the block\. sum\(V_AMOUNT\)\n/.test(snip) && /\nAfter the block\.$/.test(snip) && /V_DATE \| \? Edited in text\./.test(snip), snip);
+    ok('inserted', D().blocks(snip).length === 1 && /^Before the block\. sum\(V_AMOUNT\)\n/.test(snip) && /\nAfter the block\. Don't worry\.$/.test(snip) && /V_DATE \| \? Edited in text\./.test(snip), snip);
     ok('toastSaysSave', window.__toasts.some(function (t) { return /Save the report/.test(t); }));
     ok('currentFollows', D().entryFor('V_DATE') && D().entryFor('V_DATE').text === 'Edited in text.');
     // re-open: the inserted block is now the existing one (round trip through the builder)
@@ -497,7 +590,126 @@
     gq('[data-dg="cancel"]').click();
   }
 
-  var RUN = { dlazy: dlazy, dedit: dedit, pdict: pdict, dunit: dunit, dlink: dlink, dmenu: dmenu, dopts: dopts, dview: dview, dblank: dblank, dsub: dsub, dnone: dnone, dgen: dgen, dgenerr: dgenerr };
+  // ------------------------------------------------------------------ dstats (2026-10-24)
+  // Column stats starts with the column's meaning (the user: "now that we have data dictionaries should we add an
+  // entry to show column definition if one exists?" ... "could be in the stats submenu even"): its heading, then one
+  // item (the text, escaped, cut past 280 characters; a draft's / do-not-use tag; its source; the whole of it for a
+  // screen reader), then the counts as before. A click (or Enter: the keyboard enters the list AT it) opens the
+  // dictionary at the ENTRY's name, as the header's What this column means now does too.
+  function stPanel() { var s = document.querySelectorAll('.pnb-hm.pnb-hm-sub'); return s.length ? s[s.length - 1] : null; }
+  async function openStats(name) {
+    closeMenu();
+    rclick(fth(name));
+    if (!(await until(function () { return !!menuItem('stats'); }, 3000))) return null;
+    menuItem('stats').click();
+    await until(function () { return !!stPanel(); }, 3000);
+    return stPanel();
+  }
+  function keyAt(k) { var t = document.activeElement || document.body; t.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })); }
+  async function dstats() {
+    var s = await openStats('V_AMOUNT'), mean = s && s.querySelector('.pnb-hm-mean');
+    ok('meanShown', !!mean && mean.getAttribute('data-act') === 'statsAbout' && mean.getAttribute('role') === 'menuitem' && mean.classList.contains('pnb-hm-item')
+       && mean.textContent.indexOf('What was paid, in dollars (<b>not</b> cents).') !== -1 && mean.textContent.indexOf('Source: LR_FIXTURE.AMT') !== -1, mean && mean.outerHTML.slice(0, 400));
+    ok('meanEscaped', !!mean && !mean.querySelector('b'));
+    var kids = s ? Array.prototype.slice.call(s.children) : [];
+    ok('meanFirst', kids.length > 4 && kids[0].classList.contains('pnb-hm-head') && kids[0].textContent === 'What it means' && kids[1] === mean
+       && kids[2].classList.contains('pnb-hm-sep') && kids[3].classList.contains('pnb-hm-head') && /^Over the .+ the filter keeps$/.test(kids[3].textContent),
+       kids.slice(0, 5).map(function (k) { return k.className + ':' + String(k.textContent).slice(0, 30); }));
+    ok('meanAria', !!mean && mean.getAttribute('aria-label') === 'What it means: What was paid, in dollars (<b>not</b> cents). Source: LR_FIXTURE.AMT', mean && mean.getAttribute('aria-label'));
+    ok('meanFocused', !!mean && document.activeElement === mean, document.activeElement && document.activeElement.className);
+    if (mean) mean.click();
+    await until(function () { return rows().length > 0; }, 4000);
+    var fr = dlgBody() && dlgBody().querySelector('tr.is-focus');
+    ok('meanOpens', !!fr && fr.getAttribute('data-key') === 'V_AMOUNT' && !document.getElementById('pnbHeadMenu'), fr && fr.getAttribute('data-key'));
+    await closeDialog();
+    // an AI draft: its tag, said too
+    s = await openStats('V_NAME'); mean = s && s.querySelector('.pnb-hm-mean');
+    var dt = mean && mean.querySelector('.pnb-hm-tag-draft');
+    ok('draftTag', !!dt && dt.textContent === 'AI draft' && /The vendor's name, as on the invoice\./.test(mean.textContent) && / \(AI draft\)$/.test(mean.getAttribute('aria-label') || ''),
+       mean && mean.outerHTML.slice(0, 400));
+    // a column the dictionary does not name: the counts, as before
+    s = await openStats('V_STATUS');
+    ok('noMeanWithoutEntry', !!s && !s.querySelector('.pnb-hm-mean') && !!s.firstElementChild && /^Over the /.test(s.firstElementChild.textContent),
+       s && s.firstElementChild && s.firstElementChild.textContent);
+    closeMenu();
+    // stand-in entries for V_AMOUNT (the lookup the menu asks)
+    var dd = D(), real = dd.entryFor, realOpen = window.Penumbra.openDataDictionary, spy = [];
+    function stub(e) { dd.entryFor = function (col) { return String(col) === 'V_AMOUNT' ? e : real.apply(dd, arguments); }; }
+    try {
+      // a long meaning: cut past 280 characters at a word, the whole of it said; it wraps (an unbroken name too)
+      var longT = 'Paid from LR_FIXTURE.A_VERY_LONG_SOURCE_COLUMN_NAME_WITH_NO_SPACES_AT_ALL_IN_IT, ' + new Array(30).join('a long meaning of what was paid. ').trim();
+      stub({ name: 'V_AMOUNT', key: 'V_AMOUNT', text: longT, source: '', draft: false, avoid: false });
+      s = await openStats('V_AMOUNT'); mean = s && s.querySelector('.pnb-hm-mean');
+      var lbl = mean && mean.querySelector('.pnb-hm-label'), shownT = lbl ? lbl.textContent : '';
+      ok('longCut', shownT.length <= 283 && shownT.length > 200 && /\.\.\.$/.test(shownT) && longT.indexOf(shownT.slice(0, -3)) === 0
+         && /[\s.,;:]/.test(longT.charAt(shownT.length - 3)) && !!mean && mean.getAttribute('aria-label') === 'What it means: ' + longT, [shownT.length, shownT.slice(-24)]);
+      var cs = lbl && getComputedStyle(lbl), sr = s && s.getBoundingClientRect(), mr = mean && mean.getBoundingClientRect();
+      ok('meanWraps', !!cs && cs.whiteSpace === 'normal' && s.scrollWidth <= s.clientWidth + 1 && sr.width <= 342.5 && mr.height > 60,   // (max-width 340 + its 1px border)
+         cs && [cs.whiteSpace, s.scrollWidth, s.clientWidth, Math.round(sr.width), Math.round(mr.height)]);
+      closeMenu();
+      // a do-not-use entry with no text yet: its tag first, "No description yet.", its source
+      stub({ name: 'V_AMOUNT', key: 'V_AMOUNT', text: '', source: 'T.X', draft: false, avoid: true });
+      s = await openStats('V_AMOUNT'); mean = s && s.querySelector('.pnb-hm-mean');
+      var av = mean && mean.querySelector('.pnb-hm-tag-avoid'), bl = mean && mean.querySelector('.pnb-hm-mean-blank');
+      ok('avoidBlank', !!av && av.textContent === 'Do not use' && !!bl && bl.textContent === 'No description yet.' && mean.querySelector('.pnb-hm-label').firstElementChild === av
+         && mean.getAttribute('aria-label') === 'What it means: Do not use. No description yet. Source: T.X', mean && mean.getAttribute('aria-label'));
+      closeMenu();
+      // (the review) no space past 60% of the way: a hard cut at 280, never between an emoji's two halves
+      var emo = String.fromCharCode(0xD83D, 0xDE00), hard = new Array(280).join('x') + emo + new Array(100).join('y');   // the emoji at 279-280
+      stub({ name: 'V_AMOUNT', key: 'V_AMOUNT', text: hard, source: '', draft: false, avoid: false });
+      s = await openStats('V_AMOUNT'); mean = s && s.querySelector('.pnb-hm-mean');
+      lbl = mean && mean.querySelector('.pnb-hm-label'); shownT = lbl ? lbl.textContent : '';
+      var lastC = shownT.charCodeAt(shownT.length - 4);
+      ok('hardCut', /\.\.\.$/.test(shownT) && shownT.length === 282 && !(lastC >= 0xD800 && lastC <= 0xDBFF), [shownT.length, lastC]);
+      closeMenu();
+      // (the review) a cut landing after an opening bracket: no "(" left before the dots
+      var tidy = new Array(51).join('word ') + 'x( ' + new Array(61).join('z');   // 250 chars, "x(", a space at 252
+      stub({ name: 'V_AMOUNT', key: 'V_AMOUNT', text: tidy, source: '', draft: false, avoid: false });
+      s = await openStats('V_AMOUNT'); mean = s && s.querySelector('.pnb-hm-mean');
+      lbl = mean && mean.querySelector('.pnb-hm-label'); shownT = lbl ? lbl.textContent : '';
+      ok('cutTidy', / x\.\.\.$/.test(shownT), shownT.slice(-12));
+      closeMenu();
+      // an entry named by the heading's LABEL, not the column's name: the list reads the open menu's own heading
+      var th0 = fth('V_AMOUNT'), tn = null;
+      (function find(n) { for (var c = n.firstChild; c && !tn; c = c.nextSibling) { if (c.nodeType === 3 && c.nodeValue.indexOf('V_AMOUNT') !== -1) { tn = c; } else if (c.nodeType === 1 && !c.matches('.sort-icon, .sr-only, button, [aria-hidden="true"]')) { find(c); } } })(th0);
+      var tv = tn ? tn.nodeValue : null;
+      if (tn) { tn.nodeValue = tv.replace('V_AMOUNT', 'Paid amount'); }
+      dd.entryFor = function (col, label) { return label === 'Paid amount' ? { name: 'Paid amount', key: 'PAID AMOUNT', text: 'Named by its heading.', source: '', draft: false, avoid: false } : null; };
+      s = await openStats('V_AMOUNT'); mean = s && s.querySelector('.pnb-hm-mean');
+      ok('byLabel', !!tn && !!mean && mean.textContent.indexOf('Named by its heading.') !== -1, [!!tn, mean ? mean.textContent.slice(0, 40) : null]);
+      closeMenu();
+      if (tn) { tn.nodeValue = tv; }
+      // an entry found by the heading's label (another name): the header's item and the meaning open the dictionary at it
+      stub({ name: 'Paid amount', key: 'PAID AMOUNT', text: 'Found by its label.', source: '', draft: false, avoid: false });
+      window.Penumbra.openDataDictionary = function (f) { spy.push(f); };
+      closeMenu(); rclick(fth('V_AMOUNT'));
+      await until(function () { return !!menuItem('about'); }, 3000);
+      var hadAbout = !!menuItem('about');
+      if (hadAbout) menuItem('about').click();
+      await sleep(80);
+      var afterAbout = spy.slice();
+      s = await openStats('V_AMOUNT'); mean = s && s.querySelector('.pnb-hm-mean');
+      if (mean) mean.click();
+      await sleep(80);
+      ok('opensAtEntry', JSON.stringify(spy) === JSON.stringify(['Paid amount', 'Paid amount']), { item: hadAbout, afterItem: afterAbout, all: spy.slice() });
+      // the keyboard: ArrowRight on Column stats enters the list AT the meaning; Enter opens the dictionary
+      dd.entryFor = real; spy.length = 0;
+      closeMenu(); rclick(fth('V_AMOUNT'));
+      await until(function () { return !!menuItem('stats'); }, 3000);
+      var st = menuItem('stats');
+      if (st) st.focus();
+      keyAt('ArrowRight');
+      await sleep(60);
+      var ae = document.activeElement, atMean = !!ae && ae.classList.contains('pnb-hm-mean');
+      keyAt('Enter');
+      await sleep(80);
+      ok('keyboard', atMean && JSON.stringify(spy) === JSON.stringify(['V_AMOUNT']), [atMean, ae && ae.className, spy.slice()]);
+    } finally {
+      dd.entryFor = real; window.Penumbra.openDataDictionary = realOpen; closeMenu();
+    }
+  }
+
+  var RUN = { desc: desc, dgen2: dgen2, dstats: dstats, dlazy: dlazy, dedit: dedit, pdict: pdict, dunit: dunit, dlink: dlink, dmenu: dmenu, dopts: dopts, dview: dview, dblank: dblank, dsub: dsub, dnone: dnone, dgen: dgen, dgenerr: dgenerr };
   (async function () {
     try { await boot(); await RUN[SCN](); }
     catch (e) { R.errors.push('driver: ' + (e && e.stack || e)); }

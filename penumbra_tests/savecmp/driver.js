@@ -581,9 +581,11 @@
     // Q5 a snapshot loaded as a VIEW over the grouped report (the table shows its rows), an A-vs-B comparison on it with
     // its NAME heading clicked, then a new query: a run from a snapshot view keeps none of its grouping (as it always has,
     // though the comparison recorded one as it began), and the table's own sort comes back, not the comparison's
+    // (2026-10-24, snapgrp) ...a main.js with snapgrp gives the report its own view back from a run from a view: grouped
+    // as it was before the view (the run re-arms the grouping the view kept), in its own sort - by marker (H.snapgrp)
     var g5 = await regroupIfFlat();
     var s5 = await sortToReport();
-    var sort5 = crit();
+    var sort5 = crit(), v5a = gview();
     H.loadSnap(snapObj(SNAP, 'Viewed snapshot', 2, 58));
     var vw5 = await waitFor(function () { return H.viewing() && flatRows() === SNAP.length && reportIds().indexOf('"7"') >= 0; }, 15000);
     await sleep(400);
@@ -595,6 +597,16 @@
     $('#action_overlay').empty();
     var ran5 = await runQuery();
     var say5 = notices(), rs5 = H.rs(), mk5 = marks('#tableHeader th.sorted');
+    if (H.snapgrp) {
+      var v5 = gview();
+      // (snapgrp: while a view is on screen the page is out of group mode - the view keeps the report's grouping for the
+      // way back - so the comparison opened on it records none)
+      rec('Q5 a new query run during an A-vs-B comparison opened on a snapshot view brings the report back as it was before the view - grouped by DEPT (snapgrp: every way back gives the report\'s own view back) - in the table\'s own sort, not the comparison\'s',
+        g5 && s5 && sort5 === J(RS) && vw5 && on5 && pre5 === null && c5a === J([['NAME', '2', 'asc']]) && ran5 && !H.viewing()
+          && v5a.on && J(v5) === J(v5a) && crit() === J(RS) && rs5 === null && quiet(say5),
+        'sortBefore=' + sort5 + ' view=' + vw5 + ' ab=' + on5 + ' record=' + J(pre5 && pre5.column) + ' took=' + c5a + ' query=' + ran5 + ' viewing=' + H.viewing()
+          + ' pageSort=' + crit() + ' kept=' + J(rs5) + ' said=' + J(say5.slice(0, 160)) + ' changed=' + vdiff(v5a, v5));
+    } else
     rec('Q5 a new query run during an A-vs-B comparison opened on a snapshot view brings the report back flat (a run from a snapshot view keeps no grouping), in the table\'s own sort, not the comparison\'s',
       g5 && s5 && sort5 === J(RS) && vw5 && on5 && !!pre5 && String(pre5.column) === 'DEPT' && c5a === J([['NAME', '2', 'asc']]) && ran5 && !H.viewing()
         && !$('#groupedResultsContainer').is(':visible') && J(H.grp().cols) === '[]' && crit() === J(RS) && reportIds() === J(['3', '2', '1', '4', '5', '6'])

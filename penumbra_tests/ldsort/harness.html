@@ -114,7 +114,7 @@
       var r = {};
       // numname: a column named 2021 - an integer-like key, which JS puts FIRST in a row's keys (so in the result's
       // columns): every other column moves one place to the right, as when a report's SQL adds a column in front
-      if (S === 'numname' || S === 'numurl' || S === 'numrenamed') r['2021'] = String(Math.floor(rnd() * 5000));
+      if (S === 'numname' || S === 'numurl' || S === 'numrenamed' || S === 'numsaved') r['2021'] = String(Math.floor(rnd() * 5000));
       r.V_ID = 'ID-' + String(1000 + i);
       r.V_NAME = pick(W) + ' ' + pick(W);
       r.V_AMOUNT = money();
@@ -182,10 +182,14 @@
       requery: [],
       // casedup: saved on V_AMOUNT (place 2) - the v_amount column at 3 shares its name but for its case
       casedup: [{ colIdentifier: 'V_AMOUNT', colIndex: 2, direction: 'desc' }],
-      // numurl: the link's ?sort=2021|desc in place of any saved sort (the URL resolver makes the name a STRING)
+      // numurl: the link's ?sort=2021|desc in place of any saved sort (2026-10-25, urlnum: the URL resolver names it
+      // as a click on the heading does - the NUMBER 2021; it was the STRING)
       numurl: [],
       // numrenamed: the column named 2021 was Y_OLD when the report was saved (21 places, as now)
       numrenamed: [{ colIdentifier: 'Y_OLD', colIndex: 0, direction: 'asc' }],
+      // numsaved (2026-10-25, urlnum): a level saved as the TEXT '2021' at its place - a save made from a ?sort= view
+      // while the resolver named it so
+      numsaved: [{ colIdentifier: '2021', colIndex: 0, direction: 'asc' }],
       // mycalc: renamed in place (as renamed) while this viewer has a calculated column of their own (MYCALC):
       // the result has one column more than the report saved, the columns a save keeps as many
       mycalc: [{ colIdentifier: 'V_AMT_OLD', colIndex: 2, direction: 'asc' }],
@@ -198,7 +202,7 @@
     };
     st.sortCriteria = SORTS[S] || [];
     if (S === 'gone' || S === 'allgone' || S === 'urlsort') st.columnOrder = places(21);
-    if (S === 'numname' || S === 'numurl' || S === 'numrenamed') { st.columnOrder = places(21); st.visibleColumns = ['#', 0, 1, 2, 3, 4, 5, 6]; }
+    if (S === 'numname' || S === 'numurl' || S === 'numrenamed' || S === 'numsaved') { st.columnOrder = places(21); st.visibleColumns = ['#', 0, 1, 2, 3, 4, 5, 6]; }
     if (S === 'casedup') st.columnOrder = places(21);
     if (S === 'group') { st.groupBy = 'H_GROUP'; st.groupAgg = { column: 'H_AMT', type: 'sum' }; }
     if (S === 'pivot' || S === 'pivotgrp') {

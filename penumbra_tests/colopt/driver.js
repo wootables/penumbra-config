@@ -2185,6 +2185,228 @@
       R.chk.themeHintBtn = th.btn; R.chk.themeEnter = th.enter; R.chk.themeFocusMoves = th.focusMoved; R.chk.themeSpaceClears = th.space && th.focusKept;
       R.chk.densityHintBtn = de.btn; R.chk.densityEnter = de.enter; R.chk.densityFocusMoves = de.focusMoved; R.chk.densitySpaceClears = de.space && de.focusKept;
       R.info.theme = th; R.info.density = de;
+    },
+    // ---- (2026-10-24, hlhead) the user: "Since column headers can also do a format(), shouldnt column header right
+    // clicks also have a highlight menu (or in column highlight menus add a header option in addition to cell/row)". A
+    // rule on the column's HEADER, made in the popover: Apply to's third choice; the header lit while a row the filter
+    // keeps matches (a filter keeping none puts it out), while an aggregate holds, or always; its fill takes the place of
+    // the header's gradient, with the table's text color; a header takes format(header)'s properties (the rest named);
+    // This cell again: the cells, the header as it was, the rule's JSON as an older rule's; deleted: nothing left on it.
+    hlhd: async function () {
+      function hth() { return document.querySelector('#tableHeader th[data-colname="V_AMOUNT"]'); }
+      var amber = probe('background-color: var(--pnb-hl-amber, #fbe8a6)', 'backgroundColor');
+      var ink = probe('color: var(--text-main, #333)', 'color');
+      var cs0 = getComputedStyle(hth()), bg0 = cs0.backgroundImage, fs0 = cs0.fontSize, col0 = cs0.color;
+      openPanel();
+      await sleep(450);
+      cogOf('V_AMOUNT').click();
+      await sleep(80);
+      popover().querySelector('[data-co="hl-add"]').click();
+      await sleep(80);
+      setInput(hlQ('[data-co="hl-v"]'), '50,000');
+      await sleep(550);
+      var tos = Array.prototype.map.call(hlEd().querySelectorAll('[data-co="hl-to"]'), function (r) { return r.value + ':' + r.parentNode.textContent.trim(); }).join();
+      R.info.tos = tos;
+      R.chk.threeTargets = tos === 'cell:This cell,row:Whole row,header:Header';
+      hlQ('[data-co="hl-to"][value="header"]').click();
+      await sleep(250);
+      var rs = hlRules('V_AMOUNT'), cs = getComputedStyle(hth());
+      var cells = colCells('V_AMOUNT', true), painted = cells.filter(function (td) { return getComputedStyle(td).backgroundColor === amber; }).length;
+      var want = window.__rowsFixture.filter(function (r) { return amtOf(r) > 50000; }).length;
+      R.info.stored = rs; R.info.head = [cs.backgroundColor, cs.backgroundImage, cs.color, amber, ink, col0];
+      R.chk.hdStored = !!rs && rs.length === 1 && rs[0].hd === true && rs[0].row === false && rs[0].w === 'V_AMOUNT > 50000';
+      R.chk.headerLit = cs.backgroundColor === amber && cs.backgroundImage === 'none' && painted === 0;
+      R.chk.headerReads = cs.color === ink && ink !== col0;
+      R.info.count = hlQ('[data-hint="hl-count"]').textContent;
+      R.chk.countLit = R.info.count === 'Matches ' + want + ' of 300 rows: the header is lit.' && want > 20 && want < 280;
+      R.chk.previewName = hlQ('.pnb-hl-prev').textContent === 'V_AMOUNT';
+      // Advanced: an aggregate (format(header)'s reading), then no condition (always)
+      hlQ('[data-co="hl-adv"]').click();
+      await sleep(40);
+      var wIn = hlQ('[data-co="hl-w"]'), cIn = hlQ('[data-co="hl-css"]');
+      wIn.focus();
+      setInput(wIn, 'sum(V_AMOUNT) > 1');
+      await sleep(650);
+      var c1 = hlQ('[data-hint="hl-count"]').textContent, on1 = getComputedStyle(hth()).backgroundColor === amber, w1 = hlRules('V_AMOUNT')[0].w;
+      setInput(wIn, 'sum(V_AMOUNT) < 0');
+      await sleep(650);
+      var c2 = hlQ('[data-hint="hl-count"]').textContent, on2 = getComputedStyle(hth()).backgroundColor === amber, at2 = hth().hasAttribute('data-pnb-hl-hd');
+      R.info.agg = [c1, on1, w1, c2, on2, at2];
+      R.chk.aggLit = on1 && c1 === 'Holds: the header is lit.' && w1 === 'sum(V_AMOUNT) > 1';
+      R.chk.aggOff = !on2 && c2 === 'Does not hold: the header is not lit.' && !at2;
+      setInput(wIn, '');
+      await sleep(650);
+      R.info.always = [hlQ('[data-hint="hl-count"]').textContent, hlRules('V_AMOUNT')[0].w];
+      R.chk.always = getComputedStyle(hth()).backgroundColor === amber && R.info.always[0] === 'The header is lit, always.' && R.info.always[1] === '';
+      // a header takes format(header)'s properties: font-size is named, not drawn; its color is
+      cIn.focus();
+      setInput(cIn, 'color: #123456; font-size: 20px');
+      await sleep(650);
+      var hs4 = getComputedStyle(hth());
+      R.info.css = [hlQ('.pnb-hl-msg').textContent, hs4.color, hs4.fontSize, fs0];
+      R.chk.headCss = R.info.css[0] === 'A header takes no font-size.' && hs4.color === 'rgb(18, 52, 86)' && hs4.fontSize === fs0;
+      // a typed !important: the header still takes the color (the step draws !important itself)
+      setInput(cIn, 'color: rgb(200, 0, 0) !important');
+      await sleep(650);
+      R.info.imp = [getComputedStyle(hth()).color, hlRules('V_AMOUNT')[0].css];
+      R.chk.headImportant = getComputedStyle(hth()).color === 'rgb(200, 0, 0)';
+      setInput(cIn, 'color: #123456; font-size: 20px');
+      await sleep(650);
+      // This cell again: the cells take it, the header is as it was, the rule's JSON has no hd
+      hlQ('[data-co="hl-to"][value="cell"]').click();
+      await sleep(250);
+      var r2 = hlRules('V_AMOUNT')[0], cs2 = getComputedStyle(hth());
+      R.info.cellAgain = [JSON.stringify(r2), hth().getAttribute('style'), cs2.backgroundImage, cs2.color];
+      R.chk.cellAgain = !!r2 && !('hd' in r2) && !hth().hasAttribute('data-pnb-hl-hd') && cs2.backgroundImage === bg0 && cs2.color === col0
+        && colCells('V_AMOUNT', true).every(function (td) { return getComputedStyle(td).color === 'rgb(18, 52, 86)'; });
+      // the header once more - a row condition, a fill - then out of the popover: the filter decides
+      hlQ('[data-co="hl-to"][value="header"]').click();
+      await sleep(100);
+      wIn.focus(); setInput(wIn, 'V_AMOUNT > 50000');
+      await sleep(100);
+      cIn.focus(); setInput(cIn, 'background-color: var(--pnb-hl-amber, #fbe8a6)');
+      await sleep(650);
+      hlQ('[data-co="hl-done"]').click();
+      await sleep(120);
+      var li = popover() && popover().querySelector('[data-sec="highlight"] .pnb-hl-item');
+      R.info.desc = li ? li.textContent : null;
+      R.chk.describe = !!li && /Is greater than 50,000, header/.test(li.textContent);
+      var ab = popover() && popover().querySelector('[data-co="hl-add"]');
+      if (ab) { ab.focus(); ab.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); }
+      await sleep(150);
+      R.info.popClosed = !popover();
+      $('#tableSearch').val('V_AMOUNT <= 50000'); await window.__HC.runSearch(); await sleep(400);
+      var offCs = getComputedStyle(hth());
+      R.info.filterOff = [offCs.backgroundColor, hth().getAttribute('data-pnb-hl-hd'), document.querySelectorAll('#resultsTable tbody tr:not(.search-hidden)').length];
+      R.chk.filterOff = offCs.backgroundColor !== amber && !hth().hasAttribute('data-pnb-hl-hd');
+      $('#tableSearch').val(''); await window.__HC.runSearch(); await sleep(400);
+      R.chk.filterBack = getComputedStyle(hth()).backgroundColor === amber;
+      // deleted: nothing of it left on the header
+      cogOf('V_AMOUNT').click();
+      await sleep(80);
+      var eb = popover() && popover().querySelector('[data-co="hl-edit"][data-i="0"]');
+      if (eb) eb.click();
+      await sleep(80);
+      if (hlQ('[data-co="hl-delete"]')) hlQ('[data-co="hl-delete"]').click();
+      await sleep(250);
+      var cs3 = getComputedStyle(hth());
+      R.info.del = [JSON.stringify(hlRules('V_AMOUNT')), hth().getAttribute('style'), cs3.backgroundImage, cs3.color];
+      R.chk.deleteClears = (hlRules('V_AMOUNT') || []).length === 0 && !hth().hasAttribute('data-pnb-hl-hd') && cs3.backgroundImage === bg0 && cs3.color === col0;
+    },
+    // (2026-10-24, hlhead) the grouped view (seeded: a header rule on V_AMOUNT): every group's heading of the column lit,
+    // none of its cells
+    ghlhd: async function () {
+      var amber = probe('background-color: var(--pnb-hl-amber, #fbe8a6)', 'backgroundColor');
+      await sleep(300);
+      var ths = Array.prototype.slice.call(document.querySelectorAll('#groupedResultsContainer th[data-colname="V_AMOUNT"]'));
+      var lit = ths.filter(function (th) { return getComputedStyle(th).backgroundColor === amber && th.hasAttribute('data-pnb-hl-hd'); });
+      var cells = Array.prototype.slice.call(document.querySelectorAll('#groupedResultsContainer td')).filter(function (td) { return getComputedStyle(td).backgroundColor === amber; });
+      R.info.g = [ths.length, lit.length, cells.length, document.body.classList.contains('group-mode-active')];
+      R.chk.groupedHeads = ths.length > 1 && lit.length === ths.length && cells.length === 0;
+    },
+    // (2026-10-24, hlhead) beside the report's own format(header) (seeded): the viewer's header rule draws over it (its
+    // text color stays the report's: the rule has none of its own); deleted, the report's comes back - its fill too,
+    // which main.css's !important gradient hid on the page
+    hlhdsnip: async function () {
+      function hth() { return document.querySelector('#tableHeader th[data-colname="V_AMOUNT"]'); }
+      await sleep(300);
+      var cs = getComputedStyle(hth());
+      R.info.over = [cs.backgroundColor, cs.color, hth().getAttribute('style'), document.getElementById('reportSnippet') ? document.getElementById('reportSnippet').value : null];
+      R.chk.overSnippet = cs.backgroundColor === 'rgb(4, 5, 6)' && cs.color === 'rgb(7, 8, 9)';
+      openPanel();
+      await sleep(450);
+      cogOf('V_AMOUNT').click();
+      await sleep(80);
+      var eb = popover() && popover().querySelector('[data-co="hl-edit"][data-i="0"]');
+      if (eb) eb.click();
+      await sleep(80);
+      if (hlQ('[data-co="hl-delete"]')) hlQ('[data-co="hl-delete"]').click();
+      await sleep(250);
+      var cs2 = getComputedStyle(hth());
+      R.info.back = [cs2.backgroundColor, cs2.backgroundImage, cs2.color, hth().getAttribute('style')];
+      R.chk.snipBack = cs2.backgroundColor === 'rgb(1, 2, 3)' && cs2.backgroundImage === 'none' && cs2.color === 'rgb(7, 8, 9)';
+    },
+    // (2026-10-24, hlhead, the review) a header rule in a view link and SAVED with the report (hr*: the report's rules r1-r3):
+    // the link and the save carry hd; the Save dialog lists it as a header rule; after the save the report's rule lights the
+    // header, never the cells; the viewer's header copy of the report's cell rule r1, left unticked, stays theirs
+    hrhd: async function () {
+      window.alert = function (m) { R.notes.push('alert: ' + m); };
+      function hth(c) { return document.querySelector('#tableHeader th[data-colname="' + c + '"]'); }
+      var amber = probe('background-color: var(--pnb-hl-amber, #fbe8a6)', 'backgroundColor');
+      function cellsLit(c) { return colCells(c, true).filter(function (td) { return getComputedStyle(td).backgroundColor === amber; }).length; }
+      await sleep(300);
+      R.info.boot = [getComputedStyle(hth('V_DATE')).backgroundColor, cellsLit('V_DATE'), getComputedStyle(hth('V_AMOUNT')).backgroundColor, cellsLit('V_AMOUNT')];
+      R.chk.bootLit = getComputedStyle(hth('V_DATE')).backgroundColor === amber && cellsLit('V_DATE') === 0
+        && getComputedStyle(hth('V_AMOUNT')).backgroundColor === amber && cellsLit('V_AMOUNT') === 0;
+      var sv = window.__HC.bso(), lr = sv && sv.columnHighlights && sv.columnHighlights.V_DATE;
+      R.info.link = sv && sv.columnHighlights;
+      R.chk.linkHd = !!lr && lr.length === 1 && lr[0].id === 'hh1' && lr[0].hd === true;
+      document.getElementById('saveQuery').click();
+      await sleep(500);
+      var cbD = document.querySelector('#pnbHlSaveRow input[data-hl-save="hl|V_DATE|hh1"]'), cbA = document.querySelector('#pnbHlSaveRow input[data-hl-save="hl|V_AMOUNT|r1"]');
+      R.info.items = Array.prototype.map.call(document.querySelectorAll('#pnbHlSaveRow input[data-hl-save]'), function (cb) { return cb.getAttribute('data-hl-save') + ' ' + cb.parentNode.textContent.trim(); });
+      R.chk.listedHd = !!cbD && cbD.checked && /The header/.test(cbD.parentNode.textContent) && !!cbA && /, header/.test(cbA.parentNode.textContent);
+      if (cbA) cbA.checked = false;
+      $('#serverSaveIdInput').val('lrfix');
+      var n = window.__saves.length;
+      $('#confirmServerSaveBtn').prop('disabled', false).trigger('click');
+      await until(function () { return window.__saves.length > n; }, 8000);
+      await sleep(500);
+      var sd = null;
+      try { sd = JSON.parse(window.__saves[window.__saves.length - 1].state_data); } catch (e) { }
+      var chD = sd && sd.columnHighlights && sd.columnHighlights.V_DATE, chA = sd && sd.columnHighlights && sd.columnHighlights.V_AMOUNT;
+      R.info.saved = sd && sd.columnHighlights;
+      R.chk.savedHd = !!chD && chD.length === 1 && chD[0].id === 'hh1' && chD[0].hd === true && chD[0].row === false
+        && !!chA && chA.length === 1 && chA[0].id === 'r1' && !chA[0].hd;
+      var co = colopt() || {};
+      R.info.after = [JSON.stringify(co.V_DATE || null), JSON.stringify(co.V_AMOUNT || null), getComputedStyle(hth('V_DATE')).backgroundColor, cellsLit('V_DATE')];
+      R.chk.afterLit = !(co.V_DATE && co.V_DATE.hl && co.V_DATE.hl.length) && getComputedStyle(hth('V_DATE')).backgroundColor === amber && cellsLit('V_DATE') === 0;
+      R.chk.copyKept = !!co.V_AMOUNT && !!co.V_AMOUNT.hl && co.V_AMOUNT.hl.length === 1 && co.V_AMOUNT.hl[0].id === 'r1' && co.V_AMOUNT.hl[0].hd === true
+        && getComputedStyle(hth('V_AMOUNT')).backgroundColor === amber && cellsLit('V_AMOUNT') === 0;
+    },
+    // (2026-10-24, hlhead) a filter keeping no row, beside the report's format(header) (seeded: a fill and a text color on
+    // V_AMOUNT, under the viewer's header rule V_AMOUNT > 0; a fill alone on V_NAME): the rule goes out and nothing of it or
+    // of format(header) is left - every render and search takes format(header)'s styles off (resetCellStates) and the pass
+    // draws them over the rows it shows, none here, as without the rule; the gradient back (a fill's background-image: none
+    // comes off with it). The filter cleared: both drawn again
+    hlhdsnip0: async function () {
+      function hth(c) { return document.querySelector('#tableHeader th[data-colname="' + c + '"]'); }
+      function inl(th, p) { return th.style.getPropertyValue(p); }
+      await sleep(300);
+      var a0 = getComputedStyle(hth('V_AMOUNT')), n0 = getComputedStyle(hth('V_NAME'));
+      R.info.boot = [a0.backgroundColor, a0.backgroundImage, a0.color, n0.backgroundColor, n0.backgroundImage];
+      R.chk.snip0Lit = a0.backgroundColor === 'rgb(4, 5, 6)' && a0.color === 'rgb(7, 8, 9)' && n0.backgroundColor === 'rgb(10, 11, 12)' && n0.backgroundImage === 'none';
+      $('#tableSearch').val('V_ID = //zzzz//'); await window.__HC.runSearch(); await sleep(400);
+      var A = hth('V_AMOUNT'), N = hth('V_NAME'), a1 = getComputedStyle(A), n1 = getComputedStyle(N);
+      var left = document.querySelectorAll('#resultsTable tbody tr:not(.search-hidden)').length;
+      R.info.zero = [left, A.getAttribute('style'), A.getAttribute('data-pnb-hl-hd'), a1.backgroundImage.slice(0, 40), N.getAttribute('style'), n1.backgroundImage.slice(0, 40)];
+      R.chk.snip0Out = left === 0 && !A.hasAttribute('data-pnb-hl-hd') && !inl(A, 'background-color') && !inl(A, 'background-image') && !inl(A, 'color')
+        && a1.backgroundImage !== 'none' && !inl(N, 'background-color') && !inl(N, 'background-image') && n1.backgroundImage !== 'none';
+      $('#tableSearch').val(''); await window.__HC.runSearch(); await sleep(400);
+      var a2 = getComputedStyle(hth('V_AMOUNT')), n2 = getComputedStyle(hth('V_NAME'));
+      R.info.again = [a2.backgroundColor, a2.backgroundImage, a2.color, n2.backgroundColor, n2.backgroundImage];
+      R.chk.snip0Again = a2.backgroundColor === 'rgb(4, 5, 6)' && a2.backgroundImage === 'none' && a2.color === 'rgb(7, 8, 9)'
+        && n2.backgroundColor === 'rgb(10, 11, 12)' && n2.backgroundImage === 'none';
+    },
+    // (2026-10-24, hlhead, the second review) fills the browser refuses, beside one it takes: format(header) with a typed
+    // !important draws (stripped); one with a typo keeps the gradient (no fill and no gradient = a blank header); the
+    // viewer's header rule with a typo'd fill keeps the gradient and its own text color. The snippet emptied: every header
+    // format(header) drew is as it was (resetCellStates returns early with no rule, and nothing draws after), the viewer's
+    // rule kept
+    hlhdbad: async function () {
+      function hth(c) { return document.querySelector('#tableHeader th[data-colname="' + c + '"]'); }
+      await sleep(300);
+      var s0 = getComputedStyle(hth('V_STATUS')), d0 = getComputedStyle(hth('V_DATE')), n0 = getComputedStyle(hth('V_NAME'));
+      R.info.boot = [s0.backgroundColor, s0.backgroundImage.slice(0, 30), d0.backgroundColor, d0.backgroundImage.slice(0, 30), n0.color, n0.backgroundImage.slice(0, 30), hth('V_NAME').getAttribute('style')];
+      R.chk.impFill = s0.backgroundColor === 'rgb(253, 230, 138)' && s0.backgroundImage === 'none';
+      R.chk.badSnipFill = d0.backgroundImage !== 'none';
+      R.chk.badRuleFill = n0.color === 'rgb(9, 9, 9)' && n0.backgroundImage !== 'none';
+      var ta = document.getElementById('reportSnippet'), cmEl = ta && ta.nextElementSibling, cm = cmEl && cmEl.CodeMirror;
+      if (cm && window.__HC.rsn) { cm.setValue(''); await window.__HC.rsn(); await sleep(300); }
+      var s1 = getComputedStyle(hth('V_STATUS')), n1 = getComputedStyle(hth('V_NAME'));
+      R.info.gone = [!!cm, !!window.__HC.rsn, s1.backgroundColor, s1.backgroundImage.slice(0, 30), hth('V_STATUS').getAttribute('style'), n1.color, hth('V_NAME').getAttribute('style')];
+      R.chk.snipGone = !!cm && s1.backgroundColor !== 'rgb(253, 230, 138)' && s1.backgroundImage !== 'none' && !hth('V_STATUS').hasAttribute('data-pnb-cf-hd');
+      R.chk.goneKeepsRule = !!cm && n1.color === 'rgb(9, 9, 9)';
     }
   };
   function pivotCells(sc) {

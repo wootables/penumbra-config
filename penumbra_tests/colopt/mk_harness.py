@@ -120,6 +120,11 @@ def build(index_src=None):
     rep('    if (S === "hidcol") st.visibleColumns = ["#", 0, 1, 3, 4, 5];\n',
         '    if (S === "hidcol") st.visibleColumns = ["#", 0, 1, 3, 4, 5];\n'
         '    if (S === "frepdeep") st.resolverLinksDefault = false;\n'
+        # (2026-10-24, hlhead) the report's own format(header) on V_AMOUNT (a fill and a text color)
+        '    if (S === "hlhdsnip") st.reportSnippet = "format(header, V_AMOUNT, background-color: rgb(1, 2, 3); color: rgb(7, 8, 9))";\n'
+        '    if (S === "hlhdsnip0") st.reportSnippet = "format(header, V_AMOUNT, background-color: rgb(1, 2, 3); color: rgb(7, 8, 9))\\nformat(header, V_NAME, background-color: rgb(10, 11, 12))";\n'
+        # (the second review) a fill with a typed !important, one with a typo, a text color under the viewer's header rule
+        '    if (S === "hlhdbad") st.reportSnippet = "format(header, V_STATUS, \'background-color: #fde68a !important\')\\nformat(header, V_DATE, \'background-color: lightyelow\')\\nformat(header, V_NAME, \'color: rgb(5, 5, 5)\')";\n'
         # (2026-10-20 b) hr*: a report saved with a column format and two highlight rules
         # (a cell rule, a row rule) - what the Save dialog's Last Stop Changes saves
         '    if (/^hr/.test(S)) {\n'
@@ -157,6 +162,16 @@ def build(index_src=None):
         '                 V_STATUS: { hl: [{ id: "s1", w: "V_STATUS = //Closed//", css: "text-decoration: line-through", row: true }] },\n'
         '                 V_NAME: { hl: [{ id: "n1", w: "V_STATUS = //Pending//", css: "font-style: italic", row: false }] } },\n'
         '      ghl: { V_AMOUNT: { hl: [{ id: "g1", w: "V_AMOUNT > 50000", css: "background-color: var(--pnb-hl-amber, #fbe8a6)", row: false }] } },\n'
+        # (2026-10-24, hlhead) a header rule: the grouped view's headings (ghlhd); always, beside format(header) (hlhdsnip)
+        '      ghlhd: { V_AMOUNT: { hl: [{ id: "h1", w: "V_AMOUNT > 50000", css: "background-color: var(--pnb-hl-amber, #fbe8a6)", row: false, hd: true }] } },\n'
+        '      hlhdsnip: { V_AMOUNT: { hl: [{ id: "h2", w: "", css: "background-color: rgb(4, 5, 6)", row: false, hd: true }] } },\n'
+        # (the review) hlhdsnip0: a row condition beside format(header), then a filter keeping no row
+        '      hlhdsnip0: { V_AMOUNT: { hl: [{ id: "h3", w: "V_AMOUNT > 0", css: "background-color: rgb(4, 5, 6)", row: false, hd: true }] } },\n'
+        # (the review) hrhd (hr*: the report's rules): a header rule of their own (always), a header copy of the report's cell rule r1
+        '      hrhd: { V_DATE: { hl: [{ id: "hh1", w: "", css: "background-color: var(--pnb-hl-amber, #fbe8a6)", row: false, hd: true }] },\n'
+        '              V_AMOUNT: { hl: [{ id: "r1", w: "V_AMOUNT > 50000", css: "background-color: var(--pnb-hl-amber, #fbe8a6)", row: false, hd: true }] } },\n'
+        # (the second review) hlhdbad: a header rule whose fill has a typo, with a text color of its own
+        '      hlhdbad: { V_NAME: { hl: [{ id: "b1", w: "", css: "background-color: lightyelow; color: rgb(9, 9, 9)", row: false, hd: true }] } },\n'
         # (2026-10-20 b) hrsave: the saver's own, over the report's (hr*): a format, a rule of
         # their own on top, their change to the report's r1, the report's r2 turned off, and
         # one more of their own on another column

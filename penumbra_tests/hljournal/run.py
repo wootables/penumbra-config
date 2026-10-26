@@ -24,18 +24,25 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js', 'penumbra_tiles.js',
         'penumbra_a11y.js', 'penumbra_grouplist.js', 'penumbra_cellsel.js']
 SCN = ['hjunit', 'hjtog', 'hjnotes', 'hjwho']
+SCN = SCN + ['hjhead']   # (2026-10-24, hlhead) a header rule reading a toggle
 CHK = {
     'hjunit': ['toggleForms', 'notesForms', 'customStays'],
     'hjtog': ['painted', 'cogHl', 'editorKinds', 'rowsDrawn', 'tickRedraw', 'dataCond', 'quickDone', 'saveLabel', 'renameKeeps'],
     'hjnotes': ['notesOps', 'hasNotes', 'mentions', 'noteRedraw'],
     'hjwho': ['whoCols', 'byRule', 'onRule'],
+    'hjhead': ['headLit', 'headTick'],   # (2026-10-24, hlhead)
 }
 PHP_CHK = ['E-map', 'E-row', 'E-who', 'E-strike', 'E-notesOff', 'E-pdf', 'E-noJournal']
 # the round's checks (red on live); the rest describe what live already does
 NEW = {'L-hjunit-' + c for c in CHK['hjunit']} | {'L-hjtog-' + c for c in CHK['hjtog'] if c != 'painted'} \
     | {'L-hjnotes-' + c for c in CHK['hjnotes']} | {'L-hjwho-byRule', 'L-hjwho-onRule'} \
     | {'P-E-map', 'P-E-who', 'P-E-notesOff', 'P-E-noJournal'}
+# (2026-10-24, hlhead; hl phase 4 is live) the round's checks now: a header rule reading a toggle (live: no header rules)
+NEW = {'L-hjhead-' + c for c in CHK['hjhead']}
 MUTANTS = {
+    # --- (2026-10-24, hlhead) the journal's repaint: a header rule on or reading a journal column never drawn again
+    'h-headjournal': ([('main', "        if (_pnbHlHeadRules().some(function (x) { return String(x.col).indexOf('__JOURNAL') === 0", "        if (false && _pnbHlHeadRules().some(function (x) { return String(x.col).indexOf('__JOURNAL') === 0")],
+                      ['L-hjhead-headTick'], ['hjhead']),
     # the cog's Highlight for data columns only
     'g-gate': ([('main', "highlight: (isData || _pnbHlIsJournal(col)) && window.PenumbraColFmt.hlColOk", "highlight: isData && window.PenumbraColFmt.hlColOk")],
                ['L-hjtog-cogHl', 'L-hjnotes-notesOps'], ['hjtog', 'hjnotes']),

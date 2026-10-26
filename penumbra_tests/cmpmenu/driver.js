@@ -316,6 +316,32 @@
         && a32b.indexOf('cmpCopyLink') > 0 && a32b.indexOf('cmpCopyEvergreen') === a32b.indexOf('cmpCopyLink') + 1 && ranEv && hits.ev === 1 && a32c.indexOf('cmpCopyEvergreen') < 0,
       'shown=' + [lkShown, evShown0].join('/') + ' acts=' + J(a32a.slice(-4)) + ' withEver=' + J(a32b.slice(-4)) + ' hits=' + J(hits) + ' after=' + J(a32c.slice(-3)));
 
+    // C34 (dictstat, 2026-10-24; the user: "now that we have data dictionaries should we add an entry to show column
+    // definition if one exists?") What this column means, where the report's data dictionary names the column: after the
+    // sorts, as the report's own heading has it, on a heading and a cell; its click opens the dictionary at the ENTRY's
+    // name (the stand-in dictionary names AMOUNT as "Amount"); none for a column it does not name (NAME).
+    var w34 = wrapperOf('Modified Rows'), th34 = headIn(w34, 'AMOUNT'), td34 = cellIn(w34, '3', 'AMOUNT'), name34 = headIn(w34, 'NAME');
+    var realDict = window.PenumbraDict, realOpen34 = window.Penumbra.openDataDictionary, opened34 = [];
+    window.PenumbraDict = { entryFor: function (c, l) {
+      return (String(c).toUpperCase() === 'AMOUNT' || String(l).toUpperCase() === 'AMOUNT') ? { name: 'Amount', key: 'AMOUNT', text: 'What was paid.', source: '', draft: false, avoid: false } : null;
+    } };
+    window.Penumbra.openDataDictionary = function (f) { opened34.push(f); };
+    closeMenu(); rclick(th34);
+    var a34a = acts();
+    closeMenu(); rclick(td34);
+    var a34b = acts(), lbl34 = label('about');
+    closeMenu();
+    var ran34 = await choose(th34, 'about');
+    closeMenu(); rclick(name34);
+    var a34c = acts();
+    closeMenu();
+    if (realDict === undefined) { delete window.PenumbraDict; } else { window.PenumbraDict = realDict; }
+    window.Penumbra.openDataDictionary = realOpen34;
+    rec('C34 What this column means where the report\'s data dictionary names the column, after the sorts (a heading and a cell), opening the dictionary at the entry\'s name; none for a column it does not name',
+      J(a34a.slice(0, 4)) === J(['sortAsc', 'sortDesc', 'about', 'width']) && a34b.indexOf('about') === a34b.indexOf('sortDesc') + 1 && a34b.indexOf('sortDesc') > 0
+        && lbl34 === 'What this column means' && ran34 && J(opened34) === J(['Amount']) && !!name34 && a34c.indexOf('about') < 0 && a34c.indexOf('sortAsc') === 0,
+      'heading=' + J(a34a) + ' cell=' + J(a34b) + ' label=' + lbl34 + ' ran=' + ran34 + ' opened=' + J(opened34) + ' name=' + J(a34c));
+
     // C10 from the keyboard (Shift+F10 / the Menu key on a focused heading): the menu takes the focus; Esc gives it back
     closeMenu();
     th.setAttribute('tabindex', '0');

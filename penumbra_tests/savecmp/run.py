@@ -229,7 +229,9 @@ def hook(src):
          'window.__CF.viewing = function () { return isViewingSnapshot; };\r\n'
          # (cmprq) what a run will restore (armed by a state load, or by a stash), and a pivot left armed planted
          'window.__CF.pend = function () { return JSON.parse(JSON.stringify({ g: pendingGroupByColumn, a: pendingGroupAgg, p: pendingPivotSettings, sl: isStateLoading })); };\r\n'
-         'window.__CF.setPendPivot = function (p) { pendingPivotSettings = p; };\r\n')
+         'window.__CF.setPendPivot = function (p) { pendingPivotSettings = p; };\r\n'
+         # (2026-10-24, snapgrp) whether this main.js has snapgrp (a run from a view gives the report's own view back)
+         'window.__CF.snapgrp = (typeof _pnbSnapStateView === "function");\r\n')
     out = src[:i] + ';(function () {' + h + src[i + len(anchor):]
     j = out.rfind('});')
     out = out[:j] + '})();' + out[j + 3:]

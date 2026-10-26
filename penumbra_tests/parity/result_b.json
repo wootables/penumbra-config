@@ -417,37 +417,37 @@
     {
         "id":  "now_default",
         "snippet":  "now()",
-        "out":  "10/21/2026"
+        "out":  "10/25/2026"
     },
     {
         "id":  "now_iso",
         "snippet":  "now(\u0027YYYY-MM-DD\u0027)",
-        "out":  "2026-10-21"
+        "out":  "2026-10-25"
     },
     {
         "id":  "now_offset_1",
         "snippet":  "now(\u0027YYYY-MM-DD\u0027, \u0027-1 year\u0027)",
-        "out":  "2025-10-21"
+        "out":  "2025-10-25"
     },
     {
         "id":  "now_offset_chain",
         "snippet":  "now(\u0027YYYY-MM-DD\u0027, \u0027-1 year\u0027, \u0027+6 days\u0027)",
-        "out":  "2025-10-27"
+        "out":  "2025-10-31"
     },
     {
         "id":  "now_long",
         "snippet":  "now(\u0027MMMM D, YYYY\u0027)",
-        "out":  "OCTOBER 21, 2026"
+        "out":  "OCTOBER 25, 2026"
     },
     {
         "id":  "now_unquoted",
         "snippet":  "now(MM/DD/YYYY)",
-        "out":  "10/21/2026"
+        "out":  "10/25/2026"
     },
     {
         "id":  "now_bracket_lit",
         "snippet":  "now(\u0027[Run on] MMM D\u0027)",
-        "out":  "RUN ON OCT 21"
+        "out":  "RUN ON OCT 25"
     },
     {
         "id":  "rank_top",

@@ -10,6 +10,10 @@
 # state load, after the ?sort= override - by name; a gone name dropped with the re-query's NOTICE unless the result
 # has as many columns as the saved column order (renamed in place: the place kept, under the column's name now);
 # '#' and journal columns as they are; a pivot's chain as saved. Kit: penumbra_tests\ldsort\stage_20261023.
+# (2026-10-25, urlnum) A ?sort= level on a column named 2021 was the TEXT '2021' (numurl pinned it as a GUARD): the
+# next click on the heading started over at ascending and the header menu's Clear sort did nothing. The resolver now
+# names it as the heading's data() reads it (the NUMBER 2021), and the by-name pass gives every level it keeps that
+# form - one saved as text too (numsaved). URLNUM_NEW: the checks a build without that fix fails.
 #
 # Each scenario loads the REAL main.js (+ the live grouping module) through the REAL run path (a stubbed query.php)
 # from a stored state (harness.html) and publishes named checks:
@@ -20,6 +24,7 @@
 #   py -3 run.py --stage DIR            DIR\js\main.js
 #   py -3 run.py --live-control         the LIVE build: the NEW checks red, the GUARDs green (a build with the fix
 #                                       already: every check green)
+#   py -3 run.py --live-control --rev REV   the same on the build at a git revision (e.g. <the urlnum commit>^)
 #   py -3 run.py --stage DIR --mutant a,b / --mutants [--verbose]
 #   --scn a,b                           a subset of scenarios
 # Headless Edge over CDP; stages into %TEMP%; writes nothing to the webroot.
@@ -43,7 +48,9 @@ SCN = [('flat', ''), ('group', ''), ('multi', ''), ('gone', ''), ('allgone', '')
        # renamed level onto it, a viewer's own calculated column, a nameless level, two levels on one column, a pivot
        # report under a pinned grouping (&id=: the calc store and the presets are kept per report)
        ('casedup', ''), ('numurl', '&sort=2021%7Cdesc'), ('numrenamed', ''), ('mycalc', '&id=ldcalc'), ('nameless', ''),
-       ('dup', ''), ('pivotgrp', '&id=ldpiv')]
+       ('dup', ''), ('pivotgrp', '&id=ldpiv'),
+       # v3 (2026-10-25, urlnum): a level saved as the text '2021' - a save made from a ?sort= view before urlnum
+       ('numsaved', '')]
 # every check a scenario must publish (a missing one fails)
 CHK = {
     'flat': ['sortByName', 'rowsByName', 'marksByName', 'page1', 'noNotice', 'regroupSorted', 'regroupMarks', 'removeSorted'],
@@ -62,12 +69,13 @@ CHK = {
     'requery': ['carried', 'noNotice'],
     'taken': ['sortByName', 'notice'],
     'casedup': ['atItsPlace', 'noNotice'],
-    'numurl': ['urlAsIs', 'noNotice'],
+    'numurl': ['urlNumber', 'noNotice', 'clickOff'],
     'numrenamed': ['keptByPlace', 'numberForm', 'clickDesc'],
     'mycalc': ['calcThere', 'keptByPlace', 'noNotice', 'healed'],
     'nameless': ['leftOut', 'noNotice'],
     'dup': ['oneLevel', 'noNotice', 'clickDesc'],
     'pivotgrp': ['grouped', 'chainAsSaved', 'noNotice'],
+    'numsaved': ['numberForm', 'rowsByName', 'marksByName', 'noNotice', 'clickDesc'],
 }
 # the checks the build before the fix fails (the rest are GUARDs: green on both)
 NEW = ['L-flat-sortByName', 'L-flat-rowsByName', 'L-flat-marksByName', 'L-flat-page1', 'L-flat-regroupSorted', 'L-flat-regroupMarks',
@@ -83,6 +91,10 @@ NEW = ['L-flat-sortByName', 'L-flat-rowsByName', 'L-flat-marksByName', 'L-flat-p
        'L-journal-sortByName', 'L-journal-rowsByName',
        'L-taken-sortByName', 'L-taken-notice',
        'L-numrenamed-numberForm', 'L-numrenamed-clickDesc', 'L-mycalc-healed', 'L-nameless-leftOut', 'L-dup-oneLevel', 'L-dup-clickDesc']
+# (2026-10-25, urlnum) ...and the checks a build without urlnum's fix fails (the ?sort= resolver's text level, and one
+# saved as text): red there, whatever ldsort's own fix
+URLNUM_NEW = ['L-numurl-urlNumber', 'L-numurl-clickOff', 'L-numsaved-numberForm', 'L-numsaved-clickDesc']
+URLNUM_MARKER = "criteria.push({ colIdentifier: typeof asClick === 'number' ? asClick : upper, colIndex: hit.idx, direction: dir });"
 
 # the load's own block (patch_ldsort.py BLOCK), cut out of a candidate for the reorder mutant
 BLOCK_HEAD = '\r\n                    // (2026-10-23, ldsort) A state load\'s saved sort, on the same terms: by name against\r\n'
@@ -136,16 +148,24 @@ MUTANTS = {
                       "        var isLevel = function (c) { return !!c && typeof c === 'object'; };\r\n")],
                     ['L-nameless-leftOut'], ['nameless']),
     # a level keeps the name it was saved with, whatever it is
-    'ld-noheal': ([('            kept.push({ colIdentifier: String(c.colIdentifier) === names[i].toUpperCase() ? c.colIdentifier : heading(names[i]),\r\n',
+    'ld-noheal': ([('            kept.push({ colIdentifier: heading(names[i]),\r\n',
                     '            kept.push({ colIdentifier: c.colIdentifier,\r\n')],
-                  ['L-renamed-healed', 'L-renamed-clickDesc', 'L-casename-healed', 'L-renamedrq-requeryKeeps', 'L-numrenamed-numberForm'],
-                  ['renamed', 'casename', 'renamedrq', 'numrenamed']),
-    # every level takes the heading's form, also one that already names its column (a ?sort= on 2021: a number)
-    'ld-healall': ([('            kept.push({ colIdentifier: String(c.colIdentifier) === names[i].toUpperCase() ? c.colIdentifier : heading(names[i]),\r\n',
-                     '            kept.push({ colIdentifier: heading(names[i]),\r\n')],
-                   ['L-numurl-urlAsIs'], ['numurl']),
+                  ['L-renamed-healed', 'L-renamed-clickDesc', 'L-casename-healed', 'L-renamedrq-requeryKeeps', 'L-numrenamed-numberForm',
+                   'L-numsaved-numberForm', 'L-numsaved-clickDesc'],
+                  ['renamed', 'casename', 'renamedrq', 'numrenamed', 'numsaved']),
+    # (2026-10-25, urlnum; it replaces ld-healall, which pinned the ?sort= level's text) a level that names its column
+    # as text already is kept as it is - the build before urlnum: a saved '2021' stays text
+    'ld-keepnamed': ([('            kept.push({ colIdentifier: heading(names[i]),\r\n',
+                       '            kept.push({ colIdentifier: String(c.colIdentifier) === names[i].toUpperCase() ? c.colIdentifier : heading(names[i]),\r\n')],
+                     ['L-numsaved-numberForm', 'L-numsaved-clickDesc'], ['numsaved']),
+    # (2026-10-25, urlnum) both halves of urlnum off: the ?sort= level the text '2021' again, passed as it is
+    'ld-urltext': ([("criteria.push({ colIdentifier: typeof asClick === 'number' ? asClick : upper, colIndex: hit.idx, direction: dir });",
+                     "criteria.push({ colIdentifier: upper, colIndex: hit.idx, direction: dir });"),
+                    ('            kept.push({ colIdentifier: heading(names[i]),\r\n',
+                     '            kept.push({ colIdentifier: String(c.colIdentifier) === names[i].toUpperCase() ? c.colIdentifier : heading(names[i]),\r\n')],
+                   ['L-numurl-urlNumber', 'L-numurl-clickOff', 'L-numsaved-numberForm', 'L-numsaved-clickDesc'], ['numurl', 'numsaved']),
     # the heading's name as a string (not as jQuery's data() reads it: 2021 a number)
-    'ld-strheal': ([("        var heading = function (n) { return $('<th>').attr('data-colname', String(n).toUpperCase()).data('colname'); };\r\n",
+    'ld-strheal': ([("        var heading = function (n) { var u = String(n).toUpperCase(), d = $('<th>').attr('data-colname', u).data('colname'); return typeof d === 'number' ? d : u; };\r\n",
                      "        var heading = function (n) { return String(n).toUpperCase(); };\r\n")],
                    ['L-numrenamed-numberForm', 'L-numrenamed-clickDesc'], ['numrenamed']),
     # no NOTICE for a dropped level
@@ -169,12 +189,18 @@ def flag(name):
 stage_dir = opt('--stage', None)
 scn_arg = opt('--scn', None)
 one_mutant = opt('--mutant', None)
+rev = opt('--rev', None)
 all_mutants = flag('--mutants')
 verbose = flag('--verbose')
 live_control = flag('--live-control')
 if args: raise SystemExit('unknown arguments: %s' % ' '.join(args))
 if live_control and (stage_dir or all_mutants or one_mutant): raise SystemExit('--live-control runs the live build alone')
+if rev and not live_control: raise SystemExit('--rev is for --live-control')
 main_path = os.path.join(stage_dir or APP, 'js', 'main.js')
+# (2026-10-25, urlnum) --live-control --rev REV: the build at a git revision in the live one's place
+if rev:
+    sys.path.insert(0, r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\_oldver'); from oldver import git_show
+    main_path = git_show(rev, 'js/main.js')
 
 def read_b(p): return open(p, 'rb').read().decode('utf-8', 'surrogateescape')
 def hook(src):
@@ -268,7 +294,7 @@ try:
     names = [s for s, _ in SCN]
     if scn_arg: names = [s for s in names if s in scn_arg.split(',')]
     text = read_b(main_path)
-    print('candidate: %s (%s the fix)' % (main_path, 'with' if MARKER in text else 'WITHOUT'))
+    print('candidate: %s (%s the fix; %s urlnum\'s)' % (main_path, 'with' if MARKER in text else 'WITHOUT', 'with' if URLNUM_MARKER in text else 'WITHOUT'))
     if all_mutants or one_mutant:
         if MARKER not in text: raise SystemExit('mutants need a build with the fix (--stage)')
         ok = bad = 0
@@ -293,8 +319,9 @@ try:
             else: f += 1; failed.append(a)
         print('TOTAL pass=%d fail=%d   failed: %s' % (p, f, ' '.join(failed)))
         if live_control:
-            expect = [] if MARKER in text else NEW
-            print('CONTROL: the fix is %s live main.js - %d checks expected RED' % ('in' if MARKER in text else 'not in', len(expect)))
+            expect = ([] if MARKER in text else NEW) + ([] if URLNUM_MARKER in text else URLNUM_NEW)
+            print('CONTROL: the fix is %s live main.js, urlnum\'s %s - %d checks expected RED' % ('in' if MARKER in text else 'not in',
+                  'in' if URLNUM_MARKER in text else 'not', len(expect)))
             seen = [a for a, _, _ in res]
             new_green = [a for a in expect if a in seen and a not in failed]
             new_unseen = [a for a in expect if a not in seen and a.split('-')[1] in names]
@@ -307,6 +334,9 @@ try:
             if MARKER not in text:
                 red = [a for a in NEW if a in failed]
                 if red: print('NOTE: the fix is not in this build: %d of its checks are red as on the build before it' % len(red))
+            if URLNUM_MARKER not in text:
+                red = [a for a in URLNUM_NEW if a in failed]
+                if red: print('NOTE: urlnum\'s fix is not in this build: %d of its checks are red as on the build before it' % len(red))
             print('RESULT: GREEN' if f == 0 and p > 0 else 'RESULT: RED')
 finally:
     try: edge.kill()

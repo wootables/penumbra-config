@@ -96,14 +96,22 @@
   <div class="sp-section sp-columns-section"><div class="sp-column-container"><div id="spColumnList" class="sp-column-list"></div></div></div>
   <div class="sp-actions"><button id="spApply">Save Column Layout</button><button id="spReset">Reset</button><span id="spPendingCount"></span></div>
 </div>
-<div id="pnbStatusBar"><div class="sb-seg" id="sbColsSeg"><span id="sbCols"></span></div><div class="sb-seg" id="sbUserSeg"></div></div>
+<div id="pnbStatusBar"><div class="sb-seg" id="sbColsSeg"><span id="sbCols"></span>
+  <!-- (snapgrp) the custom-layout chip and its popover's diff lines -->
+  <span id="sbCustomCols" style="display:none"></span><div id="sbCustomColsDiff"></div><button type="button" id="sbCustomColsSave" style="display:none"></button>
+</div><div class="sb-seg" id="sbUserSeg"></div></div>
 <!--SNAP_TEMPLATE-->
+<!--PIVOT_BUILDER-->
 <pre id="out">running</pre>
 
 <script>
   (function () {
-    // every page starts clean (a phase 2 page keeps nothing of phase 1's: the stores below are per page load)
+    // every page starts clean (a phase 2 page keeps nothing of phase 1's: the stores below are per page load) -
+    // but ?mode=prefs: the viewer's stored column layout phase 1 left (#prefs=), as the next open of the report finds it
     try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
+    try {
+      if (/[?&]mode=prefs(&|$)/.test(location.search)) localStorage.setItem('penumbra_column_prefs', decodeURIComponent(String(location.hash).replace(/^#prefs=/, '')));
+    } catch (e) { window.__PRE_ERR = String(e); }
   })();
   window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' } };
   window.PENUMBRA_THEME_IDS = ['theme-default'];
@@ -163,6 +171,19 @@
     { ID: '1', DEPT: 'East', NAME: 'Alpha',   AMOUNT: '$100.00', QTY: '1' },
     { ID: '3', DEPT: 'East', NAME: 'Charlie', AMOUNT: '$300.00', QTY: '3' }
   ];
+  // Snapshot #58 (?mode=ovcalc): taken before NOTE existed by a viewer with the calculated column DOUBLE, which sits at
+  // its place 5 - the live report's NOTE place (the live run appends DOUBLE at 6).
+  window.__SNAP4 = [
+    { ID: '2', DEPT: 'West', NAME: 'Bravo',   AMOUNT: '$200.00', QTY: '2', DOUBLE: '4' },
+    { ID: '1', DEPT: 'East', NAME: 'Alpha',   AMOUNT: '$100.00', QTY: '1', DOUBLE: '2' },
+    { ID: '3', DEPT: 'East', NAME: 'Charlie', AMOUNT: '$300.00', QTY: '3', DOUBLE: '6' }
+  ];
+  // Snapshot #59 (?mode=nw, snapgrp): taken before AMOUNT and QTY were in the report (ID 0, DEPT 1, NAME 2, NOTE 3).
+  window.__SNAP5 = [
+    { ID: '3', DEPT: 'East', NAME: 'Charlie', NOTE: 'z' },
+    { ID: '1', DEPT: 'East', NAME: 'Alpha',   NOTE: 'x' },
+    { ID: '2', DEPT: 'West', NAME: 'Bravo',   NOTE: 'y' }
+  ];
   window.__QUERY = 'SELECT ID, DEPT, NAME, AMOUNT, QTY, NOTE FROM SNAPCAP_FIXTURE';
   window.penumbra_vars = {
     isAdmin: true, isGlobalAdmin: true, canEditReport: false, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '', fname: 'Harness' },
@@ -183,6 +204,16 @@
     sortOrder: 'asc', colSortOrder: 'asc', stickyColCount: 1, totalColAggs: null, totalRowAggs: null,
     totalRowAggLabels: null, totalRowAggBaseIdx: null, rankN: null, rankDir: null, rankAgg: null, rankOther: true,
     rankScope: null, noBreakdown: false, startExpanded: false, hideEmpty: false };
+  // (snapgrp, 2026-10-24) the grouped report (?mode=gv, lzg): by DEPT, summed AMOUNT, the largest groups first, the
+  // top 2 with the rest in Other, one level open - every part a capture writes; the report's own calculated column
+  // (?mode=lzc); per-column summaries and widths for the columns snapshot #59 lacks (?mode=nw)
+  window.__REPORT_GROUP2 = { groupBy: 'DEPT', groupAgg: { column: 'AMOUNT', type: 'sum' }, groupSort: { key: 'count', dir: 'desc' },
+    groupStartDepth: 1, groupLimit: { n: 2, dir: 'top', other: true, minRows: 0 } };
+  window.__REPORT_CALC = [{ name: 'DOUBLE', formula: '{QTY}*2', format: 'number' }];
+  window.__REPORT_SUMS = { AMOUNT: 'avg', QTY: 'formula' };
+  window.__REPORT_FX = { QTY: '{sum}*2' };
+  window.__REPORT_WIDTHS_NW = { NOTE: 222, NAME: 150, AMOUNT: 180, QTY: 90 };
+  window.__REPORT_PSORT = [{ colIdentifier: 'DEPT', colIndex: 0, direction: 'desc' }];
   function __base() {
     return { name: 'snapcap', query: window.__QUERY, reportTitle: 'Capture during a snapshot view',
              theme: 'theme-default', density: 'standard', sortCriteria: JSON.parse(JSON.stringify(window.__REPORT_SORT)), noLimit: true,
@@ -199,6 +230,26 @@
       st = __base();
       if (m === 'ovg') { var g = JSON.parse(JSON.stringify(window.__REPORT_GROUP)); Object.keys(g).forEach(function (k) { st[k] = g[k]; }); }
       if (m === 'ovp') { st.pivot = JSON.parse(JSON.stringify(window.__REPORT_PIVOT)); st.sortCriteria = []; }
+      // (snapgrp) the report as each new page saves it - a phase 2 link page (?mode=view) over the report as its
+      // phase 1 page (exp) had it saved
+      var x = (m === 'view') ? window.__EXP : m;
+      if (x === 'gv' || x === 'lzg' || x === 'gvf' || x === 'gvc' || x === 'gvce' || x === 'lzgc' || x === 'cmpvg') { var g2 = JSON.parse(JSON.stringify(window.__REPORT_GROUP2)); Object.keys(g2).forEach(function (k) { st[k] = g2[k]; }); }
+      // (snapback, 2026-10-24) the grouped report's ways back: a failed load during a view, Compare to Live Data from a
+      // view (?snap= tab too), Load As View over a comparison
+      if (x === 'gvfg' || x === 'cmpvf' || x === 'clv' || x === 'clvgr' || x === 'lzcl' || x === 'lvc' || x === 'lvcr' || x === 'gvfs' || x === 'lvcf') { var g3 = JSON.parse(JSON.stringify(window.__REPORT_GROUP2)); Object.keys(g3).forEach(function (k) { st[k] = g3[k]; }); }
+      // (snapback review) a report saved as a pivot by REGION, a column its query no longer has
+      if (x === 'lzclx') { st.pivot = JSON.parse(JSON.stringify(window.__REPORT_PIVOT)); st.pivot.rows = ['REGION']; st.sortCriteria = []; }
+      // (the pivot sorted by its DEPT row field, descending: a pivot's sort, which goes with its pivot)
+      if (x === 'pv' || x === 'lzp') { st.pivot = JSON.parse(JSON.stringify(window.__REPORT_PIVOT)); st.sortCriteria = JSON.parse(JSON.stringify(window.__REPORT_PSORT)); }
+      // (snapback) ...and the pivot report's ways back
+      if (x === 'pvf' || x === 'cmpvp' || x === 'clvp' || x === 'clvr' || x === 'lzclp' || x === 'lvcp') { st.pivot = JSON.parse(JSON.stringify(window.__REPORT_PIVOT)); st.sortCriteria = JSON.parse(JSON.stringify(window.__REPORT_PSORT)); }
+      // (cmppiv, 2026-10-24) ...its comparisons over the live pivot, a pivot drawn again under a search, Compare to Live
+      // Data from a view whose comparison does not render; and the grouped report's (clvf)
+      if (/^(lpc|lpab|lpr|lplv|lplvc|lplva|lpx|lpxc|lps|cmpvpz|cmpvpe|clvfp|clvn)$/.test(x)) { st.pivot = JSON.parse(JSON.stringify(window.__REPORT_PIVOT)); st.sortCriteria = JSON.parse(JSON.stringify(window.__REPORT_PSORT)); }
+      if (x === 'clvf') { var g4 = JSON.parse(JSON.stringify(window.__REPORT_GROUP2)); Object.keys(g4).forEach(function (k) { st[k] = g4[k]; }); }
+      if (x === 'nw' || x === 'lzw') { st.columnSummaries = JSON.parse(JSON.stringify(window.__REPORT_SUMS)); st.columnSummaryFormulas = JSON.parse(JSON.stringify(window.__REPORT_FX));
+                        st.columnWidths = JSON.parse(JSON.stringify(window.__REPORT_WIDTHS_NW)); }
+      if (x === 'lzc') st.calcColumns = JSON.parse(JSON.stringify(window.__REPORT_CALC));
     }
     if (st) window.penumbra_vars.preloadedState = st;
   })();
@@ -214,14 +265,15 @@
     if (/save_server_state\.php/.test(url)) window.__posts.push({ url: url, data: opts.data });
     var d = jQuery.Deferred();
     var isQuery = /query\.php/.test(url);
-    var resp = isQuery ? { data: JSON.parse(JSON.stringify(window.__LIVE)) } : {};
+    // (?mode=ovcalc0) window.__EMPTY_NEXT: the report's run comes back with no rows
+    var resp = isQuery ? { data: window.__EMPTY_NEXT ? [] : JSON.parse(JSON.stringify(window.__LIVE)) } : {};
     if (/save_server_state\.php/.test(url)) {
       var sid = 'snapcap'; try { sid = JSON.parse(opts.data).short_id || sid; } catch (e) {}
       resp = { success: true, new_id: sid, is_new: false, numeric_id: 1 };
     }
     if (/manage_snapshots\.php/.test(url) && /[?&]action=load(&|$)/.test(url)) {
       var snapId = (/[?&]snap_id=(\d+)/.exec(url) || [])[1] || '';
-      var srows = snapId === '56' ? window.__SNAP2 : (snapId === '57' ? window.__SNAP3 : window.__SNAP);
+      var srows = snapId === '56' ? window.__SNAP2 : (snapId === '57' ? window.__SNAP3 : (snapId === '59' ? window.__SNAP5 : window.__SNAP));
       resp = { status: 'success', data: { SNAP_DATA: JSON.stringify(srows.map(function (r) { return { rowData: r }; })), SNAP_NAME: 'Stored snapshot ' + snapId,
                CREATED_AT: '2026-10-20T09:00:00', COLUMN_NAMES: Object.keys(srows[0]).join(','), ROW_COUNT: srows.length, COLUMN_COUNT: Object.keys(srows[0]).length,
                REPORT_SHORT_ID: 'snapcap' } };
@@ -259,6 +311,29 @@
 <script src="penumbra_userseg.js"></script>
 <script src="penumbra_tiles.js"></script>
 <script src="penumbra_presets.js"></script>
+<script>
+  // ?mode=ovcalc: the calculated columns module, for the viewer's own column the page's &calc= adds. index.php loads
+  // it after main.js but before main.js's ready code, which main_cf.js runs at once: so here, before it (ldlayout's way)
+  if (window.__MODE === 'ovcalc' || window.__MODE === 'ovcalc0') document.write('<script src="penumbra_calc.js"><\/script>');
+  // (snapgrp) ...and for the report's own calculated column (?mode=lzc, and the Save it hands phase 2)
+  else if (window.__MODE === 'lzc' || window.__MODE === 'rsvc' || ((window.__MODE === 'saved' || window.__MODE === 'state') && window.__EXP === 'lzc')) document.write('<script src="penumbra_calc.js"><\/script>');
+  // (snapback) the pivot builder (index.php's), for the pages whose way back draws the report's pivot again through it
+  if (/^(cmpvp|clvp|lzclp|lvcp|lzclx)$/.test(window.__MODE)) {
+    (function () {
+      var t = document.getElementById('pnbPivotBuilderTpl');
+      if (t && t.content) document.body.insertBefore(t.content.cloneNode(true), document.getElementById('out'));
+      else window.__errors.push('pivot builder template missing');
+    })();
+  }
+  // (cmppiv) ...and for this round's pivot pages: their ways back draw the report's pivot again through it too
+  if (/^(lpc|lpab|lpr|lplv|lplvc|lplva|lpx|lpxc|lps|cmpvpz|cmpvpe|clvfp|clvn)$/.test(window.__MODE)) {
+    (function () {
+      var t = document.getElementById('pnbPivotBuilderTpl');
+      if (t && t.content) document.body.insertBefore(t.content.cloneNode(true), document.getElementById('out'));
+      else window.__errors.push('pivot builder template missing');
+    })();
+  }
+</script>
 <script src="main_cf.js"></script>
 <link rel="stylesheet" href="penumbra_colwidths.css">
 <script src="penumbra_colwidths.js"></script>

@@ -76,4 +76,10 @@ t('promptNoPivot', strpos($up2, 'THE PIVOT') === false);
 t('systemPivot', strpos($sp, 'a line reading exactly [pivot]') !== false && strpos($sp, 'Grand Total') !== false && strpos($sp, '[columns]') !== false);
 $facts2 = pnb_dict_known_facts(array(array('r9', $mk("action(infobox, D, dict|`[pivot]\nSTATS_COMBINED_V2.Z | pivot line | source: STATS_COMBINED_V2.Z\n[columns]\nQ | col | source: STATS_COMBINED_V2.Q`)"))), array('STATS_COMBINED_V2'), 'self');
 t('factsNoPivotLines', count($facts2['lines']) === 1 && $facts2['lines'][0] === 'STATS_COMBINED_V2.Q | col', $facts2);
+// --- (2026-10-24 sweep) a byte cut never splits a UTF-8 character; invalid UTF-8 still encodes
+if (function_exists('pnb_dict_cut')) {
+    $u = str_repeat('a', 9) . "\xC3\xA9";
+    t('cutUtf8', pnb_dict_cut($u, 10) === str_repeat('a', 9) && pnb_dict_cut($u, 11) === $u && pnb_dict_cut("ab\xE2\x82\xAC", 4) === 'ab' && pnb_dict_cut('short', 99) === 'short');
+    t('jsonInvalidUtf8', pnb_dict_json(array('x' => "bad\xC3")) !== false);
+} else { t('cutUtf8', false, 'no pnb_dict_cut'); t('jsonInvalidUtf8', false, 'no pnb_dict_json'); }
 echo "SUMMARY pass=$pass fail=$fail\n";

@@ -23,8 +23,20 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js', 'penumbra_tiles.js',
         'penumbra_a11y.js', 'penumbra_grouplist.js', 'penumbra_cellsel.js']
 SCN = ['mflat', 'mkbd', 'mopts', 'mcalc', 'mgroupby', 'gmenu', 'mrestr', 'mexcl', 'mcopy', 'mjournal', 'mmore', 'mfitnest', 'mfitnote', 'mcell', 'mnest', 'mload', 'msubs', 'mbucket', 'mnum',   # (round 33) mreset retired: Reset all columns left the menu
-       'mauto', 'mauto2', 'ggmenu', 'gglist', 'ggfmt', 'mautostale']
+       'mauto', 'mauto2', 'ggmenu', 'gglist', 'ggfmt', 'mautostale', 'mhl']   # (2026-10-24, hlhead) mhl
+SCN = SCN + ['mnestgb', 'ggnest']   # (2026-10-25, nestgb) Group by on a nested-table column
+SCN = SCN + ['gnnestbd', 'gchipnest']   # (2026-10-25, nestgb2) a group's band menu and the status bar chip on nested-table columns
 CHK = {
+    # (2026-10-25, nestgb2) the group band menu's Group by lists (grouped by H_GROUP, H_GROUP2) and the status bar's grouping
+    # chip: no nested-table column, its tables' columns at the top level (the dialog's Nested Table Columns)
+    'gnnestbd': ['nbTopList', 'nbDedupe', 'nbNoParent', 'nbInnerNone', 'nbOtherTitle', 'nbPick', 'nbPickTick', 'nbUndo', 'nbKbd', 'nbHiddenNot', 'nbHiddenList'],
+    'gchipnest': ['ncNoParent', 'ncPlain', 'ncNestList', 'ncPick', 'ncActive'],
+    # (2026-10-25, nestgb; nestcopy) a nested-table column's Nested columns section: Group by and Copy distinct values per column
+    # of its tables (flat and grouped, mouse and keyboard)
+    'mnestgb': ['nsNoDraw', 'nsSection', 'nsAria', 'nsColList', 'nsOwnOnly', 'nsPlain', 'nsNone', 'nsDigitSafe', 'nsListThrows', 'nsCase', 'nsNoRaw', 'nsClipOff', 'nsCopy',
+                'nsCopyOther', 'nsCmpNone', 'nsInnerOwn', 'nsStats', 'nsStatsFilter', 'nsStatsTables', 'nsStaleNoEmpty', 'nsGroups', 'nsGroupedTick', 'nsRegroup', 'nsKbdOpens', 'nsKbdPick', 'nsKbdCopy', 'nsKbdScroll'],   # (v2: the review's six; v3: nsCmpNone, nsInnerOwn)
+    'ggnest': ['gnSection', 'gnKbdOpens', 'gnKbdPick', 'gnTick', 'gnTickNoop', 'gnCopyGrouped', 'gnStatsGrouped'],
+    'mhl': ['hlItem', 'hlAlone', 'hlHeaderOption', 'hlBack', 'hlKbdFocus', 'hlKbdNotReset', 'hlResetFocus', 'hlNotNum', 'hlNotRestricted'],   # (2026-10-24, hlhead) Highlight... in the menu
     # (2026-10-20, grpsweep 2) a formatted column's group; a List choice left behind by a saved view
     'ggfmt': ['fmtOnlyAll'],
     'mautostale': ['staleChoice'],
@@ -156,7 +168,138 @@ NEW_SET_R33_BASE = set()
 NEW = {'L-mopts-fitItem', 'L-mopts-resetItem', 'L-mopts-resets', 'L-mopts-fitPage', 'L-mopts-fitPageUndo', 'L-mmore-resetCol',
        'L-msubs-topOrder', 'L-msubs-arrows', 'L-msubs-resetList', 'L-msubs-clearPanel', 'L-mnum-numItems', 'L-mnum-numResets',
        'L-mflat-itemsAll', 'L-mnest-nestRowHeightPlain', 'S-helpSubs', 'S-helpResetAll', 'S-helpRowHeight', 'S-helpMore'}
+# (2026-10-24, hlhead; round 33 is live) Highlight... in the header menu - hlNotNum / hlNotRestricted hold on live (guards)
+NEW = {'L-mhl-%s' % c for c in CHK['mhl'] if c not in ('hlNotNum', 'hlNotRestricted')}
+# (2026-10-25, nestgb; hlhead is LIVE since 75458b7: its mhl checks are old ones now) Group by on a nested-table column is a list
+# of its tables' columns (live: the plain item, a grouping by the whole column); ngbPlain and ngbDigitSafe hold on live (guards)
+NEW = {'L-mnestgb-%s' % c for c in CHK['mnestgb'] if c not in ('ngbPlain', 'ngbDigitSafe')} | {'L-ggnest-%s' % c for c in CHK['ggnest']} | {'S-helpNestGroup'}
+NEW = set()   # (nestgb is LIVE since 3c820e7, 2026-10-25: its checks are old ones now; the next round names its own NEW)
+# (2026-10-25, nestgb2) the group band menu's lists and the status bar's grouping chip name no nested-table column and list its
+# tables' columns at the top level (live: the column itself, no sub-column); nbInnerNone, nbHiddenNot and ncPlain hold on live (guards)
+NEW = {'L-gnnestbd-%s' % c for c in CHK['gnnestbd'] if c not in ('nbInnerNone', 'nbHiddenNot')} | {'L-gchipnest-%s' % c for c in CHK['gchipnest'] if c != 'ncPlain'} | {'S-helpNestBand'}
+NEW = set()   # (nestgb2 is LIVE since 3249bc4, 2026-10-25: its checks are old ones now)
+# (2026-10-25, nestcopy) a nested-table column's Nested columns section (Group by and Copy distinct values per column of its tables):
+# mnestgb / ggnest reshaped (live has nestgb's flyout); nsPlain and nsDigitSafe hold on live (guards). nestgb2's set above stays.
+NEW = NEW | {'L-mnestgb-%s' % c for c in CHK['mnestgb'] if c not in ('nsPlain', 'nsDigitSafe')} | {'L-ggnest-%s' % c for c in CHK['ggnest']} | {'S-helpNestGroup'}
+NEW = NEW - ({'L-mnestgb-%s' % c for c in CHK['mnestgb']} | {'L-ggnest-%s' % c for c in CHK['ggnest']} | {'S-helpNestGroup'})   # (nestcopy is LIVE since 934d195, 2026-10-25: old checks now; nestgb2's set above stays)
+# (2026-10-25, neststats) Column stats per column of a nested-table column's tables: nsStats / nsStatsFilter new, nsColList /
+# nsNone / nsClipOff reshaped (the list gains Column stats; the greyed line's reason; the stats stay where Clipboard is hidden)
+NEW = NEW | {'L-mnestgb-%s' % c for c in ('nsColList', 'nsNone', 'nsClipOff', 'nsStats', 'nsStatsFilter', 'nsStatsTables')} | {'L-ggnest-gnStatsGrouped', 'S-helpNestStats'}
+NEW = NEW - {'L-mnestgb-nsListThrows'}   # (2026-10-25, digitcol) a guard: the picker's list throwing (a stub) - holds on live
 MUTANTS = {
+    # --- (2026-10-25, nestgb2) the band menu's lists: no nested tables' columns; the nested-table column listed too; its tables'
+    # columns at every level; a name two tables share twice; Other column... promising nested fields at every level; a hidden
+    # column's tables read; a pick that adds a level instead of regrouping this one
+    'nb-nonest': ([('menu', "        if (nest.length) {\n            if (items.length) { items.push('-'); }\n", "        if (false) {\n            if (items.length) { items.push('-'); }\n")],
+                  ['L-gnnestbd-nbTopList', 'L-gnnestbd-nbDedupe', 'L-gnnestbd-nbPick', 'L-gnnestbd-nbPickTick', 'L-gnnestbd-nbUndo', 'L-gnnestbd-nbKbd'], ['gnnestbd']),
+    'nb-parent': ([('menu', "                    nest.push(gmColumnItem(info, mode, subs[j], subs[j]));\n                }\n                continue;\n",
+                    "                    nest.push(gmColumnItem(info, mode, subs[j], subs[j]));\n                }\n")], ['L-gnnestbd-nbNoParent'], ['gnnestbd']),
+    'nb-deep': ([('menu', "                for (var j = 0; outer && j < subs.length; j++) {", "                for (var j = 0; j < subs.length; j++) {")], ['L-gnnestbd-nbInnerNone'], ['gnnestbd']),
+    'nb-dedupe': ([('menu', "                    if (nestSeen[k] || used.indexOf(k) >= 0) { continue; }", "                    if (used.indexOf(k) >= 0) { continue; }")],
+                  ['L-gnnestbd-nbDedupe', 'L-gnnestbd-nbTopList'], ['gnnestbd']),
+    'nb-title': ([('menu', "'Configure grouping: hidden columns, date and number ranges' + (outer ? ', nested fields' : '')", "'Configure grouping: hidden columns, date and number ranges, nested fields'")],
+                 ['L-gnnestbd-nbOtherTitle'], ['gnnestbd']),
+    'nb-hidden': ([('menu', "subs = (nf && shown(t)) ? nf(c) : null;", "subs = nf ? nf(c) : null;")], ['L-gnnestbd-nbHiddenNot', 'L-gnnestbd-nbHiddenList'], ['gnnestbd']),
+    'nb-regroup': ([('menu', "            l[d] = c;\n", "            l.splice(d + 1, 0, c);\n")], ['L-gnnestbd-nbPick'], ['gnnestbd']),
+    # --- (2026-10-25, nestgb2) the chip: the nested-table column's button back; no nested tables' columns; a shared name twice;
+    # no heading over them; their buttons grouping by the nested-table column
+    'nc-parent': ([('main', "                    });\n                    return;\n                }\n                var label = $(this).clone()", "                    });\n                }\n                var label = $(this).clone()")],
+                  ['L-gchipnest-ncNoParent'], ['gchipnest']),
+    'nc-nonest': ([('main', "            if (nest.length) cols = cols.concat([{ head: 'Nested table columns' }], nest);", "            if (false) cols = cols.concat([{ head: 'Nested table columns' }], nest);")],
+                  ['L-gchipnest-ncNestList', 'L-gchipnest-ncPick', 'L-gchipnest-ncActive'], ['gchipnest']),
+    'nc-dedupe': ([('main', "if (!nestSeen[k]) { nestSeen[k] = true; nest.push(", "if (true) { nestSeen[k] = true; nest.push(")], ['L-gchipnest-ncNestList'], ['gchipnest']),
+    'nc-head': ([('main', "                if (c.head) { $('<div class=\"sb-pop-h\"></div>').toggleClass('sb-mt', cols[0] !== c).text(c.head).appendTo($list); return; }",
+                  "                if (c.head) { return; }")], ['L-gchipnest-ncNestList'], ['gchipnest']),
+    'nc-token': ([('main', "nest.push({ colname: String(s), label: String(s) });", "nest.push({ colname: String(colname), label: String(s) });")], ['L-gchipnest-ncPick'], ['gchipnest']),
+    # --- (2026-10-25, nestcopy) the Nested columns section: none drawn; the whole column's Copy distinct values kept; its plain Group
+    # by kept; the column's own list without its name on top; no greyed line where nothing is listed; no tick; no "instead"; a
+    # Group by that groups by nothing; one only from the flat table; the ticked one regrouping when picked again; Copy's option
+    # without its nested data (the copy reads the plain column); Other... not choosing it. (v2, the review) the names read by
+    # drawing every lazy cell (Copy's own plan); no screen reader name; group mode's case on Group by; no section where neither
+    # engine names a column; Copy distinct values where the report hides Clipboard (the nested ones; a plain column's; the copy
+    # itself); a tall menu not scrolled to the keyboard's item
+    'ns-nosection': ([('menu', "        if (nsec) { items.push('-'); items = items.concat(nsec); }   // (2026-10-25, nestcopy) the Nested columns section\n", "")],
+                     ['L-mnestgb-nsSection', 'L-mnestgb-nsNone'], ['mnestgb']),
+    'ns-keepcopy': ([('menu', "        if (clipOff || canCopyN) { use = use.filter(function (u) { return u.act !== 'copy'; }); }\n", "")],
+                    ['L-mnestgb-nsSection', 'L-mnestgb-nsNone', 'L-mnestgb-nsNoRaw', 'L-mnestgb-nsClipOff'], ['mnestgb']),
+    'ns-plaingb': ([('menu', "        if (nsub) { canGroup = false; }\n", "")], ['L-mnestgb-nsSection'], ['mnestgb']),
+    'ns-heading': ([('menu', "        var A = api(), items = [{ heading: label }];", "        var A = api(), items = [];")], ['L-mnestgb-nsColList', 'L-mnestgb-nsCase'], ['mnestgb']),
+    'ns-none': ([('menu', "            out.push({ act: 'nestnone',", "            if (false) out.push({ act: 'nestnone',")], ['L-mnestgb-nsNone', 'L-mnestgb-nsNoRaw'], ['mnestgb']),
+    'ns-tick': ([('menu', "checked: mine,\n                title: 'A row joins", "checked: false,\n                title: 'A row joins")], ['L-mnestgb-nsGroupedTick', 'L-ggnest-gnTick'], ['mnestgb', 'ggnest']),
+    'ns-instead': ([('menu', "label: 'Group by ' + label + (grouped && !mine ? ' instead' : ''),", "label: 'Group by ' + label,")],
+                   ['L-mnestgb-nsGroupedTick', 'L-ggnest-gnSection', 'L-ggnest-gnKbdOpens'], ['mnestgb', 'ggnest']),
+    'ns-run': ([('menu', "                run: function () { if (!mine) { window.Penumbra.groupByColumn(e.g); } } });", "                run: function () { } });")],
+               ['L-mnestgb-nsGroups'], ['mnestgb']),
+    'ns-flatonly': ([('menu', "if (!mine) { window.Penumbra.groupByColumn(e.g); }", "if (!gcol) { window.Penumbra.groupByColumn(e.g); }")],
+                    ['L-mnestgb-nsRegroup', 'L-ggnest-gnKbdPick'], ['mnestgb', 'ggnest']),
+    'ns-again': ([('menu', "                run: function () { if (!mine) { window.Penumbra.groupByColumn(e.g); } } });", "                run: function () { window.Penumbra.groupByColumn(e.g); } });"),
+                  ('main', "            if ($('body').hasClass('group-mode-active') && actualCol === String(currentGroupingColumn)) return;", "")],
+                 ['L-ggnest-gnTickNoop'], ['ggnest']),
+    'ns-copyplain': ([('main', "        var $opt = $('<option></option>').attr({ value: name, 'data-nested-parent': String(col), 'data-nested-sub': String(sub), 'data-nested-colid': th.getAttribute('data-column'), 'data-nested-mapkey': String(col).toUpperCase() }).text(name);",
+                       "        var $opt = $('<option></option>').attr({ value: name }).text(name);")],
+                     ['L-mnestgb-nsCopy', 'L-mnestgb-nsKbdCopy', 'L-ggnest-gnCopyGrouped'], ['mnestgb', 'ggnest']),
+    'ns-other': ([('main', "            $('#copyColumnSelector').val(name);\n            setTimeout(function () { $('#copyDelimiterInput').focus().select(); }, 60);",
+                   "            setTimeout(function () { $('#copyDelimiterInput').focus().select(); }, 60);")], ['L-mnestgb-nsCopyOther'], ['mnestgb']),
+    'ns-draw': ([('main', "        var subs = _pnbNestCopyKeys(_pnbNestCopyRows(), String(col || '').toUpperCase());\n        return subs.length ? subs : null;\n",
+                  "        var p = getNestedColumnPlan().filter(function (x) { return String(x.parentName) === String(col); })[0];\n        return p ? p.subNames : null;\n")],
+                ['L-mnestgb-nsNoDraw'], ['mnestgb']),
+    'ns-aria': ([('menu', "label: label, aria: 'Nested column ' + label, sub: true,", "label: label, sub: true,")], ['L-mnestgb-nsAria'], ['mnestgb']),
+    'ns-case': ([('menu', "label: 'Group by ' + label + (grouped", "label: 'Group by ' + e.g + (grouped")], ['L-mnestgb-nsCase'], ['mnestgb']),
+    'ns-raw': ([('menu', "csub = canCopyN ? (A.nestedCopyFields(col) || []) : null;", "csub = canCopyN ? A.nestedCopyFields(col) : null;")], ['L-mnestgb-nsNoRaw'], ['mnestgb']),
+    'ns-clip': ([('menu', "        if (e.c && !clipOff) {", "        if (e.c) {")], ['L-mnestgb-nsClipOff'], ['mnestgb']),   # (re-anchored, neststats)
+    # --- (2026-10-25, neststats) no Column stats in a column's list; the stats over every row (the filter's ignored); none where
+    # Clipboard is hidden; the heading the column's own (the rows the filter keeps, not its tables')
+    'ns-stats': ([('menu', "        if (typeof A.nestedValues === 'function') {\n            var statsMemo = null;", "        if (false) {\n            var statsMemo = null;")],
+                 ['L-mnestgb-nsStats', 'L-mnestgb-nsColList'], ['mnestgb']),
+    'ns-statsall': ([('main', "        var kept = _pnbHlRowsKept(), vals = [], tables = 0;", "        var kept = masterRowData.slice(), vals = [], tables = 0;")],
+                    ['L-mnestgb-nsStatsFilter', 'L-ggnest-gnStatsGrouped'], ['mnestgb', 'ggnest']),   # (re-anchored, the review)
+    # (the review) the flat rows alone (a search typed while grouped marks the grouped rows); the stale-main.js guard gone; a
+    # value that is a table counted as a value
+    'ns-statsflat': ([('main', "        var kept = _pnbHlRowsKept(), vals = [], tables = 0;",
+                       "        var kept = Array.prototype.map.call(document.querySelectorAll('#resultsTable > tbody > tr:not(.search-hidden)'), function (tr) { return masterRowData[_pnbLazyRowIndex(tr)]; }).filter(Boolean), vals = [], tables = 0;")],
+                     ['L-ggnest-gnStatsGrouped'], ['ggnest']),
+    'ns-stale': ([('menu', "nested && (!clipOff || typeof A.nestedValues === 'function') && typeof", "nested && typeof")], ['L-mnestgb-nsStaleNoEmpty'], ['mnestgb']),
+    'ns-statstables': ([('menu', "                    if (tabs) { list.splice(1, 0, { info: 'With a table', value: tabs.toLocaleString() }); }\n", "")], ['L-mnestgb-nsStatsTables'], ['mnestgb']),
+    'ns-statsclip': ([('menu', "        if (typeof A.nestedValues === 'function') {\n            var statsMemo = null;", "        if (!clipOff && typeof A.nestedValues === 'function') {\n            var statsMemo = null;")],
+                     ['L-mnestgb-nsClipOff'], ['mnestgb']),
+    'ns-statshead': ([('menu', "                    list[0] = { heading: 'Over the ' + all", "                    if (false) list[0] = { heading: 'Over the ' + all")],
+                     ['L-mnestgb-nsStats', 'L-mnestgb-nsStatsFilter'], ['mnestgb']),   # (re-anchored, the review)
+    'ns-clipplain': ([('menu', "        if (clipOff || canCopyN) { use =", "        if (canCopyN) { use =")], ['L-mnestgb-nsClipOff'], ['mnestgb']),
+    'ns-clipmain': ([('main', "        if (document.body.classList.contains('restrict-clipboard')) return false;\n        var subs = penumbraHeaderNestedCopyFields(col), th = null;\n",
+                      "        var subs = penumbraHeaderNestedCopyFields(col), th = null;\n")], ['L-mnestgb-nsClipOff'], ['mnestgb']),
+    'ns-scroll': ([('menu', "        else if (typeof it[i].scrollIntoView === 'function') { try { it[i].scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (eS) { } }\n", "")],
+                  ['L-mnestgb-nsKbdScroll'], ['mnestgb']),
+    'ns-scrolltop': ([('menu', "        if (i === 0 && sc) { sc.scrollTop = 0; }\n        else if (typeof", "        if (typeof")], ['L-mnestgb-nsKbdScroll'], ['mnestgb']),
+    # (v3, the second review) nested names read from a snapshot comparison's rows; the cell's lookup taking a nested table's
+    # inner @@JSON copy (the first in document order)
+    'ns-cmp': ([('main', " || document.body.classList.contains('snapshot-comparison-active')) return out;", ") return out;")], ['L-mnestgb-nsCmpNone'], ['mnestgb']),
+    'ns-inner': ([('main', "        const div = _pnbOwnRawJson(cell);\n", "        const div = cell.querySelector('.raw-json-data');\n")], ['L-mnestgb-nsInnerOwn'], ['mnestgb']),
+    # --- (2026-10-25, nestgb) main.js: every column taken for a nested table (a plain one loses its items); every nested table's
+    # columns on each; sorted by name; the picker's five rows; its list throwing out of the menu; ArrowRight opening nothing
+    # (the catch line goes along: "return any ? out : null;" is main.js's idiom, seven times over)
+    'ng-allnested': ([('main', "the plain item, as before)\n        return any ? out : null;\n", "the plain item, as before)\n        return out;\n")], ['L-mnestgb-nsPlain'], ['mnestgb']),
+    'ng-own': ([('main', "                getVirtualColumnsForRow(new Map([[C, v]])).forEach(function (vals, k) {", "                getVirtualColumnsForRow(r).forEach(function (vals, k) {")],
+               ['L-mnestgb-nsSection'], ['mnestgb']),
+    'ng-order': ([('main', "the plain item, as before)\n        return any ? out : null;\n", "the plain item, as before)\n        return any ? out.sort() : null;\n")], ['L-mnestgb-nsSection'], ['mnestgb']),
+    'ng-five': ([('main', "            for (var i = 0; i < Math.min(masterRowData.length, 10); i++) {\n                var r = masterRowData[i], v =",
+                  "            for (var i = 0; i < Math.min(masterRowData.length, 5); i++) {\n                var r = masterRowData[i], v =")],
+                ['L-mnestgb-nsOwnOnly'], ['mnestgb']),
+    'ng-nocatch': ([('main', "        } catch (e) { return null; }   // (the picker's own list throws while a column is named in digits: the plain item, as before)\n",
+                     "        } catch (e) { throw e; }\n")],
+                   ['L-mnestgb-nsListThrows'], ['mnestgb']),   # (2026-10-25, digitcol) a stubbed throw: a column named in digits throws no more
+    'ng-kbd': ([('menu', "        else if (k === 'ArrowRight' && opens) { activate(it[i]); }\n", "")],
+               ['L-mnestgb-nsKbdOpens', 'L-mnestgb-nsKbdPick', 'L-mnestgb-nsKbdCopy', 'L-ggnest-gnKbdOpens', 'L-gnnestbd-nbKbd'], ['mnestgb', 'ggnest', 'gnnestbd']),
+    # --- (2026-10-24, hlhead) Highlight...: no item; the column's whole options instead of its rules alone
+    'mh-noitem': ([('menu', "            arrange.push({ act: 'highlight', label: 'Highlight...',", "            if (false) arrange.push({ act: 'highlight', label: 'Highlight...',")], ['L-mhl-hlItem'], ['mhl']),
+    'mh-full': ([('main', "            _pnbOpenColOpts(th, !!kbd, { col: col, title: title, back: back, only: 'highlight' });", "            _pnbOpenColOpts(th, !!kbd, { col: col, title: title, back: back });")],
+                ['L-mhl-hlAlone'], ['mhl']),
+    # (the reviews) from the keyboard, the rules alone: the shared pick - no focus with no rule, Reset with one (Enter there
+    # took every rule off); after Reset, the focus nowhere in the popover
+    'mh-nofocus': ([('mod', "            if (hlOnly) first = q('[data-sec=\"highlight\"] button:not([disabled])');\n            if (first) { try { first.focus({ preventScroll: true }); } catch (x) { } }\n",
+                            "            if (first) { try { first.focus({ preventScroll: true }); } catch (x) { } }\n")],
+                   ['L-mhl-hlKbdFocus', 'L-mhl-hlKbdNotReset'], ['mhl']),
+    'mh-resetfocus': ([('mod', "            if (hlOnly) first = q('[data-sec=\"highlight\"] button:not([disabled])');   // (2026-10-24) the rules alone: their first button\n", "")],
+                      ['L-mhl-hlResetFocus'], ['mhl']),
     # --- (2026-10-20, notefit) the width module: a box's own width / max-width, a flex row's items side by side
     'j-notewidth': ([('colw', "            if (v && v.unit === 'px') { w = bb ? Math.max(v.value, e) : v.value + e; need = held ? w : Math.max(w, need); }\n", "")],
                     ['L-mfitnote-noteGrow'], ['mfitnote']),
@@ -227,7 +370,7 @@ MUTANTS = {
     'j-gmrestricted': ([('menu', "        if (!info.restricted && A) {", "        if (A) {")], ['L-ggmenu-gmRestricted'], ['ggmenu']),
     'j-hdrrestrict': ([('menu', "        if (grpRestricted()) { gi = []; }\n", "")], ['L-ggmenu-gmHdrRestricted'], ['ggmenu']),
     'j-gmused': ([('menu', "if (!shown(t) || c === '#' || isJournal(c) || used.indexOf(String(c).toUpperCase()) >= 0) { continue; }", "if (!shown(t) || c === '#' || isJournal(c)) { continue; }")], ['L-ggmenu-gmAddUsed'], ['ggmenu']),
-    'j-gmtick': ([('menu', "        return { act: 'gby:' + c, label: nm, checked: mine,", "        return { act: 'gby:' + c, label: nm, checked: false,")], ['L-ggmenu-gmTick'], ['ggmenu']),
+    'j-gmtick': ([('menu', "        return { act: 'gby:' + c, label: nm, checked: mine,", "        return { act: 'gby:' + c, label: nm, checked: false,")], ['L-ggmenu-gmTick', 'L-gnnestbd-nbPickTick'], ['ggmenu', 'gnnestbd']),
     'j-gmlevel': ([('menu', "colLabel(info.col) + (info.levels.length > 1 ? ', level ' + (info.depth + 1) + ' of ' + info.levels.length : '')", "colLabel(info.col)")], ['L-ggmenu-gmLevelMenu'], ['ggmenu']),
     'j-gmtip': ([('menu', "            if (!d || d.layout !== 'list' || gmTipSeen()) { return; }", "            if (!d || d.layout !== 'list') { return; }"),
                  ('menu', "                    if (!listOn() || gmTipSeen()) { return; }", "                    if (!listOn()) { return; }")], ['L-mauto-tipOnce'], ['mauto']),
@@ -235,7 +378,7 @@ MUTANTS = {
                    "    function spotOf(target) { return (target && target.closest) ? (target.closest('th, td') || target) : target; }")], ['L-ggmenu-gmNativeSecond'], ['ggmenu']),
     'j-gmfocus': ([('menu', "            var t = (c.focusEl && document.contains(c.focusEl)) ? c.focusEl\n", "            var t = (false) ? c.focusEl\n")], ['L-ggmenu-gmKbdBack', 'L-gglist-glKbdBack'], ['ggmenu', 'gglist']),
     'c-gmmark': ([('mcss', "#groupedResultsContainer .group-header.pnb-hm-for,\n", "")], ['L-ggmenu-gmMarked'], ['ggmenu']),
-    'j-gmundo': ([('menu', "        if (undo) { toast('<p>' + msg + offerUndo(undo) + '</p>', UNDO_MS); }", "        if (undo) { toast('<p>' + msg + offerUndo(function () { }) + '</p>', UNDO_MS); }")], ['L-ggmenu-gmUndo', 'L-ggmenu-gmRemoveUndo'], ['ggmenu']),
+    'j-gmundo': ([('menu', "        if (undo) { toast('<p>' + msg + offerUndo(undo) + '</p>', UNDO_MS); }", "        if (undo) { toast('<p>' + msg + offerUndo(function () { }) + '</p>', UNDO_MS); }")], ['L-ggmenu-gmUndo', 'L-ggmenu-gmRemoveUndo', 'L-gnnestbd-nbUndo'], ['ggmenu', 'gnnestbd']),
     'j-gmkbd': ([('menu', "        if (kbd) { var r = b.el.getBoundingClientRect(); x = r.left; y = r.bottom; }", "        if (kbd) { var r = b.el.getBoundingClientRect(); x = r.left; y = r.top - 400; }")], ['L-ggmenu-gmKbd'], ['ggmenu']),
     'j-gmnotip': ([('menu', "            if (!d || d.layout !== 'list' || gmTipSeen()) { return; }", "            return;")], ['L-mauto-tipShown'], ['mauto']),
     'j-gmclick': ([('menu', "    function clickId(id) { var b = document.getElementById(id); if (b) { b.click(); } }", "    function clickId(id) { }")], ['L-ggmenu-gmCollapseAll', 'L-ggmenu-gmConfigure'], ['ggmenu']),
@@ -472,7 +615,8 @@ RELS = {'main': os.path.join('js', 'main.js'), 'mod': os.path.join('js', 'penumb
         'colw': os.path.join('js', 'penumbra_colwidths.js'), 'menu': os.path.join('js', 'penumbra_colmenu.js'),
         'mcss': os.path.join('css', 'penumbra_colmenu.css'), 'css': os.path.join('css', 'main.css'),
         'index': 'index.php', 'help': os.path.join('help', 'tips', 'settings-tips-storage.php'), 'topic': os.path.join('help', 'topics', 'userSettingsHelpLightbox.php'),
-        'ptips': os.path.join('help', 'tips', 'pivot-tips-storage.php')}   # (2026-10-20) the grouping dialog's Layout tip
+        'ptips': os.path.join('help', 'tips', 'pivot-tips-storage.php'),   # (2026-10-20) the grouping dialog's Layout tip
+        'gtopic': os.path.join('help', 'topics', 'groupingHelpLightbox.php')}   # (2026-10-25, nestgb2) the grouping topic: the chip's list
 sys.path.insert(0, HERE)
 import mk_harness
 cand = {k: pick(v) for k, v in RELS.items()}
@@ -630,6 +774,19 @@ def static_checks(texts):
         ('S-helpGroupsSweep', 'which always shows Stacked, they stay Stacked' in texts['topic'], ''),
         # (2026-10-20, grpsweep 2) Show only keeps every value of the group
         ('S-helpOnlyValues', 'keeps every row it shows' in texts['topic'] and 'more than 200 different values' in texts['topic'], ''),
+        # (2026-10-25, nestgb; nestcopy) a nested-table column's Nested columns section
+        ('S-helpNestGroup', '<strong>Nested columns</strong> (a nested-table column)' in texts['topic'] and 'a row joins the group of each value its table holds' in texts['topic']
+         and "as Copy's <em>Nested sub-columns</em>" in texts['topic'] and 'section near the foot of the menu' in texts['topic'] and 'the menu ends with' not in texts['topic']
+         and 'Where the report hides Clipboard, the menu offers no <em>Copy distinct values</em>' in texts['topic']
+         and 'Group by a sub-column' not in texts['topic'] and chr(0x2014) not in texts['topic'], ''),
+        # (2026-10-25, neststats) the Nested columns row names Column stats; the stats row says where a sub-column's are
+        ('S-helpNestStats', "as Copy's <em>Nested sub-columns</em>, and <em>Column stats</em>" in texts['topic'] and 'has stats of its own under <em>Nested columns</em>' in texts['topic']
+         and chr(0x2014) not in texts['topic'], ''),
+        # (2026-10-25, nestgb2) the group band menu's lists and the status bar chip's: no nested-table column, its tables' columns
+        ('S-helpNestBand', "A nested-table column is never listed; the top level lists its tables' columns instead" in texts['topic']
+         and 'A nested-table column is not in the list; the columns of its tables are, under <em>Nested table columns</em>' in texts['topic']
+         and "a nested-table column's sub-columns stand in for it, under <em>Nested table columns</em>" in texts['gtopic']
+         and chr(0x2014) not in texts['topic'] + texts['gtopic'], ''),
     ]
 
 def run_browser(scns):

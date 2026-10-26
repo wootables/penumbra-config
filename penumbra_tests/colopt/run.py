@@ -105,15 +105,89 @@ CHK = {
     'pvhl': ['popHasHl', 'editorPivot', 'ruleStored', 'editorCount', 'generated', 'reedit', 'fieldRule', 'stateCarries'],
     'pvhlseed': ['seedBody', 'seedTopWins', 'seedSummary', 'seedGrand', 'seedField', 'seedOther', 'seedState', 'seedDark'],
     'pvhlnomod': ['offNotDrawn', 'offKept', 'offRoundTrip'],
+    # (2026-10-24, hlhead) header rules: authored (hlhd), the grouped view's headings (ghlhd), beside format(header) (hlhdsnip)
+    'hlhd': ['threeTargets', 'hdStored', 'headerLit', 'headerReads', 'countLit', 'previewName', 'aggLit', 'aggOff', 'always', 'headCss',
+             'headImportant', 'cellAgain', 'describe', 'filterOff', 'filterBack', 'deleteClears'],
+    'ghlhd': ['groupedHeads'],
+    'hlhdsnip': ['overSnippet', 'snipBack'],
+    # (the review) a filter keeping no row beside format(header); a header rule in a view link and saved with the report
+    'hlhdsnip0': ['snip0Lit', 'snip0Out', 'snip0Again'],
+    'hrhd': ['bootLit', 'linkHd', 'listedHd', 'savedHd', 'afterLit', 'copyKept'],
+    # (the second review) fills the browser refuses; the snippet emptied
+    'hlhdbad': ['impFill', 'badSnipFill', 'badRuleFill', 'snipGone', 'goneKeepsRule'],
 }
 SCN.append('fspa11y')
 SCN.extend(['fhlunit', 'fhl', 'fhlseed', 'ghl'])
 SCN.extend(['hrep', 'hrview', 'hrsave', 'hrnomod'])
 SCN.extend(['pvhl', 'pvhlseed', 'pvhlnomod'])
+SCN.extend(['hlhd', 'ghlhd', 'hlhdsnip', 'hlhdsnip0', 'hrhd', 'hlhdbad'])   # (2026-10-24, hlhead) header rules
 # the PHP half's hl mode (the email): its checks, by name
+PHP_HLHD = ['stateHd', 'stateAnyFlag', 'emailAlways', 'emailAggOn', 'emailAggOff', 'emailAnyOn', 'emailAnyOff', 'emailHeadCss', 'emailCellsStill', 'groupedHeads', 'emailFillShows', 'emailInk', 'emailBadFill', 'emailImpFill', 'pdfUntouched']   # (2026-10-24, hlhead)
 PHP_HL = ['fmtParity', 'numParity', 'cssParity', 'whenParity', 'stateRules', 'emailPaints', 'emailFmt', 'emailFooter', 'pdfPlain', 'darkFill', 'groupedEmail', 'noLeak']
 N = '\r\n'   # main.js, schedule_runner.php and main.css are CRLF; the module and both calc files LF
 MUTANTS = {
+    # --- (2026-10-24, hlhead) header rules: no Header choice; a header rule also drawn as a cell rule; the last styles never taken
+    # off; every row read, not the filter's; an aggregate read as a row condition; drawn without !important; the gradient kept;
+    # no text color for a fill; the text color over format(header)'s; no second draw; format(header)'s fill hidden again; any
+    # property on a header; no note; hd:false written into every rule; the count line plain; the email's header rules gone /
+    # never resolved; the help
+    'hd-noradio': ([('mod', "                '<label><input type=\"radio\" name=\"' + id + 'hr\" data-co=\"hl-to\" value=\"header\"' + (r.hd && !r.row ? ' checked' : '') + '> Header</label></div></div>') +", "                '</div></div>') +")],
+                   ['L-hlhd-threeTargets'], ['hlhd']),
+    'hd-skip': ([('main', "                    if (l[i] && l[i].hd && !l[i].row) continue;   // (2026-10-24, hlhead) a header rule: _pnbHlHeaders" + N, "")],
+                ['L-hlhd-headerLit', 'L-ghlhd-groupedHeads'], ['hlhd', 'ghlhd']),
+    'hd-noreset': ([('main', "                String(th.getAttribute('data-pnb-hl-hd') || '').split(',').forEach(function (p) { if (p) th.style.removeProperty(p); });" + N, "")],
+                   ['L-hlhd-aggOff', 'L-hlhd-filterOff', 'L-hlhd-deleteClears'], ['hlhd']),
+    'hd-allrows': ([('main', "        var sel = grouped ? '#groupedResultsContainer table tbody tr:not(.search-hidden)' : '#resultsTable tbody tr:not(.search-hidden)';",
+                     "        var sel = grouped ? '#groupedResultsContainer table tbody tr' : '#resultsTable tbody tr';")], ['L-hlhd-filterOff'], ['hlhd']),
+    'hd-noagg': ([('main', "                        if (penumbraCfAggDetectRegex().test(r.w)) x.agg = r.w;", "                        if (false) x.agg = r.w;")], ['L-hlhd-aggLit'], ['hlhd']),
+    'hd-noimp': ([('main', "                function put(p, v) { th.style.setProperty(p, v, 'important');", "                function put(p, v) { th.style.setProperty(p, v);")], ['L-hlhd-headerLit'], ['hlhd']),
+    'hd-nogradient': ([('main', "                    put('background-image', 'none');", "                    ")], ['L-hlhd-headerLit'], ['hlhd']),
+    'hd-noink': ([('main', "                        if (!ink || mine) put('color', 'var(--text-main, #333)');", "                        if (false) put('color', 'var(--text-main, #333)');")],
+                 ['L-hlhd-headerReads'], ['hlhd']),
+    'hd-inkover': ([('main', "                        if (!ink || mine) put('color',", "                        if (true) put('color',")], ['L-hlhdsnip-overSnippet'], ['hlhdsnip']),
+    'hd-nodraw2': ([('main', "            try { _pnbHlHeaders(true); } catch (e) { console.warn('header rules:', e); }   // (2026-10-24, hlhead) again, over the snippet's format(header) rules" + N, "")], ['L-hlhdsnip-overSnippet'], ['hlhdsnip']),
+    'hd-snipfill': ([('main', "                        var fv = rule._parsedCss['background-color'];" + N + "                        if (fv) {", "                        var fv = rule._parsedCss['background-color'];" + N + "                        if (false) {")], ['L-hlhdsnip-snipBack'], ['hlhdsnip']),
+    'hd-csscap': ([('main', "            if (v && _PNB_HL_HEAD_PROPS.indexOf(p) !== -1) out.push([p, v]);", "            if (v) out.push([p, v]);")], ['L-hlhd-headCss'], ['hlhd']),
+    'hd-nonote': ([('mod', "            return drop.length ? 'A header takes no ' + drop.join(', ') + '.' : '';", "            return '';")], ['L-hlhd-headCss'], ['hlhd']),
+    # hd written into every rule the module cleans (false too): a cell rule's JSON changes; hd dropped by the copy the popover
+    # hands over: a header rule is stored as a cell rule
+    'hd-json': ([('mod', "            if (r.hd === true && r.row !== true) c.hd = true;   // (2026-10-24) the column's header\n", "            c.hd = r.hd === true && r.row !== true;\n")],
+                ['L-hlhd-cellAgain'], ['hlhd']),
+    'hd-copydrop': ([('mod', "        function hlCopy(r) { var c = { id: r.id, w: r.w, css: r.css, row: !!r.row }; if (r.hd && !r.row) c.hd = true; return c; }",
+                      "        function hlCopy(r) { return { id: r.id, w: r.w, css: r.css, row: !!r.row }; }")], ['L-hlhd-hdStored'], ['hlhd']),
+    'hd-countline': ([('mod', "                    if (c && ed.r.hd && !ed.r.row && hl.lit) {", "                    if (false) {")], ['L-hlhd-countLit', 'L-hlhd-aggLit', 'L-hlhd-always'], ['hlhd']),
+    'hd-email': ([('sr', "            $hd = !$row && isset($r['hd']) && $r['hd'] === true;", "            $hd = false;")], ['P-hlhd-stateHd', 'P-hlhd-emailAlways'], []),
+    'hd-emailany': ([('sr', "                $formatRules = penumbra_hl_any_row_headers($formatRules, $cfColumns, $cfAggRows, $themeName);   // (2026-10-24, hlhead)" + N, "")],
+                    ['P-hlhd-emailAnyOn'], []),
+    'hd-help': ([('topic', "or the column's <em>Header</em>", "or the column's header")], ['S-helpHlHd'], []),
+    # --- (2026-10-24, hlhead, the review) a typed !important kept in the value (setProperty refuses the whole value); hd
+    # dropped from the plain copy a link and a save carry; a viewer's header copy of the report's cell rule read as that
+    # rule once saved (and dropped); the email: a fill under the gradient; a fill with no text color
+    'hd-imp': ([('main', r"v = d.slice(i + 1).trim().replace(/\s*!\s*important\s*$/i, '');", "v = d.slice(i + 1).trim();")], ['L-hlhd-headImportant'], ['hlhd']),
+    'hd-plain': ([('main', "if (r.hd && !r.row) c.hd = true; return c; }   // (2026-10-24, hlhead) hd too", "return c; }   // (2026-10-24, hlhead) hd too")],
+                 ['L-hrhd-linkHd', 'L-hrhd-savedHd'], ['hrhd']),
+    'hd-savedcmp': ([('main', "!!x.row === !!r.row && !!x.hd === !!r.hd; });", "!!x.row === !!r.row; });")], ['L-hrhd-copyKept'], ['hrhd']),
+    # (after the trace) every render and search takes format(header)'s styles off (resetCellStates): its fill's
+    # background-image: none left on, a header with no row under it is left with no gradient
+    'hd-rcsimg': ([('main', "            ['background-color', 'background-image', 'color', 'font-weight', 'font-style', 'border', 'text-decoration'].forEach(function (p) {",
+                                "            ['background-color', 'color', 'font-weight', 'font-style', 'border', 'text-decoration'].forEach(function (p) {")], ['L-hlhdsnip0-snip0Out'], ['hlhdsnip0']),
+    # --- (the second review) a typed !important kept (the fill refused); the gradient off for a fill the browser refused;
+    # a header rule's refused fill counted; format(header)'s headers kept with no rule left; the cleanup taking a header
+    # rule's own color; the email: the gradient off for a fill a client throws away; a typed !important read as no color
+    'hd-snipimp': ([('main', r"String(fv).replace(/\s*!\s*important\s*$/i, '')", "String(fv)")], ['L-hlhdbad-impFill'], ['hlhdbad']),
+    'hd-snipbad': ([('main', "                            if (this.style.getPropertyPriority('background-color') === 'important') this.style.setProperty('background-image', 'none', 'important');",
+                             "                            this.style.setProperty('background-image', 'none', 'important');")], ['L-hlhdbad-badSnipFill'], ['hlhdbad']),
+    'hd-badfill': ([('main', "if (ok && pv[0] === 'background-color') fill = true;", "if (pv[0] === 'background-color') fill = true;")], ['L-hlhdbad-badRuleFill'], ['hlhdbad']),
+    'hd-cfoff': ([('main', "        _pnbCfHeadersOff();   // (2026-10-24, hlhead) format(header)'s headers, rules or none" + N, "")], ['L-hlhdbad-snipGone'], ['hlhdbad']),
+    'hd-cfmine': ([('main', "                if (!hl.some(function (m) { return m === p || m.indexOf(p + '-') === 0 || p.indexOf(m + '-') === 0; })) th.style.removeProperty(p);",
+                            "                th.style.removeProperty(p);")], ['L-hlhdbad-goneKeepsRule'], ['hlhdbad']),
+    'hd-emailbad': ([('sr', " || !penumbra_hl_css_color_ok($hr['_css']['background-color'])) return '';", ") return '';")], ['P-hlhd-emailBadFill'], []),
+    'hd-emailimp': ([('sr', r"    $v = strtolower(trim(preg_replace('/\s*!\s*important\s*$/i', '', (string)$v)));", "    $v = strtolower(trim((string)$v));")], ['P-hlhd-emailImpFill'], []),
+    # the header extras in the PDF's table too (generate_report_html with $isEmail false)
+    'hd-pdfextra': ([('sr', N + "                            if ($isEmail) $hStyle .= penumbra_hl_head_extra(", N + "                            $hStyle .= penumbra_hl_head_extra("),
+                     ('sr', N + "                        if ($isEmail) $hStyle .= penumbra_hl_head_extra(", N + "                        $hStyle .= penumbra_hl_head_extra(")], ['P-hlhd-pdfUntouched'], []),
+    'hd-emailfill': ([('sr', "    $x = ' background-image: none;';", "    $x = '';")], ['P-hlhd-emailFillShows'], []),
+    'hd-emailink': ([('sr', "    if (!empty($hr['hlHeader']) && !isset($hr['_css']['color'])", "    if (false && !isset($hr['_css']['color'])")], ['P-hlhd-emailInk'], []),
     # --- the cell writer and the readers of a cell's VALUE (main.js)
     'm-rawattr': ([('main', "        if (val !== null) td.setAttribute('data-pnb-raw', val);", "        if (false) td.setAttribute('data-pnb-raw', val);")],
                   ['L-fbuild-amtShown', 'L-fsort-sortedByDate', 'L-ffilter-valueNotDisplay'], ['fbuild', 'fsort', 'ffilter']),
@@ -379,7 +453,7 @@ MUTANTS = {
                      "                wBad = true;")], ['L-fhl-addOpens'], ['fhl']),
     'c-hldark': ([('css', "body.is-dark { --pnb-hl-red: #5c2523; --pnb-hl-amber: #4d3f12; --pnb-hl-green: #1f4429; --pnb-hl-blue: #1e3a61; --pnb-hl-grey: #3c3c3c; }" + N, "")],
                  ['L-fhlseed-darkTint'], ['fhlseed']),
-    'h-hltip': ([('help', "<li><strong>Highlight</strong> - color the cells, or whole rows, that meet a condition.</li>", "")], ['S-helpHl'], []),
+    'h-hltip': ([('help', "<li><strong>Highlight</strong> - color the cells, whole rows or the column's header on a condition.</li>", "")], ['S-helpHl'], []),
     't-hltopic': ([('topic', '<h4 id="us-highlight"', '<h4 id="us-highlights"')], ['S-helpHl'], []),
     # ---- (2026-10-20 b, phase 2) the report's formats and rules
     # main.js: the report's layer read at boot; a column's format in effect; Automatic over the
@@ -500,9 +574,13 @@ def static_checks(texts):
          and 'a PDF attachment does not yet' in stp and chr(0x2014) not in stp and '&mdash;' not in stp and chr(0x2014) not in top and '&mdash;' not in top, ''),
         # (2026-10-20, hl) the tip and the topic name the Highlight rules - the topic's own
         # section, its link, the RULE badge, the options' list - and carry no em-dash
-        ('S-helpHl', '<li><strong>Highlight</strong> - color the cells, or whole rows, that meet a condition.</li>' in hlp
+        # (2026-10-25, hltip) the tip's line names the column's header too
+        ('S-helpHl', "<li><strong>Highlight</strong> - color the cells, whole rows or the column's header on a condition.</li>" in hlp
          and '<h4 id="us-highlight"' in top and 'data-jump-to="us-highlight"' in top and '<code>RULE</code>' in top
          and 'shading, highlight rules, filter and links' in top and chr(0x2014) not in top and '&mdash;' not in top and chr(0x2014) not in hlp, ''),
+        # (2026-10-24, hlhead) the topic: Apply to's Header, what a header takes, the menu's Highlight... (its table and the section)
+        ('S-helpHlHd', "or the column's <em>Header</em>" in top and 'A header takes color, background-color' in top
+         and '<strong>Highlight...</strong></td>' in top and 'or <em>Highlight...</em> in its right-click menu' in top, ''),
         ('S-noSaveDeepCell', 'serverSaveResolver' not in idx, 'index.php: serverSaveResolver x%d' % idx.count('serverSaveResolver')),
         ('S-helpNoDeepDefault', 'Defaults: Row Height, Deep Links' not in hlp and "can set the report's default under <em>Last Stop Changes</em>" not in hlp
          and 'Deep Link Vendor Codes</strong> - when on, recognized vendor codes' not in hlp, ''),
@@ -552,6 +630,14 @@ NEW_HL2 = {'L-%s-%s' % (s, c) for s in ('hrep', 'hrview', 'hrsave', 'hrnomod') f
 NEW_HL3 = {'L-%s-%s' % (s, c) for s in ('pvhl', 'pvhlseed') for c in CHK[s] if c != 'seedState'} | \
           {'L-pvhlnomod-offRoundTrip', 'P-H-pvhlEmail', 'P-H-pvhlPdf', 'S-helpPvHl', 'L-fform-pivotForm'}
 NEW = NEW_HL3
+# (2026-10-24, hlhead) header rules: the three scenarios, the email's (test_colopt.php hlhd), the help - every one red on live
+# (no Header choice there, a seeded hd rule draws as a cell rule, format(header)'s fill hidden by the !important gradient)
+NEW_HLHD = {'L-%s-%s' % (s, c) for s in ('hlhd', 'ghlhd', 'hlhdsnip', 'hlhdsnip0', 'hrhd', 'hlhdbad') for c in CHK[s] if (s, c) not in (('hlhdsnip0', 'snip0Out'), ('hlhdbad', 'badSnipFill'), ('hlhdbad', 'snipGone'))} | {'P-hlhd-' + c for c in PHP_HLHD} | {'S-helpHlHd', 'E-hlhd'}   # (E-hlhd: live has no Header choice to click)
+NEW = NEW_HLHD
+# (2026-10-25, hltip) the tip's Highlight line names the column's header: S-helpHl reads the new line (red on live
+# until it deploys); hlhead's set retires (live since 75458b7)
+NEW_HLTIP = {'S-helpHl'}
+NEW = NEW_HLTIP
 
 args = sys.argv[1:]
 def opt(name, default=None):
@@ -603,7 +689,9 @@ def hook(src):
              # (2026-10-20 b) the condition engine and a footer's number text, for the email's parity
              'paq': 'parseAdvancedQuery', 'epq': 'evaluateParsedQuery', 'numText': '_pnbNumText',
              # (2026-10-20 c) the pivot builder filled from the pivot's settings
-             'repop': 'repopulatePivotLightboxFromCurrentState'}
+             'repop': 'repopulatePivotLightboxFromCurrentState',
+             # (2026-10-24, hlhead) the snippet rendered again (an emptied editor: format(header)'s headers back)
+             'rsn': 'renderReportSnippet'}
     h = '\r\n;try { window.__HC = {' + ', '.join("%s: (typeof %s === 'function' ? %s : null)" % (k, v, v) for k, v in names.items()) + \
         '}; } catch (e) { window.__HC_ERR = String(e); }\r\n'
     out = src[:i] + ';(function () {' + h + src[i + len(anchor):]
@@ -730,6 +818,12 @@ def run_php(texts):
                               os.path.join(APP, 'penumbra_search.php')],
                              capture_output=True, text=True)
         out += php_lines(res, 'P-hl-')
+        # (2026-10-24, hlhead) the email's header rules
+        res = subprocess.run([PHP, '-n', '-d', 'memory_limit=1024M', '-d', 'extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/ext', '-d', 'extension=mbstring',
+                              '-d', 'date.timezone=America/New_York', os.path.join(HERE, 'test_colopt.php'), 'hlhd', mir, cp, os.path.join(APP, 'themes_config.php'),
+                              os.path.join(APP, 'penumbra_search.php')],
+                             capture_output=True, text=True)
+        out += php_lines(res, 'P-hlhd-')
         return out
     finally:
         shutil.rmtree(d, ignore_errors=True)

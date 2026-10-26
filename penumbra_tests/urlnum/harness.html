@@ -1,0 +1,257 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>urlnum</title>
+<link rel="stylesheet" href="main.css">
+<link rel="stylesheet" href="penumbra_colmenu.css">
+</head>
+<body class="theme-default">
+<!-- urlnum suite (2026-10-25). The REAL main.js (+ the REAL header menu, penumbra_colmenu.js)
+     booted through the REAL run path (a stubbed query.php) on the vldigit suite's fixture: a
+     60-row result shaped like a PIVOT query's, two columns named only in digits (2021, 2022)
+     beside plain ones, and 0042 (digits with a leading zero: jQuery's data() keeps that one as
+     text). data('colname') hands the 2021 heading back as the NUMBER 2021, and a header click
+     keeps that number as the sort level's colIdentifier.
+     The page is opened as harness.html?scn=S&id=unfix[&view=TOKEN][&sort=...] - the ?id= is
+     what makes a view link apply (saved reports only). pA's report opens as a PIVOT; every
+     other scenario's report is flat with no sort of its own. -->
+<div id="reportHeaderContainer"><div id="defaultTitleView"></div><div id="reportInfoPanel" style="display:none"></div></div>
+<input id="reportTitle" value=""><input id="reportSubtitle" value=""><div id="admWrapper"></div><button id="toggleAdminViewBtn"></button>
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div><div id="mainReportTitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<button id="executeQuery">Run</button><button id="stopQueryBtn">Stop</button>
+<div id="loadingOverlay" style="display:none"><p id="execution-timer"></p><p id="loadingMessage"></p><div id="loadingTip"></div></div>
+<div id="importTimestamps"></div>
+<div id="resultsHeader" style="height:20px">controls</div>
+<div id="tableSearchContainer"><input id="tableSearch" value=""></div>
+<div id="resultCount"></div>
+<div id="paginatorContainer" style="visibility:hidden">
+  <div id="paginationControls"><span id="pageInfo"></span><select id="rowsPerPageSelector"><option value="25">25</option><option value="50">50</option><option value="200">200</option><option value="all">All</option></select></div>
+  <div id="groupActionsContainer" style="display:none">
+    <a href="#" id="expandAllGroups">Expand All</a> <a href="#" id="collapseAllGroups">Collapse All</a>
+    <span id="removeGroupingSep">&bull;</span> <a href="#" id="configureGroupingBtn" role="button">Configure Grouping</a> <a href="#" id="removeGroupingLink">Remove Grouping</a>
+  </div>
+  <button id="exitPivotModeBtn" type="button" style="display:none">Exit pivot</button>
+  <button id="modifyPivotBtn" type="button" style="display:none">Modify pivot</button>
+</div>
+<div id="table-view-container"><div id="container-parent"><div id="results-wrapper" style="width:1400px;height:700px;overflow:auto"><table id="resultsTable" class="data-grid-table"><caption class="sr-only">Report results table</caption><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table></div></div></div>
+<div id="errorBox"></div><div id="undo_text_container"></div>
+<!-- the toast dock, as index.php has it: show_text() (the link's "Opened a shared view" note) draws here, or nowhere -->
+<div id="action_overlay" class="pnb-toast-dock"><span class="pnb-toast-more" hidden></span></div>
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="pnbNoSearchMatches" style="display:none"></div>
+<div id="settingsPanelOverlay"></div>
+<div id="settingsPanel">
+  <select id="spThemeSelector"><option value="report-default">Report Default</option><option value="theme-default">Default</option></select>
+  <select id="spDensitySelector"><option value="report-default">Report Default</option><option value="standard">Standard</option></select>
+  <input type="checkbox" id="spRowExpandToggle"><input type="checkbox" id="spResolverToggle">
+  <div class="sp-section sp-columns-section"><div class="sp-column-container"><div id="spColumnList" class="sp-column-list"></div></div></div>
+  <div class="sp-actions"><button id="spApply">Save Column Layout</button><button id="spReset">Reset</button><span id="spPendingCount"></span></div>
+</div>
+<!-- The grouping dialog, as index.php ships it (as in the vldigit suite): the grouped render reads its controls. -->
+<div id="groupingLightbox" class="help-lightbox">
+    <div class="lightbox-content pnb-dlg">
+        <div class="pnb-dlg-head">
+            <div class="pnb-dlg-tt"><h3 class="pnb-dlg-title">Group Table by Column</h3></div>
+            <span class="pnb-dlg-action" id="groupPresetMount"></span>
+            <button type="button" class="close-lightbox" aria-label="Close" title="Close (Esc)">&times;</button>
+        </div>
+        <p id="pivotWarningForGrouping" style="display: none;">Note, you are viewing a pivot table.</p>
+        <div class="grp-lb-body">
+          <div class="grp-lb-left">
+            <div id="groupingColumnSelector" class="penumbra-custom-select" style="width: 100%; margin-bottom: 15px;">
+                <div class="pcs-selected" data-value="" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-label="Column to group by">-- Select a Column to Group By --</div>
+                <div class="pcs-dropdown" role="listbox" aria-label="Columns to group by"></div>
+            </div>
+            <div id="groupLevel2Row" style="display: none; margin-bottom: 15px;">
+                <div id="groupingColumnSelector2" class="penumbra-custom-select" style="width: 100%;">
+                    <div class="pcs-selected" data-value="" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-label="Second grouping level">-- None --</div>
+                    <div class="pcs-dropdown" role="listbox" aria-label="Second grouping level"></div>
+                </div>
+            </div>
+            <div id="groupLevel3Row" style="display: none; margin-bottom: 15px;">
+                <div id="groupingColumnSelector3" class="penumbra-custom-select" style="width: 100%;">
+                    <div class="pcs-selected" data-value="" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-label="Third grouping level">-- None --</div>
+                    <div class="pcs-dropdown" role="listbox" aria-label="Third grouping level"></div>
+                </div>
+            </div>
+            <div id="groupBinOptions" style="display: none; margin-bottom: 15px;">
+                <span id="groupBinColName"></span>
+                <input type="number" id="groupBinWidth" min="1" step="1" autocomplete="off" aria-label="Fixed bin width">
+                <input type="text" id="groupBinEdges" autocomplete="off" aria-label="Custom range cut points">
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label><input type="checkbox" id="groupAggCheckbox"> Include additional summary in each group header</label>
+                <div id="groupAggOptions" style="display: none;">
+                    <div id="groupAggColumn" class="penumbra-custom-select" style="flex: 1;">
+                        <div class="pcs-selected" data-value="" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-label="Column to aggregate">-- Column --</div>
+                        <div class="pcs-dropdown" role="listbox" aria-label="Columns to aggregate"></div>
+                    </div>
+                    <select id="groupAggType">
+                        <option value="sum">Sum</option><option value="avg">Average</option><option value="median">Median</option>
+                        <option value="min">Min</option><option value="max">Max</option><option value="range">Range (max - min)</option>
+                        <option value="stddev">Std Deviation</option><option value="count">Count (non-blank)</option>
+                        <option value="count_blank">Count (blank)</option><option value="count_distinct">Count (distinct)</option>
+                        <option value="mode">Mode (most common)</option><option value="antimode">Antimode (least common)</option>
+                    </select>
+                    <div id="groupSummaryFilterHint"></div>
+                </div>
+            </div>
+          </div>
+          <div class="grp-lb-right">
+            <select id="groupSortSelect">
+                <option value="label|asc">Label A&ndash;Z</option><option value="label|desc">Label Z&ndash;A</option>
+                <option value="count|asc">Fewest items</option><option value="count|desc">Most items</option>
+            </select>
+            <div id="groupLimitRow"><select id="groupLimitDir"><option value="top">Top</option><option value="bottom">Bottom</option></select>
+                <input type="number" id="groupLimitN" min="0" step="1" placeholder="all"></div>
+            <label><input type="checkbox" id="groupLimitOther" checked> Roll the rest into &ldquo;(Other)&rdquo;</label>
+            <div id="groupLimitMinRow"><input type="number" id="groupLimitMinRows" min="0" step="1" placeholder="0"></div>
+            <div id="groupStartDepthRow"><select id="groupStartDepth">
+                <option value="0">Nothing (all collapsed)</option><option value="1">Level 1</option><option value="2">Level 2</option><option value="3">All levels</option>
+            </select></div>
+          </div>
+        </div>
+        <div>
+            <button id="resetGroupingBtn">Reset</button>
+            <button id="ungroupBtn" style="display: none;">Remove Grouping</button>
+            <button id="confirmGroupingBtn">Apply Grouping</button>
+        </div>
+    </div>
+</div>
+<div id="pnbStatusBar">
+  <div class="sb-seg" id="sbColsSeg"><span id="sbCols"></span>
+    <span class="sb-chip" id="sbCustomCols" style="display:none;">custom layout</span>
+    <div class="sb-pop" id="sbCustomColsPop"><div id="sbCustomColsDiff"></div><button id="sbCustomColsReset">Reset</button><button id="sbCustomColsSave" style="display:none;">Save</button></div>
+  </div>
+  <div class="sb-seg" id="sbUserSeg"></div>
+</div>
+<pre id="out">running</pre>
+
+<script>
+  (function () { try { localStorage.clear(); } catch (e) {} })();
+  window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' } };
+  window.PENUMBRA_THEME_IDS = ['theme-default'];
+  window.PENUMBRA_THEME_ALIASES = {};
+  window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  (function () {
+    var P = new URLSearchParams(location.search);
+    window.__SCN = P.get('scn') || 'fA';
+    // --- the fixture: vldigit's PIVOT-shaped result, and 0042 --------------------------------
+    // Integer-like keys come first in a JS object's key order, as they do when the browser
+    // parses query.php's JSON - so 2021 and 2022 lead the table. 0042 is no integer-like key
+    // (a leading zero): it keeps its place, last. 2021 holds three values (many ties: the
+    // second sort level decides between them), V_STATUS three, 0042 four.
+    var COLS = ['2021', '2022', 'V_ID', 'V_NAME', 'V_STATUS', '0042'];
+    // uJ: a column named [1] too, last - jQuery's data() parses that name as JSON (an array)
+    if (window.__SCN === 'uJ') COLS.push('[1]');
+    window.__COLS = COLS;
+    var seed = 20261025;
+    function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
+    function pick(a) { return a[Math.floor(rnd() * a.length)]; }
+    var W = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot'];
+    var rows = [];
+    for (var i = 1; i <= 60; i++) {
+      var r = {};
+      r['2021'] = pick(['100', '250', '975.5']);
+      r['2022'] = pick(['10', '20', '30', '40']);
+      r.V_ID = 'ID-' + String(1000 + i);
+      r.V_NAME = pick(W) + ' ' + pick(W);
+      r.V_STATUS = pick(['Open', 'Closed', 'Pending']);
+      r['0042'] = pick(['3', '5', '7', '9']);
+      if (window.__SCN === 'uJ') r['[1]'] = pick(['10', '20', '30']);
+      rows.push(r);
+    }
+    window.__rowsFixture = rows;
+    // --- the scenario's stored report ------------------------------------------
+    var order = []; for (var c = 0; c < COLS.length; c++) order.push(c);
+    var st = {
+      name: 'unfix', query: 'SELECT * FROM UN_FIXTURE', reportTitle: 'URL sort digit fixture',
+      theme: 'theme-default', density: 'standard',
+      visibleColumns: ['#'].concat(order), columnOrder: order,
+      sortCriteria: [], noLimit: true, rowExpandDefault: false, resolverLinksDefault: true,
+      rowsPerPage: '200', reportSnippet: ''
+    };
+    // pA: the report opens as a pivot (V_NAME by V_STATUS, the rows counted)
+    if (window.__SCN === 'pA') {
+      st.pivot = { v: 2, rows: ['V_NAME'], cols: ['V_STATUS'], vals: 'V_ID', agg: ['count'], aggLabels: ['Count'], aggColOverrides: ['V_ID'],
+                   aggFilters: null, aggFormulas: null, rowLayout: 'flat', colLayout: 'nested', sortOrder: 'asc', colSortOrder: 'asc',
+                   stickyColCount: 1, totalColAggs: null, totalRowAggs: null, totalRowAggLabels: null, totalRowAggBaseIdx: null,
+                   rankN: null, rankDir: null, rankAgg: null, rankOther: true, rankScope: null, noBreakdown: false, startExpanded: false, hideEmpty: false };
+    }
+    window.__STORED = st;
+    window.penumbra_vars = {
+      isAdmin: true, isGlobalAdmin: true, canEditReport: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+      tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+      imports: [], reports: [], themes: {}, prompts: {}, grants: [],
+      totalExemptions: [],
+      preloadedState: st
+    };
+    window.__queryResponse = { data: rows };
+  })();
+  window.__T = {};
+  window.__queryDone = 0;
+  window.__ajaxLog = [];
+  window.__clip = [];
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  jQuery.ajax = function (a, b) {
+    var opts = (typeof a === 'string') ? jQuery.extend({ url: a }, b || {}) : (a || {});
+    var url = String(opts.url || '');
+    window.__ajaxLog.push(url);
+    var d = jQuery.Deferred();
+    var isQuery = /query\.php/.test(url);
+    var resp = isQuery ? window.__queryResponse : (/help_content\.php/.test(url) ? '' : {});
+    setTimeout(function () {
+      try { if (opts.success) opts.success(resp, 'success', { status: 200 }); } catch (e) { window.__errors.push('ajax success threw: ' + String(e)); }
+      try { if (opts.complete) opts.complete({ status: 200 }, 'success'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }
+      d.resolve(resp, 'success', { status: 200 });
+      if (isQuery) window.__queryDone++;
+    }, 0);
+    var p = d.promise(); p.abort = function () {}; return p;
+  };
+  jQuery.getJSON = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.post = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.get = jQuery.post;
+  jQuery.fx.off = true;
+  window.__errors = [];
+  window.__rejections = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    window.__rejections.push(String((r && r.message) || r) + ' @' + String((r && r.stack) || '').split('\n').slice(1, 2).join('').trim());
+    e.preventDefault();
+  });
+  // the link's Copy writes the clipboard: keep what it would write
+  try { Object.defineProperty(navigator.clipboard, 'writeText', { configurable: true, value: function (s) { window.__clip.push(String(s)); return Promise.resolve(); } }); } catch (e) { window.__clipErr = String(e); }
+  window.confirm = function () { return true; };
+  window.alert = function (m) { window.__errors.push('alert: ' + m); };
+  window.prompt = function () { return null; };
+  if (typeof window.stackHeaders !== 'function') window.stackHeaders = function () {};
+</script>
+<script src="penumbra_userseg.js"></script>
+<!-- index.php loads the presets before main.js and the calculated columns after it - both before main.js's ready code,
+     which main_un.js runs at once: so both here, before it (as in the ldsort suite) -->
+<script src="penumbra_presets.js"></script>
+<script src="penumbra_calc.js"></script>
+<script src="main_un.js"></script>
+<script src="penumbra_colwidths.js"></script>
+<script src="penumbra_grouplist.js"></script>
+<!-- the table header's menu (index.php loads it after main.js) -->
+<script src="penumbra_colmenu.js"></script>
+<script src="driver.js"></script>
+</body></html>

@@ -295,13 +295,17 @@
       R.chk.noNotice = notices().length === 0;
       info({ marked: marked, sameName: document.querySelectorAll('#tableHeader > th[data-colname="V_AMOUNT"]').length });
     },
-    // GUARD: a link's ?sort=2021|desc - the URL resolver names the level with the STRING '2021'; it passes as it is
-    // (the snippet's data(colsort) reads the name as text)
+    // NEW (2026-10-25, urlnum): a link's ?sort=2021|desc - the URL resolver names the level as a click on the heading
+    // does, the NUMBER 2021 (it was the text '2021', pinned here as a GUARD), and it passes as it is: sorted, marked,
+    // and the next click takes it off (as text the click started over at ascending)
     numurl: async function () {
       var y = function (r) { return num(r, '2021'); }, raw = sortRaw()[0] || {};
-      R.chk.urlAsIs = sortNow() === J([['2021', '0', 'desc']]) && raw.colIdentifier === '2021' && inOrder(flatRows(), [[y, -1]]) && J(fMarks()) === J(['2021:descending']);
+      R.chk.urlNumber = sortNow() === J([['2021', '0', 'desc']]) && raw.colIdentifier === 2021 && inOrder(flatRows(), [[y, -1]]) && J(fMarks()) === J(['2021:descending']);
       R.chk.noNotice = notices().length === 0;
-      info({ type: typeof raw.colIdentifier });
+      var t0 = typeof raw.colIdentifier;
+      clickTh(fTh('2021')); await sleep(300); await frames(2);
+      R.chk.clickOff = sortNow() === '[]' && J(flatNos()) === J(naturalNos()) && fMarks().length === 0;
+      info({ type: t0 });
     },
     // the column named 2021 was Y_OLD when saved (renamed in place): kept at its place (GUARD), under the name a click
     // gives it - the NUMBER 2021 (NEW) - so a click on it goes on to descending (NEW)
@@ -312,6 +316,20 @@
       clickTh(fTh('2021')); await sleep(300); await frames(2);
       R.chk.clickDesc = sortNow() === J([['2021', '0', 'desc']]) && inOrder(flatRows(), [[y, -1]]) && J(fMarks()) === J(['2021:descending']);
       info({ type: typeof raw.colIdentifier });
+    },
+    // (2026-10-25, urlnum) a level saved as the TEXT '2021' at its place (a save made from a ?sort= view before
+    // urlnum): sorted and marked as always (GUARD), in the form a click on the heading gives - the NUMBER 2021 (NEW) -
+    // so a click on it goes on to descending (NEW)
+    numsaved: async function () {
+      var y = function (r) { return num(r, '2021'); }, raw = sortRaw()[0] || {};
+      R.chk.numberForm = raw.colIdentifier === 2021 && sortNow() === J([['2021', '0', 'asc']]);
+      R.chk.rowsByName = inOrder(flatRows(), [[y, 1]]);
+      R.chk.marksByName = J(fMarks()) === J(['2021:ascending']);
+      R.chk.noNotice = notices().length === 0;
+      var t0 = typeof raw.colIdentifier;
+      clickTh(fTh('2021')); await sleep(300); await frames(2);
+      R.chk.clickDesc = sortNow() === J([['2021', '0', 'desc']]) && inOrder(flatRows(), [[y, -1]]) && J(fMarks()) === J(['2021:descending']);
+      info({ type: t0 });
     },
     // renamed in place while this viewer has a calculated column of their own (a save leaves it out): the columns a
     // save keeps are as many as the report saved, so the level stays at its place (GUARD: as always), with no NOTICE

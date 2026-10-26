@@ -3,7 +3,7 @@
 # saveconf fixture, 300 rows; shown V_ID V_NAME V_AMOUNT V_DATE V_LINK V_STATUS,
 # hidden H_*; scenarios named g* open GROUPED by H_GROUP) PLUS the header menu:
 # css/penumbra_colmenu.css and js/penumbra_colmenu.js (EMPTY files in --control).
-import importlib.util, os
+import importlib.util, json, os, re
 HERE = os.path.dirname(os.path.abspath(__file__))
 # colopt's builder, by its path (its module name is this one's)
 _spec = importlib.util.spec_from_file_location('colopt_mk_harness', os.path.join(HERE, '..', 'colopt', 'mk_harness.py'))
@@ -52,4 +52,35 @@ def build(index_src):
         '<script>if (/^mperf|^mrerun|^gg|^mauto/.test(window.__SCN)) document.write(\'<link rel="stylesheet" href="penumbra_grouplist.css"><link rel="stylesheet" href="penumbra_cellsel.css">\' +\n'
         '  \'<script src="penumbra_grouplist.js"></scr\' + \'ipt><script src="penumbra_cellsel.js"></scr\' + \'ipt>\');</script>\n'
         '<script src="penumbra_colmenu.js"></script>\n')
+    # (2026-10-25, nestgb) mnestgb / ggnest / pnestgb (the palette's, on this harness): H_TEXT holds a nested table of its
+    # own (NOTE_KIND, NOTE_DAYS), so a nested-table column's Group by list is shown to hold its OWN tables' columns - from
+    # row 7 on (inside the ten rows group mode reads its nested columns from, past the five the dialog's picker reads the
+    # column itself from); H_NULL's tables are all empty (no column to group by)
+    rep('    window.__rowsFixture = rows;\n',
+        '    if (/^(mnestgb|ggnest|pnestgb|gnnestbd|gchipnest)$/.test(window.__SCN)) rows.forEach(function (r, i) {\n'
+        '      r.H_TEXT = i < 6 ? null : "@@JSON" + JSON.stringify([{ NOTE_KIND: (i % 2 ? "Memo" : "Call"), NOTE_DAYS: i % 5 }]);\n'
+        '      r.H_NULL = "@@JSON[]";\n'
+        '    });\n'
+        '    window.__rowsFixture = rows;\n')
+    # (2026-10-25, nestgb2) gnnestbd / gchipnest (the group band menu's lists, the status bar chip's): H_TEXT's and H_NULL's
+    # tables as above, and H_ENT's - tables sharing SUB_NAME with H_JSON's beside a column of their own (one entry for a
+    # name two tables share)
+    rep('    window.__rowsFixture = rows;\n',
+        '    if (/^(gnnestbd|gchipnest)$/.test(window.__SCN)) rows.forEach(function (r, i) {\n'
+        '      r.H_ENT = "@@JSON" + JSON.stringify([{ ENT_KIND: (i % 3 ? "Lab" : "Field"), SUB_NAME: (i % 2 ? "Alpha" : "Bravo") }]);\n'
+        '    });\n'
+        '    window.__rowsFixture = rows;\n')
+    # ...gchipnest: the status bar's grouping chip and its card, lifted from the index.php under test (main.js _sbRenderGrpPop
+    # draws its column list), written there alone (the page has not set __SCN yet): every other scenario keeps its bar
+    if index_src is not None:
+        m = re.search(r'\n([ \t]*)<span class="sb-chip" id="sbGroup"[^\n]*\n\1<div class="sb-pop sb-grp-pop" id="sbGroupPop">.*?\n\1</div>', index_src, re.S)
+        if not m:
+            raise SystemExit('lift: the grouping chip not found in index.php')
+        chip = re.sub(r'<\?php\s*/\*(?:(?!\*/).)*\*/\s*\?>', '', m.group(0).strip(), flags=re.S)
+        if '<?' in chip:
+            raise SystemExit('lift: PHP left in the grouping chip')
+        js = json.dumps(chip).replace('</', '<\\/').replace('<!--', '<\\!--')
+        rep('    <span class="sb-chip" id="sbCustomCols" style="display:none;">custom layout</span>\n',
+            '    <script>if (/[?&]scn=gchipnest(?:&|$)/.test(location.search)) document.write(' + js + ');</script>\n'
+            '    <span class="sb-chip" id="sbCustomCols" style="display:none;">custom layout</span>\n')
     return src

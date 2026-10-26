@@ -245,7 +245,7 @@
     // every entry's control or function exists here (or is a control this harness has not got)
     var ABSENT = ['pivot', 'viz', 'download', 'dl-xls', 'dl-pdf', 'dl-print', 'dl-csv', 'dl-tsv', 'dl-json', 'email', 'snapshots', 'journal', 'subscribe', 'settings', 'header', 'find', 'nextpage', 'prevpage', 'clearfilter', 'builder',
                   'taggen', 'managedata', 'formatsql', 'rowlimit', 'wordwrap', 'editorheight', 'tablelist', 'sharestate', 'popout', 'stopquery', 'firstpage', 'lastpage', 'scrollleft', 'scrollright', 'exitpivot', 'expandgroups', 'collapsegroups', 'restoregroup', 'restorepivot', 'asofexit', 'profile', 'rowscard', 'datacard', 'loadcard',
-                  'dictionary', 'gendict', 'cmpevergreen'];   /* (2026-10-23) cmpevergreen: no Snapshots button here (pcmplink puts one in) */   // (round 23) index.php's own controls this harness has not got; (2026-10-22) js/penumbra_dict.js is not loaded here (the dict suite tests both rows)
+                  'dictionary', 'gendict', 'cmpevergreen', 'col:about'];   /* (2026-10-23) cmpevergreen: no Snapshots button here (pcmplink puts one in) */   // (round 23) index.php's own controls this harness has not got; (2026-10-22) js/penumbra_dict.js is not loaded here (the dict suite tests both rows)
     var reg = pal('registry')(), bad = reg.filter(function (e) { return !e.needs && ABSENT.indexOf(e.id) < 0; }).map(function (e) { return e.id; });
     R.info.regBad = bad; R.info.regN = reg.length;
     R.chk.registryNeeds = reg.length >= 40 && bad.length === 0;
@@ -417,7 +417,10 @@
     // every column row's act is offered on some column; every act of the menus an entry or a recorded exemption
     var offered = {};
     names.forEach(function (n) { var t = fth(n); if (t) pal('menuActs')(t).forEach(function (a) { offered[a] = 1; }); });
-    var cacts = pal('columnActs')(), dead = cacts.filter(function (a) { return !offered[a]; });
+    // (2026-10-24, dictstat) a column row this page does not have (its needs() false: What this column means... on a report
+    // with no dictionary, as here) is no dead row
+    var gone = pal('registry')().filter(function (e) { return e.pick === 'column' && !e.needs; }).map(function (e) { return e.act; });
+    var cacts = pal('columnActs')(), dead = cacts.filter(function (a) { return !offered[a] && gone.indexOf(a) < 0; });
     var missing = Object.keys(offered).filter(function (a) { return cacts.indexOf(a) < 0 && !((P() && P().exempt) ? P().exempt(a) : false); });
     R.info.dead = dead; R.info.missing = missing; R.info.offered = Object.keys(offered).filter(function (a) { return !/^(swap|show|copy)-\d+$/.test(a); });
     R.chk.noDeadColRows = cacts.length >= 10 && dead.length === 0;
@@ -486,6 +489,231 @@
     if (box()) { key('Escape', { target: input() }); await sleep(30); }
     if (window.jQuery) window.jQuery(document).off('click', '.snap-banner-link-evergreen', onEver);
     ev.remove();
+  };
+  // ---------------------------------------------------------------- pdictcol (2026-10-24, dictstat; the user: "now that we have data
+  // dictionaries should we add an entry to show column definition if one exists?") What this column means... as a "Which column?" row:
+  // greyed with the Data dictionary row's reason on a report without a dictionary (the module there, no block: has() false); with
+  // one (stand-ins: this harness loads no dictionary), the picker offers the column it names and greys the rest with the reason;
+  // picking one runs the header menu's own item (the dialog opened at the entry's name).
+  S.pdictcol = async function () {
+    await boot(); await ready();
+    var LABEL = 'What this column means...';
+    var realD = window.PenumbraDict, realOpen = window.Penumbra.openDataDictionary, opened = [];
+    window.PenumbraDict = { has: function () { return false; }, current: function () { return null; }, entryFor: function () { return null; } };
+    try {
+      await open('what this column means');
+      var r0 = row(LABEL);
+      R.info.none = r0 ? [r0.section, r0.off, r0.why] : rows().slice(0, 4).map(function (x) { return [x.section, x.text]; });
+      R.chk.aboutGreyed = !!r0 && !!r0.off && r0.why === 'This report has no data dictionary';
+      if (box()) { key('Escape', { target: input() }); await sleep(30); }
+    } finally {
+      if (realD === undefined) { delete window.PenumbraDict; } else { window.PenumbraDict = realD; }
+    }
+    window.PenumbraDict = { has: function () { return true; }, current: function () { return null; },
+      entryFor: function (c) { return String(c) === 'V_AMOUNT' ? { name: 'Amount paid', key: 'AMOUNT PAID', text: 'What was paid.', source: '', draft: false, avoid: false } : null; } };
+    window.Penumbra.openDataDictionary = function (f) { opened.push(f); };
+    try {
+      await open('column meaning');
+      var r = row(LABEL);
+      R.info.row = r ? [r.section, r.off, r.why] : rows().slice(0, 6).map(function (x) { return [x.section, x.text]; });
+      R.chk.aboutRow = !!r && !r.off;
+      var picked = !!r && !r.off && await pickRow(LABEL);
+      if (picked) { await enter(); }
+      var rs = rows(), by = {};
+      rs.forEach(function (x) { by[x.text] = x; });
+      R.info.pick = rs.slice(0, 8).map(function (x) { return [x.text, x.off, x.why]; });
+      R.chk.aboutPick = picked && modeOf() === 'pick' && !!by.V_AMOUNT && !by.V_AMOUNT.off && !!by.V_NAME && !!by.V_NAME.off
+        && by.V_NAME.why === "no entry in the report's data dictionary";
+      type('v_am'); await sleep(40);
+      await enter();
+      await sleep(150);
+      R.info.opened = opened.slice();
+      R.chk.aboutRuns = JSON.stringify(opened) === JSON.stringify(['Amount paid']) && !box();
+    } finally {
+      if (box()) { key('Escape', { target: input() }); await sleep(30); }
+      if (realD === undefined) { delete window.PenumbraDict; } else { window.PenumbraDict = realD; }
+      window.Penumbra.openDataDictionary = realOpen;
+    }
+  };
+  // ---------------------------------------------------------------- phlcol (2026-10-24, hlhead) the header menu's Highlight... as a
+  // "Which column?" row: available; the picker greys the row numbers; picking a column opens that column's highlight
+  // rules on their own (the popover's Highlight section alone)
+  S.phlcol = async function () {
+    await boot(); await ready();
+    var LABEL = 'Highlight...';
+    await open('highlight');
+    var r = row(LABEL);
+    R.info.row = r ? [r.section, r.off, r.why] : rows().slice(0, 6).map(function (x) { return [x.section, x.text]; });
+    R.chk.hlRow = !!r && !r.off;
+    var picked = !!r && !r.off && await pickRow(LABEL);
+    if (picked) { await enter(); }
+    var rs = rows(), by = {};
+    rs.forEach(function (x) { by[x.text] = x; });
+    R.info.pick = rs.slice(0, 8).map(function (x) { return [x.text, x.off, x.why]; });
+    R.chk.hlPick = picked && modeOf() === 'pick' && !!by.V_AMOUNT && !by.V_AMOUNT.off && !!by['#'] && !!by['#'].off && by['#'].why === 'not for the row numbers';
+    type('v_am'); await sleep(40);
+    await enter();
+    await sleep(300);
+    var pop = document.querySelector('.sp-sumtype-menu.pnb-colopt');
+    var secs = pop ? Array.prototype.filter.call(pop.children, function (n) { return n.classList.contains('pnb-colopt-sec'); }).map(function (s) { return s.getAttribute('data-sec'); }).join() : '';
+    R.info.secs = secs;
+    R.chk.hlRuns = !box() && secs === 'highlight' && pop.textContent.indexOf('V_AMOUNT') >= 0;
+    if (pop) document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    await sleep(80);
+  };
+  // ---------------------------------------------------------------- pnestgb (2026-10-25, nestgb; the user: "@@JSON column names
+  // shouldn't appear in the command palette's group by, but the nested columns should (just like in group mode UI)") H_JSON
+  // shown: the Group by rows a typed "group by" finds hold none for H_JSON and one set per column of its tables, "group by
+  // sub_name" leading and opening the Group dialog with SUB_NAME chosen (Apply unpressed); Group by this column...'s "Which
+  // column?" lists no H_JSON row, its tables' columns under Nested table columns (V_STATUS still a row: a guard); the typed
+  // letters' best match among them is the one Enter takes (amt: SUB_AMT over V_AMOUNT); Enter on SUB_NAME groups by it.
+  // (the review) a hidden nested-table column's columns have Group by rows too (the dialog lists them; H_TEXT here, its
+  // tables from row 7), never a pick row (the pick lists the shown columns); a column named in digits (the picker's own
+  // list throws then) leaves the box working (pnDigitSafe, a guard).
+  S.pnestgb = async function () {
+    await boot(); await ready();
+    var l = A().layout();
+    l.cols.forEach(function (c) { if (c.colName === 'H_JSON') c.visible = true; });
+    A().applyLayout(l);
+    await sleep(500);
+    // (2026-10-25, nestcopy, the review) the box reads the nested tables' columns from the rows' data: nothing is drawn - H_TEXT,
+    // hidden, keeps its empty (lazy) cells while the box lists its rows (the Copy distinct values ones among them); a guard
+    function lazyCells(name) {
+      var t = document.querySelector('#tableHeader th[data-colname="' + name + '"]'), id = t ? t.getAttribute('data-column') : null;
+      var tds = id === null ? [] : document.querySelectorAll('#resultsTable tbody td[data-column="' + id + '"]');
+      return { lazy: Array.prototype.filter.call(tds, function (td) { return td.hasAttribute('data-pnb-lazy'); }).length,
+        drawn: Array.prototype.filter.call(tds, function (td) { return !!td.querySelector('.raw-json-data'); }).length };
+    }
+    var lz0 = lazyCells('H_TEXT');
+    var LABEL = 'Group by this column...', gl = document.getElementById('groupingLightbox');
+    await open('group by h_json'); await sleep(250);
+    var lz1 = lazyCells('H_TEXT');
+    R.info.noDraw = [lz0, lz1];
+    R.chk.pnCopyNoDraw = lz0.lazy > 0 && lz0.drawn === 0 && lz1.lazy === lz0.lazy && lz1.drawn === 0;
+    R.info.combos = texts().slice(0, 12);
+    R.chk.pnComboNoParent = rows().length > 0 && !rows().some(function (r) { return /^Group by H_JSON\b/.test(r.text); });
+    R.chk.pnComboNested = ['SUB_ID', 'SUB_AMT', 'SUB_NAME'].every(function (s) { var r = row('Group by ' + s); return !!r && !r.off; });
+    // a hidden nested-table column's columns (H_TEXT: NOTE_KIND, NOTE_DAYS), as the Group dialog lists them
+    await open('group by note_kind'); await sleep(250);
+    var rk = row('Group by NOTE_KIND');
+    R.info.hidden = [texts().slice(0, 5), rk ? rk.sub : null];
+    R.chk.pnComboHidden = !!rk && !rk.off && /H_TEXT/.test(rk.sub || '') && !rows().some(function (r) { return /^Group by H_TEXT\b/.test(r.text); });
+    // (guard) a column named in digits: the box still lists what "group by" finds; (2026-10-25, digitcol) and the nested
+    // tables' columns too - jQuery's number no longer makes the grouping picker's list throw (pnDigitNested; before: none)
+    $(document.querySelector('#tableHeader th[data-colname="V_ID"]')).data('colname', 2021);
+    var dOk = false, dNest = false;
+    try {
+      await open('group by v_st'); await sleep(250); dOk = !!row('Group by V_STATUS') && !!box();
+      await open('group by h_json'); await sleep(250);
+      dNest = ['SUB_ID', 'SUB_AMT', 'SUB_NAME'].every(function (s) { var r = row('Group by ' + s); return !!r && !r.off; });
+    } catch (eD) { R.info.digit = String(eD); }
+    $(document.querySelector('#tableHeader th[data-colname="V_ID"]')).removeData('colname');
+    R.chk.pnDigitSafe = dOk;
+    R.chk.pnDigitNested = dNest;
+    // (guard; digitcol) the grouping picker's list throwing for any reason (a stub): the box still lists what "group by" finds
+    var sbB = window._penumbraSearchBuilder, sbGet = sbB && sbB.getAvailableColumns, tOk = false;
+    if (sbB) { sbB.getAvailableColumns = function () { throw new Error('the grouping list threw (stub)'); }; }
+    try { await open('group by v_st'); await sleep(250); tOk = !!sbB && !!row('Group by V_STATUS') && !!box(); } catch (eT) { R.info.listThrows = String(eT); }
+    finally { if (sbB) { sbB.getAvailableColumns = sbGet; } }
+    R.chk.pnListThrows = tOk;
+    // (guard; the second review) a pivot view: no column has Group by rows there (the box reads no headers), so no nested
+    // table's columns either
+    var pm = window.Penumbra && window.Penumbra.pivotMenu, pmOn = pm ? pm.on : null, pvRows = null;
+    if (pm) {
+      pm.on = function () { return true; };
+      try { await open('group by sub'); await sleep(250); pvRows = texts(); } finally { pm.on = pmOn; }
+      if (box()) { key('Escape', { target: input() }); await sleep(30); }
+    }
+    R.info.pivot = pvRows ? pvRows.slice(0, 6) : null;
+    R.chk.pnPivotNone = !!pvRows && !pvRows.some(function (t) { return /^Group by SUB_/.test(t); });
+    await open('group by sub_name'); await sleep(350);
+    var top = rows()[0];
+    R.info.top = top ? [top.section, top.text, top.off, selIdx()] : null;
+    var topOk = !!top && top.section === 'Top match' && top.text.indexOf('Group by SUB_NAME') === 0 && !top.off && selIdx() === 0;
+    if (topOk) { await enter(); await sleep(600); }
+    var selv = document.querySelector('#groupingColumnSelector .pcs-selected');
+    R.info.dialog = [gl ? gl.style.display : null, selv ? selv.getAttribute('data-value') : null, document.body.classList.contains('group-mode-active')];
+    R.chk.pnComboTop = topOk && !!gl && gl.style.display !== 'none' && !!selv && selv.getAttribute('data-value') === 'SUB_NAME' && !document.body.classList.contains('group-mode-active');
+    if (gl) gl.style.display = 'none';
+    // "Which column?"
+    await open('group by this'); await sleep(120);
+    var r0 = row(LABEL), picked = !!r0 && !r0.off && await pickRow(LABEL);
+    if (picked) { await enter(); }
+    await sleep(120);
+    var rs = rows(), by = {};
+    rs.forEach(function (x) { by[x.text + '|' + x.section] = x; });
+    R.info.pick = rs.map(function (x) { return [x.section, x.text, x.off]; }).slice(0, 16);
+    var inPick = picked && modeOf() === 'pick';
+    R.chk.pnPickNoParent = inPick && rs.length > 3 && !rs.some(function (x) { return x.text === 'H_JSON'; });
+    R.chk.pnPickNested = inPick && ['SUB_ID', 'SUB_AMT', 'SUB_NAME'].every(function (s) { var x = by[s + '|Nested table columns']; return !!x && !x.off; })
+      && !by['NOTE_KIND|Nested table columns'];   // (a hidden column's: not in the pick, which lists the shown columns)
+    R.chk.pnPickPlain = inPick && !!by['V_STATUS|Shown columns'] && !by['V_STATUS|Shown columns'].off;
+    // the typed letters' best match: SUB_AMT (a run of the letters) over V_AMOUNT (scattered)
+    if (inPick) { type('amt'); await sleep(80); }
+    R.info.amt = [selRow().text, selRow().section, texts().slice(0, 6)];
+    R.chk.pnPickPre = inPick && selRow().text === 'SUB_AMT' && selRow().section === 'Nested table columns';
+    if (inPick) { type('sub_n'); await sleep(80); }
+    var onName = inPick && selRow().text === 'SUB_NAME';
+    if (onName) { await enter(); }
+    var g = onName && await until(function () { return document.body.classList.contains('group-mode-active') && !!A() && A().groupingColumn() === 'SUB_NAME'; }, 15000);
+    R.info.runs = [onName, !!g, !!box(), A() && A().groupingColumn()];
+    R.chk.pnPickRuns = !!g && !box();
+    if (g) { A().ungroup(); await until(function () { return !document.body.classList.contains('group-mode-active'); }, 15000); }
+    // (2026-10-25, nestcopy; the user: "this process should be repeated for the copy distinct values") the Copy distinct values
+    // rows: none for H_JSON, one per column of its tables (named as Copy names them: H_JSON-SUB_NAME), a hidden one's too
+    // (H_TEXT); Enter opens Copy on that option; a plain column keeps its row (pnCopyPlain, a guard)
+    await open('copy distinct h_json'); await sleep(250);
+    R.info.copyRows = texts().slice(0, 10);
+    R.chk.pnCopyNoParent = rows().length > 0 && !rows().some(function (r) { return r.text === 'Copy distinct values of H_JSON...'; });
+    R.chk.pnCopyNested = ['SUB_ID', 'SUB_AMT', 'SUB_NAME'].every(function (s) { var r = row('Copy distinct values of H_JSON-' + s + '...'); return !!r && !r.off; });
+    await open('copy distinct note_kind'); await sleep(250);
+    var rh = row('Copy distinct values of H_TEXT-NOTE_KIND...');
+    R.info.copyHidden = rh ? [rh.text, rh.sub] : texts().slice(0, 5);
+    R.chk.pnCopyHidden = !!rh && !rh.off && /H_TEXT/.test(rh.sub || '');
+    await open('copy distinct v_name'); await sleep(250);
+    var rp = row('Copy distinct values of V_NAME...');
+    R.chk.pnCopyPlain = !!rp && !rp.off;
+    await open('copy distinct h_json-sub_name'); await sleep(300);
+    var cpicked = await pickRow('Copy distinct values of H_JSON-SUB_NAME...');
+    if (cpicked) { await enter(); await sleep(700); }
+    R.info.copyRun = [cpicked, $('#copyActionsLightbox').is(':visible'), $('#copyColumnSelector').val(), !!box()];
+    R.chk.pnCopyRuns = cpicked && !box() && $('#copyActionsLightbox').is(':visible') && $('input[name="copyFormat"][value="single_col"]').is(':checked')
+      && $('#copyColumnSelector').val() === 'H_JSON-SUB_NAME';
+    $('#copyActionsLightbox').hide();
+    // (the review, v2) the report hides Clipboard (body.restrict-clipboard, as its View Option does): every Copy distinct values
+    // row off - the nested tables' and a plain column's alike - as the toolbar's Copy is
+    var rcn = null, rcp = null;
+    document.body.classList.add('restrict-clipboard');
+    try {
+      await open('copy distinct h_json-sub_name'); await sleep(250);
+      rcn = row('Copy distinct values of H_JSON-SUB_NAME...');
+      await open('copy distinct v_name'); await sleep(250);
+      rcp = row('Copy distinct values of V_NAME...');
+    } finally { document.body.classList.remove('restrict-clipboard'); }
+    R.info.clipOff = [rcn ? [rcn.off, rcn.why] : null, rcp ? [rcp.off, rcp.why] : null];
+    R.chk.pnCopyClipOff = !!rcn && !!rcn.off && !!rcp && !!rcp.off;
+    // (the review, v3) a nested-table column whose tables start further down than the header menu's and Copy's readings
+    // (stand-ins: neither names it): its own Copy distinct values row is off, as the menu leaves the item out
+    var aS = A(), nfW = aS && aS.nestedFields, cpW = aS && aS.nestedCopyPlan, rsp = null;
+    if (aS) { aS.nestedFields = function (c) { return String(c) === 'H_JSON' ? null : nfW.apply(this, arguments); }; aS.nestedCopyPlan = function () { return []; }; }
+    try { await open('copy distinct h_json'); await sleep(250); rsp = row('Copy distinct values of H_JSON...'); }
+    finally { if (aS) { aS.nestedFields = nfW; aS.nestedCopyPlan = cpW; } }
+    R.info.sparse = rsp ? [rsp.text, rsp.off, rsp.why] : texts().slice(0, 5);
+    R.chk.pnCopySparse = !!rsp && !!rsp.off;
+    // (2026-10-25, neststats, the review) the box never works out a nested column's Column stats (a list of facts, as the column's
+    // own): a column pick (Hide this column...) walks every shown column's menu, H_JSON's Nested columns lists among them
+    var aV = A(), nvW = aV && aV.nestedValues, nvCalls = 0, hidePicked = false;
+    if (aV && nvW) { aV.nestedValues = function () { nvCalls++; return nvW.apply(this, arguments); }; }
+    try {
+      await open('hide this column'); await sleep(150);
+      var rH = row('Hide this column...');
+      hidePicked = !!rH && !rH.off && await pickRow('Hide this column...');
+      if (hidePicked) { await enter(); await sleep(250); type('h_js'); await sleep(250); }
+    } finally { if (aV && nvW) { aV.nestedValues = nvW; } }
+    R.info.statsWork = { picked: hidePicked, mode: modeOf(), calls: nvCalls };
+    if (box()) { key('Escape', { target: input() }); await sleep(30); }
+    R.chk.pnStatsNoWork = !!nvW && hidePicked && nvCalls === 0;
+    if (box()) { key('Escape', { target: input() }); await sleep(30); }
   };
   // ---------------------------------------------------------------- pview
   S.pview = async function () {

@@ -307,6 +307,49 @@
         R.chk.onRule = (R.info.onOps || []).indexOf('last') >= 0 && recent.length === 2 && recent.every(function (tr) { var c = td(tr, ON); return c && getComputedStyle(c).backgroundColor === grey; })
           && olden.length === 1 && getComputedStyle(td(olden[0], ON)).backgroundColor !== grey;
       });
+    },
+    // (2026-10-24, hlhead, the review) a header rule reading a journal toggle - V_NAME's header while a shown row is Done,
+    // made in the popover: lit while a row is marked; the journal's repaint draws it again (out once no row is, lit on a
+    // new mark), as it does a cell rule naming Done
+    hjhead: async function () {
+      var amber = probe('background-color: var(--pnb-hl-amber, #fbe8a6)', 'backgroundColor'), done = 'Done = ' + String.fromCharCode(0x2611);
+      var keys = [];
+      await step('setup', async function () {
+        window._penumbraToggleState = { k1: {} };
+        await journal();
+        keys = rows().slice(0, 12).map(keyOf).filter(Boolean);
+        if (keys[2]) mark(keys[2]);
+        await redraw();
+      });
+      await step('rule', async function () {
+        openCog('V_NAME', 'V_NAME');
+        await addRule(async function () {
+          var adv = hlQ('[data-co="hl-adv"]');
+          if (adv) { adv.click(); await sleep(100); }
+          var wIn = hlQ('[data-co="hl-w"]'), cIn = hlQ('[data-co="hl-css"]');
+          if (wIn) { wIn.focus(); setInput(wIn, done); }
+          await sleep(100);
+          if (cIn) { cIn.focus(); setInput(cIn, 'background-color: var(--pnb-hl-amber, #fbe8a6)'); }
+          await sleep(100);
+          var hr = hlQ('[data-co="hl-to"][value="header"]');
+          if (hr) { hr.checked = true; fire(hr, 'change'); }
+        });
+        closeAll();
+        await sleep(400);
+        R.info.lit = [getComputedStyle(fth('V_NAME')).backgroundColor, fth('V_NAME').getAttribute('data-pnb-hl-hd'), keys.length];
+        R.chk.headLit = keys.length >= 6 && getComputedStyle(fth('V_NAME')).backgroundColor === amber
+          && rows().every(function (tr) { var c = td(tr, 'V_NAME'); return c && getComputedStyle(c).backgroundColor !== amber; });
+      });
+      await step('tick', async function () {
+        delete window._penumbraToggleState.k1[keys[2]];
+        await redraw();
+        var off = getComputedStyle(fth('V_NAME')).backgroundColor !== amber;
+        mark(keys[5]);
+        await redraw();
+        var on = getComputedStyle(fth('V_NAME')).backgroundColor === amber;
+        R.info.tick = [off, on];
+        R.chk.headTick = off && on;
+      });
     }
   };
 

@@ -105,6 +105,9 @@ pivot_build_field_comparators
 custom_sort_pivot_keys
 penumbra_hl_clean_css
 penumbra_state_highlight_rules
+penumbra_hl_head_extra
+penumbra_hl_css_color_ok
+penumbra_hl_any_row_headers
 penumbra_hl_journal_rules
 penumbra_hl_reads_column
 penumbra_hl_theme_fills
@@ -147,6 +150,8 @@ pivot_clean_field_value
 pivot_parse_value
 pivot_get_agg_label
 pivot_build_agg_display_labels
+pivot_row_total_display_labels
+pivot_row_total_override_is_derived
 pivot_agg_total_label
 pivot_evaluate_filter
 pivot_evaluate_single_condition
@@ -411,6 +416,9 @@ _sr_normalize_auth_list
 _sr_recipient_auth_failure
 _sr_filter_subscribers_by_access
 _sr_persist_subscriber_removal
+_sr_dbdump_display_keys
+_sr_dbdump_columns_to_drop
+_sr_persist_dbdump_column_drop
 execute_scheduled_report
 penumbra_split_change_columns
 generate_snapshot_signature

@@ -51,7 +51,10 @@ def build(index_src):
     rep('<script src="main_hc.js"></script>\n',
         '<link rel="stylesheet" href="penumbra_dict.css">\n<script src="penumbra_dict.js" data-ui="penumbra_dict_ui.js" data-ui-css="penumbra_dict_ui.css"></script>\n<script src="main_hc.js"></script>\n')
     rep('    window.__STORED = st;\n',
-        '    if (/^d/.test(S) && S !== "dnone" && S !== "dsub") st.reportSnippet = "Before the block. sum(V_AMOUNT)\\naction(infobox, " + (S === "dblank" ? "" : "Data dictionary") + ", ' + BLOCK + '\\nAfter the block.";\n'
+        # (2026-10-24 sweep) a commented-out line AFTER the block, between the block's apostrophe
+        # (vendor's) and one after it (Don't): the comment stripper used to pair the two quotes
+        # across the block and keep the comment alive
+        '    if (/^d/.test(S) && S !== "dnone" && S !== "dsub") st.reportSnippet = "Before the block. sum(V_AMOUNT)\\naction(infobox, " + (S === "dblank" ? "" : "Data dictionary") + ", ' + BLOCK + '\\n// HIDDEN_COMMENT count()\\nAfter the block. Don\\\'t worry.";\n'
         '    if (S === "dnone") st.reportSnippet = "Just text. count()";\n'
         '    if (S === "pdict") st.reportSnippet = "Pivot report.\\naction(infobox, Data dictionary, ' + PBLOCK + '";\n'
         '    if (S === "dsub") { st.reportSnippet = "No dictionary here."; st.reportSubtitle = "Read the action(infobox, Glossary, dict|`V_ID | Subtitle meaning of the id.`)"; }\n'

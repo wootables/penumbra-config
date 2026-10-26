@@ -28,6 +28,9 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
         'penumbra_a11y.js', 'penumbra_grouplist.js', 'penumbra_cellsel.js', 'penumbra_presets.js', 'penumbra_forms.js', 'penumbra_find.js']   # (round 14) Find, as index.php loads it
 SCN = ['pcold', 'pfail', 'pmain', 'ppick', 'pview', 'prow', 'pshot', 'pcombo', 'pkeys', 'pdash', 'pdasha', 'pshot6', 'pfn', 'pshot7f', 'pshot7t', 'pfeed', 'pshot8', 'prank', 'pshot9', 'pshot10', 'pshot11', 'ptools', 'ptoolsv', 'padmin', 'pshot12', 'pdsec', 'pmetr', 'phand', 'pshot14a', 'pshot14b', 'pvo', 'pshot15', 'pjar', 'pshot16', 'pchip', 'pshot17', 'pthm', 'pjip', 'pshot19', 'pshow', 'pjump', 'pverb', 'pshot20', 'pnote', 'pmail', 'pmiss', 'pshot21', 'ptop', 'pr23', 'psweep', 'psrank', 'pperf', 'pwidth', 'pcmplink']
 SCN = SCN + ['pjbusy', 'pjbusyrm', 'pjbusyhc', 'pshotjb']   # (jarbusy, 2026-10-23) the busy card while Jarvis thinks
+SCN = SCN + ['pdictcol']   # (2026-10-24, dictstat) What this column means... as a "Which column?" row
+SCN = SCN + ['phlcol']   # (2026-10-24, hlhead) Highlight... as a "Which column?" row
+SCN = SCN + ['pnestgb']   # (2026-10-25, nestgb) Group by: a nested table's columns, never the @@JSON column itself
 CHK = {
     # (jarbusy, 2026-10-23) "a visible loading animation that grabs the users attention" while the box asks Jarvis: the busy card at
     # once, large, where the answer lands and in view (a long pasted question, a 600px-tall window), moving (bar, dots, shimmer), said
@@ -48,6 +51,10 @@ CHK = {
               'colMode', 'colItems', 'colRun', 'backspaceBack', 'themePick', 'themeRuns'],
     'pwidth': ['noDeadColRows', 'widthCoverage', 'fitPageRow', 'fitPageRuns', 'resetWidthPick', 'resetWidthRuns'],   # (colmenu round 33)
     'pcmplink': ['everOff', 'everOn', 'everRuns'],   # (2026-10-23, lnk40) the comparison banner's evergreen link as a row
+    'phlcol': ['hlRow', 'hlPick', 'hlRuns'],   # (2026-10-24, hlhead) Highlight... as a "Which column?" row
+    'pnestgb': ['pnComboNoParent', 'pnComboNested', 'pnComboHidden', 'pnDigitSafe', 'pnDigitNested', 'pnListThrows', 'pnPivotNone', 'pnComboTop', 'pnPickNoParent', 'pnPickNested', 'pnPickPlain', 'pnPickPre', 'pnPickRuns',
+                'pnCopyNoDraw', 'pnCopyNoParent', 'pnCopyNested', 'pnCopyHidden', 'pnCopyPlain', 'pnCopyRuns', 'pnCopyClipOff', 'pnCopySparse', 'pnStatsNoWork'],   # (2026-10-25, nestgb; nestcopy: the pnCopy* checks; neststats: pnStatsNoWork)
+    'pdictcol': ['aboutGreyed', 'aboutRow', 'aboutPick', 'aboutRuns'],   # (2026-10-24, dictstat) the column's meaning as a "Which column?" row
     'pview': ['saveHidden', 'saveGreyExact', 'vhHidden', 'consoleHidden', 'editorSave', 'editorVh'],
     'prow': ['noRowItemsIdle', 'rowItems', 'rowFilterRuns'],
     # (round 4) the box open beside the toolbar in Wolfpack Red; the runner adds inkPalette / inkMatch from a screenshot
@@ -275,6 +282,22 @@ NEW = NEW - {'L-pcmplink-everOff', 'L-pcmplink-everOn', 'L-pcmplink-everRuns'}  
 # and the static. backKeepsOther and syncFailAsksAgain hold on live already (guards). pjbusy's busyEndsOnClose closes with Ctrl+K now.
 NEW_JE = {'L-pjip-%s' % c for c in ('noStaleActive', 'escChipCancels', 'backCancels', 'oneAtATime', 'stillSaid', 'stillLands')} | {'S-jarEdge'}
 NEW = NEW   # (jaredge is LIVE since 9120044, 2026-10-23 20:22: NEW_JE's checks are old ones now, green on live; jarvispal's set above is still undeployed)
+# (2026-10-24, dictstat) What this column means... (live: no such row) and a column row's own availability
+NEW = NEW | {'L-pdictcol-aboutGreyed', 'L-pdictcol-aboutRow', 'L-pdictcol-aboutPick', 'L-pdictcol-aboutRuns'}
+NEW = NEW - {'L-pdictcol-aboutGreyed', 'L-pdictcol-aboutRow', 'L-pdictcol-aboutPick', 'L-pdictcol-aboutRuns'}   # (dictstat41 is LIVE since e92fca8, 2026-10-24: old checks now)
+# (2026-10-24, hlhead) Highlight... as a "Which column?" row (live: no such row)
+NEW = NEW | {'L-phlcol-hlRow', 'L-phlcol-hlPick', 'L-phlcol-hlRuns'}
+NEW = NEW - {'L-phlcol-hlRow', 'L-phlcol-hlPick', 'L-phlcol-hlRuns'}   # (hlhead is LIVE since 75458b7, 2026-10-25: old checks now)
+# (2026-10-25, nestgb) Group by lists a nested table's columns, never the @@JSON column (live: the column, no sub-columns);
+# pnPickPlain, pnDigitSafe and pnPivotNone hold on live (guards). jarvispal's set above is still undeployed (red on live).
+NEW = NEW | {'L-pnestgb-%s' % c for c in CHK['pnestgb'] if c not in ('pnPickPlain', 'pnDigitSafe', 'pnPivotNone')} | {'S-nestGroupHelp'}
+NEW = NEW - ({'L-pnestgb-%s' % c for c in CHK['pnestgb']} | {'S-nestGroupHelp'})   # (nestgb is LIVE since 3c820e7, 2026-10-25: old checks now; jarvispal's set is still undeployed)
+# (2026-10-25, nestcopy) Copy distinct values rows for the nested tables' columns, none for the @@JSON column (live: the column's own
+# row, no nested ones); pnCopyPlain holds on live (a guard)
+# (v2, the review) pnCopyClipOff new; pnCopyNoDraw holds on live too (a guard: live lists no nested rows, so draws nothing)
+NEW = NEW | {'L-pnestgb-%s' % c for c in ('pnCopyNoParent', 'pnCopyNested', 'pnCopyHidden', 'pnCopyRuns', 'pnCopyClipOff', 'pnCopySparse')} | {'S-nestCopyHelp'}
+NEW = NEW - ({'L-pnestgb-%s' % c for c in CHK['pnestgb']} | {'S-nestCopyHelp'})   # (nestcopy is LIVE since 934d195, 2026-10-25: old checks now; jarvispal's set is still undeployed)
+NEW = NEW | {'L-pnestgb-pnStatsNoWork'}   # (2026-10-25, neststats) the box never works out a nested column's Column stats
 # (round 3) the group-mode icon: candidate C, and the old drawing's signature (its first line)
 GROUP_C_SYMBOL = '<symbol id="pnbi-group" viewBox="0 0 24 24"><path d="m4 4 2.5 2.5L9 4"/><line x1="12" y1="5" x2="20" y2="5"/><line x1="8" y1="9.5" x2="20" y2="9.5"/><line x1="8" y1="13" x2="20" y2="13"/><path d="m6.25 15.25 2.5 2.5-2.5 2.5"/><line x1="12" y1="18" x2="20" y2="18"/></symbol>'
 OLD_GROUP_SIG = '<line x1="5" y1="9" x2="19" y2="9"/><line x1="5" y1="15" x2="19" y2="15"/>'
@@ -284,7 +307,68 @@ def served_files():
     out += glob.glob(os.path.join(APP, 'help', '*.php')) + glob.glob(os.path.join(APP, 'help', 'topics', '*.php')) + glob.glob(os.path.join(APP, 'help', 'tips', '*.php'))
     return out
 
+# (2026-10-25, digitcol, LIVE since 306438e) pnDigitNested (a column named in digits: the nested tables' columns still listed)
+# and pnListThrows (the grouping list throwing, a stub: the box still works) hold on live
+NEW = NEW - {'L-pnestgb-pnDigitNested', 'L-pnestgb-pnListThrows'}
 MUTANTS = {
+    # --- (2026-10-25, nestcopy) the @@JSON column's own Copy distinct values row kept; no rows for its tables' columns; the shown
+    # columns' tables alone; a row that opens nothing; every shown column's own row gone
+    'pc-parent': ([('pal', "        for (var i = out.length - 1; i >= 0; i--) { if (drop[out[i].id]) { out.splice(i, 1); } }\n", "")], ['L-pnestgb-pnCopyNoParent'], ['pnestgb']),
+    'pc-none': ([('pal', "        if (hs.length) { nestCopyCombos(out, hs); }   // (2026-10-25, nestcopy) their Copy distinct values rows; none for the @@JSON column\n", "")],
+                ['L-pnestgb-pnCopyNested', 'L-pnestgb-pnCopyHidden', 'L-pnestgb-pnCopyRuns'], ['pnestgb']),
+    'pc-shown': ([('pal', "        nestCopyPlan().forEach(function (p) {\n            var parent = lab[p.col] || p.col;",
+                   "        nestCopyPlan().filter(function (p) { return hs.some(function (t) { return t.getAttribute('data-colname') === p.col; }); }).forEach(function (p) {\n            var parent = lab[p.col] || p.col;")],
+                 ['L-pnestgb-pnCopyHidden'], ['pnestgb']),
+    'pc-run': ([('pal', "run: function () { var a = A(); if (!a || typeof a.copyNested !== 'function' || !a.copyNested(p.col, s, null)) { toast('Copy is not offered for this column'); } } });",
+                 "run: function () { } });")], ['L-pnestgb-pnCopyRuns'], ['pnestgb']),
+    'pc-plaindrop': ([('pal', "if (nestedOf(c) !== null) { drop['combo:copydistinct:' + c] = true; }", "drop['combo:copydistinct:' + c] = true;")], ['L-pnestgb-pnCopyPlain'], ['pnestgb']),
+    # (v2, the review) the names read by drawing every lazy cell (Copy's own plan); the rows on where the report hides Clipboard
+    'pc-draw': ([('main', "        var rows = _pnbNestCopyRows(), out = [];\n        if (!rows.length) return out;\n",
+                  "        getNestedColumnPlan();\n        var rows = _pnbNestCopyRows(), out = [];\n        if (!rows.length) return out;\n")], ['L-pnestgb-pnCopyNoDraw'], ['pnestgb']),
+    'pc-clip': ([('pal', "        if (document.body.classList.contains('restrict-clipboard')) {\n            out.forEach(function (e) { if (String(e.id).indexOf('combo:copydistinct:') === 0) { e.avail = TOOL_OFF; } });\n        }\n", "")],
+                ['L-pnestgb-pnCopyClipOff'], ['pnestgb']),
+    # (2026-10-25, neststats) the box opening a nested column's Column stats list in its walk
+    'pc-statswalk': ([('pal', "                if (/^neststats-[0-9]+$/.test(String(it.act))) { return; }", "                if (false) { return; }")], ['L-pnestgb-pnStatsNoWork'], ['pnestgb']),
+    # (v3, the second review) a shown column whose nested tables start further down keeping its own copy row on
+    'pc-sparse': ([('pal', "            e.avail = function () { return colNestedNow(c) ? ", "            e.avail = function () { return false ? ")], ['L-pnestgb-pnCopySparse'], ['pnestgb']),
+    # --- (2026-10-25, nestgb) the @@JSON column listed in Group by's "Which column?" again; its tables' columns not listed; every
+    # column taken for a nested table; the typed letters' best match left to the shown columns; the column's own Group by rows
+    # back; its tables' columns without rows of their own
+    'pn-parent': ([('pal', "            if (e.act === 'groupBy' && nestPick(th, q, e, nest, nestSeen)) { return; }\n", "            if (e.act === 'groupBy') { nestPick(th, q, e, nest, nestSeen); }\n")],
+                  ['L-pnestgb-pnPickNoParent'], ['pnestgb']),
+    'pn-nokids': ([('pal', "            nest.push(seen[key]);\n", "")], ['L-pnestgb-pnPickNested', 'L-pnestgb-pnPickPre', 'L-pnestgb-pnPickRuns'], ['pnestgb']),
+    'pn-skipall': ([('pal', "        if (!nf) { return false; }\n        var raw = [], kids = [], parent = colName(th);", "        if (!nf) { return true; }\n        var raw = [], kids = [], parent = colName(th);")],   # (re-anchored, nestcopy)
+                   ['L-pnestgb-pnPickPlain'], ['pnestgb']),
+    'pn-pre': ([('pal', "        if (nb >= 0 && (best < 0 || items[best].off || nest[nb].score > items[best].score)) {", "        if (false) {")], ['L-pnestgb-pnPickPre'], ['pnestgb']),
+    'pn-combo': ([('pal', "            if (canGroupBtn && !nf) {\n", "            if (canGroupBtn) {\n")], ['L-pnestgb-pnComboNoParent'], ['pnestgb']),
+    'pn-nocombo': ([('pal', "        if (canGroupBtn && hs.length) { nestCombos(out, gcol); }   // (2026-10-25, nestgb) every nested table's columns, a hidden one's too (none in a pivot)\n", "")],
+                   ['L-pnestgb-pnComboNested', 'L-pnestgb-pnComboHidden', 'L-pnestgb-pnComboTop'], ['pnestgb']),
+    # (the second review) the nested tables' rows in a pivot view, where no column has Group by rows
+    'pn-pivot': ([('pal', "        if (canGroupBtn && hs.length) { nestCombos(out, gcol); }", "        if (canGroupBtn) { nestCombos(out, gcol); }")], ['L-pnestgb-pnPivotNone'], ['pnestgb']),
+    # (the review) the shown columns' nested tables alone; both safety nets gone (main.js's catch and the box's own), so the
+    # picker's list throwing on a column named in digits breaks the box
+    'pn-hidden': ([('pal', "        Array.prototype.forEach.call(document.querySelectorAll('#tableHeader th[data-colname]'), function (t) {\n            var parent = colName(t);",
+                    "        headers().forEach(function (t) {\n            var parent = colName(t);")], ['L-pnestgb-pnComboHidden'], ['pnestgb']),
+    'pn-nocatch': ([('main', "        } catch (e) { return null; }   // (the picker's own list throws while a column is named in digits: the plain item, as before)\n", "        } catch (e) { throw e; }\n"),
+                    ('pal', "        if (!(k in nestMemo)) { try { nestMemo[k] = a.nestedFields(col); } catch (e) { nestMemo[k] = null; } }\n", "        if (!(k in nestMemo)) { nestMemo[k] = a.nestedFields(col); }\n")],
+                   ['L-pnestgb-pnListThrows'], ['pnestgb']),   # (2026-10-25, digitcol) a stubbed throw: a column named in digits throws no more
+    # (2026-10-25, digitcol) main.js's column list for the search builder back to jQuery's number: no nested rows with such a column
+    'dc-sbapi': ([('main', "                // (2026-10-25, digitcol) String: jQuery's data() hands a name in digits (a PIVOT's 2021)\n"
+                           "                // back as a NUMBER, and the pickers this list feeds upper-case every name (the grouping\n"
+                           "                // dialog's pickers broke on a report with such a column and a nested-table one).\n"
+                           "                var dc = String($(this).data('colname'));\n",
+                   "                var dc = $(this).data('colname');\n")], ['L-pnestgb-pnDigitNested'], ['pnestgb']),
+    # --- (2026-10-24, hlhead) Highlight... : no row on the page
+    'hc-norow': ([('pal', "        { id: 'col:highlight', label: 'Highlight...',", "        { id: 'col:highlight', hide: function () { return true; }, label: 'Highlight...',")], ['L-phlcol-hlRow'], ['phlcol']),
+    # --- (2026-10-24, dictstat) What this column means... : offered on a report with no dictionary; greyed on one with it; a column
+    # row's own availability ignored again (greyed never); the picker's reason generic
+    'dc-availalways': ([('pal', "avail: function () { var D = window.PenumbraDict; return (D && D.has()) ? true : 'This report has no data dictionary'; }, needs: function () { return !!window.PenumbraDict; } },", "avail: function () { return true; }, needs: function () { return !!window.PenumbraDict; } },")],
+                       ['L-pdictcol-aboutGreyed'], ['pdictcol']),
+    'dc-availnever': ([('pal', "avail: function () { var D = window.PenumbraDict; return (D && D.has()) ? true : 'This report has no data dictionary'; }, needs: function () { return !!window.PenumbraDict; } },", "avail: function () { return 'This report has no data dictionary'; }, needs: function () { return !!window.PenumbraDict; } },")],
+                      ['L-pdictcol-aboutRow', 'L-pdictcol-aboutPick', 'L-pdictcol-aboutRuns'], ['pdictcol']),
+    'dc-colavail': ([('pal', "        ACTIONS.forEach(function (e) { if (e.pick === 'column' && typeof e.avail === 'function' && availNow[e.id] === true) { ", "        ACTIONS.forEach(function (e) { if (false) { ")],
+                    ['L-pdictcol-aboutGreyed'], ['pdictcol']),
+    'dc-why': ([('pal', "        if (act === 'about') { return 'no entry in the report\\'s data dictionary'; }\n", "")], ['L-pdictcol-aboutPick'], ['pdictcol']),
     # --- (jaredge, 2026-10-23) the Esc chip closing without the cancel; Backspace back leaving a waiting question running; Backspace back
     # cancelling from any mode; the one-at-a-time guard gone; the "still answering" status gone; a handler that ran at once not
     # settling the ask; Esc not forgetting the question it cancelled; the stale aria-activedescendant left on the input
@@ -1184,6 +1268,12 @@ def static_checks(texts):
          and 'padding: 11px 17px;' in texts['pcss'] and 'flex-wrap: nowrap;' in texts['pcss'] and 'max-width: 50%;' in texts['pcss'], ''),
         ('S-fuzzyWord', "if (q.length >= 3) {" in pal and "/[^a-z0-9]/.test(span)" in pal, ''),
         ('S-ownerReason', "'You own this report, so feedback would come to you'" in pal, ''),
+        # (2026-10-25, nestgb) the Columns section names a nested table's columns in Group by
+        ('S-nestGroupHelp', '<em>Nested table columns</em>' in texts['topic'] and 'A row joins the group of each value its table holds' in texts['topic']
+         and chr(0x2014) not in texts['topic'], ''),
+        # (2026-10-25, nestcopy) ...and Copy distinct values the same way
+        ('S-nestCopyHelp', 'Copy distinct values follows the same rule' in texts['topic'] and '<em>Copy distinct values of PARENT-NAME...</em>' in texts['topic']
+         and chr(0x2014) not in texts['topic'], ''),
     ]
 
 # (round 4) the ink of an icon's crop: the share of pixels that differ from the crop's corner (the
