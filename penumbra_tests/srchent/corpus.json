@@ -1,0 +1,716 @@
+{
+ "_about": "srchent (2026-10-26): cells and searches run through BOTH search engines - main.js (getCellValue / getVirtualColumnsForRow / getStructuredVirtualData, parseAdvancedQuery + evaluateParsedQuery, in harness.html) and penumbra_search.php (_search_get_cell_value, _search_get_virtual_columns, _search_get_structured_virtual_data, php_apply_search_filter, by php_side.php). expect = the RIDs a query returns; both engines must return exactly them.",
+ "columns": [
+  "#",
+  "RID",
+  "DEPT",
+  "DEPT2",
+  "TITLE",
+  "NOTE",
+  "AMT",
+  "LINK",
+  "SUBS"
+ ],
+ "rows": [
+  {
+   "#": "1",
+   "RID": "nested",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": "@@JSON[{\"SUB\": \"@@HTML<a href='#'>Lab &amp; Field</a> \", \"AMT2\": \"5\"}, {\"SUB\": \"R&amp;D\", \"AMT2\": \"7\"}, {\"SUB\": \"  spaced  \", \"AMT2\": \"9\"}, {\"SUB\": \"@@HTML\\u00a0<i>x</i>&lt;\\u00a0\", \"AMT2\": null}]"
+  },
+  {
+   "#": "2",
+   "RID": "nested2",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": "@@JSON[{\"SUB\": \"Plain\", \"AMT2\": 3}]"
+  },
+  {
+   "#": "3",
+   "RID": "amp",
+   "DEPT": "Crop &amp; Soil Sciences",
+   "DEPT2": "Crop & Soil Sciences",
+   "TITLE": "",
+   "NOTE": "",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "4",
+   "RID": "rawamp",
+   "DEPT": "Crop & Soil Sciences",
+   "DEPT2": "Crop &amp; Soil Sciences",
+   "TITLE": "",
+   "NOTE": "",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "5",
+   "RID": "pathob",
+   "DEPT": "196001-Population Health&amp;Pathobiology",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "6",
+   "RID": "ltgt",
+   "DEPT": "&lt;none&gt;",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "7",
+   "RID": "lonelt",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "Score &lt; 5",
+   "NOTE": "",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "8",
+   "RID": "pct",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "<1%",
+   "NOTE": "",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "9",
+   "RID": "bigtag",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "x &lt; 5 and y &gt; 3",
+   "NOTE": "",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "10",
+   "RID": "ltraw",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "a < b",
+   "NOTE": "",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "11",
+   "RID": "quotes",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "&quot;Quoted&quot; &amp; &apos;apos&apos;",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "12",
+   "RID": "unknown",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "&#65;&#x42;&#X43;&AMP;&eacute;&#;&amp",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "13",
+   "RID": "onepass",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "&amp;lt;b&amp;gt;bold&amp;lt;/b&amp;gt;",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "14",
+   "RID": "nbspent",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "&nbsp;Padded&nbsp;",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "15",
+   "RID": "nbspmid",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "Mid&nbsp;space",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "16",
+   "RID": "nbspraw",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "\u00a0NBSP raw\u00a0",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "17",
+   "RID": "nbsp160",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "&#160;Entity NBSP&#xA0;",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "18",
+   "RID": "bom",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "\ufeffBOM lead",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "19",
+   "RID": "pair",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "Emoji &#55357;&#56832; pair &#xD83D;&#xDE00;",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "20",
+   "RID": "lone",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "Lone &#55357; half &#56832;&#55357;",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "21",
+   "RID": "astral",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "Astral &#128512; &#65601;",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "22",
+   "RID": "hugedec",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "Huge &#99999999999999999999;|&#1234567890123456789;|&#1000000000000065;|&#000000000000000000065;|&#9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999;",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "23",
+   "RID": "hexround",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "Hex &#x20000000000001;|&#x20000000000003;|&#x1FFFFFFFFFFFFF;|&#x100000000000000000;|&#x0000000000000000041;|&#x2000000000000C1;|&#x2000000000000D0;|&#x2000000000000D1;|&#x2000000000000F0;",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "24",
+   "RID": "dollar",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "",
+   "AMT": "&#36;1,250.50",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "25",
+   "RID": "link",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "",
+   "AMT": "",
+   "LINK": "@@HTML<a href=\"x?a=1&amp;b=2\">R&amp;D Office</a>",
+   "SUBS": ""
+  },
+  {
+   "#": "26",
+   "RID": "athtml",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "",
+   "AMT": "",
+   "LINK": "&#64;&#64;HTML<b>Encoded marker</b>",
+   "SUBS": ""
+  },
+  {
+   "#": "27",
+   "RID": "quotedgt",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "",
+   "AMT": "",
+   "LINK": "<a title=\"x>y\">t</a>",
+   "SUBS": ""
+  },
+  {
+   "#": "28",
+   "RID": "comment",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "",
+   "AMT": "",
+   "LINK": "a<!-- c > d -->b",
+   "SUBS": ""
+  },
+  {
+   "#": "29",
+   "RID": "nul",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "NUL end\u0000",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "30",
+   "RID": "ideo",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "\u3000Ideographic\u2028",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "31",
+   "RID": "mongol",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "\u180eMongolian",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "32",
+   "RID": "ff",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "\fFormfeed\u000b",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  },
+  {
+   "#": "33",
+   "RID": "plain",
+   "DEPT": "Plant Biology",
+   "DEPT2": "",
+   "TITLE": "Plain title",
+   "NOTE": "plain note",
+   "AMT": "75",
+   "LINK": "@@HTML<a href=\"y\">Plain Link</a>",
+   "SUBS": ""
+  },
+  {
+   "#": "34",
+   "RID": "blank",
+   "DEPT": "",
+   "DEPT2": "",
+   "TITLE": "",
+   "NOTE": "",
+   "AMT": "",
+   "LINK": "",
+   "SUBS": ""
+  }
+ ],
+ "queries": [
+  {
+   "slug": "eqamp",
+   "q": "DEPT = 'Crop & Soil Sciences'",
+   "expect": [
+    "amp",
+    "rawamp"
+   ]
+  },
+  {
+   "slug": "containamp",
+   "q": "DEPT contains '& Soil'",
+   "expect": [
+    "amp",
+    "rawamp"
+   ]
+  },
+  {
+   "slug": "entitygone",
+   "q": "DEPT contains '&amp;'",
+   "expect": []
+  },
+  {
+   "slug": "regexamp",
+   "q": "DEPT = /Health&Patho/",
+   "expect": [
+    "pathob"
+   ]
+  },
+  {
+   "slug": "exactamp",
+   "q": "DEPT2 = //Crop & Soil Sciences//",
+   "expect": [
+    "amp",
+    "rawamp"
+   ]
+  },
+  {
+   "slug": "phamp",
+   "q": "DEPT = {DEPT2} and DEPT2 != empty",
+   "expect": [
+    "amp",
+    "rawamp"
+   ]
+  },
+  {
+   "slug": "ltgtempty",
+   "q": "DEPT = empty and RID = ltgt",
+   "expect": [
+    "ltgt"
+   ]
+  },
+  {
+   "slug": "lonelt",
+   "q": "TITLE contains 'Score < 5'",
+   "expect": [
+    "lonelt"
+   ]
+  },
+  {
+   "slug": "pct",
+   "q": "TITLE = '<1%'",
+   "expect": [
+    "pct"
+   ]
+  },
+  {
+   "slug": "bigtag",
+   "q": "TITLE = //x  3//",
+   "expect": [
+    "bigtag"
+   ]
+  },
+  {
+   "slug": "ltraw",
+   "q": "TITLE = 'a < b'",
+   "expect": [
+    "ltraw"
+   ]
+  },
+  {
+   "slug": "quotes",
+   "q": "NOTE contains \"& 'apos'\"",
+   "expect": [
+    "quotes"
+   ]
+  },
+  {
+   "slug": "unknown",
+   "q": "NOTE = //AB&#X43;&AMP;&eacute;&#;&amp//",
+   "expect": [
+    "unknown"
+   ]
+  },
+  {
+   "slug": "onepass",
+   "q": "NOTE contains '&lt;b&gt;bold'",
+   "expect": [
+    "onepass"
+   ]
+  },
+  {
+   "slug": "padded",
+   "q": "NOTE = //Padded//",
+   "expect": [
+    "nbspent"
+   ]
+  },
+  {
+   "slug": "nbspmid",
+   "q": "NOTE = //Mid space//",
+   "expect": [
+    "nbspmid"
+   ]
+  },
+  {
+   "slug": "nbspraw",
+   "q": "NOTE = //NBSP raw//",
+   "expect": [
+    "nbspraw"
+   ]
+  },
+  {
+   "slug": "nbsp160",
+   "q": "NOTE = //Entity NBSP//",
+   "expect": [
+    "nbsp160"
+   ]
+  },
+  {
+   "slug": "bom",
+   "q": "NOTE = //BOM lead//",
+   "expect": [
+    "bom"
+   ]
+  },
+  {
+   "slug": "pair",
+   "q": "NOTE contains 'Emoji \ud83d\ude00 pair \ud83d\ude00'",
+   "expect": [
+    "pair"
+   ]
+  },
+  {
+   "slug": "lone",
+   "q": "NOTE contains 'Lone  half'",
+   "expect": []
+  },
+  {
+   "slug": "astral",
+   "q": "NOTE contains 'Astral \uf600 A'",
+   "expect": [
+    "astral"
+   ]
+  },
+  {
+   "slug": "nul",
+   "q": "NOTE = //NUL end//",
+   "expect": []
+  },
+  {
+   "slug": "ideo",
+   "q": "NOTE = //Ideographic//",
+   "expect": [
+    "ideo"
+   ]
+  },
+  {
+   "slug": "mongol",
+   "q": "NOTE = //Mongolian//",
+   "expect": []
+  },
+  {
+   "slug": "ff",
+   "q": "NOTE = //Formfeed//",
+   "expect": [
+    "ff"
+   ]
+  },
+  {
+   "slug": "dollar",
+   "q": "AMT > 1000",
+   "expect": [
+    "dollar"
+   ]
+  },
+  {
+   "slug": "link",
+   "q": "LINK = 'R&D Office'",
+   "expect": [
+    "link"
+   ]
+  },
+  {
+   "slug": "linkglobal",
+   "q": "'R&D Office'",
+   "expect": [
+    "link"
+   ]
+  },
+  {
+   "slug": "globalneg",
+   "q": "!= 'Crop & Soil Sciences'",
+   "expect": [
+    "nested",
+    "nested2",
+    "pathob",
+    "ltgt",
+    "lonelt",
+    "pct",
+    "bigtag",
+    "ltraw",
+    "quotes",
+    "unknown",
+    "onepass",
+    "nbspent",
+    "nbspmid",
+    "nbspraw",
+    "nbsp160",
+    "bom",
+    "pair",
+    "lone",
+    "astral",
+    "hugedec",
+    "hexround",
+    "dollar",
+    "link",
+    "athtml",
+    "quotedgt",
+    "comment",
+    "nul",
+    "ideo",
+    "mongol",
+    "ff",
+    "plain",
+    "blank"
+   ]
+  },
+  {
+   "slug": "athtml",
+   "q": "LINK = 'Encoded marker'",
+   "expect": [
+    "athtml"
+   ]
+  },
+  {
+   "slug": "quotedgt",
+   "q": "LINK contains 'y\">t'",
+   "expect": [
+    "quotedgt"
+   ]
+  },
+  {
+   "slug": "comment",
+   "q": "LINK = //a d -->b//",
+   "expect": [
+    "comment"
+   ]
+  },
+  {
+   "slug": "nesthtml",
+   "q": "SUB = 'Lab &amp; Field'",
+   "expect": [
+    "nested"
+   ]
+  },
+  {
+   "slug": "nestraw",
+   "q": "SUB = 'R&amp;D'",
+   "expect": [
+    "nested"
+   ]
+  },
+  {
+   "slug": "nestnodec",
+   "q": "SUB = 'R&D'",
+   "expect": []
+  },
+  {
+   "slug": "nestspaced",
+   "q": "SUB = //  spaced  //",
+   "expect": [
+    "nested"
+   ]
+  },
+  {
+   "slug": "nestnbsp",
+   "q": "SUB = //x&lt;//",
+   "expect": [
+    "nested"
+   ]
+  },
+  {
+   "slug": "rowhtml",
+   "q": "__ROW SUB = 'Lab &amp; Field' and AMT2 = 5",
+   "expect": [
+    "nested"
+   ]
+  },
+  {
+   "slug": "rowhtmlneg",
+   "q": "__ROW SUB = 'Lab &amp; Field' and AMT2 = 7",
+   "expect": []
+  },
+  {
+   "slug": "nested2",
+   "q": "AMT2 = 3",
+   "expect": [
+    "nested2"
+   ]
+  },
+  {
+   "slug": "plaineq",
+   "q": "DEPT = 'Plant Biology'",
+   "expect": [
+    "plain"
+   ]
+  },
+  {
+   "slug": "plainlink",
+   "q": "LINK = 'Plain Link'",
+   "expect": [
+    "plain"
+   ]
+  }
+ ]
+}

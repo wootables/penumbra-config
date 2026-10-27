@@ -6,7 +6,7 @@
                     {
                         "name":  "args: two fields parse with defaults",
                         "pass":  true,
-                        "detail":  "{\"fields\":[{\"label\":\"College\",\"col\":\"COLLEGE\",\"mode\":\"in\",\"top\":12,\"az\":false,\"range\":false,\"blank\":false,\"list\":false},{\"label\":\"Fiscal Year\",\"col\":\"FY\",\"mode\":\"in\",\"top\":12,\"az\":true,\"range\":false,\"blank\":false,\"list\":false}],\"mods\":[],\"error\":null}"
+                        "detail":  "{\"fields\":[{\"label\":\"College\",\"col\":\"COLLEGE\",\"mode\":\"in\",\"top\":12,\"az\":false,\"range\":false,\"blank\":false,\"list\":false,\"split\":false},{\"label\":\"Fiscal Year\",\"col\":\"FY\",\"mode\":\"in\",\"top\":12,\"az\":true,\"range\":false,\"blank\":false,\"list\":false,\"split\":false}],\"mods\":[],\"error\":null}"
                     },
                     {
                         "name":  "args: bare words are keywords, case-forgiven, deduped",
@@ -41,12 +41,12 @@
                     {
                         "name":  "args: exclude and top=N options",
                         "pass":  true,
-                        "detail":  "{\"fields\":[{\"label\":\"Status\",\"col\":\"STATUS\",\"mode\":\"ex\",\"top\":3,\"az\":false,\"range\":false,\"blank\":false,\"list\":false},{\"label\":\"X\",\"col\":\"Y\",\"mode\":\"in\",\"top\":0,\"az\":false,\"range\":false,\"blank\":false,\"list\":false}],\"mods\":[],\"error\":null}"
+                        "detail":  "{\"fields\":[{\"label\":\"Status\",\"col\":\"STATUS\",\"mode\":\"ex\",\"top\":3,\"az\":false,\"range\":false,\"blank\":false,\"list\":false,\"split\":false},{\"label\":\"X\",\"col\":\"Y\",\"mode\":\"in\",\"top\":0,\"az\":false,\"range\":false,\"blank\":false,\"list\":false,\"split\":false}],\"mods\":[],\"error\":null}"
                     },
                     {
                         "name":  "args: an unknown option is a loud error",
                         "pass":  true,
-                        "detail":  "unknown option foo on Status (expected exclude, az, top=N, range, blank or list)"
+                        "detail":  "unknown option foo on Status (expected exclude, az, top=N, range, blank, list or split)"
                     },
                     {
                         "name":  "args: the column is upper-cased",
@@ -326,7 +326,7 @@
                     {
                         "name":  "render: two groups with names and chips",
                         "pass":  true,
-                        "detail":  "\u003cdiv class=\"pnb-fstrip\" role=\"group\" aria-label=\"Filters\"\u003e\u003cdiv class=\"pnb-fs-group\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"12\"\u003e\u003cspan class=\"pnb-fs-name\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003cspan class=\"pnb-fs-chips\"\u003e\u003cbutton type=\"button\" class=\"pnb-fs-chip\" aria-pressed=\"false\" data-fs-val=\""
+                        "detail":  "\u003cdiv class=\"pnb-fstrip\" role=\"group\" aria-label=\"Filters\"\u003e\u003cdiv class=\"pnb-fs-group\" role=\"group\" aria-labelledby=\"pnbFsName1\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"12\"\u003e\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName1\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003cspan class=\"pnb-fs-chips\"\u003e\u003cbutton type=\"butt"
                     },
                     {
                         "name":  "render: FY chips in az order",
@@ -351,7 +351,7 @@
                     {
                         "name":  "render: the pressed chip is read from the box, unclicked",
                         "pass":  true,
-                        "detail":  "\u003cdiv class=\"pnb-fs-group\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"12\"\u003e\u003cspan class=\"pnb-fs-name\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003cspan class=\"pnb-fs-chips\"\u003e\u003cbutton type=\"button\" class=\"pnb-f"
+                        "detail":  "\u003cdiv class=\"pnb-fs-group\" role=\"group\" aria-labelledby=\"pnbFsName3\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"12\"\u003e\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName3\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003csp"
                     },
                     {
                         "name":  "render: a selected group gets a clear button and the strip a Clear all",
@@ -386,12 +386,12 @@
                     {
                         "name":  "render: by default the label is in the DOM for screen readers and no label class is set",
                         "pass":  true,
-                        "detail":  "\u003cdiv class=\"pnb-fs-group\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"12\"\u003e\u003cspan class=\"pnb-fs-name\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003cspan class=\"pnb-fs-c"
+                        "detail":  "\u003cdiv class=\"pnb-fs-group\" role=\"group\" aria-labelledby=\"pnbFsName8\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"12\"\u003e\u003cspan class=\"pnb-fs-name\" id=\"pnbFs"
                     },
                     {
                         "name":  "render: an exclude group carries both marker forms and a screen-reader suffix",
                         "pass":  true,
-                        "detail":  "\u003cspan class=\"pnb-fs-name\" title=\"STATUS\"\u003eStatus\u003cspan class=\"pnb-fs-sr\"\u003e is not\u003c/span\u003e\u003c/span\u003e\u003cspan class=\"pnb-fs-not\" aria-hidden=\"true\"\u003e\u003cspan class=\"pnb-fs-not-long\"\u003eis not\u003c/span\u003e\u003cspan class=\"pnb-fs-n"
+                        "detail":  "\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName9\" title=\"STATUS\"\u003eStatus\u003cspan class=\"pnb-fs-sr\"\u003e is not\u003c/span\u003e\u003c/span\u003e\u003cspan class=\"pnb-fs-not\" aria-hidden=\"true\"\u003e\u003cspan class=\"pnb-fs-not-long\"\u003eis not\u003c/span\u003e\u003cspan"
                     },
                     {
                         "name":  "render: columns out of range errors loudly",
@@ -461,7 +461,7 @@
                     {
                         "name":  "click: the re-rendered chip reads as pressed",
                         "pass":  true,
-                        "detail":  "\u003cdiv class=\"pnb-fs-group\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"12\"\u003e\u003cspan class=\"pnb-fs-name\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003cspan class=\"pnb-fs-chips\"\u003e\u003cbutton type=\"button\" class=\"pnb-f"
+                        "detail":  "\u003cdiv class=\"pnb-fs-group\" role=\"group\" aria-labelledby=\"pnbFsName16\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"12\"\u003e\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName16\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003c"
                     },
                     {
                         "name":  "click: a second chip in the group joins the alternation",
@@ -511,7 +511,7 @@
                     {
                         "name":  "sync: a hand-typed condition presses its chip and lifts the pause",
                         "pass":  true,
-                        "detail":  "\u003cdiv class=\"pnb-fs-group\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"12\"\u003e\u003cspan class=\"pnb-fs-name\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003cspan class=\"pnb-fs-chips\"\u003e\u003cbutton type=\"button\" class=\"pnb-f"
+                        "detail":  "\u003cdiv class=\"pnb-fs-group\" role=\"group\" aria-labelledby=\"pnbFsName32\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"12\"\u003e\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName32\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003c"
                     },
                     {
                         "name":  "sync: clearing the box by hand releases every chip",
@@ -671,7 +671,7 @@
                     {
                         "name":  "toggle: a condition holding an or is refused",
                         "pass":  true,
-                        "detail":  "[toggle_switch: filter| takes conditions joined with and - an or cannot be combined with the rest of the search: STATUS = Active or FY = 2,025]"
+                        "detail":  "[toggle_switch: filter| takes conditions joined with and - an or cannot be combined with the rest of the filter: STATUS = Active or FY = 2,025]"
                     },
                     {
                         "name":  "toggle: a condition carrying __ROW is refused",
@@ -791,12 +791,12 @@
                     {
                         "name":  "exec: ... and says why in a notice",
                         "pass":  true,
-                        "detail":  "NOTICE: The search box holds an \"or\" query, so filter cannot add or remove one condition. Clear the search first.×"
+                        "detail":  "NOTICE: The filter box holds an \"or\" query, so filter cannot add or remove one condition. Clear the filter first.×"
                     },
                     {
                         "name":  "range: the range option makes a range field",
                         "pass":  true,
-                        "detail":  "{\"fields\":[{\"label\":\"Amount\",\"col\":\"AMOUNT\",\"mode\":\"in\",\"top\":12,\"az\":false,\"range\":true,\"blank\":false,\"list\":false}],\"mods\":[],\"error\":null}"
+                        "detail":  "{\"fields\":[{\"label\":\"Amount\",\"col\":\"AMOUNT\",\"mode\":\"in\",\"top\":12,\"az\":false,\"range\":true,\"blank\":false,\"list\":false,\"split\":false}],\"mods\":[],\"error\":null}"
                     },
                     {
                         "name":  "range: range and exclude together are refused",
@@ -821,7 +821,7 @@
                     {
                         "name":  "range: the unknown-option error names range",
                         "pass":  true,
-                        "detail":  "unknown option between on Amount (expected exclude, az, top=N, range, blank or list)"
+                        "detail":  "unknown option between on Amount (expected exclude, az, top=N, range, blank, list or split)"
                     },
                     {
                         "name":  "bound: currency and thousands become plain digits",
@@ -1031,7 +1031,7 @@
                     {
                         "name":  "render: a range field is a pair of boxes, no chips",
                         "pass":  true,
-                        "detail":  "\u003cdiv class=\"pnb-fs-group pnb-fs-range\" data-fs-col=\"AMOUNT\" data-fs-mode=\"in\" data-fs-range=\"1\" data-fs-kind=\"number\"\u003e\u003cspan class=\"pnb-fs-name\" title=\"AMOUNT\"\u003eAmount\u003c/span\u003e\u003cspan class=\"pnb-fs-rangebox"
+                        "detail":  "\u003cdiv class=\"pnb-fs-group pnb-fs-range\" role=\"group\" aria-labelledby=\"pnbFsName46\" data-fs-col=\"AMOUNT\" data-fs-mode=\"in\" data-fs-range=\"1\" data-fs-kind=\"number\"\u003e\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName"
                     },
                     {
                         "name":  "render: a number range is two text boxes with the data span as hints",
@@ -1166,17 +1166,17 @@
                     {
                         "name":  "blank: the option marks the field",
                         "pass":  true,
-                        "detail":  "{\"fields\":[{\"label\":\"College\",\"col\":\"COLLEGE\",\"mode\":\"in\",\"top\":12,\"az\":false,\"range\":false,\"blank\":true,\"list\":false}],\"mods\":[],\"error\":null}"
+                        "detail":  "{\"fields\":[{\"label\":\"College\",\"col\":\"COLLEGE\",\"mode\":\"in\",\"top\":12,\"az\":false,\"range\":false,\"blank\":true,\"list\":false,\"split\":false}],\"mods\":[],\"error\":null}"
                     },
                     {
                         "name":  "blank: a chip field is not blank by default",
                         "pass":  true,
-                        "detail":  "{\"label\":\"College\",\"col\":\"COLLEGE\",\"mode\":\"in\",\"top\":12,\"az\":false,\"range\":false,\"blank\":false,\"list\":false}"
+                        "detail":  "{\"label\":\"College\",\"col\":\"COLLEGE\",\"mode\":\"in\",\"top\":12,\"az\":false,\"range\":false,\"blank\":false,\"list\":false,\"split\":false}"
                     },
                     {
                         "name":  "blank: goes with exclude and top=N",
                         "pass":  true,
-                        "detail":  "{\"fields\":[{\"label\":\"Status\",\"col\":\"STATUS\",\"mode\":\"ex\",\"top\":2,\"az\":false,\"range\":false,\"blank\":true,\"list\":false}],\"mods\":[],\"error\":null}"
+                        "detail":  "{\"fields\":[{\"label\":\"Status\",\"col\":\"STATUS\",\"mode\":\"ex\",\"top\":2,\"az\":false,\"range\":false,\"blank\":true,\"list\":false,\"split\":false}],\"mods\":[],\"error\":null}"
                     },
                     {
                         "name":  "blank: refused on a range (a range has no chips)",
@@ -1186,7 +1186,7 @@
                     {
                         "name":  "blank: the unknown-option error names blank",
                         "pass":  true,
-                        "detail":  "unknown option empty on College (expected exclude, az, top=N, range, blank or list)"
+                        "detail":  "unknown option empty on College (expected exclude, az, top=N, range, blank, list or split)"
                     },
                     {
                         "name":  "state: the empty alternative is a value on a blank field",
@@ -1296,7 +1296,7 @@
                     {
                         "name":  "click: the re-rendered chip reads as pressed, and only it",
                         "pass":  true,
-                        "detail":  "\u003cdiv class=\"pnb-fs-group\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"3\" data-fs-blank=\"1\"\u003e\u003cspan class=\"pnb-fs-name\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003cspan class=\"pnb-fs-chips\"\u003e\u003cbutton type=\"but"
+                        "detail":  "\u003cdiv class=\"pnb-fs-group\" role=\"group\" aria-labelledby=\"pnbFsName80\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"3\" data-fs-blank=\"1\"\u003e\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName80\" title=\"COLLEGE"
                     },
                     {
                         "name":  "click: the other group counts what the blank leaves (row 13 is FY 2025)",
@@ -1331,7 +1331,7 @@
                     {
                         "name":  "typed: a blank condition on a strip without the option presses a (blank) chip that is only there while pressed",
                         "pass":  true,
-                        "detail":  "\u003cspan class=\"pnb-fs-name\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003cspan class=\"pnb-fs-chips\"\u003e\u003cbutton type=\"button\" class=\"pnb-fs-chip\" aria-pressed=\"false\" data-fs-val=\"Eng\" title=\"Eng\"\u003e\u003cspan class=\"pnb-fs-v\"\u003eEng\u003c/span\u003e\u003cspan class=\"pnb-fs-n\"\u003e6\u003c/span\u003e\u003c/button\u003e\u003cbutton type=\"button\" class=\"pnb-fs-chip\" aria-pres"
+                        "detail":  "\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName89\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003cspan class=\"pnb-fs-chips\"\u003e\u003cbutton type=\"button\" class=\"pnb-fs-chip\" aria-pressed=\"false\" data-fs-val=\"Eng\" title=\"Eng\"\u003e\u003cspan class=\"pnb-fs-v\"\u003eEng\u003c/span\u003e\u003cspan class=\"pnb-fs-n\"\u003e6\u003c/span\u003e\u003c/button\u003e\u003cbutton type=\"button\" class=\"pnb-f"
                     },
                     {
                         "name":  "typed: a click joins the value to it (one condition on the column, never two)",
@@ -1371,7 +1371,7 @@
                     {
                         "name":  "pivot: the re-rendered chip reads as pressed, with the counts of the source rows",
                         "pass":  true,
-                        "detail":  "\u003cdiv class=\"pnb-fs-group\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"12\"\u003e\u003cspan class=\"pnb-fs-name\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003cspan class=\"pnb-fs-chips\"\u003e\u003cbutton type=\"button\" class=\"pnb-f"
+                        "detail":  "\u003cdiv class=\"pnb-fs-group\" role=\"group\" aria-labelledby=\"pnbFsName94\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"12\"\u003e\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName94\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003c"
                     },
                     {
                         "name":  "pivot: a hand-typed source condition rebuilds the pivot and presses its chip",
@@ -1381,7 +1381,7 @@
                     {
                         "name":  "pivot: ... the sync reads it",
                         "pass":  true,
-                        "detail":  "\u003cdiv class=\"pnb-fs-group\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"12\"\u003e\u003cspan class=\"pnb-fs-name\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003cspan class=\"pnb-fs-chips\"\u003e\u003cbutton type=\"button\" class=\"pnb-f"
+                        "detail":  "\u003cdiv class=\"pnb-fs-group\" role=\"group\" aria-labelledby=\"pnbFsName96\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"12\"\u003e\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName96\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003c"
                     },
                     {
                         "name":  "pivot: Clear all rebuilds the whole pivot",
@@ -1401,7 +1401,7 @@
                     {
                         "name":  "pivot: the chip reads as pressed through the __SRC prefix",
                         "pass":  true,
-                        "detail":  "\u003cdiv class=\"pnb-fs-group\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"12\"\u003e\u003cspan class=\"pnb-fs-name\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003cspan class=\"pnb-fs-chips\"\u003e\u003cbutton type=\"button\" class=\"pnb-f"
+                        "detail":  "\u003cdiv class=\"pnb-fs-group\" role=\"group\" aria-labelledby=\"pnbFsName102\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"12\"\u003e\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName102\" title=\"COLLEGE\"\u003eCollege\u003c/span"
                     },
                     {
                         "name":  "pivot: a second chip joins under the one __SRC (field order)",
@@ -1421,7 +1421,7 @@
                     {
                         "name":  "list: the option parses (list true, the default top untouched)",
                         "pass":  true,
-                        "detail":  "{\"fields\":[{\"label\":\"Sponsor\",\"col\":\"SPONSOR\",\"mode\":\"in\",\"top\":12,\"az\":false,\"range\":false,\"blank\":false,\"list\":true}],\"mods\":[],\"error\":null}"
+                        "detail":  "{\"fields\":[{\"label\":\"Sponsor\",\"col\":\"SPONSOR\",\"mode\":\"in\",\"top\":12,\"az\":false,\"range\":false,\"blank\":false,\"list\":true,\"split\":false}],\"mods\":[],\"error\":null}"
                     },
                     {
                         "name":  "list: top=N is refused on a list (there is no fold)",
@@ -1436,7 +1436,7 @@
                     {
                         "name":  "list: the unknown-option message names list",
                         "pass":  true,
-                        "detail":  "unknown option foo on Sponsor (expected exclude, az, top=N, range, blank or list)"
+                        "detail":  "unknown option foo on Sponsor (expected exclude, az, top=N, range, blank, list or split)"
                     },
                     {
                         "name":  "list: the groups hold every value with its count (31 rows: S01..S08 twice, the blank cells last)",
@@ -1446,7 +1446,7 @@
                     {
                         "name":  "list: the group is a list with a find box and every value as a row, none folded, no +n more",
                         "pass":  true,
-                        "detail":  "\u003cspan class=\"pnb-fs-name\" title=\"SPONSOR\"\u003eSponsor\u003c/span\u003e\u003cspan class=\"pnb-fs-listbox\"\u003e\u003cinput type=\"search\" class=\"pnb-fs-find\" value=\"\" placeholder=\"Type to find\" aria-label=\"Find a Sponsor value\" autocomplete=\"off\" spellcheck=\"false\"\u003e\u003cspan class=\"pnb-fs-chips\"\u003e\u003cbutton type=\"button\" class=\"pnb-fs-chi"
+                        "detail":  "\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName108\" title=\"SPONSOR\"\u003eSponsor\u003c/span\u003e\u003cspan class=\"pnb-fs-listbox\"\u003e\u003cinput type=\"search\" class=\"pnb-fs-find\" value=\"\" placeholder=\"Type to find\" aria-label=\"Find a Sponsor value\" autocomplete=\"off\" spellcheck=\"false\"\u003e\u003cspan class=\"pnb-fs-chips\"\u003e\u003cbutton type=\"button\""
                     },
                     {
                         "name":  "list: the rows keep the count order, the (blank) row last, with their counts",
@@ -1456,7 +1456,7 @@
                     {
                         "name":  "list: the plain group beside it is still chips",
                         "pass":  true,
-                        "detail":  "\u003cspan class=\"pnb-fs-name\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003cspan class=\"pnb-fs-chips\"\u003e\u003cbutton type=\"button\" class=\"pnb-fs-c"
+                        "detail":  "\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName109\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003cspan class=\"pnb-fs-chips\"\u003e\u003cbutton type=\"butto"
                     },
                     {
                         "name":  "list: the find box names its field for a screen reader and keeps the browser out of it",

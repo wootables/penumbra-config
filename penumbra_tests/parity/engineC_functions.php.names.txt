@@ -73,6 +73,10 @@ pivot_normalize_bin_edges
 pivot_bins_labels
 pivot_bins_bucket_label
 pivot_parse_field_token
+penumbra_group_delim_def
+penumbra_delim_decode_entities
+penumbra_group_delim_pieces
+penumbra_grouped_row_total
 pivot_field_base
 penumbra_group_level0
 penumbra_group_levels
@@ -80,6 +84,7 @@ penumbra_group_rows_nested
 penumbra_normalize_group_limit
 penumbra_apply_group_limit
 _xlsx_subtree_count
+penumbra_grouped_row_ids
 penumbra_group_is_nested
 penumbra_group_ancestor_index
 penumbra_group_tree

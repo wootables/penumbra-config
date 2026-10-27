@@ -308,7 +308,7 @@
     assert('range: top=N on a range is refused', /az and top=N order and fold chips/.test(F.parseArgs(['Amount|AMOUNT|range|top=3']).error || ''), F.parseArgs(['Amount|AMOUNT|range|top=3']).error);
     assert('range: az on a range is refused', /az and top=N order and fold chips/.test(F.parseArgs(['Amount|AMOUNT|az|range']).error || ''), '');
     assert('range: a chip field is not a range', F.parseArgs(['College|COLLEGE']).fields[0].range === false, '');
-    assert('range: the unknown-option error names range', /exclude, az, top=N, range, blank or list/.test(F.parseArgs(['Amount|AMOUNT|between']).error || ''), F.parseArgs(['Amount|AMOUNT|between']).error);
+    assert('range: the unknown-option error names range', /exclude, az, top=N, range, blank, list or split/.test(F.parseArgs(['Amount|AMOUNT|between']).error || ''), F.parseArgs(['Amount|AMOUNT|between']).error);
     // J.2 bounds
     eq('bound: currency and thousands become plain digits', T.bound('$1,250.50', 'number'), '1250.50');
     eq('bound: an accounting negative', T.bound('(500)', 'number'), '-500');
@@ -466,7 +466,7 @@
     var p2 = F.parseArgs(['Status|STATUS|exclude|blank|top=2']);
     assert('blank: goes with exclude and top=N', !p2.error && p2.fields[0].blank === true && p2.fields[0].mode === 'ex' && p2.fields[0].top === 2, JSON.stringify(p2));
     assert('blank: refused on a range (a range has no chips)', /blank adds a chip, and Amount is a range/.test(F.parseArgs(['Amount|AMOUNT|range|blank']).error || ''), F.parseArgs(['Amount|AMOUNT|range|blank']).error);
-    assert('blank: the unknown-option error names blank', /top=N, range, blank or list/.test(F.parseArgs(['College|COLLEGE|empty']).error || ''), F.parseArgs(['College|COLLEGE|empty']).error);
+    assert('blank: the unknown-option error names blank', /top=N, range, blank, list or split/.test(F.parseArgs(['College|COLLEGE|empty']).error || ''), F.parseArgs(['College|COLLEGE|empty']).error);
     // K.2 state and compose
     var BF = [{ label: 'College', col: 'COLLEGE', mode: 'in', top: 12, az: false, range: false, blank: true }];
     var NF = [{ label: 'College', col: 'COLLEGE', mode: 'in', top: 12, az: false, range: false, blank: false }];
@@ -670,7 +670,7 @@
     assert('list: the option parses (list true, the default top untouched)', !p1.error && p1.fields[0].list === true && p1.fields[0].top === 12, JSON.stringify(p1));
     assert('list: top=N is refused on a list (there is no fold)', /top=N folds chips/.test(F.parseArgs(['Sponsor|SPONSOR|list|top=3']).error || ''), F.parseArgs(['Sponsor|SPONSOR|list|top=3']).error);
     assert('list: range and list together are refused', /both a range and a list/.test(F.parseArgs(['Amount|AMOUNT|range|list']).error || ''), F.parseArgs(['Amount|AMOUNT|range|list']).error);
-    assert('list: the unknown-option message names list', /blank or list/.test(F.parseArgs(['Sponsor|SPONSOR|foo']).error || ''), F.parseArgs(['Sponsor|SPONSOR|foo']).error);
+    assert('list: the unknown-option message names list', /blank, list or split/.test(F.parseArgs(['Sponsor|SPONSOR|foo']).error || ''), F.parseArgs(['Sponsor|SPONSOR|foo']).error);
     var SPEC = { fields: F.parseArgs(ARGS).fields, mods: [] };
     var g0 = vals(F.groups(SPEC, ''), 'SPONSOR');
     assert('list: the groups hold every value with its count (31 rows: S01..S08 twice, the blank cells last)', g0.length === 31 && g0[0][0] === 'S01' && g0[0][1] === 2 && g0[8][0] === 'S09' && g0[8][1] === 1 && g0[30][0] === '' && g0[30][1] === 2, JSON.stringify(g0.slice(0, 3)) + ' ... ' + JSON.stringify(g0.slice(-2)));

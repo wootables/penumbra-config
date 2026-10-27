@@ -2828,6 +2828,125 @@
       R.info.shapes = { n: [s1.split('|').length, s2.split('|').length], s1: s1.slice(0, 240), s2: s2.slice(0, 240) };
       R.chk.ncPick = !!g1 && asked.length === 0 && !!s1 && s1 === s2 && tops().length > 5;
     },
+    // (2026-10-26, cstat) Column stats in the grouped view (H_GROUP) with a search typed there - it marks the grouped rows
+    // alone, never the flat table's: the rows it keeps (a column's counts, a number's spread, a journal toggle's boxes), as
+    // with a search typed before grouping (a guard: live counts that one right) and with none (a guard: every row, read in
+    // the groups though all are closed); grouped by SUB_NAME (a row sits in the group of each name its table holds): each
+    // row once, and a row whose copy in one group is hidden (a group a summary condition hides marks its own rows) still
+    // counted by its copy in another, first copy or last.
+    ggstat: async function () {
+      var GR = '#groupedResultsContainer table tbody tr';
+      function ixOf(tr) { var a = tr.getAttribute('data-row-index'), h; if (a !== null) return parseInt(a, 10); h = tr.querySelector("td[data-column='#']"); return h ? parseInt(h.textContent, 10) - 1 : NaN; }
+      // the grouped rows the search keeps: their rows, each once, and every copy
+      function keptG() {
+        var seen = Object.create(null), ix = [], copies = [];
+        Array.prototype.forEach.call(document.querySelectorAll(GR), function (tr) {
+          var i = ixOf(tr);
+          if (isNaN(i) || i < 0 || !window.__rowsFixture[i] || tr.classList.contains('search-hidden')) return;
+          copies.push(tr);
+          if (!seen[i]) { seen[i] = 1; ix.push(i); }
+        });
+        return { ix: ix, copies: copies };
+      }
+      function flatHidden() { return document.querySelectorAll('#resultsTable > tbody > tr.search-hidden').length; }
+      function flatKept() { return Array.prototype.filter.call(document.querySelectorAll('#resultsTable > tbody > tr'), function (tr) { var i = ixOf(tr); return i >= 0 && !!window.__rowsFixture[i] && !tr.classList.contains('search-hidden'); }).length; }
+      function headFor(n) { return 'Over the ' + n.toLocaleString() + (n === 1 ? ' row' : ' rows') + ' the filter keeps'; }
+      // a grouped heading of the column, one on screen where there is one (a closed group's, a List's other group's, else)
+      function gthShown(col) {
+        var all = document.querySelectorAll('#groupedResultsContainer table thead th[data-colname="' + col + '"]');
+        for (var i = 0; i < all.length; i++) { if (all[i].getClientRects().length) return all[i]; }
+        return all[0] || null;
+      }
+      // its Column stats list: the count heading and the facts
+      function statsG(col) {
+        closeMenu();
+        var th = gthShown(col), o = null;
+        if (th && rclick(th) && sub('stats') && subPanel()) {
+          var hs = Array.prototype.map.call(subPanel().querySelectorAll('.pnb-hm-head'), function (e) { return e.textContent; });
+          o = { head: hs.filter(function (t) { return /^Over the |^No rows/.test(t); })[0] || '', inf: infoMap() };
+        }
+        closeMenu();
+        return o;
+      }
+      async function marked(want) { return await until(function () { return !!document.querySelector(GR + '.search-hidden') === want; }, 8000); }
+      async function cleared() { snipAction('search', ''); var ok = await until(function () { return !flatHidden() && !document.querySelector(GR + '.search-hidden') && keptG().ix.length === 300; }, 10000); await sleep(400); return ok; }
+      var openIx = [];
+      window.__rowsFixture.forEach(function (r, i) { if (r.V_STATUS === 'Open') openIx.push(i); });
+      var openN = openIx.length;
+      // no search: every row, read in the groups though every group is closed
+      $('#collapseAllGroups').trigger('click');
+      var shut = await until(function () { return tops().length > 1 && tops().every(function (w) { return !w.classList.contains('open'); }); }, 5000);
+      await sleep(250);
+      var s0 = statsG('V_STATUS');
+      R.info.csAll = { s: s0, groups: tops().length, closed: shut, gcol: A() && A().groupingColumn(), list: glOn() };
+      R.chk.csAll = shut && !!s0 && s0.head === headFor(300) && s0.inf['With a value'] === '300';
+      $('#expandAllGroups').trigger('click');
+      await sleep(250);
+      // a search typed while grouped (Filter to "Open" adds it to the box): the grouped rows marked, the flat table's not
+      var fa = A().filterAdd('V_STATUS', 'Open', false);
+      var mk = await marked(true);
+      await sleep(500);
+      var k1 = keptG(), s1 = statsG('V_STATUS');
+      R.info.csCount = { added: fa, marked: mk, search: searchVal(), open: openN, kept: k1.ix.length, flatHidden: flatHidden(), s: s1 };
+      R.chk.csCount = mk && openN > 0 && openN < 300 && k1.ix.length === openN && flatHidden() === 0 && !!s1 && s1.head === headFor(openN)
+        && s1.inf['With a value'] === String(openN) && s1.inf['Unique'] === '1' && s1.inf['Empty'] === '0';
+      // a number's spread over those rows
+      var amts = openIx.map(function (i) { return parseFloat(String(window.__rowsFixture[i].V_AMOUNT).replace(/[$,]/g, '')); }).sort(function (x, y) { return x - y; });
+      var aSum = 0;
+      amts.forEach(function (v) { aSum += v; });
+      var nf = function (x) { return Number(x).toLocaleString(undefined, { maximumFractionDigits: 2 }); };
+      var sA = statsG('V_AMOUNT');
+      R.info.csNum = { got: sA, want: [nf(amts[0]), nf(amts[amts.length - 1]), nf(aSum)] };
+      R.chk.csNum = mk && amts.length === openN && !!sA && sA.head === headFor(openN) && sA.inf['Smallest'] === nf(amts[0])
+        && sA.inf['Largest'] === nf(amts[amts.length - 1]) && sA.inf['Total'] === nf(aSum);
+      // a journal toggle's boxes on those rows (the two hooks main.js asks stubbed, as mflat's are)
+      var P = window.Penumbra, keepF = P.journalFriendlyCol, keepV = P.journalSearchColumnValue;
+      var jOn = openIx.filter(function (i) { return (parseInt(String(window.__rowsFixture[i].V_ID).slice(3), 10) - 1001) % 3 === 0; }).length;
+      P.journalFriendlyCol = function (c) { return c === 'V_STATUS' ? 'Done' : (keepF ? keepF(c) : null); };
+      P.journalSearchColumnValue = function (m, up) {
+        if (up === 'V_STATUS') return { kind: 'toggle', on: (parseInt(String(m.get('V_ID')).slice(3), 10) - 1001) % 3 === 0 };
+        return keepV ? keepV(m, up) : null;
+      };
+      var sJ = null;
+      try { sJ = statsG('V_STATUS'); } finally { P.journalFriendlyCol = keepF; P.journalSearchColumnValue = keepV; }
+      R.info.csJournal = { got: sJ, want: [jOn, openN - jOn] };
+      R.chk.csJournal = mk && jOn > 0 && jOn < openN && !!sJ && sJ.inf['Checked'] === String(jOn) && sJ.inf['Unchecked'] === String(openN - jOn);
+      // a search typed BEFORE grouping (a guard: live counts it right): the groups are drawn from the rows it keeps
+      var c1 = await cleared();
+      var fl = await flat();
+      A().filterAdd('V_STATUS', 'Open', false);
+      var fm = await until(function () { return flatKept() === openN; }, 8000);
+      await sleep(400);
+      var rg = await oneClick('H_GROUP') && await until(function () { return keptG().ix.length === openN; }, 8000);
+      await sleep(400);
+      var k2 = keptG(), s2 = statsG('V_STATUS');
+      R.info.csBefore = { cleared: c1, flat: fl, flatMarked: fm, regrouped: rg, kept: k2.ix.length, flatHidden: flatHidden(), s: s2 };
+      R.chk.csBefore = fl && fm && rg && k2.ix.length === openN && !!s2 && s2.head === headFor(openN) && s2.inf['With a value'] === String(openN);
+      // grouped by SUB_NAME, a search typed there: each row once, though it sits in the group of every name its table holds
+      var c2 = await cleared();
+      var gs = await oneClick('SUB_NAME') && await until(function () { return keptG().ix.length === 300 && tops().length > 6; }, 10000);
+      await sleep(400);
+      A().filterAdd('V_STATUS', 'Open', false);
+      var mk3 = await marked(true);
+      await sleep(500);
+      var k3 = keptG(), s3 = statsG('V_STATUS');
+      R.info.csOnce = { cleared: c2, grouped: gs, gcol: A() && A().groupingColumn(), groups: tops().length, list: glOn(), marked: mk3,
+        kept: k3.ix.length, copies: k3.copies.length, flatHidden: flatHidden(), s: s3 };
+      R.chk.csOnce = gs && mk3 && k3.ix.length === openN && k3.copies.length > k3.ix.length && !!s3 && s3.head === headFor(openN)
+        && s3.inf['With a value'] === String(openN);
+      // a row kept in two groups, one copy hidden (as a group a summary condition hides marks its own rows) - its first, then
+      // its last: still counted, by the other
+      var byIx = Object.create(null), two = null;
+      k3.copies.forEach(function (tr) { var i = ixOf(tr); (byIx[i] = byIx[i] || []).push(tr); });
+      Object.keys(byIx).some(function (i) { if (byIx[i].length > 1) { two = byIx[i]; return true; } return false; });
+      function withHidden(tr) {
+        if (tr) tr.classList.add('search-hidden');
+        try { return statsG('V_STATUS'); } finally { if (tr) tr.classList.remove('search-hidden'); }
+      }
+      var s4 = two ? withHidden(two[0]) : null, s5 = two ? withHidden(two[two.length - 1]) : null;
+      R.info.csShownCopy = { row: two ? ixOf(two[0]) : null, copies: two ? two.length : 0, first: s4, last: s5 };
+      R.chk.csShownCopy = !!two && [s4, s5].every(function (s) { return !!s && s.head === headFor(openN) && s.inf['With a value'] === String(openN); });
+    },
     mexcl: async function () {
       var td = document.querySelector('#resultsTable tbody tr td a');
       R.chk.cellNative = !!td && !rclick(td) && !menu();

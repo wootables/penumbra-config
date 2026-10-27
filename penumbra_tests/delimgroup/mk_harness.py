@@ -1,0 +1,177 @@
+# Builds delimgroup's harness.html from digitcol's page shell (the same stand-ins for
+# index.php's markup: the results table, the grouping dialog, the Copy stub, the status
+# bar), with this suite's own fixture, the header menu module and driver.js.
+#   py -3 mk_harness.py      (writes harness.html beside this file)
+import os, re
+HERE = os.path.dirname(os.path.abspath(__file__))
+SRC = r'\\oitras.oit.ncsu.edu\d$\Utilities\PHP_8.2-p\penumbra_tests\digitcol\harness.html'
+src = open(SRC, 'rb').read().decode('utf-8')
+
+def cut(s, start, end):
+    i = s.index(start); j = s.index(end, i)
+    return s[:i], s[j:]
+
+FIXTURE = r'''  (function () {
+    var P = new URLSearchParams(location.search);
+    window.__SCN = P.get('scn') || 'unit';
+    // --- the fixture: list cells beside plain ones -------------------------------
+    // PI_LIST  a semicolon list of "Lname, Fname" (the comma is INSIDE each value),
+    //          blank every 10th row, one @@HTML cell, a trailing ';', a repeat, three names
+    // KW       a comma list; TAGS a space list (no other delimiter in it); NOTES a
+    //          new-line list (\n and \r\n); PERSON "First Last" from big pools (a space
+    //          that does NOT group); STATUS / V_ID plain; AMT numbers; AWARD_DATE dates
+    var COLS = ['V_ID', 'PI_LIST', 'KW', 'TAGS', 'PERSON', 'NOTES', 'STATUS', 'AMT', 'AWARD_DATE', 'TEAM'];
+    window.__COLS = COLS;
+    var seed = 20261026;
+    function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
+    function pick(a) { return a[Math.floor(rnd() * a.length)]; }
+    function some(pool, lo, hi) { var n = lo + Math.floor(rnd() * (hi - lo + 1)), out = []; for (var i = 0; i < n; i++) out.push(pick(pool)); return out; }
+    var PEOPLE = ['Smith, Ann', 'Jones, Bo', 'Lee, Cy', 'Kim, Di', 'Park, Ed', 'Ng, Flo'];
+    var KWS = ['red', 'blue', 'green', 'gold'];
+    var TG = ['alpha', 'beta', 'gamma', 'delta'];
+    var FIRST = ['Abe', 'Bea', 'Cal', 'Dot', 'Eli', 'Fay', 'Gus', 'Hal', 'Ida', 'Jon', 'Kay', 'Lou', 'Max', 'Ned', 'Ola', 'Pam', 'Quin', 'Ray', 'Sue', 'Tom', 'Uma', 'Val', 'Wes', 'Xia', 'Yul'];
+    var LAST = ['Adams', 'Brown', 'Clark', 'Davis', 'Evans', 'Ford', 'Green', 'Hall', 'Irwin', 'Jay', 'King', 'Lane', 'Moss', 'Nash', 'Owen', 'Price', 'Quinn', 'Reed', 'Shaw', 'Todd', 'Upton', 'Vance', 'Wade', 'Young', 'Zorn'];
+    var NOTE = ['call', 'email', 'visit'];
+    var rows = [];
+    for (var i = 1; i <= 60; i++) {
+      var r = {};
+      r.V_ID = 'ID-' + (1000 + i);
+      if (i % 10 === 0) r.PI_LIST = '';
+      else if (i === 7) r.PI_LIST = '@@HTML<b>Lee, Cy</b>;Kim, Di';
+      else if (i === 13) r.PI_LIST = 'Kim, Di;';
+      else if (i === 17) r.PI_LIST = 'Smith, Ann ; Smith, Ann;Jones, Bo';
+      else if (i === 23) r.PI_LIST = 'Smith, Ann;Jones, Bo;Lee, Cy';
+      else r.PI_LIST = some(PEOPLE, 1, 3).join(pick([';', ' ; ', '; ']));
+      r.KW = some(KWS, 1, 3).join(', ');
+      r.TAGS = some(TG, 2, 3).join(' ');
+      r.PERSON = pick(FIRST) + ' ' + pick(LAST);
+      r.NOTES = some(NOTE, 1, 3).join(pick(['\n', '\r\n']));
+      r.STATUS = pick(['Open', 'Closed', 'Pending']);
+      r.AMT = (1 + rnd() * 5000).toFixed(2);
+      r.AWARD_DATE = '2024-' + ('0' + (1 + Math.floor(rnd() * 12))).slice(-2) + '-' + ('0' + (1 + Math.floor(rnd() * 28))).slice(-2);
+      rows.push(r);
+    }
+    // TEAM: semicolon lists of 1-4 of three "Lname, Fname" people, ';' alone. Its comma pieces recur (Smith, Ann,
+    // Ann;Jones...) and are fewer than its lists, so only the INNER rule keeps the comma off it. Own RNG, so the
+    // columns above draw what they always drew.
+    var seed2 = 77;
+    function rnd2() { seed2 = (seed2 * 1103515245 + 12345) & 0x7fffffff; return seed2 / 0x7fffffff; }
+    var TEAM = ['Smith, Ann', 'Jones, Bo', 'Lee, Cy'];
+    rows.forEach(function (r) { var n = 1 + Math.floor(rnd2() * 4), t = []; for (var q = 0; q < n; q++) t.push(TEAM[Math.floor(rnd2() * 3)]); r.TEAM = t.join(';'); });
+    // unit (2026-10-26, delimfix): LEADS is shaped like ?id=jjornl's PI_LIST - each cell two people ("Lead3, P (lead);
+    // Lead4, P"), 40 people in 20 lists (MORE values than texts) and every person in three rows: the split must be
+    // offered. MEMO is prose with semicolons that no other row shares: it must not be.
+    if (window.__SCN === 'unit') {
+      rows.forEach(function (r, ri) {
+        var a = ri % 20, b = (ri + 1) % 20;
+        r.LEADS = 'Lead' + a + ', P (lead); Lead' + b + ', P';
+        r.MEMO = 'Delayed ' + ri + '; waiting on item ' + ri;
+      });
+      COLS.push('LEADS', 'MEMO');
+    }
+    // json (2026-10-26, jsontot): a nested-table column, J_SUBS = 0-3 rows of SUB_NAME (from four) and SUB_AMT,
+    // on this scenario alone (the other scenarios' columns stay as they were). Its own RNG.
+    if (window.__SCN === 'json') {
+      var seed3 = 4242;
+      function rnd3() { seed3 = (seed3 * 1103515245 + 12345) & 0x7fffffff; return seed3 / 0x7fffffff; }
+      var SUBN = ['Grant', 'Seed', 'Gift', 'Loan'];
+      rows.forEach(function (r, ri) {
+        var n = (ri % 12 === 5) ? 0 : 1 + Math.floor(rnd3() * 3), sub = [];
+        for (var q = 0; q < n; q++) sub.push({ SUB_NAME: SUBN[Math.floor(rnd3() * 4)], SUB_AMT: 1 + Math.floor(rnd3() * 900) });
+        r.J_SUBS = '@@JSON' + JSON.stringify(sub);
+      });
+      COLS.push('J_SUBS');
+    }
+    // splitviz (2026-10-26): own RNG, these scenarios alone (the others' columns stay as they were).
+    var seed4 = 9001;
+    function rnd4() { seed4 = (seed4 * 1103515245 + 12345) & 0x7fffffff; return seed4 / 0x7fffffff; }
+    // PROJS: project numbers "500668, 533734" - 20 awards, each in three rows: 13 hold ONE number (so the column reads
+    // as numbers, with enough of them to bin), 7 a list of 2-6 (more numbers than lists): a comma list
+    // (?id=cvmnihusda), offered its split and NOT bins
+    function projLists() {
+      var aw = [], used = Object.create(null), LENS = [2, 3, 4, 5, 6, 2, 3];
+      function num() { var nn; do { nn = String(500000 + Math.floor(rnd4() * 90000)); } while (used[nn]); used[nn] = true; return nn; }
+      for (var a = 0; a < 20; a++) {
+        var len = a < 13 ? 1 : LENS[a - 13], nums = [];
+        for (var q = 0; q < len; q++) nums.push(num());
+        aw.push(nums.join(', '));
+      }
+      return aw;
+    }
+    // detect: columns shaped like the live reports that taught the list rule, each one it must get right
+    //   DEPT_ENT  "196001-Population Health&amp;Pathobiology" on a third of the rows: no list (the entity's ;)
+    //   TRANS     "New, logged 2024-03-12" - always a type and a date: a pair, not a list
+    //   PROJS     (above) a comma list of numbers
+    //   TITLE_C   titles with commas, two to four parts with spaces in them: no list
+    //   AMT_K     numbers written with thousands commas (1,500,000): no list
+    if (window.__SCN === 'detect') {
+      var DEPTS = ['196001-Population Health&amp;Pathobiology', '195001-Dept of Clinical Sciences', '194001-Dept Molecular Biomedical Sci'];
+      var TYPES = ['New', 'Continuation', 'Increase'];
+      var TITLES = ['Towards Secure, Crash Recoverable Systems', 'Impact through Research, Scientific Methods, and Community', 'Soil, Water, and Air',
+                    'One Health, One Planet', 'Air, Land, Sea, and Space'];
+      var AMTK = ['1,500', '2,500', '1,500,000', '2,500,000', '3,500,000', '12,500', '1,000,500,000'];
+      var aw4 = projLists();
+      rows.forEach(function (r, ri) {
+        r.DEPT_ENT = DEPTS[ri % 3];
+        r.TRANS = TYPES[Math.floor(rnd4() * 3)] + ', logged 2024-0' + (1 + Math.floor(rnd4() * 9)) + '-1' + Math.floor(rnd4() * 3);
+        r.PROJS = aw4[Math.floor(ri / 3)];
+        r.TITLE_C = TITLES[ri % 5];
+        r.AMT_K = AMTK[ri % 7];
+      });
+      COLS.push('DEPT_ENT', 'TRANS', 'PROJS', 'TITLE_C', 'AMT_K');
+    }
+    // lists: PROJS (a numbers list: Column stats must not add its lists up) and D_LIST, semicolon lists of names one
+    // of which carries an entity ("Crop &amp; Soil"); the report's filter strip splits PI_LIST and D_LIST
+    if (window.__SCN === 'lists') {
+      var aw5 = projLists(), DL = ['Crop &amp; Soil', 'Food Science', 'Entomology'];
+      rows.forEach(function (r, ri) {
+        r.PROJS = aw5[Math.floor(ri / 3)];
+        var n5 = 1 + Math.floor(rnd4() * 3), d5 = [];
+        for (var q5 = 0; q5 < n5; q5++) d5.push(DL[Math.floor(rnd4() * 3)]);
+        r.D_LIST = d5.join('; ');
+      });
+      COLS.push('PROJS', 'D_LIST');
+    }
+    window.__rowsFixture = rows;
+    var order = []; for (var c = 0; c < COLS.length; c++) order.push(c);
+    var st = {
+      name: 'dgfix', query: 'SELECT * FROM DG_FIXTURE', reportTitle: 'Split by a delimiter fixture',
+      theme: 'theme-default', density: 'standard',
+      visibleColumns: ['#'].concat(order), columnOrder: order,
+      sortCriteria: [], noLimit: true, rowExpandDefault: false, resolverLinksDefault: true,
+      rowsPerPage: '200', reportSnippet: ''
+    };
+    // (splitviz) the report snippet: a split filter strip (lists), a chart split by PI_LIST (chart)
+    if (window.__SCN === 'lists') st.reportSnippet = "filter_strip('People|PI_LIST|split', 'Depts|D_LIST|split=semicolon', 'Status|STATUS')";
+    // (vis() args: type x y series agg limit title legend values width height legendPos valuePos animate stacked
+    //  horizontal titlePos sortBy sortDir stackOrder normalize subtitle xLabel yLabel otherBucket filterXAxis)
+    if (window.__SCN === 'chart') st.reportSnippet = "vis('bar', 'PI_LIST:dsemi', 'AMT', 'none', 'count', 20, 'People', 'true', 'true', 800, 300, 'top', 'end', 'false', 'false', 'false', 'top', 'value', 'desc', 'default', 'false', '', '', '', 'false', 'true')";
+    window.__STORED = st;
+    window.penumbra_vars = {
+      isAdmin: true, isGlobalAdmin: true, canEditReport: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+      tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+      imports: [], reports: [], themes: {}, prompts: {}, grants: [],
+      totalExemptions: [],
+      preloadedState: st
+    };
+    window.__queryResponse = { data: rows };
+  })();
+'''
+
+head, tail = cut(src, '  (function () {\n    var P = new URLSearchParams', '  window.__T = {};')
+out = head + FIXTURE + tail
+out = out.replace('<title>digit-named columns</title>', '<title>split by a delimiter</title>')
+out = re.sub(r'<!-- digitcol suite.*?-->', '<!-- delimgroup suite (2026-10-26). The REAL main.js and the header menu module booted\n'
+             '     through the REAL run path (a stubbed query.php) on a 60-row fixture whose cells hold\n'
+             '     lists. Built by mk_harness.py from digitcol\'s page shell. ?scn=<name> picks the scenario. -->',
+             out, count=1, flags=re.S)
+out = out.replace('<link rel="stylesheet" href="main.css">', '<link rel="stylesheet" href="main.css">\n<link rel="stylesheet" href="penumbra_colmenu.css">')
+# the scripts: main.js (built), the header menu module (built), the driver
+i = out.index('<script src="main_dc.js"></script>')
+j = out.index('<script src="driver.js"></script>')
+# (splitviz) the shared strip grammar loads BEFORE main.js, as index.php has it
+out = out[:i] + '<script src="penumbra_tiles_dg.js"></script>\n<script src="main_dg.js"></script>\n<script src="penumbra_colmenu_dg.js"></script>\n' + out[j:]
+out = out.replace('<option value="2021">2021</option>', '<option value="STATUS">STATUS</option>')
+assert 'main_dc.js' not in out and 'search_builder_dc' not in out
+open(os.path.join(HERE, 'harness.html'), 'wb').write(out.encode('utf-8'))
+print('harness.html written (%d bytes)' % len(out))

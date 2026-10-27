@@ -502,7 +502,14 @@
         return $in.length ? String($in.val() || '') : URL_SEARCH;
     }
     function controlsSpec(tile) {
-        return (Array.isArray(tile.strip) && tile.strip.length) ? T.strip.parseArgs(tile.strip) : null;
+        if (!(Array.isArray(tile.strip) && tile.strip.length)) { return null; }
+        var sp = T.strip.parseArgs(tile.strip);
+        // A split field (2026-10-26, splitviz) is a report page's: its lists are split by the report's
+        // grouping rule (main.js), which this page does not load - said, never quietly dropped.
+        if (sp && !sp.error && sp.fields.some(function (f) { return f.split; })) {
+            return { error: 'split works in a report\'s filter_strip(), not on a dashboard Controls tile' };
+        }
+        return sp;
     }
     // A range field's kind and hints (2026-09-30) come from the values the
     // tiles hold - the same union as the chips - and are set on the field

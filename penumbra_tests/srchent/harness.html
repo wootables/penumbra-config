@@ -1,0 +1,145 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>srchent harness</title></head>
+<body>
+<!-- srchent (2026-10-26): the BROWSER half. Boots the real main.js (run.py patches
+     hooks in as the closure's first statement, and names getCellValue so it can be
+     called) and reads the corpus (corpus.js, window.CORPUS) the way the report page's
+     search does: every cell through getCellValue, every row's nested values through
+     getVirtualColumnsForRow / getStructuredVirtualData, every query through
+     parseAdvancedQuery + evaluateParsedQuery with the page's own column list
+     (penumbraFlatSearchColumns over masterRowData). It asserts nothing: run.py
+     compares what it prints with php_side.php's answers.
+     The DOM scaffold is filterstrip's (main.js binds builder elements at ready time). -->
+<div id="editorTabs"></div><div id="reportSnippetOutput"></div><div id="mainReportSubtitle"></div>
+<textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+<table id="resultsTable"><thead id="tableHeader"><tr><th data-colname="#">#</th></tr></thead><tbody></tbody></table>
+<div id="loadingOverlay" style="display:none">
+  <div class="loader"></div>
+  <p>Executing Query, Please Wait...</p>
+  <div style="display: flex; align-items: center; gap: 20px;">
+    <p id="execution-timer" style="font-size: 1.5em; margin: 0; font-weight: bold;"></p>
+    <button id="stopQueryBtn">Stop</button>
+  </div>
+  <div id="loadingTip" aria-live="polite"></div>
+</div>
+<div id="errorBox"></div>
+<div id="action_overlay"></div>
+<input id="tableSearch" value="">
+<span id="resultCount"></span>
+<div id="pivot-output-container" style="display:none"></div>
+<div id="groupedResultsContainer" style="display:none"></div>
+<div id="snapshotComparisonContainer" style="display:none"></div>
+<div id="pivotLightbox" style="display:none">
+  <div id="pivot-source-columns"></div>
+  <div id="pivot-rows"></div><div id="pivot-cols"></div><div id="pivot-vals"></div>
+  <select id="pivot-aggregation-selector"><option value="">-</option><option value="sum">sum</option></select>
+  <table><tbody id="pivot-agg-table-body"></tbody></table>
+  <select id="pivot-rows-layout-select"><option value="nested">nested</option><option value="nested-static">nested-static</option><option value="flat">flat</option></select>
+  <select id="pivot-cols-layout-select"><option value="nested">nested</option><option value="flat">flat</option></select>
+  <select id="pivot-sort-order"><option value="asc">asc</option><option value="desc">desc</option></select>
+  <input id="pivot-sticky-cols" value="3">
+  <input type="checkbox" id="pivot-row-total-override-toggle">
+  <div id="pivot-row-total-override-container" style="display:none"><div id="pivot-row-total-slots"></div><div id="pivot-row-total-tokens"></div></div>
+  <select id="pivot-rank-dir"><option value="none">none</option><option value="top">top</option><option value="bottom">bottom</option></select>
+  <input id="pivot-rank-n" value="10"><select id="pivot-rank-agg"><option value="sum">sum</option><option value="count">count</option></select>
+  <select id="pivot-rank-scope"><option value="">Overall</option></select>
+  <input type="checkbox" id="pivot-rank-other" checked><label id="pivot-rank-other-label"></label>
+  <input type="checkbox" id="pivot-no-breakdown"><input type="checkbox" id="pivot-start-expanded">
+  <select id="pivotPresetSelect"><option value=""></option></select><button id="pivotDeletePresetBtn"></button><input type="checkbox" id="pivotAutoRunPreset">
+  <button id="generatePivotBtn">Generate</button>
+  <select id="pivotSnippetTargetSelect" style="display: none;"></select>
+  <button id="updatePivotSnippetBtn" type="button" style="display: none;">&#x27F3; Update Snippet</button>
+  <button id="copyPivotSnippetBtn">Snippet</button>
+  <button id="pivotSavePresetBtn"></button>
+</div>
+<pre id="out">running</pre>
+
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  // Same boot stubs as the filterstrip / pivot_trigger / parity harnesses.
+  window.penumbra_vars = {
+    isAdmin: true, isGlobalAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+    tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+    imports: [], reports: [], themes: {}, prompts: {}, grants: []
+  };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax; jQuery.get = jQuery.ajax;
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.IntersectionObserver = window.ResizeObserver;
+  if (!window.matchMedia) {
+    window.matchMedia = function () { return { matches: false, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {} }; };
+  }
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); };
+</script>
+<script src="penumbra_tiles.js"></script>
+<script src="corpus.js"></script>
+<script src="main_patched.js"></script>
+<script>
+(function () {
+  function report(txt) { document.getElementById('out').textContent = txt; }
+  // Every character past ASCII as an escape, so the dump survives any re-encoding;
+  // a lone surrogate stays itself (JSON.stringify writes it as an escape too).
+  function asciiJson(x) {
+    var BS = String.fromCharCode(92);
+    return JSON.stringify(x).replace(/[^\x00-\x7e]/g, function (ch) { return BS + 'u' + ('0000' + ch.charCodeAt(0).toString(16)).slice(-4); });
+  }
+  function run() {
+    var S = window.__SE, C = window.CORPUS;
+    if (!S || typeof S.evalQ !== 'function' || typeof S.parseQ !== 'function' || !C) {
+      report('RESULTS_JSON:' + asciiJson({ fatal: 'hooks unavailable: ' + (window.__SE_ERR || 'n/a') + ' corpus=' + typeof C, pageErrors: window.__errors.slice(0, 6) }));
+      return;
+    }
+    var base = C.columns;
+    function toMap(o) { var m = new Map(); base.forEach(function (c) { m.set(c.toUpperCase(), o[c] == null ? '' : String(o[c])); }); return m; }
+    // The page's list: penumbraFlatSearchColumns over the header's names (no '#'), with
+    // the rows in masterRowData - it adds '#' and the nested names of the first 10 rows.
+    S.setRows(C.rows.map(toMap));
+    var cols = S.flatCols(base.filter(function (c) { return c !== '#'; }));
+    var out = { pageErrors: window.__errors.slice(0, 6), cols: cols, reads: {}, virt: {}, struct: {}, q: {} };
+    var probe = S.parseQ('RID = zzzz', cols);
+    C.rows.forEach(function (o) {
+      window.__SE_gcv = null;
+      S.evalQ(toMap(o), probe, cols);
+      var g = window.__SE_gcv, r = {};
+      base.forEach(function (c) { r[c] = g ? g(c) : null; });
+      out.reads[o.RID] = r;
+      var v = {};
+      S.virt(toMap(o)).forEach(function (vals, k) { v[k] = vals.slice(); });
+      out.virt[o.RID] = v;
+      out.struct[o.RID] = S.struct(toMap(o)).map(function (src) {
+        return { columns: Array.from(src.columns), rows: src.rows.map(function (rm) { var x = {}; rm.forEach(function (val, k) { x[k] = val; }); return x; }) };
+      });
+    });
+    C.queries.forEach(function (qq) {
+      var text = qq.q, rowMatch = false;
+      if (/^__ROW\s+/i.test(text)) { rowMatch = true; text = text.replace(/^__ROW\s+/i, ''); }
+      var parsed = S.parseQ(text, cols), ids = [];
+      C.rows.forEach(function (o) { if (S.evalQ(toMap(o), parsed, cols, rowMatch)) ids.push(o.RID); });
+      out.q[qq.slug] = ids;
+    });
+    report('RESULTS_JSON:' + asciiJson(out));
+  }
+  $(function () {
+    setTimeout(function () {
+      try { run(); } catch (e) { report('RESULTS_JSON:' + asciiJson({ fatal: String((e && e.stack) || e), pageErrors: window.__errors.slice(0, 6) })); }
+    }, 30);
+  });
+})();
+</script>
+</body></html>

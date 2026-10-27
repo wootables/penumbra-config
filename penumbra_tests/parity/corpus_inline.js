@@ -10,7 +10,10 @@ window.__CORPUS = {
         "MW",
         "MH",
         "ME",
-        "TERM"
+        "TERM",
+        "ENT",
+        "JS",
+        "CODE"
     ],
     "rows": [
         {
@@ -24,7 +27,10 @@ window.__CORPUS = {
             "MW": "  ",
             "MH": "@@HTML<b>Hi</b>",
             "ME": "",
-            "TERM": "Fall term"
+            "TERM": "Fall term",
+            "ENT": "O&apos;Kane",
+            "JS": "@@JSON[]",
+            "CODE": "&#65601;"
         },
         {
             "NAME": "Beta",
@@ -37,7 +43,10 @@ window.__CORPUS = {
             "MW": "X",
             "MH": "@@HTML<b>Hi</b>",
             "ME": "",
-            "TERM": "Spring"
+            "TERM": "Spring",
+            "ENT": "Caf&eacute;",
+            "JS": "y\u00a0",
+            "CODE": "&#X41;"
         },
         {
             "NAME": "Alpha",
@@ -50,7 +59,10 @@ window.__CORPUS = {
             "MW": "  ",
             "MH": "Z",
             "ME": "",
-            "TERM": "Fall"
+            "TERM": "Fall",
+            "ENT": "&lt;b&gt;Bold&lt;/b&gt;",
+            "JS": "\u3000z",
+            "CODE": "&#55357;&#56832;"
         },
         {
             "NAME": "",
@@ -63,7 +75,10 @@ window.__CORPUS = {
             "MW": "  ",
             "MH": "Z",
             "ME": "",
-            "TERM": "Summer"
+            "TERM": "Summer",
+            "ENT": "<1% done",
+            "JS": "",
+            "CODE": "&#10000000000000067;"
         },
         {
             "NAME": "  ",
@@ -76,7 +91,10 @@ window.__CORPUS = {
             "MW": "X",
             "MH": "@@HTML<b>Hi</b>",
             "ME": "",
-            "TERM": "Spring"
+            "TERM": "Spring",
+            "ENT": "x&nbsp;",
+            "JS": "",
+            "CODE": ""
         },
         {
             "NAME": "Gamma ",
@@ -89,7 +107,10 @@ window.__CORPUS = {
             "MW": "Y",
             "MH": "W",
             "ME": "",
-            "TERM": "Winter"
+            "TERM": "Winter",
+            "ENT": "Crop &amp; Soil",
+            "JS": "",
+            "CODE": ""
         }
     ],
     "cases": [
@@ -738,6 +759,76 @@ window.__CORPUS = {
             "id": "count_bare_all_is_condition",
             "snippet": "count(all)",
             "expect": "2"
+        },
+        {
+            "id": "cf_apos",
+            "snippet": "count(ENT = OKane)",
+            "expect": "1"
+        },
+        {
+            "id": "cf_named",
+            "snippet": "count(ENT contains eacute)",
+            "expect": "1"
+        },
+        {
+            "id": "cf_order",
+            "snippet": "count(ENT = //Bold//)",
+            "expect": "1"
+        },
+        {
+            "id": "cf_lt",
+            "snippet": "count(ENT contains done)",
+            "expect": "1"
+        },
+        {
+            "id": "cf_nbsp",
+            "snippet": "count(ENT = //x//)",
+            "expect": "1"
+        },
+        {
+            "id": "cf_amp_guard",
+            "snippet": "count(ENT = \"Crop & Soil\")",
+            "expect": "1"
+        },
+        {
+            "id": "cf_json",
+            "snippet": "count(JS contains json)",
+            "expect": "1"
+        },
+        {
+            "id": "cf_trim_nbsp",
+            "snippet": "count(JS = //y//)",
+            "expect": "1"
+        },
+        {
+            "id": "cf_trim_ideo",
+            "snippet": "count(JS = //z//)",
+            "expect": "1"
+        },
+        {
+            "id": "cf_code_wide",
+            "snippet": "sum(N, CODE = //A//)",
+            "expect": "1"
+        },
+        {
+            "id": "cf_code_pair",
+            "snippet": "count(CODE = //\ud83d\ude00//)",
+            "expect": "1"
+        },
+        {
+            "id": "cf_code_long",
+            "snippet": "count(CODE = //D//)",
+            "expect": "1"
+        },
+        {
+            "id": "cf_code_upperx",
+            "snippet": "count(CODE contains x41)",
+            "expect": "1"
+        },
+        {
+            "id": "cf_global",
+            "snippet": "count(eacute)",
+            "expect": "1"
         }
     ],
     "promptValues": [

@@ -298,6 +298,7 @@ NEW = NEW - ({'L-pnestgb-%s' % c for c in CHK['pnestgb']} | {'S-nestGroupHelp'})
 NEW = NEW | {'L-pnestgb-%s' % c for c in ('pnCopyNoParent', 'pnCopyNested', 'pnCopyHidden', 'pnCopyRuns', 'pnCopyClipOff', 'pnCopySparse')} | {'S-nestCopyHelp'}
 NEW = NEW - ({'L-pnestgb-%s' % c for c in CHK['pnestgb']} | {'S-nestCopyHelp'})   # (nestcopy is LIVE since 934d195, 2026-10-25: old checks now; jarvispal's set is still undeployed)
 NEW = NEW | {'L-pnestgb-pnStatsNoWork'}   # (2026-10-25, neststats) the box never works out a nested column's Column stats
+NEW = NEW - {'L-pnestgb-pnStatsNoWork'}   # (neststats is LIVE since 9e27a25, 2026-10-26: an old check now)
 # (round 3) the group-mode icon: candidate C, and the old drawing's signature (its first line)
 GROUP_C_SYMBOL = '<symbol id="pnbi-group" viewBox="0 0 24 24"><path d="m4 4 2.5 2.5L9 4"/><line x1="12" y1="5" x2="20" y2="5"/><line x1="8" y1="9.5" x2="20" y2="9.5"/><line x1="8" y1="13" x2="20" y2="13"/><path d="m6.25 15.25 2.5 2.5-2.5 2.5"/><line x1="12" y1="18" x2="20" y2="18"/></symbol>'
 OLD_GROUP_SIG = '<line x1="5" y1="9" x2="19" y2="9"/><line x1="5" y1="15" x2="19" y2="15"/>'

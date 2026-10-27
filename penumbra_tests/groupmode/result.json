@@ -751,22 +751,22 @@
                     {
                         "name":  "picker: an outer level’s column is excluded from level 2",
                         "pass":  true,
-                        "detail":  "|#|DEPT|AWARD_DATE|AWARD_DATE:year|AWARD_DATE:fy|AWARD_DATE:yq|AWARD_DATE:fyq|AWARD_DATE:ym|AWARD_DATE:quarter|AWARD_DATE:fquarter|AWARD_DATE:month|AWARD_DATE:monthnum|AWARD_DATE:dow|AWARD_DATE:hour|AMOUNT|ACTIVE"
+                        "detail":  "|#|DEPT|AWARD_DATE|AMOUNT|ACTIVE"
                     },
                     {
                         "name":  "picker: level 2 still offers other columns",
                         "pass":  true,
-                        "detail":  "|#|DEPT|AWARD_DATE|AWARD_DATE:year|AWARD_DATE:fy|AWARD_DATE:yq|AWARD_DATE:fyq|AWARD_DATE:ym|AWARD_DATE:quarter|AWARD_DATE:fquarter|AWARD_DATE:month|AWARD_DATE:monthnum|AWARD_DATE:dow|AWARD_DATE:hour|AMOUNT|ACTIVE"
+                        "detail":  "|#|DEPT|AWARD_DATE|AMOUNT|ACTIVE"
                     },
                     {
                         "name":  "picker: level 2 offers a None row",
                         "pass":  true,
-                        "detail":  "|#|DEPT|AWARD_DATE|AWARD_DATE:year|AWARD_DATE:fy|AWARD_DATE:yq|AWARD_DATE:fyq|AWARD_DATE:ym|AWARD_DATE:quarter|AWARD_DATE:fquarter|AWARD_DATE:month|AWARD_DATE:monthnum|AWARD_DATE:dow|AWARD_DATE:hour|AMOUNT|ACTIVE"
+                        "detail":  "|#|DEPT|AWARD_DATE|AMOUNT|ACTIVE"
                     },
                     {
                         "name":  "picker: level 2 offers bucket variants",
                         "pass":  true,
-                        "detail":  "|#|DEPT|AWARD_DATE|AWARD_DATE:year|AWARD_DATE:fy|AWARD_DATE:yq|AWARD_DATE:fyq|AWARD_DATE:ym|AWARD_DATE:quarter|AWARD_DATE:fquarter|AWARD_DATE:month|AWARD_DATE:monthnum|AWARD_DATE:dow|AWARD_DATE:hour|AMOUNT|ACTIVE"
+                        "detail":  "dropdown |:year|:fy|:yq|:fyq|:ym|:quarter|:fquarter|:month|:monthnum|:dow|:hour / list |#|DEPT|AWARD_DATE|AMOUNT|ACTIVE"
                     },
                     {
                         "name":  "picker: one level reports one level",
@@ -1571,12 +1571,12 @@
                     {
                         "name":  "preview/nested: counting a virtual grouping column does not throw",
                         "pass":  true,
-                        "detail":  "matching=6"
+                        "detail":  "matching=4"
                     },
                     {
-                        "name":  "preview/nested: a row counts once per distinct nested group it is in",
+                        "name":  "preview/nested: a matching row counts once, however many nested groups it is in",
                         "pass":  true,
-                        "detail":  "got 6 want 6"
+                        "detail":  "got 4 want 4"
                     },
                     {
                         "name":  "preview/nested: and every nested value is its own group",

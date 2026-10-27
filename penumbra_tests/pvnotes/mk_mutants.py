@@ -9,6 +9,8 @@ base = sys.argv[1] if len(sys.argv) > 1 else r'\\oitras.oit.ncsu.edu\c$\inetpub\
 FILES = {'main': 'js\\main.js', 'journal': 'js\\penumbra_journal.js', 'manage': 'manage_journal.php', 'css': 'css\\main.css'}
 CR = '\r\n'   # main.js is CRLF; penumbra_journal.js and manage_journal.php are LF
 
+# (2026-10-26, splitviz) the dd1* drill mutants and dx1presetprobe re-anchored: splitviz moved those sites onto
+# _chartDrillKeep(rows, fields, pass); each now hands its site no fields to bucket - the same reversion.
 M = {
     # the paint pass never runs: no icon anywhere
     'nopaint': ('main', [('            var on = !hold && pivotNotesActive();' + CR + '            var toks = on ? pivotRowTokens() : [];',
@@ -240,17 +242,17 @@ M = {
     'dx1capture': ('main', [("                canvasRows: $c.data('sourceRowData'),   // what the canvas held, for the drill's end (2026-10-10)", '                canvasRows: undefined,')], ['V-dx-own', 'C-dx-preset']),
     'dx1restore': ('main', [("            // (its rows: _wipeDrillState put the canvas's own back above - this stored originalRows, which the chart's", "            $c.data('sourceRowData', originalRows); // (mutant)")], ['C-dx-rows', 'C-dx-menu', 'C-dx-preset', 'V-dx-presetown']),
     'dx1presetwipe': ('main', [('        // restores its own below.)' + CR + '        _wipeDrillState(canvas);', '        // restores its own below.)' + CR + '        void 0;')], ['C-dx-preset', 'C-dx-presetcrumb']),
-    'dx1presetprobe': ('main', [('                        var rv = cleanCellVal(_chartDrillGet(probe[idx], col));', "                        var rv = cleanCellVal(row && row.get ? row.get(col) : '');")], ['C-dx-presetfy']),
+    'dx1presetprobe': ('main', [('                originalRows = _chartDrillKeep(allRows, [drill.originalCfg.xAxis, drill.originalCfg.groupBy], function (pr) {', '                originalRows = _chartDrillKeep(allRows, [], function (pr) {')], ['C-dx-presetfy']),
     'dx1presetcap': ('main', [("                canvasRows: $(canvas).data('sourceRowData'),   // for the drill's end to put back (2026-10-10)", '                canvasRows: undefined,')], ['V-dx-presetown']),
     # ---- round 13 (2026-10-10, the date-split drill): each fix reverted alone ----
-    'dd1probe': ('main', [('            var probeRows = _chartDrillProbe(sourceRows, [vizConfig.xAxis, vizConfig.groupBy]);', '            var probeRows = sourceRows;')], ['C-dt-rows', 'C-dt-drill', 'V-dt-crumb', 'C-dt-crumbswitch', 'C-dt-split', 'V-dt-cycle', 'C-dt-clickexcl', 'C-dt-clickdrill']),
+    'dd1probe': ('main', [('            var drillFields = [vizConfig.xAxis, vizConfig.groupBy];   // (a split field: a row matches by any value, 2026-10-26)', '            var drillFields = [];')], ['C-dt-rows', 'C-dt-drill', 'V-dt-crumb', 'C-dt-crumbswitch', 'C-dt-split', 'V-dt-cycle', 'C-dt-clickexcl', 'C-dt-clickdrill']),
     'dd1excl': ('main', [('                            var rv = _chartDrillCleanCellVal(_chartDrillGet(rowMap, col));', "                            var rv = _chartDrillCleanCellVal(rowMap.get ? rowMap.get(col) : '');")], ['C-dt-clickexcl']),
-    'dd1orig': ('main', [('                                var rv = _chartDrillCleanCellVal(_chartDrillGet(probeRows[ri], col));', '                                var rv = _chartDrillCleanCellVal(sourceRows[ri].get(col));')], ['C-dt-clickdrill']),
-    'dd1menuexcl': ('main', [('        var cfg = _getCanvasVizConfig(canvas) || {}, probe = _chartDrillProbe(rows, [cfg.xAxis, cfg.groupBy]);   // (a bucketed field: 2026-10-10)', '        var cfg = _getCanvasVizConfig(canvas) || {}, probe = rows;')], ['C-dt-menuexcl']),
-    'dd1path': ('main', [('        var probe = _chartDrillProbe(rows, path.slice(0, stop).map(function (s) { return s.col; }));', '        var probe = rows;')], ['C-dt-drill', 'C-dt-crumbswitch', 'C-dt-menudrill']),
+    'dd1orig': ('main', [('                        originalForDrill = _chartDrillKeep(sourceRows, drillFields, function (pr) {', '                        originalForDrill = _chartDrillKeep(sourceRows, [], function (pr) {')], ['C-dt-clickdrill']),
+    'dd1menuexcl': ('main', [('        return _chartDrillKeep(rows, [cfg.xAxis, cfg.groupBy], function (pr) {', '        return _chartDrillKeep(rows, [], function (pr) {')], ['C-dt-menuexcl']),
+    'dd1path': ('main', [('        return _chartDrillKeep(rows, path.slice(0, stop).map(function (s) { return s.col; }), function (pr) {', '        return _chartDrillKeep(rows, [], function (pr) {')], ['C-dt-drill', 'C-dt-crumbswitch', 'C-dt-menudrill']),
     'dd1crumb': ('main', [('        var baseRows = _chartDrillProbe(state.originalRows || [], path.map(function (s) { return s.col; }));', '        var baseRows = state.originalRows || [];')], ['V-dt-crumb', 'C-dt-crumbswitch']),
-    'dd1menurows': ('main', [('        var probe = _chartDrillProbe(sourceRows, [cfg.xAxis]);   // (a bucketed axis: 2026-10-10)', '        var probe = sourceRows;')], ['C-dt-menurows']),
-    'dd1panel': ('main', [('            var probe = _chartDrillProbe(sourceRows, [vizCfg.xAxis, vizCfg.groupBy]);', '            var probe = sourceRows;')], ['C-dt-panel']),
+    'dd1menurows': ('main', [('        var matchingRows = _chartDrillKeep(sourceRows, [cfg.xAxis], function (pr) {', '        var matchingRows = _chartDrillKeep(sourceRows, [], function (pr) {')], ['C-dt-menurows']),
+    'dd1panel': ('main', [('            var _fpFields = [vizCfg.xAxis, vizCfg.groupBy];', '            var _fpFields = [];')], ['C-dt-panel']),
     'dd1get': ('main', [('        return (v === undefined) ? row.get(String(col).toUpperCase()) : v;', '        return v;')], ['C-dt-panel', 'C-dt-menurows', 'C-dt-menuexcl']),
     'dd1search': ('main', [("        if (!spec || !spec.split) return '{' + field + '} = //' + val + '//';", "        if (true) return '{' + field + '} = //' + val + '//';")], ['V-dt-search', 'C-dt-split', 'V-dt-cycle', 'C-dt-menurows']),
     'dd1bucket': ('main', [("        else if (split === 'fy' && (m = /^FY(\\d{2})$/i.exec(s))) { y = 2000 + +m[1]; r = span(y - 1, 7, y, 6); }", '        else if (false) { }')], ['V-dt-search', 'C-dt-split', 'C-dt-menurows', 'V-pd-search']),

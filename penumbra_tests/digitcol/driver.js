@@ -123,9 +123,14 @@
     var lv = pickerItems('groupingColumnSelector').map(function (x) { return x.v; });
     R.obs.level0 = lv;
     rec('G-plainsb-list', S(lv) === S(['#', '2021', '2022', 'V_ID', 'V_NAME', 'V_STATUS', 'V_AMT']), 'level 0 ' + S(lv));
-    var bk = Array.prototype.map.call(document.querySelectorAll('#groupingColumnSelector .pcs-dropdown .pcs-item-bucket'), function (el) { return el.getAttribute('data-value'); });
-    R.obs.buckets = bk;
-    var of = function (c) { return bk.filter(function (v) { return v.indexOf(c + ':') === 0; }).map(function (v) { return v.slice(c.length + 1); }).sort(); };
+    // (2026-10-26, grpbucket) a column's bucket choices are the dropdown beside the picker: pick it, read them
+    var of = function (c) {
+      try { pickCustom('groupingColumnSelector', c); } catch (e) { return ['ERR ' + e.message]; }
+      var s = document.getElementById('groupingBucket1');
+      if (!s || s.style.display === 'none') return [];
+      return Array.prototype.map.call(s.options, function (o) { return o.value; }).filter(function (v) { return v; }).map(function (v) { return v.slice(1); }).sort();
+    };
+    R.obs.buckets = { '2022': of('2022'), V_AMT: of('V_AMT') };
     rec('G-plainsb-buckets', of('V_AMT').length >= 1 && S(of('2022')) === S(of('V_AMT')), '2022: ' + S(of('2022')) + ', V_AMT: ' + S(of('V_AMT')));
   }
 

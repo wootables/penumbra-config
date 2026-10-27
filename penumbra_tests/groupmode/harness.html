@@ -747,9 +747,13 @@
         assert('picker: level 2 still offers other columns',
           lvl2Values.indexOf('DEPT') !== -1, lvl2Values.join('|'));
         assert('picker: level 2 offers a None row', lvl2Values.indexOf('') !== -1, lvl2Values.join('|'));
-        // Bucket children belong to the deeper levels too.
+        // Bucket choices belong to the deeper levels too - in the dropdown beside the level's column
+        // since 2026-10-26 (grpbucket), and no longer in the column list itself.
+        window.__GM3.populateLevels(cols, ['COLLEGE', 'AWARD_DATE']);
+        var bk2 = $('#groupingBucket2 option').map(function () { return this.value; }).get();
         assert('picker: level 2 offers bucket variants',
-          lvl2Values.indexOf('AWARD_DATE:fy') !== -1, lvl2Values.join('|'));
+          bk2.indexOf(':fy') !== -1 && $('#groupingBucket2').is(':visible') && lvl2Values.indexOf('AWARD_DATE:fy') === -1,
+          'dropdown ' + bk2.join('|') + ' / list ' + lvl2Values.join('|'));
 
         window.__GM3.populateLevels(cols, ['COLLEGE']);
         eq('picker: one level reports one level', window.__GM3.dialogLevels().length, 1);
@@ -1544,10 +1548,12 @@
           var r5 = CMR('{AMOUNT} > 0');
           assert('preview/nested: counting a virtual grouping column does not throw',
             !r5.threw && r5.matching !== -1, r5.threw || ('matching=' + r5.matching));
-          // Parent 1 names constructor twice and must count ONCE; parents 3 and
-          // 4 fall into two nested groups each and count twice.
-          eq('preview/nested: a row counts once per distinct nested group it is in',
-            r5.matching, 6);
+          // Every matching parent counts ONCE, however many nested groups it is in
+          // (2026-10-26, jsontot: the user's call - a nested grouping's totals count
+          // each row once; it read 6 before, parents 3 and 4 twice). Parent 1 names
+          // constructor twice; the groups below still count every nested value.
+          eq('preview/nested: a matching row counts once, however many nested groups it is in',
+            r5.matching, 4);
           eq('preview/nested: and every nested value is its own group', r5.groups, 6);
 
           window.__GM.setAgg({ column: 'FEE', type: 'sum' });

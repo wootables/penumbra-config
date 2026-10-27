@@ -1797,8 +1797,8 @@
   "file": "main",
   "edits": [
    [
-    "                        var rv = cleanCellVal(_chartDrillGet(probe[idx], col));",
-    "                        var rv = cleanCellVal(row && row.get ? row.get(col) : '');"
+    "                originalRows = _chartDrillKeep(allRows, [drill.originalCfg.xAxis, drill.originalCfg.groupBy], function (pr) {",
+    "                originalRows = _chartDrillKeep(allRows, [], function (pr) {"
    ]
   ],
   "must": [
@@ -1827,8 +1827,8 @@
   "file": "main",
   "edits": [
    [
-    "            var probeRows = _chartDrillProbe(sourceRows, [vizConfig.xAxis, vizConfig.groupBy]);",
-    "            var probeRows = sourceRows;"
+    "            var drillFields = [vizConfig.xAxis, vizConfig.groupBy];   // (a split field: a row matches by any value, 2026-10-26)",
+    "            var drillFields = [];"
    ]
   ],
   "must": [
@@ -1864,8 +1864,8 @@
   "file": "main",
   "edits": [
    [
-    "                                var rv = _chartDrillCleanCellVal(_chartDrillGet(probeRows[ri], col));",
-    "                                var rv = _chartDrillCleanCellVal(sourceRows[ri].get(col));"
+    "                        originalForDrill = _chartDrillKeep(sourceRows, drillFields, function (pr) {",
+    "                        originalForDrill = _chartDrillKeep(sourceRows, [], function (pr) {"
    ]
   ],
   "must": [
@@ -1879,8 +1879,8 @@
   "file": "main",
   "edits": [
    [
-    "        var cfg = _getCanvasVizConfig(canvas) || {}, probe = _chartDrillProbe(rows, [cfg.xAxis, cfg.groupBy]);   // (a bucketed field: 2026-10-10)",
-    "        var cfg = _getCanvasVizConfig(canvas) || {}, probe = rows;"
+    "        return _chartDrillKeep(rows, [cfg.xAxis, cfg.groupBy], function (pr) {",
+    "        return _chartDrillKeep(rows, [], function (pr) {"
    ]
   ],
   "must": [
@@ -1894,8 +1894,8 @@
   "file": "main",
   "edits": [
    [
-    "        var probe = _chartDrillProbe(rows, path.slice(0, stop).map(function (s) { return s.col; }));",
-    "        var probe = rows;"
+    "        return _chartDrillKeep(rows, path.slice(0, stop).map(function (s) { return s.col; }), function (pr) {",
+    "        return _chartDrillKeep(rows, [], function (pr) {"
    ]
   ],
   "must": [
@@ -1927,8 +1927,8 @@
   "file": "main",
   "edits": [
    [
-    "        var probe = _chartDrillProbe(sourceRows, [cfg.xAxis]);   // (a bucketed axis: 2026-10-10)",
-    "        var probe = sourceRows;"
+    "        var matchingRows = _chartDrillKeep(sourceRows, [cfg.xAxis], function (pr) {",
+    "        var matchingRows = _chartDrillKeep(sourceRows, [], function (pr) {"
    ]
   ],
   "must": [
@@ -1942,8 +1942,8 @@
   "file": "main",
   "edits": [
    [
-    "            var probe = _chartDrillProbe(sourceRows, [vizCfg.xAxis, vizCfg.groupBy]);",
-    "            var probe = sourceRows;"
+    "            var _fpFields = [vizCfg.xAxis, vizCfg.groupBy];",
+    "            var _fpFields = [];"
    ]
   ],
   "must": [
@@ -2901,6 +2901,21 @@
    "server3"
   ]
  },
+ "cnsrline": {
+  "file": "main",
+  "edits": [
+   [
+    "        try { _cnSrPaint(chart, cfg, want); } catch (eSr) { }\r\n",
+    ""
+   ]
+  ],
+  "must": [
+   "V-ch-sr"
+  ],
+  "scn": [
+   "chbar"
+  ]
+ },
  "cw4srvscope": {
   "file": "manage",
   "edits": [
@@ -2915,36 +2930,6 @@
   "scn": [
    "server11",
    "server"
-  ]
- },
- "gl-notejump": {
-  "file": "main",
-  "edits": [
-   [
-    "                if (_gl && typeof _gl.selectGroup === 'function') _gl.selectGroup(w);\r\n",
-    ""
-   ]
-  ],
-  "must": [
-   "R-bands-listsel"
-  ],
-  "scn": [
-   "bands"
-  ]
- },
- "cnsrline": {
-  "file": "main",
-  "edits": [
-   [
-    "        try { _cnSrPaint(chart, cfg, want); } catch (eSr) { }\r\n",
-    ""
-   ]
-  ],
-  "must": [
-   "V-ch-sr"
-  ],
-  "scn": [
-   "chbar"
   ]
  }
 }

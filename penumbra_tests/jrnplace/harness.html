@@ -1,0 +1,307 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>jrnplace</title>
+<link rel="stylesheet" href="main.css">
+<link rel="stylesheet" href="density.css">
+<link rel="stylesheet" href="penumbra_colwidths.css">
+<link rel="stylesheet" href="penumbra_grouplist.css">
+</head>
+<body class="theme-default">
+<!-- jrnplace suite (2026-10-26) - where a report's SAVED layout puts the journal's columns (Notes, a toggle, its
+     who / when). A Save writes them into columnOrder / visibleColumns by name (the data columns by place), but only the
+     viewer's OWN layout (localStorage) placed them at load: for every viewer without one - a new one, or after Clear All
+     Custom Preferences - a Notes column the author moved to the end opened right after '#', and one they hid showed.
+     Each scenario boots the REAL main.js (+ the real calc and grouping modules) through the REAL run path (a stubbed
+     query.php) from a stored report whose viewOptions turn the journal on (row notes, key V_ID; a toggle 'k1' in some),
+     so the journal paints its columns as on a real load. The plumbing is the ldlayout harness's. -->
+<div id="zzHarnessPlumbing" style="display:none">
+  <input id="reportTitle" value=""><input id="reportSubtitle" value=""><div id="admWrapper"></div><button id="toggleAdminViewBtn"></button>
+  <div id="editorTabs"></div><div id="mainReportSubtitle"></div><div id="mainReportTitle"></div>
+  <textarea id="sqlQuery"></textarea><textarea id="reportSnippet"></textarea><textarea id="subquerySql"></textarea>
+  <button id="executeQuery">Run</button><button id="stopQueryBtn">Stop</button>
+  <div id="importTimestamps"></div>
+  <div id="errorBox"></div><div id="undo_text_container"></div>
+  <button id="groupTableBtn" type="button">Group</button><button id="shareQuery" type="button">Share</button>
+  <div id="helpContentContainer"></div>
+  <input type="checkbox" id="viewOptionJournal"><!-- a Save writes journalEnabled from it (the load ticks it) -->
+</div>
+<div id="loadingOverlay" style="display:none"><p id="execution-timer"></p><p id="loadingMessage"></p><div id="loadingTip"></div></div>
+<div id="reportHeaderContainer"><div id="defaultTitleView">jrnplace fixture</div><div id="reportInfoPanel" style="display:none"></div><div id="reportSnippetOutput"></div></div>
+<div id="resultsHeader">
+  <div id="tableSearchContainer"><input id="tableSearch" value=""></div>
+  <span id="resultCount"></span>
+  <div id="paginationControls"><select id="rowsPerPageSelector"><option value="25">25</option><option value="50">50</option><option value="200">200</option><option value="all">All</option><option value="none">None</option></select><span id="pageInfo"></span></div>
+  <div id="groupActionsContainer">
+    <a href="#" class="themed-link-button" id="expandAllGroups">Expand All</a>
+    <a href="#" class="themed-link-button" id="collapseAllGroups">Collapse All</a>
+    <span class="btn-group-sep" id="removeGroupingSep">&bull;</span> <a href="#" class="themed-link-button" id="configureGroupingBtn">Configure Grouping</a>
+    <a href="#" class="themed-link-button" id="removeGroupingLink">Remove Grouping</a>
+  </div>
+  <button id="exitPivotModeBtn" type="button" style="display:none">Exit pivot</button>
+  <button id="modifyPivotBtn" type="button" style="display:none">Modify pivot</button>
+</div>
+<div id="table-view-container"><table id="resultsTable" class="data-grid-table"><caption class="sr-only">Report results table</caption><thead><tr id="tableHeader"></tr></thead><tbody></tbody></table><div id="groupedResultsContainer" style="display:none"></div><div id="pivot-output-container" style="display:none"></div></div>
+<div id="groupingLightbox" style="display:none">
+  <div id="groupingColumnSelector" class="penumbra-custom-select"><div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div></div>
+  <div id="groupLevel2Row" style="display:none"><div id="groupingColumnSelector2" class="penumbra-custom-select"><div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div></div></div>
+  <div id="groupLevel3Row" style="display:none"><div id="groupingColumnSelector3" class="penumbra-custom-select"><div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div></div></div>
+  <input type="checkbox" id="groupAggCheckbox">
+  <div id="groupAggOptions" style="display:none"></div>
+  <div id="groupAggColumn" class="penumbra-custom-select"><div class="pcs-selected" data-value=""></div><div class="pcs-dropdown"></div></div>
+  <select id="groupAggType"><option value="sum">sum</option><option value="avg">avg</option></select>
+  <select id="groupSortSelect">
+    <option value="label|asc">label asc</option><option value="label|desc">label desc</option>
+    <option value="count|asc">count asc</option><option value="count|desc">count desc</option>
+  </select>
+  <select id="groupLimitDir"><option value="top">top</option><option value="bottom">bottom</option></select>
+  <input type="text" id="groupLimitN"><input type="text" id="groupLimitMinRows">
+  <input type="checkbox" id="groupLimitOther" checked>
+  <div id="groupSummaryFilterHint" style="display:none"></div>
+  <div id="groupStartDepthRow"><select id="groupStartDepth">
+    <option value="0">Collapsed</option><option value="1">Level 1</option><option value="2">Level 2</option><option value="3">All levels</option>
+  </select></div>
+  <div id="groupLayoutRow" style="display: none;">
+    <div id="groupLayoutLbl">Layout <span class="bld-help-icon" data-tip="group-layout"></span></div>
+    <div class="grp-lb-inline grp-lb-radios" role="radiogroup" aria-labelledby="groupLayoutLbl">
+      <label><input type="radio" name="groupLayoutChoice" value="stacked" checked> Stacked</label>
+      <label><input type="radio" name="groupLayoutChoice" value="list"> List</label>
+    </div>
+    <input type="hidden" id="groupLayout" value="stacked">
+  </div>
+  <button id="resetGroupingBtn" type="button">Reset</button>
+  <button id="copyGroupSnippetBtn" type="button">Snippet</button>
+  <button id="confirmGroupingBtn" type="button">Apply Grouping</button>
+</div>
+<div id="settingsPanelOverlay"></div>
+<div id="settingsPanel">
+  <select id="spThemeSelector"><option value="report-default">Report Default</option><option value="theme-default">Default</option></select>
+  <select id="spDensitySelector"><option value="report-default">Report Default</option><option value="standard">Standard</option></select>
+  <input type="checkbox" id="spRowExpandToggle"><input type="checkbox" id="spResolverToggle">
+  <div class="sp-section sp-columns-section"><div class="sp-column-container"><div id="spColumnList" class="sp-column-list"></div></div></div>
+  <div class="sp-actions"><button id="spApply">Save Column Layout</button><button id="spReset">Reset</button><span id="spPendingCount"></span></div>
+</div>
+<div id="pnbStatusBar">
+  <div class="sb-seg" id="sbColsSeg"><span id="sbCols"></span>
+    <span class="sb-chip" id="sbCustomCols" style="display:none;">custom layout</span>
+    <div class="sb-pop" id="sbCustomColsPop"><div id="sbCustomColsDiff"></div><button id="sbCustomColsReset">Reset</button><button id="sbCustomColsSave" style="display:none;">Save</button></div>
+  </div>
+  <div class="sb-seg" id="sbUserSeg"></div>
+</div>
+<!-- The Save dialog (the savelayout harness's): every field the two confirm handlers read. -->
+<button id="saveQuery">Save</button>
+<div id="saveStateLightbox" style="display:none">
+  <input id="localSaveNameInput" value=""><div id="localSaveStatus"></div><div id="localSaveSizeWarning"></div>
+  <div id="localSaveOverwriteContainer"></div><input type="checkbox" id="localSaveOverwriteCheckbox">
+  <input type="checkbox" id="enableLocalReportPassword"><input id="localSavePassword"><input id="localSavePasswordConfirm">
+  <button id="confirmLocalSaveBtn">Save locally</button>
+  <input id="serverSaveIdInput" value=""><input id="serverSaveTitleInput" value=""><input id="serverSaveSubtitleInput" value="">
+  <input type="checkbox" id="serverSaveOverwriteCheckbox" checked>
+  <div id="authAccessContainer"></div><input id="authAccessInput" value=""><input type="hidden" id="serverSaveAuthorized" value="">
+  <select id="serverSaveTheme"><option value="theme-default">Default</option></select>
+  <select id="serverSaveDensity"><option value="standard">Standard</option></select>
+  <input type="checkbox" id="serverSaveRowHeight"><input type="checkbox" id="serverSaveResolver">
+  <select id="serverSaveRowsPerPage"><option value="25">25</option><option value="200" selected>200</option></select>
+  <input type="checkbox" id="serverSaveSortNone">
+  <input type="checkbox" id="enableReportPassword"><input id="serverSavePassword"><input id="serverSavePasswordConfirm">
+  <div id="serverSaveStatus"></div>
+  <button id="confirmServerSaveBtn">Save to server</button>
+</div>
+<pre id="out">running</pre>
+
+<script>
+  (function () { try { localStorage.clear(); } catch (e) {} })();
+  window.PENUMBRA_THEMES = { 'theme-default': { label: 'Default' } };
+  window.PENUMBRA_THEME_IDS = ['theme-default'];
+  window.PENUMBRA_THEME_ALIASES = {};
+  window.PENUMBRA_LANDING_DEFAULT_THEME = 'theme-default';
+  (function () {
+    var P = new URLSearchParams(location.search);
+    var S = window.__SCN = P.get('scn') || 'repend';
+    // --- the fixture: the ldlayout one (300 rows, 20 columns) - the result the report was SAVED against --
+    var BASE = window.__BASE = [
+      'V_ID', 'V_NAME', 'V_AMOUNT', 'V_DATE', 'V_LINK', 'V_STATUS',            // 0-5 shown
+      'H_TEXT', 'H_NUM', 'H_MONEY', 'H_DATE', 'H_HTML', 'H_JSON', 'H_ENT',     // 6-12 hidden
+      'H_NL', 'H_NULL', 'H_GROUP', 'H_GROUP2', 'H_AMT', 'H_FLAG', 'H_CODE'     // 13-19 hidden
+    ];
+    var H = BASE.slice(6);
+    function places(n) { var o = []; for (var c = 0; c < n; c++) o.push(c); return o; }
+    // the journal's columns as a Save writes them (by name): Notes, toggle k1, its who / when
+    var N = '__JOURNAL_NOTES', T = '__JOURNAL_TOGGLE__k1', TB = '__JOURNAL_BY__k1', TO = '__JOURNAL_ON__k1';
+    // The saved layout: V_AMOUNT moved first, the six V_ columns shown, the H_ ones hidden (and the row numbers shown)
+    var ORD = [2, 0, 1].concat(places(20).slice(3)), VIS = ['#', 2, 0, 1, 3, 4, 5];
+    var SHOWN = ['V_AMOUNT', 'V_ID', 'V_NAME', 'V_DATE', 'V_LINK', 'V_STATUS'];
+    // cols: the result's columns NOW, in the SQL's order; order / vis: the report's saved lists; prefs: this viewer's
+    // own layout for the report (by NAME, as a column move or Save Column Layout writes it); toggle: the toggle k1
+    // with its who / when columns; group: saved grouped; link: opened from a view link with its own column layout
+    var C = {
+      repend:   { cols: BASE, order: ORD.concat([N]), vis: VIS.concat([N]) },                 // Notes moved to the end
+      // the SQL put V_NEW in front since (every saved place shifted): Notes after V_ID, the toggle block at the end - by name
+      repmid:   { cols: ['V_NEW'].concat(BASE), order: [2, 0, N, 1].concat(places(20).slice(3), [T, TB, TO]), vis: VIS.concat([N, T, TB, TO]), toggle: true },
+      rephid:   { cols: BASE, order: ORD.concat([N]), vis: VIS },                             // Notes hidden (listed, not shown)
+      repnone:  { cols: BASE },                                                               // saved before the notes were on
+      repfirst: { cols: BASE, order: [N].concat(ORD), vis: VIS.concat([N]) },                 // Notes first, as the page put it
+      minewins: { cols: BASE, order: ORD.concat([N]), vis: VIS.concat([N]), prefs: 'first' },
+      mineunl:  { cols: BASE, order: ORD.concat([N]), vis: VIS.concat([N]), prefs: 'nonotes' },
+      minehid:  { cols: BASE, order: [N].concat(ORD), vis: VIS.concat([N]), prefs: 'hidden' },
+      mineshow: { cols: BASE, order: ORD.concat([N]), vis: VIS, prefs: 'shown' },
+      linkwins: { cols: BASE, order: ORD.concat([N]), vis: VIS.concat([N]) },
+      stays:    { cols: BASE, order: ORD.concat([N]), vis: VIS.concat([N]) },
+      resetall: { cols: BASE, order: ORD.concat([N]), vis: VIS.concat([N]) },
+      resetcol: { cols: BASE, order: ORD.concat([N]), vis: VIS.concat([N]) },
+      requery:  { cols: BASE, order: ORD.concat([N]), vis: VIS.concat([N]) },
+      grouped:  { cols: BASE, order: ORD.concat([N]), vis: VIS.concat([N]), group: true },
+      flowsave: { cols: BASE },                                                               // the user's report: Notes after '#'
+      flowload: { cols: BASE },                                                               // the state flowsave posted (run.py injects it)
+      // the toggle columns (user 10-26: "make sure toggle rows follow the same fix"): Done and its who / when at the end
+      tgend:    { cols: BASE, order: [N].concat(ORD, [T, TB, TO]), vis: VIS.concat([N, T, TB, TO]), toggle: true },
+      // its who / when saved BEFORE it and hidden: right after '#', hidden; Done after them, then Notes
+      tghid:    { cols: BASE, order: [TB, TO, T, N].concat(ORD), vis: VIS.concat([T, N]), toggle: true },
+      tgflowsave: { cols: BASE, toggle: true },                                               // Done (alone) moved to the end, then Save
+      tgflowload: { cols: BASE, toggle: true }                                                // the state tgflowsave posted
+    };
+    var K = C[S] || C.repend;
+    window.__K = { order: K.order || ORD, vis: K.vis || VIS, prefs: K.prefs || null, toggle: !!K.toggle, group: !!K.group, SHOWN: SHOWN, H: H, N: N, T: T, TB: TB, TO: TO };
+    var seed = 20260930;
+    function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
+    function pick(a) { return a[Math.floor(rnd() * a.length)]; }
+    var W = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel', 'India', 'Juliet', 'Kilo', 'Lima'];
+    function money() { return '$' + (rnd() * 90000 + 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+    function date() { var d = new Date(2021, 0, 1 + Math.floor(rnd() * 1500)); return (d.getMonth() + 1) + '/' + d.getDate() + '/' + d.getFullYear(); }
+    function link() { var id = String(400000 + Math.floor(rnd() * 99999)); return '@@HTML<a href="https://oitras.oit.ncsu.edu/resolver/103?id=' + id + '" target="_new" class="resolver-link">' + id + '</a>'; }
+    var rows = [];
+    for (var i = 1; i <= 300; i++) {
+      var b = {};
+      b.V_ID = 'ID-' + String(1000 + i);
+      b.V_NAME = pick(W) + ' ' + pick(W);
+      b.V_AMOUNT = money();
+      b.V_DATE = date();
+      b.V_LINK = link();
+      b.V_STATUS = pick(['Open', 'Closed', 'Pending']);
+      b.H_TEXT = pick(W) + ' ' + pick(W) + ' ' + i;
+      b.H_NUM = String(Math.floor(rnd() * 1000));
+      b.H_MONEY = money();
+      b.H_DATE = date();
+      b.H_HTML = link();
+      var sub = []; for (var k = 0, n = 1 + Math.floor(rnd() * 3); k < n; k++) sub.push({ SUB_ID: 'S' + Math.floor(rnd() * 90), SUB_AMT: Math.floor(rnd() * 5000), SUB_NAME: pick(W) });
+      b.H_JSON = (i % 7 === 0) ? null : '@@JSON' + JSON.stringify(sub);
+      b.H_ENT = pick(['R&amp;D', 'plain', 'A &amp; B']);
+      b.H_NL = pick(W) + '\n' + pick(W);
+      b.H_NULL = (i % 3 === 0) ? null : ((i % 3 === 1) ? '' : pick(W));
+      b.H_GROUP = (i % 11 === 0) ? null : pick(['North', 'South', 'East', 'West', 'Central']);
+      b.H_GROUP2 = pick(['Tier 1', 'Tier 2', 'Tier 3']);
+      b.H_AMT = String(Math.floor(rnd() * 20000) / 100);
+      b.H_FLAG = rnd() < 0.3 ? 'Y' : 'N';
+      b.H_CODE = pick(['AB', 'CD', 'EF', 'GH']) + '-' + Math.floor(rnd() * 99);
+      b.V_NEW = 'N' + i;
+      var r = {};
+      K.cols.forEach(function (c) { r[c] = b[c]; });
+      rows.push(r);
+    }
+    window.__rowsFixture = rows;
+    window.__colsNow = Object.keys(rows[0]);
+    // --- the stored report: saved against BASE, its journal on (row notes keyed on V_ID; k1 where asked) ------------
+    var vo = { journalEnabled: true, journalRowNotes: true, journalKeyColumns: ['V_ID'] };
+    if (K.toggle) { vo.journalToggles = [{ key: 'k1', label: 'Done' }]; vo.journalToggleWho = true; }
+    var st = {
+      name: 'ldfix', query: 'SELECT * FROM LD_FIXTURE', reportTitle: 'Journal place fixture',
+      theme: 'theme-default', density: 'standard',
+      visibleColumns: (K.vis || VIS).slice(), columnOrder: (K.order || ORD).slice(),
+      layoutColumnNames: BASE.map(function (n) { return n.toUpperCase(); }),
+      sortCriteria: [], noLimit: true, rowExpandDefault: false, resolverLinksDefault: true,
+      rowsPerPage: '200', reportSnippet: '', viewOptions: vo
+    };
+    if (K.group) { st.groupBy = 'H_GROUP'; st.groupAgg = { column: 'H_AMT', type: 'sum' }; }
+    // flowload: the state the 'flowsave' scenario's Save posted (run.py puts it here before the page loads)
+    if (window.__INJECT) st = window.__INJECT;
+    window.__STORED = st;
+    window.penumbra_vars = {
+      isAdmin: true, isGlobalAdmin: true, canEditReport: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' },
+      tables: { oracle: [], pins: [], infoed: [], hr: [], fin: [] },
+      imports: [], reports: [], themes: {}, prompts: {}, grants: [],
+      totalExemptions: ['AMOUNT', 'H_AMT', 'H_NUM'],
+      preloadedState: st
+    };
+    window.__queryResponse = { data: rows };
+  })();
+  window.__T = {};
+  window.__queryDone = 0;
+  window.__ajaxLog = [];
+  window.__savePosts = [];
+</script>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="moment.min.js"></script>
+<script src="pako.min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="sql.min.js"></script>
+<script src="show-hint.js"></script>
+<script src="foldcode.js"></script>
+<script src="foldgutter.js"></script>
+<script src="brace-fold.js"></script>
+<script src="comment-fold.js"></script>
+<script src="placeholder.js"></script>
+<script src="penumbra_snippet_help.js"></script>
+<script src="purify.min.js"></script>
+<script src="penumbra_template.js"></script>
+<script>
+  jQuery.ajax = function (a, b) {
+    var opts = (typeof a === 'string') ? jQuery.extend({ url: a }, b || {}) : (a || {});
+    var url = String(opts.url || '');
+    window.__ajaxLog.push(url);
+    var d = jQuery.Deferred();
+    var isQuery = /query\.php/.test(url);
+    var resp = isQuery ? window.__queryResponse : (/help_content\.php/.test(url) ? '' : {});
+    if (/save_server_state\.php/.test(url)) {
+      var body = {}; try { body = JSON.parse(opts.data); } catch (e) {}
+      window.__savePosts.push(body);
+      resp = { success: true, message: 'Report saved successfully!', new_id: body.short_id, numeric_id: 1522, is_new: false };
+    }
+    // the journal: no marks, no notes yet (its reads answer as an empty journal does)
+    if (/manage_journal\.php/.test(url)) {
+      if (/action=toggles/.test(url)) resp = { success: true, toggles: {}, states: {} };
+      else if (/action=row_notes/.test(url)) resp = { success: true, counts: {}, notes: {} };
+      else resp = { success: true };
+    }
+    setTimeout(function () {
+      try { if (opts.success) opts.success(resp, 'success', { status: 200 }); } catch (e) { window.__errors.push('ajax success threw: ' + String(e) + ' (' + url.slice(0, 60) + ')'); }
+      try { if (opts.complete) opts.complete({ status: 200 }, 'success'); } catch (e) { window.__errors.push('ajax complete threw: ' + String(e)); }
+      d.resolve(resp, 'success', { status: 200 });
+      if (isQuery) window.__queryDone++;
+    }, 0);
+    var p = d.promise(); p.abort = function () {}; return p;
+  };
+  jQuery.getJSON = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.post = function (u, x, cb) { return jQuery.ajax({ url: u, success: (typeof x === 'function') ? x : cb }); };
+  jQuery.get = jQuery.post;
+  jQuery.fx.off = true;
+  window.__errors = [];
+  window.__rejections = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    window.__rejections.push(String((r && r.message) || r) + ' @' + String((r && r.stack) || '').split('\n').slice(1, 2).join('').trim());
+    e.preventDefault();
+  });
+  window.confirm = function () { return true; };
+  window.alert = function (m) { window.__errors.push('alert: ' + m); };
+  window.prompt = function () { return null; };
+  if (typeof window.stackHeaders !== 'function') window.stackHeaders = function () {};
+</script>
+<script src="penumbra_userseg.js"></script>
+<script src="penumbra_presets.js"></script>
+<script src="penumbra_calc.js"></script>
+<script>
+  // this viewer's own column layout for the report (by NAME), as a column move or Save Column Layout writes it
+  (function () {
+    var K = window.__K, N = K.N, V = K.SHOWN, H = K.H, lay = null;
+    if (K.prefs === 'first') lay = { order: [N].concat(V, H), visible: [N].concat(V), isNumVisible: true };                     // Notes first, shown
+    if (K.prefs === 'nonotes') lay = { order: ['V_STATUS'].concat(V.slice(0, 5), H), visible: ['V_STATUS'].concat(V.slice(0, 5)), isNumVisible: true };   // saved before Notes
+    if (K.prefs === 'hidden') lay = { order: V.concat(H, [N]), visible: V.slice(), isNumVisible: true };                         // Notes last, hidden
+    if (K.prefs === 'shown') lay = { order: V.slice(0, 2).concat([N], V.slice(2), H), visible: V.slice(0, 2).concat([N], V.slice(2)), isNumVisible: true };   // after V_ID, shown
+    if (lay) localStorage.setItem('penumbra_column_prefs', JSON.stringify({ ldfix: lay }));
+  })();
+</script>
+<script src="main_hc.js"></script>
+<script src="penumbra_colwidths.js"></script>
+<script src="penumbra_grouplist.js"></script>
+<script src="driver.js"></script>
+</body></html>

@@ -26,7 +26,11 @@ SCN = ['mflat', 'mkbd', 'mopts', 'mcalc', 'mgroupby', 'gmenu', 'mrestr', 'mexcl'
        'mauto', 'mauto2', 'ggmenu', 'gglist', 'ggfmt', 'mautostale', 'mhl']   # (2026-10-24, hlhead) mhl
 SCN = SCN + ['mnestgb', 'ggnest']   # (2026-10-25, nestgb) Group by on a nested-table column
 SCN = SCN + ['gnnestbd', 'gchipnest']   # (2026-10-25, nestgb2) a group's band menu and the status bar chip on nested-table columns
+SCN = SCN + ['ggstat']   # (2026-10-26, cstat) Column stats in the grouped view, a search typed there
 CHK = {
+    # (2026-10-26, cstat) Column stats in the grouped view with a search typed there (it marks the grouped rows alone): the rows it
+    # keeps, each row once (grouped by SUB_NAME a row sits in several groups); csAll / csBefore: no search, a search before grouping
+    'ggstat': ['csAll', 'csCount', 'csNum', 'csJournal', 'csBefore', 'csOnce', 'csShownCopy'],
     # (2026-10-25, nestgb2) the group band menu's Group by lists (grouped by H_GROUP, H_GROUP2) and the status bar's grouping
     # chip: no nested-table column, its tables' columns at the top level (the dialog's Nested Table Columns)
     'gnnestbd': ['nbTopList', 'nbDedupe', 'nbNoParent', 'nbInnerNone', 'nbOtherTitle', 'nbPick', 'nbPickTick', 'nbUndo', 'nbKbd', 'nbHiddenNot', 'nbHiddenList'],
@@ -185,8 +189,29 @@ NEW = NEW - ({'L-mnestgb-%s' % c for c in CHK['mnestgb']} | {'L-ggnest-%s' % c f
 # (2026-10-25, neststats) Column stats per column of a nested-table column's tables: nsStats / nsStatsFilter new, nsColList /
 # nsNone / nsClipOff reshaped (the list gains Column stats; the greyed line's reason; the stats stay where Clipboard is hidden)
 NEW = NEW | {'L-mnestgb-%s' % c for c in ('nsColList', 'nsNone', 'nsClipOff', 'nsStats', 'nsStatsFilter', 'nsStatsTables')} | {'L-ggnest-gnStatsGrouped', 'S-helpNestStats'}
+NEW = NEW - ({'L-mnestgb-%s' % c for c in ('nsColList', 'nsNone', 'nsClipOff', 'nsStats', 'nsStatsFilter', 'nsStatsTables')} | {'L-ggnest-gnStatsGrouped', 'S-helpNestStats'})   # (neststats is LIVE since 9e27a25, 2026-10-26: old checks now)
 NEW = NEW - {'L-mnestgb-nsListThrows'}   # (2026-10-25, digitcol) a guard: the picker's list throwing (a stub) - holds on live
+# (2026-10-26, cstat) Column stats in the grouped view count the rows a search typed there keeps, each row once (live: every
+# row - it reads the flat table, which that search never marks); csAll and csBefore hold on live (guards)
+NEW = NEW | {'L-ggstat-%s' % c for c in CHK['ggstat'] if c not in ('csAll', 'csBefore')}
+NEW = NEW - {'L-ggstat-%s' % c for c in CHK['ggstat']}   # (cstat is LIVE since 12bbda7, 2026-10-26: old checks now)
 MUTANTS = {
+    # --- (2026-10-26, cstat) the grouped view's rows: the flat table's alone (live's reading); every copy of a row; the first copy
+    # though a later one is kept; the last copy though hidden; one reader on the flat rows (a journal column's counts; every other one's)
+    'cs-flat': ([('main', "        if (!$('#groupedResultsContainer').is(':visible')) return document.querySelectorAll('#resultsTable > tbody > tr');",
+                  "        if (true) return document.querySelectorAll('#resultsTable > tbody > tr');")],
+                ['L-ggstat-csCount', 'L-ggstat-csNum', 'L-ggstat-csJournal', 'L-ggstat-csOnce', 'L-ggstat-csShownCopy'], ['ggstat']),
+    'cs-copies': ([('main', "        return Array.from(byIdx.values());", "        return Array.prototype.slice.call(all);")], ['L-ggstat-csOnce'], ['ggstat']),
+    'cs-firstcopy': ([('main', "            if (!had || (had.classList.contains('search-hidden') && !all[i].classList.contains('search-hidden'))) byIdx.set(idx, all[i]);",
+                       "            if (!had) byIdx.set(idx, all[i]);")], ['L-ggstat-csShownCopy'], ['ggstat']),
+    'cs-lastcopy': ([('main', "            if (!had || (had.classList.contains('search-hidden') && !all[i].classList.contains('search-hidden'))) byIdx.set(idx, all[i]);",
+                      "            byIdx.set(idx, all[i]);")], ['L-ggstat-csShownCopy'], ['ggstat']),
+    'cs-jrnflat': ([('main', "        var rows = _pnbColStatsRows(), seen = new Set(), n = 0, empty = 0, on = 0, notes = 0, kind = '';",
+                     "        var rows = document.querySelectorAll('#resultsTable > tbody > tr'), seen = new Set(), n = 0, empty = 0, on = 0, notes = 0, kind = '';")],
+                   ['L-ggstat-csJournal'], ['ggstat']),
+    'cs-profflat': ([('main', "        var rows = _pnbColStatsRows(), freq = new Map(), n = 0, empty = 0, nested = 0, subRows = 0;",
+                      "        var rows = document.querySelectorAll('#resultsTable > tbody > tr'), freq = new Map(), n = 0, empty = 0, nested = 0, subRows = 0;")],
+                    ['L-ggstat-csCount', 'L-ggstat-csNum', 'L-ggstat-csOnce', 'L-ggstat-csShownCopy'], ['ggstat']),
     # --- (2026-10-25, nestgb2) the band menu's lists: no nested tables' columns; the nested-table column listed too; its tables'
     # columns at every level; a name two tables share twice; Other column... promising nested fields at every level; a hidden
     # column's tables read; a pick that adds a level instead of regrouping this one

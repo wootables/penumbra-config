@@ -18,6 +18,9 @@
 //                           .bak-*-notescol): exactly CONTROL_RED fails
 //
 // S-* export resolver   X-* strip / decorate / columns   E-* edit action   P-* preconditions
+// J-* (round 8, 2026-10-26 jrnplace) the scheduled output's journal columns where the report's saved layout
+//     has them, as the page now opens them: schedule_runner.php penumbra_sched_journal_places through
+//     apply_state_logic. A mutant on schedule_runner.php runs the child on a mutated copy of the build's runner.
 // =============================================================================
 error_reporting(E_ALL);
 $APP = '//oitras.oit.ncsu.edu/c$/inetpub/wwwroot/sponsor_migration/penumbra';
@@ -27,6 +30,7 @@ $flag = function ($n) use (&$args) { $i = array_search($n, $args, true); if ($i 
 $app = $opt('--app', $APP);
 $RUNNER_PATH = '';   // set below: the build's schedule_runner.php (round 4)
 $SEARCH_PATH = file_exists($app . '/penumbra_search.php') ? $app . '/penumbra_search.php' : $APP . '/penumbra_search.php';   // (round 7)
+$LAYOUT_PATH = file_exists($app . '/penumbra_layout.php') ? $app . '/penumbra_layout.php' : $APP . '/penumbra_layout.php';   // (round 8)
 $oneMutant = $opt('--mutant');
 $flatOut = $opt('--flat-out');
 $allMutants = $flag('--mutants');
@@ -42,7 +46,7 @@ $MUTANTS = array(
     'withwho'  => array('journal_export.php', "if (\$withWho && !empty(\$resolver['notesName'])) {", "if (!empty(\$resolver['notesName'])) {",
                         array('X-decorate', 'X-rowvalues-nowho')),
     'keepcols' => array('journal_export.php', "if (!empty(\$resolver['notesName'])) \$out['whoNames'][] = \$resolver['notesName'];", "",
-                        array('X-keepcols', 'S-on-names', 'S-with-toggles')),
+                        array('X-keepcols', 'S-on-names', 'S-with-toggles', 'J-fixture')),
     'parked'   => array('journal_export.php', "if (\$rk === '' || (defined('JOURNAL_PARK_OPEN') && strpos(\$rk, JOURNAL_PARK_OPEN) === 0)) continue;", "if (\$rk === '') continue;",
                         array('S-parked')),
     'latest'   => array('manage_journal.php', "if (!empty(\$later) && (int)\$later[0]['CNT'] > 0) {", "if (false) {",
@@ -55,6 +59,27 @@ $MUTANTS = array(
                         array('Q-and', 'Q-clean', 'Q-col', 'Q-col-not', 'Q-col-regex', 'Q-count', 'Q-empty', 'Q-grouped', 'Q-word', 'Q-word-not', 'S-off-noquery', 'S-off-notesonly')),
     'flatrep'  => array('journal_export.php', "if (\$id !== '' && isset(\$replies[\$id])) { foreach (\$replies[\$id] as \$r) \$out[] = \"  \\xE2\\x86\\xB3 \" . \$line(\$r); }", "",
                         array('S-flatten', 'S-on-value', 'S-with-toggles', 'S-collide', 'X-rowvalues', 'Q-clean', 'Q-word', 'Q-word-not')),
+    // (round 8, jrnplace) schedule_runner.php: the journal's columns where the saved layout has them
+    'jp-wire'     => array('schedule_runner.php', 'if ($_lead && is_array($_jRes)) $finalOrderNames = penumbra_sched_journal_places(', 'if (false) $finalOrderNames = penumbra_sched_journal_places(',
+                        array('J-end', 'J-state', 'J-mid', 'J-hidden', 'J-who-first', 'J-hidden-anchor', 'J-hidden-prev', 'J-old-hash', 'J-names', 'J-tag', 'J-page', 'J-model')),
+    'jp-stateres' => array('schedule_runner.php', '$_jRes = (isset($state[\'journalToggleResolver\']) && is_array($state[\'journalToggleResolver\'])) ? $state[\'journalToggleResolver\']', '$_jRes = false ? null',
+                        array('J-state')),
+    'jp-hiddendata' => array('schedule_runner.php', 'if ($i === false) { $i = $after + 1; array_splice($row, $i, 0, array($n)); $gone[] = $n; }', 'if ($i === false) continue;',
+                        array('J-hidden-anchor', 'J-vc-empty', 'J-model')),
+    'jp-hash'     => array('schedule_runner.php', 'if ($x === \'#\') break;   // an old save\'s: right after it, first', '',
+                        array('J-old-hash', 'J-model')),
+    'jp-hide'     => array('schedule_runner.php', 'if ($vc !== null && !in_array($pn, $vc, true)) $gone[] = $j;', '',
+                        array('J-hidden', 'J-hidden-prev', 'J-page', 'J-model')),
+    'jp-prev'     => array('schedule_runner.php', 'if ($prev !== null) $at = array_search($prev, $row, true) + 1;', '',
+                        array('J-who-first', 'J-hidden-anchor', 'J-hidden-prev', 'J-old-hash', 'J-lead', 'J-vc-empty', 'J-names', 'J-tag', 'J-model')),
+    'jp-janchor'  => array('schedule_runner.php', 'if ($n === null && is_string($x) && isset($byPage[$x])) $n = $byPage[$x];', '',
+                        array('J-end', 'J-state', 'J-mid', 'J-hidden', 'J-who-first', 'J-page', 'J-model')),
+    'jp-first'    => array('schedule_runner.php', 'while (--$k >= 0) {', 'if ($prev !== null) $at = array_search($prev, $row, true) + 1; while (--$k >= 0) {',
+                        array('J-who-first', 'J-old-hash', 'J-page', 'J-model')),
+    'jp-tagguard' => array('schedule_runner.php', 'return (isset($page[$n]) || in_array($n, $journal, true)) ? null : $n;', 'return isset($page[$n]) ? null : $n;',
+                        array('J-tag')),
+    'jp-vcempty'  => array('schedule_runner.php', 'is_array($state[\'visibleColumns\']) && $state[\'visibleColumns\']) ?', 'is_array($state[\'visibleColumns\'])) ?',
+                        array('J-vc-empty')),
 );
 // What the build before the change gets wrong (frozen from its first control run).
 $CONTROL_RED = array('O-lifted', 'O-order', 'O-order-null', 'O-lead', 'O-wired', 'M-lifted', 'M-br', 'M-cleared', 'M-wired', 'P-flatten-fn', 'P-edit-lifted', 'S-flatten', 'S-flatten-orphan', 'S-flatten-empty', 'S-on-value', 'S-on-blank',
@@ -69,6 +94,7 @@ function lift_build($app, $mutant, $MUTANTS) {
     foreach (array('journal_export.php', 'manage_journal.php') as $f) $files[$f] = file_get_contents($app . '/' . $f);
     if ($mutant !== null) {
         list($mf, $old, $new) = $MUTANTS[$mutant];
+        if ($mf === 'schedule_runner.php') $files[$mf] = file_get_contents($GLOBALS['RUNNER_PATH']);   // (round 8) the child reads this copy
         $c = substr_count($files[$mf], $old);
         if ($c !== 1) { fwrite(STDERR, "mutant $mutant: anchor found $c times\n"); exit(2); }
         $files[$mf] = str_replace($old, $new, $files[$mf]);
@@ -454,6 +480,202 @@ if ($mode) {
     } else { $A('O-lead', false, 'apply_state_logic not loaded'); $A('O-none', false, 'apply_state_logic not loaded'); }
     $A('O-wired', substr_count($runner, '$processed = apply_state_logic($flat_rows, $state, $journal_screen_cols);') === 1
         && substr_count($runner, "'journalToggleCols' => \$journal_screen_cols,") === 1, 'execute_scheduled_report hands them over in screen order');
+
+    // J: ...or where the report's saved layout has them (round 8, 2026-10-26 jrnplace), as the page now opens them
+    // for a viewer without a layout of their own (main.js savedAnchorFor / reportLayoutFor / savedHidden): one the
+    // saved columnOrder names goes right after the nearest column before it there that the page's header holds (a
+    // data column, hidden ones too, or a journal column painted before it), else first; one it does not name follows
+    // the one painted before it, or leads; one it names that the saved visibleColumns leaves out is left out.
+    // Through apply_state_logic, with the task's resolver as a run sets it (_snippet_journal_toggles) or as a
+    // reprocessing hands it on ($state['journalToggleResolver']).
+    $f5 = $lift($runner, 'penumbra_sched_journal_places'); $f6 = $lift($runner, '_snippet_journal_toggles');
+    if ($f5 && !function_exists('penumbra_sched_journal_places')) eval($f5);
+    if ($f6 && !function_exists('_snippet_journal_toggles')) eval($f6);
+    $A('J-lifted', function_exists('penumbra_sched_journal_places') && function_exists('_snippet_journal_toggles'), 'the helper + the task resolver lifted from the runner');
+    if (!function_exists('pnb_layout_state_here') && getenv('PNB_LAYOUT') && is_file(getenv('PNB_LAYOUT'))) require_once getenv('PNB_LAYOUT');
+    $setRes = function ($r) { if (function_exists('_snippet_journal_toggles')) _snippet_journal_toggles($r); };
+    // the run's own resolver and rows: two toggles with their who / when columns, and the Notes column
+    db_reset(); $GLOBALS['DB']['notes'] = std_notes();
+    $GLOBALS['DB']['toggles'] = array(array('TOGGLE_KEY' => 'done', 'ROW_KEY' => 'P-1', 'UPDATED_BY' => 'pat', 'UPDATED_ON' => '2026-10-01'));
+    $jRows = data_rows();
+    $jJt = journalExportToggleColumns('rpt', vo(array('journalToggleWho' => true,
+        'journalToggles' => array(array('key' => 'done', 'label' => 'Done'), array('key' => 't2', 'label' => 'Taken')))), $jRows);
+    $jRes = $jJt['resolver'];
+    $jScreen = (function_exists('penumbra_sched_journal_screen_order') && is_array($jRes))
+        ? penumbra_sched_journal_screen_order($jRes, array_merge($jJt['colNames'], $jJt['whoNames'])) : array();
+    $JS = array('DONE', 'DONE BY', 'DONE ON', 'TAKEN', 'TAKEN BY', 'TAKEN ON', 'NOTES');
+    $A('J-fixture', $jScreen === $JS && count(array_intersect($JS, array_keys($jRows[0]))) === 7,
+       'the run hands over ' . json_encode($jScreen) . ' | its rows ' . json_encode(array_keys($jRows[0])));
+    $P = 'PROPOSAL ID'; $T = 'TITLE'; $M = 'AMOUNT'; $jN = '__JOURNAL_NOTES';
+    $jT = function ($k) { return '__JOURNAL_TOGGLE__' . $k; }; $jB = function ($k) { return '__JOURNAL_BY__' . $k; };
+    $jO = function ($k) { return '__JOURNAL_ON__' . $k; };
+    $allJ = array($jT('done'), $jB('done'), $jO('done'), $jT('t2'), $jB('t2'), $jO('t2'), $jN);
+    // $how: 'run' (the static a run sets), 'state' (a reprocessing's $state), 'none' (no resolver). The columns handed
+    // over: the run's list as J-fixture has it ($JS), so a journal_export.php mutant reddens J-fixture alone.
+    $jCase = function ($id, $st, $want, $how = 'run', $rows = null, $keep = null) use ($A, $runAsl, $setRes, $jRows, $JS, $jRes) {
+        $setRes($how === 'run' ? $jRes : false);
+        if ($how === 'state') $st['journalToggleResolver'] = $jRes;
+        $out = function_exists('apply_state_logic') ? $runAsl($rows === null ? $jRows : $rows, $st, $keep === null ? $JS : $keep) : array('error' => 'apply_state_logic not loaded');
+        $setRes(false);
+        $got = (is_array($out) && isset($out['data'][0]) && is_array($out['data'][0])) ? array_map('strval', array_keys($out['data'][0])) : array('ERROR ' . (isset($out['error']) ? $out['error'] : json_encode($out)));
+        $A($id, $got === $want, implode(', ', $got) . ($got === $want ? '' : '   | want ' . implode(', ', $want)));
+    };
+    $lead = array('DONE', 'DONE BY', 'DONE ON', 'TAKEN', 'TAKEN BY', 'TAKEN ON', 'NOTES');
+    // the user's report (2026-10-26): Notes moved to the end and saved; the toggles where they were
+    $stEnd = array('columnOrder' => array_merge(array_slice($allJ, 0, 6), array(0, 1, 2, $jN)), 'visibleColumns' => array_merge(array('#'), $allJ, array(0, 1, 2)));
+    $wEnd = array('DONE', 'DONE BY', 'DONE ON', 'TAKEN', 'TAKEN BY', 'TAKEN ON', $P, $T, $M, 'NOTES');
+    $jCase('J-end', $stEnd, $wEnd);
+    $jCase('J-state', $stEnd, $wEnd, 'state');
+    $jCase('J-nores', $stEnd, array_merge($lead, array($P, $T, $M)), 'none');
+    // a toggle and its who / when columns moved between two data columns; Notes right after the first toggle's
+    $jCase('J-mid', array('columnOrder' => array($jT('done'), $jB('done'), $jO('done'), $jN, 0, 1, $jT('t2'), $jB('t2'), $jO('t2'), 2),
+                          'visibleColumns' => array_merge(array('#', 0, 1, 2), $allJ)),
+        array('DONE', 'DONE BY', 'DONE ON', 'NOTES', $P, $T, 'TAKEN', 'TAKEN BY', 'TAKEN ON', $M));
+    // a toggle hidden with its who / when columns, Notes at the end
+    $jCase('J-hidden', array('columnOrder' => array_merge(array_slice($allJ, 0, 6), array(0, 1, 2, $jN)),
+                             'visibleColumns' => array('#', $jT('done'), $jB('done'), $jO('done'), 0, 1, 2, $jN)),
+        array('DONE', 'DONE BY', 'DONE ON', $P, $T, $M, 'NOTES'));
+    // a who column saved before its toggle goes first, not after the toggle; the columns the save did not name
+    // (turned on since) follow the one painted before them
+    $jCase('J-who-first', array('columnOrder' => array($jB('done'), 0, $jT('done'), $jO('done'), 1, 2),
+                                'visibleColumns' => array('#', $jB('done'), 0, $jT('done'), $jO('done'), 1, 2)),
+        array('DONE BY', $P, 'DONE', 'DONE ON', 'TAKEN', 'TAKEN BY', 'TAKEN ON', 'NOTES', $T, $M));
+    // Notes saved after a HIDDEN data column: right after it on the page (its heading is in the row), so after the
+    // columns painted after the toggle before it - not right after that toggle
+    $jCase('J-hidden-anchor', array('columnOrder' => array(0, $jT('done'), 1, $jN, 2), 'visibleColumns' => array('#', 0, $jT('done'), $jN, 2)),
+        array($P, 'DONE', 'DONE BY', 'DONE ON', 'TAKEN', 'TAKEN BY', 'TAKEN ON', 'NOTES', $M));
+    // a HIDDEN toggle at the end: the columns painted after it follow it there
+    $jCase('J-hidden-prev', array('columnOrder' => array(0, 1, 2, $jT('done')), 'visibleColumns' => array('#', 0, 1, 2)),
+        array($P, $T, $M, 'DONE BY', 'DONE ON', 'TAKEN', 'TAKEN BY', 'TAKEN ON', 'NOTES'));
+    // an old save's '#' in the order: right after it is first, ahead of the columns painted there before it
+    $jCase('J-old-hash', array('columnOrder' => array(0, '#', $jN, 1, 2), 'visibleColumns' => array('#', 0, 1, 2, $jN)),
+        array_merge(array('NOTES'), array_slice($lead, 0, 6), array($P, $T, $M)));
+    // none named: they lead, in the page's order, as before
+    $jCase('J-lead', array('columnOrder' => array(2, 0, 1), 'visibleColumns' => array('#', 0, 1, 2)), array_merge($lead, array($M, $P, $T)));
+    // an empty visibleColumns is none (main.js _pnbLayoutOf): Notes stays, though the data columns are all hidden
+    $jCase('J-vc-empty', array('columnOrder' => array(0, $jN, 1, 2), 'visibleColumns' => array()), $lead);
+    // by name (ldlayout): the SQL put TITLE first since the save; Notes stays after TITLE
+    $jRows2 = array();
+    foreach ($jRows as $r) { $o = array($T => $r[$T]); foreach ($r as $k => $v) if ($k !== $T) $o[$k] = $v; $jRows2[] = $o; }
+    $jCase('J-names', array('layoutColumnNames' => array($P, $T, $M), 'columnOrder' => array(0, 1, $jN, 2), 'visibleColumns' => array('#', 0, 1, 2, $jN)),
+        array_merge(array_slice($lead, 0, 6), array($P, $T, 'NOTES', $M)), 'run', $jRows2);
+    // a caller's own column handed on with the journal's (a test's tag) that a saved place points at is kept
+    $jRows3 = array();
+    foreach ($jRows as $i => $r) { $r['ZTAG'] = (string)$i; $jRows3[] = $r; }
+    $tagAt = array_search('ZTAG', array_keys($jRows3[0]), true);
+    $jCase('J-tag', array('columnOrder' => array(0, 1, 2, $tagAt, $jN), 'visibleColumns' => array('#', 0, 1, 2, $jN)),
+        array_merge(array_slice($lead, 0, 6), array($P, $T, $M, 'NOTES', 'ZTAG')), 'run', $jRows3, array_merge($JS, array('ZTAG')));
+
+    // J-page: the layouts penumbra_tests\jrnplace opens in the page (harness.html, the staged main.js) and the order it
+    // shows them in there (driver.js shownNow: '#' left out) - the same columns in a scheduled output. BASE: the six V_
+    // columns shown, the H_ ones hidden; Notes, and the toggle k1 ("Done") with its who / when columns.
+    $BASE = array('V_ID', 'V_NAME', 'V_AMOUNT', 'V_DATE', 'V_LINK', 'V_STATUS', 'H_TEXT', 'H_NUM', 'H_MONEY', 'H_DATE', 'H_HTML',
+                  'H_JSON', 'H_ENT', 'H_NL', 'H_NULL', 'H_GROUP', 'H_GROUP2', 'H_AMT', 'H_FLAG', 'H_CODE');
+    $pgT = '__JOURNAL_TOGGLE__k1'; $pgB = '__JOURNAL_BY__k1'; $pgO = '__JOURNAL_ON__k1';
+    $ORD = array_merge(array(2, 0, 1), range(3, 19)); $VIS = array('#', 2, 0, 1, 3, 4, 5);
+    $V = array('V_AMOUNT', 'V_ID', 'V_NAME', 'V_DATE', 'V_LINK', 'V_STATUS');
+    $pgRes = array('colMeta' => array(), 'whoMeta' => array(), 'notesName' => 'NOTES');
+    $pgResT = array('colMeta' => array(array('name' => 'DONE', 'key' => 'k1')), 'notesName' => 'NOTES',
+                    'whoMeta' => array(array('name' => 'DONE BY', 'key' => 'k1', 'kind' => 'by'), array('name' => 'DONE ON', 'key' => 'k1', 'kind' => 'on')));
+    $PG = array(   // scenario => [toggle, the result's columns now, columnOrder, visibleColumns, the page's shown order]
+        'repend'   => array(false, $BASE, array_merge($ORD, array($jN)), array_merge($VIS, array($jN)), array_merge($V, array('NOTES'))),
+        'repmid'   => array(true, array_merge(array('V_NEW'), $BASE), array_merge(array(2, 0, $jN, 1), range(3, 19), array($pgT, $pgB, $pgO)),
+                            array_merge($VIS, array($jN, $pgT, $pgB, $pgO)), array('V_AMOUNT', 'V_ID', 'NOTES', 'V_NAME', 'V_DATE', 'V_LINK', 'V_STATUS', 'DONE', 'DONE BY', 'DONE ON')),
+        'rephid'   => array(false, $BASE, array_merge($ORD, array($jN)), $VIS, $V),
+        'repnone'  => array(false, $BASE, $ORD, $VIS, array_merge(array('NOTES'), $V)),
+        'repfirst' => array(false, $BASE, array_merge(array($jN), $ORD), array_merge($VIS, array($jN)), array_merge(array('NOTES'), $V)),
+        'tgend'    => array(true, $BASE, array_merge(array($jN), $ORD, array($pgT, $pgB, $pgO)), array_merge($VIS, array($jN, $pgT, $pgB, $pgO)),
+                            array_merge(array('NOTES'), $V, array('DONE', 'DONE BY', 'DONE ON'))),
+        'tghid'    => array(true, $BASE, array_merge(array($pgB, $pgO, $pgT, $jN), $ORD), array_merge($VIS, array($pgT, $jN)), array_merge(array('DONE', 'NOTES'), $V)),
+    );
+    $pgBad = array();
+    foreach ($PG as $scn => $c) {
+        list($tg, $cols, $co, $vc, $want) = $c;
+        $keep = $tg ? array('DONE', 'DONE BY', 'DONE ON', 'NOTES') : array('NOTES');
+        $row = array();
+        foreach ($cols as $cn) $row[$cn] = 'v';
+        foreach ($keep as $j) $row[$j] = 'j';
+        $setRes($tg ? $pgResT : $pgRes);
+        $out = function_exists('apply_state_logic') ? $runAsl(array($row), array('columnOrder' => $co, 'visibleColumns' => $vc, 'layoutColumnNames' => $BASE), $keep) : null;
+        $setRes(false);
+        $got = (is_array($out) && isset($out['data'][0]) && is_array($out['data'][0])) ? array_map('strval', array_keys($out['data'][0])) : array('ERROR');
+        if ($got !== $want) $pgBad[] = "$scn: " . implode(', ', $got) . ' | the page: ' . implode(', ', $want);
+    }
+    $A('J-page', !$pgBad, $pgBad ? implode(' || ', $pgBad) : count($PG) . ' of the jrnplace page layouts, each in the order the page shows it');
+
+    // J-model: random saved layouts against a model of the page's header row (main.js paintJournalTable -> placeHead
+    // -> savedAnchorFor): '#' first, then every data column in the saved order, hidden ones too; each journal heading
+    // painted in the page's order right after its anchor (named: the nearest heading before it in the saved order
+    // that the row holds, else '#'; not named: the one painted before it, else '#'); the shown ones, less '#'.
+    mt_srand(20261026);
+    $shuf = function ($a) { for ($i = count($a) - 1; $i > 0; $i--) { $j = mt_rand(0, $i); $t = $a[$i]; $a[$i] = $a[$j]; $a[$j] = $t; } return $a; };
+    $bad = array(); $runs = 0; $moved = 0;
+    for ($case = 0; $case < 400 && function_exists('apply_state_logic') && function_exists('penumbra_sched_journal_screen_order'); $case++) {
+        $nd = mt_rand(2, 5); $data = array();
+        for ($i = 0; $i < $nd; $i++) $data[] = 'C' . $i;
+        $nt = mt_rand(1, 2); $who = mt_rand(0, 1) === 1; $notes = mt_rand(0, 2) > 0;
+        $res = array('colMeta' => array(), 'whoMeta' => array(), 'notesName' => $notes ? 'NOTES' : null);
+        $pn = array();   // output name => page name
+        for ($t = 1; $t <= $nt; $t++) {
+            $res['colMeta'][] = array('name' => 'T' . $t, 'key' => 'k' . $t); $pn['T' . $t] = '__JOURNAL_TOGGLE__k' . $t;
+            if ($who) foreach (array('by' => ' BY', 'on' => ' ON') as $kd => $sx) {
+                $res['whoMeta'][] = array('name' => 'T' . $t . $sx, 'key' => 'k' . $t, 'kind' => $kd);
+                $pn['T' . $t . $sx] = ($kd === 'by' ? '__JOURNAL_BY__k' : '__JOURNAL_ON__k') . $t;
+            }
+        }
+        if ($notes) $pn['NOTES'] = '__JOURNAL_NOTES';
+        $screen = penumbra_sched_journal_screen_order($res, array_keys($pn));
+        $row = array();
+        foreach ($data as $d) $row[$d] = 'v';
+        foreach ($screen as $j) $row[$j] = 'j';
+        $co = range(0, $nd - 1);
+        foreach ($pn as $p) if (mt_rand(0, 3) > 0) $co[] = $p;
+        if (mt_rand(0, 4) === 0) $co[] = '__JOURNAL_TOGGLE__gone';   // a toggle the report no longer has
+        if (mt_rand(0, 9) === 0) $co[] = '#';                        // an old save's
+        $co = $shuf($co);
+        $vc = array('#');
+        for ($i = 0; $i < $nd; $i++) if (mt_rand(0, 3) > 0) $vc[] = $i;
+        foreach ($pn as $p) if (mt_rand(0, 3) > 0) $vc[] = $p;
+        $vc = $shuf($vc);
+        // the model
+        $hdr = array('#');
+        foreach ($co as $x) if (is_int($x)) $hdr[] = 'D' . $x;
+        $prevH = '#'; $hid = array();
+        foreach ($screen as $j) {
+            $p = $pn[$j]; $k = array_search($p, $co, true); $anchor = $prevH;
+            if ($k !== false) {
+                $anchor = '#';
+                for ($i = $k - 1; $i >= 0; $i--) {
+                    $e = $co[$i];
+                    if ($e === '#') break;
+                    if (is_int($e)) { $anchor = 'D' . $e; break; }
+                    if (in_array('J' . $e, $hdr, true)) { $anchor = 'J' . $e; break; }
+                }
+                if (!in_array($p, $vc, true)) $hid[$j] = true;
+            }
+            array_splice($hdr, array_search($anchor, $hdr, true) + 1, 0, array('J' . $p));
+            $prevH = 'J' . $p;
+        }
+        $want = array();
+        foreach ($hdr as $h) {
+            if ($h === '#') continue;
+            if ($h[0] === 'D') { $d = (int)substr($h, 1); if (in_array($d, $vc, true)) $want[] = $data[$d]; continue; }
+            $j = array_search(substr($h, 1), $pn, true);
+            if (!isset($hid[$j])) $want[] = $j;
+        }
+        $leadWant = array();
+        foreach ($screen as $j) $leadWant[] = $j;
+        foreach ($co as $x) if (is_int($x) && in_array($x, $vc, true)) $leadWant[] = $data[$x];
+        if ($want !== $leadWant) $moved++;
+        $setRes($res);
+        $out = $runAsl(array($row), array('columnOrder' => $co, 'visibleColumns' => $vc), $screen);
+        $setRes(false);
+        $got = (is_array($out) && isset($out['data'][0]) && is_array($out['data'][0])) ? array_map('strval', array_keys($out['data'][0])) : array('ERROR');
+        $runs++;
+        if ($got !== $want && count($bad) < 2) $bad[] = json_encode(array('co' => $co, 'vc' => $vc, 'got' => $got, 'want' => $want));
+        elseif ($got !== $want) $bad[] = '';
+    }
+    $A('J-model', $runs === 400 && !$bad && $moved > 100, "$runs random layouts, $moved of them not the old lead order; " . count($bad) . ' differ from the page model' . ($bad ? ': ' . implode(' | ', array_filter($bad)) : ''));
     echo json_encode($R);
     exit(0);
 }
@@ -467,7 +689,9 @@ $EXPECT = array('P-flatten-fn', 'P-edit-lifted', 'S-flatten', 'S-flatten-orphan'
     'E-empty-file', 'E-unchanged', 'E-long', 'E-journal-off', 'E-noview', 'E-gone', 'E-noid',
     'Q-loaded', 'Q-word', 'Q-word-not', 'Q-col', 'Q-col-not', 'Q-col-regex', 'Q-count', 'Q-empty', 'Q-and', 'Q-clean', 'Q-grouped', 'Q-shadow', 'Q-off', 'Q-wired',
     'E-scope-latest', 'E-scope-bad',
-    'M-lifted', 'M-br', 'M-cleared', 'M-wired', 'O-lifted', 'O-order', 'O-order-null', 'O-lead', 'O-none', 'O-wired');
+    'M-lifted', 'M-br', 'M-cleared', 'M-wired', 'O-lifted', 'O-order', 'O-order-null', 'O-lead', 'O-none', 'O-wired',
+    'J-lifted', 'J-fixture', 'J-end', 'J-state', 'J-nores', 'J-mid', 'J-hidden', 'J-who-first', 'J-hidden-anchor', 'J-hidden-prev',
+    'J-old-hash', 'J-lead', 'J-vc-empty', 'J-names', 'J-tag', 'J-page', 'J-model');
 
 function run_build_child($files, $flatOut = null) {
     $dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'pnb_notescol_' . getmypid() . '_' . mt_rand(1000, 9999);
@@ -476,13 +700,16 @@ function run_build_child($files, $flatOut = null) {
     file_put_contents($dir . '/journal_export.php', $files['journal_export.php']);
     $eb = lift_edit_action($files['manage_journal.php']);
     if ($eb !== null) file_put_contents($dir . '/edit.txt', $eb);
+    // (round 8) a runner mutant: the child reads the mutated copy
+    $runner = $GLOBALS['RUNNER_PATH'];
+    if (isset($files['schedule_runner.php'])) { $runner = $dir . '/schedule_runner.php'; file_put_contents($runner, $files['schedule_runner.php']); }
     $php = PHP_BINARY;
     $cmd = '"' . $php . '" -n -d extension_dir=//oitras.oit.ncsu.edu/d$/Utilities/PHP_8.2-p/ext -d extension=mbstring "' . __FILE__ . '"';
-    $env = array('PNB_SEARCH' => $GLOBALS['SEARCH_PATH'], 'PNB_RUNNER' => $GLOBALS['RUNNER_PATH'], 'PNB_NOTESCOL_CHILD' => $dir, 'PNB_FLAT_OUT' => (string)$flatOut, 'SystemRoot' => getenv('SystemRoot'), 'TEMP' => getenv('TEMP'), 'TMP' => getenv('TMP'));
+    $env = array('PNB_SEARCH' => $GLOBALS['SEARCH_PATH'], 'PNB_RUNNER' => $runner, 'PNB_LAYOUT' => $GLOBALS['LAYOUT_PATH'], 'PNB_NOTESCOL_CHILD' => $dir, 'PNB_FLAT_OUT' => (string)$flatOut, 'SystemRoot' => getenv('SystemRoot'), 'TEMP' => getenv('TEMP'), 'TMP' => getenv('TMP'));
     $p = proc_open($cmd, array(1 => array('pipe', 'w'), 2 => array('pipe', 'w')), $pipes, null, $env);
     $out = stream_get_contents($pipes[1]); $err = stream_get_contents($pipes[2]);
     fclose($pipes[1]); fclose($pipes[2]); proc_close($p);
-    foreach (array('journal_export.php', 'edit.txt') as $f) if (file_exists($dir . '/' . $f)) unlink($dir . '/' . $f);
+    foreach (array('journal_export.php', 'edit.txt', 'schedule_runner.php') as $f) if (file_exists($dir . '/' . $f)) unlink($dir . '/' . $f);
     rmdir($dir);
     $res = json_decode($out, true);
     if (!is_array($res)) return array(array('FATAL', false, substr($out . ' ' . $err, 0, 1500)));

@@ -59,6 +59,17 @@ exec(escapeshellarg(PHP_BINARY) . ' -n ' . escapeshellarg($extract) . ' ' . esca
 @unlink($tmp);
 if ($exCode !== 0 || !file_exists($mirror)) { fwrite(STDERR, "extract_mirror failed: " . implode("\n", $exOut) . "\n"); exit(2); }
 require_once $mirror;
+// The filtered aggregates run on the format-condition engine, which reads a cell with
+// penumbra_search.php's _search_get_cell_value() since 2026-10-26 (cfread) - a function
+// the mirror cannot carry (extract_mirror.php lifts only what schedule_runner.php
+// DECLARES; the runner requires the file itself). Without it this suite died with "Call
+// to undefined function" at its first filtered count. Same fix as hideempty: required
+// from the runner's own tree when it has one (a staged copy may not), else the live app.
+$searchPhp = dirname($runner) . '/penumbra_search.php';
+if (!file_exists($searchPhp)) {
+    $searchPhp = '\\\\oitras.oit.ncsu.edu\\c$\\inetpub\\wwwroot\\sponsor_migration\\penumbra\\penumbra_search.php';
+}
+if (!function_exists('_search_get_cell_value')) { require_once $searchPhp; }
 $themesCfg = dirname($runner) . '/themes_config.php';
 if (!file_exists($themesCfg)) $themesCfg = '\\\\oitras.oit.ncsu.edu\\c$\\inetpub\\wwwroot\\sponsor_migration\\penumbra\\themes_config.php';
 require_once $themesCfg;

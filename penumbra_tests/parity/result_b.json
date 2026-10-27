@@ -417,37 +417,37 @@
     {
         "id":  "now_default",
         "snippet":  "now()",
-        "out":  "10/25/2026"
+        "out":  "10/26/2026"
     },
     {
         "id":  "now_iso",
         "snippet":  "now(\u0027YYYY-MM-DD\u0027)",
-        "out":  "2026-10-25"
+        "out":  "2026-10-26"
     },
     {
         "id":  "now_offset_1",
         "snippet":  "now(\u0027YYYY-MM-DD\u0027, \u0027-1 year\u0027)",
-        "out":  "2025-10-25"
+        "out":  "2025-10-26"
     },
     {
         "id":  "now_offset_chain",
         "snippet":  "now(\u0027YYYY-MM-DD\u0027, \u0027-1 year\u0027, \u0027+6 days\u0027)",
-        "out":  "2025-10-31"
+        "out":  "2025-11-01"
     },
     {
         "id":  "now_long",
         "snippet":  "now(\u0027MMMM D, YYYY\u0027)",
-        "out":  "OCTOBER 25, 2026"
+        "out":  "OCTOBER 26, 2026"
     },
     {
         "id":  "now_unquoted",
         "snippet":  "now(MM/DD/YYYY)",
-        "out":  "10/25/2026"
+        "out":  "10/26/2026"
     },
     {
         "id":  "now_bracket_lit",
         "snippet":  "now(\u0027[Run on] MMM D\u0027)",
-        "out":  "RUN ON OCT 25"
+        "out":  "RUN ON OCT 26"
     },
     {
         "id":  "rank_top",
@@ -783,5 +783,75 @@
         "id":  "count_bare_all_is_condition",
         "snippet":  "count(all)",
         "out":  "2"
+    },
+    {
+        "id":  "cf_apos",
+        "snippet":  "count(ENT = OKane)",
+        "out":  "1"
+    },
+    {
+        "id":  "cf_named",
+        "snippet":  "count(ENT contains eacute)",
+        "out":  "1"
+    },
+    {
+        "id":  "cf_order",
+        "snippet":  "count(ENT = //Bold//)",
+        "out":  "1"
+    },
+    {
+        "id":  "cf_lt",
+        "snippet":  "count(ENT contains done)",
+        "out":  "1"
+    },
+    {
+        "id":  "cf_nbsp",
+        "snippet":  "count(ENT = //x//)",
+        "out":  "1"
+    },
+    {
+        "id":  "cf_amp_guard",
+        "snippet":  "count(ENT = \"Crop \u0026 Soil\")",
+        "out":  "1"
+    },
+    {
+        "id":  "cf_json",
+        "snippet":  "count(JS contains json)",
+        "out":  "1"
+    },
+    {
+        "id":  "cf_trim_nbsp",
+        "snippet":  "count(JS = //y//)",
+        "out":  "1"
+    },
+    {
+        "id":  "cf_trim_ideo",
+        "snippet":  "count(JS = //z//)",
+        "out":  "1"
+    },
+    {
+        "id":  "cf_code_wide",
+        "snippet":  "sum(N, CODE = //A//)",
+        "out":  "1"
+    },
+    {
+        "id":  "cf_code_pair",
+        "snippet":  "count(CODE = //😀//)",
+        "out":  "1"
+    },
+    {
+        "id":  "cf_code_long",
+        "snippet":  "count(CODE = //D//)",
+        "out":  "1"
+    },
+    {
+        "id":  "cf_code_upperx",
+        "snippet":  "count(CODE contains x41)",
+        "out":  "1"
+    },
+    {
+        "id":  "cf_global",
+        "snippet":  "count(eacute)",
+        "out":  "1"
     }
 ]
