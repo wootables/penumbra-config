@@ -51,12 +51,12 @@ CHK = {
               'colMode', 'colItems', 'colRun', 'backspaceBack', 'themePick', 'themeRuns'],
     'pwidth': ['noDeadColRows', 'widthCoverage', 'fitPageRow', 'fitPageRuns', 'resetWidthPick', 'resetWidthRuns'],   # (colmenu round 33)
     'pcmplink': ['everOff', 'everOn', 'everRuns'],   # (2026-10-23, lnk40) the comparison banner's evergreen link as a row
-    'phlcol': ['hlRow', 'hlPick', 'hlRuns'],   # (2026-10-24, hlhead) Highlight... as a "Which column?" row
+    'phlcol': ['hlGone', 'hlFindsOptions'],   # (2026-10-27, fltmenu) Highlight... left the header menu: no row; the word finds Column options...
     'pnestgb': ['pnComboNoParent', 'pnComboNested', 'pnComboHidden', 'pnDigitSafe', 'pnDigitNested', 'pnListThrows', 'pnPivotNone', 'pnComboTop', 'pnPickNoParent', 'pnPickNested', 'pnPickPlain', 'pnPickPre', 'pnPickRuns',
                 'pnCopyNoDraw', 'pnCopyNoParent', 'pnCopyNested', 'pnCopyHidden', 'pnCopyPlain', 'pnCopyRuns', 'pnCopyClipOff', 'pnCopySparse', 'pnStatsNoWork'],   # (2026-10-25, nestgb; nestcopy: the pnCopy* checks; neststats: pnStatsNoWork)
     'pdictcol': ['aboutGreyed', 'aboutRow', 'aboutPick', 'aboutRuns'],   # (2026-10-24, dictstat) the column's meaning as a "Which column?" row
     'pview': ['saveHidden', 'saveGreyExact', 'vhHidden', 'consoleHidden', 'editorSave', 'editorVh'],
-    'prow': ['noRowItemsIdle', 'rowItems', 'rowFilterRuns'],
+    'prow': ['noRowItemsIdle', 'rowItems', 'rowFilterRuns', 'rowCopyRow', 'rowBounds', 'rowNoSql'],   # (2026-10-27, fltmenu) rowBounds   # (2026-10-27, copymenu) rowCopyRow; (copymenu 2) rowNoSql
     # (round 4) the box open beside the toolbar in Wolfpack Red; the runner adds inkPalette / inkMatch from a screenshot
     'pshot': ['open', 'inkPalette', 'inkMatch'],
     # (round 4b) the combinations: each opens its dialog with the choice made, applies nothing; the cap
@@ -311,7 +311,17 @@ def served_files():
 # (2026-10-25, digitcol, LIVE since 306438e) pnDigitNested (a column named in digits: the nested tables' columns still listed)
 # and pnListThrows (the grouping list throwing, a stub: the box still works) hold on live
 NEW = NEW - {'L-pnestgb-pnDigitNested', 'L-pnestgb-pnListThrows'}
+# (2026-10-27, copymenu) Copy this row from the selected cell; Copy distinct values for SQL... as a "Which column?" row
+NEW = NEW | {'L-prow-rowCopyRow', 'S-copyRowHelp'}
+NEW = NEW - {'L-prow-rowCopyRow', 'S-copyRowHelp'}   # (copymenu is LIVE since a8aabf9, 2026-10-27: old checks now)
+NEW = NEW | {'L-prow-rowNoSql'}   # (2026-10-27, copymenu 2) the For SQL row gone (live a8aabf9 has it)
+NEW = NEW - {'L-prow-rowNoSql'}   # (copymenu 2 is LIVE since 0d19cfd, 2026-10-27: old checks now)
 MUTANTS = {
+    # --- (2026-10-27, copymenu) no Copy this row from the cell; the Copy list walked as a list of its own (its rows named
+    # Copy: ...); the items' own names unread (This value)
+    'pc-rowcopy': ([('pal', "['cellFilter', 'cellExclude', 'cellAtLeast', 'cellAtMost', 'cellCopy', 'copyRow', 'copyNestedTable', 'addNote'].indexOf(it.act) < 0", "['cellFilter', 'cellExclude', 'cellAtLeast', 'cellAtMost', 'cellCopy', 'copyNestedTable', 'addNote'].indexOf(it.act) < 0")], ['L-prow-rowCopyRow'], ['prow']),
+    'pc-bundle': ([('pal', "                if (it.bundle && it.sub && typeof it.items === 'function' && !it.disabled) {", "                if (false) {")], ['L-prow-rowItems', 'L-prow-rowCopyRow'], ['prow']),
+    'pc-long': ([('pal', "                var own = it.long || it.label;", "                var own = it.label;")], ['L-prow-rowItems', 'L-prow-rowCopyRow'], ['prow']),
     # --- (2026-10-25, nestcopy) the @@JSON column's own Copy distinct values row kept; no rows for its tables' columns; the shown
     # columns' tables alone; a row that opens nothing; every shown column's own row gone
     'pc-parent': ([('pal', "        for (var i = out.length - 1; i >= 0; i--) { if (drop[out[i].id]) { out.splice(i, 1); } }\n", "")], ['L-pnestgb-pnCopyNoParent'], ['pnestgb']),
@@ -414,14 +424,14 @@ MUTANTS = {
     'e-norun': ([('pal', "          run: function () { click(bannerBtn('.snap-banner-link-evergreen')); }, needs: has('snapshotBtn') },", "          run: function () { }, needs: has('snapshotBtn') },")], ['L-pcmplink-everRuns'], ['pcmplink']),
     # --- (colmenu round 33) the width rows: no Fit columns to the page row; the row running Fit all; the column row back on
     # the act the menu dropped; Fit to page neither an entry nor an exemption
-    'w-nofitpage': ([('pal', "        { id: 'fitpage', label: 'Fit columns to the page',", "        { id: 'zzfitpage', hide: function () { return true; }, label: 'Zz',")],
+    'w-nofitpage': ([('pal', "        { id: 'fitpage', label: 'Fit all column widths to page',", "        { id: 'zzfitpage', hide: function () { return true; }, label: 'Zz',")],
                     ['L-pwidth-fitPageRow', 'L-pwidth-fitPageRuns', 'S-widthRows'], ['pwidth']),
     'w-fitall': ([('pal', "          run: function () { W().fitPage(firstTh()); }, needs: function () { return !!(W() && W().fitPage); } },",
                           "          run: function () { W().fitAll(firstTh()); }, needs: function () { return !!(W() && W().fitPage); } },")],
                  ['L-pwidth-fitPageRuns', 'L-pwidth-resetWidthRuns'], ['pwidth']),
     'w-deadreset': ([('pal', "act: 'resetWidth', icon: { pal: 'width' }", "act: 'reset', icon: { pal: 'width' }")],
                     ['L-pwidth-noDeadColRows', 'L-pwidth-widthCoverage', 'L-pwidth-resetWidthPick'], ['pwidth']),
-    'w-noexempt': ([('pal', "fitPage: 'a top-level entry (Fit columns to the page)', ", '')], ['L-pwidth-widthCoverage'], ['pwidth']),
+    'w-noexempt': ([('pal', "fitPage: 'a top-level entry (Fit all column widths to page)', ", '')], ['L-pwidth-widthCoverage'], ['pwidth']),
     # --- (2026-10-21, the searchrank follow-up) the Reports order: live's title-weighted score alone; no server place (the
     # tier, then the score); no tier (the place, then the score); no word-start tier; tag:NAME ranked by tier and place; a
     # listed row ranked from the browser's copy (its stale title); an accented letter read as a word boundary
@@ -663,6 +673,14 @@ MUTANTS = {
     'f-journalgate': ([('pal', "        var jb = el('journalBtn'), journalOn = !!(jb && shown(jb));\n", "        var jb = el('journalBtn'), journalOn = !!(jb && shown(jb) && window.PenumbraJournal);\n")], ['L-pnote-lazyJournal'], ['pnote']),
     'c-nogate': ([('pal', "        if (!visible(e, '') || dashHidden(e) || (typeof e.hide === 'function' && e.hide())) { return false; }   // the gates a row has (authoring, the page)\n", "        if (dashHidden(e) || (typeof e.hide === 'function' && e.hide())) { return false; }\n")], ['L-pchip-viewerGatedDropped', 'S-chipsSafe'], ['pchip']),
 }
+# (2026-10-27, fltmenu) phlcol reshaped: Highlight...'s old row mutants have nothing to turn red; the rows' and the keywords'
+MUTANTS = {k: v for k, v in MUTANTS.items() if 'phlcol' not in v[2]}
+MUTANTS['pf-rowbounds'] = ([('pal', "'cellAtLeast', 'cellAtMost', 'cellCopy', 'copyRow', 'copyNestedTable', 'addNote'].indexOf", "'cellCopy', 'copyRow', 'copyNestedTable', 'addNote'].indexOf")], ['L-prow-rowBounds'], ['prow'])
+MUTANTS['pf-hlkw'] = ([('pal', "kw: 'format summary shading links filter highlight colour color conditional rule cells rows header', pick: 'column' },", "kw: 'format summary shading links', pick: 'column' },")], ['L-phlcol-hlFindsOptions'], ['phlcol'])
+MUTANTS['pf-hlrow'] = ([('pal', "        { id: 'col:freeze', label: 'Freeze up to this column...',", "        { id: 'col:highlight', label: 'Highlight...', act: 'highlight', icon: { pal: 'highlight' }, kw: 'highlight', pick: 'column' },\n        { id: 'col:freeze', label: 'Freeze up to this column...',")], ['L-phlcol-hlGone'], ['phlcol'])
+NEW = NEW | {'L-prow-rowBounds', 'L-phlcol-hlGone', 'L-phlcol-hlFindsOptions', 'S-copyRowHelp'}   # (2026-10-27, fltmenu; S-copyRowHelp: the rows' help line names the new ones)
+NEW = NEW - {'L-prow-rowBounds', 'L-phlcol-hlGone', 'L-phlcol-hlFindsOptions', 'S-copyRowHelp'}   # (fltmenu is LIVE since 5eae534, 2026-10-27)
+
 CHIPS_REPLY = json.dumps({'status': 'success', 'reply': 'Group the rows by their status and look at the open ones.\n\n```penumbra-actions\n' + json.dumps([
     {'id': 'combo:group', 'args': {'column': 'V_STATUS', 'layout': 'list'}}, {'id': 'filter', 'args': {'condition': 'V_STATUS = Open'}},
     {'id': 'combo:teleport', 'args': {'column': 'V_STATUS'}}, {'id': 'col:sortAsc', 'args': {'column': 'V_AMOUNT'}}, {'id': 'action', 'args': {'id': 'zzz'}},
@@ -1091,9 +1109,9 @@ def static_checks(texts):
         ('S-registry', not missing_ids and not missing_fns, 'ids %s fns %s' % (missing_ids, missing_fns)),
         # (colmenu round 33) the width rows: Fit columns to the page runs the module's own fit; the per-column reset the menu
         # still has (its width), never the dropped act; the new list and act exempted, the old ones gone; the topic names the row
-        ('S-widthRows', "{ id: 'fitpage', label: 'Fit columns to the page'" in pal and 'run: function () { W().fitPage(firstTh()); }' in pal
+        ('S-widthRows', "{ id: 'fitpage', label: 'Fit all column widths to page'" in pal and 'run: function () { W().fitPage(firstTh()); }' in pal
          and "act: 'resetWidth'" in pal and "act: 'reset'," not in pal and "fitPage: 'a top-level entry" in pal and "resets: 'the list'" not in pal
-         and 'fitPage: function (th)' in texts['colw'] and 'Fit columns to the page' in texts['topic'], ''),
+         and 'fitPage: function (th)' in texts['colw'] and 'Fit all column widths to page' in texts['topic'], ''),
         ('S-stubSmall', 0 < len(stub.splitlines()) <= 150, '%d lines' % len(stub.splitlines())),
         ('S-noEmdash', not emd, str(emd)),
         ('S-iconsTwin', icon_n >= 12 and not icon_bad, 'toolbar entries %d, without their twin: %s' % (icon_n, icon_bad)),
@@ -1273,6 +1291,8 @@ def static_checks(texts):
         ('S-nestGroupHelp', '<em>Nested table columns</em>' in texts['topic'] and 'A row joins the group of each value its table holds' in texts['topic']
          and chr(0x2014) not in texts['topic'], ''),
         # (2026-10-25, nestcopy) ...and Copy distinct values the same way
+        # (2026-10-27, copymenu) This row's items name Copy this row
+        ('S-copyRowHelp', 'Filter to its value, Exclude it, At least or At most it (a number or a date), Copy this value, Copy this row, Copy this nested table, Add a note to this row.' in texts['topic'] and chr(0x2014) not in texts['topic'], ''),
         ('S-nestCopyHelp', 'Copy distinct values follows the same rule' in texts['topic'] and '<em>Copy distinct values of PARENT-NAME...</em>' in texts['topic']
          and chr(0x2014) not in texts['topic'], ''),
     ]

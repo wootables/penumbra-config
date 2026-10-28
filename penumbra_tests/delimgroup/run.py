@@ -45,7 +45,7 @@ EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js',
         'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js']
-ALL_SCN = ['unit', 'render', 'nested', 'menu', 'snippet', 'bucket', 'json', 'detect', 'chart', 'lists']
+ALL_SCN = ['unit', 'render', 'nested', 'menu', 'snippet', 'bucket', 'json', 'detect', 'chart', 'lists', 'copy']
 # (splitviz) main.js loads these on demand from js/ beside the page: the chart scenario draws a real vis() chart
 CHART_LIBS = ['chart-4.5.1.min.js', 'chartjs-plugin-datalabels-2.0.0.min.js', 'chartjs-chart-treemap-3.1.0.min.js',
               'chartjs-chart-sankey-0.19.1.min.js', 'penumbra_charts.js', 'penumbra_geo_us.js']
@@ -58,7 +58,10 @@ CHART_LIBS = ['chart-4.5.1.min.js', 'chartjs-plugin-datalabels-2.0.0.min.js', 'c
 # The grpbucket round went LIVE as 815d7ac; its control (815d7ac^) was exact at its deploy (CONTROL_RED_GRPBUCKET).
 # --control now runs the splitviz round's (2026-10-26: a chart and the value lists split a list column; the list
 # rule's fixes): before its deploy the live files, after it CONTROL_REV from git.
-CONTROL_REV = 'cea7ce4^'   # LIVE since cea7ce4 (2026-10-26, cfread): the control is the build before it, read from git. splitviz's (10cb44d^) was exact at its deploy.
+# The cfread round's control was cea7ce4^ (CONTROL_RED_CFREAD). --control now runs the sparse round's (2026-10-27: a
+# list few cells hold two values of is offered its split when those cells are packed): before its deploy the live
+# files, after it CONTROL_REV from git.
+CONTROL_REV = '5cee2a4^'   # LIVE since 5cee2a4 (2026-10-27, sparse): the control is the build before it, read from git
 
 NBSP = chr(160)
 # The split rule's cases: [delimiter id, cell, the values]. The browser and the runner must agree
@@ -123,11 +126,33 @@ CONTROL_RED_SPLITVIZ = ['U-pieces', 'C-viz', 'D-entity', 'D-pair', 'D-projects',
 # The cfread round's control (2026-10-26: the runner's delimiter decoder = penumbra_search.php's _search_decode_entities):
 # the build before it reads the two new split cases' surrogate pair and long codes its own way - X-pieces alone (the
 # browser's U-pieces holds: main.js is unchanged). Before its deploy the live files; after it CONTROL_REV from git.
-CONTROL_RED_LATEST = ['X-pieces']
+CONTROL_RED_CFREAD = ['X-pieces']
+# The sparse round's control (2026-10-27): the build before it offers a split only when one cell in twenty lists two
+# values, so the two packed code lists (2 of 60 cells) get none - D-packed D-packednl. D-spaced and D-onelist hold there
+# (guards: the waiver must not reach a spaced list or a lone one). main.js alone changes.
+CONTROL_RED_LATEST = ['D-packed', 'D-packednl']
+CONTROL_RED_SPARSE = CONTROL_RED_LATEST   # (the sparse round, LIVE since 5cee2a4: its control was 5cee2a4^)
+# The copymenu round's control (2026-10-27: Copy > Distinct values > Each value in the lists > For SQL): the build before it
+# offers no For SQL - L-copysql alone. Before its deploy the live files; after it CONTROL_REV from git.
+CONTROL_RED_COPYMENU = ['L-copysql']   # (the copymenu round, LIVE since a8aabf9: its control is a8aabf9^)
+# --control now runs the cpsplit round's (2026-10-27: Each value in the lists in the Copy dialog, under the header menu's
+# Other... and in copy_distinct|COL:dsemi): before its deploy the live files, after it CONTROL_REV from git.
+# The cpsplit round's control (2026-10-27): the build before it has no box in the Copy dialog (Q-box; Q-copy copies whole
+# cells ticked or not; Q-remember; the split's Other... is missing: Q-other; Q-snippet writes the column alone), reads
+# copy_distinct|PI_LIST:dsemi as a column named so and finds none (Q-trigger Q-trignl). main.js and
+# penumbra_colmenu.js change; the runner does not.
+# And the Copy list's names as the user asked them (Q-labels): This value, This row, Distinct values there.
+CONTROL_RED_LATEST = ['Q-box', 'Q-copy', 'Q-remember', 'Q-other', 'Q-snippet', 'Q-trigger', 'Q-trignl', 'Q-labels']
+CONTROL_REV = '9ca7d60^'   # LIVE since 9ca7d60 (2026-10-27, cpsplit): the control is the build before it, read from git
+CONTROL_RED_CPSPLIT = CONTROL_RED_LATEST   # (the cpsplit round, LIVE since 9ca7d60: its control was 9ca7d60^)
+# The copymenu 2 round's control (2026-10-27; the user took For SQL out again): the build before it offers For SQL under
+# "Each value in the lists" - L-copynosql alone. Before its deploy the live files; after it CONTROL_REV from git.
+CONTROL_RED_LATEST = ['L-copynosql']
+CONTROL_REV = '0d19cfd^'   # LIVE since 0d19cfd (2026-10-27, copymenu 2): the control is the build before it, read from git.
 def scn_of(aid):
     pre = aid.split('-')[0]
     return {'U': 'unit', 'C': 'render', 'N': 'nested', 'H': 'menu', 'X': 'php', 'J': 'json', 'B': 'nested',
-            'D': 'detect', 'V': 'chart', 'L': 'lists'}.get(pre) or \
+            'D': 'detect', 'V': 'chart', 'L': 'lists', 'Q': 'copy'}.get(pre) or \
         {'K-count': 'render', 'K-snippet': 'snippet', 'K-bucket': 'bucket', 'K-jcount': 'json', 'P-jbands': 'json',
          'G-reopen': 'bucket', 'G-reopenbin': 'bucket'}.get(aid) or \
         ('render' if pre == 'G' else aid.split('-', 1)[1] if pre in ('P', 'E', 'F') else '?')
@@ -202,6 +227,29 @@ MUTANTS = {
     'commawaiver': ('main', [('(pieceN >= rawN && (nLens < 3 || spaced > pieceN * 0.1))', '(pieceN >= rawN)')]),
     'tight': ('main', [("                    if (id === 'dcomma' && kind === 'num' && /,(?![ \\t])/.test(_pnbFsCellText(vals[j]))) tight = true;", '')]),
     'numkind': ('main', [("        if (kind === 'date') return out;", '        if (kind) return out;')]),
+    # (sparse, 2026-10-27) the one-in-twenty floor whole again; a cell packed whatever its white space; the new line
+    # read as white space; one list enough (none still skips: a column listing nothing twice is no list)
+    'packedfloor': ('main', [('            if (multi < vals.length * 0.05 && packed < multi * 0.9) continue;', '            if (multi < vals.length * 0.05) continue;')]),
+    'packedws': ('main', [('                    if (!/[ \\t\\n\\r\\x0B]/.test(bare)) packed++;', '                    packed++;')]),
+    'packednl': ('main', [("                    if (id === 'dnl') bare = bare.replace(/\\r\\n|\\r|\\n/g, ''); else if (id === 'dtab') bare = bare.replace(/\\t/g, '');", '')]),
+    'twolists': ('main', [('            if (multi < 2) continue;', '            if (multi < 1) continue;')]),
+    # (cpsplit, 2026-10-27) each fix site put back
+    'dlgsplit': ('main', [('const _splitId = _pnbQuick ? (_pnbQuick.split || null) : _copySplitId();', 'const _splitId = _pnbQuick ? (_pnbQuick.split || null) : null;')]),
+    'dlgbox': ('main', [('            ? (_groupDelimVariantsFor(col)[0] || null) : null;', '            ? null : null;')]),
+    'dlgremember': ('main', [("            split: $('#copySplitInput').is(':checked')   // (2026-10-27, cpsplit)", '            split: false')]),
+    'dlgrestore': ('main', [("        $('#copySplitInput').prop('checked', !!(lastCopySettings && lastCopySettings.split));   // (2026-10-27, cpsplit)", '')]),
+    'otherbox': ('main', [("            $('#copySplitInput').prop('checked', !!split);   // (2026-10-27, cpsplit) Each value in the lists' Other...", '')]),
+    'cmother': ('colmenu', [("                    sub.push({ act: 'copy-split-other', label: 'Other...',", "                    if (false) sub.push({ act: 'copy-split-other', label: 'Other...',")]),
+    'trigtok': ('main', [("const distColRaw = distTok.delim ? String(distTok.base) : (args[0] || '');", "const distColRaw = args[0] || '';")]),
+    'trigsplit': ('main', [('                        if (distTok.delim) {   // each value the lists hold, once, in order', '                        if (false) {')]),
+    'trigraw': ('main', [('const raw = distTok.delim ? _groupRowRaw(this, distName) : null;', 'const raw = null;')]),
+    'snippettok': ('main', [("const colTok = col + (_copySplitId() ? ':' + _copySplitId() : '');", 'const colTok = col;')]),
+    # (cpsplit) the Copy list's names
+    'vallabel': ('colmenu', [("label: valueLabel(cvt), long: 'Copy this value', title: cvt,", "label: 'This value', long: 'Copy this value', title: cvt,")]),
+    'valcut': ('colmenu', [("(s.length > 28 ? s.slice(0, 27) + '...' : s)", 's')]),
+    'valblank': ('colmenu', [("return s === '' ? '(blank)' : ", 'return ')]),
+    'rowlabel': ('colmenu', [("label: 'This entire row', long: 'Copy this row'", "label: 'This row', long: 'Copy this row'")]),
+    'distlabel': ('colmenu', [("shortCopy(u, 'Distinct column values')", "shortCopy(u, 'Distinct values')")]),
     'binfirst': ('main', [("        } else if (kind === 'num' && !_groupDelimVariantsFor(col).length && _groupBinWorthwhile(col)) {", "        } else if (kind === 'num' && _groupBinWorthwhile(col)) {")]),
     'vizsplit': ('main', [('        if (spec && spec.delim && rowDataMaps && rowDataMaps.length) return _vizSplitRows(rowDataMaps, xAxis, spec);', '')]),
     'splitskip': ('main', [("        if (rows[0] && typeof rows[0].has === 'function' && rows[0].has(key)) return rows;", '')]),
@@ -219,7 +267,7 @@ MUTANTS = {
     'profitems': ('main', [('        var dv = _groupDelimVariantsFor(name)[0] || null, ifreq = dv ? new Map() : null;', '        var dv = null, ifreq = null;')]),
     'profnum': ('main', [('        if (values && allNum && !ifreq) {', '        if (values && allNum) {')]),
     'filteritem': ('main', [("        var C = String(col || '').toUpperCase(), fields = [{ col: C, split: delim }];", "        var C = String(col || '').toUpperCase(), fields = [{ col: C, blank: true }];")]),
-    'copysplit': ('main', [('                if (_pnbQuick && _pnbQuick.split) {', '                if (false) {')]),
+    'copysplit': ('main', [('                if (_splitId) {', '                if (false) {')]),   # (cpsplit) re-anchored
     'fsparse': ('tiles', [("                if (m === 'split') { f.split = 'auto'; continue; }  // chips for the values a list holds (2026-10-26)", '')]),
     'fsstate': ('tiles', [("                if (ied && ((im[5] === '=' && iff.mode !== 'ex') || (im[5] === '!=' && iff.mode === 'ex'))", "                if (false && ied && ((im[5] === '=' && iff.mode !== 'ex') || (im[5] === '!=' && iff.mode === 'ex'))")]),
     'fscompose': ('tiles', [("            if (f.split && fsItemEdges(f.split)) { parts.push(fsItemCond(col, f.split, vals, f.mode === 'ex')); return; }   // (2026-10-26)", '')]),
@@ -310,6 +358,25 @@ MUTANT_RED = {
     'commawaiver': ['D-projects', 'L-numlist'],
     'tight': ['D-thousands'],
     'numkind': ['D-projects', 'L-numlist'],
+    'packedfloor': ['D-packed', 'D-packednl'],
+    'packedws': ['D-spaced'],
+    'packednl': ['D-packednl'],
+    'twolists': ['D-onelist'],
+    'dlgsplit': ['Q-copy'],
+    'dlgbox': ['Q-box', 'Q-copy', 'Q-remember', 'Q-other', 'Q-snippet'],
+    'dlgremember': ['Q-remember'],
+    'dlgrestore': ['Q-remember'],
+    'otherbox': ['Q-other'],
+    'cmother': ['Q-other'],
+    'trigtok': ['Q-trigger', 'Q-trignl'],
+    'trigsplit': ['Q-trigger', 'Q-trignl'],
+    'trigraw': ['Q-trignl'],
+    'snippettok': ['Q-snippet'],
+    'vallabel': ['Q-labels'],
+    'valcut': ['Q-labels'],
+    'valblank': ['Q-labels'],
+    'rowlabel': ['Q-labels'],
+    'distlabel': ['Q-labels'],
     'binfirst': ['D-projects'],
     'vizsplit': ['V-rows', 'V-count', 'V-sum', 'V-series', 'V-click', 'V-view', 'V-exclude', 'V-chart', 'V-clickui', 'V-panel'],
     'splitskip': ['V-panel'],
@@ -327,14 +394,14 @@ MUTANT_RED = {
     'profitems': ['L-profile', 'L-numlist', 'L-menu'],
     'profnum': ['L-numlist'],
     'filteritem': ['L-menu'],
-    'copysplit': ['L-copy'],
+    'copysplit': ['L-copy', 'Q-copy'],   # (cpsplit) the dialog's box; (copymenu 2) no For SQL to read the split
     'fsparse': ['L-parse', 'L-strip', 'L-chip', 'L-chip2'],
     'fsstate': ['L-state', 'L-chip', 'L-chip2'],
     'fscompose': ['L-state', 'L-menu', 'L-chip', 'L-chip2'],
     'fsrender': ['L-strip', 'L-chip', 'L-chip2'],
     'fswhole': ['L-state'],
     'cmitems': ['L-menu'],
-    'cmcopy': ['L-copy'],
+    'cmcopy': ['L-copy', 'L-copynosql', 'Q-other'],   # (cpsplit) the split list holds Other... too; (copymenu 2) with no list L-copynosql has none to read
     'xdecode': ['X-pieces'],
     'xdelimown': ['X-pieces'],   # (cfread) the surrogate pair and the long codes
 }

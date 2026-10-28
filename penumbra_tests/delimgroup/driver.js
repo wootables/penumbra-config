@@ -378,6 +378,7 @@
     var cm = !!(window.Penumbra && window.Penumbra.colMenu);
     // Copy distinct values: a pipe beside the other delimiters
     closeMenu(); rclick(fth('STATUS'));
+    if (item('copyMenu')) item('copyMenu').click();   // (2026-10-27, copymenu) the copies are one list, Copy
     if (item('copy')) item('copy').click();
     await sleep(100);
     var cacts = subActs(), cp = item('copy-pipe');
@@ -567,7 +568,7 @@
 
   async function scnDetect() {
     var D = fn('_groupDelimVariantsFor'), V = fn('_groupBucketVariantsFor'), off = {};
-    ['DEPT_ENT', 'TRANS', 'PROJS', 'TITLE_C', 'AMT_K'].forEach(function (c) { off[c] = D ? D(c).map(function (v) { return v.id; }) : null; });
+    ['DEPT_ENT', 'TRANS', 'PROJS', 'TITLE_C', 'AMT_K', 'CODES', 'CODES_NL', 'CODES_SP', 'CODES_ONE'].forEach(function (c) { off[c] = D ? D(c).map(function (v) { return v.id; }) : null; });
     R.obs.offers = off;
     rec('D-entity', !!D && S(off.DEPT_ENT) === '[]', S(off.DEPT_ENT));
     rec('D-pair', !!D && S(off.TRANS) === '[]', S(off.TRANS));
@@ -575,6 +576,101 @@
     rec('D-projects', !!D && S(off.PROJS) === S(['dcomma']) && S(vp) === S(['PROJS:dcomma']), S(off.PROJS) + ' / ' + S(vp));
     rec('D-titles', !!D && S(off.TITLE_C) === '[]', S(off.TITLE_C));
     rec('D-thousands', !!D && S(off.AMT_K) === '[]', S(off.AMT_K));
+    // (sparse, 2026-10-27) a list few cells hold two values of: offered when those cells are packed (?id=dirsearch's
+    // JOBCODES_ALL), a new line being its delimiter's own white space; not when spaced, nor for one list alone
+    var vc = V ? V('CODES').map(function (v) { return v.token; }) : null;
+    rec('D-packed', !!D && S(off.CODES) === S(['dpipe']) && S(vc) === S(['CODES:dpipe']), S(off.CODES) + ' / ' + S(vc));
+    rec('D-packednl', !!D && S(off.CODES_NL) === S(['dnl']), S(off.CODES_NL));
+    rec('D-spaced', !!D && S(off.CODES_SP) === '[]', S(off.CODES_SP));
+    rec('D-onelist', !!D && S(off.CODES_ONE) === '[]', S(off.CODES_ONE));
+  }
+
+  // (cpsplit, 2026-10-27) Each value in the lists beyond the header menu: the Copy dialog's box, its memory, Other...
+  // under the split, the copy_distinct trigger's COL:dsemi token and the Copy snippet writing it
+  async function scnCopy() {
+    var want = Object.create(null), wantNl = Object.create(null);
+    FX.forEach(function (r) { pieces(r.PI_LIST, ';').forEach(function (p) { want[p] = 1; }); pieces(r.NOTES, 'nl').forEach(function (p) { wantNl[p] = 1; }); });
+    want = Object.keys(want); wantNl = Object.keys(wantNl);
+    function last(n0) { return window.__clip.length > n0 ? window.__clip[window.__clip.length - 1] : null; }
+    function row() { var r = document.getElementById('copySplitRow'); return r ? { shown: r.style.display !== 'none', split: r.getAttribute('data-split'), label: $('#copySplitLabel').text(), ticked: $('#copySplitInput').is(':checked'), col: $('#copyColumnSelector').val() } : null; }
+    async function open() { clickEl(document.getElementById('copyActionsBtn')); await sleep(200); }
+    async function pick(col, delim, tick) { $('#copyColumnSelector').val(col).trigger('change'); $('#copyDelimiterInput').val(delim); if (tick !== null) $('#copySplitInput').prop('checked', tick); }
+    async function copy() { var n0 = window.__clip.length; clickEl(document.getElementById('confirmCopyBtn')); await sleep(400); return last(n0); }
+    // Q-box: the box shows for a list column (its separator and label), not for a plain one
+    await open();
+    var opts = $('#copyColumnSelector option').map(function () { return this.value; }).get();
+    await pick('PI_LIST', '|', null); var bPI = row();
+    await pick('STATUS', '|', null); var bST = row();
+    rec('Q-box', opts.indexOf('PI_LIST') >= 0 && !!bPI && bPI.shown && bPI.split === 'dsemi' && bPI.label === 'Each value in the lists (split by ;)'
+      && !!bST && !bST.shown && bST.split === '', S([bPI, bST]));
+    // Q-copy: unticked, the cells as they are; ticked, each value the lists hold, once
+    await pick('PI_LIST', '|', false); var cWhole = await copy();
+    await open(); await pick('PI_LIST', '|', true); var cEach = await copy();
+    rec('Q-copy', cWhole !== null && cWhole.split('|').some(function (v) { return v.indexOf(';') >= 0; }) && cEach !== null && sameSet(cEach.split('|'), want),
+      'whole ' + S(cWhole && cWhole.slice(0, 120)) + ' each ' + S(cEach && cEach.slice(0, 160)));
+    // Q-remember: the dialog reopens with the box as the last copy had it (here: the box unticked since, no copy)
+    $('#copySplitInput').prop('checked', false);
+    await open(); var rem = row();
+    rec('Q-remember', !!rem && rem.col === 'PI_LIST' && rem.ticked && rem.split === 'dsemi', S(rem));
+    // Q-other: the header menu's Other... under Each value in the lists opens Copy with the box ticked (the last copy
+    // unticked); the plain Other... opens it unticked (the last copy ticked)
+    await pick('PI_LIST', '|', false); await copy();
+    closeMenu(); rclick(fth('PI_LIST'));
+    if (item('copyMenu')) item('copyMenu').click();   // the copies are one list, Copy (copymenu)
+    if (item('copy')) item('copy').click();
+    await sleep(120);
+    if (item('copySplit')) item('copySplit').click();
+    await sleep(120);
+    var so = item('copy-split-other');
+    if (so) so.click();
+    await sleep(300);
+    var o1 = row();
+    closeMenu();
+    await pick('PI_LIST', '|', true); await copy();
+    closeMenu(); rclick(fth('PI_LIST'));
+    if (item('copyMenu')) item('copyMenu').click();
+    if (item('copy')) item('copy').click();
+    await sleep(120);
+    var po = item('copy-other');
+    if (po) po.click();
+    await sleep(300);
+    var o2 = row();
+    closeMenu();
+    rec('Q-other', !!so && !!o1 && o1.col === 'PI_LIST' && o1.ticked && o1.split === 'dsemi' && !!po && !!o2 && o2.col === 'PI_LIST' && !o2.ticked,
+      S({ splitOther: !!so, o1: o1, plainOther: !!po, o2: o2 }));
+    // Q-snippet: Copy snippet writes the grouping's token when the box is ticked, the column alone when not
+    await open(); await pick('PI_LIST', ',', true);
+    var n1 = window.__clip.length; clickEl(document.getElementById('copyCopySnippetBtn')); await sleep(300); var s1 = last(n1);
+    await open(); await pick('PI_LIST', ',', false);
+    var n2 = window.__clip.length; clickEl(document.getElementById('copyCopySnippetBtn')); await sleep(300); var s2 = last(n2);
+    rec('Q-snippet', !!s1 && s1.indexOf("'copy_distinct|PI_LIST:dsemi|,'") >= 0 && !!s2 && s2.indexOf("'copy_distinct|PI_LIST|,'") >= 0, S([s1, s2]));
+    // Q-trigger / Q-trignl: the report's buttons - each value once (a new-line list read as stored), the cells as they are
+    function btn(label) { return Array.prototype.filter.call(document.querySelectorAll('#reportSnippetOutput a.snippet-action'), function (a) { return a.textContent.trim() === label; })[0] || null; }
+    async function press(label) { var a = btn(label); if (!a) return null; var n0 = window.__clip.length; clickEl(a); await sleep(400); return last(n0); }
+    var tEach = await press('Each'), tWhole = await press('Whole'), tNl = await press('Notes');
+    rec('Q-trigger', tEach !== null && sameSet(tEach.split('|'), want) && tWhole !== null && tWhole.split('|').some(function (v) { return v.indexOf(';') >= 0; }),
+      'each ' + S(tEach && tEach.slice(0, 160)) + ' whole ' + S(tWhole && tWhole.slice(0, 120)));
+    rec('Q-trignl', tNl !== null && sameSet(tNl.split('|'), wantNl), S(tNl) + ' want ' + S(wantNl));
+    // Q-labels (the user: "From the copy flyout, rename: Distinct values -> Distinct column values, 'This value' -> [value],
+    // This Row -> This entire row"): a cell's Copy list names its value copy by the value (cut to 28 characters, the
+    // whole as its tooltip; an empty cell's (blank)), then the column's name (fltmenu, 5eae534: named by the column
+    // itself, above This entire row), This entire row, Distinct column values
+    function cellOf(vid, col) {
+      var tr = Array.prototype.filter.call(document.querySelectorAll('#resultsTable tbody tr'), function (r) { var c = r.querySelector('td[data-column="' + colId('V_ID') + '"]'); return !!c && c.textContent.trim() === vid; })[0];
+      return tr ? tr.querySelector('td[data-column="' + colId(col) + '"]') : null;
+    }
+    async function copyList(td) {
+      closeMenu(); rclick(td); await sleep(120);
+      if (item('copyMenu')) item('copyMenu').click();
+      await sleep(150);
+      var cc = item('cellCopy'), o = { names: subLabels(), value: cc ? label(cc) : null, tip: cc ? cc.getAttribute('title') : null };
+      closeMenu(); return o;
+    }
+    var td17 = cellOf('ID-1017', 'PI_LIST'), t17 = td17 ? td17.textContent.replace(/\s+/g, ' ').trim() : '';
+    var k17 = await copyList(td17), k10 = await copyList(cellOf('ID-1010', 'PI_LIST'));
+    var cut17 = t17.length > 28 ? t17.slice(0, 27) + '...' : null;
+    rec('Q-labels', !!cut17 && k17.value === cut17 && k17.tip === t17 && k17.names.join('|') === [cut17, 'PI_LIST', 'This entire row', 'Distinct column values'].join('|')
+      && k10.value === '(blank)', S({ id1017: k17, id1010: k10, want: cut17 }));
   }
 
   async function scnChart() {
@@ -715,6 +811,7 @@
     await search('');
     // L-copy: Copy distinct values' "Each value in the lists"
     closeMenu(); rclick(fth('PI_LIST'));
+    if (item('copyMenu')) item('copyMenu').click();   // (2026-10-27, copymenu) the copies are one list, Copy
     if (item('copy')) item('copy').click();
     await sleep(120);
     var cs = item('copySplit');
@@ -725,6 +822,9 @@
     await sleep(700);
     var clip = window.__clip.length > before ? window.__clip[window.__clip.length - 1] : null;
     rec('L-copy', !!cs && subs.indexOf('copy-split-semicolon') >= 0 && clip !== null && sameSet(clip.split('|'), Object.keys(cnt)), S(subs) + ' clip ' + S(clip));
+    closeMenu();
+    // L-copynosql (2026-10-27, copymenu 2; the user took For SQL out): "Each value in the lists" holds its delimiters alone
+    rec('L-copynosql', !!cs && subs.length > 0 && subs.indexOf('copy-split-sql') < 0, S(subs));
     closeMenu();
     // L-parse / L-state: the strip grammar's split option and its list-item condition
     var pa = TL ? TL.parseArgs(['P|PI_LIST|split=semicolon']) : null, pb = TL ? TL.parseArgs(['P|PI_LIST|split=foo']) : null;
@@ -809,6 +909,7 @@
       else if (SCN === 'detect') await scnDetect();
       else if (SCN === 'chart') await scnChart();
       else if (SCN === 'lists') await scnLists();
+      else if (SCN === 'copy') await scnCopy();
     } catch (e) {
       rec('X-' + SCN, false, 'driver threw: ' + String((e && e.stack) || e).slice(0, 600));
     }

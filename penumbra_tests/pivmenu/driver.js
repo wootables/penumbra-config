@@ -42,10 +42,14 @@
   }
   // (colmenu round 33) an item in a list beside its parent: open the parent first
   var PSUBS = [['bdWidth', /^bd(Fit|FitAll|FitPage|ResetWidth|ResetWidths)$/], ['pvLayout', /^(pvRows-|pvCols-|pvStartExpanded$)/], ['pvFreeze', /^pvFreeze-/]];
+  // (2026-10-27, copymenu) a breakdown's copies are one list, Copy: This value, This row, Column name, Distinct values (its
+  // delimiters and All values in row order in a list of its own) - reached through it, two levels deep
+  PSUBS.push(['bdCopyMenu', /^(bdCopy|bdCopyRow|bdCopyName|bdCopyDistinct)$/], ['bdCopyDistinct', /^(bdCopy-[a-z]+|bdCopyCol)$/]);
   function reachP(act) {
     var it = item(act);
     if (it) return it;
-    for (var i = 0; i < PSUBS.length; i++) { if (PSUBS[i][1].test(act) && item(PSUBS[i][0])) { item(PSUBS[i][0]).click(); return item(act); } }
+    // (2026-10-27, copymenu) a list inside a list: its parent reached first
+    for (var i = 0; i < PSUBS.length; i++) { if (PSUBS[i][1].test(act)) { var p = reachP(PSUBS[i][0]); if (p) { p.click(); return item(act); } } }
     return null;
   }
   async function choose(el, act) {
@@ -278,7 +282,9 @@
       var rB = th.getBoundingClientRect();
       R.chk.bdNativeShift = !th.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, shiftKey: true, clientX: Math.round(rB.left + 6), clientY: Math.round(rB.top + 6) })) === false && !menu();
       R.chk.bdHeadOpens = rclick(th) && !!menu() && menu().querySelector('.pnb-hm-name').textContent === txt(th) && !menu().querySelector('.pnb-hm-stats');   // (round 28) the counts moved into Column stats
-      R.chk.bdHeadItems = has(['bdSortAsc', 'bdSortDesc', 'bdStats', 'bdCopyDistinct', 'bdCopyName']) && !item('bdCopyCol') && !item('bdCopy') && !item('bdThenAsc') && !item('bdSortClear');
+      // (2026-10-27, copymenu) the copies in one list, Copy: on a heading, Column name and Distinct values
+      R.chk.bdHeadItems = has(['bdSortAsc', 'bdSortDesc', 'bdStats', 'bdCopyMenu']) && !item('bdCopyCol') && !item('bdCopy') && !item('bdThenAsc') && !item('bdSortClear')
+        && !item('bdCopyName') && !item('bdCopyDistinct') && (function () { item('bdCopyMenu').click(); return subActs().join() === 'bdCopyName,bdCopyDistinct'; })();
       R.info.bdActs = acts();
       closeMenu();
       await choose(th, 'bdSortAsc');
@@ -305,19 +311,20 @@
       var ic = dup ? dup.cellIndex : i2, thc = dup || th2;
       var vals = colVals(ic), seen = {}, distinct = vals.filter(function (v) { if (v === '' || seen[v]) return false; seen[v] = 1; return true; });
       // (round 28) Copy distinct values is a list: delimited as picked; All values in row order is its last entry
-      closeMenu(); rclick(thc); if (item('bdCopyDistinct')) { item('bdCopyDistinct').click(); await sleep(200); }
+      closeMenu(); rclick(thc); if (reachP('bdCopyDistinct')) { item('bdCopyDistinct').click(); await sleep(200); }
       var copyActs = subActs();
       if (item('bdCopyCol')) item('bdCopyCol').click();
       await sleep(300);
+      R.chk.bdNoSql = copyActs.length > 0 && copyActs.indexOf('bdCopy-sql') < 0;   // (2026-10-27, copymenu 2) no For SQL: the user took it out
       R.chk.bdCopyCol = copyActs.indexOf('bdCopy-newline') >= 0 && copyActs.indexOf('bdCopy-comma') >= 0 && copyActs[copyActs.length - 1] === 'bdCopyCol'
         && lastClip() === vals.join('\n') && /Copied \d+ values?\./.test(lastToast());
-      closeMenu(); rclick(thc); if (item('bdCopyDistinct')) { item('bdCopyDistinct').click(); await sleep(200); }
+      closeMenu(); rclick(thc); if (reachP('bdCopyDistinct')) { item('bdCopyDistinct').click(); await sleep(200); }
       if (item('bdCopy-newline')) item('bdCopy-newline').click();
       await sleep(300);
       var clipNl = lastClip();
       // the delimiter on th2 (two distinct values: a 2-row breakdown's duplicate column has one)
       var vals2 = colVals(i2), seen2 = {}, distinct2 = vals2.filter(function (v) { if (v === '' || seen2[v]) return false; seen2[v] = 1; return true; });
-      closeMenu(); rclick(th2); if (item('bdCopyDistinct')) { item('bdCopyDistinct').click(); await sleep(200); }
+      closeMenu(); rclick(th2); if (reachP('bdCopyDistinct')) { item('bdCopyDistinct').click(); await sleep(200); }
       if (item('bdCopy-comma')) item('bdCopy-comma').click();
       await sleep(300);
       R.chk.bdCopyDistinct = clipNl === distinct.join('\n') && distinct2.length >= 2 && lastClip() === distinct2.join(',') && !!dup && distinct.length < vals.length;
@@ -335,12 +342,28 @@
       R.info.bdStats = { inf: inf, ex: ex, best: best, tops: tops.slice(-5) };
       closeMenu();
       var td = bt.tBodies[0].rows[0].cells[i2];
-      R.chk.bdCell = rclick(td) && !!menu() && acts()[0] === 'bdCopy' && menu().querySelector('.pnb-hm-name').textContent === txt(th2) && td.classList.contains('pnb-hm-cell');
+      R.chk.bdCell = rclick(td) && !!menu() && acts()[0] === 'bdCopyMenu' && menu().querySelector('.pnb-hm-name').textContent === txt(th2) && td.classList.contains('pnb-hm-cell');
       closeMenu();
       await choose(td, 'bdCopy');
       R.chk.bdCopyValue = lastClip() === td.textContent.trim() && !td.classList.contains('pnb-hm-cell');
       await choose(th2, 'bdCopyName');
       R.chk.bdCopyName = lastClip() === txt(th2);
+      // (2026-10-27, copymenu) a cell's Copy list: This value, This row, Column name, Distinct values; This row: each column but
+      // '#', "Name: text"
+      closeMenu(); rclick(td);
+      var bl = [];
+      if (reachP('bdCopyMenu')) { item('bdCopyMenu').click(); await sleep(150); bl = subActs(); }
+      R.chk.bdCopyList = bl.join() === 'bdCopy,bdCopyName,bdCopyRow,bdCopyDistinct';   // (2026-10-27, fltmenu) the name before This entire row
+      // (2026-10-27, copymenu 3) the list opens under a static heading, Copy (no act)
+      R.chk.bdCopyHead = (function () { var p = subPanel(), f = p ? p.firstElementChild : null; R.info.bdCopyHead = f ? [f.className, f.textContent.trim(), f.getAttribute('data-act') || ''] : null;
+        return !!f && /(^| )pnb-hm-head( |$)/.test(f.className) && f.getAttribute('role') === 'presentation' && f.textContent.trim() === 'Copy' && !f.getAttribute('data-act'); })();
+      R.info.bdCopyList = bl;
+      closeMenu();
+      var trb = td.closest('tr'), wantR = [];
+      Array.prototype.forEach.call(bt.tHead.rows[0].cells, function (h, k) { if (k === 0 || txt(h) === '#' || h.style.display === 'none') return; var c = trb.cells[k]; if (c && !c.hasAttribute('colspan')) wantR.push(txt(h) + ': ' + String(c.innerText || '').trim()); });
+      await choose(td, 'bdCopyRow');
+      R.info.bdRow = { got: lastClip(), want: wantR.join('\n') };
+      R.chk.bdCopyRow = wantR.length >= 2 && lastClip() === wantR.join('\n') && /Copied the row \(/.test(lastToast());
       // from the keyboard (Shift+F10 on the focused heading): the menu drops from it
       th.focus();
       th.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 0, clientX: 0, clientY: 0 }));
@@ -357,7 +380,7 @@
       var topBd = acts();
       if (item('bdWidth')) { item('bdWidth').click(); await sleep(200); }
       var bwl = subActs();
-      R.chk.bdWidthItems = !!CW && topBd.indexOf('bdWidth') >= 0 && topBd.indexOf('bdWidth') < topBd.indexOf('bdCopyDistinct') && topBd.indexOf('bdFit') < 0
+      R.chk.bdWidthItems = !!CW && topBd.indexOf('bdWidth') >= 0 && topBd.indexOf('bdWidth') < topBd.indexOf('bdCopyMenu') && topBd.indexOf('bdFit') < 0
         && ['bdFit', 'bdFitAll', 'bdFitPage', 'bdResetWidth', 'bdResetWidths'].every(function (x) { return bwl.indexOf(x) >= 0; });
       R.info.bdWidthList = { top: topBd, list: bwl };
       closeMenu();

@@ -580,7 +580,7 @@ def static_checks(texts):
          and 'shading, highlight rules, filter and links' in top and chr(0x2014) not in top and '&mdash;' not in top and chr(0x2014) not in hlp, ''),
         # (2026-10-24, hlhead) the topic: Apply to's Header, what a header takes, the menu's Highlight... (its table and the section)
         ('S-helpHlHd', "or the column's <em>Header</em>" in top and 'A header takes color, background-color' in top
-         and '<strong>Highlight...</strong></td>' in top and 'or <em>Highlight...</em> in its right-click menu' in top, ''),
+         and '<strong>Highlight...</strong></td>' not in top and '(<em>Column options...</em> in its right-click menu), click <em>+ Add a rule</em>' in top, ''),   # (2026-10-27, fltmenu) Highlight... left the menu
         ('S-noSaveDeepCell', 'serverSaveResolver' not in idx, 'index.php: serverSaveResolver x%d' % idx.count('serverSaveResolver')),
         ('S-helpNoDeepDefault', 'Defaults: Row Height, Deep Links' not in hlp and "can set the report's default under <em>Last Stop Changes</em>" not in hlp
          and 'Deep Link Vendor Codes</strong> - when on, recognized vendor codes' not in hlp, ''),
@@ -638,6 +638,8 @@ NEW = NEW_HLHD
 # until it deploys); hlhead's set retires (live since 75458b7)
 NEW_HLTIP = {'S-helpHl'}
 NEW = NEW_HLTIP
+NEW = set()   # (fltmenu is LIVE since 5eae534, 2026-10-27: S-helpHlHd an old check now)
+# NEW = {'S-helpHlHd'}   # (2026-10-27, fltmenu) the topic's Highlight... row and its mention went with the menu item (hltip is live)
 
 args = sys.argv[1:]
 def opt(name, default=None):

@@ -21,6 +21,11 @@ def build(index_src):
         src = src.replace(old, new)
 
     rep('<title>colmenu</title>', '<title>viewlink</title>')
+    # (10-27 b) the selected-cells scenarios need the cell selection module (the colmenu harness loads it for gg*/mauto* only)
+    rep('<script src="penumbra_colmenu.js"></script>\n',
+        '<script>if (/^vsel|^pvsel|^vpsel|^vcmp[ST]$/.test(window.__SCN)) document.write(\'<link rel="stylesheet" href="penumbra_cellsel.css">\' +\n'
+        '  \'<script src="penumbra_cellsel.js"></scr\' + \'ipt>\');</script>\n'
+        '<script src="penumbra_colmenu.js"></script>\n')
     rep('<script src="jquery-3.7.1.min.js"></script>\n', '<script src="seed.js"></script>\n<script src="jquery-3.7.1.min.js"></script>\n')
     # the View Options boxes a state load sets (index.php's ids): a link must never move them
     rep('<div id="pnbStatusBar">', '<div id="zzViewOptions" style="display:none"><input type="checkbox" id="viewOptionSearch" checked>'

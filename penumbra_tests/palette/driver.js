@@ -384,7 +384,7 @@
     R.chk.colMode = !!box() && modeOf() === 'col';
     t = texts();
     R.info.col = t;
-    R.chk.colItems = t.indexOf('Sort ascending') >= 0 && t.indexOf('Hide this column') >= 0 && t.indexOf('Move column: Left') >= 0 && t.indexOf('Show column(s): Show all columns') >= 0 && t.indexOf('Clear all personal customizations...') >= 0;   // (colmenu round 33: the Reset list became one item)
+    R.chk.colItems = t.indexOf('Sort ascending') >= 0 && t.indexOf('Hide this column') >= 0 && t.indexOf('Move column: Left') >= 0 && t.indexOf('Show column(s): Show all columns') >= 0 && t.indexOf('Clear all customizations...') >= 0;   // (colmenu round 33: the Reset list became one item)
     await pickRow('Show column(s): Show all columns'); await enter();
     await sleep(100);
     R.chk.colRun = hid && !box() && fth('V_STATUS').style.display !== 'none';   // (hidden first, then shown again)
@@ -427,10 +427,10 @@
     R.chk.widthCoverage = !!offered.fitPage && !!offered.resetWidth && !!offered.fitAll && missing.length === 0;
     // Fit columns to the page
     await open('fit to page');
-    var fr = row('Fit columns to the page');   // (Actions, or Top match when it ranks first)
+    var fr = row('Fit all column widths to page');   // (Actions, or Top match when it ranks first)
     R.info.fitRows = rows().slice(0, 4).map(function (r) { return [r.section, r.text, r.off, r.why]; });
     R.chk.fitPageRow = !!fr && !fr.off;
-    var picked = !!fr && !fr.off && await pickRow('Fit columns to the page');
+    var picked = !!fr && !fr.off && await pickRow('Fit all column widths to page');
     if (picked) { await enter(); }
     await sleep(600);
     var u = (H && H.state) ? H.state().user : {}, shares = Object.keys(u).filter(function (k) { return /%$/.test(String(u[k])); });
@@ -538,28 +538,16 @@
   // ---------------------------------------------------------------- phlcol (2026-10-24, hlhead) the header menu's Highlight... as a
   // "Which column?" row: available; the picker greys the row numbers; picking a column opens that column's highlight
   // rules on their own (the popover's Highlight section alone)
+  // (2026-10-27, fltmenu; the user: "Highlight is a redundant card that is already inside 'Column options...'") no Highlight...
+  // row (the header menu has no such item); the word finds Column options..., where the rules are
   S.phlcol = async function () {
     await boot(); await ready();
-    var LABEL = 'Highlight...';
     await open('highlight');
-    var r = row(LABEL);
-    R.info.row = r ? [r.section, r.off, r.why] : rows().slice(0, 6).map(function (x) { return [x.section, x.text]; });
-    R.chk.hlRow = !!r && !r.off;
-    var picked = !!r && !r.off && await pickRow(LABEL);
-    if (picked) { await enter(); }
-    var rs = rows(), by = {};
-    rs.forEach(function (x) { by[x.text] = x; });
-    R.info.pick = rs.slice(0, 8).map(function (x) { return [x.text, x.off, x.why]; });
-    R.chk.hlPick = picked && modeOf() === 'pick' && !!by.V_AMOUNT && !by.V_AMOUNT.off && !!by['#'] && !!by['#'].off && by['#'].why === 'not for the row numbers';
-    type('v_am'); await sleep(40);
-    await enter();
-    await sleep(300);
-    var pop = document.querySelector('.sp-sumtype-menu.pnb-colopt');
-    var secs = pop ? Array.prototype.filter.call(pop.children, function (n) { return n.classList.contains('pnb-colopt-sec'); }).map(function (s) { return s.getAttribute('data-sec'); }).join() : '';
-    R.info.secs = secs;
-    R.chk.hlRuns = !box() && secs === 'highlight' && pop.textContent.indexOf('V_AMOUNT') >= 0;
-    if (pop) document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-    await sleep(80);
+    var r = row('Highlight...'), o = row('Column options...');
+    R.info.rows = rows().slice(0, 8).map(function (x) { return [x.section, x.text, x.off]; });
+    R.chk.hlGone = !r && rows().length > 0;
+    R.chk.hlFindsOptions = !!o && !o.off;
+    key('Escape', { target: input() }); await sleep(30);
   };
   // ---------------------------------------------------------------- pnestgb (2026-10-25, nestgb; the user: "@@JSON column names
   // shouldn't appear in the command palette's group by, but the nested columns should (just like in group mode UI)") H_JSON
@@ -756,6 +744,9 @@
     R.info.rowsIdle = texts().slice(0, 10); R.info.act = act; R.info.val = val;
     var fr = row('Filter to "' + val + '"', 'For this report');
     R.chk.rowItems = act && !!fr && !!row('Copy this value', 'For this report') && /row \d+, V_NAME/.test(fr.sub);
+    // (2026-10-27, copymenu) Copy this row beside Copy this value: the row's own copy, from the selected cell
+    var crw = row('Copy this row', 'For this report');
+    R.chk.rowCopyRow = act && !!crw && !crw.off && /row \d+, V_NAME/.test(crw.sub);
     var picked = await pickRow('Filter to "' + val + '"');
     R.info.picked = [picked, selIdx(), selRow() ? selRow().text : null, document.activeElement ? document.activeElement.id : null, modeOf()];
     var prevented = key('Enter', { target: input() });
@@ -765,6 +756,20 @@
     var q = document.getElementById('tableSearch').value;
     R.info.q = q; R.info.toasts = window.__toasts.slice(0, 3); R.info.boxAfter = !!box();
     R.chk.rowFilterRuns = !box() && q === 'V_NAME = /^(?:' + val + ')$/';
+    // (2026-10-27, copymenu 2) the For SQL row went with the menu's item (the user took For SQL out)
+    await open('for sql'); await sleep(200);
+    R.info.noSql = texts().slice(0, 6);
+    R.chk.rowNoSql = !row('Copy distinct values for SQL...');
+    key('Escape', { target: input() }); await sleep(30);
+    // (2026-10-27, fltmenu) a number cell's At least / At most, rows of their own from the selected cell (the menu's Filter list)
+    var tha = fth('V_AMOUNT'), tda = tha ? document.querySelector('#resultsTable tbody tr:not(.search-hidden) td[data-column="' + tha.getAttribute('data-column') + '"]') : null;
+    var acta = !!tda && window.Penumbra.cellSel.activate(tda);
+    await sleep(50);
+    await open('');
+    var al = row('At least ', 'For this report'), am = row('At most ', 'For this report');
+    R.info.bounds = { al: al && al.text, am: am && am.text, sub: al && al.sub };
+    R.chk.rowBounds = acta && !!al && !!am && !al.off && /row \d+, V_AMOUNT/.test(al.sub);
+    key('Escape', { target: input() }); await sleep(30);
   };
 
   // ---------------------------------------------------------------- pshot
@@ -2457,7 +2462,7 @@
     function spyOn2(obj, name, key) { var was = obj[name]; obj[name] = function () { spy2[key] = (spy2[key] || 0) + 1; return was.apply(this, arguments); }; return function () { obj[name] = was; }; }
     async function colAct(q, label, colTyped) { await open(q); await sleep(200); var pk = await pickRow(label); if (!pk) { return false; } await enter(); await sleep(150); type(colTyped); await sleep(100); await enter(); await sleep(600); return true; }
     await colAct('column options', 'Column options...', 'v_am'); R.chk.colOptions = spy.opts === 1;
-    await colAct('fit width to contents', 'Fit width to contents...', 'v_am'); var fitRow = (rows() || [])[0]; R.info.fit = [spy.fit, modeOf(), fitRow, texts().slice(0, 3)]; R.chk.colFit = spy.fit === 1 || (modeOf() === 'pick' && !!fitRow && fitRow.off && !!fitRow.why);
+    await colAct('fit width to contents', 'Fit a column width to contents...', 'v_am'); var fitRow = (rows() || [])[0]; R.info.fit = [spy.fit, modeOf(), fitRow, texts().slice(0, 3)]; R.chk.colFit = spy.fit === 1 || (modeOf() === 'pick' && !!fitRow && fitRow.off && !!fitRow.why);
     if (box()) { key('Escape', { target: input() }); await sleep(30); }
     // (colmenu round 33) the menu's per-column reset is its width's now: run, or greyed with the menu's reason (this view's widths)
     await colAct("reset this column's width", "Reset this column's width...", 'v_am'); var rsRow = (rows() || [])[0]; R.info.reset = [spy.resetOne, modeOf(), rsRow];

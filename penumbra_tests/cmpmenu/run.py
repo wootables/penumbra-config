@@ -52,10 +52,28 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
 # NEW = ['C1', 'C2', 'C5', 'C6', 'C8', 'C23', 'C32']   (lnk40 is live 425d199: old checks now)
 # (2026-10-24, dictstat) What this column means in the comparison menu
 NEW = ['C34']
+# (2026-10-27, copymenu) a cell's copies as ONE list, Copy (this value, the earlier value, this row, the column name): the
+# cell's lists reshaped (C2 C6 C28) and This row (C35); a heading's Copy column name stays alone (C1, C8 hold)
+NEW = ['C2', 'C6', 'C28', 'C35', 'C36']
+NEW = []   # (copymenu is LIVE since a8aabf9, 2026-10-27: old checks now)
+NEW = []   # (fltmenu is LIVE since 5eae534, 2026-10-27: C2 C6 old checks now)
+NEW = ['C38']   # (2026-10-27, copymenu 3) a comparison's Copy list under a Copy heading (live has none)
+NEW = []   # (copymenu 3 is LIVE since 766f5e9, 2026-10-27: old checks now)
+# NEW = ['C2', 'C6']   # (2026-10-27, fltmenu) a cell's Copy list: the column's name before This row
 # (C33, the scrollbar buffer in a comparison, went to colwidths F15-F17: a comparison's tables give way here)
 
 # --- mutants: name -> (edits on the candidate colmenu.js, assert ids that MUST go red) ---------------
 MUTANTS = {
+    # --- (2026-10-27, copymenu) no This row in the list; the row's changed value without its earlier one; an item alone
+    # shown as a list of one (a heading's Copy column name); the cell's copies left at the top level too
+    'k-cmpnorow': ([("            if (t.kind === 'cell') { cmc.push(rowCopyItem('cmpCopyRow',", "            if (false) { cmc.push(rowCopyItem('cmpCopyRow',")], ['C2', 'C6', 'C35']),
+    'k-cmpwas': ([("        if (!Array.isArray(nv) && !Array.isArray(wv)) { return (nv === '' ? '(blank)' : nv) + (wv === '' ? ' (was blank)' : ' (was: ' + wv + ')'); }", "        if (!Array.isArray(nv) && !Array.isArray(wv)) { return nv; }")], ['C35', 'C36']),
+    # (the review) a changed cell read by its rendered text (the hidden earlier view's run-together text); a blank now unsaid
+    'k-cmpnest': ([("            pushLine(out, lab, withWas(nowEl ? copyCellText(nowEl) : copyCellText(c), wasEl ? copyCellText(wasEl) : ''));", "            pushLine(out, lab, withWas(cmpNow(c), cmpWas(c)));")], ['C36']),
+    'k-cmpblank': ([("return (nv === '' ? '(blank)' : nv) + (wv === ''", "return nv + (wv === ''")], ['C36']),
+    'k-cmphead': ([("items: function () { return [{ heading: 'Copy' }].concat(list); } };", "items: function () { return list; } };")], ['C38']),   # (copymenu 3)
+    'k-cmpone': ([("        if (list.length === 1) { return shortCopy(list[0], list[0].long || list[0].label); }", "        if (false) { return shortCopy(list[0], list[0].long || list[0].label); }")], ['C1', 'C8']),
+    'k-cmplist': ([("                return !isCp;\n", "                return true;\n")], ['C2', 'C6']),
     # --- (2026-10-24, dictstat) What this column means: none in a comparison; after the column's name rather than the sorts
     'd-nocmpabout': ([("            if (ent) { sorts.push(aboutItem(ent)); }", "            if (false) { sorts.push(aboutItem(ent)); }")], ['C34']),
     'd-cmpaboutlast': ([("            if (ent) { sorts.push(aboutItem(ent)); }", "            if (ent) { name.push(aboutItem(ent)); }")], ['C34']),
@@ -111,6 +129,10 @@ MUTANTS = {
     # no Hide this group
     'k-nohide': ([("            if (x) { items.push({ act: 'cmpGroupHide'", "            if (false) { items.push({ act: 'cmpGroupHide'")], ['C5', 'C21']),
 }
+
+# (2026-10-27, fltmenu) the comparison's name copy after This row again
+MUTANTS['k-cmpnameafter'] = ([("            name.forEach(function (o) { var nm = shortCopy(o, valueLabel(nameOf(col))); nm.title = nameOf(col); cmc.push(nm); });\n            if (t.kind === 'cell') { cmc.push(rowCopyItem('cmpCopyRow', function () { return cmpRowLines(t); })); }\n",
+                               "            if (t.kind === 'cell') { cmc.push(rowCopyItem('cmpCopyRow', function () { return cmpRowLines(t); })); }\n            name.forEach(function (o) { var nm = shortCopy(o, valueLabel(nameOf(col))); nm.title = nameOf(col); cmc.push(nm); });\n")], ['C2', 'C6'])
 
 args = sys.argv[1:]
 def opt(name, default=None):

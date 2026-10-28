@@ -27,7 +27,23 @@ SCN = ['mflat', 'mkbd', 'mopts', 'mcalc', 'mgroupby', 'gmenu', 'mrestr', 'mexcl'
 SCN = SCN + ['mnestgb', 'ggnest']   # (2026-10-25, nestgb) Group by on a nested-table column
 SCN = SCN + ['gnnestbd', 'gchipnest']   # (2026-10-25, nestgb2) a group's band menu and the status bar chip on nested-table columns
 SCN = SCN + ['ggstat']   # (2026-10-26, cstat) Column stats in the grouped view, a search typed there
+SCN = SCN + ['mcopym', 'ggcopym']   # (2026-10-27, copymenu) the menu's copies as one list, Copy
+# (2026-10-27, fltmenu) a cell's Filter list, Copy's [column name] / This nested table / Distinct column groups; mhl retired
+# with Highlight... (the user: "Highlight is a redundant card that is already inside 'Column options...'"): fmNoHighlight
+SCN = [s for s in SCN if s != 'mhl'] + ['mfltm']
 CHK = {
+    # (2026-10-27, copymenu) ONE Copy list: a cell's (in its place) and a heading's; This row (the layout, a value of several
+    # lines, '#', a nested table, a journal toggle); the report hiding Clipboard; the keyboard; the grouped view's. (copymenu 2)
+    # no For SQL in any list (cmDistinct, cmNestNoSql), Link to this view where the page can make a view link
+    'mcopym': ['cmCell', 'cmList', 'cmValue', 'cmRow', 'cmRowLayout', 'cmRowLines', 'cmHead', 'cmHeadList', 'cmName', 'cmDistinct',
+               'cmClipOff', 'cmViewLinkNone', 'cmViewLink', 'cmNumRow', 'cmNumHead', 'cmKbd', 'cmNestList', 'cmNestRow', 'cmNestNoSql', 'cmJournal'],
+    'ggcopym': ['gcList', 'gcRow'],
+    # (2026-10-27, fltmenu) the Filter list (text, number, date; the bounds' rule; a heading flat), Click to filter (off / on /
+    # off, the report's for every column), no Highlight..., the Copy list's order and names, groups (date, number, none),
+    # a nested table's lists and copy, '#', the keyboard
+    'mfltm': ['fmCell', 'fmList', 'fmFilterRuns', 'fmNumList', 'fmAtLeast', 'fmKeepOther', 'fmDropOther', 'fmDate', 'fmHead', 'fmNoHighlight', 'fmNoHighlightCell',
+              'fmClick', 'fmForced', 'fmCopyOrder', 'fmCopyName', 'fmHeadName', 'fmGroupsList', 'fmGroupsCopy', 'fmGroupsNum', 'fmGroupsNone',
+              'fmNestLists', 'fmNestCopy', 'fmNestPad', 'fmNumCell', 'fmKbd'],
     # (2026-10-26, cstat) Column stats in the grouped view with a search typed there (it marks the grouped rows alone): the rows it
     # keeps, each row once (grouped by SUB_NAME a row sits in several groups); csAll / csBefore: no search, a search before grouping
     'ggstat': ['csAll', 'csCount', 'csNum', 'csJournal', 'csBefore', 'csOnce', 'csShownCopy'],
@@ -78,7 +94,7 @@ CHK = {
     'mfitnest': ['nestGrow', 'nestCompact', 'fitLines'],
     # (2026-10-20, notefit) Fit on the Notes column: the note's own box (16em growing / 22em one line), the button's row
     'mfitnote': ['noteGrow', 'noteCompact', 'noteShort', 'noteSpill'],
-    'mjournal': ['jrnPainted', 'jrnNoGroup', 'jrnNotesCell', 'jrnAddNote', 'jrnInNote', 'jrnMoves', 'jrnStaysUnsaved', 'jrnSwap', 'jrnSaved'],
+    'mjournal': ['jrnPainted', 'jrnNoGroup', 'jrnNotesCell', 'jrnAddNote', 'jrnAddNoteScrolled', 'jrnInNote', 'jrnMoves', 'jrnStaysUnsaved', 'jrnSwap', 'jrnSaved'],
     'mmore': ['thenItems', 'thenSort', 'filterList', 'filterApply', 'filterReopen', 'filterBack', 'filterEsc', 'filterClear', 'filterBlank',
               'only', 'showAll', 'resetCol', 'copyName'],
     'mcopy': ['copyItem', 'copySubmenu', 'copyComma', 'copyNewline', 'copyTab', 'copyFiltered', 'copyKeeps', 'copyOther'],
@@ -168,7 +184,7 @@ NEW_NOTEFIT = {'L-mfitnote-' + c for c in CHK['mfitnote']}   # live 96b8f66
 # (NEW = NEW_NOTEFIT left it red on exactly those 4 since their deploy). The next round names its own NEW.
 NEW_SET_R33_BASE = set()
 # (round 33) Column widths list (fit, Fit to page, resets) up the menu, row height on every column, the
-# Reset list one Clear all personal customizations item; reshaped checks fail on live too
+# Reset list one Clear all customizations item; reshaped checks fail on live too
 NEW = {'L-mopts-fitItem', 'L-mopts-resetItem', 'L-mopts-resets', 'L-mopts-fitPage', 'L-mopts-fitPageUndo', 'L-mmore-resetCol',
        'L-msubs-topOrder', 'L-msubs-arrows', 'L-msubs-resetList', 'L-msubs-clearPanel', 'L-mnum-numItems', 'L-mnum-numResets',
        'L-mflat-itemsAll', 'L-mnest-nestRowHeightPlain', 'S-helpSubs', 'S-helpResetAll', 'S-helpRowHeight', 'S-helpMore'}
@@ -195,7 +211,51 @@ NEW = NEW - {'L-mnestgb-nsListThrows'}   # (2026-10-25, digitcol) a guard: the p
 # row - it reads the flat table, which that search never marks); csAll and csBefore hold on live (guards)
 NEW = NEW | {'L-ggstat-%s' % c for c in CHK['ggstat'] if c not in ('csAll', 'csBefore')}
 NEW = NEW - {'L-ggstat-%s' % c for c in CHK['ggstat']}   # (cstat is LIVE since 12bbda7, 2026-10-26: old checks now)
+# (2026-10-27, copymenu) the menu's copies as ONE list, Copy: the new scenarios (cmValue, cmName, cmNumHead and cmStaleSql hold
+# on live: guards) and the checks of the old top level that change shape with it (the Copy list where its items were)
+COPYM_GUARDS = {'L-mcopym-cmValue', 'L-mcopym-cmName', 'L-mcopym-cmNumHead'}
+NEW_COPYM = ({'L-%s-%s' % (s, c) for s in ('mcopym', 'ggcopym') for c in CHK[s]} - COPYM_GUARDS) | {
+    'L-mflat-itemsAll', 'L-mcopy-copyItem', 'L-mcell-cellOpens', 'L-mnest-nestSubOpens', 'L-mnest-nestPadOpens', 'L-msubs-topOrder',
+    'L-msubs-arrows', 'L-msubs-showLabel', 'L-mnestgb-nsPlain', 'S-helpCopyMenu'}
+NEW = NEW | NEW_COPYM
+NEW = NEW - NEW_COPYM   # (copymenu is LIVE since a8aabf9, 2026-10-27: old checks now)
+# (2026-10-27, copymenu 2; the user: "remove the SQL copy options in the right click menu and replace with 'Link to this view',
+# with the tooltip explaining") no For SQL in any list (cmDistinct, cmNestNoSql: live a8aabf9 has it), Link to this view where
+# the page can make a view link (cmViewLink); cmViewLinkNone holds on live (a guard); the help's rows reshaped, and the
+# view link topic names the right-click route (S-helpVlMenu)
+NEW_COPYM2 = {'L-mcopym-cmDistinct', 'L-mcopym-cmNestNoSql', 'L-mcopym-cmViewLink', 'S-helpCopyMenu', 'S-helpVlMenu'}
+NEW = NEW | NEW_COPYM2
 MUTANTS = {
+    # --- (2026-10-27, copymenu) the Copy list: a cell's never placed (it lands at the heading's spot); always a list, an item
+    # alone too; the first copy alone in its place; no This row; a hidden column, '#' copied; lines not indented; a nested table
+    # as its text; a toggle as 1 / 0; a heading's list at the foot of the column's tools
+    'cm-noslot': ([('menu', "            cellCps.push(rowCopyItem('copyRow', function () { return gridRowLines(th, cell.td); }));\n            items.push(copySlot);\n",
+                   "            cellCps.push(rowCopyItem('copyRow', function () { return gridRowLines(th, cell.td); }));\n")], ['L-mcopym-cmCell', 'L-mcopym-cmClipOff'], ['mcopym']),
+    'cm-noone': ([('menu', "        if (list.length === 1) { return shortCopy(list[0], list[0].long || list[0].label); }", "        if (false) { return shortCopy(list[0], list[0].long || list[0].label); }")],
+                 ['L-mcopym-cmClipOff', 'L-mcopym-cmNumRow', 'L-mnestgb-nsSection'], ['mcopym', 'mnestgb']),
+    'cm-first': ([('menu', "        if (list.length === 1) { return shortCopy(list[0], list[0].long || list[0].label); }", "        if (true) { return shortCopy(list[0], list[0].long || list[0].label); }")],
+                 ['L-mcopym-cmCell', 'L-mcopym-cmList', 'L-mcopym-cmHead', 'L-ggcopym-gcList'], ['mcopym', 'ggcopym']),
+    'cm-norow': ([('menu', "            cellCps.push(rowCopyItem('copyRow', function () { return gridRowLines(th, cell.td); }));\n            items.push(copySlot);\n", "            items.push(copySlot);\n")],
+                 ['L-mcopym-cmList', 'L-mcopym-cmRow', 'L-mcopym-cmNumRow', 'L-ggcopym-gcList', 'L-ggcopym-gcRow'], ['mcopym', 'ggcopym']),
+    'cm-hidden': ([('menu', "            if (name === null || name === '#' || !shown(h) || !c) { return; }", "            if (name === null || name === '#' || !c) { return; }")], ['L-mcopym-cmRowLayout'], ['mcopym']),
+    'cm-rownum': ([('menu', "            if (name === null || name === '#' || !shown(h) || !c) { return; }", "            if (name === null || !shown(h) || !c) { return; }")],
+                  ['L-mcopym-cmRow', 'L-mcopym-cmNumRow', 'L-ggcopym-gcRow'], ['mcopym', 'ggcopym']),
+    'cm-indent': ([('menu', "        out.push(label + ': ' + String(v).replace(/\\r?\\n/g, '\\n  '));", "        out.push(label + ': ' + String(v));")], ['L-mcopym-cmRowLines'], ['mcopym']),
+    'cm-nesttext': ([('menu', "        return box ? nestedRows(box) : cellText(c);", "        return cellText(c);")], ['L-mcopym-cmNestRow'], ['mcopym']),
+    'cm-toggle': ([('menu', "            if (jv === '1' || jv === '0') { return jv === '1' ? 'Yes' : 'No'; }", "            if (jv === '1' || jv === '0') { return jv; }")], ['L-mcopym-cmJournal'], ['mcopym']),
+    'cm-headpos': ([('menu', "        else if (cpList.length) { use.unshift(copyEntry('copyMenu', cpList)); }", "        else if (cpList.length) { use.push(copyEntry('copyMenu', cpList)); }")], ['L-mcopym-cmHead'], ['mcopym']),
+    # --- (copymenu 2) Link to this view: none; offered where the page cannot make one; no title; running nothing; no separator
+    'cm-novl': ([('menu', "        if (vlOk && cpList.length) {", "        if (false) {")], ['L-mcopym-cmViewLink'], ['mcopym']),
+    'cm-vlalways': ([('menu', "VL.available() === true; } catch (eVL) { vlOk = false; }", "true; } catch (eVL) { vlOk = false; }")], ['L-mcopym-cmViewLinkNone'], ['mcopym']),
+    'cm-vltitle': ([('menu', "long: 'Copy a link to this view', title: VIEWLINK_TITLE, run:", "long: 'Copy a link to this view', run:")], ['L-mcopym-cmViewLink'], ['mcopym']),
+    'cm-vlrun': ([('menu', "run: function () { VL.copy(); } });", "run: function () { } });")], ['L-mcopym-cmViewLink'], ['mcopym']),
+    'cm-vlsep': ([('menu', "            cpList.push('-', { act: 'copyViewLink'", "            cpList.push({ act: 'copyViewLink'")], ['L-mcopym-cmViewLink'], ['mcopym']),
+    # --- (copymenu 3) the Copy list without its heading; a heading's Copy back below, with Group by
+    'cm-nohead': ([('menu', "items: function () { return [{ heading: 'Copy' }].concat(list); } };", "items: function () { return list; } };")], ['L-mcopym-cmHeadRow'], ['mcopym']),
+    'cm-headlow': ([('menu', "        if (items.indexOf(copySlot) < 0) { look.push(copySlot); }\n", "")], ['L-mcopym-cmHeadPlace', 'L-mcopym-cmHeadNoFilter'], ['mcopym']),
+    'cm-headalign': ([('menu', "        if (hd && fi && hd.classList.contains('pnb-hm-head') && fi.classList.contains('pnb-hm-item')) {", "        if (false) {")], ['L-mcopym-cmHeadAlign'], ['mcopym']),
+    # the keyboard: ArrowRight opens no list (the Copy list's from a cell)
+    'cm-kbd': ([('menu', "        else if (k === 'ArrowRight' && opens) { activate(it[i]); }\n", "")], ['L-mcopym-cmKbd'], ['mcopym']),
     # --- (2026-10-26, cstat) the grouped view's rows: the flat table's alone (live's reading); every copy of a row; the first copy
     # though a later one is kept; the last copy though hidden; one reader on the flat rows (a journal column's counts; every other one's)
     'cs-flat': ([('main', "        if (!$('#groupedResultsContainer').is(':visible')) return document.querySelectorAll('#resultsTable > tbody > tr');",
@@ -556,6 +616,8 @@ MUTANTS = {
     'j-innote': ([('menu', "        var onNotes = target.closest('button.journal-notes-btn');", "        var onNotes = null;")], ['L-mjournal-jrnInNote'], ['mjournal']),
     # --- (round 20) the '#' menu, Add a note, the fiscal year
     'n-native': ([('menu', "        if (!th) { return null; }   // (round 20) the '#' heading has a short menu of its own", "        if (!th || th.getAttribute('data-column') === '#') { return null; }")], ['L-mnum-numOpens'], ['mnum']),
+    # (2026-10-27, notescroll) Add a note to this row... brings the row's Notes button into the table's box first
+    'j-noscroll': ([('menu', "run: function () { intoView(nb); nb.click(); } });", "run: function () { nb.click(); } });")], ['L-mjournal-jrnAddNoteScrolled'], ['mjournal']),
     'j-nonote': ([('menu', "            if (nb && !nb.disabled) {   // (a row whose key is empty cannot take notes: its button is disabled)\n                items.push({ act: 'addNote',", "            if (false) {\n                items.push({ act: 'addNote',")], ['L-mjournal-jrnAddNote'], ['mjournal']),
     'f-fy': ([('main', "var fy = m >= PNB_FY_START_MONTH ? y + 1 : y;", "var fy = y;")], ['L-mbucket-dtUnits'], ['mbucket']),
     # --- (round 19) date Ranges, Fit all
@@ -616,6 +678,63 @@ MUTANTS = {
 }
 # (round 33) mreset retired with Reset all columns: its mutants have nothing to turn red
 MUTANTS = {k: v for k, v in MUTANTS.items() if set(v[2]) != {'mreset'}}
+# (2026-10-27, fltmenu) a cell's Filter list, Click to filter, At least / At most; Copy's [column name] before This entire row,
+# This nested table, Distinct column groups; Highlight... out. NEW = what live fails: mfltm but its guards (they hold on
+# live: Filter to still runs, a heading's flat Filter by value..., Copy column name's copy, a '#' cell, no groups where
+# none apply) and the checks reshaped with it.
+FLT_GUARDS = {'L-mfltm-fmFilterRuns', 'L-mfltm-fmHead', 'L-mfltm-fmCopyName', 'L-mfltm-fmNumCell', 'L-mfltm-fmGroupsNone'}
+NEW_FLT = ({'L-mfltm-%s' % c for c in CHK['mfltm']} - FLT_GUARDS) | {'L-gmenu-cellGroup', 'L-mcell-cellOpens', 'L-mcopym-cmCell', 'L-mcopym-cmList',
+    'L-mcopym-cmClipOff', 'L-mcopym-cmNestList', 'L-ggcopym-gcList', 'S-helpCopyMenu', 'S-helpFltMenu'}
+NEW = NEW | NEW_FLT
+NEW = NEW - NEW_FLT   # (fltmenu is LIVE since 5eae534, 2026-10-27: old checks now)
+NEW = NEW | NEW_COPYM2   # (copymenu 2, again: fltmenu's retirement took S-helpCopyMenu out with its own)
+NEW = NEW - NEW_COPYM2   # (copymenu 2 is LIVE since 0d19cfd, 2026-10-27: old checks now)
+# (2026-10-27, copymenu 3; the user: "Add a 'Copy' static header in the flyover menu so everything below makes more instant
+# sense", "When right clicking headers, move the copy menu to be above the filter to value item") the Copy list's heading
+# row; a heading's Copy right above Filter by value... (with none, after the sorts) - live has neither
+CHK['mcopym'] = CHK['mcopym'] + ['cmHeadRow', 'cmHeadPlace', 'cmHeadNoFilter', 'cmHeadAlign']
+NEW_COPYM3 = {'L-mcopym-cmHeadRow', 'L-mcopym-cmHeadPlace', 'L-mcopym-cmHeadNoFilter', 'L-mcopym-cmHeadAlign', 'L-mcopym-cmHead', 'L-msubs-topOrder'}
+NEW = NEW | NEW_COPYM3
+NEW = NEW - NEW_COPYM3   # (copymenu 3 is LIVE since 766f5e9, 2026-10-27: old checks now)
+# mhl retired with Highlight...: its mutants have nothing to turn red
+MUTANTS = {k: v for k, v in MUTANTS.items() if 'mhl' not in v[2]}
+MUTANTS.update({
+    # the Filter list: never placed; always its first item alone; Filter by value... on a cell's top level; the bounds before
+    # Filter by value...; no separator before Click to filter
+    'fm-noslot': ([('menu', "                }\n            }\n            items.push(fltSlot);\n", "                }\n            }\n")], ['L-mfltm-fmCell', 'L-mfltm-fmList', 'L-mcell-cellOpens'], ['mfltm', 'mcell']),
+    'fm-alone': ([('menu', "            else if (fl.length === 1) { fillSlot(fltSlot, fl[0]); }", "            else if (true) { fillSlot(fltSlot, fl[0]); }")], ['L-mfltm-fmCell', 'L-mfltm-fmList', 'L-mfltm-fmNumList'], ['mfltm']),
+    'fm-bytop': ([('menu', "            if (items.indexOf(fltSlot) >= 0) { fltBy = fbv; } else { look.push(fbv); }", "            look.push(fbv);")], ['L-mfltm-fmList', 'L-mfltm-fmNumList'], ['mfltm']),
+    'fm-order': ([('menu', "            var fl = flt.concat(fltBy ? [fltBy] : [], fltCmp)", "            var fl = flt.concat(fltCmp, fltBy ? [fltBy] : [])")], ['L-mfltm-fmNumList'], ['mfltm']),
+    'fm-nosep': ([('menu', "            if (cf) { if (fl.length) { fl.push('-'); } fl.push(cf); }", "            if (cf) { fl.push(cf); }")], ['L-mfltm-fmList'], ['mfltm']),
+    # the bounds: none for a number; At least writes the high end; the other end always dropped / never dropped; no dates
+    'fm-nonum': ([('main', "            if (isFinite(x)) return { kind: 'number', bound: String(x) };", "            if (false) return { kind: 'number', bound: String(x) };")], ['L-mfltm-fmNumList', 'L-mfltm-fmAtLeast'], ['mfltm']),
+    'fm-side': ([('menu', "run: function () { A.filterBound(col, 'min', bnd.bound, bnd.kind); } });", "run: function () { A.filterBound(col, 'max', bnd.bound, bnd.kind); } });")], ['L-mfltm-fmAtLeast'], ['mfltm']),
+    'fm-nokeep': ([('main', "        var was = st.range[C] || { min: '', max: '' }, r = { min: was.min || '', max: was.max || '' }", "        var was = { min: '', max: '' }, r = { min: was.min || '', max: was.max || '' }")], ['L-mfltm-fmKeepOther'], ['mfltm']),
+    'fm-nodrop': ([('main', "            if (lo > hi) r[other] = '';", "            if (false) r[other] = '';")], ['L-mfltm-fmDropOther'], ['mfltm']),
+    'fm-nodate': ([('main', "        if (k.date) {\n            var d = lib.isoDate(s);", "        if (false) {\n            var d = lib.isoDate(s);")], ['L-mfltm-fmDate'], ['mfltm']),
+    # Click to filter: always on; the report's switch ignored (menu, main.js); none at all
+    'fm-cfon': ([('menu', "            A.setClickFilter(col, !st.on);", "            A.setClickFilter(col, true);")], ['L-mfltm-fmClick'], ['mfltm']),
+    'fm-cfforced': ([('menu', "        if (st.forced) { return { act: 'clickFilter'", "        if (false) { return { act: 'clickFilter'")], ['L-mfltm-fmForced'], ['mfltm']),
+    'fm-cfmain': ([('main', "forced: document.body.classList.contains('pnb-click-filter') };", "forced: false };")], ['L-mfltm-fmForced'], ['mfltm']),
+    'fm-nocf': ([('menu', "            var fl = flt.concat(fltBy ? [fltBy] : [], fltCmp), cf = clickFilterItem(col, name, isNum, restricted);", "            var fl = flt.concat(fltBy ? [fltBy] : [], fltCmp), cf = null;")],
+                ['L-mfltm-fmList', 'L-mfltm-fmClick', 'L-mfltm-fmForced', 'L-mfltm-fmNestLists'], ['mfltm']),
+    # Copy: the name after This entire row; named Column name; no This nested table; its text, not its rows
+    'fm-nameafter': ([('menu', "        var cpList = (cpRowAt < 0 ? cellCps.concat(cpNm)", "        var cpList = (true ? cellCps.concat(cpNm)")], ['L-mfltm-fmCopyOrder', 'L-mcopym-cmList', 'L-ggcopym-gcList'], ['mfltm', 'mcopym', 'ggcopym']),
+    'fm-namelabel': ([('menu', "var o = shortCopy(u, valueLabel(cpName)); o.title = cpName; return o;", "var o = shortCopy(u, 'Column name'); return o;")], ['L-mfltm-fmCopyOrder', 'L-mfltm-fmHeadName', 'L-mcopym-cmList'], ['mfltm', 'mcopym']),
+    'fm-nonest': ([('menu', "            if (cell.td.querySelector('.nested-json-container')) {\n                cellCps.push({ act: 'copyNestedTable'", "            if (false) {\n                cellCps.push({ act: 'copyNestedTable'")],
+                  ['L-mfltm-fmNestLists', 'L-mfltm-fmNestCopy', 'L-mfltm-fmNestPad', 'L-mcopym-cmNestList'], ['mfltm', 'mcopym']),
+    'fm-nesttext': ([('menu', "l = box ? nestedRows(box) : [];", "l = [cellText(cell.td)];")], ['L-mfltm-fmNestCopy'], ['mfltm']),
+    # Distinct column groups: none; offered where the report hides Clipboard; in data order; each row's group (not once)
+    'fm-nogroups': ([('menu', "        if (gcv.length) {\n            use.push({ act: 'copyGroups'", "        if (false) {\n            use.push({ act: 'copyGroups'")], ['L-mfltm-fmGroupsList', 'L-mfltm-fmGroupsCopy', 'L-mfltm-fmGroupsNum'], ['mfltm']),
+    'fm-grpclip': ([('menu', "typeof A.groupVariants === 'function' && !document.body.classList.contains('restrict-clipboard'))", "typeof A.groupVariants === 'function')")], ['L-mfltm-fmGroupsNone'], ['mfltm']),
+    'fm-grpsort': ([('main', "        try { out.sort(pivotSplitComparator(spec.split, spec.base)); } catch (e) { }\n", "")], ['L-mfltm-fmGroupsCopy', 'L-mfltm-fmGroupsNum'], ['mfltm']),
+    'fm-grponce': ([('main', "            if (!seen[k]) { seen[k] = true; out.push(k); }", "            out.push(k);")], ['L-mfltm-fmGroupsCopy'], ['mfltm']),
+    # Highlight... back in the menu (the 10-24 item)
+    'fm-hl': ([('menu', "        // 10-24 Highlight... item went: the column's highlight rules are Column options' own (main.js keeps openColHighlight)\n",
+                "        // 10-24 Highlight... item went: the column's highlight rules are Column options' own (main.js keeps openColHighlight)\n"
+                "        if (!restricted && !isNum && A.colOptsOn()) { arrange.push({ act: 'highlight', label: 'Highlight...', run: function () { } }); }\n")],
+              ['L-mfltm-fmNoHighlight', 'L-mfltm-fmNoHighlightCell'], ['mfltm']),
+})
 
 args = sys.argv[1:]
 def opt(name, default=None):
@@ -659,7 +778,11 @@ def hook(src):
     out = out[:j] + '})();' + out[j + 3:]
     hl = '    function hideLoading() {'
     if out.count(hl) != 1: raise SystemExit('hideLoading anchor count %d' % out.count(hl))
-    return out.replace(hl, hl + '\n        window.__HC_HIDES = (window.__HC_HIDES || 0) + 1;')
+    out = out.replace(hl, hl + '\n        window.__HC_HIDES = (window.__HC_HIDES || 0) + 1;')
+    # (2026-10-27, copymenu) main.js's own notices too (its show_text is the closure's, never the driver's window.show_text stub)
+    st = '    function show_text(text, duration = 8000, opts) {'
+    if out.count(st) == 1: out = out.replace(st, st + '\n        (window.__HC_MAIN_TOASTS = window.__HC_MAIN_TOASTS || []).push(String(text));')
+    return out
 def mutate(texts, name):
     t = dict(texts)
     for f, old, new in MUTANTS[name][0]:
@@ -770,10 +893,10 @@ def static_checks(texts):
         ('S-helpBack', 'returns to this menu' in texts['topic'] and 'move like any other and stay where you put them' in texts['topic'], ''),
         # (round 8) the cell menu in both help files
         ('S-helpNum', 'Hide the row numbers' in texts['topic'] and 'Add a note to this row' in texts['topic'] and 'by fiscal year' in texts['topic'], ''),
-        ('S-helpFitAll', 'Fit all column widths' in texts['topic'] and 'date column by year' in texts['topic'], ''),
+        ('S-helpFitAll', 'Fit all column widths to contents' in texts['topic'] and 'date column by year' in texts['topic'], ''),
         ('S-helpRanges', '<em>Ranges</em> groups the values into about six ranges' in texts['topic'], ''),
-        ('S-helpSubs', '<strong>Move column</strong>' in texts['topic'] and 'Clear all personal customizations' in texts['topic'], ''),
-        ('S-helpResetAll', '<strong>Column widths</strong>: Fit to page' in texts['topic'] and 'shares of the page' in texts['topic'] and '<strong>Reset</strong>: All columns</td>' not in texts['topic'], ''),   # (round 33) reshaped
+        ('S-helpSubs', '<strong>Move column</strong>' in texts['topic'] and 'Clear all customizations' in texts['topic'], ''),
+        ('S-helpResetAll', '<strong>Column widths</strong>: Fit all column widths to page' in texts['topic'] and 'shares of the page' in texts['topic'] and '<strong>Reset</strong>: All columns</td>' not in texts['topic'], ''),   # (round 33) reshaped
         ('S-helpRowHeight', 'every row keeps one compact height' in texts['topic'] and 'nested-table cells alone' not in texts['topic'] and 'every nested row shows in full' not in texts['topic'] and '<strong>Freeze row labels</strong>' in texts['topic'], ''),
         ('S-helpCells', 'data-colmenu-cells' in texts['topic'] and 'Filter to "value"' in texts['topic'], ''),
         # (round 6) the new items in both help files
@@ -807,6 +930,23 @@ def static_checks(texts):
         # (2026-10-25, neststats) the Nested columns row names Column stats; the stats row says where a sub-column's are
         ('S-helpNestStats', "as Copy's <em>Nested sub-columns</em>, and <em>Column stats</em>" in texts['topic'] and 'has stats of its own under <em>Nested columns</em>' in texts['topic']
          and chr(0x2014) not in texts['topic'], ''),
+        # (2026-10-27, copymenu; copymenu 2) the Copy list's rows: Copy (Link to this view among them), Copy this row, Link to this
+        # view, no For SQL; the cell's Copy paragraph names the list with the link in it, a breakdown's says it has none;
+        # (fltmenu) the column's name before the row
+        ('S-helpCopyMenu', '<strong>Copy</strong></td>' in texts['topic'] and '<strong>Copy this row</strong></td>' in texts['topic'] and '<strong>Copy</strong>: Link to this view</td>' in texts['topic']
+         and 'and on a saved report <em>Link to this view</em>' in texts['topic'] and 'It carries no data: whoever opens it sees the rows their own access allows. The same link as Copy' in texts['topic']
+         and 'For SQL' not in texts['topic'] and "the <em>Copy</em> list: the value itself, the column's name, <em>This entire row</em>" in texts['topic'] and chr(0x2014) not in texts['topic']
+         and "such as <em>Copy column name</em> on a comparison's heading." in texts['topic'] and "as the column menu's but without <em>Link to this view</em>" in texts['topic']
+         and "<em>This entire row</em>, its distinct values and the view link." in texts['topic'], ''),
+        # (copymenu 2, the review) the view link topic's Copy one names the right-click route
+        ('S-helpVlMenu', "the menu's <em>Copy</em> list ends with <em>Link to this view</em>" in read_b(os.path.join(APP, 'help', 'topics', 'viewLinkHelpLightbox.php') if control
+         else pick(os.path.join('help', 'topics', 'viewLinkHelpLightbox.php'))), ''),
+        # (2026-10-27, fltmenu) the cell's Filter list, Click to filter, At least / At most, This nested table, Distinct column groups;
+        # Highlight... no item of the menu's
+        ('S-helpFltMenu', '<em>Filter</em> lists <em>Filter to "value"</em>' in texts['topic'] and '<em>Click to filter</em> is the column\'s Filter switch' in texts['topic']
+         and '<strong>Filter</strong>: At least / At most</td>' in texts['topic'] and '<em>This nested table</em> (one line per row of it)' in texts['topic']
+         and '<em>Distinct column groups</em> (a date period or number range, then a delimiter)' in texts['topic'] and '<strong>Highlight...</strong>' not in texts['topic']
+         and '<em>Highlight...</em> in its right-click menu' not in texts['topic'], ''),
         # (2026-10-25, nestgb2) the group band menu's lists and the status bar chip's: no nested-table column, its tables' columns
         ('S-helpNestBand', "A nested-table column is never listed; the top level lists its tables' columns instead" in texts['topic']
          and 'A nested-table column is not in the list; the columns of its tables are, under <em>Nested table columns</em>' in texts['topic']

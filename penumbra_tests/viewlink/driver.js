@@ -57,6 +57,11 @@
     return out;
   }
   function vis(sel) { var e = document.querySelector(sel); return !!(e && (e.offsetWidth || e.offsetHeight)); }
+  // (10-27 b) cell selection through its own gestures (js/penumbra_cellsel.js listens on document, capture phase)
+  function mev(type, el, opt) { var r = el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent(type, Object.assign({ bubbles: true, cancelable: true, button: 0, buttons: type === 'mouseup' ? 0 : 1, clientX: Math.round(r.left + 4), clientY: Math.round(r.top + 4) }, opt || {}))); }
+  async function dragSel(a, b, ctrl) { mev('mousedown', a, ctrl ? { ctrlKey: true } : null); await sleep(60); mev('mousemove', b, ctrl ? { ctrlKey: true } : null); await sleep(60); mev('mouseup', b); await sleep(150); }
+  function CSn() { return window.Penumbra && window.Penumbra.cellSel; }
+  function selInfo() { var cs = CSn(); return { n: cs ? cs.count() : -1, st: cs ? cs.stats() : null }; }
   function dom() {
     return { search: document.getElementById('tableSearch').value, shown: shownNames(), rows: rowsText(5),
       grouped: vis('#groupedResultsContainer'), pivot: vis('#pivot-output-container'), flat: vis('#resultsTable'),
@@ -359,6 +364,11 @@
       var bf = capture(), vf = bf.token ? (V().decode(bf.token) || {}) : {};
       R.info.view = vf;
       R.chk.wysiwygFormats = JSON.stringify(vf.fm || {}) === JSON.stringify({ V_AMOUNT: 'number:1' });
+      // (10-27 review) the Save dialog's list of formats and rules: on a shared view's page, none starts ticked
+      if (window.Penumbra.hlRenderSaveList) window.Penumbra.hlRenderSaveList();
+      var cbs9 = document.querySelectorAll('#pnbHlSaveRow input[data-hl-save]');
+      R.info.saveList = Array.prototype.map.call(cbs9, function (c) { return c.getAttribute('data-hl-save') + ':' + c.checked; });
+      R.chk.listUnticked = cbs9.length > 0 && Array.prototype.every.call(cbs9, function (c) { return !c.checked; });
       R.chk.csoRoundTrip = !!(vf.cso && vf.cso.V_STATUS && JSON.stringify(vf.cso.V_STATUS.values) === JSON.stringify(['Pending', 'Open', 'Closed']));
       window.__SAVE_ANSWER = function (b) { return { ok: true, json: { success: true, new_id: b.short_id, numeric_id: 7, is_new: false, updated_at: '2026-10-22 10:00:00.000000' } }; };
       var n9 = window.__saves.length;
@@ -481,6 +491,7 @@
         Array.prototype.some.call(box.querySelectorAll('tbody tr'), function (tr) { if (!tr.getClientRects().length || tr.getBoundingClientRect().bottom <= top + 1) return false; var tds = tr.querySelectorAll('td'); id = Array.prototype.map.call(tds, function (t) { return t.textContent.trim(); }).filter(function (x) { return /^ID-\d+$/.test(x); })[0] || null; return true; });
         return id;
       }
+      function idsOf(w, n) { var out = []; if (!w) return out; Array.prototype.some.call(w.querySelectorAll(':scope > .group-content tbody tr'), function (tr) { var id = Array.prototype.map.call(tr.querySelectorAll('td'), function (t) { return t.textContent.trim(); }).filter(function (x) { return /^ID-\d+$/.test(x); })[0]; if (id) out.push(id); return out.length >= n; }); return out; }
       function topGroup() { var hit = null; wraps().some(function (w) { var h = w.querySelector(':scope > .group-header'); if (h && h.getClientRects().length && w.getBoundingClientRect().bottom > 1 && h.getBoundingClientRect().bottom > -1) { hit = wpath(w); return true; } return false; }); return hit; }
       var keep = isCmp ? ['Modified Rows'] : null;
       if (SCN === 'ggsA' || SCN === 'vcmpS') {
@@ -490,7 +501,20 @@
         // open exactly `keep` with the bands' own clicks
         ws.forEach(function (w) { var want = keep.indexOf(wpath(w)) >= 0; if (w.classList.contains('open') !== want) { var h = w.querySelector(':scope > .group-header'); if (h) h.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })); } });
         await sleep(600);
+        // (10-27) a sort clicked on the comparison itself: V_AMOUNT descending (two clicks on its heading)
+        if (isCmp) for (var k2 = 0; k2 < 2; k2++) {
+          var sth = document.querySelector('#snapshotComparisonContainer thead th[data-colname="V_AMOUNT"]');
+          if (sth) sth.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+          await sleep(700);
+        }
         var tw = ws.filter(function (w) { return wpath(w) === keep[keep.length - 1]; })[0];
+        // (10-27 b) cells selected in the open group's box (its rows 1-3, V_NAME..V_AMOUNT)
+        if (isCmp) {
+          var bx = tw && tw.querySelector(':scope > .group-content'), brs = bx ? Array.prototype.filter.call(bx.querySelectorAll('tbody tr'), function (t) { return !t.classList.contains('search-hidden') && t.getClientRects().length && t.closest('.group-content') === bx; }) : [];
+          var bcell = function (i, n) { var h = bx ? bx.querySelector('thead th[data-colname="' + n + '"]') : null; return brs[i] && h ? brs[i].querySelector('td[data-column="' + h.getAttribute('data-column') + '"]') : null; };
+          if (bcell(1, 'V_NAME') && bcell(3, 'V_AMOUNT')) await dragSel(bcell(1, 'V_NAME'), bcell(3, 'V_AMOUNT'));
+          R.info.cmpSel = selInfo();
+        }
         var tb = tw && tw.querySelector(':scope > .group-content'); if (tb) tb.scrollTop = 200;
         if (!isCmp) { window.scrollTo(0, 0); window.scrollBy(0, Math.round(tw.getBoundingClientRect().top)); }
         await sleep(500);
@@ -499,6 +523,8 @@
         if (bs.url) { var us = new URL(bs.url); R.info.path = us.pathname.replace(/^\//, '') + us.search; }
         var vs = R.info.view || {};
         R.chk.carriesOpen = JSON.stringify((vs.go || []).slice().sort()) === JSON.stringify(R.info.open) && !vs.ga && Array.isArray(vs.gb) && vs.gb.length === 1;
+        if (isCmp) { R.chk.carriesSort = JSON.stringify(vs.xo || null) === JSON.stringify([['V_AMOUNT', 'desc']]); R.info.sortIds = idsOf(tw, 8); }
+        if (isCmp) R.chk.carriesCmpSel = Array.isArray(vs.sel) && vs.sel.length === 1 && vs.sel[0].g === 'Modified Rows' && R.info.cmpSel.n === 6;
       } else {
         R.chk.note = await noteShown();
         if (!keep) keep = [];
@@ -506,6 +532,8 @@
         R.info.open = openSet();
         var tw2 = wraps().filter(function (w) { return R.info.open.length && wpath(w) === R.info.open[R.info.open.length - 1]; })[0];
         R.info.top = tw2 ? boxTop(tw2) : null; R.info.page = topGroup();
+        if (isCmp) R.info.sortIds = idsOf(tw2, 8);
+        if (isCmp) { await sleep(1500); R.info.cmpSel = selInfo(); }
       }
     } else if (SCN === 'vcmpA' || SCN === 'vcmpB') {
       // (10-23) a snapshot comparison on screen: the link = the comparison's own + the view
@@ -578,6 +606,109 @@
         R.info.report = rep7; R.info.room = room7; R.info.off = off7; R.info.scroll = [wrap7.scrollWidth, wrap7.clientWidth];
         R.chk.sharesApplied = rk7.length >= 5 && off7.length === 0 && wrap7.scrollWidth <= wrap7.clientWidth + 1;
         var b7b = capture(); R.info.view = b7b.token ? V().decode(b7b.token) : null; R.info.dom = dom();
+      }
+    } else if (SCN === 'vnest') {
+      // (10-27) grouped by a nested-table column's own column (H_JSON's SUB_NAME): applied, and not named as gone
+      R.chk.note = await noteShown();
+      await sleep(600);
+      var bt9 = bodyText(), at9 = bt9.indexOf('Opened a shared view');
+      R.info.missing = V().missing(); R.info.noteText = at9 >= 0 ? bt9.slice(at9, at9 + 300) : '';
+      R.chk.grouped = vis('#groupedResultsContainer') && document.querySelectorAll('#groupedResultsContainer .group-wrapper').length > 1;
+      R.chk.nestNotMissing = V().missing().every(function (n) { return String(n).toUpperCase() !== 'SUB_NAME'; });
+      R.chk.nestNoSkip = R.chk.note === true && bt9.indexOf('no longer in this report') < 0;
+    } else if (SCN === 'vgbins') {
+      // (10-27) a grouping whose token outgrows a name (40 custom range edges, past 200 chars): kept and applied
+      R.chk.note = await noteShown();
+      await sleep(600);
+      R.chk.grouped = vis('#groupedResultsContainer') && document.querySelectorAll('#groupedResultsContainer .group-wrapper').length >= 1;
+      R.info.groups = Array.prototype.slice.call(document.querySelectorAll('#groupedResultsContainer .group-wrapper'), 0, 5).map(function (w) { return w.getAttribute('data-group-path') || w.getAttribute('data-group-key'); });
+    } else if (SCN === 'vsnapv') {
+      // (10-27) a link copied during a snapshot view (Load As View: no ?snap= in the URL) says it opens the live report
+      await until(function () { return !!document.querySelector('#tableHeader th[data-colname]'); }, 15000);
+      await sleep(500);
+      var wr10 = window.Penumbra.findHost && window.Penumbra.findHost.wrapper(); if (wr10) { wr10.scrollTop = 1400; await sleep(400); }
+      window.__VL.setSnapView(true);
+      var b10 = V().build();
+      R.info.build10 = { error: b10.error || null, snap: b10.snap };
+      R.chk.snapFlag = b10.snap === true;
+      R.chk.snapNoPositions = !!b10.view && b10.view.tr === undefined && b10.view.pg === undefined;
+      await V().copy();
+      R.chk.snapNote = await until(function () { return bodyText().indexOf('not the snapshot on screen') >= 0; }, 3000);
+      var bt10 = bodyText(), at10 = bt10.indexOf('Link copied.'); R.info.toast = at10 >= 0 ? bt10.slice(at10, at10 + 400) : '';
+      window.__VL.setSnapView(false);
+      var b10b = V().build(); R.chk.liveNoFlag = b10b.snap !== true;
+      R.chk.liveKeepsTop = !!b10b.view && b10b.view.tr > 0; R.info.trLive = b10b.view ? b10b.view.tr : null;
+    } else if (SCN === 'vunit') {
+      // (10-27 review) the cleaner keeps a formula summary and sort levels on '#' / a journal column; a filter
+      // longer than a link carries is left out whole, and said
+      var dcs = V().decode(u.get('tcsf')) || {}, dsc = V().decode(u.get('tscv')) || {};
+      R.info.dcs = dcs.cs || null; R.info.dsc = dsc.sc || null;
+      R.chk.csFormulaKept = !!(dcs.cs && dcs.cs.V_AMOUNT === 'formula');
+      R.chk.scVirtualKept = Array.isArray(dsc.sc) && dsc.sc.length === 2 && dsc.sc[0].colIndex === '#' && dsc.sc[1].colIndex === '__JOURNAL_TOGGLE__done';
+      var longF = 'V_ID in (' + Array.apply(null, Array(240)).map(function (x, i) { return "'ID-" + (1000 + i) + "'"; }).join(', ') + ')';
+      var ts11 = document.getElementById('tableSearch'), was11 = ts11.value; ts11.value = longF;
+      var b11 = V().build(); ts11.value = was11;
+      R.info.long = { len: longF.length, s: b11.view ? (b11.view.s || '').length : null, dropped: b11.dropped, error: b11.error || null };
+      R.chk.longFilterDropped = !!b11.view && b11.view.s === undefined && (b11.dropped || []).indexOf('the filter (over 2000 characters)') >= 0;
+    } else if (SCN === 'vnumA' || SCN === 'vnumB') {
+      // (10-27 review) a flat sort on the '#' column: it rides as the state's sort (?sort= knows only the query's columns)
+      function flatIds(n) { var idc = fth('V_ID').getAttribute('data-column'), out = []; Array.prototype.some.call(document.querySelectorAll('#resultsTable tbody tr'), function (tr) { if (!tr.getClientRects().length) return false; var td = tr.querySelector('td[data-column="' + idc + '"]'); if (td) out.push(td.textContent.trim()); return out.length >= n; }); return out; }
+      if (SCN === 'vnumA') {
+        var first12 = flatIds(1)[0];
+        for (var k3 = 0; k3 < 2; k3++) { var nth = document.querySelector('#tableHeader th[data-colname="#"]'); if (nth) nth.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })); await sleep(700); }
+        R.info.rows = flatIds(5);
+        R.chk.numSorted = R.info.rows.length > 0 && R.info.rows[0] !== first12;
+        var bn = capture(), vn = bn.token ? (V().decode(bn.token) || {}) : {};
+        R.info.view = vn; R.info.token = bn.token;
+        R.chk.carriesNumSort = !vn.o && Array.isArray(vn.sc) && vn.sc.length === 1 && vn.sc[0].colIndex === '#' && vn.sc[0].direction === 'desc';
+      } else {
+        R.chk.note = await noteShown(); await sleep(800);
+        R.info.rows = flatIds(5);
+        var bt12 = bodyText();
+        R.chk.noSkipNote = bt12.indexOf('skipped column') < 0 && bt12.indexOf('Sort dropped') < 0;
+      }
+    } else if (SCN === 'vselA' || SCN === 'vselB') {
+      // (10-27 b) selected cells: a block (rows 3-6, V_NAME..V_AMOUNT) and one more cell (Ctrl), then a press elsewhere
+      // (the toolbar's Copy button's way) - the link still carries them; the page it opens selects the same cells
+      var cellAt = function (i, col) { var rows = Array.prototype.filter.call(document.querySelectorAll('#resultsTable tbody tr'), function (t) { return !t.classList.contains('search-hidden') && t.getClientRects().length; }); var th = fth(col); return rows[i] && th ? rows[i].querySelector('td[data-column="' + th.getAttribute('data-column') + '"]') : null; };
+      if (SCN === 'vselA') {
+        await dragSel(cellAt(3, 'V_NAME'), cellAt(6, 'V_AMOUNT'));
+        await dragSel(cellAt(9, 'V_AMOUNT'), cellAt(9, 'V_AMOUNT'), true);
+        R.info.sel = selInfo();
+        R.chk.selected = R.info.sel.n === 9;
+        var away = document.getElementById('tableSearch'); mev('mousedown', away); mev('mouseup', away); await sleep(200);
+        R.chk.pressCleared = CSn().count() === 0;
+        var bs1 = capture(), vs1 = bs1.token ? (V().decode(bs1.token) || {}) : {};
+        R.info.view = vs1; R.info.token = bs1.token;
+        R.chk.carriesSel = Array.isArray(vs1.sel) && vs1.sel.length === 2 && JSON.stringify(vs1.sel[0].c) === JSON.stringify(['V_NAME', 'V_AMOUNT']);
+        R.chk.toastSays = (bs1.included || []).indexOf('selected cells') >= 0;
+      } else {
+        R.chk.note = await noteShown(); await sleep(3000);
+        R.info.sel = selInfo();
+        R.chk.noMissNote = bodyText().indexOf('could not be found') < 0;
+      }
+    } else if (SCN === 'vselX') {
+      // (10-27 b) a link whose selected rows are none of this page's (their fingerprints match no row): nothing selected, and said
+      R.chk.note = await noteShown(); await sleep(3000);
+      R.info.sel = selInfo();
+      R.chk.selNone = R.info.sel.n === 0;
+      R.chk.selMissNoted = bodyText().indexOf('could not be found') >= 0;
+    } else if (SCN === 'pvselA' || SCN === 'vpselB') {
+      // (10-27 b) cells selected in the pivot (a 2 x 2 block of its values): the link names them by grid place
+      await until(function () { return vis('#pivot-output-container') && document.querySelectorAll('#pivotResultTable tbody td').length > 0; }, 20000);
+      await sleep(800);
+      if (SCN === 'pvselA') {
+        var prs = document.querySelectorAll('#pivotResultTable tbody tr');
+        var pc1 = prs[0] && prs[0].cells[1], pc2 = prs[1] && prs[1].cells[2];
+        if (pc1 && pc2) await dragSel(pc1, pc2);
+        R.info.sel = selInfo();
+        R.chk.pivSelected = R.info.sel.n >= 2;   // (nested row labels span rows: a 2 x 2 drag can take in more)
+        var bp = capture(), vp = bp.token ? (V().decode(bp.token) || {}) : {};
+        R.info.view = vp; R.info.token = bp.token;
+        R.chk.carriesPivSel = Array.isArray(vp.sel) && vp.sel.length === 1 && vp.sel[0].p === 1;
+      } else {
+        R.chk.note = await noteShown(); await sleep(3000);
+        R.info.sel = selInfo();
       }
     } else if (SCN === 'vjrn') {
       // (2026-10-22) a link naming the journal's columns: none listed as gone; the journal places them by the

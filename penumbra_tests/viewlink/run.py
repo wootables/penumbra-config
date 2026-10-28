@@ -43,7 +43,8 @@ def pick(rel):
     return p if os.path.exists(p) else os.path.join(APP, rel)
 RELS = {'find': os.path.join('js', 'penumbra_find.js'), 'prompt': 'ai_system_prompt.php', 'calc': os.path.join('js', 'penumbra_calc.js'), 'main': os.path.join('js', 'main.js'), 'index': 'index.php', 'pal': os.path.join('js', 'penumbra_palette.js'),
         'form': 'submit_home_form.php', 'topic': os.path.join('help', 'topics', 'viewLinkHelpLightbox.php'),
-        'tip': os.path.join('help', 'tips', 'settings-tips-storage.php'), 'manifest': os.path.join('help', 'manifest.php')}
+        'tip': os.path.join('help', 'tips', 'settings-tips-storage.php'), 'manifest': os.path.join('help', 'manifest.php'),
+        'cellsel': os.path.join('js', 'penumbra_cellsel.js')}   # (10-27 b) the cell selection module under test
 def read_b(p):
     if not os.path.exists(p): return ''
     return open(p, 'rb').read().decode('utf-8', 'surrogateescape')
@@ -100,8 +101,17 @@ T_JRN = tok({'v': 1, 'm': 'flat', 'o': 'none', 'c': {'o': JRN_O, 'v': ['V_ID', '
              'w': {'__JOURNAL_TOGGLE__done': 90}})
 STATIC_TOK = {'vwins': T_WINS, 'vstale': T_STALE, 'vbad': T_BAD, 'vsql': T_SQL, 'vhuge': 'A' * 7000, 'vbomb': T_BOMB, 'vpgstale': T_PGSTALE, 'ggvA': T_GLIST, 'vbadpiv4': T_BADPIV4, 'vfmsave': T_FMSAVE, 'vbadpiv': T_BADPIV, 'vbadpiv2': T_BADPIV2, 'vbadgrp': T_BADGRP, 'vbadgrp2': T_BADGRP2, 'vbadpiv3': T_BADPIV3, 'vbadgrp3': T_BADGRP3, 'vmail': T_MAIL}
 STATIC_TOK['vjrn'] = T_JRN
+# (10-27 sweep) grouped by a nested-table column's own column; a grouping token past 200 chars (40 custom edges)
+STATIC_TOK['vnest'] = tok({'v': 1, 'm': 'group', 'g': {'by': 'SUB_NAME'}})
+GBINS_BY = 'H_AMT:bins' + '_'.join(str(int(round(5 * 1.5 ** i))) for i in range(1, 41))
+STATIC_TOK['vgbins'] = tok({'v': 1, 'm': 'group', 'g': {'by': GBINS_BY}})
+# (10-27 b) selected cells whose rows are none of this page's (fingerprints that match no row)
+STATIC_TOK['vselX'] = tok({'v': 1, 'm': 'flat', 'o': 'none', 'sel': [{'r': [2, 4], 'c': ['V_NAME', 'V_AMOUNT'], 'h': ['zzzzz', 'zzzzz']}]})
+# (10-27 review) the cleaner's own checks: a formula summary; sort levels on '#' and on a journal column
+T_CSF = tok({'v': 1, 'm': 'flat', 'o': 'none', 'cs': {'V_AMOUNT': 'formula'}})
+T_SCV = tok({'v': 1, 'm': 'group', 'g': {'by': 'H_GROUP'}, 'sc': [{'colIdentifier': '#', 'colIndex': '#', 'direction': 'desc'}, {'colIdentifier': '__JOURNAL_TOGGLE__done', 'colIndex': '__JOURNAL_TOGGLE__done', 'direction': 'asc'}]})
 
-SCN = ['vcapA', 'vcapB', 'gvA', 'vgrpB', 'pvA', 'vpivB', 'pflatB', 'vwins', 'vwinsc', 'vstale', 'vbad', 'vsql', 'vhuge', 'vbomb', 'vnoid', 'vstate', 'vprompt', 'vlimit', 'vpgA', 'vpgB', 'vpgstale', 'vccA', 'vccB', 'vcchB', 'vmail', 'vthA', 'vthB', 'vshare', 'vsharenoid', 'vscrA', 'vscrB', 'vfindA', 'vfindB', 'vbadpiv', 'vbadpiv2', 'vbadpiv3', 'vbadgrp', 'vbadgrp2', 'vbadgrp3', 'vfmsave', 'vbadpiv4', 'vfitA', 'vfitB', 'vjrn', 'vcmpA', 'vcmpB', 'vcmpF', 'vcmpG', 'ggvA', 'ggvB', 'ggcA', 'ggcB', 'ggsA', 'ggsB', 'vcmpS', 'vcmpT']
+SCN = ['vcapA', 'vcapB', 'gvA', 'vgrpB', 'pvA', 'vpivB', 'pflatB', 'vwins', 'vwinsc', 'vstale', 'vbad', 'vsql', 'vhuge', 'vbomb', 'vnoid', 'vstate', 'vprompt', 'vlimit', 'vpgA', 'vpgB', 'vpgstale', 'vccA', 'vccB', 'vcchB', 'vmail', 'vthA', 'vthB', 'vshare', 'vsharenoid', 'vscrA', 'vscrB', 'vfindA', 'vfindB', 'vbadpiv', 'vbadpiv2', 'vbadpiv3', 'vbadgrp', 'vbadgrp2', 'vbadgrp3', 'vfmsave', 'vbadpiv4', 'vfitA', 'vfitB', 'vjrn', 'vcmpA', 'vcmpB', 'vcmpF', 'vcmpG', 'ggvA', 'ggvB', 'ggcA', 'ggcB', 'ggsA', 'ggsB', 'vcmpS', 'vcmpT', 'vnest', 'vgbins', 'vsnapv', 'vunit', 'vnumA', 'vnumB', 'vselA', 'vselB', 'vselX', 'pvselA', 'vpselB']
 CHK = {
     'vcapA': ['api', 'filtered', 'sorted', 'hidden', 'frozen', 'width', 'format', 'built', 'carries', 'urlShape', 'copied', 'toast', 'noNoteWithoutLink'],
     'vcapB': ['note', 'active', 'oneQuery', 'rtSearch', 'rtShown', 'rtRows', 'rtView', 'rtSort', 'rtFrozen', 'rtWidths', 'rtFormats', 'rtLayout'],
@@ -124,13 +134,17 @@ CHK = {
     'vscrA': ['carriesScroll'], 'vscrB': ['note', 'rtTopRow', 'rtLeftCol'],
     'vfindA': ['findStepped', 'carriesFind', 'describedFind'], 'vfindB': ['note', 'findOpen', 'cellOnScreen', 'rtMatch', 'rtCell', 'rtTopRow'],
     'vbadpiv': ['noScript', 'pageAlive', 'pivotShown'], 'vbadpiv3': ['noScript', 'pageAlive', 'pivotShown'], 'vbadgrp3': ['noScript', 'pageAlive', 'grouped'], 'vbadpiv2': ['noScript', 'pageAlive'], 'vbadgrp': ['noScript', 'pageAlive', 'grouped'], 'vbadgrp2': ['noScript', 'pageAlive'],
-    'vfmsave': ['note', 'wysiwygFormats', 'csoRoundTrip', 'savedReportFormats', 'urlDropsView'],
+    'vfmsave': ['note', 'listUnticked', 'wysiwygFormats', 'csoRoundTrip', 'savedReportFormats', 'urlDropsView'],
     'vbadpiv4': ['noScript', 'pageAlive'],
     'vcmpA': ['compared', 'cmpLink', 'cmpCarriesView', 'cmpDescribed', 'bannerCarriesView'], 'vcmpB': ['compared', 'cmpLink', 'cmpCarriesView', 'note', 'noStale'],
     'vcmpF': ['compared', 'typedCarried', 'hiddenCarried', 'appliedFallback'], 'vcmpG': ['compared', 'hiddenAgain', 'filterKept', 'oneRun'],
     'ggcA': ['compared', 'listOn', 'carriesCmpGroup'], 'ggcB': ['compared', 'listOn', 'rtGroup', 'rtGroupTop'],
     'ggsA': ['stacked', 'carriesOpen'], 'ggsB': ['note', 'rtOpen', 'rtBoxTop', 'rtPageTop'],
-    'vcmpS': ['compared', 'stacked', 'carriesOpen'], 'vcmpT': ['compared', 'rtOpen', 'rtBoxTop'],
+    'vcmpS': ['compared', 'stacked', 'carriesOpen', 'carriesSort', 'carriesCmpSel'], 'vcmpT': ['compared', 'rtOpen', 'rtBoxTop', 'rtSort', 'rtCmpSel'],
+    'vselA': ['selected', 'pressCleared', 'carriesSel', 'toastSays'], 'vselB': ['note', 'rtSel', 'noMissNote'], 'vselX': ['note', 'selNone', 'selMissNoted'],
+    'pvselA': ['pivSelected', 'carriesPivSel'], 'vpselB': ['note', 'rtPivSel'],
+    'vnest': ['note', 'grouped', 'nestNotMissing', 'nestNoSkip'], 'vgbins': ['note', 'grouped'], 'vsnapv': ['snapFlag', 'snapNote', 'liveNoFlag', 'snapNoPositions', 'liveKeepsTop'],
+    'vunit': ['csFormulaKept', 'scVirtualKept', 'longFilterDropped'], 'vnumA': ['numSorted', 'carriesNumSort'], 'vnumB': ['note', 'rtNumSort', 'noSkipNote'],
     'ggvA': ['listOn', 'carriesGroup'], 'ggvB': ['listOn', 'note', 'rtGroup', 'rtGroupTop'],
     'vpgA': ['turned', 'carriesPage'], 'vpgB': ['note', 'rtPage'], 'vpgstale': ['note', 'clamped'],
     'vfitA': ['fitShares', 'carriesShares'], 'vfitB': ['note', 'sharesApplied', 'rtShares'],   # (2026-10-22)
@@ -145,8 +159,8 @@ GUARDS = {'L-vwinsc-seedApplies', 'L-vbad-noScript', 'L-vbad-noPollution', 'L-vb
 
 # (2026-10-22) view links are LIVE: a control judges this round's checks (NEW: red on live) and every other
 # check (green on live). The round-1 rule (all but GUARDS new) no longer fits a live feature.
-NEW = {'L-vfitA-carriesShares', 'L-vfitB-sharesApplied', 'L-vfitB-rtShares', 'L-vjrn-jrnNotMissing', 'L-vjrn-jrnNoSkipNote',
-       'L-vjrn-jrnPlaced', 'L-vjrn-jrnCellsFollow', 'L-vjrn-jrnHidden'}
+NEW = {'L-vselA-carriesSel', 'L-vselA-toastSays', 'L-vselB-rtSel', 'L-vselX-selMissNoted', 'L-vcmpS-carriesCmpSel', 'L-vcmpT-rtCmpSel',
+       'L-pvselA-carriesPivSel', 'L-vpselB-rtPivSel'}   # (10-27 b: selected cells)
 MUTANTS = {
     # --- (2026-10-22) a share refused again; the journal's columns counted gone again; the journal ignoring the
     # link's order; the journal ignoring the link's visible list
@@ -193,6 +207,32 @@ MUTANTS = {
     'm-nosxapply': ([('main', "    function runComparisonAndDisplayGrouped(snapshot, customKeyColumns = null) {\n        _pnbViewLinkSxIntoBox();", "    function runComparisonAndDisplayGrouped(snapshot, customKeyColumns = null) {\n")], ['L-vcmpG-hiddenAgain'], ['vcmpF', 'vcmpG']),
     'm-nogp': ([('main', "                if (vlg.gp) setTimeout(function () { _pnbViewLinkGroupTo(vlg); }, 300);\n", "")], ['L-ggvB-rtGroup'], ['ggvA', 'ggvB']),
     'm-nofallback': ([('main', "        return _stripSnapTypeClauses(String(_flatSearchAppliedFor || '').trim());\n", "        return '';\n")], ['L-vcmpF-appliedFallback'], ['vcmpF']),
+    # (10-27 sweep) a comparison's own sort never captured / never restored
+    'm-noxocap': ([('main', "                v.xo = sortCriteria.map(function (c) { return [String(c.colIdentifier), c.direction]; });\n", "")], ['L-vcmpS-carriesSort', 'L-vcmpT-rtSort'], ['vcmpS', 'vcmpT']),
+    'm-noxoapply': ([('main', "                if (vlg.xo) setTimeout(function () { _pnbViewLinkCmpSort(vlg.xo); }, 250);", "                if (vlg.xo) { }")], ['L-vcmpT-rtSort'], ['vcmpS', 'vcmpT']),
+    # a nested-table column's own column named as gone; a long grouping token dropped; no snapshot-view note
+    'm-nonestvirt': ([('main', "idx[n] === undefined && !virt[n]) missing[n] = orig;", "idx[n] === undefined) missing[n] = orig;")], ['L-vnest-nestNoSkip', 'L-vnest-nestNotMissing'], ['vnest']),
+    'm-gby200': ([('main', "typeof d.g.by === 'string' && d.g.by && d.g.by.length <= 2000)", "_pnbViewName(d.g.by))")], ['L-vgbins-grouped'], ['vgbins']),
+    'm-nosnapnote': ([('main', "        if (b.snap) what += ' It opens the live report", "        if (false) what += ' It opens the live report")], ['L-vsnapv-snapNote'], ['vsnapv']),
+    # (10-27 b) selected cells: not captured, not restored, a row's fingerprint ignored, a press elsewhere forgetting
+    # them, a pivot's or a group's block not named
+    'm-nosel': ([('main', "        if (!snapV) { var selB = _pnbViewLinkSelNow(); if (selB) v.sel = selB; }\n", "")], ['L-vselA-carriesSel', 'L-vselB-rtSel'], ['vselA', 'vselB']),
+    'm-noselapply': ([('main', "        if (_pnbViewLink && _pnbViewLink.sel) _pnbViewLinkSelWhenReady(_pnbViewLink);\n", "")], ['L-vselB-rtSel', 'L-vcmpT-rtCmpSel'], ['vselA', 'vselB', 'vcmpS', 'vcmpT']),
+    'm-selsig': ([('main', "rows[i].getClientRects().length && _pnbViewLinkRowSig(rows[i]) === h) return i;", "rows[i].getClientRects().length) return i;")], ['L-vselX-selNone', 'L-vselX-selMissNoted'], ['vselX']),
+    'm-selgone': ([('cellsel', "if (keep.length) { gone = { list: keep, at: Date.now() }; }", "")], ['L-vselA-carriesSel'], ['vselA']),
+    'm-selpivot': ([('main', "        if (T.id === 'pivotResultTable') return { k: { p: 1 }, rows: _pnbViewLinkPivotRows(T) };\n", "")], ['L-pvselA-carriesPivSel', 'L-vpselB-rtPivSel'], ['pvselA', 'vpselB']),
+    'm-selgroup': ([('main', "return { k: { g: path }, rows: _pnbViewLinkSelGroupRows(box) };", "return null;")], ['L-vcmpS-carriesCmpSel', 'L-vcmpT-rtCmpSel'], ['vcmpS', 'vcmpT']),
+    # (10-27 review) a formula summary dropped; sort levels on '#' / a journal column dropped, not captured, not applied
+    'm-csformula': ([('main', "(typeof x === 'string' && /^[a-z_]{1,30}$/i.test(x))) ? x : undefined; });", "(typeof x === 'string' && x !== 'formula' && /^[a-z_]{1,30}$/i.test(x))) ? x : undefined; });")], ['L-vunit-csFormulaKept'], ['vunit']),
+    'm-scvirtual': ([('main', "|| x.colIndex === '#' || (typeof x.colIndex === 'string' && /^__[A-Za-z0-9_]{1,120}$/.test(x.colIndex))", "")], ['L-vunit-scVirtualKept', 'L-vnumB-rtNumSort'], ['vunit', 'vnumA', 'vnumB']),
+    'm-flatsc': ([('main', "if (Array.isArray(chainF) && chainF.some(", "if (false && chainF.some(")], ['L-vnumA-carriesNumSort', 'L-vnumB-rtNumSort'], ['vnumA', 'vnumB']),
+    'm-flatscapply': ([('main', "if (v.sc) o.sortCriteria = v.sc.slice(); else delete o.sortCriteria;", "delete o.sortCriteria;")], ['L-vnumB-rtNumSort'], ['vnumA', 'vnumB']),
+    # a long filter cut short; a snapshot view's positions carried; the Save list ticked; the drop order; the feedback token
+    'm-longs': ([('main', "        if (longS) delete v.s;\n", "")], ['L-vunit-longFilterDropped'], ['vunit']),
+    'm-snapvpos': ([('main', "if (v.m === 'flat' && !snapV) {", "if (v.m === 'flat') {")], ['L-vsnapv-snapNoPositions'], ['vsnapv']),
+    'm-saveticked': ([('main', "(fromLink ? '' : ' checked')", "' checked'")], ['L-vfmsave-listUnticked'], ['vfmsave']),
+    'm-dropgo': ([('main', "['f fi', 'Find'], ['go ga gp', 'open groups'],", "['f fi', 'Find'],")], ['S-dropOrder'], []),
+    'm-feedbackcmp': ([('main', "return (b.token && !b.cmp) ? b.token : '';", "return b.token || '';")], ['S-feedbackNoCmp'], []),
     # (10-23 c) Stacked groups: the open set never captured / never restored
     'm-nogo': ([('main', "            if (gst) { v.go = gst.go; if (gst.ga) v.ga = true; if (gst.gb) v.gb = gst.gb; if (gst.gt) v.gt = gst.gt; }", "            if (gst) { }")], ['L-ggsA-carriesOpen', 'L-ggsB-rtOpen'], ['ggsA', 'ggsB']),
     'm-nostackapply': ([('main', "                else if (vlg.go || vlg.ga || vlg.gb || vlg.gt) setTimeout(function () { _pnbViewLinkStackTo(vlg); }, 300);\n", "")], ['L-vcmpT-rtOpen'], ['vcmpS', 'vcmpT']),
@@ -222,7 +262,7 @@ MUTANTS = {
     # Find reopened at its first match, not the sender's
     'm-findat': ([('find', "go(at >= 0 ? Math.min(at, hits.length - 1) : startIndex())", "go(startIndex())")], ['L-vfindB-rtMatch', 'L-vfindB-rtCell'], ['vfindA', 'vfindB']),
     # an open Find never captured
-    'm-nofindcap': ([('main', "if (fcur && fcur.q && !cmp) {", "if (false) {")], ['L-vfindA-carriesFind'], ['vfindA']),
+    'm-nofindcap': ([('main', "if (fcur && fcur.q && !cmp && !snapV) {", "if (false) {")], ['L-vfindA-carriesFind'], ['vfindA']),
     # (round 7) the Email dialog's Copy link does nothing
     'm-emailcopy': ([('main', "    $(document).on('click', '#emailCopyViewLink', function (e) {", "    $(document).on('click', '#emailCopyViewLinkX', function (e) {")], ['L-vmail-copyWithoutSending'], ['vmail']),
     'm-nopage': ([('main', "            currentPage = _pnbViewLink.pg;\n", "")], ['L-vpgB-rtPage', 'L-vpgstale-clamped'], ['vpgA', 'vpgB', 'vpgstale']),
@@ -247,6 +287,11 @@ def static_checks(t):
     sec = t['prompt'].split('SECTION 6: SUGGESTED QUICK ACTIONS')[1] if 'SECTION 6: SUGGESTED QUICK ACTIONS' in t['prompt'] else ''
     acts = re.search(r'id one of: ([a-z, -]+)', sec)
     out.append(('S-jarvisChip', bool(acts) and 'viewlink' in [a.strip() for a in acts.group(1).split(',')] and "{ id: 'viewlink'," in pal, 'viewlink in the prompt action ids and the palette registry'))
+    # (10-27 review) the size trim drops scrolls and open groups before the grouping; no feedback token during a comparison
+    dro = re.search(r'var PNB_VIEW_DROP_ORDER = \[(.*?)\];', main, re.S)
+    dtx = dro.group(1) if dro else ''
+    out.append(('S-dropOrder', bool(dtx) and "'go ga gp'" in dtx and "'gb gt gr gc tr lc'" in dtx and dtx.find("'go ga gp'") < dtx.find("['g', 'grouping']"), 'scrolls and open groups drop before the grouping'))
+    out.append(('S-feedbackNoCmp', "return (b.token && !b.cmp) ? b.token : '';" in main, 'no feedback-email token during a comparison'))
     out.append(('S-help', 'viewLinkHelpLightbox' in t['manifest'] and 'Copy a link to this view' in t['topic'] and 'data-tip="us-tip-viewlink"' in t['tip'] and 'data-tip="us-tip-viewlink"' in idx, 'help topic + tip (defined + consumed) + manifest'))
     ui = re.findall(r'(?:Link copied|Opened a shared view|Copy a link to this view|Skipped, no longer|Left out to fit)[^"\n]*', main + idx + pal + t['topic'] + t['tip'])
     out.append(('S-noEmdash', bool(ui) and not any('\u2014' in x or '&mdash;' in x for x in ui) and '\u2014' not in t['topic'] + t['tip'], '%d UI strings' % len(ui)))
@@ -257,7 +302,7 @@ def hook(src):
     i = src.find(anchor)
     if i < 0 or i > 400: raise SystemExit('closure anchor not found')
     # (10-23) the comparison entry point and the compressor, for the vcmp* scenarios (cmpfoot's way)
-    exp = ('try { window.__VL = {}; ["runComparisonAndDisplayGrouped", "compressString"].forEach(function (n) { try { window.__VL[n] = eval(n); } catch (e) { } }); } catch (e) { }\r\n')
+    exp = ('try { window.__VL = {}; ["runComparisonAndDisplayGrouped", "compressString"].forEach(function (n) { try { window.__VL[n] = eval(n); } catch (e) { } }); window.__VL.setSnapView = function (b) { isViewingSnapshot = !!b; }; } catch (e) { }\r\n')
     out = src[:i] + ';(function () {\r\n' + exp + src[i + len(anchor):]
     j = out.rfind('});')
     out = out[:j] + '})();' + out[j + 3:]
@@ -330,12 +375,13 @@ def write_stage(texts):
     w('harness.html', mk_harness.build(texts['index']))
     w('main_hc.js', hook(texts['main']))
     w('penumbra_calc.js', texts['calc'])
+    w('penumbra_cellsel.js', texts['cellsel'])   # (10-27 b) over the LIBS copy (live's)
     w('penumbra_find.js', texts['find'])   # (round 6) Find under test   # (round 3) the calc module under test (its Copy link)
 
 def same(a, b): return json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True)
 def run_browser(scns):
     out, res = [], {}
-    pairs = {'vcmpT': 'vcmpS', 'ggsB': 'ggsA', 'ggcB': 'ggcA', 'ggvB': 'ggvA', 'vfitB': 'vfitA', 'vscrB': 'vscrA', 'vfindB': 'vfindA', 'vthB': 'vthA', 'vccB': 'vccA', 'vpgB': 'vpgA', 'vcapB': 'vcapA', 'vgrpB': 'gvA', 'vpivB': 'pvA', 'pflatB': 'vcapA'}
+    pairs = {'vselB': 'vselA', 'vpselB': 'pvselA', 'vnumB': 'vnumA', 'vcmpT': 'vcmpS', 'ggsB': 'ggsA', 'ggcB': 'ggcA', 'ggvB': 'ggvA', 'vfitB': 'vfitA', 'vscrB': 'vscrA', 'vfindB': 'vfindA', 'vthB': 'vthA', 'vccB': 'vccA', 'vpgB': 'vpgA', 'vcapB': 'vcapA', 'vgrpB': 'gvA', 'vpivB': 'pvA', 'pflatB': 'vcapA'}
     for s in scns:
         token = STATIC_TOK.get(s)
         if s in pairs:
@@ -359,6 +405,7 @@ def run_browser(scns):
             pa = re.sub(r'&snapcmp=[^&]*', '', pa)
             path = (pa.replace('harness.html?', 'harness.html?scn=vcmpB&', 1) if pa else url_for(s, None))
         if s == 'vbad': path += '&expect_s=' + quote(BAD_S, safe='')
+        if s == 'vunit': path += '&tcsf=' + T_CSF + '&tscv=' + T_SCV
         r = run_page(path); res[s] = r
         if r.get('fatal'):
             out.append(('F-' + s, False, r['fatal'][:3000])); continue
@@ -389,6 +436,10 @@ def run_browser(scns):
                 chk['rtOpen'] = bool(ai.get('open')) and ai.get('open') == info.get('open')
                 chk['rtBoxTop'] = bool(ai.get('top')) and ai.get('top') == info.get('top')
                 if s == 'ggsB': chk['rtPageTop'] = bool(ai.get('page')) and ai.get('page') == info.get('page')
+                if s == 'vcmpT': chk['rtSort'] = bool(ai.get('sortIds')) and ai.get('sortIds') == info.get('sortIds')
+            if s == 'vnumB': chk['rtNumSort'] = bool(ai.get('rows')) and ai.get('rows') == info.get('rows')
+            if s in ('vselB', 'vpselB'): chk['rtSel' if s == 'vselB' else 'rtPivSel'] = ((ai.get('sel') or {}).get('n') or 0) > 0 and ai.get('sel') == info.get('sel')
+            if s == 'vcmpT': chk['rtCmpSel'] = ((ai.get('cmpSel') or {}).get('n') or 0) > 0 and ai.get('cmpSel') == info.get('cmpSel')
             if s == 'ggcB' or s == 'ggvB':
                 chk['rtGroup'] = bool(ai.get('sel')) and ai.get('sel') == info.get('sel')
                 chk['rtGroupTop'] = bool(ai.get('top')) and ai.get('top') == info.get('top')

@@ -53,6 +53,23 @@ arguments, a colon starts a bucket, and white space is trimmed off every token.
   entities makes one character (the old twin dropped both halves) and a code of 16+ decimal / 14+ hex digits rounds
   as parseInt does (mutant `xdelimown` puts the old twin back: X-pieces red). Half a pair alone reads U+FFFD on the
   server and stays a lone UTF-16 unit on the page (the same mark; JSON cannot carry the lone half to PHP, so no case).
+- **(sparse, 2026-10-27)** a list few cells hold two values of is offered its split when those cells are PACKED - no
+  white space but the delimiter, the way a query folds codes (`?id=dirsearch`'s JOBCODES_ALL `H865|TSW912`: two jobs
+  for 3.6% of people, under the one-in-twenty floor; prose puts a space after its punctuation). Measured on live: the
+  two dirsearch columns gain the pipe split in every college subset; no other column of dirsearch, cvmnihusda,
+  int-col-mat, dodnsa, nihpis, jjornl or grantprofiles changes. D-packed D-packednl D-spaced D-onelist; mutants
+  packedfloor packedws packednl twolists. main.js alone; the runner reads a saved token and detects nothing.
+- **(cpsplit, 2026-10-27)** Each value in the lists beyond the header menu (scenario `copy`, Q-*): the Copy dialog's
+  Copy Single Column (Distinct) shows the box for a list column only (Q-box), copies each value once when ticked
+  (Q-copy), reopens as the last copy had it (Q-remember); the header menu's split list gains Other..., which opens
+  Copy with the box ticked (Q-other); `copy_distinct|PI_LIST:dsemi|delim` copies each value once, a new-line list
+  read as stored (Q-trigger Q-trignl); Copy snippet writes that token (Q-snippet). Mutants dlgsplit dlgbox
+  dlgremember dlgrestore otherbox cmother trigtok trigsplit trigraw snippettok; copysplit re-anchored on
+  `if (_splitId) {`. (A chain's tooltip text is built by describeTrigger but never put on the link: no check.)
+  The Copy list's names (the user): a value copy named by the value, cut to 28 characters, an empty one (blank);
+  the column's name, named by itself (fltmenu, 5eae534: above This entire row); This entire row; Distinct column
+  values (Q-labels; mutants vallabel valcut valblank rowlabel distlabel). The long
+  names (an item alone, the palette's rows) stay Copy this value / Copy this row / Copy distinct values.
 - **Known, not this suite's:** the server search (penumbra_search.php `_search_get_cell_value`) does not decode
   entities as the browser's does, so a condition on `Crop & Soil` misses a cell holding `Crop &amp; Soil` in a
   scheduled send; X-search keeps to cells without entities.

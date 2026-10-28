@@ -21,7 +21,7 @@ CHK = {
     'pmcell': ['cellOpens', 'cellItems', 'drillLabel', 'cellTitleDecoded', 'labelDecoded', 'drill', 'labelItems', 'toggle', 'copyLabel', 'labelExclude', 'cellFilter',
                'cellTools', 'cellToolsNotTotal', 'cellShade', 'cellShadeUndo'],   # (2026-10-22) a value cell's Shading / Format
     # (colmenu round 14) the breakdown table's menu: sort and copy
-    'pmbreak': ['bdTable', 'bdNumNative', 'bdNativeShift', 'bdHeadOpens', 'bdHeadItems', 'bdSortAsc', 'bdSortDesc', 'bdThen', 'bdClear', 'bdCopyCol', 'bdCopyDistinct', 'bdStats', 'bdCell', 'bdCopyValue', 'bdCopyName', 'bdKbd',
+    'pmbreak': ['bdTable', 'bdNumNative', 'bdNativeShift', 'bdHeadOpens', 'bdHeadItems', 'bdSortAsc', 'bdSortDesc', 'bdThen', 'bdClear', 'bdCopyCol', 'bdCopyDistinct', 'bdStats', 'bdCell', 'bdCopyValue', 'bdCopyName', 'bdCopyList', 'bdCopyRow', 'bdNoSql', 'bdKbd',
                 'bdWidthItems', 'bdFit', 'bdResetOne', 'bdFitAll', 'bdFitPage', 'bdResetWidths', 'bdWidthsNotPivot', 'bdRowHeight'],
     # (colmenu round 17) several values, no column fields, collapsed groups: the cells by position
     'pmmulti': ['multiBuilt', 'multiItems', 'multiCollapsed', 'multiCopy', 'multiSlot', 'multiFmtKind'],
@@ -57,6 +57,16 @@ NEW = {'L-pmbreak-bdWidthItems', 'L-pmbreak-bdResetOne', 'L-pmbreak-bdFitPage', 
        'L-pmfield-layoutUndo', 'L-pmfield-freezeOne', 'L-pmfield-freezeUndo'}
 # (2026-10-22, round 33 is live: its checks are old ones now) a value cell's Shading and Format, as its heading's
 NEW = {'L-pmcell-cellTools', 'L-pmcell-cellShade', 'L-pmcell-cellShadeUndo'}
+# (2026-10-27, copymenu) a breakdown's copies as ONE list, Copy: the heading's and the cell's lists, This row, For SQL
+NEW = {'L-pmbreak-bdHeadItems', 'L-pmbreak-bdCell', 'L-pmbreak-bdWidthItems', 'L-pmbreak-bdCopyList', 'L-pmbreak-bdCopyRow', 'L-pmbreak-bdCopySql'}
+NEW = set()   # (copymenu is LIVE since a8aabf9, 2026-10-27: old checks now)
+NEW = {'L-pmbreak-bdNoSql'}   # (2026-10-27, copymenu 2) no For SQL in a breakdown's Distinct values (live a8aabf9 has it)
+NEW = set()   # (copymenu 2 is LIVE since 0d19cfd, 2026-10-27: old checks now)
+NEW = NEW - {'L-pmbreak-bdCopyList'}   # (fltmenu is LIVE since 5eae534, 2026-10-27)
+CHK['pmbreak'] = CHK['pmbreak'] + ['bdCopyHead']
+NEW = NEW | {'L-pmbreak-bdCopyHead'}   # (2026-10-27, copymenu 3) the breakdown's Copy list under a Copy heading (live has none)
+NEW = NEW - {'L-pmbreak-bdCopyHead'}   # (copymenu 3 is LIVE since 766f5e9, 2026-10-27: old checks now)
+#NEW = NEW | {'L-pmbreak-bdCopyList'}   # (2026-10-27, fltmenu) a breakdown cell's Copy list: the column's name before This entire row
 MUTANTS = {
     # --- (2026-10-22) a value cell's tools: none; offered under a Grand Total column too
     'c-notools': ([('menu', '            if (vinfo && !vinfo.total && vinfo.aggs.length === 1) {', '            if (false) {')], ['L-pmcell-cellTools', 'L-pmcell-cellShade'], ['pmcell']),
@@ -92,13 +102,23 @@ MUTANTS = {
                      "        return bdColumnTexts(t).filter(function (x) { return x !== ''; });")], ['L-pmbreak-bdCopyDistinct'], ['pmbreak']),
     # --- (colmenu round 32) the breakdown's row height item gone
     'b-norow': ([('menu', "        if (rhb) { size.push(rhb); }\n", "")], ['L-pmbreak-bdRowHeight'], ['pmbreak']),
+    'b-nohead': ([('menu', "items: function () { return [{ heading: 'Copy' }].concat(list); } };", "items: function () { return list; } };")], ['L-pmbreak-bdCopyHead'], ['pmbreak']),   # (copymenu 3)
     # --- (colmenu round 29) no decoding of the pivot's keys
     'k-raw': ([('menu', "        if (s == null || s.indexOf('&') < 0) { return String(s == null ? '' : s); }", "        return String(s == null ? '' : s);")], ['L-pmcell-cellTitleDecoded', 'L-pmcell-labelDecoded'], ['pmcell']),
     # --- (colmenu round 28) the delimiter ignored; the duplicates miscounted in a breakdown's stats
     'b-delim': ([('menu', "                pvCopy(v.join(d[2]), 'Copied ' + v.length + (v.length === 1 ? ' distinct value.' : ' distinct values.'));", "                pvCopy(v.join('\\n'), 'Copied ' + v.length + (v.length === 1 ? ' distinct value.' : ' distinct values.'));")], ['L-pmbreak-bdCopyDistinct'], ['pmbreak']),
     'b-stats': ([('menu', "        freq.forEach(function (c) { if (c > 1) { dRows += c; dExtra += c - 1; dVals++; } });", "        freq.forEach(function (c) { if (c > 1) { dRows += c; dExtra += c; dVals++; } });")], ['L-pmbreak-bdStats'], ['pmbreak']),
     'b-then': ([('menu', "        if (sortedOther) {\n            items.push({ act: 'bdThenAsc'", "        if (false) {\n            items.push({ act: 'bdThenAsc'")], ['L-pmbreak-bdThen'], ['pmbreak']),
-    'b-cell': ([('menu', "        if (t.td) {\n            items.push({ act: 'bdCopy',", "        if (false) {\n            items.push({ act: 'bdCopy',")], ['L-pmbreak-bdCell', 'L-pmbreak-bdCopyValue'], ['pmbreak']),
+    # (re-anchored 2026-10-27, copymenu: the cell's copies gather into the Copy list)
+    'b-cell': ([('menu', "        if (t.td) {\n            bcp.push({ act: 'bdCopy',", "        if (false) {\n            bcp.push({ act: 'bdCopy',")], ['L-pmbreak-bdCopyList', 'L-pmbreak-bdCopyValue'], ['pmbreak']),
+    # --- (2026-10-27, copymenu) the cell's Copy list at the foot (the heading's place); no This row; '#' in the row; no Copy
+    # list on a heading
+    'b-cpslot': ([('menu', "        if (t.td) {\n            items.push(copyEntry('bdCopyMenu', bcp));\n            items.push('-');\n        }\n", ""),
+                  ('menu', "        if (!t.td) { items.push(copyEntry('bdCopyMenu', bcp)); }\n", "        items.push(copyEntry('bdCopyMenu', bcp));\n")], ['L-pmbreak-bdCell'], ['pmbreak']),
+    'b-norow': ([('menu', "            bcp.push(rowCopyItem('bdCopyRow', function () { return bdRowLines(t); }));\n", "")], ['L-pmbreak-bdCopyList', 'L-pmbreak-bdCopyRow'], ['pmbreak']),
+    'b-rownum': ([('menu', "        for (var i = 1; i < hr.cells.length; i++) {", "        for (var i = 0; i < hr.cells.length; i++) {"),
+                  ('menu', "            if (!c || name === '#' || !shown(h) || c.hasAttribute('colspan')) { continue; }", "            if (!c) { continue; }")], ['L-pmbreak-bdCopyRow'], ['pmbreak']),
+    'b-headlist': ([('menu', "        if (!t.td) { items.push(copyEntry('bdCopyMenu', bcp)); }\n", "")], ['L-pmbreak-bdHeadItems', 'L-pmbreak-bdWidthItems'], ['pmbreak']),
     # Clear sort: no Shift+click, so the heading stays sorted
     'm-clear': ([('main', "        if (now === 'ascending' || now === 'descending') $th.trigger($.Event('click.pivotSort', { shiftKey: true }));\n", "")],
                 ['L-pmhead-sortClear'], ['pmhead']),
@@ -118,6 +138,10 @@ MUTANTS = {
                    ['L-pmcell-cellItems', 'L-pmcell-cellFilter'], ['pmcell']),
     # [Blank] kept as text: harmless here, so not run - kept for the record
 }
+
+# (2026-10-27, fltmenu) the breakdown's name copy after This entire row again
+MUTANTS['b-nameafter'] = ([('menu', "            bcp.push(bdName);\n            bcp.push(rowCopyItem('bdCopyRow', function () { return bdRowLines(t); }));\n",
+                            "            bcp.push(rowCopyItem('bdCopyRow', function () { return bdRowLines(t); }));\n            bcp.push(bdName);\n")], ['L-pmbreak-bdCopyList'], ['pmbreak'])
 
 args = sys.argv[1:]
 def opt(name, default=None):

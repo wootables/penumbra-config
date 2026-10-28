@@ -1577,6 +1577,96 @@
                         "name":  "list: ... and lifting it re-enables the box",
                         "pass":  true,
                         "detail":  ""
+                    },
+                    {
+                        "name":  "vertical: one field - its chips stack in a column, one value per line (the keyword used to change nothing here)",
+                        "pass":  true,
+                        "detail":  "[[464,12,224],[464,40,224],[464,68,224]]"
+                    },
+                    {
+                        "name":  "vertical: ... every chip as wide as the widest",
+                        "pass":  true,
+                        "detail":  "[[464,12,224],[464,40,224],[464,68,224]]"
+                    },
+                    {
+                        "name":  "vertical: ... the counts line up at the far end, and the pressed value stays at the left after its check mark",
+                        "pass":  true,
+                        "detail":  "[[464,474,679,689,false],[464,487,679,689,true],[464,474,679,689,false]]"
+                    },
+                    {
+                        "name":  "vertical: without the keyword the chips still run in a row",
+                        "pass":  true,
+                        "detail":  "[[366,12,224],[594,12,58],[656,12,60]]"
+                    },
+                    {
+                        "name":  "vertical: several fields - one group per line, as before",
+                        "pass":  true,
+                        "detail":  "[[492,12,92],[492,100,180],[492,188,240]]"
+                    },
+                    {
+                        "name":  "vertical: ... and every group\u0027s chips stack too",
+                        "pass":  true,
+                        "detail":  "[[492,100,57],[492,128,57],[492,156,57]] [[492,188,76],[492,216,76]]"
+                    },
+                    {
+                        "name":  "vertical + labels=left: the label sits left of the column, on the first chip\u0027s line",
+                        "pass":  true,
+                        "detail":  "{\"nm\":{\"l\":404.0625,\"t\":17,\"r\":456.34375,\"b\":30,\"w\":52.28125,\"h\":13},\"c0\":{\"l\":464.34375,\"t\":12,\"r\":688.625,\"b\":36,\"w\":224.28125,\"h\":24}}"
+                    },
+                    {
+                        "name":  "vertical: a group\u0027s clear button sits on the first chip\u0027s line, beside the column",
+                        "pass":  true,
+                        "detail":  "{\"cl\":{\"l\":694.625,\"t\":15,\"r\":716,\"b\":32,\"w\":21.375,\"h\":17},\"c0\":{\"l\":464.34375,\"t\":12,\"r\":688.625,\"b\":36,\"w\":224.28125,\"h\":24}}"
+                    },
+                    {
+                        "name":  "vertical: Clear all sits at the strip\u0027s left edge, not centred under the groups",
+                        "pass":  true,
+                        "detail":  "{\"ca\":[404,466],\"st\":[404,716]}"
+                    },
+                    {
+                        "name":  "vertical + labels=top: the label above a column of chips that spans the group",
+                        "pass":  true,
+                        "detail":  "{\"nm\":{\"l\":491.71875,\"t\":14,\"r\":544,\"b\":27,\"w\":52.28125,\"h\":13},\"g\":{\"l\":491.71875,\"t\":12,\"r\":716,\"b\":112,\"w\":224.28125,\"h\":100}} [[492,32,224],[492,60,224],[492,88,224]]"
+                    },
+                    {
+                        "name":  "vertical + right: the stacked groups hug their chips at the strip\u0027s right edge (the alignment was lost)",
+                        "pass":  true,
+                        "detail":  "{\"st\":[15,716],\"gs\":[[464,716],[659,716],[640,716]]}"
+                    },
+                    {
+                        "name":  "vertical + right: Clear all sits at the right edge",
+                        "pass":  true,
+                        "detail":  "{\"ca\":[654,716],\"st\":[15,716]}"
+                    },
+                    {
+                        "name":  "vertical + center: the stacked groups are centred, each as wide as its chips",
+                        "pass":  true,
+                        "detail":  "{\"st\":[15,716],\"gs\":[[253,478],[337,394],[327,404]]}"
+                    },
+                    {
+                        "name":  "vertical + columns=2: the grid places the groups, two across, and the chips still stack",
+                        "pass":  true,
+                        "detail":  "{\"g0\":[15,357],\"g1\":[375,716]} [[15,12,224],[15,40,224],[15,68,224]]"
+                    },
+                    {
+                        "name":  "vertical + segmented: the segments part with a bottom rule, not a right one (computed)",
+                        "pass":  true,
+                        "detail":  "1px / 0px"
+                    },
+                    {
+                        "name":  "vertical + top=N: \"+n more\" sits under the column at its left and hugs its text; the folded chip stays hidden",
+                        "pass":  true,
+                        "detail":  "{\"mo\":[491,63,72],\"box\":226} [[491,13,224],[491,38,224]]"
+                    },
+                    {
+                        "name":  "vertical: a list field keeps its own rules (computed: the group top-aligned, each row its own full border)",
+                        "pass":  true,
+                        "detail":  "flex-start 1px 1px"
+                    },
+                    {
+                        "name":  "segmented: a list field still scrolls (computed overflow-y auto under a max height; it was hidden, so rows past it were out of reach)",
+                        "pass":  true,
+                        "detail":  "auto 162px"
                     }
                 ]
 }

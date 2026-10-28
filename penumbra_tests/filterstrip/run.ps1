@@ -33,6 +33,12 @@
 #     row found by name, the no-match note, Enter pressing the first row showing with the typed text
 #     kept and the pressed rows first across the re-render, focus back in the box, a pressed row
 #     never hidden, the sync, Clear all, az + exclude, the or pause reaching the box
+#   - (2026-10-27) the vertical keyword (section N), on GEOMETRY from the real main.css: each
+#     group's chips in a column, one value per line, as wide as the widest, the counts lined up at
+#     the far end (it used to stack only the groups, so a one-field strip did not change); the
+#     default still a row; one group per line; the label and clear on the first chip's line; Clear
+#     all at the strip's side; right / center aligning the stacked groups; columns=N; segmented
+#     parting with a bottom rule; "+n more" under the column; a list field untouched
 # Since 2026-09-29 the strip's grammar lives in js/penumbra_tiles.js
 # (PenumbraTiles.strip, shared with the dashboard); main.js keeps the _pnbFs*
 # names as delegates, so the hooks below still reach the real code.
@@ -88,6 +94,19 @@
 #       pivotpause      the strip pauses in a pivot view again                   (main)
 #       pivotsrc        a chip column sharing an aggregate label's name is written without __SRC (main)
 #       pivotaggcount   an aggregate condition in the box zeroes the counts      (main)
+#     css mutants (2026-10-27, section N) - one rule of the stylesheet the harness loads:
+#       vchips          a vertical strip's chips stay in a row                   (css)
+#       vcount          the count follows the value instead of the far end       (css)
+#       vgrp            the label and clear centre on the column, not its first line (css)
+#       vmore           "+n more" stretches across the column                    (css)
+#       vclear          Clear all centres under the stacked groups               (css)
+#       vright          right no longer aligns the stacked groups                (css)
+#       vcenter         center no longer aligns the stacked groups               (css)
+#       vclearright     Clear all leaves the right edge under right              (css)
+#       vseg            segmented parts the stacked chips with a right rule      (css)
+#       vlist           the label rule reaches a list field too                  (css)
+#       vseglist        the segmented rule reaches a list field's rows too       (css)
+#       seglistscroll   a segmented strip's list field loses its scroll again    (css)
 #   -SearchPhp <path> is the penumbra_search.php for the server half of the
 #   range parity (default: the live one).
 #
@@ -110,7 +129,10 @@ if (-not $SearchPhp) { $SearchPhp = "$app\penumbra_search.php" }
 # COMPUTED styles: the top=N fold was green on a class check while the chips
 # stayed visible (a lighter hide rule lost to the chip's layout rule).
 if (-not $MainCss) { $MainCss = "$app\css\main.css" }
-Copy-Item $MainCss "$here\main.css" -Force
+# Read byte for byte (Latin-1 maps every byte to one char), so a css mutant
+# changes its anchor and nothing else; written to $here after the mutants.
+$latin1 = [Text.Encoding]::GetEncoding(28591)
+$cssSrc = [IO.File]::ReadAllText($MainCss, $latin1)
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Microsoft\Edge\Application\msedge.exe' }
 $summary = New-Object System.Collections.Generic.List[string]
@@ -178,16 +200,29 @@ $mutants = @{
   'blankdom'       = @('blank: $(this).attr(''data-fs-blank'') === ''1'' };', 'blank: false };', 'main')
   'blankrefold'    = @('&& !$(this).hasClass(''pnb-fs-blank''));', ');', 'main')
   'blankalways'    = @('if (f.blank && !idx['''']) { idx[''''] = { v: '''', all: 0, n: 0, on: false }; list.push(idx['''']); }', '/* mutant: no chip without empty cells */', 'main')
+  'vchips'         = @('.pnb-fstrip.vertical .pnb-fs-group:not(.pnb-fs-list) .pnb-fs-chips { flex-direction: column; flex-wrap: nowrap; align-items: stretch; }', '/* mutant: the chips stay in a row */', 'css')
+  'vcount'         = @('.pnb-fstrip.vertical .pnb-fs-group:not(.pnb-fs-list) .pnb-fs-chips .pnb-fs-chip .pnb-fs-v { flex: 1 1 auto; min-width: 0; text-align: left; }', '/* mutant: the count follows the value */', 'css')
+  'vgrp'           = @('.pnb-fstrip.vertical .pnb-fs-group:not(.pnb-fs-list) { align-items: baseline; }', '/* mutant: label and clear centre on the column */', 'css')
+  'vmore'          = @('.pnb-fstrip.vertical .pnb-fs-group .pnb-fs-chips .pnb-fs-more { align-self: flex-start; }', '/* mutant: +n more stretches */', 'css')
+  'vclear'         = @('.pnb-fstrip.vertical .pnb-fs-clearall, .pnb-fstrip.vertical .pnb-fs-note { align-self: flex-start; }', '/* mutant: Clear all centres */', 'css')
+  'vright'         = @('.pnb-fstrip.vertical.align-right { align-items: flex-end; }', '/* mutant: right lost */', 'css')
+  'vcenter'        = @('.pnb-fstrip.vertical.align-center { align-items: center; }', '/* mutant: center lost */', 'css')
+  'vclearright'    = @('.pnb-fstrip.vertical.align-right .pnb-fs-clearall, .pnb-fstrip.vertical.align-right .pnb-fs-note { align-self: flex-end; }', '/* mutant: Clear all leaves the right edge */', 'css')
+  'vseg'           = @('.pnb-fstrip.segmented.vertical .pnb-fs-group:not(.pnb-fs-list) .pnb-fs-chips .pnb-fs-chip { border-right: 0; border-bottom: 1px solid var(--border-color, #dee2e6); }', '/* mutant: segments part with a right rule */', 'css')
+  'vlist'          = @('.pnb-fstrip.vertical .pnb-fs-group:not(.pnb-fs-list) { align-items: baseline; }', '.pnb-fstrip.vertical .pnb-fs-group { align-items: baseline; }', 'css')
+  'vseglist'       = @('.pnb-fstrip.segmented.vertical .pnb-fs-group:not(.pnb-fs-list) .pnb-fs-chips .pnb-fs-chip { border-right: 0;', '.pnb-fstrip.segmented.vertical .pnb-fs-group .pnb-fs-chips .pnb-fs-chip { border-right: 0;', 'css')
+  'seglistscroll'  = @('gap: 2px; overflow-y: auto; overflow-x: hidden; }', 'gap: 2px; }', 'css')
 }
 if ($Mutant) {
   if (-not $mutants.ContainsKey($Mutant)) { throw "unknown mutant '$Mutant' (known: $(($mutants.Keys | Sort-Object) -join ', '))" }
   $mOld = $mutants[$Mutant][0]; $mNew = $mutants[$Mutant][1]; $mIn = $mutants[$Mutant][2]
-  $mText = if ($mIn -eq 'tiles') { $tilesSrc } else { $src }
+  $mText = if ($mIn -eq 'tiles') { $tilesSrc } elseif ($mIn -eq 'css') { $cssSrc } else { $src }
   $mN = ([regex]::Matches($mText, [regex]::Escape($mOld))).Count
   if ($mN -ne 1) { throw "mutant '$Mutant' anchor found $mN times in $mIn, expected 1: $mOld" }
-  if ($mIn -eq 'tiles') { $tilesSrc = $tilesSrc.Replace($mOld, $mNew) } else { $src = $src.Replace($mOld, $mNew) }
+  if ($mIn -eq 'tiles') { $tilesSrc = $tilesSrc.Replace($mOld, $mNew) } elseif ($mIn -eq 'css') { $cssSrc = $cssSrc.Replace($mOld, $mNew) } else { $src = $src.Replace($mOld, $mNew) }
   Write-Host "      + MUTANT $Mutant ($mIn)"
 }
+[IO.File]::WriteAllText("$here\main.css", $cssSrc, $latin1)
 [IO.File]::WriteAllText("$here\penumbra_tiles.js", $tilesSrc, $utf8)
 
 # The server half of the range parity (section J): the corpus through the REAL

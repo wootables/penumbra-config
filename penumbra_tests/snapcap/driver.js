@@ -606,9 +606,9 @@
   async function phaseNoColumns() {
     var b = await waitBoot();
     var st0 = H.bso(), vl0 = viewLink();
-    // (a view link never carries a formula summary: _pnbViewLinkClean drops it)
-    rec('NW0 the report runs with its widths, AMOUNT averaged and QTY summarised by a formula: a capture writes them, a view link carries the widths and AMOUNT\'s summary',
-      b && CJ(nwOf(st0)) === CJ(REPORT_NW) && !!vl0.view && CJ(vl0.view.w) === CJ(REPORT_NW.columnWidths) && CJ(vl0.view.cs) === CJ({ AMOUNT: 'avg' }),
+    // (10-27, viewlink sweep) a view link carries a formula summary too: its text is the report's saved formula
+    rec('NW0 the report runs with its widths, AMOUNT averaged and QTY summarised by a formula: a capture writes them, a view link carries the widths and both summaries',
+      b && CJ(nwOf(st0)) === CJ(REPORT_NW) && !!vl0.view && CJ(vl0.view.w) === CJ(REPORT_NW.columnWidths) && CJ(vl0.view.cs) === CJ({ AMOUNT: 'avg', QTY: 'formula' }),
       'boot=' + b + ' parts=' + CJ(nwOf(st0)) + ' link w=' + CJ(vl0.view && vl0.view.w) + ' cs=' + CJ(vl0.view && vl0.view.cs));
     var on = await loadView(window.__SNAP5, 'Snapshot without AMOUNT and QTY', 3);
     var st1 = H.bso();
@@ -1557,7 +1557,7 @@
       var w = H.bso();
       rec(id + ' ' + tag + ' made in a snapshot view (nw) reopens the report with its widths, summaries and formula',
         // (a link to the view carries the widths and the summaries but never a formula one: QTY's goes)
-        b && headIsReport() && CJ(nwOf(w)) === CJ(MODE === 'view' ? { columnWidths: REPORT_NW.columnWidths, columnSummaries: { AMOUNT: 'avg' } } : REPORT_NW),
+        b && headIsReport() && CJ(nwOf(w)) === CJ(REPORT_NW),   // (10-27, viewlink sweep) a view link too: its formula summary comes back with the report's formula
         'boot=' + b + ' parts=' + CJ(nwOf(w)) + ' ' + headView());
       return;
     }

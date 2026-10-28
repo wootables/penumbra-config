@@ -104,6 +104,7 @@ FIXTURE = r'''  (function () {
     //   PROJS     (above) a comma list of numbers
     //   TITLE_C   titles with commas, two to four parts with spaces in them: no list
     //   AMT_K     numbers written with thousands commas (1,500,000): no list
+    //   CODES*    (sparse) code lists in 2 of 60 cells: packed ones are offered (| and new line), spaced or lone not
     if (window.__SCN === 'detect') {
       var DEPTS = ['196001-Population Health&amp;Pathobiology', '195001-Dept of Clinical Sciences', '194001-Dept Molecular Biomedical Sci'];
       var TYPES = ['New', 'Continuation', 'Increase'];
@@ -117,8 +118,17 @@ FIXTURE = r'''  (function () {
         r.PROJS = aw4[Math.floor(ri / 3)];
         r.TITLE_C = TITLES[ri % 5];
         r.AMT_K = AMTK[ri % 7];
+        // (sparse, 2026-10-27) CODES: job codes as a query folds them (?id=dirsearch's JOBCODES_ALL), one per row
+        // but for two rows, 'H865|TSW912' and 'A138|A198' - 2 of 60, under one in twenty, and packed (no white space
+        // but the delimiter): offered its split. CODES_NL: the same lists joined by a new line: offered too.
+        // CODES_SP: written 'H865 | TSW912', not packed: no split. CODES_ONE: one row alone lists two: no split.
+        var C6 = ['H865', 'TSW912', 'A138', 'A198', 'B220', 'C310'];
+        r.CODES = ri === 11 ? 'H865|TSW912' : ri === 37 ? 'A138|A198' : C6[ri % 6];
+        r.CODES_NL = r.CODES.replace('|', '\n');
+        r.CODES_SP = r.CODES.replace('|', ' | ');
+        r.CODES_ONE = ri === 11 ? 'H865|TSW912' : C6[ri % 6];
       });
-      COLS.push('DEPT_ENT', 'TRANS', 'PROJS', 'TITLE_C', 'AMT_K');
+      COLS.push('DEPT_ENT', 'TRANS', 'PROJS', 'TITLE_C', 'AMT_K', 'CODES', 'CODES_NL', 'CODES_SP', 'CODES_ONE');
     }
     // lists: PROJS (a numbers list: Column stats must not add its lists up) and D_LIST, semicolon lists of names one
     // of which carries an entity ("Crop &amp; Soil"); the report's filter strip splits PI_LIST and D_LIST
@@ -142,6 +152,9 @@ FIXTURE = r'''  (function () {
       rowsPerPage: '200', reportSnippet: ''
     };
     // (splitviz) the report snippet: a split filter strip (lists), a chart split by PI_LIST (chart)
+    // (cpsplit, 2026-10-27) copy: three copy_distinct buttons
+    if (window.__SCN === 'copy') st.reportSnippet = "action(trigger, 'Each', 'copy_distinct|PI_LIST:dsemi||') "
+        + "action(trigger, 'Whole', 'copy_distinct|PI_LIST||') action(trigger, 'Notes', 'copy_distinct|NOTES:dnl||')";
     if (window.__SCN === 'lists') st.reportSnippet = "filter_strip('People|PI_LIST|split', 'Depts|D_LIST|split=semicolon', 'Status|STATUS')";
     // (vis() args: type x y series agg limit title legend values width height legendPos valuePos animate stacked
     //  horizontal titlePos sortBy sortDir stackOrder normalize subtitle xLabel yLabel otherBucket filterXAxis)
@@ -172,6 +185,14 @@ j = out.index('<script src="driver.js"></script>')
 # (splitviz) the shared strip grammar loads BEFORE main.js, as index.php has it
 out = out[:i] + '<script src="penumbra_tiles_dg.js"></script>\n<script src="main_dg.js"></script>\n<script src="penumbra_colmenu_dg.js"></script>\n' + out[j:]
 out = out.replace('<option value="2021">2021</option>', '<option value="STATUS">STATUS</option>')
+# (cpsplit) the Copy dialog as index.php has it around the single-column controls: its toolbar button, the lightbox,
+# #singleColumnOptions (main.js adds Each value in the lists there) and the Copy snippet button
+_cs = '  <select id="copyColumnSelector"><option value="STATUS">STATUS</option></select>\n  <input id="copyDelimiterInput" value=";">\n'
+assert out.count(_cs) == 1, 'copy stub anchor'
+out = out.replace('<div id="copyStub" style="display:none">\n', '<div id="copyStub" style="display:none">\n  <button id="copyActionsBtn">Copy</button>\n  <div id="copyActionsLightbox">\n', 1)
+out = out.replace(_cs, '  <div id="singleColumnOptions">\n' + _cs + '  </div>\n', 1)
+out = out.replace('  <button id="confirmCopyBtn">Copy</button>\n</div>\n', '  <button id="confirmCopyBtn">Copy</button>\n  <button id="copyCopySnippetBtn">Copy snippet</button>\n  </div>\n</div>\n', 1)
+assert 'copyCopySnippetBtn' in out and 'id="singleColumnOptions"' in out and 'id="copyActionsBtn"' in out, 'copy stub'
 assert 'main_dc.js' not in out and 'search_builder_dc' not in out
 open(os.path.join(HERE, 'harness.html'), 'wb').write(out.encode('utf-8'))
 print('harness.html written (%d bytes)' % len(out))

@@ -56,8 +56,15 @@
     calcEdit: 'calc', calcDup: 'calc', calcRemove: 'calc', calcAdj: 'calc',   // (2026-10-19, calcadj round 3) one Calculated column entry; round 5: Duplicate
     fit: 'width', fitAll: 'width', fitPage: 'width', resetWidth: 'width', resetWidths: 'width',
     groupBy: 'groupByList' };   // (2026-10-26, delimgroup) a column with buckets: Group by is a list, As is in it   // (round 33) the Reset list went
+  // (2026-10-27, copymenu) the menu's copies are one list, Copy: This value, This row, Column name, Distinct values (its
+  // delimiters in a list of its own) and (copymenu 2) Link to this view - reached through it, a delimiter two levels down
+  ['cellCopy', 'copyRow', 'copyName', 'copy', 'copyViewLink'].forEach(function (a) { SUBS[a] = 'copyMenu'; });
+  // (2026-10-27, fltmenu) a cell's filters are one list, Filter; Copy gains This nested table and Distinct column groups
+  ['cellFilter', 'cellExclude', 'cellAtLeast', 'cellAtMost', 'clickFilter'].forEach(function (a) { SUBS[a] = 'filterMenu'; });
+  ['copyNestedTable', 'copyGroups'].forEach(function (a) { SUBS[a] = 'copyMenu'; });
+  ['copy-space', 'copy-comma', 'copy-semicolon', 'copy-pipe', 'copy-tab', 'copy-newline', 'copy-other', 'copySplit'].forEach(function (a) { SUBS[a] = 'copy'; });
   function sub(act) { var it = item(act); if (!it || it.getAttribute('aria-disabled') === 'true') return false; it.click(); return true; }
-  function reach(act) { if (!item(act) && SUBS[act]) sub(SUBS[act]); return item(act); }
+  function reach(act) { if (!item(act) && SUBS[act]) { reach(SUBS[act]); sub(SUBS[act]); } return item(act); }
   async function choose(el, act) {
     closeMenu();
     rclick(el);
@@ -130,6 +137,28 @@
     it.click();
     await sleep(450);
     return true;
+  }
+  // (2026-10-27, copymenu) a heading's name as the menu reads it (no sort arrows, grips or screen-reader words), and This row
+  // as its rule says: the heading row's shown named columns ('#' aside), each "Name: text", a text of several lines indented
+  // under it; val(h, td) for a cell of its own (undefined: its text; null: left out)
+  function headLabel(h) {
+    var c = h.cloneNode(true);
+    Array.prototype.forEach.call(c.querySelectorAll('.sort-icon, .sr-only, button, [aria-hidden="true"], [class*="grip"]'), function (n) { if (n.parentNode) n.parentNode.removeChild(n); });
+    return (c.textContent || '').replace(/\s+/g, ' ').trim() || h.getAttribute('data-colname');
+  }
+  function rowWant(tr, heads, val) {
+    var out = [];
+    Array.prototype.forEach.call(heads, function (h) {
+      var nm = h.getAttribute('data-colname');
+      if (nm === null || nm === '#' || h.style.display === 'none') return;
+      var c = tr.querySelector('td[data-column="' + h.getAttribute('data-column') + '"]');
+      if (!c) return;
+      var v = val ? val(h, c) : undefined;
+      if (v === null) return;
+      if (v === undefined) v = String(c.innerText || c.textContent || '').trim();
+      out.push(headLabel(h) + ': ' + String(v).replace(/\r?\n/g, '\n  '));
+    });
+    return out;
   }
   // the Undo button of the newest notice whose text matches re
   function undoBtn(re) {
@@ -253,7 +282,8 @@
       rclick(fth('V_NAME'));
       var a = acts();
       // (round 12) the top level: sort, filter, stats; options, move, show, hide, fit, freeze; copy, calc, group; reset
-      R.chk.itemsAll = ['sortAsc', 'sortDesc', 'filter', 'width', 'rowHeight', 'options', 'move', 'show', 'hide', 'freeze', 'copy', 'copyName', 'calc', 'groupBy', 'clearPrefs'].every(function (x) { return a.indexOf(x) >= 0 || (x === 'groupBy' && a.indexOf('groupByList') >= 0); });   // (delimgroup) or its list
+      R.chk.itemsAll = ['sortAsc', 'sortDesc', 'filter', 'width', 'rowHeight', 'options', 'move', 'show', 'hide', 'freeze', 'copyMenu', 'calc', 'groupBy', 'clearPrefs'].every(function (x) { return a.indexOf(x) >= 0 || (x === 'groupBy' && a.indexOf('groupByList') >= 0); })   // (delimgroup) or its list
+        && ['copy', 'copyName'].every(function (x) { return a.indexOf(x) < 0; });   // (2026-10-27, copymenu) in the Copy list
       R.info.acts = a;
       closeMenu();
       // a column with empties (H_GROUP: null on every 11th row), counted by main.js
@@ -666,7 +696,7 @@
       closeMenu();
       // (round 8) a cell of a group's table: its column's menu, its value first
       var gtd = (function () { var t = gth('V_STATUS'), tb = t && t.closest('table'), k = t ? Array.prototype.indexOf.call(t.parentNode.children, t) : -1, tr = tb && tb.querySelector('tbody tr'); return tr ? tr.children[k] : null; })();
-      R.chk.cellGroup = !!gtd && rclick(gtd) && acts()[0] === 'cellFilter' && item('cellFilter').textContent.indexOf('"' + gtd.textContent.trim() + '"') >= 0;
+      R.chk.cellGroup = !!gtd && rclick(gtd) && acts()[0] === 'filterMenu' && !!reach('cellFilter') && item('cellFilter').textContent.indexOf('"' + gtd.textContent.trim() + '"') >= 0;
       closeMenu();
       rclick(gth('V_NAME'));
       var _gbI = item('groupBy') || item('groupByList');   // (2026-10-26, delimgroup) or its list, on a column with buckets
@@ -736,7 +766,8 @@
       }
       function lastClip() { return window.__clip.length ? window.__clip[window.__clip.length - 1] : null; }
       rclick(fth('V_STATUS'));
-      R.chk.copyItem = !!item('copy') && /^Copy distinct values/.test(item('copy').textContent.trim());
+      // (2026-10-27, copymenu) Copy distinct values is the Copy list's Distinct values
+      R.chk.copyItem = !!item('copyMenu') && item('copyMenu').querySelector('.pnb-hm-label').textContent === 'Copy' && !!reach('copy') && item('copy').querySelector('.pnb-hm-label').textContent === 'Distinct column values';   // (cpsplit) the user's name
       if (item('copy')) item('copy').click();
       await sleep(150);
       var head = anyHead();
@@ -747,7 +778,7 @@
       await sleep(600);
       R.chk.copyComma = lastClip() === distinctOf('V_STATUS').join(',');
       // a newline cannot sit in the dialog's text box: the menu hands it over
-      async function quick(act) { rclick(fth('V_STATUS')); if (item('copy')) item('copy').click(); await sleep(100); if (item(act)) item(act).click(); await sleep(600); return lastClip(); }
+      async function quick(act) { rclick(fth('V_STATUS')); reach(act); await sleep(100); if (item(act)) item(act).click(); await sleep(600); return lastClip(); }   // (2026-10-27, copymenu) through the Copy list
       R.chk.copyNewline = (await quick('copy-newline')) === distinctOf('V_STATUS').join('\n');
       R.chk.copyTab = (await quick('copy-tab')) === distinctOf('V_STATUS').join('\t');
       // only the rows the search keeps
@@ -765,7 +796,7 @@
       $('#copyActionsLightbox').hide();
       // Other...: the dialog on Single Column (Distinct), this column chosen, the box focused
       rclick(fth('V_NAME'));
-      if (item('copy')) item('copy').click();
+      reach('copy-other');   // (2026-10-27, copymenu) through the Copy list
       await sleep(100);
       if (item('copy-other')) item('copy-other').click();
       await sleep(500);
@@ -814,6 +845,23 @@
       closeMenu();
       var ranNote = dtd ? await choose(dtd, 'addNote') : false;
       R.chk.jrnAddNote = hasAdd && ranNote && noteClicks === 1;
+      // (2026-10-27, notescroll) from a cell far to the right, the Notes column scrolled out of the table's box sideways:
+      // the button is back in the box when it is clicked (the card hides while its button is out of the box)
+      var wrapN = ntd ? ntd.closest('#results-wrapper') : null, outBefore = false, inBox = null, ranFar = false;
+      if (wrapN && nbtn) {
+        var _w0 = wrapN.style.width, _o0 = wrapN.style.overflowX;
+        wrapN.style.width = '320px'; wrapN.style.overflowX = 'auto';
+        wrapN.scrollLeft = wrapN.scrollWidth;
+        var vis = function () { var r = nbtn.getBoundingClientRect(), v = wrapN.getBoundingClientRect(); return r.right > v.left && r.left < v.right; };
+        outBefore = !vis();
+        var spy = function (e) { if (e.target === nbtn) inBox = vis(); };   // (the document's capture phase: before the button's own stopper)
+        document.addEventListener('click', spy, true);
+        ranFar = await choose(ntd.parentNode.lastElementChild, 'addNote');
+        document.removeEventListener('click', spy, true);
+        wrapN.style.width = _w0; wrapN.style.overflowX = _o0; wrapN.scrollLeft = 0;
+      }
+      R.chk.jrnAddNoteScrolled = outBefore && ranFar && inBox === true;
+      R.info.jrnAddNoteScrolled = { wrap: !!wrapN, outBefore: outBefore, ranFar: ranFar, inBox: inBox };
       // (round 21) inside the button itself (its count): the Notes column's menu, with the row's notes
       var inBtn = nbtn && (nbtn.querySelector('.journal-notes-count') || nbtn.querySelector('svg'));
       R.chk.jrnInNote = !!inBtn && rclick(inBtn) && !!menu() && acts().indexOf('addNote') >= 0 && acts().indexOf('sortAsc') >= 0;
@@ -1103,8 +1151,9 @@
       var hdrCells = td ? td.querySelectorAll('.nested-json-header > *') : [], nameIdx = -1;
       for (var h = 0; h < hdrCells.length; h++) { if (hdrCells[h].textContent.replace(/[▲▼]/g, '').replace(/\s+/g, ' ').trim() === 'SUB_NAME') nameIdx = h; }
       var row0 = td ? td.querySelector('.nested-json-row') : null, subCell = (row0 && nameIdx >= 0) ? row0.children[nameIdx] : null, v = subCell ? subCell.textContent.trim() : '';
-      R.chk.nestSubOpens = !!subCell && rclick(subCell) && !!menu() && !!item('cellFilter') && item('cellFilter').textContent.indexOf('"' + v + '"') >= 0 && !item('cellExclude') && !!item('cellCopy');
+      R.chk.nestSubOpens = !!subCell && rclick(subCell) && !!menu() && !!reach('cellFilter') && item('cellFilter').textContent.indexOf('"' + v + '"') >= 0 && !item('cellExclude') && !!item('copyMenu') && !!reach('cellCopy');   // (2026-10-27, copymenu) in the Copy list
       R.info.nestSub = { v: v, acts: acts(), nameIdx: nameIdx, hdr: Array.prototype.map.call(hdrCells, function (x) { return x.textContent.trim().slice(0, 12); }) };
+      closeMenu(); rclick(subCell); reach('cellFilter');   // (2026-10-27, fltmenu) through the Filter list (the Copy list opened above)
       if (item('cellFilter')) item('cellFilter').click();
       await sleep(900);
       var want = window.__rowsFixture.filter(function (r) { return r.H_JSON && JSON.parse(r.H_JSON.substring(6)).some(function (x) { return String(x.SUB_NAME) === v; }); }).length;
@@ -1114,7 +1163,8 @@
       (function (t) { var a = document.createElement('a'); a.className = 'snippet-action'; a.setAttribute('data-action-name', 'search'); a.setAttribute('data-action-value', t); document.getElementById('reportSnippetOutput').appendChild(a); $(a).trigger('click'); a.remove(); })('');
       await sleep(900);
       // the cell around the sub-table: the column's menu, no value items
-      R.chk.nestPadOpens = !!td && rclick(td) && !!menu() && !item('cellFilter') && !item('cellCopy') && acts().indexOf('sortAsc') >= 0;
+      R.chk.nestPadOpens = !!td && rclick(td) && !!menu() && !item('cellFilter') && !item('cellCopy') && acts().indexOf('sortAsc') >= 0
+        && !!reach('copyRow') && !item('cellCopy');   // (2026-10-27, copymenu) its Copy list: the row, the column's name, no value
       closeMenu();
       // (round 30) Consistent row height: the panel's switch as a checked item on the nested column
       // (not on a plain one); a pick flips the switch and the body class, the preference with it
@@ -1140,8 +1190,8 @@
       var subId = (row0 && hdrCells.length) ? row0.children[0] : null, idText = subId ? subId.textContent.trim() : '';
       if (subId) { subId.innerHTML = '<a href="https://example.test/x?id=' + encodeURIComponent(idText) + '">' + idText + '</a>'; }
       var lnk = subId ? subId.querySelector('a') : null;
-      R.chk.nestLinkOpens = !!lnk && rclick(lnk) && !!menu() && !!item('cellFilter') && item('cellFilter').textContent.indexOf('"' + idText + '"') >= 0
-        && !!item('cellCopy') && !item('cellOpenLink') && !item('cellCopyLink');
+      R.chk.nestLinkOpens = !!lnk && rclick(lnk) && !!menu() && !!reach('cellFilter') && item('cellFilter').textContent.indexOf('"' + idText + '"') >= 0
+        && !!reach('cellCopy') && !item('cellOpenLink') && !item('cellCopyLink');   // (2026-10-27, copymenu) in the Copy list
       var foot = menu() && menu().querySelector('.pnb-hm-foot');
       R.chk.nestLinkFoot = !!foot && /Shift\+right-click/.test(foot.textContent);
       R.info.nestLink = { idText: idText, acts: acts(), foot: foot && foot.textContent };
@@ -1169,7 +1219,7 @@
       var copen = !!c0 && rclick(c0) && !!menu(); if (c0) { mdown(c0); }
       R.chk.nativeSecondCell = copen && !!c0 && !rclick(c0) && !menu();
       closeMenu();
-      rclick(lnk); if (item('cellFilter')) item('cellFilter').click();
+      rclick(lnk); reach('cellFilter'); if (item('cellFilter')) item('cellFilter').click();
       await sleep(900);
       var vis2 = Array.prototype.filter.call(document.querySelectorAll('#resultsTable tbody tr'), function (tr) { return !tr.classList.contains('search-hidden'); }).length;
       var want2 = window.__rowsFixture.filter(function (r) { return r.H_JSON && JSON.parse(r.H_JSON.substring(6)).some(function (x) { return String(x.SUB_ID) === idText; }); }).length;
@@ -1188,9 +1238,10 @@
       window.__rowsFixture.forEach(function (r) { cnt[r.V_STATUS] = (cnt[r.V_STATUS] || 0) + 1; });
       var c0 = cellAt('V_STATUS', 0), v0 = c0.textContent.trim();
       var prevented = rclick(c0), a = acts();
-      R.chk.cellOpens = prevented && !!menu() && a[0] === 'cellFilter' && a[1] === 'cellExclude' && a[2] === 'cellCopy'
+      // (2026-10-27, fltmenu) the Filter list first (Filter to, Exclude in it), then Copy
+      R.chk.cellOpens = prevented && !!menu() && a[0] === 'filterMenu' && a[1] === 'copyMenu' && !!reach('cellFilter') && subActs()[1] === 'cellExclude'
         && item('cellFilter').textContent.indexOf('"' + v0 + '"') >= 0 && c0.classList.contains('pnb-hm-cell')
-        && menu().querySelector('.pnb-hm-name').textContent === 'V_STATUS' && a.indexOf('sortAsc') > 2;
+        && menu().querySelector('.pnb-hm-name').textContent === 'V_STATUS' && a.indexOf('sortAsc') > 1;
       if (item('cellFilter')) item('cellFilter').click();
       await sleep(900);
       R.chk.cellFilter = searchVal() === 'V_STATUS = /^(?:' + v0 + ')$/' && visRows() === cnt[v0] && !c0.classList.contains('pnb-hm-cell');
@@ -1202,7 +1253,7 @@
       setSearch('');
       await sleep(900);
       var c1 = cellAt('V_STATUS', 0), v1 = c1.textContent.trim();
-      rclick(c1);
+      rclick(c1); reach('cellExclude');
       if (item('cellExclude')) item('cellExclude').click();
       await sleep(900);
       R.chk.cellExclude = searchVal() === 'V_STATUS != /^(?:' + v1 + ')$/' && visRows() === 300 - cnt[v1];
@@ -1211,6 +1262,7 @@
       // Copy this value: the text the cell shows
       var c2 = cellAt('V_NAME', 1);
       rclick(c2);
+      reach('cellCopy');   // (2026-10-27, copymenu) through the Copy list
       if (item('cellCopy')) item('cellCopy').click();
       await sleep(300);
       R.chk.cellCopy = window.__clip[window.__clip.length - 1] === c2.innerText.trim();
@@ -1218,7 +1270,7 @@
       window.Penumbra.setColOpt('V_AMOUNT', 'format', 'currency:0');
       await sleep(300);
       var c3 = cellAt('V_AMOUNT', 2), shown = c3.textContent.trim(), raw = c3.getAttribute('data-pnb-raw');
-      rclick(c3);
+      rclick(c3); reach('cellFilter');
       var rawLbl = item('cellFilter') ? item('cellFilter').textContent : '';
       if (item('cellFilter')) item('cellFilter').click();
       await sleep(900);
@@ -1235,7 +1287,7 @@
       var gk = hdrIndex('H_GROUP'), blankTd = null;
       visTrs().some(function (tr) { var r = window.__rowsFixture[parseInt(tr.cells[0].textContent, 10) - 1]; if (r && (r.H_GROUP === null || r.H_GROUP === undefined)) { blankTd = tr.children[gk]; return true; } return false; });
       var nulls = window.__rowsFixture.filter(function (r) { return r.H_GROUP === null || r.H_GROUP === undefined; }).length;
-      rclick(blankTd);
+      rclick(blankTd); reach('cellFilter');
       var bl = item('cellFilter') ? item('cellFilter').textContent : '';
       if (item('cellFilter')) item('cellFilter').click();
       await sleep(900);
@@ -1293,17 +1345,17 @@
       function key(k) { document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })); }
       function over(el) { if (el) el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true })); }
       rclick(fth('V_NAME'));
-      var a = acts(), want = ['sortAsc', 'sortDesc', 'filter', 'stats', 'width', 'rowHeight', 'options', 'move', 'show', 'hide', 'freeze', 'copy', 'copyName', 'calc', 'groupBy', 'clearPrefs'];   // (round 33) the sizes up the menu, one clear-all item at its foot
+      var a = acts(), want = ['sortAsc', 'sortDesc', 'copyMenu', 'filter', 'stats', 'width', 'rowHeight', 'options', 'move', 'show', 'hide', 'freeze', 'calc', 'groupBy', 'clearPrefs'];   // (copymenu 3) Copy above Filter by value...   // (round 33) the sizes up the menu, one clear-all item at its foot; (2026-10-27, copymenu) Copy
       var pos = want.map(function (x) { return (x === 'groupBy' && a.indexOf(x) < 0) ? a.indexOf('groupByList') : a.indexOf(x); });   // (delimgroup) or its list
       R.chk.topOrder = pos.every(function (p, i) { return p >= 0 && (i === 0 || p > pos[i - 1]); })
-        && menu().querySelectorAll('.pnb-hm-sep').length === 4 && ['move-left', 'only', 'reset', 'resetAll', 'resets', 'fit', 'fitAll', 'stats-top-0', 'pivot', 'chart', 'copy-comma'].every(function (x) { return a.indexOf(x) < 0; });
+        && menu().querySelectorAll('.pnb-hm-sep').length === 4 && ['move-left', 'only', 'reset', 'resetAll', 'resets', 'fit', 'fitAll', 'stats-top-0', 'pivot', 'chart', 'copy-comma', 'copy', 'copyName'].every(function (x) { return a.indexOf(x) < 0; });
       R.chk.noChips = !menu().querySelector('.pnb-hm-row');
-      var subs = ['move', 'show', 'copy', 'calc', 'width'];
+      var subs = ['move', 'show', 'copyMenu', 'calc', 'width'];   // (2026-10-27, copymenu) Copy, the copies' list
       R.chk.arrows = subs.every(function (x) { return !!item(x) && !!item(x).querySelector('.pnb-hm-arrow') && item(x).getAttribute('aria-haspopup') === 'menu' && item(x).getAttribute('aria-expanded') === 'false'; })
-        && !!item('copyName') && !item('copyName').querySelector('.pnb-hm-arrow');   // (stalemut) no item (u-copyname): red, not a crash
+        && !!item('hide') && !item('hide').querySelector('.pnb-hm-arrow');   // (2026-10-27, copymenu) a plain item, no arrow (Copy column name is in the Copy list)
       var showNote = item('show').querySelector('.pnb-hm-note');
       R.chk.showLabel = item('show').querySelector('.pnb-hm-label').textContent === 'Show column(s)' && !!showNote && /^\d+ hidden$/.test(showNote.textContent)
-        && item('move').querySelector('.pnb-hm-label').textContent === 'Move column' && item('copy').querySelector('.pnb-hm-label').textContent === 'Copy distinct values';
+        && item('move').querySelector('.pnb-hm-label').textContent === 'Move column' && !!item('copyMenu') && item('copyMenu').querySelector('.pnb-hm-label').textContent === 'Copy';   // (2026-10-27, copymenu; no crash where there is none)
       R.info.top = a;
       // a click on the item: its list beside it, the menu still there, the item marked
       sub('move');
@@ -1335,17 +1387,17 @@
       var ca = subActs(), cl = subLabels();
       R.chk.hoverOpens = !!subPanel() && ca.indexOf('calc-left') >= 0;
       R.chk.calcList = ca.indexOf('back') < 0 && ['calc-left', 'calc-right', 'calc-start', 'calc-end'].every(function (x) { return ca.indexOf(x) >= 0; }) && cl.indexOf('At the start') >= 0;
-      closeMenu(); rclick(fth('V_NAME')); sub('copy');
+      closeMenu(); rclick(fth('V_NAME')); reach('copy'); sub('copy');   // (2026-10-27, copymenu) through the Copy list
       var pa = subActs();
       R.chk.copyList = pa.indexOf('back') < 0 && pa.indexOf('copyName') < 0 && ['copy-space', 'copy-comma', 'copy-newline', 'copy-other'].every(function (x) { return pa.indexOf(x) >= 0; })
         && !!anyHead() && anyHead().textContent === 'Delimited by' && menu().querySelector('.pnb-hm-name').textContent === 'V_NAME';
       // (round 33) Column widths: one list (this column, every column, the page, the resets); the Reset
-      // list became one item at the foot, Clear all personal customizations...
+      // list became one item at the foot, Clear all customizations...
       closeMenu(); rclick(fth('V_NAME')); sub('width');
       var ra = subActs(), rl = subLabels(), clearIt = item('clearPrefs');
       R.chk.resetList = ra.indexOf('back') < 0 && ['fit', 'fitAll', 'fitPage', 'resetWidth', 'resetWidths'].every(function (x) { return ra.indexOf(x) >= 0; })
-        && rl.indexOf('Fit width to contents') >= 0 && rl.indexOf('Fit to page') >= 0 && rl.indexOf("Reset this column's width") >= 0 && rl.indexOf('Reset all column widths') >= 0
-        && !!clearIt && clearIt.querySelector('.pnb-hm-label').textContent === 'Clear all personal customizations...' && !clearIt.querySelector('.pnb-hm-arrow');
+        && rl.indexOf('Fit this column width to contents') >= 0 && rl.indexOf('Fit all column widths to contents') >= 0 && rl.indexOf('Fit all column widths to page') >= 0 && rl.indexOf("Reset this column's width") >= 0 && rl.indexOf('Reset all column widths') >= 0
+        && !!clearIt && clearIt.querySelector('.pnb-hm-label').textContent === 'Clear all customizations...' && !clearIt.querySelector('.pnb-hm-arrow');
       R.info.lists = { move: ma, show: sa, calc: ca, copy: pa, reset: ra };
       // Clear all custom preferences: the Settings panel's button, clicked - its confirm
       // lists what is saved (the format set above), and a No leaves it all in place
@@ -2349,14 +2401,14 @@
       // (guard) a plain column keeps its own items
       rclick(fth('V_STATUS'));
       R.chk.nsPlain = !!item('groupBy') && !item('groupBy').hasAttribute('aria-haspopup') && lab(item('groupBy')) === 'Group by this column'
-        && isList(item('copy')) && !nestActs().length && heads(menu()).indexOf('Nested columns') < 0;
+        && isList(item('copyMenu')) && isList(reach('copy')) && !nestActs().length && heads(menu()).indexOf('Nested columns') < 0;   // (2026-10-27, copymenu) its Copy list
       closeMenu();
       // a nested-table column whose tables hold no column: one greyed line with the reason
       rclick(fth('H_NULL'));
       var nn = item('nestnone');
       R.info.none = nn ? [lab(nn), nn.getAttribute('aria-disabled'), nn.getAttribute('title'), acts()] : acts();
       R.chk.nsNone = !!nn && nn.getAttribute('aria-disabled') === 'true' && nn.getAttribute('title') === 'Its nested tables have no columns'
-        && heads(menu()).indexOf('Nested columns') >= 0 && acts().indexOf('groupBy') < 0 && acts().indexOf('copy') < 0;
+        && heads(menu()).indexOf('Nested columns') >= 0 && acts().indexOf('groupBy') < 0 && acts().indexOf('copy') < 0 && acts().indexOf('copyMenu') < 0;   // (2026-10-27, copymenu)
       closeMenu();
       // (guard) a column named in digits (jQuery's data() hands it back as a number, and the grouping picker's own list throws
       // on it): the nested column's menu still opens
@@ -2394,7 +2446,7 @@
       try {
         rclick(th);
         R.info.noRaw = acts();
-        R.chk.nsNoRaw = !!menu() && acts().indexOf('copy') < 0 && acts().indexOf('nestnone') >= 0 && heads(menu()).indexOf('Nested columns') >= 0;
+        R.chk.nsNoRaw = !!menu() && acts().indexOf('copy') < 0 && acts().indexOf('copyMenu') < 0 && acts().indexOf('nestnone') >= 0 && heads(menu()).indexOf('Nested columns') >= 0;
       } finally { A().nestedFields = realNF; A().nestedCopyFields = realCF2; }
       closeMenu();
       // the report hides Clipboard (body.restrict-clipboard, as its View Option does): no Copy distinct values - the nested
@@ -2408,7 +2460,7 @@
         clipActs = subActs();
         closeMenu();
         rclick(fth('V_STATUS'));
-        plainCopy = !!item('copy');
+        plainCopy = !!item('copy') || !!item('copyMenu') || !!reach('copy');   // (2026-10-27, copymenu) or in a Copy list
         closeMenu();
         refused = typeof A().copyNested === 'function' && A().copyNested('H_JSON', 'SUB_NAME', ',') === false;
         await sleep(300);
@@ -2946,6 +2998,430 @@
       var s4 = two ? withHidden(two[0]) : null, s5 = two ? withHidden(two[two.length - 1]) : null;
       R.info.csShownCopy = { row: two ? ixOf(two[0]) : null, copies: two ? two.length : 0, first: s4, last: s5 };
       R.chk.csShownCopy = !!two && [s4, s5].every(function (s) { return !!s && s.head === headFor(openN) && s.inf['With a value'] === String(openN); });
+    },
+    // ---- (2026-10-27, copymenu; the user: "The 3 copy menus can be combined into one copy menu (value, column name, distinct
+    // values) in the right click menus"; they chose This row, then Link to this view in place of For SQL) ONE Copy list: on a
+    // cell, in its place, This value, This row, Column name, Distinct values (its delimiters), Link to this view (a saved
+    // report); on a heading where Copy distinct values was; an item alone keeps its own name (a '#' cell on an unsaved
+    // report: Copy this row; Clipboard hidden: Copy column name)
+    mcopym: async function () {
+      function lastClip() { return window.__clip.length ? window.__clip[window.__clip.length - 1] : null; }
+      function lab(el) { var x = el && el.querySelector('.pnb-hm-label'); return x ? x.textContent : ''; }
+      function note(el) { var x = el && el.querySelector('.pnb-hm-note'); return x ? x.textContent : ''; }
+      function isList(el) { return !!el && el.getAttribute('aria-haspopup') === 'menu'; }
+      function visTrs() { return Array.prototype.filter.call(document.querySelectorAll('#resultsTable tbody tr'), function (tr) { return !tr.classList.contains('search-hidden') && tr.style.display !== 'none' && !!tr.querySelector('td[data-column]'); }); }
+      function cellAt(name, i) { var t = fth(name), tr = visTrs()[i || 0]; return (t && tr) ? tr.querySelector('td[data-column="' + t.getAttribute('data-column') + '"]') : null; }
+      function flatHeads() { return document.querySelectorAll('#tableHeader > th'); }
+      function distinctOf(name) {
+        var seen = [], set = Object.create(null);
+        visTrs().forEach(function (tr) { var r = window.__rowsFixture[parseInt(tr.cells[0].textContent, 10) - 1], v = r ? r[name] : null; if (v != null && v !== '' && !set[v]) { set[v] = 1; seen.push(String(v)); } });
+        return seen;
+      }
+      // a cell: Filter to, Exclude, then Copy - its list This value, This row, Column name, Distinct values
+      var c0 = cellAt('V_NAME', 1), tr0 = c0 ? c0.closest('tr') : null;
+      closeMenu(); rclick(c0);
+      var a0 = acts(), cp = item('copyMenu');
+      R.info.cell = a0;
+      R.chk.cmCell = !!cp && lab(cp) === 'Copy' && isList(cp) && a0[0] === 'filterMenu' && a0[1] === 'copyMenu'   // (2026-10-27, fltmenu) the Filter list first
+        && ['cellCopy', 'copyRow', 'copyName', 'copy'].every(function (x) { return a0.indexOf(x) < 0; }) && a0.indexOf('sortAsc') > 1;
+      sub('copyMenu'); await sleep(100);
+      var l0 = subActs(), n0 = subLabels(), sp0 = subPanel();
+      R.info.list = [l0, n0];
+      // (2026-10-27, cpsplit; the user) the value copy named by the value itself (cut to 28, an empty one (blank)),
+      // This entire row, Distinct column values
+      var v0 = c0 ? c0.innerText.replace(/\s+/g, ' ').trim() : '', v0l = v0 === '' ? '(blank)' : (v0.length > 28 ? v0.slice(0, 27) + '...' : v0);
+      R.chk.cmList = l0.join() === 'cellCopy,copyName,copyRow,copy' && n0.join() === [v0l, 'V_NAME', 'This entire row', 'Distinct column values'].join()   // (2026-10-27, fltmenu) [column name] above This entire row
+        && isList(item('copy')) && !isList(item('copyRow')) && !!sp0 && sp0.getAttribute('aria-label') === 'Copy';
+      closeMenu();
+      // This value: the text the cell shows
+      await choose(c0, 'cellCopy');
+      R.chk.cmValue = !!c0 && lastClip() === c0.innerText.trim();
+      // This row: each shown column, "Name: value", one per line, in the table's order ('#' aside)
+      var w0 = tr0 ? rowWant(tr0, flatHeads()) : [];
+      await choose(c0, 'copyRow');
+      R.info.row = { got: lastClip(), want: w0.join('\n'), toast: lastToast() };
+      R.chk.cmRow = w0.length === 6 && lastClip() === w0.join('\n') && /Copied the row \(6 columns\)/.test(lastToast());
+      // a column hidden is left out; one shown again comes in, at its place
+      var lay = A().layout();
+      lay.cols.forEach(function (c) { if (c.colName === 'V_DATE') c.visible = false; if (c.colName === 'H_GROUP') c.visible = true; });
+      A().applyLayout(lay); await sleep(500);
+      var c1 = cellAt('V_NAME', 2), tr1 = c1 ? c1.closest('tr') : null, w1 = tr1 ? rowWant(tr1, flatHeads()) : [];
+      await choose(c1, 'copyRow');
+      var got1 = lastClip() || '';
+      R.info.rowLayout = { got: got1, want: w1.join('\n') };
+      R.chk.cmRowLayout = w1.length === 6 && got1 === w1.join('\n') && got1.indexOf('V_DATE:') < 0 && got1.indexOf('H_GROUP:') >= 0;
+      lay = A().layout();
+      lay.cols.forEach(function (c) { if (c.colName === 'V_DATE') c.visible = true; if (c.colName === 'H_GROUP') c.visible = false; });
+      A().applyLayout(lay); await sleep(500);
+      // a value of several lines goes on under its name, indented
+      var c2 = cellAt('V_NAME', 3), keep2 = c2 ? c2.innerHTML : '';
+      if (c2) c2.innerHTML = 'Line one<br>Line two';
+      await choose(c2, 'copyRow');
+      var got2 = lastClip() || '';
+      if (c2) c2.innerHTML = keep2;
+      R.info.rowLines = got2;
+      R.chk.cmRowLines = got2.indexOf('V_NAME: Line one\n  Line two\n') >= 0;
+      // a heading: Copy where Copy distinct values was (after the layout tools, before Calculated column), its list Column
+      // name and Distinct values
+      closeMenu(); rclick(fth('V_STATUS'));
+      var a3 = acts(), cpi = a3.indexOf('copyMenu');
+      R.info.head = a3;
+      R.chk.cmHead = cpi > 0 && a3[cpi + 1] === 'filter' && cpi < a3.indexOf('stats') && cpi < a3.indexOf('hide')   // (copymenu 3) right above Filter by value...
+        && ['cellCopy', 'copyRow', 'copyName', 'copy'].every(function (x) { return a3.indexOf(x) < 0; });
+      sub('copyMenu'); await sleep(100);
+      R.info.headList = subActs();
+      R.chk.cmHeadList = subActs().join() === 'copyName,copy';
+      closeMenu();
+      await choose(fth('V_STATUS'), 'copyName');
+      R.chk.cmName = lastClip() === 'V_STATUS';
+      // (copymenu 2: the user took For SQL out) Distinct values: the delimiters, then Other... - no For SQL
+      closeMenu(); rclick(fth('V_STATUS'));
+      var oth = reach('copy-other'), dl = subActs();
+      R.info.distinct = dl;
+      R.chk.cmDistinct = !!oth && dl[dl.length - 1] === 'copy-other' && dl.indexOf('copy-sql') < 0
+        && ['copy-space', 'copy-comma', 'copy-semicolon', 'copy-pipe', 'copy-tab', 'copy-newline'].every(function (a) { return dl.indexOf(a) >= 0; });
+      closeMenu();
+      // the report hiding Clipboard: a cell's Copy keeps This value, This row and Column name, no Distinct values; a heading's
+      // Column name alone, by its own name
+      var a5 = [], l5 = [], a6 = [], n6 = null;
+      document.body.classList.add('restrict-clipboard');
+      try {
+        closeMenu(); rclick(c0); a5 = acts(); sub('copyMenu'); await sleep(100); l5 = subActs(); closeMenu();
+        rclick(fth('V_NAME')); a6 = acts(); n6 = item('copyName') ? lab(item('copyName')) : null; closeMenu();
+      } finally { document.body.classList.remove('restrict-clipboard'); }
+      R.info.clipOff = { cell: a5, list: l5, head: a6, name: n6 };
+      R.chk.cmClipOff = a5[1] === 'copyMenu' && l5.join() === 'cellCopy,copyName,copyRow' && a6.indexOf('copyMenu') < 0 && a6.indexOf('copy') < 0 && n6 === 'Copy column name';
+      // (copymenu 2; the user: "replace with 'Link to this view', with the tooltip explaining") Link to this view: last in the
+      // list after a separator, where the page can make a view link (main.js PenumbraViewLink: a saved report - this harness has
+      // no report id, so none by default); its title says what the link carries; it runs the page's own copy (Copy's Copy a link
+      // to this view); on a heading and on a '#' cell too (there with This row: a list, no longer the item alone)
+      closeMenu(); rclick(c0); sub('copyMenu'); await sleep(100);
+      var vl0 = subActs();
+      closeMenu();
+      R.chk.cmViewLinkNone = vl0.length > 0 && vl0.indexOf('copyViewLink') < 0;
+      var VL = window.PenumbraViewLink, vlKeep = VL ? { av: VL.available, cp: VL.copy } : null, vlCalls = 0, vlList = [], vlTitle = '', vlLab = '', vlSep = false, vlHead = [], vlNum = [];
+      if (VL) { VL.available = function () { return true; }; VL.copy = function () { vlCalls++; return Promise.resolve({}); }; }
+      try {
+        closeMenu(); rclick(c0); sub('copyMenu'); await sleep(100);
+        vlList = subActs();
+        var vli = item('copyViewLink');
+        vlTitle = vli ? (vli.getAttribute('title') || '') : ''; vlLab = lab(vli);
+        vlSep = !!vli && !!vli.previousElementSibling && vli.previousElementSibling.classList.contains('pnb-hm-sep');
+        if (vli) vli.click();
+        await sleep(300);
+        closeMenu(); rclick(fth('V_STATUS')); sub('copyMenu'); await sleep(100); vlHead = subActs(); closeMenu();
+        var trv = visTrs()[6]; rclick(trv ? trv.cells[0] : null); vlNum = acts(); closeMenu();
+      } finally { if (VL && vlKeep) { VL.available = vlKeep.av; VL.copy = vlKeep.cp; } }
+      R.info.viewLink = { list: vlList, label: vlLab, sep: vlSep, title: vlTitle, calls: vlCalls, head: vlHead, num: vlNum };
+      // (fltmenu, 5eae534) the column's name sits above This entire row
+      R.chk.cmViewLink = vlList.join() === 'cellCopy,copyName,copyRow,copy,copyViewLink' && vlSep && vlLab === 'Link to this view'
+        && /reopens this report as you see it now/.test(vlTitle) && /It carries no data/.test(vlTitle) && vlCalls === 1
+        && vlHead.join() === 'copyName,copy,copyViewLink' && vlNum.indexOf('copyMenu') >= 0 && vlNum.indexOf('copyRow') < 0;
+      // (copymenu 3; the user: "Add a 'Copy' static header in the flyover menu so everything below makes more instant sense",
+      // "When right clicking headers, move the copy menu to be above the filter to value item") the Copy list opens under a
+      // static heading, Copy (no act: the keys and the palette pass it), on a cell and on a heading; a heading's Copy sits right
+      // above Filter by value... (a column without it: where it would be, after the sorts); a cell's Filter and Copy lead its menu
+      var firstRow = function () { var p = subPanel(), f = p ? p.firstElementChild : null; return f ? [f.className, f.getAttribute('role') || '', f.textContent.trim(), f.getAttribute('data-act') || ''] : []; };
+      var isHead = function (r) { return r.length === 4 && /(^| )pnb-hm-head( |$)/.test(r[0]) && r[1] === 'presentation' && r[2] === 'Copy' && r[3] === ''; };
+      var beforeOk = ['sortAsc', 'sortDesc', 'thenAsc', 'thenDesc', 'sortClear', 'about'];
+      // (the review) the list's first item, not its heading, level with Copy: the pointer moving across lands on an item
+      var alignOf = function () { var sp = subPanel(), it = item('copyMenu'), fi = sp ? sp.querySelector('.pnb-hm-item') : null, hd = sp ? sp.querySelector('.pnb-hm-head') : null;
+        if (!sp || !it || !fi || !hd) { return null; } var a = it.getBoundingClientRect(), b = fi.getBoundingClientRect(), c = hd.getBoundingClientRect(); return [Math.round(a.top), Math.round(b.top), Math.round(c.top), Math.round(c.bottom)]; };
+      var aligned = function (v) { return !!v && Math.abs(v[1] - v[0]) <= 3 && v[3] <= v[1] + 1 && v[2] < v[0]; };
+      closeMenu(); rclick(c0); var hc0 = acts(); sub('copyMenu'); await sleep(100);
+      var hcRow = firstRow(), hcActs = subActs(), hcAlign = alignOf(); closeMenu();
+      rclick(fth('V_STATUS')); var hh = acts(); sub('copyMenu'); await sleep(100);
+      var hhRow = firstRow(), hhAlign = alignOf(); closeMenu();
+      rclick(fth('H_JSON')); var hn = acts(); closeMenu();
+      R.info.copyHead = { cellTop: hc0, cellRow: hcRow, cellList: hcActs, cellAlign: hcAlign, headTop: hh, headRow: hhRow, headAlign: hhAlign, nestTop: hn };
+      R.chk.cmHeadAlign = aligned(hcAlign) && aligned(hhAlign);
+      var hhAt = hh.indexOf('copyMenu'), hnAt = hn.indexOf('copyName');
+      R.chk.cmHeadRow = isHead(hcRow) && hcActs[0] === 'cellCopy' && isHead(hhRow);
+      R.chk.cmHeadPlace = hhAt > 0 && hh[hhAt + 1] === 'filter' && beforeOk.indexOf(hh[hhAt - 1]) >= 0 && hc0[0] === 'filterMenu' && hc0[1] === 'copyMenu';
+      R.chk.cmHeadNoFilter = hn.indexOf('filter') < 0 && hnAt > 0 && beforeOk.indexOf(hn[hnAt - 1]) >= 0;
+      // a '#' cell: This row alone, by its own name; the '#' heading: no copy at all
+      var trn = visTrs()[4], num = trn ? trn.cells[0] : null;
+      closeMenu(); rclick(num);
+      var a7 = acts(), r7 = item('copyRow'), w7 = trn ? rowWant(trn, flatHeads()) : [];
+      R.info.num = { acts: a7, label: lab(r7) };
+      var ok7 = !!r7 && lab(r7) === 'Copy this row' && !isList(r7) && a7.indexOf('copyMenu') < 0;
+      if (r7) r7.click();
+      await sleep(400);
+      R.chk.cmNumRow = ok7 && w7.length === 6 && lastClip() === w7.join('\n');
+      closeMenu(); rclick(document.querySelector('#tableHeader th[data-column="#"]'));
+      var a8 = acts();
+      R.chk.cmNumHead = !!menu() && ['copyMenu', 'copyRow', 'copyName', 'copy', 'cellCopy'].every(function (x) { return a8.indexOf(x) < 0; });
+      closeMenu();
+      // from the keyboard: the cell's menu, down to Copy, ArrowRight opens its list on This value, Enter copies it
+      var c9 = cellAt('V_NAME', 5);
+      closeMenu(); rclick(c9, true);
+      await sleep(80);
+      function key(k) { document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })); }
+      var steps = 0;
+      while (document.activeElement && document.activeElement.getAttribute('data-act') !== 'copyMenu' && steps < 8) { key('ArrowDown'); steps++; await sleep(30); }
+      var onCopy = !!document.activeElement && document.activeElement.getAttribute('data-act') === 'copyMenu';
+      key('ArrowRight'); await sleep(150);
+      var onVal = !!document.activeElement && document.activeElement.getAttribute('data-act') === 'cellCopy';
+      var nB = window.__clip.length;
+      key('Enter'); await sleep(450);
+      R.info.kbd = { steps: steps, onCopy: onCopy, onVal: onVal, clips: window.__clip.length - nB };
+      R.chk.cmKbd = onCopy && onVal && window.__clip.length === nB + 1 && !!c9 && lastClip() === c9.innerText.trim();
+      closeMenu();
+      // a nested table's sub-cell: Copy with This value (the sub-cell's), This row (the row it sits in), Column name - no
+      // Distinct values; the row's line for the nested column: its name, then each row of its table, "KEY: value, ..."
+      lay = A().layout(); lay.cols.forEach(function (c) { if (c.colName === 'H_JSON') c.visible = true; }); A().applyLayout(lay); await sleep(600);
+      var FX = window.__rowsFixture, jid = fth('H_JSON').getAttribute('data-column'), jtd = null;
+      visTrs().some(function (tr) { var td = tr.querySelector('td[data-column="' + jid + '"]'); if (td && td.querySelector('.nested-json-row:not(.nested-total-row) .nested-json-cell')) { jtd = td; return true; } return false; });
+      var subc = jtd ? jtd.querySelector('.nested-json-row:not(.nested-total-row) .nested-json-cell') : null;
+      closeMenu(); rclick(subc);
+      var a10 = acts(); sub('copyMenu'); await sleep(100);
+      var l10 = subActs(); closeMenu();
+      R.info.nested = { acts: a10, list: l10 };
+      R.chk.cmNestList = !!subc && a10.indexOf('copyMenu') >= 0 && l10.join() === 'cellCopy,copyName,copyRow,copyNestedTable';   // (2026-10-27, fltmenu)
+      var jtr = jtd ? jtd.closest('tr') : null, jr = jtr ? FX[parseInt(jtr.cells[0].textContent, 10) - 1] : null;
+      var arr = (jr && jr.H_JSON) ? JSON.parse(jr.H_JSON.substring(6)) : [], ks = arr.length ? Object.keys(arr[0]).filter(function (x) { return x !== '__PNBDIFF'; }) : [];
+      var wantJ = 'H_JSON:' + arr.map(function (o) { return '\n  ' + ks.map(function (x) { return x + ': ' + (o[x] == null ? '' : String(o[x]).trim()); }).join(', '); }).join('');
+      await choose(subc, 'copyRow');
+      var gotJ = lastClip() || '';
+      R.info.nestRow = { got: gotJ.slice(0, 500), want: wantJ.slice(0, 500) };
+      R.chk.cmNestRow = arr.length > 0 && (gotJ + '\n').indexOf(wantJ + '\n') >= 0;
+      // a nested column's own list (Nested columns): its delimiters, then Other... - no For SQL (copymenu 2)
+      closeMenu(); rclick(fth('H_JSON'));
+      if (isList(item('nestcol-2'))) sub('nestcol-2');
+      if (isList(item('nestcopy-2'))) sub('nestcopy-2');
+      await sleep(100);
+      var nsl = subActs();
+      R.info.nestList = nsl;
+      R.chk.cmNestNoSql = nsl.length > 0 && nsl[nsl.length - 1] === 'nestcopy-2-other' && nsl.indexOf('nestcopy-2-sql') < 0;
+      closeMenu();
+      // a journal toggle's line reads Yes or No; Notes come along only where the report puts notes in copies
+      var P = window.Penumbra;
+      if (typeof P.journalPaintFor === 'function') {
+        window._penumbraJournalKeyColumns = ['V_ID']; window._penumbraToggleState = { k1: {} }; window._penumbraRowNoteCounts = {};
+        P.journalPaintFor([{ key: 'k1', label: 'Done' }], true);
+        await sleep(300);
+        var tgd = document.querySelector('#resultsTable tbody tr td.journal-toggle-col'), tgr = tgd ? tgd.closest('tr') : null;
+        var box = tgd ? tgd.querySelector('.journal-toggle-box') : null, nt = tgr ? tgr.querySelector('td.journal-notes-col') : null;
+        var tth = document.querySelector('#tableHeader th[data-column="__JOURNAL_TOGGLE__k1"]'), nth = document.querySelector('#tableHeader th[data-column="__JOURNAL_NOTES"]');
+        var vtd = tgr ? tgr.querySelector('td[data-column="1"]') : null, outNotes = nt ? P.journalExportCell(nt) : 'n/a';
+        var tl = tth ? headLabel(tth) : 'Done', nl = nth ? headLabel(nth) : 'Notes';
+        var was = box ? box.getAttribute('aria-checked') : null;
+        if (box) box.setAttribute('aria-checked', 'false');
+        await choose(vtd, 'copyRow');
+        var gNo = '\n' + (lastClip() || '') + '\n';
+        if (box) box.setAttribute('aria-checked', 'true');
+        await choose(vtd, 'copyRow');
+        var gYes = '\n' + (lastClip() || '') + '\n';
+        if (box && was !== null) box.setAttribute('aria-checked', was);
+        R.info.jrnRow = { no: gNo.slice(0, 300), yes: gYes.slice(0, 300), notesOut: outNotes, labels: [tl, nl] };
+        R.chk.cmJournal = !!box && gNo.indexOf('\n' + tl + ': No\n') >= 0 && gYes.indexOf('\n' + tl + ': Yes\n') >= 0
+          && (outNotes === null ? gNo.indexOf('\n' + nl + ':') < 0 : gNo.indexOf('\n' + nl + ': ') >= 0);
+      } else { R.info.jrnRow = 'no journalPaintFor'; }
+    },
+    // (2026-10-27, fltmenu) a cell's Filter list (Filter to, Exclude, Filter by value..., At least / At most, Click to filter),
+    // a heading's kept flat; Highlight... gone; Copy's [column name] before This entire row, This nested table, Distinct column groups
+    mfltm: async function () {
+      function lastClip() { return window.__clip.length ? window.__clip[window.__clip.length - 1] : null; }
+      function lab(el) { var x = el && el.querySelector('.pnb-hm-label'); return x ? x.textContent : ''; }
+      function isList(el) { return !!el && el.getAttribute('aria-haspopup') === 'menu'; }
+      function visTrs() { return Array.prototype.filter.call(document.querySelectorAll('#resultsTable tbody tr'), function (tr) { return !tr.classList.contains('search-hidden') && tr.style.display !== 'none' && !!tr.querySelector('td[data-column]'); }); }
+      function cellAt(name, i) { var t = fth(name), tr = visTrs()[i || 0]; return (t && tr) ? tr.querySelector('td[data-column="' + t.getAttribute('data-column') + '"]') : null; }
+      function shownOf(td) { var s = td ? td.innerText.replace(/\s+/g, ' ').trim() : ''; return s === '' ? '(blank)' : (s.length > 28 ? s.slice(0, 27) + '...' : s); }
+      function rng(col) { var b = A().filterBuckets(col); return b ? b.range : null; }
+      function numOf(s) { var t = String(s).replace(/[$,\s]/g, ''); return parseFloat(t); }
+      function sepBefore(act) { var p = subPanel(), it = p ? p.querySelector('[data-act="' + act + '"]') : null, prev = it ? it.previousElementSibling : null; return !!prev && prev.classList.contains('pnb-hm-sep'); }
+      function clearBox() { var s = document.getElementById('tableSearch'); s.value = ''; if (typeof window.runTableSearch === 'function') window.runTableSearch(); else $(s).trigger('input'); }
+      // a text cell: Filter (a list) first, then Copy; nothing of the list at the top level
+      var c0 = cellAt('V_NAME', 1);
+      closeMenu(); rclick(c0);
+      var a0 = acts(), fm = item('filterMenu');
+      R.info.cell = a0;
+      R.chk.fmCell = !!fm && lab(fm) === 'Filter' && isList(fm) && a0[0] === 'filterMenu' && a0[1] === 'copyMenu'
+        && ['cellFilter', 'cellExclude', 'filter', 'clickFilter'].every(function (x) { return a0.indexOf(x) < 0; });
+      sub('filterMenu'); await sleep(100);
+      var l0 = subActs(), n0 = subLabels();
+      R.info.list = [l0, n0];
+      var w0 = c0 ? c0.innerText.trim() : '', q0 = '"' + (w0.length > 28 ? w0.slice(0, 27) + '...' : w0) + '"';
+      R.chk.fmList = l0.join() === 'cellFilter,cellExclude,filter,clickFilter' && n0.join() === ['Filter to ' + q0, 'Exclude ' + q0, 'Filter by value...', 'Click to filter'].join()
+        && sepBefore('clickFilter') && !!subPanel() && subPanel().getAttribute('aria-label') === 'Filter';
+      closeMenu();
+      // Filter to and Filter by value... still run from the list
+      SUBS.cellFilter = SUBS.cellExclude = SUBS.cellAtLeast = SUBS.cellAtMost = SUBS.clickFilter = 'filterMenu';
+      await choose(c0, 'cellFilter');
+      R.chk.fmFilterRuns = searchVal().indexOf('V_NAME') >= 0 && searchVal().indexOf(w0) >= 0;
+      clearBox(); await sleep(400);
+      // a number: At least / At most its value, shown as the cell shows it, after Filter by value...
+      var c1 = cellAt('V_AMOUNT', 2);
+      closeMenu(); rclick(c1); sub('filterMenu'); await sleep(100);
+      var l1 = subActs(), n1 = subLabels();
+      R.info.num = [l1, n1];
+      R.chk.fmNumList = l1.join() === 'cellFilter,cellExclude,filter,cellAtLeast,cellAtMost,clickFilter'
+        && n1[3] === 'At least ' + shownOf(c1) && n1[4] === 'At most ' + shownOf(c1);
+      closeMenu();
+      // At least: the column's low bound, the value itself; the rows left all hold at least it
+      var x1 = c1 ? numOf(c1.innerText) : NaN;
+      await choose(c1, 'cellAtLeast'); await sleep(300);
+      var r1 = rng('V_AMOUNT'), vis1 = visTrs().map(function (tr) { var r = window.__rowsFixture[parseInt(tr.cells[0].textContent, 10) - 1]; return r ? numOf(r.V_AMOUNT) : NaN; });
+      R.info.atLeast = { box: searchVal(), range: r1, x: x1, n: vis1.length };
+      R.chk.fmAtLeast = isFinite(x1) && !!r1 && r1.min === x1 && r1.max === null && vis1.length > 0 && vis1.indexOf(x1) >= 0 && vis1.every(function (v) { return v >= x1; });
+      // At most a bigger value keeps the low bound; At least one past the high bound takes it away
+      var amts = visTrs().map(function (tr) { var td = tr.querySelector('td[data-column="' + fth('V_AMOUNT').getAttribute('data-column') + '"]'); return { td: td, v: td ? numOf(td.innerText) : NaN }; })
+        .filter(function (o) { return isFinite(o.v); }).sort(function (a, b) { return a.v - b.v; });
+      var hiC = amts.length > 2 ? amts[Math.floor(amts.length / 2)] : null;
+      if (hiC) await choose(hiC.td, 'cellAtMost');
+      await sleep(300);
+      var r2 = rng('V_AMOUNT');
+      R.info.keep = { range: r2, hi: hiC ? hiC.v : null };
+      R.chk.fmKeepOther = !!hiC && hiC.v > x1 && !!r2 && r2.min === x1 && r2.max === hiC.v;
+      var top = amts.length ? amts[amts.length - 1] : null;
+      if (top) await choose(top.td, 'cellAtLeast');
+      await sleep(300);
+      var r3 = rng('V_AMOUNT');
+      R.info.drop = { range: r3, top: top ? top.v : null };
+      R.chk.fmDropOther = !!top && top.v > (hiC ? hiC.v : Infinity) && !!r3 && r3.min === top.v && r3.max === null;
+      clearBox(); await sleep(400);
+      // a date: On or after / On or before, its bound an ISO day
+      var c4 = cellAt('V_DATE', 3);
+      closeMenu(); rclick(c4); sub('filterMenu'); await sleep(100);
+      var n4 = subLabels(), l4 = subActs(); closeMenu();
+      var fx4 = c4 ? window.__rowsFixture[parseInt(c4.closest('tr').cells[0].textContent, 10) - 1] : null;
+      var md = fx4 ? String(fx4.V_DATE).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/) : null, iso4 = md ? md[3] + '-' + ('0' + md[1]).slice(-2) + '-' + ('0' + md[2]).slice(-2) : null;
+      await choose(c4, 'cellAtMost'); await sleep(300);
+      var r4 = A().filterBuckets('V_DATE'), rg4 = r4 ? r4.range : null;
+      R.info.date = { labels: n4, iso: iso4, range: rg4 };
+      R.chk.fmDate = l4.indexOf('cellAtLeast') >= 0 && n4.indexOf('On or after ' + shownOf(c4)) >= 0 && n4.indexOf('On or before ' + shownOf(c4)) >= 0
+        && !!iso4 && !!rg4 && rg4.max === iso4 && rg4.min === null;
+      clearBox(); await sleep(400);
+      // a text column has no bounds (fmList); a heading keeps Filter by value... on its own, no list, no Click to filter, no Highlight...
+      closeMenu(); rclick(fth('V_AMOUNT'));
+      var a5 = acts(), all5 = allItems().map(function (e) { return e.getAttribute('data-act'); });
+      R.info.head = a5;
+      R.chk.fmHead = a5.indexOf('filter') >= 0 && a5.indexOf('filterMenu') < 0 && all5.indexOf('clickFilter') < 0 && all5.indexOf('cellAtLeast') < 0;
+      R.chk.fmNoHighlight = !!menu() && all5.indexOf('highlight') < 0 && a5.indexOf('options') >= 0;
+      closeMenu(); rclick(c0);
+      R.chk.fmNoHighlightCell = !!menu() && acts().indexOf('highlight') < 0;
+      closeMenu();
+      // Click to filter: Column options' Filter switch for the column - off, on (its cells click-filter), off again
+      function cflt() { var td = cellAt('V_NAME', 4); return !!td && td.classList.contains('pnb-cflt'); }
+      function cfItem() { closeMenu(); rclick(cellAt('V_NAME', 4)); sub('filterMenu'); var it = item('clickFilter'), o = it ? { checked: it.getAttribute('aria-checked'), dis: it.getAttribute('aria-disabled') === 'true', title: it.getAttribute('title') || '' } : null; closeMenu(); return o; }
+      var off0 = cfItem(), cl0 = cflt();
+      await choose(cellAt('V_NAME', 4), 'clickFilter'); await sleep(400);
+      var on1 = cfItem(), cl1 = cflt(), t1 = lastToast();
+      await choose(cellAt('V_NAME', 4), 'clickFilter'); await sleep(400);
+      var off2 = cfItem(), cl2 = cflt();
+      R.info.click = { off0: off0, on1: on1, off2: off2, cls: [cl0, cl1, cl2], toast: t1 };
+      R.chk.fmClick = !!off0 && off0.checked === 'false' && !cl0 && !!on1 && on1.checked === 'true' && cl1 && /Click to filter is on for/.test(t1)
+        && !!off2 && off2.checked === 'false' && !cl2 && /Column options/.test(off0.title);
+      // the report's View Options Click to filter (every column): ticked and greyed
+      document.body.classList.add('pnb-click-filter');
+      var forced = null;
+      try { forced = cfItem(); } finally { document.body.classList.remove('pnb-click-filter'); }
+      R.chk.fmForced = !!forced && forced.checked === 'true' && forced.dis;
+      // Copy: the value, the column's name (named by itself), This entire row, Distinct column values
+      closeMenu(); rclick(c0); sub('copyMenu'); await sleep(100);
+      var l6 = subActs(), n6 = subLabels(); closeMenu();
+      R.info.copy = [l6, n6];
+      R.chk.fmCopyOrder = l6.slice(0, 4).join() === 'cellCopy,copyName,copyRow,copy' && n6[1] === 'V_NAME' && n6[2] === 'This entire row' && n6[3] === 'Distinct column values';
+      await choose(c0, 'copyName');
+      R.chk.fmCopyName = lastClip() === 'V_NAME';
+      // a heading's Copy list: the name by itself too
+      closeMenu(); rclick(fth('V_STATUS')); sub('copyMenu'); await sleep(100);
+      var l7 = subActs(), n7 = subLabels(); closeMenu();
+      R.info.headCopy = [l7, n7];
+      R.chk.fmHeadName = l7[0] === 'copyName' && n7[0] === 'V_STATUS';
+      // Distinct column groups on a date column: its groups (By Year...), each a delimiter list; the copy = the groups of the
+      // rows kept, each once, in order
+      closeMenu(); rclick(fth('V_DATE')); sub('copyMenu'); await sleep(100);
+      var l8 = subActs(), gi = item('copyGroups');
+      if (isList(gi)) sub('copyGroups');
+      await sleep(100);
+      var l9 = subActs();
+      if (isList(item('copyGroup-year'))) sub('copyGroup-year');
+      await sleep(100);
+      var l10 = subActs(), dc = item('copyGroup-year-comma');
+      if (dc) dc.click();
+      await sleep(400);
+      var yrs = [], ys = Object.create(null);
+      visTrs().forEach(function (tr) { var r = window.__rowsFixture[parseInt(tr.cells[0].textContent, 10) - 1], m = r ? String(r.V_DATE).match(/(\d{4})/) : null; if (m && !ys[m[1]]) { ys[m[1]] = 1; yrs.push(m[1]); } });
+      yrs.sort();
+      R.info.groups = { copy: l8, groups: l9, delims: l10, got: lastClip(), want: yrs.join(','), toast: lastToast() };
+      R.chk.fmGroupsList = l8[l8.length - 1] === 'copyGroups' && isList(gi) && lab(gi) === 'Distinct column groups' && l9.indexOf('copyGroup-year') >= 0 && l9.indexOf('copyGroup-month') >= 0
+        && ['copyGroup-year-space', 'copyGroup-year-comma', 'copyGroup-year-newline'].every(function (a) { return l10.indexOf(a) >= 0; });
+      R.chk.fmGroupsCopy = yrs.length > 1 && lastClip() === yrs.join(',') && /Copied \d+ distinct groups \(By Year\)/.test(lastToast());
+      closeMenu();
+      // a number column's ranges: the groups in order (each label's low end rising)
+      closeMenu(); rclick(fth('V_AMOUNT'));
+      var gl = reach('copyGroups'), nl = null;
+      if (gl) { sub('copyGroups'); await sleep(100); var bins = subActs().filter(function (a) { return /^copyGroup-[a-z]+$/.test(a); }); if (bins.length) { sub(bins[0]); await sleep(100); nl = item(bins[0] + '-newline'); } }
+      if (nl) nl.click();
+      await sleep(400);
+      var bl = (lastClip() || '').split('\n'), lows = bl.map(function (s) { var m = s.replace(/,/g, '').match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : NaN; });
+      R.info.bins = { got: bl.slice(0, 8), want: typeof A().groupValues === 'function' ? A().groupValues('V_AMOUNT', 'V_AMOUNT:' + (nl ? nl.getAttribute('data-act').split('-')[1] : 'bin')) : null };   // (none on live: the control)
+      R.chk.fmGroupsNum = !!nl && bl.length > 1 && lows.every(function (v, i) { return isFinite(v) && (i === 0 || v > lows[i - 1]); })
+        && bl.join('|') === (R.info.bins.want || []).join('|');
+      closeMenu();
+      // a text column has none; nor where the report hides Clipboard
+      closeMenu(); rclick(fth('V_STATUS'));
+      var noTxt = allItems().every(function (e) { return e.getAttribute('data-act') !== 'copyGroups'; }); reach('copyName'); noTxt = noTxt && !item('copyGroups'); closeMenu();
+      document.body.classList.add('restrict-clipboard');
+      var noClip = false;
+      try { closeMenu(); rclick(fth('V_DATE')); reach('copyName'); noClip = !!menu() && !item('copyGroups'); closeMenu(); } finally { document.body.classList.remove('restrict-clipboard'); }
+      R.chk.fmGroupsNone = noTxt && noClip;
+      // a nested table's sub-cell: Filter (Filter to, Click to filter), Copy with This nested table after This entire row
+      var lay = A().layout(); lay.cols.forEach(function (c) { if (c.colName === 'H_JSON') c.visible = true; }); A().applyLayout(lay); await sleep(600);
+      var FX = window.__rowsFixture, jid = fth('H_JSON').getAttribute('data-column'), jtd = null;
+      visTrs().some(function (tr) { var td = tr.querySelector('td[data-column="' + jid + '"]'); if (td && td.querySelector('.nested-json-row:not(.nested-total-row) .nested-json-cell')) { jtd = td; return true; } return false; });
+      var subc = jtd ? jtd.querySelector('.nested-json-row:not(.nested-total-row) .nested-json-cell') : null;
+      closeMenu(); rclick(subc);
+      var a11 = acts(); sub('filterMenu'); await sleep(100);
+      var l11 = subActs(); closeMenu(); rclick(subc); sub('copyMenu'); await sleep(100);
+      var l12 = subActs(); closeMenu();
+      R.info.nested = { acts: a11, filter: l11, copy: l12 };
+      R.chk.fmNestLists = !!subc && a11[0] === 'filterMenu' && l11.join() === 'cellFilter,clickFilter' && l12.join() === 'cellCopy,copyName,copyRow,copyNestedTable';
+      SUBS.copyNestedTable = 'copyMenu';
+      var jtr = jtd ? jtd.closest('tr') : null, jr = jtr ? FX[parseInt(jtr.cells[0].textContent, 10) - 1] : null;
+      var arr = (jr && jr.H_JSON) ? JSON.parse(jr.H_JSON.substring(6)) : [], ks = arr.length ? Object.keys(arr[0]).filter(function (x) { return x !== '__PNBDIFF'; }) : [];
+      var wantJ = arr.map(function (o) { return ks.map(function (x) { return x + ': ' + (o[x] == null ? '' : String(o[x]).trim()); }).join(', '); }).join('\n');
+      await choose(subc, 'copyNestedTable');
+      R.info.nestCopy = { got: (lastClip() || '').slice(0, 400), want: wantJ.slice(0, 400), toast: lastToast() };
+      R.chk.fmNestCopy = arr.length > 0 && lastClip() === wantJ && /Copied the nested table \(\d+ rows?\)/.test(lastToast());
+      // the cell around the table (no sub-cell): This nested table too
+      var pad = jtd;
+      closeMenu(); rclick(pad); sub('copyMenu'); await sleep(100);
+      var l13 = subActs(); closeMenu();
+      R.chk.fmNestPad = l13.indexOf('copyNestedTable') >= 0 && l13.indexOf('copyRow') >= 0;
+      lay = A().layout(); lay.cols.forEach(function (c) { if (c.colName === 'H_JSON') c.visible = false; }); A().applyLayout(lay); await sleep(400);
+      // '#' cell: no Filter list (nothing to filter by), This row alone still
+      var trn = visTrs()[4], num = trn ? trn.cells[0] : null;
+      closeMenu(); rclick(num);
+      var a14 = acts(); closeMenu();
+      R.chk.fmNumCell = a14.indexOf('filterMenu') < 0 && a14.indexOf('copyRow') >= 0;
+      // the keyboard: the cell's menu opens on Filter, ArrowRight enters it on Filter to
+      closeMenu(); rclick(cellAt('V_NAME', 6), true); await sleep(80);
+      function key(k) { document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })); }
+      var onF = !!document.activeElement && document.activeElement.getAttribute('data-act') === 'filterMenu';
+      key('ArrowRight'); await sleep(150);
+      var onTo = !!document.activeElement && document.activeElement.getAttribute('data-act') === 'cellFilter';
+      R.chk.fmKbd = onF && onTo;
+      closeMenu();
+    },
+    // (2026-10-27, copymenu) the grouped view: a cell's Copy list as the flat table's; This row reads the group table's own
+    // heading row
+    ggcopym: async function () {
+      function lastClip() { return window.__clip.length ? window.__clip[window.__clip.length - 1] : null; }
+      var tabs = Array.prototype.filter.call(document.querySelectorAll('#groupedResultsContainer table'), function (t) { return !!t.querySelector('thead th[data-colname="V_NAME"]') && !!t.querySelector('tbody tr td[data-column]'); });
+      var tb = tabs[0] || null, th = tb ? tb.querySelector('thead th[data-colname="V_NAME"]') : null, cid = th ? th.getAttribute('data-column') : null;
+      var tr = tb ? Array.prototype.filter.call(tb.querySelectorAll('tbody tr'), function (x) { return !x.classList.contains('search-hidden') && !!x.querySelector('td[data-column="' + cid + '"]'); })[0] : null;
+      var td = tr ? tr.querySelector('td[data-column="' + cid + '"]') : null;
+      closeMenu(); rclick(td);
+      var a = acts(); sub('copyMenu'); await sleep(100);
+      var l = subActs(); closeMenu();
+      R.info.grouped = { tables: tabs.length, acts: a, list: l };
+      R.chk.gcList = !!td && a.indexOf('copyMenu') >= 0 && l.join() === 'cellCopy,copyName,copyRow,copy';   // (2026-10-27, fltmenu)
+      var want = tr ? rowWant(tr, th.parentNode.children) : [];
+      await choose(td, 'copyRow');
+      R.info.gRow = { got: lastClip(), want: want.join('\n') };
+      R.chk.gcRow = want.length >= 5 && lastClip() === want.join('\n');
     },
     mexcl: async function () {
       var td = document.querySelector('#resultsTable tbody tr td a');

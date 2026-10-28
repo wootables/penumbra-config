@@ -93,6 +93,8 @@
   function closeMenu() { if (window.Penumbra && window.Penumbra.colMenu) window.Penumbra.colMenu.close(); }
   // an act inside the Column widths list is reached through it
   var SUBS = { fit: 'width', fitAll: 'width', fitPage: 'width', resetWidth: 'width', resetWidths: 'width' };
+  // (2026-10-27, copymenu) a cell's copies are one list, Copy (a heading's Copy column name stays alone)
+  ['cmpCopy', 'cmpCopyWas', 'cmpCopyRow', 'cmpCopyName'].forEach(function (a) { SUBS[a] = 'cmpCopyMenu'; });
   function openSub(a) { var it = item(a); if (!it || it.getAttribute('aria-disabled') === 'true') return false; it.click(); return true; }
   async function choose(el, act) {
     closeMenu();
@@ -164,11 +166,14 @@
     // to / Exclude (its two values differ: a compare-to-live filter runs on both sides and would split the pair)
     var td3 = cellIn(w, '3', 'AMOUNT');
     rclick(td3);
-    var a2 = acts();
-    rec('C2 a changed cell offers Copy this value and Copy the earlier value (no Filter to / Exclude), then the column\'s tools; its group under the name',
-      !!td3 && td3.classList.contains('snap-cell-modified') && J(a2) === J(['cmpCopy', 'cmpCopyWas', 'sortAsc', 'sortDesc', 'width', 'rowHeight', 'cmpCopyName', 'cmpBeforeAfter', 'cmpEditMatch', 'cmpCopyLink', 'cmpClear'])
-        && /Modified Rows/.test(subLine()),
-      'cell=' + (td3 ? td3.className : null) + ' acts=' + J(a2) + ' sub=' + subLine());
+    var a2 = acts(), l2 = openSub('cmpCopyMenu') ? subActs() : [];   // (2026-10-27, copymenu) the copies are one list, Copy
+    // C38 (2026-10-27, copymenu 3) the list opens under a static heading, Copy (no act)
+    var hd2 = (function () { var p = subPanel(), f = p ? p.firstElementChild : null; return f ? [f.className, f.getAttribute('role') || '', f.textContent.trim(), f.getAttribute('data-act') || ''] : []; })();
+    rec('C38 a comparison cell\'s Copy list opens under a static Copy heading', hd2.length === 4 && /(^| )pnb-hm-head( |$)/.test(hd2[0]) && hd2[1] === 'presentation' && hd2[2] === 'Copy' && hd2[3] === '', J(hd2));
+    rec('C2 a changed cell offers Copy (this value, the earlier value, the column name, this row; no Filter to / Exclude), then the column\'s tools; its group under the name',
+      !!td3 && td3.classList.contains('snap-cell-modified') && J(a2) === J(['cmpCopyMenu', 'sortAsc', 'sortDesc', 'width', 'rowHeight', 'cmpBeforeAfter', 'cmpEditMatch', 'cmpCopyLink', 'cmpClear'])
+        && J(l2) === J(['cmpCopy', 'cmpCopyWas', 'cmpCopyName', 'cmpCopyRow']) && /Modified Rows/.test(subLine()),   // (2026-10-27, fltmenu) the name before the row
+      'cell=' + (td3 ? td3.className : null) + ' acts=' + J(a2) + ' list=' + J(l2) + ' sub=' + subLine());
     closeMenu();
 
     // C24 the value a cell filters by: read as the search reads the stored value, as the report table's cell menu
@@ -215,7 +220,7 @@
       noteTh.setAttribute('data-colname', 'NOTE');
     }
     rec('C28 a cell offers Filter to / Exclude under its column\'s real name, and none under a name the report\'s table lacks (Copy this value stays)',
-      a28a.indexOf('cellFilter') === 0 && a28a.indexOf('cellExclude') === 1 && a28.length > 0 && a28.indexOf('cmpCopy') === 0 && a28.indexOf('cellFilter') < 0 && a28.indexOf('cellExclude') < 0,
+      a28a.indexOf('cellFilter') === 0 && a28a.indexOf('cellExclude') === 1 && a28.length > 0 && a28.indexOf('cmpCopyMenu') === 0 && a28.indexOf('cellFilter') < 0 && a28.indexOf('cellExclude') < 0,
       'real=' + J(a28a.slice(0, 3)) + ' renamed=' + J(a28));
 
     // C3 / C4 the copies: the current value and the snapshot's
@@ -227,6 +232,48 @@
     await sleep(100);
     var c4 = lastClip();
     rec('C4 Copy the earlier value copies the snapshot\'s value', c4 === '$150.00', 'clip=' + J(c4));
+    // C35 (2026-10-27, copymenu) Copy > This row: each column shown as "Name: value", one per line, a changed cell's current
+    // value with the earlier one after it, "(was: ...)"; the group column (__SNAP_TYPE) and '#' left out
+    function headTxt(h) { var c = h.cloneNode(true); Array.prototype.forEach.call(c.querySelectorAll('.sort-icon, .sr-only, button, [aria-hidden="true"], [class*="grip"]'), function (n) { n.remove(); }); return (c.textContent || '').replace(/\s+/g, ' ').trim() || h.getAttribute('data-colname'); }
+    var tr3 = td3 ? td3.closest('tr') : null, want35 = [];
+    if (tr3) Array.prototype.forEach.call(td3.closest('table').querySelectorAll('thead th'), function (h) {
+      var id = h.getAttribute('data-column'), nm = h.getAttribute('data-colname');
+      if (id === null || id === '__SNAP_TYPE' || nm === '#' || h.style.display === 'none') return;
+      var c = tr3.querySelector('td[data-column="' + id + '"]');
+      if (!c) return;
+      if (c.classList.contains('snap-cell-modified')) {
+        var nw = c.querySelector('.snap-ba-now-only'), wv = c.querySelector('.snap-ba-was-val'), wt = wv ? String(wv.innerText || wv.textContent || '').trim() : '';
+        want35.push(headTxt(h) + ': ' + String((nw || c).innerText || '').trim() + (wt === '' ? ' (was blank)' : ' (was: ' + wt + ')'));
+      } else want35.push(headTxt(h) + ': ' + String(c.innerText || '').trim());
+    });
+    await choose(td3, 'cmpCopyRow');
+    await sleep(100);
+    var c35 = lastClip() || '';
+    rec('C35 Copy > This row copies the row as Name: value lines, a changed value with its earlier one after it, the group column left out',
+      want35.length >= 3 && c35 === want35.join('\n') && c35.indexOf('AMOUNT: $300.00 (was: $150.00)') >= 0 && c35.indexOf('Modified Rows') < 0,
+      'clip=' + J(c35) + ' want=' + J(want35.join('\n')));
+    // C36 (2026-10-27, copymenu; the review) a changed cell's two values read as This row reads any cell: a nested table by its
+    // rows, the earlier one under "was:" (that view is hidden until Show before & after: never its rendered text - the sort
+    // arrows, the totals, the raw JSON); a value now blank says "(blank)"
+    var keep36 = td3 ? td3.innerHTML : '', c36 = '', c36b = '';
+    function nest36(k, v) {
+      return '<div class="nested-json-container data-grid-table"><div class="nested-json-header"><div class="nested-json-cell">' + k + '<span class="sort-icon">&#9650;&#9660;</span></div></div>'
+        + '<div class="nested-json-row"><div class="nested-json-cell">' + v + '</div></div><div class="nested-json-row nested-total-row"><div class="nested-json-cell"><strong>TOTAL</strong></div></div></div>'
+        + '<div class="raw-json-data" style="display:none">[{"' + k + '":"' + v + '"}]</div>';
+    }
+    if (td3) {
+      td3.innerHTML = '<span class="snap-ba-now-only">' + nest36('KEY', 'a1') + '</span><span class="snap-ba-pair"><span class="snap-ba-label">[was:]</span> <span class="snap-ba-was-val">' + nest36('KEY', 'a0')
+        + '</span><br><span class="snap-ba-label">[now:]</span> <span class="snap-ba-now-val">' + nest36('KEY', 'a1') + '</span></span>';
+      await choose(td3, 'cmpCopyRow'); await sleep(100);
+      c36 = lastClip() || '';
+      td3.innerHTML = '<span class="snap-ba-now-only"></span><span class="snap-ba-pair"><span class="snap-ba-label">[was:]</span> <span class="snap-ba-was-val">$150.00</span><br><span class="snap-ba-label">[now:]</span> <span class="snap-ba-now-val"></span></span>';
+      await choose(td3, 'cmpCopyRow'); await sleep(100);
+      c36b = lastClip() || '';
+      td3.innerHTML = keep36;
+    }
+    rec('C36 This row reads a changed nested table by its rows, the earlier one under was:, and a value now blank as (blank)',
+      /(^|\n)AMOUNT:\n  KEY: a1\n  was:\n    KEY: a0(\n|$)/.test(c36) && /(^|\n)AMOUNT: \(blank\) \(was: \$150\.00\)(\n|$)/.test(c36b),
+      'nested=' + J(c36) + ' blank=' + J(c36b));
 
     // C5 a group's band: the group's items (expand, show only, hide) and the comparison's, under the group's name
     var hd = w.querySelector('.group-header');
@@ -241,7 +288,7 @@
     // C6 an unchanged cell (in a changed row, and in an unchanged row): no earlier value
     var nm3 = cellIn(w, '3', 'NAME'), wu = wrapperOf('Unchanged Rows'), nm1 = wu ? cellIn(wu, '1', 'NAME') : null;
     rclick(nm3);
-    var a6a = acts();
+    var a6a = acts(), l6 = openSub('cmpCopyMenu') ? subActs() : [];   // (2026-10-27, copymenu) its Copy list: no earlier value
     closeMenu();
     rclick(nm1);
     var a6b = acts();
@@ -250,9 +297,10 @@
     await sleep(100);
     var c6 = lastClip();
     rec('C6 an unchanged cell offers its value (filter, copy) and the column\'s tools, in a changed row too, never an earlier value',
-      J(a6a) === J(['cellFilter', 'cellExclude', 'cmpCopy', 'sortAsc', 'sortDesc', 'width', 'rowHeight', 'cmpCopyName', 'cmpBeforeAfter', 'cmpEditMatch', 'cmpCopyLink', 'cmpClear']) && J(a6b) === J(a6a)
+      J(a6a) === J(['cellFilter', 'cellExclude', 'cmpCopyMenu', 'sortAsc', 'sortDesc', 'width', 'rowHeight', 'cmpBeforeAfter', 'cmpEditMatch', 'cmpCopyLink', 'cmpClear'])
+        && J(l6) === J(['cmpCopy', 'cmpCopyName', 'cmpCopyRow']) && J(a6b) === J(a6a)
         && c6 === 'Alpha' && /Unchanged Rows/.test(String(nm1 ? nm1.parentNode.textContent : '')),
-      'changedRow=' + J(a6a) + ' unchangedRow=' + J(a6b) + ' clip=' + J(c6));
+      'changedRow=' + J(a6a) + ' list=' + J(l6) + ' unchangedRow=' + J(a6b) + ' clip=' + J(c6));
 
     // C7 Show before & after: the control bar's toggle, ticked while on; again, off
     await choose(th, 'cmpBeforeAfter');
