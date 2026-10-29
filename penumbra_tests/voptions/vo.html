@@ -233,14 +233,14 @@
         // The twelfth card (Search Bar) costs one title line in the narrower cards:
         // grid 79 -> 93px, tab 420 -> 435px at 1677px (591 before the morning's pass).
         // Thirteen cards (Preset Sharing, 2026-10-22) = two rows at 1677px: grid 93 -> 134px, tab 435 -> 475px.
-        T('W9', 'the tab is short: the Layout column <= 170px, the grid <= 135px (two rows of cards), the whole tab <= 476px (231 / 173 / 591 before any of this)', r(layoutCol).h <= 170 && r(g).h <= 135 && r(tab).h <= 476, 'layout=' + r(layoutCol).h + ' grid=' + r(g).h + ' tab=' + r(tab).h);
+        T('W9', 'the tab is short: the Layout column <= 170px, the grid <= 135px (two rows of cards), the whole tab <= 512px (231 / 173 / 591 before any of this; 476 until the Cards card under Table Behavior, 2026-10-28)', r(layoutCol).h <= 170 && r(g).h <= 135 && r(tab).h <= 512, 'layout=' + r(layoutCol).h + ' grid=' + r(g).h + ' tab=' + r(tab).h);
         var ctf = document.getElementById('viewOptionClickFilter').closest('.view-option-item');
         var ci = cardInfo(ctf);
         T('W10', 'Table Behavior\'s Click-to-Filter card has the same in-line layout', ci.cbBeforeTitle && Math.abs(ci.cbDy) <= 1 && Math.abs(ci.smallLeftDx) <= 1 && ci.smallFull && !ci.overflowX, 'dy=' + ci.cbDy + ' dx=' + ci.smallLeftDx + ' full=' + ci.smallFull);
       }
       if (phase === 'compact') {
         // Two rows of cards since Preset Sharing (2026-10-22): 345 -> 376px.
-        T('C6', 'compact mode: the tab <= 377px (417 before any of this; two rows of cards since the thirteenth)', r(tab).h <= 377, 'tab=' + r(tab).h);
+        T('C6', 'compact mode: the tab <= 397px (417 before any of this; two rows of cards since the thirteenth; 377 until the Cards card under Table Behavior, 2026-10-28)', r(tab).h <= 397, 'tab=' + r(tab).h);
       }
       if (phase === 'dark') {
         var c0 = cards[0];
