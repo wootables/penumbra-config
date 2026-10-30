@@ -336,13 +336,14 @@ if ($mode) {
         $r = $edit(array('note_id' => 902, 'note_text' => 'x'), array('me' => 'pat', 'admin' => true));
         $A('E-author-admin', $r['status'] === 'error' && !$GLOBALS['EDIT']['updates'], 'an admin may delete, never reword: ' . json_encode($r));
         $r = $edit(array('note_id' => 902, 'note_text' => 'x'), array('later' => 1));
-        $A('E-notlatest', $r['status'] === 'error' && isset($r['code']) && $r['code'] === 'not_latest' && !$GLOBALS['EDIT']['updates'], json_encode($r));
+        $A('E-older', $r['status'] === 'success' && count($GLOBALS['EDIT']['updates']) === 1 && count($GLOBALS['EDIT']['audit']) === 1,
+            'an older note of yours, others having written since, edits too (2026-10-29) - and is audited: ' . json_encode($r));
         $n = $GLOBALS['DB']['note']; $n['SCOPE'] = 'report'; $n['ROW_KEY'] = null;
         $r = $edit(array('note_id' => 902, 'note_text' => 'x @kim', 'mentions' => array(array('user' => 'kim'))), array('note' => $n));
         $A('E-scope', $r['status'] === 'success' && count($GLOBALS['EDIT']['updates']) === 1 && $GLOBALS['EDIT']['mails'] === array('kim'),
             'a report-level note (the journal panel, round 7): ' . json_encode($r));
         $r = $edit(array('note_id' => 902, 'note_text' => 'x'), array('note' => $n, 'later' => 1));
-        $A('E-scope-latest', $r['status'] === 'error' && isset($r['code']) && $r['code'] === 'not_latest' && !$GLOBALS['EDIT']['updates'], 'only the newest report-level note: ' . json_encode($r));
+        $A('E-scope-older', $r['status'] === 'success' && count($GLOBALS['EDIT']['updates']) === 1, 'an older report-level note of yours too (2026-10-29): ' . json_encode($r));
         $n['SCOPE'] = 'weird';
         $r = $edit(array('note_id' => 902, 'note_text' => 'x'), array('note' => $n));
         $A('E-scope-bad', $r['status'] === 'error' && !$GLOBALS['EDIT']['updates'], 'an unknown scope is refused: ' . json_encode($r));

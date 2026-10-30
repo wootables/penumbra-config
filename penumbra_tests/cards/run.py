@@ -23,7 +23,7 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js', 'penumbra_tiles.js',
         'penumbra_a11y.js', 'penumbra_grouplist.js', 'penumbra_cellsel.js', 'penumbra_colfmt.js', 'penumbra_calc.js',
         'penumbra_colwidths.js', 'penumbra_colmenu.js']
-CSS = ['density.css', 'penumbra_colwidths.css', 'penumbra_grouplist.css', 'penumbra_cellsel.css', 'penumbra_colmenu.css']
+CSS = ['density.css', 'penumbra_colwidths.css', 'penumbra_grouplist.css', 'penumbra_cellsel.css', 'penumbra_colmenu.css', 'penumbra_find.css']
 
 args = sys.argv[1:]
 def opt(name, default=None):
@@ -49,7 +49,10 @@ RELS = {'main': os.path.join('js', 'main.js'), 'index': 'index.php', 'pal': os.p
         'cards': os.path.join('js', 'penumbra_cards.js'), 'cardscss': os.path.join('css', 'penumbra_cards.css'), 'maincss': os.path.join('css', 'main.css'),
         'topic': os.path.join('help', 'topics', 'viewoptionsHelpLightbox.php'), 'tip': os.path.join('help', 'tips', 'settings-tips-storage.php'),
         'manifest': os.path.join('help', 'manifest.php'), 'readme': 'README.md',
-        'menu': os.path.join('js', 'penumbra_colmenu.js')}   # (cmenu) the menu engine: the cards' menus go through it
+        'menu': os.path.join('js', 'penumbra_colmenu.js'),   # (cmenu) the menu engine: the cards' menus go through it
+        'find': os.path.join('js', 'penumbra_find.js'),   # (round K) Find paints on the cards
+        'ustopic': os.path.join('help', 'topics', 'userSettingsHelpLightbox.php'),   # (round L) Settings > Cards
+        'pftopic': os.path.join('help', 'topics', 'powerFeaturesHelpLightbox.php'), 'sptopic': os.path.join('help', 'topics', 'savePrefsHelpLightbox.php')}
 def read_b(p):
     if not os.path.exists(p): return ''
     return open(p, 'rb').read().decode('utf-8', 'surrogateescape')
@@ -60,9 +63,10 @@ T_NOCV = tok({'v': 1, 'm': 'flat', 'o': 'none'})   # a link without the card vie
 T_XL = tok({'v': 1, 'm': 'flat', 'o': 'none', 'cv': 1, 'cz': 'xl'})   # (cxl) a link to the cards at Extra large
 
 SCN = ['cauto', 'cguess', 'cpage', 'cfull', 'chl', 'cbar', 'cesc', 'coff', 'cviewer', 'pcoff', 'gcards', 'gcoll', 'gncoll', 'ggcards', 'gglnest', 'csize', 'cszvlA', 'cszvlB', 'cnarrowA', 'cnarrowT', 'cauth', 'cauthB', 'cauthM', 'cvlA', 'cvlB', 'cvlT', 'ca11y', 'cphone', 'cperf', 'cmore',
-       'cxl', 'cxlvl', 'cmenu', 'gmenu', 'pmenu', 'cmsize', 'gmsize', 'cdet', 'gdet', 'pdet', 'cdetph']
+       'cxl', 'cxlvl', 'cmenu', 'gmenu', 'pmenu', 'cmsize', 'gmsize', 'cdet', 'gdet', 'pdet', 'cdetph', 'cmword', 'curl1', 'curl2', 'curl3', 'curl4', 'cshare', 'cnote', 'cnotedet', 'ctmenu', 'cflink', 'ckword', 'cfind', 'gfind', 'cbarpick', 'csort', 'gsort', 'cempty', 'pfind', 'clayout', 'clayoutB', 'cdetrow', 'pvfind']
+T_CV = tok({'v': 1, 'm': 'flat', 'o': 'none', 'cv': 1, 'cz': 'compact'})   # (curl) a view link asking for compact cards
 CHK = {
-    'cauto': ['switchShown', 'tableDefault', 'toCards', 'tableKeptForReaders', 'count', 'guessTitle', 'guessBig', 'guessFields', 'guessNoExtras', 'parity', 'linkKept', 'filtered', 'sorted', 'prefSaved',
+    'cauto': ['switchShown', 'tableDefault', 'toCards', 'pagerWord', 'tableKeptForReaders', 'count', 'guessTitle', 'guessBig', 'guessFields', 'guessNoExtras', 'parity', 'linkKept', 'filtered', 'sorted', 'prefSaved',
               'roles', 'oneTabStop', 'arrowRight', 'arrowDown', 'enterSelects', 'escClears', 'clickSelects', 'toTable', 'prefTable', 'switchA11y'],
     # (csize) the author's default size, the viewer's size (pref), compact's parts, the form round trip; the link's cz; the phone default
     'csize': ['authorDefault', 'sizeControl', 'viewerCompact', 'compactParts', 'prefSize', 'backToStandard', 'formSize'],
@@ -74,7 +78,7 @@ CHK = {
     'chl': ['ruledPills', 'plainPills', 'pillMatchesCell'],
     'cbar': ['cellHasBar', 'barFromCell', 'barColor'],
     'cesc': ['noScript', 'tagAsText'],
-    'coff': ['switchHidden', 'hostHidden', 'notOffered', 'setRefused'],
+    'coff': ['switchHidden', 'hostHidden', 'notOffered', 'setRefused', 'offFlyout', 'offBack'],   # (round J: noTableFlyout gone - the option off offers it now)
     'cviewer': ['noForm', 'switchShown', 'cards'],
     # (pvtiles) the pivot as tiles: the switch shows, one tile per shown pivot row + the grand total first, the label / parents /
     # row total / column values from the cells, a fold followed, a value's click drills, the exit back to flat cards, a re-entry
@@ -83,10 +87,56 @@ CHK = {
     # (gfold) the bands fold as the table's: a band click, Enter on a band, Collapse all / Expand all, the fold kept across Table <-> Cards, a nested branch
     'gcoll': ['bandsOpen', 'bandClick', 'bandAgain', 'bandKey', 'collapseAll', 'expandAll', 'keptAcrossViews', 'focusKept'],
     'gncoll': ['nested', 'branchFolds', 'leafFolds'],
-    # (glist) the group List layout: only the picked group's cards, every band drawn; a band click picks; the list's
-    # own pick (its API) updates the cards live; the pick kept across Table <-> Cards; a nested branch pick = all its leaves
-    'ggcards': ['listOn', 'onePicked', 'allBands', 'pickClick', 'pickKey', 'listPick', 'keptAcrossViews'],
+    # (cardlist, rewritten from glist) the group List layout IN the cards: its own frame on screen (the list, the total,
+    # the picked group's band), the host parked in the picked group's box (no bands of its own), the box's table laid out
+    # out of sight; a list row's click / its keys / its API move the host; a rebuild parks it again; a restored copy of
+    # the view's HTML brings no second host; Table <-> Cards; a nested branch picked = every group under it, then a leaf
+    'ggcards': ['listOn', 'onePicked', 'frameShown', 'hostInBox', 'noBandsOfItsOwn', 'tableHidden', 'pickClick', 'pickKey', 'listPick', 'rebuildParks', 'restoreNoCopy', 'keptAcrossViews'],
     'gglnest': ['listOn', 'branchPick', 'leafPick'],
+    # (cardnotes) the Notes column in the card (the journal's real panel over a fake manage_journal.php): drawn when the
+    # journal paints it, the notes read again followed, every note in full, its label, the usual buttons, a text click
+    # stays, Add a note in the card, Escape keeps the text, a redraw carries the composer, Post / Reply / Edit / x, a
+    # card menu's Add a note, Quick actions' add a note on the selected card, a hidden Notes column draws none;
+    # the details window's notes, its Escape order, a post from it, a compact card's Add a note through it
+    'cnote': ['autoDraw', 'refreshFollows', 'fullText', 'label', 'buttons', 'oneLine', 'quietIcons', 'capConsistent', 'showAll', 'textClickStays', 'addOpens', 'composeOpens', 'escKeeps', 'carried', 'post', 'postKeepsShape', 'editOlder', 'topAligned', 'dblEdit', 'cardWording', 'capOff', 'reply', 'edit', 'del', 'menuAddNote', 'paletteNote', 'hiddenNone'],
+    'cnotedet': ['inDetails', 'addInDetails', 'escComposerFirst', 'escThenCloses', 'postInDetails', 'compactViaDetails'],
+    # (round I, cardsmenu) the table's own menus while the report offers cards: Show as cards (the sizes, the current one
+    # ticked; This row as a card from a value), a size picked, a row's details, a heading's list without the row
+    'ctmenu': ['flyout', 'pickSize', 'rowCard', 'headerFlyout'],
+    # (round J) a filter link on a card and in the details window (which closes); links styled as the table's in three
+    # themes; the field a menu is for in each theme's table-hover colour
+    'cflink': ['cardLink', 'detailsLink', 'linkThemed', 'hoverThemed'],
+    # (round K) a card's Copy reads This entire card and its toast the card's; a field's stats are over the cards (the
+    # table's still over the rows the filter keeps); the details window's menus have no Sort (a card's own still has)
+    'ckword': ['copyCardLabel', 'copyCardToast', 'copyFailCard', 'statsOverCards', 'detNoSort', 'detNoDoubleSep', 'cardKeepsSort', 'tableStatsRows'],
+    # (round K, cardfind) the search box's marks on the cards (none on the hidden table); a scoped term in a field the card
+    # does not show named on each card, the line opening the details (marked there), back after it closes; Find's
+    # matches on the cards and in the details, the current card outlined; a buried match named, its card scrolled to;
+    # one on the next page: the page turns, its card outlined and on screen; closing clears; the table's Find unchanged
+    'cfind': ['filterOnCards', 'filterBuriedNamed', 'foundOpensDetails', 'lineBackAfterClose', 'filterCleared', 'findOnCards', 'findCurOutlined',
+              'findInDetails', 'barOverDetails', 'findEscKeepsDetails', 'findBuriedNamed', 'findScrolled', 'findPageTurn', 'findCloseClears', 'tableFindUnchanged'],
+    'gfind': ['bandMarked', 'cellMarked', 'foldedRevealed', 'filterMarked'],
+    # (round K, barpick) the Bar list: text columns greyed out, number columns open, the picked text column kept, the
+    # other lists untouched
+    'cbarpick': ['textOff', 'numberOn', 'pickedKept', 'otherSlotsOpen', 'noneOpen'],
+    # (round L, csort) the Sort list: listed with the cards, a pick sorts the table (the cards follow), the arrow turns it,
+    # a sort made elsewhere reads back, none clears, gone with the table; grouped: every band sorted
+    'csort': ['listShown', 'sortSized', 'pickSorts', 'arrowShown', 'flip', 'readsBack', 'noneClears', 'tableHides'],
+    'gsort': ['bandsSorted', 'menuSortFollows'],
+    # (cempty) a blank field off its card, a filled one on; the other field always
+    'cempty': ['blankOff', 'filledOn', 'otherKept'],
+    # (pvfind) a row label marked on its tile, a value on its tile and outlined; in Compact a value the tile does not
+    # show named on it; the search's marks on the tiles' labels; no Sort list over tiles
+    'pfind': ['labelMarked', 'valueMarked', 'compactNamed', 'filterOnTiles', 'sortHidden'],
+    # (clayout) Settings > Cards: shown, a title and fields picked (drawn, kept with the size pref, never the report's),
+    # back to the report's; Quick actions opens it; a seeded layout drawn on load, the author's form untouched
+    'clayout': ['sectionShown', 'titlePicked', 'fieldsPicked', 'keptAsPref', 'authorUntouched', 'resetBack', 'paletteOpens'],
+    'clayoutB': ['seededDrawn', 'seededShown', 'formIsAuthors'],
+    # (the sweep) the details window keeps its row: a sort moves it, the window follows; a page turn closes it
+    'cdetrow': ['sortFollows', 'pageCloses'],
+    # (round M) a three-measure pivot in Compact: a value the tile does not show is named as the tile's field is (the
+    # column path and the measure)
+    'pvfind': ['namedAsField'],
     'cauth': ['formOff', 'setupShown', 'pickersListed', 'chipsListed', 'liveSwitch', 'stateOnEmpty', 'statePicks', 'fourLimit', 'drawnPicks', 'untickOff', 'stateOff'],
     'cauthB': ['formOn', 'pickersShow', 'chipsShow', 'roundTrip', 'switchShown', 'reedit'],
     'cauthM': ['missingListed', 'missingChip', 'guessFallsBack', 'keptField'],
@@ -104,8 +154,20 @@ CHK = {
     # own items, a card's empty area = the row's items alone, Card size list + pick, a link / Shift keep the browser's menu,
     # Shift+F10 / the Menu key on a focused card, Esc back to the card, Show as table
     'cmenu': ['valueMenu', 'extras', 'filterRuns', 'cardRowOnly', 'sizeList', 'sizePick', 'linkKeepsBrowser', 'shiftKeepsBrowser', 'keyboardOpens', 'escRefocus', 'menuKeyOpens', 'showTable'],
-    'gmenu': ['bandMenu', 'bandActs', 'bandKeyboard', 'bandRefocus', 'groupedValueMenu'],
-    'pmenu': ['tileValueMenu', 'tileLabelMenu', 'totalTileMenu', 'tileShowTable'],
+    'gmenu': ['bandMenu', 'bandNoColumn', 'bandActs', 'bandKeyboard', 'bandRefocus', 'groupedValueMenu'],
+    'pmenu': ['tileValueMenu', 'tileNoGrid', 'tileLabelMenu', 'totalTileMenu', 'tileShowTable'],
+    # (cardword) a card's menu: the grid-only items gone, "column" -> "field" everywhere, no doubled separator, Move field up / down /
+    # to top / to bottom (a move reorders the table's columns: the fields follow), Add a calculated field... (above / below / top /
+    # bottom), Show field(s); the table's own menu untouched
+    'cmword': ['gridOnlyHidden', 'noColumnWord', 'noDoubleSep', 'moveLabels', 'moveReflected', 'moveToast', 'calcLabels', 'subNoColumn', 'tableUnchanged'],
+    # (curl) by URL: the option off + ?cards=1&cardsize=xl (the switch, the cards at xl from the guesses, the pref untouched, no
+    # leak into the state, a switch writes the pref); the option on + a saved Table pick + ?cards=1; a saved cards pick +
+    # ?cards=0; the option off + a view link's cv / cz; the builder's Open as cards option
+    'curl1': ['switchShown', 'cardsOn', 'sizeXl', 'guessed', 'offeredNoOption', 'prefUntouched', 'stateNoLeak', 'switchWrites'],
+    'curl2': ['paramWins', 'prefStillTable'],
+    'curl3': ['tableForced', 'prefStillCards'],
+    'curl4': ['linkUnlocks', 'prefUntouched'],
+    'cshare': ['noCvOnTable', 'cardsForce', 'standardNoCz'],
     # (cmsize) the menus at each of the four sizes, picked through the viewer's list: a value, the card's empty area, a band
     'cmsize': ['value_compact', 'area_compact', 'value_standard', 'area_standard', 'value_large', 'area_large', 'value_xl', 'area_xl', 'blankSelectionIgnored', 'textSelectionKeepsBrowser'],
     'gmsize': ['value_compact', 'band_compact', 'value_standard', 'band_standard', 'value_large', 'band_large', 'value_xl', 'band_xl'],
@@ -114,7 +176,7 @@ CHK = {
     # position, Next / Left, Escape back to the card, the filter respected, a value's menu inside (its cell), the menu's
     # Escape leaves the window, Open details from a card's menu, the API for the selected card; grouped: across a band;
     # a pivot tile: its parts, Next, Show the breakdown; a phone: the full-screen sheet
-    'cdet': ['clickOpens', 'header', 'shownColumns', 'values', 'noHidden', 'position', 'next', 'prevKey', 'escCloses', 'filtered', 'menuInside', 'menuEscKeepsOpen', 'openFromMenu', 'apiOpen'],
+    'cdet': ['clickOpens', 'header', 'shownColumns', 'values', 'noHidden', 'position', 'next', 'prevKey', 'escCloses', 'filtered', 'menuInside', 'menuMark', 'menuMarkGoes', 'menuEscKeepsOpen', 'openFromMenu', 'apiOpen'],
     'gdet': ['opensInGroup', 'nextCrossesBand', 'countAll'],
     'pdet': ['tileOpens', 'tileFields', 'nextTile', 'breakdownButton'],
     'cdetph': ['sheet', 'noHScroll'],
@@ -150,8 +212,147 @@ GUARDS |= {'L-cdetph-noHScroll'}   # (holds on live: a phone page with no window
 NEW = ({'L-%s-%s' % (s, c) for s in ('cdet', 'gdet', 'pdet', 'cdetph') for c in CHK[s]}
        | {'L-cauto-enterSelects', 'L-cauto-escClears', 'L-cauto-clickSelects', 'S-detRow', 'S-detHelp', 'S-detCss'}) - GUARDS   # (cdet: the details window; Enter / a click open it now)
 NEW = set()   # (cdet is LIVE since 76b3a42, 2026-10-28: old checks now)
+GUARDS |= {'L-cmword-tableUnchanged', 'L-cmword-moveReflected', 'L-gmenu-bandNoColumn'}   # (hold on live: the table's labels; a move redraws the cards there too; a band's menu never said column)
+NEW = ({'L-cmword-%s' % c for c in CHK['cmword']} | {'L-gmenu-bandNoColumn', 'L-pmenu-tileNoGrid', 'S-wordHelp'}) - GUARDS   # (cardword; tileNoGrid is red on live by the Open details title's "column")
+NEW = set()   # (cardword is LIVE, 2026-10-29)
+GUARDS |= {'L-curl1-prefUntouched', 'L-curl1-stateNoLeak', 'L-curl2-prefStillTable', 'L-curl3-prefStillCards', 'L-curl4-prefUntouched', 'L-cshare-noCvOnTable'}   # (hold on live: nothing is written there either; no cv on a table)
+NEW = ({'L-%s-%s' % (s, c) for s in ('curl1', 'curl2', 'curl3', 'curl4', 'cshare') for c in CHK[s]} | {'S-emailCards', 'S-urlHelp'}) - GUARDS   # (curl)
+NEW = set()   # (curl is LIVE, 2026-10-29: old checks now)
+GUARDS |= {'L-ggcards-onePicked'}   # (holds on live: it drew the picked group's cards alone, under bands of its own)
+NEW = ({'L-ggcards-%s' % c for c in CHK['ggcards']} | {'L-gglnest-%s' % c for c in CHK['gglnest']}
+       | {'L-%s-%s' % (s, c) for s in ('cnote', 'cnotedet') for c in CHK[s]} | {'S-noteApi', 'S-noteHelp', 'S-listHelp', 'S-noteRow'}) - GUARDS   # (cardnotes + cardlist)
+NEW = set()   # (cardnotes + cardlist are LIVE since 934b7cb, 2026-10-29: old checks now)
+GUARDS |= {'L-coff-noTableFlyout'}   # (holds on live: no table menu offers cards there)
+NEW = ({'L-cnote-%s' % c for c in ('oneLine', 'quietIcons', 'capConsistent', 'showAll', 'composeOpens', 'postKeepsShape', 'dblEdit', 'cardWording', 'capOff')}
+       | {'L-ctmenu-%s' % c for c in CHK['ctmenu']} | {'L-cauto-pagerWord', 'L-cdet-menuMark', 'L-cdet-menuMarkGoes', 'S-roundI'}) - GUARDS   # (round I)
+NEW = set()   # (round I is LIVE since 53cf6c0, 2026-10-29: old checks now)
+NEW = ({'L-cflink-%s' % c for c in CHK['cflink']} | {'L-cnote-editOlder', 'L-coff-offFlyout', 'L-coff-offBack', 'S-roundJ'}) - GUARDS   # (round J)
+NEW = set()   # (round J is LIVE since e0fcd22, 2026-10-29: old checks now)
+GUARDS |= {'L-ckword-cardKeepsSort', 'L-ckword-tableStatsRows', 'L-cfind-tableFindUnchanged', 'L-cbarpick-numberOn', 'L-cbarpick-pickedKept',
+           'L-cbarpick-otherSlotsOpen', 'L-cbarpick-noneOpen'}   # (hold on live: the card's and the table's menus, Find on the table, the open lists)
+NEW = ({'L-%s-%s' % (s, c) for s in ('ckword', 'cfind', 'gfind', 'cbarpick') for c in CHK[s]} | {'S-roundK', 'S-pager'}) - GUARDS   # (round K)
+NEW = set()   # (round K is LIVE, 2026-10-30: old checks now)
+GUARDS |= {'L-pfind-sortHidden', 'L-cempty-filledOn', 'L-cempty-otherKept'}   # (hold on live: no list over tiles; filled fields drawn)
+NEW = ({'L-%s-%s' % (s, c) for s in ('csort', 'gsort', 'cempty', 'pfind', 'clayout', 'clayoutB', 'cdetrow') for c in CHK[s]} | {'S-roundL'}
+       | {'L-cdet-menuEscKeepsOpen', 'L-cdet-menuMarkGoes', 'L-cfind-barOverDetails', 'L-cfind-findEscKeepsDetails', 'L-ckword-copyCardToast', 'L-cmword-moveToast'}) - GUARDS   # (round L; the two: the live Escape bug the sweep found, the harness now loading as index.php)
+NEW = set()   # (round L is LIVE since 2461028, 2026-10-30: old checks now)
+NEW = {'L-csort-sortSized', 'L-ckword-copyFailCard', 'L-pvfind-namedAsField'}   # (round M)
+NEW = set()   # (round M is LIVE, 2026-10-30: old checks now)
 
 MUTANTS = {
+    # (round L, csort) no Sort list; a pick that sorts nothing; the arrow dead; the list not reading the table's sort back;
+    # the flat heading in a grouped view (one table sorted, the bands not); a list over pivot tiles
+    'm-sortlist': ([('cards', "        var show = on() && !H.inPivot() && !!HM();\n        s.hidden = !show;", "        var show = false;\n        s.hidden = !show;")], ['L-csort-listShown'], ['csort']),
+    'm-sortpick': ([('cards', "            if (th) A.sort(th, (now && now.name === name) ? now.dir : 'asc');\n", "")], ['L-csort-pickSorts'], ['csort']),
+    'm-sortflip': ([('cards', "        if (A && th) A.sort(th, now.dir === 'asc' ? 'desc' : 'asc');\n", "")], ['L-csort-flip'], ['csort']),
+    'm-sortback': ([('cards', "        var want = now ? now.name : '';\n", "        var want = s.value;\n")], ['L-csort-readsBack'], ['csort']),
+    # (the sweep) the details window taking an Escape from the engine's menu; the grouped tables' sort unwatched
+    'm-escmenu': ([('cards', "        if (e.target && e.target.closest && e.target.closest('.pnb-hm, .pnb-hp, #pnbFindBar')) return;\n", "")], ['L-cdet-menuEscKeepsOpen', 'L-cfind-findEscKeepsDetails'], ['cdet', 'cfind']),
+    'm-escfind': ([('cards', "e.target.closest('.pnb-hm, .pnb-hp, #pnbFindBar')) return;", "e.target.closest('.pnb-hm, .pnb-hp')) return;")], ['L-cfind-findEscKeepsDetails'], ['cfind']),
+    'm-gsortmo': ([('cards', "                    if (t.tagName === 'TBODY' && !t.closest('#pnbCardsHost')) { clearTimeout(sortTimer); sortTimer = setTimeout(function () { if (on()) draw(); }, 40); return; }\n", "")], ['L-gsort-bandsSorted', 'L-gsort-menuSortFollows'], ['gsort']),
+    'm-detgone': ([('cards', "        if (det.tr && !(hostApi() && H.inPivot())) {\n            var di = detRows().indexOf(det.tr);", "        if (false) {\n            var di = detRows().indexOf(det.tr);")], ['L-cdetrow-pageCloses', 'L-cdetrow-sortFollows'], ['cdetrow']),   # (no row kept: by position, as live was)
+    'm-detfollow': ([('cards', "            det.at = di;\n        }\n", "        }\n")], ['L-cdetrow-sortFollows'], ['cdetrow']),
+    'm-menuimm': ([('cards', "        e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();\n        openMenu(e.target, e);", "        e.preventDefault(); e.stopPropagation();\n        openMenu(e.target, e);")], ['L-ckword-copyCardToast', 'L-cmword-moveToast'], ['ckword', 'cmword']),
+    # (round M) the Sort list back to the browser's size; the card's copy failure in the row's words; a pivot cell named
+    # without its measure
+    'm-sortsize': ([('cardscss', "#pnbCardsSort { align-self: center; margin-left: 4px; font-size: 11px; padding: 1px 2px; max-width: 15em; }\n", "")], ['L-csort-sortSized'], ['csort']),
+    'm-failcard': ([('menu', "copyText(l.join('\\n'), msg, fromCard ? 'The card could not be copied.' : 'The row could not be copied.');", "copyText(l.join('\\n'), msg, 'The row could not be copied.');")], ['L-ckword-copyFailCard'], ['ckword']),
+    'm-pvmeasure': ([('cards', "        return ck + (ms.length > 1 && ms[ai] ? ' ' + ms[ai] : '');", "        return ck;")], ['L-pvfind-namedAsField'], ['pvfind']),
+    'm-barover': ([('cardscss', "body.pnb-cdet-open .pnb-find-bar { z-index: 20001; }\n", "")], ['L-cfind-barOverDetails'], ['cfind']),
+    'm-sortgrp': ([('cards', "        if (hostApi() && H.inGroup()) {\n            var ths = document.querySelectorAll('#groupedResultsContainer", "        if (false) {\n            var ths = document.querySelectorAll('#groupedResultsContainer")], ['L-gsort-bandsSorted'], ['gsort']),
+    'm-sortpivot': ([('cards', "        var show = on() && !H.inPivot() && !!HM();\n        s.hidden = !show;", "        var show = on() && !!HM();\n        s.hidden = !show;")], ['L-pfind-sortHidden'], ['pfind']),
+    # (cempty) every field drawn, blank or not
+    'm-empty': ([('cards', "    function filled(td) { return !!td && (td.textContent.trim() !== ''", "    function filled(td) { return !!td || (td.textContent.trim() !== ''")], ['L-cempty-blankOff'], ['cempty']),
+    # (pvfind) the mirror off on pivot tiles; a pivot cell keyed by column name (none); a buried cell named by its key;
+    # the search's marks on tiles through the rows' path
+    'm-pvon': ([('cards', "    function findOn() { return on() && !!hostApi(); }", "    function findOn() { return on() && !!hostApi() && !H.inPivot(); }")], ['L-pfind-labelMarked', 'L-pfind-valueMarked', 'L-pfind-filterOnTiles'], ['pfind']),
+    'm-pvkey': ([('cards', "            return lab ? '@label' : '#' + td.cellIndex;\n", "            return '';\n")], ['L-pfind-labelMarked', 'L-pfind-valueMarked'], ['pfind']),
+    'm-pvlabel': ([('cards', "        if (!td || !(td.closest && td.closest('#pivotResultTable'))) return key;", "        return key;")], ['L-pfind-compactNamed'], ['pfind']),
+    'm-pvmarks': ([('find', "        if (view === 'pivot') { paintTileMarks(M, rows, terms, reg); return; }\n", "")], ['L-pfind-filterOnTiles'], ['pfind']),
+    # (clayout) the viewer's layout never drawn; never kept; Use the report's keeping it; the section never shown; main.js
+    # never reading it back
+    'm-layover': ([('cards', "        var cfg = withViewer(report || {}), by = hd.byName,", "        var cfg = report || {}, by = hd.byName,")], ['L-clayout-titlePicked', 'L-clayoutB-seededDrawn'], ['clayout', 'clayoutB']),
+    'm-laysave': ([('cards', "        try { H.layoutSet(v); } catch (e) { }\n", "")], ['L-clayout-keptAsPref'], ['clayout']),
+    'm-layreset': ([('cards', "        try { H.layoutSet(null); } catch (e) { }\n", "")], ['L-clayout-resetBack'], ['clayout']),
+    'm-laysec': ([('cards', "        var show = (offered() || on()) && !H.inPivot() && !!H.layoutSet;\n        sec.hidden = !show;", "        var show = (offered() || on()) && !H.inPivot() && !!H.layoutSet;\n        sec.hidden = true;")], ['L-clayout-sectionShown'], ['clayout']),
+    'm-mainlay': ([('main', "                return (e && e.cards && typeof e.cards === 'object') ? e.cards : null;", "                return null;")], ['L-clayoutB-seededDrawn', 'L-clayoutB-seededShown'], ['clayoutB']),
+    # (round K) the card's row words left as the table's; the copy toast the row's; sort kept in the details window
+    'm-cardrow': ([('menu', "        return String(s).replace(/\\bThis entire row\\b/g, 'This entire card')", "        return String(s); String(s).replace(/\\bThis entire row\\b/g, 'This entire card')")], ['L-ckword-copyCardLabel', 'L-ckword-statsOverCards'], ['ckword']),
+    'm-cardtoast': ([('menu', "                var msg = fromCard ? 'Copied the card ('", "                var msg = false ? 'Copied the card ('")], ['L-ckword-copyCardToast'], ['ckword']),
+    'm-detsort': ([('cards', "        if (t.inDetails) out = out.filter(function (it) { return !(it && it.act && SORT_ACTS[it.act]); });\n", "")], ['L-ckword-detNoSort'], ['ckword']),
+    # (cardfind) no mirror at all; Find's matches / the search's marks painted on the table, not the cards; the current
+    # match revealed in the table; a card not drawn yet never revealed; a group's name not marked; the line's click, the
+    # repaint on closing the details, the details' parts, the line's place, the outline's CSS gone
+    'm-nomirror': ([('find', "    function cardsMirror() {\n        if (dlg) { return null; }", "    function cardsMirror() {\n        if (true) { return null; }")],
+                   ['L-cfind-filterOnCards', 'L-cfind-findOnCards', 'L-cfind-findBuriedNamed', 'L-gfind-bandMarked', 'L-gfind-filterMarked'], ['cfind', 'gfind']),
+    'm-paintcards': ([('find', "        if (M) { paintCards(M); return; }   // (cardfind)\n", "")], ['L-cfind-findOnCards', 'L-cfind-findCurOutlined', 'L-cfind-findBuriedNamed'], ['cfind']),
+    'm-cardmarks': ([('find', "        if (M) { paintCardMarks(M, terms, reg, view); return; }   // (cardfind)\n", "")], ['L-cfind-filterOnCards', 'L-cfind-filterBuriedNamed'], ['cfind']),
+    'm-reveal': ([('find', "        if (Mf && td) { Mf.reveal(hit.tr); } else if", "        if (false) { Mf.reveal(hit.tr); } else if")], ['L-cfind-findScrolled'], ['cfind']),
+    'm-wanted': ([('cards', "        if (!card) { findWanted = tr; return false; }", "        if (!card) { return false; }")], ['L-cfind-findPageTurn', 'L-gfind-foldedRevealed'], ['cfind', 'gfind']),
+    'm-band': ([('find', "                if (bl && reg && (rm > 0 || k === cur)) {", "                if (false) {")], ['L-gfind-bandMarked'], ['gfind']),
+    'm-foundclick': ([('cards', "        if (fd) { e.preventDefault(); var fc = fd.closest('.pnb-card'); focusAt = cardIndex(fc); roving(); selectOnly(fc); openDetails(fc); return; }\n", "")], ['L-cfind-foundOpensDetails'], ['cfind']),
+    'm-detclose': ([('cards', "        if (P.find && typeof P.find.paged === 'function') { try { P.find.paged(); } catch (e) { } }   // (cardfind) its matches named on the card again\n", "")], ['L-cfind-lineBackAfterClose'], ['cfind']),
+    'm-detparts': ([('cards', "        if (det.open && dl && cards()[det.at] === card) add(dl.querySelector('.pnb-cdet-body'));\n", "")], ['L-cfind-foundOpensDetails', 'L-cfind-findInDetails'], ['cfind']),
+    'm-lineplace': ([('cards', "                card.insertBefore(b, at ? at.nextSibling : card.firstChild);", "                card.insertBefore(b, null);")], ['L-cfind-filterBuriedNamed'], ['cfind']),
+    'm-findcss': ([('cardscss', "#pnbCardsHost .pnb-card.is-find-cur { outline: 2px solid var(--pnb-find-cur-bg, #8f6c00); outline-offset: 1px; }\n", "")], ['L-cfind-findCurOutlined'], ['cfind']),
+    # (barpick) nothing greyed out; the picked column greyed out too
+    'm-barpick': ([('cards', "            var off = slot === 'bar' && c.name !== current && !canBar(c, props);   // (barpick) listed, greyed out", "            var off = false;")], ['L-cbarpick-textOff'], ['cbarpick']),
+    'm-barkept': ([('cards', "            var off = slot === 'bar' && c.name !== current && !canBar(c, props);   // (barpick) listed, greyed out", "            var off = slot === 'bar' && !canBar(c, props);")], ['L-cbarpick-pickedKept'], ['cbarpick']),
+    # (round J) the card containers out of main.js's filter-link handler; the window left open after one; the Light Sepia
+    # link colour / the links' underline / the Light Sepia hover colour gone; Edit on your newest note only
+    'm-flinkmain': ([('main', ", #pnbCardsHost a[data-search], #pnbCardDetails a[data-search]', function (e) {", "', function (e) {")], ['L-cflink-cardLink', 'L-cflink-detailsLink'], ['cflink']),
+    'm-flinkclose': ([('cards', "        if (e.target.closest('[data-col] a[data-search]')) { closeDetails(false); return; }\n", "")], ['L-cflink-detailsLink'], ['cflink']),
+    'm-linktheme': ([('cardscss', ".theme-light-sepia #pnbCardsHost [data-col] a, .theme-light-sepia #pnbCardDetails [data-col] a { color: var(--brand-text, #8c6e54); }\n", "")], ['L-cflink-linkThemed'], ['cflink']),
+    'm-linkdeco': ([('cardscss', "#pnbCardsHost [data-col] a, #pnbCardDetails [data-col] a { text-decoration: none; }\n", "")], ['L-cflink-linkThemed'], ['cflink']),
+    'm-hovertheme': ([('cardscss', "body.theme-light-sepia { --pnb-card-hover: #dcd5c9; }\n", "")], ['L-cflink-hoverThemed'], ['cflink']),
+    'm-editolder': ([('main', "            var mine = function (x) { return !!me && String(x.CREATED_BY || '').toLowerCase() === me; };", "            var mine = function (x) { return x === notes[notes.length - 1] && !!me && String(x.CREATED_BY || '').toLowerCase() === me; };")], ['L-cnote-editOlder'], ['cnote']),
+    # (round I) the note line / its shape after a post / the double-click; the icons' frame; the cap / Show all / the focus
+    # opening a cut card / Consistent Row Height read; the table's flyout / its row item / offered; the pager; "this card";
+    # the menu-target mark
+    'm-noteline': ([('main', "            if (inline) return inlineItemHtml(n, isReply, author, body, canEdit, canDel);   // (cardnotes 2) a card's\n", "")], ['L-cnote-oneLine'], ['cnote']),
+    'm-noteshape': ([('main', "$panel.find('.journal-rownote-list').html(renderRowNoteList(rowKey, kind, $panel.hasClass('journal-rownote-inline')));\n                        $panel.find('.journal-rownote-railmeta').html(rowNoteRailMetaHtml(rowKey, kind));\n                        if (window.Penumbra.hydrateMentionPills) window.Penumbra.hydrateMentionPills($panel, jReportId());\n                        scheduleApply();\n                        if (isPivot)", "$panel.find('.journal-rownote-list').html(renderRowNoteList(rowKey, kind));\n                        $panel.find('.journal-rownote-railmeta').html(rowNoteRailMetaHtml(rowKey, kind));\n                        if (window.Penumbra.hydrateMentionPills) window.Penumbra.hydrateMentionPills($panel, jReportId());\n                        scheduleApply();\n                        if (isPivot)")], ['L-cnote-postKeepsShape'], ['cnote']),
+    'm-notedbl': ([('main', "            $(eb).trigger('click');\n", "")], ['L-cnote-dblEdit'], ['cnote']),
+    'm-noteicons': ([('cardscss', "#pnbCardsHost .journal-rownote-inline .journal-rownote-act button,\n#pnbCardDetails .journal-rownote-inline .journal-rownote-act button {\n    display: inline-flex;", "#pnbCardsHost .journal-rownote-inline .journal-rownote-act button-x,\n#pnbCardDetails .journal-rownote-inline .journal-rownote-act button-x {\n    display: inline-flex;")], ['L-cnote-quietIcons'], ['cnote']),
+    'm-capnone': ([('cards', "    function paintCap() { var el = hostEl(), cap = capPx(); if (el) el.style.setProperty('--pnb-card-cap', cap ? cap + 'px' : 'none'); return cap; }", "    function paintCap() { var el = hostEl(), cap = capPx(); if (el) el.style.setProperty('--pnb-card-cap', 'none'); return cap; }")], ['L-cnote-capConsistent'], ['cnote']),
+    'm-showall': ([('cards', "        if (mb) { e.preventDefault(); var mc = mb.closest('.pnb-card'); setOpen(mc, !mc.classList.contains('is-open')); return; }\n", "")], ['L-cnote-showAll'], ['cnote']),
+    'm-capfocus': ([('cards', "            if (e.target.closest('.journal-rownote-compose') || tr2.bottom > cr2.bottom - 40) setOpen(card, true);\n", "")], ['L-cnote-composeOpens'], ['cnote']),
+    'm-capswitch': ([('cards', "        if (!document.body.classList.contains('disable-auto-expand')) return CAP_PX[sz] || CAP_PX.standard;", "        return CAP_PX[sz] || CAP_PX.standard;")], ['L-cnote-capOff'], ['cnote']),
+    'm-flyout': ([('menu', "            var tx = window.Penumbra.cards.tableItems(cur);", "            var tx = null;")], ['L-ctmenu-flyout', 'L-ctmenu-pickSize'], ['ctmenu']),
+    'm-flyoutrow': ([('cards', "        for (var k = 0; k < cs.length; k++) if (parseInt(cs[k].getAttribute('data-row'), 10) === i) { focusAt = k; roving(); selectOnly(cs[k]); openDetails(cs[k]); return; }\n", "")], ['L-ctmenu-rowCard'], ['ctmenu']),
+    # (round J, cardsmenu 2: m-flyoutoff retired - the option off offers the flyout now) the pick's ask; the flyout gated on the option
+    'm-offask': ([('cards', "        menuAsk = true;   // (cardsmenu 2) a report whose Cards option is off shows them too, for the visit\n", "")], ['L-coff-offFlyout', 'L-coff-offBack'], ['coff']),
+    'm-offgate': ([('cards', "        if (!hostApi() || !allowed() || on() || !c || !c.th || !c.th.closest) return null;   // (cardsmenu 2) the option on or off", "        if (!hostApi() || !offered() || on() || !c || !c.th || !c.th.closest) return null;")], ['L-coff-offFlyout', 'L-coff-offBack'], ['coff']),
+    'm-pager': ([('cards', "        paintSize();\n        paintPager();\n", "        paintSize();\n")], ['L-cauto-pagerWord'], ['cauto']),
+    'm-cardword': ([('cards', "String(it.label || '').replace(/\\bthis row\\b/, 'this card')", "String(it.label || '')")], ['L-cnote-cardWording'], ['cnote']),
+    'm-menumark': ([('cards', "            markMenuPart(t, target);   // (cardhover)\n", "")], ['L-cdet-menuMark'], ['cdet']),
+    # (cardlist) the List layout: never parked; the frame left hidden; the box's table left drawn; a restored copy kept;
+    # the host left in the box under the table; a branch's rows not gathered
+    'm-listbox': ([('cards', "        var box = (grouped && listOn()) ? listBox() : null, listWait = grouped && !box && listOn();", "        var box = null, listWait = false;")], ['L-ggcards-hostInBox', 'L-ggcards-noBandsOfItsOwn'], ['ggcards']),
+    'm-listframe': ([('cardscss', "body.pnb-cards-on.pnb-gl-on #groupedResultsContainer {\n    position: static !important;", "body.pnb-cards-on.pnb-gl-on #groupedResultsContainer-x {\n    position: static !important;")], ['L-ggcards-frameShown'], ['ggcards']),
+    'm-listhide': ([('cardscss', "body.pnb-cards-on.pnb-gl-on #groupedResultsContainer .group-wrapper.pnb-gl-sel > .group-content > :not(#pnbCardsHost) {\n    position: absolute !important;", "body.pnb-cards-on.pnb-gl-on #groupedResultsContainer .group-wrapper.pnb-gl-sel > .group-content > :not(#pnbCardsHost):not(table) {\n    position: absolute !important;")], ['L-ggcards-tableHidden'], ['ggcards']),
+    'm-listcopy': ([('cards', "                for (var i = 0; i < copies.length; i++) if (copies[i] !== hostRef) copies[i].parentNode.removeChild(copies[i]);\n", "")], ['L-ggcards-restoreNoCopy'], ['ggcards']),
+    'm-listhome': ([('cards', "            unpark();   // (cardlist) out of a List group's box\n", "")], ['L-ggcards-keptAcrossViews'], ['ggcards']),
+    'm-listrows': ([('cards', "        if (w.classList.contains('group-leaf')) return leafRows(w);\n", "        return leafRows(w);\n")], ['L-gglnest-branchPick'], ['gglnest']),
+    # (cardnotes) the notes button again; a hidden Notes column drawn; no composer carried; Escape not the notes'; a text
+    # click opens the window; a card menu's Add a note to the note card; the window's button; Quick actions' card never
+    # found; main.js: the card view not redrawn with the column, the panels not refreshed, Post / Reply / Edit / x not
+    # taught the inline panel, the composer left open after a post
+    'm-notebutton': ([('cards', "        return J ? J.html(nb.getAttribute('data-row-key') || '', notesLbl) : nb.outerHTML;", "        return nb.outerHTML;")], ['L-cnote-autoDraw', 'L-cnote-addOpens'], ['cnote']),
+    'm-notehidden': ([('cards', "        notesOn = !!th && th.style.display !== 'none';", "        notesOn = !!th;")], ['L-cnote-hiddenNone'], ['cnote']),
+    'm-notelift': ([('cards', "        var out = [], ps = root ? root.querySelectorAll('.journal-rownote-inline.is-composing') : [];", "        var out = [], ps = [];")], ['L-cnote-carried'], ['cnote']),
+    'm-noteesc': ([('cards', "            if (esc && !e.defaultPrevented && P.journalInlineNotes && P.journalInlineNotes.escape(e.target)) { e.preventDefault(); e.stopPropagation(); return; }\n", "")], ['L-cnote-escKeeps', 'L-cnotedet-escComposerFirst'], ['cnote', 'cnotedet']),
+    'm-noteclick': ([('cards', "        if (e.target.closest('a, button, input, select, textarea, .journal-notes-btn, .journal-rownote-inline')) return;   // (cardnotes) the notes are read and written in place", "        if (e.target.closest('a, button, input, select, textarea, .journal-notes-btn')) return;")], ['L-cnote-textClickStays'], ['cnote']),
+    'm-notemenu': ([('cards', "title: it.title, run: function () { if (!addNoteIn(t.card, !!t.inDetails)) it.run(); } };", "title: it.title, run: function () { it.run(); } };")], ['L-cnote-menuAddNote', 'L-cnotedet-compactViaDetails'], ['cnote', 'cnotedet']),   # (re-anchored, round I: the label line changed)
+    'm-notedet': ([('cards', "        var nb = notesOn ? tr.querySelector('.journal-notes-btn') : null;\n        if (nb) h += '<div class=\"pnb-cdet-notes\">'", "        var nb = notesOn ? tr.querySelector('.journal-notes-btn') : null;\n        if (nb) h += nb.outerHTML; if (false) h += '<div class=\"pnb-cdet-notes\">'")], ['L-cnotedet-inDetails'], ['cnotedet']),
+    'm-notepal': ([('cards', "        if (!nb || nb.disabled) return null;\n        return { card: card,", "        return null;\n        return { card: card,")], ['L-cnote-paletteNote'], ['cnote']),
+    'm-jredraw': ([('main', "                try { if (window.Penumbra.cards && window.Penumbra.cards.redraw) window.Penumbra.cards.redraw(); } catch (e) { }   // (cardnotes) the cards' Notes too\n", "")], ['L-cnote-autoDraw'], ['cnote']),
+    'm-jrefresh': ([('main', "            refreshInlineNotes();   // (cardnotes) the notes drawn in the cards follow the notes as read now\n", "")], ['L-cnote-refreshFollows'], ['cnote']),
+    'm-jpost': ([('main', "            var $card = $(this).closest('.journal-pvnote-card, .journal-rownote-inline');   // (cardnotes) or a card's own notes\n            if (!$card.length) return;\n            postRowNote(", "            var $card = $(this).closest('.journal-pvnote-card');\n            if (!$card.length) return;\n            postRowNote(")], ['L-cnote-post', 'L-cnotedet-postInDetails'], ['cnote', 'cnotedet']),
+    'm-jreply': ([('main', "            if ($panel.hasClass('journal-rownote-inline') && !inlineCompose($panel[0])) return;   // (cardnotes) its composer opens first\n", "")], ['L-cnote-reply'], ['cnote']),
+    'm-jedit': ([('main', "            var $card = $(this).closest('.journal-pvnote-card, .journal-rownote-inline');   // (cardnotes) or a card's own notes\n            var $panel = $card.find(", "            var $card = $(this).closest('.journal-pvnote-card');\n            var $panel = $card.find(")], ['L-cnote-edit'], ['cnote']),
+    'm-jdel': ([('main', "            var $card = $(this).closest('.journal-pvnote-card, .journal-rownote-inline');\n            if (!$card.length) return;\n            var kind", "            var $card = $(this).closest('.journal-pvnote-card');\n            if (!$card.length) return;\n            var kind")], ['L-cnote-del'], ['cnote']),
+    'm-notetop': ([('cardscss', "    align-content: start;   /* (cardnotes) a card stretched", "    align-content: normal;   /* (cardnotes) a card stretched")], ['L-cnote-topAligned'], ['cnote']),
+    'm-jfold': ([('main', "                if ($panel.hasClass('journal-rownote-inline')) inlineClose($panel[0], 'add', true);   // (cardnotes) posted: the card's composer folds away\n", "")], ['L-cnote-post'], ['cnote']),
     # a card drawn from every row of the table (the rows the search hid, the other pages)
     'm-unfiltered': ([('cards', "            var rows = flatRows(false);\n            try { H.fillRows(rows); } catch (e) { }", "            var rows = Array.prototype.slice.call(document.querySelectorAll('#resultsTable > tbody > tr'));\n            try { H.fillRows(rows); } catch (e) { }")],
                      ['L-cauto-filtered', 'L-cauto-count'], ['cauto']),
@@ -161,7 +362,7 @@ MUTANTS = {
     'm-unescaped': ([('cards', "((td && td.textContent.trim()) ? td.innerHTML : '<span class=\"pnb-card-blank\">(blank)</span>')", "((td && td.textContent.trim()) ? td.textContent : '<span class=\"pnb-card-blank\">(blank)</span>')")],
                     ['L-cesc-noScript', 'L-cesc-tagAsText'], ['cesc']),
     # the switch shown on every report
-    'm-switchoff': ([('cards', "    function offered() { return !!report && allowed(); }", "    function offered() { return allowed(); }")], ['L-coff-switchHidden', 'L-coff-notOffered'], ['coff']),
+    'm-switchoff': ([('cards', "    function offered() { return (!!report || asked()) && allowed(); }", "    function offered() { return allowed(); }")], ['L-coff-switchHidden', 'L-coff-notOffered'], ['coff']),
     # the pill ignores the cell's highlight rule (the one helper both the draw and the restyle read)
     'm-pillnohl': ([('cards', "    function pillStyle(td) { return styleOf(td, PILL_PROPS); }", "    function pillStyle(td) { return ''; }")], ['L-chl-ruledPills', 'L-chl-pillMatchesCell'], ['chl']),
     # the bar ignores the cell's data bar
@@ -196,7 +397,6 @@ MUTANTS = {
     'm-bandnoforward': ([('cards', "        hdr.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));\n        return true;", "        return false;")],
                         ['L-gcoll-bandClick', 'L-gcoll-bandKey', 'L-gncoll-branchFolds'], ['gcoll', 'gncoll']),
     # (glist) the List layout's pick ignored: every group's cards drawn
-    'm-pickignored': ([('cards', "            var off = listOn && w.classList.contains('pnb-gl-off');", "            var off = false;")], ['L-ggcards-onePicked', 'L-ggcards-pickClick'], ['ggcards']),
     # (csize) the size never applied to the host; compact drawing every part; the phone default gone; cz never captured / never applied
     'm-sizeignored': ([('cards', "        el.classList.toggle('is-compact', sz === 'compact');\n        el.classList.toggle('is-large', sz === 'large');\n", "")], ['L-csize-authorDefault', 'L-csize-viewerCompact'], ['csize']),
     'm-compactfull': ([('cards', "        var compact = curSize() === 'compact';   // (csize) no subtitle, bar, fields or notes", "        var compact = false;")], ['L-csize-compactParts'], ['csize']),
@@ -229,6 +429,17 @@ MUTANTS = {
     'm-detmenu': ([('cards', "        var box = t.closest('#pnbCardDetails');\n        if (box) {", "        var box = null;\n        if (box) {")], ['L-cdet-menuInside'], ['cdet']),
     'm-detdrill': ([('cards', "        closeDetails(false);\n        cell.click();\n        return true;", "        closeDetails(false);\n        return true;")], ['L-pdet-breakdownButton'], ['pdet']),
     'm-detsheet': ([('cardscss', "    #pnbCardDetails .pnb-cdet-box { width: 100vw; max-width: 100vw; height: 100%; max-height: 100%; border-radius: 0; border: 0; margin: 0; }\n", "")], ['L-cdetph-sheet'], ['cdetph']),
+    # (cardword) the grid-only items kept in a card's menu / the wording left as the table's / the card wording applied to the table too
+    'm-wordhide': ([('menu', "    var CARD_HIDE = { width: 1, rowHeight: 1, freeze: 1, unfreeze: 1, pvFreeze: 1, pvHighlight: 1, bdWidth: 1 };", "    var CARD_HIDE = {};")], ['L-cmword-gridOnlyHidden'], ['cmword']),
+    'm-wordlabel': ([('menu', "        return String(s).replace(/\\bColumns\\b/g, 'Fields')", "        return String(s); String(s).replace(/\\bColumns\\b/g, 'Fields')")], ['L-cmword-noColumnWord', 'L-cmword-subNoColumn'], ['cmword']),
+    'm-wordtable': ([('menu', "        if (fromCard) { items = cardContext(items); }   // (cardword)", "        items = cardContext(items);   // (cardword)")], ['L-cmword-tableUnchanged'], ['cmword']),
+    # (cardword) the toast kept the table's words on a card
+    'm-wordtoast': ([('menu', "        if (fromCard) { msg = cardMsg(msg); }   // (cardword) the toast speaks of fields, up / down / top / bottom\n", "")], ['L-cmword-moveToast'], ['cmword']),
+    # (curl) the URL's ask ignored / the URL's pick written into the pref / the switch still needing the option / the builder's cards option ignored
+    'm-urlignored': ([('cards', "            if (c === '1' || c === 'true' || c === 'yes') o = { cards: true }; else if (c === '0' || c === 'false' || c === 'no') o = { cards: false };", "            if (false) o = { cards: true };")], ['L-curl1-cardsOn', 'L-curl2-paramWins'], ['curl1', 'curl2']),
+    'm-urlpref': ([('cards', "        if (urlAsk && typeof urlAsk.cards === 'boolean') return urlAsk.cards ? 'cards' : 'table';   // (curl) this visit's ask, over everything", "        if (urlAsk && typeof urlAsk.cards === 'boolean') { try { H.prefSet(urlAsk.cards ? 'cards' : 'table'); } catch (e) { } return urlAsk.cards ? 'cards' : 'table'; }")], ['L-curl1-prefUntouched', 'L-curl2-prefStillTable'], ['curl1', 'curl2']),
+    'm-urlneedsopt': ([('cards', "    function offered() { return (!!report || asked()) && allowed(); }", "    function offered() { return !!report && allowed(); }")], ['L-curl1-switchShown', 'L-curl4-linkUnlocks'], ['curl1', 'curl4']),
+    'm-sharecards': ([('main', "        if (opts && opts.cards) {\n            v.cv = 1;", "        if (false) {\n            v.cv = 1;")], ['L-cshare-cardsForce'], ['cshare']),
     'm-menushift': ([('cards', "        if (e.shiftKey && e.button === 2) return;   // the browser's own menu, as the engine leaves it\n", "")], ['L-cmenu-shiftKeepsBrowser'], ['cmenu']),
     # the 1,000-card step gone (every row drawn at once)
     'm-nocap': ([('cards', "    var CAP = 1000;                   // cards drawn per step", "    var CAP = 1000000;")], ['L-cmore-capped', 'L-cmore-moreButton'], ['cmore']),
@@ -267,7 +478,7 @@ def static_checks(t):
     # (cxl) the Extra large row, both option lists, the help; (cmenu) the engine's hook + openItems, the module's handler, the help + README
     menu = t['menu']
     out.append(('S-xlRows', "{ id: 'cardsize-xl', label: 'Card size: Extra large'" in pal and "setSize('xl')" in pal and "cardSize('xl')" in pal, 'the Extra large palette row'))
-    out.append(('S-xlMarkup', idx.count('<option value="xl">') == 2 and '<option value="xl">Extra large</option>' in idx and "e.size === 'xl'" in main and "v === 'xl'" in main, 'xl in the size control and the setup row; the pref reads and writes it'))
+    out.append(('S-xlMarkup', idx.count('<option value="xl">') >= 2 and '<option value="xl">Extra large</option>' in idx and "e.size === 'xl'" in main and "v === 'xl'" in main, 'xl in the size control and the setup row; the pref reads and writes it'))
     out.append(('S-xlHelp', 'Extra large' in t['topic'] and 'Extra large' in t['tip'] and 'Card size: Compact / Standard / Large / Extra large' in t['topic'] and 'is-xl' in css, 'help topic + tip name Extra large; the css has it'))
     out.append(('S-menuHook', 'fromCard = e.pnbCardMenu || null;' in menu and 'window.Penumbra.cards.menuItems(items, fromCard, cur)' in menu and 'window.Penumbra.colMenu.openItems = function' in menu
                 and 'function onHostMenu' in cards and 'menuItems: menuItems' in cards and "ev.pnbCardMenu = t;" in cards, 'the engine takes a card\'s forwarded right-click, asks the module for its items; openItems'))
@@ -275,12 +486,50 @@ def static_checks(t):
     # (cdet) the palette row, the help, the window's css + module
     out.append(('S-detRow', "{ id: 'carddetails', label: 'Open card details'" in pal and 'cards.openDetails()' in pal, 'the Open card details palette row'))
     out.append(('S-detHelp', 'Open card details' in t['topic'] and 'never a hidden column' in t['topic'] and 'Click a card for its details' in t['tip'] and 'cdet' in t['readme'], 'help topic + tip + README name the details window'))
+    out.append(('S-wordHelp', 'speaks of fields' in t['topic'] and 'cardword' in t['readme'] and 'function cardContext(items)' in menu and 'var CARD_HIDE' in menu, 'help + README name the card wording; the engine has it'))
+    # (curl) the email dialog's Open as cards row + its handling; the URL cleaner; the reserved params; the help
+    out.append(('S-emailCards', 'id="emailLinkAsCards"' in idx and 'id="emailLinkCardSize"' in idx and 'id="emailCardsLinkRow"' in idx and "_lrUrl.searchParams.set('cards', '1')" in main
+                and "_pnbViewLinkBuild(_pnbEmailLinkOpts())" in main and "urlParams.delete('cards'); urlParams.delete('cardsize');" in main and "_DL_RESERVED_PARAMS = { cards: 1, cardsize: 1," in main
+                and "if (opts && opts.cards) {" in main, 'the email dialog\'s Open as cards (+ size) on the plain link and the view link; the URL cleaner and the reserved params know cards / cardsize'))
+    out.append(('S-urlHelp', '&amp;cards=1' in t['topic'] and 'Open as cards' in t['topic'] and 'curl' in t['readme'] and 'var urlAsk' in cards, 'help + README name the URL parameters; the module reads them'))
     out.append(('S-detCss', '#pnbCardDetails .pnb-cdet-box' in css and 'max-width: 600px' in css and "el.id = 'pnbCardDetails';" in cards and 'help-lightbox pnb-cdet' in cards and "openDetails: function" in cards, 'the window: the app\'s dialog classes, the phone sheet, the API'))
     # (csize) the three size rows, the size control and the setup's size row, the help's size text
     out.append(('S-sizeRows', all(("{ id: 'cardsize-%s', label: 'Card size: %s'" % (s, s.capitalize())) in pal and ("setSize('%s')" % s) in pal for s in ('compact', 'standard', 'large')) and 'function cardSize(sz)' in pal, 'three Card size rows'))
     out.append(('S-sizeMarkup', 'id="pnbCardsSize"' in idx and idx.find('id="pnbCardsSize"') - idx.find('id="pnbCardsSwitch"') < 1200 and 'data-slot="size"' in idx and 'value="compact"' in idx and 'value="large"' in idx, 'the size control beside the switch; the setup\'s Card size row'))
     out.append(('S-pvHelp', 'each pivot row is a tile' in t['topic'] and 'each pivot row is a tile' in t['tip'] and 'have no card form' not in t['topic'] and 'pivotHtml' in cards and "body.pnb-cards-on #pivotResultTable" in css, 'help names the pivot tiles; the module and css have them'))
     out.append(('S-sizeHelp', 'Card size' in t['topic'] and '600px or less' in t['topic'] and 'Card size sets the default' in t['tip'] and 'Card size: Compact / Standard / Large' in t['topic'], 'help topic + tip name the sizes and the phone default'))
+    # (cardnotes + cardlist) main.js's inline panel and its handlers, the module's use; the help + README; the palette's card row
+    out.append(('S-noteApi', 'window.Penumbra.journalInlineNotes = {' in main and main.count("closest('.journal-pvnote-card, .journal-rownote-inline')") >= 3 and 'refreshInlineNotes();' in main
+                and 'function inlineCompose(panel)' in main and 'function liftNotes(root)' in cards and 'P.journalInlineNotes' in cards and '.journal-rownote-inline' in css, 'main.js draws a row\'s notes in a card; post / edit / delete read the inline panel; the module and css use it'))
+    out.append(('S-noteHelp', 'The Notes column shows on the card like any long column' in t['topic'] and 'Notes (cardnotes, 2026-10-29)' in t['readme'] and 'journalInlineNotes' in t['readme'], 'help + README name the notes in the card'))
+    out.append(('S-listHelp', 'Grouped with the <strong>List</strong> layout' in t['topic'] and 'The List layout (cardlist, 2026-10-29' in t['readme'] and 'function park(box)' in cards and 'is-list' not in css, 'help + README name the List layout in cards; glist\'s band picker gone'))
+    out.append(('S-noteRow', "'Add a note to this card'" in pal and 'C.addNote(text)' in pal and 'C.noteCard()' in pal, 'Quick actions: add a note on the selected card'))
+    # (round I) the help + README name the round; the engine asks the module for the table's items; main.js draws a card's note line
+    out.append(('S-roundI', 'Show all' in t['topic'] and 'Show as cards' in t['topic'] and 'row-hover colour' in t['topic'] and '<strong>Cards:</strong>' in t['topic']
+                and 'Round I (2026-10-29' in t['readme'] and 'window.Penumbra.cards.tableItems(cur)' in t['menu'] and 'function inlineItemHtml(' in main and 'tableItems: tableItems' in cards and '.pnb-card-more' in css,
+                'help + README name round I; the engine\'s table hook; the note line; the cap'))
+    # (round J) README names the round; main.js's filter-link handler takes the card view's copies; the css themes them
+    out.append(('S-roundJ', 'Round J (2026-10-29' in t['readme'] and '#pnbCardsHost a[data-search], #pnbCardDetails a[data-search]' in main and '--pnb-card-hover' in css
+                and '.registry-theme #pnbCardsHost [data-col] a' in css and 'C.canShow && C.canShow()' in pal and 'canShow: function' in cards and 'option off' in t['topic'],
+                'README names round J; the filter links in cards; the themed hover and links; Show as cards with the option off (menu, Quick actions, help)'))
+    # (round K) help + README name the round; the mirror on both sides; the card words; the Bar list
+    out.append(('S-roundK', 'Round K (2026-10-30' in t['readme'] and 'This entire card' in t['topic'] and 'Found in:' in t['topic'] and 'Also matches in:' in t['topic']
+                and 'greyed out' in t['topic'] and 'findMirror: {' in cards and 'function cardsMirror()' in t['find'] and 'cardRow(cardWord(' in t['menu']
+                and '.pnb-card-found' in css and 'function canBar(' in cards,
+                'help + README name round K; the Find mirror (cards + find); the card words; the Bar list'))
+    # (round K) 25 and 50 per page: the pager and the save dialog, the two topics that list the sizes
+    def opts(rx):
+        m = re.search(rx, idx, re.S)
+        return re.findall(r'<option value="([^"]*)"', m.group(1)) if m else []
+    want = ['10', '25', '50', '100', '200', '500', 'all', 'none']
+    out.append(('S-pager', opts(r'<select id="rowsPerPageSelector"[^>]*>(.*?)</select>') == want and opts(r'<select id="serverSaveRowsPerPage"[^>]*>(.*?)</select>') == want
+                and '<code>10</code>, <code>25</code>, <code>50</code>, <code>100</code>' in t['pftopic'] and '10, 25, 50, 100, 200 or 500 rows' in t['sptopic'],
+                'Rows per page offers 10, 25, 50, 100, 200, 500, All, None (pager + save dialog); the help lists them'))
+    # (round L) help + README name the round; the markup; main.js's layout pref and Clear All's line; the palette row
+    out.append(('S-roundL', 'Round L (2026-10-30' in t['readme'] and 'id="us-cards"' in t['ustopic'] and 'us-tip-card-layout' in t['tip'] and 'Sort: none' in t['topic']
+                and 'id="pnbCardsSort"' in idx and 'id="spCardsSection"' in idx and 'layoutGet: function' in main and "items.push('Card title and fields')" in main
+                and "id: 'cardlayout'" in pal and 'function paintSort(' in cards and 'function filled(' in cards and 'paintTileMarks(' in t['find'],
+                'help + README name round L; the Sort list and Settings > Cards; the layout pref; the palette row; pivot tiles in Find'))
     ui = cards + css + t['topic'] + t['tip'] + (r1.group(0) if r1 else '') + (r2.group(0) if r2 else '') + (vo.group(0) if vo else '') + (idx[swi:swi + 600] if swi > 0 else '')
     out.append(('S-noEmdash', '\u2014' not in ui and '&mdash;' not in ui, 'no em-dash in the new UI text'))
     return out
@@ -289,7 +538,7 @@ def hook(src):
     anchor = '$(document).ready(function () {'
     i = src.find(anchor)
     if i < 0 or i > 400: raise SystemExit('closure anchor not found')
-    exp = ('try { window.__HC = {}; [["bso", "buildStateObject"], ["runSearch", "runTableSearch"], ["cf", "applyConditionalFormatting"], ["syncLayout", "penumbraSyncActiveLayout"]].forEach(function (p) { try { window.__HC[p[0]] = eval(p[1]); } catch (e) { } }); } catch (e) { }\r\n')
+    exp = ('try { window.__HC = {}; [["bso", "buildStateObject"], ["runSearch", "runTableSearch"], ["cf", "applyConditionalFormatting"], ["syncLayout", "penumbraSyncActiveLayout"], ["rgv", "rebuildGroupedView"]].forEach(function (p) { try { window.__HC[p[0]] = eval(p[1]); } catch (e) { } }); } catch (e) { }\r\n')
     out = src[:i] + ';(function () {\r\n' + exp + src[i + len(anchor):]
     j = out.rfind('});')
     out = out[:j] + '})();' + out[j + 3:]
@@ -375,6 +624,7 @@ def write_stage(texts):
     w('penumbra_cards.css', texts['cardscss'])
     w('main.css', texts['maincss'])
     w('penumbra_colmenu.js', texts['menu'])   # (cmenu) the engine under test (the LIBS copy above is live's)
+    w('penumbra_find.js', texts['find'])   # (round K) Find under test (cfind / gfind load it)
 
 def url_for(s, token=None):
     u = 'harness.html?scn=%s&id=lrfix' % s
@@ -383,6 +633,10 @@ def url_for(s, token=None):
     if s == 'cvlT': u += '&view=' + T_NOCV
     if s in ('cvlB', 'cszvlB') and token: u += '&view=' + token
     if s == 'cxlvl': u += '&view=' + T_XL
+    if s == 'curl1': u += '&cards=1&cardsize=xl'   # (curl)
+    if s == 'curl2': u += '&cards=1'
+    if s == 'curl3': u += '&cards=0'
+    if s == 'curl4': u += '&view=' + T_CV
     return u
 PHONE = {'width': 375, 'height': 812, 'deviceScaleFactor': 1, 'mobile': True}
 def run_browser(scns):
@@ -393,9 +647,9 @@ def run_browser(scns):
             token = ((res.get({'cvlB': 'cvlA', 'cszvlB': 'cszvlA'}[s]) or {}).get('info') or {}).get('token') or 'none'
         shot = os.path.join(shots_dir, s + '.png') if shots_dir else None
         r = run_page(url_for(s, token), PHONE if s in ('cphone', 'cnarrowA', 'cnarrowT', 'cdetph') else None, shot); res[s] = r
-        if shots_dir and s in ('cauto', 'gcards', 'gcoll', 'ggcards', 'csize', 'pcoff', 'cxl', 'cmenu', 'gmenu', 'pmenu', 'cdet', 'pdet'):   # the same page under a dark theme (csize: compact)
+        if shots_dir and s in ('cauto', 'gcards', 'gcoll', 'ggcards', 'csize', 'pcoff', 'cxl', 'cmenu', 'gmenu', 'pmenu', 'cdet', 'pdet', 'cnote'):   # the same page under a dark theme (csize: compact)
             run_page(url_for(s) + '&theme=theme-dark-blue&shot=1', None, os.path.join(shots_dir, s + '_dark.png'))
-        if shots_dir and s in ('pcoff', 'cxl', 'cmenu', 'gmenu', 'pmenu', 'cdet', 'pdet'):   # the light picture too, posed by the scenario's shot branch (the full run moves on past it)
+        if shots_dir and s in ('pcoff', 'cxl', 'cmenu', 'gmenu', 'pmenu', 'cdet', 'pdet', 'cmword', 'curl1', 'cnote'):   # the light picture too, posed by the scenario's shot branch (the full run moves on past it)
             run_page(url_for(s) + '&shot=1', None, os.path.join(shots_dir, s + '_shot.png'))
         if shots_dir and s == 'cdetph':   # (cdet) the phone sheet, open
             run_page(url_for(s) + '&shot=1', PHONE, os.path.join(shots_dir, s + '_shot.png'))

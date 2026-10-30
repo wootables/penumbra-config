@@ -869,6 +869,7 @@ ENTRY_SKIP_RULES = [
     (r'^(sendEmailBtn|resetEmailSettingsBtn)$', 'the Email dialog\'s own buttons (the dialog is a row; Send is the person\'s)'),
     (r'^(sbColsPop|sbCustomCols|sbFrozen|sbGroup$|sbGroupPop|sbGroupPresetList|sbGroupSharedList|sbGrp|sbPivot$|sbPivotPop|sbPivotPresetList|sbPivotSharedList|sbPivotOpenBuilder|sbSnap|sbSnapshot|sbRf|sbTableHidden|sbAsOf$|sbAsOfHistory|sbColsSeg|sbColsOpen|sbColsSettings)', 'a status-bar indicator or its popover\'s own buttons (the state they show has its row: Group, Pivot, Snapshots, Freeze, Version history, Settings)'),
     (r'^(sbPaletteBtn|searchPaletteIcon)$', 'the box itself'),
+    (r'^pnbCardsSortDir$', 'the cards\' Sort list arrow (Sort ascending... / Sort descending... are rows)'),   # (2026-10-30, csort)
     (r'^(copyViewLinkBtn|emailCopyViewLink)$', 'Copy a link to this view (a row, through PenumbraViewLink.copy; the Email dialog\'s Copy link is the same)'),
     (r'^(scrollTopBtn|scrollBottomBtn)$', 'Scroll to the top / bottom (rows, through scrollEdge)'),
     (r'^searchHelpIcon$', 'the Help Center (a row)'),

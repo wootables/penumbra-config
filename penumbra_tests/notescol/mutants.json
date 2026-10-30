@@ -132,8 +132,8 @@
  "editbtn": {
   "edits": [
    [
-    "            var editId = (newest && me && String(newest.CREATED_BY || '').toLowerCase() === me) ? String(newest.ID) : null;",
-    "            var editId = null;"
+    "            var mine = function (x) { return !!me && String(x.CREATED_BY || '').toLowerCase() === me; };",
+    "            var mine = function (x) { return false; };"
    ]
   ],
   "must": [
@@ -145,6 +145,7 @@
    "D-after",
    "D-preview",
    "D-count",
+   "D-own",
    "D-409",
    "E-edit409",
    "D-cancel",
@@ -155,26 +156,16 @@
  "newest": {
   "edits": [
    [
-    "            var newest = notes[notes.length - 1];",
-    "            var newest = notes[0];"
+    "            return best || bs[bs.length - 1];",
+    "            return bs[0];"
    ]
   ],
   "must": [
-   "U-hint",
-   "U-up",
-   "D-button",
-   "D-mode",
-   "D-post",
-   "D-after",
-   "D-preview",
-   "D-count",
-   "D-none",
-   "D-409",
-   "E-edit409",
-   "D-cancel",
-   "E-editcancel"
+   "U-up"
   ],
-  "scn": null
+  "scn": [
+   "cardup"
+  ]
  },
  "editpost": {
   "edits": [
@@ -468,6 +459,21 @@
   "scn": [
    "panel",
    "cardup"
+  ]
+ },
+ "panelall": {
+  "edits": [
+   [
+    "            if (String(n.CREATED_BY || '').toLowerCase() === me) editableIds[String(n.ID)] = true;",
+    "            if (String(n.CREATED_BY || '').toLowerCase() === me && false) editableIds[String(n.ID)] = true;",
+    "journal"
+   ]
+  ],
+  "must": [
+   "P-own"
+  ],
+  "scn": [
+   "panelnone"
   ]
  }
 }

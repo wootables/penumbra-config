@@ -39,6 +39,10 @@
 #     default still a row; one group per line; the label and clear on the first chip's line; Clear
 #     all at the strip's side; right / center aligning the stacked groups; columns=N; segmented
 #     parting with a bottom rule; "+n more" under the column; a list field untouched
+#   - (2026-10-29) nested (@@JSON) fields (section O): chips from the sub-rows' values, each once
+#     per row; two or more fields from one sub-table write __ROW with the first value pressed and
+#     take it off with the last (read back between, so a hand delete stays); counts held to one
+#     sub-row under __ROW; anyrow; a lone nested field writes none; range / split refused
 # Since 2026-09-29 the strip's grammar lives in js/penumbra_tiles.js
 # (PenumbraTiles.strip, shared with the dashboard); main.js keeps the _pnbFs*
 # names as delegates, so the hooks below still reach the real code.
@@ -212,6 +216,19 @@ $mutants = @{
   'vlist'          = @('.pnb-fstrip.vertical .pnb-fs-group:not(.pnb-fs-list) { align-items: baseline; }', '.pnb-fstrip.vertical .pnb-fs-group { align-items: baseline; }', 'css')
   'vseglist'       = @('.pnb-fstrip.segmented.vertical .pnb-fs-group:not(.pnb-fs-list) .pnb-fs-chips .pnb-fs-chip { border-right: 0;', '.pnb-fstrip.segmented.vertical .pnb-fs-group .pnb-fs-chips .pnb-fs-chip { border-right: 0;', 'css')
   'seglistscroll'  = @('gap: 2px; overflow-y: auto; overflow-x: hidden; }', 'gap: 2px; }', 'css')
+  # section O (2026-10-29): nested fields and __ROW
+  'nestrowadd'     = @('if (!before && after && !has) return p + ''__ROW '';', '/* mutant: __ROW never written */', 'tiles')
+  'nestrowdrop'    = @('if (before && !after && has) return p.replace(/__ROW\s+/i, '''');', '/* mutant: __ROW never taken off */', 'tiles')
+  'nestreadback'   = @('if (!before && after && !has)', 'if (after && !has)', 'tiles')
+  'nestanykw'      = @('anyrow: ''anyrow''   // no look', '_anyrow: ''anyrow''   // no look', 'tiles')
+  'nestcols'       = @('Object.keys(_pnbFsNestedSrc()).forEach(function (vc) { if (cols.indexOf(vc) === -1) cols.push(vc); });', '/* mutant: nested names unknown to the parser */', 'main')
+  'nestvals'       = @('var nested = !!_pnbFsNestedSrc()[col];', 'var nested = false;', 'main')
+  'nestpervalue'   = @('var perVal = nested && rowMatch ? Object.create(null) : null;', 'var perVal = null;', 'main')
+  'nestexcount'    = @('? $.extend({}, g, { mode: ''in'' }) : g; }) : null;', '? g : g; }) : null;', 'main')
+  'nestanyrow'     = @('if ($strip && $strip.hasClass(''anyrow'')) return out;', '/* mutant: anyrow ignored */', 'main')
+  'nestsingle'     = @('if (src[c] && n[src[c]] > 1) out[c] = true;', 'if (src[c]) out[c] = true;', 'main')
+  'nolabel'        = @('if (!label) label = bits[1];', '/* mutant: no label stays empty */', 'tiles')
+  'nestrefuse'     = @('return (f.range || f.split) && _pnbFsNestedSrc()[f.col]; });', 'return false; });', 'main')
 }
 if ($Mutant) {
   if (-not $mutants.ContainsKey($Mutant)) { throw "unknown mutant '$Mutant' (known: $(($mutants.Keys | Sort-Object) -join ', '))" }

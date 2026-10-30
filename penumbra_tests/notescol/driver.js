@@ -167,7 +167,7 @@
   S.panel = async function () {
     await openPanel();
     var eds = Array.prototype.map.call(document.querySelectorAll('#journalNotesList .journal-note-edit-btn'), function (b) { return b.closest('.journal-note').getAttribute('data-note-id'); }).sort();
-    rec('P-buttons', JSON.stringify(eds) === JSON.stringify(['802', '902']), 'Edit on lee\'s newest report note and newest row note: ' + JSON.stringify(eds));
+    rec('P-buttons', JSON.stringify(eds) === JSON.stringify(['802', '902', '903']), 'Edit on every note of lee\'s (2026-10-29: not only the newest): ' + JSON.stringify(eds));
     var box = document.getElementById('journalNoteText');
     rec('P-hint', /\u2191 edits your last note/.test(placeholderOf(box)), placeholderOf(box));
     box.focus(); upKey(box); await sleep(150);
@@ -219,9 +219,12 @@
   S.panelnone = async function () {
     await openPanel();
     var box = document.getElementById('journalNoteText');
+    var hint0 = /\u2191/.test(placeholderOf(box));   // (the hint shows in the EMPTY box: read before Up fills it)
     box.focus(); upKey(box); await sleep(120);
-    rec('P-none', document.querySelectorAll('#journalNotesList .journal-note-edit-btn').length === 0 && !/\u2191/.test(placeholderOf(box))
-        && document.getElementById('journalPostBtn').textContent === 'Post Note', 'pat has no newest note: no Edit, no tip, Up does nothing');
+    // (2026-10-29) pat's notes are no conversation's newest, and still pat's to edit: Edit on both, the tip, Up takes pat's newest (901)
+    var pe = Array.prototype.map.call(document.querySelectorAll('#journalNotesList .journal-note-edit-btn'), function (b) { return b.closest('.journal-note').getAttribute('data-note-id'); }).sort();
+    rec('P-own', JSON.stringify(pe) === JSON.stringify(['801', '901']) && hint0 && document.getElementById('journalPostBtn').textContent === 'Save'
+        && box.textContent === 'First look done.', 'pat\'s own notes: Edit on ' + JSON.stringify(pe) + ', Up: ' + document.getElementById('journalPostBtn').textContent + ' ' + JSON.stringify(box.textContent));
   };
   S.cardup = async function () {
     var c = await openCard(K3);
@@ -387,10 +390,11 @@
   S.edit = async function () {
     var c = await openCard(K3);
     var eb = c.querySelectorAll('.journal-rownote-edit-btn');
-    var owner = eb.length ? eb[0].closest('.journal-rownote-item').getAttribute('data-note-id') : null;
-    rec('D-button', eb.length === 1 && owner === '902', 'Edit buttons ' + eb.length + ' on ' + owner + ' (lee\'s 903 is older, 902 is the newest)');
-    if (!eb.length) return;
-    clickEl(eb[0]);
+    var owners = Array.prototype.map.call(eb, function (b) { return b.closest('.journal-rownote-item').getAttribute('data-note-id'); }).sort();
+    rec('D-button', JSON.stringify(owners) === JSON.stringify(['902', '903']), 'Edit buttons on ' + JSON.stringify(owners) + ' (2026-10-29: every note of lee\'s, the older 903 too)');
+    var e902 = c.querySelector('.journal-rownote-item[data-note-id="902"] .journal-rownote-edit-btn');
+    if (!e902) return;
+    clickEl(e902);
     await sleep(100);
     var banner = c.querySelector('.journal-rownote-reply-banner');
     rec('D-mode', composerText(c) === 'Follow up\nnext week.' && postBtn(c).textContent === 'Save' && /Editing your note/.test(banner.textContent)
@@ -415,8 +419,9 @@
   };
   S.editnone = async function () {
     var c = await openCard(K3);
-    rec('D-none', c.querySelectorAll('.journal-rownote-edit-btn').length === 0 && c.querySelectorAll('.journal-rownote-reply-btn').length === 3,
-        'pat\'s notes are not the newest: no Edit (Reply buttons ' + c.querySelectorAll('.journal-rownote-reply-btn').length + ')');
+    var po = Array.prototype.map.call(c.querySelectorAll('.journal-rownote-edit-btn'), function (b) { return b.closest('.journal-rownote-item').getAttribute('data-note-id'); });
+    rec('D-own', JSON.stringify(po) === JSON.stringify(['901']) && c.querySelectorAll('.journal-rownote-reply-btn').length === 3,
+        'pat\'s note is not the newest and still pat\'s to edit (2026-10-29): Edit on ' + JSON.stringify(po) + ', Reply buttons ' + c.querySelectorAll('.journal-rownote-reply-btn').length);
   };
   S.edit409 = async function () {
     window.__J.editFail = true;
@@ -439,7 +444,7 @@
     inp.innerHTML = 'my draft';
     var rb = c.querySelectorAll('.journal-rownote-reply-btn')[0];
     clickEl(rb); await sleep(50);
-    clickEl(c.querySelector('.journal-rownote-edit-btn')); await sleep(100);
+    clickEl(c.querySelector('.journal-rownote-item[data-note-id="902"] .journal-rownote-edit-btn')); await sleep(100);   // (2026-10-29: 903 is lee's too)
     var mid = composerText(c);
     clickEl(c.querySelector('.journal-rownote-edit-cancel')); await sleep(100);
     var banner = c.querySelector('.journal-rownote-reply-banner');

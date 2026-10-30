@@ -16,7 +16,7 @@
                     {
                         "name":  "args: an unknown keyword is a loud error naming itself",
                         "pass":  true,
-                        "detail":  "unknown keyword sideways (expected small, large, wide, vertical, nocounts, segmented, ghost, bare, labels=left, labels=top, columns=N, right, center, or a Label|COLUMN field)"
+                        "detail":  "unknown keyword sideways (expected small, large, wide, vertical, nocounts, segmented, ghost, bare, labels=left, labels=top, columns=N, right, center, anyrow, or a Label|COLUMN field)"
                     },
                     {
                         "name":  "args: a field with no column is refused",
@@ -24,9 +24,14 @@
                         "detail":  "a field needs a column after its pipe - got College|"
                     },
                     {
-                        "name":  "args: a field with no label is refused",
+                        "name":  "args: a field with no label takes the column name as written, options still parse",
                         "pass":  true,
-                        "detail":  "a field needs a label before its pipe - got |COLLEGE"
+                        "detail":  "got [[\"College\",\"COLLEGE\",false,12],[\"FY\",\"FY\",true,3]] want [[\"College\",\"COLLEGE\",false,12],[\"FY\",\"FY\",true,3]]"
+                    },
+                    {
+                        "name":  "args: a lone pipe is still refused (no column)",
+                        "pass":  true,
+                        "detail":  "a field needs a column after its pipe - got |"
                     },
                     {
                         "name":  "args: a column listed twice is refused",
@@ -76,7 +81,7 @@
                     {
                         "name":  "args: a prototype name is not a keyword",
                         "pass":  true,
-                        "detail":  "unknown keyword constructor (expected small, large, wide, vertical, nocounts, segmented, ghost, bare, labels=left, labels=top, columns=N, right, center, or a Label|COLUMN field)"
+                        "detail":  "unknown keyword constructor (expected small, large, wide, vertical, nocounts, segmented, ghost, bare, labels=left, labels=top, columns=N, right, center, anyrow, or a Label|COLUMN field)"
                     },
                     {
                         "name":  "args: the unknown-keyword error lists the looks",
@@ -1667,6 +1672,141 @@
                         "name":  "segmented: a list field still scrolls (computed overflow-y auto under a max height; it was hidden, so rows past it were out of reach)",
                         "pass":  true,
                         "detail":  "auto 162px"
+                    },
+                    {
+                        "name":  "nested args: anyrow is a keyword (a class on the strip, no look)",
+                        "pass":  true,
+                        "detail":  "got [null,[\"anyrow\"]] want [null,[\"anyrow\"]]"
+                    },
+                    {
+                        "name":  "nested args: the unknown-keyword message lists anyrow",
+                        "pass":  true,
+                        "detail":  "unknown keyword sideways (expected small, large, wide, vertical, nocounts, segmented, ghost, bare, labels=left, labels=top, columns=N, right, center, anyrow, or a Label|COLUMN field)"
+                    },
+                    {
+                        "name":  "nested rowPrefix: the helper exists",
+                        "pass":  true,
+                        "detail":  "function"
+                    },
+                    {
+                        "name":  "nested rowPrefix: the first value pressed writes __ROW, the last released takes it off, between them it is read back",
+                        "pass":  true,
+                        "detail":  "got [\"__ROW \",\"\",\"\",\"__ROW \",\"__SRC __ROW \",\"__SRC \",\"__ROW \",\"\"] want [\"__ROW \",\"\",\"\",\"__ROW \",\"__SRC __ROW \",\"__SRC \",\"__ROW \",\"\"]"
+                    },
+                    {
+                        "name":  "nested engine: PI and Active in one sub-row (__ROW) vs anywhere in the row",
+                        "pass":  true,
+                        "detail":  "got [\"1,3\",\"1,2,3\"] want [\"1,3\",\"1,2,3\"]"
+                    },
+                    {
+                        "name":  "nested engine: an exclude chip under __ROW = a sub-row that is a PI and not Closed",
+                        "pass":  true,
+                        "detail":  "got \"1,3\" want \"1,3\""
+                    },
+                    {
+                        "name":  "nested counts: the sub-rows\u0027 values, each once per row (row 4 has two CoPI)",
+                        "pass":  true,
+                        "detail":  "got [[\"CoPI\",3,false],[\"PI\",3,false]] want [[\"CoPI\",3,false],[\"PI\",3,false]]"
+                    },
+                    {
+                        "name":  "nested counts: under __ROW a chip counts rows with ONE sub-row holding it that passes the rest",
+                        "pass":  true,
+                        "detail":  "got [[\"Active\",2,false],[\"Closed\",1,false]] want [[\"Active\",2,false],[\"Closed\",1,false]]"
+                    },
+                    {
+                        "name":  "nested counts: an exclude field\u0027s chip still counts the rows WITH its value",
+                        "pass":  true,
+                        "detail":  "got [[\"Active\",2,false],[\"Closed\",1,false]] want [[\"Active\",2,false],[\"Closed\",1,false]]"
+                    },
+                    {
+                        "name":  "nested counts: without __ROW the same chips count any sub-row",
+                        "pass":  true,
+                        "detail":  "got [[\"Active\",3,false],[\"Closed\",2,false]] want [[\"Active\",3,false],[\"Closed\",2,false]]"
+                    },
+                    {
+                        "name":  "nested counts: a typed nested condition narrows the other columns (the parser knows nested names)",
+                        "pass":  true,
+                        "detail":  "got [[\"Eng\",1,false],[\"Sci\",0,false],[\"Ag\",0,false]] want [[\"Eng\",1,false],[\"Sci\",0,false],[\"Ag\",0,false]]"
+                    },
+                    {
+                        "name":  "nested counts: a top-level chip column is counted as before",
+                        "pass":  true,
+                        "detail":  "got [[\"Eng\",1,false],[\"Sci\",1,false],[\"Ag\",0,false]] want [[\"Eng\",1,false],[\"Sci\",1,false],[\"Ag\",0,false]]"
+                    },
+                    {
+                        "name":  "nested refusal: a range on a nested column",
+                        "pass":  true,
+                        "detail":  "[filter_strip: ROLE is a nested column, so it takes chips (no range or split)]"
+                    },
+                    {
+                        "name":  "nested refusal: a split on a nested column",
+                        "pass":  true,
+                        "detail":  "[filter_strip: ROLE is a nested column, so it takes chips (no range or split)]"
+                    },
+                    {
+                        "name":  "nested render: a nested column is a field (no \"not in this report\"), its chips its sub-rows\u0027 values",
+                        "pass":  true,
+                        "detail":  "RoleCoPI3PI3StateActive4Closed3"
+                    },
+                    {
+                        "name":  "nested click: the first chip on two fields from one sub-table writes __ROW",
+                        "pass":  true,
+                        "detail":  "got \"__ROW ROLE = /^(?:PI)$/\" want \"__ROW ROLE = /^(?:PI)$/\""
+                    },
+                    {
+                        "name":  "nested click: the redrawn counts are one-sub-row counts",
+                        "pass":  true,
+                        "detail":  "got [\"Active=2\",\"Closed=1\"] want [\"Active=2\",\"Closed=1\"]"
+                    },
+                    {
+                        "name":  "nested click: the second chip joins under the same __ROW",
+                        "pass":  true,
+                        "detail":  "got \"__ROW ROLE = /^(?:PI)$/ and STATE = /^(?:Active)$/\" want \"__ROW ROLE = /^(?:PI)$/ and STATE = /^(?:Active)$/\""
+                    },
+                    {
+                        "name":  "nested click: ... which keeps rows 1 and 3",
+                        "pass":  true,
+                        "detail":  "got \"1,3\" want \"1,3\""
+                    },
+                    {
+                        "name":  "nested clear: Clear all empties the box, __ROW too",
+                        "pass":  true,
+                        "detail":  "got \"\" want \"\""
+                    },
+                    {
+                        "name":  "nested click: __ROW goes in front of a typed condition",
+                        "pass":  true,
+                        "detail":  "got \"__ROW ROLE = /^(?:PI)$/ and COLLEGE = Eng\" want \"__ROW ROLE = /^(?:PI)$/ and COLLEGE = Eng\""
+                    },
+                    {
+                        "name":  "nested click: releasing the last value takes __ROW off and keeps the typed condition",
+                        "pass":  true,
+                        "detail":  "got \"COLLEGE = Eng\" want \"COLLEGE = Eng\""
+                    },
+                    {
+                        "name":  "nested click: a __ROW deleted by hand stays deleted while values are pressed",
+                        "pass":  true,
+                        "detail":  "got \"ROLE = /^(?:PI)$/ and STATE = /^(?:Active)$/\" want \"ROLE = /^(?:PI)$/ and STATE = /^(?:Active)$/\""
+                    },
+                    {
+                        "name":  "nested anyrow: the strip carries the class",
+                        "pass":  true,
+                        "detail":  "pnb-fstrip anyrow"
+                    },
+                    {
+                        "name":  "nested anyrow: no __ROW is written",
+                        "pass":  true,
+                        "detail":  "got \"ROLE = /^(?:PI)$/\" want \"ROLE = /^(?:PI)$/\""
+                    },
+                    {
+                        "name":  "nested anyrow: the counts are any-sub-row counts",
+                        "pass":  true,
+                        "detail":  "got [\"Active=3\",\"Closed=2\"] want [\"Active=3\",\"Closed=2\"]"
+                    },
+                    {
+                        "name":  "nested single: one nested field beside a top-level one writes no __ROW",
+                        "pass":  true,
+                        "detail":  "got \"ROLE = /^(?:PI)$/\" want \"ROLE = /^(?:PI)$/\""
                     }
                 ]
 }

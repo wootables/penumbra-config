@@ -509,6 +509,10 @@
         if (sp && !sp.error && sp.fields.some(function (f) { return f.split; })) {
             return { error: 'split works in a report\'s filter_strip(), not on a dashboard Controls tile' };
         }
+        // So is anyrow (2026-10-29): it is about a report's nested columns, which this page never sees.
+        if (sp && !sp.error && sp.mods.indexOf('anyrow') !== -1) {
+            return { error: 'anyrow works in a report\'s filter_strip(), not on a dashboard Controls tile' };
+        }
         return sp;
     }
     // A range field's kind and hints (2026-09-30) come from the values the

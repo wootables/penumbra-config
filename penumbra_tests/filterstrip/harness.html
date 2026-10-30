@@ -849,6 +849,134 @@
     });
   }
 
+  // ══════ O. nested (@@JSON) fields and __ROW (2026-10-29) ══════
+  // A field may name a nested column: its chips are the values the row's
+  // sub-rows hold, each once per row. Two or more fields from one sub-table hold
+  // their chips to ONE sub-row: the first value pressed writes __ROW, the last
+  // released takes it off, and in between the box is read back (a __ROW deleted
+  // by hand stays deleted). anyrow turns that off. Counts follow __ROW.
+  //   row 1 Eng  [Ann PI Active, Bob CoPI Closed]
+  //   row 2 Eng  [Cy PI Closed, Di CoPI Active]
+  //   row 3 Sci  [Ed PI Active]
+  //   row 4 Sci  [Fy CoPI Active, Gu CoPI Closed]
+  //   row 5 Ag   (no sub-rows)
+  // PI and Active in ONE sub-row: rows 1, 3. A PI and an Active anywhere: 1, 2, 3.
+  function sectionO(F, draw, outText, S) {
+    var box = function () { return String($('#tableSearch').val()); };
+    var G = function (col) { return $(S + ' .pnb-fs-group[data-fs-col="' + col + '"]'); };
+    var CH = function (col, v) { return G(col).find('.pnb-fs-chip[data-fs-val="' + v + '"]'); };
+    var cnt = function (col) { return G(col).find('.pnb-fs-chip').map(function () { return $(this).attr('data-fs-val') + '=' + $(this).find('.pnb-fs-n').text(); }).get(); };
+    var P = function (a) { return '@@JSON' + JSON.stringify(a.map(function (x) { return { NAME: x[0], ROLE: x[1], STATE: x[2] }; })); };
+    var data = [['Eng', P([['Ann', 'PI', 'Active'], ['Bob', 'CoPI', 'Closed']])], ['Eng', P([['Cy', 'PI', 'Closed'], ['Di', 'CoPI', 'Active']])],
+                ['Sci', P([['Ed', 'PI', 'Active']])], ['Sci', P([['Fy', 'CoPI', 'Active'], ['Gu', 'CoPI', 'Closed']])], ['Ag', '']];
+    var mk = function () {
+      return data.map(function (d, i) { var m = new Map(); m.set('#', String(i + 1)); m.set('COLLEGE', d[0]); m.set('AMOUNT', String((i + 1) * 10)); m.set('PEOPLE', d[1]); return m; });
+    };
+    var rows = mk();
+    F.setRows(rows);
+    $('#resultsTable').data('columnNameToOriginalIndex', { 'COLLEGE': 1, 'AMOUNT': 2, 'PEOPLE': 3 });
+    $('#resultsTable tbody').html(rows.map(function (r) {
+      return '<tr><td data-column="0">' + r.get('#') + '</td><td data-column="1">' + r.get('COLLEGE') + '</td><td data-column="2">' + r.get('AMOUNT') + '</td><td data-column="3">people</td></tr>';
+    }).join(''));
+    $('#tableSearch').val('');
+    var NC = ['#', 'COLLEGE', 'AMOUNT', 'PEOPLE', 'NAME', 'ROLE', 'STATE'];
+    // The engine's own reading of a text, __ROW included (as runTableSearch reads it)
+    var hits = function (text) {
+      var rm = /^__ROW\s+/i.test(text), q = text.replace(/^__ROW\s+/i, ''), parsed = F.parseQ(q, NC), n = [];
+      mk().forEach(function (r) { if (F.evalQ(r, parsed, NC, rm)) n.push(r.get('#')); });
+      return n.join(',');
+    };
+    var RP = window.PenumbraTiles && window.PenumbraTiles.strip && window.PenumbraTiles.strip.rowPrefix;
+    var a1 = F.parseArgs(['anyrow', 'Role|ROLE']);
+    eq('nested args: anyrow is a keyword (a class on the strip, no look)', [a1.error, a1.mods], [null, ['anyrow']]);
+    assert('nested args: the unknown-keyword message lists anyrow', /anyrow/.test(F.parseArgs(['sideways', 'Role|ROLE']).error || ''), F.parseArgs(['sideways', 'Role|ROLE']).error);
+    assert('nested rowPrefix: the helper exists', typeof RP === 'function', typeof RP);
+    if (typeof RP === 'function') {
+      eq('nested rowPrefix: the first value pressed writes __ROW, the last released takes it off, between them it is read back',
+        [RP('', 0, 1), RP('__ROW ', 1, 0), RP('', 1, 2), RP('__ROW ', 1, 2), RP('__SRC ', 0, 1), RP('__SRC __ROW ', 2, 0), RP('__ROW ', 0, 1), RP('', 0, 0)],
+        ['__ROW ', '', '', '__ROW ', '__SRC __ROW ', '__SRC ', '__ROW ', '']);
+    }
+    eq('nested engine: PI and Active in one sub-row (__ROW) vs anywhere in the row', [hits('__ROW ROLE = /^(?:PI)$/ and STATE = /^(?:Active)$/'), hits('ROLE = /^(?:PI)$/ and STATE = /^(?:Active)$/')], ['1,3', '1,2,3']);
+    eq('nested engine: an exclude chip under __ROW = a sub-row that is a PI and not Closed', hits('__ROW ROLE = /^(?:PI)$/ and STATE != /^(?:Closed)$/'), '1,3');
+    var SPEC = { fields: F.parseArgs(['Role|ROLE', 'State|STATE', 'College|COLLEGE']).fields, mods: [] };
+    eq('nested counts: the sub-rows\' values, each once per row (row 4 has two CoPI)', vals(F.groups(SPEC, ''), 'ROLE'), [['CoPI', 3, false], ['PI', 3, false]]);
+    eq('nested counts: under __ROW a chip counts rows with ONE sub-row holding it that passes the rest', vals(F.groups(SPEC, '__ROW ROLE = /^(?:PI)$/'), 'STATE'), [['Active', 2, false], ['Closed', 1, false]]);
+    var SPECX = { fields: F.parseArgs(['Role|ROLE', 'State|STATE|exclude']).fields, mods: [] };
+    eq('nested counts: an exclude field\'s chip still counts the rows WITH its value', vals(F.groups(SPECX, '__ROW ROLE = /^(?:PI)$/'), 'STATE'), [['Active', 2, false], ['Closed', 1, false]]);
+    eq('nested counts: without __ROW the same chips count any sub-row', vals(F.groups(SPEC, 'ROLE = /^(?:PI)$/'), 'STATE'), [['Active', 3, false], ['Closed', 2, false]]);
+    eq('nested counts: a typed nested condition narrows the other columns (the parser knows nested names)', vals(F.groups(SPEC, 'NAME = Ann'), 'COLLEGE'), [['Eng', 1, false], ['Sci', 0, false], ['Ag', 0, false]]);
+    eq('nested counts: a top-level chip column is counted as before', vals(F.groups(SPEC, '__ROW ROLE = /^(?:PI)$/ and STATE = /^(?:Active)$/'), 'COLLEGE'), [['Eng', 1, false], ['Sci', 1, false], ['Ag', 0, false]]);
+    return draw("filter_strip('Role|ROLE|range')").then(function () {
+      assert('nested refusal: a range on a nested column', /ROLE is a nested column, so it takes chips/.test(outText()), outText());
+      return draw("filter_strip('Role|ROLE|split=comma')");
+    }).then(function () {
+      assert('nested refusal: a split on a nested column', /ROLE is a nested column, so it takes chips/.test(outText()), outText());
+      return draw("filter_strip('Role|ROLE', 'State|STATE')");
+    }).then(function () {
+      assert('nested render: a nested column is a field (no "not in this report"), its chips its sub-rows\' values', $(S).length === 1 && CH('ROLE', 'PI').length === 1 && CH('STATE', 'Closed').length === 1 && !/not in this report/.test(outText()), outText().substring(0, 200));
+      CH('ROLE', 'PI').trigger('click');
+      return until(function () { return !F.motion() && box() !== ''; }, 5000);
+    }).then(function () {
+      eq('nested click: the first chip on two fields from one sub-table writes __ROW', box(), '__ROW ROLE = /^(?:PI)$/');
+      return wait(250);
+    }).then(function () {
+      eq('nested click: the redrawn counts are one-sub-row counts', cnt('STATE'), ['Active=2', 'Closed=1']);
+      CH('STATE', 'Active').trigger('click');
+      return until(function () { return !F.motion() && box().indexOf('STATE') !== -1; }, 5000);
+    }).then(function () {
+      eq('nested click: the second chip joins under the same __ROW', box(), '__ROW ROLE = /^(?:PI)$/ and STATE = /^(?:Active)$/');
+      eq('nested click: ... which keeps rows 1 and 3', hits(box()), '1,3');
+      return wait(250);
+    }).then(function () {
+      $(S + ' .pnb-fs-clearall').trigger('click');
+      return until(function () { return !F.motion() && box() === ''; }, 5000);
+    }).then(function () {
+      eq('nested clear: Clear all empties the box, __ROW too', box(), '');
+      $('#tableSearch').val('COLLEGE = Eng');
+      F.sync();
+      return wait(100);
+    }).then(function () {
+      CH('ROLE', 'PI').trigger('click');
+      return until(function () { return !F.motion() && box() !== 'COLLEGE = Eng'; }, 5000);
+    }).then(function () {
+      eq('nested click: __ROW goes in front of a typed condition', box(), '__ROW ROLE = /^(?:PI)$/ and COLLEGE = Eng');
+      return wait(250);
+    }).then(function () {
+      CH('ROLE', 'PI').trigger('click');
+      return until(function () { return !F.motion() && box().indexOf('ROLE') === -1; }, 5000);
+    }).then(function () {
+      eq('nested click: releasing the last value takes __ROW off and keeps the typed condition', box(), 'COLLEGE = Eng');
+      $('#tableSearch').val('ROLE = /^(?:PI)$/');
+      F.sync();
+      return wait(100);
+    }).then(function () {
+      CH('STATE', 'Active').trigger('click');
+      return until(function () { return !F.motion() && box().indexOf('STATE') !== -1; }, 5000);
+    }).then(function () {
+      eq('nested click: a __ROW deleted by hand stays deleted while values are pressed', box(), 'ROLE = /^(?:PI)$/ and STATE = /^(?:Active)$/');
+      $('#tableSearch').val('');
+      return draw("filter_strip('Role|ROLE', 'State|STATE', 'anyrow')");
+    }).then(function () {
+      assert('nested anyrow: the strip carries the class', $(S).hasClass('anyrow'), $(S).attr('class'));
+      CH('ROLE', 'PI').trigger('click');
+      return until(function () { return !F.motion() && box() !== ''; }, 5000);
+    }).then(function () {
+      eq('nested anyrow: no __ROW is written', box(), 'ROLE = /^(?:PI)$/');
+      return wait(250);
+    }).then(function () {
+      eq('nested anyrow: the counts are any-sub-row counts', cnt('STATE'), ['Active=3', 'Closed=2']);
+      $('#tableSearch').val('');
+      return draw("filter_strip('Role|ROLE', 'College|COLLEGE')");
+    }).then(function () {
+      CH('ROLE', 'PI').trigger('click');
+      return until(function () { return !F.motion() && box() !== ''; }, 5000);
+    }).then(function () {
+      eq('nested single: one nested field beside a top-level one writes no __ROW', box(), 'ROLE = /^(?:PI)$/');
+      $('#tableSearch').val('');
+      return wait(250);
+    });
+  }
+
   function run() {
     var F = window.__FS;
     if (!F || typeof F.state !== 'function' || typeof F.compose !== 'function') {
@@ -867,7 +995,11 @@
     var a3 = F.parseArgs(['sideways', 'College|COLLEGE']);
     assert('args: an unknown keyword is a loud error naming itself', a3.error && a3.error.indexOf('unknown keyword sideways') !== -1, a3.error);
     assert('args: a field with no column is refused', /needs a column/.test(F.parseArgs(['College|']).error || ''), F.parseArgs(['College|']).error);
-    assert('args: a field with no label is refused', /needs a label/.test(F.parseArgs(['|COLLEGE']).error || ''), F.parseArgs(['|COLLEGE']).error);
+    // 2026-10-29: the label is optional - '|COLUMN' takes the column name as written
+    var nl1 = F.parseArgs(['|College', '|FY|az|top=3']);
+    eq('args: a field with no label takes the column name as written, options still parse',
+      nl1.error ? nl1.error : nl1.fields.map(function (f) { return [f.label, f.col, f.az, f.top]; }), [['College', 'COLLEGE', false, 12], ['FY', 'FY', true, 3]]);
+    assert('args: a lone pipe is still refused (no column)', /needs a column/.test(F.parseArgs(['|']).error || ''), F.parseArgs(['|']).error);
     assert('args: a column listed twice is refused', /listed twice/.test(F.parseArgs(['A|COLLEGE', 'B|college']).error || ''), '');
     assert('args: keywords alone are refused (at least one field)', /at least one field/.test(F.parseArgs(['wide']).error || ''), '');
     var a8 = F.parseArgs(['Status|STATUS|exclude|top=3', 'X|Y|top=0']);
@@ -1132,7 +1264,7 @@
       return draw("filter_strip('College|COLLEGE')");
     }).then(function () {
       assert('render: a fresh render with an empty box shows nothing pressed', $(S + ' .pnb-fs-chip[aria-pressed="true"]').length === 0 && $(S + ' .pnb-fs-chip').length === 4, '');
-      return sectionI(F, draw, outText, S).then(function () { return sectionJ(F, draw, outText, S); }).then(function () { return sectionK(F, draw, outText, S); }).then(function () { return sectionL(F, draw, outText, S); }).then(function () { return sectionM(F, draw, outText, S); }).then(function () { return sectionN(F, draw, outText, S); });
+      return sectionI(F, draw, outText, S).then(function () { return sectionJ(F, draw, outText, S); }).then(function () { return sectionK(F, draw, outText, S); }).then(function () { return sectionL(F, draw, outText, S); }).then(function () { return sectionM(F, draw, outText, S); }).then(function () { return sectionN(F, draw, outText, S); }).then(function () { return sectionO(F, draw, outText, S); });
     }).catch(function (e) {
       assert('render/click phases crashed', false, String(e && e.stack ? e.stack : e));
     }).then(finish);

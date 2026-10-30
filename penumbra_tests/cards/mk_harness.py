@@ -28,10 +28,23 @@ CFG = {
     'cxl': {'size': 'xl'}, 'cxlvl': {}, 'cmenu': {'pill': 'V_STATUS'}, 'gmenu': {}, 'pmenu': {}, 'cmsize': {'pill': 'V_STATUS'}, 'gmsize': {},
     # (cdet) the details window: a card showing three HIDDEN columns (the window must list none of them)
     'cdet': {'title': 'V_NAME', 'big': 'H_AMT', 'pill': 'V_STATUS', 'bar': 'H_NUM', 'fields': ['V_DATE', 'H_TEXT']}, 'gdet': {}, 'pdet': {}, 'cdetph': {},
+    'cmword': {'pill': 'V_STATUS'},   # (cardword) the guessed fields V_NAME / V_DATE / V_LINK, a pill to right-click
+    # (curl) curl1 and curl4 have NO entry: the report's option is off there; curl2 / curl3 / cshare have it on
+    'curl2': {}, 'curl3': {}, 'cshare': {},
+    'cnote': {}, 'cnotedet': {}, 'ctmenu': {}, 'cflink': {},   # (cardnotes) the notes in the card (the driver turns row notes on)
+    # (round K) the card's words (a pill to right-click); Find on cards showing V_NAME, V_AMOUNT (the big number, guessed)
+    # and V_DATE alone (V_ID, V_LINK, V_STATUS buried); grouped; a TEXT column picked for the bar (stays pickable)
+    'ckword': {'pill': 'V_STATUS'}, 'cfind': {'title': 'V_NAME', 'fields': ['V_DATE']}, 'gfind': {}, 'cbarpick': {'bar': 'V_STATUS'},
+    # (round L) the Sort list flat and grouped; a field that is blank on some rows (H_NULL: null / '' / a word); Find on
+    # pivot tiles; the viewer's own title and fields over the report's (clayoutB: seeded)
+    'csort': {}, 'gsort': {}, 'cempty': {'title': 'V_NAME', 'fields': ['H_NULL', 'V_DATE']}, 'pfind': {},
+    'clayout': {'title': 'V_NAME', 'fields': ['V_DATE']}, 'clayoutB': {'title': 'V_NAME', 'fields': ['V_DATE']},
+    'cdetrow': {'title': 'V_NAME'},   # (the sweep) the details window keeps its row: 25 rows a page, as cpage
+    'pvfind': {},   # (round M) Find on a pivot of three measures (pv*: Amt, N, Mean)
 }
 # the viewer's own saved pick (penumbra_column_prefs.lrfix.view = cards), seeded before boot
-PREF_CARDS = ['cfull', 'pcoff', 'gcards', 'gcoll', 'gncoll', 'ggcards', 'gglnest', 'cvlT', 'ca11y', 'cphone', 'cbar', 'chl', 'cviewer', 'csize', 'cxl', 'cmenu', 'gmenu', 'pmenu', 'cmsize', 'gmsize', 'cdet', 'gdet', 'pdet', 'cdetph']
-PREF_TABLE = ['cnarrowT']   # (csize) the viewer chose Table: the phone default yields
+PREF_CARDS = ['cfull', 'pcoff', 'gcards', 'gcoll', 'gncoll', 'ggcards', 'gglnest', 'cvlT', 'ca11y', 'cphone', 'cbar', 'chl', 'cviewer', 'csize', 'cxl', 'cmenu', 'gmenu', 'pmenu', 'cmsize', 'gmsize', 'cdet', 'gdet', 'pdet', 'cdetph', 'cmword', 'curl3', 'cnote', 'cnotedet', 'cflink', 'ckword', 'cfind', 'gfind', 'csort', 'gsort', 'cempty', 'pfind', 'clayout', 'clayoutB', 'cdetrow', 'pvfind']
+PREF_TABLE = ['cnarrowT', 'curl2', 'ctmenu']   # (csize) the viewer chose Table: the phone default yields; (curl) ?cards=1 wins over it
 
 
 def _lift(index_src, rx, what):
@@ -54,17 +67,30 @@ def build(index_src):
     rep('<link rel="stylesheet" href="penumbra_colmenu.css">\n',
         '<link rel="stylesheet" href="penumbra_colmenu.css">\n<link rel="stylesheet" href="penumbra_cards.css">\n<link rel="stylesheet" href="theme_vars.css">\n')
     # index.php order: the card view after main.js (and the column modules); the theme ids for the driver
-    rep('<script src="driver.js"></script>\n', '<script src="penumbra_cards.js"></script>\n<script src="themes.js"></script>\n<script src="driver.js"></script>\n')
+    # (2026-10-30, the sweep) the card view BEFORE the menu engine and both DEFERRED, as index.php loads them: the card
+    # view's init then runs at once and its window-capture key listener comes before the engine's (parsed in place, its
+    # init waited for DOMContentLoaded and the engine's came first - which hid an Escape that closed the details window
+    # under an open menu)
+    rep('<script src="penumbra_colmenu.js"></script>\n', '<script defer src="penumbra_cards.js"></script>\n<script defer src="penumbra_colmenu.js"></script>\n')
+    rep('<script src="driver.js"></script>\n', '<script src="themes.js"></script>\n<script src="driver.js"></script>\n')
+    # (round K) Find in results for the scenarios that use it (index.php loads it after the card view)
+    rep('<script defer src="penumbra_colmenu.js"></script>\n', '<script defer src="penumbra_colmenu.js"></script>\n'
+        '<script>if (/^(cfind|gfind|pfind|pvfind)$/.test(window.__SCN)) document.write(\'<link rel="stylesheet" href="penumbra_find.css"><script defer src="penumbra_find.js"></scr\' + \'ipt>\');</script>\n')   # (deferred, after the engine, as index.php)
     # the switch, after the row count (index.php: inside #tableSearchContainer; the harness keeps the count beside it)
     sw = _lift(index_src, r'<span id="pnbCardsSwitch"[^\n]*', 'the switch')
     szs = _lift(index_src, r'<select id="pnbCardsSize"[^\n]*', 'the size control')   # (csize)
-    rep('<span id="resultCount"></span>', '<span id="resultCount"></span>' + sw + szs)
+    srt = _lift(index_src, r'<select id="pnbCardsSort"[^\n]*', 'the sort list')   # (round L, csort) the list and its arrow
+    rep('<span id="resultCount"></span>', '<span id="resultCount"></span>' + sw + szs + srt)
     host = _lift(index_src, r'<div id="pnbCardsHost"[^\n]*', 'the host')
     rep('<div id="pivot-output-container" style="display:none"></div></div>', '<div id="pivot-output-container" style="display:none"></div>' + host + '</div>')
     # the View Options Cards card (the editor's form), in a #view-options-tab of its own; the Exit pivot button
     vo = _lift(index_src, r'<div class="view-option-item pnb-cards-vo">.*?pnb-cards-note.*?</p>\s*</div>\s*</div>', 'the Cards card')
     vo = re.sub(r'<span class="tab-help-icon"[^>]*>\?</span>', '', vo)
     rep('<div id="pnbStatusBar">', '<div id="view-options-tab" style="display:none"><div class="view-options-grid">' + vo + '</div></div>\n<button id="exitPivotModeBtn" type="button">Exit pivot</button>\n<div id="pnbStatusBar">')
+    # (round I) the pager's Rows: label and the list's title, as index.php has them (the module reads them)
+    plb = _lift(index_src, r'<label for="rowsPerPageSelector"[^>]*>[^<]*</label>', 'the pager label')
+    ptt = re.search(r'<select id="rowsPerPageSelector" (title="[^"]*")', index_src or '')
+    rep('<div id="paginationControls"><select id="rowsPerPageSelector">', '<div id="paginationControls">' + plb + '<select id="rowsPerPageSelector"' + ((' ' + ptt.group(1)) if ptt else '') + '>')
     # the pager buttons, so a scenario turns pages through main.js's own handlers
     rep('<span id="pageInfo"></span>', '<span id="pageInfo"></span><button id="firstPageBtn">|&lt;</button><button id="prevPageBtn">&lt;</button>'
         '<button id="nextPageBtn">&gt;</button><button id="lastPageBtn">&gt;|</button>')
@@ -80,7 +106,7 @@ def build(index_src):
     rep('    window.__STORED = st;\n',
         '    window.__CARDS_CFG = ' + cfg + ';\n'
         '    if (Object.prototype.hasOwnProperty.call(window.__CARDS_CFG, S)) st.viewOptions = Object.assign({}, st.viewOptions || {}, { cards: window.__CARDS_CFG[S] });\n'
-        '    if (S === "cpage") st.rowsPerPage = "25";\n'
+        '    if (S === "cpage" || S === "cdetrow") st.rowsPerPage = "25";\n'
         '    if (S === "cguess") { st.visibleColumns = ["#", 0, 1, 7, 2, 3, 4, 5]; st.columnOrder = [0, 1, 7, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]; }\n'
         '    if (S === "cperf" || S === "cmore") st.rowsPerPage = "all";\n'
         '    if (S === "chl") st.columnHighlights = { V_STATUS: [{ id: "r1", w: "V_STATUS = //Closed//", css: "background-color: #ffebee; color: #c62828; font-weight: bold" }] };\n'
@@ -98,6 +124,7 @@ def build(index_src):
         "  (function () { try { var cs = new URLSearchParams(location.search).get('scn') || '';\n"
         "    var pref = " + _js(PREF_CARDS) + ".indexOf(cs) >= 0 ? { view: 'cards' } : (" + _js(PREF_TABLE) + ".indexOf(cs) >= 0 ? { view: 'table' } : null);\n"
         "    if (cs === 'cbar') pref = Object.assign(pref || {}, { shade: { V_AMOUNT: 'bar' } });\n"
+    "    if (cs === 'clayoutB') pref = Object.assign(pref || {}, { cards: { title: 'V_STATUS', fields: ['V_ID', 'V_AMOUNT'] } });   // (round L) the viewer's own layout\n"
         "    if (pref) localStorage.setItem('penumbra_column_prefs', JSON.stringify({ lrfix: pref }));\n"
         "    if (cs === 'cviewer') { var vt = document.getElementById('view-options-tab'); if (vt) vt.parentNode.removeChild(vt); }   // a viewer has no View Options form\n"
         "  } catch (e) {} })();\n")

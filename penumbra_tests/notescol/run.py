@@ -48,7 +48,7 @@ EXPECT = {
     'copycolon': ['C-on'],
     'panel': ['P-buttons', 'P-hint', 'P-up', 'P-save', 'P-after', 'P-up-typed', 'P-row', 'P-row-preview'],
     'panelreopen': ['P-reopen'],
-    'panelnone': ['P-none'],
+    'panelnone': ['P-own'],
     'cardup': ['U-hint', 'U-up', 'U-typed'],
     'xlsx': ['K-xlsx-on'],
     'cellcopy': ['K-cell-off'],
@@ -58,14 +58,14 @@ EXPECT = {
     'setup': ['T-default', 'T-on', 'T-on-live', 'T-rownotes-off', 'T-rownotes-back', 'T-off'],
     'restore': ['T-restore'],
     'edit': ['D-button', 'D-mode', 'D-post', 'D-after', 'D-preview', 'D-count'],
-    'editnone': ['D-none'],
+    'editnone': ['D-own'],
     'edit409': ['D-409'],
     'editcancel': ['D-cancel'],
 }
 # The build before the change (frozen from its first control run): everything new fails; the
 # "switch off = as before" asserts (V-nopreview, V-off-csv, V-off-html) pass, which is what
 # proves the fixture and the read-out are not the change.
-CONTROL_RED = ['P-reopen', 'E-panelreopen', 'P-buttons', 'P-hint', 'P-up', 'P-save', 'P-after', 'P-up-typed', 'P-row', 'P-row-preview', 'E-panel', 'U-hint', 'U-up', 'U-typed', 'E-cardup', 'K-xlsx-on', 'E-xlsx', 'K-cell-on', 'K-cell-off', 'K-hover', 'E-hovercol', 'S-word', 'S-word-not', 'S-col-text', 'S-col-not', 'S-col-regex', 'S-hidden', 'C-on', 'R-compact', 'R-hover', 'R-grow', 'R-grow-narrow', 'R-back', 'E-wrap', 'E-resize', 'W-clip', 'W-ellipsis', 'W-icon', 'W-wide', 'V-preview', 'V-tip', 'V-preview-file', 'V-oneline', 'V-switch', 'V-off-out', 'V-off-skipfn', 'E-preview', 'X-out', 'X-skipfn', 'X-cell', 'X-csv-head', 'X-csv-cell', 'X-json', 'X-html', 'X-html-nobtn', 'X-parity', 'E-exportcsv', 'T-default', 'T-on', 'T-on-live', 'T-rownotes-off', 'T-rownotes-back', 'T-off', 'E-setup', 'T-restore', 'E-restore', 'D-button', 'D-mode', 'D-post', 'D-after', 'D-preview', 'D-count', 'E-edit', 'E-editnone', 'D-409', 'E-edit409', 'D-cancel', 'E-editcancel']
+CONTROL_RED = ['P-reopen', 'E-panelreopen', 'P-buttons', 'P-hint', 'P-up', 'P-save', 'P-after', 'P-up-typed', 'P-row', 'P-row-preview', 'E-panel', 'U-hint', 'U-up', 'U-typed', 'E-cardup', 'K-xlsx-on', 'E-xlsx', 'K-cell-on', 'K-cell-off', 'K-hover', 'E-hovercol', 'S-word', 'S-word-not', 'S-col-text', 'S-col-not', 'S-col-regex', 'S-hidden', 'C-on', 'R-compact', 'R-hover', 'R-grow', 'R-grow-narrow', 'R-back', 'E-wrap', 'E-resize', 'W-clip', 'W-ellipsis', 'W-icon', 'W-wide', 'V-preview', 'V-tip', 'V-preview-file', 'V-oneline', 'V-switch', 'V-off-out', 'V-off-skipfn', 'E-preview', 'X-out', 'X-skipfn', 'X-cell', 'X-csv-head', 'X-csv-cell', 'X-json', 'X-html', 'X-html-nobtn', 'X-parity', 'E-exportcsv', 'T-default', 'T-on', 'T-on-live', 'T-rownotes-off', 'T-rownotes-back', 'T-off', 'E-setup', 'T-restore', 'E-restore', 'D-button', 'D-mode', 'D-post', 'D-after', 'D-preview', 'D-count', 'E-edit', 'E-editnone', 'P-own', 'D-own', 'D-409', 'E-edit409', 'D-cancel', 'E-editcancel']
 # (the E-* rows: the old build has no penumbraNotesColSkipped for the hook to export)
 
 args = sys.argv[1:]
@@ -148,6 +148,7 @@ _csel = os.path.join(app_dir, 'js', 'penumbra_cellsel.js')
 for _jf, _jdst in (('js/penumbra_journal.js', 'penumbra_journal_nc.js'), ('css/penumbra_journal.css', 'penumbra_journal.css')):
     _jsrc = os.path.join(app_dir, *_jf.split('/'))
     shutil.copyfile(_jsrc if os.path.exists(_jsrc) else os.path.join(APP, *_jf.split('/')), os.path.join(stage, _jdst))
+journal_text = read_b(os.path.join(stage, 'penumbra_journal_nc.js'))   # (2026-10-29) a mutant may take the journal panel's file too ('journal')
 shutil.copyfile(_csel if os.path.exists(_csel) else os.path.join(APP, 'js', 'penumbra_cellsel.js'), os.path.join(stage, 'penumbra_cellsel.js'))
 css_text = read_b(os.path.join(app_dir, 'css', 'main.css'))
 open(os.path.join(stage, 'main.css'), 'wb').write(css_text.encode('utf-8', 'surrogateescape'))
@@ -234,6 +235,7 @@ try:
             edits, must, mscn = MUTANTS[m]
             sc = [s for s in (mscn or names) if s in names]
             open(os.path.join(stage, 'main.css'), 'wb').write(mutate(css_text, m, 'css').encode('utf-8', 'surrogateescape'))
+            open(os.path.join(stage, 'penumbra_journal_nc.js'), 'wb').write(mutate(journal_text, m, 'journal').encode('utf-8', 'surrogateescape'))
             res = evaluate(run_build(mutate(cand_text, m), index_text, sc), sc)
             red = [a for a, p, _ in res if not p]
             if must is None:

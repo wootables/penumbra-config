@@ -13,7 +13,7 @@
 # (#helpCenterToc, five topics incl. the Ask page) - the driver stubs window.openHelpCenter after boot.
 import importlib.util, json, os, re
 HERE = os.path.dirname(os.path.abspath(__file__))
-_spec = importlib.util.spec_from_file_location('colmenu_mk_harness', os.path.join(HERE, '..', 'colmenu', 'mk_harness.py'))
+_spec = importlib.util.spec_from_file_location('colmenu_mk_harness', os.environ.get('PNB_COLMENU_HARNESS') or os.path.join(HERE, '..', 'colmenu', 'mk_harness.py'))   # (a local copy: the share's)
 colmenu_harness = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(colmenu_harness)
 

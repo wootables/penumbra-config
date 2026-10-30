@@ -73,6 +73,7 @@
     var before = shownRows().map(rowIdx);
     await pickView('cards');
     R.chk.toCards = on() && vis(host()) && cards().length > 0;
+    var pagerCards = (function () { var lb = q('label[for="rowsPerPageSelector"]'); return !!lb && text(lb) === 'Cards:' && /^Cards per page/.test(q('#rowsPerPageSelector').title); })();   // (round I)
     var shownThs = qa('#tableHeader th').filter(function (t) { return t.style.display !== 'none'; }).length;
     R.chk.tableKeptForReaders = window.jQuery('#tableHeader th:visible').length === shownThs && shownThs >= 7 && getComputedStyle(q('#resultsTable')).visibility === 'hidden' && window.jQuery('#resultsTable').is(':visible');
     R.chk.count = cards().length === shownRows().length && cards().length === 200;
@@ -128,6 +129,7 @@
     R.chk.switchA11y = s.getAttribute('role') === 'radiogroup' && radios.length === 2 && radios.every(function (r) { return r.getAttribute('role') === 'radio'; })
       && opt('cards').getAttribute('aria-checked') === 'true' && opt('table').getAttribute('aria-checked') === 'false' && opt('cards').classList.contains('is-selected');
     await pickView('table');
+    R.chk.pagerWord = pagerCards && (function () { var lb = q('label[for="rowsPerPageSelector"]'); return !!lb && text(lb) === 'Rows:' && /^Rows per page/.test(q('#rowsPerPageSelector').title); })();   // (round I) and back
     R.chk.toTable = !on() && host().hidden && getComputedStyle(q('#resultsTable')).visibility !== 'hidden' && opt('table').getAttribute('aria-checked') === 'true';
     R.chk.prefTable = (prefs().lrfix || {}).view === 'table';   // (csize) an explicit Table pick is kept: the phone default yields to it
     if (P.get('shot')) { await pickView('cards'); if (P.get('theme')) { var t = (window.__THEMES || []).filter(function (x) { return x.id === P.get('theme'); })[0]; if (t) applyTheme(t); } await sleep(300); }
@@ -205,6 +207,17 @@
     R.chk.notOffered = !!C() && C().offered() === false;
     if (C()) C().set('cards'); await sleep(300);
     R.chk.setRefused = !on() && !vis(host());
+    // (round J, cardsmenu 2) the option off, the table's own menu still offers Show as cards: a pick shows them for
+    // this visit, the switch with them (to go back), at the size picked
+    var ctd = td(shownRows()[1], 'V_NAME'); rclick(ctd); await sleep(80);
+    var has = !!menu() && acts().indexOf('showCards') >= 0, sub = has ? await openSub('showCards') : null;
+    var cp = sub ? q('.pnb-hm-item[data-act="showCards-compact"]', sub) : null;
+    if (cp) cp.click();
+    await until(function () { return on() && cards().length > 0; }, 4000); await sleep(100);
+    R.chk.offFlyout = has && !!cp && on() && cards().length > 0 && C().size() === 'compact' && vis(sw()) && C().offered() === true;
+    R.info.offFlyout = { has: has, sub: !!sub, on: on(), size: C() ? C().size() : null, sw: vis(sw()) };
+    await pickView('table');
+    R.chk.offBack = !on() && vis(sw()) && getComputedStyle(q('#resultsTable')).visibility !== 'hidden';
   };
   S.cviewer = async function () {
     R.chk.noForm = !q('#viewOptionCards') && !window.penumbra_vars.canEditReport;
@@ -345,47 +358,95 @@
     var all = cards(), inside = qa('.pnb-card', grpOf(w));
     return all.length > 0 && inside.length === all.length && inside.length === qa('tbody tr', w).filter(function (tr) { return !tr.classList.contains('search-hidden'); }).length;
   }
+  // (cardlist) the List layout: its own frame on screen (the list, the total, the picked group's band), the host
+  // PARKED in the picked group's box, the box's table laid out out of sight; the list's own pick moves the host
+  function selW() { return wrappers().filter(function (w) { return w.classList.contains('pnb-gl-sel'); })[0] || null; }
+  function boxOf(w) { return w ? q(':scope > .group-content', w) : null; }
+  function keptRows(w) {   // the rows a picked group shows (a branch: every group under it the search keeps)
+    var ls = w.classList.contains('group-leaf') ? [w] : qa('.group-wrapper.group-leaf', w), out = [];
+    ls.forEach(function (l) { qa(':scope > .group-content > table > tbody > tr', l).forEach(function (tr) { if (!tr.classList.contains('search-hidden')) out.push(tr); }); });
+    return out;
+  }
+  function cardsAre(w) { var rs = keptRows(w); return rs.length > 0 && same(cardRows(), rs.map(rowIdx)); }
+  function parkedIn(w) { var b = boxOf(w), h = host(); return !!b && !!h && h.parentNode === b && vis(h); }
+  function glItem(path) { return qa('#pnbGroupList .pnb-gl-item').filter(function (i) { return i.getAttribute('data-path') === path; })[0] || null; }
   S.ggcards = async function () {
-    await until(function () { return on() && grps().length > 0 && document.body.classList.contains('pnb-gl-on'); }, 10000);
-    var ws = wrappers(), st = GL() && GL().state();
+    await until(function () { return on() && document.body.classList.contains('pnb-gl-on') && cards().length > 0 && !!selW(); }, 10000);
+    await until(function () { return parkedIn(selW()); }, 3000);
+    var ws = wrappers().filter(function (w) { return w.classList.contains('group-leaf'); }), st = GL() && GL().state(), w0 = selW();
     R.chk.listOn = !!st && st.on === true && !!st.selPath && document.body.classList.contains('pnb-gl-on');
-    var sel = ws.filter(function (w) { return w.classList.contains('pnb-gl-sel'); })[0];
-    R.chk.onePicked = !!sel && cardsOnlyIn(sel) && grpOf(sel).classList.contains('is-picked') && cards().length < 300;
-    R.chk.allBands = grps().length === ws.length && grps().every(function (g) { return g.classList.contains('is-list'); }) && grps().filter(function (g) { return g.classList.contains('is-off'); }).length === ws.length - 1
-      && qa('.pnb-cards-grptoggle', host()).every(function (t) { return t.hasAttribute('aria-current') && !t.hasAttribute('aria-expanded'); });
-    R.info.list = [ws.length, grps().length, st && st.selPath, cards().length];
-    var w2 = ws[2], g2 = grpOf(w2);
-    q('.pnb-cards-grptoggle', g2).click();
-    await until(function () { return GL().state().selPath === pathOf(w2) && grpOf(w2) && grpOf(w2).classList.contains('is-picked') && cardsOnlyIn(w2); }, 5000);
-    R.chk.pickClick = GL().state().selPath === pathOf(w2) && w2.classList.contains('pnb-gl-sel') && cardsOnlyIn(w2) && q('.pnb-cards-grptoggle', grpOf(w2)).getAttribute('aria-current') === 'true' && q('.pnb-cards-grptoggle', grpOf(ws[0])).getAttribute('aria-current') === 'false';
-    var t3 = q('.pnb-cards-grptoggle', grpOf(ws[3])); t3.focus(); key(t3, 'Enter');
-    await until(function () { return GL().state().selPath === pathOf(ws[3]) && cardsOnlyIn(ws[3]); }, 5000);
-    R.chk.pickKey = GL().state().selPath === pathOf(ws[3]) && cardsOnlyIn(ws[3]);
-    // the list's own pick (as its row click does): the cards follow live
-    GL().select(pathOf(ws[1]));
-    await until(function () { return GL().state().selPath === pathOf(ws[1]) && cardsOnlyIn(ws[1]); }, 5000);
-    R.chk.listPick = GL().state().selPath === pathOf(ws[1]) && cardsOnlyIn(ws[1]) && grpOf(ws[1]).classList.contains('is-picked');
-    await pickView('table');
-    var tablePick = GL().state().selPath === pathOf(ws[1]) && ws[1].classList.contains('pnb-gl-sel') && !ws[1].classList.contains('pnb-gl-off');
+    // (live drew only the picked group's cards too, under bands of its own: this one holds there)
+    R.chk.onePicked = !!w0 && cardsAre(w0) && cards().length < 300;
+    var gc = q('#groupedResultsContainer'), gl = q('#pnbGroupList'), gcs = getComputedStyle(gc), band = w0 ? q(':scope > .group-header', w0) : null, glr = gl ? gl.getBoundingClientRect() : null;
+    R.chk.frameShown = gcs.visibility === 'visible' && gcs.position !== 'absolute' && vis(gl) && !!glr && glr.left >= 0 && glr.top >= 0 && getComputedStyle(gl).visibility === 'visible'
+      && qa('#pnbGroupList .pnb-gl-item').length === ws.length && !!band && vis(band) && getComputedStyle(band).visibility === 'visible';
+    R.chk.hostInBox = !!w0 && parkedIn(w0) && !!C().state() && C().state().list === true;
+    R.chk.noBandsOfItsOwn = cards().length > 0 && qa('#pnbCardsHost .pnb-cards-grp, #pnbCardsHost .pnb-cards-grptoggle').length === 0;
+    var tb = w0 ? q(':scope > .group-content > table', w0) : null, tcs = tb ? getComputedStyle(tb) : null;
+    R.chk.tableHidden = !!tcs && tcs.visibility === 'hidden' && tcs.position === 'absolute' && window.jQuery(tb).is(':visible');   // (laid out: the exports read :visible)
+    R.info.list = { groups: ws.length, items: qa('#pnbGroupList .pnb-gl-item').length, sel: st && st.selPath, cards: cards().length, gc: [gcs.visibility, gcs.position], hostIn: host() && host().parentNode ? host().parentNode.className : null, tb: tcs ? [tcs.visibility, tcs.position] : null };
+    // a click on a list row picks its group: the host moves into that group's box
+    var w2 = ws[2], it2 = glItem(pathOf(w2));
+    if (it2) it2.click();
+    await until(function () { return GL().state().selPath === pathOf(w2) && parkedIn(w2) && cardsAre(w2); }, 5000);
+    R.chk.pickClick = !!it2 && GL().state().selPath === pathOf(w2) && parkedIn(w2) && cardsAre(w2) && !boxOf(w0).contains(host());
+    // the list's own keys: Down picks the next group
+    gl.focus(); key(gl, 'ArrowDown');
+    await until(function () { return GL().state().selPath === pathOf(ws[3]) && parkedIn(ws[3]) && cardsAre(ws[3]); }, 5000);
+    R.chk.pickKey = GL().state().selPath === pathOf(ws[3]) && parkedIn(ws[3]) && cardsAre(ws[3]);
+    R.info.pickKey = [GL().state().selPath, pathOf(ws[3])];
+    // the list's API (the jump to a band's note)
+    GL().selectGroup(ws[1]);
+    await until(function () { return parkedIn(ws[1]) && cardsAre(ws[1]); }, 5000);
+    R.chk.listPick = GL().state().selPath === pathOf(ws[1]) && parkedIn(ws[1]) && cardsAre(ws[1]);
+    // the grouped view rebuilt under the parked host (its box replaced): parked again in the new box
+    var path1 = pathOf(ws[1]);
+    window.__HC.rgv();
+    await until(function () { var w = selW(); return !!w && pathOf(w) === path1 && parkedIn(w) && cardsAre(w); }, 6000);
+    var wr = selW();
+    R.chk.rebuildParks = !!wr && wr !== ws[1] && pathOf(wr) === path1 && parkedIn(wr) && cardsAre(wr) && qa('[id="pnbCardsHost"]').length === 1;
+    // the grouped view's saved HTML put back (a snapshot comparison closing): never a second host
+    var realHost = host(), $gc = window.jQuery('#groupedResultsContainer'); $gc.html($gc.html());
+    await sleep(30);   // (the container's observer first: until() would read the copy itself)
+    // (the host found must be the real one, parked again - never the copy the HTML brought back)
+    await until(function () { var w = selW(); return qa('[id="pnbCardsHost"]').length === 1 && host() === realHost && !!w && parkedIn(w) && cards().length === keptRows(w).length; }, 6000);
+    var wh = selW();
+    R.chk.restoreNoCopy = qa('[id="pnbCardsHost"]').length === 1 && host() === realHost && !!wh && parkedIn(wh) && cards().length === keptRows(wh).length;
+    R.info.restore = { hosts: qa('[id="pnbCardsHost"]').length, sel: wh ? pathOf(wh) : null, cards: cards().length };
+    window.__HC.rgv();   // (the real grouped view back: the rows the cards read again)
+    await until(function () { var w = selW(); return !!w && parkedIn(w) && cardsAre(w); }, 6000);
+    // Table <-> Cards: the host goes back to its place with the table; back to the cards, into the same group's box
+    var hostEl0 = host();
+    opt('table').click();
+    var homeNow = !!hostEl0 && hostEl0.isConnected && !hostEl0.closest('#groupedResultsContainer') && hostEl0.hidden;   // (at once: the switch itself takes it home)
+    await until(function () { return !on(); }, 8000); await sleep(120);
+    var hs = selW(), ht = hs ? q(':scope > .group-content > table', hs) : null;
+    var homeOk = homeNow && !!host() && !host().closest('#groupedResultsContainer') && host().hidden && !!ht && getComputedStyle(ht).visibility === 'visible' && getComputedStyle(ht).position !== 'absolute';
     await pickView('cards');
-    R.chk.keptAcrossViews = tablePick && cardsOnlyIn(ws[1]) && grpOf(ws[1]).classList.contains('is-picked');
+    await until(function () { var w = selW(); return !!w && parkedIn(w) && cardsAre(w); }, 5000);
+    var wk = selW();
+    R.chk.keptAcrossViews = homeOk && !!wk && pathOf(wk) === path1 && parkedIn(wk) && cardsAre(wk);
+    R.info.views = { homeOk: homeOk, sel: wk ? pathOf(wk) : null };
     if (P.get('shot') && P.get('theme')) { var t = (window.__THEMES || []).filter(function (x) { return x.id === P.get('theme'); })[0]; if (t) applyTheme(t); await sleep(300); }
   };
   S.gglnest = async function () {
-    await until(function () { return on() && grps().length > 0 && document.body.classList.contains('pnb-gl-on'); }, 10000);
+    await until(function () { return on() && document.body.classList.contains('pnb-gl-on') && cards().length > 0 && !!selW(); }, 10000);
     var ws = wrappers(), st = GL() && GL().state();
     var branches = ws.filter(function (w) { return w.classList.contains('group-branch'); }), leaves = ws.filter(function (w) { return w.classList.contains('group-leaf'); });
     R.chk.listOn = !!st && st.on === true && branches.length >= 5 && leaves.length > branches.length;
+    // a branch picked: every group under it as one run of cards, in its box; its groups out of sight
     var b1 = branches[1];
-    q('.pnb-cards-grptoggle', grpOf(b1)).click();
-    await until(function () { return GL().state().selPath === pathOf(b1) && cardsOnlyIn(b1); }, 5000);
+    GL().selectGroup(b1);
+    await until(function () { return GL().state().selPath === pathOf(b1) && parkedIn(b1) && cardsAre(b1); }, 5000);
     var inner = qa('.group-wrapper.group-leaf', b1);
-    R.chk.branchPick = GL().state().selPath === pathOf(b1) && cardsOnlyIn(b1) && inner.every(function (l) { return qa('.pnb-card', grpOf(l)).length > 0; }) && grpOf(b1).classList.contains('is-picked');
-    R.info.nest = [branches.length, leaves.length, inner.length, cards().length];
+    R.chk.branchPick = GL().state().selPath === pathOf(b1) && parkedIn(b1) && cardsAre(b1) && inner.length > 1
+      && inner.every(function (l) { return getComputedStyle(l).visibility === 'hidden'; }) && cards().length === keptRows(b1).length;
+    R.info.nest = [branches.length, leaves.length, inner.length, cards().length, keptRows(b1).length];
+    // ...then one of its groups
     var l0 = inner[0];
-    q('.pnb-cards-grptoggle', grpOf(l0)).click();
-    await until(function () { return GL().state().selPath === pathOf(l0) && cardsOnlyIn(l0); }, 5000);
-    R.chk.leafPick = GL().state().selPath === pathOf(l0) && cardsOnlyIn(l0) && grpOf(l0).classList.contains('is-picked') && !grpOf(b1).classList.contains('is-picked');
+    GL().selectGroup(l0);
+    await until(function () { return GL().state().selPath === pathOf(l0) && parkedIn(l0) && cardsAre(l0); }, 5000);
+    R.chk.leafPick = GL().state().selPath === pathOf(l0) && parkedIn(l0) && cardsAre(l0) && cards().length < keptRows(b1).length;
   };
   // (csize) sizes and the phone default
   function sizeSel() { return q('#pnbCardsSize'); }
@@ -733,7 +794,11 @@
     // a right-click on a value inside: that cell's menu (the engine's), the menu's Escape closes the menu alone
     var dd = q('#pnbCardDetails .pnb-cdet-fields dd[data-col="V_DATE"]'), ev = rclick(dd); await sleep(100);
     R.chk.menuInside = ev.defaultPrevented && !!menu() && text(q('.pnb-hm-name', menu())) === thName('V_DATE') && td(sr[1], 'V_DATE').classList.contains('pnb-hm-cell') && acts().indexOf('cardOpen') < 0 && acts().indexOf('cardsTable') >= 0;
+    var dt0 = dd ? dd.previousElementSibling : null, bg0 = dt0 ? getComputedStyle(dt0).backgroundColor : '';
+    R.chk.menuMark = !!dd && dd.classList.contains('is-menu-for') && !!menu() && bg0 !== 'rgba(0, 0, 0, 0)' && bg0 !== 'transparent';
     if (menu()) keyOn(document.activeElement, 'Escape'); await sleep(100);
+    R.chk.menuMarkGoes = R.chk.menuMark === true && !!dd && !dd.classList.contains('is-menu-for') && !menu();   // (after the mark: never vacuous)
+    R.info.mark = { bg: bg0, cls: dd ? dd.className : null };
     R.chk.menuEscKeepsOpen = !menu() && detOpen();
     C().closeDetails(); await sleep(80);
     // Open details from a card's own menu
@@ -785,12 +850,101 @@
     R.chk.noHScroll = document.documentElement.scrollWidth <= innerWidth + 1;
     if (!P.get('shot') && C().closeDetails) C().closeDetails();
   };
+  // (cardword) a card's menu speaks of fields and leaves the grid-only items out; the table's own menu is untouched
+  function labels(root) { return qa('.pnb-hm-item', root || menu()).map(function (i) { return text(q('.pnb-hm-label', i)) || text(i); }); }
+  function heads(root) { return qa('.pnb-hm-head', root || menu()).map(text); }
+  function labelOfAct(act, root) { var i = q('.pnb-hm-item[data-act="' + act + '"]', root || menu()); return i ? text(q('.pnb-hm-label', i)) : null; }
+  function wordy(root) { var all = labels(root).concat(heads(root), qa('.pnb-hm-item[title]', root || menu()).map(function (i) { return i.getAttribute('title'); })); return all.filter(function (s) { return /column/i.test(s || ''); }); }
+  S.cmword = async function () {
+    await until(function () { return on() && cards().length > 0; }, 8000);
+    var c0 = cards()[0], ev = rclick(q('.pnb-card-pill[data-col="V_STATUS"]', c0)); await sleep(100);
+    var a = acts(); R.info.acts = a; R.info.labels = labels();
+    R.chk.gridOnlyHidden = !!menu() && ['width', 'rowHeight', 'freeze', 'unfreeze'].every(function (x) { return a.indexOf(x) < 0; }) && ['sortAsc', 'options', 'hide', 'move', 'calc', 'stats', 'show'].every(function (x) { return a.indexOf(x) >= 0; });
+    R.info.wordy = wordy();
+    R.chk.noColumnWord = !!menu() && wordy().length === 0 && labelOfAct('hide') === 'Hide this field' && labelOfAct('options') === 'Field options...' && labelOfAct('stats') === 'Field stats' && labelOfAct('calc') === 'Add a calculated field...' && labelOfAct('move') === 'Move field' && /^Group by this field/.test(labelOfAct('groupBy') || labelOfAct('groupByList') || '');
+    R.chk.noDoubleSep = R.chk.gridOnlyHidden && !!menu() && !qa('#pnbHeadMenu .pnb-hm-sep + .pnb-hm-sep').length && !menu().firstElementChild.nextElementSibling.classList.contains('pnb-hm-sep');
+    var sub = await openSub('move'); var ml = sub ? labels(sub) : []; R.info.moveLabels = ml;
+    R.chk.moveLabels = same(ml.slice(0, 4), ['Move field up', 'Move field down', 'Move to top', 'Move to bottom']) && !!sub && wordy(sub).length === 0;
+    keyOn(document.activeElement, 'Escape'); await sleep(80);
+    // a move from a card's menu is the table's column move: the fields follow (V_LINK, the third guessed field, moves up past
+    // V_DATE; the header's cells re-order without a render, so the cards must watch the header)
+    var before = qa('.pnb-card-fields dd[data-col]', cards()[0]).map(function (d) { return d.getAttribute('data-col'); });
+    ev = rclick(q('.pnb-card-fields dd[data-col="V_LINK"]', cards()[0])); await sleep(100);
+    sub = await openSub('move'); var mr = sub ? q('.pnb-hm-item[data-act="move-left"]', sub) : null;
+    if (mr) mr.click();
+    await until(function () { var now = qa('.pnb-card-fields dd[data-col]', cards()[0]).map(function (d) { return d.getAttribute('data-col'); }); return !same(now, before); }, 5000);
+    var after = qa('.pnb-card-fields dd[data-col]', cards()[0]).map(function (d) { return d.getAttribute('data-col'); });
+    R.info.move = [before, after, colPos('V_LINK'), colPos('V_DATE'), !!mr, qa('#tableHeader th').map(function (t) { return t.getAttribute('data-colname'); }).slice(0, 8)];
+    R.chk.moveReflected = same(before, ['V_NAME', 'V_DATE', 'V_LINK']) && same(after, ['V_NAME', 'V_LINK', 'V_DATE']) && colPos('V_LINK') === colPos('V_DATE') - 1;
+    var toasted = await until(function () { return /Moved V_LINK (up|left)\./.test(document.body.innerText || ''); }, 3000);
+    R.info.toast = (document.body.innerText.match(/Moved V_LINK [a-z ]+\./) || [null])[0];
+    R.chk.moveToast = toasted && /Moved V_LINK up\./.test(document.body.innerText || '');   // the toast speaks of up, not left
+    // Add a calculated field...: its places; Show field(s): its heading
+    ev = rclick(q('.pnb-card-pill[data-col="V_STATUS"]', cards()[0])); await sleep(100);
+    sub = await openSub('calc'); var cl = sub ? labels(sub) : [], ch = sub ? heads(sub) : []; R.info.calc = [ch, cl];
+    R.chk.calcLabels = !!sub && same(cl.slice(0, 4), ['Above this field', 'Below this field', 'At the top', 'At the bottom']) && ch[0] === 'Add one, using this field' && wordy(sub).length === 0;
+    keyOn(document.activeElement, 'Escape'); await sleep(80);
+    ev = rclick(q('.pnb-card-pill[data-col="V_STATUS"]', cards()[0])); await sleep(100);
+    sub = await openSub('show'); var sh = sub ? heads(sub) : [], sl = sub ? labels(sub) : []; R.info.show = [sh, sl];
+    R.chk.subNoColumn = !!sub && sh[0] === 'Show a hidden field here' && sl.indexOf('Show only this field') >= 0 && sl.indexOf('Show all fields') >= 0 && wordy(sub).length === 0;
+    keyOn(document.activeElement, 'Escape'); await sleep(80);
+    // the table's own menu: every label as it was
+    await pickView('table');
+    var tdv = td(shownRows()[0], 'V_STATUS'); ev = rclick(tdv); await sleep(100);
+    var ta = acts(); R.info.tableActs = ta;
+    R.chk.tableUnchanged = !!menu() && ta.indexOf('width') >= 0 && ta.indexOf('rowHeight') >= 0 && labelOfAct('hide') === 'Hide this column' && labelOfAct('options') === 'Column options...' && labelOfAct('move') === 'Move column' && labelOfAct('calc') === 'Calculated column' && wordy().length > 0;
+    keyOn(document.activeElement, 'Escape'); await sleep(80);
+    await pickView('cards');
+    if (P.get('shot')) { if (P.get('theme')) { var t = (window.__THEMES || []).filter(function (x) { return x.id === P.get('theme'); })[0]; if (t) applyTheme(t); await sleep(200); } rclick(q('.pnb-card-pill[data-col="V_STATUS"]', cards()[2])); await sleep(150); await openSub('move'); await sleep(200); }
+  };
+  // (curl) the card view by URL parameter: ?cards=1|0 and ?cardsize=, the option off or on, the pref untouched; a view
+  // link's cv / cz unlock the switch too; the builder's Open as cards option
+  S.curl1 = async function () {
+    await until(function () { return on() && cards().length > 0; }, 8000);
+    R.chk.switchShown = vis(sw()) && opt('cards').getAttribute('aria-checked') === 'true';
+    R.chk.cardsOn = on() && !host().hidden && cards().length === 200 && same(cardRows(), shownRows().map(rowIdx));
+    R.chk.sizeXl = C().size() === 'xl' && host().classList.contains('is-xl') && vis(sizeSel()) && sizeSel().value === 'xl';
+    var st = C().state(); R.info.slots = st && st.slots;
+    R.chk.guessed = !!st && st.slots && st.slots.title === 'V_ID' && st.slots.big === 'V_AMOUNT' && same(st.slots.fields, ['V_NAME', 'V_DATE', 'V_LINK']);
+    R.chk.offeredNoOption = C().report() === null && C().offered() && !!C().asked && !!C().asked() && C().asked().cards === true;
+    R.chk.prefUntouched = (prefs().lrfix || {}).view === undefined && (prefs().lrfix || {}).size === undefined;
+    R.chk.stateNoLeak = !bsoCards();   // the report's saved state never gains the option from a visitor's URL
+    await pickView('table');
+    R.chk.switchWrites = !on() && (prefs().lrfix || {}).view === 'table' && vis(sw());
+    if (P.get('shot')) { await pickView('cards'); if (P.get('theme')) { var t = (window.__THEMES || []).filter(function (x) { return x.id === P.get('theme'); })[0]; if (t) applyTheme(t); } await sleep(300); }   // the cards by URL, for the picture
+  };
+  S.curl2 = async function () {
+    await until(function () { return on() && cards().length > 0; }, 8000);
+    R.chk.paramWins = on() && (prefs().lrfix || {}).view === 'table';
+    R.chk.prefStillTable = (prefs().lrfix || {}).view === 'table';
+  };
+  S.curl3 = async function () {
+    await until(function () { return vis(sw()) && window.Penumbra.cardsHost.loaded(); }, 8000); await sleep(300);
+    R.chk.tableForced = !on() && vis(sw()) && opt('table').getAttribute('aria-checked') === 'true' && (prefs().lrfix || {}).view === 'cards';
+    R.chk.prefStillCards = (prefs().lrfix || {}).view === 'cards';
+  };
+  S.curl4 = async function () {
+    await until(function () { return on() && cards().length > 0; }, 8000);
+    R.chk.linkUnlocks = on() && C().report() === null && C().offered() && window.PenumbraViewLink.active() && C().size() === 'compact' && host().classList.contains('is-compact');
+    R.chk.prefUntouched = (prefs().lrfix || {}).view === undefined && (prefs().lrfix || {}).size === undefined;
+  };
+  S.cshare = async function () {
+    await until(function () { return vis(sw()); }, 8000);
+    var b0 = window.PenumbraViewLink.build(), d0 = window.PenumbraViewLink.decode(b0.token);
+    R.chk.noCvOnTable = !on() && !!d0 && d0.cv === undefined && d0.cz === undefined;
+    var b = window.PenumbraViewLink.build({ cards: true, size: 'large' }), d = window.PenumbraViewLink.decode(b.token);
+    R.info.share = [d0, d];
+    R.chk.cardsForce = !on() && !!d && d.cv === 1 && d.cz === 'large' && (window.PenumbraViewLink.describe(b) || []).some(function (x) { return /shown as large cards/.test(x); });
+    var b2 = window.PenumbraViewLink.build({ cards: true, size: 'standard' }), d2 = window.PenumbraViewLink.decode(b2.token);
+    R.chk.standardNoCz = !!d2 && d2.cv === 1 && d2.cz === undefined;
+  };
   S.gmenu = async function () {
     await until(function () { return on() && grps().length > 0; }, 10000);
     var g0 = grps()[0], tg = q('.pnb-cards-grptoggle', g0);
     var ev = rclick(tg); await sleep(80);
     var m = menu(), a = acts(); R.info.bandActs = a;
     R.chk.bandMenu = ev.defaultPrevented && !!m && text(q('.pnb-hm-name', m)) === text(q('.pnb-cards-grpname', g0)) && a.indexOf('gToggle') >= 0 && a.indexOf('gCollapseAll') >= 0 && a.indexOf('cardSize') >= 0 && a.indexOf('cardsTable') >= 0;
+    R.info.bandWordy = wordy(); R.chk.bandNoColumn = !!m && wordy().length === 0 && a.length > 8;   // (cardword) a band's menu names no column either
     // the group's own item runs through the table's grouping: Collapse all folds every band in the cards
     q('.pnb-hm-item[data-act="gCollapseAll"]', m).click();
     await until(function () { return !menu() && grps().length > 0 && grps().every(function (g) { return g.classList.contains('is-closed'); }); }, 5000);
@@ -816,6 +970,7 @@
     var m = menu(), a = acts(), marked = q('#pivotResultTable td.pnb-hm-for');
     R.info.pvActs = a;
     R.chk.tileValueMenu = ev.defaultPrevented && !!m && !!marked && marked.hasAttribute('data-col-key') && pvCellText(marked) === text(dd) && a.indexOf('cardsTable') >= 0 && a.some(function (x) { return x !== 'cardSize' && x !== 'cardsTable'; });
+    R.info.tileWordy = wordy(); R.chk.tileNoGrid = !!m && a.indexOf('pvFreeze') < 0 && a.indexOf('pvHighlight') < 0 && wordy().length === 0;   // (cardword; the harness pivot offers no value tools, so this guards the wording alone)
     // the tile's title: the row label's menu
     ev = rclick(q('.pnb-card-title', leaf)); await sleep(80);
     marked = q('#pivotResultTable td.pnb-hm-for'); a = acts(); R.info.pvLabelActs = a;
@@ -833,6 +988,713 @@
       await pickView('cards'); if (P.get('theme')) { var t = (window.__THEMES || []).filter(function (x) { return x.id === P.get('theme'); })[0]; if (t) applyTheme(t); await sleep(200); }
       var sdd = q('.pnb-card:not(.is-total) .pnb-card-pvfields dd[data-pvc]'); if (sdd) rclick(sdd); await sleep(250);
     }
+  };
+
+  // (cardnotes) the Notes column in the card: the journal's REAL painter, list, composer and handlers (main.js), over a
+  // fake manage_journal.php (add / edit / delete / row_notes) - the harness has no journal of its own
+  var JS = null;   // the fake server: row key -> notes (oldest first), and what was asked of it
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function fakeJournal() {
+    var J = window.jQuery, real = J.ajax, seq = 500;
+    JS = { notes: Object.create(null), log: [] };
+    J.ajax = function (a, b) {
+      var o = (typeof a === 'string') ? J.extend({ url: a }, b || {}) : (a || {}), url = String(o.url || '');
+      if (url.indexOf('manage_journal.php') !== 0) return real.apply(this, arguments);
+      var body = {}; try { body = (typeof o.data === 'string') ? JSON.parse(o.data) : {}; } catch (e) { }
+      var act = body.action || ((/[?&]action=([a-z_]+)/.exec(url) || [])[1]) || '', resp = { status: 'error', message: 'not in the harness' }, i, k;
+      JS.log.push({ act: act, body: body });
+      if (act === 'add') {
+        var n = { ID: ++seq, NOTE_TEXT: body.note_text, CREATED_BY: 'harness', AUTHOR_NAME: 'Harness User', CREATED_AT: '2026-10-29 12:' + pad2(seq % 60) + ':00', PARENT_ID: body.parent_id || null };
+        (JS.notes[body.row_key] = JS.notes[body.row_key] || []).push(n);
+        resp = { status: 'success', id: n.ID, mention_results: [], reply_results: [] };
+      } else if (act === 'edit' || act === 'delete') {
+        for (k in JS.notes) for (i = 0; i < JS.notes[k].length; i++) if (String(JS.notes[k][i].ID) === String(body.note_id)) {
+          if (act === 'edit') JS.notes[k][i].NOTE_TEXT = body.note_text; else JS.notes[k].splice(i, 1);
+          resp = { status: 'success', mention_results: [] }; break;
+        }
+      } else if (act === 'row_notes') {
+        var notes = {}, counts = {};
+        for (k in JS.notes) if (JS.notes[k].length) { notes[k] = JS.notes[k].map(function (x) { return J.extend({}, x); }); counts[k] = JS.notes[k].length; }
+        resp = { status: 'success', notes: notes, counts: counts, ver: 'v' + seq };
+      }
+      var d = J.Deferred();
+      setTimeout(function () { try { if (o.success) o.success(resp); } catch (e) { } d.resolve(resp, 'success', { status: 200 }); }, 15);
+      var pr = d.promise(); pr.abort = function () { }; return pr;
+    };
+  }
+  async function loadNotes() { await new Promise(function (r) { window.Penumbra.loadJournalRowNotes(function () { r(); }); }); await sleep(300); }
+  // Row notes on, keyed by V_ID, as a state landing would set them; the Notes column painted by the journal's own pass
+  async function journalOn() {
+    fakeJournal();
+    window.confirm = function () { return true; };
+    window._penumbraJournalHidden = false;   // (the harness starts with the journal off)
+    window._penumbraJournalRowNotes = true;
+    window._penumbraJournalKeyColumns = ['V_ID'];
+    if (window.Penumbra.journalMarkLoadedKey) window.Penumbra.journalMarkLoadedKey();
+    window._penumbraToggleState = {};
+    await loadNotes();
+  }
+  function keyOfRow(tr) { var b = tr ? tr.querySelector('.journal-notes-btn') : null; return b ? b.getAttribute('data-row-key') : null; }
+  var LONG = 'The sponsor asked for a revised budget justification covering the equipment line, the travel line and the subaward; '
+    + 'we agreed to send it by Friday, with the cost share letter from the department and the updated biosketches for both co-investigators.';
+  function seed(k1, k2) {
+    JS.notes[k1] = [{ ID: 11, NOTE_TEXT: 'Called the sponsor about the budget.', CREATED_BY: 'jdoe', AUTHOR_NAME: 'Jane Doe', CREATED_AT: '2026-10-20 09:00:00', PARENT_ID: null },
+                    { ID: 12, NOTE_TEXT: LONG, CREATED_BY: 'harness', AUTHOR_NAME: 'Harness User', CREATED_AT: '2026-10-21 10:00:00', PARENT_ID: null }];
+    if (k2) JS.notes[k2] = [{ ID: 21, NOTE_TEXT: 'Waiting on the PI.', CREATED_BY: 'jdoe', AUTHOR_NAME: 'Jane Doe', CREATED_AT: '2026-10-22 11:00:00', PARENT_ID: null }];
+  }
+  function panelOf(card) { return card ? q('.pnb-card-notes .journal-rownote-inline', card) : null; }
+  function items(p) { return p ? qa(':scope > .journal-rownote-list .journal-rownote-item', p) : []; }
+  function itemTexts(p) { return items(p).map(function (it) { return text(q('.journal-rownote-text', it)); }); }
+  function inputOf(p) { return p ? q(':scope > .journal-rownote-compose .journal-rownote-input', p) : null; }
+  function typeIn(el, t) { if (el._mentionMf && el._mentionMf.setText) el._mentionMf.setText(t); else { el.textContent = t; el.dispatchEvent(new Event('input', { bubbles: true })); } }
+  function noteCardOpen() { return !!q('.journal-pvnote-card'); }
+  function lastAct() { return JS.log.length ? JS.log[JS.log.length - 1] : null; }
+  function acted(a) { return JS.log.filter(function (x) { return x.act === a; }); }
+  function cardFor(tr) { var i = rowIdx(tr); return cards().filter(function (c) { return parseInt(c.getAttribute('data-row'), 10) === i; })[0] || null; }
+  S.cnote = async function () {
+    await until(function () { return on() && cards().length > 0; }, 8000);
+    await journalOn();
+    // the journal painting its Notes column in redraws the cards with it: a panel on every card, never the button
+    await until(function () { return cards().length > 0 && cards().every(function (c) { return !!panelOf(c); }); }, 4000);
+    var cs0 = cards();
+    R.chk.autoDraw = !!fth('__JOURNAL_NOTES') && cs0.length > 0 && cs0.every(function (c) { return !!panelOf(c) && !q('.journal-notes-btn', c); });
+    R.info.auto = { col: !!fth('__JOURNAL_NOTES'), cards: cs0.length, panels: qa('#pnbCardsHost .journal-rownote-inline').length, btns: qa('#pnbCardsHost .journal-notes-btn').length };
+    var rows = shownRows(), k1 = keyOfRow(rows[1]), k2 = keyOfRow(rows[2]), c1 = cardFor(rows[1]);
+    seed(k1, k2);
+    await loadNotes();
+    // the notes read again: the same card's panel follows (no redraw)
+    var p1 = panelOf(c1), p2 = panelOf(cardFor(rows[2]));
+    R.chk.refreshFollows = !!c1 && c1.isConnected && items(p1).length === 2 && items(p2).length === 1 && text(q('.journal-rownote-inlinecount', p1)) === '2';
+    R.info.refresh = { k1: k1, c1: !!c1, conn: !!c1 && c1.isConnected, n1: items(p1).length, n2: items(p2).length };
+    // every note in full: no cut text, no scroll box of its own
+    var lt = items(p1)[1] ? q('.journal-rownote-text', items(p1)[1]) : null, ls = p1 ? q(':scope > .journal-rownote-list', p1) : null;
+    R.chk.fullText = !!lt && text(lt) === LONG && lt.scrollHeight <= lt.clientHeight + 1 && !!ls && ls.scrollHeight <= ls.clientHeight + 1 && getComputedStyle(ls).overflowY === 'visible' && lt.getBoundingClientRect().height > 30;
+    R.chk.label = !!p1 && text(q('.journal-rownote-inlinelbl', p1)) === thName('__JOURNAL_NOTES') && !!text(q('.journal-rownote-inlinelbl', p1));
+    R.info.label = [p1 ? text(q('.journal-rownote-inlinelbl', p1)) : null, thName('__JOURNAL_NOTES')];
+    // the usual buttons: Reply on each, Edit on your own newest, the x for an admin; Add a note
+    var i11 = items(p1)[0], i12 = items(p1)[1];
+    R.chk.buttons = !!i11 && !!i12 && !!q('.journal-rownote-reply-btn', i11) && !q('.journal-rownote-edit-btn', i11) && !!q('.journal-rownote-del', i11)
+      && !!q('.journal-rownote-reply-btn', i12) && !!q('.journal-rownote-edit-btn', i12) && !!q('.journal-rownote-del', i12) && !!q('.journal-rownote-addbtn', p1);
+    // (round I) a note is a line of text: a short one's author, text and age on one line; a long one wraps under its author
+    var a11 = i11 ? q('.journal-rownote-author', i11) : null, t11 = i11 ? q('.journal-rownote-text', i11) : null, w11 = i11 ? q('.journal-rownote-when', i11) : null;
+    var a12 = i12 ? q('.journal-rownote-author', i12) : null, rs12 = lt ? lt.getClientRects() : [];
+    function topOf(el) { return el.getClientRects()[0].top; }
+    R.chk.oneLine = !!a11 && !!t11 && !!w11 && Math.abs(topOf(a11) - topOf(t11)) < 4 && Math.abs(topOf(a11) - topOf(w11)) < 6 && !!q('.journal-rownote-meta', i11)
+      && !!a12 && rs12.length > 2 && Math.abs(rs12[0].top - topOf(a12)) < 4 && rs12[rs12.length - 1].left < a12.getBoundingClientRect().left + 4;
+    R.info.oneLine = { a: a11 ? topOf(a11) : null, t: t11 ? topOf(t11) : null, w: w11 ? topOf(w11) : null, rects: rs12.length, lastLeft: rs12.length ? Math.round(rs12[rs12.length - 1].left) : null, authLeft: a12 ? Math.round(a12.getBoundingClientRect().left) : null };
+    // ...its Reply / Edit / x quiet icons: no frame, no fill, faint until pointed at
+    document.body.classList.add('theme-light-sepia');
+    var rb = i12 ? q('.journal-rownote-reply-btn', i12) : null, rcs = rb ? getComputedStyle(rb) : null, act12 = i12 ? q('.journal-rownote-act', i12) : null;
+    R.chk.quietIcons = !!rb && !!q('svg', rb) && !text(rb) && /Reply/.test(rb.getAttribute('aria-label') || '') && parseFloat(rcs.borderTopWidth) === 0
+      && (rcs.backgroundColor === 'rgba(0, 0, 0, 0)' || rcs.backgroundColor === 'transparent') && !!act12 && parseFloat(getComputedStyle(act12).opacity) < 1;
+    R.info.icons = rcs ? { border: rcs.borderTopWidth, bg: rcs.backgroundColor, op: act12 ? getComputedStyle(act12).opacity : null } : null;
+    document.body.classList.remove('theme-light-sepia');
+    // (round I) Consistent Row Height on (the Settings switch; the harness starts with it off): the tall card kept to the
+    // Standard height, faded under Show all
+    var rx0 = q('#spRowExpandToggle');
+    if (rx0 && !rx0.checked) { rx0.checked = true; rx0.dispatchEvent(new Event('change', { bubbles: true })); }
+    await until(function () { return host().style.getPropertyValue('--pnb-card-cap') === '300px'; }, 3000);
+    var mb1 = q(':scope > .pnb-card-more', c1);
+    await until(function () { return c1.classList.contains('is-clipped'); }, 2000);
+    mb1 = q(':scope > .pnb-card-more', c1);
+    R.chk.capConsistent = c1.classList.contains('is-clipped') && c1.offsetHeight <= 300 + 26 && c1.offsetHeight < c1.scrollHeight && !!mb1 && text(mb1) === 'Show all' && host().style.getPropertyValue('--pnb-card-cap') === '300px';
+    R.info.cap = { h: c1.offsetHeight, sh: c1.scrollHeight, cls: c1.className, cap: host().style.getPropertyValue('--pnb-card-cap') };
+    if (mb1) mb1.click(); await sleep(120);
+    var openOk = c1.classList.contains('is-open') && c1.offsetHeight > 300 + 26 && !!q(':scope > .pnb-card-more', c1) && text(q(':scope > .pnb-card-more', c1)) === 'Show less' && !detOpen();
+    if (q(':scope > .pnb-card-more', c1)) q(':scope > .pnb-card-more', c1).click(); await sleep(120);
+    R.chk.showAll = openOk && c1.classList.contains('is-clipped') && !c1.classList.contains('is-open') && c1.offsetHeight <= 300 + 26;
+    // a click on a note's text reads it: no details window
+    if (lt) lt.click(); await sleep(120);
+    R.chk.textClickStays = !!lt && !detOpen();
+    // Add a note: the composer IN the card, focused; never the floating note card
+    q('.journal-rownote-addbtn', p1).click(); await sleep(120);
+    var in1 = inputOf(p1);
+    R.chk.addOpens = !!in1 && p1.classList.contains('is-composing') && c1.contains(in1) && document.activeElement === in1 && !noteCardOpen() && !detOpen();
+    // (round I) the box opened in the cut-off part: the card shows whole
+    await until(function () { return c1.classList.contains('is-open'); }, 1500);
+    R.chk.composeOpens = c1.classList.contains('is-open') && !!in1 && in1.getBoundingClientRect().bottom <= c1.getBoundingClientRect().bottom;
+    R.info.composeOpens = { cls: c1.className, inB: in1 ? Math.round(in1.getBoundingClientRect().bottom) : null, cB: Math.round(c1.getBoundingClientRect().bottom), act: document.activeElement ? document.activeElement.className : null };
+    // Escape folds it away, the text kept: Add a note brings it back
+    typeIn(in1, 'Draft one'); await sleep(60);
+    keyOn(in1, 'Escape'); await sleep(120);
+    var closed = !inputOf(p1) && !p1.classList.contains('is-composing') && document.activeElement === q('.journal-rownote-addbtn', p1);
+    q('.journal-rownote-addbtn', p1).click(); await sleep(120);
+    in1 = inputOf(p1);
+    R.chk.escKeeps = closed && !!in1 && text(in1) === 'Draft one';
+    // a redraw while writing: the composer, its text and the focus carried into the new card
+    C().redraw(); await sleep(120);
+    var c1b = cardFor(rows[1]), p1b = panelOf(c1b), in1b = inputOf(p1b);
+    R.chk.carried = !!c1b && c1b !== c1 && !!in1b && text(in1b) === 'Draft one' && document.activeElement === in1b && p1b.classList.contains('is-composing');
+    R.info.carried = { newCard: !!c1b && c1b !== c1, input: !!in1b, txt: in1b ? text(in1b) : null, focus: document.activeElement ? document.activeElement.className : null };
+    // Post: the note lands in the card's list, the composer folds away
+    var badShape = false, shapeMo = new MutationObserver(function () {
+      qa('.journal-rownote-item', q(':scope > .journal-rownote-list', p1b)).forEach(function (it) { if (!q(':scope > .journal-rownote-meta', it)) badShape = true; });
+    });
+    shapeMo.observe(q(':scope > .journal-rownote-list', p1b), { childList: true, subtree: true });
+    q('.journal-rownote-post', p1b).click();
+    await until(function () { var p = panelOf(cardFor(rows[1])); return acted('add').length === 1 && items(p).length === 3 && !inputOf(p); }, 5000);
+    var p1c = panelOf(cardFor(rows[1]));
+    R.chk.post = acted('add').length === 1 && acted('add')[0].body.row_key === k1 && acted('add')[0].body.note_text === 'Draft one' && itemTexts(p1c)[2] === 'Draft one'
+      && !inputOf(p1c) && text(q('.journal-rownote-inlinecount', p1c)) === '3' && !noteCardOpen();
+    // a card beside a taller one (its notes) keeps its parts together at the top: no gaps spread through it
+    var c0 = cardFor(rows[0]), c1p = cardFor(rows[1]), sameRow = !!c0 && !!c1p && c0.offsetTop === c1p.offsetTop;
+    var tt0 = c0 ? q('.pnb-card-title', c0) : null, bg0 = c0 ? q('.pnb-card-big', c0) : null;
+    R.chk.topAligned = sameRow && c1p.offsetHeight > 0 && c0.offsetHeight >= c0.scrollHeight - 1 && c0.offsetHeight > 200 && !!tt0 && !!bg0 && bg0.getBoundingClientRect().top - tt0.getBoundingClientRect().bottom < 16;
+    R.info.top = { sameRow: sameRow, h: c0 ? [c0.offsetHeight, c1p.offsetHeight] : null, gap: (tt0 && bg0) ? Math.round(bg0.getBoundingClientRect().top - tt0.getBoundingClientRect().bottom) : null };
+    shapeMo.disconnect();
+    // (round J) every note of yours can be edited, not only the newest: the older one (12) and the new one both offer Edit
+    var o12 = items(p1c).filter(function (it) { return it.getAttribute('data-note-id') === '12'; })[0], oNew = items(p1c)[2];
+    R.chk.editOlder = !!o12 && !!q('.journal-rownote-edit-btn', o12) && !!oNew && !!q('.journal-rownote-edit-btn', oNew) && !q('.journal-rownote-edit-btn', items(p1c)[0]);
+    R.chk.postKeepsShape = !badShape && items(p1c).length === 3 && items(p1c).every(function (it) { return !!q(':scope > .journal-rownote-meta', it); });
+    R.info.post = { adds: acted('add').length, n: items(p1c).length, texts: itemTexts(p1c).map(function (s) { return (s || '').slice(0, 20); }), composing: !!inputOf(p1c) };
+    // Reply to the first note: the banner names its author, the post goes under it
+    q('.journal-rownote-reply-btn', items(p1c)[0]).click(); await sleep(120);
+    var inR = inputOf(p1c), ban = q('.journal-rownote-reply-banner', p1c);
+    var banOk = !!inR && !!ban && /Jane Doe/.test(text(ban));
+    typeIn(inR, 'A reply in the card'); q('.journal-rownote-post', p1c).click();
+    await until(function () { var p = panelOf(cardFor(rows[1])); return acted('add').length === 2 && items(p).length === 4; }, 5000);
+    var p1d = panelOf(cardFor(rows[1])), rep = items(p1d).filter(function (it) { return it.classList.contains('journal-rownote-reply'); })[0];
+    R.chk.reply = banOk && acted('add').length === 2 && String(acted('add')[1].body.parent_id) === '11' && !!rep && text(q('.journal-rownote-text', rep)) === 'A reply in the card';
+    // Edit your newest (the reply): the composer takes its text, Save writes it back
+    var eb = rep ? q('.journal-rownote-edit-btn', rep) : null;
+    if (eb) eb.click(); await sleep(120);
+    var inE = inputOf(p1d), saveLbl = text(q('.journal-rownote-post', p1d));
+    var editOpen = !!inE && text(inE) === 'A reply in the card' && saveLbl === 'Save';
+    if (inE) { typeIn(inE, 'An edited reply'); q('.journal-rownote-post', p1d).click(); }
+    await until(function () { var p = panelOf(cardFor(rows[1])); return acted('edit').length === 1 && itemTexts(p).indexOf('An edited reply') >= 0; }, 5000);
+    var p1e = panelOf(cardFor(rows[1]));
+    R.chk.edit = !!eb && editOpen && acted('edit').length === 1 && String(acted('edit')[0].body.note_id) === String(rep.getAttribute('data-note-id')) && itemTexts(p1e).indexOf('An edited reply') >= 0 && !inputOf(p1e);
+    R.info.edit = { eb: !!eb, open: editOpen, lbl: saveLbl, edits: acted('edit').length };
+    // x deletes it
+    var rep2 = items(p1e).filter(function (it) { return it.classList.contains('journal-rownote-reply'); })[0], db = rep2 ? q('.journal-rownote-del', rep2) : null;
+    if (db) db.click();
+    await until(function () { var p = panelOf(cardFor(rows[1])); return acted('delete').length === 1 && items(p).length === 3; }, 5000);
+    R.chk.del = !!db && acted('delete').length === 1 && items(panelOf(cardFor(rows[1]))).length === 3 && itemTexts(panelOf(cardFor(rows[1]))).indexOf('An edited reply') < 0;
+    // (round I) a double-click on your own newest note edits it
+    var pDb = panelOf(cardFor(rows[1])), mine = items(pDb).filter(function (it) { return it.classList.contains('is-editable'); })[0];
+    if (mine) q('.journal-rownote-text', mine).dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+    await sleep(120);
+    var inDb = inputOf(panelOf(cardFor(rows[1])));
+    R.chk.dblEdit = !!mine && !!inDb && text(inDb) === text(q('.journal-rownote-text', mine)) && text(q('.journal-rownote-post', panelOf(cardFor(rows[1])))) === 'Save';
+    if (inDb) { keyOn(inDb, 'Escape'); await sleep(100); }
+    // a card's menu: Add a note to this row... writes in the card
+    var c2 = cardFor(rows[2]), ev = rclick(q('.pnb-card-fields dt', c2)); await sleep(100);
+    var an = menu() ? q('.pnb-hm-item[data-act="addNote"]', menu()) : null;
+    if (an) an.click(); await sleep(150);
+    var p2b = panelOf(cardFor(rows[2]));
+    R.chk.menuAddNote = !!an && !!inputOf(p2b) && document.activeElement === inputOf(p2b) && !noteCardOpen();
+    R.chk.cardWording = !!an && /this card/.test(text(an)) && !/this row/.test(text(an));   // (round I)
+    R.info.anLabel = an ? text(an) : null;
+    R.info.menu = { acts: acts(), an: !!an };
+    if (menu()) keyOn(document.activeElement, 'Escape');
+    if (inputOf(p2b)) { keyOn(inputOf(p2b), 'Escape'); await sleep(80); }
+    // Quick actions' add a note: the selected card
+    var none = C().noteCard ? C().noteCard() : 'no api';
+    var c3 = cardFor(rows[3]); c3.focus(); keyOn(c3, ' '); await sleep(60);
+    var nc = C().noteCard ? C().noteCard() : null, took = nc && C().addNote('From quick actions'); await sleep(150);
+    var p3 = panelOf(cardFor(rows[3]));
+    R.chk.paletteNote = none === null && !!nc && nc.title === text(q('.pnb-card-title', c3)) && !!took && !!inputOf(p3) && text(inputOf(p3)) === 'From quick actions';
+    if (inputOf(p3)) { keyOn(inputOf(p3), 'Escape'); await sleep(80); }
+    // (round I) Consistent Row Height off (the Settings switch): the cap is the window's, the 3-note card whole
+    var rx = q('#spRowExpandToggle');
+    if (rx) { rx.checked = false; rx.dispatchEvent(new Event('change', { bubbles: true })); }
+    await until(function () { return host().style.getPropertyValue('--pnb-card-cap') === (window.innerHeight - 140) + 'px'; }, 3000);
+    var c1x = cardFor(rows[1]);
+    R.chk.capOff = !!rx && document.body.classList.contains('disable-auto-expand') && host().style.getPropertyValue('--pnb-card-cap') === (window.innerHeight - 140) + 'px' && !!c1x && !c1x.classList.contains('is-clipped');
+    R.info.capOff = { rx: !!rx, cap: host().style.getPropertyValue('--pnb-card-cap'), vh: window.innerHeight, cls: c1x ? c1x.className : null };
+    if (rx) { rx.checked = true; rx.dispatchEvent(new Event('change', { bubbles: true })); await sleep(250); }
+    // a Notes column the viewer hid: no notes on the cards, as no hidden column
+    var nth = fth('__JOURNAL_NOTES'), before = qa('#pnbCardsHost .journal-rownote-inline').length;
+    if (nth) { nth.style.display = 'none'; C().redraw(); await sleep(100); }
+    R.chk.hiddenNone = !!nth && before > 0 && qa('#pnbCardsHost .journal-rownote-inline').length === 0 && cards().length > 0;
+    if (nth) { nth.style.display = ''; C().redraw(); await sleep(100); }
+    if (P.get('shot')) {   // the picture: a card with its notes and the composer open
+      if (P.get('theme')) { var t = (window.__THEMES || []).filter(function (x) { return x.id === P.get('theme'); })[0]; if (t) applyTheme(t); await sleep(200); }
+      var ps = panelOf(cardFor(rows[1])); if (ps) { q('.journal-rownote-addbtn', ps).click(); await sleep(150); typeIn(inputOf(ps), 'Sent the revised budget.'); }
+      cardFor(rows[1]).scrollIntoView({ block: 'center' }); await sleep(200);
+    }
+  };
+  // (round I, cardsmenu) the table's own right-click menus: Show as cards, a list of the sizes, This row as a card
+  S.ctmenu = async function () {
+    await until(function () { return !!sw() && !sw().hidden && !on(); }, 8000);
+    var tr = shownRows()[3], cell = td(tr, 'V_NAME');
+    rclick(cell); await sleep(80);
+    var has = !!menu() && acts().indexOf('showCards') >= 0;
+    var sub = await openSub('showCards');
+    var sa = sub ? qa('.pnb-hm-item', sub).map(function (x) { return x.getAttribute('data-act'); }) : [];
+    R.chk.flyout = has && same(sa, ['showCards-compact', 'showCards-standard', 'showCards-large', 'showCards-xl', 'showCardRow'])
+      && q('.pnb-hm-item[data-act="showCards-standard"]', sub).getAttribute('aria-checked') === 'true';
+    R.info.flyout = { has: has, sub: sa };
+    var lg = sub ? q('.pnb-hm-item[data-act="showCards-large"]', sub) : null;
+    if (lg) lg.click(); await until(function () { return on() && cards().length > 0; }, 4000); await sleep(100);
+    R.chk.pickSize = on() && C().size() === 'large' && host().classList.contains('is-large') && !menu();
+    await pickView('table');
+    rclick(td(shownRows()[3], 'V_NAME')); await sleep(80);
+    sub = await openSub('showCards');
+    var rowIt = sub ? q('.pnb-hm-item[data-act="showCardRow"]', sub) : null;
+    if (rowIt) rowIt.click(); await until(function () { return on() && detOpen(); }, 4000); await sleep(100);
+    var at = C().details().at, cs = cards();
+    R.chk.rowCard = !!rowIt && on() && detOpen() && !!cs[at] && parseInt(cs[at].getAttribute('data-row'), 10) === rowIdx(tr);
+    C().closeDetails(); await pickView('table');
+    // a heading's menu: the sizes alone (no row there)
+    rclick(fth('V_NAME')); await sleep(80);
+    sub = await openSub('showCards');
+    var ha = sub ? qa('.pnb-hm-item', sub).map(function (x) { return x.getAttribute('data-act'); }) : [];
+    R.chk.headerFlyout = ha.length === 4 && ha.indexOf('showCardRow') < 0;
+    if (menu()) keyOn(document.activeElement, 'Escape');
+  };
+  // (round J) filter links in a card and in the details window; links themed as the table's; the field highlight in
+  // each theme's table-hover colour
+  function colourOf(css) { var e = document.createElement('span'); e.style.color = css; document.body.appendChild(e); var c = getComputedStyle(e).color; e.parentNode.removeChild(e); return c; }
+  function bgOfVar(name, fb) { var e = document.createElement('span'); e.style.backgroundColor = 'var(' + name + ', ' + fb + ')'; document.body.appendChild(e); var c = getComputedStyle(e).backgroundColor; e.parentNode.removeChild(e); return c; }
+  function setThemeClass(t) {
+    var b = document.body;
+    b.className = b.className.replace(/\btheme-[\w-]+\b/g, '').replace(/\b(is-dark|registry-theme)\b/g, '').replace(/\s+/g, ' ').trim();
+    b.removeAttribute('data-theme');
+    if (t && t.id) applyTheme(t); else if (t) b.classList.add(t);
+  }
+  S.cflink = async function () {
+    await until(function () { return on() && cards().length > 0; }, 8000);
+    var tr = shownRows()[2], name = tdText(tr, 'V_NAME'), q1 = 'V_NAME = //' + name + '//';
+    function plant() { var c = td(tr, 'V_NAME'); c.innerHTML = '<a href="#" data-search="' + q1.replace(/"/g, '&quot;') + '">' + name + '</a>'; C().redraw(); }
+    plant(); await sleep(100);
+    var cl = q('dd[data-col="V_NAME"] a[data-search]', cardFor(tr));
+    if (cl) cl.click();
+    await until(function () { return window.jQuery('#tableSearch').val() === q1 && cards().length > 0 && cards().length < 200; }, 5000);
+    R.chk.cardLink = !!cl && window.jQuery('#tableSearch').val() === q1 && cards().length > 0 && cards().length < 200 && !detOpen();
+    R.info.cardLink = { link: !!cl, search: window.jQuery('#tableSearch').val(), cards: cards().length };
+    await runSearch(''); await until(function () { return shownRows().length === 200 && cards().length === 200; }, 6000);
+    plant(); await sleep(100);
+    q('.pnb-card-title', cardFor(tr)).click(); await sleep(150);
+    var dl = q('#pnbCardDetails dd[data-col="V_NAME"] a[data-search]');
+    var wasOpen = detOpen();
+    if (dl) dl.click();
+    await until(function () { return window.jQuery('#tableSearch').val() === q1 && !detOpen() && cards().length < 200; }, 5000);
+    R.chk.detailsLink = wasOpen && !!dl && window.jQuery('#tableSearch').val() === q1 && !detOpen() && cards().length > 0 && cards().length < 200;
+    R.info.detailsLink = { open: wasOpen, link: !!dl, search: window.jQuery('#tableSearch').val(), det: detOpen() };
+    await runSearch(''); await until(function () { return shownRows().length === 200 && cards().length === 200; }, 6000);
+    // a link on a card's value takes the table's own link styling, theme by theme (no theme; Light Sepia; a registry theme)
+    var reg = (window.__THEMES || []).filter(function (x) { return x.modern; })[0], looks = [], linkOk = true;
+    [null, 'theme-light-sepia', reg].forEach(function (th) {
+      setThemeClass(th);
+      var tr0 = shownRows()[0], tl = td(tr0, 'V_LINK') ? td(tr0, 'V_LINK').querySelector('a') : null, ca = q('dd[data-col="V_LINK"] a', cardFor(tr0));
+      var a = tl ? getComputedStyle(tl) : null, b = ca ? getComputedStyle(ca) : null;
+      var ok = !!a && !!b && a.color === b.color && a.textDecorationLine === b.textDecorationLine && b.textDecorationLine === 'none';
+      looks.push({ theme: th ? (th.id || th) : 'none', table: a ? [a.color, a.textDecorationLine] : null, card: b ? [b.color, b.textDecorationLine] : null });
+      if (!ok) linkOk = false;
+    });
+    R.chk.linkThemed = linkOk && !!reg;
+    R.info.links = looks;
+    // the field a menu is open for, in the theme's table-hover colour (Light Sepia names its own; a registry theme sets --row-hover)
+    var hv = [], hvOk = true;
+    [[null, colourOf('#F0E68C')], ['theme-light-sepia', colourOf('#dcd5c9')], [reg, null]].forEach(function (pair) {
+      setThemeClass(pair[0]);
+      var want = pair[1] || bgOfVar('--row-hover', '#F0E68C');
+      var dd = q('dd[data-col="V_DATE"]', cards()[1]); rclick(dd);
+      var dt = dd ? dd.previousElementSibling : null, got = dt ? getComputedStyle(dt).backgroundColor : null;
+      hv.push({ theme: pair[0] ? (pair[0].id || pair[0]) : 'none', want: want, got: got, menu: !!menu() });
+      if (!menu() || got !== want) hvOk = false;
+      if (menu()) keyOn(document.activeElement, 'Escape');
+    });
+    await sleep(60);
+    R.chk.hoverThemed = hvOk;
+    R.info.hover = hv;
+    setThemeClass(null);
+  };
+  S.cnotedet = async function () {
+    await until(function () { return on() && cards().length > 0; }, 8000);
+    await journalOn();
+    var rows = shownRows(), k1 = keyOfRow(rows[1]);
+    seed(k1, null);
+    await loadNotes();
+    // the details window: the row's notes in full, written in place
+    q('.pnb-card-title', cardFor(rows[1])).click(); await sleep(150);
+    var dp = q('#pnbCardDetails .pnb-cdet-notes .journal-rownote-inline');
+    R.chk.inDetails = detOpen() && !!dp && items(dp).length === 2 && itemTexts(dp)[1] === LONG && !q('#pnbCardDetails .journal-notes-btn');
+    if (dp) q('.journal-rownote-addbtn', dp).click(); await sleep(120);
+    var din = inputOf(dp);
+    R.chk.addInDetails = !!din && document.activeElement === din && !!din.closest('#pnbCardDetails') && !noteCardOpen();
+    // Escape: the composer first, the window stays; again: the window closes
+    if (din) { typeIn(din, 'From the window'); keyOn(din, 'Escape'); } await sleep(120);
+    R.chk.escComposerFirst = !!din && !inputOf(dp) && detOpen();
+    keyOn(document.activeElement, 'Escape'); await sleep(120);
+    R.chk.escThenCloses = R.chk.escComposerFirst === true && !detOpen();   // (after the composer closed first: never vacuous)
+    // post from the window: the note in the window's list and on the card behind it
+    q('.pnb-card-title', cardFor(rows[1])).click(); await sleep(150);
+    dp = q('#pnbCardDetails .pnb-cdet-notes .journal-rownote-inline');
+    if (dp) q('.journal-rownote-addbtn', dp).click(); await sleep(120);
+    din = inputOf(dp);
+    var kept = !!din && text(din) === 'From the window';
+    if (din) q('.journal-rownote-post', dp).click();
+    await until(function () { var d = q('#pnbCardDetails .pnb-cdet-notes .journal-rownote-inline'); return acted('add').length === 1 && items(d).length === 3 && items(panelOf(cardFor(rows[1]))).length === 3; }, 5000);
+    var d2 = q('#pnbCardDetails .pnb-cdet-notes .journal-rownote-inline');
+    R.chk.postInDetails = kept && acted('add').length === 1 && itemTexts(d2)[2] === 'From the window' && itemTexts(panelOf(cardFor(rows[1])))[2] === 'From the window' && detOpen();
+    R.info.det = { kept: kept, adds: acted('add').length, n: items(d2).length, card: items(panelOf(cardFor(rows[1]))).length };
+    C().closeDetails(); await sleep(80);
+    // compact cards draw no notes: their menu's Add a note opens the details window's composer
+    C().setSize('compact'); await sleep(150);
+    var cc = cardFor(rows[2]), noNotes = qa('#pnbCardsHost .journal-rownote-inline').length === 0;
+    rclick(q('.pnb-card-title', cc)); await sleep(100);
+    var an = menu() ? q('.pnb-hm-item[data-act="addNote"]', menu()) : null;
+    if (an) an.click(); await sleep(200);
+    var dp3 = q('#pnbCardDetails .pnb-cdet-notes .journal-rownote-inline');
+    R.chk.compactViaDetails = noNotes && !!an && detOpen() && !!inputOf(dp3) && document.activeElement === inputOf(dp3) && !noteCardOpen();
+    R.info.compact = { noNotes: noNotes, an: !!an, acts: acts(), open: detOpen() };
+    C().closeDetails(); C().setSize('standard'); await sleep(80);
+  };
+
+  // ---- (round K) the card's words; Find and the search's marks on the cards; the Bar list ------------------------
+  function hl(name) { var h = (window.CSS && CSS.highlights) ? CSS.highlights.get(name) : null; return h ? Array.from(h) : []; }
+  function rangeEl(r) { var n = r.startContainer; return n.nodeType === 1 ? n : n.parentElement; }
+  function inCards(r) { var e = rangeEl(r); return !!(e && e.isConnected && e.closest('#pnbCardsHost, #pnbCardDetails')); }
+  function rangeText(r) { var d = r.startContainer.data || ''; return d.slice(r.startOffset, r.endOffset); }
+  function FD() { return window.Penumbra && window.Penumbra.find; }
+  async function findSettle() { await until(function () { var s = FD()._state(); return !s.scanning && !s.typing; }, 20000); await sleep(200); }
+  function findInp() { return q('#pnbFindBar .pnb-find-input'); }
+  async function findStep(shift) { var i = findInp(); i.focus(); i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: !!shift, bubbles: true, cancelable: true })); await sleep(60); await findSettle(); }
+  async function findType(s) { var i = findInp(); i.focus(); i.value = s; i.dispatchEvent(new Event('input', { bubbles: true })); await sleep(20); await findSettle(); }
+  function foundLines(kind) { return qa('#pnbCardsHost .pnb-card-found.is-' + kind); }
+  function outlined() { return qa('#pnbCardsHost .pnb-card.is-find-cur'); }
+  // on screen: inside the window and inside every box around it that scrolls (the find suite's)
+  function inViewAny(el) {
+    var r = el.getBoundingClientRect();
+    if (!(r.width || r.height) || r.top < 0 || r.bottom > innerHeight) return false;
+    for (var n = el.parentElement; n && n !== document.body; n = n.parentElement) {
+      var cs = getComputedStyle(n);
+      if (/(auto|scroll|hidden)/.test(cs.overflowY) && n.scrollHeight > n.clientHeight + 1) { var b = n.getBoundingClientRect(); if (r.top < b.top - 1 || r.bottom > b.bottom + 1) return false; }
+    }
+    return true;
+  }
+  function trOfId(v) { return qa('#resultsTable > tbody > tr').filter(function (t) { return tdText(t, 'V_ID') === v; })[0] || null; }
+  function cardOfId(v) { var tr = trOfId(v); return tr ? q('#pnbCardsHost .pnb-card[data-row="' + rowIdx(tr) + '"]') : null; }
+  function sepTidy(m) { var s = qa('.pnb-hm-item, .pnb-hm-sep', m).map(function (e) { return e.classList.contains('pnb-hm-sep') ? '-' : 'i'; }).join(''); return s.length > 0 && s.indexOf('--') < 0 && s[0] !== '-' && s[s.length - 1] !== '-'; }
+  var SORTS = ['sortAsc', 'sortDesc', 'thenAsc', 'thenDesc', 'sortClear'];
+  S.ckword = async function () {
+    await until(function () { return on() && cards().length === 200; }, 8000);
+    var copied = null;
+    try { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: function (t) { copied = t; return Promise.resolve(); } } }); } catch (e) { }
+    // the card's empty area: Copy -> This entire card; run, it copies the card and says so
+    rclick(q('.pnb-card-fields dt', cards()[0])); await sleep(100);
+    var it = menu() ? q('.pnb-hm-item[data-act="copyRow"]', menu()) : null, inSub = false;
+    if (!it) { var cps = await openSub('copyMenu'); it = cps ? q('.pnb-hm-item[data-act="copyRow"]', cps) : null; inSub = !!it; }
+    var lab = it ? (text(q('.pnb-hm-label', it)) || text(it)) : null;
+    R.info.copy = { label: lab, inSub: inSub, acts: acts() };
+    R.chk.copyCardLabel = lab === (inSub ? 'This entire card' : 'Copy this card');
+    if (it) it.click();
+    var toasted = await until(function () { return /Copied the card \(\d+ fields\)\./.test(document.body.innerText || ''); }, 3000);
+    R.info.toast = (document.body.innerText.match(/Copied the [a-z]+ \(\d+ [a-z]+\)\./) || [null])[0];
+    R.chk.copyCardToast = toasted && !!copied && copied.split('\n').length >= 6;
+    // (round M) the clipboard refusing it: the card's words too
+    try { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: function () { return Promise.reject(new Error('denied')); } } }); } catch (e) { }
+    if (menu()) keyOn(document.activeElement, 'Escape'); await sleep(60);
+    rclick(q('.pnb-card-fields dt', cards()[1])); await sleep(100);
+    var cps2 = await openSub('copyMenu'), it2 = cps2 ? q('.pnb-hm-item[data-act="copyRow"]', cps2) : null; if (it2) it2.click();
+    var failed = await until(function () { return /The card could not be copied\./.test(document.body.innerText || ''); }, 3000);
+    R.chk.copyFailCard = !!it2 && failed && !/The row could not be copied\./.test(document.body.innerText || '');
+    if (menu()) keyOn(document.activeElement, 'Escape'); await sleep(60);
+    // a value's Field stats: over the cards
+    rclick(q('.pnb-card-pill[data-col="V_STATUS"]', cards()[0])); await sleep(100);
+    var ss = await openSub('stats'), hs = ss ? heads(ss) : [];
+    R.info.statsHeads = hs;
+    R.chk.statsOverCards = hs[0] === 'Over the 300 cards';   // (every row the filter keeps, as the table's)
+    if (menu()) keyOn(document.activeElement, 'Escape'); await sleep(80);
+    // the details window: a value's menu without Sort / Then sort / Clear sort, tidy; a card's own menu keeps them
+    q('.pnb-card-fields dt', cards()[2]).click(); await sleep(200);
+    rclick(q('#pnbCardDetails .pnb-cdet-fields dd[data-col="V_DATE"]')); await sleep(100);
+    var da = acts(); R.info.detActs = da;
+    R.chk.detNoSort = !!menu() && SORTS.every(function (x) { return da.indexOf(x) < 0; }) && da.indexOf('cardsTable') >= 0 && da.indexOf('stats') >= 0;
+    if (menu()) keyOn(document.activeElement, 'Escape'); await sleep(80);
+    // a number field's menu: its sorts sit between two separators (no Filter by value, no stats after them)
+    rclick(q('#pnbCardDetails .pnb-cdet-fields dd[data-col="V_AMOUNT"]')); await sleep(100);
+    var na = acts(), seq = menu() ? qa('.pnb-hm-item, .pnb-hm-sep', menu()).map(function (e) { return e.classList.contains('pnb-hm-sep') ? '-' : e.getAttribute('data-act'); }) : [];
+    R.info.detNum = seq;
+    R.chk.detNoDoubleSep = R.chk.detNoSort === true && !!menu() && SORTS.every(function (x) { return na.indexOf(x) < 0; }) && sepTidy(menu());
+    if (menu()) keyOn(document.activeElement, 'Escape'); await sleep(80);
+    C().closeDetails(); await sleep(100);
+    rclick(q('.pnb-card-fields dd[data-col="V_DATE"]', cards()[2])); await sleep(100);
+    R.chk.cardKeepsSort = !!menu() && acts().indexOf('sortAsc') >= 0;
+    if (menu()) keyOn(document.activeElement, 'Escape'); await sleep(80);
+    // the table's own stats: the rows the filter keeps, as they were
+    await pickView('table');
+    rclick(td(shownRows()[0], 'V_STATUS')); await sleep(100);
+    ss = await openSub('stats'); hs = ss ? heads(ss) : [];
+    R.info.tableHeads = hs;
+    R.chk.tableStatsRows = hs[0] === 'Over the 300 rows the filter keeps';
+    if (menu()) keyOn(document.activeElement, 'Escape'); await sleep(80);
+  };
+  S.cfind = async function () {
+    await until(function () { return on() && cards().length === 200 && !!FD(); }, 8000);
+    var nId = thName('V_ID'), nSt = thName('V_STATUS');
+    // the search box: its marks on the cards' own text (the title), none on the hidden table
+    await runSearch('Kilo'); await until(function () { return hl('pnb-filter').some(inCards); }, 4000);
+    var fr = hl('pnb-filter');
+    R.info.filter = { n: fr.length, inCards: fr.filter(inCards).length, sample: fr.slice(0, 3).map(rangeText), cards: cards().length };
+    R.chk.filterOnCards = fr.length > 0 && fr.every(inCards) && fr.some(function (r) { return !!rangeEl(r).closest('.pnb-card-title'); }) && fr.every(function (r) { return /^kilo$/i.test(rangeText(r)); });
+    // a scoped term in a field the card does not show: each card says so; a click opens the details, marked there
+    await runSearch('V_STATUS = Closed'); await until(function () { return foundLines('filter').length > 0 && foundLines('filter').length === cards().length; }, 4000);
+    var fl = foundLines('filter'), cs = cards();
+    R.info.lines = { n: fl.length, cards: cs.length, text: fl[0] ? text(fl[0]) : null, prev: fl[0] && fl[0].previousElementSibling ? fl[0].previousElementSibling.className : null };
+    R.chk.filterBuriedNamed = cs.length > 0 && cs.length < 200 && fl.length === cs.length && fl.every(function (b) { return text(b) === 'Also matches in: ' + nSt; })
+      && !!fl[0].previousElementSibling && fl[0].previousElementSibling.classList.contains('pnb-card-top');
+    var b1 = q('.pnb-card-found', cs[1]); if (b1) b1.click(); await sleep(300);
+    var dd = q('#pnbCardDetails .pnb-cdet-fields dd[data-col="V_STATUS"]');
+    R.chk.foundOpensDetails = !!b1 && detOpen() && C().details().at === 1 && !!dd && hl('pnb-filter').some(function (r) { return dd.contains(rangeEl(r)); });
+    R.info.det = { open: detOpen(), at: C().details().at, dd: !!dd, lineOnOpen: !!q('.pnb-card-found.is-filter', cards()[1]) };
+    C().closeDetails(); await sleep(300);
+    R.chk.lineBackAfterClose = R.chk.foundOpensDetails === true && !!q('.pnb-card-found.is-filter', cards()[1]);
+    await runSearch(''); await until(function () { return cards().length === 200; }, 6000); await sleep(300);
+    R.chk.filterCleared = R.chk.filterBuriedNamed === true && foundLines('filter').length === 0 && hl('pnb-filter').length === 0;
+    // Find: its matches on the cards, the current one's card outlined
+    window.scrollTo(0, 0); await sleep(100);
+    FD().open('Kilo'); await findSettle(); await findStep(false);
+    var fh = hl('pnb-find'), fc = hl('pnb-find-cur'), out = outlined();
+    R.info.find = { n: fh.length, cur: fc.length, st: FD()._state(), outlined: out.length };
+    R.chk.findOnCards = fh.length + fc.length > 0 && fh.concat(fc).every(inCards) && fh.concat(fc).every(function (r) { return /^kilo$/i.test(rangeText(r)); });
+    R.chk.findCurOutlined = out.length === 1 && fc.length > 0 && fc.every(function (r) { return out[0].contains(rangeEl(r)); }) && getComputedStyle(out[0]).outlineStyle === 'solid';
+    // ...and in the details window of the card it shows
+    if (out[0]) q('.pnb-card-title', out[0]).click(); await sleep(300);
+    var dw = q('#pnbCardDetails');
+    R.chk.findInDetails = detOpen() && hl('pnb-find').concat(hl('pnb-find-cur')).some(function (r) { return dw.contains(rangeEl(r)) && r.startContainer.isConnected; });
+    // (the sweep) the bar over the window: what is drawn at its box's middle is the bar
+    var fb = q('#pnbFindBar'), fbr = fb ? fb.getBoundingClientRect() : null, atb = fbr ? document.elementFromPoint(fbr.left + 20, fbr.top + fbr.height / 2) : null;
+    R.info.barOver = { z: fb ? getComputedStyle(fb).zIndex : null, at: atb ? (atb.id || atb.className) : null };
+    R.chk.barOverDetails = detOpen() && !!fb && !!atb && fb.contains(atb);
+    // an Escape typed in Find's box closes Find, not the window under it
+    var fi = findInp(); fi.focus(); fi.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await sleep(250);
+    R.info.findEsc = { findOpen: FD().isOpen(), det: detOpen() };
+    R.chk.findEscKeepsDetails = !FD().isOpen() && detOpen();
+    FD().open('Kilo'); await findSettle();
+    C().closeDetails(); await sleep(200);
+    // a match the card does not show, far down the page: named on its card (the current one's line), the card brought on screen
+    window.scrollTo(0, 0); await sleep(150);
+    var c190 = cardOfId('ID-1190'), before = c190 ? inViewAny(c190) : null;
+    await findType('ID-1190'); await sleep(300);   // (one match: reading the term makes it current - no Enter)
+    out = outlined(); var ln = foundLines('find');
+    R.info.buried = { st: FD()._state(), out: out.length, lines: ln.map(text), before: before, same: out[0] === c190, y: out[0] ? Math.round(out[0].getBoundingClientRect().top) : null };
+    R.chk.findBuriedNamed = ln.length === 1 && text(ln[0]) === 'Found in: ' + nId && ln[0].classList.contains('is-cur') && out.length === 1 && out[0].contains(ln[0]) && out[0] === c190;
+    R.chk.findScrolled = before === false && out.length === 1 && inViewAny(out[0]);
+    // one on the next page: the page turns, its card outlined and on screen
+    await findType('ID-1250');   // (one match, on the next page: the read itself turns the page - before the cards are drawn)
+    await until(function () { return outlined().length === 1 && cards().length === 100; }, 6000); await sleep(300);
+    out = outlined();
+    R.info.page = { sy: Math.round(window.scrollY), top: out[0] ? Math.round(out[0].getBoundingClientRect().top) : null, cards: cards().length, out: out.length, same: out[0] === cardOfId('ID-1250'), view: out[0] ? inViewAny(out[0]) : null, line: out[0] ? text(q('.pnb-card-found.is-find', out[0])) : null };
+    R.chk.findPageTurn = cards().length === 100 && out.length === 1 && out[0] === cardOfId('ID-1250') && inViewAny(out[0]) && text(q('.pnb-card-found.is-find', out[0])) === 'Found in: ' + nId;
+    FD().close(); await sleep(250);
+    R.chk.findCloseClears = R.chk.findBuriedNamed === true && foundLines('find').length === 0 && outlined().length === 0 && hl('pnb-find').length === 0 && hl('pnb-find-cur').length === 0;
+    // the table: Find paints its cells, as before
+    await pickView('table');
+    FD().open('Kilo'); await findSettle(); await findStep(false);
+    var th = hl('pnb-find').concat(hl('pnb-find-cur'));
+    R.chk.tableFindUnchanged = th.length > 0 && th.every(function (r) { return !!rangeEl(r).closest('#resultsTable'); }) && !!q('#resultsTable td.pnb-find-cur');
+    FD().close(); await sleep(100);
+  };
+  S.gfind = async function () {
+    await until(function () { return on() && grps().length > 1 && cards().length > 0 && !!FD(); }, 10000);
+    // a group's name: on the cards' own band
+    FD().open('North'); await findSettle(); await findStep(false);
+    var all = hl('pnb-find').concat(hl('pnb-find-cur'));
+    R.info.band = { n: all.length, st: FD()._state(), where: all.slice(0, 4).map(function (r) { return rangeEl(r).className + '|' + rangeText(r); }) };
+    R.chk.bandMarked = all.length > 0 && all.every(inCards) && all.some(function (r) { return !!rangeEl(r).closest('.pnb-cards-grpname'); });
+    // a value: on its card
+    await findType('Kilo'); await findStep(false);
+    all = hl('pnb-find').concat(hl('pnb-find-cur'));
+    R.info.cell = { n: all.length, st: FD()._state(), out: outlined().length };
+    R.chk.cellMarked = all.length > 0 && all.every(inCards) && all.some(function (r) { return !!rangeEl(r).closest('.pnb-card'); }) && outlined().length === 1;
+    FD().close(); await sleep(150);
+    // a match in a folded band: Find opens the group, the cards draw it (the fold watcher's timer), then its card on screen
+    var gl = grps()[grps().length - 1], gc = gl ? q('.pnb-card', gl) : null, gid = gc ? text(q('.pnb-card-title', gc)) : null;
+    if (gl) q('.pnb-cards-grptoggle', gl).click();
+    await until(function () { var g2 = grps()[grps().length - 1]; return !!g2 && g2.classList.contains('is-closed'); }, 4000); await sleep(200);
+    var folded = grps()[grps().length - 1].classList.contains('is-closed') && !q('.pnb-card', grps()[grps().length - 1]);
+    window.scrollTo(0, 0); await sleep(150);
+    FD().open(gid); await findSettle();   // (one match: the read goes to it, opening the group before the cards draw it)
+    await until(function () { return outlined().length === 1 && inViewAny(outlined()[0]); }, 5000); await sleep(200);
+    var fo = outlined();
+    R.info.fold = { sy: Math.round(window.scrollY), id: gid, folded: folded, out: fo.length, title: fo[0] ? text(q('.pnb-card-title', fo[0])) : null, view: fo[0] ? inViewAny(fo[0]) : null, st: FD()._state() };
+    R.chk.foldedRevealed = !!gid && folded && fo.length === 1 && text(q('.pnb-card-title', fo[0])) === gid && inViewAny(fo[0]) && !grps()[grps().length - 1].classList.contains('is-closed');
+    FD().close(); await sleep(150);
+    // the search box's marks
+    await runSearch('Kilo'); await until(function () { return hl('pnb-filter').some(inCards); }, 5000); await sleep(200);
+    var fr = hl('pnb-filter');
+    R.info.filter = { n: fr.length, inCards: fr.filter(inCards).length };
+    R.chk.filterMarked = fr.length > 0 && fr.every(inCards);
+    await runSearch('');
+  };
+  S.cbarpick = async function () {
+    await until(function () { return !!q('#pnbCardBar') && window.Penumbra.cardsHost && window.Penumbra.cardsHost.loaded(); }, 8000);
+    C().populate(); await sleep(100);   // (the View Options tab opened: the lists read the table's columns now)
+    function o(v) { return q('#pnbCardBar option[value="' + v + '"]'); }
+    R.info.bar = qa('#pnbCardBar option').map(function (x) { return x.value + (x.disabled ? '-' : '+'); });
+    R.chk.textOff = ['V_NAME', 'V_ID', 'H_TEXT', 'H_GROUP', 'H_GROUP2', 'H_FLAG', 'H_CODE', 'H_JSON'].every(function (v) { return !!o(v) && o(v).disabled; });
+    R.chk.numberOn = ['V_AMOUNT', 'H_NUM', 'H_AMT', 'H_MONEY'].every(function (v) { return !!o(v) && !o(v).disabled; });
+    R.chk.pickedKept = q('#pnbCardBar').value === 'V_STATUS' && !!o('V_STATUS') && !o('V_STATUS').disabled;
+    R.chk.otherSlotsOpen = qa('#pnbCardTitle option').length > 5 && !q('#pnbCardTitle option:disabled') && !q('#pnbCardPill option:disabled') && !q('#pnbCardBig option:disabled') && !q('#pnbCardSub1 option:disabled');
+    R.chk.noneOpen = !!o('') && !o('').disabled;
+  };
+
+  // ---- (round L) the Sort list; blank fields; Find on pivot tiles; Settings > Cards ------------------------------
+  function HMk() { return window.Penumbra.headerMenu; }
+  function sortSel() { return q('#pnbCardsSort'); }
+  function sortArrow() { return q('#pnbCardsSortDir'); }
+  function sortKey0() { var k = HMk().sortKeys(); return k.length ? String(k[0]).toUpperCase() : null; }
+  function sortDir0() { var k = HMk().sortKeys(); return k.length ? HMk().sortDir(k[0]) : null; }
+  function setSort(v) { var s = sortSel(); s.value = v; s.dispatchEvent(new Event('change', { bubbles: true })); }
+  function cmpBase(a, b) { return String(a).localeCompare(String(b), undefined, { sensitivity: 'base', numeric: true }); }
+  function ordered(list, dir) { for (var i = 1; i < list.length; i++) { var c = cmpBase(list[i - 1], list[i]); if (dir === 'asc' ? c > 0 : c < 0) return false; } return list.length > 1; }
+  function cardTexts(col, root) { return qa('.pnb-card [data-col="' + col + '"]', root || host()).map(text); }
+  async function settled() { await sleep(250); await until(function () { return same(cardRows(), shownRows().map(rowIdx)); }, 6000); await sleep(150); }
+  S.csort = async function () {
+    await until(function () { return on() && cards().length === 200; }, 8000);
+    var opts = sortSel() ? qa('option', sortSel()).map(function (o) { return [o.value, o.textContent]; }) : [];
+    R.info.opts = opts.slice(0, 9);
+    R.chk.listShown = vis(sortSel()) && opts.length === 7 && opts[0][0] === '' && opts[0][1] === 'Sort: none' && opts.some(function (o) { return o[0] === 'V_NAME' && o[1] === 'Sort: ' + thName('V_NAME'); })
+      && !vis(sortArrow());
+    // (round M) in the size list's own small style
+    var zs = getComputedStyle(q('#pnbCardsSize')), so = getComputedStyle(sortSel()), hz = q('#pnbCardsSize').getBoundingClientRect().height, hs = sortSel().getBoundingClientRect().height;
+    R.info.sized = { size: [zs.fontSize, Math.round(hz)], sort: [so.fontSize, Math.round(hs)] };
+    R.chk.sortSized = zs.fontSize === so.fontSize && Math.abs(hz - hs) <= 2;
+    setSort('V_NAME'); await settled();
+    var nm = shownRows().map(function (tr) { return tdText(tr, 'V_NAME'); });
+    R.info.pick = { key: sortKey0(), dir: sortDir0(), first: nm.slice(0, 3), sel: sortSel().value };
+    R.chk.pickSorts = sortKey0() === 'V_NAME' && sortDir0() === 'asc' && same(cardRows(), shownRows().map(rowIdx)) && ordered(nm, 'asc') && sortSel().value === 'V_NAME';
+    R.chk.arrowShown = vis(sortArrow()) && text(sortArrow()) === '↑';
+    sortArrow().click(); await settled();
+    nm = shownRows().map(function (tr) { return tdText(tr, 'V_NAME'); });
+    R.chk.flip = sortKey0() === 'V_NAME' && sortDir0() === 'desc' && ordered(nm, 'desc') && text(sortArrow()) === '↓' && same(cardRows(), shownRows().map(rowIdx));
+    // a sort made from the heading's menu (the engine's path): the list shows it
+    HMk().sort(fth('V_AMOUNT'), 'desc'); await settled();
+    R.info.back = { sel: sortSel().value, arrow: text(sortArrow()), key: sortKey0() };
+    R.chk.readsBack = sortSel().value === 'V_AMOUNT' && text(sortArrow()) === '↓';
+    setSort(''); await settled();
+    R.chk.noneClears = HMk().sortKeys().length === 0 && sortSel().value === '' && !vis(sortArrow());
+    await pickView('table');
+    R.chk.tableHides = !vis(sortSel()) && !vis(sortArrow());
+  };
+  S.gsort = async function () {
+    await until(function () { return on() && grps().length > 1 && cards().length > 0; }, 10000);
+    setSort('V_NAME'); await sleep(600);
+    await until(function () { return grps().every(function (g) { return ordered(cardTexts('V_NAME', g), 'asc') || qa('.pnb-card', g).length < 2; }); }, 6000);
+    var per = grps().map(function (g) { var t = cardTexts('V_NAME', g); return [t.length, ordered(t, 'asc') || t.length < 2]; });
+    R.info.per = per;
+    R.chk.bandsSorted = sortKey0() === 'V_NAME' && per.length > 1 && per.every(function (x) { return x[1]; }) && per.filter(function (x) { return x[0] > 2; }).length > 1;
+    // a card menu's Sort descending (the engine's item): every band follows too
+    rclick(q('.pnb-card-fields dd[data-col="V_NAME"]', cards()[0])); await sleep(150);
+    var sd = menu() ? q('.pnb-hm-item[data-act="sortDesc"]', menu()) : null; if (sd) sd.click();
+    await until(function () { return grps().every(function (g) { return ordered(cardTexts('V_NAME', g), 'desc') || qa('.pnb-card', g).length < 2; }); }, 6000);
+    var per2 = grps().map(function (g) { var t = cardTexts('V_NAME', g); return ordered(t, 'desc') || t.length < 2; });
+    R.info.per2 = per2;
+    R.chk.menuSortFollows = !!sd && sortDir0() === 'desc' && per2.every(Boolean) && q('#pnbCardsSort').value === 'V_NAME' && text(q('#pnbCardsSortDir')) === '\u2193';
+  };
+  S.cempty = async function () {
+    await until(function () { return on() && cards().length === 200; }, 8000);
+    var rows = shownRows(), off = 0, on2 = 0, bad = [], dates = 0;
+    cards().forEach(function (c, i) {
+      var tr = rows[i], v = tr ? tdText(tr, 'H_NULL') : null, dd = q('.pnb-card-fields dd[data-col="H_NULL"]', c);
+      if (v) { if (dd) on2++; else bad.push(['missing', i]); } else { if (!dd) off++; else bad.push(['blank shown', i]); }
+      if (q('.pnb-card-fields dd[data-col="V_DATE"]', c)) dates++;
+    });
+    R.info.empty = { off: off, on: on2, bad: bad.slice(0, 4), dates: dates };
+    R.chk.blankOff = off > 20 && bad.filter(function (b) { return b[0] === 'blank shown'; }).length === 0;
+    R.chk.filledOn = on2 > 20 && bad.filter(function (b) { return b[0] === 'missing'; }).length === 0;
+    R.chk.otherKept = dates === 200;
+  };
+  S.pfind = async function () {
+    await until(function () { return on() && cards().length > 0 && C().state() && C().state().pivot === true && !!FD(); }, 10000);
+    // a leaf tile with a plain title ("[Blank]" is search syntax in the filter box)
+    var leaf = cards().filter(function (c) { return !c.classList.contains('is-total') && /^[A-Za-z][A-Za-z0-9 ]*$/.test(text(q('.pnb-card-title', c)) || ''); })[0], term = leaf ? text(q('.pnb-card-title', leaf)) : '';
+    // a row label: on its tile's title
+    FD().open(term); await findSettle();
+    var all = hl('pnb-find').concat(hl('pnb-find-cur'));
+    R.info.label = { term: term, n: all.length, st: FD()._state(), where: all.slice(0, 3).map(function (r) { return rangeEl(r).className + '|' + rangeText(r); }) };
+    R.chk.labelMarked = !!term && all.length > 0 && all.every(inCards) && all.some(function (r) { return !!rangeEl(r).closest('.pnb-card-pv .pnb-card-title'); });
+    // a value: on its tile, the tile outlined
+    var dd = leaf ? q('.pnb-card-pvfields dd[data-pvc]', leaf) : null, v = dd ? text(dd) : '';
+    await findType(v);
+    all = hl('pnb-find').concat(hl('pnb-find-cur'));
+    R.info.value = { v: v, n: all.length, st: FD()._state(), out: outlined().length };
+    R.chk.valueMarked = !!v && all.length > 0 && all.every(inCards) && all.some(function (r) { return !!rangeEl(r).closest('.pnb-card-pv [data-pvc]'); }) && outlined().length === 1;
+    // Compact: the tile shows the title and the big number - a value it does not show is named on it
+    C().setSize('compact'); await until(function () { return host().classList.contains('is-compact'); }, 4000); await sleep(400);
+    await findType(v); await sleep(300);
+    var ln = foundLines('find');
+    R.info.compact = { lines: ln.slice(0, 3).map(text), n: ln.length };
+    R.chk.compactNamed = ln.length > 0 && ln.every(function (b) { return /^Found in: \S/.test(text(b)) && !/#\d|@label/.test(text(b)); });
+    FD().close(); C().setSize('standard'); await sleep(300);
+    // the search box's marks on the tiles' labels
+    await runSearch(term); await until(function () { return hl('pnb-filter').some(inCards); }, 5000); await sleep(200);
+    var fr = hl('pnb-filter');
+    R.info.filter = { n: fr.length, inCards: fr.filter(inCards).length };
+    R.chk.filterOnTiles = fr.length > 0 && fr.every(inCards) && fr.some(function (r) { return !!rangeEl(r).closest('.pnb-card-pv .pnb-card-title'); });
+    await runSearch('');
+    R.chk.sortHidden = !vis(sortSel());
+  };
+  function lay() { return q('#spCardsSection'); }
+  function layChip(n) { return q('#spCardFields input[value="' + n + '"]'); }
+  S.clayout = async function () {
+    await until(function () { return on() && cards().length === 200; }, 8000);
+    C().sync(); await sleep(100);
+    var ts = q('#spCardTitle'), tops = ts ? qa('option', ts).map(function (o) { return o.value; }) : [];
+    R.info.sec = { hidden: lay() ? lay().hidden : null, opts: tops };
+    R.chk.sectionShown = !!lay() && !lay().hidden && tops[0] === '' && tops.indexOf('V_STATUS') > 0 && qa('#spCardFields input').length === 6 && q('#spCardReset').disabled;
+    setSel('spCardTitle', 'V_STATUS'); await sleep(250);
+    R.chk.titlePicked = !!slots() && slots().title === 'V_STATUS' && text(q('.pnb-card-title', cards()[0])) === tdText(shownRows()[0], 'V_STATUS');
+    ['V_AMOUNT', 'V_ID'].forEach(function (n) { var c = layChip(n); if (c) { c.click(); } }); await sleep(250);
+    R.info.slots = slots();
+    R.chk.fieldsPicked = !!slots() && same(slots().fields, ['V_ID', 'V_AMOUNT']) && same(qa('.pnb-card-fields dd[data-col]', cards()[0]).map(function (d) { return d.getAttribute('data-col'); }), ['V_ID', 'V_AMOUNT']);
+    var pc = (prefs().lrfix || {}).cards;
+    R.info.pref = pc;
+    R.chk.keptAsPref = !!pc && pc.title === 'V_STATUS' && same(pc.fields, ['V_ID', 'V_AMOUNT']) && !q('#spCardReset').disabled;
+    R.chk.authorUntouched = same(bsoCards(), { title: 'V_NAME', fields: ['V_DATE'] });
+    R.info.bso = bsoCards();
+    q('#spCardReset').click(); await sleep(250);
+    R.chk.resetBack = R.chk.titlePicked === true && slots().title === 'V_NAME' && same(slots().fields, ['V_DATE']) && !(prefs().lrfix || {}).cards && q('#spCardTitle').value === '' && q('#spCardReset').disabled;
+    // Quick actions' Card title and fields...: Settings open on the section, the title list focused
+    var opened = C().openLayout(); await sleep(250);
+    R.chk.paletteOpens = opened === true && C().layoutOffered() === true && document.activeElement === q('#spCardTitle');
+  };
+  S.clayoutB = async function () {
+    await until(function () { return on() && cards().length === 200; }, 8000);
+    C().sync(); await sleep(100);
+    R.info.slots = slots();
+    R.chk.seededDrawn = !!slots() && slots().title === 'V_STATUS' && same(slots().fields, ['V_ID', 'V_AMOUNT']);
+    R.chk.seededShown = q('#spCardTitle').value === 'V_STATUS' && layChip('V_ID').checked && layChip('V_AMOUNT').checked && text(q('#spCardFieldsCount')) === '2 of 4';
+    R.chk.formIsAuthors = q('#pnbCardTitle').value === 'V_NAME' && same(bsoCards(), { title: 'V_NAME', fields: ['V_DATE'] });
+  };
+
+  S.pvfind = async function () {
+    await until(function () { return on() && cards().length > 0 && C().state() && C().state().pivot === true && !!FD(); }, 10000);
+    // a value on a leaf tile's fields (Standard), its label as the tile draws it
+    var leaf = cards().filter(function (c) { return !c.classList.contains('is-total') && /^[A-Za-z][A-Za-z0-9 ]*$/.test(text(q('.pnb-card-title', c)) || ''); })[0];
+    var title = leaf ? text(q('.pnb-card-title', leaf)) : null;
+    var dds = leaf ? qa('.pnb-card-pvfields dd[data-pvc]', leaf).filter(function (d) { return /\d/.test(text(d)); }) : [], dd = dds[1] || dds[0];
+    var v = dd ? text(dd) : null, label = dd ? text(dd.previousElementSibling) : null;
+    // Compact: the tile shows its title and its big number - the value is named on it, by that same label
+    C().setSize('compact'); await until(function () { return host().classList.contains('is-compact'); }, 4000); await sleep(400);
+    FD().open(v); await findSettle(); await sleep(300);
+    var tile = cards().filter(function (c) { return text(q('.pnb-card-title', c)) === title; })[0], ln = tile ? q('.pnb-card-found.is-find', tile) : null;
+    R.info.pv = { title: title, v: v, label: label, line: ln ? text(ln) : null, lines: foundLines('find').slice(0, 3).map(text) };
+    R.chk.namedAsField = !!label && /\s/.test(label) && !!ln && text(ln).replace(/^Found in: /, '').split(', ').indexOf(label) >= 0;
+    FD().close(); C().setSize('standard');
+  };
+  S.cdetrow = async function () {
+    await until(function () { return on() && cards().length === 25; }, 8000);
+    // a page turn takes the card away: the window closes (it never shows another row)
+    q('.pnb-card-fields dt', cards()[0]).click(); await sleep(250);
+    var before = detOpen() ? detTitle() : null;
+    // the page turned as Find turns it (findHost.showRow, no click: a click outside the window closes it by itself)
+    window.Penumbra.findHost.showRow(qa('#resultsTable > tbody > tr')[30]); await until(function () { return !detOpen(); }, 3000); await sleep(250);
+    R.info.page = { open: detOpen(), before: before, title: detTitle(), page: text(q('#pageInfo')) };
+    R.chk.pageCloses = !!before && !detOpen();
+    // every row on one page: a sort moves the row, the window follows it
+    setSel('rowsPerPageSelector', 'all'); await until(function () { return cards().length === 300; }, 8000); await sleep(200);
+    var c3 = cards()[3], t3 = text(q('.pnb-card-title', c3)), r3 = c3.getAttribute('data-row');
+    q('.pnb-card-fields dt', c3).click(); await sleep(250);
+    var was = detOpen() && detTitle() === t3;
+    HMk().sort(fth('V_AMOUNT'), 'desc'); await settled(); await sleep(200);
+    var at = C().details().at, now = cards()[at];
+    R.info.sort = { was: was, open: detOpen(), title: detTitle(), want: t3, at: at, row: now && now.getAttribute('data-row'), r3: r3, n: cards().length };
+    R.chk.sortFollows = was && detOpen() && detTitle() === t3 && !!now && now.getAttribute('data-row') === r3 && at !== 3;
+    C().closeDetails();
   };
 
   (async function () {
