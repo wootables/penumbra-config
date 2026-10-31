@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>dashsub</title>
+<link rel="stylesheet" href="main.css">
+<style>
+  /* harness-only frame: a Dashboard-layout report header, as applyHeaderLayout('dashboard')
+     leaves it (the breadcrumb moved out of the panel into the header's upper right). */
+  body { margin: 0; padding: 0; background: #fff; font-family: "Segoe UI", Roboto, sans-serif; }
+  #reportHeaderContainer { width: 900px; box-sizing: border-box; }
+  #out { white-space: pre-wrap; font-size: 11px; margin: 18px; }
+</style>
+</head>
+<body class="theme-default">
+<div id="reportHeaderContainer" class="layout-dashboard">
+  <div id="dashboardBreadcrumb">Penumbra &gt; Reports &gt; rpt</div>
+  <!-- main.css starts #reportInfoPanel hidden; the app shows it once a report loads. -->
+  <div id="reportInfoPanel" style="display: block;">
+    <h2 id="mainReportTitle">Hit Ratio</h2>
+    <div id="mainReportSubtitle" style="display: block;">Pre-award data, refreshed nightly</div>
+    <div id="pnbSubscribeSlot" style="display:none;"></div>
+  </div>
+</div>
+<pre id="out">RUNNING</pre>
+<script>
+window.__errs = []; window.addEventListener('error', function (e) { window.__errs.push(String(e.message)); });
+// Headless with a virtual-time budget renders no frames after the first, so a ResizeObserver
+// never delivers again. Record each observer and its targets; tests.js pumps them the way the
+// browser would: a callback runs only when one of ITS targets changed size since the last look.
+(function () {
+    var Native = window.ResizeObserver;
+    window.__ros = [];
+    window.ResizeObserver = function (cb) {
+        var ro = new Native(cb), rec = { cb: cb, ro: ro, targets: [], sizes: [] };
+        var observe = ro.observe.bind(ro);
+        ro.observe = function (t, o) { rec.targets.push(t); rec.sizes.push(''); return observe(t, o); };
+        window.__ros.push(rec);
+        return ro;
+    };
+    window.__roPump = function () {
+        window.__ros.forEach(function (rec) {
+            var changed = [];
+            rec.targets.forEach(function (t, i) {
+                var b = t.getBoundingClientRect(), s = b.width + 'x' + b.height;
+                if (s !== rec.sizes[i]) { rec.sizes[i] = s; changed.push({ target: t }); }
+            });
+            if (changed.length) rec.cb(changed, rec.ro);
+        });
+    };
+})();
+</script>
+<script src="jquery.js"></script>
+<script src="fixture.js"></script>
+<script src="lifted.js"></script>
+<script src="tests.js"></script>
+</body>
+</html>

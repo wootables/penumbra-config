@@ -23,24 +23,30 @@ EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js',
         'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js']
-SCN = ['gpaste', 'gnone', 'gside', 'greplace', 'gload', 'gload0']
+SCN = ['gpaste', 'gnone', 'gside', 'greplace', 'gload', 'gload0', 'gask']
 CHK = {
-    'gpaste': ['opens', 'newDisabled', 'appendChecked', 'buttonAdd', 'sentId', 'noSave', 'undoId'],
-    'gnone': ['noTargetIgnored', 'noGrantIgnored', 'starOpens', 'starNewChecked'],
+    'gpaste': ['opens', 'newAbsent', 'appendChecked', 'buttonAdd', 'sentId', 'noSave', 'undoId'],
+    'gnone': ['noTargetViewOnly', 'noGrantViewOnly', 'starOpens', 'starNewChecked'],
     'gside': ['ownerShown', 'noRemoveShared', 'removeMine', 'menuSharedBare', 'menuMineNoDup', 'menuStarDup', 'menuAdminAll'],
     'greplace': ['replaceIdSent', 'mineKept', 'ownNoReplaceId'],
     'gload': ['listCalled', 'mineFlag'],
     'gload0': ['noListCall'],
+    'gask': ['deleteAsks', 'askFooter', 'cancelKeeps', 'deleteSent', 'renameAsks', 'renameTaken', 'renameNote', 'renameSent'],
 }
 MUTANTS = {
     # main.js
-    'm-gate': ([('main', "        if (typeof penumbra_vars === 'undefined' || !(penumbra_vars.isGlobalAdmin || penumbra_vars.importGrant)) return;\r\n",
-                 "        if (typeof penumbra_vars === 'undefined' || !penumbra_vars.isGlobalAdmin) return;\r\n")], ['L-gpaste-opens', 'L-gnone-starOpens'], ['gpaste', 'gnone']),
+    # (addrows) the gate is on the TARGETS now: a listed import is a target only for an admin or a grant holder
+    'm-gate': ([('main', "        if (typeof penumbra_vars === 'undefined' || !penumbra_vars || !(penumbra_vars.isGlobalAdmin || penumbra_vars.importGrant)) return [];\r\n", "")],
+               ['L-gnone-noGrantViewOnly'], ['gnone']),
     'm-cancreate': ([('main', "(penumbra_vars.isGlobalAdmin || penumbra_vars.importGrant === '*'));\r\n    }\r\n", "true);\r\n    }\r\n")],
-                    ['L-gpaste-newDisabled', 'L-gnone-noTargetIgnored'], ['gpaste', 'gnone']),
+                    ['L-gpaste-newAbsent', 'L-gnone-noTargetViewOnly'], ['gpaste', 'gnone']),
+    # (addrows) the app's own dialogs: Cancel must keep the import; a taken name must be refused as typed
+    'm-nodelask': ([('main', "        }).then(function (ok) {\r\n            if (!ok) return;\r\n            var _delId", "        }).then(function (ok) {\r\n            if (false) return;\r\n            var _delId")],
+                   ['L-gask-cancelKeeps'], ['gask']),
+    'm-renamefree': ([('main', "                                if (v !== oldName && (window._penumbraImportedData[v] || window._penumbraImportMeta[v])) return { value: v, error: 'An import named ' + v + ' already exists.' };\r\n", "")],
+                     ['L-gask-renameTaken'], ['gask']),
     'm-appendid': ([('main', "action: 'append', id: (window._penumbraImportMeta[name] && window._penumbraImportMeta[name].id) || undefined,", "action: 'append',")], ['L-gpaste-sentId'], ['gpaste']),
     'm-undoid': ([('main', "_pnbPasteUndo = { id: r.id, import_name: name,", "_pnbPasteUndo = { import_name: name,")], ['L-gpaste-undoId'], ['gpaste']),
-    'm-notarget': ([('main', "        if (!_pnbPasteCanCreate() && !_pnbPasteTargets().length) return;   // impgrant: nowhere this paste could go\r\n", "")], ['L-gnone-noTargetIgnored'], ['gnone']),
     'm-sideremove': ([('main', "            if (!_impNotMine) html += '<div class=\"action-icon\" title=\"Remove imported data\"", "            html += '<div class=\"action-icon\" title=\"Remove imported data\"")], ['L-gside-noRemoveShared'], ['gside']),
     'm-menudup': ([('main', "${(_impCanCreate && !_impNotMine) ?", "${(!_impNotMine) ?")], ['L-gside-menuMineNoDup'], ['gside']),
     'm-menurename': ([('main', "${_impNotMine ? '' : '<div class=\"submenu-item\" data-action=\"import-rename\">Rename</div>'}", "<div class=\"submenu-item\" data-action=\"import-rename\">Rename</div>")], ['L-gside-menuSharedBare'], ['gside']),

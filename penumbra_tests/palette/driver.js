@@ -246,7 +246,7 @@
     var ABSENT = ['pivot', 'viz', 'download', 'dl-xls', 'dl-pdf', 'dl-print', 'dl-csv', 'dl-tsv', 'dl-json', 'email', 'snapshots', 'journal', 'subscribe', 'settings', 'header', 'find', 'nextpage', 'prevpage', 'clearfilter', 'builder',
                   'taggen', 'managedata', 'formatsql', 'rowlimit', 'wordwrap', 'editorheight', 'tablelist', 'sharestate', 'popout', 'stopquery', 'firstpage', 'lastpage', 'scrollleft', 'scrollright', 'exitpivot', 'expandgroups', 'collapsegroups', 'restoregroup', 'restorepivot', 'asofexit', 'profile', 'rowscard', 'datacard', 'loadcard',
                   'dictionary', 'gendict', 'cmpevergreen', 'col:about',
-                  'cards', 'cardstable', 'cardsize-compact', 'cardsize-standard', 'cardsize-large', 'cardsize-xl', 'carddetails', 'cardlayout'];   /* (2026-10-30, clayout) Settings > Cards (#spCardsSection) is not in this harness either */   /* (2026-10-28, cards + csize) the Table / Cards switch (#pnbCardsSwitch) and the size control (#pnbCardsSize) are not in this harness: the cards suite tests these rows */   /* (2026-10-23) cmpevergreen: no Snapshots button here (pcmplink puts one in) */   // (round 23) index.php's own controls this harness has not got; (2026-10-22) js/penumbra_dict.js is not loaded here (the dict suite tests both rows)
+                  'cards', 'cardstable', 'cardsize-compact', 'cardsize-standard', 'cardsize-large', 'cardsize-xl', 'carddetails', 'cardlayout', 'cardconfig', 'board'];   /* (2026-10-30, clayout) Settings > Cards (#spCardsSection) is not in this harness either; (round N, ccfg) nor the card view's Configure cards */   /* (2026-10-28, cards + csize) the Table / Cards switch (#pnbCardsSwitch) and the size control (#pnbCardsSize) are not in this harness: the cards suite tests these rows */   /* (2026-10-23) cmpevergreen: no Snapshots button here (pcmplink puts one in) */   // (round 23) index.php's own controls this harness has not got; (2026-10-22) js/penumbra_dict.js is not loaded here (the dict suite tests both rows)
     var reg = pal('registry')(), bad = reg.filter(function (e) { return !e.needs && ABSENT.indexOf(e.id) < 0; }).map(function (e) { return e.id; });
     R.info.regBad = bad; R.info.regN = reg.length;
     R.chk.registryNeeds = reg.length >= 40 && bad.length === 0;
@@ -771,6 +771,31 @@
     R.info.bounds = { al: al && al.text, am: am && am.text, sub: al && al.sub };
     R.chk.rowBounds = acta && !!al && !!am && !al.off && /row \d+, V_AMOUNT/.test(al.sub);
     key('Escape', { target: input() }); await sleep(30);
+    // (2026-10-30, selflt) the selected cell one of several selected: the selection's rows (the header menu's), named by it,
+    // the cell's own Filter to / Copy this value gone; the picked one filters by every value (two names, a status)
+    // (this harness keeps #resultsTable display:none, and a block takes only DRAWN cells: shown for this check alone)
+    var rtS = document.getElementById('resultsTable'), rtStyle = rtS.getAttribute('style');
+    var ts = document.getElementById('tableSearch'); ts.value = ''; $(ts).trigger('input');
+    await sleep(1200);
+    rtS.style.display = '';
+    var CS2 = window.Penumbra.cellSel, thn = fth('V_NAME'), ths = fth('V_STATUS');
+    var vis = Array.prototype.filter.call(document.querySelectorAll('#resultsTable tbody tr'), function (tr) { return !tr.classList.contains('search-hidden') && tr.style.display !== 'none' && !!tr.querySelector('td[data-column]'); });
+    function cIn(tr, th) { return (tr && th) ? tr.querySelector('td[data-column="' + th.getAttribute('data-column') + '"]') : null; }
+    var s1 = cIn(vis[0], thn), s2 = null, s3 = cIn(vis[0], ths);
+    for (var i = 1; i < vis.length && !s2; i++) { var cc = cIn(vis[i], thn); if (cc && s1 && cc.textContent.trim() !== s1.textContent.trim()) s2 = cc; }
+    var nsel = (CS2 && typeof CS2.select === 'function' && s1 && s2 && s3) ? CS2.select([{ a: s1, b: s1 }, { a: s2, b: s2 }, { a: s3, b: s3 }]) : 0;
+    await sleep(50);
+    await open('');
+    var sf = row('Filter to the selected values', 'For this report'), sx = row('Exclude the selected values', 'For this report'), sc = row('Copy the selected cells', 'For this report');
+    R.info.sel = { n: nsel, cells: [!!s1, !!s2, !!s3, vis.length], sf: sf && [sf.text, sf.sub], sx: !!sx, sc: !!sc, own: texts().filter(function (t) { return /^Filter to "|^Copy this value/.test(t); }).slice(0, 3) };
+    R.chk.rowSel = nsel === 3 && !!sf && !!sx && !!sc && !sf.off && sf.sub === 'the 3 selected cells' && !row('Copy this value', 'For this report') && !texts().some(function (t) { return /^Filter to "/.test(t); });
+    var pickedSel = await pickRow('Filter to the selected values', 'For this report');
+    key('Enter', { target: input() });
+    await sleep(1000);
+    var qs = ts.value;
+    R.info.selRun = { picked: pickedSel, q: qs };
+    R.chk.rowSelRuns = pickedSel && /V_NAME = \/\^\(\?:[^)]*\|[^)]*\)\$\//.test(qs) && /V_STATUS = \/\^\(\?:/.test(qs);
+    if (rtStyle === null) rtS.removeAttribute('style'); else rtS.setAttribute('style', rtStyle);
   };
 
   // ---------------------------------------------------------------- pshot

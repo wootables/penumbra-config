@@ -250,17 +250,21 @@ until(function () { return booted('e1') && stat('d1') !== '' && tile('d2').find(
 }).then(function () {
   eq('Escape restores the applied filter, and the chips with it', pressed('c1', 'COLLEGE'), ['Eng', 'Sci']);
 
-  // ══════ E. "or" pauses them ══════
+  // ══════ E. "or" is wrapped in parentheses, not paused (2026-10-30) ══════
   enter('COLLEGE = Eng or COLLEGE = Sci');
-  return until(function () { return tile('c1').find('.pnb-fstrip').attr('data-fs-off') === 'or'; }, 5000);
+  return wait(800);
 }).then(function () {
   var $s = tile('c1').find('.pnb-fstrip');
-  ok('an "or" filter pauses the chips, with a note naming the dashboard filter', $s.attr('data-fs-off') === 'or' && $s.find('.pnb-fs-chip:disabled').length === 6 && $s.find('.pnb-fs-note').text().indexOf('dashboard filter') > -1, $s.find('.pnb-fs-note').text());
-  ok('... and the switch', sw('c1', 0).is(':disabled'));
-  var before = box();
+  ok('an "or" filter no longer pauses the chips', !$s.attr('data-fs-off') && $s.find('.pnb-fs-chip:disabled').length === 0 && $s.find('.pnb-fs-note').length === 0, $s.attr('data-fs-off') + ' ' + $s.find('.pnb-fs-note').text());
+  ok('... nor the switch', !sw('c1', 0).is(':disabled'));
   chip('c1', 'COLLEGE', 'Ag').trigger('click');
-  sw('c1', 0).trigger('click');
-  return wait(300).then(function () { eq('a click while paused changes nothing', box(), before); });
+  return until(function () { return box() === 'COLLEGE = /^(?:Ag)$/ and (COLLEGE = Eng or COLLEGE = Sci)'; }, 5000).then(function () {
+    eq('a chip wraps the or filter in parentheses and adds its condition', box(), 'COLLEGE = /^(?:Ag)$/ and (COLLEGE = Eng or COLLEGE = Sci)');
+    sw('c1', 0).trigger('click');
+    return until(function () { return /AMOUNT > 5$/.test(box()); }, 5000);
+  }).then(function () {
+    eq('a switch adds its condition beside them', box(), 'COLLEGE = /^(?:Ag)$/ and (COLLEGE = Eng or COLLEGE = Sci) and AMOUNT > 5');
+  });
 }).then(function () {
   // ══════ F. clear ══════
   $('#dashSearchClear').trigger('click');
@@ -312,9 +316,9 @@ until(function () { return booted('e1') && stat('d1') !== '' && tile('d2').find(
   eq('... and the switch', $('#teCtlToggles .dash-ctl-trow').map(function () { return [[$(this).find('.teCtlTLabel').val(), $(this).find('.teCtlTCond').val()]]; }).get(), [['Open only', 'STATUS = Open']]);
   // refusals
   var a0 = ALERTS.length;
-  $('#teCtlToggles .teCtlTCond').first().val('STATUS = Open or STATUS = Closed');
+  $('#teCtlToggles .teCtlTCond').first().val('__ROW STATUS = Open');   // (an "or" is allowed since 2026-10-30: one condition in parentheses)
   $('#teApply').trigger('click');
-  ok('a switch condition with "or" is refused, the panel stays open', ALERTS.length === a0 + 1 && ALERTS[a0].indexOf('cannot use "or"') > -1 && $('#dashOverlay').length === 1, ALERTS.slice(a0).join(' | '));
+  ok('a switch condition with a modifier is refused, the panel stays open', ALERTS.length === a0 + 1 && ALERTS[a0].indexOf('cannot start with __ROW') > -1 && $('#dashOverlay').length === 1, ALERTS.slice(a0).join(' | '));
   $('#teCtlToggles .teCtlTCond').first().val('STATUS = Open');
   $('#teCtlFields .teCtlCol').first().val('');
   $('#teApply').trigger('click');

@@ -736,6 +736,53 @@ MUTANTS.update({
               ['L-mfltm-fmNoHighlight', 'L-mfltm-fmNoHighlightCell'], ['mfltm']),
 })
 
+# (2026-10-30, selflt; the user: "Maybe the right click can detect when multiple cells are selected and adjust the copy/filter
+# values accordingly", "we can also do alt+click at no risk with anything existing", "if the multiple selected cells are text
+# ... the stats bar ... can say filter this selection") a right-click inside a selection, Alt+click, the readout's Filter to
+# selection. Guards (they hold on live): the cell's own list outside a selection, no button on a readout with numbers, a
+# link and '#' keeping their click, a plain click (click-to-filter) putting its value in place of the box.
+SCN = SCN + ['msel', 'ggsel']
+CHK['msel'] = ['selCells', 'selMenu', 'selNote', 'selCopyList', 'selCopyRuns', 'selCopyFallback', 'selOutside', 'selOne', 'selCap', 'capStops', 'selMemo',
+               'selFilterRuns', 'selKeepsBox', 'selExcludeRuns', 'roButton', 'roNoNumbers', 'roRuns', 'macCtrl', 'altAdds', 'altDouble', 'altLinkNum', 'plainClickReplaces']
+CHK['ggsel'] = ['gsMenu', 'gsFilter']
+SEL_GUARDS = {'L-msel-selOutside', 'L-msel-roNoNumbers', 'L-msel-altLinkNum', 'L-msel-plainClickReplaces'}
+NEW_SEL = ({'L-%s-%s' % (s, c) for s in ('msel', 'ggsel') for c in CHK[s]} - SEL_GUARDS) | {'S-helpSelFilter'}
+NEW = NEW | NEW_SEL
+NEW = NEW - NEW_SEL   # (selflt is LIVE since e3ef480, 2026-10-30: old checks now)
+NEW = NEW | {'L-mcell-cellRaw'}   # (cfmt2, 2026-10-30: Filter to names the value as shown - red on live)
+MUTANTS.update({
+    # the menu: never the selection's; the cell's own Filter to kept; any selection (a cell outside it too); a value twice;
+    # no cap; Exclude writing Filter to; the value's copy kept; the copy given no cells
+    'sl-nosel': ([('menu', "            var sel = selPicks(cell);\n", "            var sel = null;\n")], ['L-msel-selMenu', 'L-msel-selCopyList', 'L-ggsel-gsMenu'], ['msel', 'ggsel']),
+    'sl-keepown': ([('menu', "            if (sel) { cv = null; selFilterItems", "            if (sel) { selFilterItems")], ['L-msel-selMenu'], ['msel']),
+    'sl-outside': ([('menu', "        if (base.tds.length < 2 || (cell && base.tds.indexOf(cell.td) < 0)) { return null; }", "        if (base.tds.length < 2) { return null; }")], ['L-msel-selOutside'], ['msel']),
+    'sl-dupes': ([('menu', "                if (e.low[v.toLowerCase()]) { continue; }\n", "")], ['L-msel-selOne'], ['msel']),
+    # (the review) read again on every build; read to the end past 100 values; a double-click's second click adding; a Mac's
+    # Ctrl+click adding a cell
+    'sl-nomemo': ([('menu', "        var base = (selMemo && ver !== null && selMemo.ver === ver) ? selMemo.base : null;", "        var base = null;")], ['L-msel-selMemo'], ['msel']),
+    'sl-nostop': ([('menu', "                if (pairs.length > SEL_MAX) { over = true; }\n", "")], ['L-msel-selCap', 'L-msel-capStops'], ['msel']),
+    'sl-altdbl': ([('menu', "        if (e.detail > 1) { return; }\n", "")], ['L-msel-altDouble'], ['msel']),
+    'sl-macctrl': ([('csel', "        if (e.ctrlKey && !e.metaKey && /Mac|iPhone|iPad/.test(String(navigator.platform || ''))) { return; }\n", "")], ['L-msel-macCtrl'], ['msel']),
+    'sl-nocap': ([('menu', "        var many = sel.n > SEL_MAX,", "        var many = false,")], ['L-msel-selCap'], ['msel']),
+    'sl-exclude': ([('menu', "run: function () { A.filterAddMany(sel.pairs, true); } }", "run: function () { A.filterAddMany(sel.pairs, false); } }")], ['L-msel-selExcludeRuns'], ['msel']),
+    'sl-valcopy': ([('menu', "            if (!sel && !isNum && !isJournal(col)) { var cvt", "            if (!isNum && !isJournal(col)) { var cvt")], ['L-msel-selCopyList'], ['msel']),
+    'sl-copynone': ([('menu', "run: function () { if (!S.copy(sel.tds)) {", "run: function () { if (!S.copy([])) {")], ['L-msel-selCopyRuns', 'L-msel-selCopyFallback'], ['msel']),
+    # main.js: a column's first value alone; the box's other conditions dropped
+    'sl-onevalue': ([('main', "            if (!byCol[K]) { byCol[K] = []; order.push(K); }", "            if (!byCol[K]) { byCol[K] = []; order.push(K); } else return;")], ['L-msel-selFilterRuns'], ['msel']),
+    'sl-droprest': ([('main', "        var state = _pnbFsState(String($('#tableSearch').val() || ''), flds);", "        var state = _pnbFsState('', flds);")], ['L-msel-selKeepsBox'], ['msel']),
+    # cell selection: cells() empty; the copy event's table left out; no readout button; one for numbers too; a button that runs nothing
+    'sl-nocells': ([('csel', "        cells: function () { return rects.length ? selectedCells().map(function (x) { return x.td; }) : []; },", "        cells: function () { return []; },")],
+                   ['L-msel-selCells', 'L-msel-selMenu', 'L-msel-roButton'], ['msel']),
+    'sl-nohtml': ([('csel', "                e.clipboardData.setData('text/html', p.html);\n                e.preventDefault(); e.stopImmediatePropagation();", "                e.preventDefault(); e.stopImmediatePropagation();")], ['L-msel-selCopyRuns'], ['msel']),
+    'sl-nobtn': ([('csel', "        var sf = st.numbers ? null : selFilter();", "        var sf = null;")], ['L-msel-roButton', 'L-msel-roRuns'], ['msel']),
+    'sl-numbtn': ([('csel', "        var sf = st.numbers ? null : selFilter();", "        var sf = selFilter();")], ['L-msel-roNoNumbers'], ['msel']),
+    'sl-btnrun': ([('csel', "        if (fb && seg && seg.contains(fb)) { var sf = selFilter(); if (sf) { sf.run(); } return; }", "        if (fb && seg && seg.contains(fb)) { return; }")], ['L-msel-roRuns'], ['msel']),
+    # Alt+click: none; heard after the page's click-to-filter (the box replaced first); '#' taken too
+    'sl-noalt': ([('menu', "        if (!e.altKey || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey) { return; }", "        return;")], ['L-msel-altAdds'], ['msel']),
+    'sl-altlate': ([('menu', "        A.filterAdd(col, v, false);\n    }, true);", "        A.filterAdd(col, v, false);\n    }, false);")], ['L-msel-altAdds'], ['msel']),
+    'sl-althash': ([('menu', "        if (!c || c.nested || !col || col === '#' || isJournal(col) || !A ||", "        if (!c || c.nested || !col || isJournal(col) || !A ||")], ['L-msel-altLinkNum'], ['msel']),
+})
+
 args = sys.argv[1:]
 def opt(name, default=None):
     if name in args:
@@ -761,6 +808,9 @@ RELS = {'main': os.path.join('js', 'main.js'), 'mod': os.path.join('js', 'penumb
         'index': 'index.php', 'help': os.path.join('help', 'tips', 'settings-tips-storage.php'), 'topic': os.path.join('help', 'topics', 'userSettingsHelpLightbox.php'),
         'ptips': os.path.join('help', 'tips', 'pivot-tips-storage.php'),   # (2026-10-20) the grouping dialog's Layout tip
         'gtopic': os.path.join('help', 'topics', 'groupingHelpLightbox.php')}   # (2026-10-25, nestgb2) the grouping topic: the chip's list
+# (2026-10-30, selflt) cell selection under test too (its cells() / copy(), the readout's Filter to selection): the stage's
+# copy, written over the live one LIBS put there
+RELS.update({'csel': os.path.join('js', 'penumbra_cellsel.js'), 'cselcss': os.path.join('css', 'penumbra_cellsel.css')})
 sys.path.insert(0, HERE)
 import mk_harness
 cand = {k: pick(v) for k, v in RELS.items()}
@@ -883,6 +933,8 @@ def write_stage(texts):
     w('penumbra_colmenu.js', texts['menu'])
     w('penumbra_colmenu.css', texts['mcss'])
     w('main.css', texts['css'])
+    w('penumbra_cellsel.js', texts['csel'])   # (2026-10-30, selflt)
+    w('penumbra_cellsel.css', texts['cselcss'])
 
 def static_checks(texts):
     idx = texts['index']   # (2026-10-19) the v1 help is gone: the settings topic alone carries the wording the S-help* checks pin
@@ -952,6 +1004,16 @@ def static_checks(texts):
          and 'A nested-table column is not in the list; the columns of its tables are, under <em>Nested table columns</em>' in texts['topic']
          and "a nested-table column's sub-columns stand in for it, under <em>Nested table columns</em>" in texts['gtopic']
          and chr(0x2014) not in texts['topic'] + texts['gtopic'], ''),
+    ]
+
+# (2026-10-30, selflt) the help names the selection's filters, the readout's button and Alt+click (no em dash)
+_static_checks_before_sel = static_checks
+def static_checks(texts):
+    t = texts['topic']
+    return _static_checks_before_sel(texts) + [
+        ('S-helpSelFilter', 'and the menu works on the selection: <em>Filter</em> lists <em>Filter to the selected values</em> and <em>Exclude the selected values</em>' in t
+         and 'the status bar offers <strong>Filter to selection</strong> after Count' in t and '<kbd>Alt</kbd>+click a cell (<kbd>Option</kbd> on a Mac) to add its value to the filter' in t
+         and '<kbd>Alt</kbd>+click a cell to add its value to the filter without the menu.' in t and chr(0x2014) not in t, ''),
     ]
 
 def run_browser(scns):

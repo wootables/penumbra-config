@@ -346,7 +346,7 @@ $mutants = @{
   'ctlstate'     = @('dash', 'var st = off ? { prefix: '''', sel: {}, range: {}, rest: [], or: false } : T.strip.state(text, spec.fields);', 'var st = { prefix: '''', sel: {}, range: {}, rest: [], or: false };')
   'ctlapply'     = @('dash', 'applyDashSearch(text);   // redraws the Controls tiles, focus kept (renderControlsInto)', '/* mutant: written, never applied */')
   'ctltoggle'    = @('dash', 'var next = T.strip.has(text, cond) ? T.strip.remove(text, cond) : T.strip.add(text, cond);', 'var next = T.strip.has(text, cond) ? '''' : cond;')
-  'ctlor'        = @('dash', 'var text = dashBoxText(), off = T.splitTopLevel(text).or ? ''or'' : null;', 'var text = dashBoxText(), off = null;')
+  # ctlor retired 2026-10-30 (parens phase 3): an "or" filter no longer pauses the chips - the strip wraps it in parentheses
   'ctlreach'     = @('dash', 'if (tl.type === ''note'' || tl.type === ''controls'') { continue; }', 'if (tl.type === ''note'') { continue; }')
   'ctlfill'      = @('dash', 'if (best[k] === 7 || _ctlFillAsked[k] || (had && had.score === 7)) { return; }', 'return;')
   'ctlfillonce'  = @('dash', '_ctlFillAsked[k] = true;', '/* mutant: asked again every time */')

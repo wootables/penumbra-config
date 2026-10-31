@@ -58,7 +58,7 @@
       var ev = paste(TSV);
       R.chk.opens = ev.defaultPrevented && !!ov();
       if (!ov()) return;
-      R.chk.newDisabled = !!radio('new') && radio('new').disabled && document.getElementById('pnbPasteName').disabled;
+      R.chk.newAbsent = !radio('new') && !document.getElementById('pnbPasteName');   // (addrows) a choice is offered only to someone who can use it
       R.chk.appendChecked = !!radio('append') && radio('append').checked && document.getElementById('pnbPasteTarget').value === 'ZZ_LIST';
       R.chk.buttonAdd = document.getElementById('pnbPasteGo').textContent === 'Add the rows';
       await go();
@@ -73,13 +73,16 @@
     },
     // when the paste has nowhere to go, it is not taken; the every-import grant may create
     gnone: async function () {
-      grantee([5]);   // no import in the list at all
+      grantee([5]);   // no import in the list at all: this view is the only place (addrows)
       var a = paste(TSV);
-      R.chk.noTargetIgnored = !a.defaultPrevented && !ov();
+      R.chk.noTargetViewOnly = a.defaultPrevented && !!ov() && !radio('new') && !radio('append') && !!radio('view') && radio('view').checked;
+      if (ov()) ov().remove();
       grantee(null);
-      seed();
+      seed();   // the report's import is listed, but no grant: not a target
       var b = paste(TSV);
-      R.chk.noGrantIgnored = !b.defaultPrevented && !ov();
+      R.chk.noGrantViewOnly = b.defaultPrevented && !!ov() && !radio('new') && !radio('append') && !!radio('view') && radio('view').checked;
+      R.info.gnone = ov() ? ov().querySelector('#pnbRowsDest').textContent.replace(/\s+/g, ' ').trim() : null;
+      if (ov()) ov().remove();
       grantee('*');
       var c = paste(TSV);
       R.chk.starOpens = c.defaultPrevented && !!ov();
@@ -135,6 +138,68 @@
       var m = window._penumbraImportMeta || {};
       R.chk.mineFlag = !!m.ZZ_LIST && m.ZZ_LIST.mine === false && m.ZZ_LIST.owner === 'ann' && !!m.ZZ_MINE && m.ZZ_MINE.mine === true;
       R.info = { meta: m.ZZ_LIST, n: reqs('list').length };
+    },
+    // (addrows) the import flows' questions are the app's own dialog, never confirm() / prompt():
+    // delete from the sidebar's X (Cancel keeps it; Delete sends, the registries clear once the
+    // server agrees), rename from the menu (the name checked as typed, saved in capitals, Enter = OK)
+    gask: async function () {
+      penumbra_vars.isGlobalAdmin = true; penumbra_vars.importGrant = null;
+      window._penumbraImportMeta = window._penumbraImportMeta || {};
+      window._penumbraImportIds = window._penumbraImportIds || {};
+      window._penumbraImportMeta.ZZ_MINE = { id: 6, filename: 'm.csv', row_count: 2, mine: true, owner: 'harness' };
+      window._penumbraImportIds.ZZ_MINE = 6;
+      window.__IMPORT_ANSWER = function (b) { return { ok: true, json: { status: 'success' } }; };
+      window.__HC.psb();
+      var natives = 0;
+      window.confirm = function () { natives++; return true; };
+      window.prompt = function () { natives++; return 'X'; };
+      window.alert = function () { natives++; };
+      function ask() { return document.getElementById('pnbImportAsk'); }
+      var x = sideItem('ZZ_MINE') && sideItem('ZZ_MINE').querySelector('[data-action="remove-import"]');
+      if (!x) { R.notes.push('no X on ZZ_MINE'); return; }
+      x.click();
+      await until(function () { return !!ask(); }, 2000);
+      R.chk.deleteAsks = !!ask() && /Delete ZZ_MINE \(2 rows\)\?/.test(ask().textContent) && document.getElementById('pnbImportAskOk').textContent === 'Delete' && natives === 0;
+      var st = document.getElementById('pnbImportAskStatus');
+      R.chk.askFooter = !!st && !!st.closest('.modal-prompt-buttons') && st.nextElementSibling.id === 'pnbImportAskOk' && st.previousElementSibling.classList.contains('modal-btn-secondary');
+      if (ask()) ask().querySelector('.modal-btn-secondary.pnb-ask-cancel').click();
+      await sleep(100);
+      R.chk.cancelKeeps = !ask() && reqs('delete').length === 0 && !!window._penumbraImportMeta.ZZ_MINE && !!sideItem('ZZ_MINE');
+      x = sideItem('ZZ_MINE') && sideItem('ZZ_MINE').querySelector('[data-action="remove-import"]');
+      if (x) x.click();
+      await until(function () { return !!ask(); }, 2000);
+      if (ask()) document.getElementById('pnbImportAskOk').click();
+      await until(function () { return reqs('delete').length === 1; }, 2000);
+      await sleep(200);
+      var d = lastReq('delete');
+      R.chk.deleteSent = !!d && d.id === 6 && !ask() && !window._penumbraImportMeta.ZZ_MINE && !sideItem('ZZ_MINE') && /REMOVED: Imported data source ZZ_MINE/.test(toast());
+      // rename
+      window._penumbraImportMeta.ZZ_MINE = { id: 6, filename: 'm.csv', row_count: 2, mine: true, owner: 'harness' }; window._penumbraImportIds.ZZ_MINE = 6;
+      window._penumbraImportMeta.ZZ_LIST = { id: 5, filename: 'zz.csv', row_count: 3, mine: true, owner: 'harness' };
+      window.__HC.psb();
+      var it = sideItem('ZZ_MINE');
+      window.__HC.menu(it, $(it), { pageX: 10, pageY: 10, preventDefault: function () {}, stopPropagation: function () {} });
+      var mi = document.querySelector('.context-submenu .submenu-item[data-action="import-rename"]');
+      if (!mi) { R.notes.push('no rename item'); return; }
+      mi.click();
+      await until(function () { return !!document.getElementById('pnbImportAskInput'); }, 2000);
+      var inp = document.getElementById('pnbImportAskInput');
+      R.chk.renameAsks = !!inp && inp.value === 'ZZ_MINE' && document.getElementById('pnbImportAskOk').textContent === 'Rename' && natives === 0;
+      if (!inp) return;
+      inp.value = 'zz_list'; inp.dispatchEvent(new Event('input', { bubbles: true }));
+      await sleep(50);
+      R.chk.renameTaken = document.getElementById('pnbImportAskOk').disabled && /An import named ZZ_LIST already exists/.test(document.getElementById('pnbImportAskStatus').textContent) &&
+        document.getElementById('pnbImportAskStatus').offsetParent !== null;
+      inp.value = 'my new!'; inp.dispatchEvent(new Event('input', { bubbles: true }));
+      await sleep(50);
+      R.chk.renameNote = !document.getElementById('pnbImportAskOk').disabled && /Saved as MY_NEW/.test(document.getElementById('pnbImportAskNote').textContent) &&
+        document.getElementById('pnbImportAskStatus').offsetParent === null;
+      inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+      await until(function () { return reqs('rename').length === 1; }, 2000);
+      await sleep(100);
+      var rn = lastReq('rename');
+      R.chk.renameSent = !!rn && rn.id === 6 && rn.new_name === 'MY_NEW' && !ask() && !!window._penumbraImportMeta.MY_NEW && !window._penumbraImportMeta.ZZ_MINE && !!sideItem('MY_NEW') && natives === 0;
+      R.info = { toast: toast().slice(0, 120), d: d, rn: rn, natives: natives };
     },
     // a report editor without a grant: no list request (it would only be refused)
     gload0: async function () {

@@ -1,0 +1,114 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>parens builder harness</title></head>
+<body>
+<!-- parens (2026-10-30, phase 2): the Visual Filter Builder's group rows and its guard. Boots the
+     REAL js/search_builder.js with the real lightbox markup (content.js = the body of
+     search_builder_content.php, served by a stubbed $.get) and drives openSearchBuilder with
+     grouped, nested and plain filter text. The page's engine is stubbed: _penumbraSearchAPI
+     .parseQuery answers as window.__engine says ('none' / 'one' / 'nested'); null removes it
+     for the text-fallback cases. PenumbraPresets is stubbed so getState / applyState (the
+     preset round trip) can be called. It asserts nothing: builder_run.py reads what it prints. -->
+<input id="tableSearch" value="">
+<div id="searchBuilderContainer"></div>
+<pre id="out">running</pre>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="jquery-ui.min.js"></script>
+<script src="purify.min.js"></script>
+<script src="content.js"></script>
+<script>
+  window.penumbra_vars = { isAdmin: true, currentUserKey: 'harness', shibboleth: { ouc: '', dept: '' }, reports: [], grants: [] };
+  jQuery.ajax = function () { var d = jQuery.Deferred(); d.resolve({}); return d.promise(); };
+  jQuery.getJSON = jQuery.ajax; jQuery.post = jQuery.ajax;
+  jQuery.get = function (url, cb) {
+    setTimeout(function () { if (typeof cb === 'function') cb(window.__SB_CONTENT); }, 0);
+    return { fail: function () { return this; }, done: function () { return this; }, always: function () { return this; } };
+  };
+  jQuery.fx.off = true;
+  window.ResizeObserver = function () { this.observe = function () {}; this.unobserve = function () {}; this.disconnect = function () {}; };
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); };
+  window.__engine = 'none';
+  function engineParse() {
+    if (window.__engine === 'one') return [{ type: 'group', parts: [{ type: 'condition' }, { type: 'logical', op: 'or' }, { type: 'condition' }] }, { type: 'logical', op: 'and' }, { type: 'condition' }];
+    if (window.__engine === 'nested') return [{ type: 'group', parts: [{ type: 'group', parts: [{ type: 'condition' }] }] }];
+    return [{ type: 'condition', column: 'A', op: '=', value: '1' }];
+  }
+  window._penumbraSearchAPI = {
+    getColumns: function () { return ['A', 'B', 'C', 'D'].map(function (n) { return { name: n, visible: true }; }); },
+    buildVirtualColumnNames: function () { return []; },
+    runTableSearch: function () {},
+    getCurrentReportId: function () { return 'harness'; },
+    parseQuery: engineParse
+  };
+  window.PenumbraPresets = {
+    NS: { SEARCH: 'search' },
+    reportId: function () { return 'harness'; },
+    create: function (opts) { window.__presetOpts = opts; var noop = function () {}; return { setLoaded: noop, refresh: noop, close: noop, open: noop, destroy: noop, setLabel: noop, loaded: function () { return null; } }; },
+    list: function () { return []; }, save: function () { return true; }, remove: function () {},
+    getPin: function () { return null; }, setPin: function () {}
+  };
+</script>
+<script src="search_builder.js"></script>
+<script>
+(function () {
+  function report(txt) { document.getElementById('out').textContent = txt; }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function state() {
+    var $n = $('#sbGroupedNotice'), $rows = $('#sbConditionsContainer .sb-condition-row');
+    return {
+      rows: $rows.length,
+      toggles: $rows.map(function () { return $(this).find('.sb-row-group').attr('aria-pressed') === 'true'; }).get(),
+      head: $rows.map(function () { return $(this).hasClass('sb-group-head'); }).get(),
+      last: $rows.map(function () { return $(this).hasClass('sb-group-last'); }).get(),
+      hiddenToggle: $rows.first().find('.sb-row-group').hasClass('sb-group-hidden'),
+      notice: ($n.length && $n.css('display') !== 'none') ? $n.text() : '',
+      disabled: !!$('#sbSubmitBtn').prop('disabled'),
+      preview: $('#sbQueryPreview').text(),
+      box: $('#tableSearch').val(),
+      firstValue: $rows.first().find('.sb-value-input:first').val() || ''
+    };
+  }
+  function openWith(q) { $('#tableSearch').val(q); window.openSearchBuilder(); return wait(120); }
+  function toggle(n) { $('#sbConditionsContainer .sb-condition-row').eq(n - 1).find('.sb-row-group').trigger('click'); return wait(40); }
+  function submit() { $('#sbSubmitBtn').trigger('click'); return wait(60); }
+  var out = {};
+  var GQ = '(A = 1 or B = 2) and C = 3';
+  var NQ = '((A = 1 or B = 2) and C = 3) or D = 4';
+  (async function () {
+    try {
+      window.__engine = 'one';
+      await openWith(GQ);                           out.g1 = state();                    // group rows
+      await toggle(3);                              out.g2a = state();                   // row 3 joins the group
+      await submit();                               out.g2 = state();
+      await openWith(out.g2.box);                   out.g3a = state();                   // reopened: two grouped rows
+      await toggle(2);                              out.g3b = state();                   // row 2 leaves: row 3 groups with row 2
+      await submit();                               out.g3 = state();
+      window.__engine = 'nested';
+      await openWith(NQ);                           out.g4 = state();                    // a nested group: text
+      var keep = window._penumbraSearchAPI.parseQuery;
+      delete window._penumbraSearchAPI.parseQuery;
+      await openWith(NQ);                           out.g5 = state();                    // no engine: the text decides
+      await openWith(GQ);                           out.g6 = state();                    // no engine: group rows from the text
+      await openWith('D = (x) and A = 1');          out.g7 = state();                    // a paren in a value: rows
+      await openWith('(A = 1 or B = 2 and C = 3');  out.g8 = state();                    // unbalanced: flat rows
+      window._penumbraSearchAPI.parseQuery = keep;
+      window.__engine = 'one';
+      await openWith(GQ);
+      var st = window.__presetOpts.getState();      // null while a guard is up (phase 1): the round trip then has nothing to carry
+      out.g9a = st ? { query: st.query, grouped: (st.conditions || []).map(function (c) { return !!c.grouped; }) } : { query: null, grouped: [] };
+      $('#sbClearBtn').trigger('click');            await wait(40);
+      if (st) window.__presetOpts.applyState(st);   await wait(80); out.g9 = state();    // the preset round trip
+      await openWith(GQ);
+      $('#sbConditionsContainer .sb-condition-row').eq(0).find('.sb-remove-row-btn').trigger('click'); await wait(60);
+      out.g10 = state();                                                                 // the head removed: row 2 leads, ungrouped
+      await openWith('(A = 1) and B = 2');          out.g11 = state();                   // a group of one row is that row
+      await openWith('( A = 1 or B = 2 ) and C = 3'); out.g12 = state();                 // spaced parens
+      out.errors = window.__errors.slice(0, 6);
+      report('RESULTS_JSON:' + JSON.stringify(out));
+    } catch (e) {
+      report('RESULTS_JSON:' + JSON.stringify({ fatal: String((e && e.stack) || e), errors: window.__errors.slice(0, 6) }));
+    }
+  })();
+})();
+</script>
+</body></html>

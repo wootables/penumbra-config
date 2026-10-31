@@ -64,8 +64,16 @@
 #   G3     (2026-10-21) get_audit_log.php: Pulse's action mix leaves the browser's
 #          harmless notices out, through the same twin (errbenign S1 pins what it
 #          matches: the notices only, so a real browser error still counts)
+#   H7-H9 R1 (2026-10-30, qfail) runs that failed outright (QUERY_FAIL): four in
+#          72 h RAISE the flag - Unresolved headlined by QUERY FAIL, Report errors
+#          "4 failed runs, latest Oct 30", red, 4 · 72 H (H7); mixed with a
+#          timeout + a too-big result: "6 failed runs / timeouts / too-big results"
+#          (H8); an old get_audit_log.php (no errkinds) counts them from the rows
+#          (H9); the REAL ribbon says "4 failed runs, query timeouts or too-big
+#          results (last 72 h)" (R1). G1 also pins QUERY_FAIL in ATT_QUERY and
+#          ERR_QLAST, and ERR_QERR -> errkinds.qerr.
 #
-#   run.ps1                  live files           EXPECTED: GREEN 41 / 0
+#   run.ps1                  live files           EXPECTED: GREEN 45 / 0
 #   run.ps1 -Control         the build before the Auditor tab work (per file,
 #                            its .bak-20260925-auditortab, else -auditerrors,
 #                            else -auditbenign)              EXPECTED: RED
@@ -201,6 +209,17 @@ $mBnSql0  = "`$benignCol = `"CASE WHEN ACTION = 'CLIENT_ERROR' THEN 1 ELSE 0 END
 $mBnCast  = "        `$row['BENIGN'] = (isset(`$row['BENIGN']) && (int)`$row['BENIGN'] === 1) ? 1 : 0;" + $L
 $mMix     = 'WHERE REPORT_ID = :report_id AND NOT " . penumbraBenignClientErrorSql() . "'
 $mMix0    = 'WHERE REPORT_ID = :report_id'
+# --- runs that failed outright, QUERY_FAIL (2026-10-30) ---
+$mQfFilter  = "e.ACTION === 'QUERY_TOOBIG' || e.ACTION === 'QUERY_FAIL'; });"
+$mQfFilter0 = "e.ACTION === 'QUERY_TOOBIG'; });"
+$mQfCount   = ' + (ek.qerr || 0), nB = ek.browser || 0;'
+$mQfCount0  = ', nB = ek.browser || 0;'
+$mQfWords   = "        if (ek.qerr) qKinds.push('failed runs');" + $C
+$mQfRibbon  = "parts.push(att.query === 1 ? '1 failed run, query timeout or too-big result' : att.query.toLocaleString() + ' failed runs, query timeouts or too-big results');"
+$mQfRibbon0 = "parts.push(att.query === 1 ? '1 query timeout or too-big result' : att.query.toLocaleString() + ' query timeouts or too-big results');"
+$mQfAtt     = "('QUERY_TIMEOUT','QUERY_TOOBIG','QUERY_FAIL') AND TIMESTAMP >= SYSDATE - 3"
+$mQfAtt0    = "('QUERY_TIMEOUT','QUERY_TOOBIG') AND TIMESTAMP >= SYSDATE - 3"
+$mQfCol     = "                'qerr'    => isset(`$kpiRow['ERR_QERR'])    ? (int)`$kpiRow['ERR_QERR']    : 0," + $L
 $mutantDefs = [ordered]@{
   'nohealth'     = @{ t = 'css'; edits = @(,@($mShared, $mAlone)); red = @('A1', 'A2', 'A3') }
   'floor270'     = @{ t = 'css'; edits = @(,@($mFloor, $mFloor270)); red = @('A1', 'A2') }
@@ -242,6 +261,12 @@ $mutantDefs = [ordered]@{
   'bnsqlown'     = @{ t = 'aud'; edits = @(,@($mBnSql, $mBnSql0)); red = @('G2') }
   'bnnocast'     = @{ t = 'aud'; edits = @(,@($mBnCast, '')); red = @('G2') }
   'mixall'       = @{ t = 'aud'; edits = @(,@($mMix, $mMix0)); red = @('G3') }
+  'qffilter'     = @{ t = 'js';  edits = @(,@($mQfFilter, $mQfFilter0)); red = @('H9') }
+  'qfcount'      = @{ t = 'js';  edits = @(,@($mQfCount, $mQfCount0)); red = @('H7', 'H8', 'H9') }
+  'qfwords'      = @{ t = 'js';  edits = @(,@($mQfWords, '')); red = @('H8') }
+  'qfribbon'     = @{ t = 'js';  edits = @(,@($mQfRibbon, $mQfRibbon0)); red = @('R1') }
+  'qfatt'        = @{ t = 'aud'; edits = @(,@($mQfAtt, $mQfAtt0)); red = @('G1') }
+  'qfcol'        = @{ t = 'aud'; edits = @(,@($mQfCol, '')); red = @('G1') }
 }
 function Apply-Mutant([string]$text, [string]$name) {
   foreach ($e in $mutantDefs[$name].edits) {
@@ -275,6 +300,7 @@ function Invoke-Cases($s) {
     @('hq1708', 'seg=health&admin=1&cerr=1&qerr=1&w=1708'), @('hcn1708', 'seg=health&admin=1&cerr=1&noek=1&w=1708'), @('hm1708', 'seg=health&admin=1&cerr=1&cerrmany=1&w=1708'),
     @('ho1708', 'seg=health&admin=1&qold=1&cerr=1&w=1708'), @('ho1293', 'seg=health&admin=1&qold=1&cerr=1&w=1293'), @('ho1123', 'seg=health&admin=1&qold=1&cerr=1&w=1123'),
     @('hom1123', 'seg=health&admin=1&qold=1&qmany=1&cerr=1&w=1123'),
+    @('hf1708', 'seg=health&admin=1&qfail=1&ribbon=1&w=1708'), @('hfm1708', 'seg=health&admin=1&qfail=1&qold=1&cerr=1&w=1708'), @('hfn1708', 'seg=health&admin=1&qfail=1&noek=1&w=1708'),
     @('p1708', 'seg=pulse&w=1708'), @('u1708', 'seg=health&admin=0&w=1708'), @('e1708', 'seg=health&admin=1&errors=1&w=1708'),
     @('c1708', 'seg=health&admin=1&w=1708&compact=1'), @('v1708', 'seg=events&w=1708'))) {
     [void]$cases.Add(@{ name = $cs0[0]; query = "$p&$($cs0[1])&theme=theme-hello-kitty" })
@@ -307,7 +333,7 @@ function Invoke-Cases($s) {
 
 function Get-Asserts($m, $s) {
   $out = @()
-  foreach ($k in @('h1708', 'h900', 'h720', 'hc1708', 'hc1123', 'hc1293', 'hq1708', 'hcn1708', 'hm1708', 'ho1708', 'ho1293', 'ho1123', 'hom1123', 'p1708', 'u1708', 'e1708', 'c1708', 'v1708')) {
+  foreach ($k in @('h1708', 'h900', 'h720', 'hc1708', 'hc1123', 'hc1293', 'hq1708', 'hcn1708', 'hm1708', 'ho1708', 'ho1293', 'ho1123', 'hom1123', 'hf1708', 'hfm1708', 'hfn1708', 'p1708', 'u1708', 'e1708', 'c1708', 'v1708')) {
     if ($null -eq $m[$k] -or $m[$k].error) { $out += [pscustomobject]@{ id = 'Z0'; name = "case $k rendered"; pass = $false; detail = $(if ($m[$k]) { $m[$k].error } else { 'no result' }) } }
   }
   if ($out.Count) { return ,$out }
@@ -344,7 +370,7 @@ function Get-Asserts($m, $s) {
   function RepCard($r) { if ($r -and $r.healthCards) { return @($r.healthCards.cards | Where-Object { $_.head -like 'Report errors*' })[0] } return $null }
   $rc = RepCard $hc; $rcn = RepCard $m['hcn1708']
   $bt1 = if ($rc -and $rc.clips) { [string](@($rc.clips)[-1].title) } else { '' }
-  $out += [pscustomobject]@{ id = 'H1'; name = 'Report errors card: "2 browser errors, latest Sep 13, not counted" (newest row in the title), no alarm - also from an old get_audit_log.php'; pass = ($hc.healthCards.n -eq 4) -and ($null -ne $rc) -and ($rc.cls -like '*sev-ok*') -and ($rc.text -like '*No query timeouts or too-big results*') -and ($rc.text -like '*2 browser errors, latest Sep 13, not counted*') -and ($bt1 -like '*Newest: Sep 13 * CLIENT ERROR*') -and ($rc.goto -eq 'bad') -and ($null -eq $hc.unresolved) -and ($null -ne $rcn) -and ($rcn.text -like '*2 browser errors, latest Sep 13, not counted*'); detail = "cards=$($hc.healthCards.n) cls=$($rc.cls) unresolved=$($null -ne $hc.unresolved) text=$($rc.text) | title=$bt1 | fallback=$($rcn.text)" }
+  $out += [pscustomobject]@{ id = 'H1'; name = 'Report errors card: "2 browser errors, latest Sep 13, not counted" (newest row in the title), no alarm - also from an old get_audit_log.php'; pass = ($hc.healthCards.n -eq 4) -and ($null -ne $rc) -and ($rc.cls -like '*sev-ok*') -and ($rc.text -like '*No failed runs, query timeouts or too-big results*') -and ($rc.text -like '*2 browser errors, latest Sep 13, not counted*') -and ($bt1 -like '*Newest: Sep 13 * CLIENT ERROR*') -and ($rc.goto -eq 'bad') -and ($null -eq $hc.unresolved) -and ($null -ne $rcn) -and ($rcn.text -like '*2 browser errors, latest Sep 13, not counted*'); detail = "cards=$($hc.healthCards.n) cls=$($rc.cls) unresolved=$($null -ne $hc.unresolved) text=$($rc.text) | title=$bt1 | fallback=$($rcn.text)" }
   $rq = if ($hq.healthCards) { @($hq.healthCards.cards | Where-Object { $_.head -like 'Report errors*' })[0] } else { $null }
   $out += [pscustomobject]@{ id = 'H2'; name = 'a query timeout in 72 h raises the flag: Unresolved card headlined by it (not a newer browser error), Report errors red at 1 in 72 h'; pass = ($null -ne $hq.unresolved) -and ($hq.unresolved -like '*QUERY TIMEOUT*') -and ($hq.unresolved -notlike '*CLIENT ERROR*') -and ($null -ne $rq) -and ($rq.cls -like '*sev-bad*') -and ($rq.head -like '*1 * 72 H*') -and ($rq.text -like '*1 query timeout, latest Sep 25*'); detail = "unresolved=$($hq.unresolved) | card=$($rq.cls) $($rq.head)" }
   $out += [pscustomobject]@{ id = 'H3'; name = 'the four cards sit in one row with no scrollbar at 1293px (125% scaling)'; pass = ($h13.overflow -le 0) -and ($h13.healthCards.rows -eq 1) -and ($h13.healthCards.n -eq 4); detail = "overflow=$($h13.overflow) rows=$($h13.healthCards.rows) cards=$($h13.healthCards.n)" }
@@ -356,6 +382,12 @@ function Get-Asserts($m, $s) {
   $rm = RepCard $m['hm1708']
   $out += [pscustomobject]@{ id = 'H5'; name = 'the counts are the server''s all-time ones: "31 browser errors" with only 2 among the rows fetched'; pass = ($null -ne $rm) -and ($rm.text -like '*31 browser errors, latest Sep 13, not counted*'); detail = "text=$($rm.text)" }
   $out += [pscustomobject]@{ id = 'H6'; name = 'nothing on record = no Report errors card: three cards as before, one row, no scrollbar at 900px'; pass = ($h.healthCards.n -eq 3) -and (@($h.healthCards.cards | Where-Object { $_.head -like 'Report errors*' }).Count -eq 0) -and ($n.healthCards.n -eq 3) -and ($n.healthCards.rows -eq 1) -and ($n.overflow -le 0); detail = "1708 cards=$($h.healthCards.n) | 900 cards=$($n.healthCards.n) rows=$($n.healthCards.rows) overflow=$($n.overflow)" }
+  # --- runs that failed outright, QUERY_FAIL (2026-10-30) ---
+  $hf = $m['hf1708']; $rf = RepCard $hf; $rfm = RepCard $m['hfm1708']; $rfn = RepCard $m['hfn1708']
+  $out += [pscustomobject]@{ id = 'H7'; name = 'four failed runs in 72 h raise the flag: Unresolved headlined by QUERY FAIL, Report errors red, "4 failed runs, latest Oct 30", 4 · 72 H'; pass = ($null -ne $hf.unresolved) -and ($hf.unresolved -like '*QUERY FAIL*') -and ($null -ne $rf) -and ($rf.cls -like '*sev-bad*') -and ($rf.head -like '*4 * 72 H*') -and ($rf.text -like '*4 failed runs, latest Oct 30*'); detail = "unresolved=$($hf.unresolved) | card=$($rf.cls) $($rf.head) | text=$($rf.text)" }
+  $out += [pscustomobject]@{ id = 'H8'; name = 'mixed with a timeout and a too-big result: "6 failed runs / timeouts / too-big results, latest Oct 30"'; pass = ($null -ne $rfm) -and ($rfm.text -like '*6 failed runs / timeouts / too-big results, latest Oct 30*'); detail = "text=$($rfm.text)" }
+  $out += [pscustomobject]@{ id = 'H9'; name = 'an old get_audit_log.php (no errkinds): the card counts the QUERY_FAIL rows itself, "4 failed runs, latest Oct 30"'; pass = ($null -ne $rfn) -and ($rfn.text -like '*4 failed runs, latest Oct 30*'); detail = "text=$($rfn.text)" }
+  $out += [pscustomobject]@{ id = 'R1'; name = 'the REAL ribbon names them: "4 failed runs, query timeouts or too-big results (last 72 h)", "Show the 4 events"'; pass = ($null -ne $hf.ribbon) -and ($hf.ribbon -like '*Needs attention:*4 failed runs, query timeouts or too-big results (last 72 h)*') -and ($hf.ribbon -like '*Show the 4 events*'); detail = "ribbon=$($hf.ribbon)" }
   $et = $pu.errTile
   $out += [pscustomobject]@{ id = 'P1'; name = 'Pulse''s Errors tile is a <button> into Events > Security & errors, "last: Sep 13", a tooltip naming every type'; pass = ($null -ne $et) -and ($et.tag -eq 'BUTTON') -and ($et.goto -eq 'bad') -and ($et.sub -eq 'last: Sep 13') -and ($et.title -like '*browser errors*') -and ($et.title -like '*query timeouts*'); detail = "tag=$($et.tag) goto=$($et.goto) sub=[$($et.sub)] title=[$($et.title)]" }
   $out += [pscustomobject]@{ id = 'P2'; name = 'the Errors tile looks exactly like its neighbour tile on all themes'; pass = ($tileBad.Count -eq 0); detail = "differs: $($tileBad -join ' ')" }
@@ -384,7 +416,10 @@ function Get-Asserts($m, $s) {
   $out += [pscustomobject]@{ id = 'L1'; name = 'log_client_error.php drops the browser''s own notices (view-transition aborts, the ResizeObserver notice), keeps everything else (14 cases)'; pass = ($bt -match 'RESULT: GREEN') -and (([regex]::Matches($bt, '(?m)^PASS')).Count -eq 14); detail = (($bt -split "`n" | Where-Object { $_ -cmatch '^(FAIL|RESULT|LIFT)' }) -join ' ').Trim() }
   $a = $s.aud
   $g = @()
-  if ($a -notmatch "COUNT\(CASE WHEN ACTION IN \('QUERY_TIMEOUT','QUERY_TOOBIG'\) AND TIMESTAMP >= SYSDATE - 3 THEN 1 END\) AS ATT_QUERY") { $g += 'no ATT_QUERY' }
+  if ($a -notmatch "COUNT\(CASE WHEN ACTION IN \('QUERY_TIMEOUT','QUERY_TOOBIG','QUERY_FAIL'\) AND TIMESTAMP >= SYSDATE - 3 THEN 1 END\) AS ATT_QUERY") { $g += 'no ATT_QUERY (with QUERY_FAIL)' }
+  if ($a -notmatch "TO_CHAR\(MAX\(CASE WHEN ACTION IN \('QUERY_TIMEOUT','QUERY_TOOBIG','QUERY_FAIL'\) THEN TIMESTAMP END\), 'Mon FMDD'\) AS ERR_QLAST") { $g += 'ERR_QLAST without QUERY_FAIL' }
+  if ($a -notmatch "COUNT\(CASE WHEN ACTION = 'QUERY_FAIL' THEN 1 END\) AS ERR_QERR,") { $g += 'no ERR_QERR' }
+  if ($a -notmatch "'qerr'\s*=>\s*isset\(\`$kpiRow\['ERR_QERR'\]\)") { $g += 'errkinds.qerr missing' }
   if ($a -notmatch "MAX\(CASE WHEN ACTION IN \(\`$alarmList\) THEN TIMESTAMP END\), 'YYYYMMDDHH24MISS'\) AS ATT_LAST") { $g += 'ATT_LAST not over $alarmList' }
   if ($a -notmatch "array_diff\(penumbraErrorActions\(\), array\('CLIENT_ERROR'\)\)") { $g += '$alarmList keeps CLIENT_ERROR' }
   if ($a -notmatch "'query'\s*=>\s*isset\(\`$kpiRow\['ATT_QUERY'\]\)") { $g += 'attention.query missing' }

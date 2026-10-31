@@ -13,7 +13,7 @@
   var TSV3 = 'V_ID\tV name\tH_AMT\tEXTRA\r\nP-1\tPasted One\t$1,234.50\tx\r\nP-2\tPasted Two\t(12)\ty\r\nP-3\tPasted Three\tn/a\tz\r\n';
   var TSV2 = 'V_ID\tV_NAME\r\nQ-1\tSecond One\r\nQ-2\tSecond Two\r\n';
   function $1(s) { return document.querySelector(s); }
-  function ov() { return $1('#pnbScratchOverlay'); }
+  function ov() { return $1('#pnbPasteOverlay'); }   // (addrows) the one Add rows dialog
   function scratchTrs() { return document.querySelectorAll('#resultsTable tbody tr.pnb-scratch-row'); }
   function bodyTrs() { return document.querySelectorAll('#resultsTable tbody tr').length; }
   function toast() { var t = $1('#action_overlay'); return t ? t.textContent.replace(/\s+/g, ' ') : ''; }
@@ -44,7 +44,7 @@
     b.click();
     if (!(await until(function () { return !!ov(); }, 2000))) throw new Error('no dialog');
     await typeInto(tsv);
-    var go = $1('#pnbScratchGo');
+    var go = $1('#pnbPasteGo');
     if (!go || go.disabled) throw new Error('Add button disabled: ' + ($1('#pnbScratchPlan') || {}).textContent);
     go.click();
     // (a wrong count is left for the scenario's checks to report, not thrown)
@@ -65,15 +65,15 @@
       if (!b) return;
       b.click();
       await until(function () { return !!ov(); }, 2000);
-      R.chk.dialog = !!ov() && !!$1('#pnbScratchText') && $1('#pnbScratchGo').disabled;
+      R.chk.dialog = !!ov() && !!$1('#pnbScratchText') && $1('#pnbPasteGo').disabled;
       await typeInto(TSV3);
       var plan = ($1('#pnbScratchPlan') || {}).textContent || '';
       R.info.plan = plan;
       R.chk.plan = /3 rows to add/.test(plan) && /Matched 3 of the report's 20 columns: V_ID, V_NAME, H_AMT/.test(plan) &&
         /left out: EXTRA/.test(plan) && /Not numbers, kept as text: H_AMT \(1\)/.test(plan);
-      R.chk.goLabel = $1('#pnbScratchGo').textContent === 'Add 3 rows' && !$1('#pnbScratchGo').disabled;
+      R.chk.goLabel = $1('#pnbPasteGo').textContent === 'Add 3 rows' && !$1('#pnbPasteGo').disabled;
       var q0 = window.__queryDone;
-      $1('#pnbScratchGo').click();
+      $1('#pnbPasteGo').click();
       await until(function () { return scratchTrs().length === 3; }, 15000);
       await sleep(400);
       R.chk.noRequery = window.__queryDone === q0;
@@ -186,11 +186,13 @@
       b.click();
       await until(function () { return !!ov(); }, 2000);
       await typeInto('FOO\tBAR\r\n1\t2\r\n');
-      R.chk.refused = /None of the pasted column names are in this report/.test($1('#pnbScratchPlan').textContent) && $1('#pnbScratchGo').disabled;
+      // (addrows) a refusal sits in the footer gap, between the buttons
+      function status() { var st = $1('#pnbPasteStatus'); return (st && st.closest('.modal-prompt-buttons') && st.offsetParent !== null) ? st.textContent : ''; }
+      R.chk.refused = /None of the pasted column names are in this report/.test(status()) && $1('#pnbPasteGo').disabled;
       await typeInto('V_ID\r\n');
-      R.chk.oneLine = /Paste the column names line and at least one row under it/.test($1('#pnbScratchPlan').textContent) && $1('#pnbScratchGo').disabled;
+      R.chk.oneLine = /Paste the column names line and at least one row under it/.test(status()) && $1('#pnbPasteGo').disabled;
       await typeInto('V_ID\tEXTRA\r\n\tq\r\n');   // the only value is in a column the report lacks
-      R.chk.blankRows = /Every pasted row is blank/.test($1('#pnbScratchPlan').textContent) && $1('#pnbScratchGo').disabled;
+      R.chk.blankRows = /Every pasted row is blank/.test(status()) && $1('#pnbPasteGo').disabled;
       $1('#pnbScratchText').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
       await sleep(50);
       R.chk.escCloses = !ov() && scratchTrs().length === 0;
@@ -223,7 +225,7 @@
       await until(function () { return !!ov(); }, 2000);
       await typeInto(TSV2);
       var q0 = window.__queryDone;
-      $1('#pnbScratchGo').click();
+      $1('#pnbPasteGo').click();
       await sleep(800);
       R.chk.swallowed = scratchTrs().length === 0 && window.__queryDone === q0;
       jQuery.fn.trigger = realTrigger;
@@ -237,6 +239,9 @@
     // open in the preview, nothing is saved as an import, the report stays put
     drop: async function () {
       window.penumbra_vars.isGlobalAdmin = false; window.penumbra_vars.importGrant = null;
+      // (addrows) the report's import is listed (list_for_report), but a viewer may not add to it
+      window._penumbraImportMeta = window._penumbraImportMeta || {};
+      window._penumbraImportMeta.ZZ_LIST = { id: 5, filename: 'zz.csv', row_count: 3 };
       var dt = new DataTransfer();
       dt.items.add(new File(['V_ID,V_NAME\nD-1,Dropped One\nD-2,Dropped Two\n'], 'extra.csv', { type: 'text/csv' }));
       document.body.dispatchEvent(new DragEvent('dragenter', { dataTransfer: dt, bubbles: true, cancelable: true }));
@@ -249,12 +254,23 @@
       R.chk.preview = !!ov() && $1('#pnbScratchText').hidden && ($1('.pnb-scratch-file') || {}).textContent === 'extra.csv' &&
         /2 rows to add/.test($1('#pnbScratchPlan').textContent);
       R.chk.noImport = window.__imports.length === imp0 && window.__queryDone === q0;
+      R.chk.viewOnly = !!ov() && !ov().querySelector('input[name="pnbPasteMode"][value="new"]') && !ov().querySelector('input[name="pnbPasteMode"][value="append"]') &&
+        !!ov().querySelector('input[name="pnbPasteMode"][value="view"]:checked');
       if (!ov()) return;
-      $1('#pnbScratchGo').click();
+      $1('#pnbPasteGo').click();
       await until(function () { return scratchTrs().length === 2; }, 15000);
       await sleep(300);
       var D = window.__HC_DATA || [];
       R.chk.added = scratchTrs().length === 2 && D.length === 302 && D[300].V_NAME === 'Dropped One' && window.__queryDone === q0 && window.__imports.length === imp0;
+      // (addrows) a file dropped while the dialog is open is not the page's: the paste box stays
+      $1('body').click(); await sleep(150);
+      var b2 = await cardButton('.pnb-scratch-open');
+      if (b2) b2.click();
+      await until(function () { return !!ov(); }, 2000);
+      document.body.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+      await sleep(400);
+      R.chk.dropWhileOpen = !!ov() && !$1('#pnbScratchText').hidden && !$1('.pnb-scratch-file') && window.__imports.length === imp0;
+      if (ov()) ov().remove();
     },
     // an administrator's drop is still a new import (the overlay says import)
     dropadmin: async function () {
@@ -264,6 +280,12 @@
       await sleep(250);
       R.chk.overlayImport = /file to import/.test($1('#importDragOverlay p').textContent);
       document.body.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+      await until(function () { return !!ov(); }, 4000);
+      await sleep(200);
+      var rn = ov() && ov().querySelector('input[name="pnbPasteMode"][value="new"]');
+      R.chk.dialogNew = !!rn && rn.checked && $1('#pnbPasteName').value === 'EXTRA' && ($1('.pnb-scratch-file') || {}).textContent === 'extra.csv' &&
+        $1('#pnbPasteGo').textContent === 'Import' && !window.__imports.some(function (b) { return b.action === 'save'; });
+      if (ov()) $1('#pnbPasteGo').click();
       await until(function () { return window.__imports.some(function (b) { return b.action === 'save'; }); }, 4000);
       R.chk.imported = window.__imports.some(function (b) { return b.action === 'save' && b.import_name === 'EXTRA'; }) && !ov();
     },
@@ -323,15 +345,14 @@
       document.body.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
       await until(function () { return !!$1('#pnbPasteOverlay'); }, 2000);
       var r = $1('#pnbPasteOverlay input[name="pnbPasteMode"][value="view"]');
-      R.chk.offered = !!r;
+      R.chk.offered = !!r && !!$1('#pnbPasteOverlay input[name="pnbPasteMode"][value="new"]:checked');
       if (!r) return;
       r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true }));
-      R.chk.nextLabel = $1('#pnbPasteGo').textContent === 'Next';
-      $1('#pnbPasteGo').click();
-      await until(function () { return !!ov(); }, 2000);
-      R.chk.planShown = !!ov() && $1('#pnbScratchText').hidden && /2 rows to add/.test($1('#pnbScratchPlan').textContent) && !$1('#pnbPasteOverlay');
+      await sleep(50);
+      R.chk.goLabel = $1('#pnbPasteGo').textContent === 'Add 2 rows';
+      R.chk.planShown = !!ov() && $1('#pnbScratchText').hidden && /2 rows to add/.test($1('#pnbScratchPlan').textContent);
       var q0 = window.__queryDone, saves = window.__imports.filter(function (b) { return b.action !== 'list'; }).length;
-      $1('#pnbScratchGo').click();
+      $1('#pnbPasteGo').click();
       await until(function () { return scratchTrs().length === 2; }, 15000);
       await sleep(300);
       R.chk.added = scratchTrs().length === 2 && window.__queryDone === q0 && window.__imports.filter(function (b) { return b.action !== 'list'; }).length === saves;

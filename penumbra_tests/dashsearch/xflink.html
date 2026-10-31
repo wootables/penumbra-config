@@ -48,6 +48,9 @@ function cond(row, part) {
 }
 function filt(rows, text) {
   if (!text) { return rows; }
+  // a wrapped "or" group, with conditions added beside it (parentheses, 2026-10-30): the group first, the rest on what it leaves
+  var g = text.match(/^\(([^()]*)\)(?:\s+and\s+(.*))?$/i);
+  if (g) { rows = filt(rows, g[1]); return g[2] ? filt(rows, g[2]) : rows; }
   var ors = text.split(/\s+or\s+/i).map(function (s) { return s.split(/\s+and\s+/i); });
   return rows.filter(function (r) { return ors.some(function (ands) { return ands.every(function (p) { return cond(r, p); }); }); });
 }
@@ -140,15 +143,15 @@ until(function () { return stat('s1') === '233' && stat('s2') === '159' && tile(
   return until(function () { return stat('s1') === '233'; }, 5000);
 }).then(function () {
   eq('... and the first link released leaves no filter', [box(), stat('s1')], ['', '233']);
-  // ══════ B. a text the AND-run cannot take replaces the filter ══════
+  // ══════ B. an "or" text is one condition in parentheses (2026-10-30; it used to replace the filter) ══════
   clickLink('Eng or Sci');
   return until(function () { return stat('s1') === '33'; }, 5000);
 }).then(function () {
-  eq('an "or" link replaces the filter, as it does on its own page (10 + 20 + 3)', [box(), stat('s1')], ['COLLEGE = //Eng// or COLLEGE = //Sci//', '33']);
-  clickLink('Eng');   // under an "or" filter nothing can be added to or released from: the link replaces it
+  eq('an "or" link is one condition in parentheses (10 + 20 + 3)', [box(), stat('s1')], ['(COLLEGE = //Eng// or COLLEGE = //Sci//)', '33']);
+  clickLink('Eng');   // beside the group, as any condition: the group keeps its branches apart
   return until(function () { return stat('s1') === '13'; }, 5000);
 }).then(function () {
-  eq('under an "or" filter a link replaces it again (one AND-run, never a branch)', [box(), stat('s1')], ['COLLEGE = //Eng//', '13']);
+  eq('a link beside an "or" group adds to it with and', [box(), stat('s1')], ['(COLLEGE = //Eng// or COLLEGE = //Sci//) and COLLEGE = //Eng//', '13']);
   $('#dashSearchClear').trigger('click');
   return until(function () { return box() === '' && stat('s1') === '233'; }, 5000);
 }).then(function () {

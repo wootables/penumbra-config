@@ -1755,28 +1755,28 @@
                     },
                     {
                         "name":  "bin round-trip: pill carries split + width after decorate",
-                        "pass":  true,
-                        "detail":  "bin/20000"
+                        "pass":  false,
+                        "detail":  "/"
                     },
                     {
                         "name":  "bin round-trip: writer re-emits AMOUNT:bin20000",
-                        "pass":  true,
-                        "detail":  "action(trigger, \u0027View Pivot\u0027, \u0027pivot|AMOUNT:bin20000|FY|AMOUNT|count:AMOUNT\u0027)"
+                        "pass":  false,
+                        "detail":  "action(trigger, \u0027View Pivot\u0027, \u0027pivot|AMOUNT|FY|AMOUNT|count:AMOUNT\u0027)"
                     },
                     {
                         "name":  "bins round-trip: pill keeps split + edges after decorate",
-                        "pass":  true,
-                        "detail":  "bins/100000_250000_500000_750000_1000000_5000000"
+                        "pass":  false,
+                        "detail":  "/"
                     },
                     {
                         "name":  "bins round-trip: chip reads Ranges",
-                        "pass":  true,
-                        "detail":  "Ranges"
+                        "pass":  false,
+                        "detail":  ""
                     },
                     {
                         "name":  "bins round-trip: writer re-emits the full edge list",
-                        "pass":  true,
-                        "detail":  "action(trigger, \u0027View Pivot\u0027, \u0027pivot|AMOUNT:bins100000_250000_500000_750000_1000000_5000000|FY|AMOUNT|sum:AMOUNT\u0027)"
+                        "pass":  false,
+                        "detail":  "action(trigger, \u0027View Pivot\u0027, \u0027pivot|AMOUNT|FY|AMOUNT|sum:AMOUNT\u0027)"
                     },
                     {
                         "name":  "pctile round-trip: parser kept all three aggs",

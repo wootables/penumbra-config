@@ -188,12 +188,21 @@
       eq('cond: add never doubles a condition already there', T.add('STATUS = Active', 'STATUS=Active'), 'STATUS = Active');
       eq('cond: add keeps the __ROW prefix in front', T.add('__ROW X = 1', 'Y = 2'), '__ROW X = 1 and Y = 2');
       eq('cond: add keeps a regex alternation whole', T.add('', 'COLLEGE = /^(?:Eng|Sci)$/'), 'COLLEGE = /^(?:Eng|Sci)$/');
-      assert('cond: add refuses a box holding an or (null)', T.add('A = 1 or B = 2', 'C = 3') === null, String(T.add('A = 1 or B = 2', 'C = 3')));
-      assert('cond: add refuses a condition holding an or (null)', T.add('A = 1', 'B = 1 or C = 2') === null, String(T.add('A = 1', 'B = 1 or C = 2')));
+      // parentheses (2026-10-30): an or box is wrapped and added to; an or condition is one condition in parentheses
+      eq('cond: add wraps a box holding an or in parentheses', T.add('A = 1 or B = 2', 'C = 3'), '(A = 1 or B = 2) and C = 3');
+      eq('cond: a condition holding an or is one condition in parentheses', T.add('A = 1', 'B = 1 or C = 2'), 'A = 1 and (B = 1 or C = 2)');
+      eq('cond: add keeps the __ROW prefix outside the parentheses', T.add('__ROW A = 1 or B = 2', 'C = 3'), '__ROW (A = 1 or B = 2) and C = 3');
+      assert('cond: has sees the added condition beside the wrapped or, not the branches', T.has('(A = 1 or B = 2) and C = 3', 'C = 3') === true && T.has('(A = 1 or B = 2) and C = 3', 'A = 1') === false, '');
+      assert('cond: has reads an or condition as the whole group', T.has('(A = 1 or B = 2) and C = 3', 'A = 1 or B = 2') === true && T.has('A = 1 or B = 2', 'A = 1 or B = 2') === true, '');
+      eq('split: a group is one part and its or is not top-level', window.PenumbraTiles.splitTopLevel('(A = 1 or B = 2) and C = 3'), { prefix: '', parts: ['(A = 1 or B = 2)', 'C = 3'], or: false });
+      eq('split: an or outside a group is top-level', window.PenumbraTiles.splitTopLevel('A = 1 or (B = 2 and C = 3)'), { prefix: '', parts: ['A = 1', '(B = 2 and C = 3)'], or: true });
+      eq('split: a paren in a value is a value; unbalanced parens are text', [window.PenumbraTiles.splitTopLevel('D = (x) and C = 3').parts, window.PenumbraTiles.splitTopLevel('(A = 1 or B = 2 and C = 3').or], [['D = (x)', 'C = 3'], true]);
       eq('cond: remove takes out only that condition', T.remove('AMOUNT > 100 and STATUS = Active and FY = 2025', 'STATUS = Active'), 'AMOUNT > 100 and FY = 2025');
       eq('cond: remove of the last condition empties the box, prefix and all', T.remove('__ROW STATUS = Active', 'STATUS = Active'), '');
       eq('cond: remove of an absent condition leaves the text alone', T.remove('X = 1', 'STATUS = Active'), 'X = 1');
-      assert('cond: remove refuses a box holding an or (null)', T.remove('A = 1 or B = 2', 'A = 1') === null, '');
+      eq('cond: remove leaves an or box alone when the condition is not there', T.remove('A = 1 or B = 2', 'A = 1'), 'A = 1 or B = 2');
+      eq('cond: remove of the added condition unwraps the or box', T.remove('(A = 1 or B = 2) and C = 3', 'C = 3'), 'A = 1 or B = 2');
+      eq('cond: remove keeps a group that still has company', T.remove('(A = 1 or B = 2) and C = 3 and D = 4', 'C = 3'), '(A = 1 or B = 2) and D = 4');
       var sp = window.PenumbraTiles.splitSearch('__ROW A = 1 and B = /x and y/ or C = 3');
       eq('split: splitSearch reads the same through the shared splitter', { p: sp.prefix, f: sp.fragments.map(function (x) { return x.col + ':' + x.text; }), or: sp.or },
         { p: '__ROW ', f: ['A:A = 1', 'B:B = /x and y/', 'C:C = 3'], or: true });
@@ -215,7 +224,7 @@
         assert('toggle: filter| with no condition is refused by name', $(TG).length === 0 && outText().indexOf('filter| needs a condition') !== -1, outText().substring(0, 160));
         return draw("toggle_switch('Or', 'on|filter|STATUS = Active or FY = 2025')");
       }).then(function () {
-        assert('toggle: a condition holding an or is refused', $(TG).length === 0 && outText().indexOf('an or cannot be combined') !== -1, outText().substring(0, 160));
+        assert('toggle: a condition holding an or is one condition in parentheses (2026-10-30), no refusal', $(TG).length === 1 && outText().indexOf('an or cannot be combined') === -1, outText().substring(0, 160));
         return draw("toggle_switch('Row', 'on|filter|__ROW STATUS = Active')");
       }).then(function () {
         assert('toggle: a condition carrying __ROW is refused', $(TG).length === 0 && outText().indexOf('cannot carry __ROW') !== -1, outText().substring(0, 160));
@@ -276,13 +285,21 @@
         eq('exec: unfilter| takes it out', box(), '');
         assert('exec: unfilter| reads active on a box without the condition', F.isActive('unfilter|STATUS = Active') === true, '');
         $('#tableSearch').val('COLLEGE = Eng or FY = 2025');
-        assert('exec: on a box holding an or, neither reads active', F.isActive('filter|STATUS = Active') === false && F.isActive('unfilter|STATUS = Active') === false, '');
+        // parentheses (2026-10-30): an or box is one condition in parentheses, so filter| adds beside it and unfilter| takes back out
+        assert('exec: on a box holding an or, filter| reads not active and unfilter| reads active', F.isActive('filter|STATUS = Active') === false && F.isActive('unfilter|STATUS = Active') === true, '');
         F.exec('filter|STATUS = Active');
-        return wait(150);
+        return until(function () { return !F.busy() && !F.motion() && /STATUS = Active$/.test(box()); }, 8000);
       }).then(function () {
-        eq('exec: a filter| step on an or box changes nothing', box(), 'COLLEGE = Eng or FY = 2025');
-        assert('exec: ... and says why in a notice', ($('#action_overlay').text() || '').indexOf('cannot add or remove one condition') !== -1, ($('#action_overlay').text() || '').substring(0, 200));
-        $('#tableSearch').val('');
+        eq('exec: a filter| step on an or box wraps it in parentheses and adds the condition', box(), '(COLLEGE = Eng or FY = 2025) and STATUS = Active');
+        assert('exec: ... with no notice', ($('#action_overlay').text() || '').indexOf('cannot add or remove one condition') === -1, ($('#action_overlay').text() || '').substring(0, 200));
+        F.exec('unfilter|STATUS = Active');
+        return until(function () { return !F.busy() && !F.motion() && box() === 'COLLEGE = Eng or FY = 2025'; }, 8000);
+      }).then(function () {
+        eq('exec: unfilter| of that condition unwraps the or box again', box(), 'COLLEGE = Eng or FY = 2025');
+        F.exec('unfilter|COLLEGE = Eng or FY = 2025');
+        return until(function () { return !F.busy() && !F.motion() && box() === ''; }, 8000);
+      }).then(function () {
+        eq('exec: unfilter| of the or query itself (one condition in parentheses) empties the box', box(), '');
         return null;
       });
     });
@@ -439,7 +456,11 @@
       $('#tableSearch').val('AMOUNT >= 1 or STATUS = Active');
       return draw(STRIP);
     }).then(function () {
-      assert('pause: an or query disables the boxes too', $(S).attr('data-fs-off') === 'or' && B('AMOUNT', 'min').prop('disabled') === true && B('OPENED', 'max').prop('disabled') === true, $(S).attr('data-fs-off'));
+      assert('pause: an or query no longer disables the boxes (the strip wraps it in parentheses, 2026-10-30)', !$(S).attr('data-fs-off') && B('AMOUNT', 'min').prop('disabled') === false && B('OPENED', 'max').prop('disabled') === false, $(S).attr('data-fs-off'));
+      // the AMOUNT box still holds the 5 typed above (focused boxes are never synced) and, no longer paused, commits it when
+      // focus leaves: AMOUNT >= 5 and (the or query). That search must settle before the next step clears the box.
+      return until(function () { return !F.busy() && !F.motion(); }, 8000);
+    }).then(function () {
       $('#tableSearch').val('');
       return draw("filter_strip('Status|STATUS|range')");
     }).then(function () {
@@ -509,6 +530,8 @@
       G('COLLEGE').find('.pnb-fs-more').trigger('click');   // opened, then folded again in place
       assert('render: folding back in place leaves the blank chip showing', !BL('COLLEGE').hasClass('pnb-fs-hid') && CH('COLLEGE', 'CHASS').hasClass('pnb-fs-hid') && G('COLLEGE').find('.pnb-fs-more').text() === '+1 more',
         JSON.stringify({ chass: CH('COLLEGE', 'CHASS').hasClass('pnb-fs-hid'), blank: BL('COLLEGE').hasClass('pnb-fs-hid'), more: G('COLLEGE').find('.pnb-fs-more').text() }));
+      return until(function () { return !F.busy() && !F.motion(); }, 8000);   // idle first: a click lands only when nothing is changing
+    }).then(function () {
       BL('COLLEGE').trigger('click');
       return until(function () { return !F.motion() && box() !== ''; }, 5000);
     }).then(function () {
@@ -737,7 +760,7 @@
     }).then(function () {
       $('#tableSearch').val('SPONSOR = /^(?:S01)$/ or COLLEGE = /^(?:Eng)$/');
       F.sync();
-      assert('list: the or pause disables the find box with the rows', FIND('SPONSOR').prop('disabled') === true && $(S).attr('data-fs-off') === 'or' && CH('SPONSOR', 'S01').prop('disabled') === true, String($(S).attr('data-fs-off')));
+      assert('list: an or query no longer pauses the list (the strip wraps it in parentheses)', FIND('SPONSOR').prop('disabled') === false && !$(S).attr('data-fs-off') && CH('SPONSOR', 'S01').prop('disabled') === false, String($(S).attr('data-fs-off')));
       $('#tableSearch').val('');
       F.sync();
       assert('list: ... and lifting it re-enables the box', FIND('SPONSOR').prop('disabled') === false && CH('SPONSOR', 'S01').prop('disabled') === false, '');
@@ -977,6 +1000,278 @@
     });
   }
 
+  // ══════ P. buttons (2026-10-30, fsbuttons): a field's patterns and Label|* button groups ══════
+  // '+Label|/regex/' under a column field = a pattern chip on that column, OR'd with the
+  // field's value chips in ONE regex; '+Label|CONDITION' under 'Label|*' = a button that
+  // writes its condition (one = pick one, all = each adds its own). Read back from the box.
+  function sectionP(F, draw, outText, S) {
+    // Every check runs on a main.js without buttons too (the control shows each one red),
+    // so nothing below may assume the new parts exist.
+    var T = window.PenumbraTiles && window.PenumbraTiles.strip;
+    var hasT = !!(T && typeof T.toggleAuthored === 'function' && typeof T.countState === 'function');
+    assert('buttons: PenumbraTiles.strip.toggleAuthored / countState available', hasT, 'toggleAuthored=' + typeof (T && T.toggleAuthored));
+    var box = function () { return String($('#tableSearch').val()); };
+    var err = function (a) { return F.parseArgs(a).error || ''; };
+    var flds = function (a) { return F.parseArgs(a).fields || []; };
+    var pats0 = function (a) { var p = F.parseArgs(a); return p.error ? p.error : ((p.fields && p.fields[0] && p.fields[0].pats) || []).map(function (x) { return [x.label, x.pat]; }); };
+    var auth = function (arr) { return (arr || []).map(function (e) { return [e.label, e.n, e.on]; }); };
+    var SKIP = { skip: true };
+    var rows = fixture();
+    F.setRows(rows);
+    $('#resultsTable').data('columnNameToOriginalIndex', { 'COLLEGE': 1, 'FY': 2, 'AMOUNT': 3, 'STATUS': 4, '% CHANGE': 5 });
+    $('#tableSearch').val('');
+
+    // P.1 parsing
+    var p1 = F.parseArgs(['College|COLLEGE', '+S colleges|/^S/', '+Two letters|/^..$/', 'Size|*', '+Small|AMOUNT < 50', '+Big Eng|AMOUNT >= 250 and COLLEGE = Eng', 'Status|STATUS']);
+    eq('buttons args: a + line under a column field is a pattern on that column', pats0(['College|COLLEGE', '+S colleges|/^S/', '+Two letters|/^..$/']), [['S colleges', '^S'], ['Two letters', '^..$']]);
+    var pf = p1.fields || [];
+    eq('buttons args: Label|* is a button group keyed *1, pick-one by default, its buttons in order with their parts',
+      p1.error ? p1.error : [pf[1] && pf[1].col, pf[1] && pf[1].btn, ((pf[1] && pf[1].buttons) || []).map(function (b) { return [b.label, b.parts]; })],
+      ['*1', 'one', [['Small', ['AMOUNT < 50']], ['Big Eng', ['AMOUNT >= 250', 'COLLEGE = Eng']]]]);
+    eq('buttons args: a field after the group is a plain field again', p1.error ? p1.error : [pf.length, pf[2] && pf[2].col, pf[2] && (pf[2].pats || []).length], [3, 'STATUS', 0]);
+    var p2 = F.parseArgs(['A|*|all', '+X|STATUS = Active', 'B|*', '+Y|FY = 2025']), qf = p2.fields || [];
+    eq('buttons args: all, and a second group keyed *2', p2.error ? p2.error : [qf[0] && qf[0].btn, qf[1] && qf[1].col, qf[1] && qf[1].btn], ['all', '*2', 'one']);
+    eq('buttons args: no label = the condition as written', pats0(['College|COLLEGE', '+|/^S/']), [['/^S/', '^S']]);
+    eq('buttons args: only is an option of a field with patterns', (flds(['College|COLLEGE|only', '+S|/^S/'])[0] || {}).only, true);
+    var refusals = [
+      [['+X|STATUS = Active', 'College|COLLEGE'], /goes after its group/],
+      [['College|COLLEGE', '+Eng|COLLEGE = Eng'], /is a pattern on COLLEGE, written \/regex\//],
+      [['Size|*', '+Small'], /needs a condition after its pipe/],
+      [['Size|*'], /Size needs at least one button/],
+      [['|*', '+X|A = 1'], /a \* group needs a label/],
+      [['Size|*|exclude', '+X|A = 1'], /a \* group takes one or all/],
+      [['College|COLLEGE|one'], /one goes with a button group/],
+      [['College|COLLEGE|only'], /only shows the buttons of College, and it has none/],
+      [['Size|*', '+X|__ROW STATUS = Active'], /cannot carry __ROW/],
+      [['College|COLLEGE', '+X|/a/b/'], /holds a slash/],
+      [['College|COLLEGE', '+X|/(a)\\1/'], /backreference/],
+      [['College|COLLEGE', '+X|/(/'], /not a valid regular expression/],
+      [['Amount|AMOUNT|range', '+Big|/^9/'], /is a range, so it takes no buttons/],
+      [['College|COLLEGE|list', '+S|/^S/'], /is a list, so it takes no buttons/],
+      [['College|COLLEGE|split=comma', '+S|/^S/'], /is split into its values, so it takes no buttons/],
+      [['College|COLLEGE', '+S|/^S/', '+S again|/^S/'], /repeats S/],
+      [['Size|*', '+A|AMOUNT<50', '+B|AMOUNT < 50'], /repeats A/],
+      [['College|COLLEGE', 'Mix|*', '+E|COLLEGE = /^(?:Eng)$/'], /writes COLLEGE = \/\^\(\?:Eng\)\$\/, which the COLLEGE field reads as its own/],
+      [['Amount|AMOUNT|range', 'Mix|*', '+Big|AMOUNT >= 100'], /which the AMOUNT field reads as its own/],
+      [['College|COLLEGE', '+S|/^S/', 'Mix|*', '+E|COLLEGE = /(?:^S)/'], /which the COLLEGE field reads as its own/]
+    ];
+    refusals.forEach(function (rf) { assert('buttons refuse: ' + rf[0].join(', '), rf[1].test(err(rf[0])), err(rf[0])); });
+    assert('buttons args: a plain condition on a strip column is not a conflict (no chip writes it)', !err(['College|COLLEGE', 'Mix|*', '+E|COLLEGE = Eng']), err(['College|COLLEGE', 'Mix|*', '+E|COLLEGE = Eng']));
+    assert('buttons args: an escaped slash (\\x2F) is fine', !err(['College|COLLEGE', '+RD|/R\\x2FD/']), err(['College|COLLEGE', '+RD|/R\\x2FD/']));
+    assert('buttons args: the unknown-option message still names the field options', /exclude, az, top=N, range, blank, list or split/.test(err(['College|COLLEGE|between'])), err(['College|COLLEGE|between']));
+
+    // P.2 state and compose
+    var S0 = function (t, f) { var s = F.state(t, f); s.pat = s.pat || {}; s.btn = s.btn || {}; return s; };
+    var FP = pf, SZ = FP[1] || {};
+    eq('buttons compose: one pattern', F.compose({ prefix: '', sel: {}, range: {}, pat: { COLLEGE: [0] }, btn: {}, rest: [] }, FP), 'COLLEGE = /(?:^S)/');
+    var vp = F.compose({ prefix: '', sel: { COLLEGE: ['Eng'] }, range: {}, pat: { COLLEGE: [0, 1] }, btn: {}, rest: [] }, FP);
+    eq('buttons compose: values first, then each pattern, in ONE regex', vp, 'COLLEGE = /^(?:Eng)$|(?:^S)|(?:^..$)/');
+    var vs = S0(vp, FP);
+    eq('buttons state: that regex reads back as the value and both patterns', [vs.sel.COLLEGE, vs.pat.COLLEGE, vs.rest], [['Eng'], [0, 1], []]);
+    eq('buttons state: patterns read back in the order written', S0('COLLEGE = /(?:^..$)|(?:^S)/', FP).pat.COLLEGE, [1, 0]);
+    eq('buttons state: a pattern the field does not have leaves the condition typed', S0('COLLEGE = /(?:^S)|(?:^X)/', FP).rest, ['COLLEGE = /(?:^S)|(?:^X)/']);
+    eq('buttons state: a trailing pipe (it would match every row) leaves it typed', S0('COLLEGE = /(?:^S)|/', FP).rest, ['COLLEGE = /(?:^S)|/']);
+    eq('buttons state: a plain value regex still reads as values (no pattern)', [S0('COLLEGE = /^(?:Eng|Sci)$/', FP).sel.COLLEGE, S0('COLLEGE = /^(?:Eng|Sci)$/', FP).pat], [['Eng', 'Sci'], {}]);
+    var FX = flds(['College|COLLEGE|exclude', '+S|/^S/']);
+    eq('buttons compose: an exclude field writes its patterns with !=', F.compose({ prefix: '', sel: {}, range: {}, pat: { COLLEGE: [0] }, btn: {}, rest: [] }, FX), 'COLLEGE != /(?:^S)/');
+    eq('buttons state: ... and the = form is not its own', S0('COLLEGE = /(?:^S)/', FX).rest, ['COLLEGE = /(?:^S)/']);
+    eq('buttons state: a button reads as pressed when the box holds its condition', [S0('AMOUNT < 50', FP).btn['*1'], S0('AMOUNT < 50', FP).rest], [[0], []]);
+    var b2 = S0('COLLEGE=Eng and FY = 2025 and AMOUNT>=250', FP);
+    eq('buttons state: every part, in any order and spacing, the rest kept', [b2.btn['*1'], b2.rest], [[1], ['FY = 2025']]);
+    eq('buttons state: half a button is typed text', [S0('COLLEGE = Eng', FP).btn, S0('COLLEGE = Eng', FP).rest], [{}, ['COLLEGE = Eng']]);
+    var FS1 = flds(['Size|*', '+Big|AMOUNT >= 250', '+Big Eng|AMOUNT >= 250 and COLLEGE = Eng']);
+    var FS2 = flds(['Size|*|all', '+Big|AMOUNT >= 250', '+Big Eng|AMOUNT >= 250 and COLLEGE = Eng']);
+    eq('buttons state: in a one group the button holding more parts is the pressed one; in an all group both are',
+      [S0('AMOUNT >= 250 and COLLEGE = Eng', FS1).btn['*1'], S0('AMOUNT >= 250 and COLLEGE = Eng', FS2).btn['*1']], [[1], [0, 1]]);
+    var fixed = 'COLLEGE = /^(?:Eng)$|(?:^S)/ and AMOUNT < 50 and STATUS = /^(?:Active)$/ and FY = 2025';
+    eq('buttons compose: state(compose(x)) is a fixed point with patterns, a button and a typed condition', F.compose(S0(fixed, FP), FP), fixed);
+    var tg = function (s, f, k) { return (hasT && f) ? T.toggleAuthored(s, f, k) : 'n/a'; };
+    var t1 = F.state('', FP); t1.btn = t1.btn || {};
+    var tp = [tg(t1, SZ, 0), JSON.stringify(t1.btn['*1']), tg(t1, SZ, 1), JSON.stringify(t1.btn['*1']), tg(t1, SZ, 1), JSON.stringify(t1.btn['*1'])];
+    eq('buttons toggle: a one group takes one button at a time, and a second press releases it', tp, [true, '[0]', true, '[1]', false, '[]']);
+    var t2 = F.state('', FP); t2.pat = t2.pat || {};
+    var tq = [tg(t2, FP[0], 0), tg(t2, FP[0], 1), JSON.stringify(t2.pat.COLLEGE), tg(t2, FP[0], 0), JSON.stringify(t2.pat.COLLEGE)];
+    eq('buttons toggle: patterns join and leave the field\'s alternation', tq, [true, true, '[0,1]', false, '[1]']);
+    var t3 = F.state('COLLEGE = Eng and FY = 2025', FP);
+    tg(t3, SZ, 1);
+    eq('buttons toggle: a pressed button takes its typed part out of the rest (written once)', F.compose(t3, FP), 'AMOUNT >= 250 and COLLEGE = Eng and FY = 2025');
+    var FT = flds(['A|*', '+On|STATUS = Active', 'B|*', '+On big|STATUS = Active and AMOUNT > 100']);
+    eq('buttons compose: a part two pressed buttons share is written once', F.compose({ prefix: '', sel: {}, range: {}, pat: {}, btn: { '*1': [0], '*2': [0] }, rest: [] }, FT), 'STATUS = Active and AMOUNT > 100');
+
+    // P.3 engine agreement (the server half rides the corpus in section J)
+    eq('buttons engine: a pattern matches what it says', [matchCount(F, 'COLLEGE = /(?:^S)/', rows), matchCount(F, 'COLLEGE = /(?:^..$)/', rows)], [3, 2]);
+    eq('buttons engine: values and a pattern in one regex are any-of', matchCount(F, 'COLLEGE = /^(?:Eng)$|(?:^S)/', rows), 9);
+    eq('buttons engine: an exclude field leaves out every pattern pressed (the blank row stays)', matchCount(F, 'COLLEGE != /(?:^S)|(?:^..$)/', rows), 8);
+    eq('buttons engine: a button\'s parts all apply', matchCount(F, 'AMOUNT >= 250 and STATUS = Active', rows), 2);
+
+    // P.4 counts
+    var SPECP = { fields: flds(['College|COLLEGE', '+S colleges|/^S/', '+Two letters|/^..$/', 'Size|*', '+Small|AMOUNT < 50', '+Big|AMOUNT >= 250', 'Status|STATUS']), mods: [] };
+    var gi = function (g, i) { return g.groups[i] || {}; };
+    var g0 = F.groups(SPECP, '');
+    eq('buttons counts: each pattern and button counts the rows it keeps', [auth(gi(g0, 0).pats), auth(gi(g0, 1).buttons)],
+      [[['S colleges', 3, false], ['Two letters', 2, false]], [['Small', 5, false], ['Big', 4, false]]]);
+    eq('buttons counts: a button group has no value chips', gi(g0, 1).values, []);
+    var g1 = F.groups(SPECP, 'STATUS = /^(?:Active)$/');
+    eq('buttons counts: another field narrows them', [auth(gi(g1, 0).pats), auth(gi(g1, 1).buttons)],
+      [[['S colleges', 2, false], ['Two letters', 1, false]], [['Small', 4, false], ['Big', 2, false]]]);
+    var g2 = F.groups(SPECP, 'COLLEGE = /(?:^S)/');
+    eq('buttons counts: a pressed pattern reads as on; its field\'s other chips are not narrowed by it', [auth(gi(g2, 0).pats), (vals(g2, 'COLLEGE') || []).slice(0, 2)],
+      [[['S colleges', 3, true], ['Two letters', 2, false]], [['Eng', 6, false], ['Sci', 3, false]]]);
+    eq('buttons counts: a pressed pattern narrows the other fields\' chips and buttons', [vals(g2, 'STATUS'), auth(gi(g2, 1).buttons)],
+      [[['Active', 2, false], ['Closed', 1, false], ['Pending', 0, false]], [['Small', 1, false], ['Big', 1, false]]]);
+    var g3 = F.groups(SPECP, 'AMOUNT < 50');
+    eq('buttons counts: a pressed button reads as on and narrows the value chips', [auth(gi(g3, 1).buttons), vals(g3, 'STATUS')],
+      [[['Small', 5, true], ['Big', 4, false]], [['Active', 4, false], ['Closed', 0, false], ['Pending', 1, false]]]);
+    var SPECA = { fields: flds(['Quick|*|all', '+Active|STATUS = Active', '+Big|AMOUNT >= 250']), mods: [] };
+    eq('buttons counts: in an all group a count adds to what is pressed', auth(gi(F.groups(SPECA, 'STATUS = Active'), 0).buttons), [['Active', 8, true], ['Big', 2, false]]);
+    var SPECX = { fields: FX, mods: [] };
+    eq('buttons counts: an exclude field\'s pattern counts the rows WITH it', auth(gi(F.groups(SPECX, ''), 0).pats), [['S', 3, false]]);
+    var SPECO = { fields: flds(['College|COLLEGE|only', '+S|/^S/']), mods: [] };
+    eq('buttons counts: only = no chip per value...', vals(F.groups(SPECO, ''), 'COLLEGE'), []);
+    eq('buttons counts: ... but a pressed value still shows, to be released', vals(F.groups(SPECO, 'COLLEGE = /^(?:Eng)$/'), 'COLLEGE'), [['Eng', 6, true]]);
+
+    // P.5 render and clicks
+    var PAT = function (l) { return $(S + ' .pnb-fs-pat').filter(function () { return $(this).find('.pnb-fs-v').text() === l; }); };
+    var BTN = function (l) { return $(S + ' .pnb-fs-btn').filter(function () { return $(this).find('.pnb-fs-v').text() === l; }); };
+    var VAL = function (c, v) { return $(S + ' .pnb-fs-group[data-fs-col="' + c + '"] .pnb-fs-chip[data-fs-val="' + v + '"]'); };
+    var after = function (was) { return until(function () { return !F.motion() && box() !== was; }, 5000).then(function () { return wait(250); }); };
+    var shownIn = function (sel) { return $(sel).filter(function () { return getComputedStyle(this).display !== 'none'; }).length; };
+    return draw("filter_strip('College|COLLEGE', '+S colleges|/^S/', 'Size|*', '+Small|AMOUNT < 50', '+Big|AMOUNT >= 250')").then(function () {
+      var $c = $(S + ' .pnb-fs-group').eq(0);
+      assert('buttons render: the pattern chip comes first in its field, with its count', $c.find('.pnb-fs-chip').first().is('.pnb-fs-pat') && PAT('S colleges').find('.pnb-fs-n').text() === '3'
+        && PAT('S colleges').attr('data-fs-pat') === '^S' && PAT('S colleges').attr('title') === 'COLLEGE matches /^S/', String($c.html()).substring(0, 300));
+      var $b = $(S + ' .pnb-fs-group').eq(1);
+      assert('buttons render: a button group, named, keyed, its buttons carrying their conditions', $b.is('.pnb-fs-btns') && $b.attr('data-fs-col') === '*1' && $b.attr('data-fs-btnmode') === 'one'
+        && $b.find('.pnb-fs-name').text() === 'Size' && BTN('Small').attr('data-fs-cond') === 'AMOUNT < 50' && BTN('Big').find('.pnb-fs-n').text() === '4', String($b.prop('outerHTML')).substring(0, 400));
+      assert('buttons render: not refused as a missing column', !/not in this report/.test(outText()), outText().substring(0, 160));
+      if (!$b.is('.pnb-fs-btns')) { assert('buttons click: the click flows (skipped: no button group rendered)', false, outText().substring(0, 160)); throw SKIP; }
+      PAT('S colleges').trigger('click');
+      return after('');
+    }).then(function () {
+      eq('buttons click: a pattern writes its regex', box(), 'COLLEGE = /(?:^S)/');
+      assert('buttons click: ... and reads as pressed after the redraw', PAT('S colleges').attr('aria-pressed') === 'true', PAT('S colleges').attr('aria-pressed'));
+      VAL('COLLEGE', 'Eng').trigger('click');
+      return after('COLLEGE = /(?:^S)/');
+    }).then(function () {
+      eq('buttons click: a value joins the same regex, first', box(), 'COLLEGE = /^(?:Eng)$|(?:^S)/');
+      BTN('Small').trigger('click');
+      return after('COLLEGE = /^(?:Eng)$|(?:^S)/');
+    }).then(function () {
+      eq('buttons click: a button adds its condition with and', box(), 'COLLEGE = /^(?:Eng)$|(?:^S)/ and AMOUNT < 50');
+      eq('buttons click: the redrawn button counts follow the selection', [BTN('Small').find('.pnb-fs-n').text(), BTN('Big').find('.pnb-fs-n').text()], ['2', '4']);
+      BTN('Big').trigger('click');
+      assert('buttons click: in a one group the other button releases at once', BTN('Small').attr('aria-pressed') === 'false' && BTN('Big').attr('aria-pressed') === 'true', BTN('Small').attr('aria-pressed') + ' ' + BTN('Big').attr('aria-pressed'));
+      return after('COLLEGE = /^(?:Eng)$|(?:^S)/ and AMOUNT < 50');
+    }).then(function () {
+      eq('buttons click: ... and its condition replaces the other one', box(), 'COLLEGE = /^(?:Eng)$|(?:^S)/ and AMOUNT >= 250');
+      BTN('Big').trigger('click');
+      return after('COLLEGE = /^(?:Eng)$|(?:^S)/ and AMOUNT >= 250');
+    }).then(function () {
+      eq('buttons click: a pressed button releases', box(), 'COLLEGE = /^(?:Eng)$|(?:^S)/');
+      PAT('S colleges').trigger('click');
+      return after('COLLEGE = /^(?:Eng)$|(?:^S)/');
+    }).then(function () {
+      eq('buttons click: releasing the pattern leaves the value chip\'s own shape', box(), 'COLLEGE = /^(?:Eng)$/');
+      BTN('Small').trigger('click');
+      return after('COLLEGE = /^(?:Eng)$/');
+    }).then(function () {
+      $(S + ' .pnb-fs-btns .pnb-fs-clear').trigger('click');
+      return after('COLLEGE = /^(?:Eng)$/ and AMOUNT < 50');
+    }).then(function () {
+      eq('buttons click: the group clear releases its button only', box(), 'COLLEGE = /^(?:Eng)$/');
+      $('#tableSearch').val('FY = 2025');
+      F.sync();
+      BTN('Small').trigger('click');
+      return after('FY = 2025');
+    }).then(function () {
+      eq('buttons click: a typed condition survives a button click', box(), 'AMOUNT < 50 and FY = 2025');
+      PAT('S colleges').trigger('click');
+      return after('AMOUNT < 50 and FY = 2025');
+    }).then(function () {
+      $(S + ' .pnb-fs-clearall').trigger('click');
+      return after('COLLEGE = /(?:^S)/ and AMOUNT < 50 and FY = 2025');
+    }).then(function () {
+      eq('buttons click: Clear all releases patterns and buttons and keeps the typed condition', box(), 'FY = 2025');
+      $('#tableSearch').val('AMOUNT >= 250 and COLLEGE = /(?:^S)/');
+      F.sync();
+      assert('buttons sync: a hand-typed condition presses its button and its pattern', BTN('Big').attr('aria-pressed') === 'true' && BTN('Small').attr('aria-pressed') === 'false' && PAT('S colleges').attr('aria-pressed') === 'true',
+        [BTN('Big').attr('aria-pressed'), BTN('Small').attr('aria-pressed'), PAT('S colleges').attr('aria-pressed')].join(' '));
+      $('#tableSearch').val('AMOUNT < 50 or FY = 2025');
+      F.sync();
+      assert('buttons sync: an or no longer pauses the buttons and patterns (the strip wraps it in parentheses)', $(S + ' .pnb-fs-btn:disabled').length === 0 && $(S + ' .pnb-fs-pat:disabled').length === 0, $(S + ' .pnb-fs-btn:disabled').length + ' ' + $(S + ' .pnb-fs-pat:disabled').length);
+      $('#tableSearch').val('');
+      F.sync();
+      return draw("filter_strip('Size|*', '+Big Eng|AMOUNT >= 250 and COLLEGE = Eng')");
+    }).then(function () {
+      $('#tableSearch').val('COLLEGE = Eng');
+      F.sync();
+      BTN('Big Eng').trigger('click');
+      return after('COLLEGE = Eng');
+    }).then(function () {
+      eq('buttons click: a part typed by hand is written once when the button is pressed', box(), 'AMOUNT >= 250 and COLLEGE = Eng');
+      $('#tableSearch').val('');
+      return draw("filter_strip('Quick|*|all', '+Active|STATUS = Active', '+Big|AMOUNT >= 250')");
+    }).then(function () {
+      BTN('Active').trigger('click');
+      return after('');
+    }).then(function () {
+      BTN('Big').trigger('click');
+      return after('STATUS = Active');
+    }).then(function () {
+      eq('buttons all: each button adds its condition', box(), 'STATUS = Active and AMOUNT >= 250');
+      BTN('Active').trigger('click');
+      return after('STATUS = Active and AMOUNT >= 250');
+    }).then(function () {
+      eq('buttons all: releasing one keeps the other', box(), 'AMOUNT >= 250');
+      $('#tableSearch').val('');
+      return draw("filter_strip('College|COLLEGE|exclude', '+S|/^S/')");
+    }).then(function () {
+      PAT('S').trigger('click');
+      return after('');
+    }).then(function () {
+      eq('buttons exclude: a pattern on an exclude field writes !=', box(), 'COLLEGE != /(?:^S)/');
+      $('#tableSearch').val('');
+      return draw("filter_strip('College|COLLEGE|top=1', '+S|/^S/', '+Two|/^..$/')");
+    }).then(function () {
+      var G0 = S + ' .pnb-fs-group:eq(0)';
+      eq('buttons fold: patterns never fold, top=N counts the values (+3 more)', [shownIn(G0 + ' .pnb-fs-pat'), shownIn(G0 + ' .pnb-fs-chip:not(.pnb-fs-pat)'), $(G0 + ' .pnb-fs-more').text()], [2, 1, '+3 more']);
+      $(G0 + ' .pnb-fs-more').trigger('click');
+      eq('buttons fold: +n more opens the values in place, patterns still shown', [shownIn(G0 + ' .pnb-fs-pat'), shownIn(G0 + ' .pnb-fs-chip:not(.pnb-fs-pat)')], [2, 4]);
+      $(G0 + ' .pnb-fs-more').trigger('click');
+      eq('buttons fold: less folds the values again, not the patterns', [shownIn(G0 + ' .pnb-fs-pat'), shownIn(G0 + ' .pnb-fs-chip:not(.pnb-fs-pat)'), $(G0 + ' .pnb-fs-more').text()], [2, 1, '+3 more']);
+      return draw("filter_strip('College|COLLEGE|only', '+S|/^S/')");
+    }).then(function () {
+      eq('buttons only: the field shows its patterns alone', [$(S + ' .pnb-fs-pat').length, $(S + ' .pnb-fs-chip:not(.pnb-fs-pat)').length], [1, 0]);
+      return draw("filter_strip('Size|*', '+X|NOPE = 1')");
+    }).then(function () {
+      assert('buttons refuse: a button naming a column the report lacks', /a button names NOPE, which is not in this report/.test(outText()) && $(S).length === 0, outText().substring(0, 160));
+      return draw("filter_strip('Size|*', \"+Pct|'% CHANGE' >= 5\")");
+    }).then(function () {
+      assert('buttons render: a quoted column in a button is a column of the report', $(S).length === 1 && BTN('Pct').find('.pnb-fs-n').text() === '9', outText().substring(0, 160) + ' n=' + BTN('Pct').find('.pnb-fs-n').text());
+      // P.6 a nested field's patterns hold to one sub-row like its values (__ROW with the first press)
+      var Pn = function (a) { return '@@JSON' + JSON.stringify(a.map(function (x) { return { ROLE: x[0], STATE: x[1] }; })); };
+      var nrows = [['Eng', Pn([['PI', 'Active'], ['CoPI', 'Closed']])], ['Sci', Pn([['CoPI', 'Active']])]].map(function (d, i) {
+        var m = new Map(); m.set('#', String(i + 1)); m.set('COLLEGE', d[0]); m.set('PEOPLE', d[1]); return m;
+      });
+      F.setRows(nrows);
+      $('#resultsTable').data('columnNameToOriginalIndex', { 'COLLEGE': 1, 'PEOPLE': 2 });
+      $('#tableSearch').val('');
+      return draw("filter_strip('Role|ROLE', '+P roles|/^P/', 'State|STATE')");
+    }).then(function () {
+      PAT('P roles').trigger('click');
+      return after('');
+    }).then(function () {
+      eq('buttons nested: the first pattern pressed on two fields from one sub-table writes __ROW', box(), '__ROW ROLE = /(?:^P)/');
+    }).catch(function (e) {
+      if (e !== SKIP) throw e;
+    }).then(function () {
+      $('#tableSearch').val('');
+      F.setRows(rows);
+      $('#resultsTable').data('columnNameToOriginalIndex', { 'COLLEGE': 1, 'FY': 2, 'AMOUNT': 3, 'STATUS': 4, '% CHANGE': 5 });
+      return wait(50);
+    });
+  }
+
   function run() {
     var F = window.__FS;
     if (!F || typeof F.state !== 'function' || typeof F.compose !== 'function') {
@@ -1036,7 +1331,9 @@
     eq('state: an exclude field claims its != condition', F.state('STATUS != /^(?:Closed)$/', EXF).sel.STATUS, ['Closed']);
     eq('state: the wrong operator for the field goes to rest, not the strip', F.state('STATUS = /^(?:Closed)$/', EXF).rest, ['STATUS = /^(?:Closed)$/']);
     eq('state: no spaces around the operator still reads (operator padding)', F.state('COLLEGE=/^(?:Eng)$/', FIELDS).sel.COLLEGE, ['Eng']);
-    assert('state: a top-level or is detected', F.state('COLLEGE = /^(?:Eng)$/ or FY = 2025', FIELDS).or === true, '');
+    var cOr = F.state('COLLEGE = /^(?:Eng)$/ or FY = 2025', FIELDS);
+    assert('state: a top-level or is one rest part in parentheses, not a pause (2026-10-30)', cOr.or === false && JSON.stringify(cOr.rest) === JSON.stringify(['(COLLEGE = /^(?:Eng)$/ or FY = 2025)']) && !cOr.sel.COLLEGE, JSON.stringify(cOr));
+    eq('state: a grouped rest part composes back in front of nothing else', F.compose(cOr, FIELDS), '(COLLEGE = /^(?:Eng)$/ or FY = 2025)');
     assert('state: AND with an upper-case joiner is not or', F.state('COLLEGE = /^(?:Eng)$/ AND FY = 2025', FIELDS).or === false, '');
     var c7 = F.state('__ROW COLLEGE = /^(?:Eng)$/', FIELDS);
     assert('state: a leading __ROW modifier is kept as the prefix', c7.prefix === '__ROW ' && JSON.stringify(c7.sel.COLLEGE) === '["Eng"]', JSON.stringify(c7));
@@ -1094,7 +1391,7 @@
     $('#pivot-output-container').hide();
     assert('counts: a visible pivot no longer pauses the strip (2026-10-01: its chips filter the transactions; the pressed chip and its counts read as in the table view)', e7.off === null && JSON.stringify(vals(e7, 'COLLEGE')) === JSON.stringify([['Eng', 6, true], ['Sci', 3, false], ['Ag', 2, false], ['CHASS', 1, false]]), JSON.stringify({ off: e7.off, c: vals(e7, 'COLLEGE') }));
     var e8 = F.groups(SPEC, 'COLLEGE = /^(?:Eng)$/ or FY = 2025');
-    assert('counts: a top-level or pauses the strip (off=or)', e8.off === 'or' && JSON.stringify(vals(e8, 'COLLEGE')[0]) === '["Eng",6,false]', JSON.stringify({ off: e8.off }));
+    assert('counts: a top-level or no longer pauses the strip: it is one rest part in parentheses (2026-10-30)', e8.off === null && JSON.stringify(e8.state.rest) === JSON.stringify(['(COLLEGE = /^(?:Eng)$/ or FY = 2025)']), JSON.stringify({ off: e8.off, rest: e8.state && e8.state.rest }));
     assert('counts: the same text and rows come back memoized', F.groups(SPEC, 'AMOUNT > 100') === F.groups(SPEC, 'AMOUNT > 100'), '');
 
     // ══════ F. engine A rendering ══════
@@ -1217,11 +1514,11 @@
       eq('click: Clear all releases the chips and keeps the typed condition', $('#tableSearch').val(), 'AMOUNT > 100');
       $('#tableSearch').val('COLLEGE = Eng or FY = 2025');
       F.sync();
-      assert('sync: an or query pauses the rendered strip (chips disabled, note shown)', $(S).attr('data-fs-off') === 'or' && $(S + ' .pnb-fs-chip:disabled').length === 7 && $(S + ' .pnb-fs-note').length === 1, $(S).attr('data-fs-off') + ' ' + $(S + ' .pnb-fs-chip:disabled').length);
+      assert('sync: an or query no longer pauses the rendered strip (chips enabled, no note; 2026-10-30)', !$(S).attr('data-fs-off') && $(S + ' .pnb-fs-chip:disabled').length === 0 && $(S + ' .pnb-fs-note').length === 0, $(S).attr('data-fs-off') + ' ' + $(S + ' .pnb-fs-chip:disabled').length);
       $(S + ' .pnb-fs-chip[data-fs-val="Sci"]').trigger('click');
       return wait(200);
     }).then(function () {
-      eq('sync: a click on a paused strip changes nothing', $('#tableSearch').val(), 'COLLEGE = Eng or FY = 2025');
+      eq('sync: a click beside an or query wraps it in parentheses and adds the chip', $('#tableSearch').val(), 'COLLEGE = /^(?:Sci)$/ and (COLLEGE = Eng or FY = 2025)');
       $('#tableSearch').val('FY = /^(?:2024)$/');
       F.sync();
       assert('sync: a hand-typed condition presses its chip and lifts the pause', $(S).attr('data-fs-off') === undefined && $(S + ' .pnb-fs-chip[data-fs-val="2024"]').attr('aria-pressed') === 'true'
@@ -1264,7 +1561,7 @@
       return draw("filter_strip('College|COLLEGE')");
     }).then(function () {
       assert('render: a fresh render with an empty box shows nothing pressed', $(S + ' .pnb-fs-chip[aria-pressed="true"]').length === 0 && $(S + ' .pnb-fs-chip').length === 4, '');
-      return sectionI(F, draw, outText, S).then(function () { return sectionJ(F, draw, outText, S); }).then(function () { return sectionK(F, draw, outText, S); }).then(function () { return sectionL(F, draw, outText, S); }).then(function () { return sectionM(F, draw, outText, S); }).then(function () { return sectionN(F, draw, outText, S); }).then(function () { return sectionO(F, draw, outText, S); });
+      return sectionI(F, draw, outText, S).then(function () { return sectionJ(F, draw, outText, S); }).then(function () { return sectionK(F, draw, outText, S); }).then(function () { return sectionL(F, draw, outText, S); }).then(function () { return sectionM(F, draw, outText, S); }).then(function () { return sectionN(F, draw, outText, S); }).then(function () { return sectionO(F, draw, outText, S); }).then(function () { return sectionP(F, draw, outText, S); });
     }).catch(function (e) {
       assert('render/click phases crashed', false, String(e && e.stack ? e.stack : e));
     }).then(finish);

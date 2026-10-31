@@ -48,6 +48,18 @@
       R.chk.preview = !!ov() && /3 rows/.test(ov().textContent) && /3 columns/.test(ov().textContent);
       R.chk.previewCells = !!ov() && ov().querySelectorAll('tbody tr').length === 3 && ov().querySelector('tbody tr td:nth-child(3)').textContent === '00123';
       R.chk.defaultName = !!ov() && document.getElementById('pnbPasteName').value === 'PASTED_1';
+      // (addrows) an existing name: how many rows it holds, under the choice, and the button reads Replace; then back
+      seedMeta();
+      var nm = document.getElementById('pnbPasteName');
+      nm.value = 'zz_list'; nm.dispatchEvent(new Event('input', { bubbles: true }));
+      var ex = document.getElementById('pnbRowsExisting');
+      R.chk.replaceSaid = !!ex && /ZZ_LIST already exists \(3 rows\)/.test(ex.textContent) && document.getElementById('pnbPasteGo').textContent === 'Replace the import';
+      nm.value = 'PASTED_1'; nm.dispatchEvent(new Event('input', { bubbles: true }));
+      R.chk.importAgain = ex.textContent === '' && document.getElementById('pnbPasteGo').textContent === 'Import';
+      delete window._penumbraImportMeta.ZZ_LIST;
+      // (addrows) the refusal line lives in the footer, between the buttons
+      var st = document.getElementById('pnbPasteStatus');
+      R.chk.statusInFooter = !!st && !!st.closest('.modal-prompt-buttons') && st.previousElementSibling.classList.contains('modal-btn-secondary') && st.nextElementSibling.id === 'pnbPasteGo';
       // the head band runs edge to edge across the box, its title without the generic h3 underline (as the infoboxes)
       var box = ov().querySelector('.modal-prompt-box'), head = ov().querySelector('.pnb-dlg-head'), h3 = ov().querySelector('.pnb-dlg-title');
       var br = box.getBoundingClientRect(), hr = head.getBoundingClientRect();
@@ -88,8 +100,14 @@
       var b = paste('just one line');
       R.chk.oneLineIgnored = !b.defaultPrevented && !ov();
       penumbra_vars.isGlobalAdmin = false;
+      seedMeta();   // a report-linked import in the list, as a viewer's page has (list_for_report): not theirs to add to
       var c = paste(TSV);
-      R.chk.nonAdminIgnored = !c.defaultPrevented && !ov();
+      R.chk.nonAdminViewOnly = c.defaultPrevented && !!ov() && !ov().querySelector('input[name="pnbPasteMode"][value="new"]') &&
+        !ov().querySelector('input[name="pnbPasteMode"][value="append"]') && !!ov().querySelector('input[name="pnbPasteMode"][value="view"]:checked');
+      R.info.nonAdminGo = ov() ? document.getElementById('pnbPasteGo').textContent + (document.getElementById('pnbPasteGo').disabled ? ' (disabled)' : '') : null;
+      R.info.nonAdmin = ov() ? ov().querySelector('#pnbRowsDest').textContent.replace(/\s+/g, ' ').trim() : null;
+      if (ov()) ov().remove();
+      delete window._penumbraImportMeta.ZZ_LIST;
       penumbra_vars.isGlobalAdmin = true;
       var cm = document.querySelector('.CodeMirror textarea') || document.querySelector('.CodeMirror');
       R.info.cm = cm ? cm.tagName + '.' + cm.className : null;

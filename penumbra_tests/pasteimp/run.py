@@ -4,7 +4,8 @@
 # Ctrl+V on the page (not in a field / editor / dialog) with a block of cells opens
 # a preview: a NEW import (importFileData, tab-separated) or ADD to one of your
 # imports (manage_imports.php action=append; new columns after a confirm; Undo =
-# action=append_undo). Global admins only.
+# action=append_undo). Since addrows (2026-10-30) the ONE Add rows dialog, which a viewer
+# gets too (this view only).
 #   browser half  harness.html (mk_harness.py) + driver.js: the REAL main.js paste
 #                 path against a stubbed endpoint          L-<scn>-<check>, E-<scn>
 #   PHP half      test_pasteimp.php: the merge / undo helpers LIFTED and run (incl.
@@ -25,9 +26,9 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js']
 SCN = ['newimp', 'hashcol', 'ignore', 'append', 'addcols', 'undo', 'refuse', 'rerun']
 CHK = {
-    'newimp': ['prevented', 'preview', 'previewCells', 'defaultName', 'headFlush', 'saved', 'savedText', 'closed'],
+    'newimp': ['prevented', 'preview', 'previewCells', 'defaultName', 'replaceSaid', 'importAgain', 'statusInFooter', 'headFlush', 'saved', 'savedText', 'closed'],
     'hashcol': ['hashDropped', 'cancelCloses', 'oneColumn', 'commaKept'],
-    'ignore': ['inInputIgnored', 'oneLineIgnored', 'nonAdminIgnored', 'editorIgnored', 'dialogIgnored', 'saneStillWorks'],
+    'ignore': ['inInputIgnored', 'oneLineIgnored', 'nonAdminViewOnly', 'editorIgnored', 'dialogIgnored', 'saneStillWorks'],
     'append': ['targetListed', 'buttonSaysAdd', 'sent', 'noSave', 'closed', 'notice', 'metaCount'],
     'addcols': ['asks', 'firstNoAdd', 'secondAdds', 'doneNotice'],
     'undo': ['undoSent', 'undoNotice', 'undoMeta', 'undoLinkGone', 'undoOnce'],
@@ -37,10 +38,12 @@ CHK = {
 MUTANTS = {
     # main.js
     'typing': ([('main', "        if (_pnbPasteIsTyping(e.target) || _pnbPasteIsTyping(document.activeElement)) return;\r\n", "")],
-               ['L-ignore-inInputIgnored', 'L-ignore-editorIgnored'], ['ignore']),
-    # (impgrant: a second guard - nowhere this paste could go - also stops a non-holder; drop both)
-    'nonadmin': ([('main', "        if (typeof penumbra_vars === 'undefined' || !(penumbra_vars.isGlobalAdmin || penumbra_vars.importGrant)) return;\r\n", ""),
-                  ('main', "        if (!_pnbPasteCanCreate() && !_pnbPasteTargets().length) return;   // impgrant: nowhere this paste could go\r\n", "")], ['L-ignore-nonAdminIgnored'], ['ignore']),
+               ['L-ignore-inInputIgnored'], ['ignore']),   # (addrows) the dialog the first paste opened is closed by the scenario before the editor paste),
+    # (addrows) a viewer's listed imports (the report's) are not append targets
+    'viewerappend': ([('main', "        if (typeof penumbra_vars === 'undefined' || !penumbra_vars || !(penumbra_vars.isGlobalAdmin || penumbra_vars.importGrant)) return [];\r\n", "")],
+                     ['L-ignore-nonAdminViewOnly'], ['ignore']),
+    # (addrows) an existing name must say Replace
+    'noreplace': ([('main', "            $go.text('Replace the import');\r\n", "")], ['L-newimp-replaceSaid'], ['newimp']),
     'commasplit': ([('main', "        var rows = parseCSVToObjects(String(text).replace(/\\r\\n?/g, '\\n'), '\\t');\r\n", "        var rows = parseCSVToObjects(String(text).replace(/\\r\\n?/g, '\\n'));\r\n")],
                    ['L-hashcol-commaKept'], ['hashcol']),
     'noname': ([('main', "        var safeName = ((opts && opts.name) ? String(opts.name) : fileName.replace(", "        var safeName = ((false) ? String(opts.name) : fileName.replace(")],

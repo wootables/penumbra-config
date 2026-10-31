@@ -59,6 +59,7 @@ NEW = []   # (copymenu is LIVE since a8aabf9, 2026-10-27: old checks now)
 NEW = []   # (fltmenu is LIVE since 5eae534, 2026-10-27: C2 C6 old checks now)
 NEW = ['C38']   # (2026-10-27, copymenu 3) a comparison's Copy list under a Copy heading (live has none)
 NEW = []   # (copymenu 3 is LIVE since 766f5e9, 2026-10-27: old checks now)
+NEW = ['C27']   # (2026-10-30, parens phase 3) Show only wraps an "or" query in parentheses; live refuses it
 # NEW = ['C2', 'C6']   # (2026-10-27, fltmenu) a cell's Copy list: the column's name before This row
 # (C33, the scrollbar buffer in a comparison, went to colwidths F15-F17: a comparison's tables give way here)
 
@@ -121,9 +122,10 @@ MUTANTS = {
     # Show only through the filter box's own /^(?:...)$/ form (the live side has no __SNAP_TYPE column)
     'k-onlyfs': ([("run: function () { cmpShowOnly(key); } });", "run: function () { A.filterAdd('__SNAP_TYPE', key, false); } });")], ['C20', 'C25', 'C26']),
     # Show only beside another group's condition rather than in its place
-    'k-onlyadd': ([("        F.runSearch(q ? q + ' and ' + term : term);", "        q = String(box.value || '').trim();\n        F.runSearch(q ? q + ' and ' + term : term);")], ['C25']),
+    'k-onlyadd': ([("        var next = (lib && typeof lib.add === 'function') ? lib.add(q, term) : null;", "        q = String(box.value || '').trim();\n        var next = (lib && typeof lib.add === 'function') ? lib.add(q, term) : null;")], ['C25']),
     # Show only adds itself to an "or" query
-    'k-noor': ([("        if (q && typeof F.searchHasOr === 'function' && F.searchHasOr(q)) {", "        if (false) {")], ['C27']),
+    # Show only adds itself to an "or" query without the strip's wrap (parentheses, 2026-10-30)
+    'k-noor': ([("        var next = (lib && typeof lib.add === 'function') ? lib.add(q, term) : null;", "        var next = null;")], ['C27']),
     # no Expand / Collapse on a band
     'k-notoggle': ([("            if (!listOn()) {\n                items.push({ act: 'cmpGroupToggle'", "            if (false) {\n                items.push({ act: 'cmpGroupToggle'")], ['C5', 'C22']),
     # no Hide this group
@@ -190,6 +192,11 @@ colw_stage = os.path.join(stage_dir, 'js', 'penumbra_colwidths.js') if stage_dir
 if colw_stage and not control and os.path.exists(colw_stage):
     shutil.copyfile(colw_stage, os.path.join(stage, 'penumbra_colwidths.js'))
     print('penumbra_colwidths.js: %s' % colw_stage)
+# (parens phase 3, 2026-10-30) a stage's strip library, when it has one: Show only adds through PenumbraTiles.strip.add
+tiles_stage = os.path.join(stage_dir, 'js', 'penumbra_tiles.js') if stage_dir else ''
+if tiles_stage and not control and os.path.exists(tiles_stage):
+    shutil.copyfile(tiles_stage, os.path.join(stage, 'penumbra_tiles.js'))
+    print('penumbra_tiles.js: %s' % tiles_stage)
 shutil.copyfile(os.path.join(HERE, 'driver.js'), os.path.join(stage, 'driver.js'))
 idx = read_b(os.path.join(APP, 'index.php'))
 m = re.search(r'<template id="snapshotAnalysisTemplate">.*?</template>', idx, re.S)

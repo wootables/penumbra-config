@@ -403,7 +403,7 @@ until(function () { return ['e1', 'e2', 'e3', 'e4', 'e5'].every(booted) && stat(
   }).then(function () {
     return wait(300);
   }).then(function () {
-    ok('under an "or" filter a click changes nothing and says why', $('#dashSearchInput').val() === 'COLLEGE = Eng or COLLEGE = Sci' && /cannot add one condition/.test($('.pnb-toast-card').text()), $('#dashSearchInput').val() + ' | ' + $('.pnb-toast-card').text().slice(0, 100));
+    ok('under an "or" filter a click wraps it in parentheses and adds the condition (2026-10-30)', $('#dashSearchInput').val() === '(COLLEGE = Eng or COLLEGE = Sci) and COLLEGE = /^(?:Eng)$/', $('#dashSearchInput').val() + ' | ' + $('.pnb-toast-card').text());
     $('#dashSearchClear').trigger('click');
     return until(function () { return stat('d1') === '233'; }, 4000);
   }).then(function () {

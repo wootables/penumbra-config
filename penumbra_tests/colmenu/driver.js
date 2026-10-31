@@ -1275,7 +1275,8 @@
       if (item('cellFilter')) item('cellFilter').click();
       await sleep(900);
       var same = window.__rowsFixture.filter(function (r) { return r.V_AMOUNT === raw; }).length;
-      R.chk.cellRaw = !!raw && shown !== raw && rawLbl.indexOf(raw) >= 0 && same > 0 && visRows() === same;
+      // (cfmt2, 2026-10-30, the user) the item names the value as SHOWN ($51,361), the filter keeps the stored one
+      R.chk.cellRaw = !!raw && shown !== raw && rawLbl.indexOf(shown) >= 0 && rawLbl.indexOf(raw) < 0 && same > 0 && visRows() === same;
       R.info.raw = { shown: shown, raw: raw, lbl: rawLbl, box: searchVal(), vis: visRows() };
       setSearch('');
       await sleep(900);
@@ -3422,6 +3423,212 @@
       await choose(td, 'copyRow');
       R.info.gRow = { got: lastClip(), want: want.join('\n') };
       R.chk.gcRow = want.length >= 5 && lastClip() === want.join('\n');
+    },
+    // (2026-10-30, selflt) a right-click inside a selection of several cells acts on the selection: Filter to / Exclude the
+    // selected values (a column's values alternatives, every column's held, the box's other conditions kept), Copy > The
+    // selected cells (Ctrl+C's text and table, after the press on the item cleared the selection); outside it, the cell's
+    // own; past 100 values greyed. Alt+click adds a cell's value (click-to-filter off and on: never the box replaced); a
+    // link and '#' keep their click. A selection of text alone: Filter to selection in the readout (numbers: none).
+    msel: async function () {
+      // cell selection, as index.php loads it (this harness writes it for gg* / mauto* alone)
+      if (!(window.Penumbra && window.Penumbra.cellSel)) {
+        var lk = document.createElement('link'); lk.rel = 'stylesheet'; lk.href = 'penumbra_cellsel.css'; document.head.appendChild(lk);
+        var sc = document.createElement('script'); sc.src = 'penumbra_cellsel.js'; document.body.appendChild(sc);
+      }
+      if (!(await until(function () { return !!(window.Penumbra && window.Penumbra.cellSel); }, 8000))) throw new Error('no cell selection module');
+      var CS = window.Penumbra.cellSel;
+      SUBS.selFilter = SUBS.selExclude = 'filterMenu'; SUBS.selCopy = 'copyMenu';
+      function lastClip() { return window.__clip.length ? window.__clip[window.__clip.length - 1] : null; }
+      function lab(el) { var x = el && el.querySelector('.pnb-hm-label'); return x ? x.textContent : ''; }
+      function noteOf(el) { var x = el && el.querySelector('.pnb-hm-note'); return x ? x.textContent : ''; }
+      function visTrs() { return Array.prototype.filter.call(document.querySelectorAll('#resultsTable tbody tr'), function (tr) { return !tr.classList.contains('search-hidden') && tr.style.display !== 'none' && !!tr.querySelector('td[data-column]'); }); }
+      function trOf(num) { return visTrs().filter(function (tr) { return tr.cells[0].textContent.trim() === String(num); })[0] || null; }
+      function cellIn(tr, name) { var t = fth(name); return (t && tr) ? tr.querySelector('td[data-column="' + t.getAttribute('data-column') + '"]') : null; }
+      function fx(tr) { return window.__rowsFixture[parseInt(tr.cells[0].textContent, 10) - 1]; }
+      function low(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
+      async function boxTo(q) { var s = document.getElementById('tableSearch'); s.value = q; if (typeof window.runTableSearch === 'function') window.runTableSearch(); else $(s).trigger('input'); await sleep(900); }
+      function pick(list) { return CS.select(list.map(function (td) { return { a: td, b: td }; })); }
+      function press(el) { el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, buttons: 1 })); }
+      async function runItem(el, act) { closeMenu(); rclick(el); var it = reach(act); if (!it || it.getAttribute('aria-disabled') === 'true') { closeMenu(); return false; } press(it); it.click(); await sleep(900); return true; }
+      // an unrelated condition first (it must stay); then two names of rows sharing a status, and the first row's status
+      await boxTo('V_AMOUNT > 0');
+      var trs = visTrs(), ti = trs[1], tj = null;
+      for (var k = 2; k < trs.length && !tj; k++) { if (low(fx(trs[k]).V_STATUS) === low(fx(ti).V_STATUS) && low(fx(trs[k]).V_NAME) !== low(fx(ti).V_NAME)) tj = trs[k]; }
+      if (!ti || !tj) throw new Error('fixture: no two names of one status');
+      var ni = ti.cells[0].textContent.trim(), nj = tj.cells[0].textContent.trim();
+      var a = cellIn(ti, 'V_NAME'), b = cellIn(tj, 'V_NAME'), c = cellIn(ti, 'V_STATUS');
+      var va = A().cellValue(a, 'V_NAME'), vb = A().cellValue(b, 'V_NAME'), vc = A().cellValue(c, 'V_STATUS');
+      var n0 = pick([a, b, c]), cl = CS.cells ? CS.cells() : [];
+      R.chk.selCells = n0 === 3 && cl.length === 3 && [a, b, c].every(function (td) { return cl.indexOf(td) >= 0; });
+      // the right-click inside it: the Filter list is the selection's (no Filter to "value", Exclude, At least...)
+      closeMenu(); rclick(b);
+      var a0 = acts(); sub('filterMenu'); await sleep(100);
+      var l0 = subActs(), fi = item('selFilter');
+      R.info.menu = { acts: a0, list: l0, note: noteOf(fi), title: fi ? fi.getAttribute('title') : null, va: va, vb: vb, vc: vc };
+      R.chk.selMenu = a0[0] === 'filterMenu' && a0[1] === 'copyMenu' && l0.join() === 'selFilter,selExclude,filter,clickFilter' && lab(fi) === 'Filter to the selected values'
+        && lab(item('selExclude')) === 'Exclude the selected values';
+      // (the first item takes the focus as the list opens: jQuery UI's tooltip then holds its title, in the tip it points to)
+      function tipOf(el) { if (!el) return ''; var t = el.getAttribute('title'); if (t) return t; var d = el.getAttribute('aria-describedby'), n = d ? document.getElementById(d) : null; return n ? n.textContent : ''; }
+      var t0 = tipOf(fi);
+      R.chk.selNote = noteOf(fi) === '3 values, 2 columns' && t0.indexOf(va) >= 0 && t0.indexOf(vb) >= 0 && t0.indexOf(vc) >= 0;
+      closeMenu(); rclick(b); sub('copyMenu'); await sleep(100);
+      var l1 = subActs(), ci = item('selCopy');
+      R.info.copy = { list: l1, note: noteOf(ci) };
+      R.chk.selCopyList = l1[0] === 'selCopy' && l1.indexOf('cellCopy') < 0 && l1.indexOf('copyRow') > 0 && lab(ci) === 'The selected cells' && noteOf(ci) === '3 cells';
+      closeMenu();
+      // Copy > The selected cells: the press on the item clears the selection, the copy is Ctrl+C's (its copy event: text and table)
+      var exp = CS.payload(), realExec = document.execCommand, got = null;
+      document.execCommand = function (cmd) {
+        if (cmd !== 'copy') return realExec.apply(document, arguments);
+        var dt = new DataTransfer(), ev = new ClipboardEvent('copy', { clipboardData: dt, bubbles: true, cancelable: true });
+        document.dispatchEvent(ev);
+        got = { text: dt.getData('text/plain'), html: dt.getData('text/html'), prevented: ev.defaultPrevented, count: CS.count() };
+        return true;
+      };
+      await runItem(b, 'selCopy');
+      R.info.copied = { got: got, exp: exp ? { text: exp.text.slice(0, 300) } : null, toasts: window.__toasts.slice(-2) };
+      R.chk.selCopyRuns = !!got && !!exp && got.text === exp.text && got.html === exp.html && got.prevented && got.count === 0 && got.text.indexOf(va) >= 0 && got.text.indexOf(vc) >= 0;
+      // ...where the copy event is refused: the text alone, through the clipboard
+      document.execCommand = function (cmd) { return cmd === 'copy' ? false : realExec.apply(document, arguments); };
+      a = cellIn(trOf(ni), 'V_NAME'); c = cellIn(trOf(ni), 'V_STATUS');
+      pick([a, c]); var exp2 = CS.payload();
+      await runItem(a, 'selCopy');
+      document.execCommand = realExec;
+      R.chk.selCopyFallback = !!exp2 && lastClip() === exp2.text;
+      // outside the selection: the cell's own list
+      pick([a, c]);
+      var d = cellIn(visTrs()[6], 'V_NAME');
+      closeMenu(); rclick(d); sub('filterMenu'); await sleep(100);
+      var l3 = subActs(); closeMenu();
+      R.info.outside = l3;
+      R.chk.selOutside = l3[0] === 'cellFilter' && l3.indexOf('selFilter') < 0;
+      // two cells of one value: still the selection's, one value
+      var sj = cellIn(trOf(nj), 'V_STATUS');
+      pick([c, sj]);
+      closeMenu(); rclick(c); sub('filterMenu'); await sleep(100);
+      R.chk.selOne = subActs()[0] === 'selFilter' && noteOf(item('selFilter')) === '1 value';
+      closeMenu();
+      // past 100 values: greyed, the reason its title
+      var rows40 = visTrs().slice(0, 40), blk = CS.select([{ a: cellIn(rows40[0], 'V_ID'), b: cellIn(rows40[rows40.length - 1], 'V_STATUS') }]);
+      var A0 = A(), realCV = A0.cellValue, reads = 0;
+      A0.cellValue = function () { reads++; return realCV.apply(this, arguments); };
+      closeMenu(); rclick(cellIn(rows40[3], 'V_NAME')); sub('filterMenu'); await sleep(100);
+      A0.cellValue = realCV;
+      var cap = item('selFilter');
+      R.info.cap = { cells: blk, note: noteOf(cap), dis: cap ? cap.getAttribute('aria-disabled') : null, title: tipOf(cap), reads: reads };
+      R.chk.selCap = blk > 150 && !!cap && cap.getAttribute('aria-disabled') === 'true' && /More than 100 different values/.test(tipOf(cap)) && noteOf(cap) === 'over 100 values';
+      R.chk.capStops = reads > 100 && reads < 200;   // (the reading stops past 100 values: 240 cells, about 200 of them different)
+      closeMenu();
+      // read once per selection: the cell's items built again (Quick actions builds them per keystroke) read only the cell's own
+      a = cellIn(trOf(ni), 'V_NAME'); b = cellIn(trOf(nj), 'V_NAME'); c = cellIn(trOf(ni), 'V_STATUS');
+      pick([a, b, c]);
+      var thb = fth('V_NAME'), cb = { td: b, th: thb, nested: false, target: b };
+      reads = 0; A0.cellValue = function () { reads++; return realCV.apply(this, arguments); };
+      window.Penumbra.colMenu.items(thb, cb); var rd1 = reads;
+      var it2 = window.Penumbra.colMenu.items(thb, cb), rd2 = reads - rd1;
+      A0.cellValue = realCV;
+      var fm2 = it2.filter(function (x) { return x.act === 'filterMenu'; })[0], fl2 = (fm2 && typeof fm2.items === 'function') ? fm2.items() : [];
+      R.info.memo = [rd1, rd2, fl2.map(function (x) { return x && x.act; })];
+      R.chk.selMemo = rd1 >= 1 && rd1 <= 4 && rd2 === 1 && fl2.some(function (x) { return x && x.act === 'selFilter'; });
+      // Filter to the selected values: a name of either row and the status, the typed condition kept
+      a = cellIn(trOf(ni), 'V_NAME'); b = cellIn(trOf(nj), 'V_NAME'); c = cellIn(trOf(ni), 'V_STATUS');
+      pick([a, b, c]);
+      await runItem(b, 'selFilter');
+      var q1 = searchVal(), v1 = visTrs(), names1 = {};
+      v1.forEach(function (tr) { names1[low(fx(tr).V_NAME)] = 1; });
+      R.info.filter = { q: q1, n: v1.length, names: Object.keys(names1).slice(0, 5) };
+      R.chk.selFilterRuns = v1.length > 0 && v1.every(function (tr) { var r = fx(tr); return (low(r.V_NAME) === low(va) || low(r.V_NAME) === low(vb)) && low(r.V_STATUS) === low(vc); })
+        && !!names1[low(va)] && !!names1[low(vb)] && /V_NAME = \/\^\(\?:/.test(q1) && /V_STATUS = \/\^\(\?:/.test(q1);
+      R.chk.selKeepsBox = q1.indexOf('V_AMOUNT > 0') >= 0 && q1.split(' and ').length === 3;
+      // Exclude the selected values: every row holding any of them leaves
+      await boxTo('');
+      a = cellIn(trOf(ni), 'V_NAME'); c = cellIn(trOf(ni), 'V_STATUS');
+      pick([a, c]);
+      await runItem(a, 'selExclude');
+      var q2 = searchVal(), v2 = visTrs();
+      R.info.exclude = { q: q2, n: v2.length };
+      R.chk.selExcludeRuns = v2.length > 0 && v2.every(function (tr) { var r = fx(tr); return low(r.V_NAME) !== low(va) && low(r.V_STATUS) !== low(vc); }) && /V_NAME != /.test(q2) && /V_STATUS != /.test(q2);
+      // the readout: a selection of text alone offers Filter to selection after Count; one with numbers does not
+      await boxTo('');
+      a = cellIn(trOf(ni), 'V_NAME'); b = cellIn(trOf(nj), 'V_NAME');
+      pick([a, b]); await sleep(150);
+      var ro = document.getElementById('pnbCellSelReadout'), fb = ro ? ro.querySelector('.pnb-csel-fltbtn') : null;
+      R.info.readout = ro ? ro.innerHTML.slice(0, 500) : null;
+      R.chk.roButton = !!fb && fb.textContent === 'Filter to selection' && !ro.querySelector('.pnb-csel-sum') && (fb.getAttribute('title') || '').indexOf(va) >= 0;
+      pick([a, cellIn(trOf(ni), 'V_AMOUNT')]); await sleep(150);
+      ro = document.getElementById('pnbCellSelReadout');
+      R.chk.roNoNumbers = !!ro && !ro.hidden && !!ro.querySelector('.pnb-csel-sum') && !ro.querySelector('.pnb-csel-fltbtn');
+      pick([a, b]); await sleep(150);
+      fb = document.querySelector('#pnbCellSelReadout .pnb-csel-fltbtn');
+      if (fb) { press(fb); fb.click(); }
+      await sleep(900);
+      var v4 = visTrs();
+      R.info.roRun = { q: searchVal(), n: v4.length };
+      R.chk.roRuns = !!fb && v4.length > 0 && v4.every(function (tr) { var n = low(fx(tr).V_NAME); return n === low(va) || n === low(vb); }) && /V_NAME = \/\^\(\?:/.test(searchVal());
+      // a Mac's Ctrl+click is its right-click: the selection stays for the menu (Cmd adds a cell there); elsewhere Ctrl adds
+      function ctrlPress(td) { td.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, buttons: 1, ctrlKey: true })); window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 })); }
+      a = cellIn(trOf(ni), 'V_NAME'); c = cellIn(trOf(ni), 'V_STATUS'); var dd = cellIn(trOf(nj), 'V_NAME');
+      pick([a, c]);
+      Object.defineProperty(navigator, 'platform', { configurable: true, get: function () { return 'MacIntel'; } });
+      ctrlPress(dd); await sleep(50);
+      var onMac = CS.count();
+      delete navigator.platform;
+      ctrlPress(dd); await sleep(50);
+      var onWin = CS.count();
+      R.info.macCtrl = [onMac, onWin, navigator.platform];
+      R.chk.macCtrl = onMac === 2 && onWin === 3;
+      // Alt+click adds a cell's value: click-to-filter off, then on (its plain click would replace the box); a link and '#' keep theirs
+      await boxTo('');
+      var reached = 0;
+      function seen(e) { reached++; if (e.target.closest && e.target.closest('a[href]')) e.preventDefault(); }
+      document.addEventListener('click', seen);
+      function altClick(el) { return !el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, altKey: true, button: 0 })); }
+      document.body.classList.remove('pnb-click-filter');
+      var p5 = altClick(cellIn(trOf(ni), 'V_NAME')); await sleep(900);
+      var q5 = searchVal();
+      document.body.classList.add('pnb-click-filter');
+      var r0 = reached;
+      altClick(cellIn(trOf(ni), 'V_STATUS')); await sleep(900);
+      var q6 = searchVal(), r6 = reached - r0;
+      R.info.alt = { q5: q5, q6: q6, prevented: p5, reached: r6 };
+      R.chk.altAdds = p5 && /^V_NAME = \/\^\(\?:/.test(q5) && q6.indexOf('V_NAME = ') >= 0 && q6.indexOf('V_STATUS = ') >= 0 && q6.indexOf('//') < 0 && r6 === 0;
+      // a double-click's second click adds nothing (and the click-to-filter on still never takes it)
+      var dEv = new MouseEvent('click', { bubbles: true, cancelable: true, altKey: true, button: 0, detail: 2 }), rd0 = reached;
+      cellIn(trOf(ni), 'V_AMOUNT').dispatchEvent(dEv); await sleep(900);
+      R.info.altDouble = { q: searchVal(), prevented: dEv.defaultPrevented, reached: reached - rd0 };
+      R.chk.altDouble = searchVal() === q6 && dEv.defaultPrevented && reached === rd0;
+      var lnk = document.querySelector('#resultsTable tbody tr:not(.search-hidden) td a[href]'), num = document.querySelector('#resultsTable tbody tr:not(.search-hidden) td[data-column="#"]');
+      var before = searchVal(), r1 = reached;
+      if (lnk) altClick(lnk);
+      if (num) altClick(num);
+      await sleep(600);
+      R.info.altKeep = { link: !!lnk, num: !!num, reached: reached - r1, q: searchVal() };
+      R.chk.altLinkNum = !!lnk && !!num && reached - r1 === 2 && searchVal() === before;
+      // a plain click with click-to-filter on still puts its value in place of the box (the report's own, untouched)
+      var pc = cellIn(visTrs()[0], 'V_STATUS'), pv = pc ? A().cellValue(pc, 'V_STATUS') : '';
+      if (pc) pc.click();
+      await sleep(900);
+      R.chk.plainClickReplaces = !!pc && searchVal() === 'V_STATUS = //' + pv + '//';
+      document.removeEventListener('click', seen);
+      document.body.classList.remove('pnb-click-filter');
+      await boxTo('');
+    },
+    // (2026-10-30, selflt) the grouped view: a selection in a group's table - the selection's Filter list, and its filter
+    ggsel: async function () {
+      var CS = window.Penumbra.cellSel;   // (gg*: the harness loads cell selection)
+      var tabs = Array.prototype.filter.call(document.querySelectorAll('#groupedResultsContainer table'), function (t) { return !!t.querySelector('thead th[data-colname="V_NAME"]') && !!t.querySelector('tbody tr td[data-column]'); });
+      var tb = tabs[0] || null, th = tb ? tb.querySelector('thead th[data-colname="V_NAME"]') : null, ths = tb ? tb.querySelector('thead th[data-colname="V_STATUS"]') : null;
+      var tr = tb ? Array.prototype.filter.call(tb.querySelectorAll('tbody tr'), function (x) { return !x.classList.contains('search-hidden') && x.style.display !== 'none' && !!x.querySelector('td[data-column]'); })[0] : null;
+      var a = tr ? tr.querySelector('td[data-column="' + th.getAttribute('data-column') + '"]') : null, c = tr ? tr.querySelector('td[data-column="' + ths.getAttribute('data-column') + '"]') : null;
+      var n = (a && c && CS) ? CS.select([{ a: a, b: a }, { a: c, b: c }]) : 0;
+      closeMenu(); rclick(a); sub('filterMenu'); await sleep(100);
+      var l = subActs(), it = item('selFilter');
+      if (it) it.click();
+      await sleep(1200);
+      var q = searchVal();
+      R.info.g = { n: n, list: l, q: q };
+      R.chk.gsMenu = n === 2 && l[0] === 'selFilter' && l[1] === 'selExclude';
+      R.chk.gsFilter = /V_NAME = \/\^\(\?:/.test(q) && /V_STATUS = \/\^\(\?:/.test(q);
     },
     mexcl: async function () {
       var td = document.querySelector('#resultsTable tbody tr td a');

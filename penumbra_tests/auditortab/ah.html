@@ -69,6 +69,8 @@
                slice(js, 'function _auditActionLabel(action) {', '\n    }\n', 400) + '\n    }\n' +
                slice(js, 'function _auditAttention(kpis) {', '\n    }\n', 600) + '\n    }\n' +
                slice(js, 'function _auditPaintHealth() {', '    // ---- Attention ribbon', 20000) +
+               // the ribbon itself (2026-10-30, qfail): its words for att.query
+               slice(js, 'function renderAuditRibbon(kpis, shortId) {', '\n    }\n', 4000) + '\n    }\n' +
                slice(js, 'function _auditSparkSvg(trend, w, h, titleFn) {', '\n    }\n', 4000) + '\n    }\n' +
                slice(js, 'function _auditBarsSvg(data, w, h, titleFn) {', '\n    }\n', 2500) + '\n    }\n' +
                slice(js, 'function _auditRankHtml(items, labelFn) {', '\n    }\n', 2000) + '\n    }\n' +
@@ -77,7 +79,7 @@
                slice(js, '    var AUDIT_SEGS = [', '    function _auditShowSeg(name) {', 12000);
     fns = new Function('$', 'moment', 'state',
       'var _auditHealthCache = state.health, _auditKpisCache = state.kpis, _auditSeg = state.seg;\n' + code +
-      '\nreturn { paint: _auditPaintHealth, pulse: renderAuditSegPulse, bar: renderAuditSegBar };');
+      '\nreturn { paint: _auditPaintHealth, pulse: renderAuditSegPulse, bar: renderAuditSegBar, ribbon: renderAuditRibbon };');
     // The ribbon / Health / Pulse click delegates, sliced out of main.js: a click
     // records which segment it asked for and the Events family it pre-set.
     var hcode = slice(js, '    // "Show in Events" (ribbon + Health cards): switch segment, pre-filter.', '    // Scheduler tab -> "view log"', 1500);
@@ -119,11 +121,16 @@
   if (qerr) bad.unshift({ ACTION: 'QUERY_TIMEOUT', AUDIT_TIME: t('25-SEP-2026', '10', '15', 'AM'), USER_ID: 'jsmith4', SOURCE_DATA: { message: 'Query cancelled after 120s (per-call timeout).' } });
   // A newer browser error than the timeout, to prove it cannot headline the Unresolved card.
   if (qerr && cerr) bad.unshift({ ACTION: 'CLIENT_ERROR', AUDIT_TIME: t('25-SEP-2026', '11', '40', 'AM'), USER_ID: 'akpatel', SOURCE_DATA: { message: 'ResizeObserver loop completed with undelivered notifications.' } });
+  // qfail (2026-10-30): four runs that failed outright inside 72 h (QUERY_FAIL,
+  // the InfoEd outage of Oct 30) - an ALARM, named in its own words.
+  var qfl = q.get('qfail') === '1';
+  if (qfl) ['40', '42', '48', '52'].forEach(function (mi) { bad.unshift({ ACTION: 'QUERY_FAIL', AUDIT_TIME: t('30-OCT-2026', '03', mi, 'PM'), USER_ID: 'mrgrady', SOURCE_DATA: { message: 'Could not connect to InfoEd MS-SQL (SQLSTATE 08001).' } }); });
   var sched = [];
   for (var i = 0; i < 14; i++) sched.push({ ACTION: 'SCHEDULE_RUN_OK', AUDIT_TIME: t('01-SEP-2026', '10', String(22 - i).padStart(2, '0'), 'AM'), USER_ID: 'SCHEDULER' });
   var app = admin ? { components: { scheduler: { status: 'online', seconds_ago: 58 }, databases: { oracle: { status: 'ok' }, sirius: { status: 'ok' } }, databases_probed_at: '2026-09-25T12:43:01-04:00', delivery: { status: 'ok' } } } : null;
   var kpis = errors ? { attention: { badpass: 0, denied: 0, email_fail: 1, sched_fail: 0, last: '20260925090200' }, ack_last: '' } : { attention: { badpass: 0, denied: 0, email_fail: 0, sched_fail: 0, last: '20260624191300' }, ack_last: '' };
   if (qerr) { kpis.attention.query = 1; kpis.attention.last = '20260925101500'; }
+  if (qfl) { kpis.attention.query = (kpis.attention.query || 0) + 4; kpis.attention.last = '20261030155200'; }
   // kpis.errkinds = get_audit_log.php's ALL-TIME counts per kind (what the card
   // shows). cerrmany: 31 browser errors on record, only 2 of them among the 25
   // rows the view fetches. noek: an old get_audit_log.php (the card falls back
@@ -136,6 +143,9 @@
   if (qold && q.get('qmany') === '1') { ek.qto = 1207; ek.qbig = 388; ek.browser = 1031; }
   if (qerr) { ek.qto += 1; ek.qlast = 'Sep 25'; }
   if (qerr && cerr) { ek.browser += 1; ek.blast = 'Sep 25'; }
+  // qerr joined errkinds 2026-10-30; set only here, so every other case is an
+  // errkinds WITHOUT it (the shape of the server before QUERY_FAIL).
+  if (qfl) { ek.qerr = 4; ek.qlast = 'Oct 30'; }
   if (q.get('noek') !== '1') kpis.errkinds = ek;
 
   var bar = document.getElementById('auditSegBar');
@@ -176,7 +186,11 @@
   function r(el) { var b = el.getBoundingClientRect(); return { x: +b.left.toFixed(1), y: +b.top.toFixed(1), w: +b.width.toFixed(1), h: +b.height.toFixed(1) }; }
   function go() {
     try {
-      if (seg === 'health') fns($, moment, { health: { bad: bad, sched: sched, app: app }, kpis: kpis }).paint();
+      if (seg === 'health') {
+        var hf = fns($, moment, { health: { bad: bad, sched: sched, app: app }, kpis: kpis });
+        hf.paint();
+        if (q.get('ribbon') === '1') hf.ribbon(kpis, 'grantprofiles');
+      }
       else if (seg === 'pulse') {
         // A busy report's metrics: 8 action-mix rows = the server's cap, the
         // tallest card Pulse can have.
@@ -265,6 +279,7 @@
           clips: Array.prototype.slice.call(c.querySelectorAll('.audit-hclip')).map(function (x) { return { title: x.getAttribute('title') || '', h: +x.getBoundingClientRect().height.toFixed(1), cut: x.scrollWidth > x.clientWidth }; }) }; }) };
       })(),
       unresolved: (function () { var u = document.querySelector('#auditSegHealth > .audit-hcard.sev-bad'); return u ? u.textContent.replace(/\s+/g, ' ').trim().slice(0, 300) : null; })(),
+      ribbon: (function () { var rb = document.getElementById('auditRibbon'); return rb && rb.style.display !== 'none' ? rb.textContent.replace(/\s+/g, ' ').trim() : null; })(),
       errTile: (function () {
         var e = document.querySelector('#auditSegPulse [data-audit-goto-events="bad"]'), ref = null;
         Array.prototype.slice.call(document.querySelectorAll('#auditSegPulse .audit-tile')).forEach(function (t) { if (!ref && t !== e && /Exports/.test(t.textContent)) ref = t; });

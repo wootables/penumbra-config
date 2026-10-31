@@ -1,5 +1,5 @@
 {
-  "_about": "Range fields (2026-09-30): the texts a range box writes, run through BOTH search engines - main.js (parseAdvancedQuery + evaluateParsedQuery, in harness.html) and penumbra_search.php (php_apply_search_filter, by range_php.php). Four date formats and three number shapes (currency, thousands, accounting negative) in one column each, as real reports mix them. expect = the matching row count; both engines must give it. The (blank) chip's texts (2026-09-30, later) ride the same rows: an empty alternative against row 6's blank AMOUNT and OPENED.",
+  "_about": "Range fields (2026-09-30): the texts a range box writes, run through BOTH search engines - main.js (parseAdvancedQuery + evaluateParsedQuery, in harness.html) and penumbra_search.php (php_apply_search_filter, by range_php.php). Four date formats and three number shapes (currency, thousands, accounting negative) in one column each, as real reports mix them. expect = the matching row count; both engines must give it. The (blank) chip's texts (2026-09-30, later) ride the same rows: an empty alternative against row 6's blank AMOUNT and OPENED. Buttons (2026-10-30): the regex a field with patterns writes (its value block and each pattern as (?:p), one alternation; a pattern with its own pipes, a lookahead, a lower-case pattern against the i flag, an escaped slash) and a button's AND-run.",
   "columns": ["#", "AMOUNT", "OPENED", "STATUS", "COLLEGE"],
   "rows": [
     { "#": "1", "AMOUNT": "100",       "OPENED": "01/15/2024", "STATUS": "Active",  "COLLEGE": "Eng" },
@@ -23,6 +23,16 @@
     { "q": "AMOUNT = /^(?:)$/", "expect": 1 },
     { "q": "AMOUNT != /^(?:)$/", "expect": 6 },
     { "q": "AMOUNT = /^(?:100|)$/", "expect": 2 },
-    { "q": "OPENED = /^(?:)$/ and COLLEGE = /^(?:Ag)$/", "expect": 1 }
+    { "q": "OPENED = /^(?:)$/ and COLLEGE = /^(?:Ag)$/", "expect": 1 },
+    { "q": "COLLEGE = /(?:^S)/", "expect": 2 },
+    { "q": "COLLEGE = /^(?:Eng)$|(?:^S)/", "expect": 5 },
+    { "q": "COLLEGE != /(?:^S)|(?:^A)/", "expect": 3 },
+    { "q": "STATUS = /(?:^(Active|Pending)$)/", "expect": 5 },
+    { "q": "COLLEGE = /(?:^(?!Eng$))/", "expect": 4 },
+    { "q": "STATUS = /^(?:Closed)$|(?:^P)/", "expect": 3 },
+    { "q": "COLLEGE = /(?:^e)/", "expect": 3 },
+    { "q": "COLLEGE = /(?:R\\x2FD)|(?:^Ag$)/", "expect": 2 },
+    { "q": "AMOUNT >= 100 and STATUS = Active", "expect": 1 },
+    { "q": "COLLEGE = /(?:^E)/ and STATUS = /(?:^C)/", "expect": 2 }
   ]
 }

@@ -626,20 +626,14 @@
     rec('C26 Show only this group keeps the filter box\'s data conditions', ran26 && a26[0] === ALL4 && a26[1] === J(['Modified Rows'])
       && a26[2] === "NAME != 'Zulu' and __SNAP_TYPE = 'Modified Rows'" && a26[3] === J(['3', '4']), 'states=' + J(a26));
 
-    // C27 ...and leaves an "or" query alone (one more condition would bind to its last branch), saying why
+    // C27 ...and wraps an "or" query in parentheses first (2026-10-30), so the group's condition applies to all of it
     await search("NAME = 'Alpha' or NAME = 'Bravo'");
-    var k27 = J(keys()), q27a = box().value, c27 = document.getElementById('snapshotComparisonContainer');
-    // the notice as the page is asked for it (on screen it may queue behind earlier steps' Undo cards: three show at once)
-    var said = [], st0 = window.show_text;
-    window.show_text = function (h) { said.push(String(h)); return st0.apply(this, arguments); };
-    var ran27 = await choose(bandOf('Unchanged Rows'), 'cmpGroupOnly');
-    await sleep(700);
-    window.show_text = st0;
-    var q27b = box().value, same27 = document.getElementById('snapshotComparisonContainer') === c27;
-    var told27 = said.some(function (h) { return /holds an "or" query/.test(h); });
+    var k27 = J(keys());
+    var ran27 = await chooseRerun(bandOf('Unchanged Rows'), 'cmpGroupOnly');
+    var a27 = [k27, J(keys()), box().value];
     await search('');
-    rec('C27 Show only this group leaves an "or" query in the box as it is, and says why', ran27 && k27 === J(['Unchanged Rows']) && q27b === q27a && same27 && told27,
-      'ran=' + ran27 + ' groups=' + k27 + ' box=' + J([q27a, q27b]) + ' same=' + same27 + ' told=' + told27 + ' said=' + J(said.map(function (h) { return h.slice(0, 80); })));
+    rec('C27 Show only this group wraps an "or" query in parentheses and adds its condition', ran27 && a27[1] === J(['Unchanged Rows'])
+      && a27[2] === "(NAME = 'Alpha' or NAME = 'Bravo') and __SNAP_TYPE = 'Unchanged Rows'", 'ran=' + ran27 + ' states=' + J(a27));
 
     // C21 Hide this group: the band's x - the group leaves, its condition in the filter box
     var ran21 = await chooseRerun(bandOf('New Rows'), 'cmpGroupHide');

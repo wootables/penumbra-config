@@ -513,6 +513,10 @@
         if (sp && !sp.error && sp.mods.indexOf('anyrow') !== -1) {
             return { error: 'anyrow works in a report\'s filter_strip(), not on a dashboard Controls tile' };
         }
+        // And buttons (2026-10-30, fsbuttons): this tile counts and draws only value chips so far.
+        if (sp && !sp.error && sp.fields.some(function (f) { return f.buttons || (f.pats && f.pats.length); })) {
+            return { error: 'buttons (+Label|...) work in a report\'s filter_strip(), not on a dashboard Controls tile' };
+        }
         return sp;
     }
     // A range field's kind and hints (2026-09-30) come from the values the
@@ -627,7 +631,7 @@
     // has no values yet (its tiles are still loading). An unchanged drawing
     // leaves the DOM alone, so a re-read never moves focus or a hover.
     function renderControlsInto($tile, tile) {
-        var text = dashBoxText(), off = T.splitTopLevel(text).or ? 'or' : null;
+        var text = dashBoxText(), off = null;   // an "or" filter no longer pauses the chips: the strip wraps it in parentheses (2026-10-30)
         var spec = controlsSpec(tile), html = '', waiting = false;
         var rinfo = controlsKinds(spec);
         var textRange = Object.keys(rinfo).filter(function (c) { return rinfo[c].kind === 'text'; });
@@ -823,9 +827,10 @@
     // A search link's own text (a cell's data-search, the report's click-to-
     // search convention; 2026-10-01): a table tile's link, or a framed report's
     // posted here instead of searching that frame alone. Toggled like a cell's
-    // value, one AND-run only; a text the run cannot take (an "or", a modifier,
-    // or a box holding an "or") replaces the filter, as the link does on its own
-    // page. Applied as written: a now() or calc() inside it is the report
+    // value, one AND-run: an "or" text is one condition in parentheses and a
+    // box holding an "or" is wrapped first (2026-10-30); only a text with a
+    // modifier replaces the filter, as the link does on its own page. Applied
+    // as written: a now() or calc() inside it is the report
     // page's to resolve, and a framed page has resolved it before posting.
     function crossFilterText(text) {
         text = String(text == null ? '' : text).trim();
@@ -3701,7 +3706,6 @@
             if (!label && !cond) { return; }
             if (!cond) { err = 'Enter the condition for the switch ' + label + '.'; return; }
             var sp = T.splitTopLevel(cond);
-            if (sp.or) { err = 'A switch condition cannot use "or" (the filter has no parentheses to keep it apart): ' + cond; return; }
             if (sp.prefix) { err = 'A switch condition cannot start with __ROW, __ALL or __SRC: ' + cond; return; }
             toggles.push({ label: label || cond, cond: cond });
         });

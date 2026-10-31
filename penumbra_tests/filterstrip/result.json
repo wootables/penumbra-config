@@ -6,7 +6,7 @@
                     {
                         "name":  "args: two fields parse with defaults",
                         "pass":  true,
-                        "detail":  "{\"fields\":[{\"label\":\"College\",\"col\":\"COLLEGE\",\"mode\":\"in\",\"top\":12,\"az\":false,\"range\":false,\"blank\":false,\"list\":false,\"split\":false},{\"label\":\"Fiscal Year\",\"col\":\"FY\",\"mode\":\"in\",\"top\":12,\"az\":true,\"range\":false,\"blank\":false,\"list\":false,\"split\":false}],\"mods\":[],\"error\":null}"
+                        "detail":  "{\"fields\":[{\"label\":\"College\",\"col\":\"COLLEGE\",\"mode\":\"in\",\"top\":12,\"az\":false,\"range\":false,\"blank\":false,\"list\":false,\"split\":false,\"pats\":[],\"only\":false},{\"label\":\"Fiscal Year\",\"col\":\"FY\",\"mode\":\"in\",\"top\":12,\"az\":true,\"range\":false,\"blank\":false,\"list\":false,\"split\":false,\"pats\":[],\"only\":false}],\"mods\":[],\"error\":null}"
                     },
                     {
                         "name":  "args: bare words are keywords, case-forgiven, deduped",
@@ -46,12 +46,12 @@
                     {
                         "name":  "args: exclude and top=N options",
                         "pass":  true,
-                        "detail":  "{\"fields\":[{\"label\":\"Status\",\"col\":\"STATUS\",\"mode\":\"ex\",\"top\":3,\"az\":false,\"range\":false,\"blank\":false,\"list\":false,\"split\":false},{\"label\":\"X\",\"col\":\"Y\",\"mode\":\"in\",\"top\":0,\"az\":false,\"range\":false,\"blank\":false,\"list\":false,\"split\":false}],\"mods\":[],\"error\":null}"
+                        "detail":  "{\"fields\":[{\"label\":\"Status\",\"col\":\"STATUS\",\"mode\":\"ex\",\"top\":3,\"az\":false,\"range\":false,\"blank\":false,\"list\":false,\"split\":false,\"pats\":[],\"only\":false},{\"label\":\"X\",\"col\":\"Y\",\"mode\":\"in\",\"top\":0,\"az\":false,\"range\":false,\"blank\":false,\"list\":false,\"split\":false,\"pats\":[],\"only\":false}],\"mods\":[],\"error\":null}"
                     },
                     {
                         "name":  "args: an unknown option is a loud error",
                         "pass":  true,
-                        "detail":  "unknown option foo on Status (expected exclude, az, top=N, range, blank, list or split)"
+                        "detail":  "unknown option foo on Status (expected exclude, az, top=N, range, blank, list or split; only for a field with buttons)"
                     },
                     {
                         "name":  "args: the column is upper-cased",
@@ -126,7 +126,7 @@
                     {
                         "name":  "state: empty text",
                         "pass":  true,
-                        "detail":  "{\"prefix\":\"\",\"sel\":{},\"range\":{},\"rest\":[],\"or\":false}"
+                        "detail":  "{\"prefix\":\"\",\"sel\":{},\"range\":{},\"rest\":[],\"or\":false,\"pat\":{},\"btn\":{}}"
                     },
                     {
                         "name":  "state: one strip condition is claimed",
@@ -136,7 +136,7 @@
                     {
                         "name":  "state: two strip conditions plus a typed one (kept verbatim as rest)",
                         "pass":  true,
-                        "detail":  "{\"prefix\":\"\",\"sel\":{\"COLLEGE\":[\"Eng\"],\"FY\":[\"2025\"]},\"range\":{},\"rest\":[\"AMOUNT \u003e 100\"],\"or\":false}"
+                        "detail":  "{\"prefix\":\"\",\"sel\":{\"COLLEGE\":[\"Eng\"],\"FY\":[\"2025\"]},\"range\":{},\"rest\":[\"AMOUNT \u003e 100\"],\"or\":false,\"pat\":{},\"btn\":{}}"
                     },
                     {
                         "name":  "state: an exclude field claims its != condition",
@@ -154,9 +154,14 @@
                         "detail":  "got [\"Eng\"] want [\"Eng\"]"
                     },
                     {
-                        "name":  "state: a top-level or is detected",
+                        "name":  "state: a top-level or is one rest part in parentheses, not a pause (2026-10-30)",
                         "pass":  true,
-                        "detail":  ""
+                        "detail":  "{\"prefix\":\"\",\"sel\":{},\"range\":{},\"rest\":[\"(COLLEGE = /^(?:Eng)$/ or FY = 2025)\"],\"or\":false,\"pat\":{},\"btn\":{}}"
+                    },
+                    {
+                        "name":  "state: a grouped rest part composes back in front of nothing else",
+                        "pass":  true,
+                        "detail":  "got \"(COLLEGE = /^(?:Eng)$/ or FY = 2025)\" want \"(COLLEGE = /^(?:Eng)$/ or FY = 2025)\""
                     },
                     {
                         "name":  "state: AND with an upper-case joiner is not or",
@@ -166,12 +171,12 @@
                     {
                         "name":  "state: a leading __ROW modifier is kept as the prefix",
                         "pass":  true,
-                        "detail":  "{\"prefix\":\"__ROW \",\"sel\":{\"COLLEGE\":[\"Eng\"]},\"range\":{},\"rest\":[],\"or\":false}"
+                        "detail":  "{\"prefix\":\"__ROW \",\"sel\":{\"COLLEGE\":[\"Eng\"]},\"range\":{},\"rest\":[],\"or\":false,\"pat\":{},\"btn\":{}}"
                     },
                     {
                         "name":  "state: \"and\" inside the regex literal is a value, not a joiner",
                         "pass":  true,
-                        "detail":  "{\"prefix\":\"\",\"sel\":{\"COLLEGE\":[\"Arts and Sciences\",\"Eng\"]},\"range\":{},\"rest\":[],\"or\":false}"
+                        "detail":  "{\"prefix\":\"\",\"sel\":{\"COLLEGE\":[\"Arts and Sciences\",\"Eng\"]},\"range\":{},\"rest\":[],\"or\":false,\"pat\":{},\"btn\":{}}"
                     },
                     {
                         "name":  "state: a quoted column name is claimed",
@@ -319,9 +324,9 @@
                         "detail":  "{\"off\":null,\"c\":[[\"Eng\",6,true],[\"Sci\",3,false],[\"Ag\",2,false],[\"CHASS\",1,false]]}"
                     },
                     {
-                        "name":  "counts: a top-level or pauses the strip (off=or)",
+                        "name":  "counts: a top-level or no longer pauses the strip: it is one rest part in parentheses (2026-10-30)",
                         "pass":  true,
-                        "detail":  "{\"off\":\"or\"}"
+                        "detail":  "{\"off\":null,\"rest\":[\"(COLLEGE = /^(?:Eng)$/ or FY = 2025)\"]}"
                     },
                     {
                         "name":  "counts: the same text and rows come back memoized",
@@ -504,19 +509,19 @@
                         "detail":  "got \"AMOUNT \u003e 100\" want \"AMOUNT \u003e 100\""
                     },
                     {
-                        "name":  "sync: an or query pauses the rendered strip (chips disabled, note shown)",
+                        "name":  "sync: an or query no longer pauses the rendered strip (chips enabled, no note; 2026-10-30)",
                         "pass":  true,
-                        "detail":  "or 7"
+                        "detail":  "undefined 0"
                     },
                     {
-                        "name":  "sync: a click on a paused strip changes nothing",
+                        "name":  "sync: a click beside an or query wraps it in parentheses and adds the chip",
                         "pass":  true,
-                        "detail":  "got \"COLLEGE = Eng or FY = 2025\" want \"COLLEGE = Eng or FY = 2025\""
+                        "detail":  "got \"COLLEGE = /^(?:Sci)$/ and (COLLEGE = Eng or FY = 2025)\" want \"COLLEGE = /^(?:Sci)$/ and (COLLEGE = Eng or FY = 2025)\""
                     },
                     {
                         "name":  "sync: a hand-typed condition presses its chip and lifts the pause",
                         "pass":  true,
-                        "detail":  "\u003cdiv class=\"pnb-fs-group\" role=\"group\" aria-labelledby=\"pnbFsName32\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"12\"\u003e\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName32\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003c"
+                        "detail":  "\u003cdiv class=\"pnb-fs-group\" role=\"group\" aria-labelledby=\"pnbFsName34\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"12\"\u003e\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName34\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003c"
                     },
                     {
                         "name":  "sync: clearing the box by hand releases every chip",
@@ -614,14 +619,44 @@
                         "detail":  "got \"COLLEGE = /^(?:Eng|Sci)$/\" want \"COLLEGE = /^(?:Eng|Sci)$/\""
                     },
                     {
-                        "name":  "cond: add refuses a box holding an or (null)",
+                        "name":  "cond: add wraps a box holding an or in parentheses",
                         "pass":  true,
-                        "detail":  "null"
+                        "detail":  "got \"(A = 1 or B = 2) and C = 3\" want \"(A = 1 or B = 2) and C = 3\""
                     },
                     {
-                        "name":  "cond: add refuses a condition holding an or (null)",
+                        "name":  "cond: a condition holding an or is one condition in parentheses",
                         "pass":  true,
-                        "detail":  "null"
+                        "detail":  "got \"A = 1 and (B = 1 or C = 2)\" want \"A = 1 and (B = 1 or C = 2)\""
+                    },
+                    {
+                        "name":  "cond: add keeps the __ROW prefix outside the parentheses",
+                        "pass":  true,
+                        "detail":  "got \"__ROW (A = 1 or B = 2) and C = 3\" want \"__ROW (A = 1 or B = 2) and C = 3\""
+                    },
+                    {
+                        "name":  "cond: has sees the added condition beside the wrapped or, not the branches",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "cond: has reads an or condition as the whole group",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "split: a group is one part and its or is not top-level",
+                        "pass":  true,
+                        "detail":  "got {\"prefix\":\"\",\"parts\":[\"(A = 1 or B = 2)\",\"C = 3\"],\"or\":false} want {\"prefix\":\"\",\"parts\":[\"(A = 1 or B = 2)\",\"C = 3\"],\"or\":false}"
+                    },
+                    {
+                        "name":  "split: an or outside a group is top-level",
+                        "pass":  true,
+                        "detail":  "got {\"prefix\":\"\",\"parts\":[\"A = 1\",\"(B = 2 and C = 3)\"],\"or\":true} want {\"prefix\":\"\",\"parts\":[\"A = 1\",\"(B = 2 and C = 3)\"],\"or\":true}"
+                    },
+                    {
+                        "name":  "split: a paren in a value is a value; unbalanced parens are text",
+                        "pass":  true,
+                        "detail":  "got [[\"D = (x)\",\"C = 3\"],true] want [[\"D = (x)\",\"C = 3\"],true]"
                     },
                     {
                         "name":  "cond: remove takes out only that condition",
@@ -639,9 +674,19 @@
                         "detail":  "got \"X = 1\" want \"X = 1\""
                     },
                     {
-                        "name":  "cond: remove refuses a box holding an or (null)",
+                        "name":  "cond: remove leaves an or box alone when the condition is not there",
                         "pass":  true,
-                        "detail":  ""
+                        "detail":  "got \"A = 1 or B = 2\" want \"A = 1 or B = 2\""
+                    },
+                    {
+                        "name":  "cond: remove of the added condition unwraps the or box",
+                        "pass":  true,
+                        "detail":  "got \"A = 1 or B = 2\" want \"A = 1 or B = 2\""
+                    },
+                    {
+                        "name":  "cond: remove keeps a group that still has company",
+                        "pass":  true,
+                        "detail":  "got \"(A = 1 or B = 2) and D = 4\" want \"(A = 1 or B = 2) and D = 4\""
                     },
                     {
                         "name":  "split: splitSearch reads the same through the shared splitter",
@@ -674,9 +719,9 @@
                         "detail":  "[toggle_switch: filter| needs a condition, such as filter|STATUS = Active]"
                     },
                     {
-                        "name":  "toggle: a condition holding an or is refused",
+                        "name":  "toggle: a condition holding an or is one condition in parentheses (2026-10-30), no refusal",
                         "pass":  true,
-                        "detail":  "[toggle_switch: filter| takes conditions joined with and - an or cannot be combined with the rest of the filter: STATUS = Active or FY = 2,025]"
+                        "detail":  "Or"
                     },
                     {
                         "name":  "toggle: a condition carrying __ROW is refused",
@@ -784,24 +829,34 @@
                         "detail":  ""
                     },
                     {
-                        "name":  "exec: on a box holding an or, neither reads active",
+                        "name":  "exec: on a box holding an or, filter| reads not active and unfilter| reads active",
                         "pass":  true,
                         "detail":  ""
                     },
                     {
-                        "name":  "exec: a filter| step on an or box changes nothing",
+                        "name":  "exec: a filter| step on an or box wraps it in parentheses and adds the condition",
+                        "pass":  true,
+                        "detail":  "got \"(COLLEGE = Eng or FY = 2025) and STATUS = Active\" want \"(COLLEGE = Eng or FY = 2025) and STATUS = Active\""
+                    },
+                    {
+                        "name":  "exec: ... with no notice",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "exec: unfilter| of that condition unwraps the or box again",
                         "pass":  true,
                         "detail":  "got \"COLLEGE = Eng or FY = 2025\" want \"COLLEGE = Eng or FY = 2025\""
                     },
                     {
-                        "name":  "exec: ... and says why in a notice",
+                        "name":  "exec: unfilter| of the or query itself (one condition in parentheses) empties the box",
                         "pass":  true,
-                        "detail":  "NOTICE: The filter box holds an \"or\" query, so filter cannot add or remove one condition. Clear the filter first.×"
+                        "detail":  "got \"\" want \"\""
                     },
                     {
                         "name":  "range: the range option makes a range field",
                         "pass":  true,
-                        "detail":  "{\"fields\":[{\"label\":\"Amount\",\"col\":\"AMOUNT\",\"mode\":\"in\",\"top\":12,\"az\":false,\"range\":true,\"blank\":false,\"list\":false,\"split\":false}],\"mods\":[],\"error\":null}"
+                        "detail":  "{\"fields\":[{\"label\":\"Amount\",\"col\":\"AMOUNT\",\"mode\":\"in\",\"top\":12,\"az\":false,\"range\":true,\"blank\":false,\"list\":false,\"split\":false,\"pats\":[],\"only\":false}],\"mods\":[],\"error\":null}"
                     },
                     {
                         "name":  "range: range and exclude together are refused",
@@ -826,7 +881,7 @@
                     {
                         "name":  "range: the unknown-option error names range",
                         "pass":  true,
-                        "detail":  "unknown option between on Amount (expected exclude, az, top=N, range, blank, list or split)"
+                        "detail":  "unknown option between on Amount (expected exclude, az, top=N, range, blank, list or split; only for a field with buttons)"
                     },
                     {
                         "name":  "bound: currency and thousands become plain digits",
@@ -931,7 +986,7 @@
                     {
                         "name":  "state: only the first bound of a side is claimed",
                         "pass":  true,
-                        "detail":  "{\"prefix\":\"\",\"sel\":{},\"range\":{\"AMOUNT\":{\"min\":\"100\",\"max\":\"\"}},\"rest\":[\"AMOUNT \u003e= 200\"],\"or\":false}"
+                        "detail":  "{\"prefix\":\"\",\"sel\":{},\"range\":{\"AMOUNT\":{\"min\":\"100\",\"max\":\"\"}},\"rest\":[\"AMOUNT \u003e= 200\"],\"or\":false,\"pat\":{},\"btn\":{}}"
                     },
                     {
                         "name":  "state: a date range, a US date read as an ISO day",
@@ -1034,9 +1089,59 @@
                         "detail":  "got [1,1] want [1,1]"
                     },
                     {
+                        "name":  "parity: COLLEGE = /(?:^S)/ (browser = server = 2)",
+                        "pass":  true,
+                        "detail":  "got [2,2] want [2,2]"
+                    },
+                    {
+                        "name":  "parity: COLLEGE = /^(?:Eng)$|(?:^S)/ (browser = server = 5)",
+                        "pass":  true,
+                        "detail":  "got [5,5] want [5,5]"
+                    },
+                    {
+                        "name":  "parity: COLLEGE != /(?:^S)|(?:^A)/ (browser = server = 3)",
+                        "pass":  true,
+                        "detail":  "got [3,3] want [3,3]"
+                    },
+                    {
+                        "name":  "parity: STATUS = /(?:^(Active|Pending)$)/ (browser = server = 5)",
+                        "pass":  true,
+                        "detail":  "got [5,5] want [5,5]"
+                    },
+                    {
+                        "name":  "parity: COLLEGE = /(?:^(?!Eng$))/ (browser = server = 4)",
+                        "pass":  true,
+                        "detail":  "got [4,4] want [4,4]"
+                    },
+                    {
+                        "name":  "parity: STATUS = /^(?:Closed)$|(?:^P)/ (browser = server = 3)",
+                        "pass":  true,
+                        "detail":  "got [3,3] want [3,3]"
+                    },
+                    {
+                        "name":  "parity: COLLEGE = /(?:^e)/ (browser = server = 3)",
+                        "pass":  true,
+                        "detail":  "got [3,3] want [3,3]"
+                    },
+                    {
+                        "name":  "parity: COLLEGE = /(?:R\\x2FD)|(?:^Ag$)/ (browser = server = 2)",
+                        "pass":  true,
+                        "detail":  "got [2,2] want [2,2]"
+                    },
+                    {
+                        "name":  "parity: AMOUNT \u003e= 100 and STATUS = Active (browser = server = 1)",
+                        "pass":  true,
+                        "detail":  "got [1,1] want [1,1]"
+                    },
+                    {
+                        "name":  "parity: COLLEGE = /(?:^E)/ and STATUS = /(?:^C)/ (browser = server = 2)",
+                        "pass":  true,
+                        "detail":  "got [2,2] want [2,2]"
+                    },
+                    {
                         "name":  "render: a range field is a pair of boxes, no chips",
                         "pass":  true,
-                        "detail":  "\u003cdiv class=\"pnb-fs-group pnb-fs-range\" role=\"group\" aria-labelledby=\"pnbFsName46\" data-fs-col=\"AMOUNT\" data-fs-mode=\"in\" data-fs-range=\"1\" data-fs-kind=\"number\"\u003e\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName"
+                        "detail":  "\u003cdiv class=\"pnb-fs-group pnb-fs-range\" role=\"group\" aria-labelledby=\"pnbFsName48\" data-fs-col=\"AMOUNT\" data-fs-mode=\"in\" data-fs-range=\"1\" data-fs-kind=\"number\"\u003e\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName"
                     },
                     {
                         "name":  "render: a number range is two text boxes with the data span as hints",
@@ -1159,9 +1264,9 @@
                         "detail":  "got \"AMOUNT \u003e= 5 and OPENED \u003c= 2024\" want \"AMOUNT \u003e= 5 and OPENED \u003c= 2024\""
                     },
                     {
-                        "name":  "pause: an or query disables the boxes too",
+                        "name":  "pause: an or query no longer disables the boxes (the strip wraps it in parentheses, 2026-10-30)",
                         "pass":  true,
-                        "detail":  "or"
+                        "detail":  ""
                     },
                     {
                         "name":  "refused: a range on a text column is a loud error naming it",
@@ -1171,17 +1276,17 @@
                     {
                         "name":  "blank: the option marks the field",
                         "pass":  true,
-                        "detail":  "{\"fields\":[{\"label\":\"College\",\"col\":\"COLLEGE\",\"mode\":\"in\",\"top\":12,\"az\":false,\"range\":false,\"blank\":true,\"list\":false,\"split\":false}],\"mods\":[],\"error\":null}"
+                        "detail":  "{\"fields\":[{\"label\":\"College\",\"col\":\"COLLEGE\",\"mode\":\"in\",\"top\":12,\"az\":false,\"range\":false,\"blank\":true,\"list\":false,\"split\":false,\"pats\":[],\"only\":false}],\"mods\":[],\"error\":null}"
                     },
                     {
                         "name":  "blank: a chip field is not blank by default",
                         "pass":  true,
-                        "detail":  "{\"label\":\"College\",\"col\":\"COLLEGE\",\"mode\":\"in\",\"top\":12,\"az\":false,\"range\":false,\"blank\":false,\"list\":false,\"split\":false}"
+                        "detail":  "{\"label\":\"College\",\"col\":\"COLLEGE\",\"mode\":\"in\",\"top\":12,\"az\":false,\"range\":false,\"blank\":false,\"list\":false,\"split\":false,\"pats\":[],\"only\":false}"
                     },
                     {
                         "name":  "blank: goes with exclude and top=N",
                         "pass":  true,
-                        "detail":  "{\"fields\":[{\"label\":\"Status\",\"col\":\"STATUS\",\"mode\":\"ex\",\"top\":2,\"az\":false,\"range\":false,\"blank\":true,\"list\":false,\"split\":false}],\"mods\":[],\"error\":null}"
+                        "detail":  "{\"fields\":[{\"label\":\"Status\",\"col\":\"STATUS\",\"mode\":\"ex\",\"top\":2,\"az\":false,\"range\":false,\"blank\":true,\"list\":false,\"split\":false,\"pats\":[],\"only\":false}],\"mods\":[],\"error\":null}"
                     },
                     {
                         "name":  "blank: refused on a range (a range has no chips)",
@@ -1191,7 +1296,7 @@
                     {
                         "name":  "blank: the unknown-option error names blank",
                         "pass":  true,
-                        "detail":  "unknown option empty on College (expected exclude, az, top=N, range, blank, list or split)"
+                        "detail":  "unknown option empty on College (expected exclude, az, top=N, range, blank, list or split; only for a field with buttons)"
                     },
                     {
                         "name":  "state: the empty alternative is a value on a blank field",
@@ -1301,7 +1406,7 @@
                     {
                         "name":  "click: the re-rendered chip reads as pressed, and only it",
                         "pass":  true,
-                        "detail":  "\u003cdiv class=\"pnb-fs-group\" role=\"group\" aria-labelledby=\"pnbFsName80\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"3\" data-fs-blank=\"1\"\u003e\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName80\" title=\"COLLEGE"
+                        "detail":  "\u003cdiv class=\"pnb-fs-group\" role=\"group\" aria-labelledby=\"pnbFsName85\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"3\" data-fs-blank=\"1\"\u003e\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName85\" title=\"COLLEGE"
                     },
                     {
                         "name":  "click: the other group counts what the blank leaves (row 13 is FY 2025)",
@@ -1336,7 +1441,7 @@
                     {
                         "name":  "typed: a blank condition on a strip without the option presses a (blank) chip that is only there while pressed",
                         "pass":  true,
-                        "detail":  "\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName89\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003cspan class=\"pnb-fs-chips\"\u003e\u003cbutton type=\"button\" class=\"pnb-fs-chip\" aria-pressed=\"false\" data-fs-val=\"Eng\" title=\"Eng\"\u003e\u003cspan class=\"pnb-fs-v\"\u003eEng\u003c/span\u003e\u003cspan class=\"pnb-fs-n\"\u003e6\u003c/span\u003e\u003c/button\u003e\u003cbutton type=\"button\" class=\"pnb-f"
+                        "detail":  "\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName94\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003cspan class=\"pnb-fs-chips\"\u003e\u003cbutton type=\"button\" class=\"pnb-fs-chip\" aria-pressed=\"false\" data-fs-val=\"Eng\" title=\"Eng\"\u003e\u003cspan class=\"pnb-fs-v\"\u003eEng\u003c/span\u003e\u003cspan class=\"pnb-fs-n\"\u003e6\u003c/span\u003e\u003c/button\u003e\u003cbutton type=\"button\" class=\"pnb-f"
                     },
                     {
                         "name":  "typed: a click joins the value to it (one condition on the column, never two)",
@@ -1376,7 +1481,7 @@
                     {
                         "name":  "pivot: the re-rendered chip reads as pressed, with the counts of the source rows",
                         "pass":  true,
-                        "detail":  "\u003cdiv class=\"pnb-fs-group\" role=\"group\" aria-labelledby=\"pnbFsName94\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"12\"\u003e\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName94\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003c"
+                        "detail":  "\u003cdiv class=\"pnb-fs-group\" role=\"group\" aria-labelledby=\"pnbFsName99\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"12\"\u003e\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName99\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003c"
                     },
                     {
                         "name":  "pivot: a hand-typed source condition rebuilds the pivot and presses its chip",
@@ -1386,7 +1491,7 @@
                     {
                         "name":  "pivot: ... the sync reads it",
                         "pass":  true,
-                        "detail":  "\u003cdiv class=\"pnb-fs-group\" role=\"group\" aria-labelledby=\"pnbFsName96\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"12\"\u003e\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName96\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003c"
+                        "detail":  "\u003cdiv class=\"pnb-fs-group\" role=\"group\" aria-labelledby=\"pnbFsName101\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"12\"\u003e\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName101\" title=\"COLLEGE\"\u003eCollege\u003c/span"
                     },
                     {
                         "name":  "pivot: Clear all rebuilds the whole pivot",
@@ -1406,7 +1511,7 @@
                     {
                         "name":  "pivot: the chip reads as pressed through the __SRC prefix",
                         "pass":  true,
-                        "detail":  "\u003cdiv class=\"pnb-fs-group\" role=\"group\" aria-labelledby=\"pnbFsName102\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"12\"\u003e\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName102\" title=\"COLLEGE\"\u003eCollege\u003c/span"
+                        "detail":  "\u003cdiv class=\"pnb-fs-group\" role=\"group\" aria-labelledby=\"pnbFsName107\" data-fs-col=\"COLLEGE\" data-fs-mode=\"in\" data-fs-top=\"12\"\u003e\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName107\" title=\"COLLEGE\"\u003eCollege\u003c/span"
                     },
                     {
                         "name":  "pivot: a second chip joins under the one __SRC (field order)",
@@ -1426,7 +1531,7 @@
                     {
                         "name":  "list: the option parses (list true, the default top untouched)",
                         "pass":  true,
-                        "detail":  "{\"fields\":[{\"label\":\"Sponsor\",\"col\":\"SPONSOR\",\"mode\":\"in\",\"top\":12,\"az\":false,\"range\":false,\"blank\":false,\"list\":true,\"split\":false}],\"mods\":[],\"error\":null}"
+                        "detail":  "{\"fields\":[{\"label\":\"Sponsor\",\"col\":\"SPONSOR\",\"mode\":\"in\",\"top\":12,\"az\":false,\"range\":false,\"blank\":false,\"list\":true,\"split\":false,\"pats\":[],\"only\":false}],\"mods\":[],\"error\":null}"
                     },
                     {
                         "name":  "list: top=N is refused on a list (there is no fold)",
@@ -1441,7 +1546,7 @@
                     {
                         "name":  "list: the unknown-option message names list",
                         "pass":  true,
-                        "detail":  "unknown option foo on Sponsor (expected exclude, az, top=N, range, blank, list or split)"
+                        "detail":  "unknown option foo on Sponsor (expected exclude, az, top=N, range, blank, list or split; only for a field with buttons)"
                     },
                     {
                         "name":  "list: the groups hold every value with its count (31 rows: S01..S08 twice, the blank cells last)",
@@ -1451,7 +1556,7 @@
                     {
                         "name":  "list: the group is a list with a find box and every value as a row, none folded, no +n more",
                         "pass":  true,
-                        "detail":  "\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName108\" title=\"SPONSOR\"\u003eSponsor\u003c/span\u003e\u003cspan class=\"pnb-fs-listbox\"\u003e\u003cinput type=\"search\" class=\"pnb-fs-find\" value=\"\" placeholder=\"Type to find\" aria-label=\"Find a Sponsor value\" autocomplete=\"off\" spellcheck=\"false\"\u003e\u003cspan class=\"pnb-fs-chips\"\u003e\u003cbutton type=\"button\""
+                        "detail":  "\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName113\" title=\"SPONSOR\"\u003eSponsor\u003c/span\u003e\u003cspan class=\"pnb-fs-listbox\"\u003e\u003cinput type=\"search\" class=\"pnb-fs-find\" value=\"\" placeholder=\"Type to find\" aria-label=\"Find a Sponsor value\" autocomplete=\"off\" spellcheck=\"false\"\u003e\u003cspan class=\"pnb-fs-chips\"\u003e\u003cbutton type=\"button\""
                     },
                     {
                         "name":  "list: the rows keep the count order, the (blank) row last, with their counts",
@@ -1461,7 +1566,7 @@
                     {
                         "name":  "list: the plain group beside it is still chips",
                         "pass":  true,
-                        "detail":  "\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName109\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003cspan class=\"pnb-fs-chips\"\u003e\u003cbutton type=\"butto"
+                        "detail":  "\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName114\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003cspan class=\"pnb-fs-chips\"\u003e\u003cbutton type=\"butto"
                     },
                     {
                         "name":  "list: the find box names its field for a screen reader and keeps the browser out of it",
@@ -1574,9 +1679,9 @@
                         "detail":  "got \"SPONSOR != /^(?:S03)$/\" want \"SPONSOR != /^(?:S03)$/\""
                     },
                     {
-                        "name":  "list: the or pause disables the find box with the rows",
+                        "name":  "list: an or query no longer pauses the list (the strip wraps it in parentheses)",
                         "pass":  true,
-                        "detail":  "or"
+                        "detail":  "undefined"
                     },
                     {
                         "name":  "list: ... and lifting it re-enables the box",
@@ -1807,6 +1912,456 @@
                         "name":  "nested single: one nested field beside a top-level one writes no __ROW",
                         "pass":  true,
                         "detail":  "got \"ROLE = /^(?:PI)$/\" want \"ROLE = /^(?:PI)$/\""
+                    },
+                    {
+                        "name":  "buttons: PenumbraTiles.strip.toggleAuthored / countState available",
+                        "pass":  true,
+                        "detail":  "toggleAuthored=function"
+                    },
+                    {
+                        "name":  "buttons args: a + line under a column field is a pattern on that column",
+                        "pass":  true,
+                        "detail":  "got [[\"S colleges\",\"^S\"],[\"Two letters\",\"^..$\"]] want [[\"S colleges\",\"^S\"],[\"Two letters\",\"^..$\"]]"
+                    },
+                    {
+                        "name":  "buttons args: Label|* is a button group keyed *1, pick-one by default, its buttons in order with their parts",
+                        "pass":  true,
+                        "detail":  "got [\"*1\",\"one\",[[\"Small\",[\"AMOUNT \u003c 50\"]],[\"Big Eng\",[\"AMOUNT \u003e= 250\",\"COLLEGE = Eng\"]]]] want [\"*1\",\"one\",[[\"Small\",[\"AMOUNT \u003c 50\"]],[\"Big Eng\",[\"AMOUNT \u003e= 250\",\"COLLEGE = Eng\"]]]]"
+                    },
+                    {
+                        "name":  "buttons args: a field after the group is a plain field again",
+                        "pass":  true,
+                        "detail":  "got [3,\"STATUS\",0] want [3,\"STATUS\",0]"
+                    },
+                    {
+                        "name":  "buttons args: all, and a second group keyed *2",
+                        "pass":  true,
+                        "detail":  "got [\"all\",\"*2\",\"one\"] want [\"all\",\"*2\",\"one\"]"
+                    },
+                    {
+                        "name":  "buttons args: no label = the condition as written",
+                        "pass":  true,
+                        "detail":  "got [[\"/^S/\",\"^S\"]] want [[\"/^S/\",\"^S\"]]"
+                    },
+                    {
+                        "name":  "buttons args: only is an option of a field with patterns",
+                        "pass":  true,
+                        "detail":  "got true want true"
+                    },
+                    {
+                        "name":  "buttons refuse: +X|STATUS = Active, College|COLLEGE",
+                        "pass":  true,
+                        "detail":  "a button goes after its group (Label|* or Label|COLUMN) - got +X|STATUS = Active"
+                    },
+                    {
+                        "name":  "buttons refuse: College|COLLEGE, +Eng|COLLEGE = Eng",
+                        "pass":  true,
+                        "detail":  "a button on College is a pattern on COLLEGE, written /regex/ - got COLLEGE = Eng (a condition of its own goes in a Label|* group)"
+                    },
+                    {
+                        "name":  "buttons refuse: Size|*, +Small",
+                        "pass":  true,
+                        "detail":  "the button Small needs a condition after its pipe, as +Label|CONDITION"
+                    },
+                    {
+                        "name":  "buttons refuse: Size|*",
+                        "pass":  true,
+                        "detail":  "Size needs at least one button after it, as +Label|CONDITION"
+                    },
+                    {
+                        "name":  "buttons refuse: |*, +X|A = 1",
+                        "pass":  true,
+                        "detail":  "a * group needs a label, as Label|* - got |*"
+                    },
+                    {
+                        "name":  "buttons refuse: Size|*|exclude, +X|A = 1",
+                        "pass":  true,
+                        "detail":  "unknown option exclude on Size (a * group takes one or all; the other options go with a column)"
+                    },
+                    {
+                        "name":  "buttons refuse: College|COLLEGE|one",
+                        "pass":  true,
+                        "detail":  "one goes with a button group (Label|*), not with the column COLLEGE"
+                    },
+                    {
+                        "name":  "buttons refuse: College|COLLEGE|only",
+                        "pass":  true,
+                        "detail":  "only shows the buttons of College, and it has none (+Label|/pattern/ after it)"
+                    },
+                    {
+                        "name":  "buttons refuse: Size|*, +X|__ROW STATUS = Active",
+                        "pass":  true,
+                        "detail":  "the button X cannot carry __ROW, __ALL or __SRC: __ROW STATUS = Active"
+                    },
+                    {
+                        "name":  "buttons refuse: College|COLLEGE, +X|/a/b/",
+                        "pass":  true,
+                        "detail":  "the pattern of X holds a slash, which ends it early: write \\x2F instead"
+                    },
+                    {
+                        "name":  "buttons refuse: College|COLLEGE, +X|/(a)\\1/",
+                        "pass":  true,
+                        "detail":  "the pattern of X holds a backreference (\\1), which the other chips\u0027 patterns would renumber"
+                    },
+                    {
+                        "name":  "buttons refuse: College|COLLEGE, +X|/(/",
+                        "pass":  true,
+                        "detail":  "the pattern of X is not a valid regular expression: /(/"
+                    },
+                    {
+                        "name":  "buttons refuse: Amount|AMOUNT|range, +Big|/^9/",
+                        "pass":  true,
+                        "detail":  "Amount is a range, so it takes no buttons"
+                    },
+                    {
+                        "name":  "buttons refuse: College|COLLEGE|list, +S|/^S/",
+                        "pass":  true,
+                        "detail":  "College is a list, so it takes no buttons"
+                    },
+                    {
+                        "name":  "buttons refuse: College|COLLEGE|split=comma, +S|/^S/",
+                        "pass":  true,
+                        "detail":  "College is split into its values, so it takes no buttons"
+                    },
+                    {
+                        "name":  "buttons refuse: College|COLLEGE, +S|/^S/, +S again|/^S/",
+                        "pass":  true,
+                        "detail":  "the button S again repeats S on College"
+                    },
+                    {
+                        "name":  "buttons refuse: Size|*, +A|AMOUNT\u003c50, +B|AMOUNT \u003c 50",
+                        "pass":  true,
+                        "detail":  "the button B repeats A on Size"
+                    },
+                    {
+                        "name":  "buttons refuse: College|COLLEGE, Mix|*, +E|COLLEGE = /^(?:Eng)$/",
+                        "pass":  true,
+                        "detail":  "the button E writes COLLEGE = /^(?:Eng)$/, which the COLLEGE field reads as its own: press its chip, or write the condition another way"
+                    },
+                    {
+                        "name":  "buttons refuse: Amount|AMOUNT|range, Mix|*, +Big|AMOUNT \u003e= 100",
+                        "pass":  true,
+                        "detail":  "the button Big writes AMOUNT \u003e= 100, which the AMOUNT field reads as its own: press its chip, or write the condition another way"
+                    },
+                    {
+                        "name":  "buttons refuse: College|COLLEGE, +S|/^S/, Mix|*, +E|COLLEGE = /(?:^S)/",
+                        "pass":  true,
+                        "detail":  "the button E writes COLLEGE = /(?:^S)/, which the COLLEGE field reads as its own: press its chip, or write the condition another way"
+                    },
+                    {
+                        "name":  "buttons args: a plain condition on a strip column is not a conflict (no chip writes it)",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "buttons args: an escaped slash (\\x2F) is fine",
+                        "pass":  true,
+                        "detail":  ""
+                    },
+                    {
+                        "name":  "buttons args: the unknown-option message still names the field options",
+                        "pass":  true,
+                        "detail":  "unknown option between on College (expected exclude, az, top=N, range, blank, list or split; only for a field with buttons)"
+                    },
+                    {
+                        "name":  "buttons compose: one pattern",
+                        "pass":  true,
+                        "detail":  "got \"COLLEGE = /(?:^S)/\" want \"COLLEGE = /(?:^S)/\""
+                    },
+                    {
+                        "name":  "buttons compose: values first, then each pattern, in ONE regex",
+                        "pass":  true,
+                        "detail":  "got \"COLLEGE = /^(?:Eng)$|(?:^S)|(?:^..$)/\" want \"COLLEGE = /^(?:Eng)$|(?:^S)|(?:^..$)/\""
+                    },
+                    {
+                        "name":  "buttons state: that regex reads back as the value and both patterns",
+                        "pass":  true,
+                        "detail":  "got [[\"Eng\"],[0,1],[]] want [[\"Eng\"],[0,1],[]]"
+                    },
+                    {
+                        "name":  "buttons state: patterns read back in the order written",
+                        "pass":  true,
+                        "detail":  "got [1,0] want [1,0]"
+                    },
+                    {
+                        "name":  "buttons state: a pattern the field does not have leaves the condition typed",
+                        "pass":  true,
+                        "detail":  "got [\"COLLEGE = /(?:^S)|(?:^X)/\"] want [\"COLLEGE = /(?:^S)|(?:^X)/\"]"
+                    },
+                    {
+                        "name":  "buttons state: a trailing pipe (it would match every row) leaves it typed",
+                        "pass":  true,
+                        "detail":  "got [\"COLLEGE = /(?:^S)|/\"] want [\"COLLEGE = /(?:^S)|/\"]"
+                    },
+                    {
+                        "name":  "buttons state: a plain value regex still reads as values (no pattern)",
+                        "pass":  true,
+                        "detail":  "got [[\"Eng\",\"Sci\"],{}] want [[\"Eng\",\"Sci\"],{}]"
+                    },
+                    {
+                        "name":  "buttons compose: an exclude field writes its patterns with !=",
+                        "pass":  true,
+                        "detail":  "got \"COLLEGE != /(?:^S)/\" want \"COLLEGE != /(?:^S)/\""
+                    },
+                    {
+                        "name":  "buttons state: ... and the = form is not its own",
+                        "pass":  true,
+                        "detail":  "got [\"COLLEGE = /(?:^S)/\"] want [\"COLLEGE = /(?:^S)/\"]"
+                    },
+                    {
+                        "name":  "buttons state: a button reads as pressed when the box holds its condition",
+                        "pass":  true,
+                        "detail":  "got [[0],[]] want [[0],[]]"
+                    },
+                    {
+                        "name":  "buttons state: every part, in any order and spacing, the rest kept",
+                        "pass":  true,
+                        "detail":  "got [[1],[\"FY = 2025\"]] want [[1],[\"FY = 2025\"]]"
+                    },
+                    {
+                        "name":  "buttons state: half a button is typed text",
+                        "pass":  true,
+                        "detail":  "got [{},[\"COLLEGE = Eng\"]] want [{},[\"COLLEGE = Eng\"]]"
+                    },
+                    {
+                        "name":  "buttons state: in a one group the button holding more parts is the pressed one; in an all group both are",
+                        "pass":  true,
+                        "detail":  "got [[1],[0,1]] want [[1],[0,1]]"
+                    },
+                    {
+                        "name":  "buttons compose: state(compose(x)) is a fixed point with patterns, a button and a typed condition",
+                        "pass":  true,
+                        "detail":  "got \"COLLEGE = /^(?:Eng)$|(?:^S)/ and AMOUNT \u003c 50 and STATUS = /^(?:Active)$/ and FY = 2025\" want \"COLLEGE = /^(?:Eng)$|(?:^S)/ and AMOUNT \u003c 50 and STATUS = /^(?:Active)$/ and FY = 2025\""
+                    },
+                    {
+                        "name":  "buttons toggle: a one group takes one button at a time, and a second press releases it",
+                        "pass":  true,
+                        "detail":  "got [true,\"[0]\",true,\"[1]\",false,\"[]\"] want [true,\"[0]\",true,\"[1]\",false,\"[]\"]"
+                    },
+                    {
+                        "name":  "buttons toggle: patterns join and leave the field\u0027s alternation",
+                        "pass":  true,
+                        "detail":  "got [true,true,\"[0,1]\",false,\"[1]\"] want [true,true,\"[0,1]\",false,\"[1]\"]"
+                    },
+                    {
+                        "name":  "buttons toggle: a pressed button takes its typed part out of the rest (written once)",
+                        "pass":  true,
+                        "detail":  "got \"AMOUNT \u003e= 250 and COLLEGE = Eng and FY = 2025\" want \"AMOUNT \u003e= 250 and COLLEGE = Eng and FY = 2025\""
+                    },
+                    {
+                        "name":  "buttons compose: a part two pressed buttons share is written once",
+                        "pass":  true,
+                        "detail":  "got \"STATUS = Active and AMOUNT \u003e 100\" want \"STATUS = Active and AMOUNT \u003e 100\""
+                    },
+                    {
+                        "name":  "buttons engine: a pattern matches what it says",
+                        "pass":  true,
+                        "detail":  "got [3,2] want [3,2]"
+                    },
+                    {
+                        "name":  "buttons engine: values and a pattern in one regex are any-of",
+                        "pass":  true,
+                        "detail":  "got 9 want 9"
+                    },
+                    {
+                        "name":  "buttons engine: an exclude field leaves out every pattern pressed (the blank row stays)",
+                        "pass":  true,
+                        "detail":  "got 8 want 8"
+                    },
+                    {
+                        "name":  "buttons engine: a button\u0027s parts all apply",
+                        "pass":  true,
+                        "detail":  "got 2 want 2"
+                    },
+                    {
+                        "name":  "buttons counts: each pattern and button counts the rows it keeps",
+                        "pass":  true,
+                        "detail":  "got [[[\"S colleges\",3,false],[\"Two letters\",2,false]],[[\"Small\",5,false],[\"Big\",4,false]]] want [[[\"S colleges\",3,false],[\"Two letters\",2,false]],[[\"Small\",5,false],[\"Big\",4,false]]]"
+                    },
+                    {
+                        "name":  "buttons counts: a button group has no value chips",
+                        "pass":  true,
+                        "detail":  "got [] want []"
+                    },
+                    {
+                        "name":  "buttons counts: another field narrows them",
+                        "pass":  true,
+                        "detail":  "got [[[\"S colleges\",2,false],[\"Two letters\",1,false]],[[\"Small\",4,false],[\"Big\",2,false]]] want [[[\"S colleges\",2,false],[\"Two letters\",1,false]],[[\"Small\",4,false],[\"Big\",2,false]]]"
+                    },
+                    {
+                        "name":  "buttons counts: a pressed pattern reads as on; its field\u0027s other chips are not narrowed by it",
+                        "pass":  true,
+                        "detail":  "got [[[\"S colleges\",3,true],[\"Two letters\",2,false]],[[\"Eng\",6,false],[\"Sci\",3,false]]] want [[[\"S colleges\",3,true],[\"Two letters\",2,false]],[[\"Eng\",6,false],[\"Sci\",3,false]]]"
+                    },
+                    {
+                        "name":  "buttons counts: a pressed pattern narrows the other fields\u0027 chips and buttons",
+                        "pass":  true,
+                        "detail":  "got [[[\"Active\",2,false],[\"Closed\",1,false],[\"Pending\",0,false]],[[\"Small\",1,false],[\"Big\",1,false]]] want [[[\"Active\",2,false],[\"Closed\",1,false],[\"Pending\",0,false]],[[\"Small\",1,false],[\"Big\",1,false]]]"
+                    },
+                    {
+                        "name":  "buttons counts: a pressed button reads as on and narrows the value chips",
+                        "pass":  true,
+                        "detail":  "got [[[\"Small\",5,true],[\"Big\",4,false]],[[\"Active\",4,false],[\"Closed\",0,false],[\"Pending\",1,false]]] want [[[\"Small\",5,true],[\"Big\",4,false]],[[\"Active\",4,false],[\"Closed\",0,false],[\"Pending\",1,false]]]"
+                    },
+                    {
+                        "name":  "buttons counts: in an all group a count adds to what is pressed",
+                        "pass":  true,
+                        "detail":  "got [[\"Active\",8,true],[\"Big\",2,false]] want [[\"Active\",8,true],[\"Big\",2,false]]"
+                    },
+                    {
+                        "name":  "buttons counts: an exclude field\u0027s pattern counts the rows WITH it",
+                        "pass":  true,
+                        "detail":  "got [[\"S\",3,false]] want [[\"S\",3,false]]"
+                    },
+                    {
+                        "name":  "buttons counts: only = no chip per value...",
+                        "pass":  true,
+                        "detail":  "got [] want []"
+                    },
+                    {
+                        "name":  "buttons counts: ... but a pressed value still shows, to be released",
+                        "pass":  true,
+                        "detail":  "got [[\"Eng\",6,true]] want [[\"Eng\",6,true]]"
+                    },
+                    {
+                        "name":  "buttons render: the pattern chip comes first in its field, with its count",
+                        "pass":  true,
+                        "detail":  "\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName176\" title=\"COLLEGE\"\u003eCollege\u003c/span\u003e\u003cspan class=\"pnb-fs-chips\"\u003e\u003cbutton type=\"button\" class=\"pnb-fs-chip pnb-fs-pat\" aria-pressed=\"false\" data-fs-pat=\"^S\" title=\"COLLEGE matches /^S/\"\u003e\u003cspan class=\"pnb-fs-v\"\u003eS colleges\u003c/span\u003e\u003cspan class=\"pnb-fs-n\"\u003e3\u003c/span\u003e\u003c/button"
+                    },
+                    {
+                        "name":  "buttons render: a button group, named, keyed, its buttons carrying their conditions",
+                        "pass":  true,
+                        "detail":  "\u003cdiv class=\"pnb-fs-group pnb-fs-btns\" role=\"group\" aria-labelledby=\"pnbFsName177\" data-fs-col=\"*1\" data-fs-mode=\"in\" data-fs-btnmode=\"one\"\u003e\u003cspan class=\"pnb-fs-name\" id=\"pnbFsName177\"\u003eSize\u003c/span\u003e\u003cspan class=\"pnb-fs-chips\"\u003e\u003cbutton type=\"button\" class=\"pnb-fs-chip pnb-fs-btn\" aria-pressed=\"false\" data-fs-cond=\"AMOUNT \u0026lt; 50\" title=\"AMOUNT \u0026lt; 50\"\u003e\u003cspan class=\"pnb-fs-v\"\u003eSmall\u003c/span\u003e\u003cspan class=\"pnb-"
+                    },
+                    {
+                        "name":  "buttons render: not refused as a missing column",
+                        "pass":  true,
+                        "detail":  "CollegeS colleges3Eng6Sci3Ag2CHASS1SizeSmall5Big4"
+                    },
+                    {
+                        "name":  "buttons click: a pattern writes its regex",
+                        "pass":  true,
+                        "detail":  "got \"COLLEGE = /(?:^S)/\" want \"COLLEGE = /(?:^S)/\""
+                    },
+                    {
+                        "name":  "buttons click: ... and reads as pressed after the redraw",
+                        "pass":  true,
+                        "detail":  "true"
+                    },
+                    {
+                        "name":  "buttons click: a value joins the same regex, first",
+                        "pass":  true,
+                        "detail":  "got \"COLLEGE = /^(?:Eng)$|(?:^S)/\" want \"COLLEGE = /^(?:Eng)$|(?:^S)/\""
+                    },
+                    {
+                        "name":  "buttons click: a button adds its condition with and",
+                        "pass":  true,
+                        "detail":  "got \"COLLEGE = /^(?:Eng)$|(?:^S)/ and AMOUNT \u003c 50\" want \"COLLEGE = /^(?:Eng)$|(?:^S)/ and AMOUNT \u003c 50\""
+                    },
+                    {
+                        "name":  "buttons click: the redrawn button counts follow the selection",
+                        "pass":  true,
+                        "detail":  "got [\"2\",\"4\"] want [\"2\",\"4\"]"
+                    },
+                    {
+                        "name":  "buttons click: in a one group the other button releases at once",
+                        "pass":  true,
+                        "detail":  "false true"
+                    },
+                    {
+                        "name":  "buttons click: ... and its condition replaces the other one",
+                        "pass":  true,
+                        "detail":  "got \"COLLEGE = /^(?:Eng)$|(?:^S)/ and AMOUNT \u003e= 250\" want \"COLLEGE = /^(?:Eng)$|(?:^S)/ and AMOUNT \u003e= 250\""
+                    },
+                    {
+                        "name":  "buttons click: a pressed button releases",
+                        "pass":  true,
+                        "detail":  "got \"COLLEGE = /^(?:Eng)$|(?:^S)/\" want \"COLLEGE = /^(?:Eng)$|(?:^S)/\""
+                    },
+                    {
+                        "name":  "buttons click: releasing the pattern leaves the value chip\u0027s own shape",
+                        "pass":  true,
+                        "detail":  "got \"COLLEGE = /^(?:Eng)$/\" want \"COLLEGE = /^(?:Eng)$/\""
+                    },
+                    {
+                        "name":  "buttons click: the group clear releases its button only",
+                        "pass":  true,
+                        "detail":  "got \"COLLEGE = /^(?:Eng)$/\" want \"COLLEGE = /^(?:Eng)$/\""
+                    },
+                    {
+                        "name":  "buttons click: a typed condition survives a button click",
+                        "pass":  true,
+                        "detail":  "got \"AMOUNT \u003c 50 and FY = 2025\" want \"AMOUNT \u003c 50 and FY = 2025\""
+                    },
+                    {
+                        "name":  "buttons click: Clear all releases patterns and buttons and keeps the typed condition",
+                        "pass":  true,
+                        "detail":  "got \"FY = 2025\" want \"FY = 2025\""
+                    },
+                    {
+                        "name":  "buttons sync: a hand-typed condition presses its button and its pattern",
+                        "pass":  true,
+                        "detail":  "true false true"
+                    },
+                    {
+                        "name":  "buttons sync: an or no longer pauses the buttons and patterns (the strip wraps it in parentheses)",
+                        "pass":  true,
+                        "detail":  "0 0"
+                    },
+                    {
+                        "name":  "buttons click: a part typed by hand is written once when the button is pressed",
+                        "pass":  true,
+                        "detail":  "got \"AMOUNT \u003e= 250 and COLLEGE = Eng\" want \"AMOUNT \u003e= 250 and COLLEGE = Eng\""
+                    },
+                    {
+                        "name":  "buttons all: each button adds its condition",
+                        "pass":  true,
+                        "detail":  "got \"STATUS = Active and AMOUNT \u003e= 250\" want \"STATUS = Active and AMOUNT \u003e= 250\""
+                    },
+                    {
+                        "name":  "buttons all: releasing one keeps the other",
+                        "pass":  true,
+                        "detail":  "got \"AMOUNT \u003e= 250\" want \"AMOUNT \u003e= 250\""
+                    },
+                    {
+                        "name":  "buttons exclude: a pattern on an exclude field writes !=",
+                        "pass":  true,
+                        "detail":  "got \"COLLEGE != /(?:^S)/\" want \"COLLEGE != /(?:^S)/\""
+                    },
+                    {
+                        "name":  "buttons fold: patterns never fold, top=N counts the values (+3 more)",
+                        "pass":  true,
+                        "detail":  "got [2,1,\"+3 more\"] want [2,1,\"+3 more\"]"
+                    },
+                    {
+                        "name":  "buttons fold: +n more opens the values in place, patterns still shown",
+                        "pass":  true,
+                        "detail":  "got [2,4] want [2,4]"
+                    },
+                    {
+                        "name":  "buttons fold: less folds the values again, not the patterns",
+                        "pass":  true,
+                        "detail":  "got [2,1,\"+3 more\"] want [2,1,\"+3 more\"]"
+                    },
+                    {
+                        "name":  "buttons only: the field shows its patterns alone",
+                        "pass":  true,
+                        "detail":  "got [1,0] want [1,0]"
+                    },
+                    {
+                        "name":  "buttons refuse: a button naming a column the report lacks",
+                        "pass":  true,
+                        "detail":  "[filter_strip: a button names NOPE, which is not in this report]"
+                    },
+                    {
+                        "name":  "buttons render: a quoted column in a button is a column of the report",
+                        "pass":  true,
+                        "detail":  "SizePct9 n=9"
+                    },
+                    {
+                        "name":  "buttons nested: the first pattern pressed on two fields from one sub-table writes __ROW",
+                        "pass":  true,
+                        "detail":  "got \"__ROW ROLE = /(?:^P)/\" want \"__ROW ROLE = /(?:^P)/\""
                     }
                 ]
 }

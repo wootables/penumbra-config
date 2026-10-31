@@ -513,6 +513,14 @@
         if (sp && !sp.error && sp.mods.indexOf('anyrow') !== -1) {
             return { error: 'anyrow works in a report\'s filter_strip(), not on a dashboard Controls tile' };
         }
+        // And buttons (2026-10-30, fsbuttons): this tile counts and draws only value chips so far.
+        if (sp && !sp.error && sp.fields.some(function (f) { return f.buttons || (f.pats && f.pats.length); })) {
+            return { error: 'buttons (+Label|...) work in a report\'s filter_strip(), not on a dashboard Controls tile' };
+        }
+        // And shift (2026-10-30, fsshift): this tile's clicks always combine.
+        if (sp && !sp.error && sp.mods.indexOf('shift') !== -1) {
+            return { error: 'shift works in a report\'s filter_strip(), not on a dashboard Controls tile' };
+        }
         return sp;
     }
     // A range field's kind and hints (2026-09-30) come from the values the

@@ -43,6 +43,12 @@
 #     per row; two or more fields from one sub-table write __ROW with the first value pressed and
 #     take it off with the last (read back between, so a hand delete stays); counts held to one
 #     sub-row under __ROW; anyrow; a lone nested field writes none; range / split refused
+#   - (2026-10-30) buttons (section P): '+Label|/regex/' under a column field = a pattern chip
+#     OR'd with its value chips in ONE regex (only = the patterns alone); 'Label|*' + '+Label|COND'
+#     = a button group (one = pick one, all = each adds its own). Parsing and every refusal, the
+#     read-back (known patterns only, a button by every part in any order), compose as a fixed
+#     point, each chip's count as its own query, render, clicks, sync, fold, nested __ROW; the
+#     regexes also ride the corpus through penumbra_search.php (section J)
 # Since 2026-09-29 the strip's grammar lives in js/penumbra_tiles.js
 # (PenumbraTiles.strip, shared with the dashboard); main.js keeps the _pnbFs*
 # names as delegates, so the hooks below still reach the real code.
@@ -162,6 +168,9 @@ if (-not $src.Substring(0, 200).Contains($anchor)) { throw "main.js closure anch
 # pass.
 $mutants = @{
   'fsorblind'   = @('if (low === ''or'') { out.or = true; }', 'if (low === ''or'') { out.or = false; }', 'tiles')
+  # parentheses (2026-10-30): the or box is not wrapped (a chip would bind to one branch); a group is not one part
+  'fswrapblind' = @('if (!sp.or) { return sp; }', 'return sp;', 'tiles')
+  'fsparenflat' = @('depth += (tok === ''('') ? 1 : -1;', 'depth = 0;', 'tiles')
   'fsnoescape'  = @('function fsEncode(v) { return String(v).replace(/[.*+?^${}()|[\]\\]/g, ''\\$&'').replace(/\//g, ''\\x2F''); }', 'function fsEncode(v) { return String(v).replace(/\//g, ''\\x2F''); }', 'tiles')
   'fsrestdrop'  = @('(st.rest || []).forEach(function (r) { if (r) parts.push(r); });', '/* mutant: rest dropped */', 'tiles')
   'fsselfcount' = @('if (gc !== col && st.sel[gc] && st.sel[gc].length) { others.sel[gc] = st.sel[gc]; anyOther = true; }', 'if (st.sel[gc] && st.sel[gc].length) { others.sel[gc] = st.sel[gc]; anyOther = true; }', 'main')
@@ -229,6 +238,35 @@ $mutants = @{
   'nestsingle'     = @('if (src[c] && n[src[c]] > 1) out[c] = true;', 'if (src[c]) out[c] = true;', 'main')
   'nolabel'        = @('if (!label) label = bits[1];', '/* mutant: no label stays empty */', 'tiles')
   'nestrefuse'     = @('return (f.range || f.split) && _pnbFsNestedSrc()[f.col]; });', 'return false; });', 'main')
+  # section P (2026-10-30): buttons - patterns and Label|* groups
+  'btnparse'       = @('if (raw.charAt(0) === ''+'') {', 'if (false) {', 'tiles')
+  'patread'        = @('? fsPatBody(body, iff.pats) : null;', '? null : null;', 'tiles')
+  'patcompose'     = @('if (f.pats && pon.length) { parts.push(fsPatCond(col, f, st.sel[col], pon)); return; }', '/* mutant: patterns not written */', 'tiles')
+  'patvals'        = @('if (vals && vals.length) alts.push(''^(?:'' + vals.map(fsEncode).join(''|'') + '')$'');', '/* mutant: values dropped beside a pattern */', 'tiles')
+  'btnclaim'       = @('fsClaimButtons(st, fields);', '/* mutant: buttons never read back */', 'tiles')
+  'btnsubset'      = @('if (f.btn !== ''all'') {', 'if (false) {', 'tiles')
+  'btnone'         = @('else st[kind][col] = (kind === ''btn'' && f.btn !== ''all'') ? [k] : cur.concat([k]);', 'else st[kind][col] = cur.concat([k]);', 'tiles')
+  'btnrest'        = @('st.rest = (st.rest || []).filter(function (r) { return drop.indexOf(condKey(r)) === -1; });', '/* mutant: the parts stay in the rest */', 'tiles')
+  'btndedupe'      = @('if (!bseen[pk]) { bseen[pk] = true; parts.push(p); }', 'parts.push(p);', 'tiles')
+  'btnconflict'    = @('if (!claim.rest.length && by) {', 'if (false) {', 'tiles')
+  'patslash'       = @('if (body.indexOf(''/'') !== -1) return', 'if (false) return', 'tiles')
+  'patbackref'     = @('if (/[1-9]/.test(body.charAt(i + 1))) return', 'if (false) return', 'tiles')
+  'patlist'        = @('if (host.list) return { error:', 'if (false) return { error:', 'tiles')
+  'patcount'       = @('else { c.sel[col] = []; c.pat[col] = [k]; }', 'else { c.pat[col] = fsOn(st, ''pat'', col).concat([k]); }', 'tiles')
+  'btncountall'    = @('c.btn[col] = f.btn === ''all'' ? fsOn(st, ''btn'', col).filter(function (x) { return x !== k; }).concat([k]) : [k];', 'c.btn[col] = [k];', 'tiles')
+  'authrender'     = @('(grp.pats || []).forEach(function (e) { html += fsAuthoredChip(''pat'', e, g.off, counts); });', '/* mutant: patterns not drawn */', 'tiles')
+  'authothers'     = @('if (_pnbFsLib().authoredOthers(others, st, fields, col)) anyOther = true;', '/* mutant: value chips ignore patterns and buttons */', 'main')
+  'patexin'        = @('var inF = cfields.map(function (g) { return String(g.col).toUpperCase() === col ? $.extend({}, g, { mode: ''in'' }) : g; });', 'var inF = cfields;', 'main')
+  'authdom'        = @('return $.extend(_pnbFsLib().authoredFromDom(this), {', 'return $.extend({}, {', 'main')
+  'authsync'       = @('$(this).find(''.pnb-fs-pat'').each(function (k) { $(this).attr(''aria-pressed'', gPat.indexOf(k) !== -1 ? ''true'' : ''false''); });', '/* mutant: a typed pattern presses nothing */', 'main')
+  'authclick'      = @('if ($(this).is(''.pnb-fs-pat, .pnb-fs-btn'')) {', 'if (false) {', 'main')
+  'authfold'       = @('$grp.find(''.pnb-fs-chip:not(.pnb-fs-pat)'').each(function (i) {', '$grp.find(''.pnb-fs-chip'').each(function (i) {', 'main')
+  'authclear'      = @(' st.pat[cc] = []; st.btn[cc] = [];', '', 'main')
+  'authoneoff'     = @('if (af.buttons && af.btn !== ''all'') $ag.find(''.pnb-fs-btn'').not(aChip).attr(''aria-pressed'', ''false'');', '/* mutant: the other button waits for the redraw */', 'main')
+  'btnmissing'     = @('return !f.buttons && fsCols.indexOf(f.col) === -1;', 'return fsCols.indexOf(f.col) === -1;', 'main')
+  'btncols'        = @('if (fsBtnBad.length && (masterRowData.length || fsCols.length > 1)) {', 'if (false) {', 'main')
+  'onlyfilter'     = @('if (f.only) list = list.filter(function (e3) { return e3.on || (f.blank && e3.v === ''''); });', '/* mutant: only ignored */', 'main')
+  'rowpat'         = @('+ _pnbFsLib().on(s, ''pat'', c).length', '+ 0', 'main')
 }
 if ($Mutant) {
   if (-not $mutants.ContainsKey($Mutant)) { throw "unknown mutant '$Mutant' (known: $(($mutants.Keys | Sort-Object) -join ', '))" }

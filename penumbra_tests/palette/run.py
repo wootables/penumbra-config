@@ -704,6 +704,15 @@ QS_EPA_FIXTURE = json.dumps({"status": "success", "data": [dict(zip(("ID", "SHOR
     (906, "cdawd", "Awards by Department and College Over the Past 5 Fiscal Years-to-Date", "ownerx", "2026-10-05 20:55:11"),
     (907, "hitratio", "Proposal Hit Ratio by College, Department and PI", "ownerx", "2026-10-05 11:21:24"),
     (908, "award_compare_monthdeptprimespon", "Compare month to month, year to year, awards by sponsor and department.", "ownerx", "2026-08-20 16:26:14"))]})
+# (2026-10-30, selflt) the selected cell one of several selected: the header menu's Filter to / Exclude the selected values and
+# Copy the selected cells as rows, named by the selection, the cell's own gone; the picked row filters by every value
+CHK['prow'] = CHK['prow'] + ['rowSel', 'rowSelRuns']
+NEW_SEL = {'L-prow-rowSel', 'L-prow-rowSelRuns', 'S-selRowHelp'}
+NEW = NEW | NEW_SEL
+NEW = NEW - NEW_SEL   # (selflt is LIVE since e3ef480, 2026-10-30: old checks now)
+MUTANTS['sl-palrows'] = ([('pal', "            if (['selFilter', 'selExclude', 'selCopy'].indexOf(it.act) >= 0 && !it.disabled) {", "            if (false) {")], ['L-prow-rowSel', 'L-prow-rowSelRuns'], ['prow'])
+MUTANTS['sl-palsub'] = ([('pal', "sub: 'the ' + nSel + ' selected cells',", "sub: where,")], ['L-prow-rowSel'], ['prow'])
+
 args = sys.argv[1:]
 def opt(name, default=None):
     if name in args:
@@ -739,6 +748,8 @@ RELS = {'main': os.path.join('js', 'main.js'), 'mod': os.path.join('js', 'penumb
         'aia': 'ai_assist.php',   # (round 18a) the proxy's time budget
         'journal': os.path.join('js', 'penumbra_journal.js'),   # (round 21) the journal's compose
         'chrome2': 'penumbra_admin_chrome.php'}   # (round 23) the inventory reads the chrome's markup too
+# (2026-10-30, selflt) cell selection under test too (its cells(): the selection's rows): the stage's, over LIBS's live copy
+RELS.update({'csel': os.path.join('js', 'penumbra_cellsel.js')})
 sys.path.insert(0, HERE)
 import mk_harness, mk_dash_harness, mk_adm_harness
 cand = {k: pick(v) for k, v in RELS.items()}
@@ -870,6 +881,8 @@ ENTRY_SKIP_RULES = [
     (r'^(sbColsPop|sbCustomCols|sbFrozen|sbGroup$|sbGroupPop|sbGroupPresetList|sbGroupSharedList|sbGrp|sbPivot$|sbPivotPop|sbPivotPresetList|sbPivotSharedList|sbPivotOpenBuilder|sbSnap|sbSnapshot|sbRf|sbTableHidden|sbAsOf$|sbAsOfHistory|sbColsSeg|sbColsOpen|sbColsSettings)', 'a status-bar indicator or its popover\'s own buttons (the state they show has its row: Group, Pivot, Snapshots, Freeze, Version history, Settings)'),
     (r'^(sbPaletteBtn|searchPaletteIcon)$', 'the box itself'),
     (r'^pnbCardsSortDir$', 'the cards\' Sort list arrow (Sort ascending... / Sort descending... are rows)'),   # (2026-10-30, csort)
+    (r'^(sbCardsOpen|sbCardsConfig)$', 'the status bar\'s Cards card and its Configure cards... (Show as cards / as a table, Card size and Configure cards... are rows)'),   # (2026-10-30, cards round O)
+    (r'^sbColsViewSwitch$', 'the Cols card\'s Layout line: Switch to cards layout / table layout (Show as cards and Show as a table are rows)'),   # (2026-10-30, cards round P)
     (r'^(copyViewLinkBtn|emailCopyViewLink)$', 'Copy a link to this view (a row, through PenumbraViewLink.copy; the Email dialog\'s Copy link is the same)'),
     (r'^(scrollTopBtn|scrollBottomBtn)$', 'Scroll to the top / bottom (rows, through scrollEdge)'),
     (r'^searchHelpIcon$', 'the Help Center (a row)'),
@@ -936,6 +949,7 @@ def write_stage(texts):
     w('penumbra_colmenu.js', texts['menu'])
     w('penumbra_colmenu.css', texts['mcss'])
     w('main.css', texts['css'])
+    w('penumbra_cellsel.js', texts['csel'])   # (2026-10-30, selflt)
     w('penumbra_palette_boot.js', texts['stub'])
     w('penumbra_palette.js', texts['pal'])
     w('penumbra_palette.css', texts['pcss'])
@@ -1339,6 +1353,12 @@ SHOT7 = {'pshot7f': os.environ.get('PNB_SHOT7F') or os.path.join(tempfile.gettem
          'pshot21': os.environ.get('PNB_SHOT21') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shot21.png')}   # (round 21) an email row first
 
 SHOT7['pshotjb'] = os.environ.get('PNB_SHOTJB') or os.path.join(tempfile.gettempdir(), 'pnb_palette_shotjb.png')   # (jarbusy) the busy card
+# (2026-10-30, selflt) the rows' help line names the selection's rows (the line S-copyRowHelp pins kept as it was)
+_static_checks_before_sel = static_checks
+def static_checks(texts):
+    return _static_checks_before_sel(texts) + [
+        ('S-selRowHelp', 'In a selection of several cells: Filter to the selected values, Exclude the selected values, Copy the selected cells.' in texts['topic'] and chr(0x2014) not in texts['topic'], ''),
+    ]
 def run_browser(scns):
     out = []
     for s in scns:
