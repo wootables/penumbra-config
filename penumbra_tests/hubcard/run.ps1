@@ -64,7 +64,7 @@
 # UNC .ps1 files are GPO-blocked here - run the body as a scriptblock:
 #   $sb = [scriptblock]::Create([IO.File]::ReadAllText('\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\hubcard\run.ps1')); & $sb
 # =============================================================================
-param([switch]$Control, [switch]$Mutant, [switch]$Mutant2, [switch]$Mutant3, [switch]$Mutant4, [switch]$Mutant5, [switch]$Mutant6, [switch]$Mutant7, [switch]$Mutant8, [string]$Html, [string]$App)
+param([switch]$Control, [switch]$Mutant, [switch]$Mutant2, [switch]$Mutant3, [switch]$Mutant4, [switch]$Mutant5, [switch]$Mutant6, [switch]$Mutant7, [switch]$Mutant8, [switch]$Mutant9, [string]$Html, [string]$App)
 
 $ErrorActionPreference = 'Stop'
 $here = if ($PSScriptRoot) { $PSScriptRoot } else { '\\oitras\d$\Utilities\PHP_8.2-p\penumbra_tests\hubcard' }
@@ -82,6 +82,7 @@ if ($Mutant5) { $args += '--mutant5' }
 if ($Mutant6) { $args += '--mutant6' }
 if ($Mutant7) { $args += '--mutant7' }
 if ($Mutant8) { $args += '--mutant8' }
+if ($Mutant9) { $args += '--mutant9' }
 if ($Html)    { $args += "--html=$Html" }
 
 & $php @args

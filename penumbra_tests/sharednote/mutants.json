@@ -1,0 +1,473 @@
+{
+ "nobase": {
+  "edits": [
+   [
+    "                body = { action: 'edit', note_id: box._snId, note_text: text, base_text: base, mentions: mentions };",
+    "                body = { action: 'edit', note_id: box._snId, note_text: text, mentions: mentions };"
+   ]
+  ],
+  "must": [
+   "K-post",
+   "K-after",
+   "K-cell",
+   "F-word",
+   "F-again",
+   "R-post",
+   "R-after"
+  ],
+  "scn": [
+   "card",
+   "conflict",
+   "clear"
+  ]
+ },
+ "render": {
+  "edits": [
+   [
+    "            if (sharedOn() && kind !== 'pivot' && kind !== 'chart') return sharedViewHtml(rowKey);   // (sharednote) the one note\n",
+    ""
+   ]
+  ],
+  "must": [
+   "K-after",
+   "K-cell",
+   "E-card",
+   "F-theirs",
+   "F-again",
+   "E-conflict"
+  ],
+  "scn": [
+   "card",
+   "conflict",
+   "inline"
+  ]
+ },
+ "flat": {
+  "edits": [
+   [
+    "            if (sharedOn()) { var sn = sharedNoteIn(notes); return sn ? String(sn.NOTE_TEXT == null ? '' : sn.NOTE_TEXT).replace(/\\r\\n|\\r/g, '\\n').replace(/^[ \\t\\n]+|[ \\t\\n]+$/g, '') : ''; }\n",
+    ""
+   ]
+  ],
+  "must": [
+   "X-text",
+   "X-csv",
+   "X-parity",
+   "X-search"
+  ],
+  "scn": [
+   "export"
+  ]
+ },
+ "preview": {
+  "edits": [
+   [
+    "            if (sharedOn()) t = t.trim().replace(/\\s*[\\r\\n]+\\s*/g, ' · ');   // (sharednote) its lines apart on the one line\n",
+    ""
+   ]
+  ],
+  "must": [
+   "L-preview",
+   "L-tip",
+   "K-cell",
+   "N-cell"
+  ],
+  "scn": [
+   "cell",
+   "card",
+   "blank"
+  ]
+ },
+ "count": {
+  "edits": [
+   [
+    "(n && !shared ? n : '')",
+    "(n ? n : '')"
+   ]
+  ],
+  "must": [
+   "L-nocount",
+   "T-live"
+  ],
+  "scn": [
+   "cell",
+   "setup"
+  ]
+ },
+ "conflict": {
+  "edits": [
+   [
+    "                    box._snBase = cur ? String(cur.NOTE_TEXT == null ? '' : cur.NOTE_TEXT) : null;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "F-again"
+  ],
+  "scn": [
+   "conflict"
+  ]
+ },
+ "esc": {
+  "edits": [
+   [
+    "            if (sharedEscape()) return true;   // (sharednote) an edit open in the box: cancelled\n",
+    ""
+   ]
+  ],
+  "must": [
+   "K-esc",
+   "K-esc-focus"
+  ],
+  "scn": [
+   "cancel"
+  ]
+ },
+ "savemode": {
+  "edits": [
+   [
+    "            if (window._penumbraJournalNotesMode === 'shared') viewOptions.journalNotesMode = 'shared';\n",
+    ""
+   ]
+  ],
+  "must": [
+   "T-on"
+  ],
+  "scn": [
+   "setup"
+  ]
+ },
+ "restoremode": {
+  "edits": [
+   [
+    "                window._penumbraJournalNotesMode = _jvo.journalNotesMode === 'shared' ? 'shared' : '';   // a Shared note (2026-11-01)\n",
+    ""
+   ]
+  ],
+  "must": [
+   "L-preview",
+   "L-nocount",
+   "L-tip",
+   "L-empty",
+   "K-view",
+   "K-meta",
+   "K-editbtn",
+   "K-box",
+   "K-post",
+   "K-after",
+   "K-cell",
+   "E-card",
+   "K-esc",
+   "K-esc-focus",
+   "K-draft",
+   "K-cancel",
+   "E-cancel",
+   "N-open",
+   "N-post",
+   "N-cell",
+   "E-blank",
+   "M-field",
+   "M-post",
+   "M-view",
+   "M-clock",
+   "E-mention",
+   "G-row",
+   "G-staged",
+   "G-unpick",
+   "G-post",
+   "G-set",
+   "G-cell",
+   "G-remove",
+   "E-files",
+   "H-first",
+   "H-set",
+   "H-cell",
+   "E-filesonly",
+   "G-paste",
+   "G-drop",
+   "G-fail",
+   "E-paste",
+   "S-standard",
+   "S-compact",
+   "S-large",
+   "S-compose",
+   "S-dblclick",
+   "E-smallcard",
+   "F-word",
+   "F-theirs",
+   "F-again",
+   "E-conflict",
+   "R-post",
+   "R-after",
+   "E-clear",
+   "X-text",
+   "X-csv",
+   "X-parity",
+   "X-search",
+   "T-restore",
+   "I-html",
+   "I-compose",
+   "I-draft",
+   "I-escape",
+   "E-inline"
+  ],
+  "scn": null
+ },
+ "draft": {
+  "edits": [
+   [
+    "            if (keep && ta && (snText(ta) !== (box._snBase || '').replace(/\\s+$/, '') || (box._snFiles && box._snFiles.length))) _snDrafts[snDraftKey(key)] = { html: ta.innerHTML, base: box._snBase, id: box._snId, files: (box._snFiles || []).slice() };\n",
+    ""
+   ]
+  ],
+  "must": [
+   "K-draft",
+   "K-cancel",
+   "E-cancel",
+   "I-draft"
+  ],
+  "scn": [
+   "cancel",
+   "inline"
+  ]
+ },
+ "mentionfield": {
+  "edits": [
+   [
+    "                if (window.Penumbra.mentionField) {\n                    ta._mentionMf = window.Penumbra.mentionField(ta, {",
+    "                if (false) {\n                    ta._mentionMf = window.Penumbra.mentionField(ta, {"
+   ]
+  ],
+  "must": [
+   "M-field",
+   "M-post",
+   "M-view"
+  ],
+  "scn": [
+   "mention"
+  ]
+ },
+ "clock": {
+  "edits": [
+   [
+    "                    var when = (cur && window.moment && moment(cur.CREATED_AT, 'YYYY-MM-DD HH:mm:ss').isAfter(moment())) ? 'just now' : fmtWhen(cur && cur.CREATED_AT);",
+    "                    var when = fmtWhen(cur && cur.CREATED_AT);"
+   ]
+  ],
+  "must": [
+   "M-clock"
+  ],
+  "scn": [
+   "mention"
+  ]
+ },
+ "blankopen": {
+  "edits": [
+   [
+    "                if (!sharedNoteOf(key) || _snDrafts[snDraftKey(key)]) sharedOpen(_snBox);",
+    "                if (_snDrafts[snDraftKey(key)]) sharedOpen(_snBox);"
+   ]
+  ],
+  "must": [
+   "N-open",
+   "N-post",
+   "N-cell",
+   "E-blank"
+  ],
+  "scn": [
+   "blank",
+   "card"
+  ]
+ },
+ "compose": {
+  "edits": [
+   [
+    "                if (panel && panel.classList.contains('pnb-sharednote')) return !!sharedOpen(sharedEditWhere(panel), text || '');   // (sharednote; sharedcard: a small card's in its details)\n",
+    ""
+   ]
+  ],
+  "must": [
+   "I-compose",
+   "I-draft"
+  ],
+  "scn": [
+   "inline"
+  ]
+ },
+ "smallcard": {
+  "edits": [
+   [
+    "            if (!/^(compact|standard)$/.test(String(C.size() || 'standard'))) return box;",
+    "            if (!/^$/.test(String(C.size() || 'standard'))) return box;"
+   ]
+  ],
+  "must": [
+   "S-standard",
+   "S-compact",
+   "S-compose",
+   "S-dblclick"
+  ],
+  "scn": [
+   "smallcard"
+  ]
+ },
+ "needsnotes": {
+  "edits": [
+   [
+    "$('#journalNotesModeShared').prop('checked', window._penumbraJournalNotesMode === 'shared').prop('disabled', !window._penumbraJournalRowNotes);",
+    "$('#journalNotesModeShared').prop('checked', window._penumbraJournalNotesMode === 'shared').prop('disabled', false);"
+   ]
+  ],
+  "must": [
+   "T-needs-notes"
+  ],
+  "scn": [
+   "setup"
+  ]
+ },
+ "filesdrop": {
+  "edits": [
+   [
+    "            if (zone.input && zone.input.classList.contains('pnb-sharednote-files')) { sharedAddFiles(sharedBox(zone.input), files); return; }\n",
+    ""
+   ]
+  ],
+  "must": [
+   "G-drop",
+   "G-fail"
+  ],
+  "scn": [
+   "paste"
+  ]
+ },
+ "pastewrap": {
+  "edits": [
+   [
+    "            if (!$wrap.length) $wrap = $(noteEl).closest('.pnb-sharednote-edit');   // (sharedfiles) a Shared note's box\n",
+    ""
+   ]
+  ],
+  "must": [
+   "G-paste",
+   "G-drop"
+  ],
+  "scn": [
+   "paste"
+  ]
+ },
+ "replyparent": {
+  "edits": [
+   [
+    "            if (rootId) fd.append('parent_id', rootId);\n",
+    ""
+   ]
+  ],
+  "must": [
+   "G-post",
+   "G-set",
+   "G-cell",
+   "G-remove",
+   "E-files",
+   "H-first",
+   "H-set"
+  ],
+  "scn": [
+   "files",
+   "filesonly"
+  ]
+ },
+ "firstfile": {
+  "edits": [
+   [
+    "                            root = (resp.attachment && resp.attachment.note_id) ? String(resp.attachment.note_id) : null;\n",
+    ""
+   ]
+  ],
+  "must": [
+   "H-first"
+  ],
+  "scn": [
+   "filesonly"
+  ]
+ },
+ "filesset": {
+  "edits": [
+   [
+    "                + sharedFilesHtml(rowKey, n)\n",
+    ""
+   ]
+  ],
+  "must": [
+   "G-set",
+   "G-remove",
+   "E-files",
+   "H-set"
+  ],
+  "scn": [
+   "files",
+   "filesonly"
+  ]
+ },
+ "cardgrid": {
+  "edits": [
+   [
+    ".journal-rownote-inline .journal-rownote-compose-actions { display: contents; }",
+    ".journal-rownote-inline .journal-rownote-compose-actions { display: flex; }",
+    "cardscss"
+   ]
+  ],
+  "must": [
+   "C-layout-card"
+  ],
+  "scn": [
+   "layout"
+  ]
+ },
+ "sharedrow": {
+  "edits": [
+   [
+    ".pnb-sharednote-row { display: flex; align-items: flex-end; gap: 8px; }",
+    ".pnb-sharednote-row { display: block; }",
+    "css"
+   ]
+  ],
+  "must": [
+   "G-row",
+   "G-layout-card"
+  ],
+  "scn": [
+   "files",
+   "layout"
+  ]
+ },
+ "cfb8-medium": {
+  "edits": [
+   [
+    "#pnbCardsHost:not(.is-large):not(.is-xl) .journal-rownote-inline .journal-rownote-input { grid-row: 2; grid-column: 1 / -1; }",
+    "",
+    "cardscss"
+   ]
+  ],
+  "must": [
+   "C-layout-medium"
+  ],
+  "scn": [
+   "layout"
+  ]
+ },
+ "cfb8-mediumsn": {
+  "edits": [
+   [
+    "#pnbCardsHost:not(.is-large):not(.is-xl) .pnb-sharednote-row { flex-direction: column; align-items: stretch; }",
+    "",
+    "cardscss"
+   ]
+  ],
+  "must": [
+   "G-layout-medium"
+  ],
+  "scn": [
+   "layout"
+  ]
+ }
+}

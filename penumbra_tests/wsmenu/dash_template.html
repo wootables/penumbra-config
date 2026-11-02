@@ -1,0 +1,72 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Sponsor KPIs &middot; Penumbra Dashboards</title>
+<!-- wsmenu: a dashboard as dashboard.php draws one - penumbra_dash_vars (a top-level const), the header band with the
+     crumb, the title and js/penumbra_dashboard.js renderHead()'s buttons (ids, classes, aria-keyshortcuts, titles as it
+     writes them), a grid of tiles (a chart, a table), the list page (?list=1) and kiosk view (?kiosk=1); then the menu's
+     block as dashboard.php emits it: the tools registry for an admin, penumbra_userseg.js and its configure script
+     LIFTED from the dashboard.php under test (__CONFIGURE__), Quick actions' stub, the module. ?admin=0 = a viewer. -->
+<link rel="stylesheet" href="main.css">
+<link rel="stylesheet" href="penumbra_colmenu.css">
+<link rel="stylesheet" href="penumbra_wsmenu.css">
+<style>
+  .dash-head { display: flex; align-items: center; gap: 16px; padding: 12px 20px; }
+  .dash-head-actions { margin-left: auto; display: flex; gap: 8px; }
+  .dash-grid { display: grid; grid-template-columns: repeat(3, 300px); gap: 40px; padding: 20px; }
+  .dash-tile { height: 160px; border: 1px solid #ccc; }
+  .dash-home-item { padding: 10px; border: 1px solid #ccc; margin: 10px 20px; width: 500px; }
+  #dashGap { height: 220px; }
+</style>
+<script>
+  (function () { try { localStorage.clear(); } catch (e) { } })();
+  window.__Q = new URLSearchParams(location.search);
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.__clip = [];
+  try { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: function (t) { window.__clip.push(String(t)); return Promise.resolve(); } } }); } catch (e) { }
+</script>
+<script>
+const penumbra_dash_vars = { currentUserKey: 'harness', isAdmin: window.__Q.get('admin') !== '0', canCreate: true, canEdit: true, noadm: false,
+                             shortId: window.__Q.get('list') ? '' : 'kpis', found: !window.__Q.get('list') };
+</script>
+</head>
+<body class="dash-body">
+<script>if (window.__Q.get('kiosk')) { document.body.className += ' dash-kiosk'; }</script>
+<div id="dashApp" class="dash-app">
+  <header class="dash-head" id="dashHead">
+    <nav class="pnb-crumb" aria-label="Breadcrumb"><a href="index.php">Penumbra</a> &rsaquo; <span id="dashCrumb">Dashboards</span></nav>
+    <div class="dash-head-title" id="dashHeadTitle"></div>
+    <div class="dash-head-actions" id="dashHeadActions"></div>
+  </header>
+  <main id="dashMain" class="dash-main" tabindex="-1"></main>
+</div>
+<script>
+  (function () {
+    var V = penumbra_dash_vars, t = document.getElementById('dashHeadTitle'), a = document.getElementById('dashHeadActions'), m = document.getElementById('dashMain');
+    if (!V.shortId) {
+      t.innerHTML = '<h1>Your dashboards</h1>';
+      a.innerHTML = '<button type="button" class="dash-btn dash-btn-primary" id="dashCreateBtn">+ New dashboard</button>' +
+        '<button type="button" class="dash-btn dash-help-link" id="dashHelpBtn" title="Help for dashboards: tiles, address parameters, title tokens, keyboard, kiosk">? Help</button>';
+      m.innerHTML = '<div class="dash-home-item" id="dashRow1"><span class="dash-home-title">Sponsor KPIs</span> <a href="dashboard.php?id=kpis">open</a></div><div id="dashGap"></div>';
+      return;
+    }
+    t.innerHTML = '<h1>Sponsor KPIs</h1>';
+    a.innerHTML = '<button type="button" class="dash-btn" id="dashRefreshBtn" title="Re-fetch every tile (R)" aria-keyshortcuts="r">&#8635; Refresh</button>' +
+      '<a class="dash-btn" href="dashboard.php?id=kpis&amp;kiosk=1" title="Chrome-free wall-display view of this dashboard, auto-refreshing (K)" aria-keyshortcuts="k">&#9974;&#xFE0E; Kiosk</a>' +
+      '<button type="button" class="dash-btn" id="dashEditBtn" title="Rearrange, resize, add and edit tiles (E)" aria-keyshortcuts="e">&#9998; Edit</button>' +
+      '<button type="button" class="dash-btn dash-help-link" id="dashHelpBtn" aria-keyshortcuts="h" title="Help for dashboards: tiles, address parameters, title tokens, keyboard, kiosk (H)">? Help</button>';
+    m.innerHTML = '<div class="dash-grid" id="dashGrid">' +
+      '<div class="dash-tile" data-tile-id="t1" id="tile1"><div class="dash-tile-head"><span class="dash-tile-label">Awards</span></div><div class="dash-tile-body"><canvas width="200" height="80"></canvas></div></div>' +
+      '<div class="dash-tile" data-tile-id="t2" id="tile2"><div class="dash-tile-head"><span class="dash-tile-label">Proposals</span></div><div class="dash-tile-body"><table><tr><td id="tileCell">42</td></tr></table></div></div>' +
+      '<div class="dash-tile" data-tile-id="t3" id="tile3"><div class="dash-tile-head"><span class="dash-tile-label">Expiring</span></div><div class="dash-tile-body">7</div></div>' +
+      '</div><div id="dashGap"></div>';
+  })();
+</script>
+<script>if (window.__Q.get('admin') !== '0') { window.PENUMBRA_ADMIN_TOOLS = __TOOLS__; }</script>
+<script src="penumbra_userseg.js"></script>
+<script>
+__CONFIGURE__
+</script>
+<script src="penumbra_palette_boot.js" data-js="palette_fake.js" data-css=""></script>
+<script src="penumbra_wsmenu.js"></script>
+<script src="wsdriver.js"></script>
+</body></html>

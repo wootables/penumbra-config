@@ -1,0 +1,140 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="main.css"><link rel="stylesheet" href="penumbra_tiles.css"><link rel="stylesheet" href="penumbra_dashboard.css">
+</head><body class="pnb-dash theme-default">
+<!-- cdash harness (2026-11-01, the gap list's item 7): the REAL penumbra_dashboard.js + penumbra_tiles.js - an embed
+     tile's View (Table | Cards) and card size: the framed report's address, the open link, the tile editor (shown for
+     the whole report or the table alone, saved, re-edited), the infobox embed| grammar. ?scn=render|editor|infobox;
+     the result lands in window.__HCRESULT = {chk, info, errors}. -->
+<div id="dashApp" class="dash-app"><header class="dash-head" id="dashHead">
+  <div class="dash-head-title" id="dashHeadTitle"></div>
+  <div class="dash-head-actions" id="dashHeadActions"></div>
+</header><main id="dashMain"></main></div>
+<script src="jquery-3.7.1.min.js"></script>
+<script src="chart-4.5.1.min.js"></script>
+<script>
+var SCN = (location.search.match(/scn=(\w+)/) || [])[1] || 'render';
+var ERRORS = [], POSTS = [];
+window.onerror = function (m, src, line) { ERRORS.push('onerror: ' + m + ' @' + String(src).split('/').pop() + ':' + line); };
+history.replaceState = function () {};
+window.open = function () { return null; };
+$.getJSON = function () { var d = $.Deferred(); setTimeout(function () { d.resolve({ status: 'success', data: [] }); }, 5); return d.promise(); };
+$.ajax = function (o) {
+  var d = $.Deferred();
+  if (String(o.url).indexOf('action=save') > -1) { POSTS.push(JSON.parse(o.data)); setTimeout(function () { d.resolve({ status: 'success', message: 'Dashboard updated.', tags: [] }); }, 10); }
+  else { setTimeout(function () { d.resolve({ status: 'success', data: [] }); }, 5); }
+  return d.promise();
+};
+var TILES = [
+  { id: 'e1', type: 'embed', report: 'rep1', label: 'Cards large', show: 'both', view: 'cards', cardSize: 'large', w: 6, h: 4 },
+  { id: 'e2', type: 'embed', report: 'rep1', label: 'Table', show: 'both', view: 'table', w: 6, h: 4 },
+  { id: 'e3', type: 'embed', report: 'rep1', label: 'Old tile', show: 'both', w: 6, h: 4 },
+  { id: 'e4', type: 'embed', report: 'rep1', label: 'Header', show: 'header', view: 'cards', w: 6, h: 2 },
+  { id: 'e5', type: 'embed', report: 'rep1', label: 'Table only', show: 'table', view: 'cards', w: 6, h: 4 },
+  { id: 'n1', type: 'note', label: '', text: 'a note', w: 12, h: 1 }
+];
+const penumbra_dash_vars = {
+  currentUserKey: 'tester', isAdmin: true, canCreate: true, reportGrantPatterns: [],
+  shortId: 'demo', found: true, canEdit: true, noadm: false,
+  shibboleth: { name: 'Ada', fname: 'Ada' },
+  tagVocabulary: [], tagGrants: [], tagsReady: false,
+  meta: { short_id: 'demo', title: 'Demo', owner_id: 'tester', authorized: 'tester', updated_at: '2026-11-01 09:00', version: '2026-11-01 09:00:00.111111', tags: [] },
+  state: { version: 1, theme: 'theme-default', refreshSeconds: 0, tiles: TILES },
+  builderAssets: { css: [], js: [] },
+  themes: [{ id: 'theme-default', label: 'Default Light', isDark: false }], themeAliases: {}
+};
+</script>
+<script src="purify.min.js"></script><script src="penumbra_tiles.js"></script>
+<script src="dash_hc.js"></script>
+<script>
+(function () {
+  var chk = {}, info = {};
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function tileEl(id) { return document.querySelector('#dashMain .dash-tile[data-tile-id="' + id + '"]'); }
+  function src(id) { var t = tileEl(id), f = t && t.querySelector('iframe.dash-embed'); return f ? f.getAttribute('src') : null; }
+  function openHref(id) { var t = tileEl(id), a = t && t.querySelector('a.dash-tile-open'); return a ? a.getAttribute('href') : null; }
+  function visible(sel) { var e = document.querySelector(sel); return !!e && e.offsetParent !== null && getComputedStyle(e).display !== 'none'; }
+  async function save() {
+    var n = POSTS.length;
+    if (!$('#dashSaveBtn').length) { $('#dashHeadActions').append('<button type="button" id="dashSaveBtn">Save</button>'); }
+    $('#dashSaveBtn').trigger('click');
+    for (var i = 0; i < 100 && POSTS.length === n; i++) { await wait(20); }
+    await wait(60);
+    return POSTS[POSTS.length - 1];
+  }
+  async function editor(id) {
+    var t = tileEl(id), b = t && t.querySelector('.dash-tt-btn[data-act="edit"]');
+    if (b) $(b).trigger('click');
+    for (var i = 0; i < 60 && !document.getElementById('teApply'); i++) { await wait(25); }
+    await wait(60);
+  }
+  async function run() {
+    await wait(400);
+    var T = window.PenumbraTiles;
+    if (SCN === 'render') {
+      var s1 = src('e1'), s2 = src('e2'), s3 = src('e3'), s4 = src('e4'), s5 = src('e5');
+      info.srcs = [s1, s2, s3, s4, s5]; info.open = openHref('e1');
+      chk.cardsUrl = !!s1 && s1.indexOf('&cards=1&cardsize=large') > -1;
+      chk.tableUrl = !!s2 && s2.indexOf('&cards=0') > -1 && s2.indexOf('cards=1') === -1;
+      chk.legacyUrl = !!s3 && s3.indexOf('cards=') === -1;
+      chk.headerNone = !!s4 && s4.indexOf('eview=header') > -1 && s4.indexOf('cards=') === -1;
+      chk.tableOnlyCards = !!s5 && s5.indexOf('eview=table') > -1 && s5.indexOf('&cards=1') > -1 && s5.indexOf('cardsize') === -1;
+      chk.openCards = !!info.open && info.open.indexOf('&cards=1&cardsize=large') > -1 && info.open.indexOf('embed=1') === -1;
+      chk.openLegacy = (openHref('e3') || 'x').indexOf('cards=') === -1;
+    } else if (SCN === 'editor') {
+      $('#dashEditBtn').trigger('click'); await wait(150);
+      await editor('e3');   // an old tile: Table, its size hidden
+      chk.viewShown = visible('#teViewField') && $('#teView').val() === 'table';
+      chk.sizeHidden = !!document.getElementById('teCardSize') && !visible('#teCardSize');
+      $('#teView').val('cards').trigger('change'); await wait(30);
+      chk.sizeShows = visible('#teCardSize') && $('#teCardSize').val() === '';
+      $('#teShow').val('header').trigger('change'); await wait(30);
+      chk.headerHides = !visible('#teViewField');
+      $('#teShow').val('table').trigger('change'); await wait(30);
+      chk.tableShows = visible('#teViewField');
+      $('#teShow').val('both').trigger('change');
+      $('#teCardSize').val('xl');
+      $('#teApply').trigger('click'); await wait(250);
+      var sv = src('e3'); info.after = sv;
+      chk.appliedUrl = !!sv && sv.indexOf('&cards=1&cardsize=xl') > -1;
+      var p = await save(), st = p ? JSON.parse(p.state_data) : null, e3 = st ? st.tiles.filter(function (x) { return x.id === 'e3'; })[0] : null;
+      info.saved = e3;
+      chk.saved = !!e3 && e3.view === 'cards' && e3.cardSize === 'xl';
+      await editor('e3');   // re-edit: the saved choice comes back
+      chk.reedit = $('#teView').val() === 'cards' && $('#teCardSize').val() === 'xl' && visible('#teCardSize');
+      $('#teView').val('table').trigger('change');
+      $('#teApply').trigger('click'); await wait(250);
+      p = await save(); st = JSON.parse(p.state_data); e3 = st.tiles.filter(function (x) { return x.id === 'e3'; })[0];
+      chk.backToTable = e3.view === 'table' && !('cardSize' in e3) && (src('e3') || '').indexOf('&cards=0') > -1;
+      await editor('e4');   // a header tile saves no view
+      $('#teApply').trigger('click'); await wait(250);
+      p = await save(); st = JSON.parse(p.state_data); var e4 = st.tiles.filter(function (x) { return x.id === 'e4'; })[0];
+      chk.headerNoView = !('view' in e4) && !('cardSize' in e4);
+      info.e4 = e4;
+    } else if (SCN === 'infobox') {
+      var a = T.parseEmbedSpec('rep1?view=cards&cardsize=xl&FY=2026'), b = T.parseEmbedSpec('rep1?cards=0'), c = T.parseEmbedSpec('{"report":"rep1","view":"cards","cardSize":"huge"}'),
+          d = T.parseEmbedSpec('rep1?show=header&view=cards'), e = T.parseEmbedSpec('{"report":"rep1","view":"Cards","cardSize":"Compact"}');
+      info.specs = [a, b, c, d, e];
+      chk.parseCards = !!a.spec && a.spec.view === 'cards' && a.spec.cardSize === 'xl' && a.spec.prompts.FY === '2026' && !('view' in a.spec.prompts);
+      chk.parseZero = !!b.spec && b.spec.view === 'table' && !('cards' in b.spec.prompts);
+      chk.badSizeDropped = !!c.spec && c.spec.view === 'cards' && !('cardSize' in c.spec);
+      var ua = T.embedUrl(a.spec, {}), ub = T.embedUrl(b.spec, {}), uc = T.embedUrl(c.spec, {}), ud = T.embedUrl(d.spec, {}), ue = T.embedUrl(e.spec, {});
+      info.urls = [ua, ub, uc, ud, ue];
+      chk.urlCards = ua.indexOf('&cards=1&cardsize=xl') > -1 && ua.indexOf('FY=2026') > -1;
+      chk.urlZero = T.embedUrl({ type: 'embed', report: 'rep1', view: 'table' }, {}).indexOf('&cards=0') > -1;
+      chk.urlNoSize = uc.indexOf('&cards=1') > -1 && uc.indexOf('cardsize') === -1;
+      chk.urlHeaderNone = ud.indexOf('cards=') === -1;
+      chk.jsonCase = ue.indexOf('&cards=1&cardsize=compact') > -1;
+      chk.promptReserved = T.embedUrl({ type: 'embed', report: 'rep1', prompts: { cards: '1', CARDSIZE: 'xl', FY: '2026' } }, {}).indexOf('cards') === -1;
+      chk.openUrlCards = T.openUrl(a.spec, {}).indexOf('&cards=1&cardsize=xl') > -1;
+    }
+  }
+  run().then(function () {
+    window.__HCRESULT = { chk: chk, info: info, errors: ERRORS };
+    window.__HCDONE = true;
+  }, function (e) {
+    window.__HCRESULT = { chk: chk, info: info, errors: ERRORS.concat(['driver: ' + (e && e.stack || e)]) };
+    window.__HCDONE = true;
+  });
+})();
+</script>
+</body></html>

@@ -42,6 +42,10 @@
  * --mutant7  pnb_warn_target() answers null for every warning (2026-10-14):
  *            the "Worth a look" lines render as plain text again, and section
  *            1 must go RED on exactly the two warning-link assertions.
+ * --mutant9  penumbra_outage_known_window() answers null for every episode
+ *            (2026-11-01): no outage is a known window any more, so the
+ *            known-window counts, the hatched strip cells, the dimmed rows
+ *            and the day view's heading all go RED
  * --mutant8  the help drifts back toward the old hub (2026-10-21): the single-
  *            key line names the Health page's 1 to 4 again, the Refresh row
  *            loses "it starts off." and the outage row its show-more, and the
@@ -82,7 +86,7 @@ if (!function_exists('mb_substr')) {
     function mb_strlen($s, $e = null) { return strlen($s); }
 }
 
-$HEALTH = ''; $PAGE = ''; $HTML = ''; $CONTROL = false; $MUTANT = false; $MUTANT2 = false; $MUTANT3 = false; $MUTANT4 = false; $MUTANT5 = false; $MUTANT6 = false; $MUTANT7 = false; $MUTANT8 = false;
+$HEALTH = ''; $PAGE = ''; $HTML = ''; $CONTROL = false; $MUTANT = false; $MUTANT2 = false; $MUTANT3 = false; $MUTANT4 = false; $MUTANT5 = false; $MUTANT6 = false; $MUTANT7 = false; $MUTANT8 = false; $MUTANT9 = false;
 foreach ($argv as $a) {
     if (strpos($a, '--health=') === 0)     $HEALTH = substr($a, 9);
     elseif (strpos($a, '--page=') === 0)   $PAGE = substr($a, 7);
@@ -96,6 +100,7 @@ foreach ($argv as $a) {
     elseif ($a === '--mutant6')            $MUTANT6 = true;
     elseif ($a === '--mutant7')            $MUTANT7 = true;
     elseif ($a === '--mutant8')            $MUTANT8 = true;
+    elseif ($a === '--mutant9')            $MUTANT9 = true;
 }
 if ($HEALTH === '' || $PAGE === '') { fwrite(STDERR, "usage: --health=<penumbra_health.php> --page=<health.php> [--html=<out>] [--control] [--mutant] [--mutant2] [--mutant3] [--mutant4] [--mutant5] [--mutant6] [--mutant7] [--mutant8]\n"); exit(2); }
 
@@ -189,6 +194,13 @@ function clean($html) {
 $src  = file_get_contents($HEALTH);
 $page = file_get_contents($PAGE);
 if ($src === false || $page === false) { fwrite(STDERR, "cannot read the sources\n"); exit(2); }
+if ($MUTANT9) {
+    // No outage is a known window any more.
+    $needle = 'function penumbra_outage_known_window($patterns, $ep) {';
+    if (substr_count($src, $needle) !== 1) { fwrite(STDERR, "mutant9: penumbra_outage_known_window not found in penumbra_health.php\n"); exit(2); }
+    $src = str_replace($needle, $needle . ' return null;', $src);
+    echo "MUTANT9: penumbra_outage_known_window() answers null for every episode\n";
+}
 if ($MUTANT2) {
     // The stale threshold stops applying: a directory of any age reads 'ok'.
     $needle = 'if ($age > PENUMBRA_DIRECTORY_STALE_SECS) {';
@@ -216,7 +228,7 @@ if ($MUTANT7) {
     $page = str_replace($needle, $needle . ' return null;', $page);
     echo "MUTANT7: every warning line loses its home (pnb_warn_target returns null)\n";
 }
-file_put_contents($TMP . DIRECTORY_SEPARATOR . 'helpers.php', "<?php\n" . lift($page, array('pnb_h', 'pnb_dot', 'pnb_ago', 'pnb_bytes', 'pnb_chip', 'pnb_dur', 'pnb_info', 'pnb_range_btn', 'pnb_cell_len', 'pnb_notice_line', 'pnb_warn_target', 'pnb_fold_btn')));
+file_put_contents($TMP . DIRECTORY_SEPARATOR . 'helpers.php', "<?php\n" . lift($page, array('pnb_h', 'pnb_dot', 'pnb_ago', 'pnb_bytes', 'pnb_chip', 'pnb_chips_flush', 'pnb_dur', 'pnb_info', 'pnb_range_btn', 'pnb_cell_len', 'pnb_notice_line', 'pnb_warn_target', 'pnb_fold_btn')));
 require $TMP . DIRECTORY_SEPARATOR . 'helpers.php';
 // The window picker's quick spans (2026-10-01) come from the analytics pages'
 // own function, lifted from the analytics_shared.php beside the page under test.
@@ -252,7 +264,9 @@ $schedStarts = array();
 $t3 = strtotime(date('Y-m-d', $T) . ' 03:03:10');
 if ($t3 > $T - 900) $t3 -= $DAY;               // a run before 03:18 keeps the window in the past
 for ($d = 2; $d >= 0; $d--) {
-    $t0 = $t3 - $d * $DAY;
+    // From the DATE, not by 86400 s (2026-11-01, the morning DST ended): a day
+    // of 25 hours put the earlier windows at 04:03 and no pattern formed.
+    $t0 = strtotime(date('Y-m-d', $t3 - $d * $DAY) . ' 03:03:10');
     $schedStarts[] = $t0;
     $ev[] = array($t0,       array('scheduler heartbeat is 412s old'), array());
     $ev[] = array($t0 + 300, array('scheduler heartbeat is 712s old'), array());
@@ -522,7 +536,7 @@ ok(strpos($hLk, 'under last_known') !== false && strpos($hLk, 'answers 503 only 
 section('2. Scheduler card and the tiles');
 $h = $H['r1'];
 ok(strpos($h, 'id="pnbCardSched"') !== false && strpos($h, '<span class="k">Last heartbeat</span>') !== false, 'scheduler as a key/value list');
-ok(preg_match('/<h2><button type="button" class="pnb-fold" aria-expanded="false"[^>]*>Scheduler<\/button> <span class="pnb-i"/', $h) === 1, 'its footnote became an (i) in the heading, after the fold toggle (2026-10-14)');
+ok(preg_match('/<h2><button type="button" class="pnb-fold" aria-expanded="false"[^>]*>Scheduler<\/button> <span class="pnb-sum"/', $h) === 1 && strpos($h, '>Scheduler</button> <span class="pnb-i"') === false, 'the heading is the fold toggle and the summary; its (i) moved to the page note (2026-11-01)');
 ok(strpos($h, 'class="pnb-h2-r"') !== false && strpos($h, 'ONLINE') !== false, 'status pinned at the heading\'s right');
 ok(substr_count($h, '<div class="pnb-tile ') === 6, 'six tiles: five databases and the mail relay', substr_count($h, '<div class="pnb-tile '));
 ok(preg_match('/<div class="pnb-tile degraded">.*?<b>INFOED<\/b>/s', $h) === 1, 'INFOED tile carries the degraded tone');
@@ -540,7 +554,7 @@ ok(preg_match('#<span class="pnb-h2-r"><span class="pnb-adm-dot ok"></span>OK</s
 ok(strpos($h, '<span class="pnb-sum">directory refreshed 17h ago &middot; people_sync ok in 17.2 s (') !== false, 'the summary leads with the directory', $h);
 ok(strpos($h, 'Lookups still answer') === false && strpos($h, 'refresh is paused') === false, 'no note while everything is fine');
 ok(substr_count($h, '<div class="pnb-tile ') === 6, 'the six tiles are untouched');
-ok(strpos($h, 'PENUMBRA_PEOPLE</strong> is what the people picker') !== false && strpos($page, 'Run, pause or read the job in the Maintenance card below') === false, 'the (i) explains the directory line; the old pointer to a separate card is gone');
+ok(strpos($page, 'PENUMBRA_PEOPLE is what the people picker') !== false && strpos($page, 'Run, pause or read the job in the Maintenance card below') === false, 'the page note explains the directory line (the card\'s (i) moved there 2026-11-01); the old pointer to a separate card is gone');
 $h = $H['top'];
 ok(preg_match('#<a class="pnb-chip ok" href="\#pnbCardMaint" data-card="pnbCardMaint" title="last refreshed [^"]* - 71,887 people, 24,654 active - shown on the Maintenance card"><span class="pnb-chip-v">17h ago</span><span class="pnb-chip-l">directory</span>#', $h) === 1, 'directory chip: the age as its value, green, the counts in its tip, a link to the Maintenance card', $h);
 $keep = $snap;
@@ -613,7 +627,7 @@ ok(strpos($src, "define('PENUMBRA_DIRECTORY_STALE_SECS', 30 * 3600)") !== false,
 section('2d. Maintenance card (2026-09-23, the folded-in Jobs tool)');
 $h = $H['r1'];
 ok(strpos($h, 'id="pnbCardMaint"') !== false && strpos($h, 'pnb-card-fold" id="pnbCardMaint"') === false, 'the card is present and unfolded with a job registered');
-ok(preg_match('#<h2><button type="button" class="pnb-fold" aria-expanded="false"[^>]*>Maintenance</button> <span class="pnb-i".*?<span class="pnb-h2-r"><span class="pnb-adm-dot ok"></span>OK</span></h2>#s', $h) === 1, 'heading: the fold toggle, an (i), and a green dot with OK at the right (the job count moved into the summary 2026-10-14)');
+ok(preg_match('#<h2><button type="button" class="pnb-fold" aria-expanded="false"[^>]*>Maintenance</button> <span class="pnb-sum">.*?<span class="pnb-h2-r"><span class="pnb-adm-dot ok"></span>OK</span></h2>#s', $h) === 1, 'heading: the fold toggle, the summary, and a green dot with OK at the right (the (i) moved to the page note 2026-11-01)');
 ok(preg_match('#<div class="pnb-row" data-job="people_sync">\s*<span class="t"[^>]*>05:30 daily</span>\s*<span class="c ">OK</span>\s*<span class="d"[^>]*>Employee directory refresh</span>#', $h) === 1, 'the job row: schedule, OK, label', $h);
 ok(strpos($h, '<span class="to" title="Last run">' . date('Y-m-d H:i:s', $T - 61140) . '</span>') !== false, 'last run timestamp');
 ok(strpos($h, '<span class="p">ok in 17.2 s &middot; next: tomorrow 05:30</span>') !== false, 'the detail: result and next run');
@@ -698,7 +712,9 @@ echo "  info ledger: " . json_encode($ledgerN) . "\n";
 ok($ledgerN['total'] === 4 && $ledgerN['open'] === 1 && $ledgerN['near_open'] === 1 && $ledgerN['near_total'] === 1, 'ledger: 4 closed outages, one open, one open and one closed near miss', $ledgerN);
 preg_match('/<span class="pnb-h2-r"><span class="pnb-adm-dot bad"><\/span>([^<]*)<\/span>/', $h, $hm);   // the dot is red: an outage is open (2026-10-14)
 $outN = $ledgerN['total'] + $ledgerN['open']; $nearN = $ledgerN['near_total'] + $ledgerN['near_open'];
-ok(isset($hm[1]) && $hm[1] === "$outN outage" . ($outN == 1 ? '' : 's') . " &middot; $nearN near miss" . ($nearN == 1 ? '' : 'es') . " &middot; coverage " . $outg['coverage_pct'] . '%', 'heading summary counts outages, near misses and coverage', isset($hm[1]) ? $hm[1] : null);
+$outKn = isset($outg['known']) ? (int)$outg['known'] : 0; $outUx = $outN - $outKn;
+ok($outKn === 3, 'the three 03:03 scheduler windows are known windows (2026-11-01)', $outKn);
+ok(isset($hm[1]) && $hm[1] === "$outUx outage" . ($outUx == 1 ? '' : 's') . ($outKn ? " &middot; $outKn in known windows" : '') . " &middot; $nearN near miss" . ($nearN == 1 ? '' : 'es') . " &middot; coverage " . $outg['coverage_pct'] . '%', 'heading summary counts the unexplained outages, the known windows, near misses and coverage', isset($hm[1]) ? $hm[1] : null);
 ok(preg_match('/<div class="pnb-out-openrow">\s*<span class="pnb-adm-dot bad"><\/span>\s*<strong>www3 delivery<\/strong> has been down for/', $h) === 1, 'open outage row');
 ok(preg_match('/<button type="button" class="pnb-out-copy" data-packet="([^"]+)"/', $h, $m) === 1, 'with a Copy escalation packet button');
 $packet = isset($m[1]) ? html_entity_decode($m[1], ENT_QUOTES, 'UTF-8') : '';
@@ -718,7 +734,7 @@ ok(substr_count($h, 'pnb-out-copy') === 1, 'only the outage gets a Copy button (
 function strip_rows($html) {
     preg_match_all('/<div class="pnb-strip-r"><span class="pnb-strip-n">([^<]+)<\/span><div class="pnb-strip-bar( dense)?">(.*?)<\/div><\/div>/s', $html, $sm, PREG_SET_ORDER);
     $out = array();
-    foreach ($sm as $row) { $out[$row[1]] = array('cells' => substr_count($row[3], '<i'), 'b' => substr_count($row[3], 'class="b"'), 'a' => substr_count($row[3], 'class="a"'), 'dense' => $row[2] !== ''); }
+    foreach ($sm as $row) { $out[$row[1]] = array('cells' => substr_count($row[3], '<i'), 'b' => substr_count($row[3], 'class="b"'), 'a' => substr_count($row[3], 'class="a"'), 'w' => substr_count($row[3], 'class="w"'), 'dense' => $row[2] !== ''); }
     return $out;
 }
 /** The five axis ticks under a strip. */
@@ -733,7 +749,7 @@ ok(isset($strip['www3 delivery'], $strip['INFOED'], $strip['HR'], $strip['Schedu
 ok(!empty($strip['www3 delivery']) && $strip['www3 delivery']['cells'] === 168 && $strip['www3 delivery']['dense'] && $strip['www3 delivery']['b'] >= 1 && $strip['www3 delivery']['b'] <= 2, '168 hourly cells, dense; the open outage paints red', isset($strip['www3 delivery']) ? $strip['www3 delivery'] : null);
 ok(!empty($strip['INFOED']) && $strip['INFOED']['a'] >= 1 && $strip['INFOED']['b'] === 0, 'a near miss paints amber, never red', isset($strip['INFOED']) ? $strip['INFOED'] : null);
 ok(!empty($strip['HR']) && $strip['HR']['b'] >= 1 && $strip['HR']['b'] <= 2, 'last night\'s HR outage is one or two red cells', isset($strip['HR']) ? $strip['HR'] : null);
-ok(!empty($strip['Scheduler']) && $strip['Scheduler']['b'] >= 3 && $strip['Scheduler']['b'] <= 6, 'all three 03:03 scheduler windows are on it, not just today\'s', isset($strip['Scheduler']) ? $strip['Scheduler'] : null);
+ok(!empty($strip['Scheduler']) && $strip['Scheduler']['w'] >= 3 && $strip['Scheduler']['w'] <= 6 && $strip['Scheduler']['b'] === 0, 'all three 03:03 scheduler windows are on it, hatched as known windows and never red (2026-11-01)', isset($strip['Scheduler']) ? $strip['Scheduler'] : null);
 $ticks = strip_ticks($h);
 ok(count($ticks) === 5 && $ticks[4] === 'now' && preg_match('/^[A-Z][a-z]{2} \d\d:\d\d$/', $ticks[0]) === 1 && preg_match('/^[A-Z][a-z]{2} \d\d:\d\d$/', $ticks[2]) === 1,
    'five ticks over the week, weekday + time, ending at now', $ticks);
@@ -751,15 +767,19 @@ ok(strpos($h, 'data-label="Scheduler ~03:03 daily"') !== false, 'and a label for
 // the merged one-line list
 ok(strpos($h, '<div class="pnb-rows pnb-rows-out">') !== false, 'closed episodes and near misses share one list');
 // 1 near / 2 when / 3 component / 4 length / 5 to / 6 cause text / 7 tags / 8 checks
-preg_match_all('/<div class="pnb-row( near)?">\s*<span class="t">([^<]+)<\/span>\s*<span class="c">([^<]+)<\/span>\s*<span class="d">([^<]+)<\/span>\s*<span class="to">([^<]+)<\/span>\s*<span class="p" title="([^"]*)"><span class="pt">([^<]*)<\/span>(.*?)<\/span>\s*<span class="k">([^<]+)<\/span>/s', $h, $rows, PREG_SET_ORDER);
+preg_match_all('/<div class="pnb-row( near| kw)?">\s*<span class="t">([^<]+)<\/span>\s*<span class="c">([^<]+)<\/span>\s*<span class="d">([^<]+)<\/span>\s*<span class="to">([^<]+)<\/span>\s*<span class="p" title="([^"]*)"><span class="pt">([^<]*)<\/span>(.*?)<\/span>\s*<span class="k">([^<]+)<\/span>/s', $h, $rows, PREG_SET_ORDER);
 ok(count($rows) === 5, 'five one-line rows: 3 scheduler, 1 HR, 1 near miss', count($rows));
-ok(!empty($rows) && $rows[0][1] === ' near' && $rows[0][3] === 'INFOED' && strpos($rows[0][8], 'near miss</span>') !== false, 'newest first: the closed INFOED near miss, tagged');
-ok(!empty($rows) && $rows[0][2] === date('D d M H:i', $T - 3000) && $rows[0][5] === 'to ' . date('H:i', $T - 2700), 'with its start and end times');
-ok(!empty($rows) && $rows[0][6] === $rows[0][7] && $rows[0][7] === pnb_h($NM), 'the cause text is clippable on its own, whole in the title');
+ok(!empty($rows) && $rows[0][1] === '' && $rows[0][3] === 'HR' && trim($rows[0][8]) === '', 'the unexplained outage (last night\'s HR) leads the list, above the newer near miss (2026-11-01: outages, then near misses, then known windows)', $rows);
+ok(count($rows) > 1 && $rows[1][1] === ' near' && $rows[1][3] === 'INFOED' && strpos($rows[1][8], 'near miss</span>') !== false, 'then the closed INFOED near miss, tagged');
+ok(count($rows) > 1 && $rows[1][2] === date('D d M H:i', $T - 3000) && $rows[1][5] === 'to ' . date('H:i', $T - 2700), 'with its start and end times');
+ok(count($rows) > 1 && $rows[1][6] === $rows[1][7] && $rows[1][7] === pnb_h($NM), 'the cause text is clippable on its own, whole in the title');
 $schedRows = array_filter($rows, function ($r) { return $r[3] === 'Scheduler'; });
 $allTagged = count($schedRows) === 3;
-foreach ($schedRows as $r) { if (strpos($r[8], '>recurring</span>') === false || strpos($r[8], '>muted</span>') === false) $allTagged = false; }
-ok($allTagged, 'every scheduler row carries recurring + muted tags (listed, never hidden)');
+foreach ($schedRows as $r) { if (strpos($r[8], '>recurring</span>') === false || strpos($r[8], '>muted</span>') === false || $r[1] !== ' kw') $allTagged = false; }
+ok($allTagged, 'every scheduler row carries recurring + muted tags and the known-window class (listed, never hidden; dimmed since 2026-11-01)');
+$kwLast = true; $seenKw = false;
+foreach ($rows as $r) { if ($r[1] === ' kw') $seenKw = true; elseif ($seenKw) $kwLast = false; }
+ok($kwLast && $seenKw, 'the known windows are listed after the rest, whatever their time (2026-11-01)');
 $hrRows = array_filter($rows, function ($r) { return $r[3] === 'HR'; });
 ok(count($hrRows) === 1 && trim(reset($hrRows)[8]) === '' && reset($hrRows)[9] === '2 checks', 'the HR row has no tag and 2 checks');
 ok(strpos($h, '<strong>Near misses</strong>') === false && strpos($h, 'pnb-fail-list') === false, 'the old two-line lists are gone');
@@ -835,7 +855,7 @@ ok(clean($h24) && strpos($h24, 'data-range="24h" data-default="7"') !== false &&
 ok(!empty($s24['www3 delivery']) && $s24['www3 delivery']['cells'] === 96 && !$s24['www3 delivery']['dense'], '96 cells of 15 minutes, with their gaps', $s24);
 ok(isset($s24['HR']) && $s24['HR']['b'] >= 1, 'last night\'s HR outage is inside it', $s24);
 ok(count($t24) === 5 && $t24[4] === 'now' && preg_match('/^[A-Z][a-z]{2} \d\d:\d\d$/', $t24[0]) === 1 && preg_match('/^\d\d:\d\d$/', $t24[1]) === 1, 'ticks: weekday + time, then clock times, then now', $t24);
-preg_match_all('/<div class="pnb-row( near)?">/', $h24, $r24);
+preg_match_all('/<div class="pnb-row( near| kw)?">/', $h24, $r24);
 ok(count($r24[0]) === $outg['total'] + $outg['near_total'] && $outg['total'] < $outgKeep['total'], 'fewer rows than the week: only the last day\'s', array(count($r24[0]), $outg['total'], $outgKeep['total']));
 
 // --- the outage card over a custom day in the past ----------------------------
@@ -846,10 +866,10 @@ $hD = render($TMP . DIRECTORY_SEPARATOR . 'r4.php');
 $sD = strip_rows($hD); $tD = strip_ticks($hD);
 ok(clean($hD) && $outg['from'] === $outWin['from'] && $outg['to'] === $outWin['to'] && !$outg['ends_now'], 'a past day: the history resolves exactly that day', array($outg['from'], $outg['to'], $outg['ends_now']));
 ok(strpos($hD, '>' . date('M j', $schedStarts[0]) . '<span class="pnb-range-car"') !== false, 'the heading names the day', substr($hD, 0, 400));
-ok(array_keys($sD) === array('Scheduler') && $sD['Scheduler']['cells'] === 96 && $sD['Scheduler']['b'] >= 1, 'the strip shows that day only: the scheduler window, nothing after', $sD);
+ok(array_keys($sD) === array('Scheduler') && $sD['Scheduler']['cells'] === 96 && $sD['Scheduler']['w'] >= 1 && $sD['Scheduler']['b'] === 0, 'the strip shows that day only: the scheduler window, hatched as a known window, nothing after', $sD);
 ok(count($tD) === 5 && $tD[4] === '23:59' && $tD[0] === date('D', $schedStarts[0]) . ' 00:00', 'its axis runs midnight to the last minute, not to now', $tD);
 ok($outg['total'] === 1 && $outg['open_in_window'] === 0 && count($outg['open']) === 1, 'one outage that day; today\'s open outage is not in it', array($outg['total'], $outg['open_in_window'], count($outg['open'])));
-ok(preg_match('/<span class="pnb-h2-r"><span class="pnb-adm-dot bad"><\/span>1 outage &middot; 0 near misses &middot; coverage 100%<\/span>/', $hD) === 1, 'the heading counts only that day (the dot stays red: the open outage is still shown)', preg_match('/<span class="pnb-h2-r">.*?<\/span><\/span>/', $hD, $mD) ? $mD[0] : null);
+ok(preg_match('/<span class="pnb-h2-r"><span class="pnb-adm-dot bad"><\/span>0 outages &middot; 1 in known windows &middot; 0 near misses &middot; coverage 100%<\/span>/', $hD) === 1, 'the heading counts only that day: its one outage is the known window (the dot stays red: the open outage is still shown)', preg_match('/<span class="pnb-h2-r">.*?<\/span><\/span>/', $hD, $mD) ? $mD[0] : null);
 ok(strpos($hD, '<strong>www3 delivery</strong> has been down for') !== false, 'but the open outage is still shown above it: a window never hides one');
 ok(isset($outg['by_component']['scheduler']) && $outg['by_component']['scheduler']['episodes'] === 1 && $outg['by_component']['scheduler']['downtime'] === 600 && !isset($outg['by_component']['delivery']),
    'availability charges that day\'s window and nothing of the open outage', $outg['by_component']);
@@ -950,9 +970,17 @@ if ($helpSrc === false) {
 section('6. Runtime card');
 $h = $H['r5'];
 ok(strpos($h, 'id="pnbRuntime"') !== false && strpos($h, 'pnb-kv pnb-kv-2') !== false, 'runtime as a two-column key/value list');
-ok(strpos($h, '<span class="pnb-warn">security support ends 2026-12-31</span>') !== false, 'PHP end of support inline');
+ok(preg_match('#<span class="pnb-warn">security support ends 2026-12-31, (?:in \d+ days?|\d+ days? ago)</span>#', $h) === 1, 'PHP end of support inline, with the days left (2026-11-01)');
 ok(substr_count($h, '<span class="k">Disk ') === 2, 'both disks');
-ok(preg_match('/<h2><button type="button" class="pnb-fold" aria-expanded="false"[^>]*>Runtime<\/button> <span class="pnb-i"[^>]*><span class="pnb-i-tip"[^>]*>.*?IIS APPPOOL\\\\penumbra.*?<\/span><\/span><span class="pnb-sum">.*?<\/span><\/h2>/s', $h) === 1, 'the (i) names the web account; the summary follows it');
+ok(preg_match('/<h2><button type="button" class="pnb-fold" aria-expanded="false"[^>]*>Runtime<\/button> <span class="pnb-sum">.*?<\/span>\s*<span class="pnb-h2-r">/s', $h) === 1 && strpos($h, '>Runtime</button> <span class="pnb-i"') === false, 'the heading is the fold toggle and the summary; the (i) moved to the page note (2026-11-01)');
+ok(preg_match('#<details class="pnb-inv">\s*<summary>Server inventory</summary>.*?<span class="k">Runs as</span>\s*<span class="v">IIS APPPOOL\\\\penumbra #s', $h) === 1 && preg_match('#<details class="pnb-inv">.*?<span class="k">Extensions</span>#s', $h) === 1,
+   'host, limits, the web account and the extensions sit behind a closed inventory disclosure (2026-11-01)');
+ok(preg_match('#<div class="pnb-kv pnb-kv-2">\s*<span class="k">PHP</span>\s*<span class="v">8\.2\.29 &middot; <span class="pnb-warn">security support ends#', $h) === 1 && preg_match('#<span class="k">In-flight</span>#', $h) === 1, 'the card body keeps the clocked facts: the PHP deadline, the slots, the disks');
+ok(strpos($page, '<details class="pnb-adm-card pnb-hub-how" id="pnbHubHow">') !== false && strpos($page, '<summary>How to read this page</summary>') !== false
+   && strpos($page, '<dt>Scheduler</dt>') !== false && strpos($page, '<dt>Databases &amp; mail</dt>') !== false && strpos($page, '<dt>Maintenance</dt>') !== false && strpos($page, '<dt>Runtime</dt>') !== false
+   && strpos($page, 'counts as offline after 330 seconds') !== false && strpos($page, 'because a dead Oracle listener blocks for 60 to 90 seconds') !== false,
+   'one folded "How to read this page" note at the foot of the column carries the four tips that left the headings (2026-11-01)');
+ok(strpos($h, 'How to read this page') !== false && preg_match('#<dd>PHP 8\.2 security support ends 2026-12-31\. pdo_oci must stay off.*?runs as IIS APPPOOL\\\\penumbra \(the application pool identity\)#s', $h) === 1, 'the note renders in the runtime region and names the web account');
 ok(strpos($h, '<span class="pnb-ext ok">oci8</span>') !== false && strpos($h, 'pdo_oci</span>') === false, 'extensions as pills, no pdo_oci');
 
 section('7. Log viewer');
@@ -985,7 +1013,7 @@ ok(strpos($page, 'function pnb_info(') !== false, 'pnb_info helper present');
 ok(preg_match('/penumbra_admin_open\(\'System Health\', \'checked \' \. \$snap\[\'checked_at\'\], \'health\', true, \'wide\', \$pnbRefreshCtl\);/', $page) === 1, 'the refresh control rides into the chrome as the 6th argument');
 ok(strpos($page, 'id="pnbHubTop"') !== false && strpos($page, 'id="pnbHubLeft"') !== false, 'both live regions have ids');
 ok(strpos($page, "\$_POST['action'] === 'mute'") !== false && strpos($page, 'penumbra_mute_set(') !== false, 'mute POST action present');
-ok(substr_count($page, 'pnb_info(') >= 10, 'ten or more footnotes became (i) tips', substr_count($page, 'pnb_info('));
+ok(substr_count($page, 'echo pnb_info(') === 7, 'seven echoed (i) tips remain: the status band, outages, failures (folded and open), delivery, the logs, the mail tile; a database tile\'s detail is an eighth, concatenated (four card tips became the page note 2026-11-01)', substr_count($page, 'echo pnb_info('));
 ok(strpos($page, 'id="logAuto"') === false, 'no per-log auto-refresh anywhere');
 ok(strpos($page, "\r\n") === false, 'line endings stayed LF');
 // The left column's order (the user's call, 2026-10-01): outage history right
@@ -997,9 +1025,16 @@ ok($cardIds[1] === array('pnbCardSched', 'pnbCardDbs'), 'and nothing sits betwee
 
 section('8b. Declutter (2026-10-14): chips that navigate, cards that fold, lists that show more');
 $h = $H['top'];
-preg_match_all('/<a class="pnb-chip[^"]*" href="#(pnb[A-Za-z]+)"/', $h, $cm);
-ok($cm[1] === array('pnbCardSched', 'pnbCardDbs', 'pnbOutages', 'pnbFailures', 'pnbCardMaint', 'pnbCardMaint', 'pnbDelivery', 'pnbLog', 'pnbRuntime'),
-   'nine chips, each a link to its card, in the cards\' order (tasks, overdue, mail, queries and the disk folded into theirs; the directory chip leads to Maintenance since the evening)', $cm[1]);
+preg_match_all('/<a class="pnb-chip( ok| warn| bad)?" href="#(pnb[A-Za-z]+)"/', $h, $cm, PREG_SET_ORDER);
+$chipOrder = array('pnbCardSched', 'pnbCardDbs', 'pnbOutages', 'pnbFailures', 'pnbCardMaint', 'pnbCardMaint', 'pnbDelivery', 'pnbLog', 'pnbRuntime');
+$chipLoud = array(); $chipQuiet = array();
+foreach ($cm as $c) { if ($c[1] === ' ok') $chipQuiet[] = $c[2]; else $chipLoud[] = $c[2]; }
+$chipSeen = array_merge($chipLoud, $chipQuiet); sort($chipSeen); $chipWant = $chipOrder; sort($chipWant);
+$inOrder = function ($ids) use ($chipOrder) { $pos = -1; foreach ($ids as $id) { $p = array_search($id, $chipOrder, true); if ($p === false) return false; if ($p < $pos) return false; $pos = $p; } return true; };
+ok($chipSeen === $chipWant && $inOrder($chipLoud) && $inOrder($chipQuiet) && count($chipLoud) >= 1 && count($chipQuiet) >= 1,
+   'nine chips, each a link to its card: the amber and red ones as tiles first, the green ones after on the quiet line, each group in the cards\' order (2026-11-01)', array($chipLoud, $chipQuiet));
+ok(preg_match('#<div class="pnb-chipwrap">.*?<div class="pnb-chips">(<a class="pnb-chip(?: warn| bad)?"[^>]*>.*?</a>)+</div><div class="pnb-chips pnb-chips-ok" role="group" aria-label="Components with nothing to report"><span class="pnb-chips-ok-l"[^>]*>nothing to report</span>(<a class="pnb-chip ok"[^>]*>.*?</a>)+</div>\s*</div>\s*</div><!-- /pnbHubTop -->#s', $h) === 1,
+   'the tiles are one div and the green chips another, labelled "nothing to report", and nothing green is a tile (2026-11-01)', $h);
 ok(preg_match('/<div class="pnb-chip[ "]/', $h) === 0 && strpos($h, '>mail (mta)</span>') === false && strpos($h, '>tasks armed</span>') === false
    && strpos($h, '>overdue</span>') === false && strpos($h, '>queries running</span>') === false && strpos($h, '>log disk free</span>') === false, 'the five folded chips are gone');
 ok(preg_match('/<a class="pnb-chip ok" href="#pnbCardSched" data-card="pnbCardSched" title="[^"]*41 active task\(s\), 7 disabled[^"]*"><span class="pnb-chip-v">ONLINE<\/span><span class="pnb-chip-l">scheduler · 41 armed · 0 overdue<\/span>/', $h) === 1, 'scheduler chip: ONLINE, the tasks in its label and tip', $h);
@@ -1065,9 +1100,13 @@ $snap = $keep5;
 $h = $H['r6'];
 ok(preg_match('/data-log="php"[^>]*>PHP errors<span class="pnb-log-n" title="3 PHP error line\(s\) in the last hour">3<\/span><\/button>/', $h) === 1, 'the PHP errors tab carries the hour\'s count as a badge', $h);
 ok(strpos($h, 'badge: badge,') !== false && strpos($h, "if (rows[pi].s === 'err' || rows[pi].s === 'warn') nProb++;") !== false, 'the console counts the problem lines it loads onto the open tab');
-ok(strpos($h, 'window.pnbFolds = { apply: apply, jump: jump };') !== false && strpos($h, "var PREF = 'penumbra_health_folds';") !== false && strpos($h, "closest('.pnb-chip[data-card], .pnb-warn-link[data-card]')") !== false
-   && strpos($h, "if (card.getAttribute('data-force') === '1') open = true;") !== false && strpos($h, "if (window.pnbFolds) window.pnbFolds.apply();") !== false,
-   'the fold script: remembered folds, forced cards, chip and warning jumps, re-applied after the refresh swap');
+ok(strpos($h, 'window.pnbFolds = { apply: apply, jump: jump };') !== false && strpos($h, "localStorage.removeItem('penumbra_health_folds')") !== false && strpos($h, "var PREF = 'penumbra_health_folds';") === false
+   && strpos($h, "closest('.pnb-chip[data-card], .pnb-warn-link[data-card]')") !== false
+   && strpos($h, "if (card.getAttribute('data-force') === '1') open = true;") !== false && strpos($h, "if (window.pnbFolds) window.pnbFolds.apply();") !== false
+   && preg_match('/else if \(sessionOpen\[id\] !== undefined\) open = !!sessionOpen\[id\];\s*else open = card\.getAttribute\(\'data-open\'\) !== \'0\';/', $h) === 1,
+   'the fold script: folds by state (the old per-browser preference is cleared, 2026-11-01), forced cards, chip and warning jumps, re-applied after the refresh swap');
+ok(strpos($h, "function lineKey(t) {") !== false && strpos($h, '<button type="button" class="pnb-ll-n" aria-expanded="false"') !== false && strpos($h, "closest('.pnb-ll-n')") !== false && strpos($h, "' repeat' + (body.getAttribute('data-folded') === '1' ? '' : 's') + ' folded</span>'") !== false,
+   'the log console folds consecutive repeats under a count button and says how many it folded (2026-11-01)');
 ok(strpos($h, "history.replaceState(null, '', window.location.pathname + window.location.search + '#' + id)") !== false && strpos($h, "/^pnb[A-Za-z]+$/.test(hashId)") !== false, 'a jump writes the card\'s anchor into the address, and an address with one opens that card');
 $cssSrc = @file_get_contents(dirname($PAGE) . DIRECTORY_SEPARATOR . 'css' . DIRECTORY_SEPARATOR . 'main.css');
 if ($cssSrc === false) {
@@ -1087,7 +1126,7 @@ if ($helpSrc !== false) {
 ok(strpos($H['r1'], '<span class="pnb-h2-r"><span class="pnb-adm-dot warn"></span>DEGRADED</span></h2>') !== false
    && preg_match('#>Databases &amp; mail</button>.*?</h2>\s*<div class="pnb-hub-fine pnb-adm-muted" style="margin: 0 0 8px;">probed [^<]*\(cached\) &middot; <a href="\?full=1"#s', $H['r1']) === 1,
    'databases: an amber dot and DEGRADED end the heading; the probe age and re-probe link sit first in the body', $H['r1']);
-ok(preg_match('#<span class="pnb-h2-r"><span class="pnb-adm-dot bad"></span>5 outages &middot; 2 near misses &middot; coverage #', $H['r4']) === 1, 'outage history: a red dot for the open outage before its counts', $H['r4']);
+ok(preg_match('#<span class="pnb-h2-r"><span class="pnb-adm-dot bad"></span>2 outages &middot; 3 in known windows &middot; 2 near misses &middot; coverage #', $H['r4']) === 1, 'outage history: a red dot for the open outage before its counts, the known windows apart (2026-11-01)', $H['r4']);
 ok(strpos($H['r3b'], '<span class="pnb-h2-r"><span class="pnb-adm-dot warn"></span>3 FAILURES</span></h2>') !== false, 'failures with rows: an amber dot and the count', $H['r3b']);
 ok(strpos($H['r3'], '<span class="pnb-h2-r"><span class="pnb-adm-dot ok"></span>NONE</span></h2>') !== false, 'the empty failures card: a green dot and NONE', $H['r3']);
 ok(substr_count($H['r1'], '<span class="pnb-adm-dot ok"></span>OK</span></h2>') === 1 && strpos($H['r1'], '<span class="pnb-adm-dot ok"></span>ONLINE</span></h2>') !== false, 'maintenance: a green dot and OK; the scheduler keeps ONLINE', $H['r1']);
@@ -1228,7 +1267,7 @@ ok(strpos($hX, '<span class="pnb-sum"><span class="pnb-bad">missing: gd</span> &
 $all = $H['top'] . $H['r1'] . $H['r2'] . $H['r3'] . $H['r4'] . $H['r5'] . $H['r6'];
 $nI = preg_match_all('/<span class="pnb-i"[^>]*>/', $all, $im);
 $nGood = preg_match_all('/<span class="pnb-i" tabindex="0" role="button" aria-expanded="false" aria-label="[^"]+" aria-describedby="(pnbTip[0-9a-f]{10}(?:-\d+)?)"><span class="pnb-i-tip" id="\1" role="tooltip">/', $all, $gm);
-ok($nI >= 10 && $nGood === $nI && count(array_unique($gm[1])) === $nI && strpos($all, 'role="note"') === false,
+ok($nI >= 6 && $nGood === $nI && count(array_unique($gm[1])) === $nI && strpos($all, 'role="note"') === false,
    'every (i) is role=button with aria-expanded and aria-describedby naming its own tip (unique ids, no role=note)', array($nI, $nGood, count(array_unique($gm[1]))));
 preg_match_all('/<span class="pnb-i-tip"[^>]*>(.*?)<\/span><\/span>/s', $all, $tm);
 $tipLinks = 0; foreach ($tm[1] as $tt) { if (preg_match('/<(a|button|input|select)\b/i', $tt)) $tipLinks++; }
@@ -1267,7 +1306,7 @@ ok(strpos($h, "pnbSay(jname + ': ' + jsay);") !== false && strpos($h, "pnbSay(jn
 
 // 12b. The row lists are tables to AT (1.3.1).
 $allRaw = $HR['r1'] . $HR['r2'] . $HR['r4'];
-preg_match_all('#<div class="pnb-row(?: near)?"([^>]*)>(.*?)</div>#s', $allRaw, $rm, PREG_SET_ORDER);
+preg_match_all('#<div class="pnb-row(?: near| kw)?"([^>]*)>(.*?)</div>#s', $allRaw, $rm, PREG_SET_ORDER);
 $badRows = array();
 foreach ($rm as $r) { if (strpos($r[1], 'role="row"') === false || substr_count($r[2], ' role="cell"') !== 6) $badRows[] = substr($r[0], 0, 160); }
 ok(count($rm) >= 12 && !$badRows, 'every episode, job, run and delivery row is role=row with six role=cell', array(count($rm), $badRows));
@@ -1278,8 +1317,9 @@ foreach (array('r4' => 'pnb-rows pnb-rows-out', 'r1' => 'pnb-rows pnb-rows-jobs'
 ok(!in_array(false, $tblOk, true), 'each list is role=table, named, with an sr-only header row of six column headers', $tblOk);
 ok(strpos($HR['r4'], '<div class="pnb-rows-more" role="rowgroup">') !== false && strpos($HR['r4'] . $HR['r1'], '<div class="pnb-rows-more">') === false,
    'the rows behind "show more" are a rowgroup of the same table');
-ok(strpos($HR['r1'], '<span class="k" role="cell">staged 71887 updated 12 seconds 27.2</span>') !== false && preg_match('#<span class="k" title=#', $HR['r1']) === 0,
-   'a run shows every figure, not two with the rest in a tooltip');
+ok(strpos($HR['r1'], '<span class="k" role="cell">27.2 s · staged 71887</span>') !== false && preg_match('#<span class="k" title=#', $HR['r1']) === 0
+   && strpos($HR['r1'], 'people_sync: 71,887 staged, 24,654 active, 12 updated<details class="pnb-figs"><summary>all figures</summary><span class="pnb-figs-list">staged 71887 updated 12 seconds 27.2</span></details>') !== false,
+   'a run shows its duration and first figure in the row and every figure behind a disclosure, never in a tooltip (2026-11-01)');
 ok(isset($hNoteRaw) && strpos($hNoteRaw, '<div class="pnb-hub-note pnb-job-note" role="row"><span role="cell" aria-colspan="6"><strong>Employee directory refresh</strong>') !== false,
    'a job\'s findings note is a row of the jobs table, one cell spanning it');
 $h = $HR['r3b'];
@@ -1295,19 +1335,21 @@ function strip_labels($html) {
     preg_match_all('#<div class="pnb-strip-r"><span class="pnb-strip-n" aria-hidden="true">([^<]+)</span><div class="pnb-strip-bar(?: dense)?" role="img" aria-label="([^"]*)">(.*?)</div></div>#s', $html, $m, PREG_SET_ORDER);
     $out = array();
     foreach ($m as $row) {
-        preg_match_all('#<i(?: class="([ab])")?></i>#', $row[3], $cm);
-        $runs = array('b' => 0, 'a' => 0); $prev = '';
+        preg_match_all('#<i(?: class="([abw])")?></i>#', $row[3], $cm);
+        $runs = array('b' => 0, 'a' => 0, 'w' => 0); $prev = '';
         foreach ($cm[1] as $c) { if ($c !== '' && $c !== $prev) $runs[$c]++; $prev = $c; }
-        $out[html_entity_decode($row[1], ENT_QUOTES)] = array('label' => html_entity_decode($row[2], ENT_QUOTES), 'b' => $runs['b'], 'a' => $runs['a']);
+        $out[html_entity_decode($row[1], ENT_QUOTES)] = array('label' => html_entity_decode($row[2], ENT_QUOTES), 'b' => $runs['b'], 'a' => $runs['a'], 'w' => $runs['w']);
     }
     return $out;
 }
 $sl = strip_labels($HR['r4']);
 $slOk = count($sl) === substr_count($HR['r4'], 'class="pnb-strip-bar') && count($sl) >= 4;
 foreach ($sl as $nm => $x) {
-    if (strpos($x['label'], $nm . ': ') !== 0 || substr_count($x['label'], 'down ') !== $x['b'] || substr_count($x['label'], 'near miss ') !== $x['a']) $slOk = false;
+    $kwN = substr_count($x['label'], 'down in a known window ');
+    if (strpos($x['label'], $nm . ': ') !== 0 || substr_count($x['label'], 'down ') - $kwN !== $x['b'] || $kwN !== $x['w'] || substr_count($x['label'], 'near miss ') !== $x['a']) $slOk = false;
 }
-ok($slOk, 'every strip bar is role=img named "<component>: " and one phrase per red or amber run, read off its own cells', $sl);
+ok($slOk, 'every strip bar is role=img named "<component>: " and one phrase per red, hatched or amber run, read off its own cells', $sl);
+ok(isset($sl['Scheduler']) && $sl['Scheduler']['w'] >= 1 && strpos($sl['Scheduler']['label'], 'Scheduler: down in a known window ') === 0, 'a known window reads "down in a known window" (2026-11-01)', $sl);
 ok(isset($sl['www3 delivery']) && preg_match('/ to now$/', $sl['www3 delivery']['label']) === 1 && isset($sl['INFOED']) && strpos($sl['INFOED']['label'], 'INFOED: near miss ') === 0,
    'the open outage runs "to now"; a near miss says so', $sl);
 ok(preg_match('#<div class="pnb-strip" title="[^"]*" role="group" aria-label="Outages by component, [A-Z][a-z]{2} \d\d [A-Z][a-z]{2} \d\d:\d\d to now">#', $HR['r4']) === 1, 'the strip is a group named by its span');
@@ -1320,7 +1362,8 @@ ok(isset($sl24['HR']) && preg_match('/^HR: down (?:[A-Z][a-z]{2} )?\d\d:\d\d to 
 // 15-minute cells: an outage covers several, and adjacent red cells are ONE run, said once
 $sl24Ok = count($sl24) >= 2;
 foreach ($sl24 as $nm => $x) {
-    if (substr_count($x['label'], 'down ') !== $x['b'] || substr_count($x['label'], 'near miss ') !== $x['a']) $sl24Ok = false;
+    $kwN = substr_count($x['label'], 'down in a known window ');
+    if (substr_count($x['label'], 'down ') - $kwN !== $x['b'] || $kwN !== $x['w'] || substr_count($x['label'], 'near miss ') !== $x['a']) $sl24Ok = false;
 }
 $outWin = penumbra_health_window('24h', '7');
 $outg = penumbra_outage_history(array('hours' => 24, 'limit' => 25), $config);

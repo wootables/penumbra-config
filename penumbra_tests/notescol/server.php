@@ -151,6 +151,8 @@ function journalCallerCanView($r, $u, $o, $a) { return $GLOBALS['EDIT']['canView
 function journalCallerCanReadJournal($r, $u, $a) { return $GLOBALS['EDIT']['canRead']; }
 function journalHasAttachColumn() { return true; }
 function journalHasParentColumn() { return true; }
+// (2026-11-01, sharednote) the edit action reads the report's saved flags: a Discussion report here (a Shared note's edit is the sharednote suite's)
+function journalReportStateFlags($r) { return array('on' => true, 'enc' => false, 'shared' => false, 'toggles' => array(), 'labels' => array(), 'keyCols' => null); }
 function journalUpdateNoteText($id, $rid, $text, $m) { $GLOBALS['EDIT']['updates'][] = array($id, $rid, $text, $m); return 1; }
 function utf8ize($x) { return $x; }
 function journalRowRefLine($scope, $t) { return 'ROW: ' . $t; }

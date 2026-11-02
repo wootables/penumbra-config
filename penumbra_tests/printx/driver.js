@@ -57,8 +57,12 @@
       var cv = getComputedStyle(document.getElementById('pxCanvas'));
       R.chk.canvasCard = rgb(cv.backgroundColor) !== '' && rgb(cv.backgroundColor) !== '255,255,255' && cv.backgroundColor !== 'rgba(0, 0, 0, 0)' && cv.printColorAdjust === 'exact';
       var cells = Array.prototype.slice.call(document.querySelectorAll('#pivotResultTable tbody td')).slice(0, 12);
-      R.chk.darkCellsWhite = cells.length > 0 && cells.every(function (td) { var c = getComputedStyle(td); return (/background-color/.test(td.getAttribute('style') || '')) || (rgb(c.backgroundColor) === '255,255,255' && rgb(c.color) === '0,0,0'); });
-      R.info = { gt: gt && { tag: gt.tagName, cls: String(gt.className), bg: cs.backgroundColor, color: cs.color }, canvas: cv.backgroundColor };
+      // The ordinary cells print white; a total cell (the Total column, the Grand Total row's
+      // figures) prints the #eee band instead - gtBand (2026-11-01: from 10-10 they printed white).
+      R.chk.darkCellsWhite = cells.length > 0 && cells.every(function (td) { var c = getComputedStyle(td); return td.classList.contains('pivot-grand-total') || (/background-color/.test(td.getAttribute('style') || '')) || (rgb(c.backgroundColor) === '255,255,255' && rgb(c.color) === '0,0,0'); });
+      var tots = Array.prototype.slice.call(document.querySelectorAll('#pivotResultTable td.pivot-grand-total')).filter(function (td) { return !/background-color/.test(td.getAttribute('style') || ''); });
+      R.chk.gtBand = tots.length > 0 && tots.every(function (td) { var c = getComputedStyle(td); return rgb(c.backgroundColor) === '238,238,238' && rgb(c.color) === '0,0,0'; });
+      R.info = { gt: gt && { tag: gt.tagName, cls: String(gt.className), bg: cs.backgroundColor, color: cs.color }, canvas: cv.backgroundColor, tots: tots.length, tot0: tots[0] && getComputedStyle(tots[0]).backgroundColor };
     }
   };
   (async function () {

@@ -413,13 +413,13 @@ MUTANTS = {
     'm-staleform': ([('main', "                limit: currentGroupLimit || null,\n",
                       "                limit: _groupNormalizeLimit({ n: $('#groupLimitN').val(), dir: $('#groupLimitDir').val(), other: $('#groupLimitOther').is(':checked'), minRows: $('#groupLimitMinRows').val() }),\n")],
                     ['L-mauto-staleForm'], ['mauto']),
-    'm-gmchosen': ([('main', "            layout = (layout === 'list') ? 'list' : 'stacked';\n            _groupLayoutChosen = true;\n", "            layout = (layout === 'list') ? 'list' : 'stacked';\n")], ['L-mauto-chosenSticks'], ['mauto']),
+    'm-gmchosen': ([('main', "window.Penumbra.cards.canBoard())) return false;\n            _groupLayoutChosen = true;\n", "window.Penumbra.cards.canBoard())) return false;\n")], ['L-mauto-chosenSticks'], ['mauto']),   # (re-anchored, bdlay: the group menu's switch takes Board)
     # (re-anchored, sweep 2) every dialog Apply chooses
-    'm-dialogchooses': ([('main', "        else if (_groupLayoutPicked) _groupLayoutChosen = true;\n        else if (currentGroupLayout !== _layoutWas) _groupLayoutChosen = (currentGroupLayout === 'list');\n",
+    'm-dialogchooses': ([('main', "        else if (_groupLayoutPicked) _groupLayoutChosen = true;\n        else if (currentGroupLayout !== _layoutWas) _groupLayoutChosen = (currentGroupLayout !== 'stacked');\n",   # (re-anchored, bdlay)
                           "        else _groupLayoutChosen = true;\n")], ['L-mauto2-dialogKeepsAuto'], ['mauto2']),
     # --- (2026-10-20, grpsweep 2)
     'm-autoreset': ([('main', "        if (_auto) _groupLayoutChosen = false;\n", "        if (_auto) { }\n")], ['L-mautostale-staleChoice'], ['mautostale']),
-    'm-implicit': ([('main', "            _groupLayoutChosen = _groupLayoutPicked || currentGroupLayout === 'list'; _groupLayoutPicked = false;", "            _groupLayoutChosen = true; _groupLayoutPicked = false;")],
+    'm-implicit': ([('main', "            _groupLayoutChosen = _groupLayoutPicked || currentGroupLayout !== 'stacked'; _groupLayoutPicked = false;", "            _groupLayoutChosen = true; _groupLayoutPicked = false;")],   # (re-anchored, bdlay)
                    ['L-mauto2-implicitStacked'], ['mauto2']),
     'm-onlyfirst': ([('main', "            for (var i = 0; i < trs.length; i++) {\n                var idx = _pnbLazyRowIndex(trs[i]), m = (idx >= 0 && masterRowData) ? masterRowData[idx] : null;",
                       "            for (var i = 0; i < trs.length && i < 1; i++) {\n                var idx = _pnbLazyRowIndex(trs[i]), m = (idx >= 0 && masterRowData) ? masterRowData[idx] : null;")],

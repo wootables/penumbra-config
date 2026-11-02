@@ -1,0 +1,454 @@
+{
+ "_about": "parens FINAL sweep corpus (2026-10-31): second-order cases for the fix round (an empty group's joiner, the paren split before the date join, a brace name cut open, and the fixes crossing). expect = hand-worked row IDs; null = parity only. control = the PRE-FIX build (f378ce2, the three files as live before the fix round) with its exact reds; mutants = the fix lines undone (a list of edits = one mutant). NOTE: no php-brace mutant: penumbra_search.php reads a column name of several tokens up to the operator, so `{`, `A`, `}` already resolves to A there (the re-join is kept for parity with the two twins, where it is load-bearing).",
+ "columns": [
+  "#",
+  "ID",
+  "A",
+  "B",
+  "C",
+  "D",
+  "E",
+  "SUBS"
+ ],
+ "rows": [
+  {
+   "#": "1",
+   "ID": "1",
+   "A": "yes",
+   "B": "yes",
+   "C": "yes",
+   "D": "(x)",
+   "E": "Feb 2025",
+   "SUBS": "@@JSON[{\"K\":\"a\",\"V\":\"1\"},{\"K\":\"b\",\"V\":\"2\"}]"
+  },
+  {
+   "#": "2",
+   "ID": "2",
+   "A": "yes",
+   "B": "yes",
+   "C": "no",
+   "D": "zq",
+   "E": "Mar 2025",
+   "SUBS": "@@JSON[{\"K\":\"a\",\"V\":\"2\"},{\"K\":\"c\",\"V\":\"1\"}]"
+  },
+  {
+   "#": "3",
+   "ID": "3",
+   "A": "yes",
+   "B": "no",
+   "C": "yes",
+   "D": "f(x)",
+   "E": "Feb 2024",
+   "SUBS": "@@JSON[{\"K\":\"c\",\"V\":\"2\"},{\"K\":\"a\",\"V\":\"1\"}]"
+  },
+  {
+   "#": "4",
+   "ID": "4",
+   "A": "yes",
+   "B": "no",
+   "C": "no",
+   "D": "a (b) c",
+   "E": "",
+   "SUBS": ""
+  },
+  {
+   "#": "5",
+   "ID": "5",
+   "A": "no",
+   "B": "yes",
+   "C": "yes",
+   "D": "yes)",
+   "E": "2025-02-10",
+   "SUBS": ""
+  },
+  {
+   "#": "6",
+   "ID": "6",
+   "A": "no",
+   "B": "yes",
+   "C": "no",
+   "D": "(",
+   "E": "",
+   "SUBS": ""
+  },
+  {
+   "#": "7",
+   "ID": "7",
+   "A": "no",
+   "B": "no",
+   "C": "yes",
+   "D": ")",
+   "E": "",
+   "SUBS": ""
+  },
+  {
+   "#": "8",
+   "ID": "8",
+   "A": "no",
+   "B": "no",
+   "C": "no",
+   "D": "and",
+   "E": "",
+   "SUBS": ""
+  }
+ ],
+ "control": {
+  "rev": "f378ce2",
+  "red": [
+   "B-b-nested",
+   "B-b-spaces",
+   "B-b-value-and",
+   "B-d-double",
+   "B-d-two",
+   "B-j-and-or",
+   "B-j-double",
+   "B-j-lead",
+   "B-j-or-wins",
+   "B-j-trail",
+   "B-x-brace-empty",
+   "B-x-empty-date",
+   "F-b-nested",
+   "F-b-spaces",
+   "F-b-value-and",
+   "F-d-double",
+   "F-d-two",
+   "F-j-and-or",
+   "F-j-double",
+   "F-j-lead",
+   "F-j-or-wins",
+   "F-j-trail",
+   "F-x-brace-empty",
+   "F-x-empty-date",
+   "Q-d-double",
+   "Q-d-two",
+   "Q-j-and-or",
+   "Q-j-double",
+   "Q-j-lead",
+   "Q-j-or-wins",
+   "Q-j-trail",
+   "Q-x-brace-empty",
+   "Q-x-empty-date"
+  ]
+ },
+ "mutants": {
+  "js-joiner": [
+   "main",
+   "                    queryTree[queryTree.length - 1].op = tokens[i].toLowerCase();\n",
+   "                    queryTree.push({ type: 'logical', op: tokens[i].toLowerCase() });\n",
+   [
+    "B-j-and-or",
+    "B-j-double",
+    "B-j-or-wins",
+    "B-x-brace-empty"
+   ]
+  ],
+  "php-joiner": [
+   "search",
+   [
+    "                    if (!empty($queryTree) && $queryTree[count($queryTree) - 1]['type'] === 'logical') $queryTree[count($queryTree) - 1]['op'] = $nextLower;\n",
+    "                    $queryTree[count($queryTree) - 1]['op'] = $nextLower;   // an empty group's joiner (2026-10-31)\n"
+   ],
+   [
+    "                    if (false) $queryTree[count($queryTree) - 1]['op'] = $nextLower;\n",
+    "                    $queryTree[] = array('type' => 'logical', 'op' => $nextLower);   // MUTANT: pushed, not replaced\n"
+   ],
+   [
+    "Q-j-and-or",
+    "Q-j-double",
+    "Q-j-or-wins",
+    "Q-x-brace-empty"
+   ]
+  ],
+  "cf-joiner": [
+   "runner",
+   [
+    "                    if (count($tree) > 0 && $tree[count($tree) - 1]['type'] === 'logical') $tree[count($tree) - 1]['op'] = $next;\n",
+    "                if (count($tree) > 0 && $tree[count($tree) - 1]['type'] === 'logical') $tree[count($tree) - 1]['op'] = $next;   // an empty group's joiner (2026-10-31)\n"
+   ],
+   [
+    "                    if (false) $tree[count($tree) - 1]['op'] = $next;\n",
+    "                if (false) $tree[count($tree) - 1]['op'] = $next;   // MUTANT\n"
+   ],
+   [
+    "F-j-and-or",
+    "F-j-double",
+    "F-j-or-wins",
+    "F-x-brace-empty"
+   ]
+  ],
+  "js-brace": [
+   "main",
+   "                if (out[j].charAt(0) !== '{' || out[j].indexOf('}') !== -1) continue;\n",
+   "                continue;\n",
+   [
+    "B-b-nested",
+    "B-b-spaces",
+    "B-b-value-and",
+    "B-x-brace-empty"
+   ]
+  ],
+  "cf-brace": [
+   "runner",
+   "        if (substr($out[$j], 0, 1) !== '{' || strpos($out[$j], '}') !== false) continue;\n",
+   "        continue;\n",
+   [
+    "F-b-nested",
+    "F-b-spaces",
+    "F-b-value-and",
+    "F-x-brace-empty"
+   ]
+  ],
+  "js-order": [
+   "main",
+   [
+    "        const _pqSplit = penumbraSplitParenTokens(tokens, operatorKeys);\n        const _pqGroups = _pqSplit.grouped;\n        if (_pqGroups) tokens.splice.apply(tokens, [0, tokens.length].concat(_pqSplit.tokens));\n",
+    "        let i = 0;\n\n        function parseExpression() {\n"
+   ],
+   [
+    "        let _pqSplit, _pqGroups;   // MUTANT: split after the date join (the pre-fix order)\n",
+    "        _pqSplit = penumbraSplitParenTokens(tokens, operatorKeys); _pqGroups = _pqSplit.grouped;\n        if (_pqGroups) tokens.splice.apply(tokens, [0, tokens.length].concat(_pqSplit.tokens));\n        let i = 0;\n\n        function parseExpression() {\n"
+   ],
+   [
+    "B-d-double",
+    "B-d-two",
+    "B-x-empty-date"
+   ]
+  ],
+  "php-order": [
+   "search",
+   [
+    "    $pqSplit = _search_split_paren_tokens($tokens, $operatorKeys);\n    $pqGroups = $pqSplit['grouped'];\n    if ($pqGroups) $tokens = $pqSplit['tokens'];\n",
+    "    $tokenCount = count($tokens);\n    $pos = 0; // current position (replaces closure `i` from JS)\n"
+   ],
+   [
+    "",
+    "    $pqSplit = _search_split_paren_tokens($tokens, $operatorKeys);\n    $pqGroups = $pqSplit['grouped'];\n    if ($pqGroups) $tokens = $pqSplit['tokens'];\n    $tokenCount = count($tokens);\n    $pos = 0; // current position (replaces closure `i` from JS)\n"
+   ],
+   [
+    "Q-d-double",
+    "Q-d-two",
+    "Q-x-empty-date"
+   ]
+  ],
+  "cf-order": [
+   "runner",
+   [
+    "    $cfSplit = _cf_split_paren_tokens($tokens, $opKeys);\n    $cfGroups = $cfSplit['grouped'];\n    if ($cfGroups) $tokens = $cfSplit['tokens'];\n",
+    "    $i = 0;\n    $count = count($tokens);\n    $tree = array();\n"
+   ],
+   [
+    "",
+    "    $cfSplit = _cf_split_paren_tokens($tokens, $opKeys);\n    $cfGroups = $cfSplit['grouped'];\n    if ($cfGroups) $tokens = $cfSplit['tokens'];\n    $i = 0;\n    $count = count($tokens);\n    $tree = array();\n"
+   ],
+   [
+    "F-d-double",
+    "F-d-two",
+    "F-x-empty-date"
+   ]
+  ]
+ },
+ "queries": [
+  {
+   "slug": "j-lead",
+   "q": "() and A = yes",
+   "expect": [
+    "1",
+    "2",
+    "3",
+    "4"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "j-trail",
+   "q": "A = yes and ()",
+   "expect": [
+    "1",
+    "2",
+    "3",
+    "4"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "j-double",
+   "q": "A = yes () () and C = yes",
+   "expect": [
+    "1",
+    "3"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "j-or-wins",
+   "q": "A = no () or C = yes",
+   "expect": [
+    "1",
+    "3",
+    "5",
+    "6",
+    "7",
+    "8"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "j-and-or",
+   "q": "A = no and () or C = yes",
+   "expect": [
+    "1",
+    "3",
+    "5",
+    "6",
+    "7",
+    "8"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "j-nested",
+   "q": "(A = yes or ()) and C = yes",
+   "expect": [
+    "1",
+    "3"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "j-between",
+   "q": "(A = yes or B = yes) () (C = yes)",
+   "expect": [
+    "1",
+    "3",
+    "5"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "j-or-group",
+   "q": "A = no or () (C = yes)",
+   "expect": [
+    "1",
+    "3",
+    "5",
+    "6",
+    "7",
+    "8"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "b-unbalanced",
+   "q": "({ A } = yes",
+   "expect": null,
+   "paren": true
+  },
+  {
+   "slug": "b-spaces",
+   "q": "({ A } = yes or { B } = no) and { C } = yes",
+   "expect": [
+    "1",
+    "3",
+    "7"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "b-value-and",
+   "q": "({ A } = no or { D } = and) and { C } = no",
+   "expect": [
+    "6",
+    "8"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "b-nested",
+   "q": "(({ A } = yes or B = no) and { C } = yes) or D = zq",
+   "expect": [
+    "1",
+    "2",
+    "3",
+    "7"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "d-nested",
+   "q": "((E >= Feb 2025 or C = no) and A = yes) or D = zq",
+   "expect": [
+    "1",
+    "2",
+    "4"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "d-double",
+   "q": "A = yes and ((E >= Feb 2025))",
+   "expect": [
+    "1",
+    "2"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "d-quoted",
+   "q": "(E >= 'Feb 2025' or C = no) and A = yes",
+   "expect": [
+    "1",
+    "2",
+    "4"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "d-two",
+   "q": "(E >= Feb 2025) and (C = yes)",
+   "expect": [
+    "1",
+    "5"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "d-year-first",
+   "q": "(E >= 2025 Feb or D = zq) and B = yes",
+   "expect": [
+    "1",
+    "2",
+    "5"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "d-day",
+   "q": "(E = 10 Feb 2025 or D = zq) and A = no",
+   "expect": null,
+   "paren": true
+  },
+  {
+   "slug": "x-brace-empty",
+   "q": "({ A } = yes () or B = no)",
+   "expect": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "7",
+    "8"
+   ],
+   "paren": true
+  },
+  {
+   "slug": "x-empty-date",
+   "q": "(() and E >= Feb 2025)",
+   "expect": [
+    "1",
+    "2",
+    "5"
+   ],
+   "paren": true
+  }
+ ]
+}

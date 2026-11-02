@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>narrowrows harness</title>
+<link rel="stylesheet" href="main.css">
+<style>
+  /* Harness only. Each probe is a bare box of the width a hub card leaves its lists at a
+     given window: 466px = the left column at a 1364px window, 386px = at 1160px (the
+     narrowest two-column window), 683px = at 1920px. tests.js copies the template's lists
+     into each, as a card holds them. */
+  body { margin: 0; padding: 16px; }
+  .probe { margin: 0 0 24px; }
+</style>
+</head>
+<body class="pnb-adm">
+<div class="probe" id="w466" style="width: 466px"></div>
+<div class="probe" id="w386" style="width: 386px"></div>
+<div class="probe" id="w683" style="width: 683px"></div>
+<template id="lists">
+  <div class="pnb-rows pnb-rows-out" role="table" aria-label="Outage episodes, newest first">
+    <div class="sr-only" role="row"><span role="columnheader">Started</span><span role="columnheader">Component</span><span role="columnheader">Lasted</span><span role="columnheader">Ended</span><span role="columnheader">Problem</span><span role="columnheader">Checks</span></div>
+    <div class="pnb-row" role="row">
+      <span class="t" role="cell">Sun 01 Nov 06:49</span>
+      <span class="c" role="cell">INFOED</span>
+      <span class="d" role="cell">43m</span>
+      <span class="to" role="cell">to 07:33</span>
+      <span class="p" title="database infoed down" role="cell"><span class="pt">database infoed down</span><span class="pnb-out-tag" title="Part of a recurring pattern seen on 5 days">recurring</span></span>
+      <span class="k" role="cell">9 checks</span>
+    </div>
+    <div class="pnb-row near" role="row">
+      <span class="t" role="cell">Sat 31 Oct 23:58</span>
+      <span class="c" role="cell">INFOED</span>
+      <span class="d" role="cell">4m</span>
+      <span class="to" role="cell">to 00:03</span>
+      <span class="p" title="database infoed degraded (2 failed connect attempt(s) before one succeeded)" role="cell"><span class="pt">database infoed degraded (2 failed connect attempt(s) before one succeeded)</span><span class="pnb-out-tag near" title="The component answered, but only after failed attempts.">near miss</span></span>
+      <span class="k" role="cell">1 check</span>
+    </div>
+    <div class="pnb-rows-more on" role="rowgroup">
+    <div class="pnb-row" role="row">
+      <span class="t" role="cell">Sat 31 Oct 23:08</span>
+      <span class="c" role="cell">www3 delivery</span>
+      <span class="d" role="cell">1h 5m</span>
+      <span class="to" role="cell">to 00:13</span>
+      <span class="p" title="delivery stalled (3 large responses timed out)" role="cell"><span class="pt">delivery stalled (3 large responses timed out)</span><span class="pnb-out-tag mute" title="A known window.">muted</span></span>
+      <span class="k" role="cell">100 checks</span>
+    </div>
+    </div>
+  </div>
+  <div class="pnb-rows pnb-rows-jobs" role="table" aria-label="Maintenance jobs">
+    <div class="sr-only" role="row"><span role="columnheader">Schedule</span><span role="columnheader">State</span><span role="columnheader">Job</span><span role="columnheader">Last run</span><span role="columnheader">Detail</span><span role="columnheader">Actions</span></div>
+    <div class="pnb-row" data-job="people_sync" role="row">
+      <span class="t" title="Schedule (config maintenance)" role="cell">05:30 daily</span>
+      <span class="c " role="cell">OK</span>
+      <span class="d" title="people_sync" role="cell">Employee directory refresh (HR -&gt; NC_REPORTING.PENUMBRA_PEOPLE)</span>
+      <span class="to" title="Last run" role="cell">2026-11-01 05:32:39</span>
+      <span class="p" role="cell">ok in 23.8 s &middot; next: tomorrow 05:30</span>
+      <span class="k" role="cell">
+        <button type="button" class="pnb-job-btn" data-job-act="request" data-job="people_sync" title="Run on the next scheduler cycle (within five minutes)">Run now</button>
+        <button type="button" class="pnb-job-btn" data-job-act="pause" data-job="people_sync" title="Hold the schedule until you resume; a requested run still runs">Pause</button>
+        <a href="#pnbLog" class="pnb-log-jump" data-log="jobs" data-q="[people_sync]" title="Open the Internal jobs log, filtered to this job">log &#8599;</a>
+      </span>
+    </div>
+    <div class="pnb-row" data-job="db_backup" role="row">
+      <span class="t" title="Schedule (config maintenance)" role="cell">01:30 daily</span>
+      <span class="c warn" role="cell">REQUESTED</span>
+      <span class="d" title="db_backup" role="cell">Table backup (NC_REPORTING.PENUMBRA_* -&gt; backup files)</span>
+      <span class="to" title="Last run" role="cell">2026-11-01 01:33:26</span>
+      <span class="p" role="cell">ok in 71 s &middot; runs on the next cycle</span>
+      <span class="k" role="cell">
+        <button type="button" class="pnb-job-btn" data-job-act="cancel_request" data-job="db_backup" title="Withdraw the run request">Withdraw</button>
+        <button type="button" class="pnb-job-btn" data-job-act="resume" data-job="db_backup" title="Back on its schedule">Resume</button>
+        <a href="#pnbLog" class="pnb-log-jump" data-log="jobs" data-q="[db_backup]" title="Open the Internal jobs log, filtered to this job">log &#8599;</a>
+      </span>
+    </div>
+  </div>
+  <div class="pnb-rows pnb-rows-runs" role="table" aria-label="Latest maintenance runs, newest first">
+    <div class="sr-only" role="row"><span role="columnheader">Time</span><span role="columnheader">Result</span><span role="columnheader">Job</span><span role="columnheader">By</span><span role="columnheader">Message</span><span role="columnheader">Figures</span></div>
+    <div class="pnb-row" role="row">
+      <span class="t" role="cell">11-01 05:32</span>
+      <span class="c " role="cell">OK</span>
+      <span class="d" role="cell">Employee directory refresh (HR -&gt; NC_REPORTING.PENUMBRA_PEOPLE)</span>
+      <span class="to" role="cell">PEOPLE_SYNC</span>
+      <span class="p" role="cell">staged=72114 active=24874 inserted=35 updated=72079 deactivated=0 pi_eligible=2596 pi_drift=0 clamped=0 seconds=23.7</span>
+      <span class="k" role="cell">staged 72114 active 24874 pi_eligible 2596 inserted 35 updated 72079 seconds 23.7</span>
+    </div>
+    <div class="pnb-row" role="row">
+      <span class="t" role="cell">11-01 01:33</span>
+      <span class="c bad" role="cell">FAILED</span>
+      <span class="d" role="cell">Table backup (NC_REPORTING.PENUMBRA_* -&gt; backup files)</span>
+      <span class="to" role="cell">DB_BACKUP</span>
+      <span class="p" role="cell">set 2026-11-01_0132 complete: 15 tables, 109,131 rows, 70.1 MB, 1 cycle(s), 70.8s reading</span>
+      <span class="k" role="cell">tables 15 rows 109131 size 70.1 MB seconds 70.8</span>
+    </div>
+  </div>
+  <div class="pnb-rows pnb-rows-dl" role="table" aria-label="Delivery failures, newest first">
+    <div class="sr-only" role="row"><span role="columnheader">Time</span><span role="columnheader">Kind</span><span role="columnheader">Size</span><span role="columnheader">Lasted</span><span role="columnheader">Detail</span><span role="columnheader">Log</span></div>
+    <div class="pnb-row" role="row">
+      <span class="t" role="cell">08:12:01</span>
+      <span class="c bad" role="cell">STALL</span>
+      <span class="d" role="cell">1.2 MB</span>
+      <span class="to" role="cell">21s</span>
+      <span class="p" title="/sponsor_migration/penumbra/query.php" role="cell">win32 121 &middot; via 152.1.1.10 &middot; /sponsor_migration/penumbra/query.php</span>
+      <span class="k" role="cell"><a href="#pnbLog" class="pnb-log-jump" data-log="iis" data-q="12:12" title="Open the IIS access tab filtered to this minute (12:12 UTC)">log &#8599;</a></span>
+    </div>
+  </div>
+</template>
+<pre id="out"></pre>
+<script src="tests.js"></script>
+</body>
+</html>

@@ -87,7 +87,7 @@ MUTANTS = {
     # the grouping's summary, group sort, layout left out
     'm-grpagg': ([("        if (g.agg) state.groupAgg = { column: g.agg.column, type: g.agg.type };\n", "")], ['G1'], ['grouped']),
     'm-grpsort': ([("        if (g.sort && (g.sort.key !== 'label' || g.sort.dir !== 'asc')) state.groupSort = { key: g.sort.key, dir: g.sort.dir };\n", "")], ['G1'], ['grouped']),
-    'm-grplayout': ([("        if (g.layout === 'list') state.groupLayout = 'list';\n", "")], ['G1', 'R-G-saved'], ['grouped', 'R-G-saved']),
+    'm-grplayout': ([("        if (g.layout === 'list' || g.layout === 'board') state.groupLayout = g.layout;\n", "")], ['G1', 'R-G-saved'], ['grouped', 'R-G-saved']),   # (re-anchored, bdlay)
     # the report's kept sort handed out itself, not a copy: editing a capture edits what Clear puts back
     'm-copy': ([("        return _pnbCmpReportSort.map(function (c) { return Object.assign({}, c); });\n",
                  "        return _pnbCmpReportSort;\n")], ['G8'], ['grouped']),
@@ -166,7 +166,7 @@ MUTANTS = {
     'q-clearall': ([("        var _pnbCmpOn = _pnbCmpOnScreen() && !_pnbRunClearAll;\n", "        var _pnbCmpOn = _pnbCmpOnScreen();\n")],
                    ['Q7'], ['rqgrouped']),
     # the record's parts left to the globals the comparison changed, or lost
-    'q-layout': ([("        currentGroupLayout = (g.layout === 'list') ? 'list' : 'stacked';\n"
+    'q-layout': ([("        currentGroupLayout = _groupLayoutNorm(g.layout);\n"   # (re-anchored, bdlay)
                    "        $('#groupLayout').val(currentGroupLayout);   // grplist2: the dialog's field follows\n", "")],
                  ['Q1', 'Q2'], ['rqgrouped']),
     'q-gsort': ([("        currentGroupSort = g.sort ? { key: g.sort.key, dir: g.sort.dir } : { key: 'label', dir: 'asc' };\n", "")],

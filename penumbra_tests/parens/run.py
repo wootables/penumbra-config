@@ -28,6 +28,7 @@
 #   py -3 run.py --stage DIR --mutants  every mutant on DIR's files: EXACTLY its asserts red
 #   py -3 run.py --mutant NAME          one (anchors are checked first: each must occur once)
 #   --all = target + --control + --mutants in one run
+#   --corpus corpus3.json --all     the FIX ROUND's second-order cases: control = the pre-fix build, fix mutants
 # Needs py -3 and the PHP 8.2 CLI. Stages into %TEMP% (pnb_parens_*); writes nothing to the
 # webroot. One headless suite at a time on this workstation: it waits while another runs.
 # =============================================================================
@@ -57,11 +58,18 @@ for _i, _a in enumerate(sys.argv):
 with open(CORPUS_FILE, encoding='utf-8') as _f:
     CORPUS = json.load(_f)
 PAREN = [q['slug'] for q in CORPUS['queries'] if q.get('paren')]
+# A corpus may carry its own control (rev + the exact reds) and its own mutants: corpus3.json (the fix round's
+# second-order cases) controls against the PRE-FIX build and mutates the fix lines; the default corpus keeps the
+# phase-1 control (10d2ee6) and the grammar mutants below.
+if CORPUS.get('control', {}).get('rev'):
+    CONTROL_REV = CORPUS['control']['rev']
 NOFMT = set(q['slug'] for q in CORPUS['queries'] if q.get('noFormat'))
 B_PAREN = ['B-' + s for s in PAREN]
 Q_PAREN = ['Q-' + s for s in PAREN]
 F_PAREN = ['F-' + s for s in PAREN if s not in NOFMT]
 CONTROL_RED = B_PAREN + Q_PAREN + F_PAREN
+if CORPUS.get('control', {}).get('red') is not None:
+    CONTROL_RED = list(CORPUS['control']['red'])
 
 # name: (file key, old, new, the asserts that MUST go red - exactly). Each old must occur exactly once.
 MUTANTS = {
@@ -88,6 +96,8 @@ MUTANTS = {
     'cf-noeval':     ('runner', "            $results[] = evaluate_format_condition($rowData, $part['parts']);",
                                 "            $results[] = false;", None),   # filled at run time: every F paren query that has a group node
 }
+if CORPUS.get('mutants'):
+    MUTANTS = dict((k, (v[0], v[1], v[2], v[3])) for k, v in CORPUS['mutants'].items())
 
 
 def log(s):
@@ -253,13 +263,17 @@ def git_show(rel):
 def apply_mutant(texts, name):
     key, old, new, _ = MUTANTS[name]
     text = texts[key]
-    if '\r\n' in text:
-        old, new = old.replace('\n', '\r\n'), new.replace('\n', '\r\n')
-    n = text.count(old)
-    if n != 1:
-        raise SystemExit("mutant '%s' anchor found %d times in %s, expected 1: %s" % (name, n, REL[key], old[:160]))
+    olds = old if isinstance(old, list) else [old]
+    news = new if isinstance(new, list) else [new]
+    for o, nw in zip(olds, news):   # several edits = one mutant (an order swap needs two)
+        if '\r\n' in text:
+            o, nw = o.replace('\n', '\r\n'), nw.replace('\n', '\r\n')
+        n = text.count(o)
+        if n != 1:
+            raise SystemExit("mutant '%s' anchor found %d times in %s, expected 1: %s" % (name, n, REL[key], o[:160]))
+        text = text.replace(o, nw)
     out = dict(texts)
-    out[key] = text.replace(old, new)
+    out[key] = text
     return out
 
 
@@ -299,7 +313,7 @@ def main():
     # The cf-noeval mutant's expected reds: every F paren query (a group evaluated as false
     # changes each of them; a one-part group is unwrapped, so `single`, `bare-group` and `dangling` stay).
     # ... plus global-in-group, grouped but not paren-marked (the old engines happened to read it right).
-    MUTANTS['cf-noeval'] = MUTANTS['cf-noeval'][:3] + ([s for s in F_PAREN if s not in ('F-single', 'F-bare-group', 'F-empty-group', 'F-dangling')] + ['F-global-in-group'],)
+    if 'cf-noeval' in MUTANTS: MUTANTS['cf-noeval'] = MUTANTS['cf-noeval'][:3] + ([s for s in F_PAREN if s not in ('F-single', 'F-bare-group', 'F-empty-group', 'F-dangling')] + ['F-global-in-group'],)
 
     ok = True
     only_mutants = bool(a.mutant) or (a.mutants and not a.all)

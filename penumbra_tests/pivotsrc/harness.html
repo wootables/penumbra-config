@@ -153,6 +153,9 @@
     // pivot search does (it used to keep each as a search term: preview 0).
     await engineCase('E12', '__ROW TRANSACTION_TYPE = New (no aggregate named)', '__ROW TRANSACTION_TYPE = New', ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo'], 9);
     await engineCase('E13', '__ALL TRANSACTION_TYPE = New (no aggregate named)', '__ALL TRANSACTION_TYPE = New', ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo'], 9);
+    // E14 (parens fix round, 2026-10-31): a group mixing a source and an aggregate condition takes the UNSAFE path (the
+    // whole query against the pivot's own values); the source condition OUTSIDE the group used to be dropped from both passes.
+    await engineCase('E14', 'mixed group + FUNDER = Alpha outside it: the outside condition is kept', '(Awards > 1 or TRANSACTION_TYPE = Supplement) and FUNDER = Alpha', ['Alpha'], 3);
 
     // Email reading, every fixture query, pivot on screen (the task form's hint path).
     FX.emailQueries.forEach(function (q) { emailCounts[q] = prev(q, { email: true }).txns; });

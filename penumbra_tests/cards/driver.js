@@ -73,7 +73,7 @@
 
   var S = {};
   S.cauto = async function () {
-    R.chk.switchShown = vis(sw()) && same(qa('#pnbCardsSwitch .pnb-cseg-opt').map(function (o) { return o.getAttribute('data-view'); }), ['table', 'cards', 'board']);   // (round S) the board
+    R.chk.switchShown = vis(sw()) && same(qa('#pnbCardsSwitch .pnb-cseg-opt').map(function (o) { return o.getAttribute('data-view'); }), ['table', 'cards']);   // (round S) the board; (bdlay) Table / Cards again: Board is the grouping's layout
     R.chk.tableDefault = !on() && host().hidden && getComputedStyle(q('#resultsTable')).visibility !== 'hidden';
     var before = shownRows().map(rowIdx);
     await pickView('cards');
@@ -131,8 +131,8 @@
     R.chk.clickSelects = cs[2].getAttribute('aria-current') === 'true' && cs[2].tabIndex === 0 && C().selected() === parseInt(cs[2].getAttribute('data-row'), 10) && !!C().details && C().details().open;
     if (C().closeDetails) C().closeDetails(); await sleep(50);   // (on live before cdet there is no window to close)
     var s = sw(), radios = qa('.pnb-cseg-opt', s);
-    R.chk.switchA11y = s.getAttribute('role') === 'radiogroup' && radios.length === 3 && radios.every(function (r) { return r.getAttribute('role') === 'radio'; })
-      && opt('cards').getAttribute('aria-checked') === 'true' && opt('table').getAttribute('aria-checked') === 'false' && opt('board').getAttribute('aria-checked') === 'false' && opt('cards').classList.contains('is-selected');   // (round S) three
+    R.chk.switchA11y = s.getAttribute('role') === 'radiogroup' && radios.length === 2 && radios.every(function (r) { return r.getAttribute('role') === 'radio'; })
+      && opt('cards').getAttribute('aria-checked') === 'true' && opt('table').getAttribute('aria-checked') === 'false' && opt('cards').classList.contains('is-selected');   // (bdlay) two again
     await pickView('table');
     R.chk.pagerWord = pagerCards && (function () { var lb = q('label[for="rowsPerPageSelector"]'); return !!lb && text(lb) === 'Rows:' && /^Rows per page/.test(q('#rowsPerPageSelector').title); })();   // (round I) and back
     R.chk.toTable = !on() && host().hidden && getComputedStyle(q('#resultsTable')).visibility !== 'hidden' && opt('table').getAttribute('aria-checked') === 'true';
@@ -251,9 +251,9 @@
     try { C().closeDetails(); } catch (e) { }
     // (cfmt2) the window's buttons named for whom they act
     await sleep(100); C().openConfig(); await sleep(150);
-    R.chk.buttonWords = text(cbtn('pnb-ccfg-reset')) === 'Reset my cards' && text(cbtn('pnb-ccfg-default')) === 'Make default for everyone' && text(cbtn('pnb-ccfg-nodefault')) === 'Remove the default for everyone'
-      && /^Every viewer of this report/.test(cbtn('pnb-ccfg-default').getAttribute('title') || '') && !/Use the report|Use as the report/.test(cfg().textContent);
-    R.info.words = [text(cbtn('pnb-ccfg-reset')), text(cbtn('pnb-ccfg-default')), text(cbtn('pnb-ccfg-nodefault')), cbtn('pnb-ccfg-reset').title];
+    R.chk.buttonWords = text(cbtn('pnb-ccfg-reset')) === 'Reset' && !cbtn('pnb-ccfg-default') && text(cbtn('pnb-ccfg-nodefault')) === 'Clear the default'   // (cfix) Make default for everyone gone
+      && !/Use the report|Use as the report|Make default/.test(cfg().textContent);
+    R.info.words = [text(cbtn('pnb-ccfg-reset')), !!cbtn('pnb-ccfg-default'), text(cbtn('pnb-ccfg-nodefault')), cbtn('pnb-ccfg-reset').title];
     C().closeConfig();
   };
   // (cfmt2) 2,500 rows: main.js defers its format pass 50 ms; the cards must show the highlights after it, a page turn too
@@ -325,7 +325,7 @@
     R.chk.cards = on() && cards().length === 200 && !!sl && sl.title === 'V_NAME';
     // (round N) Configure cards for a viewer: no report default to make or remove; a pick is the viewer's own
     C().openConfig(); await until(cfgShown, 3000);
-    R.chk.viewerWindow = cfgShown() && cbtn('pnb-ccfg-default').hidden && cbtn('pnb-ccfg-editor').hidden && cbtn('pnb-ccfg-reset').disabled;
+    R.chk.viewerWindow = cfgShown() && !cbtn('pnb-ccfg-default') && cbtn('pnb-ccfg-editor').hidden && cbtn('pnb-ccfg-reset').disabled && /a change is kept for you|a change makes them your own/.test(text(q('#pnbCcfgSub')));   // (cfix)
     setSel('pnbCcfgTitle1', 'V_STATUS'); await sleep(200);
     R.chk.viewerPick = slots().title === 'V_STATUS' && !!mine() && mine().own === 1 && mine().title === 'V_STATUS' && !cbtn('pnb-ccfg-reset').disabled;
     R.info.viewerPref = mine();
@@ -382,26 +382,43 @@
     if (P.get('shot') && P.get('theme')) { var th = (window.__THEMES || []).filter(function (x) { return x.id === P.get('theme'); })[0]; if (th) applyTheme(th); await sleep(300); }
   };
   S.gcards = async function () {
-    await until(function () { return on() && qa('#pnbCardsHost .pnb-cards-grp').length > 0; }, 10000);
+    // (cband, 2026-11-01, the user: "it should be able to work fine in the existing stacked") the cards sit in the grouped
+    // view's own bands: the view inside the host and on screen, no bands of the cards' own, each leaf band's grid holding
+    // its rows' cards, the heads and summaries the table's (on screen), the band's table laid out out of sight, sticky heads
+    await until(function () { return on() && qa('#groupedResultsContainer .pnb-cards-inband').length > 0; }, 10000); await sleep(150);
     var leaves = qa('#groupedResultsContainer .group-wrapper.group-leaf').filter(function (w) { return !w.classList.contains('group-grand-total'); });
-    var grps = qa('#pnbCardsHost .pnb-cards-grp');
+    var gc = q('#groupedResultsContainer'), gcs = getComputedStyle(gc);
     R.chk.grouped = leaves.length >= 5 && window.jQuery('#groupedResultsContainer').is(':visible');
-    R.chk.groupCount = grps.length === leaves.length;
-    var names = true, counts = true, aggs = true, aggSeen = 0, perGroup = true, total = 0;
-    for (var i = 0; i < Math.min(grps.length, leaves.length); i++) {
-      var hdr = q(':scope > .group-header', leaves[i]);
-      if (text(q('.pnb-cards-grpname', grps[i])) !== text(q('.group-name', hdr))) names = false;
-      if (text(q('.pnb-cards-grpcount', grps[i])) !== text(q('.group-count', hdr))) counts = false;
-      var agg = q('.group-agg-summary', hdr);
-      if (agg) { aggSeen++; if (text(q('.pnb-cards-grpagg', grps[i])) !== text(agg)) aggs = false; }
-      var rows = qa(':scope > .group-content > table > tbody > tr', leaves[i]).filter(function (tr) { return !tr.classList.contains('search-hidden'); });
-      var cs = qa('.pnb-card', grps[i]); total += cs.length;
-      if (cs.length !== rows.length || !same(cs.map(function (c) { return parseInt(c.getAttribute('data-row'), 10); }), rows.map(rowIdx))) perGroup = false;
-    }
-    var any = grps.length > 0 && leaves.length > 0;   // (never vacuous: on live there are no groups of cards)
-    R.chk.groupNames = any && names; R.chk.groupCounts = any && counts; R.chk.groupAgg = aggSeen > 0 && aggs; R.chk.groupCards = any && perGroup;
+    R.chk.inBands = !!gc.closest('#pnbCardsHost') && gcs.visibility === 'visible' && gcs.position !== 'absolute' && document.body.classList.contains('pnb-cards-inband') && qa('#pnbCardsHost .pnb-cards-grp').length === 0;
+    var perGroup = true, heads = true, aggSeen = 0, aggsShown = true, total = 0;
+    leaves.forEach(function (w) {
+      var g = q(':scope > .group-content > .pnb-cards-inband', w), hdr = q(':scope > .group-header', w), agg = hdr ? q('.group-agg-summary', hdr) : null;
+      var rows = qa(':scope > .group-content > table > tbody > tr', w).filter(function (tr) { return !tr.classList.contains('search-hidden'); });
+      var cs = g ? qa('.pnb-card', g) : []; total += cs.length;
+      if (!g || cs.length !== rows.length || !same(cs.map(function (c) { return parseInt(c.getAttribute('data-row'), 10); }), rows.map(rowIdx))) perGroup = false;
+      if (!hdr || !vis(hdr) || getComputedStyle(hdr).visibility !== 'visible' || !text(q('.group-name', hdr))) heads = false;
+      if (agg) { aggSeen++; if (!vis(agg) || getComputedStyle(agg).visibility !== 'visible') aggsShown = false; }
+    });
+    R.chk.bandCards = leaves.length > 0 && perGroup;
     R.chk.totalCards = total === 300 && cards().length === 300;
-    R.info.g = [grps.length, leaves.length, aggSeen, total, text(q('.pnb-cards-grphead', grps[0]))];
+    R.chk.bandHeads = leaves.length > 0 && heads;
+    R.chk.bandAggs = aggSeen > 0 && aggsShown;
+    var tb = q(':scope > .group-content > table', leaves[0]), tcs = tb ? getComputedStyle(tb) : null, h0 = q(':scope > .group-header', leaves[0]);
+    R.chk.bandTableHidden = !!tcs && tcs.visibility === 'hidden' && tcs.position === 'absolute' && window.jQuery(tb).is(':visible');   // (laid out: the exports read :visible)
+    R.chk.headSticky = !!h0 && getComputedStyle(h0).position === 'sticky';
+    // a band grows to its cards (main.css's 425px scroll box is the table's): the first band's 27 cards, no scroller
+    var bx = q(':scope > .group-content', leaves[0]), bg = bx ? q(':scope > .pnb-cards-inband', bx) : null, bxs = bx ? getComputedStyle(bx) : null;
+    R.info.grow = bg ? { maxH: bxs.maxHeight, ovY: bxs.overflowY, box: Math.round(bx.getBoundingClientRect().height), grid: Math.round(bg.getBoundingClientRect().height) } : null;
+    R.chk.bandGrows = !!bg && bxs.maxHeight === 'none' && bxs.overflowY === 'visible' && bg.getBoundingClientRect().height > 425 && bx.getBoundingClientRect().height >= bg.getBoundingClientRect().height;
+    R.info.g = { leaves: leaves.length, aggSeen: aggSeen, total: total, gc: [gcs.visibility, gcs.position], inHost: !!gc.closest('#pnbCardsHost'), tb: tcs ? [tcs.visibility, tcs.position] : null, sticky: h0 ? getComputedStyle(h0).position : null };
+    // a stale grid in a folded band (a snapshot comparison's saved HTML brings old ones back): gone at the next draw
+    var lw = leaves[leaves.length - 1], lh = q(':scope > .group-header', lw);
+    lh.click(); await until(function () { return !lw.classList.contains('open'); }, 4000); await sleep(150);
+    var lbox = q(':scope > .group-content', lw), fake = document.createElement('div');
+    fake.className = 'pnb-cards-grid pnb-cards-inband'; fake.innerHTML = '<div class="pnb-card" data-row="0"></div>'; lbox.insertBefore(fake, lbox.firstChild);
+    C().redraw(); await sleep(200);
+    R.chk.staleGone = !fake.isConnected && !q('.pnb-cards-inband', lw) && cards().length === total - qa(':scope > .group-content > table > tbody > tr', lw).length;
+    lh.click(); await until(function () { return lw.classList.contains('open') && !!q(':scope > .group-content > .pnb-cards-inband', lw); }, 4000); await sleep(150);
     await runSearch('Alpha');
     var keptN = function () { return qa('#groupedResultsContainer .group-leaf > .group-content > table > tbody > tr').filter(function (tr) { return !tr.classList.contains('search-hidden'); }).length; };
     await until(function () { return keptN() < 300 && cards().length === keptN(); }, 8000);
@@ -411,32 +428,39 @@
   };
   // (gfold) the bands fold as the table's: the wrappers' .open is the truth; a card band mirrors it
   function wrappers() { return qa('#groupedResultsContainer .group-wrapper').filter(function (w) { return !w.classList.contains('group-grand-total'); }); }
-  function grps() { return qa('#pnbCardsHost .pnb-cards-grp'); }
-  function tog(i) { return q('#pnbCardsHost .pnb-cards-grptoggle[data-gi="' + i + '"]'); }
-  function openOf(g) { return !g.classList.contains('is-closed') && tog(g.querySelector('.pnb-cards-grptoggle').getAttribute('data-gi')).getAttribute('aria-expanded') === 'true'; }
+  // (cband, 2026-11-01) the bands are the grouped view's own (Stacked draws the cards into them): a band = a shown wrapper,
+  // its toggle = its head (a button while the cards show: tabindex, role, aria-expanded), shut = folded
+  function grps() { return qa('#groupedResultsContainer .group-wrapper').filter(function (w) { return !w.classList.contains('group-grand-total') && !w.classList.contains('search-hidden') && w.getClientRects().length > 0; }); }
+  function tog(i) { var g = grps()[i]; return g ? q(':scope > .group-header', g) : null; }
+  function openOf(g) { var h = g ? q(':scope > .group-header', g) : null; return !!h && g.classList.contains('open') && h.getAttribute('aria-expanded') === 'true'; }
+  function shut(g) { var h = g ? q(':scope > .group-header', g) : null; return !!h && !g.classList.contains('open') && h.getAttribute('aria-expanded') === 'false'; }
+  function gname(g) { return g ? text(q(':scope > .group-header .group-name', g)) : null; }
   S.gcoll = async function () {
     await until(function () { return on() && grps().length > 0; }, 10000);
     var ws = wrappers(), n = ws.length;
     R.chk.bandsOpen = n >= 5 && grps().length === n && ws.every(function (w) { return w.classList.contains('open'); }) && grps().every(openOf) && cards().length === 300;
-    tog(0).click(); await until(function () { return grps()[0] && grps()[0].classList.contains('is-closed'); }, 4000);
+    tog(0).click(); await until(function () { return shut(grps()[0]); }, 4000);
     var g0 = grps()[0], w0 = ws[0];
-    R.chk.bandClick = !w0.classList.contains('open') && g0.classList.contains('is-closed') && qa('.pnb-card', g0).length === 0 && tog(0).getAttribute('aria-expanded') === 'false' && cards().length === 300 - qa('tbody tr', w0).length;
+    R.chk.bandClick = !w0.classList.contains('open') && shut(g0) && qa('.pnb-card', g0).length === 0 && tog(0).getAttribute('aria-expanded') === 'false' && cards().length === 300 - qa('tbody tr', w0).length;
     R.info.fold = [w0.className, cards().length, qa('tbody tr', w0).length];
-    tog(0).click(); await until(function () { return grps()[0] && !grps()[0].classList.contains('is-closed'); }, 4000);
+    tog(0).click(); await until(function () { return openOf(grps()[0]); }, 4000);
     R.chk.bandAgain = ws[0].classList.contains('open') && openOf(grps()[0]) && cards().length === 300;
     tog(1).focus(); key(tog(1), 'Enter'); await until(function () { return !ws[1].classList.contains('open'); }, 4000); await sleep(150);
-    R.chk.bandKey = !ws[1].classList.contains('open') && grps()[1].classList.contains('is-closed') && tog(1).getAttribute('aria-expanded') === 'false';
+    R.chk.bandKey = !ws[1].classList.contains('open') && shut(grps()[1]) && tog(1).getAttribute('aria-expanded') === 'false';
     R.chk.focusKept = document.activeElement === tog(1);
-    q('#collapseAllGroups').click(); await until(function () { return cards().length === 0 && grps().every(function (g) { return g.classList.contains('is-closed'); }); }, 4000);
-    R.chk.collapseAll = ws.every(function (w) { return !w.classList.contains('open'); }) && grps().length === n && grps().every(function (g) { return g.classList.contains('is-closed'); }) && cards().length === 0;
+    q('#collapseAllGroups').click(); await until(function () { return cards().length === 0 && grps().every(shut); }, 4000);
+    R.chk.collapseAll = ws.every(function (w) { return !w.classList.contains('open'); }) && grps().length === n && grps().every(shut) && cards().length === 0;
     q('#expandAllGroups').click(); await until(function () { return cards().length === 300; }, 4000);
     R.chk.expandAll = ws.every(function (w) { return w.classList.contains('open'); }) && grps().every(openOf) && cards().length === 300;
     // fold band 2 here, go to the table and back: the table shows it folded (one state), the cards draw it folded again
     tog(2).click(); await until(function () { return !ws[2].classList.contains('open'); }, 4000);
     await pickView('table');
     var tableFolded = !ws[2].classList.contains('open') && ws[0].classList.contains('open');
+    // (cband) the table: the grouped view back where index.php has it, no grids, no heads made buttons, the body class gone
+    var tableHome = !q('#groupedResultsContainer').closest('#pnbCardsHost') && !qa('.pnb-cards-inband, .pnb-cards-bandmore, .pnb-cards-bandhead').length && !document.body.classList.contains('pnb-cards-inband');
     await pickView('cards');
-    R.chk.keptAcrossViews = tableFolded && grps()[2].classList.contains('is-closed') && !grps()[0].classList.contains('is-closed') && cards().length === 300 - qa('tbody tr', ws[2]).length;
+    R.chk.keptAcrossViews = tableFolded && shut(grps()[2]) && !shut(grps()[0]) && cards().length === 300 - qa('tbody tr', ws[2]).length;
+    R.chk.tableHome = tableHome;
     if (P.get('shot')) { tog(0).click(); await sleep(300); window.scrollTo(0, 0); if (P.get('theme')) { var t = (window.__THEMES || []).filter(function (x) { return x.id === P.get('theme'); })[0]; if (t) applyTheme(t); } await sleep(300); }
   };
   S.gncoll = async function () {
@@ -446,9 +470,9 @@
     var b0 = branches[0], gi0 = grps().indexOf(grps().filter(function (g) { return g.getAttribute('data-group-path') === b0.getAttribute('data-group-path'); })[0]);
     var inner = qa('.group-wrapper', b0).length, before = grps().length;
     tog(gi0).click(); await until(function () { return !b0.classList.contains('open'); }, 4000); await sleep(150);
-    R.chk.branchFolds = !b0.classList.contains('open') && grps().length === before - inner && qa('.pnb-cards-grp', grps()[gi0]).length === 0 && grps()[gi0].classList.contains('is-closed');
+    R.chk.branchFolds = !b0.classList.contains('open') && grps().length === before - inner && qa('.pnb-card', grps()[gi0]).length === 0 && shut(grps()[gi0]);
     R.info.nested = [branches.length, leaves.length, inner, before, grps().length];
-    tog(gi0).click(); await until(function () { return b0.classList.contains('open') && grps().length === before; }, 4000);
+    tog(gi0).click(); await until(function () { return openOf(b0) && grps().length === before; }, 4000); await sleep(150);   // (cband) the cards' redraw marks the head: drawn then
     var l0 = leaves[0], gl = grps().indexOf(grps().filter(function (g) { return g.getAttribute('data-group-path') === l0.getAttribute('data-group-path'); })[0]), total = cards().length;
     tog(gl).click(); await until(function () { return !l0.classList.contains('open'); }, 4000); await sleep(150);
     R.chk.leafFolds = !l0.classList.contains('open') && qa('.pnb-card', grps()[gl]).length === 0 && cards().length === total - qa('tbody tr', l0).length && grps().length === before;
@@ -573,9 +597,9 @@
     C().openConfig(); await until(cfgShown, 3000);
     var s0 = q('#pnbCcfgSize').value;
     setSel('pnbCcfgSize', 'xl'); await sleep(100); var px = (prefs().lrfix || {}).size;
-    cbtn('pnb-ccfg-default').click(); await sleep(150); var b2 = bsoCards();
-    setSel('pnbCcfgSize', 'standard'); await sleep(100); cbtn('pnb-ccfg-default').click(); await sleep(150); var b3 = bsoCards();
-    R.chk.formSize = !!b1 && b1.size === 'large' && s0 === 'standard' && px === 'xl' && !!b2 && b2.size === 'xl' && !!b3 && b3.size === undefined;
+    var b2 = bsoCards();   // (cfix) an editor's Save writes the size shown
+    setSel('pnbCcfgSize', 'standard'); await sleep(100); var b3 = bsoCards();
+    R.chk.formSize = !!b1 && b1.size === undefined && s0 === 'standard' && px === 'xl' && !!b2 && b2.size === 'xl' && !!b3 && b3.size === undefined;   // (cfix) b1: Standard is shown
     R.info.form = [b1, s0, px, b2, b3];
     C().closeConfig();
     if (P.get('shot')) { pickSize(P.get('size') || 'compact'); await sleep(300); }
@@ -586,7 +610,7 @@
     var b = window.PenumbraViewLink.build(); R.info.token = b.token;
     var d = window.PenumbraViewLink.decode(b.token);
     R.chk.carriesCz = !!d && d.cv === 1 && d.cz === 'compact' && b.view.cz === 'compact';
-    R.chk.describedCz = (window.PenumbraViewLink.describe(b) || []).some(function (x) { return /shown as compact cards/.test(x); });
+    R.chk.describedCz = (window.PenumbraViewLink.describe(b) || []).some(function (x) { return /shown as small cards/.test(x); });
     C().setSize('standard'); await sleep(150);
     var b2 = window.PenumbraViewLink.build();
     R.chk.noCzStandard = b2.view.cv === 1 && b2.view.cz === undefined;
@@ -636,29 +660,30 @@
     R.chk.pickersListed = opts.length === 21 && opts[0].value === '' && opts[0].textContent === 'Automatic' && opts.some(function (o) { return o.value === 'V_NAME'; }) && opts.some(function (o) { return o.value === 'H_TEXT' && /hidden/.test(o.textContent); })
       && qa('#pnbCcfgPill option')[0].textContent === 'None' && qa('#pnbCcfgSize option').map(function (o) { return o.value; }).join(',') === 'compact,standard,large,xl' && q('#pnbCcfgSize').value === 'standard';
     R.chk.chipsListed = qa('#pnbCcfgFields .pnb-cards-chip').length === 20 && text(q('#pnbCcfgFieldsCount')) === 'Automatic';
-    R.chk.noDefaultYet = bsoCards() === undefined && cbtn('pnb-ccfg-reset').disabled && !cbtn('pnb-ccfg-default').hidden && cbtn('pnb-ccfg-editor').hidden;
+    R.chk.noDefaultYet = bsoCards() === undefined && cbtn('pnb-ccfg-reset').disabled && !cbtn('pnb-ccfg-default') && cbtn('pnb-ccfg-editor').hidden && /then Save the report/.test(text(q('#pnbCcfgSub')));   // (cfix)
     setSel('pnbCcfgTitle1', 'V_NAME'); setSel('pnbCcfgSub1', 'V_ID'); setSel('pnbCcfgBig', 'H_AMT'); setSel('pnbCcfgPill', 'V_STATUS'); setSel('pnbCcfgBar', 'H_NUM');
     ['V_DATE', 'V_LINK', 'H_TEXT', 'H_CODE'].forEach(function (n) { cchip(n).click(); });
     await sleep(250);
     R.chk.drawnPicks = same(slots(), PICKS); R.info.slots = slots();
     var pc = mine(); R.info.pref = pc;
     R.chk.keptAsPref = !!pc && pc.own === 1 && pc.title === 'V_NAME' && same(pc.sub, ['V_ID']) && pc.big === 'H_AMT' && pc.pill === 'V_STATUS' && pc.bar === 'H_NUM' && same(pc.fields, PICKS.fields) && !cbtn('pnb-ccfg-reset').disabled;
-    R.chk.notReports = bsoCards() === undefined;
+    R.chk.notReports = same(bsoCards(), PICKS) && /Not saved yet/.test(text(q('#pnbCcfgSub')));   // (cfix) an editor's Save writes the cards shown
     // (round R) twelve at most: eight more ticked, the rest wait; untick them, the four picks again
-    var four = text(q('#pnbCcfgFieldsCount')), more = qa('#pnbCcfgFields input:not(:checked)').slice(0, 8);
+    var four = text(q('#pnbCcfgFieldsCount')), more = qa('#pnbCcfgFields input:not(:checked)').slice(0, 12);
     more.forEach(function (b) { b.click(); }); await sleep(150);
     var rest = qa('#pnbCcfgFields input:not(:checked)');
     R.info.limit = { four: four, now: text(q('#pnbCcfgFieldsCount')), rest: rest.length, off: rest.filter(function (b) { return b.disabled; }).length };
-    R.chk.fieldLimit = four === '4 of 12' && more.length === 8 && text(q('#pnbCcfgFieldsCount')) === '12 of 12' && rest.length > 0 && rest.every(function (b) { return b.disabled && b.parentNode.classList.contains('is-full'); });
+    R.chk.fieldLimit = four === '4 of 16' && more.length === 12 && text(q('#pnbCcfgFieldsCount')) === '16 of 16' && rest.length > 0 && rest.every(function (b) { return b.disabled && b.parentNode.classList.contains('is-full'); });   // (cfix) sixteen
     more.forEach(function (b) { b.click(); }); await sleep(150);
-    R.chk.fieldLimit = R.chk.fieldLimit && text(q('#pnbCcfgFieldsCount')) === '4 of 12' && same(mine().fields, PICKS.fields);
+    R.chk.fieldLimit = R.chk.fieldLimit && text(q('#pnbCcfgFieldsCount')) === '4 of 16' && same(mine().fields, PICKS.fields);
     setSel('pnbCcfgSize', 'compact'); await until(function () { return host().classList.contains('is-compact'); }, 3000);
     R.chk.sizePick = C().size() === 'compact' && (prefs().lrfix || {}).size === 'compact' && sizeSel().value === 'compact';
     // an editor's Use as the report's default: the window's setup and size are the report's (saved with it), the editor's own go
-    cbtn('pnb-ccfg-default').click(); await sleep(250);
+    // (cfix) no Make default: Save writes the cards shown, the size too; after it (savedToReport) the editor's own copy goes
     var b = bsoCards(); R.info.bso = b;
-    R.chk.makeDefault = same(b, Object.assign({}, PICKS, { size: 'compact' })) && /Save the report/.test(text(cbtn('pnb-ccfg-note'))) && !cbtn('pnb-ccfg-editor').hidden && /not saved yet/.test(text(cbtn('pnb-ccfg-has')));
-    R.chk.defaultClearsMine = !mine() && (prefs().lrfix || {}).size === undefined && same(slots(), PICKS) && C().size() === 'compact' && cbtn('pnb-ccfg-reset').disabled;
+    R.chk.makeDefault = same(b, Object.assign({}, PICKS, { size: 'compact' })) && /Not saved yet/.test(text(q('#pnbCcfgSub'))) && cbtn('pnb-ccfg-editor').hidden;
+    if (C().savedToReport) C().savedToReport(b); await sleep(250);
+    R.chk.defaultClearsMine = !mine() && (prefs().lrfix || {}).size === undefined && same(slots(), PICKS) && C().size() === 'compact' && cbtn('pnb-ccfg-reset').disabled && !cbtn('pnb-ccfg-editor').hidden && /Everyone's cards/.test(text(q('#pnbCcfgSub')));
     cbtn('pnb-ccfg-nodefault').click(); await sleep(250);
     R.info.after = { bso: bsoCards(), slots: slots(), size: C().size() };
     R.chk.removeDefault = bsoCards() === undefined && cbtn('pnb-ccfg-editor').hidden && on() && slots().title === 'V_ID' && C().size() === 'standard' && q('#pnbCcfgSize').value === 'standard';
@@ -689,23 +714,26 @@
     R.chk.switchShown = vis(sw()) && !on();
     R.chk.roundTrip = same(bsoCards(), PICKS); R.info.bso = bsoCards();
     C().openConfig(); await until(function () { return cfgShown() && on(); }, 4000); await sleep(100);
-    R.chk.editorLine = !cbtn('pnb-ccfg-editor').hidden && text(cbtn('pnb-ccfg-has')) === 'This report has a default card setup.' && !cbtn('pnb-ccfg-default').hidden && /This report's cards/.test(text(q('#pnbCcfgSub')));
+    R.chk.editorLine = !cbtn('pnb-ccfg-editor').hidden && text(cbtn('pnb-ccfg-has')) === 'This report has default cards for everyone.' && !cbtn('pnb-ccfg-default') && /Everyone's cards/.test(text(q('#pnbCcfgSub')));   // (cfix)
     R.chk.pickersShow = q('#pnbCcfgTitle1').value === 'V_NAME' && q('#pnbCcfgSub1').value === 'V_ID' && q('#pnbCcfgSub2').value === '' && q('#pnbCcfgBig').value === 'H_AMT' && q('#pnbCcfgPill').value === 'V_STATUS' && q('#pnbCcfgBar').value === 'H_NUM';
-    R.chk.chipsShow = same(qa('#pnbCcfgFields input:checked').map(function (i) { return i.value; }), PICKS.fields) && text(q('#pnbCcfgFieldsCount')) === '4 of 12';
+    R.chk.chipsShow = same(qa('#pnbCcfgFields input:checked').map(function (i) { return i.value; }), PICKS.fields) && text(q('#pnbCcfgFieldsCount')) === '4 of 16';   // (cfix) sixteen
     // the title and the subtitle back to Automatic / None: the editor's own setup, the report's untouched (V_ID is
     // guessed: no longer taken by the subtitle)
     setSel('pnbCcfgTitle1', ''); setSel('pnbCcfgSub1', ''); await sleep(200);
-    R.chk.mineFirst = same(bsoCards(), PICKS) && !!mine() && mine().own === 1 && mine().title === undefined && slots().title === 'V_ID' && slots().sub.length === 0;
-    // made the report's default: the state drops them
-    cbtn('pnb-ccfg-default').click(); await sleep(200);
+    // (cfix) the editor's own setup; Save would write it (the window says so), the report's untouched until then
+    var b1 = bsoCards();
+    R.chk.mineFirst = !!b1 && b1.title === undefined && b1.sub === undefined && b1.big === 'H_AMT' && same(C().report(), PICKS) && !!mine() && mine().own === 1 && mine().title === undefined && slots().title === 'V_ID' && slots().sub.length === 0 && /Not saved yet/.test(text(q('#pnbCcfgSub')));
+    // saved (savedToReport, as main.js after a Save over the report): the report's setup now, the editor's own copy gone
+    if (C().savedToReport) C().savedToReport(b1); await sleep(200);
     var b2 = bsoCards();
     R.chk.reedit = !!b2 && b2.title === undefined && b2.sub === undefined && b2.big === 'H_AMT' && same(b2.fields, PICKS.fields) && !mine() && slots().title === 'V_ID';
-    R.info.reedit = [b2, slots()];
-    // a re-run before the Save hands the saved setup back (formWins): the unsaved default stays; a state load replaces it
+    R.info.reedit = [b1, b2, slots()];
+    // Clear the default, then a re-run before the Save hands the saved setup back (formWins): the clearing stays; a state load replaces it
+    cbtn('pnb-ccfg-nodefault').click(); await sleep(150);
     C().setReport(PICKS, true); await sleep(100);
     var b3 = bsoCards();
     C().setReport(PICKS, false); await sleep(100);
-    R.chk.pendingKept = !!b3 && b3.title === undefined && b3.big === 'H_AMT' && same(bsoCards(), PICKS);
+    R.chk.pendingKept = b3 === undefined && same(bsoCards(), PICKS);
     R.info.pending = [b3, bsoCards()];
   };
   // a setup naming columns the query no longer returns: the guesses fill in; the window lists them, marked
@@ -737,8 +765,8 @@
     R.chk.medianHalf = mi >= 0 && Math.abs(wOf(cs[mi]) - 50) < 6;
     R.info.ws = [ws.slice(0, 6), med, mi, wide];
   };
-  // (clbar) the view link carries the viewer's own card setup: built from the cards, from the table's Open as cards
-  // (none from a plain table link), cleaned on read; cvlD opens the first link
+  // (clbar) the view link carries the viewer's own card setup: built from the cards (none from a table link; cmsize: no
+  // Open as cards any more), cleaned on read; cvlD opens the first link
   var T_SETUP = { title: 'V_STATUS', big: 'H_AMT', bar: 'H_NUM', sub: ['V_ID'], fields: ['V_DATE', 'V_LINK', 'H_TEXT', 'V_NAME', 'H_CODE'], own: 1, nolabels: 1 };
   S.cvlC = async function () {
     await until(function () { return on() && cards().length > 0; }, 8000);
@@ -750,14 +778,12 @@
     R.chk.included = (b.included || []).indexOf('card setup') >= 0;
     R.chk.described = (window.PenumbraViewLink.describe(b) || []).some(function (x) { return /your card setup/.test(x); });
     await pickView('table');
-    var b2 = window.PenumbraViewLink.build({ cards: true, size: 'large' }), d2 = window.PenumbraViewLink.decode(b2.token);
-    R.chk.emailCarries = !!d2 && d2.cv === 1 && d2.cz === 'large' && sameKeys(d2.cl, T_SETUP);
     var b3 = window.PenumbraViewLink.build(), d3 = window.PenumbraViewLink.decode(b3.token);
     R.chk.noneOnTable = !!d3 && d3.cv === undefined && d3.cl === undefined;
     var dirty = tok({ v: 1, m: 'flat', o: 'none', cv: 1, cl: { own: true, title: '<img src=x>', sub: ['V_ID', 'V_NAME', 'V_DATE'], big: 42, pill: '', bar: 'h_num',
-      fields: ['V_ID', 'V_NAME', 'V_DATE', 'V_LINK', 'V_STATUS', 'H_CODE', 'H_NUM', 'H_DATE', 'H_MONEY', 'H_AMT', 'H_TEXT', 'H_GROUP', 'H_NULL', 'H_HTML'], nolabels: true } });
+      fields: ['V_ID', 'V_NAME', 'V_DATE', 'V_LINK', 'V_STATUS', 'H_CODE', 'H_NUM', 'H_DATE', 'H_MONEY', 'H_AMT', 'H_TEXT', 'H_GROUP', 'H_NULL', 'H_HTML', 'V_AMOUNT', 'H_JSON', 'H_ENT', 'H_NL'], nolabels: true } });   // (cfix) eighteen sent
     var dd = window.PenumbraViewLink.decode(dirty); R.info.dirty = dd && dd.cl;
-    R.chk.cleaned = !!dd && !!dd.cl && dd.cl.title === undefined && same(dd.cl.sub, ['V_ID', 'V_NAME']) && dd.cl.big === undefined && dd.cl.pill === undefined && dd.cl.bar === 'H_NUM' && dd.cl.fields.length === 12 && dd.cl.own === 1 && dd.cl.nolabels === 1;
+    R.chk.cleaned = !!dd && !!dd.cl && dd.cl.title === undefined && same(dd.cl.sub, ['V_ID', 'V_NAME']) && dd.cl.big === undefined && dd.cl.pill === undefined && dd.cl.bar === 'H_NUM' && dd.cl.fields.length === 16 && dd.cl.own === 1 && dd.cl.nolabels === 1;   // (cfix) sixteen
     var de = window.PenumbraViewLink.decode(tok({ v: 1, m: 'flat', o: 'none', cv: 1, cl: { pill: 'V_STATUS' } }));
     R.chk.emptyDropped = !!de && de.cl === undefined;   // a pill alone is no setup (as layoutSet keeps none)
     window.Penumbra.cardsHost.layoutSet(null);
@@ -773,6 +799,118 @@
     var el = q('#pnbCardsConfig');
     R.chk.windowShowsLink = !!el && q('select[data-slot="bar"]', el).value === 'H_NUM' && q('select[data-slot="title"]', el).value === 'V_STATUS' && qa('#pnbCcfgFields input[type="checkbox"]:checked', el).length === 5 && !q('#pnbCcfgLabels', el).checked;
     C().closeConfig(); await sleep(50);
+  };
+  // (linkpos) a link from the cards: card 31 scrolled to the top, card 36's details open
+  S.cvlE = async function () {
+    await until(function () { return on() && cards().length > 0; }, 8000);
+    var cs = cards(), wr = document.getElementById('results-wrapper');
+    R.chk.cardsOn = on() && cs.length === 200 && !!wr;
+    cs[30].scrollIntoView({ block: 'start' }); await sleep(300);
+    C().openDetails(cs[35]); await sleep(200);
+    var b = window.PenumbraViewLink.build(), d = window.PenumbraViewLink.decode(b.token); R.info.token = b.token;
+    R.info.d = { tr: d && d.tr, cd: d && d.cd, lc: d && d.lc, st: wr.scrollTop, top: cs[30].getBoundingClientRect().top - wr.getBoundingClientRect().top };
+    R.chk.carriesTop = !!d && d.tr === 30;
+    R.chk.noLc = !!d && d.lc === undefined;
+    R.chk.carriesDetails = !!d && d.cd === 35;
+    R.chk.included = (b.included || []).indexOf('scroll position') >= 0 && (b.included || []).indexOf('open card') >= 0;
+    var desc = window.PenumbraViewLink.describe(b) || []; R.info.desc = desc;
+    R.chk.described = desc.some(function (x) { return x === 'card 31 at the top'; }) && desc.some(function (x) { return x === 'card 36 open'; });
+    C().closeDetails();
+  };
+  S.cvlF = async function () {
+    await until(function () { return on() && cards().length > 0 && detOpen(); }, 10000); await sleep(300);
+    var cs = cards(), wr = document.getElementById('results-wrapper');
+    R.chk.bootsCards = on() && cs.length === 200 && window.PenumbraViewLink.active();
+    var dt = cs[30].getBoundingClientRect().top - wr.getBoundingClientRect().top; R.info.pos = { dt: dt, st: wr.scrollTop };
+    R.chk.topCard = wr.scrollTop > 0 && Math.abs(dt) < 6;
+    R.chk.detailsOpen = detOpen() && C().details().at === 35;
+    R.chk.detailsRow = detTitle() === text(q('.pnb-card-title', cs[35]));
+  };
+  // (linkpos) a pivot link: the wrapper scrolled down and across; the page it opens scrolled the same
+  function pvEdges() {
+    var wr = document.getElementById('results-wrapper'), t = q('#pivotResultTable'), head = q('thead', t), st = q('tbody td[class*="pivot-sticky-col"]', t);
+    var left = wr.getBoundingClientRect().left;
+    if (st) { var cells = qa('td[class*="pivot-sticky-col"]', st.parentNode); left = Math.max(left, cells[cells.length - 1].getBoundingClientRect().right); }
+    return { wr: wr, rows: qa('tbody tr', t), ths: (function () { var hr = qa('thead tr', t); return hr.length ? qa('th', hr[hr.length - 1]) : []; })(), top: wr.getBoundingClientRect().top + head.getBoundingClientRect().height, left: left };
+  }
+  S.pvlA = async function () {
+    await until(function () { return qa('#pivotResultTable tbody tr').length >= 100; }, 15000); await sleep(400);
+    var e = pvEdges();
+    R.chk.pivotShown = e.rows.length >= 100 && e.ths.length >= 12 && e.wr.clientWidth <= 720;
+    e.wr.scrollTop = 900; e.wr.scrollLeft = 300; await sleep(400);
+    R.chk.scrolled = e.wr.scrollTop > 0 && e.wr.scrollLeft > 0; R.info.sc = [e.wr.scrollTop, e.wr.scrollLeft, e.wr.scrollWidth, e.wr.clientWidth, e.rows.length, e.ths.length];
+    var b = window.PenumbraViewLink.build(), d = window.PenumbraViewLink.decode(b.token); R.info.token = b.token; R.info.d = { pt: d && d.pt, pl: d && d.pl, m: d && d.m };
+    R.chk.carriesRow = !!d && d.m === 'pivot' && d.pt > 0 && d.pt < e.rows.length && Math.abs(e.rows[d.pt].getBoundingClientRect().top - e.top) < 40;
+    R.chk.carriesCol = !!d && d.pl > 0 && d.pl < e.ths.length;
+    R.chk.included = (b.included || []).indexOf('scroll position') >= 0;
+    R.chk.described = (window.PenumbraViewLink.describe(b) || []).some(function (x) { return /^pivot row \d+ at the top$/.test(x); });
+  };
+  S.pvlB = async function () {
+    await until(function () { return qa('#pivotResultTable tbody tr').length >= 100; }, 15000);
+    var d = window.PenumbraViewLink.decode(new URLSearchParams(location.search).get('view'));
+    await until(function () { return document.getElementById('results-wrapper').scrollTop > 0; }, 8000); await sleep(400);
+    var e = pvEdges(); R.info.d = { pt: d && d.pt, pl: d && d.pl, st: e.wr.scrollTop, sl: e.wr.scrollLeft };
+    R.chk.pivotShown = e.rows.length >= 100 && !!d && d.pt > 0 && d.pl > 0;
+    R.chk.rowAtTop = e.wr.scrollTop > 0 && Math.abs(e.rows[d.pt].getBoundingClientRect().top - e.top) < 6;
+    R.chk.colAtLeft = e.wr.scrollLeft > 0 && Math.abs(e.ths[d.pl].getBoundingClientRect().left - e.left) < 6;
+  };
+  // (pvcfg) the report's tiles setup: big = Total N, pill = parent labels, bar = Total Amt, fields = Amt + Mean, no labels
+  function leafTile() { return cards().filter(function (c) { return !c.classList.contains('is-total') && (q('.pnb-card-pill', c) || q('.pnb-card-sub', c)); })[0] || null; }
+  function meterTitle(c) { var m = c ? q('.pnb-card-meter', c) : null; return m ? m.title : ''; }
+  S.pvcfg = async function () {
+    await until(function () { return on() && cards().length > 0 && C().state() && C().state().pivot === true; }, 10000); await sleep(200);
+    var cs = cards(), leaf = leafTile(); R.info.leaf = leaf ? leaf.outerHTML.replace(/\s+/g, ' ').slice(0, 700) : null;
+    var big = leaf ? q('.pnb-card-big small', leaf) : null, pill = leaf ? q('.pnb-card-pill', leaf) : null, meter = leaf ? q('.pnb-card-meter', leaf) : null, dts = leaf ? qa('.pnb-card-pvfields dt', leaf).map(text) : [];
+    R.chk.bigPicked = !!big && text(big) === 'Total N';
+    R.chk.pillParent = !!pill && pill.title === 'Parent labels' && text(pill).length > 0 && !q('.pnb-card-sub', leaf);
+    R.chk.barDrawn = !!meter && parseFloat(meter.firstElementChild.style.width) > 0 && /^Total Amt:/.test(meter.title);
+    var ws = cs.filter(function (c) { return !c.classList.contains('is-total') && q('.pnb-card-meter', c); }).map(function (c) { return parseFloat(q('.pnb-card-meter', c).firstElementChild.style.width); });
+    R.chk.barRanked = ws.length > 2 && Math.max.apply(null, ws) === 100 && ws.filter(function (w, i, a) { return a.indexOf(w) === i; }).length > 1; R.info.ws = ws.slice(0, 8);
+    R.chk.fieldsPicked = dts.length > 0 && dts.every(function (t) { return /Amt|Mean/.test(t); }) && !dts.some(function (t) { return / N$/.test(t); }); R.info.dts = dts.slice(0, 6);
+    R.chk.labelsOff = !!leaf && !!q('.pnb-card-pvfields.is-nolabels', leaf);
+    R.chk.noBarOnTotal = cs[0].classList.contains('is-total') && !q('.pnb-card-meter', cs[0]) && !q('.pnb-card-pill', cs[0]);
+    // the window over the tiles: the pivot rows shown, the flat rows hidden, the picks as the report's
+    R.chk.canConfig = !!C().canConfig && C().canConfig() && (!C().configWhyNot || !C().configWhyNot());
+    C().openConfig(); await sleep(250);
+    var el = q('#pnbCardsConfig'), pvRows = el ? qa('[data-ccfg="pv"]', el) : [], flRows = el ? qa('[data-ccfg="flat"]', el) : [];
+    R.info.rows = [pvRows.length, pvRows.filter(vis).length, flRows.length, flRows.filter(vis).length];
+    R.chk.windowPivot = !!el && C().configOpen() && pvRows.length >= 6 && pvRows.every(vis) && flRows.length >= 5 && flRows.every(function (r) { return !vis(r); });
+    R.chk.windowShows = !!el && q('#pnbCcfgPvBig', el).value === 'N' && q('#pnbCcfgPvPill', el).value === 'parent' && q('#pnbCcfgPvBar', el).value === 'Amt' && qa('#pnbCcfgPvFields input:checked', el).map(function (b) { return b.value; }).join(',') === 'Amt,Mean' && !q('#pnbCcfgPvLabels', el).checked;
+    // a pick: the bar on Mean - the viewer's own tiles, drawn at once, the flat setup not made theirs
+    setSel('pnbCcfgPvBar', 'Mean'); await sleep(300);
+    var lay1 = C().layout(); R.info.lay1 = lay1;
+    R.chk.pickOwn = !!lay1 && !!lay1.pivot && lay1.pivot.bar === 'Mean' && lay1.pivot.big === 'N' && !lay1.own && /^Total Mean:/.test(meterTitle(leafTile()));
+    var b = window.PenumbraViewLink.build(), d = window.PenumbraViewLink.decode(b.token); R.info.token = b.token; R.info.cl = d && d.cl;
+    R.chk.linkCarries = !!d && d.cv === 1 && !!d.cl && !!d.cl.pivot && d.cl.pivot.bar === 'Mean' && d.cl.pivot.pill === 'parent' && same(d.cl.pivot.fields, ['Amt', 'Mean']);
+    // Reset: the viewer's tiles setup goes, the report's draws again
+    q('.pnb-ccfg-reset', el).click(); await sleep(300);
+    R.chk.resetBack = !C().layout() && /^Total Amt:/.test(meterTitle(leafTile()));
+    // an editor: Make default with the bar on Mean - the report's default carries it, the viewer's own goes
+    setSel('pnbCcfgPvBar', 'Mean'); await sleep(200);
+    var au = C().authored(); R.info.au = au;   // (cfix) no Make default: an editor's Save writes the tiles shown
+    if (C().savedToReport) C().savedToReport(au); await sleep(300);
+    R.chk.madeDefault = !!au && !!au.pivot && au.pivot.bar === 'Mean' && au.pivot.big === 'N' && !C().layout() && !!C().report().pivot && C().report().pivot.bar === 'Mean' && /^Total Mean:/.test(meterTitle(leafTile()));
+    C().closeConfig();
+  };
+  // (pvlab) one measure with no label: the pill's title and the bar's label say Total Value, as the window's options do
+  S.plab = async function () {
+    await until(function () { return on() && cards().length > 0 && C().state() && C().state().pivot === true; }, 10000); await sleep(200);
+    var leaf = cards().filter(function (c) { return !c.classList.contains('is-total') && q('.pnb-card-pill', c); })[0] || null;
+    var pill = leaf ? q('.pnb-card-pill', leaf) : null, meter = leaf ? q('.pnb-card-meter', leaf) : null;
+    R.info.words = { pill: pill ? pill.title : null, meter: meter ? meter.title : null, subs: qa('#pivotResultTable th.pivot-sub-header').length };
+    R.chk.pillWord = !!pill && pill.title === 'Total Value' && text(pill).length > 0;
+    R.chk.meterWord = !!meter && /^Total Value: \S/.test(meter.title) && parseFloat(meter.firstElementChild.style.width) > 0;
+    C().openConfig(); await sleep(250);
+    var el = q('#pnbCardsConfig'), bar = el ? q('#pnbCcfgPvBar', el) : null, sel = bar ? (bar.tagName === 'SELECT' ? bar : q('select', bar)) : null;
+    var opt = sel ? sel.selectedOptions[0] : null; R.info.windowOpt = opt ? { value: opt.value, text: text(opt) } : null;
+    R.chk.windowWord = !!opt && opt.value === 'm0' && text(opt) === 'Total Value';
+    var done = el ? qa('button', el).filter(function (b) { return text(b) === 'Done'; })[0] : null; if (done) done.click(); await sleep(150);
+  };
+  S.pvcfgB = async function () {
+    await until(function () { return on() && cards().length > 0 && C().state() && C().state().pivot === true; }, 10000); await sleep(400);
+    var lay = C().layout(); R.info.lay = lay; R.info.leaf = leafTile() ? leafTile().outerHTML.replace(/\s+/g, ' ').slice(0, 400) : null;
+    R.chk.linkApplied = !!lay && !!lay.pivot && lay.pivot.bar === 'Mean' && lay.pivot.pill === 'parent' && /^Total Mean:/.test(meterTitle(leafTile())) && !!q('.pnb-card-pill', leafTile());
+    R.chk.prefUntouched = (prefs().lrfix || {}).cards === undefined;
   };
   S.cvlA = async function () {
     await pickView('cards');
@@ -871,8 +1009,8 @@
     R.chk.backToLarge = host().classList.contains('is-large') && !host().classList.contains('is-xl') && (prefs().lrfix || {}).size === 'large';
     // (round N) an editor's default at Extra large, then Large, through Configure cards
     C().openConfig(); await until(cfgShown, 3000);
-    setSel('pnbCcfgSize', 'xl'); await sleep(100); cbtn('pnb-ccfg-default').click(); await sleep(150); var b2 = bsoCards();
-    setSel('pnbCcfgSize', 'large'); await sleep(100); cbtn('pnb-ccfg-default').click(); await sleep(150); var b3 = bsoCards();
+    setSel('pnbCcfgSize', 'xl'); await sleep(150); var b2 = bsoCards();   // (cfix) the editor's Save writes the size shown
+    setSel('pnbCcfgSize', 'large'); await sleep(150); var b3 = bsoCards();
     R.chk.formXl = !!b2 && b2.size === 'xl' && !!b3 && b3.size === 'large';
     C().closeConfig();
     if (P.get('shot')) { pickSize('xl'); if (P.get('theme')) { var t = (window.__THEMES || []).filter(function (x) { return x.id === P.get('theme'); })[0]; if (t) applyTheme(t); } await sleep(300); }
@@ -912,7 +1050,7 @@
     await runSearch(''); await until(function () { return shownRows().length === 200 && cards().length === 200; }, 6000);
     cs = cards(); c0 = cs[0];
     // the card's empty area (a field's label): the row's items alone (Copy this row, notes), none of the column's tools, the card's title on top
-    ev = rclick(q('.pnb-card-fields dt', c0)); await sleep(80);
+    ev = rclickWhite(c0); await sleep(80);   // (cfix) the padding: a field's label opens its heading's menu now
     m = menu(); a = acts(); R.info.cardActs = a;
     R.chk.cardRowOnly = ev.defaultPrevented && !!m && a.indexOf('sortAsc') < 0 && a.indexOf('filterMenu') < 0 && a.indexOf('cellFilter') < 0 && a.indexOf('hide') < 0
       && (a.indexOf('copyRow') >= 0 || a.indexOf('copyMenu') >= 0) && a.indexOf('cardsTable') >= 0 && text(q('.pnb-hm-name', m)) === text(q('.pnb-card-title', c0));
@@ -958,7 +1096,7 @@
       r.valueActs = acts().length;
       ev = rclick(head, { x: head.getBoundingClientRect().right - 2, y: head.getBoundingClientRect().top + 2 }); await sleep(80);
       r.area = !!menu() && ev.defaultPrevented && acts().indexOf('cardsTable') >= 0 && acts().indexOf('sortAsc') < 0;
-      if (grouped) { ev = rclick(q('.pnb-cards-grptoggle', grps()[0])); await sleep(80); r.band = !!menu() && ev.defaultPrevented && acts().indexOf('gToggle') >= 0; }
+      if (grouped) { ev = rclick(tog(0)); await sleep(80); r.band = !!menu() && ev.defaultPrevented && acts().indexOf('gToggle') >= 0; }
       if (menu()) keyOn(document.activeElement, 'Escape'); await sleep(40);
       out[s] = r;
     }
@@ -1002,12 +1140,12 @@
     R.chk.clickOpens = detOpen() && det().getAttribute('role') === 'dialog' && detTitle() === tdText(tr2, 'V_NAME') && !!document.activeElement.closest('#pnbCardDetails') && c2.getAttribute('aria-current') === 'true';
     var hb = q('#pnbCardDetails .pnb-cdet-card');
     R.chk.header = !!hb && text(q('.pnb-card-bigval', hb)) === tdText(tr2, 'H_AMT') && !!q('.pnb-card-pill', hb) && text(q('.pnb-card-pill', hb)) === tdText(tr2, 'V_STATUS') && !!q('.pnb-card-meter', hb);
-    var pairs = detPairs(), cols = shownCols();
+    var pairs = detPairs(), cols = qa('#tableHeader th[data-colname]').filter(function (t) { var n = t.getAttribute('data-colname'); return (t.style.display !== 'none' || n === 'H_TEXT') && n !== '#' && n.indexOf('__JOURNAL') !== 0; }).map(function (t) { return t.getAttribute('data-colname'); });   // (cfix) the card's hidden field too
     R.info.det = { pairs: pairs.slice(0, 8), cols: cols, pos: detPos() };
     R.chk.shownColumns = pairs.length > 0 && same(pairs.map(function (p) { return p[0]; }), cols.map(thName));
     R.chk.values = pairs.length === cols.length && pairs.every(function (p, i) { return p[1] === tdText(tr2, cols[i]); });
-    // the card shows H_AMT / H_NUM / H_TEXT (hidden columns): the list must not
-    R.chk.noHidden = pairs.length > 0 && pairs.every(function (p) { return !/^H_/.test(p[0]); }) && qa('#tableHeader th[data-colname^="H_"]').some(function (t) { return t.style.display === 'none'; }) && !!q('.pnb-card-fields dd[data-col="H_TEXT"]', c2);
+    // the card shows H_AMT / H_NUM / H_TEXT (hidden columns): (cfix, the user) the list has H_TEXT, the card's FIELD, and no other
+    R.chk.noHidden = pairs.length > 0 && pairs.filter(function (p) { return /^H_/.test(p[0]); }).map(function (p) { return p[0]; }).join() === thName('H_TEXT') && qa('#tableHeader th[data-colname^="H_"]').some(function (t) { return t.style.display === 'none'; }) && !!q('.pnb-card-fields dd[data-col="H_TEXT"]', c2);
     R.chk.position = detPos() === expPos(2, flatKept().length, rppNow()) && !q('#pnbCardDetails .pnb-cdet-prev').disabled && !q('#pnbCardDetails .pnb-cdet-next').disabled;
     q('#pnbCardDetails .pnb-cdet-next').click(); await sleep(120);
     var tr3 = shownRows()[3];
@@ -1164,25 +1302,30 @@
     await until(function () { return vis(sw()); }, 8000);
     var b0 = window.PenumbraViewLink.build(), d0 = window.PenumbraViewLink.decode(b0.token);
     R.chk.noCvOnTable = !on() && !!d0 && d0.cv === undefined && d0.cz === undefined;
+    // (cmsize) no Open as cards: the builder takes no cards option - a table's link stays the table's, asked or not
     var b = window.PenumbraViewLink.build({ cards: true, size: 'large' }), d = window.PenumbraViewLink.decode(b.token);
     R.info.share = [d0, d];
-    R.chk.cardsForce = !on() && !!d && d.cv === 1 && d.cz === 'large' && (window.PenumbraViewLink.describe(b) || []).some(function (x) { return /shown as large cards/.test(x); });
-    var b2 = window.PenumbraViewLink.build({ cards: true, size: 'standard' }), d2 = window.PenumbraViewLink.decode(b2.token);
-    R.chk.standardNoCz = !!d2 && d2.cv === 1 && d2.cz === undefined;
+    R.chk.optGone = !on() && !!d && d.cv === undefined && d.cz === undefined;
+    // ...and the link to the view as seen (the email's As you see it now) carries the cards at the size they show
+    await pickView('cards'); C().setSize('large'); await until(function () { return host().classList.contains('is-large'); }, 4000);
+    var b2 = window.PenumbraViewLink.build(), d2 = window.PenumbraViewLink.decode(b2.token);
+    R.info.seen = d2;
+    R.chk.asSeenSize = on() && !!d2 && d2.cv === 1 && d2.cz === 'large' && (window.PenumbraViewLink.describe(b2) || []).some(function (x) { return /shown as large cards/.test(x); });
+    C().setSize('standard'); await pickView('table');
   };
   S.gmenu = async function () {
     await until(function () { return on() && grps().length > 0; }, 10000);
-    var g0 = grps()[0], tg = q('.pnb-cards-grptoggle', g0);
+    var g0 = grps()[0], tg = tog(0);
     var ev = rclick(tg); await sleep(80);
     var m = menu(), a = acts(); R.info.bandActs = a;
-    R.chk.bandMenu = ev.defaultPrevented && !!m && text(q('.pnb-hm-name', m)) === text(q('.pnb-cards-grpname', g0)) && a.indexOf('gToggle') >= 0 && a.indexOf('gCollapseAll') >= 0 && a.indexOf('cardSize') >= 0 && a.indexOf('cardsTable') >= 0;
+    R.chk.bandMenu = ev.defaultPrevented && !!m && text(q('.pnb-hm-name', m)) === gname(g0) && a.indexOf('gToggle') >= 0 && a.indexOf('gCollapseAll') >= 0 && a.indexOf('cardSize') >= 0 && a.indexOf('cardsTable') >= 0;
     R.info.bandWordy = wordy(); R.chk.bandNoColumn = !!m && wordy().length === 0 && a.length > 8;   // (cardword) a band's menu names no column either
     // the group's own item runs through the table's grouping: Collapse all folds every band in the cards
     q('.pnb-hm-item[data-act="gCollapseAll"]', m).click();
-    await until(function () { return !menu() && grps().length > 0 && grps().every(function (g) { return g.classList.contains('is-closed'); }); }, 5000);
-    R.chk.bandActs = grps().every(function (g) { return g.classList.contains('is-closed'); }) && wrappers().every(function (w) { return !w.classList.contains('open'); }) && cards().length === 0;
+    await until(function () { return !menu() && grps().length > 0 && grps().every(shut); }, 5000);
+    R.chk.bandActs = grps().every(shut) && wrappers().every(function (w) { return !w.classList.contains('open'); }) && cards().length === 0;
     // the keyboard on a band: Shift+F10 opens the group's menu, Esc back to the band
-    tg = q('.pnb-cards-grptoggle', grps()[0]); tg.focus(); keyOn(tg, 'F10', true); await sleep(80);
+    tg = tog(0); tg.focus(); keyOn(tg, 'F10', true); await sleep(80);
     R.chk.bandKeyboard = !!menu() && menu().contains(document.activeElement) && acts().indexOf('gToggle') >= 0;
     keyOn(document.activeElement, 'Escape'); await sleep(80);
     R.chk.bandRefocus = !menu() && document.activeElement === tg;
@@ -1191,7 +1334,7 @@
     var val = q('#pnbCardsHost .pnb-card .pnb-card-val[data-col]'); ev = rclick(val); await sleep(80);
     a = acts();
     R.chk.groupedValueMenu = ev.defaultPrevented && !!menu() && (a.indexOf('filterMenu') >= 0 || a.indexOf('cellFilter') >= 0) && a.indexOf('cardsTable') >= 0 && !!q('#groupedResultsContainer td.pnb-hm-cell');
-    if (P.get('shot')) { if (P.get('theme')) { var t = (window.__THEMES || []).filter(function (x) { return x.id === P.get('theme'); })[0]; if (t) applyTheme(t); await sleep(200); } rclick(q('.pnb-cards-grptoggle', grps()[1])); await sleep(250); }
+    if (P.get('shot')) { if (P.get('theme')) { var t = (window.__THEMES || []).filter(function (x) { return x.id === P.get('theme'); })[0]; if (t) applyTheme(t); await sleep(200); } rclick(tog(1)); await sleep(250); }
     else { keyOn(document.activeElement, 'Escape'); }
   };
   S.pmenu = async function () {
@@ -1200,7 +1343,7 @@
     // (round T) the status bar's Configure cards over the tiles: shown, greyed, its reason under it
     var why = C().configWhyNot ? C().configWhyNot() : null, sb = q('#sbCardsConfig'), sn = q('#sbCardsCfgNote');
     R.info.segCfg = { why: why, hidden: sb && sb.hidden, dis: sb && sb.disabled, title: sb && sb.title, note: sn && !sn.hidden, desc: sb && sb.getAttribute('aria-describedby') };
-    R.chk.segCfgOff = !!why && !!sb && !sb.hidden && sb.disabled && sb.title === why && !!sn && !sn.hidden && vis(sn) && /pivot/i.test(text(sn)) && sb.getAttribute('aria-describedby') === 'sbCardsCfgNote';
+    R.chk.segCfgOn = !why && !!sb && !sb.hidden && !sb.disabled && (!sn || sn.hidden) && !sb.getAttribute('aria-describedby');   // (pvcfg) over a pivot too: plain, no reason line (round T had it greyed)
     // a tile's value: the pivot's own menu for its cell (marked pnb-hm-for), the card's items after it
     var ev = rclick(dd); await sleep(80);
     var m = menu(), a = acts(), marked = q('#pivotResultTable td.pnb-hm-for');
@@ -1214,6 +1357,7 @@
     R.info.pvLabel = { marked: marked ? marked.outerHTML.replace(/\s+/g, ' ').slice(0, 160) : null, title: menu() ? text(q('.pnb-hm-name', menu())) : null, labels: qa('td[data-row-field]', q('#pivotResultTable tbody tr[data-pivot-row]')).length };
     // (the engine's marker class on the cell must not redraw the tiles under the menu: the tile stays the same element)
     R.chk.tileLabelMenu = ev.defaultPrevented && !!menu() && !!marked && marked.hasAttribute('data-row-field') && a.indexOf('cardSize') >= 0 && leaf.isConnected && cards()[0] === cs[0];
+    R.chk.tileSortOffered = (R.info.pvActs || []).indexOf('tileSortAsc') >= 0 && (R.info.pvActs || []).indexOf('tileSortDesc') >= 0 && a.indexOf('tileSortAsc') >= 0 && a.indexOf('tileSortDesc') >= 0;   // (round U) a nested pivot's value and title
     // the grand total tile: the pivot's menu has no cell for the tfoot - the card's own items alone
     ev = rclick(q('.pnb-card-title', cs[0])); await sleep(80);
     a = acts(); R.info.pvTotalActs = a;
@@ -1228,13 +1372,13 @@
     rclick(q('.pnb-card-title', cs[0])); await sleep(80);   // the total tile's menu again, for the steps after
     // (round N) no Configure cards over pivot tiles: the pivot draws them (menus, Quick actions, Settings > Cards)
     R.info.cfgOff = cfgOff;
-    R.chk.tileConfigOff = cfgOff.dis === 'true' && !!why && cfgOff.title === why && !(C().canConfig && C().canConfig()) && (!lay() || lay().hidden);   // (round T) greyed with its reason, never hidden
+    R.chk.tileConfigOn = !!cfgIt && cfgOff.dis !== 'true' && !why && !!C().canConfig && C().canConfig() && (!lay() || lay().hidden);   // (pvcfg) offered over the tiles
     // Show as table from a tile: the pivot table shows again
     q('.pnb-hm-item[data-act="cardsTable"]', menu()).click(); await until(function () { return !on(); }, 4000);
     R.chk.tileShowTable = !on() && !menu() && getComputedStyle(q('#pivotResultTable')).visibility !== 'hidden';
     var tis = C().tableItems({ th: q('#pivotResultTable thead th') }), sub = (tis && tis[0] && tis[0].items) ? tis[0].items() : [], tc = sub.filter(function (x) { return x && x.act === 'showCardsConfig'; })[0];
     R.info.tableCfg = tc ? { dis: tc.disabled, why: tc.why } : null;
-    R.chk.tableCfgOff = !!tc && tc.disabled === true && tc.why === why && typeof tc.run !== 'function';   // (round T)
+    R.chk.tableCfgOn = !!tc && !tc.disabled && typeof tc.run === 'function';   // (pvcfg)
     if (P.get('shot')) {   // the tiles with a value's menu open, for the picture
       await pickView('cards'); if (P.get('theme')) { var t = (window.__THEMES || []).filter(function (x) { return x.id === P.get('theme'); })[0]; if (t) applyTheme(t); await sleep(200); }
       var sdd = q('.pnb-card:not(.is-total) .pnb-card-pvfields dd[data-pvc]'); if (sdd) rclick(sdd); await sleep(250);
@@ -1317,6 +1461,11 @@
     var p1 = panelOf(c1), p2 = panelOf(cardFor(rows[2]));
     R.chk.refreshFollows = !!c1 && c1.isConnected && items(p1).length === 2 && items(p2).length === 1 && text(q('.journal-rownote-inlinecount', p1)) === '2';
     R.info.refresh = { k1: k1, c1: !!c1, conn: !!c1 && c1.isConnected, n1: items(p1).length, n2: items(p2).length };
+    // (cfb8, the user: card settings not honoured in the email) the emailed cards carry each row's notes, as the card shows
+    // them (the table's email cell: author and text), under the column's name; a Small card none (it shows none)
+    var mtx = mailBox(C().emailHtml({})).textContent, mtc = mailBox(C().emailHtml({ size: 'compact' })).textContent;
+    R.info.mailNotes = { has: mtx.indexOf(LONG.slice(0, 30)) >= 0, lbl: mtx.indexOf(thName('__JOURNAL_NOTES')) >= 0, small: mtc.indexOf(LONG.slice(0, 30)) >= 0 };
+    R.chk.mailNotes = mtx.indexOf(LONG.slice(0, 30)) >= 0 && mtx.indexOf(thName('__JOURNAL_NOTES')) >= 0 && mtc.indexOf(LONG.slice(0, 30)) < 0;
     // every note in full: no cut text, no scroll box of its own
     var lt = items(p1)[1] ? q('.journal-rownote-text', items(p1)[1]) : null, ls = p1 ? q(':scope > .journal-rownote-list', p1) : null;
     R.chk.fullText = !!lt && text(lt) === LONG && lt.scrollHeight <= lt.clientHeight + 1 && !!ls && ls.scrollHeight <= ls.clientHeight + 1 && getComputedStyle(ls).overflowY === 'visible' && lt.getBoundingClientRect().height > 30;
@@ -1326,6 +1475,22 @@
     var i11 = items(p1)[0], i12 = items(p1)[1];
     R.chk.buttons = !!i11 && !!i12 && !!q('.journal-rownote-reply-btn', i11) && !q('.journal-rownote-edit-btn', i11) && !!q('.journal-rownote-del', i11)
       && !!q('.journal-rownote-reply-btn', i12) && !!q('.journal-rownote-edit-btn', i12) && !!q('.journal-rownote-del', i12) && !!q('.journal-rownote-addbtn', p1);
+    // (cdel, the user: no accidental delete while browsing) on a card no x shows - a note's, a Shared note's file's (the
+    // details window keeps them: cnotedet delInDetails)
+    var dx1 = q('.journal-rownote-del', i11), fx = document.createElement('button'), fxw = document.createElement('span'); fx.className = 'pnb-sharednote-filedel'; fxw.className = 'pnb-sharednote-file'; fxw.appendChild(fx); p1.appendChild(fxw);
+    R.chk.noDelOnCard = !!dx1 && getComputedStyle(dx1).display === 'none' && getComputedStyle(q('.journal-rownote-del', i12)).display === 'none' && getComputedStyle(fx).display === 'none';
+    fxw.remove();
+    // (cdel, the user) a link in a note (and in a Shared note's text) wears the theme's link colour; a file's chip its own
+    // (the text's colour)
+    var t11c = i11 ? q('.journal-rownote-text', i11) : null, ln = document.createElement('a'), chp = document.createElement('a'), sht = document.createElement('div'), ln2 = document.createElement('a'), prb = document.createElement('span');
+    ln.href = 'https://example.test/'; ln.textContent = 'example.test'; chp.className = 'journal-attach-chip'; chp.href = '#'; chp.textContent = 'file.txt';
+    sht.className = 'pnb-sharednote-text'; ln2.href = 'https://example.test/2'; ln2.textContent = 'two'; sht.appendChild(ln2);
+    prb.style.color = 'var(--brand-text, var(--brand-primary, #336699))'; prb.textContent = '.';
+    if (t11c) { t11c.appendChild(ln); t11c.appendChild(chp); t11c.appendChild(prb); p1.appendChild(sht); }
+    var brandC = getComputedStyle(prb).color, mainC = getComputedStyle(t11c || document.body).color;
+    R.info.links = { link: getComputedStyle(ln).color, shared: getComputedStyle(ln2).color, chip: getComputedStyle(chp).color, brand: brandC, text: mainC, danger: getComputedStyle(document.body).getPropertyValue('--accent-danger') };
+    R.chk.linkThemed = !!t11c && getComputedStyle(ln).color === brandC && getComputedStyle(ln2).color === brandC && getComputedStyle(chp).color !== brandC && brandC !== 'rgb(204, 0, 0)';
+    ln.remove(); chp.remove(); prb.remove(); sht.remove();
     // (round I) a note is a line of text: a short one's author, text and age on one line; a long one wraps under its author
     var a11 = i11 ? q('.journal-rownote-author', i11) : null, t11 = i11 ? q('.journal-rownote-text', i11) : null, w11 = i11 ? q('.journal-rownote-when', i11) : null;
     var a12 = i12 ? q('.journal-rownote-author', i12) : null, rs12 = lt ? lt.getClientRects() : [];
@@ -1350,13 +1515,58 @@
     mb1 = q(':scope > .pnb-card-more', c1);
     R.chk.capConsistent = c1.classList.contains('is-clipped') && c1.offsetHeight <= 300 + 26 && c1.offsetHeight < c1.scrollHeight && !!mb1 && text(mb1) === 'Show all' && host().style.getPropertyValue('--pnb-card-cap') === '300px';
     R.info.cap = { h: c1.offsetHeight, sh: c1.scrollHeight, cls: c1.className, cap: host().style.getPropertyValue('--pnb-card-cap') };
+    if (mb1) { mb1.focus(); await sleep(80); }   // (linkpos) the button's focus alone leaves the card cut: its click toggles
+    R.chk.focusKeepsClipped = !!mb1 && !c1.classList.contains('is-open') && c1.classList.contains('is-clipped');
     if (mb1) mb1.click(); await sleep(120);
     var openOk = c1.classList.contains('is-open') && c1.offsetHeight > 300 + 26 && !!q(':scope > .pnb-card-more', c1) && text(q(':scope > .pnb-card-more', c1)) === 'Show less' && !detOpen();
     if (q(':scope > .pnb-card-more', c1)) q(':scope > .pnb-card-more', c1).click(); await sleep(120);
     R.chk.showAll = openOk && c1.classList.contains('is-clipped') && !c1.classList.contains('is-open') && c1.offsetHeight <= 300 + 26;
-    // a click on a note's text reads it: no details window
-    if (lt) lt.click(); await sleep(120);
-    R.chk.textClickStays = !!lt && !detOpen();
+    // (cfb8, the user) the notes are part of the card: a click on a note's text (one a double-click does not edit) opens the
+    // card's details, as a click on the notes' white space does; a note of yours waits a double-click out (two clicks: no details)
+    function clickD(el, d) { el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: d, view: window })); }
+    var t11b = i11 ? q('.journal-rownote-text', i11) : null;
+    if (t11b) clickD(t11b, 1); await sleep(450);
+    var opened1 = detOpen(); if (opened1) { C().closeDetails(); await sleep(150); }
+    if (p1) clickD(p1, 1); await sleep(450);
+    var opened2 = detOpen(); if (opened2) { C().closeDetails(); await sleep(150); }
+    R.info.noteClicks = [opened1, opened2];
+    R.chk.textClickOpens = !!t11b && opened1 && opened2;
+    if (lt) { clickD(lt, 1); clickD(lt, 2); } await sleep(500);
+    R.chk.dblWaits = !!lt && !detOpen();
+    if (detOpen()) { C().closeDetails(); await sleep(150); }
+    // (cfb8, the user) the head on a card: "Notes" dotted and a pencil after it (the words hidden, the button's name kept); a
+    // click on the word opens the box, as the pencil does
+    var ab0 = q('.journal-rownote-addbtn', p1), lb0 = q('.journal-rownote-inlinelbl', p1), pen0 = ab0 ? q('.journal-rownote-pencil', ab0) : null, tx0 = ab0 ? q('.journal-rownote-btntxt', ab0) : null, lcs0 = lb0 ? getComputedStyle(lb0) : null;
+    function shown(el) { return !!el && el.offsetWidth > 0 && getComputedStyle(el).display !== 'none'; }   // (vis() refuses any [hidden]: the pencil carries one the card's css overrides)
+    R.info.head = { pen: pen0 ? shown(pen0) : null, txt: tx0 ? getComputedStyle(tx0).display : null, deco: lcs0 ? lcs0.textDecorationStyle + ' ' + lcs0.textDecorationLine : null, cur: lcs0 ? lcs0.cursor : null, border: ab0 ? getComputedStyle(ab0).borderTopWidth : null };
+    R.chk.pencilHead = shown(pen0) && !!tx0 && getComputedStyle(tx0).display === 'none' && ab0.getAttribute('aria-label') === 'Add a note' && parseFloat(getComputedStyle(ab0).borderTopWidth) === 0
+      && !!lcs0 && lcs0.textDecorationStyle === 'dotted' && lcs0.cursor === 'pointer' && pen0.getBoundingClientRect().left >= lb0.getBoundingClientRect().right;
+    if (lb0) clickD(lb0, 1); await sleep(150);
+    var inL = inputOf(p1);
+    R.chk.labelAdds = !!inL && p1.classList.contains('is-composing') && !detOpen() && document.activeElement === inL;
+    if (inL) { keyOn(inL, 'Escape'); await sleep(120); }
+    // (cfb8, the user) a right-click on the notes' white space is the card's menu (its Card size in Small / Medium words); on a
+    // note's text the browser's own (copy)
+    rclick(p1); await sleep(150);
+    var nm0 = acts(); R.info.notesMenu = nm0;
+    var menuOk = !!menu() && vis(menu()) && nm0.indexOf('cardSize') >= 0;
+    var szs = await openSub('cardSize'), szw = szs ? labels(szs) : [];
+    R.info.sizeWords = szw;
+    R.chk.sizeWords = szw.join('|') === 'Small|Medium|Large|Extra large';
+    if (menu() && vis(menu())) { keyOn(document.activeElement, 'Escape'); await sleep(80); }
+    if (menu() && vis(menu())) { keyOn(document.activeElement, 'Escape'); await sleep(80); }
+    var ev2 = t11b ? rclick(t11b) : null; await sleep(100);
+    R.chk.notesMenu = menuOk && !!ev2 && !ev2.defaultPrevented;
+    if (menu() && vis(menu())) { keyOn(document.activeElement, 'Escape'); await sleep(80); }
+    // (cfb8, the user) the Shared note's card-menu item: Edit note...
+    var modeWas = window._penumbraJournalNotesMode; window._penumbraJournalNotesMode = 'shared';
+    rclick(q('.pnb-card-title', c1)); await sleep(150);
+    var am0 = acts(), al0 = labels(), ai0 = am0.indexOf('addNote');
+    R.info.sharedLbl = ai0 >= 0 ? al0[ai0] : am0;
+    R.chk.sharedEditLabel = ai0 >= 0 && al0[ai0] === 'Edit note...';
+    if (menu() && vis(menu())) { keyOn(document.activeElement, 'Escape'); await sleep(80); }
+    window._penumbraJournalNotesMode = modeWas;
+    if (C().noteCard && C().noteCard()) { keyOn(c1, 'Escape'); await sleep(80); }   // the clicks above selected a card: none, as before them
     // Add a note: the composer IN the card, focused; never the floating note card
     q('.journal-rownote-addbtn', p1).click(); await sleep(120);
     var in1 = inputOf(p1);
@@ -1364,6 +1574,13 @@
     // (round I) the box opened in the cut-off part: the card shows whole
     await until(function () { return c1.classList.contains('is-open'); }, 1500);
     R.chk.composeOpens = c1.classList.contains('is-open') && !!in1 && in1.getBoundingClientRect().bottom <= c1.getBoundingClientRect().bottom;
+    // (cfb8, the user) on a Medium card the box takes the card's width and its buttons go across under it: Attach on the left,
+    // Cancel and Post on the right, in one line
+    var cmp1 = in1 ? in1.closest('.journal-rownote-compose') : null, atb = cmp1 ? q('.journal-attach-btn', cmp1) : null, cnb = cmp1 ? q('.journal-rownote-inlinecancel', cmp1) : null, pob = cmp1 ? q('.journal-rownote-post', cmp1) : null;
+    function rcb(el) { return el.getBoundingClientRect(); }
+    R.info.btns = (atb && cnb && pob) ? { inB: Math.round(rcb(in1).bottom), inW: Math.round(rcb(in1).width), cW: Math.round(rcb(cmp1).width), a: [Math.round(rcb(atb).left), Math.round(rcb(atb).top)], c: [Math.round(rcb(cnb).left), Math.round(rcb(cnb).top)], p: [Math.round(rcb(pob).left), Math.round(rcb(pob).top)] } : null;
+    R.chk.btnsUnder = C().size() === 'standard' && !!atb && !!cnb && !!pob && rcb(pob).top >= rcb(in1).bottom - 1 && Math.abs(rcb(cnb).top - rcb(pob).top) < 3 && Math.abs(rcb(atb).top - rcb(pob).top) < 3
+      && rcb(atb).right < rcb(cnb).left && rcb(cnb).right <= rcb(pob).left + 1 && rcb(in1).width >= rcb(cmp1).width - 2;
     R.info.composeOpens = { cls: c1.className, inB: in1 ? Math.round(in1.getBoundingClientRect().bottom) : null, cB: Math.round(c1.getBoundingClientRect().bottom), act: document.activeElement ? document.activeElement.className : null };
     // Escape folds it away, the text kept: Add a note brings it back
     typeIn(in1, 'Draft one'); await sleep(60);
@@ -1390,7 +1607,7 @@
     // a card beside a taller one (its notes) keeps its parts together at the top: no gaps spread through it
     var c0 = cardFor(rows[0]), c1p = cardFor(rows[1]), sameRow = !!c0 && !!c1p && c0.offsetTop === c1p.offsetTop;
     var tt0 = c0 ? q('.pnb-card-title', c0) : null, bg0 = c0 ? q('.pnb-card-big', c0) : null;
-    R.chk.topAligned = sameRow && c1p.offsetHeight > 0 && c0.offsetHeight >= c0.scrollHeight - 1 && c0.offsetHeight > 200 && !!tt0 && !!bg0 && bg0.getBoundingClientRect().top - tt0.getBoundingClientRect().bottom < 16;
+    R.chk.topAligned = sameRow && c1p.offsetHeight > 0 && c0.offsetHeight >= c0.scrollHeight - 1 && (c0.offsetHeight > 200 || host().classList.contains('is-packed')) && !!tt0 && !!bg0 && bg0.getBoundingClientRect().top - tt0.getBoundingClientRect().bottom < 16;
     R.info.top = { sameRow: sameRow, h: c0 ? [c0.offsetHeight, c1p.offsetHeight] : null, gap: (tt0 && bg0) ? Math.round(bg0.getBoundingClientRect().top - tt0.getBoundingClientRect().bottom) : null };
     shapeMo.disconnect();
     // (round J) every note of yours can be edited, not only the newest: the older one (12) and the new one both offer Edit
@@ -1429,7 +1646,7 @@
     R.chk.dblEdit = !!mine && !!inDb && text(inDb) === text(q('.journal-rownote-text', mine)) && text(q('.journal-rownote-post', panelOf(cardFor(rows[1])))) === 'Save';
     if (inDb) { keyOn(inDb, 'Escape'); await sleep(100); }
     // a card's menu: Add a note to this row... writes in the card
-    var c2 = cardFor(rows[2]), ev = rclick(q('.pnb-card-fields dt', c2)); await sleep(100);
+    var c2 = cardFor(rows[2]), ev = rclickWhite(c2); await sleep(100);   // (cfix) the card's padding, not a label
     var an = menu() ? q('.pnb-hm-item[data-act="addNote"]', menu()) : null;
     if (an) an.click(); await sleep(150);
     var p2b = panelOf(cardFor(rows[2]));
@@ -1564,6 +1781,8 @@
     q('.pnb-card-title', cardFor(rows[1])).click(); await sleep(150);
     var dp = q('#pnbCardDetails .pnb-cdet-notes .journal-rownote-inline');
     R.chk.inDetails = detOpen() && !!dp && items(dp).length === 2 && itemTexts(dp)[1] === LONG && !q('#pnbCardDetails .journal-notes-btn');
+    // (cdel) the details window keeps a note's x (a delete is meant there)
+    R.chk.delInDetails = !!dp && qa('.journal-rownote-del', dp).some(function (b) { return getComputedStyle(b).display !== 'none' && b.offsetWidth > 0; });
     if (dp) q('.journal-rownote-addbtn', dp).click(); await sleep(120);
     var din = inputOf(dp);
     R.chk.addInDetails = !!din && document.activeElement === din && !!din.closest('#pnbCardDetails') && !noteCardOpen();
@@ -1627,7 +1846,7 @@
     var copied = null;
     try { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: function (t) { copied = t; return Promise.resolve(); } } }); } catch (e) { }
     // the card's empty area: Copy -> This entire card; run, it copies the card and says so
-    rclick(q('.pnb-card-fields dt', cards()[0])); await sleep(100);
+    rclickWhite(cards()[0]); await sleep(100);   // (cfix) the card's padding, not a label
     var it = menu() ? q('.pnb-hm-item[data-act="copyRow"]', menu()) : null, inSub = false;
     if (!it) { var cps = await openSub('copyMenu'); it = cps ? q('.pnb-hm-item[data-act="copyRow"]', cps) : null; inSub = !!it; }
     var lab = it ? (text(q('.pnb-hm-label', it)) || text(it)) : null;
@@ -1640,7 +1859,7 @@
     // (round M) the clipboard refusing it: the card's words too
     try { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: function () { return Promise.reject(new Error('denied')); } } }); } catch (e) { }
     if (menu()) keyOn(document.activeElement, 'Escape'); await sleep(60);
-    rclick(q('.pnb-card-fields dt', cards()[1])); await sleep(100);
+    rclickWhite(cards()[1]); await sleep(100);   // (cfix) the card's padding, not a label
     var cps2 = await openSub('copyMenu'), it2 = cps2 ? q('.pnb-hm-item[data-act="copyRow"]', cps2) : null; if (it2) it2.click();
     var failed = await until(function () { return /The card could not be copied\./.test(document.body.innerText || ''); }, 3000);
     R.chk.copyFailCard = !!it2 && failed && !/The row could not be copied\./.test(document.body.innerText || '');
@@ -1747,7 +1966,7 @@
     FD().open('North'); await findSettle(); await findStep(false);
     var all = hl('pnb-find').concat(hl('pnb-find-cur'));
     R.info.band = { n: all.length, st: FD()._state(), where: all.slice(0, 4).map(function (r) { return rangeEl(r).className + '|' + rangeText(r); }) };
-    R.chk.bandMarked = all.length > 0 && all.every(inCards) && all.some(function (r) { return !!rangeEl(r).closest('.pnb-cards-grpname'); });
+    R.chk.bandMarked = all.length > 0 && all.every(inCards) && all.some(function (r) { return !!rangeEl(r).closest('.group-header .group-name'); });   // (cband) the band's own name
     // a value: on its card
     await findType('Kilo'); await findStep(false);
     all = hl('pnb-find').concat(hl('pnb-find-cur'));
@@ -1756,21 +1975,25 @@
     FD().close(); await sleep(150);
     // a match in a folded band: Find opens the group, the cards draw it (the fold watcher's timer), then its card on screen
     var gl = grps()[grps().length - 1], gc = gl ? q('.pnb-card', gl) : null, gid = gc ? text(q('.pnb-card-title', gc)) : null;
-    if (gl) q('.pnb-cards-grptoggle', gl).click();
-    await until(function () { var g2 = grps()[grps().length - 1]; return !!g2 && g2.classList.contains('is-closed'); }, 4000); await sleep(200);
-    var folded = grps()[grps().length - 1].classList.contains('is-closed') && !q('.pnb-card', grps()[grps().length - 1]);
+    if (gl) q(':scope > .group-header', gl).click();
+    await until(function () { return shut(grps()[grps().length - 1]); }, 4000); await sleep(200);
+    var folded = shut(grps()[grps().length - 1]) && !q('.pnb-card', grps()[grps().length - 1]);
     window.scrollTo(0, 0); await sleep(150);
     FD().open(gid); await findSettle();   // (one match: the read goes to it, opening the group before the cards draw it)
     await until(function () { return outlined().length === 1 && inViewAny(outlined()[0]); }, 5000); await sleep(200);
     var fo = outlined();
     R.info.fold = { sy: Math.round(window.scrollY), id: gid, folded: folded, out: fo.length, title: fo[0] ? text(q('.pnb-card-title', fo[0])) : null, view: fo[0] ? inViewAny(fo[0]) : null, st: FD()._state() };
-    R.chk.foldedRevealed = !!gid && folded && fo.length === 1 && text(q('.pnb-card-title', fo[0])) === gid && inViewAny(fo[0]) && !grps()[grps().length - 1].classList.contains('is-closed');
+    R.chk.foldedRevealed = !!gid && folded && fo.length === 1 && text(q('.pnb-card-title', fo[0])) === gid && inViewAny(fo[0]) && !shut(grps()[grps().length - 1]);
     FD().close(); await sleep(150);
     // the search box's marks
     await runSearch('Kilo'); await until(function () { return hl('pnb-filter').some(inCards); }, 5000); await sleep(200);
     var fr = hl('pnb-filter');
     R.info.filter = { n: fr.length, inCards: fr.filter(inCards).length };
-    R.chk.filterMarked = fr.length > 0 && fr.every(inCards);
+    // (cband) the bands' tables sit in the host now, out of sight: a mark there is in the host but on no card
+    function onCard(r) { return !!rangeEl(r).closest('.pnb-card'); }
+    function onTable(r) { return !!rangeEl(r).closest('#groupedResultsContainer .group-content > table'); }
+    R.info.filterAt = { onCards: fr.filter(onCard).length, onTables: fr.filter(onTable).length };
+    R.chk.filterMarked = fr.length > 0 && fr.every(inCards) && fr.some(onCard) && !fr.some(onTable);
     await runSearch('');
   };
   S.cbarpick = async function () {
@@ -1803,8 +2026,14 @@
     await until(function () { return on() && cards().length === 200; }, 8000);
     var opts = sortSel() ? qa('option', sortSel()).map(function (o) { return [o.value, o.textContent]; }) : [];
     R.info.opts = opts.slice(0, 9);
-    R.chk.listShown = vis(sortSel()) && opts.length === 7 && opts[0][0] === '' && opts[0][1] === 'Sort: none' && opts.some(function (o) { return o[0] === 'V_NAME' && o[1] === 'Sort: ' + thName('V_NAME'); })
-      && !vis(sortArrow());
+    R.chk.listShown = vis(sortSel()) && opts.length === 7 && opts[0][0] === '' && opts[0][1] === 'None' && opts.some(function (o) { return o[0] === 'V_NAME' && o[1] === thName('V_NAME'); })
+      && !vis(sortArrow());   // (csortlbl) None, then the bare names (were Sort: none, Sort: <name>)
+    // (csortlbl) labelled Sort by as the size list is Card size: the label names the list (no aria-label over it), the two
+    // lists start at one edge, no option says Sort: any more
+    var lb = q('#sbCardsSortRow > label[for="pnbCardsSort"]'), zr = q('#pnbCardsSize').getBoundingClientRect(), sr = sortSel().getBoundingClientRect();
+    R.info.label = { text: text(lb), lefts: [Math.round(zr.left), Math.round(sr.left)], aria: sortSel().getAttribute('aria-label'), labels: sortSel().labels ? sortSel().labels.length : -1 };
+    R.chk.labelled = !!lb && vis(lb) && text(lb) === 'Sort by' && !sortSel().hasAttribute('aria-label') && !!sortSel().labels && sortSel().labels.length === 1 && sortSel().labels[0] === lb
+      && zr.width > 0 && Math.abs(zr.left - sr.left) <= 1 && !opts.some(function (o) { return /^Sort:/.test(o[1]); });
     // (round M) in the size list's own small style
     var zs = getComputedStyle(q('#pnbCardsSize')), so = getComputedStyle(sortSel()), hz = q('#pnbCardsSize').getBoundingClientRect().height, hs = sortSel().getBoundingClientRect().height;
     R.info.sized = { size: [zs.fontSize, Math.round(hz)], sort: [so.fontSize, Math.round(hs)] };
@@ -1882,7 +2111,88 @@
     R.info.filter = { n: fr.length, inCards: fr.filter(inCards).length };
     R.chk.filterOnTiles = fr.length > 0 && fr.every(inCards) && fr.some(function (r) { return !!rangeEl(r).closest('.pnb-card-pv .pnb-card-title'); });
     await runSearch('');
-    R.chk.sortHidden = !vis(sortSel());
+    R.chk.sortShown = vis(sortSel()) && qa('option', sortSel()).some(function (o) { return o.value === 'f0'; });   // (round U) the pivot's headings (was: hidden on tiles)
+  };
+  // ---- (round U) pivot tiles sort (pfsort: H_GROUP down, V_STATUS across, Amt) --------------------------------------
+  function pvTiles() { return cards().filter(function (c) { return !c.classList.contains('is-total'); }); }
+  function tileTitles() { return pvTiles().map(function (c) { return text(q('.pnb-card-title', c)); }); }
+  function pvLabels() { return pvShownRows().filter(function (tr) { return tr.hasAttribute('data-pivot-row'); }).map(function (tr) { var l = qa('td[data-row-field]', tr).map(pvCellText).filter(Boolean); return l[l.length - 1] || '(blank)'; }); }
+  function tilesFollow() { var a = tileTitles(); return a.length > 3 && same(a, pvLabels()); }
+  function nums(list) { return list.map(function (s) { return parseFloat(String(s == null ? '' : s).replace(/[^0-9.\-]/g, '')); }).filter(function (n) { return !isNaN(n); }); }
+  function mono(list, dir) { for (var i = 1; i < list.length; i++) if (dir === 'asc' ? list[i] < list[i - 1] : list[i] > list[i - 1]) return false; return list.length > 3; }
+  function tileBigs() { return nums(pvTiles().map(function (c) { return text(q('.pnb-card-bigval', c)); })); }
+  function tileVals(label) { return nums(pvTiles().map(function (c) { var d = qa('.pnb-card-pvfields dt', c).filter(function (x) { return text(x) === label; })[0]; return d ? text(d.nextElementSibling) : null; })); }
+  function pvTh(label) { return qa('#pivotResultTable thead th').filter(function (th) { return !th.hasAttribute('colspan') && pvCellText(th) === label; })[0] || null; }
+  function ariaOf(th) { return th ? th.getAttribute('aria-sort') : null; }
+  function anySorted() { return qa('#pivotResultTable thead th').some(function (th) { return /^(a|de)scending$/.test(th.getAttribute('aria-sort') || ''); }); }
+  function canSortNow() { return !!(C().canSort && C().canSort()); }   // (live has none: the control runs through)
+  async function pvSettle(fn) { await sleep(200); await until(function () { return fn() && tilesFollow(); }, 6000); await sleep(150); }
+  S.pfsort = async function () {
+    await until(function () { return on() && cards().length > 3 && C().state() && C().state().pivot === true; }, 10000); await sleep(300);
+    R.chk.apiShowAs = typeof C().showAs === 'function' && typeof C().configWhyNot === 'function';   // (round U) round T's comment had eaten showAs
+    var ps = C().pvSorts ? C().pvSorts() : { list: [] }, opts = sortSel() ? qa('option', sortSel()).map(function (o) { return [o.value, o.textContent]; }) : [];
+    var fld = ps.list.filter(function (e) { return e.kind === 'field'; }), val = ps.list.filter(function (e) { return e.kind === 'value'; }), tot = ps.list.filter(function (e) { return e.kind === 'total'; });
+    var start = tileTitles(), leaf = pvTiles()[0], dts = leaf ? qa('.pnb-card-pvfields dt', leaf).map(text) : [];
+    R.info.opts = opts.slice(0, 10); R.info.dts = dts;
+    R.chk.listShown = vis(sortSel()) && !q('#sbCardsSortRow').hidden && opts.length === ps.list.length + 1 && opts[0][0] === '' && opts[0][1] === 'None' && !vis(sortArrow())
+      && fld.length === 1 && fld[0].key === 'f0' && !!pvTh(fld[0].label) && pvTh(fld[0].label).hasAttribute('data-row-field') && val.length >= 2 && tot.length === 1 && tot[0].label === 'Total'
+      && opts.every(function (o, i) { return i === 0 || o[1] === ps.list[i - 1].label; }) && dts.length > 0 && dts.every(function (x) { return val.some(function (e) { return e.label === x; }); })
+      && canSortNow() === true && same(start, pvLabels());
+    // the Total: the pivot sorted by its Total heading, the tiles in its rows' order, the big numbers smallest first
+    setSort('v:Total'); await pvSettle(function () { return ariaOf(q('#pivotResultTable thead th.pivot-grand-total')) === 'ascending'; });
+    var b1 = tileBigs();
+    R.info.pick = { bigs: b1.slice(0, 6), sel: sortSel().value, now: C().pvSorts ? C().pvSorts().now : null };
+    R.chk.pickSorts = ariaOf(q('#pivotResultTable thead th.pivot-grand-total')) === 'ascending' && mono(b1, 'asc') && tilesFollow() && sortSel().value === 'v:Total' && !same(tileTitles(), start);
+    R.chk.arrowShown = vis(sortArrow()) && text(sortArrow()) === '\u2191';
+    sortArrow().click(); await pvSettle(function () { return ariaOf(q('#pivotResultTable thead th.pivot-grand-total')) === 'descending'; });
+    var b2 = tileBigs();
+    R.chk.flip = mono(b2, 'desc') && tilesFollow() && text(sortArrow()) === '\u2193' && sortSel().value === 'v:Total';
+    // the pivot's own path (a heading's menu): the list shows it
+    var v0 = val[0], th0 = v0 ? pvTh(v0.label) : null;
+    if (th0) { window.Penumbra.pivotMenu.sort(th0, 'desc'); await pvSettle(function () { return ariaOf(th0) === 'descending'; }); }
+    R.info.back = { key: v0 && v0.key, sel: sortSel().value, arrow: text(sortArrow()) };
+    R.chk.readsBack = !!th0 && sortSel().value === v0.key && text(sortArrow()) === '\u2193' && mono(tileVals(v0.label), 'desc');
+    // a tile's value: Sort ascending by ITS heading (the field's label on the tile = the heading's words)
+    var lf = pvTiles().filter(function (c) { return qa('.pnb-card-pvfields dd[data-pvc]', c).length > 1; })[0], dd = lf ? qa('.pnb-card-pvfields dd[data-pvc]', lf)[1] : null, lab = dd ? text(dd.previousElementSibling) : null;
+    if (dd) { rclick(dd); await sleep(150); }
+    var a1 = acts(), it1 = menu() ? q('.pnb-hm-item[data-act="tileSortAsc"]', menu()) : null;
+    R.info.valMenu = { lab: lab, acts: a1, label: it1 ? text(it1) : null, title: it1 ? it1.getAttribute('title') : null, wordy: wordy() };
+    var okLabels = !!it1 && text(it1) === 'Sort ascending' && a1.indexOf('tileSortDesc') >= 0 && a1.indexOf('cardSize') > a1.indexOf('tileSortAsc') && wordy().length === 0;
+    if (it1) { it1.click(); await pvSettle(function () { return ariaOf(pvTh(lab)) === 'ascending'; }); }
+    R.chk.valueMenuSorts = okLabels && ariaOf(pvTh(lab)) === 'ascending' && mono(tileVals(lab), 'asc') && sortSel().value === 'v:' + lab && !menu();
+    // the same value again: its ascending ticked, Clear sort offered; Clear sort: nothing sorted, the pivot's own order
+    dd = pvTiles().filter(function (c) { return qa('.pnb-card-pvfields dd[data-pvc]', c).length > 1; })[0]; dd = dd ? qa('.pnb-card-pvfields dd[data-pvc]', dd).filter(function (x) { return text(x.previousElementSibling) === lab; })[0] : null;
+    if (dd) { rclick(dd); await sleep(150); }
+    var it2 = menu() ? q('.pnb-hm-item[data-act="tileSortAsc"]', menu()) : null, clr = menu() ? q('.pnb-hm-item[data-act="tileSortClear"]', menu()) : null;
+    R.info.again = { checked: it2 ? it2.getAttribute('aria-checked') : null, clear: !!clr };
+    if (clr) { clr.click(); await pvSettle(function () { return !anySorted(); }); }
+    R.chk.clearFromMenu = !!it2 && it2.getAttribute('aria-checked') === 'true' && !!clr && !anySorted() && same(tileTitles(), start) && sortSel().value === '' && !vis(sortArrow());
+    // a tile's title: Sort Z to A by the row field
+    var tt = q('.pnb-card-title', pvTiles()[0]); rclick(tt); await sleep(150);
+    var it3 = menu() ? q('.pnb-hm-item[data-act="tileSortDesc"]', menu()) : null;
+    R.info.titleMenu = { label: it3 ? text(it3) : null, acts: acts() };
+    var okT = !!it3 && text(it3) === 'Sort Z to A' && !!menu() && text(q('.pnb-hm-item[data-act="tileSortAsc"]', menu())) === 'Sort A to Z';
+    if (it3) { it3.click(); await pvSettle(function () { return ariaOf(pvTh(fld[0].label)) === 'descending'; }); }
+    R.chk.titleMenuSorts = okT && ariaOf(pvTh(fld[0].label)) === 'descending' && sortSel().value === 'f0' && tilesFollow();
+    // the big number: the Total's heading; the grand total tile: no sorts
+    rclick(q('.pnb-card-bigval', pvTiles()[0])); await sleep(150);
+    var it4 = menu() ? q('.pnb-hm-item[data-act="tileSortAsc"]', menu()) : null, t4 = it4 ? it4.getAttribute('title') : '';
+    if (menu()) { keyOn(document.activeElement, 'Escape'); await sleep(80); }
+    rclick(q('.pnb-card-bigval', cards()[0]) || q('.pnb-card-title', cards()[0])); await sleep(150);   // (its big number: a tfoot cell)
+    var a5 = acts(); if (menu()) { keyOn(document.activeElement, 'Escape'); await sleep(80); }
+    R.info.bigMenu = { title: t4, totalActs: a5 };
+    R.chk.bigAndTotal = /of Total,/.test(t4 || '') && cards()[0].classList.contains('is-total') && a5.length > 0 && a5.every(function (x) { return x.indexOf('tileSort') !== 0; });
+    // Sort: none: every level off, the tiles in the pivot's own order
+    setSort(''); await pvSettle(function () { return !anySorted(); });
+    R.chk.noneClears = !anySorted() && same(tileTitles(), start) && sortSel().value === '' && !vis(sortArrow()) && !!C().pvSorts && C().pvSorts().now === null;
+    // Quick actions' Sort the cards...: the Cards card open, its list focused
+    var oo = C().openSort ? C().openSort() : false; await sleep(120);
+    R.info.open = { ret: oo, open: q('#sbCardsSeg').classList.contains('sb-open'), act: document.activeElement && (document.activeElement.id || document.activeElement.tagName) };
+    R.chk.openSort = oo === true && q('#sbCardsSeg').classList.contains('sb-open') && document.activeElement === sortSel() && q('#sbCardsOpen').getAttribute('aria-expanded') === 'true';
+    keyOn(sortSel(), 'Escape'); await sleep(80);
+    // the pivot as a table: no list (its headings sort it)
+    await pickView('table');
+    R.chk.tableHides = !vis(sortSel()) && !vis(sortArrow()) && canSortNow() === false;
   };
   function lay() { return q('#spCardsSection'); }
   // (round N; round P: Settings > Cards gone) the viewer's setup through the window: a title and
@@ -1904,7 +2214,7 @@
     var pc = mine();
     R.info.pref = pc;
     R.chk.keptAsPref = !!pc && pc.own === 1 && pc.title === 'V_STATUS' && same(pc.fields, ['V_ID', 'V_AMOUNT']) && !cbtn('pnb-ccfg-reset').disabled;
-    R.chk.authorUntouched = same(bsoCards(), { title: 'V_NAME', fields: ['V_DATE'] });
+    R.chk.authorUntouched = same(C().report(), { title: 'V_NAME', fields: ['V_DATE'] }) && !!bsoCards() && bsoCards().title === 'V_STATUS';   // (cfix) the report's own until a Save; an editor's Save writes the cards shown
     R.info.bso = bsoCards();
     cbtn('pnb-ccfg-reset').click(); await sleep(250);
     R.chk.resetBack = R.chk.titlePicked === true && slots().title === 'V_NAME' && same(slots().fields, ['V_DATE']) && !mine() && q('#pnbCcfgTitle1').value === 'V_NAME'
@@ -1916,9 +2226,9 @@
     C().sync(); await sleep(100);
     R.info.slots = slots();
     R.chk.seededDrawn = !!slots() && slots().title === 'V_STATUS' && same(slots().fields, ['V_ID', 'V_AMOUNT']);
-    R.chk.formIsAuthors = same(bsoCards(), { title: 'V_NAME', fields: ['V_DATE'] });
+    R.chk.formIsAuthors = same(C().report(), { title: 'V_NAME', fields: ['V_DATE'] }) && !!bsoCards() && bsoCards().title === 'V_STATUS' && same(bsoCards().fields, ['V_ID', 'V_AMOUNT']);   // (cfix) an editor's Save writes the cards shown
     C().openConfig(); await until(cfgShown, 3000);
-    R.chk.seededShown = q('#pnbCcfgTitle1').value === 'V_STATUS' && cchip('V_ID').checked && cchip('V_AMOUNT').checked && !cchip('V_DATE').checked && text(q('#pnbCcfgFieldsCount')) === '2 of 12' && !cbtn('pnb-ccfg-reset').disabled;
+    R.chk.seededShown = q('#pnbCcfgTitle1').value === 'V_STATUS' && cchip('V_ID').checked && cchip('V_AMOUNT').checked && !cchip('V_DATE').checked && text(q('#pnbCcfgFieldsCount')) === '2 of 16' && !cbtn('pnb-ccfg-reset').disabled;   // (cfix) sixteen
   };
 
   S.pvfind = async function () {
@@ -1928,6 +2238,20 @@
     var title = leaf ? text(q('.pnb-card-title', leaf)) : null;
     var dds = leaf ? qa('.pnb-card-pvfields dd[data-pvc]', leaf).filter(function (d) { return /\d/.test(text(d)); }) : [], dd = dds[1] || dds[0];
     var v = dd ? text(dd) : null, label = dd ? text(dd.previousElementSibling) : null;
+    // (round U) three measures, nested rows: the Sort list names each value as the tile does ("Open N"), a total per
+    // measure, both row fields; a value's own menu sorts by ITS heading
+    var pss = C().pvSorts ? C().pvSorts() : { list: [] }, pvals = pss.list.filter(function (e) { return e.kind === 'value'; }).map(function (e) { return e.label; }), ptot = pss.list.filter(function (e) { return e.kind === 'total'; }).map(function (e) { return e.label; });
+    var pdts = leaf ? qa('.pnb-card-pvfields dt', leaf).map(text) : [], pbig = leaf ? text(q('.pnb-card-big small', leaf)) : null;
+    // (a later child: its row has the leaf label alone, no parent cell - a heading counted from the row's start is off)
+    var srows = pvShownRows(), stile = null;
+    cards().forEach(function (c, i) { var tr = srows[i - 1]; if (!stile && i > 0 && tr && tr.hasAttribute('data-pivot-row') && qa('td[data-row-field]', tr).length === 1 && qa('.pnb-card-pvfields dd[data-pvc]', c).filter(function (d) { return /\d/.test(text(d)); }).length > 1) stile = c; });
+    var sdds = stile ? qa('.pnb-card-pvfields dd[data-pvc]', stile).filter(function (d) { return /\d/.test(text(d)); }) : [], sdd = sdds[1] || sdds[0], slabel = sdd ? text(sdd.previousElementSibling) : null;
+    if (sdd) { rclick(sdd); await sleep(150); }
+    var sit = menu() ? q('.pnb-hm-item[data-act="tileSortAsc"]', menu()) : null;
+    R.info.pvSortLabels = { vals: pvals.slice(0, 8), tot: ptot, dts: pdts.slice(0, 6), big: pbig, item: sit ? sit.getAttribute('title') : null, label: slabel, tile: stile ? text(q('.pnb-card-title', stile)) : null };
+    R.chk.sortLabels = pvals.length >= 6 && ptot.length === 3 && pdts.length > 0 && pdts.every(function (x) { return pvals.indexOf(x) >= 0; }) && !!pbig && ptot.indexOf(pbig) >= 0
+      && pss.list.filter(function (e) { return e.kind === 'field'; }).length === 2 && !!sit && !!slabel && (sit.getAttribute('title') || '').indexOf('of ' + slabel + ',') > 0;
+    if (menu()) { keyOn(document.activeElement, 'Escape'); await sleep(100); }
     // Compact: the tile shows its title and its big number - the value is named on it, by that same label
     C().setSize('compact'); await until(function () { return host().classList.contains('is-compact'); }, 4000); await sleep(400);
     FD().open(v); await findSettle(); await sleep(300);
@@ -1994,7 +2318,7 @@
     var dt = dd.previousElementSibling, dr = dt.getBoundingClientRect(); moveAt(dt, dr.left + 3, (dr.top + dr.bottom) / 2); await sleep(30);
     R.info.hot = { text: hotText, white: hotWhite, bg: hbg, lbg: lbg, n: qa('.is-hot').length };
     R.chk.hotOnText = hotText;
-    R.chk.hotNotWhite = !hotWhite && qa('.is-hot').length === 0;
+    R.chk.hotNotWhite = !hotWhite && !dd.classList.contains('is-hot') && qa('.is-hot').every(function (x) { return x === dt; });   // (cfix) the label lights for its own (heading's) menu
     R.chk.hotLit = hotText && hbg !== 'rgba(0, 0, 0, 0)' && hbg !== 'transparent' && hbg === lbg;
     // the details window: a value's text, its cell's menu; its white space, the card's
     q('.pnb-card-fields dt', c).click(); await until(function () { return detOpen(); }, 3000); await sleep(150);
@@ -2250,12 +2574,13 @@
     R.chk.labelsShown = !dl.classList.contains('is-nolabels') && !!dt0 && dt0.getBoundingClientRect().width > 10 && !dds[0].hasAttribute('title');
     // the window: ten of twelve; two more: twelve, the rest wait, the kept setup has twelve; untick them
     C().openConfig(); await until(cfgShown, 3000); await sleep(100);
-    var ten = text(q('#pnbCcfgFieldsCount')), two = qa('#pnbCcfgFields input:not(:checked)').slice(0, 2);
+    var ten = text(q('#pnbCcfgFieldsCount')), two = qa('#pnbCcfgFields input:not(:checked)').slice(0, 6);   // (cfix) sixteen
     two.forEach(function (b) { b.click(); }); await sleep(200);
+    var took = two.filter(function (b) { return b.checked; });   // (cfix) the ones the cap let through
     var rest = qa('#pnbCcfgFields input:not(:checked)'), m12 = mine();
     R.info.win = { ten: ten, now: text(q('#pnbCcfgFieldsCount')), mine: m12 && m12.fields, rest: rest.length };
-    R.chk.windowCount = ten === '10 of 12' && text(q('#pnbCcfgFieldsCount')) === '12 of 12' && rest.length > 0 && rest.every(function (b) { return b.disabled; }) && !!m12 && m12.fields.length === 12 && slots().fields.length === 12;
-    two.forEach(function (b) { b.click(); }); await sleep(200);
+    R.chk.windowCount = ten === '10 of 16' && text(q('#pnbCcfgFieldsCount')) === '16 of 16' && rest.length > 0 && rest.every(function (b) { return b.disabled; }) && !!m12 && m12.fields.length === 16 && slots().fields.length === 16;
+    took.forEach(function (b) { b.click(); }); await sleep(200);
     R.chk.labelsBox = !!lblBox() && lblBox().checked === true;
     // labels off
     flip(lblBox()); await until(function () { var d = q('.pnb-card-fields', cards()[0]); return !!d && d.classList.contains('is-nolabels'); }, 3000); await sleep(150);
@@ -2270,8 +2595,7 @@
     R.info.kept = { box: lblBox() && lblBox().checked, cls: back && back.className, mine: mine() };
     R.chk.labelsKept = !!lblBox() && lblBox().checked === true && !!back && !back.classList.contains('is-nolabels') && !mine();
     flip(lblBox()); await until(function () { var d = q('.pnb-card-fields', cards()[0]); return !!d && d.classList.contains('is-nolabels'); }, 3000); await sleep(150);
-    // the report's default carries it
-    cbtn('pnb-ccfg-default').click(); await sleep(200);
+    // the report's default carries it: (cfix) an editor's Save writes the cards shown
     var b = bsoCards(); R.info.bso = b;
     R.chk.labelsDefault = !!b && b.nolabels === 1 && same(b.fields.slice().sort(), TEN.slice().sort());   // (the window lists the fields in the columns' order)
     C().closeConfig(); await sleep(100);
@@ -2285,7 +2609,7 @@
     C().openDetails(cards()[0]); await until(detOpen, 3000); await sleep(150);
     var ddt = qa('#pnbCardDetails .pnb-cdet-fields dt');
     R.info = Object.assign({ det: { open: detOpen(), n: ddt.length, ws: ddt.slice(0, 3).map(function (d) { return Math.round(d.getBoundingClientRect().width); }), all: qa('#pnbCardDetails dt').length, dls: qa('#pnbCardDetails dl').map(function (d) { return d.className; }) } }, R.info);   // (first: the info line is cut at 900)
-    R.chk.detailsLabels = detOpen() && ddt.length === 6 && ddt.every(function (d) { return d.getBoundingClientRect().width > 10; });   // (the six shown columns besides the title, each named)
+    R.chk.detailsLabels = detOpen() && ddt.length === 11 && ddt.every(function (d) { return d.getBoundingClientRect().width > 10; });   // (the six shown columns besides the title, each named; cfix: and the card's five hidden fields)
     C().closeDetails(); await sleep(100);
     // labels on again
     C().openConfig(); await until(cfgShown, 3000); flip(lblBox()); await sleep(250);
@@ -2319,14 +2643,35 @@
     return n;
   }
   function laneName(l) { return text(q('.pnb-cards-grpname', l)); }
+  // ---- (bdlay, 2026-10-31, the user) the board is the grouping's third LAYOUT (Configure Grouping > Layout: Board) ----
+  function layoutNow() { var G = window.Penumbra && window.Penumbra.groupLayoutHost; return G ? G.get() : null; }
+  function hmClick(a) { var it = menu() ? q('.pnb-hm-item[data-act="' + a + '"]', menu()) : null; if (it) it.click(); return !!it; }
+  // (the harness) the help the Group dialog's opening loads: a page of help here - a missing help_content.php is read
+  // by main.js as a signed-out session, which closes every dialog (the real page's server answers it)
+  function helpStub() {
+    var J = window.jQuery, og = J.get; if (og.__pnbStub) return;
+    J.get = function (u, cb) { if (u === 'help_content.php') { if (typeof cb === 'function') setTimeout(function () { cb('<div id="searchHelpLightbox"></div>'); }, 0); return J.Deferred().resolve().promise(); } return og.apply(this, arguments); };
+    J.get.__pnbStub = 1;
+  }
   S.gboard = async function () {
+    // a report SAVED grouped by H_GROUP as a Board (st.groupLayout), the viewer with no Table / Cards pick of their own
     await until(function () { return on() && lanes().length > 0; }, 10000); await sleep(200);
     var L = lanes(), T = topGroups(), b = C().board();
-    R.info.board = { lanes: L.length, tops: T.length, b: b, names: L.slice(0, 4).map(laneName) };
+    R.info.board = { lanes: L.length, tops: T.length, b: b, layout: layoutNow(), view: C().view(), names: L.slice(0, 4).map(laneName) };
     // (the picture) a board wider than the window scrolls in itself, never the page (nor squeezes what is beside it)
-    var bd = q('.pnb-cards-board'); R.info.widths = { doc: document.documentElement.scrollWidth, vw: window.innerWidth, sw: bd.scrollWidth, cw: bd.clientWidth };
-    R.chk.noPageScroll = document.documentElement.scrollWidth <= window.innerWidth + 2 && bd.scrollWidth > bd.clientWidth + 50;
-    R.chk.boardShown = b.on && b.view && host().classList.contains('is-board') && L.length === T.length && L.length >= 2
+    var bd = q('.pnb-cards-board'); R.info.widths = bd ? { doc: document.documentElement.scrollWidth, vw: window.innerWidth, sw: bd.scrollWidth, cw: bd.clientWidth } : null;
+    R.chk.noPageScroll = !!bd && document.documentElement.scrollWidth <= window.innerWidth + 2 && bd.scrollWidth > bd.clientWidth + 50;
+    // (bdlay3, the user: the page still scrolled under a board) the board reaches down to the status bar and the page itself
+    // does not scroll (boardFit runs again 400 ms after a draw)
+    await sleep(450);
+    var de = document.documentElement, sbar = q('#pnbStatusBar'), sbr = sbar ? sbar.getBoundingClientRect() : null, bdn = q('.pnb-cards-board'), bdr = bdn.getBoundingClientRect();
+    R.info.fit = { sh: de.scrollHeight, ch: de.clientHeight, board: Math.round(bdr.bottom), bar: sbr && Math.round(sbr.top), sbH: bdn.offsetHeight - bdn.clientHeight, h: host().style.getPropertyValue('--pnb-board-h'), padB: getComputedStyle(host()).paddingBottom };
+    R.chk.pageFits = de.scrollHeight <= de.clientHeight + 1;
+    var hr = host().getBoundingClientRect(); R.info.fit.under = Math.round(hr.bottom - bdr.bottom);
+    R.chk.noRoomUnder = Math.abs(hr.bottom - bdr.bottom) <= 1;   // the host keeps no room under the board (the body's padding is the status bar's)
+    // (bdlay3, the user) no Cards chip on a board: the grouping chip's card has the card size; the cards' Sort list is off
+    var goneOnBoard = !!q('#sbCardsSeg') && getComputedStyle(q('#sbCardsSeg')).display === 'none', sortBoard = C().canSort();
+    R.chk.boardShown = b.on && b.layout === true && layoutNow() === 'board' && host().classList.contains('is-board') && L.length === T.length && L.length >= 2
       && L.every(function (l, i) { return laneName(l) === text(q(':scope > .group-header .group-name', T[i])); });
     var r0 = L[0].getBoundingClientRect(), r1 = L[1].getBoundingClientRect();
     R.chk.lanesSideBySide = r1.left >= r0.right - 1 && Math.abs(r1.top - r0.top) < 2 && r0.width > 150;
@@ -2338,11 +2683,25 @@
     var whole = c0.slice(0, 8).map(function (c) { var t = q('.pnb-card-title', c), f = q('.pnb-card-fields', c), cr = c.getBoundingClientRect(), fr = f ? f.getBoundingClientRect() : null; return { cut: c.classList.contains('is-clipped'), h: Math.round(cr.height), inside: !!fr && fr.bottom <= cr.bottom + 1 && !!t && t.getBoundingClientRect().height > 8 }; });
     R.info.whole = whole.slice(0, 3);
     R.chk.cardsWhole = whole.length > 1 && whole.every(function (w) { return !w.cut && w.inside && w.h > 60; });
-    R.chk.chipBoard = text(q('#sbCardsChip')) === 'Board' && !!opt('board') && opt('board').classList.contains('is-selected') && opt('board').getAttribute('aria-checked') === 'true';
-    R.chk.boardByRow = !q('#sbCardsBoardRow').hidden && q('#pnbCardsBoardBy').value === 'H_GROUP' && b.by === 'H_GROUP';
+    // the switch: Table / Cards, no third view and no Board by; on a board Cards is selected, Table greyed with its
+    // reason - a click on it, or the switch's arrows, change nothing (no table, no pick written)
+    var ot = opt('table'), oc = opt('cards');
+    R.chk.switchTwo = qa('#pnbCardsSwitch .pnb-cseg-opt').length === 2 && !opt('board') && !q('#sbCardsBoardRow') && !q('#pnbCardsBoardBy');
+    R.chk.chipBoard = text(q('#sbCardsChip')) === 'Cards' && !!oc && oc.classList.contains('is-selected') && oc.getAttribute('aria-checked') === 'true';
+    var grey = !!ot && ot.classList.contains('is-off') && ot.getAttribute('aria-disabled') === 'true' && /Stacked or List/.test(ot.title || '') && ot.getAttribute('aria-checked') === 'false';
+    if (ot) ot.click(); await sleep(350);
+    if (oc) { oc.focus(); key(oc, 'ArrowLeft'); await sleep(250); }
+    R.info.grey = { grey: grey, title: ot && ot.title, b: C().board(), view: C().view(), pref: prefs().lrfix || null };
+    R.chk.tableGreyed = grey && C().board().on && on() && lanes().length === L.length && !('view' in (prefs().lrfix || {}));
+    // a card's own menu on a board: its way out is the grouping's layout (Switch to Stacked view), never Show as table
+    rclick(q('.pnb-card-title', c0[0])); await sleep(100);
+    var cm = acts(); R.info.cardActs = cm;
+    R.chk.cardMenu = cm.indexOf('cardsStacked') >= 0 && cm.indexOf('cardsTable') < 0 && cm.indexOf('cardsBoard') < 0;
+    if (menu()) keyOn(document.activeElement, 'Escape'); await sleep(80);
     // the keys: down the lane, across to the next lane (the same place), back, up
+    c0 = laneCards(lanes()[0]);
     c0[0].focus(); keyOn(c0[0], 'ArrowDown'); await sleep(60); var k1 = document.activeElement === c0[1];
-    keyOn(document.activeElement, 'ArrowRight'); await sleep(60); var c1 = laneCards(L[1]), k2 = c1.indexOf(document.activeElement) === Math.min(1, c1.length - 1);
+    keyOn(document.activeElement, 'ArrowRight'); await sleep(60); var c1 = laneCards(lanes()[1]), k2 = c1.indexOf(document.activeElement) === Math.min(1, c1.length - 1);
     keyOn(document.activeElement, 'ArrowLeft'); await sleep(60); var k3 = document.activeElement === c0[Math.min(1, c0.length - 1)];
     keyOn(document.activeElement, 'ArrowUp'); await sleep(60); var k4 = document.activeElement === c0[0];
     R.info.keys = [k1, k2, k3, k4];
@@ -2354,50 +2713,226 @@
     R.info.det = { t0: dt0, now: detTitle(), want: text(q('.pnb-card-title', first1)) };
     R.chk.detailsAcross = dt0 === text(q('.pnb-card-title', last0)) && detTitle() === text(q('.pnb-card-title', first1));
     C().closeDetails(); await sleep(100);
+    // (bdlay2, the user) the board scrolled sideways keeps its place as a lane folds and opens
+    var bd1 = q('.pnb-cards-board'); bd1.scrollLeft = 80; await sleep(80); var sx0 = bd1.scrollLeft;
     // a lane folds (a narrow strip, its group closed, no cards) and opens again
     q('.pnb-cards-grptoggle', lanes()[0]).click(); await until(function () { var l = lanes()[0]; return !!l && l.classList.contains('is-closed'); }, 3000); await sleep(150);
     var lc = lanes()[0], fold = lc.classList.contains('is-closed') && lc.getBoundingClientRect().width < 60 && !T[0].classList.contains('open') && laneCards(lc).length === 0;
+    var sx1 = q('.pnb-cards-board').scrollLeft;
     q('.pnb-cards-grptoggle', lc).click(); await until(function () { var l = lanes()[0]; return !!l && !l.classList.contains('is-closed'); }, 3000); await sleep(150);
     R.chk.laneFold = fold && laneCards(lanes()[0]).length === c0.length;
-    // a lane's heading: the group's menu
+    var sx2 = q('.pnb-cards-board').scrollLeft;
+    R.info.scroll = { sx0: sx0, sx1: sx1, sx2: sx2 };
+    R.chk.keepsScroll = sx0 >= 60 && Math.abs(sx1 - sx0) < 2 && Math.abs(sx2 - sx0) < 2;
+    // (bdlay2, the user) Sort groups (the group menu's, the grouping chip's: the wrappers moved in place): the lanes follow,
+    // the board where it was scrolled
+    var before = lanes().map(laneName), bd2 = q('.pnb-cards-board'); bd2.scrollLeft = 60; await sleep(60);
+    var gmenu = window.Penumbra.groupMenu; gmenu.sort('label', 'desc');
+    await until(function () { var l = lanes(); return l.length > 0 && laneName(l[0]) !== before[0]; }, 4000); await sleep(200);
+    var after = lanes().map(laneName), dom = topGroups().map(function (w) { return text(q(':scope > .group-header .group-name', w)); });
+    R.info.sort = { before: before, after: after, dom: dom, sx: q('.pnb-cards-board').scrollLeft };
+    R.chk.sortFollows = after.length === before.length && same(after, dom) && after[0] !== before[0] && Math.abs(q('.pnb-cards-board').scrollLeft - 60) < 2;
+    gmenu.sort('label', 'asc'); await until(function () { return laneName(lanes()[0]) === before[0]; }, 4000); await sleep(150);
+    // a lane's heading: the group's menu - Switch to Stacked view (List too where it is drawn), never Board again
     rclick(q('.pnb-cards-grptoggle', lanes()[0])); await sleep(100);
     var lm = menu(), la = acts(); R.info.laneActs = la;
-    R.chk.laneMenu = !!lm && text(q('.pnb-hm-name', lm)) === laneName(lanes()[0]) && la.indexOf('gToggle') >= 0;
+    var laneLabs = qa('.pnb-hm-item', lm).map(function (x) { return text(x) || ''; });   // (bdlay3, the user: Switch to Stacked view twice)
+    var laneOnce = la.filter(function (a) { return a === 'gStacked'; }).length === 1 && la.indexOf('cardsStacked') < 0 && laneLabs.filter(function (s) { return /^Switch to Stacked view/.test(s); }).length === 1;
+    R.chk.laneMenu = !!lm && text(q('.pnb-hm-name', lm)) === laneName(lanes()[0]) && la.indexOf('gToggle') >= 0 && la.indexOf('gStacked') >= 0 && la.indexOf('gBoard') < 0;
+    // Switch to Stacked view: the grouping stays, the viewer's own pick comes back - the table (they chose none)
+    var left = hmClick('gStacked'); await until(function () { return !C().board().on && !on(); }, 4000); await sleep(300);
+    R.info.leave = { left: left, layout: layoutNow(), on: on(), grp: grpOn(), view: C().view(), tops: topGroups().length };
+    R.chk.leaveToTable = left && grpOn() && layoutNow() === 'stacked' && !on() && !host().classList.contains('is-board') && !document.body.classList.contains('pnb-board-on') && vis(q('#groupedResultsContainer')) && topGroups().length === T.length;
+    // (cfb8, the user: not worth a menu slot) the grouped table's own menus offer no Show as a board (Quick actions has it)
+    var cell = qa('#groupedResultsContainer .group-content td').filter(function (x) { return vis(x) && text(x); })[1];
+    rclick(cell); await sleep(120);
+    var tm = acts(); R.info.tableActs = tm;
+    R.chk.tableMenuNoBoard = tm.length > 0 && tm.indexOf('showBoard') < 0;
     if (menu()) keyOn(document.activeElement, 'Escape'); await sleep(80);
-    // Board by another column: the lanes are its values, kept
-    setSel('pnbCardsBoardBy', 'V_STATUS');
-    await until(function () { return C().board().by === 'V_STATUS' && lanes().length === 3; }, 8000); await sleep(300);
-    var st = lanes().map(laneName).sort();
-    R.info.byPick = { b: C().board(), lanes: st };
-    R.chk.boardByPick = C().board().by === 'V_STATUS' && C().board().kept === 'V_STATUS' && same(st, ['Closed', 'Open', 'Pending']) && C().board().made === null;
-    // leaving: the grouping the board did not make stays (as bands)
-    opt('cards').click(); await until(function () { return on() && !host().classList.contains('is-board'); }, 4000); await sleep(300);
-    R.chk.leaveKeeps = grpOn() && !host().classList.contains('is-board') && qa('#pnbCardsHost .pnb-cards-grp').length > 0 && (prefs().lrfix || {}).view === 'cards';
-    if (P.get('shot')) { var cp = q('#sbCardsPop'); if (cp) cp.style.setProperty('display', 'none', 'important'); opt('board').click(); await until(function () { return lanes().length > 0; }, 4000); window.scrollTo(0, 0); await sleep(300); }   // (the picture: the lanes)
+    // Cards over the Stacked grouping: bands of cards, whose menu offers Switch to Board view - the board again
+    if (oc) oc.click(); await until(function () { return on() && qa('#groupedResultsContainer .pnb-cards-inband').length > 0; }, 4000); await sleep(200);
+    rclick(tog(0)); await sleep(120);
+    var ba = acts(); R.info.bandActs = ba;
+    var bandOnce = ba.indexOf('gBoard') >= 0 && ba.indexOf('cardsBoard') < 0 && ba.indexOf('cardsStacked') < 0;   // (bdlay3)
+    var sortStacked = C().canSort(), segBack = vis(q('#sbCardsSeg')) && text(q('#sbCardsChip')) === 'Cards';
+    var toB = ba.indexOf('gBoard') >= 0 && hmClick('gBoard');
+    await until(function () { return C().board().on && lanes().length > 0; }, 5000); await sleep(250);
+    R.chk.backToBoard = toB && C().board().on && layoutNow() === 'board' && lanes().length === topGroups().length && (prefs().lrfix || {}).view === 'cards';
+    var goneAgain = getComputedStyle(q('#sbCardsSeg')).display === 'none';
+    R.info.chip = { goneOnBoard: goneOnBoard, segBack: segBack, goneAgain: goneAgain, sortBoard: sortBoard, sortStacked: sortStacked, bandOnce: bandOnce, laneOnce: laneOnce };
+    R.chk.chipGone = goneOnBoard && segBack && goneAgain;
+    R.chk.bandMenuOnce = laneOnce && bandOnce;
+    // saved with the report as a List is (the state a Save writes); a view link carries it and says so
+    var st = (window.__HC && window.__HC.bso) ? window.__HC.bso() : null;
+    R.info.saved = st ? { groupLayout: st.groupLayout, groupBy: st.groupBy } : null;
+    R.chk.savedLayout = !!st && st.groupLayout === 'board' && /H_GROUP/.test(String(st.groupBy || ''));
+    var vb = window.PenumbraViewLink.build(), vd = window.PenumbraViewLink.decode(vb.token), said = window.PenumbraViewLink.describe(vb) || [];
+    R.info.token = vb.token; R.info.link = { m: vd && vd.m, g: vd && vd.g, said: said };
+    R.chk.linkBoard = !!vd && vd.m === 'group' && !!vd.g && vd.g.layout === 'board' && said.some(function (x) { return /\(Board\)/.test(x); });
+    // (bdlay2, the user) the grouping chip's popover: one line with the three layouts, Board marked; Configure grouping... and
+    // Ungroup half and half; a pick there switches the layout in place
+    window.jQuery('#sbGroup').trigger('click'); await sleep(250);
+    var lays = qa('#sbGrpLayouts .sb-grp-lay'), on1 = q('#sbGrpLayouts .sb-grp-lay-on');
+    R.info.pop = { shown: vis(q('#sbGrpLayouts')), lays: lays.map(function (b) { return b.getAttribute('data-layout') + (b.disabled ? ':off' : ''); }), on: on1 && on1.getAttribute('data-layout') };
+    R.chk.grpPopLayouts = vis(q('#sbGrpLayouts')) && same(lays.map(function (b) { return b.getAttribute('data-layout'); }), ['stacked', 'list', 'board'])
+      && !!on1 && on1.getAttribute('data-layout') === 'board' && on1.getAttribute('aria-pressed') === 'true' && Math.abs(lays[0].getBoundingClientRect().top - lays[2].getBoundingClientRect().top) < 2;
+    var acr = q('#sbGroupPop .sb-grp-actions'), cfb = q('#sbGrpConfigure'), ugb = q('#sbGrpUngroup');
+    var ar = acr ? acr.getBoundingClientRect() : null, cr = cfb ? cfb.getBoundingClientRect() : null, ur = ugb ? ugb.getBoundingClientRect() : null;
+    R.info.popActs = (ar && cr && ur) ? { row: Math.round(ar.width), cfg: Math.round(cr.width), ung: Math.round(ur.width), padR: Math.round(ar.right - ur.right) } : null;
+    R.chk.grpPopActions = !!(ar && cr && ur) && vis(ugb) && Math.abs(cr.width - ur.width) < 2 && Math.abs(cr.top - ur.top) < 2 && ar.right - ur.right < 2 && cr.left - ar.left < 2;
+    // (bdlay3, the user) the grouping chip's card carries the card size on a board: under the Layout line, the size now; a
+    // pick there sets it (the Cards card's own list follows); off on Stacked, back on the board
+    var szr = q('#sbGrpSizeRow'), szs = q('#sbGrpCardSize'), sz0 = C().size();
+    var szShown = vis(szr) && !!szs && szs.value === sz0 && szr.getBoundingClientRect().top >= q('#sbGrpLayouts').getBoundingClientRect().bottom - 1;
+    if (szs) { szs.value = 'large'; szs.dispatchEvent(new Event('change', { bubbles: true })); }
+    await until(function () { return C().size() === 'large'; }, 3000); await sleep(250);
+    var szSet = C().size() === 'large' && host().classList.contains('is-large') && q('#pnbCardsSize').value === 'large' && !!szr && szr.style.display === '';
+    if (szs) { szs.value = sz0; szs.dispatchEvent(new Event('change', { bubbles: true })); } await until(function () { return C().size() === sz0; }, 3000); await sleep(200);
+    var lst = q('#sbGrpLayouts .sb-grp-lay[data-layout="stacked"]');
+    if (lst) lst.click(); await until(function () { return !C().board().on; }, 4000); await sleep(200);
+    var wasStacked = layoutNow() === 'stacked' && !C().board().on && !!q('#sbGrpLayouts .sb-grp-lay-on[data-layout="stacked"]');
+    var szGone = !!szr && szr.style.display === 'none';
+    var lbd = q('#sbGrpLayouts .sb-grp-lay[data-layout="board"]');
+    if (lbd) lbd.click(); await until(function () { return C().board().on && lanes().length > 0; }, 4000); await sleep(200);
+    R.chk.grpPopSwitch = wasStacked && layoutNow() === 'board' && C().board().on && !!q('#sbGrpLayouts .sb-grp-lay-on[data-layout="board"]');
+    var szBack = !!szr && szr.style.display === '' && !!szs && szs.value === C().size();
+    R.info.grpSize = { sz0: sz0, shown: szShown, set: szSet, gone: szGone, back: szBack };
+    R.chk.grpSize = szShown && szSet && szGone && szBack;
+    window.jQuery('#sbGroup').trigger('click'); await sleep(100);   // (the popover closed again)
+    // (bdlay3) Quick actions' Sort the cards on a board: nothing to open (no Cards chip), the Cards card stays shut
+    var openBoard = C().openSort(), cardOpened = q('#sbCardsSeg').classList.contains('sb-open');
+    if (cardOpened) q('#sbCardsOpen').click();
+    await sleep(80);
+    R.info.sort = { board: sortBoard, stacked: sortStacked, open: openBoard, opened: cardOpened };
+    R.chk.sortOff = sortBoard === false && sortStacked === true && openBoard === false && !cardOpened;
+    if (P.get('shot')) { var cp = q('#sbCardsPop'); if (cp) cp.style.setProperty('display', 'none', 'important'); window.scrollTo(0, 0); await sleep(300); }   // (the picture: the lanes)
+  };
+  S.gboardvl = async function () {
+    // gboard's link (its token): the report opens as a Board from the link alone (its own saved layout is Stacked)
+    await until(function () { return on() && lanes().length > 0; }, 10000); await sleep(200);
+    R.info.vl = { b: C().board(), layout: layoutNow(), active: window.PenumbraViewLink.active(), lanes: lanes().length, tops: topGroups().length };
+    R.chk.bootsBoard = window.PenumbraViewLink.active() && C().board().on && layoutNow() === 'board' && lanes().length === topGroups().length && lanes().length >= 2;
+  };
+  S.gboardfew = async function () {
+    // (bdlay2, the user) a short board (V_STATUS: three lanes, every one fits): a folded lane keeps its width, its name across the top
+    await until(function () { return on() && lanes().length > 0; }, 10000); await sleep(250);
+    var L = lanes(), w0 = L[0].getBoundingClientRect().width;
+    q('.pnb-cards-grptoggle', L[0]).click(); await until(function () { var l = lanes()[0]; return !!l && l.classList.contains('is-closed'); }, 3000); await sleep(200);
+    var lc = lanes()[0], hd = q('.pnb-cards-lanehead', lc), wr = lc.getBoundingClientRect(), bd = q('.pnb-cards-board');
+    R.info.few = { lanes: L.length, w0: Math.round(w0), w1: Math.round(wr.width), h1: Math.round(wr.height), wm: hd ? getComputedStyle(hd).writingMode : null, roomy: !!bd && bd.classList.contains('is-roomy') };
+    R.chk.foldWide = L.length === 3 && !!bd && bd.classList.contains('is-roomy') && Math.abs(wr.width - w0) < 2 && !!hd && getComputedStyle(hd).writingMode === 'horizontal-tb' && laneCards(lc).length === 0 && wr.height < 80;
+  };
+  S.gboardbig = async function () {
+    // (bdlay2, the user: Expand all left the far lanes empty) 2,500 rows in six lanes: each lane draws its own share of the
+    // step, a lane with more its own Show more (none for the step); one lane's adds to that lane alone; Find's match past a
+    // lane's share is drawn; Collapse all then Expand all fills every lane again
+    await until(function () { return on() && lanes().length > 0; }, 20000); await sleep(400);
+    function counts() { return lanes().map(function (l) { return laneCards(l).length; }); }
+    function groupTrs(w) { var ls = w.classList.contains('group-leaf') ? [w] : qa('.group-wrapper.group-leaf', w), out = []; ls.forEach(function (x) { out = out.concat(qa(':scope > .group-content > table > tbody > tr', x).filter(function (tr) { return !tr.classList.contains('search-hidden'); })); }); return out; }
+    var L = lanes(), n0 = counts(), opened = L.filter(function (l) { return !l.classList.contains('is-closed'); }).length;
+    var share = Math.max(25, Math.ceil(1000 / Math.max(1, opened))), sizes = topGroups().map(grpLeafRows);
+    R.info.big = { lanes: L.length, opened: opened, counts: n0, share: share, sizes: sizes };
+    R.chk.lanesFilled = L.length >= 5 && opened === L.length && n0.every(function (n, i) { return n > 0 && n === Math.min(share, sizes[i]); });
+    var btns = qa('#pnbCardsHost .pnb-cards-lane .pnb-cards-lanemore .pnb-cards-morebtn'), stepBtn = q('#pnbCardsHost > .pnb-cards-more');
+    R.chk.laneMore = btns.length > 0 && btns.length === sizes.filter(function (s) { return s > share; }).length && !stepBtn;
+    // (bdlay3, the user: the Show more row said nothing of how many) each lane's row: the cards drawn of the lane's own
+    function laneTxt(i) { var m = q('.pnb-cards-lanemore .pnb-cards-moretxt', lanes()[i]); return m ? text(m) : null; }
+    function cntWant(i, n) { return n.toLocaleString() + ' of ' + sizes[i].toLocaleString() + ' cards drawn'; }
+    var cnt0 = qa('#pnbCardsHost .pnb-cards-lanemore .pnb-cards-moretxt').length === btns.length && lanes().every(function (l, i) { return !q('.pnb-cards-lanemore', l) || laneTxt(i) === cntWant(i, n0[i]); });
+    var b1 = q('.pnb-cards-lanemore .pnb-cards-morebtn', lanes()[1]);
+    if (b1) b1.click(); await until(function () { return counts()[1] > n0[1]; }, 4000); await sleep(200);
+    var n1 = counts(); R.info.more = n1;
+    R.chk.laneMoreAdds = !!b1 && n1[1] === Math.min(n0[1] + share, sizes[1]) && n1.every(function (n, i) { return i === 1 || n === n0[i]; });
+    R.info.laneTxt = [laneTxt(0), laneTxt(1), laneTxt(2)];
+    R.chk.laneCount = cnt0 && sizes[1] > n1[1] && laneTxt(1) === cntWant(1, n1[1]);
+    var deep = groupTrs(topGroups()[2])[share + 5], di = deep ? rowIdx(deep) : -1;
+    if (deep) { C().findMirror.reveal(deep); C().redraw(); await sleep(300); }
+    R.info.find = { di: di, drawn: di >= 0 && !!q('#pnbCardsHost .pnb-card[data-row="' + di + '"]') };
+    R.chk.findDraws = di >= 0 && !!q('#pnbCardsHost .pnb-card[data-row="' + di + '"]');
+    q('#collapseAllGroups').click(); await until(function () { return lanes().every(function (l) { return l.classList.contains('is-closed'); }); }, 6000); await sleep(200);
+    q('#expandAllGroups').click(); await until(function () { return lanes().every(function (l) { return !l.classList.contains('is-closed'); }); }, 6000); await sleep(500);
+    var n2 = counts(); R.info.expand = n2;
+    R.chk.expandAllFilled = n2.length === sizes.length && n2.every(function (n) { return n > 0; }) && n2.every(function (n, i) { return i === 1 || n >= Math.min(share, sizes[i]); });
+  };
+  // (cband) 2,500 rows in six Stacked bands: each open band draws its share of the step with its own Show more and count
+  // at its foot (none for the step itself); one band's Show more adds to that band alone
+  S.gbandbig = async function () {
+    await until(function () { return on() && qa('#groupedResultsContainer .pnb-cards-inband').length > 0; }, 20000); await sleep(400);
+    var leaves = qa('#groupedResultsContainer .group-wrapper.group-leaf').filter(function (w) { return !w.classList.contains('group-grand-total') && !w.classList.contains('search-hidden'); });
+    function n(w) { return qa(':scope > .group-content > .pnb-cards-inband .pnb-card', w).length; }
+    function size(w) { return qa(':scope > .group-content > table > tbody > tr', w).filter(function (tr) { return !tr.classList.contains('search-hidden'); }).length; }
+    function footTxt(w) { var f = q(':scope > .group-content > .pnb-cards-bandmore .pnb-cards-moretxt', w); return f ? text(f) : null; }
+    var share = Math.max(25, Math.ceil(1000 / Math.max(1, leaves.length))), n0 = leaves.map(n), sizes = leaves.map(size);
+    var feet = leaves.map(function (w) { return q(':scope > .group-content > .pnb-cards-bandmore', w); });
+    R.info.big = { leaves: leaves.length, share: share, n0: n0, sizes: sizes, foot0: leaves[0] ? footTxt(leaves[0]) : null };
+    R.chk.bandShares = leaves.length >= 5 && n0.every(function (x, i) { return x === Math.min(share, sizes[i]); });
+    R.chk.bandMore = feet.some(Boolean) && feet.every(function (f, i) { return (sizes[i] > share) === !!f; }) && !q('#pnbCardsHost > .pnb-cards-more')
+      && leaves.every(function (w, i) { return !feet[i] || footTxt(w) === n0[i].toLocaleString() + ' of ' + sizes[i].toLocaleString() + ' cards drawn'; });
+    var i1 = sizes.findIndex(function (s) { return s > share; }), b1 = i1 >= 0 ? q(':scope > .group-content > .pnb-cards-bandmore .pnb-cards-morebtn', leaves[i1]) : null;
+    if (b1) b1.click(); await until(function () { return n(leaves[i1]) > n0[i1]; }, 5000); await sleep(200);
+    var n1 = leaves.map(n); R.info.more = n1;
+    R.chk.bandMoreAdds = !!b1 && n1[i1] === Math.min(n0[i1] + share, sizes[i1]) && n1.every(function (x, i) { return i === i1 || x === n0[i]; });
   };
   S.cboard = async function () {
+    // a flat report shown as cards (the viewer's pick): the board never groups it by itself
     await until(function () { return on() && cards().length > 0; }, 8000); await sleep(150);
     R.info.guess = C().boardGuess();
     R.chk.guessPill = C().boardGuess() === 'H_GROUP';
     var flatN = cards().length;
-    opt('board').click(); await until(function () { return lanes().length > 0; }, 8000); await sleep(300);
-    var b = C().board(), p = prefs().lrfix || {};
-    R.info.enter = { b: b, p: p, lanes: lanes().length, tops: topGroups().length };
-    R.chk.enterGroups = grpOn() && b.on && b.by === 'H_GROUP' && b.made === 'H_GROUP' && b.kept === 'H_GROUP' && lanes().length === topGroups().length && p.view === 'board' && p.board === 'H_GROUP';
-    opt('cards').click(); await until(function () { return !grpOn() && on() && !host().classList.contains('is-board') && cards().length > 0; }, 6000); await sleep(250);
-    R.info.leave = { grp: grpOn(), n: cards().length, flatN: flatN, b: C().board() };
-    R.chk.leaveUngroups = !grpOn() && cards().length === flatN && C().board().made === null && (prefs().lrfix || {}).view === 'cards';
-    opt('board').click(); await until(function () { return lanes().length > 0; }, 8000); await sleep(250);
-    R.chk.reenter = grpOn() && C().board().by === 'H_GROUP' && C().board().on;
-    // ungrouped from elsewhere (the grouping's own Ungroup): back to Cards
-    q('#removeGroupingLink').click(); await until(function () { return C().view() === 'cards'; }, 4000); await sleep(400);
-    R.info.flip = { view: C().view(), grp: grpOn(), p: prefs().lrfix };
-    R.chk.ungroupFlips = C().view() === 'cards' && !grpOn() && !host().classList.contains('is-board') && (prefs().lrfix || {}).view === 'cards';
+    await sleep(500);
+    R.info.flat = { grp: grpOn(), b: C().board(), layout: layoutNow(), offered: C().boardOffered ? C().boardOffered() : 'none', sw: !!opt('board') };
+    R.chk.noAutoGroup = !grpOn() && !C().board().on && !opt('board') && !!C().boardOffered && C().boardOffered() === true;
+    helpStub();
+    // (cfb8, the user) no Show as a board in the card's menu; Show as a board (Quick actions: showBoard): Configure Grouping
+    // opens - the guessed column picked, Board the layout - and nothing is grouped until Apply
+    rclick(q('.pnb-card-title', cards()[0])); await sleep(100);
+    var cba = acts(); R.info.cardActs = cba;
+    R.chk.menuNoBoard = cba.length > 0 && cba.indexOf('cardsBoard') < 0 && cba.indexOf('showBoard') < 0;
+    if (menu() && vis(menu())) { keyOn(document.activeElement, 'Escape'); await sleep(80); }
+    var hasItem = true;
+    C().showBoard();
+    await until(function () { return vis(q('#groupingLightbox')) || grpOn(); }, 4000); await sleep(500);
+    var sel = q('#groupingColumnSelector .pcs-selected'), radio = q('#groupLayoutRow input[name="groupLayoutChoice"][value="board"]'), lab = radio ? radio.closest('label') : null;
+    R.info.dialog ={ item: hasItem, shown: vis(q('#groupingLightbox')), col: sel && sel.getAttribute('data-value'), radio: !!radio && radio.checked, field: q('#groupLayout') && q('#groupLayout').value, lab: lab ? lab.style.display : 'none', grp: grpOn() };
+    R.chk.dialogOpens = hasItem && vis(q('#groupingLightbox')) && !!sel && sel.getAttribute('data-value') === 'H_GROUP' && !!radio && radio.checked
+      && q('#groupLayout').value === 'board' && !!lab && lab.style.display !== 'none' && !grpOn();
+    // Apply: grouped by it, as a Board (the person's choice)
+    q('#confirmGroupingBtn').click();
+    await until(function () { return C().board().on && lanes().length > 0; }, 8000); await sleep(300);
+    R.info.apply = { b: C().board(), layout: layoutNow(), lanes: lanes().length, tops: topGroups().length };
+    R.chk.applyMakesBoard = grpOn() && C().board().on && C().board().by === 'H_GROUP' && layoutNow() === 'board' && lanes().length === topGroups().length && lanes().length >= 2;
+    // the grouping's own Ungroup: the layout goes with the grouping, the viewer's own pick (cards) stays
+    q('#removeGroupingLink').click(); await until(function () { return !grpOn(); }, 4000); await sleep(500);
+    R.info.flip = { view: C().view(), grp: grpOn(), b: C().board(), layout: layoutNow(), n: cards().length, flatN: flatN };
+    R.chk.ungroupNoFlip = !grpOn() && !C().board().on && layoutNow() === 'stacked' && C().view() === 'cards' && on() && cards().length === flatN && !host().classList.contains('is-board');
   };
   S.cboardload = async function () {
-    await until(function () { return on() && lanes().length > 0; }, 10000); await sleep(250);
-    var b = C().board(); R.info.load = { b: b, lanes: lanes().map(laneName) };
-    R.chk.loadGroups = grpOn() && b.on && b.by === 'H_GROUP' && b.made === 'H_GROUP' && lanes().length === topGroups().length && lanes().length >= 2;   // (the kept column, never the guess's V_STATUS)
+    // round S kept a board as the viewer's VIEW (view: 'board', board: H_GROUP): it reads as cards now, and nothing is
+    // grouped behind the viewer's back
+    await until(function () { return on() && cards().length > 0; }, 10000); await sleep(600);
+    var b = C().board(); R.info.load = { b: b, view: C().view(), grp: grpOn(), pref: prefs().lrfix || null };
+    R.chk.loadAsCards = C().view() === 'cards' && on() && !grpOn() && !b.on && !host().classList.contains('is-board');
+    // the next pick written drops round S's board key
+    C().set('table'); await sleep(200); C().set('cards'); await sleep(250);
+    var p = prefs().lrfix || {}; R.info.after = p;
+    R.chk.oldKeyDropped = p.view === 'cards' && !('board' in p);
+  };
+  S.cboardrx = async function () {
+    // a viewer the report keeps from grouping (body.restrict-grouping: its Group dialog is not theirs), cards on: the board
+    // offers nothing that groups the view - round S's switch grouped it through Penumbra.groupByColumn, unchecked
+    await until(function () { return on() && cards().length > 0; }, 8000); await sleep(150);
+    document.body.classList.add('restrict-grouping'); await sleep(100);
+    rclick(q('.pnb-card-title', cards()[0])); await sleep(100);
+    var ca = acts(); if (menu()) keyOn(document.activeElement, 'Escape'); await sleep(80);
+    R.info.rx = { acts: ca, offered: C().boardOffered ? C().boardOffered() : 'none', sw: !!opt('board') };
+    R.chk.noBoardOffer = ca.indexOf('cardsBoard') < 0 && !opt('board') && !!C().boardOffered && C().boardOffered() === false;
+    // every door tried (the switch's Board where there is one, else Show as a board): the view stays flat and no Group
+    // dialog opens (the stub keeps one that did open on screen)
+    helpStub();
+    if (opt('board')) opt('board').click(); else if (C().showBoard) C().showBoard();
+    await sleep(1200);
+    R.info.after = { grp: grpOn(), dialog: vis(q('#groupingLightbox')), b: C().board() };
+    R.chk.notGrouped = !grpOn() && !vis(q('#groupingLightbox'));
   };
   S.cdetrow = async function () {
     await until(function () { return on() && cards().length === 25; }, 8000);
@@ -2420,9 +2955,777 @@
     C().closeDetails();
   };
 
+  // (cprint) print as cards. A print's sheet is built on beforeprint (fired here, as the browser fires it); print media and
+  // a real PDF come from run.py on the page's ask (window.__WANTMEDIA, window.__WANTPDF -> window.__PDFINFO)
+  async function wantMedia(m) { window.__WANTMEDIA = m; await until(function () { return window.matchMedia('print').matches === (m === 'print'); }, 8000); await sleep(100); }
+  async function wantPdf() { window.__PDFINFO = null; window.__WANTPDF = 1; await until(function () { return !!window.__PDFINFO; }, 90000); return window.__PDFINFO; }
+  function sheet() { return q('#pnbCardsPrint'); }
+  function pages() { return qa('#pnbCardsPrint .pnb-cp-page'); }
+  function fire(t) { window.dispatchEvent(new Event(t)); }
+  function pgTitle(p) { return p ? text(q('.pnb-card-title', p)) : null; }
+  // window.print() stood in for: what the print would have shown (beforeprint, the sheet, afterprint)
+  function stubPrint() {
+    var seen = { calls: 0 }, real = window.print;
+    window.print = function () { seen.calls++; fire('beforeprint'); var ps = pages(); seen.pages = ps.length; seen.first = pgTitle(ps[0]); seen.n = ps[0] ? text(q('.pnb-cp-n', ps[0])) : null; seen.title = document.title; fire('afterprint'); };
+    seen.restore = function () { window.print = real; };
+    return seen;
+  }
+  S.cprint = async function () {
+    await until(function () { return on() && cards().length === 25; }, 8000); await sleep(200);
+    var n = cards().length, rep = text(q('#mainReportTitle'));
+    // the Download dialog's Print row: what a print is while cards show
+    var note = q('#downloadActionsLightbox .pnb-cards-printnote');
+    R.chk.noteShown = !!note && !note.hidden && /one page per card/.test(text(note)) && text(note).indexOf('(25 pages)') >= 0;
+    R.info.note = note ? text(note) : null;
+    // a print (Ctrl+P, the Download dialog's Print): every card drawn, one page each, in their order
+    fire('beforeprint');
+    var ps = pages();
+    R.chk.sheetBuilt = !!sheet() && sheet().parentNode === document.body && document.body.classList.contains('pnb-cprint') && ps.length === n;
+    R.chk.order = ps.length === n && ps.every(function (p, i) { return pgTitle(p) === text(q('.pnb-card-title', cards()[i])); });
+    var p3 = ps[3], tr3 = shownRows()[3], st3 = p3 ? text(q('.pnb-cp-stamp', p3)) : '';
+    R.chk.pageHead = !!p3 && text(q('.pnb-cp-n', p3)) === 'Card 4 of 25' && !!rep && text(q('.pnb-cp-rep', p3)) === rep && /^Printed /.test(st3) && /Data as of \S/.test(st3);
+    // a page = the details window's content: every shown column with the row's values (never a hidden one), the header
+    var pairs = p3 ? qa('.pnb-cdet-fields dt', p3).map(function (d) { return [text(d), text(d.nextElementSibling)]; }) : [], cols = qa('#tableHeader th[data-colname]').filter(function (t) { var n = t.getAttribute('data-colname'); return (t.style.display !== 'none' || n === 'H_TEXT') && n !== '#' && n.indexOf('__JOURNAL') !== 0; }).map(function (t) { return t.getAttribute('data-colname'); });   // (cfix) the card's hidden field (H_TEXT) too
+    R.chk.pageFields = pairs.length > 0 && pairs.length === cols.length && pairs.every(function (pp, i) { return pp[0] === thName(cols[i]) && pp[1] === tdText(tr3, cols[i]); }) && !!p3 && text(q('.pnb-card-bigval', p3)) === tdText(tr3, 'H_AMT') && !!q('.pnb-card-pill', p3);
+    R.info.page = { pairs: pairs.slice(0, 4), cols: cols, head: p3 ? text(q('.pnb-cp-head', p3)) : null, stamp: st3 };
+    R.chk.noPath = !!p3 && !q('.pnb-cp-path', p3);
+    // on paper: the sheet alone, a break after every page but the last, the upright named page, no buttons
+    await wantMedia('print');
+    var sh = sheet(), others = Array.prototype.filter.call(document.body.children, function (c) { return c !== sh && c.tagName !== 'SCRIPT' && c.tagName !== 'STYLE' && getComputedStyle(c).display !== 'none'; });
+    R.chk.paperAlone = !!sh && getComputedStyle(sh).display === 'block' && others.length === 0;
+    R.info.others = others.slice(0, 5).map(function (c) { return c.tagName + '#' + c.id + '.' + c.className; });
+    R.chk.pageBreaks = ps.length > 1 && ps.slice(0, -1).every(function (p) { return getComputedStyle(p).breakAfter === 'page'; }) && getComputedStyle(ps[ps.length - 1]).breakAfter !== 'page' && getComputedStyle(ps[0]).page === 'pnbcards';
+    // white paper and dark text under a dark theme
+    var dark = (window.__THEMES || []).filter(function (t) { return t.isDark && !t.legacy; })[0];
+    if (dark) { applyTheme(dark); await sleep(120); }
+    var ptt = ps[0] && q('.pnb-card-title', ps[0]), pdt = ps[0] && q('.pnb-cdet-fields dt', ps[0]);
+    var rT = ptt ? ratio(fgOf(ptt), bgOf(ptt)) : 0, rD = pdt ? ratio(fgOf(pdt), bgOf(pdt)) : 0, pbg = ptt ? bgOf(ptt) : null;
+    R.chk.paperColors = !!dark && rT >= 7 && rD >= 4.5 && !!pbg && pbg[0] > 250 && pbg[1] > 250 && pbg[2] > 250;
+    R.info.paper = { theme: dark && dark.id, title: +rT.toFixed(2), label: +rD.toFixed(2), bg: pbg };
+    applyTheme({ id: 'theme-default', isDark: false, modern: false });
+    await wantMedia('screen');
+    fire('afterprint');
+    var gone = !sheet() && !document.body.classList.contains('pnb-cprint');
+    // a real PDF of the page, the way a print goes: from the screen, Chrome's own beforeprint builds the sheet and its
+    // afterprint takes it away - one page per card, upright
+    var pdf = await wantPdf();
+    R.info.pdf = pdf;
+    R.chk.pdfPages = !!pdf && pdf.pages === n;
+    R.chk.pdfPortrait = !!pdf && pdf.w > 0 && pdf.h > pdf.w;
+    R.chk.afterRemoves = R.chk.sheetBuilt === true && gone && !sheet() && !document.body.classList.contains('pnb-cprint');
+    // a beforeprint inside the print layout (Chrome's PDF path while the page is already on paper): the sheet stands - the
+    // views' probes read the paper there, where a rebuild found no cards and printed the table
+    fire('beforeprint'); await wantMedia('print');
+    var pdf2 = await wantPdf();
+    R.info.pdf2 = pdf2;
+    R.chk.pdfKept = !!pdf2 && pdf2.pages === n && pdf2.h > pdf2.w;
+    await wantMedia('screen'); fire('afterprint');
+    // the details window: the Print icon beside the close prints that card alone, the document named for it while it prints
+    var c2 = cards()[2]; q('.pnb-card-title', c2).click(); await sleep(250);
+    var pb = q('#pnbCardDetails .pnb-cdet-print'), cl = q('#pnbCardDetails .pnb-cdet-close'), docT = document.title, dt2 = detOpen() ? detTitle() : null;
+    R.chk.btnShape = !!pb && pb.parentNode === q('#pnbCardDetails .pnb-dlg-head') && pb.nextElementSibling === cl && pb.getAttribute('aria-label') === 'Print this card' && /Save as PDF/.test(pb.title || '') && vis(pb) && pb.getBoundingClientRect().width <= 40;
+    var sp = stubPrint();
+    if (pb) pb.click();
+    sp.restore();
+    R.info.btn = { seen: { calls: sp.calls, pages: sp.pages, first: sp.first, n: sp.n, title: sp.title }, want: dt2, doc: docT };
+    R.chk.btnPrintsOne = sp.calls === 1 && sp.pages === 1 && !!dt2 && sp.first === dt2 && sp.n === 'Card 3 of 25';
+    R.chk.btnTitle = sp.calls === 1 && !!dt2 && sp.title === (rep ? rep + ' - ' : '') + dt2 && document.title === docT;
+    R.chk.btnKeepsOpen = !!pb && sp.calls === 1 && detOpen() && !sheet() && detTitle() === dt2;
+    // Ctrl+P in the window (the browser's beforeprint): that card alone
+    fire('beforeprint'); var one = pages();
+    R.chk.ctrlPOne = one.length === 1 && pgTitle(one[0]) === dt2;
+    fire('afterprint');
+    // Quick actions: Print the cards = every card even with the window open; Print this card = the window's
+    sp = stubPrint(); if (C().print) C().print(); sp.restore();
+    R.chk.apiAll = sp.calls === 1 && sp.pages === n;
+    sp = stubPrint(); if (C().printOne) C().printOne(); sp.restore();
+    R.chk.apiOne = sp.calls === 1 && sp.pages === 1 && sp.first === dt2;
+    // the window's buttons: ghost ones - the class, no fill, readable on every theme (Previous / Next 4.5:1, the icon 3:1)
+    var prev = q('#pnbCardDetails .pnb-cdet-prev'), next = q('#pnbCardDetails .pnb-cdet-next');
+    R.chk.ghostClass = [prev, next, pb].every(function (b) { return !!b && b.classList.contains('pnb-cdet-ghost'); }) && !prev.disabled && !next.disabled;
+    var themes = (window.__THEMES || []).filter(function (t) { return !t.legacy; }), filled = [], weak = [];
+    for (var i = 0; i < themes.length && prev && next && pb; i++) {
+      applyTheme(themes[i]); await sleep(60);
+      [prev, next, pb].forEach(function (b) { var c = rgba(getComputedStyle(b).backgroundColor); if (c && c[3] > 0.02) filled.push([themes[i].id, b.className, getComputedStyle(b).backgroundColor]); });
+      var rp = ratio(fgOf(prev), bgOf(prev)), rn = ratio(fgOf(next), bgOf(next)), ri = ratio(fgOf(pb), bgOf(pb));
+      if (rp < 4.5 || rn < 4.5 || ri < 3) weak.push([themes[i].id, +rp.toFixed(2), +rn.toFixed(2), +ri.toFixed(2)]);
+    }
+    applyTheme({ id: 'theme-default', isDark: false, modern: false });
+    R.chk.ghostFlat = !!pb && !!prev && !!next && themes.length >= 18 && filled.length === 0;
+    R.chk.ghostContrast = !!pb && !!prev && !!next && themes.length >= 18 && weak.length === 0;
+    R.info.ghost = { filled: filled.slice(0, 6), weak: weak.slice(0, 8) };
+    if (C().closeDetails) C().closeDetails(); await sleep(80);
+    // the table: a print is the table's, as before (no sheet; the table on paper)
+    await pickView('table');
+    fire('beforeprint'); await wantMedia('print');
+    R.chk.tableWhenOff = !on() && !sheet() && getComputedStyle(q('#resultsTable')).display !== 'none' && getComputedStyle(q('#resultsTable')).visibility !== 'hidden';
+    fire('afterprint'); await wantMedia('screen');
+  };
+  S.gprint = async function () {
+    await until(function () { return on() && grps().length > 1 && cards().length > 0; }, 10000); await sleep(200);
+    fire('beforeprint');
+    var ps = pages(), all = cards(), g1 = grps()[1], f1 = g1 ? q('.pnb-card', g1) : null, at = f1 ? all.indexOf(f1) : -1;
+    R.chk.gSheet = ps.length === all.length && all.length > 25;
+    var want = g1 ? gname(g1) : null, got = (at >= 0 && ps[at]) ? text(q('.pnb-cp-path', ps[at])) : null;
+    R.chk.gPath = !!want && got === want && pgTitle(ps[at]) === text(q('.pnb-card-title', f1));
+    R.info.path = { want: want, got: got, at: at };
+    fire('afterprint');
+    // a folded band: its cards are not drawn, not printed
+    var before = all.length, tg = tog(0); if (tg) tg.click();
+    await until(function () { return cards().length < before; }, 4000); await sleep(150);
+    fire('beforeprint');
+    R.chk.foldFollowed = cards().length < before && pages().length === cards().length;
+    fire('afterprint');
+    tg = tog(0); if (tg) tg.click(); await until(function () { return cards().length === before; }, 4000); await sleep(150);
+    // the board: a page names its lane
+    window.Penumbra.groupMenu.layout('board', null);   // (bdlay) the group menu's own switch
+    await until(function () { return !!(C().board && C().board().on) && qa('#pnbCardsHost .pnb-cards-lane').length > 1 && cards().length > 0; }, 8000); await sleep(200);
+    var lanes = qa('#pnbCardsHost .pnb-cards-lane'), l1 = lanes[1], lc = l1 ? q('.pnb-card', l1) : null, li = lc ? cards().indexOf(lc) : -1;
+    fire('beforeprint');
+    var lp = li >= 0 ? pages()[li] : null, lw = l1 ? text(q('.pnb-cards-grpname', l1)) : null;
+    R.chk.boardPath = !!lp && !!lw && text(q('.pnb-cp-path', lp)) === lw && pgTitle(lp) === text(q('.pnb-card-title', lc));
+    R.info.board = { lane: lw, got: lp ? text(q('.pnb-cp-path', lp)) : null, li: li };
+    fire('afterprint');
+  };
+  S.pprint = async function () {
+    await until(function () { return on() && cards().length > 0 && C().state() && C().state().pivot === true; }, 8000); await sleep(200);
+    var cs = cards();
+    fire('beforeprint');
+    var ps = pages();
+    R.chk.pSheet = ps.length === cs.length && !!ps[0] && text(q('.pnb-cp-n', ps[0])) === 'Tile 1 of ' + cs.length;
+    var li = -1; for (var i = 0; i < cs.length; i++) if (!cs[i].classList.contains('is-total')) { li = i; break; }
+    var lp = li >= 0 ? ps[li] : null;
+    R.chk.pTile = !!lp && pgTitle(lp) === text(q('.pnb-card-title', cs[li])) && text(q('.pnb-card-bigval', lp)) === text(q('.pnb-card-bigval', cs[li]));
+    await wantMedia('print');
+    var act = qa('#pnbCardsPrint .pnb-cdet-actions');
+    R.chk.pNoButton = act.length > 0 && act.every(function (a) { return getComputedStyle(a).display === 'none'; }) && qa('#pnbCardsPrint button').every(function (b) { return getComputedStyle(b).display === 'none'; });
+    await wantMedia('screen');
+    fire('afterprint');
+    if (li >= 0) { q('.pnb-card-title', cs[li]).click(); await sleep(200); }
+    var dr = q('#pnbCardDetails .pnb-cdet-drill');
+    R.chk.pDrillGhost = !!dr && dr.classList.contains('pnb-cdet-ghost') && (function () { var c = rgba(getComputedStyle(dr).backgroundColor); return !c || c[3] <= 0.02; })();
+    if (C().closeDetails) C().closeDetails();
+  };
+
+  // (cfix, 2026-10-31) the user's card fixes: packed cards (the gap under a short card filled, the order kept, Up / Down in
+  // the column, Pack the cards off / on, kept in the setup and the link); a wide part never widens a card's column; a
+  // field's LABEL right-clicked: its heading's menu (on the card, in the details window); the details window lists a
+  // hidden column the card shows; Configure cards: no Make default, Reset, All / None, sixteen, the lists' own dress;
+  // an editor's Save writes what they see, savedToReport drops their own copy; a viewer's Save writes the report's
+  function longText(rows, n) {
+    var th = fth('H_TEXT'), id = th.getAttribute('data-column');
+    window.Penumbra.cardsHost.fillRows(rows);
+    rows.forEach(function (tr) { var c = tr.querySelector('td[data-column="' + id + '"]'); if (c) c.textContent = 'The Consortium for Advanced Simulation of Light Water Reactors was established to model reactors. '.repeat(n); });
+  }
+  function rclickWhite(card) { var r = card.getBoundingClientRect(); return rclick(card, { x: r.left + 3, y: r.bottom - 3 }); }   // (cfix) a card's padding: its white space
+  function rectOf(el) { var r = el.getBoundingClientRect(); return { l: Math.round(r.left), t: Math.round(r.top), b: Math.round(r.bottom), r: Math.round(r.right) }; }
+  function textPoint(el) { var rg = document.createRange(); rg.selectNodeContents(el); var rs = rg.getClientRects()[0]; return rs ? { x: rs.left + 3, y: rs.top + rs.height / 2 } : null; }
+  S.cfix = async function () {
+    await until(function () { return on() && cards().length > 0; }, 8000);
+    var rows = shownRows();
+    longText([rows[0], rows[3]], 3); C().redraw(); await sleep(300);
+    var cs = cards(), per = 0, t0 = rectOf(cs[0]).t;
+    while (per < cs.length && rectOf(cs[per]).t === t0) per++;
+    // the card under the short card 1: right under it (its gap), not under the row's tallest (card 0)
+    var c1 = rectOf(cs[1]), c0 = rectOf(cs[0]), under = null;
+    for (var i = per; i < cs.length && !under; i++) { var r = rectOf(cs[i]); if (Math.abs(r.l - c1.l) <= 2) under = r; }
+    var gap = parseFloat(getComputedStyle(q('#pnbCardsHost .pnb-cards-grid')).columnGap) || 0;
+    R.info.pack = { per: per, c0: c0, c1: c1, under: under, gap: gap, pk: C().pack && C().pack() };
+    R.chk.packFills = host().classList.contains('is-packed') && per >= 2 && c0.b - c1.b > 100 && !!under && Math.abs(under.t - (c1.b + gap)) <= 3;
+    R.chk.orderKept = same(cardRows(), shownRows().map(rowIdx)) && cs.slice(0, per).every(function (c) { return rectOf(c).t === t0; });
+    // Up / Down: the card above or below in the same column
+    cs[1].focus(); key(cs[1], 'ArrowDown'); await sleep(60);
+    var dn = document.activeElement, dr = dn && dn.classList.contains('pnb-card') ? rectOf(dn) : null;
+    key(dn, 'ArrowUp'); await sleep(60);
+    R.info.keys = { dn: dr, back: document.activeElement === cs[1] };
+    R.chk.keysColumn = !!dr && Math.abs(dr.l - c1.l) <= 2 && !!under && dr.t === under.t && document.activeElement === cs[1];
+    // a wide part (as a note with a long unbroken line) stays inside the card: the fields keep its width
+    var w = document.createElement('div'); w.style.whiteSpace = 'nowrap'; w.textContent = 'W'.repeat(300); cs[2].appendChild(w);
+    var dl2 = q('.pnb-card-fields', cs[2]), wr = { card: rectOf(cs[2]).r, dl: dl2 ? rectOf(dl2).r : null };
+    w.parentNode.removeChild(w); R.info.wide = wr;
+    R.chk.wideStays = wr.dl !== null && wr.dl <= wr.card;
+    // a field's label: its column heading's menu, the label lit; Configure cards and the card's items after it
+    cs = cards();
+    var lab = qa('.pnb-card-fields dt', cs[2]).filter(function (d) { return d.getAttribute('data-colhead') === 'V_ID'; })[0] || null, pt = lab ? textPoint(lab) : null;
+    if (lab && pt) rclick(lab, pt); await sleep(200);
+    var m = menu(), ma = m ? acts(m) : [];
+    R.info.labMenu = { has: !!lab, acts: ma.slice(0, 30), title: m && m.getAttribute('aria-label'), lit: !!lab && lab.classList.contains('is-menu-for') };
+    R.chk.labelMenu = !!m && m.getAttribute('aria-label') === thName('V_ID') && ma.indexOf('sortAsc') >= 0 && ma.indexOf('cardConfig') >= 0 && ma.indexOf('copyRow') < 0 && !!lab && lab.classList.contains('is-menu-for');
+    if (window.Penumbra.colMenu && window.Penumbra.colMenu.close) window.Penumbra.colMenu.close(); await sleep(100);
+    // the white space beside the label (past its text): the card's own menu, never the heading's
+    var cr2 = rectOf(cs[2]);
+    rclick(cs[2], { x: cr2.l + 3, y: cr2.b - 3 }); await sleep(150);
+    var m2 = menu(); R.info.white = m2 ? acts(m2).slice(0, 12) : null;
+    R.chk.whiteIsCard = !!m2 && acts(m2).indexOf('sortAsc') < 0;
+    if (window.Penumbra.colMenu && window.Penumbra.colMenu.close) window.Penumbra.colMenu.close(); await sleep(100);
+    // the details window: the card's hidden field (H_TEXT) listed, no other hidden column; its label's menu (no Sort there)
+    C().openDetails(cards()[0]); await until(detOpen, 3000); await sleep(150);
+    var names = detPairs().map(function (p) { return p[0]; });
+    R.info.det = names;
+    R.chk.detCardField = names.indexOf(thName('H_TEXT')) >= 0 && names.filter(function (n) { return /^H_/.test(n); }).length === 1 && names.indexOf(thName('V_NAME')) >= 0;
+    var dlab = qa('#pnbCardDetails .pnb-cdet-fields dt').filter(function (d) { return d.getAttribute('data-colhead') === 'V_DATE'; })[0] || null, dpt = dlab ? textPoint(dlab) : null;
+    if (dlab && dpt) rclick(dlab, dpt); await sleep(200);
+    var m3 = menu(), a3 = m3 ? acts(m3) : [];
+    R.info.detMenu = a3.slice(0, 30);
+    R.chk.detLabelMenu = !!m3 && m3.getAttribute('aria-label') === thName('V_DATE') && a3.indexOf('sortAsc') < 0 && a3.indexOf('hide') >= 0 && detOpen();
+    if (window.Penumbra.colMenu && window.Penumbra.colMenu.close) window.Penumbra.colMenu.close(); await sleep(100);
+    C().closeDetails(); await sleep(150);
+    // Configure cards: Reset, no Make default, the lists' own dress
+    C().openConfig(); await until(cfgShown, 3000); await sleep(100);
+    var sel = q('#pnbCcfgTitle1'), cssel = getComputedStyle(sel);
+    R.info.win = { reset: text(cbtn('pnb-ccfg-reset')), def: !!cbtn('pnb-ccfg-default'), app: cssel.appearance, rad: cssel.borderTopLeftRadius, sub: text(q('#pnbCcfgSub')), clear: text(cbtn('pnb-ccfg-nodefault')) };
+    R.chk.windowWords = text(cbtn('pnb-ccfg-reset')) === 'Reset' && !cbtn('pnb-ccfg-default') && text(cbtn('pnb-ccfg-nodefault')) === 'Clear the default' && /Everyone's cards/.test(text(q('#pnbCcfgSub')))
+      && qa('.pnb-ccfg-tips li', cfg()).filter(vis).length === 3 && !/Make default/.test(cfg().textContent);
+    R.chk.listsStyled = cssel.appearance === 'none' && parseFloat(cssel.borderTopLeftRadius) >= 4 && /url\(/.test(cssel.backgroundImage);
+    // All: sixteen ticked (the table's order), kept; None: Automatic
+    var pa = q('.pnb-ccfg-pickall[data-chips="pnbCcfgFields"]', cfg()); if (pa) pa.click(); await sleep(250);
+    var all = { count: text(q('#pnbCcfgFieldsCount')), mine: mine() && mine().fields, slots: slots() && slots().fields };
+    var pn = q('.pnb-ccfg-picknone[data-chips="pnbCcfgFields"]', cfg()); if (pn) pn.click(); await sleep(250);
+    var none = { count: text(q('#pnbCcfgFieldsCount')), mine: mine() && mine().fields, slots: slots() && slots().fields };
+    R.info.allNone = { all: all, none: none };
+    R.chk.allNone = all.count === '16 of 16' && !!all.mine && all.mine.length === 16 && !!all.slots && all.slots.length === 16 && none.count === 'Automatic' && !none.mine && !!none.slots && none.slots.length === 3;
+    // an editor's Save writes the cards shown; the window says it is not saved yet; savedToReport: the editor's own copy goes
+    setSel('pnbCcfgTitle1', 'V_STATUS'); await sleep(200);
+    var b = bsoCards(), sub1 = text(q('#pnbCcfgSub'));
+    R.info.save = { b: b, sub: sub1 };
+    R.chk.editorSaves = !!b && b.title === 'V_STATUS' && b.fields === undefined && /Not saved yet/.test(sub1);
+    var pv = window.penumbra_vars.canEditReport; window.penumbra_vars.canEditReport = false;
+    var bv = bsoCards(); window.penumbra_vars.canEditReport = pv;
+    R.chk.viewerSavesReport = !!bv && bv.title === 'V_NAME' && same(bv.fields, ['H_TEXT', 'V_ID', 'V_DATE']);
+    if (C().savedToReport) C().savedToReport(b); await sleep(200);
+    R.info.saved = { mine: mine(), rep: C().report(), sub: text(q('#pnbCcfgSub')), reset: cbtn('pnb-ccfg-reset').disabled };
+    R.chk.savedDropsMine = !mine() && !!C().report() && C().report().title === 'V_STATUS' && slots().title === 'V_STATUS' && /Everyone's cards/.test(text(q('#pnbCcfgSub'))) && cbtn('pnb-ccfg-reset').disabled;
+    // Pack the cards off: the rows as before (no spans), kept in the setup and the link; on again
+    var pk = q('#pnbCcfgPack'), was = !!pk && pk.checked;
+    if (pk) flip(pk); await sleep(300);
+    cs = cards();
+    var spans = cs.filter(function (c) { return !!c.style.gridRowEnd; }).length, mo = mine(), lk = window.PenumbraViewLink.build(), dk = window.PenumbraViewLink.decode(lk.token), b2 = bsoCards();
+    R.info.off = { was: was, packed: host().classList.contains('is-packed'), spans: spans, mine: mo, cl: dk && dk.cl, b: b2 };
+    R.chk.packOff = was && !host().classList.contains('is-packed') && spans === 0 && !!mo && mo.nopack === 1 && !!dk && !!dk.cl && dk.cl.nopack === 1 && !!b2 && b2.nopack === 1;
+    if (pk) flip(pk); await sleep(300);
+    R.chk.packOn = host().classList.contains('is-packed') && cards().every(function (c) { return /^span \d+$/.test(c.style.gridRowEnd); }) && (!mine() || !mine().nopack);
+    C().closeConfig();
+  };
+  // (cfix) a report whose setup has Pack the cards off: drawn in rows; the window's box unticked
+  S.cfixB = async function () {
+    await until(function () { return on() && cards().length > 0; }, 8000);
+    R.chk.reportNoPack = !!C().report() && C().report().nopack === 1 && !host().classList.contains('is-packed') && cards().every(function (c) { return !c.style.gridRowEnd; });
+    C().openConfig(); await until(cfgShown, 3000); await sleep(100);
+    R.chk.boxFollows = !!q('#pnbCcfgPack') && q('#pnbCcfgPack').checked === false;
+    C().closeConfig();
+  };
+  // (cfix) over a pivot: Pack the cards is in the window too, kept beside the tiles' setup
+  S.pfix = async function () {
+    await until(function () { return on() && cards().length > 0 && C().state() && C().state().pivot === true; }, 10000); await sleep(200);
+    var packed0 = host().classList.contains('is-packed');
+    C().openConfig(); await until(cfgShown, 3000); await sleep(100);
+    var pk = q('#pnbCcfgPack'), shown = !!pk && vis(pk);
+    if (pk) flip(pk); await sleep(400);
+    var lay = C().layout(); R.info.pv = { packed0: packed0, shown: shown, lay: lay, packed: host().classList.contains('is-packed') };
+    R.chk.pivotPackOff = packed0 && shown && !!lay && lay.nopack === 1 && !host().classList.contains('is-packed') && (mine() || {}).nopack === 1;
+    C().closeConfig();
+  };
+
+  // (cfix2, 2026-10-31) the user's first test of cfix: a repaint (restyle: a theme change) wiped the packing (one squashed
+  // row); the window's switches on one row; Download as PDF while cards show = the cover, then a portrait page per card
+  // (the emailed PDF, called without the ask, stays the table); the Download dialog's PDF row says so
+  function loadJs(src) { return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
+  S.cfixprint = async function () {
+    await until(function () { return on() && cards().length === 25; }, 8000); await sleep(200);
+    var g0 = q('#pnbCardsHost .pnb-cards-grid'), h0 = g0 ? g0.getBoundingClientRect().height : 0;
+    document.body.classList.add('theme-dark-blue'); await sleep(600);
+    document.body.classList.remove('theme-dark-blue'); await sleep(600);
+    var g = q('#pnbCardsHost .pnb-cards-grid'), cs = cards(), hh = g ? g.getBoundingClientRect().height : 0;
+    R.info.restyle = { before: Math.round(h0), after: Math.round(hh), spans: cs.filter(function (c) { return !!c.style.gridRowEnd; }).length, n: cs.length };
+    R.chk.restyleKeeps = cs.length === 25 && cs.every(function (c) { return /^span \d+$/.test(c.style.gridRowEnd); }) && hh > 300 && Math.abs(hh - h0) < 4;
+    // the window: Show field labels and Pack the cards side by side, under the chips; Card size alone in its row
+    C().openConfig(); await until(cfgShown, 3000); await sleep(100);
+    var lb = q('#pnbCcfgLabels'), pk = q('#pnbCcfgPack'), lr = lb ? lb.getBoundingClientRect() : null, pr = pk ? pk.getBoundingClientRect() : null, ch = q('#pnbCcfgFields');
+    R.info.checks = { lb: lr && [lr.left, lr.top], pk: pr && [pr.left, pr.top], same: !!lb && !!pk && lb.closest('.pnb-cards-row') === pk.closest('.pnb-cards-row') };
+    R.chk.switchesRow = !!lr && !!pr && lb.closest('.pnb-cards-row') === pk.closest('.pnb-cards-row') && Math.abs(lr.top - pr.top) < 3 && pr.left > lr.right && !!ch && pr.top > ch.getBoundingClientRect().bottom
+      && !q('#pnbCcfgSize').closest('.pnb-cards-row').querySelector('input[type="checkbox"]');
+    C().closeConfig(); await sleep(100);
+    // the Download dialog's PDF row while cards show
+    var pn = q('#downloadActionsLightbox .pnb-cards-pdfnote');
+    R.info.pdfNote = pn ? text(pn) : null;
+    R.chk.pdfNote = !!pn && !pn.hidden && /one page per card \(25 cards\)/.test(text(pn)) && !!q('#downloadActionsLightbox .pnb-cards-printnote');
+    // Download as PDF: the cover, then a page per card, portrait; the email's call (no ask) is the table's
+    var ok = true; try { await loadJs('jspdf-2.5.1.umd.min.js'); await loadJs('jspdf-autotable-3.5.23.min.js'); } catch (e) { ok = false; }
+    var b64 = ok && window.__HC.gpdf ? await window.__HC.gpdf({ cards: true }) : null, txt = b64 ? atob(b64) : '';
+    var t3 = text(q('.pnb-card-title', cards()[2]));
+    R.info.pdf = { ok: ok, len: txt.length, pages: (txt.match(/\/Type \/Page[^s]/g) || []).length, portrait: (txt.match(/\/MediaBox \[0 0 612\.?\d* 792/g) || []).length, st: C().pdf && C().pdf(), t3: t3 };
+    R.chk.pdfCards = !!txt && R.info.pdf.pages === 26 && R.info.pdf.portrait === 25 && /\(Card 3 of 25\)/.test(txt) && txt.indexOf('(' + t3 + ')') >= 0 && /\(Downloaded /.test(txt);
+    var b2 = ok && window.__HC.gpdf ? await window.__HC.gpdf() : null, tx2 = b2 ? atob(b2) : '';
+    R.info.pdfTable = { pages: (tx2.match(/\/Type \/Page[^s]/g) || []).length, cardWord: /\(Card 1 of/.test(tx2) };
+    R.chk.pdfTableStays = !!tx2 && !/\(Card 1 of/.test(tx2) && (tx2.match(/\/MediaBox \[0 0 612\.?\d* 792/g) || []).length === 0;
+  };
+  // (cfix2) the board: each lane as tall as the room from the board's top to the status bar
+  S.gfix2 = async function () {
+    window.Penumbra.groupMenu.layout('board', null); await until(function () { return C().board().on && qa('#pnbCardsHost .pnb-cards-lane').length > 0; }, 8000); await sleep(400);   // (bdlay) the group menu's own switch
+    var ex = qa('#pnbCardsHost .pnb-cards-lane.is-closed .pnb-cards-grptoggle'); ex.forEach(function (b) { b.click(); }); await sleep(600);
+    var lanes = qa('#pnbCardsHost .pnb-cards-lane'), sbr = q('#pnbStatusBar').getBoundingClientRect(), bh = C().boardH ? C().boardH() : null;
+    var bot = Math.max.apply(null, lanes.map(function (l) { return l.getBoundingClientRect().bottom; }));
+    R.info.board = { bh: bh, bottom: Math.round(bot), sb: Math.round(sbr.top), max: lanes.map(function (l) { return getComputedStyle(l).maxHeight; }), h: lanes.map(function (l) { return Math.round(l.getBoundingClientRect().height); }), inner: innerHeight };
+    R.chk.lanesFit = !!bh && bh >= 360 && lanes.length > 0 && lanes.every(function (l) { return getComputedStyle(l).maxHeight === bh + 'px'; }) && (bot <= sbr.top + 1 || bh === 360);
+    R.chk.laneFilled = lanes.some(function (l) { return l.getBoundingClientRect().height >= bh - 2; });   // (the fixture's lanes hold more than a window of cards)
+    window.Penumbra.groupMenu.layout('stacked', null); await sleep(300);
+  };
+
+  // (cchips) a list column's values as chips: one per value (each once, the cell's order, the text between kept unseen),
+  // six on a card and +N more, every one in the details window; a pair, a link, plain text untouched; the cell's highlight
+  // on the chips (a theme switch too) and their contrast on every theme; Click to filter on a chip = that value's rows;
+  // Find past the six shows them
+  function chipEls(dd) { return dd ? qa('.pnb-cchip', dd) : []; }
+  function chipsVis(dd) { return chipEls(dd).filter(vis).map(text); }
+  function cardOf(k) { return q('#pnbCardsHost .pnb-card[data-row="' + k + '"]'); }
+  function fdd(c, col) { return c ? q('.pnb-card-fields dd[data-col="' + col + '"]', c) : null; }
+  function itemsOf(s, sep) { var seen = {}, out = []; String(s == null ? '' : s).replace(/^@@HTML/, '').replace(/<[^>]*>/g, '').split(sep).forEach(function (p) { p = p.replace(/^[ \t\n\r\0\x0B]+|[ \t\n\r\0\x0B]+$/g, ''); if (p && !seen[p]) { seen[p] = 1; out.push(p); } }); return out; }
+  function trOf(c) { var k = c ? c.getAttribute('data-row') : null, rs = shownRows(); for (var i = 0; i < rs.length; i++) if (String(rowIdx(rs[i])) === k) return rs[i]; return null; }
+  function moreWord(b) { return b ? getComputedStyle(b, '::before').content : null; }
+  // (cdash) the Email Report dialog's As cards body: Penumbra.cards.emailHtml() - mail-safe cards of the page's rows
+  function rgbOf(c) { var d = document.createElement('i'); d.style.color = c; return d.style.color; }   // (csched) a colour as the browser writes it
+  function mailBox(html) { var b = document.createElement('div'); b.innerHTML = html || ''; return b; }
+  function mailCards(b) { return Array.prototype.slice.call(b.querySelectorAll('td > div[style*="border-radius:8px"]')); }
+  function mailChips(c) { return Array.prototype.slice.call(c.querySelectorAll('span[style*="border-radius:9px"]')).map(text); }
+  function pageRows() { return qa('#resultsTable > tbody > tr').filter(function (tr) { return !tr.classList.contains('search-hidden') && tr.style.display !== 'none'; }); }
+  // (csched) the saved view: what the server Save records while cards show, and a report saved so opening in cards
+  function savedState() { var b = window.__saves[window.__saves.length - 1]; var st = b && b.state_data; try { if (typeof st === 'string') st = JSON.parse(st); } catch (e) { st = null; } return st; }
+  async function serverSave() {
+    var n = window.__saves.length;
+    window.jQuery('#confirmServerSaveBtn').prop('disabled', false).trigger('click');
+    await until(function () { return window.__saves.length > n; }, 8000); await sleep(200);
+    return window.__saves.length > n ? savedState() : null;
+  }
+  S.csave = async function () {
+    await until(function () { return on() && cards().length > 0 && !!fdd(cardOf(0), 'H_TEXT'); }, 8000); await sleep(400);
+    var C = window.Penumbra.cards, v = C.savedView ? C.savedView() : null;
+    R.info.v = v;
+    R.chk.savedNow = !!v && v.open === 1 && !!v.sent && v.sent.title === 'V_ID' && same(v.sent.sub, ['V_NAME']) && v.sent.big === 'H_AMT' && v.sent.pill === 'V_STATUS'
+                     && v.sent.bar === 'H_NUM' && same(v.sent.fields, ['H_TEXT', 'V_DATE', 'V_LINK']);
+    R.chk.savedLists = !!v && !!v.sent && !!v.sent.lists && v.sent.lists.H_TEXT === 'dsemi' && Object.keys(v.sent.lists).length === 1;
+    var st = await serverSave(), cc = st && st.viewOptions && st.viewOptions.cards;
+    R.info.saved = cc;
+    R.chk.saveWrites = !!cc && cc.open === 1 && !!cc.sent && cc.sent.title === 'V_ID' && cc.title === 'V_ID' && !!cc.sent.lists;
+    // (csz, the user) the saved view carries the size the cards show (the scheduled email draws them at it)
+    C.setSize('large'); await sleep(200); var vz = C.savedView(); C.setSize('standard'); await sleep(200);
+    R.info.sentSize = [v && v.sent && v.sent.size, vz && vz.sent && vz.sent.size, cc && cc.sent && cc.sent.size];
+    R.chk.sentSize = !!v && v.sent.size === 'standard' && !!vz && vz.sent.size === 'large' && !!cc && cc.sent.size === 'standard';
+    C.setReport({}); C.set('cards'); await sleep(500);   // the guesses: a title and three fields resolved, by name
+    var g = C.savedView ? C.savedView() : null;
+    R.info.g = g;
+    R.chk.guessResolved = !!g && !!g.sent && typeof g.sent.title === 'string' && g.sent.title.length > 0 && Array.isArray(g.sent.fields) && g.sent.fields.length === 3;
+    C.setReport({ title: 'V_ID', open: 1, sent: { title: 'V_ID' } }); C.set('cards'); await sleep(300);   // a report saved showing cards
+    var au = C.authored();
+    R.chk.linkClean = !!au && au.title === 'V_ID' && !('open' in au) && !('sent' in au);
+    // (csz) a saved view's size read back: a size kept, anything else dropped
+    C.setReport({ title: 'V_ID', open: 1, sent: { title: 'V_ID', size: 'xl' } }); var rz1 = C.report();
+    C.setReport({ title: 'V_ID', open: 1, sent: { title: 'V_ID', size: 'huge' } }); var rz2 = C.report();
+    R.info.sentKept = [rz1 && rz1.sent, rz2 && rz2.sent];
+    R.chk.sentSizeKept = !!rz1 && !!rz1.sent && rz1.sent.size === 'xl' && !!rz2 && !!rz2.sent && rz2.sent.size === undefined;
+    C.setReport({ title: 'V_ID', open: 1, sent: { title: 'V_ID' } }); C.set('cards'); await sleep(300);
+    C.set('table'); await sleep(400);
+    var t = C.savedView ? C.savedView() : 'x';
+    st = await serverSave(); cc = st && st.viewOptions ? st.viewOptions.cards : null;
+    R.info.table = [t, cc];
+    R.chk.tableClears = t === null && !!st && (!cc || (!('open' in cc) && !('sent' in cc)));
+  };
+  S.copen = async function () {
+    await until(function () { return on() && cards().length > 0; }, 8000); await sleep(300);
+    R.chk.opensCards = on() && cards().length > 0 && !document.body.classList.contains('pnb-cards-off');
+  };
+  S.cmail = async function () {
+    await until(function () { return on() && cards().length > 0 && !!fdd(cardOf(0), 'H_TEXT'); }, 8000); await sleep(400);
+    var C = window.Penumbra.cards, F = window.__rowsFixture, n0 = cards().length, h0 = q('#pnbCardsHost').innerHTML.length;
+    R.chk.mailOffered = !!C.emailable && C.emailable() === true;
+    var html = C.emailHtml ? C.emailHtml({ size: 'standard' }) : null, m = C.mail ? C.mail() : null, b = mailBox(html), cs = mailCards(b), rows = pageRows();
+    R.info.m = m; R.info.n = [cs.length, rows.length]; R.info.head = (html || '').slice(0, 600);
+    R.chk.mailCount = !!m && cs.length === rows.length && m.shown === rows.length && m.total === rows.length && !m.truncated && rows.length > 10;
+    R.chk.mailCols = cs.length > 0 && cs.every(function (c) { return c.parentNode.parentNode.children.length === 3; });   // (cmsize) Standard: three a row
+    R.chk.mailTitle = cs.length > 2 && [0, 1, 2].every(function (k) { return cs[k].firstElementChild.textContent.trim() === text(td(rows[k], 'V_ID')); });
+    // the layout wears no class and no css variable (a cell's own content may keep its classes, as the table's email does: a resolver link);
+    // no button, svg, script or input; every Click to Filter / replace link made plain text
+    R.chk.mailPlain = !!html && !b.querySelector('div[class], table[class], tr[class], td[class], span[class]:not(a span)') && html.indexOf('var(--') === -1
+        && !/<(button|svg|script|input)/i.test(html) && !/data-(search|replace)=/.test(html) && b.querySelectorAll('a.resolver-link').length > 0;
+    var lk = td(rows[0], 'V_LINK'), srcLink = lk ? lk.querySelector('a[data-search]') : null;
+    R.info.link = lk ? lk.innerHTML.slice(0, 160) : null;
+    R.chk.mailCleaned = !!srcLink && !!cs[0] && cs[0].textContent.indexOf('Find open') > -1 && !cs[0].querySelector('a[data-search], a[data-replace]');
+    var want0 = itemsOf(F[0].H_TEXT, ';'), ch0 = cs[0] ? mailChips(cs[0]) : [];
+    R.info.chips0 = ch0;
+    R.chk.mailChips = want0.length === 9 && same(ch0, want0);
+    var ok = cs[0] ? Array.prototype.slice.call(cs[0].querySelectorAll('span[style*="border-radius:9px"]')).filter(function (x) { return text(x) === 'Okafor, Ada'; })[0] : null;
+    R.info.okafor = ok ? ok.getAttribute('style') : null;
+    R.chk.mailRuled = !!ok && ok.style.backgroundColor === 'rgb(232, 245, 233)' && ok.style.color === 'rgb(27, 94, 32)';
+    var kc = -1; rows.some(function (tr, i) { if (text(td(tr, 'V_STATUS')) === 'Closed') { kc = i; return true; } return false; });
+    var pill = kc > -1 && cs[kc] ? cs[kc].querySelector('span[style*="border-radius:10px"]') : null;
+    R.info.pill = [kc, pill ? pill.getAttribute('style') : null];
+    R.chk.mailPill = !!pill && text(pill) === 'Closed' && pill.style.backgroundColor === 'rgb(255, 235, 238)' && pill.style.color === 'rgb(198, 40, 40)';
+    // (cfb8, the user: the pill not honoured) the pill as the screen draws it: outlined in the text's colour, no fill; a ruled
+    // pill in its rule's colours, its outline clear
+    var plain0 = cs.map(function (c) { return c.querySelector('span[style*="border-radius:10px"]'); }).filter(function (p) { return !!p && !p.style.backgroundColor; })[0];
+    R.info.pillPlain = plain0 ? plain0.getAttribute('style') : null;
+    R.chk.mailPillOutlined = !!plain0 && plain0.style.borderTopStyle === 'solid' && plain0.style.borderTopWidth === '1px' && plain0.style.borderTopColor === plain0.style.color && !!plain0.style.color
+      && !!pill && pill.style.borderTopColor === 'transparent';
+    R.chk.mailBig = cs.length > 0 && cs.every(function (c, i) { var t = text(td(rows[i], 'H_AMT')); return !t || (c.querySelector('span[style*="font-size:19px"]') || {}).textContent === t; });   // (cmsize) Standard's 19px
+    R.chk.mailBar = cs.filter(function (c) { return !!c.querySelector('td[style*="height:6px"][width]'); }).length > cs.length / 2;
+    var lab = cs[0] ? Array.prototype.slice.call(cs[0].querySelectorAll('td[style*="white-space:nowrap"]')).map(text) : [];
+    R.info.labels = lab;
+    R.chk.mailLabels = lab.length === 3 && lab.every(function (x) { return x.length > 0; });
+    R.chk.screenSame = cards().length === n0 && q('#pnbCardsHost').innerHTML.length === h0;
+    // (csched) the report's theme: Default Light's roles, then Dark Blue's - the registry's vars (themes.js), lent to the
+    // harness's one-entry PENUMBRA_THEMES stub for this check alone and taken back (no other scenario sees them)
+    var REG = window.PENUMBRA_THEMES || (window.PENUMBRA_THEMES = {}), lent = {};
+    function lend(id) { var t = (window.__THEMES || []).filter(function (x) { return x.id === id; })[0]; lent[id] = Object.prototype.hasOwnProperty.call(REG, id) ? REG[id] : undefined; REG[id] = Object.assign({}, REG[id] || {}, { vars: (t && t.vars) || {} }); return REG[id].vars; }
+    var keep = document.body.className, keepT = document.body.getAttribute('data-theme');
+    var dv = lend('theme-default'), dk = lend('theme-dark-blue');
+    document.body.setAttribute('data-theme', 'theme-default');
+    var hz = C.emailHtml({ size: 'standard' }), card0 = mailCards(mailBox(hz))[0], chip0 = card0 ? card0.querySelector('span[style*="border-radius:9px"]') : null;
+    R.chk.mailDefaultTheme = !!card0 && !!dv['bg-surface'] && card0.style.backgroundColor === rgbOf(dv['bg-surface']) && card0.firstElementChild.style.color === rgbOf(dv['text-main'])
+                             && !!chip0 && chip0.style.borderColor === rgbOf(dv['border-color']);
+    var tdb = (window.__THEMES || []).filter(function (x) { return x.id === 'theme-dark-blue'; })[0];
+    if (tdb) applyTheme(tdb);
+    var hd = C.emailHtml({ size: 'standard' }), cdl = mailCards(mailBox(hd)), cd = cdl[0], chd = cdl[1] ? cdl[1].querySelector('span[style*="border-radius:9px"]') : null, wrap = mailBox(hd).firstElementChild;   // card 1's list: no highlight on it
+    R.info.dark = [cd ? cd.getAttribute('style') : null, dk['bg-surface'], dk['text-main']];
+    R.chk.mailThemed = !!tdb && !!cd && !!dk['bg-surface'] && dk['bg-surface'] !== dv['bg-surface'] && cd.style.backgroundColor === rgbOf(dk['bg-surface']) && cd.firstElementChild.style.color === rgbOf(dk['text-main'])
+                       && !!chd && chd.style.backgroundColor === rgbOf(dk['bg-surface-alt']) && !!wrap && wrap.style.backgroundColor === rgbOf(dk['bg-body']);
+    document.body.className = keep; if (keepT) document.body.setAttribute('data-theme', keepT); else document.body.removeAttribute('data-theme');
+    Object.keys(lent).forEach(function (id) { if (lent[id] === undefined) delete REG[id]; else REG[id] = lent[id]; });
+    var h2 = C.emailHtml({ size: 'standard', budget: 6000 }), m2 = C.mail(), cs2 = mailCards(mailBox(h2));
+    R.info.m2 = m2;
+    R.chk.mailBudget = !!m2 && m2.truncated && m2.shown > 0 && m2.shown < m2.total && cs2.length === m2.shown && /Showing \d+ of [\d,]+ cards - [\d,]+ cards? omitted/.test(h2);
+    var h3 = C.emailHtml({ size: 'compact' }), cs3 = mailCards(mailBox(h3));
+    R.chk.mailCompact = cs3.length === rows.length && cs3.every(function (c) { return c.parentNode.parentNode.children.length === 4 && !c.querySelector('span[style*="border-radius:9px"]') && !c.querySelector('td[style*="height:6px"]'); });
+    var cs4 = mailCards(mailBox(C.emailHtml({ size: 'xl' })));
+    R.chk.mailXl = cs4.length === rows.length && cs4.every(function (c) { return c.parentNode.parentNode.children.length === 1; });
+    // (cmsize, the user: the sizes were not respected) each size its own layout - the cards a row, the title's and the big
+    // number's type, the card's padding: the screen's one size to the next (Standard and Large were sent alike) - and the
+    // send's own call (main.js passes no size) takes the size the cards show
+    var WANT = { compact: [4, '12px', '16px', '8px 9px'], standard: [3, '13px', '19px', '11px 12px'], large: [2, '15px', '22px', '14px 16px'], xl: [1, '17px', '26px', '18px 20px'] }, szInfo = {};
+    R.chk.mailSized = Object.keys(WANT).map(function (z) {
+      var w = WANT[z], cz = mailCards(mailBox(C.emailHtml({ size: z }))), c0 = cz[0];
+      var big = cz.some(function (c) { return !!c.querySelector('span[style*="font-size:' + w[2] + ';font-weight:bold"]'); });
+      szInfo[z] = c0 ? [cz.length, c0.parentNode.parentNode.children.length, c0.firstElementChild.style.fontSize, big, c0.style.padding] : null;
+      return !!c0 && cz.length === rows.length && c0.parentNode.parentNode.children.length === w[0] && c0.firstElementChild.style.fontSize === w[1] && big && c0.style.padding === w[3];
+    }).every(Boolean);
+    R.info.sized = szInfo;
+    C.setSize('large'); await until(function () { return host().classList.contains('is-large'); }, 4000); await sleep(150);
+    var hl = C.emailHtml({}), ml = C.mail(), cl = mailCards(mailBox(hl));
+    R.info.shown = [ml && ml.size, ml && ml.cols, cl.length, cl[0] ? cl[0].firstElementChild.style.fontSize : null];
+    R.chk.mailShownSize = !!ml && ml.size === 'large' && ml.cols === 2 && cl.length === rows.length && cl[0].parentNode.parentNode.children.length === 2 && cl[0].firstElementChild.style.fontSize === '15px';
+    C.emailHtml({ size: 'standard' }); var mm2 = C.mail();   // (cfb8) Medium asked for while Large shows: Medium
+    R.chk.mailMediumAsked = !!mm2 && mm2.size === 'standard' && mm2.cols === 3;
+    C.setSize('standard'); await sleep(150);
+  };
+  S.gmail = async function () {
+    await until(function () { return on() && qa('#groupedResultsContainer .group-wrapper.group-leaf').length > 2; }, 8000); await sleep(500);
+    var C = window.Penumbra.cards;
+    function leaves() { return qa('#groupedResultsContainer .group-wrapper.group-leaf').filter(function (w) { return !w.classList.contains('search-hidden') && w.style.display !== 'none'; }); }
+    var L = leaves(), k;
+    for (k = 0; k < L.length; k++) {   // the first two open, the third closed
+      var want = k < 2, hd = L[k].querySelector(':scope > .group-header');
+      if (L[k].classList.contains('open') !== want && hd) { hd.click(); await sleep(250); }
+    }
+    await sleep(400); L = leaves();
+    R.info.open = L.map(function (w) { return w.classList.contains('open'); });
+    var html = C.emailHtml ? C.emailHtml({ size: 'standard' }) : null, b = mailBox(html);
+    var heads = Array.prototype.slice.call(b.querySelectorAll('div[style*="border-radius:6px"]'));
+    function nm(w) { var g = w.querySelector(':scope > .group-header .group-name'); return g ? g.textContent.replace(/\s+/g, ' ').trim() : ''; }
+    function cnt(w) { var g = w.querySelector(':scope > .group-header .group-count'); return g ? g.textContent.replace(/\s+/g, ' ').trim() : ''; }
+    function rowsOf(w) { return qa(':scope > .group-content > table > tbody > tr', w).filter(function (tr) { return !tr.classList.contains('search-hidden'); }); }
+    function cardsAfter(h) { var t = h.nextElementSibling; return (t && t.tagName === 'TABLE') ? mailCards(mailBox(t.outerHTML)) : []; }
+    R.info.heads = heads.map(function (h) { return h.textContent; }).slice(0, 6);
+    R.chk.grpHeads = heads.length === L.length && L.length > 2;
+    R.chk.grpNames = heads.length === L.length && heads.every(function (h, i) { return h.firstElementChild && h.firstElementChild.textContent === nm(L[i]); });
+    R.chk.grpCounts = heads.length === L.length && heads.every(function (h, i) { var c = h.children[1]; return !cnt(L[i]) || (c && c.textContent === cnt(L[i])); });
+    R.chk.grpOpenCards = heads.length > 1 && L[0].classList.contains('open') && cardsAfter(heads[0]).length === rowsOf(L[0]).length && rowsOf(L[0]).length > 0
+                         && cardsAfter(heads[1]).length === rowsOf(L[1]).length;
+    R.chk.grpClosed = heads.length > 2 && !L[2].classList.contains('open') && cardsAfter(heads[2]).length === 0;
+    R.chk.grpTitles = heads.length > 0 && (function () { var c = cardsAfter(heads[0]), r = rowsOf(L[0]); return c.length > 0 && c.every(function (x, i) { return x.firstElementChild.textContent.trim() === text(td(r[i], 'V_ID')); }); })();
+  };
+  S.pmail = async function () {
+    await until(function () { return !!q('#pivotResultTable'); }, 8000); await sleep(400);
+    var C = window.Penumbra.cards;
+    R.chk.noPivot = typeof C.emailable === 'function' && C.emailable() === false && C.emailHtml() === null;
+  };
+  S.cchips = async function () {
+    await until(function () { return on() && cards().length > 0 && !!fdd(cardOf(0), 'H_TEXT'); }, 8000); await sleep(400);
+    var F = window.__rowsFixture, d0 = fdd(cardOf(0), 'H_TEXT'), mb = d0 ? q('.pnb-cchips-more', d0) : null, want0 = itemsOf(F[0].H_TEXT, ';'), k;
+    R.info.c0 = { cls: d0 && d0.className, vis: chipsVis(d0), n: d0 && d0.getAttribute('data-chips'), more: moreWord(mb), html: d0 && d0.innerHTML.slice(0, 300) };
+    R.chk.listChips = !!d0 && d0.classList.contains('is-chips') && want0.length === 9 && same(chipEls(d0).map(text), want0);
+    R.chk.capShown = same(chipsVis(d0), want0.slice(0, 6)) && !!mb && vis(mb) && moreWord(mb) === '"+3 more"' && mb.getAttribute('aria-expanded') === 'false' && /3 more values/.test(mb.getAttribute('aria-label') || '');
+    // every list reads as its cell does, the text between kept (and unseen)
+    var all = qa('#pnbCardsHost .pnb-card-fields dd.is-chips'), bad = [];
+    all.forEach(function (dd) { var c = dd.closest('.pnb-card'), tr = trOf(c), t = tr ? td(tr, dd.getAttribute('data-col')) : null; if (!t || dd.textContent !== t.textContent) bad.push(c.getAttribute('data-row')); });
+    R.info.text = { n: all.length, bad: bad.slice(0, 5) };
+    R.chk.textSame = all.length > 100 && bad.length === 0;
+    var seps = qa('#pnbCardsHost .pnb-card-fields .pnb-cchip-sep').filter(vis);
+    R.chk.sepHidden = seps.length > 100 && seps.every(function (s) { return s.getBoundingClientRect().width === 0; });
+    var d1 = fdd(cardOf(1), 'H_TEXT'), d2 = fdd(cardOf(2), 'H_TEXT');
+    R.info.d12 = [chipEls(d1).map(text), chipEls(d2).map(text)];
+    R.chk.eachOnce = same(chipEls(d1).map(text), ['Palmtag, Scott', 'Smith, Jo']);
+    R.chk.oneValue = same(chipEls(d2).map(text), ['Kumar, Ravi']) && !q('.pnb-cchips-more', d2);
+    // short chips side by side, each as wide as its text (card 2's codes: P220 | K104 | R377 on one line)
+    var c2c = chipEls(fdd(cardOf(2), 'H_CODE')), rcs = c2c.map(function (x) { return x.getBoundingClientRect(); });
+    R.info.inline = rcs.map(function (r) { return [Math.round(r.left), Math.round(r.top), Math.round(r.width)]; });
+    R.chk.inlineChips = rcs.length === 3 && rcs.every(function (r) { return Math.abs(r.top - rcs[0].top) < 1 && r.width > 20 && r.width < 60; }) && rcs[1].left > rcs[0].right && rcs[2].left > rcs[1].right;
+    var pc = 0, nameOk = 0, pb = [];
+    for (k = 0; k < 20; k++) {
+      var ck = cardOf(k), dc = fdd(ck, 'H_CODE'), dn = fdd(ck, 'V_NAME'), tn = ck ? td(trOf(ck), 'V_NAME') : null;
+      if (dc && dc.classList.contains('is-chips') && same(chipEls(dc).map(text), F[k].H_CODE.split('|'))) pc++; else pb.push(k);
+      if (dn && tn && !dn.classList.contains('is-chips') && !q('.pnb-cchip', dn) && dn.innerHTML === tn.innerHTML && /^Lname\d+, \w+$/.test(text(dn))) nameOk++;
+    }
+    R.info.pipe = pb.slice(0, 4);
+    R.chk.pipeChips = pc === 20;
+    R.chk.pairPlain = nameOk === 20;
+    var st0 = fdd(cardOf(0), 'V_STATUS');
+    R.chk.plainPlain = !!st0 && !st0.classList.contains('is-chips') && !q('.pnb-cchip', st0);
+    var d3 = fdd(cardOf(3), 'H_TEXT'), a3 = d3 ? q('a', d3) : null;
+    R.chk.linkKept = !!a3 && a3.getAttribute('href') === '#x' && !q('.pnb-cchip', d3);
+    // the highlight rule's colours on the chips, none on the value
+    var hr = null; for (k = 5; k < 60 && hr === null; k++) if (/Okafor/.test(F[k].H_TEXT)) hr = k;
+    function ruled() { var dh = hr !== null ? fdd(cardOf(hr), 'H_TEXT') : null, ch = chipEls(dh); return ch.length > 0 && ch.every(function (x) { return x.style.backgroundColor === 'rgb(232, 245, 233)' && x.classList.contains('is-ruled'); }) && !dh.style.backgroundColor; }
+    R.chk.ruledChips = ruled();
+    R.info.hlCells = qa('#resultsTable td[data-column][style*="background"]').length;
+    R.info.ruledTd = hr !== null ? (function () { var c = cardOf(hr), t = c ? td(trOf(c), 'H_TEXT') : null; return t ? [t.getAttribute('style'), t.className, t.textContent] : null; })() : null;
+    R.info.ruled = hr !== null && fdd(cardOf(hr), 'H_TEXT') ? fdd(cardOf(hr), 'H_TEXT').outerHTML.slice(0, 300) : hr;
+    // +3 more: every value, the details not opened; kept across a redraw; Fewer: six again
+    if (mb) mb.click(); await sleep(250);
+    var d0b = fdd(cardOf(0), 'H_TEXT'), mb2 = d0b ? q('.pnb-cchips-more', d0b) : null;
+    R.chk.moreOpens = chipsVis(d0b).length === 9 && !!mb2 && mb2.getAttribute('aria-expanded') === 'true' && moreWord(mb2) === '"Fewer"' && !detOpen();
+    C().redraw(); await sleep(400);
+    var d0c = fdd(cardOf(0), 'H_TEXT');
+    R.chk.moreKept = chipsVis(d0c).length === 9;
+    if (d0c && q('.pnb-cchips-more', d0c)) q('.pnb-cchips-more', d0c).click(); await sleep(250);
+    R.chk.fewer = chipsVis(fdd(cardOf(0), 'H_TEXT')).length === 6;
+    // a theme switch restyles in place: the chips keep the rule; their contrast on every theme
+    var themes = window.__THEMES || [], cls0 = document.body.className, dt0 = document.body.getAttribute('data-theme'), dk = themes.filter(function (t) { return t.isDark; })[0];
+    if (dk) { applyTheme(dk); await sleep(800); }
+    R.chk.restyleKeeps = !!dk && ruled();
+    var lowc = [], cx = chipEls(d2)[0];
+    cx = chipEls(fdd(cardOf(2), 'H_TEXT'))[0];
+    themes.forEach(function (t) { applyTheme(t); var f = cx ? fgOf(cx) : null, r = f ? ratio(f, bgOf(cx)) : 0; if (r < 4.5) lowc.push([t.id, +r.toFixed(2)]); });
+    document.body.className = cls0; if (dt0 === null) document.body.removeAttribute('data-theme'); else document.body.setAttribute('data-theme', dt0);
+    await sleep(700);
+    R.info.contrast = { n: themes.length, low: lowc };
+    R.chk.chipContrast = themes.length >= 10 && !!cx && lowc.length === 0;
+    // the details window: every value, no +N more
+    C().openDetails(cardOf(0)); await until(detOpen, 3000); await sleep(250);
+    var dd0 = q('#pnbCardDetails .pnb-cdet-fields dd[data-col="H_TEXT"]');
+    R.chk.detAll = !!dd0 && dd0.classList.contains('is-chips') && chipsVis(dd0).length === 9 && !q('.pnb-cchips-more', dd0);
+    C().closeDetails(); await sleep(250);
+    // Find a value past the six: that card's chips show, the match marked on its chip
+    if (FD()) {
+      FD().open('Zeta'); await findSettle(); await findStep(false);
+      var d0f = fdd(cardOf(0), 'H_TEXT'), zc = chipEls(d0f).filter(function (x) { return text(x) === 'Zeta, Quinn'; })[0];
+      R.info.find = { st: FD()._state(), all: d0f && d0f.classList.contains('is-allchips'), zc: !!zc && vis(zc), n: hl('pnb-find').length + hl('pnb-find-cur').length };
+      R.chk.findShows = !!zc && vis(zc) && d0f.classList.contains('is-allchips') && hl('pnb-find').concat(hl('pnb-find-cur')).some(function (r) { return zc.contains(rangeEl(r)); });
+      if (FD().close) FD().close(); await sleep(300);
+    }
+    // Click to filter: a chip keeps the rows whose list holds that value (not "Smith, Joanne"); another value its cell's text
+    document.body.classList.add('pnb-click-filter');
+    var tgt = null;
+    for (k = 5; k < 60 && !tgt; k++) tgt = chipEls(fdd(cardOf(k), 'H_TEXT')).filter(function (x) { return text(x) === 'Smith, Jo'; })[0] || null;
+    var wantQ = window.PenumbraTiles && window.PenumbraTiles.strip ? window.PenumbraTiles.strip.itemCond('H_TEXT', 'dsemi', ['Smith, Jo']) : '?';
+    var expect = F.filter(function (r) { return itemsOf(r.H_TEXT, ';').indexOf('Smith, Jo') >= 0; }).length;
+    if (tgt) tgt.click();
+    await until(function () { return q('#tableSearch').value === wantQ && shownRows().length > 0 && shownRows().length < 200; }, 6000); await sleep(500);
+    var kept = shownRows(), has = kept.every(function (tr) { return itemsOf(F[rowIdx(tr)].H_TEXT, ';').indexOf('Smith, Jo') >= 0; });
+    R.info.filter = { box: q('#tableSearch').value, want: wantQ, kept: kept.length, expect: expect, has: has, det: detOpen() };
+    R.chk.chipFilters = !!tgt && q('#tableSearch').value === wantQ && kept.length === Math.min(expect, 200) && has && kept.map(rowIdx).indexOf(4) < 0 && !detOpen();
+    await until(function () { return cards().length === kept.length; }, 4000); await sleep(200);
+    var sv = fdd(cards()[0], 'V_STATUS'), sw0 = sv ? text(sv) : null;
+    if (sv) sv.click(); await sleep(700);
+    R.info.cell = { box: q('#tableSearch').value, v: sw0 };
+    R.chk.cellStill = !!sw0 && q('#tableSearch').value === 'V_STATUS = //' + sw0 + '//';
+    document.body.classList.remove('pnb-click-filter');
+    await runSearch('');
+  };
+  // (cflt, 2026-11-01) Click to filter field by field, as the table has it: a column's own marks its values on the card
+  // (pointer, underlined at rest, a hover) and in the details window, where a click filters and closes the window; no
+  // other field filters (a click opens the details); the report's option marks every value but a link's, and its flip
+  // redraws the marks
+  function marked(el) { return !!el && el.classList.contains('is-cflt'); }
+  S.cflt = async function () {
+    await until(function () { return on() && cards().length > 0 && !!fdd(cardOf(0), 'V_STATUS') && !!fdd(cardOf(0), 'H_TEXT'); }, 8000); await sleep(400);
+    R.chk.noneOff = qa('#pnbCardsHost .is-cflt').length === 0;
+    window.Penumbra.setColOpt('V_STATUS', 'filter', true);
+    await until(function () { return marked(fdd(cardOf(0), 'V_STATUS')); }, 4000); await sleep(300);
+    var sd = fdd(cardOf(0), 'V_STATUS'), hd = fdd(cardOf(0), 'H_TEXT'), cs = sd ? getComputedStyle(sd) : null;
+    R.info.col = { cls: sd && sd.className, title: sd && sd.title, cur: cs && cs.cursor, dec: cs && cs.textDecorationLine, other: hd && hd.className };
+    R.chk.colMarked = marked(sd) && sd.classList.contains('is-cfltcol') && sd.title === 'Click to filter to this value';
+    R.chk.colPointer = !!cs && cs.cursor === 'pointer';
+    R.chk.colAtRest = !!cs && /underline/.test(cs.textDecorationLine);
+    R.chk.colOnly = !!hd && !marked(hd) && qa('#pnbCardsHost .pnb-card-val.is-cflt').every(function (v) { return v.getAttribute('data-col') === 'V_STATUS'; });
+    // another field's click opens the details, as before
+    var hc = hd ? q('.pnb-cchip', hd) : null; if (hc) hc.click();
+    await until(detOpen, 3000); await sleep(250);
+    R.chk.otherOpens = detOpen() && q('#tableSearch').value === '';
+    var dsd = q('#pnbCardDetails .pnb-cdet-fields dd[data-col="V_STATUS"]'), dother = qa('#pnbCardDetails .pnb-cdet-fields dd').filter(function (d) { return !marked(d) && text(d) && !d.querySelector('a, button'); })[0];
+    var dcs = dsd ? getComputedStyle(dsd) : null;
+    R.info.det = { cls: dsd && dsd.className, cur: dcs && dcs.cursor, other: dother && dother.getAttribute('data-col') };
+    R.chk.detMarked = marked(dsd) && !!dcs && dcs.cursor === 'pointer';
+    if (dother) dother.click(); await sleep(400);
+    R.chk.detOtherStays = !!dother && detOpen() && q('#tableSearch').value === '';
+    var sv = text(dsd);
+    if (dsd) dsd.click();
+    await until(function () { return !detOpen() && q('#tableSearch').value !== ''; }, 4000); await sleep(500);
+    R.info.detFilter = { box: q('#tableSearch').value, v: sv, open: detOpen() };
+    R.chk.detFilters = !!sv && q('#tableSearch').value === 'V_STATUS = //' + sv + '//' && !detOpen() && shownRows().length > 0 && shownRows().every(function (tr) { return tdText(tr, 'V_STATUS') === sv; });
+    await runSearch('');
+    window.Penumbra.setColOpt('V_STATUS', 'filter', false);
+    await until(function () { return !marked(fdd(cardOf(0), 'V_STATUS')); }, 4000); await sleep(300);
+    R.chk.colOffClears = qa('#pnbCardsHost .is-cflt').length === 0;
+    // the report's option: every value but a link's, the chips' own hover; off again: none
+    document.body.classList.add('pnb-click-filter');
+    await until(function () { return marked(fdd(cardOf(0), 'H_TEXT')); }, 4000); await sleep(300);
+    var ah = fdd(cardOf(0), 'H_TEXT'), as = fdd(cardOf(0), 'V_STATUS');
+    R.info.all = { h: ah && ah.className, ht: ah && ah.title, s: as && as.className };
+    R.chk.allMarked = marked(ah) && marked(as) && !as.classList.contains('is-cfltcol') && ah.title === 'Click a value to filter to it';
+    C().openDetails(cardOf(0)); await until(detOpen, 3000); await sleep(250);
+    var lk = q('#pnbCardDetails .pnb-cdet-fields dd[data-col="V_LINK"]'), ds = q('#pnbCardDetails .pnb-cdet-fields dd[data-col="V_STATUS"]');
+    R.info.link = { cls: lk && lk.className, a: !!(lk && lk.querySelector('a')) };
+    R.chk.linkUnmarked = !!lk && !!lk.querySelector('a') && !marked(lk) && marked(ds);
+    C().closeDetails(); await sleep(200);
+    document.body.classList.remove('pnb-click-filter');
+    await until(function () { return !marked(fdd(cardOf(0), 'H_TEXT')); }, 4000); await sleep(300);
+    R.chk.allOffClears = qa('#pnbCardsHost .is-cflt').length === 0;
+  };
+
   (async function () {
     // a scenario's own exception (on live: no switch, no host) is reported apart from the PAGE's errors
-    try { await boot(); if (S[SCN]) await S[SCN](); else throw new Error('no scenario ' + SCN); }
+    // ---- (cdens, 2026-11-01) density moves the cards' type and room, as it moves the table's: every card size, the board's
+  // lane heads; the two card dialogs' caps the same size on screen at every density; the board refit after a switch
+  var DENS = ['standard', 'compact', 'easy-read'];
+  async function setDens(d) {   // the Settings panel's own list (main.js applyDensity), as a viewer switches it
+    var s = q('#spDensitySelector'); if (dens0 === null) dens0 = s.value; s.value = d; s.dispatchEvent(new Event('change', { bubbles: true }));
+    await until(function () { var b = document.body.classList; return d === 'standard' ? !b.contains('density-compact') && !b.contains('density-easy-read') : b.contains('density-' + d); }, 3000);
+    await sleep(800);   // applyDensity's 100 ms re-measure, the cards' 250 ms restyle, its clip / board read
+  }
+  var dens0 = null;   // the list's value before a scenario switched it (put back after: the pref is stored)
+  function densBack() { var s = q('#spDensitySelector'); if (s && dens0 !== null) { s.value = dens0; s.dispatchEvent(new Event('change', { bubbles: true })); } }
+  function px(el, p) { return el ? parseFloat(getComputedStyle(el)[p]) : null; }
+  function cardLook() {
+    var c = cards()[0];
+    return { card: px(c, 'fontSize'), pad: px(c, 'paddingTop'), gap: px(c, 'rowGap'), title: px(q('.pnb-card-title', c), 'fontSize'), big: px(q('.pnb-card-big', c), 'fontSize'),
+      fields: px(q('.pnb-card-fields', c), 'fontSize'), pill: px(q('.pnb-card-pill', c), 'fontSize'), fam: getComputedStyle(c).fontFamily, td: px(q('#resultsTable tbody td'), 'fontSize') };
+  }
+  function rising(a, b, c) { return a !== null && b !== null && c !== null && a < b && b < c; }
+  function overlaps() {   // two cards of one grid drawn over each other (a pack that missed the new heights)
+    var n = 0;
+    qa('#pnbCardsHost .pnb-cards-grid').forEach(function (g) {
+      var rs = qa(':scope > .pnb-card', g).map(function (c) { return c.getBoundingClientRect(); });
+      for (var i = 0; i < rs.length; i++) for (var j = i + 1; j < rs.length; j++) {
+        var a = rs[i], b = rs[j];
+        if (a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1) n++;
+      }
+    });
+    return n;
+  }
+  function capOnScreen(box) {   // the box's caps in screen px (density.css zooms the box itself)
+    var z = box.currentCSSZoom || 1, s = getComputedStyle(box);
+    return { h: parseFloat(s.maxHeight) * z, w: parseFloat(s.maxWidth) * z, z: z };
+  }
+  async function dlgCaps() {   // { det: {h, w, z}, cfg: {h, w, z} } at the density shown
+    var out = {};
+    C().openDetails(); await until(function () { return !!C().details && C().details().open; }, 3000); await sleep(150);
+    out.det = capOnScreen(q('#pnbCardDetails .pnb-cdet-box')); out.detRect = q('#pnbCardDetails .pnb-cdet-box').getBoundingClientRect().width;
+    C().closeDetails(); await sleep(150);
+    C().openConfig(); await until(cfgShown, 3000); await sleep(150);
+    out.cfg = capOnScreen(q('#pnbCardsConfig .pnb-ccfg-box')); out.cfgRect = q('#pnbCardsConfig .pnb-ccfg-box').getBoundingClientRect().width;
+    C().closeConfig(); await sleep(150);
+    return out;
+  }
+  S.cdens = async function () {
+    await until(function () { return on() && cards().length > 0; }, 6000); await sleep(200);
+    var sizes = C().sizes(), M = {}, D = {}, ov = {};
+    for (var i = 0; i < DENS.length; i++) {
+      await setDens(DENS[i]);
+      for (var k = 0; k < sizes.length; k++) {
+        C().setSize(sizes[k]); await until(function () { return C().size() === sizes[k] && cards().length > 0; }, 3000); await sleep(250);
+        M[sizes[k] + '/' + DENS[i]] = cardLook();
+        if (sizes[k] === 'standard') ov[DENS[i]] = overlaps();
+      }
+      C().setSize('standard'); await sleep(250);
+      D[DENS[i]] = await dlgCaps();
+    }
+    await setDens('standard'); await sleep(200);
+    var back = cardLook();
+    R.info.looks = M; R.info.dlg = D; R.info.overlaps = ov; R.info.win = { w: window.innerWidth, h: window.innerHeight };
+    function all(f) { return sizes.every(function (z) { return f(M[z + '/standard'], M[z + '/compact'], M[z + '/easy-read'], z); }); }
+    R.chk.tableFollows = rising(M['standard/compact'].td, M['standard/standard'].td, M['standard/easy-read'].td);   // (the density switch itself works)
+    R.chk.typeFollows = all(function (s, c, e) { return rising(c.card, s.card, e.card) && rising(c.title, s.title, e.title) && rising(c.big, s.big, e.big); })
+      && DENS.every(function (d) { return ['card', 'title', 'big'].every(function (p) { return M['compact/' + d][p] < M['standard/' + d][p] && rising(M['standard/' + d][p], M['large/' + d][p], M['xl/' + d][p]); }); });   // the sizes' ladder at every density
+    R.chk.fieldsFollow = all(function (s, c, e, z) { return z === 'compact' ? s.fields === null : rising(c.fields, s.fields, e.fields); })   // (the Compact size shows no fields)
+      && DENS.every(function (d) { return rising(M['standard/' + d].fields, M['large/' + d].fields, M['xl/' + d].fields); });   // and each density keeps the sizes' ladder
+    R.chk.roomFollows = all(function (s, c, e) { return rising(c.pad, s.pad, e.pad) && rising(c.gap, s.gap, e.gap); });
+    R.chk.easyVerdana = /georgia/i.test(M['standard/easy-read'].fam) && !/georgia/i.test(M['standard/standard'].fam);
+    R.chk.backToStandard = JSON.stringify(back) === JSON.stringify(M['standard/standard']);
+    R.chk.noOverlap = ov.standard === 0 && ov.compact === 0 && ov['easy-read'] === 0;
+    var H = window.innerHeight * 0.9, W = window.innerWidth * 0.95;
+    function capOk(x) { return Math.abs(x.h - H) <= 1.5 && Math.abs(x.w - W) <= 1.5; }
+    R.chk.dlgStandard = capOk(D.standard.det) && capOk(D.standard.cfg);
+    R.chk.dlgCapsScreen = ['compact', 'easy-read'].every(function (d) { return capOk(D[d].det) && capOk(D[d].cfg) && Math.abs(D[d].det.z - (d === 'compact' ? 0.9 : 1.15)) < 0.01; });
+    densBack();
+  };
+  S.cdensph = async function () {   // a phone: the details and Configure cards sheets fill the screen's width at every density, never past it (a guard: a percentage holds them)
+    await until(function () { return on() && cards().length > 0; }, 6000); await sleep(200);
+    var W = window.innerWidth, D = {};
+    for (var i = 0; i < DENS.length; i++) { await setDens(DENS[i]); D[DENS[i]] = await dlgCaps(); }
+    await setDens('standard');
+    R.info.dlg = D; R.info.w = W;
+    var cw = document.documentElement.clientWidth;   // (as cdetph: the harness page keeps a scrollbar, the sheet fills the viewport beside it)
+    function fits(x) { return x.detRect <= W + 1 && x.detRect >= cw - 2 && x.cfgRect <= W + 1 && x.cfgRect >= cw - 2 && x.det.h === 100 * x.det.z && x.cfg.h === 100 * x.cfg.z; }   // (max-height 100%: the screen's height)
+    R.chk.sheetStandard = fits(D.standard);
+    R.chk.sheetFits = fits(D.compact) && fits(D['easy-read']);
+    densBack();
+  };
+  S.gdens = async function () {   // a board: its lane heads follow; after a switch the lanes reach the status bar again, the page never scrolls
+    await until(function () { return on() && lanes().length > 1; }, 10000); await sleep(600);
+    var de = document.documentElement, L = {};
+    function look() { var hd = q('#pnbCardsHost .pnb-cards-lane > .pnb-cards-lanehead'); return { head: px(hd, 'fontSize'), card: px(laneCards(lanes()[0])[0], 'fontSize'), h: C().boardH(), over: de.scrollHeight - de.clientHeight, lanePx: Math.round(lanes()[0].getBoundingClientRect().height) }; }
+    L.start = look();
+    for (var i = 1; i < DENS.length; i++) { await setDens(DENS[i]); L[DENS[i]] = look(); }
+    await setDens('standard'); L.standard = look();
+    R.info.board = L;
+    R.chk.laneHeadFollows = rising(L.compact.head, L.standard.head, L['easy-read'].head) && rising(L.compact.card, L.standard.card, L['easy-read'].card);
+    R.chk.pageFits = L.compact.over <= 1 && L['easy-read'].over <= 1 && L.standard.over <= 1;
+    R.chk.boardRefit = L.compact.h > L.start.h && L['easy-read'].h < L.start.h;   // Compact's shorter bar above gives the lanes its room, Easy Read's taller one takes it
+    R.chk.boardBack = Math.abs(L.standard.h - L.start.h) <= 1;
+    densBack();
+  };
+  // ---- (cdpack, 2026-11-01, the user: Compact cards at Compact density stood far apart, rows not lined up) the packed grid
+  // keeps no row gap at any size x density: in each column a card sits its gap (the margin) under the one above, no more
+  function packHoles() {   // { rowGap (the largest computed), worst (px past the gap between two cards of a column), cards }
+    var out = { rowGap: 0, worst: 0, cards: 0 };
+    qa('#pnbCardsHost .pnb-cards-grid').forEach(function (g) {
+      var cs = getComputedStyle(g), gap = parseFloat(cs.columnGap) || 0, cols = {};
+      out.rowGap = Math.max(out.rowGap, parseFloat(cs.rowGap) || 0);
+      qa(':scope > .pnb-card', g).forEach(function (c) { var r = c.getBoundingClientRect(), k = Math.round(r.left); (cols[k] = cols[k] || []).push(r); out.cards++; });
+      Object.keys(cols).forEach(function (k) {
+        var rs = cols[k].sort(function (a, b) { return a.top - b.top; });
+        for (var i = 1; i < rs.length; i++) out.worst = Math.max(out.worst, Math.round(rs[i].top - rs[i - 1].bottom - gap));
+      });
+    });
+    return out;
+  }
+  S.cdpack = async function () {
+    await until(function () { return on() && cards().length > 0; }, 6000); await sleep(200);
+    var sizes = C().sizes(), P = {};
+    for (var i = 0; i < DENS.length; i++) {
+      await setDens(DENS[i]);
+      for (var k = 0; k < sizes.length; k++) {
+        C().setSize(sizes[k]); await until(function () { return C().size() === sizes[k] && cards().length > 0; }, 3000); await sleep(400);
+        P[sizes[k] + '/' + DENS[i]] = packHoles();
+      }
+    }
+    C().setSize('standard'); await setDens('standard');
+    R.info.pack = P;
+    function tight(x) { return !!x && x.cards > 1 && host().classList.contains('is-packed') && x.rowGap === 0 && x.worst <= 3; }   // (a span rounds up to the next 2px row)
+    R.chk.standardTight = DENS.every(function (d) { return tight(P['standard/' + d]); }) && sizes.every(function (z) { return tight(P[z + '/standard']); });   // (holds on live: no density rule outranked these)
+    R.chk.compactTight = tight(P['compact/compact']);   // the user's case
+    R.chk.everyTight = Object.keys(P).every(function (z) { return tight(P[z]); });
+    densBack();
+  };
+  try { await boot(); if (S[SCN]) await S[SCN](); else throw new Error('no scenario ' + SCN); }
     catch (e) { R.fail = String(e && e.stack || e); }
     R.errors = (window.__errors || []).filter(function (x) { return !/ResizeObserver/.test(String(x)); });
     window.__HCRESULT = R; window.__HCDONE = true;

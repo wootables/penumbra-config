@@ -2,7 +2,8 @@
 # PRINTX SUITE (2026-10-10) - the print sweep: data bars print, the tables size
 # their columns on paper, help icons / chart cog stay off, a dark theme's pivot
 # Grand Total and charts print readably, the "Printed ..." stamp, and the
-# Download dialog's Print option.
+# Download dialog's Print option. (2026-11-01: + gtBand, a pivot's total cells
+# print the #eee band - from this sweep on they had printed white.)
 #   page half   harness.html (mk_harness.py, from shade's) + driver.js; run.py puts
 #               the page in PRINT media (Emulation.setEmulatedMedia) when the driver
 #               is ready, so every check reads the styles as they print  L-*, E-*
@@ -23,7 +24,7 @@ SCN = ['xflat', 'pdark']
 SCN_Q = {'xflat': '&shade=V_AMOUNT%7Cbar&shade=H_NUM'}
 CHK = {
     'xflat': ['stampText', 'barPrints', 'barExact', 'fillPrints', 'plainWhite', 'autoLayout', 'iconsGone', 'stampShown', 'headerGrey'],
-    'pdark': ['gtLabel', 'canvasCard', 'darkCellsWhite'],
+    'pdark': ['gtLabel', 'canvasCard', 'darkCellsWhite', 'gtBand'],
 }
 MUTANTS = {
     # css (main.css mixes endings: anchors carry none)
@@ -31,8 +32,11 @@ MUTANTS = {
     'c-barexact': ([('css', '    td[style*="background-color"], td[style*="background-image"] {', '    td[style*="background-color"] {')], ['L-xflat-barExact'], ['xflat']),
     'c-bump': ([('css', '    th:not(#pnb-print):not(#pnb-print-2), td:not(#pnb-print):not(#pnb-print-2):not([style*="background-color"]):not([style*="background-image"]) {',
                  '    th:not(#pnb-print), td:not(#pnb-print):not([style*="background-color"]):not([style*="background-image"]) {')], ['L-pdark-gtLabel'], ['pdark']),
+    # (2026-11-01: the sweep's own white (2,2,1) outranked the total cells' #eee (2,1,1) from 10-10 on;
+    #  their td selector takes the bump now - gtBand, and c-gtband takes it away.)
+    'c-gtband': ([('css', '    #pivot-output-container #pivotResultTable td.pivot-grand-total:not(#pnb-print),', '    #pivot-output-container #pivotResultTable td.pivot-grand-total,')], ['L-pdark-gtBand'], ['pdark']),
     'c-layout': ([('css', '        table-layout: auto !important;', '        table-layout: fixed !important;')], ['L-xflat-autoLayout'], ['xflat']),
-    'c-icons': ([('css', '    .tab-help-icon, .bld-help-icon, .sp-help-icon, #searchHelpIcon, .chart-settings-cog {', '    .bld-help-icon {')], ['L-xflat-iconsGone'], ['xflat']),
+    'c-icons': ([('css', '    .tab-help-icon, .bld-help-icon, .sp-help-icon, #searchHelpIcon, #searchPaletteIcon, .chart-settings-cog {', '    .bld-help-icon {')], ['L-xflat-iconsGone'], ['xflat']),   # (#searchPaletteIcon since a453c4e)
     'c-card': ([('css', '    body.is-dark canvas {', '    body.is-dark canvas.never {')], ['L-pdark-canvasCard'], ['pdark']),
     'c-stamp': ([('css', '#pnbPrintStamp { display: none; }', '')], ['L-xflat-stampShown'], ['xflat']),
     # js (CRLF)

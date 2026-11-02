@@ -139,3 +139,23 @@ inside `@@JSON` text on the server but not on screen; the pivot search's source 
 `unsafe OR` scan tests `.operator` on nodes that carry `op` (dead since written; a mixed group
 sets the flag directly); the pivot_trigger bin round-trip asserts fail on the pre-feature build
 too; the palette's Jarvis rows depend on the environment.
+
+## Final sweep (2026-10-31, the fix round)
+
+`corpus3.json` holds second-order cases for the five sweep fixes (an empty group's joiner at the edges, between
+groups and nested; a brace name with spaces in several places; the month-name date join inside nested and
+double groups; the fixes crossing). A corpus may carry its own `control` (`rev` + the exact `red` list) and its
+own `mutants`; corpus3's control is the PRE-FIX build (f378ce2, the three files as live before the fix round)
+and its mutants undo one fix line per engine (`js-/php-/cf-joiner`, `js-/cf-brace`, `js-/php-/cf-order`; a
+mutant's old/new may be LISTS = several edits, which the order swap needs). No `php-brace` mutant:
+penumbra_search.php reads a column name of several tokens up to the operator, so the re-join is redundant there.
+
+    py -3 run.py --stage DIR --corpus corpus3.json --all     target GREEN, control EXACT, 8 mutants EXACT
+
+The sweep found a sixth defect this way: `() and A = yes` / `A = yes and ()` returned no rows in all three
+engines (a dangling top-level joiner); the top level now trims its dangling and / or when parentheses were parsed.
+
+Builder: `builder_run.py` gained the `leakor` mutant (the joiner reset), pinned by `builder_fuzz.py --stage DIR
+--mutant leakor` (EXACTLY the three cases with a group followed by a bare row go red). `walkers.py`'s S- asserts
+read the GROUP part's side. pivotsrc: E14 (a mixed group with `FUNDER = Alpha` outside it) and the `unsafekeep`
+mutant (`-Mutant unsafekeep`: E14 / V14 red).

@@ -49,6 +49,11 @@ MUTANTS = {
     'nonest':  ("        if (nested) return { nested: true };",
                 "        if (false) return { nested: true };",
                 ['g5-notice', 'g5-disabled']),   # (the walk still stops at the inner `(`, so no row is built either way)
+    # the fix round (2026-10-31): a group's last `or` leaking onto the row after it. No g-assert has that shape;
+    # builder_fuzz.py --mutant leakor pins the cases that go red.
+    'leakor':  ("                    joiner = '';   // used up: a row with no word before it joins with and (2026-10-31: a group's last `or` used to leak onto the row after it)",
+                "                    // MUTANT: the joiner is kept for the next row",
+                []),
 }
 
 

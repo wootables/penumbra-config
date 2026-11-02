@@ -5,6 +5,6 @@ ob_start(); $r = penumbra_emit_theme_css(); $css = ob_get_clean();
 if (is_string($r) && $r !== '') $css .= $r;
 $out = array('css' => $css, 'themes' => array());
 foreach (penumbra_get_themes() as $id => $t) {
-    $out['themes'][] = array('id' => $t['id'], 'label' => $t['label'], 'isDark' => !empty($t['isDark']), 'modern' => !empty($t['cssVars']), 'legacy' => !empty($t['legacy']));
+    $out['themes'][] = array('id' => $t['id'], 'label' => $t['label'], 'isDark' => !empty($t['isDark']), 'modern' => !empty($t['cssVars']), 'legacy' => !empty($t['legacy']), 'vars' => (isset($t['vars']) && is_array($t['vars'])) ? $t['vars'] : array());   // (csched) the email cards' theme roles
 }
 echo json_encode($out);

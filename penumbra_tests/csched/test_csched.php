@@ -1,0 +1,159 @@
+<?php
+// csched suite (2026-11-01): the scheduled email's cards - penumbra_cards_email.php run on its own (the runner is never
+// required: Oracle and mail), with the runner's delimiter split LIFTED from its text, the real theme registry and search
+// decoder; plus source checks on the runner's wiring. Prints "  PASS|FAIL  <id>  <detail>" lines.
+// usage: php test_csched.php <include> <schedule_runner.php> <themes_config.php> <penumbra_search.php> <penumbra_cards.js>
+error_reporting(E_ALL); ini_set('display_errors', '1');
+list(, $INC, $RUN, $THM, $SRCH, $CJS) = $argv + array_fill(0, 6, '');
+$out = array();
+function ok($id, $pass, $detail = '') { global $out; $out[] = sprintf("  %s  %-26s %s", $pass ? 'PASS' : 'FAIL', $id, $pass ? '' : $detail); }
+$run = is_file($RUN) ? file_get_contents($RUN) : '';
+$cjs = is_file($CJS) ? file_get_contents($CJS) : '';
+
+// the runner's split, lifted (brace-counted from "function NAME(")
+function lift($src, $name) {
+    $i = strpos($src, "function $name(");
+    if ($i === false) return '';
+    $j = strpos($src, '{', $i); $d = 0; $n = strlen($src);
+    for ($k = $j; $k < $n; $k++) { $c = $src[$k]; if ($c === '{') $d++; elseif ($c === '}') { $d--; if ($d === 0) return substr($src, $i, $k - $i + 1); } }
+    return '';
+}
+if (preg_match("/define\('PENUMBRA_GROUP_PATH_SEP',[^;]*\);/", $run, $m)) eval($m[0]);
+if (is_file($SRCH) && !function_exists('_search_decode_entities')) require $SRCH;
+foreach (array('penumbra_group_delim_def', 'penumbra_delim_decode_entities', 'penumbra_group_delim_pieces', 'penumbra_sched_notes_col') as $f) { $code = lift($run, $f); if ($code !== '' && !function_exists($f)) eval($code); }
+if (is_file($THM)) require_once $THM;
+$have = is_file($INC);
+if ($have) require $INC;
+// every warning / notice the include raises from here on is a failure (the runner would log each one)
+$ERRS = array();
+set_error_handler(function ($no, $msg, $file, $line) use (&$ERRS, $INC) { if (realpath($file) === realpath($INC)) $ERRS[] = basename($file) . ':' . $line . ' ' . $msg; return true; });
+if (!$have || !function_exists('penumbra_cards_email_html')) {
+    echo "  FAIL  F-include                 no penumbra_cards_email.php at $INC\n"; exit(0);
+}
+
+// ---- the saved view ------------------------------------------------------------------------------
+$st = function ($c) { return array('viewOptions' => array('cards' => $c)); };
+ok('P-cfgNoOpen', penumbra_cards_email_cfg($st(array('title' => 'A', 'sent' => array('title' => 'A')))) === null);
+ok('P-cfgNoSent', penumbra_cards_email_cfg($st(array('open' => 1, 'title' => 'A'))) === null);
+ok('P-cfgNone', penumbra_cards_email_cfg(array()) === null && penumbra_cards_email_cfg($st(array('open' => 1, 'sent' => array('pill' => 'S')))) === null);
+$c = penumbra_cards_email_cfg($st(array('open' => 1, 'size' => 'xl', 'sent' => array('title' => 'v_id', 'sub' => array('a', 'b', 'c'), 'big' => '<b>x', 'fields' => array_map(function ($i) { return 'f' . $i; }, range(1, 20)),
+    'nolabels' => 1, 'lists' => array('f1' => 'dsemi', 'f2' => 'dbogus', '<i>' => 'dpipe')))));
+ok('P-cfgParse', is_array($c) && $c['title'] === 'V_ID' && $c['sub'] === array('A', 'B') && $c['big'] === '' && count($c['fields']) === 16 && $c['fields'][0] === 'F1'
+    && $c['nolabels'] === true && $c['lists'] === array('F1' => 'dsemi') && $c['size'] === 'xl', json_encode($c));
+$c2 = penumbra_cards_email_cfg($st(array('open' => true, 'size' => 'huge', 'sent' => array('title' => 'A'))));
+ok('P-cfgSize', is_array($c2) && $c2['size'] === 'standard' && $c2['nolabels'] === false, json_encode($c2));
+// (csz, the user) the size the cards showed when saved (sent.size) wins over the report's; none (saved before) or a bad one: the report's
+$sz4 = array_map(function ($z) use ($st) { $x = array('title' => 'A'); if ($z !== null) $x['size'] = $z; $r = penumbra_cards_email_cfg($st(array('open' => 1, 'size' => 'large', 'sent' => $x))); return $r ? $r['size'] : null; }, array('xl', 'standard', null, 'huge'));
+ok('P-cfgSentSize', $sz4 === array('xl', 'standard', 'large', 'large'), json_encode($sz4));
+
+// ---- the theme ---------------------------------------------------------------------------------------
+$T = penumbra_get_themes();
+$roleOk = function ($id) use ($T) { $r = penumbra_cards_email_theme($id); $v = isset($T[$id]['vars']) ? $T[$id]['vars'] : array(); if (!isset($v['bg-surface'], $v['text-main'], $v['bg-surface-alt'], $v['border-color'], $v['brand-primary'], $v['bg-body'], $v['text-muted'])) return false;
+    return $r['card'] === $v['bg-surface'] && $r['text'] === $v['text-main'] && $r['alt'] === $v['bg-surface-alt'] && $r['border'] === $v['border-color'] && $r['brand'] === $v['brand-primary'] && $r['paper'] === $v['bg-body'] && $r['muted'] === $v['text-muted']; };
+ok('P-themeDefault', $roleOk('theme-default'), json_encode(penumbra_cards_email_theme('theme-default')));
+ok('P-themeDark', $roleOk('theme-dark-blue') && penumbra_cards_email_theme('theme-dark-blue')['card'] !== penumbra_cards_email_theme('theme-default')['card']);
+ok('P-themeUnknown', penumbra_cards_email_theme('theme-no-such') === penumbra_cards_email_theme('theme-default'));
+$allOk = true; $bad = array(); foreach (array_keys($T) as $id) { if (!$roleOk($id) && isset($T[$id]['vars']['bg-surface'])) { $allOk = false; $bad[] = $id; } }
+ok('P-themeAll', $allOk, implode(',', $bad));
+// parity with js/penumbra_cards.js: MAIL_THEME's roles and defaults, MAIL_SIZE (cmsize: the cards a row, padding, type)
+$jsTheme = array(); $jsSize = array();
+if (preg_match('/var MAIL_THEME = \{(.*?)\};/s', $cjs, $m)) { preg_match_all("/(\w+): \['([\w-]+)', '(#[0-9a-fA-F]+)'\]/", $m[1], $mm, PREG_SET_ORDER); foreach ($mm as $x) $jsTheme[$x[1]] = array($x[2], $x[3]); }
+if (preg_match('/var MAIL_SIZE = \{(.*?)\r?\n    \};/s', $cjs, $m)) { preg_match_all("/(\w+): \{ cols: (\d), pad: '([^']+)', title: (\d+), sub: (\d+), big: (\d+), field: (\d+), label: (\d+) \}/", $m[1], $mm, PREG_SET_ORDER);
+    foreach ($mm as $x) $jsSize[$x[1]] = array('cols' => (int)$x[2], 'pad' => $x[3], 'title' => (int)$x[4], 'sub' => (int)$x[5], 'big' => (int)$x[6], 'field' => (int)$x[7], 'label' => (int)$x[8]); }
+ok('P-parityTheme', $jsTheme && $jsTheme === $GLOBALS['PENUMBRA_CARDS_MAIL_THEME'], json_encode($jsTheme));
+ok('P-paritySize', count($jsSize) === 4 && isset($GLOBALS['PENUMBRA_CARDS_MAIL_SIZE']) && $jsSize === $GLOBALS['PENUMBRA_CARDS_MAIL_SIZE'], json_encode($jsSize));
+
+// ---- the cards -----------------------------------------------------------------------------------------
+$rows = array(
+    array('ID' => 'ID-1', 'NAME' => 'Ann', 'STATUS' => 'Open', 'AMT' => '$1,000.00', 'NUM' => '10', 'PEOPLE' => 'Palmtag, Scott; Smith, Jo;Smith, Jo', 'PCT' => '40%', 'NOTE' => 'x'),
+    array('ID' => 'ID-2', 'NAME' => 'Ben', 'STATUS' => 'Closed', 'AMT' => '$2,000.00', 'NUM' => '20', 'PEOPLE' => '@@HTML<a href="#">Kumar, Ravi;Okafor, Ada</a>', 'PCT' => '75%', 'NOTE' => ''),
+    array('ID' => '', 'NAME' => 'Cy', 'STATUS' => 'Open', 'AMT' => '$3,000.00', 'NUM' => '30', 'PEOPLE' => 'Kumar, Ravi', 'PCT' => '', 'NOTE' => ''),
+    array('ID' => 'ID-4', 'NAME' => '', 'STATUS' => '', 'AMT' => '', 'NUM' => '0', 'PEOPLE' => '', 'PCT' => '', 'NOTE' => ''),
+    array('ID' => 'ID-5', 'NAME' => 'Eli', 'STATUS' => 'Open', 'AMT' => '$5,000.00', 'NUM' => '50', 'PEOPLE' => 'Byrne, Cara|Tanaka, Yui', 'PCT' => '', 'NOTE' => ''),
+);
+$CSS = array(1 => array('STATUS' => array('background-color' => '#ffebee', 'color' => '#c62828')), 4 => array('NUM' => array('background-image' => 'linear-gradient(90deg, #ff9800 0%, #ff9800 33%, transparent 33%)')));
+$ROWCSS = array(2 => array('background-color' => '#fff3e0'));
+$calls = 0;
+$cellFn = function ($row, $idx, $cols) use ($CSS, $ROWCSS, &$calls) {
+    $calls++;
+    $o = array('row' => isset($ROWCSS[$idx]) ? $ROWCSS[$idx] : array(), 'cells' => array());
+    foreach ($cols as $c) { if (!array_key_exists($c, $row)) continue; $raw = $row[$c];
+        $o['cells'][strtoupper($c)] = array('raw' => $raw, 'html' => (substr($raw, 0, 6) === '@@HTML' ? substr($raw, 6) : htmlspecialchars($raw)), 'css' => isset($CSS[$idx][$c]) ? $CSS[$idx][$c] : array()); }
+    return $o;
+};
+$cfg = penumbra_cards_email_cfg($st(array('open' => 1, 'sent' => array('title' => 'ID', 'sub' => array('NAME'), 'pill' => 'STATUS', 'big' => 'AMT', 'bar' => 'NUM',
+    'fields' => array('PEOPLE', 'GONE', 'NOTE'), 'lists' => array('PEOPLE' => 'dsemi')))));
+$r = penumbra_cards_email_html($rows, false, $cfg, 'theme-default', $cellFn, 0);
+$h = $r['html'];
+$cards = function ($h) { preg_match_all('/<div style="border:1px solid [^"]*border-radius:8px;[^"]*">(.*?)<\/div><\/td>/s', $h, $m); return $m[1]; };
+$cs = $cards($h);
+$th = penumbra_cards_email_theme('theme-default');
+ok('P-count', count($cs) === 5 && $r['shown'] === 5 && $r['total'] === 5 && !$r['truncated'] && $calls === 5, count($cs) . ' ' . json_encode(array($r['shown'], $r['total'], $calls)));
+ok('P-cols', substr_count($h, '<tr><td valign="top" width="33%"') === 2, (string)substr_count($h, '<tr><td valign="top" width="33%"'));   // (cmsize) Standard: three a row
+ok('P-title', strpos($cs[0], '>ID-1</span></div>') !== false && strpos($cs[2], '(blank)') !== false, substr($cs[2], 0, 200));
+ok('P-sub', strpos($cs[0], 'color:' . $th['muted'] . ';margin:0 0 4px;"><span style="">Ann</span></div>') !== false && strpos($cs[3], 'margin:0 0 4px;') === false);
+ok('P-pillRuled', strpos($cs[1], 'border-radius:10px;font-size:11px;border:1px solid transparent;color:#c62828;background-color:#ffebee;">Closed</span>') !== false, substr($cs[1], 0, 400));   // (cfb8) the rule's colours, the outline clear
+ok('P-pillThemed', strpos($cs[0], 'border-radius:10px;font-size:11px;border:1px solid ' . $th['text'] . ';color:' . $th['text'] . ';">Open</span>') !== false && strpos($cs[3], 'border-radius:10px') === false);   // (cfb8) outlined as on screen, no fill
+ok('P-big', strpos($cs[0], 'font-size:19px;font-weight:bold;color:' . $th['text'] . ';">$1,000.00</span> <span style="font-size:11px;color:' . $th['muted'] . ';">AMT</span>') !== false);
+// bars: the rank among 10 20 30 0 50 (abs, sorted 0 10 20 30 50): 10 -> 25%, 30 -> 75%; row 5's own gradient 33% in its colour; 0 draws a 1% floor? no: 0 -> rank 0 -> max(1) width
+preg_match_all('/<td width="(\d+)%" style="height:6px;font-size:0;line-height:0;background-color:([^;]+);"/', $h, $bm, PREG_SET_ORDER);
+$bw = array_map(function ($x) { return $x[1] . '@' . $x[2]; }, $bm);
+ok('P-bars', $bw === array('25@' . $th['brand'], '50@' . $th['brand'], '75@' . $th['brand'], '1@' . $th['brand'], '33@#ff9800'), json_encode($bw));
+ok('P-chips', substr_count($cs[0], 'border-radius:9px;') === 2 && strpos($cs[0], '>Palmtag, Scott</span>') !== false && strpos($cs[0], '>Smith, Jo</span>') !== false
+    && strpos($cs[0], 'background-color:' . $th['alt'] . ';color:' . $th['text'] . ';">Palmtag') !== false, substr($cs[0], 0, 900));
+ok('P-chipsHtmlKept', substr_count($cs[1], 'border-radius:9px;') === 0 && strpos($cs[1], '<a href="#">Kumar, Ravi;Okafor, Ada</a>') !== false);
+ok('P-chipsOther', substr_count($cs[4], 'border-radius:9px;') === 1 && strpos($cs[4], '>Byrne, Cara|Tanaka, Yui</span>') !== false);   // dsemi: a pipe is not its delimiter - one value, one chip (the screen's oneValue)
+ok('P-hiddenLeftOff', strpos($h, 'GONE') === false);
+ok('P-labels', strpos($cs[0], 'white-space:nowrap;">PEOPLE</td>') !== false && strpos($cs[0], '>NOTE</td>') !== false && strpos($cs[1], '>NOTE</td>') === false);
+ok('P-rowCss', strpos($h, 'font-family:Verdana,sans-serif;background-color:#fff3e0;">') !== false);
+ok('P-cardThemed', strpos($h, 'border:1px solid ' . $th['border'] . ';border-radius:8px;padding:11px 12px;background-color:' . $th['card'] . ';color:' . $th['text'] . ';') !== false
+    && strpos($h, 'background-color:' . $th['paper'] . ';color:' . $th['text'] . ';padding:6px;') !== false);
+ok('P-plain', !preg_match('/\sclass=|var\(--/', $h));
+$cfgN = $cfg; $cfgN['nolabels'] = true;
+ok('P-nolabels', strpos(penumbra_cards_email_html($rows, false, $cfgN, 'theme-default', $cellFn, 0)['html'], 'white-space:nowrap;') === false);
+$cfgC = $cfg; $cfgC['size'] = 'compact'; $hc = penumbra_cards_email_html($rows, false, $cfgC, 'theme-default', $cellFn, 0)['html'];
+ok('P-compact', substr_count($hc, '<tr><td valign="top" width="25%"') === 2 && strpos($hc, 'height:6px') === false && strpos($hc, 'border-radius:9px') === false && strpos($hc, 'margin:0 0 4px;') === false);
+$cfgX = $cfg; $cfgX['size'] = 'xl'; $hx = penumbra_cards_email_html($rows, false, $cfgX, 'theme-default', $cellFn, 0)['html'];
+ok('P-xl', substr_count($hx, '<tr><td valign="top" width="100%"') === 5);
+// (cmsize, the user: the sizes were not respected) Large is not Standard: two a row, its own type and padding; Extra large's
+$cfgL = $cfg; $cfgL['size'] = 'large'; $hl = penumbra_cards_email_html($rows, false, $cfgL, 'theme-default', $cellFn, 0)['html'];
+ok('P-large', substr_count($hl, '<tr><td valign="top" width="50%"') === 3 && strpos($hl, 'font-size:15px;font-weight:bold;') !== false && strpos($hl, 'font-size:22px;font-weight:bold;') !== false
+    && strpos($hl, 'padding:14px 16px;') !== false && strpos($hl, 'padding:2px 0;font-size:12px;') !== false && strpos($hl, 'font-size:13px;font-weight:bold;') === false, substr($hl, 0, 300));
+ok('P-xlType', strpos($hx, 'font-size:17px;font-weight:bold;') !== false && strpos($hx, 'font-size:26px;font-weight:bold;') !== false && strpos($hx, 'padding:18px 20px;') !== false
+    && strpos($hx, 'padding:2px 0;font-size:13px;') !== false);
+$one = preg_match('/<td valign="top" width="33%" style="padding:5px;"><div.*?<\/div><\/td>/s', $h, $om) ? strlen($om[0]) : 2000;
+$rb = penumbra_cards_email_html($rows, false, $cfg, 'theme-default', $cellFn, 2 * $one + 400);   // room for about two cards
+ok('P-budget', $rb['truncated'] && $rb['shown'] >= 2 && $rb['shown'] < 5 && $rb['total'] === 5 && count($cards($rb['html'])) === $rb['shown'], json_encode(array($rb['shown'], $rb['total'], $rb['truncated'])));
+// grouped: a path's levels by the runner's separator; the theme's group palette
+$sep = defined('PENUMBRA_GROUP_PATH_SEP') ? PENUMBRA_GROUP_PATH_SEP : "\x1f";
+$grp = array('Engineering' . $sep . 'Civil' => array($rows[0], $rows[1]), 'Science' => array($rows[4]), 'Empty' => array());
+$rg = penumbra_cards_email_html($grp, true, $cfg, 'theme-dark-blue', $cellFn, 0); $hg = $rg['html'];
+$pal = $T['theme-dark-blue']['emailGroup'];
+preg_match_all('/<div style="margin:14px 0 6px;[^"]*"><span style="[^"]*">([^<]*)<\/span> <span style="[^"]*">(\d+)<\/span><\/div>/', $hg, $gm, PREG_SET_ORDER);
+ok('P-groupHeads', count($gm) === 2 && $gm[0][1] === 'Engineering / Civil' && $gm[0][2] === '2' && $gm[1][1] === 'Science' && $gm[1][2] === '1', json_encode($gm));
+ok('P-groupPalette', strpos($hg, 'background-color:' . $pal['headerBg'] . ';') !== false && strpos($hg, 'color:' . $pal['nameColor'] . ';">Engineering') !== false && strpos($hg, 'background-color:' . $pal['countBg'] . ';color:' . $pal['countColor'] . ';">2<') !== false);
+ok('P-groupCards', count($cards($hg)) === 3 && $rg['total'] === 3 && strpos($hg, 'background-color:' . $T['theme-dark-blue']['vars']['bg-surface'] . ';') !== false);
+
+// ---- the runner's wiring (source) ------------------------------------------------------------------
+ok('S-require', substr_count($run, "require_once dirname(__FILE__) . '/penumbra_cards_email.php';") === 1);
+ok('S-globalGuarded', strpos($run, "\$GLOBALS['penumbra_cards_email'] = function_exists('penumbra_cards_email_cfg') ? penumbra_cards_email_cfg(\$state) : null;") !== false);
+ok('S-bodyOnly', strpos($run, "(\$isEmail && \$viewMode !== 'pivot' && !empty(\$data) && !empty(\$GLOBALS['penumbra_cards_email']) && function_exists('penumbra_cards_email_html'))") !== false);
+ok('S-sameCell', strpos($run, "\$cellValue = isset(\$rwMap[\$colUpper]) ? \$rwMap[\$colUpper] : (\$hlEmail ? penumbra_email_cell_format(\$colUpper, \$cell) : \$cell);\r\n                \$o['cells']") !== false
+    && strpos($run, "'html' => penumbra_notes_cell_html(formatCellContent(\$cellValue), \$colName)") !== false);
+ok('S-budget', strpos($run, "penumbra_cards_email_html(\$data, \$viewMode === 'grouped', \$_cardsCfg, \$themeName, \$_cardsCell, \$_truncLimit ? max(1, \$_truncLimit - strlen(\$html)) : 0);") !== false
+    && strpos($run, '" cards &mdash; "') !== false);
+ok('S-tableKept', substr_count($run, "    } else if (empty(\$data)) {\r\n        \$html .= \"<p>No results found.</p>\";") === 1);
+foreach (array('inc' => $INC, 'runner' => $RUN) as $k => $p) { $l = shell_exec(escapeshellarg(PHP_BINARY) . ' -n -l ' . escapeshellarg($p) . ' 2>&1'); ok('P-lint-' . $k, strpos((string)$l, 'No syntax errors') !== false, trim((string)$l)); }
+// (csz, the user) each card's notes: the runner's Notes column (penumbra_sched_notes_col, lifted), under its name, not on Small,
+// none without the column named
+$rowsN = array_map(function ($r) { $r['NOTES'] = ''; return $r; }, $rows); $rowsN[0]['NOTES'] = "2026-10-01 Ann: first\n2026-10-02 Ben: second";
+$hn0 = penumbra_cards_email_html($rowsN, false, $cfg, 'theme-default', $cellFn, 0)['html'];
+if (function_exists('penumbra_sched_notes_col')) penumbra_sched_notes_col('NOTES');
+$hn = penumbra_cards_email_html($rowsN, false, $cfg, 'theme-default', $cellFn, 0)['html'];
+$cfgCn = $cfg; $cfgCn['size'] = 'compact'; $hnc = penumbra_cards_email_html($rowsN, false, $cfgCn, 'theme-default', $cellFn, 0)['html'];
+if (function_exists('penumbra_sched_notes_col')) penumbra_sched_notes_col('');
+$csN = $cards($hn);
+ok('P-notes', function_exists('penumbra_sched_notes_col') && strpos($hn0, 'Ann: first') === false && substr_count($hn, 'Ann: first') === 1 && isset($csN[0], $csN[1])
+    && strpos($csN[0], 'margin:0 0 2px;">NOTES</div>2026-10-01 Ann: first') !== false && strpos($csN[1], '>NOTES</div>') === false && strpos($hnc, 'Ann: first') === false, isset($csN[0]) ? substr($csN[0], -300) : '');
+ok('P-noWarnings', empty($ERRS), implode(' | ', array_slice(array_unique($ERRS), 0, 4)));
+echo implode("\n", $out) . "\n";

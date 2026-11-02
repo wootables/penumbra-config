@@ -80,7 +80,7 @@ SCN = [('boot', ''), ('many', ''), ('click', ''), ('keys', ''), ('search', ''), 
        ('exports', ''), ('save', ''), ('layoutonly', ''), ('wide', ''), ('widestacked', ''), ('nested', ''),
        ('nstick', ''), ('narrow', ''), ('kill', '&grouplist=off'), ('tallabove', ''), ('broken', ''), ('exit', ''),
        ('longtext', ''), ('pinnarrow', ''), ('pinhash', ''), ('density', ''), ('listwidth', ''), ('trigger', ''), ('switch', ''),
-       ('copysnip', ''), ('pinflat', '&colwidths=flat'), ('radio', ''), ('tip', ''), ('compare', ''), ('fitstacked', ''), ('wideresize', ''), ('widecmp', ''), ('n3crumb', ''), ('nmerge', ''), ('nmergejs', ''), ('nmergeexp', ''), ('nsweep', ''), ('n3hidden', ''), ('npdf', ''), ('n3pdf', ''), ('pdf1', ''), ('nmail', ''), ('n3mail', ''), ('npath', ''),
+       ('copysnip', ''), ('trigboard', ''), ('pinflat', '&colwidths=flat'), ('radio', ''), ('tip', ''), ('colcount', ''), ('compare', ''), ('fitstacked', ''), ('wideresize', ''), ('widecmp', ''), ('n3crumb', ''), ('nmerge', ''), ('nmergejs', ''), ('nmergeexp', ''), ('nsweep', ''), ('n3hidden', ''), ('npdf', ''), ('n3pdf', ''), ('pdf1', ''), ('nmail', ''), ('n3mail', ''), ('npath', ''),
        ('cmpsort', ''), ('cmpsortlist', ''), ('ncmpsort', ''), ('cmpsortprep', ''), ('cmpsortpivot', ''),
        ('rgapply', ''), ('rglist', ''), ('nrgapply', ''), ('rgprep', ''), ('rgpivot', ''),
        ('rgremove', ''), ('rgremoff', ''), ('rgremlist', ''), ('rgremsearch', ''), ('rgremguard', ''),
@@ -164,9 +164,11 @@ CHK = {
     'trigger': ['startsStacked', 'listOn', 'layoutOnlyStep', 'aggKept', 'keepsList', 'cancelIgnored', 'junkIgnored', 'toStacked'],
     'switch': ['listSel', 'bestMatch', 'toggleOn', 'stackedNow', 'noRegroup', 'stepDone', 'stackedSel', 'plainSel', 'toggleOff', 'toggleBack'],
     'copysnip': ['writesList', 'stackedPlain'],
+    'trigboard': ['boardKept', 'boardSaved', 'copyWritesBoard', 'boardLeft'],   # (bdlay) Board through the trigger path and Copy Snippet
     # round 3
     'radio': ['opened', 'openShowsList', 'clickSets', 'appliedStacked', 'reopenShowsStacked', 'resetRepaints'],
-    'tip': ['tipShows', 'tipDescribes'],
+    'tip': ['tipShows', 'tipDescribes', 'tipEditorSnippet', 'tipReaderNoSnippet'],   # (tipaud) a reader's tip has no snippet line
+    'colcount': ['countShown', 'countLevel2', 'blanksOut', 'countDrawn', 'textKept', 'nestedNone'],   # (grpcnt) the pickers count each column's values
     # grplistcmp (2026-10-13): a snapshot comparison is listed too
     'compare': ['cmpOn', 'cmpItems', 'cmpOne', 'cmpPane', 'cmpFit', 'cmpDivider', 'cmpVisible', 'cmpCount', 'cmpClick',
                 'cmpApplyStacked', 'cmpApplyList', 'cmpNotice', 'cmpRerun', 'cmpClear'],
@@ -233,8 +235,11 @@ NEW_RGPATHS = ['L-rpsearch-clearSorted', 'L-rpsearch-clearMarks', 'L-rpsearchlis
                'L-rpjournal-jrnStripes', 'L-rppivot-exitNatural', 'L-rppivot-exitPage', 'L-rppivot-pivotSortGone', 'L-rppivot-pivotRepaint', 'L-rppivot-pivotShiftClick',
                'L-rppivot-rowFieldKept', 'L-rppivot-exitSearch', 'L-rpcmpflat-goneSorted', 'L-rpcmpflat-goneMarks', 'L-rpcmpflat-pivotCmpGone',
                'L-rpcmpflat-pivotCmpRepaint', 'L-rpcmpflat-abPivotGone', 'L-rpmarksoff-offSearchUnmarked', 'L-rpmarksoff-offApplyUnmarked']
+NEW_BDLAY = ['L-trigboard-boardKept', 'L-trigboard-boardSaved', 'L-trigboard-copyWritesBoard']   # (bdlay, 2026-10-31) boardLeft holds on live too
+NEW_GRPCNT = ['L-colcount-countShown', 'L-colcount-countLevel2', 'L-colcount-blanksOut', 'L-colcount-countDrawn', 'L-tip-tipReaderNoSnippet']   # (grpcnt, 2026-10-31) textKept, nestedNone, tipEditorSnippet hold on live too
 NEW_SETS = [('cmpgsort', 'function _pnbResortGroupedView()', NEW_CMPGSORT), ('rgsort', 'function _pnbResortFlatView(', NEW_RGSORT),
-            ('rgpaths', 'function _pnbPreCompareGroupingBack(', NEW_RGPATHS)]
+            ('rgpaths', 'function _pnbPreCompareGroupingBack(', NEW_RGPATHS),
+            ('bdlay', 'function _groupLayoutNorm(v)', NEW_BDLAY), ('grpcnt', 'function _groupValueCount(col)', NEW_GRPCNT)]
 # rgsort re-sorts on every Apply, so cmpgsort's "next" flag went with it: these mutants edit the flag and are
 # reported as superseded on a build without it (the marker), not run
 FLAG_MUTANTS = ('cg-noresort', 'cg-noask', 'cg-reentry', 'cg-noconsume')
@@ -245,6 +250,13 @@ SUPERSEDED = {'rg-nopivot': ('function _pnbPreCompareGroupingBack(', 'rgpaths so
 
 # (file, old, new): file is 'main' (main.js), 'mod' (the module) or 'css' (its stylesheet)
 MUTANTS = {
+    # (grpcnt) the level pickers' counts: none written / blanks counted / a sub-column counted / not drawn; (tipaud) the
+    # tip's writer parts kept for a reader
+    'gc-count': ([('main', "_grpLevelM ? (_groupValueCountText(name) || null) : null)", "_grpLevelM ? (null) : null)")], ['L-colcount-countShown', 'L-colcount-countLevel2'], ['colcount']),
+    'gc-blank': ([('main', "if (!/[^ \\t\\n\\r\\0\\x0B]/.test(v)) continue;   // a blank", "if (false) continue;   // a blank")], ['L-colcount-blanksOut'], ['colcount']),
+    'gc-nested': ([('main', "                if (v === undefined) continue;\r\n                held = true;", "                held = true;")], ['L-colcount-nestedNone'], ['colcount']),
+    'gc-css': ([('mcss', ".pcs-dropdown .pcs-item[data-count]::after {", ".pcs-dropdown .pcs-item[data-count-x]::after {")], ['L-colcount-countDrawn'], ['colcount']),
+    'gc-tip': ([('main', "function tipAudience() { if (!(typeof penumbra_vars !== 'undefined' && penumbra_vars && penumbra_vars.canEditReport)) $pop.find('[data-audience=\"writer\"]').remove(); }", "function tipAudience() { }")], ['L-tip-tipReaderNoSnippet'], ['tip']),
     # pdfnest: an outer group gets its own page again (the garbled title over an empty table)
     'pdfbranch': ([('main', "                const $groups = $('#groupedResultsContainer .group-wrapper.group-leaf').not('.search-hidden').filter(function () {", "                const $groups = $('#groupedResultsContainer .group-wrapper').not('.search-hidden').filter(function () {")],
                   ['L-npdf-noBranchPages'], ['npdf']),
@@ -480,7 +492,7 @@ MUTANTS = {
     'layoutonly': ([('main', "        if (want === currentGroupLayout) return false;\r\n", "        return false;\r\n")],
                    ['L-layoutonly-noRegroup'], ['layoutonly']),
     # the normal Apply forgets the layout
-    'noread': ([('main', "        // The layout (2026-10-03, grplist), read with the rest of the form.\r\n        currentGroupLayout = ($('#groupLayout').val() === 'list') ? 'list' : 'stacked';\r\n", "")],
+    'noread': ([('main', "        // The layout (2026-10-03, grplist), read with the rest of the form.\r\n        currentGroupLayout = _groupLayoutNorm($('#groupLayout').val());\r\n", "")],   # (re-anchored, bdlay)
                ['L-layoutonly-stackedAgain'], ['layoutonly']),
     # the first DRAWN band is not looked for: a hidden first band measures 0
     'stickyrevert': ([('main', "            var measured = 0;\r\n            for (var bi = 0; bi < bands.length && bi < 60 && !measured; bi++) {\r\n                measured = Math.round(bands[bi].getBoundingClientRect().height);\r\n            }\r\n",
@@ -491,7 +503,7 @@ MUTANTS = {
                        "$(\"#groupedResultsContainer .group-wrapper:first th[data-colname]:not([style*='display: none'])\")")],
                      ['L-nested-footer', 'L-nested-fills', 'L-nstick-footer', 'L-nstick-fills'], ['nested', 'nstick']),
     # List is not saved
-    'nosave': ([('main', "                state.groupLayout = 'list';\r\n", "")],
+    'nosave': ([('main', "                state.groupLayout = currentGroupLayout;\r\n", "")],   # (re-anchored, bdlay: List or Board)
                ['L-save-listSaved'], ['save']),
     # no narrow-window fallback
     'nonarrow': ([('mod', "        if (window.innerWidth < NARROW) { return false; }", "")],
@@ -549,8 +561,13 @@ MUTANTS = {
     'pinmaxwidth': ([('mod', "                sum += (drawn > 0 && drawn < pinned) ? drawn : pinned;", "                sum += drawn > 0 ? drawn : pinned;")],
                     ['L-pinnarrow-noRuleYet'], ['pinnarrow']),
     # Copy Snippet leaves the layout out: a List grouping pastes back as Stacked
-    'nocopy': ([('main', "        if (_csList) triggerValue += '|layout=list';", "")],
+    'nocopy': ([('main', "        if (_csLay !== 'stacked') triggerValue += '|layout=' + _csLay;", "")],   # (re-anchored, bdlay)
                ['L-copysnip-writesList'], ['copysnip']),
+    # (bdlay) a trigger's layout=board ignored as junk; Copy Snippet's caption without the layout
+    'bd-trigger': ([('main', "                if (v === 'list' || v === 'stacked' || v === 'board') layout = v;   // (bdlay) layout=board", "                if (v === 'list' || v === 'stacked') layout = v;")],
+                   ['L-trigboard-boardKept'], ['trigboard']),
+    'bd-copy': ([('main', "        if (_csLay !== 'stacked') colLabel += ' (' + _csLay + ')';", "")],
+                ['L-trigboard-copyWritesBoard', 'L-copysnip-writesList'], ['trigboard', 'copysnip']),
     # ---- round 3 (grplist3) ----
     # the total bar goes back under the group
     'barcol2': ([('css', "    grid-column: 1;\n    grid-row: 2;\n    align-self: start;", "    grid-column: 2;\n    grid-row: 4;\n    align-self: start;")],
@@ -615,7 +632,7 @@ MUTANTS = {
     'nopaint': ([('main', "        _groupLayoutPaint();   // grplist3: the radios show it\r\n", "")],
                 ['L-radio-openShowsList'], ['radio']),
     # a radio click does not reach the hidden field
-    'noradioset': ([('main', "        if (this.checked) $('#groupLayout').val(this.value === 'list' ? 'list' : 'stacked');", "")],
+    'noradioset': ([('main', "        if (this.checked) $('#groupLayout').val(_groupLayoutNorm(this.value));   // (bdlay) Board too", "")],   # (re-anchored, bdlay)
                    ['L-radio-clickSets'], ['radio']),
     # Reset clears the field but leaves the radio on List
     'noresetpaint': ([('main', "        $('#groupLayout').val('stacked');\r\n        _groupLayoutPaint();   // grplist3\r\n", "        $('#groupLayout').val('stacked');\r\n")],

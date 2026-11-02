@@ -68,6 +68,8 @@ $mutants = @{
   # Parenthesised: inside @() the COMMA binds before +, which garbles an unwrapped anchor.
   'phpstrip'   = @('search', ('    $resolvedFilter = penumbraStripSrcModifier($resolvedFilter);' + "`r`n`r`n    // Detect __ROW modifier"), "`r`n    // Detect __ROW modifier")
   'runnerstrip'= @('runner', ('    $resolvedFilter = penumbraStripSrcModifier($resolvedFilter);' + "`r`n`r`n    // __ROW modifier (correlate"), "`r`n    // __ROW modifier (correlate")
+  # parens fix round (2026-10-31): under the unsafe split a condition outside the mixed group is kept (E14 / V14 red without it)
+  'unsafekeep' = @('main', 'if (_hasUnsafeOr || aggNamesUpper.indexOf(aqPart.column.toUpperCase()) !== -1) {', 'if (aggNamesUpper.indexOf(aqPart.column.toUpperCase()) !== -1) {')
 }
 $mutFile = ''; $mOld = ''; $mNew = ''
 if ($Mutant) {

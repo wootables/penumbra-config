@@ -29,15 +29,16 @@
 #   P-nav      admin chrome: the tool pills end inside the viewport (was 634px)
 #   P-navstatic admin chrome: the bar is not sticky on a phone (it stood 190px tall)
 #   T-navsticky admin chrome at 1024: still sticky
-#   P-jobs     health maintenance: the job controls are inside the viewport (was 549px)
-#   P-runs     health maintenance: a run's message is inside the viewport and wraps
+#   P-jobs     health maintenance: the job controls are inside the viewport (was 549px), and the last run
+#              and the detail each show on a line of their own (1.4.10, 2026-10-15: they were hidden)
+#   P-runs     health maintenance: a run's message is inside the viewport, wraps and spans the row
 #   P-dash     dashboard head: the action buttons end inside the viewport (was 451px)
 #   P-grants   grants save bar: the note sits on its own line under the button
 #   R-sb       print: the footer status bar does not print
 #   R-adm      print: the admin tool bar does not print
 #   R-heat     print: a heatmap / conditional-format cell keeps its inline fill and text colour
 #   R-plain    print: a plain cell prints black on white, a header cell on light grey
-#   R-total    print (dark theme): the pivot grand-total row prints light, black text
+#   R-total    print (dark theme): the pivot grand-total row prints its light grey band (#eee), black text
 #   R-notice   print: a posted notice prints black on white
 #   R-crumb    print: the breadcrumb prints black
 #
@@ -80,6 +81,10 @@ A = {
  'nonav':     ('main', '    .pnb-adm-nav { flex: 1 1 100%; min-width: 0; }' + CR, ''),
  'nostatic':  ('main', '    body.pnb-adm .pnb-adm-stick { position: static; }' + CR, ''),
  'nojobs':    ('main', '    .pnb-rows-jobs .pnb-row .k { grid-column: 1 / -1; justify-content: flex-start; flex-wrap: wrap; }' + CR, ''),
+ # (2026-11-01: 1.4.10 on 10-15 stopped hiding a job's last run and detail at phone width - each takes a
+ #  line of its own. P-jobs asked for them hidden and stood red on live from then; jobshide hides them again.)
+ 'jobshide':  ('main', '    .pnb-rows-jobs .pnb-row .to, .pnb-rows-jobs .pnb-row .p { grid-column: 1 / -1; white-space: normal; }' + CR,
+                       '    .pnb-rows-jobs .pnb-row .to, .pnb-rows-jobs .pnb-row .p { display: none; }' + CR),
  'noruns':    ('main', '    .pnb-rows-runs .pnb-row .p { grid-column: 1 / -1; white-space: normal; }' + CR, ''),
  'nodash':    ('dash', '    .dash-head-actions { flex: 1 1 100%; min-width: 0; }\n', ''),
  'nogrants':  ('grants', '    .bar-inner { flex-wrap: wrap; }\n', ''),
@@ -88,8 +93,13 @@ A = {
  'noheat':    ('main', '    th:not(#pnb-print):not(#pnb-print-2), td:not(#pnb-print):not(#pnb-print-2):not([style*="background-color"]):not([style*="background-image"]) {' + CR,
                        '    th:not(#pnb-print):not(#pnb-print-2), td:not(#pnb-print):not(#pnb-print-2) {' + CR),
  'nobump':    ('main', '    th:not(#pnb-print):not(#pnb-print-2) {   /* same specificity bump as the cell rules above */' + CR, '    th {' + CR),
- 'nototal':   ('main', '    #pivot-output-container #pivotResultTable td.pivot-grand-total,' + CR + '    #pivot-output-container #pivotResultTable th.pivot-grand-total {' + CR,
+ # (2026-11-01: printx's blanket white (2,2,1) had outranked the total's td selector (2,1,1) since 10-10,
+ #  every total cell printed white and R-total - "light" - passed it, so nototal stood green. The td
+ #  selector takes the print bump now and R-total wants the #eee band; nototalbump takes the bump away.)
+ 'nototal':   ('main', '    #pivot-output-container #pivotResultTable td.pivot-grand-total:not(#pnb-print),' + CR + '    #pivot-output-container #pivotResultTable th.pivot-grand-total {' + CR,
                        '    #pivotResultTable th.pivot-grand-total {' + CR),
+ 'nototalbump': ('main', '    #pivot-output-container #pivotResultTable td.pivot-grand-total:not(#pnb-print),' + CR,
+                       '    #pivot-output-container #pivotResultTable td.pivot-grand-total,' + CR),
  'nonotice':  ('main', '    .pnb-notice { background: #fff !important; color: #000 !important; border-left-color: #000 !important; }' + CR, ''),
  'nocrumb':   ('main', '    .pnb-crumb, .pnb-crumb a { color: #000 !important; }' + CR, ''),
 }
@@ -98,9 +108,9 @@ MUTANT_RED = {
  #  nosnapfoot also reds P-snapscroll: an overflowing footer is what scrolls the dialog sideways.)
  'homefr': ['P-home'], 'noghost': ['P-ghost'], 'nohdr': ['P-header'], 'nosblead': ['P-sblead', 'P-pop'], 'nopop': ['P-pop'],
  'nosettings': ['P-settings'], 'nosnapstack': ['P-snapstack'], 'nosnapscroll': ['P-snapscroll'], 'nosnapfoot': ['P-snapfoot', 'P-snapscroll'],
- 'norepo': ['T-repo'], 'nonav': ['P-nav'], 'nostatic': ['P-navstatic'], 'nojobs': ['P-jobs'], 'noruns': ['P-runs'],
+ 'norepo': ['T-repo'], 'nonav': ['P-nav'], 'nostatic': ['P-navstatic'], 'nojobs': ['P-jobs'], 'jobshide': ['P-jobs'], 'noruns': ['P-runs'],
  'nodash': ['P-dash'], 'nogrants': ['P-grants'],
- 'noprinthide': ['R-sb', 'R-adm'], 'noheat': ['R-heat'], 'nobump': ['R-plain'], 'nototal': ['R-total'], 'nonotice': ['R-notice'], 'nocrumb': ['R-crumb'],
+ 'noprinthide': ['R-sb', 'R-adm'], 'noheat': ['R-heat'], 'nobump': ['R-plain'], 'nototal': ['R-total'], 'nototalbump': ['R-total'], 'nonotice': ['R-notice'], 'nocrumb': ['R-crumb'],
 }
 CONTROL_RED = sorted(set(sum(MUTANT_RED.values(), [])))
 
@@ -232,8 +242,6 @@ def observe():
 
 def inside(box, cw): return box is not None and box['r'] <= cw + 1 and box['l'] >= -1
 def rgb(s): return tuple(int(x) for x in re.findall(r'\d+', s or '')[:3])
-def light(s):
-    c = rgb(s); return len(c) == 3 and sum(c) / 3.0 >= 200
 
 def asserts(o):
     h, hd, r, r8, r10, rd, rp, a, a10, ap, d = (o['home390'], o['home1280'], o['rep390'], o['rep768'], o['rep1024'], o['rep1280'], o['repPrint'], o['adm390'], o['adm1024'], o['admPrint'], o['dash390'])
@@ -257,16 +265,25 @@ def asserts(o):
     R['T-navsticky'] = a10['stickPos'] == 'sticky'
     # ...and the controls span the row (without the grid-column they land in the 82px first
     # column of a second row and spill over their neighbours instead of past the viewport).
-    R['P-jobs'] = (inside(a['jobK'], a['cw']) and inside(a['jobRow'], a['cw']) and a['jobTo'] == 'none'
-                   and a['jobK']['w'] >= 0.8 * a['jobRow']['w'])
-    R['P-runs'] = inside(a['runP'], a['cw']) and inside(a['runRow'], a['cw']) and a['runPws'] == 'normal'
+    # The last run and the detail show, each across the row on a line of its own: hidden here
+    # until 1.4.10 (2026-10-15), and this check asked for them hidden until 2026-11-01.
+    R['P-jobs'] = (inside(a['jobK'], a['cw']) and inside(a['jobRow'], a['cw'])
+                   and a['jobK']['w'] >= 0.8 * a['jobRow']['w']
+                   and a['jobTo'] != 'none' and a['jobPDisplay'] != 'none'
+                   and inside(a['jobToBox'], a['cw']) and a['jobToBox']['w'] >= 0.8 * a['jobRow']['w']
+                   and inside(a['jobP'], a['cw']) and a['jobP']['w'] >= 0.8 * a['jobRow']['w'])
+    # ...and the message spans the row: since section 7 (2026-10-14) made the whole row wrap,
+    # "inside and wrapping" also passed with it squeezed into the 82px first column (noruns
+    # stood green until 2026-11-01).
+    R['P-runs'] = (inside(a['runP'], a['cw']) and inside(a['runRow'], a['cw']) and a['runPws'] == 'normal'
+                   and a['runP']['w'] >= 0.8 * a['runRow']['w'])
     R['P-dash'] = inside(d['actions'], d['cw']) and d['sw'] <= d['cw'] + 1
     R['P-grants'] = a['note']['t'] >= a['save']['b'] - 1 and inside(a['note'], a['cw'])
     R['R-sb'] = rp['sbDisplay'] == 'none' and ap['sbDisplay'] == 'none'
     R['R-adm'] = ap['stickDisplay'] == 'none'
     R['R-heat'] = rgb(rp['heatBg']) == (200, 30, 30) and rgb(rp['heatColor']) == (255, 255, 255)
     R['R-plain'] = rgb(rp['plainBg']) == (255, 255, 255) and rgb(rp['plainColor']) == (0, 0, 0) and rgb(rp['thBg']) == (240, 240, 240)
-    R['R-total'] = light(rp['totalBg']) and rgb(rp['totalColor']) == (0, 0, 0)
+    R['R-total'] = rgb(rp['totalBg']) == (238, 238, 238) and rgb(rp['totalColor']) == (0, 0, 0)
     R['R-notice'] = rgb(rp['noticeBg']) == (255, 255, 255) and rgb(rp['noticeColor']) == (0, 0, 0)
     R['R-crumb'] = rgb(rp['crumbColor']) == (0, 0, 0)
     return R

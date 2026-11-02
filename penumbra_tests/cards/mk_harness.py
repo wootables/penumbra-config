@@ -46,17 +46,40 @@ CFG = {
     'cwhite': {'title': 'V_NAME', 'big': 'H_AMT', 'pill': 'V_STATUS', 'bar': 'H_NUM', 'fields': ['V_DATE', 'V_ID']}, 'cdetpage': {}, 'cdetmore': {}, 'cseg': {},
     # (round P) Extra large with four short fields (one row's status made long), on a desktop and on a phone; ccolsview has
     # NO entry: a report with no card setup (the Cards segment not shown yet)
+    'cdens': {'title': 'V_NAME', 'sub': ['V_ID'], 'big': 'H_AMT', 'pill': 'V_STATUS', 'fields': ['V_DATE', 'H_TEXT']}, 'cdensph': {}, 'gdens': {},   # (cdens) density
+    'cdpack': {'title': 'V_NAME', 'sub': ['V_ID'], 'big': 'H_AMT', 'pill': 'V_STATUS', 'fields': ['V_DATE', 'H_TEXT']},   # (cdpack) packed at every size x density
     'gboard': {}, 'cboard': {'pill': 'H_GROUP'}, 'cboardload': {},   # (round S) the board
+    'gboardvl': {}, 'cboardrx': {},   # (bdlay) gboard's link; a viewer the report keeps from grouping
+    'gboardfew': {}, 'gboardbig': {}, 'gbandbig': {},   # (bdlay2) three lanes that fit; 2,500 rows in six lanes
     'cfieldsB': {'title': 'V_NAME', 'fields': ['V_ID', 'V_DATE']},   # (round R) the viewer's kept labels-off setup seeded over it
     'cfields': {'title': 'V_NAME', 'fields': ['V_ID', 'V_AMOUNT', 'V_DATE', 'V_LINK', 'V_STATUS', 'H_CODE', 'H_NUM', 'H_DATE', 'H_MONEY', 'H_AMT']},   # (round R) ten fields
     'cfmt': {'title': 'V_NAME', 'sub': ['V_STATUS'], 'big': 'H_AMT', 'fields': ['V_DATE', 'V_ID']},   # (cfmt) highlight rules on every part
     'cfmtbig': {'title': 'V_NAME', 'fields': ['V_DATE']},   # (cfmt2) the same rules on 2,500 rows: main.js defers its format pass
     'pvhtml': {},   # (round Q) a pivot on link-valued fields (the rows patch below)
+    'pvcfg': {'pivot': {'big': 'N', 'pill': 'parent', 'bar': 'Amt', 'fields': ['Amt', 'Mean'], 'nolabels': 1}}, 'pvcfgB': {},   # (pvcfg) the report's tiles setup on a three-measure pivot; pvcfgB opens pvcfg's link
+    'plab': {'pivot': {'pill': 'm0', 'bar': 'm0'}},   # (pvlab) one measure with no label: the pill's and the bar's word
+    'cvlE': {}, 'cvlF': {}, 'pvlA': {}, 'pvlB': {},   # (linkpos) the card at the top + open details in a link; a pivot's scroll (pvl*: 300 pivot rows, a 700px wrapper)
     'cbarrank': {'bar': 'H_NUM'}, 'cvlC': {}, 'cvlD': {},   # (clbar) the rank-scaled bar; the link's card setup (cvlD opens cvlC's link)
+    'pfsort': {},   # (round U) pivot tiles sorted (pf*: H_GROUP down)
+    # (cprint) print as cards: a card with every part (three hidden columns on it: the page lists none), 25 a page; grouped; pivot tiles
+    'cprint': {'title': 'V_NAME', 'big': 'H_AMT', 'pill': 'V_STATUS', 'bar': 'H_NUM', 'fields': ['V_DATE', 'H_TEXT']}, 'gprint': {}, 'pprint': {},
     'cxl2': {'size': 'xl', 'title': 'V_NAME', 'fields': ['V_ID', 'V_STATUS', 'V_DATE', 'V_AMOUNT']}, 'cxl2ph': {'size': 'xl', 'title': 'V_NAME', 'fields': ['V_ID', 'V_STATUS', 'V_DATE', 'V_AMOUNT']},
+    # (cfix) a long text field (H_TEXT, hidden) on the card; a report with Pack the cards off; over a pivot
+    'cfix': {'title': 'V_NAME', 'fields': ['H_TEXT', 'V_ID', 'V_DATE']}, 'cfixprint': {'title': 'V_NAME', 'big': 'H_AMT', 'pill': 'V_STATUS', 'bar': 'H_NUM', 'fields': ['V_DATE', 'H_TEXT']}, 'gfix2': {}, 'cfixB': {'title': 'V_NAME', 'nopack': 1}, 'pfix': {},
+    # (cchips) a list column's values as chips: H_TEXT a semicolon list of "Last, First" names, H_CODE a pipe list of codes,
+    # V_NAME a "Last, First" pair (no list), V_STATUS plain text
+    'cchips': {'title': 'V_ID', 'fields': ['H_TEXT', 'H_CODE', 'V_NAME', 'V_STATUS']},
+    # (cdash) the email's cards: every slot, a list field (chips), a highlighted pill; grouped; a pivot (no cards body)
+    'cmail': {'title': 'V_ID', 'sub': ['V_NAME'], 'pill': 'V_STATUS', 'big': 'H_AMT', 'bar': 'H_NUM', 'fields': ['H_TEXT', 'V_DATE', 'V_LINK']},
+    'gmail': {'title': 'V_ID', 'sub': ['V_NAME'], 'pill': 'V_STATUS', 'big': 'H_AMT', 'fields': ['H_TEXT', 'V_DATE']}, 'pmail': {},
+    # (cflt) Click to filter field by field: a list field (chips), a plain text one to filter, a link field
+    'cflt': {'title': 'V_ID', 'fields': ['H_TEXT', 'V_NAME', 'V_STATUS', 'V_LINK']},
+    # (csched) the saved view: an editor's Save while cards show; a report saved showing cards (no viewer pick: it opens in cards)
+    'csave': {'title': 'V_ID', 'sub': ['V_NAME'], 'pill': 'V_STATUS', 'big': 'H_AMT', 'bar': 'H_NUM', 'fields': ['H_TEXT', 'V_DATE', 'V_LINK']},
+    'copen': {'title': 'V_ID', 'fields': ['V_NAME'], 'open': 1, 'sent': {'title': 'V_ID', 'fields': ['V_NAME']}},
 }
 # the viewer's own saved pick (penumbra_column_prefs.lrfix.view = cards), seeded before boot
-PREF_CARDS = ['cfmtbig', 'cfmt', 'cfull', 'pcoff', 'gcards', 'gcoll', 'gncoll', 'ggcards', 'gglnest', 'cvlT', 'ca11y', 'cphone', 'cbar', 'chl', 'cviewer', 'csize', 'cxl', 'cmenu', 'gmenu', 'pmenu', 'cmsize', 'gmsize', 'cdet', 'gdet', 'pdet', 'cdetph', 'cmword', 'curl3', 'cnote', 'cnotedet', 'cflink', 'ckword', 'cfind', 'gfind', 'csort', 'gsort', 'cempty', 'pfind', 'clayout', 'clayoutB', 'cdetrow', 'pvfind', 'cwhite', 'cdetpage', 'cdetmore', 'cseg', 'cxl2', 'cxl2ph', 'pvhtml', 'cfields', 'cfieldsB', 'cboard', 'cbarrank', 'cvlC']
+PREF_CARDS = ['cdpack', 'cflt', 'cdens', 'cdensph', 'gbandbig', 'cfmtbig', 'cfmt', 'cfull', 'pcoff', 'gcards', 'gcoll', 'gncoll', 'ggcards', 'gglnest', 'cvlT', 'ca11y', 'cphone', 'cbar', 'chl', 'cviewer', 'csize', 'cxl', 'cmenu', 'gmenu', 'pmenu', 'cmsize', 'gmsize', 'cdet', 'gdet', 'pdet', 'cdetph', 'cmword', 'curl3', 'cnote', 'cnotedet', 'cflink', 'ckword', 'cfind', 'gfind', 'csort', 'gsort', 'cempty', 'pfind', 'clayout', 'clayoutB', 'cdetrow', 'pvfind', 'cwhite', 'cdetpage', 'cdetmore', 'cseg', 'cxl2', 'cxl2ph', 'pvhtml', 'cfields', 'cfieldsB', 'cboard', 'cbarrank', 'cvlC', 'pfsort', 'cvlE', 'pvcfg', 'plab', 'cprint', 'gprint', 'pprint', 'cfix', 'cfixB', 'pfix', 'cfixprint', 'gfix2', 'cboardrx', 'cchips', 'cmail', 'gmail', 'csave']
 PREF_TABLE = ['cnarrowT', 'curl2', 'ctmenu']   # (csize) the viewer chose Table: the phone default yields; (curl) ?cards=1 wins over it
 
 
@@ -77,6 +100,9 @@ def build(index_src):
 
     # index.php's viewport meta (line 74): without it a phone lays the page out 980px wide
     rep('<title>colmenu</title>', '<title>cards</title>\n<meta name="viewport" content="width=device-width, initial-scale=1">')
+    # (bdlay2) the status bar's grouping chip and its card (the colmenu harness writes them for its gchipnest alone): gboard
+    # opens the card's Layout line
+    rep('/[?&]scn=gchipnest(?:&|$)/', '/[?&]scn=(?:gchipnest|gboard)(?:&|$)/')
     rep('<link rel="stylesheet" href="penumbra_colmenu.css">\n',
         '<link rel="stylesheet" href="penumbra_colmenu.css">\n<link rel="stylesheet" href="penumbra_cards.css">\n<link rel="stylesheet" href="theme_vars.css">\n'
         # (round O) the status bar's Cards card drawn open: a control's visibility is then the segment's (reachable); the
@@ -91,7 +117,7 @@ def build(index_src):
     rep('<script src="driver.js"></script>\n', '<script src="themes.js"></script>\n<script src="driver.js"></script>\n')
     # (round K) Find in results for the scenarios that use it (index.php loads it after the card view)
     rep('<script defer src="penumbra_colmenu.js"></script>\n', '<script defer src="penumbra_colmenu.js"></script>\n'
-        '<script>if (/^(cfind|gfind|pfind|pvfind)$/.test(window.__SCN)) document.write(\'<link rel="stylesheet" href="penumbra_find.css"><script defer src="penumbra_find.js"></scr\' + \'ipt>\');</script>\n')   # (deferred, after the engine, as index.php)
+        '<script>if (/^(cfind|gfind|pfind|pvfind|cchips)$/.test(window.__SCN)) document.write(\'<link rel="stylesheet" href="penumbra_find.css"><script defer src="penumbra_find.js"></scr\' + \'ipt>\');</script>\n')   # (deferred, after the engine, as index.php)
     # the switch, after the row count (index.php: inside #tableSearchContainer; the harness keeps the count beside it)
     # (round O) the status bar's Cards segment - the switch, the size, the Sort list, Configure cards - after Cols, as
     # index.php draws it; a build without one (the control: live) has the controls beside the row count
@@ -111,12 +137,22 @@ def build(index_src):
     clp = _lift(index_src, r'\n([ \t]*)<div class="sb-pop sb-cl-pop" id="sbColsPop".*?\n\1</div>', 'the Cols card') if (index_src and 'id="sbColsView"' in index_src) else ''
     clp = re.sub(r'<\?php.*?\?>', '', clp, flags=re.S).strip('\n')
     rep('<div class="sb-seg" id="sbColsSeg"><span id="sbCols"></span>', '<div class="sb-seg" id="sbColsSeg"><span class="sb-cols-open" id="sbColsOpen" role="button" tabindex="0"><span class="sb-lab">Cols</span> <span id="sbCols"></span></span>' + (clp or '<span class="sb-pop-h" id="sbColsPopHead">Columns</span>'))
+    # (bdlay) the Layout row's Board radio, lifted from the index.php under test into the colmenu harness's own dialog
+    # markup (live has none: its control has Stacked / List alone)
+    blab = _lift(index_src, r'<label class="grp-lb-board"[^\n]*</label>', 'the Board radio')
+    if blab:
+        rep('      <label><input type="radio" name="groupLayoutChoice" value="list"> List</label>\n',
+            '      <label><input type="radio" name="groupLayoutChoice" value="list"> List</label>\n      ' + blab + '\n')
     host = _lift(index_src, r'<div id="pnbCardsHost"[^\n]*', 'the host')
     rep('<div id="pivot-output-container" style="display:none"></div></div>', '<div id="pivot-output-container" style="display:none"></div>' + host + '</div>')
     # the View Options Cards card (the editor's form), in a #view-options-tab of its own - (round N) gone from index.php:
     # lifted on the control alone (live's); Configure cards builds its own window. The Exit pivot button
     vo = _lift(index_src, r'<div class="view-option-item pnb-cards-vo">.*?pnb-cards-note.*?</p>\s*</div>\s*</div>', 'the Cards card')
     vo = re.sub(r'<span class="tab-help-icon"[^>]*>\?</span>', '', vo)
+    rep('<div id="pnbStatusBar">', '<script>if (/print$/.test(new URLSearchParams(location.search).get("scn") || "")) document.write(\'<p id="dataLoadedTimestamp">Data retrieved on: Oct 31, 2026 9:00 AM</p>'
+        '<div id="downloadActionsLightbox" class="help-lightbox" style="display:none"><div class="lightbox-content"><label style="display: block;"><input type="radio" name="downloadFormat" value="print"> <strong>Print</strong>'
+        '<small style="display: block; margin-left: 22px;">Opens your browser print dialog for what is on screen.</small></label>'
+        '<label style="display: block;"><input type="radio" name="downloadFormat" value="pdf"> <strong>PDF</strong></label></div></div>\');</script>\n<div id="pnbStatusBar">')   # (cprint)
     rep('<div id="pnbStatusBar">', '<div id="view-options-tab" style="display:none"><div class="view-options-grid">' + vo + '</div></div>\n<button id="exitPivotModeBtn" type="button">Exit pivot</button>\n<div id="pnbStatusBar">')
     # (round I) the pager's Rows: label and the list's title, as index.php has them (the module reads them)
     plb = _lift(index_src, r'<label for="rowsPerPageSelector"[^>]*>[^<]*</label>', 'the pager label')
@@ -127,12 +163,17 @@ def build(index_src):
         '<button id="nextPageBtn">&gt;</button><button id="lastPageBtn">&gt;|</button>')
     # cperf / cmore: a big report (?rows=N, default 1000), the usual six columns shown
     rep('(/^mperf|^mrerun/.test(window.__SCN) ? (+P.get("rows") || 20000) : 300)',
-        '(/^mperf|^mrerun/.test(window.__SCN) ? (+P.get("rows") || 20000) : (/^(cperf|cmore|cfmtbig)$/.test(window.__SCN) ? (+P.get("rows") || 1000) : (window.__SCN === "cdetmore" ? 1003 : 300)))')   # (round O) cdetmore: past the 1,000 drawn
+        '(/^mperf|^mrerun/.test(window.__SCN) ? (+P.get("rows") || 20000) : (/^(cperf|cmore|cfmtbig|gboardbig|gbandbig)$/.test(window.__SCN) ? (+P.get("rows") || 1000) : (window.__SCN === "cdetmore" ? 1003 : 300)))')   # (round O) cdetmore: past the 1,000 drawn
     # cesc: a value the server escaped (an image tag as text) in the title column
     rep('    window.__rowsFixture = rows;\n',
         '    if (window.__SCN === "cxl2" || window.__SCN === "cxl2ph") { rows[2].V_NAME = "Long status row"; rows[2].V_STATUS = "Waiting on the sponsor for the final signed agreement"; }\n'   # (round P) the one card that keeps one column
         '    if (window.__SCN === "pvhtml") rows.forEach(function (r) { ["H_GROUP", "H_GROUP2", "V_STATUS"].forEach(function (c) { if (r[c] != null && r[c] !== "") r[c] = "@@HTML<a href=\\"#" + c + "\\">" + r[c] + "</a>"; }); });\n'   # (round Q) link-valued pivot fields, as ?id=int-col-mat's
         '    if (window.__SCN === "cbarrank") { rows[0].H_NUM = "1000000000"; rows[1].H_NUM = "500"; rows[2].H_NUM = "500"; rows[3].H_NUM = "0"; }\n'   # (clbar) one huge value, two ties, a zero
+        '    if (/^(cchips|cmail|gmail|cflt|csave)$/.test(window.__SCN)) { var PPL = ["Palmtag, Scott", "Smith, Jo", "Kumar, Ravi", "Okafor, Ada", "Lindqvist, Eva", "Moreau, Luc", "Tanaka, Yui", "Byrne, Cara"], CODES = ["H865", "TSW912", "P220", "K104", "R377"], FIRST = ["Ann", "Ben", "Cy", "Dee", "Eli", "Fay"];\n'
+        '      rows.forEach(function (r, i) { var n = 1 + (i * 7) % 4, ps = [], cs = [], k; for (k = 0; k < n; k++) ps.push(PPL[(i + k * 3) % PPL.length]); for (k = 0; k <= i % 3; k++) cs.push(CODES[(i + k) % CODES.length]); r.H_TEXT = ps.join(";"); r.H_CODE = cs.join("|"); r.V_NAME = "Lname" + i + ", " + FIRST[i % FIRST.length]; });\n'
+        '      rows[0].H_TEXT = PPL.join("; ") + "; Zeta, Quinn"; rows[1].H_TEXT = "Palmtag, Scott; Smith, Jo;Smith, Jo"; rows[2].H_TEXT = "Kumar, Ravi";\n'
+        '      rows[3].H_TEXT = "@@HTML<a href=\\"#x\\">Palmtag, Scott;Smith, Jo</a>"; rows[4].H_TEXT = "Smith, Joanne;Kumar, Ravi"; }\n'   # (cchips) nine values (six shown); a repeat; one; a link; a near miss
+        '    if (window.__SCN === "cmail") rows[0].V_LINK = "@@HTML<a href=\\"#\\" data-search=\\"V_STATUS = //Open//\\">Find open</a>";\n'   # (cdash) a Click to Filter link: the email makes it text
         '    if (window.__SCN === "cesc") rows[0].V_NAME = "&lt;img src=x onerror=\\"window.__pwn=1\\"&gt; Alpha";\n'
         '    window.__rowsFixture = rows;\n')
     # the stored report: the Cards option, the page size, a report highlight rule, a grouped subtotal
@@ -140,14 +181,23 @@ def build(index_src):
     rep('    window.__STORED = st;\n',
         '    window.__CARDS_CFG = ' + cfg + ';\n'
         '    if (Object.prototype.hasOwnProperty.call(window.__CARDS_CFG, S)) st.viewOptions = Object.assign({}, st.viewOptions || {}, { cards: window.__CARDS_CFG[S] });\n'
-        '    if (S === "cpage" || S === "cdetrow" || S === "cdetpage" || S === "cfmtbig") st.rowsPerPage = "25";\n'
+        '    if (S === "cpage" || S === "cdetrow" || S === "cdetpage" || S === "cfmtbig" || S === "cprint" || S === "cfixprint") st.rowsPerPage = "25";\n'
         '    if (S === "cguess") { st.visibleColumns = ["#", 0, 1, 7, 2, 3, 4, 5]; st.columnOrder = [0, 1, 7, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]; }\n'
         '    if (S === "cperf" || S === "cmore" || S === "cdetmore" || S === "cxl2" || S === "cxl2ph") st.rowsPerPage = "all";\n'
         '    if (S === "chl") st.columnHighlights = { V_STATUS: [{ id: "r1", w: "V_STATUS = //Closed//", css: "background-color: #ffebee; color: #c62828; font-weight: bold" }] };\n'
         '    if (S === "cfmt" || S === "cfmtbig") st.columnHighlights = { V_NAME: [{ id: "t1", w: "", css: "background-color: #ffebee; color: #c62828" }], V_STATUS: [{ id: "s1", w: "V_STATUS = //Closed//", css: "font-style: italic; color: #2e7d32" }], H_AMT: [{ id: "b1", w: "", css: "background-color: #e8f5e9" }], V_DATE: [{ id: "f1", w: "", css: "font-weight: bold; text-decoration: underline" }] };\n'
+        '    if (S === "cchips") { st.columnHighlights = { H_TEXT: [{ id: "c1", w: "H_TEXT = /Okafor/", css: "background-color: #e8f5e9; color: #1b5e20" }] }; st.visibleColumns = ["#", 0, 1, 5, 6, 19]; }   // (cchips) the lists shown in the table: Find reads them\n'
+        '    if (S === "cmail" || S === "gmail" || S === "csave") { st.columnHighlights = { H_TEXT: [{ id: "c1", w: "H_TEXT = /Okafor/", css: "background-color: #e8f5e9; color: #1b5e20" }], V_STATUS: [{ id: "r1", w: "V_STATUS = //Closed//", css: "background-color: #ffebee; color: #c62828; font-weight: bold" }] }; st.visibleColumns = ["#", 0, 1, 2, 3, 4, 5, 6, 19]; }   // (cdash)\n'
         '    if (S === "gcards") st.groupAgg = { column: "H_AMT", type: "sum" };\n'
         '    if (S === "ggcards" || S === "gglnest") st.groupLayout = "list";   // (glist) the List layout (the colmenu harness loads penumbra_grouplist.js for gg*)\n'
         '    if (S === "gglnest") st.groupBy = "H_GROUP,H_GROUP2";\n'
+        '    if (S === "gboard") st.groupLayout = "board";   // (bdlay) a report saved grouped as a Board\n'
+        '    if (S === "gboardbig") st.groupLayout = "board";   // (bdlay2) 2,500 rows in six lanes\n'
+        '    if (S === "gboardfew") { st.groupBy = "V_STATUS"; st.groupLayout = "board"; }   // (bdlay2) three lanes: every one fits\n'
+        '    if (S === "gdens") st.groupLayout = "board";   // (cdens) the board at each density\n'
+        '    if (S === "pvlA" || S === "pvlB") { st.pivot.rows = ["V_ID"]; st.pivot.cols = ["H_GROUP", "V_STATUS"]; }   // (linkpos) a pivot tall and wide enough to scroll\n'
+        '    if (S === "pvcfg" || S === "pvcfgB") { st.pivot.agg = ["sum", "count", "avg"]; st.pivot.aggLabels = ["Amt", "N", "Mean"]; st.pivot.aggColOverrides = ["H_AMT", "H_AMT", "H_AMT"]; }   // (pvcfg) three measures\n'
+        '    if (S === "plab") st.pivot.aggLabels = null;   // (pvlab) the one measure has no label (no sub-header: pvMeasureLabels finds none)\n'
         '    window.__STORED = st;\n')
     # a viewer (cviewer): no View Options form, the report's option alone
     rep('    window.__queryResponse = { data: rows };\n',
@@ -160,9 +210,9 @@ def build(index_src):
         "    var pref = " + _js(PREF_CARDS) + ".indexOf(cs) >= 0 ? { view: 'cards' } : (" + _js(PREF_TABLE) + ".indexOf(cs) >= 0 ? { view: 'table' } : null);\n"
         "    if (cs === 'cbar') pref = Object.assign(pref || {}, { shade: { V_AMOUNT: 'bar' } });\n"
     "    if (cs === 'clayoutB') pref = Object.assign(pref || {}, { cards: { title: 'V_STATUS', fields: ['V_ID', 'V_AMOUNT'] } });   // (round L) the viewer's own layout\n"
-        "    if (cs === 'gboard') pref = Object.assign(pref || {}, { view: 'board' });   // (round S) a grouped report opened as a board\n"
-        "    if (cs === 'cboardload') pref = Object.assign(pref || {}, { view: 'board', board: 'H_GROUP' });   // (round S) a kept board, a flat report (a hidden column: the guess would never pick it)\n"
+        "    if (cs === 'cboardload') pref = Object.assign(pref || {}, { view: 'board', board: 'H_GROUP' });   // (round S) a kept board, a flat report; (bdlay) it reads as cards\n"
         "    if (cs === 'cfieldsB') pref = Object.assign(pref || {}, { cards: { own: 1, title: 'V_NAME', fields: ['V_ID', 'V_AMOUNT', 'V_DATE'], nolabels: 1 } });   // (round R) a kept labels-off setup\n"
+        "    if (/^pvl/.test(cs)) { var pst = document.createElement('style'); pst.textContent = '#results-wrapper { max-width: 700px; }'; document.head.appendChild(pst); }   // (linkpos) a wrapper the pivot overflows sideways\n"
         "    if (pref) localStorage.setItem('penumbra_column_prefs', JSON.stringify({ lrfix: pref }));\n"
         "    if (cs === 'cviewer') { var vt = document.getElementById('view-options-tab'); if (vt) vt.parentNode.removeChild(vt); }   // a viewer has no View Options form\n"
         "  } catch (e) {} })();\n")

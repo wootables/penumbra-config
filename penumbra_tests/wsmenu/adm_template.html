@@ -1,0 +1,112 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Penumbra &middot; Manage Grants</title>
+<!-- wsmenu: an admin tool as penumbra_admin_chrome.php draws one (the body's classes, the sticky bar and its nav from
+     the tools registry, the footer status bar's profile card, the family settings drawer with its OWN script lifted
+     from the chrome) around a page with data (a table, a chart, a log), fields, a tab strip with counts and a tool's
+     buttons. ?admin=1|0 (the chrome tag's data-admin), ?tool=<registry id> (the current pill), ?dz=compact|easy-read
+     (the family density: css/density.css zooms the body). -->
+<link rel="stylesheet" href="main.css">
+<link rel="stylesheet" href="density.css">
+<link rel="stylesheet" href="penumbra_colmenu.css">
+<link rel="stylesheet" href="penumbra_wsmenu.css">
+<style>main { padding: 20px; } #gap { height: 260px; } #chart { width: 200px; height: 80px; display: block; }</style>
+</head>
+<body class="pnb-adm pnb-adm-dz">
+<script>
+  (function () { try { localStorage.clear(); } catch (e) { } })();
+  window.__Q = new URLSearchParams(location.search);
+  (function () { var dz = window.__Q.get('dz'); if (dz === 'compact' || dz === 'easy-read') { document.body.classList.add('density-' + dz); } })();
+  window.__TOOLS = __TOOLS__;
+  window.__errors = [];
+  window.onerror = function (m, src, line) { window.__errors.push(String(m) + ' @' + String(src).split('/').pop() + ':' + line); return true; };
+  window.__clip = [];
+  try { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: function (t) { window.__clip.push(String(t)); return Promise.resolve(); } } }); } catch (e) { }
+</script>
+<div class="pnb-adm-stick"><header class="pnb-adm-bar">
+  <div class="pnb-adm-titles"><h1>Manage Grants</h1><p>Per-user SQL, report, tag and scheduler scopes</p></div>
+  <nav class="pnb-adm-nav" id="admNav"></nav>
+</header></div>
+<script>
+  (function () {
+    var nav = document.getElementById('admNav'), here = window.__Q.get('tool') || 'grants';
+    window.__TOOLS.forEach(function (t) {
+      var a = document.createElement('a');
+      a.href = t.href; a.textContent = t.icon + ' ' + t.label;
+      if (t.id === here) { a.className = 'on'; a.setAttribute('aria-current', 'page'); }
+      nav.appendChild(a);
+    });
+  })();
+</script>
+<main class="pnb-adm-main">
+  <p id="intro">Grants here never exceed the global allow-list.</p>
+  <div class="tabs" role="tablist" aria-label="Sections" id="tabStrip">
+    <button type="button" class="tab-btn active" role="tab" id="tab-a" aria-selected="true">Overview</button>
+    <button type="button" class="tab-btn" role="tab" id="tab-b" aria-selected="false">Users<span class="tab-badge">12</span></button>
+    <button type="button" class="tab-btn" role="tab" id="tab-c" aria-selected="false">Errors</button>
+  </div>
+  <table id="dataTable"><thead><tr><th>User</th><th>Scope</th></tr></thead><tbody><tr><td id="dataCell">jjornl</td><td>ORIED_*</td></tr></tbody></table>
+  <canvas id="chart" width="200" height="80"></canvas>
+  <pre id="logPre">2026-11-01 10:00 Run Complete</pre>
+  <p><input type="text" id="someInput" value="a field"> <a id="someLink" href="#x">a link</a></p>
+  <p><button type="button" id="addUserBtn">+ Add user</button> <button type="button" id="saveBtn">Save changes</button> <button type="button" id="newTagBtn">+ New tag</button></p>
+  <div id="gap"></div>
+</main>
+<script>
+  Array.prototype.forEach.call(document.querySelectorAll('#tabStrip .tab-btn'), function (b) {
+    b.addEventListener('click', function () {
+      Array.prototype.forEach.call(document.querySelectorAll('#tabStrip .tab-btn'), function (x) { x.setAttribute('aria-selected', x === b ? 'true' : 'false'); x.classList.toggle('active', x === b); });
+    });
+  });
+</script>
+<div id="pnbStatusBar" role="region" aria-label="Status bar">
+  <div class="sb-spring"></div>
+  <div class="sb-seg sb-user sb-click" id="sbUserSeg">
+    <button type="button" class="sb-user-btn" id="sbUserBtn" aria-expanded="false" aria-controls="sbUserPop" aria-label="Profile and recent reports"><span class="sb-ava">H</span><span class="sb-val">Harness</span></button>
+    <div class="sb-pop" id="sbUserPop"><div id="sbReportsList"><div class="sb-recent-empty">No reports opened yet.</div></div>
+      <div class="sb-upop-foot"><a href="index.php">Home</a><a href="#" id="sbPaletteBtn" data-pnb-palette="open" role="button" title="Quick actions (Ctrl+K)">Quick actions</a></div></div>
+  </div>
+</div>
+<div id="settingsPanelOverlay"></div>
+<div id="settingsPanel">
+  <div id="settingsPanelHandle" title="(CTRL+,) Settings Panel"><span class="handle-inner">&#9654;</span></div>
+  <div class="sp-header"><span class="sp-title">Harness's Settings</span><button type="button" id="settingsPanelClose" aria-label="Close">&times;</button></div>
+  <div class="sp-body">
+    <select id="spThemeSelector"><option value="report-default">App default (Wolfpack Red)</option><option value="theme-default">Default Light</option><option value="theme-dark-blue">Dark Blue</option><option value="theme-wolfpack">Wolfpack Red</option></select>
+    <select id="spDensitySelector"><option value="report-default">App default (Standard)</option><option value="standard">Standard</option><option value="compact">Compact</option><option value="easy-read">Easy Read</option></select>
+  </div>
+</div>
+<script>
+  // the chrome's own appliers (penumbra_admin_theme_script), as far as the menu needs them: the theme's class on the
+  // body, the density's class on an opted-in body (css/density.css zooms it); each call recorded
+  window.PENUMBRA_THEME_IDS = ['theme-default', 'theme-dark-blue', 'theme-wolfpack'];
+  window.__applied = [];
+  window.pnbApplyTheme = function (t) {
+    var b = document.body;
+    b.classList.remove('theme-dark-blue', 'theme-wolfpack', 'is-dark');
+    if (t && t !== 'report-default' && t !== 'theme-default') { b.classList.add(t); }
+    window.__applied.push('theme:' + t);
+  };
+  window.pnbApplyDensity = function (v) {
+    var b = document.body;
+    b.classList.remove('density-compact', 'density-easy-read');
+    if (v === 'compact' || v === 'easy-read') { b.classList.add('density-' + v); }
+    window.__applied.push('density:' + v);
+  };
+</script>
+<script src="penumbra_userseg.js"></script>
+<script>
+(function () {
+    window.PenumbraUserSeg.configure({ isAdmin: window.__Q.get('admin') !== '0', userKey: 'harness' });
+    window.PenumbraUserSeg.wireChromeBar();
+})();
+__DRAWER__
+</script>
+<script>
+  // the chrome prints the registry for an admin only (penumbra_admin_tools_menu, in the profile card's footer)
+  if (window.__Q.get('admin') !== '0') { window.PENUMBRA_ADMIN_TOOLS = window.__TOOLS; }
+  window.PENUMBRA_ADMIN_VARS = { isAdmin: window.__Q.get('admin') !== '0', page: 'admin' };
+</script>
+<script src="penumbra_palette_boot.js" data-js="palette_fake.js" data-css=""></script>
+<script>document.write('<script src="penumbra_wsmenu.js" data-admin="' + (window.__Q.get('admin') === '0' ? '0' : '1') + '"></scr' + 'ipt>');</script>
+<script src="wsdriver.js"></script>
+</body></html>

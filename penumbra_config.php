@@ -20,8 +20,10 @@ $dec = function ($v) use ($__pnb_key) {
 return [
 
     //db creds
-    'ieprd_user' => $dec('enc:v1:LVtr8q0u3HEyCCJjSNo2BFGAFFKpve6NdvxA4qjJfn2gET90'),
-    'ieprd_pass' => $dec('enc:v1:nulEVaVcb4XjL93kj/8YCrobkiaYbgxR5GqbinnLobQP1cBgmPQ='),
+//    'ieprd_user' => $dec('enc:v1:LVtr8q0u3HEyCCJjSNo2BFGAFFKpve6NdvxA4qjJfn2gET90'),
+//    'ieprd_pass' => $dec('enc:v1:nulEVaVcb4XjL93kj/8YCrobkiaYbgxR5GqbinnLobQP1cBgmPQ='),
+	'ieprd_user'  => $dec('enc:v1:DNYwdhRflKO2xrvM4WcbpupMf8HpB9C0ejvYAk47xr34pSuiOj0zhQ=='),
+    'ieprd_pass'  => $dec('enc:v1:qrECD418eIqA3zDSPTI6NsQabh7clm68ZGdnX0RLCnnldn/CaFg2AX5N1go='),
     'pins_user'   => $dec('enc:v1:+06z9B9Qf1udZzwUs5MmJeNtLWarsbqsmNstZ8Yttxb6qyw='),
     'pins_pass'   => $dec('enc:v1:a8Yki29COPAzEfY2ibsHm4xkwosgSjJp8AvPzHUzZRHEwBLJkWFadg=='),
     'infoed_user' => $dec('enc:v1:ftEPsDOlPMR9k3pzfGBUuA8bQrD84qmZCgWaOzcKdrN1M842LJQ='),

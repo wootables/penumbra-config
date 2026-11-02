@@ -2222,6 +2222,29 @@
                  after2: after2, afterAb: afterAb,
                  rep2: rep2, now: sortNow(), marks: fMarks(), first: flatIds().slice(0, 4) };
     },
+    // (grpcnt, 2026-10-31, the user: "if the split by already knows the number of values, all columns should already
+    // know the number of values and state it in the column dropdown") each level picker's column states its count of
+    // values after its name, blanks left out as Split by's count leaves them; level 2 too; the item's text stays the
+    // column (the picker reads it); a nested table's sub-columns state none
+    colcount: async function () {
+      $('#configureGroupingBtn').trigger('click'); await sleep(400);
+      $('#groupingColumnSelector .pcs-selected').trigger('click'); await sleep(150);
+      function item(lv, c) { return document.querySelector('#groupingColumnSelector' + lv + ' .pcs-item[data-value="' + c + '"]'); }
+      function want(c) { var s = new Set(); (window.__rowsFixture || []).forEach(function (r) { var v = r[c]; if (v == null) return; v = String(v); if (/[^ \t\n\r\0\x0B]/.test(v)) s.add(v); }); return s.size; }
+      function words(n) { return n.toLocaleString('en-US') + (n === 1 ? ' value' : ' values'); }
+      var g = item('', 'H_GROUP'), g2 = item('2', 'H_GROUP2'), nl = item('', 'H_NULL'), fl = item('', 'H_FLAG');
+      var nested = Array.prototype.slice.call(document.querySelectorAll('#groupingColumnSelector .pcs-item-nested'));
+      var after = g ? getComputedStyle(g, '::after').content : '';
+      R.info = { g: g && g.getAttribute('data-count'), g2: g2 && g2.getAttribute('data-count'), nl: nl && nl.getAttribute('data-count'), fl: fl && fl.getAttribute('data-count'),
+                 want: [want('H_GROUP'), want('H_GROUP2'), want('H_NULL'), want('H_FLAG')], rows: (window.__rowsFixture || []).length,
+                 nested: nested.length, nestedCounted: nested.filter(function (x) { return x.hasAttribute('data-count'); }).length, after: after, text: g && g.textContent };
+      R.chk.countShown = !!g && g.getAttribute('data-count') === words(want('H_GROUP')) && !!fl && fl.getAttribute('data-count') === words(want('H_FLAG'));
+      R.chk.countLevel2 = !!g2 && g2.getAttribute('data-count') === words(want('H_GROUP2'));
+      R.chk.blanksOut = !!nl && nl.getAttribute('data-count') === words(want('H_NULL')) && (window.__rowsFixture || []).some(function (r) { return r.H_NULL === ''; });
+      R.chk.countDrawn = /values/.test(after || '');
+      R.chk.textKept = !!g && g.textContent === 'H_GROUP';
+      R.chk.nestedNone = nested.length > 0 && nested.every(function (x) { return !x.hasAttribute('data-count'); });
+    },
     // grplist3: the Layout ? tip shows its text. The shared popover was wired only by
     // the pivot / viz / snapshot / Tag Generator dialogs - this one showed nothing.
     tip: async function () {
@@ -2234,6 +2257,18 @@
       R.chk.tipShows = /Stacked/.test(t) && /\bList\b/.test(t);
       R.chk.tipDescribes = /All groups total/.test(t) && /fills the rest of the window/.test(t);
       R.info = { icon: !!ic, text: t.slice(0, 220) };
+      // (tipaud, 2026-10-31, the user: the Layout tip told readers about snippet buttons) the snippet line is for those who
+      // can edit the report: an editor sees it, a reader who cannot gets the tip without it
+      R.chk.tipEditorSnippet = /snippet button/i.test(t);
+      if (ic) ic.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, cancelable: true, relatedTarget: document.body }));
+      await until(function () { return !document.querySelector('.bld-help-pop.open'); }, 3000);
+      window.penumbra_vars.canEditReport = false;
+      if (ic) ic.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true, relatedTarget: document.body }));
+      await until(function () { var q2 = document.querySelector('.bld-help-pop.open'); return !!q2 && /Stacked/.test(q2.textContent); }, 5000);
+      var p2 = document.querySelector('.bld-help-pop.open'), t2 = p2 ? p2.textContent.replace(/\s+/g, ' ') : '';
+      window.penumbra_vars.canEditReport = true;
+      R.info.reader = t2.slice(0, 260);
+      R.chk.tipReaderNoSnippet = /Stacked/.test(t2) && /their own view/.test(t2) && !/snippet/i.test(t2);
     },
     // The grouping dialog's Copy Snippet writes the layout option for List (only), and
     // the caption says so.
@@ -2249,6 +2284,34 @@
       var b = last();
       R.chk.stackedPlain = b.indexOf('group_by|H_GROUP|H_AMT|sum') !== -1 && b.indexOf('layout=') === -1 && b.indexOf('(list)') === -1;
       R.info = { a: a, b: b, clipErr: window.__clipErr || null };
+    },
+    // (bdlay, 2026-10-31) Board, the grouping's third layout, through the trigger path and the dialog's Copy Snippet.
+    // No card view in this harness: the board draws nothing here - the layout is kept (the dialog's field, the state a
+    // Save writes) and List stands down, the groups Stacked. Stored as List.
+    trigboard: async function () {
+      var steps = 0;
+      $(document).on('penumbra:stepComplete.zzb', function () { steps++; });
+      function state() { return HC.buildStateObject() || {}; }
+      function last() { return window.__clip[window.__clip.length - 1] || ''; }
+      async function fire(cmd) {
+        var s0 = steps;
+        HC.executeChainStep(cmd);
+        if (!(await until(function () { return steps > s0; }, 15000))) throw new Error('trigger "' + cmd + '": no stepComplete in 15 s');
+        await sleep(150); await frames(4);
+      }
+      await fire('group_by|H_GROUP|H_AMT|sum|layout=board');
+      R.chk.boardKept = HC.getLayout() === 'board' && !isOn() && shownTop().length === 6 && $('#groupLayout').val() === 'board';
+      R.chk.boardSaved = state().groupLayout === 'board';
+      seedDialog(); $('#groupLayout').val('board'); $('#groupingLightbox').show();
+      window.__clip = [];
+      $('#copyGroupSnippetBtn').trigger('click'); await sleep(150);
+      var a = last();
+      R.chk.copyWritesBoard = a.indexOf('group_by|H_GROUP|H_AMT|sum|layout=board') !== -1 && a.indexOf('Group by H_GROUP (board)') !== -1;
+      $('#groupingLightbox').hide();
+      await fire('group_by|H_GROUP|H_AMT|sum|layout=stacked');
+      R.chk.boardLeft = HC.getLayout() === 'stacked' && !state().groupLayout && !isOn() && shownTop().length === 6;
+      $(document).off('penumbra:stepComplete.zzb');
+      R.info = { steps: steps, layout: HC.getLayout(), saved: state().groupLayout, a: a, clipErr: window.__clipErr || null };
     },
     // layout_switch / toggle_switch positions that name a layout: selected / on only in
     // that layout, the best match wins, and a click that changes only the layout ends
