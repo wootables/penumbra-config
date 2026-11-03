@@ -46,6 +46,7 @@ EDGE = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js', 'codemirror.min.js', 'sql.min.js',
         'show-hint.js', 'foldcode.js', 'foldgutter.js', 'brace-fold.js', 'comment-fold.js', 'placeholder.js',
         'penumbra_snippet_help.js', 'purify.min.js', 'penumbra_template.js', 'penumbra_userseg.js']
+LIBS.append('penumbra_tiles.js')   # (2026-11-02, cfsplit) the filter strip: fsplit / gsplit's list-item condition
 SCN = ['fbuild', 'fsort', 'fpanel', 'fsum', 'ffilter', 'fdeep', 'frepdeep', 'furldeep', 'fcalc', 'fxss', 'fsave', 'fclear', 'gfmt', 'fheat', 'pvfmt', 'pvfmt2', 'pvtie', 'pvcog', 'fnomod', 'ffreeze', 'ftips', 'fform', 'fprows', 'fparity']
 def q(s): return urllib.parse.quote(s, safe='')
 SCN_Q = {
@@ -121,6 +122,14 @@ SCN.extend(['fhlunit', 'fhl', 'fhlseed', 'ghl'])
 SCN.extend(['hrep', 'hrview', 'hrsave', 'hrnomod'])
 SCN.extend(['pvhl', 'pvhlseed', 'pvhlnomod'])
 SCN.extend(['hlhd', 'ghlhd', 'hlhdsnip', 'hlhdsnip0', 'hrhd', 'hlhdbad'])   # (2026-10-24, hlhead) header rules
+# (2026-11-02, cfsplit) a list column's Split by ; under Filter: offered (greyed until Click to filter) and never on a
+# plain column, stored, its cells, a click on one value, a separator, a cell of one value (and one repeating a value),
+# Enter, the mark as the pointer moves, off again (a guard), the SPLIT badge, waiting for a Click to filter, Reset, the
+# report's Click-to-Filter; the grouped view
+CHK['fsplit'] = ['offered', 'notOnPlain', 'enables', 'stored', 'classOn', 'clickItem', 'rowsListing', 'reMark', 'sepInert', 'oneAnywhere', 'dupOne',
+                 'enterOne', 'enterManyInert', 'hoverMarks', 'offWhole', 'badge', 'waitsForFilter', 'resetClears', 'resetOnForced', 'forcedSplit']
+CHK['gsplit'] = ['groupedClass', 'groupedClick']
+SCN.extend(['fsplit', 'gsplit'])
 # the PHP half's hl mode (the email): its checks, by name
 PHP_HLHD = ['stateHd', 'stateAnyFlag', 'emailAlways', 'emailAggOn', 'emailAggOff', 'emailAnyOn', 'emailAnyOff', 'emailHeadCss', 'emailCellsStill', 'groupedHeads', 'emailFillShows', 'emailInk', 'emailBadFill', 'emailImpFill', 'pdfUntouched']   # (2026-10-24, hlhead)
 PHP_HL = ['fmtParity', 'numParity', 'cssParity', 'whenParity', 'stateRules', 'emailPaints', 'emailFmt', 'emailFooter', 'pdfPlain', 'darkFill', 'groupedEmail', 'noLeak']
@@ -473,7 +482,7 @@ MUTANTS = {
     'm-repbadge': ([('main', "else if (rf) bits.push({ t: F.badge(rf), own: false,", "else if (rf) bits.push({ t: F.badge(rf), own: true,")],
                    ['L-hrep-repBadges', 'L-hrsave-afterBadges'], ['hrep', 'hrsave']),
     'm-norule': ([('main', "else if (hv.off.length) bits.push({ t: 'NO RULE', own: true, w: _pnbHlWords(name, hv) });", '')], ['L-hrep-offBadge'], ['hrep']),
-    'm-resetoff': ([('main', '_pnbColOptWrite(col, { fmt: null, filter: null, deep: null, hl: null, hlOff: null });', '_pnbColOptWrite(col, { fmt: null, filter: null, deep: null, hl: null });')],
+    'm-resetoff': ([('main', '_pnbColOptWrite(col, { fmt: null, filter: null, split: null, deep: null, hl: null, hlOff: null });', '_pnbColOptWrite(col, { fmt: null, filter: null, split: null, deep: null, hl: null });')],   # (re-aimed 2026-11-02, cfsplit)
                    ['L-hrep-resetBack'], ['hrep']),
     'm-viewlink': ([('main', 'if (Object.keys(_colOpts.highlights).length) state.columnHighlights = _colOpts.highlights;', '')], ['L-hrep-viewLink'], ['hrep']),
     # main.js: the Save dialog's list, what a save takes into the report, after it
@@ -556,6 +565,49 @@ MUTANTS = {
     't-lsc': ([('stopic', '<h4 id="lsc-colopts"', '<h4 id="lsc-colopt"')], ['S-helpHl2'], []),
     't-hidden': ([('topic', 'reads only the columns it shows', 'reads the columns it shows')], ['S-helpHl2'], []),
 }
+# (2026-11-02, cfsplit) a list column's Split by ;: the value read, its cells, the click, the cut, Enter, the mark, the badge,
+# Reset, the report's Click-to-Filter; the popover's box, its greying, its pick; the help, the stylesheet
+MUTANTS.update({
+    'sp-get': ([('main', "        if (typeof o.split === 'string' && groupDelimDef(o.split)) out.split = o.split;   // (cfsplit) the list's separator id" + N, "")],
+               ['L-fsplit-classOn', 'L-fsplit-clickItem'], ['fsplit']),
+    'sp-store': ([('main', "        else if (key === 'split') _pnbColOptWrite(col, { split: value === true ? (_pnbColSplitId(col) || null) : null });", "        else if (key === 'split') return;")],
+                 ['L-fsplit-stored', 'L-fsplit-classOn'], ['fsplit']),
+    'sp-render': ([('main', "filter: o.filter === true, split: o.split || '' };", "filter: o.filter === true, split: '' };")], ['L-fsplit-classOn', 'L-gsplit-groupedClass'], ['fsplit', 'gsplit']),
+    'sp-class': ([('main', "        if (ro && ro.split) td.classList.add('pnb-cflt-split');", "        if (false) td.classList.add('pnb-cflt-split');")], ['L-fsplit-classOn', 'L-gsplit-groupedClass'], ['fsplit', 'gsplit']),
+    'sp-click': ([('main', "        const split = _pnbCfltSplitOf(td);", "        const split = null;")], ['L-fsplit-clickItem', 'L-fsplit-sepInert', 'L-gsplit-groupedClick'], ['fsplit', 'gsplit']),
+    'sp-hit': ([('main', "                if (x >= bs[b].left - 1 && x <= bs[b].right + 1 && y >= bs[b].top - 1 && y <= bs[b].bottom + 1) return its[i].v;", "                if (true) return its[i].v;")],
+               ['L-fsplit-clickItem', 'L-fsplit-sepInert', 'L-fsplit-hoverMarks'], ['fsplit']),
+    'sp-one': ([('main', "        if (its.n === 1) return its[0].v;" + N, "")], ['L-fsplit-oneAnywhere', 'L-fsplit-dupOne'], ['fsplit']),
+    'sp-distinct': ([('main', "                if (!seen[v]) { seen[v] = true; out.n++; }", "                out.n++;")], ['L-fsplit-dupOne'], ['fsplit']),
+    'sp-trim': ([('main', "            while (a < b && _PNB_CFLT_WS.test(t.charAt(a))) a++;" + N, "")], ['L-fsplit-hoverMarks'], ['fsplit']),
+    'sp-enter': ([('main', "        const split = _pnbCfltSplitOf(this);", "        const split = null;")], ['L-fsplit-enterOne', 'L-fsplit-enterManyInert'], ['fsplit']),
+    'sp-entermany': ([('main', "            if (its.n === 1) {", "            if (its.n >= 1) {")], ['L-fsplit-enterManyInert'], ['fsplit']),
+    'sp-mark': ([('main', "        if (v !== h.v) { h.v = v; _pnbCfltMark(this, v, h.its); }", "        if (v !== h.v) { h.v = v; }")], ['L-fsplit-hoverMarks'], ['fsplit']),
+    'sp-remark': ([('main', "            _pnbCfltHov.td = null;   // (the rows move under the filter: the pointer's next move marks afresh)" + N, "")], ['L-fsplit-reMark'], ['fsplit']),
+    'sp-leave': ([('main', "        h.td = null; h.sp = null; h.its = null; h.v = null;" + N + "        _pnbCfltMark(null);", "        h.td = null; h.sp = null; h.its = null; h.v = null;")],
+                 ['L-fsplit-hoverMarks'], ['fsplit']),
+    'sp-cond': ([('main', "        _applyLinkSearch(q);" + N + "        return true;", "        _applyLinkSearch(col + ' = //' + value + '//');" + N + "        return true;")],
+                ['L-fsplit-clickItem', 'L-fsplit-rowsListing'], ['fsplit']),
+    'sp-forced': ([('main', "        if (!document.body.classList.contains('pnb-click-filter') && !td.classList.contains('pnb-cflt')) return null;", "        if (!td.classList.contains('pnb-cflt')) return null;")],
+                  ['L-fsplit-forcedSplit'], ['fsplit']),
+    'sp-gate': ([('main', "        if (!document.body.classList.contains('pnb-click-filter') && !td.classList.contains('pnb-cflt')) return null;" + N, "")], ['L-fsplit-waitsForFilter'], ['fsplit']),
+    'sp-badge': ([('main', "            if (o.split) bits.push({ t: 'SPLIT', own: true, w: 'Split by ' + groupDelimDef(o.split).sym + ': a click filters by the one value clicked' });" + N, "")],
+                 ['L-fsplit-badge'], ['fsplit']),
+    'sp-reset': ([('main', "_pnbColOptWrite(col, { fmt: null, filter: null, split: null, deep: null, hl: null, hlOff: null });", "_pnbColOptWrite(col, { fmt: null, filter: null, deep: null, hl: null, hlOff: null });")],
+                 ['L-fsplit-resetClears'], ['fsplit']),
+    'sp-pop': ([('main', "forced: allFilter, split: _pnbColSplitPop(col, o) } : null,", "forced: allFilter, split: null } : null,")], ['L-fsplit-offered'], ['fsplit']),
+    # the module: no box, never greyed, its greying not following Click to filter, no pick, Reset leaving it ticked, not
+    # counted as the viewer's own (Reset greyed)
+    'sp-box': ([('mod', "(cfg.filter.split ? '<label class=\"pnb-colopt-check pnb-colopt-indent\">", "(false ? '<label class=\"pnb-colopt-check pnb-colopt-indent\">")], ['L-fsplit-offered'], ['fsplit']),
+    'sp-grey': ([('mod', " + (cfg.filter.value || cfg.filter.forced ? '' : ' disabled') + ", " + ")], ['L-fsplit-offered'], ['fsplit']),
+    'sp-sync': ([('mod', "            else if (k === 'filter') { changed('filter', !!t.checked); syncSplitUi(); }", "            else if (k === 'filter') { changed('filter', !!t.checked); }")], ['L-fsplit-enables'], ['fsplit']),
+    'sp-change': ([('mod', "            else if (k === 'split') changed('split', !!t.checked);\n", "")], ['L-fsplit-stored'], ['fsplit']),
+    'sp-resetui': ([('mod', "            var sp = q('[data-co=\"split\"]'); if (sp) sp.checked = false;\n", "")], ['L-fsplit-resetClears'], ['fsplit']),
+    'sp-own': ([('mod', "            if (sp && sp.checked) any = true;\n", "")], ['L-fsplit-resetOnForced'], ['fsplit']),
+    # the help, the stylesheet
+    'sp-help': ([('topic', '(list columns)</td>', '(lists)</td>')], ['S-helpSplit'], []),
+    'sp-css': ([('css', '::highlight(pnb-cflt-item) {', '::highlight(pnb-cflt-none) {')], ['S-cssSplit'], []),
+})
 # (colopt f) checks on the files' text, beside the browser's
 def static_checks(texts):
     idx, hlp, top, stp = texts['index'], texts['help'], texts['topic'], texts['stopic']
@@ -588,6 +640,16 @@ def static_checks(texts):
         ('S-helpFilterRow', '<li><strong>Filter</strong> - click a table cell to filter by that value.</li>' in hlp   # (2026-10-19) the tip store; the topic's <em> wording no longer read here
          and 'Click a value to filter the table' not in hlp
          and 'click a value to filter; vendor code links' not in hlp, ''),
+    ]
+# (2026-11-02, cfsplit) the topic's Split by ; row and SPLIT badge; the stylesheet's mark and its hover rule
+_static_checks0 = static_checks
+def static_checks(texts):
+    top, css = texts['topic'], texts['css']
+    return _static_checks0(texts) + [
+        ('S-helpSplit', '<strong>Filter</strong>: <em>Split by ;</em> (list columns)</td>' in top and '<code>SPLIT</code></td>' in top
+         and 'a separator filters nothing.</td></tr>' in top and chr(0x2014) not in top, ''),
+        ('S-cssSplit', '::highlight(pnb-cflt-item) {' in css and 'td.pnb-cflt.pnb-cflt-split:not(.cell-contains-nested-table):not(:empty):hover' in css
+         and '.pnb-colopt-indent { padding-left: 19px; }' in css, ''),
     ]
 # the checks colopt b brought (live since 16:22) - kept for the record
 NEW_B = {'L-fpanel-' + c for c in ('cogsAll', 'noOldChips', 'restCog', 'cogWidth', 'badgeReads', 'barBadge', 'vcDefault', 'vcOff')} | \
@@ -639,7 +701,23 @@ NEW = NEW_HLHD
 NEW_HLTIP = {'S-helpHl'}
 NEW = NEW_HLTIP
 NEW = set()   # (fltmenu is LIVE since 5eae534, 2026-10-27: S-helpHlHd an old check now)
+# (2026-11-02, cfsplit) a list column's Split by ;: red on live but the two guards (a plain column offers none; off again is
+# the whole cell, as live clicks); the scenarios do not die there (their API calls are no-ops on live)
+NEW_SPLIT = {'L-fsplit-' + c for c in CHK['fsplit'] if c not in ('notOnPlain', 'offWhole')} | {'L-gsplit-' + c for c in CHK['gsplit']} | {'S-helpSplit', 'S-cssSplit'}
+NEW = NEW_SPLIT
+NEW = set()   # (cfsplit is LIVE since 37ecd5d, 2026-11-02: old checks now)
 # NEW = {'S-helpHlHd'}   # (2026-10-27, fltmenu) the topic's Highlight... row and its mention went with the menu item (hltip is live)
+# (2026-11-02, pnt) a total's number text (main.js _pnbNumText, schedule_runner.php penumbra_num_text): 15 significant
+# digits, not toFixed(12)'s binary noise - a sum of cents at 206623.04999999993 shows $206,623.1 at currency:1, not .0.
+# numTie: the page's (hrep) and the email's (P-hl) against the expected text, both red on live; the num list's new
+# cases keep numParity on the pair. Mutants: the old line back in each twin, the email's tie rounded to even
+CHK['hrep'].append('numTie')
+MUTANTS['m-numtext'] = ([('main', 'var s = (mag >= 1e-6 && mag < 1e14) ? v.toPrecision(15) : mag >= 1e21 ? String(v) : v.toFixed(12);',
+                          'var s = mag >= 1e21 ? String(v) : v.toFixed(12);')], ['L-hrep-numTie', 'P-hl-numParity'], ['hrep'])
+MUTANTS['s-numtext'] = ([('sr', '    if ($mag >= 1e-6 && $mag < 1e14) {', '    if (false) {')], ['P-hl-numTie', 'P-hl-numParity'], ['hrep'])
+MUTANTS['s-numtie'] = ([('sr', "        if ($dg[$k] >= '5') {", "        if ($dg[$k] > '5') {")], ['P-hl-numTie', 'P-hl-numParity'], ['hrep'])
+NEW = {'L-hrep-numTie', 'P-hl-numTie'}
+NEW = set()   # (pnt is LIVE since c5451f9, 2026-11-02: old checks now)
 
 args = sys.argv[1:]
 def opt(name, default=None):

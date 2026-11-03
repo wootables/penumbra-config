@@ -70,6 +70,15 @@ def build(index_src):
         '      r.H_ENT = "@@JSON" + JSON.stringify([{ ENT_KIND: (i % 3 ? "Lab" : "Field"), SUB_NAME: (i % 2 ? "Alpha" : "Bravo") }]);\n'
         '    });\n'
         '    window.__rowsFixture = rows;\n')
+    # (2026-11-02, cfsplit 3) mfvsplit: V_NAME a semicolon list of "Last, First" names (colopt's fsplit fixture: one to three
+    # a row, row 2 repeating one, row 3 with white space round its ;) - Filter by value's Split by ; tab opens first on it
+    rep('    window.__rowsFixture = rows;\n',
+        '    if (window.__SCN === "mfvsplit" || window.__SCN === "mitem") rows.forEach(function (r, i) {\n'
+        '      var P = ["Palmtag, Scott", "Smith, Jo", "Nguyen, An", "Okafor, Ada", "Berg, Lena", "Diaz, Rosa", "Kim, Min", "Lund, Ola"], l = [];\n'
+        '      for (var k = 0; k <= i % 3; k++) l.push(P[(i * 3 + k * 5) % P.length]);\n'
+        '      r.V_NAME = i === 1 ? "Smith, Jo;Smith, Jo" : (i === 2 ? "Kim, Min ; Lund, Ola" : l.join(";"));\n'
+        '    });\n'
+        '    window.__rowsFixture = rows;\n')
     # ...gchipnest: the status bar's grouping chip and its card, lifted from the index.php under test (main.js _sbRenderGrpPop
     # draws its column list), written there alone (the page has not set __SCN yet): every other scenario keeps its bar
     if index_src is not None:

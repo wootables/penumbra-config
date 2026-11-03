@@ -36,6 +36,10 @@
 //            without the dialog's list; the email's fixtures (test_colopt.php hl)
 //   hrview   a viewer: no changing the report's rules, Off for me, their own on top
 //   hrsave   the Save dialog's Last Stop Changes list, the save, the report after it
+//   (2026-11-02, cfsplit) a list column's Split by ; under Filter (V_NAME a semicolon list here, mk_harness):
+//   fsplit   offered and greyed, stored, its cells, a click on one value, a separator, a cell of one value, Enter,
+//            the mark as the pointer moves, off again, the SPLIT badge, Reset, the report's Click-to-Filter
+//   gsplit   the grouped view's copies
 (function () {
   var SCN = window.__SCN;
   var R = { scn: SCN, chk: {}, info: {}, notes: [] };
@@ -237,14 +241,44 @@
       window.__rowsFixture.forEach(function (r) { ['currency:0', 'number:2', 'percent:1', 'currency'].forEach(function (s) { fmt.push([r.V_AMOUNT, s, F.formatValue(r.V_AMOUNT, s)]); }); });
       [13456789.12, 12345.499999999998, 12345.5, 99999999.995, 1.005, 0.125, 2.5, -2.5, 1e-7, 0.1 + 0.2, 123.45678901234568, -0.0000001, 4.35 * 100, 1 / 3, 7]
         .forEach(function (f) { ['number:2', 'number:0', 'currency:0', 'currency', 'percent:1', 'number:4'].forEach(function (s) { num.push([f, s, F.formatValue(HC.numText(f), s)]); }); });
+      // (2026-11-02, pnt) totals of cents that land just under a 5: the format rounds what was added up, not
+      // the binary noise (413 cents values add up to 206623.04999999993); an exact tie rounds up as toPrecision
+      var cents = 0, tie = [];
+      for (var ci = 1; ci <= 413; ci++) cents += (ci * 7919 % 99991) / 100;
+      [[cents, 'currency:1', '$206,623.1'], [720750.0499999999, 'currency:1', '$720,750.1'], [50000.45, 'currency:1', '$50,000.5'], [123456.15, 'number:1', '123,456.2'],
+       [-123456.15, 'currency:1', '-$123,456.2'], [46327812889827.25, 'number:1', '46,327,812,889,827.3'], [0.30000000000000004, 'number:4', '0.3000']]
+        .forEach(function (c) { tie.push([c[0], c[1], c[2], F.formatValue(HC.numText(c[0]), c[1])]); });
+      [cents, 720750.0499999999, 50000.45, 46327812889827.25, -12345678901234.75, 999999.9999999999]
+        .forEach(function (f) { ['number:2', 'number:0', 'currency:0', 'currency', 'percent:1', 'number:4'].forEach(function (s) { num.push([f, s, F.formatValue(HC.numText(f), s)]); }); });
       ['color: red', 'COLOR : Red ;; background-color:#fff', 'color: red; color: blue', 'font-weight: bold; foo: bar', 'background-color: url(x)', 'color: rgb(1, 2, 3)',
         'color: rgb(1, 2, 3', 'color: )(', "font-family: 'Courier New', monospace", 'color: expression(alert(1))',
         'border: 1px solid #ccc; border-left: 4px solid var(--accent-danger, #c62828)', 'text-decoration: line-through underline', 'transform: rotate(2deg)',
         'font-size: 120%', 'color: "red"', 'color: red /* x */', 'color: javascript:1', 'color: a@b', 'width: 10px', ':color red', 'color:', 'color: ' + new Array(125).join('a'),
         'background-color: var(--pnb-hl-amber, #fbe8a6); color: var(--accent-danger, #c62828); font-weight: bold; font-style: italic; text-decoration: line-through']
         .forEach(function (s) { css.push([s, F.cleanCss(s).css]); });
-      return { fmt: fmt, num: num, css: css };
+      return { fmt: fmt, num: num, css: css, tie: tie };
     };
+    return K;
+  }
+
+  // ---- (2026-11-02, cfsplit) a list column's values in a cell: where each stands, a click or a move there, the mark
+  function splitKit() {
+    var K = {};
+    K.parts = function (td) { return td.textContent.split(';').map(function (x) { return x.trim(); }); };
+    // cells of n different values, none with white space round a separator
+    K.cells = function (n) {
+      return colCells('V_NAME').filter(function (td) { var p = K.parts(td); return p.length === n && !/ ; /.test(td.textContent) && p.filter(function (x, i) { return p.indexOf(x) === i; }).length === n; });
+    };
+    K.cond = function (v) { var FS = window.PenumbraTiles && window.PenumbraTiles.strip; return (FS && FS.itemCond) ? FS.itemCond('V_NAME', 'dsemi', [v]) : '(no strip lib)'; };
+    K.listing = function (v) { return window.__rowsFixture.filter(function (r) { return r.V_NAME.split(';').map(function (x) { return x.trim(); }).indexOf(v) !== -1; }).length; };
+    // the first box of [s, e) of the cell's text (one text node), its middle, a value's middle
+    K.box = function (td, s, e) { var n = td.firstChild, r = document.createRange(); if (!n || n.nodeType !== 3) return null; r.setStart(n, s); r.setEnd(n, e); return r.getClientRects()[0] || null; };
+    K.mid = function (td, s, e) { var b = K.box(td, s, e); return b ? { x: b.left + b.width / 2, y: b.top + b.height / 2 } : null; };
+    K.at = function (td, v) { var s = td.textContent.indexOf(v); return s < 0 ? null : K.mid(td, s, s + v.length); };
+    K.click = function (td, pt) { td.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: pt.x, clientY: pt.y })); };
+    K.move = function (td, pt) { td.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: pt.x, clientY: pt.y })); };
+    K.marked = function () { var h = window.CSS && CSS.highlights && CSS.highlights.get('pnb-cflt-item'); return h ? Array.from(h).map(function (r) { return r.toString(); }) : []; };
+    K.clear = async function () { $('#tableSearch').val(''); window.__HC.runSearch(); await sleep(400); };
     return K;
   }
 
@@ -1862,6 +1896,8 @@
       R.info.email = K.emailFix();
       R.info.when = K.whenFix();
       R.info.unit = K.unitFix();
+      R.chk.numTie = R.info.unit.tie.every(function (c) { return c[3] === c[2]; });
+      R.info.numTie = R.info.unit.tie.filter(function (c) { return c[3] !== c[2]; });
       R.info.rowsAll = window.__rowsFixture.map(function (r) {
         var o = {};
         Object.keys(r).forEach(function (k) { if (!/^(V_LINK|H_HTML|H_JSON)$/.test(k)) o[k] = r[k]; });
@@ -2393,6 +2429,172 @@
     // viewer's header rule with a typo'd fill keeps the gradient and its own text color. The snippet emptied: every header
     // format(header) drew is as it was (resetCellStates returns early with no rule, and nothing draws after), the viewer's
     // rule kept
+    // (2026-11-02, cfsplit) A list column's Split by ; under Filter. V_NAME holds semicolon lists of "Last, First"
+    // names here (mk_harness: one to three a row; row 2 repeats one, row 3 has white space round its ;)
+    fsplit: async function () {
+      var K = splitKit();
+      document.getElementById('saveStateLightbox').style.display = 'none';   // (its Enter-to-save takes every Enter while shown)
+      openPanel();
+      await sleep(450);
+      // offered on the list column - greyed while its Click to filter is off, its hint tied to it - never on a plain one
+      cogOf('V_NAME').click();
+      var pop = popover(), sb = pop && pop.querySelector('[data-sec="filter"] [data-co="split"]');
+      var sbTxt = sb ? sb.parentNode.textContent.replace(/\s+/g, ' ').trim() : '', hint = sb ? document.getElementById(sb.getAttribute('aria-describedby') || '') : null;
+      R.chk.offered = !!sb && sbTxt === 'Split by ;' && sb.disabled && !sb.checked && !!hint && pop.contains(hint) && /list holds the value clicked/.test(hint.textContent);
+      closeAll(); await sleep(60);
+      cogOf('V_STATUS').click();
+      var pst = popover();
+      R.chk.notOnPlain = !!pst && !!pst.querySelector('[data-co="filter"]') && !pst.querySelector('[data-co="split"]');
+      closeAll(); await sleep(60);
+      // ticking Click to filter lets it be ticked; ticked, it stores the list's separator
+      cogOf('V_NAME').click();
+      pop = popover();
+      var fb = pop.querySelector('[data-co="filter"]');
+      fb.checked = true; fire(fb, 'change');
+      sb = pop.querySelector('[data-co="split"]');
+      R.chk.enables = !!sb && !sb.disabled;
+      if (sb) { sb.checked = true; fire(sb, 'change'); }
+      var co = colopt();
+      R.chk.stored = !!co && !!co.V_NAME && co.V_NAME.split === 'dsemi' && co.V_NAME.filter === true;
+      closeAll(); await sleep(60);
+      // its cells say so (a plain column's do not)
+      var nm = colCells('V_NAME'), stc = colCells('V_STATUS');
+      R.chk.classOn = nm.length > 50 && nm.every(function (td) { return td.classList.contains('pnb-cflt-split') && td.classList.contains('pnb-cflt'); })
+        && stc.length > 0 && stc.every(function (td) { return !td.classList.contains('pnb-cflt-split'); });
+      // a click on the second value of a cell listing three: the rows whose list holds it (every one of them)
+      // (the pointer moves there first, as a person's does: the value is marked when the click comes)
+      var c3 = K.cells(3)[0], v2 = c3 ? K.parts(c3)[1] : '', p2 = c3 ? K.at(c3, v2) : null;
+      if (p2) { K.move(c3, p2); K.click(c3, p2); }
+      await sleep(400);
+      R.chk.clickItem = !!p2 && searchVal() === K.cond(v2);
+      var shown = colCells('V_NAME'), lists = K.listing(v2);
+      R.chk.rowsListing = lists > 0 && shown.length === Math.min(lists, 200) && shown.every(function (td) { return K.parts(td).indexOf(v2) !== -1; });
+      // ...and the pointer still over that value (its row moved up under the filter) marks it again
+      var p2b = (c3 && c3.isConnected) ? K.at(c3, v2) : null;
+      if (p2b) K.move(c3, p2b);
+      var mr = K.marked();
+      R.chk.reMark = !!p2b && mr.length === 1 && mr[0] === v2;
+      R.info.click = { v2: v2, search: searchVal(), shown: shown.length, lists: lists, p2: p2 };
+      await K.clear();
+      // a click on a separator (white space round it): nothing
+      var cs = colCells('V_NAME').filter(function (td) { return / ; /.test(td.textContent); })[0];
+      var si = cs ? cs.textContent.indexOf(';') : -1, ps = si >= 0 ? K.mid(cs, si, si + 1) : null;
+      if (ps) K.click(cs, ps);
+      await sleep(300);
+      R.chk.sepInert = !!ps && searchVal() === '';
+      await K.clear();
+      // a cell of one value: a click anywhere in it - past its text - filters by it
+      var c1 = K.cells(1).filter(function (td) { return td.textContent.indexOf(';') < 0; })[0];
+      var r1 = c1 ? c1.getBoundingClientRect() : null, t1 = c1 ? K.box(c1, 0, c1.textContent.length) : null;
+      var x1 = r1 ? r1.right - 3 : 0;
+      if (c1) K.click(c1, { x: x1, y: r1.top + r1.height / 2 });
+      await sleep(400);
+      R.chk.oneAnywhere = !!c1 && !!t1 && x1 > t1.right + 4 && searchVal() === K.cond(c1.textContent.trim());
+      R.info.one = { v: c1 && c1.textContent, x1: x1, tr: t1 && t1.right, search: searchVal() };
+      await K.clear();
+      // ...and a cell repeating one value holds ONE value: its separator filters by it
+      var cd = colCells('V_NAME').filter(function (td) { return td.textContent === 'Smith, Jo;Smith, Jo'; })[0];
+      var di = cd ? cd.textContent.indexOf(';') : -1, pd = di >= 0 ? K.mid(cd, di, di + 1) : null;
+      if (pd) K.click(cd, pd);
+      await sleep(400);
+      R.chk.dupOne = !!pd && searchVal() === K.cond('Smith, Jo');
+      await K.clear();
+      // Enter: a cell of one value filters by it; a cell listing several waits for a click
+      var e1 = K.cells(1).filter(function (td) { return td.textContent.indexOf(';') < 0; })[1];
+      if (e1) { e1.setAttribute('tabindex', '-1'); e1.focus(); e1.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); }
+      await sleep(400);
+      R.chk.enterOne = !!e1 && searchVal() === K.cond(e1.textContent.trim());
+      await K.clear();
+      var e3 = K.cells(3)[1];
+      if (e3) { e3.setAttribute('tabindex', '-1'); e3.focus(); e3.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); }
+      await sleep(300);
+      R.chk.enterManyInert = !!e3 && searchVal() === '';
+      await K.clear();   // (live filters there: the steps after start from every row)
+      // the value a click would take is marked as the pointer moves - every place it stands, its text alone -
+      // nothing over a separator, nothing once the pointer leaves
+      var hv = K.cells(3)[0], hp = hv ? K.at(hv, K.parts(hv)[1]) : null;
+      if (hp) K.move(hv, hp);
+      var m1 = K.marked();
+      var hs = colCells('V_NAME').filter(function (td) { return / ; /.test(td.textContent); })[0], hsi = hs ? hs.textContent.indexOf(';') : -1;
+      if (hsi >= 0) K.move(hs, K.mid(hs, hsi, hsi + 1));
+      var m2 = K.marked();
+      if (hs) K.move(hs, K.at(hs, 'Lund, Ola'));
+      var m3 = K.marked();
+      if (hs) hs.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }));
+      var m4 = K.marked();
+      R.chk.hoverMarks = !!hp && m1.length === 1 && m1[0] === K.parts(hv)[1] && m2.length === 0 && m3.length === 1 && m3[0] === 'Lund, Ola' && m4.length === 0;
+      R.info.marks = [m1, m2, m3, m4];
+      // Split by ; off: the whole cell, as before
+      window.Penumbra.setColOpt('V_NAME', 'split', false);
+      var w2 = K.cells(2).filter(function (td) { var p = K.parts(td); return !/ ; /.test(td.textContent) && p[0] !== p[1]; })[0];
+      var wp = w2 ? K.at(w2, K.parts(w2)[1]) : null, wt = w2 ? w2.textContent.trim() : '';
+      if (wp) K.click(w2, wp);
+      await sleep(400);
+      R.chk.offWhole = !!wp && searchVal() === 'V_NAME = //' + wt + '//' && !(colopt() && colopt().V_NAME && colopt().V_NAME.split)
+        && colCells('V_NAME').every(function (td) { return !td.classList.contains('pnb-cflt-split'); });
+      R.info.off = { wt: wt, search: searchVal() };
+      await K.clear();
+      // the badge: SPLIT, the viewer's own, in words - with the column's Click to filter off it waits for one: a
+      // click filters nothing, no value is marked
+      window.Penumbra.setColOpt('V_NAME', 'filter', false);
+      window.Penumbra.setColOpt('V_NAME', 'split', true);
+      await sleep(30);
+      var bd = badgesOf('V_NAME'), cg = cogOf('V_NAME'), cgt = cg ? (cg.getAttribute('title') || '') : '';
+      R.chk.badge = bd.some(function (b) { return b.t === 'SPLIT' && b.own; }) && !bd.some(function (b) { return b.t === 'FILTER'; })
+        && cgt.indexOf('Split by ;: a click filters by the one value clicked') !== -1 && cg.classList.contains('is-custom');
+      R.info.badge = { bd: bd, cgt: cgt };
+      var wc = K.cells(3)[0], wv = wc ? K.at(wc, K.parts(wc)[1]) : null;
+      if (wv) { K.move(wc, wv); K.click(wc, wv); }
+      await sleep(300);
+      R.chk.waitsForFilter = !!wv && searchVal() === '' && K.marked().length === 0
+        && colCells('V_NAME').every(function (td) { return td.classList.contains('pnb-cflt-split') && !td.classList.contains('pnb-cflt'); });
+      // Reset takes it away: unticked and greyed again, the cells plain
+      cogOf('V_NAME').click();
+      pop = popover();
+      var rb = pop && pop.querySelector('[data-co="reset"]');
+      if (rb) rb.click();
+      await sleep(60);
+      sb = pop && pop.querySelector('[data-co="split"]');
+      co = colopt();
+      R.chk.resetClears = !!rb && !!sb && !sb.checked && sb.disabled && !(co && co.V_NAME) && colCells('V_NAME').every(function (td) { return !td.classList.contains('pnb-cflt-split'); });
+      closeAll(); await sleep(60);
+      // the report's Click-to-Filter (every column): Split by ; is the viewer's to tick there (Reset then offered),
+      // and works with no Click to filter of the column's own
+      document.body.classList.add('pnb-click-filter');
+      cogOf('V_NAME').click();
+      pop = popover();
+      fb = pop && pop.querySelector('[data-co="filter"]'); sb = pop && pop.querySelector('[data-co="split"]');
+      var forcedUi = !!fb && fb.checked && fb.disabled && !!sb && !sb.disabled && !sb.checked;
+      if (sb) { sb.checked = true; fire(sb, 'change'); }
+      rb = pop && pop.querySelector('[data-co="reset"]');
+      R.chk.resetOnForced = !!rb && !rb.disabled;
+      closeAll(); await sleep(60);
+      var fc = K.cells(3)[0], fv = fc ? K.parts(fc)[2] : '', fp = fc ? K.at(fc, fv) : null;
+      if (fp) K.click(fc, fp);
+      await sleep(400);
+      R.chk.forcedSplit = forcedUi && !!fp && searchVal() === K.cond(fv);
+      document.body.classList.remove('pnb-click-filter');
+      await K.clear();
+    },
+    // (cfsplit) the grouped view's copies of the cells (grouped by H_GROUP, every level open)
+    gsplit: async function () {
+      var K = splitKit();
+      window.Penumbra.setColOpt('V_NAME', 'filter', true);
+      window.Penumbra.setColOpt('V_NAME', 'split', true);
+      await sleep(300);
+      var gc = [];
+      Array.prototype.forEach.call(document.querySelectorAll('#groupedResultsContainer table'), function (t) {
+        var ths = Array.prototype.slice.call(t.querySelectorAll('thead th')), i = ths.findIndex(function (th) { return th.dataset.colname === 'V_NAME'; });
+        if (i < 0) return;
+        Array.prototype.forEach.call(t.querySelectorAll('tbody tr'), function (tr) { if (tr.children[i]) gc.push(tr.children[i]); });
+      });
+      R.chk.groupedClass = gc.length > 50 && gc.every(function (td) { return td.classList.contains('pnb-cflt-split'); });
+      var g3 = gc.filter(function (td) { return isShown(td) && K.parts(td).length === 3; })[0], gv = g3 ? K.parts(g3)[1] : '', gp = g3 ? K.at(g3, gv) : null;
+      if (gp) K.click(g3, gp);
+      await sleep(500);
+      R.chk.groupedClick = !!gp && searchVal() === K.cond(gv);
+      R.info = { n: gc.length, gv: gv, search: searchVal() };
+    },
     hlhdbad: async function () {
       function hth(c) { return document.querySelector('#tableHeader th[data-colname="' + c + '"]'); }
       await sleep(300);

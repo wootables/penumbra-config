@@ -26,6 +26,10 @@ NEW = {'P-pillThemed', 'P-pillRuled'}   # (cfb8: the pill outlined as on screen)
 NEW = set()   # (cfb8 is LIVE since e1c835f: the control expects every check green)
 NEW = {'P-cfgSentSize', 'P-notes'}   # (csz: the size shown at save, the notes)
 NEW = set()   # (csz is LIVE since 4cda1d2: the control expects every check green)
+NEW = {'P-cutNoHeads', 'P-rankFast', 'S-changeNoCards'}   # (cnest sweep: the cut's headings, the rank's search, change analysis as tables)
+NEW = set()   # (cnest is LIVE since ab526da: the control expects every check green)
+NEW = {'P-pctShown'}   # (csw2: a Percent format's bar by its shown text)
+NEW = set()   # (csw2 is LIVE since a7d63c3: the control expects every check green)
 EITHER = {'P-budget'}
 MUTANTS = {
     'm-open': ([('inc', "    if (!$c || empty($c['open']) || !isset($c['sent']) || !is_array($c['sent'])) return null;", "    if (!$c || !isset($c['sent']) || !is_array($c['sent'])) return null;")], ['P-cfgNoOpen']),
@@ -46,7 +50,14 @@ MUTANTS = {
     'm-hidden': ([('inc', "    $pick = function ($n) use ($have) { return ($n !== '' && isset($have[$n])) ? $n : ''; };", "    $pick = function ($n) use ($have) { return $n; };")], ['P-noWarnings']),
     'm-budget': ([('inc', "            if ($budget > 0 && $bytes + strlen($card) > $budget) { $cut = true; continue; }\n", "")], ['P-budget']),
     'm-heads': ([('inc', "        if ($sc['name'] !== null) {\n", "        if (false) {\n")], ['P-groupHeads']),
-    'm-rank': ([('inc', "    return (($a + $b - 1) / 2) / ($n - 1) * 100;", "    return $b / $n * 100;")], ['P-bars']),
+    'm-rank': ([('inc', "    return (($a + $lo - 1) / 2) / ($n - 1) * 100;", "    return $lo / $n * 100;")], ['P-bars', 'P-rankSame']),   # (cnest: re-anchored)
+    # (cnest sweep) the cut's headings / the rank's scan back / change analysis as cards
+    'cn-heads': ([('inc', "        if ($cut && !$cells) continue;   // (cnest sweep)", "        // (cnest sweep)")], ['P-cutNoHeads']),
+    'cn-scan': ([('inc', "    $lo = 0; $hi = $n; while ($lo < $hi) { $md = ($lo + $hi) >> 1; if ($vals[$md] < $v) $lo = $md + 1; else $hi = $md; }", "    $lo = 0; while ($lo < $n && $vals[$lo] < $v) $lo++; for ($w = 0; $w < $n; $w++) { $vals[$w] = $vals[$w]; }")], ['P-rankFast']),
+    'cn-change': ([('run', "                    $GLOBALS['penumbra_cards_email'] = null;   // (cnest sweep)", "                    // (cnest sweep)")], ['S-changeNoCards']),
+    # (csw2) the bar's shown percentage: not passed / not read
+    'w2-pctcall': ([('inc', "$vals, $rc['html']);", "$vals);")], ['P-pctShown']),
+    'w2-pctread': ([('inc', "    if ($st !== '' && preg_match", "    if (false && preg_match")], ['P-pctShown']),
     'm-labels': ([('inc', "($cfg['nolabels'] ? '' :", "(false ? '' :")], ['P-nolabels']),
     'm-rowcss': ([('inc', "            $cs = (is_array($f['row']) && isset($f['row']['background-color']))", "            $cs = (false && isset($f['row']['background-color']))")], ['P-rowCss']),
     # schedule_runner.php

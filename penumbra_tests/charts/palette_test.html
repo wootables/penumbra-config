@@ -134,10 +134,15 @@ try {
        return true;
      })());
 
-  // ══ 3. EVERY PALETTE FILLS TEN SLOTS AND REPEATS NONE ══════════════════
+  // ══ 3. EVERY PALETTE FILLS ITS SLOTS AND REPEATS NONE ══════════════════
+  // The hue palettes carry PENUMBRA_PALETTE_SIZE colours; mono carries 20
+  // since gmono (2026-11-02): 9 main lightness rungs plus 10 half-step
+  // fills, so a Gantt coloured by a 13-value column stops wrapping into
+  // exact repeats at series 11.
   for (var k = 0; k < pn.length; k++) {
     var pal = P.build(pn[k], MATRIX);
-    eq('build: ' + pn[k] + ' fills all ' + P.SIZE + ' slots', pal.length, P.SIZE);
+    var wantLen = pn[k] === 'mono' ? 20 : P.SIZE;
+    eq('build: ' + pn[k] + ' fills all ' + wantLen + ' slots', pal.length, wantLen);
     var seen = {}, dupe = false, bad = false;
     for (var q = 0; q < pal.length; q++) {
       if (seen[pal[q].toString()]) dupe = true;
@@ -210,6 +215,40 @@ try {
   // ever use - get the whole range instead of one corner of it.
   ok('mono: the first four are spread, not adjacent rungs',
      minSepN(mono, 4) > 0.10, 'minSep4=' + minSepN(mono, 4).toFixed(4));
+
+  // ── 6b. gmono (2026-11-02): mono holds up at DEPTH ─────────────────────
+  // A chart asks for colours by index and _penumbraPaletteRgb wraps at the
+  // palette's length, so the measure that matters past ten series is over
+  // the WRAPPED sequence - the old ten-colour mono scored exactly 0 at 13
+  // series (three pairs of identical Gantt bars, measured live). Driven on
+  // three brand shapes: Matrix (brand pinned bright), Wolfpack red (dark,
+  // saturated - the brand whose tints clip, which is what the chroma cap
+  // is for; uncapped, clipping bends red toward orange, drift 0.134), and
+  // Solarized blue (mid-lightness - the brand a one-sided ladder ruins,
+  // 0.0019 measured with the dark half removed).
+  function wrapSep(pal, n) {
+    var u = [];
+    for (var wi = 0; wi < n; wi++) u.push(pal[wi % pal.length]);
+    return minSep(u);
+  }
+  var WOLFPACK = [153, 0, 0], SOLBLUE = [38, 139, 210];
+  var monoR = P.build('mono', WOLFPACK), monoB = P.build('mono', SOLBLUE);
+  eq('mono: carries twenty colours', mono.length, 20);
+  ok('mono: thirteen series stay apart on Matrix', wrapSep(mono, 13) > 0.03,
+     'sep13=' + wrapSep(mono, 13).toFixed(4));
+  ok('mono: thirteen series stay apart on Wolfpack red', wrapSep(monoR, 13) > 0.03,
+     'sep13=' + wrapSep(monoR, 13).toFixed(4));
+  ok('mono: thirteen series stay apart on Solarized blue', wrapSep(monoB, 13) > 0.03,
+     'sep13=' + wrapSep(monoB, 13).toFixed(4));
+  ok('mono: all twenty stay apart on Wolfpack red', minSep(monoR) > 0.03,
+     'sep20=' + minSep(monoR).toFixed(4));
+  var hueR = Math.atan2(P.lab(monoR[0])[2], P.lab(monoR[0])[1]), driftR = 0;
+  for (var rj = 0; rj < monoR.length; rj++) {
+    var labR = P.lab(monoR[rj]);
+    driftR = Math.max(driftR, Math.abs(Math.atan2(labR[2], labR[1]) - hueR));
+  }
+  ok('mono: the chroma cap keeps the hue steady on a dark saturated brand',
+     driftR < 0.06, 'drift=' + driftR.toFixed(4));
 
   // ══ 7. classic IS FROZEN, AND IGNORES THE THEME ════════════════════════
   // These are the exact values charts used before palettes existed. Someone

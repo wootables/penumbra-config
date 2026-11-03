@@ -502,22 +502,22 @@
     {
         "name":  "R gantt: the builder emits a vis() call of its own type",
         "pass":  true,
-        "detail":  "vis(\u0027gantt\u0027, \u0027AWARD_ID\u0027, \u0027START_DATE\u0027, \u0027END_DATE\u0027, \u0027sum\u0027, 16, \u0027RT gantt\u0027, true, "
+        "detail":  "vis(\u0027gantt\u0027, \u0027AWARD_ID\u0027, \u0027START_DATE\u0027, \u0027END_DATE\u0027, \u0027sum\u0027, 9999, \u0027RT gantt\u0027, true"
     },
     {
         "name":  "R gantt: vis() -\u003e parse -\u003e reopen -\u003e vis() is the same call",
         "pass":  true,
-        "detail":  "got \"vis(\u0027gantt\u0027, \u0027AWARD_ID\u0027, \u0027START_DATE\u0027, \u0027END_DATE\u0027, \u0027sum\u0027, 16, \u0027RT gantt\u0027, true, true, \u0027100%\u0027, 530, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027duration\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027today\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027gantt\u0027, \u0027AWARD_ID\u0027, \u0027START_DATE\u0027, \u0027END_DATE\u0027, \u0027sum\u0027, 16, \u0027RT gantt\u0027, true, true, \u0027100%\u0027, 530, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027duration\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027today\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+        "detail":  "got \"vis(\u0027gantt\u0027, \u0027AWARD_ID\u0027, \u0027START_DATE\u0027, \u0027END_DATE\u0027, \u0027sum\u0027, 9999, \u0027RT gantt\u0027, true, true, \u0027100%\u0027, 530, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027duration\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027fy24\u0027, \u0027today+1y\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027today\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"},\\\"colorBy\\\":\\\"STATUS\\\"}\u0027)\" | want \"vis(\u0027gantt\u0027, \u0027AWARD_ID\u0027, \u0027START_DATE\u0027, \u0027END_DATE\u0027, \u0027sum\u0027, 9999, \u0027RT gantt\u0027, true, true, \u0027100%\u0027, 530, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027duration\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027fy24\u0027, \u0027today+1y\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027today\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"},\\\"colorBy\\\":\\\"STATUS\\\"}\u0027)\""
     },
     {
         "name":  "R gantt: preset snapshot -\u003e apply -\u003e snapshot is the same",
         "pass":  true,
-        "detail":  "got {\"type\":\"gantt\",\"xAxis\":\"AWARD_ID\",\"yAxis\":\"START_DATE\",\"groupBy\":\"END_DATE\",\"agg\":\"sum\",\"limit\":16,\"title\":\"RT gantt\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"530\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"duration\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"today\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"} | want {\"type\":\"gantt\",\"xAxis\":\"AWARD_ID\",\"yAxis\":\"START_DATE\",\"groupBy\":\"END_DATE\",\"agg\":\"sum\",\"limit\":16,\"title\":\"RT gantt\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"530\",\"yMin\":\"\",\"yMax\":\"\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"duration\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"today\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\"}"
+        "detail":  "got {\"type\":\"gantt\",\"xAxis\":\"AWARD_ID\",\"yAxis\":\"START_DATE\",\"groupBy\":\"END_DATE\",\"agg\":\"sum\",\"limit\":9999,\"title\":\"RT gantt\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"530\",\"yMin\":\"fy24\",\"yMax\":\"today+1y\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"duration\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"today\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"},\\\"colorBy\\\":\\\"STATUS\\\"}\"} | want {\"type\":\"gantt\",\"xAxis\":\"AWARD_ID\",\"yAxis\":\"START_DATE\",\"groupBy\":\"END_DATE\",\"agg\":\"sum\",\"limit\":9999,\"title\":\"RT gantt\",\"subtitle\":\"\",\"xAxisLabel\":\"\",\"yAxisLabel\":\"\",\"titlePos\":\"top\",\"legendPos\":\"bottom\",\"legend\":true,\"valuePos\":\"auto\",\"values\":true,\"width\":\"100%\",\"height\":\"530\",\"yMin\":\"fy24\",\"yMax\":\"today+1y\",\"logScale\":false,\"stacked\":false,\"stackOrder\":\"default\",\"normalize\":false,\"horizontal\":false,\"filterXAxis\":true,\"filterGroup\":false,\"otherBucket\":false,\"sortBy\":\"duration\",\"sortDir\":\"desc\",\"trendLine\":\"none\",\"referenceLine\":\"today\",\"showSettings\":true,\"filterExpression\":\"STATUS != Declined\",\"vizOptions\":\"{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"},\\\"colorBy\\\":\\\"STATUS\\\"}\"}"
     },
     {
         "name":  "R gantt: a reapplied preset emits the same vis() call",
         "pass":  true,
-        "detail":  "got \"vis(\u0027gantt\u0027, \u0027AWARD_ID\u0027, \u0027START_DATE\u0027, \u0027END_DATE\u0027, \u0027sum\u0027, 16, \u0027RT gantt\u0027, true, true, \u0027100%\u0027, 530, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027duration\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027today\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\" | want \"vis(\u0027gantt\u0027, \u0027AWARD_ID\u0027, \u0027START_DATE\u0027, \u0027END_DATE\u0027, \u0027sum\u0027, 16, \u0027RT gantt\u0027, true, true, \u0027100%\u0027, 530, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027duration\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027today\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"}}\u0027)\""
+        "detail":  "got \"vis(\u0027gantt\u0027, \u0027AWARD_ID\u0027, \u0027START_DATE\u0027, \u0027END_DATE\u0027, \u0027sum\u0027, 9999, \u0027RT gantt\u0027, true, true, \u0027100%\u0027, 530, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027duration\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027fy24\u0027, \u0027today+1y\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027today\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"},\\\"colorBy\\\":\\\"STATUS\\\"}\u0027)\" | want \"vis(\u0027gantt\u0027, \u0027AWARD_ID\u0027, \u0027START_DATE\u0027, \u0027END_DATE\u0027, \u0027sum\u0027, 9999, \u0027RT gantt\u0027, true, true, \u0027100%\u0027, 530, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027duration\u0027, \u0027desc\u0027, \u0027default\u0027, false, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, true, false, false, \u0027fy24\u0027, \u0027today+1y\u0027, \u0027\u0027, \u0027none\u0027, false, true, \u0027STATUS != Declined\u0027, \u0027today\u0027, \u0027\u0027, \u0027\u0027, \u0027\u0027, false, \u0027{\\\"format\\\":{\\\"style\\\":\\\"compact\\\"},\\\"colorBy\\\":\\\"STATUS\\\"}\u0027)\""
     },
     {
         "name":  "R map: the builder emits a vis() call of its own type",
@@ -1207,7 +1207,7 @@
     {
         "name":  "A gantt: the canvas is labelled for screen readers",
         "pass":  true,
-        "detail":  "Gantt chart: RT gantt. 16 rows; full data in the adjacent table."
+        "detail":  "Gantt chart: RT gantt. 38 rows; full data in the adjacent table."
     },
     {
         "name":  "A gantt: a data table sits beside the chart, with rows",
@@ -1623,5 +1623,180 @@
         "name":  "K bar: ...and opens it",
         "pass":  true,
         "detail":  "[\"[[\\\"DEPT\\\",\\\"Agriculture\\\"]]\"]"
+    },
+    {
+        "name":  "T the header API has timelineCols and chartTimeline",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "T two dates: start, end and the text column with the most distinct values",
+        "pass":  true,
+        "detail":  "got {\"start\":\"START_DATE\",\"end\":\"END_DATE\",\"label\":\"AWARD_ID\"} | want {\"start\":\"START_DATE\",\"end\":\"END_DATE\",\"label\":\"AWARD_ID\"}"
+    },
+    {
+        "name":  "T ...whatever the card title is",
+        "pass":  true,
+        "detail":  "got \"AWARD_ID\" | want \"AWARD_ID\""
+    },
+    {
+        "name":  "T the start is the date named like a start",
+        "pass":  true,
+        "detail":  "got \"START_DATE\" | want \"START_DATE\""
+    },
+    {
+        "name":  "T the end is the date named like an end",
+        "pass":  true,
+        "detail":  "got \"END_DATE\" | want \"END_DATE\""
+    },
+    {
+        "name":  "T one date column = no Timeline row",
+        "pass":  true,
+        "detail":  "got null | want null"
+    },
+    {
+        "name":  "T no colKinds = no Timeline row",
+        "pass":  true,
+        "detail":  "got null | want null"
+    },
+    {
+        "name":  "T the builder is a Gantt",
+        "pass":  true,
+        "detail":  "got \"gantt\" | want \"gantt\""
+    },
+    {
+        "name":  "T one bar per the label",
+        "pass":  true,
+        "detail":  "got \"AWARD_ID\" | want \"AWARD_ID\""
+    },
+    {
+        "name":  "T from the start column",
+        "pass":  true,
+        "detail":  "got \"START_DATE\" | want \"START_DATE\""
+    },
+    {
+        "name":  "T to the end column",
+        "pass":  true,
+        "detail":  "got \"END_DATE\" | want \"END_DATE\""
+    },
+    {
+        "name":  "T it emits a Gantt vis() over the columns",
+        "pass":  true,
+        "detail":  "vis(\u0027gantt\u0027, \u0027AWARD_ID\u0027, \u0027START_DATE\u0027, \u0027END_DATE\u0027, \u0027sum\u0027, 9999, \u0027\u0027, true, true, \u0027100%\u0027, 53"
+    },
+    {
+        "name":  "T it starts from a reset builder (no leftover title or filter)",
+        "pass":  true,
+        "detail":  " | "
+    },
+    {
+        "name":  "T (the X list does offer buckets here)",
+        "pass":  true,
+        "detail":  "4"
+    },
+    {
+        "name":  "T Color By lists plain columns only",
+        "pass":  true,
+        "detail":  "got 0 | want 0"
+    },
+    {
+        "name":  "T End Date lists plain columns only",
+        "pass":  true,
+        "detail":  "got 0 | want 0"
+    },
+    {
+        "name":  "G (the fixture has 21 to 199 awards)",
+        "pass":  true,
+        "detail":  "39"
+    },
+    {
+        "name":  "G the suggested Limit: all its bars (under the cap of 200, not what fits the set height)",
+        "pass":  true,
+        "detail":  "got \"9999\" | want \"9999\""
+    },
+    {
+        "name":  "G the preview drew",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "G the preview grows to its bars (about 22px each)",
+        "pass":  true,
+        "detail":  "994"
+    },
+    {
+        "name":  "G ...with the dates along the top too",
+        "pass":  true,
+        "detail":  "x,y,xTop"
+    },
+    {
+        "name":  "G the report draws it",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "G the report chart grows as well",
+        "pass":  true,
+        "detail":  "994 (preview 994)"
+    },
+    {
+        "name":  "G ...with the dates along the top too",
+        "pass":  true,
+        "detail":  "x,y,xTop"
+    },
+    {
+        "name":  "G Limit 10: the note says so",
+        "pass":  true,
+        "detail":  "got \"Showing 10 of 39 bars.\" | want \"Showing 10 of 39 bars.\""
+    },
+    {
+        "name":  "G ...drawn under the chart",
+        "pass":  true,
+        "detail":  ""
+    },
+    {
+        "name":  "G 10 bars: no taller than its set height, no top axis",
+        "pass":  true,
+        "detail":  "530 / x,y"
+    },
+    {
+        "name":  "G a canvas sized by its style (fullscreen, a slide) keeps its size (not grown to its bars)",
+        "pass":  true,
+        "detail":  "600 / null"
+    },
+    {
+        "name":  "S a Gantt offers Sort By Color By group",
+        "pass":  true,
+        "detail":  "1 / block"
+    },
+    {
+        "name":  "S no Color By: the right-click menu has no Color By group entry",
+        "pass":  true,
+        "detail":  "1 / none"
+    },
+    {
+        "name":  "S the bars come in Color By groups, in the legend\u0027s order",
+        "pass":  true,
+        "detail":  "got [\"Awarded\",\"Declined\",\"(mixed)\"] | want [\"Awarded\",\"Declined\",\"(mixed)\"]"
+    },
+    {
+        "name":  "S ...it is saved in the chart",
+        "pass":  true,
+        "detail":  "vis(\u0027gantt\u0027, \u0027AWARD_ID\u0027, \u0027START_DATE\u0027, \u0027END_DATE\u0027, \u0027sum\u0027, 9999, \u0027\u0027, true, true, \u0027100%\u0027, 530, \u0027bottom\u0027, \u0027auto\u0027, true, false, false, \u0027top\u0027, \u0027color\u0027, \u0027desc\u0027, \u0027defa"
+    },
+    {
+        "name":  "S with a Color By: the entry shows",
+        "pass":  true,
+        "detail":  "flex / ≡ Sort by Color By group"
+    },
+    {
+        "name":  "S another type: the option is hidden and the sort falls back to Value",
+        "pass":  true,
+        "detail":  "none / value"
+    },
+    {
+        "name":  "S reopening the saved chart shows Color By group, selected",
+        "pass":  true,
+        "detail":  "1 / color / block"
     }
 ]

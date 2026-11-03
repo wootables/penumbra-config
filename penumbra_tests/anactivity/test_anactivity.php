@@ -159,7 +159,8 @@ ok(strpos($all, 'aligned to each window&rsquo;s last day') === false && strpos($
 ok(substr_count($all, '<?php if (!$anCalMode): /* Recent activity (E3b-2)') === 2, 'the tab button and its panel at both scopes, not in calendar mode');
 ok(strpos($all, "<?php if (!\$anReportScope): ?>\n                        <th scope=\"col\" style=\"width:120px;\" data-sortable>Report") !== false, 'Platform\'s feed has a Report column');
 ok(strpos($all, "if (\$excludeMe)         \$ftExcl[] = 'not mine';") !== false, 'Hide my own views is tagged');
-ok(strpos($all, "\$machineAccounts = array('DEV_API', 'SCHEDULER', 'PEOPLE_SYNC');") !== false, 'Hide automation covers the nightly directory job too (PEOPLE_SYNC, 2026-10-03)');
+ok(strpos($all, "\$machineAccounts = array('DEV_API', 'SCHEDULER', 'PEOPLE_SYNC', 'DB_BACKUP');") !== false, 'Hide automation covers the nightly directory job (PEOPLE_SYNC, 2026-10-03) and the nightly table backup (DB_BACKUP, 2026-11-02)');
+ok(strpos($all, 'Hide the DEV_API, SCHEDULER, PEOPLE_SYNC and DB_BACKUP machine accounts') !== false, 'and its tooltip names DB_BACKUP');
 ok(strpos($all, '<h2 class="an-crumbs"><span class="an-crumb">Analytics</span><span class="an-crumb-sep" aria-hidden="true">&rsaquo;</span><span class="an-crumb-here" aria-current="page">All Reports</span></h2>') !== false, 'Platform title: Analytics > All Reports');
 ok(strpos($all, 'Analytics - all reports') === false, 'the old dash title is gone');
 ok(preg_match('/<\?php if \(\$isAdmin\): \?><a class="an-crumb" href="<\?php echo htmlspecialchars\(\$anUpHref\); \?>" title="Back up to Platform Metrics[^\n]*?>All Reports<\/a>/', $all) === 1, 'report title: All Reports links up to Platform (with its filters), admins only');

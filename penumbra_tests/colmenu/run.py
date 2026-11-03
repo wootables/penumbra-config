@@ -783,6 +783,90 @@ MUTANTS.update({
     'sl-althash': ([('menu', "        if (!c || c.nested || !col || col === '#' || isJournal(col) || !A ||", "        if (!c || c.nested || !col || isJournal(col) || !A ||")], ['L-msel-altLinkNum'], ['msel']),
 })
 
+# (2026-11-02, cfsplit 2; the user: "Yes, add it") a list column's Split by ; in the cell menu's Filter list, under Click to
+# filter while that is on: hidden while it is off and on a column that is no list (guards - live has no such item either, and
+# the pick is live since cfsplit), right under it with the separator's name, ticking and unticking the column's pick, the
+# report's Click-to-Filter; the help's sentence
+SCN = SCN + ['msplit']
+CHK['msplit'] = ['hiddenOff', 'underFilter', 'notPlain', 'ticks', 'unticks', 'goneWithFilter', 'forced']
+NEW_CS = {'L-msplit-' + c for c in CHK['msplit'] if c not in ('hiddenOff', 'notPlain', 'goneWithFilter')} | {'S-helpSplitMenu'}
+NEW = NEW | NEW_CS
+NEW = NEW - NEW_CS   # (cfsplit 2 is LIVE since f3b1ed9, 2026-11-02: old checks now)
+# (2026-11-02, cfsplit 3; the user: "lets do it") Filter by value's Split by ; tab on a list column (mfvsplit: V_NAME a ; list via
+# mk_harness), and a space list's tab offered but not opened first, a pick there reopening on it (mfvspace: the pick is the
+# only reason it opens there - fv-reopen was GREEN on mfvsplit, whose long list opens the tab anyway). Guards (green on live too, where the dialog's
+# Values pick works alone): valuesReplace, itemsClear, plainNoTab - each bitten by its mutant here.
+SCN = SCN + ['mfvsplit', 'mfvspace']
+CHK['mfvsplit'] = ['tabs', 'itemsList', 'itemsApply', 'itemsReopen', 'valuesReplace', 'itemsReplace', 'countsOther', 'itemsClear', 'plainNoTab']
+CHK['mfvspace'] = ['spaceNotFirst', 'spaceReopen']
+NEW_FV = {'L-mfvsplit-' + c for c in CHK['mfvsplit'] if c not in ('valuesReplace', 'itemsClear', 'plainNoTab')} | {'L-mfvspace-' + c for c in CHK['mfvspace']} | {'S-helpFvSplit'}
+NEW = NEW | NEW_FV
+NEW = NEW - NEW_FV   # (cfsplit 3 is LIVE since 6d71bc4, 2026-11-02: old checks now)
+# (2026-11-02, cfsplit 4; the user: "In card detailed mode and table mode, right clicking on a split item does not offer
+# filter or copy of just that item") mitem (V_NAME the mfvsplit ; lists): a right-click on one value of a cell listing
+# several puts Filter to / Exclude it and its Copy first; a second value adds; guards (hold on live, where no value has
+# items of its own): none on the separator, on a cell of one value, from the keyboard, on a plain column.
+SCN = SCN + ['mitem']
+CHK['mitem'] = ['itemMenu', 'itemCopyFirst', 'itemFilterRuns', 'itemAdds', 'itemExcludeRuns', 'itemCopyRuns', 'sepNone', 'oneNone', 'kbdNone', 'plainNone']
+NEW_IT = {'L-mitem-' + c for c in CHK['mitem'] if c not in ('sepNone', 'oneNone', 'kbdNone', 'plainNone')} | {'S-helpItemMenu'}
+NEW = NEW | NEW_IT
+NEW = NEW - NEW_IT   # (cfsplit 4 is LIVE since 81e2699, 2026-11-02: old checks now)
+MUTANTS.update({
+    # no value read at the right-click; read from the keyboard too; the pair after Filter by value...; Exclude written as Filter
+    # to (the menu's call, then main.js's mode); Copy taking the whole cell; a cell of one value offering them; the first value
+    # instead of the one under the pointer
+    'it-none': ([('menu', "        if (cell && !kbd) { cell.item = listItemOf(cell, e.clientX, e.clientY); }   // (cfsplit 4) none from the keyboard\n", "")],
+                ['L-mitem-itemMenu', 'L-mitem-itemCopyFirst'], ['mitem']),
+    'it-kbd': ([('menu', "if (cell && !kbd) { cell.item = listItemOf(", "if (cell) { cell.item = listItemOf(")], ['L-mitem-kbdNone'], ['mitem']),
+    'it-order': ([('menu', "flt.push({ act: 'itemFilter',", "fltCmp.push({ act: 'itemFilter',")], ['L-mitem-itemMenu'], ['mitem']),
+    'it-exinc': ([('menu', "run: function () { A.filterExcludeItem(col, li.value, li.delim); }", "run: function () { A.filterAddItem(col, li.value, li.delim); }")], ['L-mitem-itemExcludeRuns'], ['mitem']),
+    'it-xmode': ([('main', "xf = [{ col: K, split: delim, mode: 'ex' }];", "xf = [{ col: K, split: delim }];")], ['L-mitem-itemExcludeRuns'], ['mitem']),
+    'it-copywhole': ([('menu', "run: function () { copyValue(li.value); } }); }   // (cfsplit 4)", "run: function () { copyValue(cellText(cell.td)); } }); }   // (cfsplit 4)")], ['L-mitem-itemCopyRuns'], ['mitem']),
+    'it-one': ([('main', "        if (its.n < 2) return null;\n", "")], ['L-mitem-oneNone'], ['mitem']),
+    'it-at': ([('main', ": _pnbCfltItemAt(td, its, at.x, at.y);", ": its[0].v;")], ['L-mitem-itemMenu', 'L-mitem-sepNone'], ['mitem']),
+})
+MUTANTS.update({
+    # the dialog: no tab; never first for a long list; first for a space too; the box's pick not read back; the lists' Apply
+    # writing whole cells; the Values tab's Apply keeping the lists' pick; the ticks shared; Clear re-applying the ticks
+    'fv-notab': ([('menu', "(items ? '<button type=\"button\" role=\"tab\" class=\"pnb-hp-mode\" data-hp=\"mode-items\">' + esc(dv.label) + '</button>' : '')", "''")],
+                 ['L-mfvsplit-tabs', 'L-mfvspace-spaceNotFirst'], ['mfvsplit', 'mfvspace']),
+    'fv-nofirst': ([('menu', "if (items && (anyI || (!any && !ranged && vals.length > 20 && dv.delim !== 'dspace'))) { mode = 'items'; }", "if (items && anyI) { mode = 'items'; }")],
+                   ['L-mfvsplit-tabs'], ['mfvsplit']),
+    'fv-space': ([('menu', " && dv.delim !== 'dspace'))) { mode = 'items'; }", "))) { mode = 'items'; }")], ['L-mfvspace-spaceNotFirst'], ['mfvspace']),
+    'fv-reopen': ([('menu', "if (items && (anyI || (!any", "if (items && (false || (!any")], ['L-mfvspace-spaceReopen'], ['mfvspace']),
+    'fv-whole': ([('menu', "                A.filterItemsApply(col, (isClear || pickedI.length === iv.length) ? null : pickedI, dv.delim, null);",
+                   "                A.filterApply(col, (isClear || pickedI.length === iv.length) ? null : pickedI);")], ['L-mfvsplit-itemsApply'], ['mfvsplit']),
+    'fv-keepsplit': ([('menu', "            if (anyI) { A.filterItemsApply(col, null, dv.delim, clear ? null : picked); return; }   // (cfsplit 3) the lists' pick gives way\n", "")],
+                     ['L-mfvsplit-valuesReplace'], ['mfvsplit']),
+    'fv-curon': ([('menu', "        function curOn() { return mode === 'items' ? onI : on; }", "        function curOn() { return on; }")], ['L-mfvsplit-itemsApply'], ['mfvsplit']),
+    'fv-clear': ([('menu', "(isClear || pickedI.length === iv.length) ? null : pickedI, dv.delim, null);", "(pickedI.length === iv.length) ? null : pickedI, dv.delim, null);")],
+                 ['L-mfvsplit-itemsClear'], ['mfvsplit']),
+    # main.js: the whole cells' pick kept by the lists' Apply; the counts not under the other conditions
+    'fv-keepwhole': ([('main', "        if (cells && cells.length) st.sel[C] = cells.slice(); else delete st.sel[C];", "        if (cells && cells.length) st.sel[C] = cells.slice();")],
+                     ['L-mfvsplit-itemsReplace'], ['mfvsplit']),
+    'fv-counts': ([('main', "var g = _pnbFsGroups({ fields: [{ col: C, split: split, az: true }] }, String($('#tableSearch').val() || ''));", "var g = _pnbFsGroups({ fields: [{ col: C, split: split, az: true }] }, '');")],
+                  ['L-mfvsplit-countsOther', 'L-mfvsplit-itemsReopen'], ['mfvsplit']),
+})
+MUTANTS.update({
+    # the menu: no item; shown while Click to filter is off; above it; its separator unnamed; never ticked; only ever ticking;
+    # no toast
+    'cs-noitem': ([('menu', "            var cs = cf ? clickSplitItem(col, name) : null;", "            var cs = null;")],
+                  ['L-msplit-underFilter', 'L-msplit-ticks', 'L-msplit-unticks', 'L-msplit-forced'], ['msplit']),
+    'cs-always': ([('menu', "        if (!st || !st.filterOn) { return null; }", "        if (!st) { return null; }")], ['L-msplit-hiddenOff', 'L-msplit-goneWithFilter'], ['msplit']),
+    'cs-order': ([('menu', "            if (cs) { fl.push(cs); }", "            if (cs) { fl.unshift(cs); }")], ['L-msplit-underFilter'], ['msplit']),
+    'cs-label': ([('menu', "label: 'Split by ' + st.sym, checked: !!st.on,", "label: 'Split', checked: !!st.on,")], ['L-msplit-underFilter'], ['msplit']),
+    'cs-checked': ([('menu', "label: 'Split by ' + st.sym, checked: !!st.on, title: tip", "label: 'Split by ' + st.sym, checked: false, title: tip")], ['L-msplit-ticks', 'L-msplit-forced'], ['msplit']),
+    'cs-run': ([('menu', "            A.setClickSplit(col, !st.on);", "            A.setClickSplit(col, true);")], ['L-msplit-unticks'], ['msplit']),
+    'cs-toast': ([('menu', "            toast('<p>' + (st.on ? 'Split by '", "            if (false) toast('<p>' + (st.on ? 'Split by '")], ['L-msplit-ticks', 'L-msplit-unticks'], ['msplit']),
+    # main.js: no split read; the report's Click-to-Filter not counted; the pick never written
+    'cs-api': ([('main', "            return sp ? { on: sp.value, sym: sp.sym, filterOn: !!(st.on || st.forced) } : null;", "            return null;")],
+               ['L-msplit-underFilter', 'L-msplit-ticks', 'L-msplit-forced'], ['msplit']),
+    'cs-forced': ([('main', "filterOn: !!(st.on || st.forced) }", "filterOn: !!st.on }")], ['L-msplit-forced'], ['msplit']),
+    'cs-set': ([('main', "        setClickSplit: function (col, on) { penumbraSetColOpt(col, 'split', !!on); return true; },", "        setClickSplit: function (col, on) { return true; },")],
+               ['L-msplit-ticks'], ['msplit']),
+    # (S-helpSplitMenu has no mutant here: this runner's mutants run browser scenarios only)
+})
+
 args = sys.argv[1:]
 def opt(name, default=None):
     if name in args:
@@ -1014,6 +1098,33 @@ def static_checks(texts):
         ('S-helpSelFilter', 'and the menu works on the selection: <em>Filter</em> lists <em>Filter to the selected values</em> and <em>Exclude the selected values</em>' in t
          and 'the status bar offers <strong>Filter to selection</strong> after Count' in t and '<kbd>Alt</kbd>+click a cell (<kbd>Option</kbd> on a Mac) to add its value to the filter' in t
          and '<kbd>Alt</kbd>+click a cell to add its value to the filter without the menu.' in t and chr(0x2014) not in t, ''),
+    ]
+
+# (2026-11-02, cfsplit 2) the topic's cell-menu paragraph names Split by ; after Click to filter (no em dash)
+_static_checks_before_cs = static_checks
+def static_checks(texts):
+    t = texts['topic']
+    return _static_checks_before_cs(texts) + [
+        ('S-helpSplitMenu', '<em>Click to filter</em> is the column\'s Filter switch' in t
+         and 'On a list column, while it is ticked, <em>Split by ;</em> follows it: a click then filters by the one value clicked.' in t and chr(0x2014) not in t, ''),
+    ]
+
+# (2026-11-02, cfsplit 3) the topic's Filter by value... row for the Split by ; tab (no em dash)
+_static_checks_before_fv = static_checks
+def static_checks(texts):
+    t = texts['topic']
+    return _static_checks_before_fv(texts) + [
+        ('S-helpFvSplit', '<strong>Filter by value...</strong>: <em>Split by ;</em></td>' in t and "a pick on either tab replaces the other's." in t
+         and 'or for a long list not split at spaces.</td></tr>' in t and chr(0x2014) not in t, ''),
+    ]
+
+# (2026-11-02, cfsplit 4) the topic's paragraph for one value of a list cell (no em dash)
+_static_checks_before_it = static_checks
+def static_checks(texts):
+    t = texts['topic']
+    return _static_checks_before_it(texts) + [
+        ('S-helpItemMenu', 'right-click one value of a cell listing several: <em>Filter</em> starts with <em>Filter to</em> and <em>Exclude</em> that value alone' in t
+         and 'On a card, right-click its chip, there or in the details window.</p>' in t and chr(0x2014) not in t, ''),
     ]
 
 def run_browser(scns):

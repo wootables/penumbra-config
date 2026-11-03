@@ -1,0 +1,22 @@
+$mutantDefs = [ordered]@{
+  # no right-click menu
+  'noctx'     = @{ file = 'module'; edits = @(,@('            if (rowMenu.open(item, x, y, kbd)) { e.preventDefault(); }', '')); red = @('N1','N11','N13') }
+  # a click on a row with no tray opens nothing again
+  'noleft'    = @{ file = 'module'; edits = @(,@('                rowMenu.open(this, r.left + 24, r.bottom, false);', '')); red = @('N5') }
+  # Insert at the beginning welds the helper onto the old first line
+  'nostartnl' = @{ file = 'module'; edits = @(,@("            ins = text + (empty ? '' : '\n');", "            ins = text;")); red = @('N2') }
+  # Append to the end welds the helper onto the old last line
+  'noendnl'   = @{ file = 'module'; edits = @(,@("            ins = (empty || pos.ch === 0 || text.charAt(0) === '\n' ? '' : '\n') + text;", "            ins = text;")); red = @('N3') }
+  # the menu built in the main page while the console is popped out
+  'nodoc'     = @{ file = 'module'; edits = @(@("            var m = doc.createElement('div');
+            m.className = 'pnb-hm snip-row-menu';", "            var m = d.createElement('div');
+            m.className = 'pnb-hm snip-row-menu';"), @('            doc.body.appendChild(m);
+            var off = [];', '            d.body.appendChild(m);
+            var off = [];')); red = @('N13') }
+  # main.js's Escape no longer closes the menu first
+  'noesc'     = @{ file = 'module'; edits = @(,@('        if (rowMenu.isOpen()) { rowMenu.closeAndRefocus(); return true; }', '')); red = @('N8') }
+  # How to use opens nothing
+  'nopin'     = @{ file = 'module'; edits = @(,@('                        if (c) { cardPop.pin(item, ico, c.help + (c.fn ? cardMoreHtml(c.fn) : '''')); }', '')); red = @('N9') }
+  # Copy copies the placeholder text, not the realized recipe
+  'norealcopy' = @{ file = 'module'; edits = @(,@('run: function () { copyToClipboard(realizeColumns(text()), item.ownerDocument); } });', 'run: function () { copyToClipboard(text(), item.ownerDocument); } });')); red = @('N10') }
+}

@@ -82,8 +82,15 @@ const penumbra_dash_vars = {
       chk.openLegacy = (openHref('e3') || 'x').indexOf('cards=') === -1;
     } else if (SCN === 'editor') {
       $('#dashEditBtn').trigger('click'); await wait(150);
-      await editor('e3');   // an old tile: Table, its size hidden
-      chk.viewShown = visible('#teViewField') && $('#teView').val() === 'table';
+      // (cnest sweep) an old tile: The report's view (none saved), kept by an edit that leaves the View alone
+      await editor('e3');
+      chk.legacyShown = visible('#teViewField') && $('#teView').val() === '';
+      $('#teApply').trigger('click'); await wait(250);
+      var p0 = await save(), s0 = p0 ? JSON.parse(p0.state_data) : null, e30 = s0 ? s0.tiles.filter(function (x) { return x.id === 'e3'; })[0] : null;
+      info.legacy = { saved: e30, src: src('e3') };
+      chk.legacyKept = !!e30 && !('view' in e30) && (src('e3') || 'cards=').indexOf('cards=') === -1;
+      await editor('e3');   // its size hidden
+      chk.viewShown = visible('#teViewField') && $('#teView').val() === '';
       chk.sizeHidden = !!document.getElementById('teCardSize') && !visible('#teCardSize');
       $('#teView').val('cards').trigger('change'); await wait(30);
       chk.sizeShows = visible('#teCardSize') && $('#teCardSize').val() === '';

@@ -81,6 +81,8 @@ try {
     ['_vizDateMs', grab('function _vizDateMs(')],
     ['_vizGanttTickFmt', grab('function _vizGanttTickFmt(')],
     ['_vizGanttMarker', grab('function _vizGanttMarker(')],
+    // (gsmall) the duration words applyGanttChartConfig calls - lifted only where the code has them, so a control on an older build still stands up
+    ['_vizGanttDurText', code.indexOf('function _vizGanttDurText(') !== -1 ? grab('function _vizGanttDurText(') : ''],
     ['applyGanttChartConfig', grab('function applyGanttChartConfig(')]
   ];
   var bad = [];
@@ -93,7 +95,7 @@ try {
   if (bad.length) throw new Error('bad extract(s): ' + bad.map(function(b){return b.split(':')[0];}).join(', '));
   var gsrc = pieces.map(function (p) { return p[1]; }).join('\n');
   var G = new Function(gsrc +
-    '\nreturn {ms:_vizDateMs, tick:_vizGanttTickFmt, marker:_vizGanttMarker, apply:applyGanttChartConfig};')();
+    '\nreturn {ms:_vizDateMs, tick:_vizGanttTickFmt, marker:_vizGanttMarker, apply:applyGanttChartConfig, dur:(typeof _vizGanttDurText === "function" ? _vizGanttDurText : null)};')();
 
   // ---- date parsing ----
   ok('dateMs: null for blank', G.ms('') === null);
@@ -292,6 +294,403 @@ try {
   var c4 = cfg();
   G.apply(c4, {labels:[],datasets:[]}, {});
   ok('ganttCfg: no-op on non-gantt data', c4.options.indexAxis === undefined);
+
+  // =====================================================================
+  // (gwin / gcolor / gsortend, 2026-11-02) the window, Color By, End Date sort
+  // =====================================================================
+  function gwD(ms){ return ms == null ? null : moment(ms).format('YYYY-MM-DD HH:mm'); }
+  // null-safe reads, so a build without the feature FAILS each assert instead of throwing the harness
+  function gwMk(raw, edge){ var m = G.marker(raw, edge); return m ? gwD(m.ms) : null; }
+  function gwMkl(raw, edge){ var m = G.marker(raw, edge); return m ? m.label : null; }
+  function gwLg(g){ return g && g._ganttLegend ? g._ganttLegend.map(function(k){return k.text;}) : null; }
+  function gwWin(g, k){ return g && g._ganttWin ? g._ganttWin[k] : 'no-window'; }
+
+  // ---- window words: _vizGanttMarker(raw, edge) ----
+  eq('gwin: fy27 From = Jul 1 2026', gwMk('fy27','from'), '2026-07-01 00:00');
+  eq('gwin: fy27 To = end of Jun 30 2027', gwMk('fy27','to'), '2027-06-30 23:59');
+  eq('gwin: FY2027 four digits', gwMk('FY2027','from'), '2026-07-01 00:00');
+  eq('gwin: fy 26 with a space', gwMk('fy 26','to'), '2026-06-30 23:59');
+  eq('gwin: today+90d', gwMk('today+90d','from'), gwD(moment().startOf('day').add(90,'days').valueOf()));
+  eq('gwin: today-6m', gwMk('today-6m','from'), gwD(moment().startOf('day').subtract(6,'months').valueOf()));
+  eq('gwin: today + 2w (spaces)', gwMk('today + 2w','from'), gwD(moment().startOf('day').add(14,'days').valueOf()));
+  eq('gwin: today+1y as To = end of that day', gwMk('today+1y','to'), gwD(moment().endOf('day').add(1,'years').valueOf()));
+  eq('gwin: a plain To date reaches the end of its day', gwMk('03/01/2026','to'), '2026-03-01 23:59');
+  eq('gwin: a plain From date is its start', gwMk('2026-03-01','from'), '2026-03-01 00:00');
+  eq('gwin: bare 0 refused with an edge (a Y Min left from another type)', G.marker('0','from'), null);
+  eq('gwin: bare 2026 refused with an edge', G.marker('2026','from'), null);
+  eq('gwin: 80,000 refused with an edge', G.marker('80,000','to'), null);
+  eq('gwin: junk refused', G.marker('soon','from'), null);
+  eq('gwin: blank = no edge', G.marker('','to'), null);
+  eq('gwin: today as an edge gets no Today label', gwMkl('today','from'), '');
+  eq('gwin: the marker keeps its Today label', gwMkl('today'), 'Today');
+  eq('gwin: a relative marker keeps an explicit label', gwMkl('today+7d|Due'), 'Due');
+
+  // ---- the window in the data builder ----
+  function gx(rowsIn, sortBy, sortDir, extras, lim){ return gen(rowsIn,'TASK','START','END','sum',lim||10,'gantt',sortBy,sortDir,'default',false,false,null,'',extras||{}); }
+  var gW = gx(R,'value','asc',{yMin:'02/15/2026', yMax:'04/15/2026'});
+  eq('gwin: bars wholly outside drop out', gW.labels, ['Review','Negotiate']);
+  eq('gwin: axis min IS Show From', gW._ganttMin, G.ms('02/15/2026'));
+  eq('gwin: axis max IS the end of Show To', gwD(gW._ganttMax), '2026-04-15 23:59');
+  ok('gwin: the ticks adapt to the WINDOW (~60 days -> day ticks), not the data span',
+     gW._ganttSpanDays > 59 && gW._ganttSpanDays < 61, String(gW._ganttSpanDays));
+  ok('gwin: payload carries the window', !!gW._ganttWin && gW._ganttWin.from === G.ms('02/15/2026'));
+  var gOpen = gx(R,'value','asc',{yMin:'03/20/2026'});
+  eq('gwin: From only', gOpen.labels, ['Negotiate','Award']);
+  ok('gwin: an open To keeps the data end + pad', gOpen._ganttMax > G.ms('05/10/2026'));
+  eq('gwin: an open To is null in the payload', gwWin(gOpen,'to'), null);
+  eq('gwin: a To date includes bars starting that day', gx(R,'value','asc',{yMax:'03/16/2026'}).labels, ['Proposal','Review','Negotiate']);
+  var gRev = gx(R,'value','asc',{yMin:'05/01/2026', yMax:'01/01/2026'});
+  eq('gwin: From after To sets no window', gRev.labels.length, 4);
+  eq('gwin: ...and no payload window', gRev._ganttWin, null);
+  var gJunk = gx(R,'value','asc',{yMin:'0', yMax:'abc'});
+  eq('gwin: non-dates set no window', gJunk.labels.length, 4);
+  eq('gwin: ...and keep the padded span', gJunk._ganttWin, null);
+  var gNone = gx(R,'value','asc',{yMin:'01/01/2030'});
+  ok('gwin: an empty window says so', !!gNone._noData && /Show From/.test(gNone._noData), JSON.stringify(gNone._noData));
+  var gWm = gx(R,'value','asc',{yMin:'02/15/2026', yMax:'04/15/2026', referenceLine:'12/25/2026|Deadline'});
+  eq('gwin: a marker outside a set window does not widen it', gwD(gWm._ganttMax), '2026-04-15 23:59');
+  eq('gwin: Limit applies after the window', gx(R,'value','asc',{yMin:'02/15/2026', yMax:'04/15/2026'},1).labels, ['Review']);
+  eq('gwin: no window = no payload window', g2._ganttWin, null);
+
+  // ---- End Date sort ----
+  var R2 = rows([
+    ['A','01/01/2026','12/31/2026'],
+    ['B','02/01/2026','03/01/2026'],
+    ['C','03/01/2026','04/01/2026'],
+    ['D','01/15/2026','02/10/2026']
+  ]);
+  eq('gsortend: end asc = soonest first', gx(R2,'end','asc').labels, ['D','B','C','A']);
+  eq('gsortend: end desc = latest first', gx(R2,'end','desc').labels, ['A','C','B','D']);
+  ok('gsortend: differs from start order', JSON.stringify(gx(R2,'end','asc').labels) !== JSON.stringify(gx(R2,'value','asc').labels));
+  eq('gsortend: Limit keeps the soonest ends', gx(R2,'end','asc',null,2).labels, ['D','B']);
+  eq('gsortend: equal ends tie-break on start', gx(rows([
+    ['Late','02/01/2026','03/01/2026'],
+    ['Early','01/01/2026','03/01/2026']
+  ]),'end','asc').labels, ['Early','Late']);
+  eq('gsortend: what ends in the window, soonest first', gx(R2,'end','asc',{yMin:'02/05/2026', yMax:'03/31/2026'}).labels, ['D','B','C','A']);
+
+  // ---- Color By ----
+  function rowsS(list){ return list.map(function(r){ var m=new Map(); m.set('TASK',r[0]); m.set('START',r[1]); m.set('END',r[2]); m.set('STATUS',r[3]); return m; }); }
+  var RS = rowsS([
+    ['T1','01/01/2026','02/01/2026','Pending'],
+    ['T2','02/01/2026','03/01/2026','Closed'],
+    ['T3','03/01/2026','04/01/2026','Pending'],
+    ['T4','04/01/2026','05/01/2026','Active']
+  ]);
+  var CB = {vizOptions: JSON.stringify({colorBy:'STATUS'})};
+  var gC = gx(RS,'value','asc',CB);
+  eq('gcolor: the column rides the payload', gC._ganttColorBy, 'STATUS');
+  eq('gcolor: legend lists the values A to Z', gwLg(gC), ['Active','Closed','Pending']);
+  eq('gcolor: a value = one color (fill)', gC.datasets[0].backgroundColor, ['C2','C1','C2','C0']);
+  eq('gcolor: a value = one color (border)', gC.datasets[0].borderColor, ['B2','B1','B2','B0']);
+  eq('gcolor: legend entry wears its color', gC._ganttLegend ? [gC._ganttLegend[0].fill, gC._ganttLegend[0].stroke] : null, ['C0','B0']);
+  eq('gcolor: each bar carries its value', gC._ganttBars.map(function(b){return b.colorVal;}), ['Pending','Closed','Pending','Active']);
+  eq('gcolor: _baseColors follow the fill', gC.datasets[0]._baseColors, ['C2','C1','C2','C0']);
+  var gCw = gx(RS,'value','asc',{vizOptions: CB.vizOptions, yMin:'02/15/2026', yMax:'03/15/2026'});
+  eq('gcolor: a value keeps its color in a window', gCw.datasets[0].backgroundColor, ['C1','C2']);
+  eq('gcolor: the legend lists only values shown', gwLg(gCw), ['Closed','Pending']);
+  var gCs = gx(RS,'label','desc',CB);
+  eq('gcolor: a value keeps its color across a sort', gCs.datasets[0].backgroundColor, ['C0','C2','C1','C2']);
+  eq('gcolor: lower-case column name works', gx(RS,'value','asc',{vizOptions:'{"colorBy":"status"}'})._ganttColorBy, 'STATUS');
+  eq('gcolor: an options OBJECT works too', (gx(RS,'value','asc',{vizOptions:{colorBy:'STATUS'}})._ganttLegend || []).length, 3);
+  var gMix = gx(rowsS([
+    ['Same','01/01/2026','02/01/2026','Active'],
+    ['Same','02/01/2026','03/01/2026','Closed'],
+    ['Solo','01/01/2026','02/01/2026','Active']
+  ]),'label','asc',CB);
+  eq('gcolor: merged rows that disagree read (mixed)', gMix._ganttBars.map(function(b){return b.colorVal;}), ['(mixed)','Active']);
+  eq('gcolor: (mixed) is listed last', gwLg(gMix), ['Active','(mixed)']);
+  var gAgree = gx(rowsS([
+    ['Same','01/01/2026','02/01/2026','Active'],
+    ['Same','02/01/2026','03/01/2026','Active']
+  ]),'label','asc',CB);
+  eq('gcolor: merged rows that agree keep the value', gAgree._ganttBars[0].colorVal, 'Active');
+  eq('gcolor: no Color By = no legend', gx(RS,'value','asc',{})._ganttLegend, null);
+  eq('gcolor: no Color By = each bar its own color', gx(RS,'value','asc',{}).datasets[0].backgroundColor, ['C0','C1','C2','C3']);
+  eq('gcolor: the screen-reader table names the column', gC._a11yRows.columns, ['Task','Start','End','Days','STATUS']);
+  eq('gcolor: ...and each bar its value', gC._a11yRows.rows[3][4], 'Active');
+
+  // ---- applyGanttChartConfig: the legend, the tooltip, the edge arrows ----
+  var cC = cfg();
+  G.apply(cC, gC, {showValues:false, textColor:'#111', isDark:false, fsBoost:0});
+  ok('gcolor cfg: legend shown with Color By', cC.options.plugins.legend.display === true);
+  var lgl = (cC.options.plugins.legend.labels && cC.options.plugins.legend.labels.generateLabels) ? cC.options.plugins.legend.labels.generateLabels() : [];
+  eq('gcolor cfg: legend entries from the payload', lgl.map(function(l){return [l.text,l.fillStyle,l.strokeStyle];}), [['Active','C0','B0'],['Closed','C1','B1'],['Pending','C2','B2']]);
+  ok('gcolor cfg: a legend click is a no-op', typeof cC.options.plugins.legend.onClick === 'function' && cC.options.plugins.legend.onClick() === undefined);
+  eq('gcolor cfg: tooltip names the value', cC.options.plugins.tooltip.callbacks.label({dataIndex:3})[2], 'STATUS: Active');
+  ok('gcolor cfg: no edge arrows without a window', !(cC.plugins||[]).some(function(p){return p.id==='penumbraGanttEdges';}));
+  var cP = cfg();
+  G.apply(cP, g2, {showValues:false, textColor:'#111', isDark:false, fsBoost:0});
+  eq('gcolor cfg: tooltip has no value line without Color By', cP.options.plugins.tooltip.callbacks.label({dataIndex:0}).length, 2);
+
+  var cWin = cfg();
+  G.apply(cWin, gW, {showValues:false, textColor:'#111', isDark:false, fsBoost:0});
+  eq('gwin cfg: x min from the window', cWin.options.scales.x.min, gW._ganttMin);
+  eq('gwin cfg: x max from the window', cWin.options.scales.x.max, gW._ganttMax);
+  var gwEdge = (cWin.plugins||[]).filter(function(p){return p.id==='penumbraGanttEdges';})[0];
+  ok('gwin cfg: edge-arrow plugin registered with a window', !!gwEdge);
+  // Drive it with a stub chart: Review (Feb 1 - Mar 15) starts before Feb 15 -> a LEFT arrow;
+  // Negotiate (Mar 16 - Apr 30) ends after Apr 15 -> a RIGHT arrow.
+  var gwDrawn = [], gwStroked = 0;   // (gbar sweep) the arrows' outline
+  var gwCtx = { save:function(){}, restore:function(){}, beginPath:function(){}, closePath:function(){},
+    moveTo:function(x,y){ gwDrawn.push([x,y]); }, lineTo:function(){}, fill:function(){}, stroke:function(){ gwStroked++; }, fillStyle:'', strokeStyle:'', lineWidth:0 };
+  var gwChart = { ctx: gwCtx, chartArea: {left:100, right:500, top:0, bottom:200},
+    scales: { x: { min: gW._ganttMin, max: gW._ganttMax } },
+    getDatasetMeta: function(){ return { data: [ {y:20,height:10}, {y:40,height:10} ] }; } };
+  if (gwEdge) gwEdge.afterDatasetsDraw(gwChart);
+  eq('gwin cfg: one arrow per cut edge', gwDrawn.length, 2);
+  eq('gwin cfg: Review cut on the LEFT', gwDrawn[0], [102,20]);
+  eq('gwin cfg: Negotiate cut on the RIGHT', gwDrawn[1], [498,40]);
+  gwDrawn = [];
+  if (gwEdge) gwEdge.afterDatasetsDraw({ ctx: gwCtx, chartArea: {left:100, right:500, top:0, bottom:200},
+    scales: { x: { min: G.ms('01/01/2025'), max: G.ms('01/01/2027') } },
+    getDatasetMeta: function(){ return { data: [ {y:20,height:10}, {y:40,height:10} ] }; } });
+  ok('gwin cfg: no arrows when nothing is cut', !!gwEdge && gwDrawn.length === 0);
+
+  // =====================================================================
+  // (gsmall, 2026-11-02) today's line by default, long spans in months / years, a one-row bar's card fields
+  // =====================================================================
+  function gsD(ms){ return ms == null ? null : moment(ms).format('YYYY-MM-DD'); }
+  function gsGen(rowsIn, extras, sortBy){ return gen(rowsIn,'TASK','START','END','sum',10,'gantt',sortBy||'value','asc','default',false,false,null,'',extras||{}); }
+
+  // ---- (gdur) durations ----
+  var gsDur = G.dur || function(){ return null; };
+  eq('gdur: 90 days stays days', gsDur(90), '90d');
+  eq('gdur: 91 days reads in months', gsDur(91), '3 mo');
+  eq('gdur: 400 days = 13 mo', gsDur(400), '13 mo');
+  eq('gdur: 729 days = 24 mo', gsDur(729), '24 mo');
+  eq('gdur: 730 days reads in years', gsDur(730), '2 yr');
+  eq('gdur: 1,461 days = 4 yr', gsDur(1461), '4 yr');
+  eq('gdur: 1,644 days = 4.5 yr', gsDur(1644), '4.5 yr');
+  eq('gdur: long words, years', gsDur(1461, true), 'about 4 years');
+  eq('gdur: long words, months', gsDur(400, true), 'about 13 months');
+  eq('gdur: long words, days', gsDur(30, true), '30 days');
+  eq('gdur: long words, one day', gsDur(1, true), '1 day');
+  var gsLong = gsGen(rows([['Award','01/01/2026','01/01/2030']]));
+  var gsCl = cfg();
+  G.apply(gsCl, gsLong, {showValues:true, textColor:'#111', isDark:false, fsBoost:0});
+  eq('gdur: a 4-year bar is labelled in years', gsCl.options.plugins.datalabels.formatter(null, {dataIndex:0}), '4 yr');
+  eq('gdur: its tooltip adds the years', gsCl.options.plugins.tooltip.callbacks.label({dataIndex:0})[1], '1,461 days (about 4 years)');
+
+  // ---- (gtoday) today's line by default ----
+  var gsNow = rows([['Now', moment().subtract(30,'days').format('MM/DD/YYYY'), moment().add(30,'days').format('MM/DD/YYYY')]]);
+  var gsT = gsGen(gsNow);
+  ok('gtoday: blank Marker Date + today inside the bars = today\'s line', !!gsT._ganttMarker);
+  eq('gtoday: ...at today', gsT._ganttMarker ? gsD(gsT._ganttMarker.ms) : null, moment().format('YYYY-MM-DD'));
+  eq('gtoday: ...labelled Today', gsT._ganttMarker ? gsT._ganttMarker.label : null, 'Today');
+  eq('gtoday: none = no line', gsGen(gsNow, {referenceLine:'none'})._ganttMarker, null);
+  eq('gtoday: NONE in capitals too', gsGen(gsNow, {referenceLine:'NONE'})._ganttMarker, null);
+  eq('gtoday: today outside the bars = no line', gsGen(R)._ganttMarker, null);
+  ok('gtoday: ...and the span is not widened to today', gsGen(R)._ganttMax < G.ms('06/01/2026'), gsD(gsGen(R)._ganttMax));
+  ok('gtoday: a typed today still widens it, as before', gsGen(R, {referenceLine:'today'})._ganttMax >= moment().startOf('day').valueOf());
+  eq('gtoday: a typed date is kept', gsD(gsGen(gsNow, {referenceLine:'01/01/2026|Kickoff'})._ganttMarker.ms), '2026-01-01');
+
+  // ---- (gtip) a one-row bar's card fields ----
+  function rowsT(list){ return list.map(function(r){ var m=new Map(); m.set('TASK',r[0]); m.set('START',r[1]); m.set('END',r[2]); m.set('PI',r[3]); m.set('AMOUNT',r[4]); m.set('STATUS',r[5]); m.set('SPONSOR',r[6]); return m; }); }
+  var RT = rowsT([
+    ['Solo', '01/01/2026', '06/30/2026', 'Lee, Ji', '1234567', 'Active', 'NSF'],
+    ['Pair', '01/01/2026', '03/01/2026', 'Ortiz, J', '5000', 'Closed', 'NIH'],
+    ['Pair', '02/01/2026', '04/01/2026', 'Ortiz, J', '6000', 'Closed', 'NIH'],
+    ['NoPi', '01/01/2026', '02/01/2026', '', '$1,250', 'Pending', 'DOE']
+  ]);
+  var gsKeepP = window.Penumbra;
+  try {
+    window.Penumbra = { cards: { slots: function () { return { title: 'TASK', sub: ['PI'], big: 'AMOUNT', pill: 'STATUS', bar: null, fields: ['SPONSOR', 'START'] }; } } };
+    var gsTip = gsGen(RT, {}, 'label');   // NoPi, Pair, Solo
+    var gsBar = function (g, l) { return g._ganttBars.filter(function (b) { return b.label === l; })[0] || {}; };
+    eq('gtip: a one-row bar carries its card fields (sub, big, pill; never the label or the dates)', gsBar(gsTip, 'Solo').tip, [['PI','Lee, Ji'],['AMOUNT','1,234,567'],['STATUS','Active']]);
+    eq('gtip: a merged bar carries none', gsBar(gsTip, 'Pair').tip, undefined);
+    eq('gtip: a blank field is left out; a formatted value is kept as it is', gsBar(gsTip, 'NoPi').tip, [['AMOUNT','$1,250'],['STATUS','Pending']]);
+    var gsTipC = gsGen(RT, {vizOptions: JSON.stringify({colorBy:'STATUS'})}, 'label');
+    eq('gtip: the Color By column is not repeated; the next field takes its place', gsBar(gsTipC, 'Solo').tip, [['PI','Lee, Ji'],['AMOUNT','1,234,567'],['SPONSOR','NSF']]);
+    var gsCt = cfg();
+    G.apply(gsCt, gsTip, {showValues:false, textColor:'#111', isDark:false, fsBoost:0});
+    var gsSoloAt = gsTip._ganttBars.map(function (b) { return b.label; }).indexOf('Solo');
+    var gsTl = gsCt.options.plugins.tooltip.callbacks.label({dataIndex:gsSoloAt});
+    eq('gtip: the tooltip lists them after the dates', gsTl.slice(2), ['PI: Lee, Ji','AMOUNT: 1,234,567','STATUS: Active']);
+    window.Penumbra = { cards: { slots: function () { return null; } } };
+    eq('gtip: no card slots = no fields', gsBar(gsGen(RT, {}, 'label'), 'Solo').tip, undefined);
+    window.Penumbra = {};
+    eq('gtip: no card view = no fields', gsBar(gsGen(RT, {}, 'label'), 'Solo').tip, undefined);
+  } finally { window.Penumbra = gsKeepP; }
+
+  // =====================================================================
+  // (gbar, 2026-11-02) a one-row bar keeps its row; its click opens the card details over the chart's one-row bars
+  // =====================================================================
+  var gbR = rows([['A','01/01/2026','02/01/2026'],['B','01/15/2026','03/01/2026'],['B','02/01/2026','04/01/2026'],['C','03/01/2026','05/01/2026']]);
+  var gbG = gen(gbR,'TASK','START','END','sum',10,'gantt','value','asc','default',false,false,null,'',{});
+  var gbRows = gbG.datasets[0]._ganttRows || [];
+  eq('gbar: one entry per bar', gbRows.length, 3);
+  ok('gbar: a one-row bar keeps its row (the same object)', gbRows[0] === gbR[0] && gbRows[2] === gbR[3]);
+  eq('gbar: a merged bar keeps none', gbRows[1], null);
+  var gbHas = code.indexOf('function _pnbGanttBarDetails(') !== -1;
+  var gbFn = gbHas ? new Function('masterRowData', grab('function _pnbLazyRowIndex(') + '\n' + grab('function _pnbGanttBarDetails(') + '\nreturn _pnbGanttBarDetails;') : null;
+  var gbTbl = document.createElement('table'); gbTbl.id = 'resultsTable';
+  var gbBody = document.createElement('tbody'); gbTbl.appendChild(gbBody); document.body.appendChild(gbTbl);
+  var gbTrs = gbR.map(function (m, i) { var tr = document.createElement('tr'); tr.setAttribute('data-row-index', String(i)); gbBody.appendChild(tr); return tr; });
+  var gbCalls = [], gbKeepP = window.Penumbra;
+  function gbStub(group) {
+    window.Penumbra = { cards: { openRows: function (trs, i, word, back) { gbCalls.push({ trs: trs, i: i, word: word, back: back }); return true; } },
+      cardsHost: { inGroup: function () { return !!group; }, inPivot: function () { return false; } } };
+  }
+  var gbChart = { data: { datasets: [{ _ganttRows: gbRows }] }, canvas: 'CANVAS' };
+  try {
+    gbStub(false);
+    var gbClick = gbFn ? gbFn(gbR) : function () { return false; };
+    var gbOk = gbClick(gbChart, { datasetIndex: 0, index: 2 });
+    var gbC = gbCalls[0] || {};
+    ok('gbar: a one-row bar opens the card details', gbOk === true && gbCalls.length === 1);
+    ok("gbar: ...over the chart's one-row bars, in its order", !!gbC.trs && gbC.trs.length === 2 && gbC.trs[0] === gbTrs[0] && gbC.trs[1] === gbTrs[3]);
+    eq('gbar: ...at the clicked bar', gbC.i, 1);
+    eq('gbar: ...counted as bars', gbC.word, 'bars');
+    eq('gbar: ...the chart gets the focus back', gbC.back, 'CANVAS');
+    gbCalls = [];
+    eq('gbar: a merged bar does not (its breakdown stays)', gbClick(gbChart, { datasetIndex: 0, index: 1 }), false);
+    gbTrs[0].classList.add('search-hidden');
+    gbClick(gbChart, { datasetIndex: 0, index: 2 });
+    ok('gbar: a row the filter hides is skipped', !!gbCalls[0] && gbCalls[0].trs.length === 1 && gbCalls[0].i === 0);
+    gbTrs[0].classList.remove('search-hidden'); gbCalls = [];
+    gbStub(true);
+    eq('gbar: grouped: no (the breakdown, as before)', gbClick(gbChart, { datasetIndex: 0, index: 0 }), false);
+    window.Penumbra = { cards: {} };
+    eq('gbar: no card view: no', gbClick(gbChart, { datasetIndex: 0, index: 0 }), false);
+    gbStub(false);
+    eq('gbar: a row the table does not hold: no', gbFn ? gbFn([new Map()])(gbChart, { datasetIndex: 0, index: 0 }) : false, false);
+  } finally { window.Penumbra = gbKeepP; gbTbl.remove(); }
+  // (gbar sweep, the browser check) the edge arrow: white with an outline, readable on a dark bar
+  eq('gbar sweep: the edge arrow is white', gwCtx.fillStyle, '#fff');
+  eq('gbar sweep: ...outlined (one stroke per arrow)', gwStroked, 2);
+
+  // =====================================================================
+  // (glong, 2026-11-02) long reports: the note under the chart, the height the bars need, the dates along the
+  // top, the Limit's cap
+  // =====================================================================
+  function glRows(n, nodate) {
+    var a = [];
+    for (var i = 0; i < n; i++) { var s = moment('2026-01-01').add(i, 'days'); a.push(['T' + (i + 1), s.format('MM/DD/YYYY'), s.clone().add(30, 'days').format('MM/DD/YYYY')]); }
+    for (var j = 0; j < (nodate || 0); j++) a.push(['N' + j, j % 2 ? '' : '01/01/2026', j % 2 ? '02/01/2026' : '']);
+    return rows(a);
+  }
+  function glGen(r, limit) { return gen(r,'TASK','START','END','sum',limit,'gantt','value','asc','default',false,false,null,'',{}); }
+  var gl1 = glGen(glRows(30, 3), 12), gl2 = glGen(glRows(30, 1), 9999), gl3 = glGen(glRows(5), 9999), gl4 = glGen(glRows(400), 9999);
+  eq('glong: the Limit cuts to 12 bars', gl1.labels && gl1.labels.length, 12);
+  eq('glong: the note says what the Limit cut and the rows with no date', gl1._ganttNote, 'Showing 12 of 30 bars. 3 rows with no start or end date are not shown.');
+  eq('glong: no cut, one row with no date', gl2._ganttNote, '1 row with no start or end date is not shown.');
+  eq('glong: nothing left out = no note', gl3._ganttNote, '');
+  var gl5 = gen(glRows(30), 'TASK','START','END','sum',9999,'gantt','value','asc','default',false,false,null,'',{ yMin: '02/20/2026' });
+  ok('glong: the window drops bars without a note (it is the window, not the Limit)', !!gl5.labels && gl5.labels.length < 30 && gl5._ganttNote === '', (gl5.labels && gl5.labels.length) + ' / ' + JSON.stringify(gl5._ganttNote));
+  eq('glong: 30 bars: the dates along the top too', gl2._ganttTopAxis, true);
+  eq('glong: 5 bars: not', gl3._ganttTopAxis, false);
+  eq('glong: the height 30 bars need (22px each, the axes, the note)', gl2._ganttNeedH, 30 * 22 + 110 + 26 + 18);
+  eq('glong: the height 5 bars need', gl3._ganttNeedH, 5 * 22 + 110);
+  eq('glong: the height is capped (a canvas has a size limit)', gl4._ganttNeedH, 6000);
+
+  // applyGanttChartConfig: the top axis and the note
+  var glc = cfg(); glc.options.layout = { padding: { top: 4, right: 6, bottom: 2, left: 0 } };
+  G.apply(glc, gl2, {showValues:false, textColor:'#111', isDark:false, fsBoost:0});
+  var glX = glc.options.scales.xTop;
+  ok('glong: a top axis over the same dates', !!glX && glX.position === 'top' && glX.axis === 'x' && glX.min === gl2._ganttMin && glX.max === gl2._ganttMax, JSON.stringify(glX || null));
+  ok('glong: ...with the same tick dates', !!glX && glX.ticks.callback === glc.options.scales.x.ticks.callback);
+  var glNote = (glc.plugins || []).filter(function (p) { return p.id === 'penumbraGanttNote'; })[0];
+  ok('glong: the note is drawn', !!glNote);
+  eq('glong: ...with room below the axis (the other padding kept)', glc.options.layout.padding, { top: 4, right: 6, bottom: 18, left: 0 });
+  var glTxt = [], glCtx = { save:function(){}, restore:function(){}, fillText:function (t, x, y) { glTxt.push([t, x, y]); } };
+  if (glNote) glNote.afterDraw({ chartArea: { left: 40, right: 500, top: 10, bottom: 300 }, ctx: glCtx, height: 330 });
+  eq('glong: ...under the plot, at its left edge', glTxt, [['1 row with no start or end date is not shown.', 40, 327]]);
+  var glc2 = cfg(); G.apply(glc2, gl3, {showValues:false, textColor:'#111', isDark:false, fsBoost:0});
+  ok('glong: 5 bars, nothing left out: no top axis, no note', !glc2.options.scales.xTop && !(glc2.plugins || []).some(function (p) { return p.id === 'penumbraGanttNote'; }));
+  var glc3 = cfg(); glc3.options.layout = { padding: 8 }; G.apply(glc3, gl1, {showValues:false, textColor:'#111', isDark:false, fsBoost:0});
+  eq('glong: a one-number padding becomes four sides', glc3.options.layout.padding, { top: 8, right: 8, bottom: 24, left: 8 });
+
+  // _vizGanttGrow: the canvas's height raised to the bars' need, from its authored height
+  var glGrowSrc = code.indexOf('function _vizGanttGrow(') !== -1 ? grab('function _vizGanttGrow(') : null;
+  ok('glong grow: _vizGanttGrow exists', !!glGrowSrc);
+  if (glGrowSrc) {
+    var glGrow = new Function(glGrowSrc + '\nreturn _vizGanttGrow;')();
+    var glCv = document.createElement('canvas'); glCv.setAttribute('height', '400');
+    glGrow(glCv, 900); eq('glong grow: up to what the bars need', glCv.getAttribute('height'), '900');
+    glGrow(glCv, 500); eq('glong grow: a redraw needing less grows from the set height, not the last size', glCv.getAttribute('height'), '500');
+    glGrow(glCv, 300); eq('glong grow: ...never below the set height', glCv.getAttribute('height'), '400');
+    glCv.setAttribute('height', '700'); glGrow(glCv, 300); eq("glong grow: a caller's new height is the new base", glCv.getAttribute('height'), '700');
+  }
+
+  // the suggested Limit: a cap of 200 (the chart grows), not what fits the set height
+  var glSug = null;
+  try {
+    glSug = new Function('var VIZ_LIMIT_UNLIMITED = 9999;\n' + grab('var VIZ_LIMIT_RULE = {') + ';\nvar GL_D = 0;\n' +
+      'function pivotParseFieldToken(t){ return { base: t }; }\nfunction _vizXLabelStats(){ return { distinct: GL_D, avgChars: 6 }; }\n' +
+      'function _vizDefaultBaseWidth(){ return 1200; }\nfunction getVizDefaultDimensions(){ return { height: 600 }; }\n' +
+      'function $(){ return { val: function(){ return ""; }, is: function(){ return false; } }; }\n' +
+      grab('function _vizSuggestLimit(') + '\nreturn function (d) { GL_D = d; return _vizSuggestLimit("gantt", "TASK", false); };')();
+  } catch (e) { LOG.push('INFO  glong limit: ' + e.message); }
+  eq('glong limit: 812 bars -> a Limit of 200', glSug ? glSug(812) : null, 200);
+  eq('glong limit: 150 bars -> no limit (they all fit)', glSug ? glSug(150) : null, 9999);
+
+  // =====================================================================
+  // (gfix, 2026-11-02) typed dates forgive their format; Values Center is
+  // honoured with per-bar contrast ink; long filter values truncate
+  // =====================================================================
+  // ---- (gdate) the typed Marker / Show From / Show To fields ----
+  var gfY = moment().year();
+  eq('gdate: dashes between numbers', gwMk('11-03-2026','from'), '2026-11-03 00:00');
+  eq('gdate: a 2-digit year with dashes', gwMk('3-5-26','from'), '2026-03-05 00:00');
+  eq('gdate: month-name day, comma', gwMk('Nov 3, 2026','from'), '2026-11-03 00:00');
+  eq('gdate: full month name', gwMk('November 3 2026','from'), '2026-11-03 00:00');
+  eq('gdate: day before the full month', gwMk('3 November 2026','from'), '2026-11-03 00:00');
+  eq('gdate: slashes the other way', gwMk('2026/11/3','from'), '2026-11-03 00:00');
+  eq('gdate: dots', gwMk('11.3.2026','from'), '2026-11-03 00:00');
+  eq('gdate: month and day alone mean this year', gwMk('11/3','from'), gfY + '-11-03 00:00');
+  eq('gdate: a bare month-name day too', gwMk('Nov 3','from'), gfY + '-11-03 00:00');
+  eq('gdate: ...and as a To it reaches the end of its day', gwMk('Nov 3','to'), gfY + '-11-03 23:59');
+  eq('gdate: the marker takes the loose forms too', gwMk('11-03-2026'), '2026-11-03 00:00');
+  eq('gdate: ...with a label', gwMkl('Nov 3, 2026|Renewal'), 'Renewal');
+  eq('gdate: a 13th month is still refused', G.marker('13-45-2026','from'), null);
+  eq('gdate: junk is still junk', G.marker('soonish','from'), null);
+  eq('gdate: a bare number with an edge is still refused', G.marker('80,000','to'), null);
+
+  // ---- (gvpos) Values position reaches the Gantt labels ----
+  var gvData = gsGen(rows([['Dark','01/01/2026','03/01/2026'],['Pale','02/01/2026','05/01/2026']]), {}, 'label');
+  gvData.datasets[0]._baseColors = ['rgba(153, 0, 0, 0.8)', 'rgba(255, 220, 210, 0.8)'];
+  var gvC = cfg(); gvC.data = { datasets: gvData.datasets };
+  G.apply(gvC, gvData, {showValues:true, textColor:'#111', isDark:false, fsBoost:0, valuePos:'center'});
+  eq('gvpos: Center anchors the label on the bar', gvC.options.plugins.datalabels.anchor, 'center');
+  eq('gvpos: ...and centres it', gvC.options.plugins.datalabels.align, 'center');
+  ok('gvpos: centred ink is per bar', typeof gvC.options.plugins.datalabels.color === 'function');
+  eq('gvpos: white ink on a deep bar', typeof gvC.options.plugins.datalabels.color === 'function' ? gvC.options.plugins.datalabels.color({dataIndex:0}) : null, '#ffffff');
+  eq('gvpos: dark ink on a pale bar', typeof gvC.options.plugins.datalabels.color === 'function' ? gvC.options.plugins.datalabels.color({dataIndex:1}) : null, '#1f1f1f');
+  var gvE = cfg(); gvE.data = { datasets: gvData.datasets };
+  G.apply(gvE, gvData, {showValues:true, textColor:'#111', isDark:false, fsBoost:0});
+  eq('gvpos: no position keeps the label beside the bar', gvE.options.plugins.datalabels.anchor, 'end');
+  eq('gvpos: ...aligned right', gvE.options.plugins.datalabels.align, 'right');
+  eq('gvpos: ...in the page text colour', gvE.options.plugins.datalabels.color, '#111');
+  ok('gvpos: both renderers hand the position over',
+     (code.match(/valuePos: valuePos\s+\/\/ \(gvpos/g) || []).length === 2,
+     'call sites found: ' + ((code.match(/valuePos: valuePos\s+\/\/ \(gvpos/g) || []).length));
+
+  // ---- (gtrunc) long filter values ellipsize in the chart menu ----
+  ok('gtrunc: the filter leaf wraps its value in a label span',
+     code.indexOf('<span class="ctx-filter-label">') !== -1);
+  ok('gtrunc: the full value rides the row as a native tooltip',
+     /ctx-filter-leaf" data-col="' \+ escapeHtml\(col\) \+ '" data-val="' \+ escapeHtml\(val\) \+ '" title="' \+ escapeHtml\(val\)/.test(code));
+
+  // =====================================================================
+  // (gsortcolor, 2026-11-02) Sort By Color By group: each value's bars together (the legend's order), by start date
+  // =====================================================================
+  var RSC = rowsS([
+    ['A1', '03/01/2026', '06/01/2026', 'Pending'],
+    ['A2', '01/01/2026', '02/01/2026', 'Active'],
+    ['A3', '05/01/2026', '07/01/2026', 'Active'],
+    ['A4', '02/01/2026', '09/01/2026', 'Closed'],
+    ['A5', '04/01/2026', '05/01/2026', 'Pending'],
+    ['A6', '06/01/2026', '08/01/2026', 'Active']
+  ]);
+  var CBs = {vizOptions: JSON.stringify({colorBy:'STATUS'})};
+  var gsc1 = gx(RSC, 'color', 'asc', CBs);
+  eq('gsortcolor: each value together, A to Z, by start within it', gsc1.labels, ['A2','A3','A6','A4','A1','A5']);
+  eq("gsortcolor: ...in the legend's order", gsc1._ganttLegend.map(function (k) { return k.text; }), ['Active','Closed','Pending']);
+  eq("gsortcolor: Desc flips the dates only (the groups keep the legend's order)", gx(RSC, 'color', 'desc', CBs).labels, ['A6','A3','A2','A4','A5','A1']);
+  eq('gsortcolor: without a Color By it is start date', gx(RSC, 'color', 'asc', {}).labels, gx(RSC, 'value', 'asc', {}).labels);
+  eq('gsortcolor: the Limit keeps the first groups', gx(RSC, 'color', 'asc', CBs, 4).labels, ['A2','A3','A6','A4']);
 
   document.getElementById('out').textContent =
     'RESULT '+(FAIL===0?'ALL-PASS':'HAS-FAILURES')+'  pass='+PASS+' fail='+FAIL+'\n'+LOG.join('\n');

@@ -116,6 +116,20 @@ def build(index_src=None):
         '    // power of two - binary 1.00499999..., which Intl prints 1.00 and the decimal text 1.01)\n'
         '    if (window.__SCN === "pvtie") rows.forEach(function (r) { r.H_AMT = "1.005"; });\n'
         '    window.__rowsFixture = rows;\n')
+    # (2026-11-02, cfsplit) fsplit / gsplit: V_NAME a semicolon list of "Last, First" names - one to three a row,
+    # row 2 repeating one, row 3 with white space round its ; - so its Group by offers Split by ; (no random draw:
+    # the other columns keep their values); and the filter strip (js/penumbra_tiles.js, before main.js as index.php
+    # loads it), whose list-item condition a click on one of the values writes
+    rep('    window.__rowsFixture = rows;\n',
+        '    if (/^(?:fsplit|gsplit)$/.test(window.__SCN)) rows.forEach(function (r, i) {\n'
+        '      var P = ["Palmtag, Scott", "Smith, Jo", "Nguyen, An", "Okafor, Ada", "Berg, Lena", "Diaz, Rosa", "Kim, Min", "Lund, Ola"], l = [];\n'
+        '      for (var k = 0; k <= i % 3; k++) l.push(P[(i * 3 + k * 5) % P.length]);\n'
+        '      r.V_NAME = i === 1 ? "Smith, Jo;Smith, Jo" : (i === 2 ? "Kim, Min ; Lund, Ola" : l.join(";"));\n'
+        '    });\n'
+        '    window.__rowsFixture = rows;\n')
+    rep('<script src="main_hc.js"></script>\n',
+        '<script>if (/^(?:fsplit|gsplit)$/.test(window.__SCN)) document.write(\'<script src="penumbra_tiles.js"></scr\' + \'ipt>\');</script>\n'
+        '<script src="main_hc.js"></script>\n')
     # (colopt f) a report saved with the old Last Stop Changes "Deep Link Vendor Codes" off
     rep('    if (S === "hidcol") st.visibleColumns = ["#", 0, 1, 3, 4, 5];\n',
         '    if (S === "hidcol") st.visibleColumns = ["#", 0, 1, 3, 4, 5];\n'

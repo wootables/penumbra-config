@@ -98,6 +98,16 @@ try {
   ok('static: rail jump centres the thumb on the click', /frac \* t\.scrollWidth - t\.clientWidth \/ 2/.test(code));
   ok('static: rail drag scale is scrollWidth over rail width', /scale: t\.scrollWidth \/ Math\.max\(1, r\.width\)/.test(code));
   ok('static: vizSyncCarousel reports aria-valuenow on the rail', /aria-valuenow/.test(grab('function vizSyncCarousel(')));
+  // autoviz (2026-11-02): a deliberately picked type is kept by Auto-build.
+  ok('static: the deliberate-type flag exists', /var _vizTypeTouched = false;/.test(code));
+  ok('static: a tile click sets the flag', /\$\(this\)\.addClass\('active'\);\n\n\s*\/\/ A clicked tile[^\n]*\n\s*_vizTypeTouched = true;/.test(code));
+  ok('static: reset clears the flag', /_vizLimitTouched = false;\n\s*_vizTypeTouched = false;/.test(code));
+  ok('static: opening on a saved chart sets the flag', /restoreVizConfig\(lastVisConfig\);\n[\s\S]{0,200}_vizTypeTouched = true;/.test(code));
+  ok('static: the auto-build click consults the flag, never the bare active tile', /var _selType = _vizTypeTouched \? \(\$\('\.viz-type-option\.active'\)\.data\('type'\) \|\| ''\) : '';/.test(code));
+  ok('static: the infeasible notice names the suggested type', /Try it as a <strong>" \+ escapeHtml\(_sugLabel\)/.test(code));
+  ok('static: a kept type is announced in the HEADS UP', /Kept the selected ' \+ _selLabel \+ ' type/.test(code));
+  ok('static: the applier writes axis titles for axis types only', /VIZ_NO_AXIS_LABELS\.indexOf\(_autoType\) === -1 && _autoType !== 'gantt'/.test(grab('function _vizApplyAutoConfig(')));
+  eq('static: all three Auto-build tips say a picked type is kept', (code.match(/A chart type you have already picked is kept/g) || []).length, 3);
 
   // ---- 1. Sandbox: real readers + shape rules, stubbed DOM ----------------
   var stubs = [
@@ -136,7 +146,11 @@ try {
     grab('function _vizColLooksLikeYear('), grab('function _vizPickAutoMeasure('), grab('function _vizSplitWord('),
     grab('function _vizAutoShape('), grab('function _vizPropsForCol('), grab('function _vizChartableCols('),
     grab('function _vizCanAgg('), grab('function groupsToVizConfig('), grab('function reportToVizConfig('),
-    grab('function pivotToVizConfig('), grab('function _vizAutoSource('), grab('function getSmartVizDefaults(')
+    grab('function pivotToVizConfig('), grab('function _vizAutoSource('), grab('function getSmartVizDefaults('),
+    // autoviz (2026-11-02): auto-build keeps a deliberately picked type
+    grab('function _vizAutoColClasses('), grab('function _vizAutoMeasureList('), grab('function _vizAutoSecondCat('),
+    grab('function _vizAutoStateCol('), grab('function _vizAutoGanttDates('), grabVar('_VIZ_AGG_TITLE_WORDS'),
+    grab('function _vizAutoYAxisTitle('), grab('function _vizAutoRetype(')
   ].join('\n');
 
   var SB = new Function(stubs + '\n' + real + '\n' +
@@ -144,7 +158,9 @@ try {
     ' isSeq: _vizXIsSequence, autoSort: _vizAutoSort, dateSplit: _vizAutoDateSplit, distinctTok: _vizDistinctCountTok,' +
     ' hasNeg: _vizColHasNegative, looksYear: _vizColLooksLikeYear, pickMeasure: _vizPickAutoMeasure, shape: _vizAutoShape,' +
     ' score: _vizScoreXCandidate, groups: groupsToVizConfig, report: reportToVizConfig, pivot: pivotToVizConfig,' +
-    ' source: _vizAutoSource, smart: getSmartVizDefaults };')();
+    ' source: _vizAutoSource, smart: getSmartVizDefaults,' +
+    ' classes: _vizAutoColClasses, mlist: _vizAutoMeasureList, secondCat: _vizAutoSecondCat,' +
+    ' stateCol: _vizAutoStateCol, ganttDates: _vizAutoGanttDates, ytitle: _vizAutoYAxisTitle, retype: _vizAutoRetype };')();
 
   // ---- scenario builders -------------------------------------------------
   // defs: [[name, kind]] kind = text | money | num | date | bool | year(=date at year granularity)
@@ -262,6 +278,20 @@ try {
   setRows(50, function (i) { return { CAT: STATUS[i % 3], AMOUNT: i === 4 ? '($200.00)' : '$10.00' }; });
   s = SB.shape({ xAxis: 'CAT', groupBy: 'none', agg: 'sum', yAxis: 'AMOUNT', warnings: [] });
   eq('shape: a negative in the measure vetoes the doughnut', s.type, 'bar');
+
+  // a series past the data builder's 50-value guard is dropped, not errored
+  // (autoviz2: a pivot's one-value-per-award column field auto-built straight
+  // into the "Too many groups" panel)
+  awdRows(200);
+  s = SB.shape({ xAxis: 'TRANSACTION_TYPE', groupBy: 'DIRECT_SPONSOR_NAME', agg: 'sum', yAxis: 'AMOUNT', warnings: [] });
+  eq('shape: 40 series pass the builder guard and stay', s.groupBy, 'DIRECT_SPONSOR_NAME');
+  setRows(200, function (i) { return { TRANSACTION_TYPE: ['New', 'Continuation'][i % 2], BIGCOL: 'S' + (i % 80), AMOUNT: '$5.00' }; });
+  w = [];
+  s = SB.shape({ xAxis: 'TRANSACTION_TYPE', groupBy: 'BIGCOL', agg: 'sum', yAxis: 'AMOUNT', warnings: w });
+  eq('shape: 80 series would hit "Too many groups" -> the split is dropped', s.groupBy, 'none');
+  has('shape: ... and the warning names the column, count and limit', w, /BIGCOL has 80 values - too many to draw as chart series \(the builder tops out at 50\)/);
+  eq('shape: ... what remains is still shaped (2 clean shares -> doughnut)', s.type, 'doughnut');
+  awdRows(200);
 
   // constant X with a series: promote the series
   setTable(AWD); awdRows(120, 'US Federal');
@@ -466,6 +496,154 @@ try {
   SB.DOM.groupedVisible = false; SB.set('currentGroupingColumn', '');
   eq('source: flat -> report', SB.source().kind, 'report');
   ok('source: report tip mentions the gauge and per-period fallbacks', /gauge/.test(SB.source().tip) && /per period/.test(SB.source().tip));
+
+  // ---- 10. Retype onto a chosen type (autoviz, 2026-11-02) ------------------
+  // _vizAutoRetype re-aims the reader's config at the type the user picked, or
+  // refuses with a reason the click handler shows in the centre notice.
+  setTable(AWD); awdRows(200);
+  var rt, m10;
+
+  m10 = SB.report();                                      // auto = doughnut of AMOUNT by PRIME
+  rt = SB.retype('bar', 'Bar', m10);
+  eq('retype bar: ok, same axes, upright and unstacked', [rt.ok, m10.config.type, m10.config.xAxis, m10.config.yAxis, m10.config.horizontal, m10.config.stacked], [true, 'bar', 'PRIME_SPONSOR_CATEGORY', 'AMOUNT', false, false]);
+  has('retype bar: the reader lead line survives (axes unchanged)', m10.warnings, /^Charting the total of AMOUNT/);
+
+  m10 = SB.report();
+  rt = SB.retype('line', 'Line', m10);
+  eq('retype line: a categorical X moves to the first date-class column', [rt.ok, m10.config.type, m10.config.xAxis], [true, 'line', 'FY']);
+  has('retype line: ... and says so', m10.warnings, /A line reads best over time/);
+  eq('retype line: a sequence sorts by label', [m10.sortBy, m10.sortDir], ['label', 'asc']);
+
+  // a sequence SERIES becomes the X axis (the live awdspon pivot: X was the
+  // sponsor, the series FY - keeping FY as the series while X moved to FY
+  // drew a one-point-per-series "FY by FY" line)
+  m10 = { config: { type: 'bar', xAxis: 'ORIGINATING SPONSOR', yAxis: 'AMOUNT', groupBy: 'FY', agg: 'sum', stacked: true }, warnings: [] };
+  rt = SB.retype('line', 'Line', m10);
+  eq('retype line: a sequence series swaps onto the X axis', [rt.ok, m10.config.type, m10.config.xAxis, m10.config.groupBy], [true, 'line', 'FY', 'ORIGINATING SPONSOR']);
+  has('retype line: the swap is explained', m10.warnings, /FY is the X axis and ORIGINATING SPONSOR became the series/);
+  eq('retype line: swapped sequence sorts by label', [m10.sortBy, m10.sortDir], ['label', 'asc']);
+  m10 = { config: { type: 'bar', xAxis: 'PRIME_SPONSOR_CATEGORY', yAxis: 'AMOUNT', groupBy: 'TRANSACTION_TYPE', agg: 'sum' }, warnings: [] };
+  rt = SB.retype('line', 'Line', m10);
+  eq('retype line: a category series stays put, X still moves to the date class', [rt.ok, m10.config.xAxis, m10.config.groupBy], [true, 'FY', 'TRANSACTION_TYPE']);
+
+  m10 = SB.report();
+  rt = SB.retype('histogram', 'Histogram', m10);
+  eq('retype histogram: charts the measure itself', [rt.ok, m10.config.xAxis, m10.config.yAxis, m10.config.agg, m10.config.groupBy], [true, 'AMOUNT', '', 'count', 'none']);
+  has('retype histogram: explained', m10.warnings, /how AMOUNT is distributed/);
+  hasNot('retype histogram: the stale "total of X by Y" lead is gone', m10.warnings, /^Charting the total of /);
+
+  m10 = SB.report();
+  rt = SB.retype('gauge', 'Gauge', m10);
+  eq('retype gauge: one total of the measure', [rt.ok, m10.config.type, m10.config.yAxis, m10.config.agg], [true, 'gauge', 'AMOUNT', 'sum']);
+
+  m10 = SB.report();
+  rt = SB.retype('funnel', 'Funnel', m10);
+  eq('retype funnel: 3 stages is enough', [rt.ok, m10.config.type, m10.config.groupBy], [true, 'funnel', 'none']);
+
+  // radar needs 3+ categories
+  m10 = { config: { type: 'bar', xAxis: 'TRANSACTION_TYPE', yAxis: 'AMOUNT', groupBy: 'none', agg: 'sum' }, warnings: [] };
+  rt = SB.retype('radar', 'Radar', m10);
+  ok('retype radar: 2 categories refused with a reason', !rt.ok && /at least 3 categories and TRANSACTION_TYPE has 2/.test(rt.reason), rt.reason);
+
+  // non-additive measure forced additive for part-to-whole types
+  m10 = { config: { type: 'bar', xAxis: 'PRIME_SPONSOR_CATEGORY', yAxis: 'AMOUNT', groupBy: 'none', agg: 'avg' }, warnings: [] };
+  rt = SB.retype('treemap', 'Treemap', m10);
+  eq('retype treemap: average becomes Sum (parts of a whole)', [rt.ok, m10.config.agg], [true, 'sum']);
+  has('retype treemap: ... and says so', m10.warnings, /shows shares of one whole, so avg became Sum/);
+
+  // negatives refuse the part-to-whole shapes
+  setRows(50, function (i) { return { PRIME_SPONSOR_CATEGORY: ['US Federal', 'State', 'Industry'][i % 3], AMOUNT: i === 4 ? '($200.00)' : '$10.00' }; });
+  m10 = { config: { type: 'bar', xAxis: 'PRIME_SPONSOR_CATEGORY', yAxis: 'AMOUNT', groupBy: 'none', agg: 'sum' }, warnings: [] };
+  rt = SB.retype('pie', 'Pie', m10);
+  ok('retype pie: a negative measure is refused with a reason', !rt.ok && /AMOUNT holds negative values/.test(rt.reason), rt.reason);
+
+  // scatter / butterfly need two measures, combo needs one
+  awdRows(200);
+  m10 = SB.report();
+  rt = SB.retype('scatter', 'Scatter', m10);
+  ok('retype scatter: one measure refused, naming it', !rt.ok && /only AMOUNT/.test(rt.reason), rt.reason);
+  m10 = SB.report();
+  rt = SB.retype('butterfly', 'Butterfly', m10);
+  ok('retype butterfly: one measure refused', !rt.ok && /only AMOUNT/.test(rt.reason), rt.reason);
+  m10 = SB.report();
+  rt = SB.retype('combo', 'Combo', m10);
+  eq('retype combo: one measure -> bar of the sum + a count line', [rt.ok, m10.config.comboSeries.length, m10.config.comboSeries[0].col, m10.config.comboSeries[0].type, m10.config.comboSeries[1].agg], [true, 2, 'AMOUNT', 'bar', 'count']);
+  ok('retype combo: a count line gets the right-hand axis (dual = horizontal)', m10.config.horizontal === true);
+
+  setTable([['DEPT', 'text'], ['AMOUNT', 'money'], ['HEADCOUNT', 'num']]);
+  setRows(50, function (i) { return { DEPT: 'Dept ' + (i % 5), AMOUNT: '$' + (100 + i), HEADCOUNT: String(1 + (i % 9)) }; });
+  eq('measure list: money then clean numerics', SB.mlist(SB.classes()), ['AMOUNT', 'HEADCOUNT']);
+  m10 = SB.report();
+  rt = SB.retype('scatter', 'Scatter', m10);
+  eq('retype scatter: two measures -> one against the other', [rt.ok, m10.config.xAxis, m10.config.yAxis, m10.sortBy], [true, 'AMOUNT', 'HEADCOUNT', 'label']);
+  m10 = SB.report();
+  rt = SB.retype('butterfly', 'Butterfly', m10);
+  eq('retype butterfly: a side per measure', [rt.ok, m10.config.comboSeries[0].col, m10.config.comboSeries[1].col], [true, 'AMOUNT', 'HEADCOUNT']);
+  m10 = SB.report();
+  rt = SB.retype('combo', 'Combo', m10);
+  eq('retype combo: two measures -> sum line, single axis', [rt.ok, m10.config.comboSeries[1].col, m10.config.comboSeries[1].agg, m10.config.horizontal], [true, 'HEADCOUNT', 'sum', false]);
+  m10 = SB.report();
+  rt = SB.retype('box', 'Box Plot', m10);
+  eq('retype box: category plus the measure', [rt.ok, m10.config.xAxis, m10.config.yAxis], [true, 'DEPT', 'AMOUNT']);
+
+  // box with no measure refused
+  setTable([['DEPT', 'text'], ['NOTE', 'text']]);
+  setRows(30, function (i) { return { DEPT: 'Dept ' + (i % 4), NOTE: 'n' + i }; });
+  m10 = SB.report();
+  rt = SB.retype('box', 'Box Plot', m10);
+  ok('retype box: no measure refused', !rt.ok && /no money or number column/.test(rt.reason), rt.reason);
+
+  // gantt wants a start/end date pair and a near-unique label
+  setTable([['TASK', 'text'], ['START_DATE', 'date'], ['END_DATE', 'date'], ['AMOUNT', 'money']]);
+  setRows(40, function (i) { return { TASK: 'Task ' + i, START_DATE: iso(2025, 1 + (i % 12), 1 + (i % 25)), END_DATE: iso(2026, 1 + (i % 12), 1 + (i % 25)), AMOUNT: '$' + i }; });
+  eq('ganttDates: end found by name, start is the other', SB.ganttDates(['START_DATE', 'END_DATE']), { start: 'START_DATE', end: 'END_DATE' });
+  eq('ganttDates: neutral names fall back to table order', SB.ganttDates(['DATE_A', 'DATE_B']), { start: 'DATE_A', end: 'DATE_B' });
+  eq('ganttDates: one date column -> null', SB.ganttDates(['START_DATE']), null);
+  m10 = SB.report();
+  rt = SB.retype('gantt', 'Gantt', m10);
+  eq('retype gantt: label / start / end wired (end rides groupBy)', [rt.ok, m10.config.xAxis, m10.config.yAxis, m10.config.groupBy], [true, 'TASK', 'START_DATE', 'END_DATE']);
+  eq('retype gantt: sorted by start date ascending', [m10.sortBy, m10.sortDir], ['value', 'asc']);
+  setTable(AWD); awdRows(200);
+  m10 = SB.report();
+  rt = SB.retype('gantt', 'Gantt', m10);
+  ok('retype gantt: a lone date-class pair fails honestly when only one real pair is absent', !rt.ok || (m10.config.yAxis && m10.config.groupBy), rt.reason);
+
+  // sankey: a second category column becomes Stage 2
+  m10 = SB.report();
+  rt = SB.retype('sankey', 'Sankey', m10);
+  ok('retype sankey: ok with a second category as Stage 2', rt.ok && m10.config.groupBy && m10.config.groupBy !== 'none' && m10.config.groupBy !== 'PRIME_SPONSOR_CATEGORY', JSON.stringify(m10.config));
+  has('retype sankey: flow explained', m10.warnings, /^Flowing PRIME_SPONSOR_CATEGORY into /);
+  setTable([['RECORD_ID', 'text'], ['STATUS', 'text'], ['AMOUNT', 'money']]);
+  setRows(80, function (i) { return { RECORD_ID: 'R' + i, STATUS: STATUS[i % 3], AMOUNT: '$' + i }; });
+  m10 = { config: { type: 'bar', xAxis: 'STATUS', yAxis: 'AMOUNT', groupBy: 'none', agg: 'sum' }, warnings: [] };
+  rt = SB.retype('sankey', 'Sankey', m10);
+  ok('retype sankey: no usable second category refused', !rt.ok && /second category column/.test(rt.reason), rt.reason);
+
+  // map: a column of US states, resolved through the (stubbed) chart module
+  setTable([['STATE', 'text'], ['AMOUNT', 'money']]);
+  setRows(40, function (i) { return { STATE: ['NC', 'VA', 'GA', 'TX'][i % 4], AMOUNT: '$' + (10 + i) }; });
+  window.PenumbraCharts = { armed: true, _vizResolveState: function (v) { var S = { NC: 1, VA: 1, GA: 1, TX: 1 }; return S[String(v).trim()] ? { code: v } : null; } };
+  m10 = SB.report();
+  rt = SB.retype('map', 'Map', m10);
+  eq('retype map: the state column is found and measured', [rt.ok, m10.config.xAxis, m10.config.yAxis, m10.config.agg], [true, 'STATE', 'AMOUNT', 'sum']);
+  delete window.PenumbraCharts;
+  m10 = SB.report();
+  rt = SB.retype('map', 'Map', m10);
+  ok('retype map: no armed module -> refused with the state-column reason', !rt.ok && /US state names or codes/.test(rt.reason), rt.reason);
+
+  // a single-row KPI cannot drive a category chart
+  setTable([['DEPT', 'text'], ['TOTAL', 'money']]);
+  setRows(1, function () { return { DEPT: 'Chemistry', TOTAL: '$5.00' }; });
+  m10 = SB.report();                                      // auto = gauge
+  rt = SB.retype('bar', 'Bar', m10);
+  ok('retype on one row: category charts refused', !rt.ok && /single row/.test(rt.reason), rt.reason);
+
+  // Y-axis titles, the applier's vocabulary
+  eq('ytitle: sum', SB.ytitle('bar', 'sum', 'AMOUNT'), 'Total AMOUNT');
+  eq('ytitle: count', SB.ytitle('bar', 'count', ''), 'Count of Records');
+  eq('ytitle: histogram always counts', SB.ytitle('histogram', 'count', ''), 'Count of Records');
+  eq('ytitle: percentile', SB.ytitle('bar', 'p90', 'AMT'), 'P90 AMT');
+  eq('ytitle: scatter names the column alone', SB.ytitle('scatter', 'sum', 'HEADCOUNT'), 'HEADCOUNT');
 
 } catch (e) {
   FAIL++; LOG.push('HARNESS-ERROR ' + (e && e.stack || e));

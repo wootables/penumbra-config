@@ -65,8 +65,8 @@ def tok(obj):
 T_NOCV = tok({'v': 1, 'm': 'flat', 'o': 'none'})   # a link without the card view: the table (the link wins over a saved pick)
 T_XL = tok({'v': 1, 'm': 'flat', 'o': 'none', 'cv': 1, 'cz': 'xl'})   # (cxl) a link to the cards at Extra large
 
-SCN = ['cfmtbig', 'cfmt', 'cauto', 'cguess', 'cpage', 'cfull', 'chl', 'cbar', 'cesc', 'coff', 'cviewer', 'pcoff', 'gcards', 'gcoll', 'gncoll', 'ggcards', 'gglnest', 'csize', 'cszvlA', 'cszvlB', 'cnarrowA', 'cnarrowT', 'cnarrowN', 'cauth', 'cauthB', 'cauthM', 'cvlA', 'cvlB', 'cvlT', 'ca11y', 'cphone', 'cperf', 'cmore',
-       'cxl', 'cxlvl', 'cmenu', 'gmenu', 'pmenu', 'cmsize', 'gmsize', 'cdet', 'gdet', 'pdet', 'cdetph', 'cmword', 'curl1', 'curl2', 'curl3', 'curl4', 'cshare', 'cnote', 'cnotedet', 'ctmenu', 'cflink', 'ckword', 'cfind', 'gfind', 'cbarpick', 'csort', 'gsort', 'cempty', 'pfind', 'clayout', 'clayoutB', 'cdetrow', 'pvfind', 'cwhite', 'cdetpage', 'cdetmore', 'cseg', 'cxl2', 'cxl2ph', 'ccolsview', 'pvhtml', 'cfields', 'cfieldsB', 'gboard', 'gboardvl', 'gboardfew', 'gboardbig', 'gbandbig', 'cboard', 'cboardload', 'cboardrx', 'cbarrank', 'cvlC', 'cvlD', 'pfsort', 'cvlE', 'cvlF', 'pvlA', 'pvlB', 'pvcfg', 'pvcfgB', 'plab', 'cprint', 'gprint', 'pprint', 'cfix', 'cfixB', 'pfix', 'cfixprint', 'gfix2', 'cchips', 'cmail', 'gmail', 'pmail', 'cdens', 'cdensph', 'gdens', 'cflt', 'csave', 'copen', 'cdpack']
+SCN = ['cgbar', 'cfmtbig', 'cfmt', 'cauto', 'cguess', 'cpage', 'cfull', 'chl', 'cbar', 'cesc', 'coff', 'cviewer', 'pcoff', 'gcards', 'gcoll', 'gncoll', 'ggcards', 'gglnest', 'csize', 'cszvlA', 'cszvlB', 'cnarrowA', 'cnarrowT', 'cnarrowN', 'cauth', 'cauthB', 'cauthM', 'cvlA', 'cvlB', 'cvlT', 'ca11y', 'cphone', 'cperf', 'cmore',
+       'cw2det', 'cw2nest', 'cw2more', 'cw2pdf', 'gw2band', 'gw2mail', 'pw2piv', 'pw2next', 'cnest', 'ctclear', 'csweep', 'gsweep', 'gbcols', 'cpct', 'cfindgo', 'ctsel', 'cxl', 'cxlvl', 'cmenu', 'gmenu', 'pmenu', 'cmsize', 'gmsize', 'cdet', 'gdet', 'pdet', 'cdetph', 'cmword', 'curl1', 'curl2', 'curl3', 'curl4', 'cshare', 'cnote', 'cnotedet', 'ctmenu', 'ctrow', 'gtrow', 'cflink', 'ckword', 'cfind', 'gfind', 'cbarpick', 'csort', 'gsort', 'cempty', 'pfind', 'clayout', 'clayoutB', 'cdetrow', 'pvfind', 'cwhite', 'cdetpage', 'cdetmore', 'cseg', 'cxl2', 'cxl2ph', 'ccolsview', 'pvhtml', 'cfields', 'cfieldsB', 'gboard', 'gboardvl', 'gboardfew', 'gboardbig', 'gbandbig', 'cboard', 'cboardload', 'cboardrx', 'cbarrank', 'cvlC', 'cvlD', 'pfsort', 'cvlE', 'cvlF', 'pvlA', 'pvlB', 'pvcfg', 'pvcfgB', 'plab', 'cprint', 'gprint', 'pprint', 'cfix', 'cfixB', 'pfix', 'cfixprint', 'gfix2', 'cchips', 'cmail', 'gmail', 'pmail', 'cdens', 'cdensph', 'gdens', 'cflt', 'csave', 'copen', 'cdpack']
 T_CV = tok({'v': 1, 'm': 'flat', 'o': 'none', 'cv': 1, 'cz': 'compact'})   # (curl) a view link asking for compact cards
 CHK = {
     'cauto': ['switchShown', 'tableDefault', 'toCards', 'pagerWord', 'tableKeptForReaders', 'count', 'guessTitle', 'guessBig', 'guessFields', 'guessNoExtras', 'parity', 'linkKept', 'filtered', 'sorted', 'prefSaved',
@@ -113,7 +113,29 @@ CHK = {
     # (round I, cardsmenu) the table's own menus while the report offers cards: Show as cards (the sizes, the current one
     # ticked; This row as a card from a value), a size picked, a row's details, a heading's list without the row; (round N)
     # no size ticked while the table shows, Configure cards... last
-    'ctmenu': ['flyout', 'noneTicked', 'pickSize', 'rowCard', 'headerFlyout'],
+    'ctmenu': ['rowTop', 'flyout', 'noneTicked', 'pickSize', 'rowCard', 'headerFlyout'],
+    # (crow, the user) This row as a card: the row's details window OVER THE TABLE - the table stays, the count is of rows,
+    # Next / Left step its rows, the menus inside lack the cards' own items, Print is that card, Escape gives the table's
+    # cell back (active, focused), Next past the page turns the table's page (Previous back), Quick actions' Open card
+    # details for the active cell (Next then Escape: the moved row's cell), a sort keeps the row, a filter that hides it
+    # closes it, cards drawn under it make it the cards' window; grouped: the open groups' rows, a folded one's skipped
+    'ctrow': ['opens', 'countRows', 'notesShown', 'nextRow', 'prevKey', 'menuInside', 'printsCard', 'escBack', 'pageTurns', 'pageBack',
+              'paletteRow', 'paletteBack', 'sortFollows', 'filterCloses', 'toCards', 'toCardsBack'],
+    'gtrow': ['opensInGroup', 'foldedSkipped', 'nextCrossesGroup'],
+    # (gbar) a chart's rows as a list: the window, "1 of 3 bars", another page's row, the end, back, Escape to the chart
+    'cgbar': ['opens', 'countBars', 'nextFar', 'nextLast', 'endStops', 'prevBack', 'escChart', 'escCanvas'],   # (gfocus) escCanvas
+    # (cnest, 2026-11-02, the user) a nested table's gaps on a card are its field's (hover, menu; the details window too); the
+    # card's padding still the card's; Clear all customizations last under one separator: a value's, a label's, the
+    # details window's, the table's own (after This row as a card / Show as cards), a heading's; it still runs
+    'cnest': ['nestHot', 'nestGapField', 'clearLastCard', 'whiteStillCard', 'clearLastLabel', 'nestGapDetails', 'clearLastDetails'],
+    'ctclear': ['tableClearLast', 'clearRuns', 'headClearLast'],
+    # (cnest sweep) the card sweep's fixes, one check each (S-cn*: the ones a page cannot reach here)
+    # (csw2, 2026-11-02, the user: a second card sweep) one check per fix
+    'cw2det': ['selNoWin', 'dragKeeps', 'bodyTop', 'endFocus', 'escMenuFirst', 'noEngine', 'clipNoRepass', 'panelFocus', 'tableLinkSize'],
+    'cw2nest': ['subFilter'], 'cw2more': ['rowNotDrawn', 'moreFocus'], 'cw2pdf': ['pdfShared'], 'gw2band': ['bandDown', 'regroupResets'],
+    'gw2mail': ['foldedHeadKept'], 'pw2piv': ['setupOnce', 'selGone', 'detGone'], 'pw2next': ['pivotNextOn'],
+    'csweep': ['escOverPopover', 'reopenMidFade', 'dblKeeps', 'backdropCloses', 'altKeys', 'menuKeyOnButton'],
+    'gsweep': ['cutNoHeads'], 'gbcols': ['boardColsGreyed'], 'cpct': ['pctBar', 'pctLabel'], 'cfindgo': ['findLetGo'], 'ctsel': ['pageTurnNoSel'],
     # (round J) a filter link on a card and in the details window (which closes); links styled as the table's in three
     # themes; the field a menu is for in each theme's table-hover colour
     'cflink': ['cardLink', 'detailsLink', 'linkThemed', 'hoverThemed'],
@@ -472,7 +494,30 @@ NEW = set()   # (csz is LIVE since 4cda1d2, 2026-11-01: old checks now)
 GUARDS |= {'L-cnotedet-delInDetails'}   # (cdel: holds on live - the details window always had the x)
 NEW = {'L-cnote-noDelOnCard', 'L-cnote-linkThemed', 'S-cdel'} - GUARDS   # (cdel: no x on a card; links themed)
 NEW = set()   # (cdel is LIVE since 883f359, 2026-11-01: old checks now)
+GUARDS |= {'L-ctmenu-headerFlyout'}   # (crow: holds on live - a heading's menu never had the row's item)
+NEW = ({'L-%s-%s' % (sc, c) for sc in ('ctrow', 'gtrow') for c in CHK[sc]} | {'L-ctmenu-rowTop', 'L-ctmenu-flyout', 'L-ctmenu-rowCard', 'S-crow'}) - GUARDS   # (crow: the row's window over the table)
+NEW = set()   # (crow is LIVE since 5b78a0c, 2026-11-02: old checks now)
+GUARDS |= {'L-cnest-whiteStillCard', 'L-ctclear-clearRuns'}   # (cnest: hold on live - the card's padding, the item's own run)
+NEW = ({'L-%s-%s' % (sc, c) for sc in ('cnest', 'ctclear') for c in CHK[sc]}) - GUARDS   # (cnest: nested gaps, Clear all last)
+GUARDS |= {'L-csweep-backdropCloses', 'L-csweep-reopenMidFade'}   # (cnest sweep: hold on live - one click on the backdrop closed it; a window opened in the X's fade stays)
+NEW = ({'L-%s-%s' % (sc, c) for sc in ('cnest', 'ctclear', 'csweep', 'gsweep', 'gbcols', 'cpct', 'cfindgo', 'ctsel') for c in CHK[sc]}
+       | {'S-cnest', 'S-cnPvSetup', 'S-cnTotalWord', 'S-cnResetPv', 'S-cnResetFlat'}) - GUARDS   # (cnest + its sweep)
+NEW = set()   # (cnest is LIVE since ab526da, 2026-11-02: old checks now)
+NEW = {'L-cgbar-%s' % c for c in CHK['cgbar']}   # (gbar: a chart's rows as a list in the details window)
+NEW = set()   # (gbar is LIVE since c08a91a, 2026-11-02: old checks now)
+NEW = {'L-cgbar-escCanvas'}   # (gfocus: Escape focuses a chart canvas)
+NEW = set()   # (gfocus is LIVE, 2026-11-02: old checks now)
 
+# (2026-11-02, cfsplit 4; the user: "In card detailed mode and table mode, right clicking on a split item does not offer filter
+# or copy of just that item") citem: a chip right-clicked (H_TEXT's ; names, H_CODE's | codes), on the card and in the details
+# window: Filter to / Exclude its value and its Copy first; guards (hold on live): none on a field of one value or a plain one
+SCN = SCN + ['citem']
+CHK['citem'] = ['chipMenu', 'chipCopy', 'chipFilterRuns', 'chipExcludeRuns', 'chipCopyRuns', 'pipeChip', 'detChip', 'oneChipNone', 'pillNone']
+GUARDS |= {'L-citem-oneChipNone', 'L-citem-pillNone'}
+NEW = ({'L-citem-%s' % c for c in CHK['citem']} | {'S-citem'}) - GUARDS
+NEW = set()   # (cfsplit 4 is LIVE since 81e2699, 2026-11-02: old checks now)
+NEW = ({'L-%s-%s' % (sc, c) for sc in ('cw2det', 'cw2nest', 'cw2more', 'cw2pdf', 'gw2band', 'gw2mail', 'pw2piv', 'pw2next') for c in CHK[sc]}) - GUARDS   # (csw2: the second card sweep)
+NEW = set()   # (csw2 is LIVE since a7d63c3, 2026-11-02: old checks now)
 MUTANTS = {
     # (cdpack) the packed grid's row-gap guard gone: the density rules' size gaps come back
     'pk-rowgap': ([('cardscss', '#pnbCardsHost.is-packed .pnb-cards-grid { row-gap: 0 !important; }\n', '')], ['L-cdpack-compactTight', 'L-cdpack-everyTight', 'S-cdpack'], ['cdpack']),
@@ -537,6 +582,63 @@ MUTANTS = {
     # (cdel) the x back on a card / a note's link red again / the hide reaching the details window too
     'cd-del': ([('cardscss', "#pnbCardsHost .journal-rownote-inline .journal-rownote-act button.journal-rownote-del, #pnbCardsHost .pnb-sharednote-file .pnb-sharednote-filedel { display: none; }", "#pnbCardsHost .pnb-sharednote-file .pnb-sharednote-filedel { display: none; }")], ['L-cnote-noDelOnCard'], ['cnote']),
     'cd-link': ([('maincss', ".journal-rownote-text a:not(.journal-attach-chip),\n.pnb-sharednote-text a:not(.journal-attach-chip) {\n    color: var(--brand-text, var(--brand-primary, #336699));", ".journal-rownote-text a:not(.journal-attach-chip),\n.pnb-sharednote-text a:not(.journal-attach-chip) {\n    color: var(--accent-danger, #cc0000);")], ['L-cnote-linkThemed'], ['cnote']),
+    # (crow) the row's item back in the Show as cards list; the window's rows the cards'; the table's redraw closing it; the
+    # count in cards; the cards' items in its menus; no menu in it; the cell not made active; the opened cell kept after a
+    # step; Print refused; cards drawn under it keeping the table's rows; Quick actions' table path gone; folded rows kept
+    'cr-top': ([('cards', "        if (tr) out.push({ act: 'showCardRow',", "        if (false) out.push({ act: 'showCardRow',")], ['L-ctmenu-rowTop', 'L-ctmenu-rowCard', 'L-ctrow-opens'], ['ctmenu', 'ctrow']),
+    'cr-rows': ([('cards', "    function detRows() { return det.tbl ? (det.rows || []) : rowsDrawn.map(", "    function detRows() { return false ? (det.rows || []) : rowsDrawn.map(")], ['L-ctrow-opens', 'L-ctrow-nextRow'], ['ctrow']),
+    'cr-sync': ([('cards', "            if (det.tbl) { if (det.open) detRender(); } else closeDetails(false);", "            closeDetails(false);")], ['L-ctrow-pageTurns', 'L-ctrow-sortFollows'], ['ctrow']),
+    'cr-word': ([('cards', "var word = det.list ? ' ' + det.list.word : (det.tbl ? ' rows' : ' cards');", "var word = det.list ? ' ' + det.list.word : ' cards';")], ['L-ctrow-countRows', 'L-gtrow-opensInGroup'], ['ctrow', 'gtrow']),
+    'cr-extras': ([('cards', "        if (t.tbl) return [];   // (crow)", "        if (false) return [];   // (crow)")], ['L-ctrow-menuInside'], ['ctrow']),
+    'cr-menu': ([('cards', "if (!CM || !hostApi() || !(on() || (det.open && det.tbl))) return false;", "if (!CM || !hostApi() || !on()) return false;")], ['L-ctrow-menuInside'], ['ctrow']),
+    'cr-active': ([('cards', "if (CS && typeof CS.activate === 'function') CS.activate(back); }", "}")], ['L-ctrow-escBack'], ['ctrow']),
+    'cr-col': ([('cards', "        if (tr && tr.isConnected && col) for (i = 0; i < tr.cells.length; i++) if (tr.cells[i].getAttribute('data-column') === col) return tr.cells[i];\n", "")], ['L-ctrow-paletteBack'], ['ctrow']),
+    'cr-print': ([('cards', "        if (!hostApi() || !(on() || (det.open && det.tbl))) return null;", "        if (!hostApi() || !on()) return null;")], ['L-ctrow-printsCard'], ['ctrow']),
+    'cr-draw': ([('cards', "        if (det.open) { if (det.tbl && !det.list) tblEnd(); detRender(); }", "        if (det.open) { detRender(); }")], ['L-ctrow-toCards'], ['ctrow']),
+    'cr-pal': ([('cards', "openDetails: function (card) { return (!card && !on()) ? openActive() : openDetails(card || null); },", "openDetails: function (card) { return openDetails(card || null); },")], ['L-ctrow-paletteRow', 'L-ctrow-paletteBack'], ['ctrow']),
+    'cr-fold': ([('cards', "        return leafRows(null).filter(function (tr) { return tr.getClientRects().length > 0; });", "        return leafRows(null);")], ['L-gtrow-foldedSkipped', 'L-gtrow-opensInGroup'], ['gtrow']),
+    # --- (cnest) a nested table's gaps; Clear all customizations last
+    'cn-hit': ([('cards', "|| n.classList.contains('nested-json-container')) && inRect(", ") && inRect(")], ['L-cnest-nestHot', 'L-cnest-nestGapField', 'L-cnest-nestGapDetails'], ['cnest']),
+    'cn-last': ([('menu', "        items = clearLast(items);   // (cnest)", "")], ['L-cnest-clearLastCard', 'L-cnest-clearLastLabel', 'L-cnest-clearLastDetails', 'L-ctclear-tableClearLast', 'L-ctclear-headClearLast'], ['cnest', 'ctclear']),
+    'cn-sep': ([('menu', "return tidy.concat(tidy.length ? ['-'] : [], [c]);", "return tidy.concat([c]);")], ['L-cnest-clearLastCard', 'L-ctclear-tableClearLast'], ['cnest', 'ctclear']),
+    # --- (cnest sweep) one mutant per fix
+    'cs-esc': ([('cards', "    function escMine(t, sel) {", "    function escMine(t, sel) { return true;")], ['L-csweep-escOverPopover'], ['csweep']),
+    'cs-dbl': ([('cards', "if (e.target === dlg && !(e.detail > 1) && !(detDown", "if (e.target === dlg && !(detDown")], ['L-csweep-dblKeeps'], ['csweep']),
+    'cs-altcard': ([('cards', "        if (e.altKey || e.ctrlKey || e.metaKey) return;   // (cnest sweep)", "        // (cnest sweep)")], ['L-csweep-altKeys'], ['csweep']),
+    'cs-altdet': ([('cards', "(e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.altKey && !e.ctrlKey && !e.metaKey && !/^", "(e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !/^")], ['L-csweep-altKeys'], ['csweep']),
+    'cs-f10': ([('cards', "            if (openMenu(e.target, null)) { e.preventDefault(); e.stopPropagation(); }", "            e.preventDefault(); e.stopPropagation(); openMenu(e.target, null);")], ['L-csweep-menuKeyOnButton'], ['csweep']),
+    'cs-cut': ([('cards', "            if (cut && !cells.length && sec.rows.length) continue;   // (cnest sweep)", "            // (cnest sweep)")], ['L-gsweep-cutNoHeads'], ['gsweep']),
+    'cs-cols': ([('cards', "            var bd = c && boardOn();", "            var bd = false;")], ['L-gbcols-boardColsGreyed'], ['gbcols']),
+    'cs-pct': ([('cards', "pv = /%\\s*$/.test(st) ? num(st) : null;", "pv = null;")], ['L-cpct-pctBar'], ['cpct']),
+    'cs-pctlab': ([('cards', "(td.textContent.trim() || textOf(td));   // (cnest sweep)", "textOf(td);   // (cnest sweep)")], ['L-cpct-pctLabel'], ['cpct']),
+    'cs-find': ([('cards', "        if (findWanted && (!findWanted.isConnected || (P.find", "        if (false && (!findWanted.isConnected || (P.find")], ['L-cfindgo-findLetGo'], ['cfindgo']),
+    'cs-sel': ([('cards', "if (!det.tbl) sel = rowIdx(to);", "sel = rowIdx(to);")], ['L-ctsel-pageTurnNoSel'], ['ctsel']),
+    'cs-pvsetup': ([('cards', " : ((report && report.pivot) ? report.pivot : null); }", " : null; }")], ['S-cnPvSetup'], []),
+    'cs-total': ([('cards', "bigLabel = pvTotalWord(measures, bmi);", "bigLabel = 'Total ' + (measures[bmi] || '');")], ['S-cnTotalWord'], []),
+    'cs-resetpv': ([('cards', "curp.own || curp.title || curp.fields || curp.nopack", "curp.own || curp.title || curp.fields")], ['S-cnResetPv'], []),
+    'cs-resetflat': ([('cards', "H.layoutSet((keepPv && keepPv.pivot) ? { pivot: keepPv.pivot } : null);", "H.layoutSet(null);")], ['S-cnResetFlat'], []),
+    'cn-tidy': ([('menu', "out.forEach(function (it) { if (it !== '-' || (tidy.length && tidy[tidy.length - 1] !== '-')) { tidy.push(it); } });", "out.forEach(function (it) { tidy.push(it); });")], ['L-cnest-clearLastCard', 'L-ctclear-tableClearLast'], ['cnest', 'ctclear']),
+    # --- (csw2) the second card sweep: one mutant per fix
+    'w2-sel': ([('cards', "        if (window.getSelection && !window.getSelection().isCollapsed && String(window.getSelection()).trim() !== '') return;   // (csw2) a drag", "        // (csw2) a drag")], ['L-cw2det-selNoWin'], ['cw2det']),
+    'w2-drag': ([('cards', " && !(detDown && detDown !== dlg && dlg.contains(detDown))) closeDetails(true);", ") closeDetails(true);")], ['L-cw2det-dragKeeps'], ['cw2det']),
+    'w2-top': ([('cards', "if (bx) bx.scrollTop = 0; if (bd) bd.scrollTop = 0; }", "if (bx) bx.scrollTop = 0; }")], ['L-cw2det-bodyTop'], ['cw2det']),
+    'w2-end': ([('cards', "        if (fb && ((pd && document.activeElement === pb)", "        if (false && ((pd && document.activeElement === pb)")], ['L-cw2det-endFocus'], ['cw2det']),
+    'w2-escm': ([('cards', "&& !e.defaultPrevented && menuOpen()) { e.preventDefault(); e.stopPropagation(); menuEngine().close(); return; }", "&& false) { }")], ['L-cw2det-escMenuFirst'], ['cw2det']),
+    'w2-engine': ([('cards', "        if (!menuEngine()) return;   // (csw2)", "        // (csw2)")], ['L-cw2det-noEngine'], ['cw2det']),
+    'w2-clip': ([('cards', "if (on() && !ms.every(moreOnly)) scheduleClip();", "if (on()) scheduleClip();")], ['L-cw2det-clipNoRepass'], ['cw2det']),
+    'w2-panel': ([('menu', "        if (p.back && document.contains(p.back)) { t = p.back; }   // (csw2)", "        // (csw2)")], ['L-cw2det-panelFocus'], ['cw2det']),
+    'w2-tlink': ([('cards', "        if (vl && vl.cards) return sizeOk", "        if (vl) return sizeOk")], ['L-cw2det-tableLinkSize'], ['cw2det']),
+    'w2-sub': ([('cards', "            (subCell(target, t) || t.el).dispatchEvent(ev);", "            t.el.dispatchEvent(ev);")], ['L-cw2nest-subFilter'], ['cw2nest']),
+    'w2-row': ([('cards', "        if (on()) return showAs(null, tr) === true;", "        if (on()) { showAs(null, tr); return det.open; }")], ['L-cw2more-rowNotDrawn'], ['cw2more']),
+    'w2-more': ([('cards', "            if (mf && mat > 0) {", "            if (false) {")], ['L-cw2more-moreFocus'], ['cw2more']),
+    'w2-pdf': ([('cards', "var sn = items.length ? null : box.querySelector('.pnb-sharednote-text')", "var sn = null")], ['L-cw2pdf-pdfShared'], ['cw2pdf']),
+    'w2-band': ([('cards', "        if (best === null) {   // (csw2)", "        if (false) {   // (csw2)")], ['L-gw2band-bandDown'], ['gw2band']),
+    'w2-regroup': ([('cards', "        if (lastDraw && lastDraw.gsig !== gsig) laneMore = Object.create(null);\n", "")], ['L-gw2band-regroupResets'], ['gw2band']),
+    'w2-fold': ([('cards', "if (cut && !cells.length && sec.rows.length) continue;", "if (cut && !cells.length) continue;")], ['L-gw2mail-foldedHeadKept'], ['gw2mail']),
+    'w2-once': ([('cards', "out += pvTile(tr, idx, measures, compact, false, ps0); count++;", "out += pvTile(tr, idx, measures, compact, false); count++;")], ['L-pw2piv-setupOnce'], ['pw2piv']),
+    'w2-pvsel': ([('cards', "            sel = null; focusAt = 0; openCards = Object.create(null);\n", "")], ['L-pw2piv-selGone'], ['pw2piv']),
+    'w2-pvdet': ([('cards', "            if (det.open && !det.tbl) closeDetails(false);\n", "")], ['L-pw2piv-detGone'], ['pw2piv']),
+    'w2-pnext': ([('cards', "        if (det.open && hostApi() && H.inPivot()) {   // (csw2)", "        if (det.open && hostApi() && H.inPivot()) { return false;   // (csw2)")], ['L-pw2next-pivotNextOn'], ['pw2next']),
     'cd-delall': ([('cardscss', "#pnbCardsHost .journal-rownote-inline .journal-rownote-act button.journal-rownote-del, #pnbCardsHost .pnb-sharednote-file .pnb-sharednote-filedel { display: none; }", ".journal-rownote-inline .journal-rownote-act button.journal-rownote-del, .pnb-sharednote-file .pnb-sharednote-filedel { display: none !important; }")], ['L-cnotedet-delInDetails'], ['cnotedet']),
     'cz-sent': ([('cards', "        sent.size = curSize();   // (csz, the user) the size the cards show: the scheduled email draws them at it\n", "")], ['L-csave-sentSize'], ['csave']),
     'cz-clean': ([('cards', "        if (SIZES.indexOf(x.size) >= 0) o.size = x.size;   // (csz)\n", "")], ['L-csave-sentSizeKept'], ['csave']),
@@ -697,7 +799,7 @@ MUTANTS = {
     'b-offui': ([('cards', "var ov = opts[i].getAttribute('data-view'), off = bd && ov === 'table',", "var ov = opts[i].getAttribute('data-view'), off = false,")], ['L-gboard-tableGreyed'], ['gboard']),
     'b-arrows': ([('cards', "            else if (!boardOn()) {   // (round S) through every option the switch has; (bdlay) a board: Cards alone (Table greyed)", "            else {")], ['L-gboard-tableGreyed'], ['gboard']),
     'b-cardmenu': ([('cards', "        if (bd) out.push({ act: 'cardsStacked',", "        if (false) out.push({ act: 'cardsStacked',")], ['L-gboard-cardMenu'], ['gboard']),
-    'b-tablemenu': ([('cards', "        } }];   // (cfb8, the user: not worth a menu slot)", "        } }].concat([{ act: 'showBoard', label: 'Show as a board', run: function () { showBoard(); } }]);   // (cfb8, the user: not worth a menu slot)")], ['L-gboard-tableMenuNoBoard'], ['gboard']),   # (cfb8: the item back)
+    'b-tablemenu': ([('cards', "        } }]);   // (cfb8, the user: not worth a menu slot)", "        } }, { act: 'showBoard', label: 'Show as a board', run: function () { showBoard(); } }]);   // (cfb8, the user: not worth a menu slot)")], ['L-gboard-tableMenuNoBoard'], ['gboard']),   # (cfb8: the item back; re-anchored, crow)
     'b-menu': ([('menu', "            view.push({ act: 'gBoard', label: 'Switch to Board view',", "            if (false) view.push({ act: 'gBoard', label: 'Switch to Board view',")], ['L-gboard-backToBoard'], ['gboard']),
     'b-gmnorm': ([('main', "            layout = _groupLayoutNorm(layout);\n            // (bdlay) a board only where the card view can draw it\n", "            layout = (layout === 'list') ? 'list' : 'stacked';\n            // (bdlay) a board only where the card view can draw it\n")], ['L-gboard-backToBoard', 'L-gfix2-lanesFit'], ['gboard', 'gfix2']),
     'b-gmguard': ([('main', "            if (layout === 'board' && !(window.Penumbra.cards && typeof window.Penumbra.cards.canBoard === 'function' && window.Penumbra.cards.canBoard())) return false;", "            if (layout === 'board') return false;")], ['L-gboard-backToBoard'], ['gboard']),
@@ -760,7 +862,7 @@ MUTANTS = {
     'pc-nopill': ([('cards', "        if (!total && ps.pill === 'parent' && sub) {", "        if (false) {")], ['L-pvcfg-pillParent'], ['pvcfg']),
     'pc-nobar': ([('cards', "        if (!total && !compact && ps.bar) {   // (pvcfg) a bar from a measure's row total, its place among the tiles", "        if (false) {   // (pvcfg) a bar from a measure's row total, its place among the tiles")], ['L-pvcfg-barDrawn'], ['pvcfg']),
     'pc-nofields': ([('cards', "                if (pvFieldsOn && pvFieldsOn.indexOf(ai) < 0) continue;   // (pvcfg) the measures picked\n", "")], ['L-pvcfg-fieldsPicked'], ['pvcfg']),
-    'pc-nobig': ([('cards', "        if (bmi >= 0) { var bci = pvTotalCell(tr, bmi); if (bci >= 0) { big = bci; bigLabel = 'Total ' + (measures[bmi] || ''); } }\n", "")], ['L-pvcfg-bigPicked'], ['pvcfg']),
+    'pc-nobig': ([('cards', "        if (bmi >= 0) { var bci = pvTotalCell(tr, bmi); if (bci >= 0) { big = bci; bigLabel = pvTotalWord(measures, bmi); } }   // (cnest sweep) an unlabelled measure named (Total Value 2), not 'Total '\n", "")], ['L-pvcfg-bigPicked'], ['pvcfg']),
     'pc-window': ([('cards', "    function canConfig() { return !!hostApi() && allowed(); }   // (pvcfg) over a pivot too: the tiles' setup", "    function canConfig() { return !!hostApi() && allowed() && !H.inPivot(); }")], ['L-pvcfg-canConfig', 'L-pvcfg-windowPivot', 'L-pmenu-tileConfigOn'], ['pvcfg', 'pmenu']),
     'pc-nolink': ([('main', "            if (Object.keys(q).length) o.pivot = q;\n", "")], ['L-pvcfg-linkCarries', 'L-pvcfgB-linkApplied'], ['pvcfg', 'pvcfgB']),
     'pc-nostore': ([('main', "                if (v && v.pivot && typeof v.pivot === 'object') o.pivot = JSON.parse(JSON.stringify(v.pivot));   // (pvcfg) the tiles' setup\n", "")], ['L-pvcfg-pickOwn'], ['pvcfg']),
@@ -820,12 +922,12 @@ MUTANTS = {
     'm-hotwhite': ([('cards', "        if (dd && !onText(dd, { x: e.clientX, y: e.clientY })) dd = null;\n", "")], ['L-cwhite-hotNotWhite'], ['cwhite']),
     'm-hotcss': ([('cardscss', ".pnb-card-fields dd.is-hot, .pnb-card-fields dt:has(+ dd.is-hot),\n", ".pnb-card-fields dd.is-hotx, .pnb-card-fields dt:has(+ dd.is-hotx),\n")], ['L-cwhite-hotLit'], ['cwhite']),
     'm-detbeyond': ([('cards', "        if (to < 0 || to >= n) return detBeyond(delta);   // (round O) past the page, or past the cards drawn\n", "        if (to < 0 || to >= n) return false;\n")], ['L-cdetpage-nextTurns', 'L-cdetpage-prevTurns', 'L-cdetpage-keysTurn', 'L-cdetmore-nextDraws'], ['cdetpage', 'cdetmore']),
-    'm-detcan': ([('cards', "        el.querySelector('.pnb-cdet-next').disabled = !detCan(1);", "        el.querySelector('.pnb-cdet-next').disabled = det.at >= n - 1;")], ['L-cdetpage-nextEnabled', 'L-cdetmore-posMore'], ['cdetpage', 'cdetmore']),
+    'm-detcan': ([('cards', "pd = !detCan(-1), nd = !detCan(1),", "pd = !detCan(-1), nd = det.at >= n - 1,")], ['L-cdetpage-nextEnabled', 'L-cdetmore-posMore'], ['cdetpage', 'cdetmore']),
     'm-detcanlast': ([('cards', "        return g >= 0 && !!all[g + delta] && !!(P.findHost && typeof P.findHost.showRow === 'function');", "        return g >= 0;")], ['L-cdetpage-lastOff'], ['cdetpage']),
-    'm-detposall': ([('cards', "                main = (g + 1).toLocaleString() + ' of ' + all.length.toLocaleString() + ' cards';", "                main = (det.at + 1).toLocaleString() + ' of ' + n.toLocaleString() + ' cards';")], ['L-cdetpage-posAll', 'L-cdetpage-posPage'], ['cdetpage']),
+    'm-detposall': ([('cards', "                main = (g + 1).toLocaleString() + ' of ' + all.length.toLocaleString() + word;", "                main = (det.at + 1).toLocaleString() + ' of ' + n.toLocaleString() + word;")], ['L-cdetpage-posAll', 'L-cdetpage-posPage'], ['cdetpage']),
     'm-detpage': ([('cards', "                if (rpp > 0 && all.length > rpp) {", "                if (false) {")], ['L-cdetpage-posAll'], ['cdetpage']),
-    'm-detmore': ([('cards', "        if (delta > 0 && det.at === detCount() - 1 && drawn.more > 0) {   // the next step of cards", "        if (false) {   // the next step of cards")], ['L-cdetmore-nextDraws'], ['cdetmore']),
-    'm-detrowfirst': ([('cards', "        det.tr = to; sel = rowIdx(to);   // the window's row first: the redraw finds it on its page", "        sel = rowIdx(to);")], ['L-cdetpage-nextTurns'], ['cdetpage']),
+    'm-detmore': ([('cards', "        if (delta > 0 && det.at === detCount() - 1 && drawn.more > 0 && !det.tbl) {   // the next step of cards", "        if (false) {   // the next step of cards")], ['L-cdetmore-nextDraws'], ['cdetmore']),
+    'm-detrowfirst': ([('cards', "        det.tr = to; if (!det.tbl) sel = rowIdx(to);   // the window's row first:", "        if (!det.tbl) sel = rowIdx(to);   // (re-anchored, cnest):")], ['L-cdetpage-nextTurns'], ['cdetpage']),
     'm-seg': ([('cards', "            g.style.display = off ? '' : 'none';", "            g.style.display = 'none';")], ['L-cseg-segShown'], ['cseg']),
     'm-segchip': ([('cards', "            if (c) { var t = v ? 'Cards' : 'Table';", "            if (c) { var t = 'Table';")], ['L-cseg-chipCards'], ['cseg']),   # (re-anchored, round S: the chip says Board too; bdlay; bdlay2: Cards again)
     'm-fields': ([('cards', "        var f = on() && !H.inPivot();\n", "        var f = false;\n")], ['L-cseg-fieldsWord'], ['cseg']),
@@ -866,7 +968,7 @@ MUTANTS = {
     # never reading it back
     'm-layover': ([('cards', "        var cfg = withViewer(report || {}), by = hd.byName,", "        var cfg = report || {}, by = hd.byName,")], ['L-clayout-titlePicked', 'L-clayoutB-seededDrawn'], ['clayout', 'clayoutB']),
     'm-laysave': ([('cards', "        try { H.layoutSet(cfgRead()); } catch (e) { }\n", "")], ['L-clayout-keptAsPref', 'L-cauth-keptAsPref'], ['clayout', 'cauth']),   # (re-anchored, round N: the window's pick)
-    'm-layreset': ([('cards', "        try { H.layoutSet(null); } catch (e) { }\n        try { if (H.sizeSet) H.sizeSet(null); } catch (e) { }\n        size = null; sizePicked = false;\n        cfgPaint(); paintSize(); cfgRedraw();",
+    'm-layreset': ([('cards', "        try { H.layoutSet((keepPv && keepPv.pivot) ? { pivot: keepPv.pivot } : null); } catch (e) { }\n        try { if (H.sizeSet) H.sizeSet(null); } catch (e) { }\n        size = null; sizePicked = false;\n        cfgPaint(); paintSize(); cfgRedraw();",
                      "        try { if (H.sizeSet) H.sizeSet(null); } catch (e) { }\n        size = null; sizePicked = false;\n        cfgPaint(); paintSize(); cfgRedraw();")], ['L-clayout-resetBack'], ['clayout']),   # (re-anchored, cfix)
     # (round N, ccfg) Configure cards: the table's flyout ticking a size again; the card menu's / the table list's / the
     # Settings button's / the hotkey's way in gone; Escape not the window's; the cards not shown behind it; the focus not in
@@ -876,7 +978,7 @@ MUTANTS = {
     'm-cfgmenu': ([('cards', "        out.push({ act: 'cardConfig', label: 'Configure cards...', title: 'The title,", "        if (false) out.push({ act: 'cardConfig', label: 'Configure cards...', title: 'The title,")], ['L-cauth-menuOpens'], ['cauth']),   # (re-anchored, pvcfg)
     'm-cfgtable': ([('cards', "            out.push('-', { act: 'showCardsConfig', label: 'Configure cards...', title: 'The title,", "            if (false) out.push('-', { act: 'showCardsConfig', label: 'Configure cards...', title: 'The title,")], ['L-cauth-tableMenuOpens', 'L-ctmenu-noneTicked'], ['cauth', 'ctmenu']),   # (re-anchored, pvcfg)
     'm-cfgkey': ([('cards', "String(e.key || '').toUpperCase() !== 'L') return;", "String(e.key || '').toUpperCase() !== 'Q') return;")], ['L-cauth-hotkeyToggles'], ['cauth']),
-    'm-cfgesc': ([('cards', "        if (cfgOpen && esc && !e.defaultPrevented) { e.preventDefault(); e.stopPropagation(); closeConfig(true); return; }\n", "")], ['L-cauth-escCloses'], ['cauth']),
+    'm-cfgesc': ([('cards', "        if (cfgOpen && esc && !e.defaultPrevented && escMine(e.target, '#pnbCardsConfig')) { e.preventDefault(); e.stopPropagation(); closeConfig(true); return; }\n", "")], ['L-cauth-escCloses'], ['cauth']),
     'm-cfgbehind': ([('cards', "        if (!on()) showAs(null, null);   // the cards behind the window: each pick shows at once\n", "")], ['L-cauth-cardsBehind'], ['cauth']),
     'm-cfgfocus': ([('cards', "        try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); }\n        return true;", "        return true;")], ['L-cauth-focusFirst', 'L-clayout-paletteOpens'], ['cauth', 'clayout']),
     'm-cfgown': ([('cards', "        var el = cfgEl(), o = { own: 1 }, i;", "        var el = cfgEl(), o = {}, i;")], ['L-cauth-keptAsPref', 'L-clayout-keptAsPref'], ['cauth', 'clayout']),
@@ -936,7 +1038,7 @@ MUTANTS = {
     'm-capfocus': ([('cards', "            if (e.target.closest('.journal-rownote-compose') || tr2.bottom > cr2.bottom - 40) setOpen(card, true);\n", "")], ['L-cnote-composeOpens'], ['cnote']),
     'm-capswitch': ([('cards', "        if (!document.body.classList.contains('disable-auto-expand')) return CAP_PX[sz] || CAP_PX.standard;", "        return CAP_PX[sz] || CAP_PX.standard;")], ['L-cnote-capOff'], ['cnote']),
     'm-flyout': ([('menu', "            var tx = window.Penumbra.cards.tableItems(cur);", "            var tx = null;")], ['L-ctmenu-flyout', 'L-ctmenu-pickSize'], ['ctmenu']),
-    'm-flyoutrow': ([('cards', "        for (var k = 0; k < cs.length; k++) if (parseInt(cs[k].getAttribute('data-row'), 10) === i) { focusAt = k; roving(); selectOnly(cs[k]); openDetails(cs[k]); return; }\n", "")], ['L-ctmenu-rowCard'], ['ctmenu']),
+    'm-flyoutrow': ([('cards', "run: function () { openRow(tr, td); } });", "run: function () { showAs(null, tr); } });")], ['L-ctmenu-rowCard'], ['ctmenu']),   # (crow: re-aimed - the row's item showed the cards first)
     # (round J, cardsmenu 2: m-flyoutoff retired - the option off offers the flyout now) the pick's ask; the flyout gated on the option
     # (round N: m-offask and m-offgate retired - offered() IS allowed() now, and a menu's ask only keeps the switch where
     # the view pick cannot be written: set() writes it, which shows the switch by itself)
@@ -1019,7 +1121,7 @@ MUTANTS = {
     'm-compactfull': ([('cards', "        var compact = curSize() === 'compact';   // (csize) no subtitle, bar, fields or notes", "        var compact = false;")], ['L-csize-compactParts'], ['csize']),
     'm-nophone': ([('cards', "        return (H.narrow && H.narrow() && !!report) ? 'cards' : 'table';", "        return 'table';")], ['L-cnarrowA-narrowOpensCards'], ['cnarrowA']),
     'm-nocz': ([('main', "            if (czNow === 'compact' || czNow === 'large' || czNow === 'xl') v.cz = czNow;\n", "")], ['L-cszvlA-carriesCz', 'L-cszvlB-bootsCompact'], ['cszvlA', 'cszvlB']),   # (re-anchored, cxl)
-    'm-czapply': ([('cards', "        if (vl) return sizeOk(vl.size) ? vl.size : 'standard';", "        if (vl) return 'standard';")], ['L-cszvlB-bootsCompact'], ['cszvlA', 'cszvlB']),
+    'm-czapply': ([('cards', "        if (vl && vl.cards) return sizeOk(vl.size) ? vl.size : 'standard';", "        if (vl && vl.cards) return 'standard';")], ['L-cszvlB-bootsCompact'], ['cszvlA', 'cszvlB']),
     # (cxl) Extra large refused by the module / never classed / not carried by a link / not applied from one
     'm-noxl': ([('cards', "    function sizeOk(v) { return v === 'compact' || v === 'large' || v === 'xl'; }", "    function sizeOk(v) { return v === 'compact' || v === 'large'; }")], ['L-cxl-authorXl'], ['cxl']),
     'm-xlclass': ([('cards', "        el.classList.toggle('is-xl', sz === 'xl');   // (cxl)\n", "")], ['L-cxl-authorXl', 'L-cxl-twoPerRow'], ['cxl']),
@@ -1027,7 +1129,7 @@ MUTANTS = {
     'm-xlczapply': ([('main', "        if (d.cz === 'compact' || d.cz === 'large' || d.cz === 'xl') v.cz = d.cz;", "        if (d.cz === 'compact' || d.cz === 'large') v.cz = d.cz;")], ['L-cxlvl-bootsXl'], ['cxlvl']),
     # (cmenu) the right-click never forwarded to the cell (the card's own items alone) / the card's items gone / a card's empty area with the
     # whole column menu / the keys gone / the focus never named / a band not forwarded / the engine's hook gone / Shift+right-click taken
-    'm-menuoff': ([('cards', "            t.el.dispatchEvent(ev);\n", "")], ['L-cmenu-valueMenu', 'L-cmenu-filterRuns'], ['cmenu']),
+    'm-menuoff': ([('cards', "            (subCell(target, t) || t.el).dispatchEvent(ev);   // (csw2) a nested table's value: its own sub-cell\n", "")], ['L-cmenu-valueMenu', 'L-cmenu-filterRuns'], ['cmenu']),
     'm-menuextras': ([('cards', "        out = out.concat(menuExtras(t, out.length > 0));\n", "")], ['L-cmenu-extras'], ['cmenu']),
     'm-menurow': ([('cards', "        if (t.kind === 'card' && !t.pivot) out = rowItems(out, t);\n", "")], ['L-cmenu-cardRowOnly'], ['cmenu']),
     'm-menukbd': ([('cards', "        if ((tog || inDet || (e.target && e.target.classList && e.target.classList.contains('pnb-card'))) && ((e.key === 'F10' && e.shiftKey) || e.key === 'ContextMenu')) {", "        if (false) {")], ['L-cmenu-keyboardOpens'], ['cmenu']),   # (cband: a band's head has its own, k-headmenu)   # (re-anchored, cdet)
@@ -1040,7 +1142,7 @@ MUTANTS = {
     # (cdet) hidden columns listed / Next over every row of the table (the filter and the page ignored) / Escape gone / a click
     # opens nothing / a right-click inside not the cell's / the drill button clicks nothing / the phone sheet rule gone
     'm-dethidden': ([('cards', "            if ((c.hidden && !onCard[c.name]) || c.hash || c.journal) continue;", "            if (c.hash || c.journal) continue;")], ['L-cdet-noHidden', 'L-cdet-shownColumns', 'L-cfix-detCardField'], ['cdet', 'cfix']),   # (re-anchored, cfix)
-    'm-detnext': ([('cards', "    function detRows() { return rowsDrawn.map(function (x) { return x.tr; }); }", "    function detRows() { return Array.prototype.slice.call(document.querySelectorAll('#resultsTable > tbody > tr')); }")], ['L-cdet-filtered'], ['cdet']),
+    'm-detnext': ([('cards', "    function detRows() { return det.tbl ? (det.rows || []) : rowsDrawn.map(function (x) { return x.tr; }); }", "    function detRows() { return Array.prototype.slice.call(document.querySelectorAll('#resultsTable > tbody > tr')); }")], ['L-cdet-filtered'], ['cdet']),
     'm-detesc': ([('cards', "            if (!(P.noteCardEscape && P.noteCardEscape())) closeDetails(true);\n", "")], ['L-cdet-escCloses'], ['cdet']),
     'm-detnoopen': ([('cards', "        openDetails(card);   // (cdet) a click opens the card's details\n", "")], ['L-cdet-clickOpens'], ['cdet']),
     'm-detmenu': ([('cards', "        var box = t.closest('#pnbCardDetails');\n        if (box) {", "        var box = null;\n        if (box) {")], ['L-cdet-menuInside'], ['cdet']),
@@ -1064,6 +1166,16 @@ MUTANTS = {
     # the switch never hidden in the markup (shown before a report offers it)
     # (the penumbraSyncActiveLayout hook has no mutant since pvtiles: every pivot transition also mutates #pivot-output-container, which the tiles watch)
 }
+
+# (gbar, 2026-11-02) the details window's list mode (a Gantt's one-row bars)
+MUTANTS.update({
+    'gb-keeps': ([('cards', "        if (det.tbl && !det.list) det.rows = tblRows();", "        if (det.tbl) det.rows = tblRows();")], ['L-cgbar-nextFar', 'L-cgbar-prevBack'], ['cgbar']),
+    'gb-show': ([('cards', "        if (det.list) listShow(det.tr);   // (gbar) its page first", "")], ['L-cgbar-nextFar'], ['cgbar']),
+    'gb-end': ([('cards', "        if (det.list) return false;   // (gbar) a list ends where it ends", "")], ['L-cgbar-endStops'], ['cgbar']),
+    'gb-word': ([('cards', "var word = det.list ? ' ' + det.list.word : (det.tbl ? ' rows' : ' cards');", "var word = det.tbl ? ' rows' : ' cards';")], ['L-cgbar-countBars'], ['cgbar']),
+    'gb-back': ([('cards', "            try { back.focus({ preventScroll: true }); } catch (e) { }\n", "")], ['L-cgbar-escChart', 'L-cgbar-escCanvas'], ['cgbar']),   # (gfocus: re-anchored)
+    'gb-tabindex': ([('cards', "            if (!back.hasAttribute('tabindex') && back.tabIndex < 0) back.setAttribute('tabindex', '-1');\n", "")], ['L-cgbar-escCanvas'], ['cgbar']),   # (gfocus)
+})
 
 def static_checks(t):
     out = []
@@ -1126,6 +1238,19 @@ def static_checks(t):
     out.append(('S-cdel', 'cdel (2026-11-01' in t['readme'] and '#pnbCardsHost .journal-rownote-inline .journal-rownote-act button.journal-rownote-del, #pnbCardsHost .pnb-sharednote-file .pnb-sharednote-filedel { display: none; }' in css
                 and '.journal-rownote-text a:not(.journal-attach-chip),' in t['maincss'] and 'var(--accent-danger, #cc0000);\n    text-decoration: underline;\n    overflow-wrap: anywhere;' not in t['maincss'].replace('\r\n', '\n')
                 and "(delete in the card's details)" in t['ustopic'], 'cdel: no x on a card, links themed, help, README'))
+    # (crow) the row's window over the table: the module (the table's rows, the open, the back), one row item, Quick actions, help, README
+    # (cnest sweep) the fixes a page here cannot reach: the tiles keep the report's setup under a viewer's own flat one, an
+    # unlabelled measure's big number named, Configure cards' Reset over a pivot keeps Pack the cards off, the flat Reset
+    # keeps the viewer's tiles setup; the README's paragraph
+    out.append(('S-cnPvSetup', "function pvSetup() { var e = effective(); return (e && e.pivot) ? e.pivot : ((report && report.pivot) ? report.pivot : null); }" in cards, 'a viewer\'s own setup keeps the report\'s tiles'))
+    out.append(('S-cnTotalWord', "bigLabel = pvTotalWord(measures, bmi);" in cards and "bigLabel = 'Total ' + (measures[bmi] || '')" not in cards, 'an unlabelled measure\'s big number named'))
+    out.append(('S-cnResetPv', "(curp.own || curp.title || curp.fields || curp.nopack) ? curp : null" in cards, 'Reset over a pivot keeps Pack the cards off'))
+    out.append(('S-cnResetFlat', "H.layoutSet((keepPv && keepPv.pivot) ? { pivot: keepPv.pivot } : null);" in cards and "Object.keys(v).some(function (k) { return k !== 'pivot'; })" in cards, 'the flat Reset keeps the viewer\'s tiles setup'))
+    out.append(('S-cnest', 'cnest (2026-11-02' in t['readme'] and 'function clearLast(items)' in t['menu'] and "n.classList.contains('nested-json-container')" in cards, 'cnest: README, Clear all last, nested gaps'))
+    out.append(('S-crow', 'crow (2026-11-02' in t['readme'] and 'function openRow(tr, cell)' in cards and 'function tblRows()' in cards and 'function tblBack()' in cards
+                and cards.count("act: 'showCardRow'") == 1 and 'showAs(null, tr); } });' not in cards and 'C.canRow && C.canRow()' in pal and 'cards.openDetails()' in pal
+                and 'details window over the table, which stays as it is' in t['ustopic'] and "(on the table: the active cell's row)" in t['ustopic'],
+                'crow: the window over the table - module, the menu item, Quick actions, help, README'))
     out.append(('S-csz', 'csz (2026-11-01' in t['readme'] and 'sent.size = curSize();' in cards and 'if (SIZES.indexOf(x.size) >= 0) o.size = x.size;' in cards, 'csz: the saved view carries the size shown; README'))
     out.append(('S-detCss', '#pnbCardDetails .pnb-cdet-box' in css and 'max-width: 600px' in css and "el.id = 'pnbCardDetails';" in cards and 'help-lightbox pnb-cdet' in cards and "openDetails: function" in cards, 'the window: the app\'s dialog classes, the phone sheet, the API'))
     # (csize) the three size rows, the size control and the setup's size row, the help's size text
@@ -1308,6 +1433,23 @@ def hook(src):
     hl = '    function hideLoading() {'
     if out.count(hl) != 1: raise SystemExit('hideLoading anchor count %d' % out.count(hl))
     return out.replace(hl, hl + '\n        window.__HC_HIDES = (window.__HC_HIDES || 0) + 1;')
+# (cfsplit 4) the chip on the forwarded target; the Your Settings topic's bullet; the README's note
+_static_checks_before_citem = static_checks
+def static_checks(t):
+    out = _static_checks_before_citem(t)
+    out.append(('S-citem', "var chipEl = target.closest('.pnb-cchip'); t.item = chipEl ? chipEl.textContent : null;" in t['cards']
+                and 'Right-click a chip for <em>Filter to</em>, <em>Exclude</em> and <em>Copy</em> of that value alone, on the card or in the details window.</li>' in t['ustopic']
+                and '(cfsplit 4, the user' in t['readme'], 'the chip on the target, the topic\'s bullet, the README'))
+    return out
+MUTANTS.update({
+    # (cfsplit 4) the chip not named on the forwarded target (the card and the details window alike); the cell's first value
+    # taken in place of the chip's (main.js)
+    'ci-nochip': ([('cards', "var chipEl = target.closest('.pnb-cchip'); t.item = chipEl ? chipEl.textContent : null;", "var chipEl = null; t.item = null;")],
+                  ['L-citem-chipMenu', 'L-citem-detChip', 'S-citem'], ['citem']),
+    'ci-first': ([('main', "var v = (at.value !== undefined && at.value !== null) ? String(at.value) : _pnbCfltItemAt(td, its, at.x, at.y);", "var v = its[0].v;")],
+                 ['L-citem-chipMenu'], ['citem']),
+})
+
 def mutate(texts, name):
     t = dict(texts)
     for f, old, new in MUTANTS[name][0]:
@@ -1383,7 +1525,7 @@ def run_page(path, metrics=None, shot=None):
                     data = call('Page.captureScreenshot', {'format': 'png', 'captureBeyondViewport': False}).get('data')
                     if data: open(shot, 'wb').write(base64.b64decode(data))
                 return json.loads(v)
-        tr = call('Runtime.evaluate', {'expression': 'JSON.stringify({errors: window.__errors, q: window.__queryDone, h: window.__HC_HIDES})', 'returnByValue': True}).get('result', {}).get('value')
+        tr = call('Runtime.evaluate', {'expression': 'JSON.stringify({errors: window.__errors, q: window.__queryDone, h: window.__HC_HIDES, step: window.__step})', 'returnByValue': True}).get('result', {}).get('value')
         return {'fatal': 'timeout; %s' % tr}
     finally:
         try: ws.close()
@@ -1414,6 +1556,7 @@ def url_for(s, token=None):
     if s == 'curl3': u += '&cards=0'
     if s == 'curl4': u += '&view=' + T_CV
     if s == 'gboardbig': u += '&rows=2500'   # (bdlay2) six lanes past the step
+    if s == 'gw2band': u += '&rows=2500'   # (csw2) Stacked bands past the step
     if s == 'gbandbig': u += '&rows=2500'   # (cband) six Stacked bands past the step
     return u
 PHONE = {'width': 375, 'height': 812, 'deviceScaleFactor': 1, 'mobile': True}

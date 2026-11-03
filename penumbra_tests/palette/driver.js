@@ -549,6 +549,12 @@
     R.chk.hlGone = !r && rows().length > 0;
     R.chk.hlFindsOptions = !!o && !o.off;
     key('Escape', { target: input() }); await sleep(30);
+    // (2026-11-02, cfsplit) ...and its Filter's Split by ; (a list column's): "split" finds Column options... too
+    await open('split');
+    var so = row('Column options...');
+    R.info.splitRows = rows().slice(0, 8).map(function (x) { return [x.section, x.text, x.off]; });
+    R.chk.splitFindsOptions = !!so && !so.off;
+    key('Escape', { target: input() }); await sleep(30);
   };
   // ---------------------------------------------------------------- pnestgb (2026-10-25, nestgb; the user: "@@JSON column names
   // shouldn't appear in the command palette's group by, but the nested columns should (just like in group mode UI)") H_JSON

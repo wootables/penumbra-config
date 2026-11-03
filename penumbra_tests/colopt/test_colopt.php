@@ -163,7 +163,7 @@ if ($mode === 'hl') {
     $need = array('penumbra_state_highlight_rules', 'penumbra_state_column_formats', 'penumbra_hl_clean_css', 'penumbra_hl_theme_fills',
                   'penumbra_num_text', '_pnb_colfmt_value', 'generate_report_html', 'parse_format_condition', 'evaluate_format_condition');
     $missing = array_values(array_filter($need, function ($f) { return !function_exists($f); }));
-    $names = array('fmtParity', 'numParity', 'cssParity', 'whenParity', 'stateRules', 'emailPaints', 'emailFmt', 'emailFooter', 'pdfPlain', 'darkFill', 'groupedEmail', 'noLeak');
+    $names = array('fmtParity', 'numParity', 'cssParity', 'whenParity', 'stateRules', 'emailPaints', 'emailFmt', 'emailFooter', 'pdfPlain', 'darkFill', 'groupedEmail', 'noLeak', 'numTie');
     if ($missing || !$hr || empty($hr['email']) || empty($hr['unit']) || empty($hr['when'])) {
         foreach ($names as $n) ok(false, $n, $missing ? 'missing: ' . implode(' ', $missing) : 'no browser fixture (hrep did not run)');
     } else {
@@ -174,6 +174,11 @@ if ($mode === 'hl') {
         $bad = array(); $n = 0;
         foreach ($u['num'] as $c) { $n++; $t = penumbra_num_text((float)$c[0]); $p = _pnb_colfmt_value($t, $c[1]); if ($p !== $c[2]) $bad[] = json_encode($c[0]) . " ($t) " . $c[1] . ' js=' . show($c[2]) . ' php=' . show($p); }
         ok($n >= 90 && !$bad, 'numParity', "$n cases, " . count($bad) . ' differ: ' . implode(' ; ', array_slice($bad, 0, 6)));
+        // (2026-11-02, pnt) a total of cents just under a 5, and an exact tie: the page's text and the email's both
+        // what was added up (penumbra_num_text: 15 digits, half up), not the binary noise
+        $bad = array(); $n = 0;
+        foreach ((isset($u['tie']) ? $u['tie'] : array()) as $c) { $n++; $t = penumbra_num_text((float)$c[0]); $p = _pnb_colfmt_value($t, $c[1]); if ($p !== $c[2]) $bad[] = json_encode($c[0]) . " ($t) " . $c[1] . ' want=' . show($c[2]) . ' php=' . show($p); }
+        ok($n >= 7 && !$bad, 'numTie', "$n cases, " . count($bad) . ' differ: ' . implode(' ; ', array_slice($bad, 0, 6)));
         $bad = array(); $n = 0;
         foreach ($u['css'] as $c) { $n++; $p = penumbra_hl_clean_css($c[0]); $want = str_replace("'", '"', $c[1]); if ($p !== $want) $bad[] = show($c[0]) . ' js=' . show($want) . ' php=' . show($p); }
         ok($n >= 20 && !$bad, 'cssParity', "$n cases, " . count($bad) . ' differ: ' . implode(' ; ', array_slice($bad, 0, 6)));

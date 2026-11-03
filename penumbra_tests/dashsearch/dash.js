@@ -3843,6 +3843,18 @@
                             '<option value="chart"' + (t.show === 'chart' ? ' selected' : '') + '>One chart or slide (from the report)</option>' +
                             '</select>',
                         'Header-only makes a great KPI strip; table-only drops the banner. With table-only, prompts are set by this tile&#39;s prompt values (the inputs live in the header). One chart/slide shows a single report page, rendered by the report&#39;s own engine.') +
+                        // (cdash, 2026-11-01) the report's table or its cards, for the whole report or the table alone
+                        '<div id="teViewField"' + (t.show === 'header' || t.show === 'chart' ? ' style="display:none;"' : '') + '>' +
+                        fieldRow('View', '<select id="teView">' +
+                            '<option value="table"' + (t.view === 'cards' ? '' : ' selected') + '>Table</option>' +
+                            '<option value="cards"' + (t.view === 'cards' ? ' selected' : '') + '>Cards</option></select> ' +
+                            '<select id="teCardSize" aria-label="Card size"' + (t.view === 'cards' ? '' : ' style="display:none;"') + '>' +
+                            '<option value=""' + (t.cardSize ? '' : ' selected') + '>The report&#39;s card size</option>' +
+                            [['compact', 'Small'], ['standard', 'Medium'], ['large', 'Large'], ['xl', 'Extra large']].map(function (z) {
+                                return '<option value="' + z[0] + '"' + (t.cardSize === z[0] ? ' selected' : '') + '>' + z[1] + '</option>';
+                            }).join('') + '</select>',
+                        'Cards draw each row as a card, with the fields, colours and grouping the report set up for its cards. Viewers can switch back to the table inside the tile.') +
+                        '</div>' +
                         '<div id="teChartNField"' + (t.show === 'chart' ? '' : ' style="display:none;"') + '>' +
                         fieldRow('Chart / slide', '<span id="teChartPick"><input type="number" id="teChartN" min="1" max="99" value="' + (t.chartN || 1) + '"></span>',
                         'Which of the report&#39;s charts or slides to show. The list is read from the report itself (its fullscreen-carousel order).') +
@@ -4151,6 +4163,7 @@
                 var isChart = $(this).val() === 'chart';
                 $('#teChartNField').toggle(isChart);
                 $('#teAutoHField').toggle(!isChart);
+                $('#teViewField').toggle(!isChart && $(this).val() !== 'header');   // (cdash)
                 if (isChart) { refreshChartPick(); } else { stopChartProbe(); }
             });
             // Cancel on the loading cover: keep the manual number input instead.
@@ -4160,6 +4173,7 @@
                 $('#teChartPick').after('<div class="dash-field-hint" id="teChartPickStatus">List loading cancelled - enter the number manually (fullscreen-carousel order).</div>');
             });
             $ov.on('change', '#tePrompts', function () { if (t.report) { sniffFromReport(); } });
+            $ov.on('change', '#teView', function () { $('#teCardSize').toggle($(this).val() === 'cards'); });   // (cdash)
 
             // Sizes are set by dragging the tile's corner in edit mode, not here.
             // Existing tiles keep their spans; new ones start from a sane per-type
@@ -4241,6 +4255,10 @@
                     } else if (ty === 'embed') {
                         next.search = $.trim($('#teSearch').val());
                         next.show = $('#teShow').val();
+                        if (next.show === 'both' || next.show === 'table') {   // (cdash) the View, for the whole report or the table alone
+                            next.view = $('#teView').val() === 'cards' ? 'cards' : 'table';
+                            if (next.view === 'cards' && $('#teCardSize').val()) { next.cardSize = $('#teCardSize').val(); }
+                        }
                         if (next.show === 'chart') {
                             next.chartN = Math.max(1, Math.min(99, parseInt($('#teChartN').val(), 10) || 1));
                             next.autoHeight = false;   // the carousel overlay is a fixed stage

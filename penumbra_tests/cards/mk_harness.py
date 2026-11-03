@@ -31,7 +31,11 @@ CFG = {
     'cmword': {'pill': 'V_STATUS'},   # (cardword) the guessed fields V_NAME / V_DATE / V_LINK, a pill to right-click
     # (curl) curl1 and curl4 have NO entry: the report's option is off there; curl2 / curl3 / cshare have it on
     'curl2': {}, 'curl3': {}, 'cshare': {},
-    'cnote': {}, 'cnotedet': {}, 'ctmenu': {}, 'cflink': {},   # (cardnotes) the notes in the card (the driver turns row notes on)
+    'cnote': {}, 'cnotedet': {}, 'ctmenu': {}, 'cflink': {}, 'ctrow': {'title': 'V_NAME'}, 'gtrow': {'title': 'V_NAME'}, 'cnest': {'title': 'V_NAME', 'fields': ['H_TEXT', 'V_DATE']}, 'ctclear': {},
+    'cw2det': {'title': 'V_NAME', 'fields': ['V_DATE', 'V_ID']}, 'cw2nest': {'title': 'V_NAME', 'fields': ['H_TEXT', 'V_DATE']}, 'cw2more': {'title': 'V_NAME'}, 'cw2pdf': {'title': 'V_NAME'},
+    'gw2band': {'title': 'V_NAME', 'fields': ['V_DATE', 'V_ID']}, 'gw2mail': {'title': 'V_NAME', 'fields': ['V_DATE', 'V_ID']}, 'pw2piv': {}, 'pw2next': {},   # (csw2) the second card sweep
+    'csweep': {'title': 'V_NAME', 'fields': ['V_DATE', 'V_ID']}, 'gsweep': {'title': 'V_NAME', 'fields': ['V_DATE', 'V_ID']}, 'gbcols': {}, 'cpct': {'title': 'V_NAME', 'bar': 'V_AMOUNT'},
+    'cfindgo': {'title': 'V_NAME'}, 'ctsel': {'title': 'V_NAME'},   # (cnest sweep)   # (crow) the window over the table   # (cardnotes) the notes in the card (the driver turns row notes on)
     # (round K) the card's words (a pill to right-click); Find on cards showing V_NAME, V_AMOUNT (the big number, guessed)
     # and V_DATE alone (V_ID, V_LINK, V_STATUS buried); grouped; a TEXT column picked for the bar (stays pickable)
     'ckword': {'pill': 'V_STATUS'}, 'cfind': {'title': 'V_NAME', 'fields': ['V_DATE']}, 'gfind': {}, 'cbarpick': {'bar': 'V_STATUS'},
@@ -69,6 +73,7 @@ CFG = {
     # (cchips) a list column's values as chips: H_TEXT a semicolon list of "Last, First" names, H_CODE a pipe list of codes,
     # V_NAME a "Last, First" pair (no list), V_STATUS plain text
     'cchips': {'title': 'V_ID', 'fields': ['H_TEXT', 'H_CODE', 'V_NAME', 'V_STATUS']},
+    'citem': {'title': 'V_ID', 'fields': ['H_TEXT', 'H_CODE', 'V_NAME', 'V_STATUS']},   # (cfsplit 4) a chip's own Filter to / Exclude / Copy
     # (cdash) the email's cards: every slot, a list field (chips), a highlighted pill; grouped; a pivot (no cards body)
     'cmail': {'title': 'V_ID', 'sub': ['V_NAME'], 'pill': 'V_STATUS', 'big': 'H_AMT', 'bar': 'H_NUM', 'fields': ['H_TEXT', 'V_DATE', 'V_LINK']},
     'gmail': {'title': 'V_ID', 'sub': ['V_NAME'], 'pill': 'V_STATUS', 'big': 'H_AMT', 'fields': ['H_TEXT', 'V_DATE']}, 'pmail': {},
@@ -79,8 +84,9 @@ CFG = {
     'copen': {'title': 'V_ID', 'fields': ['V_NAME'], 'open': 1, 'sent': {'title': 'V_ID', 'fields': ['V_NAME']}},
 }
 # the viewer's own saved pick (penumbra_column_prefs.lrfix.view = cards), seeded before boot
-PREF_CARDS = ['cdpack', 'cflt', 'cdens', 'cdensph', 'gbandbig', 'cfmtbig', 'cfmt', 'cfull', 'pcoff', 'gcards', 'gcoll', 'gncoll', 'ggcards', 'gglnest', 'cvlT', 'ca11y', 'cphone', 'cbar', 'chl', 'cviewer', 'csize', 'cxl', 'cmenu', 'gmenu', 'pmenu', 'cmsize', 'gmsize', 'cdet', 'gdet', 'pdet', 'cdetph', 'cmword', 'curl3', 'cnote', 'cnotedet', 'cflink', 'ckword', 'cfind', 'gfind', 'csort', 'gsort', 'cempty', 'pfind', 'clayout', 'clayoutB', 'cdetrow', 'pvfind', 'cwhite', 'cdetpage', 'cdetmore', 'cseg', 'cxl2', 'cxl2ph', 'pvhtml', 'cfields', 'cfieldsB', 'cboard', 'cbarrank', 'cvlC', 'pfsort', 'cvlE', 'pvcfg', 'plab', 'cprint', 'gprint', 'pprint', 'cfix', 'cfixB', 'pfix', 'cfixprint', 'gfix2', 'cboardrx', 'cchips', 'cmail', 'gmail', 'csave']
-PREF_TABLE = ['cnarrowT', 'curl2', 'ctmenu']   # (csize) the viewer chose Table: the phone default yields; (curl) ?cards=1 wins over it
+PREF_CARDS = ['cw2det', 'cw2nest', 'cw2more', 'cw2pdf', 'gw2band', 'gw2mail', 'pw2piv', 'pw2next', 'cnest', 'csweep', 'gsweep', 'gbcols', 'cpct', 'cfindgo', 'cdpack', 'cflt', 'cdens', 'cdensph', 'gbandbig', 'cfmtbig', 'cfmt', 'cfull', 'pcoff', 'gcards', 'gcoll', 'gncoll', 'ggcards', 'gglnest', 'cvlT', 'ca11y', 'cphone', 'cbar', 'chl', 'cviewer', 'csize', 'cxl', 'cmenu', 'gmenu', 'pmenu', 'cmsize', 'gmsize', 'cdet', 'gdet', 'pdet', 'cdetph', 'cmword', 'curl3', 'cnote', 'cnotedet', 'cflink', 'ckword', 'cfind', 'gfind', 'csort', 'gsort', 'cempty', 'pfind', 'clayout', 'clayoutB', 'cdetrow', 'pvfind', 'cwhite', 'cdetpage', 'cdetmore', 'cseg', 'cxl2', 'cxl2ph', 'pvhtml', 'cfields', 'cfieldsB', 'cboard', 'cbarrank', 'cvlC', 'pfsort', 'cvlE', 'pvcfg', 'plab', 'cprint', 'gprint', 'pprint', 'cfix', 'cfixB', 'pfix', 'cfixprint', 'gfix2', 'cboardrx', 'cchips', 'cmail', 'gmail', 'csave']
+PREF_CARDS = PREF_CARDS + ['citem']   # (cfsplit 4)
+PREF_TABLE = ['cnarrowT', 'curl2', 'ctmenu', 'ctrow', 'gtrow', 'ctclear', 'ctsel']   # (csize) the viewer chose Table: the phone default yields; (curl) ?cards=1 wins over it
 
 
 def _lift(index_src, rx, what):
@@ -117,7 +123,7 @@ def build(index_src):
     rep('<script src="driver.js"></script>\n', '<script src="themes.js"></script>\n<script src="driver.js"></script>\n')
     # (round K) Find in results for the scenarios that use it (index.php loads it after the card view)
     rep('<script defer src="penumbra_colmenu.js"></script>\n', '<script defer src="penumbra_colmenu.js"></script>\n'
-        '<script>if (/^(cfind|gfind|pfind|pvfind|cchips)$/.test(window.__SCN)) document.write(\'<link rel="stylesheet" href="penumbra_find.css"><script defer src="penumbra_find.js"></scr\' + \'ipt>\');</script>\n')   # (deferred, after the engine, as index.php)
+        '<script>if (/^(cfind|gfind|pfind|pvfind|cchips|cfindgo)$/.test(window.__SCN)) document.write(\'<link rel="stylesheet" href="penumbra_find.css"><script defer src="penumbra_find.js"></scr\' + \'ipt>\');</script>\n')   # (deferred, after the engine, as index.php)
     # the switch, after the row count (index.php: inside #tableSearchContainer; the harness keeps the count beside it)
     # (round O) the status bar's Cards segment - the switch, the size, the Sort list, Configure cards - after Cols, as
     # index.php draws it; a build without one (the control: live) has the controls beside the row count
@@ -153,6 +159,8 @@ def build(index_src):
         '<div id="downloadActionsLightbox" class="help-lightbox" style="display:none"><div class="lightbox-content"><label style="display: block;"><input type="radio" name="downloadFormat" value="print"> <strong>Print</strong>'
         '<small style="display: block; margin-left: 22px;">Opens your browser print dialog for what is on screen.</small></label>'
         '<label style="display: block;"><input type="radio" name="downloadFormat" value="pdf"> <strong>PDF</strong></label></div></div>\');</script>\n<div id="pnbStatusBar">')   # (cprint)
+    # (crow) the cell selection (the table's active cell) for the row window's scenarios
+    rep('<div id="pnbStatusBar">', '<script>if (/^(ctrow|gtrow|ctsel)$/.test(new URLSearchParams(location.search).get("scn") || "")) document.write(\'<link rel="stylesheet" href="penumbra_cellsel.css"><script src="penumbra_cellsel.js"></scr\' + \'ipt>\');</script>\n<div id="pnbStatusBar">')
     rep('<div id="pnbStatusBar">', '<div id="view-options-tab" style="display:none"><div class="view-options-grid">' + vo + '</div></div>\n<button id="exitPivotModeBtn" type="button">Exit pivot</button>\n<div id="pnbStatusBar">')
     # (round I) the pager's Rows: label and the list's title, as index.php has them (the module reads them)
     plb = _lift(index_src, r'<label for="rowsPerPageSelector"[^>]*>[^<]*</label>', 'the pager label')
@@ -163,17 +171,19 @@ def build(index_src):
         '<button id="nextPageBtn">&gt;</button><button id="lastPageBtn">&gt;|</button>')
     # cperf / cmore: a big report (?rows=N, default 1000), the usual six columns shown
     rep('(/^mperf|^mrerun/.test(window.__SCN) ? (+P.get("rows") || 20000) : 300)',
-        '(/^mperf|^mrerun/.test(window.__SCN) ? (+P.get("rows") || 20000) : (/^(cperf|cmore|cfmtbig|gboardbig|gbandbig)$/.test(window.__SCN) ? (+P.get("rows") || 1000) : (window.__SCN === "cdetmore" ? 1003 : 300)))')   # (round O) cdetmore: past the 1,000 drawn
+        '(/^mperf|^mrerun/.test(window.__SCN) ? (+P.get("rows") || 20000) : (/^(cperf|cmore|cfmtbig|gboardbig|gbandbig|gw2band)$/.test(window.__SCN) ? (+P.get("rows") || 1000) : (/^(cdetmore|cfindgo|cw2more|pw2next)$/.test(window.__SCN) ? 1003 : 300)))')   # (round O) cdetmore: past the 1,000 drawn
     # cesc: a value the server escaped (an image tag as text) in the title column
     rep('    window.__rowsFixture = rows;\n',
         '    if (window.__SCN === "cxl2" || window.__SCN === "cxl2ph") { rows[2].V_NAME = "Long status row"; rows[2].V_STATUS = "Waiting on the sponsor for the final signed agreement"; }\n'   # (round P) the one card that keeps one column
         '    if (window.__SCN === "pvhtml") rows.forEach(function (r) { ["H_GROUP", "H_GROUP2", "V_STATUS"].forEach(function (c) { if (r[c] != null && r[c] !== "") r[c] = "@@HTML<a href=\\"#" + c + "\\">" + r[c] + "</a>"; }); });\n'   # (round Q) link-valued pivot fields, as ?id=int-col-mat's
         '    if (window.__SCN === "cbarrank") { rows[0].H_NUM = "1000000000"; rows[1].H_NUM = "500"; rows[2].H_NUM = "500"; rows[3].H_NUM = "0"; }\n'   # (clbar) one huge value, two ties, a zero
-        '    if (/^(cchips|cmail|gmail|cflt|csave)$/.test(window.__SCN)) { var PPL = ["Palmtag, Scott", "Smith, Jo", "Kumar, Ravi", "Okafor, Ada", "Lindqvist, Eva", "Moreau, Luc", "Tanaka, Yui", "Byrne, Cara"], CODES = ["H865", "TSW912", "P220", "K104", "R377"], FIRST = ["Ann", "Ben", "Cy", "Dee", "Eli", "Fay"];\n'
+        '    if (/^(cchips|cmail|gmail|cflt|csave|citem)$/.test(window.__SCN)) { var PPL = ["Palmtag, Scott", "Smith, Jo", "Kumar, Ravi", "Okafor, Ada", "Lindqvist, Eva", "Moreau, Luc", "Tanaka, Yui", "Byrne, Cara"], CODES = ["H865", "TSW912", "P220", "K104", "R377"], FIRST = ["Ann", "Ben", "Cy", "Dee", "Eli", "Fay"];\n'
         '      rows.forEach(function (r, i) { var n = 1 + (i * 7) % 4, ps = [], cs = [], k; for (k = 0; k < n; k++) ps.push(PPL[(i + k * 3) % PPL.length]); for (k = 0; k <= i % 3; k++) cs.push(CODES[(i + k) % CODES.length]); r.H_TEXT = ps.join(";"); r.H_CODE = cs.join("|"); r.V_NAME = "Lname" + i + ", " + FIRST[i % FIRST.length]; });\n'
         '      rows[0].H_TEXT = PPL.join("; ") + "; Zeta, Quinn"; rows[1].H_TEXT = "Palmtag, Scott; Smith, Jo;Smith, Jo"; rows[2].H_TEXT = "Kumar, Ravi";\n'
         '      rows[3].H_TEXT = "@@HTML<a href=\\"#x\\">Palmtag, Scott;Smith, Jo</a>"; rows[4].H_TEXT = "Smith, Joanne;Kumar, Ravi"; }\n'   # (cchips) nine values (six shown); a repeat; one; a link; a near miss
         '    if (window.__SCN === "cmail") rows[0].V_LINK = "@@HTML<a href=\\"#\\" data-search=\\"V_STATUS = //Open//\\">Find open</a>";\n'   # (cdash) a Click to Filter link: the email makes it text
+        '    if (window.__SCN === "cpct") rows.forEach(function (r, i) { r.V_AMOUNT = String([0.125, 0.5, 0.25, 0.8, 0.05][i % 5]); });\n'   # (cnest sweep) a Percent format over fractions
+        '    if (/^(cnest|cw2nest)$/.test(window.__SCN)) rows.forEach(function (r, i) { r.H_TEXT = "@@JSON" + JSON.stringify([{ KIND: "Memo", DAYS: i % 5 }, { KIND: "Call", DAYS: (i + 2) % 7 }, { KIND: "Visit", DAYS: 10 + i % 3 }]); });\n'   # (cnest) a nested table on each card
         '    if (window.__SCN === "cesc") rows[0].V_NAME = "&lt;img src=x onerror=\\"window.__pwn=1\\"&gt; Alpha";\n'
         '    window.__rowsFixture = rows;\n')
     # the stored report: the Cards option, the page size, a report highlight rule, a grouped subtotal
@@ -181,8 +191,15 @@ def build(index_src):
     rep('    window.__STORED = st;\n',
         '    window.__CARDS_CFG = ' + cfg + ';\n'
         '    if (Object.prototype.hasOwnProperty.call(window.__CARDS_CFG, S)) st.viewOptions = Object.assign({}, st.viewOptions || {}, { cards: window.__CARDS_CFG[S] });\n'
-        '    if (S === "cpage" || S === "cdetrow" || S === "cdetpage" || S === "cfmtbig" || S === "cprint" || S === "cfixprint") st.rowsPerPage = "25";\n'
+        '    if (S === "cpage" || S === "cdetrow" || S === "ctrow" || S === "cdetpage" || S === "cfmtbig" || S === "cprint" || S === "cfixprint") st.rowsPerPage = "25";\n'
         '    if (S === "cguess") { st.visibleColumns = ["#", 0, 1, 7, 2, 3, 4, 5]; st.columnOrder = [0, 1, 7, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]; }\n'
+        '    if (S === "cfindgo") st.rowsPerPage = "all";   // (cnest sweep) past the 1,000 drawn\n'
+        '    if (S === "ctsel") st.rowsPerPage = "25";\n'
+        '    if (S === "cw2more" || S === "pw2next") st.rowsPerPage = "all";   // (csw2) past the 1,000 drawn\n'
+        '    if (S === "cw2pdf") st.rowsPerPage = "25";   // (csw2) a PDF of 25 cards\n'
+        '    if (S === "pw2piv" || S === "pw2next") st.pivot.rows = ["V_ID"];   // (csw2) a tile per row\n'
+        '    if (S === "cpct") st.columnFormats = { V_AMOUNT: "percent" };\n'
+        '    if (S === "gbcols") st.groupLayout = "board";\n'
         '    if (S === "cperf" || S === "cmore" || S === "cdetmore" || S === "cxl2" || S === "cxl2ph") st.rowsPerPage = "all";\n'
         '    if (S === "chl") st.columnHighlights = { V_STATUS: [{ id: "r1", w: "V_STATUS = //Closed//", css: "background-color: #ffebee; color: #c62828; font-weight: bold" }] };\n'
         '    if (S === "cfmt" || S === "cfmtbig") st.columnHighlights = { V_NAME: [{ id: "t1", w: "", css: "background-color: #ffebee; color: #c62828" }], V_STATUS: [{ id: "s1", w: "V_STATUS = //Closed//", css: "font-style: italic; color: #2e7d32" }], H_AMT: [{ id: "b1", w: "", css: "background-color: #e8f5e9" }], V_DATE: [{ id: "f1", w: "", css: "font-weight: bold; text-decoration: underline" }] };\n'

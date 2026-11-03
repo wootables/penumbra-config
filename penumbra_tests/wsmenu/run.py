@@ -10,11 +10,13 @@
 #                 script lifted from penumbra_admin_chrome.php): D-*
 #   static        index.php / the chrome load it behind the switch, listRows, ES5, no em-dash, help, README: S-*
 #   X-<scn>       no page errors
-# --control = the build before the menu, read from git (CONTROL_REV below; --control-rev REV for another): every NEW
-# check red, the GUARDS green (what that build already does: a cell's and a heading's menu are the header menu's, a
-# field / a link / Shift / selected text keep the browser's, an admin tool's data keeps the browser's).
+#   (round 3, 2026-11-02) Fit all column widths to contents / to page: F-* (rfit), V-fitRestricted
+# --control = the build before this round, read from git (CONTROL_REV below; --control-rev REV for another): this
+# round's checks (NEW_R3) red, the rest green. --control-r1 = the build before the menu: every check red but the
+# GUARDS (what that build already does: a cell's and a heading's menu are the header menu's, a field / a link / Shift /
+# selected text keep the browser's, an admin tool's data keeps the browser's).
 #
-#   py -3 run.py [--app DIR] [--control [--control-rev REV]] [--mutants | --mutant NAME[,NAME]] [--scn a,b] [--keep]
+#   py -3 run.py [--app DIR] [--control | --control-r1 [--control-rev REV]] [--mutants | --mutant NAME[,NAME]] [--scn a,b] [--keep]
 # Headless Edge over CDP; stages into %TEMP%\pnb_wsm_*; writes nothing to the webroot. One suite at a time.
 # =============================================================================
 import html, json, os, re, shutil, socket, subprocess, sys, tempfile, time, urllib.request
@@ -32,6 +34,7 @@ LIBS = ['jquery-3.7.1.min.js', 'jquery-ui.min.js', 'moment.min.js', 'pako.min.js
 FOOT = "Shift+right-click for the browser's menu"
 SCN = ['rmenu', 'ractions', 'rsubs', 'rkeys', 'rviewer', 'reditor', 'rhome', 'rcoexist', 'dadmin', 'dzoom', 'dnonadmin']
 SCN = SCN + ['rowner', 'ddash', 'ddashlist', 'ddashv', 'dkiosk']   # (round 2) the report's owner, a dashboard
+SCN = SCN + ['rfit']   # (round 3) the two fit items
 CHK = {
     'rmenu': ['R-opensBar', 'R-items', 'R-title', 'R-foot', 'R-notes', 'R-place', 'R-margin', 'R-header', 'R-status', 'R-claimed', 'R-cellNative', 'R-headNative',
               'R-input', 'R-link', 'R-shift', 'R-selNative', 'R-selElsewhere', 'R-second', 'R-reopen'],
@@ -40,7 +43,7 @@ CHK = {
     'rsubs': ['S-recentOrder', 'S-recentCur', 'S-recentPin', 'S-recentLinks', 'S-recentAgo', 'S-recentRepo', 'S-parity',
               'S-adminHeads', 'S-adminConsole', 'S-adminTools', 'S-adminSave', 'S-tab', 'S-subPlace', 'S-hoverOpens'],
     'rkeys': ['K-open', 'K-place', 'K-arrows', 'K-type', 'K-subOpen', 'K-subBack', 'K-escape', 'K-escNoConsole', 'K-enter'],
-    'rviewer': ['V-items', 'V-rerunNote', 'V-recentNoRepo'],
+    'rviewer': ['V-items', 'V-rerunNote', 'V-recentNoRepo', 'V-fitRestricted'],
     'reditor': ['E-items', 'E-adminNoTools', 'E-recentNoRepo'],
     'rhome': ['H-kind', 'H-items', 'H-adminTools', 'H-title'],
     'rcoexist': ['C-headThenPage', 'C-pageThenHead'],
@@ -53,13 +56,17 @@ CHK = {
     'ddashlist': ['G-listItems', 'G-listTitle', 'G-listRow'],
     'ddashv': ['G-viewerItems', 'G-viewerRecent'],
     'dkiosk': ['G-kioskNone'],
+    # (round 3, 2026-11-02: Fit all column widths to contents / to page)
+    'rfit': ['F-items', 'F-fitAll', 'F-fitPage', 'F-cards', 'F-groupFolded', 'F-grouped', 'F-groupPage', 'F-pivot', 'F-noRows'],
 }
 # what live already does: the header menu's spots, a field, a link, Shift, selected text, an admin tool's data
 GUARDS = {'R-cellNative', 'R-headNative', 'R-input', 'R-link', 'R-shift', 'R-selNative', 'R-claimed', 'D-data', 'G-tile', 'G-listRow', 'G-kioskNone'}
 STATIC = ['S-indexLoads', 'S-chromeLoads', 'S-usersegRows', 'S-es5', 'S-noEmdash', 'S-help', 'S-readme', 'S-dashLoads']
-# round 2's checks: red on round 1's build (the --control build), with the item lists that grew (Theme, Density, Send feedback)
-NEW_R2 = {'R-place', 'R-items', 'V-items', 'E-items', 'H-items', 'D-items', 'D-nonAdmin', 'A-feedback', 'A-theme', 'A-density', 'D-theme', 'D-density', 'O-items',
-          'S-help', 'S-readme', 'S-dashLoads'} | {c for k in ('ddash', 'ddashlist', 'ddashv', 'dkiosk') for c in CHK[k]} - {'G-tile', 'G-listRow', 'G-kioskNone'}
+# round 3's checks: red on round 2's build (the --control build), with the item lists that grew (the fit items end a
+# report's menu: K-enter's End lands on Fit all column widths to page). F-cards / F-pivot / F-noRows / V-fitRestricted
+# (no fit items there) are green on it, as round 2 has none anywhere; they are red on the build before the menu.
+# (Round 2's set, NEW_R2, was checked against round 1's build, 57f6d9e: the share's run.py.bak-20261102-wsm2.)
+NEW_R3 = {'R-items', 'V-items', 'E-items', 'O-items', 'K-enter', 'F-items', 'F-fitAll', 'F-fitPage', 'F-grouped', 'F-groupPage', 'S-help', 'S-readme'}
 
 # Each mutant: ([(file key, exact old, new)], [checks that must go red], [scenarios to run]). Every anchor once.
 MUTANTS = {
@@ -112,6 +119,18 @@ MUTANTS = {
     'ws-nochange': ([('ws', "        if (window.jQuery) { window.jQuery(s).trigger('change'); } else { s.dispatchEvent(new Event('change', { bubbles: true })); }", "")], ['A-theme', 'A-density', 'D-theme', 'D-density'], ['ractions', 'dadmin']),
     'ws-fbowner': ([('ws', "!reportId() || (V && V.isReportOwner)) { return null; }", "!reportId()) { return null; }")], ['O-items'], ['rowner']),
     'ws-fbspec': ([('ws', "window.penumbraOpenFeedbackDialog(a ? (a.getAttribute('data-action-value') || '') : FEEDBACK_SPEC,", "window.penumbraOpenFeedbackDialog(a ? (a.getAttribute('data-action-value') || '') : '',")], ['A-feedback'], ['ractions']),
+    # (round 3) the fit items: the view they act on, where they are left out
+    'ws-fitcards': ([('ws', "        if (C && C.on()) { return null; }\n        if (box && shown(box) && box.querySelector('tbody tr')) {", "        if (box && shown(box) && box.querySelector('tbody tr')) {")], ['F-cards'], ['rfit']),
+    'ws-fitshown': ([('ws', "        return (box && shown(box) && box.querySelector('tbody tr')) ? box.querySelector('#tableHeader th[data-colname]') : null;",
+                      "        return (box && box.querySelector('tbody tr')) ? box.querySelector('#tableHeader th[data-colname]') : null;")], ['F-pivot'], ['rfit']),
+    'ws-fitrows': ([('ws', "        return (box && shown(box) && box.querySelector('tbody tr')) ? box.querySelector('#tableHeader th[data-colname]') : null;",
+                     "        return (box && shown(box)) ? box.querySelector('#tableHeader th[data-colname]') : null;")], ['F-noRows'], ['rfit']),
+    'ws-fitgroup': ([('ws', "        if (box && shown(box) && box.querySelector('tbody tr')) {\n            ths = box.querySelectorAll('.group-content > table > thead th[data-colname]');\n"
+                               "            for (i = 0; i < ths.length; i++) { if (shown(ths[i])) { return ths[i]; } }\n            return null;\n        }\n", "")], ['F-grouped', 'F-groupPage'], ['rfit']),
+    'ws-fitfolded': ([('ws', "            for (i = 0; i < ths.length; i++) { if (shown(ths[i])) { return ths[i]; } }", "            if (ths.length) { return ths[0]; }")], ['F-groupFolded'], ['rfit']),
+    'ws-fitcan': ([('ws', "        if (!W || !th || typeof W.canFit !== 'function' || !W.canFit(th)) { return out; }", "        if (!W || !th) { return out; }")], ['V-fitRestricted'], ['rviewer']),
+    'ws-fitswap': ([('ws', "                run: function () { W.fitAll(th); } });", "                run: function () { W.fitPage(th); } });")], ['F-fitAll', 'F-grouped'], ['rfit']),
+    'ws-fitorder': ([('ws', "            add(rowHeightItem());\n            fitItems().forEach(add);", "            fitItems().forEach(add);\n            add(rowHeightItem());")], ['R-items', 'F-items'], ['rmenu', 'rfit']),
     'dp-noload': ([('dash', "<script src=\"js/penumbra_wsmenu.js?v=<?php echo (int)@filemtime(__DIR__ . '/js/penumbra_wsmenu.js'); ?>\"></script>", "")], ['S-dashLoads'], []),
     'dp-notools': ([('dash', "<?php if (!empty($isAdmin)): ?><div hidden><?php penumbra_admin_tools_menu(); ?></div><?php endif; ?>", "")], ['S-dashLoads'], []),
     'ix-noload': ([('index', "<script defer src=\"js/penumbra_wsmenu.js?v=<?php echo filemtime(__DIR__ . '/js/penumbra_wsmenu.js'); ?>\"></script>", "")], ['S-indexLoads'], []),
@@ -132,10 +151,11 @@ one_mutant = opt('--mutant', None)
 all_mutants = flag('--mutants')
 control = flag('--control')
 control_r1 = flag('--control-r1')
-# --control's build = the files as git holds them at a revision: the build before this round (round 1's, 57f6d9e:
-# NEW_R2 red, everything else green); --control-r1 the build before the menu (9a9dfb4^: every check but the guards
-# red). Every file the harness reads comes from there, so a control is one consistent build whatever has shipped since.
-CONTROL_REV = '57f6d9e'      # round 1 live (9a9dfb4 + its help cache): no dashboards, no Theme / Density, no feedback
+# --control's build = the files as git holds them at a revision: the build before this round (round 2's, live at the
+# cut 1b0f3b2: NEW_R3 red, everything else green); --control-r1 the build before the menu (9a9dfb4^: every check but
+# the guards red). Every file the harness reads comes from there, so a control is one consistent build whatever has
+# shipped since.
+CONTROL_REV = '1b0f3b2'      # round 2 live (25a92a8 + its help cache 040ec4b, then crow 5b78a0c): no fit items
 CONTROL_R1_REV = '9a9dfb4^'  # the menu shipped in 9a9dfb4 (2026-11-01): the build before it
 control_rev = opt('--control-rev', CONTROL_R1_REV if control_r1 else CONTROL_REV)
 if control_r1: control = True
@@ -335,7 +355,8 @@ def scenario(name, out):
             p.rclick(gap)
             m, c = p.menu(), p.lastctx()
             A('R-opensBar', m is not None and c.get('prevented') and not c.get('head') and c.get('id') == 'resultsHeader', '%s %s' % (gap, c))
-            A('R-items', m and [i['act'] for i in m['items']] == ['header', 'settings', 'theme', 'density', 'viewLink', 'quick', 'recent', 'admin', 'rerun', 'metrics', 'feedback', 'history', 'cardsShow', 'rowHeight'], m and [i['act'] for i in m['items']])
+            A('R-items', m and [i['act'] for i in m['items']] == ['header', 'settings', 'theme', 'density', 'viewLink', 'quick', 'recent', 'admin', 'rerun', 'metrics', 'feedback', 'history', 'cardsShow', 'rowHeight',
+                                                                  'fitAll', 'fitPage'], m and [i['act'] for i in m['items']])
             A('R-title', m and m['name'] == 'Lazy rows fixture (lrfix)', m and m['name'])
             A('R-foot', m and m['foot'] == FOOT, m and m['foot'])
             notes = dict((i['act'], i['note']) for i in m['items']) if m else {}
@@ -599,8 +620,9 @@ def scenario(name, out):
             A('K-escape', was and p.menu() is None and p.ev('document.activeElement && document.activeElement.id') == 'wsProbeBtn', '%s %s' % (was, p.ev('document.activeElement && document.activeElement.id')))
             A('K-escNoConsole', was and p.ev('localStorage.getItem("penumbra_admin_open")') is None and p.ev('document.body.classList.contains("admin-view")') == av0,
               '%s %s %s' % (was, p.ev('localStorage.getItem("penumbra_admin_open")'), av0))
-            p.ev('document.getElementById("wsProbeBtn").focus(), 1')
-            on0 = not p.ev('document.body.classList.contains("disable-auto-expand")')
+            # (round 3) the last item is Fit all column widths to page: Enter runs it (a stand-in for the widths module's
+            # fitPage counts the call; the fit itself is F-*'s), the menu closes and the focus is back on the button
+            p.ev('document.getElementById("wsProbeBtn").focus(); window.__fp = 0; window.Penumbra.colWidths.fitPage = function () { window.__fp++; return true; }; 1')
             p.key('F10', 8)
             if p.menu() is None:
                 p.ev('document.getElementById("wsProbeBtn").dispatchEvent(new MouseEvent("contextmenu", {bubbles: true, cancelable: true, button: 0, clientX: 0, clientY: 0})), 1')
@@ -608,8 +630,8 @@ def scenario(name, out):
             last = (p.menu() or {}).get('focus')
             p.key('Enter')
             time.sleep(0.3)
-            on1 = not p.ev('document.body.classList.contains("disable-auto-expand")')
-            A('K-enter', last == 'rowHeight' and on1 != on0 and p.menu() is None and p.ev('document.activeElement && document.activeElement.id') == 'wsProbeBtn', '%s %s %s %s' % (last, on0, on1, p.ev('document.activeElement && document.activeElement.id')))
+            A('K-enter', last == 'fitPage' and p.ev('window.__fp') == 1 and p.menu() is None and p.ev('document.activeElement && document.activeElement.id') == 'wsProbeBtn',
+              '%s %s %s' % (last, p.ev('window.__fp'), p.ev('document.activeElement && document.activeElement.id')))
         elif name in ('rviewer', 'reditor'):
             p, ok = rpt('id=lrfix&scn=wsv&role=' + ('viewer' if name == 'rviewer' else 'editor'))
             gap = p.ev('window.__ws.gap("#resultsHeader", "right")')
@@ -617,10 +639,11 @@ def scenario(name, out):
             m = p.menu() or {'items': []}
             acts = [i['act'] for i in m['items']]
             if name == 'rviewer':
-                A('V-items', acts == ['header', 'settings', 'theme', 'density', 'viewLink', 'quick', 'recent', 'rerun', 'metrics', 'feedback', 'cardsShow', 'rowHeight'], acts)
+                A('V-items', acts == ['header', 'settings', 'theme', 'density', 'viewLink', 'quick', 'recent', 'rerun', 'metrics', 'feedback', 'cardsShow', 'rowHeight', 'fitAll', 'fitPage'], acts)
                 A('V-rerunNote', [i['note'] for i in m['items'] if i['act'] == 'rerun'] == [''], [i for i in m['items'] if i['act'] == 'rerun'])
             else:
-                A('E-items', acts == ['header', 'settings', 'theme', 'density', 'viewLink', 'quick', 'recent', 'admin', 'rerun', 'metrics', 'feedback', 'history', 'cardsShow', 'rowHeight'], acts)
+                A('E-items', acts == ['header', 'settings', 'theme', 'density', 'viewLink', 'quick', 'recent', 'admin', 'rerun', 'metrics', 'feedback', 'history', 'cardsShow', 'rowHeight',
+                                      'fitAll', 'fitPage'], acts)
                 p.click(p.ev('window.__ws.itemAt("admin", 0)'))
                 time.sleep(0.5)
                 mm = p.menu() or {'subs': []}
@@ -634,6 +657,14 @@ def scenario(name, out):
             mm = p.menu() or {'subs': []}
             s0 = mm['subs'][0]['items'] if mm['subs'] else []
             A('V-recentNoRepo' if name == 'rviewer' else 'E-recentNoRepo', [i['act'] for i in s0] == ['recentNone'] and s0[0]['disabled'], [(i['act'], i['label']) for i in s0])
+            if name == 'rviewer':
+                # (round 3) the report closes Column Organization to its viewers (main.js penumbraColWidthsRestricted):
+                # the widths are the report's, so no fit items (the rest of the table's items stay)
+                p.key('Escape')
+                p.ev('window._penumbraHideColumns = true; 1')
+                p.rclick(gap)
+                va = p.acts() or []
+                A('V-fitRestricted', 'rowHeight' in va and 'fitAll' not in va and 'fitPage' not in va, va)
         elif name == 'rhome':
             p, ok = rpt('scn=wsh')
             A('H-kind', p.ev('window.PenumbraPageMenu && window.PenumbraPageMenu.kind()') == 'home', p.ev('window.PenumbraPageMenu && window.PenumbraPageMenu.kind()'))
@@ -664,7 +695,95 @@ def scenario(name, out):
             p, ok = rpt('id=lrfix&scn=wso&role=owner')
             p.rclick(p.ev('window.__ws.gap("#resultsHeader", "right")'))
             acts = p.acts() or []
-            A('O-items', acts == ['header', 'settings', 'theme', 'density', 'viewLink', 'quick', 'recent', 'admin', 'rerun', 'metrics', 'history', 'cardsShow', 'rowHeight'], acts)
+            A('O-items', acts == ['header', 'settings', 'theme', 'density', 'viewLink', 'quick', 'recent', 'admin', 'rerun', 'metrics', 'history', 'cardsShow', 'rowHeight', 'fitAll', 'fitPage'], acts)
+        elif name == 'rfit':
+            # (round 3, 2026-11-02) Fit all column widths to contents / to page: the header menu's two items, made through
+            # a heading of the view on screen; none over the cards, a pivot or a table without rows. The widths module's
+            # own fitAll / fitPage are wrapped to record which view's heading each was handed and what it returned; its
+            # notices are recorded as colmenu's driver does (a .zz-toast each, so their Undo is a real button to press)
+            p, ok = rpt('id=lrfix&scn=wsf')
+            p.ev('(function () { var W = window.Penumbra.colWidths; window.__fits = []; window.__toasts = [];'
+                 ' ["fitAll", "fitPage"].forEach(function (k) { var f = W[k]; W[k] = function (th) { var r = f.apply(this, arguments);'
+                 ' window.__fits.push([k, !(th && th.closest) ? "none" : (th.closest("#tableHeader") ? "flat" : (th.closest("#groupedResultsContainer") ? "group" : "other")), r]); return r; }; });'
+                 ' window.show_text = function (html) { window.__toasts.push(String(html)); var d = document.createElement("div"); d.className = "zz-toast"; d.innerHTML = String(html); document.body.appendChild(d); };'
+                 ' return 1; })()')
+            H = 'window.Penumbra.colWidthsHost'
+            shown_n = p.ev('Array.prototype.filter.call(document.querySelectorAll("#tableHeader th[data-colname]"), function (t) { return t.style.display !== "none" && t.getAttribute("data-column") !== "#"; }).length') or 0
+            def menu_acts():
+                p.rclick(p.ev('window.__ws.gap("#resultsHeader", "right")'))
+                a = p.acts() or []
+                p.key('Escape')
+                return a
+            def pick(act):
+                p.ev('window.__fits = []; window.__toasts = []; 1')
+                p.rclick(p.ev('window.__ws.gap("#resultsHeader", "right")'))
+                pt = p.ev('window.__ws.itemAt(%s, 0)' % json.dumps(act))
+                if pt: p.click(pt)
+                else: p.key('Escape')
+                time.sleep(0.5)
+                return p.ev('window.__fits[0] || null'), p.ev('window.__toasts[window.__toasts.length - 1] || ""') or ''
+            def undo():
+                p.ev('var u = document.querySelectorAll(".zz-toast .pnb-colw-undo"); u.length && u[u.length - 1].click(); 1')
+                time.sleep(0.3)
+            p.rclick(p.ev('window.__ws.gap("#resultsHeader", "right")'))
+            its = (p.menu() or {'items': []})['items']
+            fit = [i for i in its if i['act'] in ('fitAll', 'fitPage')]
+            A('F-items', [i['act'] for i in its][-3:] == ['rowHeight', 'fitAll', 'fitPage'] and [i['label'] for i in fit] == ['Fit all column widths to contents', 'Fit all column widths to page']
+              and all(i['role'] == 'menuitem' and not i['disabled'] and not i['note'] and (i['title'] or '').startswith('Every shown column') for i in fit),
+              [(i['act'], i['label'], i['role'], i['note'], (i['title'] or '')[:30]) for i in its[-3:]])
+            p.key('Escape')
+            # the flat table: every shown column fitted, with Undo in the notice
+            f, t = pick('fitAll')
+            n = p.ev(H + '.userDiff().length')
+            A('F-fitAll', f == ['fitAll', 'flat', True] and n >= min(shown_n, 4) and 'column widths fitted to content' in t and 'pnb-colw-undo' in t, '%s n=%s/%s %s' % (f, n, shown_n, t[:90]))
+            undo()
+            f, t = pick('fitPage')
+            sh = p.ev('(function () { var u = %s.state().user; return Object.keys(u).filter(function (k) { return /%%$/.test(String(u[k])); }).length; })()' % H)
+            wrap = p.ev('(function () { var w = document.getElementById("results-wrapper"); return w ? [w.scrollWidth, w.clientWidth] : null; })()')
+            A('F-fitPage', f == ['fitPage', 'flat', True] and (sh or 0) >= min(shown_n, 4) and bool(wrap) and wrap[0] <= wrap[1] + 1 and 'fitted to the page' in t and 'pnb-colw-undo' in t,
+              '%s shares=%s/%s wrap=%s %s' % (f, sh, shown_n, wrap, t[:90]))
+            undo()
+            # the cards: the table stays laid out under them, out of sight - no fit items
+            p.ev('window.Penumbra.cards.showAs(), 1')
+            on = p.wait('window.Penumbra.cards && window.Penumbra.cards.on()', 5)
+            time.sleep(0.4)
+            ca = menu_acts()
+            A('F-cards', on and 'cardsTable' in ca and 'fitAll' not in ca and 'fitPage' not in ca, '%s %s' % (on, ca))
+            p.ev('window.Penumbra.cards.set("table"), 1')
+            p.wait('!window.Penumbra.cards.on()', 5)
+            time.sleep(0.4)
+            # the grouped view, every group folded (as it opens here): no table laid out, nothing to measure - no fit items
+            p.ev('window.Penumbra.groupByColumn("V_STATUS"), 1')
+            g = p.wait('document.body.classList.contains("group-mode-active") && window.Penumbra.headerMenu.groupingColumn() === "V_STATUS"'
+                       ' && document.querySelectorAll("#groupedResultsContainer > .group-wrapper").length === 3 && !!document.querySelector("#groupedResultsContainer .group-content > table > tbody > tr")', 15)
+            time.sleep(0.6)
+            folded = p.ev('!document.querySelector("#groupedResultsContainer .group-wrapper.open")')
+            ga = menu_acts()
+            A('F-groupFolded', bool(g) and folded and 'rowHeight' in ga and 'fitAll' not in ga and 'fitPage' not in ga, '%s %s %s' % (g, folded, ga))
+            # ...the first group opened (a click on its band): its table's heading, so the groups' columns are the ones fitted
+            p.click(p.ev('window.__ws.center("#groupedResultsContainer > .group-wrapper > .group-header")'))
+            p.wait('!!document.querySelector("#groupedResultsContainer > .group-wrapper.open")', 5)
+            time.sleep(0.4)
+            f, t = pick('fitAll')
+            A('F-grouped', bool(g) and f == ['fitAll', 'group', True] and 'column widths fitted to content' in t, '%s %s %s' % (g, f, t[:90]))
+            undo()
+            f, t = pick('fitPage')
+            A('F-groupPage', bool(g) and f == ['fitPage', 'group', True] and 'fitted to the page' in t, '%s %s %s' % (g, f, t[:90]))
+            undo()
+            p.ev('window.Penumbra.headerMenu.ungroup(), 1')
+            p.wait('!document.body.classList.contains("group-mode-active") && document.querySelector("#resultsTable tbody tr") && window.__ws.vis(document.getElementById("resultsTable"))', 10)
+            time.sleep(0.5)
+            # a pivot, as main.js leaves the page for one: the flat table hidden (its rows still in it), the pivot's shown
+            p.ev('jQuery("#resultsTable").hide(); jQuery("#pivot-output-container").html(\'<table id="pivotResultTable"><thead><tr><th>V_STATUS</th><th>Count</th></tr></thead>'
+                 '<tbody><tr><td>Open</td><td>3</td></tr></tbody></table>\').show(); 1')
+            time.sleep(0.3)
+            pa = menu_acts()
+            A('F-pivot', 'rowHeight' in pa and 'fitAll' not in pa and 'fitPage' not in pa, pa)
+            # no rows: a query that came back empty (main.js empties the body; the header row stays)
+            p.ev('jQuery("#pivot-output-container").empty(); jQuery("#resultsTable tbody").empty(); jQuery("#resultsTable").show(); 1')
+            time.sleep(0.3)
+            na = menu_acts()
+            A('F-noRows', 'header' in na and 'fitAll' not in na and 'fitPage' not in na, na)
         elif name in ('ddash', 'ddashlist', 'ddashv', 'dkiosk'):
             # (round 2) a dashboard (dash_template.html): its header's buttons, the tools, the list page, a viewer, kiosk view
             qs = {'ddash': 'admin=1', 'ddashlist': 'admin=1&list=1', 'ddashv': 'admin=0', 'dkiosk': 'admin=1&kiosk=1'}[name]
@@ -866,10 +985,12 @@ def static_checks(t):
     sec = t['help'][hp:t['help'].find('id="us-colmenu"', hp)] if hp > 0 else ''
     A('S-help', hp > 0 and 'data-jump-to="us-pagemenu"' in t['help'] and '<kbd>Shift</kbd>+right-click' in sec and 'Recent reports' in sec
       and '<strong>Theme</strong>' in sec and '<strong>Send feedback to the report owner...</strong>' in sec and 'A dashboard has it too' in sec
+      and '<strong>Fit all column widths to contents</strong>' in sec and '<strong>Fit all column widths to page</strong>' in sec
       and 'Right-click the dashboard' in t['dhelp']
       and '—' not in sec and '&mdash;' not in sec and 'right-click page menu' in t['manifest'], len(sec))
     A('S-readme', 'penumbra_tests\\wsmenu\\run.py' in t['readme'] and 'js\\penumbra_wsmenu.off' in t['readme'] and '(2026-11-01, "wsmenu"; suite `wsmenu`)' in t['readme']
-      and 'Copy link to this dashboard' in t['readme'] and 'Send feedback to the report owner' in t['readme'])
+      and 'Copy link to this dashboard' in t['readme'] and 'Send feedback to the report owner' in t['readme']
+      and '**Round 3 (2026-11-02' in t['readme'] and 'Fit all column widths to contents' in t['readme'])
     d = t['dash']
     A('S-dashLoads', "require_once 'penumbra_admin_chrome.php';" in d and "file_exists(__DIR__ . '/js/penumbra_wsmenu.off')" in d
       and '<?php if (!empty($isAdmin)): ?><div hidden><?php penumbra_admin_tools_menu(); ?></div><?php endif; ?>' in d
@@ -889,7 +1010,7 @@ def expected_ids(scns):
 
 try:
     texts = load_texts()
-    print('build: %s' % ('git %s (CONTROL: %s)' % (control_rev, 'the build before the menu' if control_r1 else "round 1's build") if control else app_dir))
+    print('build: %s' % ('git %s (CONTROL: %s)' % (control_rev, 'the build before the menu' if control_r1 else "round 2's build") if control else app_dir))
     names = [s for s in SCN if not scn_arg or s in scn_arg.split(',')]
     if all_mutants or one_mutant:
         good = bad = 0
@@ -918,8 +1039,8 @@ try:
             else: f += 1; failed.append(a)
         print('TOTAL pass=%d fail=%d   failed: %s' % (p, f, ' '.join(failed)))
         if control:
-            # round 1's build: round 2's checks red; the build before the menu: every check but the guards (and no page errors)
-            new = [a for a in want if ((a not in GUARDS and not a.startswith('X-')) if control_r1 else (a in NEW_R2))]
+            # round 2's build: round 3's checks red; the build before the menu: every check but the guards (and no page errors)
+            new = [a for a in want if ((a not in GUARDS and not a.startswith('X-')) if control_r1 else (a in NEW_R3))]
             wrong = [a for a in want if (a in failed) != (a in new)]
             print('CONTROL: %s' % ('as expected (%d red, %d %s green)' % (len(new), len(want) - len(new), 'guards' if control_r1 else 'others') if not wrong else 'NOT as expected: %s' % ' '.join(wrong)))
             print('RESULT: GREEN' if not wrong else 'RESULT: RED')

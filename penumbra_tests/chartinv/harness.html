@@ -279,7 +279,9 @@
     gauge: function () { clickType('gauge'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); setv('#vizReferenceLine', '5000000|Goal'); $('#vizGaugeBands').val('2000000|4000000').trigger('input').trigger('change'); },
     bullet: function () { setv('#vizXAxis', 'DEPT'); clickType('bullet'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); setv('#vizReferenceLine', '1000000'); },
     box: function () { setv('#vizXAxis', 'DEPT'); clickType('box'); setv('#vizYAxis', 'AMOUNT'); setv('#vizBoxWhiskers', 'minmax'); },
-    gantt: function () { setv('#vizXAxis', 'AWARD_ID'); clickType('gantt'); setv('#vizYAxis', 'START_DATE'); setv('#vizGanttEnd', 'END_DATE'); setv('#vizReferenceLine', 'today'); setv('#vizSortBy', 'duration'); },
+    gantt: function () { setv('#vizXAxis', 'AWARD_ID'); clickType('gantt'); setv('#vizYAxis', 'START_DATE'); setv('#vizGanttEnd', 'END_DATE'); setv('#vizReferenceLine', 'today'); setv('#vizSortBy', 'duration');
+      // (gwin / gcolor, 2026-11-02) the window and Color By ride the same round trip
+      setv('#vizGanttColor', 'STATUS'); setv('#vizYMin', 'fy24'); setv('#vizYMax', 'today+1y'); },
     map: function () { setv('#vizXAxis', 'STATE'); clickType('map'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); setv('#vizMapBins', 'equal'); check('#vizMapLabels', false); },
     sankey: function () { setv('#vizXAxis', 'DEPT'); clickType('sankey'); setv('#vizYAxis', 'AMOUNT'); setv('#vizAggregation', 'sum'); setv('#vizSankeyTo', 'STATUS'); setv('#vizSankeyStage3', 'FY'); setv('#vizLimit', '5'); }
   };
@@ -338,6 +340,10 @@
     o['groupBy first option'] = $('#vizGroupBy option').first().text();
     o['sortBy value text'] = $('#vizSortBy option[value="value"]').text();
     o['sortBy duration shown'] = $('#vizSortBy option[value="duration"]').css('display') !== 'none';
+    // (gwin / gsortend / gcolor, 2026-11-02)
+    o['sortBy end shown'] = $('#vizSortBy option[value="end"]').css('display') !== 'none';
+    o['yMin label'] = $('#vizYMinLt').text(); o['yMax label'] = $('#vizYMaxLt').text();
+    o['yMin placeholder'] = $('#vizYMin').attr('placeholder') || ''; o['yMax placeholder'] = $('#vizYMax').attr('placeholder') || '';
     o['values center shown'] = $('#vizValues option[value="center"]').css('display') !== 'none';
     o['values start shown'] = $('#vizValues option[value="start"]').css('display') !== 'none';
     o['filter group text'] = $('#vizFilterGroupWrap .viz-chip-text').text();
@@ -566,6 +572,137 @@
   // map, treemap) lists one entry per screen-reader row, and each runs what a canvas
   // click on that point runs; point notes show (count) and open from the menu; the
   // row breakdown's sortable headers are tab stops that Enter sorts.
+  // ---- T (gtl, 2026-11-02): Quick actions' Timeline - the columns it picks, and the builder it opens ----------
+  function runT() {
+    section('T', function () {
+      var HM = window.Penumbra && window.Penumbra.headerMenu;
+      assert('T the header API has timelineCols and chartTimeline', !!HM && typeof HM.timelineCols === 'function' && typeof HM.chartTimeline === 'function');
+      if (!HM || typeof HM.timelineCols !== 'function') return;
+      var keepK = window.Penumbra.colKinds, keepC = window.Penumbra.cards;
+      var KINDS = { '#': { num: true }, AMOUNT: { num: true }, N: { num: true }, START_DATE: { date: true }, END_DATE: { date: true } };
+      try {
+        window.Penumbra.cards = null;
+        window.Penumbra.colKinds = function (c) { return KINDS[c] || {}; };
+        // (gbar sweep, the browser check: rpt's label was ACTIVITY TYPE, a few values -> a few merged bars) the label is
+        // the text column with the most distinct values, whatever the card title is
+        var keepM = (window.__CI && window.__CI.setMaster) ? window.__CI.setMaster(FIX) : null;
+        try {
+          eq('T two dates: start, end and the text column with the most distinct values', HM.timelineCols(), { start: 'START_DATE', end: 'END_DATE', label: 'AWARD_ID' });
+          window.Penumbra.cards = { slots: function () { return { title: 'DEPT' }; } };
+          eq('T ...whatever the card title is', HM.timelineCols().label, 'AWARD_ID');
+          window.Penumbra.cards = null;
+        } finally { if (window.__CI && window.__CI.setMaster) window.__CI.setMaster(keepM); }
+        KINDS.FY = { date: true };   // a third date, before START_DATE: the start is still the one named like a start
+        eq('T the start is the date named like a start', HM.timelineCols().start, 'START_DATE');
+        eq('T the end is the date named like an end', HM.timelineCols().end, 'END_DATE');
+        delete KINDS.FY;
+        KINDS.END_DATE = {};   // one date alone: no timeline
+        eq('T one date column = no Timeline row', HM.timelineCols(), null);
+        window.Penumbra.colKinds = undefined;
+        eq('T no colKinds = no Timeline row', HM.timelineCols(), null);
+      } finally { window.Penumbra.colKinds = keepK; window.Penumbra.cards = keepC; }
+      // the builder, opened by the action: a Gantt over the columns, drawn
+      openBuilder();
+      // (gbar sweep, the browser check) the report's saved chart's title / filter came along: the action resets first
+      $('#vizTitle').val('Leftover title').trigger('change');
+      $('#vizFilterExpression').val('amount > 0').trigger('change');
+      var $lb = $('#visualizationLightbox'), shown0 = $lb.css('display');
+      $lb.css('display', 'flex');
+      try {
+        HM.chartTimeline('AWARD_ID', 'START_DATE', 'END_DATE');
+        eq('T the builder is a Gantt', $('.viz-type-option.active').data('type'), 'gantt');
+        eq('T one bar per the label', $('#vizXAxis').val(), 'AWARD_ID');
+        eq('T from the start column', $('#vizYAxis').val(), 'START_DATE');
+        eq('T to the end column', $('#vizGanttEnd').val(), 'END_DATE');
+        var code = window.vizBuildCodeFromForm();
+        assert('T it emits a Gantt vis() over the columns', code.indexOf("vis('gantt', 'AWARD_ID', 'START_DATE', 'END_DATE'") === 0, code.slice(0, 90));
+        assert('T it starts from a reset builder (no leftover title or filter)', $('#vizTitle').val() !== 'Leftover title' && $('#vizFilterExpression').val() === '', $('#vizTitle').val() + ' | ' + $('#vizFilterExpression').val());
+        var bucketed = function (sel) { return $(sel + ' option').filter(function () { return String(this.value).indexOf(':') !== -1; }).length; };
+        assert('T (the X list does offer buckets here)', bucketed('#vizXAxis') > 0, bucketed('#vizXAxis'));
+        eq('T Color By lists plain columns only', bucketed('#vizGanttColor'), 0);
+        eq('T End Date lists plain columns only', bucketed('#vizGanttEnd'), 0);
+      } finally { $lb.css('display', shown0); }
+    });
+  }
+
+  // ---- G (glong, 2026-11-02): a long Gantt grows to its bars, in the builder's preview and on the report ----------
+  async function runG() {
+    var F = window.__CI;
+    await asection('G', async function () {
+      var glN = Object.keys(FIX.reduce(function (o, m) { o[m.get('AWARD_ID')] = 1; return o; }, {})).length;   // the fixture's awards (39)
+      assert('G (the fixture has 21 to 199 awards)', glN > 20 && glN < 200, glN);
+      openBuilder(); setv('#vizXAxis', 'AWARD_ID'); clickType('gantt'); setv('#vizYAxis', 'START_DATE'); setv('#vizGanttEnd', 'END_DATE');
+      eq('G the suggested Limit: all its bars (under the cap of 200, not what fits the set height)', $('#vizLimit').val(), '9999');
+      setv('#vizLimit', '9999');
+      window.vizRunLiveUpdate();
+      var pv = Chart.getChart('vizChart');
+      assert('G the preview drew', !!pv);
+      if (!pv) return;
+      var pvH = pv.height;
+      assert('G the preview grows to its bars (about 22px each)', pvH >= glN * 22, pvH);
+      assert('G ...with the dates along the top too', !!pv.scales.xTop && pv.scales.xTop.position === 'top', Object.keys(pv.scales).join(','));
+      var rr = await renderReport(window.vizBuildCodeFromForm());
+      assert('G the report draws it', !!rr.chart, rr.text || '');
+      if (rr.chart) {
+        assert('G the report chart grows as well', rr.chart.height >= glN * 22, rr.chart.height + ' (preview ' + pvH + ')');
+        assert('G ...with the dates along the top too', !!rr.chart.scales.xTop, Object.keys(rr.chart.scales).join(','));
+      }
+      setv('#vizLimit', '10');
+      window.vizRunLiveUpdate();
+      var pv2 = Chart.getChart('vizChart');
+      eq('G Limit 10: the note says so', pv2 && pv2.data._ganttNote, 'Showing 10 of ' + glN + ' bars.');
+      assert('G ...drawn under the chart', !!pv2 && (pv2.config.plugins || []).some(function (p) { return p && p.id === 'penumbraGanttNote'; }));
+      assert('G 10 bars: no taller than its set height, no top axis', !!pv2 && pv2.height < pvH && !pv2.scales.xTop, pv2 && (pv2.height + ' / ' + Object.keys(pv2.scales).join(',')));
+      // a canvas its caller sized by style (the fullscreen page, a slide) keeps that size
+      var cv = document.createElement('canvas'); cv.id = 'glFixed'; cv.width = 800; cv.height = 600; cv.style.width = '400px'; cv.style.height = '300px';
+      document.body.appendChild(cv);
+      try {
+        var cd = F.chartData(FIX, 'AWARD_ID', 'START_DATE', 'END_DATE', 'sum', 9999, 'gantt', 'value', 'asc', 'default', false, false, null, '', {});
+        F.renderSnip('glFixed', 'gantt', cd, '', false, false);
+        var fc = Chart.getChart(cv);
+        assert('G a canvas sized by its style (fullscreen, a slide) keeps its size (not grown to its bars)', !!fc && fc.height < glN * 22 && cv.getAttribute('data-gantt-grown') === null, fc ? fc.height + ' / ' + cv.getAttribute('data-gantt-grown') : 'no chart');
+        if (fc) fc.destroy();
+      } finally { cv.remove(); }
+    });
+  }
+
+  // ---- S (gsortcolor, 2026-11-02): Sort By Color By group - the builder's option and the chart's right-click entry ----
+  async function runS() {
+    await asection('S', async function () {
+      var $menu = $('#chartContextMenu');
+      function menuOn(cv) { $menu.hide(); $(cv).trigger($.Event('contextmenu', { clientX: 20, clientY: 20 })); return $menu.find('li.ctx-gantt-sort-color'); }
+      openBuilder(); setv('#vizXAxis', 'AWARD_ID'); clickType('gantt'); setv('#vizYAxis', 'START_DATE'); setv('#vizGanttEnd', 'END_DATE');
+      var $opt = $('#vizSortBy option[value="color"]');
+      assert('S a Gantt offers Sort By Color By group', $opt.length === 1 && $opt.css('display') !== 'none', $opt.length + ' / ' + $opt.css('display'));
+      window.vizRunLiveUpdate();
+      var cv = document.getElementById('vizChart');
+      var $e = menuOn(cv);
+      assert('S no Color By: the right-click menu has no Color By group entry', $e.length === 1 && $e.css('display') === 'none', $e.length + ' / ' + $e.css('display'));
+      $menu.hide();
+      setv('#vizGanttColor', 'STATUS'); setv('#vizSortBy', 'color');
+      window.vizRunLiveUpdate();
+      var ch = Chart.getChart('vizChart');
+      var by = ch ? ch.data._ganttBars.map(function (b) { return b.colorVal; }) : [];
+      var runs = by.filter(function (v, i) { return i === 0 || v !== by[i - 1]; });
+      var legend = ch && ch.data._ganttLegend ? ch.data._ganttLegend.map(function (k) { return k.text; }) : [];
+      eq('S the bars come in Color By groups, in the legend\'s order', runs, legend);
+      var scCode = window.vizBuildCodeFromForm();
+      assert('S ...it is saved in the chart', /'color'/.test(scCode), scCode.slice(0, 160));
+      $e = menuOn(cv);
+      assert('S with a Color By: the entry shows', $e.length === 1 && $e.css('display') !== 'none' && /Color By group/.test($e.text()), $e.css('display') + ' / ' + $e.text());
+      $menu.hide();
+      clickType('bar');
+      assert('S another type: the option is hidden and the sort falls back to Value', $opt.css('display') === 'none' && $('#vizSortBy').val() === 'value', $opt.css('display') + ' / ' + $('#vizSortBy').val());
+      // reopening the saved chart (the restore path, not the type click) shows the option and lands on it
+      var F = window.__CI;
+      F.setSnippet(scCode);
+      var scParsed = F.enumVis();
+      openBuilder();
+      if (scParsed.length) F.restore(scParsed[0].config);
+      assert('S reopening the saved chart shows Color By group, selected', scParsed.length === 1 && $('#vizSortBy').val() === 'color' && $opt.css('display') !== 'none', scParsed.length + ' / ' + $('#vizSortBy').val() + ' / ' + $opt.css('display'));
+    });
+  }
+
   async function runK() {
     var F = window.__CI, P = window.Penumbra || {};
     var saved = { active: P.chartNotesActive, count: P.chartNoteCount, open: P.openChartNote };
@@ -693,6 +830,9 @@
     if (!ONLY || ONLY === 'F') await runF();
     if (!ONLY || ONLY === 'D') await runD();
     if (!ONLY || ONLY === 'K') await runK();
+    if (!ONLY || ONLY === 'T') runT();   // (gtl)
+    if (!ONLY || ONLY === 'G') await runG();   // (glong)
+    if (!ONLY || ONLY === 'S') await runS();   // (gsortcolor)
     // E (email / PDF) runs in the vischarts suite on these very calls and rows.
     Object.keys(EXPORT_CODES).forEach(function (t) { results.push({ name: 'EXPORT code ' + t, pass: true, detail: EXPORT_CODES[t], export: true }); });
     var cols = ['DEPT', 'STATUS', 'FY', 'AMOUNT', 'AWARD_ID', 'STATE', 'N', 'START_DATE', 'END_DATE'];

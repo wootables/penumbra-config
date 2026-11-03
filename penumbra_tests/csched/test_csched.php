@@ -98,6 +98,13 @@ ok('P-big', strpos($cs[0], 'font-size:19px;font-weight:bold;color:' . $th['text'
 // bars: the rank among 10 20 30 0 50 (abs, sorted 0 10 20 30 50): 10 -> 25%, 30 -> 75%; row 5's own gradient 33% in its colour; 0 draws a 1% floor? no: 0 -> rank 0 -> max(1) width
 preg_match_all('/<td width="(\d+)%" style="height:6px;font-size:0;line-height:0;background-color:([^;]+);"/', $h, $bm, PREG_SET_ORDER);
 $bw = array_map(function ($x) { return $x[1] . '@' . $x[2]; }, $bm);
+// (csw2) a Percent format's bar: the shown percentage (the raw fraction's rank before), as js barOf
+$pf = function ($row, $idx, $cols) { $o = array('row' => array(), 'cells' => array()); foreach ($cols as $c) { if (!array_key_exists($c, $row)) continue; $raw = $row[$c];
+    $o['cells'][strtoupper($c)] = array('raw' => $raw, 'html' => htmlspecialchars($c === 'NUM' ? rtrim(rtrim(number_format($raw * 100, 1), '0'), '.') . '%' : $raw), 'css' => array()); } return $o; };
+$pr = array(); foreach (array('0.125', '0.5', '0.8') as $i => $v) $pr[] = array('ID' => 'P' . $i, 'NUM' => $v);
+$ph = penumbra_cards_email_html($pr, false, penumbra_cards_email_cfg($st(array('open' => 1, 'sent' => array('title' => 'ID', 'bar' => 'NUM')))), 'theme-default', $pf, 0);
+preg_match_all('/<td width="(\d+)%" style="height:6px;/', $ph['html'], $pm);
+ok('P-pctShown', $pm[1] === array('13', '50', '80'), json_encode($pm[1]));
 ok('P-bars', $bw === array('25@' . $th['brand'], '50@' . $th['brand'], '75@' . $th['brand'], '1@' . $th['brand'], '33@#ff9800'), json_encode($bw));
 ok('P-chips', substr_count($cs[0], 'border-radius:9px;') === 2 && strpos($cs[0], '>Palmtag, Scott</span>') !== false && strpos($cs[0], '>Smith, Jo</span>') !== false
     && strpos($cs[0], 'background-color:' . $th['alt'] . ';color:' . $th['text'] . ';">Palmtag') !== false, substr($cs[0], 0, 900));
@@ -155,5 +162,19 @@ if (function_exists('penumbra_sched_notes_col')) penumbra_sched_notes_col('');
 $csN = $cards($hn);
 ok('P-notes', function_exists('penumbra_sched_notes_col') && strpos($hn0, 'Ann: first') === false && substr_count($hn, 'Ann: first') === 1 && isset($csN[0], $csN[1])
     && strpos($csN[0], 'margin:0 0 2px;">NOTES</div>2026-10-01 Ann: first') !== false && strpos($csN[1], '>NOTES</div>') === false && strpos($hnc, 'Ann: first') === false, isset($csN[0]) ? substr($csN[0], -300) : '');
+// (cnest sweep) a grouped body cut by size heads only the groups it has cards of (they ran on, uncounted, past the budget)
+$grpM = array(); for ($gi = 0; $gi < 8; $gi++) $grpM['Group ' . $gi] = array($rows[$gi % 5]);
+$rm = penumbra_cards_email_html($grpM, true, $cfg, 'theme-default', $cellFn, 2 * $one + 400); $segs = explode('<div style="margin:14px 0 6px;', $rm['html']); array_shift($segs);
+ok('P-cutNoHeads', $rm['truncated'] && count($segs) >= 1 && count($segs) < 8 && count(array_filter($segs, function ($s) { return strpos(explode('<div style="margin:14px 0 6px;', $s)[0], 'border-radius:8px') === false; })) === 0,
+    json_encode(array($rm['shown'], $rm['total'], count($segs))));
+// the bar's rank: the same answers as the scan it replaced (ties share their run's middle), in a binary search
+$refRank = function ($v, $vals) { $n = count($vals); if ($n < 2) return 100; $a = 0; while ($a < $n && $vals[$a] < $v) $a++; $b = $a; while ($b < $n && $vals[$b] <= $v) $b++; return (($a + $b - 1) / 2) / ($n - 1) * 100; };
+mt_srand(7); $same = true;
+for ($k = 0; $k < 200 && $same; $k++) { $vs = array(); $m = mt_rand(0, 30); for ($j = 0; $j < $m; $j++) $vs[] = mt_rand(0, 9); sort($vs); for ($j = -1; $j <= 10 && $same; $j++) $same = abs(_pnb_cm_rank($j, $vs) - $refRank($j, $vs)) < 1e-9; }
+ok('P-rankSame', $same);
+$big = range(0, 19999); $t0 = microtime(true); for ($j = 0; $j < 20000; $j++) _pnb_cm_rank($j, $big); $dt = microtime(true) - $t0;
+ok('P-rankFast', $dt < 1.5, sprintf('%.2fs for 20,000 ranks over 20,000 values', $dt));
+// a change analysis (the was/now groups) mails tables, never cards
+ok('S-changeNoCards', strpos($run, "                    \$viewMode = 'grouped';\r\n                    \$GLOBALS['penumbra_cards_email'] = null;") !== false);
 ok('P-noWarnings', empty($ERRS), implode(' | ', array_slice(array_unique($ERRS), 0, 4)));
 echo implode("\n", $out) . "\n";

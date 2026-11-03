@@ -23,7 +23,7 @@ CSS = ['main.css', 'penumbra_tiles.css', 'penumbra_dashboard.css']
 SCN = ['render', 'editor', 'infobox']
 CHK = {
     'render': ['cardsUrl', 'tableUrl', 'legacyUrl', 'headerNone', 'tableOnlyCards', 'openCards', 'openLegacy'],
-    'editor': ['viewShown', 'sizeHidden', 'sizeShows', 'headerHides', 'tableShows', 'appliedUrl', 'saved', 'reedit', 'backToTable', 'headerNoView'],
+    'editor': ['legacyShown', 'legacyKept', 'viewShown', 'sizeHidden', 'sizeShows', 'headerHides', 'tableShows', 'appliedUrl', 'saved', 'reedit', 'backToTable', 'headerNoView'],
     'infobox': ['parseCards', 'parseZero', 'badSizeDropped', 'urlCards', 'urlZero', 'urlNoSize', 'urlHeaderNone', 'jsonCase', 'promptReserved', 'openUrlCards'],
 }
 # hold on live too: an old tile and a header send no view; a header tile saves none
@@ -42,7 +42,10 @@ MUTANTS = {
     'noparse': ([('tiles', "                else if (lk === 'view') { spec.view = v; }   // (cdash) view=cards|table\n", "")], ['L-infobox-parseCards'], ['infobox']),
     'noreserve': ([('tiles', "limit: 1, cards: 1, cardsize: 1 };", "limit: 1 };")], ['L-infobox-promptReserved'], ['infobox']),
     'nocase': ([('tiles', "            spec.view = String(spec.view || '').toLowerCase();   // (cdash)\n", "            spec.view = String(spec.view || '');   // (cdash)\n")], ['L-infobox-jsonCase'], ['infobox']),
-    'nosave': ([('dash', "                            next.view = $('#teView').val() === 'cards' ? 'cards' : 'table';\r\n", "")], ['L-editor-saved', 'L-editor-appliedUrl'], ['editor']),
+    'nosave': ([('dash', "                            if (tv === 'cards' || tv === 'table') { next.view = tv; } else { delete next.view; }\r\n", "")], ['L-editor-saved', 'L-editor-appliedUrl'], ['editor']),   # (cnest: re-anchored)
+    # (cnest sweep) an old tile keeps no view: the editor's The report's view, an edit that leaves it alone
+    'cn-legacy': ([('dash', "if (tv === 'cards' || tv === 'table') { next.view = tv; } else { delete next.view; }", "next.view = tv === 'cards' ? 'cards' : 'table';")], ['L-editor-legacyKept'], ['editor']),
+    'cn-legopt': ([('dash', "(t.view === 'cards' || t.view === 'table' ? '' : ' selected') + '>The report&#39;s view</option>' +", "' disabled>The report&#39;s view</option>' +")], ['L-editor-legacyShown', 'L-editor-viewShown'], ['editor']),
     'noshowtoggle': ([('dash', "                $('#teViewField').toggle(!isChart && $(this).val() !== 'header');   // (cdash)\r\n", "")], ['L-editor-headerHides'], ['editor']),
     'nosizetoggle': ([('dash', "            $ov.on('change', '#teView', function () { $('#teCardSize').toggle($(this).val() === 'cards'); });   // (cdash)\r\n", "")], ['L-editor-sizeShows'], ['editor']),
 }

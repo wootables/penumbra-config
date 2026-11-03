@@ -1536,7 +1536,7 @@
       if (modes.length !== 2) {   // (the control: live has no Ranges) the text column's panel alone
         key('Escape');
         pnl = await openFilter('V_NAME');
-        R.chk.bkText = !!pnl && !pnl.querySelector('.pnb-hp-mode') && rowsP().length > 20;
+        R.chk.bkText = !!pnl && !pnl.querySelector('[data-hp="mode-ranges"]') && rowsP().length > 20;   // (cfsplit 3: no Ranges; a list's Split by tab may sit there)
         key('Escape');
         return;
       }
@@ -1587,7 +1587,7 @@
       R.chk.bkClear = !!cl && searchVal() === '' && visRows() === 300;
       // a text column: no Ranges
       pnl = await openFilter('V_NAME');
-      R.chk.bkText = !!pnl && !pnl.querySelector('.pnb-hp-mode') && rowsP().length > 20;
+      R.chk.bkText = !!pnl && !pnl.querySelector('[data-hp="mode-ranges"]') && rowsP().length > 20;   // (cfsplit 3: no Ranges; a list's Split by tab may sit there)
       key('Escape');
       await sleep(100);
       // (round 19) a date column: by year or by month, the bounds ISO days, the rows within
@@ -3221,6 +3221,222 @@
     },
     // (2026-10-27, fltmenu) a cell's Filter list (Filter to, Exclude, Filter by value..., At least / At most, Click to filter),
     // a heading's kept flat; Highlight... gone; Copy's [column name] before This entire row, This nested table, Distinct column groups
+    // (2026-11-02, cfsplit 2) a list column's Split by ; in the cell menu's Filter list, under Click to filter while that is
+    // on. V_NAME ("Alpha Bravo" here) is a list its Group by splits at the space; V_STATUS is no list.
+    msplit: async function () {
+      function visTrs() { return Array.prototype.filter.call(document.querySelectorAll('#resultsTable tbody tr'), function (tr) { return !tr.classList.contains('search-hidden') && tr.style.display !== 'none' && !!tr.querySelector('td[data-column]'); }); }
+      function cellAt(name, i) { var t = fth(name), tr = visTrs()[i || 0]; return (t && tr) ? tr.querySelector('td[data-column="' + t.getAttribute('data-column') + '"]') : null; }
+      function colopt() { return prefs().colopt || {}; }
+      function list(name) {
+        closeMenu(); rclick(cellAt(name, 2)); sub('filterMenu');
+        var it = item('clickSplit'), lb = it ? it.querySelector('.pnb-hm-label') : null;
+        var o = { acts: subActs(), split: it ? { label: lb ? lb.textContent : '', checked: it.getAttribute('aria-checked'), dis: it.getAttribute('aria-disabled') === 'true', title: it.getAttribute('title') || '' } : null };
+        closeMenu(); return o;
+      }
+      SUBS.clickSplit = 'filterMenu';
+      // Click to filter off: no Split by (nothing it could do yet)
+      var l0 = list('V_NAME');
+      R.chk.hiddenOff = l0.acts.indexOf('clickFilter') >= 0 && l0.acts.indexOf('clickSplit') < 0;
+      // on: right under Click to filter, its separator named, unticked, its words naming Column options
+      window.Penumbra.setColOpt('V_NAME', 'filter', true); await sleep(100);
+      var l1 = list('V_NAME');
+      R.chk.underFilter = !!l1.split && l1.acts.indexOf('clickSplit') === l1.acts.indexOf('clickFilter') + 1 && l1.split.label === 'Split by space'
+        && l1.split.checked === 'false' && !l1.split.dis && /Column options/.test(l1.split.title);
+      // a column that is no list: Click to filter alone
+      window.Penumbra.setColOpt('V_STATUS', 'filter', true); await sleep(100);
+      var lp = list('V_STATUS');
+      R.chk.notPlain = lp.acts.indexOf('clickFilter') >= 0 && lp.acts.indexOf('clickSplit') < 0;
+      window.Penumbra.setColOpt('V_STATUS', 'filter', false);
+      // ticked: the column's pick (Column options' own), ticked in the list after, the toast says so, the cells split
+      await choose(cellAt('V_NAME', 2), 'clickSplit');
+      var t1 = lastToast(), c1 = colopt().V_NAME, l2 = list('V_NAME'), td1 = cellAt('V_NAME', 3);
+      R.chk.ticks = !!c1 && c1.split === 'dspace' && c1.filter === true && !!l2.split && l2.split.checked === 'true' && /Split by space is on for/.test(t1)
+        && !!td1 && td1.classList.contains('pnb-cflt-split');
+      // ...and off again: the pick gone, the whole cell again
+      await choose(cellAt('V_NAME', 2), 'clickSplit');
+      var t2 = lastToast(), c2 = colopt().V_NAME, l3 = list('V_NAME'), td2 = cellAt('V_NAME', 3);
+      R.chk.unticks = !(c2 && c2.split) && !!l3.split && l3.split.checked === 'false' && /Split by space is off for/.test(t2) && !!td2 && !td2.classList.contains('pnb-cflt-split');
+      // Click to filter off: gone from the list, the pick kept for when it is back
+      window.Penumbra.setColOpt('V_NAME', 'split', true);
+      window.Penumbra.setColOpt('V_NAME', 'filter', false); await sleep(100);
+      var l4 = list('V_NAME');
+      R.chk.goneWithFilter = l4.acts.indexOf('clickSplit') < 0 && !!colopt().V_NAME && colopt().V_NAME.split === 'dspace';
+      // the report's Click-to-Filter (every column): offered, ticked as the pick stands
+      document.body.classList.add('pnb-click-filter');
+      var l5 = null;
+      try { l5 = list('V_NAME'); } finally { document.body.classList.remove('pnb-click-filter'); }
+      R.chk.forced = !!l5 && !!l5.split && l5.split.checked === 'true' && !l5.split.dis;
+      window.Penumbra.setColOpt('V_NAME', 'split', false);
+      R.info = { l0: l0, l1: l1, lp: lp, l2: l2, l3: l3, l4: l4, l5: l5, t1: t1, t2: t2, c1: c1, c2: c2 };
+    },
+    // (2026-11-02, cfsplit 3) Filter by value's Split by ; tab on a list column (mk_harness: V_NAME a semicolon list here)
+    mfvsplit: async function () {
+      function panelEl() { return document.getElementById('pnbHeadPanel'); }
+      function visRows() { return Array.prototype.filter.call(document.querySelectorAll('#resultsTable tbody tr'), function (tr) { return !tr.classList.contains('search-hidden'); }).length; }
+      function rowsP() { var p = panelEl(); return p ? Array.prototype.slice.call(p.querySelectorAll('.pnb-hp-row')) : []; }
+      function labels() { return rowsP().map(function (r) { return r.querySelector('.pnb-hp-v').textContent; }); }
+      function counts() { return rowsP().map(function (r) { return +r.querySelector('.pnb-hp-n').textContent.replace(/,/g, ''); }); }
+      function ticked() { return rowsP().filter(function (r) { return r.querySelector('input').checked; }).map(function (r) { return r.querySelector('.pnb-hp-v').textContent; }); }
+      function tab(m) { var p = panelEl(); return p ? p.querySelector('[data-hp="mode-' + m + '"]') : null; }
+      function sel(m) { var t = tab(m); return !!t && t.getAttribute('aria-selected') === 'true'; }
+      function btn(h) { var p = panelEl(); return p ? p.querySelector('[data-hp="' + h + '"]') : null; }
+      function press(h) { var b = btn(h); if (b && !b.disabled) b.click(); }
+      function tick(names) {
+        rowsP().forEach(function (r) {
+          var cb = r.querySelector('input'), on = names.indexOf(r.querySelector('.pnb-hp-v').textContent) >= 0;
+          if (cb.checked !== on) { cb.checked = on; cb.dispatchEvent(new Event('change', { bubbles: true })); }
+        });
+      }
+      async function openFv(name) { closeMenu(); rclick(fth(name)); if (item('filter')) item('filter').click(); await sleep(300); return panelEl(); }
+      async function toTab(m) { var t = tab(m); if (t) t.click(); await sleep(100); }
+      function key(k) { window.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })); }
+      function parts(s) { return String(s).split(';').map(function (x) { return x.trim(); }).filter(Boolean); }
+      function listing(names, rows) { return (rows || window.__rowsFixture).filter(function (r) { var p = parts(r.V_NAME); return names.some(function (n) { return p.indexOf(n) >= 0; }); }).length; }
+      var FS = window.PenumbraTiles && window.PenumbraTiles.strip;
+      function cond(names) { return (FS && FS.itemCond) ? FS.itemCond('V_NAME', 'dsemi', names) : '(no strip lib)'; }
+      function box(t) { var s = document.getElementById('tableSearch'); s.value = t; if (typeof window.runTableSearch === 'function') window.runTableSearch(); else $(s).trigger('input'); }
+      // a list column: Values and Split by ; (no Ranges), the split tab open first (a long list of whole lists, nothing picked)
+      var p0 = await openFv('V_NAME');
+      var tabs0 = p0 ? Array.prototype.map.call(p0.querySelectorAll('.pnb-hp-mode'), function (b) { return b.textContent; }) : [];
+      R.chk.tabs = tabs0.join() === 'Values,Split by ;' && sel('items') && !!btn('find') && btn('find').style.display !== 'none';
+      // each value its lists hold, once, a-z, with the rows listing it; all of them ticked (no pick yet)
+      var want = {};
+      window.__rowsFixture.forEach(function (r) { var seen = {}; parts(r.V_NAME).forEach(function (x) { if (!seen[x]) { seen[x] = 1; want[x] = (want[x] || 0) + 1; } }); });
+      var wl = Object.keys(want).sort(function (a, b) { return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }); });
+      R.chk.itemsList = labels().join('|') === wl.join('|') && counts().join() === wl.map(function (k) { return want[k]; }).join() && ticked().length === wl.length;
+      // Apply two of them: the rows whose list holds either (the list-item condition a card's chip writes)
+      tick(['Kim, Min', 'Smith, Jo']); press('apply'); await sleep(500);
+      R.chk.itemsApply = searchVal() === cond(['Kim, Min', 'Smith, Jo']) && visRows() === listing(['Kim, Min', 'Smith, Jo']) && !panelEl();
+      // reopened: on the split tab, those two ticked, Clear filter offered
+      await openFv('V_NAME');
+      R.chk.itemsReopen = sel('items') && ticked().join('|') === 'Kim, Min|Smith, Jo' && !!btn('clear');
+      // the Values tab's pick replaces the lists' (one condition a column)
+      await toTab('values');
+      var wv = labels()[0];
+      tick([wv]); press('apply'); await sleep(500);
+      var s1 = searchVal();
+      R.chk.valuesReplace = /^V_NAME = \/\^\(\?:/.test(s1) && s1.indexOf('(?:^|;)') < 0 && visRows() === window.__rowsFixture.filter(function (r) { return r.V_NAME === wv; }).length;
+      // ...and the other way round: the dialog opens on Values (the box picks from it), the lists' pick replaces it
+      await openFv('V_NAME');
+      var opensValues = sel('values');
+      await toTab('items');
+      tick(['Lund, Ola']); press('apply'); await sleep(500);
+      var s2 = searchVal();
+      R.chk.itemsReplace = opensValues && s2 === cond(['Lund, Ola']) && visRows() === listing(['Lund, Ola']);
+      // the counts are under the rest of the filter: another column's condition narrows them
+      box('V_STATUS = //Open//'); await sleep(500);
+      await openFv('V_NAME');
+      var openRows = window.__rowsFixture.filter(function (r) { return r.V_STATUS === 'Open'; }), lw = labels(), cw = counts();
+      R.chk.countsOther = sel('items') && lw.length > 0 && lw.every(function (l, i) { return cw[i] === listing([l], openRows); }) && cw.some(function (c, i) { return c < want[lw[i]]; });
+      // Clear filter takes the lists' pick away; the other column's condition stays
+      tick(['Berg, Lena']); press('apply'); await sleep(500);
+      await openFv('V_NAME');
+      var cl = btn('clear'); if (cl) cl.click(); await sleep(500);
+      R.chk.itemsClear = !!cl && searchVal() === 'V_STATUS = //Open//';
+      // a column that is no list: no tabs
+      await openFv('V_STATUS');
+      R.chk.plainNoTab = !!panelEl() && !panelEl().querySelector('.pnb-hp-mode');
+      key('Escape'); await sleep(100);
+      box(''); await sleep(300);
+      R.info = { tabs: tabs0, want: wl, s1: s1, s2: s2, counts: cw, labels: lw };
+    },
+    // (cfsplit 3) ...a space list (the fixture's own V_NAME, "Alpha Bravo"): its Split by space tab is offered, Values opens first;
+    // a pick made there reopens on it (the pick alone: a space list never opens there first)
+    mfvspace: async function () {
+      closeMenu(); rclick(fth('V_NAME')); if (item('filter')) item('filter').click(); await sleep(300);
+      var p = document.getElementById('pnbHeadPanel'), tabs = p ? Array.prototype.map.call(p.querySelectorAll('.pnb-hp-mode'), function (b) { return b.textContent; }) : [];
+      var vs = p && p.querySelector('[data-hp="mode-values"]');
+      R.chk.spaceNotFirst = tabs.join() === 'Values,Split by space' && !!vs && vs.getAttribute('aria-selected') === 'true';
+      var it = p && p.querySelector('[data-hp="mode-items"]');
+      if (it) { it.click(); await sleep(100); }
+      var rws = p ? Array.prototype.slice.call(p.querySelectorAll('.pnb-hp-row')) : [], first = rws[0] ? rws[0].querySelector('.pnb-hp-v').textContent : '';
+      rws.forEach(function (r, i) { var cb = r.querySelector('input'); if (cb.checked !== (i === 0)) { cb.checked = (i === 0); cb.dispatchEvent(new Event('change', { bubbles: true })); } });
+      var ap = p && p.querySelector('[data-hp="apply"]');
+      if (it && ap && !ap.disabled) { ap.click(); await sleep(500); }
+      closeMenu(); rclick(fth('V_NAME')); if (item('filter')) item('filter').click(); await sleep(300);
+      var p2 = document.getElementById('pnbHeadPanel'), it2 = p2 && p2.querySelector('[data-hp="mode-items"]');
+      var tk = p2 ? Array.prototype.filter.call(p2.querySelectorAll('.pnb-hp-row'), function (r) { return r.querySelector('input').checked; }).map(function (r) { return r.querySelector('.pnb-hp-v').textContent; }) : [];
+      R.chk.spaceReopen = !!first && !!it2 && it2.getAttribute('aria-selected') === 'true' && tk.join('|') === first;
+      R.info = { tabs: tabs, first: first, ticked: tk, box: document.getElementById('tableSearch').value };
+    },
+    // (cfsplit 4; the user: "In card detailed mode and table mode, right clicking on a split item does not offer filter or copy
+    // of just that item") a right-click on one value of a cell listing several (V_NAME the mfvsplit ; lists): Filter to /
+    // Exclude it alone and its Copy first, the cell's own after; a second value adds; none on the separator, on a cell of one
+    // value, from the keyboard, on a plain column
+    mitem: async function () {
+      SUBS.itemFilter = 'filterMenu'; SUBS.itemExclude = 'filterMenu'; SUBS.itemCopy = 'copyMenu';
+      function visTrs() { return Array.prototype.filter.call(document.querySelectorAll('#resultsTable tbody tr'), function (tr) { return !tr.classList.contains('search-hidden') && tr.style.display !== 'none' && !!tr.querySelector('td[data-column]'); }); }
+      function tdOf(tr, name) { var t = fth(name); return (t && tr) ? tr.querySelector('td[data-column="' + t.getAttribute('data-column') + '"]') : null; }
+      function parts(s) { return String(s).split(';').map(function (x) { return x.trim(); }).filter(Boolean); }
+      function distinct(a) { return a.filter(function (x, i) { return a.indexOf(x) === i; }); }
+      function listing(names, rows) { return (rows || window.__rowsFixture).filter(function (r) { var p = parts(r.V_NAME); return names.some(function (n) { return p.indexOf(n) >= 0; }); }).length; }
+      var FS = window.PenumbraTiles && window.PenumbraTiles.strip;
+      function cond(names, ex) { return (FS && FS.itemCond) ? FS.itemCond('V_NAME', 'dsemi', names, !!ex) : '(no strip lib)'; }
+      function box(t) { var s = document.getElementById('tableSearch'); s.value = t; if (typeof window.runTableSearch === 'function') window.runTableSearch(); else $(s).trigger('input'); }
+      // the middle of [s, e) of a cell's text (its first box)
+      function mid(td, s, e) {
+        var w = document.createTreeWalker(td, NodeFilter.SHOW_TEXT), n, at = 0, r = document.createRange(), on = false, done = false;
+        while (!done && (n = w.nextNode())) { var L = n.nodeValue.length; if (!on && s <= at + L) { r.setStart(n, s - at); on = true; } if (on && e <= at + L) { r.setEnd(n, e - at); done = true; } at += L; }
+        var b = done ? r.getClientRects()[0] : null;
+        return b ? { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) } : null;
+      }
+      function valueAt(td, v) { var i = td ? td.textContent.indexOf(v) : -1; return i < 0 ? null : mid(td, i, i + v.length); }
+      function rclickAt(td, pt, kbd) { closeMenu(); return !td.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: kbd ? 0 : 2, clientX: pt ? pt.x : 0, clientY: pt ? pt.y : 0 })); }
+      async function lists(td, pt, kbd) {
+        var o = { f: [], fl: [], c: [], cl: [] };
+        rclickAt(td, pt, kbd); await sleep(60);
+        if (item('filterMenu') && sub('filterMenu')) { await sleep(60); o.f = subActs(); o.fl = subLabels(); }
+        rclickAt(td, pt, kbd); await sleep(60);
+        if (item('copyMenu') && sub('copyMenu')) { await sleep(60); o.c = subActs(); o.cl = subLabels(); }
+        closeMenu(); return o;
+      }
+      async function run(td, pt, act) { rclickAt(td, pt); await sleep(60); var it = reach(act); if (it) { it.click(); await sleep(500); } return !!it; }
+      // a cell listing three names, its second one
+      var tr3 = visTrs().filter(function (tr) { var c = tdOf(tr, 'V_NAME'); return c && distinct(parts(c.textContent)).length === 3; })[0];
+      var c3 = tdOf(tr3, 'V_NAME'), p3 = c3 ? distinct(parts(c3.textContent)) : [], v = p3[1], pt = c3 ? valueAt(c3, v) : null;
+      var L = c3 ? await lists(c3, pt) : { f: [], fl: [], c: [], cl: [] };
+      R.info.lists = L; R.info.v = v; R.info.pt = pt;
+      R.chk.itemMenu = !!v && L.f.slice(0, 4).join() === 'itemFilter,itemExclude,cellFilter,cellExclude' && L.fl[0] === 'Filter to "' + v + '"' && L.fl[1] === 'Exclude "' + v + '"';
+      R.chk.itemCopyFirst = L.c.slice(0, 2).join() === 'itemCopy,cellCopy' && L.cl[0] === v;
+      // Filter to it: the rows whose list holds it (the list-item condition a chip writes)
+      if (c3) await run(c3, pt, 'itemFilter');
+      var s1 = searchVal();
+      R.chk.itemFilterRuns = !!v && s1 === cond([v]) && visTrs().length === listing([v]);
+      // a second value, in another cell: added to the condition (the rows listing either)
+      var tr4 = visTrs().filter(function (tr) { var c = tdOf(tr, 'V_NAME'), d = c ? distinct(parts(c.textContent)) : []; return d.length >= 2 && d.some(function (x) { return x !== v; }); })[0];
+      var c4 = tdOf(tr4, 'V_NAME'), w = c4 ? distinct(parts(c4.textContent)).filter(function (x) { return x !== v; })[0] : null;
+      if (c4 && w) await run(c4, valueAt(c4, w), 'itemFilter');
+      var s2 = searchVal();
+      R.chk.itemAdds = !!w && s2 === cond([v, w]) && visTrs().length === listing([v, w]);
+      R.info.adds = { s1: s1, s2: s2, w: w, vis: visTrs().length, want: w ? listing([v, w]) : null };
+      // Exclude it: the rows whose list does not hold it
+      box(''); await sleep(400);
+      c3 = tdOf(tr3, 'V_NAME'); pt = valueAt(c3, v);
+      if (c3) await run(c3, pt, 'itemExclude');
+      var s3 = searchVal(), vx = visTrs();
+      R.chk.itemExcludeRuns = !!v && s3 === cond([v], true) && vx.length > 0 && vx.every(function (tr) { return parts(tdOf(tr, 'V_NAME').textContent).indexOf(v) < 0; });
+      R.info.ex = { s3: s3, vis: vx.length };
+      box(''); await sleep(400);
+      // Copy it: the value alone
+      c3 = tdOf(tr3, 'V_NAME'); pt = valueAt(c3, v);
+      var nclip = window.__clip.length;
+      if (c3) await run(c3, pt, 'itemCopy');
+      await sleep(100);
+      R.chk.itemCopyRuns = !!v && window.__clip.length === nclip + 1 && window.__clip[window.__clip.length - 1] === v;
+      R.info.clip = window.__clip.slice(-2);
+      // none: on the separator between two values; on a cell of one value (written twice); from the keyboard; a plain column
+      c3 = tdOf(tr3, 'V_NAME');
+      var si = c3 ? c3.textContent.indexOf(';') : -1, Ls = si >= 0 ? await lists(c3, mid(c3, si, si + 1)) : { f: ['x'], c: [] };
+      R.chk.sepNone = si >= 0 && Ls.f.indexOf('itemFilter') < 0 && Ls.f.indexOf('cellFilter') === 0 && Ls.c.indexOf('itemCopy') < 0;
+      var tr1 = visTrs().filter(function (tr) { var c = tdOf(tr, 'V_NAME'); return c && parts(c.textContent).length === 2 && distinct(parts(c.textContent)).length === 1; })[0];
+      var c1 = tdOf(tr1, 'V_NAME'), L1 = c1 ? await lists(c1, valueAt(c1, parts(c1.textContent)[0])) : { f: ['x'], c: [] };
+      R.chk.oneNone = !!c1 && L1.f.indexOf('itemFilter') < 0 && L1.f.indexOf('cellFilter') === 0 && L1.c.indexOf('itemCopy') < 0;
+      var Lk = c3 ? await lists(c3, valueAt(c3, v), true) : { f: ['x'], c: [] };
+      R.chk.kbdNone = !!c3 && Lk.f.indexOf('itemFilter') < 0 && Lk.f.indexOf('cellFilter') === 0 && Lk.c.indexOf('itemCopy') < 0;
+      var cst = tdOf(tr3, 'V_STATUS'), Lp = cst ? await lists(cst, valueAt(cst, cst.textContent.trim())) : { f: ['x'], c: [] };
+      R.chk.plainNone = !!cst && Lp.f.indexOf('itemFilter') < 0 && Lp.f.indexOf('cellFilter') === 0 && Lp.c.indexOf('itemCopy') < 0;
+      R.info.none = { sep: Ls, one: L1, kbd: Lk, plain: Lp };
+    },
     mfltm: async function () {
       function lastClip() { return window.__clip.length ? window.__clip[window.__clip.length - 1] : null; }
       function lab(el) { var x = el && el.querySelector('.pnb-hm-label'); return x ? x.textContent : ''; }

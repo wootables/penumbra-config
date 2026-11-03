@@ -676,7 +676,7 @@ MUTANTS = {
 # (2026-10-27, fltmenu) phlcol reshaped: Highlight...'s old row mutants have nothing to turn red; the rows' and the keywords'
 MUTANTS = {k: v for k, v in MUTANTS.items() if 'phlcol' not in v[2]}
 MUTANTS['pf-rowbounds'] = ([('pal', "'cellAtLeast', 'cellAtMost', 'cellCopy', 'copyRow', 'copyNestedTable', 'addNote'].indexOf", "'cellCopy', 'copyRow', 'copyNestedTable', 'addNote'].indexOf")], ['L-prow-rowBounds'], ['prow'])
-MUTANTS['pf-hlkw'] = ([('pal', "kw: 'format summary shading links filter highlight colour color conditional rule cells rows header', pick: 'column' },", "kw: 'format summary shading links', pick: 'column' },")], ['L-phlcol-hlFindsOptions'], ['phlcol'])
+MUTANTS['pf-hlkw'] = ([('pal', "kw: 'format summary shading links filter split delimiter highlight colour color conditional rule cells rows header', pick: 'column' },", "kw: 'format summary shading links', pick: 'column' },")], ['L-phlcol-hlFindsOptions', 'L-phlcol-splitFindsOptions'], ['phlcol'])   # (re-aimed 2026-11-02, cfsplit)
 MUTANTS['pf-hlrow'] = ([('pal', "        { id: 'col:freeze', label: 'Freeze up to this column...',", "        { id: 'col:highlight', label: 'Highlight...', act: 'highlight', icon: { pal: 'highlight' }, kw: 'highlight', pick: 'column' },\n        { id: 'col:freeze', label: 'Freeze up to this column...',")], ['L-phlcol-hlGone'], ['phlcol'])
 NEW = NEW | {'L-prow-rowBounds', 'L-phlcol-hlGone', 'L-phlcol-hlFindsOptions', 'S-copyRowHelp'}   # (2026-10-27, fltmenu; S-copyRowHelp: the rows' help line names the new ones)
 NEW = NEW - {'L-prow-rowBounds', 'L-phlcol-hlGone', 'L-phlcol-hlFindsOptions', 'S-copyRowHelp'}   # (fltmenu is LIVE since 5eae534, 2026-10-27)
@@ -710,6 +710,11 @@ CHK['prow'] = CHK['prow'] + ['rowSel', 'rowSelRuns']
 NEW_SEL = {'L-prow-rowSel', 'L-prow-rowSelRuns', 'S-selRowHelp'}
 NEW = NEW | NEW_SEL
 NEW = NEW - NEW_SEL   # (selflt is LIVE since e3ef480, 2026-10-30: old checks now)
+# (2026-11-02, cfsplit) Column options' Filter has Split by ; on a list column: "split" finds Column options...
+CHK['phlcol'] = CHK['phlcol'] + ['splitFindsOptions']
+NEW = NEW | {'L-phlcol-splitFindsOptions'}
+NEW = NEW - {'L-phlcol-splitFindsOptions'}   # (cfsplit is LIVE since 37ecd5d, 2026-11-02)
+MUTANTS['pf-splitkw'] = ([('pal', "kw: 'format summary shading links filter split delimiter highlight", "kw: 'format summary shading links filter highlight")], ['L-phlcol-splitFindsOptions'], ['phlcol'])
 MUTANTS['sl-palrows'] = ([('pal', "            if (['selFilter', 'selExclude', 'selCopy'].indexOf(it.act) >= 0 && !it.disabled) {", "            if (false) {")], ['L-prow-rowSel', 'L-prow-rowSelRuns'], ['prow'])
 MUTANTS['sl-palsub'] = ([('pal', "sub: 'the ' + nSel + ' selected cells',", "sub: where,")], ['L-prow-rowSel'], ['prow'])
 

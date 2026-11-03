@@ -1,0 +1,23 @@
+# =============================================================================
+# CUSTOM CODE PANEL ROW MENU SUITE (2026-11-02, snipmenu)
+#
+# User: "shortcut helpers left+right click menu: insert at beginning, append to
+# end, insert at cursor (if exists inside editor), anything else?, how to use >
+# [function hover help text]".
+#
+# Headless Edge runs the REAL main.js (ready closure unwrapped), the REAL jQuery
+# UI / CodeMirror / main.css / penumbra_colmenu.css and the REAL lazy
+# js/penumbra_snippet_help.js through main.js's own loader; the console pops out
+# with the REAL "Open in Window" button. Harness + staging come from the fnpop
+# suite. See driver.js for every assert (N1..N15).
+#
+#   run.ps1                        the live app
+#   run.ps1 -App <dir>             a stage dir holding js\ and css\ (any file it lacks comes from live)
+#   run.ps1 -Control               the pre-snipmenu files (-App <orig dir>): RED
+#   run.ps1 -Mutant <name>         ONE edit put back on the fix build
+#   run.ps1 -Mutants               every mutant against the asserts it MUST turn red
+#   -Keep keeps the staging dirs.  Prints RESULT: GREEN/RED (never exits).
+# UNC NOTE: -File against a UNC path is GPO-blocked on this box. Run the body:
+#   & ([scriptblock]::Create([IO.File]::ReadAllText('<dir>\run.ps1'))) -Mutants
+# Stages into %TEMP%; writes nothing to the webroot.
+# =============================================================================

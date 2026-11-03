@@ -95,6 +95,7 @@ $hooks = @(
   '  loadChartModule: penumbraLoadChartModule, loadScript: loadScript,',
   '  renderSnippet: renderReportSnippet, updatePanel: updateFilterPanelStatus, drillInPlace: _drillChartInPlace,',
   '  rowsByPath: _filterRowsByPath, panelExclusions: _applyChartPanelExclusions,',
+  '  setMaster: function (r) { var was = masterRowData; masterRowData = r; return was; },',   # (gbar) the Timeline label counts the rows
   '  setSnippet: function (t) { snippetEditor.setValue(t); } };',
   '} catch (e) { window.__CI_ERR = String(e); }'
 ) -join ' '

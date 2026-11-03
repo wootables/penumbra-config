@@ -530,7 +530,7 @@ ok(clean($hLkU) && strpos($hLkU, 'pnb-adm-status bad') !== false && strpos($hLkU
    'a cached down with no probe time still turns it red, marked cached', substr($hLkU, 0, 400));
 ok(clean($hBoth) && strpos($hBoth, 'pnb-adm-status bad') !== false && strpos($hBoth, '>Degraded: scheduler offline, database infoed down (probed 2m ago)</a>') !== false,
    'a live problem and a cached one are both named, live first');
-ok(strpos($hLk, 'under last_known') !== false && strpos($hLk, 'answers 503 only on a live probe') !== false,
+ok(strpos($hLk, 'under <code>last_known</code>') !== false && strpos($hLk, 'answers 503 only on a live probe') !== false,
    'the (i) says why the JSON behind the link can still answer 200');
 
 section('2. Scheduler card and the tiles');
@@ -928,14 +928,14 @@ ok($logsLib !== false && strpos($logsLib, "\$out['jobs'] = array(") !== false &&
 section('5d. The tooltips say what the page does now (2026-10-01)');
 // The windows, the card order and auto-refresh-off each left a tip behind that
 // described the old page. Every one is pinned here, with the old words absent.
-ok(strpos($page, "while a card\\'s window picker is open, and while this tab is in the background") !== false && strpos($page, 'once an interval is picked; it starts off') !== false,
+ok(strpos($page, 'have a window picker or the export menu open') !== false && strpos($page, 'it starts off until you pick an interval') !== false,
    'the pause button names the picker hold and that auto-refresh starts off');
 ok(strpos($H['top'], 'Always the last 24 hours, whatever window the Failures card shows.') !== false, 'the failures chip says it keeps 24 hours whatever the card shows');
 ok(strpos($H['top'], 'always the last 7 days, whatever window the Outage history card shows') !== false, 'the outages chip says it keeps 7 days whatever the card shows');
-ok(strpos($H['r4'], 'The recurring-window pills read the whole record instead') !== false, 'the outage (i) says the pills read the whole record, not the window');
+ok(strpos($H['r4'], 'Known-window pills read the whole record') !== false, 'the outage (i) says the pills read the whole record, not the window');
 ok(strpos($H['r4'], "across the whole record and not only this card's window") !== false && strpos($H['r4'], 'Each time it falls inside the window you are viewing, it is still listed below.') !== false
    && strpos($page, 'Still listed below every time it happens') === false, 'a recurring-window pill no longer promises every occurrence is listed below');
-ok(strpos($H['r6'], 'Auto-refresh is off unless you pick an interval in the header') !== false && strpos($H['r6'], '<b>r</b> re-reads the log') !== false
+ok(strpos($H['r6'], 'Auto-refresh is off until you pick an interval in the header') !== false && strpos($H['r6'], '<b>r</b> re-read &middot;') !== false
    && strpos($page, '<b>r</b> refreshes') === false, 'the Logs (i): auto-refresh is opt-in, and r re-reads the log (not the page)');
 ok(strpos($H['r6'], 'title="Single-key shortcuts: r re-reads the log, 1 to ') !== false && strpos($page, 'Single-key shortcuts: r refreshes') === false, 'the keys switch says the same');
 ok(strpos($H['r6'], "(auto ? ' - refreshes with the page' : ' - click the tab to re-read')") !== false && strpos($H['r6'], "var auto = !!(rs && rs.value !== '0');") !== false,
@@ -1084,7 +1084,7 @@ ok(preg_match('/<div class="pnb-out-kw"[^>]*>.*?<div class="pnb-out-pat">\s*<spa
 ok(substr_count($h, '<div class="pnb-rows-more">') === 1 && preg_match('/<div class="pnb-rows pnb-rows-out">\s*(<div class="pnb-row[^>]*>.*?<\/div>\s*){3}<div class="pnb-rows-more">/s', $h) === 1, 'three episodes listed, the other two behind the fold', $h);
 ok(preg_match('/<div class="pnb-more-line pnb-adm-muted" data-key="out"><button type="button" class="pnb-link-btn pnb-more-btn" aria-expanded="false"\s+data-more="show 2 more" data-less="show fewer"\s+data-some="3 of 5 listed" data-all="5 of 5 listed">show 2 more<\/button> &middot; <span class="pnb-more-n">3 of 5 listed<\/span>, near misses included &middot; the full record is the <strong>Watchdog<\/strong> log tab<\/div>/', $h) === 1, 'the count line: show 2 more, 3 of 5 listed, where the rest is', $h);
 ok(strpos($h, 'older in this window not listed') === false, 'the old "older not listed" note is gone');
-ok(strpos($h, 'the strip, the availability line and the list all follow it') !== false && strpos($h, 'the tiles and the list') === false, 'the outage (i) names the availability line, not the tiles');
+ok(strpos($h, 'drives the strip, the availability line and the list') !== false && strpos($h, 'the tiles and the list') === false, 'the outage (i) names the availability line, not the tiles');
 ok(strpos($hD, 'pnb-rows-more') === false && strpos($hD, '<span class="pnb-more-n">1 of 1 listed</span>') !== false && strpos($hD, 'pnb-more-btn') === false, 'one episode in the window: no fold, "1 of 1 listed"', $hD);
 // the maintenance runs: three, then show more
 ok(strpos($H['r1'], 'pnb-rows-more') === false && strpos($H['r1'], 'pnb-more-line') === false, 'three runs: no fold');
